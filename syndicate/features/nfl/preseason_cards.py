@@ -23,6 +23,11 @@ from syndicate.features.nfl.preseason_depth import NONSTARTER_PARTICIPATION_SHAR
 from syndicate.features.nfl.preseason_depth import PRESEASON_WEEK_LABELS
 from syndicate.features.nfl.live_game_state import SEASONTYPE_PRESEASON
 from syndicate.features.nfl.live_game_state import attach_nfl_live_game_state
+from syndicate.features.nfl.cards import _nfl_card_block
+from syndicate.features.nfl.cards import _nfl_matchup_context_items
+from syndicate.features.shared.football_cards import football_market_tiles
+from syndicate.features.shared.football_cards import football_shared_predictions
+from syndicate.features.shared.football_cards import format_kickoff_label
 from syndicate.features.nfl.live_game_state import nfl_game_state_index
 from syndicate.features.nfl.preseason_depth import likely_snap_leaders
 from syndicate.features.nfl.preseason_depth import likely_starters_sitting
@@ -306,9 +311,47 @@ def _game_from_preseason_projection(projection: Any, season: int, week: int, *, 
             _depth_chart_panel(home_name, season, week),
         ]
     )
+    # THE MARKET LINE IN HOME-MARGIN UNITS. `betting["home_spread"]` above is
+    # the BOOK's own home spread (negative = home favoured), which is what the
+    # shared markets block publishes; every football CARD helper takes a home
+    # margin, positive = home favoured. One negation, named.
+    preseason_market_margin = None if betting.get("home_spread") is None else -float(betting["home_spread"])
+    preseason_market_total = betting.get("total")
+    preseason_scoreboard = {
+        "home_points": round(projection.home_score_mean, 1),
+        "away_points": round(projection.away_score_mean, 1),
+        "total_points": round(projection.total_mean, 1),
+        "spread_label": spread_label,
+        "spread_label_short": (
+            "Pick'em" if margin == 0 else f"{home_abbr if margin > 0 else away_abbr} by {abs(margin):.1f}"
+        ),
+        "win_probability": win_probability,
+        "home_win_probability": projection.home_win_rate,
+        "source_label": "SmartSim 2.0 (preseason)",
+        # FILLED AFTER THE ESPN JOIN, not here. The PRESEASON schedule file's
+        # `gameday` is a UTC date while the regular-season file's is US-local
+        # (`nfl/sources.py` measures both), so `_nfl_schedule_kickoffs` -- which
+        # reads the regular-season file and anchors Eastern -- would be wrong
+        # for these rows. `build_preseason_cards_page_context` fills them from
+        # ESPN's own `startTime`, which needs no convention at all.
+        "kickoff": "",
+        "kickoff_label": "",
+        "venue": "Venue unavailable",
+        "market_margin": preseason_market_margin,
+        "market_total": preseason_market_total,
+        "smartsim2_available": True,
+        "smartsim2_margin": projection.margin_mean,
+        "smartsim2_margin_stdev": projection.margin_stdev,
+        "smartsim2_total_points": projection.total_mean,
+        "smartsim2_total_stdev": projection.total_stdev,
+    }
     return {
         "gamePk": game_pk,
-        "card_variant": "shared_default",
+        # The preseason board is the THIRD NFL card builder and it moves with
+        # the other two. A board whose shape depends on the phase is the same
+        # defect as one whose shape depends on the artifact: NFL would have had
+        # a 181px compact card in September and a 643-1085px one in August.
+        "card_variant": "nfl_main",
         "away": {
             "abbr": away_abbr,
             "name": away_name,
@@ -351,6 +394,56 @@ def _game_from_preseason_projection(projection: Any, season: int, week: int, *, 
             }
         ],
         "shared_top_play_rows": [],
+        # See `nfl/cards.py:_game_from_smartsim_projection` for the measurement
+        # behind all three of these. `#557`'s lesson applies here too:
+        # `predictions` is TOP LEVEL, beside `nfl_card` and never inside it.
+        "predictions": football_shared_predictions(
+            projection,
+            market_margin=preseason_market_margin,
+            market_total=preseason_market_total,
+        ),
+        "market_tiles": football_market_tiles(
+            home_team=home_abbr,
+            away_team=away_abbr,
+            market_margin=preseason_market_margin,
+            market_total=preseason_market_total,
+            market_book_count=0,
+            market_source="preseason odds" if market else None,
+            model_margin=projection.margin_mean,
+            model_total=projection.total_mean,
+            home_win_rate=projection.home_win_rate,
+        ),
+        "nfl_card": _nfl_card_block(
+            season=season,
+            week=week,
+            away_name=away_name,
+            home_name=home_name,
+            away_abbr=away_abbr,
+            home_abbr=home_abbr,
+            away_branding=away_branding,
+            home_branding=home_branding,
+            scoreboard=preseason_scoreboard,
+            matchup_context_items=_nfl_matchup_context_items(
+                away_name=away_name,
+                home_name=home_name,
+                market_margin=preseason_market_margin,
+                market_total=preseason_market_total,
+                model_margin=projection.margin_mean,
+                model_total=projection.total_mean,
+            ),
+            summary={
+                "coverage_score": None,
+                "coverage_tier": "preseason_shrunk",
+                "publication_status": "publishable",
+                "publication_priority": None,
+                "publication_ready": True,
+                # The disclosure the whole preseason board is built around --
+                # `_game_from_preseason_projection`'s own summary says to treat
+                # it with much lower confidence than a regular-season one.
+                "ready_label": f"Preseason -- shrunk {share:.0%} toward league-neutral",
+                "tier_badges": [{"label": "Preseason", "active": True}],
+            },
+        ),
         "panels": panels,
     }
 
@@ -386,6 +479,18 @@ def build_preseason_cards_page_context(selected_week: int, *, season: int | None
         games,
         nfl_game_state_index(season, resolved_week, seasontype=SEASONTYPE_PRESEASON),
     )
+    # KICKOFF, from the join that just ran. The preseason schedule file's dates
+    # are UTC and the regular-season reader's Eastern anchor would be wrong for
+    # them, so ESPN's `startTime` -- already fetched for the state join -- is
+    # the only source used here. A card ESPN did not match keeps an empty
+    # kickoff and the compact strip falls back to its status, which is honest.
+    for game in games:
+        card = game.get("nfl_card")
+        board = card.get("scoreboard") if isinstance(card, dict) else None
+        start_time = game.get("startTime")
+        if isinstance(board, dict) and start_time and not board.get("kickoff"):
+            board["kickoff"] = start_time
+            board["kickoff_label"] = format_kickoff_label(start_time)
 
     prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
     scoreboard_items = [

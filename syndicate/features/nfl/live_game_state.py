@@ -314,11 +314,43 @@ def attach_nfl_live_game_state(
             # `game[side]["score"]` before it reaches `live_state`, and the
             # card template renders from the side containers.
             _stamp_side_scores(game, state)
+            _stamp_started_status(game, live_state)
         elif live_state["in_progress"]:
             live += 1
             _stamp_side_scores(game, state)
+            _stamp_started_status(game, live_state)
 
     return {"matched": matched, "live": live, "final": final, "games": len(games), "index": len(index)}
+
+
+def _stamp_started_status(game: dict[str, Any], live_state: Mapping[str, Any]) -> None:
+    """Overwrite the card's `status` with ESPN's, for a game that has STARTED.
+
+    THE PARITY GAP THIS CLOSES. `attach_ncaaf_live_game_state` has done this
+    since 2026-08-29 and this function did not, so the two football boards
+    disagreed about what a live game's own header says. Measured on the served
+    payloads 2026-09-07:
+
+        NCAAF   status = "Final" x50, "14:40 - 3rd" x1
+        NFL     status = "Week 1" x16
+
+    NFL's slate was genuinely pregame that day, so this is a LATENT defect
+    rather than a visible one -- and that is exactly why it needed finding
+    before kickoff rather than during it. `_shared_game_state` copies `status`
+    straight into `shared_game_state.status`, which is what the compact strip's
+    live head and the live lens's eyebrow both fall back to. Left alone, a live
+    NFL card would have rendered its eyebrow as "Week 1" while the clock ran.
+
+    STARTED GAMES ONLY. A pregame card keeps the week label it has always had:
+    ESPN's pregame `shortDetail` is a date-and-time string ("9/9 - 8:20 PM
+    EDT") and the strip already has a properly formatted kickoff line of its
+    own to show there.
+
+    An empty ESPN status leaves the card untouched rather than blanking it.
+    """
+    status = str(live_state.get("status") or "").strip()
+    if status:
+        game["status"] = status
 
 
 def _stamp_side_scores(game: dict[str, Any], state: Mapping[str, Any]) -> None:

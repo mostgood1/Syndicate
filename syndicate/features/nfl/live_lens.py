@@ -230,11 +230,77 @@ def _score_line(game: dict[str, Any]) -> str | None:
     return f"{away_abbr} {int(round(away_score))}-{int(round(home_score))} {home_abbr}"
 
 
-def _status_eyebrow(game: dict[str, Any]) -> str:
+def _game_state_label(game: dict[str, Any]) -> tuple[str, str]:
+    """(eyebrow, phase) for one NFL live-lens row.
+
+    THE PARITY GAP THIS CLOSES. NCAAF's lens leads with
+    `Games 51 | Live 1 | Final 50 | Pregame 0` and gives each row an eyebrow
+    that says what that game is doing; NFL's header counted
+    `Games | Live matches | Season | Phase | Week` and its eyebrow was
+    `game.status`, which on a pregame board is the constant "Week 1" on every
+    row. A constant is not a status.
+
+    READS `live_state` FIRST, `shared_game_state` SECOND, and the order is
+    load-bearing here in a way it is not on the cards board.
+    `apply_game_board_contract` derives `shared_game_state` when the CARDS
+    context is built; `_apply_live_state_to_game` then overlays fresh ESPN
+    state onto the same dicts afterwards and does NOT re-derive the shared
+    block. So on exactly the rows that just went live, `shared_game_state` is
+    the stale one. Reading it first would have made this function most wrong
+    precisely when it matters most.
+
+    NO FABRICATED PHASE. A row with neither block reads "pregame", which is
+    what an NFL card with no ESPN match genuinely is on this board -- but it
+    reports the kickoff it has rather than inventing a clock.
+    """
+    live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+    shared = game.get("shared_game_state") if isinstance(game.get("shared_game_state"), dict) else {}
+    is_live = bool(live_state.get("in_progress")) or bool(shared.get("live")) or bool(game.get("shared_is_live"))
+    is_final = bool(live_state.get("final")) or bool(shared.get("final"))
+
+    if is_live:
+        period = live_state.get("period") if live_state.get("period") is not None else shared.get("period")
+        clock = _safe_text(live_state.get("clock") or shared.get("clock"), "")
+        parts = [
+            f"Q{int(period)}" if isinstance(period, (int, float)) and period else None,
+            clock if clock and clock != "-" else None,
+        ]
+        label = " · ".join(part for part in parts if part)
+        if not label:
+            label = _safe_text(live_state.get("status") or shared.get("status"), "Live")
+        return label, "live"
+    if is_final:
+        return "Final", "final"
+
+    nfl_card = game.get("nfl_card") if isinstance(game.get("nfl_card"), dict) else {}
+    scoreboard = nfl_card.get("scoreboard") if isinstance(nfl_card.get("scoreboard"), dict) else {}
+    kickoff = _safe_text(scoreboard.get("kickoff_label"), "")
+    if kickoff and kickoff != "Kickoff unavailable":
+        return kickoff, "pregame"
     status = game.get("status")
     if isinstance(status, dict):
-        return _safe_text(status.get("status"), "Live")
-    return _safe_text(status, "Weekly board")
+        return _safe_text(status.get("status"), "Pregame"), "pregame"
+    return _safe_text(status, "Pregame"), "pregame"
+
+
+def _phase_counts(games: list[dict[str, Any]]) -> dict[str, int]:
+    """Live/final/pregame over the whole slate.
+
+    Reported ALONGSIDE `matched`, never instead of it: "the ESPN join found
+    nothing" and "the join worked and every game is pregame" produce an
+    identical board and are different defects. NCAAF's own live-state attach
+    states the same rule for the same reason.
+    """
+    counts = {"live": 0, "final": 0, "pregame": 0}
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        counts[_game_state_label(game)[1]] += 1
+    return counts
+
+
+def _status_eyebrow(game: dict[str, Any]) -> str:
+    return _game_state_label(game)[0]
 
 
 def _meta_text(game: dict[str, Any]) -> str:
@@ -341,6 +407,7 @@ def build_live_lens_snapshot(week: int, season: int) -> dict[str, Any]:
         merged_games.append(game)
 
     rank_cards = [_rank_card(game) for game in merged_games]
+    phases = _phase_counts(merged_games)
     source_path = str(cards_context.get("source_path") or live_lens_snapshot_path())
     phase_label = "Preseason" if is_preseason else "Regular season"
     week_display = f"Preseason Week {resolved_week}" if is_preseason else f"Week {resolved_week}"
@@ -353,6 +420,7 @@ def build_live_lens_snapshot(week: int, season: int) -> dict[str, Any]:
             f"Phase: {phase_label}",
             f"Games surfaced: {len(merged_games)}",
             f"Games with a live-state match: {matched_count}",
+            f"Slate state: {phases['live']} live, {phases['final']} final, {phases['pregame']} pregame",
         ],
     }
     empty_state = None
@@ -383,7 +451,16 @@ def build_live_lens_snapshot(week: int, season: int) -> dict[str, Any]:
         rank_cards=rank_cards,
         using_sample_data=False,
         header_stats=[
+            # Games / Live / Final / Pregame FIRST, which is what you open a
+            # live board to see, and is what MLB's and NCAAF's lenses lead
+            # with. `Live matches` is kept and moved after them: it counts ESPN
+            # JOIN hits, not live games, and the two are different questions --
+            # dropping it would remove the only signal that separates a dead
+            # join from a quiet slate.
             {"label": "Games", "value": str(len(merged_games))},
+            {"label": "Live", "value": str(phases["live"])},
+            {"label": "Final", "value": str(phases["final"])},
+            {"label": "Pregame", "value": str(phases["pregame"])},
             {"label": "Live matches", "value": str(matched_count)},
             {"label": "Season", "value": str(resolved_season)},
             {"label": "Phase", "value": phase_label},

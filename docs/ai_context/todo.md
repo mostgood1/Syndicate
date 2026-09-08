@@ -1,5 +1,60 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#646` — **NFL SERVED THE GENERIC BOARD PARTIALS WHILE NCAAF SERVED THE FOOTBALL ONES — one string, three surfaces** — lane `nfl-ncaaf-ui-parity`, 2026-09-07 — **FIXED AND LANDED; DEPLOY + SERVED-PAYLOAD READING OWED**
+
+`shared/_game_card.html` and `shared/_scoreboard_strip.html` branch on
+`card_variant` and NOTHING else. NFL emitted `shared_default` from all three of
+its card builders, so both dispatchers fell through to their GENERIC branch —
+on a payload that already carried crests, a real book spread (`-3.5`), a real
+total (`44.5`) and a full projection.
+
+Measured on production (web `81213a32`) 2026-09-07, the two served pages side
+by side in a browser:
+
+    surface                        NCAAF                    NFL
+    card_variant                   ncaaf_main x51           shared_default x16
+    compact card height            181px, UNIFORM x51       643-1085px, SIXTEEN
+                                                            distinct heights on
+                                                            16 cards
+    crest <img> in the strip       102                      0
+    shared_predictions home_cover  51/51                    0/16
+    shared_predictions total_over  51/51                    0/16
+    kickoff / venue on the card    51/51                    no such key
+    ESPN status when started       "Final" / "14:40 - 3rd"  never written
+    live-lens row eyebrow          "Q2 · 7:31" / "Final"    "Week 1" x16
+
+A uniform height is direct evidence nothing wraps; sixteen distinct heights on
+sixteen cards is direct evidence each card was sized by a different-length
+paragraph of prose.
+
+**NFL's live/final read 0 because 2026 week 1 had not kicked off**, so the
+missing ESPN-status stamp was LATENT rather than visible — a live NFL card
+would have rendered its eyebrow as "Week 1" while the clock ran.
+
+**Why every test stayed green:** no test asked which PARTIAL a variant reaches.
+`card_variant` is a plain string and the branch that reads it lives in a
+template. `tests/test_nfl_ncaaf_ui_parity.py` now pins the whole CHAIN —
+producer emits the variant → dispatcher routes it → partial reads the key the
+producer sets — because a test on any ONE of those three passes while the chain
+is broken.
+
+Landed: `shared/football_cards.py` (NCAAF **delegates** to it, so two sports
+cannot become two copies); `nfl_main` from all three builders; both dispatchers
+routing the two football variants to one branch; sport-generic partials; an
+`nfl_card` block with kickoff+venue from `schedule_2026.csv`, cover/over
+probabilities and model-against-market tiles; a Team Context panel from
+`nfl/game_context.py` (real, production-available, never read by a board
+before); `status` stamped on started games; live-lens phase counts; and
+`show_matchup_context` on `/nfl/game/<id>`, without which that panel was
+shipped to the browser and unreachable.
+
+**OWED, and it needs a deploy of web + refresh-worker** (no `render.yaml`, so
+no `blueprint_sync`): on the served `/nfl/api/cards`, `card_variant ==
+"nfl_main"` on every game and `shared_predictions.probabilities.home_cover`
+non-null **as n/N, never as a boolean**. The after-numbers recorded in
+`state_football.md [nfl-ncaaf-ui-parity]` are substrate `checkout` — evidence
+about the CODE, and they say nothing about what production serves.
+
 ### `#645` — **FOUR MEASUREMENTS OWED ON WORK THAT ALREADY SHIPPED. Each one is a number nobody can currently obtain, not a feature** — lane `prop-join-yield`, 2026-09-03 — **CODE LANDED AND LIVE; READINGS OUTSTANDING**
 
 Everything below is deployed and running. What is missing is the reading that

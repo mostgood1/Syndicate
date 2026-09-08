@@ -6,6 +6,8 @@ import json
 import os
 import re
 import statistics
+from datetime import datetime
+from datetime import timezone
 from functools import lru_cache
 from typing import Any
 
@@ -18,10 +20,15 @@ from syndicate.features.nfl.sources import build_module_links
 from syndicate.features.nfl.sources import default_nfl_source_root
 from syndicate.features.nfl.sources import default_week
 from syndicate.features.nfl.sources import latest_season
+from syndicate.features.nfl.sources import real_schedule_path
 from syndicate.features.nfl.sources import recommendation_path
 from syndicate.features.nfl.props import nfl_prop_recommendations_for_matchup
 from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.discrete_nav import resolve_selected_value
+from syndicate.features.shared.football_cards import cover_probability
+from syndicate.features.shared.football_cards import football_market_tiles
+from syndicate.features.shared.football_cards import football_shared_predictions
+from syndicate.features.shared.football_cards import format_kickoff_label
 from syndicate.features.shared.formatters import format_pct
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.market_inventory import join_odds_to_sim
@@ -244,6 +251,289 @@ def _resolved_week(selected_week: int, *, season: int | None = None) -> int:
     return resolve_selected_value(requested_week, _available_card_weeks(resolved_season), default_week(resolved_season))
 
 
+@lru_cache(maxsize=8)
+def _nfl_schedule_kickoffs(season: int) -> dict[str, dict[str, Any]]:
+    """{game_id: {kickoff, venue}} from `schedule_{season}.csv`.
+
+    KICKOFF AND VENUE WERE ON DISK AND NEVER ON THE CARD. NCAAF's compact strip
+    leads with a kickoff line and its main card carries a Venue row; NFL's card
+    had neither key, so the shared football templates would have shown the
+    card's `detail` ("SmartSim 2.0") where the kickoff belongs.
+
+    `gametime` IS US-EASTERN, NOT UTC, and only for the REGULAR season.
+    `nfl/sources.py` records the measurement that establishes it: regular-season
+    `gameday`/`gametime` are US-local and agree with ESPN exactly on 2026 week 1
+    (the CSV's four gamedays split 16 games 1/1/13/1 and ESPN returns the same),
+    while the PRESEASON file's `gameday` is a UTC date. This reads the
+    regular-season file only, so the Eastern anchor is the correct one -- and it
+    is verified rather than assumed: `2026_01_NE_SEA` is `2026-09-09 20:20`
+    here and ESPN's own `startTime` for that game is `2026-09-10T00:20Z`, which
+    is the same instant.
+
+    A row with no usable date is SKIPPED, never defaulted -- an absent kickoff
+    renders as no kickoff line, which is honest; a defaulted one renders as a
+    confident wrong time.
+    """
+    out: dict[str, dict[str, Any]] = {}
+    try:
+        from zoneinfo import ZoneInfo
+
+        eastern = ZoneInfo("America/New_York")
+    except Exception:  # noqa: BLE001 -- a kickoff label must never cost the board
+        return out
+    path = real_schedule_path(int(season))
+    if not path.exists():
+        return out
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle):
+                game_id = str(row.get("game_id") or "").strip()
+                gameday = str(row.get("gameday") or "").strip()
+                if not game_id or not gameday:
+                    continue
+                gametime = str(row.get("gametime") or "").strip() or "00:00"
+                try:
+                    local = datetime.strptime(f"{gameday} {gametime}", "%Y-%m-%d %H:%M").replace(tzinfo=eastern)
+                except ValueError:
+                    continue
+                out[game_id] = {
+                    "kickoff": local.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    "venue": str(row.get("stadium") or "").strip() or None,
+                }
+    except Exception:  # noqa: BLE001
+        return out
+    return out
+
+
+# The NFL card contract, mirroring `ncaaf_card`. Bumped when a template-visible
+# key is added or removed, never for a value change.
+_NFL_CARD_CONTRACT_VERSION = 1
+
+
+def _nfl_market_margin_and_total(lines_entry: dict[str, Any] | None) -> tuple[float | None, float | None]:
+    """(home margin, game total) from a `real_betting_lines` entry.
+
+    SIGN, and it is the whole reason this is a function rather than two
+    `.get()` calls at each call site. `run_line.home` is a BOOK HOME SPREAD --
+    NEGATIVE when the home side is favoured (`-3.5` = home by 3.5). Every
+    consumer in the football card family works in HOME MARGIN, where POSITIVE
+    means home is favoured: `football_market_tiles`, `football_shared_predictions`
+    and `_ncaaf_cover_probability` all take one. So this negates.
+
+    Getting it backwards yields entirely plausible numbers pointing at the
+    wrong team. `state.md` records a whole NFL analysis lost to exactly this
+    confusion over nflverse's `spread_line`, and `ncaaf/cards.py` states the
+    same convention for the same reason.
+    """
+    entry = lines_entry if isinstance(lines_entry, dict) else {}
+    run_line = entry.get("run_line") if isinstance(entry.get("run_line"), dict) else {}
+    total_runs = entry.get("total_runs") if isinstance(entry.get("total_runs"), dict) else {}
+    book_home_spread = _safe_float(run_line.get("home"))
+    market_margin = None if book_home_spread is None else -book_home_spread
+    return market_margin, _safe_float(total_runs.get("line"))
+
+
+def _nfl_team_context_items(
+    season: int,
+    week: int,
+    *,
+    away_abbr: str,
+    home_abbr: str,
+    away_name: str,
+    home_name: str,
+) -> list[dict[str, str]]:
+    """Per-side game context for the card's Team Context panel.
+
+    REAL AND ALREADY IN PRODUCTION, which is the only reason this panel is
+    populated at all rather than left as an honest empty state.
+    `nfl/game_context.py` reads `schedule_{season}.csv` -- the file its own
+    docstring calls out as the one source that exists on Render, against the
+    gitignored nflverse dump that does not -- and derives each side's implied
+    team total from the closing spread and total. That module was built for the
+    prop model; nothing on the board had ever read it.
+
+    NCAAF's equivalent panel carries returning production, portal impact and
+    coach continuity. Those have no NFL analogue and are NOT faked here: the
+    panel shows what this sport actually knows about the two teams, and shows
+    nothing when the schedule row carries no closing line (`game_context`
+    skips such a row rather than defaulting it to zero).
+    """
+    try:
+        from syndicate.features.nfl.game_context import team_context
+    except Exception:  # noqa: BLE001 -- a context panel must never cost the board
+        return []
+    items: list[dict[str, str]] = []
+    for abbr, name in ((away_abbr, away_name), (home_abbr, home_name)):
+        try:
+            context = team_context(season, week, abbr)
+        except Exception:  # noqa: BLE001
+            context = None
+        if not isinstance(context, dict):
+            continue
+        implied = _safe_float(context.get("implied_total"))
+        favoured_by = _safe_float(context.get("favoured_by"))
+        if implied is None:
+            continue
+        side = "Home" if context.get("is_home") else "Away"
+        # `favoured_by` is this team's own margin, positive when IT is
+        # favoured -- already flipped for the away side by `game_context`.
+        if favoured_by is None:
+            line_text = "no closing line"
+        elif favoured_by > 0:
+            line_text = f"favoured by {favoured_by:.1f}"
+        elif favoured_by < 0:
+            line_text = f"underdog by {abs(favoured_by):.1f}"
+        else:
+            line_text = "pick'em"
+        items.append(
+            {
+                "label": name,
+                "value": f"Implied {implied:.1f}",
+                "detail": f"{side} side, {line_text}, game total {_format_num(context.get('game_total'))}",
+            }
+        )
+    return items
+
+
+def _nfl_spread_text(margin: float | None, *, away_name: str, home_name: str) -> str:
+    """A home-relative margin rendered the way a spread is read aloud.
+
+    POSITIVE = home favoured, on both the model's number and the market's, so
+    one function serves both and they cannot disagree about which side a sign
+    points at.
+    """
+    if margin is None:
+        return "No line"
+    if margin == 0:
+        return "Pick'em"
+    favourite = home_name if margin > 0 else away_name
+    return f"{favourite} -{abs(margin):.1f}"
+
+
+def _nfl_matchup_context_items(
+    *,
+    away_name: str,
+    home_name: str,
+    market_margin: float | None,
+    market_total: float | None,
+    model_margin: float | None,
+    model_total: float | None,
+) -> list[dict[str, str]]:
+    """The model against the market, side by side, for the Matchup panel.
+
+    Both margins are HOME-RELATIVE (see `_nfl_market_margin_and_total`), so the
+    difference is signed the same way: positive means the model likes the HOME
+    side more than the book does.
+    """
+    items: list[dict[str, str]] = []
+    if model_margin is not None or market_margin is not None:
+        if market_margin is not None and model_margin is not None:
+            market_text = _nfl_spread_text(market_margin, away_name=away_name, home_name=home_name)
+            detail = f"Market {market_text} \u00b7 model {model_margin - market_margin:+.1f} vs market"
+        else:
+            detail = "No book has quoted this game yet"
+        items.append(
+            {
+                "label": "Spread",
+                "value": _nfl_spread_text(model_margin, away_name=away_name, home_name=home_name),
+                "detail": detail,
+            }
+        )
+    if model_total is not None or market_total is not None:
+        if market_total is not None and model_total is not None:
+            detail = f"Market {market_total:.1f} \u00b7 model {model_total - market_total:+.1f} vs market"
+        else:
+            detail = "No book has quoted this game yet"
+        items.append(
+            {
+                "label": "Total",
+                "value": f"{model_total:.1f}" if model_total is not None else "No model total",
+                "detail": detail,
+            }
+        )
+    return items
+
+
+def _nfl_card_block(
+    *,
+    season: int,
+    week: int,
+    away_name: str,
+    home_name: str,
+    away_abbr: str,
+    home_abbr: str,
+    away_branding: Any,
+    home_branding: Any,
+    scoreboard: dict[str, Any],
+    team_context_items: list[dict[str, str]] | None = None,
+    matchup_context_items: list[dict[str, str]] | None = None,
+    smartsim_reasons: list[dict[str, str]] | None = None,
+    summary: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """The `nfl_card` block, shaped exactly like NCAAF's `ncaaf_card`.
+
+    THE TEMPLATES ARE THE CONTRACT AND THEY ARE SHARED.
+    `shared/_game_card_ncaaf.html` and `shared/_scoreboard_strip_ncaaf.html`
+    serve BOTH football codes (see their headers); they resolve their card
+    block from `ncaaf_card` or `nfl_card`, so this shape is not optional
+    decoration -- a missing `scoreboard` makes the main card fall back to the
+    generic partial and the compact card render without its numbers.
+
+    WHAT IS DELIBERATELY ABSENT. `rank`, `conference` and `school_name` are
+    NCAAF's; an NFL team has none of them and the templates now omit the row
+    rather than printing a dash. `coverage_score` / `coverage_tier` come from
+    NCAAF's publication audit, which NFL has no equivalent of -- reported as
+    `None`/`"projection_only"` rather than a fabricated grade.
+    """
+    away_context = {
+        "abbreviation": away_abbr,
+        "logo_url": away_branding.logo_url if away_branding else None,
+        "primary_color": away_branding.primary_color if away_branding else None,
+        "secondary_color": away_branding.secondary_color if away_branding else None,
+    }
+    home_context = {
+        "abbreviation": home_abbr,
+        "logo_url": home_branding.logo_url if home_branding else None,
+        "primary_color": home_branding.primary_color if home_branding else None,
+        "secondary_color": home_branding.secondary_color if home_branding else None,
+    }
+    return {
+        "version": _NFL_CARD_CONTRACT_VERSION,
+        "sport_label": "NFL",
+        "summary": summary
+        or {
+            "coverage_score": None,
+            "coverage_tier": "projection_only",
+            "publication_status": "publishable",
+            "publication_priority": None,
+            "publication_ready": True,
+            "ready_label": "Publication ready",
+            "tier_badges": [{"label": "SmartSim 2.0", "active": True}],
+        },
+        "teams": {"home": home_context, "away": away_context},
+        "scoreboard": scoreboard,
+        "scoreboard_header": {
+            "away": dict(away_context),
+            "home": dict(home_context),
+            "kickoff": scoreboard.get("kickoff"),
+            "kickoff_label": scoreboard.get("kickoff_label") or scoreboard.get("kickoff"),
+            "venue": scoreboard.get("venue"),
+            "status": f"Week {week}",
+            "status_detail": scoreboard.get("source_label"),
+        },
+        "team_context": {
+            "items": list(team_context_items or []),
+            "summary": "Each side's implied team total, derived from the closing spread and game total.",
+        },
+        "matchup_context": {
+            "items": list(matchup_context_items or []),
+            "summary": "The model's spread and total against the book's.",
+        },
+        "smartsim_reasons": list(smartsim_reasons or []),
+        "context_sections": [],
+    }
+
+
 def _game_from_snapshot_bundle(bundle: dict[str, Any], season: int, week: int) -> dict[str, Any]:
     away_team = _safe_text(bundle.get("away_team"), "Away")
     home_team = _safe_text(bundle.get("home_team"), "Home")
@@ -279,9 +569,30 @@ def _game_from_snapshot_bundle(bundle: dict[str, Any], season: int, week: int) -
     # shape, so the Box Score/Game tabs correctly fall back to their generic
     # "unavailable" empty states for this (historical, 2025-only) path
     # rather than inventing numbers.
+    # A SCOREBOARD WITH NO PROJECTION IN IT, and that is the honest shape for
+    # this path. The comment above records why: the legacy `upcoming_recs_*.csv`
+    # snapshot carries type/confidence/ev_pct/odds per recommendation row and
+    # NOTHING that could become a projected score, a market line or a win
+    # probability. The football templates omit each fact whose value is absent,
+    # so this card renders crests, abbreviations and a real kickoff -- and no
+    # numbers it does not have. That is a strictly better compact card than the
+    # generic strip's two paragraphs of prose, without inventing anything.
+    schedule_row = _nfl_schedule_kickoffs(season).get(game_pk) or {}
+    kickoff = schedule_row.get("kickoff") or ""
+    snapshot_scoreboard = {
+        "source_label": confidence,
+        "kickoff": kickoff or game_date,
+        "kickoff_label": format_kickoff_label(kickoff) or game_date,
+        "venue": schedule_row.get("venue") or "Venue unavailable",
+    }
     return {
         "gamePk": game_pk,
-        "card_variant": "shared_default",
+        # See `_game_from_smartsim_projection` for the measurement behind this
+        # string. BOTH builders move, not just the one that serves the current
+        # season: a board that changes shape depending on which artifact backed
+        # it is the same class of defect as a board that never changes shape at
+        # all, and this path still serves every stored 2025 week.
+        "card_variant": "nfl_main",
         "away": {
             "abbr": away_abbr,
             "name": away_team,
@@ -314,6 +625,26 @@ def _game_from_snapshot_bundle(bundle: dict[str, Any], season: int, week: int) -
             {"label": "Best signal", "value": top_type},
         ],
         "shared_top_play_rows": _top_play_rows(ordered_rows),
+        "nfl_card": _nfl_card_block(
+            season=season,
+            week=week,
+            away_name=away_team,
+            home_name=home_team,
+            away_abbr=away_abbr,
+            home_abbr=home_abbr,
+            away_branding=away_branding,
+            home_branding=home_branding,
+            scoreboard=snapshot_scoreboard,
+            summary={
+                "coverage_score": None,
+                "coverage_tier": "snapshot_only",
+                "publication_status": "publishable",
+                "publication_priority": None,
+                "publication_ready": True,
+                "ready_label": "Stored weekly snapshot",
+                "tier_badges": [{"label": "Snapshot", "active": True}],
+            },
+        ),
         "panels": [
             {
                 "eyebrow": "Weekly snapshot",
@@ -416,9 +747,68 @@ def _game_from_smartsim_projection(projection: Any, season: int, week: int) -> d
         away_full_name=away_name,
         home_full_name=home_name,
     )
+    # THE MARKET LINE, IN HOME-MARGIN UNITS. `betting` above stores the BOOK's
+    # own home spread (negative = home favoured) because that is what
+    # `_shared_markets` publishes; every football CARD helper works in home
+    # margin instead. One conversion, named, rather than a sign flip inline at
+    # three call sites.
+    market_margin, market_total = _nfl_market_margin_and_total(lines_entry)
+    schedule_row = _nfl_schedule_kickoffs(season).get(game_pk) or {}
+    kickoff = schedule_row.get("kickoff") or ""
+    scoreboard = {
+        "home_points": round(projection.home_score_mean, 1),
+        "away_points": round(projection.away_score_mean, 1),
+        "total_points": round(projection.total_mean, 1),
+        "spread_label": spread_label,
+        # THE SAME FACT, ABBREVIATED, FOR THE COMPACT CARD ONLY.
+        # `.cards-strip-pregame-fact` clips with no wrap and no ellipsis;
+        # measured in a browser on the rebuilt strip, "Seattle Seahawks by 0.3"
+        # rendered as "Seattle Seah..." and "Chicago Bears by 2.2" as
+        # "Chicago Bea...". NCAAF never hit this because its label carries a
+        # SCHOOL name ("TCU by 12.3"), which is already short.
+        #
+        # The full-name label is KEPT and still what the main card's "Projected
+        # spread" callout shows -- that panel has the room, and a card that has
+        # room should print the team's name. Two labels, one number, chosen by
+        # the surface's width; `ncaaf/cards.py:_market_metric_row` records the
+        # same trade for the same reason.
+        "spread_label_short": (
+            "Pick'em"
+            if projection.margin_mean == 0
+            else f"{home_abbr if projection.margin_mean > 0 else away_abbr} by {abs(projection.margin_mean):.1f}"
+        ),
+        "win_probability": win_probability,
+        "home_win_probability": projection.home_win_rate,
+        "source_label": "SmartSim 2.0",
+        "kickoff": kickoff,
+        "kickoff_label": format_kickoff_label(kickoff) or "Kickoff unavailable",
+        "venue": schedule_row.get("venue") or "Venue unavailable",
+        "market_margin": market_margin,
+        "market_total": market_total,
+        "smartsim2_available": True,
+        "smartsim2_margin": projection.margin_mean,
+        "smartsim2_margin_stdev": projection.margin_stdev,
+        "smartsim2_total_points": projection.total_mean,
+        "smartsim2_total_stdev": projection.total_stdev,
+    }
     return {
         "gamePk": game_pk,
-        "card_variant": "shared_default",
+        # `nfl_main`, not `shared_default`. This one string is the whole
+        # dispatch: `shared/_game_card.html` and `shared/_scoreboard_strip.html`
+        # branch on `card_variant` and nothing else, so every NFL board card
+        # fell through to the GENERIC partials while NCAAF's reached the
+        # football ones. Measured in a browser against production 2026-09-07,
+        # the two served pages side by side:
+        #
+        #   compact card height   NCAAF 181px uniform x51 | NFL 643-1085px,
+        #                                                   16 distinct heights
+        #   crest <img> in strip  NCAAF 102               | NFL 0
+        #
+        # 16 distinct heights on 16 cards is the direct evidence: each card was
+        # being sized by a different-length paragraph of prose (`game.summary`
+        # plus the first panel's body, both rendered unconditionally by
+        # `_scoreboard_strip_generic.html`).
+        "card_variant": "nfl_main",
         "away": {
             "abbr": away_abbr,
             "name": away_name,
@@ -464,6 +854,69 @@ def _game_from_smartsim_projection(projection: Any, season: int, week: int) -> d
             "score": {"away_mean": projection.away_score_mean, "home_mean": projection.home_score_mean},
         },
         "betting": betting,
+        # TOP LEVEL, beside `nfl_card` and NOT inside it.
+        # `publication_adapter._shared_predictions` reads `game["predictions"]`.
+        # NCAAF's first cut of the same block went inside its sport key, where
+        # nothing reads it -- production deployed clean and still served 0/51
+        # non-null means. NFL's four MEANS were already arriving via the
+        # `sim.periods.full` fallback, which is why the gap here was the two
+        # PROBABILITY legs only: `home_cover` and `total_over` were null on
+        # 16/16 served cards while the same payload carried
+        # `markets.spread.home -3.5` and `markets.total.line 44.5`.
+        "predictions": football_shared_predictions(
+            projection, market_margin=market_margin, market_total=market_total
+        ),
+        # THE MODEL AGAINST THE MARKET. These four tiles were `Home mean /
+        # Away mean / Projected spread / Win probability` -- byte-identical to
+        # this card's own `metrics` list rendered directly above them, so the
+        # market row restated the projection twice and showed the book's number
+        # nowhere.
+        "market_tiles": football_market_tiles(
+            # ABBREVIATIONS, not display names, and the constraint is width not
+            # taste. `.cards-market-tile` shows roughly six characters at the
+            # tile's value size; NCAAF passes school names, which are already
+            # short ("TCU -12.3"), while an NFL display name is not
+            # ("Seattle Seahawks -3.5" overruns the neighbouring tile). The
+            # same measurement that set `_market_metric_row`'s compact format
+            # in `ncaaf/cards.py` applies here, and "SEA -3.5" is unambiguous
+            # with "NE @ SEA" printed directly above it.
+            home_team=home_abbr,
+            away_team=away_abbr,
+            market_margin=market_margin,
+            market_total=market_total,
+            market_book_count=0,
+            market_source="real_betting_lines" if lines_entry else None,
+            model_margin=projection.margin_mean,
+            model_total=projection.total_mean,
+            home_win_rate=projection.home_win_rate,
+        ),
+        "nfl_card": _nfl_card_block(
+            season=season,
+            week=week,
+            away_name=away_name,
+            home_name=home_name,
+            away_abbr=away_abbr,
+            home_abbr=home_abbr,
+            away_branding=away_branding,
+            home_branding=home_branding,
+            scoreboard=scoreboard,
+            team_context_items=_nfl_team_context_items(
+                season,
+                week,
+                away_abbr=away_abbr,
+                home_abbr=home_abbr,
+                away_name=away_name,
+                home_name=home_name,
+            ),
+            matchup_context_items=_nfl_matchup_context_items(
+                away_name=away_name,
+                home_name=home_name,
+                market_margin=market_margin,
+                market_total=market_total,
+                model_margin=projection.margin_mean,
+                model_total=projection.total_mean,
+            ),
+        ),
         "probability_rows": [
             {
                 "label": "Full Game",
@@ -528,9 +981,8 @@ def build_cards_page_context(selected_week: int, *, season: int | None = None, s
     # `live_game_state.py` has existed for weeks and its ONLY callers were
     # `preseason_cards.py` (always `SEASONTYPE_PRESEASON`) and an unrelated
     # fantasy-news module. `scripts/poll_nfl_live_state.py`'s own docstring
-    # says so outright: "the regular season is not wired at all". Both
-    # builders above hardcode `card_variant: "shared_default"` and neither
-    # ever set `game["live_state"]` -- which is the key
+    # says so outright: "the regular season is not wired at all". Neither
+    # builder above ever set `game["live_state"]` -- which is the key
     # `publication_adapter._shared_game_state` reads to produce
     # `shared_is_live` / `shared_game_state`, the fields the card template
     # already branches on.
@@ -563,6 +1015,25 @@ def build_cards_page_context(selected_week: int, *, season: int | None = None, s
                 nfl_game_state_index(season, resolved_week,
                                      seasontype=SEASONTYPE_REGULAR),
             )
+            # KICKOFF, SECOND SOURCE. `_nfl_schedule_kickoffs` is the primary
+            # one and it needs no network, but a card whose `game_id` is not in
+            # `schedule_{season}.csv` would otherwise show "Kickoff unavailable"
+            # where the compact strip's head goes. ESPN has just been asked for
+            # this exact week, so its `startTime` is free here.
+            #
+            # `setdefault` semantics by hand: this only ever FILLS a hole. A
+            # kickoff already read from the schedule wins, because that file is
+            # the source of record for the board's own week model.
+            for game in games:
+                card = game.get("nfl_card")
+                board = card.get("scoreboard") if isinstance(card, dict) else None
+                if not isinstance(board, dict) or board.get("kickoff"):
+                    continue
+                start_time = game.get("startTime")
+                if not start_time:
+                    continue
+                board["kickoff"] = start_time
+                board["kickoff_label"] = format_kickoff_label(start_time) or board.get("kickoff_label")
             print(f"[nfl_cards] LIVE_STATE season={season} week={resolved_week} "
                   f"{coverage}", flush=True)
         except Exception as exc:
@@ -698,14 +1169,16 @@ def _nfl_real_lines_for_matchup(season: int, *, away_full_name: str, home_full_n
 
 
 def _nfl_cover_probability(*, line: float, mean: float | None, stdev: float | None) -> float | None:
-    """P(actual > line) under a Normal(mean, stdev) model -- mirrors
-    syndicate.features.ncaaf.cards._ncaaf_cover_probability exactly (same
-    reasoning: a raw margin/total point estimate is not a probability and
-    must never be dropped into a field the board renders as a percentage;
-    None when there's no stdev to draw a real probability from)."""
-    if mean is None or stdev is None or stdev <= 0:
-        return None
-    return 1.0 - statistics.NormalDist(mean, stdev).cdf(line)
+    """Delegates to `shared/football_cards.cover_probability`.
+
+    This was a verbatim copy of NCAAF's, and its own docstring said so
+    ("mirrors ..._ncaaf_cover_probability exactly"). A copy that ANNOUNCES it
+    is a copy is still a copy -- and the two boards did diverge, in the CALLER
+    rather than here: NCAAF fed it a market line from the card builder and
+    published `home_cover`/`total_over` on 51/51 cards, while NFL never called
+    it from the card builder at all and published null on 16/16.
+    """
+    return cover_probability(line=line, mean=mean, stdev=stdev)
 
 
 _NFL_MARKET_BOARD_DISPLAY_LABELS = {

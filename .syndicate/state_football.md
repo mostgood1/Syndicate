@@ -2262,3 +2262,77 @@ before it is treated as a defect.
 2026-09-09 20:20 PDT / 2026-09-10 03:20 UTC. There is no live NFL game before
 then, so no verification window exists earlier, regardless of which clock a
 reader is using.
+
+## [nfl-ncaaf-ui-parity] NFL RENDERED THE GENERIC BOARD PARTIALS WHILE NCAAF RENDERED THE FOOTBALL ONES — one string, three surfaces `[measured 2026-09-07 on production web 81213a32, lane nfl-ncaaf-ui-parity; FIXED IN CODE, NOT DEPLOYED]`
+
+**`shared/_game_card.html` and `shared/_scoreboard_strip.html` branch on
+`card_variant` and NOTHING else.** NFL emitted `shared_default` from all three
+of its card builders, so both dispatchers fell through to their GENERIC branch
+— on a payload that already carried crests, a real book spread (`-3.5`), a real
+total (`44.5`) and a full projection.
+
+Measured on the two served pages the same afternoon, NCAAF beside NFL:
+
+    surface                        NCAAF                    NFL
+    card_variant                   ncaaf_main x51           shared_default x16
+    compact card height            181px, UNIFORM x51       643-1085px, SIXTEEN
+                                                            distinct heights on
+                                                            16 cards
+    crest <img> in the strip       102                      0
+    shared_predictions home_cover  51/51                    0/16
+    shared_predictions total_over  51/51                    0/16
+    kickoff / venue on the card    51/51                    no such key
+    ESPN status when started       "Final" / "14:40 - 3rd"  never written
+    live-lens header               Games/Live/Final/Pregame Games/Live matches/
+                                                            Season/Phase/Week
+    live-lens row eyebrow          "Q2 · 7:31" / "Final"    "Week 1" x16
+
+**A uniform height is direct evidence nothing wraps. Sixteen distinct heights on
+sixteen cards is direct evidence each card was sized by a different-length
+paragraph** — `_scoreboard_strip_generic.html` renders `game.summary` and the
+first panel's title/body unconditionally, both repeating the card below.
+
+**NFL's live/final read 0 because 2026 week 1 had not kicked off** (first game
+2026-09-09T00:20Z). So the missing ESPN-status stamp was LATENT, not visible:
+`_shared_game_state` copies `status` verbatim, and a live NFL card would have
+rendered its eyebrow as "Week 1" while the clock ran. NCAAF has stamped it
+since 2026-08-29.
+
+**THE FIX IS THE CHAIN, NOT EITHER HALF.** Producer emits the variant →
+dispatcher routes it → partial reads the key the producer sets. A test on any
+one of those three passes while the chain is broken, which is why every NFL
+test was green throughout. `tests/test_nfl_ncaaf_ui_parity.py` pins all three.
+
+Shipped in code:
+- `shared/football_cards.py` — `format_kickoff_label`, `cover_probability`,
+  `football_shared_predictions`, `football_market_tiles`. **NCAAF DELEGATES to
+  it**; two sports with two copies is `#557`'s per-site-copy failure one level
+  up.
+- All three NFL builders emit `nfl_main` (regular season, stored snapshot,
+  preseason). Both dispatchers route `ncaaf_main` and `nfl_main` to one branch.
+- The football partials resolve `ncaaf_card` OR `nfl_card`, and every
+  sport-specific label became a variable — "No NCAAF team context" on an NFL
+  card reads as a data outage rather than a template one. Rank/conference rows
+  are omitted when absent instead of dashed.
+- NFL `nfl_card` block: kickoff + venue from `schedule_2026.csv` (Eastern
+  anchor, verified against ESPN's own `startTime` for `2026_01_NE_SEA`),
+  cover/over probabilities, model-against-market tiles, and a Team Context
+  panel from `nfl/game_context.py` — real, production-available, and never read
+  by any board surface before.
+- `attach_nfl_live_game_state` stamps `status` on STARTED games only.
+- The live lens counts Games/Live/Final/Pregame and its eyebrow reads the FRESH
+  `live_state` before the stale `shared_game_state` (the cards contract derives
+  the shared block, then `_apply_live_state_to_game` overlays ESPN and does not
+  re-derive it — reading the shared block first is most wrong on exactly the
+  rows that just went live).
+- `/nfl/game/<id>` sets `show_matchup_context`, which gates both the tab and the
+  panel: the model-against-market comparison was being shipped to the browser
+  and was unreachable.
+
+**AFTER-NUMBERS ARE `checkout`, NOT `render`.** Measured in a browser against a
+local server in the lane worktree with copied NFL fixtures: compact cards
+161-181px (2 heights; the 161s are the games with no book line, whose market
+chips are correctly omitted), 30 crests, zero prose blocks, kickoff 16/16,
+venue 16/16, cover/over 14/16 — the 14 is bounded by the local odds fixture,
+not by the code. **This is evidence about the CODE. Nothing here says what
+production serves until it is deployed and re-read.**

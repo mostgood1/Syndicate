@@ -1,6 +1,8 @@
+{#- Main-card dispatch. Both football codes share one variant partial; see
+    `shared/_scoreboard_strip.html` for the measurement that put NFL here. -#}
 {% if game.card_variant == 'mlb_main' %}
   {% include 'shared/_game_card_mlb.html' %}
-{% elif game.card_variant == 'ncaaf_main' %}
+{% elif game.card_variant in ('ncaaf_main', 'nfl_main') %}
   {% include 'shared/_game_card_ncaaf.html' %}
 {% else %}
   {% include 'shared/_game_card_generic.html' %}

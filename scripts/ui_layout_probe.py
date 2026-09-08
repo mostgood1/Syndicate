@@ -134,19 +134,22 @@ NUMERIC_CLASSES = [".cards-data-pair strong", ".cards-market-main", ".cards-mini
 # An entry here is a claim that can rot, so it is checked in BOTH directions:
 # absent-and-exempt passes quietly, but present-and-exempt is reported, because
 # that means the sport grew the class and the exemption is now a lie.
-NUMERIC_CLASS_EXEMPT: dict[str, dict[str, str]] = {
-    "ncaaf": {
-        ".cards-market-main": (
-            "the ncaaf card has no market tile row at all -- `_game_card.html` "
-            "sends `ncaaf_main` to `_game_card_ncaaf.html`, which contains zero "
-            "`cards-market` markup and presents the same numbers as "
-            "`.cards-data-pair` inside panels. Verified 2026-08-15. NOTE: "
-            "`ncaaf/cards.py` does build `market_tiles`, but they are "
-            "publication metadata (Coverage/Tier/Status/Priority), not market "
-            "data, and they are consumed by `home.py` -- not dead, do not delete."
-        ),
-    },
-}
+# THE ONE ENTRY THIS HELD WAS REMOVED 2026-09-07 BECAUSE IT HAD GONE FALSE, and
+# the exemption's own two-directional check is what makes that a fact rather
+# than an opinion: `ncaaf` claimed `.cards-market-main` was absent "by design"
+# because `_game_card_ncaaf.html` "contains zero `cards-market` markup", and
+# that template grew a real `cards-market-row` on 2026-08-27 -- two `.cards-market-main`
+# elements per card. The tiles it called "publication metadata
+# (Coverage/Tier/Status/Priority)" are now Spread / Total / Win probability /
+# Books, i.e. exactly the market data the exemption said they were not.
+#
+# Verified 2026-08-15 is what the entry said, and it was true then. That is the
+# point of the shape: an entry here is a CLAIM THAT CAN ROT, so it is checked
+# in both directions and a present-and-exempt class is REPORTED. This one was
+# being reported and the report was the answer -- delete the claim, do not
+# re-verify it. `[lane nfl-ncaaf-ui-parity, which made NFL render the same
+# markup through the same partial]`
+NUMERIC_CLASS_EXEMPT: dict[str, dict[str, str]] = {}
 
 WCAG_TARGET_PX = 44
 

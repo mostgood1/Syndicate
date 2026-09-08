@@ -1,5 +1,22 @@
+{#- FOOTBALL main game card -- NCAAF *and* NFL.
+
+    THE FILE NAME IS HISTORICAL. Built for NCAAF; NFL renders through it too
+    `[2026-09-07, lane nfl-ncaaf-ui-parity]`. `shared/_game_card.html` routes
+    both `ncaaf_main` and `nfl_main` here and the card block resolves from
+    `ncaaf_card` OR `nfl_card`, which are the same shape by contract. The name
+    was kept rather than churning four test modules and
+    `scripts/ui_layout_probe.py` for a rename.
+
+    EVERY SPORT-SPECIFIC LABEL BELOW IS NOW A VARIABLE, not a literal. A shared
+    template with one sport's vocabulary hardcoded is a slower version of the
+    same divergence the shared dispatch just removed -- "No NCAAF team context"
+    on an NFL card is a bug that renders, and reads as a data outage rather
+    than a template one. Rows whose value is absent are OMITTED rather than
+    dashed: an NFL team has no AP rank and no conference, and an FCS NCAAF team
+    often has neither either. -#}
 <article class="feature-game-card cards-game-card" id="game-{{ game.gamePk }}">
-  {% set ncaaf = game.ncaaf_card if game.ncaaf_card is defined else none %}
+  {% set ncaaf = game.ncaaf_card if game.ncaaf_card is defined else (game.nfl_card if game.nfl_card is defined else none) %}
+  {% set sport_label = (ncaaf.sport_label if ncaaf and ncaaf.sport_label is defined and ncaaf.sport_label else ('NFL' if game.card_variant == 'nfl_main' else 'NCAAF')) %}
   {% set summary = ncaaf.summary if ncaaf else {} %}
   {% set teams = ncaaf.teams if ncaaf else {} %}
   {% set scoreboard = ncaaf.scoreboard if ncaaf else {} %}
@@ -33,6 +50,12 @@
       purpose, so a card cannot silently un-suppress its projection panel the
       next time somebody changes the placeholder. -#}
   {% set venue = scoreboard.get('venue') or away_header.get('venue') or home_header.get('venue') or '—' %}
+  {#- The projection's own name, never a hardcoded engine. NCAAF's blended card
+      says "Enhanced Totals Engine", its standalone card and every NFL card say
+      "SmartSim 2.0", and printing the wrong one is a disclosure defect, not a
+      cosmetic one -- `smartsim_ats_policy_implementation_report.md` is explicit
+      that a card must never claim engine involvement that did not happen. -#}
+  {% set engine_label = scoreboard.get('source_label') or 'Projection' %}
 
   {% if not ncaaf %}
     {% include 'shared/_game_card_generic.html' %}
@@ -209,10 +232,10 @@
           <div class="cards-summary-grid">
             <div class="cards-data-pair"><span>Away team</span><strong>{{ game.away.name }}</strong></div>
             <div class="cards-data-pair"><span>Home team</span><strong>{{ game.home.name }}</strong></div>
-            <div class="cards-data-pair"><span>Away rank</span><strong>{{ away_rank or '—' }}</strong></div>
-            <div class="cards-data-pair"><span>Home rank</span><strong>{{ home_rank or '—' }}</strong></div>
-            <div class="cards-data-pair"><span>Away conference</span><strong>{{ away_conf or '—' }}</strong></div>
-            <div class="cards-data-pair"><span>Home conference</span><strong>{{ home_conf or '—' }}</strong></div>
+            {% if away_rank %}<div class="cards-data-pair"><span>Away rank</span><strong>{{ away_rank }}</strong></div>{% endif %}
+            {% if home_rank %}<div class="cards-data-pair"><span>Home rank</span><strong>{{ home_rank }}</strong></div>{% endif %}
+            {% if away_conf %}<div class="cards-data-pair"><span>Away conference</span><strong>{{ away_conf }}</strong></div>{% endif %}
+            {% if home_conf %}<div class="cards-data-pair"><span>Home conference</span><strong>{{ home_conf }}</strong></div>{% endif %}
             <div class="cards-data-pair"><span>Kickoff</span><strong>{{ kickoff }}</strong></div>
             <div class="cards-data-pair"><span>Venue</span><strong>{{ venue }}</strong></div>
           </div>
@@ -232,7 +255,7 @@
           <div class="cards-box-head">
             <div>
               <div class="cards-table-kicker">Section 2</div>
-              <div class="cards-table-title"><strong>Enhanced Totals Engine</strong></div>
+              <div class="cards-table-title"><strong>{{ engine_label }}</strong></div>
             </div>
             <span class="cards-overview-badge{% if scoreboard and scoreboard.home_points not in ('-', '—') %} is-ready{% else %} is-suppressed{% endif %}">Projection</span>
           </div>
@@ -293,11 +316,11 @@
           <div class="cards-box-head">
             <div>
               <div class="cards-table-kicker">Section 3</div>
-              <div class="cards-table-title"><strong>Enhanced Totals Engine Reasons</strong></div>
+              <div class="cards-table-title"><strong>{{ engine_label }} Reasons</strong></div>
             </div>
             <span class="cards-overview-badge">Why it leans</span>
           </div>
-          <div class="cards-mini-copy">{{ smartsim_reasons.lead if smartsim_reasons and smartsim_reasons.lead is defined else 'Enhanced Totals Engine reasons derived from the current team and matchup context.' }}</div>
+          <div class="cards-mini-copy">{{ smartsim_reasons.lead if smartsim_reasons and smartsim_reasons.lead is defined else engine_label ~ ' reasons derived from the current team and matchup context.' }}</div>
           <div class="cards-callout-list">
             {% for item in smartsim_reason_items[:5] %}
               <div class="cards-callout">
@@ -320,7 +343,7 @@
           </div>
           <span class="cards-overview-badge">Explanation</span>
         </div>
-        <div class="cards-mini-copy">{{ team_context.summary if team_context and team_context.summary is defined else 'Returned production, portal impact, coach continuity, and roster experience.' }}</div>
+        <div class="cards-mini-copy">{{ team_context.summary if team_context and team_context.summary is defined else 'Team-level context for this matchup.' }}</div>
         {% if team_context_items %}
           <div class="cards-callout-list">
             {% for item in team_context_items[:4] %}
@@ -332,7 +355,7 @@
             {% endfor %}
           </div>
         {% else %}
-          <div class="cards-empty-copy">No NCAAF team context was available for this matchup yet.</div>
+          <div class="cards-empty-copy">No {{ sport_label }} team context was available for this matchup yet.</div>
         {% endif %}
       </div>
     </section>
@@ -347,7 +370,7 @@
             </div>
             <span class="cards-overview-badge">Comparison</span>
           </div>
-          <div class="cards-mini-copy">Conference, returning production, portal, coach, and roster comparisons.</div>
+          <div class="cards-mini-copy">{{ matchup_context.summary if matchup_context and matchup_context.summary is defined else 'Conference, returning production, portal, coach, and roster comparisons.' }}</div>
           <div class="cards-callout-list">
             {% for item in matchup_context_items[:5] %}
               <div class="cards-callout">

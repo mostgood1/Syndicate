@@ -14,7 +14,10 @@ class GameBoardContractPropTeamTests(unittest.TestCase):
         # rows here, which were silently discarded on every request and
         # replaced by free-text scraped off display panels -- the only
         # escape hatch was the card_variant == "mlb_main" early-return,
-        # which NFL doesn't use (card_variant: "shared_default").
+        # which NFL doesn't use. NFL's own variant became `nfl_main` on
+        # 2026-09-07 (lane nfl-ncaaf-ui-parity); this fixture keeps
+        # `shared_default` because what it exercises is the NON-mlb path, and
+        # every variant but `mlb_main` takes it.
         real_rows = [{"heading": "Moneyline", "name": "NYJ ML", "detail": "Confident | Odds -110", "value": "+4.2%"}]
         game = {
             "card_variant": "shared_default",

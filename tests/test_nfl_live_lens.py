@@ -103,7 +103,14 @@ class NflLiveLensSnapshotTests(unittest.TestCase):
         self.assertEqual(game["home"]["score"], 17.0)
 
         card = snapshot["rank_cards"][0]
-        self.assertEqual(card["eyebrow"], "Live")
+        # THE EYEBROW CARRIES THE CLOCK, not the constant "Live"
+        # `[2026-09-07, lane nfl-ncaaf-ui-parity]`. It read `game.status`, which
+        # is "Week 1" on every pregame row -- the same constant-eyebrow defect
+        # NCAAF's lens fixed on 2026-08-29 and whose shape this now matches
+        # ("Q3 · 4:12" / "Final" / the formatted kickoff). `badge` still
+        # says "Live"; the two are different fields and only one of them has
+        # room for a period and a clock.
+        self.assertEqual(card["eyebrow"], "Q3 · 4:12")
         self.assertEqual(card["badge"], "Live")
         self.assertIn("Q3 4:12", card["meta"])
         self.assertIn("BAL 14-17 KC", card["meta"])

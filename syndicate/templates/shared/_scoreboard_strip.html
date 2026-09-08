@@ -1,6 +1,17 @@
+{#- Compact-strip dispatch. The branch is `card_variant` and NOTHING else, so a
+    producer that forgets to set it gets the generic strip no matter how rich
+    its payload is. Measured against production 2026-09-07, NFL vs NCAAF, the
+    two football boards side by side in a browser:
+
+      NCAAF (`ncaaf_main`)     181px, uniform across all 51 cards, 102 crests
+      NFL   (`shared_default`) 643-1085px, 16 distinct heights on 16 cards, 0 crests
+
+    A uniform height is direct evidence nothing wraps; 16 distinct heights on
+    16 cards is direct evidence each card is sized by a different-length
+    paragraph. Both football codes now take the same branch. -#}
 {% if games and games[0].card_variant == 'mlb_main' %}
   {% include 'shared/_scoreboard_strip_mlb.html' %}
-{% elif games and games[0].card_variant == 'ncaaf_main' %}
+{% elif games and games[0].card_variant in ('ncaaf_main', 'nfl_main') %}
   {% include 'shared/_scoreboard_strip_ncaaf.html' %}
 {% elif games and games[0].card_variant == 'soccer_main' %}
   {% include 'shared/_scoreboard_strip_soccer.html' %}

@@ -1,4 +1,23 @@
-{#- NCAAF compact scoreboard strip, modelled on SOCCER'S.
+{#- FOOTBALL compact scoreboard strip -- NCAAF *and* NFL. Modelled on SOCCER'S.
+
+    THE FILE NAME IS HISTORICAL. It was built for NCAAF and NFL now renders
+    through it too `[2026-09-07, lane nfl-ncaaf-ui-parity]`; the name was kept
+    rather than churning four test modules and `scripts/ui_layout_probe.py`
+    for a rename. `shared/_scoreboard_strip.html` routes both `ncaaf_main` and
+    `nfl_main` here, and the card block below resolves from `ncaaf_card` OR
+    `nfl_card` -- one template, one shape, two producers, so the two codes
+    cannot drift into two different compact cards again.
+
+    WHAT NFL LOOKED LIKE BEFORE, measured in a browser against production
+    2026-09-07 with the NCAAF board open beside it:
+
+      NCAAF   181px, uniform across all 51 cards, 102 crest <img>
+      NFL     643-1085px, SIXTEEN distinct heights on 16 cards, 0 crests
+
+    Same dispatcher, same day. NFL's `card_variant` was `shared_default`, so it
+    fell through to `_scoreboard_strip_generic.html` -- whose two unconditional
+    prose blocks (`game.summary` and the first panel's body) are what sized
+    every card differently.
 
     SOCCER IS THE REFERENCE HERE, not MLB. Its pregame compact card presents
     the right information in the right shape: a kickoff line, then one row per
@@ -35,12 +54,16 @@
   {% if games %}
     <div class="cards-scoreboard-strip">
       {% for game in games %}
-        {%- set ncaaf = game.ncaaf_card if game.ncaaf_card is defined else none -%}
+        {#- EITHER football code's card block. `ncaaf_card` first only because
+            it is the older producer; the two are the same shape by contract
+            (`ncaaf/cards.py:_build_*_ncaaf_card_contract` and
+            `nfl/cards.py:_nfl_card_block`). -#}
+        {%- set ncaaf = game.ncaaf_card if game.ncaaf_card is defined else (game.nfl_card if game.nfl_card is defined else none) -%}
         {%- set scoreboard = ncaaf.scoreboard if ncaaf and ncaaf.scoreboard is defined else {} -%}
         {%- set kickoff = scoreboard.get('kickoff_label') if scoreboard else none -%}
         {%- set state = game.shared_game_state if game.shared_game_state is defined and game.shared_game_state else {} -%}
         {%- set is_live = game.shared_is_live or state.get('live') -%}
-        <a class="cards-strip-card cards-strip-card--ncaaf" href="#game-{{ game.gamePk }}" data-game-pk="{{ game.gamePk }}">
+        <a class="cards-strip-card cards-strip-card--ncaaf"{# --ncaaf carries the football sizing bump in dense_cards.css; both codes want it #} href="#game-{{ game.gamePk }}" data-game-pk="{{ game.gamePk }}">
           {#- The head is the kickoff, or the game's live state once it has one.
               A status badge reading "Week 1" on all 51 cards told a scanning
               reader nothing.
@@ -119,8 +142,13 @@
           {%- set market_spread = (game.markets or {}).get('spread') if game.markets is defined else none -%}
           {%- set market_total = (game.markets or {}).get('total') if game.markets is defined else none -%}
           <div class="cards-strip-pregame-facts">
-            {% if scoreboard.get('spread_label') %}
-              <span class="cards-strip-pregame-fact"><span class="cards-strip-pregame-fact-label">Spread</span> {{ scoreboard.get('spread_label') }}</span>
+            {#- `spread_label_short` when the producer offers one. This chip
+                CLIPS with no wrap and no ellipsis, and an NFL display name does
+                not fit ("Seattle Seah..."). NCAAF sets only `spread_label` and
+                falls through to it unchanged, which is correct -- a school name
+                already fits. -#}
+            {% if scoreboard.get('spread_label_short') or scoreboard.get('spread_label') %}
+              <span class="cards-strip-pregame-fact"><span class="cards-strip-pregame-fact-label">Spread</span> {{ scoreboard.get('spread_label_short') or scoreboard.get('spread_label') }}</span>
             {% endif %}
             {% if scoreboard.get('total_points') is not none %}
               <span class="cards-strip-pregame-fact"><span class="cards-strip-pregame-fact-label">Total</span> {{ scoreboard.get('total_points') }} proj</span>

@@ -10,6 +10,10 @@ from typing import Any
 from functools import lru_cache
 from pathlib import Path
 
+from syndicate.features.shared.football_cards import cover_probability
+from syndicate.features.shared.football_cards import football_market_tiles
+from syndicate.features.shared.football_cards import football_shared_predictions
+from syndicate.features.shared.football_cards import format_kickoff_label
 from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
 
 from syndicate.features.ncaaf.sources import available_weeks
@@ -414,17 +418,9 @@ _NCAAF_MARKET_BOARD_DISPLAY_LABELS = {
 
 
 def _ncaaf_cover_probability(*, line: float, mean: float | None, stdev: float | None) -> float | None:
-    """P(actual > line) under a Normal(mean, stdev) model -- used for both
-    "home covers this spread" and "game goes over this total". None when
-    there's no real distribution to draw the probability from (no stdev
-    available yet, e.g. no SmartSim 2.0 shadow data for this game), rather
-    than fabricating one from the point estimate alone: a raw margin/total
-    point value (e.g. 57.9 projected points) is not a probability and must
-    never be dropped into a 0-1 field the board renders as a percentage.
-    """
-    if mean is None or stdev is None or stdev <= 0:
-        return None
-    return 1.0 - statistics.NormalDist(mean, stdev).cdf(line)
+    """Delegates to `shared/football_cards.cover_probability` -- see there for
+    why a missing stdev returns None instead of a point-estimate stand-in."""
+    return cover_probability(line=line, mean=mean, stdev=stdev)
 
 
 def _market_metric_row(margin: float | None) -> dict[str, Any] | None:
@@ -459,82 +455,27 @@ def _market_metric_row(margin: float | None) -> dict[str, Any] | None:
 
 
 def _smartsim2_standalone_market_tiles(row: dict[str, Any], projection: Any = None) -> list[dict[str, Any]]:
-    """The four header tiles, showing the real line once one exists.
+    """Unpacks an NCAAF board row, then delegates to
+    `shared/football_cards.football_market_tiles`.
 
-    These used to be four hardcoded placeholders ("Source / Tier / Status /
-    Priority") because there was never a price to put in them. Now that there
-    can be, the first two carry it -- and when there is still no line they say
-    so plainly rather than showing a dash that reads as a broken tile.
+    MOVED, not copied `[2026-09-07, lane nfl-ncaaf-ui-parity]`. NFL's four
+    tiles were `Home mean / Away mean / Projected spread / Win probability` --
+    byte-identical to that card's own `metrics` list rendered directly above
+    them -- while its payload already carried a real book spread and total. It
+    needs THIS function, not a second one that will drift from it. Only the row
+    unpacking is NCAAF's; the model-against-market presentation is not.
     """
-    margin = _safe_float(row.get("market_margin"))
-    total = _safe_float(row.get("market_total"))
-    books = row.get("market_book_count") or 0
-
-    if margin is None:
-        spread_title, spread_sub = "No line", "No book quoted yet"
-    else:
-        # Shown from the FAVOURITE's side, which is how a spread is read aloud.
-        favourite = row.get("home_team") if margin > 0 else row.get("away_team")
-        spread_title = "Pick'em" if margin == 0 else f"{favourite} -{abs(margin):.1f}"
-        spread_sub = f"Market spread - {books} book{'s' if books != 1 else ''}"
-
-    # MODEL AGAINST MARKET, which is what a compact card is FOR. Two of these
-    # four tiles used to be metadata -- "Source: SmartSim 2.0" and a book count
-    # -- so a card could carry a full projection and a full market line and
-    # show the reader neither of them side by side. MLB's card is the
-    # reference: `cards-market-row` puts the comparison above the fold.
-    #
-    # This is only possible now because the projection reaches the shared
-    # contract at all; before 2026-08-27 `shared_predictions.margin_mean` and
-    # `.total_mean` were null on 51/51 cards.
-    model_margin = _safe_float(getattr(projection, "margin_mean", None))
-    model_total = _safe_float(getattr(projection, "total_mean", None))
-    home_team = row.get("home_team")
-    away_team = row.get("away_team")
-
-    # SIGN CONVENTION, stated because `state.md` records a whole NFL analysis
-    # lost to it: BOTH margins are home-relative and positive means the home
-    # side is favoured. The edge is model minus market, so positive = the model
-    # likes the HOME side more than the book does.
-    if model_margin is None:
-        spread_model_sub = "No model spread"
-    else:
-        model_fav = home_team if model_margin > 0 else away_team
-        model_spread_text = "Pick'em" if model_margin == 0 else f"{model_fav} -{abs(model_margin):.1f}"
-        if margin is None:
-            spread_model_sub = f"Model {model_spread_text}"
-        else:
-            spread_model_sub = f"Model {model_spread_text} · {model_margin - margin:+.1f} vs market"
-
-    if model_total is None:
-        total_model_sub = "No model total"
-    elif total is None:
-        total_model_sub = f"Model {model_total:.1f}"
-    else:
-        total_model_sub = f"Model {model_total:.1f} · {model_total - total:+.1f} vs market"
-
-    home_win = _safe_float(getattr(projection, "home_win_rate", None))
-    if home_win is None:
-        win_title, win_sub = "No model", "Win probability unavailable"
-    else:
-        win_side = home_team if home_win >= 0.5 else away_team
-        win_title = f"{win_side} {max(home_win, 1.0 - home_win) * 100:.0f}%"
-        win_sub = "Model win probability"
-
-    return [
-        {"label": "Spread", "title": spread_title, "sub": spread_model_sub if model_margin is not None else spread_sub},
-        {
-            "label": "Total",
-            "title": f"{total:.1f}" if total is not None else "No line",
-            "sub": total_model_sub if model_total is not None else ("Market total" if total is not None else "No book quoted yet"),
-        },
-        {"label": "Win probability", "title": win_title, "sub": win_sub},
-        {
-            "label": "Books",
-            "title": str(books) if books else "-",
-            "sub": str(row.get("market_source") or "No market capture"),
-        },
-    ]
+    return football_market_tiles(
+        home_team=row.get("home_team"),
+        away_team=row.get("away_team"),
+        market_margin=row.get("market_margin"),
+        market_total=row.get("market_total"),
+        market_book_count=row.get("market_book_count") or 0,
+        market_source=row.get("market_source"),
+        model_margin=getattr(projection, "margin_mean", None),
+        model_total=getattr(projection, "total_mean", None),
+        home_win_rate=getattr(projection, "home_win_rate", None),
+    )
 
 
 def _smartsim2_standalone_betting(row: dict[str, Any], projection: Any) -> dict[str, Any]:
@@ -658,74 +599,19 @@ def _ncaaf_shared_predictions_block(
     market_margin: Any = None,
     market_total: Any = None,
 ) -> dict[str, Any]:
-    """The SHARED contract's `predictions` block, which NCAAF never populated.
+    """Delegates to `shared/football_cards.football_shared_predictions`.
 
-    MEASURED ON PRODUCTION 2026-08-27, all 51 week-1 cards -- the numbers were
-    on the card the whole time, in the wrong place:
-
-        shared_predictions.home_mean    null  |  metrics["Home mean"]        30.3
-        shared_predictions.away_mean    null  |  metrics["Away mean"]        20.0
-        shared_predictions.margin_mean  null  |  metrics["Projected spread"] TCU by 10.3
-        shared_predictions.total_mean   null  |  metrics["Projected total"]  50.3
-        shared_predictions...home_win    0.8  |  the ONLY field that was set
-
-    `metrics` is a DISPLAY list of label/value pairs. `shared_predictions` is
-    what Layer 1, Layer 2, the compact cards and the market board read, so every
-    cross-sport consumer saw a projected score of nothing and no projected
-    spread or total -- on a betting product, the two numbers a line is actually
-    compared against. `publication_adapter._shared_predictions` reads
-    `predictions`, `sim.score`, `score` and `sim.periods.full`; NCAAF set none.
-
-    ONE HELPER, THREE CALLERS. There are three NCAAF card-contract builders
-    (`_build_ncaaf_card_contract`, `_build_smartsim_ncaaf_card_contract`,
-    `_build_smartsim2_standalone_ncaaf_card_contract`) and a per-site copy is
-    how one of them silently keeps the old behaviour. Market lines are optional
-    because only the standalone builder has them in scope -- without them the
-    means still publish and only the cover probabilities stay None, which is
-    honest: absent must stay absent, never a neutral 0.5.
-
-    Cover/over probabilities use `_ncaaf_cover_probability`, the same function
-    the market board rows use, so the board and the contract cannot disagree
-    about the same game.
+    MOVED, not copied `[2026-09-07, lane nfl-ncaaf-ui-parity]`. The original
+    docstring's whole point was ONE HELPER, THREE CALLERS -- because a per-site
+    copy is how one of NCAAF's three card builders silently keeps the old
+    behaviour. Two SPORTS with two copies is that same failure one level up:
+    NFL served `home_cover`/`total_over` null on 16/16 cards, with a real book
+    line and a real model stdev on the same payload. The measurement table and
+    the reasoning live in the shared function.
     """
-    if projection is None:
-        return {}
-    margin_mean = _safe_float(getattr(projection, "margin_mean", None))
-    total_mean = _safe_float(getattr(projection, "total_mean", None))
-    margin_stdev = _safe_float(getattr(projection, "margin_stdev", None))
-    total_stdev = _safe_float(getattr(projection, "total_stdev", None))
-    home_mean = _safe_float(getattr(projection, "home_score_mean", None))
-    away_mean = _safe_float(getattr(projection, "away_score_mean", None))
-    home_win = _safe_float(getattr(projection, "home_win_rate", None))
-
-    home_cover = away_cover = total_over = total_under = None
-    margin_line = _safe_float(market_margin)
-    total_line = _safe_float(market_total)
-    if margin_line is not None:
-        home_cover = _ncaaf_cover_probability(line=margin_line, mean=margin_mean, stdev=margin_stdev)
-        if home_cover is not None:
-            away_cover = round(1.0 - home_cover, 6)
-    if total_line is not None:
-        total_over = _ncaaf_cover_probability(line=total_line, mean=total_mean, stdev=total_stdev)
-        if total_over is not None:
-            total_under = round(1.0 - total_over, 6)
-
-    return {
-        "home_mean": home_mean,
-        "away_mean": away_mean,
-        "margin_mean": margin_mean,
-        "total_mean": total_mean,
-        "margin_stdev": margin_stdev,
-        "total_stdev": total_stdev,
-        "probabilities": {
-            "home_win": home_win,
-            "away_win": (round(1.0 - home_win, 6) if home_win is not None else None),
-            "home_cover": home_cover,
-            "away_cover": away_cover,
-            "total_over": total_over,
-            "total_under": total_under,
-        },
-    }
+    return football_shared_predictions(
+        projection, market_margin=market_margin, market_total=market_total
+    )
 
 
 def _ncaaf_market_board_rows_for_game(
@@ -1508,41 +1394,16 @@ def _format_decimal(value: Any, *, places: int = 3) -> str:
 
 
 def _format_kickoff_label(value: Any) -> str:
-    """Human kickoff string for the card, in the platform's display timezone.
+    """Delegates to `shared/football_cards.format_kickoff_label`.
 
-    Measured 2026-08-14 on production: NCAAF cards rendered
-    `KICKOFF 2026-08-29T16:00:00.000Z` -- the raw `start_date_api` value
-    straight from the schedule row, reaching the UI unformatted.
-
-    This is deliberately a SEPARATE key from `kickoff` rather than a
-    reformat in place. `kickoff` is parsed as data downstream --
-    `ncaaf/betting_card.py:_kickoff_date_and_label` calls
-    `datetime.fromisoformat` on exactly this field to build its per-day
-    grouping -- so formatting it at the producer would have traded a
-    cosmetic defect for a broken betting card.
-
-    Central, because that is what every other display surface in this repo
-    uses (`features/shared/timezone.py`, `SYNDICATE_BOARD_TZ`). Times are
-    assembled with portable strftime directives only: `%-I`/`%-d` are
-    POSIX-only and raise on Windows, where this also runs.
+    MOVED, not copied `[2026-09-07, lane nfl-ncaaf-ui-parity]`. NFL's board
+    needs the identical label and this file is NCAAF's; a second copy over
+    there is exactly the per-site-copy failure this module's own
+    `_ncaaf_shared_predictions_block` docstring warns about one screen down.
+    The body, its Windows-portable strftime rule and the reason `kickoff` is
+    left unformatted all travelled with it -- see that function's docstring.
     """
-    text = str(value or "").strip()
-    if not text:
-        return ""
-    try:
-        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
-    except Exception:
-        return text
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=CENTRAL_TIMEZONE)
-    local = parsed.astimezone(CENTRAL_TIMEZONE)
-    hour = local.hour % 12 or 12
-    meridiem = "AM" if local.hour < 12 else "PM"
-    zone = local.strftime("%Z") or "CT"
-    return (
-        f"{local.strftime('%a')} {local.strftime('%b')} {local.day}, "
-        f"{hour}:{local.strftime('%M')} {meridiem} {zone}"
-    )
+    return format_kickoff_label(value)
 
 
 def _publication_ready(coverage_tier: str | None) -> bool:

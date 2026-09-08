@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -123,36 +124,78 @@ def test_numeric_class_matching_nothing_fails_rather_than_vanishing():
     assert "measurement did NOT run" in text
 
 
-def test_declared_exemption_passes_when_the_class_is_absent():
-    """NCAAF has no market tile row; asserting one is asserting a design it lacks.
+# THESE TWO NOW PATCH THE TABLE INSTEAD OF READING THE LIVE ONE
+# `[2026-09-07, lane nfl-ncaaf-ui-parity]`. They used to ride on the single real
+# entry -- `ncaaf` exempting `.cards-market-main` -- and that entry was DELETED
+# because it had gone false: `_game_card_ncaaf.html` grew a real
+# `cards-market-row` on 2026-08-27, so the class it swore was absent by design
+# renders twice per card.
+#
+# `NUMERIC_CLASS_EXEMPT` is now EMPTY, and an empty table is the healthy state
+# -- every sport's numeric classes are measured, nothing is excused. But the
+# MECHANISM still has to work the day someone needs it, and a test that can
+# only run while a real exemption happens to exist is a test that disappears
+# exactly when the table is at its healthiest. Patching a synthetic entry keeps
+# the mechanism covered and decouples it from whether any sport currently
+# claims one.
+_FAKE_EXEMPT = {
+    "ncaaf": {".cards-market-main": "synthetic entry -- see the note above this block"}
+}
 
-    This is opt-out BY NAME with a reason, the same shape as OUT_OF_SEASON --
-    silent absence stays a failure, declared absence does not.
-    """
-    text, ok = _summarize(
-        _report(sport="ncaaf", tabularFigures={".cards-market-main": {"count": 0, "values": {}}})
-    )
+
+def test_declared_exemption_passes_when_the_class_is_absent():
+    """Opt-out BY NAME with a reason, the same shape as OUT_OF_SEASON --
+    silent absence stays a failure, declared absence does not."""
+    with mock.patch.object(probe, "NUMERIC_CLASS_EXEMPT", _FAKE_EXEMPT):
+        text, ok = _summarize(
+            _report(sport="ncaaf", tabularFigures={".cards-market-main": {"count": 0, "values": {}}})
+        )
     assert ok, text
     assert "measurement did NOT run" not in text
 
 
 def test_declared_exemption_is_checked_in_the_other_direction_too():
-    """An exemption is a claim that can rot. If the class appears, say so."""
-    text, ok = _summarize(
-        _report(
-            sport="ncaaf",
-            tabularFigures={".cards-market-main": {"count": 4, "values": {"tabular-nums": 4}}},
+    """An exemption is a claim that can rot. If the class appears, say so.
+
+    This direction is not hypothetical: it is what reported the `ncaaf` entry
+    as stale, and deleting that entry -- rather than re-verifying it -- was the
+    answer the report was giving.
+    """
+    with mock.patch.object(probe, "NUMERIC_CLASS_EXEMPT", _FAKE_EXEMPT):
+        text, ok = _summarize(
+            _report(
+                sport="ncaaf",
+                tabularFigures={".cards-market-main": {"count": 4, "values": {"tabular-nums": 4}}},
+            )
         )
-    )
     assert not ok
     assert "STALE EXEMPTION" in text
 
 
-def test_exemption_is_scoped_to_its_sport():
-    """The same absent class on a sport that DOES have the row still fails."""
-    text, ok = _summarize(
-        _report(sport="nfl", tabularFigures={".cards-market-main": {"count": 0, "values": {}}})
+def test_the_live_exemption_table_is_empty_and_that_is_the_healthy_state():
+    """A guard against the table quietly becoming a general-purpose allowlist.
+
+    Not a ban on ever adding one -- it is a tripwire that makes adding one a
+    DECISION, with this test's failure as the place to write down the reason,
+    the way the deleted `ncaaf` entry did.
+    """
+    assert probe.NUMERIC_CLASS_EXEMPT == {}, (
+        "an exemption was added: state the sport, the class, and why the design "
+        "legitimately lacks it -- then update this test"
     )
+
+
+def test_exemption_is_scoped_to_its_sport():
+    """The same absent class on a sport that DOES have the row still fails.
+
+    `nfl` is the right control and is now a stronger one: since 2026-09-07 it
+    renders the SAME partial as `ncaaf`, so a missing market row there is
+    unambiguously a defect rather than a design difference.
+    """
+    with mock.patch.object(probe, "NUMERIC_CLASS_EXEMPT", _FAKE_EXEMPT):
+        text, ok = _summarize(
+            _report(sport="nfl", tabularFigures={".cards-market-main": {"count": 0, "values": {}}})
+        )
     assert not ok
     assert "measurement did NOT run" in text
 

@@ -40,7 +40,7 @@ def build_game_detail_page_context(selected_week: int, game_pk: str, *, season: 
     game["href"] = f"/nfl/cards?season={resolved_season}&week={resolved_week}"
     game["href_label"] = "Back to NFL cards"
 
-    return build_single_game_board_context(
+    detail_context = build_single_game_board_context(
         selected_date=week_label,
         prev_date=str(cards_context.get("prev_date") or resolved_week),
         next_date=str(cards_context.get("next_date") or resolved_week),
@@ -72,3 +72,23 @@ def build_game_detail_page_context(selected_week: int, game_pk: str, *, season: 
         control_name="week",
         hidden_fields=[{"name": "season", "value": str(resolved_season)}],
     )
+    # THE MATCHUP TAB, which NCAAF's game detail has set since it was built and
+    # NFL's never did `[2026-09-07, lane nfl-ncaaf-ui-parity]`.
+    #
+    # `shared/_game_card_ncaaf.html` -- the partial both football codes now
+    # render -- gates that tab AND its panel on `show_matchup_context`, and the
+    # template's own rule is that a panel exists iff a tab addresses it. So the
+    # flag is not decoration: without it the model-against-market comparison
+    # this card builds is shipped to the browser and unreachable, which is the
+    # exact defect `tests/test_ncaaf_card_template.py` exists to catch.
+    #
+    # The CARDS BOARD deliberately does NOT set it, on either sport. Adding the
+    # tab there for NFL alone would trade one asymmetry for its mirror image.
+    matchup_context = (game.get("nfl_card") or {}).get("matchup_context") or {}
+    detail_context.update(
+        {
+            "matchup_context": matchup_context,
+            "show_matchup_context": bool(matchup_context.get("items")),
+        }
+    )
+    return detail_context
