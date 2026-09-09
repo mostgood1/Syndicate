@@ -29359,3 +29359,22 @@ refusals and a post-deploy ceiling of zero. Re-take READING 1 tomorrow after
 - **WHAT SURVIVES, and it is the useful half.** The consumption path is CORRECT: `book_grid_artifact.py:203` calls `book_quotes_path(sport, date_str)` and `:232` `iter_book_quotes(sport, date_str)` -- exactly the file the change writes -- and the kind is generic (`odds_book_quotes.py:313`/`:579`: `"prop" if player else "game"`). **There is no NFL-specific prop gate; MLB and NFL diverge only at capture.** The `.state.json` 503s are incidental: `book_grid_artifact.py:240` wraps `read_quote_last_seen` in try/except and it feeds only a display age. Not a cache either -- `BOOK_GRID_TICK` fired 16:02/16:12/16:19/16:29 and re-read the shard each time.
 - **THE READING IS THEREFORE OWED, NOT FAILED.** Scheduled task `nfl-props-date-shard-reading`, 2026-09-09 14:05 CT, gated on the writer's OWN log line (`--text "date-shard"` on live-odds-worker), which is the flag test and the reachability test in one because it prints from inside the sharding function. It is instructed to distinguish "writer did not run" from "writer ran and wrote nothing", to read `total_rows` not a page, and to expect a MEGABYTE-scale shard jump rather than the ~30 KB/hour the game-line writer adds.
 - claims released on both services.
+
+### refresh-worker fa6c4c19 -> 8730b829 -- KALSHI PRECAP DATE-AWARE: 273 in-window rungs recovered at ZERO budget cost, and 379 that no reordering can save
+- `fa6c4c19` live 2026-09-09T17:36:46Z with `SYNDICATE_KALSHI_PRECAP_DATE_AWARE` ABSENT, deliberately, so the counter could measure the CURRENT rule before anything changed. `8730b829` live 18:05:37Z with the flag ON (it also carries the NCAAF alias map, `04a82c38`). `MAX_MARKETS_PER_SERIES` is UNCHANGED at 400 -- the module's own note forbids raising it ("Shrink the payload rather than raising the ceiling"), so this spends the same budget better.
+- **THE BEFORE, 17:37:59Z, `mode=arrival`, 6 capped series:** fetched 6,782, kept 2,400, cut 4,382, **kept_in_window 907, cut_in_window 652.** So the arbitrary first-400 slice was discarding 652 rungs for games inside the board's own window while keeping 907 -- 42% of the in-window rungs Kalshi returned, at no budget saving.
+- **THE PER-SERIES SPLIT IS THE REAL FINDING, and it is TWO problems, not one:**
+
+      KXNCAAFSPREAD   fetched 2478  kept 400  kept_in_window   0  cut_in_window 128   <- pure misallocation
+      KXNCAAFTOTAL    fetched 1967  kept 400  kept_in_window   0  cut_in_window 114   <- pure misallocation
+      KXNCAAF1HTOTAL  fetched  754  kept 400  kept_in_window  61  cut_in_window  27
+      KXNFLSPREAD     fetched  404  kept 400  kept_in_window  46  cut_in_window   4
+      KXMLBHRR        fetched  644  kept 400  kept_in_window 400  cut_in_window 244   <- BUDGET SHORTFALL
+      KXMLBTB         fetched  535  kept 400  kept_in_window 400  cut_in_window 135   <- BUDGET SHORTFALL
+
+  **The two NCAAF series kept 400 rungs of which NOT ONE was in-window** while discarding 242 that were. The two MLB prop series already keep 400 in-window rungs and still cut 379 more -- **reordering cannot help those at all**; only a different budget or market subset can.
+- **THE AFTER, 18:06Z, `mode=date_aware`:** kept_in_window **931**, cut_in_window **379**. Both NCAAF series and `KXNFLSPREAD` are no longer capped at all; `KXNFLREC` (824 fetched, 400 kept, 131 in-window) now cuts **0** in-window. **The residual 379 is exactly `KXMLBHRR` 244 + `KXMLBTB` 135 -- the two budget-shortfall series, unchanged, as diagnosed.**
+- **READ IN-WINDOW LOSS, NOT RAW TOTALS: the slate moved between the two reads** (capped_series 6 -> 3, fetched 6,782 -> 2,003) because Kalshi's listing changes through the day. Comparing `cut_total` across those two lines would be comparing two different populations. `cut_in_window` is the field that survives the change of slate.
+- **DO NOT QUOTE 652 AS THE PRIZE.** 273 was recoverable by reordering and is now recovered; 379 is a separate open question about whether 400 fits dense prop ladders. Quoting the headline would overstate the fix by more than double.
+- the offline replay in `fa6c4c19`'s own report predicted 114 redirected on one series; live across six it was 273. **The replay understated it ~2.4x**, which is the argument for the counter existing rather than trusting a reconstruction.
+- OPEN, and now measurable for the first time: `KXMLBHRR`/`KXMLBTB` lose 379 in-window rungs per tick to the cap itself. That is upstream of every Kalshi coverage number and nobody chose it deliberately.
