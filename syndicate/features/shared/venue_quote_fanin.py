@@ -1539,6 +1539,19 @@ def apply_venue_quotes_to_grid(
     # only way to name the contract behind a price was to replay the join.
     matched_series: dict[str, int] = {}
     venue_basis_rows = 0
+    # `#S6a`. HOW MUCH OF THE KALSHI BOOK IS ACTUALLY PRICED, versus how much
+    # is still paying the assumed full rate. `fee_is_upper_bound` used to be
+    # stamped on 100% of Kalshi rows, which made it a constant and therefore
+    # useless as an instrument; once the multiplier is resolved per series its
+    # RATE becomes the coverage number -- unresolved/(resolved+unresolved) is
+    # the share of the book whose fee is still only a bound.
+    # `fee_unresolved_series` names WHICH series, because a count says how big
+    # a hole is and never what shape it has, and the repair for a non-zero
+    # here is one line in `venue_fees.KALSHI_SERIES_FEE_MULTIPLIERS` after
+    # re-running `scripts/read_kalshi_fee_params.py`.
+    fee_multiplier_resolved = 0
+    fee_multiplier_unresolved = 0
+    fee_unresolved_series: dict[str, int] = {}
     live_venue_ages: list[float] = []
     live_venue_ages_by_source: dict[str, list[float]] = {}
     by_source: dict[str, int] = {}
@@ -1651,6 +1664,7 @@ def apply_venue_quotes_to_grid(
             #
             # So the only moment both halves exist is this one.
             if _venue_basis_edge is not None:
+                _kalshi_multiplier = _resolved_kalshi_fee_multiplier(quote)
                 side_best["venue_basis"] = _venue_basis_edge(
                     side_best,
                     venue=_VENUE_BASIS_NAME.get(quote.source, quote.source),
@@ -1660,13 +1674,49 @@ def apply_venue_quotes_to_grid(
                     row_game_token=row_game,
                     # The BOOK's age, still unmodified at this point. See (1).
                     book_quote_age_seconds=side_best.get("age_seconds"),
-                    # Absent from `kalshi_markets.json`; the module assumes the
-                    # full rate and stamps `fee_is_upper_bound`.
-                    kalshi_fee_multiplier=None,
+                    # RESOLVED FROM THE SERIES ON THE ROW. `#S6a`.
+                    #
+                    # This argument was an unconditional `None` until
+                    # 2026-09-09, so every Kalshi row was priced at the FULL
+                    # rate while every MLB game/total/spread series and every
+                    # batter-prop series is HALF. Measured on the 2026-09-09
+                    # 12:30Z board over 212 paired MLB prop rows: median net
+                    # hold 5.09% assumed against 3.55% true -- 1.64 points of
+                    # hold that came from the assumption, not from the venue.
+                    #
+                    # The ticker was already on the row (`quote.venue_ref`,
+                    # 257 of 279 rows) and the table was already written down
+                    # in `venue_fees`; only the wire between them was missing.
+                    #
+                    # None still means UNKNOWN, and unknown still means full
+                    # rate plus `fee_is_upper_bound`. See
+                    # `_resolved_kalshi_fee_multiplier` for why that asymmetry
+                    # is not a wash.
+                    kalshi_fee_multiplier=_kalshi_multiplier,
                     is_live=row_is_live,
                 ).as_payload()
                 if side_best["venue_basis"].get("displayable"):
                     venue_basis_rows += 1
+                # COUNTED OFF THE EMITTED PAYLOAD, NOT OFF THE INPUT. `#S6a`.
+                #
+                # `_kalshi_multiplier` is what this function CHOSE;
+                # `fee_is_upper_bound` is what the row actually GOT. Counting
+                # the first would let this instrument report full coverage
+                # while the argument sat unwired -- which is exactly the state
+                # the line exists to detect, and it was verified by breaking
+                # the wire and watching a payload-based counter follow while an
+                # input-based one did not.
+                if quote.source == "kalshi":
+                    if side_best["venue_basis"].get("fee_is_upper_bound"):
+                        fee_multiplier_unresolved += 1
+                        _series = str(
+                            getattr(quote, "venue_ref", None) or ""
+                        ).split("-", 1)[0].strip().upper()
+                        fee_unresolved_series[_series or "(no venue_ref)"] = (
+                            fee_unresolved_series.get(_series or "(no venue_ref)", 0) + 1
+                        )
+                    else:
+                        fee_multiplier_resolved += 1
 
             # THE VENUE-QUOTE AGE DISTRIBUTION, UNCENSORED.
             #
@@ -1762,6 +1812,24 @@ def apply_venue_quotes_to_grid(
         flush=True,
     )
 
+    # UNCONDITIONAL, INCLUDING THE ZERO, AND WITH ITS DENOMINATOR. `#S6a`.
+    # `resolved` and `upper_bound` sum to the Kalshi rows the comparison saw,
+    # so this line separates three states a single counter cannot: the fee
+    # table covers the book, the table has a hole (`series=` names it), and
+    # the comparison never ran at all (both zero, which is NOT coverage).
+    _kalshi_fee_rows = fee_multiplier_resolved + fee_multiplier_unresolved
+    print(
+        "[venue_quote_fanin] KALSHI_FEE_MULTIPLIER"
+        f" sport={sport_slug} resolved={fee_multiplier_resolved}"
+        f" upper_bound={fee_multiplier_unresolved} kalshi_rows={_kalshi_fee_rows}"
+        f" unmapped={dict(sorted(fee_unresolved_series.items()))}"
+        " -- resolved reads the DECLARED per-series rate"
+        " (`venue_fees.KALSHI_SERIES_FEE_MULTIPLIERS`); upper_bound is still"
+        " assuming the FULL rate and is stamped `fee_is_upper_bound`."
+        " upper_bound/kalshi_rows IS the unmapped share of the book",
+        flush=True,
+    )
+
     # UNCONDITIONAL, including the zero, and WITH ITS DENOMINATOR. A guard whose
     # only evidence is a counter nobody prints is how the first `#603` pass came
     # to look like it was working while rejecting nothing.
@@ -1819,6 +1887,11 @@ def apply_venue_quotes_to_grid(
         # facts that look identical without `sides_seen`.
         "ambiguous_unnamed_rejected": ambiguous_unnamed_rejected,
         "venue_basis_rows": venue_basis_rows,
+        # `#S6a`. Returned as well as printed so a caller can aggregate the
+        # coverage across sports without parsing logs.
+        "fee_multiplier_resolved": fee_multiplier_resolved,
+        "fee_multiplier_unresolved": fee_multiplier_unresolved,
+        "fee_unresolved_series": dict(sorted(fee_unresolved_series.items())),
         # The raw ages, so a caller can aggregate across sports.
         "live_venue_ages": live_venue_ages,
         "by_source": by_source,
@@ -1863,6 +1936,44 @@ try:  # pragma: no cover - import-order guard, not a behaviour branch
     )
 except ImportError:  # pragma: no cover
     _venue_basis_edge = None
+
+# THE FEE TABLE LIVES IN ONE PLACE. `#S6a`. Imported rather than re-typed:
+# two copies of a fee schedule diverge, and the wrong one gets believed. Same
+# defensive shape as above -- None means every Kalshi row falls back to the
+# full rate exactly as it did before this change, which is the conservative
+# direction and never the expensive one.
+try:  # pragma: no cover - import-order guard, not a behaviour branch
+    from syndicate.features.shared.venue_fees import (
+        kalshi_fee_multiplier_for_series as _kalshi_fee_multiplier_for_series,
+    )
+except ImportError:  # pragma: no cover
+    _kalshi_fee_multiplier_for_series = None
+
+
+def _resolved_kalshi_fee_multiplier(quote: Any) -> float | None:
+    """The declared multiplier for THIS quote's series, or None for unknown.
+
+    None is the signal `venue_basis_edge` already understands: assume the FULL
+    rate and stamp `fee_is_upper_bound`. Everything that is not a Kalshi quote
+    with a readable, MAPPED series ticker lands there.
+
+    **THE ASYMMETRY IS DELIBERATE AND IT IS NOT A WASH.** Overstating a fee
+    can only shrink an edge -- the cost is an opportunity that goes unshown,
+    and nobody loses money on a bet not placed. Understating one invents edge
+    that is not there and loses money on every fill. So an unmapped or
+    unreadable series keeps today's behaviour EXACTLY, and nothing here ever
+    guesses a cheaper rate from a prefix, a sport, or a market family
+    (`venue_fees` names three such rules its own table falsifies).
+    """
+    if _kalshi_fee_multiplier_for_series is None:
+        return None
+    if str(getattr(quote, "source", None) or "") != "kalshi":
+        # Polymarket's fee is flat and measured; it has no multiplier and must
+        # not be handed one. `venue_basis_edge` ignores the argument on that
+        # branch, but passing a Kalshi number on a Polymarket row would be a
+        # lie in the payload even where it is inert.
+        return None
+    return _kalshi_fee_multiplier_for_series(getattr(quote, "venue_ref", None))
 
 
 def _reprice_live_benchmark(

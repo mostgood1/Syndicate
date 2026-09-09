@@ -46,10 +46,13 @@ Both fees are measured, not assumed (`venue_fees.py`):
     Kalshi      `rate * C * P * (1-P)`, rate = 0.07 * the SERIES' OWN
                 `fee_multiplier` -- every MLB game/total/spread series is HALF
                 rate. Verified against 18/18 real fills, rounding ceil-to-4dp.
-                Nothing writes that multiplier into `kalshi_markets.json` yet,
-                so when it is absent the FULL rate is assumed and the row is
-                stamped `fee_is_upper_bound`. That can only shrink an edge,
-                never invent one -- see the block at the fee call.
+                Since `#S6a` the caller RESOLVES that multiplier from the
+                series ticker on the row (`venue_fees.
+                kalshi_fee_multiplier_for_series`), so a mapped series is
+                priced at its real rate. An UNMAPPED or unreadable series
+                still assumes the FULL rate and is still stamped
+                `fee_is_upper_bound` -- that can only shrink an edge, never
+                invent one -- see the block at the fee call.
     Polymarket  150 bps of NOTIONAL, FLAT, price-independent. Verified against
                 five real `commissionNotionalTotalCollected` values.
 
@@ -410,28 +413,41 @@ def venue_basis_edge(
                 # THE FULL RATE, ASSUMED, NOT A REFUSAL -- and the direction is
                 # the whole justification.
                 #
-                # Nothing writes `fee_multiplier` into `kalshi_markets.json`
-                # today, so refusing here would make this module INERT on the
-                # one venue whose in-play depth is actually measured (1c
-                # spreads, ~900k contracts of 24h volume on a single live
-                # moneyline). Inert-but-principled is the worse failure: the
-                # feature would silently do nothing and read as "Kalshi has no
-                # live edges", which is precisely the confusion that cost an
-                # evening when `markets_key_absent` made Kalshi offer zero
-                # quotes platform-wide.
+                # `#S6a` (2026-09-09): this branch used to take EVERY Kalshi
+                # row, because `venue_quote_fanin` passed an unconditional
+                # `None`. It now passes the series' declared multiplier when
+                # the series is mapped, so this branch is what UNKNOWN means
+                # rather than what Kalshi means. The arithmetic below is
+                # untouched -- this package changed which multiplier is
+                # chosen, never the formula.
                 #
-                # Assuming FULL rate is safe in the only direction that matters.
-                # Every MLB game/total/spread series is HALF rate, so the true
-                # fee is at most this and usually half of it: the assumption can
-                # only make an edge look SMALLER, never invent one. Assuming
-                # half would have the opposite sign and is not available.
+                # Refusing here would still make the module INERT on the one
+                # venue whose in-play depth is actually measured (1c spreads,
+                # ~900k contracts of 24h volume on a single live moneyline).
+                # Inert-but-principled is the worse failure: the feature would
+                # silently do nothing and read as "Kalshi has no live edges",
+                # which is precisely the confusion that cost an evening when
+                # `markets_key_absent` made Kalshi offer zero quotes
+                # platform-wide.
+                #
+                # Assuming FULL rate is safe in the only direction that matters,
+                # and the two directions do not cost the same. Overstating a fee
+                # can only make an edge look SMALLER: the worst case is an
+                # opportunity that goes unshown, and nobody loses money on a bet
+                # not placed. Understating one INVENTS edge that is not there and
+                # loses on every fill. Full rate is the dearer of the two rates
+                # ever observed, so assuming it is the conservative side;
+                # assuming half has the opposite sign and is not available.
                 #
                 # `kalshi_polymarket_arb` already made this exact call
                 # (`float(m.get("kalshi_fee_multiplier") or 1.0)`), so this is
                 # consistency with a live decision, not a new one.
                 #
                 # The assumption RIDES ON THE PAYLOAD (`fee_is_upper_bound`) so
-                # a reader is never told a bound is a measurement.
+                # a reader is never told a bound is a measurement -- and since
+                # `#S6a` that stamp is no longer a constant on Kalshi rows, so
+                # its RATE is a real instrument for how much of the book the
+                # fee table does not cover.
                 fee_is_upper_bound = True
             fee = kalshi_taker_fee_dollars(
                 1.0,

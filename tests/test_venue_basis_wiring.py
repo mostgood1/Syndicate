@@ -64,7 +64,20 @@ def _row(state: str = "live", *, book_age: float = FRESH_BOOK_AGE, books: int = 
     }
 
 
-def _quotes(now: float, *, home: int = 250, away: int = -300, source: str = "kalshi") -> dict:
+def _quotes(
+    now: float,
+    *,
+    home: int = 250,
+    away: int = -300,
+    source: str = "kalshi",
+    venue_ref: str | None = None,
+) -> dict:
+    """`venue_ref` defaults to None deliberately.
+
+    That is the UNKNOWN-series case, and it must keep the pre-`#S6a` behaviour
+    exactly -- full rate, `fee_is_upper_bound` stamped. Tests that want the
+    resolved path pass a real ticker.
+    """
     out = {}
     for side, price in (("home", home), ("away", away)):
         key = str(quote_key("mlb", "h2h", side, None))
@@ -78,6 +91,7 @@ def _quotes(now: float, *, home: int = 250, away: int = -300, source: str = "kal
             american=price,
             line=None,
             fetched_at=now - 10.0,
+            venue_ref=venue_ref,
         )
     return out
 
@@ -189,13 +203,145 @@ def test_the_venue_NAME_is_translated_not_passed_through():
     assert basis["fee_is_upper_bound"] is False
 
 
-def test_kalshi_rows_are_stamped_as_a_FEE_UPPER_BOUND():
-    """Nothing writes the series multiplier yet, so the full rate is assumed.
-    The row must say so rather than present the bound as the fee."""
+def test_a_kalshi_row_with_NO_series_is_stamped_as_a_FEE_UPPER_BOUND():
+    """UNKNOWN keeps the conservative behaviour, unchanged by `#S6a`.
+
+    No `venue_ref` means no series, which means no declared multiplier. The
+    full rate is assumed and the row must SAY so rather than present a bound
+    as the fee. Overstating a fee only shrinks an edge; understating one
+    invents an edge that is not there, so the two directions are not a wash
+    and absent must land on this side.
+    """
     now = time.time()
     row = _row()
-    _apply([row], _quotes(now, source="kalshi"), now)
+    stats = _apply([row], _quotes(now, source="kalshi"), now)
     assert row["best"]["home"]["venue_basis"]["fee_is_upper_bound"] is True
+    # And the counter agrees with the stamp, so the log line is not decorative.
+    assert stats["fee_multiplier_resolved"] == 0
+    assert stats["fee_multiplier_unresolved"] >= 1
+    assert "(no venue_ref)" in stats["fee_unresolved_series"]
+
+
+def test_a_row_with_no_venue_ref_does_not_RAISE():
+    """`venue_ref` is optional on `Quote` and None on plenty of real quotes.
+
+    Asserted separately from the stamp above because a crash and a bound would
+    both leave the board without a number, and only one of them is the
+    designed behaviour.
+    """
+    now = time.time()
+    row = _row()
+    stats = _apply([row], _quotes(now, source="kalshi", venue_ref=None), now)
+    assert row["best"]["home"]["venue_basis"]["edge_pct"] is not None
+    assert stats["venue_basis_rows"] >= 1
+
+
+def test_a_KNOWN_half_rate_series_RESOLVES_and_drops_the_stamp():
+    """REACHABILITY, and it is the point of the whole package.
+
+    The fix is one argument in `venue_quote_fanin`; a unit test on
+    `venue_basis_edge` would pass whether or not that argument was ever wired,
+    which is exactly the inert-fix shape this repo has four of on file. So the
+    assertion is made through `apply_venue_quotes_to_grid` on a quote carrying
+    a real ticker.
+
+    `KXMLBTOTAL` is x0.5 (`venue_fees.KALSHI_SERIES_FEE_MULTIPLIERS`, read
+    2026-09-01). The row must come back UNBOUNDED and CHEAPER than the same
+    row with no series -- `off != on`, measured, not merely available.
+    """
+    now = time.time()
+    resolved_row = _row()
+    stats = _apply(
+        [resolved_row],
+        _quotes(now, source="kalshi", venue_ref="KXMLBTOTAL-26SEP061340MILCIN-4"),
+        now,
+    )
+    basis = resolved_row["best"]["home"]["venue_basis"]
+    assert basis["fee_is_upper_bound"] is False, (
+        "the resolved multiplier never reached the fan-in -- the wire is inert"
+    )
+    assert stats["fee_multiplier_resolved"] >= 1
+    assert stats["fee_multiplier_unresolved"] == 0
+    assert stats["fee_unresolved_series"] == {}
+
+    # OFF != ON. Same fixture, no series: dearer fee, smaller edge.
+    unknown_row = _row()
+    _apply([unknown_row], _quotes(now, source="kalshi"), now)
+    unknown = unknown_row["best"]["home"]["venue_basis"]
+    assert unknown["fee_is_upper_bound"] is True
+    assert basis["venue_fee_per_contract"] < unknown["venue_fee_per_contract"]
+    assert basis["edge_pct"] > unknown["edge_pct"]
+
+
+def test_a_FULL_rate_series_resolves_to_the_full_rate_WITHOUT_the_stamp():
+    """`KXMLBERA` is x1.0 and MEASURED. A resolved 1.0 and an assumed 1.0 are
+    the same number and different facts; only the unmeasured one is a bound.
+
+    If these collapsed, `fee_is_upper_bound` would stop being readable as a
+    coverage instrument -- which is the second half of what this package buys.
+    """
+    now = time.time()
+    row = _row()
+    stats = _apply(
+        [row], _quotes(now, source="kalshi", venue_ref="KXMLBERA-26SEP06-XYZ"), now
+    )
+    basis = row["best"]["home"]["venue_basis"]
+    assert basis["fee_is_upper_bound"] is False
+    assert stats["fee_multiplier_resolved"] >= 1
+
+    # ...and the ARITHMETIC is identical to the assumed-full-rate row. This
+    # package changed which multiplier is chosen, never the formula.
+    assumed_row = _row()
+    _apply([assumed_row], _quotes(now, source="kalshi"), now)
+    assumed = assumed_row["best"]["home"]["venue_basis"]
+    assert basis["venue_fee_per_contract"] == assumed["venue_fee_per_contract"]
+    assert basis["edge_pct"] == assumed["edge_pct"]
+
+
+def test_an_UNMAPPED_series_keeps_the_full_rate_AND_the_stamp():
+    """A series nobody has read is not a series that is cheap.
+
+    No prefix rule, no "MLB is half": `venue_fees` names three broader rules
+    its own table falsifies, including two MLB totals series at different
+    rates. An unmapped ticker must land on the conservative branch and be
+    NAMED in the counter, because that name is the one-line repair.
+    """
+    now = time.time()
+    row = _row()
+    stats = _apply(
+        [row],
+        _quotes(now, source="kalshi", venue_ref="KXMLBNOTREAL-26SEP06-XYZ"),
+        now,
+    )
+    basis = row["best"]["home"]["venue_basis"]
+    assert basis["fee_is_upper_bound"] is True
+    assert stats["fee_multiplier_resolved"] == 0
+    assert stats["fee_unresolved_series"] == {"KXMLBNOTREAL": 2}
+
+    # And it really is the FULL rate, not some third number.
+    unknown_row = _row()
+    _apply([unknown_row], _quotes(now, source="kalshi"), now)
+    assert (
+        basis["venue_fee_per_contract"]
+        == unknown_row["best"]["home"]["venue_basis"]["venue_fee_per_contract"]
+    )
+
+
+def test_a_POLYMARKET_ticker_is_never_handed_a_kalshi_multiplier():
+    """Polymarket's fee is flat and measured; the Kalshi table must not touch
+    it, and it must not appear in the Kalshi coverage counter either -- a
+    denominator inflated by rows from the other venue would misstate the
+    unmapped share of the Kalshi book."""
+    now = time.time()
+    row = _row()
+    stats = _apply(
+        [row],
+        _quotes(now, source="polymarket_us", venue_ref="mlb-cin-chc-2026-09-06"),
+        now,
+    )
+    assert row["best"]["home"]["venue_basis"]["fee_is_upper_bound"] is False
+    assert stats["fee_multiplier_resolved"] == 0
+    assert stats["fee_multiplier_unresolved"] == 0
 
 
 def test_a_row_with_no_venue_quote_carries_NO_verdict_at_all():

@@ -270,3 +270,83 @@ def test_the_bound_is_ABOVE_the_measurement_at_every_price():
         bound = polymarket_worst_case_fee_dollars(100, price)
         measured = polymarket_fee_dollars(100, price)
         assert bound > measured, f"at p={price}: bound {bound} !> measured {measured}"
+
+
+# --------------------------------------------------------------------------
+# THE SERIES -> MULTIPLIER TABLE. `#S6a`.
+#
+# The table is a SNAPSHOT of venue configuration, so these tests deliberately
+# do not re-type every rate: pinning all 24 rows here would just be a second
+# copy of the same thing that diverges when the venue changes. They pin the
+# two facts a caller relies on -- the resolver's SHAPE, and the direction it
+# fails in.
+# --------------------------------------------------------------------------
+
+
+def test_a_mapped_series_resolves_from_a_FULL_TICKER_not_just_a_bare_series():
+    """Callers hold contract tickers, not series. If only the bare form
+    resolved, every real board row would fall through to the assumed rate and
+    the fix would be inert on the only input it ever sees."""
+    from syndicate.features.shared.venue_fees import kalshi_fee_multiplier_for_series
+
+    assert kalshi_fee_multiplier_for_series("KXMLBTB") == 0.5
+    assert kalshi_fee_multiplier_for_series(
+        "KXMLBTB-26SEP091840NYYBOS-BOSDEVERS12-2"
+    ) == 0.5
+
+
+def test_an_UNKNOWN_series_returns_None_and_NEVER_a_cheap_guess():
+    """None is the caller's signal to assume the FULL rate and stamp the row.
+
+    The asymmetry is the design: overstating a fee only shrinks an edge, while
+    understating one invents edge that is not there and loses on every fill.
+    So nothing unmapped may resolve, and no prefix rule may rescue it.
+    """
+    from syndicate.features.shared.venue_fees import kalshi_fee_multiplier_for_series
+
+    for unknown in ("", None, "KXMLBNOTREAL", "KXMLBNOTREAL-26SEP06-X",
+                    "mlb-cin-chc-2026-09-06", "-", 17):
+        assert kalshi_fee_multiplier_for_series(unknown) is None, unknown
+
+
+def test_the_table_is_NOT_uniform_which_is_why_a_per_sport_rule_is_wrong():
+    """`venue_fees` names three broader rules its own table falsifies. This
+    pins the sharpest one: two MLB totals series at two different rates.
+
+    A future edit that "simplifies" this to `MLB -> 0.5` would be wrong in
+    both directions at once, and this is the test that says so.
+    """
+    from syndicate.features.shared.venue_fees import (
+        KALSHI_SERIES_FEE_MULTIPLIERS,
+        kalshi_fee_multiplier_for_series,
+    )
+
+    assert kalshi_fee_multiplier_for_series("KXMLBTOTAL") == 0.5
+    assert kalshi_fee_multiplier_for_series("KXMLBINNINGTOTAL") == 1.0
+    assert set(KALSHI_SERIES_FEE_MULTIPLIERS.values()) == {0.5, 1.0}
+
+
+def test_the_assumed_multiplier_is_the_DEAREST_rate_in_the_table():
+    """A "conservative" default cheaper than some real rate would not be
+    conservative at all -- the same trap `POLYMARKET_ASSUMED_WORST_CASE_RATE`
+    fell into when it sat below the measured fee."""
+    from syndicate.features.shared.venue_fees import (
+        KALSHI_ASSUMED_FEE_MULTIPLIER,
+        KALSHI_SERIES_FEE_MULTIPLIERS,
+    )
+
+    assert KALSHI_ASSUMED_FEE_MULTIPLIER >= max(KALSHI_SERIES_FEE_MULTIPLIERS.values())
+
+
+def test_the_FORMULA_is_untouched_for_a_given_multiplier():
+    """`#S6a` changed WHICH multiplier is chosen, never the arithmetic.
+
+    Pinned against the real fill the module docstring quotes: 19 contracts at
+    0.53 on a x1.0 series charged $0.3314.
+    """
+    assert kalshi_taker_fee_dollars(19, 0.53, fee_multiplier=1.0) == pytest.approx(
+        0.3314, abs=1e-9
+    )
+    # And the half-rate series is exactly half of it, pre-rounding aside.
+    half = kalshi_taker_fee_dollars(19, 0.53, fee_multiplier=0.5)
+    assert half == pytest.approx(0.1657, abs=1e-9)

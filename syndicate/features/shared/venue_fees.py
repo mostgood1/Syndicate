@@ -276,6 +276,10 @@ __all__ = [
     "FEE_TYPE_QUADRATIC_WITH_MAKER",
     "KNOWN_FEE_TYPES",
     "KALSHI_BASE_TAKER_RATE",
+    "KALSHI_SERIES_FEE_MULTIPLIERS",
+    "KALSHI_ASSUMED_FEE_MULTIPLIER",
+    "kalshi_series_from_ticker",
+    "kalshi_fee_multiplier_for_series",
     "MAKER_FRACTION",
     "POLYMARKET_ASSUMED_WORST_CASE_RATE",
     "POLYMARKET_MEASURED_NOTIONAL_RATE",
@@ -311,6 +315,108 @@ KNOWN_FEE_TYPES = frozenset({FEE_TYPE_QUADRATIC, FEE_TYPE_QUADRATIC_WITH_MAKER})
 
 # MEASURED on 25 of our own fills across two multipliers -- see the docstring.
 KALSHI_BASE_TAKER_RATE = 0.07
+
+# --------------------------------------------------------------------------
+# THE SERIES -> MULTIPLIER TABLE, DECLARED ONCE. `#S6a`.
+# --------------------------------------------------------------------------
+#
+# Until 2026-09-09 this table existed only in the module docstring above, so
+# every caller that had a series ticker in hand still had to assume the full
+# rate. Measured cost on production the same day (775-row board, 212 paired
+# MLB prop over/under rows): the assumed-full-rate net hold read a median
+# 5.09% against 3.55% at the true half rate -- **1.64 points of hold invented
+# by an assumption**, worth roughly 1.5 ROI points on the audit's ladder.
+#
+# THIS IS A SNAPSHOT OF VENUE CONFIGURATION, NOT A CONSTANT OF NATURE. It is
+# the 2026-09-01 read of `scripts/read_kalshi_fee_params.py` (19 MLB series, 0
+# failures) and the 2026-08-29 read for the other sports. Re-run that script
+# and diff this dict; it is here so there is ONE place to diff, not so the
+# numbers stop being measured.
+#
+# THE MULTIPLIER IS A PROPERTY OF THE SERIES AND NOTHING ELSE -- the docstring
+# above names three broader rules this very table falsifies (not per sport,
+# not props-vs-games, not per market family). So: no prefix rules, no
+# heuristics, no "MLB is half". A series that is not spelled out here is
+# UNKNOWN, and unknown is priced at the full rate.
+KALSHI_SERIES_FEE_MULTIPLIERS: dict[str, float] = {
+    # MLB, read 2026-09-01 (`read_kalshi_fee_params.py`, 19 series, 0 failures)
+    "KXMLBGAME": 0.5,
+    "KXMLBSPREAD": 0.5,
+    "KXMLBTOTAL": 0.5,
+    "KXMLBKS": 0.5,
+    "KXMLBOUTS": 0.5,
+    "KXMLBHIT": 0.5,
+    "KXMLBHR": 0.5,
+    "KXMLBHRR": 0.5,
+    "KXMLBRBI": 0.5,
+    "KXMLBTB": 0.5,
+    "KXMLBSB": 0.5,
+    "KXMLBF5TOTAL": 0.5,
+    "KXMLBF5SPREAD": 0.5,
+    "KXMLBTEAMTOTAL": 0.5,
+    "KXMLBERA": 1.0,
+    "KXMLBHA": 1.0,
+    "KXMLBWA": 1.0,
+    "KXMLBASGAME": 1.0,
+    "KXMLBINNINGTOTAL": 1.0,
+    # Other sports, read 2026-08-29. Every one of them full rate, which is why
+    # the fix below can only ever move MLB rows -- stated so a zero delta on
+    # an NFL slate reads as CORRECT rather than as an inert change.
+    "KXNFLGAME": 1.0,
+    "KXNBAGAME": 1.0,
+    "KXWNBAGAME": 1.0,
+    "KXWNBATOTAL": 1.0,
+    "KXNCAAFGAME": 1.0,
+}
+
+# What a caller gets when the series is unknown. FULL RATE.
+#
+# THE ASYMMETRY IS THE WHOLE DESIGN AND IT IS NOT SYMMETRIC IN COST.
+# Overstating a fee can only SHRINK a computed edge: the worst case is that a
+# real opportunity goes unshown, and nobody loses money on a bet not placed.
+# Understating a fee INVENTS edge that does not exist and loses money on every
+# single fill. So an unknown series is priced at the dearer of the two rates we
+# have ever observed, and the row is stamped `fee_is_upper_bound` so a reader
+# is never handed a bound as though it were a measurement.
+KALSHI_ASSUMED_FEE_MULTIPLIER = 1.0
+
+
+def kalshi_series_from_ticker(ticker: Any) -> str | None:
+    """`KXMLBTB-26SEP091840NYYBOS-BOSDEVERS12-2` -> `KXMLBTB`.
+
+    Kalshi tickers are `<SERIES>-<event><suffix>`, so the series is the first
+    hyphen-delimited field. Returns None for anything that is not one -- a
+    Polymarket slug carries no series at all, and guessing a prefix off one is
+    how a Polymarket row would come to be priced on a Kalshi fee table.
+    """
+    text = str(ticker or "").strip().upper()
+    if not text:
+        return None
+    head = text.split("-", 1)[0].strip()
+    return head or None
+
+
+def kalshi_fee_multiplier_for_series(series: Any) -> float | None:
+    """The declared multiplier for a series ticker, or None if it is UNKNOWN.
+
+    Accepts either a bare series (`KXMLBTB`) or a full contract ticker; both
+    are in circulation, and a caller that has to remember which is which will
+    eventually pass the wrong one.
+
+    **None means UNKNOWN, and the caller must treat it as the full rate.** It
+    deliberately does NOT return `KALSHI_ASSUMED_FEE_MULTIPLIER` itself: a
+    resolved 1.0 (`KXMLBERA`, measured) and an assumed 1.0 (never read) are
+    the same number and different facts, and only the caller can stamp the
+    difference onto the row. Collapsing them here would make
+    `fee_is_upper_bound` unreadable as a coverage instrument.
+    """
+    key = kalshi_series_from_ticker(series)
+    if key is None:
+        return None
+    value = KALSHI_SERIES_FEE_MULTIPLIERS.get(key)
+    if value is None:
+        return None
+    return float(value)
 
 # UNVERIFIED. Third-party sources put the maker fee at a quarter of the taker
 # fee (0.0175 / 0.07). No fill of ours confirms it, and `maker_fee_dollars`
