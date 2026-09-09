@@ -71,3 +71,36 @@ def isolated_wnba_cards_context(scratch: Path | None = None) -> Iterator[Path]:
             patch.object(cards, "wnba_cards_context_artifact_path", _scratch_wnba_cards_context_path(scratch))
         )
         yield scratch
+
+
+@contextlib.contextmanager
+def no_vendored_basketball_schedule_fetch() -> Iterator[None]:
+    """Stop a test from SUBPROCESSING out to the vendored `fetch-schedule` CLI.
+
+    THE WRITE THE IN-PROCESS GUARD CANNOT SEE, and the reason it is worth naming
+    rather than only fixing. `schedule_adapter._fetch_basketball_schedule` reads
+    the season schedule for a date and, finding no row for it, calls
+    `_fetch_basketball_schedule_via_cli`, which runs
+    `python -m wnba_betting.cli fetch-schedule` as a CHILD PROCESS. That child
+    fetches the live NBA/WNBA schedule over the network and writes
+    `vendor/<repo>/data/processed/schedule_<season>.{json,csv}` -- the file
+    `wnba_fixture_identity` calls the git-tracked MASTER. Measured 2026-09-09:
+    all 114 rows of `schedule_2026.csv` plus its `.json` rewritten by a test
+    run, under both runners.
+
+    `conftest.py`'s write guard wraps `open`/`Path.open`/mkdir in THIS process,
+    so a child process is invisible to it by construction. That is the guard's
+    one structural blind spot, and this is the block that covers it -- at the
+    seam, not by forbidding `subprocess` outright, so the adapter's own
+    read/cache logic still runs under test and only the fetch is removed.
+
+    Note this is a NETWORK call in a unit test as well as a tracked-file write:
+    it fires whenever the requested date has no row in the season file, which in
+    the off-season is every date. Returning False is the adapter's real
+    "vendor CLI unavailable" path, which leaves the caller with the rows it
+    already read -- exactly the behaviour on a machine with no vendor tree.
+    """
+    from syndicate.features.shared import schedule_adapter
+
+    with patch.object(schedule_adapter, "_fetch_basketball_schedule_via_cli", return_value=False):
+        yield

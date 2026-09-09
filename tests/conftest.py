@@ -167,6 +167,27 @@ def _isolate_kalshi_markets_artifact(tmp_path_factory):
 
 
 @pytest.fixture(autouse=True)
+def _no_vendored_schedule_subprocess_in_tests():
+    """The write guard's one structural blind spot, closed at the seam.
+
+    `schedule_adapter._fetch_basketball_schedule_via_cli` spawns
+    `python -m wnba_betting.cli fetch-schedule` as a CHILD process, which fetches
+    the live schedule over the network and rewrites the git-tracked
+    `vendor/wnba_betting_repo/data/processed/schedule_2026.{json,csv}`. A child
+    process cannot be seen by an in-process interceptor, so the guard below is
+    blind to it by construction -- it was found by the file coming back modified
+    while the guard reported nothing.
+
+    Reasoning and the block itself in `tests/_artifact_isolation.py`, shared with
+    the unittest entrypoints.
+    """
+    from tests._artifact_isolation import no_vendored_basketball_schedule_fetch
+
+    with no_vendored_basketball_schedule_fetch():
+        yield
+
+
+@pytest.fixture(autouse=True)
 def _isolate_wnba_cards_context_publish(tmp_path_factory):
     """THE FOURTH INSTANCE, and the first one under `data/` rather than `reports/`.
 

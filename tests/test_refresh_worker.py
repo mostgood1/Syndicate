@@ -47,6 +47,59 @@ def _assert_no_refresh_subprocess(test, mocked_popen) -> None:
     test.assertEqual(spawned, [], f"expected no refresh job spawned directly; got {spawned}")
 
 
+# ---------------------------------------------------------------------------
+# Every test here that calls `main()` runs the REAL worker, so it writes REAL
+# artifacts.
+# ---------------------------------------------------------------------------
+# `main()` runs its scheduled ticks, and those ticks publish: measured
+# 2026-09-09, fifteen tests in this file wrote
+# `data/ncaaf_source/historical_truth/sp_ratings_2026.json` (via
+# `_run_ncaaf_live_resim_tick` -> `_ncaaf_sp_ratings_index` ->
+# `generate_smartsim2_ncaaf_projections._write_sp_cache`) and created
+# `data/live/` for the lens snapshot. Those land in the git-tracked mirror
+# `CLAUDE.md` calls a cold-start safety net, which is the confusion this whole
+# guard exists to stop.
+#
+# TWO DISTINCT CAUSES, and only one of them was visible from the test bodies.
+# The five sites that pass `clear=True` were setting `SYNDICATE_REPORTS_ROOT`
+# and nothing else, so the data root fell back to the repo's own -- fixed at
+# those sites, in the shape the file's multi-line `patch.dict` blocks already
+# use. The other ten never cleared the environment at all; they simply ran with
+# whatever was ambient, and nothing in the suite pointed the DATA root anywhere.
+# That is what this module-scoped default is for.
+#
+# It cannot be a conftest fixture on its own: `clear=True` erases the whole
+# environment, so a fixture's `SYNDICATE_DATA_ROOT` is gone by the time `main()`
+# runs. Hence both -- the explicit value at every clearing site, and this
+# default for the rest.
+#
+# The tests that need the repo's real mirror read it by absolute path
+# (`repo_root / "data" / "soccer_source" / ...`) rather than through the env, so
+# redirecting the root does not take their fixtures away.
+_MODULE_DATA_ROOT = None
+_MODULE_DATA_ROOT_PATCH = None
+
+
+def setUpModule() -> None:
+    global _MODULE_DATA_ROOT, _MODULE_DATA_ROOT_PATCH
+
+    _MODULE_DATA_ROOT = TemporaryDirectory(prefix="refresh_worker_data_root_")
+    _MODULE_DATA_ROOT_PATCH = patch.dict(
+        os.environ, {"SYNDICATE_DATA_ROOT": str(Path(_MODULE_DATA_ROOT.name) / "data")}
+    )
+    _MODULE_DATA_ROOT_PATCH.start()
+
+
+def tearDownModule() -> None:
+    global _MODULE_DATA_ROOT, _MODULE_DATA_ROOT_PATCH
+    if _MODULE_DATA_ROOT_PATCH is not None:
+        _MODULE_DATA_ROOT_PATCH.stop()
+        _MODULE_DATA_ROOT_PATCH = None
+    if _MODULE_DATA_ROOT is not None:
+        _MODULE_DATA_ROOT.cleanup()
+        _MODULE_DATA_ROOT = None
+
+
 class RefreshWorkerTests(unittest.TestCase):
     @staticmethod
     def _load_module(repo_root: Path):
@@ -247,7 +300,7 @@ class RefreshWorkerTests(unittest.TestCase):
             latest_manifest_path = Path(tmp_dir) / "refresh_status_latest.json"
             latest_manifest_path.write_text(json.dumps({"state": "idle"}), encoding="utf-8")
 
-            with patch.dict(module.os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=True), patch.object(
+            with patch.dict(module.os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root), "SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data")}, clear=True), patch.object(
                 sys,
                 "argv",
                 [
@@ -346,6 +399,7 @@ class RefreshWorkerTests(unittest.TestCase):
                 module.os.environ,
                 {
                     "SYNDICATE_REPORTS_ROOT": str(reports_root),
+                    "SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data"),
                     "WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN": "1",
                 },
                 clear=True,
@@ -399,6 +453,7 @@ class RefreshWorkerTests(unittest.TestCase):
                 module.os.environ,
                 {
                     "SYNDICATE_REPORTS_ROOT": str(reports_root),
+                    "SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data"),
                     "WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN": "1",
                 },
                 clear=True,
@@ -493,6 +548,7 @@ class RefreshWorkerTests(unittest.TestCase):
                 module.os.environ,
                 {
                     "SYNDICATE_REPORTS_ROOT": str(reports_root),
+                    "SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data"),
                     "SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN": "1",
                 },
                 clear=True,
@@ -556,7 +612,7 @@ class RefreshWorkerTests(unittest.TestCase):
 
             with patch.dict(
                 module.os.environ,
-                {"SYNDICATE_REPORTS_ROOT": str(reports_root)},
+                {"SYNDICATE_REPORTS_ROOT": str(reports_root), "SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data")},
                 clear=True,
             ), patch.object(
                 sys,
@@ -596,6 +652,7 @@ class RefreshWorkerTests(unittest.TestCase):
                 module.os.environ,
                 {
                     "SYNDICATE_REPORTS_ROOT": str(reports_root),
+                    "SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data"),
                     "RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN": "1",
                 },
                 clear=True,
@@ -652,6 +709,7 @@ class RefreshWorkerTests(unittest.TestCase):
                 module.os.environ,
                 {
                     "SYNDICATE_REPORTS_ROOT": str(reports_root),
+                    "SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data"),
                     "RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN": "1",
                 },
                 clear=True,
@@ -692,7 +750,7 @@ class RefreshWorkerTests(unittest.TestCase):
 
             with patch.dict(
                 module.os.environ,
-                {"SYNDICATE_REPORTS_ROOT": str(reports_root)},
+                {"SYNDICATE_REPORTS_ROOT": str(reports_root), "SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data")},
                 clear=True,
             ), patch.object(
                 sys,
@@ -1183,7 +1241,7 @@ class RefreshWorkerTests(unittest.TestCase):
             fake_process.pid = 4321
             fake_process.poll.return_value = 0
 
-            with patch.dict(module.os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=True), patch.object(
+            with patch.dict(module.os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root), "SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data")}, clear=True), patch.object(
                 sys,
                 "argv",
                 [
@@ -1232,7 +1290,7 @@ class RefreshWorkerTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.dict(module.os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=True), patch.object(
+            with patch.dict(module.os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root), "SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data")}, clear=True), patch.object(
                 sys,
                 "argv",
                 [
@@ -1271,7 +1329,7 @@ class RefreshWorkerTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.dict(module.os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=True), patch.object(
+            with patch.dict(module.os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root), "SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data")}, clear=True), patch.object(
                 sys,
                 "argv",
                 [
@@ -1447,7 +1505,7 @@ class RefreshWorkerTests(unittest.TestCase):
             fake_process.pid = 4321
             fake_process.poll.return_value = 0
 
-            with patch.dict(module.os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=True), patch.object(
+            with patch.dict(module.os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root), "SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data")}, clear=True), patch.object(
                 sys,
                 "argv",
                 [
@@ -1496,6 +1554,7 @@ class RefreshWorkerTests(unittest.TestCase):
                 module.os.environ,
                 {
                     "SYNDICATE_REPORTS_ROOT": tmp_dir,
+                    "SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data"),
                     "SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES": "true",
                 },
                 clear=False,
@@ -1860,7 +1919,15 @@ def _run_main_once(rrw, tmp_path, monkeypatch, *, env=None):
     latest.parent.mkdir(parents=True, exist_ok=True)
     latest.write_text(json.dumps(WEDGED_MANIFEST), encoding="utf-8")
 
-    for key, value in {"SYNDICATE_REPORTS_ROOT": str(reports_root), **(env or {})}.items():
+    # `SYNDICATE_DATA_ROOT` beside the reports root, for the same reason the
+    # module-scoped default above exists: `main()` publishes, and without this
+    # the NCAAF resim tick writes `sp_ratings_2026.json` and `data/live/` into
+    # the tracked mirror.
+    for key, value in {
+        "SYNDICATE_REPORTS_ROOT": str(reports_root),
+        "SYNDICATE_DATA_ROOT": str(tmp_path / "data"),
+        **(env or {}),
+    }.items():
         monkeypatch.setenv(key, value)
     monkeypatch.setattr(
         sys,
