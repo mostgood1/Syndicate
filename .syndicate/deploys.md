@@ -28522,3 +28522,41 @@ ratchet, it does not remove the cause. The driver is artifact ops traffic —
 pid 270's own 62 requests are 48 publish/stream — and web remains a 2 GB service
 with `WEB_CONCURRENCY=2`. The free mitigation stands: keep bulk publish/export
 loops out of the game window.
+
+### refresh-worker d209f2b6 — pricing-plane-v1 deploy 4: `SYNDICATE_FAIR_ANCHOR=sharp_only`. The Pinnacle tier is the anchor that survived its readings `[lane pricing-plane-v1, deploy dep-dagaj9e1egvs739u4b20, fired 2026-09-09T00:34:45Z, live 00:40:13Z, substrate render]`
+
+Same code as deploy 3 plus main's tip (d209f2b6 is a peer's ledger/ci commit; every
+pricing-plane commit is an ancestor). Env changed 00:04Z: `sharp` → `sharp_only`
+(Pinnacle tier, then the consensus chain; no exchange tier). Preflight CLEAR
+recorded after the 00:11:01Z MLB sim finished (exit 0); the claim had expired
+during the wait and was re-taken ONCE at 00:3xZ, not in a loop.
+
+**verify — the flag reaches the board and the exchange tier is gone, PASSING.**
+First post-boot shortlist (`limit=2000`, read 00:55:34Z, after the new process's
+first `layer2_shortlist` build at 00:53:40Z):
+
+    fair_method   consensus 1,797   sharp_anchor 203   exchange_mid 0   book_margin_model 0 (on this slate)
+    refusals      none (the exchange tier is not consulted under sharp_only)
+    consensus rows: fair_probability == fair_consensus_prob on 1,797 / 1,797
+
+**Pinnacle by-book reading (the tier that stays):**
+
+    n=203  mean +0.544  median +0.433  mean|d| 1.136 pp  p10 -1.05  p90 +2.11  min -4.87  max +9.21
+    |d|>2pp 33   |d|>5pp 2   hold mean 4.15%  p90 4.97%  max 7.18%
+    sport   ncaaf n=124 mean|d| 1.027 (pregame weekend lines)   mlb n=79 mean|d| 1.307 (in-play at this hour)
+    market  spreads 0.819  totals 0.870  h2h 1.666  spreads_alt 1.940  totals_alt 1.184
+
+The two rows past 5 pp are BOTH in-play MLB alternate spreads where Pinnacle is the
+ONLY book on the line (`books=1`, hold 5.8%): a lone sharp quote at a 5.8% hold is
+not corroborated either. **That is the P1c item, sharper than before:** a hold cap
+on the Pinnacle tier (~5%) and a minimum of 2 books on the line for an in-play
+anchor. Everything else in the table is what a sharp anchor should look like
+against a soft median.
+
+**Deploy 2 → 3 → 4 in one line:** `sharp` anchored 331 rows (68 Pinnacle, 263
+exchange); P1b's gates cut the exchange rows to 159 without making the survivors
+accurate (Kalshi 3.1 pp at 1.4% hold); `sharp_only` keeps the 203 Pinnacle rows and
+drops every exchange anchor while preserving each row's counterfactual median.
+The 3-day same-book CLV reading for the sharp tier runs on `fair_method ==
+sharp_anchor` rows from 00:40:13Z, split by market, against the prior 3 days'
+consensus rows. Claim released after this entry.
