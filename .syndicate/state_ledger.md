@@ -1326,3 +1326,13 @@ a fixture and a `setUpModule`.
 **Off switch** `SYNDICATE_TEST_DATA_MIRROR_GUARD=off`, which is also the control
 that distinguishes FIXED from BLOCKED: guard-on-and-clean is equally what a
 silently-blocking guard looks like.
+
+**ONE HOLE FOUND AFTER THIS SUBJECT WAS FIRST WRITTEN, 2026-09-09.** `_git_ignores`
+cached its verdict per DIRECTORY, and `git check-ignore` answers NOT ignored for
+anything in the index — so one query for an ignored name exempted every TRACKED
+file in that directory for the rest of the process (208 of them under
+`source_artifacts/data/live_lens/`). Reproduced on `e44e1d79`. The guard's own
+self-check was the poisoner: it ended on a priming query, which is why it passed
+alone and failed only in a parallel run. Fix `ba732005`, lane
+`data-mirror-write-guard-sweep`. **A cache key coarser than the predicate it
+caches is a correctness bug, not a performance trade.**

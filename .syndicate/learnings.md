@@ -4848,3 +4848,33 @@ rule.
 guard-ON-and-clean reading cannot tell FIXED from BLOCKED; only the guard-OFF arm
 can. In all three the reading was true and the SCOPE it was offered for was wider
 than the reading could support.
+
+## 2026-09-09 FORBIDDEN: caching a `git check-ignore` verdict per DIRECTORY. The answer differs INSIDE one directory — that is the whole point of the exemption — and one query for an ignored name then exempts every TRACKED file beside it `[lane data-tree-write-guard, hole found by lane data-mirror-write-guard-sweep, fix ba732005]`
+
+The guard in `tests/conftest.py` exempts a write whose path `.gitignore` already
+excludes, and the exemption's stated basis is that **`git check-ignore` answers
+NOT ignored for anything in the index, whatever rules match it** — so a new cache
+file under an ignored-by-rule subtree is exempt while a TRACKED file beside it is
+not. I then cached the verdict per directory "because a directory rule applies to
+the whole subtree", which denies exactly that.
+
+MEASURED, one directory holding 208 tracked files:
+
+    tracked      -> False   correct
+    ignored name -> True    correct, and PRIMES the per-directory cache
+    tracked      -> True    WRONG — guard disarmed for the rest of the process
+
+**THE SHAPE, past this instance: A CACHE KEY COARSER THAN THE PREDICATE IT CACHES
+IS A CORRECTNESS BUG, NOT A PERFORMANCE TRADE.** The predicate here is per-PATH by
+definition; keying it per directory cannot represent two answers, so the second
+answer is silently replaced by the first. Check the key against the predicate's
+own granularity before caching anything.
+
+**AND THE SELF-CHECK POISONED IT.** The test that pins "a tracked file inside an
+ignored subtree is still guarded" ended on a query for an ignored NAME in that
+directory, priming the cache as its last act. It passed alone and failed only in a
+parallel full run. So: **a guard's self-check must not leave the guard in a
+different state than it found it** — and the general form, contributed by the
+sibling lane, is that A SELF-CHECK FOR A GUARD MUST ASSERT THE GUARD IS INSTALLED
+BEFORE IT EXERCISES THE GUARDED PATH, or the check's own failure mode is to
+perform the damage it exists to detect.
