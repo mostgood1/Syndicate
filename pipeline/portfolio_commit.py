@@ -262,6 +262,35 @@ def _utc_now_stamp() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+class _VenueResolvers(tuple):
+    """`(price_resolver, ticker_resolver)`, plus WHY it is empty when it is.
+
+    A TUPLE SUBCLASS ON PURPOSE, so `price, ticker = _venue_price_resolver(...)`
+    keeps working everywhere and every plain `return (None, None)` in this file
+    stays exactly what it is today. `_venue_feed_status` reads the extra field
+    through `getattr(..., "withheld_by", None)`, so the DEFAULT -- a bare tuple,
+    an unconverted return path, a caller that never asks -- is `None`, which is
+    the READER_FAILED branch. The alarm is what you get when nobody said
+    otherwise; you have to positively assert a policy to escape it.
+
+    `withheld_by` is the NAME OF THE ENV FLAG that suppressed the matches, and
+    it is set only by the site that actually did the suppressing and watched the
+    match list go empty because of it. It is not derived from the flag's value,
+    the sport, or the date: a build whose join produced nothing at all sets it
+    to None even with the flag off, because that build's zero is not the
+    policy's doing and must keep reading as a defect.
+    """
+
+    # NO `__slots__`: a variable-length builtin (`tuple`) cannot take a
+    # non-empty one -- `TypeError: nonempty __slots__ not supported for subtype
+    # of 'tuple'` -- and the attribute is the whole point of the class.
+
+    def __new__(cls, price, ticker, withheld_by: str | None = None):
+        self = super().__new__(cls, (price, ticker))
+        self.withheld_by = str(withheld_by).strip() if withheld_by else None
+        return self
+
+
 def _polymarket_price_resolver(selected_date: str | None):
     """`(price_resolver, ticker_resolver)` for Polymarket US, or `(None, None)`.
 
@@ -497,7 +526,20 @@ def _polymarket_price_resolver(selected_date: str | None):
         flush=True,
     )
     if not matches:
-        return (None, None)
+        # WHICH ZERO THIS IS, carried out rather than re-derived. If withholding
+        # is what emptied the list, the plan line says `policy_withheld:` and
+        # names the flag; if the join produced nothing in the first place, this
+        # stays `None` and the venue keeps stamping READER_FAILED, because that
+        # zero is a defect no matter what the flag is set to.
+        return _VenueResolvers(
+            None,
+            None,
+            withheld_by=(
+                "SYNDICATE_POLYMARKET_PROP_RESOLVERS"
+                if (prop_matches and not props_armed)
+                else None
+            ),
+        )
     return polymarket_price_resolver(matches), polymarket_ticker_resolver(matches)
 
 
@@ -539,17 +581,48 @@ _VENUE_FEED_GAP = {
 _VENUES_WITH_FEEDS = ("kalshi", "polymarket")
 
 
-def _venue_feed_status(venue: str, resolver: object) -> str:
+def _venue_feed_status(
+    venue: str, resolver: object, withheld_by: str | None = None
+) -> str:
     """One token explaining `venue_priced`, for the plan line.
 
     THE POINT IS THE THIRD CASE. `venue_feed` and `capability_gap` are both
     fine; `READER_FAILED` is a venue we can price, silently pricing from the
     aggregator instead -- exactly the Kalshi failure of 2026-08-25, which cost
     weeks because its symptom was a zero that looked like Novig's zero.
+
+    THE FOURTH CASE IS THE THIRD ONE'S TWIN, and it was reading as the third
+    for as long as both existed. `SYNDICATE_KALSHI_SOCCER_RESOLVERS` and
+    `SYNDICATE_POLYMARKET_PROP_RESOLVERS` are DELIBERATE gates, off by default,
+    that strip their matches out of the order path; when they strip the last
+    one the builder returns `(None, None)` -- the same value a broken reader
+    returns. Measured 2026-09-09 (lane `kalshi-join-match-rate`): every
+    near-zero Kalshi match tick observed that day was a tomorrow-date build
+    whose matches are 100% soccer, and every one of them stamped
+    `READER_FAILED` on a system doing exactly what it was told. So:
+
+        venue_feed       priced from the venue's own book
+        capability_gap   nothing to do; the venue cannot be priced and never could
+        policy_withheld  someone CHOSE this; the flag named in the token undoes it
+        READER_FAILED    a venue we CAN price is not being priced -- a live defect
+
+    `READER_FAILED` IS NOT BROADENED OR SOFTENED BY THE NEW CASE, and must not
+    be. It is in capitals so it cannot be skimmed past, and the whole cost of
+    2026-08-25 was an alarm that read like an ordinary zero. The fourth token
+    is a SEPARATE branch reached only when a caller positively asserts which
+    flag did the withholding; `withheld_by=None` -- the default, and what every
+    plain `(None, None)` in this file produces -- leaves this function's
+    behaviour byte-for-byte what it was.
+
+    `withheld_by` is a FLAG NAME, not a boolean, because a reader who has to
+    grep for the switch is a reader who does not flip it.
     """
     name = str(venue or "").strip().lower()
     if resolver is not None:
         return "venue_feed"
+    flag = str(withheld_by).strip() if withheld_by else ""
+    if flag:
+        return f"policy_withheld:{flag}"
     if name in _VENUE_FEED_GAP:
         return _VENUE_FEED_GAP[name]
     if name in _VENUES_WITH_FEEDS:
@@ -571,6 +644,14 @@ def _venue_price_resolver(venue: str, selected_date: str | None = None):
     Kalshi and Polymarket US have direct feeds. A venue with none keeps behaving
     exactly as before rather than erroring, and the difference surfaces as
     `price_source` on the rows instead of as a special case in the caller.
+
+    THE RESULT MAY BE A `_VenueResolvers`, which unpacks as the same two-tuple
+    and additionally carries `withheld_by` when a POLICY GATE
+    (`SYNDICATE_KALSHI_SOCCER_RESOLVERS`, `SYNDICATE_POLYMARKET_PROP_RESOLVERS`)
+    is what emptied the match list. Read it with `getattr(..., "withheld_by",
+    None)` and hand it to `_venue_feed_status`: every other path here returns a
+    bare tuple, so an unconverted or unread path degrades to the ALARM rather
+    than to a shrug.
 
     NOVIG DELIBERATELY HAS NONE, and that is a capability gap rather than an
     omission: its public CSV mirror is anonymized at the game/player/team level
@@ -825,7 +906,23 @@ def _resolvers_from_markets(markets, selected_date: str | None = None):
         # Named, and `(None, None)` so the venue reverts to the aggregator
         # rather than losing its book -- but the line above says it happened,
         # which is what this whole failure lacked.
-        return (None, None)
+        #
+        # AND WHICH ZERO IT IS, carried out to the plan line. `soccer_idx and
+        # not soccer_armed` is the ONLY thing that earns `policy_withheld`: it
+        # means withholding is what took the last match. A join that matched
+        # nothing at all leaves this `None` and keeps stamping READER_FAILED,
+        # which is correct -- the flag's value says nothing about whether the
+        # reader worked, and reading the flag alone would reclassify exactly
+        # the 2026-08-25 defect as policy.
+        return _VenueResolvers(
+            None,
+            None,
+            withheld_by=(
+                "SYNDICATE_KALSHI_SOCCER_RESOLVERS"
+                if (soccer_idx and not soccer_armed)
+                else None
+            ),
+        )
     return kalshi_price_resolver(matches), kalshi_ticker_resolver(matches)
 
 
@@ -1216,8 +1313,16 @@ def run_portfolio_commit(
             # THE VENUE'S OWN PRICES, where we have them. Only Kalshi has a
             # direct feed today; every other venue falls back to the aggregator,
             # and `price_source` on each scoped row records which was used.
-            venue_price_resolver, venue_ticker_resolver = _venue_price_resolver(venue, normalized)
-            feed_status = _venue_feed_status(venue, venue_price_resolver)
+            venue_resolvers = _venue_price_resolver(venue, normalized)
+            venue_price_resolver, venue_ticker_resolver = venue_resolvers
+            # `getattr`, not an attribute read: every other return path in
+            # `_venue_price_resolver` is a plain `(None, None)` and must keep
+            # stamping READER_FAILED. Absent signal -> alarm, never policy.
+            feed_status = _venue_feed_status(
+                venue,
+                venue_price_resolver,
+                withheld_by=getattr(venue_resolvers, "withheld_by", None),
+            )
             scoped, scope_refusals = scope_rows_to_venue(
                 rows,
                 venue,
@@ -1256,11 +1361,13 @@ def run_portfolio_commit(
                 # aggregator -- the difference between a real coverage number
                 # and OddsAPI's view of one.
                 f"venue_priced={sum(1 for r in scoped if r.get('price_source') == 'venue_feed')} "
-                # ...AND WHY, because a zero here has two opposite causes and
-                # they call for opposite work. `capability_gap` is nothing to
-                # do; `READER_FAILED` is a venue that HAS a feed pricing off
-                # the aggregator instead, which is what Kalshi did silently for
-                # weeks while the fan-in produced 2,344 quotes for it.
+                # ...AND WHY, because a zero here has opposite causes and they
+                # call for opposite work. `capability_gap` is nothing to do;
+                # `policy_withheld:<FLAG>` is a gate someone chose, and the
+                # token names the switch that undoes it; `READER_FAILED` is a
+                # venue that HAS a feed pricing off the aggregator instead,
+                # which is what Kalshi did silently for weeks while the fan-in
+                # produced 2,344 quotes for it.
                 f"feed={feed_status} "
                 # HOW MANY PLACEABLE ROWS THE POSITION CAP COST, which is the
                 # number that says whether `max_positions` is the binding
