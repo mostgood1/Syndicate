@@ -5,6 +5,44 @@
 
 ---
 
+## 2026-09-09 16:34:39-16:38:04Z — web `6e9325e1` -> `1c6308c3` (3 commits) — **the crest reaches the market-board hub masthead** — lane `brand-mascot-logo`
+
+User-directed ("deploy it"), second deploy of this lane. Web only; no
+`render.yaml`, so no `blueprint_sync`.
+
+**The delta is NOT all mine, and that is stated rather than glossed.** 3
+commits: `1c6308c3` (this masthead), `b5084188` (my own deploy ledger row,
+inert), and **`2290d685` from another lane — NFL prop quote date-sharding,
+which touches `syndicate/features/shared/odds_book_quotes.py` (+53) and is
+runtime code the web service reads.** It is not inert and it is not mine.
+Deploying it here is correct rather than incidental: refresh-worker was
+ALREADY on `2290d685` (16:07:34Z), so web was the half still behind, and the
+protocol's own rule — deploy a commit on `origin/main` — is what makes two
+lanes' deploys compose instead of reverting each other. Live `6e9325e1` was
+confirmed an ancestor of the target.
+
+**verify:**
+1. **Deploy `live` 16:38:04Z**, `dep-dagol7rl550s73cfm220`, trigger `api`;
+   `deploy_preflight.py` afterwards reads `live commit 1c6308c3`.
+2. **The masthead is SERVED, checked in the markup rather than by eye** —
+   `/market-board` carries `.market-board-hub__masthead`, the `<img
+   class="market-board-hub__art">`, and the `max-width: 900px` rule that sets
+   `display: none` on the art. The pre-existing `<h1>Market Board</h1>` is
+   still present and inside it, so this is an addition, not a replacement.
+3. **`syndicate-crest.jpg` byte-identical to the local build** on the public
+   edge: `c03deb3e36eed425af38991749502314`. Same discipline as the last row —
+   a 200 at that path would also have been satisfied by the copy deployed
+   3 minutes earlier, so identity is the reading, not reachability.
+4. `/`, `/syndicate`, `/market-board`, `/portfolio` all 200 after the deploy;
+   `/market-board` rendered at 1440 shows the crest panel with the tiles
+   unmoved beneath it, no console errors.
+
+**NOT verified:** the mobile rendering ON PRODUCTION. The 375px drop-and-shed
+behaviour was confirmed locally only; the CSS that does it is served (reading
+2 above) but nobody has loaded the public page on a phone width.
+
+---
+
 ## 2026-09-09 15:51:12-15:54:34Z — web `7bf2b901` -> `6e9325e1` (9 commits) — **the brand mark split ships: mascot crest for large slots, wordmark S for the chrome** — lane `brand-mascot-logo`
 
 User-directed ("deploy it"). Web only — this is templates and static assets;
