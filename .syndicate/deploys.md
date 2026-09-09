@@ -29603,3 +29603,225 @@ refusals and a post-deploy ceiling of zero. Re-take READING 1 tomorrow after
 - **A DELIBERATE OMISSION WORTH KEEPING:** the NCAAF sim box shows ONLY anytime-TD probability. `prop_model`'s own backtest measured it WORSE than a player's own average on receiving/rushing/passing yards, receptions and passing TDs, so projecting those would have printed five invented numbers under a `Sim` chip. Anytime TD is the one market that beat both the player mean and the league base rate. **A narrower honest table beat a wider fabricated one.**
 - caching, and it bit twice today: `ncaaf/player_stats.py:68` is an `@lru_cache` with no invalidation, so web served a stale empty player box for ~25 minutes after the data was published and only a deploy cleared it. The new roster loader keys on the snapshot's `(path, mtime, size)` instead, so a republished roster appears WITHOUT a restart -- the better pattern, and the one to copy.
 - soccer caveat, from its own author: final boxes are cached and never rebuilt, so matches that reached final BEFORE the deploy keep an empty player box permanently. Only matches finishing after it populate. **My first reading of soccer was taken on those stale matches and wrongly called the feature broken.**
+
+### refresh-worker da6838ca — S1 FOOTBALL SEGMENT SIDECAR, first flagged run
+
+`[2026-09-09 17:18-18:05 CDT / 22:18-23:05Z, lane `s1-sidecar-reading` on behalf
+of `segments-joint-v1`, scheduled reading, READ-ONLY against production — no
+deploy, no env change, no code edit]`
+
+**verdict: S1 is VERIFIED FOR NFL AND STILL OWED FOR NCAAF.** The sidecar
+appeared on the first generator run after the flag went live, every structural
+check passes exactly, and the overtime branch — the claim most likely to be
+wrong — was actually exercised rather than merely not-contradicted. NCAAF wrote
+nothing, for a reason that is DETERMINED and not guessed: its generator has not
+run since the flag.
+
+**verify: `nfl_source/smartsim2_segment_distributions_2026_wk1.json` exists on
+production, 163,040 B, 16 games, `generated_at 2026-09-09T22:35:52.378Z`; all
+224 of its histograms sum to exactly 300; and `full == h1 + h2` to 0.0000 on
+all 16 games while `full - (q1+q2+q3+q4)` is strictly POSITIVE on all 16.**
+That last pair is the overtime proof and it is arithmetic, not a flag read.
+
+#### THE DEPLOY IN THIS HEADING IS NOT THE DEPLOY THAT RAN THE CODE — correcting the reading's own premise
+
+`da6838ca` is the commit whose deploy INJECTED
+`SYNDICATE_FOOTBALL_SEGMENT_DISTRIBUTIONS` (live `12:01:14Z`). By the time the
+generator actually ran, **five more refresh-worker deploys had landed and the
+live commit was `d84840a9`** (deploy `dep-dagto0jl550s73eeslmg`, live
+`2026-09-09T22:24:40.618Z`, trigger `api`) — 110 commits after `da6838ca`, and
+finishing **8 minutes 19 seconds before** the generator launched. Checked rather
+than assumed: `git merge-base --is-ancestor a77ca53e d84840a9` returns YES, and
+`SYNDICATE_FOOTBALL_SEGMENT_DISTRIBUTIONS` is still present in refresh-worker's
+live env (167 keys read from `/v1/services/srv-d91dpertqb8s73co8ls0/env-vars`).
+So the reading stands — but **anyone citing this entry should cite `d84840a9`,
+not the heading.** The heading is kept as the scheduled task wrote it so the
+two can be tied together.
+
+Consequence for §7 below: **the worker rebooted 8 minutes before the run, so
+every memory number here is boot-confounded** in exactly the way the standing
+rule says. The container figures are near a fresh floor.
+
+#### 1. DOES A SIDECAR EXIST — YES FOR NFL, NO FOR NCAAF, AND THE NO IS EXPLAINED
+
+| sport | pattern | files | verdict |
+|---|---|---|---|
+| NFL | `nfl_source/smartsim2_segment_distributions_*.json` | **1** — `..._2026_wk1.json` | WRITTEN |
+| NCAAF | `ncaaf_source/data/smartsim2_segment_distributions_*.json` | **0** | NOT WRITTEN |
+
+`schema_version 1`, `season 2026`, `week 1`, `segment_source "quarter_log"`,
+`distribution_version 1`, seeds `1..300` `sequential: true` on every game.
+
+**The NCAAF zero is "the generator did not run", NOT "the generator ran and
+wrote nothing"** — the task required these be told apart and they can be, from
+one log line each. Every `SEASON_PROJECTION_LAUNCHING` on refresh-worker over
+the 35 h window `2026-09-08T12:00Z .. 2026-09-09T23:20Z`:
+
+| launched (UTC) | sport | season/week | reason |
+|---|---|---|---|
+| 2026-09-08T22:27:36.127Z | nfl | 2026 wk1 | `artifact_stale` age 87,493 s |
+| 2026-09-09T02:06:59.469Z | **ncaaf** | 2026 wk1 | `artifact_stale` age 87,042 s |
+| 2026-09-09T02:14:24.411Z | **ncaaf** | 2026 wk2 | `artifact_missing_no_prior_launch` |
+| 2026-09-09T22:32:59.721Z | nfl | 2026 wk1 | `artifact_stale` age 86,624 s |
+
+Both NCAAF launches predate the flag's `12:01:14Z` injection by ~10 hours. The
+sport has had no generator run in the flagged era at all, so **its accumulator
+has never executed in production and NCAAF's half of S1 is UNTESTED, not
+passing.** On the 86,400 s gate its next run is due ~`2026-09-10T02:07Z`.
+
+The NFL launch at `22:32:59.721Z` is the predicted one: `age_seconds=86624`
+back-dates to `2026-09-08T22:29:15Z`, the prior artifact's mtime, and the task
+predicted "around 22:29Z". Sidecar written `22:35:52.378Z`, ~2 m 53 s later.
+
+#### 2. BYTES PER GAME — 6.2% UNDER THE LOCAL MEASUREMENT
+
+| | bytes | games | B/game | ratio vs local |
+|---|---|---|---|---|
+| local 16-game run | — | 16 | 10,865 | 1.000 |
+| **production** | **163,040** | **16** | **10,190.0** | **0.938** |
+
+Under, not over, and the direction is explainable: bucket counts vary with the
+spread of each game's draws, and production's slate is not the local one. At
+this rate a full 16-game NFL week costs ~159 KB per week-artifact.
+
+#### 3. SEGMENT COVERAGE — 16/16 COMPLETE, ZERO GAPS
+
+Every one of the 16 games carries all seven of `q1,q2,q3,q4,h1,h2,full`.
+**Games missing a segment: NONE.** Bucket counts on a representative game
+(`ARI_LAC`): full 49, h1 27, h2 32, q1 12, q2 18, q3 15, q4 17.
+
+#### 4. HISTOGRAM INTEGRITY — 224/224 EXACT
+
+16 games x 7 segments x 2 distributions = **224 checks, 0 violations.** Every
+`total_points_dist` and every `margin_dist` sums to exactly **300**, which is
+that game's `sims`. `skipped_sims` is **0 on all 16 games** — the accumulator's
+refuse-by-name path (a `quarter_log` shape it cannot separate OT from) never
+fired, so no sim was silently dropped from a denominator.
+
+#### 5. OVERTIME — THE BRANCH WAS ACTUALLY EXERCISED, AND IT BINS CORRECTLY
+
+**This is not a vacuous pass.** 122 of 4,800 sims went to overtime (**2.54%**;
+the local run measured 112/4,800 = 2.33%), and **all 16 of 16 games contain at
+least one OT sim** (range 3..11). `h2_regulation_only` is `false` on every game.
+
+The structural check is that OT points must land in `h2` and in `full` and in
+no quarter — which is what `_SEGMENT_QUARTERS` declares (`h2: (3, 4, None)`,
+`full: (1, 2, 3, 4, None)`, quarters bare). Verified by arithmetic on the
+served histograms rather than by reading the flag:
+
+| game | OT sims | full total | full-(h1+h2) | same, margin | full-sum(q1..q4) | implied pts/OT sim |
+|---|---|---|---|---|---|---|
+| `ARI_LAC` | 4 | 39.4567 | +0.0000 | +0.0000 | +0.0533 | 4.00 |
+| `ATL_PIT` | 11 | 44.8367 | +0.0000 | +0.0000 | +0.1900 | 5.18 |
+| `BAL_IND` | 7 | 48.5600 | +0.0000 | +0.0000 | +0.1367 | 5.86 |
+| `BUF_HOU` | 11 | 39.2500 | +0.0000 | +0.0000 | +0.2300 | 6.27 |
+| `CHI_CAR` | 5 | 45.8300 | +0.0000 | +0.0000 | +0.1033 | 6.20 |
+| `CLE_JAX` | 3 | 35.2367 | +0.0000 | +0.0000 | +0.0567 | 5.67 |
+| `DAL_NYG` | 9 | 52.8533 | +0.0000 | +0.0000 | +0.1967 | 6.56 |
+| `DEN_KC` | 6 | 43.7033 | +0.0000 | +0.0000 | +0.1267 | 6.33 |
+| `GB_MIN` | 9 | 34.3500 | +0.0000 | +0.0000 | +0.1700 | 5.67 |
+| `MIA_LV` | 9 | 34.6133 | +0.0000 | +0.0000 | +0.1833 | 6.11 |
+| `NE_SEA` | 10 | 42.6233 | +0.0000 | +0.0000 | +0.1667 | 5.00 |
+| `NO_DET` | 5 | 46.2100 | +0.0000 | -0.0000 | +0.0767 | 4.60 |
+| `NYJ_TEN` | 5 | 36.9233 | +0.0000 | +0.0000 | +0.0767 | 4.60 |
+| `SF_LA` | 11 | 53.6533 | +0.0000 | +0.0000 | +0.2033 | 5.55 |
+| `TB_CIN` | 8 | 48.3533 | +0.0000 | +0.0000 | +0.1467 | 5.50 |
+| `WAS_PHI` | 9 | 43.0000 | +0.0000 | +0.0000 | +0.1567 | 5.22 |
+
+- **`full - (h1+h2)` is 0.0000 on all 16 games, for total AND margin.** h2 is
+  carrying the overtime points; if it were regulation-only this column would be
+  positive by the OT residual.
+- **`full - sum(q1..q4)` is strictly positive on all 16** — the quarters do NOT
+  carry OT, so the segments are not double-counting.
+- Scaling that residual by `sims / overtime_sims` gives **4.00 to 6.56 points
+  per overtime sim**, which is the right magnitude for NFL overtime (a FG is 3,
+  a TD 6-7, and both teams sometimes score). A binning bug would not land in
+  that band by accident.
+
+#### 6. DID THE FLAG MOVE THE SERVED PROJECTION — NO, AND HERE IS EXACTLY WHICH CHECK I COULD DO
+
+**The check I COULD do, and it is stronger than schema equality.** The served
+`nfl_source/smartsim2_projections_2026_wk1.csv` (`generated_at 22:33:12Z..`,
+same run) reconciles against the sidecar's `full` segment on **16/16 games, to
+<0.001 on both `total_mean` and `margin_mean`** — the entire residual is the
+CSV's 3-decimal rounding. `NE_SEA` CSV total 42.623 vs sidecar 42.6233; margin
+-0.463 vs -0.4633. That the accumulator reproduces the served numbers exactly
+means it **observed the same draws and consumed no randomness** — it cannot
+have perturbed the RNG stream that produced the CSV.
+
+Schema and shape, against the pre-flag git-tracked copy: **16 columns
+identical** (`game_id..generated_at`), **16 data rows in both**,
+`seeds_used=300`, `profile_name=nfl_v1`, one distinct `rating_source`.
+
+**The check I could NOT do, stated rather than glossed:** a byte-compare against
+the PRE-FLAG PRODUCTION copy. That artifact (`generated_at
+2026-09-08T22:29:16Z`) is not recoverable — it was overwritten by this run, and
+the git-tracked copy is from `2026-08-01T17:53:30Z` (commit `e8a97125`), five
+weeks stale. Its values legitimately differ for a reason that is NOT S1: the
+`SYNDICATE_NFL_PPG_RATINGS` flip on 2026-09-08 moved margin sd 0.980 → 4.379,
+recorded by lane `nfl-ncaaf-ui-parity`. So a value diff against it would have
+been read as an S1 effect and would have been wrong. **The byte-identity claim
+for S1 rests on the local A/B at commit time (3,232 B in both arms, same sha256
+over the 15 non-timestamp columns), not on this production reading.**
+
+#### 7. WORKER MEMORY — 61.5% OF CEILING, NO OOM, AND THE CONTAINER NUMBER IS CONFOUNDED
+
+Peak over the run window `22:32:30Z .. 22:38:00Z` (11 `ALL_PROCESS_MEMORY`
+samples, window fully covered `22:32:56.545Z .. 22:37:52.010Z`):
+
+| field | peak | of 4,096 MB |
+|---|---|---|
+| `accounted_rss_mb` | **2,518.547** at `22:35:55.636Z` | **61.5%** |
+| `container_memory_unreclaimable_mb` | 2,313.681 | 56.5% |
+| `container_memory_mb` | 3,968.703 | 96.9% — **page-cache inclusive, not a leak** |
+
+**No OOM.** `render_events.py --service refresh-worker --since
+2026-09-09T11:00Z --end 23:25Z` returned 32 events, every one `build_started`
+/ `build_ended` / `deploy_started` / `deploy_ended`; **zero `server_failed`**,
+and the listing printed its OUTPUT COMPLETE line so this is not a fragment.
+
+**The container figure does not belong to S1 and must not be quoted as its
+cost.** At the 2,518 MB peak the container held **9 processes**, including a
+concurrent `refresh_odds_sources.py --sports soccer --phase live` — and the
+process count ran 5 → 11 across the window against 4 → 5 in the pre-flag
+comparison window. Two different workloads.
+
+**The unconfounded number is the generator's OWN RSS,** which is in the same
+log line and isolates the flag:
+
+| arm | date | generator peak `rss_mb` | samples |
+|---|---|---|---|
+| **OFF** (flag absent) | 2026-09-08, launch 22:27:36Z | **38.039** | 3 |
+| **ON** (flag set) | 2026-09-09, launch 22:32:59Z | **38.477** | 3 |
+| delta | | **+0.438 MB** | vs +0.527 MB (+552,960 B) predicted locally — ratio **0.83** |
+
+Same cmdline both arms
+(`.../generate_smartsim2_nfl_projections.py --season 2026 --week 1`), so this
+is one process against itself 24 h apart.
+
+**Caveat on that delta, because the sampling is not phase-matched.** Three
+samples per arm. The OFF-arm samples all fall at `22:28:03..22:28:08`, the
+first 32 s of that run; the ON-arm samples span `22:33:32..22:35:44`, i.e.
+33 s to 2 m 45 s in — the phase where an accumulator would have grown. So the
+ON arm is sampled where the cost shows and the OFF arm is not. **+0.438 MB is
+indicative, not a controlled peak-to-peak comparison.** What IS solid: the
+generator process never exceeded **38.5 MB** at any sampled moment of a flagged
+run, against a 4,096 MB ceiling — 0.94%.
+
+#### CAVEATS AND WHAT REMAINS UNTESTED — the full list
+
+1. **NCAAF's accumulator has never executed in production.** Its half of S1 is
+   untested, not passing. Due ~`2026-09-10T02:07Z`. The `HOT_ARTIFACT_PATTERNS`
+   entry for the NCAAF path is therefore also unexercised — the NFL entry is
+   proved by the artifact being exportable, the NCAAF one is not.
+2. **Only week 1 of one season is covered.** 16 games, 4,800 sims, one slate.
+3. **The heading's deploy is not the running commit** — `d84840a9`, see above.
+4. **Every memory number is boot-confounded** (reboot 8 m 19 s before the run)
+   and the container figure is workload-confounded (concurrent soccer refresh).
+5. **The +0.438 MB delta is not phase-matched** across arms, per §7.
+6. **The pre-flag production CSV is gone**, so §6's no-movement claim rests on
+   the commit-time local A/B plus this run's internal CSV-vs-sidecar
+   reconciliation — not on a production before/after.
+7. **Nothing reads this artifact yet.** S1 persists; it does not price. That a
+   sidecar is well-formed says nothing about whether a half or quarter market
+   built on it would be calibrated.
