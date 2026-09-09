@@ -5,6 +5,44 @@
 
 ---
 
+## 2026-09-09 01:00:59Z — `ci-suite` @ `a4db0a82` — **RECOVERED: the revert restored a completing suite. 21 new failures — and the total is not the instrument.** `[lane chunk-assignment-stable]`
+
+Run `crn-dafg4h0u01pc73aavs6g-1788912474` on the reverted commit:
+`collected=16668 failing=23`, **`21 NEW FAILURE(S)`**, `rc=1` at **3020 s**, 9
+fast steps `rc=0`, **no `oomKilled`**. The two runs on the hash layout died at
+16 min and 6 min; this one finished.
+
+**THE TOTAL HAS BEEN 25, THEN 17, THEN 21 ACROSS THREE FULL RUNS IN ONE
+EVENING**, on code that nobody was breaking. That number is not a usable
+instrument, and this row exists mostly to say so.
+
+**WHAT IS STABLE, and is the thing to judge on — 15, in every run:**
+
+    test_intelligence.py                                  5
+    test_intelligence_state.py                            8
+    test_live_refresh_loop / test_memory_observability    2   (the headroom pair)
+
+layout-independent, cause known (`floor_mb=3000` against `max_mb=2048`), ZERO
+regressions.
+
+**WHAT MOVES:** `test_heap_roots` x4, `test_home_mlb_live_lens_states`,
+`test_retainer_census`, `test_evaluation_ledger_projection`, and — new this run
+— `test_mlb_refresh_runner` x2 and `test_mlb_live_lens_snapshot_reader`. Several
+are PROVEN to pass in isolation (`#649`). Their presence or absence is not
+signal.
+
+**A SECOND, SHARPER READING OF `#649` FELL OUT OF THIS RUN.** Chunks 1-4
+reproduced the 22:19 run EXACTLY (1788/0, 1959/8, 1757/0, 2088/2) and chunks 5-8
+diverged — because commits landed between the two runs. **So round-robin is
+perfectly reproducible when the file list does not change; it is unstable ONLY
+under insertion.** That narrows the defect from "the gate is noisy" to "the gate
+is noisy on days when a test file is added", which is most days, and it is the
+precise thing the reverted hash was built to fix.
+
+**The scheduled 04:30 check now anchors on the 15** and is told to expect a
+volatile tail of roughly 2-8, rather than any specific total — the third
+correction to that task tonight, and the first one that is not a number.
+
 ## 2026-09-09 00:07:31Z — `ci-suite` — **REGRESSION AND REVERT. I shipped the hash chunk assignment; it OOM'd the suite twice. Back on round-robin at `a4db0a82`.** `[lane chunk-assignment-stable]`
 
     e5f4b9d5  hash, --chunks 8    OOM at 2Gi in chunk 2, ~16 min   (was completing in ~3020s)
