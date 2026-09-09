@@ -18,6 +18,17 @@ order would have been FILLED at it is not measurable from stored data at all.
 
 THIS PACKAGE CHANGES NO SERVED PRICE AND ADDS NO PRICING LOGIC. It stops a
 discard. Nothing here computes a fill probability.
+
+SECOND PASS, 2026-09-09 -- SIZE AT TOUCH. `yes_bid_size_fp`/`yes_ask_size_fp`
+arrive on 12,000 of 12,000 open markets and were being dropped one seam
+earlier, by `kalshi_client._MARKET_FIELDS` itself. They are captured here as
+`bid_size`/`ask_size`. The same measurement found `liquidity_dollars` to be a
+DEAD PLACEHOLDER -- the literal "0.0000" on all 12,000, including a market with
+volume 343,240 and a 3-level book -- so it is deliberately NOT remapped onto
+anything: its zero is a true fact about the venue.
+
+STILL CAPTURE ONLY. Storing size at touch does not measure fill; it makes fill
+measurable, which is a different sentence.
 """
 
 from __future__ import annotations
@@ -55,9 +66,21 @@ def _market(**over):
         "volume_24h_fp": 678,
         "open_interest_fp": 910,
         "liquidity_dollars": 1234.56,
+        # SIZE AT TOUCH -- added to `_MARKET_FIELDS` 2026-09-09. Present on
+        # every market Kalshi lists and dropped by the allowlist until then.
+        "yes_bid_size_fp": 2241.0,
+        "yes_ask_size_fp": 1180.0,
     }
     m.update(over)
     return m
+
+
+# The venue-native names for everything `DEPTH_FIELDS` maps, in one place so a
+# "strip the depth" fixture cannot go stale when the list grows.
+_VENUE_DEPTH_KEYS = {
+    "yes_bid_dollars", "no_bid_dollars", "yes_bid_size_fp", "yes_ask_size_fp",
+    "volume_fp", "volume_24h_fp", "open_interest_fp", "liquidity_dollars",
+}
 
 
 # --------------------------------------------------------------------------
@@ -78,6 +101,53 @@ def test_all_six_liquidity_fields_reach_the_daily_row():
     assert row["liquidity"] == 1234.56
     # Every one of them, not a subset that happened to be easy.
     assert set(mod.DEPTH_FIELDS) <= set(row)
+
+
+def test_size_at_touch_round_trips_from_the_venues_own_field_names():
+    """THE TWO FIELDS THAT CARRY FILL SIGNAL, and the reason this second pass
+    exists. `yes_bid_size_fp`/`yes_ask_size_fp` arrive on every market Kalshi
+    lists and were dropped by `kalshi_client._MARKET_FIELDS` -- they sat in
+    `probe()`'s `present_but_unexpected` the whole time, the same failure mode
+    that cost a two-day diagnosis over `exchange_index`."""
+    from syndicate.features.shared.kalshi_client import _MARKET_FIELDS, normalize_market
+
+    assert "yes_bid_size_fp" in _MARKET_FIELDS
+    assert "yes_ask_size_fp" in _MARKET_FIELDS
+    normalized = normalize_market(_market())
+    assert normalized["yes_bid_size_fp"] == 2241.0
+    assert normalized["yes_ask_size_fp"] == 1180.0
+    # Carried, not counted as a schema gap.
+    assert "yes_bid_size_fp" not in normalized["missing_fields"]
+    assert "yes_ask_size_fp" not in normalized["missing_fields"]
+    # And a payload that stops carrying them says so by NAME rather than
+    # defaulting to zero -- the whole reason the allowlist is an allowlist.
+    silent = normalize_market({k: v for k, v in _market().items()
+                               if not k.endswith("_size_fp")})
+    assert silent["yes_bid_size_fp"] is None
+    assert "yes_bid_size_fp" in silent["missing_fields"]
+    assert "yes_ask_size_fp" in silent["missing_fields"]
+
+    row = mod.kalshi_daily_rows([normalized])[0]
+    assert row["bid_size"] == 2241.0
+    assert row["ask_size"] == 1180.0
+
+
+def test_the_sizes_are_named_for_what_they_are_and_liquidity_is_not_remapped():
+    """NAMING IS THE POINT. `liquidity_dollars` is a DEAD PLACEHOLDER --
+    measured 2026-09-09 as the literal "0.0000" on 12,000 of 12,000 open
+    markets, one of them carrying volume 343,240, a 1-cent spread and a
+    3-level book. Remapping it onto size at touch would fabricate a signal, so
+    it stays captured and useless, and the real fields are called
+    `bid_size`/`ask_size` rather than borrowing a poisoned word."""
+    row = mod.kalshi_daily_rows([_market(liquidity_dollars="0.0000")])[0]
+    assert row["liquidity"] == "0.0000"
+    assert row["bid_size"] == 2241.0
+    assert mod._as_depth(row["liquidity"]) == 0.0
+    # No field in the row is named after liquidity except the placeholder.
+    assert [f for f in mod.DEPTH_FIELDS if "liquid" in f] == ["liquidity"]
+    # And volume/open interest are not standing in for depth either.
+    assert row["volume"] != row["bid_size"]
+    assert row["open_interest"] != row["ask_size"]
 
 
 def test_the_rows_existing_fields_keep_their_names_and_their_values():
@@ -105,9 +175,7 @@ def test_a_market_without_the_fields_yields_None_not_zero_and_not_absent():
     "the venue told us nothing" versus "a market nobody holds". A fill model
     that collapses them reads an untraded market as a fetch failure. The key is
     PRESENT so the absence is stated rather than inferred from a missing key."""
-    bare = {k: v for k, v in _market().items()
-            if k not in {"yes_bid_dollars", "no_bid_dollars", "volume_fp",
-                         "volume_24h_fp", "open_interest_fp", "liquidity_dollars"}}
+    bare = {k: v for k, v in _market().items() if k not in _VENUE_DEPTH_KEYS}
     row = mod.kalshi_daily_rows([bare])[0]
     for field in mod.DEPTH_FIELDS:
         assert field in row, f"{field} went absent instead of None"
@@ -119,9 +187,16 @@ def test_zero_open_interest_survives_as_zero():
     """The other half of the same distinction, and the reason `_as_depth`
     exists rather than reusing `_as_float` -- which maps 0.0 to None ON PURPOSE
     because zero is not a PRICE. Zero very much is a depth."""
-    row = mod.kalshi_daily_rows([_market(open_interest_fp=0, volume_fp=0)])[0]
+    row = mod.kalshi_daily_rows([
+        _market(open_interest_fp=0, volume_fp=0, yes_bid_size_fp=0, yes_ask_size_fp=0.0)
+    ])[0]
     assert row["open_interest"] == 0
     assert row["volume"] == 0
+    # A zero SIZE AT TOUCH is the sharpest case of the same rule: nothing is
+    # resting there, which is a fill fact and not a missing reading.
+    assert row["bid_size"] == 0
+    assert row["bid_size"] is not None
+    assert row["ask_size"] == 0.0
     assert mod._as_depth(0) == 0.0
     assert mod._as_depth(0) is not None
     # The contrast, pinned: the price coercion still refuses zero.
@@ -153,6 +228,8 @@ def test_depth_is_persisted_on_the_point_that_observed_it():
     assert point["volume_24h"] == 678
     assert point["open_interest"] == 910
     assert point["liquidity"] == 1234.56
+    assert point["bid_size"] == 2241.0
+    assert point["ask_size"] == 1180.0
 
 
 def test_a_partially_reported_market_keeps_its_Nones_in_the_stored_point():
@@ -248,15 +325,15 @@ def test_the_lean_artifact_is_byte_identical_after_this_change():
     from syndicate.features.shared.kalshi_client import normalize_market
 
     with_depth = normalize_market(_market())
-    without = {k: v for k, v in with_depth.items()
-               if k not in {"yes_bid_dollars", "no_bid_dollars", "volume_fp",
-                            "volume_24h_fp", "open_interest_fp",
-                            "liquidity_dollars"}}
+    without = {k: v for k, v in with_depth.items() if k not in _VENUE_DEPTH_KEYS}
 
     dumped_with = json.dumps(kor._lean_market(with_depth), separators=(",", ":"))
     dumped_without = json.dumps(kor._lean_market(without), separators=(",", ":"))
     assert dumped_with == dumped_without
     assert not (set(json.loads(dumped_with)) & set(mod.DEPTH_FIELDS))
-    # And none of the venue-native names either.
+    # And none of the venue-native names either -- including the two sizes
+    # added 2026-09-09, which must not leak into the size-constrained row.
     assert "yes_bid_dollars" not in dumped_with
     assert "open_interest_fp" not in dumped_with
+    assert "yes_bid_size_fp" not in dumped_with
+    assert "yes_ask_size_fp" not in dumped_with

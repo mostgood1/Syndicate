@@ -121,7 +121,25 @@ _MARKET_FIELDS = (
     "volume_fp",
     "volume_24h_fp",
     "open_interest_fp",
+    # A VENUE-SIDE PLACEHOLDER, NOT A LIQUIDITY READING. Measured 2026-09-09
+    # across both hosts: the literal string "0.0000" on 12,000 of 12,000 open
+    # markets, 12 cursor pages. It is not illiquidity --
+    # `KXMLBGAME-26SEP091310MINDET-DET` reported `liquidity_dollars="0.0000"`
+    # while carrying `volume_fp=343240.44`, `open_interest_fp=304259.41`, a
+    # 1-cent spread and a 3-level orderbook. Kept captured because its zero is a
+    # true fact about the venue; it must NEVER be remapped onto another field,
+    # which would fabricate a signal out of a dead column.
     "liquidity_dollars",
+    # SIZE AT TOUCH -- the real thing `liquidity_dollars` is not, and the two
+    # fields a fill model actually needs. Present on 12,000 of 12,000 markets
+    # in the same measurement, and they showed up in `probe()`'s
+    # `present_but_unexpected` for months: the allowlist below was dropping
+    # them, exactly the failure mode the `exchange_index` note describes.
+    #
+    # `volume` / `volume_24h` / `open_interest` are historical FLOW and open
+    # STOCK. Neither is book depth and neither may be substituted for these.
+    "yes_bid_size_fp",
+    "yes_ask_size_fp",
     "open_time",
     "close_time",
     "expiration_time",

@@ -1349,9 +1349,14 @@ def _run_kalshi_odds_refresh_unbounded(*, force: bool = False) -> dict[str, Any]
     #
     # The accurate statement now:
     #
-    #   yes_bid / no_bid / volume / volume_24h / open_interest / liquidity
+    #   yes_bid / no_bid / bid_size / ask_size / volume / volume_24h /
+    #   open_interest / liquidity
     #       SURVIVE, in the daily book -- `DEPTH_FIELDS` on each appended
-    #       point, keyed to the tick that observed them.
+    #       point, keyed to the tick that observed them. `bid_size`/`ask_size`
+    #       are `yes_bid_size_fp`/`yes_ask_size_fp`, added 2026-09-09: SIZE AT
+    #       TOUCH, and the only stored numbers that bear on whether a quoted
+    #       ask was reachable. `liquidity` is a venue-side placeholder reading
+    #       "0.0000" on every open market and is not a substitute for them.
     #   strike_type, custom_strike, rules_primary, result, open_time,
     #   expiration_time, last_price / previous_price, exchange_index,
     #   missing_fields, market_type

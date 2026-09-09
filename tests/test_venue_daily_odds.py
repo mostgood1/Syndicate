@@ -734,12 +734,27 @@ def _depth_row(market_id="m1", yes=0.5, no=0.5, **depth):
 
 
 _FULL_DEPTH = {
-    "yes_bid": 0.44, "no_bid": 0.52, "volume": 1200.0,
+    "yes_bid": 0.44, "no_bid": 0.52,
+    # SIZE AT TOUCH, added 2026-09-09. Named `bid_size`/`ask_size` and never
+    # "liquidity" -- the field of that name is a venue placeholder that reads
+    # "0.0000" on every open market.
+    "bid_size": 2241.0, "ask_size": 1180.0,
+    "volume": 1200.0,
     "volume_24h": 300.0, "open_interest": 88.0, "liquidity": 9100.0,
 }
 
 
-def test_a_point_with_all_six_fields_is_FULL_coverage():
+def test_the_counter_covers_every_declared_depth_field():
+    """The fixture must exercise the WHOLE field list, or a newly captured
+    field would be silently untested by every assertion below that spells its
+    fixture out. This is the guard that fails when `DEPTH_FIELDS` grows and the
+    fixture does not."""
+    assert set(_FULL_DEPTH) == set(mod.DEPTH_FIELDS)
+    assert "bid_size" in mod.DEPTH_FIELDS
+    assert "ask_size" in mod.DEPTH_FIELDS
+
+
+def test_a_point_with_all_the_fields_is_FULL_coverage():
     report = mod.record_daily_odds(
         "kalshi", "mlb", "2026-08-25", [_depth_row("m1", **_FULL_DEPTH)]
     )
@@ -778,7 +793,43 @@ def test_a_None_field_counts_ABSENT():
     assert report["depth_absent"]["yes_bid"] == 0
 
 
-def test_a_point_with_no_depth_at_all_counts_absent_on_all_six_and_no_block():
+def test_a_zero_size_at_touch_is_a_READING_not_a_gap():
+    """`bid_size == 0` means NOTHING IS RESTING THERE -- the most fill-relevant
+    reading either field can carry, and the one a truthiness test would file
+    under "missing". Of one production tick's 2,187 markets, 1,246 showed zero
+    volume AND zero open interest, so this state is the common case rather
+    than an edge."""
+    row = dict(_FULL_DEPTH, bid_size=0.0, ask_size=0)
+    report = mod.record_daily_odds("kalshi", "mlb", "2026-08-25", [_depth_row("m1", **row)])
+    for field in ("bid_size", "ask_size"):
+        assert report["depth_zero"][field] == 1, field
+        assert report["depth_absent"][field] == 0, field
+        assert report["depth_nonzero"][field] == 0, field
+    assert report["depth_blocks"] == 1
+    from syndicate.features.shared.refresh_state_store import read_json_file
+    point = read_json_file(
+        mod.daily_odds_path("kalshi", "mlb", "2026-08-25")
+    )["markets"]["m1"]["points"][-1]
+    assert point["bid_size"] == 0.0
+    assert point["ask_size"] == 0.0
+    assert point["bid_size"] is not None
+
+
+def test_an_absent_size_at_touch_counts_ABSENT_and_not_zero():
+    """The other half of the distinction, on the new fields specifically: a
+    venue that stops returning the sizes must not read as a book with nothing
+    resting in it."""
+    row = dict(_FULL_DEPTH, bid_size=None, ask_size=None)
+    report = mod.record_daily_odds("kalshi", "mlb", "2026-08-25", [_depth_row("m1", **row)])
+    for field in ("bid_size", "ask_size"):
+        assert report["depth_absent"][field] == 1, field
+        assert report["depth_zero"][field] == 0, field
+    # The rest of the block is unaffected -- per field, never aggregated.
+    assert report["depth_nonzero"]["volume"] == 1
+    assert report["depth_blocks"] == 1
+
+
+def test_a_point_with_no_depth_at_all_counts_absent_on_every_field_and_no_block():
     report = mod.record_daily_odds("kalshi", "mlb", "2026-08-25", [_row("m1")])
     assert report["depth_points"] == 1
     assert report["depth_blocks"] == 0
@@ -796,10 +847,12 @@ def test_a_mixed_batch_sums_to_the_denominator_field_by_field():
         _row("m4"),
         # Non-numeric and boolean are absences, not readings -- `_as_depth`.
         _depth_row("m5", **dict(_FULL_DEPTH, volume="n/a", no_bid=True)),
+        # One side of the touch empty, the other deep. Both are readings.
+        _depth_row("m6", **dict(_FULL_DEPTH, bid_size=0.0, ask_size=None)),
     ]
     report = mod.record_daily_odds("kalshi", "mlb", "2026-08-25", rows)
-    assert report["depth_points"] == 5 == report["appended"]
-    assert report["depth_blocks"] == 4
+    assert report["depth_points"] == 6 == report["appended"]
+    assert report["depth_blocks"] == 5
     for field in mod.DEPTH_FIELDS:
         total = (
             report["depth_nonzero"][field]
@@ -811,6 +864,11 @@ def test_a_mixed_batch_sums_to_the_denominator_field_by_field():
     assert report["depth_absent"]["liquidity"] == 2   # m3 explicit None, m4 no depth
     assert report["depth_absent"]["volume"] == 2      # m4 no depth, m5 "n/a"
     assert report["depth_absent"]["no_bid"] == 2      # m4 no depth, m5 boolean
+    # SIZE AT TOUCH, the three states side by side on one batch.
+    assert report["depth_zero"]["bid_size"] == 1      # m6 nothing resting
+    assert report["depth_absent"]["bid_size"] == 1    # m4 no depth
+    assert report["depth_nonzero"]["bid_size"] == 4
+    assert report["depth_absent"]["ask_size"] == 2    # m4 no depth, m6 explicit None
 
 
 def test_record_venue_book_sums_depth_across_the_per_sport_files():
@@ -826,6 +884,8 @@ def test_record_venue_book_sums_depth_across_the_per_sport_files():
     assert report["depth_points"] == 2
     assert report["depth_blocks"] == 2
     assert report["depth_nonzero"]["yes_bid"] == 2
+    assert report["depth_nonzero"]["bid_size"] == 2
+    assert report["depth_nonzero"]["ask_size"] == 2
     assert report["depth_zero"]["open_interest"] == 1
     assert report["depth_absent"]["liquidity"] == 1
 
@@ -836,7 +896,8 @@ def test_the_line_is_flat_whitespace_splittable_key_equals_value():
     landing", so it must survive a naive split."""
     report = mod.record_daily_odds(
         "kalshi", "mlb", "2026-08-25",
-        [_depth_row("m1", **dict(_FULL_DEPTH, open_interest=0.0, liquidity=None))],
+        [_depth_row("m1", **dict(_FULL_DEPTH, open_interest=0.0, liquidity=None,
+                                 bid_size=0.0, ask_size=None))],
     )
     line = mod.format_depth_coverage(report)
     pairs = dict(token.split("=", 1) for token in line.split(" "))
@@ -853,8 +914,20 @@ def test_the_line_is_flat_whitespace_splittable_key_equals_value():
         part.split(":", 1) for part in pairs["depth_zero"].split(",")
     )
     assert counts["open_interest"] == "1"
+    # The new fields are printed by the SAME mechanism, in the same three
+    # states -- the shape that isolated the dead `liquidity` placeholder from
+    # the fields that work.
+    assert counts["bid_size"] == "1"
     absent = dict(part.split(":", 1) for part in pairs["depth_absent"].split(","))
     assert absent["liquidity"] == "1"
+    assert absent["ask_size"] == "1"
+    nonzero = dict(part.split(":", 1) for part in pairs["depth_nonzero"].split(","))
+    assert nonzero["bid_size"] == "0"
+    # Per field the three states still sum to the point count.
+    for field in mod.DEPTH_FIELDS:
+        assert (
+            int(nonzero[field]) + int(counts[field]) + int(absent[field])
+        ) == int(pairs["depth_points"]), field
 
 
 def test_polymarket_supplies_no_depth_so_its_rows_fill_none_of_the_six():

@@ -1189,19 +1189,22 @@ def _polymarket_daily_book() -> None:
         # NO `depth_*` FIELDS HERE, DELIBERATELY, AND THIS IS THE REASON.
         # Kalshi's `DAILY_BOOK` line carries depth-capture counters
         # (`venue_daily_odds.format_depth_coverage`). This one does not,
-        # because Polymarket supplies none of the six: these rows are built
+        # because Polymarket supplies none of them: these rows are built
         # from `GAME_SLATE_ARTIFACT`, whose per-market shape is
         # `polymarket_us_markets._SLATE_STORAGE_FIELDS` (slug,
         # sportsMarketTypeV2, outcomes, outcomePrices, line, gameStartTime,
         # orderPriceMinTickSize, minimumTradeQty, orderable) -- no bid, no
-        # volume, no open interest, no liquidity, and the `_KEEP` trim upstream
-        # drops the rest first. `polymarket_daily_rows` fills none of
-        # `DEPTH_FIELDS` for exactly that reason.
+        # size at touch, no volume, no open interest, no liquidity, and the
+        # `_KEEP` trim upstream drops the rest first. `polymarket_daily_rows`
+        # fills none of `DEPTH_FIELDS` for exactly that reason, and the
+        # `bid_size`/`ask_size` capture added 2026-09-09 is Kalshi-only for the
+        # same reason -- inventing a symmetric counter here would be a
+        # fabricated number, not parity.
         #
         # `record_venue_book` still RETURNS the counters for this venue, and
         # they would read `absent == depth_points` on every field. Printing
-        # that every 180 seconds would be six numbers restating a fact about
-        # the fetch that this comment states once. If the slate ever starts
+        # that every 180 seconds would be a row of numbers restating a fact
+        # about the fetch that this comment states once. If the slate ever starts
         # carrying depth, map it in `polymarket_daily_rows` and add
         # `format_depth_coverage(report)` here -- the report already has it.
         f" detail={report.get('detail')}",

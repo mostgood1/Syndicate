@@ -104,7 +104,7 @@ MAX_POINTS_PER_MARKET = 48
 # one-lot-wide market from a deep one, because the discriminating numbers were
 # fetched on every tick and dropped at the row builder.
 #
-# These six are the common depth shape. A venue fills what it has and leaves
+# These eight are the common depth shape. A venue fills what it has and leaves
 # the rest None -- an ASYMMETRIC record that is honest beats a symmetric one
 # that is invented (see `polymarket_daily_rows`, which fills none of them
 # because the slate it reads does not carry them).
@@ -132,9 +132,39 @@ MAX_POINTS_PER_MARKET = 48
 # ceiling. It is a disk cost. If a file ever does cross `_trim_to_budget`, the
 # trim order still drops POINTS before MARKETS, so coverage -- the thing this
 # module exists for -- degrades last.
+#
+# SIZE AT TOUCH ADDED 2026-09-09 (`bid_size` / `ask_size`), and the naming is
+# deliberate. `liquidity` is a POISONED WORD in this module: the venue field
+# behind it (`liquidity_dollars`) is a dead placeholder that reported the
+# literal "0.0000" on 12,000 of 12,000 open markets, including one with
+# `volume_fp=343240.44`, a 1-cent spread and a 3-level book. So these two are
+# NOT called liquidity, and `liquidity` is NOT remapped onto them -- its zero
+# stays captured and honest rather than being quietly given someone else's
+# number. Nobody should re-derive this: the placeholder is the venue's, the
+# sizes are the real book.
+#
+# `bid_size`/`ask_size` are the YES side: `bid_size` is the quantity resting at
+# `yes_bid`, `ask_size` the quantity offered at the ask stored as `yes`. They
+# are the only stored numbers that say whether a quoted ask was REACHABLE --
+# `volume`/`volume_24h` are historical flow and `open_interest` is stock, so
+# none of the three is book depth and none may stand in for these.
+#
+# A ZERO SIZE IS A READING, not a gap: nothing is resting there. Of one
+# production tick's 2,187 markets, 1,246 showed zero volume AND zero open
+# interest -- over half of what Kalshi lists has never traded -- which is
+# itself a fill fact, and `_as_depth` is what keeps it distinct from absent.
+#
+# THE SIZE OF THE TWO EXTRA FIELDS IS ARITHMETIC, NOT A NEW MEASUREMENT, and it
+# is labelled that way on purpose. The block above measured 112 B per point for
+# six fields with ~69 B of that in the keys; two more keys of the same shape add
+# roughly 35-40 B per WRITTEN point (~+30% on the depth block, ~+25% on a point).
+# Same disk-backed path, same absent ceiling, same trim order. Re-measure before
+# quoting a file-level number -- do not read the table above as covering eight.
 DEPTH_FIELDS = (
     "yes_bid",
     "no_bid",
+    "bid_size",
+    "ask_size",
     "volume",
     "volume_24h",
     "open_interest",
@@ -310,7 +340,7 @@ def _as_depth(value: Any) -> float | None:
 
 
 def _depth_of(row: Mapping[str, Any]) -> dict[str, Any]:
-    """The six depth readings a row carries, coerced but never defaulted."""
+    """Every `DEPTH_FIELDS` reading a row carries, coerced but never defaulted."""
     return {field: _as_depth(row.get(field)) for field in DEPTH_FIELDS}
 
 
@@ -403,10 +433,13 @@ def record_daily_odds(
     # and changed nothing because its only consumer refuses pregame, and a file
     # whose growth was credited to a writer that had not produced it.
     #
-    # PER FIELD, NEVER AGGREGATED. The six come from six different Kalshi
-    # columns and fail independently: `open_interest_fp` going absent is a
-    # different fact from `liquidity_dollars` going absent, and one blended
-    # percentage would hide five healthy fields behind one broken one.
+    # PER FIELD, NEVER AGGREGATED. Each comes from its own Kalshi column and
+    # they fail independently: `open_interest_fp` going absent is a different
+    # fact from `liquidity_dollars` going absent, and one blended percentage
+    # would hide the healthy fields behind one broken one. That is not
+    # hypothetical -- it is how the dead `liquidity` placeholder was isolated
+    # from five working fields, which is what motivated capturing
+    # `bid_size`/`ask_size` in the first place.
     #
     # THREE STATES, because two of them are indistinguishable in a naive
     # "count the truthy values" pass and only one of them is a defect:
@@ -492,7 +525,8 @@ def record_daily_odds(
         depth = _depth_of(row)
         # Counted on the SAME pass that decides whether to store the block --
         # no second traversal, no re-read, no re-parse. This runs every tick,
-        # so it is six dict increments per written point and nothing else.
+        # so it is one dict increment per `DEPTH_FIELDS` entry per written
+        # point and nothing else.
         depth_points += 1
         carried_depth = False
         for field in DEPTH_FIELDS:
@@ -510,7 +544,7 @@ def record_daily_odds(
                 depth_nonzero[field] += 1
         if carried_depth:
             depth_blocks += 1
-            # ALL SIX OR NONE. Once a venue has told us anything, a None inside
+            # ALL OR NONE. Once a venue has told us anything, a None inside
             # the block means "this venue does not report this one", which is a
             # different fact from the block being absent because the venue
             # reports no depth at all. Polymarket's rows are the second case
@@ -682,11 +716,12 @@ def kalshi_daily_rows(markets: Sequence[Mapping[str, Any]]) -> list[dict[str, An
             "yes": market.get("yes_ask_dollars"),
             "no": market.get("no_ask_dollars"),
             # THE DEPTH SIDE OF THE SAME TICK. `kalshi_client._MARKET_FIELDS`
-            # has fetched all six on every market since 2026-08-23 and
+            # has fetched the first six on every market since 2026-08-23 and
             # `normalize_market` carries them; this builder kept the two asks
             # and dropped the rest, so nothing downstream could measure whether
-            # a quoted ask was reachable. Venue-native names on the left,
-            # `DEPTH_FIELDS` on the right.
+            # a quoted ask was reachable. The two SIZES were not even fetched
+            # until 2026-09-09 -- the allowlist dropped them. Venue-native
+            # names on the left, `DEPTH_FIELDS` on the right.
             #
             # `.get` with NO DEFAULT: a field the venue stopped returning must
             # arrive as None. `normalize_market` already writes None and counts
@@ -694,6 +729,14 @@ def kalshi_daily_rows(markets: Sequence[Mapping[str, Any]]) -> list[dict[str, An
             # manufacture "a market nobody holds" out of a schema change.
             "yes_bid": market.get("yes_bid_dollars"),
             "no_bid": market.get("no_bid_dollars"),
+            # SIZE AT TOUCH. Present on every market Kalshi lists, and dropped
+            # by `_MARKET_FIELDS` until 2026-09-09 -- they were sitting in
+            # `probe()`'s `present_but_unexpected` the whole time. Named for
+            # what they are: `liquidity` below is a venue-side PLACEHOLDER that
+            # reads "0.0000" on every open market, and these are the real book,
+            # so neither is called liquidity and neither feeds it.
+            "bid_size": market.get("yes_bid_size_fp"),
+            "ask_size": market.get("yes_ask_size_fp"),
             "volume": market.get("volume_fp"),
             "volume_24h": market.get("volume_24h_fp"),
             "open_interest": market.get("open_interest_fp"),
@@ -775,15 +818,17 @@ def polymarket_daily_rows(markets: Sequence[Mapping[str, Any]]) -> list[dict[str
     sportsMarketTypeV2, outcomes, outcomePrices, line, gameStartTime,
     orderPriceMinTickSize, minimumTradeQty, orderable) -- and the `_KEEP` trim
     upstream of it drops everything else first. Neither list has a bid, a
-    volume, an open interest or a liquidity in it.
+    SIZE AT TOUCH, a volume, an open interest or a liquidity in it.
 
     `polymarket_client._MARKET_FIELDS` DOES fetch `volume`, `volume24hr` and
     `liquidity` -- but that is the gamma client, which does not feed this
-    builder, and it has no bid/ask depth either. So there is no honest mapping
-    to write here today. Asymmetric capture beats a fabricated symmetry: the
-    Kalshi rows carry depth, these do not, and `record_daily_odds` stores no
-    empty depth block for them rather than writing six nulls per point across
-    ~12,000 markets.
+    builder, and it has no bid/ask depth or resting size either. So there is no
+    honest mapping to write here today, and in particular nothing here may be
+    mapped to `bid_size`/`ask_size` to make the two venues look alike.
+    Asymmetric capture beats a fabricated symmetry: the Kalshi rows carry
+    depth, these do not, and `record_daily_odds` stores no empty depth block
+    for them rather than writing a null per `DEPTH_FIELDS` entry per point
+    across ~12,000 markets.
     """
     from syndicate.features.shared.polymarket_board_join import (
         MARKET_TYPE_TO_BOARD,
@@ -1032,12 +1077,17 @@ def format_depth_coverage(report: Mapping[str, Any]) -> str:
     line on whitespace has to special-case them. This is the one line an
     operator greps to answer "is depth landing", so it stays splittable.
 
-    ALL SIX FIELDS ALWAYS, INCLUDING THE ZEROES, in `DEPTH_FIELDS` order: a
+    EVERY `DEPTH_FIELDS` ENTRY ALWAYS, INCLUDING THE ZEROES, in that order: a
     counter that appears only when it fires cannot distinguish "this field is
-    absent" from "this build does not have the counter".
+    absent" from "this build does not have the counter". It is derived from
+    `DEPTH_FIELDS` rather than listed here, so `bid_size` and `ask_size` are
+    printed by the same mechanism that isolated the dead `liquidity`
+    placeholder from the fields that work -- which is the whole reason this
+    per-field, three-state shape exists rather than one blended percentage.
 
     CAPTURE ONLY. This proves a depth value was fetched and written. It is not
-    evidence that anything reads it.
+    evidence that anything reads it, and a nonzero `bid_size` count is not a
+    measurement of fill -- it is what makes fill measurable at all.
     """
 
     def _render(counts: Any) -> str:
