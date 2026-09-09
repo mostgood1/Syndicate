@@ -554,6 +554,33 @@ def _isolate_kalshi_discovered_series():
 # `data/wnba_source` copies as its mirrors. Watching only `data/` was blind to
 # the more authoritative of the two. See `_guarded_mirror_roots`.
 #
+# THE SHAPE THIS KEEPS CATCHING, named because it has now appeared three times
+# in three unrelated scripts and the next one will look the same: **A TEST PINS
+# ONE PATH AND THE CODE RESOLVES TWO.** The test passes an explicit destination,
+# asserts on the file it named, and passes -- while a SECOND path in the same
+# call resolves from `data_root()` and lands in the mirror. The passing
+# assertion is what hides it: it proves the file the test named is right and
+# says nothing about the file it did not.
+#
+#   * `refresh_ncaab_odds_history` takes `--out-dir`, which covers the odds CSV
+#     the test asserts on; `append_book_quotes` ignores the flag and writes
+#     `data/ncaab_source/tracking/book_quotes/<date>.jsonl`.
+#   * `_persist_live_lens_report` resolves `live_lens_log_path(date)` separately
+#     from `live_lens_report_path(date)`; a test stubbing only the report still
+#     appends to the tracked JSONL log.
+#   * `emit_settlement_inputs` is `Path(out_dir) if out_dir is not None else
+#     (data_root() / "settlement_inputs")`, and `run_refresh_worker` calls it
+#     with no `out_dir` at all. (Traced by session
+#     `data-mirror-write-guard-sweep`, who named the pattern; closed here as a
+#     side effect of the module-scoped data root in `test_refresh_worker.py`,
+#     verified with the guard MUTED so "fixed" is distinguishable from
+#     "blocked".)
+#
+# The lesson for a fix, not just for finding it: redirect the ROOT, not the
+# symbol or the flag. A flag covers one path by construction, and patching a
+# path-returning symbol can miss -- measured on `live_lens_log_path`, where
+# `patch.object` was in scope at the failing line and the write still landed.
+#
 # A test that genuinely means to write there says so with
 # `@pytest.mark.writes_tracked_data`. To tell this guard's findings apart from
 # failures that were already there, re-run with
