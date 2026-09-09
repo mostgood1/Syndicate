@@ -84,6 +84,76 @@ from syndicate.features.shared.kalshi_catalogue import (  # noqa: E402
 # agree about which fixtures are reachable should not disagree by a constant.
 _SOCCER_FORWARD_HORIZON_DAYS = 14
 
+# -------------------------------------------------------------------------
+# THE SAME DEFECT, ON A SECOND SPORT -- AND THE COST IS MEASURED
+# -------------------------------------------------------------------------
+#
+# "soccer's board rows carry the slate date while its markets carry the
+# fixture date" (see `_date_ok`) is not a fact about soccer. It is a fact
+# about any sport whose board is a FORWARD SLATE, and NCAAF is one.
+#
+# MEASURED 2026-09-09 on production, `/api/portfolio/paper?date=2026-09-09`:
+# the Kalshi plan sized **11 positions, every one NCAAF, every one
+# `price_source='aggregator'` with NO `venue_ticker`** -- matching the same
+# tick's `PAPER2_PLAN_WRITTEN ... venue=kalshi ... placeable_committed=0/11`.
+# Their `commence_time`s are 2026-09-11/12, so every corresponding Kalshi
+# market died in `_date_ok` below as `market_is_for_another_date` purely
+# because `sport != "soccer"`.
+#
+# AND KALSHI LISTS THEM. `[kalshi_odds] BY_GAME_DATE`, same day, for
+# 2026-09-12: `KXNCAAFGAME 182, KXNCAAFSPREAD 400, KXNCAAFTOTAL 400` -- the
+# exact three families those rows want (h2h / spreads / totals, `segment=full`).
+# None of those three appear in `unreadable_by_series`, so their titles
+# already classify; the date gate is the only thing in the way.
+#
+# NOT AUTOMATICALLY SAFE FOR EVERY DATE, WHICH IS WHY THIS IS PER-SPORT AND
+# HORIZONED. 2026-09-11 carries ONLY segment families for NCAAF
+# (`KXNCAAF1HSPREAD/1HTOTAL/1Q..4Q`), so the two 09-11 rows in that plan must
+# still refuse -- and they do, on `_segments_agree`, which is a real predicate
+# rather than this date accident. That is the point: widening the date does
+# not weaken any identity check, it just stops one check from standing in for
+# all of them.
+#
+# ABSENT MEANS `soccer` -- EXACTLY TODAY'S BEHAVIOUR. A deploy without an env
+# decision is a byte-identical no-op, and the counter below is what makes the
+# decision readable before any money moves.
+_FORWARD_HORIZON_DAYS: dict[str, int] = {
+    # Unchanged, and deliberately the same constant as
+    # `polymarket_board_join._FORWARD_HORIZON_DAYS`.
+    "soccer": _SOCCER_FORWARD_HORIZON_DAYS,
+    # A college football week. The board's forward NCAAF rows sit 2-3 days
+    # out; 7 covers a full week without reaching into the NEXT one, where a
+    # club pair can legitimately recur and `event_matches_two_games` would be
+    # the only thing standing between us and a bet on the wrong game.
+    "ncaaf": 7,
+    "nfl": 7,
+}
+_DEFAULT_FORWARD_SPORTS = ("soccer",)
+
+
+def _forward_date_sports() -> frozenset[str]:
+    """Which sports may pair a Kalshi market dated AHEAD of the slate.
+
+    `SYNDICATE_KALSHI_FORWARD_DATE_SPORTS`, a comma list. Absent -> `soccer`,
+    which is what this file did before the list existed. `off`/`none` disables
+    the widening for every sport, which is the old
+    `SYNDICATE_KALSHI_SOCCER_FORWARD_DATES=off` kill switch generalised --
+    that variable is still honoured, and still only speaks for soccer.
+    """
+    raw = str(os.environ.get("SYNDICATE_KALSHI_FORWARD_DATE_SPORTS") or "").strip()
+    if not raw:
+        sports = set(_DEFAULT_FORWARD_SPORTS)
+    elif raw.lower() in {"0", "off", "false", "no", "none"}:
+        sports = set()
+    else:
+        sports = {p.strip().lower() for p in raw.split(",") if p.strip()}
+    if not _soccer_forward_dates_enabled():
+        # The original kill switch, kept literal: it turns SOCCER off and says
+        # nothing about any other sport. Folding it into a blanket disable
+        # would silently re-scope a variable somebody set for one reason.
+        sports.discard("soccer")
+    return frozenset(sports)
+
 
 def _soccer_forward_dates_enabled() -> bool:
     """Kill switch for the soccer forward-date widening. ON by default.
@@ -118,6 +188,20 @@ REASON_NEEDS_EVENT_MAPPING = "needs_event_mapping"
 REASON_EVENT_UNMATCHED = "event_not_on_our_board"
 REASON_EVENT_AMBIGUOUS = "event_matches_two_games"
 REASON_GAME_LINES_DISABLED = "game_lines_disabled"
+# INSIDE THE HORIZON, AND THIS SPORT IS NOT ON THE FORWARD LIST.
+#
+# Split out of `market_is_for_another_date` on purpose, and it is the whole
+# reachability instrument for `SYNDICATE_KALSHI_FORWARD_DATE_SPORTS`. The old
+# counter cannot answer the only question that matters before flipping a flag
+# --  "how many markets WOULD this admit?" -- because it sums a stale game
+# from last week, a futures contract, and a fixture two days out into one
+# number. This one counts exactly the population the flag governs, so the
+# decision is a READING taken with the flag still off, not a prediction.
+#
+# Same shape as `REASON_GAME_LINES_DISABLED` directly above, for the same
+# reason: "resolved, and still not priced" is a different fact from "we could
+# not resolve it", and one impersonating the other is `#505`.
+REASON_FORWARD_DATE_SPORT_OFF = "forward_date_sport_not_enabled"
 # A team-named game line whose club we cannot place on either side of the
 # resolved game. Its own reason because it is the LAST guard before a bet
 # on the wrong team, and it must never be quietly folded into "no row".
@@ -1198,15 +1282,21 @@ def join_kalshi_to_board(
     # THE HORIZON IS THE SIBLING JOIN'S, not a new number:
     # `polymarket_board_join._FORWARD_HORIZON_DAYS = 14`, and Kalshi's soccer
     # set occupies exactly that span (09-02..09-15 on the measured build).
-    _forward_horizon_date = ""
+    #
+    # PER SPORT NOW, because the horizon is a property of the SPORT'S calendar
+    # and not of this join. Soccer keeps 14; NCAAF gets a week. See
+    # `_FORWARD_HORIZON_DAYS`.
+    _forward_horizon_by_sport: dict[str, str] = {}
     if wanted_date:
-        try:
-            _forward_horizon_date = (
-                _dt.date.fromisoformat(wanted_date)
-                + _dt.timedelta(days=_SOCCER_FORWARD_HORIZON_DAYS)
-            ).isoformat()
-        except ValueError:
-            _forward_horizon_date = ""
+        for _sport, _days in _FORWARD_HORIZON_DAYS.items():
+            try:
+                _forward_horizon_by_sport[_sport] = (
+                    _dt.date.fromisoformat(wanted_date) + _dt.timedelta(days=_days)
+                ).isoformat()
+            except ValueError:
+                _forward_horizon_by_sport = {}
+                break
+    _forward_sports = _forward_date_sports()
 
     # KALSHI'S OWN CLUB CODE -> NAME PAIRING, derived once per build from the
     # market list already in hand. See `build_club_code_names`: the venue
@@ -1222,20 +1312,35 @@ def join_kalshi_to_board(
         sport_for_series as _sport_for_series,
     )
 
-    def _date_ok(game_date: str, market: Mapping[str, Any]) -> bool:
+    def _date_verdict(game_date: str, market: Mapping[str, Any]) -> str:
         """Does this market's game date serve the slate being committed?
 
-        Exact for every sport. Soccer additionally accepts a FUTURE fixture
-        inside the horizon, because soccer's board rows carry the slate date
-        while its markets carry the fixture date.
+        Returns `ok`, `forward_sport_off`, or `wrong_date` -- THREE outcomes,
+        not two, and the middle one is the reason this stopped being a bool.
+
+        Exact for every sport. A sport on the forward list additionally accepts
+        a FUTURE fixture inside ITS horizon, because those sports' board rows
+        carry the slate date while their markets carry the fixture date.
+
+        `forward_sport_off` means: this market is inside the horizon its sport
+        WOULD get, and its sport is not on the list. That is the population
+        `SYNDICATE_KALSHI_FORWARD_DATE_SPORTS` governs, counted while the flag
+        is still off -- so turning it on is a decision taken against a measured
+        number instead of a guess. Rolled into `market_is_for_another_date` it
+        was unmeasurable: that counter also holds last week's settled games and
+        every futures contract, which is 4,237 of 6,000 on a quiet build.
         """
         if game_date == wanted_date:
-            return True
-        if not _soccer_forward_dates_enabled() or not _forward_horizon_date:
-            return False
-        if _sport_for_series(market.get("series")) != "soccer":
-            return False
-        return bool(wanted_date < game_date <= _forward_horizon_date)
+            return "ok"
+        sport = _sport_for_series(market.get("series"))
+        horizon = _forward_horizon_by_sport.get(str(sport or ""))
+        if not horizon or not (wanted_date < game_date <= horizon):
+            # Stale, or beyond any horizon this sport could ever get. No flag
+            # would admit it, so it is not the flag's population.
+            return "wrong_date"
+        if sport not in _forward_sports:
+            return "forward_sport_off"
+        return "ok"
 
     for market in kalshi_markets:
         # THE CATALOGUE DECIDES WHAT THIS MARKET IS, for every sport at once.
@@ -1359,8 +1464,13 @@ def join_kalshi_to_board(
                 if game_date is None:
                     _refuse(REASON_UNDATABLE)
                     continue
-                if not _date_ok(game_date, market):
-                    _refuse(REASON_WRONG_DATE)
+                _verdict = _date_verdict(game_date, market)
+                if _verdict != "ok":
+                    _refuse(
+                        REASON_FORWARD_DATE_SPORT_OFF
+                        if _verdict == "forward_sport_off"
+                        else REASON_WRONG_DATE
+                    )
                     continue
 
             resolution = _resolve_event(market, board_rows, club_code_names)
@@ -1601,8 +1711,18 @@ def join_kalshi_to_board(
                 # market gets its own reason so the count is visible.
                 _refuse(REASON_UNDATABLE)
                 continue
-            if not _date_ok(game_date, market):
-                _refuse(REASON_WOULD_MATCH_WRONG_DATE if rows else REASON_WRONG_DATE)
+            _verdict = _date_verdict(game_date, market)
+            if _verdict != "ok":
+                if _verdict == "forward_sport_off":
+                    # Same split as the game-line branch above. Kept ahead of
+                    # `would_match_but_wrong_date` because it is the STRONGER
+                    # statement: the calendar is not the disagreement, the flag
+                    # is, and that distinction is the flag's whole instrument.
+                    _refuse(REASON_FORWARD_DATE_SPORT_OFF)
+                else:
+                    _refuse(
+                        REASON_WOULD_MATCH_WRONG_DATE if rows else REASON_WRONG_DATE
+                    )
                 continue
 
         if not rows:

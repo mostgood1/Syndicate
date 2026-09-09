@@ -71,12 +71,24 @@ def test_a_future_soccer_fixture_is_no_longer_refused_for_its_date():
 
 def test_the_same_market_IS_refused_by_date_with_the_switch_off(monkeypatch):
     """off != on. Without this the change is indistinguishable from a join that
-    ignores its own switch."""
+    ignores its own switch.
+
+    THE REASON NAME CHANGED, AND THE ASSERTION IS STRONGER FOR IT
+    `[2026-09-09, lane kalshi-join-match-rate]`. A market inside the horizon
+    that is refused because its sport is not on the forward list is no longer
+    counted as `market_is_for_another_date` -- it is
+    `forward_date_sport_not_enabled`. The old name was literally true and
+    unusable: it also holds last week's settled games and every futures
+    contract, 4,237 of 6,000 on a measured build, so it could never answer
+    "how many markets would this flag admit?". Still exactly one refusal, and
+    still the switch that causes it.
+    """
     monkeypatch.setenv("SYNDICATE_KALSHI_SOCCER_FORWARD_DATES", "off")
     out = join_kalshi_to_board(
         [_soccer_market()], [], selected_date="2026-09-01"
     )
-    assert out["reasons"].get("market_is_for_another_date", 0) == 1
+    assert out["reasons"].get("forward_date_sport_not_enabled", 0) == 1
+    assert out["matched"] == 0
 
 
 def test_a_soccer_fixture_PAST_the_horizon_still_refuses():
