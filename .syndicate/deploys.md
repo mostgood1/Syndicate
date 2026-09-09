@@ -5,6 +5,69 @@
 
 ---
 
+## 2026-09-09 19:06:57-19:12:59Z — web `00902dd1` -> `44499cb0` — **the coverage page is back, fed by a worker-published artifact; BOTH services now on `44499cb0`** — lane `intelligence-coverage-artifact`
+
+User-directed ("wait for the worker and deploy both"). **Only web was
+deployed, and that is the whole point of the on-main rule.** The producer half
+(`5c7af861`) was ALREADY LIVE on refresh-worker at 18:49:50Z — carried there by
+`segments-joint-v1`'s deploy of `44499cb0`, which I did not order and did not
+need to. Serialisation is not composition; being on `main` is. Deploying web to
+that same SHA puts both services on one commit.
+
+**The 80-minute watch was made unnecessary by re-reading state instead of
+trusting the plan.** The watcher was polling for a refresh-worker claim it
+turned out I never needed; 13 readings in, a direct preflight showed the worker
+had already shipped my commit. Stopped the watcher rather than let it run.
+
+**THE CHECK THAT MATTERED WAS NOT THE DEPLOY.** Local verification proved
+nothing about production: locally `_state_backend_kind()` is `filesystem`, so
+producer and reader were one process on one disk. In production they are two
+services that **cannot share a disk**. Enumerated before firing, from the live
+env-vars API (`snapshot_render_env.py`, hashed values):
+
+| | web | refresh-worker |
+|---|---|---|
+| `SYNDICATE_REFRESH_STATE_BACKEND` | sha `b4bfe7c31fb4` | sha `b4bfe7c31fb4` |
+| `SYNDICATE_REFRESH_STATE_URL` | sha `fdab98caf10b` | sha `fdab98caf10b` |
+| `SYNDICATE_REFRESH_STATE_NAMESPACE` | sha `515542b85f6c` | **absent** |
+
+`b4bfe7c31fb4` = `"keyvalue"`, `515542b85f6c` = `"syndicate"` — and
+`_state_namespace()` defaults to exactly `"syndicate"` when the key is absent,
+so the asymmetry resolves to the same prefix. Same backend, same store, same
+namespace. Also confirmed `coverage_report.json` hits no
+`_KEYVALUE_EXCLUDED_PATH_MARKERS` entry, so it is keyvalue-backed rather than
+per-service disk. **Had the namespace default differed, everything below would
+have deployed green and the page would have been permanently degraded.**
+
+**verify:**
+1. **Both services on `44499cb0`** — web finished 19:12:59Z
+   (`dep-dagqskepcuac73a965hg`), refresh-worker 18:49:50Z.
+2. **`/intelligence/status` → `200 text/html`** (was a 302 to a JSON endpoint
+   since 2026-06-10).
+3. **THE CROSS-SERVICE READ IS PROVEN, not inferred:** the page renders
+   **"Published 13:50:39"** — a timestamp the WORKER wrote and WEB read, which
+   is only possible through the shared keyvalue store. The degraded chip
+   ("No coverage report published for this date yet") appears **0 times**.
+   Both states have now been observed, locally and in production, so a
+   "Published" reading is discriminating rather than a default.
+4. **Real numbers, not zeros:** tracked artifacts 1/2, advanced inputs 3/4,
+   with per-sport panels (MLB, NBA, …) carrying paths and per-metric chips.
+   Zeros would have been indistinguishable from the empty projection.
+5. **The pill and its target pinned together:** `/intelligence` serves
+   `href="/intelligence/status">Data coverage`, and that URL serves HTML.
+   Either half can be right while the pair is broken — which is exactly what
+   was true for three months.
+
+**No worker deploy was taken, so no in-flight job was killed.** Preflight had
+shown 11 processes on refresh-worker at 18:31Z including an MLB daily sim.
+
+**NOT verified:** what happens when the worker stops publishing for a full
+`DEFAULT_MAX_AGE_SECONDS` (6 h) — the staleness branch is unit-tested but has
+never been seen in production.
+
+
+---
+
 ## 2026-09-09 17:06:48-17:10:29Z — web `617a2805` -> `00902dd1` (5 commits) — **the app had NO error handler; branded, content-negotiated 404/500 now live** — lane `brand-mascot-logo`
 
 User-directed. Web only; no `render.yaml`. Delta: 5 commits, and **the only
