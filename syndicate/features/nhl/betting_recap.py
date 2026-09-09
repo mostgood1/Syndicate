@@ -69,6 +69,22 @@ def _empty_bucket() -> dict[str, Any]:
         "wins": 0,
         "losses": 0,
         "pushes": 0,
+        # Settled rows carrying no `payout`, i.e. rows counted in the W-L-P
+        # record that contribute nothing to `profit_total`. PURELY AN
+        # INSTRUMENT: this module has always been the CORRECT one -- it never
+        # fabricated a payout, which is why `nba/betting_recap.py` was changed
+        # to match it -- but "correct" here meant SILENT, and an ROI computed
+        # over fewer rows than were settled looked identical to one computed
+        # over all of them.
+        #
+        # NOTE FOR WHOEVER PICKS UP THE ROI QUESTION: `stake` and `payout` are
+        # added INDEPENDENTLY below, so a row with a stake and no payout still
+        # enlarges the ROI DENOMINATOR while contributing no numerator. That is
+        # the opposite error from NBA's fabricated even money and it understates
+        # ROI. It is deliberately NOT changed here -- this pass adds the reading,
+        # it does not move a published number on the strength of it. See
+        # `leads.md`.
+        "unpriced": 0,
         "stake_total": 0.0,
         "profit_total": 0.0,
         "accuracy_pct": None,
@@ -150,6 +166,8 @@ def _section_for_date(rows: list[dict[str, str]], date_str: str) -> dict[str, An
                 buckets[bucket_name]["pushes"] += 1
             stake = _safe_float(row.get("stake"))
             payout = _safe_float(row.get("payout"))
+            if payout is None:
+                buckets[bucket_name]["unpriced"] += 1
             if stake is not None:
                 buckets[bucket_name]["stake_total"] += stake
             if payout is not None:
@@ -170,7 +188,7 @@ def _aggregate_sections(items: list[dict[str, Any]], key: str) -> dict[str, Any]
         for name, bucket in section_buckets.items():
             if name not in buckets or not isinstance(bucket, dict):
                 continue
-            for field in ("total", "resolved", "wins", "losses", "pushes"):
+            for field in ("total", "resolved", "wins", "losses", "pushes", "unpriced"):
                 buckets[name][field] += int(bucket.get(field) or 0)
             for field in ("stake_total", "profit_total"):
                 buckets[name][field] += float(bucket.get(field) or 0.0)

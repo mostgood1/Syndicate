@@ -113,6 +113,49 @@ def test_live_lens_loss_without_a_price_is_still_a_full_stake():
     assert bucket["unpriced"] == 0
 
 
+def test_the_counter_reaches_the_payload_the_ui_reads(tmp_path, monkeypatch):
+    """End to end: an unpriced winner in the CSV must surface as `unpriced` in
+    the recap payload, because that is the field the recap table now draws.
+
+    A producer-level unit test proves the arithmetic; this proves the value
+    survives the aggregation and lands in the published shape. Without it a
+    later refactor could keep `_settle_game_pick` correct and still drop the
+    counter on the way out, which is exactly the class of silence this whole
+    change is about."""
+    from syndicate.features.nba import betting_recap as recap
+
+    processed = tmp_path / "data" / "processed"
+    processed.mkdir(parents=True)
+    (processed / "recommendations_2026-01-02.csv").write_text(
+        """market,side,home,away,date,ev,price,tier
+ML,HOME,HOME,AWAY,2026-01-02,5.0,-110,High
+ML,HOME2,HOME2,AWAY2,2026-01-02,5.0,,High
+""",  # row 2 is the UNPRICED winner: same result, empty price cell
+        encoding="utf-8",
+    )
+    (processed / "recon_games_2026-01-02.csv").write_text(
+        """home_team,visitor_team,home_pts,visitor_pts
+HOME,AWAY,110,100
+HOME2,AWAY2,110,100
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(recap, "_artifact_root", lambda: processed)
+    recap.build_betting_recap_payload.cache_clear()
+    payload = recap.build_betting_recap_payload("since=2026-01-02&until=2026-01-02")
+    recap.build_betting_recap_payload.cache_clear()
+
+    bucket = payload["items"][0]["games"]["buckets"]["Overall"]
+    assert bucket["resolved"] == 2 and bucket["wins"] == 2
+    assert bucket["unpriced"] == 1, "the unpriced winner vanished between settlement and the payload"
+    assert bucket["stake_total"] == 1.0, "ROI must be a rate over the priced row only"
+    assert bucket["profit_total"] == pytest.approx(100.0 / 110.0)
+    assert bucket["roi_pct"] == pytest.approx(90.9, abs=0.1)
+
+    flags = sorted(bool(pick["unpriced"]) for pick in payload["items"][0]["games"]["picks"])
+    assert flags == [False, True], "the per-pick flag the row view reads is missing"
+
+
 def test_every_bucket_shape_carries_the_counter():
     """Both modules keep their own bucket dict; a counter added to one and not
     the other is a gap that only shows up in whichever payload nobody reads."""
