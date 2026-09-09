@@ -467,3 +467,37 @@ load-bearing part**: 213 `/api/...` routes have callers that parse JSON, so
 (`Accept: */*` from curl and most clients scores html and json equally). A
 route's own `abort(404, description=...)` message survives — soccer's
 unknown-league 404 still names every valid league.
+
+## [client-slate-date] THE BROWSER'S SLATE DATE IS CENTRAL, FROM ONE FUNCTION, AND A RATCHET NOW HOLDS IT `[verified 2026-09-09 in production, lane probability-converter-registry, web a6a8730d]`
+
+`localYMD` had **six definitions in two implementations**: 5 copies of
+`America/New_York` + 06:00 rollback, and 1 of the BROWSER's own timezone with no
+rollback (MLB's live-lens page). It is now **one** function,
+`syndicate/static/shared/slate_date.js` — `slateYMD(timeZone, cutoffHour)` plus
+a `localYMD()` reading an optional `window.SYNDICATE_SLATE_DATE`. **No page
+carries an override.** Ten pages load it: `{nba,nhl}` betting-recap,
+`{mlb,nba,nhl,wnba}` market-accuracy, `{mlb,nba,nhl,wnba}` live-lens-accuracy.
+
+**The default is `America/Chicago`, matching the server** —
+`shared/timezone.py` defines the slate day as `ZoneInfo("America/Chicago")` and
+`central_today()` has **306 call sites**. The client had been defaulting these
+pages to a different day from the one the server resolves.
+
+**VERIFIED IN PRODUCTION, at an instant where the zones differ** — this matters
+because at any ordinary hour Central and Eastern agree and the reading is
+worthless: frozen clock in the live page, **`2026-07-01T10:59Z` (06:59 ET /
+05:59 CT) returns `2026-06-30`**, where Eastern gives `2026-07-01`. The served
+`slate_date.js` contains `cfg.timeZone:'America/Chicago'`. **The window in which
+anything moves is 05:00-06:00 Central.**
+
+**`tests/test_slate_date_timezone_discipline.py` now sweeps the CLIENT too.**
+Its scope was `.py` files only, which is why the browser drifted with nothing
+reporting it. The client half is an allowlist-with-reasons, and it is proved
+both ways: a real `Intl` call in Eastern FAILS it, a `//` or `/* */` prose
+mention PASSES.
+
+**STILL EASTERN, deliberately allowlisted:**
+`static/nba/cards_source.js:getLocalDateISO()` is a genuine ET slate default on
+the NBA cards family (a lead); `templates/nhl/cards_source.html` compares
+against an ET "today" ON PURPOSE, to decide live polling, because "artifact
+dates are ET-based" — moving it would change which slates poll.

@@ -590,6 +590,7 @@ once this index exists: re-splitting would orphan the parts.
 | [live-surface-tier5] | THE LIVE SURFACE — Tier 5 `[measured 08-15 02:3x–03:0xZ]` | `state_ui.md` |
 | [ask-the-syndicate] | ASK THE SYNDICATE | `state_ui.md` |
 | [ui-board-cards] | UI / BOARD CARDS | `state_ui.md` |
+| [client-slate-date] | THE BROWSER'S SLATE DATE IS CENTRAL, FROM ONE FUNCTION, AND A RATCHET NOW HOLDS IT `[verified 2026-09-09 in production]` | `state_ui.md` |
 | [live-odds-worker-memory-is-page-cache] | live-odds-worker READS 96% AND IS NOT IN DANGER — THE FIELD EVERYONE REACHES FOR IS THE WRONG ONE `[measured 2 | `state_venues.md` |
 | [603-cross-game-quote-keys] | VENUE QUOTES NAMED NO GAME; FIXED ON EVERY PATH, DEPLOYED, AND STILL UNPROVEN AFTER THREE READINGS `[2026-08-3 | `state_venues.md` |
 | [venue-fee-economics] | FEES ARE READ FROM THE VENUE AND VERIFIED AGAINST 18/18 REAL FILLS; THE ARB THRESHOLD WAS ABOVE BREAK-EVEN EVE | `state_venues.md` |

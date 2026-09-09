@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 949 rules `[generated]`
+## Index — 950 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5130,3 +5130,39 @@ the pattern has to be able to match before its 0 means anything.
   real spending limits on a false premise. Three now-inert env vars remain and
   are owed a reconciliation; **do not simply delete them**, because absent
   resolves to a code default that differs from both the env and the stored value.
+
+
+## 2026-09-09 FORBIDDEN: scoping a fix from the COUNT written in the lead that reported it. A lead's number is the author's hypothesis at the moment of noticing; re-census first `[lane probability-converter-registry]`
+
+Three leads followed in one session, and **every one of the three undercounted
+the thing it named** — each time by a factor, and each time the real number
+changed what the right fix was:
+
+| the lead said | the census found | what it changed |
+|---|---|---|
+| "SIX byte-identical copies of two JS renderers" | **74 definitions** — ALL 15 functions in both reconciliation templates, 11 across all four market-accuracy ones | the fix was two modules, not one edit |
+| "residual THREE-way `localYMD` duplication" | **6 definitions in 2 implementations**, five of them already inside shipped modules | the fix became one parameterised function, not a 3-way hoist |
+| "NBA settlement books EVEN MONEY on a missing price" (one function) | **3 sites in 2 modules**, one of them CROSS-SPORT | fixing only the named one would have left the same defect live in soccer/MLB/NBA live-lens |
+
+And the same session produced the INVERSE: a "6 Eastern vs 3 Central" census I
+wrote into a lead myself turned out to have counted three different things as
+one — slate-date resolution, display formatting, and a deliberate ET comparison
+that must NOT be changed. Only **two** of the six were what the lead implied.
+
+**WHY IT HAPPENS, and why it is not carelessness.** A lead is written at the
+moment of NOTICING, from whatever grep surfaced the thing — usually a
+first-line or single-token match, on the file that happened to be open. That is
+exactly the cheapest and least accurate moment to count. `/lead`'s whole value
+is that it costs nothing to record, and the cost it saves is the census.
+
+**HOW TO APPLY.** Treat the lead's number as the lower bound and the lead's
+FRAMING as unverified. Before scoping: re-census over the full tree with a
+matcher that can see the whole construct (full function BODIES, not first
+lines; templates AND static; nested and method scope, not just column 0), and
+CLASSIFY the hits before counting them — "same string" is not "same thing", and
+the NHL live-polling comparison would have been broken by a fix that treated it
+as one more instance.
+
+**The cost of not doing it is asymmetric.** Under-counting ships a fix that
+leaves the defect live somewhere else, and the ledger then records the lead as
+CLOSED. Over-counting only wastes a grep.
