@@ -819,6 +819,16 @@ death, never life — do not invert it.
 - Narrative, evidence, dead ends and retractions: `.syndicate/log/2026-09-09.md`.
 
 
+### heap-roots-parallel-flake — OPEN — opened 2026-09-09 — session 83b5aca4-7bdc-4525-a045-0bd5326c6969
+- Goal: `tests/test_heap_roots.py::WiderRootTests` (6 tests) passes under a FULL parallel suite, repeatedly — WITHOUT weakening what those tests pin. They exist to prove the root walk is ordered specific-first; a fix that makes them pass by loosening the ownership assertion destroys the thing they were written for.
+- Files (collision-checked 2026-09-09 with `.claude/hooks/lane_claims.claims_by_path` over `origin/main:.syndicate/lanes.md` — ZERO holders on each): `tests/test_heap_roots.py`, and `syndicate/features/shared/memory_observability.py` ONLY IF the walk itself turns out to be at fault. Intent is test-side. `#632`'s owning lane `web-oom-profiler-steady` is CLOSED, so nothing else claims this area.
+- **PRE-EXISTING, NOT CAUSED BY THE MIRROR-GUARD WORK, and measured rather than assumed:** the same 6 failed in a full run on `b099d557` before any of that work landed, and they pass 11/11 in isolation with `SYNDICATE_TEST_DATA_MIRROR_GUARD` both ON and OFF. Found while verifying lane `data-mirror-write-guard-sweep`; not its defect.
+- Hypothesis, WRITTEN BEFORE TESTING: the assertions are about WHICH ROOT owns an object, and the module's own docstring says "the shared `seen` set means the first root to reach an object owns it". Under a full parallel suite the interpreter holds far more imported modules and live objects than in isolation, so a DIFFERENT root reaches the fixture object first and the ownership assertion flips. i.e. the tests depend on the heap POPULATION, which `-n 6 --dist loadfile` changes.
+- Falsification test: if the six fail identically when `test_heap_roots.py` is run beside a SMALL unrelated module and pass beside a LARGE one (or are insensitive to what else is imported at all), the population hypothesis is wrong and the cause is something specific — a particular module's globals, or the cap interacting with object count. Also falsified if they fail in a SINGLE-worker full run, which would make it ordering/imports rather than parallelism.
+- Verification: (a) the six pass across at least 3 full parallel runs with different seeds; (b) a MUTATION CHECK that they still bind — reintroduce the broad-root-first ordering the file was written to catch, and they must go RED. (b) is the load-bearing half: per `learnings.md` 2026-09-09, a control must be shown to FAIL in the arm where the thing is broken, and passing is not evidence until it has.
+- Blocked by: nothing.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
