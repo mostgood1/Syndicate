@@ -5,7 +5,7 @@
     "ours_count": 0
   },
   "bucket": "2026-09-09T01:00:00Z",
-  "bucket_age_minutes": 58.1,
+  "bucket_age_minutes": 79.0,
   "edge": {
     "background_bytes": 108812401,
     "background_count": 147,
@@ -15,16 +15,17 @@
   },
   "known_body_bytes": 157286448,
   "known_edge_basis_bytes": 158210624,
-  "metered_mb": 397.35278,
+  "metered_mb": 401.11304,
   "neighbour_buckets": {
     "2026-09-08T21:00:00Z": 78.185196,
     "2026-09-08T22:00:00Z": 136.3277,
     "2026-09-08T23:00:00Z": 315.3486,
     "2026-09-09T00:00:00Z": 437.729,
-    "2026-09-09T01:00:00Z": 397.35278
+    "2026-09-09T01:00:00Z": 401.11304,
+    "2026-09-09T02:00:00Z": 64.0788
   },
   "sent_200": 2596,
-  "settled": false,
+  "settled": true,
   "transfer": "reports/bandwidth_spikes/controlled_transfer_20260909T000627Z.json",
   "window": {
     "end": "2026-09-09T01:00:00Z",
