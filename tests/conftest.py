@@ -1,9 +1,65 @@
 from __future__ import annotations
 
 import os
+import tempfile
 from pathlib import Path
 
 import pytest
+
+
+# ---------------------------------------------------------------------------
+# THE REPORTS ROOT IS REDIRECTED AT IMPORT, NOT PER TEST
+# ---------------------------------------------------------------------------
+# `_isolate_reports_root` below points `SYNDICATE_REPORTS_ROOT` at a scratch
+# dir for every test, and that is still the right per-test behaviour. It is
+# not sufficient on its own, because a function-scoped fixture is a WINDOW,
+# not a wall: `monkeypatch` restores the variable at teardown, and anything
+# still running then writes to the REAL `reports/`.
+#
+# MEASURED 2026-09-09, and it is not hypothetical. `reports/intelligence/
+# kalshi_markets.json` came back modified after a full run with every
+# per-test isolation in place. The writer, caught by the guard's `os.replace`
+# seam with its stack:
+#
+#     run_live_odds_refresh_worker.py:2520  _venue_poll_background_loop
+#     run_live_odds_refresh_worker.py:2486  _venue_poll_tick
+#     kalshi_odds_refresh.py:804            run_kalshi_odds_refresh
+#     kalshi_odds_refresh.py:1224           _run_kalshi_odds_refresh_unbounded
+#     refresh_state_store.py:704            write_json_file
+#     refresh_state_store.py:358            _atomic_write_text  -> os.replace
+#
+# A DAEMON THREAD. `run_live_odds_refresh_worker.main()` starts the venue poll
+# at line 2343; a test that drives that entrypoint leaves the loop ticking
+# every >=1s for the REST OF THE SESSION, and its writes land in whatever
+# test's window happens to be open -- one of the two hits was recorded during
+# another test's `(setup)` phase, before that test's fixtures had applied.
+#
+# So the redirect is ALSO made once here, at import, and never lifted. Same
+# lesson as the subprocess block one directory over: an isolation must be
+# scoped to the LIFETIME of the thing it isolates, not to the convenience of
+# the fixture. `setdefault` so a developer or CI that sets the variable
+# deliberately still wins, and so the per-test fixture below can still
+# override it for freshness.
+#
+# This changes nothing DURING a test -- the fixture already redirected there.
+# It closes the gaps between tests, at collection, and in surviving threads
+# and subprocesses, which inherit the environment.
+os.environ.setdefault(
+    "SYNDICATE_REPORTS_ROOT",
+    tempfile.mkdtemp(prefix="syndicate_session_reports_root_"),
+)
+# The value the per-test fixture RESTORES TO at teardown -- i.e. the floor a
+# surviving thread or a late subprocess actually reads. Captured here so the
+# regression test can assert on the floor itself; asserting inside a test can
+# only ever see the fixture's own override, which is isolated either way and
+# so cannot tell a working wall from a missing one.
+SESSION_REPORTS_ROOT_FLOOR = os.environ["SYNDICATE_REPORTS_ROOT"]
+
+
+@pytest.fixture
+def session_reports_root_floor():
+    """The import-time `SYNDICATE_REPORTS_ROOT`, for its own regression test."""
+    return SESSION_REPORTS_ROOT_FLOOR
 
 
 @pytest.fixture(autouse=True)
@@ -873,7 +929,7 @@ _install_data_mirror_write_guard()
 
 
 # ---------------------------------------------------------------------------
-# TEMPORARY ATTRIBUTION PROBE -- lane data-mirror-write-guard-sweep, 2026-09-09
+# THE ATTRIBUTION PROBE -- off unless SYNDICATE_TEST_MIRROR_WATCH names a file
 # ---------------------------------------------------------------------------
 # The interceptor above cannot see a write from a SUBPROCESS or from `os.open`.
 # Measured: a full run leaves `live_lens_2026_06_02.jsonl` one line longer and
@@ -887,6 +943,21 @@ _install_data_mirror_write_guard()
 # `PYTEST_CURRENT_TEST` is set in the PARENT while it blocks on the child.
 # An EMPTY `PYTEST_CURRENT_TEST` is itself a finding: it means the write
 # happened between tests, i.e. from a thread that outlived its test.
+#
+# READ THE ATTRIBUTION WITH THIS CAVEAT, because the output is read before
+# the caveat is. EVERY process polls the SAME files, so a single write to a
+# path all six xdist workers can see produces SIX rows, each naming whatever
+# that worker happened to be running. MEASURED: one write to
+# `reports/intelligence/kalshi_markets.json` produced 42 rows across 6
+# workers and the controller, at the same second.
+#
+#   * A per-file write in the writing process (the vendor schedule, the
+#     live-lens log) attributes RELIABLY -- one process moves it, one row.
+#   * A multi-worker row is CORRELATION, not attribution. Use it to find the
+#     second, then get the writer from the intercepted dump's stack.
+#
+# The `intercepted` records carry a real stack and are authoritative; the
+# mtime rows exist for the writers no in-process seam can see at all.
 _MIRROR_WATCH_LOG = str(os.environ.get("SYNDICATE_TEST_MIRROR_WATCH") or "").strip()
 
 
