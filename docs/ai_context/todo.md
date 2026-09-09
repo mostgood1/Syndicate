@@ -1,5 +1,90 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#650` — **`render.yaml` IS 167 ENV VARS BEHIND PRODUCTION AND CANNOT BE PUSHED BY ANYONE. Reconciling it is owed.** — lane `nfl-props-autorun-e2e`, 2026-09-08 — **BLOCKED BY A GUARD ON PURPOSE; reconciliation NOT started**
+
+Measured key-by-key against each service's live `/v1/services/<id>/env-vars`:
+
+    service            yaml   live   sync would DELETE   would CHANGE
+    web                  52     84          34                1
+    refresh-worker       84    161          77                1
+    live-odds-worker     76    132          56                1
+
+A `blueprint_sync` would delete **167 live env vars** and overwrite `ODDS_API_KEY`
+on all three — including `SYNDICATE_EXECUTION_MODE=live`,
+`SYNDICATE_EXECUTION_LIVE_ARMED=1`, the spend caps of a live-money execution
+system, and the venue credentials themselves (`KALSHI_PRIVATE_KEY`,
+`POLYMARKET_US_PRIVATE_KEY`).
+
+`scripts/check_blueprint_drift.py` + a `deploy-guard` branch now REFUSE such a
+push (verified live from the primary tree). Override is
+`SYNDICATE_ALLOW_BLUEPRINT_DRIFT=1`, and it should not be used.
+
+**THE WORK IS NOT A COPY.** It needs a per-key decision: blueprint-managed vs
+deliberately dashboard-only. The four secrets above must NEVER enter a
+git-tracked file — they want `sync: false`. Until this is done, NOBODY can push
+`render.yaml` for any reason, including changes unrelated to env.
+Detail: `.syndicate/log/2026-09-08.md` PART 7; `learnings.md` 2026-09-08.
+
+---
+
+### `#651` — **NFL props are PRIOR-SEASON RATES, not edges. The board's top-ranked rows are its least trustworthy.** — lane `nfl-props-autorun-e2e`, 2026-09-08 — **OPEN; one measured bias removed, the modelling gap remains**
+
+`Rate basis: Prior season` on 1,670 of 1,670 served cards. A structural
+over-projection was found and halved — the estimator counted only games a player
+was INVOLVED in, so a receiver who dressed and was never targeted left the
+denominator (model-minus-line median **+7.7% -> +3.5%**, `receiving_yards`
++18.2% -> +11.5%). It is still biased high, and the residual is ROLE CHANGE:
+the top four edges on the board are Tuten/Holani "Unders" priced off last
+season's BACKUP usage against a market that expects them to start (model 5.2
+carries vs a line of 12.5).
+
+**Two obvious gates were investigated and REJECTED ON EVIDENCE — do not retry
+them blind:** `injuries_2026.csv` does not exist (feed stops at 2025), and
+`depth_charts_2026.csv` omits real starters (James Cook, Kyle Pitts, Aaron
+Jones, Chris Godwin checked by name across the whole file), so gating on it
+would refuse them. A roster-status gate is safe but tiny — 17 of 980 rows.
+
+**Also unvalidated:** the estimator fix is NOT graded against outcomes, because
+`backtest_nfl_props.py` excludes zero-engagement games (7,326 graded vs 1,138
+excluded for receiving_yards) and is structurally blind to the exact defect it
+would need to referee. Validating it needs a population the harness does not
+currently produce.
+
+---
+
+### `#652` — **CLOSED 2026-09-08: the NFL board was mispriced on 56% of rows, invisible on every card, and destroyable by any worker boot. All fixed and verified on production.** — lane `nfl-props-autorun-e2e`
+
+Five independent defects, each verified on the served payload or the rendered
+page (details in `.syndicate/deploys.md` and `log/2026-09-08.md` PARTS 4-7):
+
+1. **Per-line pricing.** `P(over)` is computed for a SPECIFIC line but rows were
+   keyed `stat::player`, so ONE probability was applied to every line of a
+   market: **371 of 371 multi-line groups shared a percentage, 924 cards**.
+   Tuten read 95.5% under 47.5, 50.5 AND 51.5. Now 0 of 368, 0 monotonicity
+   violations. Migrated with a dual-keyed artifact so neither deploy order could
+   empty the board.
+2. **Main-card prop panel.** Was 8 anytime-TD rows, away team only, no model:
+   markets `{ATD 128}` -> 5 markets, both teams **0/16 -> 16/16**, `projected`
+   **0/128 -> 93/128**.
+3. **The card title was invisible** — near-white on a white card, contrast
+   **1.11** against WCAG AA's 4.5, on all 1,670 cards. Now 15.94. Found by
+   LOOKING at the page; every API check passed while it was broken.
+4. **The worker could destroy the artifact.** refresh-worker cannot BUILD it
+   (no player pbp, not allowlisted, 97.9 MB vs a 12 MiB ceiling) yet published
+   a 284-byte empty file over web's good copy after every boot. Three guards:
+   refuse-to-write, refuse-to-publish-empty, and refuse-if-not-the-producer.
+5. **Web's memory ratchet.** No `--max-requests`, so workers never recycled;
+   fixed via `GUNICORN_CMD_ARGS` (NOT `render.yaml` — see `#650`) and verified
+   by a worker starting 24 min into a lifetime with no deploy.
+
+**STILL OWED AND NOT CLOSED BY THIS ITEM:** the artifact's producer is an
+OFFLINE run — refresh-worker can never build it — so line coverage decays as
+the market moves (675 rows drifted in ~2h15m; card count fell 1,670 -> 1,515
+until a rebuild). Task `nfl-wk1-prop-artifact-refresh` fires once at 2026-09-09
+16:30 CDT. A durable answer needs either the pbp reachable from a service or a
+scheduled offline producer.
+
+---
 ### `#649` — **CLOSED 2026-09-08: `test_retainer_census` is ORDER-SENSITIVE, not a change. It joins the chunk-reshuffling group.** — lane `render-cron-failures`
 
 **DISCRIMINATOR RUN, substrate render:** `crn-dafg4h0u01pc73aavs6g-1788909461`,
