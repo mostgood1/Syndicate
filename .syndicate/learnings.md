@@ -4535,3 +4535,30 @@ did not cover in my head: **a persisted baseline FILE**, not a worktree.
 - Cost: none, because the enumeration ran first. Had it not, the cost would have
   been a live-money system's configuration and every sport's tuning, hours
   before the NFL season opener.
+
+
+### 2026-09-08 — FORBIDDEN: editing a `.claude/hooks/` file in a worktree and believing it is in force. Hooks run from the PRIMARY tree.
+
+- What we believed: a guard change landed on `main` is a guard change in effect.
+- What was actually true: `deploy-guard.py` resolves its root as
+  `CLAUDE_PROJECT_DIR`, which is the PRIMARY tree, and the hook binary Claude
+  Code executes is that tree's copy — not the worktree's, and not `main`'s. A
+  new `render.yaml` drift branch tested green in the worktree and was **inert**
+  in every real invocation, because the checker it shells out to did not exist
+  at that root. The helper's missing-file branch returns "allow", so it failed
+  silently and open, which is correct for a hook and invisible to the author.
+- How we found out: by driving the branch with a forced payload instead of
+  trusting that a landed commit is a live guard. The same session had already
+  shipped one inert guard earlier in the day, which is the only reason the
+  question got asked.
+- The rule going forward: after changing anything under `.claude/hooks/`, prove
+  it from the PRIMARY tree — run the hook's own test there, or invoke the hook
+  with a payload — before recording it as protection. And a hook that shells out
+  to a script must be landed TOGETHER with that script into the tree the hook
+  reads, or the guard is a no-op that looks installed.
+- Related: the primary tree can be hundreds of commits behind with dozens of
+  modified files, so "pull it" is not a safe default. Update the specific clean
+  files, then UNSTAGE them — `git checkout <ref> -- <paths>` stages as a side
+  effect, and the index there is shared.
+- Cost: none this time. The cost avoided was a guard that everyone believed was
+  protecting a live-money configuration and was not.
