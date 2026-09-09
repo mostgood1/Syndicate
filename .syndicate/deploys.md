@@ -5,6 +5,46 @@
 
 ---
 
+## 2026-09-09 00:07:31Z — `ci-suite` — **REGRESSION AND REVERT. I shipped the hash chunk assignment; it OOM'd the suite twice. Back on round-robin at `a4db0a82`.** `[lane chunk-assignment-stable]`
+
+    e5f4b9d5  hash, --chunks 8    OOM at 2Gi in chunk 2, ~16 min   (was completing in ~3020s)
+    e5f4b9d5  hash, --chunks 16   OOM at 2Gi in chunk 2, ~6 min    (chunk had 64 files)
+    a4db0a82  round-robin, 8      REVERTED, deployed 00:07:31Z, dep-daga5im7bikc73ftefng
+
+Revert behind claim + `CLEAR` preflight, claim released, start command back to
+`--pytest-chunks 8`. Verified in the deployed commit, not assumed: `blake2b`
+appears **0** times at `a4db0a82`, round-robin **1**.
+
+**THE ERROR, and it is a specific one rather than bad luck.** I wrote in the new
+function's own docstring that *"the peak is set by the WORST group"* and that
+*"file COST varies far more than file COUNT"* — and then validated the change by
+measuring **file COUNT** (1.082x of even) and called it acceptable. **I named the
+right risk and measured a different quantity.** That is worse than not naming it:
+the comment made the change look considered.
+
+Round-robin spreads by POSITION, which incidentally separates files that sort
+together; a hash is free to co-locate them, and it did. Chunk 1 of the 8-chunk
+hash run took **629 s** where round-robin chunks took 300-420 s.
+
+**16 CHUNKS SETTLED THE MECHANISM AND IS THE USEFUL PART.** Chunk 2 held **64
+files** and still OOM'd, FASTER than at 8. So the variable is not chunk SIZE —
+a small set of heavy files bucketed together exceeds 2Gi with 63 companions.
+Halving again would not have helped; only separating those specific files would.
+**A count-balanced split cannot bound a cost-dominated peak.**
+
+**WHAT SURVIVES, AND IT IS REAL.** The stability property is proven and was
+confirmed in production before the OOM: chunks 1 and 2 reported **134** and
+**137** files, exactly the values computed locally from the same commit — so the
+assignment is deterministic across machines, and inserting a file moves 0 others
+(against ~944 under round-robin). **The property is sound; the LAYOUT it happens
+to produce is not affordable at 2Gi.** Reusing it needs per-file cost data so
+buckets balance by COST, which is a different and larger piece of work.
+
+**WHAT THIS COST:** two failed production runs and a cron left broken for ~30
+minutes. `ci-suite`'s daily red list therefore still moves on its own — the
+problem `#649` raised is UNFIXED and now has a failed attempt recorded against
+it.
+
 ## 2026-09-08 23:31:52Z — `ci-suite` @ `e5f4b9d5` — **chunk assignment is now a HASH OF THE PATH, so the daily red list stops moving on its own. DEPLOYED; the reading it enables is tomorrow's.** `[lane chunk-assignment-stable]`
 
 Deploy `dep-dag9krp5efls73a1a37g`, live 23:31:52Z, behind claim + `CLEAR`
