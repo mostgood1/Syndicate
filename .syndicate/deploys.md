@@ -5,6 +5,69 @@
 
 ---
 
+## 2026-09-09 14:32:56-14:38:59Z — web `e4552e27` -> `e4552e27` (SAME SHA, env-only) — **web's gunicorn access log RESTORED** — lane `web-access-log-emitter-dead`
+
+**verify: 104 gunicorn access lines in `type=app` over 14:39:03-14:40:17Z (74 s),
+against a measured ZERO across 2026-09-08T23:45:58Z..2026-09-09T14:1xZ (14h49m).**
+Counted the same way both times (`render_logs.py --service web --text "HTTP/1.1"`);
+the pre-fix read at 13:00Z returned `nothing matched`. The restored lines are the
+internal `10.x` service-to-service ones —
+`10.193.130.21 ... "POST /api/ops/artifacts/publish HTTP/1.1" 200 106` — which is
+the point: `[render-egress-spikes]` states that internal traffic appears ONLY in
+these lines, so this was the instrument on one side of the open contradiction.
+
+**THE CAUSE WAS NOT A LOGGING CHANGE, AND THAT IS THE WHOLE LESSON.**
+`GUNICORN_CMD_ARGS` was ABSENT from web in the 2026-09-02 env snapshot, so the
+access log was coming from **Render's own default injection** for a `python`
+service — which is why `git log -S"access-logfile" -- render.yaml` is empty, the
+live `startCommand` has no such flag, and the log ran anyway. On 2026-09-08 23:44Z
+lane `nfl-props-autorun-e2e` SET that key to `--max-requests 1000
+--max-requests-jitter 100` as web's OOM fix (5 `oomKilled` at 2Gi). **An explicit
+value REPLACES Render's default rather than adding to it**, so the OOM fix silently
+took the access log with it, and the last line lands at 23:45:58Z, mid-deploy.
+Nobody could have caught that in review: the key that broke it never mentions
+logging, and the flag it removed was never written down anywhere in this repo.
+
+**Half the fix was already applied and left undeployed.** Someone wrote
+`scripts/one_shot_restore_web_access_log.py` — still UNTRACKED, in no commit — and
+ran it. It APPENDS rather than overwrites, deliberately, so it cannot revert the
+OOM fix. They stopped there, leaving an expired `web` deploy claim under this
+lane's slug (80.4 min old when I took it). Their own docstring is the reason that
+was not enough: *"An env change is NOT live until a deploy: Render does not
+re-inject env on a restart."* Live value before this deploy already read
+`--max-requests 1000 --max-requests-jitter 100 --access-logfile -`; the gunicorn
+master was pid 63, booted 23:47:28Z, and web had had no deploy since.
+
+**Deployed the SAME SHA on purpose.** main's tip was 48 commits / 65 files /
++12,179 lines of five other lanes' unshipped work; shipping that under an
+access-log fix is the composition error this ledger keeps paying for. Zero code
+change — the deploy exists solely to re-inject env.
+
+**THE OOM FIX SURVIVED.** `--max-requests` and `--access-logfile` are two flags in
+ONE variable, parsed in one pass, so the access log resuming is direct evidence
+that gunicorn consumed the same string that carries the recycling caps. Corroborated
+independently: worker pid moved 5988 -> 6229 under the OLD process between the two
+preflights, i.e. recycling was observably working before this deploy and nothing
+here rewrote the value.
+
+**Tooling note, worth fixing:** `render_deploy.py` refuses a same-SHA deploy with
+`ALREADY live -- nothing to deploy`, because it assumes a deploy always ships code.
+For an env-only re-injection that assumption is wrong, and the only way through is
+`--allow-rollback` — a flag whose name misdescribes what happened (the same SHA
+moves nothing backwards). `deploy_preflight.py` already has the right vocabulary
+for this (`--allow-redundant`, which returned CLEAR). Lead filed to give
+`render_deploy.py` the matching flag.
+
+Locks: claim `web` held by this lane 14:12:36Z, released after this entry.
+preflight `CLEAR` re-run 14:3xZ at the target SHA with `--allow-redundant`.
+No `render.yaml` touched — the one-shot script records that the blueprint is 166
+env vars behind production and a `blueprint_sync` would delete
+`SYNDICATE_EXECUTION_LIVE_ARMED` and the live-money spend caps.
+
+deploy id `dep-dagms5u7bikc73bsf1sg`, trigger `api`, build 14:32:56Z, live 14:38:59Z.
+
+---
+
 ## 2026-09-09 08:44:58Z — cron `sim-input-reports` + `ci-suite` — **both SCHEDULED runs read. Substrate `render`.** `[lane render-cron-failures]`
 
 The one-shot check the lane was waiting on. Every prior verification of the
