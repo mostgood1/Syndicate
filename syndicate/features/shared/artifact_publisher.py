@@ -459,6 +459,54 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # the re-sim's 24-hour staleness bound, and `sweep_changed_hot_artifacts`
     # publishes only what CHANGED.
     "ncaaf_source/historical_truth/sp_ratings_*.json",
+    # THE NCAAF GAME CARD'S PLAYER BOX SCORE. `lane ncaaf-player-stats-wiring`,
+    # 2026-09-09.
+    #
+    # `syndicate/features/ncaaf/player_stats_refresh.py` (entry point
+    # `scripts/refresh_ncaaf_player_game_stats.py`) refreshes the CFBD
+    # player-game-stats snapshot per completed week on refresh-worker;
+    # `_ncaaf_player_box_section` in `syndicate/features/ncaaf/cards.py` reads it
+    # on WEB and joins STRICTLY on the card's own season. So a snapshot that
+    # never crosses the service boundary renders a stated empty state on every
+    # current-season card no matter how current the worker's copy is.
+    #
+    # CHECKED BEFORE ADDING, not assumed: no existing pattern in this tuple
+    # matched this path. The nearest sibling is
+    # `*_source/source_artifacts/data/processed/team_registry/*.csv`, which stops
+    # at its own directory name.
+    #
+    # THE ENTRY IS A LITERAL PATH, ON PURPOSE. There is exactly ONE file in that
+    # directory and its name is fixed --
+    # `sources.player_game_stats_snapshot_path()` takes no arguments. In fnmatch
+    # `*` CROSSES `/` (the `roster_objs` note at the top of this tuple is the
+    # worked example), so any wildcard here would reach further than the one
+    # artifact it is meant to carry, into a directory a future producer may
+    # share. A literal cannot, and this repo has a `_publish_refused_as_empty`
+    # guard precisely because publishing the wrong thing has cost before.
+    #
+    # NO SERVING HAZARD -- the `#413` test, applied rather than skipped. Web's
+    # reader joins on season and REFUSES a season it does not match, so the
+    # PRESENCE of a fresher file cannot freeze or fabricate a box score. Contrast
+    # `raw/statsapi/feed_live`, where presence IS the trigger and which is
+    # export-only forever. That is why this belongs on the HOT list and not the
+    # read-only one.
+    #
+    # `#208` AS EVER: this PERMITS the transfer, it does not make one happen --
+    # and on refresh-worker there is no blanket sweep at all
+    # (`sweep_changed_hot_artifacts`'s only production caller is
+    # `live_lens_loop`, on another service). The push is an explicit
+    # `publish_hot_artifact` call at the end of
+    # `scripts/refresh_ncaaf_player_game_stats.py`, the same shape
+    # `build_nfl_roster_snapshot.py` already uses.
+    #
+    # SIZE, measured not guessed: 4,198,470 B at 35,829 rows == ~117 B/row, so a
+    # full 2026 season on top of 2025 lands near ~13 MB -- just ABOVE
+    # `_PUBLISH_MAX_BYTES` (12 MiB). The direct call streams and never consults
+    # that ceiling (see the `book_grid` note at `_FAILED_DIRECT_PUBLISH`), so the
+    # transfer keeps working; what is lost past that point is the SWEEP's
+    # repair-on-failure. Stated here so a future stale-snapshot complaint starts
+    # in the right place.
+    "ncaaf_source/source_artifacts/data/processed/player_game_stats/ncaaf_player_game_stats_snapshot.csv",
     # `#310`, DIAGNOSTIC. The WNBA grader's actual result inputs, and the file
     # both recon builders are built from. Until now `recon_games_*`,
     # `recon_props_*` and dated `boxscores_*` were in no pattern here (only the

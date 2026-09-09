@@ -5035,6 +5035,173 @@ def _launch_autorun_nfl_depth_chart_snapshot(
     return True
 
 
+# ---------------------------------------------------------------------------
+# NCAAF PLAYER-GAME-STATS SNAPSHOT AUTORUN. `lane ncaaf-player-stats-wiring`,
+# 2026-09-09.
+#
+# WHAT THIS BRANCH IS FOR. `syndicate/features/ncaaf/player_stats_refresh.py`
+# and `scripts/refresh_ncaaf_player_game_stats.py` landed complete and verified
+# against the live CFBD endpoint (`year=2026&week=1` -> 203 games / 6.01 MB ->
+# 4,937 rows), and NOTHING CALLED THEM. A job with no dispatch is a job that
+# does not exist, and the symptom is indistinguishable from a broken one: the
+# game card's Box Score tab renders its stated empty state on every 2026 card
+# because the snapshot it joins against still holds only `season=2025`.
+#
+# THIS DOES NOT ENABLE IT, DELIBERATELY.
+# `NCAAF_PLAYER_STATS_ENABLE_REFRESH_WORKER_AUTORUN` stays ABSENT, and absent is
+# OFF -- `player_stats_autorun_enabled` matches an explicit affirmative and maps
+# everything else, including a typo, to off rather than falling through to the
+# permissive branch. What lands here is SCHEDULABILITY. The reading that the
+# refresh actually runs in production is still owed and needs the flag set and a
+# deploy; until then the only line this emits is a rate-limited SKIPPED.
+#
+# THE GATE IS DELEGATED, NOT RE-SPELLED. Both the flag and the interval are read
+# through `player_stats_refresh`'s own accessors rather than a second
+# `os.environ.get("NCAAF_PLAYER_STATS_...")` here. `learnings.md` 2026-09-03 is
+# the reason: an env key inferred or re-typed in a second place is how "ABSENT"
+# becomes a statement about spelling. A failed import is treated as OFF for the
+# same reason -- unknown must never resolve to the permissive branch.
+#
+# CADENCE. Daily (`NCAAF_PLAYER_STATS_REFRESH_INTERVAL_SECONDS`, default 86400,
+# floor 3600), because a weekly sport's stat lines settle overnight after
+# Saturday's slate. Each run re-fetches a short trailing window so CFBD's
+# post-game corrections land, so a missed day is not a missing week.
+#
+# PLACEMENT: LAST OF THE DAILY-GATED INGESTION BRANCHES, immediately ABOVE
+# `_launch_autorun_mlb_refresh`. `#341` is the whole reason placement is stated
+# rather than left to chance -- every branch in that chain is `elif`, so an
+# entry below a high-frequency branch runs on no tick at all during a slate, and
+# reconciliation was mute FOR WEEKS that way while enabled and correctly
+# configured. Above `mlb_refresh` it is safe for the same reasons the NFL
+# ingestion block above it is: daily-gated, so it wins at most one tick per 24h,
+# and it launches a subprocess rather than running inline, so it never holds a
+# job slot the refresh branches are waiting on. It sits BELOW the whole NFL
+# block rather than inside it so that block stays one readable unit.
+#
+# NO PERSISTED PID GUARD, matching the NFL snapshot autoruns rather than the
+# season projections: the marker is a last-ATTEMPT stamp written BEFORE the
+# launch, so a crash costs one interval and never a storm, and there is no pid
+# whose liveness can be misread (`#443`). The refresh itself is safe to repeat
+# -- an empty week is a no-op that never opens the CSV, and a run that damaged
+# an untargeted (season, week) group raises rather than exiting 0.
+#
+# `print(..., flush=True)`, never `logger.info`: the latter does not reach
+# Render's log collector, which would make this branch invisible in exactly the
+# state it exists to report.
+# ---------------------------------------------------------------------------
+
+_NCAAF_PLAYER_STATS_SKIP_LOG_AT: dict[str, float] = {}
+_NCAAF_PLAYER_STATS_SKIP_LOG_INTERVAL_SECONDS = 60.0
+_NCAAF_PLAYER_STATS_FALLBACK_INTERVAL_SECONDS = 86400
+
+
+def _ncaaf_player_stats_enabled() -> bool:
+    """Absent, empty, unparseable, or unimportable -> OFF."""
+    try:
+        from syndicate.features.ncaaf.player_stats_refresh import player_stats_autorun_enabled
+
+        return bool(player_stats_autorun_enabled())
+    except Exception:
+        return False
+
+
+def _ncaaf_player_stats_interval_seconds() -> int:
+    try:
+        from syndicate.features.ncaaf.player_stats_refresh import (
+            player_stats_refresh_interval_seconds,
+        )
+
+        return int(player_stats_refresh_interval_seconds())
+    except Exception:
+        return _NCAAF_PLAYER_STATS_FALLBACK_INTERVAL_SECONDS
+
+
+def _ncaaf_player_stats_state_path() -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "ncaaf_player_game_stats.json"
+
+
+def _ncaaf_player_stats_script_args() -> list[str]:
+    script_path = Path(__file__).resolve().parent / "refresh_ncaaf_player_game_stats.py"
+    return [sys.executable, str(script_path), "--json"]
+
+
+def _launch_autorun_ncaaf_player_stats(
+    *,
+    latest_manifest_path: Path,
+    worker_status_path: Path,
+    refresh_cycle: dict[str, int],
+) -> bool:
+    """Refresh the NCAAF player-game-stats snapshot when the marker is missing
+    or stale. Default OFF -- see the module comment above.
+    """
+    now = time.time()
+
+    def _skip(reason: str, detail: str = "") -> bool:
+        last = _NCAAF_PLAYER_STATS_SKIP_LOG_AT.get(reason, 0.0)
+        if now - last >= _NCAAF_PLAYER_STATS_SKIP_LOG_INTERVAL_SECONDS:
+            _NCAAF_PLAYER_STATS_SKIP_LOG_AT[reason] = now
+            print(f"[refresh_worker] NCAAF_PLAYER_STATS_SKIPPED reason={reason} {detail}".rstrip(), flush=True)
+        return False
+
+    if not _ncaaf_player_stats_enabled():
+        return _skip("disabled", "NCAAF_PLAYER_STATS_ENABLE_REFRESH_WORKER_AUTORUN is not true")
+    selected_date = central_today_iso()
+    active = {item.strip().lower() for item in _active_sports_for_date(selected_date).split(",") if item.strip()}
+    if "ncaaf" not in active:
+        return _skip("not_in_season", f"date={selected_date} active={','.join(sorted(active))}")
+
+    interval = _ncaaf_player_stats_interval_seconds()
+    state = _refresh_state_store()["read_json_file"](_ncaaf_player_stats_state_path())
+    last_attempt = 0.0
+    if isinstance(state, dict):
+        try:
+            last_attempt = float(state.get("attempted_at_epoch") or 0.0)
+        except (TypeError, ValueError):
+            last_attempt = 0.0
+    age = time.time() - last_attempt
+    if last_attempt > 0.0 and age < interval:
+        return _skip("rate_limited", f"marker_age_s={int(age)}/interval_s={interval}")
+
+    try:
+        _refresh_state_store()["write_json_file"](
+            _ncaaf_player_stats_state_path(),
+            {
+                "attempted_at_epoch": time.time(),
+                "attempted_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                "interval_seconds": interval,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[refresh_worker] NCAAF_PLAYER_STATS_MARKER_FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return False
+
+    print(
+        f"[refresh_worker] NCAAF_PLAYER_STATS_LAUNCHING date={selected_date} "
+        f"last_attempt_age_s={int(age) if last_attempt else 'never'} "
+        f"interval_s={interval}",
+        flush=True,
+    )
+    try:
+        process = subprocess.Popen(_ncaaf_player_stats_script_args())
+    except Exception as exc:  # noqa: BLE001
+        print(f"[refresh_worker] NCAAF_PLAYER_STATS_LAUNCH_FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return False
+
+    refresh_cycle["claimed_count"] = int(refresh_cycle.get("claimed_count") or 0) + 1
+    _write_worker_status(
+        worker_status_path=worker_status_path,
+        latest_manifest_path=latest_manifest_path,
+        state="launched",
+        detail=f"Auto-launched NCAAF player-game-stats refresh because the marker was missing or older than {interval}s.",
+        ran_job=True,
+        run_exit_code=None,
+        latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+        launch_pid=int(getattr(process, "pid", 0) or 0) or None,
+        refresh_cycle=refresh_cycle,
+    )
+    return True
+
+
 def _season_projection_process_still_running(sport: str) -> bool:
     # Confirmed live 2026-08-02: this autorun had no "already running" guard
     # at all -- unlike every sibling autorun here (MLB's daily sim, the
@@ -7207,6 +7374,20 @@ def main() -> int:
             # rather than running inline, so the poll loop is free again
             # immediately. It sits behind the pbp fetch specifically because it
             # CONSUMES what that job produces.
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_ncaaf_player_stats(
+            # LAST OF THE DAILY-GATED INGESTION BRANCHES, and ABOVE
+            # `_launch_autorun_mlb_refresh` on purpose -- `#341`. Every branch
+            # here is `elif`, so anything below a high-frequency refresh runs on
+            # no tick at all during a slate. Daily-gated and subprocess-launched,
+            # so it costs at most one winning tick per 24h and holds no job slot.
+            # DEFAULT OFF: with the flag absent this emits a rate-limited
+            # SKIPPED line and declines, so the chain below is unaffected.
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,

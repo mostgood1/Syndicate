@@ -191,6 +191,42 @@ def main(argv: list[str] | None = None) -> int:
     payload = report.as_dict()
     payload["status"] = "ok" if report.ok else "validation_issues"
     payload["requested_weeks"] = list(weeks)
+
+    # PUBLISH TO WEB, or none of this reaches a reader.
+    #
+    # This job runs on refresh-worker and writes to THAT service's disk;
+    # `_ncaaf_player_box_section` reads WEB's. Render disks are per-service, and
+    # **there is no blanket sweep on refresh-worker** --
+    # `sweep_changed_hot_artifacts`'s only production caller is `live_lens_loop`,
+    # on another service. So the `HOT_ARTIFACT_PATTERNS` entry for this snapshot
+    # PERMITS the transfer and nothing else; without this call the allowlist
+    # entry is inert and the card stays empty with every stage upstream of it
+    # reporting success (`#208`, and the two watchers who burned ~35 minutes on
+    # exactly that shape).
+    #
+    # UNCONDITIONAL ON A COMPLETED RUN, not gated on rows_written. A run where
+    # every week is a legitimate no-op still has to converge web onto whatever
+    # this disk holds -- otherwise a stale bootstrapped copy on web can never be
+    # corrected once the weeks it needed have gone quiet. Cost of that choice,
+    # stated rather than hidden: `_LAST_PUBLISHED_CHECKSUM` is per-PROCESS and
+    # this is a fresh subprocess each run, so the de-dup never hits here and a
+    # daily armed run re-uploads the whole file -- ~4.2 MB today, ~13 MB by the
+    # end of the season. Once a day, against a `book_grid` that ships 12.7 MB
+    # every cycle.
+    #
+    # Best-effort and never fatal: `publish_hot_artifact` returns False rather
+    # than raising for every condition (unconfigured, not allowlisted, network),
+    # and a transfer failure must not turn a good refresh into a non-zero exit.
+    # Same shape `scripts/build_nfl_roster_snapshot.py` already uses.
+    try:
+        from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+        payload["artifact_published"] = bool(publish_hot_artifact(output_path, timeout_seconds=120))
+    except Exception as exc:  # noqa: BLE001 - the transfer must never fail the refresh
+        payload["artifact_published"] = False
+        payload["artifact_publish_error"] = f"{type(exc).__name__}: {exc}"
+    payload["artifact_published_path"] = str(output_path)
+
     _emit(payload, as_json=args.json)
     return 0 if report.ok else 1
 
