@@ -189,6 +189,11 @@ AMERICAN_TO_PROBABILITY: list[Impl] = [
     Impl("american_to_probability", "scripts.fetch_mlb_oddsapi_local", "_american_implied_prob"),
     Impl("american_to_probability", "scripts.regrade_mlb_game_markets", "_american_to_implied",
          "int(price), no guards at all"),
+    # ADDED 2026-09-09. The ONE genuine scalar converter among the six the
+    # tripwire caught this round; it meets all five requirements, so it is
+    # deliberately NOT in the test's KNOWN_FAILING set.
+    Impl("american_to_probability", "scripts.backtest_mlb_first5_vs_market", "implied",
+         "str().replace('+') coercion + zero guard; the scalar half of `devig_home`"),
 ]
 
 AMERICAN_TO_DECIMAL: list[Impl] = [
@@ -250,6 +255,22 @@ NOT_REACHABLE: list[tuple[str, str]] = [
      "defined inside a function; not importable, so untestable and unshareable"),
     ("syndicate/features/intelligence_audit.py `decimal_to_american` (nested)",
      "defined inside a function; decimal->american, no module-level twin"),
+    # ADDED 2026-09-09. This list is HAND-KEPT and was 2 of 6. `discover_unregistered`
+    # anchors its regex at column 0, so a NESTED converter is invisible to the
+    # tripwire rather than merely unregistered -- implementation 32 can still land
+    # unnoticed if it lands indented. Swept with an indented-`def` variant of the
+    # same name hints; making the tripwire itself see them needs the harness to
+    # resolve a nested target, which it cannot do today.
+    ("syndicate/features/shared/live_gameline_ledger.py `implied` (nested, in `_devig_home_prob`)",
+     "defined inside a function; an unregistered american->probability implementation "
+     "that the tripwire cannot see"),
+    ("syndicate/features/soccer/cards.py `_implied` (nested)",
+     "defined inside a function; american->probability"),
+    ("syndicate/features/nba/betting_recap.py `_decimal_price` (nested)",
+     "defined inside a function; american->decimal"),
+    ("syndicate/features/nfl/fantasy_schedule.py `implied_points` (nested)",
+     "defined inside a function; spread/total -> team points, NOT a probability "
+     "converter -- recorded so the next sweep does not re-adjudicate it"),
 ]
 
 
@@ -266,6 +287,8 @@ _DEF_RE = None  # compiled lazily; `re` is only needed for the sweep
 # Converter-SHAPED names that are not scalar prob<->odds converters. Each needs
 # a reason, so that "it isn't one" is a claim someone made and not an omission.
 NOT_A_SCALAR_CONVERTER: dict[str, str] = {
+    "scripts/backtest_mlb_first5_vs_market.py:devig_home": "two/three-way devig; takes an h2h Mapping, returns (prob, was_three_way). Its scalar half, `implied`, IS registered",
+    "scripts/backtest_soccer_market_prior.py:_devig": "sequence in, sequence out (same shape as opportunity_signals.devig)",
     "scripts/build_soccer_picks.py:_devig": "normalizes a probability dict; not scalar",
     "scripts/fetch_mlb_oddsapi_local.py:_american_str": "formats a price for display",
     "scripts/probability_differential.py:reference_american_to_probability": "this harness's own reference",
@@ -280,7 +303,10 @@ NOT_A_SCALAR_CONVERTER: dict[str, str] = {
     "syndicate/features/prediction_reconciliation.py:_american_profit": "price->profit, not price->probability (3 impls; see the report)",
     "syndicate/features/shared/evaluation_settlement.py:_american_profit": "price->profit (3 impls; see the report)",
     "syndicate/features/shared/ledger_bridge.py:_american_profit": "price->profit (3 impls; see the report)",
+    "syndicate/features/shared/layer2_board.py:_fair_devig_method": "env-var reader; returns the NAME of a de-vig method, never a probability",
     "syndicate/features/shared/layer2_board.py:_implied_book_total_pct": "ev_pct->book total, a different concept",
+    "syndicate/features/shared/live_gameline_ledger.py:_devig_home_prob": "two-sided devig; takes a consensus Mapping (same shape as market_anchoring.devig_two_way_home_prob)",
+    "syndicate/features/shared/live_gameline_ledger.py:_market_fair_prob": "field-precedence read over two Mappings (priced value, else de-vig); not a conversion",
     "syndicate/features/shared/market_inventory.py:join_odds_to_sim": "a join, not a conversion",
     "syndicate/features/shared/opportunity_signals.py:devig": "sequence in, sequence out",
     "syndicate/features/shared/opportunity_signals.py:fair_probability_by_book": "book-keyed, not scalar",
