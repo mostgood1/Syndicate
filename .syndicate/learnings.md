@@ -4824,3 +4824,27 @@ the pre-fix control quoted below.
   Landed `04a82c38` + `8730b829`. **Scope held: this removes ONE OF TWO gates on
   the Kalshi execution path and places no orders** -- none of today's NCAAF
   contracts is FBS-vs-FBS.
+
+## 2026-09-09 FORBIDDEN: reporting a sweep as COMPLETE without its COVERAGE DENOMINATOR. A sweep that was stopped early is not a sweep, and "every hit I found is fixed" reads as "every hit is fixed" `[lane data-tree-write-guard, commit 7a03160d]`
+
+`ac801817`'s own message said "all 57 data/-mirror write hits closed, at four
+seams". True of the 57 that had been NAMED, and false about the sweep: the verbose
+pass that produced them was stopped at ~37%. A peer session ran theirs to
+completion and reported **105 hit node ids across 23 files**.
+
+The 48-hit gap was not cosmetic. Re-measuring their extra files against
+`ac801817` found **11 live hits in 3 files**, so `main` was RED for those tests
+while a landed commit message described the sweep as closed.
+
+**HOW TO APPLY.** State the denominator with the numerator, every time: "57 of a
+pass that reached 37%" is honest and "all 57" is not. The words that made this
+wrong are cheap to fix — "every hit I found" rather than "all hits" — and a
+partial sweep is worth landing, so this is a REPORTING rule, not a do-more-work
+rule.
+
+**AND THE SAME SHAPE, TWICE MORE IN ONE SESSION.** A per-file green result
+(`test_refresh_worker.py` 70/0) cannot see a between-test write — the peer's 25 of
+143 vendor-schedule writes carried an EMPTY `PYTEST_CURRENT_TEST`. And a
+guard-ON-and-clean reading cannot tell FIXED from BLOCKED; only the guard-OFF arm
+can. In all three the reading was true and the SCOPE it was offered for was wider
+than the reading could support.

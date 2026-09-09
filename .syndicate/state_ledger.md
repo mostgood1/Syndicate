@@ -1287,3 +1287,42 @@ before offering any suite failure as work.**
 **AND A WORKTREE WITHOUT `data/` CANNOT ANSWER THE QUESTION.** The same re-check
 read "369 passed, 32 skipped" and looked green; the 32 skips WERE the
 data-dependent tests. Reading a skip count as a pass is how a real failure hides.
+
+## [test-suite-writes-tracked-mirror] THE TEST SUITE WROTE INTO THE TRACKED `data/` MIRROR, AND NOTHING SAID SO — **GUARDED SINCE 2026-09-09** `[lane data-tree-write-guard, commits b099d557..e35f710f, NO DEPLOY]`
+
+`tests/conftest.py` now fails any test that writes under a tracked artifact
+mirror. Two guarded roots: `data/`, and every `vendor/*/data` (the WNBA one holds
+the schedule file `wnba_fixture_identity` calls the git-tracked MASTER, with the
+`data/wnba_source` copies as its mirrors).
+
+**WHY IT WAS INVISIBLE.** `reports/` had FIVE isolation fixtures, each added after
+a test dirtied a tracked artifact; `data/` had none. And the writers are
+never-raise instrumentation — `append_book_quotes` catches `Exception`, prints
+`FAILED` and returns — so a guard that only raised would leave the run green with
+the file on disk. The guard RECORDS and raises; the record fails the teardown and
+cannot be swallowed.
+
+**SIX WRITERS, 69 HITS, all closed.** The reported one (`book_quotes/.jsonl` from
+`selected_date=None`, a TEST defect, not production) was 1 of them. The others:
+the WNBA cards-context publish (38 hits, four routes), the vendored
+`fetch-schedule` SUBPROCESS, worker `main()` under a cleared env and under the
+ambient env (two different causes, neither substitutable for the other), the MLB
+ladders status artifact, and the live-lens log/report asymmetry.
+
+**TWO EXEMPTIONS, both measured:** a `mkdir` that creates nothing, and a path
+`.gitignore` already excludes. A TRACKED file is never exempt whatever rules match
+it — `git check-ignore` answers 1 for anything in the index — so
+`source_artifacts/` being ignored wholesale does not blind the guard to
+overwriting one of its thousands of tracked files.
+
+**WHAT IT CANNOT SEE, stated so a clean run is not over-read:** `os.open` and
+anything below it (MEASURED, not theoretical: an append via `Path.open("a")` is
+refused where the same append via `os.open(..., O_WRONLY|O_APPEND)` lands), a
+write from a CHILD PROCESS, and every `python -m unittest` entrypoint — CI runs
+`tests.test_archives` that way and unittest never imports a conftest, which is why
+the two redirects live in `tests/_artifact_isolation.py` and are applied from both
+a fixture and a `setUpModule`.
+
+**Off switch** `SYNDICATE_TEST_DATA_MIRROR_GUARD=off`, which is also the control
+that distinguishes FIXED from BLOCKED: guard-on-and-clean is equally what a
+silently-blocking guard looks like.

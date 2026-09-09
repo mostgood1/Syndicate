@@ -457,12 +457,10 @@ once this index exists: re-splitting would orphan the parts.
 | [week-scoped-board-window] | SCOPED, NOT BUILT `[2026-08-29]` | `state_board.md` |
 | [board-model-edge-coverage] | 2026-08-30 — 82% of the board is UNSIZABLE, and every `_alt` market is 0% | `state_board.md` |
 | [live-edge-basis-label] | `edge_basis` WAS WRONG ON EVERY LIVE MONEYLINE ROW, AND THE MEASUREMENT THAT CERTIFIED IT COULD NOT HAVE SEEN  | `state_board.md` |
-| [nfl-props-week1-dead] | NFL PLAYER PROPS WERE STRUCTURALLY DEAD EVERY WEEK 1, AND THE MODEL RAN ON THE SERVICE WITHOUT THE DATA | `state_football.md` |
-| [nfl-ncaaf-ui-parity] | NFL RENDERED THE GENERIC BOARD PARTIALS WHILE NCAAF RENDERED THE FOOTBALL ONES — one string, three surfaces | `state_football.md` |
 | [nfl-board-projection-coverage] | NFL BOARD PROJECTION COVERAGE IS 100% `[measured 2026-09-04T23:19:34Z on the served payload, lanes nfl-project | `state_football.md` |
 | [ncaaf-zero-orders-is-two-gates] | NCAAF SERVES ZERO ORDERS BY DESIGN, and it is TWO gates, not one `[verified 2026-09-01, lane game-market-entry | `state_football.md` |
 | [ncaaf-team-registry-two-files] | THE RESOLVER READS THE *SNAPSHOT*, AND THE FILE BESIDE IT IS OLDER AND DIFFERENT `[measured 2026-09-03]` | `state_football.md` |
-| [nfl-rating-units] | NFL'S SIM COULD NOT TELL TEAMS APART — cause was the SCALE, not units; that diagnosis FALSIFIED. Scale 20.0 DEPLOYED 2026-09-08 for DISPLAY; still loses to the close and must not price | `state_football.md` |
+| [nfl-rating-units] | NFL'S SIM COULD NOT TELL TEAMS APART. THE CAUSE WAS THE SCALE CONSTANT, **NOT** A UNITS DEFECT — that diagnosi | `state_football.md` |
 | [football-smartsim2] | FOOTBALL (NFL + NCAAF) — smartsim2 runs on FOUR SCALARS `[measured 2026-08-18, lane football-model-owner]` | `state_football.md` |
 | [ncaaf-calibration-profile-live] | THE PROMOTED NCAAF PROFILE IS LIVE, AND PROMOTING ONE IS A **CODE DEPLOY** `[verified 2026-09-05, render]` | `state_football.md` |
 | [nfl-archived] | NFL — earlier closed work, archived — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19.md`, verbatim.** | `state_football.md` |
@@ -490,6 +488,9 @@ once this index exists: re-splitting would orphan the parts.
 | [nfl-game-context] | Game context is built and measured, and INERT in production | `state_football.md` |
 | [cfbd-monthly-quota-exhausted] | 2026-08-30 — LIVE: NCAAF projections are FAILING in production, on opener weekend | `state_football.md` |
 | [ncaaf-live-resim] | SMARTSIM2 CAN BE RESUMED FROM MID-GAME; ITS ENTRYPOINT COULD NOT `[measured 2026-09-05, lane ncaaf-live-resim] | `state_football.md` |
+| [nfl-season-open-date] | THE 09-09 vs 09-10 DISAGREEMENT IS A TIMEZONE, NOT AN ERROR — READ 2026-09-07 `[lane soccer-unfed-inputs]` | `state_football.md` |
+| [nfl-ncaaf-ui-parity] | NFL RENDERED THE GENERIC BOARD PARTIALS WHILE NCAAF RENDERED THE FOOTBALL ONES — one string, three surfaces `[ | `state_football.md` |
+| [nfl-props-week1-dead] | NFL PLAYER PROPS WERE STRUCTURALLY DEAD EVERY WEEK 1, AND THE MODEL RAN ON THE SERVICE WITHOUT THE DATA `[FIXE | `state_football.md` |
 | [kalshi-in-play-and-real-fees] | KALSHI TRADES IN-PLAY AND PUBLISHES ITS OWN FEE PARAMETERS; THE ARB THRESHOLD WAS ABOVE BREAK-EVEN EVERYWHERE  | `state_kalshi.md` |
 | [kalshi-segment-on-full-game] | KALSHI PLACED SEGMENT BETS ON FULL-GAME CONTRACTS: the join key had no `segment` `[verified 2026-08-28, lane p | `state_kalshi.md` |
 | [kalshi-venue-execution] | KALSHI ORDERS: the blocker was SHARD COLLATERAL, and spreads were inverting the bet `[verified 2026-08-26, lan | `state_kalshi.md` |
@@ -518,6 +519,7 @@ once this index exists: re-splitting would orphan the parts.
 | [discard-guard-origin-blindness] | `discard-guard.py` CALLED PUSHED CONTENT "NOWHERE ELSE", AND BLOCKED `git restore --staged` — **FIXED (`e3a515 | `state_ledger.md` |
 | [git-store-onedrive] | ONEDRIVE MANAGES `.git` AND `.syndicate`, AND IT SILENTLY BREAKS `git worktree remove` `[2026-09-06, lane git- | `state_ledger.md` |
 | [full-suite-run-method] | RUNNING THE FULL SUITE ON THIS MACHINE NEEDS BATCHING, AN ISOLATION RETRY AND A PINNED MANIFEST — and the fail | `state_ledger.md` |
+| [test-suite-writes-tracked-mirror] | THE TEST SUITE WROTE INTO THE TRACKED `data/` MIRROR, AND NOTHING SAID SO — **GUARDED SINCE 2026-09-09** `[lan | `state_ledger.md` |
 | [mlb-hitter-strikeouts-prop] | MLB HITTER `strikeouts` WAS A DEAD FIELD FOR MONTHS; FIXED, DEPLOYED AND VERIFIED — AND NO BET WAS EVER PRICED | `state_mlb.md` |
 | [mlb-sim-edge-is-anti-predictive] | THE MLB SIM'S CLAIMED EDGE IS ANTI-PREDICTIVE, AND THE PROP BOOK IS A REAL EDGE SPENT ON VIG `[verified 2026-0 | `state_mlb.md` |
 | [mlb-certainty-claims] | MLB PUBLISHES LIVE WIN PROBABILITIES OF EXACTLY 0.0 AND 1.0, PRICES THEM, AND TWO OF THEM LOST `[measured 2026 | `state_mlb.md` |
@@ -533,7 +535,7 @@ once this index exists: re-splitting would orphan the parts.
 | [mlb-vendor-exit-audit] | MLB VENDOR EXIT — 18 OF 20 PIPELINE STAGES HAVE NO NATIVE PRODUCER `[2026-08-20, MEASURED]` | `state_mlb.md` |
 | [mlb-ladders-native-builder] | MLB LADDERS — NATIVE BUILDER SHIPPED TO THE TREE `[2026-08-19]` | `state_mlb.md` |
 | [mlb-live-lens-row-shape] | The live-lens report has TWO writers and TWO row shapes — verified 2026-08-26 (lane `mlb-chip-live-state`) | `state_mlb.md` |
-| [settlement-autorun-live-settles-zero] | THE EVALUATION-SETTLEMENT AUTORUN WAS LIVE ALL ALONG AND SETTLED ZERO — the switch was never the blocker, the JOIN was; fixed on main and live `[2026-09-08, lane restore-measurement]` | `state_model.md` |
+| [settlement-autorun-live-settles-zero] | THE EVALUATION-SETTLEMENT AUTORUN WAS LIVE ALL ALONG AND SETTLED ZERO — the switch was never the blocker, the  | `state_model.md` |
 | [ledger-and-primary-tree] | — MEASURED 2026-09-02, this machine | `state_model.md` |
 | [ledger-precommit-guard] | LEDGER COMMITS ARE GUARDED AT TWO LEVELS — VERIFIED 2026-09-02 | `state_model.md` |
 | [replay-diff-gate] | A PRODUCTION DAY NOW REPRODUCES OFFLINE, 0 MISMATCHES — and two board blocks provably CANNOT `[verified 2026-0 | `state_model.md` |
@@ -574,7 +576,6 @@ once this index exists: re-splitting would orphan the parts.
 | [portfolio-settlement] | PORTFOLIO SETTLEMENT — the ledger crossed no service boundary, and the join keyed on a value that drifts `[ver | `state_portfolio.md` |
 | [order-model-attribution] | AN ORDER RECORDS THE SIM'S VERDICT — DEPLOYED AND VERIFIED ON PRODUCTION; THE COMMIT GATE MAKES FOUR OF THE NI | `state_portfolio.md` |
 | [soccer-prop-book-coverage] | WIDENING SOCCER PROP REGIONS BUYS ONE SOFT BOOK FOR ~1M CREDITS/MONTH — **KNOB SHIPPED, DELIBERATELY LEFT OFF* | `state_soccer.md` |
-| [nfl-season-open-date] | THE 09-09 vs 09-10 DISAGREEMENT IS A TIMEZONE, NOT AN ERROR — READ 2026-09-07 `[lane soccer-unfed-inputs]` | `state_football.md` |
 | [soccer-input-gate] | THE SOCCER INPUT GATE NOW RUNS, AND 4 OF ITS 9 ALARMS WERE DECISIONS — MEASURED 2026-09-07 `[lane soccer-unfed | `state_soccer.md` |
 | [soccer-market-anchor] | MARKET-ANCHORING IS REACHABLE AND STILL OFF BY DECISION — MEASURED 2026-09-02 `[lane soccer-anchor-cost, main  | `state_soccer.md` |
 | [soccer-board-coverage] | — MEASURED 2026-09-02, production, NOT A DEFECT | `state_soccer.md` |
@@ -602,6 +603,8 @@ once this index exists: re-splitting would orphan the parts.
 | [exchange-refresh-cadence] | — VERIFIED 2026-08-27, live-odds-worker `34b4d4b4` | `state_venues.md` |
 | [exchange-venues] | Crypto.com is NOT a third venue — VERIFIED 2026-08-28, local full-egress session | `state_venues.md` |
 | [venue-market-universe] | The venues list ~25,000 markets and the board acts on 277 — VERIFIED 2026-08-30 | `state_venues.md` |
+| [render-crons] | THE THREE CRON SERVICES: WHAT THEY ARE, AND FOUR FACTS THAT COST A SESSION TO LEARN `[2026-09-08, lane render- | `state_worker.md` |
+| [ci-suite-pytest-step] | THE FULL SUITE RUNS ON THE CRON ONLY WHEN CHUNKED, AND IT IS PERMANENTLY RED FOR A KNOWN REASON `[2026-09-08,  | `state_worker.md` |
 | [refresh-worker-headroom-2026-09-02] | THE ~1.4GB HEADROOM FIGURE IS STALE, AND THE METRIC EVERYONE READS IS THE WRONG ONE `[2026-09-02, lane m625-en | `state_worker.md` |
 | [accuracy-autorun-OOM-2026-09-02] | THE ACCURACY AUTORUN OOM-KILLED refresh-worker. **RESOLVED — DISARMED AND VERIFIED 19:32Z.** `[2026-09-02, lan | `state_worker.md` |
 | [local-fleet-runner] | THE THREE SERVICES RUN LOCALLY NOW — and doing it naively would have placed REAL ORDERS `[verified 2026-09-02, | `state_worker.md` |
