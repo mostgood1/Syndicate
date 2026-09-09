@@ -29052,3 +29052,25 @@ refusals and a post-deploy ceiling of zero. Re-take READING 1 tomorrow after
   A FAIL would also grow the files far faster than the fixture predicted, so the size question and the append question have the same instrument.
 - also owed after the deploy, from `73fa7703` (Kalshi fee multiplier): the `[venue_quote_fanin] KALSHI_FEE_MULTIPLIER ... resolved=N upper_bound=N unmapped={...}` counter. Its author measured 181 Kalshi tickers across 9 series with **0 unmapped** on a production board read, and a hold delta of 1.65 points on **n=7** paired rows -- small, and stated as such. The production counter is what turns that into a real denominator.
 - deploy still PENDING at the time of this entry: an MLB sim (`props_now_available`, started 13:52:06Z) has been running 21+ minutes and preflight will not return CLEAR while it holds. Claim held by `segments-joint-v1`.
+
+### refresh-worker f3c03749 -- STEP 3 DEPLOY 3: venue fee multiplier + depth capture + NCAAF variant (off). BOTH READINGS PASS
+- live 2026-09-09T14:37:03.071901Z, preflight CLEAR, trigger api. Carries `73fa7703` (Kalshi fee multiplier), `52a995f2` (venue depth capture), `462ccde4` (NCAAF drive-profile variant, flag ABSENT so today's profile is unchanged), plus the box-score work that landed in the same window.
+- **READING 1 -- THE APPEND RULE IS INTACT. This was the falsification test and it passes.** `52a995f2` claims a point is appended only when an ASK moved, deliberately not when volume moved, because volume is monotonic and folding it into the equality test would turn "a point per move" into "a point per fetch". Measured `appended/parsed` on `[kalshi_odds] DAILY_BOOK`:
+
+      baseline (pre-deploy, 4 ticks 13:57-14:11Z)   0.137  0.127  0.202  0.106   range 0.106-0.202  mean 0.143
+      post-deploy (4 WARM ticks 14:43-14:54Z)       0.225  0.184  0.117  0.148   range 0.117-0.225  mean 0.169
+
+  Nothing approached parity, which is what a per-fetch regression would look like. **The ranges OVERLAP and with n=4 either side this is UNDERPOWERED to say whether the small mean shift (0.143 -> 0.169) is real; I am not claiming it in either direction.** What is established is the thing that mattered: the append rule was not silently converted.
+- **THE FIRST POST-DEPLOY TICK MUST NOT BE USED, and nearly was.** 14:38:08Z read `files=12 listed=3759 parsed=3759 appended=1673`, a ratio of **0.445** that looks exactly like the regression. It is a COLD BOOT: 12 files and 3,759 markets against a warm 33 files and 9,600-13,500. Deploys reboot, so the first tick of anything is boot-confounded -- the same trap the ledger already records for worker memory, arriving here with the sign flipped so the fix looks BROKEN rather than good. Wait for `files=33` before comparing.
+- **READING 2 -- THE FEE MULTIPLIER RESOLVES ON EVERY ROW, ALL FOUR SPORTS, ZERO UNMAPPED.** `[venue_quote_fanin] KALSHI_FEE_MULTIPLIER`, 14:44Z:
+
+      sport=mlb     resolved=40  upper_bound=0  kalshi_rows=40  unmapped={}
+      sport=nfl     resolved=56  upper_bound=0  kalshi_rows=56  unmapped={}
+      sport=ncaaf   resolved=16  upper_bound=0  kalshi_rows=16  unmapped={}
+      sport=soccer  resolved=2   upper_bound=0  kalshi_rows=2   unmapped={}
+
+  **114 of 114 Kalshi rows resolved, 0 `fee_is_upper_bound`.** Before this the fan-in passed `kalshi_fee_multiplier=None` unconditionally and EVERY row assumed the full rate. The counter is computed off the EMITTED payload rather than the chosen input -- its author verified that distinction by reverting the call site, where a payload-based counter correctly read `resolved=0` while an input-based one read `resolved=2` against a dead wire.
+- **WHAT THIS DOES AND DOES NOT PROVE.** It proves the multiplier is wired, reaches production, and covers today's series completely. It does NOT re-establish the hold improvement: the 5.09% -> 3.55% median figure is the earlier 212-row measurement, and the author's own reproduction was **n=7 paired rows** (4.36% -> 2.71%, delta 1.65 pt), which they stated as small. The population is now 114 rows/tick, so a proper hold re-read is available and OWED.
+- **NOT VERIFIABLE FROM PRODUCTION, stated so it is not mistaken for measured:** the depth capture's `+29.5%` per-file size figure. `reports/intelligence/venue_odds/` is on the worker's mounted disk and not in `HOT_ARTIFACT_PATTERNS`; `/api/ops/artifacts/export` returns 0 matches on every pattern tried. That number is a fixture measurement over 883 markets.
+- NCAAF drive variant `462ccde4` is deployed with `SYNDICATE_NCAAF_DRIVE_PROFILE` ABSENT and its author recommends AGAINST flipping it (the fit reverses at sampled ratings). Deployed != enabled; nothing about NCAAF projections changed.
+- claim released. Lane `segments-joint-v1`.
