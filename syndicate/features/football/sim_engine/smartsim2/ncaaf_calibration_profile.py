@@ -32,6 +32,9 @@ parameter sweep, not a multi-iteration calibration loop.
 
 from __future__ import annotations
 
+import dataclasses
+import os
+
 from syndicate.features.football.sim_engine.smartsim2.calibration_profile import CalibrationProfile
 from syndicate.features.shared.calibration_profile_paths import calibration_profile_path
 from syndicate.features.shared.calibration_profile_store import load_versioned_profile
@@ -132,6 +135,141 @@ NCAAF_CALIBRATION_PROFILE, NCAAF_CALIBRATION_PROFILE_METADATA = load_versioned_p
     artifact_path=calibration_profile_path("ncaaf"),
 )
 
+# ----------------------------------------------------------------------------
+# S4a -- DRIVE-STRUCTURE VARIANTS, selected by SYNDICATE_NCAAF_DRIVE_PROFILE
+# ----------------------------------------------------------------------------
+#
+# ABSENT MEANS TODAY'S PROFILE, EXACTLY. Not "close to", not "the default
+# rebuilt from literals" -- the object resolved above, unmodified, whatever the
+# versioned-profile artifact made it. A variant is a `dataclasses.replace` on
+# THAT object, so it layers on a promoted artifact instead of discarding it, and
+# with the flag absent no `replace` runs at all.
+#
+# A VARIANT IS A DICT OF OVERRIDES, NOT A WHOLE PROFILE, for the same reason.
+# Writing out a full `CalibrationProfile(...)` would silently freeze every field
+# it restates at the value it had the day it was written, so a later re-fit of
+# the shipped profile would reach the variant in some fields and not others.
+#
+# WHY A FLAG AND NOT A PROMOTED ARTIFACT. `calibration_profile_path("ncaaf")` is
+# how a fit SHIPS. This seam is how a fit is MEASURED next to the one in
+# production, in the same process, without either becoming the served number.
+# Promotion is a separate decision and needs a reading behind it.
+#
+# A VARIANT IS A DELTA FROM A NAMED BASE VERSION, and says which one. The fit
+# below was measured against `ncaaf-goal-line-refit-1` -- the promoted artifact
+# with the goal-line mechanism ON. Applied instead to the in-source DEFAULT
+# (mechanism OFF, drive_yardage_multiplier 1.15) the same two absolute values
+# describe a profile nobody measured. That is not hypothetical: a session
+# worktree excludes `data/`, the loader's fall back to the default is silent by
+# design, and a whole sweep was run against the wrong baseline before this was
+# noticed. `resolve_ncaaf_drive_profile` refuses the mismatch rather than
+# resolving to something plausible-looking.
+NCAAF_DRIVE_PROFILE_VARIANT_BASE_VERSION = "ncaaf-goal-line-refit-1"
+
+# MEASURED, AND RECOMMENDED AGAINST. `docs/reports/ncaaf_drive_structure_fit_report.md`
+# carries the sweep, the rejected settings and the full two-dimensional table.
+# The short version, so nobody flips this on the strength of the name:
+#
+#   at NEUTRAL ratings (800 games x 3 seed banks)
+#       structure       4.16% -> 4.25%   slightly WORSE
+#       outcome quality 7.36% -> 6.34%   better
+#       outcome mix    26.79% -> 16.02%  much better (the FG accounting)
+#       q4 normalized   0.037 -> 0.070   WORSE, from near-exact
+#   at SAMPLED ratings (500 games) -- the case production actually simulates
+#       outcome quality 5.33% -> 6.94%   WORSE; totals 52.43 -> 54.53 vs 53.35
+#
+# The two measurements disagree about whether this is an improvement, which is
+# by itself enough not to ship it. Every NCAAF calibration so far, this one
+# included, was scored with both teams at rating 0.0; the rated run says that is
+# a different game. Re-derive at realistic ratings before promoting anything.
+NCAAF_DRIVE_PROFILE_VARIANT_OVERRIDES: dict[str, dict[str, object]] = {
+    "s4a_drive_fit_v1": {
+        # THE MADE-FG CURVE, and the only reason it is reachable is a
+        # measurement fix. `_outcome` in the harness scanned for the substring
+        # "field_goal", which "missed_field_goal" CONTAINS, so every missed kick
+        # was counted as a made one. Split correctly the live profile makes 8.3%
+        # of drives (truth 10.0%) and MISSES 6.7% (truth 3.1%) -- the make curve
+        # is far too punishing, which the merged bucket hid completely.
+        # 0.022 -> 0.014 takes the missed rate to ~4.6% and the made rate to
+        # ~10.5%, i.e. both toward truth at once.
+        "field_goal_make_distance_penalty": 0.014,
+        # RED-ZONE TOUCHDOWN WEIGHT, re-fitted because the mechanism beside it
+        # changed. v2 chose 0.58 from a 6-point sweep and recorded that more
+        # aggressive values cost the overall touchdown rate. That sweep ran with
+        # `goal_line_touchdown` OFF; with the mechanism ON (promoted 2026-08-27)
+        # a drive reaching the end zone already scores, so the weight is no
+        # longer the only path to a red-zone touchdown and 0.80 is affordable.
+        # This is the "adding a MECHANISM requires re-fitting the rates that
+        # were absorbing it" rule applied to a rate the goal-line re-fit missed.
+        "red_zone_touchdown_weight_bonus": 0.80,
+    },
+}
+
+
+def _variant_factory(overrides: dict[str, object]):
+    def apply(base: CalibrationProfile) -> CalibrationProfile:
+        return dataclasses.replace(base, **overrides) if overrides else base
+
+    return apply
+
+
+NCAAF_DRIVE_PROFILE_VARIANTS = {
+    name: _variant_factory(overrides)
+    for name, overrides in NCAAF_DRIVE_PROFILE_VARIANT_OVERRIDES.items()
+}
+
+# THE EXACT VALUES THAT MEAN "SHIPPED". Anything else that is not a registered
+# variant RAISES.
+#
+# An unrecognised value must not fall through to the shipped profile: that maps
+# a typo onto the permissive branch, and the resulting run looks like a
+# successful measurement of the variant while measuring production. The flag is
+# absent in production, so this can only fire for someone who deliberately set
+# it and got the name wrong -- which is exactly who needs to be told.
+NCAAF_DRIVE_PROFILE_ENV = "SYNDICATE_NCAAF_DRIVE_PROFILE"
+_SHIPPED_ALIASES = {"", "default", "shipped", "off", "none"}
+
+
+def resolve_ncaaf_drive_profile(
+    base: CalibrationProfile,
+    raw: str | None,
+    *,
+    base_version: str | None = None,
+) -> tuple[CalibrationProfile, str]:
+    """`(profile, variant_name)` for a raw env value. `base` itself when absent.
+
+    `base_version` is the version the loaded profile reports. When a variant is
+    requested and that version is not the one the variant was fitted against,
+    this RAISES -- a delta applied to the wrong base is a profile nobody
+    measured, and it would otherwise resolve silently.
+    """
+    name = (raw or "").strip().lower()
+    if name in _SHIPPED_ALIASES:
+        return base, "shipped"
+    factory = NCAAF_DRIVE_PROFILE_VARIANTS.get(name)
+    if factory is None:
+        raise ValueError(
+            f"{NCAAF_DRIVE_PROFILE_ENV}={raw!r} is not a known NCAAF drive profile. "
+            f"Known: {sorted(NCAAF_DRIVE_PROFILE_VARIANTS)} (or unset for the shipped profile)."
+        )
+    if base_version is not None and base_version != NCAAF_DRIVE_PROFILE_VARIANT_BASE_VERSION:
+        raise ValueError(
+            f"{NCAAF_DRIVE_PROFILE_ENV}={raw!r} is a delta from "
+            f"{NCAAF_DRIVE_PROFILE_VARIANT_BASE_VERSION!r}, but the loaded NCAAF profile is "
+            f"{base_version!r}. Applying it here would produce a profile that was never "
+            f"measured. If `data/calibration/ncaaf_profile.json` is simply absent (a session "
+            f"worktree excludes `data/`), point SYNDICATE_CALIBRATION_PROFILE_DIR at a copy; "
+            f"if the artifact was re-promoted, the fit needs re-measuring against it."
+        )
+    return factory(base), name
+
+
+NCAAF_CALIBRATION_PROFILE, NCAAF_DRIVE_PROFILE_ACTIVE = resolve_ncaaf_drive_profile(
+    NCAAF_CALIBRATION_PROFILE,
+    os.environ.get(NCAAF_DRIVE_PROFILE_ENV),
+    base_version=str(NCAAF_CALIBRATION_PROFILE_METADATA.get("version") or ""),
+)
+
 # WHICH PROFILE IS LIVE MUST BE OBSERVABLE. Measured 2026-08-27: the promoted
 # artifact was deployed to refresh-worker and NOTHING on the service could say
 # whether it had been loaded — `render_logs --text calibration` matched nothing,
@@ -146,7 +284,8 @@ print(
     f"[calibration] ncaaf profile source={NCAAF_CALIBRATION_PROFILE_METADATA.get('source')}"
     f" version={NCAAF_CALIBRATION_PROFILE_METADATA.get('version', '-')}"
     f" goal_line_touchdown={NCAAF_CALIBRATION_PROFILE.goal_line_touchdown}"
-    f" drive_yardage_multiplier={NCAAF_CALIBRATION_PROFILE.drive_yardage_multiplier}",
+    f" drive_yardage_multiplier={NCAAF_CALIBRATION_PROFILE.drive_yardage_multiplier}"
+    f" drive_profile={NCAAF_DRIVE_PROFILE_ACTIVE}",
     flush=True,
 )
 
@@ -154,4 +293,10 @@ __all__ = [
     "NCAAF_CALIBRATION_PROFILE",
     "NCAAF_CALIBRATION_PROFILE_DEFAULT",
     "NCAAF_CALIBRATION_PROFILE_METADATA",
+    "NCAAF_DRIVE_PROFILE_ACTIVE",
+    "NCAAF_DRIVE_PROFILE_ENV",
+    "NCAAF_DRIVE_PROFILE_VARIANTS",
+    "NCAAF_DRIVE_PROFILE_VARIANT_BASE_VERSION",
+    "NCAAF_DRIVE_PROFILE_VARIANT_OVERRIDES",
+    "resolve_ncaaf_drive_profile",
 ]
