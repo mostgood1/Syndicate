@@ -28969,3 +28969,23 @@ READING 2 PASS - 47 of 49 non-full segment orders graded (95.9%) over
 2026-09-02..09-08 vs 42.2% for full-game, zero observable full-game-mismatch
 refusals and a post-deploy ceiling of zero. Re-take READING 1 tomorrow after
 ~11:00Z, and check for an intervening refresh-worker deploy before believing it.
+
+### refresh-worker -- PRE-DEPLOY BASELINE for the venue depth capture `52a995f2` (taken BEFORE the deploy, because it is destroyed by it)
+- taken 2026-09-09 ~14:15Z against live commit `da6838ca`, which does NOT contain `52a995f2` or `73fa7703`. Four consecutive `[kalshi_odds] DAILY_BOOK` ticks on refresh-worker, 13:57:19Z / 14:01:25Z / 14:06:54Z / 14:11:55Z:
+
+      files=33  errors=0  unpriced=0  no_id=0  undated=569  skipped=0  skipped_by_sport={}
+      listed     11,426 / 11,076 / 14,680 / 10,672
+      parsed     10,258 /  9,577 / 13,512 /  9,504
+      appended    1,401 /  1,217 /  2,727 /  1,008
+      unchanged  10,025 /  9,859 / 11,953 /  9,664
+
+- **THE DAILY BOOK IS NOT READABLE FROM PRODUCTION, which decides how this can be verified at all.** `/api/ops/artifacts/export` returns 0 matches for `reports/intelligence/venue_odds/*.json`, `intelligence/venue_odds/*.json` and `**/venue_odds/*.json`. `#637` moved that directory to the worker's mounted disk and it is not in `HOT_ARTIFACT_PATTERNS`. **So the +29.5%-per-file size figure in `52a995f2`'s report was measured on a fixture of 883 markets and CANNOT be confirmed against production from the web service.** Do not record it as a production measurement; it is a fixture measurement with a stated denominator.
+- **WHAT CAN BE CHECKED, and it is the claim that matters.** `52a995f2` states the append rule is UNTOUCHED: a point is appended only when an ask MOVED, deliberately not when volume changed, because volume is monotonic and folding it into the equality test would turn "a point per move" into "a point per fetch". That is falsifiable against the baseline above.
+
+      PASS  appended stays a small fraction of parsed -- baseline ratio 0.106 to 0.202
+      FAIL  appended approaches parsed (ratio -> ~1.0), which means every fetch now
+            writes a point because a depth field moved and was compared
+
+  A FAIL would also grow the files far faster than the fixture predicted, so the size question and the append question have the same instrument.
+- also owed after the deploy, from `73fa7703` (Kalshi fee multiplier): the `[venue_quote_fanin] KALSHI_FEE_MULTIPLIER ... resolved=N upper_bound=N unmapped={...}` counter. Its author measured 181 Kalshi tickers across 9 series with **0 unmapped** on a production board read, and a hold delta of 1.65 points on **n=7** paired rows -- small, and stated as such. The production counter is what turns that into a real denominator.
+- deploy still PENDING at the time of this entry: an MLB sim (`props_now_available`, started 13:52:06Z) has been running 21+ minutes and preflight will not return CLEAR while it holds. Claim held by `segments-joint-v1`.
