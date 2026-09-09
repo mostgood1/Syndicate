@@ -206,3 +206,38 @@ def test_a_tracked_file_is_guarded_even_inside_an_ignored_subtree(data_mirror_wr
 
     beside = tracked.with_name("_write_guard_selfcheck_new.jsonl")
     assert data_mirror_write_guard.git_ignores(beside) is True
+
+
+def test_the_vendored_schedule_fetch_is_blocked_at_the_floor(data_mirror_write_guard):
+    """The subprocess block must be in force at IMPORT, not merely per test.
+
+    THIS ASSERTS ON THE FLOOR, and that is not a stylistic choice. Session
+    `data-mirror-write-guard-sweep` measured 143 mtime changes on
+    `vendor/wnba_betting_repo/data/processed/schedule_2026.{csv,json}` in one
+    parallel run, 25 of them with an EMPTY `PYTEST_CURRENT_TEST` -- writes that
+    happened BETWEEN tests, from a thread that outlived the test which started
+    it. A patch applied by an autouse fixture is in force only DURING a test, so
+    those 25 were unprotected by construction.
+
+    They also supplied the reason a naive version of this test is worthless:
+    their first regression test for the sibling `reports/` fix PASSED WITH THE
+    FIX REMOVED, because inside a test the per-test layer is active either way,
+    so the probe could not tell a working wall from a missing one. Hence the
+    order below -- the installed-at-import check comes FIRST and the call comes
+    second, so a regression fails here instead of spawning the live network
+    fetch this block exists to prevent.
+    """
+    assert data_mirror_write_guard.vendored_schedule_block_installed(), (
+        "the vendored fetch-schedule block is not installed at conftest import; "
+        "if it has been turned back into an autouse fixture, the between-test "
+        "window is open again"
+    )
+
+    from syndicate.features.shared import schedule_adapter
+
+    fetch = schedule_adapter._fetch_basketball_schedule_via_cli
+    # Patched, not the real function -- checked before calling, because calling
+    # the real one shells out to `python -m wnba_betting.cli fetch-schedule` and
+    # rewrites a tracked file.
+    assert getattr(fetch, "return_value", None) is False, fetch
+    assert fetch("wnba") is False

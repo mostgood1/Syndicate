@@ -856,6 +856,18 @@ def data_mirror_write_guard():
         def mirror_roots() -> tuple[str, ...]:
             return _GUARDED_MIRROR_ROOTS
 
+        @staticmethod
+        def vendored_schedule_block_installed() -> bool:
+            """Was the subprocess block entered at IMPORT, not per test?
+
+            This is the FLOOR, and the distinction is the whole point: a
+            per-test patch leaves the between-test window open, which is where
+            25 of 143 vendor-schedule writes actually happened. Exposed so the
+            self-check can assert on it rather than on what a test can see --
+            inside a test the two are indistinguishable.
+            """
+            return _VENDORED_SCHEDULE_FETCH_BLOCK is not None
+
     return _Handle()
 
 
