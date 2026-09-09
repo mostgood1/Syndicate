@@ -4562,3 +4562,218 @@ did not cover in my head: **a persisted baseline FILE**, not a worktree.
   effect, and the index there is shared.
 - Cost: none this time. The cost avoided was a guard that everyone believed was
   protecting a live-money configuration and was not.
+
+## 2026-09-08 An era split that quarantines a STORED metric does not bind a recomputation from the RAW records — check which one the split is about before accepting its sample size `[scheduled task live-gameline-accuracy-snapshot, no lane]`
+
+- **The rule.** When a tool refuses to pool across a boundary, read WHAT it pools.
+  `pool_live_gameline_trend.py` raises on a mixed-era set, and the task brief
+  states flatly that a number spanning the eras "measures the bug, not the
+  model". Both are correct **about the board's STORED score**, which pre-`75cf9aec`
+  compared `P(over)` / `P(home covers)` against "did the home team win". They say
+  nothing about a figure recomputed from the raw ledger, because filtering
+  `market=='h2h'` yourself *applies the post-fix restriction by construction*.
+- **What it cost to not notice.** The quarantine was inherited as a fact about the
+  DATA rather than about one consumer of it, and that capped the analysis at
+  **121 games / 9 dates** when **252 games / 19 dates** were sitting in the same
+  retained ledger. On the smaller sample the headline result's CI straddled zero
+  (`>10pp`: +0.03063, CI [-0.00916, +0.07095]); on the full one it does not
+  (+0.03432, CI [+0.00650, +0.06077]). **The boundary was not costing accuracy,
+  it was costing power** — and an under-powered result reads as "we cannot say
+  yet", which is indistinguishable from "there is nothing here".
+- **How to discharge it.** Diff the boundary commit against the fields you
+  actually read, and say so. Here: `git show --stat 75cf9aec` / `4d20ea00` touch
+  neither `model_home_win_prob`, `market_fair_prob` nor `market`; v3 added `line`
+  to `record_key` (population change for totals/spreads dedup only) and v4 added
+  the game clock. **The same diff found a boundary that DOES bind:** `priceable`
+  gained stale/age-absent refusals on 2026-09-01, so any priceable-cut comparison
+  spanning that date is not like-for-like. One check, two answers, opposite signs
+  — which is the point. Do not generalise either.
+
+## 2026-09-08 FORBIDDEN: reading an empty segment as an ABSENT FIELD without checking the field's TYPE. A wrong type guard and a missing column return the identical empty set `[scheduled task live-gameline-accuracy-snapshot, no lane]`
+
+- **What happened.** A score-state segmentation returned zero rows in every bucket
+  and was reported to the user as *"the most promising remaining segmentation is
+  blocked by instrumentation — `home_score`/`away_score` are null on every row"*,
+  with a lead offered off the back of it. The fields were fully populated:
+  **string**-typed (`'0'`, `'1'`), and the filter was `isinstance(h, int)`. A
+  by-version field census, run for an unrelated reason, showed `home_score
+  984/988` and blew the claim up.
+- **Why the existing rule did not catch it.** `learnings.md`'s "read the field you
+  already have" and "absence in a window isn't absence" both point at a field
+  being *unfetched* or *unpopulated*. This one was fetched AND populated, and the
+  emptiness was manufactured by my own predicate one line later. **The null result
+  is evidence about the QUERY until the query has been shown to be capable of
+  returning something.** Same failure class as "prove the frame could have been
+  non-null" (2026-09-05), reached through types rather than through sampling.
+- **The cheap check.** Before reporting any segment as unavailable, print the
+  population and the distinct values of the field you filtered on — not its
+  non-null count, which was 4,489/4,489 here and looked perfect. Two of the four
+  "dead field" claims made in that same pass were wrong for two different reasons
+  (`sigma` was constant BY DESIGN — it is `PRICEABLE_SIGMA`, documented in
+  `state.md` and in the code comment; the scores were a type error), and both were
+  withdrawn inside the session. **A field census is one command and it is the
+  thing that should precede the claim, not follow it.**
+
+## 2026-09-08 A Brier gap is not evidence of miscalibration. DECOMPOSE before prescribing a recalibration — reliability and resolution fail differently and only one of them is fixable by a transform `[scheduled task live-gameline-accuracy-snapshot, no lane]`
+
+- **The trap.** A model that scores worse than the market, and whose error grows
+  monotonically with how far it departs from the market, *looks* exactly like an
+  overconfident model. I stated that reading to the user and wrote it into
+  `state.md` as "strongly indicated". The reliability curve refuted it the same
+  session: the model is **adequately calibrated** (slope 0.9053, ECE 0.03037 vs
+  0.02514, all ten bins' bootstrap intervals covering the diagonal), and the
+  reliability gap is **+0.00055 with a 95% CI of [-0.00324, +0.00475] — it spans
+  zero.** The deficit is **resolution**: +0.00790, CI [+0.00065, +0.01511].
+- **Why it matters more than a wording fix.** Brier = reliability - resolution +
+  uncertainty, and **a recalibration can only move the reliability term.** Driving
+  it to zero — a ceiling no fitted transform actually reaches — leaves the model at
+  0.17711 against the market's 0.17020. **At most 6.5% of the gap is reachable by
+  recalibration.** That is the mechanism behind the leave-one-date-out
+  recalibration already recorded as having failed out of sample, and it predicts
+  that any further transform-fitting will also fail. Without the decomposition the
+  obvious next move — "it's overconfident, shrink it" — is a guaranteed dead end
+  that looks reasonable and costs a cycle.
+- **The distinguishing measurement, and it is cheap.** Higher spread with lower
+  resolution is the signature: model sd **0.28231** vs market **0.26601** while
+  model resolution **0.07146** vs market **0.07935**. It moves more and tracks
+  outcomes less — the extremeness is variance, not information. **Check the split
+  at several bin counts before believing it** (Murphy is bin-dependent): here
+  resolution held 92-98% of the gap across 5/8/10/15/20 bins, so the finding is
+  not a binning artifact. A single bin count would not have earned the claim.
+
+## 2026-09-08 FORBIDDEN: validating a measurement instrument ONLY against a case whose expected answer is the SAME as the bug's output. A control that cannot distinguish "working" from "broken" is not a control `[lane mlb-pregame-baseline-feed]`
+
+Reconstructed from `log/2026-09-08.md` (entry *"reliability curve, the encompassing
+null, and the pregame-baseline fix"*) and `deploys.md` `## 2026-09-08 20:44:27Z —
+live-odds-worker 57052784`, which recorded the reading as MEASUREMENT PENDING with
+the pre-fix control quoted below.
+
+- **The TECHNICAL failure: none in the system.** The fix worked on the first
+  deploy. What failed was the INSTRUMENT that judged it. `measure_pregame_baseline.py`
+  filtered `game_state == "live"` and never filtered `market == "h2h"` /
+  `segment == "full"` — the h2h restriction my own historical analysis had used
+  hours earlier in the same session, on the same ledger.
+- **What we believed:** "STILL NULL on live rows — the fix did NOT reach
+  production", reported to the user as a terminal verdict on **109 post-deploy
+  rows, 0 non-null**.
+- **What was actually true:** all 109 rows were `first1`/`first3`/`first5`
+  SEGMENT REFUSALS (`market=totals_alt`, `withheld_reason=segment_pricing_disabled`,
+  `game_pk=None`, `model_home_win_prob=None`) — the rows a sibling lane made
+  visible in the ledger. They carry no `live_mc` h2h lane, so the field is
+  legitimately None on them and always would be. **Priced full-game h2h rows in
+  that population: ZERO.** The correct verdict was "nothing to read". Forty
+  minutes later, on the corrected predicate: **38/38 non-null, 7 games, 7
+  distinct values.**
+- **How we found out:** by printing EVERY FIELD of one raw row instead of
+  trusting the aggregate. The row count was 109 — big enough to feel like a
+  sample, and that feeling did the damage.
+- **WHY THE EXISTING RULE DID NOT CATCH IT, which is the point of this entry.**
+  `learnings.md` already carries *"a null result needs a live population — prove
+  the frame could have been non-null"* (2026-09-05), and I WROTE A SIBLING RULE
+  THE SAME DAY (*"reading an empty segment as an ABSENT FIELD"*). Prose did not
+  save me. What I actually did was build a positive control — 2026-09-07,
+  pre-fix, "4,017 live rows, 0 non-null" — and declare the instrument validated.
+  **That control expected NULL. The bug also produced NULL. So the control was
+  incapable of detecting the defect, and its green reading is what gave me the
+  confidence to report a falsification.** It even mis-stated its own denominator:
+  4,017 was every live row, where only ~521 were h2h.
+- **The rule going forward:** an instrument that can emit a NEGATIVE verdict must
+  be validated against a case whose expected answer is **POSITIVE**. If every
+  control you have expects the same output as the failure mode, you have tested
+  nothing. Corollary, and cheaper than the rule: **before reading a null as a
+  falsification, print the COMPOSITION of the population you scored — the
+  breakdown by the discriminating fields — never only its size.** `n=109` and
+  `n=0 of the right kind` are the same number to a counter and opposite answers
+  to a reader.
+- **Cost:** one false FALSIFIED published to the user, withdrawn ~15 minutes
+  later. Had the raw row not been inspected, a working fix would have been
+  recorded as broken and the next session would have re-debugged a non-defect.
+- **THE CHECK, because prose demonstrably failed twice here.**
+  `measure_pregame_baseline.py` now prints the post-deploy population's
+  `(market, segment)` breakdown and returns exit 2 — "nothing to read" — rather
+  than exit 1 whenever the priced-full-game-h2h subset is empty. Exit 1 is now
+  reachable ONLY from a non-empty, correctly-typed population. Any future
+  measurement script in this repo owes the same two things: a composition print,
+  and a positive control.
+
+## 2026-09-08 FORBIDDEN: concluding two working trees hold the SAME content because the same path is dirty in both. Co-occurrence is not identity, and the difference is ADDITIONS a deletions count cannot see `[worktree cleanup, no lane]`
+
+- **What I believed:** `unknown-submit-retry-provenance` carried "routine mirror
+  churn, regenerable, safe to discard" — reasoned from the fact that
+  `vendor/wnba_betting_repo/data/processed/schedule_2026.{csv,json}` are ALSO
+  dirty in the primary tree. I said so to the user and moved to `git checkout --`
+  them.
+- **What was actually true:** `.claude/hooks/discard-guard.py` blocked it, having
+  searched **all 58 committed versions across every ref**: **16 CSV lines and 1
+  JSON line exist in NO commit anywhere.** Two trees can carry DIFFERENT
+  modifications to the same path; "both dirty" says only that both were touched.
+- **How we found out:** the guard, not me. I had already committed to the
+  conclusion in a message.
+- **The rule going forward:** before discarding a modification because "it is
+  also modified elsewhere", DIFF THE TWO VERSIONS AGAINST EACH OTHER, or search
+  the content across refs. Same path + both dirty is not evidence of same
+  content. **And the failure is invisible to the usual check:** unique content
+  here is ADDITIONS, so `git diff --numstat` reading "0 deletions, nothing of
+  mine destroyed" is exactly the reassurance that fails — the same shape as the
+  2026-09-03 lane-block destruction the guard's own docstring cites.
+- **Cost:** none, because the guard held. Would have been 17 lines of content
+  existing in no commit on any ref, deleted on a bad inference.
+
+## 2026-09-08 FORBIDDEN: extracting a block by splitting ONLY on its own delimiter. The LAST block swallows the file's entire trailing structure, and pasting it elsewhere duplicates that structure silently `[lanes.md reconcile, no lane]`
+
+- **What I believed:** a lane block runs from its `### <slug>` header to the next
+  `### ` header, so extracting one from `origin/main:.syndicate/lanes.md` and
+  inserting it locally is a clean copy.
+- **What was actually true:** `bandwidth-controlled-transfer` is the LAST block in
+  upstream's `## OPEN` section, so "to the next `###`" ran to END OF FILE. Its
+  "block" was **234 lines** carrying `## Archived lanes` and **12 other `## `
+  structural headings**. Inserting it dropped a duplicate archive heading into the
+  middle of the OPEN section and pushed the next inserted block BELOW it — where
+  `lane-guard` reads it as archived and **stops enforcing its file claims,
+  silently**. Correct extraction bounds the block by the next `###` **OR** the
+  next `##`, whichever comes first; the same block then measures **8 lines**.
+  234 vs 8 is the tell.
+- **How we found out:** `.claude/hooks/ledger-postwrite-check.py` fired on the
+  write — "lane block(s) BELOW `## Archived lanes`". Not from reading the diff:
+  the insert looked correct in every summary I printed, because the corruption
+  was INSIDE a block body I never examined.
+- **The rule going forward:** any structural extractor must be bounded by the
+  NEXT DELIMITER OF ITS OWN LEVEL *OR ANY HIGHER LEVEL*, and the cheap check is
+  to assert the extracted body contains **no heading of a higher level than the
+  block itself** — one line, and it would have caught this before the write.
+  Sanity-check the extracted SIZE too: one block 30x the others is not a big
+  block, it is a parse that ran off the end.
+- **DO NOT "FIX" THIS BY HOISTING.** The guard suggests `hoist_open_lanes.py`,
+  which moves the misplaced block — correct for a genuine ordering drift, wrong
+  here, because it leaves the duplicated `## Archived lanes` heading in place and
+  the file stays corrupt in a way the next check will not name. Revert to the
+  pre-write backup and redo the extraction.
+- **Cost:** none — reverted from a backup taken before the write. Would have been
+  a shared ledger with duplicated section structure and at least one OPEN lane's
+  claims silently unenforced for every session in this tree.
+
+## 2026-09-08 When reconciling two divergent copies of a ledger, RECENCY ALONE MAY NOT PICK THE WINNER. Check the losing side for UNIQUE CONTENT before overwriting it `[lanes.md status reconcile, no lane]`
+
+- **The situation:** 20 lanes were OPEN locally and CLOSED/ORPHANED on
+  `origin/main`. Flipping them is the DANGEROUS direction — a closed lane's
+  claims stop being enforced, so a wrong call lets another session edit across
+  lanes silently.
+- **Recency said take upstream, unanimously:** local was newer for **0 of 20**,
+  upstream newer for 15, equal for 5. On that evidence alone the answer is
+  "overwrite all 20".
+- **That would have destroyed work.** A separate unique-content check — every
+  substantive local line searched against upstream's `lanes.md` +
+  `lanes_closed.md` + `lanes_history.md` — found **3 blocks carrying lines
+  present nowhere upstream**, including a shared-file declaration written earlier
+  the same session. Those 3 were left untouched; the other 17 were replaced.
+- **Why recency was insufficient, concretely:** 5 of the 20 tied on date, and two
+  carried dates in the FUTURE (09-10, 09-15 against a real date of 09-08) because
+  the max-date proxy reads target dates out of body prose, not edit times. A
+  date extracted from free text is a weak instrument and cannot be the only one.
+- **The rule going forward:** two independent checks must AGREE before
+  overwriting a block in a shared ledger — one for which side is newer, one for
+  whether the losing side holds anything unique. If they disagree, keep the local
+  copy: over-enforcement of a stale claim is recoverable, a deleted claim or a
+  deleted note is not.
+- **Cost:** none. The method is the same predicate `discard-guard.py` applies to
+  file content, applied to ledger blocks.

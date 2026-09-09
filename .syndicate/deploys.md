@@ -5,6 +5,103 @@
 
 ---
 
+## 2026-09-09 01:40:53Z — live-odds-worker `57052784` — **FINAL COVERAGE: 178/178 rows, 10/10 games, 32 distinct values. 100% across the whole slate.** `[lane mlb-pregame-baseline-feed, CLOSED]`
+
+**Strengthens the 22:43:12Z row below**, which recorded the same fix at 38/38 /
+7 games. Appended, not edited. Watched the ledger for ~3h across the evening
+slate; the reading never dipped below 100%:
+
+| time (UTC) | live | final | ledger rows | priced full-game h2h | non-null | games | distinct values |
+|---|---|---|---|---|---|---|---|
+| 23:05 | 7 | 0/15 | 1,596 | 12 | 12 (100%) | 5/5 | 5 |
+| 23:25 | 10 | 0/15 | 3,653 | 24 | 24 (100%) | 7/7 | 7 |
+| 23:35 | 10 | 0/15 | 4,422 | 38 | 38 (100%) | 7/7 | 7 |
+| **01:40** | **11** | **4/15** | **11,266** | **178** | **178 (100%)** | **10/10** | **32** |
+
+**The distinct-value count scaling with game count is the load-bearing detail** —
+32 distinct priors across 10 games (each game re-simmed many times) is what a real
+per-game pregame probability looks like. A default would have collapsed to one
+value, and the watcher flags that case explicitly.
+
+**Pre-fix control, same script and predicate: 2026-09-07, 0 non-null.**
+
+Closes the caveat on the 22:43Z row, which rested on 3 rows / 2 games. Still NOT
+measured: whether a live game can finish without ever producing a priced
+full-game h2h row — 10 of the games that were live produced one, but that is
+board-build cadence, not this fix.
+
+## 2026-09-08 20:44:27Z — live-odds-worker `57052784` — **MEASUREMENT PENDING (STRUCTURALLY, NOT FROM NEGLECT): the field this deploy repairs CANNOT appear before first pitch at 22:35Z.** `[lane mlb-pregame-baseline-feed]`
+
+Deploy `dep-dag747p5efls73fcb3n0`, triggered **20:37:51Z**, live **20:44:27Z**
+(~6.5 min). Preflight returned **CLEAR one second before the trigger** — an
+earlier run at 20:32Z was **HOLD** with 3 jobs in flight (`refresh_odds_sources`,
+`run_refresh_odds_job`, `poll_soccer_live_state --league championship`); I waited
+for them to finish on their own rather than killing them. Claim held by
+`mlb-pregame-baseline-feed` from 20:32:43Z.
+
+**WHY live-odds-worker AND NOT refresh-worker.** The fix is entirely inside
+`_build_game_lens`, and `start_live_lens_background_loop` — the only loop that
+calls it — is imported and started in `scripts/run_live_odds_refresh_worker.py`
+and nowhere else. The consumers (the join, `record_live_gamelines`, the ledger
+writer) are UNCHANGED and read the published snapshot's `gameLens` lanes, so
+refresh-worker staying on `aedb66c9` is correct, not an oversight.
+
+**WHAT SHIPPED.** `pregame_home_win_prob` has been null on every MLB ledger row
+since it shipped in `4d20ea00`. Two defects, both in `_build_game_lens`:
+(a) it read `baseline_probs.get("homeWin")`/`.get("awayWin")` while the only
+producers write `home_win_prob`/`away_win_prob` — across the whole vendor tree
+those camelCase strings occurred at exactly three sites, all three READS, no
+writer; (b) the `live` lane had no prediction row at all, so fixing (a) alone
+still yields None, because `live_gameline_from_lens` returns the FIRST `live_mc`
+row and the lane order makes that `live`. Mapped `live` → the FULL-GAME
+baseline. **Only the end-to-end test caught (b); four unit tests were green with
+it broken.**
+
+**PRE-FIX CONTROL, taken with the SAME script and predicate that will take the
+after-reading** (`scratchpad/measure_pregame_baseline.py`), so this is
+like-for-like and not a claim about what "used to" happen:
+
+| date | live rows | games | `pregame_home_win_prob` non-null |
+|---|---|---|---|
+| **2026-09-07** (pre-fix, full slate) | 4,017 | 12 | **0** |
+| 2026-09-08 (this deploy) | — | — | **pending, see below** |
+
+**WHY THE READING CANNOT BE TAKEN YET, and this is structural rather than an
+excuse.** The field reaches the ledger only via the `live` lane, and that lane
+exists only when `_build_game_lens` sees a LIVE game and `estimate_live`
+returned (`source: "live_mc"`). At deploy time **all 15 MLB games were
+`Preview`**; first pitch is **22:35Z**. With no live games
+`live_gameline_from_lens` refuses every row, so a null read right now would say
+nothing about the fix. **DEPLOY-LIVE IS NOT EVIDENCE; the artifact is.**
+
+An earlier proof of half (a) was attempted and is NOT AVAILABLE: the
+`live_lens_report_*.json` artifact exports EMPTY for every date tried
+(09-06, 09-07, and today), while `live_gameline_ledger_*.jsonl` for those same
+dates exports fine — consistent with the report living on the worker's disk that
+web cannot serve. So the ledger row is the only reachable measurement.
+
+**THE OWED READING**, after 22:35Z:
+
+    python scratchpad/measure_pregame_baseline.py 2026-09-08
+
+PASSES if rows stamped `game_state: live` carry a non-null
+`pregame_home_win_prob`. **FALSIFIES the fix** if live rows exist for today,
+were written after 20:44:27Z, and the field is STILL null. A degenerate
+all-identical value would mean a default crept in rather than a real prior, and
+the script flags that separately.
+
+**COMMIT NOTE.** `3f150b95` (local) / `57052784` (on main, after a cherry-pick
+that conflicted with the `first5` branch `mlb-live-segment-pricing` had landed
+in the same function — resolved keeping BOTH, 191 tests green across both
+lanes' suites). Committed with `SYNDICATE_ALLOW_LEDGER_COMMIT=1`: the ledger
+guard fired on `lanes.md`/`deploys.md` being behind origin/main, but NEITHER WAS
+STAGED — `git diff --cached --name-only` was exactly the two code paths — so the
+commit records no ledger file. The staleness it reports is real and separate.
+
+**VENDORED FILE.** A re-vendor of `mlb_bettingv2` silently reverts both halves.
+`tests/test_mlb_pregame_baseline_lane.py` carries a camelCase mutation-detector
+as the tripwire; the fix should also go upstream.
+
 ## 2026-09-09 01:00:59Z — `ci-suite` @ `a4db0a82` — **RECOVERED: the revert restored a completing suite. 21 new failures — and the total is not the instrument.** `[lane chunk-assignment-stable]`
 
 Run `crn-dafg4h0u01pc73aavs6g-1788912474` on the reverted commit:
