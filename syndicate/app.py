@@ -18,6 +18,9 @@ import threading
 from typing import Callable
 
 from flask import Flask
+from flask import jsonify
+from flask import render_template
+from flask import request
 from flask.json.provider import DefaultJSONProvider
 from syndicate.features.shared import memory_observability
 from syndicate.blueprints.ask_the_syndicate import ask_the_syndicate_bp
@@ -449,6 +452,127 @@ def create_app() -> Flask:
     @app.route("/")
     def root():
         return "OK", 200
+
+    # ERROR PAGES. Until 2026-09-09 this app registered NO error handler at
+    # all, so a typo'd URL and an unhandled exception both served Werkzeug's
+    # bare white default: no nav, no styling, no link back to a board. Every
+    # other surface in the product extends `shared/base.html`; these two were
+    # the only ones that did not, and they are the two a person hits when
+    # something has already gone wrong.
+    #
+    # THE CONTENT TYPE IS NEGOTIATED, and that is the load-bearing part. There
+    # are 213 `/api/...` routes whose callers parse JSON; handing them an HTML
+    # page on a 404 turns a clean "not found" into a parse error at the caller,
+    # which is a worse failure than the one being reported. `/api/` prefix
+    # first (an XHR that forgot its Accept header still gets JSON), then the
+    # Accept header for everything else. The JSON shape matches what the ops
+    # and intelligence blueprints already return: `{"ok": false, "error": ...}`.
+    def _wants_json() -> bool:
+        if request.path.startswith("/api/"):
+            return True
+        # `best_match` with html listed FIRST, rather than comparing quality
+        # values: `Accept: */*` -- curl, most bots, and plenty of HTTP
+        # clients -- scores both types at 1.0, so a `>=` comparison ties and
+        # falls to JSON. Measured: `curl http://.../no-such-page` came back
+        # `application/json`. A tie is not a preference, and the default for
+        # an HTML app must be HTML; `best_match` resolves ties to the first
+        # entry in the list, which is what makes html the default here.
+        best = request.accept_mimetypes.best_match(
+            ["text/html", "application/json"], default="text/html"
+        )
+        return best == "application/json"
+
+    def _error_response(status: int, headline: str, message: str, detail: str = ""):
+        if _wants_json():
+            return jsonify({"ok": False, "error": message, "status": status}), status
+        # A 500 handler that can itself raise is a 500 handler that produces a
+        # blank page, which is what we are here to remove. Template rendering
+        # touches the context processor, the Jinja env and the static
+        # url_for -- all of which are exactly what a broken deploy breaks -- so
+        # the fallback is a self-contained string with no app state in it.
+        try:
+            return (
+                render_template(
+                    "errors/error.html",
+                    error_code=status,
+                    error_headline=headline,
+                    error_message=message,
+                    error_detail=detail,
+                ),
+                status,
+            )
+        except Exception:  # pragma: no cover - only reachable when Jinja itself is broken
+            return (
+                "<!doctype html><meta charset=utf-8>"
+                f"<title>Syndicate | {status}</title>"
+                "<body style=\"margin:0;padding:48px;background:#08131f;color:#edf4fb;"
+                "font:16px/1.5 system-ui,sans-serif\">"
+                f"<h1 style=\"font-size:22px;margin:0 0 8px\">{status}</h1>"
+                f"<p style=\"color:#bfd0df;margin:0 0 16px\">{message}</p>"
+                "<a href=\"/\" style=\"color:#9af3de\">Back to the board</a></body>",
+                status,
+            )
+
+    def _route_description(exc: object) -> str:
+        """The message the ROUTE set with `abort(404, description=...)`, if any.
+
+        Some routes 404 with something far better than a generic page can
+        say -- soccer's unknown-league gate names every valid league slug, for
+        instance. The first version of this handler discarded that and showed
+        boilerplate instead, which `tests/test_soccer_blueprint_routes.py::
+        test_the_404_names_the_valid_leagues` caught: a branded 404 that is
+        LESS informative than the one it replaced is a regression wearing a
+        nicer coat.
+
+        Compared against the CLASS default rather than truthiness, because
+        werkzeug always populates `description` -- with its own boilerplate
+        ("The requested URL was not found on the server...") when the route
+        set nothing. Only a difference from that default means a route spoke.
+        """
+        description = getattr(exc, "description", None)
+        if not isinstance(description, str) or not description.strip():
+            return ""
+        if description == getattr(type(exc), "description", None):
+            return ""
+        return description.strip()
+
+    @app.errorhandler(404)
+    def handle_not_found(exc):
+        from_route = _route_description(exc)
+        if from_route:
+            return _error_response(404, "That page is not part of Syndicate.", from_route)
+        return _error_response(
+            404,
+            "That page is not part of Syndicate.",
+            "The URL you asked for does not match any board, sport or tool here.",
+            "If you followed a link from inside the app, the sport may not have a "
+            "board for this date yet -- try the market board and pick the date there.",
+        )
+
+    @app.errorhandler(500)
+    def handle_server_error(exc):
+        # Logged BEFORE rendering, and with `print(..., flush=True)` rather
+        # than `logger.info`: per CLAUDE.md the logger never reaches Render's
+        # collector, and an unhandled 500 is precisely the event that must not
+        # be lost to that. The type and path are enough to find it in the
+        # deploy's logs; the message is deliberately not shown to the user.
+        #
+        # UNWRAP FIRST. Flask hands this handler a werkzeug
+        # `InternalServerError`, not the exception that was raised -- so
+        # `type(exc).__name__` is the constant string "InternalServerError" on
+        # every 500 ever logged, which is the one thing the line exists to
+        # vary. `original_exception` is where the real cause lives. Caught by
+        # tests/test_error_pages.py before this shipped, not after.
+        cause = getattr(exc, "original_exception", None) or exc
+        print(f"UNHANDLED_500 path={request.path} {type(cause).__name__}: {cause}", flush=True)
+        return _error_response(
+            500,
+            "Something broke on our side.",
+            "The page could not be built. This is logged and is not something "
+            "you can fix by retrying immediately.",
+            "The boards below are served independently, so they are usually "
+            "still up when one page is not.",
+        )
 
     def _start_background_loops() -> None:
         render_web_dyno = _is_render_web_dyno()
