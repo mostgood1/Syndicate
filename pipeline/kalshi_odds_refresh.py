@@ -262,10 +262,29 @@ DEFAULT_REQUEST_SPACING_MS = 150
 # which is what makes a high cadence affordable.
 DEFAULT_DORMANT_INTERVAL_SECONDS = 3600
 
-# Total markets kept in the artifact. The keyvalue store refuses at 8MB and
-# `layer2_shortlist` already sits at 5.7MB of that budget, so an unbounded
-# multi-sport catalogue is a write that starts failing silently one sport from
-# now. Trimmed OLDEST-SERIES-FIRST and reported, never silently.
+# Markets in the JOIN'S WORKING SET for one tick -- `all_markets`, the list
+# handed to `join_to_board`. A CPU budget, NOT an artifact-size bound.
+#
+# CORRECTED 2026-09-09. This comment used to read "Total markets kept in the
+# artifact. The keyvalue store refuses at 8MB ...", and that stopped being true
+# the moment `state.pop("markets", None)` removed the only place the merged
+# list was persisted. What is written now is `per_series[<t>]["markets"]`, each
+# bounded by `MAX_MARKETS_PER_SERIES` and NOTHING bounded by this constant, so
+# every durable consumer -- `execute_portfolio`, `portfolio_commit`,
+# `kalshi_polymarket_arb`, `venue_quote_adapters`, all via `markets_from_state`
+# -- reads a set this number does not describe.
+#
+# VERIFIED against the mirrored artifact of the 2026-09-08T18:43:02Z tick:
+# `markets_from_state` -> 5,450 across 78 series while `state["count"]` (which
+# IS `len(all_markets)`) read 3,128. Two different populations under one
+# constant, and the stale sentence read as a guarantee about the larger one.
+#
+# The 8MB refusal is real and is held off by `MAX_MARKETS_PER_SERIES` plus
+# `_lean_market`, which are what actually bound the written document. This
+# number bounds `join_to_board`'s O(markets x rows) pass instead -- measured at
+# 20-26s -- so raising it is a worker-CPU decision, not a storage one.
+#
+# Trimmed OLDEST-SERIES-FIRST and reported, never silently.
 MAX_STORED_MARKETS = 6000
 
 # The slots each SPORT is guaranteed before the rest compete on staleness.
@@ -278,6 +297,12 @@ PER_SPORT_FLOOR_MARKETS = 300
 # between it and the next trim -- which is exactly what overwrote it once.
 _DEMAND_SAMPLE_LIMIT = 12
 _DEMAND_WINDOW_SECONDS = 6 * 3600
+# Board-DATE samples kept, on the same 6h clock. One per build rather than one
+# per slate, and a build is ~3 minutes, so 6h is ~120 of them -- sized above
+# that so a busy hour cannot evict the forward date the board keeps asking for.
+# The trim reads the DISTINCT dates out of this, so the list being long costs
+# nothing but a few hundred bytes in the artifact.
+_DATE_SAMPLE_LIMIT = 240
 
 # Markets kept per series in the JOIN'S WORKING SET.
 #
@@ -400,6 +425,226 @@ def board_window_dates(now: datetime | None = None) -> tuple[str, str]:
     )
 
 
+# THE SAME FIX, ONE LEVEL UP. `fa6c4c19` made the PER-SERIES cut date-aware and
+# `_trim_to_storage_bounds` immediately re-applied the identical date-blind
+# slice: both of its passes truncate with `markets[:room]`, i.e. in ARRIVAL
+# order, on the set `select_markets_for_cap` had just chosen by date.
+#
+# MEASURED over 33 refresh-worker ticks 19:01-21:19Z on 2026-09-09: the union of
+# two consecutive ticks (~5 min apart) shows ~800 in-window markets discarded
+# per tick, and WHICH ones ROTATES -- `KXMLBTOTAL` had 158 of the board's own
+# rungs present at 21:09 and gone at both 21:14 and 21:19; `KXMLBGAME` (today's
+# moneyline) 30 present at 21:14 and absent either side. The last tick held
+# 2,910 of 6,000 slots (48.5%) on games OUTSIDE the window, 193 of them on a
+# WNBA slate ten days past. The rotation also thrashes CLV history.
+#
+# `SYNDICATE_KALSHI_TRIM_DATE_AWARE` -- ABSENT MEANS TODAY'S ARRIVAL ORDER.
+# `TRIM_SELECT mode=` names the rule that actually ran on every trimmed tick, so
+# `off != on` is a reading rather than an inference.
+#
+# THE BUDGET IS NOT TOUCHED. `MAX_STORED_MARKETS` and `PER_SPORT_FLOOR_MARKETS`
+# are unchanged and the retained COUNT is identical under both modes -- removing
+# the 6,000 bound is a ~2.5x worker-CPU change on a join already at 20-26s, and
+# that decision is not this one.
+DEFAULT_TRIM_UNDATED_RESERVE_PCT = 10
+
+
+def trim_date_aware_enabled() -> bool:
+    """OFF unless set. Absent is today's arrival-order `markets[:room]`."""
+    raw = os.environ.get("SYNDICATE_KALSHI_TRIM_DATE_AWARE")
+    if raw is None:
+        return False
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _trim_undated_reserve(cap: int) -> int:
+    """Slots a budget of `cap` holds for markets whose game date cannot be read.
+
+    NOT ZERO, for the reason `PRECAP_UNDATED_RESERVE` gives at length: PLAYER
+    PROPS SKIP THE JOIN'S DATE CHECK ENTIRELY, so a prop whose ticker shape does
+    not parse is joinable while being undatable, and evicting it would repeat
+    this very defect in a new place. The daily book counts `undated=569` every
+    tick, so the population is real rather than hypothetical.
+
+    The same 10% the per-series reserve is (40 of 400), expressed as a fraction
+    because the storage budget varies per sport and per pass.
+    """
+    return max(0, int(cap * DEFAULT_TRIM_UNDATED_RESERVE_PCT / 100))
+
+
+def board_dates_from_state(state: Mapping[str, Any] | None) -> list[str]:
+    """The dates the BOARD actually built for, freshest window only.
+
+    THE WHOLE DESIGN PROBLEM OF THIS FIX. The trim runs during the REFRESH,
+    before any join, so it cannot ask the board what date it is serving --
+    exactly the blocker `_record_board_demand` already solved for sport demand,
+    and solved the same way: the join is the only place that sees the board and
+    the catalogue in one breath, so it WRITES what it saw and the next trim
+    reads it.
+
+    NEVER INFERRED FROM `today`. `selected_date` can be FORWARD -- a board built
+    on a Friday for Saturday's slate -- and its day is counted in CENTRAL, so a
+    trim that assumed "today" in any zone would discard the very slate the board
+    was about to price. It reads the recorded dates or it falls back to the
+    per-series window, and it never guesses in between.
+    """
+    if not isinstance(state, Mapping):
+        return []
+    now = time.time()
+    seen: set[str] = set()
+    for sample in state.get("board_date_samples") or []:
+        if not isinstance(sample, Mapping):
+            continue
+        at = sample.get("at")
+        if not isinstance(at, (int, float)) or (now - float(at)) > _DEMAND_WINDOW_SECONDS:
+            continue
+        day = str(sample.get("date") or "").strip()[:10]
+        if len(day) == 10 and day[4] == "-" and day[7] == "-":
+            seen.add(day)
+    return sorted(seen)
+
+
+def trim_windows(
+    board_dates: Sequence[str],
+    sports: Sequence[str],
+    *,
+    now: datetime | None = None,
+) -> tuple[tuple[str, str], dict[str, str]]:
+    """`((start, default_end), {sport: end})` -- the join's OWN admission rule.
+
+    PER SPORT, because that is what `kalshi_board_join._date_verdict` does. It
+    admits a market whose game date EQUALS the slate date, plus -- for the
+    sports on `SYNDICATE_KALSHI_FORWARD_DATE_SPORTS` -- anything inside that
+    sport's `_FORWARD_HORIZON_DAYS` horizon. A single flat window would either
+    strand soccer's +14 fixtures outside it (a coverage regression in the change
+    meant to fix coverage) or drag every sport's far-dated catalogue inside it,
+    which is the 2,910-of-6,000 reading this fix exists to remove.
+
+    The horizon table is IMPORTED, never copied. A second copy of a number the
+    join owns is a copy that goes stale silently, and this file has already paid
+    for one of those today.
+
+    START is the EARLIEST board date, with no day of slack: `_date_verdict`
+    returns `wrong_date` for any market dated before the slate, so a market
+    older than the earliest board date provably cannot join and a back-day would
+    spend relevance on markets that cannot be used. They are not destroyed --
+    they sort into the `past` bucket and still take free slots.
+
+    NO RECORDED DATES -> `board_window_dates()`, the per-series window. Cold
+    start, or a worker whose board has not joined in six hours; the fallback is
+    wider than the truth, which is the safe direction.
+    """
+    days: dict[str, int] = {}
+    forward: frozenset[str] = frozenset()
+    try:
+        from syndicate.features.shared.kalshi_board_join import (
+            _FORWARD_HORIZON_DAYS,
+            _forward_date_sports,
+        )
+
+        days = dict(_FORWARD_HORIZON_DAYS)
+        forward = _forward_date_sports()
+    except Exception:  # noqa: BLE001 -- an unreadable horizon must not stop the trim
+        days, forward = {}, frozenset()
+
+    valid = sorted({str(d)[:10] for d in board_dates if str(d or "").strip()})
+    if valid:
+        start, anchor = valid[0], valid[-1]
+    else:
+        start, anchor = board_window_dates(now)
+
+    per_sport: dict[str, str] = {}
+    for sport in sports:
+        horizon = days.get(str(sport or "").strip().lower(), 0)
+        if not horizon or str(sport or "").strip().lower() not in forward:
+            per_sport[sport] = anchor
+            continue
+        try:
+            per_sport[sport] = (
+                datetime.strptime(anchor, "%Y-%m-%d").date() + timedelta(days=horizon)
+            ).isoformat()
+        except ValueError:
+            per_sport[sport] = anchor
+    return (start, anchor), per_sport
+
+
+def select_by_relevance(
+    candidates: Sequence[int],
+    cap: int,
+    dates: Sequence[str | None],
+    in_window: Sequence[bool],
+    *,
+    window_end: Sequence[str] | str,
+    undated_reserve: int,
+) -> set[int]:
+    """THE ONE ORDERING RULE. Which of `candidates` survive a budget of `cap`.
+
+    EXTRACTED so the per-series cap and the global storage trim cannot drift
+    apart. They ran the same defect twice -- `markets[:400]` and `markets[:room]`
+    -- and a second hand-written copy of this ordering would be a third place
+    for it to come back.
+
+    `candidates` are indices into `dates`/`in_window`; the caller decides what
+    the window IS (per sport, if it wants -- `window_end` may be a per-index
+    sequence) and this decides only the order. Returns a SET, so the caller
+    emits in its own order rather than in priority order.
+
+    ORDER OF PREFERENCE, most board-relevant first:
+
+      1. a reserved minority for UNDATED markets
+      2. dated INSIDE the board window, nearest date first
+      3. the remaining undated
+      4. dated outside it -- nearest FUTURE first, then the recent past
+    """
+    idxs = list(candidates)
+    if cap >= len(idxs):
+        return set(idxs)
+    if cap <= 0:
+        return set()
+
+    def _end_for(i: int) -> str:
+        return window_end if isinstance(window_end, str) else window_end[i]
+
+    inside: list[int] = []
+    undated: list[int] = []
+    future: list[int] = []
+    past: list[int] = []
+    for i in idxs:
+        if dates[i] is None:
+            undated.append(i)
+        elif in_window[i]:
+            inside.append(i)
+        elif dates[i] > _end_for(i):
+            future.append(i)
+        else:
+            past.append(i)
+    inside.sort(key=lambda i: (dates[i], i))
+    future.sort(key=lambda i: (dates[i], i))
+    past.sort(key=lambda i: (dates[i], i), reverse=True)
+    reserve = min(len(undated), max(0, undated_reserve))
+    priority = undated[:reserve] + inside + undated[reserve:] + future + past
+    return set(priority[:cap])
+
+
+def relevance_counters(
+    kept: set[int],
+    cut: set[int],
+    in_window: Sequence[bool],
+    dates: Sequence[str | None],
+) -> dict[str, int]:
+    """The counter shape both stages report, so the two lines are comparable.
+
+    `cut_in_window` is the number that matters: rungs the join could have priced
+    and now cannot. `kept`/`cut` are the budget, and `*_undated` says whether
+    the reserve held.
+    """
+    out = {"kept": len(kept), "cut": len(cut)}
+    for label, group in (("kept", kept), ("cut", cut)):
+        out[f"{label}_in_window"] = sum(1 for i in group if in_window[i])
+        out[f"{label}_undated"] = sum(1 for i in group if dates[i] is None)
+    return out
+
+
 def select_markets_for_cap(
     markets: Sequence[Mapping[str, Any]],
     cap: int,
@@ -430,44 +675,26 @@ def select_markets_for_cap(
     rows = list(markets)
     start, end = window
     dates = [game_date_from_ticker((m or {}).get("ticker")) for m in rows]
+    in_window = [d is not None and start <= d <= end for d in dates]
 
-    counters = {
-        "fetched": len(rows),
-        "kept": min(len(rows), cap),
-        "cut": max(0, len(rows) - cap),
-    }
     if len(rows) <= cap:
         keep_index = set(range(len(rows)))
     elif not date_aware:
         keep_index = set(range(cap))
     else:
-        in_window: list[int] = []
-        undated: list[int] = []
-        future: list[int] = []
-        past: list[int] = []
-        for idx, day in enumerate(dates):
-            if day is None:
-                undated.append(idx)
-            elif start <= day <= end:
-                in_window.append(idx)
-            elif day > end:
-                future.append(idx)
-            else:
-                past.append(idx)
-        in_window.sort(key=lambda i: (dates[i], i))
-        future.sort(key=lambda i: (dates[i], i))
-        past.sort(key=lambda i: (dates[i], i), reverse=True)
-        reserve = min(len(undated), PRECAP_UNDATED_RESERVE)
-        priority = undated[:reserve] + in_window + undated[reserve:] + future + past
-        keep_index = set(priority[:cap])
+        keep_index = select_by_relevance(
+            range(len(rows)),
+            cap,
+            dates,
+            in_window,
+            window_end=end,
+            undated_reserve=PRECAP_UNDATED_RESERVE,
+        )
 
+    cut_index = set(range(len(rows))) - keep_index
     kept = [rows[i] for i in range(len(rows)) if i in keep_index]
     cut = [rows[i] for i in range(len(rows)) if i not in keep_index]
-    for label, group in (("kept", keep_index), ("cut", set(range(len(rows))) - keep_index)):
-        counters[f"{label}_in_window"] = sum(
-            1 for i in group if dates[i] is not None and start <= dates[i] <= end
-        )
-        counters[f"{label}_undated"] = sum(1 for i in group if dates[i] is None)
+    counters = {"fetched": len(rows), **relevance_counters(keep_index, cut_index, in_window, dates)}
     return kept, cut, counters
 
 
@@ -869,6 +1096,10 @@ def _sport_slot_caps(
 def _trim_to_storage_bounds(
     per_series_markets: list[tuple[float, str, list[dict[str, Any]]]],
     demand: Mapping[str, int] | None = None,
+    *,
+    board_dates: Sequence[str] | None = None,
+    date_aware: bool = False,
+    counters: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], int, dict[str, int]]:
     """Fit the working set into `MAX_STORED_MARKETS`, guaranteeing each sport a floor.
 
@@ -893,9 +1124,30 @@ def _trim_to_storage_bounds(
     wants them -- holding them empty would trade one sport's starvation for
     everyone's.
 
+    STALENESS IS ALSO THE WRONG SELECTOR INSIDE A BUDGET, which is what
+    `date_aware=True` fixes. Both passes truncated with `markets[:room]` -- the
+    ARRIVAL order Kalshi answered in -- so the global trim re-applied exactly the
+    date-blind slice `select_markets_for_cap` had just removed one level down.
+    See `SYNDICATE_KALSHI_TRIM_DATE_AWARE` for the measurement. `board_dates`
+    is the board's OWN window, plumbed down from the last join rather than
+    guessed from `today`; absent, it falls back to `board_window_dates()`.
+
+    SAME BUDGET EITHER WAY. `len(markets)` is identical under both modes -- the
+    caps, the floor and `MAX_STORED_MARKETS` are untouched and only the choice
+    of which markets fill them changes. `counters`, if given, is filled with the
+    kept/cut split and how many of the CUT were in the board's window.
+
     Returns `(markets, trimmed, kept_by_sport)`; the caller reports all three.
     """
     from syndicate.features.shared.kalshi_catalogue import sport_for_series
+
+    if date_aware:
+        return _trim_by_relevance(
+            per_series_markets,
+            demand,
+            board_dates=board_dates,
+            counters=counters,
+        )
 
     ordered = sorted(per_series_markets, key=lambda item: item[0])
     all_markets: list[dict[str, Any]] = []
@@ -949,6 +1201,208 @@ def _trim_to_storage_bounds(
         # and it was in the line written to prove the floor worked.
         kept_by_sport[sport] = kept_by_sport.get(sport, 0) + len(markets)
 
+    if counters is not None:
+        # THE ARRIVAL MODE REPORTS ITS OWN COST, and that is the reachability
+        # proof rather than a nicety. A counter that only exists on the new path
+        # cannot show `off != on`; `learnings.md` calls the alternative
+        # instrument blindness. This is what the ~800-in-window-cut-per-tick
+        # reading was taken with.
+        counters.update(
+            _relevance_report(
+                per_series_markets,
+                kept=all_markets,
+                board_dates=board_dates,
+                sport_of=sport_of,
+                mode="arrival",
+            )
+        )
+    return all_markets, trimmed, kept_by_sport
+
+
+def _relevance_report(
+    per_series_markets: Sequence[tuple[float, str, list[dict[str, Any]]]],
+    *,
+    kept: Sequence[Mapping[str, Any]],
+    board_dates: Sequence[str] | None,
+    sport_of: Mapping[str, str],
+    mode: str,
+) -> dict[str, Any]:
+    """kept/cut and how many of each were in the board's window.
+
+    SCORES A SELECTION IT DID NOT MAKE, which is the only way the OLD rule's
+    in-window cut can be counted at all -- and that number is what proves the
+    new rule is worth having. Matched on object IDENTITY: the arrival path's
+    slices hold the same dicts, so this cannot be fooled by a repeated ticker
+    the way a name-keyed set would be.
+    """
+    from syndicate.features.shared.kalshi_catalogue import game_date_from_ticker
+
+    sports = sorted(set(sport_of.values()))
+    (start, _anchor), ends = trim_windows(board_dates or [], sports)
+    kept_ids = {id(m) for m in kept}
+
+    dates: list[str | None] = []
+    in_window: list[bool] = []
+    keep_idx: set[int] = set()
+    cut_idx: set[int] = set()
+    by_sport_cut: dict[str, int] = {}
+    for _age, series, markets in per_series_markets:
+        sport = sport_of.get(series, "unmapped")
+        end = ends.get(sport, start)
+        for market in markets:
+            i = len(dates)
+            day = game_date_from_ticker((market or {}).get("ticker"))
+            dates.append(day)
+            inside = day is not None and start <= day <= end
+            in_window.append(inside)
+            if id(market) in kept_ids:
+                keep_idx.add(i)
+            else:
+                cut_idx.add(i)
+                if inside:
+                    by_sport_cut[sport] = by_sport_cut.get(sport, 0) + 1
+
+    out: dict[str, Any] = {
+        "mode": mode,
+        "offered": len(dates),
+        "window": f"{start}..{max(ends.values()) if ends else start}",
+        "board_dates": list(board_dates or []),
+    }
+    out.update(relevance_counters(keep_idx, cut_idx, in_window, dates))
+    out["cut_in_window_by_sport"] = dict(sorted(by_sport_cut.items()))
+    return out
+
+
+def _trim_by_relevance(
+    per_series_markets: list[tuple[float, str, list[dict[str, Any]]]],
+    demand: Mapping[str, int] | None,
+    *,
+    board_dates: Sequence[str] | None,
+    counters: dict[str, Any] | None,
+) -> tuple[list[dict[str, Any]], int, dict[str, int]]:
+    """The same two passes, the same budget, ordered by BOARD RELEVANCE.
+
+    THE ONLY THING THAT CHANGES IS WHICH MARKETS FILL THE SLOTS. Pass 1 still
+    gives each sport `_sport_slot_caps`' allowance and pass 2 still hands the
+    leftovers out sport-blind to `MAX_STORED_MARKETS`; what was `markets[:room]`
+    in both is now `select_by_relevance`, so the cut falls on markets the join
+    could not have priced anyway instead of on whichever rungs Kalshi listed
+    last.
+
+    PASS 1 IS PER SPORT, NOT PER SERIES, and that matters: a sport's allowance
+    used to be consumed by whichever of its series was freshest, so MLB's
+    innings ladder could spend the sport's whole budget while `KXMLBGAME` --
+    today's moneyline -- got nothing. Within the sport, series stay in staleness
+    order and that order is the selector's tie-break, so freshness still decides
+    between two equally relevant markets.
+
+    OUTPUT ORDER IS THE INPUT'S: series in staleness order, markets in the order
+    they arrived, minus the cut ones. A selection change that also reorders
+    makes an unrelated regression impossible to attribute -- the same rule
+    `select_markets_for_cap` states.
+    """
+    from syndicate.features.shared.kalshi_catalogue import (
+        game_date_from_ticker,
+        sport_for_series,
+    )
+
+    ordered = sorted(per_series_markets, key=lambda item: item[0])
+    sport_of = {
+        series: (str(sport_for_series(series) or "").strip().lower() or "unmapped")
+        for _age, series, _m in ordered
+    }
+    caps = _sport_slot_caps(sorted(set(sport_of.values())), demand)
+    (start, _anchor), ends = trim_windows(board_dates or [], sorted(set(sport_of.values())))
+
+    # One flat index space, built in EMISSION order, so a keep-set can be
+    # decided globally and then emitted without reordering anything.
+    flat: list[dict[str, Any]] = []
+    flat_sport: list[str] = []
+    dates: list[str | None] = []
+    in_window: list[bool] = []
+    window_end: list[str] = []
+    spans: list[tuple[str, int, int]] = []
+    for _age, series, markets in ordered:
+        sport = sport_of[series]
+        end = ends.get(sport, start)
+        begin = len(flat)
+        for market in markets:
+            day = game_date_from_ticker((market or {}).get("ticker"))
+            flat.append(market)
+            flat_sport.append(sport)
+            dates.append(day)
+            window_end.append(end)
+            in_window.append(day is not None and start <= day <= end)
+        spans.append((series, begin, len(flat)))
+
+    by_sport_idx: dict[str, list[int]] = {}
+    for i, sport in enumerate(flat_sport):
+        by_sport_idx.setdefault(sport, []).append(i)
+
+    keep: set[int] = set()
+    kept_count = 0
+    # PASS 1 -- the floor/allowance pass. Sports are taken in the order their
+    # freshest series appears, which is the order the old loop reached them in.
+    seen_order: list[str] = []
+    for sport in flat_sport:
+        if sport not in seen_order:
+            seen_order.append(sport)
+    for sport in seen_order:
+        idxs = by_sport_idx.get(sport) or []
+        allowance = caps.get(sport, PER_SPORT_FLOOR_MARKETS) if caps else PER_SPORT_FLOOR_MARKETS
+        room = min(max(0, allowance), max(0, MAX_STORED_MARKETS - kept_count))
+        chosen = select_by_relevance(
+            idxs,
+            room,
+            dates,
+            in_window,
+            window_end=window_end,
+            undated_reserve=_trim_undated_reserve(room),
+        )
+        keep |= chosen
+        kept_count += len(chosen)
+
+    # PASS 2 -- the leftovers, sport-blind, to the global bound. Sport-blind is
+    # deliberate and unchanged; what changes is that a leftover in the board's
+    # window now outranks a leftover three weeks out instead of losing to it on
+    # arrival order.
+    leftovers = [i for i in range(len(flat)) if i not in keep]
+    room = max(0, MAX_STORED_MARKETS - kept_count)
+    keep |= select_by_relevance(
+        leftovers,
+        room,
+        dates,
+        in_window,
+        window_end=window_end,
+        undated_reserve=_trim_undated_reserve(room),
+    )
+
+    all_markets: list[dict[str, Any]] = []
+    kept_by_sport: dict[str, int] = {}
+    for series, begin, stop in spans:
+        sport = sport_of[series]
+        for i in range(begin, stop):
+            if i in keep:
+                all_markets.append(flat[i])
+                kept_by_sport[sport] = kept_by_sport.get(sport, 0) + 1
+    trimmed = len(flat) - len(all_markets)
+
+    if counters is not None:
+        cut_idx = set(range(len(flat))) - keep
+        by_sport_cut: dict[str, int] = {}
+        for i in cut_idx:
+            if in_window[i]:
+                by_sport_cut[flat_sport[i]] = by_sport_cut.get(flat_sport[i], 0) + 1
+        counters.update(
+            {
+                "mode": "date_aware",
+                "offered": len(flat),
+                "window": f"{start}..{max(ends.values()) if ends else start}",
+                "board_dates": list(board_dates or []),
+                **relevance_counters(keep, cut_idx, in_window, dates),
+                "cut_in_window_by_sport": dict(sorted(by_sport_cut.items())),
+            }
+        )
     return all_markets, trimmed, kept_by_sport
 
 
@@ -1286,9 +1740,20 @@ def _run_kalshi_odds_refresh_unbounded(*, force: bool = False) -> dict[str, Any]
     #
     # Freshest series are kept: a stale series' prices are the least useful
     # thing in the working set, which is the claim the docstring was making.
+    # THE BOARD'S OWN WINDOW, PLUMBED DOWN -- never inferred from `today`.
+    # `selected_date` can be FORWARD and is counted in Central, so a trim that
+    # assumed today would discard tomorrow's slate on a Friday. `join_to_board`
+    # records the dates it actually built for; this reads them back, exactly as
+    # `board_demand` already does for sports.
+    trim_board_dates = board_dates_from_state(state)
+    trim_date_aware = trim_date_aware_enabled()
+    trim_counters: dict[str, Any] = {}
     all_markets, trimmed_now, kept_by_sport = _trim_to_storage_bounds(
         per_series_markets,
         demand=state.get("board_demand") if isinstance(state.get("board_demand"), Mapping) else None,
+        board_dates=trim_board_dates,
+        date_aware=trim_date_aware,
+        counters=trim_counters,
     )
     trimmed += trimmed_now
     if trimmed_now:
@@ -1297,6 +1762,36 @@ def _run_kalshi_odds_refresh_unbounded(*, force: bool = False) -> dict[str, Any]
             f" floor={PER_SPORT_FLOOR_MARKETS}"
             f" demand={dict(sorted((state.get('board_demand') or {}).items())) or None}"
             f" kept_by_sport={dict(sorted(kept_by_sport.items()))}",
+            flush=True,
+        )
+        # OFF AND ON BOTH PRINT THIS, with `mode=` naming the rule that ran --
+        # the same reachability shape `PRECAP_SELECT` uses one level down, so a
+        # flag believed on and inert is READABLE rather than inferred.
+        #
+        # `cut_in_window` IS THE POINT OF THE LINE. It counts rungs the join
+        # could have priced and now cannot. Under `mode=arrival` that was ~800
+        # per tick and it ROTATED between ticks; under `mode=date_aware` it
+        # should fall to whatever the budget genuinely cannot hold, and
+        # `cut_in_window_by_sport` says which slate is paying for it.
+        #
+        # `board_dates=[]` means the fallback window ran -- nothing has joined
+        # in six hours -- and every number on the line should be read as being
+        # about a GUESSED window rather than the board's own.
+        print(
+            "[kalshi_odds] TRIM_SELECT"
+            f" mode={trim_counters.get('mode')}"
+            f" window={trim_counters.get('window')}"
+            f" board_dates={trim_counters.get('board_dates')}"
+            f" bound={MAX_STORED_MARKETS}"
+            f" floor={PER_SPORT_FLOOR_MARKETS}"
+            f" offered={trim_counters.get('offered')}"
+            f" kept={trim_counters.get('kept')}"
+            f" cut={trim_counters.get('cut')}"
+            f" kept_in_window={trim_counters.get('kept_in_window')}"
+            f" cut_in_window={trim_counters.get('cut_in_window')}"
+            f" kept_undated={trim_counters.get('kept_undated')}"
+            f" cut_undated={trim_counters.get('cut_undated')}"
+            f" cut_in_window_by_sport={trim_counters.get('cut_in_window_by_sport')}",
             flush=True,
         )
 
@@ -1927,7 +2422,7 @@ def join_to_board(
             f" board={report.get('board_event_sample')}",
             flush=True,
         )
-    _record_board_demand(rows)
+    _record_board_demand(rows, selected_date=selected_date)
     _capture_kalshi_quotes(report, rows, selected_date=selected_date)
     return report
 
@@ -2062,8 +2557,18 @@ def _capture_kalshi_quotes(
         print(f"[kalshi_odds] QUOTE_CAPTURE_FAILED {type(exc).__name__}: {exc}", flush=True)
 
 
-def _record_board_demand(rows: list[dict[str, Any]]) -> None:
+def _record_board_demand(
+    rows: list[dict[str, Any]],
+    *,
+    selected_date: str | None = None,
+) -> None:
     """Persist how many board rows each sport asked for, for the NEXT trim.
+
+    AND WHICH DATE IT ASKED FOR, added 2026-09-09 for the same reason and by the
+    same mechanism. `_trim_to_storage_bounds` runs during the REFRESH, before
+    any join, so it cannot see the board's window either -- and it must not
+    infer one from `today`, because `selected_date` can be forward and is
+    counted in Central. Recording it here is the only place that knows.
 
     THE WORKING SET HAD NO NOTION OF WHICH SPORTS HAVE GAMES TODAY, and that is
     what `_sport_slot_caps` needs to fix it. The demand lives here rather than
@@ -2086,7 +2591,15 @@ def _record_board_demand(rows: list[dict[str, Any]]) -> None:
             sport = str((row or {}).get("sport") or "").strip().lower()
             if sport:
                 counts[sport] = counts.get(sport, 0) + 1
-        if not counts:
+        # THE DATE IS RECORDED EVEN WHEN THE DEMAND IS EMPTY, deliberately. A
+        # board whose rows carry no `sport` still tells the trim WHICH SLATE it
+        # was built for, and that is the more load-bearing of the two: demand
+        # only re-weights slots a sport already has a floor for, while the date
+        # decides whether any of its markets are relevant at all.
+        board_day = str(selected_date or "").strip()[:10]
+        if len(board_day) != 10 or board_day[4] != "-" or board_day[7] != "-":
+            board_day = ""
+        if not counts and not board_day:
             return
         from syndicate.features.shared.refresh_state_store import read_json_file, write_json_file
 
@@ -2119,8 +2632,32 @@ def _record_board_demand(rows: list[dict[str, Any]]) -> None:
             and isinstance(sample.get("at"), (int, float))
             and (now - float(sample["at"])) <= _DEMAND_WINDOW_SECONDS
         ]
-        samples.append({"at": now, "counts": counts})
-        samples = samples[-_DEMAND_SAMPLE_LIMIT:]
+        if counts:
+            samples.append({"at": now, "counts": counts})
+            samples = samples[-_DEMAND_SAMPLE_LIMIT:]
+
+        # THE DATE SAMPLES DECAY ON THE SAME CLOCK AND FOR THE SAME REASON. The
+        # builds alternate between the full slate and a smaller forward-date
+        # board, so last-write-wins would hand the trim a window that flips
+        # every few minutes -- which is the rotation this whole fix exists to
+        # stop, reintroduced in the plumbing. A UNION over the window, ageing
+        # out, is stable and still lets a finished slate fall away.
+        #
+        # LIMIT IS SEPARATE from the demand samples' 12: this list holds one
+        # entry per BUILD, and a 6h window at ~3min per build is ~120 of them.
+        # Bounded well above that so a busy hour cannot silently evict the
+        # forward date the board is about to ask for again.
+        date_samples = [
+            sample
+            for sample in (state.get("board_date_samples") or [])
+            if isinstance(sample, Mapping)
+            and isinstance(sample.get("at"), (int, float))
+            and (now - float(sample["at"])) <= _DEMAND_WINDOW_SECONDS
+        ]
+        if board_day:
+            date_samples.append({"at": now, "date": board_day})
+        date_samples = date_samples[-_DATE_SAMPLE_LIMIT:]
+        state["board_date_samples"] = date_samples
 
         merged: dict[str, int] = {}
         for sample in samples:
@@ -2136,7 +2673,13 @@ def _record_board_demand(rows: list[dict[str, Any]]) -> None:
         write_json_file(path, state)
         print(
             f"[kalshi_odds] BOARD_DEMAND seen={dict(sorted(counts.items()))}"
-            f" merged={dict(sorted(merged.items()))} samples={len(samples)}",
+            f" merged={dict(sorted(merged.items()))} samples={len(samples)}"
+            # THE WINDOW THE NEXT TRIM WILL USE. Printed beside the demand it
+            # travels with, because a `dates=[]` here is what `TRIM_SELECT
+            # board_dates=[]` means one tick later -- and that is the difference
+            # between the trim reading the board and the trim guessing.
+            f" date={board_day or None}"
+            f" dates={board_dates_from_state(state)}",
             flush=True,
         )
     except Exception as exc:  # noqa: BLE001 -- an optimisation must not cost the join
