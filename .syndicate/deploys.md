@@ -5,6 +5,70 @@
 
 ---
 
+## 2026-09-09 15:01:31-15:05:05Z — web `e4552e27` -> `7bf2b901` (55 commits) — **web SHIPPED FORWARD to main** — lane `web-ship-forward`
+
+User-directed. Web had been 55 commits behind since 2026-09-08T23:47:28Z.
+
+**verify (four readings, all taken):**
+1. **Deploy `live` 15:05:05Z**, `dep-dagn9iqjnfac73e9l8mg`, build 15:01:31Z.
+2. **Serving from the public edge:** `/healthz` 200 (34 B), `/` 200 (17,965,111 B),
+   `/mlb` 200 (336,704 B), `/api/board/game-chips` 200 (111,653 B). Real payloads,
+   not a health-check-only pass.
+3. **No `server_failed` / `oomKilled` across 15:05:05Z..15:25Z (20 min)** —
+   `render_events.py --failures-only`, `OUTPUT COMPLETE`, 0 of 0 selected.
+4. **The access-log fix from `web-access-log-emitter-dead` SURVIVED** — 125 lines
+   in the first 87 s. It shares `GUNICORN_CMD_ARGS` with the OOM recycling caps,
+   so this was expected, but it is now a standing check on every web deploy.
+
+**THE DECLARED RISK DID NOT MATERIALISE, and here is the comparison rather than an
+assurance.** The risk written into the lane BEFORE firing: +2,552/-96 across 24
+runtime files, incl. `layer2_board.py` (+392) and `kalshi_board_join.py` (+313),
+onto a 2 GB service that took 5 `oomKilled` events on 2026-09-08. Memory at equal
+minutes-since-boot, same service, previous process vs this one:
+
+| minutes since boot | pre-deploy (boot 14:38:59Z) | post-deploy (boot 15:05:05Z) |
+|---|---|---|
+| +5  | 1069.3 MB | 808.7 MB |
+| +10 | 1281.2 MB | 1137.1 MB |
+| +15 | 1388.5 MB | 1257.5 MB |
+| +20 | 1449.7 MB | 1380.7 MB |
+
+Same shape, marginally lower at every point. **Not a claim that memory improved**:
+20 minutes is short, the curve has not plateaued, and `memory` here is the cgroup
+total, which includes page cache — the ledger's own rule is to split anon vs
+inactive_file before calling any of this a leak or a fix. What it does support is
+the narrow claim the deploy needed: **55 commits did not make web's memory profile
+worse in the first 20 minutes.**
+
+**AN INSTRUMENT TRAP I WALKED INTO AND CAUGHT — worth the four lines.** My first
+watch sampled `/v1/metrics/memory` WITHOUT `startTime`/`endTime` every 3 minutes
+for 18 minutes and returned the byte-identical triple `[1283.8, 1314.0, 1311.0]`
+on all seven calls. Unparameterised, that endpoint serves a FIXED window, so the
+loop measured nothing while looking exactly like a stable service — the most
+reassuring possible shape for a reading that contains no information. Re-read with
+an explicit 3 h window at `resolutionSeconds=300`: 37 samples, **37 distinct
+values**, min 577.3 / max 1478.5 MB. Only then is "no OOM" evidence. The rule this
+instance re-earns: a healthy reading is evidence only once you know what makes the
+instrument read unhealthy.
+
+**Pre-checks that made this safe to fire, done before the claim was taken:**
+`requirements.txt` UNCHANGED in the range (no build risk); `render.yaml` UNCHANGED
+(cannot fire `blueprint_sync`); the only two new env reads —
+`SYNDICATE_KALSHI_LADDER_MONOTONIC` and
+`SYNDICATE_LIVE_GAMELINE_PUBLISH_DISABLED_SPORTS` — are BOTH no-ops when absent
+(the ladder gate counts and stamps but refuses nothing, `matches` byte-identical;
+the disable list parses to an empty set), checked because `CLAUDE.md` says absent
+!= off and web carries neither key; and no OPEN lane was holding back a web deploy.
+
+**Revert target if something surfaces later: `e4552e27`.** This deploy carried five
+other lanes' work (NCAAF/soccer cards, pricing plane P1c/P1d, venue depth, Kalshi
+ladder+fees), so a regression attributed here needs bisecting, not reverting blind.
+
+Locks: claim `web` by `web-ship-forward` 15:0xZ, released after this entry.
+preflight `CLEAR` at the target SHA.
+
+---
+
 ## 2026-09-09 14:32:56-14:38:59Z — web `e4552e27` -> `e4552e27` (SAME SHA, env-only) — **web's gunicorn access log RESTORED** — lane `web-access-log-emitter-dead`
 
 **verify: 104 gunicorn access lines in `type=app` over 14:39:03-14:40:17Z (74 s),

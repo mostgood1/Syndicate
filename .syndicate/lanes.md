@@ -147,7 +147,7 @@ death, never life — do not invert it.
   never pooled (`2026-09-02` FORBIDDEN: post-restart ramp).
 - Blocked by: none
 
-### web-ship-forward — OPEN — opened 2026-09-09 — session d5c69f3c-63c3-45cc-ba72-5d9db425ebf2
+### web-ship-forward — CLOSED 2026-09-09 — opened 2026-09-09 — session d5c69f3c-63c3-45cc-ba72-5d9db425ebf2 — **SHIPPED AND VERIFIED: web `e4552e27` -> `7bf2b901` (55 commits), live 15:05:05Z. Four readings taken — edge serves real payloads on 4 routes, no `server_failed` across 20 min, the access-log fix survived (125 lines/87 s), and memory at equal minutes-since-boot is at or below the previous process at every point. `deploys.md` 2026-09-09 15:01Z.**
 - Goal: web moves from `e4552e27` (booted 2026-09-08T23:47:28Z) to main tip `375e9a1b` — 55 commits — and SERVES without a new OOM or a 5xx floor. User-directed: "ship web forward to main".
 - Files: none — this lane writes no code. `.syndicate/deploys.md` (the measurement) and this block only.
 - Hypothesis: n/a — a deploy, not a diagnosis.
