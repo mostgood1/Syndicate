@@ -88,7 +88,15 @@ FAIR_PROVENANCE_FIELDS: tuple[str, ...] = (
 # dedup silently failing and turning an append-once file into an append-always
 # one. That is exactly how `evaluation_ledger_chunks` reached 367 MB/day, and
 # the failure is invisible until something tries to read it.
-_MAX_LEDGER_BYTES = 16 * 1024 * 1024
+#
+# Re-sized 2026-09-09 (P1d): the "kilobytes" premise was already false -- the
+# 2026-09-04 file measured 13,089,729 B over 17,515 openings (747 B/record)
+# with every sport's props on the board, and the seven `FAIR_PROVENANCE_FIELDS`
+# add ~200 B/record. At 16 MiB a Saturday slate would have truncated its
+# evening openings, i.e. the tripwire would have eaten the exact rows the
+# sharp-anchor CLV reading needs. 32 MiB keeps ~2.5x headroom over the largest
+# measured day while still bounding an append-always failure to one file.
+_MAX_LEDGER_BYTES = 32 * 1024 * 1024
 
 
 def _reports_root() -> Path:
