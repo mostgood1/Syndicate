@@ -194,6 +194,15 @@ AMERICAN_TO_PROBABILITY: list[Impl] = [
     # deliberately NOT in the test's KNOWN_FAILING set.
     Impl("american_to_probability", "scripts.backtest_mlb_first5_vs_market", "implied",
          "str().replace('+') coercion + zero guard; the scalar half of `devig_home`"),
+    # ADDED 2026-09-09 by the NESTED sweep. Both were defined inside a function
+    # and were therefore invisible to the tripwire rather than merely
+    # unregistered; both closed over nothing, so lifting them to module level
+    # was behaviour-neutral and made them testable. Both meet all five
+    # requirements.
+    Impl("american_to_probability", "syndicate.features.shared.live_gameline_ledger", "_implied_prob_from_american",
+         "was nested in `_devig_home_prob`"),
+    Impl("american_to_probability", "syndicate.features.soccer.cards", "_implied_prob_from_american",
+         "was nested in `_game_event_market_data`; coerces via `_safe_float`"),
 ]
 
 AMERICAN_TO_DECIMAL: list[Impl] = [
@@ -205,6 +214,12 @@ AMERICAN_TO_DECIMAL: list[Impl] = [
     Impl("american_to_decimal", "scripts.build_soccer_picks", "_american_to_decimal"),
     Impl("american_to_decimal", "scripts.regrade_mlb_game_markets", "_american_to_decimal",
          "int(price) then 100/abs(price) -- ZeroDivisionError at 0"),
+    # ADDED 2026-09-09 by the NESTED sweep. Was nested in `_settle_game_pick`.
+    # RETURNS 2.0 (even money) on a missing or zero price instead of refusing,
+    # which makes an unpriced settled row indistinguishable from a +100 winner.
+    # Registered, not excused, precisely so that shows up in the scorecard.
+    Impl("american_to_decimal", "syndicate.features.nba.betting_recap", "_settlement_decimal_price",
+         "settlement payout multiplier; 2.0 on None/0 rather than None"),
 ]
 
 def _backfill_card_adapter(fn: Any, value: Any) -> Any:
@@ -247,31 +262,25 @@ GRIDS: dict[str, list[tuple[str, Any]]] = {
     "probability_to_american": PROBABILITY_GRID,
 }
 
-# Known non-importable implementations of the same concepts. Recorded rather
-# than silently dropped: a converter defined inside a function body is invisible
-# to every consolidation and to this harness alike, which is itself a finding.
-NOT_REACHABLE: list[tuple[str, str]] = [
-    ("scripts/refresh_wnba_oddsapi_props.py `_implied` (nested)",
-     "defined inside a function; not importable, so untestable and unshareable"),
-    ("syndicate/features/intelligence_audit.py `decimal_to_american` (nested)",
-     "defined inside a function; decimal->american, no module-level twin"),
-    # ADDED 2026-09-09. This list is HAND-KEPT and was 2 of 6. `discover_unregistered`
-    # anchors its regex at column 0, so a NESTED converter is invisible to the
-    # tripwire rather than merely unregistered -- implementation 32 can still land
-    # unnoticed if it lands indented. Swept with an indented-`def` variant of the
-    # same name hints; making the tripwire itself see them needs the harness to
-    # resolve a nested target, which it cannot do today.
-    ("syndicate/features/shared/live_gameline_ledger.py `implied` (nested, in `_devig_home_prob`)",
-     "defined inside a function; an unregistered american->probability implementation "
-     "that the tripwire cannot see"),
-    ("syndicate/features/soccer/cards.py `_implied` (nested)",
-     "defined inside a function; american->probability"),
-    ("syndicate/features/nba/betting_recap.py `_decimal_price` (nested)",
-     "defined inside a function; american->decimal"),
-    ("syndicate/features/nfl/fantasy_schedule.py `implied_points` (nested)",
-     "defined inside a function; spread/total -> team points, NOT a probability "
-     "converter -- recorded so the next sweep does not re-adjudicate it"),
-]
+# Converters that are real but cannot be reached by `getattr(module, attr)` --
+# defined inside a function or a class body, so the differential cannot run over
+# them. This is a FINDING, not an excuse: the right response to an entry here is
+# to lift the function to module level, which is behaviour-neutral whenever it
+# closes over nothing.
+#
+# EMPTIED 2026-09-09. It had been HAND-KEPT and was 2 of 6 -- stale in exactly
+# the direction that hides work, because `discover_unregistered` could not see
+# nested defs and so nothing ever contradicted it. The sweep is now AST-based
+# and covers every scope, so this list is ENFORCED: anything that belongs here
+# and is missing fails `test_every_converter_is_registered_or_excused`.
+#
+# All five nested converters it should have held were resolved rather than
+# recorded: three lifted and registered (`live_gameline_ledger`, `soccer.cards`,
+# `nba.betting_recap`), one DELETED as a third copy in a module that already had
+# a registered module-level twin (`refresh_wnba_oddsapi_props._implied` ->
+# `_american_price_to_prob`), and one excused as not a tested concept
+# (`intelligence_audit`).
+NOT_REACHABLE: list[tuple[str, str]] = []
 
 
 # ---------------------------------------------------------------------------
@@ -282,7 +291,17 @@ NOT_REACHABLE: list[tuple[str, str]] = [
 # must be either registered above or listed here with a reason. Otherwise the
 # next duplicate lands silently and the whole exercise repeats.
 
-_DEF_RE = None  # compiled lazily; `re` is only needed for the sweep
+# The sweep walks the AST, not a regex. It used to be
+# `re.compile(r"^def ...", re.MULTILINE)`, anchored at column 0 -- which meant a
+# converter defined INSIDE a function was invisible to the tripwire rather than
+# merely unregistered. Measured 2026-09-09: five nested converters, one of them
+# an unregistered `american_to_probability`, plus one method. The hand-kept
+# NOT_REACHABLE list that was supposed to cover exactly this was 2 of 6.
+#
+# So scope is now part of the KEY, and every scope is swept:
+#   module-level  ->  path.py:name          (unchanged, so no existing key churns)
+#   nested        ->  path.py:outer.name
+#   method        ->  path.py:Class.name
 
 # Converter-SHAPED names that are not scalar prob<->odds converters. Each needs
 # a reason, so that "it isn't one" is a claim someone made and not an omission.
@@ -297,6 +316,11 @@ NOT_A_SCALAR_CONVERTER: dict[str, str] = {
     "syndicate/features/intelligence.py:_american_odds_match": "preference matcher, returns bool",
     "syndicate/features/intelligence.py:_american_odds_value": "coerces text to a price; the GUARD in front of the unguarded converters",
     "syndicate/features/intelligence.py:_decimal_to_american": "decimal->american; SOLE module-level impl of that direction, so no differential is possible",
+    # ADDED 2026-09-09 by the NESTED sweep, which sees nested and method scopes
+    # for the first time. Neither of these is one of the three tested concepts,
+    # so lifting them would buy nothing.
+    "syndicate/features/intelligence_audit.py:_parlay_validation.decimal_to_american": "an audit STUB, nested in `_parlay_validation`; decimal->american returning a FORMATTED STRING, and the harness carries no decimal->american concept to differential it against",
+    "syndicate/features/nfl/fantasy_schedule.py:MarketTeamRatings.implied_points": "a method; spread+total -> projected team POINTS, not a probability or a price",
     "syndicate/features/ncaaf/cards.py:_format_decimal": "display formatting",
     "syndicate/features/nhl/sim_engine/hockeysim/features/market_lines.py:_consensus_american": "takes a list",
     "syndicate/features/nhl/sim_engine/hockeysim/market_anchoring.py:devig_two_way_home_prob": "two-sided devig",
@@ -350,40 +374,77 @@ _NAME_HINT = ("implied", "american", "decimal", "devig", "no_vig", "novig",
               "fair_prob", "prob_to", "odds_to")
 
 
-def discover_unregistered(root: str = ROOT) -> list[str]:
-    """Module-level converter-shaped defs that are neither registered nor
-    explicitly excused. Empty is the passing state."""
-    import re
+def _converter_defs(root: str = ROOT) -> list[tuple[str, str]]:
+    """Every converter-SHAPED def in the tree, as (key, scope).
 
-    global _DEF_RE
-    if _DEF_RE is None:
-        _DEF_RE = re.compile(r"^def ([_a-zA-Z][_a-zA-Z0-9]*)\s*\(", re.MULTILINE)
+    `scope` is one of "module", "nested", "method". A syntactically unparseable
+    file is reported rather than skipped: a file the sweep cannot read is a file
+    the sweep is not covering, and silently covering nothing is the failure this
+    whole tripwire exists to prevent.
+    """
+    import ast
+    import warnings
 
-    registered = {f"{i.module.replace('.', '/')}.py:{i.attr}" for i in REGISTRY}
-    unregistered = []
+    found: list[tuple[str, str]] = []
     for sub in ("syndicate", "pipeline", "scripts"):
         base = os.path.join(root, sub)
         for dirpath, dirnames, filenames in os.walk(base):
             dirnames[:] = [d for d in dirnames
                            if d not in {"__pycache__", "node_modules", ".venv", "venv"}]
-            for filename in filenames:
+            for filename in sorted(filenames):
                 if not filename.endswith(".py"):
                     continue
                 full = os.path.join(dirpath, filename)
                 rel = os.path.relpath(full, root).replace("\\", "/")
                 try:
                     with open(full, encoding="utf-8", errors="replace") as fh:
-                        text = fh.read()
-                except OSError:
+                        # A file elsewhere in the tree with a stray `\p` is not
+                        # this sweep's finding, and surfacing it here would train
+                        # the reader to ignore the sweep's output.
+                        with warnings.catch_warnings():
+                            warnings.simplefilter("ignore", SyntaxWarning)
+                            warnings.simplefilter("ignore", DeprecationWarning)
+                            tree = ast.parse(fh.read())
+                except (OSError, SyntaxError, ValueError) as exc:
+                    found.append((f"{rel}:<UNPARSEABLE {type(exc).__name__}>", "module"))
                     continue
-                for name in _DEF_RE.findall(text):
-                    if not any(h in name.lower() for h in _NAME_HINT):
-                        continue
-                    key = f"{rel}:{name}"
-                    if key in registered or key in NOT_A_SCALAR_CONVERTER:
-                        continue
-                    unregistered.append(key)
-    return sorted(unregistered)
+
+                def walk(node: Any, stack: list[tuple[str, str]]) -> None:
+                    for child in ast.iter_child_nodes(node):
+                        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                            if not stack:
+                                scope, prefix = "module", ""
+                            elif stack[-1][0] == "class":
+                                scope, prefix = "method", f"{stack[-1][1]}."
+                            else:
+                                scope, prefix = "nested", f"{stack[-1][1]}."
+                            if any(h in child.name.lower() for h in _NAME_HINT):
+                                found.append((f"{rel}:{prefix}{child.name}", scope))
+                            walk(child, stack + [("func", child.name)])
+                        elif isinstance(child, ast.ClassDef):
+                            walk(child, stack + [("class", child.name)])
+                        else:
+                            walk(child, stack)
+
+                walk(tree, [])
+    return found
+
+
+def discover_unregistered(root: str = ROOT) -> list[str]:
+    """Converter-shaped defs at ANY scope that are neither registered nor
+    explicitly excused. Empty is the passing state.
+
+    A nested or method-scoped def cannot be reached by `getattr(module, attr)`,
+    so it can never be REGISTERED -- its only honest homes are
+    `NOT_A_SCALAR_CONVERTER` (it is not one) or `NOT_REACHABLE` (it is one, and
+    is untestable where it sits). `NOT_REACHABLE` is therefore a FINDING, not an
+    excuse, and the right response to landing in it is to lift the function to
+    module level so the differential can actually run over it.
+    """
+    registered = {f"{i.module.replace('.', '/')}.py:{i.attr}" for i in REGISTRY}
+    excused = set(NOT_A_SCALAR_CONVERTER) | {key for key, _why in NOT_REACHABLE}
+    return sorted(key for key, _scope in _converter_defs(root)
+                  if key not in registered and key not in excused)
 
 
 # ---------------------------------------------------------------------------

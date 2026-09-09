@@ -581,6 +581,25 @@ def append_records(path: Path, records: list[dict[str, Any]]) -> dict[str, Any]:
     return coverage
 
 
+def _implied_prob_from_american(american: Any) -> float | None:
+    """American price -> implied probability. None for anything that is not one.
+
+    LIFTED to module level 2026-09-09; it used to be nested inside
+    `_devig_home_prob`. It closed over nothing, so the lift is behaviour-neutral
+    -- and nested it was invisible to `scripts/probability_differential.py`,
+    which is the point: an unregistered implementation of a concept that has 41
+    of them cannot sit one indent below the tripwire's sweep. It is registered
+    now, and differentially tested against all of the others.
+    """
+    try:
+        odds = float(american)
+    except (TypeError, ValueError):
+        return None
+    if odds == 0:
+        return None
+    return abs(odds) / (abs(odds) + 100.0) if odds < 0 else 100.0 / (odds + 100.0)
+
+
 def _devig_home_prob(consensus: Any) -> float | None:
     """De-vig a two-sided American moneyline into P(home). None if it is not one.
 
@@ -591,15 +610,7 @@ def _devig_home_prob(consensus: Any) -> float | None:
     if not isinstance(consensus, Mapping):
         return None
 
-    def implied(american: Any) -> float | None:
-        try:
-            odds = float(american)
-        except (TypeError, ValueError):
-            return None
-        if odds == 0:
-            return None
-        return abs(odds) / (abs(odds) + 100.0) if odds < 0 else 100.0 / (odds + 100.0)
-
+    implied = _implied_prob_from_american
     home, away = implied(consensus.get("home")), implied(consensus.get("away"))
     if home is None or away is None:
         return None

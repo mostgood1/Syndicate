@@ -41,6 +41,22 @@ def _safe_float(value: Any) -> float | None:
         return None
 
 
+def _implied_prob_from_american(american: Any) -> float | None:
+    """American price -> implied probability. None for anything that is not one.
+
+    LIFTED to module level 2026-09-09 from inside `_game_event_market_data`; it
+    closed over nothing but `_safe_float`, which is already module-level, so the
+    lift is behaviour-neutral. Nested, it was invisible to
+    `scripts/probability_differential.py` -- the tripwire anchored its regex at
+    column 0 -- so this implementation was neither registered nor differentially
+    tested against the 40 others. It is both now.
+    """
+    price = _safe_float(american)
+    if price is None or price == 0:
+        return None
+    return (100.0 / (price + 100.0)) if price > 0 else ((-price) / ((-price) + 100.0))
+
+
 def _fmt_pct(value: Any) -> str:
     number = _safe_float(value)
     return f"{number * 100:.1f}%" if number is not None else "-"
@@ -700,12 +716,6 @@ def _game_event_market_data(league: str, date_str: str, home_team: str, away_tea
 
     out: dict[str, Any] = {}
 
-    def _implied(american: Any) -> float | None:
-        price = _safe_float(american)
-        if price is None or price == 0:
-            return None
-        return (100.0 / (price + 100.0)) if price > 0 else ((-price) / ((-price) + 100.0))
-
     # --- BTTS: best price per side, then de-vig the pair together.
     best: dict[str, float] = {}
     for row in rows:
@@ -716,7 +726,8 @@ def _game_event_market_data(league: str, date_str: str, home_team: str, away_tea
         if side in {"yes", "no"} and price is not None:
             if side not in best or price > best[side]:
                 best[side] = price
-    p_yes, p_no = _implied(best.get("yes")), _implied(best.get("no"))
+    p_yes = _implied_prob_from_american(best.get("yes"))
+    p_no = _implied_prob_from_american(best.get("no"))
     if p_yes is not None and p_no is not None and (p_yes + p_no) > 0:
         out["p_btts_yes"] = round(p_yes / (p_yes + p_no), 4)
         out["btts_yes_price"] = best.get("yes")

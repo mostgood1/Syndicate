@@ -4573,23 +4573,12 @@ def _repair_predictions_slate_from_game_odds_if_needed(*, processed_root: Path, 
             rebuild[col] = pd.to_numeric(rebuild[col], errors="coerce")
     
 
-    def _implied(odds: float | None) -> float | None:
-        try:
-            value = float(odds)
-        except Exception:
-            return None
-        if value == 0:
-            return None
-        if value > 0:
-            return 100.0 / (value + 100.0)
-        return (-value) / ((-value) + 100.0)
-
     home_probs: list[float] = []
     for _, row in rebuild.iterrows():
         home_ml = row.get("home_ml") if "home_ml" in rebuild.columns else None
         away_ml = row.get("away_ml") if "away_ml" in rebuild.columns else None
-        p_home = _implied(home_ml)
-        p_away = _implied(away_ml)
+        p_home = _american_price_to_prob(home_ml)
+        p_away = _american_price_to_prob(away_ml)
         if p_home is not None and p_away is not None and float(p_home + p_away) > 0:
             home_probs.append(float(p_home) / float(p_home + p_away))
         else:

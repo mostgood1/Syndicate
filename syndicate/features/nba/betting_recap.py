@@ -137,6 +137,28 @@ def _tier_for_game(row: dict[str, str]) -> str:
     return "Low"
 
 
+def _settlement_decimal_price(american: float | None) -> float:
+    """American price -> decimal payout multiplier for settling a graded pick.
+
+    LIFTED to module level 2026-09-09 from inside `_settle_game_pick`; it closed
+    over nothing, so the lift is behaviour-neutral. Nested, it was invisible to
+    `scripts/probability_differential.py`.
+
+    IT DOES NOT MEET THE HARNESS'S `american_to_decimal` REQUIREMENTS, AND THAT
+    IS THE POINT OF REGISTERING IT: a missing or zero price returns **2.0**, so
+    an ungraded price silently books EVEN MONEY (`(2.0 - 1.0) * stake`) instead
+    of refusing to settle the row. That is a settlement policy wearing a
+    converter's shape. It is recorded in the test's KNOWN_FAILING set rather
+    than excused, so the behaviour is visible instead of asserted-away; changing
+    it is a money question and belongs to whoever owns NBA settlement.
+    """
+    if american is None or american == 0:
+        return 2.0
+    if american > 0:
+        return 1.0 + (american / 100.0)
+    return 1.0 + (100.0 / abs(american))
+
+
 def _settle_game_pick(row: dict[str, str], recon_row: dict[str, str] | None) -> tuple[bool, bool, bool, float]:
     if recon_row is None:
         return False, False, False, 0.0
@@ -153,13 +175,6 @@ def _settle_game_pick(row: dict[str, str], recon_row: dict[str, str] | None) -> 
     margin = home_pts - away_pts
     total = home_pts + away_pts
     stake = 1.0
-
-    def _decimal_price(american: float | None) -> float:
-        if american is None or american == 0:
-            return 2.0
-        if american > 0:
-            return 1.0 + (american / 100.0)
-        return 1.0 + (100.0 / abs(american))
 
     resolved = False
     is_win = False
@@ -193,7 +208,7 @@ def _settle_game_pick(row: dict[str, str], recon_row: dict[str, str] | None) -> 
     if is_push:
         return True, False, True, 0.0
     if is_win:
-        return True, True, False, (_decimal_price(price) - 1.0) * stake
+        return True, True, False, (_settlement_decimal_price(price) - 1.0) * stake
     return True, False, False, -stake
 
 
