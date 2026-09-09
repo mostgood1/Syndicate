@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 917 rules `[generated]`
+## Index — 948 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5011,15 +5011,23 @@ body. A tie is not a preference.
 - **The rule going forward:** on a shared fast-moving `main`, the tree is a variable between ANY two runs, and usually the largest one. Before attributing a flip to ordering, run `git log <base1>..<base2>` and `git merge-base --is-ancestor <candidate fix> <base>`. "Order-dependent" is a claim about a POPULATION of orderings and needs repeated runs on ONE tree; a single flip across two different trees is evidence about the trees. Corollary: the more experienced you are with the ordering explanation, the more available it becomes — I reached for it precisely because I had just been burned by the opposite error.
 - **Cost:** a wrong attribution published to two sessions and nearly a third, plus an inaccurate framing offered to the lane owner about their own closed work. Caught before delivery, by one ancestry check.
 
-## 2026-09-09 FORBIDDEN: relaying a peer's observation as a CORRECTION to a THIRD lane's work without measuring it yourself. The bar for a claim about someone else's CLOSED lane is higher than for one about your own, not lower `[lane data-tree-write-guard, caught by lane data-mirror-write-guard-sweep before it was sent]`
+## 2026-09-09 FORBIDDEN: AMPLIFYING a peer's unverified CONCLUSION into a relay to a THIRD lane, without measuring it yourself. The bar for a claim about someone else's CLOSED lane is higher than for one about your own, not lower `[lane data-tree-write-guard, caught by lane data-mirror-write-guard-sweep before it was sent]`
 
-Lane `data-mirror-write-guard-sweep` reported that
-`test_probability_differential::test_every_converter_is_registered_or_excused`
-PASSED in their run 8, having FAILED in their run 7. I had spun that test out to
+**THE ORIGINATION IS CORRECTED HERE `[2026-09-09, at that lane's own
+insistence]`. This entry first said they reported an OBSERVATION and that I turned
+it into a conclusion. That was wrong in the direction that flattered them, and they
+refused it.** What they actually sent, verbatim, was: *"`test_probability_
+differential` passed this run, which makes it order-dependent too rather than
+reliably red -- worth knowing for the lane you spun out."* "Passed this run" is the
+observation; everything after the comma is a CONCLUSION about a third lane's closed
+work, with a recommendation to act on it attached.
+
+So the sequence was **their unverified conclusion -> MY AMPLIFICATION into a
+proposed relay -> their verification stopping it.** I had spun that test out to
 lane `probability-converter-registry` (session 359fa678) on the strength of it
-being red on `main`, and that lane had since CLOSED it. On their single
-observation I recommended they tell that session "order-dependent is the more
-accurate word" than its own "was RED on main and is now green".
+being red on `main`, and that lane had CLOSED it; I agreed with their conclusion
+and proposed they tell that session "order-dependent is the more accurate word"
+than its own "was RED on main and is now green".
 
 **I DID NOT CHECK, AND IT WAS WRONG.** The peer verified before sending and it does
 not survive one command:
@@ -5036,9 +5044,10 @@ session that was not in the conversation to defend it.
 **WHY THIS IS WORSE THAN AN ORDINARY WRONG NUMBER.** A wrong reading about my own
 lane costs me a re-run. A wrong correction RELAYED into a third lane's closed
 record costs that session its verdict, and it arrives with a peer's authority
-attached rather than mine. The chain here was: their observation -> my
-recommendation -> their message to a third party. Two of the three links never
-measured it.
+attached rather than mine. The chain was: their CONCLUSION -> my amplification
+into a proposed relay -> a message to a third party. NEITHER of us had measured it,
+and the amplification is the step that would have made it arrive carrying two
+sessions' apparent agreement.
 
 **HOW TO APPLY.** Before relaying anything as a correction to another lane: run the
 discriminating command yourself, and if you cannot, relay the OBSERVATION with its
