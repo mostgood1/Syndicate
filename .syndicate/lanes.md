@@ -147,6 +147,14 @@ death, never life — do not invert it.
   never pooled (`2026-09-02` FORBIDDEN: post-restart ramp).
 - Blocked by: none
 
+### web-ship-forward — OPEN — opened 2026-09-09 — session d5c69f3c-63c3-45cc-ba72-5d9db425ebf2
+- Goal: web moves from `e4552e27` (booted 2026-09-08T23:47:28Z) to main tip `375e9a1b` — 55 commits — and SERVES without a new OOM or a 5xx floor. User-directed: "ship web forward to main".
+- Files: none — this lane writes no code. `.syndicate/deploys.md` (the measurement) and this block only.
+- Hypothesis: n/a — a deploy, not a diagnosis.
+- Falsification test: n/a. The RISK being carried, stated before firing: 24 runtime files, +2,552/-96, including `layer2_board.py` (+392) and `kalshi_board_join.py` (+313) on a 2 GB service that took 5 `oomKilled` events on 2026-09-08. If web OOMs after this, this deploy is the first suspect and the revert target is `e4552e27`.
+- Verification: (a) deploy reaches `live`; (b) `/healthz` 200 and a real board route 200 from the edge; (c) NO `oomKilled` / `server_failed` in the events API for 15+ min after boot; (d) access lines still emitted (the fix from `web-access-log-emitter-dead` must survive — same `GUNICORN_CMD_ARGS`, so it should, but it is now a standing check).
+- Blocked by: none. Pre-checked: `requirements.txt` UNCHANGED (no build risk); `render.yaml` UNCHANGED in range (cannot fire `blueprint_sync`); the only two new env reads, `SYNDICATE_KALSHI_LADDER_MONOTONIC` and `SYNDICATE_LIVE_GAMELINE_PUBLISH_DISABLED_SPORTS`, both no-op when ABSENT (the ladder gate counts and refuses nothing, matches byte-identical; the disable list parses to an empty set) — checked because `CLAUDE.md` says absent != off; and no OPEN lane holds back a web deploy.
+
 ## OPEN
 ### settled-sample-nfl-reconcile — OPEN — opened 2026-09-04 — two settlement ledgers disagreed about NFL, and the disagreement sizes real money
 - Goal: reconcile `settlement_all_time.by_sport` (NFL `orders=1, settled=0`) against
