@@ -29453,3 +29453,34 @@ refusals and a post-deploy ceiling of zero. Re-take READING 1 tomorrow after
 - **THE COMMON ROOT: I verified an effect through an instrument I had not validated, three times, against a system that was working.** `learnings.md`'s standing rule is *"a healthy reading is evidence only once you know what makes it read unhealthy"*. Here the inverse bit: an UNHEALTHY reading is evidence only once you know the instrument can read healthy. A field-name typo and a default page size are indistinguishable from a broken feature, and neither would have survived one look at a raw row -- which cost 30 seconds when I finally did it.
 - what was genuinely true and is unchanged: the shard-key defect was real (no day had ever had NFL props on this board), the Central-kickoff-date rule was the correct fix, and the consumption path never needed changing.
 - **The `nfl-props-date-shard-reading` scheduled task (19:05 CT) is now REDUNDANT** -- this entry is that reading, taken early and against the raw artifact. Its brief also gates on a log line that CANNOT fire: the writer runs as a sweep child on live-odds-worker with `stdout=DEVNULL`.
+
+### live-odds-worker 13ca56c5 -- NFL PROP DATE SHARD, the reading
+- **VERDICT: NFL PROPS REACH THE BOARD. The fix works end to end.** Taken 2026-09-09 19:2x-19:4xZ, independently of the entry above (`697e96d0`, 19:20Z), which it AGREES with on the headline and extends on three points that entry does not carry: the authorship proof, the reason its log gate can never fire, and the Layer 2 numbers.
+- **THE BRIEF'S GATE IS UNMEASURABLE BY CONSTRUCTION -- UNMEASURED, NOT NEGATIVE.** `[odds_book_quotes] nfl prop date-shard` never appeared and never can: `launch_refresh_run` spawns the sweep child with `"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL` (`ops_refresh.py:1403-1404`), and that print is emitted by the CHILD. **Discriminating control, same service, same windows:** parent-process prints came through in volume -- `PREGAME_CADENCE_DETAIL` 6 matches, `ODDS_SWEEP_LAUNCHED` 8, `[intelligence_state]` 125 -- while EVERY `[odds_book_quotes]` line matched zero, including the pre-existing `nfl append FAILED` variant that predates this change. The instrument reads healthy; this needle is behind a wall.
+- **THE CADENCE DID FIRE, with the code live.** `ODDS_SWEEP_LAUNCHED date=2026-09-09 sports=mlb,nfl,soccer count=3` at **18:51:42.575Z** -- the only NFL launch in 8 sweeps between 18:43Z and 19:19Z (the other 7 are `mlb,soccer`). Corroborated by the marker: `nfl:marker_age_s=7093/interval_s=7200` at 18:45:24Z, nfl ABSENT from the 18:51:39Z line (mid-run), then `nfl:marker_age_s=413` at 18:59:39Z. Deploy was 16:49:22Z, so this is the first run with the code live.
+- **AUTHORSHIP IS UNAMBIGUOUS -- the two-writer trap the brief warned about is dissolved by the FUTURE-DATED shards.** The NFL game-line writer only ever writes the current day, so a shard dated ahead of today has exactly one possible author. Classified on the rows' own `kind` field (NOT `player`, and NOT `player_name`):
+
+  | shard | bytes | lines | kind split | capture window |
+  |---|---|---|---|---|
+  | `2026-09-08.jsonl` | 2,667,870 | 5,962 | **game 5,962 / prop 0** | 05:01:44 .. 21:57:10 (08th) |
+  | `2026-09-09.jsonl` | 2,892,332 | 6,427 | game 5,655 / **prop 772** | 00:52:10 .. **18:52:21** |
+  | `2026-09-10.jsonl` | 326,810 | 702 | **prop 702 / game 0** | 18:52:21 only |
+  | `2026-09-13.jsonl` | 3,539,350 | 7,645 | **prop 7,645 / game 0** | 18:52:21 only |
+  | `2026-09-14.jsonl` | 309,030 | 670 | **prop 670 / game 0** | 18:52:21 only |
+  | `2026_wk1.jsonl` | 51,377,576 | 111,373 | prop 111,373 | 2026-08-21 .. 18:52:21 |
+
+  **`2026-09-08` is the control: 100% game rows, zero props, the day before the code was live.** The three future shards are 100% prop, every row stamped `18:52:21`, and did not exist before that instant. **Delta: +9,789 prop rows across four Central dates, ~4.18 MB of it in three brand-new files** -- megabytes, as pre-registered, and not the ~30 KB/h the game-line writer adds. The week shard is intact at 48.99 MB, so the offline ROI reader is not orphaned.
+- **BOARD, `/api/board/book-grid?sport=nfl&limit=5000`, `total_rows` read explicitly:**
+
+  | | before `2290d685` | now |
+  |---|---|---|
+  | `total_rows` | 1,218-1,226 | **1,378** |
+  | `game` | all of them | **1,229** |
+  | `prop` | **0** | **149** |
+  | markets | h2h, spreads, totals | Receiving Yards 48, Anytime TD 33, Rushing Yards 24, Passing Yards 19, Receptions 13, Rushing Attempts 5, Passing Attempts 3, Passing TDs 2, Interceptions 2 |
+
+  All 149 are tonight's Seattle v New England across **33 distinct players**. NFL `game` rows 1,229 against a 1,218-1,226 baseline -- unchanged within slate drift, **no regression**.
+- **LAYER 2, `/api/board/layer2-shortlist?sport=nfl`, artifact `written_at 2026-09-09T19:26:54Z`:** `per_sport.nfl` was `game 73, prop 0`; it is now **`game 77, prop 1582`** (`available 2225`, `selected 1659`). Ingest `dates_with_rows` is **exactly `['2026-09-09','2026-09-10','2026-09-13','2026-09-14']`** -- the four Central dates the commit predicted, arrived at independently by the producer.
+- **THE CAP DID NOT BIND.** `LAYER2_SHARD_TRIMMED sport=nfl` never fired. That is a CONTROLLED negative, not an unmeasured one: `[intelligence_state]` emitted 125 lines on refresh-worker in the same window, so the collector sees this module's parent prints. The flag was the lever, not the cap.
+- **TWO INSTRUMENT FACTS worth keeping.** (1) `book-grid`'s `limit` is silently **clamped to 2000** -- `limit=5000` returned 2,000 rows against `total_rows=2,949` for MLB. NFL at 1,378 is under the clamp so its split is complete; **MLB's and soccer's `kind` splits from this endpoint are page-capped and must not be quoted as slate counts.** (2) Rows carry an explicit `kind` field; classifying on `player` (absent) or `player_name` (present) is an unnecessary hop that has already produced one wrong reading.
+- **HONEST RESIDUALS, neither of which changes the verdict.** (a) Pre-registered expectation for 09-09 was **283** grid prop rows; actual is **149**, ~53%. 772 prop QUOTE rows aggregate to 149 GRID rows, so quote-to-grid reduction is the obvious place to look, but I did not test it and will not assert it. (b) MLB/soccer prop counts: no regression is VISIBLE (`per_sport` mlb prop 1,442, soccer prop 1,036; mlb, nfl and soccer each at `selected 1659`, which reads as an equal per-sport allocation rather than a zero-sum pool, and no trim fired) -- **but I hold no pre-change baseline for those two numbers, so this is "no evidence of regression", not "regression excluded".**
