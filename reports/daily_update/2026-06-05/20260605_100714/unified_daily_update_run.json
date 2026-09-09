@@ -33,7 +33,7 @@
                             "environmentOverrides":  {
                                                          "MLB_BETTING_DATA_ROOT":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
                                                          "MLB_LIVE_LENS_DIR":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
-                                                         "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                         "ODDS_API_KEY": "<redacted>"
                                                      },
                             "runtimePolicy":  {
                                                   "simsPerGame":  1000,
@@ -68,7 +68,7 @@
                             "environmentOverrides":  {
                                                          "MLB_BETTING_DATA_ROOT":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
                                                          "MLB_LIVE_LENS_DIR":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
-                                                         "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                         "ODDS_API_KEY": "<redacted>"
                                                      },
                             "runtimePolicy":  {
                                                   "simsPerGame":  1000,
@@ -97,7 +97,7 @@
                                                          "APP_TZ_OFFSET_HOURS":  "-6",
                                                          "APP_TZ":  "America/Chicago",
                                                          "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS":  "4",
-                                                         "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                         "ODDS_API_KEY": "<redacted>"
                                                      },
                             "runtimePolicy":  {
                                                   "smartsimNSims":  1000,
@@ -132,7 +132,7 @@
                                                          "SYNDICATE_WNBA_SOURCE_APP_FALLBACK":  "1",
                                                          "APP_TZ":  "America/Chicago",
                                                          "APP_TZ_OFFSET_HOURS":  "-6",
-                                                         "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                         "ODDS_API_KEY": "<redacted>"
                                                      },
                             "runtimePolicy":  {
                                                   "smartsimNSims":  1000,
@@ -169,7 +169,7 @@
                           "environmentOverrides":  {
                                                        "MLB_BETTING_DATA_ROOT":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
                                                        "MLB_LIVE_LENS_DIR":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
-                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                       "ODDS_API_KEY": "<redacted>"
                                                    },
                           "runtimePolicy":  {
                                                 "simsPerGame":  1000,
@@ -209,7 +209,7 @@
                           "environmentOverrides":  {
                                                        "MLB_BETTING_DATA_ROOT":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
                                                        "MLB_LIVE_LENS_DIR":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
-                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                       "ODDS_API_KEY": "<redacted>"
                                                    },
                           "runtimePolicy":  {
                                                 "simsPerGame":  1000,
@@ -243,7 +243,7 @@
                                                        "APP_TZ_OFFSET_HOURS":  "-6",
                                                        "APP_TZ":  "America/Chicago",
                                                        "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS":  "4",
-                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                       "ODDS_API_KEY": "<redacted>"
                                                    },
                           "runtimePolicy":  {
                                                 "smartsimNSims":  1000,
@@ -283,7 +283,7 @@
                                                        "SYNDICATE_WNBA_SOURCE_APP_FALLBACK":  "1",
                                                        "APP_TZ":  "America/Chicago",
                                                        "APP_TZ_OFFSET_HOURS":  "-6",
-                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                       "ODDS_API_KEY": "<redacted>"
                                                    },
                           "runtimePolicy":  {
                                                 "smartsimNSims":  1000,

@@ -154,6 +154,55 @@ $eventSimPolicyConfig = [ordered]@{
     }
 }
 
+# SECRET REDACTION FOR ANYTHING THAT LEAVES THIS PROCESS.
+#
+# Measured 2026-09-09: this script's console output redacted API keys (see
+# Invoke-Step below, which has done so since it was written) while the RUN
+# MANIFEST wrote them in clear -- and the manifest is committed. The live
+# ODDS_API_KEY was found in four tracked files on a PUBLIC repo:
+#
+#   reports/daily_update/latest/unified_daily_update_latest.json
+#   reports/daily_update/<date>/<run>/unified_daily_update_run.json
+#   reports/intelligence/status_response_cache.json   (embeds the manifest)
+#   reports/ops_jobs.json                             (embeds it again)
+#
+# at .sourceSteps[].environmentOverrides.ODDS_API_KEY and
+# .sportRuns[].environmentOverrides.ODDS_API_KEY. Only the first two are written
+# here; the other two are copies made downstream, which is exactly why the fix
+# belongs at the point the value enters the manifest rather than at each writer.
+#
+# ONE PREDICATE, USED BY BOTH PATHS. The console redaction and the manifest
+# redaction now call the same function. Two copies of a rule like this drift,
+# and the drift is silent -- the log looks redacted while the artifact is not,
+# which is the state this replaced.
+function Test-SecretEnvName {
+    param([string]$Name)
+
+    # Same shape the console summary has always used, plus the credential words
+    # it happened not to list. Widening what gets redacted is the safe direction.
+    return [bool]($Name -match '(^|_)(KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|CREDENTIALS)(_|$)')
+}
+
+function Protect-EnvironmentOverrides {
+    param($EnvironmentOverrides)
+
+    if (-not $EnvironmentOverrides) {
+        return $EnvironmentOverrides
+    }
+
+    # Returns a COPY. The live hashtable is what Invoke-Step sets on the real
+    # process environment, so redacting in place would break every job.
+    $safe = [ordered]@{}
+    foreach ($entry in ($EnvironmentOverrides.GetEnumerator() | Sort-Object Name)) {
+        if (Test-SecretEnvName -Name $entry.Key) {
+            $safe[$entry.Key] = '<redacted>'
+        } else {
+            $safe[$entry.Key] = $entry.Value
+        }
+    }
+    return $safe
+}
+
 function Invoke-Step {
     param(
         [string]$Name,
@@ -172,7 +221,7 @@ function Invoke-Step {
             $EnvironmentOverrides.GetEnumerator() |
                 Sort-Object Name |
                 ForEach-Object {
-                    $displayValue = if ($_.Key -match '(^|_)(KEY|TOKEN|SECRET)(_|$)') { '<redacted>' } else { $_.Value }
+                    $displayValue = if (Test-SecretEnvName -Name $_.Key) { '<redacted>' } else { $_.Value }
                     "{0}={1}" -f $_.Key, $displayValue
                 }
         ) -join '; '
@@ -4434,7 +4483,7 @@ $runManifest = [ordered]@{
     eventSimExecution = @()
     artifactUpdates = @()
     policyPerformance = @()
-    sourceSteps = @($sourceSteps | ForEach-Object { [ordered]@{ sport = $_.Sport; workflow = $_.Workflow; name = $_.Name; workingDirectory = $_.WorkingDirectory; environmentOverrides = $_.EnvironmentOverrides; runtimePolicy = $_.RuntimePolicy; command = $_.Command } })
+    sourceSteps = @($sourceSteps | ForEach-Object { [ordered]@{ sport = $_.Sport; workflow = $_.Workflow; name = $_.Name; workingDirectory = $_.WorkingDirectory; environmentOverrides = (Protect-EnvironmentOverrides $_.EnvironmentOverrides); runtimePolicy = $_.RuntimePolicy; command = $_.Command } })
     stageDecisions = @(
         @($sourceSteps | ForEach-Object { [ordered]@{ stage = 'source_update'; sport = $_.Sport; workflow = $_.Workflow; name = $_.Name; decision = 'planned'; status = if ($DryRun) { 'dry_run' } else { 'pending' } } })
         [ordered]@{ stage = 'sim_execution'; decision = if ($simExecutionDecision -eq $false) { 'skipped' } elseif ($simExecutionDecision -eq $true) { 'planned' } else { 'planned' }; status = if ($simExecutionDecision -eq $false) { 'skipped' } else { if ($DryRun) { 'dry_run' } else { 'pending' } } }
@@ -4678,7 +4727,7 @@ try {
                 status = if ($DryRun) { 'dry_run' } else { 'started' }
                 error = $null
                 workingDirectory = $step.WorkingDirectory
-                environmentOverrides = $step.EnvironmentOverrides
+                environmentOverrides = (Protect-EnvironmentOverrides $step.EnvironmentOverrides)
                 runtimePolicy = $step.RuntimePolicy
                 command = $step.Command
                 mirrorManifestPath = (Get-MirrorManifestPath -Sport $step.Sport -DateValue $Date)
