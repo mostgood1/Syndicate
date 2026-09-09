@@ -1,6 +1,7 @@
 {
   "app": {
     "access_lines": 3048,
+    "instrument_blind": false,
     "log_lines": 6906,
     "note": "served_bytes is RESPONSE size only; a POST body (e.g. artifacts/publish) is NOT counted here",
     "served_bytes": 261263948,
@@ -126,7 +127,7 @@
     ]
   },
   "bucket": "2026-09-09T00:00:00Z",
-  "captured_at": "2026-09-09T01:21:39Z",
+  "captured_at": "2026-09-09T02:17:09Z",
   "deploys_in_window": [
     {
       "commit": "e4552e279e",
@@ -302,7 +303,7 @@
       }
     ]
   },
-  "metered_mb": 437.729,
+  "metered_mb": null,
   "note": "bucket is RIGHT-labelled: it covers window_covered, i.e. the hour BEFORE its label. edge_* is public traffic only; app_* includes internal service-to-service.",
   "other_services_same_hour": {
     "live-odds-worker": 21.7,
