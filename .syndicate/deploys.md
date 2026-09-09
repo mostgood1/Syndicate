@@ -5,6 +5,43 @@
 
 ---
 
+## 2026-09-09 16:46:51-16:50:22Z — web `1c6308c3` -> `617a2805` (5 commits) — **the hub crest stacks above the tiles on mobile instead of being dropped** — lane `brand-mascot-logo`
+
+User-directed ("stack it above the tiles on mobile" + "deploy it"). Web only;
+no `render.yaml`. Delta: 5 commits, of which **only `617a2805` touches shipped
+code** — the rest are tests (`ac801817`, `fdc24e6f`) and ledger. Live
+`1c6308c3` confirmed an ancestor of the target.
+
+**verify:**
+1. **Deploy `live` 16:50:22Z**, `dep-dagoquon74is739dmeug`;
+   `deploy_preflight.py` afterwards reads `live commit 617a2805`.
+2. **The new rule is served AND the old one is gone** — both halves, because
+   showing the banner and un-hiding it are different edits and only the pair
+   proves the swap: served CSS contains
+   `height: clamp(132px, 30vw, 240px)` inside `@media (max-width: 900px)`, and
+   `grep -c '.market-board-hub__art { display: none; }'` over the same
+   response = **0**.
+3. **THE MOBILE GAP FROM THE 16:38Z ROW IS NOW CLOSED.** That row recorded
+   "NOT verified: the mobile rendering ON PRODUCTION". The public page has now
+   been loaded at 375x812: crest banner renders between the intro and the first
+   tile, crown and eyes both inside the crop, `Betting Board` tile still on the
+   first screen, no console errors.
+4. `/`, `/syndicate`, `/market-board`, `/portfolio` all 200 after the deploy.
+
+**Why the height is a `clamp` and not a constant, recorded because it was a
+measurement and not a preference:** `object-fit: cover` on a fixed-height box
+crops harder the wider the box gets. A flat 148px was right at 375px and at
+820px had cropped past the eyes to crown-and-shoulders. `clamp(132px, 30vw,
+240px)` keeps the eyes inside the window across the whole stacked range;
+checked at both widths before shipping.
+
+**Still NOT verified across this lane:** the tab favicon and the iOS
+home-screen icon as a user sees them. Assets proven byte-identical on the
+edge; nobody has looked at an installed icon.
+
+
+---
+
 ## 2026-09-09 16:34:39-16:38:04Z — web `6e9325e1` -> `1c6308c3` (3 commits) — **the crest reaches the market-board hub masthead** — lane `brand-mascot-logo`
 
 User-directed ("deploy it"), second deploy of this lane. Web only; no
