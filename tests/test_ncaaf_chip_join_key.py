@@ -15,11 +15,19 @@ The canonical-key index is the one designed for exactly this -- two feeds
 spelling one club differently -- and it was empty on BOTH sides because
 `canonical_team("ncaaf", ...)` is None for everything.
 
-WHY THE FIX IS NOT "populate `_alias_map('ncaaf')`". That was built, measured
-and reverted on 2026-08-29 (`.syndicate/handoff_2026-08-29_ncaaf_umass_alias_
-gap.md`): it makes `teams_match` map-authoritative, and `venue_quote_adapters.
-event_game_token` depends on NCAAF NOT canonicalising (`#603`).
-`test_ncaaf_alias_map_stays_empty` is the control that keeps that true.
+WHY THE FIX WAS NOT "populate `_alias_map('ncaaf')`" -- AND WHAT CHANGED. That
+was built, measured and reverted on 2026-08-29 (`.syndicate/handoff_2026-08-29_
+ncaaf_umass_alias_gap.md`): it makes `teams_match` map-authoritative, and
+`venue_quote_adapters.event_game_token` depends on NCAAF not canonicalising
+(`#603`). On 2026-09-09 the map landed anyway, from a different source and
+behind that revert's own two gates -- see `team_aliases._ncaaf_alias_to_name`
+and `tests/test_ncaaf_team_aliases.py`. `#603` is held by `game_token` refusing
+NCAAF explicitly rather than by the map being empty.
+`test_the_2026_08_29_REVERTS_HAZARDS_STAY_REFUSED` is the control now.
+
+`chip_join_key` is still not redundant: the map is FBS-only, while
+`resolve_team` reads all four divisions, so an FCS visitor on a real slate
+resolves here and nowhere else.
 
 DATA-FREE ON PURPOSE. The session worktree excludes `data/`, and a test that
 silently degraded to "registry absent -> nothing resolves -> None" would pass
@@ -90,19 +98,56 @@ def _registry_csv() -> str:
     return "".join(lines)
 
 
+def _clear_ncaaf_registry_caches() -> None:
+    """EVERY cache downstream of the registry path, in one place.
+
+    THIS LIST WAS INCOMPLETE AND THE GAP WAS INVISIBLE. It cleared only
+    `oddsapi_lines`' two caches, so `team_aliases._ncaaf_alias_to_name` (added
+    2026-09-09, `lru_cache(maxsize=1)`) and `oddsapi_lines.fbs_canonical_names`
+    kept this file's SIX-SCHOOL STUB for the rest of the pytest process. Every
+    NCAAF test that ran after this file then asked a stub registry and got
+    `canonical_team("ncaaf", "South Florida Bulls") -> None` -- which reads
+    exactly like "the map does not cover it".
+
+    It could not be seen before, because `_alias_map("ncaaf")` returned `{}`
+    with or without the stub. Adding a real map is what turned a dormant leak
+    into a wrong answer, so the clear list is now derived from the caches that
+    exist rather than from the ones someone remembered.
+    """
+    for module, names in (
+        (oddsapi_lines, ("_alias_map", "_mascot_tails", "fbs_canonical_names")),
+        (team_aliases, ("_ncaaf_alias_to_name", "_nickname_alias_map", "unambiguous_club_tokens")),
+    ):
+        for name in names:
+            cached = getattr(module, name, None)
+            clear = getattr(cached, "cache_clear", None)
+            if clear is not None:
+                clear()
+
+
+@pytest.fixture(autouse=True)
+def _ncaaf_registry_caches_are_never_left_dirty():
+    """AUTOUSE, so a test in this file that forgets the fixture cannot leak
+    either. The stub is process-global state once cached; nothing about the
+    fixture's own scope contains it."""
+    _clear_ncaaf_registry_caches()
+    try:
+        yield
+    finally:
+        _clear_ncaaf_registry_caches()
+
+
 @pytest.fixture
 def ncaaf_registry(tmp_path, monkeypatch):
     """Point the NCAAF resolver at a registry this test wrote."""
     path = tmp_path / "ncaaf_team_registry_snapshot.csv"
     path.write_text(_registry_csv(), encoding="utf-8")
     monkeypatch.setattr(oddsapi_lines, "team_registry_snapshot_path", lambda: path)
-    oddsapi_lines._alias_map.cache_clear()
-    oddsapi_lines._mascot_tails.cache_clear()
+    _clear_ncaaf_registry_caches()
     try:
         yield path
     finally:
-        oddsapi_lines._alias_map.cache_clear()
-        oddsapi_lines._mascot_tails.cache_clear()
+        _clear_ncaaf_registry_caches()
 
 
 def test_the_registry_stub_actually_resolves(ncaaf_registry):
@@ -162,18 +207,38 @@ def test_built_ncaaf_chip_carries_a_join_key(ncaaf_registry):
     assert chip["home"]["abbr"] == "RUT"
 
 
-def test_ncaaf_alias_map_stays_empty(ncaaf_registry):
-    """THE CONTROL FOR THE 2026-08-29 REVERT.
+def test_the_2026_08_29_REVERTS_HAZARDS_STAY_REFUSED(ncaaf_registry):
+    """THE CONTROL FOR THE 2026-08-29 REVERT -- REWRITTEN, NOT DELETED.
 
-    Populating `_alias_map("ncaaf")` makes `teams_match` map-authoritative and
-    flips `venue_quote_adapters.event_game_token` off its `evt:` fallback
-    (`#603`). The display join must be reached WITHOUT doing that.
+    This asserted `_alias_map("ncaaf") == {}`. NCAAF gained a map on
+    2026-09-09 (`team_aliases._ncaaf_alias_to_name`), so the emptiness is gone
+    and the two things it was PROTECTING are what get asserted instead. Both
+    were the revert's actual arguments:
+
+      1. a miss must not become a confident wrong club (`MAS`);
+      2. `#603`'s `evt:` token shape must survive -- `game_token` refuses NCAAF
+         explicitly so the board and venue halves keep agreeing.
     """
-    assert team_aliases._alias_map("ncaaf") == {}
-    assert team_aliases.canonical_team("ncaaf", "UMass Minutemen") is None
-    assert team_aliases.unambiguous_club_tokens("ncaaf") == frozenset()
-    # A miss must stay a miss, not become a confident wrong club.
+    from syndicate.features.shared.venue_quote_adapters import event_game_token, game_token
+
+    # The map exists, and the name the 08-29 attempt could NOT reach now does.
+    assert team_aliases._alias_map("ncaaf")
+    assert team_aliases.canonical_team("ncaaf", "UMass Minutemen") == "massachusetts"
+    # ...and a miss is still a miss, not a confident wrong club.
+    assert team_aliases.canonical_team("ncaaf", "MAS") is None
     assert team_aliases.teams_match("ncaaf", "MAS", "Idaho Vandals") is False
+    # `#603` is untouched: no club-pair token for ncaaf, so both halves of the
+    # quote join still key on the event identity.
+    assert game_token("ncaaf", "Massachusetts", "Rutgers") is None
+    assert event_game_token("evt-mas-rut") == "evt:evt-mas-rut"
+    # The token guard is a REFUSAL of shared words, not of the sport. Asserted
+    # against THIS STUB's vocabulary, not the real registry's -- `state` is
+    # unambiguous among six schools and shared among 26 real ones, so the
+    # production behaviour belongs in `test_ncaaf_team_aliases.py` and only
+    # the mechanism belongs here.
+    tokens = team_aliases.unambiguous_club_tokens("ncaaf")
+    assert "massachusetts" in tokens
+    assert "umass" not in tokens  # names Massachusetts AND UMass Dartmouth
 
 
 def test_chip_join_key_is_additive_for_every_other_sport(ncaaf_registry):

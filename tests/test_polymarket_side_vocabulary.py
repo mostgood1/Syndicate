@@ -175,16 +175,48 @@ def test_a_sport_with_NO_club_map_offers_no_token_keys():
     """The absence has to be present, or the rule above is only tested where a
     map exists to disagree with.
 
-    `_alias_map` returns `{}` for ncaaf, ncaab and nhl, so nothing in those
-    sports can be shown unambiguous. Before the guard, every one of their rows
-    fell through the raw-string path -- "Ohio State Buckeyes" against "Michigan
-    Wolverines" offered `ncaaf|h2h|state`, a word shared by a large fraction of
-    the sport. NCAAF reached the board side on 2026-08-27.
+    `_alias_map` returns `{}` for ncaab and nhl, so nothing in those sports can
+    be shown unambiguous and `unknown` must not land on the permissive branch.
+    (NCAAF was a third exemplar until it gained a map on 2026-09-09; it is
+    asserted separately below, where it is now the STRONGER case.)
+    """
+    for sport, home, away in (
+        ("nhl", "Boston Bruins", "Toronto Maple Leafs"),
+        ("ncaab", "Duke Blue Devils", "North Carolina Tar Heels"),
+    ):
+        row = {"sport": sport, "market": "h2h", "side": "home", "line": None,
+               "home_team": home, "away_team": away}
+        assert _candidate_keys(row, sport) == [f"{sport}|h2h|home"]
+
+
+def test_ncaaf_offers_the_CLUB_but_never_the_word_its_sport_shares():
+    """The case this guard was written for, now that NCAAF has a map.
+
+    Before the guard, "Ohio State Buckeyes" against "Michigan Wolverines"
+    offered `ncaaf|h2h|state` -- a word shared by 26 programmes, which
+    `apply_venue_quotes` would resolve against the sport's WHOLE quote pool and
+    could answer from an entirely different fixture. The full club name is
+    unambiguous and is offered; every word of it is shared and none is.
     """
     row = {"sport": "ncaaf", "market": "h2h", "side": "home", "line": None,
            "home_team": "Ohio State Buckeyes", "away_team": "Michigan Wolverines"}
 
-    assert _candidate_keys(row, "ncaaf") == ["ncaaf|h2h|home"]
+    keys = _candidate_keys(row, "ncaaf")
+    assert keys[0] == "ncaaf|h2h|home"
+    assert "ncaaf|h2h|state" not in keys
+    assert "ncaaf|h2h|ohio" not in keys
+    assert "ncaaf|h2h|michigan" not in keys
+    assert "ncaaf|h2h|buckeyes" not in keys
+    try:
+        from syndicate.features.ncaaf.oddsapi_lines import fbs_canonical_names
+
+        registry = bool(fbs_canonical_names())
+    except Exception:
+        registry = False
+    if registry:
+        # Non-vacuous only with the registry: without it the map is empty and
+        # every assertion above passes for the wrong reason.
+        assert "ncaaf|h2h|ohio state" in keys, keys
 
 
 @needs_soccer_rosters

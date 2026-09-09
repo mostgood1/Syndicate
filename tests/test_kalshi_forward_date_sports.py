@@ -144,15 +144,38 @@ def test_ON_the_same_market_passes_the_date_gate(monkeypatch):
     assert out["reasons"].get("event_not_on_our_board", 0) == 1
 
 
-def test_the_ALIAS_MAP_is_the_real_gate_and_this_lane_did_not_open_it():
-    """THE HONEST RESULT, pinned.
+def test_the_ALIAS_MAP_gate_is_OPEN_as_of_2026_09_09_and_the_flag_default_is_NOT():
+    """REWRITTEN AT THE MOMENT ITS PREDECESSOR NAMED.
 
-    Turning the flag on gains ZERO matched NCAAF rows, because
-    `canonical_team('ncaaf', ...)` resolves nothing. If someone later adds an
+    This test used to pin the honest result that turning the flag on gained
+    ZERO matched NCAAF rows, because `canonical_team('ncaaf', ...)` resolved
+    nothing -- and it said in its own docstring: "If someone later adds an
     NCAAF alias map this test fails and must be rewritten -- which is the
-    correct moment to re-argue the flag's default.
+    correct moment to re-argue the flag's default."
+
+    `team_aliases._ncaaf_alias_to_name` landed on 2026-09-09, so that moment is
+    now and the clubs below resolve. **THE FLAG'S DEFAULT IS DELIBERATELY NOT
+    RE-ARGUED HERE.** The two gates are independent: this one was the alias map
+    and it is open; the forward-date gate is a separate decision with its own
+    evidence, and the lane that opened the map explicitly did not touch it.
+    The assertions below say exactly that and nothing more.
+
+    Registry-dependent, and the skip says so rather than passing vacuously --
+    a data-free tree resolves nothing and would look like the old world.
     """
     from syndicate.features.shared.team_aliases import canonical_team
+
+    try:
+        from syndicate.features.ncaaf.oddsapi_lines import fbs_canonical_names
+
+        registry = bool(fbs_canonical_names())
+    except Exception:
+        registry = False
+    if not registry:
+        pytest.skip(
+            "ncaaf_team_registry_snapshot.csv absent (data/ is excluded from session "
+            "worktrees) -- this assertion did NOT run"
+        )
 
     for club in (
         "South Florida Bulls",
@@ -161,9 +184,17 @@ def test_the_ALIAS_MAP_is_the_real_gate_and_this_lane_did_not_open_it():
         "ARMY",
         "Alabama Crimson Tide",
     ):
-        assert canonical_team("ncaaf", club) is None, club
-    # ...and the control: sports that DO have a map resolve.
+        assert canonical_team("ncaaf", club) is not None, club
+    # ...and the control: sports that DO have a map still resolve.
     assert canonical_team("nfl", "Kansas City Chiefs") is not None
+    # The FORWARD-DATE gate is untouched by that, and stays the second blocker.
+    assert _forward_date_sports_default_is_soccer_only()
+
+
+def _forward_date_sports_default_is_soccer_only() -> bool:
+    """The flag's default with no env decision, read rather than assumed."""
+    out = join_kalshi_to_board([_ncaaf_total()], [], selected_date=SLATE)
+    return out["reasons"].get(REASON_FORWARD_DATE_SPORT_OFF, 0) == 1
 
 
 # ---------------------------------------------------------------------------

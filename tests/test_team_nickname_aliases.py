@@ -72,5 +72,26 @@ def test_wnba_gains_nothing_because_its_supplement_already_covers_it():
 
 
 def test_a_sport_with_no_alias_map_is_unaffected():
-    assert canonical_team("ncaaf", "Buckeyes") is None
+    """nhl and ncaab are the exemplars now. NCAAF used to be one and gained a
+    map on 2026-09-09; it is asserted separately below, because the derivation
+    this file tests is DECLINED for that sport rather than merely empty."""
+    assert canonical_team("nhl", "Bruins") is None
+    assert canonical_team("ncaab", "Blue Devils") is None
     assert canonical_team("", "Bears") is None
+
+
+def test_ncaaf_declines_this_derivation_even_though_it_now_has_a_map():
+    """`_nickname_alias_map`'s premise is "<City> <Nickname>", where the last
+    word IS the nickname. CFBD's canonical names are SCHOOLS, so the last word
+    is a qualifier and the derivation yields `southern` -> Georgia Southern,
+    `green` -> Bowling Green, `a&m` -> Texas A&M -- unique only because the map
+    is FBS-only and Southern University and Florida A&M are hidden by that.
+
+    Registry-independent: the branch returns `{}` before it reads anything, so
+    this asserts the same thing with or without `data/`.
+    """
+    from syndicate.features.shared import team_aliases as ta
+
+    assert ta._nickname_alias_map("ncaaf") == {}
+    assert canonical_team("ncaaf", "Southern") is None
+    assert canonical_team("ncaaf", "A&M") is None
