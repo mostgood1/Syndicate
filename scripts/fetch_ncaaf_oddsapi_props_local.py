@@ -535,26 +535,120 @@ def parse_events_to_rows(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return rows
 
 
+#: Env flag: also shard NCAAF prop quotes by Central kickoff DATE.
+#:
+#: Named to match `SYNDICATE_NFL_PROP_QUOTES_DATE_SHARD` (`2290d685`) because it
+#: is the same switch over the same defect in the sibling sport; two names for
+#: one mechanism is how an operator ends up turning on half of it.
+#:
+#: ABSENT MEANS OFF, and off is byte-for-byte today's behaviour -- the week
+#: shard alone.
+_NCAAF_PROP_DATE_SHARD_ENV = "SYNDICATE_NCAAF_PROP_QUOTES_DATE_SHARD"
+
+
+def _ncaaf_prop_date_shard_enabled() -> bool:
+    """Is the date-shard write on? Absent/blank/anything falsy -> False."""
+    raw = str(os.environ.get(_NCAAF_PROP_DATE_SHARD_ENV) or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
 def _append_ncaaf_book_quotes(events: list[dict[str, Any]], *, season: int, week: int) -> None:
     """Every book's price for every tracked market, into the shared quote log.
 
     Same #209 Class A defect and same fix as NFL: `_choose_bookmaker` keeps one
-    book out of a response that already contains several. Sharded by
-    `{season}_wk{week}` to match how NCAAF props are scoped everywhere else.
+    book out of a response that already contains several.
+
+    TWO SHARD KEYS, AND BOTH ARE LOAD-BEARING -- identically to NFL's
+    `_append_nfl_book_quotes`, which this mirrors deliberately.
+
+    `{season}_wk{week}` is what this has always written, matching how NCAAF
+    props are scoped everywhere else in the tree. **Nothing in the app reads
+    it.** Every board reader asks for CALENDAR dates -- `layer2_shortlist`
+    loops `resolve_window_dates`, `layer1_board` can only emit `YYYY-MM-DD`,
+    `book_grid_artifact` is built one file per date -- so measured on
+    production 2026-09-09 the 26.98 MB `2026_wk1.jsonl` plus 0.85 MB
+    `2026_wk2.jsonl` held 17,012 live prop quote keys across 76 events and
+    `/api/board/book-grid?sport=ncaaf` served **0 props** on every date in the
+    window: 0 of 33 (09-11), 0 of 503 (09-12), 0 of 66 (09-13), and 0 of 650 on
+    the last Saturday played (09-05). No day has ever had an NCAAF prop on that
+    board.
+
+    The date key is what makes them reachable, and it copies this sport's own
+    working precedent rather than inventing one: `fetch_ncaaf_oddsapi_game_lines.py`
+    writes `ncaaf_source/tracking/book_quotes/<date>.jsonl`, which is exactly
+    why NCAAF GAME rows do reach the board. Which date, and why Central rather
+    than UTC, is argued once in `odds_book_quotes.kickoff_shard_date` and is
+    NOT re-derived here -- two resolvers disagreeing is how the halves of a
+    join end up on different vocabularies. Central matters more for NCAAF than
+    for NFL: a Saturday slate's marquee window is after 7pm CT, and
+    `layer1_board.artifact_read_dates` already documents an NCAAF game
+    (MEM @ UNLV, 2026-08-30T02:19Z = 9:19pm Central on the 29th) lost to
+    precisely this off-by-one.
+
+    **THE WEEK SHARD IS KEPT, NOT REPLACED**, written first and unchanged.
+    Unlike NFL -- where `scripts/report_nfl_props_roi.py` reads
+    `{season}_wk{week}.jsonl` directly -- a repo-wide search found **no reader
+    of the NCAAF week key at all**, offline or otherwise
+    (`scripts/backtest_ncaaf_player_props.py` and
+    `scripts/build_ncaaf_pick_ledger.py` both go through the props CSV, not the
+    quote log). So nothing is orphaned either way; it is kept for symmetry with
+    NFL and because an append-only capture is the cheapest thing in this
+    pipeline to keep and the most expensive to have thrown away.
+
+    Gated on `SYNDICATE_NCAAF_PROP_QUOTES_DATE_SHARD`; absent reproduces the old
+    single write exactly.
 
     Never raises: a quote-log failure must not fail an odds fetch.
     """
     try:
         if not isinstance(events, list) or not events:
             return
-        from syndicate.features.shared.odds_book_quotes import append_book_quotes, quote_rows_from_oddsapi_events
+        from syndicate.features.shared.odds_book_quotes import (
+            append_book_quotes,
+            bucket_quote_rows_by_kickoff_date,
+            quote_rows_from_oddsapi_events,
+        )
 
         rows = quote_rows_from_oddsapi_events(events, market_map=MARKET_STD_MAP)
+        captured_at = datetime.now(tz=timezone.utc).isoformat()
         append_book_quotes(
             sport="ncaaf",
             date_str=f"{int(season)}_wk{int(week)}",
             rows=rows,
-            captured_at=datetime.now(tz=timezone.utc).isoformat(),
+            captured_at=captured_at,
+        )
+        if not _ncaaf_prop_date_shard_enabled():
+            return
+
+        # SAME `captured_at` as the week write above, not a second clock read.
+        # `append_book_quotes` stamps it onto every row and into the last-seen
+        # state, so two readings microseconds apart would make the same
+        # observation look like two, and would break any join between the two
+        # copies of the capture.
+        buckets, unfiled = bucket_quote_rows_by_kickoff_date(rows)
+        for shard_date in sorted(buckets):
+            append_book_quotes(
+                sport="ncaaf",
+                date_str=shard_date,
+                rows=buckets[shard_date],
+                captured_at=captured_at,
+            )
+        # REPORTED, not swallowed. A row with no parseable commence_time cannot
+        # be date-filed and is NOT defaulted onto today -- an unknown kickoff
+        # filed as today's is indistinguishable from a real one. It still
+        # reaches the week shard above, so nothing is lost; this is the line
+        # that says how much did not reach a date shard.
+        #
+        # `flush=True` because this can run as a sweep CHILD with
+        # `stdout=DEVNULL` on live-odds-worker, in which case the line never
+        # reaches a log at all -- so verification is by ARTIFACT (shard exists,
+        # `player_name` present, freshest `captured_at`), never by log absence.
+        print(
+            "[odds_book_quotes] ncaaf prop date-shard"
+            f" rows={len(rows)} dates={len(buckets)}"
+            f" unfiled_no_commence_time={len(unfiled)}"
+            f" shards={sorted(buckets)}",
+            flush=True,
         )
     except Exception as exc:
         print(f"[odds_book_quotes] ncaaf append FAILED {type(exc).__name__}: {exc}")
