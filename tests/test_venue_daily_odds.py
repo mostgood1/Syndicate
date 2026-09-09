@@ -717,3 +717,164 @@ def test_a_brand_new_file_with_no_old_copy_is_unaffected(monkeypatch):
     report = mod.record_daily_odds("kalshi", "mlb", "2026-08-25", [_row("m9")])
     assert report["status"] == "ok"
     assert report["opened"] == 1
+
+
+# --------------------------------------------------------------------------
+# Depth CAPTURE coverage -- the counter that makes `52a995f2` verifiable
+#
+# The daily book lives on the worker's mounted disk and is NOT in
+# `HOT_ARTIFACT_PATTERNS`, so `/api/ops/artifacts/export` cannot read it and
+# the files are too large to publish. The log counter is the only instrument.
+# It measures CAPTURE; nothing consumes the depth yet.
+# --------------------------------------------------------------------------
+
+
+def _depth_row(market_id="m1", yes=0.5, no=0.5, **depth):
+    return _row(market_id, yes=yes, no=no, **depth)
+
+
+_FULL_DEPTH = {
+    "yes_bid": 0.44, "no_bid": 0.52, "volume": 1200.0,
+    "volume_24h": 300.0, "open_interest": 88.0, "liquidity": 9100.0,
+}
+
+
+def test_a_point_with_all_six_fields_is_FULL_coverage():
+    report = mod.record_daily_odds(
+        "kalshi", "mlb", "2026-08-25", [_depth_row("m1", **_FULL_DEPTH)]
+    )
+    assert report["depth_points"] == 1
+    assert report["depth_blocks"] == 1
+    assert report["depth_nonzero"] == {field: 1 for field in mod.DEPTH_FIELDS}
+    assert report["depth_zero"] == {field: 0 for field in mod.DEPTH_FIELDS}
+    assert report["depth_absent"] == {field: 0 for field in mod.DEPTH_FIELDS}
+
+
+def test_a_genuine_zero_counts_PRESENT_and_never_absent():
+    """THE DISTINCTION THIS COUNTER EXISTS FOR. `open_interest == 0` is a
+    market nobody holds -- a real reading. Counting it as a miss would report
+    every untraded market as a capture failure, which is the exact confusion
+    `_as_depth` was written to prevent."""
+    row = dict(_FULL_DEPTH, open_interest=0.0, volume_24h=0)
+    report = mod.record_daily_odds("kalshi", "mlb", "2026-08-25", [_depth_row("m1", **row)])
+    assert report["depth_absent"]["open_interest"] == 0
+    assert report["depth_absent"]["volume_24h"] == 0
+    assert report["depth_zero"]["open_interest"] == 1
+    assert report["depth_zero"]["volume_24h"] == 1
+    assert report["depth_nonzero"]["open_interest"] == 0
+    # And the block was still stored: a zero is depth, so the point carries it.
+    assert report["depth_blocks"] == 1
+    from syndicate.features.shared.refresh_state_store import read_json_file
+    state = read_json_file(mod.daily_odds_path("kalshi", "mlb", "2026-08-25"))
+    assert state["markets"]["m1"]["points"][-1]["open_interest"] == 0.0
+
+
+def test_a_None_field_counts_ABSENT():
+    row = dict(_FULL_DEPTH, liquidity=None)
+    report = mod.record_daily_odds("kalshi", "mlb", "2026-08-25", [_depth_row("m1", **row)])
+    assert report["depth_absent"]["liquidity"] == 1
+    assert report["depth_zero"]["liquidity"] == 0
+    assert report["depth_nonzero"]["liquidity"] == 0
+    assert report["depth_absent"]["yes_bid"] == 0
+
+
+def test_a_point_with_no_depth_at_all_counts_absent_on_all_six_and_no_block():
+    report = mod.record_daily_odds("kalshi", "mlb", "2026-08-25", [_row("m1")])
+    assert report["depth_points"] == 1
+    assert report["depth_blocks"] == 0
+    assert report["depth_absent"] == {field: 1 for field in mod.DEPTH_FIELDS}
+
+
+def test_a_mixed_batch_sums_to_the_denominator_field_by_field():
+    """A coverage number without its denominator is this ledger's most
+    repeated error. Per field the three states must account for every point
+    written this tick, or the line cannot be read as a rate."""
+    rows = [
+        _depth_row("m1", **_FULL_DEPTH),
+        _depth_row("m2", **dict(_FULL_DEPTH, open_interest=0.0)),
+        _depth_row("m3", **dict(_FULL_DEPTH, liquidity=None, yes_bid=None)),
+        _row("m4"),
+        # Non-numeric and boolean are absences, not readings -- `_as_depth`.
+        _depth_row("m5", **dict(_FULL_DEPTH, volume="n/a", no_bid=True)),
+    ]
+    report = mod.record_daily_odds("kalshi", "mlb", "2026-08-25", rows)
+    assert report["depth_points"] == 5 == report["appended"]
+    assert report["depth_blocks"] == 4
+    for field in mod.DEPTH_FIELDS:
+        total = (
+            report["depth_nonzero"][field]
+            + report["depth_zero"][field]
+            + report["depth_absent"][field]
+        )
+        assert total == report["depth_points"], field
+    assert report["depth_zero"]["open_interest"] == 1
+    assert report["depth_absent"]["liquidity"] == 2   # m3 explicit None, m4 no depth
+    assert report["depth_absent"]["volume"] == 2      # m4 no depth, m5 "n/a"
+    assert report["depth_absent"]["no_bid"] == 2      # m4 no depth, m5 boolean
+
+
+def test_record_venue_book_sums_depth_across_the_per_sport_files():
+    rows = [
+        dict(_FULL_DEPTH, id="m1", yes=0.5, no=0.5, market="h2h",
+             sport="mlb", game_date="2026-08-25", family="KXTEST"),
+        dict(_FULL_DEPTH, id="m2", yes=0.5, no=0.5, market="h2h",
+             sport="nfl", game_date="2026-08-26", family="KXTEST",
+             open_interest=0.0, liquidity=None),
+    ]
+    report = mod.record_venue_book("kalshi", rows)
+    assert report["files"] == 2
+    assert report["depth_points"] == 2
+    assert report["depth_blocks"] == 2
+    assert report["depth_nonzero"]["yes_bid"] == 2
+    assert report["depth_zero"]["open_interest"] == 1
+    assert report["depth_absent"]["liquidity"] == 1
+
+
+def test_the_line_is_flat_whitespace_splittable_key_equals_value():
+    """The sibling `skipped_by_sport=`/`unparsed=` fields print dict reprs with
+    spaces in them. This is the field an operator greps to answer "is depth
+    landing", so it must survive a naive split."""
+    report = mod.record_daily_odds(
+        "kalshi", "mlb", "2026-08-25",
+        [_depth_row("m1", **dict(_FULL_DEPTH, open_interest=0.0, liquidity=None))],
+    )
+    line = mod.format_depth_coverage(report)
+    pairs = dict(token.split("=", 1) for token in line.split(" "))
+    assert set(pairs) == {
+        "depth_points", "depth_blocks", "depth_nonzero", "depth_zero", "depth_absent",
+    }
+    assert pairs["depth_points"] == "1"
+    assert pairs["depth_blocks"] == "1"
+    # Every field named every time, in DEPTH_FIELDS order, zeroes included.
+    for key in ("depth_nonzero", "depth_zero", "depth_absent"):
+        names = [part.split(":", 1)[0] for part in pairs[key].split(",")]
+        assert names == list(mod.DEPTH_FIELDS), key
+    counts = dict(
+        part.split(":", 1) for part in pairs["depth_zero"].split(",")
+    )
+    assert counts["open_interest"] == "1"
+    absent = dict(part.split(":", 1) for part in pairs["depth_absent"].split(","))
+    assert absent["liquidity"] == "1"
+
+
+def test_polymarket_supplies_no_depth_so_its_rows_fill_none_of_the_six():
+    """Item 5, stated as a test rather than a belief: the honest output for
+    this venue is an explicit absence, not a fabricated symmetric counter.
+    `_SLATE_STORAGE_FIELDS` has no bid, volume, open interest or liquidity."""
+    from syndicate.features.shared.polymarket_us_markets import _SLATE_STORAGE_FIELDS
+
+    for field in mod.DEPTH_FIELDS:
+        assert field not in _SLATE_STORAGE_FIELDS
+    rows = mod.polymarket_daily_rows([
+        {"slug": "mlb-mlb-nyy-bos-2026-08-25", "sportsMarketTypeV2": "MONEYLINE",
+         "outcomePrices": '["0.6","0.4"]'},
+    ])
+    assert rows and all(field not in rows[0] for field in mod.DEPTH_FIELDS)
+    report = mod.record_venue_book("polymarket", rows)
+    # Counted, and every field reads absent -- a fact about the fetch.
+    assert report["depth_points"] >= 1
+    assert report["depth_blocks"] == 0
+    assert report["depth_nonzero"] == {field: 0 for field in mod.DEPTH_FIELDS}
+    assert report["depth_absent"] == {
+        field: report["depth_points"] for field in mod.DEPTH_FIELDS
+    }

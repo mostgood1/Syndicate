@@ -391,6 +391,39 @@ def record_daily_odds(
     parsed = 0
     unparsed_by_family: dict[str, int] = {}
 
+    # DEPTH CAPTURE COVERAGE -- and read the scope of this before quoting it.
+    #
+    # THIS MEASURES CAPTURE ONLY. It says a depth number arrived on a point
+    # this tick wrote. It says NOTHING about whether anything CONSUMES it, and
+    # today nothing does: the request path reads asks, and the fill measurement
+    # these fields exist for has not been built. A consumer is still owed, and
+    # a green line here must never be cited as evidence that depth is "working"
+    # end to end. Twice on 2026-09-09 a feature was believed live on evidence
+    # that did not bear on it -- a fee multiplier that resolved 114 of 114 rows
+    # and changed nothing because its only consumer refuses pregame, and a file
+    # whose growth was credited to a writer that had not produced it.
+    #
+    # PER FIELD, NEVER AGGREGATED. The six come from six different Kalshi
+    # columns and fail independently: `open_interest_fp` going absent is a
+    # different fact from `liquidity_dollars` going absent, and one blended
+    # percentage would hide five healthy fields behind one broken one.
+    #
+    # THREE STATES, because two of them are indistinguishable in a naive
+    # "count the truthy values" pass and only one of them is a defect:
+    #   nonzero -- the venue reported a number
+    #   zero    -- the venue reported EXACTLY 0.0, which is a real reading (a
+    #              market nobody holds), not a miss. `_as_depth` keeps this
+    #              distinct from None on purpose; collapsing it here would undo
+    #              that and report every untraded market as a capture failure.
+    #   absent  -- None: the field was not in the payload.
+    # Per field the three sum to `depth_points`, so the denominator is always
+    # recoverable from the line itself.
+    depth_points = 0
+    depth_blocks = 0
+    depth_nonzero: dict[str, int] = {field: 0 for field in DEPTH_FIELDS}
+    depth_zero: dict[str, int] = {field: 0 for field in DEPTH_FIELDS}
+    depth_absent: dict[str, int] = {field: 0 for field in DEPTH_FIELDS}
+
     for row in rows:
         market_id = str((row or {}).get("id") or "").strip()
         if not market_id:
@@ -457,7 +490,26 @@ def record_daily_odds(
         # would have taken.
         point: dict[str, Any] = {"ts": stamp, "yes": yes, "no": no}
         depth = _depth_of(row)
-        if any(value is not None for value in depth.values()):
+        # Counted on the SAME pass that decides whether to store the block --
+        # no second traversal, no re-read, no re-parse. This runs every tick,
+        # so it is six dict increments per written point and nothing else.
+        depth_points += 1
+        carried_depth = False
+        for field in DEPTH_FIELDS:
+            value = depth[field]
+            if value is None:
+                depth_absent[field] += 1
+                continue
+            carried_depth = True
+            # `value == 0.0` and not `not value`: 0.0 is the reading we are
+            # deliberately keeping separate, and a falsy test would file it
+            # with the absences.
+            if value == 0.0:
+                depth_zero[field] += 1
+            else:
+                depth_nonzero[field] += 1
+        if carried_depth:
+            depth_blocks += 1
             # ALL SIX OR NONE. Once a venue has told us anything, a None inside
             # the block means "this venue does not report this one", which is a
             # different fact from the block being absent because the venue
@@ -567,6 +619,16 @@ def record_daily_odds(
         "unparsed_by_family": dict(
             sorted(unparsed_by_family.items(), key=lambda kv: -kv[1])
         ),
+        # DEPTH CAPTURE, CAPTURE ONLY -- see the counter block above for what
+        # this does and does not evidence. `depth_points` is the denominator
+        # (points this tick actually wrote); `depth_blocks` is how many of
+        # those carried any depth at all. Per field, nonzero+zero+absent ==
+        # depth_points.
+        "depth_points": depth_points,
+        "depth_blocks": depth_blocks,
+        "depth_nonzero": dict(depth_nonzero),
+        "depth_zero": dict(depth_zero),
+        "depth_absent": dict(depth_absent),
         "trimmed_points": trimmed_points,
         "trimmed_markets": trimmed_markets,
         # `#638`. REPORTED EVEN WHEN FALSE, like every other counter here: a
@@ -874,6 +936,12 @@ def record_venue_book(
     listed = parsed = opened = appended = 0
     unchanged = unpriced = skipped_no_id = stale_source_files = 0
     unparsed_by_family: dict[str, int] = {}
+    # Summed across the per-(sport, date) files, so the denominator on the log
+    # line is the whole tick rather than one file's slice.
+    depth_points = depth_blocks = 0
+    depth_nonzero: dict[str, int] = {field: 0 for field in DEPTH_FIELDS}
+    depth_zero: dict[str, int] = {field: 0 for field in DEPTH_FIELDS}
+    depth_absent: dict[str, int] = {field: 0 for field in DEPTH_FIELDS}
     for (sport, game_date), group in sorted(grouped.items()):
         result = record_daily_odds(
             venue, sport, game_date, group, source_fetched_at=source_fetched_at
@@ -895,6 +963,16 @@ def record_venue_book(
         skipped_no_id += int(result.get("skipped_no_id") or 0)
         if result.get("source_unchanged"):
             stale_source_files += 1
+        depth_points += int(result.get("depth_points") or 0)
+        depth_blocks += int(result.get("depth_blocks") or 0)
+        for bucket, key in (
+            (depth_nonzero, "depth_nonzero"),
+            (depth_zero, "depth_zero"),
+            (depth_absent, "depth_absent"),
+        ):
+            for field, count in (result.get(key) or {}).items():
+                if field in bucket:
+                    bucket[field] += int(count or 0)
         for family, count in (result.get("unparsed_by_family") or {}).items():
             unparsed_by_family[family] = unparsed_by_family.get(family, 0) + count
         files.append({
@@ -930,5 +1008,52 @@ def record_venue_book(
         "unparsed_by_family": dict(
             sorted(unparsed_by_family.items(), key=lambda kv: -kv[1])
         ),
+        # DEPTH CAPTURE ACROSS THE WHOLE TICK. Present for every venue,
+        # including the ones that supply nothing -- for those every field reads
+        # `absent == depth_points`, which is the honest reading and not a
+        # failure. What a CALLER prints is its own decision: see
+        # `format_depth_coverage`, and the note on `polymarket_daily_rows`
+        # about why that venue's line omits it.
+        "depth_points": depth_points,
+        "depth_blocks": depth_blocks,
+        "depth_nonzero": dict(depth_nonzero),
+        "depth_zero": dict(depth_zero),
+        "depth_absent": dict(depth_absent),
         "detail": files[:12],
     }
+
+
+def format_depth_coverage(report: Mapping[str, Any]) -> str:
+    """The depth-capture counters as flat, WHITESPACE-FREE `key=value` fields.
+
+    Rendered `field:count,field:count` rather than as a Python dict repr, which
+    is what the sibling `skipped_by_sport=` and `unparsed=` fields use. Those
+    embed `{'a': 1, 'b': 2}` -- spaces and quotes -- so a reader splitting the
+    line on whitespace has to special-case them. This is the one line an
+    operator greps to answer "is depth landing", so it stays splittable.
+
+    ALL SIX FIELDS ALWAYS, INCLUDING THE ZEROES, in `DEPTH_FIELDS` order: a
+    counter that appears only when it fires cannot distinguish "this field is
+    absent" from "this build does not have the counter".
+
+    CAPTURE ONLY. This proves a depth value was fetched and written. It is not
+    evidence that anything reads it.
+    """
+
+    def _render(counts: Any) -> str:
+        counts = counts if isinstance(counts, Mapping) else {}
+        return ",".join(
+            f"{field}:{int(counts.get(field) or 0)}" for field in DEPTH_FIELDS
+        )
+
+    return (
+        # THE DENOMINATOR FIRST. A coverage number without the count it is out
+        # of is this ledger's single most repeated error.
+        f"depth_points={int(report.get('depth_points') or 0)}"
+        f" depth_blocks={int(report.get('depth_blocks') or 0)}"
+        f" depth_nonzero={_render(report.get('depth_nonzero'))}"
+        # PRESENT, NOT MISSING. A zero here is a market nobody holds, which is
+        # a reading; it belongs with `nonzero` when you ask "did capture work".
+        f" depth_zero={_render(report.get('depth_zero'))}"
+        f" depth_absent={_render(report.get('depth_absent'))}"
+    )

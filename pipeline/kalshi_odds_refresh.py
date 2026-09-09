@@ -1546,6 +1546,7 @@ def _record_daily_book(markets: list[dict[str, Any]]) -> None:
     """
     try:
         from syndicate.features.shared.venue_daily_odds import (
+            format_depth_coverage,
             kalshi_daily_rows,
             record_venue_book,
         )
@@ -1589,6 +1590,21 @@ def _record_daily_book(markets: list[dict[str, Any]]) -> None:
         # THE COVERAGE GAP, BY FAMILY. Empty means every market Kalshi listed
         # for these sports was named, which has never yet been true.
         f" unparsed={report.get('unparsed_by_family')}"
+        # DEPTH CAPTURE, AND THIS IS THE ONLY INSTRUMENT THAT REPORTS IT.
+        # `52a995f2` began storing six Kalshi liquidity fields on every point
+        # and shipped no way to tell whether any of them landed:
+        # `reports/intelligence/venue_odds/` sits on the worker's mounted disk
+        # (`#637`) and is deliberately NOT in `HOT_ARTIFACT_PATTERNS`, so
+        # `/api/ops/artifacts/export` returns nothing for it and the files are
+        # too large and too fast-growing to publish -- the module's own note
+        # says "shrink the payload rather than raising the ceiling". A counter
+        # makes the state readable at a fixed, tiny cost instead.
+        #
+        # WHAT IT DOES NOT SAY: nothing here is evidence that the depth is
+        # CONSUMED. It is written and unread. The fill measurement it exists to
+        # enable is still owed, and this line must not be quoted as proof that
+        # one exists.
+        f" {format_depth_coverage(report)}"
         f" detail={report.get('detail')}",
         flush=True,
     )

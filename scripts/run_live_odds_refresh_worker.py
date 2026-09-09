@@ -1186,6 +1186,24 @@ def _polymarket_daily_book() -> None:
         # owed, and `SPORTS_MARKET_TYPE_PROP` is a mixed bucket, so the family
         # is the venue's own type rather than anything inferred from it.
         f" unparsed={report.get('unparsed_by_family')}"
+        # NO `depth_*` FIELDS HERE, DELIBERATELY, AND THIS IS THE REASON.
+        # Kalshi's `DAILY_BOOK` line carries depth-capture counters
+        # (`venue_daily_odds.format_depth_coverage`). This one does not,
+        # because Polymarket supplies none of the six: these rows are built
+        # from `GAME_SLATE_ARTIFACT`, whose per-market shape is
+        # `polymarket_us_markets._SLATE_STORAGE_FIELDS` (slug,
+        # sportsMarketTypeV2, outcomes, outcomePrices, line, gameStartTime,
+        # orderPriceMinTickSize, minimumTradeQty, orderable) -- no bid, no
+        # volume, no open interest, no liquidity, and the `_KEEP` trim upstream
+        # drops the rest first. `polymarket_daily_rows` fills none of
+        # `DEPTH_FIELDS` for exactly that reason.
+        #
+        # `record_venue_book` still RETURNS the counters for this venue, and
+        # they would read `absent == depth_points` on every field. Printing
+        # that every 180 seconds would be six numbers restating a fact about
+        # the fetch that this comment states once. If the slate ever starts
+        # carrying depth, map it in `polymarket_daily_rows` and add
+        # `format_depth_coverage(report)` here -- the report already has it.
         f" detail={report.get('detail')}",
         flush=True,
     )
