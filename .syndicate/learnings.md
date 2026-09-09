@@ -5010,3 +5010,45 @@ body. A tie is not a preference.
 - **How we found out:** checking the ancestry before sending the correction, because the claim was about somebody else's work. The same check would have taken ten seconds before publishing it the first time.
 - **The rule going forward:** on a shared fast-moving `main`, the tree is a variable between ANY two runs, and usually the largest one. Before attributing a flip to ordering, run `git log <base1>..<base2>` and `git merge-base --is-ancestor <candidate fix> <base>`. "Order-dependent" is a claim about a POPULATION of orderings and needs repeated runs on ONE tree; a single flip across two different trees is evidence about the trees. Corollary: the more experienced you are with the ordering explanation, the more available it becomes — I reached for it precisely because I had just been burned by the opposite error.
 - **Cost:** a wrong attribution published to two sessions and nearly a third, plus an inaccurate framing offered to the lane owner about their own closed work. Caught before delivery, by one ancestry check.
+
+## 2026-09-09 FORBIDDEN: relaying a peer's observation as a CORRECTION to a THIRD lane's work without measuring it yourself. The bar for a claim about someone else's CLOSED lane is higher than for one about your own, not lower `[lane data-tree-write-guard, caught by lane data-mirror-write-guard-sweep before it was sent]`
+
+Lane `data-mirror-write-guard-sweep` reported that
+`test_probability_differential::test_every_converter_is_registered_or_excused`
+PASSED in their run 8, having FAILED in their run 7. I had spun that test out to
+lane `probability-converter-registry` (session 359fa678) on the strength of it
+being red on `main`, and that lane had since CLOSED it. On their single
+observation I recommended they tell that session "order-dependent is the more
+accurate word" than its own "was RED on main and is now green".
+
+**I DID NOT CHECK, AND IT WAS WRONG.** The peer verified before sending and it does
+not survive one command:
+
+    f6c7a3ac  12:37:31  the converter fix
+    bdc6ed50  12:08:12  their run 7 base -> `merge-base --is-ancestor` NO
+    c9d6660d  13:47:28  their run 8 base -> `merge-base --is-ancestor` YES
+
+It passed because it was FIXED. That lane's framing was exactly right, its
+1-failed/10-passed baseline was the right measurement, and my "order-dependent"
+was an unforced attribution error about work I had not measured, belonging to a
+session that was not in the conversation to defend it.
+
+**WHY THIS IS WORSE THAN AN ORDINARY WRONG NUMBER.** A wrong reading about my own
+lane costs me a re-run. A wrong correction RELAYED into a third lane's closed
+record costs that session its verdict, and it arrives with a peer's authority
+attached rather than mine. The chain here was: their observation -> my
+recommendation -> their message to a third party. Two of the three links never
+measured it.
+
+**HOW TO APPLY.** Before relaying anything as a correction to another lane: run the
+discriminating command yourself, and if you cannot, relay the OBSERVATION with its
+provenance ("their run 8 passed; I have not checked why") and never the CONCLUSION.
+"Order-dependent" is a claim about a POPULATION of orderings and needs repeated
+runs on ONE tree — a single flip across two DIFFERENT trees is evidence about the
+trees. On a fast-moving shared `main` the tree is a variable between any two runs
+and usually the largest one: `git log <base1>..<base2>` first.
+
+Related, same day, same pair of sessions: [a-cache-key-coarser-than-its-predicate]
+and the rule that a control must be shown to FAIL in the arm where the thing is
+broken. Four non-discriminating controls between two sessions in one day; this is
+the fifth instance of trusting a reading that had not been made to fail.
