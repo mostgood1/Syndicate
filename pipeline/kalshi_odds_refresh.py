@@ -1438,6 +1438,35 @@ def record_and_report(markets: list[dict[str, Any]]) -> dict[str, Any]:
     return recorded
 
 
+def _ladder_summary(report: Mapping[str, Any]) -> dict[str, Any]:
+    """The ladder gate's headline counters, in one dict repr fit for a log line.
+
+    The full `ladder_monotonic` block carries per-market breakdowns and sampled
+    ladders; those are for a diagnostic, not for the line other tools grep. What
+    survives here is the minimum that makes the gate readable: the mode it ran
+    in, the DENOMINATOR (`ladders_checked`), what it found, what it did, and how
+    big the worst violation was in probability points.
+    """
+    block = report.get("ladder_monotonic")
+    if not isinstance(block, Mapping):
+        # An older join, or one that did not run the block. Says so rather than
+        # printing zeros -- a zero and an absent instrument read identically,
+        # and that confusion is what `learnings.md` calls instrument blindness.
+        return {"mode": "absent"}
+    return {
+        k: block.get(k)
+        for k in (
+            "mode",
+            "rungs_seen",
+            "ladders_checked",
+            "ladders_monotonic",
+            "ladders_violating",
+            "ladders_refused",
+            "worst_violation_points",
+        )
+    }
+
+
 def join_to_board(
     markets: list[dict[str, Any]],
     rows: list[dict[str, Any]],
@@ -1521,6 +1550,19 @@ def join_to_board(
         # smaller number, and quoting one against the other is the mistake this
         # field exists to stop.
         f" collapsed_bet_keys={collapsed_bet_keys}"
+        # THE LADDER GATE, SO IT IS MEASURABLE BEFORE IT IS TRUSTED. It ships
+        # in report-only (`SYNDICATE_KALSHI_LADDER_MONOTONIC` absent), which
+        # means the ONLY evidence it works is this line: `mode`,
+        # `ladders_checked` as the denominator, `ladders_violating` as the
+        # finding, `ladders_refused` as what it actually did, and
+        # `worst_violation_points` so a violation has a size and not just a
+        # count. A gate whose findings cannot be read from production is a
+        # gate nobody can decide to turn on.
+        #
+        # TRIMMED, NOT WHOLE. The report also carries `samples` and the
+        # per-market breakdowns; those are dict-of-dict and belong beside
+        # `reasons` in a diagnostic, not in the line other tools parse.
+        f" ladder_monotonic={_ladder_summary(report)}"
         # Named refusals: "Kalshi has nothing we bet" and "our join is broken"
         # must never share a number. That confusion is #505.
         #

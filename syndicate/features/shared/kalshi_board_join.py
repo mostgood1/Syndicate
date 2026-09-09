@@ -52,6 +52,7 @@ from typing import Any
 __all__ = [
     "normalize_person",
     "join_kalshi_to_board",
+    "kalshi_ladder_monotonic_mode",
     "kalshi_price_resolver",
     "kalshi_ticker_resolver",
 ]
@@ -142,6 +143,80 @@ REASON_UNDATABLE = "no_game_date_in_ticker"
 # tickets. See `kalshi_catalogue._SERIES_SEGMENT` for the list.
 REASON_SEGMENT_MISMATCH = "segment_has_no_matching_series"
 
+# --------------------------------------------------------------------------
+# LADDER MONOTONICITY -- the arithmetic check, ported from Polymarket
+# --------------------------------------------------------------------------
+#
+# `polymarket_board_join.py` has carried this since 2026-08-29 and Kalshi has
+# not: grepping `monoton` across `syndicate/`, `pipeline/` and `scripts/` on
+# 2026-09-09 matched Polymarket's join and its coverage audit, nothing else.
+# Kalshi is the venue that actually places orders, so the gap sat on the
+# expensive side.
+#
+# THE INVARIANT IS ARITHMETIC, NOT A MODEL OPINION. On one fixture, one market
+# and one side, the probabilities across the rungs of a ladder have a forced
+# ordering. If they contradict each other, the pairing that produced them is
+# untrustworthy at EVERY rung, which is why a violation condemns the whole
+# ladder rather than the rung that trips it -- picking a winner between two
+# contradicting rungs is the same guess this file refuses everywhere else.
+#
+# It needs no fair value and no reference book, so it sees exactly what the
+# price-comparison instruments cannot.
+REASON_LADDER_NOT_MONOTONIC = "ladder_not_monotonic"
+
+# Two rungs quoted a tick apart are noise, not a contradiction. THE SAME 0.02
+# POLYMARKET USES (`polymarket_board_join.py`, `if worst > 0.02`) -- deliberately
+# not re-derived, because two venues carrying two tolerances for one arithmetic
+# invariant is a difference nobody would be able to explain later.
+LADDER_TOLERANCE = 0.02
+
+# WHICH WAY EACH SIDE'S LADDER MUST RUN, and getting this backwards would
+# condemn every healthy ladder instead of the broken ones.
+#
+#   -1  probability must NOT RISE as the line rises
+#   +1  probability must NOT FALL as the line rises
+#
+# TOTALS. `over` at a higher line is a strictly harder outcome -- over 3.5 runs
+# cannot be likelier than over 2.5 in the same game -- so P(over) is
+# non-increasing. `under` is its complement and runs the other way.
+#
+# SPREADS RUN THE OPPOSITE WAY FROM TOTALS, and this is the half of the rule
+# that is easy to get wrong. The board writes a spread as a SIGNED line against
+# one club: that club's row at line `L` pays when its margin beats `-L`
+# (`TEX -1.5` needs a 2-run win; `TEX +1.5` survives a 1-run loss). So as `L`
+# RISES the threshold FALLS and the bet gets EASIER: P(cover) is
+# NON-DECREASING in the signed line. Both board sides carry their own signed
+# line, so `home` and `away` take the same +1 -- the mirror is already in the
+# sign of the number, not in the direction of the test.
+#
+# This is also why a spread ladder legitimately draws rungs from markets naming
+# EITHER club: `_side_for_team` has already turned "Texas wins by over 1.5" into
+# a `TEX -1.5` row and "…" into the `CWS +1.5` row. Both are rungs of the same
+# away-side ladder and must be ordered together.
+_LADDER_SIDE_DIRECTION: dict[str, int] = {
+    "over": -1,
+    "o": -1,
+    "under": +1,
+    "u": +1,
+    "home": +1,
+    "away": +1,
+}
+
+# MARKETS WHOSE LADDER IDENTITY THIS JOIN CANNOT STATE, so they are skipped by
+# name rather than checked on a key that does not name the bet.
+#
+# A team total is one club's runs. The board row identity this join keys on
+# (`_row_key`: event, market, player, line, side, segment) has NO slot for the
+# club, and `_event_key` already collapses both clubs' `team_totals` rows at one
+# line into a single list. Grouping a ladder on that key would put the home
+# club's `over` rungs and the away club's `over` rungs into ONE ladder and
+# manufacture a violation out of two individually clean books -- the precise
+# failure Polymarket's join records for player props ("a join key for a player
+# prop that omits the player is a defect that looks like a working join").
+#
+# Counted as `rungs_skipped_ambiguous_subject` rather than dropped silently.
+_LADDER_AMBIGUOUS_MARKETS = frozenset({"team_totals", "team_total"})
+
 # How many DISTINCT SERIES get a sample title. One per series, so the bound is
 # on series rather than on samples.
 #
@@ -164,6 +239,32 @@ def game_lines_enabled() -> bool:
 
     raw = str(os.environ.get("SYNDICATE_KALSHI_GAME_LINES") or "").strip().lower()
     return raw in {"1", "true", "yes", "on"}
+
+
+def kalshi_ladder_monotonic_mode() -> str:
+    """`off` | `report` | `enforce`. **Absent means `report`.**
+
+    REPORT-ONLY FIRST IS THE HOUSE RULE, and it is not caution for its own
+    sake: a gate that starts refusing on the deploy that introduces it produces
+    a reading -- "ladders refused: 41" -- that cannot distinguish a real
+    integrity problem in the book from a direction rule written backwards. One
+    slate of counts against an unchanged board settles that for free, and then
+    `SYNDICATE_KALSHI_LADDER_MONOTONIC=1` turns the same code into a gate with
+    no second change to review.
+
+    So absent counts and stamps and refuses NOTHING: `matches` is byte-identical
+    to a build without this check, and `reasons` gains no key.
+
+    `off` is a real off switch -- the check does not run at all -- and is
+    distinct from absent, which runs it and reports. Read per call rather than
+    at import so the mode can move without a code deploy.
+    """
+    raw = str(os.environ.get("SYNDICATE_KALSHI_LADDER_MONOTONIC") or "").strip().lower()
+    if raw in {"1", "true", "yes", "on", "enforce"}:
+        return "enforce"
+    if raw in {"0", "false", "no", "off"}:
+        return "off"
+    return "report"
 
 
 # Market-type tokens a soccer series ticker ends with. Longest first, because
@@ -626,6 +727,41 @@ def _row_key(row: Mapping[str, Any]) -> tuple[str, str, str, float, str, str] | 
     )
 
 
+def _ladder_key(row: Mapping[str, Any]) -> tuple[str, str, str, str, str] | None:
+    """The rungs of one ladder: `_row_key` with the LINE taken out.
+
+    That is the point of it. `_row_key` IS this file's statement of what a bet
+    is; a ladder is the set of bets that differ only in the line, so removing
+    exactly that one field gives the grouping without inventing a second
+    vocabulary that could drift from the first.
+
+    Keeping every other field is load-bearing:
+
+    * `event_id` -- two games' totals are not one ladder.
+    * `player` -- Tatis's hits rungs and Machado's must not sort together.
+      Polymarket paid for this one already; the note lives on `_lkey` there.
+    * `side` -- `over` and `under` run in opposite directions, so a merged
+      ladder would be non-monotonic by construction.
+    * `segment` -- a first-5-innings `over 4.5` is not a rung of the full-game
+      ladder; `_row_market` strips the segment from the market name, so without
+      this the two would sort into one.
+
+    None when the row cannot be keyed at all, when its side has no direction
+    (an `h2h` row is `home`/`away` with no line -- `_row_key` returns a None
+    line for it, and that is caught by the caller), or when the market is one
+    whose subject this key cannot name -- see `_LADDER_AMBIGUOUS_MARKETS`.
+    """
+    key = _row_key(row)
+    if key is None:
+        return None
+    event_id, market, player, _line, side, segment = key
+    if side not in _LADDER_SIDE_DIRECTION:
+        return None
+    if market in _LADDER_AMBIGUOUS_MARKETS:
+        return None
+    return (event_id, market, player, side, segment)
+
+
 def _row_price(row: Mapping[str, Any]) -> float | None:
     """The best book price on a board row, or None. American odds.
 
@@ -967,6 +1103,52 @@ def join_kalshi_to_board(
 
     def _refuse(reason: str) -> None:
         reasons[reason] = reasons.get(reason, 0) + 1
+
+    # LADDER RUNGS, COLLECTED AS THE MATCHES ARE BUILT -- the same place
+    # `polymarket_board_join` collects them, and for the same reason: the check
+    # has to run over what the join actually PRICED. Reading the board rows
+    # instead would test a population no order can be placed from, and would
+    # miss the case this exists for, which is two Kalshi contracts disagreeing
+    # with each other after the half-point conversion.
+    #
+    # `(line, probability, index into `matches`)`. The index is what lets a
+    # violation condemn the whole ladder without a second join.
+    ladder_points: dict[
+        tuple[str, str, str, str, str], list[tuple[float, float, int]]
+    ] = {}
+    # Rungs the check could not take, by reason. Named and reported rather than
+    # dropped: a ladder count with no skip count cannot say whether "0 ladders
+    # refused" means a clean book or an instrument that saw nothing.
+    ladder_skips: dict[str, int] = {}
+
+    def _note_rung(row: Mapping[str, Any], match: Mapping[str, Any]) -> None:
+        market_name = _row_market(row)
+        if market_name in _LADDER_AMBIGUOUS_MARKETS:
+            ladder_skips["ambiguous_subject"] = (
+                ladder_skips.get("ambiguous_subject", 0) + 1
+            )
+            return
+        key = _ladder_key(row)
+        if key is None:
+            ladder_skips["unkeyable"] = ladder_skips.get("unkeyable", 0) + 1
+            return
+        try:
+            line = float(match.get("line"))
+            probability = float(match.get("kalshi_probability"))
+        except (TypeError, ValueError):
+            # A moneyline has no line, and a market can carry an American price
+            # with no probability field. Neither is a defect and neither is a
+            # rung; both are counted so the denominator stays readable.
+            ladder_skips["no_line_or_probability"] = (
+                ladder_skips.get("no_line_or_probability", 0) + 1
+            )
+            return
+        if probability != probability or line != line:  # NaN
+            ladder_skips["no_line_or_probability"] = (
+                ladder_skips.get("no_line_or_probability", 0) + 1
+            )
+            return
+        ladder_points.setdefault(key, []).append((line, probability, len(matches) - 1))
 
     wanted_date = str(selected_date or "").strip()[:10]
 
@@ -1384,6 +1566,7 @@ def join_kalshi_to_board(
                         "game_line": True,
                     }
                 )
+                _note_rung(row, matches[-1])
             continue
 
         series = verdict.get("series")
@@ -1483,6 +1666,131 @@ def join_kalshi_to_board(
                     "model_edge_pct": row.get("model_edge_pct"),
                 }
             )
+            _note_rung(row, matches[-1])
+
+    # ----------------------------------------------------------------------
+    # THE LADDER GATE. See `REASON_LADDER_NOT_MONOTONIC` for the invariant and
+    # `_LADDER_SIDE_DIRECTION` for the direction rule.
+    # ----------------------------------------------------------------------
+    #
+    # TRUNCATION IS NOT INCOHERENCE, and this is the distinction the whole
+    # block is built around. `pipeline/kalshi_odds_refresh.py` logs a
+    # `KXNCAAFSPREAD` ladder arriving as 400 rungs of 1,994 -- a real, logged
+    # defect -- and a ladder that is a CONTIGUOUS SUBSET of the venue's book is
+    # still internally consistent. So the check compares only the rungs it
+    # HAS, pairwise in line order, and never reasons about a gap: a missing
+    # 2.5 between a 1.5 and a 3.5 changes nothing, because the invariant holds
+    # between any two rungs regardless of what sits between them. There is
+    # deliberately no "expected rung count" anywhere in here.
+    ladder_mode = kalshi_ladder_monotonic_mode()
+    ladders_checked = 0
+    ladders_monotonic = 0
+    ladders_single_rung = 0
+    ladders_duplicate_line = 0
+    ladder_violations: dict[str, int] = {}
+    ladder_worst_points: dict[str, float] = {}
+    ladder_samples: list[dict[str, Any]] = []
+    drop_indices: set[int] = set()
+    worst_points_overall = 0.0
+    if ladder_mode != "off":
+        for (event_id, market_name, player, side_name, segment), points in (
+            ladder_points.items()
+        ):
+            lines = {round(line, 6) for line, _p, _i in points}
+            if len(lines) < 2:
+                # One rung is a price, not a ladder. Counted, because "0
+                # violations" over a book that is ALL single rungs is a very
+                # different reading from "0 violations" over 300 real ladders.
+                ladders_single_rung += 1
+                continue
+            if len(lines) != len(points):
+                # Two contracts priced the SAME board row -- a venue
+                # disagreement, not an ordering error, and choosing between
+                # them to build the sequence would be a guess. Skipped by name.
+                ladders_duplicate_line += 1
+                continue
+            ladders_checked += 1
+            direction = _LADDER_SIDE_DIRECTION[side_name]
+            ordered = sorted(points, key=lambda t: t[0])
+            worst = 0.0
+            worst_pair: tuple[float, float] | None = None
+            for (l_a, p_a, _ia), (l_b, p_b, _ib) in zip(ordered, ordered[1:]):
+                # `direction < 0` (over): p must not RISE, so a rise is the
+                # violation. `direction > 0` (under, and every spread side):
+                # p must not FALL, so a fall is the violation.
+                delta = (p_b - p_a) if direction < 0 else (p_a - p_b)
+                if delta > worst:
+                    worst = delta
+                    worst_pair = (l_a, l_b)
+            # The counter key aggregates per MARKET FAMILY -- the ladder key
+            # carries the player token and the event, and counting on those
+            # would turn this summary into a roster of every prop on the slate.
+            counter_key = f"{market_name}|{side_name}"
+            if worst > LADDER_TOLERANCE:
+                ladder_violations[counter_key] = ladder_violations.get(counter_key, 0) + 1
+                points_worst = round(worst * 100.0, 2)
+                worst_points_overall = max(worst_points_overall, points_worst)
+                ladder_worst_points[counter_key] = max(
+                    ladder_worst_points.get(counter_key, 0.0), points_worst
+                )
+                drop_indices.update(i for _l, _p, i in points)
+                if len(ladder_samples) < 6:
+                    ladder_samples.append(
+                        {
+                            "event_id": event_id[:16],
+                            "market": market_name,
+                            "player": player or None,
+                            "side": side_name,
+                            "segment": segment,
+                            # PROBABILITY POINTS, not a fraction. A magnitude
+                            # quoted in two units across two venues is a
+                            # magnitude nobody can compare.
+                            "worst_points": round(worst * 100.0, 2),
+                            "worst_between_lines": worst_pair,
+                            "ladder": [(l, round(p, 4)) for l, p, _i in ordered][:8],
+                        }
+                    )
+            else:
+                ladders_monotonic += 1
+
+    # REPORT-ONLY REFUSES NOTHING. `drop_indices` is computed either way -- the
+    # count is the whole point of the report mode -- but only `enforce` acts on
+    # it, so with the flag absent `matches` is byte-identical to a build
+    # without this block and `reasons` gains no key.
+    ladders_refused = 0
+    matches_refused = 0
+    if ladder_mode == "enforce" and drop_indices:
+        ladders_refused = sum(ladder_violations.values())
+        matches_refused = len(drop_indices)
+        for _ in range(matches_refused):
+            _refuse(REASON_LADDER_NOT_MONOTONIC)
+        matches = [m for i, m in enumerate(matches) if i not in drop_indices]
+
+    ladder_monotonic_report: dict[str, Any] = {
+        "mode": ladder_mode,
+        "rungs_seen": sum(len(v) for v in ladder_points.values()),
+        "ladders_seen": len(ladder_points),
+        "ladders_checked": ladders_checked,
+        "ladders_single_rung": ladders_single_rung,
+        "ladders_duplicate_line": ladders_duplicate_line,
+        "ladders_monotonic": ladders_monotonic,
+        "ladders_violating": sum(ladder_violations.values()),
+        # What the gate ACTUALLY DID, which in `report` mode is nothing. Held
+        # apart from `ladders_violating` so the two can never be read as one:
+        # "we found 12" and "we dropped 12" are the same number only once the
+        # flag is on.
+        "ladders_refused": ladders_refused,
+        "matches_refused": matches_refused,
+        "worst_violation_points": worst_points_overall,
+        "violations_by_market": dict(
+            sorted(ladder_violations.items(), key=lambda kv: -kv[1])
+        ),
+        "worst_points_by_market": dict(
+            sorted(ladder_worst_points.items(), key=lambda kv: -kv[1])
+        ),
+        "rungs_skipped": dict(sorted(ladder_skips.items())),
+        "samples": ladder_samples,
+    }
 
     # SAMPLES FROM BOTH SIDES, so a zero-match join says WHICH FIELD disagrees.
     # `no_matching_board_row: 132` alone is exactly the `#505` report -- a count
@@ -1533,6 +1841,11 @@ def join_kalshi_to_board(
         # nobody can see the frequency of is one nobody will revisit. Measured
         # 1 of 78 collapsed keys on a 553-row MLB slate.
         "alt_main_collisions": alt_main_collisions,
+        # THE LADDER GATE'S OWN COUNTS. Reported in every mode, `off` included,
+        # so the mode itself is a reading rather than a belief -- "the gate is
+        # in report-only" is exactly the kind of claim `learnings.md` says must
+        # be checked, not assumed.
+        "ladder_monotonic": ladder_monotonic_report,
         "kalshi_key_sample": kalshi_keys,
         # One refused title per series: what grammar is missing, not how many.
         "unreadable_titles": unreadable_titles,
