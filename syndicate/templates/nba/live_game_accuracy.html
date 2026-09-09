@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>NBA Betting - Live Game Lens Accuracy</title>
   <meta name="description" content="Aggregated settled BET performance for Live Game Lens (Totals + ATS)." />
-  <link rel="icon" href="data:,">
+  {# The wordmark's S, same asset base.html serves. These pages are
+     standalone shells with their own <head>; they used to blank the
+     favicon with `data:,` because there was no real one to point at. #}
+  <link rel="icon" href="{{ url_for('static', filename='shared/favicon-32.png') }}" sizes="32x32" type="image/png">
+  <link rel="icon" href="{{ url_for('static', filename='shared/favicon-16.png') }}" sizes="16x16" type="image/png">
   <meta http-equiv="Cache-Control" content="no-store" />
   <meta name="color-scheme" content="dark light" />
   <style>

@@ -718,6 +718,14 @@ death, never life — do not invert it.
 - Blocked by: none. No OPEN lane claims either file (checked against `origin/main`).
 
 
+### brand-mascot-logo — OPEN — opened 2026-09-09 — session 72982c61-1f52-42f6-b551-eafdbcaa7a1b — **integrate the new mascot crest ALONGSIDE the existing wordmark, split by RENDER SIZE, not by taste**
+- Goal `[user: "keep our original Syndicate logo BUT integrate this version as well - find the smart places for usage between this logo and our more understated S logo"]`: give each mark the slots it can actually carry. Source art `~/Downloads/SyndicateLogov2.png`, 1254x1254 RGB.
+- Measurement that decided the split (contact sheets at 512/128/64/32/16, `scratchpad/brand/`): the mascot is a full illustration and is unreadable at 32px and mud at 16px — a tight hood-only crop is no better. The wordmark's S, squared, is clean at 32 and legible at 16 on BOTH a light and a dark tab strip. So: **S owns browser chrome, mascot owns every large slot.**
+- Two real defects found on the way, both pre-existing: `base.html` declared **no `<link rel="icon">` at all**, and `manifest.json`'s only icon was the 815x193 WORDMARK at `sizes: "any"`, which an installer letterboxes. There were also **no `og:`/`twitter:` tags anywhere**, so a pasted board URL previewed as bare text.
+- Files: `syndicate/templates/shared/base.html`, `syndicate/templates/syndicate.html`, `syndicate/static/shared/manifest.json`, `scripts/build_brand_assets.py` (NEW), and NEW assets under `syndicate/static/shared/`: `favicon.svg`, `favicon-16.png`, `favicon-32.png`, `favicon.ico`, `apple-touch-icon.png`, `syndicate-mascot.png`, `syndicate-mascot-192.png`, `syndicate-crest.jpg`, `syndicate-og.jpg`. `syndicate-logo.png/.svg` UNCHANGED — the header lockup keeps the wordmark on every page.
+- Presentation-only. No sim, no artifact, no worker, no `render.yaml`. This lane cannot cause a `blueprint_sync`.
+- Verification: pages render with the icons and meta served (browser smoke, not a unit test) — the mark must be seen, not asserted.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

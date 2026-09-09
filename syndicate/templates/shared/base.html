@@ -4,8 +4,55 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#040c14" />
+
+    {# Two marks, two jobs, split on the only criterion that matters here --
+       the size the slot actually renders at.
+
+       The wordmark's "S" is the ONLY one of the pair that survives a 16px
+       tab strip. The mascot crest is a full illustration (hood, crown,
+       ball, neon smoke) and goes to mud below ~64px; that was measured on a
+       16/32/64/128 contact sheet, and on a tight hood-only crop too, before
+       any of this was wired. So the S owns the browser chrome and the
+       mascot owns every slot that renders large: home screens, install
+       prompts, link previews.
+
+       Prior state was worse than "no mascot": there was no <link rel=icon>
+       at all, so tabs fell back to the browser default, and manifest.json's
+       one icon was the 815x193 WORDMARK declared `sizes: "any"` -- which an
+       installer letterboxes into a thin sliver on a plain plate.
+
+       NO `favicon.svg`, deliberately. The obvious source for one is
+       `syndicate-logo.svg`, and rendering it at 240px beside the PNG shows
+       it is NOT the logo -- it draws two parallel bars where the real mark
+       is an interlocking S, and sets the wordmark in Arial. Nothing in the
+       app references that file; every surface uses the PNG. So these
+       favicons are cropped from the PNG, and a scalable icon would need the
+       real mark re-vectorised first. #}
+    <link rel="icon" href="{{ url_for('static', filename='shared/favicon-48.png') }}" sizes="48x48" type="image/png" />
+    <link rel="icon" href="{{ url_for('static', filename='shared/favicon-32.png') }}" sizes="32x32" type="image/png" />
+    <link rel="icon" href="{{ url_for('static', filename='shared/favicon-16.png') }}" sizes="16x16" type="image/png" />
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='shared/apple-touch-icon.png') }}" />
     <link rel="manifest" href="{{ url_for('static', filename='shared/manifest.json') }}" />
     <title>{% block title %}Syndicate{% endblock %}</title>
+
+    {# Link previews carried no image at all, so a board URL pasted into a
+       chat rendered as a bare line of text. The card pairs both marks: the
+       wordmark carries the NAME (the mascot art contains its own
+       "SYNDICATE" lettering, which is why the card crops above it -- two
+       wordmarks on one image reads as a mistake), the crest carries the
+       personality. Rebuild with scripts/build_brand_assets.py. #}
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Syndicate" />
+    <meta property="og:title" content="{{ self.title() }}" />
+    <meta property="og:description" content="{% block social_description %}Multi-sport betting intelligence: sim-backed edges, live boards, and portfolio tracking.{% endblock %}" />
+    <meta property="og:url" content="{{ request.base_url }}" />
+    <meta property="og:image" content="{{ url_for('static', filename='shared/syndicate-og.jpg', _external=True) }}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="{{ self.title() }}" />
+    <meta name="twitter:description" content="{{ self.social_description() }}" />
+    <meta name="twitter:image" content="{{ url_for('static', filename='shared/syndicate-og.jpg', _external=True) }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='shared/app.css') }}" />
     {% block extra_head %}{% endblock %}
   </head>
