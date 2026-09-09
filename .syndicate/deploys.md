@@ -28393,3 +28393,48 @@ having IGNORED the variable. Gunicorn 21.2 documents `GUNICORN_CMD_ARGS`, so
 "read and applied" is likely; likely is not verified.
 
 Board unaffected: 1,670 cards after the deploy. Claim released after this entry.
+
+### refresh-worker 5b5ad529 — pricing-plane-v1 deploy 3 (P1b exchange gates, flag still `sharp`): the gates fire and the exchange tier is STILL not a fair — tight-but-wrong dominates. Decision: `sharp_only` `[lane pricing-plane-v1, deploy dep-dag9onp5efls73a1qrv0, fired 2026-09-08T23:38:07Z, live 23:43:54Z, substrate render]`
+
+Preflight CLEAR after the 23:23:45Z next-day MLB sim finished (exit 0). Claim held
+by restore-measurement. Same env as deploy 2 (`SYNDICATE_FAIR_ANCHOR=sharp`); P1b's
+two gates at their defaults (hold ≤ 4.0%, row books ≥ 3).
+
+**verify 1 — the gates reach the board, PASSING.** First post-boot shortlist
+(`limit=2000`, read 2026-09-09T00:04:03Z), 2,000 rows, 2,000 carrying
+`fair_anchor_hold_pct`:
+
+    fair_method   consensus 1,657   exchange_mid 159 (was 263)   sharp_anchor 60   book_margin_model 124
+    refusals      exchange_hold_too_wide 79   exchange_uncorroborated 22
+
+**verify 2 — by anchor book, sharp-minus-median (pp) and the anchor's own hold:**
+
+    kalshi      n=66  mean -0.691  mean|d| 3.089  >2pp 38  >5pp 14   hold mean 1.41%  max 3.84%
+    pinnacle    n=60  mean +0.114  mean|d| 1.640  >2pp 16  >5pp 3    hold mean 4.51%  max 7.26%
+    prophetx    n=38  mean +1.129  mean|d| 2.819  >2pp 24  >5pp 3    hold mean 1.78%  max 3.60%
+    polymarket  n=35  mean +0.024  mean|d| 0.935  >2pp 4   >5pp 0    hold mean 2.30%  max 3.91%
+    novig       n=13  mean|d| 1.523  >5pp 1 · matchbook n=4  0.797 · betfair_ex_eu n=3  0.328
+    all anchored n=219  mean +0.020  median +0.144  p10 -4.20  p90 +3.31  |d|>2pp 83  |d|>5pp 21
+
+Deploy 2's Kalshi read mean|d| 2.699 on 137 rows; after the gates it reads 3.089 on
+66. **The hold gate removed rows but did not select the accurate ones: the
+survivors hold 1.4% and still sit 3 pp from the median.** That is the
+tight-but-wrong case P1b's own report named as the thing its gate cannot catch.
+Largest survivors: a Kalshi 3-way away leg at +11.5 pp (row books 2 on the
+quote's per-side count; the gate reads the ROW-level count, books on the line at
+all, which is a definitional choice not a defect), a Kalshi alt-under 3.5 at
+-9.8 pp (hold 3.84%), a Kalshi full total under 8.5 at -8.5 pp on a 19-book row
+(hold 1.02%). **Pinnacle also degraded at this hour** (mean|d| 0.885 → 1.640, 3 rows
+past 5 pp, holds up to 7.26%): 00:04Z is an in-play/finished MLB slate where
+Pinnacle's own pairs widen, and its tier is ungated on hold by design.
+
+**DECISION (on this reading):** `SYNDICATE_FAIR_ANCHOR=sharp_only` set on
+refresh-worker at 00:04Z — Pinnacle tier then the consensus chain, no exchange tier
+— to be injected by deploy 4 after the 25-min spacing (≥ 00:08:54Z). Reasons: the
+exchange tier fails both readings; every exchange row's counterfactual median is
+stamped, so nothing is lost; the plan's rule is that a flag stays only while a
+reading supports it. **Owed next (P1c):** a mid-vs-median DISTANCE gate for the
+exchange tier (the discriminator the hold is not), a hold cap on the Pinnacle tier,
+and a re-read on a DAYTIME pregame board rather than a midnight in-play one before
+any exchange row anchors again. The 3-day CLV reading for the sharp tier proceeds
+on Pinnacle rows only, split by `fair_anchor_book`.
