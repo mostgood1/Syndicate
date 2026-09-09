@@ -33,12 +33,28 @@
       border: 1px solid var(--cards-line-strong);
       box-shadow: 0 14px 32px rgba(0, 0, 0, 0.42);
     }
-    /* Dropped, not stacked, below 900px -- same rule as the hero. This is a
-       navigation page: pushing six-plus tiles down by ~170px on a phone
-       costs the visitor the thing they came for. */
+    /* Stacked below 900px rather than dropped `[user decision, 2026-09-09]`.
+       It diverges from the /syndicate hero on purpose: that page has a
+       question input that must stay on the first screen, and this one has
+       nothing above the tiles to protect. The card chrome is still shed so
+       the h1 and intro sit flush exactly as they did before the masthead
+       existed, and the art becomes a short banner -- capped at 132px rather
+       than the 256px its own aspect ratio would take at 375px wide, which
+       would be most of a phone screen before a single tile. */
     @media (max-width: 900px) {
-      .market-board-hub__masthead { grid-template-columns: 1fr; padding: 0; border: 0; background: none; box-shadow: none; }
-      .market-board-hub__art { display: none; }
+      .market-board-hub__masthead {
+        grid-template-columns: 1fr;
+        gap: 16px;
+        padding: 0;
+        border: 0;
+        background: none;
+        box-shadow: none;
+      }
+      /* Height tracks width, because `cover` on a fixed-height box crops
+         harder the wider it gets: a flat 148px looked right at 375 and at
+         820 had cropped past the eyes to crown-and-shoulders. The clamp
+         keeps the eyes inside the window across the whole stacked range. */
+      .market-board-hub__art { min-height: 0; height: clamp(132px, 30vw, 240px); object-position: center 26%; }
     }
     .market-board-hub__intro { color: var(--cards-text-soft); margin: 0; max-width: 640px; }
     .market-board-hub__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
