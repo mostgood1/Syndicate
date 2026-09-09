@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 948 rules `[generated]`
+## Index — 949 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5061,3 +5061,34 @@ Related, same day, same pair of sessions: [a-cache-key-coarser-than-its-predicat
 and the rule that a control must be shown to FAIL in the arm where the thing is
 broken. Four non-discriminating controls between two sessions in one day; this is
 the fifth instance of trusting a reading that had not been made to fail.
+
+## 2026-09-09 FORBIDDEN: appending a rule to `learnings.md` without running `build_learnings_index.py`. The rule is then INVISIBLE to the index every session reads, and nothing anywhere reports the drift `[lane data-tree-write-guard, found while correcting an unrelated entry]`
+
+Measured 2026-09-09: `grep -c` for my freshly appended rule in
+`.syndicate/learnings_index.md` returned **0**. I had appended to `learnings.md`
+and never regenerated. Running `py -3 scripts/build_learnings_index.py` did not
+add one rule, it added **31** -- the index header went **917 -> 948**. So this is
+not my slip alone; it is the steady state of a file several sessions append to and
+nobody regenerates.
+
+**WHY IT MATTERS MORE THAN A STALE COUNT.** The index is the file the session-start
+digest and every "what do we already know about X" search actually reads;
+`learnings.md` itself is 948 rules and no session reads it whole. A rule that is
+in `learnings.md` and not in the index has been WRITTEN and not PUBLISHED. It will
+be rediscovered the expensive way, which is precisely what the ledger exists to
+prevent -- and the author has no signal, because the append succeeded, the commit
+succeeded, `git status` is clean, and the diff shows exactly the lines intended.
+
+**THE SHAPE, past this instance: A GENERATED VIEW THAT IS NOT REBUILT BY THE WRITE
+THAT INVALIDATES IT WILL DRIFT SILENTLY, AND THE DRIFT IS INVISIBLE FROM THE SIDE
+THAT WRITES.** Same family as the `state.md` subject index, which at least refuses
+(`split_state.py --reindex` is documented as required when adding a subject) and
+which the same day was found missing two subjects that existed in a part.
+
+**HOW TO APPLY.** Append and regenerate in ONE step, and verify by reading the
+GENERATED view rather than the source. **Grep a SHORT distinctive substring, not
+the heading:** the index truncates each heading with an ellipsis, so my own first
+check used the full heading, returned 0 against an index that DID contain the rule,
+and read as the very failure it was testing for. A false alarm in the same family
+as the four non-discriminating controls this pair of sessions logged the same day --
+the pattern has to be able to match before its 0 means anything.

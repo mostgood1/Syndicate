@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 948 rules `[generated]`
+## Index — 949 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 373**
+**FORBIDDEN — 374**
 
 - [2026-09-06 — FORBIDDEN: instrumenting join A, reading it, and concluding about a value…](#2026-09-06-forbidden-instrumenting-join-a-reading-it-and-concluding-about-a-value-written-by-join-b-name-the-writer-of-the-field-in-the-falsification-test-itself-lane-mlb-first5-kalshi-fanin-mismatch-vs-15410ca7)
 - [2026-09-06 — FORBIDDEN: concluding a guard covers a symptom because the guard is deploy…](#2026-09-06-forbidden-concluding-a-guard-covers-a-symptom-because-the-guard-is-deployed-firing-and-named-after-it-find-the-code-that-wrote-the-field-you-are-looking-at-lane-mlb-first5-kalshi-fanin-mismatch)
@@ -193,6 +193,7 @@
 - [2026-09-09 FORBIDDEN: a ledger-append check that only counts DELETIONS. The merge hazar…](#2026-09-09-forbidden-a-ledger-append-check-that-only-counts-deletions-the-merge-hazard-is-added-lines-nobody-wrote-today-lane-data-mirror-write-guard-sweep-local_74f19a18)
 - [2026-09-09 FORBIDDEN: attributing a test's red->green flip to ORDERING without first ch…](#2026-09-09-forbidden-attributing-a-tests-red-green-flip-to-ordering-without-first-checking-what-landed-between-the-two-runs-i-made-this-error-in-both-directions-in-one-day-lane-data-mirror-write-guard-sweep)
 - [2026-09-09 FORBIDDEN: AMPLIFYING a peer's unverified CONCLUSION into a relay to a THIRD…](#2026-09-09-forbidden-amplifying-a-peers-unverified-conclusion-into-a-relay-to-a-third-lane-without-measuring-it-yourself-the-bar-for-a-claim-about-someone-elses-closed-lane-is-higher-than-for-one-about-your-own-not-lower-lane-data-tree-write-guard-caught-by-lane-data-mirror-write-guard-sweep-before-it-was-sent)
+- [2026-09-09 FORBIDDEN: appending a rule to `learnings.md` without running `build_learnin…](#2026-09-09-forbidden-appending-a-rule-to-learningsmd-without-running-build_learnings_indexpy-the-rule-is-then-invisible-to-the-index-every-session-reads-and-nothing-anywhere-reports-the-drift-lane-data-tree-write-guard-found-while-correcting-an-unrelated-entry)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
