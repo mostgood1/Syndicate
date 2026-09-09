@@ -183,3 +183,71 @@ not treated as a target.
   quarters. Lane `s4a-ncaaf-drive-fit` is fitting it under the rule above and is
   instructed to recommend AGAINST flipping if the fit trades quarters for
   structure.
+
+## 8. CORRECTION — the NCAAF drive-structure numbers in section 4 and section 7 describe the IN-SOURCE DEFAULT, not production
+
+`[2026-09-09, from lane `s4a-ncaaf-drive-fit`, commit `462ccde4`]`
+
+Sections 4 and 7 quote the NCAAF sim as missing truth by **+27% plays/drive,
++12% seconds/drive, -15% possessions/game**. Those figures come from
+`scripts/calibrate_ncaaf_drive_structure.py`'s docstring and they are correct
+about the IN-SOURCE DEFAULT PROFILE. **They are not what production runs, and
+this file asserted them as the current state. That was wrong.**
+
+NCAAF's live profile is a PROMOTED ARTIFACT, `data/calibration/ncaaf_profile.json`
+(`ncaaf-goal-line-refit-1`, promoted 2026-08-27). Measured against it:
+
+| metric | vs in-source default | **vs the live artifact** |
+|---|---|---|
+| plays per drive | +25% | **+9.1%** |
+| seconds per drive | +12% | **-3.2%** |
+| possessions per game | -15% | **-3.0%** |
+| structure score | 12.8% | **4.2%** |
+
+**So the gap S4a was scoped to close was already largely closed**, by a lane that
+promoted an artifact rather than editing the source constants.
+
+### HOW THE WRONG BASELINE SURVIVED FOUR SWEEP ROUNDS, which is the durable lesson
+
+`scripts/session_worktree.py` EXCLUDES `data/` by design -- 34,690 of 37,745
+tracked files, and a lossy mirror that is never evidence about production. So in
+a session worktree the promoted profile artifact is ABSENT, and
+`load_versioned_profile` **falls back to the in-source default SILENTLY**. Four
+sweep rounds ran against that fallback and were internally consistent the whole
+time; an unrelated test failure is what exposed it.
+
+This is the `absent != off` trap wearing different clothes: absent artifact did
+not mean "no profile", it meant "a DIFFERENT profile, unannounced". A calibration
+harness that cannot tell you which baseline it just measured is not a harness.
+
+Guards now in place (`462ccde4`): the harness prints profile source and version on
+every run with a `!!!` block when the artifact is missing, and a declared variant
+carries its base version and **raises** on mismatch rather than proceeding.
+
+### Two measurement defects found and fixed before any fit was trusted
+
+- **`missed_field_goal` was being counted as `field_goal`** by substring match.
+  Split correctly: made FG **8.3% vs 10.0% truth**, missed FG **6.7% vs 3.1%** --
+  the sim misses more than twice as many field goals as reality, which the merged
+  bucket hid entirely.
+- **Outcome quality was never scored while fitting.** The harness now scores
+  PRIMARY (structure), SECONDARY (game total, four quarters, h1/h2) and TERTIARY
+  (outcome mix), with a pre-stated gate rejecting any candidate that moves a
+  quarter by more than 0.05.
+
+### The recommendation is DO NOT FLIP, and the reason generalises
+
+The best candidate (`s4a_drive_fit_v1`, FG distance penalty 0.022 -> 0.014, red-zone
+TD weight 0.58 -> 0.80) improves the outcome mix 26.79% -> 16.02% and q1/q2/q3,
+but **regresses q4 from -2.0% to +3.5%** and buys nothing on structure.
+
+Decisively: **at SAMPLED ratings -- what production actually simulates -- the fit
+reverses.** Outcome quality goes 5.33% -> 6.94% and game totals 52.43 -> 54.53
+against truth 53.35. The live profile is already right there and the fit
+overshoots.
+
+**The systemic finding, which is bigger than this package: every NCAAF
+calibration to date was scored at rating 0.0.** Production does not simulate
+rating-0.0 teams. Any calibration conclusion drawn that way -- including the
+artifact's own field-goal choices, all made against the merged made/missed
+bucket -- is owed a re-derivation at realistic ratings before it is trusted.
