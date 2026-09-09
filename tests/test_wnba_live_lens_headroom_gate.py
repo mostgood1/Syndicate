@@ -90,9 +90,17 @@ def test_insufficient_headroom_skips_the_build_and_says_why():
     assert meta["reason"] == "low_headroom"
 
 
-def test_sufficient_headroom_still_builds():
-    """The gate must not become a permanent off-switch."""
-    with patch.object(
+def test_sufficient_headroom_still_builds(tmp_path):
+    """The gate must not become a permanent off-switch.
+
+    `tmp_path` because the SUFFICIENT branch is the one that goes on to PUBLISH:
+    the tick ends in `write_json_file(...)` under `data_root()`, so with the real
+    root it creates `data/live/` in the git-tracked mirror. Its sibling test
+    above needs no such thing -- the whole point there is that nothing builds.
+    """
+    with patch.dict(
+        os.environ, {"SYNDICATE_DATA_ROOT": str(tmp_path / "data_root")}
+    ), patch.object(
         live_lens_loop, "_wnba_live_lens_headroom_snapshot",
         return_value={"sufficient": True, "available_bytes": 9 * 1024 ** 3},
     ), patch.dict(live_lens_loop._LIVE_LENS_BUILDERS, {"wnba": lambda d: {"games": []}}), \

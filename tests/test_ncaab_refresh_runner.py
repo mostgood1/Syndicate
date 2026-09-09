@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -40,7 +41,15 @@ class NcaabRefreshRunnerTests(unittest.TestCase):
                 "--out-dir",
                 str(out_dir),
             ]
-            with patch.object(module, "_load_source_adapter", return_value=_FakeAdapter), patch("sys.argv", argv):
+            # `--out-dir` covers the odds CSV but NOT the quote log: `main()` also
+            # calls `_append_ncaab_book_quotes` -> `append_book_quotes`, which
+            # resolves `data/ncaab_source/tracking/book_quotes/<date>.jsonl` from
+            # `data_root()` and ignores `--out-dir` entirely. That is the same
+            # artifact family as the `book_quotes/.jsonl` write this guard was
+            # built for, one sport over.
+            with patch.dict(
+                os.environ, {"SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data_root")}
+            ), patch.object(module, "_load_source_adapter", return_value=_FakeAdapter), patch("sys.argv", argv):
                 rc = module.main()
 
             self.assertEqual(rc, 0)
@@ -72,7 +81,15 @@ class NcaabRefreshRunnerTests(unittest.TestCase):
                 "--out-dir",
                 str(out_dir),
             ]
-            with patch.object(module, "_load_source_adapter", return_value=_FakeAdapter), patch("sys.argv", argv):
+            # `--out-dir` covers the odds CSV but NOT the quote log: `main()` also
+            # calls `_append_ncaab_book_quotes` -> `append_book_quotes`, which
+            # resolves `data/ncaab_source/tracking/book_quotes/<date>.jsonl` from
+            # `data_root()` and ignores `--out-dir` entirely. That is the same
+            # artifact family as the `book_quotes/.jsonl` write this guard was
+            # built for, one sport over.
+            with patch.dict(
+                os.environ, {"SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data_root")}
+            ), patch.object(module, "_load_source_adapter", return_value=_FakeAdapter), patch("sys.argv", argv):
                 rc = module.main()
 
             self.assertEqual(rc, 0)

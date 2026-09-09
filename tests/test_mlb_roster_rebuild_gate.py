@@ -13,6 +13,7 @@ all -- and the engine standard requires a rebuild to land any new input field.
 from __future__ import annotations
 
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -65,6 +66,11 @@ def _run(monkeypatch, tmp_path, gate: str | None, date: str = "2026-08-19"):
 
     monkeypatch.setattr(job.subprocess, "Popen", fake_popen)
     monkeypatch.setattr(job, "_hydrate_vendor_oddsapi_mirror", lambda *a, **k: None)
+    # `main()` PUBLISHES, and these helpers only read the argv it built.
+    # Without a scratch data root `ladders_build.write_status_artifact` writes
+    # `data/mlb_source/source_artifacts/data/daily/ladders/daily_ladders_status_<date>.json`
+    # into the git-tracked mirror -- measured on eight tests in this file.
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path / "data_root"))
     if gate is None:
         monkeypatch.delenv("SYNDICATE_MLB_ROSTER_REBUILD_DATE", raising=False)
     else:
@@ -156,6 +162,14 @@ def _run_capturing_checklist(monkeypatch, gate: str | None, sim_rc: int = 0):
     monkeypatch.setattr(job.subprocess, "run",
                         lambda cmd, **kw: calls.append(list(cmd)) or _P())
     monkeypatch.setattr(job, "_hydrate_vendor_oddsapi_mirror", lambda *a, **k: None)
+    # `main()` PUBLISHES, and these helpers only read the argv it built.
+    # Without a scratch data root `ladders_build.write_status_artifact` writes
+    # `data/mlb_source/source_artifacts/data/daily/ladders/daily_ladders_status_<date>.json`
+    # into the git-tracked mirror -- measured on eight tests in this file.
+    # No `tmp_path` in this helper's signature, so its own scratch dir --
+    # `monkeypatch` cannot create one and adding a parameter would touch every
+    # caller for no gain.
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(Path(tempfile.mkdtemp(prefix="mlb_gate_")) / "data_root"))
     monkeypatch.setattr(job, "publish_changed_hot_artifacts", lambda *a, **k: 0)
     monkeypatch.setattr(job, "bootstrap_mlb_player_game_log", lambda *a, **k: {})
     monkeypatch.setattr(job, "pull_season_artifacts", lambda *a, **k: 0)
