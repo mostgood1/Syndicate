@@ -626,7 +626,6 @@ _DATA_MIRROR_GUARD_DISABLED = str(os.environ.get("SYNDICATE_TEST_DATA_MIRROR_GUA
 }
 _WRITE_MODE_CHARS = frozenset("wxa+")
 _GIT_IGNORED_PATH_CACHE: dict[str, bool] = {}
-_GIT_IGNORED_SUBTREE_CACHE: dict[str, bool] = {}
 
 
 def _is_inside_tracked_data_mirror(path: object) -> bool:
@@ -659,11 +658,28 @@ def _git_ignores(path: object) -> bool:
     exactly what a fresh worktree does not have. Probing the parent therefore
     answers "not ignored" for the whole tree the rule was written for.
 
-    Two caches, and the difference matters. A directory rule applies to the
-    whole subtree, so its verdict is safe to reuse for every sibling; any other
-    pattern (`*.tmp`, say) is about the FILENAME, and reusing it per directory
-    would exempt a real write that happens to sit beside an ignored one. So only
-    a trailing-slash pattern populates the per-directory cache.
+    CACHED PER PATH AND NEVER PER DIRECTORY, and that is a correctness
+    requirement rather than a tuning choice. This function's whole purpose is
+    that **`git check-ignore` answers NOT ignored for anything in the index,
+    whatever rules match it** -- so a new cache file under an ignored-by-rule
+    subtree is exempt while a TRACKED file beside it is not. Two answers coexist
+    inside one directory, and a per-directory key cannot represent that.
+
+    A per-directory cache DID live here, justified by "a directory rule applies
+    to the whole subtree, so its verdict is safe to reuse for every sibling",
+    which denies the exemption twenty lines from the test that pins it.
+    Measured on `data/mlb_source/source_artifacts/data/live_lens/`, which holds
+    208 tracked files under a trailing-slash rule: tracked -> False (correct),
+    an ignored NAME in the same directory -> True (correct, and it primed the
+    cache), then tracked again -> **True, WRONG** -- the guard disarmed for every
+    tracked file in that directory for the rest of the process. Found by lane
+    `data-mirror-write-guard-sweep`.
+
+    **A CACHE KEY COARSER THAN THE PREDICATE IT CACHES IS A CORRECTNESS BUG, NOT
+    A PERFORMANCE TRADE.** The exact-path cache still removes every repeat, and
+    this function is only reached by a write INSIDE a guarded root -- the rare
+    path, and a defect when it happens -- so one subprocess per distinct path is
+    the right trade.
 
     Any failure -- git absent, a timeout, output in an unexpected shape --
     answers False. A guard whose join failed must not relax the rule.
@@ -676,31 +692,21 @@ def _git_ignores(path: object) -> bool:
     cached = _GIT_IGNORED_PATH_CACHE.get(exact_key)
     if cached is not None:
         return cached
-    parent_key = os.path.normcase(str(target.parent))
-    if _GIT_IGNORED_SUBTREE_CACHE.get(parent_key):
-        return True
     import subprocess
 
-    pattern = ""
     try:
+        # Only the exit code is read, so no `-v`: the pattern text existed solely
+        # to decide whether to populate the per-directory cache that is now gone.
         completed = subprocess.run(
-            ["git", "check-ignore", "-v", "--", str(target)],
+            ["git", "check-ignore", "--", str(target)],
             cwd=str(Path(__file__).resolve().parents[1]),
             capture_output=True,
-            text=True,
             timeout=20,
         )
         ignored = completed.returncode == 0
-        if ignored:
-            # `<source>:<line>:<pattern>	<path>` -- the pattern is the third
-            # colon-separated field of the first line.
-            first = (completed.stdout or "").splitlines()[0]
-            pattern = first.split("	", 1)[0].split(":", 2)[-1].strip()
     except Exception:
         ignored = False
     _GIT_IGNORED_PATH_CACHE[exact_key] = ignored
-    if ignored and pattern.endswith("/"):
-        _GIT_IGNORED_SUBTREE_CACHE[parent_key] = True
     return ignored
 
 

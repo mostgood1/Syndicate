@@ -197,6 +197,19 @@ def test_a_tracked_file_is_guarded_even_inside_an_ignored_subtree(data_mirror_wr
     if not tracked.is_file():
         pytest.skip("this worktree has no data/ mirror (see session_worktree.py)")
 
+    # THE IGNORED SIBLING GOES FIRST, AND NOT FOR TIDINESS. This assertion used
+    # to be the LAST act of this test, and it POISONED whatever ran next in the
+    # same xdist worker: `_git_ignores` kept a per-directory cache, so one query
+    # for an ignored NAME here exempted every tracked file in this directory --
+    # 208 of them -- for the rest of the process. The cache is gone (see
+    # `_git_ignores`), and this test no longer ends on a priming query either, so
+    # the self-check does not depend on an implementation detail of the thing it
+    # is supposed to be checking independently.
+    beside = tracked.with_name("_write_guard_selfcheck_new.jsonl")
+    assert data_mirror_write_guard.git_ignores(beside) is True
+
+    # ...and the TRACKED verdict is asserted AFTER it, which is the ordering that
+    # fails against the old cache.
     assert data_mirror_write_guard.git_ignores(tracked) is False
     before = tracked.read_bytes()
     with pytest.raises(RuntimeError, match="TRACKED data/ MIRROR"):
@@ -204,8 +217,40 @@ def test_a_tracked_file_is_guarded_even_inside_an_ignored_subtree(data_mirror_wr
     assert len(data_mirror_write_guard.consume()) == 1
     assert tracked.read_bytes() == before
 
-    beside = tracked.with_name("_write_guard_selfcheck_new.jsonl")
-    assert data_mirror_write_guard.git_ignores(beside) is True
+
+def test_an_ignored_sibling_does_not_exempt_a_tracked_file_beside_it(data_mirror_write_guard):
+    """The regression test for the per-directory ignore cache.
+
+    THE ORDER IS THE TEST. `git check-ignore` answers NOT ignored for anything in
+    the index whatever rules match it, so within ONE directory a tracked file and
+    a new name give DIFFERENT answers. A cache keyed on the directory cannot hold
+    both, and the old one let the first query win for the rest of the process.
+
+    Measured before the fix, on this exact directory (208 tracked files under a
+    trailing-slash rule): tracked -> False, ignored name -> True (primes), tracked
+    -> **True, WRONG**. Both orders are asserted below, because the exact-path
+    cache hides the defect if the tracked file is queried first -- which is how a
+    weaker version of this test would have passed against the bug.
+    """
+    live_lens = REPO_ROOT / "data" / "mlb_source" / "source_artifacts" / "data" / "live_lens"
+    tracked_a = live_lens / "live_lens_2026_05_29.jsonl"
+    tracked_b = live_lens / "live_lens_2026_06_02.jsonl"
+    if not (tracked_a.is_file() and tracked_b.is_file()):
+        pytest.skip("this worktree has no data/ mirror (see session_worktree.py)")
+
+    ignores = data_mirror_write_guard.git_ignores
+    ignored_name = live_lens / "_write_guard_selfcheck_never_existed.jsonl"
+
+    # IGNORED FIRST, then a DIFFERENT tracked file in the same directory: the
+    # exact-path cache cannot mask this one.
+    assert ignores(ignored_name) is True
+    assert ignores(tracked_b) is False, (
+        "a query for an ignored name exempted a TRACKED file in the same "
+        "directory -- the per-directory ignore cache is back"
+    )
+    # And the other order, for completeness.
+    assert ignores(tracked_a) is False
+    assert ignores(ignored_name) is True
 
 
 def test_the_vendored_schedule_fetch_is_blocked_at_the_floor(data_mirror_write_guard):
