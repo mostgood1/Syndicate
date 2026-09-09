@@ -116,9 +116,22 @@ def test_a_scratch_dir_named_data_is_not_the_mirror(data_mirror_write_guard, tmp
     assert data_mirror_write_guard.classifies_as_mirror(scratch) is False
 
 
-def test_the_mirror_root_is_the_repos_own_data_dir(data_mirror_write_guard):
-    """A guard pointed at the wrong tree reads healthy forever."""
-    assert data_mirror_write_guard.mirror_root() == os.path.normcase(str(REPO_ROOT / "data"))
+def test_the_guarded_roots_are_this_repos_tracked_mirrors(data_mirror_write_guard):
+    """A guard pointed at the wrong tree reads healthy forever.
+
+    Both roots are asserted, because the second one (`vendor/<repo>/data/`) was
+    added after the first sweep showed a tracked vendor file being rewritten,
+    and a root that silently stopped resolving would look exactly like a clean
+    suite.
+    """
+    roots = data_mirror_write_guard.mirror_roots()
+    assert os.path.normcase(str(REPO_ROOT / "data")) in roots
+    vendor_wnba = REPO_ROOT / "vendor" / "wnba_betting_repo" / "data"
+    if vendor_wnba.is_dir():
+        assert os.path.normcase(str(vendor_wnba)) in roots
+    assert data_mirror_write_guard.classifies_as_mirror(
+        REPO_ROOT / "vendor" / "wnba_betting_repo" / "data" / "processed" / "schedule_2026.csv"
+    ) is True
 
 
 def test_a_mkdir_that_creates_nothing_is_not_reported(data_mirror_write_guard):

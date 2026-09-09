@@ -167,6 +167,28 @@ def _isolate_kalshi_markets_artifact(tmp_path_factory):
 
 
 @pytest.fixture(autouse=True)
+def _isolate_wnba_cards_context_publish(tmp_path_factory):
+    """THE FOURTH INSTANCE, and the first one under `data/` rather than `reports/`.
+
+    `build_cards_page_context` ends in `publish_cards_page_context`, which writes
+    `data/live/wnba_cards_context*.json` under `data_root()`. Two test files
+    reach it through code they are actually asserting on --
+    `test_archives.py` via its routes and `test_intelligence.py` via
+    `build_intelligence_overview` -> `_wnba_has_live_games` -> ... -> the
+    publish -- so a per-file fix would have to be repeated for the next caller.
+
+    The write guard below is what found it. The redirect itself lives in
+    `tests/_artifact_isolation.py` because CI runs `python -m unittest
+    tests.test_archives` and never imports this file; one definition, both
+    runners.
+    """
+    from tests._artifact_isolation import isolated_wnba_cards_context
+
+    with isolated_wnba_cards_context(tmp_path_factory.mktemp("wnba_cards_context")):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def _isolate_prediction_ledger(tmp_path_factory):
     # The suite was writing this dev machine's REAL data/prediction_ledger.json.
     # intelligence.py:7706 calls record_prediction() on every query, and
@@ -466,12 +488,49 @@ def _isolate_kalshi_discovered_series():
 # `unittest` never imports a conftest. `tests/_cache_isolation.py` exists for
 # that same gap and explains it at length.
 #
+# TWO ROOTS, NOT ONE `[widened after the first full-suite sweep]`. `data/` is
+# the mirror `CLAUDE.md` names; `vendor/<repo>/data/` is the second, and a test
+# run rewrites all 114 rows of the TRACKED
+# `vendor/wnba_betting_repo/data/processed/schedule_2026.csv` -- a file
+# `wnba_fixture_identity` calls "the git-tracked master", with the
+# `data/wnba_source` copies as its mirrors. Watching only `data/` was blind to
+# the more authoritative of the two. See `_guarded_mirror_roots`.
+#
 # A test that genuinely means to write there says so with
 # `@pytest.mark.writes_tracked_data`. To tell this guard's findings apart from
 # failures that were already there, re-run with
 # `SYNDICATE_TEST_DATA_MIRROR_GUARD=off`.
-_TRACKED_DATA_MIRROR = os.path.normcase(str(Path(__file__).resolve().parents[1] / "data"))
-_TRACKED_DATA_MIRROR_PREFIX = _TRACKED_DATA_MIRROR + os.sep
+_REPO_ROOT_FOR_GUARD = Path(__file__).resolve().parents[1]
+_TRACKED_DATA_MIRROR = os.path.normcase(str(_REPO_ROOT_FOR_GUARD / "data"))
+
+
+def _guarded_mirror_roots() -> tuple[str, ...]:
+    """Every tracked artifact mirror in this repo, not just the obvious one.
+
+    `data/` is the mirror `CLAUDE.md` names. `vendor/<repo>/data/` is the second
+    one, and it was found the way the rest of this guard was -- by measurement:
+    a test run rewrites the TRACKED
+    `vendor/wnba_betting_repo/data/processed/schedule_2026.csv`, all 114 rows of
+    it, and `wnba_fixture_identity` calls that file "the git-tracked master"
+    with the `data/wnba_source` copies as its mirrors. A guard that watched only
+    `data/` was blind to the MORE authoritative of the two.
+
+    Adding these roots is close to free in false positives, because the
+    `.gitignore` exemption does the discriminating: `vendor/*/data/` is largely
+    ignored, so only a tracked file (or an untracked, unignored one -- exactly
+    what a `git add` sweep collects) can trip the guard there.
+    """
+    roots = [_TRACKED_DATA_MIRROR]
+    vendor = _REPO_ROOT_FOR_GUARD / "vendor"
+    if vendor.is_dir():
+        for child in sorted(vendor.iterdir()):
+            candidate = child / "data"
+            if candidate.is_dir():
+                roots.append(os.path.normcase(str(candidate)))
+    return tuple(roots)
+
+
+_GUARDED_MIRROR_ROOTS = _guarded_mirror_roots()
 _DATA_MIRROR_WRITES: list[str] = []
 _DATA_MIRROR_GUARD_MUTED = {"value": False}
 _DATA_MIRROR_GUARD_DISABLED = str(os.environ.get("SYNDICATE_TEST_DATA_MIRROR_GUARD") or "").strip().lower() in {
@@ -496,7 +555,10 @@ def _is_inside_tracked_data_mirror(path: object) -> bool:
         except Exception:
             return False
     normalized = os.path.normcase(os.path.abspath(raw))
-    return normalized == _TRACKED_DATA_MIRROR or normalized.startswith(_TRACKED_DATA_MIRROR_PREFIX)
+    for root in _GUARDED_MIRROR_ROOTS:
+        if normalized == root or normalized.startswith(root + os.sep):
+            return True
+    return False
 
 
 def _git_ignores(path: object) -> bool:
@@ -706,8 +768,8 @@ def data_mirror_write_guard():
             return _git_ignores(path)
 
         @staticmethod
-        def mirror_root() -> str:
-            return _TRACKED_DATA_MIRROR
+        def mirror_roots() -> tuple[str, ...]:
+            return _GUARDED_MIRROR_ROOTS
 
     return _Handle()
 
