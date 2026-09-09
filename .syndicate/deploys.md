@@ -5,6 +5,72 @@
 
 ---
 
+## 2026-09-09 21:57:17-22:03:42Z — web `44499cb0` -> `a6a8730d` — **the settlement/recap work is live: unpriced rows are counted instead of paid at a fabricated price, and the client slate date is Central** — lane `probability-converter-registry`
+
+User-directed ("deploy it", then "verify it once it's live"). **web ONLY, and
+that was checked rather than assumed.** Both workers were already on `2888c2f2`,
+which by ancestry contains the settlement fix, the recap UI, the NHL ROI fix and
+the first de-duplication; everything I landed after it touches only templates,
+static JS and tests — `git diff --name-only 2888c2f2..b308f720 -- '*.py'` returns
+nothing of mine. So no worker claim was taken.
+
+**Pre-fired checks.** `render.yaml` UNCHANGED in the range (no `blueprint_sync`,
+so nothing config-side applied); `requirements.txt` UNCHANGED (no build risk);
+**zero new env-var reads** in the whole range, so no "absent != off" hazard;
+preflight CLEAR with only gunicorn infra and two already-dead defunct children,
+i.e. no in-flight sim to kill; target on `origin/main`; claim held by this lane.
+
+**RIDING ALONG, named because it is not mine:** five files from other lanes —
+`ncaaf/player_stats_refresh.py` (NEW, 351 lines, its own commit says "still
+off"), `kalshi_odds_refresh.py`, `kalshi_client.py`, `artifact_publisher.py`,
+`venue_daily_odds.py`. Serialisation is not composition; being on `main` is.
+Checked that `player_stats_refresh` is imported by no blueprint and not the app
+factory, so web does not execute it.
+
+verify: **TWO OF MY THREE PLANNED CHECKS WERE NON-DISCRIMINATING AND ARE
+RECORDED AS SUCH, because both would have read the same before and after.**
+
+1. `curl /nba/betting-recap | grep -c Unpriced` read **0 after** — and **0 was
+   also the pre-deploy baseline I had called "not deployed yet"**. Wrong
+   instrument: the column is built by JS into `#daysRoot` at runtime, so the
+   header never appears in server-rendered HTML either way.
+2. Driving the live page and reading `<th>` returned `headers=[]` — **no table
+   at all**, because NHL/NBA are off-season and the window is empty. An empty
+   table cannot show a column.
+
+**The checks that DID discriminate:**
+
+| reading | before | after |
+|---|---|---|
+| `/static/shared/slate_date.js` | **404** | **200** |
+| `recap_common.js`, `recap_reconciliation.js`, `recap_market_accuracy.js`, `recap_live_lens_daily.js` | **404** each | **200** each |
+| served `slate_date.js` default zone | (absent) | **`cfg.timeZone:'America/Chicago'`** |
+| `function localYMD` inline in served `/nba/betting-recap`, `/mlb/live-lens-accuracy` | 1 each | **0 each** |
+| `/nba/api/betting-recap` roi buckets carrying `unpriced` | (field did not exist) | **72 of 72** |
+| `/nhl/api/betting-recap` roi buckets carrying `unpriced` | (field did not exist) | **184 of 184** |
+
+**Exercised the DEPLOYED code rather than waiting for data.** Calling
+production's own `renderBucketTable` / `renderByMarketTable` with a bucket
+fixture: `<th>Unpriced</th>` **emitted**, and the count renders as the
+`bad`-classed cell. Zero page or console errors.
+
+**The Central move proven where the zones actually differ,** by freezing the
+clock in the live page: at **`2026-07-01T10:59Z` (06:59 ET / 05:59 CT)
+production returns `2026-06-30`** — Central — where Eastern would give
+`2026-07-01`. At `11:30Z`, outside the window, both give `2026-07-01`. Without
+that instant the reading is worthless: today ET and Central agree, so
+`localYMD()` returns `2026-09-09` under either.
+
+`/healthz`, `/`, `/portfolio`, `/intelligence` all **200**. `render_events
+--since 22:03:00Z`: **CLEAN, no `server_failed`**, one `deploy_ended`. Web had
+already logged `unhealthy` at 19:17:54Z and 20:28:48Z **before** this deploy
+(657 such events historically), so that pattern is pre-existing and carries no
+signal about this change.
+
+Noted for whoever reads the SHAs next: `live-odds-worker` moved to `169e328e` at
+22:02:09Z while this build ran — another lane's deploy, not mine. The three
+services are on three different commits as of this write.
+
 ## 2026-09-09 19:06:57-19:12:59Z — web `00902dd1` -> `44499cb0` — **the coverage page is back, fed by a worker-published artifact; BOTH services now on `44499cb0`** — lane `intelligence-coverage-artifact`
 
 User-directed ("wait for the worker and deploy both"). **Only web was
