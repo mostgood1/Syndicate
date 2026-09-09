@@ -1,0 +1,488 @@
+{
+  "args": {
+    "boundary_margin_s": 240,
+    "concurrency": 3,
+    "dry_run": false,
+    "quiet_minutes": 10,
+    "require_quiet_mb": 12.0,
+    "skip_quiet_check": false,
+    "target_mb": 150.0
+  },
+  "asset": "/static/shared/syndicate-logo.png",
+  "base": "https://syndicate-an21.onrender.com",
+  "calibration": {
+    "at": "2026-09-09T00:06:25Z",
+    "bytes": 60588,
+    "cf_cache": "DYNAMIC",
+    "encoding": "identity",
+    "i": 0,
+    "origin": "gunicorn",
+    "seconds": 0.344,
+    "status": 200,
+    "token": "000000-c9ffd286"
+  },
+  "distinct_sizes": [
+    60588
+  ],
+  "elapsed_seconds": 282.3,
+  "health": [
+    {
+      "at": "2026-09-09T00:06:27Z",
+      "seconds": 0.282,
+      "status": 200,
+      "tag": "before"
+    },
+    {
+      "at": "2026-09-09T00:06:47Z",
+      "seconds": 0.187,
+      "status": 200,
+      "tag": "during"
+    },
+    {
+      "at": "2026-09-09T00:07:07Z",
+      "seconds": 0.234,
+      "status": 200,
+      "tag": "during"
+    },
+    {
+      "at": "2026-09-09T00:07:27Z",
+      "seconds": 0.344,
+      "status": 200,
+      "tag": "during"
+    },
+    {
+      "at": "2026-09-09T00:07:48Z",
+      "seconds": 0.172,
+      "status": 200,
+      "tag": "during"
+    },
+    {
+      "at": "2026-09-09T00:08:08Z",
+      "seconds": 0.234,
+      "status": 200,
+      "tag": "during"
+    },
+    {
+      "at": "2026-09-09T00:08:28Z",
+      "seconds": 0.172,
+      "status": 200,
+      "tag": "during"
+    },
+    {
+      "at": "2026-09-09T00:08:48Z",
+      "seconds": 0.375,
+      "status": 200,
+      "tag": "during"
+    },
+    {
+      "at": "2026-09-09T00:09:09Z",
+      "seconds": 0.359,
+      "status": 200,
+      "tag": "during"
+    },
+    {
+      "at": "2026-09-09T00:09:29Z",
+      "seconds": 0.219,
+      "status": 200,
+      "tag": "during"
+    },
+    {
+      "at": "2026-09-09T00:09:49Z",
+      "seconds": 0.188,
+      "status": 200,
+      "tag": "during"
+    },
+    {
+      "at": "2026-09-09T00:10:09Z",
+      "seconds": 0.375,
+      "status": 200,
+      "tag": "during"
+    },
+    {
+      "at": "2026-09-09T00:10:30Z",
+      "seconds": 0.297,
+      "status": 200,
+      "tag": "during"
+    },
+    {
+      "at": "2026-09-09T00:10:50Z",
+      "seconds": 0.187,
+      "status": 200,
+      "tag": "during"
+    },
+    {
+      "at": "2026-09-09T00:11:09Z",
+      "seconds": 0.204,
+      "status": 200,
+      "tag": "after"
+    }
+  ],
+  "health_aborted": false,
+  "health_reason": "",
+  "hour": {
+    "bucket_label": "2026-09-09T01:00:00Z",
+    "estimated_seconds": 297.7,
+    "seconds_left_in_hour": 3213
+  },
+  "implied_gb_per_hour": 1.87,
+  "kind": "controlled_transfer",
+  "known_bytes": 157286448,
+  "known_edge_basis_bytes": 158210624,
+  "known_edge_basis_mb": 150.881,
+  "known_mb": 150.0,
+  "non_200": [],
+  "planned_bytes": 157286448,
+  "planned_requests": 2596,
+  "quiet_check": {
+    "limit_mb": 12.0,
+    "mb": 5.493,
+    "quiet": true,
+    "requests": 21,
+    "top": [
+      {
+        "mb": 5.305,
+        "requests": 10,
+        "who": "73.75.177.190 | Python-urllib/3.11"
+      },
+      {
+        "mb": 0.174,
+        "requests": 3,
+        "who": "73.75.177.190 | syndicate-controlled-transfer/1.0"
+      },
+      {
+        "mb": 0.011,
+        "requests": 2,
+        "who": "207.46.13.64 | Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko;"
+      },
+      {
+        "mb": 0.002,
+        "requests": 5,
+        "who": "74.220.48.175 | Python-urllib/3.11"
+      },
+      {
+        "mb": 0.0,
+        "requests": 1,
+        "who": "74.220.48.178 | Python-urllib/3.11"
+      }
+    ],
+    "window": {
+      "end": "2026-09-09T00:06:26Z",
+      "minutes": 10,
+      "start": "2026-09-08T23:56:26Z"
+    }
+  },
+  "rate_mb_per_s": 0.531,
+  "records_summary": {
+    "byte_counts": {
+      "60588": 2596
+    },
+    "cf_cache_counts": {
+      "DYNAMIC": 2596
+    },
+    "encoding_counts": {
+      "identity": 2596
+    },
+    "first_10": [
+      {
+        "at": "2026-09-09T00:06:27Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 1,
+        "origin": "gunicorn",
+        "seconds": 0.328,
+        "status": 200,
+        "token": "000001-ccaddd6a"
+      },
+      {
+        "at": "2026-09-09T00:06:27Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 2,
+        "origin": "gunicorn",
+        "seconds": 0.265,
+        "status": 200,
+        "token": "000002-711c01a0"
+      },
+      {
+        "at": "2026-09-09T00:06:27Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 3,
+        "origin": "gunicorn",
+        "seconds": 0.438,
+        "status": 200,
+        "token": "000003-c105a65d"
+      },
+      {
+        "at": "2026-09-09T00:06:27Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 4,
+        "origin": "gunicorn",
+        "seconds": 0.172,
+        "status": 200,
+        "token": "000004-c30b9690"
+      },
+      {
+        "at": "2026-09-09T00:06:27Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 5,
+        "origin": "gunicorn",
+        "seconds": 0.39,
+        "status": 200,
+        "token": "000005-18a44e0a"
+      },
+      {
+        "at": "2026-09-09T00:06:27Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 6,
+        "origin": "gunicorn",
+        "seconds": 0.203,
+        "status": 200,
+        "token": "000006-f73d8ecf"
+      },
+      {
+        "at": "2026-09-09T00:06:27Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 7,
+        "origin": "gunicorn",
+        "seconds": 0.219,
+        "status": 200,
+        "token": "000007-2cb61047"
+      },
+      {
+        "at": "2026-09-09T00:06:28Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 8,
+        "origin": "gunicorn",
+        "seconds": 0.266,
+        "status": 200,
+        "token": "000008-72ec971e"
+      },
+      {
+        "at": "2026-09-09T00:06:28Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 9,
+        "origin": "gunicorn",
+        "seconds": 0.234,
+        "status": 200,
+        "token": "000009-77470b71"
+      },
+      {
+        "at": "2026-09-09T00:06:28Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 10,
+        "origin": "gunicorn",
+        "seconds": 0.219,
+        "status": 200,
+        "token": "000010-c2da7a58"
+      }
+    ],
+    "last_10": [
+      {
+        "at": "2026-09-09T00:11:08Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 2587,
+        "origin": "gunicorn",
+        "seconds": 0.312,
+        "status": 200,
+        "token": "002587-b5b603f3"
+      },
+      {
+        "at": "2026-09-09T00:11:08Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 2588,
+        "origin": "gunicorn",
+        "seconds": 0.218,
+        "status": 200,
+        "token": "002588-296836f3"
+      },
+      {
+        "at": "2026-09-09T00:11:08Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 2589,
+        "origin": "gunicorn",
+        "seconds": 0.281,
+        "status": 200,
+        "token": "002589-b4e28907"
+      },
+      {
+        "at": "2026-09-09T00:11:08Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 2590,
+        "origin": "gunicorn",
+        "seconds": 0.328,
+        "status": 200,
+        "token": "002590-008697be"
+      },
+      {
+        "at": "2026-09-09T00:11:08Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 2591,
+        "origin": "gunicorn",
+        "seconds": 0.297,
+        "status": 200,
+        "token": "002591-13eb668b"
+      },
+      {
+        "at": "2026-09-09T00:11:09Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 2592,
+        "origin": "gunicorn",
+        "seconds": 0.203,
+        "status": 200,
+        "token": "002592-0f2727fe"
+      },
+      {
+        "at": "2026-09-09T00:11:09Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 2593,
+        "origin": "gunicorn",
+        "seconds": 0.344,
+        "status": 200,
+        "token": "002593-7321fc0c"
+      },
+      {
+        "at": "2026-09-09T00:11:09Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 2594,
+        "origin": "gunicorn",
+        "seconds": 0.329,
+        "status": 200,
+        "token": "002594-b3530d21"
+      },
+      {
+        "at": "2026-09-09T00:11:09Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 2595,
+        "origin": "gunicorn",
+        "seconds": 0.235,
+        "status": 200,
+        "token": "002595-3f1da448"
+      },
+      {
+        "at": "2026-09-09T00:11:09Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 2596,
+        "origin": "gunicorn",
+        "seconds": 0.265,
+        "status": 200,
+        "token": "002596-ed1cd8cc"
+      }
+    ],
+    "n": 2596,
+    "note": "The full 2,596-record array was dropped before committing: every record carried status 200, exactly 60,588 bytes, cf-cache DYNAMIC and identity encoding, so the array was 688 KB of one repeated row. The counters above are over ALL records, not the samples.",
+    "origin_counts": {
+      "gunicorn": 2596
+    },
+    "seconds": {
+      "max": 1.563,
+      "min": 0.156,
+      "p50": 0.297,
+      "p90": 0.469,
+      "p99": 0.593
+    },
+    "slowest_5": [
+      {
+        "at": "2026-09-09T00:09:00Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 1428,
+        "origin": "gunicorn",
+        "seconds": 1.563,
+        "status": 200,
+        "token": "001428-ea0aaa00"
+      },
+      {
+        "at": "2026-09-09T00:10:43Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 2375,
+        "origin": "gunicorn",
+        "seconds": 1.562,
+        "status": 200,
+        "token": "002375-dc1ea149"
+      },
+      {
+        "at": "2026-09-09T00:09:00Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 1429,
+        "origin": "gunicorn",
+        "seconds": 1.485,
+        "status": 200,
+        "token": "001429-0abc28d9"
+      },
+      {
+        "at": "2026-09-09T00:06:56Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 278,
+        "origin": "gunicorn",
+        "seconds": 1.406,
+        "status": 200,
+        "token": "000278-96d17aa3"
+      },
+      {
+        "at": "2026-09-09T00:09:25Z",
+        "bytes": 60588,
+        "cf_cache": "DYNAMIC",
+        "encoding": "identity",
+        "i": 1628,
+        "origin": "gunicorn",
+        "seconds": 1.297,
+        "status": 200,
+        "token": "001628-2632cc3d"
+      }
+    ],
+    "status_counts": {
+      "200": 2596
+    }
+  },
+  "requests_200": 2596,
+  "requests_sent": 2596,
+  "started_at": "2026-09-09T00:06:25Z",
+  "transfer_ended_at": "2026-09-09T00:11:09Z",
+  "transfer_started_at": "2026-09-09T00:06:27Z",
+  "user_agent": "syndicate-controlled-transfer/1.0"
+}
