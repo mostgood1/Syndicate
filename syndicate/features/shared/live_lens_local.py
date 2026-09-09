@@ -344,6 +344,10 @@ def _init_accuracy_bucket() -> dict[str, Any]:
         "wins": 0,
         "losses": 0,
         "pushes": 0,
+        # Rows that GRADED but carry no price: counted for accuracy, kept out of
+        # stake_total/profit_total so `roi_pct` is a rate over the rows it could
+        # be computed for, and the shortfall in its denominator is READABLE.
+        "unpriced": 0,
         "stake_total": 0.0,
         "profit_total": 0.0,
     }
@@ -365,21 +369,40 @@ def _finalize_accuracy_bucket(bucket: dict[str, Any]) -> dict[str, Any]:
 
 
 def _apply_accuracy_result(bucket: dict[str, Any], result: str | None, price: Any) -> None:
+    """Grade one row into `bucket`.
+
+    THE PRICE FALLBACK IS GONE. This used to read
+    `_american_to_decimal(price) or 1.909090909`, so a win with no price booked
+    the profit of a -110 winner -- a number no book quoted, summed into
+    `profit_total` and divided into `roi_pct` with nothing reporting it. This is
+    the cross-sport twin of the same defect in `nba/betting_recap.py`; the
+    correct shape is `nhl/betting_recap.py`, which adds a payout only when it
+    has one.
+
+    A win with no price still counts toward wins and accuracy -- grading needs a
+    result, pricing needs a price -- and lands in `unpriced` instead.
+    """
     bucket["bets"] += 1
     if not result:
         return
     bucket["resolved"] += 1
     stake = 1.0
-    decimal_price = _american_to_decimal(price) or 1.909090909
-    profit = 0.0
+    decimal_price = _american_to_decimal(price)
     if result == "push":
         bucket["pushes"] += 1
+        profit: float | None = 0.0
     elif result == "win":
         bucket["wins"] += 1
-        profit = (float(decimal_price) - 1.0) * stake
+        # A loss costs the stake at any price; only a WIN needs one to be paid.
+        profit = None if decimal_price is None else (float(decimal_price) - 1.0) * stake
     elif result == "loss":
         bucket["losses"] += 1
         profit = -stake
+    else:
+        profit = 0.0
+    if profit is None:
+        bucket["unpriced"] += 1
+        return
     bucket["stake_total"] += stake
     bucket["profit_total"] += float(profit)
 

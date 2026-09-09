@@ -91,6 +91,12 @@ def _empty_bucket() -> dict[str, Any]:
         "wins": 0,
         "losses": 0,
         "pushes": 0,
+        # Rows that GRADED but carry no price. They count toward accuracy and are
+        # kept OUT of stake_total/profit_total, so `roi_pct` is a rate over the
+        # rows it could actually be computed for. Without this field the ROI
+        # denominator's shortfall is invisible, which is how the fabricated
+        # even-money payout stayed unnoticed: nothing ever reported it.
+        "unpriced": 0,
         "stake_total": 0.0,
         "profit_total": 0.0,
         "accuracy_pct": None,
@@ -137,29 +143,38 @@ def _tier_for_game(row: dict[str, str]) -> str:
     return "Low"
 
 
-def _settlement_decimal_price(american: float | None) -> float:
-    """American price -> decimal payout multiplier for settling a graded pick.
+def _settlement_decimal_price(american: Any) -> float | None:
+    """American price -> decimal payout multiplier. None when there is no price.
 
-    LIFTED to module level 2026-09-09 from inside `_settle_game_pick`; it closed
-    over nothing, so the lift is behaviour-neutral. Nested, it was invisible to
-    `scripts/probability_differential.py`.
+    IT USED TO RETURN 2.0 FOR A MISSING OR ZERO PRICE. That fabricated EVEN
+    MONEY on a graded win (`(2.0 - 1.0) * stake`), which is indistinguishable in
+    the output from a real +100 winner and inflates `profit_total` and `roi_pct`
+    with a number no book ever quoted. The prop path did the same thing with
+    `1.909090909` (-110). Both are gone.
 
-    IT DOES NOT MEET THE HARNESS'S `american_to_decimal` REQUIREMENTS, AND THAT
-    IS THE POINT OF REGISTERING IT: a missing or zero price returns **2.0**, so
-    an ungraded price silently books EVEN MONEY (`(2.0 - 1.0) * stake`) instead
-    of refusing to settle the row. That is a settlement policy wearing a
-    converter's shape. It is recorded in the test's KNOWN_FAILING set rather
-    than excused, so the behaviour is visible instead of asserted-away; changing
-    it is a money question and belongs to whoever owns NBA settlement.
+    `syndicate/features/nhl/betting_recap.py` is the precedent, not a new
+    policy: it adds `payout` to the bucket only `if payout is not None`, and a
+    row with no payout still counts toward wins/losses. Grading needs a score;
+    PRICING needs a price. Those are different requirements and the buckets now
+    keep them apart -- see `_empty_bucket`'s `unpriced`.
+
+    Lifted to module level 2026-09-09 from inside `_settle_game_pick` so that
+    `scripts/probability_differential.py` could see it at all; it now meets all
+    five of that harness's `american_to_decimal` requirements and is no longer
+    in the test's KNOWN_FAILING set.
     """
-    if american is None or american == 0:
-        return 2.0
-    if american > 0:
-        return 1.0 + (american / 100.0)
-    return 1.0 + (100.0 / abs(american))
+    price = _coerce_float(american)
+    if price is None or price == 0:
+        return None
+    if price > 0:
+        return 1.0 + (price / 100.0)
+    return 1.0 + (100.0 / abs(price))
 
 
-def _settle_game_pick(row: dict[str, str], recon_row: dict[str, str] | None) -> tuple[bool, bool, bool, float]:
+def _settle_game_pick(row: dict[str, str], recon_row: dict[str, str] | None) -> tuple[bool, bool, bool, float | None]:
+    """(resolved, is_win, is_push, profit). `profit` is None when the row GRADED
+    but carries no price, which is a different state from a profit of 0.0 and
+    must not be summed into a P/L."""
     if recon_row is None:
         return False, False, False, 0.0
     home_pts, away_pts = _coerce_result(recon_row)
@@ -208,7 +223,11 @@ def _settle_game_pick(row: dict[str, str], recon_row: dict[str, str] | None) -> 
     if is_push:
         return True, False, True, 0.0
     if is_win:
-        return True, True, False, (_settlement_decimal_price(price) - 1.0) * stake
+        decimal = _settlement_decimal_price(price)
+        # A win with no price is a win whose PAYOUT is unknown. Booking even
+        # money here is what this function used to do.
+        return True, True, False, None if decimal is None else (decimal - 1.0) * stake
+    # A loss costs the stake whatever the price was, so this one is knowable.
     return True, False, False, -stake
 
 
@@ -280,7 +299,7 @@ def _recon_prop_index(rows: list[dict[str, str]]) -> dict[tuple[str, str], dict[
     return index
 
 
-def _settle_prop_pick(row: dict[str, str], play: dict[str, Any] | None, recon_stats: dict[str, float] | None) -> tuple[bool, bool, bool, float, float | None]:
+def _settle_prop_pick(row: dict[str, str], play: dict[str, Any] | None, recon_stats: dict[str, float] | None) -> tuple[bool, bool, bool, float | None, float | None]:
     if not play or recon_stats is None:
         return False, False, False, 0.0, None
     market = str(play.get("market") or "").strip().lower()
@@ -307,18 +326,14 @@ def _settle_prop_pick(row: dict[str, str], play: dict[str, Any] | None, recon_st
     else:
         return False, False, False, 0.0, None
 
-    price = _coerce_float(play.get("price"))
-    if price is None or price == 0:
-        decimal = 1.909090909
-    elif price > 0:
-        decimal = 1.0 + (price / 100.0)
-    else:
-        decimal = 1.0 + (100.0 / abs(price))
+    # Was `decimal = 1.909090909` (a fabricated -110) whenever the price was
+    # missing or zero -- the same defect as the game path, one function apart.
+    decimal = _settlement_decimal_price(play.get("price"))
     if abs(actual - line) < 1e-9:
         return True, False, True, 0.0, float(actual)
     is_win = (actual > line) if side == "OVER" else (actual < line)
     if is_win:
-        return True, True, False, decimal - 1.0, float(actual)
+        return True, True, False, None if decimal is None else decimal - 1.0, float(actual)
     return True, False, False, -1.0, float(actual)
 
 
@@ -332,7 +347,7 @@ def _aggregate(items: list[dict[str, Any]], key: str) -> dict[str, Any]:
         for bucket_name, bucket in section_buckets.items():
             if bucket_name not in buckets or not isinstance(bucket, dict):
                 continue
-            for field in ("total", "resolved", "wins", "losses", "pushes"):
+            for field in ("total", "resolved", "wins", "losses", "pushes", "unpriced"):
                 buckets[bucket_name][field] += int(bucket.get(field) or 0)
             for field in ("stake_total", "profit_total"):
                 buckets[bucket_name][field] += float(bucket.get(field) or 0.0)
@@ -384,8 +399,11 @@ def build_betting_recap_payload(query_string: str) -> dict[str, Any] | None:
                         bucket["wins"] += 1
                     else:
                         bucket["losses"] += 1
-                    bucket["stake_total"] += 1.0
-                    bucket["profit_total"] += profit
+                    if profit is None:
+                        bucket["unpriced"] += 1
+                    else:
+                        bucket["stake_total"] += 1.0
+                        bucket["profit_total"] += profit
             home_pts, away_pts = _coerce_result(recon_row) if recon_row else (None, None)
             game_picks.append({
                 "market": str(row.get("market") or "").strip().upper(),
@@ -400,6 +418,8 @@ def build_betting_recap_payload(query_string: str) -> dict[str, Any] | None:
                 "resolved": resolved,
                 "result": "Push" if (resolved and is_push) else ("Win" if (resolved and is_win) else ("Loss" if resolved else None)),
                 "profit": profit if resolved else None,
+                # Graded, but no price to pay it at. Distinct from profit 0.0.
+                "unpriced": bool(resolved and profit is None),
                 "home_pts": home_pts,
                 "away_pts": away_pts,
             })
@@ -425,8 +445,11 @@ def build_betting_recap_payload(query_string: str) -> dict[str, Any] | None:
                         bucket["wins"] += 1
                     else:
                         bucket["losses"] += 1
-                    bucket["stake_total"] += 1.0
-                    bucket["profit_total"] += profit
+                    if profit is None:
+                        bucket["unpriced"] += 1
+                    else:
+                        bucket["stake_total"] += 1.0
+                        bucket["profit_total"] += profit
             prop_picks.append({
                 "player": player,
                 "team": team,
@@ -441,6 +464,8 @@ def build_betting_recap_payload(query_string: str) -> dict[str, Any] | None:
                 "actual": actual,
                 "result": "Push" if (resolved and is_push) else ("Win" if (resolved and is_win) else ("Loss" if resolved else None)),
                 "profit": profit if resolved else None,
+                # Graded, but no price to pay it at. Distinct from profit 0.0.
+                "unpriced": bool(resolved and profit is None),
             })
 
         items.append({

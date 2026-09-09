@@ -64,19 +64,16 @@ KNOWN_FAILING = {
         "syndicate.features.bankroll_manager:_american_to_decimal",
         "syndicate.features.intelligence:_american_to_decimal",
         "syndicate.features.nhl.sim_engine.hockeysim.adapters:american_to_decimal",
-        # ADDED 2026-09-09. This one is NOT a new broken converter -- it is an
-        # OLD one that the tripwire could not see, because it was defined inside
-        # `_settle_game_pick` and the sweep only looked at column 0. The sweep is
-        # AST-based now, the function was lifted to module level unchanged, and
-        # this entry is what "the failing set grew because we started looking"
-        # has to look like: recorded, with the behaviour named, not excused.
-        #
-        # It returns 2.0 on a missing or zero price, so an unpriced settled row
-        # books EVEN MONEY and is indistinguishable in the output from a +100
-        # winner. It also RAISES on a string price where the four above return
-        # None. Changing that is a settlement-money decision, not a converter
-        # cleanup, so it is left to whoever owns NBA settlement -- see leads.md.
-        "syndicate.features.nba.betting_recap:_settlement_decimal_price",
+        # `nba.betting_recap:_settlement_decimal_price` was ADDED here on
+        # 2026-09-09 and REMOVED the same day, which is the whole point of the
+        # set. It had returned 2.0 on a missing or zero price -- an unpriced
+        # settled row booking EVEN MONEY, indistinguishable in the output from a
+        # +100 winner -- and it was invisible until the sweep went AST-based and
+        # found it nested inside `_settle_game_pick`. It refuses now, the
+        # settlement path carries the None through to an `unpriced` count
+        # instead of a fabricated payout, and it meets all five requirements.
+        # Deliberately NOT listed: re-listing a fixed implementation would let
+        # it silently regress to a fabricated default.
     },
     "probability_to_american": {
         # ALL THREE `max(0.02, min(0.98, p))` clamp sites are now fixed and are

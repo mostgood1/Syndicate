@@ -214,12 +214,12 @@ AMERICAN_TO_DECIMAL: list[Impl] = [
     Impl("american_to_decimal", "scripts.build_soccer_picks", "_american_to_decimal"),
     Impl("american_to_decimal", "scripts.regrade_mlb_game_markets", "_american_to_decimal",
          "int(price) then 100/abs(price) -- ZeroDivisionError at 0"),
-    # ADDED 2026-09-09 by the NESTED sweep. Was nested in `_settle_game_pick`.
-    # RETURNS 2.0 (even money) on a missing or zero price instead of refusing,
-    # which makes an unpriced settled row indistinguishable from a +100 winner.
-    # Registered, not excused, precisely so that shows up in the scorecard.
+    # ADDED 2026-09-09 by the NESTED sweep. Was nested in `_settle_game_pick`,
+    # and returned 2.0 (even money) on a missing or zero price -- registering it
+    # is what put that on the scorecard, and it was FIXED the same day. It
+    # refuses now and meets every requirement.
     Impl("american_to_decimal", "syndicate.features.nba.betting_recap", "_settlement_decimal_price",
-         "settlement payout multiplier; 2.0 on None/0 rather than None"),
+         "settlement payout multiplier; `_coerce_float` + zero guard"),
 ]
 
 def _backfill_card_adapter(fn: Any, value: Any) -> Any:
