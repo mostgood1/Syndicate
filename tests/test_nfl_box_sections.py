@@ -365,7 +365,11 @@ def test_live_box_does_not_delete_the_sim_box():
     game = _card(final=True, in_progress=False, status="Final", away_pts=17, home_pts=24,
                  away_linescores=[7, 3, 0, 7], home_linescores=[0, 10, 7, 7])
     titles = [s["title"] for s in nfl_cards._nfl_box_sections(game, season=2026, week=1)]
-    assert titles == ["Live / final box", "Sim box", "Player box"]
+    # The TEAM-level "Sim box" survives the per-player projection panels that
+    # were added beside it -- the same rule one level down: adding player
+    # detail must not delete the team projection other surfaces quote.
+    assert titles[:3] == ["Live / final box", "Sim box", "Player box"]
+    assert titles[3:], "the sim player projection panel(s) went missing"
 
 
 def test_attach_stamps_every_card_including_one_with_no_reading():
@@ -409,7 +413,11 @@ def test_shared_contract_keeps_the_nfl_sections():
         {"date": "2026 Week 1", "games": [game]}, sport="nfl", module="cards"
     )
     served = context["games"][0]["shared_box_sections"]
-    assert [s["title"] for s in served] == ["Live / final box", "Sim box", "Player box"]
+    titles = [s["title"] for s in served]
+    assert titles[:3] == ["Live / final box", "Sim box", "Player box"]
+    # Whatever state the projection artifact is in on this machine, its
+    # panel(s) must survive the contract too.
+    assert titles[3:]
     assert served[0]["table_rows"][0] == ["NE", "7", "3", "0", "7", "17"]
 
 

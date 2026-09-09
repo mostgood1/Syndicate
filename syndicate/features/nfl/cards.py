@@ -12,6 +12,7 @@ from functools import lru_cache
 from typing import Any
 
 from syndicate.features.nfl.props import nfl_prop_display_stat
+from syndicate.features.nfl.props import nfl_prop_projection_artifact_path
 from syndicate.features.nfl.props import nfl_props_key
 from syndicate.features.nfl.props import nfl_props_rows_for_week
 from syndicate.features.nfl.smartsim2_projection import read_projection_artifact
@@ -20,6 +21,7 @@ from syndicate.features.nfl.sources import build_module_links
 from syndicate.features.nfl.sources import default_nfl_source_root
 from syndicate.features.nfl.sources import default_week
 from syndicate.features.nfl.sources import latest_season
+from syndicate.features.nfl.sources import nfl_source_roots
 from syndicate.features.nfl.sources import real_schedule_path
 from syndicate.features.nfl.sources import recommendation_path
 from syndicate.features.nfl.props import nfl_prop_recommendations_for_matchup
@@ -1228,6 +1230,519 @@ def _nfl_sim_box_section(game: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+# ---------------------------------------------------------------------------
+# PER-PLAYER SIM PROJECTIONS
+# ---------------------------------------------------------------------------
+# `_nfl_sim_box_section` above is TWO ROWS of team-level projected scoring, and
+# it was the whole of NFL's "Sim" surface on the box tab. Measured on
+# production 2026-09-09: chip `Sim`, 0 columns, 2 rows (21.8 / 22.1). MLB's box
+# tab carries a projected line per player and soccer's `_squad_box_sections`
+# publishes 8 columns over 22-43 rows per side. NFL was the odd one out.
+#
+# The team rows are KEPT, not folded in. MLB's rule is that the live box never
+# deletes the sim box; the same rule applies one level down -- adding player
+# detail must not remove the team projection the scoreboard, the market tiles
+# and the picks page all quote.
+
+# Per SIDE, not per game: soccer publishes 22-43 rows a side and shows them
+# all, but an NFL prop artifact reaches ~30 skill players a side once every
+# market is unioned. Named for the reason the actuals cap above is named.
+_NFL_SIM_PLAYER_BOX_ROW_LIMIT = 24
+
+# (artifact market, column header, decimal places).
+#
+# ORDER MIRRORS THE ACTUALS PANEL so the two tables read in the same direction:
+# `_NFL_PLAYER_BOX_COLUMNS` is Pass yds, Pass TD, Rush yds, Rec yds, TD; this
+# is the same spine with `Rec` restored (the artifact carries receptions and
+# ESPN's football groups make them awkward to line up, so the actuals panel
+# omits them).
+#
+# ONLY THE STATS THIS PANEL CAN SHOW HONESTLY, AND THE TEST IS A MEASUREMENT.
+#
+# THIS IS WHERE NFL DIVERGES FROM ITS NCAAF TWIN, DELIBERATELY. NCAAF shows
+# ONLY anytime-TD, because `prop_model` was measured WORSE than a player's own
+# average on every continuous market. NFL's number is a different thing: every
+# row in the 2026 week-1 artifact is tagged `nfl_prior_season_fallback`, i.e.
+# the projection here IS essentially the player's own prior-season rate, and
+# `reports/nfl_props_backtest_2022_2025.json` scores it OUT OF SAMPLE (fit
+# 2022w3..2023w18, scored 2024w3..2025w18) against a league-constant baseline:
+#
+#     market            n_score   MAE model   MAE baseline    corr
+#     passing_yards        1136      60.46        88.32       0.669
+#     passing_tds           997       0.93         0.98       0.309
+#     rushing_yards        4673      14.23        24.03       0.711
+#     receptions           7380       1.40         1.81       0.594
+#     receiving_yards      7326      18.52        23.87       0.566
+#     anytime_td           8464       0.396        0.411      0.252
+#
+# All six beat the baseline out of sample, so all six are shown. Copying
+# NCAAF's TD-only table here would have been the mirror-image error: dropping
+# five columns that were measured to carry signal, because a DIFFERENT model in
+# a different sport did not.
+#
+# THE THREE THE ARTIFACT CARRIES AND THIS PANEL STILL REFUSES: `passing_
+# attempts`, `rushing_attempts` and `interceptions` (44 / 54 / 26 rows in the
+# week-1 file). Two separate reasons, both disqualifying on their own.
+#   - `interceptions` is the one market the backtest does NOT clear: MAE 0.6965
+#     against a 0.6887 baseline out of sample -- WORSE raw, rescued only by
+#     de-biasing (0.6872) and carrying a correlation of 0.072, which is noise.
+#   - all three have no counterpart column in the actuals panel beside this one
+#     (`_NFL_PLAYER_BOX_COLUMNS`), so a reader comparing the two tables row by
+#     row would find projections with nothing to check them against.
+# They remain on `/nfl/props`, against their own prices, where a price is the
+# thing they are judged by.
+_NFL_SIM_PLAYER_STAT_COLUMNS: tuple[tuple[str, str, int], ...] = (
+    ("passing_yards", "Pass yds", 0),
+    ("passing_tds", "Pass TD", 1),
+    ("rushing_yards", "Rush yds", 0),
+    ("receptions", "Rec", 1),
+    ("receiving_yards", "Rec yds", 0),
+)
+
+# Held apart from the table above because it is the one column that is NOT a
+# projected stat count. `anytime_td` carries a PROBABILITY in [0, 1] (0.3457 for
+# AJ Barner), so it renders as `34.6%` under a `%`-suffixed header. The actuals
+# panel's neighbouring column is an integer count of touchdowns actually
+# scored. Printing 0.3 there -- or, worse, rounding it to 0 -- would put a
+# probability in a column a reader reads as a score.
+_NFL_SIM_PLAYER_TD_MARKET = "anytime_td"
+_NFL_SIM_PLAYER_TD_HEADER = "Anytime TD%"
+
+# Markets whose projected value is a YARDAGE, summed to rank a side's players.
+# The actuals panel sorts by total yards; this sorts by projected total yards,
+# so a player near the top of one panel is near the top of the other and the
+# two can be read against each other.
+_NFL_SIM_PLAYER_RANK_MARKETS = ("passing_yards", "rushing_yards", "receiving_yards")
+
+
+def _nfl_sim_player_projection_index(season: int, week: int) -> dict[str, Any]:
+    """Per-game, per-player projections for `season`/`week`, or a stated refusal.
+
+    -----------------------------------------------------------------------
+    CACHING -- IT INVALIDATES, AND THAT IS THE WHOLE POINT OF THE MTIME KEY
+    -----------------------------------------------------------------------
+
+    `ncaaf/player_stats.py:68` wraps its loader in a bare `@lru_cache` with no
+    invalidation, and web served a stale empty result for hours after fresh
+    data was published -- only a deploy cleared it. This artifact is REWRITTEN
+    OUT OF BAND (the `nfl-wk1-prop-artifact-refresh` job rebuilds it a few
+    hours before kickoff), so a bare cache would pin whatever this dyno read
+    first for the life of the process, which for a Wednesday-night game means
+    pinning the pregame copy through the entire game.
+
+    So the cache key carries the artifact's `st_mtime_ns`. A republish changes
+    the key and the next request reads the new file; nothing has to restart.
+    Same contract as `props._nfl_card_prop_projection_index`, deliberately --
+    that function solved this exact problem for the compact card's prop rows.
+
+    THE KEY IS A `stat()` PER CANDIDATE ROOT, NOT `nfl_prop_projection_artifact_
+    path()`, AND THAT IS A MEASUREMENT, NOT A STYLE CHOICE. That resolver
+    content-probes each root with `_prop_projection_row_count`, which parses the
+    WHOLE 470KB artifact to decide whether a candidate has rows. Calling it on
+    the warm path put a full JSON parse on every card: `attach_nfl_box_sections`
+    runs over the whole board, so a 16-game slate paid it 16 times. Measured on
+    the real 2026 week-1 artifact over four candidate roots:
+
+        16x nfl_prop_projection_artifact_path()  60.7 ms   (3.79 ms/card)
+        16x stat() across the same roots          1.88 ms  (0.12 ms/card)
+
+    Web is the display-only service; a 60ms parse tax on a board render to
+    discover an mtime it is about to hand to a cache is exactly the kind of
+    request-path compute that belongs to a worker. So the cheap key is taken
+    first and the expensive resolution happens ONCE, inside the cached body.
+
+    The key is a tuple over EVERY root, not just the winning one, so it is
+    strictly stronger than a single-file mtime: a republish onto ANY candidate
+    root invalidates -- including the case that actually matters here, an
+    artifact appearing on the mounted disk where the checkout's copy (or no
+    copy) was being served. A single-path key would have missed that, because
+    the path it stats is chosen by the very probe it has not run yet.
+
+    SEASON AND WEEK ARE CHECKED AGAINST THE PAYLOAD, not just the filename.
+    `read_nfl_prop_projection_artifact` resolves a path whose NAME encodes the
+    week and never opens the `season`/`week` fields inside. A file that
+    disagrees with its own name is exactly the failure the actuals path already
+    learned about -- last season's numbers under tonight's teams look entirely
+    plausible and are wrong in every cell -- so a mismatch is a REFUSAL with
+    both numbers named, not a silent render.
+    """
+    try:
+        stamps = _nfl_prop_projection_root_stamps(season, week)
+    except Exception:  # noqa: BLE001 -- a box must never cost the board
+        return {"ok": False, "reason": "path_unresolved", "path": "", "games": {}}
+    return _nfl_sim_player_projection_index_cached(season, week, stamps)
+
+
+def _nfl_prop_projection_root_stamps(season: int, week: int) -> tuple[int, ...]:
+    """`st_mtime_ns` of this artifact under every candidate root, 0 where absent.
+
+    The cheap half of the cache key -- see `_nfl_sim_player_projection_index`.
+    Deliberately does NOT ask which root wins; that question costs a 470KB
+    parse and is answered once, behind the cache.
+    """
+    relative = f"nfl_prop_projections_{season}_wk{week}.json"
+    stamps: list[int] = []
+    for root in nfl_source_roots():
+        try:
+            stamps.append((root / relative).stat().st_mtime_ns)
+        except OSError:
+            # Absent or unreadable are the SAME key here on purpose: both mean
+            # "this root contributes nothing", and a file appearing later
+            # changes the tuple either way.
+            stamps.append(0)
+    return tuple(stamps)
+
+
+@lru_cache(maxsize=4)
+def _nfl_sim_player_projection_index_cached(
+    season: int, week: int, _stamps: tuple[int, ...]
+) -> dict[str, Any]:
+    try:
+        path = nfl_prop_projection_artifact_path(season, week)
+    except Exception:  # noqa: BLE001
+        return {"ok": False, "reason": "path_unresolved", "path": "", "games": {}}
+    location = str(path)
+    if not any(_stamps):
+        # No candidate root has the file at all. Reported as `absent` rather
+        # than `unreadable`, because "nobody published it" and "it is there and
+        # broken" send a reader to different places.
+        return {"ok": False, "reason": "absent", "path": location, "games": {}}
+    try:
+        with path.open("r", encoding="utf-8-sig") as handle:
+            payload = json.load(handle)
+    except Exception:  # noqa: BLE001
+        return {"ok": False, "reason": "unreadable", "path": location, "games": {}}
+    if not isinstance(payload, dict):
+        return {"ok": False, "reason": "unreadable", "path": location, "games": {}}
+
+    payload_season = _safe_float(payload.get("season"))
+    payload_week = _safe_float(payload.get("week"))
+    if payload_season is None or payload_week is None:
+        return {"ok": False, "reason": "unstamped", "path": location, "games": {}}
+    if int(payload_season) != int(season) or int(payload_week) != int(week):
+        return {
+            "ok": False,
+            "reason": "wrong_week",
+            "path": location,
+            "games": {},
+            "payload_season": int(payload_season),
+            "payload_week": int(payload_week),
+        }
+
+    rows = payload.get("sim_rows")
+    if not isinstance(rows, list):
+        return {"ok": False, "reason": "unreadable", "path": location, "games": {}}
+
+    games: dict[str, dict[str, dict[str, Any]]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        game_id = str(row.get("game_id") or "").strip()
+        name = str(row.get("entity") or "").strip()
+        if not game_id or not name:
+            continue
+        # `market` is `"<stat>::<lowercased player>"` -- one row per (player,
+        # market, line), so several rows can share a stat key.
+        market = str(row.get("market") or "").split("::")[0].strip()
+        value = _safe_float(row.get("projected_value"))
+        if not market or value is None:
+            continue
+        players = games.setdefault(game_id, {})
+        player = players.setdefault(
+            name.lower(),
+            {"name": name, "team": str(row.get("player_team") or "").strip(), "stats": {}},
+        )
+        if not player["team"]:
+            player["team"] = str(row.get("player_team") or "").strip()
+        # `setdefault`, matching `props._nfl_card_prop_projection_index_cached`:
+        # `projected_value` is a property of the PLAYER and is identical across
+        # every line they are quoted at, so the first row wins and later ones
+        # cannot flip it.
+        player["stats"].setdefault(market, value)
+    return {
+        "ok": True,
+        "reason": "",
+        "path": location,
+        "generated_at": str(payload.get("generated_at") or ""),
+        "games": games,
+        "row_count": len(rows),
+    }
+
+
+def _nfl_sim_player_rows_for_game(
+    index: dict[str, Any], *, away_name: str, home_name: str
+) -> dict[str, dict[str, Any]] | None:
+    """This game's players out of the artifact index, or None for no match.
+
+    The artifact keys a game as `"<away full name>|<home full name>"` --
+    `nfl_props_key`, the same key `/nfl/api/props` joins on -- so the literal
+    key is tried first. The CANONICAL pair is the fallback and not the primary,
+    because an exact agreement between the card and the artifact should never
+    be routed through an alias map that could, in principle, collapse two
+    spellings the artifact means to keep apart.
+    """
+    games = index.get("games")
+    if not isinstance(games, dict) or not games:
+        return None
+    direct = games.get(nfl_props_key(away_name, home_name))
+    if isinstance(direct, dict):
+        return direct
+    away_key = canonical_team("nfl", away_name)
+    home_key = canonical_team("nfl", home_name)
+    if not away_key or not home_key:
+        return None
+    for game_id, players in games.items():
+        parts = str(game_id).split("|")
+        if len(parts) != 2:
+            continue
+        if canonical_team("nfl", parts[0]) == away_key and canonical_team("nfl", parts[1]) == home_key:
+            return players if isinstance(players, dict) else None
+    return None
+
+
+def _nfl_sim_player_lead(live_state: dict[str, Any] | None) -> str:
+    """One sentence naming WHICH of the four states this panel is rendering in.
+
+    The panel itself never changes -- a projection is the same number before,
+    during and after a game -- so the sentence is the only thing that can tell
+    a reader whether the numbers beside it are real yet. All four keep chip
+    `Sim`: soccer's squad panel used to derive its chip from whether a
+    live-state object existed, which put a `Live` label on a simulated number.
+    """
+    if not isinstance(live_state, dict):
+        return (
+            "Projected player lines. Live game state has not been read for this game, so "
+            "there are no real lines to compare them against yet"
+        )
+    if bool(live_state.get("final")):
+        return (
+            "Projected player lines, from before kickoff and kept beside the final ones. "
+            "The real numbers are in the Player box panel above"
+        )
+    if bool(live_state.get("in_progress")):
+        return (
+            "Projected player lines — NOT what has happened. The real in-game numbers are "
+            "in the Player box panel above"
+        )
+    return "Projected player lines for a game that has not kicked off"
+
+
+def _nfl_sim_player_box_sections(
+    game: dict[str, Any], *, season: int, week: int
+) -> list[dict[str, Any]]:
+    """One projected stat table per side, mirroring soccer's squad panels.
+
+    ------------------------------------------------------------------
+    PROJECTIONS AND ACTUALS ARE NEVER THE SAME TABLE
+    ------------------------------------------------------------------
+
+    These sections are chipped `Sim`, `kind="projection"`, titled
+    `"<ABBR> sim player projections"`, and carry their own columns. They sit
+    BESIDE `"Player box"` -- ESPN's real per-player lines, chipped
+    `Live`/`Final`, `kind="actual"` -- and are never merged into it. This
+    platform has already shipped and backed out a surface that put a projected
+    number where a real one belonged; a single combined table is exactly that
+    surface, because one column of it would be real and the next simulated with
+    nothing in the markup saying which.
+
+    SEASON AND WEEK ARE JOINED STRICTLY. The artifact is addressed by season
+    and week, and `_nfl_sim_player_projection_index` additionally refuses a
+    payload whose own `season`/`week` fields disagree with the ones asked for.
+    There is no "closest available week" fallback and there must not be one.
+    """
+    away = game.get("away") if isinstance(game.get("away"), dict) else {}
+    home = game.get("home") if isinstance(game.get("home"), dict) else {}
+    away_abbr = str(away.get("abbr") or "AWAY")
+    home_abbr = str(home.get("abbr") or "HOME")
+    away_name = str(away.get("name") or away_abbr)
+    home_name = str(home.get("name") or home_abbr)
+    live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else None
+
+    index = _nfl_sim_player_projection_index(season, week)
+    if not index.get("ok"):
+        return [_nfl_sim_player_missing_section(index, season=season, week=week)]
+
+    players = _nfl_sim_player_rows_for_game(index, away_name=away_name, home_name=home_name)
+    if not players:
+        return [
+            {
+                "title": "Sim player projections",
+                "body": (
+                    f"The week {week} prop-projection artifact was read "
+                    f"({index.get('row_count') or 0} rows) but carries no player rows for "
+                    f"{away_name} @ {home_name}. Nothing is being substituted from another "
+                    "game or another week."
+                ),
+                "chip": "Sim",
+                "kind": "projection",
+                "rows": [],
+            }
+        ]
+
+    # Sides are resolved through `canonical_team`, NOT by comparing tri-codes.
+    # The artifact speaks nflverse (`LA`, `WAS`); the card's branding speaks
+    # ESPN (`LAR`, `WSH`). That exact gap has already cost this module twice --
+    # two crestless rows on the compact strip, and a projection join that
+    # dropped the Rams -- and `canonical_team` is the one map both directions
+    # already route through.
+    away_key = canonical_team("nfl", away_name) or canonical_team("nfl", away_abbr)
+    home_key = canonical_team("nfl", home_name) or canonical_team("nfl", home_abbr)
+    by_side: dict[str, list[dict[str, Any]]] = {"away": [], "home": []}
+    unassigned = 0
+    for player in players.values():
+        key = canonical_team("nfl", player.get("team"))
+        if key and key == away_key:
+            by_side["away"].append(player)
+        elif key and key == home_key:
+            by_side["home"].append(player)
+        else:
+            # Counted and reported rather than guessed onto a side. A player
+            # shown under the wrong team is worse than a player not shown.
+            unassigned += 1
+
+    lead = _nfl_sim_player_lead(live_state)
+    sections: list[dict[str, Any]] = []
+    for side, abbr, team_name in (
+        ("away", away_abbr, away_name),
+        ("home", home_abbr, home_name),
+    ):
+        note = ""
+        if side == "away" and unassigned:
+            # Reported once, on the first panel, so a reader sees the number
+            # without it being duplicated on both.
+            note = (
+                f" {unassigned} projected player(s) in this game carry a team code that "
+                "matches neither side and are not shown under either."
+            )
+        sections.append(
+            _nfl_sim_player_side_section(
+                by_side[side],
+                abbr=abbr,
+                team_name=team_name,
+                lead=lead,
+                note=note,
+                generated_at=str(index.get("generated_at") or ""),
+            )
+        )
+    return sections
+
+
+def _nfl_sim_player_missing_section(
+    index: dict[str, Any], *, season: int, week: int
+) -> dict[str, Any]:
+    """The stated empty state, naming the artifact and WHY it was refused.
+
+    Four distinct reasons, because "the file is not there" and "the file is
+    there and is for a different week" are different facts and a reader who is
+    told the wrong one goes looking in the wrong place.
+    """
+    reason = str(index.get("reason") or "")
+    path = str(index.get("path") or f"nfl_source/nfl_prop_projections_{season}_wk{week}.json")
+    if reason == "wrong_week":
+        detail = (
+            f"The artifact at `{path}` is stamped season "
+            f"{index.get('payload_season')} week {index.get('payload_week')}, not season "
+            f"{season} week {week}. It is REFUSED rather than rendered — another week's "
+            "projections under tonight's teams would look entirely plausible and be wrong."
+        )
+    elif reason == "unstamped":
+        detail = (
+            f"The artifact at `{path}` does not carry the `season`/`week` fields needed to "
+            f"prove it is season {season} week {week}, so it is not rendered."
+        )
+    elif reason in {"unreadable", "path_unresolved"}:
+        detail = f"The prop-projection artifact (`{path}`) could not be read."
+    else:
+        detail = (
+            f"No prop-projection artifact has been published for season {season} week "
+            f"{week} (`nfl_source/nfl_prop_projections_{season}_wk{week}.json`). It is "
+            "rebuilt a few hours before kickoff."
+        )
+    return {
+        "title": "Sim player projections",
+        "body": f"{detail} Nothing is being substituted in its place.",
+        "chip": "Sim",
+        "kind": "projection",
+        "rows": [],
+    }
+
+
+def _nfl_sim_player_side_section(
+    players: list[dict[str, Any]],
+    *,
+    abbr: str,
+    team_name: str,
+    lead: str,
+    note: str,
+    generated_at: str,
+) -> dict[str, Any]:
+    """One side's table. Columns are built from what this side actually has."""
+    stamp = f" Generated {generated_at[:19].replace('T', ' ')}Z." if len(generated_at) >= 19 else ""
+    if not players:
+        # Stated, not hidden -- soccer's precedent. A prop artifact's coverage
+        # is genuinely one-sided for some games, and an absent panel is
+        # indistinguishable from a rendering bug.
+        return {
+            "title": f"{abbr} sim player projections",
+            "body": f"No player projections were published for {team_name} in this game.",
+            "chip": "Sim",
+            "kind": "projection",
+            "rows": [],
+        }
+
+    # A column survives only if at least one player on THIS side has a value
+    # for it. A column of dashes is a claim that the stat was projected at
+    # nothing, which is not what an absent market means.
+    active = [
+        (market, header, digits)
+        for market, header, digits in _NFL_SIM_PLAYER_STAT_COLUMNS
+        if any(_safe_float(p["stats"].get(market)) is not None for p in players)
+    ]
+    show_td = any(_safe_float(p["stats"].get(_NFL_SIM_PLAYER_TD_MARKET)) is not None for p in players)
+    columns = ["Player"] + [header for _, header, _ in active]
+    if show_td:
+        columns.append(_NFL_SIM_PLAYER_TD_HEADER)
+
+    def _rank(player: dict[str, Any]) -> tuple[float, float]:
+        yards = sum(
+            _safe_float(player["stats"].get(market)) or 0.0
+            for market in _NFL_SIM_PLAYER_RANK_MARKETS
+        )
+        return (yards, _safe_float(player["stats"].get(_NFL_SIM_PLAYER_TD_MARKET)) or 0.0)
+
+    ordered = sorted(players, key=_rank, reverse=True)
+    table_rows: list[list[str]] = []
+    for player in ordered[:_NFL_SIM_PLAYER_BOX_ROW_LIMIT]:
+        row = [str(player.get("name") or "Player")]
+        for market, _header, digits in active:
+            value = _safe_float(player["stats"].get(market))
+            # An em dash, not a zero. This player has no quoted line in this
+            # market, which is not a projection of zero.
+            row.append("—" if value is None else f"{value:.{digits}f}")
+        if show_td:
+            td = _safe_float(player["stats"].get(_NFL_SIM_PLAYER_TD_MARKET))
+            row.append("—" if td is None else f"{td * 100.0:.1f}%")
+        table_rows.append(row)
+
+    shown = len(table_rows)
+    scope = f"{shown} {team_name} players" if shown == len(ordered) else (
+        f"top {shown} of {len(ordered)} {team_name} players by projected total yards"
+    )
+    return {
+        "title": f"{abbr} sim player projections",
+        # ALWAYS `Sim`, in every game state -- see `_nfl_sim_player_lead`.
+        "chip": "Sim",
+        "kind": "projection",
+        "body": (
+            f"{lead} — {scope}. Anytime TD is a PROBABILITY, not a count; the Player box "
+            f"column beside it counts touchdowns actually scored.{note}{stamp}"
+        ),
+        "columns": columns,
+        "table_rows": table_rows,
+        "rows": [],
+    }
+
+
 # How many player lines one game's box shows. A NAMED constant, not a literal:
 # NCAAF's slate-coverage test parses its module's AST and rejects any
 # board-sized integer slice cap, because two of those once silently truncated a
@@ -1430,6 +1945,10 @@ def _nfl_box_sections(game: dict[str, Any], *, season: int, week: int) -> list[d
     if sim_section is not None:
         sections.append(sim_section)
     sections.append(_nfl_player_box_section(game, season=season, week=week))
+    # AFTER the actuals panel, not before it. Real numbers lead; the projected
+    # ones trail. The team-level `Sim box` above is untouched -- adding player
+    # detail must not delete the team projection other surfaces quote.
+    sections.extend(_nfl_sim_player_box_sections(game, season=season, week=week))
     return sections
 
 
