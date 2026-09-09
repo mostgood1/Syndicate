@@ -988,6 +988,303 @@ def _game_from_smartsim_projection(projection: Any, season: int, week: int) -> d
     }
 
 
+# --------------------------------------------------------------------------
+# BOX SCORE
+# --------------------------------------------------------------------------
+#
+# WHY THIS EXISTS. NFL's box-score tab was the shared contract's GENERIC
+# derivation (`game_board_contract._build_box_sections`) and nothing more: at
+# best a two-row "Final score" beside a two-row "Sim game box". There was no
+# quarter scoring and no player line anywhere on the card, on a sport whose
+# entire betting surface is quarters, halves and player props.
+#
+# THE PORT IS NCAAF's (`9b57dd52`), deliberately, because both football codes
+# already render the SAME partial (`shared/_game_card_ncaaf.html`, dispatched
+# on `card_variant in ('ncaaf_main', 'nfl_main')`) and NFL's card block is
+# shaped "exactly like NCAAF's `ncaaf_card`" by its own docstring. So the grid
+# branch (`section.columns` / `section.table_rows`) and the per-section `chip`
+# are already in the template; only the data side was missing, and
+# `game_board_contract._normalize_game` already PRESERVES a non-empty
+# `shared_box_sections` set by a sport. The cross-sport contract needed no
+# change here either.
+#
+# THE CHIP BUG WAS LIVE ON NFL. The template's card-level fallback is
+# `'Live' if live_state else 'Sim'` where `live_state` is `shared_is_live` --
+# FALSE on a completed game. Every generic section NFL served carried no chip
+# of its own, so a finished game's real "Final score" panel was labelled
+# **Sim**. Every section below names its own chip, which is the whole reason
+# NCAAF's one-line template change exists; NFL inherited the fix the moment it
+# started supplying chips, and inherits the bug for as long as it does not.
+
+_NFL_REGULATION_PERIODS = 4
+
+# `—`, not blank. A blank cell in a stat grid reads as "zero points", and an
+# unplayed quarter and a scoreless one are different facts.
+_NFL_BOX_EMPTY_CELL = "—"
+
+
+def _nfl_linescores(live_state: Any, side: str) -> list[Any] | None:
+    values = live_state.get(f"{side}_linescores") if isinstance(live_state, dict) else None
+    return list(values) if isinstance(values, list) and values else None
+
+
+def _nfl_period_count(*linescores: Any) -> int:
+    return max((len(v) for v in linescores if isinstance(v, list)), default=0)
+
+
+def _nfl_overtime_total(values: list[Any] | None) -> int | None:
+    """Every period past regulation, summed into ONE cell.
+
+    THE BINNING IS THE PLATFORM'S, NOT A NEW ONE. `segment_actuals`'
+    `_FOOTBALL_SEGMENTS` gives `nfl` (the same table as `ncaaf`)
+    `h2 = (3, 4, None)`, where the trailing `None` means "and every period
+    after" -- the sportsbook convention that the second half INCLUDES all
+    overtime. A card that split OT into OT1/OT2 columns, or folded it into Q4,
+    would disagree with how this same platform GRADES a second-half order, and
+    anyone comparing the box against a settled bet would be reading two
+    different definitions of one game.
+
+    `test_nfl_overtime_binning_matches_segment_actuals` asserts that
+    correspondence against `segment_actuals` itself rather than a hand-written
+    number, so a change to the convention breaks the test instead of quietly
+    making the card disagree with the grader.
+
+    None when no overtime period carries a value, so an absent OT is absent
+    rather than a zero.
+    """
+    if not isinstance(values, list) or len(values) <= _NFL_REGULATION_PERIODS:
+        return None
+    seen = False
+    total = 0
+    for value in values[_NFL_REGULATION_PERIODS:]:
+        if isinstance(value, (int, float)):
+            total += int(value)
+            seen = True
+    return total if seen else None
+
+
+def _nfl_box_cell(values: list[Any] | None, index: int) -> str:
+    if not isinstance(values, list) or index >= len(values):
+        return _NFL_BOX_EMPTY_CELL
+    value = values[index]
+    if isinstance(value, (int, float)):
+        return str(int(value))
+    # A present-but-None entry is a HOLE, not a zero:
+    # `segment_actuals.linescores_from_competitor` keeps a missing period's
+    # position rather than shifting later periods left.
+    return _NFL_BOX_EMPTY_CELL
+
+
+def _nfl_side_total(live_state: dict[str, Any], side: str, values: list[Any] | None) -> str:
+    points = live_state.get(f"{side}_pts")
+    if isinstance(points, (int, float)):
+        return str(int(points))
+    if isinstance(values, list):
+        seen = [v for v in values if isinstance(v, (int, float))]
+        if seen:
+            return str(int(sum(seen)))
+    return _NFL_BOX_EMPTY_CELL
+
+
+def _nfl_linescore_section(game: dict[str, Any]) -> dict[str, Any]:
+    """The quarter box, or a STATED empty state saying which of four it is.
+
+    Pregame, in-progress, final and "no live-state reading at all" must be
+    distinguishable ON SCREEN -- one blank grid for all four is the defect this
+    replaces, not a smaller version of it.
+    """
+    title = "Live / final box"
+    live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else None
+    if live_state is None:
+        return {
+            "title": title,
+            "body": (
+                "Live game state has not been read for this game, so no quarter scoring is "
+                "available. This is a missing reading, not a 0-0 game."
+            ),
+            "chip": "No reading",
+            "kind": "unknown",
+            "rows": [],
+        }
+
+    status = str(live_state.get("status") or "").strip()
+    started = bool(live_state.get("in_progress")) or bool(live_state.get("final"))
+    away_values = _nfl_linescores(live_state, "away")
+    home_values = _nfl_linescores(live_state, "home")
+
+    if not started:
+        return {
+            "title": title,
+            "body": (
+                f"Scheduled{f' — {status}' if status else ''}. The quarter box fills in "
+                "period by period once the game kicks off."
+            ),
+            "chip": "Pregame",
+            "kind": "scheduled",
+            "rows": [],
+        }
+
+    if away_values is None and home_values is None:
+        return {
+            "title": title,
+            "body": (
+                f"{'Final' if live_state.get('final') else 'In progress'}"
+                f"{f' — {status}' if status else ''}, but the scoreboard has not published "
+                "per-quarter scoring for this game yet."
+            ),
+            "chip": "Final" if live_state.get("final") else "Live",
+            "kind": "actual",
+            "rows": [],
+        }
+
+    periods = _nfl_period_count(away_values, home_values)
+    away_ot = _nfl_overtime_total(away_values)
+    home_ot = _nfl_overtime_total(home_values)
+    has_overtime = periods > _NFL_REGULATION_PERIODS and (away_ot is not None or home_ot is not None)
+
+    columns = ["Team", "Q1", "Q2", "Q3", "Q4"]
+    if has_overtime:
+        columns.append("OT")
+    columns.append("T")
+
+    table_rows: list[list[str]] = []
+    for side, values, overtime in (
+        ("away", away_values, away_ot),
+        ("home", home_values, home_ot),
+    ):
+        container = game.get(side) if isinstance(game.get(side), dict) else {}
+        label = str(container.get("abbr") or container.get("name") or side.upper())
+        cells = [label]
+        cells.extend(_nfl_box_cell(values, index) for index in range(_NFL_REGULATION_PERIODS))
+        if has_overtime:
+            cells.append(str(overtime) if overtime is not None else _NFL_BOX_EMPTY_CELL)
+        cells.append(_nfl_side_total(live_state, side, values))
+        table_rows.append(cells)
+
+    if live_state.get("final"):
+        # ESPN's `shortDetail` for a regulation final is literally "Final", so
+        # appending it unconditionally produces "Final — Final." on every
+        # completed game. Kept only when it says something more ("Final/OT").
+        extra = status if status and status.lower() != "final" else ""
+        body = f"Final{f' — {extra}' if extra else ''}."
+    else:
+        period = live_state.get("period")
+        clock = str(live_state.get("clock") or "").strip()
+        detail = status or (f"Q{period}" if isinstance(period, int) else "")
+        if clock and detail:
+            detail = f"{detail} · {clock}"
+        body = (
+            f"In progress{f' — {detail}' if detail else ''}. Quarters not yet played show as "
+            f"{_NFL_BOX_EMPTY_CELL}."
+        )
+    if has_overtime:
+        body += (
+            " OT is one column covering every overtime period, matching how this platform "
+            "grades football's second half (periods 3, 4 and all overtime)."
+        )
+    return {
+        "title": title,
+        "body": body,
+        "chip": "Final" if live_state.get("final") else "Live",
+        "kind": "actual",
+        "columns": columns,
+        "table_rows": table_rows,
+    }
+
+
+def _nfl_sim_box_section(game: dict[str, Any]) -> dict[str, Any] | None:
+    """The projected score, kept BESIDE the live box rather than replaced by it.
+
+    MLB's card (`_game_card_mlb.html`) shows "Live / final box" and "Sim box"
+    as two coexisting panels and the live one never deletes the sim one.
+    Supplying `shared_box_sections` bypasses the shared contract's own
+    derivation entirely, so the sim rows it used to produce have to be
+    re-supplied here or they would silently vanish the moment a real box
+    existed -- the fix deleting the thing it was meant to sit beside.
+    """
+    card = game.get("nfl_card") if isinstance(game.get("nfl_card"), dict) else {}
+    scoreboard = card.get("scoreboard") if isinstance(card.get("scoreboard"), dict) else {}
+    away_points = _safe_float(scoreboard.get("away_points"))
+    home_points = _safe_float(scoreboard.get("home_points"))
+    if away_points is None and home_points is None:
+        return None
+    rows = []
+    for side, value in (("away", away_points), ("home", home_points)):
+        container = game.get(side) if isinstance(game.get(side), dict) else {}
+        rows.append(
+            {
+                "name": str(container.get("abbr") or side.upper()),
+                "detail": str(container.get("name") or ""),
+                "value": f"{value:.1f}" if value is not None else "-",
+            }
+        )
+    label = str(scoreboard.get("source_label") or "SmartSim 2.0").strip() or "SmartSim 2.0"
+    return {
+        "title": "Sim box",
+        "body": f"{label} projected scoring, kept beside the live box for the whole game.",
+        "chip": "Sim",
+        "kind": "projection",
+        "rows": rows,
+    }
+
+
+def _nfl_player_box_section(game: dict[str, Any], *, season: int, week: int) -> dict[str, Any]:
+    """Per-player lines for THIS game, or a stated empty state naming the gap.
+
+    A STATED EMPTY STATE, NEVER A FILLED-IN WRONG ONE. `nfl/player_stats.py`
+    can produce season-to-date lines off `pbp_{season}.csv`, and rendering
+    those under a live game would be a fabricated box score that looks entirely
+    plausible: nflverse's play-by-play lags by days, so on a Wednesday-night
+    week-1 game it holds either nothing or LAST season. NCAAF made exactly this
+    call for the same reason (its snapshot is 2025-only) and the rule is the
+    same here -- an empty state that explains itself is a correct reading; a
+    filled one that quietly changed season or week is a defect.
+    """
+    return {
+        "title": "Player box",
+        "body": (
+            "Per-player lines are not read for this game. The season play-by-play artifact "
+            f"(`pbp_{season}.csv`) lags the live feed by days, so last week's or last season's "
+            "numbers are deliberately NOT shown under this game."
+        ),
+        "chip": "Not published",
+        "kind": "unknown",
+        "rows": [],
+    }
+
+
+def _nfl_box_sections(game: dict[str, Any], *, season: int, week: int) -> list[dict[str, Any]]:
+    sections = [_nfl_linescore_section(game)]
+    sim_section = _nfl_sim_box_section(game)
+    if sim_section is not None:
+        sections.append(sim_section)
+    sections.append(_nfl_player_box_section(game, season=season, week=week))
+    return sections
+
+
+def attach_nfl_box_sections(games: list[dict[str, Any]], season: int, week: int) -> int:
+    """Set `shared_box_sections` on every card. Never raises.
+
+    Runs on EVERY card, including ones the live-state join never matched: "no
+    reading" is a state the box has to render, and skipping those cards would
+    hand them straight back to the shared contract's generic derivation, whose
+    sections carry no chip and therefore reproduce the mislabel this closes.
+    """
+    stamped = 0
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        try:
+            game["shared_box_sections"] = _nfl_box_sections(game, season=season, week=week)
+            stamped += 1
+        except Exception as exc:  # noqa: BLE001 -- a box must never cost the board
+            print(
+                f"NFL_BOX_SECTIONS_ERROR week={week} error={type(exc).__name__}: {exc}",
+                flush=True,
+            )
+    return stamped
+
+
 def build_cards_page_context(selected_week: int, *, season: int | None = None, sort: str = "date") -> dict[str, Any]:
     resolved_season = int(season or latest_season())
     resolved_week = _resolved_week(selected_week or default_week(resolved_season), season=resolved_season)
@@ -1075,6 +1372,16 @@ def build_cards_page_context(selected_week: int, *, season: int | None = None, s
             print(f"[nfl_cards] LIVE_STATE_FAILED season={season} "
                   f"week={resolved_week} error={type(exc).__name__}: {exc}",
                   flush=True)
+
+    # BOX SECTIONS, AFTER the live-state stamp and BEFORE the board contract.
+    # Order is load-bearing in both directions: the linescore section reads
+    # `game["live_state"]`, which the block above is what sets, and
+    # `apply_game_board_contract` -> `_normalize_game` only PRESERVES a
+    # `shared_box_sections` that is already there -- stamping after it would
+    # fill a key the contract had already overwritten with its generic
+    # derivation.
+    if games:
+        attach_nfl_box_sections(games, season, resolved_week)
 
     weeks = _available_card_weeks(season)
     prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)

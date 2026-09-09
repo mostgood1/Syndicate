@@ -65,6 +65,7 @@ import urllib.request
 from typing import Any, Mapping
 
 from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
+from syndicate.features.shared.segment_actuals import linescores_from_competitor
 
 
 _SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
@@ -154,6 +155,24 @@ def _state_from_event(event: Mapping[str, Any]) -> dict[str, Any] | None:
     away_pts = _score_or_none(away_row.get("score")) if (in_progress or final) else None
     home_pts = _score_or_none(home_row.get("score")) if (in_progress or final) else None
 
+    # PER-PERIOD SCORES, CARRIED RATHER THAN DROPPED -- the same root cause
+    # NCAAF's box-score tab had (`9b57dd52`). `competitors[].linescores[]` has
+    # been in this exact payload the whole time and this function read only the
+    # aggregate, so the board could show a final score and had no way to show
+    # HOW it got there. `scripts/poll_nfl_live_state._game_from_event` already
+    # parses the identical field off the identical endpoint for settlement;
+    # this is the CARD's reader of it, and it costs no extra fetch.
+    #
+    # `linescores_from_competitor` is the platform's one parser: it honours an
+    # entry's own `period` so a feed that skips one leaves a HOLE rather than
+    # shifting every later quarter left. A shifted linescore renders the wrong
+    # quarter with total confidence.
+    #
+    # Same pregame gate as the score. An unstarted game must carry `None`, not
+    # `[]` -- an empty list downstream reads as "played, scored nothing".
+    away_linescores = linescores_from_competitor(away_row) if (in_progress or final) else None
+    home_linescores = linescores_from_competitor(home_row) if (in_progress or final) else None
+
     return {
         "event_id": event_id,
         "away_abbr": away_abbr,
@@ -173,6 +192,8 @@ def _state_from_event(event: Mapping[str, Any]) -> dict[str, Any] | None:
         "start_time": _text(event.get("date")),
         "away_pts": away_pts,
         "home_pts": home_pts,
+        "away_linescores": away_linescores,
+        "home_linescores": home_linescores,
         # DOWN / DISTANCE / FIELD POSITION WERE ALREADY IN THIS PAYLOAD AND WERE
         # BEING THROWN AWAY. `_fetch_scoreboard` returns the whole scoreboard
         # JSON, whose competitions carry a `situation` block; nothing in `nfl/`,
@@ -281,6 +302,15 @@ def attach_nfl_live_game_state(
             live_state["away_pts"] = state["away_pts"]
         if state.get("home_pts") is not None:
             live_state["home_pts"] = state["home_pts"]
+        # Copied only when PRESENT and non-empty, so absence stays absent: a
+        # pregame game must not gain an empty list that a box renderer would
+        # read as "four quarters played, zero points". A list may still contain
+        # `None` holes -- see `linescores_from_competitor` -- and the box
+        # renders those as an em dash rather than a zero.
+        for side_key in ("away_linescores", "home_linescores"):
+            values = state.get(side_key)
+            if isinstance(values, list) and values:
+                live_state[side_key] = list(values)
         # GAME SHAPE -- the state this game is in, kept instead of discarded.
         # Lane `game-shape-capture`; contract in `shared/game_shape.py`.
         # Nothing downstream can currently ask WHEN a football projection is
