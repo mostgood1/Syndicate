@@ -189,6 +189,12 @@ def _init_bucket() -> dict[str, Any]:
         "wins": 0,
         "losses": 0,
         "pushes": 0,
+        # Settled rows excluded from the ROI computation -- see
+        # `nhl/betting_recap.py`'s `_empty_bucket`, which carries the full
+        # reasoning. This module had a byte-identical copy of the same
+        # independent-guard defect and is fixed with it, because a fix applied
+        # to one of two copies is the harder bug to find later.
+        "unpriced": 0,
         "stake_total": 0.0,
         "profit_total": 0.0,
     }
@@ -223,9 +229,11 @@ def _apply_row(bucket: dict[str, Any], row: dict[str, str]) -> None:
         bucket["pushes"] += 1
     stake = _safe_float(row.get("stake"))
     profit = _safe_float(row.get("payout"))
-    if stake is not None:
+    if stake is None or profit is None:
+        # BOTH OR NEITHER; a stake without its payout is not a return.
+        bucket["unpriced"] += 1
+    else:
         bucket["stake_total"] += float(stake)
-    if profit is not None:
         bucket["profit_total"] += float(profit)
 
 

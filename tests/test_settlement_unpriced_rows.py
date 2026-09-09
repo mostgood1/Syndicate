@@ -161,3 +161,101 @@ def test_every_bucket_shape_carries_the_counter():
     the other is a gap that only shows up in whichever payload nobody reads."""
     for bucket in (_empty_bucket(), _init_accuracy_bucket()):
         assert "unpriced" in bucket
+
+
+# ---------------------------------------------------------------------------
+# NHL: the mirror-image defect, in the module that was the correct precedent
+# ---------------------------------------------------------------------------
+# `nhl/betting_recap.py` never fabricated a payout -- it is why the NBA fix
+# exists in the shape it does -- but it added `stake` and `payout`
+# INDEPENDENTLY, so a settled row with a stake and no payout enlarged the ROI
+# DENOMINATOR while contributing no numerator. That understates ROI, which is
+# the opposite error from NBA's fabricated even money and the one that looks
+# like conservatism rather than a bug.
+#
+# MEASURED BEFORE IT WAS CHANGED: 0 mismatched rows in 7,902 settled rows across
+# both git-tracked logs, and production's `stake_total / 100` equalled `resolved`
+# exactly on 365 game and 1,702 prop rows over 90 days. The published numbers do
+# not move. These tests exist because the hole was structural, not because a
+# number was wrong -- so they assert the INVARIANT, which no population can.
+
+NL = chr(10)  # written without an escape on purpose: the shell layer that
+              # generated this file un-escapes backslashes in a heredoc.
+NHL_LOG_HEADER = "date,home,away,market,bet,ev,price,result,stake,payout"
+
+
+def _nhl_payload(tmp_path, monkeypatch, log_lines):
+    from syndicate.features.nhl import betting_recap as nhl_recap
+
+    root = tmp_path / "processed"
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "reconciliations_log.csv").write_text(
+        NL.join([NHL_LOG_HEADER, *log_lines, ""]), encoding="utf-8"
+    )
+    (root / "props_reconciliations_log.csv").write_text(NHL_LOG_HEADER + NL, encoding="utf-8")
+    monkeypatch.setattr(nhl_recap, "_artifact_root", lambda: root)
+    nhl_recap.build_betting_recap_payload.cache_clear()
+    try:
+        payload = nhl_recap.build_betting_recap_payload("since=2026-01-02&until=2026-01-02")
+    finally:
+        nhl_recap.build_betting_recap_payload.cache_clear()
+    return payload["items"][0]["games"]["buckets"]["Overall"]
+
+
+def test_nhl_a_stake_without_its_payout_does_not_enlarge_the_roi_denominator(tmp_path, monkeypatch):
+    """THE DEFECT. Row 2 is settled and staked but has no payout. Under the old
+    code its 100 joined `stake_total` while contributing nothing to
+    `profit_total`, halving a +10% ROI to +5%."""
+    bucket = _nhl_payload(tmp_path, monkeypatch, [
+        "2026-01-02,HOME,AWAY,ML,HOME,0.12,-110,win,100,10",
+        "2026-01-02,HOME2,AWAY2,ML,HOME2,0.12,-110,win,100,",
+    ])
+    assert bucket["resolved"] == 2 and bucket["wins"] == 2, "both rows still GRADE"
+    assert bucket["unpriced"] == 1
+    assert bucket["stake_total"] == 100.0, "the unpaid row must be out of the DENOMINATOR"
+    assert bucket["profit_total"] == 10.0
+    assert bucket["roi_pct"] == pytest.approx(10.0), "was 5.0 when the terms were added independently"
+
+
+def test_nhl_a_payout_without_its_stake_does_not_inflate_the_roi_numerator(tmp_path, monkeypatch):
+    """The other half of the same asymmetry, and the one that flatters the
+    number rather than understating it."""
+    bucket = _nhl_payload(tmp_path, monkeypatch, [
+        "2026-01-02,HOME,AWAY,ML,HOME,0.12,-110,win,100,10",
+        "2026-01-02,HOME2,AWAY2,ML,HOME2,0.12,-110,win,,10",
+    ])
+    assert bucket["resolved"] == 2
+    assert bucket["unpriced"] == 1
+    assert bucket["stake_total"] == 100.0
+    assert bucket["profit_total"] == 10.0, "was 20.0, a return on a stake nobody recorded"
+    assert bucket["roi_pct"] == pytest.approx(10.0)
+
+
+def test_nhl_complete_rows_are_untouched(tmp_path, monkeypatch):
+    """The fix must not move a number for the rows that were always complete --
+    which, measured, is every row in both logs and in production."""
+    bucket = _nhl_payload(tmp_path, monkeypatch, [
+        "2026-01-02,HOME,AWAY,ML,HOME,0.12,-110,win,100,90.91",
+        "2026-01-02,HOME2,AWAY2,ML,HOME2,0.12,-110,loss,100,-100",
+    ])
+    assert bucket["unpriced"] == 0
+    assert bucket["stake_total"] == 200.0
+    assert bucket["profit_total"] == pytest.approx(-9.09)
+    assert bucket["roi_pct"] == pytest.approx(-4.545, abs=0.01)
+
+
+def test_nhl_market_accuracy_carries_the_same_rule(tmp_path, monkeypatch):
+    """`nhl/market_accuracy.py` held a byte-identical copy of the independent
+    guards. A fix applied to one of two copies is the harder bug to find later,
+    so the rule is asserted on both."""
+    from syndicate.features.nhl import market_accuracy as nhl_market
+
+    bucket = nhl_market._init_bucket() if hasattr(nhl_market, "_init_bucket") else None
+    assert bucket is not None and "unpriced" in bucket
+    nhl_market._apply_row(bucket, {"result": "win", "stake": "100", "payout": "10"})
+    nhl_market._apply_row(bucket, {"result": "win", "stake": "100", "payout": ""})
+    nhl_market._apply_row(bucket, {"result": "win", "stake": "", "payout": "10"})
+    assert bucket["resolved"] == 3
+    assert bucket["unpriced"] == 2
+    assert bucket["stake_total"] == 100.0
+    assert bucket["profit_total"] == 10.0

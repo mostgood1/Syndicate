@@ -69,21 +69,24 @@ def _empty_bucket() -> dict[str, Any]:
         "wins": 0,
         "losses": 0,
         "pushes": 0,
-        # Settled rows carrying no `payout`, i.e. rows counted in the W-L-P
-        # record that contribute nothing to `profit_total`. PURELY AN
-        # INSTRUMENT: this module has always been the CORRECT one -- it never
-        # fabricated a payout, which is why `nba/betting_recap.py` was changed
-        # to match it -- but "correct" here meant SILENT, and an ROI computed
-        # over fewer rows than were settled looked identical to one computed
-        # over all of them.
+        # Settled rows EXCLUDED FROM THE ROI COMPUTATION: counted in the W-L-P
+        # record, absent from both `stake_total` and `profit_total`. One field,
+        # one meaning, across every sport that publishes these buckets.
         #
-        # NOTE FOR WHOEVER PICKS UP THE ROI QUESTION: `stake` and `payout` are
-        # added INDEPENDENTLY below, so a row with a stake and no payout still
-        # enlarges the ROI DENOMINATOR while contributing no numerator. That is
-        # the opposite error from NBA's fabricated even money and it understates
-        # ROI. It is deliberately NOT changed here -- this pass adds the reading,
-        # it does not move a published number on the strength of it. See
-        # `leads.md`.
+        # `stake` and `payout` used to be added INDEPENDENTLY, so a settled row
+        # with a stake and no payout enlarged the ROI DENOMINATOR while
+        # contributing no numerator -- the opposite error from the fabricated
+        # even money removed from `nba/betting_recap.py`, and it UNDERSTATED
+        # ROI. A row now contributes BOTH terms or NEITHER, because a ratio
+        # built from a stake without its payout is not a return on anything.
+        #
+        # MEASURED BEFORE CHANGING IT, and the honest answer is that the
+        # published numbers do not move: 0 mismatched rows in 7,902 settled
+        # rows across both git-tracked logs (2,189 games + 5,713 props), so the
+        # ROI delta is 0.0000 pts on each; and production's `stake_total / 100`
+        # equalled `resolved` exactly on 365 game and 1,702 prop rows over 90
+        # days, i.e. no settled row was missing a stake there either. This is a
+        # structural hole being closed, not a correction to a wrong number.
         "unpriced": 0,
         "stake_total": 0.0,
         "profit_total": 0.0,
@@ -166,11 +169,11 @@ def _section_for_date(rows: list[dict[str, str]], date_str: str) -> dict[str, An
                 buckets[bucket_name]["pushes"] += 1
             stake = _safe_float(row.get("stake"))
             payout = _safe_float(row.get("payout"))
-            if payout is None:
+            if stake is None or payout is None:
+                # BOTH OR NEITHER. See `_empty_bucket`'s `unpriced`.
                 buckets[bucket_name]["unpriced"] += 1
-            if stake is not None:
+            else:
                 buckets[bucket_name]["stake_total"] += stake
-            if payout is not None:
                 buckets[bucket_name]["profit_total"] += payout
     return {
         "rows": len(matching_rows),
