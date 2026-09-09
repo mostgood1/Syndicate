@@ -179,6 +179,18 @@ def _bucket_window(bucket: str) -> tuple[str, str]:
     return start.strftime("%Y-%m-%dT%H:%M:%SZ"), end.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _served_display(app: dict) -> str:
+    """`None` reads as a glitch; an unreadable instrument must SAY it is unreadable.
+
+    The JSON already refuses (`served_mb` is null when `instrument_blind`), but
+    both print paths interpolated that null straight into the line, so a dead
+    emitter rendered as the literal `app served None MB` -- which a reader
+    skims as noise rather than as the refusal it is.
+    """
+    if app.get("instrument_blind"):
+        return "UNREADABLE (access-log emitter off)"
+    return f"{app['served_mb']} MB"
+
 def _top(pairs: dict[str, list[int]], limit: int = 12) -> list[dict[str, Any]]:
     return [
         {"key": k, "bytes": v[0], "count": v[1]}
@@ -345,7 +357,7 @@ def run_check(args: argparse.Namespace, key: str) -> int:
             out.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
             fired += 1
             print(f"      edge {report['edge']['mb']} MB / {report['edge']['requests']} reqs | "
-                  f"app served {report['app']['served_mb']} MB | "
+                  f"app served {_served_display(report['app'])} | "
                   f"publish in {sum(v['mb'] for v in report['publish_into_web'].values()):.1f} MB")
             print(f"      -> {out}")
     if not fired:
@@ -377,7 +389,7 @@ def main() -> int:
         out.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
         print(json.dumps({k: v for k, v in report.items() if k not in ("edge", "app")}, indent=2))
         print(f"edge {report['edge']['mb']} MB / {report['edge']['requests']} reqs")
-        print(f"app served {report['app']['served_mb']} MB / {report['app']['access_lines']} access lines")
+        print(f"app served {_served_display(report['app'])} / {report['app']['access_lines']} access lines")
         for row in report["edge"]["top_paths"][:5]:
             print(f"   edge {row['bytes']/1048576:8.2f} MB  n={row['count']:5d}  {row['key'][:60]}")
         for row in report["app"]["top_paths"][:5]:
