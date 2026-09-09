@@ -106,6 +106,7 @@ def clv_for_orders(
     orders touch.
     """
     from syndicate.features.shared.clv_join import clv_pct_from_prices
+    from syndicate.features.shared.clv_opening_ledger import FAIR_PROVENANCE_FIELDS
     from syndicate.features.shared.clv_position_join import opening_key_for_position
 
     if clv_rows is None:
@@ -228,6 +229,9 @@ def clv_for_orders(
             # ours. The gap between them is what our TIMING was worth, which is
             # a different question from whether the pick was right.
             open_clv_pct=row.get("clv_pct"),
+            # The opening's fair-price provenance, so placed orders split by
+            # anchor tier and book the same way the openings do (P1d).
+            **{field: row.get(field) for field in FAIR_PROVENANCE_FIELDS},
         )
 
     resolved = [row for row in graded if row["reason"] == REASON_RESOLVED]

@@ -312,3 +312,31 @@ def test_the_headline_is_the_UNRESTRICTED_book_not_a_blend():
     line = order_clv_report_line(clv_for_orders(orders, date=DATE, clv_rows=rows))
     assert "same_book_n=1" in line          # the unrestricted book alone
     assert "paper:kalshi" in line           # paper2 reported separately
+
+
+def test_a_resolved_order_carries_the_openings_fair_price_provenance():
+    """P1d: placed orders split by anchor tier and book the same way the
+    openings do -- the stamp rides the resolver row, never re-derived here."""
+    report = clv_for_orders(
+        [_order()], date=DATE,
+        clv_rows=[_clv_row(fair_method="sharp_anchor", fair_anchor_book="pinnacle",
+                           fair_devig_method="power", fair_consensus_prob=0.51,
+                           fair_anchor_hold_pct=2.0, fair_anchor_median_gap_pp=0.3,
+                           fair_anchor_refusal=None)],
+    )
+    row = report["rows"][0]
+    assert row["reason"] == REASON_RESOLVED
+    assert row["fair_method"] == "sharp_anchor"
+    assert row["fair_anchor_book"] == "pinnacle"
+    assert row["fair_devig_method"] == "power"
+    assert row["fair_consensus_prob"] == 0.51
+    assert row["fair_anchor_hold_pct"] == 2.0
+    assert row["fair_anchor_median_gap_pp"] == 0.3
+    assert "fair_anchor_refusal" in row and row["fair_anchor_refusal"] is None
+
+
+def test_a_resolver_row_without_stamps_grades_with_None_not_absent():
+    report = clv_for_orders([_order()], date=DATE, clv_rows=[_clv_row()])
+    row = report["rows"][0]
+    assert row["reason"] == REASON_RESOLVED
+    assert "fair_method" in row and row["fair_method"] is None

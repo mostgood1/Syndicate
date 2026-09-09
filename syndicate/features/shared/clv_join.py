@@ -431,7 +431,7 @@ def compute_clv_for_date(
     history_payload: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Pair every recorded opening for `sport` on `date` with its close."""
-    from syndicate.features.shared.clv_opening_ledger import load_openings
+    from syndicate.features.shared.clv_opening_ledger import FAIR_PROVENANCE_FIELDS, load_openings
 
     openings = [
         record
@@ -648,6 +648,11 @@ def compute_clv_for_date(
                 # view -- §4's open question, and the reason to measure at all.
                 "model_edge_pct": opening.get("model_edge_pct"),
                 "ev_pct": opening.get("ev_pct"),
+                # Fair-price provenance, carried from the OPENING (the stamp at
+                # the instant we chose, not whatever the board says now) so
+                # the reading splits by anchor tier and book exactly (P1d).
+                # None on openings recorded before the stamps existed.
+                **{field: opening.get(field) for field in FAIR_PROVENANCE_FIELDS},
             }
         )
 

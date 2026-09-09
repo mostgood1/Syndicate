@@ -30,6 +30,23 @@ WHAT IT IS NOT. It does not compute CLV and it does not read odds history. The
 join has a real unsolved problem (see `_opening_key`) and pairing an unfinished
 join with an unwritten opening would lose another day of data while the join is
 argued about. Recording is urgent; joining is not.
+
+WHY THE FAIR-PRICE PROVENANCE IS STAMPED HERE (pricing plane v1, P1d). Since
+1cdf5c17 / 5b5ad529 / 7d3efaf1 every board quote carries `fair_method`
+(consensus | sharp_anchor | exchange_mid | two_sided_same_book |
+book_margin_model), the anchor book, the devig method and the anchor's hold /
+refusal state, and production has run `SYNDICATE_FAIR_ANCHOR=sharp_only` since
+2026-09-09T00:40:13Z. The 3-day CLV reading due 09-12 has to split by
+`fair_method` and by book EXACTLY -- did the sharp-anchored rows beat the close
+where the consensus-priced rows did not -- and until this record carried the
+stamps the only split available was by ERA, openings before versus after the
+flag flipped, which is confounded by slate: a different set of games, books and
+market mixes on either side of the cut. An opening is written once and never
+rewritten, so a stamp that is not recorded at first sighting cannot be
+reconstructed later from a board that has moved on. Copied flat from the quote
+(`FAIR_PROVENANCE_FIELDS`), never re-derived, and `None` -- not absent, not a
+default -- on a legacy row without them, so a split can never silently fold
+unstamped rows into a tier.
 """
 
 from __future__ import annotations
@@ -42,6 +59,7 @@ from pathlib import Path
 from typing import Any
 
 __all__ = [
+    "FAIR_PROVENANCE_FIELDS",
     "OPENING_LEDGER_SUBDIR",
     "opening_ledger_path",
     "record_openings",
@@ -49,6 +67,21 @@ __all__ = [
 ]
 
 OPENING_LEDGER_SUBDIR = "clv_openings"
+
+# The fair-price provenance stamps every opening carries, in record order. One
+# list, imported by every downstream carrier that whitelists fields
+# (`clv_join.compute_clv_for_date`, `order_clv.clv_for_orders`), so a stamp
+# added here reaches the resolved rows without three lists having to agree.
+# `fair_anchor_refusals` (a list) is deliberately absent: the record stays flat.
+FAIR_PROVENANCE_FIELDS: tuple[str, ...] = (
+    "fair_method",
+    "fair_anchor_book",
+    "fair_devig_method",
+    "fair_consensus_prob",
+    "fair_anchor_hold_pct",
+    "fair_anchor_median_gap_pp",
+    "fair_anchor_refusal",
+)
 
 # Hard ceiling on one date's file. A first-sighting-only ledger over ~3.4k MLB
 # market ids is kilobytes, so this is not a budget -- it is a tripwire for the
@@ -181,6 +214,17 @@ def _opening_record(row: Mapping[str, Any], key: str, captured_at: str) -> dict[
         "other_sides": quote.get("other_sides") or None,
         "fair_probability": _as_float(quote.get("fair_probability")),
         "fair_method": quote.get("fair_method"),
+        # The rest of the fair-price provenance (P1d): which anchor book priced
+        # this side, devigged how, and what the anchor looked like at the
+        # instant we chose. Stamped so the CLV reading splits by anchor tier
+        # and book exactly, not by era. Copied from the quote, never
+        # re-derived; a legacy row without them records None, never a default.
+        "fair_anchor_book": quote.get("fair_anchor_book"),
+        "fair_devig_method": quote.get("fair_devig_method"),
+        "fair_consensus_prob": _as_float(quote.get("fair_consensus_prob")),
+        "fair_anchor_hold_pct": _as_float(quote.get("fair_anchor_hold_pct")),
+        "fair_anchor_median_gap_pp": _as_float(quote.get("fair_anchor_median_gap_pp")),
+        "fair_anchor_refusal": quote.get("fair_anchor_refusal"),
         # Carried so CLV can later be split by whether a model had a view at
         # all, which is §4's open question and the reason `#425` made skill
         # first-class. Absent stays absent rather than becoming null.

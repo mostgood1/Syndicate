@@ -276,3 +276,98 @@ def test_a_publish_failure_never_breaks_the_recorder(tmp_path, monkeypatch):
     assert report["openings_written"] == 1
     assert report["published"] is False
     assert len(load_openings("2026-08-14", root=tmp_path)) == 1, "the write was lost to a publish failure"
+
+
+# ---- fair-price provenance (pricing plane v1, P1d) -------------------------
+# The 09-12 CLV reading for the sharp anchor must split by `fair_method` and
+# book exactly. Until the opening carried the stamps the only split was by
+# era, confounded by slate. These pin: stamped rows carry them, legacy rows
+# carry None (not absent, not a default), and the prior record is untouched.
+
+_STAMPED_QUOTE = {
+    "fair_method": "sharp_anchor",
+    "fair_anchor_book": "pinnacle",
+    "fair_devig_method": "power",
+    "fair_consensus_prob": 0.4021,
+    "fair_anchor_hold_pct": 2.4,
+    "fair_anchor_median_gap_pp": 0.7,
+    "fair_anchor_refusal": "hold_too_wide",
+    "fair_anchor_refusals": [{"book": "circa", "reason": "stale"}],
+}
+
+_PRIOR_KEYS_IN_ORDER = (
+    "key", "captured_at", "sport", "event_id", "market", "side", "line",
+    "player_name", "segment", "kind", "commence_time", "home_team", "away_team",
+    "price", "bookmaker", "books_quoting", "book_prices", "other_sides",
+    "fair_probability", "fair_method", "model_edge_pct", "ev_pct",
+)
+
+
+def test_the_fair_price_provenance_is_stamped_on_the_opening(tmp_path):
+    from syndicate.features.shared.clv_opening_ledger import FAIR_PROVENANCE_FIELDS
+
+    record_openings([_row(quote=_STAMPED_QUOTE)], date="2026-08-14", now=_NOW, root=tmp_path)
+    rec = load_openings("2026-08-14", root=tmp_path)[0]
+    for field in FAIR_PROVENANCE_FIELDS:
+        assert rec[field] == _STAMPED_QUOTE[field], field
+    # The list is deliberately NOT carried: the record stays flat.
+    assert "fair_anchor_refusals" not in rec
+    assert json.dumps(rec)
+
+
+def test_a_legacy_row_without_the_stamps_records_None_not_absent_and_not_a_default(tmp_path):
+    from syndicate.features.shared.clv_opening_ledger import FAIR_PROVENANCE_FIELDS
+
+    legacy = _row()
+    legacy["quote"] = {"price": 155, "bookmaker": "betopenly", "books_quoting": 10}
+    record_openings([legacy], date="2026-08-14", now=_NOW, root=tmp_path)
+    rec = load_openings("2026-08-14", root=tmp_path)[0]
+    for field in FAIR_PROVENANCE_FIELDS:
+        assert field in rec, f"{field} absent; a split would silently drop this row"
+        assert rec[field] is None, f"{field} defaulted to {rec[field]!r}; must be None"
+    assert rec["fair_consensus_prob"] != 0.5
+
+
+def test_the_stamps_are_additive_and_the_prior_record_is_byte_for_byte_unchanged(tmp_path):
+    from syndicate.features.shared.clv_opening_ledger import (
+        FAIR_PROVENANCE_FIELDS,
+        _opening_key,
+        _opening_record,
+    )
+
+    record_openings([_row()], date="2026-08-14", now=_NOW, root=tmp_path)
+    rec = load_openings("2026-08-14", root=tmp_path)[0]
+
+    # Existing keys keep their relative order in the record as built (the
+    # writer sorts keys on disk, so order is only observable here); the new
+    # ones are the only additions.
+    built = _opening_record(_row(), _opening_key(_row()), "2026-08-14T19:00:00Z")
+    assert tuple(k for k in built if k in _PRIOR_KEYS_IN_ORDER) == _PRIOR_KEYS_IN_ORDER
+    assert set(built) - set(_PRIOR_KEYS_IN_ORDER) == set(FAIR_PROVENANCE_FIELDS) - {"fair_method"}
+    assert set(rec) == set(built)
+
+    # And the prior values, as written to disk, are exactly what they were before P1d.
+    assert {k: rec[k] for k in _PRIOR_KEYS_IN_ORDER} == {
+        "key": _opening_key(_row()),
+        "captured_at": "2026-08-14T19:00:00Z",
+        "sport": "mlb",
+        "event_id": "f1e49b28e98e693eaa5d5a27c58ece19",
+        "market": "spreads",
+        "side": "home",
+        "line": 1.5,
+        "player_name": None,
+        "segment": None,
+        "kind": None,
+        "commence_time": "2026-08-14T23:11:00Z",
+        "home_team": "Tampa Bay Rays",
+        "away_team": "Baltimore Orioles",
+        "price": 155,
+        "bookmaker": "betopenly",
+        "books_quoting": 10,
+        "book_prices": None,
+        "other_sides": None,
+        "fair_probability": 0.411086575093516,
+        "fair_method": "consensus",
+        "model_edge_pct": 2.4,
+        "ev_pct": 3.1,
+    }

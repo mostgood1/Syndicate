@@ -434,3 +434,42 @@ def test_a_close_after_the_opening_still_resolves(tmp_path):
     assert report["resolved"] == 1
     assert report["same_book_n"] == 1
     assert report["avg_clv_pct"] is not None
+
+
+def test_a_resolved_row_carries_the_openings_fair_price_provenance(tmp_path):
+    """P1d: the CLV reading splits by anchor tier and book, from the OPENING's
+    stamp. A legacy opening resolves with the keys present and None."""
+    from syndicate.features.shared.clv_opening_ledger import FAIR_PROVENANCE_FIELDS, record_openings
+
+    stamped = {
+        **_game_opening(),
+        "line": None,
+        "quote": {
+            "price": -120, "bookmaker": "betmgm",
+            "fair_method": "sharp_anchor", "fair_anchor_book": "pinnacle",
+            "fair_devig_method": "power", "fair_consensus_prob": 0.53,
+            "fair_anchor_hold_pct": 2.1, "fair_anchor_median_gap_pp": 0.4,
+            "fair_anchor_refusal": None,
+        },
+    }
+    legacy = {**_game_opening(side="away"), "quote": {"price": 110, "bookmaker": "betmgm"}, "line": None}
+    record_openings([stamped, legacy], date="2026-08-14", now=_OPEN_AT, root=tmp_path)
+
+    key = ("event_id=2124d4bb5569819a30020e5b907ca202|home_team=Cincinnati Reds|"
+           "away_team=Miami Marlins|market=h2h|bookmaker=betmgm")
+    payload = {"markets": {key: _state([_point("2026-08-14T22:30:00+00:00")])}}
+    report = compute_clv_for_date("2026-08-14", "mlb", root=tmp_path, history_payload=payload)
+    assert report["resolved"] == 2
+    rows = {r["side"]: r for r in report["rows"]}
+
+    assert rows["home"]["fair_method"] == "sharp_anchor"
+    assert rows["home"]["fair_anchor_book"] == "pinnacle"
+    assert rows["home"]["fair_devig_method"] == "power"
+    assert rows["home"]["fair_consensus_prob"] == 0.53
+    assert rows["home"]["fair_anchor_hold_pct"] == 2.1
+    assert rows["home"]["fair_anchor_median_gap_pp"] == 0.4
+    assert rows["home"]["fair_anchor_refusal"] is None
+    for field in FAIR_PROVENANCE_FIELDS:
+        assert field in rows["away"] and rows["away"][field] is None, field
+    # The arithmetic did not move.
+    assert rows["home"]["clv_pct"] == clv_pct_from_prices(-120, -150.0)
