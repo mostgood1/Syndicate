@@ -52,6 +52,7 @@
   <!-- These renderers live in one place now: they were byte-identical
        copies in every reconciliation template. Loaded before the inline
        script so its calls resolve unchanged. -->
+  <script src="/static/shared/slate_date.js"></script>
   <script src="/static/shared/recap_reconciliation.js"></script>
   <script>
     (function(){try{const body=document.body;const saved=localStorage.getItem('theme');if(saved==='light') body.classList.add('light');const t=document.getElementById('themeToggle');if(t){t.addEventListener('click',()=>{body.classList.toggle('light');localStorage.setItem('theme', body.classList.contains('light')?'light':'dark');});}}catch(_){}})();

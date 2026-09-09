@@ -65,12 +65,26 @@
   <!-- These renderers live in one place now: they were byte-identical
        copies in all four live-lens templates. `recap_common.js` carries
        the four this family also shares with the market-accuracy pages. -->
+  <script src="/static/shared/slate_date.js"></script>
+  <script>
+    // MLB'S LIVE-LENS PAGE IS THE ODD ONE OUT, and this line is the whole of
+    // the difference. The other nine recap/accuracy pages default their date
+    // picker to Eastern with an 06:00 rollback; this one has always used the
+    // BROWSER's timezone with no rollback. That was previously invisible --
+    // it lived in a sixth copy of `localYMD` that looked like the other five
+    // until you diffed them (183 chars against 684).
+    //
+    // PRESERVED, NOT ENDORSED. Removing this line changes what date this page
+    // opens on, which is a behaviour decision and not this refactor's to make.
+    // See `slate_date.js` and `leads.md`: the client side does not agree with
+    // itself about Eastern vs Central, and the Python side says Central.
+    window.SYNDICATE_SLATE_DATE = { timeZone: null, cutoffHour: 0 };
+  </script>
   <script src="/static/shared/recap_common.js"></script>
   <script src="/static/shared/recap_live_lens_daily.js"></script>
   <script>
     window.addEventListener('error', function(ev){try{const root=document.getElementById('dailyRoot')||document.getElementById('summaryRoot');if(root){const msg=(ev&&ev.error&&ev.error.message)?ev.error.message:(ev&&ev.message?ev.message:'Unknown error');root.innerHTML=`<div class="card">An error occurred while rendering: ${String(msg)}</div>`;}}catch(_){}});
     (function(){try{const body=document.body;const saved=localStorage.getItem('theme');if(saved==='light') body.classList.add('light');const t=document.getElementById('themeToggle');if(t){t.addEventListener('click',()=>{body.classList.toggle('light');localStorage.setItem('theme', body.classList.contains('light')?'light':'dark');});}}catch(_){}})();
-    function localYMD(){const d=new Date();const y=d.getFullYear();const m=String(d.getMonth()+1).padStart(2,'0');const day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`;}
     function renderDailyRecaps(js){const root=document.getElementById('dailyRoot');if(!root) return;const days=js&&Array.isArray(js.days)?js.days.slice():[];if(!days.length){root.innerHTML='<div class="card">No recap data available.</div>';return;}days.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));root.innerHTML='';days.forEach((it)=>{const date=String(it&&it.date||'');const s=it&&it.summary?it.summary:null;const hr=s&&s.hit_rate!=null?Number(s.hit_rate):null;const dayClass=(hr==null)?'':(hr>=0.55?'day-good':(hr<=0.45?'day-bad':''));const sig=it&&it.signals?it.signals:null;const sigLine=(sig&&sig.exists)?(`signals=${Number(sig.lines||0)} (${Math.round(Number(sig.bytes||0)/1024)}KB)`):'';const warns=it&&Array.isArray(it.warnings)?it.warnings:[];const warnLine=warns.length?(`WARN: ${warns.join(', ')}`):'';const metaLine=[sigLine,warnLine].filter(Boolean).join(' · ');const byMarket=it&&Array.isArray(it.by_market)?it.by_market:[];const byKlass=it&&Array.isArray(it.by_klass)?it.by_klass:[];const byStat=it&&Array.isArray(it.by_stat)?it.by_stat:[];const mTbl=renderBreakdownTable(byMarket,'By market','key','Market');const kTbl=renderBreakdownTable(byKlass,'By selection','key','Selection');const sTbl=renderBreakdownTable(byStat,'By stat','key','Stat');const card=document.createElement('div');card.className=`card ${dayClass}`;card.innerHTML=`<details><summary><span class="title-md">${esc(date)}</span> <span class="muted-small">· ${esc(hitLine(s))}${metaLine?(' · '+esc(metaLine)):''}</span></summary>${mTbl}${kTbl}${sTbl}</details>`;root.appendChild(card);});}
     async function loadAll(){const summaryRoot=document.getElementById('summaryRoot');const dailyRoot=document.getElementById('dailyRoot');if(summaryRoot) summaryRoot.innerHTML='<div class="card">Loading…</div>';if(dailyRoot) dailyRoot.innerHTML='<div class="card">Loading daily recaps…</div>';const WINDOW_DAYS=30;const datePicker=document.getElementById('datePicker');const until=(datePicker&&String(datePicker.value||'').trim())?String(datePicker.value||'').trim():isoTodayUTC();const since=addDaysUTC(until,-(WINDOW_DAYS-1));try{updateUrlDate(until);const res=await fetch(`{{ api_path }}?since=${encodeURIComponent(since)}&until=${encodeURIComponent(until)}`, {cache:'no-store'});const js=await res.json();if(!js||js.ok!==true){const msg=js&&js.error?String(js.error):'Failed to load live lens accuracy.';if(summaryRoot) summaryRoot.innerHTML=`<div class="card">${esc(msg)}</div>`;if(dailyRoot) dailyRoot.innerHTML=`<div class="card">${esc(msg)}</div>`;return;}renderSummaryCards(js);renderDailyRecaps(js);}catch(e){const msg=(e&&e.message)?e.message:String(e||'Failed');if(summaryRoot) summaryRoot.innerHTML=`<div class="card">Failed to load: ${esc(msg)}</div>`;if(dailyRoot) dailyRoot.innerHTML=`<div class="card">Failed to load: ${esc(msg)}</div>`;}}
     window.addEventListener('DOMContentLoaded', ()=>{const qd=pickYmdFromQuery();const d=(qd&&/^\d{4}-\d{2}-\d{2}$/.test(qd))?qd:localYMD();const inp=document.getElementById('datePicker');if(inp) inp.value=d;const resetBtn=document.getElementById('resetBtn');if(resetBtn) resetBtn.addEventListener('click', ()=>{ if(inp) inp.value=localYMD(); loadAll(); });loadAll();});
