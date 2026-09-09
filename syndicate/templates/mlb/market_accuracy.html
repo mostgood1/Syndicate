@@ -89,6 +89,7 @@
   <!-- These renderers live in one place now: they were byte-identical
        copies in every market-accuracy template. Loaded before the inline
        script so its calls resolve unchanged. -->
+  <script src="/static/shared/recap_common.js"></script>
   <script src="/static/shared/recap_market_accuracy.js"></script>
   <script>
     window.addEventListener('error', function(ev){try{const root=document.getElementById('dailyRoot')||document.getElementById('summaryRoot');if(root){const msg=(ev&&ev.error&&ev.error.message)?ev.error.message:(ev&&ev.message?ev.message:'Unknown error');root.innerHTML=`<div class="card">An error occurred while rendering: ${String(msg)}</div>`;}}catch(_){}});
