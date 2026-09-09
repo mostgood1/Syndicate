@@ -240,12 +240,30 @@ def capture(service: str, bucket: str, key: str, metered_mb: float | None = None
         base = path.split("?")[0]
         app_paths[base][0] += size; app_paths[base][1] += 1
         app_ips[ip][0] += size; app_ips[ip][1] += 1
+    # A DEAD EMITTER MUST NOT RENDER AS A SMALL NUMBER. web stopped emitting
+    # gunicorn access lines at 2026-09-08T23:45:58Z and served_mb has been a
+    # structural 0.0 ever since -- while `metered / app-served` is the ratio the
+    # whole `[render-egress-spikes]` finding rests on (11.25, 2.85, 3.05, 16.84,
+    # 9.32). Dividing by this silently would manufacture an infinite gap out of a
+    # broken instrument. Zero access lines against a NON-EMPTY edge log is the
+    # discriminator: it separates "nothing was served" (edge empty too, a real
+    # quiet hour) from "nobody wrote it down".
+    app_blind = access_lines == 0 and report["edge"]["requests"] > 0
     report["app"] = {
         "log_lines": len(app), "access_lines": access_lines,
-        "served_bytes": app_total, "served_mb": round(app_total / 1048576, 2),
+        "served_bytes": None if app_blind else app_total,
+        "served_mb": None if app_blind else round(app_total / 1048576, 2),
         "top_paths": _top(app_paths), "top_clients": _top(app_ips),
+        "instrument_blind": app_blind,
         "note": "served_bytes is RESPONSE size only; a POST body (e.g. artifacts/publish) is NOT counted here",
     }
+    if app_blind:
+        report["app"]["blind_reason"] = (
+            "0 gunicorn access lines while the edge log carried "
+            + str(report["edge"]["requests"]) + " requests -- the access-log EMITTER is off, "
+            "so served_mb is UNKNOWN, not zero. Do not compute metered/app-served from this "
+            "bucket. See .syndicate/findings_2026-09-09_web_access_log_dead.md"
+        )
 
     # Publish request BODIES -- invisible to every response-size count above,
     # and the largest single flow into web. Read from the WORKER side.
