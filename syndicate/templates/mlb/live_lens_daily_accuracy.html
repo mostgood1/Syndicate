@@ -66,20 +66,6 @@
        copies in all four live-lens templates. `recap_common.js` carries
        the four this family also shares with the market-accuracy pages. -->
   <script src="/static/shared/slate_date.js"></script>
-  <script>
-    // MLB'S LIVE-LENS PAGE IS THE ODD ONE OUT, and this line is the whole of
-    // the difference. The other nine recap/accuracy pages default their date
-    // picker to Eastern with an 06:00 rollback; this one has always used the
-    // BROWSER's timezone with no rollback. That was previously invisible --
-    // it lived in a sixth copy of `localYMD` that looked like the other five
-    // until you diffed them (183 chars against 684).
-    //
-    // PRESERVED, NOT ENDORSED. Removing this line changes what date this page
-    // opens on, which is a behaviour decision and not this refactor's to make.
-    // See `slate_date.js` and `leads.md`: the client side does not agree with
-    // itself about Eastern vs Central, and the Python side says Central.
-    window.SYNDICATE_SLATE_DATE = { timeZone: null, cutoffHour: 0 };
-  </script>
   <script src="/static/shared/recap_common.js"></script>
   <script src="/static/shared/recap_live_lens_daily.js"></script>
   <script>

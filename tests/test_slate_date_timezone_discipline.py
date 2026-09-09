@@ -179,3 +179,146 @@ class SlateDateTimezoneDisciplineTests(unittest.TestCase):
         code = _code_only(default_week)
         self.assertIn("central_today_iso", code)
         self.assertNotIn("date_cls.today", code)
+
+
+# ---------------------------------------------------------------------------
+# The CLIENT side, added 2026-09-09
+# ---------------------------------------------------------------------------
+# The sweep above searches `.py` files only, and that scope is exactly why the
+# browser drifted: ten recap/accuracy pages defaulted their date picker to
+# America/New_York while every one of `central_today()`'s 306 call sites
+# resolved the slate in America/Chicago. Nothing reported it, because the guard
+# that exists to say "Central, always" could not see JavaScript.
+#
+# Moved to Central 2026-09-09 by user decision ("move it to Central"). This
+# ratchet is what keeps it there.
+#
+# Not every America/New_York in the tree is a defect, so this is an allowlist
+# rather than a ban, and each entry has to say why.
+CLIENT_ROOTS = ("syndicate/templates", "syndicate/static")
+CLIENT_TZ_ALLOWLIST: dict[str, str] = {
+    "syndicate/templates/nhl/cards_source.html":
+        "DELIBERATE and commented in place: compares the requested date against an "
+        "ET today to decide LIVE POLLING, because artifact dates are ET-based. It "
+        "is not a slate-date default, and moving it would change which slates poll.",
+    "syndicate/static/nba/cards_source.js":
+        "`getLocalDateISO()` IS a genuine ET slate default, on the NBA cards page "
+        "family rather than the recap/accuracy ten. Known and recorded in leads.md, "
+        "not fixed in the pass that moved the others -- listed here to keep the "
+        "ratchet honest, not to bless it.",
+}
+
+_NEWLINE = chr(10)
+_BACKSLASH = chr(92)
+_QUOTES = (chr(34), chr(39), chr(96))
+
+
+def _js_code_only(text: str) -> str:
+    """JS/HTML with // and /* */ comments removed, string literals kept.
+
+    Same reasoning as `_code_only` above, and the same trap in a new place:
+    `slate_date.js`'s header EXPLAINS the Eastern-to-Central move and names the
+    old zone twice. A check that cannot tell code from prose about code would
+    flag the explanation, and the natural way to silence it is to delete the
+    explanation. `test_the_comment_prose_is_not_what_makes_that_pass` below
+    guards the opposite failure: a stripper that blanks the file would make
+    every check here inert while all of them pass.
+    """
+    out = []
+    i, n = 0, len(text)
+    in_line = in_block = False
+    quote = None
+    while i < n:
+        ch = text[i]
+        nxt = text[i + 1] if i + 1 < n else ""
+        if in_line:
+            if ch == _NEWLINE:
+                in_line = False
+                out.append(ch)
+            else:
+                out.append(" ")
+        elif in_block:
+            if ch == "*" and nxt == "/":
+                in_block = False
+                out.append("  ")
+                i += 1
+            else:
+                out.append(_NEWLINE if ch == _NEWLINE else " ")
+        elif quote:
+            out.append(ch)
+            if ch == _BACKSLASH and nxt:
+                out.append(nxt)
+                i += 1
+            elif ch == quote:
+                quote = None
+        elif ch in _QUOTES:
+            quote = ch
+            out.append(ch)
+        elif ch == "/" and nxt == "/":
+            in_line = True
+            out.append("  ")
+            i += 1
+        elif ch == "/" and nxt == "*":
+            in_block = True
+            out.append("  ")
+            i += 1
+        else:
+            out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def _client_eastern_files() -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for root in CLIENT_ROOTS:
+        base = REPO_ROOT / root
+        if not base.exists():
+            continue
+        for path in base.rglob("*"):
+            if path.suffix not in {".html", ".js"} or not path.is_file():
+                continue
+            code = _js_code_only(path.read_text(encoding="utf-8", errors="replace"))
+            hits = code.count("America/New_York")
+            if hits:
+                rel = str(path.relative_to(REPO_ROOT)).replace(chr(92), "/")
+                counts[rel] = hits
+    return counts
+
+
+class ClientSlateTimezoneTests(unittest.TestCase):
+    def test_no_new_eastern_slate_dates_in_the_browser(self) -> None:
+        found = _client_eastern_files()
+        new = sorted(set(found) - set(CLIENT_TZ_ALLOWLIST))
+        self.assertEqual(
+            new,
+            [],
+            "America/New_York introduced in client code: "
+            + ", ".join(f"{name} ({found[name]}x)" for name in new)
+            + ". The slate day is America/Chicago -- see this module docstring and "
+            "syndicate/static/shared/slate_date.js. If the new use is NOT a slate "
+            "date (a display format, or a deliberate ET comparison), add it to "
+            "CLIENT_TZ_ALLOWLIST with the reason.",
+        )
+
+    def test_the_shared_slate_helper_is_central(self) -> None:
+        # Named directly rather than only swept: this one line decides what date
+        # ten recap/accuracy pages open on.
+        path = REPO_ROOT / "syndicate" / "static" / "shared" / "slate_date.js"
+        code = _js_code_only(path.read_text(encoding="utf-8"))
+        self.assertIn("America/Chicago", code)
+        self.assertNotIn("America/New_York", code)
+
+    def test_the_comment_prose_is_not_what_makes_that_pass(self) -> None:
+        # The check above is only meaningful if it can still SEE a zone in code.
+        # Proves the stripper did not simply blank the file.
+        path = REPO_ROOT / "syndicate" / "static" / "shared" / "slate_date.js"
+        raw = path.read_text(encoding="utf-8")
+        code = _js_code_only(raw)
+        self.assertIn("America/New_York", raw, "the header should still explain the move")
+        self.assertIn("America/Chicago", code, "the stripper removed the code it must scan")
+        self.assertGreater(len(code.strip()), 200, "stripper blanked the file; the check would be inert")
+
+    def test_client_allowlist_has_no_stale_entries(self) -> None:
+        found = _client_eastern_files()
+        stale = sorted(name for name in CLIENT_TZ_ALLOWLIST if name not in found)
+        self.assertEqual(stale, [], f"client allowlist entries no longer needed, remove them: {stale}")
