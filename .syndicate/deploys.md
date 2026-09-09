@@ -28598,3 +28598,39 @@ drops every exchange anchor while preserving each row's counterfactual median.
 The 3-day same-book CLV reading for the sharp tier runs on `fair_method ==
 sharp_anchor` rows from 00:40:13Z, split by market, against the prior 3 days'
 consensus rows. Claim released after this entry.
+
+### refresh-worker 7d3efaf1 — pricing-plane-v1 deploy 5 (P1c gates, `sharp_only`): the Pinnacle tier now reads like a sharp anchor with its own quality gate binding `[lane pricing-plane-v1, deploy dep-dagb5a8u01pc73dpfd7g, fired 2026-09-09T01:13:13Z, live 01:16:28Z, substrate render]`
+
+Main tip 7d3efaf1 (P1c). Env unchanged from deploy 4 (`SYNDICATE_FAIR_ANCHOR=sharp_only`;
+P1c gates at defaults: Pinnacle hold ≤ 5.0%, ≥ 2 books when in-play; exchange
+distance gate inert under sharp_only). Preflight CLEAR (board build only in flight,
+no sim, spacing satisfied). Claim held by restore-measurement; released after this
+entry.
+
+**verify — first post-boot board (`limit=2000`, read 01:30:54Z), 1,656 rows, all
+carrying P1c's stamps:**
+
+    fair_method   consensus 1,486   sharp_anchor 168   book_margin_model 2   exchange_mid 0
+    refusals      sharp_hold_too_wide 7   sharp_uncorroborated_live 0   (exchange gates not consulted)
+    consensus rows: fair_probability == fair_consensus_prob on 1,486 / 1,486
+
+    pinnacle n=168  mean +0.461  median +0.433  mean|d| 1.000 pp  p10 -1.00  p90 +2.01  min -6.29  max +4.64
+    |d|>2pp 20   |d|>5pp 1   hold mean 3.97%  p90 4.57%  MAX 5.00%  (the cap binds exactly there)
+    sport   ncaaf n=142 mean|d| 0.977 (pregame)   mlb n=26 mean|d| 1.131 (in-play, late slate)
+    market  spreads 0.718  totals 0.880  h2h 1.618  spreads_alt 0.833  totals_alt 0.629
+
+Against deploy 4 (00:55Z, no Pinnacle gates): mean|d| 1.136 → 1.000, p90 2.11 → 2.01,
+rows > 5 pp 2 → 1, max hold 7.18% → 5.00%. The two lone-book in-play alt spreads that
+were the > 5 pp rows are gone; nothing was refused as `sharp_uncorroborated_live`
+on this slate, so that gate is deployed and reachable (tests) but not exercised
+tonight. The one remaining > 5 pp row is a 17-book in-play MLB total (under 14.5,
+hold 4.45%) — Pinnacle disagreeing with the soft median inside its own gates,
+which is the signal the tier exists to carry, not a defect.
+
+**State of the pricing plane's fair after five deploys:** anchor = Pinnacle only,
+gated on hold and in-play corroboration; exchanges never anchor until a daytime
+pregame reading under `sharp` (with the distance gate) says they can. Every row
+still carries the counterfactual median. The 3-day same-book CLV reading for the
+sharp tier runs on `fair_method == sharp_anchor` rows from 2026-09-09T00:40:13Z
+(the first `sharp_only` boot), split by market, against the prior 3 days' consensus
+rows — the first read is due 2026-09-12.
