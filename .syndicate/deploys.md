@@ -5,6 +5,81 @@
 
 ---
 
+## 2026-09-09 08:44:58Z — cron `sim-input-reports` + `ci-suite` — **both SCHEDULED runs read. Substrate `render`.** `[lane render-cron-failures]`
+
+The one-shot check the lane was waiting on. Every prior verification of the
+three 2026-09-08 cron fixes was on a MANUALLY triggered run; these are the
+first SCHEDULED ones. Read-only — no deploy, no config change, no trigger.
+
+**`sim-input-reports` — `crn-dafj4ie7bikc738q9ol0-29815620`, 07:00:35Z → 07:02:26Z, `status: successful`.**
+Its `=== READ-BACK FROM PRODUCTION ===` block printed an alarm COUNT for all
+five roots, the load-bearing one an int, not a boolean:
+
+| root | resolved_root | alarms |
+|---|---|---|
+| wnba_source | `/opt/render/project/src/data` | 1 |
+| nba_source | `/opt/render/project/src/data` | 1 |
+| **nhl_source** | `/opt/render/project/src/data/nhl_source` | **21** |
+| nfl_source | `/opt/render/project/src/data/nfl_source/source_artifacts` | 6 |
+| ncaaf_source | `/opt/render/project/src/data/ncaaf_source/source_artifacts` | 6 |
+
+`nhl_source alarms=21` is the exact int that raised `TypeError: object of type
+'int' has no len()` on the three runs of 2026-09-07/08. All five publishes
+returned `PUBLISH_OK`; 50 files pulled.
+
+**`ci-suite` — `crn-dafg4h0u01pc73aavs6g-29815680`, 08:00:37Z → 08:44:58Z (2,661 s), `unsuccessful` / `nonZeroExit: 1`. THAT IS THE CORRECT RESULT.**
+
+- **It COMPLETED. No `oomKilled`.** This is the reading that matters most —
+  every run before 2026-09-08 died at `memoryLimit 2Gi`, and the two runs at
+  23:40Z and 23:57Z on 09-08 OOM'd again on the chunk-assignment change that
+  was then REVERTED (`a4db0a82`). Peak observed in-run: `memory_current_mb`
+  **925.0 of `memory_max_mb` 2048.0** (45.2%), `memory_anon_mb` 306.7.
+- **9 of 10 steps rc=0**, including `archive regression suite rc=0 55.0s` —
+  the step whose green is the only reading that distinguishes the `_step_env()`
+  Render-var scrub from `main` having been red all along.
+- `pytest vs baseline` rc=1 in 2,502 s: **`collected=16668`, `failing=17`,
+  15 NEW.** 8 chunks, 1,079 test files, on tree `a4db0a82b75a`.
+- The 2 non-new failures are the two recorded in `tests/pytest_baseline.json`:
+  `test_probability_differential::test_every_converter_is_registered_or_excused`
+  and `test_memory_observability::test_malloc_arena_snapshot_degrades_quietly_off_glibc`.
+
+The 15 NEW, by file: `test_intelligence.py` ×5, `test_intelligence_state.py`
+×8, `test_memory_observability::test_memory_headroom_snapshot_reports_insufficient_and_sufficient`,
+`test_retainer_census::test_it_FINDS_a_large_module_level_cache_and_ranks_it_first`.
+**Zero are regressions** — the first 14 are the `OVERVIEW_STOPPED_FOR_MEMORY
+floor_mb=3000` vs `max_mb=2048` contradiction (`intelligence.py:2915-2930`),
+unsatisfiable by construction on a 2 GB runner. `tests/pytest_baseline.json` was
+NOT regenerated and must not be: 14 of these fail on a HOST property.
+
+**THE ONE SHAPE CHANGE, and it narrows a claim rather than breaking anything.**
+The lane's "STABLE CORE — 15, present in every run, layout-independent" is
+**14**. `test_live_refresh_loop::LiveRefreshLoopTests::test_odds_refresh_memory_headroom_snapshot_reports_insufficient_and_sufficient`
+was declared stable-core and **PASSED** in this run. It is not in the baseline,
+so had it failed it would have been listed — its absence is a pass, not a
+suppression.
+
+And the cause is **not** chunk reshuffling. The run at 00:07:54Z → 01:00:59Z is
+a same-commit control: same `a4db0a82`, same `collected=16668`, same 8×135
+round-robin layout over the same 1,079 files — and it reported **21 NEW**,
+including that test, `test_home_mlb_live_lens_states`,
+`test_mlb_live_lens_snapshot_reader`, `test_mlb_refresh_runner` ×2 and
+`test_evaluation_ledger_projection`. **21 → 15 at a fixed layout means the
+volatile tail is nondeterministic WITHIN a chunk, not merely a function of
+which files share a process.** Chunk assignment is `sorted(files)[i] → i%8`,
+so it moves only when a test file is added or removed; it did not move here.
+Verified by recomputing the assignment against `a4db0a82`:
+`test_live_refresh_loop.py` is idx 427 → chunk 4, and chunk 4's only reported
+failure in this run was `test_probability_differential` (idx 739, also chunk 4).
+Recorded, not fixed — the tail is explicitly not signal.
+
+**verify:** `cron_job_run_ended` for `crn-dafj4ie7bikc738q9ol0-29815620`
+(`successful`) and `crn-dafg4h0u01pc73aavs6g-29815680` (`nonZeroExit: 1`, no
+`oomKilled`), plus the two log readings named above: `nhl_source ... alarms=21`
+and `archive regression suite rc=0`. Both runs fired on their own schedules
+(`0 7 * * *`, `0 8 * * *`); neither carries a `user` in any triggering event.
+
+---
+
 ## 2026-09-09 01:40:53Z — live-odds-worker `57052784` — **FINAL COVERAGE: 178/178 rows, 10/10 games, 32 distinct values. 100% across the whole slate.** `[lane mlb-pregame-baseline-feed, CLOSED]`
 
 **Strengthens the 22:43:12Z row below**, which recorded the same fix at 38/38 /
