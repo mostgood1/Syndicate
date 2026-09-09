@@ -134,3 +134,52 @@ all until a resolver exists. The work is: persist what is computed, gate what is
 persisted, measure before publishing, and use the joint as a joint.
 
 Corrections owed to the audit artifact's sections 04-08 and to recommendation 3.
+
+## 7. THE FOOTBALL QUARTER DIMENSION IS THE LEAST-CALIBRATED PART OF THE MODEL, and a prior recalibration made it worse
+
+`[added 2026-09-09, from `docs/reports/smartsim_2_nfl_truth_recalibration_report.md`, dated 2026-07-15]`
+
+This was not in the original recon and it changes what S4 has to prove. NFL's
+smartsim2 WAS recalibrated against measured truth -- 17,677 real drives over 816
+regular-season games, nflverse PBP 2023-2025 -- and the report's own table shows
+game-level metrics improving while the PER-QUARTER dimension did not:
+
+| metric | truth | sim before | sim recalibrated | normalized error before -> after |
+|---|---|---|---|---|
+| possessions/game | 21.66 | 20.55 | **21.69** | 0.051 -> **0.001** |
+| drive_length_seconds | 166.2 | 178.8 | **169.6** | 0.075 -> **0.020** |
+| game_totals | 45.13 | 43.48 | 44.15 | 0.036 -> **0.022** |
+| punt_rate | 35.1% | 42.4% | 37.2% | 0.208 -> **0.059** |
+| touchdown_rate | 22.0% | 25.6% | 23.5% | 0.165 -> **0.068** |
+| quarter_1_scoring | 8.82 | 9.04 | 9.38 | 0.025 -> **0.063 WORSE** |
+| quarter_2_scoring | 13.91 | 11.76 | 12.44 | 0.155 -> 0.106 |
+| quarter_3_scoring | 9.26 | 10.32 | 10.32 | 0.115 -> **0.115 UNCHANGED** |
+| quarter_4_scoring | 12.86 | 12.17 | 11.89 | 0.053 -> **0.075 WORSE** |
+| drive_length_plays | 5.93 | 6.90 | 6.62 | 0.164 -> 0.117 |
+
+**Three of the four quarters got worse or stood still while every game-level
+metric improved.** After recalibration the worst-fitting metrics in the whole
+table are `drive_length_plays` (0.117), `quarter_3_scoring` (0.115) and
+`quarter_2_scoring` (0.106) -- i.e. the drive-count term and the quarter split,
+which are exactly the two things a half or quarter price depends on.
+
+**Why this matters more than it looks.** The model engine standard already warns
+that adding a mechanism to a calibrated engine requires re-fitting what was
+absorbing it. This is the same failure from the other direction: a fit optimised
+on game-level aggregates bought its improvement partly OUT OF the quarter split,
+and nothing in the process objected, because per-quarter error was reported but
+not treated as a target.
+
+**Consequences, and they are directional:**
+- S4's gate is not "grade the halves and see". The quarter dimension is
+  KNOWN-WEAK with numbers already on file, so a half distribution built on it
+  starts from a measured deficit rather than an unknown one.
+- Any future football calibration MUST score per-quarter scoring as a first-class
+  objective, not as a diagnostic printed underneath the real ones. S4a's brief
+  carries that requirement explicitly.
+- NCAAF has had NO drive-structure fit at all (`scripts/calibrate_ncaaf_drive_structure.py`:
+  plays/drive +27%, seconds/drive +12%, possessions/game -15% against 53,548
+  real drives), so it is BOTH uncalibrated on structure AND unmeasured on
+  quarters. Lane `s4a-ncaaf-drive-fit` is fitting it under the rule above and is
+  instructed to recommend AGAINST flipping if the fit trades quarters for
+  structure.
