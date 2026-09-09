@@ -91,3 +91,85 @@ The gate is load-bearing here rather than procedural: subtracting a large
 background from the meter would mean trusting the very log whose completeness P1
 is testing. The probe refuses to fire above `--require-quiet-mb` and refuses to
 straddle an hour boundary; both refusals are recorded in its output.
+
+---
+
+## 4. THE READING — scored by a SECOND READER, and what I add to it
+
+`[2026-09-09 ~02:5xZ, session 40d9e921 — the lane owner, reading after the fact]`
+
+**The primary record is not here.** Session `6767cdba` (the `bandwidth-spike-tripwire`
+scheduled task, which I had armed as a backup in case this session did not survive
+the two-hour settle) read the bucket at 02:3xZ and scored all three predictions in
+the lane block, with the access-log half in
+`.syndicate/findings_2026-09-09_web_access_log_dead.md` and lane
+`web-access-log-emitter-dead`. **Read those, not a paraphrase of them.** Its
+scoring is P1 CONFIRMED (~8% edge-log deficit, pager artifact ruled out), P2 VOID
+(the emitter died at 23:45:58Z, 20 minutes before the transfer), P3 a coefficient
+of **1.516–1.575** on real delivered bytes after correcting for P1.
+
+I reached the same three conclusions independently before seeing theirs, by a
+different route, and the numbers agree: my narrow-window rescan found **2,403 of
+2,596** (0.9257) against their 2,399 (0.9187) — same finding, ~7–8%, and I also
+ruled out **id collision in the dedup** (2,417 raw entries, 2,417 unique ids),
+which their paging check does not cover. Two independent scans of the same
+window differing by 4 lines is itself a small measure of the log's jitter.
+
+**THREE THINGS I ADD.**
+
+### (a) There is no "normal-hours coefficient" — the ratio is a continuum, not two regimes
+
+The second reader places 1.52–1.58 "inside the ledger's existing 1.7–2.2x
+normal-hours rule, slightly below it." That is true of my hour and not true of
+its neighbours. Same instrument pair, same service, settled buckets:
+
+| bucket | metered | edge logged | reqs | metered/edge | |
+|---|---|---|---|---|---|
+| 2026-09-09 01:00Z | 401.11 | 241.52 | 2,531 | **1.66** | the controlled hour |
+| 2026-09-09 00:00Z | 437.73 | 203.57 | 366 | **2.15** | board traffic, no transfer |
+| 2026-09-08 23:00Z | 315.35 | 88.48 | 285 | **3.56** | board traffic |
+| 2026-09-08 17:00Z | 2,962.71 | 275.03 | 536 | 10.77 | SPIKE |
+| 2026-09-08 16:00Z | 2,470.66 | 101.39 | 449 | 24.37 | SPIKE |
+
+**1.66 → 2.15 → 3.56 → 10.77 → 24.37 is a smooth ladder, not a normal regime and
+a spike regime.** The two hours either side of the controlled one, with no probe
+traffic in them, sit ABOVE the 1.7-2.2 band and above the calibrated coefficient.
+So "the meter charges ~1.5-1.6x" is a statement about ONE hour whose composition
+was 62% identical 60 KB static files — not a property of the meter. Anything that
+multiplies edge bytes by a constant to predict the bill remains unsupported, and
+the spike hours may be the far end of one mechanism rather than a separate one.
+
+(One row deliberately omitted: 2026-09-09 02:00Z read 45.47 MB at 13 minutes and
+120.20 MB at ~50 minutes. Still settling, so it is not evidence of anything —
+noted only because its ratio of 0.462 would look like a finding to anyone who
+sampled it once.)
+
+### (b) A mechanism for the dead access log that explains the key count
+
+The other lane's hypothesis is "an environment change carried by that deploy,"
+with `GUNICORN_CMD_ARGS` present on web, absent on the workers, absent from
+`render.yaml`. What that leaves unexplained is the ledger's own record that web
+went **84 → 85 keys, exactly +1** — the key was NEW, so nothing of ours was
+overwritten, and no `--access-logfile` exists anywhere in our config or start
+command. Yet access lines existed for weeks and stopped at that deploy.
+
+**Hypothesis: Render injects its own default `GUNICORN_CMD_ARGS` containing
+`--access-logfile -`, and a user-set value replaces the injected default
+wholesale.** That accounts for all three facts at once: logging with no flag of
+ours, a NEW key rather than an edit, and the emitter dying at the first deploy
+after the key was set. **Falsifier, one env edit and a deploy:** set it to
+`--max-requests 1000 --max-requests-jitter 100 --access-logfile -`. If access
+lines return, confirmed; if they do not, this paragraph is wrong and the cause is
+elsewhere. Cheap, reversible, and it restores the instrument either way.
+
+### (c) The quiet gate held at fire time and then failed for the hour — worth separating
+
+The pre-fire check is a 10-minute window; the meter's unit is an hour. Mine
+passed at 5.493 MB and the hour still ended 43% background, because the board
+came back at ~00:2xZ: 51.16 MB from a Windows Chrome UA and 21.20 MB from an X11
+Chrome UA on `73.75.177.190`, plus 17.32 MB of `coverage_watch` polling and 13.94
+MB from `174.253.98.187`. **A gate scoped tighter than the instrument's
+resolution can pass and still leave the reading contaminated.** For the second
+arm, the gate should hold for the whole hour, not the ten minutes before firing —
+which in practice means watching during the transfer and voiding the run if
+background arrives, not just checking before it.

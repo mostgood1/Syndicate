@@ -1,0 +1,63 @@
+{
+  "aborted": "not quiet",
+  "args": {
+    "boundary_margin_s": 240,
+    "concurrency": 3,
+    "dry_run": false,
+    "quiet_minutes": 10,
+    "require_quiet_mb": 5.0,
+    "skip_quiet_check": false,
+    "target_mb": 150.0
+  },
+  "asset": "/static/shared/syndicate-logo.png",
+  "base": "https://syndicate-an21.onrender.com",
+  "calibration": {
+    "at": "2026-09-09T00:01:01Z",
+    "bytes": 60588,
+    "cf_cache": "DYNAMIC",
+    "encoding": "identity",
+    "i": 0,
+    "origin": "gunicorn",
+    "seconds": 0.25,
+    "status": 200,
+    "token": "000000-f20af025"
+  },
+  "kind": "controlled_transfer",
+  "planned_bytes": 157286448,
+  "planned_requests": 2596,
+  "quiet_check": {
+    "limit_mb": 5.0,
+    "mb": 30.232,
+    "quiet": false,
+    "requests": 42,
+    "top": [
+      {
+        "mb": 23.854,
+        "requests": 24,
+        "who": "174.253.98.187 | Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+      },
+      {
+        "mb": 6.365,
+        "requests": 12,
+        "who": "73.75.177.190 | Python-urllib/3.11"
+      },
+      {
+        "mb": 0.011,
+        "requests": 2,
+        "who": "207.46.13.64 | Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko;"
+      },
+      {
+        "mb": 0.001,
+        "requests": 4,
+        "who": "74.220.48.175 | Python-urllib/3.11"
+      }
+    ],
+    "window": {
+      "end": "2026-09-09T00:01:01Z",
+      "minutes": 10,
+      "start": "2026-09-08T23:51:01Z"
+    }
+  },
+  "started_at": "2026-09-09T00:01:01Z",
+  "user_agent": "syndicate-controlled-transfer/1.0"
+}
