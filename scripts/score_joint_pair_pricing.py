@@ -8,6 +8,22 @@ FOUR ARMS ON IDENTICAL MARGINALS -- only the dependence term varies:
     heuristic       the flag-sum path
     measured RAW    the joint's Spearman coefficient, as originally shipped
     measured CONV   the same coefficient through `threshold_correlation`
+    measured SEC2   `#621` Phase 5: the converted coefficient used as an
+                    INDICATOR CORRELATION in the second-order covariance
+                    expansion, rather than as a fraction-of-distance-to-Frechet
+                    weight, and capped at `_MEASURED_JOINT_MAX_SHIFT`
+
+WHY SEC2 IS A DIFFERENT QUESTION FROM CONV, AND WHY THE OLD RESULT DOES NOT
+SETTLE IT. `sim_joint_correlation.measured` returns the RAW coefficient because
+CONV scored WORSE (+0.00156 log-loss same-player, CI [+0.00100, +0.00219], over
+162,491 pairs). But that comparison fed both through
+`_correlation_adjusted_probability` as a Frechet WEIGHT -- a role in which the
+coefficient's units do not matter much, so attenuating it just moved the price
+less. SEC2 puts phi where phi actually belongs: `Cov = phi sqrt(p q p q)`. For
+n=2 that reproduces the Gaussian copula's own orthant probability exactly. So a
+converted coefficient is REQUIRED here, not optional, and RAW in this role would
+be a unit error rather than a tuning choice. Whether it PAYS is what this arm
+answers; nothing above answers it.
 
 THE POPULATION IS SELECTED. `daily_top_props` is chosen BY MODEL EDGE, so this
 answers "does the fix help on the props we would actually bet", not "does it
@@ -36,7 +52,9 @@ for p in (str(WT),):
 
 from syndicate.features.correlation_engine import compute_correlation  # noqa: E402
 from syndicate.features.intelligence_parlay_runtime import (  # noqa: E402
+    _MEASURED_JOINT_MAX_SHIFT,
     _correlation_adjusted_probability,
+    measured_joint_weight,
 )
 from syndicate.features.mlb.threshold_correlation import threshold_correlation  # noqa: E402
 
@@ -84,6 +102,15 @@ def tri(i, k):
     if i < k:
         i, k = k, i
     return i * (i - 1) // 2 + k
+
+
+def _sec2(probs, phi):
+    """`#621` Phase 5 arm: phi as a COVARIANCE term, not as a Frechet weight."""
+    w = measured_joint_weight(list(probs), {"0:1": float(phi)})
+    if w is None:
+        return _correlation_adjusted_probability(probs, 0.0)
+    return _correlation_adjusted_probability(
+        probs, w, max_shift=_MEASURED_JOINT_MAX_SHIFT)
 
 
 def ll(p, y):
@@ -193,6 +220,7 @@ def main() -> int:
                         "raw": _correlation_adjusted_probability(probs, measured),
                         "conv": _correlation_adjusted_probability(
                             probs, threshold_correlation(measured, la["p"], lb["p"])),
+                        "sec2": _sec2(probs, threshold_correlation(measured, la["p"], lb["p"])),
                         "same_player": la["pid"] == lb["pid"],
                         "measured": measured, "heuristic": heur,
                     })
@@ -212,7 +240,8 @@ def main() -> int:
         print("\n%s -- n=%d over %d games" % (label, m, len(sub)))
         print("  %-16s %10s %10s" % ("arm", "log-loss", "brier"))
         for arm, nm in (("indep", "independence"), ("heur", "heuristic"),
-                        ("raw", "measured RAW"), ("conv", "measured CONV")):
+                        ("raw", "measured RAW"), ("conv", "measured CONV"),
+                        ("sec2", "measured SEC2")):
             a = sum(ll(x[arm], x["y"]) for _, p in sub for x in p) / m
             b = sum((x[arm] - x["y"]) ** 2 for _, p in sub for x in p) / m
             print("  %-16s %10.5f %10.5f" % (nm, a, b))
@@ -220,7 +249,7 @@ def main() -> int:
         # sum(ll over picked games) / sum(n over picked games), and a game's
         # contribution does not change between resamples -- so this is exact,
         # not an approximation, and removes 325M ll() calls per comparison.
-        arms = ("indep", "heur", "raw", "conv")
+        arms = ("indep", "heur", "raw", "conv", "sec2")
         pre = []
         for _, pp in sub:
             acc = dict.fromkeys(arms, 0.0)
@@ -229,23 +258,25 @@ def main() -> int:
                     acc[a] += ll(x[a], x["y"])
             pre.append((len(pp), acc))
         rng = random.Random(99)
-        for base in ("heur", "indep", "raw"):
-            d = []
-            for _ in range(2000):
-                k = 0
-                c = o = 0.0
-                for _ in pre:
-                    n_i, acc_i = pre[rng.randrange(len(pre))]
-                    k += n_i
-                    c += acc_i["conv"]
-                    o += acc_i[base]
-                if not k:
-                    continue
-                d.append((c - o) / k)
-            d.sort()
-            if d:
-                print("  CONV vs %-9s %+0.5f  95%% CI [%+0.5f, %+0.5f]" % (
-                    base, sum(d) / len(d), d[int(.025 * len(d))], d[int(.975 * len(d))]))
+        for focus in ("conv", "sec2"):
+            for base in ("heur", "indep", "raw"):
+                d = []
+                for _ in range(2000):
+                    k = 0
+                    c = o = 0.0
+                    for _ in pre:
+                        n_i, acc_i = pre[rng.randrange(len(pre))]
+                        k += n_i
+                        c += acc_i[focus]
+                        o += acc_i[base]
+                    if not k:
+                        continue
+                    d.append((c - o) / k)
+                d.sort()
+                if d:
+                    print("  %s vs %-9s %+0.5f  95%% CI [%+0.5f, %+0.5f]" % (
+                        focus.upper(), base, sum(d) / len(d),
+                        d[int(.025 * len(d))], d[int(.975 * len(d))]))
 
     table(per_game, "ALL PAIRS")
     for lbl, keep in (("SAME-PLAYER", True), ("CROSS-PLAYER", False)):

@@ -1,0 +1,93 @@
+==============================================================================
+MEASURED JOINT vs HEURISTIC -- MLB ONLY, published sim artifacts
+==============================================================================
+dates                5  (2026-09-05 .. 2026-09-09)
+sim artifacts        71   carrying sim.joint: 71
+
+COVERAGE (denominators, not decoration)
+  2-leg tickets      181476
+  NOTE: counters below are CUMULATIVE over the 2-leg AND 3-leg arms,
+        so pair counts exceed the ticket count by design.
+  pairs measured     245376  (100.0%)
+  pairs fallback     0  (0.0%)  <- unmeasured, NOT independent
+  legs measured      426852 of 426852
+  parlays measured   202776   not-mlb 0   no-measured-pair 0
+  resolver reasons   {'measured': 245376}
+
+PAIR DIFFERENCE  measured_p - heuristic_p     n=181476
+  mean -0.02290   median -0.02390   sd 0.02018
+  p1    -0.05730
+  p5    -0.04980
+  p25   -0.03620
+  p50   -0.02390
+  p75   -0.01250
+  p95   -0.00100
+  p99   +0.06560
+  min  -0.07530   max +0.12300
+  same-player   n=7668    mean +0.04106  median +0.03670
+  cross-player  n=173808  mean -0.02572  median -0.02490
+
+UNCAPPED FRECHET WEIGHT |w|  (what the cap acts on)   n=181476
+  all           n=181476  p50 0.0394  p90 0.1234  p99 0.7211  max 1.0051
+  same-player   n=7668    p50 0.5930  p90 0.9858  p99 1.0001  max 1.0051
+  cross-player  n=173808  p50 0.0372  p90 0.1043  p99 0.1867  max 0.3647
+  share within a candidate cap:
+      bound           all   same-pl  cross-pl
+      0.25         95.75%     1.85%    99.89%
+      0.40         96.12%     8.23%   100.00%
+      0.60         97.99%    52.41%   100.00%
+      0.75         99.11%    78.96%   100.00%
+      0.85         99.28%    83.03%   100.00%
+      0.95         99.35%    84.73%   100.00%
+
+WHERE THE CAP BINDS  (|w| > 0.85)
+  pairs 1301 of 181476 (0.72%)   with a leg at p<0.15: 27 (2.1%)
+  median min-marginal capped 0.354 vs uncapped 0.242
+  same-player share capped 100.0% vs population 4.2%
+
+3-LEG DIFFERENCE  measured_p - heuristic_p     n=21300
+  mean -0.01447   median -0.01370   min -0.09060   max +0.13550
+  all three pairs measured: 21300 of 21300
+
+BIGGEST DISAGREEMENTS (hand-check these)
+  +0.1230  Kenny Piper Over 0.5 home_runs | Kenny Piper Over 1.5 total_bases
+           p_a=0.4160 p_b=0.4750  rho_S=+0.903 phi=0.7214  heur_score=+1.000  w=+0.813
+           heuristic_p=0.2522  measured_p=0.3752  independent=0.1976
+  +0.1128  Juan Soto Over 0.5 home_runs | Juan Soto Over 1.5 total_bases
+           p_a=0.3900 p_b=0.5180  rho_S=+0.876 phi=0.6567  heur_score=+1.000  w=+0.851
+           heuristic_p=0.2490  measured_p=0.3618  independent=0.2020
+  +0.1104  Kenny Piper Over 0.5 home_runs | Kenny Piper Over 0.5 rbi
+           p_a=0.4160 p_b=0.5230  rho_S=+0.859 phi=0.65  heur_score=+1.000  w=+0.806
+           heuristic_p=0.2672  measured_p=0.3776  independent=0.2176
+  +0.1095  Munetaka Murakami Over 0.5 home_runs | Munetaka Murakami Over 1.5 total_bases
+           p_a=0.3680 p_b=0.4660  rho_S=+0.867 phi=0.6593  heur_score=+1.000  w=+0.807
+           heuristic_p=0.2206  measured_p=0.3301  independent=0.1715
+  +0.1094  Kyle Schwarber Over 0.5 home_runs | Kyle Schwarber Over 1.5 total_bases
+           p_a=0.3900 p_b=0.5290  rho_S=+0.864 phi=0.6377  heur_score=+1.000  w=+0.845
+           heuristic_p=0.2522  measured_p=0.3616  independent=0.2063
+  +0.1093  Juan Soto Over 0.5 home_runs | Juan Soto Over 0.5 rbi
+           p_a=0.3900 p_b=0.4780  rho_S=+0.861 phi=0.6576  heur_score=+1.000  w=+0.787
+           heuristic_p=0.2373  measured_p=0.3466  independent=0.1864
+  +0.1078  Joshua Báez Over 0.5 home_runs | Joshua Báez Over 1.5 total_bases
+           p_a=0.3900 p_b=0.5390  rho_S=+0.869 phi=0.6371  heur_score=+1.000  w=+0.862
+           heuristic_p=0.2552  measured_p=0.3630  independent=0.2102
+  +0.1070  Randal Grichuk Over 0.5 hits | Randal Grichuk Over 1.5 total_bases
+           p_a=0.5940 p_b=0.4390  rho_S=+0.922 phi=0.6841  heur_score=+1.000  w=+0.935
+           heuristic_p=0.3053  measured_p=0.4123  independent=0.2608
+  +0.1068  Rafael Flores Jr. Over 0.5 home_runs | Rafael Flores Jr. Over 1.5 total_bases
+           p_a=0.3770 p_b=0.5280  rho_S=+0.865 phi=0.6311  heur_score=+1.000  w=+0.858
+           heuristic_p=0.2435  measured_p=0.3503  independent=0.1991
+  +0.1063  Shay Whitcomb Over 0.5 hits | Shay Whitcomb Over 1.5 total_bases
+           p_a=0.4680 p_b=0.3330  rho_S=+0.964 phi=0.7386  heur_score=+1.000  w=+0.980
+           heuristic_p=0.2001  measured_p=0.3064  independent=0.1558
+
+SETTLEMENT SCORING   n=123 pairs  -- REPORTED, NOT RELIED ON
+  heuristic  log-loss 0.03582  brier 0.00176
+  measured   log-loss 0.01925  brier 0.00067
+  positives 0 of 123   distinct games 2   same-player 1
+  n IS THE WHOLE STORY. With a near-all-zero outcome column the arm
+  that prices LOWER wins mechanically, which is not evidence about
+  dependence. No bootstrap is run because there are not enough
+  independent game clusters to resample. DIFFERENCE, not improvement.
+
+wrote C:\tmp\s5data\summary.json
