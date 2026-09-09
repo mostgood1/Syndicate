@@ -367,6 +367,29 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # exact shape that left `espn_match_stats.json` off the worker for three
     # weeks while it sat git-tracked in the checkout (2026-09-07).
     "nfl_source/smartsim2_ratings_*_wk*.json",
+    # THE SEGMENT DISTRIBUTIONS SIDECAR (`lane s1-football-segment-capture`),
+    # beside the projections it was produced from, in the same run, by the same
+    # generators. The sim already computed a per-quarter record per seed and
+    # both generators discarded it; these carry `{outcome: count}` histograms
+    # for `q1..q4 / h1 / h2 / full` so half and quarter markets can later be
+    # priced and MEASURED.
+    #
+    # Allowlisted at the same time as the writer, not afterwards --
+    # `model_engine_standard.md` s3: an artifact that is written but not
+    # allowlisted cannot be read or published through `/api/ops/artifacts/*`,
+    # so it is unauditable on Render. That matters here specifically because
+    # the file is written on refresh-worker while every future consumer of it
+    # lives on web -- the exact shape that left `espn_match_stats.json` off the
+    # worker for three weeks (2026-09-07).
+    #
+    # `#208` as ever: this PERMITS the transfer, it does not make one happen --
+    # and here nothing is even written until
+    # `SYNDICATE_FOOTBALL_SEGMENT_DISTRIBUTIONS` is on. The two paths differ by
+    # sport because the generators write to different roots (NFL directly under
+    # `nfl_source/`, NCAAF under `ncaaf_source/data/`), exactly as their
+    # projections CSVs two entries above do.
+    "nfl_source/smartsim2_segment_distributions_*_wk*.json",
+    "ncaaf_source/data/smartsim2_segment_distributions_*_wk*.json",
     # WHICH NCAAF WEEKS HAVE BEEN PLAYED. `lane ncaaf-games-cache-refresh`,
     # measured 2026-09-01.
     #

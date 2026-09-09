@@ -45,6 +45,9 @@ from syndicate.features.ncaaf.cfbd_quota_latch import (
     raise_if_latched,
 )
 from syndicate.features.ncaaf.smartsim2_projection import SmartSimNcaafProjection
+from syndicate.features.shared.football_segment_distributions import FootballSegmentAccumulator
+from syndicate.features.shared.football_segment_distributions import segment_distributions_enabled
+from syndicate.features.shared.football_segment_distributions import write_segment_distributions_artifact
 from syndicate.features.ncaaf.smartsim2_projection import write_projection_artifact
 from syndicate.features.ncaaf.sources import default_ncaaf_source_root
 
@@ -765,6 +768,7 @@ def build_projection(
     seeds: int = SEEDS_PER_GAME,
     sp_index: dict[str, tuple[float, float]] | None = None,
     sp_means: tuple[float, float] = (0.0, 0.0),
+    segment_accumulator: FootballSegmentAccumulator | None = None,
 ) -> SmartSimNcaafProjection:
     # SP+ FIRST, PPA AS FALLBACK. SP+ is points-per-game and backtests better on
     # margin (r 0.506 vs 0.372, residual SD 17.63 vs 18.97 over 740 games); PPA
@@ -818,6 +822,12 @@ def build_projection(
         output = simulate_game(sim_input, profile=NCAAF_CALIBRATION_PROFILE)
         home_scores.append(output.final_score["home"])
         away_scores.append(output.final_score["away"])
+        # STOP DISCARDING `quarter_log`. `#S1`. Identical seam to the NFL
+        # generator, folding through the SAME shared accumulator so the two
+        # sports cannot bin `h1`/`h2` differently. `final_score` handling above
+        # is untouched; None unless the flag is on.
+        if segment_accumulator is not None:
+            segment_accumulator.add(output)
 
     margins = [h - a for h, a in zip(home_scores, away_scores)]
     totals = [h + a for h, a in zip(home_scores, away_scores)]
@@ -995,6 +1005,9 @@ def main() -> None:
     log(f"SP_RATINGS teams={len(sp_index)} off_mean={sp_means[0]:.2f} def_mean={sp_means[1]:.2f}")
 
     projections: list[SmartSimNcaafProjection] = []
+    # ABSENT => OFF => no accumulator is built and no sidecar is written.
+    segments_enabled = segment_distributions_enabled()
+    segment_blocks: dict[str, dict] = {}
     skipped_no_cfbd_match: list[str] = []
     skipped_not_fbs_vs_fbs: list[str] = []
 
@@ -1011,6 +1024,7 @@ def main() -> None:
             skipped_not_fbs_vs_fbs.append(f"{away_team} @ {home_team}")
             continue
         game_id = str(cfbd_game.get("id") or f"{args.season}_{args.week}_{home_team}_{away_team}".replace(" ", "_"))
+        segment_accumulator = FootballSegmentAccumulator() if segments_enabled else None
         projection = build_projection(
             season=args.season,
             week=args.week,
@@ -1022,11 +1036,28 @@ def main() -> None:
             sp_means=sp_means,
             rating_source=rating_source,
             seeds=args.seeds,
+            segment_accumulator=segment_accumulator,
         )
         projections.append(projection)
+        if segment_accumulator is not None:
+            block = segment_accumulator.payload()
+            if block is not None:
+                segment_blocks[str(game_id)] = block
         log(f"PROJECTED {away_team} @ {home_team} -> {projection.home_score_mean:.1f}-{projection.away_score_mean:.1f}")
 
     path = write_projection_artifact(projections, season=args.season, week=args.week, data_root=DATA_ROOT)
+    # ABSENT => OFF => no sidecar, and the CSV above is byte-identical to the
+    # one this script wrote before segment capture existed.
+    if segments_enabled:
+        segment_path = write_segment_distributions_artifact(
+            segment_blocks, season=args.season, week=args.week, data_root=DATA_ROOT
+        )
+        log(f"SEGMENT_DISTRIBUTIONS path={segment_path} games={len(segment_blocks)} bytes={segment_path.stat().st_size}")
+        print(f"segment_distributions_path={segment_path}", flush=True)
+        print(f"segment_distributions_games={len(segment_blocks)}", flush=True)
+        print(f"segment_distributions_bytes={segment_path.stat().st_size}", flush=True)
+    else:
+        print("segment_distributions=off", flush=True)
     elapsed = time.time() - start
 
     log(f"WRITE_DONE path={path} projections={len(projections)} elapsed={elapsed:.1f}s")

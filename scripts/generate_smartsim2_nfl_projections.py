@@ -46,6 +46,9 @@ from syndicate.features.football.sim_engine.smartsim2.contracts import SmartSim2
 from syndicate.features.football.sim_engine.smartsim2.game_simulator import simulate_game
 from syndicate.features.nfl.injury_adjustment import adjust_team_rating_for_injuries
 from syndicate.features.nfl.smartsim2_projection import SmartSimNflProjection
+from syndicate.features.shared.football_segment_distributions import FootballSegmentAccumulator
+from syndicate.features.shared.football_segment_distributions import segment_distributions_enabled
+from syndicate.features.shared.football_segment_distributions import write_segment_distributions_artifact
 from syndicate.features.nfl.smartsim2_projection import write_projection_artifact
 from syndicate.features.nfl.smartsim2_projection import write_ratings_artifact
 from syndicate.features.nfl.sources import default_nfl_source_root
@@ -711,6 +714,7 @@ def build_projection(
     prior_plays: list[tuple[int, str, str, str, float]] | None,
     seeds: int = SEEDS_PER_GAME,
     apply_injury_adjustment: bool = False,
+    segment_accumulator: FootballSegmentAccumulator | None = None,
 ) -> tuple[SmartSimNflProjection, list[dict]]:
     # Defaults OFF -- backtested against the real, completed 2025 season
     # (scripts/backtest_nfl_injury_adjustment.py,
@@ -770,6 +774,15 @@ def build_projection(
         output = simulate_game(sim_input, profile=NFL_CALIBRATION_PROFILE)
         home_scores.append(output.final_score["home"])
         away_scores.append(output.final_score["away"])
+        # STOP DISCARDING `quarter_log`. `#S1`. The sim computed a per-quarter
+        # record for this seed and the two lines above were the whole of what
+        # survived it, so no half/quarter market could ever be priced or
+        # measured. Folding is counts-only and does not touch `final_score`
+        # handling above; `segment_accumulator` is None unless
+        # `SYNDICATE_FOOTBALL_SEGMENT_DISTRIBUTIONS` is on, so OFF is a
+        # None-check per seed and nothing else.
+        if segment_accumulator is not None:
+            segment_accumulator.add(output)
 
     margins = [h - a for h, a in zip(home_scores, away_scores)]
     totals = [h + a for h, a in zip(home_scores, away_scores)]
@@ -830,7 +843,13 @@ def main() -> None:
 
     projections: list[SmartSimNflProjection] = []
     all_injury_diagnostics: list[dict] = []
+    # ABSENT => OFF => `segment_blocks` stays empty, no accumulator is built,
+    # no sidecar is written, and the projections CSV is byte-identical to the
+    # one this script wrote before segment capture existed.
+    segments_enabled = segment_distributions_enabled()
+    segment_blocks: dict[str, dict] = {}
     for row in schedule_rows:
+        segment_accumulator = FootballSegmentAccumulator() if segments_enabled else None
         projection, injury_diagnostics = build_projection(
             season=args.season,
             week=args.week,
@@ -841,9 +860,14 @@ def main() -> None:
             prior_plays=prior_plays,
             seeds=args.seeds,
             apply_injury_adjustment=args.injury_adjustment,
+            segment_accumulator=segment_accumulator,
         )
         projections.append(projection)
         all_injury_diagnostics.extend(injury_diagnostics)
+        if segment_accumulator is not None:
+            block = segment_accumulator.payload()
+            if block is not None:
+                segment_blocks[str(row["game_id"])] = block
         log(f"PROJECTED {row['away_team']} @ {row['home_team']} -> {projection.home_score_mean:.1f}-{projection.away_score_mean:.1f}")
 
     # `#389` follow-up: READS stay on DATA_ROOT (the probed root -- find the
@@ -889,6 +913,19 @@ def main() -> None:
     ratings_path = write_ratings_artifact(
         ratings_for_artifact, season=args.season, week=args.week, data_root=output_root
     )
+    # Same `output_root` as the projections and the ratings -- `#389`: reads
+    # probe, writes go to the CONFIGURED root, or the artifact lands in the
+    # ephemeral checkout and every deploy discards it.
+    if segments_enabled:
+        segment_path = write_segment_distributions_artifact(
+            segment_blocks, season=args.season, week=args.week, data_root=output_root
+        )
+        log(f"SEGMENT_DISTRIBUTIONS path={segment_path} games={len(segment_blocks)} bytes={segment_path.stat().st_size}")
+        print(f"segment_distributions_path={segment_path}", flush=True)
+        print(f"segment_distributions_games={len(segment_blocks)}", flush=True)
+        print(f"segment_distributions_bytes={segment_path.stat().st_size}", flush=True)
+    else:
+        print("segment_distributions=off", flush=True)
     _sources = {}
     for _o, _d, _s in ratings_for_artifact.values():
         _sources[_s] = _sources.get(_s, 0) + 1

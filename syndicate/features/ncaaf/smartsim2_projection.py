@@ -157,6 +157,25 @@ def read_projection_artifact(*, season: int, week: int, data_root: Path) -> tupl
         return tuple(SmartSimNcaafProjection.from_csv_row(row) for row in csv.DictReader(handle))
 
 
+# SEGMENT DISTRIBUTIONS -- an ADDITIVE SIDECAR, not a column. `#S1`.
+#
+# The sim already computed per-quarter scoring for every seed and both
+# generators discarded it, so the persisted artifact was 8 scalars per game
+# with no distribution of any kind. These re-export the sidecar writer/reader
+# from `syndicate/features/shared/football_segment_distributions.py` (one
+# implementation, shared with NFL, so the two sports cannot bin `h1`/`h2`
+# differently) and are the projection contract's entry point to it.
+#
+# `PROJECTION_CSV_COLUMNS` and `SmartSimNcaafProjection` are UNCHANGED: same
+# fields, same order, same values. With the flag off nothing here is called
+# and the CSV is byte-identical to the pre-change one.
+from syndicate.features.shared.football_segment_distributions import (  # noqa: E402
+    read_segment_distributions_artifact,
+    segment_distributions_artifact_path,
+    write_segment_distributions_artifact,
+)
+
+
 __all__ = [
     "CONSENSUS_SOURCE_LABEL",
     "LEGACY_ENGINE_SOURCE_LABEL",
@@ -166,5 +185,8 @@ __all__ = [
     "SmartSimNcaafProjection",
     "projection_artifact_path",
     "read_projection_artifact",
+    "read_segment_distributions_artifact",
+    "segment_distributions_artifact_path",
     "write_projection_artifact",
+    "write_segment_distributions_artifact",
 ]
