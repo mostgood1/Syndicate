@@ -294,6 +294,14 @@ def attach_nfl_live_game_state(
             "status": state.get("status") or "",
             "source": "espn_scoreboard",
         }
+        # THE ESPN EVENT ID, kept so a per-game reader can address this game.
+        # NFL's `gamePk` is nflverse-shaped (`2026_01_NE_SEA`) and is NOT an
+        # ESPN id -- the join above reaches this row through the
+        # `"{AWAY}@{HOME}"` fallback key, and that resolution was then thrown
+        # away. `live_player_box` needs exactly this id and has no other way to
+        # get it without repeating the join.
+        if state.get("event_id"):
+            live_state["event_id"] = str(state["event_id"])
         if state.get("period") is not None:
             live_state["period"] = state["period"]
         if state.get("clock"):

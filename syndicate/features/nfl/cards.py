@@ -1228,29 +1228,200 @@ def _nfl_sim_box_section(game: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+# How many player lines one game's box shows. A NAMED constant, not a literal:
+# NCAAF's slate-coverage test parses its module's AST and rejects any
+# board-sized integer slice cap, because two of those once silently truncated a
+# slate to 16 games. This is a PER-GAME display cap and not a slate cap at all,
+# and it is named for the same reason NCAAF's is.
+_NFL_PLAYER_BOX_ROW_LIMIT = 12
+
+_NFL_PLAYER_BOX_COLUMNS = [
+    "Player",
+    "Tm",
+    "Pass yds",
+    "Pass TD",
+    "Rush yds",
+    "Rec yds",
+    "TD scored",
+]
+
+
 def _nfl_player_box_section(game: dict[str, Any], *, season: int, week: int) -> dict[str, Any]:
     """Per-player lines for THIS game, or a stated empty state naming the gap.
 
-    A STATED EMPTY STATE, NEVER A FILLED-IN WRONG ONE. `nfl/player_stats.py`
-    can produce season-to-date lines off `pbp_{season}.csv`, and rendering
-    those under a live game would be a fabricated box score that looks entirely
-    plausible: nflverse's play-by-play lags by days, so on a Wednesday-night
-    week-1 game it holds either nothing or LAST season. NCAAF made exactly this
-    call for the same reason (its snapshot is 2025-only) and the rule is the
-    same here -- an empty state that explains itself is a correct reading; a
-    filled one that quietly changed season or week is a defect.
+    ---------------------------------------------------------------------
+    THE SOURCE IS THIS GAME'S OWN FEED, AND NOTHING ELSE IS ALLOWED IN
+    ---------------------------------------------------------------------
+
+    Rows come from `live_player_box`, which reads ESPN's summary for THIS
+    event id -- so they cannot be another week's or another season's by
+    construction. `nfl/player_stats.py` can also produce real lines, off
+    `pbp_{season}.csv`, and it is deliberately NOT used here: nflverse's
+    play-by-play lands days after a game, so on a Wednesday-night week-1
+    kickoff it holds either nothing for this season or everything for the
+    last one. Printing that under tonight's teams would be a fabricated box
+    score that looks entirely plausible and is wrong in every cell. NCAAF made
+    the same call for the same reason (`9b57dd52`).
+
+    FOUR STATES, each with its own sentence and its own chip -- a blank table
+    for all four is the defect, not the fix:
+
+      pregame          no lines exist yet; say the game has not kicked off.
+      no reading       the live-state join never matched, so there is no event
+                       id to ask about. Distinct from a feed that answered.
+      read, empty      ESPN publishes `boxscore.teams` before
+                       `boxscore.players`; early in a game that block is
+                       genuinely absent. Say so rather than implying nobody
+                       has touched the ball.
+      read, populated  the real lines.
     """
+    live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else None
+    if live_state is None:
+        return {
+            "title": "Player box",
+            "body": (
+                "Live game state has not been read for this game, so there is no game feed to "
+                "pull player lines from. This is a missing reading, not an empty box score."
+            ),
+            "chip": "No reading",
+            "kind": "unknown",
+            "rows": [],
+        }
+
+    final = bool(live_state.get("final"))
+    started = final or bool(live_state.get("in_progress"))
+    if not started:
+        return {
+            "title": "Player box",
+            "body": (
+                "This game has not kicked off, so no player lines exist for it yet. Season "
+                f"play-by-play (`pbp_{season}.csv`) lags the live feed by days and is "
+                "deliberately NOT substituted here — last week's numbers under tonight's "
+                "teams would be a fabricated box score."
+            ),
+            "chip": "Pregame",
+            "kind": "scheduled",
+            "rows": [],
+        }
+
+    # `None` means the fetch never answered; `[]` means it answered and nobody
+    # has a line yet. Collapsing the two would put the confident empty state on
+    # a game whose box simply never arrived.
+    rows = game.get("live_player_box")
+    if not isinstance(rows, list):
+        return {
+            "title": "Player box",
+            "body": (
+                "The game-feed box score could not be read for this game, so no player lines "
+                "are shown. Nothing is being substituted in their place."
+            ),
+            "chip": "Not read",
+            "kind": "unknown",
+            "rows": [],
+        }
+    if not rows:
+        return {
+            "title": "Player box",
+            "body": (
+                "The game feed has not published a player box for this game yet — it posts team "
+                "totals first and per-player lines a few plays later."
+            ),
+            "chip": "Final" if final else "Live",
+            "kind": "actual",
+            "rows": [],
+        }
+
+    ordered = sorted(
+        rows,
+        key=lambda row: (
+            _safe_float(row.get("total_yards")) or 0.0,
+            _safe_float(row.get("td_scored")) or 0.0,
+        ),
+        reverse=True,
+    )
+    table_rows: list[list[str]] = []
+    for row in ordered[:_NFL_PLAYER_BOX_ROW_LIMIT]:
+        table_rows.append(
+            [
+                str(row.get("player_name") or "Unknown"),
+                str(row.get("team_abbr") or "—"),
+                str(int(_safe_float(row.get("pass_yards")) or 0)),
+                str(int(_safe_float(row.get("pass_td")) or 0)),
+                str(int(_safe_float(row.get("rush_yards")) or 0)),
+                str(int(_safe_float(row.get("rec_yards")) or 0)),
+                str(int(_safe_float(row.get("td_scored")) or 0)),
+            ]
+        )
+    shown = min(len(ordered), _NFL_PLAYER_BOX_ROW_LIMIT)
+    if final:
+        lead = "Final player lines from the game feed"
+    else:
+        clock = str(live_state.get("clock") or "").strip()
+        period = live_state.get("period")
+        when = " ".join(
+            part for part in ((f"Q{period}" if isinstance(period, int) else ""), clock) if part
+        )
+        lead = f"Player lines AS OF{f' {when}' if when else ' the last feed read'}"
     return {
         "title": "Player box",
         "body": (
-            "Per-player lines are not read for this game. The season play-by-play artifact "
-            f"(`pbp_{season}.csv`) lags the live feed by days, so last week's or last season's "
-            "numbers are deliberately NOT shown under this game."
+            f"{lead} — top {shown} of {len(ordered)} by total yards. "
+            "TD scored counts rushing and receiving touchdowns only; a passing touchdown is "
+            "the same score as its receiver's and is in the Pass TD column instead."
         ),
-        "chip": "Not published",
-        "kind": "unknown",
-        "rows": [],
+        "chip": "Final" if final else "Live",
+        "kind": "actual",
+        "columns": list(_NFL_PLAYER_BOX_COLUMNS),
+        "table_rows": table_rows,
     }
+
+
+def attach_nfl_player_box(games: list[dict[str, Any]], *, season: int, week: int) -> dict[str, int]:
+    """Read one ESPN summary per STARTED game and stash the rows on the card.
+
+    Pregame games are never fetched: they have no box, so a Thursday board
+    costs zero HTTP calls and a single-game night costs one. Never raises --
+    the box degrades to a stated empty state, the board does not.
+    """
+    wanted: list[tuple[str, bool]] = []
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+        event_id = str(live_state.get("event_id") or "").strip()
+        if not event_id:
+            continue
+        if not (bool(live_state.get("in_progress")) or bool(live_state.get("final"))):
+            continue
+        wanted.append((event_id, bool(live_state.get("final"))))
+    if not wanted:
+        return {"requested": 0, "read": 0, "games": len(games)}
+
+    try:
+        from syndicate.features.nfl.live_player_box import nfl_player_box_index
+
+        index = nfl_player_box_index(wanted)
+    except Exception as exc:  # noqa: BLE001 -- a box must never cost the board
+        print(
+            f"[nfl_cards] PLAYER_BOX_FAILED season={season} week={week} "
+            f"error={type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return {"requested": len(wanted), "read": 0, "games": len(games)}
+
+    stamped = 0
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+        event_id = str(live_state.get("event_id") or "").strip()
+        # Assigned only on a HIT. An unset key is "not read"; `[]` is "read and
+        # nobody has a line yet", and `_nfl_player_box_section` says something
+        # different for each.
+        if event_id and event_id in index:
+            game["live_player_box"] = index[event_id]
+            stamped += 1
+    return {"requested": len(wanted), "read": stamped, "games": len(games)}
 
 
 def _nfl_box_sections(game: dict[str, Any], *, season: int, week: int) -> list[dict[str, Any]]:
@@ -1372,6 +1543,24 @@ def build_cards_page_context(selected_week: int, *, season: int | None = None, s
             print(f"[nfl_cards] LIVE_STATE_FAILED season={season} "
                   f"week={resolved_week} error={type(exc).__name__}: {exc}",
                   flush=True)
+
+    # PLAYER LINES, for STARTED games only -- see `attach_nfl_player_box`.
+    # Between the live-state stamp (which is what supplies the ESPN event id
+    # and the started flag this reads) and the box sections (which render it).
+    if games:
+        try:
+            coverage = attach_nfl_player_box(games, season=season, week=resolved_week)
+            if coverage["requested"]:
+                print(
+                    f"[nfl_cards] PLAYER_BOX season={season} week={resolved_week} {coverage}",
+                    flush=True,
+                )
+        except Exception as exc:  # noqa: BLE001
+            print(
+                f"[nfl_cards] PLAYER_BOX_FAILED season={season} week={resolved_week} "
+                f"error={type(exc).__name__}: {exc}",
+                flush=True,
+            )
 
     # BOX SECTIONS, AFTER the live-state stamp and BEFORE the board contract.
     # Order is load-bearing in both directions: the linescore section reads

@@ -411,3 +411,256 @@ def test_shared_contract_keeps_the_nfl_sections():
     served = context["games"][0]["shared_box_sections"]
     assert [s["title"] for s in served] == ["Live / final box", "Sim box", "Player box"]
     assert served[0]["table_rows"][0] == ["NE", "7", "3", "0", "7", "17"]
+
+
+# --------------------------------------------------------------------------
+# Section three: real player lines off the game feed
+# --------------------------------------------------------------------------
+
+
+def _summary(groups_by_team: dict) -> dict:
+    return {
+        "boxscore": {
+            "teams": [],
+            "players": [
+                {"team": {"abbreviation": abbr}, "statistics": groups}
+                for abbr, groups in groups_by_team.items()
+            ],
+        }
+    }
+
+
+_PASSING = ["completions/passingAttempts", "passingYards", "yardsPerPassAttempt",
+            "passingTouchdowns", "interceptions"]
+_RUSHING = ["rushingAttempts", "rushingYards", "yardsPerRushAttempt", "rushingTouchdowns"]
+_RECEIVING = ["receptions", "receivingYards", "yardsPerReception", "receivingTouchdowns"]
+
+
+def _real_shaped_summary() -> dict:
+    """The shape ESPN actually returns -- verified on event 401873297."""
+    return _summary(
+        {
+            "SEA": [
+                {"name": "passing", "keys": _PASSING, "labels": ["C/ATT", "YDS", "AVG", "TD", "INT"],
+                 "athletes": [{"athlete": {"id": "1", "displayName": "Drew Lock"},
+                               "stats": ["12/14", "103", "7.4", "1", "0"]}]},
+                {"name": "rushing", "keys": _RUSHING, "labels": ["CAR", "YDS", "AVG", "TD"],
+                 "athletes": [
+                     {"athlete": {"id": "1", "displayName": "Drew Lock"}, "stats": ["2", "8", "4.0", "0"]},
+                     {"athlete": {"id": "2", "displayName": "Jacardia Wright"},
+                      "stats": ["8", "81", "10.1", "1"]},
+                 ]},
+                {"name": "receiving", "keys": _RECEIVING, "labels": ["REC", "YDS", "AVG", "TD"],
+                 "athletes": [
+                     {"athlete": {"id": "2", "displayName": "Jacardia Wright"},
+                      "stats": ["1", "12", "12.0", "0"]},
+                     {"athlete": {"id": "3", "displayName": "Elijah Arroyo"},
+                      "stats": ["2", "50", "25.0", "1"]},
+                 ]},
+                {"name": "defensive", "keys": ["totalTackles", "soloTackles", "sacks"],
+                 "labels": ["TOT", "SOLO", "SACKS"],
+                 "athletes": [{"athlete": {"id": "9", "displayName": "A Linebacker"},
+                               "stats": ["10", "2", "0"]}]},
+            ],
+            "NE": [
+                {"name": "passing", "keys": _PASSING, "labels": ["C/ATT", "YDS", "AVG", "TD", "INT"],
+                 "athletes": [{"athlete": {"id": "4", "displayName": "A Quarterback"},
+                               "stats": ["9/17", "69", "4.1", "0", "1"]}]},
+            ],
+        }
+    )
+
+
+def test_player_rows_merge_the_three_groups_per_athlete():
+    from syndicate.features.nfl.live_player_box import player_rows_from_summary
+
+    rows = {r["player_name"]: r for r in player_rows_from_summary(_real_shaped_summary())}
+    assert rows["Drew Lock"]["pass_yards"] == 103.0
+    assert rows["Drew Lock"]["pass_td"] == 1.0
+    # The SAME athlete's rushing line merges in rather than becoming a 2nd row.
+    assert rows["Drew Lock"]["rush_yards"] == 8.0
+    assert rows["Jacardia Wright"]["rush_yards"] == 81.0
+    assert rows["Jacardia Wright"]["rec_yards"] == 12.0
+    assert rows["Jacardia Wright"]["td_scored"] == 1.0
+    assert rows["Jacardia Wright"]["team_abbr"] == "SEA"
+    # A defensive-only line has no cell in this grid and is dropped, not zeroed
+    # into a row that would push a real skill player off the table.
+    assert "A Linebacker" not in rows
+
+
+def test_a_passing_touchdown_is_not_counted_as_an_anytime_touchdown():
+    """It is the SAME score as its receiver's; summing all three double-counts."""
+    from syndicate.features.nfl.live_player_box import player_rows_from_summary
+
+    rows = {r["player_name"]: r for r in player_rows_from_summary(_real_shaped_summary())}
+    assert rows["Drew Lock"]["td_scored"] == 0.0
+    assert rows["Elijah Arroyo"]["td_scored"] == 1.0
+
+
+def test_stats_are_read_by_key_position_not_by_label():
+    """`labels` are display strings; `keys` name the stat. One source, in order."""
+    from syndicate.features.nfl.live_player_box import player_rows_from_summary
+
+    payload = _summary(
+        {
+            "SEA": [
+                {
+                    "name": "rushing",
+                    "keys": _RUSHING,
+                    "labels": ["WHATEVER", "THESE", "SAY", "NOW"],
+                    "athletes": [
+                        {"athlete": {"id": "7", "displayName": "Runner"},
+                         "stats": ["9", "77", "8.6", "2"]}
+                    ],
+                }
+            ]
+        }
+    )
+    row = player_rows_from_summary(payload)[0]
+    assert row["rush_yards"] == 77.0 and row["td_scored"] == 2.0
+
+
+def test_a_summary_with_no_player_block_is_none_not_empty():
+    """`None` = never read. `[]` = read, nobody has a line. Different states."""
+    from syndicate.features.nfl.live_player_box import player_rows_from_summary
+
+    assert player_rows_from_summary(None) is None
+    assert player_rows_from_summary({}) is None
+    # ESPN posts `boxscore.teams` before `boxscore.players` on a fresh kickoff.
+    assert player_rows_from_summary({"boxscore": {"teams": []}}) is None
+    assert player_rows_from_summary({"boxscore": {"teams": [], "players": []}}) == []
+
+
+def _started(final: bool, **extra) -> dict:
+    return _card(
+        final=final,
+        in_progress=not final,
+        status="Final" if final else "2nd Quarter",
+        event_id="401872656",
+        away_pts=17,
+        home_pts=24,
+        away_linescores=[7, 3, 0, 7] if final else [7, 3],
+        home_linescores=[0, 10, 7, 7] if final else [7],
+        **extra,
+    )
+
+
+def test_player_box_renders_the_real_lines_on_a_final_game():
+    from syndicate.features.nfl.live_player_box import player_rows_from_summary
+
+    game = _started(final=True)
+    game["live_player_box"] = player_rows_from_summary(_real_shaped_summary())
+    section = _section(game, "Player box")
+    assert section["columns"] == [
+        "Player", "Tm", "Pass yds", "Pass TD", "Rush yds", "Rec yds", "TD scored"
+    ]
+    assert section["table_rows"][0] == ["Drew Lock", "SEA", "103", "1", "8", "0", "0"]
+    names = [row[0] for row in section["table_rows"]]
+    assert names == ["Drew Lock", "Jacardia Wright", "A Quarterback", "Elijah Arroyo"]
+    assert section["chip"] == "Final"
+
+
+def test_a_live_game_says_the_lines_are_as_of_a_moment():
+    from syndicate.features.nfl.live_player_box import player_rows_from_summary
+
+    game = _started(final=False, period=2, clock="4:12")
+    game["live_player_box"] = player_rows_from_summary(_real_shaped_summary())
+    section = _section(game, "Player box")
+    assert section["chip"] == "Live"
+    assert "AS OF" in section["body"]
+    assert "4:12" in section["body"]
+
+
+def test_pregame_player_box_states_it_and_refuses_the_lagging_artifact():
+    game = _card(in_progress=False, final=False, status="9/9 - 8:20 PM EDT")
+    section = _section(game, "Player box")
+    assert "table_rows" not in section
+    assert "has not kicked off" in section["body"]
+    assert "pbp_2026.csv" in section["body"]
+    assert section["chip"] == "Pregame"
+
+
+def test_a_missing_summary_degrades_to_a_stated_state_not_an_empty_table():
+    """Started, but the fetch never answered -- say so, substitute nothing."""
+    section = _section(_started(final=True), "Player box")
+    assert "table_rows" not in section
+    assert "could not be read" in section["body"]
+    assert "substituted" in section["body"]
+    assert section["chip"] == "Not read"
+
+
+def test_read_but_empty_is_said_differently_from_never_read():
+    game = _started(final=False, period=1, clock="12:44")
+    game["live_player_box"] = []
+    section = _section(game, "Player box")
+    assert "has not published a player box" in section["body"]
+    assert section["chip"] == "Live"
+
+
+def test_no_live_state_at_all_is_a_missing_reading():
+    section = _section(_card(), "Player box")
+    assert "missing reading" in section["body"]
+    assert section["chip"] == "No reading"
+
+
+def test_only_started_games_are_ever_fetched(monkeypatch):
+    """A Thursday board must cost ZERO summary calls."""
+    calls: list = []
+
+    def _index(events):
+        events = list(events)
+        calls.append(events)
+        return {event_id: [] for event_id, _ in events}
+
+    monkeypatch.setattr(
+        "syndicate.features.nfl.live_player_box.nfl_player_box_index", _index
+    )
+    pregame = _card(in_progress=False, final=False, status="9/9 - 8:20 PM EDT",
+                    event_id="401872657")
+    coverage = nfl_cards.attach_nfl_player_box([pregame, _card()], season=2026, week=1)
+    assert calls == []
+    assert coverage == {"requested": 0, "read": 0, "games": 2}
+
+    started = _started(final=True)
+    coverage = nfl_cards.attach_nfl_player_box([pregame, started], season=2026, week=1)
+    assert calls == [[("401872656", True)]]
+    assert coverage["requested"] == 1 and coverage["read"] == 1
+    assert "live_player_box" not in pregame
+
+
+def test_a_failing_fetch_never_costs_the_board(monkeypatch):
+    def _boom(events):
+        raise RuntimeError("espn unreachable")
+
+    monkeypatch.setattr(
+        "syndicate.features.nfl.live_player_box.nfl_player_box_index", _boom
+    )
+    started = _started(final=True)
+    coverage = nfl_cards.attach_nfl_player_box([started], season=2026, week=1)
+    assert coverage == {"requested": 1, "read": 0, "games": 1}
+    assert "live_player_box" not in started
+    # And the section still renders, saying what is missing.
+    section = _section(started, "Player box")
+    assert "could not be read" in section["body"]
+
+
+def test_the_event_id_survives_the_live_state_join():
+    """NFL's `gamePk` is nflverse-shaped, so the ESPN id has to be carried."""
+    game = _card()
+    game["gamePk"] = "2026_01_NE_SEA"
+    index = {
+        "NE@SEA": {
+            "event_id": "401872656",
+            "away_abbr": "NE",
+            "home_abbr": "SEA",
+            "in_progress": True,
+            "final": False,
+            "status": "2nd Quarter",
+            "away_pts": 10,
+            "home_pts": 7,
+            "away_linescores": [7, 3],
+            "home_linescores": [7],
+        }
+    }
+    attach_nfl_live_game_state([game], index)
+    assert game["live_state"]["event_id"] == "401872656"
