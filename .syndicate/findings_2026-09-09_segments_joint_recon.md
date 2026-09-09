@@ -1,0 +1,136 @@
+# FINDINGS — Step 3 "Segments and the joint": what the audit got wrong
+
+`[2026-09-09, lane segments-joint-v1, three code agents + four live production reads]`
+
+The Engine Room Audit's recommendation 3 read: *"persist per-sim vectors; MLB
+first1/3/5 + rest-of-game from the live MC; football drive conversion fitted then
+1H distributions + NCAAF live dists; NHL periods; first SGP/ladder fair-value vs
+Kalshi rungs (paper)."* Four of those five clauses were written without knowing
+what production already does. Corrected below, with the reading that settles each.
+
+## 1. MLB segments are ALREADY priced off distributions — the clause is DONE
+
+The sim publishes `sim.segments.{full,first1,first3,first5}`, each carrying
+`total_runs_dist` and `run_margin_dist` histograms plus win/tie probabilities
+(`vendor/mlb_bettingv2/tools/daily_update.py:4673-4691`), and
+`syndicate/features/shared/prop_projections.py:887-942` walks those histograms to
+price segment totals and spreads. This is not a point estimate compared to a line;
+it is the distribution evaluated at the threshold.
+
+**Served-board reading, 2026-09-09, `/api/board/layer2-shortlist?sport=mlb`, 200 rows:**
+
+| segment | rows WITH `model_edge_pct` | rows without |
+|---|---|---|
+| first1 | 30 | 1 |
+| first3 | 67 | 6 |
+| first5 | 35 | 0 |
+| full   | 49 | 12 |
+
+139 of 200 served MLB rows are segment rows and 132 of them carry a model edge.
+**Do not write a package to "add MLB segment pricing".** What is actually missing
+is narrower: `first1` and `first3` have no LIVE source (only `first5` does, via
+`live_mc_first5`, `syndicate/features/shared/live_gameline_join.py:262`;
+`live_mc.py:104-105` has no first1/first3), and per-INNING detail is collapsed.
+
+## 2. The MLB joint EXISTS and is populated in production
+
+`sim.joint` carries a packed Spearman lower triangle: **153 labels, 11,628
+entries, `scale` 1000, `n` 1000, `clamped` 0**, over 29 players plus the eight
+segment-score dimensions (`team|full|away`, `team|first1|home`, `team|first3|*`,
+`team|first5|*`). Read live from
+`mlb_source/source_artifacts/data/daily/sims/2026-09-09/sim_9_COL_at_NYY_pk823497_g1.json`
+(401,578 B). Producer `sim_engine/joint_outcomes.py:117-126`, `:283-304`; emitted
+`daily_update.py:4703-4714`; consumer `syndicate/features/mlb/sim_joint_correlation.py`.
+
+A Gaussian-copula conversion from rank correlation of COUNTS to correlation of
+THRESHOLDED indicators already exists too
+(`syndicate/features/mlb/threshold_correlation.py:1-52`, `rho_gauss = 2 sin(pi
+rho_S/6)`), measured on 6,396 leg pairs, where raw `rho_S` overstated dependence
+1.5-1.9x. **The joint is not missing. What is missing is that parlay pricing does
+not use it as a joint**: `syndicate/features/intelligence_parlay_runtime.py:124-164`
+interpolates between independence and the Frechet bound by AVERAGE pairwise
+correlation, capped at 0.25, and its own comment says "NOT A COPULA" (`:148`).
+
+## 3. MLB ladders are already distributional — and Kalshi has no integrity gate
+
+`syndicate/features/mlb/ladders_build.py:208-252` `_dist_ladder` emits the full
+cumulative `P(X >= total)` from the sim outcome histogram, one rung per outcome,
+with a certainty refusal at `:179-200`. Every MLB prop market maps to a `*_dist`
+histogram (`:88-132`).
+
+The gap is on the venue side and it is asymmetric:
+`syndicate/features/shared/polymarket_board_join.py:2445-2485` groups rungs, sorts
+by line, asserts monotonicity at tolerance 0.02, and condemns the whole ladder on
+violation. **Kalshi has no such check** — `monoton` matches nothing in
+`kalshi_board_join.py`. And **nothing anywhere selects a rung**: the execution
+ledger takes the `line` it is handed (`execution_ledger.py`, `portfolio_commit.py`
+have no rung/alt-line selection).
+
+## 4. Football: the sim ALREADY resolves quarters and the writer throws them away
+
+`syndicate/features/football/sim_engine/smartsim2/game_simulator.py:101` loops
+quarters, `:119-128` records per-quarter points and drive/possession counts, and
+`:187` returns `quarter_log`. **`scripts/generate_smartsim2_nfl_projections.py:769-771`
+keeps only `output.final_score`.** The persisted artifact is 8 scalars per game
+(`syndicate/features/nfl/smartsim2_projection.py:33-49`) — no distribution of any
+kind, not even the full-game margin histogram.
+
+So h1 rows are market-only by an EXPLICIT guard, not by omission:
+`nfl_game_projections.py:367-369` and `ncaaf/game_projections.py:374-376` skip any
+row whose segment is not `full`, counted as `non_full_segment_rows` /
+`rows_non_full_segment`, and `portfolio_commit.py:472` then refuses
+`no_model_edge_pct`. Every h1 row we capture is unsizable.
+
+The same seam appears in NCAAF live: `syndicate/features/ncaaf/live_resim.py:419`
+re-runs the real engine mid-game and collects margins at `:422`, then
+`build_game_lens` (`:492-495`) says the lane "deliberately does not carry"
+`marginDist`. **The distribution is computed and discarded** — and it is exactly
+the object MLB's segment pricer consumes.
+
+**The credibility caveat that must gate any football half pricing:** drive rates
+are hand-tuned constants, not fitted (`drive_priors.py:343`, `:366-371`, `:384`,
+`:454`; profile scalars `calibration_profile.py:123-150`). Measured truth over
+**53,548 real NCAAF drives** already sits in
+`scripts/calibrate_ncaaf_drive_structure.py:38-58` (TD 0.264, FG 0.100, punt
+0.351, turnover 0.109, downs 0.073, 5.77 plays/drive, 165.4 s/drive, 23.65
+possessions/game), and the sim misses it by **+27% plays/drive, +12% s/drive,
+-15% possessions/game**, with totals over-dispersed ~2.17x market. Half scoring is
+MORE sensitive to drive count than full-game scoring is, so a half distribution
+derived from these rates inherits a larger error than the full-game numbers do.
+
+## 5. NHL periods should NOT be built yet — there is no denominator
+
+Per-period lambdas exist and are persisted as MEANS
+(`hockeysim/projection.py:58` `period_shares = (0.2924, 0.3478, 0.3598)`;
+`artifacts.py:59-64` write `period{1,2,3}_{home,away}_proj`), but no per-period
+outcome distribution is emitted. Two facts make period pricing premature:
+
+- Market anchoring reaches the periods and **rescales the level only**
+  (`market_anchoring.py:165`, `:196-199`); the P1/P2/P3 SHAPE is three fixed
+  constants. A period edge would be mostly the anchor plus a constant.
+- **NHL is absent from `segment_actuals.SEGMENT_PERIODS`** (`:263-266`) and no
+  `bet_status_nhl.py` exists. An NHL `p1` order refuses `unsupported_segment`.
+  Capture would outrun grading, which `learnings.md` forbids.
+
+Gradeable today: NFL and NCAAF `q1-q4`/`h1`/`h2` (h2 includes OT by the `None`
+sentinel), soccer `h1`/`h2`, MLB `first1/3/5`, WNBA quarters and halves.
+
+## 6. The largest measured lever ships display-only
+
+`syndicate/features/shared/venue_basis_edge.py` prices exchange against book
+consensus NET OF FEE, with a fee model verified on 18/18 real fills
+(`venue_fees.py:399-527`, quadratic `rate * C * P * (1-P)`). It is **`servable`
+False for every row and unscored against realised results** (`:31-34`), and where
+`fee_multiplier` is absent it assumes the full rate and stamps
+`fee_is_upper_bound` (`:49-52`). Audit recommendation 6 calls venue-hold routing
+the largest measured lever on file (+8.48pp gross, MLB prop unders). It is built,
+inert, and unmeasured.
+
+## What this changes about the plan
+
+Step 3 is not a modelling problem. Four of its five clauses are **writer seams and
+guards** over machinery that already exists, and one (NHL) should not be built at
+all until a resolver exists. The work is: persist what is computed, gate what is
+persisted, measure before publishing, and use the joint as a joint.
+
+Corrections owed to the audit artifact's sections 04-08 and to recommendation 3.
