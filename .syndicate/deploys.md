@@ -5,6 +5,66 @@
 
 ---
 
+## 2026-09-09 17:06:48-17:10:29Z — web `617a2805` -> `00902dd1` (5 commits) — **the app had NO error handler; branded, content-negotiated 404/500 now live** — lane `brand-mascot-logo`
+
+User-directed. Web only; no `render.yaml`. Delta: 5 commits, and **the only
+runtime files in it are mine** (`syndicate/app.py` +124,
+`syndicate/templates/errors/error.html` +103); the rest are tests and ledger.
+Live `617a2805` confirmed an ancestor of the target.
+
+**What was broken before this:** `grep errorhandler` over `app.py` and every
+blueprint returned NOTHING. A typo'd URL and an unhandled exception both
+served Werkzeug's bare white default page — no nav, no styling, no link back.
+
+**verify:**
+1. **Deploy `live` 17:10:29Z**, `dep-dagp4a7qj5pc73d17vgg`; preflight
+   afterwards reads `live commit 00902dd1`.
+2. **ALL FOUR NEGOTIATION BRANCHES probed against the public edge**, because
+   the branch is the whole risk — 213 `/api/` routes have callers that parse
+   JSON, and an HTML body on a 404 turns a clean "not found" into a parse
+   error at the caller:
+
+   | request | served |
+   |---|---|
+   | `curl` (`Accept: */*`) on an HTML path | `404 text/html` |
+   | `/api/no-such-endpoint` | `404 application/json` |
+   | browser `Accept` | `404 text/html` |
+   | `Accept: application/json` | `404 application/json` |
+
+3. **A ROUTE-SUPPLIED 404 MESSAGE SURVIVES, checked on the live site.**
+   `/soccer/zzz/cards` serves *"Unknown soccer league 'zzz'. Valid leagues:
+   belgian_pro_league, bundesliga, championship, epl, eredivisie, la_liga,
+   ligue_1, mls, primeira_liga, serie_a."* This is the reading that matters
+   most: the first version of the handler DISCARDED that and printed
+   boilerplate. A branded page that is less informative than the one it
+   replaced is a regression wearing a nicer coat.
+4. **Every asset on the error page is 200; the only 404 is the document
+   itself**, which is the point. Checked in the network log, not by eye —
+   a missing crest would have rendered as empty space and looked fine.
+5. `/`, `/syndicate`, `/market-board`, `/portfolio`, `/mlb` all 200 after.
+
+**Three defects were caught by test or probe BEFORE this shipped, none by
+reading the code back:** the 500 log line printed the constant
+`InternalServerError` instead of the real cause (`original_exception`);
+`Accept: */*` tied and fell to JSON so `curl` on an HTML path returned JSON;
+and the route-description discard in reading 3. `tests/test_error_pages.py`
+pins all three, 12 tests, each asserting WHICH shape comes back rather than
+just the status.
+
+**NOT verified on production:** the 500 page itself. There is no route that
+reliably 500s, and manufacturing one in production to look at it would be a
+worse idea than the page is a good one. It shares the template with the 404
+(proven above), and `test_error_pages.py` covers its status, its content
+type, that it does not leak the exception, and that `UNHANDLED_500` reaches
+stdout — but the production rendering is inferred, not measured.
+
+**Two `test_ops.py` failures seen alongside this work are NOT from it** —
+re-baselined on a clean `origin/main` worktree and they fail identically
+there (`data/` mirror write guard, `Path.mkdir -> data/nba_source/logs`).
+
+
+---
+
 ## 2026-09-09 16:46:51-16:50:22Z — web `1c6308c3` -> `617a2805` (5 commits) — **the hub crest stacks above the tiles on mobile instead of being dropped** — lane `brand-mascot-logo`
 
 User-directed ("stack it above the tiles on mobile" + "deploy it"). Web only;
