@@ -473,3 +473,237 @@ def test_a_resolved_row_carries_the_openings_fair_price_provenance(tmp_path):
         assert field in rows["away"] and rows["away"][field] is None, field
     # The arithmetic did not move.
     assert rows["home"]["clv_pct"] == clv_pct_from_prices(-120, -150.0)
+
+
+# ---------------------------------------------------------------------------
+# SEGMENT
+# ---------------------------------------------------------------------------
+#
+# `_history_key` carried no `segment` while `_opening_key` -- the other half of
+# this same join -- always has. MEASURED 2026-09-09 on production, reproducing
+# the live report byte-for-byte: 19 of 2,007 resolved rows on 2026-09-08 were a
+# SEGMENT bet priced off a FULL-GAME close, 17 of them inside the headline
+# `same_book` population of 231, moving `avg_clv_pct` 0.9497 -> 1.1479. On the
+# two preceding dates the headline's SIGN flipped: -0.1533 -> +0.0248 and
+# -0.0492 -> +0.1749.
+#
+# THE MECHANISM IS THAT h2h HAS NO LINE. `_price_for_side` already refuses a
+# line disagreement, so a first-5 total 4.5 against a full-game 8.5 lands in
+# `line_mismatch` and never becomes a row. A moneyline has no number to
+# disagree about -- 18 of the 19 contaminated rows were `h2h`. A test written
+# only against totals would have passed throughout.
+
+_FULL_GAME_KEY = ("event_id=2124d4bb5569819a30020e5b907ca202|home_team=Cincinnati Reds|"
+                  "away_team=Miami Marlins|market=h2h|bookmaker=betmgm")
+
+
+def _f5(**over):
+    return _game_opening(segment="first5", **over)
+
+
+def test_a_first5_bet_does_not_take_the_full_game_close(tmp_path):
+    """The defect, end to end. A first-5 moneyline and a nine-inning moneyline
+    are different bets; the full-game history entry must not answer for both."""
+    from syndicate.features.shared.clv_opening_ledger import record_openings
+
+    record_openings(
+        [{**_f5(), "quote": {"price": -120, "bookmaker": "betmgm"}, "line": None}],
+        date="2026-08-14", now=_OPEN_AT, root=tmp_path,
+    )
+    report = compute_clv_for_date(
+        "2026-08-14", "mlb", root=tmp_path,
+        history_payload={"markets": {_FULL_GAME_KEY: _state([_point("2026-08-14T22:30:00+00:00")])}},
+    )
+    assert report["resolved"] == 0
+    assert report["unresolved_reasons"] == {"segment_absent_from_history": 1}
+
+
+def test_the_identical_full_game_bet_still_resolves(tmp_path):
+    """The other half of the pair, and the one that makes the first meaningful.
+
+    Without it, a key that refused EVERYTHING would pass the test above."""
+    from syndicate.features.shared.clv_opening_ledger import record_openings
+
+    record_openings(
+        [{**_game_opening(), "quote": {"price": -120, "bookmaker": "betmgm"}, "line": None}],
+        date="2026-08-14", now=_OPEN_AT, root=tmp_path,
+    )
+    report = compute_clv_for_date(
+        "2026-08-14", "mlb", root=tmp_path,
+        history_payload={"markets": {_FULL_GAME_KEY: _state([_point("2026-08-14T22:30:00+00:00")])}},
+    )
+    assert report["resolved"] == 1
+    assert report["rows"][0]["close_price"] == -150.0
+    assert report["rows"][0]["close_book_scope"] == "same_book"
+
+
+def test_the_full_game_key_is_byte_identical_to_the_stored_shape():
+    """The load-bearing constraint, pinned rather than trusted.
+
+    The odds-history STORE writes no `segment` term -- 4,063 of 4,063 keys on
+    the 2026-09-08 mlb shard. Spelling full game as `segment=full` would orphan
+    every full-game lookup and take CLV to zero, so full game must key as
+    NOTHING. This asserts the exact string, because that is what a pipe-joined
+    key comparison actually depends on."""
+    from syndicate.features.shared.clv_join import _history_key
+
+    assert _history_key(_game_opening()) == _FULL_GAME_KEY
+    # Absent, and every spelling of full game, land on the same key -- matching
+    # what `_odds_history_market_key` does with a field it does not carry.
+    for spelling in (None, "", "full", "FULL", " Full ", "game", "full_game"):
+        assert _history_key(_game_opening(segment=spelling)) == _FULL_GAME_KEY, spelling
+    assert _history_key(_f5()) != _FULL_GAME_KEY
+    assert "|segment=first5|" in _history_key(_f5())
+
+
+def test_every_segment_value_gets_its_own_key():
+    """Production carries `first1`, `first3`, `first5` (mlb) and `h1` (ncaaf) in
+    the opening ledger. A fix that only knew about first-5 would still collide."""
+    from syndicate.features.shared.clv_join import _history_key
+
+    keys = {_history_key(_game_opening(segment=s))
+            for s in ("full", "first1", "first3", "first5", "h1")}
+    assert len(keys) == 5
+
+
+def test_a_prop_key_carries_the_segment_too():
+    """The prop branch is a different key SHAPE and was missed by the same
+    omission. It resolves book-agnostically, so a collision there is a
+    market-wide close attributed to a segment prop."""
+    from syndicate.features.shared.clv_join import _history_key
+
+    prop = _game_opening(player_name="Elly De La Cruz", market="batter_hits",
+                         side="over", line=0.5)
+    assert _history_key(prop) == "player_name=elly de la cruz|market=batter_hits|selection=over"
+    assert (_history_key(dict(prop, segment="first5"))
+            == "player_name=elly de la cruz|market=batter_hits|segment=first5|selection=over")
+
+
+def test_the_different_book_fallback_does_not_cross_segments(tmp_path):
+    """The SECOND of three segment-blind lookups, and not theoretical: 1 of the
+    19 contaminated rows on 2026-09-08 arrived through this route rather than
+    the primary key. Fixing only `_history_key` would have left it open."""
+    from syndicate.features.shared.clv_opening_ledger import record_openings
+
+    record_openings(
+        [{**_f5(bookmaker="polymarket"),
+          "quote": {"price": -120, "bookmaker": "polymarket"}, "line": None}],
+        date="2026-08-14", now=_OPEN_AT, root=tmp_path,
+    )
+    other_book_full_game = (
+        "event_id=2124d4bb5569819a30020e5b907ca202|home_team=Cincinnati Reds|"
+        "away_team=Miami Marlins|market=h2h|bookmaker=fanduel")
+    report = compute_clv_for_date(
+        "2026-08-14", "mlb", root=tmp_path,
+        history_payload={"markets": {
+            other_book_full_game: _state([_point("2026-08-14T22:30:00+00:00")])}},
+    )
+    assert report["resolved"] == 0
+    assert "different_book_close" not in {
+        row.get("close_book_scope") for row in report["rows"]}
+
+
+def test_a_segment_close_resolves_once_history_carries_the_term(tmp_path):
+    """REACHABILITY, and the thing that makes this a key fix rather than a
+    blanket refusal of segment bets.
+
+    Nothing in production writes a `segment=` history key today, so every
+    segment opening currently lands in `segment_absent_from_history`. The day
+    `_odds_history_market_key` emits one, this join picks it up with no further
+    change -- asserted here so that claim is tested rather than promised."""
+    from syndicate.features.shared.clv_opening_ledger import record_openings
+
+    record_openings(
+        [{**_f5(), "quote": {"price": -120, "bookmaker": "betmgm"}, "line": None}],
+        date="2026-08-14", now=_OPEN_AT, root=tmp_path,
+    )
+    segment_market = ("event_id=2124d4bb5569819a30020e5b907ca202|home_team=Cincinnati Reds|"
+                      "away_team=Miami Marlins|market=h2h|segment=first5|bookmaker=betmgm")
+    report = compute_clv_for_date(
+        "2026-08-14", "mlb", root=tmp_path,
+        history_payload={"markets": {segment_market: _state([_point("2026-08-14T22:30:00+00:00")])}},
+    )
+    assert report["resolved"] == 1
+    assert report["rows"][0]["close_price"] == -150.0
+    # `same_book` is what makes this a DIRECT key hit. The old segmentless key
+    # also resolved this fixture -- via the `(event_id, market)` fallback, as
+    # `different_book_close`, from a market it could not tell apart. Asserting
+    # the scope is what separates "found its own key" from "fell through".
+    assert report["rows"][0]["close_book_scope"] == "same_book"
+
+
+def test_the_refusal_is_named_apart_from_a_real_capture_gap(tmp_path):
+    """`no_market_in_history` already held 1,567 rows on 2026-09-08. Folding the
+    segment refusals into it would hide this fix's whole coverage cost inside a
+    bucket that was already large."""
+    from syndicate.features.shared.clv_opening_ledger import record_openings
+
+    record_openings(
+        [{**_f5(), "quote": {"price": -120, "bookmaker": "betmgm"}, "line": None},
+         {**_game_opening(event_id="NOT_IN_HISTORY"),
+          "quote": {"price": -120, "bookmaker": "betmgm"}, "line": None}],
+        date="2026-08-14", now=_OPEN_AT, root=tmp_path,
+    )
+    report = compute_clv_for_date("2026-08-14", "mlb", root=tmp_path,
+                                  history_payload={"markets": {}})
+    assert report["unresolved_reasons"] == {
+        "segment_absent_from_history": 1, "no_market_in_history": 1}
+
+
+def test_only_the_key_miss_is_relabelled_not_every_segment_failure(tmp_path):
+    """A segment bet that FOUND its market and then failed on the clock has
+    failed for that reason and must keep saying so. Relabelling every segment
+    failure would turn the counter into a segment census and destroy four real
+    diagnoses to build one."""
+    from syndicate.features.shared.clv_opening_ledger import record_openings
+
+    record_openings(
+        [{**_f5(), "quote": {"price": -120, "bookmaker": "betmgm"}, "line": None}],
+        date="2026-08-14", now=_OPEN_AT, root=tmp_path,
+    )
+    segment_market = ("event_id=2124d4bb5569819a30020e5b907ca202|home_team=Cincinnati Reds|"
+                      "away_team=Miami Marlins|market=h2h|segment=first5|bookmaker=betmgm")
+    report = compute_clv_for_date(
+        "2026-08-14", "mlb", root=tmp_path,
+        # Every observation at or after kickoff: found the market, no close.
+        history_payload={"markets": {
+            segment_market: _state([_point("2026-08-14T23:30:00+00:00")])}},
+    )
+    assert report["unresolved_reasons"] == {"no_pregame_observation": 1}
+
+
+def test_the_report_states_the_segment_denominator(tmp_path):
+    """`segment_absent_from_history` is a count. Without its denominator it is
+    not a rate, and this repo has paid for that distinction before."""
+    from syndicate.features.shared.clv_opening_ledger import record_openings
+
+    record_openings(
+        [{**_f5(), "quote": {"price": -120, "bookmaker": "betmgm"}, "line": None},
+         {**_game_opening(segment="full"),
+          "quote": {"price": -120, "bookmaker": "betmgm"}, "line": None}],
+        date="2026-08-14", now=_OPEN_AT, root=tmp_path,
+    )
+    report = compute_clv_for_date("2026-08-14", "mlb", root=tmp_path,
+                                  history_payload={"markets": {}})
+    assert report["openings_by_segment"] == {"first5": 1, "full": 1}
+    # Both rows are LABELLED, so the permissive absent->full step never fired.
+    # `_game_opening()` with no `segment` at all is the other case and has its
+    # own test -- production openings all carry the field (47,954 of 47,954).
+    assert report["openings_without_segment"] == 0
+
+
+def test_an_unlabelled_opening_is_counted_so_the_permissive_step_is_visible(tmp_path):
+    """`_key_segment` maps ABSENT onto full game, matching what the producer
+    does with a field it does not carry. That is the one permissive step in
+    this key, so it is instrumented rather than assumed: zero across 47,954
+    production openings on 2026-09-06..09-08."""
+    from syndicate.features.shared.clv_opening_ledger import record_openings
+
+    record_openings(
+        [{**_game_opening(segment=None), "quote": {"price": -120, "bookmaker": "betmgm"},
+          "line": None}],
+        date="2026-08-14", now=_OPEN_AT, root=tmp_path,
+    )
+    report = compute_clv_for_date("2026-08-14", "mlb", root=tmp_path,
+                                  history_payload={"markets": {}})
+    assert report["openings_without_segment"] == 1

@@ -197,9 +197,13 @@ def clv_for_orders(
             # `no_close_reason` distinguishes `no_market_in_history` (this
             # family is not tracked: h2h_lay, totals_alt, h2h_3_way,
             # spreads_alt) from `close_precedes_open` (a real close exists but
-            # predates our opening) from an opening the resolver never saw at
-            # all (None -- our book absent from the shard). Three different
-            # problems; only the flat name made them look like one.
+            # predates our opening) from `segment_absent_from_history` (odds
+            # history writes no `segment=` term, so a first-5 or first-3 bet
+            # has no key of its own and is REFUSED rather than given the
+            # full-game close -- see `clv_join._key_segment`) from an opening
+            # the resolver never saw at all (None -- our book absent from the
+            # shard). Four different problems; only the flat name made them
+            # look like one.
             _row(
                 REASON_NO_CLOSE,
                 close_price=None,

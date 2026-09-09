@@ -3477,6 +3477,17 @@ def api_ops_clv_report() -> Any:
     every time: `close_precedes_open` and `line_mismatch` are the two defects
     that made this endpoint's first number (-5.215) wrong, and they are now
     counted rather than silently folded into an average.
+
+    **`segment_absent_from_history` IS EXPECTED TO BE LARGE, AND THAT IS THE
+    THIRD SUCH DEFECT WORKING RATHER THAN A GAP.** `clv_join._history_key` used
+    to carry no `segment`, so a first-3 or first-5 bet took the FULL-GAME
+    close. Measured 2026-09-09 on 2026-09-08 mlb: 19 of 2,007 resolved rows
+    were exactly that, 17 of them inside the headline population of 231, and
+    removing them moved `avg_clv_pct` 0.9497 -> 1.1479 -- on 09-06 and 09-07
+    the headline's SIGN flipped. Odds history writes no `segment=` term at all
+    (4,063 of 4,063 keys), so those bets now have no key of their own and are
+    refused by name. Read it against `openings_by_segment`, which is on the
+    report for exactly that reason: the count alone is not a rate.
     """
     # Protected endpoint: requires admin token (enforced by before_request).
     date = str(request.args.get("date") or "").strip()

@@ -188,22 +188,103 @@ def _parse_ts(value: Any) -> datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
+# ---------------------------------------------------------------------------
+# THE SEGMENT TERM, AND WHY FULL-GAME IS SPELLED AS NOTHING
+# ---------------------------------------------------------------------------
+#
+# `_history_key` carried no `segment`, while `_opening_key` -- the other half of
+# this very join -- has always carried it. A first-five-innings moneyline and a
+# nine-inning moneyline are different bets, and collided they take each other's
+# close.
+#
+# MEASURED 2026-09-09 on production, reproducing the live report exactly
+# (openings 11,577, resolved 2,007, avg_clv_pct 0.9497 -- byte-identical to
+# `/api/ops/clv/report?date=2026-09-08&sport=mlb`):
+#
+#     3.0-3.5% of history keys span more than one segment      (09-06..09-08)
+#     19 of 2,007 resolved rows (0.95%) were a SEGMENT bet priced off a
+#        FULL-GAME close
+#     17 of those sat in the headline `same_book` population of 231 -- 7.4%
+#     avg_clv_pct 0.9497 -> 1.1479 with them removed  (-0.198pp contamination)
+#
+# **THE MECHANISM IS THAT h2h HAS NO LINE.** `_price_for_side` already refuses a
+# pairing whose line disagrees, so a first-5 total 4.5 against a full-game 8.5
+# lands in `line_mismatch` (1,260 on that date) and never reaches a row. A
+# moneyline has no number to disagree about, so every first-3 and first-5 h2h
+# went straight through: 18 of the 19 contaminated rows are `h2h`. A guard that
+# only works where a line exists is not a segment guard.
+#
+# **WHY THE TERM IS OMITTED FOR FULL GAME RATHER THAN SPELLED `full`.** The
+# odds-history STORE writes no segment term at all -- 4,063 of 4,063 keys on the
+# 2026-09-08 mlb shard, checked rather than assumed -- because
+# `odds_refresh_tracking._odds_history_market_key` appends a `field=value` part
+# only when the row carries that field, and `segment` is not in its list. So
+# spelling `segment=full` would orphan EVERY full-game lookup and take CLV to
+# zero. Omitted, all 1,988 full-game rows keep the byte-identical key they have
+# today and only a segment bet gets a new one.
+#
+# CONSEQUENCE, STATED RATHER THAN HIDDEN: a segment opening now looks up a key
+# the store does not contain, so it resolves to nothing and is counted by name
+# instead of taking a full-game price. **That is the intended direction** -- an
+# unresolved bet appears in the work list, a mis-priced one appears in the P&L
+# as skill -- but it is a REFUSAL, not segment CLV. Segment CLV becomes
+# available the moment `_odds_history_market_key` starts emitting a `segment=`
+# part for non-full rows; this key already matches it, and nothing else here
+# needs to change. That producer is left alone deliberately: its keys are a
+# persisted store read by the board's movement badges and by every sport, so
+# widening it is its own change with its own measurement.
+def _key_segment(value: Any) -> str:
+    """The segment term for a history key. Empty string means full game.
+
+    Absent is treated as full game because that is what the PRODUCER does, not
+    as a convenience: it appends no part for a missing field, so a row with
+    `segment="full"` and a row with no `segment` at all already produce one
+    identical key at the writing end. Matching that is fidelity. Any other
+    value is a different bet and gets its own term.
+
+    The condition that invalidates this: openings that carry no `segment` field.
+    There were **zero** across 47,954 production openings on 2026-09-06..09-08,
+    and `compute_clv_for_date` counts them on the report (`openings_without_
+    segment`) so the day that changes is visible rather than inferred.
+    """
+    text = str(value or "").strip().lower()
+    return "" if text in ("", "full", "game", "fullgame", "full_game") else text
+
+
+def _count_by(rows: Any, of: Any) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows or ():
+        label = str(of(row))
+        counts[label] = counts.get(label, 0) + 1
+    return counts
+
+
 def _history_key(opening: Mapping[str, Any]) -> str | None:
     """The odds-history key this opening should be looked up under."""
     market = str(opening.get("market") or "").strip().lower()
     if not market:
         return None
+    # Placed immediately after `market` in both shapes, which is where
+    # `_odds_history_market_key` would emit it: that function walks a fixed
+    # field tuple and `segment` belongs beside the market it qualifies. The
+    # position is part of the contract -- these are "|"-joined strings compared
+    # verbatim, so a term in the wrong place matches nothing.
+    segment = _key_segment(opening.get("segment"))
+    segment_part = f"|segment={segment}" if segment else ""
     player = str(opening.get("player_name") or "").strip().lower()
     if player:
         side = str(opening.get("side") or "").strip().lower()
-        return f"player_name={player}|market={market}|selection={side}"
+        return f"player_name={player}|market={market}{segment_part}|selection={side}"
     event_id = str(opening.get("event_id") or "").strip()
     home = str(opening.get("home_team") or "").strip()
     away = str(opening.get("away_team") or "").strip()
     book = str(opening.get("bookmaker") or "").strip().lower()
     if not event_id:
         return None
-    return f"event_id={event_id}|home_team={home}|away_team={away}|market={market}|bookmaker={book}"
+    return (
+        f"event_id={event_id}|home_team={home}|away_team={away}"
+        f"|market={market}{segment_part}|bookmaker={book}"
+    )
 
 
 def _price_for_side(point: Mapping[str, Any], opening: Mapping[str, Any]) -> tuple[float | None, str | None]:
@@ -476,7 +557,13 @@ def compute_clv_for_date(
     # blended in. The remaining 18 misses are market families absent from
     # history entirely (`h2h_lay`, `totals_alt`, `h2h_3_way`, `spreads_alt`);
     # those are a capture-side gap and stay unresolved by name.
-    by_event_market: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
+    #
+    # SEGMENT IS IN THIS INDEX'S KEY TOO. It is the second of the three
+    # segment-blind lookups in this function, and it is not theoretical: 1 of
+    # the 19 contaminated rows measured on 2026-09-08 came through here rather
+    # than the primary key, so fixing only `_history_key` would have left a
+    # `different_book_close` route open for exactly the same bets.
+    by_event_market: dict[tuple[str, str, str], list[Mapping[str, Any]]] = {}
     for market_key, state in markets.items():
         if not isinstance(state, Mapping) or not str(market_key).startswith("event_id="):
             continue
@@ -485,8 +572,9 @@ def compute_clv_for_date(
         )
         event_id = str(parts.get("event_id") or "").strip()
         market_name = str(parts.get("market") or "").strip().lower()
+        segment_name = _key_segment(parts.get("segment"))
         if event_id and market_name:
-            by_event_market.setdefault((event_id, market_name), []).append(state)
+            by_event_market.setdefault((event_id, market_name, segment_name), []).append(state)
 
     rows: list[dict[str, Any]] = []
     unresolved: dict[str, int] = {}
@@ -522,6 +610,7 @@ def compute_clv_for_date(
             event_key = (
                 str(opening.get("event_id")).strip(),
                 str(opening.get("market") or "").strip().lower(),
+                _key_segment(opening.get("segment")),
             )
             # PREFER A GENUINE SAME-BOOK PAIR BEFORE FALLING BACK.
             #
@@ -546,6 +635,11 @@ def compute_clv_for_date(
                     if (
                         str(parts.get("event_id") or "").strip() != event_key[0]
                         or str(parts.get("market") or "").strip().lower() != event_key[1]
+                        # The third segment-blind lookup. Same event, same
+                        # market, another book -- and, without this, any
+                        # segment. A same-book pairing across segments is still
+                        # the wrong bet; it is only unbiased about the BOOK.
+                        or _key_segment(parts.get("segment")) != event_key[2]
                     ):
                         continue
                     book = str(parts.get("bookmaker") or "").strip().lower()
@@ -569,6 +663,7 @@ def compute_clv_for_date(
             event_key = (
                 str(opening.get("event_id")).strip(),
                 str(opening.get("market") or "").strip().lower(),
+                _key_segment(opening.get("segment")),
             )
             for alternate in by_event_market.get(event_key, []):
                 if alternate is state:
@@ -582,6 +677,20 @@ def compute_clv_for_date(
         if key is None:
             resolved["unresolved_reason"] = "unkeyable_opening"
         reason = resolved.get("unresolved_reason")
+        # A SEGMENT BET WHOSE KEY IS NOT IN THE STORE IS NOT A CAPTURE GAP, and
+        # lumping it under `no_market_in_history` with 1,567 genuine ones would
+        # hide the entire coverage cost of this fix behind a bucket that was
+        # already large. Named separately so it is countable and actionable: the
+        # action is to make `_odds_history_market_key` emit a `segment=` part.
+        #
+        # ONLY that one reason is renamed. A segment opening that DID find its
+        # market and then failed on the line, the clock or a missing pregame
+        # observation has failed for that reason and must keep saying so --
+        # relabelling every segment failure would turn this counter into a
+        # segment census and destroy four real diagnoses to build one.
+        if reason == "no_market_in_history" and _key_segment(opening.get("segment")):
+            reason = "segment_absent_from_history"
+            resolved["unresolved_reason"] = reason
         if reason:
             _unresolve(opening, reason)
             continue
@@ -753,6 +862,23 @@ def compute_clv_for_date(
         "openings": len(openings),
         "resolved": resolved_count,
         "unresolved_reasons": unresolved,
+        # THE SEGMENT SPLIT OF THE INPUT, so the coverage this key costs is a
+        # RATE and not a bare count. `segment_absent_from_history` in
+        # `unresolved_reasons` has no meaning without its denominator.
+        "openings_by_segment": {
+            segment: count
+            for segment, count in sorted(
+                _count_by(openings, lambda row: _key_segment(row.get("segment")) or "full").items()
+            )
+        },
+        # `_key_segment` maps an ABSENT segment onto full game, matching what
+        # `_odds_history_market_key` does with a missing field. That is the one
+        # permissive step in this key, so it is counted rather than assumed:
+        # **zero** across 47,954 production openings on 2026-09-06..09-08, and
+        # a non-zero here means unlabelled rows are taking full-game closes.
+        "openings_without_segment": sum(
+            1 for row in openings if not str(row.get("segment") or "").strip()
+        ),
         # The same failures, keyed, so a caller holding one opening can say WHY
         # rather than only that it failed.
         "unresolved_rows": unresolved_rows,
