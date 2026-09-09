@@ -528,6 +528,24 @@ def _isolate_kalshi_discovered_series():
 # `unittest` never imports a conftest. `tests/_cache_isolation.py` exists for
 # that same gap and explains it at length.
 #
+# The `os.open` gap is REAL and MEASURED: an append to a tracked mirror file
+# through `Path.open("a")` is refused, while the same append through
+# `os.open(..., O_WRONLY|O_APPEND)` passes and the bytes land (controls run by
+# session `data-mirror-write-guard-sweep`). It is not theoretical --
+# `scripts/refresh_*_oddsapi.py::_copy_file_with_fallback` already copies through
+# `os.open` on EINVAL.
+#
+# BUT IT DOES NOT EXPLAIN `live_lens_2026_06_02.jsonl`, and that hypothesis is
+# recorded as FALSIFIED so nobody re-runs it. It was the obvious candidate for
+# the modification this lane saw twice with nothing attributable to it, and a
+# one-variable A/B killed it: with the `os.open` wrapper PRESENT and with it
+# REMOVED, `test_mlb_refresh_runner.py::test_build_live_lens_snapshot_internal_
+# merges_cards_detail_into_vendor_report` is intercepted identically and the file
+# stays at 20 lines and 0 dirty either way. The real writer was ordinary and
+# in-process: the report/log path asymmetry in `_persist_live_lens_report`, fixed
+# in that test. A guard's blind spot being real does not make it the cause of the
+# nearest unexplained symptom.
+#
 # TWO ROOTS, NOT ONE `[widened after the first full-suite sweep]`. `data/` is
 # the mirror `CLAUDE.md` names; `vendor/<repo>/data/` is the second, and a test
 # run rewrites all 114 rows of the TRACKED
