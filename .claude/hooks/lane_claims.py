@@ -187,6 +187,32 @@ _DISCLAIMER_MARKERS = (
     # Safe as a PREFIX cut: a path BEFORE the word is still claimed, so
     # "`a.py` (never deployed)" keeps claiming `a.py`.
     "never",
+    # 2026-09-09: THE SAME BUG, SAME FILE, DIFFERENT PHRASING. `render.yaml` was
+    # again reported CONTESTED -- held by `bandwidth-controlled-transfer`, whose
+    # Files bullet ends "No production code, no deploy, no `render.yaml` -- this
+    # lane cannot cause a `blueprint_sync`". A pure PROHIBITION, read as a claim,
+    # because the 2026-09-03 fix added `never` and the ledger's other way of
+    # spelling a prohibition is a bare negation. Two sessions in a row have now
+    # been told the lane most carefully avoiding this file owns it.
+    #
+    # WHY NOT THE BARE "no ", WHICH IS THE OBVIOUS FIX. Measured over all 2,186
+    # `- Files:`-block lines in lanes.md + lanes_closed.md + lanes_history.md:
+    # bare "no " changes 13 lines and FIVE of them lose a real claim, because
+    # the cut is a PREFIX and "no" is common mid-sentence --
+    # "(`_meta` HRR note only -- no coefficient changes), `scripts/fit_mlb_prop_calibration.py`"
+    # drops the very file the bullet is claiming. Losing a claim is the WORSE
+    # direction: a false contest is loud and gets surfaced, an unclaimed file
+    # lets two lanes edit it silently.
+    #
+    # These five change 4 lines out of 2,186 and every one is a genuine
+    # disclaimer; the OPEN-lane claim map goes 70 -> 69 paths, the single
+    # difference being `render.yaml` released. Nothing is newly claimed.
+    # Re-measure the same way before adding a sixth.
+    ", no ",
+    ". no ",
+    "no deploy",
+    "no production code",
+    "no code change",
 )
 
 

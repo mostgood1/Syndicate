@@ -124,6 +124,77 @@ def test_the_marker_tuple_has_exactly_one_definition() -> None:
         f"expected exactly one definition, in lane_claims.py; found {definers}")
 
 
+BARE_NEGATION_LANES = """## OPEN
+
+### lane-d — OPEN — opened 2026-09-09 — session ddd
+- Files: `.syndicate/findings_x.md` (NEW), `scripts/probe.py` (NEW). No production
+  code, no deploy, no `render.yaml` — this lane cannot cause a `blueprint_sync`.
+- Blocked by: none.
+
+## Archived lanes
+"""
+
+
+def test_a_BARE_NEGATION_prohibition_is_not_a_claim() -> None:
+    """THE 2026-09-09 REPEAT: same bug, same file, different phrasing.
+
+    The 2026-09-03 fix added `never`, and the ledger's OTHER way of spelling a
+    prohibition is a bare negation -- "no production code, no deploy, no
+    `render.yaml`". So `render.yaml` was reported CONTESTED a second time, held
+    by the lane whose Files bullet exists to swear off it, and a second session
+    was told to go resolve a conflict that did not exist.
+    """
+    claims = CHECKER.claims(BARE_NEGATION_LANES)
+    holders = sorted(slug for slug, path in claims if path == "render.yaml")
+    assert holders == [], f"a bare-negation prohibition was read as a claim by {holders}"
+    assert CHECKER.contested_files(claims) == {}
+
+
+def test_the_bare_negation_line_still_claims_its_real_files() -> None:
+    """Same asymmetry as the `never` fix: quiet bought by losing a claim is the
+    dangerous direction. Both paths sit BEFORE the negation and are real."""
+    claims = CHECKER.claims(BARE_NEGATION_LANES)
+    assert ("lane-d", ".syndicate/findings_x.md") in claims
+    assert ("lane-d", "scripts/probe.py") in claims
+
+
+def test_the_bare_word_no_is_NOT_a_marker() -> None:
+    """WHY THE OBVIOUS FIX WAS REJECTED, pinned so nobody 'simplifies' the five
+    markers back down to `no `.
+
+    Measured over all 2,186 `- Files:`-block lines in the three ledger files:
+    bare `no ` changes 13 lines and FIVE lose a real claim, because the cut is a
+    PREFIX and `no` is common mid-sentence. This is one of the five, verbatim
+    from `lanes_history.md`. Under bare `no ` the claimed script is dropped.
+    """
+    text = """## OPEN
+
+### lane-e — OPEN — opened 2026-09-09 — session eee
+- Files: `data/mlb/coefficients.json` (`_meta` HRR note only — no coefficient
+  changes), `scripts/fit_mlb_prop_calibration.py`
+- Blocked by: none.
+
+## Archived lanes
+"""
+    claims = CHECKER.claims(text)
+    assert ("lane-e", "scripts/fit_mlb_prop_calibration.py") in claims, (
+        "a mid-sentence 'no' swallowed the claim that followed it -- "
+        "the bare marker is back")
+
+
+def test_a_path_BEFORE_a_bare_negation_is_still_claimed() -> None:
+    """The five new markers are PREFIX cuts like every other one."""
+    text = """## OPEN
+
+### lane-f — OPEN — opened 2026-09-09 — session fff
+- Files: `syndicate/features/f.py`, no deploy needed.
+- Blocked by: none.
+
+## Archived lanes
+"""
+    assert ("lane-f", "syndicate/features/f.py") in CHECKER.claims(text)
+
+
 def test_a_claimed_path_must_not_contain_a_marker_word() -> None:
     """THE TRAP THIS LANE FELL INTO. The first version of this test file was
     named `test_lane_guard_never_marker.py`; the marker cut INSIDE its own path
