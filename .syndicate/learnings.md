@@ -5092,3 +5092,41 @@ check used the full heading, returned 0 against an index that DID contain the ru
 and read as the very failure it was testing for. A false alarm in the same family
 as the four non-discriminating controls this pair of sessions logged the same day --
 the pattern has to be able to match before its 0 means anything.
+### 2026-09-09 — FORBIDDEN: quoting a spending cap, limit or flag from `env-vars` when a STORE can override it — and treating a one-source instrument's negative as a fact about the value
+
+- **What we believed:** that `live-odds-worker`'s environment held the live
+  execution caps — `MAX_ORDER_DOLLARS=10`, `MAX_DAY_DOLLARS_KALSHI=50`,
+  `BANKROLL_UNITS=40` — and that they were a testing leftover throttling the
+  platform's largest measured lever to ~$2/day.
+- **What was actually true:** a STORED settings store overrides the environment
+  on every one of those fields and has since **2026-09-04T13:21:37-05:00**.
+  Resolved: **`max_order_dollars` 35.01, `max_day_dollars_kalshi` 150.01,
+  `max_day_orders_kalshi` 15, `bankroll_units` 1000** — `/api/portfolio/limits`
+  and `/api/portfolio/settings` report `"stored"` for every field with
+  `store_error: null`. The prize was understated **~3x**, and the conclusion
+  flips from "raise the caps" to "score the edge; no cap decision is pending".
+- **How we found out:** only by reading the endpoint that reports what the guard
+  RESOLVES, after three env vars set on the user's authority had no effect.
+  **The pre-check that was supposed to catch this returned a clean, confident
+  negative** — `/api/ops/artifacts/export?pattern=…execution_limits.json` →
+  "NO STORED LIMITS FILE". The store lives in the **keyvalue backend**, which
+  artifact export cannot see; `execution_limits_settings.py:19-25` says so in its
+  own docstring, and [[project_keyvalue_artifact_split_blinds_guards]] already
+  recorded the split.
+- **The rule going forward:** **a cap has a RESOLVED value and a SET value, and
+  they are different objects — never quote the SET one.** Read the endpoint that
+  reports the guard's resolution and read its `sources` map. Generally: **when a
+  value has more than one possible source, an instrument that can see only one
+  source cannot produce a negative result ABOUT THE VALUE — only about its own
+  source.** A clean negative from such an instrument is worthless and reads
+  exactly like a real one.
+- **A SECOND READER AGREEING IS NOT CORROBORATION WHEN BOTH READ THE SAME WRONG
+  SOURCE.** A subagent independently reported the same env-derived caps; two
+  wrong readings of one source is **one error counted twice**, and that is why
+  this survived an afternoon of work built on top of it.
+- **Cost:** none shipped, by luck rather than design — the env values set were at
+  or below the stored ones and stored wins regardless, so no live limit moved.
+  Had env governed and the values been higher, this session would have raised
+  real spending limits on a false premise. Three now-inert env vars remain and
+  are owed a reconciliation; **do not simply delete them**, because absent
+  resolves to a code default that differs from both the env and the stored value.
