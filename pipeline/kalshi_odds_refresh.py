@@ -1117,7 +1117,27 @@ def _run_kalshi_odds_refresh_unbounded(*, force: bool = False) -> dict[str, Any]
     # type, `missing_fields` -- and the join reads `yes_american`/`no_american`,
     # the classifier reads ticker/series/title, the price lookup reads the ask
     # dollars, and the snapshot reads `close_time`. Nothing downstream of here
-    # reads the rest, and the full row survives in the daily book.
+    # reads the rest.
+    #
+    # WHAT SURVIVES WHERE, CORRECTED 2026-09-09. This comment used to end "and
+    # the full row survives in the daily book". It did not, and had not since
+    # the daily book was written: `venue_daily_odds.kalshi_daily_rows` built a
+    # row out of the ASKS ALONE, so the diagnostic fields were dropped at that
+    # seam too and this sentence read as a guarantee that nothing was lost. It
+    # was the second of two drops, not the safety net for the first.
+    #
+    # The accurate statement now:
+    #
+    #   yes_bid / no_bid / volume / volume_24h / open_interest / liquidity
+    #       SURVIVE, in the daily book -- `DEPTH_FIELDS` on each appended
+    #       point, keyed to the tick that observed them.
+    #   strike_type, custom_strike, rules_primary, result, open_time,
+    #   expiration_time, last_price / previous_price, exchange_index,
+    #   missing_fields, market_type
+    #       DO NOT survive anywhere. They exist for DIAGNOSIS at fetch time,
+    #       are printed or asserted on in-process, and end with this tick.
+    #       Wanting one of them later means adding it to the daily row, not
+    #       here.
     #
     # NOT FILTERED BY GAME DATE, and that was tried and reverted. Dropping
     # undated markets looked attractive -- futures can never match a board row
@@ -1241,9 +1261,21 @@ def report_catalogue_gaps(markets: list[dict[str, Any]]) -> dict[str, Any]:
     return gaps
 
 
-# The fields anything downstream of the artifact actually reads. Everything
-# else `normalize_market` carries exists for DIAGNOSIS at fetch time and is
-# already in the daily book, which is the record.
+# The fields anything downstream of the artifact actually reads.
+#
+# SIZE-CONSTRAINED ON PURPOSE, and this tuple is the constraint. Production
+# logged `KEYVALUE_WRITE_LARGE ... size_bytes=5314201 warn_bytes=1048576` for
+# `kalshi_markets.json`, and the refusal that created the lean row prescribed
+# its own fix: "Shrink the payload rather than raising the ceiling". Six more
+# fields across ~11,000 markets is exactly the growth that forbids. DEPTH DOES
+# NOT BELONG HERE -- it went into the daily book (`venue_daily_odds`), which
+# runs on the full unshrunk set and is the capture-first record. Nothing on the
+# request path reads a bid or an open interest; if something ever does, that is
+# a size decision to argue with a number, not a field to slip in.
+#
+# What `normalize_market` carries and this drops is now genuinely fetch-time
+# diagnosis only -- see the corrected note at the persistence bound above for
+# which of those survive in the daily book and which end with the tick.
 _LEAN_MARKET_FIELDS = (
     "ticker",
     "event_ticker",

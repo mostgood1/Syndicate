@@ -89,11 +89,57 @@ __all__ = [
     "sport_for_polymarket_league",
     "MAX_POINTS_PER_MARKET",
     "MAX_MARKETS_PER_FILE",
+    "DEPTH_FIELDS",
 ]
 
 # Same bound `kalshi_board` uses, and for the same reason: enough points to see
 # a day's movement, few enough that one market cannot dominate the document.
 MAX_POINTS_PER_MARKET = 48
+
+# THE OTHER HALF OF A QUOTE, AND IT WAS BEING THROWN AWAY.
+#
+# A row carried `yes`/`no` -- both ASKS -- and nothing else. HOLD is measurable
+# from an ask; whether you could actually have been FILLED at it is not. With
+# only asks stored, no model built on this record can ever distinguish a
+# one-lot-wide market from a deep one, because the discriminating numbers were
+# fetched on every tick and dropped at the row builder.
+#
+# These six are the common depth shape. A venue fills what it has and leaves
+# the rest None -- an ASYMMETRIC record that is honest beats a symmetric one
+# that is invented (see `polymarket_daily_rows`, which fills none of them
+# because the slate it reads does not carry them).
+#
+# MISSING IS NOT ZERO, and that distinction is the whole reason these are typed
+# rather than defaulted: `open_interest` absent means the venue told us
+# nothing, `open_interest == 0` means a market nobody holds. A fill model that
+# collapses the two reads an untraded market as a fetch failure. `_as_depth`
+# below is the guard -- note it is NOT `_as_float`, which maps 0.0 to None on
+# purpose because zero is not a PRICE. Zero very much is a DEPTH.
+#
+# THE SIZE, MEASURED 2026-09-09 rather than estimated -- the last per-row
+# estimate in this module was wrong by enough to cause 2,203 rejected writes.
+# On a fixture of 883 markets (the count this module's own header measured for
+# Kalshi in production on 2026-08-25), serialized exactly as the store sees it:
+#
+#   one point              50 ->    162 B   (+112, and ~69 of that is the KEYS)
+#   file @  1 point/mkt   326 KB ->  422 KB  (+29.5%)   row  378 ->   489 B
+#   file @ 12 points/mkt  808 KB ->  1.9 MB  (+142.7%)  row  937 ->  2,274 B
+#   file @ 48 points/mkt  2.4 MB ->  6.8 MB  (+193.4%)  row 2,766 -> 8,114 B
+#
+# NOT A WRITE-REJECTION RISK, and that is why this is affordable at all:
+# `refresh_state_store._KEYVALUE_EXCLUDED_PATH_MARKERS` moved
+# `/intelligence/venue_odds/` to the MOUNTED DISK in `#637`, which has no 8 MB
+# ceiling. It is a disk cost. If a file ever does cross `_trim_to_budget`, the
+# trim order still drops POINTS before MARKETS, so coverage -- the thing this
+# module exists for -- degrades last.
+DEPTH_FIELDS = (
+    "yes_bid",
+    "no_bid",
+    "volume",
+    "volume_24h",
+    "open_interest",
+    "liquidity",
+)
 
 # Per (venue, sport, date).
 #
@@ -235,6 +281,39 @@ def _as_float(value: Any) -> float | None:
     return parsed
 
 
+def _as_depth(value: Any) -> float | None:
+    """A depth quantity, or None. DELIBERATELY NOT `_as_float`.
+
+    `_as_float` refuses 0.0 and 1.0 because neither is a probability PRICE.
+    Reusing it here would be the exact confusion this capture exists to end:
+    `open_interest = 0` is a real, informative reading -- a market nobody
+    holds -- and folding it onto the same None as "the venue returned no such
+    field" makes a fill model unable to tell an untraded market from a fetch
+    failure.
+
+    So: None only for absent, empty, non-numeric or NaN. Every finite number
+    survives, including zero, and including a bid at 1.0 dollar.
+    """
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        # `True` is 1.0 to `float()`. A boolean in a depth field means the
+        # venue's schema moved, not that open interest is one.
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed != parsed or parsed in (float("inf"), float("-inf")):
+        return None
+    return parsed
+
+
+def _depth_of(row: Mapping[str, Any]) -> dict[str, Any]:
+    """The six depth readings a row carries, coerced but never defaulted."""
+    return {field: _as_depth(row.get(field)) for field in DEPTH_FIELDS}
+
+
 def daily_odds_path(venue: str, sport: str, game_date: str):
     """`reports/intelligence/venue_odds/<venue>__<sport>__<YYYY_MM_DD>.json`.
 
@@ -367,7 +446,25 @@ def record_daily_odds(
             unchanged += 1
             entry["last_seen"] = stamp
             continue
-        points.append({"ts": stamp, "yes": yes, "no": no})
+        # THE APPEND RULE IS UNCHANGED, and deliberately so. A point is still
+        # appended only when an ASK moved. Depth moves on almost every tick --
+        # volume is monotonic -- so folding it into the equality test would turn
+        # "a point per move" into "a point per fetch", which is precisely the
+        # growth `MAX_POINTS_PER_MARKET` and `_trim_to_budget` exist to stop.
+        # The consequence, stated rather than discovered later: depth is
+        # sampled AT ASK-MOVE TIMES, not continuously. That is the sample a
+        # fill model wants anyway -- the book as it stood beside the price you
+        # would have taken.
+        point: dict[str, Any] = {"ts": stamp, "yes": yes, "no": no}
+        depth = _depth_of(row)
+        if any(value is not None for value in depth.values()):
+            # ALL SIX OR NONE. Once a venue has told us anything, a None inside
+            # the block means "this venue does not report this one", which is a
+            # different fact from the block being absent because the venue
+            # reports no depth at all. Polymarket's rows are the second case
+            # and pay no bytes for it.
+            point.update(depth)
+        points.append(point)
         entry["last_seen"] = stamp
         appended += 1
         if len(points) > MAX_POINTS_PER_MARKET:
@@ -522,6 +619,23 @@ def kalshi_daily_rows(markets: Sequence[Mapping[str, Any]]) -> list[dict[str, An
             "sport": sport_for_series(market.get("series")),
             "yes": market.get("yes_ask_dollars"),
             "no": market.get("no_ask_dollars"),
+            # THE DEPTH SIDE OF THE SAME TICK. `kalshi_client._MARKET_FIELDS`
+            # has fetched all six on every market since 2026-08-23 and
+            # `normalize_market` carries them; this builder kept the two asks
+            # and dropped the rest, so nothing downstream could measure whether
+            # a quoted ask was reachable. Venue-native names on the left,
+            # `DEPTH_FIELDS` on the right.
+            #
+            # `.get` with NO DEFAULT: a field the venue stopped returning must
+            # arrive as None. `normalize_market` already writes None and counts
+            # it in `missing_fields`, and re-defaulting it to 0 here would
+            # manufacture "a market nobody holds" out of a schema change.
+            "yes_bid": market.get("yes_bid_dollars"),
+            "no_bid": market.get("no_bid_dollars"),
+            "volume": market.get("volume_fp"),
+            "volume_24h": market.get("volume_24h_fp"),
+            "open_interest": market.get("open_interest_fp"),
+            "liquidity": market.get("liquidity_dollars"),
         })
     return out
 
@@ -591,6 +705,23 @@ def polymarket_daily_rows(markets: Sequence[Mapping[str, Any]]) -> list[dict[str
     discarded. `SPORTS_MARKET_TYPE_PROP` is a mixed bucket -- it holds League
     of Legends map winners as well as anything else -- so the venue TYPE is
     recorded as the family and nothing is inferred from it here.
+
+    NO DEPTH FIELDS, AND THAT IS A FACT ABOUT THE FETCH, NOT AN OVERSIGHT.
+    `DEPTH_FIELDS` is left entirely unfilled here because nothing on this path
+    carries the numbers. These rows are read from `GAME_SLATE_ARTIFACT`, whose
+    per-market shape is `polymarket_us_markets._SLATE_STORAGE_FIELDS` (slug,
+    sportsMarketTypeV2, outcomes, outcomePrices, line, gameStartTime,
+    orderPriceMinTickSize, minimumTradeQty, orderable) -- and the `_KEEP` trim
+    upstream of it drops everything else first. Neither list has a bid, a
+    volume, an open interest or a liquidity in it.
+
+    `polymarket_client._MARKET_FIELDS` DOES fetch `volume`, `volume24hr` and
+    `liquidity` -- but that is the gamma client, which does not feed this
+    builder, and it has no bid/ask depth either. So there is no honest mapping
+    to write here today. Asymmetric capture beats a fabricated symmetry: the
+    Kalshi rows carry depth, these do not, and `record_daily_odds` stores no
+    empty depth block for them rather than writing six nulls per point across
+    ~12,000 markets.
     """
     from syndicate.features.shared.polymarket_board_join import (
         MARKET_TYPE_TO_BOARD,
