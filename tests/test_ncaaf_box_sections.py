@@ -275,11 +275,26 @@ def test_player_box_renders_when_the_season_actually_has_rows(monkeypatch):
 # --------------------------------------------------------------------------
 
 
+#: The full section list, in order. ACTUALS FIRST, THEN PROJECTIONS -- a
+#: reader has to be able to tell at a glance which half of the tab is a
+#: measurement, so the two groups never interleave.
+EXPECTED_SECTION_TITLES = [
+    "Live / final box",
+    "Player box",
+    "Sim box",
+    "AWY player projections",
+    "HOM player projections",
+]
+
+
 def test_live_box_does_not_delete_the_sim_box():
     game = _card(final=True, in_progress=False, status="Final", away_pts=17, home_pts=24,
                  away_linescores=[7, 3, 0, 7], home_linescores=[0, 10, 7, 7])
     titles = [s["title"] for s in ncaaf_cards._ncaaf_box_sections(game, season=2026, week=1)]
-    assert titles == ["Live / final box", "Sim box", "Player box"]
+    # The TEAM-level sim box survives a final game, and so does it survive the
+    # arrival of the per-player projection tables beside it -- adding detail
+    # must not delete the summary somebody may already be reading.
+    assert titles == EXPECTED_SECTION_TITLES
 
 
 def test_linescores_are_carried_onto_the_card_by_the_live_state_join():
@@ -315,7 +330,7 @@ def test_absent_live_state_artifact_still_stamps_a_box_and_never_raises(monkeypa
     games = [_card()]
     ncaaf_cards._attach_live_state(games, 2026, 1)
     sections = games[0]["shared_box_sections"]
-    assert [s["title"] for s in sections] == ["Live / final box", "Sim box", "Player box"]
+    assert [s["title"] for s in sections] == EXPECTED_SECTION_TITLES
     assert "not been read" in sections[0]["body"]
 
 
@@ -334,5 +349,5 @@ def test_shared_contract_keeps_the_ncaaf_sections():
         {"date": "Week 1", "games": [game]}, sport="ncaaf", module="cards"
     )
     served = context["games"][0]["shared_box_sections"]
-    assert [s["title"] for s in served] == ["Live / final box", "Sim box", "Player box"]
+    assert [s["title"] for s in served] == EXPECTED_SECTION_TITLES
     assert "Box score unavailable" not in [s["title"] for s in served]

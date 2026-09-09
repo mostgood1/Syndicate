@@ -2969,12 +2969,198 @@ def _ncaaf_player_box_section(game: dict[str, Any], *, season: int, week: int) -
     }
 
 
+def _ncaaf_sim_player_sections(
+    game: dict[str, Any], *, season: int, week: int
+) -> list[dict[str, Any]]:
+    """One PROJECTION table per side, mirroring soccer's `_squad_box_sections`.
+
+    -------------------------------------------------------------------
+    THIS IS THE SIM PANEL. THE ACTUALS PANEL IS `_ncaaf_player_box_section`
+    -------------------------------------------------------------------
+
+    Both are per-player and they must never be mistaken for one another:
+
+      * `Player box`      -- chip `Final`, real CFBD stat lines, this week's.
+      * `<ABBR> player projections` -- chip `Sim`, model output, this file.
+
+    The chip is the literal string `"Sim"` on every state, INCLUDING a final
+    game, and is never derived from `live_state`. Soccer shipped the derived
+    version and a live match labelled its projection panel `Live` -- a
+    simulated number wearing an actuals label, which is the one failure mode
+    this platform has already shipped and backed out.
+
+    The team-level `Sim box` above is KEPT, not folded in. It is the game
+    engine's projected scoring; these are the prop model's per-player
+    probabilities, from a different artifact and a different estimator, and
+    MLB's rule that live never deletes sim applies just as much to detail
+    never deleting the summary somebody may already read.
+
+    Columns are only what the data really carries -- see
+    `player_projections`'s docstring for the measurement that forbids yardage
+    columns. The two market columns appear only when this game's capture
+    actually quoted somebody, so a slate whose books have not posted gets a
+    five-column table rather than two columns of dashes.
+    """
+    from syndicate.features.ncaaf import player_projections
+
+    home = game.get("home") if isinstance(game.get("home"), dict) else {}
+    away = game.get("away") if isinstance(game.get("away"), dict) else {}
+    home_team = str(home.get("name") or "")
+    away_team = str(away.get("name") or "")
+
+    sections: list[dict[str, Any]] = []
+    for side, container, team_name in (("away", away, away_team), ("home", home, home_team)):
+        abbr = str(container.get("abbr") or side.upper())
+        title = f"{abbr} player projections"
+        try:
+            result = player_projections.squad_projections(
+                season=season,
+                week=week,
+                team_name=team_name,
+                home_team=home_team,
+                away_team=away_team,
+            )
+        except Exception as exc:  # noqa: BLE001 -- named, never fatal to the board
+            print(
+                f"NCAAF_SIM_PLAYER_BOX_FAILED week={week} side={side} "
+                f"error={type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            result = None
+
+        if result is None:
+            sections.append(
+                {
+                    "title": title,
+                    "body": (
+                        f"Player projections could not be built for {team_name or abbr}. The error "
+                        "is logged as NCAAF_SIM_PLAYER_BOX_FAILED; nothing is guessed in its place."
+                    ),
+                    "chip": "Sim",
+                    "kind": "projection",
+                    "rows": [],
+                }
+            )
+            continue
+
+        rows = result.get("rows") or []
+        if not rows:
+            # Four different empty states, four different fixes. A single
+            # "no projections" line would make a dead registry join and a
+            # first-week roster of freshmen look identical.
+            if not result.get("team_id"):
+                body = (
+                    f"The NCAAF team registry could not resolve “{team_name or abbr}”, so no "
+                    f"{season} roster could be joined to this side. Projections fill in once "
+                    "`ncaaf_team_registry_snapshot.csv` carries this name form."
+                )
+            elif not result.get("roster"):
+                body = (
+                    f"The {season} roster snapshot carries no skill-position players for "
+                    f"{team_name or abbr}. Projections fill in when "
+                    "`scripts/build_ncaaf_roster_snapshot.py` is re-run for this season."
+                )
+            elif result.get("history_season") is None:
+                body = (
+                    "No season in the CFBD player-game snapshot has anyone with the "
+                    f"{player_projections.prop_model.MIN_PRIOR_GAMES} games the anytime-TD model "
+                    "needs to fit a rate, so nothing is projected rather than guessed. "
+                    "Projections fill in when "
+                    "`scripts/build_ncaaf_player_game_stats_snapshot.py` is re-run."
+                )
+            else:
+                body = (
+                    f"None of the {result['roster']} {season} skill-position players on "
+                    f"{team_name or abbr}'s roster has the "
+                    f"{player_projections.prop_model.MIN_PRIOR_GAMES} prior games the anytime-TD "
+                    "model requires, so every one is refused rather than guessed."
+                )
+            sections.append(
+                {
+                    "title": title,
+                    "body": body,
+                    "chip": "Sim",
+                    "kind": "projection",
+                    "rows": [],
+                }
+            )
+            continue
+
+        quoted = int(result.get("quoted") or 0)
+        columns = ["Player", "Pos", "Sim TD%", "Prior G", "Prior TD"]
+        if quoted:
+            columns.extend(["Mkt TD%", "Best price"])
+
+        table_rows: list[list[str]] = []
+        for row in rows[: player_projections.MAX_ROWS_PER_SIDE]:
+            probability = _safe_float(row.get("probability"))
+            implied = _safe_float(row.get("market_implied"))
+            cells = [
+                str(row.get("player_name") or "Player"),
+                str(row.get("position") or "-"),
+                f"{probability * 100.0:.1f}%" if probability is not None else NULL_PLACEHOLDER,
+                str(int(row.get("prior_games") or 0)),
+                f"{_safe_float(row.get('prior_tds')) or 0.0:.0f}",
+            ]
+            if quoted:
+                cells.append(f"{implied * 100.0:.1f}%" if implied is not None else NULL_PLACEHOLDER)
+                cells.append(str(row.get("market_price") or NULL_PLACEHOLDER))
+            table_rows.append(cells)
+
+        shown = len(table_rows)
+        history_season = result.get("history_season")
+        # The ROSTER is this season's; the RATE may be fitted on an earlier
+        # one. Saying which is the whole difference between a named model
+        # input and last season's numbers quietly printed as this season's.
+        fitted = (
+            f"fitted on {history_season} game logs because {season} has not yet played the "
+            f"{player_projections.prop_model.MIN_PRIOR_GAMES} games the model requires"
+            if result.get("history_is_fallback")
+            else f"fitted on {history_season} game logs"
+        )
+        body = (
+            f"PROJECTED, not played — the real stat lines are in “Player box”. "
+            f"{shown} of {result['roster']} {season} skill-position "
+            f"{team_name or abbr} players, ranked by modelled anytime-TD probability, {fitted}. "
+            "Anytime TD is the only NCAAF market with an out-of-sample edge over a player's own "
+            "average, so it is the only one projected. "
+            f"{result['refused']} roster players were refused for insufficient history."
+        )
+        if quoted:
+            body += (
+                f" “Mkt TD%” is implied from the best captured {season} week {week} price, vig "
+                "included, and is a market number, not a model one."
+            )
+        sections.append(
+            {
+                "title": title,
+                "body": body,
+                # ALWAYS "Sim". Never `'Live' if live_state else 'Sim'`.
+                "chip": "Sim",
+                "kind": "projection",
+                "columns": columns,
+                "table_rows": table_rows,
+                "rows": [],
+            }
+        )
+    return sections
+
+
 def _ncaaf_box_sections(game: dict[str, Any], *, season: int, week: int) -> list[dict[str, Any]]:
+    """Actuals first, then projections, and the two groups never interleave.
+
+    Order is load-bearing for exactly one reason: a reader scanning this tab
+    must be able to tell at a glance which half of it is a measurement. The
+    linescore and the player box are what happened; the sim box and the two
+    player-projection tables are what the models expect. Every projection
+    section is chipped `Sim`; both actuals sections chip `Final`/`Live`.
+    """
     sections = [_ncaaf_linescore_section(game)]
+    sections.append(_ncaaf_player_box_section(game, season=season, week=week))
     sim_section = _ncaaf_sim_box_section(game)
     if sim_section is not None:
         sections.append(sim_section)
-    sections.append(_ncaaf_player_box_section(game, season=season, week=week))
+    sections.extend(_ncaaf_sim_player_sections(game, season=season, week=week))
     return sections
 
 
