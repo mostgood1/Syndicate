@@ -28771,3 +28771,126 @@ rows — the first read is due 2026-09-12.
 - reading scheduled: local one-shot task `s1-football-sidecar-reading`, 2026-09-09 18:15 CT, with a dry-run guard before 22:45Z. It must report bytes/game against the locally measured **10,865 B/game**, per-game segment coverage `q1..q4,h1,h2,full`, histogram counts summing to the sim count, peak `accounted_rss_mb` against the 4096 MB ceiling (local delta was +552,960 B), and that the projection CSV did not move. **It is instructed that if no game in the slate reaches overtime it must SAY the OT branch was untested rather than report it as passing** -- S1's h2 binning recovers OT as `final_score - sum(quarter_log)` and 112 of 4,800 local sims exercised it, but an unexercised branch in production is not a verified one.
 - S1 and S3 remain DEPLOYED, NOT VERIFIED. S2's gate is live, defaulted to report, and checked 0 ladders against 7 matched rows -- see the deploy 1 entry; a zero there is a fact about the denominator, and the offline 17.3% figure is still neither confirmed nor refuted.
 - claim released. Lane `segments-joint-v1`.
+
+### restore-measurement - MORNING READINGS 2026-09-09 (settlement + ledger)
+
+Unattended scheduled run, read-only against production. Two owed readings for
+the 2026-09-08 segment-settlement work (join fix `5e84b758`, refresh-worker live
+with it at `aedb66c9` 2026-09-08T19:58:07Z).
+
+READING 1 - evaluation settlement autorun: **UNMEASURED**.
+
+`/api/ops/evaluation-settlement/status` -> `autorun_status` at 12:33Z and again
+at 12:36Z:
+
+    epoch 2026-09-09T11:02:28Z   state started   error None
+    keys present: ['epoch','note','state']   -- NO summary object at all
+    note: "#256: claimed before the work; the final write replaces this with results"
+
+Every criterion field is absent, not zero: `total_recommendation_records`,
+`settleable`, `matched`, `settled`, `settled_rate_of_settleable`,
+`unmatched_no_key_match`, `unmatched_no_graded_rows`,
+`unmatched_no_key_match_reasons`, `pending_by_sport`, `graded_rows_available`
+all read `null`. The baselines (settled 0 of 29,630; no_key_match 23,080;
+no_graded_rows 6,550) are therefore UNTESTED - not confirmed, not refuted.
+
+The run was NOT stale-by-predating-the-deploy: it claimed at 11:02:28Z, well
+after 2026-09-08T19:58:07Z. It claimed and never finished.
+
+WHY it never finished - refresh-worker `srv-d91dpertqb8s73co8ls0` was
+REDEPLOYED at 2026-09-09T11:57:58Z, finishing 12:01:15Z (`dep-dagkjhm7bikc73bjputg`,
+commit `da6838ca`, trigger `api`), i.e. the process was replaced 55.5 minutes
+into the claimed run. That alone ends the pass. The worker was demonstrably
+alive at 11:07:59Z and 11:58:10Z, so it did not die at claim time.
+
+An OOM CANNOT BE EXCLUDED, and the instrument is why: the service events feed
+returned 100 events back to 2026-09-07T19:05Z and every one is
+`deploy_started`/`deploy_ended`/`build_started`/`build_ended` - ZERO non-deploy
+events in 40.9 hours. A feed that has never carried an OOM in this window is not
+evidence that no OOM occurred. Memory was hot either side of the run:
+`container_memory_pct_of_max` 96.2 at 11:07:59Z and 92.6 at 11:58:10Z of 4096MB,
+with `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` firing
+at both.
+
+NO RETRY TODAY, and the next window is 2026-09-10. `_evaluation_settlement_should_run_now`
+(run_refresh_worker.py, deployed `da6838ca`) compares CENTRAL CALENDAR DATES:
+the claim at 11:02:28Z UTC is 06:02 Central 2026-09-09, so `now_central.date() ==
+last_central_date` holds for the rest of today and the gate returns False. The
+interval override is inert - `EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS` is
+present on refresh-worker but EMPTY, and `str(... or "").strip()` makes empty
+falsy, so the daily gate stands (86400). Owner confirmed:
+`EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN=true`,
+`EVALUATION_SETTLEMENT_SPORTS=mlb,wnba`, `EVALUATION_SETTLEMENT_LOOKBACK_DAYS=7`
+on refresh-worker; the key is absent from web and live-odds-worker.
+
+THE SYSTEMIC POINT, which outlives this reading: refresh-worker took 25 deploys
+between 2026-09-07T19:05Z and 2026-09-09T12:01Z - one every 1.6 hours. A
+settlement pass that needs the better part of an hour has to land inside a
+deploy-free gap, and today it did not. This reading will keep coming back
+UNMEASURED until the pass is either made resumable or run somewhere deploys do
+not reach it.
+
+READING 2 - segment orders in the paper execution ledger: **PASS**, with the
+instrument named.
+
+`/api/ops/execution/ledger-summary?mode=paper`. The task's `days=2` window is
+blind for this question - 09-09 and 09-10 are 100% unsettled (0 of 209 account
+full-game orders) because today's slate is not final yet. That is absence of
+population, not a result. Re-read at `days=9` to reach dates that have actually
+been graded:
+
+    2026-09-02..09-08, account row `paper:paper`
+      full      orders  972   settled  410   (42.2%)
+      NON-full  orders   49   settled   47   (95.9%)
+        first1 7/7   first3 9/10   first5 23/23   h1 8/9
+    2026-09-02..09-08, venue rows `paper:paper:*`
+      full      orders 1160   settled  498   (42.9%)
+      NON-full  orders  34   settled   32   (94.1%)
+        first1 1/1   first3 4/4   first5 27/29
+
+Segment orders settle at 95.9% against 42.2% for full-game rows over the same
+dates, across four distinct segments (first1/first3/first5/h1). Well over the
+"ideally >=1 graded order with a non-full segment" bar - there are 47.
+
+On refusals, SAY WHAT THE INSTRUMENT CAN SEE. This endpoint exposes NO refusal or
+reason counters: a scan of the whole payload for `refus`/`unavailable`/
+`segment_actual`/`unsupported` returns nothing but three prose `*_reason` strings
+in `verdict_reachability`. Refusal NAMES are not readable here at all, so
+"no `actual_is_full_game_not_*`" cannot be read off directly. What IS readable is
+the consequence: a refusal returns `{unavailable_reason}` and leaves the row
+UNGRADED, so refusals are BOUNDED BY THE UNSETTLED COUNT - at most 2 of 49
+(account) and 2 of 34 (venue). Both unsettled account rows sit on 09-04 (first3)
+and 09-05 (h1), BEFORE the 2026-09-08T19:58Z deploy. The post-deploy graded
+segment population - 09-08's rows - is 6 of 6 settled (first1 2/2, first5 4/4).
+The single segment order dated after the deploy that is unsettled is a 09-09
+kalshi `first5`, on a date where all 342 venue full-game orders are equally
+unsettled. So: no new full-game-mismatch refusal is observable, and the ceiling
+on unobserved ones post-deploy is zero.
+
+Vocabulary check against the DEPLOYED SHA, not the working tree: both reason
+families exist at `da6838ca`. `segment_actual_unavailable:<seg>` and
+`unsupported_segment:<seg>` are emitted by
+`syndicate/features/shared/segment_actuals.py:446,453,464`; the older
+`actual_is_full_game_not_<seg>` / `final_box_is_full_game_not_<seg>` guard lives
+in `bet_status.py:181` / `bet_status_wnba.py:216`. Worth recording that the first
+grep for this ran against the primary tree and found segment_actuals.py ABSENT -
+that tree is 614 commits behind origin/main, and the file only exists at the
+deployed SHA. Primary tree is not deployed code, again.
+
+LEAD, not fixed here (read-only run): the settlement autorun's
+PREVIOUS_RUN_NEVER_COMPLETED branch (run_refresh_worker.py ~:3560, `da6838ca`)
+prints "Not retrying today (see #256)" and then FALLS THROUGH to re-claim and
+run - there is no `return False`. That is the exact log-contradicts-code defect
+the accuracy-summary copy of this function documents having already fixed in its
+own branch (~:3315: "a log line that reports the OPPOSITE of the code beneath
+it"). In practice the daily gate above makes "not today" true, so the line is
+accidentally correct today and would be actively misleading on any day the gate
+lets a second pass through.
+
+verify: READING 1 UNMEASURED - autorun_status still `{state: started, epoch
+2026-09-09T11:02:28Z}` with no summary at 12:36Z, run killed by the 11:57:58Z
+refresh-worker redeploy, Central-date gate blocks retry until 2026-09-10.
+READING 2 PASS - 47 of 49 non-full segment orders graded (95.9%) over
+2026-09-02..09-08 vs 42.2% for full-game, zero observable full-game-mismatch
+refusals and a post-deploy ceiling of zero. Re-take READING 1 tomorrow after
+~11:00Z, and check for an intervening refresh-worker deploy before believing it.
