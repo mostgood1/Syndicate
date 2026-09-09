@@ -734,7 +734,12 @@ class MatchBoxTests(unittest.TestCase):
             MATCH_BOX, away_abbr="ALA", home_abbr="RAY", final=True
         )
         titles = [section["title"] for section in sections]
-        self.assertEqual(titles, ["Goals", "Match stats"])
+        # `MATCH_BOX` predates the per-player box (2026-09-09) and carries no
+        # `players` key, so the third section is the STATED empty state rather
+        # than a per-side table -- exactly the case a blank grid would have
+        # hidden. `tests/test_soccer_player_box.py` covers the populated one.
+        self.assertEqual(titles, ["Goals", "Match stats", "Player box"])
+        self.assertFalse(sections[2].get("table_rows"))
         goals = sections[0]
         self.assertEqual(goals["columns"], ["Min", "Scorer", "Team"])
         self.assertEqual(goals["table_rows"][0][1], "Sergio Camello")

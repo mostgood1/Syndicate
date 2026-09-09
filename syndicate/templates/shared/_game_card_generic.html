@@ -477,7 +477,18 @@
         <div class="cards-panel-card">
           <div class="cards-box-head">
             <div class="cards-table-title"><strong>{{ section.title }}</strong></div>
-            <span class="cards-chip">{{ 'Live' if live_state else 'Sim' }}</span>
+            {#- THE CHIP DESCRIBES THE SECTION, NOT THE REQUEST.
+                It used to read `'Live' if live_state else 'Sim'`, which asks
+                whether a live-state OBJECT happens to be attached to the card
+                -- a question with nothing to do with what this particular
+                table contains. Two wrong labels came out of that, in opposite
+                directions: a FINISHED match's real, recorded box score was
+                chipped "Sim" (live_state absent once the match is settled),
+                and a LIVE match's sim squad projections were chipped "Live".
+                A section that knows what it holds says so in `section.chip`
+                ("Final box" / "Live box" / "Sim"); the old expression stays as
+                the fallback for sections that do not yet declare one. -#}
+            <span class="cards-chip">{{ section.chip if section.chip else ('Live' if live_state else 'Sim') }}</span>
           </div>
           <div class="cards-callout-copy">{{ section.body }}</div>
           {% if section.columns and section.table_rows %}

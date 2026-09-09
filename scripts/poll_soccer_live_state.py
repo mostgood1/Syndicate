@@ -136,7 +136,14 @@ def _build_match_boxes(
             continue
         is_final = str(event.get("status_state") or "") == "post"
         cached = prior.get(event_id)
-        if is_final and isinstance(cached, dict) and cached.get("final"):
+        # `players` is the per-player box added 2026-09-09. A final box cached
+        # BEFORE that has no such key and, being final, would never be rebuilt
+        # -- so every already-finished match would permanently show the stated
+        # "no per-player rows" empty state. `is not None` (not truthiness):
+        # a rebuilt box whose summary genuinely carries no rosters writes `{}`,
+        # which must then cache like any other final rather than refetching on
+        # every tick (`#241`, worker periodic work is never free).
+        if is_final and isinstance(cached, dict) and cached.get("final") and cached.get("players") is not None:
             boxes[event_id] = cached
             reused += 1
             continue

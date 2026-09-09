@@ -1600,6 +1600,8 @@ def _squad_box_sections(
             # nothing is indistinguishable from a rendering bug.
             sections.append(
                 {
+                    "chip": "Sim",
+                    "kind": "projection",
                     "title": f"{abbr} squad projections",
                     "body": f"No player projections were published for {team_name} in this match.",
                     "rows": [],
@@ -1625,6 +1627,12 @@ def _squad_box_sections(
             )
         sections.append(
             {
+                # ALWAYS "Sim", including while a match is in play. The chip
+                # used to be derived from whether a live-state object existed,
+                # so a live match labelled this projection panel "Live" -- a
+                # simulated number wearing an actuals label.
+                "chip": "Sim",
+                "kind": "projection",
                 "title": f"{abbr} squad projections",
                 "body": (
                     f"{len(table_rows)} {team_name} players. Expected minutes share, shots, shots on "
@@ -1857,6 +1865,8 @@ def _momentum_section(
         label = f"{side} pressing hard"
 
     return [{
+        "chip": "Live lens",
+        "kind": "actual",
         "title": "Attack momentum",
         "rows": [
             {"label": "Now", "value": label},
@@ -1867,12 +1877,134 @@ def _momentum_section(
 
 
 
+def _player_box_sections(
+    match_box: dict[str, Any],
+    *,
+    away_abbr: str,
+    home_abbr: str,
+    final: bool,
+    state_key: str,
+) -> list[dict[str, Any]]:
+    """The REAL per-player lines -- one table per side.
+
+    Every number in these tables was RECORDED by the match feed. The sim's
+    per-player numbers are a different section (`_squad_box_sections`), with a
+    different title, a different chip and `kind: "projection"`. They are never
+    merged into one grid and never share a column: a projected value sitting in
+    a column a reader takes for actuals is the failure mode this platform has
+    already paid for.
+
+    One table per side rather than one combined table, matching
+    `_squad_box_sections` and MLB's box tab -- a combined grid is ~44 rows and
+    reads as an undifferentiated list.
+
+    Empty states are STATED and say WHICH state they are. Pre-match, in-play
+    with no rosters yet, and finished-but-the-feed-published-nothing are three
+    different facts and must not render identically (or as a blank grid).
+    """
+    players = match_box.get("players") if isinstance(match_box.get("players"), dict) else {}
+    kicker = "Final" if final else "Live"
+    chip = "Final box" if final else "Live box"
+    any_rows = any(
+        (players.get(side) or {}).get("players") for side in ("home", "away") if isinstance(players.get(side), dict)
+    )
+    if not any_rows:
+        # The summary exists (we have team stats or goals) but carries no
+        # `rosters` block. Name the reason rather than printing an empty grid.
+        if state_key == "in":
+            body = (
+                "The match feed has not published lineups for this match yet, so there is no "
+                "per-player line. Nothing below it is a substitute: the squad projections are "
+                "the simulation's, not results."
+            )
+        else:
+            body = (
+                "The match feed published no per-player rows for this match, so no actual "
+                "player line exists for it. The squad projections below are the simulation's."
+            )
+        return [
+            {
+                "kicker": kicker,
+                "chip": chip,
+                "kind": "actual",
+                "title": "Player box",
+                "body": body,
+                "rows": [],
+            }
+        ]
+
+    clock_seconds = _safe_float(match_box.get("clock_seconds"))
+    as_of = ""
+    if not final and clock_seconds:
+        as_of = f" As of {int(clock_seconds // 60)}'."
+
+    columns = ["Player", "Pos", "Role", "Min", "G", "A", "Sh", "SOT"]
+    sections: list[dict[str, Any]] = []
+    for side, abbr in (("away", away_abbr), ("home", home_abbr)):
+        bucket = players.get(side) if isinstance(players.get(side), dict) else {}
+        team_name = str(bucket.get("team") or abbr)
+        roster = [row for row in (bucket.get("players") or []) if isinstance(row, dict)]
+        appeared = [row for row in roster if row.get("appeared")]
+        if not appeared:
+            sections.append(
+                {
+                    "kicker": kicker,
+                    "chip": chip,
+                    "kind": "actual",
+                    "title": f"{abbr} player box",
+                    "body": (
+                        f"The match feed lists {len(roster)} {team_name} players but records none of "
+                        "them as having entered the match yet."
+                    ),
+                    "rows": [],
+                }
+            )
+            continue
+        # Starters first, then by minutes played -- the order a box score is
+        # read in. `minutes` is never None here (`appeared` guarantees it).
+        appeared.sort(key=lambda row: (0 if row.get("starter") else 1, -(_safe_float(row.get("minutes")) or 0.0)))
+        table_rows = []
+        for row in appeared:
+            table_rows.append(
+                [
+                    str(row.get("player_name") or "Player").strip(),
+                    str(row.get("position") or "-").strip() or "-",
+                    "XI" if row.get("starter") else "Sub",
+                    _fmt_num(row.get("minutes"), 0),
+                    _fmt_num(row.get("goals"), 0),
+                    _fmt_num(row.get("assists"), 0),
+                    _fmt_num(row.get("shots"), 0),
+                    _fmt_num(row.get("shots_on_target"), 0),
+                ]
+            )
+        unused = len(roster) - len(appeared)
+        bench_note = f" {unused} named substitute{'s' if unused != 1 else ''} did not appear." if unused > 0 else ""
+        sections.append(
+            {
+                "kicker": kicker,
+                "chip": chip,
+                "kind": "actual",
+                "title": f"{abbr} player box",
+                "body": (
+                    f"{len(table_rows)} {team_name} players who appeared. Minutes, goals, assists, "
+                    "shots and shots on target as recorded by the match feed -- not projected."
+                    f"{bench_note}{as_of}"
+                ),
+                "columns": columns,
+                "table_rows": table_rows,
+                "rows": [],
+            }
+        )
+    return sections
+
+
 def _match_box_sections(
     match_box: dict[str, Any] | None,
     *,
     away_abbr: str,
     home_abbr: str,
     final: bool,
+    state: str | None = None,
 ) -> list[dict[str, Any]]:
     """The REAL box score -- what happened -- as card sections.
 
@@ -1883,14 +2015,48 @@ def _match_box_sections(
     existed the whole time; nothing shaped them for a card. See
     `ingestion/espn_match_box.py`.
 
-    Returns [] rather than a placeholder when there is no reading, so the card
-    falls through to its own empty state instead of rendering an authoritative-
-    looking table of dashes.
+    Returns [] rather than a placeholder when there is no reading AND no state
+    to name, so the card falls through to its own empty state instead of
+    rendering an authoritative-looking table of dashes.
+
+    `state` is the card's effective status state (`pre`/`in`/`post`). It is
+    what separates the four honest cases:
+
+    * `pre`  -- no actuals exist yet. NO actuals section at all; the card shows
+      the sim's projections, correctly labelled as projections.
+    * `in`   -- partial actuals; minutes are cut at the live clock.
+    * `post` -- complete actuals.
+    * `in`/`post` with NO summary -- the feed failed or has not answered. A
+      STATED empty section, because a finished match with no box is a fact
+      worth showing, and silence there is indistinguishable from a bug.
     """
-    if not isinstance(match_box, dict):
+    state_key = str(state or "").strip().lower()
+    if state_key == "pre":
+        # Nothing has happened yet. An "actuals" panel here could only ever be
+        # empty, and an empty actuals panel beside a populated projection panel
+        # invites reading the projection as the result.
+        return []
+    if not isinstance(match_box, dict) or not match_box:
+        if state_key in {"in", "post"}:
+            return [
+                {
+                    "kicker": "Final" if final else "Live",
+                    "chip": "Final box" if final else "Live box",
+                    "kind": "actual",
+                    "title": "Player box",
+                    "body": (
+                        "No match-feed summary has been returned for this match, so there is no "
+                        "actual box score to show"
+                        + (" for this finished match." if state_key == "post" else " yet.")
+                        + " Anything below this point is the simulation's projection."
+                    ),
+                    "rows": [],
+                }
+            ]
         return []
     sections: list[dict[str, Any]] = []
     kicker = "Final" if final else "Live"
+    chip = "Final box" if final else "Live box"
 
     goals = match_box.get("goals") if isinstance(match_box.get("goals"), list) else []
     goal_rows = []
@@ -1908,6 +2074,8 @@ def _match_box_sections(
         sections.append(
             {
                 "kicker": kicker,
+                "chip": chip,
+                "kind": "actual",
                 "title": "Goals",
                 "body": f"{len(goal_rows)} goal{'s' if len(goal_rows) != 1 else ''} as played, in order.",
                 "columns": ["Min", "Scorer", "Team"],
@@ -1929,6 +2097,8 @@ def _match_box_sections(
             sections.append(
                 {
                     "kicker": kicker,
+                    "chip": chip,
+                    "kind": "actual",
                     "title": "Match stats",
                     "body": "Team totals from the match feed, not the simulation.",
                     "columns": ["Stat", away_abbr, home_abbr],
@@ -1936,6 +2106,15 @@ def _match_box_sections(
                     "rows": [],
                 }
             )
+    sections.extend(
+        _player_box_sections(
+            match_box,
+            away_abbr=away_abbr,
+            home_abbr=home_abbr,
+            final=final,
+            state_key=state_key,
+        )
+    )
     return sections
 
 
@@ -2255,6 +2434,7 @@ def _match_to_game(
                     away_abbr=_abbr(away_team, league),
                     home_abbr=_abbr(home_team, league),
                     final=effective_state == "post",
+                    state=effective_state,
                 ),
                 *_squad_box_sections(
                     squad_props=squad_props or [],

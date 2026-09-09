@@ -14,19 +14,31 @@ game card can render. Soccer's box tab therefore showed only sim squad
 projections, while MLB's showed both a real "Live / final box" and a "Sim
 box".
 
-Deliberately team-level plus goals, not a full per-player grid. The card's
-box tab already renders the sim's per-player squad projection; what it had
-no counterpart for was *what actually happened*. Team stats plus the goals
-are that, and they stay small enough to sit inside the existing
-``live_state_{date}.json`` artifact (which is already allowlisted in
-``HOT_ARTIFACT_PATTERNS``) rather than needing a new published file.
+Team stats plus goals were the FIRST cut, and the per-player grid is the
+second (2026-09-09). The rows were already parsed and then dropped on the
+floor: ``espn_lineups.extract_match_player_rows`` yields real goals,
+assists, shots, shots on target and the starter flag off the SAME payload,
+and ``espn_match_events.compute_minutes_played`` turns the same payload's
+``keyEvents`` into exact minutes -- both were feeding model CSVs only, and
+``build_match_box`` did not carry either through. So soccer's box tab
+rendered the sim's per-player projection with no per-player counterpart for
+what actually happened. Adding it costs no extra HTTP call: same
+``fetch_match_summary`` response ``poll_soccer_live_state`` already holds.
+
+All of it stays inside the existing ``live_state_{date}.json`` artifact
+(already allowlisted in ``HOT_ARTIFACT_PATTERNS``) rather than needing a new
+published file.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from syndicate.features.soccer.ingestion.espn_match_events import extract_key_events
+from syndicate.features.soccer.ingestion.espn_lineups import extract_match_player_rows
+from syndicate.features.soccer.ingestion.espn_match_events import (
+    compute_minutes_played,
+    extract_key_events,
+)
 
 # (ESPN `name`, display label, scale). Ordered as the card renders them:
 # what a bettor reads first, not ESPN's own emission order.
@@ -182,6 +194,85 @@ def extract_linescores(summary: dict[str, Any]) -> dict[str, list[int | None]]:
     return out
 
 
+def summary_clock_seconds(summary: dict[str, Any]) -> float | None:
+    """The match clock carried by the summary HEADER, in seconds, or None.
+
+    Same shape ``fetch_events`` reads off the scoreboard: the clock lives on
+    ``competition.status``, NOT on its nested ``.type`` (which has no ``clock``
+    key at all -- measured on live fixture 401882908).
+
+    Exists so minutes played on an IN-PROGRESS match are cut at the current
+    clock rather than at ``compute_minutes_played``'s nominal 5400s full-time
+    default. Without it a starter 20 minutes into a match reads "90" -- a
+    projected-looking number sitting in a column that claims to be actuals,
+    which is the exact class of failure this repo has paid for before.
+    """
+    header = summary.get("header") if isinstance(summary.get("header"), dict) else {}
+    competitions = header.get("competitions") if isinstance(header.get("competitions"), list) else []
+    competition = competitions[0] if competitions and isinstance(competitions[0], dict) else {}
+    status = competition.get("status") if isinstance(competition.get("status"), dict) else {}
+    try:
+        value = float(status.get("clock"))
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0.0 else None
+
+
+def extract_player_box(summary: dict[str, Any], *, event_id: str) -> dict[str, Any]:
+    """``{"home": {"team": ..., "players": [...]}, "away": {...}}`` of REAL
+    per-player match lines -- minutes, goals, assists, shots, shots on target.
+
+    Every value here is a RECORDED value from the match feed. Nothing in this
+    dict is ever a model output, and nothing merges a model output into it;
+    the sim's per-player numbers live on a separate artifact key
+    (``player_props``) and are rendered in a separate, separately labelled
+    card section. See ``cards._player_box_sections``.
+
+    ``appeared`` is the load-bearing flag. ``compute_minutes_played`` OMITS a
+    player who never entered the match (an unused substitute) rather than
+    giving them 0.0, because "played zero minutes" is impossible and "did not
+    play" is the real state. That distinction is carried through here rather
+    than collapsed: ``minutes`` is ``None``, not ``0``, for an unused sub.
+
+    Returns ``{}`` when the summary carries no ``rosters`` block at all --
+    which is what a PRE-MATCH summary looks like, and is a different state
+    from "played but recorded nothing". Callers must say which.
+    """
+    rows = extract_match_player_rows(summary, event_id=event_id)
+    if not rows:
+        return {}
+    clock = summary_clock_seconds(summary)
+    key_events = extract_key_events(summary)
+    if clock is None:
+        minutes = compute_minutes_played(key_events, rows)
+    else:
+        minutes = compute_minutes_played(key_events, rows, match_end_seconds=clock)
+
+    box: dict[str, Any] = {}
+    for row in rows:
+        side = str(row.get("side") or "").strip().lower()
+        if side not in {"home", "away"}:
+            continue
+        bucket = box.setdefault(side, {"team": row.get("team") or "", "players": []})
+        player_id = str(row.get("player_id") or "")
+        played = minutes.get(player_id)
+        bucket["players"].append(
+            {
+                "player_id": player_id,
+                "player_name": row.get("player_name") or "",
+                "position": row.get("position") or "",
+                "starter": bool(row.get("starter")),
+                "appeared": played is not None,
+                "minutes": played,
+                "goals": row.get("total_goals"),
+                "assists": row.get("goal_assists"),
+                "shots": row.get("total_shots"),
+                "shots_on_target": row.get("shots_on_target"),
+            }
+        )
+    return box
+
+
 def build_match_box(summary: dict[str, Any], *, event_id: str) -> dict[str, Any]:
     """The per-match box record written into ``live_state_{date}.json``."""
     linescores = extract_linescores(summary)
@@ -189,6 +280,13 @@ def build_match_box(summary: dict[str, Any], *, event_id: str) -> dict[str, Any]
         "event_id": event_id,
         "teams": extract_team_box(summary),
         "goals": extract_goals(summary),
+        # REAL per-player lines. Keyed `players`, distinct from the sim's
+        # `player_props`, so no reader can confuse a recorded number for a
+        # projected one by key alone.
+        "players": extract_player_box(summary, event_id=event_id),
+        # The clock those minutes were cut at (None on a finished match, where
+        # the nominal full-time default is correct).
+        "clock_seconds": summary_clock_seconds(summary),
         # Per-half goals for segment settlement. ``None`` (not ``[]``) when the
         # summary carries none, so the resolver refuses BY NAME rather than
         # reading an empty half as 0-0.
@@ -197,4 +295,11 @@ def build_match_box(summary: dict[str, Any], *, event_id: str) -> dict[str, Any]
     }
 
 
-__all__ = ["build_match_box", "extract_goals", "extract_linescores", "extract_team_box"]
+__all__ = [
+    "build_match_box",
+    "extract_goals",
+    "extract_linescores",
+    "extract_player_box",
+    "extract_team_box",
+    "summary_clock_seconds",
+]
