@@ -136,6 +136,47 @@ has never changed; the MARGIN has moved three times, and it is the margin a
 reader uses to decide whether to keep pulling the thread.
 
 --------------------------------------------------------------------------
+FIFTH CORRECTION `[2026-09-09, lane exchange-prop-segment-key]`: THE PAIRING
+KEY OMITTED `segment`. **NO NUMBER ABOVE MOVES.** Here is why, measured.
+--------------------------------------------------------------------------
+
+`quote_key` was a hand-written five-tuple with no `segment`, while
+`odds_book_quotes._KEY_FIELDS` -- the shared definition of quote identity --
+has carried `segment` all along. Reported by `findings_2026-09-09_entry_cost_
+scored`, which measured 8.9% of keys spanning more than one segment on ITS
+population and traced a fictitious -21.7pp headline to it. The key is now a
+PROJECTION of `_KEY_FIELDS` (minus `bookmaker`, the axis being compared) so
+there is one field list rather than two that can drift.
+
+**EVERY PUBLISHED FIGURE WAS RE-DERIVED BEFORE THIS WAS WRITTEN, AND ALL EIGHT
+COMPARISONS CAME BACK BYTE-IDENTICAL** -- old `29c9c92f` against the fixed
+script, same shards, `--book gate` and `--book all`, per-date over
+2026-09-01..09-04 and pooled, plus a pooled 8-date run. So `85,591` cells,
+`4.233 -> 3.956pp`, `+1.14%`, the `+6.92%` subset and `+1.172pp` all stand
+unchanged, and STEP 6 IS STILL NOT MET.
+
+WHY THE DEFECT COULD NOT FIRE HERE, and the reason is a FILTER, not the key:
+`load_rows` keeps only `kind == "prop"`, and props are only ever quoted for the
+whole game. Censused over eight production shards 2026-09-01..09-08:
+
+    kind=prop   764,898 rows   segment=full           100.0%   (no other value)
+    kind=game   759,678 rows   full 484,861 / first5 206,023 / first3 48,893
+                                                     / first1 19,901
+
+**THAT IS A NULL RESULT ON A LIVE POPULATION, NOT A DEAD FIELD.** The same
+files carry 274,817 non-full-segment rows; this script never sees one because
+it drops game markets one line earlier. The scoring lane's 8.9% is entirely
+`totals_alt` / `spreads_alt`, which are `kind == "game"`.
+
+So the fix is about the instrument, not about rescuing a reading -- **and the
+guard it removes is exactly the kind that expires silently.** "Props are always
+full-game" is a property of today's capture, not of the key, and the moment a
+first-5 prop is captured the old key would have started pairing it against a
+full-game book price with nothing in the output to show for it. See
+`findings_2026-09-06_venue_fanin_has_no_segment` for the same omission costing
+real money one module over ($7.08 of orders on 2026-08-28).
+
+--------------------------------------------------------------------------
 THREE THINGS THIS GETS RIGHT THAT AN OBVIOUS VERSION GETS WRONG
 --------------------------------------------------------------------------
 
@@ -330,12 +371,73 @@ def _hhmmss(stamp: float) -> str:
     return datetime.utcfromtimestamp(stamp).strftime("%H:%M:%S")
 
 
-def quote_key(row: dict) -> tuple:
-    return (
-        str(row.get("event_id") or ""), str(row.get("market") or ""),
-        str(row.get("player_name") or ""), str(row.get("line")),
-        str(row.get("selection") or ""),
+# ---------------------------------------------------------------------------
+# THE PAIRING KEY IS DERIVED FROM `_KEY_FIELDS`, NOT RETYPED
+# ---------------------------------------------------------------------------
+# It used to be a hand-written five-tuple `(event, market, player, line, side)`
+# and it OMITTED `segment`, while `odds_book_quotes._KEY_FIELDS` -- the shared
+# definition of what makes one quote a different quote -- has carried `segment`
+# all along. Two key definitions that must agree, maintained apart, is exactly
+# how they came to disagree; so this one is now a PROJECTION of that one and
+# there is only one field list in the repo to keep right.
+#
+# WHAT THE OMISSION DOES. A first-five-innings over 4.5 and a full-game over 4.5
+# are different wagers. Keyed without `segment` they collide, so a full-game
+# exchange price gets paired against a first-5 sportsbook price and the
+# difference is reported as an entry gain. `findings_2026-09-09_entry_cost_scored`
+# measured 469 of 5,290 keys (8.9%) spanning more than one segment on the
+# scoring lane's population and traced a fictitious -21.7pp headline to it, with
+# one observed pairing reading "MLB over 1.5 at +245". Same class as the
+# `venue_quote_fanin` defect (`findings_2026-09-06_venue_fanin_has_no_segment`):
+# one venue quote serving two different bets.
+#
+# THE ONE FIELD THIS KEY MAY DROP is `bookmaker`, because comparing across books
+# IS the measurement. Everything else that distinguishes a quote must stay, and
+# stays by construction rather than by anyone remembering it.
+try:
+    sys.path.insert(0, str(REPO_ROOT))
+    from syndicate.features.shared.odds_book_quotes import _KEY_FIELDS
+except Exception as exc:  # pragma: no cover - a broken import must not be silent
+    raise SystemExit(
+        "cannot import odds_book_quotes._KEY_FIELDS -- the pairing key is derived "
+        f"from it and must not fall back to a local list: {exc}"
     )
+
+# The axis being compared. Dropping it is the point of the key.
+PAIRING_AXIS: tuple[str, ...] = ("bookmaker",)
+QUOTE_KEY_FIELDS: tuple[str, ...] = tuple(f for f in _KEY_FIELDS if f not in PAIRING_AXIS)
+# The two-way cell: the same key WITHOUT the side, so de-vig can find the
+# opposite leg. Derived from the quote key rather than from `_KEY_FIELDS`
+# directly, so it cannot drift from it either.
+CELL_KEY_FIELDS: tuple[str, ...] = tuple(f for f in QUOTE_KEY_FIELDS if f != "selection")
+
+# Asserted, not assumed. If `segment` is ever removed upstream this key goes
+# silently back to the defect it was written to fix, and a silent regression in
+# a pairing key is invisible in the output -- the surviving rows are all real.
+if "segment" not in QUOTE_KEY_FIELDS or "segment" not in CELL_KEY_FIELDS:
+    raise SystemExit(
+        "odds_book_quotes._KEY_FIELDS no longer carries `segment`; this pairing "
+        "key would silently pair a first-5 price against a full-game one"
+    )
+
+_MARKET_AT = QUOTE_KEY_FIELDS.index("market")
+if CELL_KEY_FIELDS.index("market") != _MARKET_AT:
+    raise SystemExit("quote and cell keys disagree on where `market` sits")
+
+
+def _key_part(value) -> str:
+    """One field of a key, as a string.
+
+    `_quote_key`'s `str(row.get(f) or "")` is NOT copied: `or ""` folds a real
+    falsy value onto the absent one, and a `line` of 0 would then share a key
+    with a row that has no line at all. Absent stays absent; present stays
+    present. This is strictly no-less-discriminating than the shared function."""
+    return "" if value is None else str(value)
+
+
+def quote_key(row: dict) -> tuple:
+    """The identity of a quote across BOOKS -- `_KEY_FIELDS` minus `bookmaker`."""
+    return tuple(_key_part(row.get(field)) for field in QUOTE_KEY_FIELDS)
 
 
 # `#624` step 6's gate is about ONE book, not about props in general: item 07
@@ -437,10 +539,7 @@ def in_gate_market(row: dict) -> bool:
 
 def cell_key(row: dict) -> tuple:
     """`quote_key` WITHOUT the side -- the two-way cell, not one of its legs."""
-    return (
-        str(row.get("event_id") or ""), str(row.get("market") or ""),
-        str(row.get("player_name") or ""), str(row.get("line")),
-    )
+    return tuple(_key_part(row.get(field)) for field in CELL_KEY_FIELDS)
 
 
 def latest_quote_at(series, at: float, window: float):
@@ -547,7 +646,7 @@ def derive_entry_cost(rows: list, window: int) -> dict:
     sub_today, sub_gain, sub_after, sub_fair = [], [], [], []
     covered = 0
     for (_captured, key), cell in cheapest.items():
-        multiplier, _resolved = kalshi_multiplier_for_market(key[1])
+        multiplier, _resolved = kalshi_multiplier_for_market(market_of(key))
         # The LATEST quote each venue is still showing, then the cheapest of
         # those -- price shopping ACROSS venues at one instant. NOT the cheapest
         # quote anywhere in the window: that picks whichever second of the last
@@ -666,7 +765,7 @@ def measure_date(rows: list, window: int) -> dict:
     used: dict[float, int] = defaultdict(int)
     for key in set(books) & set(exch):
         series = books[key]
-        multiplier, resolved = kalshi_multiplier_for_market(key[1])
+        multiplier, resolved = kalshi_multiplier_for_market(market_of(key))
         for stamp, venue, exchange_prob in exch[key]:
             best = None
             for book_ts, _book, book_prob in series:
@@ -801,7 +900,13 @@ def print_gate_verdict(report: dict, window_minutes: int) -> None:
 
 
 def market_of(key: tuple) -> str:
-    return key[1]
+    """The market out of a quote OR cell key, by NAME rather than by position.
+
+    Both keys are projections of `_KEY_FIELDS` now, so reordering that tuple
+    moves this index. A hard-coded `key[1]` would keep working and start
+    returning the wrong field, which is the same silent class as the omission
+    this key was fixed for."""
+    return key[_MARKET_AT]
 
 
 def expand_dates(explicit: list, since: str, until: str) -> list:

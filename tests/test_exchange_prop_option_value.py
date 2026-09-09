@@ -121,6 +121,114 @@ class KeyingTests(unittest.TestCase):
         self.assertNotEqual(MOD.quote_key(base), MOD.quote_key(other_side))
 
 
+class SegmentKeyingTests(unittest.TestCase):
+    """`quote_key` OMITTED `segment` while `odds_book_quotes._KEY_FIELDS` -- the
+    shared definition of quote identity -- has always carried it.
+
+    A first-five-innings over 4.5 and a full-game over 4.5 are different wagers.
+    Collided, a full-game exchange price pairs against a first-5 sportsbook
+    price and the difference is reported as an entry gain.
+    `findings_2026-09-09_entry_cost_scored` measured 8.9% of keys spanning more
+    than one segment on the scoring lane's population and traced a fictitious
+    -21.7pp headline to it. Every test here calls the REAL key function: a
+    reimplemented key in a test cannot fail when the real one drifts."""
+
+    BASE = {"sport": "mlb", "kind": "prop", "event_id": "e1", "segment": "full",
+            "market": "totals", "selection": "over", "player_name": "", "line": 1.5}
+
+    def test_a_full_game_and_a_first5_quote_do_not_pair(self) -> None:
+        """Same market, same line, same side, different portion of the game."""
+        full = dict(self.BASE, segment="full")
+        first5 = dict(self.BASE, segment="first5")
+        self.assertNotEqual(MOD.quote_key(full), MOD.quote_key(first5))
+
+    def test_the_two_way_cell_separates_segments_too(self) -> None:
+        """`cell_key` feeds the de-vig. Collided there, a full-game under is
+        priced against a first-5 over and the overround is meaningless."""
+        full = dict(self.BASE, segment="full")
+        first5 = dict(self.BASE, segment="first5")
+        self.assertNotEqual(MOD.cell_key(full), MOD.cell_key(first5))
+
+    def test_every_other_segment_value_is_separated_as_well(self) -> None:
+        """Not just `first5`. Production shards 2026-09-01..09-04 carry
+        `first1` (10,378 rows) and `first3` (27,482) alongside `first5`
+        (110,585), so a fix that only knew about first-5 would still collide."""
+        keys = {MOD.quote_key(dict(self.BASE, segment=segment))
+                for segment in ("full", "first1", "first3", "first5")}
+        self.assertEqual(len(keys), 4)
+
+    def test_the_key_is_derived_from_the_shared_field_list(self) -> None:
+        """The point of the fix. Two field lists maintained apart is how they
+        came to disagree, so this one is a projection of `_KEY_FIELDS` and the
+        ONLY field it may drop is the axis being compared."""
+        from syndicate.features.shared.odds_book_quotes import _KEY_FIELDS
+
+        self.assertEqual(MOD.PAIRING_AXIS, ("bookmaker",))
+        self.assertEqual(
+            MOD.QUOTE_KEY_FIELDS,
+            tuple(f for f in _KEY_FIELDS if f not in MOD.PAIRING_AXIS))
+        self.assertIn("segment", MOD.QUOTE_KEY_FIELDS)
+        self.assertIn("segment", MOD.CELL_KEY_FIELDS)
+        self.assertNotIn("selection", MOD.CELL_KEY_FIELDS)
+
+    def test_the_key_drops_the_book_because_that_is_the_comparison(self) -> None:
+        """Guards the other direction: a key that kept `bookmaker` would pair
+        nothing at all, and the script would report a clean zero."""
+        kalshi = dict(self.BASE, bookmaker="kalshi")
+        draftkings = dict(self.BASE, bookmaker="draftkings")
+        self.assertEqual(MOD.quote_key(kalshi), MOD.quote_key(draftkings))
+
+    def test_market_is_read_by_name_not_by_position(self) -> None:
+        """`kalshi_multiplier_for_market(key[1])` was correct only for the old
+        five-tuple. Reordering `_KEY_FIELDS` moves that index, and a wrong
+        multiplier is a silent fee error, not a crash."""
+        self.assertEqual(MOD.market_of(MOD.quote_key(self.BASE)), "totals")
+        self.assertEqual(MOD.market_of(MOD.cell_key(self.BASE)), "totals")
+
+    def test_an_absent_line_does_not_collide_with_a_zero_line(self) -> None:
+        """`_quote_key`'s `str(row.get(f) or "")` folds a real falsy value onto
+        the absent one. This key does not copy that: absent stays absent."""
+        absent = dict(self.BASE)
+        absent.pop("line")
+        self.assertNotEqual(MOD.quote_key(dict(self.BASE, line=0)),
+                            MOD.quote_key(absent))
+
+    def test_an_unlabelled_segment_does_not_default_onto_full(self) -> None:
+        """Unknown must not default permissive. A row with no segment is not
+        evidence that it is a full-game quote, and pairing it with one is
+        exactly the defect under repair."""
+        unlabelled = dict(self.BASE)
+        unlabelled.pop("segment")
+        self.assertNotEqual(MOD.quote_key(unlabelled),
+                            MOD.quote_key(dict(self.BASE, segment="full")))
+
+    def test_a_segmented_pair_is_not_measured_as_a_gain(self) -> None:
+        """End to end through `measure_date`, not just the key function.
+
+        A full-game sportsbook price at 0.50 and a first-5 exchange price at
+        0.30 look like a 20-point entry gain when the segments collide. Keyed
+        correctly the two never meet, so nothing is measured -- and the row is
+        counted as UNMATCHED rather than dropped, so the coverage cost stays
+        visible."""
+        row = lambda book, segment, probability: (
+            1000.0, book, probability,
+            {"sport": "mlb", "kind": "prop", "event_id": "e1", "segment": segment,
+             "market": "batter_hits", "selection": "under", "player_name": "A",
+             "line": 0.5, "bookmaker": book})
+        report = MOD.measure_date(
+            [row("draftkings", "full", 0.50), row("kalshi", "first5", 0.30)],
+            window=1800)
+        self.assertEqual(report["both_keys"], 0)
+        self.assertEqual(report["gains"], {})
+        self.assertEqual(report["exchange_rows"], 1)
+
+        same_segment = MOD.measure_date(
+            [row("draftkings", "full", 0.50), row("kalshi", "full", 0.30)],
+            window=1800)
+        self.assertEqual(same_segment["both_keys"], 1)
+        self.assertGreater(same_segment["gains"]["kalshi"][0], 15.0)
+
+
 class GateBookTests(unittest.TestCase):
     """`#624` step 6 is a gate on ONE book — unders, minus HR and HRR. Measuring
     entry improvement over all props and spending it against that book's ROI
