@@ -28478,3 +28478,47 @@ exchange tier (the discriminator the hold is not), a hold cap on the Pinnacle ti
 and a re-read on a DAYTIME pregame board rather than a midnight in-play one before
 any exchange row anchors again. The 3-day CLV reading for the sharp tier proceeds
 on Pinnacle rows only, split by `fair_anchor_book`.
+
+
+---
+
+## 2026-09-09 00:31Z — web `e4552e27` — **THE OWED READING, DISCHARGED: gunicorn workers ARE recycling** — lane `nfl-props-autorun-e2e`
+
+Closes the `verify: OWED` left by the **2026-09-08 23:44-23:47Z** entry above.
+Read-only; no deploy, no config change.
+
+**THE DISCRIMINATING FACT: a worker started 24 minutes into the process lifetime,
+with no deploy to explain it.**
+
+    service booted            23:47:28.924Z   (deploy e4552e27)
+    deploys since             NONE            (re-read from /deploys; last finished 23:47:28Z)
+    worker pid 270 started    00:11:11Z       (age 1154.2s at 00:30:26Z)
+
+Pre-fix baseline, for contrast — this is what "never recycles" looked like:
+
+    pid 97:  age  906.6 -> 1148.2 -> 1877.5 -> 2850.0 s
+    pid 98:  age  914.6 -> 1033.9 -> 1400.0 -> 2357.9 s
+
+Two workers, ages climbing monotonically to 47 minutes, never resetting.
+
+**IT IS A WORKER, NOT A SPAWNED JOB**, and that was checked rather than assumed:
+pid 270's episode carries `routes_since_baseline` = `{publish 30, stream 18,
+healthz 12, intelligence/query 1, wnba boxscore 1}` over `route_requests_total`
+62. A job has no routes.
+
+**IT IS ALREADY BOUNDING GROWTH:** pid 270 reads `anon_after_mb 538.4` at 1154 s
+old, where the un-recycled workers reached 600-650 MB by 2800 s.
+
+**WHY THE OBVIOUS CHECK WAS NOT USED.** `Booting worker` / `Worker exiting` are
+NOT captured on this service — searched the previous deploy's window and matched
+NOTHING — so their absence would have read as failure and meant nothing. And the
+partial signal recorded earlier (`/healthz` 200 in 0.32 s) was correctly NOT
+banked: a clean boot is equally consistent with gunicorn having IGNORED
+`GUNICORN_CMD_ARGS`. Only the pid change separates those two worlds, and it has
+now been observed.
+
+**STILL TRUE, so nobody reads this as the OOM being solved:** this bounds the
+ratchet, it does not remove the cause. The driver is artifact ops traffic —
+pid 270's own 62 requests are 48 publish/stream — and web remains a 2 GB service
+with `WEB_CONCURRENCY=2`. The free mitigation stands: keep bulk publish/export
+loops out of the game window.
