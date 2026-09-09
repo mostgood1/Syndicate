@@ -33,6 +33,9 @@ NEW_QUOTE_FIELDS = (
     # P1b -- the exchange gates' working.
     "fair_anchor_hold_pct",
     "fair_anchor_refusal",
+    # P1c -- every refusal that fired, and the evaluated pair's median gap.
+    "fair_anchor_refusals",
+    "fair_anchor_median_gap_pp",
 )
 
 
@@ -184,6 +187,9 @@ def test_flag_absent_or_median_is_byte_identical_to_the_legacy_board(monkeypatch
         # `median` has no anchor tier, so it never evaluated a pair to refuse.
         assert quote["fair_anchor_hold_pct"] is None
         assert quote["fair_anchor_refusal"] is None
+        # P1c: None, not an empty list -- no tier ran, so there is no list.
+        assert quote["fair_anchor_refusals"] is None
+        assert quote["fair_anchor_median_gap_pp"] is None
 
 
 def test_the_default_fair_is_the_median_over_every_book_pinnacle_included():
@@ -244,11 +250,14 @@ def test_sharp_changes_only_the_fair_never_the_price_side_of_ev(monkeypatch):
 
 
 def test_pinnacle_one_sided_falls_to_the_exchange_mid(monkeypatch):
+    """The Kalshi pair here sits ~1 pp from the two-book median (P1c's
+    distance gate admits it); the original -140/+125 sat 6.1 pp away and would
+    now be `exchange_far_from_median` -- see section (k) for that case."""
     monkeypatch.setenv(layer2_board.FAIR_ANCHOR_ENV, "sharp")
-    cells = _cells(kalshi=(-140, 125), draftkings=(-108, 100), fanduel=(-110, -102))
+    cells = _cells(kalshi=(-112, 104), draftkings=(-108, 100), fanduel=(-110, -102))
     cells["pinnacle"] = {"home": _cell(-125)}
     resolved = _resolve_fair(_row(cells), SIDES)
-    expected = devig([-140, 125], method="power")
+    expected = devig([-112, 104], method="power")
     assert resolved.method == "exchange_mid"
     assert resolved.anchor_book == "kalshi"
     assert resolved.fair_by_side == {"home": expected[0], "away": expected[1]}
@@ -487,12 +496,20 @@ def test_the_row_count_falls_back_to_the_per_side_counts(monkeypatch):
     assert _resolve_fair(row, SIDES).method == "exchange_mid"
 
 
-def test_the_pinnacle_tier_is_not_gated_on_hold(monkeypatch):
-    """A wide Pinnacle pair still anchors -- the gates are the EXCHANGE tier's."""
+def test_the_pinnacle_tier_is_not_gated_on_the_exchanges_hold_cap(monkeypatch):
+    """P1b: the 4.0 hold cap is the EXCHANGE tier's. P1c gave Pinnacle its own
+    cap at 5.0, so a pair between the two anchors as Pinnacle and is refused
+    as an exchange -- and a 12% Pinnacle pair, which P1b admitted, no longer
+    is (section (k))."""
     monkeypatch.setenv(layer2_board.FAIR_ANCHOR_ENV, "sharp")
-    resolved = _resolve_fair(_row(_cells(pinnacle=WIDE_PAIR, **SOFT)), SIDES)
-    assert resolved.method == "sharp_anchor"
-    assert resolved.anchor_hold_pct == hold_pct(list(WIDE_PAIR))
+    between = (-111, -109)  # ~4.54%: over the exchange's 4.0, under Pinnacle's 5.0
+    assert 4.0 < hold_pct(list(between)) < 5.0
+    as_pinnacle = _resolve_fair(_row(_cells(pinnacle=between, **SOFT)), SIDES)
+    assert as_pinnacle.method == "sharp_anchor"
+    assert as_pinnacle.anchor_hold_pct == hold_pct(list(between))
+    as_exchange = _resolve_fair(_row(_cells(kalshi=between, **SOFT)), SIDES)
+    assert as_exchange.method == "consensus"
+    assert as_exchange.anchor_refusal == "exchange_hold_too_wide"
 
 
 def test_a_refused_deep_exchange_does_not_stop_a_tighter_one_below_it(monkeypatch):
@@ -647,9 +664,19 @@ def test_the_production_extreme_a_wide_kalshi_under_does_not_anchor_under_defaul
     assert resolved.anchor_refusal == "exchange_hold_too_wide"
     assert resolved.anchor_hold_pct == kalshi_hold
     assert resolved.fair_by_side == resolved.consensus_by_side
-    # And with the gate relaxed it WOULD have -- the gate, not the pair, is
-    # what changed the answer.
+    # With the HOLD gate relaxed it is STILL refused -- by P1c's distance gate,
+    # which is the one that actually discriminates this pair: a mid of 0.09
+    # against a median of 0.38 is ~28 pp away. Only with both relaxed does it
+    # anchor, so the gates, not the pair, are what changed the answer.
     monkeypatch.setenv(layer2_board.FAIR_EXCHANGE_MAX_HOLD_PCT_ENV, "20")
+    hold_relaxed = _resolve_fair(row, sides)
+    assert hold_relaxed.method == "consensus"
+    assert hold_relaxed.anchor_refusal == "exchange_far_from_median"
+    assert hold_relaxed.anchor_median_gap_pp == pytest.approx(
+        abs(mid_under - resolved.consensus_by_side["under"]) * 100.0
+    )
+    assert hold_relaxed.anchor_median_gap_pp > 25.0
+    monkeypatch.setenv(layer2_board.FAIR_EXCHANGE_MAX_MEDIAN_GAP_PP_ENV, "50")
     relaxed = _resolve_fair(row, sides)
     assert relaxed.method == "exchange_mid"
     assert relaxed.fair_by_side["under"] == mid_under
@@ -665,3 +692,376 @@ def test_the_other_production_extreme_a_books_one_row_is_uncorroborated(monkeypa
         resolved = _resolve_fair(row, SIDES)
         assert resolved.method == "consensus", venue
         assert resolved.anchor_refusal == "exchange_uncorroborated", venue
+
+
+# --------------------------------------------------------------------------
+# (k) P1c -- the Pinnacle tier is gated on its OWN quality; the exchange tier
+# on its DISTANCE from the median; every refusal is stamped.
+#
+# The readings (refresh-worker, served board, 2,000 rows each):
+#   00:04Z `sharp`+P1b   Kalshi survivors n=66 mean|d| 3.089 pp, 14 > 5 pp, at
+#                        hold mean 1.41% -- TIGHT BUT WRONG. Pinnacle n=60
+#                        1.640 pp, 3 > 5 pp, holds to 7.26% in play.
+#   00:55Z `sharp_only`  Pinnacle n=203 mean|d| 1.136 pp, 2 > 5 pp -- both
+#                        in-play MLB `spreads_alt`, `books=1`, hold 5.8%.
+# --------------------------------------------------------------------------
+
+#: Pinnacle pairs by hold: the production extreme and one under the cap.
+PINNACLE_WIDE_PAIR = MID_PAIR  # -113/-113, ~5.75%: the 00:55Z extreme's hold
+PINNACLE_OK_PAIR = (-109, -108)  # ~3.9%: under the 5.0 cap
+
+#: Exchange pairs by DISTANCE from a 19-book -110/-110 median (0.500), both
+#: well under the 4.0 hold cap -- so only the distance gate can separate them.
+NEAR_PAIR = (-112, 105)  # mid 0.520, ~2.0 pp away, hold ~1.6%
+FAR_PAIR = (-134, 121)  # mid 0.561, ~6.1 pp away, hold ~2.5%
+NINETEEN_SOFT = {f"soft{i:02d}": (-110, -110) for i in range(19)}
+
+LIVE = {"state": "live", "status_token": "Top 5"}
+
+
+@pytest.fixture(autouse=True)
+def _default_p1c_env(monkeypatch):
+    monkeypatch.delenv(layer2_board.FAIR_SHARP_MAX_HOLD_PCT_ENV, raising=False)
+    monkeypatch.delenv(layer2_board.FAIR_SHARP_MIN_BOOKS_LIVE_ENV, raising=False)
+    monkeypatch.delenv(layer2_board.FAIR_EXCHANGE_MAX_MEDIAN_GAP_PP_ENV, raising=False)
+
+
+def _gap_pp(pair: tuple[int, int], consensus: Mapping[str, float]) -> float:
+    return abs(devig(list(pair), method="power")[0] - consensus["home"]) * 100.0
+
+
+def test_the_p1c_fixture_pairs_sit_where_the_test_names_say():
+    assert 5.0 < hold_pct(list(PINNACLE_WIDE_PAIR)) < 6.0
+    assert 3.5 < hold_pct(list(PINNACLE_OK_PAIR)) < 4.5
+    assert layer2_board.FAIR_SHARP_MAX_HOLD_PCT_DEFAULT == 5.0
+    assert layer2_board.FAIR_SHARP_MIN_BOOKS_LIVE_DEFAULT == 2
+    assert layer2_board.FAIR_EXCHANGE_MAX_MEDIAN_GAP_PP_DEFAULT == 3.0
+    median = _resolve_fair(_row(_cells(**NINETEEN_SOFT)), SIDES).consensus_by_side
+    assert median["home"] == pytest.approx(0.5)
+    assert hold_pct(list(NEAR_PAIR)) < 4.0 and hold_pct(list(FAR_PAIR)) < 4.0
+    assert 1.5 < _gap_pp(NEAR_PAIR, median) < 2.5
+    assert 5.5 < _gap_pp(FAR_PAIR, median) < 6.5
+
+
+# -- the Pinnacle tier's hold cap ------------------------------------------
+
+
+def test_a_pinnacle_pair_at_five_point_eight_is_refused_and_four_anchors(monkeypatch):
+    monkeypatch.setenv(layer2_board.FAIR_ANCHOR_ENV, "sharp_only")
+    wide = _resolve_fair(_row(_cells(pinnacle=PINNACLE_WIDE_PAIR, **SOFT)), SIDES)
+    assert wide.method == "consensus"
+    assert wide.anchor_book is None
+    assert wide.anchor_refusal == "sharp_hold_too_wide"
+    assert wide.anchor_refusals == ("sharp_hold_too_wide",)
+    assert wide.anchor_hold_pct == hold_pct(list(PINNACLE_WIDE_PAIR))
+    assert wide.fair_by_side == wide.consensus_by_side, "fell to consensus as if Pinnacle had not quoted"
+
+    ok = _resolve_fair(_row(_cells(pinnacle=PINNACLE_OK_PAIR, **SOFT)), SIDES)
+    assert ok.method == "sharp_anchor"
+    assert ok.anchor_book == "pinnacle"
+    assert ok.anchor_refusal is None
+    assert ok.anchor_refusals == ()
+    assert ok.anchor_hold_pct == hold_pct(list(PINNACLE_OK_PAIR))
+
+
+def test_a_refused_pinnacle_falls_to_the_exchange_under_sharp_and_to_consensus_under_sharp_only(monkeypatch):
+    """Exactly as if Pinnacle had not quoted -- and the passed-over refusal is
+    still on the row, so the reading can count exchange_mid rows that exist
+    because Pinnacle was gated."""
+    row = _row(_cells(pinnacle=PINNACLE_WIDE_PAIR, kalshi=TIGHT_PAIR, **SOFT))
+    monkeypatch.setenv(layer2_board.FAIR_ANCHOR_ENV, "sharp")
+    via_exchange = _resolve_fair(row, SIDES)
+    assert via_exchange.method == "exchange_mid"
+    assert via_exchange.anchor_book == "kalshi"
+    assert via_exchange.anchor_refusal is None, "a non-None refusal means ON CONSENSUS because of a gate"
+    assert via_exchange.anchor_refusals == ("sharp_hold_too_wide",)
+    assert via_exchange.anchor_hold_pct == hold_pct(list(TIGHT_PAIR)), "the ANCHOR's hold, not the refused one's"
+    monkeypatch.setenv(layer2_board.FAIR_ANCHOR_ENV, "sharp_only")
+    via_consensus = _resolve_fair(row, SIDES)
+    assert via_consensus.method == "consensus"
+    assert via_consensus.anchor_refusal == "sharp_hold_too_wide"
+    assert via_consensus.anchor_refusals == ("sharp_hold_too_wide",)
+
+
+# -- the Pinnacle tier's in-play corroboration ------------------------------
+
+
+def test_a_live_row_with_pinnacle_alone_is_refused_but_a_pregame_one_anchors(monkeypatch):
+    monkeypatch.setenv(layer2_board.FAIR_ANCHOR_ENV, "sharp_only")
+    pregame = _resolve_fair(_with_books(_row(_cells(pinnacle=(-125, 115))), 1), SIDES)
+    assert pregame.method == "sharp_anchor", "a pregame Pinnacle line IS the corroboration"
+    assert pregame.anchor_refusals == ()
+
+    live = _resolve_fair(_with_books(_row(_cells(pinnacle=(-125, 115)), game=LIVE), 1), SIDES)
+    assert live.method == "consensus"
+    assert live.anchor_refusal == "sharp_uncorroborated_live"
+    assert live.anchor_hold_pct == hold_pct([-125, 115])
+
+    corroborated = _resolve_fair(_with_books(_row(_cells(pinnacle=(-125, 115), draftkings=(-108, 100)), game=LIVE), 2), SIDES)
+    assert corroborated.method == "sharp_anchor", "two books on a live line is enough"
+
+
+def test_an_unknown_book_count_on_a_live_row_is_refused_not_admitted(monkeypatch):
+    monkeypatch.setenv(layer2_board.FAIR_ANCHOR_ENV, "sharp_only")
+    row = _row(_cells(pinnacle=(-125, 115), **SOFT), game=LIVE)
+    row["books_quoting"] = None
+    for side in row["best"].values():
+        side.pop("books_quoting", None)
+    assert _resolve_fair(row, SIDES).anchor_refusal == "sharp_uncorroborated_live"
+    row["game"] = {"state": "pregame"}
+    assert _resolve_fair(row, SIDES).method == "sharp_anchor", "pregame has no count gate"
+
+
+@pytest.mark.parametrize(
+    "row_state, expected",
+    [
+        ({"game": {"state": "live"}}, True),
+        ({"game": {"state": "IN_PROGRESS"}}, True),
+        ({"game": {"state": "in"}}, True),
+        ({"game": None, "is_live": True}, True),
+        ({"game": None, "game_state": "live"}, True),
+        ({"game": None, "market_state": "live"}, True),
+        ({"game": {"state": "pregame"}}, False),
+        ({"game": {"state": "final"}}, False),
+        ({"game": {"state": "scheduled"}}, False),
+        ({"game": None}, False),
+        ({"game": None, "is_live": False}, False),
+    ],
+)
+def test_row_is_live_reads_the_grids_state_and_the_translated_fields(row_state, expected):
+    """`game.state` is what the grid carries at `_resolve_fair` time; the
+    top-level fields are what `build_layer2_rows` writes afterwards. Only an
+    affirmed in-play token counts -- final, pregame, unknown and absent do not."""
+    assert layer2_board._row_is_live(_row(**row_state)) is expected
+
+
+# -- the exchange tier's distance gate --------------------------------------
+
+
+def test_an_exchange_two_pp_from_the_median_anchors_and_six_pp_is_refused(monkeypatch):
+    monkeypatch.setenv(layer2_board.FAIR_ANCHOR_ENV, "sharp")
+    near = _resolve_fair(_row(_cells(kalshi=NEAR_PAIR, **NINETEEN_SOFT)), SIDES)
+    assert near.method == "exchange_mid"
+    assert near.anchor_book == "kalshi"
+    assert near.anchor_refusals == ()
+    assert near.anchor_median_gap_pp == pytest.approx(_gap_pp(NEAR_PAIR, near.consensus_by_side))
+
+    far = _resolve_fair(_row(_cells(kalshi=FAR_PAIR, **NINETEEN_SOFT)), SIDES)
+    assert far.method == "consensus"
+    assert far.anchor_refusal == "exchange_far_from_median"
+    assert far.anchor_refusals == ("exchange_far_from_median",)
+    assert far.anchor_hold_pct == hold_pct(list(FAR_PAIR)), "the hold is stamped even when distance refused it"
+    assert far.anchor_median_gap_pp == pytest.approx(_gap_pp(FAR_PAIR, far.consensus_by_side))
+    assert far.anchor_median_gap_pp > 3.0
+
+
+def test_an_exchange_with_no_median_to_check_is_refused_not_admitted(monkeypatch):
+    """Kalshi alone in `cells` but `books_quoting` says 3 (one-sided books the
+    grid counted): P1b's gates pass, and the "median" would be Kalshi's own
+    de-vig. One book is not a median, so there is nothing to check against."""
+    monkeypatch.setenv(layer2_board.FAIR_ANCHOR_ENV, "sharp")
+    resolved = _resolve_fair(_row(_cells(kalshi=TIGHT_PAIR)), SIDES)
+    assert resolved.method == "consensus"
+    assert resolved.anchor_refusal == "exchange_no_median_to_check"
+    assert resolved.anchor_refusals == ("exchange_no_median_to_check",)
+    # A second two-sided book is a median, and the pair is within 3 pp of it.
+    with_one_more = _resolve_fair(_row(_cells(kalshi=TIGHT_PAIR, draftkings=(-108, 100))), SIDES)
+    assert with_one_more.method == "exchange_mid"
+
+
+def test_the_pinnacle_tier_is_not_gated_on_distance(monkeypatch):
+    """The same pair that is `exchange_far_from_median` as Kalshi anchors as
+    Pinnacle: a sharp book disagreeing with the soft median is the SIGNAL, and
+    the gap is stamped so the reading can see it."""
+    monkeypatch.setenv(layer2_board.FAIR_ANCHOR_ENV, "sharp")
+    as_pinnacle = _resolve_fair(_row(_cells(pinnacle=FAR_PAIR, **NINETEEN_SOFT)), SIDES)
+    assert as_pinnacle.method == "sharp_anchor"
+    assert as_pinnacle.anchor_refusals == ()
+    assert as_pinnacle.anchor_median_gap_pp == pytest.approx(_gap_pp(FAR_PAIR, as_pinnacle.consensus_by_side))
+    assert as_pinnacle.anchor_median_gap_pp > 5.0
+    as_kalshi = _resolve_fair(_row(_cells(kalshi=FAR_PAIR, **NINETEEN_SOFT)), SIDES)
+    assert as_kalshi.anchor_refusal == "exchange_far_from_median"
+
+
+# -- the stamps ---------------------------------------------------------------
+
+
+def test_the_refusal_list_is_pinnacle_then_each_exchange_in_priority_order(monkeypatch):
+    """Pinnacle wide, betfair wide, kalshi far: three refusals in tier order,
+    the single-valued stamps all the FIRST refused pair's (Pinnacle's)."""
+    monkeypatch.setenv(layer2_board.FAIR_ANCHOR_ENV, "sharp")
+    row = _row(_cells(pinnacle=PINNACLE_WIDE_PAIR, betfair_ex_eu=WIDE_PAIR, kalshi=FAR_PAIR, **NINETEEN_SOFT))
+    resolved = _resolve_fair(row, SIDES)
+    assert resolved.method == "consensus"
+    assert resolved.anchor_refusals == (
+        "sharp_hold_too_wide",
+        "exchange_hold_too_wide",
+        "exchange_far_from_median",
+    )
+    assert resolved.anchor_refusal == resolved.anchor_refusals[0]
+    assert resolved.anchor_hold_pct == hold_pct(list(PINNACLE_WIDE_PAIR))
+    assert resolved.anchor_median_gap_pp == pytest.approx(_gap_pp(PINNACLE_WIDE_PAIR, resolved.consensus_by_side))
+
+
+def test_both_new_stamps_reach_the_served_quote(monkeypatch):
+    monkeypatch.setenv(layer2_board.FAIR_ANCHOR_ENV, "sharp")
+    anchored = build_layer2_rows([_row(_cells(pinnacle=(-125, 115), **SOFT))])["opportunities"]
+    passed_over = build_layer2_rows([_row(_cells(pinnacle=PINNACLE_WIDE_PAIR, kalshi=TIGHT_PAIR, **SOFT))])["opportunities"]
+    refused = build_layer2_rows([_row(_cells(kalshi=FAR_PAIR, **NINETEEN_SOFT))])["opportunities"]
+    assert anchored and passed_over and refused
+    for candidate in anchored:
+        quote = candidate["quote"]
+        assert quote["fair_method"] == "sharp_anchor"
+        assert quote["fair_anchor_refusals"] == []
+        assert quote["fair_anchor_median_gap_pp"] == pytest.approx(
+            abs(quote["fair_probability"] - quote["fair_consensus_prob"]) * 100.0
+        )
+    for candidate in passed_over:
+        quote = candidate["quote"]
+        assert quote["fair_method"] == "exchange_mid"
+        assert quote["fair_anchor_refusal"] is None
+        assert quote["fair_anchor_refusals"] == ["sharp_hold_too_wide"]
+        assert quote["fair_anchor_hold_pct"] == hold_pct(list(TIGHT_PAIR))
+    for candidate in refused:
+        quote = candidate["quote"]
+        assert quote["fair_method"] == "consensus"
+        assert quote["fair_anchor_refusal"] == "exchange_far_from_median"
+        assert quote["fair_anchor_refusals"] == ["exchange_far_from_median"]
+        assert quote["fair_anchor_median_gap_pp"] > 3.0
+        assert quote["fair_consensus_prob"] == quote["fair_probability"]
+
+
+def test_an_anchor_mode_row_with_nothing_fresh_carries_an_empty_list_not_none(monkeypatch):
+    """None means `median` (no tier ran). An anchor mode that evaluated
+    nothing says so with an empty list, so the mode is readable per row."""
+    monkeypatch.setenv(layer2_board.FAIR_ANCHOR_ENV, "sharp")
+    soft_only = _resolve_fair(_row(_cells(**SOFT)), SIDES)
+    assert soft_only.method == "consensus"
+    assert soft_only.anchor_refusals == ()
+    assert soft_only.anchor_median_gap_pp is None
+    no_cells = _resolve_fair(_row(), SIDES)
+    assert no_cells.method == "two_sided_same_book"
+    assert no_cells.anchor_refusals == ()
+    monkeypatch.delenv(layer2_board.FAIR_ANCHOR_ENV)
+    assert _resolve_fair(_row(_cells(**SOFT)), SIDES).anchor_refusals is None
+
+
+# -- each gate is reachable from the environment: off != on -------------------
+
+
+def test_sharp_max_hold_env_is_reachable_off_is_not_on(monkeypatch):
+    monkeypatch.setenv(layer2_board.FAIR_ANCHOR_ENV, "sharp_only")
+    row = _row(_cells(pinnacle=PINNACLE_WIDE_PAIR, **SOFT))
+    assert _resolve_fair(row, SIDES).anchor_refusal == "sharp_hold_too_wide", "absent env must be the 5.0 default"
+    monkeypatch.setenv(layer2_board.FAIR_SHARP_MAX_HOLD_PCT_ENV, "8.0")
+    assert _resolve_fair(row, SIDES).method == "sharp_anchor"
+    monkeypatch.setenv(layer2_board.FAIR_SHARP_MAX_HOLD_PCT_ENV, "garbage")
+    assert _resolve_fair(row, SIDES).anchor_refusal == "sharp_hold_too_wide", "unparseable is the default"
+
+
+def test_sharp_min_books_live_env_is_reachable_off_is_not_on(monkeypatch):
+    monkeypatch.setenv(layer2_board.FAIR_ANCHOR_ENV, "sharp_only")
+    row = _with_books(_row(_cells(pinnacle=(-125, 115)), game=LIVE), 1)
+    assert _resolve_fair(row, SIDES).anchor_refusal == "sharp_uncorroborated_live"
+    monkeypatch.setenv(layer2_board.FAIR_SHARP_MIN_BOOKS_LIVE_ENV, "1")
+    assert _resolve_fair(row, SIDES).method == "sharp_anchor"
+    monkeypatch.setenv(layer2_board.FAIR_SHARP_MIN_BOOKS_LIVE_ENV, "0")
+    assert _resolve_fair(row, SIDES).anchor_refusal == "sharp_uncorroborated_live", "0 is not a count; default"
+
+
+def test_max_median_gap_env_is_reachable_off_is_not_on(monkeypatch):
+    monkeypatch.setenv(layer2_board.FAIR_ANCHOR_ENV, "sharp")
+    row = _row(_cells(kalshi=FAR_PAIR, **NINETEEN_SOFT))
+    assert _resolve_fair(row, SIDES).anchor_refusal == "exchange_far_from_median", "absent env must be the 3.0 default"
+    monkeypatch.setenv(layer2_board.FAIR_EXCHANGE_MAX_MEDIAN_GAP_PP_ENV, "10")
+    assert _resolve_fair(row, SIDES).method == "exchange_mid"
+    monkeypatch.setenv(layer2_board.FAIR_EXCHANGE_MAX_MEDIAN_GAP_PP_ENV, "1.0")
+    near = _row(_cells(kalshi=NEAR_PAIR, **NINETEEN_SOFT))
+    assert _resolve_fair(near, SIDES).anchor_refusal == "exchange_far_from_median", "tightened, 2 pp is far"
+    monkeypatch.setenv(layer2_board.FAIR_EXCHANGE_MAX_MEDIAN_GAP_PP_ENV, "-3")
+    assert _resolve_fair(near, SIDES).method == "exchange_mid", "negative is not a distance; default"
+
+
+def test_the_p1c_gate_readers_default_on_absent_or_garbage(monkeypatch):
+    assert layer2_board._fair_sharp_max_hold_pct() == 5.0
+    assert layer2_board._fair_sharp_min_books_live() == 2
+    assert layer2_board._fair_exchange_max_median_gap_pp() == 3.0
+    monkeypatch.setenv(layer2_board.FAIR_SHARP_MAX_HOLD_PCT_ENV, "-1")
+    monkeypatch.setenv(layer2_board.FAIR_SHARP_MIN_BOOKS_LIVE_ENV, "x")
+    monkeypatch.setenv(layer2_board.FAIR_EXCHANGE_MAX_MEDIAN_GAP_PP_ENV, "")
+    assert layer2_board._fair_sharp_max_hold_pct() == 5.0
+    assert layer2_board._fair_sharp_min_books_live() == 2
+    assert layer2_board._fair_exchange_max_median_gap_pp() == 3.0
+
+
+# -- the three production extremes, reproduced --------------------------------
+
+
+def test_production_extreme_a_an_in_play_spreads_alt_pinnacle_alone_at_five_point_eight(monkeypatch):
+    """00:55Z `sharp_only`: both rows past 5 pp were in-play MLB `spreads_alt`
+    with `books=1` -- Pinnacle the lone book on the line -- at a 5.8% hold.
+    Under the defaults the corroboration gate names it first (the gates run
+    books, then hold, as P1b's do); relax that and the hold cap still stops
+    it; only with both relaxed does it anchor. The row's own median is
+    Pinnacle's own de-vig, so the stamped gap is ~0 and says nothing -- which
+    is exactly why a lone in-play Pinnacle needed a gate that is not distance."""
+    monkeypatch.setenv(layer2_board.FAIR_ANCHOR_ENV, "sharp_only")
+    row = _with_books(
+        _row(
+            _cells(pinnacle=PINNACLE_WIDE_PAIR),
+            market="spreads_alt",
+            line=-1.5,
+            game={"state": "live", "status_token": "Bot 7"},
+        ),
+        1,
+    )
+    resolved = _resolve_fair(row, SIDES)
+    assert resolved.method == "consensus"
+    assert resolved.anchor_refusal == "sharp_uncorroborated_live"
+    assert resolved.anchor_refusals == ("sharp_uncorroborated_live",)
+    assert 5.0 < resolved.anchor_hold_pct < 6.0
+    monkeypatch.setenv(layer2_board.FAIR_SHARP_MIN_BOOKS_LIVE_ENV, "1")
+    assert _resolve_fair(row, SIDES).anchor_refusal == "sharp_hold_too_wide"
+    monkeypatch.setenv(layer2_board.FAIR_SHARP_MAX_HOLD_PCT_ENV, "8")
+    assert _resolve_fair(row, SIDES).method == "sharp_anchor"
+    # The same line PREGAME at the same hold is still refused -- by hold alone.
+    row["game"] = {"state": "pregame"}
+    monkeypatch.delenv(layer2_board.FAIR_SHARP_MIN_BOOKS_LIVE_ENV)
+    monkeypatch.delenv(layer2_board.FAIR_SHARP_MAX_HOLD_PCT_ENV)
+    assert _resolve_fair(row, SIDES).anchor_refusal == "sharp_hold_too_wide"
+
+
+def test_production_extreme_b_a_tight_kalshi_pair_three_pp_from_a_nineteen_book_median(monkeypatch):
+    """00:04Z `sharp`+P1b: the Kalshi survivors -- hold mean 1.41%, mean |d|
+    3.089 pp. Tight but wrong. P1b admitted this pair; P1c's distance gate
+    refuses it and stamps the gap it was refused for."""
+    monkeypatch.setenv(layer2_board.FAIR_ANCHOR_ENV, "sharp")
+    survivor = (-117, 110)
+    assert 1.2 < hold_pct(list(survivor)) < 1.6
+    row = _with_books(_row(_cells(kalshi=survivor, **NINETEEN_SOFT)), 20)
+    resolved = _resolve_fair(row, SIDES)
+    assert 3.0 < resolved.anchor_median_gap_pp < 3.3, resolved.anchor_median_gap_pp
+    assert resolved.method == "consensus"
+    assert resolved.anchor_refusal == "exchange_far_from_median"
+    assert resolved.anchor_hold_pct == hold_pct(list(survivor))
+    assert resolved.fair_by_side == resolved.consensus_by_side
+    # P1b's gates alone would have let it through -- the distance gate is the
+    # discriminator the hold gate was not.
+    monkeypatch.setenv(layer2_board.FAIR_EXCHANGE_MAX_MEDIAN_GAP_PP_ENV, "100")
+    assert _resolve_fair(row, SIDES).method == "exchange_mid"
+
+
+def test_production_extreme_c_a_tight_kalshi_pair_within_one_pp_of_the_median_anchors(monkeypatch):
+    """The pair the gates are FOR: a 1.0% hold within 1 pp of a 19-book median
+    is a sharper estimate of the same thing, and it anchors."""
+    monkeypatch.setenv(layer2_board.FAIR_ANCHOR_ENV, "sharp")
+    close = (-103, -101)
+    assert 0.8 < hold_pct(list(close)) < 1.2
+    row = _with_books(_row(_cells(kalshi=close, **NINETEEN_SOFT)), 20)
+    resolved = _resolve_fair(row, SIDES)
+    assert resolved.anchor_median_gap_pp < 1.0
+    assert resolved.method == "exchange_mid"
+    assert resolved.anchor_book == "kalshi"
+    assert resolved.anchor_refusals == ()
+    assert resolved.fair_by_side["home"] == devig(list(close), method="power")[0]
+    assert resolved.fair_by_side["home"] != resolved.consensus_by_side["home"]

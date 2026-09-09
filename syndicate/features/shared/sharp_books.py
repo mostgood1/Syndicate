@@ -41,6 +41,24 @@ board (2026-09-08, 331 anchored rows) put Kalshi at a mean 2.7 pp from the
 median with 17 rows past 5 pp, against Pinnacle's 0.9 pp and 1 -- the gates are
 that reading, and `SYNDICATE_FAIR_ANCHOR=sharp_only` drops tier 2 entirely.
 
+BOTH TIERS ARE GATED, ON DIFFERENT THINGS (P1c). The second and third readings
+(2026-09-09 00:04Z and 00:55Z) showed the hold gate REMOVING exchange rows
+without SELECTING the accurate ones -- Kalshi survivors at a 1.41% mean hold
+still sat 3.1 pp from the median with 14 rows past 5 pp -- and Pinnacle's only
+two >5 pp rows under `sharp_only` were in-play `spreads_alt` lines it quoted
+ALONE at a 5.8% hold. So the Pinnacle tier is now gated on its OWN quality: own
+hold at most `SYNDICATE_FAIR_SHARP_MAX_HOLD_PCT` (5.0) and, on a LIVE row,
+`books_quoting` at least `SYNDICATE_FAIR_SHARP_MIN_BOOKS_LIVE` (2) -- a lone
+PREGAME Pinnacle still anchors, because it is the corroboration. The exchange
+tier gains the discriminator the hold gate is not: its de-vigged mid must sit
+within `SYNDICATE_FAIR_EXCHANGE_MAX_MEDIAN_GAP_PP` (3.0 pp) of the consensus
+median, and there must be a median of at least two books to check against.
+Pinnacle is deliberately NOT gated on that distance -- a sharp book disagreeing
+with the soft consensus is the signal the anchor exists to surface, not a
+defect -- and `layer2_board`'s P1c block carries the readings and the refusal
+names (`sharp_hold_too_wide`, `sharp_uncorroborated_live`,
+`exchange_far_from_median`, `exchange_no_median_to_check`).
+
 `SHARP_BOOKS` is the union the ledger reports coverage on. It is deliberately
 NOT extended with the direct venues: `state.md [sharp-reference-price]` measured
 100% game-line coverage on exactly this five-book set, and a record's
