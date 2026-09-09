@@ -626,6 +626,9 @@ _DATA_MIRROR_GUARD_DISABLED = str(os.environ.get("SYNDICATE_TEST_DATA_MIRROR_GUA
 }
 _WRITE_MODE_CHARS = frozenset("wxa+")
 _GIT_IGNORED_PATH_CACHE: dict[str, bool] = {}
+# The unwrapped `open`, kept so the diagnostic watcher below can write its own
+# log without tripping the guard it exists to check.
+_ORIGINAL_OPEN = open
 
 
 def _is_inside_tracked_data_mirror(path: object) -> bool:
@@ -717,7 +720,31 @@ def _record_data_mirror_write(operation: str, path: object) -> None:
     import traceback
 
     detail = f"{operation} -> {path}"
-    _DATA_MIRROR_WRITES.append(detail + "\n" + "".join(traceback.format_stack()[:-2][-12:]))
+    stack = "".join(traceback.format_stack()[:-2][-12:])
+    _DATA_MIRROR_WRITES.append(detail + "\n" + stack)
+    if _MIRROR_WATCH_LOG:
+        # The per-test assertion already prints this, but only for the test
+        # that tripped it. Sweeping the whole suite needs every hit in ONE
+        # place with its test id, so offenders can be grouped by WRITER
+        # rather than read one failure at a time.
+        try:
+            import json as _json
+
+            with _ORIGINAL_OPEN(_MIRROR_WATCH_LOG, "a", encoding="utf-8") as _fh:
+                _fh.write(
+                    _json.dumps(
+                        {
+                            "kind": "intercepted",
+                            "operation": operation,
+                            "path": str(path),
+                            "current_test": os.environ.get("PYTEST_CURRENT_TEST"),
+                            "stack": stack,
+                        }
+                    )
+                    + "\n"
+                )
+        except Exception:
+            pass
     raise RuntimeError(
         f"TEST WROTE INTO THE TRACKED data/ MIRROR: {detail}\n"
         "That tree is a git-tracked cold-start mirror, not scratch space -- see "
@@ -750,6 +777,9 @@ def _install_data_mirror_write_guard() -> None:
 
     if getattr(builtins.open, "_syndicate_data_mirror_guard", False):
         return
+
+    global _ORIGINAL_OPEN
+    _ORIGINAL_OPEN = builtins.open
 
     def _guard_open(original):
         def _open(file, mode="r", *args, **kwargs):
@@ -806,6 +836,30 @@ def _install_data_mirror_write_guard() -> None:
 
         setattr(os, _name, _guarded_os_delete)
 
+    # `os.open` -- MEASURED, not theoretical. A probe that appended to a tracked
+    # mirror file with `os.open(..., O_WRONLY | O_APPEND)` PASSED under the
+    # guard and left the bytes on disk, while the identical append through
+    # `Path.open("a")` was refused with 0 bytes written. It is the seam
+    # `shutil`'s EINVAL fallback in `scripts/refresh_*_oddsapi.py` already uses
+    # (`os.open(dst, O_WRONLY | O_CREAT | O_TRUNC)`), so it was one copy-path
+    # fallback away from being taken in production code too.
+    #
+    # A READ costs one bitwise AND: `O_RDONLY` is 0, so read-only opens never
+    # reach the path check. `Path.open` reaches `io.open(..., opener=...)` which
+    # calls `os.open` underneath, so a write through it is seen twice -- but the
+    # first raise means the second check never runs.
+    _os_open = os.open
+    _os_open_write_flags = 0
+    for _flag_name in ("O_WRONLY", "O_RDWR", "O_APPEND", "O_CREAT", "O_TRUNC"):
+        _os_open_write_flags |= getattr(os, _flag_name, 0)
+
+    def _guarded_os_open(path, flags, *args, **kwargs):
+        if (flags & _os_open_write_flags) and _is_inside_tracked_data_mirror(path):
+            _record_data_mirror_write(f"os.open(flags=0x{flags:x})", path)
+        return _os_open(path, flags, *args, **kwargs)
+
+    os.open = _guarded_os_open
+
     for _name in ("replace", "rename"):
         def _guarded_os_move(src, dst, *args, _original=getattr(os, _name), _name=_name, **kwargs):
             if _is_inside_tracked_data_mirror(dst) or _is_inside_tracked_data_mirror(src):
@@ -816,6 +870,88 @@ def _install_data_mirror_write_guard() -> None:
 
 
 _install_data_mirror_write_guard()
+
+
+# ---------------------------------------------------------------------------
+# TEMPORARY ATTRIBUTION PROBE -- lane data-mirror-write-guard-sweep, 2026-09-09
+# ---------------------------------------------------------------------------
+# The interceptor above cannot see a write from a SUBPROCESS or from `os.open`.
+# Measured: a full run leaves `live_lens_2026_06_02.jsonl` one line longer and
+# rewrites `vendor/wnba_betting_repo/data/processed/schedule_2026.*`, with the
+# guard active and firing correctly on the in-process cases (control run
+# 2026-09-09: an append through `Path.open` inside a unittest.TestCase is
+# refused, 0 bytes reach disk, and it surfaces as an E).
+#
+# This polls the KNOWN victims' mtimes and records who was running when one
+# moved. It names the test even when the writer is a child process, because
+# `PYTEST_CURRENT_TEST` is set in the PARENT while it blocks on the child.
+# An EMPTY `PYTEST_CURRENT_TEST` is itself a finding: it means the write
+# happened between tests, i.e. from a thread that outlived its test.
+_MIRROR_WATCH_LOG = str(os.environ.get("SYNDICATE_TEST_MIRROR_WATCH") or "").strip()
+
+
+def _install_mirror_write_watcher() -> None:
+    if not _MIRROR_WATCH_LOG:
+        return
+    import json
+    import sys
+    import threading
+    import time as _time
+
+    repo = Path(__file__).resolve().parents[1]
+    targets = [
+        repo / "data" / "mlb_source" / "source_artifacts" / "data" / "live_lens" / "live_lens_2026_06_02.jsonl",
+        repo / "vendor" / "wnba_betting_repo" / "data" / "processed" / "schedule_2026.csv",
+        repo / "vendor" / "wnba_betting_repo" / "data" / "processed" / "schedule_2026.json",
+        repo / "reports" / "intelligence" / "intelligence_state.json",
+        repo / "reports" / "intelligence" / "intelligence_state_history.jsonl",
+        repo / "reports" / "intelligence" / "kalshi_markets.json",
+    ]
+
+    def _stamp(path: Path) -> tuple[int, int]:
+        try:
+            st = path.stat()
+            return (st.st_mtime_ns, st.st_size)
+        except OSError:
+            return (0, -1)
+
+    def _loop() -> None:
+        import traceback as _tb
+
+        seen = {p: _stamp(p) for p in targets}
+        while True:
+            for path in targets:
+                now = _stamp(path)
+                if now != seen[path]:
+                    seen[path] = now
+                    frames = []
+                    try:
+                        for tid, frame in sys._current_frames().items():
+                            frames.append(f"--- thread {tid}\n" + "".join(_tb.format_stack(frame)[-8:]))
+                    except Exception:
+                        pass
+                    record = {
+                        "path": str(path),
+                        "pid": os.getpid(),
+                        "worker": os.environ.get("PYTEST_XDIST_WORKER"),
+                        "current_test": os.environ.get("PYTEST_CURRENT_TEST"),
+                        "reports_root_env": os.environ.get("SYNDICATE_REPORTS_ROOT"),
+                        "guard_muted": _DATA_MIRROR_GUARD_MUTED["value"],
+                        "at": _time.strftime("%H:%M:%S"),
+                        "threads": frames,
+                    }
+                    try:
+                        with _ORIGINAL_OPEN(_MIRROR_WATCH_LOG, "a", encoding="utf-8") as fh:
+                            fh.write(json.dumps(record) + "\n")
+                            fh.flush()
+                    except Exception:
+                        pass
+            _time.sleep(0.2)
+
+    threading.Thread(target=_loop, name="mirror-write-watcher", daemon=True).start()
+
+
+_install_mirror_write_watcher()
 
 
 def pytest_configure(config):
@@ -898,3 +1034,112 @@ def _no_writes_into_the_tracked_data_mirror(request):
             f"({len(recorded)} operation(s)); see the block comment in "
             "tests/conftest.py.\n\n" + "\n\n".join(recorded)
         )
+
+
+# ---------------------------------------------------------------------------
+# THE FILESYSTEM SENTINEL -- what the interceptor above CANNOT see
+# ---------------------------------------------------------------------------
+# The interceptor is an in-process patch, so it names the offending test but it
+# only sees writes made by THIS interpreter through `open` / `Path.open` /
+# `os.*`. Two defects measured on 2026-09-09 went straight past it, and both
+# were real:
+#
+#   * `data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_06_02.jsonl`
+#     gained one line on every full run. The identical append through
+#     `Path.open("a")` inside a `unittest.TestCase` IS refused (control run: 0
+#     bytes reached disk, the test errored) -- so the writer was not this
+#     interpreter.
+#   * `vendor/wnba_betting_repo/data/processed/schedule_2026.{csv,json}` were
+#     rewritten from a live ESPN fetch by `schedule_adapter.py`'s
+#     `python -m wnba_betting.cli fetch-schedule` SUBPROCESS. No in-process
+#     patch can ever see that, however many seams it covers.
+#
+# So the guard is deliberately TWO instruments with different failure modes:
+# the interceptor gives attribution and cannot see a child process; the
+# sentinel sees every writer including `os.open`, a C extension and a
+# subprocess, and cannot say which test did it. Neither alone is the check --
+# a sentinel-only report with no interceptor hit is itself the finding that
+# the write came from outside this interpreter.
+#
+# It compares the git status of the guarded trees BEFORE and AFTER the session
+# and reports only what CHANGED, so the 72 pre-existing dirty entries in the
+# primary shared tree are not attributed to the run. Controller only: an xdist
+# worker would report the whole session's dirt as its own.
+_SENTINEL_ROOTS = ("data", "vendor", "reports")
+_SENTINEL_BASELINE: dict[str, str] = {}
+
+
+def _sentinel_snapshot() -> dict[str, str] | None:
+    """`path -> status` for the guarded trees, or None if git could not answer.
+
+    Returns None rather than {} on failure. An empty snapshot would read as
+    "the tree was clean", and a failed baseline followed by a real write would
+    then report every pre-existing dirty file as new -- an unknown must not
+    land on either the permissive OR the alarming branch.
+    """
+    import subprocess
+
+    try:
+        completed = subprocess.run(
+            ["git", "status", "--porcelain", "--", *_SENTINEL_ROOTS],
+            cwd=str(_REPO_ROOT_FOR_GUARD),
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except Exception:
+        return None
+    if completed.returncode != 0:
+        return None
+    out: dict[str, str] = {}
+    for line in (completed.stdout or "").splitlines():
+        if len(line) < 4:
+            continue
+        out[line[3:].strip().strip('"')] = line[:2]
+    return out
+
+
+def pytest_sessionstart(session):
+    if _DATA_MIRROR_GUARD_DISABLED or hasattr(session.config, "workerinput"):
+        return
+    snapshot = _sentinel_snapshot()
+    if snapshot is None:
+        return
+    _SENTINEL_BASELINE.clear()
+    _SENTINEL_BASELINE.update(snapshot)
+    _SENTINEL_BASELINE["__taken__"] = "1"
+
+
+def pytest_sessionfinish(session, exitstatus):
+    if _DATA_MIRROR_GUARD_DISABLED or hasattr(session.config, "workerinput"):
+        return
+    if not _SENTINEL_BASELINE.pop("__taken__", ""):
+        return  # no usable baseline -- say nothing rather than guess
+    after = _sentinel_snapshot()
+    if after is None:
+        return
+    changed = sorted(path for path, status in after.items() if _SENTINEL_BASELINE.get(path) != status)
+    if not changed:
+        return
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    lines = [
+        "",
+        "THE TEST RUN CHANGED %d TRACKED-ARTIFACT PATH(S):" % len(changed),
+        *("    %s  %s" % (after[path], path) for path in changed[:40]),
+    ]
+    if len(changed) > 40:
+        lines.append("    ... and %d more" % (len(changed) - 40))
+    lines += [
+        "",
+        "These trees are git-tracked mirrors, not scratch space -- see CLAUDE.md.",
+        "If no test above reported writing there, the writer was NOT this",
+        "interpreter: an `os.open`, a C extension, or a SUBPROCESS a test shells",
+        "out to. Redirect the write in the TEST, or mark it writes_tracked_data.",
+        "Re-run with SYNDICATE_TEST_DATA_MIRROR_GUARD=off to mute both halves.",
+        "",
+    ]
+    if reporter is not None:
+        reporter.write_line("\n".join(lines), red=True)
+    else:
+        print("\n".join(lines))
+    session.exitstatus = 1

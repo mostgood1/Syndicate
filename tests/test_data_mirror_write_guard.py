@@ -286,3 +286,99 @@ def test_the_vendored_schedule_fetch_is_blocked_at_the_floor(data_mirror_write_g
     # rewrites a tracked file.
     assert getattr(fetch, "return_value", None) is False, fetch
     assert fetch("wnba") is False
+
+
+# ---------------------------------------------------------------------------
+# The two seams the first version of this guard did not cover.
+# ---------------------------------------------------------------------------
+
+
+def test_os_open_for_writing_is_refused_and_recorded(data_mirror_write_guard):
+    """`os.open` was the documented hole, and it was a REAL one.
+
+    MEASURED 2026-09-09, before this was closed: a probe test that appended to
+    a tracked mirror file with `os.open(..., O_WRONLY | O_APPEND)` PASSED and
+    left the bytes on disk, while the identical append through `Path.open("a")`
+    in the same style of test was refused with nothing written. `shutil`'s
+    EINVAL fallback in `scripts/refresh_*_oddsapi.py` copies through exactly
+    this call, so it was one fallback away from being a production path too.
+    """
+    target = REPO_ROOT / "data" / "_write_guard_selfcheck_os_open.jsonl"
+
+    with pytest.raises(RuntimeError, match="TRACKED data/ MIRROR"):
+        os.open(str(target), os.O_WRONLY | os.O_CREAT | os.O_APPEND)
+
+    recorded = data_mirror_write_guard.consume()
+    assert len(recorded) == 1, recorded
+    assert "os.open" in recorded[0]
+    assert not target.exists()
+
+
+def test_os_open_for_reading_the_mirror_is_not_reported(data_mirror_write_guard):
+    """The split is OPERATION, not path -- reads of the mirror must stay free.
+
+    This is the assertion that keeps the `os.open` wrapper from condemning the
+    92 tests that read this tree on purpose: `O_RDONLY` is 0, so a read never
+    even reaches the path check.
+    """
+    existing = next((REPO_ROOT / "data" / "mlb_source").rglob("*.json"), None)
+    if existing is None:
+        pytest.skip("this worktree has no data/ mirror to read (see session_worktree.py)")
+
+    # A FILE, not the directory: Windows refuses `os.open` on a directory with
+    # EACCES, which would fail this test for a reason that has nothing to do
+    # with the guard.
+    fd = os.open(str(existing), os.O_RDONLY)
+    os.close(fd)
+    assert data_mirror_write_guard.consume() == []
+
+
+@pytest.mark.parametrize(
+    "relative, inside",
+    [
+        ("vendor/wnba_betting_repo/data/processed/schedule_2026.csv", True),
+        ("vendor/nba_betting_repo/data/processed/x.json", True),
+        ("vendor/mlb_bettingv2/data/x.json", True),
+        # Vendor SOURCE is not an artifact mirror; guarding it would fire on
+        # every test that writes a scratch file beside vendored code.
+        ("vendor/wnba_betting_repo/app.py", False),
+        ("vendor/wnba_betting_repo/src/wnba_betting/cli.py", False),
+    ],
+)
+def test_vendor_data_trees_are_guarded_and_vendor_source_is_not(data_mirror_write_guard, relative, inside):
+    """`vendor/*/data/` is the same defect one directory over.
+
+    MEASURED: a full run rewrote all 114 rows of the TRACKED
+    `vendor/wnba_betting_repo/data/processed/schedule_2026.csv` and its `.json`
+    sibling, from a live ESPN fetch, on every run.
+    """
+    assert data_mirror_write_guard.classifies_as_mirror(REPO_ROOT / relative) is inside
+
+
+def test_every_tracked_vendor_data_tree_is_covered(data_mirror_write_guard):
+    """A guard pointed at a subset of the trees reads healthy forever.
+
+    Derives the expectation from what is actually TRACKED rather than from a
+    hand-written list, so a vendor tree added later fails this test instead of
+    being silently unguarded.
+    """
+    import subprocess
+
+    completed = subprocess.run(
+        ["git", "ls-files", "--", "vendor/*/data"],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if completed.returncode != 0:
+        pytest.skip("git unavailable")
+    tracked_trees = {
+        "/".join(line.split("/")[:3]) for line in (completed.stdout or "").splitlines() if line.strip()
+    }
+    if not tracked_trees:
+        pytest.skip("this worktree has no vendor data checked out")
+
+    guarded = {os.path.normcase(root) for root in data_mirror_write_guard.mirror_roots()}
+    for tree in sorted(tracked_trees):
+        assert os.path.normcase(str(REPO_ROOT / tree)) in guarded, tree
