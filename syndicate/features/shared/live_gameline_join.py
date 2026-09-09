@@ -524,6 +524,54 @@ def _min_sims() -> int:
     return value if value > 0 else _DEFAULT_MIN_SIMS
 
 
+REASON_PUBLISH_DISABLED = "model_edge_publishing_disabled_for_sport"
+
+
+def publishing_disabled_for_sport(sport: Any) -> bool:
+    """Is model-vs-market edge publication switched OFF for this sport?
+
+    **THIS IS NOT A PRECISION DECISION AND MUST NOT BE EXPRESSED AS ONE.** The
+    same effect is reachable by setting `min_edge_pp` to something enormous, and
+    that would be wrong: every counter and every ledger row would then read as
+    "the edge was too small to trust", when the actual statement is "we do not
+    believe this model". The refusal is the feature, so it gets its own name --
+    `REASON_PUBLISH_DISABLED` -- and a reader can tell the two apart forever.
+
+    **PER SPORT, BECAUSE THE EVIDENCE IS PER SPORT.** `min_edge_pp` is global and
+    sport-blind. Using it here would silence WNBA and soccer on MLB-only
+    evidence, and `state.md` records WNBA's live model BEATING the market
+    (-0.12504, thin and selected) while soccer TRAILS (+0.10767). Reading a
+    shared refusal's SCOPE as if it were the scope of the evidence is the error
+    `learnings.md` 2026-09-06 forbids.
+
+    **WHY MLB IS SET, measured over 252 games / 19 dates on the raw h2h ledger
+    against StatsAPI finals** (`deploys.md`, `state.md`): pooled fresh-cut
+    +0.00905 with a bootstrap-over-games CI of [+0.00154, +0.01686] -- it
+    excludes zero, so the model is behind and the sample is no longer
+    under-powered. The deficit is RESOLUTION, not calibration (reliability gap
+    CI spans zero; resolution is 92-98% of the gap at every bin count), which
+    closes recalibration at a 6.5% ceiling. No subpopulation survives
+    leave-one-date-out, and the model/market blend is significantly WORSE out of
+    sample. There is no remaining cheap fix, so publication stops.
+
+    **PUBLICATION STOPS; MEASUREMENT DOES NOT.** A disabled row is still built,
+    still carries its probabilities, and is still written to the ledger as
+    non-priceable. The denominator survives, the model keeps being scored, and
+    the `pregame_home_win_prob` shrink-toward-prior test stays possible.
+
+    DEFAULT OFF. An unset or empty env leaves every sport exactly as it is.
+    """
+    key = str(sport or "").strip().lower()
+    if not key:
+        # UNKNOWN MUST NOT TAKE THE PERMISSIVE BRANCH IN EITHER DIRECTION. An
+        # absent sport cannot be shown to be disabled, so it is not -- but it is
+        # also not silently disabled, which would suppress a sport nobody named.
+        return False
+    raw = str(os.environ.get("SYNDICATE_LIVE_GAMELINE_PUBLISH_DISABLED_SPORTS") or "")
+    disabled = {s.strip().lower() for s in raw.split(",") if s.strip()}
+    return key in disabled
+
+
 def min_edge_pp() -> float:
     """An ABSOLUTE floor under the publish bar, in percentage points.
 
@@ -907,6 +955,7 @@ def price_moneyline(
     sims: Any,
     sigma: float = PRICEABLE_SIGMA,
     analytic_std_err: Any = None,
+    sport: Any = None,
 ) -> dict[str, Any]:
     """Price one side, or refuse it by name.
 
@@ -1012,6 +1061,16 @@ def price_moneyline(
         out["withheld_reason"] = REASON_NOT_PRICEABLE
         return out
 
+    # THE PUBLISH SWITCH, APPLIED LAST ON PURPOSE. Everything above still runs,
+    # so `edge_pp`, `prob_std_err` and the precision verdict are all computed and
+    # recorded exactly as before -- only the final `priceable` is withheld. Put
+    # earlier, this would blank the fields the ledger scores the model on, and
+    # turning publication off would destroy the evidence needed to ever turn it
+    # back on.
+    if publishing_disabled_for_sport(sport):
+        out["withheld_reason"] = REASON_PUBLISH_DISABLED
+        return out
+
     out["priceable"] = True
     return out
 
@@ -1100,6 +1159,7 @@ def price_analytic_line_market(
             sims=None,
             sigma=sigma,
             analytic_std_err=totals_sigma,
+            sport=sport,
         )
     if market_key not in _ANALYTIC_PRICEABLE_MARKETS:
         return None
@@ -1132,6 +1192,7 @@ def price_analytic_line_market(
         sims=None,
         sigma=sigma,
         analytic_std_err=analytic_std_err,
+        sport=sport,
     )
     return verdict
 
@@ -1319,6 +1380,7 @@ def attach_live_gamelines(
     index: Mapping[tuple[str, str], Mapping[str, Any]],
     *,
     segment_index: Mapping[tuple[str, str], Mapping[str, Any]] | None = None,
+    sport: Any = None,
 ) -> dict[str, Any]:
     """Overlay the live game-line projection on live moneyline rows.
 
@@ -1527,6 +1589,9 @@ def attach_live_gamelines(
                     market=market_key,
                     market_prob=projection.get("market_fair_prob_over"),
                     sims=hit.get("sims_run"),
+            # SPORT-SCOPED PUBLISH SWITCH. Threaded rather than read from a
+            # global, so disabling MLB cannot silence WNBA or soccer.
+            sport=sport,
                 )
             _apply_verdict(row, projection, verdict, hit, coverage,
                            live_projected=verdict.get("model_prob"))

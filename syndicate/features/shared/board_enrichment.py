@@ -1687,7 +1687,7 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                     "reason": "no soccer match in play in any league's live-state artifact",
                     "rows_live_gameline_edged": 0,
                 }
-            coverage = attach_live_gamelines(grid, index)
+            coverage = attach_live_gamelines(grid, index, sport=sport)
         else:
             snapshot = read_json_file(data_root() / "live" / f"{sport}_live_lens.json")
             if not isinstance(snapshot, dict):
@@ -1742,6 +1742,9 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                     sport=sport,
                 ),
                 segment_index=segment_index,
+                # SPORT-SCOPED PUBLISH SWITCH, same value the index already
+                # carries. Threaded so disabling one sport cannot silence another.
+                sport=sport,
             )
             if segment_index is not None:
                 coverage["segment_index_size"] = len(segment_index)
