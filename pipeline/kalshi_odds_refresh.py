@@ -49,7 +49,7 @@ from __future__ import annotations
 
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -303,6 +303,172 @@ MAX_MARKETS_PER_SERIES = 400
 # and the total cut are ALWAYS printed, so this bounds the log without letting a
 # partial list impersonate a complete one.
 MAX_CAP_COST_SERIES = 12
+
+# SPEND THE SAME 400 BETTER. The cap is not the defect; `markets[:400]` is.
+#
+# The slice is DATE-BLIND, so which rungs survive is whichever order Kalshi
+# happened to answer in. RE-MEASURED HERE, on the mirrored production artifact
+# of the 2026-09-08T18:41:03Z tick (a parallel lane's 1,967/1,567 was a
+# different tick, so this is the number this code was written against):
+#
+#   KXNCAAFTOTAL  fetched 1577  kept 400 -- ALL of them 2026-09-12
+#   listed that tick: 09-10: 19, 09-11: 95, 09-12: 1444, 09-13: 19
+#
+# So the slice destroyed 114 of 114 rungs of the two NEAREST game dates while
+# spending all 400 slots on Saturday, and that ceiling sits UPSTREAM of every
+# Kalshi coverage and match-rate number anyone has quoted. It is NOT uniform:
+# the other three capped series on that tick were already date-ordered by
+# arrival and this rule keeps them byte-identical.
+#
+# Raising the cap is the wrong fix and the module already refuses it:
+# `KEYVALUE_WRITE_REJECTED ... Shrink the payload rather than raising the
+# ceiling`. So the budget stays and the SELECTION changes.
+#
+# `SYNDICATE_KALSHI_PRECAP_DATE_AWARE` -- ABSENT MEANS THE OLD ARBITRARY SLICE.
+# This changes which markets production prices against, so it is switchable and
+# `PRECAP_SELECT mode=` names which rule ran on every capped tick.
+DEFAULT_PRECAP_WINDOW_AHEAD_DAYS = 2
+DEFAULT_PRECAP_WINDOW_BACK_DAYS = 1
+# Slots a mixed series holds for markets whose GAME DATE cannot be read.
+#
+# NOT ZERO, AND THAT IS THE WHOLE DECISION. Dropping undated markets was tried
+# and reverted (see the note above `_lean_market`'s call site): PLAYER PROPS
+# SKIP THE JOIN'S DATE CHECK ENTIRELY, so a prop whose ticker shape does not
+# parse is joinable while being undatable, and evicting it would repeat this
+# very defect in a new place. `undated=569` appears in the daily book counters
+# every tick, so the population is real rather than hypothetical.
+#
+# 10% of the cap. A series that is ENTIRELY undated -- a futures ladder -- is
+# unaffected either way: it has no in-window markets to lose the slots to, so
+# it fills all 400 regardless. The reserve only bites on a MIXED series, which
+# is exactly the case where a date-first order would otherwise starve the
+# unparseable props out of existence.
+PRECAP_UNDATED_RESERVE = 40
+
+
+def precap_date_aware_enabled() -> bool:
+    """OFF unless set. Absent is the old date-blind `markets[:400]`."""
+    raw = os.environ.get("SYNDICATE_KALSHI_PRECAP_DATE_AWARE")
+    if raw is None:
+        return False
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _precap_window_days(name: str, default: int) -> int:
+    """A bad value falls back to the default, never to zero.
+
+    `int("")` into a bare except returning 0 would silently narrow the window
+    to today alone -- a typo becoming a data-loss policy, which is the shape
+    `refresh_interval_seconds` already guards against.
+    """
+    raw = os.environ.get(name)
+    try:
+        parsed = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed >= 0 else default
+
+
+def board_window_dates(now: datetime | None = None) -> tuple[str, str]:
+    """The `YYYY-MM-DD` range a board build can plausibly ask for, inclusive.
+
+    EASTERN, because `game_date_from_ticker` reads Kalshi's own event segment
+    and Kalshi dates events in `America/New_York` -- the same reason
+    `kalshi_catalogue` localises its start times there. Reading "today" in UTC
+    would move the window a day early for every evening slate.
+
+    A day BACK as well as forward: a board can still be serving a game whose ET
+    date has rolled over, and the cost of one extra in-window day is that the
+    tie-break sorts it last, not that it displaces anything.
+    """
+    try:
+        from zoneinfo import ZoneInfo
+
+        current = (now or datetime.now(timezone.utc)).astimezone(ZoneInfo("America/New_York"))
+    except Exception:  # noqa: BLE001 -- a missing tzdata must not stop the cut
+        current = now or datetime.now(timezone.utc)
+    today = current.date()
+    back = _precap_window_days(
+        "SYNDICATE_KALSHI_PRECAP_WINDOW_BACK_DAYS", DEFAULT_PRECAP_WINDOW_BACK_DAYS
+    )
+    ahead = _precap_window_days(
+        "SYNDICATE_KALSHI_PRECAP_WINDOW_AHEAD_DAYS", DEFAULT_PRECAP_WINDOW_AHEAD_DAYS
+    )
+    return (
+        (today - timedelta(days=back)).isoformat(),
+        (today + timedelta(days=ahead)).isoformat(),
+    )
+
+
+def select_markets_for_cap(
+    markets: Sequence[Mapping[str, Any]],
+    cap: int,
+    window: tuple[str, str],
+    *,
+    date_aware: bool,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, int]]:
+    """Choose which `cap` markets survive. Returns `(kept, cut, counters)`.
+
+    SAME BUDGET, DIFFERENT SELECTION. `len(kept)` is `min(len(markets), cap)`
+    under both modes -- the payload cannot grow, which is the constraint the
+    keyvalue refusal imposes -- and under the cap the input is returned
+    unchanged in both.
+
+    ORDER OF PREFERENCE when capping, most board-relevant first:
+
+      1. a reserved minority for UNDATED markets (see `PRECAP_UNDATED_RESERVE`)
+      2. dated INSIDE the board window, nearest date first
+      3. the remaining undated
+      4. dated outside it -- nearest FUTURE first, then the recent past
+
+    The kept set is emitted in the INPUT'S OWN ORDER, not in priority order.
+    Nothing downstream should depend on market order, and a selection change
+    that also reorders makes an unrelated regression impossible to attribute.
+    """
+    from syndicate.features.shared.kalshi_catalogue import game_date_from_ticker
+
+    rows = list(markets)
+    start, end = window
+    dates = [game_date_from_ticker((m or {}).get("ticker")) for m in rows]
+
+    counters = {
+        "fetched": len(rows),
+        "kept": min(len(rows), cap),
+        "cut": max(0, len(rows) - cap),
+    }
+    if len(rows) <= cap:
+        keep_index = set(range(len(rows)))
+    elif not date_aware:
+        keep_index = set(range(cap))
+    else:
+        in_window: list[int] = []
+        undated: list[int] = []
+        future: list[int] = []
+        past: list[int] = []
+        for idx, day in enumerate(dates):
+            if day is None:
+                undated.append(idx)
+            elif start <= day <= end:
+                in_window.append(idx)
+            elif day > end:
+                future.append(idx)
+            else:
+                past.append(idx)
+        in_window.sort(key=lambda i: (dates[i], i))
+        future.sort(key=lambda i: (dates[i], i))
+        past.sort(key=lambda i: (dates[i], i), reverse=True)
+        reserve = min(len(undated), PRECAP_UNDATED_RESERVE)
+        priority = undated[:reserve] + in_window + undated[reserve:] + future + past
+        keep_index = set(priority[:cap])
+
+    kept = [rows[i] for i in range(len(rows)) if i in keep_index]
+    cut = [rows[i] for i in range(len(rows)) if i not in keep_index]
+    for label, group in (("kept", keep_index), ("cut", set(range(len(rows))) - keep_index)):
+        counters[f"{label}_in_window"] = sum(
+            1 for i in group if dates[i] is not None and start <= dates[i] <= end
+        )
+        counters[f"{label}_undated"] = sum(1 for i in group if dates[i] is None)
+    return kept, cut, counters
 
 
 def request_spacing_seconds() -> float:
@@ -1015,24 +1181,44 @@ def _run_kalshi_odds_refresh_unbounded(*, force: bool = False) -> dict[str, Any]
     # it recovers close to nothing. Same code either way, opposite verdicts, and
     # nothing already logged separates them.
     cap_cost: list[tuple[int, str, int, dict[str, int]]] = []
+    # WHICH 400 SURVIVE, and what the losers were. `cap_cost` says what date the
+    # cut markets carried; this says whether the cut was AVOIDABLE -- a cut
+    # market inside the board window is a rung the join could have priced and
+    # now cannot, while a cut December future costs nothing. That is the number
+    # a future session needs to judge whether 400 is still the right budget, and
+    # the old slice could not produce it.
+    precap_select: list[tuple[int, str, dict[str, int]]] = []
+    precap_window = board_window_dates()
+    precap_date_aware = precap_date_aware_enabled()
+    # The kept lists, reused by the persistence shrink below so the ARTIFACT and
+    # the working set hold the same 400. Selecting twice by two rules would give
+    # the board a different set from the one this tick's join measured.
+    kept_by_series: dict[str, list[dict[str, Any]]] = {}
     for series in wanted:
         entry = per_series.get(series) or {}
         markets = list(entry.get("markets") or [])
         full_markets.extend(markets)
         if len(markets) > MAX_MARKETS_PER_SERIES:
-            trimmed += len(markets) - MAX_MARKETS_PER_SERIES
+            markets, cut_markets, select_counts = select_markets_for_cap(
+                markets,
+                MAX_MARKETS_PER_SERIES,
+                precap_window,
+                date_aware=precap_date_aware,
+            )
+            trimmed += select_counts["cut"]
+            precap_select.append((select_counts["cut_in_window"], series, select_counts))
             # THE CUT SLICE, before it stops existing. Dated with the SAME
             # function the join uses, so the two numbers are comparable; an
             # undatable ticker is named rather than dropped, for the reason
             # `board_by_game_date` gives at length.
             cut_dates: dict[str, int] = {}
-            for cut_market in markets[MAX_MARKETS_PER_SERIES:]:
+            for cut_market in cut_markets:
                 cut_date = game_date_from_ticker(cut_market.get("ticker")) or "<undatable_ticker>"
                 cut_dates[cut_date] = cut_dates.get(cut_date, 0) + 1
             cap_cost.append(
-                (len(markets) - MAX_MARKETS_PER_SERIES, series, len(markets), cut_dates)
+                (select_counts["cut"], series, select_counts["fetched"], cut_dates)
             )
-            markets = markets[:MAX_MARKETS_PER_SERIES]
+            kept_by_series[series] = markets
         age = _seconds_since(entry.get("fetched_at"))
         if age is not None:
             staleness[series] = int(age)
@@ -1051,6 +1237,41 @@ def _run_kalshi_odds_refresh_unbounded(*, force: bool = False) -> dict[str, Any]
             f" cut_total={sum(item[0] for item in cap_cost)}"
             f" shown={len(shown)}"
             f" detail={ {series: {'fetched': fetched, 'cut': cut_n, 'cut_by_date': dates} for cut_n, series, fetched, dates in shown} }",
+            flush=True,
+        )
+
+    # OFF AND ON BOTH PRINT THIS, and the numbers differ -- that is the
+    # reachability proof. `mode=` names the rule that actually ran, so a flag
+    # believed on and inert is readable rather than inferred; `learnings.md`
+    # calls the alternative instrument blindness.
+    #
+    # `cut_in_window` is the whole point of the line. It is the count of rungs
+    # the join could have priced and cannot, which under `mode=arrival` is what
+    # the old slice was throwing away and under `mode=date_aware` should fall to
+    # zero unless a single series' in-window ladder alone exceeds the budget.
+    #
+    # READ IT BESIDE `PRECAP_CUT_BY_DATE`, NOT ALONE. A WEEKLY sport has nothing
+    # inside a today+2 window on a Tuesday, so `cut_in_window=0` there means
+    # "the cut was all forward games", not "the cut was free" -- measured
+    # 2026-09-08, `KXNCAAFTOTAL` cut 1,044 rungs of the coming Saturday with
+    # zero in-window. The date histogram beside it is what carries that.
+    if precap_select:
+        precap_select.sort(reverse=True)
+        shown_sel = precap_select[:MAX_CAP_COST_SERIES]
+        print(
+            "[kalshi_odds] PRECAP_SELECT"
+            f" mode={'date_aware' if precap_date_aware else 'arrival'}"
+            f" window={precap_window[0]}..{precap_window[1]}"
+            f" cap={MAX_MARKETS_PER_SERIES}"
+            f" undated_reserve={PRECAP_UNDATED_RESERVE}"
+            f" capped_series={len(precap_select)}"
+            f" fetched_total={sum(item[2]['fetched'] for item in precap_select)}"
+            f" kept_total={sum(item[2]['kept'] for item in precap_select)}"
+            f" cut_total={sum(item[2]['cut'] for item in precap_select)}"
+            f" kept_in_window_total={sum(item[2]['kept_in_window'] for item in precap_select)}"
+            f" cut_in_window_total={sum(item[2]['cut_in_window'] for item in precap_select)}"
+            f" shown={len(shown_sel)}"
+            f" detail={ {series: counts for _, series, counts in shown_sel} }",
             flush=True,
         )
 
@@ -1154,7 +1375,17 @@ def _run_kalshi_odds_refresh_unbounded(*, force: bool = False) -> dict[str, Any]
         if not markets:
             continue
         if len(markets) > MAX_MARKETS_PER_SERIES:
-            markets = markets[:MAX_MARKETS_PER_SERIES]
+            # THE SAME 400 THE WORKING SET KEPT, not a second date-blind slice.
+            # This is the copy the BOARD reads back (`markets_from_state`), so
+            # leaving it on the old rule would have made the selection change
+            # invisible to the only consumer that matters -- the fix would have
+            # measured itself and shipped nothing.
+            markets = kept_by_series.get(series) or select_markets_for_cap(
+                markets,
+                MAX_MARKETS_PER_SERIES,
+                precap_window,
+                date_aware=precap_date_aware,
+            )[0]
         entry["markets"] = [_lean_market(m) for m in markets]
 
     print(
