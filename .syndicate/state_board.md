@@ -822,3 +822,44 @@ and both verified here before being accepted.**
    is easy to drop from this list**: the framing this defect arrived under said
    "MLB and WNBA", and soccer was found only by measuring. Read (4) as "NCAAF adds
    a new population", never as "the label was never wrong".
+
+## [coverage-report-artifact] THE DATA-COVERAGE PAGE IS ARTIFACT-BACKED — worker publishes, web reads, and the cross-service read is PROVEN `[verified 2026-09-09 on production, both services `44499cb0`]`
+
+`/intelligence/status` renders `intelligence_status.html` again. It 302'd to
+`/api/intelligence/status` from 2026-06-10 (`5aeb8075`) until 2026-09-09 — and
+that target serves the **board state, not coverage**, so the board's "Data
+coverage" pill answered a different question in unrendered JSON while the
+template sat orphaned with no caller.
+
+**IT WAS NOT RESTORED BY REVERTING, AND MUST NOT BE.** The old body called
+`build_intelligence_status()`, recorded at `pipeline/intelligence_state.py` as
+**"confirmed live to single-handedly exceed the refresh-worker's 2GB memory
+limit"** (2026-07-24) *with* `skip_game_hydration=True`. Web is also 2GB, its
+gunicorn workers measured 527 MB / 491 MB resident. That call must never sit on
+a request path.
+
+Instead: `syndicate/features/shared/coverage_report_artifact.py` projects the
+status to exactly the fields the template renders, and the intelligence-state
+loop publishes it **at the one call site that already holds a built status** —
+so it costs a projection and a write, no computation. Web reads it; absent,
+stale or wrong-date renders a degraded state that SAYS so.
+
+**The cross-service read is proven, not assumed.** A local end-to-end test
+proves nothing here: locally `_state_backend_kind()` is `filesystem`, one
+process on one disk. Production is two services that cannot share a disk.
+Checked from the live env-vars API before deploying — both carry
+`SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` and the same store URL; web sets
+`SYNDICATE_REFRESH_STATE_NAMESPACE=syndicate` and refresh-worker omits it, which
+resolves to the **same** prefix because `_state_namespace()` defaults to
+`"syndicate"`. `coverage_report.json` hits no `_KEYVALUE_EXCLUDED_PATH_MARKERS`
+entry. Then verified on the served page: **"Published 13:50:39"**, a timestamp
+the worker wrote and web read.
+
+**Still a miss, and separate:** `STATUS_CACHE_PATH`
+(`reports/intelligence/status_response_cache.json`) has **zero writers**
+repo-wide — read at `intelligence_state.py:5173`, written nowhere — so
+`_load_cached_status_payload` never hits and the worker pays the expensive
+build every tick. Untouched by this lane; see `leads.md`.
+
+**UNVERIFIED:** the staleness branch (`DEFAULT_MAX_AGE_SECONDS`, 6 h). Unit
+tested, never seen in production.

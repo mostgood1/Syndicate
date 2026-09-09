@@ -430,3 +430,40 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
   **Until a worker deploy carries it, production still fabricates.**
 
 ---
+
+## [brand-marks-and-error-pages] TWO BRAND MARKS, SPLIT BY RENDER SIZE — and the app finally has error pages `[verified 2026-09-09, lane brand-mascot-logo, live on web]`
+
+**Two marks, and they are not interchangeable.** The split was measured on
+16/32/64/128/512 contact sheets before anything was wired, not chosen:
+
+- **wordmark's S** (`syndicate-logo.png`, squared) — clean at 32px, legible at
+  16px on a light AND a dark tab strip. Owns the **browser chrome**
+  (`favicon-48/32/16.png`, `favicon.ico`) and the **header lockup on every
+  page**, which is unchanged.
+- **mascot crest** (`syndicate-crest.jpg` / `syndicate-mascot*.png`) —
+  unreadable at 32px and mud at 16px, in BOTH full-art and a tight hood-only
+  crop. Owns every slot that renders large: `apple-touch-icon.png`, the PWA
+  192/512 icons, the `og:`/`twitter:` card, and four page surfaces —
+  `/syndicate` hero, market-board masthead, the error page, and
+  `/intelligence/status`.
+
+**There is deliberately NO `favicon.svg`.** The obvious source,
+`syndicate-logo.svg`, **is not the logo** — rendered at 240px beside the PNG it
+draws two parallel bars where the real mark is an interlocking S, and sets the
+wordmark in Arial. Nothing in the app references that file. A scalable icon
+needs the mark re-vectorised first.
+
+Rebuild every asset with `py -3 scripts/build_brand_assets.py` (master art at
+`docs/brand/syndicate-mascot-source.png`, outside `static/`, never served). It
+reproduces all nine byte-identically.
+
+**THE APP NOW HAS ERROR PAGES. It had NONE before 2026-09-09** — `grep
+errorhandler` over `app.py` and every blueprint returned nothing, so a typo'd
+URL and an unhandled exception both served Werkzeug's bare white default. One
+parameterised template (`errors/error.html`) extending `shared/base.html`, so
+both codes keep the nav. **The content type is negotiated and that is the
+load-bearing part**: 213 `/api/...` routes have callers that parse JSON, so
+`/api/` prefix and an Accept check decide, with a TIE resolving to HTML
+(`Accept: */*` from curl and most clients scores html and json equally). A
+route's own `abort(404, description=...)` message survives — soccer's
+unknown-league 404 still names every valid league.

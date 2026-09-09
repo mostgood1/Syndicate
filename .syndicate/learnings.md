@@ -4878,3 +4878,72 @@ different state than it found it** — and the general form, contributed by the
 sibling lane, is that A SELF-CHECK FOR A GUARD MUST ASSERT THE GUARD IS INSTALLED
 BEFORE IT EXERCISES THE GUARDED PATH, or the check's own failure mode is to
 perform the damage it exists to detect.
+
+## 2026-09-09 FORBIDDEN: trusting a LOCAL end-to-end test of a producer/reader pair that crosses SERVICES. Locally the state backend is `filesystem` — one process, one disk — so the test proves the code and says nothing about whether the two services share a store `[lane intelligence-coverage-artifact, commit 5c7af861]`
+
+**What we believed.** The new coverage artifact was proven: the worker-side
+publish and the web-side read were exercised end to end, and BOTH states were
+observed — the page said "No coverage report published for this date yet", then
+the loop logged `PUBLISHED date=2026-09-09 sports=8` and the page showed
+"Published 13:12:20". That is a genuinely discriminating local reading.
+
+**What was actually true.** It was a reading about the CODE, not the
+DEPLOYMENT. `_state_backend_kind()` returns `filesystem` locally, so producer
+and reader were one process writing and reading one disk. In production they are
+two services, and *Render's disk cannot be shared between them* — the whole
+reason `refresh_state_store` exists. The local pass would have looked identical
+if the artifact were per-service disk, which would have made the page
+permanently degraded in production while every test stayed green.
+
+**How we found out.** Asking, before deploying web, which paths
+`_keyvalue_backed()` actually covers — then reading the LIVE env-vars API for
+both services rather than `render.yaml`. Backend and store URL matched. The
+namespace did NOT look symmetric: web sets
+`SYNDICATE_REFRESH_STATE_NAMESPACE`, refresh-worker omits it. That resolved
+safely only because `_state_namespace()` defaults to exactly web's value
+(`"syndicate"`). Had the default been anything else, the deploy would have gone
+green and the artifact would have been written under one prefix and read under
+another.
+
+**The rule going forward.** For any artifact one service writes and another
+reads, three things get checked on the LIVE services before the deploy, not
+after: (1) the path is keyvalue-backed — no `_KEYVALUE_EXCLUDED_PATH_MARKERS`
+hit; (2) `SYNDICATE_REFRESH_STATE_BACKEND` and `..._URL` match on both; (3) the
+NAMESPACE resolves to the same string on both, **including when one side omits
+the key and falls back to a default**. An asymmetric env var is not
+automatically a bug and not automatically fine — resolve it to a value.
+
+**And the generalisation of the near-miss:** a fallback default that happens to
+equal the other side's explicit value is a correct system for an accidental
+reason. It is worth writing down precisely because nothing in the code says the
+two must agree.
+
+## 2026-09-09 A REPLACEMENT THAT IS LESS INFORMATIVE THAN WHAT IT REPLACED IS A REGRESSION, however much better it looks. A generic branded 404 discarded the route's own `abort(404, description=...)` `[lane brand-mascot-logo, commit 00902dd1]`
+
+**What we believed.** Adding the app's first-ever error pages was a pure gain —
+before them a typo'd URL served Werkzeug's bare white default, with no nav and
+no way back.
+
+**What was actually true.** Some routes 404 with something far better than a
+generic page can say. Soccer's unknown-league gate aborts with a description
+naming every valid league slug; the new handler threw that away and printed
+boilerplate. Strictly worse than the ugly page it replaced, for that route.
+
+**How we found out.** `tests/test_soccer_blueprint_routes.py::
+test_the_404_names_the_valid_leagues` — a test written for a different reason
+that happened to pin the message. Nothing in review caught it, and the page
+looked good.
+
+**The rule going forward.** When replacing a generic surface with a branded one,
+enumerate what the OLD surface carried that the new one drops. For HTTP errors
+specifically: read `HTTPException.description` and prefer it, comparing against
+the **class default** rather than truthiness — werkzeug always populates that
+field, so a truthiness check silently prints its boilerplate instead of yours.
+
+**Two sibling defects in the same change, both found by probe rather than
+review, both the same shape — an instrument that cannot vary:** the 500 log line
+printed `type(exc).__name__`, which Flask makes the constant
+`InternalServerError` on every 500 ever logged (the cause lives in
+`original_exception`); and `Accept: */*` scores html and json equally, so a `>=`
+comparison tied and fell to JSON, making `curl` on an HTML path return a JSON
+body. A tie is not a preference.
