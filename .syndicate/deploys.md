@@ -29499,3 +29499,22 @@ refusals and a post-deploy ceiling of zero. Re-take READING 1 tomorrow after
 - when the reading can be taken: NCAAF's pregame cadence is `interval_s=28800` (8h), far slower than NFL's 7200s, so the first flagged write may be hours away. Verify by ARTIFACT -- `ncaaf_source/.../book_quotes/<date>.jsonl` carrying rows with `player_name` -- never by log absence: these writers run as sweep children with `stdout=DEVNULL` and their print CANNOT reach Render's logs.
 - projected when it does fire, from the agent's measurement of the live week shards (17,012 quote keys, 76 events): 09-10 +18, 09-11 +172, 09-12 +526, and a full Saturday ~+2,136 props on 650 game rows = 2,786 total, **46.4% of `BOOK_GRID_ARTIFACT_MAX_ROWS=6000`**. `per_sport_limit=2000` is a PER-SPORT allocation, so NCAAF saturating it truncates only NCAAF's own tail and cannot cost MLB or soccer a row.
 - watch item, not a blocker: NCAAF date shards are already the largest in the tree (`2026-09-05.jsonl` 97 MB, `2026-09-12` 37 MB) and this adds ~27 MB of prop capture across them. A disk and publish-volume question, not a row-cap one.
+
+### nfl-props-autorun-e2e 2026-09-09 -- WEEK-1 PROP ARTIFACT REBUILT ON NEAR-FINAL LINES; BOARD 1,452 -> 1,999 CARDS. NO DEPLOY, NO CODE CHANGE.
+- **This is a DATA refresh, not a deploy.** Scheduled task `nfl-wk1-prop-artifact-refresh`, run offline from worktree `nfl-props-autorun-e2e` on `8af323cc` (origin/main). Nothing was deployed and no service commit moved. The producer is the offline run by design -- refresh-worker cannot build this (`nfl_source/tracking/nflverse/pbp/pbp_2025.csv` is 97.9 MB against a 12 MiB publish ceiling and is in neither allowlist).
+- **THE ODDS CAPTURE WAS PULLED FIRST, and it had moved -- rebuilding without it would have achieved nothing.** `pull_streamed_artifact('nfl_source/oddsapi_player_props_2026_wk1.csv')` -> `STREAM_PULL_OK bytes=990835`. Local file **880,776 B (2026-09-08 17:02:02 CDT) -> 990,835 B**, 6,695 quote rows. That is +110,059 B of fresh quotes in ~23h.
+- **BUILD:** `odds_rows 2886  sim_rows 1126  entities 250`, `rate_sources {'prior_season_fallback': 1126}`, `refused_wrong_team=217 refused_unknown_team=0`, `PUBLISH_OK ... bytes=515770`. Against the task's pre-registered expectation of `~2400 / ~960 / ~250`: odds and sim rows are HIGHER (more lines quoted as kickoff nears), entities on the nose. No `REFUSED reason=zero_sim_rows`.
+- **verify: THE ARTIFACT PRODUCTION HOLDS IS THE ONE THIS RUN BUILT, read back from production, not inferred from the exit code.** `GET /api/ops/artifacts/stream?path=nfl_source/nfl_prop_projections_2026_wk1.json` with a Bearer ADMIN_TOKEN returns `generated_at 2026-09-09T21:41:48.863298+00:00` (**16:41:48 CDT, 2h38m before the 19:20 CDT kickoff**) and `row_count 1126` -- matching the build's `sim_rows` exactly.
+- **verify: SERVED BOARD, `/nfl/api/props?season=2026&week=1`, cards counted under `rank_cards` (`card_sections` is 0 on this route and reading it is what made a previous session call a healthy board dead):**
+
+  | | before rebuild | after rebuild |
+  |---|---|---|
+  | `rank_cards` | **1,452** | **1,999** (+547, +37.7%) |
+  | multi-line (player, market, side) groups | 284 | **477** |
+  | cards inside those groups | 644 | 1,350 |
+  | groups sharing ONE model percentage | **0** | **0** |
+  | monotonicity violations | **0** | **0** |
+
+- **THE TWO MUST-BE-ZERO CHECKS ARE ZERO IN BOTH READS, and the population they ran over is complete.** 250 of the served cards do not parse as `<side> <line>` -- **all 250 are Anytime TD**, whose `meta` is the bare string `Over` with no numeric line. A market with one line per side cannot form a multi-line group, so those 250 are outside the question by construction rather than a blind spot in the checker. Parsed population 1,749 of 1,999. The 371-of-371 collapse that mispriced 924 cards on 2026-09-08 has not returned.
+- **The board was ALREADY healthy before this run** (1,452 cards, both checks zero) -- this was coverage, not repair. The +547 cards are lines quoted since the last build that previously had no `stat::player::line` projection and were correctly dropped.
+- instrument note kept: the checker is `verify_nfl_props.py` in the session worktree, parsing `title` -> player/market, `meta` -> side/line, and the `Real rate model` metric -> probability. It scores the SERVED payload, not the artifact, so it measures what a user sees.
