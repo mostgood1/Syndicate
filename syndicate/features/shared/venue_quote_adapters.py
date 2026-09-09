@@ -95,19 +95,20 @@ def event_game_token(event_id: Any) -> str | None:
     WHY A SECOND SHAPE EXISTS AT ALL
     --------------------------------------------------------------------------
 
-    `game_token` resolves both clubs through `canonical_team`, and for NCAAF
-    that returns None on everything: `_alias_map("ncaaf")` has **0 entries**
-    (measured 2026-08-29 against mlb 38, nfl 38, wnba 50, soccer 474). So the
-    club-pair token is unbuildable there, and NCAAF quotes kept colliding
-    across games after the rest of `#603` shipped -- 4 of 7 live Polymarket
-    NCAAF totals rows shared one price on the 00:30:59Z board.
+    `game_token` resolves both clubs through `canonical_team`, and when this
+    was written that returned None on everything for NCAAF: `_alias_map`
+    ("ncaaf") had **0 entries** (measured 2026-08-29 against mlb 38, nfl 38,
+    wnba 50, soccer 474). So the club-pair token was unbuildable there, and
+    NCAAF quotes kept colliding across games after the rest of `#603` shipped
+    -- 4 of 7 live Polymarket NCAAF totals rows shared one price on the
+    00:30:59Z board.
 
-    **THE OBVIOUS FIX IS THE ONE THAT WAS ALREADY REVERTED.** Populating
-    `_alias_map("ncaaf")` was built, measured and backed out the same day
-    (`handoff_2026-08-29_ncaaf_umass_alias_gap.md`): it does not resolve the
-    names anyway, and it makes `teams_match` MAP-AUTHORITATIVE, turning
-    `canonical_team("ncaaf", "MAS")` -> `UMass Dartmouth` from a harmless miss
-    into a confident wrong answer. This deliberately does not go near it.
+    **NCAAF GAINED A MAP ON 2026-09-09** (`team_aliases._ncaaf_alias_to_name`,
+    595 entries over the 138 FBS clubs) and THIS PATH IS UNCHANGED ANYWAY:
+    `game_token` refuses NCAAF explicitly so the two halves of the join keep
+    agreeing on `evt:`. Its docstring carries the measurement and the condition
+    for lifting that. Nothing here is dead code -- nhl and ncaab still have no
+    map at all, and NCAAF still lands here on every row.
 
     `event_id` is the identity we already have on every board row, and the one
     thing both halves of the join can agree on without a club vocabulary. It is
@@ -151,8 +152,33 @@ def game_token(sport: Any, home: Any, away: Any) -> str | None:
     on. The fan-in's game check cannot catch it either, since both halves
     produce the same token. Recorded rather than papered over -- AZ@SF and
     BOS@NYY both played doubleheaders on the day this was written.
+
+    NCAAF IS HELD ON `event_game_token` DELIBERATELY, EVEN THOUGH ITS CLUBS
+    CANONICALISE AS OF 2026-09-09. The two halves of this join are fed
+    DIFFERENT vocabularies: the board row carries full club names ("Florida
+    State Seminoles"), while `_polymarket_sides` passes SLUG FRAGMENTS
+    (`aec-cfb-nmxst-flst-...` -> "nmxst", "flst"), which are Polymarket's own
+    codes and appear in no registry. So `team_aliases._ncaaf_alias_to_name`
+    resolves the board half and not the venue half, and the halves would stop
+    agreeing -- the board offering `@florida state+new mexico state` while the
+    quote still carries `@evt:...`. `venue_quote_fanin`'s
+    `_quote_is_for_another_game` then REJECTS that quote, so the map would have
+    SUBTRACTED coverage from a working `#603` join rather than added any.
+
+    Caught by `test_the_board_row_derives_the_SAME_ncaaf_token`, which asserts
+    the two halves agree, and by nothing else -- an asymmetric token looks
+    exactly like a correct one from either side alone.
+
+    THIS COSTS NOTHING TODAY: `game_token("ncaaf", ...)` returned None for
+    every input before the map existed, so every call site here is byte-for-byte
+    unchanged. Lifting it is a real improvement and a SEPARATE piece of work --
+    it requires the VENUE half to resolve too (a slug-code vocabulary), and it
+    must be measured on both halves at once, not on this one.
     """
-    from syndicate.features.shared.team_aliases import canonical_team
+    from syndicate.features.shared.team_aliases import canonical_team, normalize
+
+    if normalize(sport) == "ncaaf":
+        return None
 
     try:
         one = canonical_team(sport, home)

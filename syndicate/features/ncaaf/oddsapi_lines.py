@@ -160,6 +160,94 @@ _ODDSAPI_NAME_SUPPLEMENT: Mapping[str, str] = {
 
 
 @lru_cache(maxsize=1)
+def fbs_canonical_names() -> frozenset[str]:
+    """The canonical names of the FBS teams only, from the same snapshot.
+
+    The registry carries all four divisions (fbs 138, fcs 128, ii 171, iii 247
+    on the 2026-08-26 snapshot) and the non-FBS rows are what make a bare code
+    dangerous: `MAS` is UMass Dartmouth's REAL abbreviation and collides with
+    the synthetic three-letter abbr a board chip builds for Massachusetts.
+
+    Exposed so a consumer can restrict itself to the subdivision the board
+    actually cards, without re-reading or re-parsing the CSV.
+    """
+    return frozenset(
+        str(row.get("canonical_team_name") or "").strip()
+        for row in _csv_rows(team_registry_snapshot_path())
+        if (row.get("subdivision") or "").strip().lower() == "fbs"
+        and str(row.get("canonical_team_name") or "").strip()
+    )
+
+
+def iter_team_alias_offers() -> Iterable[tuple[str, str, bool]]:
+    """Every `(raw alias, canonical team, is_supplement)` this module's
+    vocabulary is built from -- BEFORE folding and BEFORE the collision pass.
+
+    ONE ENUMERATION, MORE THAN ONE NORMALISER. `_alias_map` below folds these
+    with `fold()` (punctuation deleted, `&` -> ` and `);
+    `team_aliases._ncaaf_alias_to_name` needs the SAME vocabulary keyed with
+    `team_aliases.normalize`, which keeps `&` and parentheses. Those two
+    disagree on "Texas A&M" and "Miami (OH)", so a consumer cannot re-key this
+    module's folded output -- it needs the raw strings.
+
+    Yielding them rather than letting the second consumer re-enumerate the CSV
+    columns is the point: `team_aliases`' own header says a second
+    hand-maintained list is "the drift this module exists to prevent", and two
+    resolvers that disagree about one club is a silent mismatch nobody sees
+    (`#218`). A school added to the registry, or an entry added to
+    `_ODDSAPI_NAME_SUPPLEMENT`, reaches both consumers or neither.
+
+    `is_supplement` is carried because the two classes are treated differently
+    and must stay distinguishable: registry offers are subject to the collision
+    pass, supplement entries are hand-verified answers to names the registry
+    genuinely does not carry and OVERRIDE it.
+    """
+    for row in _csv_rows(team_registry_snapshot_path()):
+        canonical = str(row.get("canonical_team_name") or "").strip()
+        if not canonical:
+            continue
+        school = str(row.get("school_name") or "").strip()
+        mascot = str(row.get("mascot_name") or "").strip()
+
+        # The high-confidence key first: OddsAPI's own "<School> <Mascot>".
+        if school and mascot:
+            yield (f"{school} {mascot}", canonical, False)
+        yield (canonical, canonical, False)
+        yield (school, canonical, False)
+
+        # "Boise St." as well as "Boise State". Measured 2026-08-25 across all
+        # 138 FBS teams: the full spellings resolve 138/138, but if the feed
+        # abbreviates, **30 of 138 silently lose their line** -- and a team with
+        # no line is indistinguishable on the board from a team no book quoted.
+        # Cheap to cover, and covering it costs nothing if the feed never
+        # abbreviates.
+        #
+        # ADDS AN ALIAS, never rewrites the lookup string, and that distinction
+        # is load-bearing: the registry holds 11 schools whose name genuinely
+        # STARTS with "St."/"Saint" (St. Anselm, Saint John's (MN), ...). A
+        # transform mapping the token "st" -> "state" on input would mangle
+        # every one of them. Generating "Boise St." as an extra key for a team
+        # already named "Boise State" cannot touch them, and any key two
+        # canonical teams both claim is dropped by the collision pass.
+        if " State" in school:
+            abbreviated = school.replace(" State", " St.")
+            yield (abbreviated, canonical, False)
+            if mascot:
+                yield (f"{abbreviated} {mascot}", canonical, False)
+        yield (str(row.get("display_name") or ""), canonical, False)
+        # `aliases` is pipe-separated and INCLUDES the bare mascot, which is why
+        # every alias goes through the collision check rather than being trusted.
+        for alias in str(row.get("aliases") or "").split("|"):
+            yield (alias, canonical, False)
+        # Abbreviations collide hard across divisions (many "ACU"s); the
+        # collision pass is what makes offering them safe.
+        yield (str(row.get("abbreviation") or ""), canonical, False)
+
+    for alias, canonical in _ODDSAPI_NAME_SUPPLEMENT.items():
+        yield (alias, canonical, True)
+
+
+@lru_cache(maxsize=1)
 def _alias_map() -> dict[str, str]:
     """folded alias -> CFBD canonical team name.
 
@@ -187,46 +275,13 @@ def _alias_map() -> dict[str, str]:
         elif existing != canonical:
             collisions.add(key)
 
-    for row in _csv_rows(team_registry_snapshot_path()):
-        canonical = str(row.get("canonical_team_name") or "").strip()
-        if not canonical:
-            continue
-        school = str(row.get("school_name") or "").strip()
-        mascot = str(row.get("mascot_name") or "").strip()
-
-        # The high-confidence key first: OddsAPI's own "<School> <Mascot>".
-        if school and mascot:
-            offer(f"{school} {mascot}", canonical)
-        offer(canonical, canonical)
-        offer(school, canonical)
-
-        # "Boise St." as well as "Boise State". Measured 2026-08-25 across all
-        # 138 FBS teams: the full spellings resolve 138/138, but if the feed
-        # abbreviates, **30 of 138 silently lose their line** -- and a team with
-        # no line is indistinguishable on the board from a team no book quoted.
-        # Cheap to cover, and covering it costs nothing if the feed never
-        # abbreviates.
-        #
-        # ADDS AN ALIAS, never rewrites the lookup string, and that distinction
-        # is load-bearing: the registry holds 11 schools whose name genuinely
-        # STARTS with "St."/"Saint" (St. Anselm, Saint John's (MN), ...). A
-        # transform mapping the token "st" -> "state" on input would mangle
-        # every one of them. Generating "Boise St." as an extra key for a team
-        # already named "Boise State" cannot touch them, and any key two
-        # canonical teams both claim is dropped by the collision pass above.
-        if " State" in school:
-            abbreviated = school.replace(" State", " St.")
-            offer(abbreviated, canonical)
-            if mascot:
-                offer(f"{abbreviated} {mascot}", canonical)
-        offer(row.get("display_name"), canonical)
-        # `aliases` is pipe-separated and INCLUDES the bare mascot, which is why
-        # every alias goes through the collision check rather than being trusted.
-        for alias in str(row.get("aliases") or "").split("|"):
+    # The vocabulary itself lives in `iter_team_alias_offers` so that
+    # `team_aliases` can key the SAME offers with its own normaliser rather
+    # than maintain a second list. The supplement is skipped here and applied
+    # below, after the collision pass, exactly as it always was.
+    for alias, canonical, is_supplement in iter_team_alias_offers():
+        if not is_supplement:
             offer(alias, canonical)
-        # Abbreviations collide hard across divisions (many "ACU"s); the
-        # collision pass is what makes offering them safe.
-        offer(row.get("abbreviation"), canonical)
 
     for key in collisions:
         mapping.pop(key, None)

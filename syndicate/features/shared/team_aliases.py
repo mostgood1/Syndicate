@@ -489,6 +489,137 @@ def _soccer_alias_to_name() -> dict[str, str]:
 
 
 @lru_cache(maxsize=1)
+def _ncaaf_alias_to_name() -> dict[str, str]:
+    """NCAAF alias -> canonical club, **FBS ONLY**, derived from the CFBD team
+    registry that `ncaaf.oddsapi_lines` already reads.
+
+    -------------------------------------------------------------------------
+    THIS REVERSES A DOCUMENTED REVERT, AND ONLY BECAUSE ITS TWO GATES NOW PASS
+    -------------------------------------------------------------------------
+
+    Populating this branch was built, measured and backed out on 2026-08-29
+    (`handoff_2026-08-29_ncaaf_umass_alias_gap.md`, and FORBIDDEN in
+    `learnings_evidence.md`). That entry does not ban the map outright -- it
+    bans adding one **without first** (a) confirming the SOURCE carries the
+    name the join is failing on, and (b) enumerating what the new map resolves
+    that the heuristics previously left unresolved, because those are exactly
+    the lookups whose semantics flip from "fall back" to "authoritative".
+    Both gates were run before this shipped, and both pass **because the source
+    is a different one**:
+
+    (a) The 08-29 attempt derived from the registry module's raw
+        `unambiguous_team_index()`. This derives from
+        `oddsapi_lines.iter_team_alias_offers()`, which carries
+        `_ODDSAPI_NAME_SUPPLEMENT` -- 26 hand-verified entries the registry
+        genuinely lacks. `umass minutemen`, the exact token that defeated the
+        08-29 map, resolves here to `massachusetts`.
+
+    (b) The 08-29 attempt's named failure was
+        `canonical_team("ncaaf", "MAS")` -> **UMass Dartmouth** (team 379's
+        real abbr, colliding with the synthetic abbr a chip builds for
+        Massachusetts), which a map-authoritative `teams_match` turns from a
+        harmless miss into a confident wrong answer. **`mas` is not a key
+        here**: `oddsapi_lines._alias_map`'s collision pass already drops any
+        folded string two canonical teams both claim, and the FBS filter below
+        removes UMass Dartmouth from the map entirely.
+
+    -------------------------------------------------------------------------
+    WHY FBS-ONLY, AND WHY THE COLLISION PASS STAYS ALL-DIVISION
+    -------------------------------------------------------------------------
+
+    The 2026-08-26 snapshot carries 684 teams: fbs 138, fcs 128, ii 171,
+    iii 247. The board cards FBS-vs-FBS only, and every non-FBS row is a source
+    of codes that mean something else -- the `MAS` case is one of 685.
+
+    But the collision pass is deliberately NOT recomputed within FBS. Offers
+    are counted across ALL FOUR divisions and only then filtered to FBS, so a
+    code claimed by one FBS and one FCS school is dropped rather than handed to
+    the FBS one. Recomputing inside FBS would resolve it -- and an FCS visitor
+    sending that code would be confidently joined to the wrong programme. FCS
+    and non-FBS opponents resolve to **None**, which puts `teams_match` back on
+    its heuristics for them: exactly today's behaviour.
+
+    -------------------------------------------------------------------------
+    AMBIGUOUS NICKNAMES RESOLVE TO NOTHING
+    -------------------------------------------------------------------------
+
+    This is the sport where that bites hardest and the registry's `aliases`
+    column offers the bare mascot for every school. Measured on the 08-26
+    snapshot: **95 keys dropped for collision, every one of them a bare
+    mascot** -- `tigers` is claimed by 25 schools (5 FBS), `bulldogs` by 23
+    (4 FBS), `wildcats` by 15 (4 FBS), `eagles` 17, `cougars` 11, `aggies` 6.
+    47 of the 95 name at least one FBS programme and 21 name more than one, so
+    a "most popular wins" rule would have been wrong on all 21. 56 bare mascots
+    survive, and only because they are unique across all 684 rows
+    (`boilermakers`, `buckeyes`, `chanticleers`, `cornhuskers`).
+
+    A NOTE ON "MIAMI", WHICH IS AMBIGUOUS IN ENGLISH AND NOT IN THIS
+    VOCABULARY. CFBD names Miami FL `Miami` and Miami OH `Miami (OH)`, so
+    `miami` is that programme's own canonical name rather than a guess between
+    two. It resolves, and it would resolve through `canonical_team`'s
+    already-a-value branch even if this map omitted the key. `miami oh`,
+    `miami ohio`, `miami fl` and `miami florida` all resolve to the right
+    school, and `chip_join_key` has shipped this same verdict via
+    `resolve_team` since 2026-09-03 -- making the two disagree is the drift
+    this module exists to prevent.
+    """
+    try:
+        from syndicate.features.ncaaf.oddsapi_lines import (
+            fbs_canonical_names,
+            iter_team_alias_offers,
+        )
+    except Exception:
+        return {}
+    try:
+        fbs = fbs_canonical_names()
+        offers = list(iter_team_alias_offers())
+    except Exception:
+        return {}
+    if not fbs or not offers:
+        # An absent registry must look like "no map", never like a small one.
+        return {}
+
+    owners: dict[str, set[str]] = {}
+    supplement: dict[str, str] = {}
+    for alias, canonical, is_supplement in offers:
+        name = normalize(canonical)
+        if not name:
+            continue
+        # THE APOSTROPHE IS THE THIRD KEY FORM AND IT IS NOT COSMETIC.
+        # `fold_accents` already deletes dots for exactly this reason; CFBD
+        # spells two FBS programmes with one ("Hawai'i", "Ragin' Cajuns") and
+        # the board's feed spells neither. Measured on the served 2026-09-09
+        # NCAAF board: without this, `Hawaii Rainbow Warriors` and
+        # `Louisiana Ragin Cajuns` were the only two FBS slots of 160 that
+        # failed, and both are apostrophes alone. Deleted rather than replaced
+        # with a space, so "hawai'i" meets "hawaii" and not "hawai i".
+        deapostrophised = str(alias or "").replace("'", "").replace("’", "")
+        for key in (normalize(alias), fold_accents(alias), normalize(deapostrophised)):
+            if not key or key.isdigit():
+                continue
+            if is_supplement:
+                if canonical in fbs:
+                    supplement[key] = name
+            else:
+                owners.setdefault(key, set()).add(canonical)
+
+    by_name = {normalize(team): team for team in fbs}
+    mapping = {
+        key: normalize(next(iter(claimants)))
+        for key, claimants in owners.items()
+        if len(claimants) == 1 and next(iter(claimants)) in fbs
+    }
+    # Hand-verified answers to names the registry does not carry override the
+    # collision pass, mirroring `oddsapi_lines._alias_map`'s own ordering.
+    mapping.update(supplement)
+    # Every FBS club must be reachable by its own canonical name even if some
+    # alias of it collided.
+    for key, team in by_name.items():
+        mapping.setdefault(key, key)
+    return mapping
+
+
+@lru_cache(maxsize=1)
 def _soccer_alias_by_league() -> dict[str, dict[str, str]]:
     """Per-league club maps. Same derivation as `_soccer_alias_to_name`, but the
     ambiguity is resolved WITHIN a league instead of across all of them.
@@ -587,6 +718,8 @@ def _alias_map(sport: str) -> dict[str, str]:
         return mapping
     if slug == "soccer":
         return _soccer_alias_to_name()
+    if slug == "ncaaf":
+        return _ncaaf_alias_to_name()
     return {}
 
 
@@ -619,6 +752,27 @@ def _nickname_alias_map(sport: str) -> dict[str, str]:
     nfl 32 nicknames added and 0 dropped; mlb 27 added, 1 dropped; nba 26 added;
     wnba 0 added, because its vendored supplement already carries them.
     """
+    slug = normalize(sport)
+    if slug == "ncaaf":
+        # NCAAF IS THE ONE SPORT WHERE THIS DERIVATION'S PREMISE IS FALSE, so it
+        # declines rather than deriving badly. Every rule above rests on a club
+        # name shaped "<City> <Nickname>", where the last word IS the nickname.
+        # CFBD's canonical names are SCHOOLS -- "Georgia Southern", "Bowling
+        # Green", "Boston College", "Texas A&M", "Miami (OH)" -- so the last
+        # word is a qualifier, and taking it yields `southern`, `green`,
+        # `college`, `a&m`, `(oh)`. Measured on the 2026-08-26 snapshot: 14 such
+        # keys, and not one of them is a nickname. `a&m` and `southern` are the
+        # dangerous pair -- unique only because the FBS filter hides Florida
+        # A&M, Alabama A&M and Southern University, so they read as unambiguous
+        # while naming a programme the board may actually face.
+        #
+        # NOTHING IS LOST BY DECLINING. Real NCAAF nicknames are MASCOTS, and
+        # they already reach `_alias_map` through the registry's own `aliases`
+        # column under an all-division collision pass -- 56 survive
+        # (`boilermakers`, `buckeyes`), 95 are dropped as shared. That is the
+        # right mechanism for this sport and this would only add a second,
+        # weaker one beside it.
+        return {}
     mapping = _alias_map(sport)
     clubs = set(mapping.values())
     by_last: dict[str, set[str]] = {}
@@ -658,10 +812,17 @@ def unambiguous_club_tokens(sport: str) -> frozenset[str]:
     was offering before this filter existed.
 
     A SPORT WITH NO MAP GETS AN EMPTY SET, which is a refusal and not a
-    degradation: nhl, ncaaf and ncaab all resolve `_alias_map` to `{}`, so
-    nothing about them can be shown unambiguous and `unknown` must not land on
-    the permissive branch. NCAAF reaches the board side as of 2026-08-27 and
-    "Ohio State Buckeyes" would otherwise offer `ncaaf|h2h|state`.
+    degradation: nhl and ncaab still resolve `_alias_map` to `{}`, so nothing
+    about them can be shown unambiguous and `unknown` must not land on the
+    permissive branch.
+
+    NCAAF GAINED A MAP ON 2026-09-09 and this filter is what makes that safe
+    rather than reckless. It is the sport with the most shared words of any on
+    the platform, and the count says so: 138 FBS clubs yield **158** tokens,
+    against soccer's 403 from 474 clubs. `state` is claimed by 26 programmes,
+    `ohio` by two ("Ohio", "Ohio State"), `carolina` by four and `tech` by
+    four -- all correctly excluded, including the `ncaaf|h2h|state` key this
+    docstring was written to warn about.
 
     Single-word tokens shorter than 3 characters are dropped by the caller, not
     here; this reports ownership only.
@@ -732,21 +893,27 @@ def chip_join_key(sport: Any, value: Any) -> str | None:
     WHY THIS IS NOT JUST `canonical_team`
     -------------------------------------------------------------------------
 
-    `canonical_team` answers off `_alias_map`, and `_alias_map("ncaaf")` has
-    **0 entries** -- deliberately, and it must stay that way. Populating it was
-    built, measured and REVERTED on 2026-08-29
-    (`.syndicate/handoff_2026-08-29_ncaaf_umass_alias_gap.md`) because it makes
-    `teams_match` MAP-AUTHORITATIVE (`teams_match` returns the map's equality
-    verdict and deliberately does not fall through to its heuristics), turning a
-    harmless miss into a confident wrong answer. `venue_quote_adapters.
-    event_game_token` then built a whole second token shape on the same fact --
-    "any sport whose clubs canonicalise keeps the club-pair token" -- to stop
-    NCAAF quotes colliding across games (`#603`). Filling `_alias_map("ncaaf")`
-    would silently undo that.
+    **HISTORY, AND WHAT CHANGED ON 2026-09-09.** This existed because
+    `_alias_map("ncaaf")` had **0 entries** -- populating it had been built,
+    measured and REVERTED on 2026-08-29
+    (`.syndicate/handoff_2026-08-29_ncaaf_umass_alias_gap.md`) because a map
+    makes `teams_match` MAP-AUTHORITATIVE (it returns the map's equality
+    verdict and deliberately does not fall through to its heuristics), turning
+    a harmless miss into a confident wrong answer.
 
-    So this is a SEPARATE, ADDITIVE resolver used by the display join only.
-    `teams_match`, `unambiguous_club_tokens` and `event_game_token` all still
-    read `_alias_map` and all still see NCAAF as a sport with no map.
+    `_ncaaf_alias_to_name` now supplies that map, from a DIFFERENT source and
+    behind that revert's own two gates -- read its docstring before touching
+    either. The measured outcome is the opposite of the 08-29 fear: over the
+    registry's whole vocabulary `teams_match` gained 190 correct verdicts, lost
+    0, and its wrong-pair false positives FELL from 7 to 1 (`Iowa` vs `Iowa
+    State`, `Ohio` vs `Ohio State`, `Texas` vs `North Texas` were all True on
+    the prefix heuristic and are False now).
+
+    THIS FUNCTION IS KEPT ANYWAY, and is no longer NCAAF-shaped by necessity so
+    much as by coverage. The map is FBS-only; `resolve_team` reads all four
+    divisions, so an FCS visitor on a real slate still resolves here and
+    nowhere else. `canonical_team` is tried FIRST, so where both answer they
+    answer identically -- both return the CFBD canonical name, normalised.
 
     -------------------------------------------------------------------------
     WHAT IT FIXES, MEASURED ON THE SERVED PAYLOAD 2026-09-03
