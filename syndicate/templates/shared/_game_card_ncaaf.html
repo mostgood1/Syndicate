@@ -460,7 +460,11 @@
         <div class="cards-panel-card">
           <div class="cards-box-head">
             <div class="cards-table-title"><strong>{{ section.title }}</strong></div>
-            <span class="cards-chip">{{ 'Live' if live_state else 'Sim' }}</span>
+            {#- A section may name its OWN chip, and the linescore section does.
+                The card-level fallback reads `shared_is_live`, which is false on
+                a FINAL game -- so a real, completed box score was chipped "Sim",
+                which is the exact misattribution this tab was rebuilt to stop. -#}
+            <span class="cards-chip">{{ section.chip if section.chip else ('Live' if live_state else 'Sim') }}</span>
           </div>
           <div class="cards-callout-copy">{{ section.body }}</div>
           {% if section.columns and section.table_rows %}

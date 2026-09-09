@@ -513,6 +513,26 @@ def attach_ncaaf_live_game_state(
             live_state["away_pts"] = state["away_score"]
         if state.get("home_score") is not None:
             live_state["home_pts"] = state["home_score"]
+        # PER-PERIOD SCORES, CARRIED RATHER THAN DROPPED.
+        #
+        # `poll_ncaaf_live_state._game_from_event` has written
+        # `home_linescores`/`away_linescores` into the persisted record since
+        # 2026-09-08 (verified on event 401858438) and the ESPN fallback parses
+        # the identical field, but this function copied out only the aggregate
+        # score -- so the board could show a final score and had no way to show
+        # HOW it got there. That is the whole reason the NCAAF box-score tab
+        # rendered the shared contract's "Box score unavailable" placeholder.
+        #
+        # Copied only when present, so absence stays absent: an unstarted game
+        # has `None` here (the producer's own pregame gate, same as the score)
+        # and must not gain an empty list that reads as "played, scored zero".
+        # A list may contain `None` holes -- `linescores_from_competitor`
+        # preserves a missing period's position rather than shifting later
+        # periods left -- and the box renders those holes as blanks.
+        for side_key in ("away_linescores", "home_linescores"):
+            values = state.get(side_key)
+            if isinstance(values, list) and values:
+                live_state[side_key] = list(values)
         game["live_state"] = live_state
 
         # `shared_game_state.startTime` was null on all 51 cards, so the shared

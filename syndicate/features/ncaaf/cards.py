@@ -2642,6 +2642,364 @@ def _build_smartsim2_standalone_ncaaf_card_contract(row: dict[str, Any], week: i
     }
 
 
+# --------------------------------------------------------------------------
+# BOX SCORE
+# --------------------------------------------------------------------------
+#
+# WHY THIS EXISTS. The NCAAF card's box-score tab rendered the shared
+# contract's placeholder -- "This sport has not shipped a live box-score lane
+# into the shared board yet" (`game_board_contract._build_box_sections`) --
+# because NCAAF supplied no `shared_box_sections` and the generic derivation
+# emits at most three TWO-ROW team-level sections and never a `columns` /
+# `table_rows` grid.
+#
+# THE TEMPLATE ALREADY RENDERED THE GRID. `_game_card_ncaaf.html` has had the
+# `cards-statgrid` branch (`section.columns and section.table_rows`) the whole
+# time; the data side had simply never filled it. This is a data fix, not a
+# template one, and `game_board_contract._normalize_game` already PRESERVES a
+# non-empty `shared_box_sections` set by a sport's card builder -- so the
+# cross-sport contract needed no change either.
+#
+# THE QUARTER LINESCORE IS THE PART THAT WORKS TODAY. Per-period scores are
+# persisted by `scripts/poll_ncaaf_live_state._game_from_event` and now carried
+# onto the card by `ncaaf/live_game_state.attach_ncaaf_live_game_state`. The
+# PLAYER table is NOT reachable this season -- see `_ncaaf_player_box_section`.
+
+_NCAAF_REGULATION_PERIODS = 4
+
+# `—`, not blank. A blank cell in a stat grid reads as "zero points", and an
+# unplayed quarter and a scoreless one are different facts.
+_NCAAF_BOX_EMPTY_CELL = "—"
+
+# How many player lines one game's box shows. A NAMED constant, not a literal:
+# `test_ncaaf_board_slate_coverage` parses this module's AST and rejects any
+# board-sized integer slice cap, because two of those once silently truncated
+# the slate to 16 games. This one is a PER-GAME display cap and not a slate cap
+# at all, but the guard cannot tell those apart from a bare `[:10]` -- and the
+# guard being unable to tell is the point of it.
+_NCAAF_PLAYER_BOX_ROW_LIMIT = 10
+
+
+def _ncaaf_linescores(live_state: Any, side: str) -> list[Any] | None:
+    values = live_state.get(f"{side}_linescores") if isinstance(live_state, dict) else None
+    return list(values) if isinstance(values, list) and values else None
+
+
+def _ncaaf_period_count(*linescores: Any) -> int:
+    return max((len(v) for v in linescores if isinstance(v, list)), default=0)
+
+
+def _ncaaf_overtime_total(values: list[Any] | None) -> int | None:
+    """Every period past regulation, summed into ONE cell.
+
+    THE BINNING IS THE PLATFORM'S, NOT A NEW ONE. `segment_actuals`'
+    `_FOOTBALL_SEGMENTS` gives football `h2 = (3, 4, None)`, where the trailing
+    `None` means "and every period after" -- i.e. the sportsbook convention
+    that the second half INCLUDES all overtime. A card that split OT into
+    OT1/OT2 columns, or folded OT into Q4, would disagree with how the same
+    platform grades a second-half order, and anyone comparing the box to a
+    settled bet would be reading two different definitions of the same game.
+
+    Returns None when no overtime period carries a value, so an absent OT is
+    absent rather than a zero.
+    """
+    if not isinstance(values, list) or len(values) <= _NCAAF_REGULATION_PERIODS:
+        return None
+    seen = False
+    total = 0
+    for value in values[_NCAAF_REGULATION_PERIODS:]:
+        if isinstance(value, (int, float)):
+            total += int(value)
+            seen = True
+    return total if seen else None
+
+
+def _ncaaf_box_cell(values: list[Any] | None, index: int) -> str:
+    if not isinstance(values, list) or index >= len(values):
+        return _NCAAF_BOX_EMPTY_CELL
+    value = values[index]
+    if isinstance(value, (int, float)):
+        return str(int(value))
+    # A present-but-None entry is a HOLE, not a zero:
+    # `segment_actuals.linescores_from_competitor` keeps a missing period's
+    # position rather than shifting later periods left.
+    return _NCAAF_BOX_EMPTY_CELL
+
+
+def _ncaaf_side_total(live_state: dict[str, Any], side: str, values: list[Any] | None) -> str:
+    points = live_state.get(f"{side}_pts")
+    if isinstance(points, (int, float)):
+        return str(int(points))
+    if isinstance(values, list):
+        seen = [v for v in values if isinstance(v, (int, float))]
+        if seen:
+            return str(int(sum(seen)))
+    return _NCAAF_BOX_EMPTY_CELL
+
+
+def _ncaaf_linescore_section(game: dict[str, Any]) -> dict[str, Any]:
+    """The quarter box, or a STATED empty state saying which of four it is.
+
+    Pregame, in-progress, final and "no live state at all" must be
+    distinguishable on screen -- a blank grid for all four is the defect this
+    replaces, not a smaller version of it.
+    """
+    title = "Live / final box"
+    live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else None
+    if live_state is None:
+        return {
+            "title": title,
+            "body": (
+                "Live game state has not been read for this game, so no quarter scoring is "
+                "available. This is a missing reading, not a 0-0 game."
+            ),
+            "chip": "No reading",
+            "rows": [],
+        }
+
+    status = str(live_state.get("status") or "").strip()
+    started = bool(live_state.get("in_progress")) or bool(live_state.get("final"))
+    away_values = _ncaaf_linescores(live_state, "away")
+    home_values = _ncaaf_linescores(live_state, "home")
+
+    if not started:
+        return {
+            "title": title,
+            "body": (
+                f"Scheduled{f' — {status}' if status else ''}. The quarter box fills in "
+                "period by period once the game kicks off."
+            ),
+            "chip": "Pregame",
+            "rows": [],
+        }
+
+    if away_values is None and home_values is None:
+        return {
+            "title": title,
+            "body": (
+                f"{'Final' if live_state.get('final') else 'In progress'}"
+                f"{f' — {status}' if status else ''}, but the scoreboard has not published "
+                "per-quarter scoring for this game yet."
+            ),
+            "chip": "Final" if live_state.get("final") else "Live",
+            "rows": [],
+        }
+
+    periods = _ncaaf_period_count(away_values, home_values)
+    away_ot = _ncaaf_overtime_total(away_values)
+    home_ot = _ncaaf_overtime_total(home_values)
+    has_overtime = periods > _NCAAF_REGULATION_PERIODS and (away_ot is not None or home_ot is not None)
+
+    columns = ["Team", "Q1", "Q2", "Q3", "Q4"]
+    if has_overtime:
+        columns.append("OT")
+    columns.append("T")
+
+    table_rows: list[list[str]] = []
+    for side, values, overtime in (
+        ("away", away_values, away_ot),
+        ("home", home_values, home_ot),
+    ):
+        container = game.get(side) if isinstance(game.get(side), dict) else {}
+        label = str(container.get("abbr") or container.get("name") or side.upper())
+        cells = [label]
+        cells.extend(_ncaaf_box_cell(values, index) for index in range(_NCAAF_REGULATION_PERIODS))
+        if has_overtime:
+            cells.append(str(overtime) if overtime is not None else _NCAAF_BOX_EMPTY_CELL)
+        cells.append(_ncaaf_side_total(live_state, side, values))
+        table_rows.append(cells)
+
+    if live_state.get("final"):
+        # ESPN's `shortDetail` for a regulation final is literally "Final", so
+        # appending it produced "Final — Final." on every completed game. Kept
+        # only when it says something more ("Final/2OT").
+        extra = status if status and status.lower() != "final" else ""
+        body = f"Final{f' — {extra}' if extra else ''}."
+    else:
+        period = live_state.get("period")
+        clock = str(live_state.get("clock") or "").strip()
+        detail = status or (f"Q{period}" if isinstance(period, int) else "")
+        if clock and detail:
+            detail = f"{detail} · {clock}"
+        body = (
+            f"In progress{f' — {detail}' if detail else ''}. Quarters not yet played show as "
+            f"{_NCAAF_BOX_EMPTY_CELL}."
+        )
+    if has_overtime:
+        body += (
+            " OT is one column covering every overtime period, matching how this platform "
+            "grades football's second half (periods 3, 4 and all overtime)."
+        )
+    return {
+        "title": title,
+        "body": body,
+        "chip": "Final" if live_state.get("final") else "Live",
+        "columns": columns,
+        "table_rows": table_rows,
+    }
+
+
+def _ncaaf_sim_box_section(game: dict[str, Any]) -> dict[str, Any] | None:
+    """The projected score, kept BESIDE the live box rather than replaced by it.
+
+    MLB's card shows "Live / final box" and "Sim box" as two coexisting panels
+    and the live one never deletes the sim one. Supplying `shared_box_sections`
+    bypasses the shared contract's own derivation entirely, so the sim rows it
+    used to produce have to be re-supplied here or they would silently vanish
+    the moment a real box existed.
+    """
+    card = game.get("ncaaf_card") if isinstance(game.get("ncaaf_card"), dict) else {}
+    scoreboard = card.get("scoreboard") if isinstance(card.get("scoreboard"), dict) else {}
+    away_points = _safe_float(scoreboard.get("away_points"))
+    home_points = _safe_float(scoreboard.get("home_points"))
+    if away_points is None and home_points is None:
+        return None
+    rows = []
+    for side, value in (("away", away_points), ("home", home_points)):
+        container = game.get(side) if isinstance(game.get(side), dict) else {}
+        rows.append(
+            {
+                "name": str(container.get("abbr") or side.upper()),
+                "detail": str(container.get("name") or ""),
+                "value": f"{value:.1f}" if value is not None else NULL_PLACEHOLDER,
+            }
+        )
+    return {
+        "title": "Sim box",
+        "body": str(scoreboard.get("source_label") or SMARTSIM2_PUBLIC_LABEL)
+        + " projected scoring, kept beside the live box for the whole game.",
+        "chip": "Sim",
+        "rows": rows,
+    }
+
+
+@lru_cache(maxsize=16)
+def _ncaaf_player_rows_for_week(season: int, week: int) -> tuple[dict[str, Any], ...]:
+    """Real player stat lines for one (season, week), keyed by CFBD team name.
+
+    Cached per (season, week) so the CSV is parsed once per process, never once
+    per card: the web service reads artifacts, it does not recompute them.
+    """
+    try:
+        from syndicate.features.ncaaf.player_stats import load_player_game_rows
+
+        rows = load_player_game_rows(season)
+    except Exception as exc:  # noqa: BLE001 -- named, never fatal to the board
+        print(f"NCAAF_PLAYER_BOX_LOAD_FAILED season={season} error={type(exc).__name__}: {exc}", flush=True)
+        return ()
+    return tuple(row for row in rows if isinstance(row, dict) and row.get("week") == week)
+
+
+def _ncaaf_player_box_section(game: dict[str, Any], *, season: int, week: int) -> dict[str, Any]:
+    """Per-player lines for THIS season only, or a stated empty state.
+
+    ---------------------------------------------------------------------
+    THE SNAPSHOT IS LAST SEASON'S AND MUST NOT BE RENDERED AS THIS ONE'S
+    ---------------------------------------------------------------------
+
+    `ncaaf_player_game_stats_snapshot.csv` (tracked, `source_snapshot_date=
+    2026-08-26`) holds **35,829 rows, every one `season=2025`, weeks 1-16** --
+    measured, not assumed. `load_player_game_rows` filters by season, so a 2026
+    card joins to ZERO rows, which is the correct answer: last season's numbers
+    printed under this game's teams would be a fabricated box score that looks
+    completely plausible and is wrong in every cell.
+
+    So the join is STRICTLY on the card's own season and the empty state SAYS
+    the snapshot has no rows for it. An empty state that explains itself is a
+    correct reading; a filled one that quietly changed seasons is a defect.
+    """
+    home = game.get("home") if isinstance(game.get("home"), dict) else {}
+    away = game.get("away") if isinstance(game.get("away"), dict) else {}
+    team_names = {
+        _normalize_text(str(away.get("name") or "")): "away",
+        _normalize_text(str(home.get("name") or "")): "home",
+    }
+    team_names.pop("", None)
+
+    matched = [
+        row
+        for row in _ncaaf_player_rows_for_week(season, week)
+        if _normalize_text(str(row.get("team") or "")) in team_names
+    ]
+    if not matched:
+        return {
+            "title": "Player box",
+            "body": (
+                f"No player stat lines are published for the {season} season yet — the tracked "
+                "CFBD player-game snapshot covers 2025 only, and last season's numbers are "
+                "deliberately NOT shown under this game. This fills in when "
+                "`scripts/build_ncaaf_player_game_stats_snapshot.py` is re-run for the current "
+                "season."
+            ),
+            "chip": "Not published",
+            "rows": [],
+        }
+
+    def _yards(row: dict[str, Any]) -> float:
+        return (
+            float(row.get("passing_yards") or 0.0)
+            + float(row.get("rushing_yards") or 0.0)
+            + float(row.get("receiving_yards") or 0.0)
+        )
+
+    matched.sort(key=_yards, reverse=True)
+    table_rows: list[list[str]] = []
+    for row in matched[:_NCAAF_PLAYER_BOX_ROW_LIMIT]:
+        side = team_names.get(_normalize_text(str(row.get("team") or "")), "away")
+        container = game.get(side) if isinstance(game.get(side), dict) else {}
+        table_rows.append(
+            [
+                str(row.get("player_name") or "Unknown"),
+                str(container.get("abbr") or side.upper()),
+                str(int(row.get("passing_yards") or 0)),
+                str(int(row.get("rushing_yards") or 0)),
+                str(int(row.get("receiving_yards") or 0)),
+                str(int(row.get("anytime_td") or 0)),
+            ]
+        )
+    return {
+        "title": "Player box",
+        "body": (
+            f"Real CFBD player-game lines for {season} week {week}, top "
+            f"{_NCAAF_PLAYER_BOX_ROW_LIMIT} by total yards."
+        ),
+        "chip": "Final",
+        "columns": ["Player", "Tm", "Pass yds", "Rush yds", "Rec yds", "TD"],
+        "table_rows": table_rows,
+    }
+
+
+def _ncaaf_box_sections(game: dict[str, Any], *, season: int, week: int) -> list[dict[str, Any]]:
+    sections = [_ncaaf_linescore_section(game)]
+    sim_section = _ncaaf_sim_box_section(game)
+    if sim_section is not None:
+        sections.append(sim_section)
+    sections.append(_ncaaf_player_box_section(game, season=season, week=week))
+    return sections
+
+
+def attach_ncaaf_box_sections(games: list[dict[str, Any]], season: int, week: int) -> int:
+    """Set `shared_box_sections` on every card. Never raises.
+
+    Runs on EVERY card, including ones the live-state join never matched: "no
+    reading" is a state the box has to render, and skipping those cards would
+    hand them straight back to the shared contract's "Box score unavailable".
+    """
+    stamped = 0
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        try:
+            game["shared_box_sections"] = _ncaaf_box_sections(game, season=season, week=week)
+            stamped += 1
+        except Exception as exc:  # noqa: BLE001 -- a box must never cost the board
+            print(
+                f"NCAAF_BOX_SECTIONS_ERROR week={week} error={type(exc).__name__}: {exc}",
+                flush=True,
+            )
+    return stamped
+
+
 def _attach_live_state(games: list[dict[str, Any]], season: int, week: int) -> None:
     """Stamp ESPN live state onto the week's cards, before the board contract.
 
@@ -2676,7 +3034,15 @@ def _attach_live_state(games: list[dict[str, Any]], season: int, week: int) -> N
         coverage["scheduled"] = stamp_scheduled_start_times(games)
     except Exception as exc:  # noqa: BLE001 -- named, never fatal to the board
         print(f"NCAAF_LIVE_STATE_ERROR week={week} error={type(exc).__name__}: {exc}", flush=True)
+        # THE BOX STILL RENDERS ON THIS PATH, and it must: without a reading,
+        # its correct output is the "live game state has not been read" state,
+        # which is a different thing on screen from "0-0" and from the shared
+        # contract's "Box score unavailable" placeholder. Returning here would
+        # hand every card straight back to that placeholder on exactly the
+        # failure the box exists to describe.
+        attach_ncaaf_box_sections(games, season, week)
         return
+    attach_ncaaf_box_sections(games, season, week)
     # `matched` is printed separately from `live`/`final` because a dead join
     # and a quiet slate render identically and are different defects.
     # `logger.info` does not reach Render's collector -- hence print/flush.
