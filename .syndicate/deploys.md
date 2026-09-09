@@ -29074,3 +29074,20 @@ refusals and a post-deploy ceiling of zero. Re-take READING 1 tomorrow after
 - **NOT VERIFIABLE FROM PRODUCTION, stated so it is not mistaken for measured:** the depth capture's `+29.5%` per-file size figure. `reports/intelligence/venue_odds/` is on the worker's mounted disk and not in `HOT_ARTIFACT_PATTERNS`; `/api/ops/artifacts/export` returns 0 matches on every pattern tried. That number is a fixture measurement over 883 markets.
 - NCAAF drive variant `462ccde4` is deployed with `SYNDICATE_NCAAF_DRIVE_PROFILE` ABSENT and its author recommends AGAINST flipping it (the fit reverses at sampled ratings). Deployed != enabled; nothing about NCAAF projections changed.
 - claim released. Lane `segments-joint-v1`.
+
+### refresh-worker f3c03749 -- ADDENDUM: THE FEE MULTIPLIER FIX IS LIVE, CORRECT, AND INERT. Do not credit it with a hold improvement.
+- measured 2026-09-09 14:58Z, one board cycle after the deploy. `[venue_quote_fanin] VENUE_BASIS`:
+
+      sport=soccer  displayable=0  sides_seen=19223
+      sport=soccer  displayable=0  sides_seen=17450
+      sport=mlb     displayable=0  sides_seen=4553
+      sport=nfl     displayable=0  sides_seen=2438
+      sport=ncaaf   displayable=0  sides_seen=1076
+
+  **~27,000 sides seen after the deploy, 0 displayable venue-basis rows, every sport.**
+- **THE CHAIN, and it is a one-consumer chain.** `_resolved_kalshi_fee_multiplier` resolves the series rate and the ONLY thing it is passed to is the `venue_basis` computation at `venue_quote_fanin.py:1695`, which takes `is_live=row_is_live`. `venue_basis_edge.py:303-308` REFUSES whenever `is_live` is false. At this hour essentially every row is pregame. **So the multiplier resolves and is then handed to a computation that immediately refuses. It is resolved and discarded.**
+- **WHAT THIS MEANS FOR THE READING ABOVE, which would otherwise be misread.** `resolved=114 upper_bound=0 unmapped={}` across mlb/nfl/ncaaf/soccer is TRUE and proves the wire works. It does **NOT** mean hold improved. **The 1.64-point hold gain (median 5.09% -> 3.55%) is NOT BEING REALISED ANYWHERE TODAY**, and will not be until either (a) rows go in-play, where `venue_basis` actually runs, or (b) the pregame entry-cost path S6b exists. The natural reading of "114 of 114 resolved" is that the fee got cheaper; it did not.
+- **This is `learnings.md`'s "a deployed fix can be inert" arriving on schedule, and the ONLY reason it was caught is that the consumer was traced rather than the counter believed.** A counter proving a value was COMPUTED says nothing about whether anything CONSUMED it. `resolved=114` and `displayable=0` are both true at the same instant.
+- **STATUS CORRECTION: S6a is READY, not EFFECTIVE.** Those are different claims and the ledger should not conflate them. Nothing is wrong with `73fa7703`; it is correct, tested, wired and covers today's series completely. It sits behind a guard that is doing its job for a different question.
+- **The owed hold re-read is therefore NOT takeable from production either**, and the reason is the same guard: production emits no hold for a pregame row. Any hold figure for this population must be an OFFLINE recomputation over `quote.book_prices` and stated as such -- which is exactly what the 212-row 3.55% figure already was. Do not present a recomputation as a served number.
+- unchanged and still true from the main entry: the append rule held (0.117-0.225 over 4 warm ticks vs a 0.106-0.202 baseline), and the NCAAF drive variant is deployed with its flag ABSENT.
