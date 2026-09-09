@@ -337,6 +337,31 @@ def _grant(root, session_id):
         return None
 
 
+def _blueprint_drift(root):
+    """(exit_code, printable) from scripts/check_blueprint_drift.py.
+
+    Returns (0, "") when the checker cannot be run at all -- ALLOWING the push.
+    That looks like the wrong default for a safety check and is the right one
+    HERE: this hook's whole contract is to fail open (`except Exception:
+    sys.exit(0)` at the bottom of the file), and a missing checker must not
+    become a way to wedge every render.yaml push forever. The checker itself
+    fails CLOSED on an unreadable API, which is where that judgement belongs.
+    """
+    if str(os.environ.get("SYNDICATE_ALLOW_BLUEPRINT_DRIFT") or "").strip().lower() in ("1", "true", "yes", "on"):
+        return 0, ""
+    script = os.path.join(root, "scripts", "check_blueprint_drift.py")
+    if not os.path.isfile(script):
+        return 0, ""
+    try:
+        proc = subprocess.run([sys.executable, script],
+                              capture_output=True, timeout=120, cwd=root)
+    except Exception:  # noqa: BLE001 -- a broken checker must not wedge pushes
+        return 0, ""
+    out = (proc.stdout or b"").decode("utf-8", "replace")
+    tail = [ln for ln in out.splitlines() if ln.startswith(("DRIFT:", "UNKNOWN:", "CLEAR:"))]
+    return proc.returncode, chr(10).join(tail[-4:]) or out[-400:]
+
+
 def _refuse(kind, lane, service_state):
     """One message per refusal, always carrying the command that clears it."""
     lines = [
@@ -423,6 +448,47 @@ def main():
             "audit trail -- record in .syndicate/deploys.md why it was needed.\n"
             % (grant.get("service", "any"), grant.get("note", "no note recorded")))
         return 0
+
+    # BLUEPRINT DRIFT: a `render.yaml` push is refused while the file is behind
+    # LIVE env, and NO CLAIM CAN AUTHORISE IT. This runs BEFORE the lock logic
+    # on purpose -- the locks answer "is it your turn", and no amount of turn
+    # makes deleting 167 production env vars correct.
+    #
+    # MEASURED 2026-09-08: `render.yaml` was 167 keys behind production across
+    # three services. A sync would have deleted `SYNDICATE_EXECUTION_MODE=live`,
+    # `SYNDICATE_EXECUTION_LIVE_ARMED=1`, the spend caps of a live-money
+    # execution system, AND the venue credentials themselves
+    # (`KALSHI_PRIVATE_KEY`, `POLYMARKET_US_PRIVATE_KEY`), while overwriting
+    # `ODDS_API_KEY` on all three. Three locks and a CLEAR preflight would have
+    # let every bit of that through, because none of them looks at env.
+    #
+    # THIS FILE'S OWN HEADER PROMISED THIS CHECK AND NOBODY HAD WRITTEN IT: it
+    # advertises "`scripts/deploy_preflight.py`   job liveness + render.yaml
+    # blast radius", and preflight contains no env-var logic at all. This makes
+    # the sentence true.
+    #
+    # SCOPED TO `render.yaml` PUSHES ONLY, so an ordinary service deploy pays
+    # nothing -- no API calls, no latency, no new way to fail. And the module
+    # tail is `except Exception: sys.exit(0)`, so a bug in the checker itself
+    # still fails OPEN, which is this file's standing contract.
+    if shape == "render.yaml":
+        drift_code, drift_out = _blueprint_drift(root)
+        if drift_code != 0:
+            sys.stderr.write(
+                "BLOCKED: this push carries `render.yaml`, and the file is BEHIND\n"
+                "live production env. `blueprint_sync` would apply it wholesale.\n\n"
+                "%s\n\n"
+                "No claim authorises this -- the locks order deploys, they do not\n"
+                "make a destructive one safe. Reconcile the live values INTO\n"
+                "render.yaml first, and do NOT copy secrets into a git-tracked\n"
+                "file (ODDS_API_KEY, ADMIN_TOKEN, KALSHI_PRIVATE_KEY and\n"
+                "POLYMARKET_US_PRIVATE_KEY belong to the dashboard; they want\n"
+                "`sync: false`).\n\n"
+                "  py -3 scripts/check_blueprint_drift.py       # the full enumeration\n\n"
+                "Override, and say why in .syndicate/deploys.md:\n"
+                "  SYNDICATE_ALLOW_BLUEPRINT_DRIFT=1\n"
+                % drift_out)
+            return 2
 
     services = _target_services(cmd, shape)
     if not services:
