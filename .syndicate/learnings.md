@@ -4777,3 +4777,50 @@ the pre-fix control quoted below.
   deleted note is not.
 - **Cost:** none. The method is the same predicate `discard-guard.py` applies to
   file content, applied to ledger blocks.
+### 2026-09-09 — DISCHARGED, not overridden: the 2026-08-29 NCAAF alias-map prohibition was CONDITIONAL, and both its conditions are now met
+
+- **What we believed:** that `FORBIDDEN: closing a name-join gap by POPULATING an
+  alias map, without first checking the map's source carries the missing name`
+  (2026-08-29) barred NCAAF from ever getting a map. Read as a blanket ban it
+  would have left `canonical_team("ncaaf", …)` returning `None` for every club
+  indefinitely.
+- **What was actually true:** the rule's own wording is conditional -- it forbids
+  populating a map *without first* doing two things, and it names both: (a)
+  confirm the SOURCE contains the specific name the join fails on, and (b)
+  enumerate what the map resolves that the heuristics previously left
+  unresolved, because those lookups flip from "fall back" to "authoritative".
+  **Both were run and both passed**, on the 08-29 entry's own named failures:
+  `umass minutemen` -> `massachusetts` now resolves (the token that defeated the
+  08-29 attempt), and `canonical_team("ncaaf","MAS")` -> `UMass Dartmouth` -- its
+  headline mis-resolution -- returns **None**.
+- **Why it works now and did not then:** a DIFFERENT SOURCE and a different
+  derivation. 08-29 built 2,232 keys from `unambiguous_team_index()` over
+  `ncaaf_team_registry.csv` (2026-07-21). This derives 595 entries over 138 FBS
+  clubs from `iter_team_alias_offers()` over
+  `ncaaf_team_registry_snapshot.csv` (2026-08-26) -- the file
+  `oddsapi_lines.resolve_team` actually reads. **Fewer keys, better ones.** The
+  collision pass also counts across all four divisions BEFORE filtering to FBS,
+  so a code an FCS school also claims is dropped rather than handed to the FBS
+  programme: 95 bare mascots dropped (`tigers` 25 schools, `bulldogs` 23,
+  `wildcats` 15).
+- **The semantics-flip the 08-29 rule feared was measured and went the other
+  way.** Wrong-pair false positives **fell 7 -> 1**: `Iowa`/`Iowa State`,
+  `Ohio`/`Ohio State` and `Texas`/`North Texas` all returned True under the old
+  prefix heuristic and are now correctly distinct. `teams_match` gained **+190
+  correct with 0 lost**.
+- **How we found out:** by treating the rule as a checklist rather than a wall,
+  running its two gates against the exact tokens its evidence entry names, and
+  refusing to proceed on key count alone -- which is precisely the error 08-29
+  recorded ("2,232 keys looked like success; the one token that mattered still
+  returned `None`").
+- **The rule going forward:** **a CONDITIONAL prohibition is discharged by
+  meeting its conditions and recording the measurement, not by asking for an
+  override.** Read the rule's own wording before treating it as absolute, and
+  when it names a failing token, test THAT token. The blanket reading of this
+  entry would have cost the platform every NCAAF club resolution indefinitely.
+  Where a rule IS absolute (`FORBIDDEN` with no condition), this does not apply.
+- **Cost:** none. 138/138 FBS clubs resolve, 102/102 club slots on a 51-game
+  card, 22/22 eligible board games via `match_event_blob`, where all were 0.
+  Landed `04a82c38` + `8730b829`. **Scope held: this removes ONE OF TWO gates on
+  the Kalshi execution path and places no orders** -- none of today's NCAAF
+  contracts is FBS-vs-FBS.
