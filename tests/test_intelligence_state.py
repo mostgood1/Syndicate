@@ -3093,15 +3093,36 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(fields["state_last_updated"], "2026-07-04T21:00:00Z")
         self.assertEqual(fields["debug_source"], "snapshot_read")
 
-    def test_status_page_redirects_to_api_status(self) -> None:
-        app = Flask(__name__)
-        app.register_blueprint(intelligence_bp)
+    def test_status_page_renders_coverage_html_instead_of_redirecting(self) -> None:
+        """REPLACES test_status_page_redirects_to_api_status `[user decision,
+        2026-09-09]`.
 
-        with app.test_request_context("/intelligence/status?date=2026-06-10", method="GET"):
-            response = app.view_functions["syndicate_intelligence.intelligence_status_page"]()
+        The redirect it pinned was a real defect wearing a passing test. Its
+        target, `/api/intelligence/status`, serves the intelligence BOARD
+        STATE -- not coverage -- so the board's "Data coverage" pill sent
+        people to unrendered JSON that answered a different question, and
+        `intelligence_status.html` sat orphaned with no caller for three
+        months.
 
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("/api/intelligence/status?date=2026-06-10", response.location)
+        The route now reads a worker-published artifact. It still must never
+        BUILD one: `build_intelligence_status()` is the call recorded in this
+        module as exceeding a 2GB service on its own. That guarantee is tested
+        in `tests/test_coverage_report_artifact.py`, which sabotages the
+        builder and requires the page to render anyway.
+
+        Uses create_app() rather than a bare Flask(__name__): the blueprint
+        renders a template now, and a bare app rooted at the tests package
+        resolves no template folder.
+        """
+        from syndicate.app import create_app
+
+        app = create_app()
+        app.testing = True
+        response = app.test_client().get("/intelligence/status?date=2026-06-10")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/html", response.headers["Content-Type"])
+        self.assertIn("The Syndicate data coverage page", response.get_data(as_text=True))
 
     def test_default_intelligence_query_does_not_use_stale_latest_board_snapshot_fallback(self) -> None:
         response_payload = {

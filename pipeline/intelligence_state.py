@@ -53,6 +53,7 @@ from syndicate.features.shared.odds_control_plane import load_odds_history_paylo
 from syndicate.features.shared.odds_control_plane import odds_history_roots_for_sport
 from syndicate.features.shared.odds_control_plane import odds_history_paths_for_sport
 from syndicate.features.shared.odds_control_plane import resolve_current_shard_key
+from syndicate.features.shared.coverage_report_artifact import publish_coverage_report
 from syndicate.features.shared.refresh_state_store import KeyValuePayloadTooLarge
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
@@ -5233,6 +5234,26 @@ class IntelligenceStateService:
                     status = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date, force_refresh=False, skip_game_hydration=True)
             else:
                 status = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date, force_refresh=False, skip_game_hydration=True)
+
+        # PUBLISH THE COVERAGE REPORT HERE, and only here, because this is the
+        # one place in the system that already holds a built status. The web
+        # service cannot build one: `build_intelligence_status` is the call
+        # measured above to exceed a 2GB service on its own, and web is also
+        # 2GB. So `/intelligence/status` reads what this writes, and renders a
+        # degraded state when nothing has been written yet.
+        #
+        # Sound from THIS call site specifically, despite `skip_game_hydration=
+        # True`: the published projection carries artifacts, advanced_inputs,
+        # advanced_gate, readiness_gate and the two summaries -- all computed in
+        # build_intelligence_status's own loop or from `overview`'s slug/name/
+        # active_today, never from the hydrated dashboard_games/home_rails that
+        # the flag skips. Adding a field to the projection that DOES need
+        # hydration would silently publish an empty one from here.
+        #
+        # Cost added is a projection plus one keyvalue write; no computation.
+        # publish_coverage_report never raises -- a coverage page must not be
+        # able to take down the loop that produces the boards.
+        publish_coverage_report(status if isinstance(status, dict) else {}, str(selected_date or ""))
 
         status_fingerprint = self._source_state_fingerprint_from_status(status if isinstance(status, dict) else {}, selected_date)
         fingerprint = hashlib.sha256(f"{cache_key}:{status_fingerprint}".encode("utf-8")).hexdigest()

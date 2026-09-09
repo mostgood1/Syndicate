@@ -43,6 +43,8 @@ from syndicate.features.shared.game_chip_scoreboard import (
     build_game_chips,
 )
 from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
+from syndicate.features.shared.coverage_report_artifact import empty_coverage_report
+from syndicate.features.shared.coverage_report_artifact import read_coverage_report
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.timezone import normalize_timestamped_payload
@@ -3868,12 +3870,39 @@ def market_board_opportunities_page():
 
 @intelligence_bp.get("/intelligence/status")
 def intelligence_status_page():
+    """The data-coverage PAGE. Reads a published artifact; never builds one.
+
+    This route 302'd to `/api/intelligence/status` from 2026-06-10 (`5aeb8075`)
+    until 2026-09-09. Two things were wrong with that. The redirect's target
+    serves the intelligence BOARD STATE, not coverage -- so the board's "Data
+    coverage" pill answered a different question in unrendered JSON -- and the
+    template it replaced, `intelligence_status.html`, became an orphan no code
+    referenced.
+
+    It is NOT restored by reverting. The old body called
+    `build_intelligence_status()`, which `pipeline/intelligence_state.py`
+    records as "confirmed live to single-handedly exceed the refresh-worker's
+    2GB memory limit" (2026-07-24). Web is also 2GB. That call must not be on
+    a request path, so the worker publishes a projection of it and this reads
+    the projection -- the worker-split rule in CLAUDE.md, applied literally.
+
+    When nothing has been published (fresh deploy, worker behind, a date with
+    no tick yet) the page renders `empty_coverage_report()` and says so. It
+    does NOT backfill: "If data is missing at request time, the correct
+    behavior is a degraded/empty UI state, not an on-request backfill."
+    """
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
-    selected_sport = str(request.args.get("sport") or "").strip()
-    redirect_target = f"/api/intelligence/status?date={selected_date}"
-    if selected_sport:
-        redirect_target = f"{redirect_target}&sport={selected_sport}"
-    return redirect(redirect_target, code=302)
+    report = read_coverage_report(selected_date)
+    published = report is not None
+    if report is None:
+        report = empty_coverage_report(selected_date)
+    return render_template(
+        "intelligence_status.html",
+        status_report=report,
+        selected_date=selected_date,
+        coverage_published=published,
+        coverage_generated_at=report.get("generated_at"),
+    )
 
 
 def _portfolio_summary_limit() -> int:

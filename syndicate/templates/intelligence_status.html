@@ -29,10 +29,40 @@
       box-shadow: var(--cards-shadow);
     }
 
+    /* Same crest, same framing rules as the /syndicate hero, the market-board
+       masthead and the error pages -- rounded, bordered, cover-cropped on the
+       hood and eyes -- so every brand moment in the product reads as one
+       system. Border uses this page's own --intel-status-border rather than
+       --cards-line-strong, because the rest of the page does. */
     .intel-status-hero {
       padding: 24px;
       display: grid;
-      gap: 14px;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 272px);
+      gap: 22px;
+      align-items: stretch;
+    }
+
+    .intel-status-hero__body { display: grid; gap: 14px; align-content: start; }
+
+    .intel-status-hero__art {
+      width: 100%;
+      height: 100%;
+      min-height: 180px;
+      display: block;
+      object-fit: cover;
+      object-position: center 34%;
+      border-radius: 18px;
+      border: 1px solid var(--intel-status-border);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+    }
+
+    /* Stacked, not dropped -- this is a reference page, not navigation and not
+       an input surface, so nothing here has to stay above the fold. Height
+       tracks width for the reason measured on the market-board hub: `cover`
+       on a fixed-height box crops past the eyes as the box widens. */
+    @media (max-width: 900px) {
+      .intel-status-hero { grid-template-columns: 1fr; gap: 18px; }
+      .intel-status-hero__art { min-height: 0; height: clamp(132px, 30vw, 240px); object-position: center 26%; }
     }
 
     .intel-status-topline {
@@ -199,22 +229,38 @@
   {% set readiness_gate = status_report.readiness_gate if status_report.readiness_gate is defined else {'ready': false, 'ready_sports': [], 'partial_sports': [], 'blocked_sports': [], 'inactive_sports': []} %}
   <div class="intel-status-shell">
     <section class="intel-status-hero">
-      <div class="intel-status-topline">
-        <div>
-          <div class="intel-status-kicker">Coverage and readiness</div>
-          <h1 class="intel-status-title">The Syndicate data coverage page</h1>
+      <div class="intel-status-hero__body">
+        <div class="intel-status-topline">
+          <div>
+            <div class="intel-status-kicker">Coverage and readiness</div>
+            <h1 class="intel-status-title">The Syndicate data coverage page</h1>
+          </div>
+          <div class="intel-status-linkbar">
+            <a class="intel-status-link is-primary" href="{{ url_for('syndicate_intelligence.intelligence_home', date=selected_date) }}">Back to intelligence engine</a>
+            <a class="intel-status-link" href="{{ url_for('syndicate_intelligence.intelligence_status_api', date=selected_date, refresh=1) }}">Open status JSON</a>
+          </div>
         </div>
+        <p class="intel-status-subtitle">This page is only for artifact coverage and readiness details. The query engine itself now lives on its own page, so the intelligence surface can stay focused on prompts, recommendations, tables, and charts.</p>
         <div class="intel-status-linkbar">
-          <a class="intel-status-link is-primary" href="{{ url_for('syndicate_intelligence.intelligence_home', date=selected_date) }}">Back to intelligence engine</a>
-          <a class="intel-status-link" href="{{ url_for('syndicate_intelligence.intelligence_status_api', date=selected_date, refresh=1) }}">Open status JSON</a>
+          <span class="intel-status-chip{% if readiness_gate.ready %} is-good{% else %} is-warn{% endif %}">{% if readiness_gate.ready %}Gate ready{% else %}Gate blocked{% endif %}</span>
+          <span class="intel-status-chip">Date {{ selected_date }}</span>
+          {# The page reads a worker-published artifact and never builds one, so
+             "nothing published yet" is a real and expected state -- a fresh
+             deploy, a worker behind, or a date with no tick. Saying so beats
+             showing 0/0 everywhere, which is indistinguishable from a measured
+             result of zero. #}
+          {% if coverage_published %}
+            <span class="intel-status-chip is-good">Published {{ coverage_generated_at|central_epoch }}</span>
+          {% else %}
+            <span class="intel-status-chip is-warn">No coverage report published for this date yet</span>
+          {% endif %}
         </div>
       </div>
-      <p class="intel-status-subtitle">This page is only for artifact coverage and readiness details. The query engine itself now lives on its own page, so the intelligence surface can stay focused on prompts, recommendations, tables, and charts.</p>
-      <div class="intel-status-linkbar">
-        <span class="intel-status-chip{% if readiness_gate.ready %} is-good{% else %} is-warn{% endif %}">{% if readiness_gate.ready %}Gate ready{% else %}Gate blocked{% endif %}</span>
-        <span class="intel-status-chip">Date {{ selected_date }}</span>
-        <span class="intel-status-chip">Local-first only</span>
-      </div>
+      {# alt="" -- the h1 beside it already names the page, so a described
+         image would only make a screen reader say it twice. #}
+      <img class="intel-status-hero__art"
+           src="{{ url_for('static', filename='shared/syndicate-crest.jpg') }}"
+           alt="" role="presentation" width="720" height="492" />
     </section>
 
     <section class="intel-status-summary-grid">
