@@ -794,6 +794,17 @@ death, never life — do not invert it.
 - Hypothesis, WRITTEN BEFORE TESTING: the assertions are about WHICH ROOT owns an object, and the module's own docstring says "the shared `seen` set means the first root to reach an object owns it". Under a full parallel suite the interpreter holds far more imported modules and live objects than in isolation, so a DIFFERENT root reaches the fixture object first and the ownership assertion flips. i.e. the tests depend on the heap POPULATION, which `-n 6 --dist loadfile` changes.
 - Falsification test: if the six fail identically when `test_heap_roots.py` is run beside a SMALL unrelated module and pass beside a LARGE one (or are insensitive to what else is imported at all), the population hypothesis is wrong and the cause is something specific — a particular module's globals, or the cap interacting with object count. Also falsified if they fail in a SINGLE-worker full run, which would make it ordering/imports rather than parallelism.
 - Verification: (a) the six pass across at least 3 full parallel runs with different seeds; (b) a MUTATION CHECK that they still bind — reintroduce the broad-root-first ordering the file was written to catch, and they must go RED. (b) is the load-bearing half: per `learnings.md` 2026-09-09, a control must be shown to FAIL in the arm where the thing is broken, and passing is not evidence until it has.
+- **HYPOTHESIS FALSIFIED 2026-09-09 — HEAP POPULATION IS NOT THE VARIABLE. Recorded as an EXONERATION so nobody re-runs it.** Dose-response in ONE process with `test_heap_roots.py` LAST, dose measured rather than assumed:
+  | dose | modules | gc objects | result |
+  |---|---|---|---|
+  | alone | 1,542 | 144,522 | 11 passed |
+  | `syndicate.features.shared` | +193 | +4,037 | 12 passed |
+  | `syndicate`+`pipeline` (fs walk) | +185 | +8,864 | 12 passed |
+  | **+`scripts`+`tests`** | **1,542 -> 4,189 (+1,642)** | **144,522 -> 312,227 (2.16x)** | **12 passed** |
+  The top dose is a SERIAL-FULL-RUN-EQUIVALENT module population and a 2.16x object count, and `WiderRootTests` passes 11/11 there. So "the first root to reach an object owns it" is robust to VOLUME, and the lane's original hypothesis is wrong.
+- **WHAT IS LEFT, and it is a different shape: IDENTITY, not COUNT.** A specific object reachable from a specific module's globals that a BROAD root reaches before the narrow one would be selection-dependent and invisible to a dose-response. That is the next hypothesis, and it is NOT yet tested.
+- **THE SERIAL FULL RUN DID NOT ANSWER THE PARALLELISM QUESTION.** It truncated at 49% (109 lines, ends mid-line, exit 127, no summary). Cause NOT established — no `MemoryError`, no Windows error event, 16 GB free at the time. Do not re-run it expecting an answer without first understanding why it dies.
+- **TWO OF MY OWN READINGS IN THIS LANE WERE INSTRUMENT ARTEFACTS, retracted here so they are not inherited:** (1) "`test_live_refresh_loop.py` kills the process" — FALSE, it completes (228 tests, 100%, exit 0); (2) "dose-response arm C died" — unproven. Both came from `| tail -N` on output whose final line is a **134,444-character** JSON memory blob, which silently cut the pytest summary; and `EXIT=$?` after a pipe reads `tail`'s status, not pytest's. Use `> file` and GREP for the summary, never `tail`, on any command in this repo that prints `*_MEMORY` JSON.
 - Blocked by: nothing.
 
 
