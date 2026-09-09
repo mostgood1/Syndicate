@@ -47,6 +47,31 @@ from syndicate.features.shared.kalshi_board_join import (
 # --------------------------------------------------------------------------
 
 
+@pytest.fixture(autouse=True)
+def _quote_capture_writes_to_a_scratch_data_root(tmp_path, monkeypatch):
+    """Keep this file's `join_to_board` calls out of the tracked `data/` mirror.
+
+    `join_to_board` is not a pure reporter: its last act is
+    `_capture_kalshi_quotes`, which appends every matched price to
+    `book_quotes/<date>.jsonl` under `data_root()`. So a test that only wants
+    the BOARD_JOIN log line writes an artifact as a side effect, and measured
+    2026-09-09 `test_the_gate_is_readable_from_the_emitted_log_line` created
+    `data/mlb_source/tracking/book_quotes/.jsonl` in the checkout -- the empty
+    prefix being `selected_date=None`, which is what this file passes because
+    the date is irrelevant to a ladder-shape assertion.
+
+    The DATE is not the defect and fixing it would be worse: a real date writes
+    a real-looking shard into the mirror, which is the exact confusion
+    `CLAUDE.md` documents at length. The data ROOT is the defect, so it is
+    redirected here rather than at the call.
+
+    Autouse and module-wide, not on the one test: the next ladder test to reach
+    `join_to_board` inherits the isolation instead of rediscovering it.
+    """
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path / "data_root"))
+    yield
+
+
 @contextlib.contextmanager
 def _series_registered(mapping):
     """Add series to `SERIES_SPORT` for one test, then put the table BACK.

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 import pytest
 
 
@@ -392,3 +395,341 @@ def _isolate_kalshi_discovered_series():
     finally:
         kalshi_catalogue._DISCOVERED.clear()
         kalshi_catalogue._DISCOVERED.update(before)
+
+
+# ---------------------------------------------------------------------------
+# THE TRACKED-DATA-MIRROR WRITE GUARD
+# ---------------------------------------------------------------------------
+# The fixtures above are five rounds of the same lesson about `reports/`: a test
+# wrote a TRACKED artifact, the tree came back dirty, and `335dca07` is what a
+# `git add -A` then does with that class of dirt. `data/` is the same defect
+# with a bigger blast radius, because `CLAUDE.md` gives that tree a specific job
+# -- a cold-start mirror that is explicitly NOT what production computed -- and
+# the reason it is documented at that length is that a locally-written file
+# there is indistinguishable from a mirrored one.
+#
+# MEASURED 2026-09-09: `pytest tests/ -k "venue or kalshi or polymarket"`
+# created `data/mlb_source/tracking/book_quotes/.jsonl` -- note the EMPTY date
+# prefix -- plus its `.state.json` sidecar. `reports/` had five fixtures by
+# then and `data/` had none, so nothing said so.
+#
+# IT FOUND A SECOND ONE IMMEDIATELY, which is the argument for having it rather
+# than only fixing the reported case: five `test_archives.py` tests reached
+# `wnba/cards.py::publish_cards_page_context` through the routes they exercise
+# and published board context into `data/live/`. Nothing under `data/live/` is
+# tracked, and that makes it worse rather than better -- untracked and NOT
+# ignored is precisely the state a `git add` sweep collects, and a later local
+# run reads the file back as if the mirror had produced it. Isolated in that
+# module's `setUpModule`; see the comment there for why not a fixture.
+#
+# WHY AN INTERCEPTOR RATHER THAN AN ENV OVERRIDE. `SYNDICATE_DATA_ROOT` is the
+# `reports_root()`-shaped fix and it does NOT work here: 92 tests read
+# `REPO_ROOT/data/...` on purpose and several ignore the variable entirely (see
+# `scripts/session_worktree.py`'s `--with-test-data` note), so pointing the
+# whole suite at a scratch dir would break the tests whose SUBJECT is the
+# mirror. Reads must keep working; only WRITES are the defect. So this guard
+# names the OPERATION instead of the path, which also covers a writer nobody
+# has added yet.
+#
+# It fails TWICE on purpose. The raise puts the offending writer in the
+# traceback, which is the only thing that makes the cause cheap to find. But
+# several writers on this path are deliberately never-raise instrumentation
+# (`append_book_quotes` catches `Exception`, prints `FAILED` and returns), so a
+# raise alone can be swallowed and leave the run green with the file on disk --
+# and that is exactly how `book_quotes/.jsonl` got written. The recorded list is
+# what the teardown assertion reads, and that cannot be swallowed.
+#
+# TWO EXEMPTIONS, BOTH MEASURED RATHER THAN GUESSED. A guard that reports
+# harmless operations gets switched off, so both of these were found by running
+# the guard over the whole suite and reading what it caught:
+#
+#   * **A `mkdir` that creates nothing.** `mkdir(parents=True, exist_ok=True)`
+#     against an existing directory is a no-op, and eleven `test_archives.py`
+#     tests do it on `.../source_artifacts/data/live_lens`, a directory with 208
+#     TRACKED files already in it. A mkdir that WOULD create is still reported,
+#     because it is the earliest visible point of intent and gives the best
+#     traceback -- it is how the `book_quotes` writer was found.
+#   * **A path `.gitignore` already excludes.** The harm this guard exists to
+#     prevent is a file nobody meant to commit -- reached by a `git add` sweep,
+#     or read back later as if the mirror had produced it. Neither can happen
+#     under an ignore rule, and `.gitignore` is the repo's own statement that a
+#     subtree is regenerable local cache: `data/nfl_source/tracking/` is listed
+#     there, and nine `test_football_sim_engine.py` tests populate the nflverse
+#     release cache under it through the real code path on purpose. A TRACKED
+#     file is never exempt, whatever rules match it -- `git check-ignore` says 1
+#     for a tracked path -- and an ignore check that fails for any reason counts
+#     as NOT ignored, because an unknown must not land on the permissive branch.
+#
+# NOT COVERED, stated so it is not mistaken for covered: `os.open` and anything
+# below it (a C extension writing through its own file handle), and every
+# `python -m unittest` entrypoint -- CI runs `tests.test_archives` that way and
+# `unittest` never imports a conftest. `tests/_cache_isolation.py` exists for
+# that same gap and explains it at length.
+#
+# A test that genuinely means to write there says so with
+# `@pytest.mark.writes_tracked_data`. To tell this guard's findings apart from
+# failures that were already there, re-run with
+# `SYNDICATE_TEST_DATA_MIRROR_GUARD=off`.
+_TRACKED_DATA_MIRROR = os.path.normcase(str(Path(__file__).resolve().parents[1] / "data"))
+_TRACKED_DATA_MIRROR_PREFIX = _TRACKED_DATA_MIRROR + os.sep
+_DATA_MIRROR_WRITES: list[str] = []
+_DATA_MIRROR_GUARD_MUTED = {"value": False}
+_DATA_MIRROR_GUARD_DISABLED = str(os.environ.get("SYNDICATE_TEST_DATA_MIRROR_GUARD") or "").strip().lower() in {
+    "off",
+    "0",
+    "false",
+    "no",
+}
+_WRITE_MODE_CHARS = frozenset("wxa+")
+_GIT_IGNORED_PATH_CACHE: dict[str, bool] = {}
+_GIT_IGNORED_SUBTREE_CACHE: dict[str, bool] = {}
+
+
+def _is_inside_tracked_data_mirror(path: object) -> bool:
+    try:
+        raw = os.fspath(path)  # type: ignore[arg-type]
+    except TypeError:
+        return False  # an int fd, a socket -- not a path we can attribute
+    if isinstance(raw, bytes):
+        try:
+            raw = raw.decode()
+        except Exception:
+            return False
+    normalized = os.path.normcase(os.path.abspath(raw))
+    return normalized == _TRACKED_DATA_MIRROR or normalized.startswith(_TRACKED_DATA_MIRROR_PREFIX)
+
+
+def _git_ignores(path: object) -> bool:
+    """Does `.gitignore` already exclude this path?
+
+    Only ever called for a write that is already inside the mirror, so the
+    subprocess cost lands on the rare path and never on a read.
+
+    PROBE THE PATH ITSELF, NOT ITS PARENT. A rule written with a trailing slash
+    (`data/nfl_source/tracking/`) matches a leading component of a longer path
+    whether or not that component exists on disk, but matches the component
+    ITSELF only if it is a directory that exists -- and an ignored subtree is
+    exactly what a fresh worktree does not have. Probing the parent therefore
+    answers "not ignored" for the whole tree the rule was written for.
+
+    Two caches, and the difference matters. A directory rule applies to the
+    whole subtree, so its verdict is safe to reuse for every sibling; any other
+    pattern (`*.tmp`, say) is about the FILENAME, and reusing it per directory
+    would exempt a real write that happens to sit beside an ignored one. So only
+    a trailing-slash pattern populates the per-directory cache.
+
+    Any failure -- git absent, a timeout, output in an unexpected shape --
+    answers False. A guard whose join failed must not relax the rule.
+    """
+    try:
+        target = Path(os.path.abspath(os.fspath(path)))  # type: ignore[arg-type]
+    except Exception:
+        return False
+    exact_key = os.path.normcase(str(target))
+    cached = _GIT_IGNORED_PATH_CACHE.get(exact_key)
+    if cached is not None:
+        return cached
+    parent_key = os.path.normcase(str(target.parent))
+    if _GIT_IGNORED_SUBTREE_CACHE.get(parent_key):
+        return True
+    import subprocess
+
+    pattern = ""
+    try:
+        completed = subprocess.run(
+            ["git", "check-ignore", "-v", "--", str(target)],
+            cwd=str(Path(__file__).resolve().parents[1]),
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        ignored = completed.returncode == 0
+        if ignored:
+            # `<source>:<line>:<pattern>	<path>` -- the pattern is the third
+            # colon-separated field of the first line.
+            first = (completed.stdout or "").splitlines()[0]
+            pattern = first.split("	", 1)[0].split(":", 2)[-1].strip()
+    except Exception:
+        ignored = False
+    _GIT_IGNORED_PATH_CACHE[exact_key] = ignored
+    if ignored and pattern.endswith("/"):
+        _GIT_IGNORED_SUBTREE_CACHE[parent_key] = True
+    return ignored
+
+
+def _record_data_mirror_write(operation: str, path: object) -> None:
+    """Record, then raise. See the block comment above for why it is both."""
+    if _DATA_MIRROR_GUARD_MUTED["value"] or _git_ignores(path):
+        return
+    import traceback
+
+    detail = f"{operation} -> {path}"
+    _DATA_MIRROR_WRITES.append(detail + "\n" + "".join(traceback.format_stack()[:-2][-12:]))
+    raise RuntimeError(
+        f"TEST WROTE INTO THE TRACKED data/ MIRROR: {detail}\n"
+        "That tree is a git-tracked cold-start mirror, not scratch space -- see "
+        "CLAUDE.md. Redirect the write (monkeypatch SYNDICATE_DATA_ROOT to a "
+        "tmp_path, or patch the path the code under test resolves), or mark the "
+        "test writes_tracked_data if it truly must write there."
+    )
+
+
+def _would_create(path: object) -> bool:
+    """A `mkdir(exist_ok=True)` on an existing directory writes nothing."""
+    try:
+        return not Path(os.fspath(path)).exists()  # type: ignore[arg-type]
+    except Exception:
+        return True
+
+
+def _install_data_mirror_write_guard() -> None:
+    """Wrap the write seams once, at conftest import.
+
+    `builtins.open` and `io.open` are the same function object under two names,
+    and `Path.open` reaches `io.open` directly, so patching one of the three
+    leaves the other two open. `Path.write_text`/`write_bytes` go through
+    `Path.open` and need no wrapper of their own. `os.replace`/`os.rename` are
+    here because an atomic write whose temp file sits OUTSIDE the mirror still
+    lands inside it at the rename.
+    """
+    import builtins
+    import io
+
+    if getattr(builtins.open, "_syndicate_data_mirror_guard", False):
+        return
+
+    def _guard_open(original):
+        def _open(file, mode="r", *args, **kwargs):
+            if isinstance(mode, str) and (_WRITE_MODE_CHARS & set(mode)) and _is_inside_tracked_data_mirror(file):
+                _record_data_mirror_write(f"open(mode={mode!r})", file)
+            return original(file, mode, *args, **kwargs)
+
+        _open._syndicate_data_mirror_guard = True  # type: ignore[attr-defined]
+        return _open
+
+    builtins.open = _guard_open(builtins.open)
+    io.open = _guard_open(io.open)
+
+    _path_open = Path.open
+
+    def _guarded_path_open(self, mode="r", *args, **kwargs):
+        if isinstance(mode, str) and (_WRITE_MODE_CHARS & set(mode)) and _is_inside_tracked_data_mirror(self):
+            _record_data_mirror_write(f"Path.open(mode={mode!r})", self)
+        return _path_open(self, mode, *args, **kwargs)
+
+    Path.open = _guarded_path_open  # type: ignore[assignment]
+
+    _path_mkdir = Path.mkdir
+
+    def _guarded_path_mkdir(self, *args, **kwargs):
+        if _is_inside_tracked_data_mirror(self) and _would_create(self):
+            _record_data_mirror_write("Path.mkdir", self)
+        return _path_mkdir(self, *args, **kwargs)
+
+    Path.mkdir = _guarded_path_mkdir  # type: ignore[assignment]
+
+    _path_unlink = Path.unlink
+
+    def _guarded_path_unlink(self, *args, **kwargs):
+        if _is_inside_tracked_data_mirror(self):
+            _record_data_mirror_write("Path.unlink", self)
+        return _path_unlink(self, *args, **kwargs)
+
+    Path.unlink = _guarded_path_unlink  # type: ignore[assignment]
+
+    for _name in ("makedirs", "mkdir"):
+        def _guarded_os_mkdir(path, *args, _original=getattr(os, _name), _name=_name, **kwargs):
+            if _is_inside_tracked_data_mirror(path) and _would_create(path):
+                _record_data_mirror_write(f"os.{_name}", path)
+            return _original(path, *args, **kwargs)
+
+        setattr(os, _name, _guarded_os_mkdir)
+
+    for _name in ("remove", "unlink", "rmdir"):
+        def _guarded_os_delete(path, *args, _original=getattr(os, _name), _name=_name, **kwargs):
+            if _is_inside_tracked_data_mirror(path):
+                _record_data_mirror_write(f"os.{_name}", path)
+            return _original(path, *args, **kwargs)
+
+        setattr(os, _name, _guarded_os_delete)
+
+    for _name in ("replace", "rename"):
+        def _guarded_os_move(src, dst, *args, _original=getattr(os, _name), _name=_name, **kwargs):
+            if _is_inside_tracked_data_mirror(dst) or _is_inside_tracked_data_mirror(src):
+                _record_data_mirror_write(f"os.{_name}", dst)
+            return _original(src, dst, *args, **kwargs)
+
+        setattr(os, _name, _guarded_os_move)
+
+
+_install_data_mirror_write_guard()
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "writes_tracked_data: this test deliberately writes under the git-tracked "
+        "data/ mirror; the conftest write guard is muted for it.",
+    )
+
+
+@pytest.fixture
+def data_mirror_write_guard():
+    """A handle on the write guard, for the guard's OWN self-check only.
+
+    `tests/test_data_mirror_write_guard.py` has to make the guard fire on
+    purpose, and a test cannot both trip it and pass: `pytest.raises` catches
+    the raise, but the recorded entry still fails the autouse fixture in
+    teardown -- which is the point of recording it. `consume()` takes the
+    entries this test caused, so the teardown check sees an empty list and the
+    self-check can assert on what was recorded.
+
+    Nothing else should use this. A test that trips the guard by accident is the
+    defect the guard exists to report.
+    """
+
+    class _Handle:
+        def __init__(self) -> None:
+            self._from = len(_DATA_MIRROR_WRITES)
+
+        def consume(self) -> list[str]:
+            taken = _DATA_MIRROR_WRITES[self._from:]
+            del _DATA_MIRROR_WRITES[self._from:]
+            return taken
+
+        @staticmethod
+        def classifies_as_mirror(path: object) -> bool:
+            return _is_inside_tracked_data_mirror(path)
+
+        @staticmethod
+        def git_ignores(path: object) -> bool:
+            return _git_ignores(path)
+
+        @staticmethod
+        def mirror_root() -> str:
+            return _TRACKED_DATA_MIRROR
+
+    return _Handle()
+
+
+@pytest.fixture(autouse=True)
+def _no_writes_into_the_tracked_data_mirror(request):
+    """Fail any test that writes under the repo's git-tracked `data/` tree."""
+    muted = _DATA_MIRROR_GUARD_DISABLED or request.node.get_closest_marker("writes_tracked_data") is not None
+    previous = _DATA_MIRROR_GUARD_MUTED["value"]
+    _DATA_MIRROR_GUARD_MUTED["value"] = muted
+    before = len(_DATA_MIRROR_WRITES)
+    try:
+        yield
+    finally:
+        _DATA_MIRROR_GUARD_MUTED["value"] = previous
+        recorded = _DATA_MIRROR_WRITES[before:]
+        del _DATA_MIRROR_WRITES[before:]
+    if recorded:
+        # Reached even when the writer swallowed the raise -- the normal case
+        # for this repo's never-raise instrumentation paths.
+        raise AssertionError(
+            "this test wrote into the git-tracked data/ mirror "
+            f"({len(recorded)} operation(s)); see the block comment in "
+            "tests/conftest.py.\n\n" + "\n\n".join(recorded)
+        )

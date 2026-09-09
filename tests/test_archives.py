@@ -104,6 +104,61 @@ from syndicate.features.wnba.cards import _default_live_event_ids as wnba_defaul
 from syndicate.features.intelligence_audit import _scored_candidates
 
 
+# ---------------------------------------------------------------------------
+# Keep this module's route calls out of the tracked `data/` tree.
+# ---------------------------------------------------------------------------
+# Five tests here reach `wnba/cards.py::publish_cards_page_context` through the
+# routes they exercise, and that publish resolves its path from `data_root()`:
+# `data/live/wnba_cards_context[_live]_<date>.json`. On Render that family lives
+# in the keyvalue store; in a checkout it falls through to the filesystem, so a
+# test run created `data/live/` and left published board context in it. Nothing
+# under `data/live/` is tracked (0 files), which is exactly why it is dangerous
+# rather than merely untidy: it is untracked and NOT ignored, so a `git add`
+# sweep picks it up, and a later local run reads it back as if the mirror had
+# produced it -- the confusion `CLAUDE.md` documents at length.
+#
+# `setUpModule`, not a pytest fixture: **CI does not run pytest.**
+# `.github/workflows/ci.yml` runs `python -m unittest tests.test_archives`, and
+# `unittest` never imports `conftest.py` -- the same gap
+# `tests/_cache_isolation.py` exists for. A fixture here would leave the one
+# runner that actually gates merges unprotected.
+#
+# The path function is patched rather than `SYNDICATE_DATA_ROOT` set, because
+# this module READS the mirror in hundreds of tests and redirecting the root
+# would take the data out from under all of them.
+_WNBA_CARDS_CONTEXT_TMPDIR: TemporaryDirectory | None = None
+_WNBA_CARDS_CONTEXT_PATCH = None
+
+
+def setUpModule() -> None:
+    global _WNBA_CARDS_CONTEXT_TMPDIR, _WNBA_CARDS_CONTEXT_PATCH
+    from syndicate.features.wnba import cards as _wnba_cards
+
+    _WNBA_CARDS_CONTEXT_TMPDIR = TemporaryDirectory(prefix="wnba_cards_context_")
+    scratch = Path(_WNBA_CARDS_CONTEXT_TMPDIR.name)
+
+    def _scratch_context_path(selected_date, *, live_status_merged: bool = False) -> Path:
+        suffix = "_live" if live_status_merged else ""
+        return scratch / "live" / f"wnba_cards_context{suffix}_{str(selected_date).strip()}.json"
+
+    _WNBA_CARDS_CONTEXT_PATCH = patch.object(
+        _wnba_cards, "wnba_cards_context_artifact_path", _scratch_context_path
+    )
+    _WNBA_CARDS_CONTEXT_PATCH.start()
+
+
+def tearDownModule() -> None:
+    global _WNBA_CARDS_CONTEXT_TMPDIR, _WNBA_CARDS_CONTEXT_PATCH
+    if _WNBA_CARDS_CONTEXT_PATCH is not None:
+        _WNBA_CARDS_CONTEXT_PATCH.stop()
+        _WNBA_CARDS_CONTEXT_PATCH = None
+    if _WNBA_CARDS_CONTEXT_TMPDIR is not None:
+        _WNBA_CARDS_CONTEXT_TMPDIR.cleanup()
+        _WNBA_CARDS_CONTEXT_TMPDIR = None
+
+
+
+
 
 # A deterministic sport for the home sport-stack contract assertions.
 #

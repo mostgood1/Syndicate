@@ -1,0 +1,195 @@
+"""The guard that keeps the suite out of the git-tracked `data/` mirror.
+
+WHY THIS FILE EXISTS AND NOT JUST THE GUARD. The guard in `tests/conftest.py`
+is an instrument, and an instrument that has only ever returned "healthy" has
+not been read -- this repo has a standing rule about exactly that. So the tests
+here make it read UNHEALTHY on purpose, and pin the two ways it could be wrong
+in the direction that would matter:
+
+  1.  **Silent on a swallowed raise.** Several writers on this path are
+      deliberately never-raise instrumentation -- `append_book_quotes` catches
+      `Exception`, prints `FAILED` and returns a payload -- so a guard that only
+      raised would leave the run green with the file on disk. That is the actual
+      2026-09-09 case: `book_quotes/.jsonl` was written through a bare `except`.
+
+  2.  **Firing on a path that merely LOOKS like the mirror.** A guard that
+      matched on the string "data" would condemn every `tmp_path` with `data`
+      in it, and a prefix test without a separator would condemn a sibling
+      called `data_backup`. Either one gets the guard disabled within a week,
+      which is worse than not having it.
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_a_write_into_the_mirror_is_refused_and_recorded(data_mirror_write_guard):
+    """The raise carries the writer; the record survives a swallowed raise."""
+    target = REPO_ROOT / "data" / "_write_guard_selfcheck" / "probe.jsonl"
+
+    with pytest.raises(RuntimeError, match="TRACKED data/ MIRROR"):
+        target.parent.mkdir(parents=True, exist_ok=True)
+
+    recorded = data_mirror_write_guard.consume()
+    assert len(recorded) == 1, recorded
+    # The recorded entry is what the teardown assertion prints, so it has to
+    # name the operation AND carry the stack -- a bare "something wrote" is not
+    # actionable.
+    assert "Path.mkdir" in recorded[0]
+    assert "test_a_write_into_the_mirror_is_refused_and_recorded" in recorded[0]
+    # REFUSED, not merely reported: the guard checks before it delegates, so
+    # nothing reached the tree.
+    assert not target.parent.exists()
+
+
+def test_an_open_for_writing_is_refused_and_a_read_is_not(data_mirror_write_guard, tmp_path):
+    """Reads must keep working -- 92 tests read this tree on purpose.
+
+    The whole design rests on splitting the operation rather than the path, so
+    this is the assertion that says the split is real.
+    """
+    existing = REPO_ROOT / "data" / "mlb_source"
+    if not existing.is_dir():
+        pytest.skip("this worktree has no data/ mirror to read (see session_worktree.py)")
+
+    # A read of the mirror: allowed, and must record nothing.
+    list(existing.iterdir())
+    assert data_mirror_write_guard.consume() == []
+
+    with pytest.raises(RuntimeError, match="TRACKED data/ MIRROR"):
+        (existing / "_write_guard_selfcheck.jsonl").open("a", encoding="utf-8")
+    assert len(data_mirror_write_guard.consume()) == 1
+    assert not (existing / "_write_guard_selfcheck.jsonl").exists()
+
+
+@pytest.mark.writes_tracked_data
+def test_the_marker_is_a_real_escape_hatch():
+    """A test that genuinely owns a mirror path must be able to say so.
+
+    Without a working opt-out the first legitimate writer turns the guard off
+    for everybody, so this is load-bearing rather than a courtesy.
+    """
+    target = REPO_ROOT / "data" / "_write_guard_selfcheck_marked.jsonl"
+    try:
+        target.write_text("{}\n", encoding="utf-8")
+        assert target.is_file()
+    finally:
+        # The unlink is intercepted too, and is allowed here for the same
+        # reason the write was.
+        if target.exists():
+            target.unlink()
+
+
+@pytest.mark.parametrize(
+    "relative, inside",
+    [
+        ("data", True),
+        ("data/mlb_source/tracking/book_quotes/2026-09-09.jsonl", True),
+        # The two false positives that would get this guard deleted.
+        ("data_backup/x.jsonl", False),
+        ("datasets/x.jsonl", False),
+        # A sibling tree that is not the mirror at all.
+        ("reports/intelligence/kalshi_markets.json", False),
+    ],
+)
+def test_only_the_mirror_itself_classifies_as_the_mirror(data_mirror_write_guard, relative, inside):
+    assert data_mirror_write_guard.classifies_as_mirror(REPO_ROOT / relative) is inside
+
+
+def test_a_scratch_dir_named_data_is_not_the_mirror(data_mirror_write_guard, tmp_path):
+    """`tmp_path / "data"` is what a correctly isolated test writes to.
+
+    `SYNDICATE_DATA_ROOT` is pointed at exactly this shape by the fixtures that
+    already redirect it, so a guard that flagged it would fire on every one of
+    them.
+    """
+    scratch = tmp_path / "data"
+    scratch.mkdir()
+    (scratch / "probe.jsonl").write_text("{}\n", encoding="utf-8")
+    assert data_mirror_write_guard.consume() == []
+    assert data_mirror_write_guard.classifies_as_mirror(scratch) is False
+
+
+def test_the_mirror_root_is_the_repos_own_data_dir(data_mirror_write_guard):
+    """A guard pointed at the wrong tree reads healthy forever."""
+    assert data_mirror_write_guard.mirror_root() == os.path.normcase(str(REPO_ROOT / "data"))
+
+
+def test_a_mkdir_that_creates_nothing_is_not_reported(data_mirror_write_guard):
+    """`mkdir(parents=True, exist_ok=True)` on an existing directory is a no-op.
+
+    Eleven `test_archives.py` tests do exactly this against a directory holding
+    208 tracked files. Reporting it would have made the guard's first full-suite
+    run look like eleven defects, and a guard with that hit rate gets removed.
+    """
+    existing = REPO_ROOT / "data" / "mlb_source" / "source_artifacts" / "data" / "live_lens"
+    if not existing.is_dir():
+        pytest.skip("this worktree has no data/ mirror (see session_worktree.py)")
+
+    existing.mkdir(parents=True, exist_ok=True)
+    assert data_mirror_write_guard.consume() == []
+    # ...and the same call against a path that does NOT exist is still reported,
+    # which is the half that found the `book_quotes` writer. `tracking/` rather
+    # than `source_artifacts/` because the latter is ignored wholesale by
+    # `.gitignore` -- see the next test.
+    probe_dir = REPO_ROOT / "data" / "mlb_source" / "tracking" / "_write_guard_selfcheck_dir"
+    with pytest.raises(RuntimeError, match="TRACKED data/ MIRROR"):
+        probe_dir.mkdir(parents=True, exist_ok=True)
+    assert len(data_mirror_write_guard.consume()) == 1
+    assert not probe_dir.exists()
+
+
+def test_a_gitignored_subtree_is_not_the_tracked_mirror(data_mirror_write_guard):
+    """`.gitignore` is the repo's own statement that a subtree is local cache.
+
+    `data/nfl_source/tracking/` is listed there, and nine
+    `test_football_sim_engine.py` tests fill the nflverse release cache under it
+    through the real ingestion path. Nothing under an ignore rule can reach a
+    commit or be read back later as if the mirror had produced it, which is the
+    entire harm this guard is about.
+    """
+    ignored = REPO_ROOT / "data" / "nfl_source" / "tracking" / "_write_guard_selfcheck"
+    assert data_mirror_write_guard.classifies_as_mirror(ignored) is True
+    assert data_mirror_write_guard.git_ignores(ignored) is True
+
+    probe = ignored / "probe.jsonl"
+    try:
+        probe.parent.mkdir(parents=True, exist_ok=True)
+        probe.write_text("{}", encoding="utf-8")
+        assert data_mirror_write_guard.consume() == []
+    finally:
+        if probe.exists():
+            probe.unlink()
+        if probe.parent.is_dir():
+            probe.parent.rmdir()
+
+
+def test_a_tracked_file_is_guarded_even_inside_an_ignored_subtree(data_mirror_write_guard):
+    """The exemption is about what git would SURFACE, not about the rules.
+
+    `.gitignore:36` excludes `data/*_source/source_artifacts/` wholesale, and
+    that tree nonetheless holds thousands of TRACKED files -- 208 under
+    `live_lens` alone. `git check-ignore` answers 1 for anything in the index, so
+    overwriting one of those is still reported while a NEW cache file beside it
+    is not. Without this test the exemption reads as "source_artifacts is
+    exempt", which would blind the guard to the worst case it has.
+    """
+    tracked = REPO_ROOT / "data" / "mlb_source" / "source_artifacts" / "data" / "live_lens" / "live_lens_2026_05_29.jsonl"
+    if not tracked.is_file():
+        pytest.skip("this worktree has no data/ mirror (see session_worktree.py)")
+
+    assert data_mirror_write_guard.git_ignores(tracked) is False
+    before = tracked.read_bytes()
+    with pytest.raises(RuntimeError, match="TRACKED data/ MIRROR"):
+        tracked.open("a", encoding="utf-8")
+    assert len(data_mirror_write_guard.consume()) == 1
+    assert tracked.read_bytes() == before
+
+    beside = tracked.with_name("_write_guard_selfcheck_new.jsonl")
+    assert data_mirror_write_guard.git_ignores(beside) is True
