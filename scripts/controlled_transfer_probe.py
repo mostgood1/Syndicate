@@ -74,11 +74,18 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = REPO_ROOT / "reports" / "bandwidth_spikes"
 
 BASE = "https://syndicate-an21.onrender.com"
-#: A static asset: cheap to serve (no sim, no artifact read, no memory), stable
-#: in size, and `cf-cache-status: DYNAMIC` so every request reaches the origin
-#: and appears in BOTH logs. An ops endpoint would have put CPU and memory on a
-#: 2 GB service to measure bytes, which is not the thing under test.
-ASSET = "/static/wnba/cards-parity.js"
+#: An INCOMPRESSIBLE static asset, and the choice is load-bearing. Measured
+#: 2026-09-08: a JS file's client-side size is 4.8x what Render counts, because
+#: the origin always sends gzip (Cloudflare normalises `Accept-Encoding` toward
+#: it) and Cloudflare inflates the body for a client that asked for `identity`.
+#: A PNG logs 60,944 against 60,588 received under BOTH encodings, so the client
+#: measures the same quantity the meter does. It is also cheap to serve -- no
+#: sim, no artifact read, no memory -- and `cf-cache-status: DYNAMIC`, so every
+#: request reaches the origin and appears in both logs.
+ASSET = "/static/shared/syndicate-logo.png"
+#: `edge responseBytes - client bytes`, measured over four requests: the response
+#: headers Render counts and the client does not see as body.
+EDGE_HEADER_OVERHEAD = 356
 USER_AGENT = "syndicate-controlled-transfer/1.0"
 
 HEALTH_PATH = "/healthz"
@@ -341,6 +348,12 @@ def main() -> int:
             "requests_200": len(ok),
             "known_bytes": total_bytes,
             "known_mb": round(total_bytes / 1048576, 3),
+            # What Render's own instruments should count for these requests:
+            # body + the response headers the client never sees as body.
+            "known_edge_basis_bytes": total_bytes + EDGE_HEADER_OVERHEAD * len(ok),
+            "known_edge_basis_mb": round(
+                (total_bytes + EDGE_HEADER_OVERHEAD * len(ok)) / 1048576, 3
+            ),
             "rate_mb_per_s": round(total_bytes / 1048576 / max(elapsed, 0.001), 3),
             "implied_gb_per_hour": round(total_bytes / 1048576 * 3600 / max(elapsed, 0.001) / 1024, 2),
             "distinct_sizes": sorted({r.get("bytes", 0) for r in records}),
@@ -351,7 +364,8 @@ def main() -> int:
             "records": records,
         }
     )
-    print(f"   sent {sent}, 200s {len(ok)}, {report['known_mb']} MB in {elapsed:.1f}s "
+    print(f"   sent {sent}, 200s {len(ok)}, {report['known_mb']} MB body "
+          f"({report['known_edge_basis_mb']} MB on the edge basis) in {elapsed:.1f}s "
           f"= {report['rate_mb_per_s']} MB/s ({report['implied_gb_per_hour']} GB/h)")
     if health.abort.is_set():
         print("   HEALTH VETO:", health.reason)
