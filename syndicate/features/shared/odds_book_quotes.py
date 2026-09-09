@@ -186,6 +186,59 @@ def book_quotes_path(sport: str, date_str: str) -> Path:
     return data_root() / f"{slug}_source" / "tracking" / "book_quotes" / f"{str(date_str).strip()}.jsonl"
 
 
+def kickoff_shard_date(row: Mapping[str, Any]) -> str | None:
+    """The shard key for one quote row: the CENTRAL calendar day it kicks off.
+
+    **WHY CENTRAL AND NOT UTC, which is the other obvious answer.** Every board
+    reader asks for `YYYY-MM-DD` calendar dates -- `layer1_board.resolve_window_dates`
+    produces them, `layer2_shortlist` loops them, `book_grid_artifact` is built
+    one per date -- and the calendar those dates are counted in is CENTRAL:
+    the anchor is `central_today_iso()`, `build_layer1_board` filters each row
+    by its own Central game date, and `book_grid_artifact` says so outright
+    ("the board rolls to the next slate date at midnight Central").
+
+    A UTC-derived key is off by one for every kickoff after 7pm Central, which
+    on a football slate is the marquee window. Measured on production
+    2026-09-09: `NE @ SEA` commences `2026-09-10T00:20:00Z`, which the board
+    itself renders `7:20P CT` on the **9th**. Under a UTC key that game's rows
+    file under `2026-09-10` and a reader asking for the 9th finds nothing --
+    the same class of bug `central_date_from_iso`'s own docstring was written
+    for, and the same one `layer1_board.artifact_read_dates` exists to paper
+    over on the READ side. Keying Central removes the need for the paper.
+
+    Returns None when there is no parseable `commence_time`. **Deliberately not
+    defaulted to today**: a row whose kickoff is unknown filed under today is
+    indistinguishable from a row that really kicks off today, and the caller
+    must be able to report the difference rather than misfile it silently.
+    """
+    from syndicate.features.shared.timezone import central_date_from_iso
+
+    resolved = central_date_from_iso(row.get("commence_time") if isinstance(row, Mapping) else None)
+    return resolved.isoformat() if resolved is not None else None
+
+
+def bucket_quote_rows_by_kickoff_date(
+    rows: Iterable[Mapping[str, Any]],
+) -> tuple[dict[str, list[Mapping[str, Any]]], list[Mapping[str, Any]]]:
+    """Split quote rows into `{central_kickoff_date: rows}` plus the unfiled.
+
+    Two return values on purpose. A caller that only got the dict would have no
+    way to say how many rows it could not place, and "0 rows for this date" and
+    "every row lost its commence_time" would render as the same number.
+    """
+    buckets: dict[str, list[Mapping[str, Any]]] = {}
+    unfiled: list[Mapping[str, Any]] = []
+    for row in rows or ():
+        if not isinstance(row, Mapping):
+            continue
+        shard_date = kickoff_shard_date(row)
+        if not shard_date:
+            unfiled.append(row)
+            continue
+        buckets.setdefault(shard_date, []).append(row)
+    return buckets, unfiled
+
+
 def resolve_book_quotes_path(sport: str, date_str: str) -> Path:
     """The READ path: the plain shard if present, else its compressed form.
 

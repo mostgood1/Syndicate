@@ -530,26 +530,102 @@ def parse_events_to_rows(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
             continue
     return rows
 
+#: Env flag: also shard NFL prop quotes by Central kickoff DATE (`#NFL-props-date-shard`).
+#:
+#: ABSENT MEANS OFF, and off is byte-for-byte today's behaviour -- the week
+#: shard alone. That default is deliberate and not caution for its own sake:
+#: turning this on admits ~15.9k prop quote keys into a board store whose rows
+#: key already measures over its keyvalue ceiling, so the first deploy must not
+#: be the thing that discovers the ceiling.
+_NFL_PROP_DATE_SHARD_ENV = "SYNDICATE_NFL_PROP_QUOTES_DATE_SHARD"
+
+
+def _nfl_prop_date_shard_enabled() -> bool:
+    """Is the date-shard write on? Absent/blank/anything falsy -> False."""
+    raw = str(os.environ.get(_NFL_PROP_DATE_SHARD_ENV) or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
 def _append_nfl_book_quotes(events: list[dict[str, Any]], *, season: int, week: int) -> None:
     """Every book's price for every tracked market, into the shared quote log.
 
-    Sharded by `{season}_wk{week}` rather than a date, matching how NFL's own
-    props CSV and odds_history snapshot paths are scoped -- an NFL week is the
-    unit here, not a slate day.
+    TWO SHARD KEYS, AND BOTH ARE LOAD-BEARING.
+
+    `{season}_wk{week}` is what this has always written, matching how NFL's own
+    props CSV and odds_history snapshot paths are scoped. **Nothing in the app
+    reads it.** Every board reader asks for calendar dates -- `layer2_shortlist`
+    loops `resolve_window_dates`, `layer1_board` can only emit `YYYY-MM-DD`,
+    `book_grid_artifact` is built one file per date -- so measured on production
+    2026-09-09 the 48.4 MB week shard held 15,935 live prop keys across 16
+    events and `/api/board/book-grid?sport=nfl` served **0 props of 1,219 rows**.
+    No day had ever had an NFL prop on that board.
+
+    The date key is what makes them reachable, and it copies the sport's own
+    working precedent rather than inventing one: `fetch_nfl_team_odds_local.py`
+    writes a date shard, which is exactly why NFL GAME rows do reach the board.
+    Which date, and why Central rather than UTC, is argued in
+    `odds_book_quotes.kickoff_shard_date` -- in short, the board's window is a
+    Central calendar and a UTC key is off by one for every kickoff after 7pm CT.
+
+    **THE WEEK SHARD IS KEPT, NOT REPLACED.** `scripts/report_nfl_props_roi.py`
+    reads `{season}_wk{week}.jsonl` directly (`quote_path`, :93) and is the only
+    thing in this repo that turns an NFL prop prediction into a P&L. Dropping
+    the key it reads would orphan a working analysis tool for the live season
+    while leaving its 2023-2025 backfill (written by
+    `backfill_nfl_historical_props.py`, same key, untouched) intact -- a
+    half-broken tool, which is worse than either whole state. The cost is one
+    extra copy of the capture on disk and in the publish sweep; the benefit is
+    that neither reader can be broken by the other's key.
+
+    Gated on `SYNDICATE_NFL_PROP_QUOTES_DATE_SHARD`; absent reproduces the old
+    single write exactly.
 
     Never raises: a quote-log failure must not fail an odds fetch.
     """
     try:
         if not isinstance(events, list) or not events:
             return
-        from syndicate.features.shared.odds_book_quotes import append_book_quotes, quote_rows_from_oddsapi_events
+        from syndicate.features.shared.odds_book_quotes import (
+            append_book_quotes,
+            bucket_quote_rows_by_kickoff_date,
+            quote_rows_from_oddsapi_events,
+        )
 
         rows = quote_rows_from_oddsapi_events(events, market_map=MARKET_STD_MAP)
+        captured_at = datetime.now(tz=timezone.utc).isoformat()
         append_book_quotes(
             sport="nfl",
             date_str=f"{int(season)}_wk{int(week)}",
             rows=rows,
-            captured_at=datetime.now(tz=timezone.utc).isoformat(),
+            captured_at=captured_at,
+        )
+        if not _nfl_prop_date_shard_enabled():
+            return
+
+        # SAME `captured_at` as the week write above, not a second clock read.
+        # `append_book_quotes` stamps it onto every row and into the last-seen
+        # state, so two readings microseconds apart would make the same
+        # observation look like two, and would break any join between the two
+        # copies of the capture.
+        buckets, unfiled = bucket_quote_rows_by_kickoff_date(rows)
+        for shard_date in sorted(buckets):
+            append_book_quotes(
+                sport="nfl",
+                date_str=shard_date,
+                rows=buckets[shard_date],
+                captured_at=captured_at,
+            )
+        # REPORTED, not swallowed. A row with no parseable commence_time cannot
+        # be date-filed and is NOT defaulted onto today -- an unknown kickoff
+        # filed as today's is indistinguishable from a real one. It still
+        # reaches the week shard above, so nothing is lost; this is the line
+        # that says how much did not reach a date shard.
+        print(
+            "[odds_book_quotes] nfl prop date-shard"
+            f" rows={len(rows)} dates={len(buckets)}"
+            f" unfiled_no_commence_time={len(unfiled)}"
+            f" shards={sorted(buckets)}",
+            flush=True,
         )
     except Exception as exc:
         print(f"[odds_book_quotes] nfl append FAILED {type(exc).__name__}: {exc}")
