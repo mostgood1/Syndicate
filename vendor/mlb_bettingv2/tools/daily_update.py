@@ -281,6 +281,12 @@ _SIMW_WANT_HITTER = False
 _SIMW_BATTER_IDS: List[int] = []
 _SIMW_PROP_IDS: List[int] = []
 _SIMW_CFG_KWARGS: Dict[str, Any] = {}
+# `S3`. Passed EXPLICITLY through `_simw_init` rather than re-read from the
+# environment inside the worker. `spawn` does inherit `os.environ`, so an env
+# read would usually work -- but "usually" is how a chunk silently accumulates
+# nothing while the parent publishes a half-populated block. One decision, made
+# once, in the parent.
+_SIMW_WANT_INNINGS = False
 _PITCHER_BOX_KEYS: Tuple[str, ...] = ("BF", "P", "OUTS", "H", "R", "ER", "BB", "SO", "HR", "HBP")
 _PITCHER_PROP_DIST_SPECS: Tuple[Tuple[str, str, str], ...] = (
     ("so", "SO", "so_mean"),
@@ -340,6 +346,23 @@ from sim_engine.joint_outcomes import (
     hitter_label as _joint_hitter_label,
 )
 
+# --- `S3`: the per-inning run distributions ---------------------------------
+#
+# `seg_score(r, innings)` a few hundred lines below SUMS A PREFIX of the sim's
+# nine-plus element per-inning run vector, so by the time anything is written the
+# only surviving shape is four cumulative scalars. Inning-level and
+# rest-of-game markets cannot be priced off a prefix sum. This keeps the
+# per-inning marginals as counters, in the SAME `{value: count}` packing the
+# segments already use, so `prop_projections.project_game_market` can walk an
+# inning's block exactly as it walks a segment's today.
+#
+# OFF unless `SYNDICATE_MLB_INNING_DISTRIBUTIONS` is set -- absent means off, and
+# with it absent the artifact is byte-identical to before this existed.
+from sim_engine.inning_distributions import (
+    accumulator_for as _inning_accumulator_for,
+    enabled as _inning_distributions_enabled,
+)
+
 
 def _joint_accumulator_for(batter_ids, n_sims: int):
     """One game's joint accumulator, or None when there is nothing to measure.
@@ -370,8 +393,10 @@ def _simw_init(
     batter_ids: Optional[List[int]] = None,
     pitcher_prop_ids: Optional[List[int]] = None,
     cfg_kwargs: Optional[Dict[str, Any]] = None,
+    want_innings: bool = False,
 ) -> None:
-    global _SIMW_AWAY, _SIMW_HOME, _SIMW_WEATHER, _SIMW_PARK, _SIMW_UMPIRE, _SIMW_SEED, _SIMW_WANT_HITTER, _SIMW_BATTER_IDS, _SIMW_PROP_IDS, _SIMW_CFG_KWARGS
+    global _SIMW_AWAY, _SIMW_HOME, _SIMW_WEATHER, _SIMW_PARK, _SIMW_UMPIRE, _SIMW_SEED, _SIMW_WANT_HITTER, _SIMW_BATTER_IDS, _SIMW_PROP_IDS, _SIMW_CFG_KWARGS, _SIMW_WANT_INNINGS
+    _SIMW_WANT_INNINGS = bool(want_innings)
     _SIMW_AWAY = away_roster
     _SIMW_HOME = home_roster
     _SIMW_WEATHER = weather
@@ -654,6 +679,7 @@ def _simw_chunk(start_i: int, n: int) -> Dict[str, Any]:
     batter_ids = list(_SIMW_BATTER_IDS)
     prop_ids = list(_SIMW_PROP_IDS)
     cfg_kwargs = dict(_SIMW_CFG_KWARGS or {})
+    want_innings = bool(_SIMW_WANT_INNINGS)
 
     def init_seg():
         return {
@@ -718,6 +744,11 @@ def _simw_chunk(start_i: int, n: int) -> Dict[str, Any]:
     # correlation is invariant to row order, so the parent concatenates chunks
     # without reindexing (`JointAccumulator.extend`).
     joint_acc = _joint_accumulator_for(batter_ids, int(n)) if want_hitter else None
+
+    # `S3` FIRST OF TWO SITES. Both copies of the accumulation loop must move
+    # together -- `#334`/`#429` are what happens when one does not, and
+    # `--workers` defaults to 4, so THIS is the copy production runs.
+    inning_acc = _inning_accumulator_for(int(n), want=want_innings)
 
     for i in range(int(start_i), int(start_i) + int(n)):
         cfg = GameConfig(rng_seed=seed + int(i), weather=weather, park=park, umpire=umpire, **cfg_kwargs)
@@ -875,6 +906,12 @@ def _simw_chunk(start_i: int, n: int) -> Dict[str, Any]:
         f5 = seg_score(r, 5)
         f3 = seg_score(r, 3)
 
+        # `S3` FIRST SITE. Reads the same two vectors `seg_score` reads, before
+        # `r` is dropped at the next iteration. Counters only -- `record` keeps
+        # no reference to `r` or to either vector.
+        if inning_acc is not None:
+            inning_acc.record(r.away_inning_runs, r.home_inning_runs)
+
         # `#621` PHASE 4, FIRST SITE. The eight segment scores as joint
         # dimensions. `samples` below keeps 50 of these per segment; this keeps
         # every one, and keeps them ALIGNED with the batter outcomes from the
@@ -917,6 +954,9 @@ def _simw_chunk(start_i: int, n: int) -> Dict[str, Any]:
         # all -- `_merge_seg` merges counts only, so the multiprocessing path
         # (the DEFAULT: `--workers` is 4) discarded the joint entirely.
         "joint": joint_acc.to_transport() if joint_acc is not None else None,
+        # `S3`. Counts only, so this crosses the boundary as a few hundred small
+        # ints regardless of how many sims the chunk ran.
+        "innings": inning_acc.to_transport() if inning_acc is not None else None,
     }
 
 
@@ -4443,6 +4483,12 @@ def _sim_many(
     if joint_total is not None:
         joint_total = _JointAccumulator(joint_total.labels, 0) if workers > 1 and total_sims > 1 else joint_total
 
+    # `S3`. The flag is read ONCE, here, and carried to the workers as an
+    # initarg. Absent => False => nothing is accumulated, no key is written, and
+    # the artifact is byte-identical to what it was before this code existed.
+    want_innings = _inning_distributions_enabled()
+    inning_total = _inning_accumulator_for(total_sims, want=want_innings)
+
     if workers > 1 and total_sims > 1:
         ctx = multiprocessing.get_context("spawn")
         chunk_count = min(int(workers), int(total_sims))
@@ -4469,6 +4515,7 @@ def _sim_many(
                 batter_ids,
                 prop_ids,
                 cfg_kwargs,
+                bool(want_innings),  # `S3`
             ),
         ) as ex:
             futures = [ex.submit(_simw_chunk, st, n) for st, n in chunks]
@@ -4492,6 +4539,9 @@ def _sim_many(
                     _joint_chunk = res.get("joint")
                     if _joint_chunk:
                         joint_total.extend(_joint_chunk)
+                # `S3`. THE MERGE, on the path production actually takes.
+                if inning_total is not None:
+                    inning_total.extend(res.get("innings"))
     else:
         for i in range(total_sims):
             cfg = GameConfig(rng_seed=rng_seed + i, weather=weather, park=park, umpire=umpire, **cfg_kwargs)
@@ -4624,6 +4674,10 @@ def _sim_many(
             f5 = seg_score(r, 5)
             f3 = seg_score(r, 3)
 
+            # `S3` SECOND SITE. See the first.
+            if inning_total is not None:
+                inning_total.record(r.away_inning_runs, r.home_inning_runs)
+
             # `#621` PHASE 4, SECOND SITE. See the first.
             if joint_total is not None:
                 for _seg_name, _score in (("full", full), ("first1", f1), ("first3", f3), ("first5", f5)):
@@ -4714,6 +4768,20 @@ def _sim_many(
             )
         except Exception as exc:
             print(f"[sim_many] JOINT_FAILED away={away_abbr} home={home_abbr} err={exc!r}", flush=True)
+
+    # `S3`. A NEW KEY. `sim.segments` is consumed today (cards, the daily
+    # summary mirror, `prop_projections`), so it is not reshaped -- the per-inning
+    # marginals sit beside it under `sim.innings` and nothing that reads
+    # `segments` sees a change. Omitted entirely when nothing was recorded, so a
+    # consumer can tell "not measured" from "measured, no runs".
+    #
+    # Wrapped for the same reason the joint is: an addition must never be able
+    # to fail a sim that would otherwise have written its marginals.
+    if inning_total is not None and inning_total.sims > 0:
+        try:
+            out["innings"] = inning_total.to_payload()
+        except Exception as exc:
+            print(f"[sim_many] INNINGS_FAILED away={away_abbr} home={home_abbr} err={exc!r}", flush=True)
 
     out["aggregate_boxscore"] = _build_aggregate_boxscore(
         sims=int(sims),
