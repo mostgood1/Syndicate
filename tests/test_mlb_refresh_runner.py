@@ -1157,7 +1157,31 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                 # replacement to this `with` block and restores it on exit.
                 import vendor.mlb_bettingv2.tools.web.flask_frontend as vendor_frontend
 
-                with patch.object(vendor_frontend, "_live_lens_payload", lambda *args, **kwargs: {}), patch.object(
+                # THE REPORT PATH IS NOT THE ONLY PATH, and the asymmetry is the
+                # bug. `_persist_live_lens_report` resolves
+                # `live_lens_log_path(date)` separately from the report path and
+                # APPENDS to it, so stubbing only the report leaves the JSONL log
+                # aimed at the git-tracked mirror: measured 2026-09-09, this test
+                # appended a line to `data/mlb_source/source_artifacts/data/
+                # live_lens/live_lens_2026_06_02.jsonl`.
+                #
+                # Patched on `syndicate.features.mlb.live_lens` rather than on
+                # `module`, because that is the module whose
+                # `_persist_live_lens_report` actually runs here -- and scoped to
+                # this `with` block rather than assigned, for the same reason the
+                # comment above gives for the vendor attributes: a bare
+                # assignment on a shared module outlives the test.
+                # Redirected at the ROOT rather than by patching the symbol.
+                # `patch.object(_mlb_live_lens, "live_lens_log_path", ...)` was
+                # tried first and did NOT take: the write still landed in the
+                # mirror with the patch demonstrably in scope, so the resolution
+                # does not go through the attribute this test can see.
+                # `SYNDICATE_MLB_SOURCE_ROOT` is what `sources._source_roots()`
+                # actually reads, and it cannot be bypassed by a module-identity
+                # question -- which is the property worth having in a guard fix.
+                with patch.dict(
+                    os.environ, {"SYNDICATE_MLB_SOURCE_ROOT": str(Path(tmp_dir) / "source")}
+                ), patch.object(vendor_frontend, "_live_lens_payload", lambda *args, **kwargs: {}), patch.object(
                     vendor_frontend,
                     "_live_lens_reports_payload",
                     lambda d, include_archive=False: json.loads(report_path.read_text(encoding="utf-8")),
