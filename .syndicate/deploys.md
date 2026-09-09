@@ -5,6 +5,51 @@
 
 ---
 
+## 2026-09-09 15:51:12-15:54:34Z — web `7bf2b901` -> `6e9325e1` (9 commits) — **the brand mark split ships: mascot crest for large slots, wordmark S for the chrome** — lane `brand-mascot-logo`
+
+User-directed ("deploy it"). Web only — this is templates and static assets;
+neither worker renders a page. No `render.yaml`, so no `blueprint_sync`.
+
+**Delta is small and was enumerated before firing:** 9 commits, of which only
+**two touch shipped code** — `a3d81570` (this lane) and `167b2841` (kalshi
+forward-date gate, whose flag ships off). The rest are ledger. Live `7bf2b901`
+was confirmed an **ancestor** of the target, so this is cumulative, not a
+partial revert of another lane.
+
+**verify (four readings, all taken):**
+1. **Deploy `live` 15:54:34Z**, `dep-dago0s0u01pc738nhgg0`, trigger `api`.
+   `deploy_preflight.py` afterwards: `live commit 6e9325e1`.
+2. **BYTE-IDENTITY, not a 200.** Three assets fetched from the public edge and
+   md5'd against the local build — a 200 only proves *something* is served at
+   the path, which the old wordmark would also have satisfied:
+
+   | asset | md5 (prod == local) |
+   |---|---|
+   | `apple-touch-icon.png` | `c9129f64bbef49db5fc13a3089cd5655` |
+   | `syndicate-og.jpg` | `099cc863f99ebd4d1e27423e32c22288` |
+   | `favicon-32.png` | `3136e4a3b0989d3a396acdfaa684e6cc` |
+
+3. **The head is served, and the og URL resolves to the PUBLIC host** —
+   `/syndicate` carries all four `<link rel=icon>` (48/32/16 + apple-touch) and
+   `og:image` = `https://syndicate-an21.onrender.com/static/shared/syndicate-og.jpg`.
+   That last one is the discriminating half: `url_for(..., _external=True)`
+   behind Render's proxy could have emitted an internal host and previewed as a
+   broken image everywhere, and nothing local would have shown it.
+4. **The defect is GONE, checked as an absence with a named reader:**
+   `grep -c syndicate-logo.png` over the served `manifest.json` = **0**; the
+   icon array is now `syndicate-mascot-192.png 192x192` +
+   `syndicate-mascot.png 512x512`. Previously its ONLY icon was the 815x193
+   wordmark at `sizes: "any"`, which an installer letterboxes.
+
+**Rendered check:** `/syndicate` at 1440 on production shows the crest panel in
+the hero, wordmark still alone in the header lockup. No error state.
+
+**NOT verified, and named so it is not mistaken for verified:** the tab favicon
+and the iOS home-screen icon as a USER sees them. Both are browser-chrome
+renderings of assets proven byte-identical above, but nobody has looked at an
+actual installed icon. The 16px legibility claim rests on the pre-build contact
+sheets, not on production.
+
 ## 2026-09-09 15:01:31-15:05:05Z — web `e4552e27` -> `7bf2b901` (55 commits) — **web SHIPPED FORWARD to main** — lane `web-ship-forward`
 
 User-directed. Web had been 55 commits behind since 2026-09-08T23:47:28Z.
