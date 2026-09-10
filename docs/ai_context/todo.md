@@ -3513,6 +3513,63 @@ worker-local export-only set once (2) unblocks.
 
 ---
 
+
+> **PHASE M EXERCISED END-TO-END 2026-09-09 22:5x CT. Two of the three VERIFY
+> criteria are now MET; the third is BLOCKED BY PRODUCTION DATA, not by tooling —
+> and finding that out IS this phase working.**
+> `[lane web-oom-census, session 2edf8b82 — measurement only, no code changed]`
+>
+> **STALE HAZARD CLOSED.** The note above says (3)'s commit `66b66895` "is not on
+> `origin/main`, so the file does not exist in the primary tree".
+> `scripts/snapshot_render_env.py` **is on `origin/main` now**, as are
+> `mirror_manifest.py`, `replay_diff_gate.py` and `fleet_local.py`. All six build
+> items are landed AND reachable.
+>
+> **Mirror established** at `C:\syndicate-mirror` (outside the git tree, outside
+> OneDrive, per the practicals). `inventory` reads the whole hot set in **11.79s —
+> 47,567 files / 17,316,080,217 bytes**, up from the 33,221 / 13.97 GB recorded on
+> 09-02.
+>
+> **VERIFY (2) — already MET, unchanged.** The replay-diff day stands.
+>
+> **VERIFY (3) "first deployed-inert-class defect caught locally" — NOW MET, and
+> it was caught by exactly the mechanism this phase exists to create.** Building
+> the NFL prop join tonight (`a4b500fd`), the first version passed **13 unit tests**
+> and stamped **ZERO rows** when run through the REAL entry point against the REAL
+> published artifact: `latest_season()` answers 2025 early in a season because it
+> globs the SmartSim2 family rather than props, and the fallback scan could not
+> reach 2026. **Unit tests never exercised resolution at all**; a local run over
+> production data did. Had it shipped it would have been inert in production and
+> indistinguishable from "the model has no view". Recorded in
+> `findings_2026-09-09_nfl_prop_model_coverage.md` and `learnings.md`.
+>
+> **VERIFY (1) "parity manifest covering at least the families `#624` uses" — NOT
+> MET, AND THE REASON IS THE FINDING.** All six families were exercised and all six
+> WORK; **no single date has all six**:
+>
+>     2026-09-08  4 of 6 matched (39 files, 168,169,643 B)  manifest e6757f3cc842fd23
+>                 verify: 39 re-hashed, 0 missing, 0 drifted -- PASS
+>                 mlb_actuals_replay 0, mlb_prop_history 0
+>     2026-06-14  mlb_actuals_replay 15 files   manifest 47568090177ed76b
+>     2026-06-10  mlb_prop_history    2 files   manifest 146a4abb46b5abb5
+>
+> `mlb_book_grid_replay` covers **35 dates, 2026-08-06..09-09**. `feed_live` is
+> frozen at **2026-06-14..06-25**; `props_history` is **18 files over 7 scattered
+> dates** (06-10, 07-02, 07-04, 07-05, 07-08, 07-09, 08-06). **The two families
+> missing from every recent date are precisely the two needed to GRADE props
+> against outcomes**, which is `#624`'s whole subject.
+>
+> **THIS IS `CLAUDE.md`'s ONE-USABLE-DATE TRAP, REPRODUCED WITH THE NEW TOOLING —
+> and now it is LOUD instead of silent.** Before Phase M an analysis joining these
+> families would have collapsed to the intersection and still looked like it ran on
+> months of data. `sync` now prints `production reports NO files for these patterns
+> on this date` per family, per date.
+>
+> **CONSEQUENCE FOR `#624`: it cannot be graded end-to-end on a recent slate until
+> `feed_live` and `props_history` are being published for CURRENT dates.** That is
+> a producer/publisher question, not a mirror question, and it should be settled
+> before Phase 1 work is scheduled. **Do not read this as the mirror failing.**
+
 ### `#624` — **PHASE 1 — MLB PROP PROGRAM (Sept). The +8.5pp-gross under book, converted from vig into ROI.** — lane `edge-plan`, 2026-09-01 — **OPEN; order is load-bearing**
 
 1. **Tail calibration FIRST**: per-(market, line) isotonic/Platt on
