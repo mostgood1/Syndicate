@@ -30268,3 +30268,196 @@ run, against a 4,096 MB ceiling — 0.94%.
 - instrument note: the checker is `verify_nfl_props.py` in the session worktree, parsing `title` -> player/market, `meta` -> side/line, and the `Real rate model` metric -> probability. It scores the SERVED payload, not the artifact, so it measures what a user sees. **Hazard hit and worked around:** a heredoc'd em-dash in the title-split regex was transcoded by the shell layer, which silently made ALL 2,028 cards unparseable and would have read as a total board failure -- the classification above was re-run from a file with an explicit `—` escape. This is `learnings.md` 2026-09-03, *shell layer transcodes bytes*, in a new place.
 
 - one run was asked for and one run was taken. No further rebuild before kickoff.
+
+### restore-measurement — EVENING READINGS 2026-09-09 (MLB supply, prop seal, tape) + STEP 1 VERDICT
+
+Unattended scheduled run, READ-ONLY against production. No deploy, no env change,
+no code edit. Companion to `### restore-measurement — MORNING READINGS 2026-09-09`
+(readings 1-2) earlier in this file; the four readings are numbered across both.
+
+READING 3a — MLB graded supply for 2026-09-08: **PASS, and name the counter.**
+
+`/mlb/api/market-accuracy?date=2026-09-08`, read 2026-09-10T02:34:42Z.
+`source_kind` `season_betting_day_payloads`, `profile` `retuned`, source path
+`.../eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_09_08.json`.
+
+THE PAYLOAD CARRIES TWO POPULATIONS AND THEY DIFFER BY 77x. `games.overall` and
+`props.overall` are computed on the OFFICIAL tier only:
+
+    games.overall    bets 1    resolved 1    (1W 0L)   by_market: Moneyline only
+    props.overall    bets 12   resolved 12   (7W 5L)
+    combined.overall bets 13   resolved 13   (8W 5L, ROI +0.15%)
+
+`rows` carries the graded row population the baseline was quoting:
+
+    rows.all       1003 rows   ml 15 | hitter_hits 205 | hitter_rbis 203
+                               hitter_total_bases 172 | hitter_hits_runs_rbis 170
+                               hitter_home_runs 162 | pitcher_strikeouts 28
+                               pitcher_outs 26 | hitter_runs 22
+                               results: 448W / 555L, 0 ungraded
+    rows.playable   990 rows   ml 14
+    rows.official    13 rows   ml 1   (== the `overall` blocks)
+
+The stated baseline "8-15 game rows per day, props 0 per day" is at `rows.all`
+scale, not official-tier scale — 1 official ML pick was never 8-15 of anything.
+Against the matching counter: **game rows 15 (>= 10), and props 988 of 988 graded
+in `rows.all` / 12 of 12 official against a baseline of 0.** Both clauses PASS.
+Read off `games.overall` alone the game clause would read 1 and "fail"; that is the
+wrong denominator, not a regression. `selected_counts` confirms the official card:
+combined 13, hitter_hits 4, hitter_total_bases 6, hitter_runs 1, ml 1,
+pitcher_props 1, and 0 for hitter HR / H+R+R / RBIs / totals — the live caps.
+
+READING 3b — the pregame snapshots on disk. Present, and ASYMMETRIC ACROSS THE TWO
+TREES, which is the whole point of WP6:
+
+    mlb_source/source_artifacts/data/daily/snapshots/2026-09-08/
+      oddsapi_pitcher_props_2026_09_08_pregame.json    57,682 B   2026-09-08T22:18:18Z (17:18 CT)
+      (NO hitter pregame file in this tree)
+    mlb_source/data/daily/snapshots/2026-09-08/
+      oddsapi_hitter_props_2026_09_08_pregame.json    613,113 B   2026-09-08T15:19:37Z (10:19 CT)
+      oddsapi_pitcher_props_2026_09_08_pregame.json    57,682 B   2026-09-08T22:18:18Z (17:18 CT)
+
+The hitter seal exists ONLY in the sibling tree. A grader reading only
+`source_artifacts/` would find no hitter pregame file at all.
+
+READING 3c — the prop seal (#611) in the locked card: **PASS.**
+
+Two artifacts match `daily_summary_2026_09_08_locked_policy.json` and they are
+DIFFERENT STAGES — say which one you read:
+
+  (i) `.../data/daily/daily_summary_2026_09_08_locked_policy.json` (189,878 B),
+      `tool` `tools/daily_update_multi_profile.py`, generated 2026-09-08T23:49:05.
+      This is the CARD BUILD. Its `inputs` point at the LIVE market files
+      (`.../data/market/oddsapi/oddsapi_hitter_props_2026_09_08.json`, no
+      `_pregame`), the string `pregame` appears ZERO times, and there is no
+      `lines read:` warning. This is the build step, not the graded step — do not
+      read it as a seal failure.
+
+  (ii) `.../eval/seasons/2026/locked_cards_retuned/daily_summary_2026_09_08_locked_policy.json`
+      (2,237,104 B), `tool` `tools/eval/build_season_betting_cards_manifest.py`,
+      generated 2026-09-09T21:17:44 — today, after the 2026-09-08T19:58:07Z
+      refresh-worker deploy. This is the graded lineage market-accuracy reads.
+      `inputs`:
+
+        game_lines    /opt/render/project/data/mlb_source/source_artifacts/data/daily/snapshots/2026-09-08/oddsapi_game_lines_2026_09_08_pregame.json
+        pitcher_lines /opt/render/project/data/mlb_source/data/daily/snapshots/2026-09-08/oddsapi_pitcher_props_2026_09_08_pregame.json
+        hitter_lines  /opt/render/project/data/mlb_source/data/daily/snapshots/2026-09-08/oddsapi_hitter_props_2026_09_08_pregame.json
+
+      All three end `_pregame.json`. Warnings, verbatim:
+
+        Game lines read: ..._pregame.json (pregame-freeze, 15 games)
+        Hitter lines read: ..._pregame.json (pregame-freeze, 265 players)
+        Pitcher lines read: ..._pregame.json (pregame-freeze, 29 players)
+
+      265 hitters is "in the hundreds" as specified. NOT `(live, ...)`. The same
+      three warnings appear on the market-accuracy day payload, so the seal is on
+      the path that actually grades.
+
+**WP6 `47990a30` (the sibling-tree read) is CONFIRMED WORKING, not merely deployed.**
+Hitter and pitcher lines resolve into `mlb_source/data/...` while game lines resolve
+into `mlb_source/source_artifacts/data/...` — the grader crossed trees, and per 3b the
+hitter file exists in no other tree, so a same-tree-only reader would have fallen back
+to live. The discriminating evidence is the PATH PREFIX, not the `_pregame` suffix.
+
+READING 4 — segment lines in the tape. Tapes are keyed by EVENT date, not capture
+date (the nfl tree holds 2026-09-13 and 2026-09-14 files today), and a live game's
+rows land in both the event-date and the next UTC-date file.
+
+NFL — **PASS.**
+
+    nfl_source/tracking/book_quotes/2026-09-09.jsonl   7,654 lines, 0 unparsable
+      full  7,580 rows / 270 events   (spreads 2048, totals 2043, h2h 1866, props)
+      h1       74 rows /   1 event    (totals 32, h2h 22, spreads 20)
+    nfl_source/tracking/book_quotes/2026-09-10.jsonl   6,271 lines, 0 unparsable
+      full  6,126 rows / 240 events
+      h1      145 rows /   1 event    (spreads 50, totals 50, h2h 45)
+
+Both h1 blocks are the SAME event `8c94552d022acec4a0458d70c19d3da9`, commence_time
+2026-09-10T00:20:00Z = 19:20 CT 2026-09-09 — the opener the reading was aimed at.
+219 h1 rows total. `SYNDICATE_NFL_SEGMENT_MARKETS=h1` is live on both workers and
+producing tape.
+
+SOCCER — **PASS.**
+
+    soccer_source/tracking/book_quotes/2026-09-09.jsonl   31,156 lines, 63 unparsable
+      full  30,762 rows / 70 events
+      h1       331 rows /  6 events   (h2h 212, totals 84, spreads 35)
+
+The six fixtures and their commence_time:
+
+    287d8b864bf09ee057b007374849d4ae   2026-09-09T16:45:00Z
+    3915fb1555852ddb7990dccadde3ca4e   2026-09-09T23:30:00Z
+    4d6fddf9991f1d7f74911ad57eb31be4   2026-09-09T23:45:00Z
+    5762ede9a915d31a919665485e6de2cf   2026-09-09T23:30:00Z
+    7d685a22147e99f3a4f307c04abdee05   2026-09-09T23:30:00Z
+    e363663013dfb649e6d27c5214ce221b   2026-09-09T23:30:00Z
+
+WP4 per-event segment capture is producing rows in production, not just in tests.
+This closes the "soccer h1 a population null" reading from 2026-09-08 20:1xZ — that
+null was a genuine absence of population, and the population arrived.
+
+NEW, INCIDENTAL, NOT A READING: 63 of 31,156 soccer tape lines (0.20%) are
+HEAD-TRUNCATED — each a valid record missing its opening bytes
+(`ection":"yes","player_name":"Marco Pasalic",...`), lengths 2-465 B, carrying
+`captured_at` from 2026-09-05. The tail is intact, so this is a non-atomic
+concurrent append, not corruption on read. Any consumer that counts this tape and
+does not count its own skips silently under-reports by ~0.2%. Filed as an
+observation only; the NFL and NCAAF tapes had 0 unparsable lines.
+
+NCAAF — **NULL OF POPULATION, not a failure.** There is NO
+`ncaaf_source/tracking/book_quotes/2026-09-09.jsonl` at all (export count 0),
+consistent with no Wednesday FBS slate. The next file, 2026-09-10.jsonl, holds 33
+rows on 1 event (commence 2026-09-11T00:00:00Z), all `full` and all PLAYER PROPS
+(Anytime TD 19, Receiving Yards 6, Rushing Yards 4, Passing Yards 2, Passing TDs 2)
+— no h2h/spreads/totals sweep has reached it yet, so
+`SYNDICATE_NCAAF_SEGMENT_MARKETS=h1` is UNEXERCISED, not refuted. It has not yet had
+a game-day chance to emit.
+
+LEDGER, segment on orders. `/api/ops/execution/ledger-summary?days=1&mode=paper`
+covers ONLY 2026-09-10 and is blind for this question, exactly as the morning entry
+warned: 86 account orders, `by_segment` = `{full: 86 orders, 0 settled}`, zero
+non-full, 0 of 86 settled because today's slate has not finished. That is absence of
+population twice over. Re-read at `days=3` to reach graded dates:
+
+    2026-09-08  paper:paper         232 orders   first1 2/2  first5 4/4            full 226 / 29 settled
+                paper:paper:kalshi   87 orders   first5 4/3                        full  83 / 17
+                (novig 68, polymarket 7, prophetx 167 — all full)
+    2026-09-09  paper:paper         229 orders   first1 2/2  first3 2/2  first5 4/4  full 221 / 19
+                paper:paper:kalshi   80 orders   first5 8/8                        full  72 /  3
+                paper:paper:novig    73 orders   first1 1/1  first5 1/1            full  71 /  6
+                (polymarket 12, prophetx 179 — all full)
+
+**8 non-full segment orders on 2026-09-09 and all 8 settled** (first1 2, first3 2,
+first5 4); 6 of 6 on 2026-09-08. Consistent with morning READING 2 (47 of 49 settled
+at days=9). NOTE: no `h1` ORDER exists on either date even though h1 TAPE rows do —
+capture and order generation are different stages, and only capture was in this
+lane's scope.
+
+STEP 1 VERDICT — **NOT CLOSED. Three of four readings PASS; READING 1 is UNMEASURED
+and it is the lane's headline deliverable.**
+
+    READING 1  evaluation-settlement autorun   UNMEASURED  (morning entry)
+    READING 2  segment orders settle           PASS   47/49 at days=9; 8/8 on 09-09
+    READING 3  MLB supply + #611 prop seal     PASS   15 ml rows, 988 graded props,
+                                                      pregame-freeze 265 hitters,
+                                                      sibling-tree read confirmed
+    READING 4  h1 rows in the tape             PASS   nfl 219 rows / 1 event;
+                                                      soccer 331 rows / 6 events;
+                                                      ncaaf NULL (no slate)
+
+UNMEASURED IS NOT A NULL OF POPULATION AND MUST NOT BE COUNTED AS ONE. The settlement
+pass claimed at 2026-09-09T11:02:28Z and never wrote a summary; the refresh-worker
+process was replaced by a redeploy 55.5 minutes in. The baselines WP8 `5e84b758` was
+built to move — settled 0 of 29,630, `unmatched_no_key_match` 23,080 — are still
+UNTESTED. Not confirmed, not refuted. The lane's own falsification test ("a settlement
+run after the join fix still reading `settled 0` with graded rows present = the join
+fix is inert") has not been RUN, so the join fix has no measurement and cannot be
+called verified.
+
+The blocker is structural, not a bad day: refresh-worker took 25 deploys in the 41
+hours to 2026-09-09T12:01Z, one every 1.6 hours, and the settlement pass needs the
+better part of an hour inside a deploy-free gap. The daily gate compares CENTRAL
+calendar dates, so there is no retry today; next window 2026-09-10 ~06:00 CT.
+
+Lane `restore-measurement` stays OPEN with a STATUS line naming READING 1. Three
+readings landing is worth banking — do not re-take 2, 3 or 4.
