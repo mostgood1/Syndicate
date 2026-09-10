@@ -5,6 +5,75 @@
 
 ---
 
+## 2026-09-09 21:41-21:45 CT — refresh-worker `a101c437` — **THE READING for the NFL prop join. Positive on every signal; the one clean signal is a COMPOSITION change.**
+
+Appends the 21:08 CT row above (deploy 21:08:07 CT, live 21:11:51 CT). Claim
+already released. **All times Central**, which is the clock this ledger reports
+in; the UTC stamps in the log lines are +5h.
+
+### THE COMPARISON, AND ITS LIMIT
+
+Baseline is the 19:11 CT plan on the **09-09** board; the reading is the 21:44 CT
+plan on the **09-10** board. That is the worker's normal EVENING NEXT-DAY build
+(it starts building tomorrow's board late on 09-09) — **not a date roll caused by
+the deploy**, and not two views of one slate. 09-10 is also a far thinner NFL
+slate than 09-13's Sunday card. So **no absolute count below is attributable on
+its own.**
+
+| | 19:11 CT, 09-09 board, pre-deploy | 21:44 CT, 09-10 board, post-deploy |
+|---|--:|--:|
+| `rows_in` | 3,029 | 1,147 |
+| `no_model_edge_pct` | 1,872 (**61.8%** of rows_in) | 258 (**22.5%**) |
+| `no_model_edge_by_sport['nfl']` | **1,503** | **173** |
+| `top_market_per_refusal['no_model_edge_pct']` | **`receiving yards:473`** | **`h2h:70`** |
+| `LAYER2_BOARD_HEALTH sport=nfl` | rows 1,884 / pregame_proj **71** / no_proj 1,813 | rows 219 / pregame_proj **76** / no_proj 143 |
+| NFL published rows carrying a projection | **3.8%** | **34.7%** |
+| `PREGAME_PROJECTION_JOIN sport=nfl` | considered 8,624 / projected 8,582 | considered **18,907** / projected **9,373** |
+
+Venue plans on the same build corroborate: `venue=prophetx sim_view_on=424/424`
+and `venue=novig sim_view_on=330/330` both with **no `no_model_edge_pct` refusal
+at all**, and `venue=polymarket no_model_edge_by_sport={'nfl': 2}`.
+
+### THE ONE SIGNAL A THINNER SLATE CANNOT EXPLAIN
+
+**`top_market_per_refusal['no_model_edge_pct']` moved from `receiving yards:473`
+to `h2h:70`.** That is a COMPOSITION change, not a size change: the prop markets
+that dominated this refusal are no longer in it, and what leads now is a GAME
+market. A thinner slate scales every market down together — it does not reorder
+which market leads. **This is the strongest evidence on the page**, and it is the
+one number here that does not need the slate to be held constant.
+
+Second: `PREGAME_PROJECTION_JOIN`'s **denominator more than doubled** (8,624 ->
+18,907) while `projected` rose 8,582 -> 9,373. The denominator jump is
+`_merge_nfl_coverage` behaving exactly as designed — NFL's coverage payload now
+counts PROP rows, which it never did before (`#425`'s numerator/denominator
+rule). **So the apparent fall from ~99% to 49.6% projected is the denominator
+becoming honest, NOT coverage regressing.** A reader who quotes that percentage
+without this note draws the opposite conclusion.
+
+### NOT ESTABLISHED
+
+- **No absolute count of rows gained.** The ~726 predicted in the row above
+  (recorded before the reading) is neither confirmed nor refuted: `9,373 - 8,582
+  = +791` is the right order of magnitude, but it spans two slates and the
+  pre-deploy runs themselves ranged 7,658-8,694.
+- **NFL rows remain 65% unprojected** post-deploy (no_proj 143 of 219).
+  Consistent with the known artifact ceiling — refresh-worker holds 980 sim rows,
+  and 56 of 205 quoted players have no artifact row at all — but not measured
+  here.
+- `/api/board/layer2-shortlist` returned **0 NFL rows with a model edge**
+  throughout, against an artifact stamped `written_at` 20:46:09 CT — BEFORE the
+  21:11:51 CT deploy. **That zero was a pre-fix artifact, not a failed join**, and
+  it was gated out rather than recorded. Same artifact-mtime trap `learnings.md`
+  already carries.
+
+### OWED
+
+**A full-size NFL board after the deploy** — the 09-13 Sunday card, or any build
+with rows >= 1,000 — against `rows=1884 pregame_proj=71 no_proj=1813 edged=63`.
+That is the only pair that removes the slate difference. A monitor is armed.
+
+
 ## 2026-09-10 02:08:07Z / live 02:11:51Z — refresh-worker `a101c437` — **NFL prop model wired into the board. READING OWED, and named below.**
 
 Ships `a4b500fd` (`shared/nfl_prop_projections.py` + the NFL branch of
