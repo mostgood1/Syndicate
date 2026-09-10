@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 import base64
 import calendar
 import hashlib
@@ -6450,7 +6451,13 @@ class IntelligenceStateService:
                 f"excluded_market={layer2_shortlist.get('rows_excluded_market')} "
                 f"uninformative_ev={layer2_shortlist.get('rows_uninformative_ev')} "
                 f"beyond_game_cap={layer2_shortlist.get('rows_beyond_game_cap')} "
-                f"sports={layer2_shortlist.get('active_sports')}",
+                f"sports={layer2_shortlist.get('active_sports')} "
+                # PER-SPORT SERVED COUNTS. `rows` above is the total, and every
+                # drop counter is summed across sports -- so on 2026-09-10 soccer
+                # fell from 853 served rows to 77 between two cycles and nothing
+                # in this line could say which sport lost them or when. One dict,
+                # counted from the rows already in hand; no extra work.
+                f"served_by_sport={dict(sorted(Counter(str((r or {}).get('sport')) for r in (layer2_shortlist.get('rows') or [])).items()))}",
                 flush=True,
             )
         except Exception as exc:

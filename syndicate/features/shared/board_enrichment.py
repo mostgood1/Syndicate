@@ -26,6 +26,7 @@ board a user reads and the board that gets persisted cannot drift apart.
 
 from __future__ import annotations
 
+import time
 import json
 import logging
 from pathlib import Path
@@ -38,6 +39,63 @@ _LOGGER = logging.getLogger(__name__)
 # keeping the worst case at 8 scoreboard calls per sport per build rather than
 # one per distinct fixture date in a shard that may hold a month of futures.
 _MAX_GAME_STATE_DATES = 7
+
+
+# A CAPTURED "LIVE" IS TRUSTED ONLY THIS FRESH. The fallback below reads the
+# NCAAF scoreboard capture the poller persists; a record written mid-game and
+# never refreshed would otherwise keep a finished game "live" on the board, and
+# `live_edge_policy` would then price a settled market. Pregame and final are
+# safe to read at any age (final is terminal, pregame cannot price a live edge).
+_NCAAF_CAPTURE_LIVE_MAX_AGE_SECONDS = 900
+
+
+def _read_ncaaf_capture(iso_date: str) -> tuple[list, float | None]:
+    """`(games, fetched_at)` from the persisted NCAAF scoreboard capture, READ ONLY.
+
+    Never fetches: this runs inside the board cycle on a worker with an OOM
+    history (`#241`), so a missing capture is a miss, not a network call. The
+    capture is written by `scripts.poll_ncaaf_live_state` (settlement's lazy
+    capture and the live ticks), through the same keyvalue store read here.
+    """
+    try:
+        from scripts.poll_ncaaf_live_state import live_state_path
+        from syndicate.features.shared.refresh_state_store import read_json_file
+
+        record = read_json_file(live_state_path(iso_date))
+    except Exception:
+        return [], None
+    if not isinstance(record, dict):
+        return [], None
+    games = [g for g in (record.get("games") or []) if isinstance(g, dict)]
+    try:
+        fetched_at = float(record.get("fetched_at"))
+    except (TypeError, ValueError):
+        fetched_at = None
+    return games, fetched_at
+
+
+def _game_block_from_capture(game: dict, *, fetched_at: float | None, now: float) -> dict | None:
+    """The same `row["game"]` shape a chip produces, from one captured game.
+
+    None when the captured state cannot be trusted: a "live" game read from a
+    capture older than `_NCAAF_CAPTURE_LIVE_MAX_AGE_SECONDS`, or with no stamp.
+    """
+    final = bool(game.get("final"))
+    live = bool(game.get("in_progress")) and not final
+    if live and (fetched_at is None or now - fetched_at > _NCAAF_CAPTURE_LIVE_MAX_AGE_SECONDS):
+        return None
+    state = "final" if final else ("live" if live else "pregame")
+    away = str(game.get("away_abbr") or game.get("away_team") or "")
+    home = str(game.get("home_abbr") or game.get("home_team") or "")
+    return {
+        "state": state,
+        "start_time_utc": game.get("start_time"),
+        "status_token": "FINAL" if final else (game.get("status") or None),
+        "matchup": f"{away} @ {home}",
+        "home_score": game.get("home_score"),
+        "away_score": game.get("away_score"),
+        "source": "ncaaf_live_state_capture",
+    }
 
 
 def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
@@ -218,7 +276,58 @@ def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
             for team in (home, away):
                 unmatched[str(team)] = unmatched.get(str(team), 0) + 1
 
+    # NCAAF ROWS THE CHIPS MISSED FALL BACK TO THE ESPN CAPTURE. The NCAAF chip
+    # builder keeps a game only if it has a CARD, so an FBS-vs-FCS game (no card)
+    # gets no chip, and a card whose key is spelled differently from the
+    # schedule's gets none either. Measured 2026-09-10 on production: ESPN lists
+    # 80 FBS games for 09-12 and the chips carry 76; the four missing (NMSU @
+    # Hawai'i, Cal Poly @ San Jose State, Southern Miss @ Auburn, Mercyhurst @
+    # New Mexico) left their board rows with no `game` block, so no live line
+    # could attach on Saturday. The poller's capture lists every ESPN FBS game,
+    # and the join is by registry id (or name), so spelling stops mattering.
+    capture_matched = 0
+    if sport == "ncaaf" and unmatched:
+        now_epoch = time.time()
+        captures: dict = {}
+        for row in grid:
+            if not isinstance(row, dict) or row.get("game"):
+                continue
+            home, away = row.get("home_team"), row.get("away_team")
+            if not home or not away:
+                continue
+            raw = str(row.get("commence_time") or "").strip()
+            dates = list(kickoff_capture_dates(raw)) if kickoff_capture_dates is not None and raw else []
+            if not dates and len(raw) >= 10:
+                dates = [raw[:10]]
+            for capture_date in dates:
+                if capture_date not in captures:
+                    captures[capture_date] = _read_ncaaf_capture(capture_date)
+                games, fetched_at = captures[capture_date]
+                hit = next(
+                    (g for g in games
+                     if _side_matches(home, {"name": g.get("home_team"), "abbr": g.get("home_abbr")})
+                     and _side_matches(away, {"name": g.get("away_team"), "abbr": g.get("away_abbr")})),
+                    None,
+                )
+                if hit is None:
+                    continue
+                block = _game_block_from_capture(hit, fetched_at=fetched_at, now=now_epoch)
+                if block is not None:
+                    row["game"] = block
+                    capture_matched += 1
+                break
+        if capture_matched:
+            matched += capture_matched
+            still = {}
+            for row in grid:
+                if isinstance(row, dict) and not row.get("game") and row.get("home_team") and row.get("away_team"):
+                    for team in (row.get("home_team"), row.get("away_team")):
+                        still[str(team)] = still.get(str(team), 0) + 1
+            unmatched = still
+
     coverage = {"chips": len(chips), "rows_matched": matched}
+    if capture_matched:
+        coverage["rows_matched_by_capture"] = capture_matched
     # NO CHIPS IS NOT A JOIN FAILURE, and reporting it as one is the exact
     # confusion this field was added to remove. Measured 2026-08-08: NFL
     # returned `chips: 0, unmatched_teams: [20 clubs]`, which reads as a broken

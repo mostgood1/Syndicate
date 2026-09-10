@@ -168,3 +168,107 @@ def test_MLB_asks_only_for_its_UTC_dates_as_before(chips_by_date):
     board_enrichment.attach_game_state([row], sport="mlb", selected_date="2026-09-10")
 
     assert sorted(calls) == ["2026-09-10", "2026-09-11"]
+
+
+
+# ---------------------------------------------------------------------------
+# NCAAF ROWS THE CHIPS MISS TAKE GAME STATE FROM THE ESPN CAPTURE (2026-09-10)
+# ---------------------------------------------------------------------------
+# ESPN's 80 FBS games on 09-12 produced 76 chips; the four missing left their
+# rows with no `game` block. The poller's capture has every ESPN FBS game.
+
+
+def _captured(home, away, *, home_abbr="", away_abbr="", in_progress=False, final=False, start="2026-09-13T01:00Z"):
+    return {"home_team": home, "away_team": away, "home_abbr": home_abbr, "away_abbr": away_abbr,
+            "in_progress": in_progress, "final": final, "home_score": 7 if (in_progress or final) else None,
+            "away_score": 3 if (in_progress or final) else None, "status": "2nd 5:00" if in_progress else "Sat 8:00 PM",
+            "start_time": start}
+
+
+@pytest.fixture
+def capture(monkeypatch):
+    import time as _time
+
+    def install(by_date, *, age_seconds=60, chips_list=(), ids=None):
+        ids = ids if ids is not None else {"San Jose State Spartans": "23", "San José State": "23", "Cal Poly Mustangs": "13", "Cal Poly": "13"}
+        monkeypatch.setattr(game_chip_scoreboard, "build_game_chips", lambda _d, _s: list(chips_list))
+        monkeypatch.setattr(ncaaf_team_registry, "resolve_ncaaf_team_id", lambda name: ids.get(str(name)))
+        stamp = _time.time() - age_seconds
+        monkeypatch.setattr(board_enrichment, "_read_ncaaf_capture",
+                            lambda d: (list(by_date.get(d, [])), stamp if d in by_date else None))
+    return install
+
+
+def _sjsu_row():
+    row = _row("San Jose State Spartans", "Cal Poly Mustangs")
+    row["commence_time"] = "2026-09-13T01:00:00Z"
+    return row
+
+
+def test_an_NCAAF_game_with_NO_CHIP_takes_state_from_the_capture(capture):
+    # The chips are built for the date but carry some OTHER game; this one has no chip.
+    capture({"2026-09-12": [_captured("San José State", "Cal Poly", home_abbr="SJSU", away_abbr="CP")]},
+            chips_list=[_chip("Boston College", "Rutgers")])
+    grid = [_sjsu_row()]
+
+    coverage = board_enrichment.attach_game_state(grid, sport="ncaaf", selected_date="2026-09-13")
+
+    assert grid[0]["game"]["state"] == "pregame"
+    assert grid[0]["game"]["matchup"] == "CP @ SJSU"
+    assert grid[0]["game"]["source"] == "ncaaf_live_state_capture"
+    assert coverage["rows_matched_by_capture"] == 1
+    assert "unmatched_teams" not in coverage
+
+
+def test_a_FRESH_live_capture_marks_the_row_live(capture):
+    capture({"2026-09-12": [_captured("San José State", "Cal Poly", home_abbr="SJSU", away_abbr="CP", in_progress=True)]},
+            chips_list=[_chip("Boston College", "Rutgers")], age_seconds=120)
+    grid = [_sjsu_row()]
+
+    board_enrichment.attach_game_state(grid, sport="ncaaf", selected_date="2026-09-13")
+
+    assert grid[0]["game"]["state"] == "live"
+    assert grid[0]["game"]["home_score"] == 7
+
+
+def test_a_STALE_live_capture_is_NOT_trusted(capture):
+    # A mid-game capture never refreshed must not keep a finished game live.
+    capture({"2026-09-12": [_captured("San José State", "Cal Poly", home_abbr="SJSU", away_abbr="CP", in_progress=True)]},
+            chips_list=[_chip("Boston College", "Rutgers")], age_seconds=3600)
+    grid = [_sjsu_row()]
+
+    board_enrichment.attach_game_state(grid, sport="ncaaf", selected_date="2026-09-13")
+
+    assert "game" not in grid[0]
+
+
+def test_a_STALE_final_capture_is_still_trusted(capture):
+    capture({"2026-09-12": [_captured("San José State", "Cal Poly", home_abbr="SJSU", away_abbr="CP", final=True)]},
+            chips_list=[_chip("Boston College", "Rutgers")], age_seconds=86400)
+    grid = [_sjsu_row()]
+
+    board_enrichment.attach_game_state(grid, sport="ncaaf", selected_date="2026-09-13")
+
+    assert grid[0]["game"]["state"] == "final"
+
+
+def test_a_CHIP_match_is_never_overwritten_by_the_capture(capture):
+    capture({"2026-09-12": [_captured("San José State", "Cal Poly", home_abbr="SJSU", away_abbr="CP", final=True)]},
+            chips_list=[_chip("San José State", "Cal Poly", home_abbr="SJSU", away_abbr="CP")])
+    grid = [_sjsu_row()]
+
+    coverage = board_enrichment.attach_game_state(grid, sport="ncaaf", selected_date="2026-09-13")
+
+    assert grid[0]["game"]["state"] == "pregame"  # the chip's, not the capture's final
+    assert "rows_matched_by_capture" not in coverage
+
+
+def test_other_sports_never_read_the_NCAAF_capture(capture, monkeypatch):
+    calls = []
+    capture({})
+    monkeypatch.setattr(board_enrichment, "_read_ncaaf_capture", lambda d: calls.append(d) or ([], None))
+    row = _row("Los Angeles Rams", "San Francisco 49ers", sport="nfl")
+
+    board_enrichment.attach_game_state([row], sport="nfl", selected_date="2026-09-10")
+
+    assert calls == []
