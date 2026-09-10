@@ -3882,6 +3882,68 @@ worker-local export-only set once (2) unblocks.
 
 ---
 
+
+> **SCOPED AGAINST `book_quotes` 2026-09-09 23:2x CT `[lane web-oom-census]`.**
+> Only ONE of the five steps is a `book_quotes` job. Saying which — and which are
+> NOT — is the point, because `#625` originally listed `mlb_prop_history` as a
+> Phase 1 input and that family has now been REMOVED (no producer ever existed;
+> its data is a strict subset of this tape).
+>
+> **THE TAPE.** `mlb_source/tracking/book_quotes/{date}.jsonl`, mirror family
+> `mlb_book_grid_replay`. **MLB: 35 dates, 2026-08-06..09-09, the last 14
+> CONTIGUOUS (08-27..09-09).** Four other sports carry the same tape (nfl 38,
+> soccer 41, ncaaf 31, wnba 25), so anything built here generalises.
+>
+> **STEP 5 (exchange prop economics) IS THE `book_quotes` JOB, and it is now both
+> REQUIRED and POSSIBLE.**
+> - **REQUIRED:** every figure that step published came from
+>   `measure_exchange_prop_option_value.py`, whose `quote_key` OMITTED `segment`
+>   — it paired full-game exchange prices against first-5 book prices. Fixed in
+>   **`1f988642`**, which now derives the key from `_KEY_FIELDS` and raises
+>   `SystemExit` if `segment` ever leaves it. **The +0.64%..+0.84% net, the 82.3%
+>   gross win-rate and the n=2,062 all predate that fix and must be re-derived
+>   before being quoted again.**
+> - **POSSIBLE:** the item's own caveat is *"ONE DAY of capture ... re-run over a
+>   full week before sizing anything"*. There are now **14 contiguous MLB days**.
+> - **THE TAPE CARRIES BOTH SIDES.** Measured on 2026-09-08 alone:
+>
+>       exchange   polymarket 8,563 + kalshi 6,502 =  15,065 prop rows
+>       sportsbook 8 books                        = 115,786 prop rows
+>       (total 130,851 prop rows, 100% with `player_name`, 10 bookmakers)
+>
+>   The ORIGINAL STUDY used **6,523 exchange and 37,391 sportsbook rows for its
+>   whole run**. **One day of the tape is 2.3x its exchange sample and 3.1x its
+>   sportsbook sample.**
+> - Expect the **67% exclusion for "no time-aligned sportsbook price"** to fall
+>   sharply: both sides now come from ONE file written by ONE capture cadence,
+>   rather than two feeds aligned after the fact. **That is a prediction, recorded
+>   BEFORE the run so it cannot be fitted afterwards.**
+> - **HRR CONTAMINATION IS STRUCTURALLY EXCLUDED, not merely avoided.** Step 2's
+>   surviving warning is that any window spanning June/early-July is poisoned; the
+>   producer healed between 06-25 and 07-20. **The tape begins 2026-08-06**, wholly
+>   after that boundary. A `book_quotes`-scoped evaluation cannot include a
+>   poisoned date.
+> - Cite the mirror manifest per `#625` law (2). 2026-09-08 verified today:
+>   `e6757f3cc842fd23`, 39 files, 168,169,643 B, verify 39/39, 0 drifted.
+>
+> **THE OTHER FOUR STEPS ARE NOT `book_quotes` WORK — do not re-scope them here:**
+> - **(1) tail calibration** — both halves shipped (`f03ef38a`, `f1508e78`,
+>   `77b36315`). Done.
+> - **(2) HRR null** — closed as already fixed; only the contamination warning
+>   survives, and it is discharged for this tape (above).
+> - **(3) rate re-fit** (`scripts/refit_mlb_rates.py`) — STILL OWED and the largest
+>   remaining modelling item. It needs RATES, not quotes; a tape of prices cannot
+>   answer a per-PA rate bias. Unblocked and independent — it does not wait on
+>   step 5.
+> - **(4) `#202` edge scan** — blocked on graded rows RETAINING THE MECHANISM
+>   PAYLOAD (survives on 534 of 9,479 rows, two dates of fifty-one). That is a
+>   grading-pipeline defect, not a quote-capture one. `book_quotes` cannot fix it.
+>
+> **RECOMMENDED ORDER: re-run step 5 on the 14 contiguous days with the fixed key
+> FIRST** — it is the only step whose blocker is now fully cleared, it retires a
+> set of numbers currently in the ledger that are known to rest on a broken key,
+> and it needs no new production capture.
+
 ### `#623` — **PHASE 2 — WNBA SPRINT 2026-09-17..09-25, run as a TEST (30 games in 9 days).** — lane `edge-plan`, 2026-09-01 — **OPEN; preconditions are `#626` (c)(d)(e)**
 
 Execute against the pre-registered gates — nothing here is discretionary:
