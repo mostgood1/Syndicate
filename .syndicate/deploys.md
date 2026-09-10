@@ -5,6 +5,65 @@
 
 ---
 
+## 2026-09-10 00:44:05Z — web `26c8cfc6` — **MEASURED: 19 contaminated CLV rows are gone and the headline moved 0.9497 -> 1.1479. Production reproduces the local prediction to four decimals.** `[lane odds-history-segment-term]`
+
+Three commits, one chain, all already on `origin/main`: `1f988642` (exchange-prop
+pairing key derived from `_KEY_FIELDS`), `cff0cd4e` (`clv_join._history_key`
+carried no `segment`), `26c8cfc6` (`markets.segments` never reached the
+odds-history shard). Web carries the CONSUMER half — `/api/ops/clv/report` and
+the `attach_clv_to_rows` request path in `blueprints/intelligence.py`.
+
+**verify:** `/api/ops/clv/report?date=<D>&sport=mlb`, read live at 00:45Z, four
+minutes after `finishedAt`:
+
+| date | | resolved | avg_clv_pct | same_book_n | segment_absent_from_history |
+|---|---|--:|--:|--:|--:|
+| 2026-09-08 | before | 2,007 | +0.9497 | 231 | — |
+| 2026-09-08 | **after** | **1,988** | **+1.1479** | **214** | **1,617** |
+| 2026-09-07 | before | 2,217 | **−0.0492** | 192 | — |
+| 2026-09-07 | **after** | **2,206** | **+0.1749** | 181 | **1,066** |
+
+**Every figure matches the pre-deploy local run over the same production payload
+to the digit.** The "before" column is not a memory: it was produced by running
+`origin/main`'s `clv_join` against the exported opening ledger and odds-history
+shard, and the unmodified run reproduced the then-live report byte-for-byte
+(`openings 11,577 / resolved 2,007 / avg_clv_pct 0.9497`) before anything was
+changed.
+
+**The MLB CLV headline was NEGATIVE on 09-07 because of this defect.** 19 of the
+2,007 resolved rows on 09-08 were a first-3 or first-5 bet priced against a
+nine-inning close, 17 of them inside the 231-row same-book headline. The
+mechanism is that **h2h has no line**: `_price_for_side` already refuses a line
+disagreement, so a first-5 total 4.5 against a full-game 8.5 lands in
+`line_mismatch` (1,250) and never becomes a row — but a moneyline has no number
+to disagree about, and 18 of the 19 were `h2h`.
+
+**`segment_absent_from_history` = 1,617 IS THE EXPECTED INTERMEDIATE STATE, NOT A
+REGRESSION.** It equals the non-full opening count exactly (188 + 359 + 1,070),
+and `openings_by_segment` is on the report so it has a denominator. Those bets
+are now REFUSED rather than given a full-game price; they become resolvable only
+once a worker on `26c8cfc6` rebuilds an odds_history shard with segment-keyed
+entries. `no_market_in_history` fell 1,567 -> 185 in the same move, because
+segment openings that used to land there are now named separately.
+
+`openings_without_segment` = **0** on both dates, which is the one permissive
+step in the new key (absent -> full game, matching what the producer does with a
+missing field) reading clean rather than assumed.
+
+**NOT YET DEPLOYED, and the chain is not finished:** refresh-worker (live
+`d84840a9`) and live-odds-worker (live `169e328e`) both returned HOLD —
+refresh-worker on 5 in-flight jobs including
+`run_mlb_daily_sim_job.py --date 2026-09-09 --only-game-pks <15 games>`, a full
+slate resim; live-odds-worker on 3, including `refresh_odds_sources.py`. Claims
+held by this lane, waiting. **Both run the odds-history sync, so the producer
+half does nothing until they are live.**
+
+**Cost to expect when they land, measured not estimated:** distinct GAME keys in
+the odds_history shard grow **3.63x** — on the real 2026-09-08 mlb shard that is
++803 keys, +9.5MB, **56.4 -> 65.9MB (+17%)**. Props untouched. A naive read of
+the `data/` mirror says 4.45x / +22%; that number is stale because it counts
+`first7`, dropped 2026-07-25 (`#16`).
+
 ## 2026-09-09 21:57:17-22:03:42Z — web `44499cb0` -> `a6a8730d` — **the settlement/recap work is live: unpriced rows are counted instead of paid at a fabricated price, and the client slate date is Central** — lane `probability-converter-registry`
 
 User-directed ("deploy it", then "verify it once it's live"). **web ONLY, and
