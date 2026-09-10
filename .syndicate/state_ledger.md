@@ -1288,13 +1288,23 @@ OneDrive/Coding, %LOCALAPPDATA%, %TEMP%) aimed at any husk.
 
 **REMEDIATED 2026-09-10 17:40Z: `session_worktree.py prune --apply` deleted 115
 of 115 free husks -- 190 -> 75 admin dirs, 122 -> 7 stale, 69 listed before AND
-after.** The 7 HELD are the only pointer to 25 commits:
-`accuracy-summary-ledger-budget` (6), `gate-per-side-derived` (1),
-`live-lens-date-gate` (3), `probability-converter-registry` (1),
-`soccer-anchor-cost` (2), `soccer-card-final-state` (2),
-`web-oom-profiler-steady` (10). `session_worktree.py prune` prints each commit;
-rescue with `git branch rescue/<id> <sha>`, or judge it disposable and
-`Remove-Item -Recurse -Force` the dir.
+after.** The 7 it HELD (the only pointer to 25 commits) were then reviewed per
+commit, and **all 25 are on main or were deliberately discarded -- none needed
+rescuing.** 10 have a same-subject counterpart on main (7 byte-identical patches,
+1 a subset of its counterpart, 1 an amend of two commits that landed separately, 1
+a botched cherry-pick its author reset away before landing the real one). 13 are
+ledger-only with 96-100% of their added lines on main (the gaps are status lines
+rewritten later, one `lanes_history.md` passage corrected on main by `aca57e4f`,
+and a generated count). 2 (`soccer-card-final-state`) are code that lane
+`suite-preexisting-seven` DISCARDED in favour of peer `ff022d5d`: its closing
+block in `lanes_history.md` says so, and main's `c353b47d` keeps only its two
+`test_live_refresh_loop` fixes. **User-authorised, the 7 plus the free
+`watcher-admin-token` were deleted at 18:36Z after a same-instant re-check (still
+stale, no HEAD/gitdir/locked, no on-disk pointer, every lost commit one of the
+25): 78 -> 70 admin dirs, 70 listed before AND after.** Per-commit list in
+`log/2026-09-10.md`. Recoverable until the next gc with `git fsck --lost-found`.
+At 18:38Z, after `prune --apply` cleared one more fresh husk: **0 stale, 71 admin
+dirs = 72 listed minus main** -- no hidden registrations.
 
 **PREVENTION, on main `7e8715e8` (lane `worktree-close-and-prune`), VERIFIED
 2026-09-10 17:50Z:** `close` clears READONLY on its own admin dir BEFORE `git
