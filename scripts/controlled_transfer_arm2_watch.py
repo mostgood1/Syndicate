@@ -44,11 +44,18 @@ is detected from the LAST RETURNED bucket, settled or not: a partial reading can
 only grow, so a partial already over `--spike-mb` stays over it.
 
 **Metered MB alone does not identify a spike** -- `2026-09-09T00:00:00Z` metered
-437.7 MB and was one human browsing at a ratio of 2.15. The discriminator is
-metered / edge-logged over the same window: 1.66 / 2.15 / 3.56 for ordinary
-hours against 10.77 / 24.37 for the two spikes. Both bars must be cleared. A
-half-settled bucket makes the ratio read LOW, so this detector is conservative
-and fires late rather than early. The bet is that spikes CLUSTER -- 2026-09-08 ran five consecutive hours --
+437.7 MB and was one human browsing. The discriminator is metered / APP-SERVED
+over the same window: 0.35-3.05 for ordinary hours against 8.20-16.84 for the
+five anomalous ones, scored over all 19 captured hours. Both bars must be
+cleared. A half-settled bucket makes the ratio read LOW, so this detector is
+conservative and fires late rather than early.
+
+**The denominator was `edge` until 2026-09-10 and that was wrong** -- it
+overlaps (10.23-33.58 anomalous vs 0.52-20.59 ordinary; a 0.41 MB near-idle
+hour reads 20.59), and at the old 6.0 bar it admitted one false fire. It is
+still recorded on every poll, so polls either side of the switch stay
+comparable; it just no longer decides. When the app log is BLIND the gate
+REFUSES -- it does not fall back to the edge ratio. The bet is that spikes CLUSTER -- 2026-09-08 ran five consecutive hours --
 so firing in the current hour on the previous hour's evidence lands inside the
 episode. If it does not, the reading is a normal-hour replication of arm 1,
 which is worth having and is reported as such rather than as arm A.
@@ -79,7 +86,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.bandwidth_tripwire import (  # noqa: E402
-    SERVICE_IDS, _RESP_BYTES, _USER_AGENT, _api_key, _logs, _metric,
+    SERVICE_IDS, _ACCESS, _RESP_BYTES, _USER_AGENT, _api_key, _logs, _metric,
 )
 
 OUT_DIR = REPO_ROOT / "reports" / "bandwidth_spikes"
@@ -89,12 +96,27 @@ PROBE_UA = "syndicate-controlled-transfer/1.0"
 #: METERED MB ALONE DOES NOT IDENTIFY A SPIKE, and using it as the trigger was
 #: this script's first bug. `2026-09-09T00:00:00Z` metered 437.7 MB and was ONE
 #: HUMAN BROWSING (edge 203.57 MB, ratio 2.15) -- the third reader's entry in the
-#: lane exists precisely to stop that bucket being counted as a spike. What
-#: separates a spike is the RATIO of metered to edge-logged bytes: the ladder
-#: runs 1.66 / 2.15 / 3.56 for ordinary hours and 10.77 / 24.37 for the two
-#: spikes. So both conditions must hold, and the cheap one is checked first.
+#: lane exists precisely to stop that bucket being counted as a spike. So a
+#: RATIO bar is needed beside the MB bar, and the cheap one is checked first.
+#:
+#: THE RATIO'S DENOMINATOR IS `app-served`, NOT `edge` `[2026-09-10, user
+#: directed; lane `bandwidth-excess-vs-ratio`, evidence `42d4794b`]`. Scored
+#: against all 19 captured hours: `metered/edge` runs 10.23-33.58 in the five
+#: anomalous hours against 0.52-20.59 in the fourteen others -- it OVERLAPS, and
+#: a near-idle hour (`2026-09-09 09:00Z`, 0.41 MB metered, 66 requests) reads
+#: 20.59, inside the band `09-08 16:00Z` occupies at 2,470 MB. `metered/app`
+#: runs 8.20-16.84 against 0.35-3.05 -- it SEPARATES. At the old bar of 6.0 on
+#: edge, eleven hours clear 300 MB and six clear the ratio: the five real ones
+#: plus `09-08 15:00Z` (420 MB, edge ratio 7.09, app ratio 3.05 -- not
+#: anomalous). `metered/app >= 5.0` cuts to exactly the five, no false fire and
+#: none missed. A false fire is not free: it spends 150 MB of billed bytes and
+#: hands P1 a reading LABELLED a spike hour that is not one, which destroys the
+#: single variable arm 2 controls.
 DEFAULT_SPIKE_MB = 300.0
+#: Kept, RECORDED, and NO LONGER GATING -- the field stays comparable with the
+#: polls taken before the switch, but nothing branches on it.
 DEFAULT_SPIKE_RATIO = 6.0
+DEFAULT_SPIKE_APP_RATIO = 5.0
 #: Arm A matches arm 1's volume exactly so spike-vs-normal is the only variable.
 ARM_A_MB = 150.0
 #: Arm B doubles it: the different-volume second arm the coefficient needs.
@@ -156,6 +178,93 @@ def edge_mb_for_bucket(key: str, bucket: str) -> tuple[float, int]:
         size = _RESP_BYTES.search(message)
         total += int(size.group(1)) if size else 0
     return total / 1048576, len(rows)
+
+
+#: THE APP LOG IS FAR BIGGER THAN THE EDGE LOG AND `_logs` PAGES AT 100 LINES.
+#: `edge_mb_for_bucket` uses 120 pages and that is ample for a request log
+#: (377-449 lines in the hours captured so far); the same budget on the APP log
+#: would have TRUNCATED `2026-09-08T00:00:00Z`, a real spike hour, at 12,000 of
+#: its 15,644 lines. Truncation is the dangerous direction: it under-counts the
+#: DENOMINATOR, inflates `metered/app`, and manufactures precisely the false
+#: fire this gate was switched to prevent. 400 pages is 2.6x the largest hour
+#: on record (15,644), and the coverage check below refuses rather than trusting
+#: the budget to be enough.
+APP_LOG_MAX_PAGES = 400
+#: The pager walks BACKWARD from the end of the window. If it never reached the
+#: start, the oldest row we hold is materially after it and the total is short.
+APP_LOG_COVERAGE_TOLERANCE_S = 120
+
+
+def app_served_mb_for_bucket(key: str, bucket: str) -> tuple[float, int, bool]:
+    """Application-served bytes (gunicorn access lines) over a bucket's window.
+
+    This is the ratio's denominator now. Unlike the edge log it includes
+    internal service-to-service traffic, which is why it separates the
+    anomalous hours and `edge` does not.
+
+    Returns (served_mb, access_lines, covered). `access_lines == 0` is NOT a
+    served total of zero, and `covered is False` is not a small total -- the
+    caller refuses on both rather than dividing.
+    """
+    end = dt.datetime.strptime(bucket[:19], "%Y-%m-%dT%H:%M:%S")
+    start = end - dt.timedelta(hours=1)
+    rows = _logs(
+        key, SERVICE_IDS["web"],
+        start.strftime("%Y-%m-%dT%H:%M:%SZ"), end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "app", max_pages=APP_LOG_MAX_PAGES,
+    )
+    total = 0
+    lines = 0
+    for _ts, message, _labels in rows:
+        match = _ACCESS.match(message.strip())
+        if not match:
+            continue
+        lines += 1
+        size_text = match.groups()[4]
+        total += int(size_text) if size_text.isdigit() else 0
+    covered = True
+    if rows:
+        oldest = dt.datetime.strptime(rows[0][0][:19], "%Y-%m-%dT%H:%M:%S")
+        covered = (oldest - start).total_seconds() <= APP_LOG_COVERAGE_TOLERANCE_S
+    return total / 1048576, lines, covered
+
+
+def arm_a_verdict(metered: float, edge_mb: float, edge_requests: int,
+                  served_mb: float, access_lines: int, covered: bool,
+                  spike_mb: float, spike_app_ratio: float) -> tuple[str, str, float | None]:
+    """The arm A gate, as a PURE function so it can be scored off captures.
+
+    It lives outside the poll loop deliberately: a predicate that only exists
+    inline can only ever be tested by a paraphrase of itself, and
+    `scripts/score_arm_a_gate.py` scores THIS function against all 23 captured
+    hours -- positive and negative -- rather than a restatement.
+
+    Returns (decision, reason, metered_over_app). Decision is one of
+    "ARM_A", "not a spike", "UNDECIDABLE", "under MB bar".
+    """
+    if metered < spike_mb:
+        return "under MB bar", f"metered {metered:.1f} MB < {spike_mb}", None
+    # REFUSE WHEN THE APP LOG IS BLIND -- DO NOT FALL BACK TO THE EDGE RATIO
+    # (`learnings.md`: unknown must not default permissive). web's access-line
+    # emitter was structurally dead from 2026-09-08T23:45:58Z until it was
+    # restored at 2026-09-09T14:38Z, and one hour already in the captured set --
+    # `09-09 01:00Z`, over 300 MB -- has no readable app number at all. Zero
+    # access lines against a NON-EMPTY edge log is the discriminator: it
+    # separates "nothing was served" from "nobody wrote it down". Falling back
+    # to `metered/edge` here would reinstate exactly the bar this switch
+    # removed, in precisely the hours where it is least trustworthy.
+    if access_lines == 0 and edge_requests > 0:
+        return "UNDECIDABLE", "app log blind (0 access lines against a non-empty edge log)", None
+    if served_mb <= 0:
+        return "UNDECIDABLE", "no app-served bytes to divide by", None
+    if not covered:
+        return ("UNDECIDABLE",
+                "app log page budget exhausted -- denominator is truncated, "
+                "which would inflate the ratio", None)
+    ratio = metered / served_mb
+    if ratio >= spike_app_ratio:
+        return "ARM_A", f"metered/app {ratio:.2f} >= {spike_app_ratio}", ratio
+    return "not a spike", f"metered/app {ratio:.2f} < {spike_app_ratio}", ratio
 
 
 def background_mb(key: str, minutes: int) -> tuple[float, int]:
@@ -232,8 +341,13 @@ def main() -> int:
     parser.add_argument("--until", default="", help="UTC ISO stamp to stop watching (default +14h)")
     parser.add_argument("--spike-mb", type=float, default=DEFAULT_SPIKE_MB)
     parser.add_argument("--spike-ratio", type=float, default=DEFAULT_SPIKE_RATIO,
-                        help="metered / edge-logged MB over the same window; ordinary "
-                             "hours run 1.66-3.56, the two spikes 10.77 and 24.37")
+                        help="RECORDED, NOT GATING since 2026-09-10: metered / edge-logged "
+                             "MB. Scored over 19 captured hours it OVERLAPS (10.23-33.58 "
+                             "anomalous vs 0.52-20.59 ordinary), so it cannot decide.")
+    parser.add_argument("--spike-app-ratio", type=float, default=DEFAULT_SPIKE_APP_RATIO,
+                        help="THE GATE: metered / app-served MB over the same window. "
+                             "Anomalous hours run 8.20-16.84, ordinary 0.35-3.05. Refuses "
+                             "(does not fire) when the app access log is blind.")
     parser.add_argument("--arm-a-mb", type=float, default=ARM_A_MB)
     parser.add_argument("--arm-b-mb", type=float, default=ARM_B_MB)
     parser.add_argument("--quiet-band", default="05:00-11:00",
@@ -256,6 +370,8 @@ def main() -> int:
         "watch_until": _stamp(deadline),
         "spike_mb": args.spike_mb,
         "spike_ratio": args.spike_ratio,
+        "spike_app_ratio": args.spike_app_ratio,
+        "gate": "metered/app-served (edge ratio recorded, not gating) [switched 2026-09-10]",
         "quiet_band_utc": args.quiet_band,
         "polls": [],
         "fired": None,
@@ -276,20 +392,40 @@ def main() -> int:
         # the ratio bar, which is the whole point of having two.
         if metered >= args.spike_mb and left > ARM_A_MIN_SECONDS_LEFT:
             edge, requests = edge_mb_for_bucket(key, bucket)
-            ratio = metered / edge if edge > 0 else float("inf")
+            served, access_lines, covered = app_served_mb_for_bucket(key, bucket)
+            edge_ratio = metered / edge if edge > 0 else float("inf")
             poll.update({"edge_mb": round(edge, 2), "edge_requests": requests,
-                         "metered_over_edge": round(ratio, 2)})
-            _say(f"   over {args.spike_mb} MB: edge {edge:.1f} MB / {requests} reqs -> ratio {ratio:.2f}")
-            if ratio >= args.spike_ratio:
+                         "metered_over_edge": round(edge_ratio, 2),
+                         "app_served_mb": round(served, 2), "access_lines": access_lines,
+                         "app_log_covered": covered})
+            decision, reason, ratio = arm_a_verdict(
+                metered, edge, requests, served, access_lines, covered,
+                args.spike_mb, args.spike_app_ratio,
+            )
+            poll["ratio_verdict"] = reason
+            if ratio is not None:
+                poll["metered_over_app"] = round(ratio, 2)
+            _say(f"   over {args.spike_mb} MB: app-served {served:.1f} MB / {access_lines} lines "
+                 f"-> {decision} ({reason}); edge {edge:.1f} MB / {requests} reqs, edge ratio "
+                 f"{edge_ratio:.2f}, NOT gating")
+            if decision == "UNDECIDABLE":
+                poll["decision"] = "UNDECIDABLE"
+                _say("   refusing -- NOT falling back to the edge ratio")
+                record["polls"].append(poll)
+                out.write_text(json.dumps(record, indent=2, sort_keys=True), encoding="utf-8")
+                if args.dry_run:
+                    break
+                time.sleep(args.poll_minutes * 60)
+                continue
+            if decision == "ARM_A":
                 poll["decision"] = "ARM_A"
                 record["polls"].append(poll)
-                _say(f"SPIKE DETECTED: {bucket} {metered:.1f} MB at ratio {ratio:.2f} -- arm A")
+                _say(f"SPIKE DETECTED: {bucket} {metered:.1f} MB -- {reason} -- arm A")
                 if args.dry_run:
                     record["fired"] = {"arm": "A", "dry_run": True}
                     break
                 record["fired"] = fire("A", args.arm_a_mb, skip_quiet=True, key=key, watch=False)
                 break
-            poll["ratio_verdict"] = "busy hour, not a spike"
 
         in_band = band_start <= hour < band_end
         if in_band and metered <= args.quiet_bucket_mb and left >= ARM_B_MIN_SECONDS_LEFT:
