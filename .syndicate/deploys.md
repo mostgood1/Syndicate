@@ -5,6 +5,74 @@
 
 ---
 
+## 2026-09-09 22:08 CT — refresh-worker `a101c437` — **THE LIKE-FOR-LIKE NFL READING, AND IT CORRECTS MY OWN PREDICTION. The join works; the MECHANISM is not the one I designed for.**
+
+Discharges the reading owed by the 21:08 CT row. Same-size boards at last, so the
+slate confound is gone.
+
+### The comparison
+
+| `LAYER2_BOARD_HEALTH sport=nfl` | pre-deploy | 22:08 CT, post-deploy |
+|---|--:|--:|
+| rows | 1,884 | 1,847 |
+| **pregame_proj** | **71** | **185** |
+| no_proj | 1,813 | 1,662 |
+| **edged** | **63** | **65** |
+
+Board size within 2%. **Projections nearly tripled. `edged` moved by TWO.**
+
+### What that gap means, from the served post-deploy artifact (`written_at` 22:08:53 CT)
+
+    nfl prop rows                          1,774
+    carrying a projection from my join       112
+      of those, edge_vs_market_pct        **0**
+      of those, model_edge_pct           **112**
+    edge_unavailable_reason (112 of 112):
+      "one-sided market: no two-sided fair to price against;
+       priced against the modelled fair instead"
+
+**THE JOIN WORKS — all 112 produce the `model_edge_pct` that
+`no_model_edge_pct` refuses on. But NOT ONE does it the way I built it to.**
+`_attach_sim_probability_edge` prices against `_no_vig_over_probability`, which
+needs a two-sided consensus. **Served prop rows are one-sided — they carry no
+`sides` and no `consensus` at all.** So the market-fair edge never computes, and
+the value arrives entirely through `_model_edge_for`'s `_modelled_fair_edge_for`
+fallback.
+
+### MY PREDICTION WAS WRONG, AND THE REASON IS INSTRUCTIVE
+
+The 21:08 CT row predicted **~726 rows** gaining a usable `model_edge_pct`, from
+a local run measuring **1,019 stamped / 950 edged**. The 950 was an artefact of
+my own harness: **I reconstructed the two-sided consensus by pairing the board's
+own over/under best prices**, and flagged it as "INDICATIVE, not exact". It was
+worse than indicative — it manufactured the exact input production does not
+have, and 950 -> 0 is the whole distance between the fabricated input and the
+real one. The honest local number was the OTHER one I measured and set aside:
+**64 edged without reconstruction.**
+
+**The rule: a harness that supplies a field production does not supply is not
+measuring production.** Same family as the caps read from env, the counter that
+cannot fire on its path, and the flag read instead of the installer — four in one
+session, all "the reading was about the instrument, not the system".
+
+### So what DID the lever move
+
+**+114 projections and +114 model edges on a same-size board** (71 -> 185
+pregame_proj; 112 of them prop rows from this join). NFL rows carrying a model
+view went **3.8% -> 10.0%**. Real, measured, attributable — and an order of
+magnitude below the 71.7% the fabricated harness suggested.
+
+### CARRY THIS INTO THE STAKING DECISION
+
+Sample row: `Anytime TD / Malik Davis / ev_pct 5.21 / model_edge_pct 12.23`. A
+12.23-point edge sits well inside `_MODEL_EDGE_MAX_POINTS = 15` and will rank at
+the top of the board. **These edges are priced against the MODELLED fair, not the
+market's — so they are the model disagreeing with itself, with no market
+cross-check**, on rows `#651` documents as biased high. The user's decision to
+let the Sunday card grade them stands, and `nfl-prop-settled-grade`
+(2026-09-15 10:00 CT) is what settles it.
+
+
 ## 2026-09-09 ~22:15 CT — **USER DECISION, ASKED AND GIVEN: NFL player props STAY STAKEABLE through the week-1 card. Recorded because the deploy above changed a live-money surface as a SIDE EFFECT.**
 
 No deploy. This records a decision and the reasoning presented before it.
