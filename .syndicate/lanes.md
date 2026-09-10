@@ -373,6 +373,7 @@ death, never life — do not invert it.
 - Falsification test: with the flag off the tick's snapshot must be byte-identical to today's (FBS-only); with it on, an FBS-vs-FCS live game must gain exactly one `live_resim` lane stamped `market_implied`, and an FBS-vs-FBS game's lane must be unchanged. A game with no captured pregame line must refuse by name, never price.
 - Verification: production, during FAMU @ MIA — the NCAAF snapshot index shows the game with a `live_resim` lane, and `/api/board/book-grid?sport=ncaaf&date=2026-09-11` shows `index_size >= 1` with FAMU @ MIA rows carrying `live_gameline`.
 - Blocked by: none. `ncaaf-live-resim-wire` (the producer's lane) CLOSED 2026-09-10; no OPEN lane claims these files.
+- **PREGAME HALF MET 2026-09-10 15:17 CDT on `86c82220`**, deployed by `exchange-execution-unblock` and carrying this lane's `3e33f083` plus `football-layer2-live-parity`'s ESPN-date chip fix, which FAMU @ MIA also needed. Lens 49 → 50 games with FAMU @ MIA present (`game_not_in_progress`, correct before kickoff). Tick `fcs` {`candidates 1`, `lines_captured 1`, `priced_on_implied_rating 1`}. FAMU @ MIA board rows with a `game` block 0 → 13. **IN-GAME HALF OWED** (`deploys.md` 15:17 CT): a persistent monitor in session `df26ac0c` from 18:58 CDT, with scheduled task `ncaaf-famu-mia-live-gameline-reading` at 20:05 CDT as backup.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

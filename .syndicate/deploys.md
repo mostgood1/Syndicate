@@ -5,6 +5,43 @@
 
 ---
 
+## 2026-09-10 15:17 CT — reading only, no deploy — refresh-worker `86c82220` (lane `ncaaf-fcs-market-implied-rating`, session `df26ac0c`) — **PREGAME HALF MET: FAMU @ MIA IS IN THE NCAAF LIVE LENS ON A MARKET-IMPLIED RATING, ITS PREGAME LINE IS CAPTURED, AND ITS 13 BOARD ROWS NOW CARRY A GAME STATE. THE IN-GAME HALF IS OWED AFTER KICKOFF.**
+
+The deploy is lane `exchange-execution-unblock`'s (`dep-dahgta67bikc73e4i64g`, live 15:13:21 CT, main's
+tip `86c82220` by agreement); its own measurement is its own. It carried two fixes FAMU @ MIA needed
+tonight, both on `main`. (1) `3e33f083`, this lane: the NCAAF live re-sim covered FBS-vs-FBS only (FAMU
+is FCS, no SP+ row), so the game was absent from the lens. It now enters from the ESPN live index, with
+FAMU's SP+ components backed out of the market's pregame spread and total, read only on a `pre` event and
+persisted in the tick's keyvalue status. (2) Lane `football-layer2-live-parity`'s ESPN-date chip fix in
+`board_enrichment.attach_game_state`. The 09-11 book grid had queried only 09-11 chips, while ESPN files
+this 8 PM ET kickoff under 09-10, so its rows had no `game` block, and `attach_live_gamelines` never
+prices a row that is not live. Both needed; neither is enough alone.
+
+**verify (pregame):** served payloads and Render logs (substrate `render`), same instruments both sides:
+
+| | before: 14:58 CT, `2d53fdf7` | **after: 15:17 CT, `86c82220`** |
+|---|---|---|
+| NCAAF lens (`/api/ops/live-lens/snapshot-index?sport=ncaaf`) games | 49 | **50** |
+| FAMU @ MIA in the lens | absent | **present**, refused `game_not_in_progress` (correct before kickoff) |
+| tick `NCAAF_LIVE_RESIM` `fcs` counters (15:17:04 CT) | field absent (old code) | **`candidates 1`, `lines_captured 1`, `priced_on_implied_rating 1`**, `no_pregame_line 0`, `line_fetch_failures 0` |
+| tick `ratings_teams` | 98 | **100** (Miami + FAMU's implied rating) |
+| FAMU @ MIA 09-11 board rows with a `game` block | 0 of 13 | **13 of 13** (`pregame`, board 15:14:48 CT) |
+
+The emitter was checked before the null was read: `NCAAF_LIVE_RESIM` printed every ~3.4 min before the
+boot (15:03:18, 15:06:40, 15:10:04 CT), so the post-boot line is a reading, not a gap. **NOT read
+directly:** the lane's `ratingSource: market_implied` stamp. `live/ncaaf_live_lens.json` is not exportable
+(`/api/ops/artifacts/export` → 403), and `snapshot-index` summarises lanes without that key. The evidence is
+`priced_on_implied_rating: 1`, which is incremented only on the branch that sets the provenance. The line
+used is DraftKings MIA -59.5 / O/U 65.5 (ESPN event 401858213), and the implied FAMU raw SP+ is off 15.6 /
+def 53.4 against production's Miami (35.0, 13.3). **Known bias, recorded rather than corrected:** smartsim2
+from kickoff on those ratings gives MIA +49.4 / total 59.7 against the market's 59.5 / 65.5 (checkout run,
+evidence about the code), so live probabilities lean slightly toward FAMU.
+
+**OWED, the in-game half:** during the game, the lens lane must be `live_resim`, FAMU @ MIA's full-game
+board rows must be `live` with a `live_gameline` block, and there must be no NCAAF
+`BOOK_GRID_LIVE_GAMELINE_FAILURE`. A persistent monitor in session `df26ac0c` watches from 18:58 CT. Scheduled
+task `ncaaf-famu-mia-live-gameline-reading` (20:05 CT) is the backup.
+
 ## 2026-09-10 19:32:11-19:38:09Z — web `2224dec0` -> `ab787363` — **NCAAF week_state read-time grace, READER HALF LIVE; no regression (the artifact has no field yet, so the reader answered by the old rule)** `[lane ncaaf-games-cache-refresh, session a8d753fe]`
 
 Deploy `dep-dahgbeuk1f9s73fmnovg`, trigger `api`: created 19:32:11Z, build done ~19:36:20Z, live 19:38:09Z. Claim `ncaaf-games-cache-refresh` (acquired 19:30:52Z). Preflight CLEAR at 19:31:17Z for `ab787363`: only gunicorn running, last web deploy 156 min earlier. User decision 2026-09-10: "land it and deploy both before Saturday". Range `2224dec0..ab787363` is 47 commits and 9 runtime files (+434/-36). This lane's are `ncaaf/week_state.py` and `ncaaf/sources.py`; the rest are other lanes' landed work: `execute_portfolio.py`, `bet_status_nfl.py`, `bet_status_ncaaf.py`, `ncaaf_team_registry.py`, `board_enrichment.py`, `live_gameline_join.py`, `intelligence_evaluation.py`. `requirements.txt` and `render.yaml` are unchanged. One new env read in range, `SYNDICATE_ACCURACY_SUMMARY_LEDGER_MAX_CHUNKS`: absent means BOUNDED (the owning lane's own docstring), and only refresh-worker's accuracy autorun reads it.
