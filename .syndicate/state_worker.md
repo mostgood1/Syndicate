@@ -85,6 +85,55 @@ RUNNER is too small for that subset.
 
 ## [refresh-worker-headroom-2026-09-02] THE ~1.4GB HEADROOM FIGURE IS STALE, AND THE METRIC EVERYONE READS IS THE WRONG ONE `[2026-09-02, lane m625-env-snapshots, measured off 200 MEMORY_WATCHDOG samples 15:30-16:10Z]`
 
+> ### CORRECTION 2026-09-09/10 -- THE NUMBERS ABOVE ARE SUPERSEDED. THE METHOD IS NOT. `[lane refresh-worker-anon-ratchet]`
+>
+> **The band and the peak stage have both moved. "~2.26GB headroom" is no
+> longer true and must not be used to size new periodic work.** The 2026-09-02
+> body is kept verbatim below because its METHOD lesson -- read `memory_anon_mb`,
+> never `memory_headroom_mb` or `memory_current_mb` -- is what made this
+> measurement possible, and because I proved it still bites: I first reported
+> this ratchet as *"`container_memory_mb` MAX 4,095.9 = 100.0% of the ceiling"*,
+> which is exactly the field this section warns against. Reclaimable page cache
+> measured **1,426MB mean** on the same samples.
+>
+> **FOUR INDEPENDENT LIVE-SLATE WINDOWS, none straddling a restart** (the
+> 22:24:40Z and 01:33:47Z deploys are both cut around, per `learnings.md`
+> 2026-09-02), 5,040 `MEMORY_WATCHDOG` samples, every window's coverage checked
+> against what was asked:
+>
+> | window (UTC) | live | n | anon min | anon mean | **anon MAX** | headroom at peak |
+> |---|---|--:|--:|--:|--:|--:|
+> | 22:30-23:30 | `d84840a9` | 1,589 | 1,551.3 | 2,090.5 | **2,820.8** | 1,275.2 |
+> | 23:30-00:45 | `d84840a9` | 1,952 | 1,734.5 | 2,281.3 | **3,031.0** | 1,065.0 |
+> | 00:45-01:28 | `d84840a9` | 1,093 | 1,931.0 | 2,463.6 | **3,138.7** | **957.3** |
+> | 01:45-02:00 | `26c8cfc6` | 406 | 1,880.8 | 2,280.0 | **2,690.6** | 1,405.4 |
+>
+> **The recorded max was 1,877. The lowest of these four peaks is 2,820.8** --
+> +50% on the old ceiling, and the worst window leaves **957MB**, not ~2.26GB.
+>
+> **IT IS A RATCHET, NOT AN EXCURSION, AND THE FLOOR IS WHAT SAYS SO.** Across
+> the three pre-deploy windows the MINIMUM climbs 1,551.3 -> 1,734.5 -> 1,931.0,
+> ~+380MB in three hours, with the mean and max climbing in step. A spike would
+> move the max and leave the floor.
+>
+> **THE HIGH-WATER STAGE HAS MOVED: `overview_sport_end` -> `board_contract_end`,
+> in all four windows.** Anything sized against the overview peak is sized
+> against the wrong stage.
+>
+> **NOT ATTRIBUTABLE TO THE 2026-09-10 DEPLOY, and the direction is the wrong
+> one for that story anyway** -- the three worst windows are all PRE-deploy
+> `d84840a9`. The post-deploy row is lower on every column and is NOT evidence
+> of an improvement: it starts 11 minutes after a reboot, covered 15 of the 30
+> minutes asked, and ran at roughly a third of the job load (process_count mean
+> 7.0 pre against 3.1 post). A full-slate window on `26c8cfc6` is owed and is
+> the only thing that can price the +17% odds_history shard that deploy carried.
+>
+> **CONSTRAINT ON ANY REMEDY: `state.md [user-decisions]` 2026-08-16 -- DO NOT
+> BUMP THE refresh-worker PLAN, REDUCE INSTEAD.** Taken with the numbers in
+> front of the user. A smaller headroom than recorded is not an argument that
+> reopens it.
+
+
 **Read `memory_anon_mb`, not `memory_headroom_mb`.** `memory_current_mb` includes
 reclaimable page cache and this worker holds **~1.2GB** of it, so the headroom
 field understates by roughly that much.
