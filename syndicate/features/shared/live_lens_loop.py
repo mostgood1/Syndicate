@@ -784,6 +784,28 @@ def _run_live_lens_tick() -> dict[str, Any]:
 		"results": results,
 		"ok": all(bool(result.get("ok")) for result in results.values()),
 	}
+	if "mlb" in active_sports:
+		# FINAL PASS ON PAST MLB REPORTS (2026-09-10, lane `mlb-lens-final-status`).
+		# This tick writes TODAY's report only, so a game still running at the
+		# midnight-Central roll kept a mid-game row in yesterday's report for good
+		# -- and on web, which holds no feed payload for a past date, that row IS
+		# the date's status (9 games on 7 of 9 dates, 09-01..09-09).
+		#
+		# AFTER the sports, so a slow StatsAPI can never delay today's lens; and
+		# inside the tick, so the publish sweep the caller runs next carries a
+		# rewritten report to web this same cycle. Imported here rather than at
+		# module scope: a NEW name, so it cannot shadow a module-level one (the
+		# UnboundLocalError recorded in `_run_live_lens_tick_for_sport`).
+		#
+		# NEVER FATAL, and `ok` is left alone: this is repair work on past dates,
+		# and a StatsAPI outage must not read as a failed live tick.
+		try:
+			from syndicate.features.mlb import live_lens_final_pass as _mlb_final_pass
+
+			meta["mlbFinalPass"] = _mlb_final_pass.finalize_recent_mlb_live_lens_reports(date_str)
+		except Exception as exc:
+			meta["mlbFinalPass"] = {"error": f"{type(exc).__name__}: {exc}"}
+			print(f"[live_lens_loop] MLB_LIVE_LENS_FINAL_PASS_FAILED {type(exc).__name__}: {exc}", flush=True)
 	meta["finishedAt"] = _utc_now()
 	write_json_file(_meta_dir() / "latest_live_lens_tick.json", meta)
 	return meta
