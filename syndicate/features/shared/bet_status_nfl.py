@@ -52,14 +52,26 @@ board_wanted samples, 2026-08-28T02:10Z). That market is in
 NAME regardless of this flag, and needs no special case here.
 
 --------------------------------------------------------------------------
-PROPS REFUSE, BY NAME
+PROPS ARE GRADED OFF ESPN'S PER-PLAYER BOX (since 2026-09-10)
 --------------------------------------------------------------------------
 
-The scoreboard capture carries team scores and nothing per-player, so a passing
-or receiving prop is not gradeable from it. That is a PERMANENT refusal and is
-reported separately from "the capture is not there yet", which is transient --
-the rule `bet_status_wnba` states and paid for, and the reason the market check
-below runs BEFORE the artifact read.
+The scoreboard capture carries team scores and nothing per-player. Until
+2026-09-10 that made every prop a PERMANENT refusal
+(`nfl_props_not_gradeable_from_scoreboard`) -- which, once the board began
+staking NFL props on 2026-09-09, meant real exposure with no production grade.
+It was already firing on the first order the morning after.
+
+Props now read ESPN's summary for the game (`nfl/live_player_box`), found
+through the capture's own `event_id`. The rules that stay:
+
+  * PERMANENT BEFORE TRANSIENT. An unmapped player market or a non-full segment
+    refuses by name before anything is read, the order the game-line path below
+    has always used -- `bet_status_wnba` states the rule and paid for it.
+  * ABSENT IS NOT ZERO. A player missing from a FINAL box may have been
+    inactive (books void that) or active with no touch; this box cannot tell
+    them apart, so it refuses. A player who appears in ANY stat group played,
+    so his zeros are real zeros and settle.
+  * ONE READ PER GAME. The box is cached per resolver, like the live state.
 """
 
 from __future__ import annotations
@@ -80,8 +92,22 @@ REASON_NOT_NFL = "not_an_nfl_order"
 REASON_NO_MATCHUP = "no_home_away_teams_on_order"
 REASON_NO_LIVE_STATE = "no_nfl_live_state_for_date"
 REASON_GAME_NOT_FOUND = "game_not_in_nfl_live_state"
-REASON_PROPS = "nfl_props_not_gradeable_from_scoreboard"
 REASON_UNKNOWN_MARKET = "unmapped_market"
+# PLAYER PROPS, graded off ESPN's per-player box since 2026-09-10. Until then
+# every one refused as `nfl_props_not_gradeable_from_scoreboard`, which made
+# NFL props stakeable but unmeasurable. Each refusal below is named, and each is
+# one of two kinds: PERMANENT (this market or segment can never be graded here)
+# or TRANSIENT (the box is not there yet).
+REASON_PROP_MARKET = "nfl_prop_market_not_mapped"
+REASON_PROP_SEGMENT = "nfl_prop_needs_full_game"
+REASON_NO_EVENT_ID = "nfl_game_has_no_espn_event_id"
+REASON_NO_BOX = "nfl_player_box_unavailable"
+# A player absent from a FINAL box may have been inactive -- which books VOID --
+# or active with no touch in any stat group. Those settle differently and this
+# box cannot tell them apart, so it refuses rather than grading a zero.
+REASON_PLAYER_NOT_IN_BOX = "nfl_player_not_in_final_box"
+REASON_PLAYER_NOT_IN_BOX_YET = "nfl_player_not_in_live_box_yet"
+REASON_PLAYER_AMBIGUOUS = "nfl_player_ambiguous_in_box"
 # A team total is ONE side's points. Grading it off the combined score would
 # roughly double the value and settle overs that lost, so it refuses until the
 # side token is read properly. Same refusal soccer makes, same reason.
@@ -102,6 +128,86 @@ def _as_float(value: Any) -> float | None:
         return float(str(value).strip())
     except (TypeError, ValueError):
         return None
+
+
+# Board market -> the box field that settles it. BOTH vocabularies, because both
+# reach orders: the board writes display labels ("Receiving Yards") and a
+# minority of rows still carry the raw OddsAPI key -- 28 of 1,422 served NFL
+# prop rows on 2026-09-09 arrived as `player_receptions` / `player_pass_tds`.
+# `interceptions` here is the QB's prop, interceptions THROWN, which is why the
+# box reads it from ESPN's `passing` group only.
+_PROP_FIELDS = {
+    "passing yards": "pass_yards",
+    "player_pass_yds": "pass_yards",
+    "passing attempts": "pass_attempts",
+    "player_pass_attempts": "pass_attempts",
+    "passing completions": "completions",
+    "player_pass_completions": "completions",
+    "passing tds": "pass_td",
+    "passing touchdowns": "pass_td",
+    "player_pass_tds": "pass_td",
+    "interceptions": "pass_int",
+    "player_pass_interceptions": "pass_int",
+    "rushing yards": "rush_yards",
+    "player_rush_yds": "rush_yards",
+    "rushing attempts": "rush_attempts",
+    "player_rush_attempts": "rush_attempts",
+    "receptions": "receptions",
+    "player_receptions": "receptions",
+    "receiving yards": "rec_yards",
+    "player_reception_yds": "rec_yards",
+    "anytime td": "td_scored",
+    "player_anytime_td": "td_scored",
+}
+# Anytime TD is a yes/no market with no line on the board. "Scored at least
+# once" is `td_scored > 0.5`, and `paper_settlement` honours a line the resolver
+# supplies (`resolved.get("line", order.get("line"))`).
+_ANYTIME_TD_FIELD = "td_scored"
+_ANYTIME_TD_LINE = 0.5
+_NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
+
+
+def _player_key(value: Any) -> str:
+    """A player name folded for joining a board order to ESPN's box.
+
+    Built ON `prop_projections._norm_name`, which already folds accents and
+    ligatures correctly, and fixes the two things it cannot: INITIALS and
+    SUFFIXES. `_norm_name` turns "A.J. Brown" into "a j brown" while the board
+    writes "AJ Brown" -> "aj brown", so runs of single letters are merged here;
+    and ESPN and the books disagree on "Jr." / "III", so suffixes are dropped.
+    Measured on the opener: ESPN's box carries "A.J. Brown", the board "AJ Brown".
+    """
+    from syndicate.features.shared.prop_projections import _norm_name
+
+    tokens = [token for token in _norm_name(value).split() if token not in _NAME_SUFFIXES]
+    merged: list[str] = []
+    initials = ""
+    for token in tokens:
+        if len(token) == 1:
+            initials += token
+            continue
+        if initials:
+            merged.append(initials)
+            initials = ""
+        merged.append(token)
+    if initials:
+        merged.append(initials)
+    return " ".join(merged)
+
+
+def _fetch_box(event_id: str) -> list[dict[str, Any]] | None:
+    """Every athlete in this game's ESPN box, every field. None means NOT READ.
+
+    A module-level seam so tests can substitute a real captured payload without
+    network access. One GET per game per resolver construction -- see the
+    resolver's own cache -- and no new periodic task, for the reason
+    `_load_games` gives.
+    """
+    try:
+        from syndicate.features.nfl.live_player_box import fetch_player_stat_rows
+    except ImportError:  # pragma: no cover - deploy-skew guard
+        return None
+    return fetch_player_stat_rows(event_id)
 
 
 def _load_games(selected_date: str) -> list[dict[str, Any]] | None:
@@ -170,6 +276,83 @@ def nfl_status_resolver(selected_date: str):
             cache["games"] = _load_games(selected_date)
         return cache["games"]
 
+    def box(event_id: str) -> list[dict[str, Any]] | None:
+        # ONCE PER GAME PER RESOLVER, like the live-state read above: a slate of
+        # forty prop orders on one game is one ESPN GET, not forty. A failed
+        # read is remembered for this pass only and retried on the next.
+        slot = f"box:{event_id}"
+        if slot not in cache:
+            cache[slot] = _fetch_box(event_id)
+        return cache[slot]
+
+    def locate(home_team: Any, away_team: Any) -> tuple[Mapping[str, Any] | None, str | None]:
+        """`(record, None)` or `(None, refusal)`, in the order the refusals
+        have always been made: matchup, then capture, then game."""
+        if not home_team or not away_team:
+            # `event_id` is the OddsAPI hash and cannot address an ESPN-keyed
+            # capture, so there is no fallback here that would be anything but
+            # a guess.
+            return None, REASON_NO_MATCHUP
+        found = games()
+        if found is None:
+            return None, REASON_NO_LIVE_STATE
+        for candidate in found:
+            # BOTH FORMS TRIED. The capture stores the display name and the
+            # tri-code; the board may hold either, and `canonical_team` resolves
+            # both, so a miss on one is not a miss on the game.
+            home_hit = teams_match("nfl", home_team, candidate.get("home_team")) or teams_match(
+                "nfl", home_team, candidate.get("home_abbr")
+            )
+            away_hit = teams_match("nfl", away_team, candidate.get("away_team")) or teams_match(
+                "nfl", away_team, candidate.get("away_abbr")
+            )
+            if home_hit and away_hit:
+                return candidate, None
+        return None, REASON_GAME_NOT_FOUND
+
+    def resolve_prop(order: Mapping[str, Any], canonical: str, segment: str) -> dict[str, Any]:
+        # PERMANENT REFUSALS FIRST, before any read -- the rule the game-line
+        # path below already follows, for the same reason.
+        field = _PROP_FIELDS.get(canonical)
+        if field is None:
+            return {"unavailable_reason": REASON_PROP_MARKET}
+        if segment != FULL_GAME_SEGMENT:
+            # ESPN's box is whole-game. A quarter prop graded off it would be
+            # graded off the wrong quantity.
+            return {"unavailable_reason": REASON_PROP_SEGMENT}
+
+        record, refusal = locate(order.get("home_team"), order.get("away_team"))
+        if refusal:
+            return {"unavailable_reason": refusal}
+        is_final = bool(record.get("final"))
+        if not (bool(record.get("in_progress")) or is_final):
+            # Not unanswerable -- not yet asked.
+            return {"current_value": None, "is_final": False, "started": False}
+        event_id = str(record.get("event_id") or "").strip()
+        if not event_id:
+            return {"unavailable_reason": REASON_NO_EVENT_ID}
+
+        rows = box(event_id)
+        if rows is None:
+            return {"unavailable_reason": REASON_NO_BOX}
+        key = _player_key(order.get("player_name"))
+        matches = [row for row in rows if _player_key(row.get("player_name")) == key]
+        if len(matches) > 1:
+            return {"unavailable_reason": REASON_PLAYER_AMBIGUOUS}
+        if not matches:
+            return {
+                "unavailable_reason": REASON_PLAYER_NOT_IN_BOX if is_final else REASON_PLAYER_NOT_IN_BOX_YET
+            }
+
+        resolved: dict[str, Any] = {
+            "current_value": _as_float(matches[0].get(field)),
+            "is_final": is_final,
+            "started": True,
+        }
+        if field == _ANYTIME_TD_FIELD and _as_float(order.get("line")) is None:
+            resolved["line"] = _ANYTIME_TD_LINE
+        return resolved
+
     def resolve(order: Mapping[str, Any]) -> dict[str, Any]:
         if _norm(order.get("sport")) != "nfl":
             # This resolver is handed every order; a non-NFL one is not a
@@ -199,38 +382,20 @@ def nfl_status_resolver(selected_date: str):
         # points against the whole scoreline.
         if canonical in _TEAM_TOTAL_MARKETS:
             return {"unavailable_reason": REASON_TEAM_TOTAL}
+        if order.get("player_name"):
+            # A PLAYER PROP, graded off ESPN's per-player box. Routed before the
+            # game-line test, so a prop is never reported as an unmapped game
+            # market.
+            return resolve_prop(order, canonical, segment)
         is_total = canonical in _GAME_TOTAL_MARKETS
         is_line = is_game_line_market("nfl", market)
         if not (is_total or is_line):
-            return {"unavailable_reason": REASON_PROPS if order.get("player_name") else REASON_UNKNOWN_MARKET}
+            return {"unavailable_reason": REASON_UNKNOWN_MARKET}
 
         home_team, away_team = order.get("home_team"), order.get("away_team")
-        if not home_team or not away_team:
-            # `event_id` is the OddsAPI hash and cannot address an ESPN-keyed
-            # capture, so there is no fallback here that would be anything but
-            # a guess.
-            return {"unavailable_reason": REASON_NO_MATCHUP}
-
-        found = games()
-        if found is None:
-            return {"unavailable_reason": REASON_NO_LIVE_STATE}
-
-        record = None
-        for candidate in found:
-            # BOTH FORMS TRIED. The capture stores the display name and the
-            # tri-code; the board may hold either, and `canonical_team` resolves
-            # both, so a miss on one is not a miss on the game.
-            home_hit = teams_match("nfl", home_team, candidate.get("home_team")) or teams_match(
-                "nfl", home_team, candidate.get("home_abbr")
-            )
-            away_hit = teams_match("nfl", away_team, candidate.get("away_team")) or teams_match(
-                "nfl", away_team, candidate.get("away_abbr")
-            )
-            if home_hit and away_hit:
-                record = candidate
-                break
-        if record is None:
-            return {"unavailable_reason": REASON_GAME_NOT_FOUND}
+        record, refusal = locate(home_team, away_team)
+        if refusal:
+            return {"unavailable_reason": refusal}
 
         if segment == FULL_GAME_SEGMENT:
             home = _as_float(record.get("home_score"))

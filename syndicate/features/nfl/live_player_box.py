@@ -64,8 +64,10 @@ from typing import Any, Iterable, Mapping
 from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
 
 __all__ = [
+    "fetch_player_stat_rows",
     "nfl_player_box_index",
     "player_rows_from_summary",
+    "player_stat_rows_from_summary",
 ]
 
 _SUMMARY_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary"
@@ -104,6 +106,58 @@ _TD_KEYS = {
     "rushingTouchdowns": "rush_td",
     "receivingTouchdowns": "rec_td",
 }
+# COUNTING STATS, added 2026-09-10 for SETTLEMENT: `bet_status_nfl` grades
+# player props off these. Each key is unique across ESPN's football groups, so
+# it maps without consulting the group name.
+_COUNT_KEYS = {
+    "rushingAttempts": "rush_attempts",
+    "receptions": "receptions",
+    "receivingTargets": "targets",
+}
+# GROUP-SCOPED, AND THE SCOPE IS THE WHOLE POINT. ESPN carries `interceptions`
+# in TWO groups: `passing` (interceptions THROWN -- the QB's prop) and a
+# separate `interceptions` group (picks CAUGHT, by the defender). Measured on
+# event 401872656 (NE @ SEA, 2026-09-09): Drake Maye's passing line reads
+# `interceptions: 3` while SEA's `interceptions` group lists the three defenders
+# who caught them. A name-only map would credit each defender with a thrown
+# interception and grade an interceptions prop off the wrong player.
+_PASSING_GROUP = "passing"
+_PASS_INT_KEY = "interceptions"
+# Completions and attempts share ONE key and ONE cell: "23/33".
+_COMP_ATT_KEY = "completions/passingAttempts"
+
+# Every numeric field a merged row carries, zero-initialised. The first six are
+# the card's, in the card's order; the rest exist for settlement.
+_ROW_FIELDS = (
+    "pass_yards",
+    "rush_yards",
+    "rec_yards",
+    "pass_td",
+    "rush_td",
+    "rec_td",
+    "completions",
+    "pass_attempts",
+    "pass_int",
+    "rush_attempts",
+    "receptions",
+    "targets",
+)
+# EXACTLY what the card rendered before the counting stats existed, in the same
+# order. `player_rows_from_summary` projects onto this so the card payload is
+# byte-identical -- the settlement fields must not leak onto a page nobody
+# asked to change.
+_DISPLAY_FIELDS = (
+    "player_name",
+    "team_abbr",
+    "pass_yards",
+    "rush_yards",
+    "rec_yards",
+    "pass_td",
+    "rush_td",
+    "rec_td",
+    "td_scored",
+    "total_yards",
+)
 
 
 def _number(value: Any) -> float | None:
@@ -131,6 +185,15 @@ def _fetch_summary(event_id: str) -> Mapping[str, Any] | None:
     return payload if isinstance(payload, Mapping) else None
 
 
+def _split_pair(value: Any) -> tuple[float | None, float | None]:
+    """"23/33" -> (23.0, 33.0). Either half None when it does not parse."""
+    text = str(value if value is not None else "").strip()
+    if "/" not in text:
+        return None, None
+    left, _, right = text.partition("/")
+    return _number(left), _number(right)
+
+
 def player_rows_from_summary(summary: Mapping[str, Any] | None) -> list[dict[str, Any]] | None:
     """`boxscore.players[]` -> one row per player with a real stat line.
 
@@ -139,7 +202,35 @@ def player_rows_from_summary(summary: Mapping[str, Any] | None) -> list[dict[str
     the two differently. ESPN publishes `boxscore.teams` long before
     `boxscore.players` on a game that has just kicked off, so this distinction
     is the normal early-game state, not an error.
+
+    THE CARD'S VIEW, AND UNCHANGED BY SETTLEMENT'S NEEDS. Rows are filtered to
+    players with yards or a touchdown and projected onto `_DISPLAY_FIELDS`, so
+    the payload is byte-identical to what it was before the counting stats were
+    parsed. Settlement reads `player_stat_rows_from_summary` instead.
     """
+    rows = _merged_player_rows(summary)
+    if rows is None:
+        return None
+    # A player who appeared in a group with no yards and no touchdown has no
+    # line to show; keeping them would bury the ones who do under a roster.
+    shown = [row for row in rows if row["total_yards"] or row["td_scored"] or row["pass_td"]]
+    return [{field: row[field] for field in _DISPLAY_FIELDS} for row in shown]
+
+
+def player_stat_rows_from_summary(summary: Mapping[str, Any] | None) -> list[dict[str, Any]] | None:
+    """EVERY athlete in the box, with EVERY parsed field -- for grading, not display.
+
+    Unfiltered on purpose. A player listed in ANY stat group took the field, so a
+    zero in one of his fields is a real zero -- a receiver with one carry and no
+    targets genuinely caught nothing. The card's filter would drop him and turn
+    that real zero into an absence, which a grader must treat as "did not play".
+    None keeps the card's meaning: no player block at all.
+    """
+    return _merged_player_rows(summary)
+
+
+def _merged_player_rows(summary: Mapping[str, Any] | None) -> list[dict[str, Any]] | None:
+    """One merged row per (team, athlete) across every stat group, unfiltered."""
     if not isinstance(summary, Mapping):
         return None
     boxscore = summary.get("boxscore")
@@ -161,6 +252,10 @@ def player_rows_from_summary(summary: Mapping[str, Any] | None) -> list[dict[str
         for group in groups:
             if not isinstance(group, Mapping):
                 continue
+            # The group NAME is read only to scope the two keys that need it
+            # (`completions/passingAttempts`, `interceptions`); every other key
+            # is unique across groups and maps by name alone.
+            group_name = str(group.get("name") or "").strip()
             # `keys`, never `labels`: labels are display strings ("YDS") and
             # are neither stable nor unique across groups.
             keys = [str(key or "").strip() for key in (group.get("keys") or [])]
@@ -180,24 +275,32 @@ def player_rows_from_summary(summary: Mapping[str, Any] | None) -> list[dict[str
                 stats = stats if isinstance(stats, list) else []
                 row = merged.setdefault(
                     (abbr, str(athlete.get("id") or name)),
-                    {
-                        "player_name": name,
-                        "team_abbr": abbr,
-                        "pass_yards": 0.0,
-                        "rush_yards": 0.0,
-                        "rec_yards": 0.0,
-                        "pass_td": 0.0,
-                        "rush_td": 0.0,
-                        "rec_td": 0.0,
-                    },
+                    {"player_name": name, "team_abbr": abbr, **{field: 0.0 for field in _ROW_FIELDS}},
                 )
                 for position, key in enumerate(keys):
                     if position >= len(stats):
                         break
-                    field = _YARD_KEYS.get(key) or _TD_KEYS.get(key)
+                    cell = stats[position]
+                    if key == _COMP_ATT_KEY:
+                        if group_name == _PASSING_GROUP:
+                            completions, attempts = _split_pair(cell)
+                            if completions is not None:
+                                row["completions"] = completions
+                            if attempts is not None:
+                                row["pass_attempts"] = attempts
+                        continue
+                    if key == _PASS_INT_KEY:
+                        # THROWN only. The same key in the `interceptions`
+                        # group is picks CAUGHT and must not land here.
+                        if group_name == _PASSING_GROUP:
+                            value = _number(cell)
+                            if value is not None:
+                                row["pass_int"] = value
+                        continue
+                    field = _YARD_KEYS.get(key) or _TD_KEYS.get(key) or _COUNT_KEYS.get(key)
                     if field is None:
                         continue
-                    value = _number(stats[position])
+                    value = _number(cell)
                     if value is not None:
                         row[field] = value
 
@@ -208,9 +311,8 @@ def player_rows_from_summary(summary: Mapping[str, Any] | None) -> list[dict[str
         # summing all three would double-count every one of them.
         row["td_scored"] = row["rush_td"] + row["rec_td"]
         row["total_yards"] = row["pass_yards"] + row["rush_yards"] + row["rec_yards"]
-    # A player who appeared in a group with no yards and no touchdown has no
-    # line to show; keeping them would bury the ones who do under a roster.
-    return [row for row in rows if row["total_yards"] or row["td_scored"] or row["pass_td"]]
+    # UNFILTERED. The card's filter lives in `player_rows_from_summary`.
+    return rows
 
 
 def _cached(event_id: str) -> tuple[bool, list[dict[str, Any]] | None]:
@@ -285,3 +387,23 @@ def nfl_player_box_index(
     except Exception as exc:  # noqa: BLE001 -- a box must never cost the board
         print(f"NFL_PLAYER_BOX_FETCH_FAILED error={type(exc).__name__}: {exc}", flush=True)
     return out
+
+
+def fetch_player_stat_rows(event_id: str) -> list[dict[str, Any]] | None:
+    """One game's full ESPN box for SETTLEMENT: every athlete, every field.
+
+    Deliberately NOT routed through `nfl_player_box_index`. Its cache, batch
+    budget and request-path warning exist for a web page assembling up to
+    thirteen boxes under an 8s budget; settlement runs on refresh-worker, reads
+    one game at a time, and caches per resolver (`bet_status_nfl`). It must also
+    never share the card cache, which holds the FILTERED display rows -- a
+    grader reading those would turn every real zero into an absence and refuse
+    a bet it could have settled.
+
+    None means NOT READ: the fetch failed, or ESPN has not published a player
+    block yet.
+    """
+    event_id = str(event_id or "").strip()
+    if not event_id:
+        return None
+    return player_stat_rows_from_summary(_fetch_summary(event_id))
