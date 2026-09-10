@@ -621,6 +621,15 @@ def cmd_prune(args) -> int:
 
     Deletes directly rather than clearing READONLY and re-running `git worktree
     prune`, because that prune would take the HELD dirs too.
+
+    A dir is also HELD while a CHECKOUT FOLDER BY ITS NAME still exists. Once git
+    has deleted a husk's `gitdir` file nothing records where its checkout lived,
+    and git calls it stale whatever is on disk. Measured 2026-09-10:
+    `arm2-denominator-wt2` was stale while `C:\\tmp\\arm2-denominator-wt2` still
+    existed -- emptied by a `git worktree remove` that could not delete the folder
+    a shell was sitting in. The name is the only clue left, so look where
+    worktrees get made: the session root, the directory above it (ad-hoc
+    `C:\\tmp\\<name>` checkouts), and beside the main worktree.
     """
     main = _main_root()
     common = git("rev-parse", "--path-format=absolute", "--git-common-dir", cwd=main, check=True)
@@ -648,19 +657,35 @@ def cmd_prune(args) -> int:
         print("could not tell which commits are reachable -- deleting nothing")
         return 1
     held = {d: sorted(s & lost) for d, s in shas.items() if s & lost}
-    free = [d for d in ids if d not in held]
+    session_root = Path(getattr(args, "root", DEFAULT_ROOT))
+    roots = (session_root, session_root.parent, main.parent)
+    present: dict[str, Path] = {}
+    for dir_id in ids:
+        folder = next((root / dir_id for root in roots if (root / dir_id).exists()), None)
+        if folder is not None:
+            present[dir_id] = folder
+    free = [d for d in ids if d not in held and d not in present]
 
-    print(f"{len(ids)} stale admin dir(s) under {admin_root}: "
-          f"{len(free)} free, {len(held)} HELD (the last pointer to a commit)")
+    print(f"{len(ids)} stale admin dir(s) under {admin_root}: {len(free)} free, "
+          f"{len(held)} HELD (the last pointer to a commit), "
+          f"{len(present)} HELD (a checkout folder by that name still exists)")
     for dir_id, commits in sorted(held.items()):
         print(f"  HELD {dir_id}: {len(commits)} commit(s) nothing else keeps")
         shown = git("log", "--no-walk=unsorted", "--format=%H %s", *commits[:3], cwd=main)
         for line in shown.stdout.splitlines():
             print(f"      {line[:12]}{line[40:110]}")
+    for dir_id, folder in sorted(present.items()):
+        try:
+            entries = sum(1 for _ in folder.iterdir()) if folder.is_dir() else 0
+            what = "empty" if folder.is_dir() and not entries else f"{entries} entries"
+        except OSError:
+            what = "unreadable"
+        what += ", has .git" if (folder / ".git").exists() else ", no .git"
+        print(f"  HELD {dir_id}: {folder} still exists ({what})")
     if not args.apply:
         print("\ndry run -- re-run with --apply to delete the free ones. A HELD dir stays")
         print("until its commits are rescued (`git branch rescue/<id> <sha>`) or judged")
-        print("disposable, and is then deleted by hand.")
+        print("disposable, or its checkout folder is gone, and is then deleted by hand.")
         return 0
 
     failed = []
@@ -670,7 +695,8 @@ def cmd_prune(args) -> int:
         shutil.rmtree(target, ignore_errors=True)
         if target.exists():
             failed.append(dir_id)
-    print(f"\ndeleted {len(free) - len(failed)} of {len(free)} free admin dir(s); {len(held)} held")
+    print(f"\ndeleted {len(free) - len(failed)} of {len(free)} free admin dir(s); "
+          f"{len(set(held) | set(present))} held")
     for dir_id in failed:
         print(f"  could not delete {admin_root / dir_id} -- something holds a handle in it")
     return 1 if failed else 0

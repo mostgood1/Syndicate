@@ -389,6 +389,17 @@ death, never life — do not invert it.
 - Verification: (1) off != on unit tests, plus a source tripwire that no raw `top_play.get("ev_pct")` remains in either producer; (2) live-odds-worker's live SHA carries the fix BY CONTENT after a deploy; (3) the 09-17 reading in the Goal.
 - Blocked by: none.
 
+### prune-checkout-guard — CLOSED 2026-09-10 — opened 2026-09-10 — session 4d4e0959-c99d-4777-bebb-37851c341e75 — **GOAL MET: `prune` holds any stale admin dir with a same-named checkout folder in the session root, the directory above it, or beside the main tree, and names the folder. 7/7 tests; main's current version fails the new one. Tooling only, no deploy.**
+- Goal: `session_worktree.py prune` never deletes a stale admin dir while a checkout folder by its name still exists — in the session root, in the directory above it (ad-hoc `C:\tmp\<name>`), or beside the main worktree — and it says which folder held it. User-directed 2026-09-10 ("delete it and add the guard to prune"). — **GOAL: MET.** THE READINGS:
+  - `tests/test_session_worktree_close.py`: 7 passed with the guard. Against main's current version the new test fails (the husk whose folder still exists gets deleted) and the other 6 pass.
+  - A real `prune` dry run on this repo with the guarded copy printed "nothing to prune", exit 0. After today's cleanup there were 0 stale entries, so the real-roots path ran cleanly but had nothing to hold.
+- Files: `scripts/session_worktree.py`, `tests/test_session_worktree_close.py`.
+- Hypothesis: n/a — a guard for a case measured today. `arm2-denominator-wt2` was stale to git while `C:\tmp\arm2-denominator-wt2` still existed (empty), and `prune --apply` would have deleted its admin dir without noticing.
+- Falsification test: n/a.
+- Verification: the new test (one husk with a same-named folder in the session root, one with a folder in the directory above, one with none) passes with the guard and fails on main's current version; the existing prune test still passes; a real `prune` dry run on this repo reads clean.
+- Blocked by: none.
+- 2026-09-10 19:43Z, user-authorised one-off: `arm2-denominator-wt2`'s admin dir was deleted while its checkout folder still existed. At that instant the folder was re-checked as EMPTY with no `.git`, and the admin dir's one SHA is kept elsewhere. The empty folder was left in place, because a session's shell may still sit in it. 0 stale entries after.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

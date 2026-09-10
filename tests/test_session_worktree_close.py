@@ -247,11 +247,37 @@ def test_prune_deletes_only_husks_whose_commits_live_on_elsewhere(repo, monkeypa
     mod = _load("prune")
     monkeypatch.setattr(mod, "REPO_ROOT", main)
 
-    assert mod.cmd_prune(Namespace(apply=False)) == 0
+    assert mod.cmd_prune(Namespace(apply=False, root=repo.sessions)) == 0
     assert all((admin_root / n).exists() for n in husks)           # a dry run by default
 
-    assert mod.cmd_prune(Namespace(apply=True)) == 0
+    assert mod.cmd_prune(Namespace(apply=True, root=repo.sessions)) == 0
     assert not (admin_root / "reachable").exists()
     assert not (admin_root / "rebased").exists()
     assert (admin_root / "lost").exists()
     assert never_landed[:10] in capsys.readouterr().out
+
+
+def test_prune_holds_a_husk_whose_checkout_folder_still_exists(repo, monkeypatch, capsys):
+    """Measured 2026-09-10: `arm2-denominator-wt2` was stale to git while its checkout
+    folder still existed -- emptied by a remove that could not delete the folder a shell
+    sat in. Once `gitdir` is gone nothing records the path, so the name is the only clue:
+    look in the session root and in the directory above it (ad-hoc `C:\\tmp\\<name>`)."""
+    main = repo.main
+    head = _git("rev-parse", "HEAD", cwd=main)
+    admin_root = main / ".git" / "worktrees"
+    for name in ("folder-gone", "folder-in-sessions", "folder-adhoc-x7"):
+        (admin_root / name / "logs").mkdir(parents=True)
+        (admin_root / name / "ORIG_HEAD").write_text(head + "\n")     # nothing lost, either way
+    (repo.sessions / "folder-in-sessions").mkdir()                     # empty, like the real one
+    (repo.sessions.parent / "folder-adhoc-x7").mkdir()
+    mod = _load("prune_guard")
+    monkeypatch.setattr(mod, "REPO_ROOT", main)
+
+    assert mod.cmd_prune(Namespace(apply=True, root=repo.sessions)) == 0
+
+    assert not (admin_root / "folder-gone").exists()
+    assert (admin_root / "folder-in-sessions").exists()
+    assert (admin_root / "folder-adhoc-x7").exists()
+    out = capsys.readouterr().out
+    assert "HELD folder-in-sessions" in out and str(repo.sessions / "folder-in-sessions") in out
+    assert "HELD folder-adhoc-x7" in out
