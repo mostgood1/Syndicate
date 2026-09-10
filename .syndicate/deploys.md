@@ -5,6 +5,52 @@
 
 ---
 
+## 2026-09-10 12:36 CT — refresh-worker `ce31cc7a` (lane `football-settlement-gaps`) — **PREGAME LINES NOW READ NOT-STARTED (327 → 0 refusals) AND EVERY NCAAF TEAM NAME RESOLVES (50 → 0). 16 OF THOSE ORDERS NOW SURFACE THE NEXT GAP: THEIR GAME IS NOT IN THE CAPTURE.**
+
+Deploy `dep-dahecnifngtc7395i730`, triggered 12:18:22 CT, the first CLEAR after a 10-job HOLD at
+12:08 CT (the MLB daily sim and an odds refresh were running). Live 12:21:36 CT, on top of `0ceb9636`.
+Code: `bet_status_nfl.py`, `bet_status_ncaaf.py`, `ncaaf_team_registry.py`, plus tests. Also carried,
+and already live on web as `2224dec0`: the portfolio sign-in/books code (`portfolio_auth.py`,
+`portfolio_books.py`, templates, static) from lanes `portfolio-login-multibook` and
+`portfolio-auth-hash-guard`. No `render.yaml`, no env change. No restart or OOM event since go-live
+(Render events).
+
+**verify:** fresh baseline on `0ceb9636` against the first pass on `ce31cc7a`:
+
+| `SETTLED date=2026-09-10` | before, 12:03 CT (407 orders) | **after, 12:36 CT (418 orders)** |
+|---|---|---|
+| `no_team_scores` | 197 | **0** |
+| `ncaaf_game_carries_no_scores` | 130 | **0** |
+| `ncaaf_team_not_in_registry_or_ambiguous` | 50 | **0** |
+| `not_decided_yet` | 3 | **367** |
+| `game_not_in_ncaaf_live_state` | 0 | **16** |
+| `order_not_filled` | 2 | 10 |
+| `no_live_feed` (MLB) / soccer | 24 / 1 | 24 / 1 |
+
+`BET_STATUS` 12:01 → 12:35 CT: `resolved` 3 → **374**; `no_team_scores` 189 → 0,
+`ncaaf_game_carries_no_scores` 131 → 0, `ncaaf_team_not_in_registry_or_ambiguous` 48 → 0;
+`game_not_in_ncaaf_live_state` 0 → 16.
+
+**MEASURED, both fixes.** The 327 pregame no-score rows now read not-started, and all 50 registry
+misses now resolve a team. The count closes: 3 + 327 + 34 (the 50 misses less the 16 below) = 364,
+against 367 after, with 11 more orders on the date.
+
+**THE NEXT GAP, NOT FIXED HERE: 16 of the 50 find their teams but not their game.**
+`game_not_in_ncaaf_live_state: 16` was 0 before only because the name refusal came first.
+Suspected, UNVERIFIED: FCS-vs-FCS games (Gardner-Webb is FCS), which the NCAAF capture never
+holds, because `poll_ncaaf_live_state` fetches ESPN with `groups=80` (FBS only). Discriminator: list
+this week's games for the seven teams and check which have no FBS opponent.
+
+**`order_not_filled` 2 → 10 is NOT attributed to this change** and was not measured here.
+
+**Pre-existing, seen in the post-deploy logs, NOT this deploy:** `BOOK_GRID_LIVE_GAMELINE_FAILURE
+sport=mlb`, a `TypeError: price_distribution_market() got an unexpected keyword argument 'sport'`
+at `live_gameline_join.py:1585`, on every board cycle since at least 11:24 AM CT (on `0ceb9636`,
+before this deploy). Neither file is in `0ceb9636..ce31cc7a`. Flagged as a separate task.
+
+**verify: MET** for both named reasons. The first production GRADE is still owed (scheduled task
+`nfl-ncaaf-first-grade-reading`, 11:15 PM CT).
+
 ## 2026-09-10 09:59 CT — refresh-worker `0ceb9636` (lane `nfl-prop-grading`) — **EVERY NFL AND NCAAF ORDER NOW FINDS ITS GAME: `game_not_in_nfl_live_state` 2 → 0, `game_not_in_ncaaf_live_state` 284 → 0. STILL NO GRADE, BECAUSE NONE OF THOSE GAMES HAS BEEN PLAYED.**
 
 Deploy `dep-dahc5495efls73dfk7hg`, triggered 09:45:37 CT, live 09:48:24 CT, on top of `2259edf8`.
