@@ -31842,3 +31842,54 @@ and then SETs, with nothing atomic between the two.
     `BLOCKED_ON_UNRECONCILED` and `Traceback`; the count held at 14.
   - live-odds-worker was redeployed to `e4410f37` at 22:18:17Z by lane `mlb-lens-final-status`. That commit
     carries all six markers of this change BY CONTENT, so the owed reading's window runs on across it.
+
+## 2026-09-10 22:12:21-22:18:17Z — live-odds-worker `2914b6c7` -> `e4410f37` — lane `mlb-lens-final-status`
+
+**What:** ONE runtime change over the live build: `cfec04ef`, the MLB live-lens final pass
+(`syndicate/features/mlb/live_lens_final_pass.py` + the hook in `live_lens_loop._run_live_lens_tick`).
+The ride-along is 4 ledger-only commits (`aa5a4c22`, `42410346`, `3cb3b76a`, `e4410f37`). No
+`requirements*` or `render.yaml` change. Live `2914b6c7` is an ancestor of the target, so nothing is reverted.
+
+**Baseline, before the pass:** on web `ab787363` at 19:41:38Z and on web `c2dcd525` at 20:04:41Z,
+`/mlb/api/cards?date=2026-09-03` read 823095/823907 `Live / In Progress`; the served census for
+2026-09-01..09-09 was **9 games `Live` on 7 of 9 dates**; the 09-03 chips read 7 `final` + 2 `live`.
+
+**Locks:** the claim went to `mlb-lens-final-status` at 22:07:32Z (token `4ee5309e...`), right after
+`write-ahead-build-refusal` released it following its own post-deploy reading. Preflight returned
+HOLD on 8 polls (3 odds-refresh jobs in flight) and **CLEAR at 22:12:07Z** after 9 polls at ~10 s,
+with only infrastructure processes running. Deploy `dep-dahimhafngtc739srppg` via `render_deploy.py
+--service live-odds-worker --commit e4410f37`: created 22:12:21Z -> `update_in_progress` 22:16:44Z
+-> **live 22:18:17Z**. Pre-slate, as agreed with lane `ncaaf-fcs-market-implied-rating`, since live odds
+feed FAMU @ MIA's board join at 19:00 CDT.
+
+**verify -- the reading:**
+
+```
+producer (live-odds-worker), first tick after boot:
+  22:19:54Z [live_lens_final_pass] MLB_LIVE_LENS_FINAL_PASS today=2026-09-10 lookback=10 dates_checked=10
+            skipped_verified=0 no_report=0 open_rows=6 finalized=6 still_open=0 fetch_failed=0 write_failed=0
+            games=['2026-09-06:823903', '2026-09-04:823093', '2026-09-03:823095', '2026-09-03:823907',
+                   '2026-09-02:823906', '2026-09-01:823908']
+transport (live-odds-worker publish sweep, every cycle since):
+  22:21:10Z published_hot_artifacts count=659 failed=44 ; 22:22:44Z count=667 failed=38
+  SWEEP_SKIPPED_DETAIL stale_slate=[...live_lens_report_2026_09_03.json(2026-09-03), ..._09_01.json, ..._09_06.json]
+  -> artifact_publisher._publish_skip_reason: date > _PUBLISH_MAX_AGE_DAYS=1 is "never exempted" (sweep only)
+web at 22:22:46Z (+269s), reading script verify_final_pass.py:
+  live_lens_report_2026_09_03.json, BOTH forms: generatedAt 2026-09-03T23:59:10-05:00, finalPass_entries=0,
+    823095 Live/In Progress, 823907 Live/In Progress
+  served /mlb/api/cards?date=2026-09-03: 823095 Live, 823907 Live
+  census 09-01..09-09 served: 1,1,2,2,1,1,0,0,1 = 9 Live on 7 of 9 dates   (baseline: 9 on 7 of 9)
+  chips 2026-09-03 source=inline_artifact_stale states={'final': 7, 'live': 2}   (baseline: 7 + 2)
+web, which form is served (22:28-22:31Z):
+  09-04 source_artifacts 2,280,218 B (full) 823905 Live, 823093 Live | data/ 60,078 B 823905 Final | SERVED Live, Live
+  09-05 source_artifacts 1,589,732 B (full) 824553 Live              | data/ 31,341 B 824553 Final | SERVED Live
+  09-09 web ACCEPTED live-odds-worker source_artifacts 8,736,835 B (823900 Final) at 22:25:39.302Z, then
+        data/ 132,548 B (823900 Live) at 22:25:39.477Z; a cards read then reconciled (sources.py
+        _resolve_data_path_with_reconcile copies the NEWER form over the target): target now 132,548 B,
+        823900 Live | SERVED Live
+```
+
+**Verdict: NOT_MET.** The pass RAN and finalized live-odds-worker's OWN copies (22:19:54Z `finalized=6 still_open=0 fetch_failed=0`), and NONE of it reached web: at 22:22:46Z web served 823095/823907 `Live`, the census read 9 `Live` on 7 of 9 dates and the 09-03 chips 7 final + 2 live, the baseline unchanged. TWO causes, both measured. (1) TRANSPORT: the publish sweep refuses any artifact dated more than a day old (`artifact_publisher._PUBLISH_MAX_AGE_DAYS = 1`, "never exempted"); every sweep since logs `stale_slate=[..09_03, 09_01, 09_06..]`. My module docstring's claim that the sweep carries the rewrite the same cycle was WRONG. (2) RECONCILE ON WEB: `sources._resolve_data_path_with_reconcile` copies the newer slim `mlb_source/data/` form over the served `source_artifacts` target on read. 09-09's full final copy (8,736,835 B, 823900 Final) was accepted at 22:25:39.302Z and the slim copy (132,548 B, Live) at .477Z, and the next cards read replaced the target, which now reads 132,548 B and Live. Publishing the producer's copies wholesale is ruled out: web's 09-04/09-05 targets are the FULL reports (2.28/1.59 MB), and the merge copies `actual_box_panel`/`gameLens`/`market_tiles`/`predictions` from them. NEXT: a status-only patch of web's OWN copies (read, finalize from StatsAPI, publish back; slim form first, target last), deployed after tonight's slate.
+
+**Rollback:** `render_deploy.py --service live-odds-worker --commit 2914b6c7 --allow-rollback`. The
+pass also has a kill switch, `SYNDICATE_MLB_LIVE_LENS_FINAL_PASS=0`, which needs a deploy to inject.
