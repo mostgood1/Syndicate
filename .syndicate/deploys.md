@@ -5,6 +5,32 @@
 
 ---
 
+## 2026-09-09 22:0x CT — correction to the row above: the owed NFL reading is on a SCHEDULED TASK, not a monitor
+
+The entry above says *"A monitor is armed"* for the full-size NFL board reading.
+**That would have become false within the hour.** A monitor lives only as long as
+the session that started it, and the reading cannot be taken until the 09-13
+Sunday card is inside the board horizon — the board runs `horizon_days=1`, so a
+full-size NFL board does not exist until the evening of **09-12**, three days out.
+
+Replaced with a one-shot scheduled task, **`nfl-prop-join-sunday-reading`, firing
+2026-09-12 19:30 CT.** It carries the baseline
+(`rows=1884 pregame_proj=71 no_proj=1813 edged=63`), the exact log queries, and
+the four traps this measurement has already produced once each:
+
+  * `PREGAME_PROJECTION_JOIN`'s `projected` PERCENTAGE fell ~99% -> ~50% because
+    the denominator now counts prop rows. Not a regression; read the count.
+  * A zero from the board API means nothing unless `written_at` post-dates the
+    21:11:51 CT deploy.
+  * `refused_wrong_team` / `refused_unknown_team` are structurally zero on the
+    artifact path (`props.py:603`) and evidence nothing.
+  * Expect coverage BELOW the local 71.7% — refresh-worker's artifact copy holds
+    980 sim rows, not 1,140.
+
+It is instructed to report "no verdict yet" rather than manufacture one from a
+small board, which is the failure mode that made this correction necessary.
+
+
 ## 2026-09-09 21:41-21:45 CT — refresh-worker `a101c437` — **THE READING for the NFL prop join. Positive on every signal; the one clean signal is a COMPOSITION change.**
 
 Appends the 21:08 CT row above (deploy 21:08:07 CT, live 21:11:51 CT). Claim
