@@ -3217,6 +3217,52 @@ Mostly execution of already-measured items; references, not duplicates:
 
 ---
 
+
+> **(h) IS SATISFIED. THE BLOCKING CLAIM ABOVE IS STALE — verified 2026-09-09 22:3x CT.**
+> `[lane web-oom-census, session 2edf8b82 — measurement only]`
+>
+> The block above says (h) is "LANDED BUT INERT — it has never run once" and that
+> "the feedback loop the whole plan rests on ... is one env var away from existing
+> and currently does not". **Both flags are now SET on refresh-worker**, read by
+> PAGINATING all 167 keys (the item itself records that `?limit=100` is a PAGE
+> SIZE and that reading one page is how the previous evidence went wrong):
+>
+>     ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN      = true
+>     EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN = true
+>     EVALUATION_SETTLEMENT_LOOKBACK_DAYS                 = 7
+>     EVALUATION_SETTLEMENT_SPORTS                        = mlb,wnba
+>
+> **AND ARMED IS NOT ENOUGH — both are PRODUCING**, which is the state this item
+> actually asks for:
+>
+>     [refresh_worker] ACCURACY_SUMMARY_AUTORUN_GATED reason=daily_gate
+>       target_hour_central=7 last_epoch=1788958946 age_sec=51971 never_run=no
+>     [paper_settlement] PNL all_time book=portfolio settled=1297 pending=883
+>       staked=$6784.63 pnl=$106.55 roi=1.57% win_rate=45.37%
+>
+> `never_run=no` with a real `last_epoch` is the direct refutation of "has never
+> run once". The daily gate at 07:00 Central is by design, not a stall.
+>
+> **NOTE, per `CLAUDE.md`'s documented near-miss:** `EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS`
+> is present but EMPTY. `int(raw or 86400)` makes empty fall back to the daily
+> gate, so this is currently safe — but the key existing AT ALL is the hazard that
+> file warns about, and a non-empty value would silently mean 4 runs/day of a
+> ~1.4GB job. **Leave it empty or delete it; do not 'fix' it by setting a number.**
+>
+> **WHAT THE RESTORED LOOP NOW SAYS, and it is load-bearing for `#624`:**
+>
+>     by_market_family   game_line    496  +$219.09   +7.67%  49.8%
+>                        game_total   530    +$8.12   +0.27%  45.1%
+>                        player_prop  271  -$120.65  -13.17%  38.0%
+>     by_venue_family    kalshi/player_prop  132  -$31.64  -7.8%
+>
+> **Player props are the only market family losing money platform-wide**, which
+> independently corroborates `portfolio_commit.resolve_excluded_families`'s
+> `mlb:player_prop` default (measured there at −19.27% over 16 dates).
+> **NFL is 18 settled rows — far too thin to read**, so this does NOT settle the
+> 2026-09-09 decision to leave NFL props stakeable; `nfl-prop-settled-grade`
+> (09-15) still owns that. It does mean the REFERENCE CLASS is negative.
+
 ### `#625` — **PHASE M — LOCAL MIRROR + REPLAY GATE. Prod→local full mirror; local-first development under three laws.** — lane `edge-plan`, 2026-09-01 — **OPEN, parallel with `#626`; accelerates every later phase**
 
 Endorsed in the analysis §12 as an UPGRADE of "Render is the source of truth":
