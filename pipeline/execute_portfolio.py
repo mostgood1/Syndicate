@@ -512,6 +512,48 @@ def run_execution(
             refused["incomplete_position"] = refused.get("incomplete_position", 0) + 1
             continue
 
+        # NO CONTRACT, NO ORDER -- AND NO LEDGER ROW.  [2026-09-10, user decision]
+        #
+        # A live position with no `venue_ticker` can never be built: Kalshi's
+        # `order_body` raises `no_venue_ticker`, and Polymarket's resolver needs
+        # the slug and raises `market_unresolved_for_position`. Both refusals
+        # happen INSIDE `place_order`, which has already written the write-ahead
+        # `submitted` row by then. So every pass wrote one row per unbuildable
+        # position and then completed it `rejected`.
+        #
+        # That write-ahead is what froze BOTH venues for six days. On
+        # 2026-09-04T18:27:25Z a Polymarket position with no slug was written,
+        # refused at build and logged `rejected` (`LIVE_ORDER ... ticker=None`,
+        # and `POLYMARKET_NO_SLUG ... type=NoneType` the same instant) -- and
+        # the stored row still read `submitted` on 2026-09-10 (a lost update;
+        # the mechanism is unproven).
+        # Any unreconciled live order blocks every placement on every venue
+        # (`BLOCKED_ON_UNRECONCILED`), and nothing reconciles an order that never
+        # got a venue id, so it held until an operator resolved it. The first
+        # unblocked pass that day wrote 8 more such rows -- 8 NCAAF positions,
+        # every one `OrderBuildError: no_venue_ticker` -- each another chance to
+        # strand.
+        #
+        # Refused here, by name, before anything is written: a lost update
+        # cannot strand a row that does not exist. PAPER is unchanged -- it fills
+        # the unrestricted plan, which carries no venue contracts at all.
+        if mode == LIVE and not request.venue_ticker:
+            skipped += 1
+            refused["no_venue_ticker"] = refused.get("no_venue_ticker", 0) + 1
+            print(
+                f"[execute_portfolio] REFUSED_NO_VENUE_TICKER venue={venue}"
+                f" sport={getattr(request, 'sport', None)}"
+                f" market={getattr(request, 'market', None)}"
+                f" player={getattr(request, 'player_name', None)!r}"
+                f" side={getattr(request, 'side', None)}"
+                f" line={getattr(request, 'line', None)}"
+                f" price_source={position.get('price_source')!r}"
+                f" {_ev_fields_of(position)}"
+                " -- no venue contract on this position; nothing written",
+                flush=True,
+            )
+            continue
+
         # TOO EARLY TO PLACE  [2026-08-31, user decision]
         #
         # >>> THE ORIGINAL PREMISE OF THIS GATE IS REFUTED. READ THIS FIRST. <<<

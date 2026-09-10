@@ -47,6 +47,13 @@ def _row(**overrides):
     return row
 
 
+# A venue plan's placeable position always carries the contract it was priced
+# on -- `venue_scope` stamps it -- and live refuses one without it before
+# anything is written (`no_venue_ticker`). So a live test that means to PLACE
+# carries one, and a test about the refusal passes `venue_ticker=None`.
+_TICKER = "KXMLBGAME-26AUG22AWAYHOME-HOME"
+
+
 def _write_live_plan(monkeypatch, rows, venue="kalshi"):
     """A venue-scoped plan, which is the only book live mode may place.
 
@@ -259,7 +266,7 @@ def test_paper_mode_is_not_blocked_by_a_stranded_order(monkeypatch):
 def test_force_does_not_bypass_the_live_arm(monkeypatch):
     """`force` skips the enablement flag only. A convenience flag that can reach
     real money is not a convenience."""
-    _write_live_plan(monkeypatch, [_row()])
+    _write_live_plan(monkeypatch, [_row(venue_ticker=_TICKER)])
     monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
     monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "kalshi")
     from pipeline import execute_portfolio as runner
@@ -311,7 +318,7 @@ def test_inline_still_runs_paper(monkeypatch):
 def test_the_non_inline_path_is_unchanged(monkeypatch):
     """A standalone run (its own service, or the CLI) keeps full live capability
     -- the refusal must not leak into the path that is allowed to place."""
-    _write_live_plan(monkeypatch, [_row()])
+    _write_live_plan(monkeypatch, [_row(venue_ticker=_TICKER)])
     monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
     monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
     monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "kalshi")
@@ -477,7 +484,7 @@ def test_the_commit_populates_live_bet_status(monkeypatch, capsys):
 
 
 def test_live_mode_against_a_venue_with_no_adapter_stops_with_a_reason(monkeypatch):
-    _write_live_plan(monkeypatch, [_row()])
+    _write_live_plan(monkeypatch, [_row(venue_ticker=_TICKER)])
     monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
     monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
     monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
@@ -544,6 +551,120 @@ def test_a_position_with_no_contract_yields_an_order_the_adapter_refuses(monkeyp
 
 
 # --------------------------------------------------------------------------
+# No contract, no order -- and no ledger row
+# --------------------------------------------------------------------------
+
+
+def _arm_live(monkeypatch, venue="kalshi"):
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", venue)
+
+
+def _recording_submitter(monkeypatch):
+    from pipeline import execute_portfolio as runner
+
+    sent = []
+
+    def submitter(request):
+        sent.append(request)
+        return {"status": "filled", "fill_price": 0.46, "fill_stake_dollars": 0.92}
+
+    monkeypatch.setattr(runner, "_venue_submitter", lambda venue: submitter)
+    return sent
+
+
+def test_live_refuses_a_position_with_no_contract_BEFORE_anything_is_written(monkeypatch, capsys):
+    """MEASURED 2026-09-10T17:26:03Z, the first pass after an operator cleared
+    the order that had frozen both venues since 09-04: Kalshi `positions=8
+    placed=0 refused={}`, and all 8 logged `LIVE_ORDER status=rejected ...
+    OrderBuildError: no_venue_ticker`.
+
+    Each of the 8 went through `place_order`, which writes the `submitted` row
+    BEFORE the builder refuses -- so every pass manufactured fresh rows of the
+    kind a lost update had already stranded once. And `refused={}` said nothing
+    had been refused at all.
+    """
+    from pipeline import execute_portfolio as runner
+
+    _write_live_plan(monkeypatch, [_row(venue_ticker=None)])
+    _arm_live(monkeypatch)
+    sent = _recording_submitter(monkeypatch)
+
+    result = runner.run_execution("2026-08-22", venue_scope="kalshi")
+
+    assert result["status"] == "ok"
+    assert result["positions"] == 1
+    assert result["refused"] == {"no_venue_ticker": 1}
+    assert result["placed"] == 0
+    assert result["skipped"] == 1
+    assert sent == []
+    # THE POINT. No write-ahead row, so nothing a lost update can strand.
+    assert ledger_summary("2026-08-22")["orders"] == 0
+    out = capsys.readouterr().out
+    assert "REFUSED_NO_VENUE_TICKER venue=kalshi" in out
+    assert "LIVE_ORDER" not in out
+
+
+def test_the_refusal_is_per_position_and_a_neighbour_with_a_contract_still_places(monkeypatch):
+    """The control. A guard that refused the whole slate would pass the test
+    above and stop the one bet that could be placed."""
+    from pipeline import execute_portfolio as runner
+
+    _write_live_plan(
+        monkeypatch,
+        [_row(venue_ticker=_TICKER), _row(event_id="evt-2", venue_ticker=None)],
+    )
+    _arm_live(monkeypatch)
+    sent = _recording_submitter(monkeypatch)
+
+    result = runner.run_execution("2026-08-22", venue_scope="kalshi")
+
+    assert result["positions"] == 2
+    assert result["placed"] == 1
+    assert result["refused"] == {"no_venue_ticker": 1}
+    assert [r.venue_ticker for r in sent] == [_TICKER]
+    assert ledger_summary("2026-08-22")["orders"] == 1
+
+
+def test_a_polymarket_entry_with_no_slug_is_no_contract_either(monkeypatch):
+    """`venue_scope` stamps Polymarket's resolver output verbatim, and it is a
+    DICT (`{slug, tick_size, minimum_trade_qty}`), not a string. An entry with
+    no slug is not a contract -- and a non-empty dict is truthy, the exact shape
+    that sailed past a guard once already (2026-08-25, see `_venue_ticker_of`).
+    """
+    from pipeline import execute_portfolio as runner
+
+    _write_live_plan(
+        monkeypatch,
+        [_row(venue_ticker={"tick_size": 0.01, "minimum_trade_qty": 1.0})],
+        venue="polymarket",
+    )
+    _arm_live(monkeypatch, venue="polymarket")
+    sent = _recording_submitter(monkeypatch)
+
+    result = runner.run_execution("2026-08-22", venue_scope="polymarket")
+
+    assert result["refused"] == {"no_venue_ticker": 1}
+    assert sent == []
+    assert ledger_summary("2026-08-22")["orders"] == 0
+
+
+def test_paper_still_fills_a_position_with_no_contract(monkeypatch):
+    """PAPER fills the unrestricted plan, which carries no venue contract at
+    all. The guard is live-only; applied to paper it would empty the harness."""
+    _write_plan(monkeypatch, [_row(venue_ticker=None)])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    from pipeline import execute_portfolio as runner
+
+    result = runner.run_execution("2026-08-22")
+    assert result["mode"] == "paper"
+    assert result["placed"] == 1
+    assert "no_venue_ticker" not in result["refused"]
+
+
+# --------------------------------------------------------------------------
 # Live must not place the UNRESTRICTED plan at one venue
 # --------------------------------------------------------------------------
 
@@ -602,7 +723,7 @@ def test_a_retried_order_is_counted_and_LOGGED_not_swallowed(monkeypatch):
         LIVE, STATUS_REJECTED, complete_order, find_order, idempotency_key, place_order,
     )
 
-    _write_live_plan(monkeypatch, [_row()])
+    _write_live_plan(monkeypatch, [_row(venue_ticker=_TICKER)])
     monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
     monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
     monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
@@ -650,7 +771,7 @@ def test_a_retry_is_charged_against_the_cap(monkeypatch):
         LIVE, STATUS_REJECTED, complete_order, _load, complete_order,
     )
 
-    _write_live_plan(monkeypatch, [_row()])
+    _write_live_plan(monkeypatch, [_row(venue_ticker=_TICKER)])
     monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
     monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
     monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
