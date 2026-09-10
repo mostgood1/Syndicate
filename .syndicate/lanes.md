@@ -387,6 +387,20 @@ death, never life — do not invert it.
 - Blocked by: none. `ncaaf-live-resim-wire` (the producer's lane) CLOSED 2026-09-10; no OPEN lane claims these files.
 - **PREGAME HALF MET 2026-09-10 15:17 CDT on `86c82220`**, deployed by `exchange-execution-unblock` and carrying this lane's `3e33f083` plus `football-layer2-live-parity`'s ESPN-date chip fix, which FAMU @ MIA also needed. Lens 49 → 50 games with FAMU @ MIA present (`game_not_in_progress`, correct before kickoff). Tick `fcs` {`candidates 1`, `lines_captured 1`, `priced_on_implied_rating 1`}. FAMU @ MIA board rows with a `game` block 0 → 13. **IN-GAME HALF OWED** (`deploys.md` 15:17 CT): a persistent monitor in session `df26ac0c` from 18:58 CDT, with scheduled task `ncaaf-famu-mia-live-gameline-reading` at 20:05 CDT as backup.
 
+### wnba-schedule-guard-fix — OPEN — opened 2026-09-10 — session 8c631ba2-16bd-41a6-a384-d655570b10ba (desktop `local_f4eeac0a-49e0-49f6-8320-610fd1ae3d14`)
+- Goal: on a WNBA no-game day, production serves ZERO WNBA chips and writes ZERO games under that day's `live_state` key. Read on 2026-09-11: 0 WNBA chips in `/api/board/game-chips?date=2026-09-11`, 0 games in `/wnba/api/live_state?date=2026-09-11`, and `per_sport_ingest.wnba.sweep_state = no_slate` on the Layer 2 board.
+- Files: `syndicate/features/wnba/sources.py` (`has_games_for_date` only), `syndicate/features/wnba/cards.py` (the two stored-date substitution sites only: `_resolved_source_cards_date`, and the `_nearest_available_cards_date` branch of `_build_cards_page_context_uncached`), `tests/test_wnba_schedule_guard.py` (NEW).
+- Hypothesis: n/a — the fixes named by lane `wnba-chip-frozen-trace`. User decision 2026-09-10: "apply (a) and (b) and deploy before 09-17".
+  - **SCOPE CORRECTION, stated before the code:** (b) as first written covered `cards.py:607` only. `_build_cards_page_context_uncached` substitutes today a SECOND time at `:4042` without consulting the schedule, and the writer reaches it. So (b) is applied at both sites, or it is inert on the writer.
+- Falsification test:
+  - (1) If refresh-worker runs the fix and today's (09-10) WNBA chips still read the 08-30 games, then (a) does not reach ESPN from Render: the reader's no-games gate never fired.
+  - (2) If `live_state_2026-09-11` holds any 08-30 game on 09-11, a third substitution path exists.
+- Verification:
+  - (1) off != on unit tests, mutation-checked. They INCLUDE a page-builder-level test, because that is the writer's actual call; a resolver-only test would not do.
+  - (2) the refresh-worker and live-odds-worker live SHAs carry both fixes BY CONTENT.
+  - (3) the same-day 09-10 chip reading, then the 09-11 reading in the Goal.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
