@@ -9,11 +9,13 @@ Same rules as state.md: when a fact changes, EDIT THE LINE.
 
 **THE GATE** (`portfolio_auth.py`, installed app-wide in `create_app`) covers
 every `/portfolio*` page and `/api/portfolio/*` endpoint. Credentials are
-`SYNDICATE_PORTFOLIO_USERNAME` + `SYNDICATE_PORTFOLIO_PASSWORD_HASH` on web,
-DASHBOARD-ONLY. Measured live: signed-out pages → 302
-`/portfolio/login?next=…`; signed-out JSON → 401 `portfolio_login_required`;
-boot line `PORTFOLIO_AUTH_MODE mode=required credentials_configured=True
-hash=yes on_render=True`.
+`SYNDICATE_PORTFOLIO_USERNAME` + `SYNDICATE_PORTFOLIO_PASSWORD` (plain) on web,
+DASHBOARD-ONLY — `SYNDICATE_PORTFOLIO_PASSWORD_HASH` was deleted 2026-09-10
+after it held a plaintext value and refused every sign-in. Measured live:
+signed-out pages → 302 `/portfolio/login?next=…`; signed-out JSON → 401
+`portfolio_login_required`; boot line `PORTFOLIO_AUTH_MODE mode=required
+credentials_configured=True hash=no on_render=True` (16:26:59Z); **a real
+sign-in, `LOGIN_OK` 16:43:56Z.**
 
 **TOOLING READS WITH THE OPS TOKEN.** `X-Admin-Token` (or `?admin_token=`)
 passes — measured 200 on `/api/portfolio/live` and `/api/portfolio/books`. **A

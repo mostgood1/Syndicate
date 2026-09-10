@@ -945,6 +945,14 @@ death, never life — do not invert it.
 - Verification: `tests/test_bandwidth_tripwire.py` updated and passing; the re-derived captures committed, each carrying `window_covered = label..label+1h` and a `rederived` block holding the prior window's numbers; a `--check` run from the primary tree after the copy is updated.
 - Blocked by: none. OUT OF SCOPE, flagged so nothing is mistaken for fixed: `controlled_transfer_read.py` (`_bucket_for`) and `controlled_transfer_arm2_watch.py` (edge/app windows, the gate denominator) carry the same end-label assumption. That is the user's decision 2, not taken here. `score_arm_a_gate.py` reads these captures, so its five-fire result WILL move; that gets reported, not "fixed" by editing its EXPECTED.
 
+### portfolio-auth-hash-guard — OPEN — opened 2026-09-10 — session 7a239b89-c8fd-49b7-ba5a-e41bb9d4d9bc — **LANDED, NOT DEPLOYED — it ships with the next web deploy, and its verification is one boot line anyone can read.**
+- Goal: a value in `SYNDICATE_PORTFOLIO_PASSWORD_HASH` that is not a werkzeug hash locks the portfolio LOUDLY — 503, a named problem on the page and in the boot log, never the value — instead of rejecting every sign-in in silence. Found in production 2026-09-10: the plaintext password sat in the HASH key, five `LOGIN_FAILED` at 16:12Z, and nothing said why.
+- Files: `syndicate/features/shared/portfolio_auth.py`, `syndicate/blueprints/portfolio_books.py`, `syndicate/templates/portfolio_login.html`, `tests/test_portfolio_auth.py`
+- Hypothesis: n/a (a fix; the cause was measured — `deploys.md` 2026-09-10 16:26:59Z).
+- Falsification test: n/a.
+- Verification: LOCAL, done — 186 portfolio tests green, including a plain password in the HASH key → 503 with the named problem and the value never echoed (page, login POST, JSON), a malformed key locking off Render too, and scrypt / pbkdf2 hashes still signing in. PRODUCTION, owed — the next web deploy's boot line must carry `problem=none`; with today's credentials it should read `credentials_configured=True hash=no problem=none`.
+- Blocked by: none. Deploy when convenient — web only, ~60-90 s of 502s, and no change for a signed-in user (the session key is derived from the credentials, which do not change).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

@@ -30939,3 +30939,24 @@ update 16:03:20Z -> **live 16:05:19Z**, on the SHA requested.
 holds it. The cookie path is covered by `tests/test_portfolio_auth.py`.
 **Expected side effect:** a bare `curl` of `/api/portfolio/*` now returns 401;
 send `X-Admin-Token`.
+
+## 2026-09-10 16:26:59-16:27:00Z — web `df60b3e3` -> `df60b3e3` (env change, `trigger=service_updated`) — lane `portfolio-login-multibook`
+
+**What:** NOT a code deploy. The user saved web's environment in the Render
+dashboard, which redeployed the SAME commit. The change:
+`SYNDICATE_PORTFOLIO_PASSWORD_HASH` DELETED — it held the plaintext password,
+not a hash, so `check_password_hash` returned False to every attempt (five
+`LOGIN_FAILED`, 401 each, 16:12Z) — and `SYNDICATE_PORTFOLIO_PASSWORD` set.
+Presence re-read by key name afterwards: USERNAME set, PASSWORD set,
+PASSWORD_HASH absent. No lock taken — the dashboard save is the user's own
+action, and it carried no code.
+
+**verify — MEASURED:**
+- boot, both gunicorn workers, 16:26:59Z:
+  `[portfolio_auth] PORTFOLIO_AUTH_MODE mode=required credentials_configured=True hash=no on_render=True`
+- **the real sign-in the 16:00:58Z entry could not measure:** `LOGIN_OK`
+  16:43:56Z (one `LOGIN_FAILED` 16:43:47Z just before it), and the user
+  confirmed the sign-in in session.
+
+The guard that makes a non-hash in the HASH key fail LOUDLY instead of silently
+is lane `portfolio-auth-hash-guard` — landed, not yet deployed.
