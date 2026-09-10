@@ -677,10 +677,19 @@ marginal cost is AT MOST 350.6 MiB per 2GB accepted, ~3x worse than the ratio
 predicts, so 8.2GB projects to ~2566 MiB and lands too close to the ceiling if it
 coincides with the 1877 baseline peak.
 
-**UNEXERCISED.** The autorun is once per Central day and 09-04's ran under the OLD
-2GB budget. First 4GB read is >= 07:00 CT 2026-09-05, pre-registered in the lane:
-`skipped_budget` 0 = headroom to spare, ~12 = the BYTE budget is the wrong
-instrument and the next step is a CHUNK-COUNT bound, between = report the number.
+**EXERCISED -- THE PRE-REGISTERED `~12` BRANCH FIRED, AND A FIXED BYTE BUDGET GETS
+WORSE WITH TIME `[updated 2026-09-10, lane accuracy-ledger-budget-raise]`.** First
+4GB run, 09-05: `count=21 skipped_budget=12 dates=21` of 33 chunks -- the byte
+budget is the wrong instrument. 09-10: `count=16 bytes=3999961107 records=91265
+skipped_budget=22 dates=16` of 38 chunks. The average admitted chunk grew 190.5 ->
+250.0 MB, so the same 4GB buys five fewer days, and the 28-date drift window
+rests on 16. 09-10 peaks, refresh-worker: in-run anon 2,034.9 MiB (12:33-12:57Z),
+pre-run 2,732.6 MiB (12:00-12:33Z) -- the run window is again NOT the worker's
+peak. **A chunk-count bound (45 days; the byte budget kept as a 45 x 256 MB
+backstop) is on main as `57019962` and is NOT LIVE**: at 19:37Z refresh-worker
+ran `2d53fdf7`, which lacks it BY CONTENT. The first reading, with five
+pre-registered predictions and a revert line (in-run anon > 2,600 MiB), is in
+the lane.
 
 **A LEDGER RECORD IS ONE PER BOARD RECOMMENDATION PER `source_fingerprint` CHANGE**
 (`maybe_record_board_state_to_evaluation_ledger`, `pipeline/intelligence_state.py:3023`),
