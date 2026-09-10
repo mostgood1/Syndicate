@@ -5,6 +5,53 @@
 
 ---
 
+## 2026-09-10 07:09 CT — refresh-worker `7ae7ced4` + env `SYNDICATE_MLB_DATA_ROOT` — **RE-PROBE: THE MOUNT HOLDS 48 CLEAN DATES IN EXACTLY THE TREE THE RE-FIT READS. `#624` STEP 3 IS UNBLOCKED.**
+
+Deploy 07:09:39 CT, `dep-dah9s0u1egvs73d6rcog`, injecting
+`SYNDICATE_MLB_DATA_ROOT=/opt/render/project/data/mlb_source/source_artifacts/data`
+(the value `MLB_BETTING_DATA_ROOT` already held). Boot line **07:13:27 CT**.
+
+**verify:** the probe's own unconditional line, same probe as the 00:20 CT row, only
+the root changed:
+
+| | checkout (00:25 CT) | **mount (07:13 CT)** |
+|---|---|---|
+| `data_root` | `/opt/render/project/`**`src`**`/data/...` | `/opt/render/project/data/...` |
+| `refit_tree` | 13 dates, **0 clean**, 06-15..06-27 | **48 dates, 48 clean**, 07-20..09-10 |
+| `producer_tree` | 26 dates, **0 clean**, 06-15..07-12 | **53 dates, 53 clean**, 07-20..09-10 |
+
+**EVERY DATE ON THE MOUNT IS CLEAN** — `first == first_clean == 2026-07-20` in
+both trees. **The re-fit's own tree (`daily_pitcher_props/snapshots/*/roster_objs/`)
+exists on the mount with 48 dates**, so the path-mismatch hypothesis from the
+00:20 CT row is ALSO refuted: it was never the suffix, it was only the root.
+
+**THE WHOLE DEFECT WAS ONE UNSET VARIABLE.** `refit_mlb_rates.py:59` falls back to
+a repo-relative path when `SYNDICATE_MLB_DATA_ROOT` is absent; on a Render
+service that resolves to the ephemeral CHECKOUT, which git ships carrying
+exactly the HRR-contaminated dates. `#441`'s trap, in a second module.
+
+**BLAST RADIUS, checked BEFORE setting it:** `SYNDICATE_MLB_DATA_ROOT` has exactly
+two readers — `refit_mlb_rates.py` and this probe. No production code path reads
+it, so setting it changed nothing that serves or stakes.
+
+**AN INCIDENT ON THE WAY, recorded because it reported success.** The first
+`render_env_set.py` call went through Git Bash, whose MSYS path conversion
+rewrote `/opt/render/...` to **`C:/Program Files/Git/opt/render/...`** — and the
+script printed **`SET OK`**. A wrong absolute path, stored on a production
+service, with a success message. **It never reached the running process** (env
+only injects on deploy); it was corrected via PowerShell and the STORED value
+read back before deploying. `learnings.md` already records Git Bash mangling
+path args; **`render_env_set.py` accepting a mangled absolute path without
+complaint is new, and is a tripwire worth adding.**
+
+**CONSEQUENCE FOR `#624` STEP 3:** the rate re-fit can now run on refresh-worker
+against **48 clean, mount-resident dates** — 3.7x the 13 poisoned ones it would
+have read an hour ago, and wholly past the HRR boundary. Its `--holdout-dates`
+flag makes an out-of-sample split possible on that window.
+
+Claim released.
+
+
 ## 2026-09-10 00:20 CT — refresh-worker `80930e6d` — **MLB roster-substrate probe. THE HYPOTHESIS IS REFUTED, AND THE REAL CAUSE IS A ROOT THAT RESOLVES TO THE EPHEMERAL CHECKOUT.**
 
 Deploy 00:20:50 CT, `dep-dah3scht0dsc73ef8vmg`, boot line at **00:25:16 CT** — a
