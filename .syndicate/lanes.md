@@ -889,6 +889,7 @@ death, never life — do not invert it.
 - Corroborating and unexplained: `min inactive_file` bottomed at **37.2 MB**, inside the band preceding the two real kills (26.3, 42.2) against 164-240 surviving -- while `oom_band_report.py` read **0 excursions, 0 kills**. A clean excursion count is not a clean band.
 - **CONSTRAINT ON ANY REMEDY: `state.md [user-decisions]` 2026-08-16 -- DO NOT BUMP THE refresh-worker PLAN, REDUCE INSTEAD.** A smaller headroom than recorded is not an argument that reopens a settled decision.
 - Blocked by: none. Deploys nothing, holds no claim.
+- **OWNING SESSION `4ffadc9e` IS ARCHIVED AS OF 2026-09-10 — THIS LANE IS DELIBERATELY UNOWNED, NOT ORPHANED, AND HERE IS THE DIFFERENCE.** It claims NO files, so it blocks nobody and an orphan sweep releasing it costs nothing. Its remaining work needs a live slate that has not happened yet, so there is nothing a session could do tonight by staying open. **THE PICKUP IS A SCHEDULED TASK, NOT A PERSON:** `refresh-worker-anon-ratchet-band`, one-shot, fires 2026-09-11 00:20 local over the FIXED band `2026-09-10T22:00Z..2026-09-11T05:00Z`, running `scripts/slate_band_anon_report.py` and `scripts/oom_band_report.py`, and it carries the full brief including the 2,500MB test, the 3,138.7MB comparison and the standing DO-NOT-BUMP-THE-PLAN constraint. If that task did not run, the band is still readable after the fact from either tool — the window is a timestamp range, not "the last N hours", precisely so a late or missed run loses nothing.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
