@@ -2355,6 +2355,40 @@ request allocated" and not "which arena leaked".
 **FRAGMENTATION IS REAL BUT SMALL:** 56.6 MB across both workers (41.9 + 14.7),
 22% of arena bytes, and stable. It is not the ~173 MB/h.
 
+
+> **RE-CENSUSED 2026-09-09: THIS ITEM SAYS 2 KILLS. THE REAL FIGURE IS 16, AND 14
+> OF THEM LANDED AFTER THIS ITEM WAS WRITTEN. ONE WAS TODAY.**
+> `[lane web-oom-census, session 2edf8b82 — measurement only, no code]`
+>
+> From the events API (`scripts/render_events.py --service web --failures-only`),
+> which is the only instrument allowed to answer this, 2026-08-25..09-09:
+>
+>     oomKilled  memoryLimit=2Gi   16
+>     unhealthy  health check      37
+>     ------------------------------
+>     server_failed total          53
+>
+> By Central day: 08-29 x1, 08-31 x1, **09-02 x3**, 09-03 x1, **09-06 x3**,
+> 09-07 x1, **09-08 x5**, 09-09 x1. **The item's own 2 were the first two of a
+> series that has been running for eleven days and getting worse.**
+>
+> **THE ITEM'S WARNING ABOUT `server_failed` IS CORRECT AND STILL LOAD-BEARING:**
+> 37 of the 53 are `unhealthy`, so sizing off the raw count inflates this ~3.3x.
+>
+> **SHAPE: POST-BOOT, NOT STEADY-STATE — this is new information.** All six kills
+> in the 09-07/09-08 window follow a SINGLE `deploy_ended` at ~09:02, at
+> **11.4 / 21.5 / 41.5 / 68.9 / 71.1 minutes** after it. Today's single kill was
+> **14.8 min** after a `deploy_ended`. Web climbs to its 2 GB limit within roughly
+> 10-70 minutes of boot, is killed, restarts, and repeats — then goes quiet.
+> A leak that only bites after a restart is a different investigation from a
+> steady-state one, and it explains why the kills arrive in bursts.
+>
+> **NOT DIAGNOSED: which allocation drives the climb.** `#566`'s lesson holds —
+> `ALL_PROCESS_MEMORY` percentages count clean page cache and are not evidence.
+> The next step is splitting ANON from `inactive_file` on web at ~+10 and ~+60
+> minutes post-boot, which distinguishes a real leak from cache the kernel would
+> have reclaimed.
+
 ### `#631` — **SOCCER BOARD STALENESS: a soccer-only date never becomes eligible to build, so its rows age forever** — lane `game-market-entry-roi-curve` (handed over on closing `soccer-overview-cost`), 2026-09-01 — **OPEN**
 
 Inherited on closing lane `soccer-overview-cost`, whose GOAL (find and remove
