@@ -5,6 +5,23 @@
 
 ---
 
+## 2026-09-10 13:24 CT — reading only, no deploy — `#618` (`fcbbcc62`, the deliberate ridealong) — **VERIFIED: ALL THREE RECIPE STEPS PASS ON PRODUCTION**
+
+`#618` shipped as a DELIBERATE RIDEALONG with no dedicated deploy, so its verification was owed to
+whichever deploy carried it. Taken 2026-09-10 ~13:24 CDT by a subagent of lane
+`football-layer2-live-parity`, with the NFL publish line re-read by the parent session:
+
+1. **PASS:** `fcbbcc62` is an ancestor of web `2224dec0`, refresh-worker `a9bafa9d` and
+   live-odds-worker `332e596d`.
+2. **PASS:** `PUBLISH_OK path=nfl_source/smartsim2_projections_2026_wk1.csv bytes=3390` at
+   2026-09-09 17:35:52 CDT (re-read); NCAAF wk2 `bytes=11725` at 21:34:58 CDT; NCAAF wk1
+   `bytes=12189` at 2026-09-08 21:12:51 CDT.
+3. **PASS:** `/api/ops/artifacts/export` returns `count=1` with a fractional mtime for all three.
+
+`#633` did not block it (the same NCAAF run: `skipped_no_cfbd_match=0`).
+
+**verify: MET.**
+
 ## 2026-09-10 13:16 CT — refresh-worker `a9bafa9d` (lane `ncaaf-kickoff-rollover`) — **EVERY NCAAF ORDER NOW FINDS ITS GAME: `game_not_in_ncaaf_live_state` 16 → 0. THE ONE MISS WAS A HAWAI'I KICKOFF THAT OddsAPI AND ESPN PUT ON OPPOSITE SIDES OF EASTERN MIDNIGHT.**
 
 Deploy `dep-daheun5g1s2s73c9ouc0`, triggered 12:56:44 CT after CLEAR at 12:56:29 (a 2-job HOLD at
