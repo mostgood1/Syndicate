@@ -5,6 +5,30 @@
 
 ---
 
+## 2026-09-10 15:25 CT — refresh-worker `86c82220` (deployed by lane `exchange-execution-unblock`; code from lanes `football-layer2-live-parity` + `ncaaf-fcs-market-implied-rating`) — **FAMU @ MIA NOW CARRIES GAME STATE ON THE 09-11 GRID (13/13 rows), SO A LIVE GAME LINE CAN ATTACH TONIGHT.**
+
+`86c82220` went live 15:13:21 CT. It is origin/main's tip carrying `3e33f083` (session df26ac0c: FBS-vs-FCS
+games enter the NCAAF live re-sim on a market-implied rating for the FCS side) AND this lane's `86c82220`
+(`attach_game_state` fetches football scoreboard chips for the kickoff's ESPN date as well as its UTC date,
+because ESPN files FAMU @ MIA, 2026-09-11T00:00Z, under 20260910). One restart, before kickoff. This lane
+did not deploy it; the reading is this lane's.
+
+**verify**, from production's `/api/board/book-grid?sport=ncaaf&date=<d>` after the first board cycle on the
+new build (`PAPER2_PLAN_WRITTEN` 2026-09-10T20:25:24Z):
+
+| grid | before | **after** | still unmatched |
+|---|---|---|---|
+| 2026-09-11 | served 19:51Z: `rows_matched 208`, `unmatched_teams [Florida A&M Rattlers, Miami Hurricanes]`, 13 FAMU @ MIA rows with no `game` block. Predicted from production rows: 208 → 221 | **222/222 rows with a `game` block; coverage `chips 86, rows_matched 222`; FAMU @ MIA 13/13** | none |
+| 2026-09-12 | predicted from production rows: 287 → 300 | **300/300 rows with a `game` block; coverage `chips 85, rows_matched 1524`; FAMU @ MIA 0/0** | Arkansas State Red Wolves, South Alabama Jaguars |
+| 2026-09-13 | predicted from production rows: 0 → 52 (NMSU @ Hawai'i and Cal Poly @ SJSU still unmatched) | **54/64 rows with a `game` block; coverage `chips 76, rows_matched 54`; FAMU @ MIA 0/0** | Hawaii Rainbow Warriors, New Mexico State Aggies, Cal Poly Mustangs, San Jose State Spartans |
+
+The three grids were built at 20:14:48–20:16:40Z, 1–3 min after go-live, so they are the new code's output. The grid's own `game_state` coverage counts every row it built (1,524 on 09-12) while the endpoint serves at most 300, which is why 09-12 reads `rows_matched 1524` beside 300/300 served. Still unmatched and NOT investigated: Arkansas State / South Alabama (09-12 grid) and NMSU @ Hawai'i, Cal Poly @ San Jose State (09-13 grid).
+
+Tracebacks on refresh-worker since go-live: `['# COVERED    nothing matched   (1 page(s) fetched)']`. The in-game FAMU @ MIA live-lens
+reading (pregame line captured, live re-sim lane present) belongs to session df26ac0c.
+
+**verify: MET.**
+
 ## 2026-09-10 15:17 CT — reading only, no deploy — refresh-worker `86c82220` (lane `ncaaf-fcs-market-implied-rating`, session `df26ac0c`) — **PREGAME HALF MET: FAMU @ MIA IS IN THE NCAAF LIVE LENS ON A MARKET-IMPLIED RATING, ITS PREGAME LINE IS CAPTURED, AND ITS 13 BOARD ROWS NOW CARRY A GAME STATE. THE IN-GAME HALF IS OWED AFTER KICKOFF.**
 
 The deploy is lane `exchange-execution-unblock`'s (`dep-dahgta67bikc73e4i64g`, live 15:13:21 CT, main's
