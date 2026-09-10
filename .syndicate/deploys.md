@@ -31028,3 +31028,29 @@ Every body begins with a projected `{"record_type":"prediction",...}` row. With
 recorded above (the accuracy-ledger budget-raise entry), both halves of that
 lane's testable outcome are now read in production, and it is CLOSED on that
 basis.
+## 2026-09-10 16:51:56-16:55:19Z — web `df60b3e3` -> `2224dec0` — lane `portfolio-auth-hash-guard`
+
+**What:** one web-relevant commit, `38bef205` — a value in
+`SYNDICATE_PORTFOLIO_PASSWORD_HASH` that is not a werkzeug hash now locks the
+portfolio with a NAMED problem (503, `problem=password_hash_not_a_hash`, the
+value never echoed) instead of refusing every sign-in in silence, which is what
+production did at 16:12Z. 3 files, +63/-10; `requirements.txt` unchanged. The
+other four commits since the live build are ledger-only. Live `df60b3e3` is an
+ancestor of the target, so nothing was reverted.
+
+**Locks:** claim `portfolio-auth-hash-guard`; preflight CLEAR for `2224dec0` —
+gunicorn infra only, no jobs. Deploy `dep-dahe0bafngtc739487lg` via
+`render_deploy.py --service web --commit 2224dec0…`: build 16:51:57Z -> update
+16:53:45Z -> **live 16:55:19Z**, on the SHA requested.
+
+**verify — MEASURED 16:55:18-16:56:12Z:**
+- boot, both gunicorn workers, 16:55:18Z — the reading the lane named:
+  `[portfolio_auth] PORTFOLIO_AUTH_MODE mode=required credentials_configured=True hash=no problem=none on_render=True`
+- process: `/api/ops/version` -> `version.commit = 2224dec0e5e4…`
+- the same 10 readings as 16:00:58Z, 10/10: signed-out pages 302 to sign-in,
+  signed-out `/api/portfolio/*` 401, the sign-in page shows its form (neither the
+  "not set up" nor the "misconfigured" page), `X-Admin-Token` 200,
+  `Cache-Control: private, no-store` on gated responses, `/healthz` ungated.
+
+The live credentials pass the new shape check, which is what `problem=none`
+proves: the guard can see a real setup and did not lock it.

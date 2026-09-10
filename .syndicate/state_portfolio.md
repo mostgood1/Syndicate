@@ -15,7 +15,10 @@ after it held a plaintext value and refused every sign-in. Measured live:
 signed-out pages → 302 `/portfolio/login?next=…`; signed-out JSON → 401
 `portfolio_login_required`; boot line `PORTFOLIO_AUTH_MODE mode=required
 credentials_configured=True hash=no on_render=True` (16:26:59Z); **a real
-sign-in, `LOGIN_OK` 16:43:56Z.**
+sign-in, `LOGIN_OK` 16:43:56Z.** Since `2224dec0` (live 16:55:19Z) a HASH value
+that is not a werkzeug hash locks with a named `problem=password_hash_not_a_hash`
+(503, value never echoed) instead of refusing every sign-in; the boot line now
+carries `problem=none` when the setup is sound.
 
 **TOOLING READS WITH THE OPS TOKEN.** `X-Admin-Token` (or `?admin_token=`)
 passes — measured 200 on `/api/portfolio/live` and `/api/portfolio/books`. **A
