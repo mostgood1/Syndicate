@@ -1320,7 +1320,8 @@ worktree prune` cannot and HOLDS any husk naming a commit nothing else keeps.
 accrue** from sessions running an older copy and from bare `git worktree remove`
 (`push_via_worktree.py`'s `finally`, ad-hoc commands): one new
 (`watcher-admin-token`) between 17:40Z and 17:50Z, and two more (`capture-commit-wt`,
-`tripwire-window-wt`) by 20:2xZ. Run `prune`. **Since `dce7c172`, `prune` also
+`tripwire-window-wt`) by 20:2xZ, both pruned at 20:58Z. That left 0 stale entries:
+70 admin dirs = 71 listed minus main. Run `prune`. **Since `dce7c172`, `prune` also
 HOLDS a stale admin dir while a checkout folder by its name still exists** (in the
 session root, the directory above it, or beside the main tree). The case that
 prompted it: `arm2-denominator-wt2` was stale to git while its folder still
