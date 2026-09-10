@@ -1296,15 +1296,20 @@ after.** The 7 HELD are the only pointer to 25 commits:
 rescue with `git branch rescue/<id> <sha>`, or judge it disposable and
 `Remove-Item -Recurse -Force` the dir.
 
-**PREVENTION, on main (lane `worktree-close-and-prune`):** `close` clears
-READONLY on its own admin dir BEFORE `git worktree remove` and runs every git call
-from the MAIN worktree -- it had been using `REPO_ROOT`, which is the tree being
-closed whenever the worktree's own copy runs, and died `NotADirectoryError
-[WinError 267]` after its fallback delete. Re-running `close` after such a crash
-now deletes a merged leftover branch and keeps an unmerged one. `prune` (a dry
-run unless `--apply`) finishes what `git worktree prune` cannot and HOLDS any
-husk naming a commit nothing else keeps. Husks from OTHER tooling (a bare `git
-worktree remove` in an ad-hoc script) still accrue -- run `prune`.
+**PREVENTION, on main `7e8715e8` (lane `worktree-close-and-prune`), VERIFIED
+2026-09-10 17:50Z:** `close` clears READONLY on its own admin dir BEFORE `git
+worktree remove` and runs every git call from the MAIN worktree -- it had been
+using `REPO_ROOT`, which is the tree being closed whenever the worktree's own copy
+runs, and died `NotADirectoryError [WinError 267]` after its fallback delete.
+Re-running `close` after such a crash now deletes a merged leftover branch and
+keeps an unmerged one. `prune` (a dry run unless `--apply`) finishes what `git
+worktree prune` cannot and HOLDS any husk naming a commit nothing else keeps.
+**The reading:** a probe worktree's admin dir read-only on 4 of 4 directories
+~10 min after creation; `close` run from the probe's OWN copy cleared them, exited
+0, and left no dir, no admin dir, no registration and no branch. **Husks still
+accrue** from sessions running an older copy and from bare `git worktree remove`
+(`push_via_worktree.py`'s `finally`, ad-hoc commands): one new
+(`watcher-admin-token`) between 17:40Z and 17:50Z. Run `prune`.
 
 **NOT TESTED: pausing OneDrive.** It would not clear bits already set, and the
 lab shows the bit alone is sufficient; whether a pause stops NEW bits is
