@@ -30902,3 +30902,40 @@ CAPS: worst live date is 09-12 at 1,240 / 6,000 = 20.7% of `BOOK_GRID_ARTIFACT_M
 REGRESSION: MLB 09-10 752 props of 1,038; soccer 09-10 / 09-12 / 09-13 `total_rows` 3,094 / 9,935 / 5,143. There is NO same-date pre-change baseline for either sport, so non-regression is UNEVIDENCED, not shown. It is structurally isolated: the grid artifact is one file per (sport, date) with its own `max_rows`. Soccer's `kind` split is a PAGE CAP (`returned=2000`, `book-grid` clamps `limit` to 2000), not the slate. Soccer 09-12 carries `rows_truncated=3935` -- soccer's own artifact at its own 6,000 cap, which an NCAAF change cannot reach. Noted, not owned here. NCAAF `game` rows: 33 / 494 / 60 against 33-36 / 503-506 / 66 at the two earlier reads. No truncation, so this is not a cap displacing them; the -2.4% on 09-12 is unattributed market churn and is NOT claimed to be "unchanged".
 
 SIZES (a disk and publish-volume question, not a row cap): 09-05 97.01 MB (unchanged since 09-06), 09-12 44.95 MB (37 MB at commit time, so +~8 MB so far against ~27 MB projected), 09-11 3.34 MB, 09-13 3.87 MB, `2026_wk1` 28.07 MB, `2026_wk2` 1.91 MB. The week shard is still written first, so every prop quote is now stored twice.
+
+## 2026-09-10 16:00:58-16:05:19Z — web `26c8cfc6` -> `df60b3e3` — lane `portfolio-login-multibook`
+
+**What:** portfolio sign-in over every `/portfolio*` page and `/api/portfolio/*`
+endpoint, plus manual portfolios and a portfolio dropdown (`609b45c6`). The user
+set `SYNDICATE_PORTFOLIO_USERNAME` + `SYNDICATE_PORTFOLIO_PASSWORD_HASH` on web in
+the dashboard FIRST — presence checked by key name via `/env-vars`, values never
+read. No `render.yaml` change.
+
+**Carried along, all on `main` and already live on refresh-worker `0ceb9636`,
+which contains every one:** `bdbb2fb0`, `a4b500fd`, `353650c7`, `2259edf8`,
+`0ceb9636` — the NFL prop model on the board path, NFL prop grading off ESPN's
+box, `#633`, kickoff-date resolvers. 20 web-relevant files, +3491/-781;
+`requirements.txt` unchanged. Live `26c8cfc6` is an ancestor of the target, so
+nothing was reverted.
+
+**Locks:** claim `portfolio-login-multibook` 15:58:37Z; preflight CLEAR for
+`df60b3e3834c` — gunicorn infra only, no jobs. Deploy `dep-dahd8erl550s73frivpg`
+via `render_deploy.py --service web --commit df60b3e3…`: build 16:00:59Z ->
+update 16:03:20Z -> **live 16:05:19Z**, on the SHA requested.
+
+**verify — MEASURED 16:05:17-16:05:46Z:**
+- process: `/api/ops/version` -> `version.commit = df60b3e3834c46ed00200e12d2ac00aea1915eaf`
+- boot, both gunicorn workers, 16:05:17Z:
+  `[portfolio_auth] PORTFOLIO_AUTH_MODE mode=required credentials_configured=True hash=yes on_render=True`
+- signed out: `GET /portfolio` -> **302** `/portfolio/login?next=/portfolio`;
+  `/portfolio/books/manual` -> **302** `…?next=/portfolio/books/manual`
+- signed out: `GET /api/portfolio/{live,summary,books}` -> **401** `portfolio_login_required`
+- `GET /portfolio/login` -> 200 with the form — NOT the fail-closed "not set up" page
+- with `X-Admin-Token`: `/api/portfolio/books` -> 200 `['manual']`;
+  `/api/portfolio/live` -> 200 (orders 0, `execution_mode=live`)
+- every gated response carries `Cache-Control: private, no-store`; `/healthz` -> 200, ungated
+
+**Not measured:** a browser sign-in with the real credential — only the user
+holds it. The cookie path is covered by `tests/test_portfolio_auth.py`.
+**Expected side effect:** a bare `curl` of `/api/portfolio/*` now returns 401;
+send `X-Admin-Token`.

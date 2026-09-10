@@ -5,12 +5,49 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
+## [portfolio-sign-in-and-books] EVERY PORTFOLIO PAGE IS BEHIND A SIGN-IN, AND THERE IS MORE THAN ONE PORTFOLIO `[verified on production 2026-09-10T16:05Z, web df60b3e3, lane portfolio-login-multibook]`
+
+**THE GATE** (`portfolio_auth.py`, installed app-wide in `create_app`) covers
+every `/portfolio*` page and `/api/portfolio/*` endpoint. Credentials are
+`SYNDICATE_PORTFOLIO_USERNAME` + `SYNDICATE_PORTFOLIO_PASSWORD_HASH` on web,
+DASHBOARD-ONLY. Measured live: signed-out pages → 302
+`/portfolio/login?next=…`; signed-out JSON → 401 `portfolio_login_required`;
+boot line `PORTFOLIO_AUTH_MODE mode=required credentials_configured=True
+hash=yes on_render=True`.
+
+**TOOLING READS WITH THE OPS TOKEN.** `X-Admin-Token` (or `?admin_token=`)
+passes — measured 200 on `/api/portfolio/live` and `/api/portfolio/books`. **A
+bare curl of `/api/portfolio/*` returns 401 from 2026-09-10 on**, which breaks
+every recipe in this ledger that reads `/api/portfolio/live` or
+`/api/portfolio/paper` without the header.
+
+**ABSENT IS NOT OFF.** On Render, missing credentials answer 503 on every gated
+path (tested, not observed live). `SYNDICATE_PORTFOLIO_AUTH=off` is the only
+way to open it.
+
+**DURABILITY HAZARD — `render.yaml`.** The credential keys are dashboard-only,
+and a `blueprint_sync` deletes dashboard-only keys (`todo.md #650`). When `#650`
+reconciles the blueprint they must enter it as `sync: false`, or the next sync
+locks the portfolio. That fails closed, but it reads as an outage.
+
+**THE PORTFOLIOS.** A dropdown on every portfolio page: Kalshi + Polymarket
+(`/portfolio`), Paper (`/portfolio/paper`), and MANUAL portfolios
+(`/portfolio/books/<id>`; default `manual` = "Other books"). Hand-entered bets
+live in `data_root()/portfolio_books.json` on WEB'S disk only — deliberately
+not the prediction ledger, because `prediction_reconciliation._match_result_row`
+accepts the first result row sharing ANY key with a bet (sport alone) and would
+grade a typed bet off another game. Slip-logged bets stay in
+`prediction_ledger.json` with a new `portfolio_id` (None → the default book).
+Live reading 16:05Z: `/api/portfolio/books` → `['manual']`, no user-created
+portfolio yet.
+
 ## [portfolio-live-surface] `/portfolio` IS THE LIVE BUYING ENGINE, the venue caps BIND, and the VENUE now settles our bets `[verified 2026-08-27T00:0xZ, lanes portfolio-live-primary / portfolio-venue-caps-editable / venue-balances-on-portfolio / venue-settlement / venue-first-refusal / open-bet-live-status]`
 
 **`/portfolio/live` NO LONGER EXISTS as a page** — it is a 302 to
 `/portfolio#live` carrying the query string; `portfolio_live.html` is deleted.
-`/portfolio` renders the execution ledger's real orders AND the prediction
-ledger's user-logged bets, labelled, never summed. `/portfolio/paper` untouched.
+`/portfolio` renders the execution ledger's real orders only — the prediction
+ledger's user-logged bets moved to the manual portfolio "Other books" on
+2026-09-10 (`[portfolio-sign-in-and-books]`). `/portfolio/paper` untouched.
 
 **THE VENUE CAPS ARE USER-EDITABLE AND THEY BIND.** Seven fields
 (`max_day_dollars_kalshi|_polymarket`, `max_day_orders_kalshi|_polymarket`,
