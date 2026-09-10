@@ -528,10 +528,71 @@ def append_book_quotes(
         return {"error": f"{type(exc).__name__}: {exc}", "appended": 0}
 
 
+#: Sports whose OddsAPI PLAYER-PROP capture files `book_quotes` rows under a
+#: DISPLAY label, and by Central KICKOFF date: `MARKET_STD_MAP` plus
+#: `bucket_quote_rows_by_kickoff_date` in `scripts/fetch_nfl_oddsapi_props_local.py`
+#: and its NCAAF twin. Every other sport's shard speaks the canonical OddsAPI key
+#: and is dated by the board, so nothing here changes for them.
+FOOTBALL_PROP_QUOTE_SPORTS = frozenset({"nfl", "ncaaf"})
+
+_FOOTBALL_PROP_LABELS: dict[str, dict[str, str]] = {}
+
+
+def book_quote_prop_market(sport: Any, market: Any) -> str:
+    """The name `sport`'s `book_quotes` shard files a player-prop market under.
+
+    TWO WRITERS, TWO VOCABULARIES, ONE SHARD. NFL's OddsAPI capture writes
+    `Receptions`; the Kalshi join speaks the canonical key, `player_receptions`
+    (`kalshi_board_join._board_key` canonicalises BOTH sides to pair them, which
+    is why the match succeeds). `book_grid._instance_key` keys on the raw
+    `market`, so a Kalshi price filed under the canonical key became its OWN
+    one-book grid row instead of a cell in the sportsbook row for the same bet.
+
+    MEASURED on production 2026-09-10 (web's NFL `book_quotes/2026-09-10.jsonl`):
+    261 Kalshi prop rows, every one `player_receptions` or `player_pass_tds`,
+    against 2,685 sportsbook rows under `Receptions` / `Passing TDs`. Each
+    stranded Kalshi row priced its "fair" off its own two sides (EV = minus half
+    the hold, the -0.9% on every row of the user's screenshot), and the NFL prop
+    join refused it by name (`unsupported_markets {player_receptions: 66,
+    player_pass_tds: 33}`), so it read NO SIM VIEW. Replaying the real
+    `build_book_grid` over that shard with only this relabel applied, 15 of 15
+    SF @ LAR Kalshi instances merged into their sportsbook rows.
+
+    THE LABELS ARE THE NFL PROP JOIN'S OWN (`_NFL_PROP_MARKET_TO_STAT`), mapped
+    back through `market_keys` -- the two authorities that already exist, rather
+    than a third copy of the fetchers' `MARKET_STD_MAP`. A label `market_keys`
+    cannot canonicalise (`Interceptions`, today) simply has no reverse entry and
+    its market passes through unchanged, which is exactly today's behaviour.
+    `tests/test_kalshi_book_quote_capture.py` pins this against both fetchers'
+    maps, so the three cannot drift apart silently.
+    """
+    text = str(market or "").strip()
+    key = str(sport or "").strip().lower()
+    if not text or key not in FOOTBALL_PROP_QUOTE_SPORTS:
+        return text
+    labels = _FOOTBALL_PROP_LABELS.get(key)
+    if labels is None:
+        try:
+            from syndicate.features.nfl.props import _NFL_PROP_MARKET_TO_STAT
+            from syndicate.features.shared.market_keys import canonical_market_key
+        except Exception:
+            # Not cached: an import that failed once is retried on the next call
+            # rather than disabling the relabel for the life of the process.
+            return text
+        labels = {}
+        for label in _NFL_PROP_MARKET_TO_STAT:
+            canonical = canonical_market_key(key, label)
+            if canonical and canonical != label:
+                labels.setdefault(canonical, label)
+        _FOOTBALL_PROP_LABELS[key] = labels
+    return labels.get(text, text)
+
+
 def quote_rows_from_kalshi_matches(
     matches: Iterable[Mapping[str, Any]],
     *,
     allow_game_lines: bool = False,
+    sport: str | None = None,
 ) -> list[dict[str, Any]]:
     """Kalshi board-join matches -> quote rows. `#617`.
 
@@ -603,6 +664,19 @@ def quote_rows_from_kalshi_matches(
     not by this paragraph** -- that test fails the moment `source` enters
     `_KEY_FIELDS`, which is exactly when a source check becomes safe. Prose
     relies on a reader believing it; a test fails if they are wrong.
+
+    ------------------------------------------------------------------
+    THE SHARD'S VOCABULARY AND THE GAME'S IDENTITY `[2026-09-10]`
+    ------------------------------------------------------------------
+
+    `sport` relabels a prop into the name that sport's shard already files it
+    under (`book_quote_prop_market`), so the price lands in the SAME grid row as
+    the sportsbooks' rather than beside it. `home_team` / `away_team` /
+    `commence_time` ride through when the caller stamped them on the match
+    (`_capture_kalshi_quotes` does, from the board rows): `book_grid` takes a
+    grid row's identity from the rows it pivots, and without them every Kalshi
+    row read `matchup ''` and fell back to the board date. Both are no-ops for a
+    caller that passes neither, which was every call before this.
     """
     out: list[dict[str, Any]] = []
     for match in matches or ():
@@ -617,6 +691,8 @@ def quote_rows_from_kalshi_matches(
             # A game market. OddsAPI already writes Kalshi here, and a second
             # source under the same dedup key alternates rather than merges.
             continue
+        if player:
+            market = book_quote_prop_market(sport, market)
         out.append(
             {
                 "bookmaker": "kalshi",
@@ -626,6 +702,9 @@ def quote_rows_from_kalshi_matches(
                 "selection": match.get("board_side"),
                 "player_name": player or None,
                 "event_id": match.get("board_event_id"),
+                "home_team": match.get("home_team"),
+                "away_team": match.get("away_team"),
+                "commence_time": match.get("commence_time"),
                 # `prop` vs `game` is decided by the same rule `_normalize`
                 # applies, stated here so a match with no player is not
                 # silently reclassified if that default ever changes.

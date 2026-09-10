@@ -2468,11 +2468,27 @@ def _capture_kalshi_quotes(
             QUOTE_SOURCE_VENUE_DIRECT,
         )
         from syndicate.features.shared.odds_book_quotes import (
+            FOOTBALL_PROP_QUOTE_SPORTS,
             append_book_quotes,
+            book_quote_prop_market,
+            bucket_quote_rows_by_kickoff_date,
             quote_rows_from_kalshi_matches,
         )
 
+        # THE GAME'S IDENTITY, looked up the same way and from the same rows as
+        # the sport. A match names its event and nothing else about it, so the
+        # quote rows built from matches carried no `home_team`, `away_team` or
+        # `commence_time` -- and `book_grid` builds a grid row's identity from
+        # the rows it pivots. MEASURED on production 2026-09-10: 261 of 261
+        # Kalshi prop rows in web's NFL 09-10 shard had no `commence_time`, so
+        # every board row they built fell back to the board date for
+        # `game_date` with an empty `matchup`, and the page's game rail folded
+        # those label-less groups into ONE card titled "Matchup" holding
+        # players from eight different games. First non-empty value per field
+        # wins, from ANY row of the event: the index also holds Kalshi-derived
+        # rows, whose teams are blank.
         sport_by_event: dict[str, str] = {}
+        identity_by_event: dict[str, dict[str, str]] = {}
         for row in board_rows or ():
             if not isinstance(row, Mapping):
                 continue
@@ -2480,21 +2496,43 @@ def _capture_kalshi_quotes(
             sport = str(row.get("sport") or "").strip().lower()
             if event_id and sport:
                 sport_by_event.setdefault(event_id, sport)
+            if event_id:
+                identity = identity_by_event.setdefault(event_id, {})
+                for field in ("home_team", "away_team", "commence_time"):
+                    value = str(row.get(field) or "").strip()
+                    if value and field not in identity:
+                        identity[field] = value
 
         by_sport: dict[str, list[dict[str, Any]]] = {}
         no_sport = 0
+        identity_stamped = 0
+        relabelled = 0
         for match in matches:
             if not isinstance(match, Mapping):
                 continue
-            sport = sport_by_event.get(str(match.get("board_event_id") or "").strip())
+            event_id = str(match.get("board_event_id") or "").strip()
+            sport = sport_by_event.get(event_id)
             if not sport:
                 no_sport += 1
                 continue
-            by_sport.setdefault(sport, []).append(dict(match))
+            stamped = dict(match)
+            gained = False
+            for field, value in (identity_by_event.get(event_id) or {}).items():
+                if not str(stamped.get(field) or "").strip():
+                    stamped[field] = value
+                    gained = True
+            identity_stamped += int(gained)
+            if stamped.get("player_name"):
+                market = str(stamped.get("market") or "").strip()
+                relabelled += int(book_quote_prop_market(sport, market) != market)
+            by_sport.setdefault(sport, []).append(stamped)
 
         captured = 0
         appended_by_sport: dict[str, int] = {}
+        appended_by_shard: dict[str, int] = {}
         game_line_rows = 0
+        unfiled_rows = 0
+        board_date = str(selected_date or "").strip()
         for sport, sport_matches in by_sport.items():
             # GAME LINES FOR SOCCER ONLY -- see `_GAME_LINE_CAPTURE_SPORTS`.
             # Soccer's venue matches are ALL game lines (h2h/totals: a club
@@ -2508,33 +2546,55 @@ def _capture_kalshi_quotes(
             rows = quote_rows_from_kalshi_matches(
                 sport_matches,
                 allow_game_lines=sport_allows_game_line_capture(sport),
+                sport=sport,
             )
             if not rows:
                 continue
-            result = append_book_quotes(
-                sport=sport,
-                date_str=str(selected_date or "").strip(),
-                rows=rows,
-                captured_at=_now_stamp(),
-                # STAMP THE PROVENANCE, or the grid throws these away.
-                #
-                # `book_grid` refuses a row whose bookmaker is a direct-feed
-                # venue, to keep the 2026-08-25 "one price source per venue"
-                # invariant against OddsAPI's copy of kalshi/polymarket. A quote
-                # row carries no source field, so measured 2026-09-01 that
-                # refusal could not tell THESE rows -- the venue's own prices --
-                # from the aggregator's, and discarded both: Layer 1 and the
-                # book-grid saw no exchange at all.
-                #
-                # `drop_from_grid` now asks for provenance instead of the name,
-                # and absent still means dropped, so this stamp is what actually
-                # lets a directly-observed price reach a board.
-                extra={QUOTE_SOURCE_FIELD: QUOTE_SOURCE_VENUE_DIRECT},
-            )
-            _n = int((result or {}).get("appended") or 0)
-            captured += _n
-            if _n:
-                appended_by_sport[sport] = appended_by_sport.get(sport, 0) + _n
+            # THE KICKOFF DATE'S SHARD, for the sports whose OddsAPI capture
+            # files there (`FOOTBALL_PROP_QUOTE_SPORTS`), because the board
+            # builds each date's grid from that date's shard alone. MEASURED
+            # 2026-09-10: 150 of the 261 Kalshi prop rows in NFL's 09-10 shard
+            # were Sunday and Monday games whose sportsbook rows live in the
+            # 09-13 / 09-14 shards, so no relabel could ever merge them -- they
+            # stood alone all week as a second, self-priced copy of a bet the
+            # Sunday grid already carried. A row with no known kickoff keeps
+            # the board date, which is what every row got before, and is
+            # counted in `unfiled=`. Every other sport keeps the board date.
+            if sport in FOOTBALL_PROP_QUOTE_SPORTS:
+                shards, unfiled = bucket_quote_rows_by_kickoff_date(rows)
+                if unfiled:
+                    shards.setdefault(board_date, []).extend(unfiled)
+                    unfiled_rows += len(unfiled)
+            else:
+                shards = {board_date: list(rows)}
+            captured_at = _now_stamp()
+            for shard_date in sorted(shards):
+                result = append_book_quotes(
+                    sport=sport,
+                    date_str=shard_date,
+                    rows=shards[shard_date],
+                    captured_at=captured_at,
+                    # STAMP THE PROVENANCE, or the grid throws these away.
+                    #
+                    # `book_grid` refuses a row whose bookmaker is a direct-feed
+                    # venue, to keep the 2026-08-25 "one price source per venue"
+                    # invariant against OddsAPI's copy of kalshi/polymarket. A
+                    # quote row carries no source field, so measured 2026-09-01
+                    # that refusal could not tell THESE rows -- the venue's own
+                    # prices -- from the aggregator's, and discarded both: Layer 1
+                    # and the book-grid saw no exchange at all.
+                    #
+                    # `drop_from_grid` now asks for provenance instead of the
+                    # name, and absent still means dropped, so this stamp is what
+                    # actually lets a directly-observed price reach a board.
+                    extra={QUOTE_SOURCE_FIELD: QUOTE_SOURCE_VENUE_DIRECT},
+                )
+                _n = int((result or {}).get("appended") or 0)
+                captured += _n
+                if _n:
+                    appended_by_sport[sport] = appended_by_sport.get(sport, 0) + _n
+                    shard_key = f"{sport}:{shard_date}"
+                    appended_by_shard[shard_key] = appended_by_shard.get(shard_key, 0) + _n
             game_line_rows += sum(1 for r in rows if not r.get("player_name"))
         # ONE LINE, ALWAYS, INCLUDING THE ZEROES. `no_sport` and an empty
         # `by_sport` are different failures -- "the match carries no sport" and
@@ -2550,7 +2610,14 @@ def _capture_kalshi_quotes(
             # wrote nothing.
             f" matches={len(matches)} sports={sorted(by_sport)}"
             f" appended={captured} appended_by_sport={appended_by_sport}"
-            f" game_lines={game_line_rows} no_sport={no_sport}",
+            f" game_lines={game_line_rows} no_sport={no_sport}"
+            # 2026-09-10's counters, so the fix's reach reads off this same line:
+            # prop matches moved into their shard's vocabulary, matches that
+            # gained a team or kickoff from the board, rows with no known
+            # kickoff (filed under the board date), and rows appended per
+            # `sport:shard` -- a Sunday game under today's date is the defect.
+            f" relabelled={relabelled} identity_stamped={identity_stamped}"
+            f" unfiled={unfiled_rows} shards={appended_by_shard}",
             flush=True,
         )
     except Exception as exc:  # noqa: BLE001 -- instrumentation must not fail the join

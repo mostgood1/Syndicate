@@ -311,29 +311,137 @@ def test_builder_repairs_an_empty_local_artifact_on_refusal(monkeypatch):
     assert result["published"] is False
 
 
-def test_builder_never_overwrites_a_good_local_artifact(monkeypatch):
+_PROP_ARTIFACT_REL = "nfl_source/nfl_prop_projections_2026_wk1.json"
+
+
+def _prop_artifact_bytes(rows: int, generated_at: str | None) -> bytes:
+    import json
+
+    payload = {"season": 2026, "week": 1, "row_count": rows,
+               "sim_rows": [{"market": f"receptions::p{i}::1.5", "sim_projection": 0.5}
+                            for i in range(rows)]}
+    if generated_at is not None:
+        payload["generated_at"] = generated_at
+    return json.dumps(payload).encode("utf-8")
+
+
+def _repair_setup(monkeypatch, tmp_path, *, local: bytes, pulled: bytes | None):
+    """A POPULATED local copy on a real disk under `tmp_path`, and a pull that
+    writes `pulled` over it the way `pull_streamed_artifact` does (None = 304)."""
+    import os
+
+    import scripts.build_nfl_prop_projections as builder
+
+    target = tmp_path / _PROP_ARTIFACT_REL
+    target.parent.mkdir(parents=True)
+    target.write_bytes(local)
+    old = 1_789_000_000
+    os.utime(target, (old, old))
+    monkeypatch.setattr(builder, "data_root", lambda: tmp_path)
+    monkeypatch.setattr(builder, "nfl_props_rows_for_week", lambda s, w, **k: ([], []))
+    monkeypatch.setattr(
+        builder, "read_nfl_prop_projection_artifact", lambda s, w: [{"entity": "x"}] * 980
+    )
+    calls: list[str] = []
+
+    def fake_pull(relative_path, **kwargs):
+        calls.append(relative_path)
+        if pulled is None:
+            return True, 0
+        target.write_bytes(pulled)
+        return True, len(pulled)
+
+    monkeypatch.setattr(builder, "pull_streamed_artifact", fake_pull)
+    return builder, target, calls, old
+
+
+def test_builder_never_overwrites_a_good_local_artifact(monkeypatch, tmp_path):
     """The repair must not destroy a local copy that HAS rows.
 
     Measured while writing it: the unconditional version pulled web's 111-byte
     empty artifact over a local one. On a developer checkout -- the only machine
     that can currently build this -- that deletes the only copy that exists.
-    """
-    import scripts.build_nfl_prop_projections as builder
 
-    pulled: list[str] = []
-    monkeypatch.setattr(builder, "nfl_props_rows_for_week", lambda s, w, **k: ([], []))
-    monkeypatch.setattr(
-        builder, "read_nfl_prop_projection_artifact", lambda s, w: [{"entity": "x"}] * 980
-    )
-    monkeypatch.setattr(
-        builder, "pull_streamed_artifact", lambda p, **k: pulled.append(p) or (True, 1)
-    )
+    CHANGED 2026-09-10, AND THE INVARIANT IS KEPT, NOT RELAXED. This test used
+    to assert that a populated local copy is never even PULLED over, and that
+    rule froze refresh-worker on a stale artifact for a whole day --
+    `REPAIR_SKIPPED_LOCAL_OK local_rows=980` hourly while web served 1,140 rows,
+    so the NFL board's sim view survived on Anytime TD alone. The pull now
+    happens; what cannot happen is the pulled copy SURVIVING when it is worse.
+    Here web sends that empty kind of artifact, and the local file must come
+    back byte-for-byte, mtime included.
+    """
+    local = _prop_artifact_bytes(980, "2026-09-08T16:01:02+00:00")
+    empty = _prop_artifact_bytes(0, "2026-09-10T01:00:00+00:00")
+    builder, target, calls, old = _repair_setup(monkeypatch, tmp_path, local=local, pulled=empty)
 
     result = builder.build(2026, 1)
-    assert pulled == [], "a good local artifact must never be overwritten"
+    assert calls == [_PROP_ARTIFACT_REL], "the repair must be REACHED, or the rollback proves nothing"
+    assert target.read_bytes() == local, "a good local artifact must never be replaced by an empty one"
+    assert int(target.stat().st_mtime) == old
+    assert result["repair_outcome"] == "rolled_back_pulled_copy_empty"
     assert result["repair_pull_ok"] is False
     assert result["repair_pull_written"] == 0
     assert result["refused"] == "zero_sim_rows"
+
+
+def test_a_NEWER_published_artifact_replaces_a_stale_local_one(monkeypatch, tmp_path):
+    """THE PRODUCTION CASE, 2026-09-10: local 980 rows from an older build, web
+    1,140 rows built 2026-09-10T00:09:04Z."""
+    newer = _prop_artifact_bytes(1140, "2026-09-10T00:09:04.808033+00:00")
+    builder, target, calls, _ = _repair_setup(
+        monkeypatch, tmp_path, local=_prop_artifact_bytes(980, "2026-09-08T16:01:02+00:00"),
+        pulled=newer,
+    )
+
+    result = builder.build(2026, 1)
+    assert calls == [_PROP_ARTIFACT_REL]
+    assert target.read_bytes() == newer
+    assert result["repair_outcome"] == "pulled_newer"
+    assert result["repair_pull_ok"] is True
+    assert result["repair_pull_written"] == len(newer)
+
+
+def test_an_OLDER_published_artifact_is_rolled_back(monkeypatch, tmp_path):
+    """Web's mtime can be newer than its content -- a republish of an old build
+    is exactly that. The artifact's own `generated_at` decides, not the clock."""
+    local = _prop_artifact_bytes(1140, "2026-09-10T00:09:04+00:00")
+    builder, target, _, old = _repair_setup(
+        monkeypatch, tmp_path, local=local,
+        pulled=_prop_artifact_bytes(980, "2026-09-08T16:01:02+00:00"),
+    )
+
+    result = builder.build(2026, 1)
+    assert target.read_bytes() == local
+    assert int(target.stat().st_mtime) == old
+    assert result["repair_outcome"] == "rolled_back_pulled_copy_older"
+
+
+def test_an_unstateable_vintage_is_rolled_back_not_trusted(monkeypatch, tmp_path):
+    """Unknown must not default permissive: a copy that cannot say when it was
+    built cannot be shown to be newer than the one it would replace."""
+    local = _prop_artifact_bytes(980, "2026-09-08T16:01:02+00:00")
+    builder, target, _, _ = _repair_setup(
+        monkeypatch, tmp_path, local=local, pulled=_prop_artifact_bytes(1140, None)
+    )
+
+    result = builder.build(2026, 1)
+    assert target.read_bytes() == local
+    assert result["repair_outcome"] == "rolled_back_vintage_unknown"
+
+
+def test_a_304_leaves_the_local_copy_untouched(monkeypatch, tmp_path):
+    """The steady state: web's copy is not newer than the local mtime, web
+    answers 304, nothing is written and nothing is restored."""
+    local = _prop_artifact_bytes(980, "2026-09-08T16:01:02+00:00")
+    builder, target, calls, old = _repair_setup(monkeypatch, tmp_path, local=local, pulled=None)
+
+    result = builder.build(2026, 1)
+    assert calls == [_PROP_ARTIFACT_REL]
+    assert target.read_bytes() == local
+    assert int(target.stat().st_mtime) == old
+    assert result["repair_outcome"] == "local_current"
+    assert result["repair_pull_written"] == 0
 
 
 def test_a_successful_build_never_repairs(monkeypatch):
