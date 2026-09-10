@@ -283,3 +283,157 @@ def test_the_written_path_is_one_the_allowlist_actually_matches(ncaaf_root):
         f"{relative} is written by the generator but no HOT_ARTIFACT_PATTERNS entry matches it, "
         "so publish_hot_artifact returns SKIP_NOT_ALLOWLISTED and web never sees it"
     )
+
+
+# ------------------------------------------ the read-time grace (2026-09-10)
+
+def _utc(*args) -> float:
+    import datetime as _dt
+
+    return _dt.datetime(*args, tzinfo=_dt.timezone.utc).timestamp()
+
+
+def _utc_iso(epoch: float) -> str:
+    import datetime as _dt
+
+    return _dt.datetime.fromtimestamp(epoch, _dt.timezone.utc).isoformat()
+
+
+# The 2026-09-08 failure, from `deploys.md`: SMU @ Florida State kicked off at
+# 23:30Z on 09-07, the daily build ran 137.8 minutes later, and the reading
+# taken at 15:05Z on 09-08 found the board still on week 1.
+SMU_FSU_KICKOFF = _utc(2026, 9, 7, 23, 30)
+BUILD_0908 = SMU_FSU_KICKOFF + 137.8 * 60
+READING_0908 = _utc(2026, 9, 8, 15, 5)
+
+
+def _week1_with_one_straggler() -> list[dict]:
+    return [
+        _game(1, completed=True, kickoff=SMU_FSU_KICKOFF - 48 * _HOUR),
+        _game(1, completed=True, kickoff=SMU_FSU_KICKOFF - 3 * _HOUR),
+        _game(1, completed=False, kickoff=SMU_FSU_KICKOFF),
+        _game(2, completed=False, kickoff=_utc(2026, 9, 12, 16, 0)),
+        _game(2, completed=False, kickoff=_utc(2026, 9, 13, 4, 0)),
+    ]
+
+
+def test_the_producer_records_each_weeks_latest_unplayed_kickoff(ncaaf_root):
+    from syndicate.features.ncaaf.week_state import build_week_state
+
+    undated = _game(3, completed=False, kickoff=NOW)
+    undated["startDate"] = None
+    state = build_week_state(
+        2026,
+        games=[
+            _game(1, completed=True, kickoff=NOW - 72 * _HOUR),
+            _game(2, completed=False, kickoff=NOW - 2 * _HOUR),
+            _game(2, completed=False, kickoff=NOW + 1 * _HOUR),
+            # A completed game never sets `last`, however late it kicked off.
+            _game(2, completed=True, kickoff=NOW + 5 * _HOUR),
+            undated,
+        ],
+        now=NOW,
+    )
+    kickoffs = state["unplayed_kickoffs"]
+    assert "1" not in kickoffs, "a fully played week carries no entry"
+    assert kickoffs["2"] == {"undated": 0, "last": _utc_iso(NOW + 1 * _HOUR)}
+    assert kickoffs["3"] == {"undated": 1}
+    # The counts every existing reader depends on are unchanged.
+    assert state["weeks"]["2"] == {"games": 3, "completed": 1, "unplayed": 2}
+    assert state["stale_completion_flags"] == 0
+
+
+def test_the_0908_reading_would_have_found_week_2(ncaaf_root):
+    """THE FAILURE THIS EXISTS FOR, replayed: same build clock, same straggler,
+    same reading time. The plain rule answered 1. Inside the grace it must
+    still answer 1 -- a game 11 h past kickoff can genuinely still be
+    unflagged in the source."""
+    from syndicate.features.ncaaf.week_state import build_week_state, target_week_from_state
+
+    state = build_week_state(2026, games=_week1_with_one_straggler(), now=BUILD_0908)
+    assert state["weeks"]["1"]["unplayed"] == 1, "precondition: the build caught the game unplayed"
+    assert target_week_from_state(state, now=BUILD_0908) == 1
+    assert target_week_from_state(state, now=SMU_FSU_KICKOFF + 11 * _HOUR) == 1
+    assert target_week_from_state(state, now=READING_0908) == 2
+
+
+def test_the_saturday_slate_releases_the_board_twelve_hours_after_its_last_kickoff(ncaaf_root):
+    """The 2026-09-12 slate on today's build clock: the build lands ~03:2xZ,
+    after the 03:00Z USC kickoff and before New Mexico State @ Hawai'i at
+    04:00Z. The boundary is the grace itself, one minute either side."""
+    from syndicate.features.ncaaf.week_state import build_week_state, target_week_from_state
+
+    last_kickoff = _utc(2026, 9, 13, 4, 0)
+    games = [
+        _game(2, completed=True, kickoff=_utc(2026, 9, 12, 16, 0)),
+        _game(2, completed=False, kickoff=_utc(2026, 9, 13, 3, 0)),
+        _game(2, completed=False, kickoff=last_kickoff),
+        _game(3, completed=False, kickoff=_utc(2026, 9, 19, 16, 0)),
+    ]
+    state = build_week_state(2026, games=games, now=_utc(2026, 9, 13, 3, 25))
+    assert target_week_from_state(state, now=last_kickoff + 12 * _HOUR - 60) == 2
+    assert target_week_from_state(state, now=last_kickoff + 12 * _HOUR + 60) == 3
+
+
+def test_an_undated_unplayed_game_keeps_its_week(ncaaf_root):
+    """An unknown must not take the permissive branch. A game with no kickoff
+    cannot be shown to be over, so its week holds, as under the plain rule."""
+    from syndicate.features.ncaaf.week_state import build_week_state, target_week_from_state
+
+    undated = _game(2, completed=False, kickoff=NOW)
+    undated["startDate"] = ""
+    state = build_week_state(
+        2026,
+        games=[
+            _game(2, completed=False, kickoff=NOW - 72 * _HOUR),
+            undated,
+            _game(3, completed=False, kickoff=NOW + 96 * _HOUR),
+        ],
+        now=NOW,
+    )
+    assert target_week_from_state(state, now=NOW + 365 * 24 * _HOUR) == 2
+
+
+def test_an_artifact_without_kickoff_facts_reads_exactly_as_before(ncaaf_root):
+    """Deploy order stays free: new reader code over an artifact the old
+    producer wrote must answer what it answers today, however late it is."""
+    from syndicate.features.ncaaf.week_state import target_week_from_state
+
+    state = {
+        "weeks": {
+            "1": {"games": 99, "completed": 98, "unplayed": 1},
+            "2": {"games": 86, "completed": 0, "unplayed": 86},
+        }
+    }
+    assert target_week_from_state(state, now=READING_0908 + 30 * 24 * _HOUR) == 1
+
+
+def test_the_highest_unplayed_week_is_never_skipped(ncaaf_root):
+    """The grace must not turn an answer into None: `ncaaf_target_week` reads
+    None as "no artifact" and falls back to the STALE games cache -- the
+    frozen week 1 this lane exists to remove."""
+    from syndicate.features.ncaaf.week_state import build_week_state, target_week_from_state
+
+    state = build_week_state(
+        2026,
+        games=[
+            _game(12, completed=True, kickoff=NOW - 200 * _HOUR),
+            _game(13, completed=False, kickoff=NOW - 100 * _HOUR),
+        ],
+        now=NOW,
+    )
+    assert target_week_from_state(state, now=NOW) == 13
+
+
+def test_ncaaf_target_week_applies_the_grace_on_the_request_path(ncaaf_root, monkeypatch):
+    """End to end through the one function the board, the worker's projection
+    gate and the odds refresh all call -- with the clock pinned, not the rule."""
+    from syndicate.features.ncaaf import sources
+    from syndicate.features.ncaaf import week_state
+    from syndicate.features.ncaaf.week_state import build_week_state, write_week_state
+
+    write_week_state(build_week_state(2026, games=_week1_with_one_straggler(), now=BUILD_0908))
+    monkeypatch.setattr(week_state, "_now", lambda: SMU_FSU_KICKOFF + 2 * _HOUR)
+    assert sources.ncaaf_target_week(2026) == 1
+    monkeypatch.setattr(week_state, "_now", lambda: READING_0908)
+    assert sources.ncaaf_target_week(2026) == 2

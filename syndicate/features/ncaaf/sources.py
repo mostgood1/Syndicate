@@ -265,6 +265,12 @@ def ncaaf_target_week(season: int) -> int | None:
     ORDER MATTERS AND IS NOT A PREFERENCE. The fallback is the STALE source by
     construction; reading it first would mean the artifact never had an effect
     and this change would be inert while looking wired.
+
+    ON THE ARTIFACT PATH A WEEK STOPS HOLDING THE BOARD 12 H AFTER ITS LAST
+    UNPLAYED KICKOFF, even if CFBD has not flagged that game completed yet --
+    `week_state.target_week_from_state`. The fallback keeps the plain rule: its
+    kickoff times come from a cache written in July, and a clock comparison is
+    only as good as the kickoff it compares.
     """
     from syndicate.features.ncaaf.week_state import read_week_state, target_week_from_state
 
