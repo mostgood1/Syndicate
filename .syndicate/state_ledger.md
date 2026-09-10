@@ -1319,7 +1319,13 @@ worktree prune` cannot and HOLDS any husk naming a commit nothing else keeps.
 0, and left no dir, no admin dir, no registration and no branch. **Husks still
 accrue** from sessions running an older copy and from bare `git worktree remove`
 (`push_via_worktree.py`'s `finally`, ad-hoc commands): one new
-(`watcher-admin-token`) between 17:40Z and 17:50Z. Run `prune`.
+(`watcher-admin-token`) between 17:40Z and 17:50Z, and two more (`capture-commit-wt`,
+`tripwire-window-wt`) by 20:2xZ. Run `prune`. **Since `dce7c172`, `prune` also
+HOLDS a stale admin dir while a checkout folder by its name still exists** (in the
+session root, the directory above it, or beside the main tree). The case that
+prompted it: `arm2-denominator-wt2` was stale to git while its folder still
+existed, emptied by a remove that could not delete a folder a shell sat in, and
+`--apply` would have taken it.
 
 **NOT TESTED: pausing OneDrive.** It would not clear bits already set, and the
 lab shows the bit alone is sufficient; whether a pause stops NEW bits is
@@ -1336,6 +1342,30 @@ non-atomic copy+delete.
 attributes and is in the WORKING tree, so the CRLF-rewrite warning on every
 ledger append and OneDrive arbitrating ledger writes are unchanged by it.
 Ending that class means moving the repo, not the store.
+
+## [todo-id-allocation] A TODO ID IS RESERVED BY A PUSH TO `main` BEFORE ANY WORK — one claim-only `[skip ci]` commit per allocation `[2026-09-10, lanes todo-id-alloc-worktrees + todo-id-push-reserve, commits 3e02f854 + 1797b3e4, NO DEPLOY]`
+
+`py -3 scripts/todo_id_alloc.py --holder <lane>` builds a commit on freshly
+fetched `origin/main` whose only change is `.syndicate/todo_ids/<n>.claim`, and
+pushes it to `main`. The push is the lock: it lands only if `main` still points
+at that parent, so two clones racing for one number get different ids. Measured
+through a real bare remote: 101 and 102, where the version before gave 101 twice;
+and that remote REJECTED a reservation built on a stale `main`. First real use:
+`f08c0125` reserved `#654`, and `gh run list --commit f08c0125` shows 0 CI runs
+while its neighbours each ran.
+
+- **Nothing to commit for the id.** The claim is already on `main`, and it is NOT
+  written into the caller's tree, because an untracked copy would block the next
+  rebase.
+- **Fallback, loud.** When no push is possible (offline, auth, no origin), the id
+  comes from the machine-wide lock in `<git common dir>/syndicate/todo_ids/`; then
+  commit the tracked claim with the entry. `--no-push` / `--no-fetch` choose this.
+- **The mark** (`--show`) reads `origin/main`'s two ledgers and tracked claims,
+  this tree's claims, the primary tree's claim dir and the shared lock dir.
+- **A stale copy** (a tree whose script predates `3e02f854`) still allocates per
+  tree and can collide. The primary tree carries the push version since today's
+  fast-forwards (`c2dcd525`, then `6eb82bbe`).
+- **Untested:** a truly simultaneous race against GitHub itself.
 
 ## [full-suite-run-method] RUNNING THE FULL SUITE ON THIS MACHINE NEEDS BATCHING, AN ISOLATION RETRY AND A PINNED MANIFEST — and the failure LIST expires within hours `[2026-09-05/06, lane nfl-fantasy-artifact-root]`
 

@@ -520,6 +520,7 @@ once this index exists: re-splitting would orphan the parts.
 | [split-state-reindex-truncation] | `split_state.py --reindex --apply` DELETED EVERYTHING BELOW THE `[subject-index]` TABLE — **FIXED, ON MAIN (`2 | `state_ledger.md` |
 | [discard-guard-origin-blindness] | `discard-guard.py` CALLED PUSHED CONTENT "NOWHERE ELSE", AND BLOCKED `git restore --staged` — **FIXED (`e3a515 | `state_ledger.md` |
 | [git-store-onedrive] | ONEDRIVE MANAGES `.git` AND `.syndicate`, AND IT SILENTLY BREAKS `git worktree remove` `[2026-09-06, lane git- | `state_ledger.md` |
+| [todo-id-allocation] | A TODO ID IS RESERVED BY A PUSH TO `main` BEFORE ANY WORK — one claim-only `[skip ci]` commit per allocation ` | `state_ledger.md` |
 | [full-suite-run-method] | RUNNING THE FULL SUITE ON THIS MACHINE NEEDS BATCHING, AN ISOLATION RETRY AND A PINNED MANIFEST — and the fail | `state_ledger.md` |
 | [test-suite-writes-tracked-mirror] | THE TEST SUITE WROTE INTO THE TRACKED `data/` MIRROR, AND NOTHING SAID SO — **GUARDED SINCE 2026-09-09** `[lan | `state_ledger.md` |
 | [mlb-hitter-strikeouts-prop] | MLB HITTER `strikeouts` WAS A DEAD FIELD FOR MONTHS; FIXED, DEPLOYED AND VERIFIED — AND NO BET WAS EVER PRICED | `state_mlb.md` |
