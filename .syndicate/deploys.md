@@ -31678,3 +31678,28 @@ in-flight work to restart onto identical code. Same precedent as 2026-09-04 15:0
     - The two NCAAF orders count as duplicates and were not re-placed.
     - There were zero `LIVE_ORDER` lines and no `BLOCKED_ON_UNRECONCILED`.
     - The ledger's order count held at 466 across the pass.
+
+## 2026-09-10 21:45:08-21:50:27Z — refresh-worker `86c82220` -> `c29a7d4e` — NOT MY DEPLOY: lane `wnba-schedule-guard-fix`'s, and it carries the single-pass accuracy autorun — lane `accuracy-ledger-budget-raise`
+
+**No deploy was taken by this lane.** `wnba-schedule-guard-fix` held the claim for `6ebec70e`. I asked
+it to deploy main's tip instead, since the tip was `6ebec70e` plus a ledger commit and `c29a7d4e`, so one
+restart would carry both lanes. It deployed `c29a7d4e`: `dep-dahi9p6q1p3s73dm5ujg`, created 21:45:08Z,
+`update_in_progress` by 21:49:19Z, **live 21:50:27Z**. The claim itself had expired at 45 min by then.
+
+**Reachability, checked:**
+- `c29a7d4e` contains `57019962` (chunk-count bound), `c2dcd525` (MLB lens guard), `3e33f083` and
+  `86c82220`. All four checked by ancestry.
+- Content verified on the tree: `DEFAULT_ACCURACY_SUMMARY_LEDGER_MAX_CHUNKS = 45` and
+  `computed = build_accuracy_summaries(sports)` are both present.
+- `SYNDICATE_ACCURACY_SUMMARY_LEDGER_MAX_CHUNKS` and `SYNDICATE_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES` are
+  ABSENT: single-key env API returned 404 at 21:51:54Z, and no value was read.
+
+**Condition met for lane `ncaaf-fcs-market-implied-rating`,** whose file this change edits by
+consent: main's tip, fired before 17:45 CDT, and no restart from this lane in 18:45-22:30 CDT. Their
+session was pinged with the SHA and finish time.
+
+**MEASUREMENT OPEN.** Both changes are UNEXERCISED until the 2026-09-11 autorun (>= 07:00 CT).
+Scheduled task `accuracy-autorun-reading-0911` (08:30 CDT) takes the reading against the five
+predictions pre-registered in the lane: one `LEDGER_CHUNKS_ACCEPTED` line, `skipped_budget=0
+truncated=0`, 150-165k records, 7.5-9.5 GB, in-run anon ~2,155-2,200 MiB (revert above 2,600),
+`elapsed_s` 450-1,200.
