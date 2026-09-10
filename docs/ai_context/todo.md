@@ -1,5 +1,24 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#657` — **`execution_ledger._load` READS A FAILED READ AS AN EMPTY LEDGER, and every money gate that reads it fails OPEN on a Redis blip** — lane `write-ahead-build-refusal`, filed for lane `execution-ledger-cas`, 2026-09-10 — **OPEN; not started**
+
+- **Mechanism.** `refresh_state_store.read_json_file_result` catches every read failure on both backends (keyvalue and disk) and returns `(None, False)`. `read_json_file` drops the `ok` flag, and `_load` turns `None` into `{"orders": []}`. So `_load`'s `LedgerError` "refuse rather than look empty" path cannot fire in production. `test_an_unreadable_ledger_refuses_rather_than_looking_empty` passes only because it monkeypatches the reader to raise.
+- **Census (grep, 2026-09-10): 29 non-merge sites.**
+  - 12 in `execution_ledger.py`: `resolve_unknown_submit`, `acknowledge_grade_conflict`, `find_order`, `record_order`, `complete_order`, `_blocking_record_for`, `reclassify_presend_failures`, `repair_odds_unit_stakes`, `reconcile_live_orders`, `unreconciled_orders`, and `ledger_summary` twice.
+  - 17 imports elsewhere: `paper_settlement.py` 6, `venue_settlement.py` 4, `pipeline/portfolio_commit.py` 3, `execution_guard.py` 2 (`spent_today`, `_live_stake_since`), `scripts/run_live_odds_refresh_worker.py` 1, `scripts/fit_staked_probability.py` 1.
+- **What fails OPEN on one blip:**
+  - `unreconciled_orders` returns `[]`, so the global `BLOCKED_ON_UNRECONCILED` latch lets a pass place on top of an order of unknown state.
+  - `spent_today` and `_live_stake_since` read $0, so the day caps and the balance gate under-count.
+  - `_blocking_record_for`, `record_order` and `find_order` find no row, so a duplicate can be placed. The venue's client-order-id dedupe is then the last guard.
+- **Not in scope: the writers,** which load and then `_persist`. `#656` covers them: its strict merge re-read, which refuses on an empty baseline, stops a masked load from erasing the ledger.
+- **Fix direction.** `_load` reads through `read_json_file_result` and raises `LedgerError` when `ok` is False; an absent key stays a legitimate empty ledger. Then decide per caller:
+  - money gates fail CLOSED (block the pass, refuse the order);
+  - display paths degrade visibly;
+  - re-base the refusal test on the real reader returning `(None, False)`, not on a raise.
+- **Close when** the real reader's `(None, False)` makes `unreconciled_orders`, `spent_today` and `_blocking_record_for` refuse in tests that do not monkeypatch the ledger, and that code is live on the services that run them.
+
+---
+
 ### `#656` — **THE EXECUTION LEDGER'S WRITE IS NOT ATOMIC: a SET landing between another writer's merge-read and its SET is silently lost. It froze both venues for six days from 2026-09-04. A compare-and-swap in `_persist` is owed on all three services.** — lane `write-ahead-build-refusal`, 2026-09-10 — **OPEN; fix not started (chipped as a task)**
 
 - **Mechanism, proven.** `execution_ledger._persist` → `_merge_onto_current` re-reads the store and three-way merges; then `write_json_file` SETs the whole ~2.7 MB document. Nothing between the read and the SET is atomic, so a writer whose window straddles another writer's SET writes back its stale copy of every row it "kept theirs". 2026-09-04: live-odds-worker SET at 18:27:25.083 (K `rejected`; it also dropped paper Q), then refresh-worker SET at 18:27:25.228 = its own 24.711 doc + 48 B (Q filled, K back to `submitted`). The stored row: `submitted_at 18:27:23.597740Z`, `error` and `venue_resolved_at` null.
