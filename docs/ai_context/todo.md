@@ -3324,6 +3324,20 @@ Mostly execution of already-measured items; references, not duplicates:
 > 2026-09-09 decision to leave NFL props stakeable; `nfl-prop-settled-grade`
 > (09-15) still owns that. It does mean the REFERENCE CLASS is negative.
 
+> **(h) COVERAGE: THE BYTE BUDGET IS REPLACED BY A CHUNK-COUNT BOUND — 2026-09-10.** `[lane accuracy-ledger-budget-raise, session 218b778c]`
+>
+> The autorun above RUNS, but it reads a TRUNCATED ledger, and the truncation got
+> worse at a fixed 4 GB: 09-05 `count=21 skipped_budget=12` (33 chunks) -> 09-10
+> `count=16 skipped_budget=22` (38 chunks), because days grew from ~190 MB to
+> ~250 MB. The 28-date drift window rested on 16 dates.
+> `DEFAULT_ACCURACY_SUMMARY_LEDGER_MAX_CHUNKS = 45` is now the primary bound, with
+> the byte budget as a backstop at 45 x 256 MB. **Not live until a refresh-worker
+> deploy carries it.** The pre-registered reading -- goal line `skipped_budget=0
+> truncated=0`, in-run peak anon under 2,600 MiB -- is in `lanes.md`
+> `accuracy-ledger-budget-raise`. Two costs to watch: memory tracks RECORDS (~2 KB
+> retained each, ~4-10k new records a day), and the autorun re-reads the whole
+> ledger once per sport, 8 times, inline in refresh-worker's loop.
+
 ### `#625` — **PHASE M — LOCAL MIRROR + REPLAY GATE. Prod→local full mirror; local-first development under three laws.** — lane `edge-plan`, 2026-09-01 — **OPEN, parallel with `#626`; accelerates every later phase**
 
 Endorsed in the analysis §12 as an UPGRADE of "Render is the source of truth":

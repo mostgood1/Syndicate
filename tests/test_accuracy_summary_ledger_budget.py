@@ -226,3 +226,155 @@ def test_truncation_is_visible_in_coverage_not_only_in_a_log_line(ledger, tmp_pa
         "the number of chunks the budget REFUSED must be published, not just logged"
     )
     assert coverage["dates_covered"] < 3
+
+
+# --- the CHUNK-COUNT bound (2026-09-10) ---------------------------------------
+#
+# The pre-registered 09-04 rule said a first 4GB run skipping "~12" chunks means
+# the byte budget is the wrong instrument. It skipped 12; by 09-10 the same 4GB
+# bought 16 dates instead of 21 because the days got fatter. These pin the
+# replacement: a day count as the primary bound, the byte budget as a backstop
+# sized in the same unit.
+
+MAX_CHUNKS_ENV = "SYNDICATE_ACCURACY_SUMMARY_LEDGER_MAX_CHUNKS"
+
+
+def _collect_bounded(path, *, budget=None, max_chunks=None):
+    stats: dict = {}
+    rows = list(ie._stream_chunked_ledger_records(
+        path, max_total_bytes=budget, max_chunks=max_chunks, stats=stats
+    ))
+    return rows, stats
+
+
+class _FakeChunk:
+    """Duck-types the two things selection reads (`.name`, `.stat().st_size`),
+    so a production-sized plan can be checked without writing gigabytes."""
+
+    def __init__(self, name, size):
+        self.name = name
+        self._size = size
+
+    def stat(self):
+        return type("_Stat", (), {"st_size": self._size})()
+
+
+def test_chunk_bound_takes_exactly_the_newest_n_whole_chunks(ledger, tmp_path):
+    _, sizes = _write_chunks(tmp_path, {
+        "2026-08-01": 50, "2026-08-02": 50, "2026-08-03": 50, "2026-08-04": 50,
+    })
+    rows, stats = _collect_bounded(ledger, budget=10_000_000, max_chunks=2)
+    seen = sorted({row["artifact_metadata"]["selected_date"] for row in rows})
+    assert seen == ["2026-08-03", "2026-08-04"], "the NEWEST days must be the ones kept"
+    assert len(rows) == 100, "a chunk-bounded read takes WHOLE chunks, never a partial one"
+    assert stats["chunks_skipped_count"] == 2
+    assert stats["chunks_skipped_budget"] == 0, "the byte backstop must not be what bound this"
+    assert stats["chunks_partial"] == 0
+    assert stats["bytes_skipped"] == sizes["2026-08-01"] + sizes["2026-08-02"]
+    assert stats["max_chunks"] == 2
+    assert stats["truncated"] is True, "a day the count refused still narrows the sample"
+
+
+def test_chunk_bound_off_does_not_equal_on(ledger, tmp_path):
+    _write_chunks(tmp_path, {"2026-08-01": 50, "2026-08-02": 50, "2026-08-03": 50})
+    unbounded, _ = _collect_bounded(ledger, budget=10_000_000, max_chunks=None)
+    bounded, _ = _collect_bounded(ledger, budget=10_000_000, max_chunks=1)
+    assert len(unbounded) > len(bounded) > 0, (
+        "chunk bound is INERT: bounded and unbounded reads returned the same set"
+    )
+
+
+def test_chunk_bound_holds_when_the_byte_budget_is_opted_out(ledger, tmp_path):
+    """Budget 0 used to mean the whole ledger. With a chunk bound set it must
+    still mean at most N days: EITHER bound has to switch the budgeted path on,
+    or the byte opt-out falls through to the unbounded read that OOM-killed
+    refresh-worker on 2026-09-02."""
+    _write_chunks(tmp_path, {"2026-08-01": 50, "2026-08-02": 50, "2026-08-03": 50})
+    rows, stats = _collect_bounded(ledger, budget=0, max_chunks=2)
+    assert len(rows) == 100
+    assert stats["chunks_skipped_count"] == 1
+    assert stats["chunks_skipped_budget"] == 0
+    assert stats["budget_exhausted"] is False
+
+
+def test_the_byte_backstop_still_binds_behind_the_chunk_bound(ledger, tmp_path):
+    """The count is checked first, but a budget smaller than N chunks must
+    still bound bytes exactly -- the backstop is not decorative."""
+    _write_chunks(tmp_path, {"2026-08-01": 200, "2026-08-02": 200, "2026-08-03": 200})
+    rows, stats = _collect_bounded(ledger, budget=100_000, max_chunks=45)
+    assert stats["bytes_accepted"] <= 100_000
+    assert stats["chunks_skipped_count"] == 0
+    assert stats["chunks_skipped_budget"] >= 1
+    assert rows
+
+
+def test_defaults_admit_the_whole_ledger_measured_in_production_2026_09_10():
+    """Tied to MEASURED refresh-worker numbers, not round ones.
+
+    2026-09-10: `LEDGER_CHUNKS_ACCEPTED count=16 bytes=3999961107
+    skipped_budget=22` -- 38 chunks, average admitted 249,997,569 B -- and
+    `PROJECTION_DONE seen=38`. The defaults must admit a ledger that size, with
+    margin for the one chunk a day it gains, and the byte backstop must not bind
+    before the count does at that density. Otherwise the backstop is the bound
+    again, and coverage erodes as days get fatter: 21 dates on 09-05, 16 on
+    09-10, both at a fixed 4GB.
+    """
+    measured_chunks = 38
+    measured_avg_admitted_bytes = 3_999_961_107 // 16
+    assert ie.DEFAULT_ACCURACY_SUMMARY_LEDGER_MAX_CHUNKS > measured_chunks
+    assert ie.DEFAULT_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES >= (
+        ie.DEFAULT_ACCURACY_SUMMARY_LEDGER_MAX_CHUNKS * measured_avg_admitted_bytes
+    )
+
+
+def test_old_budget_reproduces_the_09_10_shortfall_and_the_defaults_remove_it():
+    chunks = [_FakeChunk(f"2026-chunk-{i:03d}.jsonl", 249_997_569) for i in range(38)]
+    _, old = ie._select_ledger_chunks_within_budget(chunks, max_total_bytes=4_000_000_000)
+    assert old["chunks_skipped_budget"] >= 20, "the old 4GB default refuses most of the ledger"
+    selected, new = ie._select_ledger_chunks_within_budget(
+        chunks,
+        max_total_bytes=ie.DEFAULT_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES,
+        max_chunks=ie.DEFAULT_ACCURACY_SUMMARY_LEDGER_MAX_CHUNKS,
+    )
+    assert len(selected) == 38
+    assert (new["chunks_skipped_budget"], new["chunks_skipped_count"], new["chunks_partial"]) == (0, 0, 0)
+
+
+def test_max_chunks_env_absent_is_bounded_zero_unlimited_garbage_default(monkeypatch):
+    monkeypatch.delenv(MAX_CHUNKS_ENV, raising=False)
+    assert ie._accuracy_summary_ledger_max_chunks() == ie.DEFAULT_ACCURACY_SUMMARY_LEDGER_MAX_CHUNKS
+    assert ie._accuracy_summary_ledger_max_chunks() > 0, "absent must mean BOUNDED"
+    monkeypatch.setenv(MAX_CHUNKS_ENV, "0")
+    assert ie._accuracy_summary_ledger_max_chunks() == 0
+    monkeypatch.setenv(MAX_CHUNKS_ENV, "not-a-number")
+    assert ie._accuracy_summary_ledger_max_chunks() == ie.DEFAULT_ACCURACY_SUMMARY_LEDGER_MAX_CHUNKS
+
+
+def test_build_accuracy_summary_reaches_the_chunk_bound(ledger, tmp_path, monkeypatch):
+    """Reachability through the REAL entry point, off != on -- a bound the
+    helper honours and the caller never passes is the inert-feature shape."""
+    _write_chunks(tmp_path, {"2026-08-01": 50, "2026-08-02": 50, "2026-08-03": 50})
+    monkeypatch.delenv(ENV_KEY, raising=False)
+    monkeypatch.setenv(MAX_CHUNKS_ENV, "2")
+    coverage = ie.build_accuracy_summary(sport="mlb")["ledger_coverage"]
+    assert coverage["max_chunks"] == 2
+    assert coverage["dates_covered"] == 2
+    assert coverage["date_min"] == "2026-08-02"
+    assert coverage["chunks_skipped_count"] == 1
+    assert coverage["chunks_skipped_budget"] == 0
+    monkeypatch.setenv(MAX_CHUNKS_ENV, "0")
+    monkeypatch.setenv(ENV_KEY, "0")
+    assert ie.build_accuracy_summary(sport="mlb")["ledger_coverage"]["dates_covered"] == 3
+
+
+def test_log_line_names_the_chunk_bound_and_what_it_left_out(ledger, tmp_path, capsys):
+    """The worker's stdout is the only place this is readable in production --
+    `ledger_coverage` lands in the keyvalue store, which no ops route serves."""
+    _write_chunks(tmp_path, {"2026-08-01": 50, "2026-08-02": 50, "2026-08-03": 50})
+    _collect_bounded(ledger, budget=10_000_000, max_chunks=2)
+    line = [l for l in capsys.readouterr().out.splitlines() if "LEDGER_CHUNKS_ACCEPTED" in l][-1]
+    assert "max_chunks=2" in line
+    assert "skipped_chunks=1" in line
+    assert "skipped_budget=0" in line
+    assert "skipped_bytes=0 " not in line and "skipped_bytes=" in line
+    assert line.rstrip().endswith("truncated=1")
