@@ -5,6 +5,11 @@
 
 Syndicate is the new unified multi-sport app that will eventually replace the separate sport-specific frontends.
 
+## Reference docs
+
+- The Syndicate intelligence roadmap and current implementation reference live in `docs/the_syndicate_intelligence_plan.md`.
+- The custom Syndicate workflow skills and when to use them live in `docs/syndicate-skills.md`.
+
 ## Core principles
 
 - This is not seven apps inside one UI.

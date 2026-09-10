@@ -442,6 +442,7 @@
             item.edge && item.edge !== '-' ? chip(`Edge ${item.edge}`, 'is-good') : '',
             item.confidence && item.confidence !== '-' ? chip(`Conf ${item.confidence}`) : '',
             item.odds && item.odds !== '-' ? chip(`Odds ${item.odds}`) : '',
+            item.freshness_label ? chip(item.freshness_label) : '',
             item.implied_probability ? chip(`Imp ${item.implied_probability}%`) : '',
             item.price_edge_pct ? chip(`Price edge ${item.price_edge_pct}%`, item.price_edge_pct > 0 ? 'is-good' : 'is-warn') : '',
           ].filter(Boolean).join('');
