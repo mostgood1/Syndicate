@@ -69,13 +69,13 @@ exchange-execution-unblock]`.
   `place_order` (`refused['no_venue_ticker']`, a `REFUSED_NO_VENUE_TICKER` line). No write-ahead row is ever
   written for an order that cannot be built.
   - First pass: 11 refused, and 1 placed and filled, the first live Kalshi fill since 09-04.
-- **The residual is closed too** `[live-odds-worker 2914b6c7, live 2026-09-10T21:55:18Z, lane write-ahead-build-refusal]`.
+- **The residual is closed too** `[live-odds-worker 2914b6c7, live 2026-09-10T21:55:18Z, lane write-ahead-build-refusal; carried by e4410f37, live 22:18:17Z, verified by content]`.
   A LIVE order is now BUILT before its write-ahead row.
   - These write NO row, log `REFUSED_AT_BUILD`, and are counted by name in `refused`:
     - a contract that cannot be built (a slug missing from the slate, a side `order_body` refuses, Kalshi `no_live_price`)
     - a disarmed worker
     - a missing adapter
-  - First pass after boot: `duplicates=1 refused={'no_venue_ticker': 17}`, and the `live:kalshi` order count held at 14.
+  - Passes at 22:03, 22:09 and 22:14Z all read `duplicates=1 refused={'no_venue_ticker': 17}`, and the `live:kalshi` order count held at 14.
   - **The refusal branch itself is UNMEASURED in production**, because no contract has failed its build since. That reading is owed in `deploys.md`.
   - NOT closed: the same race can revert a SENT order's completion (`todo.md #656`, a CAS in `_persist`).
 - **Kalshi NCAAF/NFL forward-date matching** (`SYNDICATE_KALSHI_FORWARD_DATE_SPORTS=soccer,ncaaf,nfl`) is live

@@ -5399,3 +5399,12 @@ the instrument rather than the system.**
 - **How we found out**: the fix's lane recorded a falsification test (a failure-line count) BEFORE shipping. The zero was made readable by a positive marker that the call ran: the request-path warning `operation=wnba_public_scoreboard_live_state_fetch`, triggered by a request.
 - **The rule going forward**: when an ESPN call fails from Render, vary the HEADERS before blaming the host, and record the refusal as the (host, User-Agent) pair that was measured. Never conclude "this host is dark" for a caller whose headers differ from the ones measured.
 - **Cost**: an unneeded code change and deploy, caught before landing, and a state line that overstated the refusal for two weeks.
+
+## 2026-09-10 — RECURRENCE (instrument blindness): I cited `last_blind_write None` as evidence about a ledger write. The field cannot be set in production `[lane write-ahead-build-refusal; found by lane execution-ledger-cas]`
+
+- **What I believed**: `last_blind_write None` on `/api/ops/execution/ledger-summary` meant no blind write had happened. `state_model.md` called it "a meaningful null", and I quoted it in both the baseline and the verify of the `2914b6c7` deploy.
+- **What was actually true**: the field is set only when `_load()` raises inside `_merge_onto_current`. `_load()` cannot raise: `refresh_state_store.read_json_file_result` catches every read failure on both backends and returns None, and `_load` turns that into an EMPTY ledger. The null is structural.
+  - `test_an_unreadable_ledger_refuses_rather_than_looking_empty` passes only because it monkeypatches the reader to raise. That is a harness supplying a failure production cannot produce.
+- **How we found out**: lane `execution-ledger-cas`, scoping `#656`, read the reader's exception handling. I confirmed both functions from code.
+- **The rule going forward**: before citing a status field as evidence, find the code path that sets its UNHEALTHY value and confirm that path can execute in production. A field that can only ever read healthy is not an instrument. Same family as this file's instrument-blindness rules, and the 2026-09-09 FORBIDDEN on harness-supplied failure modes.
+- **Cost**: two uninformative readings in a deploy entry, corrected the same evening. The entry's other readings stand.
