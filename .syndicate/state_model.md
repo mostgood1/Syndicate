@@ -261,8 +261,17 @@ services on `a36e3c1a` 2026-08-28 ~18:57Z; web on `89678782` 19:09Z.**
 **DEPLOY-VERIFIED, PARTIAL.** The ledger stops going backwards: 18:55-18:57 runs
 `1,295,990 -> 1,298,163` monotonic ACROSS the service boundary, against the
 `-8,031` step that started this. `last_blind_write` is readable on
-`/api/ops/execution/ledger-summary` and reads `None` — a meaningful null, since
-`_persist` only writes that field and never clears it.
+`/api/ops/execution/ledger-summary` and reads `None`.
+
+**`last_blind_write` CANNOT READ ANYTHING BUT `None` IN PRODUCTION, so its null is NOT evidence**
+`[corrected 2026-09-10 from code; found by lane execution-ledger-cas, confirmed by lane write-ahead-build-refusal]`.
+- The field is set only when `_load()` raises inside `_merge_onto_current`.
+- `_load()` cannot raise. `refresh_state_store.read_json_file_result` catches every read failure on BOTH
+  backends (keyvalue and disk) and returns `(None, False)`, and `_load` turns `None` into an EMPTY ledger.
+- So the `LedgerError` "refuse rather than look empty" path is dead in production.
+  `test_an_unreadable_ledger_refuses_rather_than_looking_empty` passes only because it monkeypatches
+  `read_json_file` to raise.
+- A read failure during a persist is therefore a SILENT near-empty write, not a stamped blind one.
 
 **`LEDGER_MERGE` HAS FIRED, AND THE MERGE IS NOT ENOUGH** `[measured 2026-09-10 off the 2026-09-04
 logs, lane write-ahead-build-refusal]`.

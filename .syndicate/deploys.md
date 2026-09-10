@@ -31831,3 +31831,14 @@ and then SETs, with nothing atomic between the two.
   - That pass must carry no `LIVE_ORDER status=rejected … OrderBuildError` line.
   - The date's `live:*` order count must not move for it.
   - To find it: `py -3 scripts/render_logs.py --service live-odds-worker --text REFUSED_AT_BUILD --start 2026-09-10T21:55:18Z`.
+- **CORRECTION, appended 2026-09-10 (lane `write-ahead-build-refusal`):** the `last_blind_write None`
+  readings in this entry's baseline and verify carry NO information.
+  - The field is set only when `_load()` raises, and `refresh_state_store.read_json_file` swallows every read
+    failure, so `_load()` cannot raise in production. See `state_model.md [execution-ledger-cross-service-race]`.
+  - The rest of this entry's measurement stands: the pass counts, the zero lines since boot, and the order
+    count held at 14.
+  - Later reading, 22:20:13Z: three passes on `2914b6c7` (22:03, 22:09, 22:14Z) read the same
+    `duplicates=1 refused={'no_venue_ticker': 17}`. Still zero `REFUSED_AT_BUILD`, rejected `LIVE_ORDER`,
+    `BLOCKED_ON_UNRECONCILED` and `Traceback`; the count held at 14.
+  - live-odds-worker was redeployed to `e4410f37` at 22:18:17Z by lane `mlb-lens-final-status`. That commit
+    carries all six markers of this change BY CONTENT, so the owed reading's window runs on across it.
