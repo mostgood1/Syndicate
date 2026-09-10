@@ -53,8 +53,25 @@ in 20:00-20:10, then 0.1-7.4). Start-labelled, buckets `16:00Z`-`19:00Z` (2,471-
 ARE that block, and `20:00Z` = 220.7 MB is ~4.6 min at the run's ~48 MB/min. End-labelled,
 the meter would start AND stop exactly one hour before the edge flow, at both ends.
 
-**LAG SCAN — supplementary, still running at time of writing; see addendum.** ~180
-same-bucket poll intervals, metered delta vs served bytes shifted by every lag -70..+5 min.
+**LAG SCAN (addendum, landed after the first commit) — PEAK AT -4 MIN, NOT -60.** All 180
+same-bucket poll intervals across the three watcher records (1,101.6 MB of metered
+increments), each correlated against served bytes in the same window shifted by every lag
+from -70 to +5 min. The per-second logs were complete, with no truncated hour: 1,310.1 MB of
+app-served bytes and 483.3 MB of edge.
+
+| lag | r (app-served) | r (edge) |
+|---|---|---|
+| **-4 min** | **0.488** | 0.502 |
+| -3 | 0.458 | 0.498 |
+| -2 | 0.423 | **0.510** |
+| -1 | 0.454 | 0.500 |
+| 0 | 0.411 | 0.482 |
+| -58 / -60 / -62 | 0.155 / 0.154 / 0.205 | 0.173 / 0.132 / 0.125 |
+
+The five best lags are all between -4 and 0 min. The -60 min that an end-labelled bucket
+with a one-hour replay would need scores about a third of that. **A bandwidth bucket fills
+with its OWN hour's traffic, 1-4 minutes behind real time.** r ~0.5 rather than higher is
+expected from 4-minute polls against bursty traffic; the peak's POSITION is the result.
 
 ## 3. The ratio evidence, and why it is WEAK
 
