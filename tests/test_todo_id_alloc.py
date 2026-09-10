@@ -18,8 +18,11 @@ that matters (no two callers get the same number) rather than the file layout.
 2026-09-10: the same property ACROSS TREES. With one worktree per session, the
 O_EXCL directory was each tree's own copy of the tracked `.syndicate/todo_ids/`,
 so two worktrees both won the same number (`#562`/`#563`), and a tree behind
-`origin/main` re-issued a landed id (`#569`). The last test drives the real
-script in two real worktrees of a throwaway repo.
+`origin/main` re-issued a landed id (`#569`).
+
+2026-09-10, later: ACROSS CLONES. No local lock reaches another machine, so the
+id is reserved by pushing its claim to `main`; the remote's compare-and-swap is
+the lock. The last tests drive the real script through a real bare remote.
 """
 
 from __future__ import annotations
@@ -29,6 +32,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -54,8 +58,9 @@ def _sandbox(tmp_path, monkeypatch):
     monkeypatch.setattr(alloc, "CLOSED", closed)
     monkeypatch.setattr(alloc, "CLAIM_DIR", tmp_path / "ids")
     # Every source that is not a file in the sandbox, pinned -- a unit test must
-    # never read this repo's origin/main or write its shared claim dir.
-    # `raising=False` so the same fixture also drives an unfixed module.
+    # never read this repo's origin/main, write its shared claim dir, or PUSH.
+    # `raising=False` so the same fixture also drives an older module.
+    monkeypatch.setattr(alloc, "PUSH", False, raising=False)
     monkeypatch.setattr(alloc, "_origin_ids", lambda fetch: set(), raising=False)
     monkeypatch.setattr(alloc, "_shared_claim_dir", lambda: tmp_path / "shared", raising=False)
     monkeypatch.setattr(alloc, "_main_claim_dir", lambda: None, raising=False)
@@ -132,13 +137,13 @@ def test_a_missing_ledger_is_not_a_crash(_sandbox):
     assert alloc.high_water() == 102
 
 
-# --- 2026-09-10: across trees -------------------------------------------------
+# --- across trees ------------------------------------------------------------
 
 
 def test_two_worktrees_never_get_the_same_id(_sandbox, monkeypatch):
-    """THE LEAD. Same base commit, two trees, two private copies of the tracked
-    claim dir: O_EXCL in either one could not see the other. The lock is now the
-    shared dir, which both trees reach."""
+    """Same base commit, two trees, two private copies of the tracked claim dir:
+    O_EXCL in either one could not see the other. The lock is now the shared
+    dir, which both trees reach."""
     first = alloc.allocate("tree-a")
     tree_b = _sandbox / "tree_b"
     tree_b.mkdir()
@@ -184,7 +189,50 @@ def test_an_unreachable_origin_warns_and_still_allocates(_sandbox, monkeypatch, 
     assert "fetch origin main` failed" in err and "unreadable" in err
 
 
-# --- the real script, in two real worktrees ------------------------------------
+# --- across clones: reserved by push ------------------------------------------
+
+
+def test_a_push_that_loses_the_race_retries_with_a_fresh_mark(_sandbox, monkeypatch):
+    """Two clones built the same number on the same parent and the remote took
+    the other one. Re-fetch, re-read the mark, take the next number."""
+    views = iter([set(), {103}])            # the winner's claim appears on the second fetch
+    state = {"origin": set()}
+
+    def origin_base():
+        state["origin"] = next(views)
+        return "base"
+
+    built, verdicts = [], iter(["moved", "ok"])
+    monkeypatch.setattr(alloc, "PUSH", True, raising=False)
+    monkeypatch.setattr(alloc, "_origin_base", origin_base, raising=False)
+    monkeypatch.setattr(alloc, "_origin_ids", lambda fetch: state["origin"], raising=False)
+    monkeypatch.setattr(alloc, "_claim_commit",
+                        lambda base, payloads, holder: built.append(sorted(payloads)) or "c", raising=False)
+    monkeypatch.setattr(alloc, "_push", lambda commit: next(verdicts), raising=False)
+    assert alloc.allocate("clone-b") == [104]
+    assert built == [[103], [104]]
+
+
+def test_a_push_that_cannot_happen_falls_back_to_the_local_lock_loudly(_sandbox, monkeypatch, capsys):
+    """Offline or unauthorised: still an id, still the tracked record that makes
+    a collision loud at land -- and a warning, because the remote holds nothing."""
+    monkeypatch.setattr(alloc, "PUSH", True, raising=False)
+    monkeypatch.setattr(alloc, "_origin_base", lambda: "base", raising=False)
+    monkeypatch.setattr(alloc, "_claim_commit", lambda *a: "c", raising=False)
+    monkeypatch.setattr(alloc, "_push", lambda commit: "error: Authentication failed", raising=False)
+    assert alloc.allocate("offline") == [103]
+    assert (_sandbox / "ids" / "103.claim").is_file()
+    assert "THIS machine only" in capsys.readouterr().err
+
+
+def test_no_reachable_origin_falls_back_too(_sandbox, monkeypatch, capsys):
+    monkeypatch.setattr(alloc, "PUSH", True, raising=False)
+    monkeypatch.setattr(alloc, "_origin_base", lambda: None, raising=False)
+    assert alloc.allocate("offline") == [103]
+    assert "THIS machine only" in capsys.readouterr().err
+
+
+# --- the real script, through a real bare remote --------------------------------
 
 
 def _git(*args, cwd):
@@ -198,49 +246,119 @@ def _run(tree: Path, *args) -> subprocess.CompletedProcess:
                           cwd=str(tree), capture_output=True, text=True)
 
 
-@pytest.fixture
-def real_repo(tmp_path, monkeypatch):
-    base = tmp_path.resolve()
+def _origin_claims(origin: Path) -> set[str]:
+    listed = _git("--git-dir", str(origin), "ls-tree", "--name-only", "main", "--",
+                  ".syndicate/todo_ids/", cwd=origin)
+    return {Path(line).name for line in listed.splitlines()}
+
+
+def _hermetic(base: Path, monkeypatch) -> None:
     (base / "gitconfig").write_text("")
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(base / "gitconfig"))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
     for key in ("GIT_AUTHOR", "GIT_COMMITTER"):
         monkeypatch.setenv(f"{key}_NAME", "test")
         monkeypatch.setenv(f"{key}_EMAIL", "test@example.invalid")
+
+
+def _seed(repo: Path, origin: Path) -> None:
+    (repo / "docs" / "ai_context").mkdir(parents=True)
+    (repo / "docs" / "ai_context" / "todo.md").write_text("### `#100` — a\n", encoding="utf-8")
+    (repo / "docs" / "ai_context" / "todo_closed.md").write_text("", encoding="utf-8")
+    (repo / ".syndicate" / "todo_ids").mkdir(parents=True)
+    (repo / ".syndicate" / "todo_ids" / "100.claim").write_text("{}", encoding="utf-8")
+    (repo / "scripts").mkdir()
+    (repo / "scripts" / "todo_id_alloc.py").write_bytes((ROOT / "scripts" / "todo_id_alloc.py").read_bytes())
+    _git("add", ".", cwd=repo)
+    _git("commit", "-q", "-m", "base", cwd=repo)
+    _git("remote", "add", "origin", str(origin), cwd=repo)
+    _git("push", "-q", "-u", "origin", "main", cwd=repo)
+
+
+@pytest.fixture
+def real_repo(tmp_path, monkeypatch):
+    """One clone with a session worktree; a peer lands `#107` after both were cut."""
+    base = tmp_path.resolve()
+    _hermetic(base, monkeypatch)
     origin, main, peer, tree = base / "origin.git", base / "main", base / "peer", base / "wt"
     _git("init", "-q", "--bare", "-b", "main", str(origin), cwd=base)
     _git("init", "-q", "-b", "main", str(main), cwd=base)
-    (main / "docs" / "ai_context").mkdir(parents=True)
-    (main / "docs" / "ai_context" / "todo.md").write_text("### `#100` — a\n", encoding="utf-8")
-    (main / "docs" / "ai_context" / "todo_closed.md").write_text("", encoding="utf-8")
-    (main / ".syndicate" / "todo_ids").mkdir(parents=True)
-    (main / ".syndicate" / "todo_ids" / "100.claim").write_text("{}", encoding="utf-8")
-    (main / "scripts").mkdir()
-    (main / "scripts" / "todo_id_alloc.py").write_bytes((ROOT / "scripts" / "todo_id_alloc.py").read_bytes())
-    _git("add", ".", cwd=main)
-    _git("commit", "-q", "-m", "base", cwd=main)
-    _git("remote", "add", "origin", str(origin), cwd=main)
-    _git("push", "-q", "-u", "origin", "main", cwd=main)
+    _seed(main, origin)
     _git("worktree", "add", "-q", "-b", "session/w", str(tree), "origin/main", cwd=main)
-    # A peer lands #107 after both trees were cut: both are now BEHIND origin.
     _git("clone", "-q", str(origin), str(peer), cwd=base)
     with (peer / "docs" / "ai_context" / "todo.md").open("a", encoding="utf-8") as fh:
         fh.write("\n### `#107` — landed by a peer\n")
     _git("commit", "-q", "-am", "peer lands 107", cwd=peer)
     _git("push", "-q", "origin", "main", cwd=peer)
-    return main, tree
+    return SimpleNamespace(origin=origin, main=main, tree=tree)
 
 
-def test_the_real_script_in_two_real_worktrees(real_repo):
-    """No monkeypatch: each tree runs ITS OWN copy, exactly as sessions do."""
-    main, tree = real_repo
-    in_tree = _run(tree, "--holder", "session-w")
-    in_main = _run(main, "--holder", "primary")
+@pytest.fixture
+def two_clones(tmp_path, monkeypatch):
+    """Two machines: separate clones of one bare remote, sharing no `.git`."""
+    base = tmp_path.resolve()
+    _hermetic(base, monkeypatch)
+    origin, seed, a, b = base / "origin.git", base / "seed", base / "a", base / "b"
+    _git("init", "-q", "--bare", "-b", "main", str(origin), cwd=base)
+    _git("init", "-q", "-b", "main", str(seed), cwd=base)
+    _seed(seed, origin)
+    _git("clone", "-q", str(origin), str(a), cwd=base)
+    _git("clone", "-q", str(origin), str(b), cwd=base)
+    return SimpleNamespace(origin=origin, a=a, b=b)
+
+
+def test_the_machine_lock_serialises_two_real_worktrees(real_repo):
+    """`--no-push`: each tree runs ITS OWN copy, exactly as sessions do, and the
+    shared lock in the git common dir is all that stands between them."""
+    in_tree = _run(real_repo.tree, "--holder", "session-w", "--no-push")
+    in_main = _run(real_repo.main, "--holder", "primary", "--no-push")
     assert in_tree.returncode == 0, in_tree.stderr
     assert in_main.returncode == 0, in_main.stderr
     got = (in_tree.stdout.strip(), in_main.stdout.strip())
     assert got == ("108", "109"), got          # above the peer's 107, and never the same
-    assert (main / ".git" / "syndicate" / "todo_ids" / "108.claim").is_file()   # the lock
-    assert (main / ".git" / "syndicate" / "todo_ids" / "109.claim").is_file()
-    assert (tree / ".syndicate" / "todo_ids" / "108.claim").is_file()           # the record
-    assert (main / ".syndicate" / "todo_ids" / "109.claim").is_file()
+    lock = real_repo.main / ".git" / "syndicate" / "todo_ids"
+    assert (lock / "108.claim").is_file() and (lock / "109.claim").is_file()
+    assert (real_repo.tree / ".syndicate" / "todo_ids" / "108.claim").is_file()   # the record
+    assert (real_repo.main / ".syndicate" / "todo_ids" / "109.claim").is_file()
+
+
+def test_two_real_worktrees_reserve_on_the_remote(real_repo):
+    """The default: the reservation is a commit on `main`, not a file in the tree."""
+    in_tree = _run(real_repo.tree, "--holder", "session-w")
+    in_main = _run(real_repo.main, "--holder", "primary")
+    assert (in_tree.stdout.strip(), in_main.stdout.strip()) == ("108", "109"), (in_tree.stderr, in_main.stderr)
+    assert {"108.claim", "109.claim"} <= _origin_claims(real_repo.origin)
+    # No untracked copy: it would block the session's next rebase onto main.
+    assert not (real_repo.tree / ".syndicate" / "todo_ids" / "108.claim").exists()
+    assert not (real_repo.main / ".syndicate" / "todo_ids" / "109.claim").exists()
+    # And the session can still move onto the new main.
+    _git("rebase", "-q", "origin/main", cwd=real_repo.tree)
+
+
+def test_two_separate_clones_are_serialised_by_the_push(two_clones):
+    """THE GAP `#563` NAMED: two machines, no shared `.git`, one number each."""
+    a = _run(two_clones.a, "--holder", "clone-a")
+    b = _run(two_clones.b, "--holder", "clone-b")
+    assert a.returncode == 0 and b.returncode == 0, (a.stderr, b.stderr)
+    assert (a.stdout.strip(), b.stdout.strip()) == ("101", "102")
+    assert {"101.claim", "102.claim"} <= _origin_claims(two_clones.origin)
+    subjects = _git("--git-dir", str(two_clones.origin), "log", "-2", "--format=%s", "main",
+                    cwd=two_clones.origin).splitlines()
+    assert len(subjects) == 2 and all("[skip ci]" in s for s in subjects), subjects
+
+
+def test_a_reservation_on_a_stale_base_is_rejected_by_the_remote(two_clones, monkeypatch):
+    """The property the design rests on, against a REAL remote: a push is a
+    compare-and-swap. Clone B builds on the `main` it saw; clone A moves `main`
+    first; B's push must be refused, and B's next attempt takes the next number."""
+    b = two_clones.b
+    monkeypatch.setattr(alloc, "REPO", b)
+    monkeypatch.setattr(alloc, "TODO", b / "docs" / "ai_context" / "todo.md")
+    monkeypatch.setattr(alloc, "CLOSED", b / "docs" / "ai_context" / "todo_closed.md")
+    monkeypatch.setattr(alloc, "CLAIM_DIR", b / ".syndicate" / "todo_ids")
+    stale = alloc._origin_base()
+    assert _run(two_clones.a, "--holder", "clone-a").stdout.strip() == "101"
+    commit = alloc._claim_commit(stale, {101: alloc._payload(101, "clone-b")}, "clone-b")
+    assert alloc._push(commit) == "moved"
+    assert alloc.allocate("clone-b", push=True) == [102]
+    assert {"101.claim", "102.claim"} <= _origin_claims(two_clones.origin)

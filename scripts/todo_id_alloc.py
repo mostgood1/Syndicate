@@ -39,7 +39,7 @@ TRACKED `.syndicate/todo_ids/` of whichever tree ran this script (`REPO` is
 copy, so two O_EXCL creates of the same number both succeeded -- recorded twice
 in `todo.md` (`#562` -> `#563`, `#569`), each found at `git merge`. And the mark
 was read from the local tree only, so a tree behind `origin/main` could re-issue
-an id that had already landed (`#569`). Three layers now, one per distance:
+an id that had already landed (`#569`). The local lock is now machine-wide:
 
   * SAME MACHINE, ANY TREE: the lock is `<git common dir>/syndicate/todo_ids/`,
     which every worktree of this clone shares and git never tracks. Claims an
@@ -47,16 +47,34 @@ an id that had already landed (`#569`). Three layers now, one per distance:
     the primary tree routinely runs a stale copy, and 6 such claims were sitting
     there untracked when this was fixed.
   * A TREE BEHIND ITS REMOTE: the mark also reads `origin/main`'s two ledgers and
-    its tracked claim files, after a best-effort `git fetch` (`--no-fetch` skips
-    it; a failed fetch WARNS and uses the ref as last fetched).
-  * SEPARATE CLONES (another machine, a cloud container): nothing local can
-    serialise those. The TRACKED claim is still written in this tree -- commit it
-    with the entry, and a collision fails LOUDLY as an add/add at land instead of
-    silently. Preventing it outright needs a store the clones share, or an id
-    reserved by a push before the work (`#563`); not built.
+    its tracked claim files, after a best-effort `git fetch` (a failed fetch
+    WARNS and uses the ref as last fetched).
 
-    python scripts/todo_id_alloc.py --holder <lane>          # allocate one
+RESERVED BY PUSH -- 2026-09-10 (lane `todo-id-push-reserve`). No local lock can
+serialise two SEPARATE clones (another machine, a cloud container): they share
+nothing but the remote. So by default the id is reserved ON THE REMOTE before
+anyone writes a word about it. A commit is built whose parent is `origin/main`
+as just fetched and whose only change is `.syndicate/todo_ids/<n>.claim`, and it
+is pushed to `main`. A push is a compare-and-swap -- it lands only if `main`
+still points at that parent -- so of two clones racing for one number exactly
+one push succeeds; the other is rejected, re-fetches, sees the winner's claim,
+and takes the next number.
+
+  * Built with plumbing (`hash-object`, `mktree`, `commit-tree`), so it never
+    touches the caller's index or working tree and runs no commit hook.
+  * `[skip ci]` in the message: `ci.yml` runs on every push to `main`, and a
+    claim file needs no CI run.
+  * The claim is NOT also written into the caller's tree: it is already on
+    `main`, and an untracked copy would block their next rebase ("untracked
+    working tree file would be overwritten").
+  * When a push cannot happen (offline, auth, no origin) the id falls back to
+    the machine-wide lock and says so LOUDLY -- a separate clone could then take
+    the same number, so commit the claim with the entry, and the collision fails
+    as an add/add at land instead of silently. `--no-push` asks for that outright.
+
+    python scripts/todo_id_alloc.py --holder <lane>          # reserve one on origin
     python scripts/todo_id_alloc.py --holder <lane> --count 2
+    python scripts/todo_id_alloc.py --holder <lane> --no-push   # this machine only
     python scripts/todo_id_alloc.py --show                   # high-water mark
     python scripts/todo_id_alloc.py --show --no-fetch        # offline
 
@@ -82,6 +100,13 @@ CLAIM_DIR = REPO / ".syndicate" / "todo_ids"
 ORIGIN_REF = "origin/main"
 _LEDGER_PATHS = ("docs/ai_context/todo.md", "docs/ai_context/todo_closed.md")
 _CLAIM_PATH = ".syndicate/todo_ids"
+
+PUSH = True          # reserve on the remote by default; `--no-push` (and tests) turn it off
+_PUSH_ATTEMPTS = 8
+# `git push` output meaning "main moved under you" -- worth a retry -- as opposed
+# to auth, network or a server-side refusal, which no retry can fix.
+# `[remote rejected] (cannot lock ref ...)` is the same race, lost at the server.
+_RACE_MARKERS = ("[rejected]", "fetch first", "non-fast-forward", "cannot lock ref", "stale info")
 
 # BOTH ERAS, because the high-water mark has to be the true one. Ids ~0-168 are
 # table rows (`| **125** |`), ~275+ are headers (``### `#447` ``). Reading only
@@ -120,13 +145,22 @@ def _warn(message: str) -> None:
     sys.stderr.write(f"WARNING: {message}\n")
 
 
-def _git(*args: str, timeout: int = 30) -> subprocess.CompletedProcess | None:
+def _git(*args: str, timeout: int = 30, input: str | None = None,
+         env: dict | None = None) -> subprocess.CompletedProcess | None:
     """None when git cannot run at all; callers treat that as "no view" and say so."""
     try:
         return subprocess.run(["git", *args], cwd=str(REPO), capture_output=True, text=True,
-                              encoding="utf-8", errors="replace", timeout=timeout)
+                              encoding="utf-8", errors="replace", timeout=timeout,
+                              input=input, env=env)
     except (OSError, subprocess.TimeoutExpired):
         return None
+
+
+def _checked(result: subprocess.CompletedProcess | None, what: str, *, allow_empty: bool = False) -> str:
+    if result is None or result.returncode != 0 or not (allow_empty or result.stdout.strip()):
+        detail = "" if result is None else (result.stderr or result.stdout).strip()[:200]
+        raise RuntimeError(f"git {what} failed" + (f": {detail}" if detail else ""))
+    return result.stdout
 
 
 def _shared_claim_dir() -> Path | None:
@@ -187,6 +221,15 @@ def high_water(*, fetch: bool = True) -> int:
     return max(ids) if ids else 0
 
 
+def _payload(value: int, holder: str) -> dict:
+    return {
+        "id": value,
+        "holder": holder,
+        "claimed_at": datetime.now(timezone.utc).isoformat(),
+        "tree": str(REPO),
+    }
+
+
 def _create_exclusive(path: Path, payload: dict) -> bool:
     try:
         fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
@@ -200,7 +243,116 @@ def _create_exclusive(path: Path, payload: dict) -> bool:
     return True
 
 
-def allocate(holder: str, *, count: int = 1, fetch: bool = True) -> list[int]:
+# --- reserved by push -----------------------------------------------------------
+
+
+def _ls_tree(tree: str | None) -> dict[str, tuple[str, str, str]]:
+    if not tree:
+        return {}
+    entries: dict[str, tuple[str, str, str]] = {}
+    for record in _checked(_git("ls-tree", "-z", tree), "ls-tree", allow_empty=True).split("\0"):
+        if record:
+            meta, _, name = record.partition("\t")
+            mode, kind, sha = meta.split(" ")
+            entries[name] = (mode, kind, sha)
+    return entries
+
+
+def _mktree(entries: dict[str, tuple[str, str, str]]) -> str:
+    body = "".join(f"{mode} {kind} {sha}\t{name}\0" for name, (mode, kind, sha) in entries.items())
+    return _checked(_git("mktree", "-z", input=body), "mktree").strip()
+
+
+def _tree_with(tree: str | None, parts: list[str], files: dict[str, str]) -> str:
+    """`tree` with `files` (name -> blob) added in the directory `parts`, rebuilding
+    only the trees on that path -- three `mktree` calls, whatever the repo's size."""
+    entries = _ls_tree(tree)
+    if parts:
+        current = entries.get(parts[0])
+        sub = current[2] if current and current[1] == "tree" else None
+        entries[parts[0]] = ("040000", "tree", _tree_with(sub, parts[1:], files))
+    else:
+        for name, blob in files.items():
+            if name in entries:
+                raise RuntimeError(f"{_CLAIM_PATH}/{name} already exists on {ORIGIN_REF}")
+            entries[name] = ("100644", "blob", blob)
+    return _mktree(entries)
+
+
+def _origin_base() -> str | None:
+    """`origin/main`, freshly fetched: the parent a reservation must be built on.
+    None when it cannot be refreshed -- a compare-and-swap against a ref this
+    clone could not update can only lose."""
+    fetched = _git("fetch", "--quiet", "origin", "main", timeout=120)
+    if fetched is None or fetched.returncode != 0:
+        return None
+    head = _git("rev-parse", "--verify", "--quiet", f"{ORIGIN_REF}^{{commit}}")
+    if head is None or head.returncode != 0 or not head.stdout.strip():
+        return None
+    return head.stdout.strip()
+
+
+def _claim_commit(base: str, payloads: dict[int, dict], holder: str) -> str:
+    """A commit on `base` whose only change is one claim file per id."""
+    files = {f"{value}.claim": _checked(_git("hash-object", "-w", "--stdin", input=json.dumps(payload)),
+                                        "hash-object").strip()
+             for value, payload in payloads.items()}
+    root = _checked(_git("rev-parse", f"{base}^{{tree}}"), "rev-parse").strip()
+    tree = _tree_with(root, _CLAIM_PATH.split("/"), files)
+    ids = ", ".join(f"#{value}" for value in payloads)
+    message = f"todo id: reserve {ids} for {holder} [skip ci]"
+    return _checked(_git("commit-tree", tree, "-p", base, "-m", message), "commit-tree").strip()
+
+
+def _push(commit: str) -> str:
+    """"ok"; "moved" when `main` changed under us (retry); "error: <why>" otherwise."""
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}     # never hang on a credential prompt
+    pushed = _git("push", "--porcelain", "origin", f"{commit}:refs/heads/main", timeout=120, env=env)
+    if pushed is None:
+        return "error: git push did not complete"
+    if pushed.returncode == 0:
+        return "ok"
+    said = f"{pushed.stdout}\n{pushed.stderr}".strip()
+    if any(marker in said for marker in _RACE_MARKERS):
+        return "moved"
+    return "error: " + (said.splitlines()[-1][:200] if said else f"exit {pushed.returncode}")
+
+
+def _reserve_on_origin(holder: str, count: int) -> list[int] | None:
+    """Reserve `count` ids on the remote in ONE commit. None means "could not", and
+    has already said why."""
+    for _attempt in range(_PUSH_ATTEMPTS):
+        base = _origin_base()
+        if base is None:
+            _warn(f"could not refresh {ORIGIN_REF} -- reserving on THIS machine only")
+            return None
+        start = high_water(fetch=False) + 1        # origin/main as just fetched, plus every local claim
+        payloads = {value: _payload(value, holder) for value in range(start, start + count)}
+        try:
+            commit = _claim_commit(base, payloads, holder)
+        except RuntimeError as exc:
+            _warn(f"could not build the reservation commit ({exc}) -- reserving on THIS machine only")
+            return None
+        status = _push(commit)
+        if status == "ok":
+            shared = _shared_claim_dir()
+            if shared is not None:                 # a local record too; the lock was the push
+                shared.mkdir(parents=True, exist_ok=True)
+                for value, payload in payloads.items():
+                    _create_exclusive(shared / f"{value}.claim", payload)
+            sys.stderr.write(f"reserved on {ORIGIN_REF} by {commit[:10]} -- nothing to commit for it\n")
+            return list(payloads)
+        if status != "moved":
+            _warn(f"push failed ({status[len('error: '):]}) -- reserving on THIS machine only")
+            return None
+    _warn(f"{ORIGIN_REF} moved {_PUSH_ATTEMPTS} times in a row -- reserving on THIS machine only")
+    return None
+
+
+# --- the machine-wide lock ------------------------------------------------------
+
+
+def _reserve_locally(holder: str, count: int, fetch: bool) -> list[int]:
     shared = _shared_claim_dir()
     if shared is None:
         _warn("no git common dir -- claims serialise within THIS tree only")
@@ -213,12 +365,7 @@ def allocate(holder: str, *, count: int = 1, fetch: bool = True) -> list[int]:
     # than any plausible burst and still terminates.
     ceiling = candidate + 500
     while len(taken) < count and candidate < ceiling:
-        payload = {
-            "id": candidate,
-            "holder": holder,
-            "claimed_at": datetime.now(timezone.utc).isoformat(),
-            "tree": str(REPO),
-        }
+        payload = _payload(candidate, holder)
         # The SHARED file is the lock. The tracked one in this tree is the record
         # that turns a collision with another clone into a loud add/add at land.
         # Losing either create skips the number; a gap is legal.
@@ -228,7 +375,18 @@ def allocate(holder: str, *, count: int = 1, fetch: bool = True) -> list[int]:
         candidate += 1
     if len(taken) < count:
         raise RuntimeError(f"could not allocate {count} ids below {ceiling}")
+    sys.stderr.write(f"reserved on THIS machine only -- commit {_CLAIM_PATH}/<id>.claim with the "
+                     "entry: it is what makes a collision with another clone fail loudly at land\n")
     return taken
+
+
+def allocate(holder: str, *, count: int = 1, fetch: bool = True, push: bool | None = None) -> list[int]:
+    """Reserve on the remote when possible; otherwise on this machine, loudly."""
+    if PUSH if push is None else push:
+        reserved = _reserve_on_origin(holder, count)
+        if reserved is not None:
+            return reserved
+    return _reserve_locally(holder, count, fetch)
 
 
 def main() -> int:
@@ -236,8 +394,10 @@ def main() -> int:
     ap.add_argument("--holder", help="lane or session taking the id")
     ap.add_argument("--count", type=int, default=1)
     ap.add_argument("--show", action="store_true", help="print the high-water mark and exit")
+    ap.add_argument("--no-push", action="store_true",
+                    help="reserve on this machine only; commit the claim with the entry")
     ap.add_argument("--no-fetch", action="store_true",
-                    help=f"do not refresh {ORIGIN_REF} before reading it")
+                    help=f"stay off the network: no fetch of {ORIGIN_REF} and no push")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
@@ -249,14 +409,13 @@ def main() -> int:
     if args.count < 1:
         ap.error("--count must be at least 1")
 
-    ids = allocate(args.holder, count=args.count, fetch=not args.no_fetch)
+    ids = allocate(args.holder, count=args.count, fetch=not args.no_fetch,
+                   push=not (args.no_push or args.no_fetch))
     if args.json:
         print(json.dumps({"ids": ids, "holder": args.holder}))
     else:
         for value in ids:
             print(value)
-    sys.stderr.write(f"commit {_CLAIM_PATH}/<id>.claim with the entry: it is what makes a "
-                     "collision with another clone fail loudly at land\n")
     return 0
 
 

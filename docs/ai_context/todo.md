@@ -113,6 +113,30 @@ gives 108 and 109.
   and now counted), and not removed, because that tree is shared.
 
 ---
+
+### `#654` — **CLOSED 2026-09-10: a todo id is now RESERVED ON THE REMOTE before any work, so two separate clones can no longer take the same number.** — lane `todo-id-push-reserve`
+
+`#653` made the lock machine-wide, but nothing local reaches another machine or a
+cloud container (the gap `#563` named). Measured on that version through a real
+bare remote: two separate clones both got **101**.
+
+- `todo_id_alloc.py --holder <lane>` now builds a commit on `origin/main` as just
+  fetched, whose only change is `.syndicate/todo_ids/<n>.claim`, and pushes it to
+  `main`. It is built with plumbing, so the caller's index and tree are never
+  touched. The push lands only if `main` has not moved, so exactly one of two
+  racing clones wins; the other re-fetches and takes the next number.
+- The message carries `[skip ci]`, because `ci.yml` runs on every push to `main`.
+  The claim is not also written into the caller's tree, because an untracked copy
+  would block their next rebase.
+- When no push is possible (offline, auth, no origin), it falls back to the
+  machine lock with a loud warning. `--no-push` asks for that; `--no-fetch` stays
+  off the network.
+- Verified: 21/21 tests, including two separate clones through a real bare remote
+  (101, 102) and a stale-base reservation that the remote REJECTED. This item's
+  own id came from the real remote: `f08c0125` `todo id: reserve #654 ... [skip ci]`,
+  one file, its parent the previous `main`, nothing left in the tree.
+
+---
 ### `#649` — **CLOSED 2026-09-08: `test_retainer_census` is ORDER-SENSITIVE, not a change. It joins the chunk-reshuffling group.** — lane `render-cron-failures`
 
 **DISCRIMINATOR RUN, substrate render:** `crn-dafg4h0u01pc73aavs6g-1788909461`,

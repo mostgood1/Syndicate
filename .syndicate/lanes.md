@@ -412,6 +412,19 @@ death, never life — do not invert it.
 - Verification: that reading on web, `/api/board/game-chips?date=2026-09-03&sports=mlb` reading 9 `final`, and a test that goes RED with the fix reverted.
 - Blocked by: none.
 
+### todo-id-push-reserve — CLOSED 2026-09-10 — opened 2026-09-10 — session 4d4e0959-c99d-4777-bebb-37851c341e75 — **GOAL MET: ids are reserved on the remote. Two separate clones got 101/102 through a real bare remote (the previous version gave 101/101); that remote REJECTED a stale-base reservation; the real reservation `f08c0125` (`#654`) touched one file and started no CI run. Tooling only, no deploy.**
+- Goal: two SEPARATE clones (another machine, a cloud container) can no longer be handed the same todo id. `todo_id_alloc.py` reserves each id by pushing its claim to `main` before any work, and retries when `main` moves. It must not touch the caller's index or tree, must not trigger a CI run per id, and falls back to the local lock, loudly, only when a push cannot happen. User-directed 2026-09-10 ("build the push-reserved id too"). — **GOAL: MET.** THE READINGS:
+  - The falsification test was NOT triggered. The real bare remote refused the stale-base reservation (`_push` returned `moved`), and the retry took 102.
+  - Two separate clones got 101 and 102; the previous version gave 101 twice.
+  - Tests: 21/21 here and under the repo's conftest. The previous version passes 14 of 21; one of its 7 failures is only its missing `--no-push` flag.
+  - The real reservation `f08c0125` (`todo id: reserve #654 for todo-id-push-reserve [skip ci]`) changes only `.syndicate/todo_ids/654.claim`. Its parent is the previous `main` tip, `57019962`, and it left no untracked copy in the tree.
+  - `gh run list --commit f08c0125` returns 0 runs, while `57019962` and the five commits before it each have a push run.
+- Files: `scripts/todo_id_alloc.py`, `tests/test_todo_id_alloc.py`.
+- Hypothesis: n/a — a build, on the mechanism `todo.md #563` named. The property it rests on: a push to `main` is a compare-and-swap against the parent the commit was built on.
+- Falsification test: a reservation commit built on a STALE `origin/main` is ACCEPTED by a real remote → the push is not a compare-and-swap, and the design is wrong. Or: two separate clones of one bare remote get the same id.
+- Verification: the new tests pass on this build and fail on `3e02f854` (per-machine lock only). Two separate clones get 101 and 102 through a real bare remote, and that remote rejects a stale-base reservation. A real reservation lands one claim-only `[skip ci]` commit on `main`. The existing tests still pass.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
