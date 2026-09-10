@@ -5,6 +5,47 @@
 
 ---
 
+## 2026-09-10 09:59 CT — refresh-worker `0ceb9636` (lane `nfl-prop-grading`) — **EVERY NFL AND NCAAF ORDER NOW FINDS ITS GAME: `game_not_in_nfl_live_state` 2 → 0, `game_not_in_ncaaf_live_state` 284 → 0. STILL NO GRADE, BECAUSE NONE OF THOSE GAMES HAS BEEN PLAYED.**
+
+Deploy `dep-dahc5495efls73dfk7hg`, triggered 09:45:37 CT, live 09:48:24 CT, on top of `2259edf8`.
+Code change: the kickoff-date lookup in `bet_status_nfl.py` and `bet_status_ncaaf.py`, plus their
+tests. The only other non-ledger file in `2259edf8..0ceb9636` is another session's test
+(`tests/test_controlled_transfer_arm2_watch.py`), which does not run on the worker. No
+`render.yaml`, no env change. Preflight CLEAR 09:45 CT. No `Traceback` after go-live.
+
+**verify:** the same line, fresh baseline on `2259edf8` against the first pass on `0ceb9636`:
+
+| `SETTLED date=2026-09-10` reason | before, 09:38 CT (349 orders) | **after, 09:59 CT (352 orders)** |
+|---|---|---|
+| `game_not_in_nfl_live_state` | 2 | **0** |
+| `game_not_in_ncaaf_live_state` | 284 | **0** |
+| `not_decided_yet` | 0 | **2** |
+| `ncaaf_game_carries_no_scores` | 2 | **117** |
+| `no_team_scores` | 0 | **172** |
+| `ncaaf_team_not_in_registry_or_ambiguous` | 40 | 40 |
+| `no_live_feed` / `order_not_filled` / soccer | 18 / 2 / 1 | 18 / 2 / 1 |
+
+`BET_STATUS` 09:36 → 09:57 CT: `game_not_in_nfl_live_state` 1 → 0, `game_not_in_ncaaf_live_state`
+282 → 0, `resolved` 0 → **2**.
+
+**MEASURED: the lookup works in production.** Both NFL orders now resolve (`resolved=2`,
+`not_decided_yet: 2`): each found its game, and the game has not started. The NCAAF orders that
+could not find a game now read as found-but-unscored (117 + 172 = 289; three orders arrived
+between the passes): each found its game, which has not been played. The opener findings
+called the NCAAF count "consistent with games not yet played". That was right about the games
+and wrong about the reason: those orders could not have graded after the games were played either.
+
+**The 09:19 CT entry's discriminator (re-read after SF @ LAR) is superseded:** the order is found.
+
+**Pre-existing, not introduced here:** a game line on a game that has NOT STARTED reads as a
+no-scores refusal (`ncaaf_game_carries_no_scores`, `no_team_scores`), not as not-started; props
+read `not_decided_yet`. It clears when the game has a score, so it does not block grading, but
+it puts 289 pregame rows on the counter as refusals.
+
+**verify: OWED** — the first production GRADE, which needs a played game: SF @ LAR ends
+~10:45 PM CT tonight, NCAAF plays Saturday 09-12, NFL Sunday 09-13. Reading: `SETTLED` lines with
+non-empty `outcomes` on NFL and NCAAF orders, and the no-score counts falling as games finish.
+
 ## 2026-09-10 09:19 CT — refresh-worker `2259edf8` (lane `nfl-prop-grading`) — **THE BLANKET NFL PROP REFUSAL IS GONE (1 → 0). NO NFL PROP HAS BEEN GRADED YET: THE ONE PROP ORDER NOW CANNOT FIND ITS GAME.**
 
 Deploy `dep-dahbimh42hec73fklljg`, triggered 09:06:18 CT, live 09:09:06 CT, on top of `7ae7ced4`.
