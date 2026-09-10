@@ -160,11 +160,39 @@ FAMILIES: dict[str, dict[str, Any]] = {
             "mlb_source/source_artifacts/data/raw/statsapi/feed_live/*/{date}/*.json.gz",
         ),
     },
-    "mlb_prop_history": {
-        "role": "input",
-        "note": "prop-history CSVs under tracking/ -- also newly reachable via `#625`(2).",
-        "patterns": ("*_source/tracking/odds_*_props_history_{date}.csv",),
-    },
+    # `mlb_prop_history` WAS HERE AND IS DELIBERATELY GONE `[2026-09-09, user
+    # decision, lane web-oom-census]`. It matched `*_source/tracking/odds_*_props_history_{date}.csv`.
+    #
+    # **IT COULD NEVER BE FILLED, AND ITS DATA WAS ALREADY IN ANOTHER FAMILY.**
+    # Measured before removing it:
+    #
+    #   * **No producer, and never one.** `git log --all -S "hitter_props_history"`
+    #     over `*.py`/`*.ps1` returns only the allowlist-split commit `8da0eddc`;
+    #     the sole occurrence in the tree outside a pattern is a test fixture.
+    #     The 18 files on production are historical data committed to git by
+    #     something outside this codebase -- hence dates scattered across
+    #     06-10, 07-02, 07-04, 07-05, 07-08, 07-09, 08-06 rather than daily.
+    #   * **`book_quotes` already carries it, at 83x, daily.** For 2026-09-08 the
+    #     tape holds **130,851 MLB prop rows, 100% with `player_name`, across 10
+    #     bookmakers**, covering every hitter market plus `strikeouts`/`outs` --
+    #     against props_history's 1,581 rows for 2026-06-10 with no bookmaker
+    #     column at all. props_history's six fields
+    #     (`player_name,market,selection,line,price,snapshot_ts`) are a STRICT
+    #     SUBSET of the tape's seventeen. That tape is already synced here as
+    #     `mlb_book_grid_replay`.
+    #   * **Nothing reads it.** No reader anywhere in `syndicate/`, `pipeline/`
+    #     or `scripts/`.
+    #
+    # WHY REMOVAL RATHER THAN LEAVING IT EMPTY: `sync` prints "production reports
+    # NO files for these patterns on this date" per family, and that warning is
+    # the instrument that made this findable at all. A family that can NEVER be
+    # filled fires it on every run and trains the reader to ignore it.
+    #
+    # **THE EXPORT-ONLY PATTERN IN `artifact_publisher.py` STAYS** -- the 18
+    # historical files remain readable. This removes a mirror family, not access.
+    #
+    # Grading props against outcomes reads `book_quotes/{date}.jsonl`
+    # (`mlb_book_grid_replay`), filtered to `kind == "prop"`.
     "mlb_actuals_inputs": {
         "role": "input",
         # Everything `build_mlb_actuals.build_mlb_actuals_for_date` reads:

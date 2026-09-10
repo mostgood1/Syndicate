@@ -3617,6 +3617,42 @@ worker-local export-only set once (2) unblocks.
 >   permanently-empty family trains readers to ignore the empty-family warning,
 >   which is the one instrument that made this findable.
 
+
+> **`mlb_prop_history` REMOVED from the mirror families `[2026-09-09, user
+> decision, lane web-oom-census]`. The instruction was to WIRE a producer for it;
+> measuring first showed that would have built a lossy duplicate.**
+>
+> | | `props_history` 2026-06-10 | `book_quotes` 2026-09-08 |
+> |---|--:|--:|
+> | MLB prop rows | 1,581 | **130,851** |
+> | with `player_name` | yes | **100%** |
+> | bookmakers | **no column at all** | **10** |
+> | markets | hitter + pitcher | all 8, incl. `strikeouts`/`outs` |
+> | cadence | 7 scattered dates | **daily, current** |
+>
+> props_history's six fields (`player_name,market,selection,line,price,snapshot_ts`)
+> are a **STRICT SUBSET** of the tape's seventeen, and that tape was already being
+> synced as family `mlb_book_grid_replay`. There is no reader anywhere in
+> `syndicate/`, `pipeline/` or `scripts/`, and no producer has ever existed.
+>
+> **REMOVAL WAS VERIFIED TO CHANGE NOTHING.** Re-syncing 2026-09-08 after the edit
+> returns the SAME manifest — `e6757f3cc842fd23`, 39 files, 168,169,643 bytes,
+> byte-identical to the pre-removal run — because the family matched zero files
+> there anyway. The citation above still resolves.
+>
+> **THE EXPORT-ONLY PATTERN STAYS** (`artifact_publisher.py`): the 18 historical
+> files remain readable, `tests/test_export_only_patterns.py` 24/24 green. This
+> removed a mirror family, NOT access.
+>
+> **WHY NOT LEAVE IT EMPTY:** `sync` prints "production reports NO files for these
+> patterns on this date" per family, and that warning is the only reason this was
+> findable. A family that can never be filled fires it every run and trains the
+> reader to ignore it.
+>
+> **Grading props against outcomes reads `book_quotes/{date}.jsonl` filtered to
+> `kind == "prop"`.** `#624` should be scoped against that, not against a CSV
+> family that never existed.
+
 ### `#624` — **PHASE 1 — MLB PROP PROGRAM (Sept). The +8.5pp-gross under book, converted from vig into ROI.** — lane `edge-plan`, 2026-09-01 — **OPEN; order is load-bearing**
 
 1. **Tail calibration FIRST**: per-(market, line) isotonic/Platt on
