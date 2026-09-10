@@ -83,6 +83,56 @@ laptop.
 2 GB cron at all? The tests are not wrong and the guard is not wrong — the
 RUNNER is too small for that subset.
 
+
+## [odds-history-segment-keys] THE odds_history SHARD CARRIES `segment=` KEYS NOW — and three separate key builders were segment-blind, in two different ways `[verified in production 2026-09-10, lane odds-history-segment-term, live `26c8cfc6`]`
+
+**The store's game keys were `event_id|home_team|away_team|market|bookmaker` with
+NO segment term — 4,063 of 4,063 keys on the 2026-09-08 mlb shard — so nothing
+downstream could tell a first-5 price from a nine-inning one. Measured live
+2026-09-10 01:34Z, 57 s after refresh-worker went live: 0 -> 35 segment keys
+(`first5` 21 / `first3` 10 / `first1` 4), and 38 within the hour. It accumulates
+every cycle, not once at boot.**
+
+**TWO DIFFERENT DEFECTS, and the second is the one that would have made a key
+fix inert.** `clv_join._history_key` simply omitted the field. But
+`odds_refresh_tracking` never SAW a segment: `_market_rows_from_mapping`
+descends `markets`, meets the key `segments`, stamps `market="segments"` from the
+container name and stops, because the level below is segment NAMES. Measured on
+a real 15-game snapshot: **45 rows out, zero carrying a segment**; after the
+descent fix, 270 rows / 225 keys / 180 segment-keyed.
+
+**FULL GAME KEYS AS NOTHING, AND THAT IS LOAD-BEARING.** Every entry already in
+every shard was written without a segment term and these keys are compared
+verbatim, so `segment=full` would have orphaned the whole store on the first
+write after deploy — silently, because an orphaned key looks exactly like a
+market nobody has quoted. Verified across all 47 mirror game-line snapshots:
+1,544 old keys -> 6,873, **0 lost**. Cross-sport nhl/nba/wnba 405 keys, 0 lost;
+ncaaf/nfl/soccer route segment prices to `book_quotes`, not to an odds-history
+snapshot, so no row of theirs carries a `segment`.
+
+**WHAT IT COST IN CLV, measured against production before and after:** 19 of
+2,007 resolved rows on 2026-09-08 were a segment bet priced off a full-game
+close, 17 of them inside the 231-row same-book headline. `avg_clv_pct` +0.9497
+-> **+1.1479**; on 09-07 the headline **flipped sign**, -0.0492 -> +0.1749.
+**The mechanism is that h2h has no line** — `_price_for_side` already refuses a
+line disagreement, so segmented totals landed in `line_mismatch`, but a
+moneyline has no number to disagree about and 18 of the 19 were `h2h`. A guard
+that only works where a line exists is not a segment guard.
+
+**`segment_absent_from_history` IS EXPECTED TO BE LARGE AND IS NOT A GAP.**
+1,617 on 09-08, equal to that date's non-full opening count. Those bets are
+REFUSED rather than mispriced; they become resolvable only for dates whose shard
+is rebuilt post-deploy. Read it against `openings_by_segment`, which is on the
+report for that reason.
+
+**UNVERIFIED, and both need a shard built entirely post-deploy:** the growth
+ratio (predicted **3.63x** game keys, +9.5MB, 56.4 -> 65.9MB **+17%**, measured
+on complete mirror snapshots only — the live shard grew 0.5% on the night and
+240 -> 284 game keys is unfair by construction), and `segment_absent_from_history`
+actually falling. `venue_quote_adapters` now refuses a segment-keyed entry by
+name rather than keying it as full game, because its `quote_key` has no segment
+slot.
+
 ## [refresh-worker-headroom-2026-09-02] THE ~1.4GB HEADROOM FIGURE IS STALE, AND THE METRIC EVERYONE READS IS THE WRONG ONE `[2026-09-02, lane m625-env-snapshots, measured off 200 MEMORY_WATCHDOG samples 15:30-16:10Z]`
 
 > ### CORRECTION 2026-09-09/10 -- THE NUMBERS ABOVE ARE SUPERSEDED. THE METHOD IS NOT. `[lane refresh-worker-anon-ratchet]`

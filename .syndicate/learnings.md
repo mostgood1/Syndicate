@@ -5238,3 +5238,36 @@ pinning to 1.
 honest "nothing to join" are the same observation unless the code says which
 inputs it used. Every join that can address the wrong partition must name the
 partition it addressed.
+
+## 2026-09-09 - FORBIDDEN: predicting that a consumer-side key fix will start resolving, without first checking that the PRODUCER's data reaches its key builder at all. The field being absent from a key and the data being absent from the function are different defects, and the second makes the first's fix inert `[lane odds-history-segment-term, commits cff0cd4e / 26c8cfc6, DEPLOYED]`
+
+- **What I believed:** having added `segment` to `clv_join._history_key`, I wrote
+  in that commit -- and told the user -- that segment CLV would become available
+  "the moment `_odds_history_market_key` emits a `segment=` part; this key
+  already matches it, and nothing else here needs to change."
+- **What was true:** the producer's key list was the SMALLER half of its problem.
+  `_market_rows_from_mapping` descends `markets`, meets the container key
+  `segments`, stamps `market="segments"` from the container NAME and stops --
+  the level below is segment names (`first5`), which is neither a recognised
+  container nor a line snapshot. **The whole subtree had never produced a row.**
+  Measured by running the real flattener over a real 15-game snapshot: **45 rows
+  out, 15 each of h2h/spreads/totals, ZERO carrying a segment.** Adding
+  `segment` to that key alone would have shipped INERT and looked done.
+- **Why the wrong belief was so comfortable:** the consumer's defect was
+  legible -- a field missing from a tuple -- so I generalised it to the other
+  side of the same contract. Both halves were "missing `segment`", which is true
+  and useless: one was missing a FIELD FROM A KEY, the other was missing the
+  DATA ENTIRELY.
+- **The check that would have caught it in one command**, and which is now the
+  rule: before predicting a consumer will resolve, run the producer's real
+  reader over a real input and count the rows carrying the field. Not a grep for
+  the field name -- the field name appears in the snapshot, in the fetcher and
+  in the segment map; it was the ROW COUNT that was zero.
+- **Cost:** none shipped, because the reachability run happens before the commit
+  in this repo's standard (`model_engine_standard.md`: reachability test before
+  correctness tests, `off != on`). That standard is written about sim engines
+  and it caught a key builder -- **its scope is wider than its title.**
+- **Generalises to:** any two-sided contract fixed one side at a time --
+  `_KEY_FIELDS` consumers, board joins, settlement identity. `presence != reachability`
+  already exists as a rule; this is the producer-side twin of it.
+
