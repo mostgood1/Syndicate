@@ -29842,3 +29842,33 @@ run, against a 4,096 MB ceiling — 0.94%.
 - **THIS DOES NOT UNGATE S4 (football half pricing), and the reason is unchanged and measured.** The input now exists; the model behind it does not yet deserve to price on. NFL's smartsim2 was recalibrated 2026-07-15 against 17,677 real drives and **per-quarter scoring got WORSE or stood still in 3 of 4 quarters** while every game-level metric improved (q1 0.025->0.063, q3 0.115->0.115, q4 0.053->0.075). After that fit the three worst metrics on file are `drive_length_plays` 0.117, `quarter_3_scoring` 0.115 and `quarter_2_scoring` 0.106 — the drive-count term and the quarter split, which is exactly what a half price rests on. **Capture was never the blocker; calibration is.**
 - NCAAF has no sidecar yet (`ncaaf_source/data/smartsim2_segment_distributions_*.json` returns 0) — its generator runs on the same daily gate and has not fired since the flag went live.
 - the scheduled task `s1-football-sidecar-reading` (18:15 CT) is now REDUNDANT for the NFL half; this entry is that reading, taken directly off the artifact.
+### nfl-props-autorun-e2e 2026-09-09 -- FINAL PRE-KICKOFF WEEK-1 PROP REBUILD, PUBLISHED 11 MINUTES BEFORE KICKOFF; BOARD 1,850 -> 2,028 CARDS. NO DEPLOY, NO CODE CHANGE.
+
+- **This is a DATA refresh, not a deploy.** Scheduled task `nfl-wk1-prop-rebuild-at-kickoff`, run offline from worktree `nfl-props-autorun-e2e` on `98dc7771` (an ancestor of `origin/main`; fast-forwarded to `7669c5b1` before the ledger commit). Nothing was deployed and no service commit moved. The producer is the offline run by design -- refresh-worker cannot build this (`nfl_source/tracking/nflverse/pbp/pbp_2025.csv` is 97.9 MB against a 12 MiB publish ceiling and is in neither allowlist).
+
+- **THE CARD COUNT DECAYS BETWEEN BUILDS, AND THIS RUN MEASURED THE DECAY FOR THE FIRST TIME.** The 16:41 CDT run left the served board at **1,999** cards. Nothing was deployed and the artifact was untouched in the interval, yet the same checker read **1,850** at 19:07 CDT -- **-149 cards in 2h26m**. That is the documented mechanism running in the live direction: each artifact row is keyed `stat::player::line`, books moved their lines through the afternoon, and every re-quoted line lost its projection and had its card correctly dropped. **So the rebuild is not merely additive coverage -- without it the board SHRINKS as kickoff approaches, which is exactly when it matters.** This is the strongest argument on file for the pre-kickoff rebuild, and it was not available until two runs bracketed the same slate.
+
+- **THE ODDS CAPTURE WAS PULLED FIRST, and it had moved.** `pull_streamed_artifact('nfl_source/oddsapi_player_props_2026_wk1.csv')` -> `STREAM_PULL_OK bytes=998429`. Local file **990,835 B -> 998,429 B** (+7,594 B), **6,695 -> 6,749 quote rows** (+54) in the 2h51m since the 16:18 CDT pull. Smaller than that pull's +110,059 B, as expected this close to kickoff -- the market has mostly settled.
+
+- **BUILD:** `odds_rows 2922  sim_rows 1140  entities 249`, `rate_sources {'prior_season_fallback': 1140}`, `refused_wrong_team=221 refused_unknown_team=0`, `PUBLISH_OK ... bytes=522068`. Against the 16:41 run (`2886 / 1126 / 250`): odds and sim rows are HIGHER as the task predicted, entities one lower. No `REFUSED reason=zero_sim_rows`.
+
+- **verify: THE ARTIFACT PRODUCTION HOLDS IS THE ONE THIS RUN BUILT, read back from production, not inferred from the exit code.** `GET /api/ops/artifacts/stream?path=nfl_source/nfl_prop_projections_2026_wk1.json` with a Bearer ADMIN_TOKEN returns `generated_at 2026-09-10T00:09:04.808033+00:00` (**19:09:04 CDT, 10m56s before the 19:20 CDT kickoff**) and `row_count 1140` -- matching the build's `sim_rows` exactly.
+
+- **verify: SERVED BOARD, `/nfl/api/props?season=2026&week=1`, cards counted under `rank_cards` (`card_sections` is 0 on this route and reading it is what made a previous session call a healthy board dead):**
+
+  | | before rebuild (19:07 CDT) | after rebuild (19:11 CDT) |
+  |---|---|---|
+  | `rank_cards` | **1,850** | **2,028** (+178, +9.6%) |
+  | parsed population | 1,601 | 1,779 |
+  | multi-line (player, market, side) groups | 455 | **479** |
+  | cards inside those groups | 1,186 | 1,370 |
+  | groups sharing ONE model percentage | **0** | **0** |
+  | monotonicity violations | **0** | **0** |
+
+- **THE TWO MUST-BE-ZERO CHECKS ARE ZERO IN BOTH READS, and the population they ran over is complete.** **249** of the served cards do not parse as `<side> <line>` in both reads -- **all 249 are Anytime TD**, confirmed by classifying them, not assumed: their `meta` is the bare string `Over` with no numeric line, and 249 matches the build's own `markets {'anytime_td': 249}` exactly. A market with one line per side cannot form a multi-line group, so those 249 are outside the question by construction rather than a blind spot in the checker. The 371-of-371 collapse that mispriced 924 cards on 2026-09-08 has not returned.
+
+- **The board was ALREADY healthy before this run** (both checks zero at 1,850 cards) -- this was coverage, not repair, and the task said to publish anyway because fresher lines are the point. It was right to: see the decay measurement above.
+
+- instrument note: the checker is `verify_nfl_props.py` in the session worktree, parsing `title` -> player/market, `meta` -> side/line, and the `Real rate model` metric -> probability. It scores the SERVED payload, not the artifact, so it measures what a user sees. **Hazard hit and worked around:** a heredoc'd em-dash in the title-split regex was transcoded by the shell layer, which silently made ALL 2,028 cards unparseable and would have read as a total board failure -- the classification above was re-run from a file with an explicit `—` escape. This is `learnings.md` 2026-09-03, *shell layer transcodes bytes*, in a new place.
+
+- one run was asked for and one run was taken. No further rebuild before kickoff.
