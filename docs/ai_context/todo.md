@@ -1326,6 +1326,42 @@ model claim on a measured 17-sigma out-of-sample loss, and
 on the board, not money.** That is the reason to fix it calmly and the reason
 not to spend CFBD quota fixing it in a hurry.
 
+
+> **THE LAST LIVE HALF IS FIXED AND LANDED `353650c7` — DEPLOY PENDING (user: "deploy it with the next one"), 2026-09-09.**
+> `[lane ncaaf-window-reason, session 2edf8b82]`
+>
+> **CFBD IS STILL NOT EXHAUSTED — re-checked before touching this, because it is
+> the item's premise.** Zero `cfbd_quota` lines on refresh-worker since the 09-01
+> month roll, and `[ppa] season=2025 source=api` succeeded 2026-09-10T02:26:09Z.
+>
+> **Bug 1 (`considered` counting every grid row on all seven passes) was verified
+> ALREADY FIXED on main**, not assumed: `ncaaf/game_projections.py` filters on
+> `commence_time` before `considered += 1`.
+>
+> **Bug 2 was only HALF fixed, and the live half was the common one.** The
+> existing code replaced the merged `reason` only when the window produced
+> NOTHING. The case this item actually describes is a window that MOSTLY
+> SUCCEEDED with one trailing date that legitimately has no CSV yet; that date's
+> reason is admitted by "first non-falsy wins" and nothing overwrote it.
+>
+> **Measured live 2026-09-10 02:41 CT, six days after the first half was recorded
+> as fixed:**
+>
+>     PREGAME_PROJECTION_JOIN sport=ncaaf considered=590 projected=329
+>       reason=no NCAAF SmartSim2 projections for this date
+>
+> **329 of 590 rows (55.8%) had a projection and the same line said there were
+> none.** That contradiction is what made this item read as a producer outage and
+> get filed under a headline both halves of which were later refuted.
+>
+> A reason is for a failure, so a window that produced rows now DROPS the field
+> rather than rewording it — any string there reads as "this join did not work".
+> The empty dates are named in `empty_window_dates` instead. 3 tests,
+> mutation-checked; the zero-rows branch and the single-date case are both pinned.
+>
+> **REMAINING ON THIS ITEM: the deploy, then one reading** — `PREGAME_PROJECTION_JOIN
+> sport=ncaaf` on a window with `projected > 0` must carry NO `reason`.
+
 ### `#632` — **WEB WAS OOM-KILLED TWICE. Real `oomKilled` events at the 2G limit, and nothing owns them** — lane `game-market-entry-roi-curve` (surfaced by `boot-sync-healthcheck-kill`, rehomed on closing it), 2026-09-01 — **OPEN**
 
 **Measured, Render events API, `srv-d88ahvrbc2fs73eodu30` (`syndicate`, the WEB
