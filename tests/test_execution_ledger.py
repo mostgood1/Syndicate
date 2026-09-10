@@ -2828,12 +2828,14 @@ def test_live_with_no_adapter_writes_nothing(monkeypatch):
     assert writes == []
 
 
-def test_KNOWN_HAZARD_a_write_landing_between_merge_read_and_SET_is_lost(monkeypatch):
-    """THE 2026-09-04 LOST UPDATE, REPLAYED. THIS TEST PASSES BECAUSE THE DEFECT
-    EXISTS. When `_persist` gains a compare-and-swap, invert it.
+def test_a_write_landing_between_merge_read_and_SET_now_SURVIVES(monkeypatch):
+    """THE 2026-09-04 LOST UPDATE, REPLAYED -- AND NOW REFUSED. `#656`.
 
-    `_merge_onto_current` re-reads the store, then `write_json_file` SETs, and
-    nothing makes the two atomic. Measured from both services' own
+    Until 2026-09-10 this was `test_KNOWN_HAZARD_a_write_landing_between_
+    merge_read_and_SET_is_lost`, and it PASSED BECAUSE THE DEFECT EXISTED.
+
+    `_merge_onto_current` re-read the store, then `write_json_file` SET, and
+    nothing made the two atomic. Measured from both services' own
     `KEYVALUE_WRITE_LARGE` sizes:
 
         18:27:24.711  refresh-worker    2,701,710 B  paper Q written (K submitted)
@@ -2841,21 +2843,27 @@ def test_KNOWN_HAZARD_a_write_landing_between_merge_read_and_SET_is_lost(monkeyp
         18:27:25.228  refresh-worker    2,701,758 B  = its 24.711 doc + 48 B (Q filled)
 
     refresh-worker's merge-read fell between 24.711 and 25.083, and its SET
-    landed after 25.083 carrying K as it had read it. The stored row still
-    reads `submitted_at 18:27:23.597740Z` with `error` and `venue_resolved_at`
-    null -- the write-ahead version, WITH NO ERROR ON IT. That is why no
-    reconcile rule keyed on a recorded build error could ever have cleared it,
-    and why the close is to not write the row at all.
+    landed after 25.083 carrying K as it had read it: the write-ahead version,
+    with no error on it, which froze both venues for six days.
+
+    The rival now fires from INSIDE the merge's read, at the store layer, so
+    this runs unchanged against the pre-`#656` module: there K comes back
+    `submitted`; here the SET is refused and the merge re-runs on a fresh
+    read. `test_execution_ledger_cas.py` replays it on the keyvalue backend.
     """
+    from syndicate.features.shared import refresh_state_store as store
+
     _armed(monkeypatch)
     k, _ = record_order(_request(venue="polymarket", position_key="K"), mode=LIVE)
     q, _ = record_order(_request(position_key="Q"), mode=PAPER)
 
-    real_write = ledger.write_json_file
-    rival = []
+    real_read = store.read_json_file_result
+    ledger_path = str(ledger._ledger_path())
+    armed, rival = [], []
 
-    def write_with_a_rival_inside_the_window(path, payload):
-        if not rival:
+    def read_then_a_rival_lands(path):
+        result = real_read(path)
+        if armed and not rival and str(path) == ledger_path:
             rival.append(1)
             # live-odds-worker's WHOLE write, landing after refresh-worker's
             # merge-read and before its SET.
@@ -2864,21 +2872,26 @@ def test_KNOWN_HAZARD_a_write_landing_between_merge_read_and_SET_is_lost(monkeyp
                 status=STATUS_REJECTED,
                 error="OrderBuildError: market_unresolved_for_position",
             )
-        return real_write(path, payload)
+        return result
+
+    # The merge reads through `read_json_file_result` on both sides of `#656`:
+    # via `read_json_file` before, by name from the ledger module after.
+    monkeypatch.setattr(store, "read_json_file_result", read_then_a_rival_lands)
+    monkeypatch.setattr(ledger, "read_json_file_result", read_then_a_rival_lands, raising=False)
 
     # refresh-worker completes its paper fill: load, change Q, persist.
     state = ledger._load()
     for order in state["orders"]:
         if order["idempotency_key"] == q["idempotency_key"]:
             order["status"] = STATUS_FILLED
-    monkeypatch.setattr(ledger, "write_json_file", write_with_a_rival_inside_the_window)
+    armed.append(1)
     ledger._persist(state)
 
     assert rival == [1], "the rival write never landed inside the window"
     stored = ledger.find_order(k["idempotency_key"])
-    # LOST. The rejection was written, then overwritten by the stale copy.
-    assert stored["status"] == STATUS_SUBMITTED
-    assert stored["error"] is None
-    assert stored["venue_resolved_at"] is None
+    # SURVIVED. The rejection is what the store holds, not the stale copy.
+    assert stored["status"] == STATUS_REJECTED
+    assert stored["error"] == "OrderBuildError: market_unresolved_for_position"
+    assert stored["venue_resolved_at"] is not None
     assert ledger.find_order(q["idempotency_key"])["status"] == STATUS_FILLED
-    assert [o["idempotency_key"] for o in unreconciled_orders()] == [k["idempotency_key"]]
+    assert unreconciled_orders() == []

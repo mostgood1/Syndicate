@@ -74,7 +74,10 @@ from collections.abc import Sequence
 from typing import Any, Callable, Mapping
 
 from syndicate.features.shared.refresh_state_store import (
+    WriteConflict,
+    compare_and_swap_json_file,
     read_json_file,
+    read_json_file_result,
     reports_root,
     write_json_file,
 )
@@ -537,7 +540,38 @@ def _load() -> dict[str, Any]:
         # would make every existing order look unplaced and invite a duplicate
         # of the entire slate. This is the one place the module refuses rather
         # than degrades.
+        #
+        # NEVER REACHED IN PRODUCTION, found 2026-09-10: `read_json_file` swallows
+        # every read failure on BOTH backends and returns None, the same as an
+        # absent key, so a store blip reads as an EMPTY ledger and this line
+        # never runs. `_read_for_merge` is the strict read `_persist` needs.
+        # Making THIS read strict changes ~20 callers, and is `#658`.
         raise LedgerError(f"execution ledger unreadable: {type(exc).__name__}: {exc}") from exc
+    return _shape_loaded(payload)
+
+
+def _read_for_merge() -> dict[str, Any]:
+    """The merge's re-read. STRICT, where `_load` is not. `#656`.
+
+    `read_json_file` returns the same None for a FAILED read as for an absent
+    key, so `_load` hands back an EMPTY ledger on a store blip. For the merge
+    that is the worst answer there is: merged onto nothing, our copy becomes
+    the whole document, and under the compare-and-swap it commits atomically
+    -- the key really was unchanged -- silently dropping every row anyone else
+    wrote. So this read keeps the flag: a failed read is a failure, and
+    `_merge_onto_current`'s retry and its loud fallback can actually run.
+    """
+    payload, ok = read_json_file_result(_ledger_path())
+    if not ok:
+        raise LedgerError(
+            "execution ledger unreadable for the merge: the store read failed or held malformed JSON"
+        )
+    return _shape_loaded(payload)
+
+
+def _shape_loaded(payload: Any) -> dict[str, Any]:
+    """What `_load` and `_read_for_merge` both return: the rows, the
+    document-level fields worth carrying, and the baseline."""
     if not isinstance(payload, Mapping):
         return {"orders": [], "created_at": _utc_now(), "last_blind_write": None, _BASELINE_KEY: {}}
     orders = payload.get("orders")
@@ -558,9 +592,15 @@ def _load() -> dict[str, Any]:
 
 
 def _merge_onto_current(
-    ours: list[dict[str, Any]], baseline: Mapping[str, str] | None
+    ours: list[dict[str, Any]],
+    baseline: Mapping[str, str] | None,
+    *,
+    current_out: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Three-way merge of OUR orders onto whatever the store holds NOW.
+
+    `current_out`, when given, receives the store's `last_blind_write` as read,
+    a document-level field the row merge cannot carry. `_persist` uses it.
 
     ----------------------------------------------------------------------
     WHY THIS EXISTS: THE LEDGER WAS LOSING WRITES, MEASURED `#600`
@@ -640,11 +680,33 @@ def _merge_onto_current(
     last_exc: Exception | None = None
     for _attempt in range(3):
         try:
-            current = _load()
+            # STRICT since `#656` -- see `_read_for_merge`. Through `_load` this
+            # read could not fail: a store blip came back as an empty ledger and
+            # the merge below ran onto nothing, a blind write that neither this
+            # retry nor the stamp ever saw.
+            current = _read_for_merge()
             break
         except Exception as exc:  # noqa: BLE001
             last_exc = exc
     if current is None:
+        if not baseline:
+            # OUR OWN LOAD SAW AN EMPTY LEDGER, and now the store cannot be read.
+            # `_load` returns empty on a failed read, so `ours` is very likely
+            # only the rows the caller just added. Writing that blind REPLACES
+            # THE WHOLE LEDGER with them: every placed order forgotten, and the
+            # duplicate guard with it. Refusing loses one write; the fallback
+            # below would lose all of them. Raised by lane
+            # write-ahead-build-refusal, 2026-09-10.
+            print(
+                f"[execution_ledger] MERGE_READ_FAILED {type(last_exc).__name__}: {last_exc}"
+                " -- 3 attempts, and our own load saw an EMPTY ledger: REFUSED, because a"
+                " blind write of this copy would replace the whole ledger",
+                flush=True,
+            )
+            raise LedgerError(
+                "execution ledger unreadable for the merge, and this writer's own load was "
+                "empty: refusing a write that would replace the whole ledger"
+            ) from last_exc
         print(
             f"[execution_ledger] MERGE_READ_FAILED {type(last_exc).__name__}: {last_exc}"
             " -- 3 attempts, writing our whole copy, concurrent edits may be lost",
@@ -654,6 +716,8 @@ def _merge_onto_current(
         counts["merge_failed"] = 1
         return list(ours), counts
 
+    if current_out is not None:
+        current_out["last_blind_write"] = current.get("last_blind_write")
     theirs = current.get("orders") or []
     ours_by_key = {_order_identity(o): o for o in ours}
     merged: list[dict[str, Any]] = []
@@ -834,38 +898,136 @@ def acknowledge_grade_conflict(
     raise OperatorResolutionError(f"order_not_found: {key}")
 
 
+# `#656`. How many times `_persist` re-reads, re-merges and re-SETs before it
+# stops insisting on atomicity for one write. Five conflicts in a row need five
+# other SETs landing in five consecutive ~0.3-0.5 s windows; the densest burst
+# measured, 2026-09-04 18:27:24-25, held three SETs across all services in 1.1 s.
+_CAS_MAX_ATTEMPTS = 5
+
+# One `LEDGER_CAS_ACTIVE` line per process. A persist with no conflict prints
+# nothing, so without it a deployed CAS reads exactly like an undeployed one
+# until the first collision.
+_cas_announced = False
+
+
 def _persist(state: dict[str, Any]) -> dict[str, Any]:
     # MERGE BEFORE THE TRIM, not after. The cap is a property of the document
     # actually being written, and trimming our copy first would drop rows the
     # merge is about to re-add from the store.
+    #
+    # THE MERGE-READ AND THE SET ARE ONE COMPARE-AND-SWAP. `#656`, 2026-09-10.
+    # `#600`'s merge re-read the store and then SET, with nothing atomic between
+    # the two, so a SET landing in that ~0.3-0.5 s window was overwritten by our
+    # stale copy of every row we "kept theirs". Measured 2026-09-04: three
+    # orders in 1.1 s, and live order `6bc5617c` reverted to `submitted` froze
+    # placement on both venues for six days. The merge now runs INSIDE
+    # `compare_and_swap_json_file`: if anything wrote the ledger after our
+    # merge-read began, our SET does not happen, and we re-read and re-merge.
+    # The three-way rules themselves are unchanged.
+    global _cas_announced
     baseline = state.pop(_BASELINE_KEY, None)
-    orders, merge_counts = _merge_onto_current(state.get("orders") or [], baseline)
-    state["orders"] = orders
-    if merge_counts.get("merge_failed"):
-        # STAMPED INTO THE DOCUMENT, NOT ONLY LOGGED.
-        #
-        # Raised by lane `venue-join-refusal-visibility`: a log line is
-        # ephemeral, and this repo has burned itself on log-only evidence more
-        # than once -- Render's log API is spotty and a 03:00 blind write that
-        # nobody was watching for leaves no trace at all. So the fact that a
-        # write MAY have lost concurrent edits survives as state.
-        #
-        # Same instinct as `reclassified_from`, `fill_stake_dollars_before_
-        # repair` and `pre_resolution_status`: keep the fact that a correction
-        # happened, not just the correction.
-        #
-        # NOT SURFACED AS A BANNER. `[user 2026-08-28]` has just been shown why
-        # an un-actionable red state is worse than none -- there is no operator
-        # action that repairs a lost update, so this is evidence for whoever is
-        # diagnosing, reachable through `ledger_summary`, and nothing more.
-        state["last_blind_write"] = {
+    ours = list(state.get("orders") or [])
+    fields = {k: v for k, v in state.items() if k != "orders"}
+    written: dict[str, Any] = {}
+
+    def _build(attempt: int) -> dict[str, Any]:
+        # ONCE PER ATTEMPT, from `fields` every time: a stamp or a trim from an
+        # attempt that never landed must not leak into the one that does.
+        current: dict[str, Any] = {}
+        orders, merge_counts = _merge_onto_current(ours, baseline, current_out=current)
+        doc = dict(fields)
+        if doc.get("last_blind_write") is None and current.get("last_blind_write") is not None:
+            # A DOCUMENT-level field, so the row merge cannot carry it. `fields`
+            # is as old as the caller's `_load()`; the store's copy is as of this
+            # attempt. Erasing a stamp would erase the one durable record that
+            # a write was lost.
+            doc["last_blind_write"] = current["last_blind_write"]
+        if merge_counts.get("merge_failed"):
+            # STAMPED INTO THE DOCUMENT, NOT ONLY LOGGED.
+            #
+            # Raised by lane `venue-join-refusal-visibility`: a log line is
+            # ephemeral, and this repo has burned itself on log-only evidence
+            # more than once -- Render's log API is spotty and a 03:00 blind
+            # write that nobody was watching for leaves no trace at all. So the
+            # fact that a write MAY have lost concurrent edits survives as state.
+            #
+            # Same instinct as `reclassified_from`, `fill_stake_dollars_before_
+            # repair` and `pre_resolution_status`: keep the fact that a
+            # correction happened, not just the correction.
+            #
+            # NOT SURFACED AS A BANNER. `[user 2026-08-28]` has just been shown
+            # why an un-actionable red state is worse than none -- there is no
+            # operator action that repairs a lost update, so this is evidence for
+            # whoever is diagnosing, reachable through `ledger_summary`, and
+            # nothing more.
+            doc["last_blind_write"] = {
+                "at": _utc_now(),
+                "reason": "merge_read_failed_after_retries",
+                "orders_written": len(orders),
+            }
+        # No `else` branch: `_load` carries `last_blind_write` forward, so a
+        # healthy write preserves it rather than clearing it. A successful merge
+        # later does not un-lose whatever the blind one may have dropped.
+        trimmed = max(0, len(orders) - _MAX_RECORDS)
+        if trimmed:
+            # Oldest out. Reported, never silent -- a ledger that quietly
+            # forgets is worse than one that refuses to grow, because the gap is
+            # invisible.
+            orders = orders[-_MAX_RECORDS:]
+        doc["orders"] = orders
+        doc["updated_at"] = _utc_now()
+        written.clear()
+        written.update(doc=doc, counts=merge_counts, trimmed=trimmed)
+        return doc
+
+    try:
+        cas = compare_and_swap_json_file(_ledger_path(), _build, max_attempts=_CAS_MAX_ATTEMPTS)
+    except WriteConflict as exc:
+        # EVERY ATTEMPT LOST. Falling back to ONE non-atomic merge and SET --
+        # the pre-`#656` behaviour -- rather than raising: `complete_order` is
+        # one of nine callers, and a refused write there drops a recorded FILL,
+        # which strands the order exactly as the race does. Loud and stamped,
+        # like `merge_read_failed`, because it is the one path left that can
+        # lose a concurrent write.
+        cas = None
+        doc = _build(exc.attempts + 1)
+        doc["last_blind_write"] = {
             "at": _utc_now(),
-            "reason": "merge_read_failed_after_retries",
-            "orders_written": len(orders),
+            "reason": "cas_retries_exhausted",
+            "orders_written": len(doc["orders"]),
+            "attempts": exc.attempts,
         }
-    # No `else` branch: `_load` carries `last_blind_write` forward, so a healthy
-    # write preserves it rather than clearing it. A successful merge later does
-    # not un-lose whatever the blind one may have dropped.
+        write_json_file(_ledger_path(), doc)
+        print(
+            f"[execution_ledger] LEDGER_CAS_EXHAUSTED attempts={exc.attempts}"
+            " -- every compare-and-swap lost to a concurrent write; wrote ONE"
+            " non-atomic merge instead, so a write landing in that window is lost"
+            " (stamped last_blind_write.reason=cas_retries_exhausted)",
+            flush=True,
+        )
+
+    doc = written["doc"]
+    merge_counts = written["counts"]
+    trimmed = written["trimmed"]
+    orders = doc["orders"]
+    if cas is not None:
+        if not _cas_announced:
+            _cas_announced = True
+            print(
+                f"[execution_ledger] LEDGER_CAS_ACTIVE backend={cas.backend}"
+                f" max_attempts={_CAS_MAX_ATTEMPTS} -- the merge-read and the SET"
+                " are one compare-and-swap (#656)",
+                flush=True,
+            )
+        if cas.conflicts:
+            # THE FIX CATCHING A REAL COLLISION. Each conflict is a write that
+            # landed inside this persist's merge-read->SET window and, before
+            # `#656`, would have been overwritten by our stale copy.
+            print(
+                f"[execution_ledger] LEDGER_CAS conflicts={cas.conflicts}"
+                f" attempts={cas.attempts} backend={cas.backend}",
+                flush=True,
+            )
     if merge_counts.get("concurrent") or merge_counts.get("merge_failed"):
         # WHAT THE MERGE ACTUALLY RESCUED. Printed only when the store had
         # changed under us, because a line on every write would be constant
@@ -881,18 +1043,14 @@ def _persist(state: dict[str, Any]) -> dict[str, Any]:
             f"{' MERGE_FAILED' if merge_counts.get('merge_failed') else ''}",
             flush=True,
         )
-    trimmed = 0
-    if len(orders) > _MAX_RECORDS:
-        trimmed = len(orders) - _MAX_RECORDS
-        # Oldest out. Reported, never silent -- a ledger that quietly forgets is
-        # worse than one that refuses to grow, because the gap is invisible.
-        orders = orders[-_MAX_RECORDS:]
-        state["orders"] = orders
+    if trimmed:
         print(
             f"[execution_ledger] TRIMMED dropped={trimmed} kept={len(orders)} cap={_MAX_RECORDS}",
             flush=True,
         )
-    state["updated_at"] = _utc_now()
+    # The caller's `state` becomes the document that was WRITTEN -- merged,
+    # trimmed and stamped -- exactly as the in-place version left it.
+    state.update(doc)
     serialized = json.dumps(state, separators=(",", ":"))
     size = len(serialized.encode("utf-8", errors="replace"))
     if size >= _WARN_BYTES:
@@ -928,7 +1086,6 @@ def _persist(state: dict[str, Any]) -> dict[str, Any]:
             ),
             flush=True,
         )
-    write_json_file(_ledger_path(), state)
     state["trimmed"] = trimmed
     return state
 

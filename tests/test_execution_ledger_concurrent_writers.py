@@ -176,7 +176,9 @@ def test_a_failed_re_read_falls_back_LOUDLY_rather_than_silently(monkeypatch, ca
     def _boom():
         raise ledger.LedgerError("store unreachable")
 
-    monkeypatch.setattr(ledger, "_load", _boom)
+    # `_read_for_merge`, not `_load`: since `#656` the merge re-reads through the
+    # STRICT read, because `_load` cannot fail -- see `_read_for_merge`.
+    monkeypatch.setattr(ledger, "_read_for_merge", _boom)
     ledger._persist(state)
     assert "MERGE_READ_FAILED" in capsys.readouterr().out
 
@@ -268,19 +270,19 @@ def test_a_TRANSIENT_read_failure_still_merges_instead_of_clobbering(monkeypatch
     fresh["orders"][0]["outcome"] = "won"
     ledger._persist(fresh)
 
-    real_load = ledger._load
+    real_read = ledger._read_for_merge
     calls = {"n": 0}
 
     def _flaky():
         calls["n"] += 1
         if calls["n"] == 1:
             raise ledger.LedgerError("transient")
-        return real_load()
+        return real_read()
 
     stale["orders"][1]["reconciled_at"] = "now"
-    monkeypatch.setattr(ledger, "_load", _flaky)
+    monkeypatch.setattr(ledger, "_read_for_merge", _flaky)
     ledger._persist(stale)
-    monkeypatch.setattr(ledger, "_load", real_load)
+    monkeypatch.setattr(ledger, "_read_for_merge", real_read)
 
     after = _stored()
     # NOT clobbered: the retry got a clean read and the merge ran.
@@ -302,7 +304,7 @@ def test_a_blind_write_is_STAMPED_into_the_document_not_only_logged(monkeypatch)
     state = ledger._load()
     state["orders"][0]["outcome"] = "won"
 
-    real_load = ledger._load
+    real_read = ledger._read_for_merge
 
     def _always_broken():
         raise ledger.LedgerError("store down")
@@ -310,10 +312,10 @@ def test_a_blind_write_is_STAMPED_into_the_document_not_only_logged(monkeypatch)
     # NOT `monkeypatch.undo()`: the autouse fixture shares this monkeypatch
     # instance, so undoing here also reverts SYNDICATE_REPORTS_ROOT and the
     # read lands on a different, empty ledger. Keeping a reference to the real
-    # loader is the narrower tool.
-    monkeypatch.setattr(ledger, "_load", _always_broken)
+    # reader is the narrower tool.
+    monkeypatch.setattr(ledger, "_read_for_merge", _always_broken)
     ledger._persist(state)
-    monkeypatch.setattr(ledger, "_load", real_load)
+    monkeypatch.setattr(ledger, "_read_for_merge", real_read)
 
     stamp = ledger._load()["last_blind_write"]
     assert stamp is not None

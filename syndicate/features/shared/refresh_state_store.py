@@ -19,10 +19,13 @@ from functools import lru_cache
 import hashlib
 import json
 import os
+import random
 import re
+import threading
+import time
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, NamedTuple
 
 from syndicate.features.shared.timezone import normalize_timestamped_payload
 from syndicate.features.shared.source_roots import repo_root_from
@@ -626,8 +629,14 @@ def _log_payload_composition(key: str, payload: Any, *, top_n: int = 10) -> None
         pass
 
 
-def _guard_keyvalue_payload_size(path: Path, serialized: str, payload: Any = None) -> None:
+def _guard_keyvalue_payload_size(
+    path: Path, serialized: str, payload: Any = None, *, announce_large: bool = True
+) -> None:
     """Make an oversized keyvalue write loud instead of mysterious.
+
+    `announce_large=False` still REFUSES an oversized value but skips the
+    `KEYVALUE_WRITE_LARGE` line, for `compare_and_swap_json_file`, which checks
+    before its transaction and announces only a write that landed.
 
     #60. Three separate 2026-07-25 outages were one bug -- an unbounded
     payload crossing this boundary -- and every one of them presented as
@@ -676,6 +685,8 @@ def _guard_keyvalue_payload_size(path: Path, serialized: str, payload: Any = Non
             "the store closes the connection above roughly 9MB, which surfaces as an unrelated ConnectionError."
         )
 
+    if not announce_large:
+        return
     print(
         f"[refresh_state_store] KEYVALUE_WRITE_LARGE key={key} "
         f"size_bytes={size_bytes} warn_bytes={warn_bytes} max_bytes={max_bytes} caller={caller}",
@@ -702,6 +713,156 @@ def write_json_file(path: Path, payload: dict[str, Any]) -> None:
         _execute_keyvalue_operation(_write_json)
         return
     _atomic_write_text(path, json.dumps(normalized_payload, indent=2))
+
+
+class WriteConflict(RuntimeError):
+    """A compare-and-swap lost every attempt to a concurrent writer.
+
+    Its own type, like `KeyValuePayloadTooLarge`, so a caller can tell "somebody
+    else kept writing this path" from a transient ConnectionError. What to do
+    about it is the CALLER's decision: this module cannot know which of the two
+    possible losses -- ours, by refusing, or theirs, by writing anyway -- a given
+    document can afford.
+    """
+
+    def __init__(self, path: Path, attempts: int) -> None:
+        super().__init__(
+            f"compare-and-swap on {_state_key_for_path(path)} lost {attempts} attempt(s) to concurrent writers"
+        )
+        self.path = path
+        self.attempts = attempts
+
+
+class CasResult(NamedTuple):
+    """What `compare_and_swap_json_file` did. `attempts` is the one that committed."""
+
+    attempts: int
+    backend: str
+
+    @property
+    def conflicts(self) -> int:
+        return self.attempts - 1
+
+
+_DISK_CAS_LOCKS: dict[str, threading.Lock] = {}
+_DISK_CAS_LOCKS_GUARD = threading.Lock()
+
+
+def _disk_cas_lock(path: Path) -> threading.Lock:
+    key = _normalize_state_path(path)
+    with _DISK_CAS_LOCKS_GUARD:
+        lock = _DISK_CAS_LOCKS.get(key)
+        if lock is None:
+            lock = _DISK_CAS_LOCKS[key] = threading.Lock()
+        return lock
+
+
+def _disk_version(path: Path) -> str | None:
+    try:
+        return hashlib.sha1(path.read_bytes()).hexdigest()
+    except FileNotFoundError:
+        return None
+
+
+def _keyvalue_cas_attempt(
+    client: Any, path: Path, build: Callable[[int], dict[str, Any]], attempt: int
+) -> bool:
+    import redis
+
+    key = _state_key_for_path(path)
+    with client.pipeline(transaction=True) as pipe:
+        # WATCH BEFORE `build` READS. `build` reads through the ordinary client,
+        # on another connection, and that is sound: WATCH fails the EXEC if the
+        # key changes at ANY point after it was armed, and it was armed before
+        # the read began.
+        pipe.watch(key)
+        normalized = normalize_timestamped_payload(build(attempt))
+        serialized = json.dumps(normalized, separators=(",", ":"))
+        # Refuse an oversized document BEFORE the transaction; announce a large
+        # one only once it has landed -- see below.
+        _guard_keyvalue_payload_size(path, serialized, normalized, announce_large=False)
+        pipe.multi()
+        pipe.set(key, serialized, ex=_default_keyvalue_ttl_seconds(path))
+        try:
+            pipe.execute()
+        except redis.exceptions.WatchError:
+            return False
+    # ONE `KEYVALUE_WRITE_LARGE` LINE PER SET THAT LANDED. The 2026-09-04 lost
+    # update was reconstructed from exactly these lines, read as document
+    # versions; an aborted attempt printing one would put a version in that
+    # record that never existed.
+    _guard_keyvalue_payload_size(path, serialized, normalized)
+    _record_refresh_status_history(path)
+    return True
+
+
+def _disk_cas_attempt(path: Path, build: Callable[[int], dict[str, Any]], attempt: int) -> bool:
+    version = _disk_version(path)
+    normalized = normalize_timestamped_payload(build(attempt))
+    serialized = json.dumps(normalized, indent=2)
+    with _disk_cas_lock(path):
+        if _disk_version(path) != version:
+            return False
+        _atomic_write_text(path, serialized)
+    return True
+
+
+def compare_and_swap_json_file(
+    path: Path,
+    build: Callable[[int], dict[str, Any]],
+    *,
+    max_attempts: int = 5,
+    backoff_seconds: float = 0.05,
+) -> CasResult:
+    """Write the document `build(attempt)` returns ONLY if nothing else wrote
+    `path` after that attempt began. On a conflict, call `build` again.
+
+    `#656`. `write_json_file` is a blind SET, so a caller that reads, merges and
+    then writes -- `execution_ledger._persist` -- loses any write that lands
+    between its read and its SET, however careful the merge. Measured
+    2026-09-04: three orders in 1.1 s, one of which froze live placement on
+    both venues for six days.
+
+    THE CONTRACT: `build` does its OWN reads of `path`, inside the call. It runs
+    after the version is pinned, so what it read is exactly what this write
+    replaces, or the write does not happen. It must be safe to call more than
+    once, and it receives the attempt number (1-based).
+
+        keyvalue    WATCH, build, MULTI/SET/EXEC. A WatchError is a conflict.
+        filesystem  content hash, build, then under a lock: re-hash, replace.
+                    The lock is per path and IN-PROCESS: it serialises this
+                    process's writers, which is all the disk backend serves
+                    (local runs and tests). Two PROCESSES on one disk are
+                    narrowed to the re-hash->replace step, not closed.
+                    Production is keyvalue.
+
+    Formatting, TTL, the size refusal and the history index are exactly
+    `write_json_file`'s, so the two paths cannot drift apart.
+
+    Raises `WriteConflict` after `max_attempts` conflicts; the caller decides
+    what that costs. A retry first sleeps a jittered `backoff_seconds *
+    attempt`, so two writers that collided do not collide again in lockstep.
+    """
+    attempts = max(1, int(max_attempts))
+    keyvalue = _keyvalue_backed(path)
+    backend = "keyvalue" if keyvalue else "filesystem"
+    for attempt in range(1, attempts + 1):
+        if attempt > 1 and backoff_seconds > 0:
+            time.sleep(random.uniform(0.0, backoff_seconds * attempt))
+        if keyvalue:
+            committed = _execute_keyvalue_operation(
+                lambda client, _attempt=attempt: _keyvalue_cas_attempt(client, path, build, _attempt)
+            )
+        else:
+            committed = _disk_cas_attempt(path, build, attempt)
+        if committed:
+            return CasResult(attempts=attempt, backend=backend)
+        print(
+            f"[refresh_state_store] CAS_CONFLICT key={_state_key_for_path(path)} "
+            f"backend={backend} attempt={attempt} max_attempts={attempts}",
+            flush=True,
+        )
+    raise WriteConflict(path, attempts)
 
 
 def write_text_file(path: Path, payload: str) -> None:
