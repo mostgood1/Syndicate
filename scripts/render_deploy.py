@@ -23,6 +23,22 @@ a habit. `--allow-rollback` when it is deliberate.
 If the live SHA cannot be read the guard steps aside rather than blocking: a
 deploy must not fail because telemetry did.
 
+`--reinject-env` IS THE ONE CASE WHERE "ALREADY LIVE" IS NOT A NO-OP, and it
+exists because refusing it forced a worse deploy. An env change does not reach
+the running process -- a restart does not re-inject, only a deploy does -- so
+"the env is wrong, the code is right" is a real state, and the MINIMAL fix for
+it is a deploy of the commit already live. Without this flag the only ways to
+express that are (a) deploy forward to `origin/main`, shipping every other
+lane's code as collateral and making any post-deploy reading ambiguous, or
+(b) POST to the API by hand, which is exactly the bypass `deploy-guard.py`
+guards shape 2 against. Measured 2026-09-09: web's gunicorn access log had been
+dead 13 h with the corrected `GUNICORN_CMD_ARGS` sitting uninjected, and the
+forward deploy would have carried 6,217 lines from five other lanes.
+
+It is still a real deploy: same claim, same preflight, same restart, and the
+rollback guard is untouched (target == live is not a rollback). It only says
+that a same-commit POST is deliberate.
+
     py -3 scripts/render_deploy.py --service web --commit d4bb29b5
     py -3 scripts/render_deploy.py --service refresh-worker --commit HEAD --json
     py -3 scripts/render_deploy.py --service refresh-worker --commit 03073270 --allow-rollback
@@ -49,12 +65,46 @@ SERVICE_IDS = {
 }
 
 
+def _main_worktree_root() -> Path:
+    """The main working tree's root, or this one if git cannot say.
+
+    `.env` is gitignored, so a session worktree -- which the protocol says is
+    where lane work happens -- has none, and this script died with an empty key
+    when run from there. Falling back to the main tree is what
+    `snapshot_render_env.py` already does.
+    """
+    here = Path(__file__).resolve().parent.parent
+    for args in (["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                 ["git", "rev-parse", "--git-common-dir"]):
+        try:
+            done = subprocess.run(args, cwd=str(here), capture_output=True,
+                                  text=True, timeout=15)
+        except Exception:
+            continue
+        if done.returncode != 0:
+            continue
+        raw = (done.stdout or "").strip()
+        if not raw:
+            continue
+        common = Path(raw)
+        if not common.is_absolute():
+            common = (here / common).resolve()
+        if common.name == ".git" and common.parent.is_dir():
+            return common.parent
+    return here
+
+
 def _load_api_key() -> str:
     key = os.environ.get("RENDER_API_KEY", "").strip()
     if key:
         return key
-    env_path = Path(__file__).resolve().parent.parent / ".env"
-    if env_path.is_file():
+    here = Path(__file__).resolve().parent.parent
+    seen = set()
+    for root in (here, _main_worktree_root()):
+        env_path = (root / ".env").resolve()
+        if env_path in seen or not env_path.is_file():
+            continue
+        seen.add(env_path)
         for line in env_path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if not line or line.startswith("#") or "=" not in line:
@@ -123,6 +173,10 @@ def main() -> int:
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--allow-rollback", action="store_true",
                         help="deploy even if it would move production BACKWARDS")
+    parser.add_argument("--reinject-env", action="store_true",
+                        help="allow a SAME-COMMIT deploy: the code is already "
+                             "right and an env change needs a deploy to reach "
+                             "the running process")
     args = parser.parse_args()
 
     key = _load_api_key()
@@ -140,10 +194,17 @@ def main() -> int:
                   f"or pass --allow-rollback if you know what you are doing",
                   file=sys.stderr)
             return 2
-        if target == live:
-            print(f"{args.service} is ALREADY live on {live[:8]} -- nothing to deploy.",
+        if target == live and not args.reinject_env:
+            print(f"{args.service} is ALREADY live on {live[:8]} -- nothing to deploy.\n"
+                  f"If the CODE is already right and the ENV is what changed, that is\n"
+                  f"a real deploy and not a no-op: pass --reinject-env. A restart does\n"
+                  f"NOT re-inject env vars; only a deploy does.",
                   file=sys.stderr)
             return 2
+        if target == live:
+            print(f"--reinject-env: deploying {args.service} on the SHA it already runs "
+                  f"({live[:8]}). Zero code delta; the env is the only changed variable.",
+                  file=sys.stderr)
         if not _is_ancestor(live, target):
             print(
                 f"REFUSING: {args.service} is live on {live[:8]}, which is NOT an\n"

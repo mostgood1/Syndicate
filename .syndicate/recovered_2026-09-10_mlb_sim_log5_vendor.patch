@@ -1,0 +1,966 @@
+diff --git a/vendor/mlb_bettingv2/data/tuning/hitter_props_calibration/default.json b/vendor/mlb_bettingv2/data/tuning/hitter_props_calibration/default.json
+index b0461657..2099e149 100644
+--- a/vendor/mlb_bettingv2/data/tuning/hitter_props_calibration/default.json
++++ b/vendor/mlb_bettingv2/data/tuning/hitter_props_calibration/default.json
+@@ -1,5 +1,50 @@
+ {
+   "enabled": true,
++  "_meta": {
++    "generated_at": "2026-09-01",
++    "description": "Hitter-props affine-logit calibration, refit via fit_hitter_prob_calibration.py against PRODUCTION sim_vs_actual batches pulled from Render (/api/ops/artifacts/export), season_2026_ui_daily_live. Three-way chronological split: FIT 30 days 2026-06-14..08-11 (--batch-dir); VAL 10 days 08-12..08-21 (--val-batch-dir, used for L2 selection AND for per-prop config selection, so it is NOT held out); TEST 10 days 08-22..08-31, touched by neither and used only for the final read below.",
++    "held_out_test": {
++      "window": "2026-08-22..2026-08-31",
++      "n_observations": 48708,
++      "raw_no_calibration": {
++        "logloss": 0.37859,
++        "brier": 0.11842
++      },
++      "incumbent_2026_07_17": {
++        "logloss": 0.37889,
++        "brier": 0.1186
++      },
++      "this_config": {
++        "logloss": 0.37535,
++        "brier": 0.11856
++      },
++      "verdict": "This config beats the 2026-07-17 incumbent on BOTH metrics. The incumbent had gone STALE and was measurably WORSE THAN NO CALIBRATION AT ALL on this window (logloss 0.37889 vs raw 0.37859, brier 0.11860 vs 0.11842) -- replacing it is the change; the gain over raw is logloss-only and Brier is ~flat."
++    },
++    "per_prop_source": {
++      "doubles_1plus": "refit_2026_09_01",
++      "hits_1plus": "refit_2026_09_01",
++      "hits_2plus": "refit_2026_09_01",
++      "hits_3plus": "kept_2026_07_17",
++      "rbi_1plus": "refit_2026_09_01",
++      "rbi_2plus": "refit_2026_09_01",
++      "rbi_3plus": "refit_2026_09_01",
++      "rbi_4plus": "kept_2026_07_17",
++      "runs_1plus": "refit_2026_09_01",
++      "runs_2plus": "refit_2026_09_01",
++      "runs_3plus": "refit_2026_09_01",
++      "sb_1plus": "refit_2026_09_01",
++      "total_bases_1plus": "refit_2026_09_01",
++      "total_bases_2plus": "refit_2026_09_01",
++      "total_bases_3plus": "refit_2026_09_01",
++      "total_bases_4plus": "refit_2026_09_01",
++      "total_bases_5plus": "refit_2026_09_01",
++      "triples_1plus": "refit_2026_09_01"
++    },
++    "discharges_prior_followup": "The 2026-07-17 _meta excluded doubles_1plus, sb_1plus and triples_1plus as 'plausible but not confidently validated in the time available ... pending dedicated follow-up'. All three are now fitted and all three IMPROVE on the untouched TEST split (doubles 0.4071->0.4010, sb 0.3061->0.2363, triples 0.0753->0.0640 logloss). That follow-up is discharged.",
++    "hits_runs_rbis_deliberately_absent": "HRR carries NO entry, deliberately, and the reasoning below CORRECTS the note this field held on 2026-09-01 earlier the same day. WITHDRAWN: 'the fit pins the slope at the clamp floor (a=0.05), therefore HRR's probability carries no usable signal.' The clamp-floor fit was an ARTIFACT OF A CONTAMINATED FIT WINDOW -- 1,422 of 7,074 HRR observations in it (20.1%) were literal zeros from the producer null, while VAL and TEST contained none and the hits_1plus control contained none anywhere. CORRECTED: refit on clean dates only, HRR produces healthy slopes (2plus a=0.772, 3plus 0.789, 4plus 0.929, 5plus 1.137). Its probability is NOT signal-free. THE DECISION STANDS ON A DIFFERENT BASIS: even the clean-data fit REGRESSES HRR on the held-out window (2plus 0.6690->0.6740, 3plus 0.5570->0.5603, 4plus 0.4102->0.4149), so the fitted affine-logit correction does not generalise and HRR is left alone. Adding it later requires a fresh held-out reading, not a re-reading of this note.",
++    "reproduce": "scripts/fit_mlb_prop_calibration.py --help",
++    "hits_runs_rbis_producer_null_closed": "The producer null that todo #624 step 2 was opened for is ALREADY FIXED and step 2 is not actionable. Measured on production 2026-09-01: all 993 zero-probability graded HRR rows fall in 2026-06-04..07-08; from 08-07 every graded HRR row is non-zero. On the batch surface the boundary is exact -- 100% zeros on six dates (2026-06-14..06-25), 0% on all 43 dates from 07-20 onward. CONSEQUENCE FOR ANY FUTURE EVALUATION: a window spanning June/early-July is contaminated for HRR, and the assessment's '14.2% of the prop book is staked off a null' is true of ITS window and false of today. scripts/fit_mlb_prop_calibration.py now detects and excludes wholly-degenerate dates."
++  },
+   "default": {
+     "enabled": true,
+     "mode": "affine_logit",
+@@ -7,47 +52,69 @@
+     "b": 0.0
+   },
+   "props": {
++    "doubles_1plus": {
++      "enabled": true,
++      "mode": "affine_logit",
++      "a": 0.43567710428169015,
++      "b": -1.121381759908393,
++      "diag": {
++        "n": 7074,
++        "iters": 4,
++        "nll_before": 2860.8399304876784,
++        "nll_after": 2801.8212135366603,
++        "sum_w": 7074.0,
++        "prior_a": 1.0,
++        "prior_b": 0.0,
++        "l2_a": 10.0,
++        "l2_b": 10.0,
++        "val_logloss": 0.3959965875493136,
++        "val_brier": 0.11735059925134915,
++        "selected_l2": 10.0,
++        "selected_l2_b": 10.0,
++        "rank_weight_alpha": 0.0
++      }
++    },
+     "hits_1plus": {
+       "enabled": true,
+       "mode": "affine_logit",
+-      "a": 0.8129457117071183,
+-      "b": -0.30958458112821413,
++      "a": 0.7882212733209201,
++      "b": -0.21158018743212978,
+       "diag": {
+-        "n": 7470,
++        "n": 7074,
+         "iters": 4,
+-        "nll_before": 5260.882228124622,
+-        "nll_after": 5095.824044122319,
+-        "sum_w": 7470.0,
++        "nll_before": 5025.3880096468865,
++        "nll_after": 4871.358179985068,
++        "sum_w": 7074.0,
+         "prior_a": 1.0,
+         "prior_b": 0.0,
+-        "l2_a": 0.001,
+-        "l2_b": 0.001,
+-        "val_logloss": 0.6796299682682525,
+-        "val_brier": 0.24328607254891263,
+-        "selected_l2": 0.001,
+-        "selected_l2_b": 0.001,
++        "l2_a": 1000.0,
++        "l2_b": 1000.0,
++        "val_logloss": 0.6702582712133123,
++        "val_brier": 0.23869249986408084,
++        "selected_l2": 1000.0,
++        "selected_l2_b": 1000.0,
+         "rank_weight_alpha": 0.0
+       }
+     },
+     "hits_2plus": {
+       "enabled": true,
+       "mode": "affine_logit",
+-      "a": 0.8729091530049566,
+-      "b": -0.488443882978567,
++      "a": 0.7014791092432703,
++      "b": -0.7484946665960454,
+       "diag": {
+-        "n": 7470,
++        "n": 7074,
+         "iters": 4,
+-        "nll_before": 3760.9986899766327,
+-        "nll_after": 3679.016066200228,
+-        "sum_w": 7470.0,
++        "nll_before": 3619.4059958070898,
++        "nll_after": 3454.4557040899163,
++        "sum_w": 7074.0,
+         "prior_a": 1.0,
+         "prior_b": 0.0,
+-        "l2_a": 0.001,
+-        "l2_b": 0.001,
+-        "val_logloss": 0.49436451974793694,
+-        "val_brier": 0.158058229021527,
+-        "selected_l2": 0.001,
+-        "selected_l2_b": 0.001,
++        "l2_a": 30.0,
++        "l2_b": 30.0,
++        "val_logloss": 0.47693329009689306,
++        "val_brier": 0.15136815118463084,
++        "selected_l2": 30.0,
++        "selected_l2_b": 30.0,
+         "rank_weight_alpha": 0.0
+       }
+     },
+@@ -73,281 +140,313 @@
+         "rank_weight_alpha": 0.0
+       }
+     },
+-    "runs_1plus": {
++    "rbi_1plus": {
+       "enabled": true,
+       "mode": "affine_logit",
+-      "a": 1.1232466727682764,
+-      "b": -0.03655718436797566,
++      "a": 0.8612969150003876,
++      "b": -0.358324938205423,
+       "diag": {
+-        "n": 7470,
++        "n": 7074,
+         "iters": 4,
+-        "nll_before": 4825.545237218815,
+-        "nll_after": 4817.089419327364,
+-        "sum_w": 7470.0,
++        "nll_before": 4149.034556528384,
++        "nll_after": 4091.250220089119,
++        "sum_w": 7074.0,
+         "prior_a": 1.0,
+         "prior_b": 0.0,
+-        "l2_a": 1.0,
+-        "l2_b": 1.0,
+-        "val_logloss": 0.6423742691543537,
+-        "val_brier": 0.22521160882925137,
+-        "selected_l2": 1.0,
+-        "selected_l2_b": 1.0,
++        "l2_a": 100.0,
++        "l2_b": 100.0,
++        "val_logloss": 0.5705407446559084,
++        "val_brier": 0.19177679082203875,
++        "selected_l2": 100.0,
++        "selected_l2_b": 100.0,
+         "rank_weight_alpha": 0.0
+       }
+     },
+-    "runs_2plus": {
++    "rbi_2plus": {
+       "enabled": true,
+       "mode": "affine_logit",
+-      "a": 0.9261234940132834,
+-      "b": -0.19228897242508147,
++      "a": 0.7235289496738657,
++      "b": -0.8181627818279358,
+       "diag": {
+-        "n": 7470,
+-        "iters": 3,
+-        "nll_before": 2038.9209939967657,
+-        "nll_after": 2038.6402293734475,
+-        "sum_w": 7470.0,
++        "n": 7074,
++        "iters": 4,
++        "nll_before": 2269.7647941226,
++        "nll_after": 2230.3694164673816,
++        "sum_w": 7074.0,
+         "prior_a": 1.0,
+         "prior_b": 0.0,
+-        "l2_a": 1.0,
+-        "l2_b": 1.0,
+-        "val_logloss": 0.2715718448547393,
+-        "val_brier": 0.07227793262372104,
+-        "selected_l2": 1.0,
+-        "selected_l2_b": 1.0,
++        "l2_a": 10.0,
++        "l2_b": 10.0,
++        "val_logloss": 0.2996282792527188,
++        "val_brier": 0.0817250326194527,
++        "selected_l2": 10.0,
++        "selected_l2_b": 10.0,
+         "rank_weight_alpha": 0.0
+       }
+     },
+-    "runs_3plus": {
++    "rbi_3plus": {
+       "enabled": true,
+       "mode": "affine_logit",
+-      "a": 0.7993665199869558,
+-      "b": -0.7677512074101701,
++      "a": 1.1082234689950647,
++      "b": -0.052743929541283804,
+       "diag": {
+-        "n": 7470,
++        "n": 7074,
+         "iters": 4,
+-        "nll_before": 482.2322910372818,
+-        "nll_after": 481.15054606023256,
+-        "sum_w": 7470.0,
++        "nll_before": 965.4929656182464,
++        "nll_after": 940.9650615447678,
++        "sum_w": 7074.0,
+         "prior_a": 1.0,
+         "prior_b": 0.0,
+-        "l2_a": 0.001,
+-        "l2_b": 0.001,
+-        "val_logloss": 0.07327561385696273,
+-        "val_brier": 0.013689041477399376,
+-        "selected_l2": 0.001,
+-        "selected_l2_b": 0.001,
++        "l2_a": 1000.0,
++        "l2_b": 1000.0,
++        "val_logloss": 0.1417911732909422,
++        "val_brier": 0.031937712428131454,
++        "selected_l2": 1000.0,
++        "selected_l2_b": 1000.0,
+         "rank_weight_alpha": 0.0
+       }
+     },
+-    "rbi_1plus": {
++    "rbi_4plus": {
+       "enabled": true,
+       "mode": "affine_logit",
+-      "a": 1.0343659492570847,
+-      "b": -0.08244353255152793,
++      "a": 0.817374617969368,
++      "b": -1.0153344413443937,
+       "diag": {
+         "n": 7470,
+         "iters": 4,
+-        "nll_before": 4384.438453929773,
+-        "nll_after": 4375.066845536774,
++        "nll_before": 426.3321888666202,
++        "nll_after": 423.15562636374204,
+         "sum_w": 7470.0,
+         "prior_a": 1.0,
+         "prior_b": 0.0,
+-        "l2_a": 0.001,
+-        "l2_b": 0.001,
+-        "val_logloss": 0.5849571318094939,
+-        "val_brier": 0.19817060570952832,
+-        "selected_l2": 0.001,
+-        "selected_l2_b": 0.001,
++        "l2_a": 1.0,
++        "l2_b": 1.0,
++        "val_logloss": 0.05971144862089018,
++        "val_brier": 0.010808534095367514,
++        "selected_l2": 1.0,
++        "selected_l2_b": 1.0,
+         "rank_weight_alpha": 0.0
+       }
+     },
+-    "rbi_2plus": {
++    "runs_1plus": {
+       "enabled": true,
+       "mode": "affine_logit",
+-      "a": 1.010347066637928,
+-      "b": -0.021093368165238536,
++      "a": 0.8742687256552696,
++      "b": -0.28150445157968135,
+       "diag": {
+-        "n": 7470,
+-        "iters": 3,
+-        "nll_before": 2463.3923650456863,
+-        "nll_after": 2462.7546321803993,
+-        "sum_w": 7470.0,
++        "n": 7074,
++        "iters": 4,
++        "nll_before": 4618.508122316789,
++        "nll_after": 4555.444967188505,
++        "sum_w": 7074.0,
+         "prior_a": 1.0,
+         "prior_b": 0.0,
+-        "l2_a": 0.001,
+-        "l2_b": 0.001,
+-        "val_logloss": 0.32656236611443396,
+-        "val_brier": 0.0909146955020142,
+-        "selected_l2": 0.001,
+-        "selected_l2_b": 0.001,
++        "l2_a": 300.0,
++        "l2_b": 300.0,
++        "val_logloss": 0.6273418781240947,
++        "val_brier": 0.21836662678711063,
++        "selected_l2": 300.0,
++        "selected_l2_b": 300.0,
+         "rank_weight_alpha": 0.0
+       }
+     },
+-    "rbi_3plus": {
++    "runs_2plus": {
+       "enabled": true,
+       "mode": "affine_logit",
+-      "a": 0.9296633982184584,
+-      "b": -0.3770837833775959,
++      "a": 0.6914549333898226,
++      "b": -1.107618834404751,
+       "diag": {
+-        "n": 7470,
+-        "iters": 4,
+-        "nll_before": 1100.6571638946762,
+-        "nll_after": 1097.375860869554,
+-        "sum_w": 7470.0,
++        "n": 7074,
++        "iters": 5,
++        "nll_before": 1795.2399524385728,
++        "nll_after": 1724.7257701757842,
++        "sum_w": 7074.0,
+         "prior_a": 1.0,
+         "prior_b": 0.0,
+-        "l2_a": 1.0,
+-        "l2_b": 1.0,
+-        "val_logloss": 0.15860634324470813,
+-        "val_brier": 0.03626326160124311,
+-        "selected_l2": 1.0,
+-        "selected_l2_b": 1.0,
++        "l2_a": 10.0,
++        "l2_b": 10.0,
++        "val_logloss": 0.25417193784631475,
++        "val_brier": 0.06625526025954671,
++        "selected_l2": 10.0,
++        "selected_l2_b": 10.0,
+         "rank_weight_alpha": 0.0
+       }
+     },
+-    "rbi_4plus": {
++    "runs_3plus": {
+       "enabled": true,
+       "mode": "affine_logit",
+-      "a": 0.817374617969368,
+-      "b": -1.0153344413443937,
++      "a": 0.1824074110113749,
++      "b": -4.031575786592906,
+       "diag": {
+-        "n": 7470,
+-        "iters": 4,
+-        "nll_before": 426.3321888666202,
+-        "nll_after": 423.15562636374204,
+-        "sum_w": 7470.0,
++        "n": 7074,
++        "iters": 6,
++        "nll_before": 373.9677952776428,
++        "nll_after": 329.2549808190909,
++        "sum_w": 7074.0,
+         "prior_a": 1.0,
+         "prior_b": 0.0,
+-        "l2_a": 1.0,
+-        "l2_b": 1.0,
+-        "val_logloss": 0.05971144862089018,
+-        "val_brier": 0.010808534095367514,
+-        "selected_l2": 1.0,
+-        "selected_l2_b": 1.0,
++        "l2_a": 0.3,
++        "l2_b": 0.3,
++        "val_logloss": 0.0684835306275068,
++        "val_brier": 0.012461046879310985,
++        "selected_l2": 0.3,
++        "selected_l2_b": 0.3,
++        "rank_weight_alpha": 0.0
++      }
++    },
++    "sb_1plus": {
++      "enabled": true,
++      "mode": "affine_logit",
++      "a": 0.08127761841633653,
++      "b": -2.305299483144907,
++      "diag": {
++        "n": 7074,
++        "iters": 6,
++        "nll_before": 2026.7500702948605,
++        "nll_after": 1596.7178789376555,
++        "sum_w": 7074.0,
++        "prior_a": 1.0,
++        "prior_b": 0.0,
++        "l2_a": 0.0,
++        "l2_b": 0.0,
++        "val_logloss": 0.215133211609465,
++        "val_brier": 0.053285590203763035,
++        "selected_l2": 0.0,
++        "selected_l2_b": 0.0,
+         "rank_weight_alpha": 0.0
+       }
+     },
+     "total_bases_1plus": {
+       "enabled": true,
+       "mode": "affine_logit",
+-      "a": 0.8129457117071183,
+-      "b": -0.30958458112821413,
++      "a": 0.7882212733209201,
++      "b": -0.21158018743212978,
+       "diag": {
+-        "n": 7470,
++        "n": 7074,
+         "iters": 4,
+-        "nll_before": 5260.882228124622,
+-        "nll_after": 5095.824044122319,
+-        "sum_w": 7470.0,
++        "nll_before": 5025.3880096468865,
++        "nll_after": 4871.358179985068,
++        "sum_w": 7074.0,
+         "prior_a": 1.0,
+         "prior_b": 0.0,
+-        "l2_a": 0.001,
+-        "l2_b": 0.001,
+-        "val_logloss": 0.6796299682682525,
+-        "val_brier": 0.24328607254891263,
+-        "selected_l2": 0.001,
+-        "selected_l2_b": 0.001,
++        "l2_a": 1000.0,
++        "l2_b": 1000.0,
++        "val_logloss": 0.6702582712133123,
++        "val_brier": 0.23869249986408084,
++        "selected_l2": 1000.0,
++        "selected_l2_b": 1000.0,
+         "rank_weight_alpha": 0.0
+       }
+     },
+     "total_bases_2plus": {
+       "enabled": true,
+       "mode": "affine_logit",
+-      "a": 0.8731302767226239,
+-      "b": -0.2110572866115072,
++      "a": 0.7250349027680957,
++      "b": -0.40158518032308305,
+       "diag": {
+-        "n": 7470,
+-        "iters": 3,
+-        "nll_before": 4710.777682628566,
+-        "nll_after": 4693.294086267436,
+-        "sum_w": 7470.0,
++        "n": 7074,
++        "iters": 4,
++        "nll_before": 4494.051310807411,
++        "nll_after": 4407.365910552774,
++        "sum_w": 7074.0,
+         "prior_a": 1.0,
+         "prior_b": 0.0,
+-        "l2_a": 1.0,
+-        "l2_b": 1.0,
+-        "val_logloss": 0.6245166801702768,
+-        "val_brier": 0.2168224049439395,
+-        "selected_l2": 1.0,
+-        "selected_l2_b": 1.0,
++        "l2_a": 100.0,
++        "l2_b": 100.0,
++        "val_logloss": 0.5981986648621559,
++        "val_brier": 0.20473135838803966,
++        "selected_l2": 100.0,
++        "selected_l2_b": 100.0,
+         "rank_weight_alpha": 0.0
+       }
+     },
+     "total_bases_3plus": {
+       "enabled": true,
+       "mode": "affine_logit",
+-      "a": 0.8284343477183266,
+-      "b": -0.16783582949281917,
++      "a": 0.8551004751269042,
++      "b": -0.31820850263560196,
+       "diag": {
+-        "n": 7470,
++        "n": 7074,
+         "iters": 4,
+-        "nll_before": 3733.520568299024,
+-        "nll_after": 3728.4914742656074,
+-        "sum_w": 7470.0,
++        "nll_before": 3439.835636779022,
++        "nll_after": 3419.498637735258,
++        "sum_w": 7074.0,
+         "prior_a": 1.0,
+         "prior_b": 0.0,
+-        "l2_a": 1.0,
+-        "l2_b": 1.0,
+-        "val_logloss": 0.4939684667451564,
+-        "val_brier": 0.1580302254251404,
+-        "selected_l2": 1.0,
+-        "selected_l2_b": 1.0,
++        "l2_a": 100.0,
++        "l2_b": 100.0,
++        "val_logloss": 0.45368890901084075,
++        "val_brier": 0.14199940570735717,
++        "selected_l2": 100.0,
++        "selected_l2_b": 100.0,
+         "rank_weight_alpha": 0.0
+       }
+     },
+     "total_bases_4plus": {
+       "enabled": true,
+       "mode": "affine_logit",
+-      "a": 0.9356555591402093,
+-      "b": 0.14555416998143364,
++      "a": 0.7843008468047663,
++      "b": -0.42271184111210186,
+       "diag": {
+-        "n": 7470,
++        "n": 7074,
+         "iters": 4,
+-        "nll_before": 3113.73267822382,
+-        "nll_after": 3080.9119513260302,
+-        "sum_w": 7470.0,
++        "nll_before": 2719.7129815877042,
++        "nll_after": 2709.6510290175397,
++        "sum_w": 7074.0,
+         "prior_a": 1.0,
+         "prior_b": 0.0,
+-        "l2_a": 0.001,
+-        "l2_b": 0.001,
+-        "val_logloss": 0.39974097176049905,
+-        "val_brier": 0.11967565875554786,
+-        "selected_l2": 0.001,
+-        "selected_l2_b": 0.001,
++        "l2_a": 30.0,
++        "l2_b": 30.0,
++        "val_logloss": 0.35045181793208025,
++        "val_brier": 0.10126595494302053,
++        "selected_l2": 30.0,
++        "selected_l2_b": 30.0,
+         "rank_weight_alpha": 0.0
+       }
+     },
+     "total_bases_5plus": {
+       "enabled": true,
+       "mode": "affine_logit",
+-      "a": 0.8458494541819349,
+-      "b": -0.227572200686316,
++      "a": 0.722716192325312,
++      "b": -0.846169468541303,
+       "diag": {
+-        "n": 7470,
++        "n": 7074,
+         "iters": 4,
+-        "nll_before": 1846.2350024104167,
+-        "nll_after": 1836.7348026851682,
+-        "sum_w": 7470.0,
++        "nll_before": 1598.6105226952207,
++        "nll_after": 1581.4569495299322,
++        "sum_w": 7074.0,
+         "prior_a": 1.0,
+         "prior_b": 0.0,
+-        "l2_a": 1.0,
+-        "l2_b": 1.0,
+-        "val_logloss": 0.23479097734807974,
+-        "val_brier": 0.06003599618081049,
+-        "selected_l2": 1.0,
+-        "selected_l2_b": 1.0,
++        "l2_a": 10.0,
++        "l2_b": 10.0,
++        "val_logloss": 0.22576634891325667,
++        "val_brier": 0.05738462475683923,
++        "selected_l2": 10.0,
++        "selected_l2_b": 10.0,
++        "rank_weight_alpha": 0.0
++      }
++    },
++    "triples_1plus": {
++      "enabled": true,
++      "mode": "affine_logit",
++      "a": 0.05,
++      "b": -4.016758713362727,
++      "diag": {
++        "n": 7074,
++        "iters": 8,
++        "nll_before": 601.0754949238831,
++        "nll_after": 528.6583248890563,
++        "sum_w": 7074.0,
++        "prior_a": 1.0,
++        "prior_b": 0.0,
++        "l2_a": 0.0,
++        "l2_b": 0.0,
++        "val_logloss": 0.05980930578544626,
++        "val_brier": 0.010630781003227105,
++        "selected_l2": 0.0,
++        "selected_l2_b": 0.0,
+         "rank_weight_alpha": 0.0
+       }
+     }
+-  },
+-  "_meta": {
+-    "generated_at": "2026-07-17",
+-    "description": "Hitter-props affine-logit calibration fit via fit_hitter_prob_calibration.py against the 2026-season backfill, tune=35/holdout=11 days (seed 2026, matching the starter-hook sweep split), L2 selected per-prop via holdout logloss grid [0.001,0.01,0.05,0.1,0.3,1.0].",
+-    "excluded_thin_sample": [
+-      "doubles_1plus",
+-      "sb_1plus",
+-      "triples_1plus"
+-    ],
+-    "excluded_reason": "Correction magnitude (a~0.2-0.3) barely moved even at max tested L2=1.0 on a comparatively thin positive-event sample (rare extra-base-hit/steal events within n=7470 PA observations) -- plausible but not confidently validated in the time available. Left uncalibrated (a=1,b=0 via default) pending dedicated follow-up.",
+-    "source_batch_tune": "data/eval/batches/hitter_calib_tune (35 days)",
+-    "source_batch_holdout": "data/eval/batches/hitter_calib_holdout (11 days)"
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/vendor/mlb_bettingv2/data/tuning/manager_pitching_overrides/forward_start_2026_04_14_v1.json b/vendor/mlb_bettingv2/data/tuning/manager_pitching_overrides/forward_start_2026_04_14_v1.json
+index 58fdf850..a54702e7 100644
+--- a/vendor/mlb_bettingv2/data/tuning/manager_pitching_overrides/forward_start_2026_04_14_v1.json
++++ b/vendor/mlb_bettingv2/data/tuning/manager_pitching_overrides/forward_start_2026_04_14_v1.json
+@@ -1,13 +1,66 @@
+ {
+   "_meta": {
+-    "generated_at": "2026-07-17",
+-    "description": "First forward-tuning override for the MLB manager_pitching='v2' model. Fitted via sweep_mgr_starter_hook_add_pitches.py against the 2026-season backfill (35 tune days / 11 disjoint holdout days, seed 2026, 100 sims/game), across two sweeps totaling grid [-14,-11,-8,-5,-2]. See vendor/mlb_bettingv2/data/eval/batches/tuning_mgr_starter_hook_add_pitches/20260717_154342 and .../20260717_214518 for full sweep artifacts, and Syndicate/mlb_sim_accuracy_assessment_and_optimization_plan.md Phase 1 item #1.",
+-    "selected_value": -11,
+-    "rationale": "Only tested value landing inside the Phase 1 target of pitch bias within +/-2 (holdout bias +1.35, tune +0.87) while also clearing SO MAE <2.0 (1.97) and outs MAE <5.0 (4.25), with zero measurable regression to ML brier, totals MAE, or the hitter-HR guardrail. -8 undershoots the bias target (+3.63 holdout); -14 overshoots and fails the sweep's own holdout-MAE guardrail (14.71 vs baseline 14.15, bias flips to -0.86).",
+-    "baseline_holdout_pitch_bias": 9.76,
+-    "selected_holdout_pitch_bias": 1.35,
+-    "holdout_games": 11,
+-    "tune_games": 35
++    "description": "Forward-tuning overrides for manager_pitching='v2', active for any sim date >= 2026-04-14 via should_use_forward_tuning(). Each key below has its own provenance block. See Syndicate/mlb_sim_accuracy_assessment_and_optimization_plan.md Phase 1 item #1 for full context.",
++    "starter_hook_add_pitches": {
++      "generated_at": "2026-07-19",
++      "description": "Re-fit of the starter-hook-add-pitches override for the MLB manager_pitching='v2' model, made necessary by promoting log5/odds-ratio combination for hr_tgt/inplay_hit in sim_engine/pitch_model.py (2026-07-19) -- that change shifted the raw pitch-count bias curve enough that the prior fit (-11, from 2026-07-17 against the naive-average combiner) no longer lands near zero. Re-swept manually against the same 35-tune/11-holdout 2026-season backfill (seed 2026, 100 sims/game), grid [-12,-13,-14] under the new log5 combiner, calibration disabled to see the raw effect. See the log5 combiner promotion note in pitch_model.py's _combined().",
++      "selected_value": -13,
++      "rationale": "Clean, monotonic bracket: -12 -> holdout bias +0.73 (tune), -13 -> holdout bias +0.44 / essentially zero on tune (-0.02), -14 -> overshoots negative (tune -0.73). -13 lands closest to zero on both tune and holdout without overshooting, and is a materially better pitch-count fit than the prior -11 value ever achieved even under the old naive-average combiner (holdout bias was +1.35 at best).",
++      "previous_fit": {
++        "generated_at": "2026-07-17",
++        "selected_value": -11,
++        "context": "Fit against the naive-average rate combiner (pre-log5). Grid [-14,-11,-8,-5,-2]. Superseded by this entry once log5 combination was promoted for hr/inplay_hit.",
++        "baseline_holdout_pitch_bias": 9.76,
++        "selected_holdout_pitch_bias": 1.35
++      },
++      "baseline_holdout_pitch_bias_under_log5": 1.90,
++      "selected_holdout_pitch_bias_under_log5": 0.44,
++      "holdout_games": 11,
++      "tune_games": 35
++    },
++    "starter_hook_stamina_excess_weight": {
++      "generated_at": "2026-07-20",
++      "description": "New tunable added 2026-07-20: sim_engine/simulate.py's _starter_effective_hook previously hardcoded a 0.25 weight on stamina above the manager's baseline hook -- min(base,stamina) discarded any excess entirely, then only 25% of it was credited back, while below-baseline stamina got full credit via the min(). This severely dampened upside for high-stamina workhorses (a maxed-out stamina_pitches=115 vs base=95 only reached eff_hook=100, barely above a league-average pitcher's 92), which combined with a real data-attribution bug in _derive_stamina_pitches_from_season_stats (season-total pitches divided by start count alone, corrupting estimates for mixed-role pitchers -- see build_roster.py fix same day) to make pitcher pitch-count projections converge toward a narrow band regardless of real ace-vs-back-end differences. Fixed the data-attribution bug directly in code; made the 0.25 weight tunable and swept it here since it's a genuine magnitude question, not a correctness bug. Swept grid [0.25,0.50,0.75,1.00] against the same 35-tune/11-holdout 2026-season backfill, on top of the stamina fix + the newly-populated Statcast player-feature set (see data/statcast/features/) + selective log5 + starter_hook_add_pitches=-13.",
++      "selected_value": 0.75,
++      "rationale": "Clean monotonic tune-day trend crossing zero near weight=1.00 (0.25->-0.63, 0.50->-0.38, 0.75->-0.15, 1.00->+0.06), but holdout generalization favored 0.75 over 1.00 (holdout bias +0.20 vs +0.39, outs_mae 3.877 vs 3.914) -- the tune-day optimum didn't hold on holdout, so the more conservative value was selected. HR/hits/total-runs metrics stayed completely flat across the whole grid (hr_avg_p 0.0945-0.0946, full_mae_total_runs 3.539-3.548), confirming this change is cleanly isolated to pitcher workload with no side effects.",
++      "old_hardcoded_value": 0.25,
++      "holdout_games": 11,
++      "tune_games": 35
++    },
++    "starter_quality_hook_weight": {
++      "generated_at": "2026-08-01",
++      "description": "New tunable: eff_hook (_starter_effective_hook, above) is driven entirely by stamina_pitches -- a workload-history proxy -- with no channel at all for the starter's own pitching quality. Confirmed via real roster-artifact dump: Chris Sale (.336 K-rate) and Nick Martinez (.116 K-rate) both derived to stamina_pitches=89 on the same slate. A live pull-decision trace confirmed eff_hook does correctly drive real pull timing (corr 0.51 with actual pitch-count-at-removal), ruling out the mechanism itself -- it's purely a missing-signal problem. _starter_matchup_hook_adjustment already gives the *opposing* lineup's quality this kind of influence; _starter_quality_hook_delta (sim_engine/simulate.py) gives the pitcher's own quality the same, using K-BB% (K-rate minus BB-rate, a standard sabermetric quality proxy) rather than raw K-rate. A first cut using raw K-rate deviation from a fixed constant, hand-tuned by weight, was tested at weight=0.7 and 0.35 across the full 46-date/1210-start backtest and found real but badly miscalibrated (overshot elite into over-projection, made mid-high tier *worse* at every tested weight). Root-caused via OLS regression of real per-start outs bias against K-BB% (n=1210): corr=-0.236, R^2=0.056, zero-crossing 0.307, slope -15.29 outs/unit -- replaced the hand-tuned formula with these fitted coefficients directly (starter_quality_hook_reference/_slope/_max_pitches, left at their code defaults; only the weight is promoted here).",
++      "selected_value": 1.0,
++      "rationale": "At weight=1.0 (applying the fitted regression directly, capped at max_pitches=10), all four market-line tiers moved the correct direction or stayed flat -- elite -0.416->-0.462 outs bias (flat), mid-high +0.993->+0.732 (improved, the tier that got *worse* under every hand-tuned attempt), mid +2.125->+1.782 (improved), back-end +3.035->+2.659 (improved). Modest magnitude (closes ~12-26% of each tier's gap), consistent with the weak individual-pitcher R^2 -- most per-start outs variance is real game noise, not pitcher quality -- but safely and correctly shaped, unlike the discarded hand-tuned version. Full-game side effects are small and consistent with the other hook-related promotions above (brier_home_win 0.2224->0.2241, mae_total_runs 3.742->3.771, mae_run_margin 3.323->3.365).",
++      "discarded_first_attempt": {
++        "description": "Raw K-rate deviation from a fixed 0.223 constant, hand-tuned by weight instead of fit to data.",
++        "weight_0.7_elite_outs_bias": "-0.416 -> +1.113 (overshot into over-projection)",
++        "weight_0.7_midhigh_outs_bias": "+0.993 -> +1.708 (wrong direction, worse)",
++        "weight_0.35_midhigh_outs_bias": "+0.993 -> +1.352 (same wrong direction at half magnitude)"
++      },
++      "matched_market_line_starts": 882,
++      "holdout_games": 11,
++      "tune_games": 35,
++      "batch_artifacts": "vendor/mlb_bettingv2/data/eval/_prototype_test/full46_baseline and full46_qualityhook_v2_w10"
++    },
++    "starter_tto_quality_scaling": {
++      "generated_at": "2026-08-01",
++      "description": "_starter_tto_quality_mult (sim_engine/simulate.py) scales pull_starter_third_time_penalty (the flat, per-team 3rd-time-through-order penalty) by the starter's own K-rate. It has TWO consumers: the pull-probability logit in _select_pitcher_v2 (tested first, part 3, and found to have no measurable real-scale effect on outs) and a K/BB/HR/inplay RATE-degradation multiplier in _adjust_pitcher_day_rates_v2 (simulate.py:1936) that was never separately isolated -- every starter's simulated K-rate gets knocked down by the same flat amount once fatigued past bf>=18, elite arms included, even though real aces are known to hold their stuff better through the order. The part-3 test (weight=0.5, 12 dates, before k_combine_log5_weight or starter_quality_hook_weight were promoted) was underpowered by the same margin that made the K-rate combiner itself look like a dead end at 12-16 dates before the full 46-date/882-start test revealed a real corr=0.283 signal -- re-tested at full scale on top of the three already-promoted fixes.",
++      "selected_value": 0.0,
++      "REVERTED_2026-08-01": "Promoted to 1.0 first (see 'superseded_rationale'), then reverted the same session once tested against the betting-accuracy harness properly -- part 11's test was stacked on top of the already-reverted inplay_hit_combine_log5_weight=0.0 state; retested stacked on the correct (inplay=log5) happy-place checkpoint instead (full46_baseline_v2 vs full46_happyplace_test, n=882 pooled hit rate): strikeouts 55.78%->54.65% (WORSE -- this is the exact market the fix was built to help, via the K-rate decay mechanism, and it made real-money accuracy worse there), hits_allowed 54.63%->56.43% (better), outs 59.54%->59.15% (slightly worse). Net effect across the three markets is roughly a wash at best, and it degrades the one market it specifically targeted. Given the session's core lesson (statistical-bias improvements do not reliably translate to betting-accuracy improvements -- see inplay_hit_combine_log5_weight's REVERTED note above), a fix with mixed/ambiguous real-money evidence and a per-tier statistical benefit of only ~2-3% doesn't clear the bar. Reverted to 0.0 (unconditional no-op, reproducing pre-session behavior exactly).",
++      "superseded_rationale": "Real, small, consistently-signed STATISTICAL effect confirmed at n=882: all four market-line SO tiers moved the correct direction (elite -2.618->-2.555, mid-high -1.131->-1.100, mid +0.161->+0.147, back-end +0.827->+0.789), and elite outs bias improved meaningfully (-0.422->-0.202). One blemish: mid-high outs bias worsened slightly. Full-game side effects flat. This looked like a clean, safe, small win until graded against real betting outcomes in the correct (non-confounded) context.",
++      "starter_tto_quality_league_k": 0.223,
++      "starter_tto_quality_spread": 0.06,
++      "matched_market_line_starts": 882,
++      "holdout_games": 11,
++      "tune_games": 35,
++      "betting_hit_rate_without_tto": {"strikeouts": 0.5578, "hits_allowed": 0.5463, "outs": 0.5954},
++      "betting_hit_rate_with_tto": {"strikeouts": 0.5465, "hits_allowed": 0.5643, "outs": 0.5915},
++      "batch_artifacts": "vendor/mlb_bettingv2/data/eval/_prototype_test/full46_baseline_v2, full46_happyplace_test; betting_accuracy.py"
++    }
+   },
+-  "starter_hook_add_pitches": -11
++  "starter_hook_add_pitches": -13,
++  "starter_hook_stamina_excess_weight": 0.75,
++  "starter_quality_hook_weight": 1.0,
++  "starter_tto_quality_scaling": 0.0
+ }
+diff --git a/vendor/mlb_bettingv2/data/tuning/pitch_model_overrides/forward_start_2026_04_14_v1.json b/vendor/mlb_bettingv2/data/tuning/pitch_model_overrides/forward_start_2026_04_14_v1.json
+index 23d5cc2c..b7916902 100644
+--- a/vendor/mlb_bettingv2/data/tuning/pitch_model_overrides/forward_start_2026_04_14_v1.json
++++ b/vendor/mlb_bettingv2/data/tuning/pitch_model_overrides/forward_start_2026_04_14_v1.json
+@@ -26,8 +26,41 @@
+       "holdout_games": 11,
+       "tune_games": 35,
+       "sweep_artifacts": "vendor/mlb_bettingv2/data/eval/batches/tuning_pm_xb_share_mult/20260719_101830"
++    },
++    "k_combine_log5_weight": {
++      "generated_at": "2026-08-01",
++      "description": "Diagnosed via a 46-date/1209-start backtest against real market strikeout lines that batter-K-rate-vs-pitcher-K-rate combination used a plain 50/50 average, which structurally pulls every pitcher's per-PA strikeout target halfway toward the batter's (near-league-average) rate -- suppressing elite/ace projections and inflating back-end ones. Added k_combine_log5_weight as a shrinkage-weighted blend toward log5 (odds-ratio) combination, the same treatment hr/inplay_hit already get (see the _combined() comment in sim_engine/pitch_model.py). Validated at full backtest scale (same 46 tune+holdout dates, 100 sims/game, 1210 starts, 882 matched to real market K lines) via run_batch_eval_days.py, weight=1.0 (full log5) vs weight=0.0 (prior default).",
++      "selected_value": 1.0,
++      "rationale": "Real, correctly-directioned, statistically credible effect: corr(market_K_line, per-start prediction delta) = 0.283 (a smaller same-day sample without market-line control showed only 0.06 -- this is genuinely the signal, not noise). All four market-line tiers move the right way: elite bias -2.659->-2.585, mid-high -1.062->-1.046, mid +0.335->+0.274, back-end +1.048->+0.957. Full-game side effects at this scale are negligible-to-favorable (brier_home_win 0.2224->0.2245 flat, mae_total_runs 3.742->3.641 improved, mae_run_margin 3.323->3.370 flat) -- unlike the prior full k/bb/hbp log5 attempt that regressed full-game totals (see _combined()'s comment), applying log5 to K alone at real scale does not carry that cost. IMPORTANT CAVEAT: this only closes ~3% of the diagnosed elite-tier gap (-2.659 -> -2.585 out of ~2.66 SO deficit). The bulk of the elite-pitcher strikeout gap is not from this per-PA-rate formula and is believed to come from workload/PA-count projection compression (stamina_pitches shrinkage toward a fixed prior) rather than K-rate combination -- see todo.md #178 for the open follow-up.",
++      "baseline_k_combine_log5_weight": 0.0,
++      "baseline_elite_tier_so_bias": -2.659,
++      "selected_elite_tier_so_bias": -2.585,
++      "elite_tier_n": 39,
++      "matched_market_line_starts": 882,
++      "holdout_games": 11,
++      "tune_games": 35,
++      "batch_artifacts": "vendor/mlb_bettingv2/data/eval/_prototype_test/full46_baseline and full46_k10"
++    },
++    "inplay_hit_combine_log5_weight": {
++      "generated_at": "2026-08-01",
++      "description": "Diagnosed (todo.md part 9) that TEAM-level hits allowed -- all pitchers, not just starters -- are over-projected by +1.48/game (17.6% relative, n=1224 team-games). Tested reverting inplay_hit fully back to flat average (weight=0.0) via 46-date/100-sims backtesting, holding the other promoted fixes constant.",
++      "selected_value": 1.0,
++      "REVERTED_2026-08-01": "Promoted to 0.0 first (see 'superseded_rationale' below), then reverted back to the original 1.0 (log5) the same session after building and finally running the betting-accuracy harness (grades the model's own P(over) against real market lines, not just mean-vs-actual bias -- built earlier in the session but not actually run until after this fix was already promoted). At weight=0.0 (flat average, what was briefly promoted), pooled real-money hit rate WORSENS on every market vs. the k_combine_log5_weight=1.0 + starter_quality_hook_weight=1.0 checkpoint that came right before it: strikeouts 55.78%->53.74%, hits_allowed 54.63%->53.08%, outs 59.54%->55.83% (n=882 each). That checkpoint (k+quality-hook, inplay still at log5) is strictly the best of all four tested states for betting accuracy -- it beats even the pre-session 'nothing promoted' baseline on strikeouts (52.49%) and outs (57.75%). The statistical-bias win (reducing mean hits-allowed error) is real, but it does not translate into better bets, and for a betting-intelligence platform the metric that actually matters is hit rate against the market's real lines, not mean-prediction bias in isolation. Lesson for next time: grade any pitch_model/manager_pitching change against betting_accuracy.py BEFORE promoting, not after -- bias/MAE improvements can trade away real edge (see market_blend_eval.py's docstring, which predicted this exact failure mode analytically before this fix was ever tested against it).",
++      "superseded_rationale": "Broadly and consistently positive on STATISTICAL accuracy, not a narrow trade-off: TEAM-level hits bias improved from +1.482 to +0.821 (44.6% of the gap closed, n=1224), every market-line tier improved, and it unexpectedly also improved HR/total-bases calibration and full-game total-runs MAE. Real, small statistical costs: outs bias worsened modestly in 3 of 4 tiers, a mechanical interaction (fewer hits allowed -> more balls in play become outs -> pitcher reaches eff_hook sooner in outs terms). This looked like a clear net positive until graded against real betting outcomes.",
++      "baseline_inplay_hit_combine_log5_weight": 1.0,
++      "team_hits_n": 1224,
++      "baseline_team_hits_bias": 1.482,
++      "flat_avg_team_hits_bias": 0.821,
++      "betting_hit_rate_at_k_plus_qualityhook_checkpoint": {"strikeouts": 0.5578, "hits_allowed": 0.5463, "outs": 0.5954},
++      "betting_hit_rate_after_inplay_revert": {"strikeouts": 0.5374, "hits_allowed": 0.5308, "outs": 0.5583},
++      "matched_market_line_starts": 882,
++      "holdout_games": 11,
++      "tune_games": 35,
++      "batch_artifacts": "vendor/mlb_bettingv2/data/eval/_prototype_test/full46_baseline_v2, full46_inplayflat_v1, full46_ttorate_w10; betting_accuracy.py"
+     }
+   },
+   "hr_rate_mult": 1.10,
+-  "xb_share_mult": 1.10
++  "xb_share_mult": 1.10,
++  "k_combine_log5_weight": 1.0,
++  "inplay_hit_combine_log5_weight": 1.0
+ }
+diff --git a/vendor/mlb_bettingv2/sim_engine/data/build_roster.py b/vendor/mlb_bettingv2/sim_engine/data/build_roster.py
+index f4d2e61b..985291b1 100644
+--- a/vendor/mlb_bettingv2/sim_engine/data/build_roster.py
++++ b/vendor/mlb_bettingv2/sim_engine/data/build_roster.py
+@@ -604,24 +604,36 @@ def _derive_stamina_pitches_from_season_stats(
+     sp_prior = 92.0
+     rp_prior = 25.0
+ 
+-    if force_starter:
+-        # If we don't have a pitch count sample yet (early season), keep a SP-like prior.
+-        if total_pitches > 0 and gs >= 1:
++    # total_pitches is the season total across ALL appearances (starts +
++    # relief), so total_pitches/gs is only a valid "pitches per start"
++    # estimate when starts account for nearly all of a pitcher's outings.
++    # For anyone with meaningful relief work mixed in this season (swingmen,
++    # recent call-ups, spot starters, injury fill-ins), that division wrongly
++    # folds relief-outing pitches into the numerator while dividing by the
++    # much smaller start count -- e.g. 1 start + 3 relief outings totalling
++    # 334 pitches this season computed as 334 "pitches in that one start",
++    # inflating the estimate arbitrarily (even past what a true workhorse
++    # starter's own clean per-start average would produce). Only trust the
++    # observed average when starts are effectively the pitcher's whole role.
++    start_purity = (gs / g) if g > 0 else (1.0 if gs > 0 else 0.0)
++
++    def _starter_estimate() -> float:
++        if total_pitches > 0 and gs >= 1 and start_purity >= 0.5:
+             obs = total_pitches / max(1.0, gs)
+-            est = _shrink_to_prior(obs, sp_prior, n=gs, n0=10.0)
+-        else:
+-            est = sp_prior
++            return _shrink_to_prior(obs, sp_prior, n=gs, n0=10.0)
++        return sp_prior
++
++    if force_starter:
++        # If we don't have a pure-starter pitch count sample yet (early
++        # season, or a mostly-relief role), keep a SP-like prior.
++        est = _starter_estimate()
+         return int(max(70, min(115, round(est))))
+ 
+     # Heuristic role classification: starter-like if they start often.
+     starter_like = (gs >= 3.0) and (g <= 0 or (gs / max(1.0, g)) >= 0.45)
+ 
+     if starter_like:
+-        if total_pitches > 0 and gs >= 1:
+-            obs = total_pitches / max(1.0, gs)
+-            est = _shrink_to_prior(obs, sp_prior, n=gs, n0=10.0)
+-        else:
+-            est = sp_prior
++        est = _starter_estimate()
+         return int(max(70, min(115, round(est))))
+ 
+     # Reliever-like: estimate by pitches per game pitched, shrunk to RP prior.
+diff --git a/vendor/mlb_bettingv2/sim_engine/pitch_model.py b/vendor/mlb_bettingv2/sim_engine/pitch_model.py
+index 379f580a..be8c7d01 100644
+--- a/vendor/mlb_bettingv2/sim_engine/pitch_model.py
++++ b/vendor/mlb_bettingv2/sim_engine/pitch_model.py
+@@ -1,6 +1,7 @@
+ from __future__ import annotations
+ 
+ import math
++import os
+ import random
+ from dataclasses import dataclass
+ from typing import Dict, Optional, Tuple
+@@ -171,7 +172,59 @@ class PitchModelConfig:
+         )
+ 
+ 
+-def _combined(a: float, b: float) -> float:
++def _use_log5_combine() -> bool:
++    # A/B toggle under investigation 2026-07-19: _combined() below is a flat
++    # 50/50 average of the batter's own rate and the pitcher's own allowed
++    # rate, not the log5/odds-ratio method real projection systems (Marcels,
++    # ZiPS, etc.) use to merge two independent rate estimates against a
++    # league baseline. A naive average has no way to account for one side
++    # having much less spread than the other (e.g. pitchers have much less
++    # control over BABIP-type outcomes than batters per DIPS theory), which
++    # could systematically suppress variance versus log5. Gated so the raw
++    # effect can be A/B'd through the eval harness before promoting.
++    return os.environ.get("MLB_SIM_LOG5_COMBINE") == "1"
++
++
++# Approximate league-average rates, used only as the log5 baseline term.
++# These mirror the same fallback constants build_roster.py already uses when
++# a player has too few PA/BF to compute a real rate (see _rate(..., default)
++# call sites there) -- reusing them here keeps the log5 baseline consistent
++# with what the rest of the pipeline already treats as "league average".
++_LEAGUE_RATE = {
++    "k": 0.23,
++    "bb": 0.08,
++    "hbp": 0.008,
++    "hr": 0.03,
++    "inplay_hit": 0.275,
++}
++
++
++def _combined_log5(a: float, b: float, league: float) -> float:
++    return clamp01(_sigmoid(_logit01(a) + _logit01(b) - _logit01(league)))
++
++
++def _log5_selective_keys() -> Optional[set]:
++    # If set, ONLY these league_keys use log5 -- the rest stay on the naive
++    # average regardless of MLB_SIM_LOG5_COMBINE. Investigation 2026-07-19:
++    # full log5 (all five rates) validated real wins on hr/inplay_hit but
++    # also amplified matchup extremity on the k/bb/hbp pacing side enough to
++    # significantly regress full_weighted.mae_total_runs on holdout. This
++    # scopes log5 to just the two rates it was actually shown to fix.
++    raw = os.environ.get("MLB_SIM_LOG5_SELECTIVE_KEYS")
++    if not raw:
++        return None
++    return {k.strip() for k in raw.split(",") if k.strip()}
++
++
++def _combined(a: float, b: float, league_key: Optional[str] = None) -> float:
++    if league_key is not None:
++        selective = _log5_selective_keys()
++        if selective is not None:
++            if league_key in selective:
++                return _combined_log5(a, b, _LEAGUE_RATE[league_key])
++            return clamp01(0.5 * float(a) + 0.5 * float(b))
++        if _use_log5_combine():
++            return _combined_log5(a, b, _LEAGUE_RATE[league_key])
+     return clamp01(0.5 * float(a) + 0.5 * float(b))
+ 
+ 
+@@ -329,11 +382,11 @@ def simulate_pitch(
+             return PitchResult(pitch_type=pitch_type, call=PitchCall.FOUL, is_strike=True, is_ball=False, in_play=False)
+ 
+     # Combine rates (PA-level priors)
+-    k_tgt = _combined(batter_k_rate, pitcher_k_rate)
+-    bb_tgt = _combined(batter_bb_rate, pitcher_bb_rate)
+-    hbp_tgt = _combined(batter_hbp_rate, pitcher_hbp_rate)
+-    hr_tgt = _combined(float(batter_hr_rate) * float(batter_pt_hr_mult), float(pitcher_hr_rate) * float(pitcher_pt_hr_mult))
+-    inplay_hit = _combined(batter_inplay_hit_rate, pitcher_inplay_hit_rate)
++    k_tgt = _combined(batter_k_rate, pitcher_k_rate, "k")
++    bb_tgt = _combined(batter_bb_rate, pitcher_bb_rate, "bb")
++    hbp_tgt = _combined(batter_hbp_rate, pitcher_hbp_rate, "hbp")
++    hr_tgt = _combined(float(batter_hr_rate) * float(batter_pt_hr_mult), float(pitcher_hr_rate) * float(pitcher_pt_hr_mult), "hr")
++    inplay_hit = _combined(batter_inplay_hit_rate, pitcher_inplay_hit_rate, "inplay_hit")
+ 
+     # Optional K-target calibration (applied before translating k_tgt into call mix).
+     k_mult = _cfg_float(cfg, "k_logit_mult", 1.0)
+diff --git a/vendor/mlb_bettingv2/sim_engine/simulate.py b/vendor/mlb_bettingv2/sim_engine/simulate.py
+index 2737344c..598f671d 100644
+--- a/vendor/mlb_bettingv2/sim_engine/simulate.py
++++ b/vendor/mlb_bettingv2/sim_engine/simulate.py
+@@ -1365,13 +1365,13 @@ def _sigmoid(x: float) -> float:
+         return 0.5
+ 
+ 
+-def _starter_effective_hook(base_hook: int, stamina_hook: int, availability_mult: float) -> int:
++def _starter_effective_hook(base_hook: int, stamina_hook: int, availability_mult: float, stamina_excess_weight: float = 0.25) -> int:
+     base = int(base_hook)
+     stamina = int(stamina_hook)
+     avail = _clamp01(float(availability_mult))
+     eff_hook = min(base, stamina)
+     if stamina > base:
+-        eff_hook += int(round(0.25 * float(stamina - base)))
++        eff_hook += int(round(float(stamina_excess_weight) * float(stamina - base)))
+     eff_hook -= int(round((1.0 - avail) * 10.0))
+     return int(eff_hook)
+ 
+@@ -1497,6 +1497,16 @@ def _select_pitcher_v2(roster: TeamRoster, state: GameState, rng: random.Random,
+     # Tuning knobs (defaults are the current promoted behavior)
+     hook_jitter_pitches = max(0, _ov_i("hook_jitter_pitches", 0))
+     starter_hook_add_pitches = _ov_i("starter_hook_add_pitches", 0)
++    # Weight applied to stamina above the manager's baseline hook when
++    # computing a starter's effective pull threshold -- see
++    # _starter_effective_hook. Default 0.25 severely dampens the upside for
++    # high-stamina workhorses (min(base,stamina) discards the excess
++    # entirely, then only this fraction of it is credited back), while
++    # below-baseline stamina gets full credit via the min(). Investigation
++    # 2026-07-20: this asymmetry was a primary driver of pitcher pitch-count
++    # projections converging toward a narrow band regardless of real
++    # workhorse-vs-short-outing differences.
++    starter_hook_stamina_excess_weight = _clamp01(_ov_f("starter_hook_stamina_excess_weight", 0.25))
+     starter_hook_spread = max(1.0, _ov_f("starter_hook_spread", 6.0))
+     starter_pull_bias = _clamp01(_ov_f("starter_pull_bias", 0.15))
+     starter_hard_cap_buffer = max(0, _ov_i("starter_hard_cap_buffer", 28))
+@@ -1579,7 +1589,7 @@ def _select_pitcher_v2(roster: TeamRoster, state: GameState, rng: random.Random,
+         base_hook = int(roster.manager.pull_starter_pitch_count)
+         stamina_hook = int(getattr(starter_prof, "stamina_pitches", base_hook) or base_hook)
+         avail = _avail_pitcher(starter_prof)
+-        eff_hook = _starter_effective_hook(base_hook, stamina_hook, avail)
++        eff_hook = _starter_effective_hook(base_hook, stamina_hook, avail, starter_hook_stamina_excess_weight)
+ 
+         if early_sample_scale > 0:
+             eff_hook -= int(round(float(starter_early_sample_hook_delta_max) * float(early_sample_scale)))
+diff --git a/vendor/mlb_bettingv2/tools/datasets/build_statcast_player_feature_set.py b/vendor/mlb_bettingv2/tools/datasets/build_statcast_player_feature_set.py
+index ea59f13a..d1017e01 100644
+--- a/vendor/mlb_bettingv2/tools/datasets/build_statcast_player_feature_set.py
++++ b/vendor/mlb_bettingv2/tools/datasets/build_statcast_player_feature_set.py
+@@ -314,6 +314,15 @@ def _iter_statcast_files(raw_root: Path, season: int) -> Iterable[Path]:
+     base = raw_root / str(int(season))
+     if not base.exists():
+         return
++    # Support both layouts: files nested one level under a month/date-range
++    # subdirectory, and files written flat directly under the season dir
++    # (e.g. fetch_statcast_raw_pitches_x64.py writes
++    # {season}/statcast_{start}_{end}.csv.gz with no subdirectory). Bug found
++    # 2026-07-20: this previously only checked subdirectories, so a flat
++    # layout silently produced zero files and an empty feature set with no
++    # error.
++    for f in sorted(base.glob("*.csv.gz")):
++        yield f
+     for month_dir in sorted([p for p in base.iterdir() if p.is_dir()], key=lambda p: p.name):
+         for f in sorted(month_dir.glob("*.csv.gz")):
+             yield f

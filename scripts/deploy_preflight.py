@@ -56,6 +56,7 @@ Read-only. Performs GETs against the Render API and never writes.
     py -3 scripts/deploy_preflight.py --service refresh-worker
     py -3 scripts/deploy_preflight.py --service refresh-worker --target-commit f1bba90c
     py -3 scripts/deploy_preflight.py --service refresh-worker --json
+    py -3 scripts/deploy_preflight.py --service web --target-commit e4552e27 --reinject-env
 
 Exit codes:  0 = CLEAR (only infrastructure running)
              1 = HOLD (a job would be killed, or the deploy is redundant)
@@ -238,15 +239,43 @@ NON_RESTARTING_DEPLOY_STATUSES = frozenset({
 })
 
 
+def _env_files():
+    """`.env` in THIS tree, then in the main worktree. Order matters, both do.
+
+    `.env` is gitignored, so a session worktree -- which the protocol says is
+    where lane work happens -- does not have one, and both locks died with
+    `RENDER_API_KEY not set` when run from there. A deploy tool that only works
+    in the tree the protocol tells you to leave is a tool people work around.
+    `snapshot_render_env.py` already reaches for the primary tree; this is the
+    same fallback, and it is a FALLBACK: a `.env` beside the script still wins,
+    so a deliberately different key in a worktree is still honoured.
+    """
+    seen, out = set(), []
+    for root in (REPO_ROOT, _main_worktree_root()):
+        path = (root / ".env").resolve()
+        if path in seen:
+            continue
+        seen.add(path)
+        if path.exists():
+            out.append(path)
+    return out
+
+
+def _env_value(name: str) -> str:
+    for path in _env_files():
+        for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            if line.startswith(name):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return ""
+
+
 def _api_key() -> str:
     value = str(os.environ.get("RENDER_API_KEY") or "").strip()
     if value:
         return value
-    env_path = REPO_ROOT / ".env"
-    if env_path.exists():
-        for line in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-            if line.startswith("RENDER_API_KEY"):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    value = _env_value("RENDER_API_KEY")
+    if value:
+        return value
     raise SystemExit("RENDER_API_KEY not set in the environment or .env")
 
 
@@ -275,12 +304,7 @@ def _admin_token() -> str | None:
     value = str(os.environ.get("ADMIN_TOKEN") or "").strip()
     if value:
         return value
-    env_path = REPO_ROOT / ".env"
-    if env_path.exists():
-        for line in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-            if line.startswith("ADMIN_TOKEN"):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return None
+    return _env_value("ADMIN_TOKEN") or None
 
 
 def web_processes() -> tuple[list[dict], str] | None:
@@ -729,6 +753,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--service", required=True, choices=sorted(SERVICE_IDS))
     parser.add_argument("--target-commit", default="", help="commit you intend to deploy; warns if already live")
+    parser.add_argument("--reinject-env", action="store_true",
+                        help="the target being ALREADY LIVE is deliberate: the code is "
+                             "unchanged and an env var needs a deploy to reach the "
+                             "running process. Waives ONLY the redundancy HOLD.")
     parser.add_argument("--allow-off-main", action="store_true",
                         help="permit a target commit that is NOT on origin/main. Such a "
                              "deploy cannot compose with another session's -- whichever "
@@ -766,6 +794,18 @@ def main() -> int:
         report["target_commit"] = args.target_commit[:8]
         report["target_already_live"] = contained
         redundant = contained is True
+    # --reinject-env: "already live" is redundant for CODE and NOT for ENV. A
+    # restart does not re-inject environment variables; only a deploy does, so
+    # "the code is right and the env is stale" is a real state whose minimal fix
+    # is a deploy of the SHA already running. Refusing it does not prevent a
+    # deploy -- it pushes the operator into deploying `origin/main` instead, which
+    # ships every other lane's code as collateral (6,217 lines on 2026-09-09) and
+    # makes the post-deploy reading ambiguous. Only THIS branch is waived: jobs in
+    # flight, cron runs, unreadable processes, OFF_MAIN, TOO_SOON and a foreign
+    # claim are all evaluated before it and still HOLD.
+    if redundant and args.reinject_env:
+        report["redundancy_waived"] = True
+        redundant = False
 
     # Composition check. `origin/main` is re-read from the local repo, so a stale
     # fetch reads as off-main rather than as on-main: an unknown must not land on
@@ -975,6 +1015,9 @@ def main() -> int:
         verdict, code = "CLEAR", EXIT_CLEAR
         reason = ("no cron run in flight" if is_cron else "only infrastructure processes running") + (
             f" ({len(defunct)} defunct child(ren) awaiting reap -- already dead, cannot be killed by a deploy)" if defunct else ""
+        ) + (
+            "; REDUNDANCY WAIVED by --reinject-env -- same-commit deploy to re-inject env"
+            if report.get("redundancy_waived") else ""
         )
     report["verdict"] = verdict
     report["reason"] = reason

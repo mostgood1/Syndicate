@@ -30960,3 +30960,71 @@ action, and it carried no code.
 
 The guard that makes a non-hash in the HASH key fail LOUDLY instead of silently
 is lane `portfolio-auth-hash-guard` — landed, not yet deployed.
+
+## 2026-09-10 ~16:15Z — ledger truth pass: 3 open-measurement markers reconciled, 1 never-recorded deploy recorded, 1 lane goal read `[lane census-rescue-0910]`
+
+From the 2026-09-10 open-work census (`findings_2026-09-10_open_work_census.md`).
+The author of this entry made NO deploy. The three RECONCILED lines are written
+WITHOUT the literal marker token on purpose — `session-start.sh` counts that
+string, the same trap the 2026-09-02 15:49:39Z entry names.
+
+- RECONCILED: the `#395` rate-ceiling line in the 2026-08-13 deploy checklist
+  ("still Measured: [marker] with no follow-up row"). No service, SHA or deploy
+  row was ever attached to `#395` anywhere in this file — its only other mention
+  is the `#394`/`#395` egress-window note beside it — and the egress work it
+  belonged to is recorded in `todo.md` "Egress incident (2026-08-12)" and
+  `docs/reports/live_odds_worker_egress_analysis.md`. Reconciled as NO DEPLOY TO
+  MEASURE, not as a pass.
+- RECONCILED: refresh-worker `db573857` (`#461` + `#467`, lane
+  `basketball-model-owner`, live 2026-08-19 01:36:46Z). `#461`'s effect was
+  observed on a real production cycle by the later "#468 + #469 — EFFECT
+  CONFIRMED" entry (2026-08-19 ~15:13Z): three fresh
+  `team_advanced_stats_2026_asof_*` files where one stale file had stood.
+  `#467`'s position-matchup multiplier was never separately measured and still
+  is not. Reconciled as PARTLY OBSERVED — not a pass for `#467`.
+- RECONCILED: the MLB `hitter_strikeouts` -> `batter_strikeouts` join (the
+  measurement line under its "PREFLIGHT VERDICT 2026-08-20T03:0xZ: FAIL as a
+  STANDALONE deploy"). It shipped as a ride-along inside `#440` / `85296826`,
+  whose own measurement records the 0 -> 0 reading as structurally
+  inconclusive: no book posted the market on any checked date. Reconciled as
+  UNMEASURABLE until a book posts `batter_strikeouts` — neither a pass nor a
+  failure.
+
+### refresh-worker `f5c2468a` — live 2026-09-09 03:51:01Z (22:51 CDT 09-08) — lane `mlb-stop-publishing-edges` — RECORDED AFTER THE FACT
+
+- What: `SYNDICATE_LIVE_GAMELINE_PUBLISH_DISABLED_SPORTS`, a sport-scoped switch
+  so MLB live model-vs-market edges are never marked `priceable` yet are still
+  recorded (`live_gameline_join.py` +65, `board_enrichment.py` +5, 14 tests in
+  `tests/test_live_gameline_publish_switch.py`). Default off.
+- Source: Render deploys API for `srv-d91dpertqb8s73co8ls0` — `trigger=api`,
+  created 03:45:05Z, finished 03:51:01Z; superseded since by many later
+  refresh-worker deploys (live at this writing: `0ceb9636`).
+- Why it is recorded here: it had no entry of its own — it appeared only as a
+  passing mention inside another lane's 04:26Z entry — so the session-start
+  digest could not see that its measurement is owed. The holding session
+  (desktop `05fdfc3e`, CLI `d76b711b`) read it as "live and inert" and then
+  stopped on a question to the user; that reading lives in its transcript, not
+  in this file.
+- verify: an MLB row on the served live-gameline board carrying
+  `priceable: false` with `withheld_reason` =
+  `model_edge_publishing_disabled_for_sport`, while WNBA / soccer / NCAAF rows
+  are unaffected — read off the SERVED payload, not off the env var.
+- MEASUREMENT: <pending> — owed by lane `mlb-stop-publishing-edges`.
+
+### `evaluation-ledger-projected-mirror` — the Goal's second half READ, 2026-09-10 ~16:05Z
+
+`GET /api/ops/artifacts/stream?path=reports/intelligence/evaluation_ledger_projected/<date>.jsonl`
+against web, `X-Admin-Token`, read-only:
+
+    2026-09-04  HTTP 200  4,415,207 bytes
+    2026-09-05  HTTP 200  6,089,065 bytes
+    2026-09-06  HTTP 200  4,350,670 bytes
+    2026-09-07  HTTP 200  4,493,503 bytes
+    2026-09-08  HTTP 200  2,488,362 bytes
+    2026-09-09  HTTP 200  3,741,325 bytes
+
+Every body begins with a projected `{"record_type":"prediction",...}` row. With
+`[ledger_projection] PROJECTION_DONE ... published=8 over_ceiling=0` already
+recorded above (the accuracy-ledger budget-raise entry), both halves of that
+lane's testable outcome are now read in production, and it is CLOSED on that
+basis.

@@ -15,11 +15,30 @@ WHAT IT DELIBERATELY DOES NOT DO. It does not average Briers across days --
 that would weight a 3-game day equally with a 15-game day. It stores the raw
 per-day components so a later pass can pool them correctly, weighted by the
 independent unit (games), which is the denominator that matters.
+
+A RETAINED NUMBER IS ONLY AS GOOD AS THE SAMPLE IT DESCRIBES. The row built
+below is an ALLOWLIST -- a counter on the served payload that is not named
+there is dropped, permanently, and the history keeps no trace that it existed.
+That is not hypothetical: rows for 2026-08-20..08-29 carry a market Brier of
+0.24928 on average (every one within +/-0.014 of 0.25, the score of a constant
+0.5 forecaster) because the scorer was comparing P(over) and P(home covers)
+against "did the home team win", and `75cf9aec` found it only by reading the
+LEDGER. The history could not have shown it: it retained the Brier and nothing
+about which markets were in it.
+
+**So: when the scorer gains a counter that describes the POPULATION, name it
+here in the same change.** The worker-side twin,
+`live_gameline_accuracy.build_row`, allowlists the same five
+(`finals_index`, `unscored`, `reason`, `records_by_market`, `scored_markets`)
+and the two are meant to stay comparable. Pre-existing rows keep `None` for
+anything added later, which is correct -- they are an accurate record of what
+was captured at the time, and must never be backfilled with a guess.
 """
 
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import sys
@@ -141,6 +160,45 @@ def main() -> int:
         "games_with_outcome": score.get("games_with_outcome"),
         "records_considered": score.get("records_considered"),
         "unscored": score.get("unscored"),
+        # WHAT THE SAMPLE WAS MADE OF. `records_by_market` splits the scoreable
+        # population by market and `scored_markets` names the set actually
+        # admitted, so a reader never has to know `_SCOREABLE_MARKETS` to
+        # interpret the Brier above it.
+        #
+        # THIS DICT IS AN ALLOWLIST, and that is the whole defect these two keys
+        # close: a counter added to the served payload is silently DROPPED here
+        # unless it is named. `75cf9aec` found the scorer had been comparing
+        # P(over) and P(home covers) against "did the home team win" -- the
+        # ledger carries three markets and `build_records` stores all of their
+        # probabilities under the field name `model_home_win_prob`, which is
+        # only true for h2h. It survived ten nights of capture BECAUSE nothing
+        # recorded the mix: the pooled `priceable_only` difference read +0.05749
+        # over 118 games with the model worse on 9 of 10 dates, and that number
+        # was never a model-vs-market result. A totals or spread line is set to
+        # make its own market a coin flip, so its de-vigged probability sits
+        # near 0.5 -- and against an event it is not predicting, ~0.5 is
+        # near-optimal, Brier for an uninformative forecast being minimised at
+        # the base rate. The market's retained Brier is the fingerprint: ten
+        # dates, mean 0.24928, every one within +/-0.014 of the 0.25 a constant
+        # 0.5 forecaster scores.
+        #
+        # The scorer was fixed. Retaining the Brier but not the mix reproduces
+        # the same blindness one layer down, in exactly the file a later reader
+        # trusts -- so `live_gameline_accuracy.build_row` names these on the
+        # WORKER side and this is the local capture's matching pair.
+        "records_by_market": score.get("records_by_market"),
+        "scored_markets": score.get("scored_markets"),
+        # WHY A NIGHT CAPPED. `finals_index` carries the join diagnostics
+        # (`finals_seen`, `finals_level`, `finals_skipped_no_numeric_score`
+        # and its distinct-game count), which are what explain a
+        # `games_with_outcome` far below the slate -- 08-27 retained 4 of ~15
+        # and 08-28 retained 1, and the history recorded neither the cap nor
+        # its cause. `reason` is the scorer's own word for a build that scored
+        # nothing, so a zero-outcome row says WHY instead of looking identical
+        # to a failure. Both are on the worker-side allowlist for the same
+        # reason and are carried here to keep the two histories comparable.
+        "finals_index": score.get("finals_index"),
+        "reason": score.get("reason"),
         # `priceable_only` is the SOUND cut: same population both sides. In
         # `all_records` the model and market n differ (1526 vs 1449 on
         # 2026-08-20), so that Brier difference spans different row sets.
@@ -210,6 +268,23 @@ def main() -> int:
     print(f"  ledger written={row['ledger_written']} candidates={row['ledger_candidates']} "
           f"priceable={row['rows_priceable']} "
           f"(v2 discriminator satisfied: {bool((row['ledger_written'] or 0) > (row['rows_priceable'] or 0))})")
+    # PRINTED, not merely retained. The Brier above is uninterpretable without
+    # the market mix beneath it, and a number a reader has to go looking for is
+    # how the P(over) defect survived ten nightly captures. `scored=` is the
+    # count actually behind the Brier; anything else on the line was refused.
+    by_market = row.get("records_by_market") or {}
+    if by_market:
+        scored = set(row.get("scored_markets") or [])
+        mix = " ".join(
+            f"{name}={count}{'' if name in scored else '(refused)'}"
+            for name, count in sorted(by_market.items(), key=lambda kv: -kv[1])
+        )
+        print(f"  markets scored={sorted(scored)} | {mix}")
+    else:
+        # ABSENT, and said so. A board older than `75cf9aec` emits no market
+        # counters at all, and that is not the same as a slate with no records.
+        print("  markets: NOT REPORTED by this board build "
+              "(pre-75cf9aec payload -- the Brier's market mix is unknown)")
 
     if args.print_only:
         return 0
@@ -224,5 +299,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    import io  # noqa: E402  (used above; imported late to keep the header clean)
+    # `import io` USED TO LIVE HERE, "imported late to keep the header clean".
+    # It is a header import now because this guard does not run for an
+    # importer: `io` was bound as a module global ONLY on the CLI path, so
+    # `main()` raised `NameError` at its first `io.open` for anyone who
+    # imported this module and called it -- which is to say, for any test of
+    # the row it builds. The script worked in production the whole time and
+    # was untestable the whole time, which is why it went unnoticed.
     sys.exit(main())
