@@ -5,6 +5,60 @@
 
 ---
 
+## 2026-09-10 13:57 CT — refresh-worker `6c727968` (lane `mlb-stop-publishing-edges`, adopted by session `df26ac0c`) — **MLB LIVE GAME LINES ATTACH AGAIN: `BOOK_GRID_LIVE_GAMELINE_FAILURE` STOPS, AND THE MLB PUBLISH SWITCH IS LIVE ON ALL THREE MARKETS FOR THE FIRST TIME**
+
+Deploy `dep-dahfi8ek1f9s73fkb1i0`, triggered 13:38:25 CT on a CLEAR preflight at 13:38:13 CT. Two
+earlier preflights did not clear: TOO_SOON at 13:22 CT (spacing counts from `a9bafa9d`'s FINISH at
+13:03:01, not its start), then a 6-job HOLD at 13:28 CT (MLB daily sim + odds refresh, not killed).
+Live 13:44:23 CT, on top of `a9bafa9d`. No `render.yaml`, no env change. Render events 13:38 CT → now:
+`deploy_started/build_started/build_ended/deploy_ended` only, no `server_failed`.
+
+**The defect.** f5c2468a (live 09-08 22:51 CT) put the `sport=sport` meant for `price_moneyline`
+inside the `price_distribution_market(...)` call in `attach_live_gamelines`. That function has no
+such parameter, so the first live full-game totals/spreads row to reach pricing raised `TypeError`,
+and `attach_live_gamelines_for_sport` returned `error` for the WHOLE attach, h2h included. The
+`price_moneyline` call got no `sport` at all, so the switch was never live on h2h. **153
+`BOOK_GRID_LIVE_GAMELINE_FAILURE` lines from 09-08 22:58:58 CT (8 min after go-live) to 09-10 13:07
+CT: mlb 51, soccer 102.** It fired only on cycles where such a row reached pricing, not on every cycle.
+**Fix:** `price_distribution_market` takes `sport` and applies the switch after the precision gate,
+as `price_moneyline` does, and the h2h call now passes `sport`. With
+`SYNDICATE_LIVE_GAMELINE_PUBLISH_DISABLED_SPORTS=mlb` on refresh-worker, MLB rows now attach but are
+refused by name.
+
+**Also carried** (on `main`, not this lane's): `332e596d` `execute_portfolio.py` (a live position
+with no venue contract is refused before anything is written; already live on live-odds-worker as
+its own commit) and `7e8715e8` `session_worktree.py` (local tooling).
+
+**verify:** the served payload, same instrument both sides. `GET /api/board/book-grid?sport=mlb&date=2026-09-10`:
+
+| `live_gamelines` | before: `a9bafa9d`, board 13:41:25 CT | **after: `6c727968`, board 13:45:13 CT** |
+|---|---|---|
+| `error` | `live gameline join failed` | **null** |
+| rows reaching pricing (`projected`) | unknown (attach aborted) | **7** |
+| `model_edge_publishing_disabled_for_sport` | 0 | **4** (h2h 1, spreads 1, totals 2) |
+| `prob_interval_swamps_edge` | — | 3 (precision reason kept, switch runs after it) |
+| priceable MLB rows | 1 (h2h, before the crash) | **0** |
+
+Every refused row still carries `edge_pp` and `prob_std_err` (e.g. HOU @ PHI totals 7.5: edge
+-13.63pp, std_err 0.040, 120 sims), and `live_gameline_ledger.written` = 7. So publication stops and
+measurement does not. The 13:45 board had full-game spreads/totals rows reach pricing, and those are
+exactly the rows that raised on `a9bafa9d`, so this null had a live population. A second board at
+13:56:34 CT: `error` null, 0 rows reaching pricing (quotes stale). **`BOOK_GRID_LIVE_GAMELINE_FAILURE`:
+1 line at 13:07:12 CT on `a9bafa9d` → 0 lines 13:44:23–13:56:33 CT on `6c727968`.** The log window
+is 12 min; the 13:45 board is the load-bearing reading.
+
+**NOT measured:** WNBA, soccer and NCAAF on production. No soccer match was in play (soccer board:
+`no soccer match in play`), and no WNBA or NCAAF live game fell in the window. Soccer supplied 102 of
+the 153 failures, so its first live window after this deploy is the reading still owed (lane stays
+OPEN for it). Unit coverage: `TestTheRealCallerPath` plus the per-sport isolation tests.
+
+- RECONCILED: the MLB half of the `refresh-worker f5c2468a` entry's owed MEASUREMENT (lane `mlb-stop-publishing-edges`). An MLB row on the served board carries `priceable: false` with `withheld_reason` = `model_edge_publishing_disabled_for_sport`, measured above. Its other-sports clause is carried by the lane.
+
+Claim: acquired 13:18:52 CT after `ncaaf-kickoff-rollover` released it. Re-taken by me at
+13:58:07 CT with `--force --ttl 1800` (a forced replacement of my OWN claim, 39.3 min old, so it could
+not lapse mid-measurement). Released after this entry landed. Next in line: lane
+`football-layer2-live-parity` (`2d53fdf7`, contains `6c727968`).
+
 ## 2026-09-10 13:24 CT — reading only, no deploy — `#618` (`fcbbcc62`, the deliberate ridealong) — **VERIFIED: ALL THREE RECIPE STEPS PASS ON PRODUCTION**
 
 `#618` shipped as a DELIBERATE RIDEALONG with no dedicated deploy, so its verification was owed to
