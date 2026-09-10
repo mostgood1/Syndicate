@@ -507,6 +507,65 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # repair-on-failure. Stated here so a future stale-snapshot complaint starts
     # in the right place.
     "ncaaf_source/source_artifacts/data/processed/player_game_stats/ncaaf_player_game_stats_snapshot.csv",
+    # THE NCAAF GAME CARD'S PER-SIDE SIM PLAYER PROJECTIONS.
+    # `lane ncaaf-roster-snapshot-publish`, 2026-09-09.
+    #
+    # `scripts/build_ncaaf_roster_snapshot.py` writes the CFBD-derived roster
+    # snapshot on the worker; `_roster_index_cached` in
+    # `syndicate/features/ncaaf/player_projections.py` reads it on WEB and joins
+    # STRICTLY on the card's own season. `16d5d811` shipped the per-side
+    # projection tables and they render on all 51 cards with ZERO rows and an
+    # honest body -- "The 2026 roster snapshot carries no skill-position players
+    # for <team>." MEASURED 2026-09-09 23:2xZ: that empty state is CORRECT. The
+    # code works; the file is simply not on web.
+    #   local  15,496 rows for 2026 across 138 teams (44,395 total with 2025)
+    #   web    `/api/ops/artifacts/export?pattern=ncaaf_source/**/
+    #          ncaaf_roster_snapshot.csv` -> 0 artifacts
+    #
+    # CHECKED BEFORE ADDING with the real matcher, not assumed: NONE of the 181
+    # existing entries matched this path. The three that mention a roster or a
+    # sibling `processed/` directory all stop short of it --
+    # `*_source/source_artifacts/data/processed/team_registry/*.csv` stops at its
+    # own directory name, and both `nfl_source/.../rosters/roster_*_snapshot.csv`
+    # and `nfl_source/tracking/nflverse/roster/roster_*.csv` are the other sport.
+    #
+    # THE ENTRY IS A LITERAL PATH, ON PURPOSE -- the same reason the
+    # `player_game_stats` entry above is one. There is exactly ONE file in that
+    # directory and its name is fixed: `sources.roster_snapshot_path()` takes no
+    # arguments. In fnmatch `*` CROSSES `/` (the `roster_objs` note at the top of
+    # this tuple is the worked example), so any wildcard here would reach further
+    # than the single artifact it is meant to carry, into a directory a future
+    # producer may share. It must also not swallow `team_registry/*.csv`, which
+    # is separately allowlisted and stays that way; a literal cannot reach it.
+    #
+    # NO SERVING HAZARD -- `#413`'s test applied rather than skipped. Web's
+    # reader filters every row on the requested season and drops anything else,
+    # so the PRESENCE of a fresher file cannot fabricate or freeze a projection;
+    # the worst it can do is show the season it actually contains. Contrast
+    # `raw/statsapi/feed_live`, where presence IS the trigger and which is
+    # export-only forever. So this belongs on the HOT list, not the read-only
+    # one.
+    #
+    # `#208` AS EVER: this PERMITS the transfer, it does not make one happen --
+    # and on refresh-worker there is no blanket sweep at all
+    # (`sweep_changed_hot_artifacts`'s only production caller is
+    # `live_lens_loop`, on another service). NOTHING published this path before
+    # today, checked: `build_ncaaf_roster_snapshot.py` had no
+    # `publish_hot_artifact` call of any kind. The push is now an explicit,
+    # UNCONDITIONAL call at the end of that script, the same shape
+    # `build_nfl_roster_snapshot.py` already uses -- unconditional so a stale
+    # bootstrapped copy on web converges on the next completed build rather than
+    # only when a flag happens to be set.
+    #
+    # SIZE, measured not guessed: 2,588,538 B at 44,395 rows == ~58 B/row, so
+    # 2025 plus a FULL 2026 lands near ~3.4 MB -- comfortably under
+    # `_PUBLISH_MAX_BYTES` (12 MiB), and it would take four more accumulated
+    # seasons to approach it. Unlike the `player_game_stats` sibling this one is
+    # not near the bound. If it ever crosses, the direct call streams and never
+    # consults that ceiling (see the `book_grid` note at `_FAILED_DIRECT_PUBLISH`)
+    # so the transfer keeps working; what is lost past that point is the SWEEP's
+    # repair-on-failure.
+    "ncaaf_source/source_artifacts/data/processed/roster/ncaaf_roster_snapshot.csv",
     # `#310`, DIAGNOSTIC. The WNBA grader's actual result inputs, and the file
     # both recon builders are built from. Until now `recon_games_*`,
     # `recon_props_*` and dated `boxscores_*` were in no pattern here (only the

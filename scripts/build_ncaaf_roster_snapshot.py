@@ -63,6 +63,43 @@ def main() -> int:
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(report_text, encoding="utf-8")
     print(report_text)
+
+    # PUBLISH TO WEB -- `lane ncaaf-roster-snapshot-publish`, 2026-09-09.
+    #
+    # Nothing published this artifact before today. Measured on production
+    # 2026-09-09 23:2xZ: `/api/ops/artifacts/export?pattern=ncaaf_source/**/
+    # ncaaf_roster_snapshot.csv` returned 0 artifacts, so every NCAAF card's
+    # per-side sim projection table (`16d5d811`) rendered its stated empty
+    # state -- "The 2026 roster snapshot carries no skill-position players for
+    # <team>" -- on all 51 cards. That empty state was CORRECT: the reader
+    # works and the file had never crossed the service boundary. The worker
+    # writes to its own mounted disk; `_roster_index_cached` in
+    # `syndicate/features/ncaaf/player_projections.py` reads WEB's.
+    #
+    # The allowlist entry added alongside this (`HOT_ARTIFACT_PATTERNS`) only
+    # PERMITS the transfer -- `#208`. There is no blanket sweep on
+    # refresh-worker (`sweep_changed_hot_artifacts`'s only production caller is
+    # `live_lens_loop`, on another service), so without this explicit call the
+    # entry is inert and every upstream stage still reports success.
+    #
+    # UNCONDITIONAL, deliberately, and on a COMPLETED run rather than a clean
+    # one: the CSV is written by `write_ncaaf_roster_snapshot_csv` before
+    # validation is scored, `validation_issues` only changes this process's
+    # EXIT CODE, and a run that produced a file web does not have should
+    # converge web on it. Gating the push on a flag or on a clean validation is
+    # how a stale bootstrapped copy survives every subsequent rebuild.
+    # `publish_hot_artifact` itself checks the allowlist and is a best-effort
+    # no-op when unconfigured, so this costs nothing off Render -- the same
+    # shape `build_nfl_roster_snapshot.py` already uses.
+    try:
+        from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+        published = publish_hot_artifact(roster_result.output_path)
+    except Exception as exc:  # noqa: BLE001 - transfer must never fail the build
+        published = False
+        print(f"artifact_publish_error={type(exc).__name__}: {exc}", flush=True)
+    print(f"artifact_published={published}", flush=True)
+
     return 0 if not roster_result.validation_issues else 1
 
 
