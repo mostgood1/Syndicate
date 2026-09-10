@@ -457,6 +457,7 @@ once this index exists: re-splitting would orphan the parts.
 | [week-scoped-board-window] | SCOPED, NOT BUILT `[2026-08-29]` | `state_board.md` |
 | [board-model-edge-coverage] | 2026-08-30 — 82% of the board is UNSIZABLE, and every `_alt` market is 0% | `state_board.md` |
 | [live-edge-basis-label] | `edge_basis` WAS WRONG ON EVERY LIVE MONEYLINE ROW, AND THE MEASUREMENT THAT CERTIFIED IT COULD NOT HAVE SEEN  | `state_board.md` |
+| [coverage-report-artifact] | THE DATA-COVERAGE PAGE IS ARTIFACT-BACKED — worker publishes, web reads, and the cross-service read is PROVEN  | `state_board.md` |
 | [nfl-board-projection-coverage] | NFL BOARD PROJECTION COVERAGE IS 100% `[measured 2026-09-04T23:19:34Z on the served payload, lanes nfl-project | `state_football.md` |
 | [ncaaf-zero-orders-is-two-gates] | NCAAF SERVES ZERO ORDERS BY DESIGN, and it is TWO gates, not one `[verified 2026-09-01, lane game-market-entry | `state_football.md` |
 | [ncaaf-team-registry-two-files] | THE RESOLVER READS THE *SNAPSHOT*, AND THE FILE BESIDE IT IS OLDER AND DIFFERENT `[measured 2026-09-03]` | `state_football.md` |
@@ -499,6 +500,7 @@ once this index exists: re-splitting would orphan the parts.
 | [kalshi-odds-refresh-bound] | THE VENUE FAN-OUT IS A COLD-START BURST ON A PERSISTED CLOCK, AND IT IS NOW TIME-BOUNDED `[2026-09-03, lane ka | `state_kalshi.md` |
 | [layer2-board-keyvalue-ceiling] | THE BOARD'S CEILING IS THE COMBINED KEY, NOT THE SHARDS — and `per_sport=3000` corrupted production for ~29 mi | `state_layer2.md` |
 | [layer2-realized-accuracy] | THE LAYER 2 BOARD'S REALIZED ACCURACY — the portfolio book is the surface, and the measurement chain is broken | `state_layer2.md` |
+| [sim-weight-clv-decomposition] | `_SCORE_SIM_WEIGHT`'s OWN UNBLOCK CONDITION WAS RUN, AND THE ANSWER IS NO — leave `(0.125, 1.5)` alone `[2026- | `state_layer2.md` |
 | [layer2_board_display] | LAYER 2 BOARD -- USER-VISIBLE DISPLAY BUGS, 2026-08-20 AUDIT | `state_layer2.md` |
 | [layer1-layer2-boards] | LAYER 1 / LAYER 2 BOARDS — session briefs exist; three facts worth not re-deriving `[code read 08-16 11:2x CDT | `state_layer2.md` |
 | [layer1-board-date-scoping] | THE BOARD WAS DROPPING GAMES TWO WAYS — both FIXED AND VERIFIED `[verified 2026-08-30 05:0x-05:5xZ, web+refres | `state_layer2.md` |
@@ -590,7 +592,8 @@ once this index exists: re-splitting would orphan the parts.
 | [live-surface-tier5] | THE LIVE SURFACE — Tier 5 `[measured 08-15 02:3x–03:0xZ]` | `state_ui.md` |
 | [ask-the-syndicate] | ASK THE SYNDICATE | `state_ui.md` |
 | [ui-board-cards] | UI / BOARD CARDS | `state_ui.md` |
-| [client-slate-date] | THE BROWSER'S SLATE DATE IS CENTRAL, FROM ONE FUNCTION, AND A RATCHET NOW HOLDS IT `[verified 2026-09-09 in production]` | `state_ui.md` |
+| [brand-marks-and-error-pages] | TWO BRAND MARKS, SPLIT BY RENDER SIZE — and the app finally has error pages `[verified 2026-09-09, lane brand- | `state_ui.md` |
+| [client-slate-date] | THE BROWSER'S SLATE DATE IS CENTRAL, FROM ONE FUNCTION, AND A RATCHET NOW HOLDS IT `[verified 2026-09-09 in pr | `state_ui.md` |
 | [live-odds-worker-memory-is-page-cache] | live-odds-worker READS 96% AND IS NOT IN DANGER — THE FIELD EVERYONE REACHES FOR IS THE WRONG ONE `[measured 2 | `state_venues.md` |
 | [603-cross-game-quote-keys] | VENUE QUOTES NAMED NO GAME; FIXED ON EVERY PATH, DEPLOYED, AND STILL UNPROVEN AFTER THREE READINGS `[2026-08-3 | `state_venues.md` |
 | [venue-fee-economics] | FEES ARE READ FROM THE VENUE AND VERIFIED AGAINST 18/18 REAL FILLS; THE ARB THRESHOLD WAS ABOVE BREAK-EVEN EVE | `state_venues.md` |
@@ -606,6 +609,7 @@ once this index exists: re-splitting would orphan the parts.
 | [venue-market-universe] | The venues list ~25,000 markets and the board acts on 277 — VERIFIED 2026-08-30 | `state_venues.md` |
 | [render-crons] | THE THREE CRON SERVICES: WHAT THEY ARE, AND FOUR FACTS THAT COST A SESSION TO LEARN `[2026-09-08, lane render- | `state_worker.md` |
 | [ci-suite-pytest-step] | THE FULL SUITE RUNS ON THE CRON ONLY WHEN CHUNKED, AND IT IS PERMANENTLY RED FOR A KNOWN REASON `[2026-09-08,  | `state_worker.md` |
+| [odds-history-segment-keys] | THE odds_history SHARD CARRIES `segment=` KEYS NOW — and three separate key builders were segment-blind, in tw | `state_worker.md` |
 | [refresh-worker-headroom-2026-09-02] | THE ~1.4GB HEADROOM FIGURE IS STALE, AND THE METRIC EVERYONE READS IS THE WRONG ONE `[2026-09-02, lane m625-en | `state_worker.md` |
 | [accuracy-autorun-OOM-2026-09-02] | THE ACCURACY AUTORUN OOM-KILLED refresh-worker. **RESOLVED — DISARMED AND VERIFIED 19:32Z.** `[2026-09-02, lan | `state_worker.md` |
 | [local-fleet-runner] | THE THREE SERVICES RUN LOCALLY NOW — and doing it naively would have placed REAL ORDERS `[verified 2026-09-02, | `state_worker.md` |

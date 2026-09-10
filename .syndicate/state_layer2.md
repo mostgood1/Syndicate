@@ -173,6 +173,94 @@ portfolio endpoints serve settlement marginals only (`by_sport`,
 `by_market_family`, `by_venue_family`), never per-order rows, so no calibration
 curve exists. Exposing settled orders with their board fields is the unblock.
 
+## [sim-weight-clv-decomposition] `_SCORE_SIM_WEIGHT`'s OWN UNBLOCK CONDITION WAS RUN, AND THE ANSWER IS NO — leave `(0.125, 1.5)` alone `[2026-09-04, lane sim-clv-decomposition, READ-ONLY: no deploy, no env var]`
+
+**A non-zero `sim_component` does NOT predict better CLV.** In the direction the
+board rewards it predicts slightly WORSE CLV. Measured at adequate power — this
+is a falsification, not an underpowered null.
+
+**THE ORDER-SIDE JOIN IS DEAD, AND NOT FOR A SAMPLING REASON.** `_LEAN_FIELDS`
+began persisting `model_edge_pct`/`ev_pct` at `04187cdf` (2026-09-03 14:22 CT)
+and `sim_view` at `cb223b62` (17:26 CT); settlement is a once-per-Central-day
+job at ~06:00 CT. Production `/api/ops/execution/ledger-summary?days=60&mode=paper`:
+`sim_view` on **104 of 852 orders (12.21%)** and **13 of 667 settled (1.95%)**,
+**all 13 `agrees`**. `disagrees` and `neutral` have never been placed ONCE.
+Power: a 10pp ROI gap needs **3,796** settled attributed orders (per-bet ROI SD
+~110pp) — ~108 days at ~55 attributed/day, and the treatment arm still would not
+fill, because `disagrees` is EV-censored by the stake gates. **Do not wait on it.**
+
+**WHAT WORKED INSTEAD.** `clv_opening_ledger._opening_record` has carried
+`model_edge_pct`/`ev_pct` on every published row since **2026-08-15**, and
+`clv_join` carries both onto each resolved row beside `clv_pct`. `sim_component`
+needs no storage — it is exactly `clip(0.125 * model_edge_pct, +/-1.5)`. Harvested
+17,714 resolved rows over 21 dates x 5 sports via `/api/ops/clv/report?rows=1`.
+Two properties make this arm STRICTLY better than the order arm: it is
+**uncensored** (no stake gate), and **`sim_view` IS the sign of `sim_component`**
+(`layer2_board.py:3021-3035`), so the sign buckets ARE the agree/disagree split.
+
+**RESULTS.** Pregame closes only (3,563 unknown-timing rows EXCLUDED, not folded
+in; 40 in-play excluded; n=14,111). Book scopes never pooled. Fixed-effect pooled
+WITHIN-CELL differences, stratified on sport x market x side x price bucket, cells
+>=15/arm. CLV in **probability points**:
+
+    contrast                                    diff     95% CI            n a/b
+    props (book_agnostic) positive - negative  -0.113  [-0.253, +0.027]  2717/2448
+    props (book_agnostic) has-view - absent    +0.176  [+0.074, +0.277]  6160/2658
+    game lines (same_book) positive - negative -0.186  [-0.340, -0.033]  1309/1069
+    game lines (same_book) has-view - absent   -0.099  [-0.237, +0.039]  2280/757
+    props CAPPED - uncapped (positive only)    +0.017  [-0.155, +0.189]   655/2214
+    game lines CAPPED - uncapped (pos only)    +0.010  [-0.511, +0.532]    40/119
+
+Negative in BOTH scopes; the game-line CI excludes zero; 16/22 props cells and
+12/17 game-line cells put the endorsed arm behind. Props dose-response is
+monotone the wrong way (Q1 -1.500..-0.604 -> +1.6026 CLV; Q5 +1.248..+1.500 ->
++1.0805). **Powered:** props detects 0.25pp at 1,297/arm and has >2,400/arm, so
+a props effect above **+0.03pp** is ruled out at 95%.
+
+**HELD OUT, THE SIGN DOES NOT REPLICATE — and the two scopes disagree about what
+tail calibration (shipped 2026-09-01) did:**
+
+    props      PRE  -0.4137 (z -3.54, 12 cells)   POST +0.1155 (z +1.13,  9 cells)
+    game lines PRE  -0.1245 (z -1.32, 15 cells)   POST -0.5177 (z -2.74,  5 cells, 247 rows -- THIN)
+
+**COMPONENT AGAINST COMPONENT:** `corr(ev_pct, clv)` +0.4109 props / +0.0673 game
+lines; `corr(sim_component, clv)` **-0.0821 / -0.0454**; and the load-bearing one,
+`corr(ev_pct, sim_component)` = **-0.3644** — the terms pull against each other,
+so weight moved onto the sim comes off the better-correlated term. **Caveat:** in
+`book_agnostic_close` the opening is our best-of-N price and the close is
+market-wide, so a high-EV row is far from consensus BY CONSTRUCTION and +0.411 is
+inflated. In the clean `same_book` scope the EV contrast is -0.132 (z -2.03) —
+*neither* component beats the close there.
+
+**THE ARITHMETIC SCREEN CANNOT GATE A WEIGHT CHANGE, and this is its own finding.**
+`scripts/score_sim_weight_impact.py` returns the IDENTICAL PASS at weight 0.125,
+0.25, 0.5 and **1.0** with the cap at 1.5: `promoted` fires only when
+`-5 + contribution > 0`, and the cap bounds contribution at 1.5. Uncapped its
+boundary is `5.0/10.36 = 0.4826` (the spreads median), i.e. **3.9x headroom above
+today's value**. It screens the CAP and is BLIND to the WEIGHT. Still a valid cap
+screen; never cite it as validation of a weight.
+
+**DECISION: LEAVE BOTH ALONE.** Do not raise (claim falsified at power; terms
+anti-correlated). Do not lower to 0.0 — `blended_score` then reduces to `ev_pct`,
+identical for every side under a proportional de-vig, so the board cannot pick a
+side at all and the screen FAILs it; the measured cost of keeping 0.125 is at most
+0.19 probability points, which is cheap for the only side-picking capability the
+board has, and props presence is worth +0.176 [+0.074, +0.277]. Do not touch the
+cap — inert in CLV terms but the only structural bar to the 2026-08-08 domination
+failure. The surface's "price-led, sim-breaks-ties" description stays CORRECT.
+
+**WHAT WOULD CHANGE IT.** POST-calibration props is the one cut that moved toward
+the sim (+0.1155, z +1.13, n 1156/982). Re-run `scripts/decompose_sim_clv.py` over
+2026-09-01..~09-18 once that window stands alone at ~2,500/arm. A positive
+`positive - negative` with a CI excluding zero, AND game lines no longer negative,
+is the first real evidence for a raise — and it is a NEW hypothesis, because this
+data generated it.
+
+**NOT CLAIMED:** this is the published BOARD population, not the bet slate (the
+right population for a RANKING weight, not a claim about fills); CLV is not ROI;
+the HRR-poisoned window 2026-06-04..07-08 **cannot** contaminate it — the openings
+ledger starts 2026-08-15 and returns 0 for 08-14 and earlier.
+
 ## [layer2_board_display] LAYER 2 BOARD -- USER-VISIBLE DISPLAY BUGS, 2026-08-20 AUDIT
 
 ### 2026-08-21 -- FOUR MORE, ALL THE SAME SHAPE: a number computed in one frame, displayed in another `[code + artifact evidence, NOT a served-board read -- see the gap below]`
