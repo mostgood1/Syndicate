@@ -14,26 +14,29 @@ import pytest
 from scripts import bandwidth_tripwire as tw
 
 
-def test_buckets_are_RIGHT_labelled():
-    """Bucket `X:00` covers `(X-1):00 .. X:00`.
+def test_bandwidth_buckets_are_labelled_by_the_hours_START():
+    """Bucket `X:00` covers `X:00 .. (X+1):00`.
 
-    Confirmed twice in production against the independent `http-requests`
-    metric (182 reported vs 190 scanned). Getting it backwards analyses the
-    wrong hour, which cost an afternoon on an hour that was never the spike.
+    This test asserted the OPPOSITE until 2026-09-10. The old basis, "confirmed
+    against `http-requests`", was true of THAT metric and was applied to
+    bandwidth. Same-instant read at 15:13:07Z: the hour in flight was `16:00Z`
+    in `http-requests` and `15:00Z` in `bandwidth`. The headline "4,050 MB
+    against 2.6 MB of public traffic" for `09-04 18:00Z` was this pairing
+    error; its own hour carried 178.2 MB over 1,366 requests.
     """
     start, end = tw._bucket_window("2026-09-04T18:00:00Z")
 
-    assert start == "2026-09-04T17:00:00Z"
-    assert end == "2026-09-04T18:00:00Z"
+    assert start == "2026-09-04T18:00:00Z"
+    assert end == "2026-09-04T19:00:00Z"
 
 
 def test_the_window_is_exactly_one_hour():
-    start, end = tw._bucket_window("2026-09-06T00:00:00Z")
+    start, end = tw._bucket_window("2026-09-05T23:00:00Z")
     fmt = "%Y-%m-%dT%H:%M:%SZ"
     delta = dt.datetime.strptime(end, fmt) - dt.datetime.strptime(start, fmt)
 
     assert delta == dt.timedelta(hours=1)
-    assert start == "2026-09-05T23:00:00Z", "must roll back across midnight"
+    assert end == "2026-09-06T00:00:00Z", "must roll forward across midnight"
 
 
 def test_unsettled_buckets_are_EXCLUDED(monkeypatch):
@@ -153,3 +156,82 @@ def test_the_threshold_default_sits_far_above_ordinary_hours():
     default must fire on the phenomenon, not on somebody using the board."""
     assert tw.DEFAULT_THRESHOLD_MB >= 500
     assert tw.DEFAULT_SETTLE_MINUTES >= 60
+
+
+def _ts(hh_mm_ss: str, day: str = "2026-09-08") -> str:
+    return f"{day}T{hh_mm_ss}.000000Z"
+
+
+def test_an_emitter_that_DIES_inside_the_window_is_PARTIAL():
+    """`09-08 23:00Z` now covers 23:00-00:00, and web's access-log emitter died
+    at 23:45:58Z inside it. `app_blind` only catches a WHOLE dead hour, so
+    without this the re-derived capture reads 46 minutes of lines as a small
+    served total."""
+    edge = [_ts(f"23:{m:02d}:10") for m in range(0, 60, 3)]
+    access = [_ts(f"23:{m:02d}:10") for m in range(0, 46, 3)]
+
+    gap = tw._emitter_gap(edge, access)
+
+    assert gap is not None and "after the last access line" in gap
+
+
+def test_an_emitter_that_RETURNS_inside_the_window_is_PARTIAL():
+    """Restored 2026-09-09 ~14:38Z: the `14:00Z` bucket has lines only at the end."""
+    edge = [_ts(f"14:{m:02d}:00", "2026-09-09") for m in range(0, 60, 4)]
+    access = [_ts(f"14:{m:02d}:00", "2026-09-09") for m in range(40, 60, 4)]
+
+    gap = tw._emitter_gap(edge, access)
+
+    assert gap is not None and "before the first access line" in gap
+
+
+def test_a_fully_logged_hour_is_NOT_partial():
+    edge = [_ts(f"20:{m:02d}:00") for m in range(2, 58, 5)]
+    access = [_ts(f"20:{m:02d}:01") for m in range(2, 58, 5)]
+
+    assert tw._emitter_gap(edge, access) is None
+
+
+def test_no_access_lines_at_all_is_left_to_the_blind_check():
+    """Zero lines is `instrument_blind`, a different and stronger refusal."""
+    assert tw._emitter_gap([_ts("20:10:00")], []) is None
+
+
+def test_rederive_keeps_the_prior_windows_numbers():
+    """Overwriting a capture must not destroy what it used to say: ledger
+    entries quote those numbers, and they stay true of the hour BEFORE."""
+    old = {
+        "bucket": "2026-09-04T18:00:00Z", "captured_at": "2026-09-05T01:00:00Z",
+        "window_covered": {"start": "2026-09-04T17:00:00Z", "end": "2026-09-04T18:00:00Z"},
+        "metered_mb": 4050.1,
+        "edge": {"mb": 2.6, "requests": 131},
+        "app": {"served_mb": None, "access_lines": 0, "instrument_blind": True},
+        "publish_into_web": {"refresh-worker": {"mb": 1.0}, "live-odds-worker": {"mb": 2.0}},
+    }
+
+    prior = tw._prior_numbers(old)
+
+    assert prior["window_covered"]["start"] == "2026-09-04T17:00:00Z"
+    assert prior["edge_mb"] == 2.6 and prior["edge_requests"] == 131
+    assert prior["app_served_mb"] is None and prior["app_instrument_blind"] is True
+    assert prior["publish_into_web_mb"] == 3.0
+
+
+def test_capture_reads_EVERY_log_over_the_new_window(monkeypatch):
+    """Reachability: the window moved in ONE helper, and a capture reads four
+    logs through it. Assert every call actually used label..label+1h."""
+    calls = []
+
+    def fake_logs(key, resource, start, end, log_type, max_pages=200):
+        calls.append((log_type, start, end))
+        return []
+
+    monkeypatch.setattr(tw, "_logs", fake_logs)
+    monkeypatch.setattr(tw, "_get", lambda *a, **k: [])
+    monkeypatch.setattr(tw, "_metric", lambda *a, **k: {})
+
+    report = tw.capture("web", "2026-09-08T20:00:00Z", "key", metered_mb=220.7)
+
+    assert report["window_covered"] == {"start": "2026-09-08T20:00:00Z", "end": "2026-09-08T21:00:00Z"}
+    assert len(calls) == 4, calls
+    assert all((s, e) == ("2026-09-08T20:00:00Z", "2026-09-08T21:00:00Z") for _t, s, e in calls), calls

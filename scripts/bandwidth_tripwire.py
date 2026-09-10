@@ -10,16 +10,24 @@ captures the full context the moment a bucket clears a threshold.
 
 FOUR INSTRUMENT TRAPS ARE BAKED IN, because each produced a wrong reading first:
 
-1. **Buckets are RIGHT-LABELLED.** Bucket `15:00` covers `14:00..15:00`.
-   Confirmed twice against the independent `http-requests` metric (182 reported
-   vs 190 scanned). Getting this backwards analyses the wrong hour, which is
-   how one investigation spent an afternoon on an hour that was never the spike.
+1. **A BANDWIDTH bucket is labelled by its hour's START.** Bucket `15:00`
+   covers `15:00..16:00`. This said the opposite until 2026-09-10, and that was
+   true of a DIFFERENT metric: `http-requests` IS end-labelled (arm 1's 2,596
+   requests sit in its `01:00Z`), and that check was applied to bandwidth. A
+   same-instant read at 15:13:07Z filed the hour in flight under `16:00Z` in
+   `http-requests` and `15:00Z` in `bandwidth`. A lag scan over 180 poll
+   intervals put metered increments 1-4 min behind served bytes, not 60.
+   Getting this backwards analyses the wrong hour: every capture before the fix
+   paired a metered hour with the logs of the hour before it. See
+   `.syndicate/findings_2026-09-10_spike_crossing_and_labelling.md`.
 
-2. **A bucket SETTLES for ~50 minutes and grows up to 39x while doing it.**
-   Measured: `3.2 -> 5.2 -> 13.3 -> 22.3 -> 44.2 -> 64.7 -> 79.3 -> 95.7 ->
-   110.3 -> 124.6 -> 125.9`, then flat. **A fresh low reading is INCOMPLETE, not
-   low.** So this tool only judges buckets whose hour closed at least
-   `--settle-minutes` ago, and it records the value twice to prove it settled.
+2. **A bucket keeps growing for ~60 minutes after its label.** That is its
+   own hour filling in, 1-4 min behind real time. It was recorded as "settling
+   after the hour closes". Measured: `3.2 -> 5.2 -> 13.3 -> 22.3 -> 44.2 ->
+   64.7 -> 79.3 -> 95.7 -> 110.3 -> 124.6 -> 125.9`, then flat. **A fresh low
+   reading is INCOMPLETE, not low.** So this tool only judges buckets whose
+   LABEL is at least `--settle-minutes` old. At 70 that is ~6-10 min after the
+   hour ends; watcher polls on 2026-09-10 reached 99-100% at minute 61-62.
 
 3. **`type=request` is EDGE-ONLY.** It carries what the public proxy served and
    NOT internal service-to-service traffic, which appears only in the gunicorn
@@ -173,9 +181,14 @@ def _logs(key: str, resource: str, start: str, end: str, log_type: str, max_page
 
 
 def _bucket_window(bucket: str) -> tuple[str, str]:
-    """Trap 1: RIGHT-LABELLED. Bucket `X:00` covers `(X-1):00 .. X:00`."""
-    end = dt.datetime.strptime(bucket[:19], "%Y-%m-%dT%H:%M:%S")
-    start = end - dt.timedelta(hours=1)
+    """Trap 1: a BANDWIDTH bucket `X:00` covers `X:00 .. (X+1):00`.
+
+    It was `(X-1):00 .. X:00` until 2026-09-10, which is true of the
+    `http-requests` metric and FALSE for `bandwidth`. Every capture before
+    then paired a metered hour with the previous hour's logs.
+    """
+    start = dt.datetime.strptime(bucket[:19], "%Y-%m-%dT%H:%M:%S")
+    end = start + dt.timedelta(hours=1)
     return start.strftime("%Y-%m-%dT%H:%M:%SZ"), end.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -190,6 +203,65 @@ def _served_display(app: dict) -> str:
     if app.get("instrument_blind"):
         return "UNREADABLE (access-log emitter off)"
     return f"{app['served_mb']} MB"
+
+
+#: Every public request reaches gunicorn and is logged there, so an edge request
+#: with no access line within this long is a GAP IN THE EMITTER (or an app-log
+#: page budget that ran out), not a quiet stretch.
+EMITTER_GAP_MINUTES = 10
+
+
+def _emitter_gap(edge_ts: list[str], access_ts: list[str]) -> str | None:
+    """Did the access-log emitter die or come back INSIDE this window?
+
+    `instrument_blind` only catches an emitter that is off for the WHOLE hour.
+    Moving the window to label..label+1h put two known transitions inside one:
+    the emitter died at 2026-09-08T23:45:58Z (bucket `23:00Z` now holds 46 min
+    of lines and 14 of none) and came back at ~2026-09-09T14:38Z. A partial
+    served total reads as a SMALL one, which is the permissive default this
+    tool already refuses for a dead hour. Zero access lines is left to the
+    blind check.
+    """
+    if not access_ts or not edge_ts:
+        return None
+    parse = lambda s: dt.datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S")  # noqa: E731
+    first, last = min(access_ts), max(access_ts)
+    margin = dt.timedelta(minutes=EMITTER_GAP_MINUTES)
+    before = sum(1 for t in edge_ts if parse(t) < parse(first) - margin)
+    after = sum(1 for t in edge_ts if parse(t) > parse(last) + margin)
+    parts = []
+    if before:
+        parts.append(f"{before} edge requests before the first access line ({first[:19]}Z)")
+    if after:
+        parts.append(f"{after} edge requests after the last access line ({last[:19]}Z)")
+    if not parts:
+        return None
+    return ("access-log emitter gap inside the window: " + "; ".join(parts)
+            + " -- served_mb is a PARTIAL total, do not divide by it")
+
+
+def _prior_numbers(old: dict[str, Any]) -> dict[str, Any]:
+    """What a capture said before it was re-derived on the corrected window.
+
+    Kept, not discarded: ledger entries quote these numbers, and they remain
+    true -- of the hour BEFORE the bucket's label.
+    """
+    edge = old.get("edge") or {}
+    app = old.get("app") or {}
+    publish = old.get("publish_into_web") or {}
+    return {
+        "captured_at": old.get("captured_at"),
+        "window_covered": old.get("window_covered"),
+        "metered_mb": old.get("metered_mb"),
+        "edge_mb": edge.get("mb"),
+        "edge_requests": edge.get("requests"),
+        "app_served_mb": app.get("served_mb"),
+        "app_access_lines": app.get("access_lines"),
+        "app_instrument_blind": app.get("instrument_blind"),
+        "publish_into_web_mb": round(sum(float((v or {}).get("mb") or 0) for v in publish.values()), 2)
+        if isinstance(publish, dict) else None,
+    }
+
 
 def _top(pairs: dict[str, list[int]], limit: int = 12) -> list[dict[str, Any]]:
     return [
@@ -209,8 +281,10 @@ def capture(service: str, bucket: str, key: str, metered_mb: float | None = None
         "captured_at": dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "metered_mb": metered_mb,
         "note": (
-            "bucket is RIGHT-labelled: it covers window_covered, i.e. the hour BEFORE its label. "
-            "edge_* is public traffic only; app_* includes internal service-to-service."
+            "bucket is labelled by its hour's START: window_covered is label..label+1h "
+            "(changed 2026-09-10; captures before then read the hour BEFORE the label -- see "
+            "`rederived.prior` where present). edge_* is public traffic only; app_* includes "
+            "internal service-to-service."
         ),
     }
 
@@ -241,11 +315,13 @@ def capture(service: str, bucket: str, key: str, metered_mb: float | None = None
     app_ips: dict[str, list[int]] = defaultdict(lambda: [0, 0])
     app_total = 0
     access_lines = 0
-    for _ts, message, _labels in app:
+    access_ts: list[str] = []
+    for ts, message, _labels in app:
         match = _ACCESS.match(message.strip())
         if not match:
             continue
         access_lines += 1
+        access_ts.append(ts)
         ip, _method, path, _status, size_text = match.groups()
         size = int(size_text) if size_text.isdigit() else 0
         app_total += size
@@ -269,6 +345,10 @@ def capture(service: str, bucket: str, key: str, metered_mb: float | None = None
         "instrument_blind": app_blind,
         "note": "served_bytes is RESPONSE size only; a POST body (e.g. artifacts/publish) is NOT counted here",
     }
+    gap = None if app_blind else _emitter_gap([ts for ts, _m, _l in edge], access_ts)
+    report["app"]["instrument_partial"] = gap is not None
+    if gap:
+        report["app"]["partial_reason"] = gap
     if app_blind:
         report["app"]["blind_reason"] = (
             "0 gunicorn access lines while the edge log carried "
@@ -365,21 +445,72 @@ def run_check(args: argparse.Namespace, key: str) -> int:
     return fired
 
 
+_CAPTURE_NAME = re.compile(r"^(?P<service>[a-z-]+)_\d{8}T\d{6}Z\.json$")
+
+
+def rederive_all(services: list[str], key: str) -> int:
+    """Re-capture every capture on disk on the corrected window (2026-09-10).
+
+    Idempotent: a capture already on the new window is skipped. What each file
+    said before is kept under `rederived.prior`. `metered_mb` is re-read, which
+    also fills the captures that recorded it as null.
+    """
+    done = 0
+    for service in services:
+        for path in sorted(OUT_DIR.glob(f"{service}_*.json")):
+            named = _CAPTURE_NAME.match(path.name)
+            if not named or named.group("service") != service:
+                continue
+            old = json.loads(path.read_text(encoding="utf-8"))
+            bucket = old.get("bucket")
+            if not bucket:
+                continue
+            start, end = _bucket_window(bucket)
+            if (old.get("window_covered") or {}).get("start") == start:
+                print(f"  {bucket}  already on the corrected window -- skipped", flush=True)
+                continue
+            metered = _metric(key, "bandwidth", SERVICE_IDS[service], start, end).get(bucket)
+            report = capture(service, bucket, key,
+                             metered_mb=metered if metered is not None else old.get("metered_mb"))
+            report["rederived"] = {
+                "at": dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "reason": ("window corrected to label..label+1h -- a BANDWIDTH bucket is labelled by "
+                           "its hour's START. See .syndicate/findings_2026-09-10_spike_crossing_and_labelling.md"),
+                "prior": _prior_numbers(old),
+            }
+            path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+            done += 1
+            prior = report["rederived"]["prior"]
+            app = report["app"]
+            flag = " BLIND" if app.get("instrument_blind") else (" PARTIAL" if app.get("instrument_partial") else "")
+            print(f"  {bucket}  metered {report['metered_mb']}  edge {prior['edge_mb']} -> "
+                  f"{report['edge']['mb']} MB ({prior['edge_requests']} -> {report['edge']['requests']} reqs)  "
+                  f"served {prior['app_served_mb']} -> {app['served_mb']}{flag}", flush=True)
+    print(f"re-derived {done} capture(s)")
+    return done
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--services", nargs="+", default=["web"], choices=sorted(SERVICE_IDS))
     parser.add_argument("--threshold-mb", type=float, default=DEFAULT_THRESHOLD_MB)
     parser.add_argument("--settle-minutes", type=int, default=DEFAULT_SETTLE_MINUTES,
-                        help="only judge buckets whose hour closed this long ago (default 70)")
+                        help="only judge buckets whose LABEL is at least this old (default 70)")
     parser.add_argument("--lookback-hours", type=int, default=6)
     parser.add_argument("--check", action="store_true", help="one pass")
     parser.add_argument("--watch", action="store_true", help="loop until stopped")
     parser.add_argument("--interval-minutes", type=int, default=20)
     parser.add_argument("--capture", metavar="BUCKET", help="capture one bucket explicitly, e.g. 2026-09-04T18:00:00Z")
     parser.add_argument("--force", action="store_true", help="re-capture a bucket already on disk")
+    parser.add_argument("--rederive", action="store_true",
+                        help="re-capture every capture on disk on the corrected window, keeping the prior numbers")
     args = parser.parse_args()
 
     key = _api_key()
+
+    if args.rederive:
+        rederive_all(args.services, key)
+        return 0
 
     if args.capture:
         service = args.services[0]
