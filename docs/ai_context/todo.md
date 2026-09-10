@@ -4022,6 +4022,60 @@ worker-local export-only set once (2) unblocks.
 > The two-way hold measures 7.007%, and `2 x per-side = 8.44%` is the 4.05 error
 > restated — do not reintroduce it.
 
+
+> **STEP 3'S RATE RE-FIT IS BLOCKED, AND THE BLOCKER IS DATA REACHABILITY, NOT
+> MODELLING. IT WAS NOT RUN — deliberately.** `[2026-09-09 23:5x CT, lane
+> web-oom-census. Measurement only; `scripts/refit_mlb_rates.py` was NOT executed
+> against a window, and no rates were changed.]`
+>
+> `refit_mlb_rates.py:264` enumerates its jobs from
+> `daily_pitcher_props/snapshots/<date>/roster_objs/roster_obj_*.json`
+> (`SYNDICATE_MLB_DATA_ROOT`-overridable). Three sources were checked:
+>
+> | source | dates | usable |
+> |---|--:|---|
+> | local checkout | **13**, 2026-06-15..06-27 | **NONE — all poisoned** |
+> | production, `daily_pitcher_props` | **0** | not allowlisted AT ALL |
+> | production, exportable `roster_obj*` | **0** | absent in every layout |
+>
+> **EVERY LOCAL DATE IS AT OR BEFORE THE HRR HEALING BOUNDARY.** Step 2 of this
+> item records the boundary exactly — 100% zeros on 2026-06-14..06-25, 0% from
+> 07-20 onward. The 13 available dates are **06-15..06-27**. There is not one
+> clean date locally. **Step 2 also records that this exact thing already happened
+> once: "the first run of that script was itself poisoned by these six dates and
+> produced a confident wrong conclusion."** Running it now reproduces that.
+>
+> **AND IT WOULD NOT BE A CLAIM EVEN IF IT WERE CLEAN.** `#625`(6) added the
+> substrate labels to `model_engine_standard.md` §3b: `render`,
+> `mirror:<manifest_id>`, `checkout` — and **`checkout` is NEVER a claim.** The
+> local `data/` tree is the checkout substrate.
+>
+> **PRODUCTION CANNOT SUPPLY A CLEAN WINDOW EITHER.** `daily_pitcher_props` appears
+> nowhere in `artifact_publisher.py` — neither hot nor export-only — so it can
+> never be published or exported. `daily/snapshots` IS reachable (2,759 files, 117
+> dates, **53 of them >= 07-20 and therefore clean**) but contains only
+> `oddsapi_*`, `lineups`, `probables`, `meta`, `injuries_raw`, `roster_events`.
+> **No `roster_obj_*.json` in any layout, on any date.**
+>
+> **NUANCE FOR `#638`'s OWNER, because the ledger's note reads the other way.**
+> `#625`(2) says `roster_objs` "was already matched by `snapshots/*/*.json` because
+> fnmatch `*` crosses `/`". The PATTERN may well match — but there is nothing on
+> web for it to match: **0 artifacts named `roster_obj*`**. Reachability of a
+> pattern and presence of a file are different facts, and only the second one
+> unblocks this.
+>
+> **WHAT WOULD ACTUALLY UNBLOCK IT, in increasing order of cost:**
+> 1. **Run the re-fit ON refresh-worker**, where the roster objects already live.
+>    No transfer, no allowlist change; it is a compute job on the service that
+>    holds the data.
+> 2. **Export-allowlist the roster objects** so a clean window can be MIRRORED and
+>    manifest-cited, which is what makes the result a claim under §3b.
+> 3. Rebuild roster objects locally for clean dates from reachable inputs — most
+>    work, and it re-derives something production already has.
+>
+> **This is the largest remaining modelling item in Phase 1 and it is one
+> data-reachability decision away from being runnable.**
+
 ### `#623` — **PHASE 2 — WNBA SPRINT 2026-09-17..09-25, run as a TEST (30 games in 9 days).** — lane `edge-plan`, 2026-09-01 — **OPEN; preconditions are `#626` (c)(d)(e)**
 
 Execute against the pre-registered gates — nothing here is discretionary:
