@@ -194,25 +194,6 @@ death, never life — do not invert it.
   measurement.
 
 ## OPEN
-### publish-503-rate-baseline — OPEN — opened 2026-09-08 — session 435e6279-c6d8-4a9c-b41c-f1bd67112631
-- Goal: state whether web's `/api/ops/artifacts/publish` **503 rate** (merge-at-capacity
-  backpressure, `syndicate/blueprints/ops.py:2298`) is steady state or specific to a
-  bandwidth-spike hour — as a RATE with its denominator, per hour, over 24 contiguous buckets.
-- Files: NONE. The measurement runs from a scratch script outside the repo and writes no
-  tracked file; the result is recorded in the ledger only. Deliberately naming no path
-  here — an earlier draft wrote the ledger destinations into this block and the parser
-  read them as a claim on the whole ledger directory, contesting another OPEN lane.
-- Hypothesis: the 23% 503 rate measured in ONE hour (693/2,996, 2026-09-07T23:00Z) is
-  elevated relative to ordinary hours, i.e. the merge ceiling is hit disproportionately
-  during a spike bucket.
-- Falsification test: if ordinary (non-spike, non-deploy) buckets show a comparable or
-  higher 503 share, the hypothesis is dead and 23% is simply what this system does.
-- Verification: a 24-row table, every row fetched by the IDENTICAL pager and text filter
-  (no separately-sampled control — `2026-09-03` FORBIDDEN), each row carrying its
-  denominator and its fetch coverage, with deploy-adjacent buckets reported separately and
-  never pooled (`2026-09-02` FORBIDDEN: post-restart ramp).
-- Blocked by: none
-
 ### web-ship-forward — CLOSED 2026-09-09 — opened 2026-09-09 — session d5c69f3c-63c3-45cc-ba72-5d9db425ebf2 — **SHIPPED AND VERIFIED: web `e4552e27` -> `7bf2b901` (55 commits), live 15:05:05Z. Four readings taken — edge serves real payloads on 4 routes, no `server_failed` across 20 min, the access-log fix survived (125 lines/87 s), and memory at equal minutes-since-boot is at or below the previous process at every point. `deploys.md` 2026-09-09 15:01Z.**
 - Goal: web moves from `e4552e27` (booted 2026-09-08T23:47:28Z) to main tip `375e9a1b` — 55 commits — and SERVES without a new OOM or a 5xx floor. User-directed: "ship web forward to main".
 - Files: none — this lane writes no code. `.syndicate/deploys.md` (the measurement) and this block only.
@@ -929,6 +910,7 @@ death, never life — do not invert it.
 - `portfolio-decision-and-execution` — ORPHANED, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — — opened 2026-08-22 — session 9324a3e5-364e
 - `portfolio-ledger-service-split` — ORPHANED, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — — opened 2026-08-22 — session 74a0966a-a9fe
 - `profitable-buckets` — **ORPHANED 2026-09-08 — WAITING ON DATA, resume 2026-09-15** — opened 2026-09-08 — session 3492626c — **NO DEMONSTRATED LIVE-GAMELINE EDGE ON MLB. h2h
+- `publish-503-rate-baseline` — CLOSED 2026-09-10 — opened 2026-09-08 — session 435e6279 — **GOAL: MET: publish 503 rate is steady state (34.2% over 24 h; ordinary hours 32.0% > the 23% spike hour); hypothesis falsified**
 - `render-cron-failures` — CLOSED 2026-09-08, **GOAL: MET 2026-09-09** — opened 2026-09-08 — session e371dfde — **all three defects fixed, deployed and MEASURED, and the SCHEDULED runs the goal asked for are now READ**: `sim-input-reports` `crn-dafj4ie7bikc738q9ol0-29815620` 07:00:35Z→ 07:02:26Z `successful` with `nhl_source ... alarms=21`; `ci-suite` `crn-dafg4h0u01pc73aavs6g-29815680` 08:00:37Z→ 08:44:58Z `nonZeroExit: 1` with **no `oomKilled`**, `collected=16668`, 9/10 steps rc=0, 15 NEW of which 14 are the 3000 MB floor on a 2048 MB runner. Shape change: the layout-independent stable core is **14, not 15**. Block updated in place in `lanes_history.md`; readings in `deploys.md` 2026-09-09 08:44:58Z.
 - `render-web-request-path` — **ORPHANED, UNOWNED, CLAIMS RELEASED** `[session 726ef4ff checkpointed and archived 2026-08-22 ~19:4xZ]` — — **SHIPPED AND MEASURED; ONE ITEM OWED**
 - `session-scope-drift-guard` — **CLOSED 2026-09-08 — falsification test RAN: rate passes (0.50 firings/session, 73% silent), precision does NOT (6 of 11 firings were in-goal). Kept,

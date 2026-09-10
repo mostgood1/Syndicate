@@ -5258,3 +5258,58 @@ carried-forward work in `docs/ai_context/todo.md` `#650`/`#651`/`#652`.
 - Falsification test: n/a.
 - Verification: a run of the SCHEDULED task (not a hand run) writes a heartbeat line with `http=200` and `auth=token`; the token string is absent from the heartbeat, the findings file, the task's output and `$env:TEMP`.
 - Blocked by: none. Promotes the 2026-09-10 lead in `leads.md` ("had no scheduler for 9 days").
+
+### publish-503-rate-baseline — CLOSED 2026-09-10 — opened 2026-09-08 — session 435e6279-c6d8-4a9c-b41c-f1bd67112631 (desktop `local_65729cfd-71ac-49ac-8b10-e7020936a499`) — **GOAL: MET. The 503 rate is STEADY STATE, about one publish in three at every hour (34.2% over 24 buckets), and the spike-hour hypothesis is falsified by the lane's own test. Closed by session 78cad512 on the user's decision 2026-09-10 ("Record, close, archive"): the holder is an unattended scheduled-run session that cannot receive an answer, and this finding existed only in its transcript.**
+- **GOAL VERDICT — Goal (verbatim): "state whether web's `/api/ops/artifacts/publish` **503 rate** (merge-at-capacity backpressure, `syndicate/blueprints/ops.py:2298`) is steady state or specific to a bandwidth-spike hour — as a RATE with its denominator, per hour, over 24 contiguous buckets." -> GOAL: MET.** Reading: 24 contiguous hourly buckets, 2026-09-07T17:00Z..2026-09-08T16:00Z, each fetched by the same pager and text filter (`reached_start=True` on all 24), each with its own denominator, deploy-adjacent buckets flagged. The falsification test's reading, ordinary buckets (non-spike, no deploy), is 10,716 / 33,437 = 32.0%, ABOVE the 23.1% hour that prompted the lane, so the hypothesis is DEAD. Spike buckets pool LOWER than non-spike (28.8% vs 35.4%). The filtered sweep and the earlier unfiltered pager agree on the 23:00Z hour within 0.13% (2,992/690 vs 2,996/693).
+- was (the header before closing, verbatim): — OPEN — opened 2026-09-08 — session 435e6279-c6d8-4a9c-b41c-f1bd67112631
+- Goal: state whether web's `/api/ops/artifacts/publish` **503 rate** (merge-at-capacity
+  backpressure, `syndicate/blueprints/ops.py:2298`) is steady state or specific to a
+  bandwidth-spike hour — as a RATE with its denominator, per hour, over 24 contiguous buckets.
+- Files: NONE. The measurement runs from a scratch script outside the repo and writes no
+  tracked file; the result is recorded in the ledger only. Deliberately naming no path
+  here — an earlier draft wrote the ledger destinations into this block and the parser
+  read them as a claim on the whole ledger directory, contesting another OPEN lane.
+- Hypothesis: the 23% 503 rate measured in ONE hour (693/2,996, 2026-09-07T23:00Z) is
+  elevated relative to ordinary hours, i.e. the merge ceiling is hit disproportionately
+  during a spike bucket.
+- Falsification test: if ordinary (non-spike, non-deploy) buckets show a comparable or
+  higher 503 share, the hypothesis is dead and 23% is simply what this system does.
+- Verification: a 24-row table, every row fetched by the IDENTICAL pager and text filter
+  (no separately-sampled control — `2026-09-03` FORBIDDEN), each row carrying its
+  denominator and its fetch coverage, with deploy-adjacent buckets reported separately and
+  never pooled (`2026-09-02` FORBIDDEN: post-restart ramp).
+- Blocked by: none
+- Result table, recovered 2026-09-10 from the session's sweep output (`tasks/bv17lnqgk.output` in its temp folder; it also wrote `C:/tmp/publish_503_sweep.json`). Spike membership (>= 400 MB metered) is from that session's own metered join:
+
+    hour (bucket start)    publishes    503   rate   flags
+    2026-09-07T17:00:00Z     3454    1535   44.4%  DEPLOY
+    2026-09-07T18:00:00Z     3777    1604   42.5%  DEPLOY
+    2026-09-07T19:00:00Z     4200    1362   32.4%  
+    2026-09-07T20:00:00Z     3660    1675   45.8%  DEPLOY
+    2026-09-07T21:00:00Z     3634    1566   43.1%  DEPLOY
+    2026-09-07T22:00:00Z     3750    1226   32.7%  
+    2026-09-07T23:00:00Z     2992     690   23.1%  SPIKE
+    2026-09-08T00:00:00Z     2497     624   25.0%  SPIKE DEPLOY
+    2026-09-08T01:00:00Z     2739     649   23.7%  
+    2026-09-08T02:00:00Z     2511     647   25.8%  DEPLOY
+    2026-09-08T03:00:00Z     2530     581   23.0%  
+    2026-09-08T04:00:00Z     2997     877   29.3%  
+    2026-09-08T05:00:00Z     2001     566   28.3%  
+    2026-09-08T06:00:00Z     1665     523   31.4%  
+    2026-09-08T07:00:00Z     1953     560   28.7%  
+    2026-09-08T08:00:00Z     2418     738   30.5%  
+    2026-09-08T09:00:00Z     2253     879   39.0%  
+    2026-09-08T10:00:00Z     2197     793   36.1%  
+    2026-09-08T11:00:00Z     2090     747   35.7%  
+    2026-09-08T12:00:00Z     2644    1215   46.0%  
+    2026-09-08T13:00:00Z     2019     817   40.5%  DEPLOY
+    2026-09-08T14:00:00Z     1957     775   39.6%  SPIKE DEPLOY
+    2026-09-08T15:00:00Z     2266     650   28.7%  SPIKE DEPLOY
+    2026-09-08T16:00:00Z     1829     584   31.9%  SPIKE DEPLOY
+
+    all 24                 24 buckets   64033 publishes   21883 503   34.2%
+    spike (>= 400 MB)       5 buckets   11541 publishes    3323 503   28.8%
+    non-spike              19 buckets   52492 publishes   18560 503   35.4%
+    non-spike, no deploy   13 buckets   33437 publishes   10716 503   32.0%
+
+- Its closing question (re-capture the 2026-09-08 16:00Z and 17:00Z spike buckets before their logs aged out) was already moot: later tripwire fires captured both (`reports/bandwidth_spikes/web_20260908T160000Z.json`, `web_20260908T170000Z.json` on origin/main).
