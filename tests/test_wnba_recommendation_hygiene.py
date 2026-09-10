@@ -117,18 +117,79 @@ def test_totals_rows_are_dropped_and_ats_survives(monkeypatch, tmp_path):
     import json
 
     payload = json.loads(path.read_text(encoding="utf-8")) if path else {}
+    # `per_game` is the key the builder writes. This read used `games`/`slate`
+    # until 2026-09-10, so it asserted over an empty list and could not fail.
     markets = [
         str(pick.get("market") or "").upper()
-        for game in (payload.get("games") or payload.get("slate") or [])
+        for game in (payload.get("per_game") or [])
         if isinstance(game, dict)
         for pick in (game.get("picks") or [])
         if isinstance(pick, dict)
     ]
+    assert "ATS" in markets, "the ATS pick must survive, or the TOTAL assertion below is vacuous"
     assert "TOTAL" not in markets, "a withheld market must not reach the slate"
     assert refresher._WIN_PROB_STATS.get("totals_withheld", 0) >= 1, (
         "the refusal must be COUNTED -- a silent drop is indistinguishable from "
         "the generator never producing totals"
     )
+
+
+# ------------------------------------------------------- prop EV on the slate
+def test_slate_prop_ev_is_refused_and_the_pick_sinks_in_its_game(monkeypatch, tmp_path):
+    """The third prop site -- the loop that WRITES the slate -- read `ev_pct` raw.
+
+    Pre-fix, 2264.8 reached the slate and, as `score` and the within-game sort
+    key, ranked first. Refused, the pick stays, its EV is absent, the refusal is
+    counted, and it sorts behind every pick whose EV is a number.
+    """
+    import json
+
+    processed = tmp_path / "processed"
+    processed.mkdir()
+
+    def _index(**_kwargs):
+        row = {"home_tri": "ATL", "away_tri": "MIN",
+               "home": "Atlanta Dream", "away": "Minnesota Lynx"}
+        return [row], {"ATL": row, "MIN": row}, {("atlanta dream", "minnesota lynx"): row}
+
+    props = [
+        {"team": "ATL", "player": "Implausible Player",
+         "top_play": {"stat": "pts", "line": 20.5, "side": "OVER", "price": -110,
+                      "ev_pct": 2264.8, "p_win": 0.6, "proj": 22.0}},
+        {"team": "MIN", "player": "Plausible Player",
+         "top_play": {"stat": "reb", "line": 8.5, "side": "OVER", "price": 105,
+                      "ev_pct": 12.0, "p_win": 0.55, "proj": 9.1}},
+    ]
+    monkeypatch.setattr(refresher, "_local_game_cards_index", _index)
+    monkeypatch.setattr(refresher, "_load_local_props_recommendations", lambda **_k: props)
+    monkeypatch.setattr(refresher, "_emit_win_prob_build", lambda *_a, **_k: None)
+
+    _, path = refresher._build_local_recommendations_slate_artifact(
+        processed_root=processed, date_str="2026-09-17"
+    )
+    picks = [pick for game in json.loads(path.read_text(encoding="utf-8"))["per_game"] for pick in game["picks"]]
+    by_player = {pick["display_pick"].split(" OVER")[0]: pick for pick in picks}
+    assert set(by_player) == {"Implausible Player", "Plausible Player"}, "a refused EV must not DROP the pick"
+    assert by_player["Implausible Player"]["ev_pct"] is None
+    assert by_player["Implausible Player"]["score"] is None
+    assert by_player["Plausible Player"]["ev_pct"] == pytest.approx(12.0)
+    assert picks[-1]["display_pick"].startswith("Implausible Player"), "a refused EV sorts last in its game"
+    assert refresher._WIN_PROB_STATS["ev_refused_implausible"] == 1
+
+
+def test_every_prop_ev_read_routes_through_plausibility_in_both_producers():
+    """Presence is not coverage. `test_nba_props_integrity` asserts the refused
+    form APPEARS in each producer, and that held while the WNBA slate writer read
+    `ev_pct` raw. Pin the COUNT instead: every read is a refused read."""
+    from pathlib import Path
+
+    wnba = Path(refresher.__file__)
+    for path in (wnba, wnba.with_name("refresh_nba_oddsapi_props.py")):
+        source = path.read_text(encoding="utf-8-sig")
+        raw = source.count('top_play.get("ev_pct")')
+        refused = source.count('_plausible_ev_pct(_float_or_none(top_play.get("ev_pct")))')
+        assert raw > 0, f"{path.name}: the read moved, so this tripwire is now vacuous"
+        assert raw == refused, f"{path.name}: {raw - refused} prop EV read(s) bypass _plausible_ev_pct"
 
 
 # ------------------------------------------------------------------ tiering

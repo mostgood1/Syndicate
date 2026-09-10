@@ -2189,7 +2189,14 @@ def _build_local_recommendations_slate_artifact(*, processed_root: Path, date_st
         stat = str(top_play.get("stat") or "").strip().lower()
         line_value = _float_or_none(top_play.get("line"))
         side = str(top_play.get("side") or "").strip().upper() or "OVER"
-        ev_pct = _float_or_none(top_play.get("ev_pct"))
+        # THE EV REFUSAL, AT THE SITE THAT WRITES THE SLATE (2026-09-10). The
+        # file's other two prop sites and both NBA sites already route prop EV
+        # through `_plausible_ev_pct`; this one read it raw, so an implausible
+        # EV reached `recommendations_slate_<date>.json` -- and, as `score` and
+        # the within-game sort key below, ranked FIRST. Refused, the pick stays
+        # on the slate with its EV absent and sorts last in its game, which is
+        # what a refused game-market EV already does above.
+        ev_pct = _plausible_ev_pct(_float_or_none(top_play.get("ev_pct")))
         # Explicit None tests, not an `or` chain: `or` also fires on a
         # genuine 0.0, so a real "this side cannot win" p_win used to fall
         # through to the price, and a missing price then fabricated 0.5.

@@ -45,12 +45,13 @@ def test_implausible_game_ev_fails():
     assert "EV refusal" in reason
 
 
-def test_implausible_prop_ev_is_reported_not_gated():
-    # The slate's prop loop never calls `_plausible_ev_pct`; failing on it would
-    # fail the slate for a fix nobody shipped, and hiding it would overstate the fix.
-    verdict, _, detail = gate.evaluate_slate(_slate(CLEAN_GAME, {**CLEAN_PROP, "ev_pct": 150.0}))
-    assert verdict == gate.PASS
-    assert detail["prop_ev_over_100 (REPORTED, not gated)"] == 1
+def test_implausible_prop_ev_fails():
+    # Gated since lane `wnba-slate-prop-ev-refusal` routed the slate's prop EV
+    # through `_plausible_ev_pct`: a slate written without that fix is a defect.
+    verdict, reason, detail = gate.evaluate_slate(_slate(CLEAN_GAME, {**CLEAN_PROP, "ev_pct": 150.0}))
+    assert verdict == gate.FAIL
+    assert "prop EV refusal" in reason
+    assert detail["prop_ev_over_100"] == 1
 
 
 def test_empty_slate_is_unreadable_not_pass():

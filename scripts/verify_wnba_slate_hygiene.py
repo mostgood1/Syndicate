@@ -23,14 +23,13 @@ THREE OUTCOMES, following `verify_wnba_settlement_gate.py`:
 **Exit 3 is not a failure.** On 2026-09-10 there is no WNBA game, so every
 reading is UNREADABLE by construction -- that is the break, not a defect.
 
-REPORTED, NOT GATED: prop picks with |ev_pct| > 100. The slate builder's prop
-loop (`_build_local_recommendations_slate_artifact`, `ev_pct =
-_float_or_none(top_play.get("ev_pct"))`) never calls `_plausible_ev_pct`; the
-file's two other prop sites and both NBA sites do. So the EV refusal does not
-cover props ON THE SLATE. Gating on it would fail a slate for a fix nobody
-shipped; hiding it would let "EV refusal is in force" be read as covering
-props. It also matters for ORDER: `ev_pct` is the slate's `score` and the
-within-game sort key, so an implausible prop EV ranks FIRST.
+GATED SINCE 2026-09-10: prop picks with |ev_pct| > 100. Until then the slate
+builder's prop loop (`_build_local_recommendations_slate_artifact`) read
+`ev_pct` raw while the file's two other prop sites and both NBA sites refused
+it, so the EV refusal did not cover props ON THE SLATE -- and an implausible
+prop EV, being the slate's `score` and within-game sort key, ranked FIRST.
+Lane `wnba-slate-prop-ev-refusal` routed it through `_plausible_ev_pct`; a
+slate written by code without that fix FAILs here.
 
 `--check layer2` answers `todo #614` and sprint gate 7 instead: did WNBA reach
 the Layer 2 board for the date, and if not, WHICH gate stopped it. The gate
@@ -110,7 +109,7 @@ def evaluate_slate(payload, *, allow_totals: bool = False):
         "p_win_outside_clamp": sum(1 for v in p_wins if v < _CLAMP_LOW - _EPS or v > _CLAMP_HIGH + _EPS),
         "total_picks": sum(1 for p in picks if str(p.get("market") or "").strip().upper() in _TOTAL_MARKETS),
         "game_ev_over_100": game_ev_over,
-        "prop_ev_over_100 (REPORTED, not gated)": prop_ev_over,
+        "prop_ev_over_100": prop_ev_over,
         "max_abs_ev_pct": round(max_abs_ev, 3),
         "price_inside_pm100 (REPORTED, not gated)": price_inside,
     }
@@ -130,6 +129,8 @@ def evaluate_slate(payload, *, allow_totals: bool = False):
         )
     if game_ev_over:
         failures.append(f"{game_ev_over} game-market pick(s) with |ev_pct| > 100: the EV refusal is not in force")
+    if prop_ev_over:
+        failures.append(f"{prop_ev_over} prop pick(s) with |ev_pct| > 100: the prop EV refusal is not in force")
     if failures:
         return FAIL, "; ".join(failures), detail
     return PASS, f"{len(picks)} picks over {len(games)} games, every in-force check holds", detail
