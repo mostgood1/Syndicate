@@ -4240,11 +4240,11 @@ the measurement to repeat on this sprint.
 > - **RISK FOR 09-17 — WNBA chips are FROZEN at the last slate.**
 >   - `/api/board/game-chips?date=2026-09-10` serves ESPN `401857186..189`, which is exactly the 2026-08-30 Central slate, all FINAL with an empty `start_time_utc`. That is where `scheduled_games: 4` comes from on a day ESPN lists no WNBA game.
 >   - **MECHANISM ESTABLISHED 2026-09-10** (lane `wnba-chip-frozen-trace`, in `lanes_closed.md`).
->     - `has_games_for_date(today)` fetches `site.api.espn.com`, which refuses Render, so it returns None. The guard at `wnba/cards.py:607` blocks only on False.
+>     - `has_games_for_date(today)` fetched `site.api.espn.com` with `User-Agent: Syndicate-WNBA/1.0`, a pair Render is refused on, so it returned None. The guard at `wnba/cards.py:607` blocks only on False.
 >     - So a worker's `build_live_state_payload(today, allow_stored_date_fallback=True)` (`scripts/refresh_wnba_oddsapi_props.py:609`) builds from the substituted 08-30 slate and persists it under TODAY's `live_state` key (`cards.py:6672`). The chip path reads that key as today.
 >   - **Prognosis (revised 2026-09-10):** with fix (b), no substitution happens on a no-game day, so 09-17's cards should resolve normally. The writer-side reading is 2026-09-11.
 >   - **FIXED 2026-09-10 (lane `wnba-schedule-guard-fix`).** (a) and (b) are deployed: live-odds-worker `6ebec70e`, refresh-worker `c29a7d4e`. Same-day readings: chips 4 -> 0, and Layer 2 `no_slate`. (c) was not taken. The original options:
->   - **LEAD, not taken:** `wnba/cards.py:4356` (`_public_scoreboard_live_state_payload`) still asks `site.api.espn.com`, with no custom UA. On a game day the live ESPN status it supplies may be dark on Render. Check it on 09-17 before trusting live game state.
+>   - **LEAD CHECKED AND EXONERATED 2026-09-10 (lane `wnba-public-scoreboard-host`).** `_public_scoreboard_live_state_payload` reaches ESPN from Render as it stands: 5 of 5 runs on web, and 0 failure prints on any service that day. It sends urllib's default User-Agent, which `site.api` answers. Not changed. On 09-17, in-play games should carry ESPN period/clock in `/wnba/api/live_state`.
 >     - point `has_games_for_date` at `site.web.api.espn.com`, which restores the 07-23 guard;
 >     - treat None as unknown at `cards.py:607`;
 >     - never persist another date's games under today's key (`cards.py:6672`).

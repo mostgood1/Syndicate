@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 961 rules `[generated]`
+## Index — 964 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 382**
+**FORBIDDEN — 384**
 
 - [2026-09-06 — FORBIDDEN: instrumenting join A, reading it, and concluding about a value…](#2026-09-06-forbidden-instrumenting-join-a-reading-it-and-concluding-about-a-value-written-by-join-b-name-the-writer-of-the-field-in-the-falsification-test-itself-lane-mlb-first5-kalshi-fanin-mismatch-vs-15410ca7)
 - [2026-09-06 — FORBIDDEN: concluding a guard covers a symptom because the guard is deploy…](#2026-09-06-forbidden-concluding-a-guard-covers-a-symptom-because-the-guard-is-deployed-firing-and-named-after-it-find-the-code-that-wrote-the-field-you-are-looking-at-lane-mlb-first5-kalshi-fanin-mismatch)
@@ -202,6 +202,8 @@
 - [2026-09-09 FORBIDDEN: measuring a change against a harness that SUPPLIES AN INPUT PRODU…](#2026-09-09-forbidden-measuring-a-change-against-a-harness-that-supplies-an-input-production-does-not-have-the-result-describes-the-harness-and-the-gap-can-be-the-entire-effect-lane-nfl-prop-model-coverage-caught-only-because-the-prediction-was-written-down-before-the-reading)
 - [2026-09-10 — FORBIDDEN: publishing "this remedy does not work" from ONE invocation form…](#2026-09-10-forbidden-publishing-this-remedy-does-not-work-from-one-invocation-form-of-a-tool-attrib--r-dir-s-d-failed-because-s-makes-the-last-path-component-a-name-to-match-attrib--r-dir-s-d-works-and-the-failed-form-carried-a-wrong-mechanism-into-the-ledger-for-four-days-lane-worktree-close-and-prune-correcting-lane-git-out-of-onedrive-2026-09-06)
 - [2026-09-10 — FORBIDDEN: running anything from `REPO_ROOT = Path(__file__).parents[1]` a…](#2026-09-10-forbidden-running-anything-from-repo_root-path__file__parents1-after-deleting-a-checkout-or-acting-on-shared-state-from-it-with-one-worktree-per-session-a-scripts-own-copy-lives-inside-a-session-tree-so-repo_root-means-the-checkout-this-copy-came-from-not-the-repo-resolve-the-main-worktree-explicitly-lane-worktree-close-and-prune)
+- [2026-09-10 — FORBIDDEN: clearing a stranded ledger row on a field that the LOST write s…](#2026-09-10-forbidden-clearing-a-stranded-ledger-row-on-a-field-that-the-lost-write-set-a-lost-update-restores-the-other-writers-stale-copy-of-the-whole-row-so-every-field-that-write-carried-is-gone-with-it-lane-write-ahead-build-refusal)
+- [2026-09-10 — FORBIDDEN: recording an ESPN refusal from Render as a property of the HOST…](#2026-09-10-forbidden-recording-an-espn-refusal-from-render-as-a-property-of-the-host-it-is-a-host-headers-pair-siteapiespncom-answered-web-5-of-5-with-urllibs-default-user-agent-in-the-same-hour-it-refused-has_games_for_dates-syndicate-wnba10-lane-wnba-public-scoreboard-host)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -402,7 +404,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](learnings_evidence.md#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated) `[evidence]`
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 
-**Rules and corrections — 573**
+**Rules and corrections — 574**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -515,6 +517,7 @@
 - [2026-09-10 — REQUIRED: before restoring a shared ledger file over its working copy, aud…](#2026-09-10-required-before-restoring-a-shared-ledger-file-over-its-working-copy-audit-it-for-sections-that-exist-only-there-and-audit-by-inner-content-because-a-header-set-comparison-lies-in-both-directions-lane-odds-history-segment-term)
 - [2026-09-10 — REQUIRED: before recording a producer fix as "in force once the artifact i…](#2026-09-10-required-before-recording-a-producer-fix-as-in-force-once-the-artifact-is-rebuilt-check-every-site-on-the-path-that-writes-that-artifact-the-wnba-ev-refusal-covered-2-of-3-prop-sites-and-the-one-it-missed-is-the-slate-writer-lane-wnba-accuracy-assessment-session-8c631ba2)
 - [2026-09-10 — RECURRENCE, not a new rule: I shipped a fix predicted from a REFRESH-WORKE…](#2026-09-10-recurrence-not-a-new-rule-i-shipped-a-fix-predicted-from-a-refresh-worker-instrument-and-measured-it-on-web-it-was-right-for-the-service-the-instrument-read-and-inert-on-the-service-that-serves-the-symptom-lanes-mlb-final-state-mapping-mlb-lens-final-status)
+- [2026-09-10 — OVERTURNED: `#600`'s three-way merge does NOT stop different orders clobbe…](#2026-09-10-overturned-600s-three-way-merge-does-not-stop-different-orders-clobbering-each-other-because-its-re-read-and-its-set-are-not-atomic-lane-write-ahead-build-refusal-correcting-state_modelmd-execution-ledger-cross-service-race-2026-08-28)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

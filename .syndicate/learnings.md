@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 961 rules `[generated]`
+## Index — 964 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5391,3 +5391,11 @@ the instrument rather than the system.**
   - Paper rows stuck at `submitted` count the hits: 13 across 09-06..09-11. That is an upper bound, since a crash mid-`place_order` leaves the same shape.
   - Fix: `todo.md #656`.
 - **Cost**: six days with no live placement on either venue (09-04 to 09-10), plus paper fills silently lost.
+
+## 2026-09-10 — FORBIDDEN: recording an ESPN refusal from Render as a property of the HOST. It is a (host, headers) pair: `site.api.espn.com` answered web 5 of 5 with urllib's default User-Agent, in the same hour it refused `has_games_for_date`'s `Syndicate-WNBA/1.0` `[lane wnba-public-scoreboard-host]`
+
+- **What we believed**: `site.api.espn.com` returns 403 to every Render service, so any code on that host is dark in production. `state_basketball [espn-egress-and-wnba-boxscores]` said so on 2026-08-26: "The 403 is the HOST". I carried that into a trace and into a proposed fix for the live WNBA public scoreboard.
+- **What was actually true**: `_public_scoreboard_live_state_payload` asks `site.api` with NO custom User-Agent. It ran 5 times on web on 2026-09-10 from 22:12:23Z with ZERO `SCOREBOARD_FETCH_FAILED`, a line it prints on any exception. The workers logged none that day either. In the same hour web's `has_games_for_date` (same host, `User-Agent: Syndicate-WNBA/1.0`) returned a non-False verdict. The 2026-08-05 probe in `wnba/cards.py` had already said this: a custom UA gets a 403 from Render, and the default answers.
+- **How we found out**: the fix's lane recorded a falsification test (a failure-line count) BEFORE shipping. The zero was made readable by a positive marker that the call ran: the request-path warning `operation=wnba_public_scoreboard_live_state_fetch`, triggered by a request.
+- **The rule going forward**: when an ESPN call fails from Render, vary the HEADERS before blaming the host, and record the refusal as the (host, User-Agent) pair that was measured. Never conclude "this host is dark" for a caller whose headers differ from the ones measured.
+- **Cost**: an unneeded code change and deploy, caught before landing, and a state line that overstated the refusal for two weeks.

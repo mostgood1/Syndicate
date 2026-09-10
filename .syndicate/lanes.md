@@ -440,20 +440,6 @@ death, never life — do not invert it.
 - Blocked by: nothing for the code. The reading waits on production producing a refused build. No claim is held, and no deploy is owed.
 - Not in scope, filed: the same race can revert a SENT order's completion. That is `todo.md #656`, a CAS in `_persist` on all three services.
 
-### wnba-public-scoreboard-host — OPEN — opened 2026-09-10 — session 8c631ba2-16bd-41a6-a384-d655570b10ba (desktop `local_f4eeac0a-49e0-49f6-8320-610fd1ae3d14`)
-- Goal: `_public_scoreboard_live_state_payload` reaches ESPN from Render. Read as ZERO `[wnba_cards] SCOREBOARD_FETCH_FAILED` lines on a worker running the fix, across a window in which the same worker logged them before the fix.
-- Files: `syndicate/features/wnba/cards.py` (the request in `_public_scoreboard_live_state_payload` only), `syndicate/features/wnba/sources.py` (a shared `wnba_scoreboard_request` builder, with `has_games_for_date` moved onto it and its behaviour identical), `tests/test_wnba_public_scoreboard_host.py` (NEW).
-- Hypothesis (written BEFORE testing): the live public-scoreboard fetch fails on Render today.
-  - It still asks `site.api.espn.com` (`wnba/cards.py:4382`), with no custom User-Agent. That is the host the ledger records refusing all three Render services (2026-08-26).
-  - Each failure prints `SCOREBOARD_FETCH_FAILED` (`:4405`).
-  - Since its 21:50:27Z deploy, refresh-worker's chip path calls this fetch on every chip build, because the schedule gate now fires and the provider falls through to `_wnba_live_state_games`. So its log since then should show those lines, with an HTTP 403.
-- Falsification test: if refresh-worker shows ZERO `SCOREBOARD_FETCH_FAILED` lines since 21:50:27Z while chip builds run, the fetch succeeds from Render (a 200 with 0 events returns None silently). Then the change is not needed: record the exoneration and do not ship it.
-- Verification:
-  - (1) off != on unit tests.
-  - (2) the pre-fix count of failure lines per worker, then ZERO on the same worker once the fix is live, over a comparable window.
-  - (3) on 09-17, live WNBA games carry ESPN period/clock in `/wnba/api/live_state` (the sprint's scheduled reading).
-- Blocked by: none.
-
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
@@ -523,6 +509,7 @@ death, never life — do not invert it.
 - `wnba-halftime-elapsed` — **ORPHANED, UNOWNED** `[session 1f76348c ARCHIVED 2026-08-21 ~16:1xZ]` — — **ONE READING OWED** — fix is LIVE on web (`2b9040df`, content-verified) an
 - `wnba-live-odds-capture-gap` — ORPHANED, NARROWED, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — — **THE AUTORUN FIRED FOR REAL `[
 - `wnba-live-props-data` — **ORPHANED, UNOWNED** `[session 1f76348c 2026-08-21T17:4xZ]` — — **PROPS CHAIN BUILT+DEPLOYED (UNPROVEN); `#499` TOTALS PRICING DEPLOYED (UNPROVEN).**
+- `wnba-public-scoreboard-host` — CLOSED 2026-09-10 — opened 2026-09-10 — session 8c631ba2 — **FALSIFIED BEFORE SHIPPING: the live WNBA scoreboard fetch already reaches ESPN from Render (5/5 on web, 0 failures anywhere); nothing changed, nothing deployed; the ESPN refusal is header-dependent, not the host**
 
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

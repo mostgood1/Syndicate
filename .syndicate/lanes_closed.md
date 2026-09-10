@@ -5776,3 +5776,28 @@ carried-forward work in `docs/ai_context/todo.md` `#650`/`#651`/`#652`.
   - (1) is a deduction until measured: ESPN lists no 09-10 game, so the chips can only exist if the gate saw None, not False.
 - Verification: the file:line chain from the writer to the served chip, each hop backed by a production reading or a reproduction; then the 09-17 prognosis.
 - Blocked by: none.
+
+### wnba-public-scoreboard-host — CLOSED 2026-09-10 — opened 2026-09-10 — session 8c631ba2-16bd-41a6-a384-d655570b10ba (desktop `local_f4eeac0a-49e0-49f6-8320-610fd1ae3d14`) — **FALSIFIED BEFORE SHIPPING: the live scoreboard fetch already reaches ESPN from Render. Nothing was changed and nothing deployed.**
+- **GOAL VERDICT — Goal (verbatim): "`_public_scoreboard_live_state_payload` reaches ESPN from Render. Read as ZERO `[wnba_cards] SCOREBOARD_FETCH_FAILED` lines on a worker running the fix, across a window in which the same worker logged them before the fix." → GOAL: NOT MET as worded, and WITHDRAWN by the lane's own falsification test.**
+  - The change the Goal presupposed was not needed, so it was not shipped. That is the exoneration branch written before any reading.
+  - The intent, that the live scoreboard reaches ESPN from Render before 09-17, already holds. The reading: web ran the fetch 5 times after a triggered request at 22:12:17Z (request-path warning `operation=wnba_public_scoreboard_live_state_fetch` from 22:12:23Z) with ZERO `SCOREBOARD_FETCH_FAILED`, which prints on any exception; zero `SCOREBOARD_FETCH_FAILED` / `SCOREBOARD_CARRIED_FORWARD` on refresh-worker since 21:50:27Z and on live-odds-worker and web since 12:00Z.
+- **THE ZERO IS READABLE, not just absent.**
+  - The failure print exists in web's live commit `c2dcd525` (checked by content), and a positive marker shows the call ran: the request-path warning fires at the top of `_public_scoreboard_live_state_payload`, before the network call.
+  - Worker-side it is inferred, not observed: no positive marker exists there, only zero failure prints. The 09-17 sprint's `live_state` reading (ESPN period/clock on in-play games) confirms it with games live.
+- **WHY IT WORKS — the refusal is a (host, headers) pair, not a host.**
+  - This fetch asks `site.api.espn.com` with urllib's DEFAULT User-Agent. That is the one combination the 2026-08-05 probe found Render could use.
+  - In the same hour, web's `has_games_for_date` asked the same host with `User-Agent: Syndicate-WNBA/1.0` (the pre-fix code, still live on web at `c2dcd525`) and returned a non-False verdict: the resolver substituted `2026-09-09`.
+  - So `state_basketball [espn-egress-and-wnba-boxscores]`'s "the 403 is the HOST" is corrected in place. A learning is appended.
+- **DISCARDED, never landed:** a shared `wnba_scoreboard_request` builder that would have moved this fetch to `site.web.api.espn.com` + `Mozilla/5.0`, and its test file. Moving a working call onto different headers would have been a change without a defect behind it.
+- Goal: `_public_scoreboard_live_state_payload` reaches ESPN from Render. Read as ZERO `[wnba_cards] SCOREBOARD_FETCH_FAILED` lines on a worker running the fix, across a window in which the same worker logged them before the fix.
+- Files: `syndicate/features/wnba/cards.py` (the request in `_public_scoreboard_live_state_payload` only), `syndicate/features/wnba/sources.py` (a shared `wnba_scoreboard_request` builder, with `has_games_for_date` moved onto it and its behaviour identical), `tests/test_wnba_public_scoreboard_host.py` (NEW).
+- Hypothesis (written BEFORE testing): the live public-scoreboard fetch fails on Render today.
+  - It still asks `site.api.espn.com` (`wnba/cards.py:4382`), with no custom User-Agent. That is the host the ledger records refusing all three Render services (2026-08-26).
+  - Each failure prints `SCOREBOARD_FETCH_FAILED` (`:4405`).
+  - Since its 21:50:27Z deploy, refresh-worker's chip path calls this fetch on every chip build, because the schedule gate now fires and the provider falls through to `_wnba_live_state_games`. So its log since then should show those lines, with an HTTP 403.
+- Falsification test: if refresh-worker shows ZERO `SCOREBOARD_FETCH_FAILED` lines since 21:50:27Z while chip builds run, the fetch succeeds from Render (a 200 with 0 events returns None silently). Then the change is not needed: record the exoneration and do not ship it.
+- Verification:
+  - (1) off != on unit tests.
+  - (2) the pre-fix count of failure lines per worker, then ZERO on the same worker once the fix is live, over a comparable window.
+  - (3) on 09-17, live WNBA games carry ESPN period/clock in `/wnba/api/live_state` (the sprint's scheduled reading).
+- Blocked by: none.

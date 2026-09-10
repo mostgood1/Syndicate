@@ -388,7 +388,7 @@ POINT estimate (MAE 6.636 vs 7.453) and a naive 50/50 blend beat **neither**
   - `scripts/verify_wnba_slate_hygiene.py --check layer2` names the gate that stopped WNBA.
   - **`scheduled_games: 4` WAS FALSE. FIXED AND DEPLOYED 2026-09-10 (lane `wnba-schedule-guard-fix`).** On refresh-worker `c29a7d4e`, chips went 4 -> 0 (21:51Z) and Layer 2 went to `no_slate` (21:59Z). The mechanism was found by lane `wnba-chip-frozen-trace`:
     - `/api/board/game-chips?date=2026-09-10` serves ESPN `401857186..189` (the 2026-08-30 slate), all FINAL, with no start time.
-    - `has_games_for_date(today)` fetches `site.api.espn.com`, which refuses Render, so it returns None. The guard at `wnba/cards.py:607` blocks only on False.
+    - `has_games_for_date(today)` fetched `site.api.espn.com` with `User-Agent: Syndicate-WNBA/1.0`, a pair Render gets refused on (the host itself answers the default UA; see the correction under `[espn-egress-and-wnba-boxscores]`), so it returned None. The guard at `wnba/cards.py:607` blocks only on False.
     - So a worker's `build_live_state_payload(today, allow_stored_date_fallback=True)` builds from the substituted 08-30 slate and persists it under TODAY's `live_state` key (`cards.py:6672`). The chip path reads that key as today.
     - With fix (b), today may be substituted only on a CONFIRMED slate, at both substitution sites. The writer is read on 09-11. Today's `live_state_2026-09-10` key stays frozen until the date roll.
     - Fixes (a) and (b) applied (`6ebec70e`). Fix (c), never persisting another date's games under today's key, was not taken.
@@ -468,6 +468,14 @@ WORKERS. `site.web.api.espn.com` does not.** Both serve the same paths. The
 Measured both ways 2026-08-26; the swap produced `{"ok":true,"games":3}` on the
 first attempt where the other host had 403'd minutes earlier. Overridable via
 `SYNDICATE_WNBA_SCOREBOARD_URL`.
+
+**CORRECTED 2026-09-10 (lane `wnba-public-scoreboard-host`): the refusal depends on the REQUEST HEADERS, not only the host.**
+- `_public_scoreboard_live_state_payload` asks `site.api.espn.com/.../wnba/scoreboard` with urllib's DEFAULT User-Agent.
+- It ran 5 times on web from 22:12:23Z with ZERO `SCOREBOARD_FETCH_FAILED`. That line prints on any exception, and the run is shown by the request-path warning `operation=wnba_public_scoreboard_live_state_fetch`.
+- There were no failure lines on either worker that day.
+- In the same hour, the same host with `User-Agent: Syndicate-WNBA/1.0` (the old schedule check, still live on web) returned a non-False verdict.
+- This matches the 2026-08-05 probe noted in `wnba/cards.py`: a custom UA draws a 403 from Render, and the default answers.
+- **When an ESPN call fails from Render, vary the HEADERS before blaming the host, and record the refusal as the (host, User-Agent) pair measured.**
 
 **`wnba_source/data/processed/boxscores_<date>.csv` HAD NO PRODUCER IN
 SYNDICATE.** Every caller of the vendor fetcher lives in
