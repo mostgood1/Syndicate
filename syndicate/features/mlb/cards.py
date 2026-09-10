@@ -3025,6 +3025,23 @@ def _live_lens_game_row(selected_date: str, game_pk: int) -> dict[str, Any] | No
 
 def _merge_live_lens_row_into_game(game: dict[str, Any], live_lens_row: dict[str, Any]) -> dict[str, Any]:
     merged = dict(game)
+    # A FINAL GAME CANNOT UN-FINISH. The per-date live-lens report is last
+    # written when the live-lens loop rolls to the next date at midnight
+    # Central, so a game still in progress at that moment keeps a `Live` row for
+    # its date forever -- while the feed-derived `status` that
+    # `_games_from_daily_summary` sets already reads Final. Copying the row's
+    # `status` unconditionally let the frozen row win. Measured 2026-09-10 (lane
+    # `mlb-final-state-mapping`): web's `live_lens_report_2026_09_03.json`, last
+    # written 23:59:10 CT, holds 823095 and 823907 at `Live / In Progress`; both
+    # ended 00:05/00:09 CT, and the cards payload and board chips still served
+    # them `live` six days later. Census 09-01..09-09: 9 games on 7 of 9 dates.
+    #
+    # Only this one direction is held back. For a game that is pregame or live
+    # the lens is the fresher source and still wins, and a row that is itself
+    # final still replaces a final status.
+    keep_final_status = _cards_status_is_final(game.get("status")) and not _cards_status_is_final(
+        live_lens_row.get("status")
+    )
     for key in (
         "status",
         "score",
@@ -3050,6 +3067,8 @@ def _merge_live_lens_row_into_game(game: dict[str, Any], live_lens_row: dict[str
         "snapshotAvailable",
         "simContextAvailable",
     ):
+        if key == "status" and keep_final_status:
+            continue
         value = live_lens_row.get(key)
         if value is None:
             continue
