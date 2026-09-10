@@ -5,6 +5,56 @@
 
 ---
 
+## 2026-09-10 09:19 CT — refresh-worker `2259edf8` (lane `nfl-prop-grading`) — **THE BLANKET NFL PROP REFUSAL IS GONE (1 → 0). NO NFL PROP HAS BEEN GRADED YET: THE ONE PROP ORDER NOW CANNOT FIND ITS GAME.**
+
+Deploy `dep-dahbimh42hec73fklljg`, triggered 09:06:18 CT, live 09:09:06 CT, on top of `7ae7ced4`.
+**One code change.** `7ae7ced4..2259edf8` is 5 commits, 4 of them ledger-only; the only
+non-ledger files are `bet_status_nfl.py`, `nfl/live_player_box.py`, `tests/test_bet_status_nfl.py`
+and one test fixture. No `render.yaml`, no env change. Preflight CLEAR at 09:05 CT (infrastructure
+processes only, no sim in flight). No `Traceback` after boot. The `PULL_FAILED` export timeouts
+after boot are pre-existing: 15 on the prior boot, 07:14–09:06 CT.
+
+**verify:** the refusal reason on the same two lines, before and after:
+
+| | before (`7ae7ced4`) | **after (`2259edf8`)** |
+|---|---|---|
+| `SETTLED date=2026-09-10` | 09:04 CT: orders=339, `nfl_props_not_gradeable_from_scoreboard: 1` | **09:19 CT: orders=340, that reason ABSENT; `game_not_in_nfl_live_state: 1`** |
+| `BET_STATUS` | 08:54 CT: `nfl_props_not_gradeable_from_scoreboard: 1` | **09:17 CT: ABSENT; `game_not_in_nfl_live_state: 1`** |
+
+**MEASURED: the blanket refusal is gone.** Every other reason count is unchanged (NCAAF
+281 / 39 / 2, `no_live_feed` 14, `order_not_filled` 2, soccer 1).
+
+**NOT MEASURED: a production grade.** The resolver now reaches the game lookup (the old code
+refused a prop before looking), and the lookup fails. The 09-10 capture is ESPN
+`?dates=20260910`, which holds exactly one game, SF @ LAR in Melbourne (7:35 PM CT tonight, event
+401872657). The poller keeps scheduled games: `poll_nfl_live_state._game_from_event` returns every
+event, with scores `None` pregame. ESPN and OddsAPI both list the Rams as home. So an order on
+SF @ LAR would read not-started, not game-not-found. This order is therefore on a game ESPN does
+not date 09-10, or the stored 09-10 capture differs from what ESPN returns now. **Which one is not
+known.** Order rows are deliberately not exposed over HTTP: `/api/ops/execution/ledger-summary`
+returns counts only, by construction.
+
+**SUSPECTED DEFECT, UNVERIFIED, AND IT GATES THE SUNDAY GRADE.** `paper_settlement.settle_orders`
+resolves each order against the capture for its `selected_date`, and `portfolio_commit` stamps
+the PLAN's date on every order. If a Thursday-to-Saturday plan commits a prop on a Sunday game,
+that order is looked up in the wrong day's capture and can never grade. Game lines share this path.
+
+**Discriminator:** after SF @ LAR goes final (~10:45 PM CT tonight), re-read
+`SETTLED date=2026-09-10`. If `game_not_in_nfl_live_state: 1` persists, the order is not on that
+game. On Sunday night, read `SETTLED` for 09-11 and 09-12 for NFL `game_not_in_nfl_live_state`.
+If confirmed, the fix belongs in the resolver: find an order's game by its own commence time (the
+capture for the game's ESPN date), not by the plan date.
+
+**verify: OWED** — a production NFL prop grade (`outcomes` non-empty on an NFL prop order).
+
+**`#633` (`353650c7`): NOT carried by this deploy, and its verify is still OWED.** It went live in
+`7ae7ced4` at 07:12 CT. The reading proposed for it, `PREGAME_PROJECTION_JOIN sport=ncaaf` with
+`projected > 0` carrying no `reason`, **does not discriminate**: the 12 lines before the fix went
+live (06:18–07:08 CT) already read `projected=333 reason=None`, the same as the lines after it
+(`projected=331 reason=None` at 08:41, 08:53 and 09:01 CT). A predicate that was already true on
+the unfixed build is not evidence. `#633` needs a reading taken from the window the defect
+described (one that projected rows while reporting none), not this line.
+
 ## 2026-09-10 07:09 CT — refresh-worker `7ae7ced4` + env `SYNDICATE_MLB_DATA_ROOT` — **RE-PROBE: THE MOUNT HOLDS 48 CLEAN DATES IN EXACTLY THE TREE THE RE-FIT READS. `#624` STEP 3 IS UNBLOCKED.**
 
 Deploy 07:09:39 CT, `dep-dah9s0u1egvs73d6rcog`, injecting

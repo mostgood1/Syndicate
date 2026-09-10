@@ -112,3 +112,21 @@ grade props. **That is the fix, and it gates the whole NFL-prop staking decision
 The same `SETTLED date=2026-09-10` line shows `ncaaf_team_not_in_registry_or_ambiguous: 37`.
 Unlike `game_not_in_ncaaf_live_state` (264, consistent with games not yet played), a
 registry miss does not resolve with time.
+
+## CORRECTION (2026-09-10 ~9:15 AM CDT, same session)
+
+The "PERMANENT premise is now stale" paragraph above says `live_player_box.py` parses
+per-player groups "including receptions and attempts". **That was false when written.** It
+read those groups, but its reduced row kept only yards and TDs (as the grading section above
+correctly says), and it dropped every player with no yards and no TD, so a 0-catch receiver
+vanished instead of reading 0. As written it could not have graded receptions, attempts or
+interceptions.
+
+The fix extended that parser rather than trusting it. `2259edf8` adds an unfiltered
+`player_stat_rows_from_summary` (receptions, targets, rush/pass attempts, completions, and
+interceptions THROWN, read from the `passing` group only, because ESPN's `interceptions`
+group holds picks CAUGHT under the same key), and `bet_status_nfl` now grades props from it,
+with a player absent from a FINAL box as a named refusal, never a zero. The card's rows are
+unchanged. It went live on refresh-worker at 2026-09-10 9:09 AM CDT; the production reading
+is in `deploys.md` under that date. Scheduled task `nfl-prop-settled-grade` was rewritten
+to use the production grader and cross-check it, and it no longer names the card parser.
