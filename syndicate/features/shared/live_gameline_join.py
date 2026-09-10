@@ -833,6 +833,7 @@ def price_distribution_market(
     market_prob: Any,
     sims: Any,
     sigma: float = PRICEABLE_SIGMA,
+    sport: Any = None,
 ) -> dict[str, Any]:
     """Price a live TOTALS or SPREADS row off the re-sim's own histogram.
 
@@ -938,6 +939,13 @@ def price_distribution_market(
     # withhold, and it would look more rigorous for having come from a shape.
     if abs(edge) < float(sigma) * std_err * 100.0:
         out["withheld_reason"] = REASON_NOT_PRICEABLE
+        return out
+    # THE PUBLISH SWITCH, LAST, for the same reason as in `price_moneyline`:
+    # the ledger keeps every measured field. This parameter did not exist when
+    # f5c2468a passed `sport=` to this function, and that TypeError aborted the
+    # whole live game-line attach for MLB and soccer from 2026-09-09 03:58Z.
+    if publishing_disabled_for_sport(sport):
+        out["withheld_reason"] = REASON_PUBLISH_DISABLED
         return out
     out["priceable"] = True
     return out
@@ -1589,9 +1597,9 @@ def attach_live_gamelines(
                     market=market_key,
                     market_prob=projection.get("market_fair_prob_over"),
                     sims=hit.get("sims_run"),
-            # SPORT-SCOPED PUBLISH SWITCH. Threaded rather than read from a
-            # global, so disabling MLB cannot silence WNBA or soccer.
-            sport=sport,
+                    # SPORT-SCOPED PUBLISH SWITCH. Threaded rather than read
+                    # from a global, so disabling MLB cannot silence WNBA or soccer.
+                    sport=sport,
                 )
             _apply_verdict(row, projection, verdict, hit, coverage,
                            live_projected=verdict.get("model_prob"))
@@ -1625,6 +1633,9 @@ def attach_live_gamelines(
             # Present only for a sport with a MEASURED analytic interval; None
             # everywhere else, which leaves the sims gate in charge.
             analytic_std_err=hit.get("analytic_std_err"),
+            # The h2h half of the switch. f5c2468a threaded `sport` everywhere
+            # but here, so on this path it was inert even with the env set.
+            sport=sport,
         )
 
         _apply_verdict(row, projection, verdict, hit, coverage)
