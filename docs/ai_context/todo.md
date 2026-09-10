@@ -2880,6 +2880,39 @@ Mostly execution of already-measured items; references, not duplicates:
   sport's "close" is cadence luck, degrading all non-MLB CLV. Extend to every
   sport with a slate. Verify: ramp/closing phase stamps present per sport in
   `book_quotes`.
+  **VERIFY CLAUSE REPOINTED 2026-09-09 22:4x CT** `[lane web-oom-census, session 2edf8b82]`.
+  The clause above ("ramp/closing phase stamps present per sport in `book_quotes`")
+  is UNSATISFIABLE and was already flagged as such: `book_quotes` rows carry no
+  phase field. **It is superseded by this, which was verified readable BEFORE
+  being written down** — repointing one unreadable clause to another would have
+  been no improvement.
+
+  **NEW VERIFY:** `[live_refresh_loop] T_WINDOW_SWEEP_DUE {...}` on
+  **`live-odds-worker`** carries BOTH a `<sport>:ramp:<event_id>` and a
+  `<sport>:closing:<event_id>` key for each sport with a slate, over a window
+  spanning that sport's T-60 and T-10. Real sample, 2026-09-09 18:20 CT:
+
+      T_WINDOW_SWEEP_DUE {"soccer": ["soccer:closing:3915fb15...",
+        "soccer:closing:5762ede9...", "soccer:ramp:502c9554...", ...]}
+
+  **THREE THINGS THAT WILL OTHERWISE BE MISREAD:**
+  1. **It is on `live-odds-worker`, NOT `refresh-worker`** — refresh-worker emits
+     none of these, and a zero-match search there is not evidence of a regression.
+  2. **LIVE SPORTS ARE SKIPPED BY DESIGN.** `_t_window_due_sports` returns early
+     for any sport whose `_LIVE_STATUS_CHECKERS` entry says the slate is live —
+     their slate-wide live cadence already covers every event. **Absence during a
+     live slate is CORRECT.** Read the clause only over a PREGAME window.
+  3. **Do NOT try to read `t_window_sweeps.json` via `/api/ops/artifacts/export`.**
+     `_t_window_markers_path` writes through `read_json_file`, i.e. the KEYVALUE
+     backend, which the artifact export is structurally blind to.
+
+  **STATUS CORRECTION, same reading:** the bullet says
+  `_T_WINDOW_COMMENCE_PROVIDERS` "covers 2 of 8 sports". It now covers **THREE** —
+  `mlb`, `wnba`, **`soccer`** (`live_refresh_loop.py:4099-4103`), and soccer is the
+  one actually firing sweeps in the sample above. The remaining five are unchanged,
+  and the bullet's own scoping note still holds: NFL/NCAAF/NHL/NCAAB need the
+  run-plane ownership question (`#619`) answered first, because a provider alone
+  does nothing on a service whose loop never ticks that sport.
 - (g) **Both-side prices at selection time** — 0 of 8,778 graded MLB prop keys
   carry both sides. Record the opposite side's quote on every selection, all
   sports. Verify: >90% of NEW graded keys carry both sides within one slate.
