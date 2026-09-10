@@ -5,6 +5,70 @@
 
 ---
 
+## 2026-09-10 01:13:46Z / 01:33:47Z — live-odds-worker + refresh-worker `26c8cfc6` — **MEASURED: the odds-history shard carries `segment=` keys for the first time, 0 -> 35. The chain is closed on all three services. THE RATIO IS NOT YET MEASURABLE and the 1.18x a naive read gives is unfair by construction.** `[lane odds-history-segment-term]`
+
+Completes the 00:44:05Z web row above. Same commit, `26c8cfc6`, on all three:
+
+    web                00:44:05Z   verified, claim released
+    live-odds-worker   01:13:46Z   claim released
+    refresh-worker     01:33:47Z   claim held through the observation
+
+**verify:** `/api/ops/artifacts/export` on `*mlb_source/tracking/odds_history/2026-09-09.json`,
+baseline taken BEFORE the refresh-worker deploy and re-read 57 s after it:
+
+| | bytes | keys | game keys | **segment-keyed** |
+|---|--:|--:|--:|--:|
+| 01:14:29Z, live `d84840a9` | 53,380,155 | 3,997 | 240 | **0** |
+| 01:34:44Z, live `26c8cfc6` | 53,659,978 | 4,042 | 284 | **35** |
+
+35 keys across `first5` 21 / `first3` 10 / `first1` 4, and across `h2h` 12 /
+`spreads` 11 / `totals` 12, carrying 47 history points. Sample:
+`event_id=163a7ada...|market=h2h|segment=first5|bookmaker=kalshi`.
+
+**GATED ON THE SHARD'S BYTES, NOT ON THE DEPLOY BEING LIVE.** A shard written
+before the deploy carries no segment keys and reads exactly like a failed fix;
+the pass condition was a shard whose bytes had CHANGED and which contained
+`|segment=`. Both held.
+
+**DO NOT QUOTE 1.18x AS THE GROWTH RATIO.** 240 -> 284 game keys is what a naive
+read gives against the predicted 3.63x, and it is unfair by construction: the
+2026-09-09 shard had **~14 hours of full-game history accumulated before the
+deploy and one minute of segment history after it**, while 3.63x was measured
+over COMPLETE game-line snapshots. The two are not comparable, and the deploy
+also landed at the TAIL of the slate, when few markets are still quoted.
+**The fair test is the 2026-09-10 shard, built entirely post-deploy** — that is
+the reading this row is still owed.
+
+Re-read at 01:38:57Z: byte-identical, 35 keys unchanged. One sweep has landed,
+not a stream. That is expected at this hour and is NOT yet evidence the producer
+runs every cycle; a second sweep is part of what tomorrow settles.
+
+**Deploy health, refresh-worker (the service with the OOM history, and the one
+taking the +17% shard).** Events clean: `deploy_started` 01:28:30Z ->
+`build_ended` 01:32:35Z -> `deploy_ended` 01:33:47Z, no OOM, no restart loop, no
+`server_failed`. RSS 1,023 MB at 01:36Z against 2,166 MB pre-deploy — **that
+comparison is BOOT-CONFOUNDED and is not a win**: every deploy reboots, so the
+floor always looks good for the first few minutes. The memory question is open
+until a full slate has run on the larger shard.
+
+**STILL OWED, and both need tomorrow:**
+1. The growth ratio on a shard built entirely post-deploy (predicted 3.63x game
+   keys, +17% bytes on a 56.4MB shard).
+2. `segment_absent_from_history` FALLING from ~1,617/day on
+   `/api/ops/clv/report`, against `openings_by_segment` as its denominator.
+   **Reading it for 09-08 or 09-09 now and calling it a failure would be the
+   trap this row exists to name** — those dates' history predates the producer,
+   so their segment openings stay correctly refused.
+
+Windows on both workers were SECONDS TO A MINUTE long, and that is worth
+recording for the next person: two watchers polling the same service disagreed
+at nearly the same instant (CLEAR / 0 jobs at 20:02:38 against HOLD / 2 jobs at
+20:03:13). A poll-then-deploy-by-hand loop misses them. What worked was a
+watcher that EXITS on the first CLEAR so the harness notifies, then
+fresh-preflight -> claim -> deploy inside the same minute. The watcher was
+deliberately read-only about the claim: re-`acquire` inside a poll loop rotates
+the token and strands the lane's own claim.
+
 ## 2026-09-10 01:32-01:34Z — web `26c8cfc6` — **THE OWED READING, DISCHARGED: NFL's own copy of the live-state stamp EXECUTES in production — 1/1 started, ESPN status, score and clock all present, and the clock ADVANCES between two reads.** `[lane nfl-live-state-verify, measured by scheduled task `verify-nfl-week1-live-state`]`
 
 No deploy. This is the measurement owed since 2026-09-08, when `_stamp_started_status`
