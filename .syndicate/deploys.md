@@ -1610,6 +1610,160 @@ term) and `bfd6eec2` are NOT in it. Anyone measuring the chips route after
 14:02:20Z is measuring `09f6ab86` + the 180 s env.
 
 ---
+## 2026-09-08 — web `09f6ab86` / refresh-worker `296e14ec` — NCAAF WEEK ADVANCE: **THE BOARD DID NOT ADVANCE. FAIL on both prescribed readings — and the cause is NOT the write-once cache `cc1feccc` fixed.** The fix is live and every stage of it works; the board is pinned because the producer built the artifact 137.8 minutes into week 1's LAST game.
+
+Scheduled verification, the one the 2026-09-01 deploy could not make: 2026-09-08 is
+the first date on which a frozen `target_week = 1` is observably wrong, because week
+1's last game was 09-07. READ-ONLY run, no deploy, no fix. Readings 2026-09-08
+10:05-10:35 CDT (15:05-15:35Z). Lane `ncaaf-games-cache-refresh` — **STAYS OPEN.**
+
+### The two prescribed readings — both FAIL
+
+1. `/api/ops/ncaaf/season-weeks` -> `resolved_active_season 2026`,
+   **`resolved_active_weeks [1]`**. Spec: PASS requires 2 present. FAIL.
+2. `/ncaaf/api/cards?week=1` vs `?week=2` — both HTTP 200, both **609,072 bytes**,
+   both `date: "2026 Week 1"`, both **51 games**, both nav `nextDate=prevDate="1"`.
+   Same 51 `gamePk`s (set equality), every one prefixed `1_`. Compared FIELD BY
+   FIELD across all 51 games: **zero differing game fields.** The only difference in
+   the whole payload is the top-level `requested_date`, which echoes the query
+   param — `'2026 Week 1'` vs `'2026 Week 2'` — while `date` says Week 1 in both.
+   **The sha256s DIFFER and that is a trap:** 24e2c175.. vs ca4e07cb.., entirely
+   attributable to that one echoed field. A hash comparison alone would have
+   reported "not byte-identical, therefore the bug is gone." It is not gone.
+
+### WHICH STAGE IS WRONG — measured, not guessed. It is stage 2, and only its CLOCK.
+
+Every stage of `cc1feccc` is working. Walked in pipeline order:
+
+- **Upstream `completed` flags: HEALTHY.** The artifact reads
+  `stale_completion_flags: 0`. Nothing is played-but-unflagged. This is the exact
+  diagnostic `week_state.py` was written to expose and it is clean.
+- **The artifact: PRESENT, and produced TODAY.**
+  `/api/ops/artifacts/export?path=ncaaf_source/data/week_state/ncaaf_week_state_2026.json`
+  -> HTTP 200, `count: 1`, 1,597 B. `generated_at 2026-09-08T01:47:45.743271+00:00`,
+  `games 888`, `source ncaaf_games_cache`, `stale_completion_flags 0`.
+  **CONTROL RUN AND PASSED:** same endpoint with
+  `path=.../definitely_not_allowlisted.txt` -> **HTTP 403** `"path is not an allowed
+  hot or export-only artifact."` The 200 is therefore load-bearing.
+- **The publish: WORKED.** `[artifact_publisher] PUBLISH_OK
+  path=ncaaf_source/data/week_state/ncaaf_week_state_2026.json bytes=1671` at
+  **2026-09-08T01:47:45.759Z — 16 ms after `generated_at`.** Then
+  `PUBLISH_SKIPPED_UNCHANGED checksum=7088644b123e` x6 through 02:08:12Z.
+- **The reader: WORKING AS DESIGNED.** `ncaaf_target_week`
+  (`syndicate/features/ncaaf/sources.py:269-272`) reads the artifact FIRST and
+  short-circuits, so the stale gzip fallback never runs.
+  `target_week_from_state` (`syndicate/features/ncaaf/week_state.py:177`) returns
+  the lowest week with `unplayed > 0`.
+- **NO REVERT.** `cc1feccc` is an ancestor of BOTH live SHAs —
+  web `09f6ab86` (finished 14:02:20Z) and refresh-worker `296e14ec` (15:05:37Z),
+  2 of 2 by `git merge-base --is-ancestor`.
+
+**THE ONE NUMBER THAT EXPLAINS EVERYTHING:** the artifact says
+**`week 1: games 99, completed 98, unplayed 1`.** One unplayed game in week 1 is
+pinning the entire board, and the reader is right to return 1 given that input.
+
+### The unplayed game is SMU @ Florida State, and the build caught it MID-GAME
+
+    artifact generated_at   2026-09-08T01:47:45Z  =  2026-09-07 20:47:45 CDT
+    SMU @ Florida State ko  2026-09-07T23:30:00Z  =  2026-09-07 18:30:00 CDT
+    12h stale-flag cutoff   2026-09-07T13:47:45Z
+    build ran 137.8 minutes after kickoff — i.e. WHILE THE GAME WAS BEING PLAYED
+
+CFBD said `completed: false` and was CORRECT. Kickoff (23:30Z) is later than the
+12-hour grace cutoff (13:47:45Z), so `build_week_state`
+(`week_state.py:113-118`) counted it `unplayed` and did NOT flag it stale. That is
+the only pair of numbers mutually consistent with `unplayed 1` + `stale_flags 0`.
+
+**Identification is bounded, not inferred.** Production's week_state says week 1
+holds **99** games. The checkout's `data/ncaaf_source/historical_truth/games_2026.json.gz`
+carries the same **99** week-1 regular games, and exactly **1** of them kicks off at
+or after the 13:47:45Z cutoff: SMU @ Florida State, 2026-09-07T23:30Z. Substrate
+labelled: the COUNTS are `render`; the KICKOFF TIMES are `checkout`, admissible here
+only because schedule times are not what goes stale (the `completed` flags are) and
+the 99 matches production exactly. **Corroborated on a third instrument:** the served
+production board's own latest week-1 row is `1_SMU_Florida_State`,
+`startTime 2026-09-07T23:30Z`, and it now reads `Final: True` — as do all 51.
+
+### The mechanism, and why it will recur
+
+`SEASON_PROJECTION_REFRESH_INTERVAL_SECONDS` defaults to **86400**
+(`scripts/run_refresh_worker.py:3650-3656`). The week_state artifact is rebuilt at
+most **once per 24 h**, and this cycle it was rebuilt 2h18m before week 1 finished.
+Nothing has rebuilt it in the **13.7 hours** since (last touch 02:08:12Z, now
+15:35Z). So the board serves a finished week for up to ~24 h after that week ends —
+**every week whose final game ends after the daily build**, not just this one.
+
+Two further consequences worth naming before anyone fixes this:
+
+- **A game that never completes pins the board FOREVER.** A cancelled or abandoned
+  fixture keeps `unplayed >= 1` permanently. `stale_completion_flags` would catch it
+  after the 12 h grace, but **nothing reads that field to act** — it is diagnostic
+  only. `min(week with an unplayed game)` has no straggler tolerance.
+- **The gate is self-referential.** `_season_projection_target_week`
+  (`run_refresh_worker.py:3682-3690`) calls the very `ncaaf_target_week` the stale
+  artifact pins, so the daily run targets the week the stale artifact names. Not
+  today's blocker — `build_week_state` walks the whole season cache regardless of the
+  target week — but it is a loop, and it should be read before changing the cadence.
+
+### PREDICTION, EXPLICITLY NOT A MEASUREMENT
+
+The next daily run (~2026-09-09T01:4xZ = **~2026-09-08 20:4x CDT tonight**) should
+see SMU @ Florida State `completed: true` -> week 1 `unplayed 0` -> `target_week 2`,
+and the board should advance WITHOUT intervention. **This is unverified.** If it has
+not advanced by 2026-09-09 morning, the cadence is not the whole story and the
+straggler-tolerance defect above is the next thing to test.
+
+### INSTRUMENT: the two prescribed log needles are STILL unobservable
+
+`GAMES_CACHE_REFRESH `, `WEEK_STATE season=`, `WEEK_STATE_ERROR` and
+`WEEK_STATE_PUBLISH_ERROR` all returned **zero** matches over 2026-09-06T00:00Z..now
+on refresh-worker. **That absence proves nothing** and was not treated as evidence:
+`log()` at `scripts/generate_smartsim2_ncaaf_projections.py:805` writes ONLY to the
+`--progress-log` FILE, never to stdout, so every one of those needles is invisible to
+Render's collector by construction. **Already recorded in the 2026-09-02 entry above
+(then at `:796`), suggested-not-applied, and STILL NOT APPLIED** — and the scheduled
+task for today prescribed those same four needles again. A documented instrument
+defect that survives two verifications has cost two sessions the same detour.
+
+- **CONTROL, run BEFORE claiming any absence:** `BOARD_HEALTH sport=ncaaf` over
+  2026-09-08T00:00Z..now returned hits through **15:12:18Z**. The logs API was
+  healthy; the absence is the emitter's fault, as before.
+- What WAS usable, and what this check actually rested on: the `[artifact_publisher]`
+  lines (a different emitter, which does print) plus the artifact's own
+  `generated_at`. 16 ms apart, so the producer provably ran.
+
+### INCIDENTAL, UNRELATED, AND NOT THIS LANE'S: **web is in an OOM-kill loop RIGHT NOW**
+
+Found because three consecutive `?week=2` fetches returned instant HTTP 502s
+(0.19-0.29 s, `x-render-routing: dynamic-paid-error`) and then `?week=1` — which had
+just succeeded — 502'd too. Not a week bug; the service was down. Events API,
+web, since 13:00Z:
+
+    14:13:44Z  oomKilled  memoryLimit=2Gi     14:14:08Z  server_available
+    14:23:48Z  oomKilled  memoryLimit=2Gi     14:24:08Z  server_available
+    14:43:54Z  oomKilled  memoryLimit=2Gi     14:44:18Z  server_available
+    15:11:13Z  oomKilled  memoryLimit=2Gi
+    15:13:28Z  oomKilled  memoryLimit=2Gi     15:14:08Z  server_available
+
+**5 OOM kills in 61 minutes**, plus `unhealthy HTTP health check failed` at
+14:07:23Z after the 13:55Z user deploy (`mostgood@gmail.com`, build_ended
+13:59:55Z, deploy_ended 14:02:21Z). My 502s land exactly inside the
+15:13:28 -> 15:14:08 gap. **A `/ncaaf/api/cards` fetch is a 609 KB payload and took
+14.7-15.8 s to serve** once the service was back, so this route is a plausible
+contributor and should not be exonerated on this reading. Reported, not diagnosed —
+belongs to whichever lane owns web OOM, not to this one.
+
+verify: **NEGATIVE RESULT, FULLY MEASURED.** `/api/ops/ncaaf/season-weeks` returned
+`resolved_active_weeks [1]` (PASS required 2), and `/ncaaf/api/cards?week=2` served
+`date "2026 Week 1"` with the same 51 week-1 `gamePk`s and zero differing game fields
+against `?week=1`. First wrong stage isolated to the artifact's BUILD CLOCK, not the
+fix: production week_state `generated_at 2026-09-08T01:47:45Z` with `week 1:
+completed 98, unplayed 1, stale_completion_flags 0`, read HTTP 200 against a 403
+control, the single unplayed game bounded to SMU @ Florida State
+(ko 2026-09-07T23:30Z, 137.8 min before the build) by a 99-vs-99 join and confirmed
+Final on the served board. `cc1feccc` is an ancestor of both live SHAs, 2 of 2 — no
+revert, and every stage of the fix works. NOT FIXED, unattended read-only run.
+
 ## 2026-09-07 21:52:16Z — refresh-worker `66e121f3` — **MEASURED: sub-4MiB publishes now carry `X-Artifact-Publisher`.** `[lane soccer-unfed-inputs]`
 
 `dep-dafj1lht0dsc73ebqbe0`, POSTed 21:47:02Z, live 21:52:16.663704Z, preflight
