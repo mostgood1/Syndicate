@@ -4,7 +4,7 @@
 
 - **What.** week_state is rebuilt once a day inside the NCAAF projection run, and that run drifts ~19 min/day (01:47:45Z -> 02:07:00Z -> 02:26:07Z on 09-08..10). A build that lands mid-slate counts the evening's games as unplayed, and `target_week_from_state` then held the board on a FINISHED week for a day. Measured on 2026-09-08 (SMU @ Florida State, caught 137.8 min after kickoff). Predicted for 2026-09-13 (a ~03:2xZ build against last kickoffs at 03:00-04:00Z).
 - **Fix, `ab787363`.** The producer adds `unplayed_kickoffs`: per week, the latest unplayed kickoff and a count of undated games. The reader skips a week once every unplayed game in it kicked off more than 12 h ago (`_COMPLETION_GRACE_SECONDS`, the stale-flag threshold). An absent field or an undated game keeps the old rule, and the highest candidate week is never skipped. Tests 59 passed / 1 skipped; 4 of 4 mutations caught.
-- **Deployed.** web: live 2026-09-10T19:38:09Z, no regression (`deploys.md`). refresh-worker: carried by lane `exchange-execution-unblock`'s code deploy, agreed by message; confirm by the ancestry of the live commit.
+- **Deployed.** web: live 2026-09-10T19:38:09Z, no regression (`deploys.md`). refresh-worker: `86c82220` live 2026-09-10T20:13:21Z, deployed by lane `exchange-execution-unblock`; `ab787363` is an ancestor (checked).
 - **Owed readings.** `ncaaf-week-state-field-tonight` (23:00 CDT 09-10: the artifact carries the field). `ncaaf-week3-advance-sunday` (11:30 CDT 09-13: PASS = week 3 served). `ncaaf-week3-advance-monday` (08:00 CDT 09-14).
 - **Close when** the Sunday reading shows week 3 served on the grace; then move this item to `todo_closed.md`.
 
