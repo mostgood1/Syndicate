@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 950 rules `[generated]`
+## Index — 952 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5166,3 +5166,39 @@ as one more instance.
 **The cost of not doing it is asymmetric.** Under-counting ships a fix that
 leaves the defect live somewhere else, and the ledger then records the lead as
 CLOSED. Over-counting only wastes a grep.
+
+## 2026-09-09 FORBIDDEN: reporting a STAGE, FEATURE or MECHANISM as OFF because its env flag is ABSENT, without finding the resolution site and checking for an UNCONDITIONAL installer. A stage's state is a property of the PROCESS THAT RAN IT, not of the environment `[lane segments-joint-v1, my SECOND instance of this shape in six hours]`
+
+**WHAT HAPPENED.** The step 5 recon read five flags off both workers, found four
+ABSENT, and reported "five of six stages are shipped dark". One of the five was
+wrong. `pipeline/layer2_shortlist.py:664` calls `install_measured_correlation`
+UNCONDITIONALLY and by design (`#621` phase 4), writing a PROCESS-WIDE resolver
+registry that all ten `compute_correlation` call sites read -- including
+`bankroll_manager.compute_correlation`, so it reaches BET SIZING. Its own
+counter shows 61 of 62 installs True on the date that has sims, 54 of those
+across the full 15-game slate. It had been live all day. And
+`SYNDICATE_PARLAY_MEASURED_JOINT`, the flag I read, gates something NARROWER
+than its name: only the n-leg phi expansion in the parlay runtime.
+
+**WHY THIS IS ALREADY A RULE AND STILL HAPPENED.** Six hours earlier the same
+lane retracted the execution caps for the same reason and wrote *"a cap, limit
+or flag has a RESOLVED value and a SET value, and they are different objects."*
+That correction was about a STORE overriding env. I filed it as a fact about
+stores, so when the second case had no store -- just an unconditional call site
+-- the rule did not fire. **The generalisation is not "check the store". It is
+that reading configuration NEVER establishes what code did.**
+
+**HOW TO APPLY.** Before writing any on/off verdict: (1) grep every reference to
+the flag NAME and confirm the resolution site is the only one; (2) grep the
+mechanism's installer/entry symbol separately -- an unconditional caller will
+not appear in a search for the flag; (3) prefer a reading the code already
+prints. `install_measured_correlation` printing `installed=` on every build,
+including when nothing is installed, is why this was catchable in one query.
+That counter exists because its author wrote that a resolver answering `None`
+for everything is indistinguishable from one nobody wired up -- **the same
+ambiguity my flag read walked into.**
+
+**COROLLARY WORTH MORE THAN THE CORRECTION.** A mechanism installed into a
+process-wide registry resolves DIFFERENTLY PER DECISION PATH depending on which
+process installed it, and no flag anywhere reports that. Any claim of the form
+"X is on" is incomplete without naming the process.

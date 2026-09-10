@@ -124,3 +124,78 @@ and `model_edge_pct` is numeric on only **902 of 2,623 rows (34.4%)**
 dark stages should be switched on, and in what order, each with a reading.**
 That is a smaller change than the extraction and is where the measured work of
 steps 2 and 3 actually reaches a served number.
+
+---
+
+## CORRECTION, same day, before this file informed anything: FOUR dark, not five
+
+**The claim above that `SYNDICATE_PARLAY_MEASURED_JOINT` being ABSENT means the
+measured joint is off is WRONG.** I inferred a stage's resolved state from an env
+var — **the exact error I retracted six hours earlier over the execution caps**
+(`findings_2026-09-09_execution_caps_are_stored_not_env.md`), and the rule I
+wrote there is *"a cap, limit or flag has a RESOLVED value and a SET value, and
+they are different objects."* I then wrote five stage verdicts off SET values.
+
+### What production actually does
+
+`pipeline/layer2_shortlist.py:664` calls `install_measured_correlation(date)`
+**UNCONDITIONALLY — no flag, deliberately** (`#621` phase 4), because it writes a
+**process-wide resolver registry** that all ten `compute_correlation` call sites
+read, `bankroll_manager.compute_correlation(candidate, existing)` among them. So
+it reaches **BET SIZING**, not just badges.
+
+It prints its own report unconditionally, so this is readable rather than
+inferred. refresh-worker, 2026-09-09T06:04Z..2026-09-10T00:35Z, 95 builds:
+
+| date built for | installed=True | installed=False | why False |
+|---|--:|--:|---|
+| 2026-09-09 (has sims) | **61** | 1 | pre-sim build |
+| 2026-09-10 (no sims yet) | 1 | 32 | `no_sims_for_date`, `no_joint_in_any_artifact` |
+
+**61 of 62 builds on the date that has sims installed it, 54 of them across the
+full 15-game MLB slate.** The measured joint is not dark. It has been live all
+day.
+
+### What the flag actually gates
+
+Narrower than its name: `_parlay_correlation_profile:230-231` uses
+`measured_joint_enabled()` only to decide `sport_ok`, i.e. whether the **n-leg
+phi expansion** runs. `_compute_correlation` is called for every pair **either
+way**, and returns measured values whenever the registry was installed *in that
+process*. So the gate is on the parlay expansion, not on the measurement.
+
+### The corrected picture — and it is a better finding than the wrong one
+
+| stage | resolved state |
+|---|---|
+| quote plane | **ON** (`SYNDICATE_FAIR_ANCHOR=sharp_only`) |
+| measured joint | **ON, unconditionally, board path — reaching sizing** |
+| calibrate | OFF |
+| blend | INERT (β=0) |
+| Kelly-on-fair | OFF |
+| pregame interval gate | OFF |
+
+**The joint is ASYMMETRIC ACROSS DECISION PATHS: installed on whichever process
+ran `layer2_shortlist`, absent on any process that did not, and the flag that
+looks like it governs it governs something else.** That is a concrete instance of
+this file's own six-paths problem — the same mechanism resolving differently per
+path, with no stage trace to say so — and it strengthens the case for a stamped
+pipeline rather than weakening it.
+
+### The other three ARE off, and this was checked rather than assumed
+
+`pricing_calibration_enabled` (`probability_calibration.py:202`),
+`kelly_on_fair_enabled` (`bankroll_manager.py:157`) and
+`pregame_interval_gate_enabled` (`portfolio_commit.py:292`) are each a **single
+resolution site, a bare `os.environ` read, absent-is-off by explicit design**,
+with no store hop and no unconditional twin. Verified by enumerating every
+reference to each flag name in the tree, not by reading the env again.
+
+### The rule this earns
+
+**A STAGE'S STATE IS A PROPERTY OF THE PROCESS THAT RAN IT, NOT OF THE
+ENVIRONMENT.** Before calling any stage on or off, find its resolution site and
+check for an unconditional installer; then prefer the reading the code already
+prints over any inference from configuration. `install_measured_correlation`
+printing `installed=` on every build is why this was catchable in one query —
+**that counter is the pattern the stage trace should copy.**
