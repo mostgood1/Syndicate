@@ -226,10 +226,37 @@ def test_an_order_with_no_teams_refuses_rather_than_falling_back_to_event_id(_ga
     assert view["unavailable_reason"] == bet_status_nfl.REASON_NO_MATCHUP
 
 
-def test_a_PREGAME_game_carries_no_scores_and_does_not_settle_a_total_as_under(_games):
+def test_a_PREGAME_game_is_NOT_STARTED_and_never_settles_a_total_as_under(_games):
     """A 0-0 on a game that has not kicked off is a schedule placeholder. The
-    capture stores None; grading it would settle every pregame under."""
+    capture stores None; grading it would settle every pregame under. Since
+    2026-09-10 it reads NOT STARTED rather than as a missing score, the answer
+    props and segments already gave."""
+    from syndicate.features.shared.bet_status import STATUS_NOT_STARTED, resolve_bet_status
+
     _games(_game(home_score=None, away_score=None, final=False, in_progress=False))
+
+    view = nfl_status_resolver("2026-08-28")(_order(market="totals", side="over", line=44.5))
+
+    assert view == {"current_value": None, "is_final": False, "started": False}
+    status = resolve_bet_status(market="totals", side="over", line=44.5, current_value=None,
+                                is_final=False, started=False)
+    assert status["status"] == STATUS_NOT_STARTED
+
+
+def test_a_PREGAME_spread_is_NOT_STARTED_not_no_team_scores(_games):
+    # The game-line half of the same fix: `game_line_view` answers a pregame
+    # spread with `no_team_scores`, which is what 172 rows read on 2026-09-10.
+    _games(_game(home_score=None, away_score=None, final=False, in_progress=False))
+
+    view = nfl_status_resolver("2026-08-28")(_order(market="spreads", side="home", line=-3.5))
+
+    assert view == {"current_value": None, "is_final": False, "started": False}
+
+
+def test_a_FINAL_game_with_no_scores_still_REFUSES(_games):
+    # The fix must not eat the refusal it sits beside: a game ESPN calls final
+    # (postponed and cancelled games land here) with no score is still unknown.
+    _games(_game(home_score=None, away_score=None, final=True, in_progress=False))
 
     view = nfl_status_resolver("2026-08-28")(_order(market="totals", side="over", line=44.5))
 

@@ -187,7 +187,17 @@ def test_the_MARKET_check_runs_BEFORE_the_artifact_read(monkeypatch):
 
 
 def test_a_pregame_game_does_not_settle_a_total(_games):
+    # NOT STARTED since 2026-09-10, rather than a missing-score refusal; it
+    # still never settles a pregame total as an under.
     _games(_game(home_score=None, away_score=None, final=False, in_progress=False))
+
+    view = ncaaf_status_resolver("2026-08-29")(_order(market="totals", side="over", line=52.5))
+
+    assert view == {"current_value": None, "is_final": False, "started": False}
+
+
+def test_a_FINAL_game_with_no_scores_still_refuses(_games):
+    _games(_game(home_score=None, away_score=None, final=True, in_progress=False))
 
     view = ncaaf_status_resolver("2026-08-29")(_order(market="totals", side="over", line=52.5))
 

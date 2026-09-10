@@ -55,8 +55,46 @@ from typing import Any
 __all__ = ["resolve_ncaaf_team_id", "unambiguous_team_index", "registry_path"]
 
 
+# APOSTROPHES AND THE OKINA ARE NOT PART OF A NAME. OddsAPI drops them and the
+# registry keeps them, so "Hawaii Rainbow Warriors", "Louisiana Ragin Cajuns"
+# and "Gardner-Webb Runnin Bulldogs" missed "Hawai'i", "Ragin'" and "Runnin'".
+# Measured 2026-09-10 on production's board and plan: 3 of the 7 NCAAF names
+# that failed the registry, out of 142. Stripped on BOTH sides (index keys and
+# lookups), so it can only merge spellings of one name, and a merge that made
+# two teams share a key would drop that key, not pick one.
+_IGNORED_CHARACTERS = str.maketrans("", "", "'\u2018\u2019\u02bb`")
+
+
+
+def _odds_name_supplement() -> list[tuple[str, str]]:
+    """`(alias, canonical team name)` from the ODDS JOIN'S OWN supplement.
+
+    The other 4 of those 7 names are forms the registry does not carry: OddsAPI
+    sends the long form where the registry has the short one ("Appalachian
+    State" / "App State", "Southern Mississippi", "Sam Houston State"), or the
+    reverse ("UMass" / "Massachusetts"; ESPN's `shortDisplayName` "UMass" failed
+    too). `oddsapi_lines._ODDSAPI_NAME_SUPPLEMENT` already answers every one of
+    them, hand-verified against live OddsAPI reads, and it is how the board got
+    these teams' lines in the first place. Settlement simply never read it.
+
+    READ THROUGH `iter_team_alias_offers`, the one enumeration its docstring
+    says every consumer must share ("reaches both consumers or neither"), so a
+    name added there now reaches the grader too. A second hand-kept list here
+    is the drift that function exists to prevent.
+
+    [] if the module cannot be imported: the index then behaves exactly as it
+    did before this existed, which refuses rather than guesses.
+    """
+    try:
+        from syndicate.features.ncaaf.oddsapi_lines import iter_team_alias_offers
+
+        return [(alias, canonical) for alias, canonical, is_supplement in iter_team_alias_offers() if is_supplement]
+    except Exception:  # pragma: no cover - deploy-skew guard
+        return []
+
+
 def _norm(value: Any) -> str:
-    return " ".join(str(value or "").strip().lower().split())
+    return " ".join(str(value or "").translate(_IGNORED_CHARACTERS).strip().lower().split())
 
 
 def registry_path() -> Path | None:
@@ -101,6 +139,7 @@ def unambiguous_team_index() -> dict[str, str]:
         return {}
 
     owners: dict[str, set[str]] = {}
+    by_canonical: dict[str, set[str]] = {}
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -118,9 +157,21 @@ def unambiguous_team_index() -> dict[str, str]:
         # it on its own, so without this the scoreboard's primary name field
         # would miss the registry entirely.
         keys.add(_norm(f"{row.get('school_name')} {row.get('mascot_name')}"))
+        by_canonical.setdefault(_norm(row.get("canonical_team_name")), set()).add(team_id)
         for key in keys:
             if key:
                 owners.setdefault(key, set()).add(team_id)
+
+    # THE SUPPLEMENT ENTERS THE SAME AMBIGUITY PASS AS EVERY OTHER KEY. The odds
+    # join lets it OVERRIDE a collision, since a board line is a display. Here a
+    # wrong join is a confident wrong grade, so a supplement key two teams
+    # would own refuses like any other. An entry whose canonical name this
+    # registry does not hold, or holds twice, is skipped rather than guessed.
+    for alias, canonical in _odds_name_supplement():
+        ids = by_canonical.get(_norm(canonical)) or set()
+        key = _norm(alias)
+        if key and len(ids) == 1:
+            owners.setdefault(key, set()).add(next(iter(ids)))
 
     return {key: next(iter(ids)) for key, ids in owners.items() if len(ids) == 1}
 

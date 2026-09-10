@@ -228,6 +228,16 @@ def ncaaf_status_resolver(selected_date: str):
             away = _as_float(record.get("away_score"))
             is_final = bool(record.get("final"))
             started = bool(record.get("in_progress")) or is_final
+            if not started:
+                # NOT STARTED, NOT A REFUSAL. A game that has not kicked off
+                # has no score by definition, and reporting that as a missing
+                # score put 289 pregame rows on the refusal counter on
+                # 2026-09-10 (`no_team_scores` + `..._carries_no_scores`), while
+                # props and segments on the same games already read
+                # not-started. The capture's `None` pregame scores still can
+                # never settle a total as an under: nothing grades until the
+                # game has started.
+                return {"current_value": None, "is_final": False, "started": False}
         else:
             # THE SEGMENT'S OWN SCORE PAIR, or a named refusal. `is_final` is
             # the SEGMENT's -- a first-half total is decided at the half --
