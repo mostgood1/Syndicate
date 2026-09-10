@@ -854,6 +854,15 @@ death, never life — do not invert it.
 - Verification: LOCAL, done — 186 portfolio tests green, including a plain password in the HASH key → 503 with the named problem and the value never echoed (page, login POST, JSON), a malformed key locking off Render too, and scrypt / pbkdf2 hashes still signing in. PRODUCTION, owed — the next web deploy's boot line must carry `problem=none`; with today's credentials it should read `credentials_configured=True hash=no problem=none`.
 - Blocked by: none. Deploy when convenient — web only, ~60-90 s of 502s, and no change for a signed-in user (the session key is derived from the credentials, which do not change).
 
+### worktree-close-and-prune — OPEN — opened 2026-09-10 — session 4d4e0959-c99d-4777-bebb-37851c341e75
+- Goal: (a) `session_worktree.py close` COMPLETES when `git worktree remove` fails: every git call after the fallback delete runs from the MAIN repo root, the directory is gone, `git worktree list` no longer lists it, a fully-merged branch is deleted and an unmerged one is refused. (b) The cause of `git worktree prune` -> `failed to delete '.git/worktrees/<id>': Permission denied` (~120 admin dirs) is measured and written into the ledger with a safe remediation, applied only where it is clearly safe. User-directed 2026-09-10. Tooling only, NO deploy.
+- Files: `scripts/session_worktree.py`, `tests/test_session_worktree_close.py` (NEW). Ledger writes go to the shared ledger files and claim nothing.
+- Hypothesis: (2) `REPO_ROOT = Path(__file__).parents[1]`, so running a worktree's OWN copy of the script makes the default `cwd` of every `git()` call the very tree `close` deletes; the `--force` close that did not crash ran a copy that lived elsewhere — the flag is not the difference. (1) FILE_ATTRIBUTE_READONLY on the admin DIRECTORIES makes git's `rmdir` fail with EACCES; the files inside are not the blocker. NOTE: (1) was lab-tested BEFORE this block was written — see the log line below; recorded rather than re-ordered.
+- Falsification test: (2) a close whose `REPO_ROOT` is a DIFFERENT live tree also crashes -> the cause is elsewhere. (1) a lab repo OUTSIDE OneDrive, R set on the admin dirs only, does NOT reproduce `Permission denied` -> the attribute is not sufficient.
+- Verification: the new test file passes (a REAL read-only-attribute failure on Windows, no monkeypatch, plus a simulated exit 255 run from the closed tree's own copy), and the UNFIXED script fails it; a real `close` from a worktree's own copy completes; husk counts before/after the remediation recorded.
+- Blocked by: none.
+- 2026-09-10 18:3xZ (1) LAB RESULT, outside OneDrive: R on the admin dir + its subdirs only (0 read-only files) reproduces `error: failed to delete '.git/worktrees/wt1': Permission denied` and leaves `ORIG_HEAD`, `logs/`, `refs/` — the repo's husk shape exactly. `os.rmdir` on an empty R directory: `PermissionError 13`. Hypothesis (1) SURVIVES; the 2026-09-06 learning's "Windows largely IGNORES ReadOnly on directories" is contradicted.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
