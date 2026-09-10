@@ -267,6 +267,29 @@ def arm_a_verdict(metered: float, edge_mb: float, edge_requests: int,
     return "not a spike", f"metered/app {ratio:.2f} < {spike_app_ratio}", ratio
 
 
+def arm_a_wait_status(metered: float, seconds_left: float, spike_mb: float,
+                      verdict_reason: str | None) -> str:
+    """What arm A made of a poll that did not fire -- for the `wait` line and the record.
+
+    The `wait` reasons used to be arm B's alone, so a poll where arm A was never
+    EVALUATED read exactly like one where it was evaluated and declined.
+    Measured on the `2026-09-10T01:48:45Z` watch: 14 polls saw a bucket over the
+    MB bar, the gate ran on 3, and the time guard skipped the other 11 with
+    nothing recorded. A bucket settles upward through the following hour, so it
+    tends to cross the bar with too little of that hour left; each was in fact
+    judged once, at the top of the NEXT hour, and the log never showed that.
+
+    `verdict_reason` is `arm_a_verdict`'s reason when the gate ran this poll,
+    else None.
+    """
+    if verdict_reason is not None:
+        return f"arm A: {verdict_reason}"
+    if metered < spike_mb:
+        return f"arm A: {metered:.1f} MB < {spike_mb:g} MB bar"
+    return (f"arm A: over {spike_mb:g} MB bar, NOT EVALUATED -- {seconds_left:.0f}s left "
+            f"<= {ARM_A_MIN_SECONDS_LEFT}")
+
+
 def background_mb(key: str, minutes: int) -> tuple[float, int]:
     """Non-probe edge bytes in the last `minutes`. Our own UA is excluded."""
     now = _now()
@@ -390,6 +413,7 @@ def main() -> int:
         # The ratio scan costs a full log page-through, so it is gated behind the
         # cheap metered test. A busy browsing hour clears the MB bar and fails
         # the ratio bar, which is the whole point of having two.
+        verdict_reason = None
         if metered >= args.spike_mb and left > ARM_A_MIN_SECONDS_LEFT:
             edge, requests = edge_mb_for_bucket(key, bucket)
             served, access_lines, covered = app_served_mb_for_bucket(key, bucket)
@@ -403,6 +427,7 @@ def main() -> int:
                 args.spike_mb, args.spike_app_ratio,
             )
             poll["ratio_verdict"] = reason
+            verdict_reason = reason
             if ratio is not None:
                 poll["metered_over_app"] = round(ratio, 2)
             _say(f"   over {args.spike_mb} MB: app-served {served:.1f} MB / {access_lines} lines "
@@ -427,6 +452,7 @@ def main() -> int:
                 record["fired"] = fire("A", args.arm_a_mb, skip_quiet=True, key=key, watch=False)
                 break
 
+        poll["arm_a"] = arm_a_wait_status(metered, left, args.spike_mb, verdict_reason)
         in_band = band_start <= hour < band_end
         if in_band and metered <= args.quiet_bucket_mb and left >= ARM_B_MIN_SECONDS_LEFT:
             poll["decision"] = "ARM_B"
@@ -452,7 +478,9 @@ def main() -> int:
                 reasons.append(f"last bucket {metered:.1f} MB > {args.quiet_bucket_mb}")
             if left < ARM_B_MIN_SECONDS_LEFT:
                 reasons.append(f"{left:.0f}s left < {ARM_B_MIN_SECONDS_LEFT}")
-            poll["why"] = "; ".join(reasons)
+            # Arm A first and each arm labelled: arm B's 2600 s guard used to be
+            # the only time limit on the line, and reads as arm A's (1600 s).
+            poll["why"] = f"{poll['arm_a']} | arm B: " + ("; ".join(reasons) or "n/a")
             record["polls"].append(poll)
             _say(f"wait: {bucket} {metered:.1f} MB -- {poll['why']}")
 
