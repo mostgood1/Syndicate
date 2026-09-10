@@ -72,6 +72,24 @@ def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
         except Exception:  # pragma: no cover - deploy-skew guard; the name match still runs
             resolve_ncaaf_team_id = None
 
+        # FOOTBALL CHIPS LIVE ON ESPN'S DATE, NOT THE UTC DATE. A night kickoff
+        # has a UTC `commence_time` on the NEXT day while ESPN files the game
+        # under the Eastern one: FAMU @ MIA is 2026-09-11T00:00Z and sits on
+        # ESPN's 20260910 scoreboard. Measured 2026-09-10 on the served 09-11
+        # NCAAF book grid: its 13 FAMU @ MIA rows carried NO `game` block and
+        # `unmatched_teams` named BOTH teams (Miami matches by name, so the chip
+        # was simply never fetched). So football also queries the ESPN date of
+        # each kickoff, through the same helper the grader uses (Eastern date,
+        # plus the previous day for a small-hours kickoff). Football teams do not
+        # play on consecutive days, so an extra date cannot join a row to another
+        # game the way it could on an MLB series; other sports are unchanged.
+        kickoff_capture_dates = None
+        if sport in ("nfl", "ncaaf"):
+            try:
+                from syndicate.features.shared.bet_status_nfl import kickoff_capture_dates
+            except Exception:  # pragma: no cover - deploy-skew guard; UTC dates still run
+                kickoff_capture_dates = None
+
         # CHIPS FOR THE DATES THE ROWS ACTUALLY SPAN, not just this artifact's
         # date (`#348`).
         #
@@ -94,6 +112,8 @@ def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
             raw = str((row.get("commence_time") or "")).strip()
             if len(raw) >= 10:
                 row_dates.add(raw[:10])
+                if kickoff_capture_dates is not None:
+                    row_dates.update(kickoff_capture_dates(raw))
         # BOUNDED, and the bound is stated rather than implicit: each date is a
         # scoreboard call, and an artifact can carry weeks of forward fixtures
         # (1,246 NFL rows across many dates, measured the same day). Nearest

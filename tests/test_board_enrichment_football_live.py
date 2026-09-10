@@ -90,3 +90,81 @@ def test_other_sports_never_consult_the_NCAAF_registry(chips, monkeypatch):
 
     assert coverage["rows_matched"] == 0
     assert called == []
+
+
+
+# ---------------------------------------------------------------------------
+# FOOTBALL CHIPS ARE FETCHED FOR THE KICKOFF'S ESPN DATE (2026-09-10)
+# ---------------------------------------------------------------------------
+# FAMU @ MIA: commence 2026-09-11T00:00Z, filed by ESPN under 2026-09-10. The
+# 09-11 book grid used to ask only for 09-11 chips, so it never saw the game.
+
+
+@pytest.fixture
+def chips_by_date(monkeypatch):
+    def install(by_date, ids=_IDS):
+        calls = []
+
+        def build(date, sports):
+            calls.append(date)
+            return list(by_date.get(date, []))
+
+        monkeypatch.setattr(game_chip_scoreboard, "build_game_chips", build)
+        monkeypatch.setattr(ncaaf_team_registry, "resolve_ncaaf_team_id", lambda name: ids.get(str(name)))
+        return calls
+    return install
+
+
+def test_a_NIGHT_kickoff_on_the_NEXT_UTC_day_still_finds_its_ESPN_chip(chips_by_date):
+    calls = chips_by_date({"2026-09-10": [_chip("Miami", "Florida A&M", home_abbr="MIA", away_abbr="FAM")]})
+    grid = [_row("Miami Hurricanes", "Florida A&M Rattlers")]  # commence 2026-09-11T00:00:00Z
+
+    coverage = board_enrichment.attach_game_state(grid, sport="ncaaf", selected_date="2026-09-11")
+
+    assert coverage["rows_matched"] == 1
+    assert grid[0]["game"]["matchup"] == "Florida A&M @ Miami"
+    assert "2026-09-10" in calls
+
+
+def test_WITHOUT_the_ESPN_date_the_09_11_grid_cannot_see_the_game(chips_by_date, monkeypatch):
+    # The falsifier: with the helper unavailable, only UTC dates are asked for,
+    # which is exactly the pre-fix behaviour -- and both teams go unmatched.
+    import syndicate.features.shared.bet_status_nfl as bsn
+
+    monkeypatch.setattr(bsn, "kickoff_capture_dates", lambda _raw: [])
+    # 09-11 HAS chips, as production's does (85 of them), just not this game's.
+    chips_by_date({
+        "2026-09-10": [_chip("Miami", "Florida A&M", home_abbr="MIA", away_abbr="FAM")],
+        "2026-09-11": [_chip("Boston College", "Rutgers")],
+    })
+    grid = [_row("Miami Hurricanes", "Florida A&M Rattlers")]
+
+    coverage = board_enrichment.attach_game_state(grid, sport="ncaaf", selected_date="2026-09-11")
+
+    assert coverage["rows_matched"] == 0
+    assert set(coverage.get("unmatched_teams", [])) == {"Miami Hurricanes", "Florida A&M Rattlers"}
+
+
+def test_a_SMALL_HOURS_kickoff_also_asks_for_the_previous_day(chips_by_date):
+    # NMSU @ Hawai'i: OddsAPI 2026-09-13T04:00Z, ESPN files it under 09-12.
+    ids = dict(_IDS, **{"Hawaii Rainbow Warriors": "62", "Hawai'i": "62", "New Mexico State Aggies": "166", "New Mexico State": "166"})
+    calls = chips_by_date({"2026-09-12": [_chip("Hawai'i", "New Mexico State")]}, ids=ids)
+    row = _row("Hawaii Rainbow Warriors", "New Mexico State Aggies")
+    row["commence_time"] = "2026-09-13T04:00:00Z"
+
+    coverage = board_enrichment.attach_game_state([row], sport="ncaaf", selected_date="2026-09-13")
+
+    assert coverage["rows_matched"] == 1
+    assert "2026-09-12" in calls
+
+
+def test_MLB_asks_only_for_its_UTC_dates_as_before(chips_by_date):
+    # Other sports are unchanged: no ESPN-date expansion, so a series cannot be
+    # joined to the previous day's game through an extra date.
+    calls = chips_by_date({})
+    row = _row("Los Angeles Dodgers", "San Francisco Giants", sport="mlb")
+    row["commence_time"] = "2026-09-11T02:10:00Z"
+
+    board_enrichment.attach_game_state([row], sport="mlb", selected_date="2026-09-10")
+
+    assert sorted(calls) == ["2026-09-10", "2026-09-11"]
