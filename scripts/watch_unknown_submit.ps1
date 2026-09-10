@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Replaces the Claude Code scheduled task `unknown-submit-balance-evidence-capture`
-    for STEPS 1-3, which are purely mechanical: one unauthenticated GET, two counts,
+    for STEPS 1-3, which are purely mechanical: one authenticated GET, two counts,
     one appended heartbeat line. No model in the hot path.
 
     WHY THIS EXISTS. Measured 2026-08-31/09-01: 3 of the last 4 scheduled runs of the
@@ -16,7 +16,13 @@
     a */15 schedule. The window this watches for is 16 MINUTES, so that is a dead
     watcher.
 
-    READ-ONLY toward production. No credentials, no .env, no Render API, NO GIT.
+    READ-ONLY toward production. ONE credential, used read-only: ADMIN_TOKEN (env
+    var, else <RepoRoot>\.env), sent as X-Admin-Token because /api/portfolio/live has
+    required sign-in since the 2026-09-10 portfolio-auth deploy (df60b3e3) -- without
+    it every run is a 401 and the watcher sees nothing. The token reaches curl through
+    a temp header file deleted straight after the call: never on a command line,
+    where any local process can read it, and never in any output. Each heartbeat says
+    auth=token|none so a 401 explains itself. No Render API, NO GIT.
     Writes exactly two local files, both inside the repo's .syndicate/ directory.
 
 .NOTES
@@ -64,6 +70,20 @@ function Add-PlainText([string]$path, [string]$text) {
     [System.IO.File]::AppendAllText($path, $text, $enc)
 }
 
+# Environment first, so a caller can inject the token without a file; else the
+# repo's .env, whose values may be quoted.
+function Get-AdminToken {
+    $v = [string]$env:ADMIN_TOKEN
+    if (-not [string]::IsNullOrWhiteSpace($v)) { return $v.Trim() }
+    $envFile = Join-Path $RepoRoot '.env'
+    if (-not (Test-Path -LiteralPath $envFile)) { return '' }
+    foreach ($line in [System.IO.File]::ReadAllLines($envFile)) {
+        $m = [regex]::Match($line, '^\s*ADMIN_TOKEN\s*=\s*(.*)$')
+        if ($m.Success) { return $m.Groups[1].Value.Trim().Trim([char[]]@('"', "'")) }
+    }
+    return ''
+}
+
 # ONE UTC day per file, single-generation roll: today and yesterday, never more.
 function Write-Heartbeat([string]$line) {
     if (Test-Path -LiteralPath $hb) {
@@ -100,7 +120,21 @@ if (-not (Test-Path -LiteralPath $synDir)) {
 $tmp  = Join-Path $env:TEMP ('portfolio_live_{0}.json' -f ([guid]::NewGuid().ToString('N')))
 $wfmt = 'HTTPCODE=%{http_code} RETRIES=%{num_retries} TIME=%{time_total}'
 
-$meta = & curl.exe -s --max-time 90 --retry 3 --retry-delay 20 --retry-all-errors -w $wfmt -o $tmp $BaseUrl
+$token = Get-AdminToken
+if ($token) { $auth = 'token' } else { $auth = 'none' }
+$curlArgs = @('-s', '--max-time', '90', '--retry', '3', '--retry-delay', '20', '--retry-all-errors', '-w', $wfmt, '-o', $tmp)
+$hdrFile = $null
+if ($token) {
+    # -H @file: the header is read from the file, so it never appears on curl's command line.
+    $hdrFile = Join-Path $env:TEMP ('portfolio_live_hdr_{0}.txt' -f ([guid]::NewGuid().ToString('N')))
+    [System.IO.File]::WriteAllText($hdrFile, "X-Admin-Token: $token`n", (New-Object System.Text.UTF8Encoding($false)))
+    $curlArgs += @('-H', "@$hdrFile")
+}
+try {
+    $meta = & curl.exe @curlArgs $BaseUrl
+} finally {
+    if ($hdrFile -and (Test-Path -LiteralPath $hdrFile)) { Remove-Item -LiteralPath $hdrFile -Force }
+}
 $curlExit = $LASTEXITCODE
 
 $code    = '000'
@@ -112,9 +146,9 @@ if ($mm.Success) {
 }
 
 if ($code -ne '200') {
-    Write-Heartbeat "$stamp ran=1 http=$code unknown_submits=0 recent_orders_60m=0 note=fetch_failed;retries=$retries;curl_exit=$curlExit"
+    Write-Heartbeat "$stamp ran=1 http=$code unknown_submits=0 recent_orders_60m=0 note=fetch_failed;retries=$retries;curl_exit=$curlExit;auth=$auth"
     if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force }
-    Write-Output "FETCH FAILED http=$code retries=$retries curl_exit=$curlExit"
+    Write-Output "FETCH FAILED http=$code retries=$retries curl_exit=$curlExit auth=$auth"
     exit 2
 }
 
@@ -122,7 +156,7 @@ try {
     $raw = Get-Content -LiteralPath $tmp -Raw -Encoding UTF8
     $d   = $raw | ConvertFrom-Json
 } catch {
-    Write-Heartbeat "$stamp ran=1 http=$code unknown_submits=0 recent_orders_60m=0 note=unparseable_payload;retries=$retries"
+    Write-Heartbeat "$stamp ran=1 http=$code unknown_submits=0 recent_orders_60m=0 note=unparseable_payload;retries=$retries;auth=$auth"
     if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force }
     Write-Output "PARSE FAILED"
     exit 3
@@ -159,7 +193,7 @@ if ($null -ne $ordersRaw) {
 $stateAge = Get-Prop $d 'state_age_seconds'
 $by       = Get-Prop $d 'state_recorded_by'
 if ($retries -gt 0) { $note = "recovered_after_${retries}_retries" } else { $note = 'clean' }
-$note = "$note;state_age=${stateAge}s;by=$by;src=ps1"
+$note = "$note;state_age=${stateAge}s;by=$by;src=ps1;auth=$auth"
 Write-Heartbeat "$stamp ran=1 http=$code unknown_submits=$($unknown.Count) recent_orders_60m=$recent note=$note"
 
 # ---------- STEP 4: capture, if there is anything to capture ----------

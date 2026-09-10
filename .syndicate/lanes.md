@@ -863,6 +863,14 @@ death, never life — do not invert it.
 - Blocked by: none.
 - 2026-09-10 18:3xZ (1) LAB RESULT, outside OneDrive: R on the admin dir + its subdirs only (0 read-only files) reproduces `error: failed to delete '.git/worktrees/wt1': Permission denied` and leaves `ORIG_HEAD`, `logs/`, `refs/` — the repo's husk shape exactly. `os.rmdir` on an empty R directory: `PermissionError 13`. Hypothesis (1) SURVIVES; the 2026-09-06 learning's "Windows largely IGNORES ReadOnly on directories" is contradicted.
 
+### watcher-admin-token — OPEN — opened 2026-09-10 — session 78cad512-3dbb-4e20-bc19-a001eed9a27f (desktop `local_b85a1f7c-02bf-4240-87f8-fb1c893aae14`)
+- Goal: the Windows task `Syndicate unknown-submit watcher` gets HTTP 200 from `/api/portfolio/live` again, because `scripts/watch_unknown_submit.ps1` sends `X-Admin-Token` (from `ADMIN_TOKEN` in the environment, else `.env`) — without the token appearing on any command line, in the heartbeat, in the findings file or in output. `[user decision 2026-09-10: "Add the admin token to the watcher"]`
+- Files: `scripts/watch_unknown_submit.ps1`.
+- Hypothesis: n/a — the 401 cause is measured: the portfolio-auth deploy `df60b3e3` gated the route, and the heartbeat reads `2026-09-10T17:25:11Z ... http=401 ... note=fetch_failed`.
+- Falsification test: n/a.
+- Verification: a run of the SCHEDULED task (not a hand run) writes a heartbeat line with `http=200` and `auth=token`; the token string is absent from the heartbeat, the findings file, the task's output and `$env:TEMP`.
+- Blocked by: none. Promotes the 2026-09-10 lead in `leads.md` ("had no scheduler for 9 days").
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
