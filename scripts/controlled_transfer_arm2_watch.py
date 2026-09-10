@@ -112,6 +112,12 @@ PROBE_UA = "syndicate-controlled-transfer/1.0"
 #: none missed. A false fire is not free: it spends 150 MB of billed bytes and
 #: hands P1 a reading LABELLED a spike hour that is not one, which destroys the
 #: single variable arm 2 controls.
+#:
+#: CAVEAT `[2026-09-10]`: every number above was scored on captures that paired
+#: each bucket with the hour BEFORE its label. A bandwidth bucket is labelled by
+#: its hour's START, so the captures are being re-derived; paired correctly, the
+#: five anomalous hours read 5.10-9.41 and the ordinary ones 0.44-2.87. The bar
+#: is unchanged pending `score_arm_a_gate.py` on the re-derived captures.
 DEFAULT_SPIKE_MB = 300.0
 #: Kept, RECORDED, and NO LONGER GATING -- the field stays comparable with the
 #: polls taken before the switch, but nothing branches on it.
@@ -164,10 +170,35 @@ def latest_bucket(key: str) -> tuple[str, float]:
     return bucket, values[bucket]
 
 
-def edge_mb_for_bucket(key: str, bucket: str) -> tuple[float, int]:
-    """Edge-logged bytes over the window a RIGHT-labelled bucket covers."""
-    end = dt.datetime.strptime(bucket[:19], "%Y-%m-%dT%H:%M:%S")
-    start = end - dt.timedelta(hours=1)
+#: Metered increments trail served bytes by 1-4 minutes: the lag scan over 180
+#: poll intervals on 2026-09-10 peaked at -4 min (r 0.49 app-served, 0.50 edge).
+#: A partial meter read at time t has counted bytes up to about t - 4 min, so
+#: the denominator stops there too.
+METER_LAG_MINUTES = 4
+
+
+def denominator_window(bucket: str, now: dt.datetime) -> tuple[dt.datetime, dt.datetime]:
+    """The part of the bucket's OWN hour the meter has counted by `now`.
+
+    A bandwidth bucket `X:00` covers `X:00..(X+1):00`; it is labelled by its
+    hour's START (`.syndicate/findings_2026-09-10_spike_crossing_and_labelling.md`).
+    Until 2026-09-10 the gate divided a PARTIAL meter by the FULL PREVIOUS hour,
+    `(X-1):00..X:00`: the wrong hour, and a complete one against an incomplete
+    one. On the 09-08 run that held mid-run hours below 5x until minute 32-37,
+    past the 1,600 s guard.
+
+    Returns (start, end). `end == start` means nothing is countable yet, and the
+    readers return an empty total that the gate refuses rather than divides by.
+    """
+    start = dt.datetime.strptime(bucket[:19], "%Y-%m-%dT%H:%M:%S")
+    end = min(start + dt.timedelta(hours=1), now - dt.timedelta(minutes=METER_LAG_MINUTES))
+    return start, max(start, end)
+
+
+def edge_mb_for_bucket(key: str, start: dt.datetime, end: dt.datetime) -> tuple[float, int]:
+    """Edge-logged bytes over `denominator_window()`. Recorded, not gating."""
+    if end <= start:
+        return 0.0, 0
     rows = _logs(
         key, SERVICE_IDS["web"],
         start.strftime("%Y-%m-%dT%H:%M:%SZ"), end.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -195,10 +226,10 @@ APP_LOG_MAX_PAGES = 400
 APP_LOG_COVERAGE_TOLERANCE_S = 120
 
 
-def app_served_mb_for_bucket(key: str, bucket: str) -> tuple[float, int, bool]:
-    """Application-served bytes (gunicorn access lines) over a bucket's window.
+def app_served_mb_for_bucket(key: str, start: dt.datetime, end: dt.datetime) -> tuple[float, int, bool]:
+    """Application-served bytes (gunicorn access lines) over `denominator_window()`.
 
-    This is the ratio's denominator now. Unlike the edge log it includes
+    This is the ratio's denominator. Unlike the edge log it includes
     internal service-to-service traffic, which is why it separates the
     anomalous hours and `edge` does not.
 
@@ -206,8 +237,8 @@ def app_served_mb_for_bucket(key: str, bucket: str) -> tuple[float, int, bool]:
     served total of zero, and `covered is False` is not a small total -- the
     caller refuses on both rather than dividing.
     """
-    end = dt.datetime.strptime(bucket[:19], "%Y-%m-%dT%H:%M:%S")
-    start = end - dt.timedelta(hours=1)
+    if end <= start:
+        return 0.0, 0, True
     rows = _logs(
         key, SERVICE_IDS["web"],
         start.strftime("%Y-%m-%dT%H:%M:%SZ"), end.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -415,13 +446,16 @@ def main() -> int:
         # the ratio bar, which is the whole point of having two.
         verdict_reason = None
         if metered >= args.spike_mb and left > ARM_A_MIN_SECONDS_LEFT:
-            edge, requests = edge_mb_for_bucket(key, bucket)
-            served, access_lines, covered = app_served_mb_for_bucket(key, bucket)
+            # The bucket's OWN hour so far -- see denominator_window().
+            win_start, win_end = denominator_window(bucket, _now())
+            edge, requests = edge_mb_for_bucket(key, win_start, win_end)
+            served, access_lines, covered = app_served_mb_for_bucket(key, win_start, win_end)
             edge_ratio = metered / edge if edge > 0 else float("inf")
             poll.update({"edge_mb": round(edge, 2), "edge_requests": requests,
                          "metered_over_edge": round(edge_ratio, 2),
                          "app_served_mb": round(served, 2), "access_lines": access_lines,
-                         "app_log_covered": covered})
+                         "app_log_covered": covered,
+                         "denominator_window": [_stamp(win_start), _stamp(win_end)]})
             decision, reason, ratio = arm_a_verdict(
                 metered, edge, requests, served, access_lines, covered,
                 args.spike_mb, args.spike_app_ratio,
