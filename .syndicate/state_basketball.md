@@ -386,12 +386,12 @@ POINT estimate (MAE 6.636 vs 7.453) and a naive 50/50 blend beat **neither**
   - WNBA IS iterated on every build. At 2026-09-10 18:38:45Z `per_sport_ingest.wnba` read `quote_rows 0, grid_rows 0, opportunities 0, sweep_state pending, scheduled_games 4`, while `active_sports` read `mlb, ncaaf, nfl, soccer`. The "ncaaf and soccer" reading was 08-30's.
   - The gates, in order (code, 2026-09-10): manifest; the date's quote shard; per-sport exception; the lane gate (a row with no game state after kickoff is demoted — `wnba cand=1225 … opps=0` on 08-25 was this); horizon / stale kickoff / quote age ≤ 14h; value floor / per-game cap.
   - `scripts/verify_wnba_slate_hygiene.py --check layer2` names the gate that stopped WNBA.
-  - **`scheduled_games: 4` IS FALSE, and the mechanism is ESTABLISHED (2026-09-10, lane `wnba-chip-frozen-trace`).**
+  - **`scheduled_games: 4` WAS FALSE. FIXED AND DEPLOYED 2026-09-10 (lane `wnba-schedule-guard-fix`).** On refresh-worker `c29a7d4e`, chips went 4 -> 0 (21:51Z) and Layer 2 went to `no_slate` (21:59Z). The mechanism was found by lane `wnba-chip-frozen-trace`:
     - `/api/board/game-chips?date=2026-09-10` serves ESPN `401857186..189` (the 2026-08-30 slate), all FINAL, with no start time.
     - `has_games_for_date(today)` fetches `site.api.espn.com`, which refuses Render, so it returns None. The guard at `wnba/cards.py:607` blocks only on False.
     - So a worker's `build_live_state_payload(today, allow_stored_date_fallback=True)` builds from the substituted 08-30 slate and persists it under TODAY's `live_state` key (`cards.py:6672`). The chip path reads that key as today.
-    - It repeats every no-game day. It should self-heal on 09-17 once that day's cards exist.
-    - NOT FIXED. Three fixes are named in `lanes_closed.md`, `wnba-chip-frozen-trace`.
+    - With fix (b), today may be substituted only on a CONFIRMED slate, at both substitution sites. The writer is read on 09-11. Today's `live_state_2026-09-10` key stays frozen until the date roll.
+    - Fixes (a) and (b) applied (`6ebec70e`). Fix (c), never persisting another date's games under today's key, was not taken.
   - `_LIVE_GAME_STATE_SPORTS` is `{mlb, soccer}`, so the chips are WNBA's only game state. If they are still frozen at tip-off on 09-17, every WNBA row is demoted after kickoff.
   - Layer 2 is the only surface that persists what it recommended. WNBA profitability stays unmeasurable there until WNBA rows reach it.
 - **Layer 1 model coverage is 4–6%** — `rows_modelled_fair` is 20–56 of

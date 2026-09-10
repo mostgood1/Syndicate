@@ -31703,3 +31703,52 @@ Scheduled task `accuracy-autorun-reading-0911` (08:30 CDT) takes the reading aga
 predictions pre-registered in the lane: one `LEDGER_CHUNKS_ACCEPTED` line, `skipped_budget=0
 truncated=0`, 150-165k records, 7.5-9.5 GB, in-run anon ~2,155-2,200 MiB (revert above 2,600),
 `elapsed_s` 450-1,200.
+
+## 2026-09-10 21:12:58-21:19:20Z — live-odds-worker `5bb0158a` -> `6ebec70e` — lane `wnba-schedule-guard-fix`
+
+**What:** code `6ebec70e`. User decision 2026-09-10: "apply (a) and (b) and deploy before 09-17".
+- (a) `has_games_for_date` asks `site.web.api.espn.com`, with the same host, override and headers as `scripts/build_wnba_boxscores.py`.
+- (b) For TODAY, a stored date may stand in only when the schedule CONFIRMS games. This applies at BOTH substitution sites: `_resolved_source_cards_date`, and the `_nearest_available_cards_date` branch of `_build_cards_page_context_uncached`.
+- This service runs the WNBA producer that writes each day's `live_state` key.
+- Ride-along: 21 commits since the live build. Those touching runtime paths: `6ebec70e` wnba: the schedule guard fires on Render -- has_games_for_date asks site.web.api; today is substitute; `7909d24a` bandwidth captures: all 23 re-derived on the bucket's own hour; close tripwire-bucket-window; `86c82220` board: football rows also fetch scoreboard chips for the kickoff's ESPN date; `3e33f083` ncaaf live re-sim: FBS-vs-FCS games on a MARKET-IMPLIED rating for the FCS side (FAMU @ MIA tonight); `dce7c172` session_worktree prune: hold a stale admin dir while a checkout folder by its name still exists. No `render.yaml` or `requirements*` change. Live `5bb0158a` is an ancestor.
+
+**Preflight:** CLEAR 21:02:12Z, and again in-process at 21:12:58Z. Only infrastructure processes were running; no MLB sim. Deployed at 21:12:59Z, `dep-dahhqmp594qs73ah62fg`.
+
+**Reading, post-deploy:**
+- Live `6ebec70e`, `finishedAt 21:19:20.762Z`.
+- The new process runs the autorun path: `WNBA_PREGAME_AUTORUN_PREV date=2026-09-10 launched=ok` at 21:26:25Z.
+- 0 Tracebacks since boot.
+
+**verify: OWED 2026-09-11.** The writer-side reading is `/wnba/api/live_state?date=2026-09-11` = 0 games. It is armed as scheduled task `wnba-0911-no-game-chips-reading`. The chip reading is refresh-worker's; see the entry below.
+
+## 2026-09-10 21:44:08-21:50:27Z — refresh-worker `86c82220` -> `c29a7d4e` — lane `wnba-schedule-guard-fix` (carrying lane `accuracy-ledger-budget-raise`'s `c29a7d4e`)
+
+**What:** `c29a7d4e` = `6ebec70e` (this lane's fix) + `3c88a071` (ledger) + `c29a7d4e`.
+- `c29a7d4e` is `#626(h)`: the accuracy autorun reads the evaluation ledger ONCE for all eight sports (`intelligence_evaluation.py`, `_launch_autorun_accuracy_summary`).
+- Deployed at the owning lane's request (session 218b778c), to save a refresh-worker restart. I did NOT take the moving main tip `2914b6c7`: it adds another lane's live-order execution change.
+- No `render.yaml` or `requirements*` change. Live `86c82220` is an ancestor.
+- Coordinated with lane `ncaaf-fcs-market-implied-rating` (session df26ac0c), which asked for no restart 18:45-22:30 CDT for FAMU @ MIA. Its `3e33f083` was already live in `86c82220`. Its 21:26Z CLAIMED preflight was a read-only watcher, not a pending deploy.
+
+**Preflight:** HOLD from 21:02Z, on back-to-back `run_mlb_daily_sim_job.py` runs and odds jobs.
+- The CLEAR windows were short.
+- One in-process check lost the race at 21:30:41Z: HOLD, a new MLB sim had started. It correctly did not fire.
+- Then poll-and-fire in one process: CLEAR 21:45:07Z, fired 21:45:08Z, `dep-dahi9p6q1p3s73dm5ujg`.
+
+**Reading, post-deploy. This is the discriminating one for (a) on Render:**
+- Live `c29a7d4e`, `finishedAt 21:50:27.460Z`.
+- By content: `wnba/sources.py` has 1 ref to `site.web.api.espn.com` and 0 to `https://site.api.espn.com`. `wnba/cards.py` has 3 refs to `_stored_date_substitution_allowed`.
+- **WNBA chips for 2026-09-10 went 4 -> 0**, from the first post-boot chip artifact (`published_at 21:51:21Z`), and stayed 0 through 21:58:24Z.
+- **Layer 2 `per_sport_ingest.wnba` went from `pending` / `scheduled_games 4` to `no_slate` / `0`** on the first post-boot board (`written_at 21:59:19Z`).
+- The chips can only empty if refresh-worker's no-games gate fired, which means `has_games_for_date(today)` returned False from Render. Falsification (1) did NOT fire.
+- 0 Tracebacks since boot.
+
+**NOT cleared today, and this is not a verdict on (b):**
+- Today's `live_state_2026-09-10` key still holds the four 08-30 games. It was last written at `16:45:05 CDT`, before the refresh-worker restart, and has not been rewritten since.
+- It is TODAY's key. On a worker, `_artifact_bundle`'s live-state fallback reads it back as today's rows, so nothing rewrites it clean before the date roll. Web serves it at `/wnba/api/live_state?date=2026-09-10` until midnight CT.
+- The chips no longer read it, because the gate fires first.
+
+**verify: OWED 2026-09-11** (scheduled task `wnba-0911-no-game-chips-reading`, 10:00 CT):
+- `/wnba/api/live_state?date=2026-09-11` = 0 games, which tests the writer and (b);
+- 0 WNBA chips;
+- `per_sport_ingest.wnba.sweep_state = no_slate`.
+The `#626(h)` autorun reading belongs to lane `accuracy-ledger-budget-raise`; its first run is at 07:00 CT or later on 09-11.
