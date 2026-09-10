@@ -754,3 +754,32 @@ def test_ONE_capture_read_per_date_per_resolver(monkeypatch):
     resolve(_sunday_total(home_team="Chicago Bears", away_team="Green Bay Packers"))
     resolve(_sunday_total(home_team="Chicago Bears", away_team="Green Bay Packers"))
     assert calls == ["2026-09-13", "2026-09-10"]
+
+
+# ---------------------------------------------------------------------------
+# 9. ESPN'S DAY RUNS PAST EASTERN MIDNIGHT (2026-09-10)
+# ---------------------------------------------------------------------------
+# New Mexico State @ Hawai'i: OddsAPI says 2026-09-13T04:00Z (00:00 ET, Sunday),
+# ESPN says 03:59Z and files it under 2026-09-12.
+
+
+@pytest.mark.parametrize(
+    "commence_time, expected",
+    [
+        ("2026-09-13T04:00:00Z", ["2026-09-12", "2026-09-13"]),  # OddsAPI's NMSU @ HAW
+        ("2026-09-13T03:59:00Z", ["2026-09-12"]),  # ESPN's own stamp for it
+        ("2026-09-13T09:59:00Z", ["2026-09-12", "2026-09-13"]),  # 05:59 ET still rolls
+        ("2026-09-13T10:00:00Z", ["2026-09-13"]),  # 06:00 ET does not
+        ("2026-09-13T17:00:00Z", ["2026-09-13"]),  # a Sunday 1 PM ET kickoff
+        ("2026-09-13", ["2026-09-13"]),  # a bare date has no hour to roll
+        (None, []),
+        ("not a time", []),
+    ],
+)
+def test_a_SMALL_HOURS_kickoff_is_also_looked_up_under_the_PREVIOUS_day(commence_time, expected):
+    assert bet_status_nfl.kickoff_capture_dates(commence_time) == expected
+
+
+def test_the_order_search_puts_the_rollover_day_FIRST_and_the_plan_date_LAST():
+    order = {"commence_time": "2026-09-13T04:00:00Z"}
+    assert bet_status_nfl.order_capture_dates(order, "2026-09-10") == ["2026-09-12", "2026-09-13", "2026-09-10"]

@@ -265,6 +265,16 @@ def _load_games(selected_date: str) -> list[dict[str, Any]] | None:
 # The college scoreboard agrees: FAMU @ MIA, 2026-09-11T00:00Z, under 20260910.
 _ESPN_SCHEDULE_TZ = "America/New_York"
 
+# BUT ESPN'S DAY RUNS PAST EASTERN MIDNIGHT. Measured 2026-09-10: New Mexico
+# State @ Hawai'i kicks off at 2026-09-13T04:00Z by OddsAPI (00:00 ET, Sunday)
+# and 03:59Z by ESPN, which files it under 20260912 (Saturday). The two feeds
+# put one game on either side of midnight, and 16 NCAAF orders read
+# `game_not_in_ncaaf_live_state` because Sunday's capture could not hold it.
+# A kickoff before this Eastern hour is therefore ALSO looked up under the
+# previous day, first. No game on either board starts between 00:00 and 06:00
+# ET on purpose, so this only ever catches a late West Coast or Hawai'i game.
+_ESPN_DAY_ROLLOVER_HOUR = 6
+
 
 def kickoff_capture_date(commence_time: Any) -> str | None:
     """The ESPN capture date that holds a game kicking off at `commence_time`.
@@ -296,6 +306,32 @@ def kickoff_capture_date(commence_time: Any) -> str | None:
     return moment.astimezone(ZoneInfo(_ESPN_SCHEDULE_TZ)).date().isoformat()
 
 
+def kickoff_capture_dates(commence_time: Any) -> list[str]:
+    """Every ESPN capture date that can hold this kickoff, most likely first.
+
+    Usually one: the Eastern date. A kickoff before `_ESPN_DAY_ROLLOVER_HOUR`
+    Eastern also gets the previous day, and gets it FIRST, because that is the
+    day ESPN files it under. [] when the stamp is absent or unreadable.
+    """
+    from datetime import datetime, timedelta, timezone
+    from zoneinfo import ZoneInfo
+
+    day = kickoff_capture_date(commence_time)
+    if day is None:
+        return []
+    text = str(commence_time or "").strip()
+    if len(text) == 10:
+        # A bare date carries no hour, so there is nothing to roll over.
+        return [day]
+    moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    local = moment.astimezone(ZoneInfo(_ESPN_SCHEDULE_TZ))
+    if local.hour < _ESPN_DAY_ROLLOVER_HOUR:
+        return [(local.date() - timedelta(days=1)).isoformat(), day]
+    return [day]
+
+
 def order_capture_dates(order: Mapping[str, Any], selected_date: str) -> list[str]:
     """Capture dates to search for this order's game, most likely first.
 
@@ -310,7 +346,7 @@ def order_capture_dates(order: Mapping[str, Any], selected_date: str) -> list[st
     `commence_time` was graded that way before, and still must be.
     """
     dates: list[str] = []
-    for capture_date in (kickoff_capture_date(order.get("commence_time")), str(selected_date or "").strip()):
+    for capture_date in (*kickoff_capture_dates(order.get("commence_time")), str(selected_date or "").strip()):
         if capture_date and capture_date not in dates:
             dates.append(capture_date)
     return dates

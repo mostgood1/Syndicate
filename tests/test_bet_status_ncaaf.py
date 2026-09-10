@@ -248,6 +248,11 @@ def test_the_index_is_populated_and_drops_a_measurable_number_of_keys():
 # The registry is stubbed so these run without the mirrored team data.
 
 _KICKOFF_IDS = {
+    "Hawaii Rainbow Warriors": "62",
+    "Hawai'i Rainbow Warriors": "62",
+    "HAW": "62",
+    "New Mexico State Aggies": "166",
+    "NMSU": "166",
     "Georgia Bulldogs": "61",
     "UGA": "61",
     "Clemson Tigers": "228",
@@ -334,3 +339,24 @@ def test_ncaaf_the_plan_date_still_grades_a_same_day_order(monkeypatch):
     module, _ = _kickoff_setup(monkeypatch, {"2026-09-12": [_uga_clem_final()]})
     order = _saturday_total(selected_date="2026-09-12", commence_time=None)
     assert module.ncaaf_status_resolver("2026-09-12")(order)["current_value"] == 41.0
+
+
+def _nmsu_haw(**over):
+    row = {
+        "home_team": "Hawai'i Rainbow Warriors", "away_team": "New Mexico State Aggies",
+        "home_abbr": "HAW", "away_abbr": "NMSU",
+        "home_score": 31, "away_score": 17,
+        "in_progress": False, "final": True,
+    }
+    row.update(over)
+    return row
+
+
+def test_ncaaf_a_game_ESPN_files_BEFORE_eastern_midnight_is_found(monkeypatch):
+    # The measured case: OddsAPI 04:00Z (Sunday ET), ESPN 03:59Z under Saturday.
+    module, calls = _kickoff_setup(monkeypatch, {"2026-09-10": [_famu_mia_pregame()], "2026-09-12": [_nmsu_haw()]})
+    order = _saturday_total(home_team="Hawaii Rainbow Warriors", away_team="New Mexico State Aggies",
+                            line=45.5, commence_time="2026-09-13T04:00:00Z")
+    resolved = module.ncaaf_status_resolver("2026-09-10")(order)
+    assert resolved == {"current_value": 48.0, "is_final": True, "started": True}
+    assert calls == ["2026-09-12"]
