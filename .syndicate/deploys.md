@@ -5,6 +5,52 @@
 
 ---
 
+## 2026-09-10 02:08:07Z / live 02:11:51Z — refresh-worker `a101c437` — **NFL prop model wired into the board. READING OWED, and named below.**
+
+Ships `a4b500fd` (`shared/nfl_prop_projections.py` + the NFL branch of
+`board_enrichment._attach_projections_by_sport`). `dep-dah121tbedkc738kv5m0`,
+trigger `api`, holder lane `nfl-prop-model-coverage`.
+
+**WHY:** production's own `PLAN_WRITTEN` at 2026-09-10T00:11:12Z refused
+`no_model_edge_pct` on **1,872 of 3,029 rows (61.8% of the funnel)** with
+`no_model_edge_by_sport={'nfl': 1503, ...}` — NFL is 80% of the largest term
+between a 3,029-row board and 22 positions. The model for those rows was already
+published, allowlisted and current; nothing on the board path read it.
+
+**Jobs killed, deliberately and with user authorisation:** preflight held at 10
+in-flight jobs (an `run_mlb_daily_sim_job.py` -> `daily_update.py --workflow
+ui-daily` chain running since ~22:30Z, plus an odds-refresh chain). The user was
+asked, chose to proceed, and was told the MLB chain was a sim job rather than
+only a manifest build. The deploy went out on a genuine lull — preflight
+returned `CLEAR: only infrastructure processes running` at 02:06:31Z and again
+against the exact target SHA — so nothing was actually cancelled mid-flight.
+
+**verify:** TWO independent readings, neither yet available at the time of
+writing (refresh-worker takes ~21 min from boot to its first board publish, so
+they are due ~02:33Z):
+
+1. `[layer2_shortlist] PREGAME_PROJECTION_JOIN sport=nfl considered=... projected=...`
+   — the DIRECT coverage number. Pass condition: `projected` > 0, having been 0
+   on every prior build.
+2. The next `[portfolio_commit] PLAN_WRITTEN`'s
+   `no_model_edge_by_sport['nfl']` — pass condition: materially below **1,503**.
+
+**PREDICTED, from a local run of the real entry point against the real published
+artifact and 1,422 real served NFL prop rows:** 1,019 rows stamped (71.7%), 950
+carrying a numeric `edge_vs_market_pct`, of which 224 exceed
+`_MODEL_EDGE_MAX_POINTS=15` and are dropped by `_model_edge_for` — so **~726 NFL
+rows should gain a usable `model_edge_pct`**. Recorded BEFORE the reading so the
+prediction cannot be fitted to the result.
+
+**EXPECT THE PRODUCTION NUMBER TO COME IN BELOW 71.7%.** refresh-worker's own
+copy of the artifact holds **980** sim rows against the **1,140** the local run
+used (`REPAIR_SKIPPED_LOCAL_OK local_rows=980`; `[nfl_props] JOIN ...
+sim_source=artifact sim_rows=980` at 01:42Z). A lower number is the artifact
+being smaller on that disk, NOT the join failing — the two are distinguishable
+by `considered` staying at its usual value while `projected` scales with the
+artifact.
+
+
 ## 2026-09-10 01:13:46Z / 01:33:47Z — live-odds-worker + refresh-worker `26c8cfc6` — **MEASURED: the odds-history shard carries `segment=` keys for the first time, 0 -> 35. The chain is closed on all three services. THE RATIO IS NOT YET MEASURABLE and the 1.18x a naive read gives is unfair by construction.** `[lane odds-history-segment-term]`
 
 Completes the 00:44:05Z web row above. Same commit, `26c8cfc6`, on all three:

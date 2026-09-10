@@ -111,3 +111,69 @@ under a named reason with the offending labels in the payload.
   Until that is read, this is a local result only.
 - `_nfl_card_prop_projection_index`'s docstring should be corrected where it
   stands; this file records the correction but does not edit `nfl/props.py`.
+
+---
+
+## LEAD, for whoever owns the prop model: the residual gap is PLAYER COVERAGE, and it is not rookies
+
+The 375 unmatched rows were split by cause, because "the line moved" and "the
+player is unrated" have completely different fixes:
+
+| cause | rows |
+|---|--:|
+| line moved (model has this player+stat at another line) | **0** |
+| stat unrated (player known, this market not projected) | **0** |
+| **player has no row in the artifact at all** | **375 (100%)** |
+
+**Zero line drift.** So rebuilding the artifact more often would recover nothing,
+and the ceiling is set entirely by how many players the model can rate.
+
+    players quoted on the board : 205
+    players the model rates     : 249
+    quoted but UNRATED          :  56  (27.3% of quoted players, 379 rows)
+
+**AND THEY ARE NOT ROOKIES.** The largest by row count are established starters:
+deshaun watson (16), geno smith (15), tua tagovailoa (15), kyler murray (14),
+travis etienne jr. (14), kirk cousins (14), bijan robinson (13), kenneth walker
+iii (12).
+
+**It is not a name-resolution failure either, which was the obvious first guess
+and is WRONG.** Checked with exact and fuzzy matching (`difflib`, cutoff 0.75)
+against every `entity` in the artifact: **no exact match and NO NEAR MATCH for
+any of the eight.** The artifact covers all 32 teams, so it is not a missing
+team either. These players are simply absent.
+
+The pattern is mostly QBs and RBs, several of whom missed significant 2025 time
+(the season the week-1 `prior_season_fallback` rate is derived from), so the
+likeliest cause is a minimum-games or minimum-attempts threshold in the rate
+resolution rather than anything about names. **NOT VERIFIED — this is a lead,
+not a finding**, and it belongs to whoever owns `player_rate_with_prior`.
+
+Worth roughly **379 rows on top of the 1,019 this lane recovers**, which would
+take NFL prop coverage from ~72% to ~98%.
+
+### Correction to the lead above, before it misled anyone
+
+I was about to argue the cause from `[nfl_props] JOIN season=2026 week=1
+sim_source=artifact odds_rows=2816 sim_rows=980 refused_wrong_team=0
+refused_unknown_team=0` — reading "1,836 rows dropped with both refusal counters
+at zero" as proof of a name→id resolution failure.
+
+**That inference is invalid.** `props.py:603` short-circuits the loop with
+`if artifact_rows is not None: continue` **before** the team check, so on the
+ARTIFACT path both counters are **structurally zero** and can never be anything
+else. A counter that cannot be non-zero on the path being taken is not evidence
+about that path — the same instrument-blindness that produced the caps error,
+the `DEVNULL` log gate and the flag-vs-installer error earlier in this session.
+
+What the numbers actually say is narrower: **the artifact lags the odds board.**
+refresh-worker holds **980** sim rows, web holds **1,140**, and the board now
+quotes **2,816** odds rows. But the 56 absent players were computed against the
+*1,140-row* copy, so capture size alone does not explain them.
+
+**So the cause of the 56 is UNKNOWN and my minimum-games guess is UNVERIFIED.**
+Closing it needs the offline builder's environment (the 97.9 MB pbp that
+`HOT_ARTIFACT_PATTERNS` cannot carry), so it cannot be settled from here. What
+IS established and worth carrying: zero line drift, 375 rows lost to absent
+players, and 56 of 205 quoted players missing from an artifact that covers all
+32 teams.
