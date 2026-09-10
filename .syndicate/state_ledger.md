@@ -1225,32 +1225,90 @@ exit 0 in 7.2s with **122 lines still unaccounted for by the cheap revs** — al
 found in OLDER commits. A line can sit in an older `origin/main` commit and not
 at its tip; only the all-refs sweep sees that.
 
-## [git-store-onedrive] ONEDRIVE MANAGES `.git` AND `.syndicate`, AND IT SILENTLY BREAKS `git worktree remove` `[2026-09-06, lane git-out-of-onedrive, commits cef79cf9 + 28ae6b5c, NO DEPLOY]`
+## [git-store-onedrive] ONEDRIVE MANAGES `.git` AND `.syndicate`, AND IT SILENTLY BREAKS `git worktree remove` `[2026-09-06, lane git-out-of-onedrive, commits cef79cf9 + 28ae6b5c, NO DEPLOY; MECHANISM CORRECTED and 115 husks removed 2026-09-10, lane worktree-close-and-prune]`
 
 The repo is at `C:\Users\<user>\OneDrive\Coding\Syndicate`, so OneDrive's Cloud
 Files filter manages the working tree AND the git store. **The store is 5.9 GB**
-and is being synced to the cloud continuously. Measured attributes:
+and is being synced to the cloud continuously. Measured attributes, 2026-09-10:
 
-    .git                    Directory + ReparsePoint + PINNED
-    .git\worktrees\<entry>  ReadOnly + Directory + Archive + ReparsePoint + PINNED
-                            and the logs/ + refs/ FILES inside each are ReadOnly
-    .syndicate              ReadOnly + Directory + Archive + ReparsePoint + PINNED
+    .git, .git\worktrees    Directory + ReparsePoint + PINNED            (NOT ReadOnly)
+    .git\worktrees\<id>     ReadOnly + Directory + Archive + ReparsePoint + PINNED
+      its info/ logs/ refs/ the same -- every DIRECTORY is ReadOnly
+      the FILES inside      Archive (+ ReparsePoint) + PINNED -- NOT ReadOnly
+    .syndicate, docs        ReadOnly + Directory + Archive + ReparsePoint + PINNED
+    scripts, tests          NOT ReadOnly
 
-**WHAT THIS BREAKS, and it fails half-way rather than loudly.** Windows honours
-`ReadOnly` on FILES, not directories. So `git worktree remove` deletes the
-worktree contents, then cannot delete `.git/worktrees/<name>` — leaving BOTH a
-stale registration and an empty husk directory. **Three occurrences in one
-session**, including on the cleanup's own worktrees.
+**THE BIT IS APPLIED AFTER GIT CREATES THE DIR, NOT BY GIT.** A fresh admin dir
+read `Directory + PINNED`, 0 read-only entries, from +6 s to +70 s; at ~6 min it
+read `ReadOnly + ... + ReparsePoint` on all 4 directories -- the bit arrives with
+OneDrive's placeholder reparse point. 188 of 188 admin dirs carried it. Git
+creates them clean (lab, outside OneDrive).
 
-**AND THE STALE REGISTRATIONS ARE INVISIBLE.** A registration whose `gitdir`
-file is missing is hidden from `git worktree list` while still occupying
-`.git/worktrees/`. Measured 2026-09-06: `list` said **83** while the directory
-held **118**. 36 dead entries had accumulated unseen. Cleaned to 83/83/0.
+**THE MECHANISM, REPRODUCED OUTSIDE OneDrive** (lab repo in a session
+scratchpad): ReadOnly on the admin dir and its subdirs, 0 read-only files,
+reproduces `error: failed to delete '.git/worktrees/wt1': Permission denied` and
+leaves `ORIG_HEAD`, `logs/`, `refs/` -- the repo's husk shape exactly. `os.rmdir`
+on an empty read-only directory: `PermissionError 13`. Git deletes files in
+directory order and STOPS at the first read-only subdirectory, which is why every
+husk holds only what sorts after `info/` or `logs/` (`ORIG_HEAD`, `logs/HEAD`,
+`MERGE_MSG`). **This section's 2026-09-06 reading -- "Windows honours ReadOnly on
+FILES, not directories", "the logs/ + refs/ FILES are ReadOnly" -- was wrong on
+both counts** (`learnings.md` 2026-09-10).
 
-**THE OBVIOUS REMEDY DOES NOT WORK.** `attrib -R /S /D` left the count unchanged
-(118 ReadOnly before, 118 after). What works is PowerShell
-`Remove-Item -Recurse -Force`, because `-Force` overrides `ReadOnly` itself.
-Do not reach for `attrib`.
+**WHAT IT BREAKS, and it fails half-way rather than loudly.**
+- `git worktree remove` deletes the checkout, then fails on the admin dir:
+  **exit 255**, registration half-deleted (`gitdir` gone). Run with git's own cwd
+  INSIDE the checkout it also exits 255 (Windows will not delete a process's
+  cwd), and a retry then exits **128** `is not a working tree` -- both codes are
+  in session transcripts.
+- The husk has no `gitdir`, so **`git worktree list` cannot see it** and every
+  `git worktree prune` fails on it again. 2026-09-06 cleaned 118 -> 83; by
+  2026-09-10 17:40Z it had regrown to **190 admin dirs, 69 listed, 122 husks**.
+- `session_worktree.py close` crashed in the fallback this triggers (below).
+
+**THE REMEDIES, one lab husk each, counted after:**
+
+    attrib -R "<dir>\*" /S /D  +  attrib -R "<dir>"   works
+    attrib -R "<dir>" /S /D    (the 09-06 form)       FAILS: with /S the last path
+                                                      component is a NAME to match,
+                                                      so only <dir> itself is cleared
+    os.chmod(p, S_IWRITE) / SetFileAttributesW        works
+    Remove-Item -Recurse -Force                       works (-Force clears ReadOnly)
+    shutil.rmtree(ignore_errors=True)                 FAILS, silently
+
+**A HUSK IS SAFE TO DELETE ONLY AFTER CHECKING WHAT IT POINTS AT.** Its
+`ORIG_HEAD` / `logs/HEAD` can be the last record of a commit. Over the 122: 1,461
+SHAs, 413 unreachable from any ref -- and **405 of those outside even `rev-list
+--all --reflog`**, so git already does not treat a husk's reflog as a gc root: a
+husk keeps the RECORD of a SHA, not the object (`git fsck --lost-found` still
+finds dangling commits until gc). 388 of the 413 have a rebased twin on
+origin/main (same author time, email and subject -- `land` rebases); **25 have
+none, in 7 husks**. 0 of 77 `.git` pointer files on disk (C:/tmp,
+OneDrive/Coding, %LOCALAPPDATA%, %TEMP%) aimed at any husk.
+
+**REMEDIATED 2026-09-10 17:40Z: `session_worktree.py prune --apply` deleted 115
+of 115 free husks -- 190 -> 75 admin dirs, 122 -> 7 stale, 69 listed before AND
+after.** The 7 HELD are the only pointer to 25 commits:
+`accuracy-summary-ledger-budget` (6), `gate-per-side-derived` (1),
+`live-lens-date-gate` (3), `probability-converter-registry` (1),
+`soccer-anchor-cost` (2), `soccer-card-final-state` (2),
+`web-oom-profiler-steady` (10). `session_worktree.py prune` prints each commit;
+rescue with `git branch rescue/<id> <sha>`, or judge it disposable and
+`Remove-Item -Recurse -Force` the dir.
+
+**PREVENTION, on main (lane `worktree-close-and-prune`):** `close` clears
+READONLY on its own admin dir BEFORE `git worktree remove` and runs every git call
+from the MAIN worktree -- it had been using `REPO_ROOT`, which is the tree being
+closed whenever the worktree's own copy runs, and died `NotADirectoryError
+[WinError 267]` after its fallback delete. Re-running `close` after such a crash
+now deletes a merged leftover branch and keeps an unmerged one. `prune` (a dry
+run unless `--apply`) finishes what `git worktree prune` cannot and HOLDS any
+husk naming a commit nothing else keeps. Husks from OTHER tooling (a bare `git
+worktree remove` in an ad-hoc script) still accrue -- run `prune`.
+
+**NOT TESTED: pausing OneDrive.** It would not clear bits already set, and the
+lab shows the bit alone is sufficient; whether a pause stops NEW bits is
+unmeasured. Moving the store out of OneDrive (below) is what ends the class.
 
 **Relocation tooling exists and has NOT been run:** `scripts/move_git_store.py`
 (dry run by default, refuses on a dirty tree — it correctly returned
