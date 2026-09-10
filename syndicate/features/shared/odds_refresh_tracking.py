@@ -904,6 +904,119 @@ def _odds_history_line_snapshot(row: Mapping[str, Any]) -> dict[str, Any] | None
     return snapshot or None
 
 
+# ---------------------------------------------------------------------------
+# SEGMENT: THE MARKETS SUBTREE THAT NEVER REACHED THE SHARD
+# ---------------------------------------------------------------------------
+#
+# The MLB game-lines snapshot has carried a `markets.segments` block all along
+# -- `{full, first1, first3, first5}`, each holding its own `h2h`/`spreads`/
+# `totals` (`scripts/fetch_mlb_oddsapi_local.py:431`). None of it ever became a
+# history entry, and the reason was NOT that `segment` was missing from the key.
+#
+# MEASURED 2026-09-09 by running the real flattener over a real snapshot
+# (`_odds_history_rows_from_json`, 15-game MLB slate): **45 rows out, 15 each of
+# h2h/spreads/totals, ZERO carrying a segment.** `_market_rows_from_mapping`
+# descends `markets`, meets the key `segments`, sets `market="segments"` from
+# the container name and then STOPS -- the next level down is segment NAMES
+# (`first5`), which is neither a recognised container nor a line snapshot. So
+# the whole subtree was discarded silently, and adding `segment` to the key
+# alone would have shipped INERT.
+#
+# Confirmed against production for the shard side: 4,063 of 4,063 keys in the
+# 2026-09-08 mlb shard carry no `segment` term, and its only game markets are
+# plain `h2h`/`spreads`/`totals` (102 each). Nothing downstream could tell a
+# first-5 price from a nine-inning one because nothing downstream had ever seen
+# one.
+#
+# Two changes, and both are needed for either to do anything: `_segment_rows`
+# below descends the subtree and STAMPS the segment on each row, and
+# `_odds_history_market_key` puts that stamp in the key.
+#
+# **WHAT IT COSTS, MEASURED RATHER THAN WAVED AT, because worker periodic work
+# is never free and this shard is read whole into memory on a 4GB service.**
+# Across the 47 game-line snapshots in the mirror, distinct GAME keys go
+# 1,544 -> 5,599, a **3.63x** growth. Priced against the real 2026-09-08 mlb
+# shard (56.4MB; 306 game keys at 11.6KB each, 3,757 prop keys carrying 93.5%
+# of the bytes): **+803 game keys, +9.5MB, 56.4 -> 65.9MB, +17%.**
+#
+# The mirror on its face says 4.45x / +22%, and that number is STALE: it counts
+# `first7`, which was dropped 2026-07-25 (`#16` -- six markets, ~90 credits a
+# sweep, and the sim never produced a first7 projection). The newest mirror
+# file carrying one is 2026-07-16, so 3.63x is the production figure and 4.45x
+# is what a naive read of `data/` would have reported.
+#
+# Prop keys are untouched: MLB props have no segments block and are 100%
+# full-game in the capture (764,898 rows over 2026-09-01..09-08).
+_SEGMENT_KEY_FIELD = "segment"
+_SEGMENTS_CONTAINER = "segments"
+
+# Every spelling of "the whole game", which must produce NO key term.
+_FULL_GAME_SEGMENTS = frozenset({"", "full", "game", "fullgame", "full_game"})
+
+
+def _odds_history_segment_term(value: Any) -> str:
+    """The segment term for a history key. Empty means full game -- NO term.
+
+    **FULL GAME MUST KEY AS NOTHING, and that is load-bearing rather than
+    stylistic.** Every entry already in every shard was written without a
+    segment term, and these keys are compared verbatim as "|"-joined strings.
+    Spelling full game as `segment=full` would orphan the entire existing store
+    on the first write after deploy -- every movement badge, every CLV close,
+    every `venue_quote_adapters` lookup -- and would do it silently, because an
+    orphaned key looks exactly like a market nobody has quoted yet.
+
+    Omitted, a full-game row keeps the byte-identical key it has today and only
+    a segment row gets a new one. Verified rather than asserted: see
+    `tests/test_odds_history_segment_key.py`, which pins the exact string.
+
+    Absent maps to full game because that is what this function's own caller
+    already did with a missing field -- it appends no part for one -- so the
+    two were already indistinguishable at the writing end. This makes that
+    explicit; it does not widen it.
+    """
+    text = str(value or "").strip().lower()
+    return "" if text in _FULL_GAME_SEGMENTS else text
+
+
+def _segment_rows(
+    segments: Mapping[str, Any], context: Mapping[str, Any]
+) -> list[dict[str, Any]]:
+    """Rows for `markets.segments`, one per (segment, market).
+
+    The level under `segments` is a segment NAME, not a market name, which is
+    exactly what the generic recursion cannot know -- it would have stamped
+    `market="segments"` on all of them and collapsed first-1, first-3 and
+    first-5 into one entry, which is the same defect one level worse.
+
+    `market` is OVERRIDDEN rather than `setdefault`, because the generic path
+    has already put the container name there by the time we are called.
+
+    THE `full` BLOCK IS A DUPLICATE OF THE TOP-LEVEL MARKETS and is emitted
+    anyway rather than skipped: `fetch_mlb_oddsapi_local` mirrors `segments.
+    full` up to `markets.h2h`/`spreads`/`totals`, so the two are the same quote
+    and produce the same key, the same line and the same price. The write
+    loop's `seen_current_snapshots` de-dupes them on exactly that tuple.
+    Skipping it here would be a second place that has to know about the
+    mirroring, and if that mirroring ever stops the full-game lane would go
+    silently empty instead.
+    """
+    rows: list[dict[str, Any]] = []
+    for segment_name, block in (segments or {}).items():
+        if not isinstance(block, Mapping):
+            continue
+        segment = str(segment_name or "").strip().lower()
+        if not segment:
+            continue
+        for market_name, market_value in block.items():
+            if not isinstance(market_value, Mapping):
+                continue
+            market_context = dict(context)
+            market_context[_SEGMENT_KEY_FIELD] = segment
+            market_context["market"] = str(market_name)
+            rows.extend(_market_rows_from_mapping(market_value, context=market_context))
+    return rows
+
+
 def _odds_history_market_key(row: Mapping[str, Any]) -> str | None:
     # Soccer's raw props feed (scripts/fetch_soccer_oddsapi_props_local.py)
     # already writes a fully-formed disambiguated key under "market_key"
@@ -942,6 +1055,10 @@ def _odds_history_market_key(row: Mapping[str, Any]) -> str | None:
         # "team"/"team_key" above never match it.
         "team_tri",
         "market",
+        # `segment` QUALIFIES the market and sits immediately after it. Handled
+        # below rather than here, because a full-game row must emit NO term at
+        # all -- see `_odds_history_segment_term`.
+        _SEGMENT_KEY_FIELD,
         # The generic "market" value on these rows is just the category
         # ("player_prop"), not the specific stat -- "stat" (e.g. "pra"/"pts")
         # is what actually distinguishes one player's several simultaneous
@@ -958,7 +1075,10 @@ def _odds_history_market_key(row: Mapping[str, Any]) -> str | None:
         "book",
         "bookmaker",
     ):
-        value = str(row.get(key) or "").strip()
+        if key == _SEGMENT_KEY_FIELD:
+            value = _odds_history_segment_term(row.get(key))
+        else:
+            value = str(row.get(key) or "").strip()
         if value:
             parts.append(f"{key}={value}")
     if not parts:
@@ -983,6 +1103,9 @@ def _market_rows_from_mapping(payload: Mapping[str, Any], *, context: Mapping[st
         "team_key",
         "team",
         "market",
+        # Carried down the recursion like `market` is, so a row nested below a
+        # segment block keeps its segment instead of reading as full game.
+        _SEGMENT_KEY_FIELD,
         "selection",
         "book",
         "bookmaker",
@@ -1010,6 +1133,13 @@ def _market_rows_from_mapping(payload: Mapping[str, Any], *, context: Mapping[st
         nested = payload.get(key)
         if isinstance(nested, Mapping):
             for nested_key, nested_value in nested.items():
+                # `segments` is a container of SEGMENT NAMES, not a market. The
+                # generic branch below would stamp `market="segments"` and then
+                # stop one level short of the prices -- which is what it did,
+                # for the whole life of this function.
+                if str(nested_key) == _SEGMENTS_CONTAINER and isinstance(nested_value, Mapping):
+                    rows.extend(_segment_rows(nested_value, merged_context))
+                    continue
                 nested_context = dict(merged_context)
                 if nested_key and not nested_context.get("market"):
                     nested_context["market"] = str(nested_key)

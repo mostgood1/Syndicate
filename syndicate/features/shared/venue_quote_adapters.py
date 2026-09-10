@@ -1309,6 +1309,16 @@ def oddsapi_outcome(sport: str, selected_date: str) -> SourceOutcome:
     no_side = 0
     no_price = 0
     no_line = 0
+    # Odds-history keys started carrying a `segment=` term on 2026-09-09
+    # (`odds_refresh_tracking._odds_history_segment_term`). `quote_key` below
+    # has NO segment slot -- see its `#603` docstring, which records that 2 of
+    # 14 game-line keys already spanned more than one segment across 74 real
+    # orders -- so a first-5 price entering here would be keyed as a full-game
+    # one. Refused by name rather than left to be caught by the `side` check
+    # that happens to cover it today (MLB shard keys carry no side, so every
+    # MLB entry is already dropped): that is a coincidence, not a guard, and it
+    # would stop covering the moment a sport writes both a side and a segment.
+    segment_keyed = 0
     for market_key, entry in markets.items():
         if not isinstance(entry, Mapping):
             continue
@@ -1342,6 +1352,13 @@ def oddsapi_outcome(sport: str, selected_date: str) -> SourceOutcome:
         # module is built on would have been silently inert.
         market = parsed_key.get("market")
         side = parsed_key.get("side")
+        from syndicate.features.shared.odds_refresh_tracking import (
+            _odds_history_segment_term,
+        )
+
+        if _odds_history_segment_term(parsed_key.get("segment")):
+            segment_keyed += 1
+            continue
         # NO SIDE, NO QUOTE. MLB keys carry `market=h2h|bookmaker=fanduel` with
         # no side at all -- one entry per event+market+book -- so there is
         # nothing that says which team `last_odds` belongs to. Emitting it
@@ -1398,6 +1415,8 @@ def oddsapi_outcome(sport: str, selected_date: str) -> SourceOutcome:
     dropped = []
     if no_side:
         dropped.append(f"no_side_in_key:{no_side}")
+    if segment_keyed:
+        dropped.append(f"segment_keyed_entry:{segment_keyed}")
     if no_price:
         dropped.append(f"no_last_odds:{no_price}")
     if no_line:
