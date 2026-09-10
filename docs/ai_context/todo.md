@@ -2389,6 +2389,46 @@ request allocated" and not "which arena leaked".
 > minutes post-boot, which distinguishes a real leak from cache the kernel would
 > have reclaimed.
 
+
+> **ANON vs INACTIVE_FILE SPLIT, TAKEN 2026-09-09 22:1x CT — THIS IS NOT `#566`'s
+> PAGE-CACHE CONFOUND. ANON IS THE DOMINANT AND VOLATILE TERM.**
+> `[lane web-oom-census, session 2edf8b82 — measurement only]`
+>
+> Web emits `CONTAINER_MEMORY` with the exact fields this needs (it does NOT emit
+> `ALL_PROCESS_MEMORY` — that is worker-only, and looking for it there is why this
+> split had not been taken). 60 samples, 2026-09-10 02:58-03:17Z:
+>
+>     memory_anon_mb          546 -> 1168     delta  +621 MB
+>     memory_inactive_file_mb 242 ->  635     delta  +393 MB
+>     memory_current_mb      1753 -> 1961     limit  2048 MB
+>     memory_headroom_mb       87 (minimum)
+>
+> **`#566` concluded "no memory issue" because the alarming number was clean page
+> cache. That does not transfer here.** Anon alone swings 621 MB and PEAKS AT
+> 1,168 MB of a 2,048 MB limit — anon is not reclaimable, and it is what the OOM
+> killer acts on. Reclaimable cache is a secondary term, not the story.
+>
+> **The service runs continuously against its ceiling**, sawtoothing in 200-400 MB
+> swings: 1961 -> 1757 -> 1786 -> 1925 -> 1892 -> 1954 -> 1753 -> 1939. At 87 MB of
+> headroom any ordinary spike is a kill, which is why the kills cluster rather than
+> recur on a period.
+>
+> **ATTRIBUTED TO A NAMED STAGE.** Every sample is tagged
+> `build_live_state_payload_*` / `build_live_player_lens_payload`, and
+> `PROCESS_TREE_MEMORY` on the same tick reads `self_rss_mb 547`. Those live in
+> `syndicate/blueprints/home.py` (`_nba_live_state_games:760`,
+> `_wnba_live_state_games:802`, `_load_home_live_prop_items:5953`).
+>
+> **WHAT IS NOT ESTABLISHED, AND MUST NOT BE ASSUMED:** whether those stages run on
+> the REQUEST PATH or inside web's own background live-refresh loop. They are
+> helpers several levels below any decorated route, and no
+> `warn_if_compute_in_request_path` line appears on web — **but that absence is
+> evidence about the EMITTER, not about the path**, so it settles nothing. If they
+> ARE on the request path this is a straight violation of `CLAUDE.md`'s
+> load-bearing web/worker rule; if they are in the background loop it is still web
+> doing heavy computation. **The two have different fixes, so the next step is
+> establishing which — not optimising either.**
+
 ### `#631` — **SOCCER BOARD STALENESS: a soccer-only date never becomes eligible to build, so its rows age forever** — lane `game-market-entry-roi-curve` (handed over on closing `soccer-overview-cost`), 2026-09-01 — **OPEN**
 
 Inherited on closing lane `soccer-overview-cost`, whose GOAL (find and remove
