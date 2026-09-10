@@ -158,3 +158,41 @@ filling in. **The number held** (6-11 min), for a reason the prediction did not 
 
 **What would settle labelling beyond the same-instant read:** a small known transfer at a
 known minute. It puts bytes on the bill, and section 1 makes it unnecessary.
+
+## 8. ACTED ON, the same day — addendum `[2026-09-10 ~20:2xZ, lane tripwire-bucket-window, CLOSED]`
+
+The user directed every item in §7. All of them are done:
+
+- **Tripwire window** → `label..label+1h`, in `a5ef5d84`. It also flags an access-log emitter
+  that dies or comes back INSIDE an hour (`instrument_partial`), and adds `--rederive`. The
+  primary tree's untracked copy, which the scheduled task runs, was updated and hash-checked,
+  and a `--check` ran from there.
+- **All 23 committed captures re-derived** on their own hour. Each keeps its old numbers under
+  `rederived.prior`, and the five null `metered_mb` values are filled. Both of the lane's
+  falsification tests passed:
+  `09-04 18:00Z` edge 2.63 MB / 131 reqs → **178.16 MB / 1,366**, and `09-08 20:00Z` edge
+  253.26 → **29.19 MB** (the run's edge flow collapses in the same hour as the meter). Flags now
+  carried: `09-08 23:00Z` PARTIAL (the emitter died at 23:45:58Z inside it); `09-09 00:00Z`,
+  `01:00Z`, `09:00Z` and `13:00Z` BLIND.
+- **Arm 2 gate denominator** → the bucket's own hour so far, in `d536173e`; the watcher was
+  restarted at 17:06:22Z.
+- **Reader** `ba6383b9`; **probe label and arm 1 re-read** `e080f97c`. Arm 1's P3 coefficient
+  is 1.655-1.719x, not 1.516-1.575x; its P1 is unchanged.
+- **The tripwire task's trap text** was rewritten.
+
+**`score_arm_a_gate.py` on the corrected captures: the SAME five fires** — 09-08 00, 16, 17,
+18, 19Z at m/app 5.10 / 7.78 / 8.62 / 8.30 / 9.41. Ordinary hours now run up to **3.92**
+(`09-09 23:00Z`, was 2.32), so the margin under the 5.0 bar is narrower. The script exits 1
+on two rows of its EXPECTED table. Both are artefacts of the table, not of the gate, and the
+table is left unedited:
+`09-09 00:00Z` is now UNDECIDABLE, because its real hour sits inside the access-log outage;
+and `09-04 18:00Z` is scored for the first time (m/app 2.79, "not a spike").
+
+**The result that matters most here: the investigation's headline hour is not anomalous on
+the app ratio.** `09-04 18:00Z` metered 4,050.1 MB and, correctly paired, served **1,452.38 MB**
+in its own hour through the app log (178.16 MB of it at the edge). m/app 2.79 sits inside the
+ordinary range (up to 3.92). "4,050 MB against 2.6 MB of public traffic" was the pairing error,
+start to finish. **The 2026-09-08 run is now the only anomalous set in the captures.**
+**What would falsify that:** none of the other nine 09-01..04 spike buckets is captured.
+Capturing them (Render's logs still reach 09-01) would show whether `09-04 18:00Z` is typical
+of that week or the exception.

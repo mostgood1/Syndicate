@@ -1,78 +1,99 @@
 {
   "app": {
     "access_lines": 0,
-    "log_lines": 3151,
+    "blind_reason": "0 gunicorn access lines while the edge log carried 62 requests -- the access-log EMITTER is off, so served_mb is UNKNOWN, not zero. Do not compute metered/app-served from this bucket. See .syndicate/findings_2026-09-09_web_access_log_dead.md",
+    "instrument_blind": true,
+    "instrument_partial": false,
+    "log_lines": 3644,
     "note": "served_bytes is RESPONSE size only; a POST body (e.g. artifacts/publish) is NOT counted here",
-    "served_bytes": 0,
-    "served_mb": 0.0,
+    "served_bytes": null,
+    "served_mb": null,
     "top_clients": [],
     "top_paths": []
   },
   "bucket": "2026-09-09T09:00:00Z",
-  "captured_at": "2026-09-10T00:29:46Z",
+  "captured_at": "2026-09-10T18:45:15Z",
   "deploys_in_window": [],
   "edge": {
-    "bytes": 22506,
+    "bytes": 20627,
     "mb": 0.02,
-    "requests": 66,
+    "requests": 62,
     "top_clients": [
       {
-        "bytes": 11613,
-        "count": 34,
+        "bytes": 11265,
+        "count": 33,
         "key": "74.220.48.175"
       },
       {
-        "bytes": 10893,
-        "count": 32,
+        "bytes": 9362,
+        "count": 29,
         "key": "74.220.48.159"
       }
     ],
     "top_paths": [
       {
-        "bytes": 20862,
-        "count": 60,
+        "bytes": 18435,
+        "count": 54,
         "key": "/wnba/api/live_player_boxscore"
       },
       {
-        "bytes": 1644,
-        "count": 6,
+        "bytes": 2192,
+        "count": 8,
         "key": "/wnba/api/final_player_boxscore"
       }
     ],
     "top_user_agents": [
       {
-        "bytes": 20862,
-        "count": 60,
+        "bytes": 18435,
+        "count": 54,
         "key": "Python-urllib/3.11"
       },
       {
-        "bytes": 1644,
-        "count": 6,
+        "bytes": 2192,
+        "count": 8,
         "key": "Mozilla/5.0"
       }
     ]
   },
   "metered_mb": 0.41175175,
-  "note": "bucket is RIGHT-labelled: it covers window_covered, i.e. the hour BEFORE its label. edge_* is public traffic only; app_* includes internal service-to-service.",
+  "note": "bucket is labelled by its hour's START: window_covered is label..label+1h (changed 2026-09-10; captures before then read the hour BEFORE the label -- see `rederived.prior` where present). edge_* is public traffic only; app_* includes internal service-to-service.",
   "other_services_same_hour": {
     "live-odds-worker": 15.4,
     "refresh-worker": 11.2
   },
   "publish_into_web": {
     "live-odds-worker": {
-      "bytes": 97596294,
-      "mb": 93.08,
-      "publishes": 415
+      "bytes": 149679646,
+      "mb": 142.75,
+      "publishes": 533
     },
     "refresh-worker": {
-      "bytes": 116214268,
-      "mb": 110.83,
-      "publishes": 303
+      "bytes": 124640368,
+      "mb": 118.87,
+      "publishes": 311
     }
+  },
+  "rederived": {
+    "at": "2026-09-10T18:52:28Z",
+    "prior": {
+      "app_access_lines": 0,
+      "app_instrument_blind": null,
+      "app_served_mb": 0.0,
+      "captured_at": "2026-09-10T00:29:46Z",
+      "edge_mb": 0.02,
+      "edge_requests": 66,
+      "metered_mb": 0.41175175,
+      "publish_into_web_mb": 203.91,
+      "window_covered": {
+        "end": "2026-09-09T09:00:00Z",
+        "start": "2026-09-09T08:00:00Z"
+      }
+    },
+    "reason": "window corrected to label..label+1h -- a BANDWIDTH bucket is labelled by its hour's START. See .syndicate/findings_2026-09-10_spike_crossing_and_labelling.md"
   },
   "service": "web",
   "window_covered": {
-    "end": "2026-09-09T09:00:00Z",
-    "start": "2026-09-09T08:00:00Z"
+    "end": "2026-09-09T10:00:00Z",
+    "start": "2026-09-09T09:00:00Z"
   }
 }

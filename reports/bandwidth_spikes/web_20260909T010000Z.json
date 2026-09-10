@@ -1,9 +1,10 @@
 {
   "app": {
     "access_lines": 0,
-    "blind_reason": "0 gunicorn access lines while the edge log carried 2531 requests -- the access-log EMITTER is off, so served_mb is UNKNOWN, not zero. Do not compute metered/app-served from this bucket. See .syndicate/findings_2026-09-09_web_access_log_dead.md",
+    "blind_reason": "0 gunicorn access lines while the edge log carried 365 requests -- the access-log EMITTER is off, so served_mb is UNKNOWN, not zero. Do not compute metered/app-served from this bucket. See .syndicate/findings_2026-09-09_web_access_log_dead.md",
     "instrument_blind": true,
-    "log_lines": 4111,
+    "instrument_partial": false,
+    "log_lines": 4437,
     "note": "served_bytes is RESPONSE size only; a POST body (e.g. artifacts/publish) is NOT counted here",
     "served_bytes": null,
     "served_mb": null,
@@ -11,145 +12,145 @@
     "top_paths": []
   },
   "bucket": "2026-09-09T01:00:00Z",
-  "captured_at": "2026-09-09T02:04:57Z",
+  "captured_at": "2026-09-10T18:36:32Z",
   "deploys_in_window": [],
   "edge": {
-    "bytes": 253253265,
-    "mb": 241.52,
-    "requests": 2531,
+    "bytes": 272814161,
+    "mb": 260.18,
+    "requests": 365,
     "top_clients": [
       {
-        "bytes": 238472317,
-        "count": 2473,
+        "bytes": 272354860,
+        "count": 317,
         "key": "73.75.177.190"
       },
       {
-        "bytes": 14612633,
-        "count": 10,
-        "key": "174.253.98.187"
+        "bytes": 351702,
+        "count": 6,
+        "key": "157.55.39.201"
       },
       {
-        "bytes": 95366,
+        "bytes": 55934,
         "count": 2,
-        "key": "52.167.144.172"
+        "key": "52.167.144.197"
       },
       {
-        "bytes": 57789,
+        "bytes": 37742,
         "count": 1,
-        "key": "40.77.167.15"
+        "key": "40.77.167.43"
       },
       {
-        "bytes": 8882,
-        "count": 26,
+        "bytes": 8529,
+        "count": 25,
         "key": "74.220.48.175"
       },
       {
-        "bytes": 4676,
-        "count": 13,
-        "key": "74.220.48.178"
+        "bytes": 3621,
+        "count": 11,
+        "key": "74.220.48.159"
       },
       {
-        "bytes": 1573,
-        "count": 5,
-        "key": "74.220.48.159"
+        "bytes": 1715,
+        "count": 1,
+        "key": "52.167.144.166"
       },
       {
         "bytes": 29,
         "count": 1,
-        "key": "52.241.146.217"
+        "key": "65.55.210.59"
+      },
+      {
+        "bytes": 29,
+        "count": 1,
+        "key": "9.129.53.210"
       }
     ],
     "top_paths": [
       {
-        "bytes": 144498486,
-        "count": 2372,
-        "key": "/static/shared/syndicate-logo.png"
-      },
-      {
-        "bytes": 86303129,
-        "count": 24,
+        "bytes": 229022455,
+        "count": 80,
         "key": "/api/intelligence/query"
       },
       {
-        "bytes": 14045152,
-        "count": 22,
-        "key": "/api/board/layer2-shortlist"
-      },
-      {
-        "bytes": 4108094,
-        "count": 12,
-        "key": "/api/ops/artifacts/export"
-      },
-      {
-        "bytes": 3718107,
-        "count": 2,
+        "bytes": 30723569,
+        "count": 11,
         "key": "/"
       },
       {
-        "bytes": 347708,
-        "count": 26,
+        "bytes": 7500452,
+        "count": 15,
+        "key": "/api/board/layer2-shortlist"
+      },
+      {
+        "bytes": 3925160,
+        "count": 9,
+        "key": "/api/ops/artifacts/export"
+      },
+      {
+        "bytes": 1016356,
+        "count": 76,
         "key": "/api/board/game-chips"
       },
       {
-        "bytes": 57789,
+        "bytes": 295901,
         "count": 1,
-        "key": "/mlb/api/game/823415/card-detail"
+        "key": "/mlb/api/cards"
       },
       {
-        "bytes": 50077,
+        "bytes": 80005,
         "count": 1,
-        "key": "/mlb/api/game/823742/card-detail"
+        "key": "/nfl/api/props"
       },
       {
-        "bytes": 45289,
+        "bytes": 37742,
         "count": 1,
-        "key": "/mlb/api/game/824062/card-detail"
+        "key": "/static/mlb/cards_source.js"
       },
       {
-        "bytes": 14325,
+        "bytes": 36148,
         "count": 1,
-        "key": "/static/shared/board_cards.css"
+        "key": "/nfl/api/cards"
       },
       {
-        "bytes": 14035,
-        "count": 40,
-        "key": "/wnba/api/live_player_boxscore"
+        "bytes": 31898,
+        "count": 1,
+        "key": "/mlb"
       },
       {
-        "bytes": 12543,
+        "bytes": 30484,
         "count": 1,
-        "key": "/static/shared/dense_cards.css"
+        "key": "/mlb/api/game/823414/card-detail"
+      },
+      {
+        "bytes": 25450,
+        "count": 1,
+        "key": "/mlb/api/game/824792/card-detail"
       }
     ],
     "top_user_agents": [
       {
-        "bytes": 144440864,
-        "count": 2384,
-        "key": "syndicate-controlled-transfer/1.0"
-      },
-      {
-        "bytes": 53645698,
-        "count": 40,
-        "key": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-      },
-      {
-        "bytes": 36837846,
-        "count": 22,
+        "bytes": 208540430,
+        "count": 212,
         "key": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, l"
       },
       {
-        "bytes": 18174577,
-        "count": 77,
+        "bytes": 52251710,
+        "count": 70,
+        "key": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+      },
+      {
+        "bytes": 11574322,
+        "count": 69,
         "key": "Python-urllib/3.11"
       },
       {
-        "bytes": 153155,
-        "count": 3,
+        "bytes": 447122,
+        "count": 11,
         "key": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatibl"
       },
       {
-        "bytes": 1096,
-        "count": 4,
+        "bytes": 548,
+        "count": 2,
         "key": "Mozilla/5.0"
       },
       {
@@ -159,27 +160,45 @@
       }
     ]
   },
-  "metered_mb": null,
-  "note": "bucket is RIGHT-labelled: it covers window_covered, i.e. the hour BEFORE its label. edge_* is public traffic only; app_* includes internal service-to-service.",
+  "metered_mb": 401.11304,
+  "note": "bucket is labelled by its hour's START: window_covered is label..label+1h (changed 2026-09-10; captures before then read the hour BEFORE the label -- see `rederived.prior` where present). edge_* is public traffic only; app_* includes internal service-to-service.",
   "other_services_same_hour": {
     "live-odds-worker": 18.1,
     "refresh-worker": 5.4
   },
   "publish_into_web": {
     "live-odds-worker": {
-      "bytes": 277727107,
-      "mb": 264.86,
-      "publishes": 566
+      "bytes": 216162595,
+      "mb": 206.15,
+      "publishes": 549
     },
     "refresh-worker": {
-      "bytes": 253667113,
-      "mb": 241.92,
-      "publishes": 292
+      "bytes": 243003228,
+      "mb": 231.75,
+      "publishes": 341
     }
+  },
+  "rederived": {
+    "at": "2026-09-10T18:45:15Z",
+    "prior": {
+      "app_access_lines": 0,
+      "app_instrument_blind": true,
+      "app_served_mb": null,
+      "captured_at": "2026-09-09T02:04:57Z",
+      "edge_mb": 241.52,
+      "edge_requests": 2531,
+      "metered_mb": null,
+      "publish_into_web_mb": 506.78,
+      "window_covered": {
+        "end": "2026-09-09T01:00:00Z",
+        "start": "2026-09-09T00:00:00Z"
+      }
+    },
+    "reason": "window corrected to label..label+1h -- a BANDWIDTH bucket is labelled by its hour's START. See .syndicate/findings_2026-09-10_spike_crossing_and_labelling.md"
   },
   "service": "web",
   "window_covered": {
-    "end": "2026-09-09T01:00:00Z",
-    "start": "2026-09-09T00:00:00Z"
+    "end": "2026-09-09T02:00:00Z",
+    "start": "2026-09-09T01:00:00Z"
   }
 }
