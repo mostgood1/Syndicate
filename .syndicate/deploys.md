@@ -5,6 +5,79 @@
 
 ---
 
+## 2026-09-10 01:32-01:34Z — web `26c8cfc6` — **THE OWED READING, DISCHARGED: NFL's own copy of the live-state stamp EXECUTES in production — 1/1 started, ESPN status, score and clock all present, and the clock ADVANCES between two reads.** `[lane nfl-live-state-verify, measured by scheduled task `verify-nfl-week1-live-state`]`
+
+No deploy. This is the measurement owed since 2026-09-08, when `_stamp_started_status`
+landed in `09f6ab86` and **could not be tested that day** — 2026 week 1 had not kicked
+off, `started` read 0/16 on every attempt, and the branch never executed. NCAAF
+exercising the identical code path (`started 51/51`) was evidence about the MECHANISM
+and never evidence about NFL's copy. Week 1 opened 2026-09-09 19:20 CDT
+(`2026-09-10T00:20Z`); these reads are ~72 and ~74 minutes in.
+
+**Deployed code, verified not assumed.** Web's live SHA is `26c8cfc6e308`
+(`/v1/services/srv-d88ahvrbc2fs73eodu30/deploys`, `status live`, `trigger api`,
+`finishedAt 2026-09-10T00:44:05Z` — 48 minutes before the first read). `09f6ab86` is an
+ancestor of it, AND `git grep _stamp_started_status 26c8cfc6e308 --
+syndicate/features/nfl/live_game_state.py` returns the definition at `:364` plus both
+call sites at `:355`/`:359`. Ancestry alone would not have settled it; the content grep
+does.
+
+**verify (1) — `/nfl/api/cards`, read 2026-09-10T01:32:20Z:**
+
+| check | reading |
+|---|--:|
+| games on the board | 16 |
+| `started` (`shared_game_state.live` OR `.final`) | **1 / 16** |
+| of started: `game.status` is an ESPN string, NOT the literal `"Week 1"` | **1 / 1** |
+| of started: both `away.score` and `home.score` present | **1 / 1** |
+| of started: `shared_game_state.clock` non-empty | **1 / 1** |
+
+The one started game, `2026_01_NE_SEA`: `status "0:50 - 2nd"` (ESPN `shortDetail` form,
+not a week label), `live true`, `final false`, `clock "0:50"`, `period 2.0`,
+`away.score 7`, `home.score 0`. The other 15 cards read `status "Week 1"`, `clock ""`,
+`period null`, no scores — which is the **designed** pregame behaviour, not a miss: the
+stamp overwrites `game["status"]` for started games only.
+
+**verify (2) — `/nfl/live-lens?season=2026&week=1`, read 2026-09-10T01:32:26Z:**
+header now reads **Games 16 / Live 1 / Final 0 / Pregame 15**, the four counts the fix
+introduced, and the prose line above it agrees independently: *"Games surfaced: 16 /
+Games with a live-state match: 1 / Slate state: 1 live, 0 final, 15 pregame."* The old
+tiles (`Live matches 1 / Season 2026 / Phase Regular season / Week 1`) are still rendered
+*after* the new four — the fix added a row rather than replacing one, which is worth
+knowing before someone reads the old tiles as a regression. **The literal string
+`"Week 1"` appears ZERO times in the entire 42,928-byte page**, so no row's eyebrow is
+the old constant: the live row's eyebrow is `Q2 · 0:50` with detail `Q2 0:50 | NE 7-0
+SEA`, and each pregame row carries its kickoff (`Thu Sep 10, 7:35 PM CDT`, `Sun Sep 13,
+12:00 PM CDT`, …).
+
+**verify (3) — THE ONE THAT RULES OUT A FROZEN ARTIFACT.** A single non-zero reading
+cannot distinguish a live ESPN merge from a stale snapshot that happens to contain a
+score. Second `/nfl/api/cards` read at **01:34:08Z**, ~108 seconds later:
+
+| read | `status` | `clock` | period | score |
+|---|---|--:|--:|--:|
+| 01:32:20Z | `0:50 - 2nd` | `0:50` | 2 | NE 7 - SEA 0 |
+| 01:34:08Z | `0:39 - 2nd` | `0:39` | 2 | NE 7 - SEA 0 |
+
+The game clock **moved 0:50 → 0:39** between reads. That is a live read, per request,
+off ESPN — not an artifact written once.
+
+**On the n=1 denominator — this is NOT the void case the task guarded against.**
+`started` is 1, not 0, so the branch demonstrably ran. And 1/16 is not a thin sample of
+a larger startable population: exactly one week-1 game had kicked off at read time
+(`2026-09-10T00:20Z`); the remaining 15 start `2026-09-11T00:35Z` through
+`2026-09-15T00:15Z`, i.e. one to five days out. **1 is the complete population of games
+that could possibly have been non-null in this window**, so 1/1 on each of the three
+sub-checks is full coverage of what exists, not a lucky draw. What this reading does not
+cover is the `final` half of `started` — 0 games were final at 01:34Z, so the
+final-branch stamp remains untested on NFL. Sunday's slate settles that for free.
+
+Window looked at: 2026-09-10T01:32:20Z - 01:34:08Z (2026-09-09 20:32-20:34 CDT).
+
+Ledger: `.syndicate/state_football.md [nfl-ncaaf-ui-parity]`, `docs/ai_context/todo.md #646`.
+
+---
+
 ## 2026-09-10 00:44:05Z — web `26c8cfc6` — **MEASURED: 19 contaminated CLV rows are gone and the headline moved 0.9497 -> 1.1479. Production reproduces the local prediction to four decimals.** `[lane odds-history-segment-term]`
 
 Three commits, one chain, all already on `origin/main`: `1f988642` (exchange-prop
