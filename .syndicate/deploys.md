@@ -5,6 +5,42 @@
 
 ---
 
+## 2026-09-10 13:16 CT — refresh-worker `a9bafa9d` (lane `ncaaf-kickoff-rollover`) — **EVERY NCAAF ORDER NOW FINDS ITS GAME: `game_not_in_ncaaf_live_state` 16 → 0. THE ONE MISS WAS A HAWAI'I KICKOFF THAT OddsAPI AND ESPN PUT ON OPPOSITE SIDES OF EASTERN MIDNIGHT.**
+
+Deploy `dep-daheun5g1s2s73c9ouc0`, triggered 12:56:44 CT after CLEAR at 12:56:29 (a 2-job HOLD at
+12:49 CT: the MLB daily sim and `ui-daily`), live 13:03:01 CT, on top of `ce31cc7a`. Code:
+`bet_status_nfl.py` (`kickoff_capture_dates`, shared by the NCAAF resolver) plus tests. Also carried:
+`scripts/watch_unknown_submit.ps1`, a local Windows script that does not run on the worker. No
+`render.yaml`, no env change.
+
+**Cause (measured before the fix):** running the real `ncaaf_status_resolver` over production's
+`/api/board/layer2-shortlist` + `/api/portfolio/plan` NCAAF rows against live ESPN captures, 67 of 68
+games resolved. The one miss was New Mexico State @ Hawai'i: OddsAPI's commence 2026-09-13T04:00Z
+(00:00 ET, Sunday), ESPN's 03:59Z, filed under 20260912. The lookup searched Sunday, then the plan
+date. **FCS HYPOTHESIS FALSIFIED:** all seven formerly-unresolved teams' games are on ESPN's FBS
+(`groups=80`) board on the lookup's date, so the poller was left unchanged.
+
+**verify:** the 12:36 CT pass on `ce31cc7a` against the first pass on `a9bafa9d`:
+
+| `SETTLED date=2026-09-10` | before, 12:36 CT (418 orders) | **after, 13:16 CT (429 orders)** |
+|---|---|---|
+| `not_decided_yet` | 367 | **391** |
+| `game_not_in_ncaaf_live_state` | 16 | **0** |
+| `order_not_filled` | 10 | **12** |
+| `no_live_feed` | 24 | **25** |
+| `no_soccer_live_state_for_date` | 1 | 1 |
+
+graded=0 already_graded=0 outcomes={}.
+
+`BET_STATUS` after go-live: `[bet_status] BET_STATUS orders=420 resolved=395 decided=0 won=0 lost=0 ahead=0 behind=0 reasons={'no_live_feed': 24, 'no_soccer_live_state_for_date': 1}`. Its order population differs from `SETTLED`'s (203 vs 415 rows across the day), so its counts are not compared against the settlement baseline.
+
+**Coordination:** lane `mlb-stop-publishing-edges` asked for `6c727968` to ship in this deploy. It had
+already started, and `a9bafa9d` is an ancestor of `6c727968`, so their deploy carries this fix and
+neither reverts the other. The claim was released to them after this entry.
+
+**verify: MET**. The first production GRADE is still owed
+(scheduled task `nfl-ncaaf-first-grade-reading`, 11:15 PM CT).
+
 ## 2026-09-10 12:36 CT — refresh-worker `ce31cc7a` (lane `football-settlement-gaps`) — **PREGAME LINES NOW READ NOT-STARTED (327 → 0 refusals) AND EVERY NCAAF TEAM NAME RESOLVES (50 → 0). 16 OF THOSE ORDERS NOW SURFACE THE NEXT GAP: THEIR GAME IS NOT IN THE CAPTURE.**
 
 Deploy `dep-dahecnifngtc7395i730`, triggered 12:18:22 CT, the first CLEAR after a 10-job HOLD at
