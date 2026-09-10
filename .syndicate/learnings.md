@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 952 rules `[generated]`
+## Index — 953 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5202,3 +5202,39 @@ ambiguity my flag read walked into.**
 process-wide registry resolves DIFFERENTLY PER DECISION PATH depending on which
 process installed it, and no flag anywhere reports that. Any claim of the form
 "X is on" is incomplete without naming the process.
+
+## 2026-09-09 FORBIDDEN: trusting a season/week (or any period) resolver that derives from a DIFFERENT artifact family than the one you are about to read. It lags by exactly as long as the two families disagree, and the join then returns nothing -- which is indistinguishable from "the model has no view" `[lane nfl-prop-model-coverage, caught by a reachability run, not by 13 green unit tests]`
+
+**WHAT HAPPENED.** The new NFL prop join asked `latest_season()` which season to
+read. On 2026-09-09 it answered **2025** while the artifact on disk was
+`nfl_prop_projections_2026_wk1.json`. `latest_season` derives from
+`week_summaries()`, which globs the **SmartSim2 projection** family -- a
+different family on a different publish cadence. Early in a season, when week-1
+props exist and last season's projections still dominate that glob, it is a year
+behind. The join stamped ZERO rows and reported success.
+
+**THIRTEEN UNIT TESTS WERE GREEN THROUGH THIS.** They all passed an index in
+directly, so none of them exercised resolution. Only running the real entry
+point against the real published artifact showed it, which is
+`model_engine_standard.md`'s "reachability test before correctness tests"
+earning its keep on the first try.
+
+**AND THE FIRST FIX WAS ALSO WRONG, THE SAME WAY.** The fallback scan probed
+`[resolved, resolved - 1]` -- so from a resolved 2025 it could never reach 2026,
+the very year it needed. A fallback built on the same bad input inherits the bad
+input. What fixed it was a signal that does NOT depend on which artifact family
+is on this disk: **the season the DATE names.**
+
+**HOW TO APPLY.** (1) Resolve a period from something intrinsic to the request
+(the date) or from the family you are actually reading -- never from a sibling
+family's presence on disk. (2) When you must fall back, make the fallback's
+inputs independent of what failed. (3) Report WHICH period answered
+(`artifact_season`/`artifact_week`) and whether a fallback ran
+(`resolution="artifact_scan"`), so an empty join is attributable instead of
+silent. This repo has shipped period self-pinning before -- `#471`, NFL week
+pinning to 1.
+
+**THE GENERAL SHAPE, which is the part worth keeping:** an empty join and an
+honest "nothing to join" are the same observation unless the code says which
+inputs it used. Every join that can address the wrong partition must name the
+partition it addressed.
