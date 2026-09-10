@@ -862,6 +862,13 @@ death, never life — do not invert it.
 - Blocked by: none. Deploys owed: live-odds-worker (code + env), refresh-worker (env only; a deploy kills an in-flight sim, so preflight CLEAR first).
 - 2026-09-10 17:21:24Z (1) DONE: `POST /portfolio/live/unknown/6bc5617ccc3bf1f54d02bb35/resolve` finding=`not_placed` → 303; `unreconciled` 0; the row reads `rejected`, `pre_resolution_status=submitted`. 17:26:03Z live-odds-worker `EXECUTION status=ok` on kalshi AND polymarket — the global block is gone; hypothesis (1) SURVIVES. The same pass: kalshi `positions=8 placed=0 refused={}`, and all 8 logged `LIVE_ORDER status=rejected … OrderBuildError: no_venue_ticker` (NCAAF, 09-12 games) — wall 2, plus 8 fresh write-ahead rows of the kind (3) removes. Note `refused={}`: the EXECUTED line does not count these at all. Polymarket 0 positions, all policy (`below_min_ev` 20, `no_model_edge` 14, `below_min_stake` 1).
 - NOTE: this block was drafted before (1) ran and inserted after it — recorded rather than re-ordered.
+- 2026-09-10 18:17:30Z (3) VERIFIED on production: live-odds-worker `332e596d`, live 18:09:58Z.
+  - The first pass read `refused={'no_venue_ticker': 11} retried=0`, with 11 `REFUSED_NO_VENUE_TICKER` lines, zero `LIVE_ORDER … no_venue_ticker`, and no block.
+  - The plan's one placeable position (an MLB total, `venue_feed`) FILLED: the first live Kalshi fill since 09-04. Recorded in `deploys.md` 2026-09-10 18:03:41Z.
+  - Re-read one pass later, at 18:22:46Z: the same 11 were refused, the fill counted as a duplicate, there were zero `LIVE_ORDER` lines and no block, and the ledger's order count held at 430.
+- (2) HALF DONE. The flag is live on live-odds-worker: `TRIM_SELECT` ncaaf in-window cut 220 → 3,316.
+  - refresh-worker is still owed. Its claim went to `ncaaf-kickoff-rollover`, then straight to `mlb-stop-publishing-edges`.
+  - The flag stays unset there until this lane holds the claim, so it cannot ride another lane's deploy.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

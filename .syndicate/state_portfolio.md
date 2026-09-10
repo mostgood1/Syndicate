@@ -48,6 +48,23 @@ portfolio yet.
 
 ## [portfolio-live-surface] `/portfolio` IS THE LIVE BUYING ENGINE, the venue caps BIND, and the VENUE now settles our bets `[verified 2026-08-27T00:0xZ, lanes portfolio-live-primary / portfolio-venue-caps-editable / venue-balances-on-portfolio / venue-settlement / venue-first-refusal / open-bet-live-status]`
 
+**LIVE PLACEMENT WAS FROZEN ON BOTH VENUES FROM 2026-09-04T18:27Z TO 2026-09-10T17:21Z, AND WHAT CAUSED IT
+IS NOW REFUSED BEFORE IT CAN RECUR** `[verified on production 2026-09-10T18:17:30Z, lane
+exchange-execution-unblock]`.
+
+- **The freeze.** One Polymarket order with no slug was written `submitted` (the write-ahead), refused at
+  build, and logged `rejected`. The stored row stayed `submitted` anyway: a lost update, mechanism unproven.
+  - Any unreconciled live order blocks every venue.
+  - Nothing reconciles an order that never got a venue id.
+  - It was cleared by the operator path, `/portfolio/live/unknown/<key>/resolve` with `not_placed`.
+- **The fix.** Since `332e596d`, a LIVE position with no `venue_ticker` is refused by name before
+  `place_order` (`refused['no_venue_ticker']`, a `REFUSED_NO_VENUE_TICKER` line). No write-ahead row is ever
+  written for an order that cannot be built.
+  - First pass: 11 refused, and 1 placed and filled, the first live Kalshi fill since 09-04.
+- **Kalshi NCAAF/NFL forward-date matching** (`SYNDICATE_KALSHI_FORWARD_DATE_SPORTS=soccer,ncaaf,nfl`) is live
+  on live-odds-worker. On refresh-worker, where the join reads it: OWED. Another lane held the claim at 18:2xZ, and the env is deliberately unset until this lane holds it.
+  - `167b2841`'s "gains zero NCAAF rows" caveat is stale. `04a82c38` gave NCAAF its alias map.
+
 **`/portfolio/live` NO LONGER EXISTS as a page** — it is a 302 to
 `/portfolio#live` carrying the query string; `portfolio_live.html` is deleted.
 `/portfolio` renders the execution ledger's real orders only — the prediction

@@ -31136,3 +31136,64 @@ gunicorn infra only, no jobs. Deploy `dep-dahe0bafngtc739487lg` via
 
 The live credentials pass the new shape check, which is what `problem=none`
 proves: the guard can see a real setup and did not lock it.
+
+## 2026-09-10 18:03:41-18:09:58Z — live-odds-worker `26c8cfc6` -> `332e596d` + env `SYNDICATE_KALSHI_FORWARD_DATE_SPORTS=soccer,ncaaf,nfl` — lane `exchange-execution-unblock`
+
+**What:** code `332e596d`. A LIVE position with no venue contract is now refused by name
+(`refused['no_venue_ticker']`, one `REFUSED_NO_VENUE_TICKER` line each) BEFORE `place_order`,
+so no write-ahead `submitted` row is ever written for an order that can never be built. That
+write-ahead is what a lost update stranded on 2026-09-04T18:27:25Z, freezing both venues until
+the 17:21:24Z operator resolution. Env: `SYNDICATE_KALSHI_FORWARD_DATE_SPORTS` absent ->
+`soccer,ncaaf,nfl`, set by the single-key endpoint (`value_matches=True`, len 16). On this
+service `kalshi_odds_refresh.trim_windows` reads it. Ride-along: 89 commits since the live build, 19 of them touching runtime
+code — this lane's plus 18 from other lanes. 16 of those 18 already run on refresh-worker
+(`ce31cc7a` contains them). Only two are new to every worker: `a9bafa9d`
+(`bet_status_nfl.py`, a small-hours Eastern kickoff is also searched under the previous day,
++37/-1) and `7e8715e8` (`scripts/session_worktree.py`, local tooling no worker runs).
+`requirements*.txt` and `render.yaml` are unchanged across the range. Live
+`26c8cfc6` is an ancestor of the target, so nothing is reverted.
+
+**Baseline, pre-deploy:**
+- `EXECUTED … venue=kalshi` at 17:46:27Z and 17:52:18Z: `positions=10 placed=0 retried=10
+  refused={}`. EVERY pass re-ran all 10 rejected rows through the write-ahead, and the line
+  named none of them.
+- `TRIM_SELECT` 17:56:52Z: `mode=arrival window=2026-09-10..2026-09-25
+  board_dates=['2026-09-10', '2026-09-11'] cut_in_window=911
+  cut_in_window_by_sport={'mlb': 548, 'ncaaf': 220, 'nfl': 143}`.
+
+**Locks:** claim `exchange-execution-unblock` (acquired 17:54:05Z). Preflight at 17:54:47Z
+returned HOLD: 1 to 7 odds-refresh jobs in flight, re-polled every ~60 s. It returned CLEAR
+at 18:03:05Z for `332e596d`, with only infrastructure processes running plus 3 defunct
+children awaiting reap. Deploy `dep-dahf1vajnfac738mnku0` via `render_deploy.py --service
+live-odds-worker --commit 332e596d…`: created 18:03:41Z -> `update_in_progress` by 18:08:12Z
+-> **live 18:09:58Z**, on the SHA requested.
+
+**verify — MEASURED 18:16:13-18:19Z, on the first executor pass after boot (18:17:30Z):**
+- The reading the lane named: `EXECUTED date=2026-09-10 mode=live venue=kalshi … positions=12
+  placed=1 failed=0 duplicates=0 retried=0 skipped=11 refused={'no_venue_ticker': 11}
+  spent={'dollars': 16.3, 'orders': 1}`. The baseline was `retried=10 refused={}`: the 10 rejected
+  rows are no longer re-sent through the write-ahead, and every unbuildable position is counted by
+  name.
+- 11 `REFUSED_NO_VENUE_TICKER venue=kalshi sport=ncaaf … price_source='aggregator' … nothing written`
+  lines, one per refused position. This shows the branch RAN, not merely that it deployed.
+- Exactly ONE `LIVE_ORDER` since boot, and zero `no_venue_ticker` rejects:
+  `status=submitted venue=kalshi ticker=KXMLBTOTAL-26SEP101940PITCWS-9 sport=mlb market=totals side=over
+  line=8.5 stake=16.3`. It is the plan's one `venue_feed` position (`placeable_committed=1/12` at 18:15:07Z).
+- The ledger (`/api/portfolio/live`) has that row as `status=filled`, 37 contracts at $0.44 = $16.28,
+  submitted 18:17:27Z, reconciled 18:17:32Z, `venue_status=executed`, `venue_remaining_count=0`.
+  **The first live Kalshi fill since 2026-09-04.**
+- No `BLOCKED_ON_UNRECONCILED` since boot; `/api/portfolio/live` reads `unreconciled: []`. No
+  `Traceback` since 18:09:30Z.
+- The Polymarket pass at 18:17:36Z read `positions=2 refused={'pregame_price_too_high': 2}`, a policy
+  hold, not this guard.
+- The flag, on this service. `TRIM_SELECT` at 18:16:13Z: `window=2026-09-10..2026-09-25 kept_in_window=5671
+  cut_in_window=6113 cut_in_window_by_sport={'mlb': 551, 'ncaaf': 3316, 'nfl': 2246}`. At 17:56:52Z it was
+  `kept_in_window=2237 cut_in_window=911 {'mlb': 548, 'ncaaf': 220, 'nfl': 143}`.
+  - NCAAF/NFL forward markets now fall INSIDE the trim window, so the flag is read. MLB is unchanged.
+  - The 6,000-market bound now binds on in-window markets: 6,113 of them are cut, mostly NCAAF/NFL. Whether
+    the join loses a market it needs to that cut is for the refresh-worker reading, and is not answered here.
+- Re-read one pass later, at 18:22:46Z, which is where a reverting write would show:
+  `positions=12 placed=0 duplicates=1 retried=0 skipped=11 refused={'no_venue_ticker': 11}`.
+  - The filled order counts as a duplicate, so there was no second placement.
+  - The 11 were refused again, with zero `LIVE_ORDER` lines and no block.
+  - The ledger's order count held at 430 across that pass, so nothing was written for the 11.
