@@ -686,8 +686,9 @@ skipped_budget=22 dates=16` of 38 chunks. The average admitted chunk grew 190.5 
 rests on 16. 09-10 peaks, refresh-worker: in-run anon 2,034.9 MiB (12:33-12:57Z),
 pre-run 2,732.6 MiB (12:00-12:33Z) -- the run window is again NOT the worker's
 peak. **A chunk-count bound (45 days; the byte budget kept as a 45 x 256 MB
-backstop) is on main as `57019962` and is NOT LIVE**: at 19:37Z refresh-worker
-ran `2d53fdf7`, which lacks it BY CONTENT. The first reading, with five
+backstop) is LIVE on refresh-worker `86c82220` since 2026-09-10 20:13:21Z**, carried by
+a peer's deploy and verified BY CONTENT, with both env overrides absent. It is
+UNEXERCISED until the 2026-09-11 autorun. The first reading, with five
 pre-registered predictions and a revert line (in-run anon > 2,600 MiB), is in
 the lane.
 

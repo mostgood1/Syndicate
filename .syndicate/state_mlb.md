@@ -1287,7 +1287,7 @@ at `Live / In Progress`, and both ended 00:05/00:09 CT. **9 games on 7 of 9 date
 - **REFRESH-WORKER** holds the feed payloads (`FEED_LIVE_STATUS` read Final for all
   nine on 09-04), and there the merge DID overwrite that Final. **Fixed on main
   `c2dcd525`**, and live on web since 20:04:10Z, where it is inert by construction.
-  It reaches refresh-worker's board builds only with a refresh-worker deploy.
+  Live on refresh-worker `86c82220` since 20:13:21Z (a peer's deploy, content-verified).
 
 `FEED_LIVE_STATUS` prints only when `not _render_web_dyno()`: it is a
 refresh-worker instrument, and it says nothing about what web serves.

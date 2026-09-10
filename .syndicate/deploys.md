@@ -31443,3 +31443,18 @@ fix THERE (board builds), and it reaches production only with a refresh-worker d
 **KEPT, NOT ROLLED BACK.** The change is correct on both services and inert on web; a rollback
 would only remove the worker-side fix. The web fix is a decision, recorded in lane
 `mlb-lens-final-status`. Claim released after this entry.
+
+## 2026-09-10 20:13:21Z — refresh-worker `2d53fdf7` -> `86c82220` — NOT MY DEPLOY: lane `exchange-execution-unblock`'s, and it carries `57019962` + `c2dcd525` — lanes `accuracy-ledger-budget-raise`, `mlb-lens-final-status`
+
+**No deploy was taken for these two lanes.** I was queued behind this claim to ship the same
+two commits. `86c82220` is a descendant of both, so a second deploy would only have killed
+in-flight work to restart onto identical code. Same precedent as 2026-09-04 15:00Z.
+
+**Reachability, checked -- not assumed:** verified BY CONTENT on the deployed tree -- `DEFAULT_ACCURACY_SUMMARY_LEDGER_MAX_CHUNKS = 45`, the caller line `max_chunks=_accuracy_summary_ledger_max_chunks(),` and the lens guard `if key == "status" and keep_final_status:` all present. env overrides `SYNDICATE_ACCURACY_SUMMARY_LEDGER_MAX_CHUNKS` and `SYNDICATE_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES` ABSENT on refresh-worker (single-key env API -> 404; no value read).
+
+**What is and is NOT measured yet:**
+- chunk-count bound: **UNEXERCISED.** The autorun is once per Central day; the first run on
+  this code is 2026-09-11 >= 07:00 CT. The pre-registered reading and its revert line (in-run
+  anon > 2,600 MiB) are in lane `accuracy-ledger-budget-raise`. OPEN MEASUREMENT.
+- MLB lens guard, worker side: live but narrow in reach -- see lane `mlb-lens-final-status`.
+  The web side was measured at 20:04:41Z and did NOT move (entry above).
