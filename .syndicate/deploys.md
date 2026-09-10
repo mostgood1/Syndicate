@@ -5,6 +5,41 @@
 
 ---
 
+## 2026-09-10 16:16 CT — reading only, no deploy — refresh-worker `86c82220` (lane `mlb-stop-publishing-edges`, the soccer half of the 13:57 CT entry) — **NOT TAKEN: 0 SOCCER FAILURE LINES SINCE THE FIX, BUT NO SOCCER ROW REACHED PRICING. EVERY LIVE ROW WAS REFUSED AT THE TEAM-KEY LOOKUP, APPARENTLY ON "CF Estrela" vs "Estrela".**
+
+Scheduled task `soccer-live-gameline-reading`, measurement only: no code, env or deploy touched. It was set for 3:25 PM CT and actually started at 3:50 PM CT.
+
+**Match.** Braga at CF Estrela, Primeira Liga (ESPN event `401885474`, "Braga at Estrela"), kickoff 2:15 PM CT. It was in play at 75' at 3:50 PM CT and final by 4:14 PM CT, Estrela 2-1 Braga. The board's soccer live-gameline index held exactly this one match (`index_size` 1 on every read).
+
+**Fix is live.** At 3:50 PM CT, refresh-worker was on `86c82220` (`dep-dahgta67bikc73e4i64g`, live 3:13:21 PM CT, deployed by lane `exchange-execution-unblock`), which is on `origin/main`. `git merge-base --is-ancestor 6c727968 86c82220` exits 0. Two refresh-worker deploys followed 1:44:23 PM CT: `2d53fdf7` (live 2:35:29 PM CT) and `86c82220`. Both contain `6c727968`.
+
+**Served board**, `/api/board/book-grid?sport=soccer&date=2026-09-10&limit=2000`, read every 2 min for 12 reads, 3:51-4:14 PM CT. The table lists each distinct `generated_at`; reads 2-4 and 7 re-served a board already listed. Every board was generated after 1:44:23 PM CT.
+
+| read (CT) | generated (CT) | `error` | `reason` | `index_size` | considered | projected | edged | `withheld_by_reason` | rows with a `live_gameline` block |
+|---|---|---|---|---|---|---|---|---|---|
+| 3:51:15 | 3:50:22 | null | null | 1 | 6 | 0 | 0 | `no_live_gameline_projection` 6 | 0 |
+| 3:59:21 | 3:58:10 | null | null | 1 | 4 | 0 | 0 | `no_live_gameline_projection` 4 | 0 |
+| 4:01:22 | 4:00:58 | null | null | 1 | 6 | 0 | 0 | `no_live_gameline_projection` 6 | 0 |
+| 4:05:24 | 4:04:09 | null | null | 1 | 3 | 0 | 0 | `no_live_gameline_projection` 3 | 0 |
+| 4:07:25 | 4:06:01 | null | null | 1 | 3 | 0 | 0 | `no_live_gameline_projection` 3 | 0 |
+| 4:09:28 | 4:07:47 | null | null | 1 | 3 | 0 | 0 | `no_live_gameline_projection` 3 | 0 |
+| 4:12:14 | 4:10:39 | null | null | 1 | 3 | 0 | 0 | `no_live_gameline_projection` 3 | 0 |
+| 4:14:16 | 4:12:24 | null | null | 1 | 3 | 0 | 0 | `no_live_gameline_projection` 3 | 0 |
+
+Rows carrying a live block, counted per (market, segment, `priceable`/`withheld_reason`): **none on any board.** So there are also 0 rows with `model_edge_publishing_disabled_for_sport`, but that follows trivially and is **not evidence** that the switch stays inside MLB. On the 3:52:13 PM CT board, the page showed 3 live rows (it returns 2,000 of 3,091): `h2h` full, `totals` 3.5 full (quote age 134.6s), and `btts` full. All three read `home_team` "CF Estrela" and `away_team` "Braga".
+
+**Logs** (`render_logs.py`, refresh-worker). `BOOK_GRID_LIVE_GAMELINE_FAILURE sport=soccer`: **0 lines**, 1:44:23-4:14:35 PM CT. `BOOK_GRID_LIVE_GAMELINE_FAILURE` for every sport: **0 lines** over the same window. **Positive control:** the same search over 12:30-1:10 PM CT, before the fix, returned 6 lines (mlb, 12:32:55-1:07:12 PM CT). So the search does see the line, which is emitted by `_LOGGER.exception` at `board_enrichment.py:1893`.
+
+**Why NOT TAKEN.** Every considered row stopped at `live_gameline_join.py:1536-1538`: `row_index.get((away, home))` returned None, so the row got `REASON_NO_LIVE_PROJECTION` with `projected=False`. That happens before the staleness gate and before `price_distribution_market` (`:1593`), the call that raised the `TypeError`. **No soccer totals/spreads row reached pricing, so the crash path was never exercised.** `error` null on 8 of 8 boards shows the join ran without raising. It does not show the fix works for soccer: before the fix, a board only errored when a row reached pricing.
+
+**New finding: INFERRED, not measured on the index itself.** The key misses on the home team's NAME. The grid row reads `home_team` "CF Estrela" (OddsAPI). ESPN's scoreboard gives the home side as "Estrela" in `displayName`, `shortDisplayName`, `name` and `location` alike. The soccer index is keyed on the poller's ESPN names (`soccer_live_gameline_source.py:183`). The join is exact, with no alias table: `_norm_team` at `live_gameline_join.py:1253` only lowercases and collapses whitespace. The away name "Braga" and the home/away orientation agree on both sides. I could not read the index key directly: `live/soccer_live_lens.json` is keyvalue-backed, `/api/ops/live-lens/status` returns 401 without auth, and ADMIN_TOKEN was not used. Precedent: `deploys_history.md:20593` recorded `primeira_liga|CF Estrela v Braga` unmatched in the PREGAME projection join too, attributed then to the fixture being absent. **Not fixed here.** Any match involving Estrela cannot deliver this reading. The backup task `soccer-live-gameline-reading-fri` (2026-09-11 2:55 PM CT, Friday European slate) stays ENABLED. It needs a fixture whose grid and ESPN names match exactly; gate 1 measured exact joins on la_liga.
+
+verify: **NOT TAKEN.** 0 soccer `BOOK_GRID_LIVE_GAMELINE_FAILURE` lines from 1:44:23 to 4:14:35 PM CT, and the search is proven able to see them. But 0 of 8 post-fix soccer boards had `projected > 0`: every considered row (3-6 per board) was refused at the team-key lookup, before pricing. This is a null with no live population. Soccer's "unaffected by the MLB switch" and "no crash on totals/spreads" both remain unmeasured on production.
+
+(written by scheduled task soccer-live-gameline-reading)
+
+---
+
 ## 2026-09-10 15:25 CT — refresh-worker `86c82220` (deployed by lane `exchange-execution-unblock`; code from lanes `football-layer2-live-parity` + `ncaaf-fcs-market-implied-rating`) — **FAMU @ MIA NOW CARRIES GAME STATE ON THE 09-11 GRID (13/13 rows), SO A LIVE GAME LINE CAN ATTACH TONIGHT.**
 
 `86c82220` went live 15:13:21 CT. It is origin/main's tip carrying `3e33f083` (session df26ac0c: FBS-vs-FCS
