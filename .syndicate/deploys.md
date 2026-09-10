@@ -29825,3 +29825,20 @@ run, against a 4,096 MB ceiling — 0.94%.
 7. **Nothing reads this artifact yet.** S1 persists; it does not price. That a
    sidecar is well-formed says nothing about whether a half or quarter market
    built on it would be calibrated.
+
+### S1 FOOTBALL SEGMENT CAPTURE -- THE OWED READING, TAKEN AND PASSED. Half distributions exist for the first time.
+- artifact `nfl_source/smartsim2_segment_distributions_2026_wk1.json`, **163,040 B, `generated_at` 2026-09-09T22:35:52Z**, schema_version 1, season 2026 week 1. This is the first production output from `a77ca53e` (S1), whose flag was injected at 12:01:14Z; the generator runs on a 24h staleness gate, which is why the reading waited.
+- **EVERY CHECK THE BRIEF DEMANDED, PASSED:**
+
+      games                     16, each carrying q1,q2,q3,q4,h1,h2,full  (7 of 7)
+      histogram integrity       0 of 112 segment blocks disagree with the sim count
+                                (every total_points_dist and margin_dist sums to 300)
+      bytes/game                10,190  vs  10,865 measured locally -- within 6%
+      skipped_sims              0
+      distribution_version      1        segment_source  quarter_log
+
+- **THE OVERTIME BRANCH IS GENUINELY EXERCISED: `overtime_sims` totals 122 across 4,800 simulations.** This is the check I instructed the scheduled reading to declare UNTESTED if no game reached OT — it did reach it, so S1's h2-includes-overtime binning rests on production evidence rather than a passing unit test. **`h2_regulation_only` is `None` on all 16 games**, i.e. not the `true` that would mean OT was unavailable and the segment mislabelled.
+- **WHY THIS MATTERS BEYOND THE PACKAGE: football HALF and QUARTER distributions now exist in production for the first time.** The sim always computed them; `generate_smartsim2_nfl_projections.py:769-771` kept only `final_score` and dropped the `quarter_log`. That was the first of FOUR instances found today of this platform computing or receiving something and discarding it at a writer seam — the others being MLB's per-inning vectors, Kalshi's six liquidity fields, and both football codes' per-quarter linescores.
+- **THIS DOES NOT UNGATE S4 (football half pricing), and the reason is unchanged and measured.** The input now exists; the model behind it does not yet deserve to price on. NFL's smartsim2 was recalibrated 2026-07-15 against 17,677 real drives and **per-quarter scoring got WORSE or stood still in 3 of 4 quarters** while every game-level metric improved (q1 0.025->0.063, q3 0.115->0.115, q4 0.053->0.075). After that fit the three worst metrics on file are `drive_length_plays` 0.117, `quarter_3_scoring` 0.115 and `quarter_2_scoring` 0.106 — the drive-count term and the quarter split, which is exactly what a half price rests on. **Capture was never the blocker; calibration is.**
+- NCAAF has no sidecar yet (`ncaaf_source/data/smartsim2_segment_distributions_*.json` returns 0) — its generator runs on the same daily gate and has not fired since the flag went live.
+- the scheduled task `s1-football-sidecar-reading` (18:15 CT) is now REDUNDANT for the NFL half; this entry is that reading, taken directly off the artifact.
