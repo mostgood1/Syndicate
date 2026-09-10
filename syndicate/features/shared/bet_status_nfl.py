@@ -259,22 +259,82 @@ def _load_games(selected_date: str) -> list[dict[str, Any]] | None:
     return [game for game in games if isinstance(game, Mapping)]
 
 
+# ESPN FILES A GAME UNDER ITS US-EASTERN DATE. Measured 2026-09-10 on the
+# scoreboard's `?dates=`: NE @ SEA, kicking off 2026-09-10T00:20Z, is listed
+# under 20260909, and SF @ LAR (2026-09-11T00:35Z, in Melbourne) under 20260910.
+# The college scoreboard agrees: FAMU @ MIA, 2026-09-11T00:00Z, under 20260910.
+_ESPN_SCHEDULE_TZ = "America/New_York"
+
+
+def kickoff_capture_date(commence_time: Any) -> str | None:
+    """The ESPN capture date that holds a game kicking off at `commence_time`.
+
+    None when the stamp is absent or unreadable; the caller then falls back to
+    the plan date, which is what it always did, never to a guess. A bare date
+    is taken as already being the game's date: reading it as midnight UTC would
+    move it to the previous Eastern day.
+
+    Public because `bet_status_ncaaf` has the same plan-date lookup and uses it.
+    """
+    from datetime import date, datetime, timezone
+    from zoneinfo import ZoneInfo
+
+    text = str(commence_time or "").strip()
+    if not text:
+        return None
+    if len(text) == 10:
+        try:
+            return date.fromisoformat(text).isoformat()
+        except ValueError:
+            return None
+    try:
+        moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(ZoneInfo(_ESPN_SCHEDULE_TZ)).date().isoformat()
+
+
+def order_capture_dates(order: Mapping[str, Any], selected_date: str) -> list[str]:
+    """Capture dates to search for this order's game, most likely first.
+
+    The KICKOFF date first, the plan date second. An order carries the PLAN's
+    date (`portfolio_commit` stamps `selected_date` on every row), and a plan
+    commits games days ahead. Measured 2026-09-10: the one NFL prop order dated
+    09-10 read `game_not_in_nfl_live_state` against a 09-10 capture holding only
+    SF @ LAR, and 281 NCAAF orders read `game_not_in_ncaaf_live_state` against a
+    09-10 capture holding one FBS game. Searching the plan date alone meant a
+    Saturday or Sunday bet placed on a Thursday could never find its game, and
+    never grade. The plan date stays as the fallback: an order with no readable
+    `commence_time` was graded that way before, and still must be.
+    """
+    dates: list[str] = []
+    for capture_date in (kickoff_capture_date(order.get("commence_time")), str(selected_date or "").strip()):
+        if capture_date and capture_date not in dates:
+            dates.append(capture_date)
+    return dates
+
+
 def nfl_status_resolver(selected_date: str):
     """A resolver `paper_settlement` can inject, for NFL orders.
 
-    The live-state read happens ONCE per resolver, not once per order: a slate
-    of forty NFL orders must not mean forty reads of one artifact that does not
-    change between them.
+    The live-state read happens ONCE per capture date per resolver, not once per
+    order: a slate of forty NFL orders must not mean forty reads of one artifact
+    that does not change between them.
     """
     from syndicate.features.shared.game_line_bet import game_line_view, is_game_line_market
     from syndicate.features.shared.team_aliases import teams_match
 
     cache: dict[str, Any] = {}
 
-    def games() -> list[dict[str, Any]] | None:
-        if "games" not in cache:
-            cache["games"] = _load_games(selected_date)
-        return cache["games"]
+    def games(capture_date: str) -> list[dict[str, Any]] | None:
+        # ONE READ PER CAPTURE DATE PER RESOLVER. A Sunday card committed on a
+        # Thursday plan is thirteen games on one date: one read, not thirteen.
+        slot = f"games:{capture_date}"
+        if slot not in cache:
+            cache[slot] = _load_games(capture_date)
+        return cache[slot]
 
     def box(event_id: str) -> list[dict[str, Any]] | None:
         # ONCE PER GAME PER RESOLVER, like the live-state read above: a slate of
@@ -285,29 +345,38 @@ def nfl_status_resolver(selected_date: str):
             cache[slot] = _fetch_box(event_id)
         return cache[slot]
 
-    def locate(home_team: Any, away_team: Any) -> tuple[Mapping[str, Any] | None, str | None]:
+    def locate(order: Mapping[str, Any]) -> tuple[Mapping[str, Any] | None, str | None]:
         """`(record, None)` or `(None, refusal)`, in the order the refusals
-        have always been made: matchup, then capture, then game."""
+        have always been made: matchup, then capture, then game. The game is
+        searched under its KICKOFF date first; see `order_capture_dates`."""
+        home_team, away_team = order.get("home_team"), order.get("away_team")
         if not home_team or not away_team:
             # `event_id` is the OddsAPI hash and cannot address an ESPN-keyed
             # capture, so there is no fallback here that would be anything but
             # a guess.
             return None, REASON_NO_MATCHUP
-        found = games()
-        if found is None:
+        capture_dates = order_capture_dates(order, selected_date)
+        if not capture_dates:
             return None, REASON_NO_LIVE_STATE
-        for candidate in found:
-            # BOTH FORMS TRIED. The capture stores the display name and the
-            # tri-code; the board may hold either, and `canonical_team` resolves
-            # both, so a miss on one is not a miss on the game.
-            home_hit = teams_match("nfl", home_team, candidate.get("home_team")) or teams_match(
-                "nfl", home_team, candidate.get("home_abbr")
-            )
-            away_hit = teams_match("nfl", away_team, candidate.get("away_team")) or teams_match(
-                "nfl", away_team, candidate.get("away_abbr")
-            )
-            if home_hit and away_hit:
-                return candidate, None
+        for capture_date in capture_dates:
+            for candidate in games(capture_date) or ():
+                # BOTH FORMS TRIED. The capture stores the display name and the
+                # tri-code; the board may hold either, and `canonical_team`
+                # resolves both, so a miss on one is not a miss on the game.
+                home_hit = teams_match("nfl", home_team, candidate.get("home_team")) or teams_match(
+                    "nfl", home_team, candidate.get("home_abbr")
+                )
+                away_hit = teams_match("nfl", away_team, candidate.get("away_team")) or teams_match(
+                    "nfl", away_team, candidate.get("away_abbr")
+                )
+                if home_hit and away_hit:
+                    return candidate, None
+        # THE REFUSAL NAMES THE CAPTURE THAT SHOULD HAVE HELD THE GAME. When the
+        # kickoff date's capture could not be read, "not found" in the plan
+        # date's is not evidence the game is missing. That is the transient
+        # reason, and it must read as one. (Cached: no second read.)
+        if games(capture_dates[0]) is None:
+            return None, REASON_NO_LIVE_STATE
         return None, REASON_GAME_NOT_FOUND
 
     def resolve_prop(order: Mapping[str, Any], canonical: str, segment: str) -> dict[str, Any]:
@@ -321,7 +390,7 @@ def nfl_status_resolver(selected_date: str):
             # graded off the wrong quantity.
             return {"unavailable_reason": REASON_PROP_SEGMENT}
 
-        record, refusal = locate(order.get("home_team"), order.get("away_team"))
+        record, refusal = locate(order)
         if refusal:
             return {"unavailable_reason": refusal}
         is_final = bool(record.get("final"))
@@ -393,7 +462,7 @@ def nfl_status_resolver(selected_date: str):
             return {"unavailable_reason": REASON_UNKNOWN_MARKET}
 
         home_team, away_team = order.get("home_team"), order.get("away_team")
-        record, refusal = locate(home_team, away_team)
+        record, refusal = locate(order)
         if refusal:
             return {"unavailable_reason": refusal}
 

@@ -574,3 +574,156 @@ def test_paper_settlement_SETTLES_an_nfl_prop_WON_and_LOST(_opener):
     assert outcome_of(
         _prop(market="Anytime TD", player_name="Jaxon Smith-Njigba", side="yes", line=None)
     ) == OUTCOME_WON
+
+
+# ---------------------------------------------------------------------------
+# 8. THE GAME IS FOUND UNDER ITS KICKOFF DATE, NOT THE PLAN DATE (2026-09-10)
+# ---------------------------------------------------------------------------
+# An order carries the PLAN's date, and a plan commits games days ahead.
+# Measured 2026-09-10: the one NFL prop order dated 09-10 read
+# `game_not_in_nfl_live_state` against a 09-10 capture holding only SF @ LAR.
+
+
+def _captures(monkeypatch, by_date):
+    """`_load_games` keyed by capture date. Returns the dates read, in order."""
+    calls: list[str] = []
+
+    def load(capture_date):
+        calls.append(capture_date)
+        games = by_date.get(capture_date)
+        return None if games is None else list(games)
+
+    monkeypatch.setattr(bet_status_nfl, "_load_games", load)
+    return calls
+
+
+def _sf_lar_pregame():
+    return {
+        "event_id": "401872657",
+        "home_team": "Los Angeles Rams",
+        "away_team": "San Francisco 49ers",
+        "home_abbr": "LAR",
+        "away_abbr": "SF",
+        "home_score": None,
+        "away_score": None,
+        "in_progress": False,
+        "final": False,
+        "status": "Scheduled",
+    }
+
+
+def _det_no_final():
+    return {
+        "event_id": "401900001",
+        "home_team": "Detroit Lions",
+        "away_team": "New Orleans Saints",
+        "home_abbr": "DET",
+        "away_abbr": "NO",
+        "home_score": 27,
+        "away_score": 20,
+        "in_progress": False,
+        "final": True,
+        "status": "Final",
+    }
+
+
+def _sunday_total(**over):
+    row = {
+        "sport": "nfl",
+        "home_team": "Detroit Lions",
+        "away_team": "New Orleans Saints",
+        "market": "totals",
+        "side": "over",
+        "line": 44.5,
+        "selected_date": "2026-09-10",
+        "commence_time": "2026-09-13T17:00:00Z",
+    }
+    row.update(over)
+    return row
+
+
+@pytest.mark.parametrize(
+    "commence_time, expected",
+    [
+        # The three real games the mapping was read off (ESPN `?dates=`).
+        ("2026-09-10T00:20:00Z", "2026-09-09"),  # NE @ SEA, listed under 20260909
+        ("2026-09-11T00:35:00Z", "2026-09-10"),  # SF @ LAR, listed under 20260910
+        ("2026-09-13T17:00:00Z", "2026-09-13"),  # a Sunday 1 PM ET kickoff
+        ("2026-09-13T17:00:00+00:00", "2026-09-13"),
+        ("2026-09-13T17:00:00", "2026-09-13"),  # naive is read as UTC
+        ("2026-09-13", "2026-09-13"),  # a bare date is already the game's date
+        (None, None),
+        ("", None),
+        ("not a time", None),
+    ],
+)
+def test_the_kickoff_capture_date_is_the_ESPN_eastern_date(commence_time, expected):
+    assert bet_status_nfl.kickoff_capture_date(commence_time) == expected
+
+
+def test_a_SUNDAY_order_on_a_THURSDAY_plan_finds_its_game(monkeypatch):
+    calls = _captures(
+        monkeypatch, {"2026-09-10": [_sf_lar_pregame()], "2026-09-13": [_det_no_final()]}
+    )
+    resolved = nfl_status_resolver("2026-09-10")(_sunday_total())
+    assert resolved == {"current_value": 47.0, "is_final": True, "started": True}
+    # Found under Sunday; the plan date's capture was never needed.
+    assert calls == ["2026-09-13"]
+
+
+def test_WITHOUT_a_kickoff_stamp_the_same_order_still_cannot_find_it(monkeypatch):
+    # The falsifier: this is exactly the pre-fix behaviour, and it is what an
+    # order with no readable `commence_time` still gets.
+    _captures(monkeypatch, {"2026-09-10": [_sf_lar_pregame()], "2026-09-13": [_det_no_final()]})
+    resolved = nfl_status_resolver("2026-09-10")(_sunday_total(commence_time=None))
+    assert resolved == {"unavailable_reason": bet_status_nfl.REASON_GAME_NOT_FOUND}
+
+
+def test_WITHOUT_a_kickoff_stamp_the_plan_date_still_grades(monkeypatch):
+    # The fallback: a same-day order with no stamp grades exactly as before.
+    _captures(monkeypatch, {"2026-09-13": [_det_no_final()]})
+    resolved = nfl_status_resolver("2026-09-13")(_sunday_total(selected_date="2026-09-13", commence_time=None))
+    assert resolved["current_value"] == 47.0
+
+
+def test_a_PROP_on_a_night_game_is_found_under_its_EASTERN_date(_opener, monkeypatch):
+    # NE @ SEA kicked off 2026-09-10T00:20Z and ESPN files it under 09-09. An
+    # order on the 09-10 plan must still find it, and grade off the real box.
+    _opener()
+    _captures(monkeypatch, {"2026-09-09": [_opener_game()], "2026-09-10": [_sf_lar_pregame()]})
+    order = _prop(
+        market="Passing Yards",
+        player_name="Drake Maye",
+        selected_date="2026-09-10",
+        commence_time="2026-09-10T00:20:00Z",
+    )
+    resolved = nfl_status_resolver("2026-09-10")(order)
+    assert resolved["current_value"] == 178.0
+    assert resolved["is_final"] is True
+
+
+def test_an_UNREADABLE_kickoff_capture_is_no_live_state_NOT_game_not_found(monkeypatch):
+    # The plan date's capture is readable and lacks the game, but the capture
+    # that SHOULD hold it could not be read. That is transient, and must say so.
+    _captures(monkeypatch, {"2026-09-10": [_sf_lar_pregame()]})
+    resolved = nfl_status_resolver("2026-09-10")(_sunday_total())
+    assert resolved == {"unavailable_reason": bet_status_nfl.REASON_NO_LIVE_STATE}
+
+
+def test_a_game_in_NEITHER_capture_is_game_not_found(monkeypatch):
+    _captures(monkeypatch, {"2026-09-10": [_sf_lar_pregame()], "2026-09-13": [_sf_lar_pregame()]})
+    resolved = nfl_status_resolver("2026-09-10")(_sunday_total())
+    assert resolved == {"unavailable_reason": bet_status_nfl.REASON_GAME_NOT_FOUND}
+
+
+def test_ONE_capture_read_per_date_per_resolver(monkeypatch):
+    calls = _captures(
+        monkeypatch, {"2026-09-10": [_sf_lar_pregame()], "2026-09-13": [_det_no_final()]}
+    )
+    resolve = nfl_status_resolver("2026-09-10")
+    for side in ("over", "under", "over"):
+        resolve(_sunday_total(side=side))
+    # A miss reads both dates, once each, and nothing is re-read after.
+    resolve(_sunday_total(home_team="Chicago Bears", away_team="Green Bay Packers"))
+    resolve(_sunday_total(home_team="Chicago Bears", away_team="Green Bay Packers"))
+    assert calls == ["2026-09-13", "2026-09-10"]

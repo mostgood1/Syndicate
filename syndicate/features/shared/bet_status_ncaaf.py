@@ -136,15 +136,19 @@ def _load_games(selected_date: str) -> list[dict[str, Any]] | None:
 
 def ncaaf_status_resolver(selected_date: str):
     """A resolver `paper_settlement` can inject, for NCAAF orders."""
+    from syndicate.features.shared.bet_status_nfl import order_capture_dates
     from syndicate.features.shared.game_line_bet import game_line_view, is_game_line_market
     from syndicate.features.shared.ncaaf_team_registry import resolve_ncaaf_team_id
 
     cache: dict[str, Any] = {}
 
-    def games() -> list[dict[str, Any]] | None:
-        if "games" not in cache:
-            cache["games"] = _load_games(selected_date)
-        return cache["games"]
+    def games(capture_date: str) -> list[dict[str, Any]] | None:
+        # ONE READ PER CAPTURE DATE PER RESOLVER: a Saturday slate committed
+        # on a Thursday plan is one read, not one per order.
+        slot = f"games:{capture_date}"
+        if slot not in cache:
+            cache[slot] = _load_games(capture_date)
+        return cache[slot]
 
     def resolve(order: Mapping[str, Any]) -> dict[str, Any]:
         if _norm(order.get("sport")) != "ncaaf":
@@ -186,25 +190,37 @@ def ncaaf_status_resolver(selected_date: str):
         if not home_id or not away_id or home_id == away_id:
             return {"unavailable_reason": REASON_TEAM_UNRESOLVED}
 
-        found = games()
-        if found is None:
+        # KICKOFF DATE FIRST, PLAN DATE SECOND; `bet_status_nfl.order_capture_dates`
+        # carries the measurement. 281 NCAAF orders dated 2026-09-10 read
+        # `game_not_in_ncaaf_live_state` against a capture holding one FBS game:
+        # Saturday games on a Thursday plan, looked up under Thursday.
+        capture_dates = order_capture_dates(order, selected_date)
+        if not capture_dates:
             return {"unavailable_reason": REASON_NO_LIVE_STATE}
 
         record = None
-        for candidate in found:
-            # The capture stores several name forms; ANY of them resolving to
-            # the right id is a match, and each is resolved through the same
-            # unambiguous index, so a mascot cannot stand in for a school.
-            cand_home = next(
-                (r for r in (resolve_ncaaf_team_id(candidate.get(f))
-                             for f in ("home_team", "home_abbr")) if r), None)
-            cand_away = next(
-                (r for r in (resolve_ncaaf_team_id(candidate.get(f))
-                             for f in ("away_team", "away_abbr")) if r), None)
-            if cand_home == home_id and cand_away == away_id:
-                record = candidate
+        for capture_date in capture_dates:
+            for candidate in games(capture_date) or ():
+                # The capture stores several name forms; ANY of them resolving to
+                # the right id is a match, and each is resolved through the same
+                # unambiguous index, so a mascot cannot stand in for a school.
+                cand_home = next(
+                    (r for r in (resolve_ncaaf_team_id(candidate.get(f))
+                                 for f in ("home_team", "home_abbr")) if r), None)
+                cand_away = next(
+                    (r for r in (resolve_ncaaf_team_id(candidate.get(f))
+                                 for f in ("away_team", "away_abbr")) if r), None)
+                if cand_home == home_id and cand_away == away_id:
+                    record = candidate
+                    break
+            if record is not None:
                 break
         if record is None:
+            # Named for the capture that SHOULD have held the game: an
+            # unreadable kickoff-date capture is the transient reason, not a
+            # missing game. (Cached: no second read.)
+            if games(capture_dates[0]) is None:
+                return {"unavailable_reason": REASON_NO_LIVE_STATE}
             return {"unavailable_reason": REASON_GAME_NOT_FOUND}
 
         if segment == FULL_GAME_SEGMENT:

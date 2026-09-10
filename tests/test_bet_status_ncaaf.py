@@ -227,3 +227,100 @@ def test_the_index_is_populated_and_drops_a_measurable_number_of_keys():
     index = unambiguous_team_index()
 
     assert len(index) > 1500, f"registry index looks empty or truncated: {len(index)}"
+
+
+# ---------------------------------------------------------------------------
+# THE GAME IS FOUND UNDER ITS KICKOFF DATE, NOT THE PLAN DATE (2026-09-10)
+# ---------------------------------------------------------------------------
+# Measured 2026-09-10: 281 NCAAF orders dated 09-10 read
+# `game_not_in_ncaaf_live_state` against a 09-10 capture holding ONE FBS game
+# (FAMU @ MIA). Saturday games on a Thursday plan, looked up under Thursday.
+# The registry is stubbed so these run without the mirrored team data.
+
+_KICKOFF_IDS = {
+    "Georgia Bulldogs": "61",
+    "UGA": "61",
+    "Clemson Tigers": "228",
+    "CLEM": "228",
+    "Miami Hurricanes": "2390",
+    "MIA": "2390",
+    "Florida A&M Rattlers": "50",
+    "FAMU": "50",
+}
+
+
+def _kickoff_setup(monkeypatch, by_date):
+    from syndicate.features.shared import bet_status_ncaaf, ncaaf_team_registry
+
+    monkeypatch.setattr(ncaaf_team_registry, "resolve_ncaaf_team_id", lambda name: _KICKOFF_IDS.get(str(name)))
+    calls: list[str] = []
+
+    def load(capture_date):
+        calls.append(capture_date)
+        games = by_date.get(capture_date)
+        return None if games is None else list(games)
+
+    monkeypatch.setattr(bet_status_ncaaf, "_load_games", load)
+    return bet_status_ncaaf, calls
+
+
+def _famu_mia_pregame():
+    return {
+        "home_team": "Miami Hurricanes", "away_team": "Florida A&M Rattlers",
+        "home_abbr": "MIA", "away_abbr": "FAMU",
+        "home_score": None, "away_score": None,
+        "in_progress": False, "final": False,
+    }
+
+
+def _uga_clem_final():
+    return {
+        "home_team": "Georgia Bulldogs", "away_team": "Clemson Tigers",
+        "home_abbr": "UGA", "away_abbr": "CLEM",
+        "home_score": 24, "away_score": 17,
+        "in_progress": False, "final": True,
+    }
+
+
+def _saturday_total(**over):
+    row = {
+        "sport": "ncaaf",
+        "home_team": "Georgia Bulldogs",
+        "away_team": "Clemson Tigers",
+        "market": "totals",
+        "side": "over",
+        "line": 40.5,
+        "selected_date": "2026-09-10",
+        "commence_time": "2026-09-12T19:30:00Z",
+    }
+    row.update(over)
+    return row
+
+
+def test_ncaaf_a_SATURDAY_order_on_a_THURSDAY_plan_finds_its_game(monkeypatch):
+    module, calls = _kickoff_setup(
+        monkeypatch, {"2026-09-10": [_famu_mia_pregame()], "2026-09-12": [_uga_clem_final()]}
+    )
+    resolved = module.ncaaf_status_resolver("2026-09-10")(_saturday_total())
+    assert resolved == {"current_value": 41.0, "is_final": True, "started": True}
+    assert calls == ["2026-09-12"]
+
+
+def test_ncaaf_WITHOUT_a_kickoff_stamp_the_same_order_still_cannot_find_it(monkeypatch):
+    module, _ = _kickoff_setup(
+        monkeypatch, {"2026-09-10": [_famu_mia_pregame()], "2026-09-12": [_uga_clem_final()]}
+    )
+    resolved = module.ncaaf_status_resolver("2026-09-10")(_saturday_total(commence_time=None))
+    assert resolved == {"unavailable_reason": module.REASON_GAME_NOT_FOUND}
+
+
+def test_ncaaf_an_UNREADABLE_kickoff_capture_is_no_live_state(monkeypatch):
+    module, _ = _kickoff_setup(monkeypatch, {"2026-09-10": [_famu_mia_pregame()]})
+    resolved = module.ncaaf_status_resolver("2026-09-10")(_saturday_total())
+    assert resolved == {"unavailable_reason": module.REASON_NO_LIVE_STATE}
+
+
+def test_ncaaf_the_plan_date_still_grades_a_same_day_order(monkeypatch):
+    module, _ = _kickoff_setup(monkeypatch, {"2026-09-12": [_uga_clem_final()]})
+    order = _saturday_total(selected_date="2026-09-12", commence_time=None)
+    assert module.ncaaf_status_resolver("2026-09-12")(order)["current_value"] == 41.0
