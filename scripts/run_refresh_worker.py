@@ -3539,16 +3539,29 @@ def _launch_autorun_accuracy_summary(
     error_text: str | None = None
     try:
         from syndicate.features.shared.graded_outcomes import GRADED_OUTCOME_GRADERS
-        from syndicate.features.shared.intelligence_evaluation import build_accuracy_summary
+        from syndicate.features.shared.intelligence_evaluation import build_accuracy_summaries
 
-        for sport in sorted(GRADED_OUTCOME_GRADERS.keys()):
-            try:
-                summary = build_accuracy_summary(sport=sport) or {}
-            except Exception as exc:
+        # ONE LEDGER READ FOR EVERY SPORT (2026-09-10, lane
+        # `accuracy-ledger-budget-raise`). This loop called
+        # `build_accuracy_summary(sport=...)` eight times, and each call
+        # re-streamed the whole bounded ledger to keep one sport: eight
+        # `LEDGER_CHUNKS_ACCEPTED` lines per run, ~8 GB each under the
+        # chunk-count bound, parsed inline in this loop. The per-sport results
+        # are identical (`tests/test_accuracy_summary_single_pass.py`).
+        sports = sorted(GRADED_OUTCOME_GRADERS.keys())
+        try:
+            computed = build_accuracy_summaries(sports)
+        except Exception as exc:
+            # The READ failed, so no sport has a summary. Recorded against every
+            # sport, which is what eight failing per-sport calls used to write.
+            computed = {sport: {"error": f"{type(exc).__name__}: {exc}"} for sport in sports}
+        for sport in sports:
+            summary = computed.get(sport) or {}
+            if "error" in summary:
                 # One sport's failure must not cost the other seven their
-                # summary -- the per-sport try is the difference between a
-                # partial artifact and no artifact at all.
-                summaries[sport] = {"error": f"{type(exc).__name__}: {exc}"}
+                # summary -- `build_accuracy_summaries` isolates each sport's
+                # computation; this keeps its error in the artifact.
+                summaries[sport] = summary
                 continue
             summaries[sport] = _bounded_accuracy_summary(summary)
             # ITS OWN COST, EMITTED. This is what makes arming it a decision

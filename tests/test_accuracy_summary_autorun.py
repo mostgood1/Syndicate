@@ -119,10 +119,12 @@ class ClaimBeforeWorkTests(unittest.TestCase):
             with patch.object(WORKER, "_refresh_state_store", return_value=store):
                 with patch.object(WORKER, "_accuracy_summary_should_run_now", return_value=True):
                     with patch(
-                        "syndicate.features.shared.intelligence_evaluation.build_accuracy_summary",
+                        "syndicate.features.shared.intelligence_evaluation.build_accuracy_summaries",
                         side_effect=summary_side_effect
-                        or (lambda **kwargs: {"sport": kwargs.get("sport"), "sample_size": 3, "settled_count": 1}),
-                    ):
+                        or (lambda sports, **kwargs: {
+                            sport: {"sport": sport, "sample_size": 3, "settled_count": 1} for sport in sports
+                        }),
+                    ) as summaries_call:
                         # MUST be patched, not merely tolerated. The autorun now
                         # also writes the projected ledger mirror, and its
                         # defaults resolve to the REAL reports root -- an
@@ -139,6 +141,7 @@ class ClaimBeforeWorkTests(unittest.TestCase):
                             fired = WORKER._launch_autorun_accuracy_summary(
                                 latest_manifest_path=Path("x"), worker_status_path=Path("y"), refresh_cycle={}
                             )
+        self.last_summaries_call = summaries_call
         return fired, writes
 
     def test_a_failing_mirror_does_not_mark_the_SUMMARY_errored(self) -> None:
@@ -191,14 +194,30 @@ class ClaimBeforeWorkTests(unittest.TestCase):
         self.assertNotIn("not retrying", printed.lower(),
                          "the message must not claim a skip the code does not perform")
 
-    def test_one_sport_failing_does_not_lose_the_others(self) -> None:
-        calls = {"n": 0}
+    def test_the_ledger_is_read_ONCE_for_every_sport(self) -> None:
+        """Eight per-sport calls re-read the whole ledger eight times. The
+        autorun must make exactly one call, carrying every graded sport."""
+        from syndicate.features.shared.graded_outcomes import GRADED_OUTCOME_GRADERS
 
-        def _flaky(**kwargs):
-            calls["n"] += 1
-            if calls["n"] == 1:
-                raise RuntimeError("boom")
-            return {"sport": kwargs.get("sport"), "sample_size": 1, "settled_count": 0}
+        self._run(last_status={})
+        self.assertEqual(self.last_summaries_call.call_count, 1)
+        self.assertEqual(self.last_summaries_call.call_args.args[0], sorted(GRADED_OUTCOME_GRADERS.keys()))
+
+    def test_a_failed_READ_is_recorded_against_every_sport(self) -> None:
+        def _boom(sports, **kwargs):
+            raise OSError("ledger unreadable")
+
+        _fired, writes = self._run(last_status={}, summary_side_effect=_boom)
+        sports = writes[-1].get("sports") or {}
+        self.assertGreater(len(sports), 1)
+        self.assertTrue(all("error" in (value or {}) for value in sports.values()))
+        self.assertIn(writes[-1].get("state"), {"ok", "error"})
+
+    def test_one_sport_failing_does_not_lose_the_others(self) -> None:
+        def _flaky(sports, **kwargs):
+            out = {sport: {"sport": sport, "sample_size": 1, "settled_count": 0} for sport in sports}
+            out[sports[0]] = {"error": "RuntimeError: boom"}
+            return out
 
         _fired, writes = self._run(last_status={}, summary_side_effect=_flaky)
         sports = writes[-1].get("sports") or {}

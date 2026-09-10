@@ -3077,9 +3077,29 @@ def build_accuracy_summary(
     through refresh_state_store the same way evaluation-settlement's
     autorun status already does.
     """
-    from syndicate.features.shared.drift_detection import detect_metric_drift
-
     sport_slug = str(sport or "").strip().lower() or None
+    record_rows, ledger_stats = _accuracy_summary_record_rows(records, ledger_path)
+    if sport_slug:
+        record_rows = [record for record in record_rows if _record_sport(record) in {sport_slug, None}]
+    return _accuracy_summary_from_rows(
+        record_rows,
+        sport_slug=sport_slug,
+        ledger_stats=ledger_stats,
+        recent_days=recent_days,
+        baseline_days=baseline_days,
+    )
+
+
+def _accuracy_summary_record_rows(
+    records: Iterable[Mapping[str, Any]] | None,
+    ledger_path: Path | str | None,
+) -> "tuple[list[dict[str, Any]], dict[str, Any]]":
+    """The ledger read behind every accuracy summary: stream, project, dedup.
+
+    Shared by `build_accuracy_summary` (one sport) and `build_accuracy_summaries`
+    (every sport from ONE read), so the two cannot drift apart.
+    """
+    ledger_stats: dict[str, Any] = {}
     # `#626`(h): the ledger load is BUDGETED here and nowhere else. Measured
     # 2026-09-02 -- unbudgeted this materialises 4.01-4.41x accepted chunk bytes
     # (R2 0.999998, intercept zero), which at production's 830,832,574 accepted
@@ -3130,8 +3150,19 @@ def build_accuracy_summary(
     # _latest_by_recommendation_id materialises, so the generator is exhausted
     # by the time this line runs.
     ledger_stats["projected_bytes"] = projected_bytes
-    if sport_slug:
-        record_rows = [record for record in record_rows if _record_sport(record) in {sport_slug, None}]
+    return record_rows, ledger_stats
+
+
+def _accuracy_summary_from_rows(
+    record_rows: list[dict[str, Any]],
+    *,
+    sport_slug: str | None,
+    ledger_stats: Mapping[str, Any],
+    recent_days: int,
+    baseline_days: int,
+) -> dict[str, Any]:
+    """One sport's summary from rows already read, projected, deduped and filtered."""
+    from syndicate.features.shared.drift_detection import detect_metric_drift
 
     settled_rows = _settled_records(record_rows)
     by_date: dict[str, list[dict[str, Any]]] = {}
@@ -3176,6 +3207,73 @@ def build_accuracy_summary(
     }
 
 
+def build_accuracy_summaries(
+    sports: Iterable[str],
+    *,
+    records: Iterable[Mapping[str, Any]] | None = None,
+    ledger_path: Path | str | None = None,
+    recent_days: int = 7,
+    baseline_days: int = 21,
+) -> dict[str, dict[str, Any]]:
+    """Every sport's `build_accuracy_summary`, from ONE ledger read.
+
+    WHY. The refresh-worker autorun called `build_accuracy_summary(sport=...)`
+    once per graded sport, and every call re-streamed the WHOLE bounded ledger
+    only to keep one sport of it. Measured 2026-09-10: eight
+    `LEDGER_CHUNKS_ACCEPTED` lines per autorun (12:34:06..12:55:47Z), each
+    re-reading 3,999,961,107 B. With the chunk-count bound admitting the whole
+    ~8 GB ledger that becomes ~64 GB of JSON parsed per day, INLINE in the
+    refresh loop. One read serves all eight.
+
+    EQUIVALENCE IS THE CONTRACT: `summaries[s]` equals
+    `build_accuracy_summary(sport=s)` on the same ledger, `generated_at` aside.
+    Same dedup over ALL records first, same `{sport, None}` filter, same record
+    order -- each sport's list is built in ONE pass over the deduped rows, so it
+    is exactly what the filter would have returned.
+
+    MEMORY. The deduped set is held once, as the per-sport call already did
+    during its dedup. It is partitioned into per-sport REFERENCE lists, the full
+    list is released, and each sport's list is dropped once its summary exists.
+
+    A sport whose summary raises gets `{"error": ...}` and the rest still
+    compute -- the autorun's per-sport isolation, kept. A failure of the READ
+    raises: nothing per-sport survives it, and the caller already records that.
+    """
+    wanted = list(dict.fromkeys(str(s or "").strip().lower() for s in sports))
+    wanted = [s for s in wanted if s]
+    record_rows, ledger_stats = _accuracy_summary_record_rows(records, ledger_path)
+    buckets: dict[str, list[dict[str, Any]]] = {s: [] for s in wanted}
+    for record in record_rows:
+        record_sport = _record_sport(record)
+        if record_sport is None:
+            for bucket in buckets.values():
+                bucket.append(record)
+        elif record_sport in buckets:
+            buckets[record_sport].append(record)
+    del record_rows
+    summaries: dict[str, dict[str, Any]] = {}
+    # SMALLEST SPORT FIRST. Every bucket stays alive until its own summary is
+    # built, so the sport computed first overlaps the most retained records.
+    # Building the biggest one (MLB) LAST puts its transient on the least else.
+    # Measured on a 40,000-record checkout corpus: alphabetical order (MLB
+    # first) peaked 23% ABOVE eight separate calls (73.3 vs 59.6 MiB).
+    for sport_slug in sorted(wanted, key=lambda slug: len(buckets[slug])):
+        rows = buckets.pop(sport_slug)
+        try:
+            summaries[sport_slug] = _accuracy_summary_from_rows(
+                rows,
+                sport_slug=sport_slug,
+                ledger_stats=ledger_stats,
+                recent_days=recent_days,
+                baseline_days=baseline_days,
+            )
+        except Exception as exc:
+            summaries[sport_slug] = {"error": f"{type(exc).__name__}: {exc}"}
+        del rows
+    # Computed smallest-first; returned in the order asked for.
+    return {sport_slug: summaries[sport_slug] for sport_slug in wanted}
+
+
 __all__ = [
     "SCHEMA_VERSION",
     "DEFAULT_LEDGER_PATH",
@@ -3184,6 +3282,7 @@ __all__ = [
     "build_reliability_profile",
     "build_segmented_reliability_profile",
     "build_accuracy_summary",
+    "build_accuracy_summaries",
     "build_intelligence_evaluation_bundle",
     "build_evaluation_history_summary",
     "build_recommendation_performance_analytics",
