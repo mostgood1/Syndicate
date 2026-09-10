@@ -127,10 +127,11 @@ real 2026 wk1 inputs, twice, flag off vs on, and the realised spread is 0.980 ->
 4.379 with `rating_source` unchanged in both arms. The transfer is measured now,
 not assumed.
 
-**STILL OWED:** production's own regenerated artifact (~5:13 PM local 2026-09-08,
-86400s interval); scheduled task `nfl-wk1-projection-spread-check`. Until then
-the production claim is INFERRED from a control arm that reproduces the live
-artifact to three decimals — not directly observed.
+**OBSERVED IN PRODUCTION `[2026-09-08T22:32:51Z, deploys.md row of that time, commit 8c4aef01]`:**
+production's own regenerated wk1 artifact reads `margin_mean` stdev **4.379**
+(was 0.980) and 11/16 inside P(home) 0.35-0.65 (was 16/16), with `rating_source`
+unchanged on all 16. That is the prediction, exactly. Lane `nfl-rating-units` CLOSED
+2026-09-10 on that reading; `abc56f64` is an ancestor of live refresh-worker `6c727968`.
 
 ---
 

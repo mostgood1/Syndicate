@@ -5,6 +5,39 @@
 
 ---
 
+## 2026-09-10 18:39-18:45Z — reading only, no deploy — NCAAF WEEK ADVANCE, SECOND READING — **BOTH PRESCRIBED READINGS PASS; the 2026-09-08 prediction held. The Saturday build is predicted to land mid-slate.** `[lane ncaaf-games-cache-refresh, session a8d753fe]`
+
+This reading has been owed since `cc1feccc` (2026-09-01). It FAILED once, on 2026-09-08, when the build caught SMU @ Florida State mid-game. Substrate `render`. Live SHAs: web `2224dec0`; refresh-worker `a9bafa9d` at read time, redeployed to `6c727968` at 18:44:23Z by another lane. `cc1feccc` is an ancestor of both.
+
+- `/api/ops/ncaaf/season-weeks` (18:39:51Z): `resolved_active_season 2026`, **`resolved_active_weeks [1, 2]`**. The spec requires 2. **PASS.**
+- Same instant, 18:44:50-18:45:28Z: `/ncaaf/api/cards?week=1` returns `date "2026 Week 1"`, 51 games, all `1_`; `?week=2` returns `date "2026 Week 2"`, 49 games, all `2_`. They differ. **PASS.** (`?week=3` serves `"2026 Week 2"`, the pregame-window trim, which is correct while the target is 2.)
+- `/api/ops/artifacts/export?path=ncaaf_source/data/week_state/ncaaf_week_state_2026.json` returns HTTP 200, `count 1`; a non-allowlisted path on the same endpoint returns **HTTP 403**. The artifact: `generated_at 2026-09-10T02:26:07Z`, `games 888`, `stale_completion_flags 0`, week 1 `99 games / 99 completed / 0 unplayed`, week 2 `86 / 0 / 86`.
+- **The producer half, LIVE BUT UNPROVEN since 2026-09-01, is now proven.** refresh-worker logs `[artifact_publisher] PUBLISH_OK path=ncaaf_source/data/week_state/ncaaf_week_state_2026.json` at 2026-09-09T02:07:00Z and at 2026-09-10T02:26:07Z (16 ms after `generated_at`). The 2026-09-08 row predicted the board would advance at the next daily run with no intervention, and it did. **Not measured:** which of those two builds first carried week 1 = 99/99, because the 09-09 artifact was never read.
+
+### The producer gate, read against the Saturday 2026-09-12 slate — PREDICTION, not a measurement
+
+week_state is rebuilt only inside the NCAAF season-projection run. `_season_projection_should_launch` (`scripts/run_refresh_worker.py:5330`) launches that run when the TARGET week's `smartsim2_projections_<season>_wk<week>.csv` is at least `_season_projection_refresh_interval_seconds()` old (`:4130`, `int(raw or 86400)`). `SEASON_PROJECTION_REFRESH_INTERVAL_SECONDS` was absent on refresh-worker at the 2026-09-08 22:32:51Z read and has not been re-read. Measured fire times: 01:47:45Z (09-08), 02:07:00Z (09-09), 02:26:07Z (09-10). That is **+19 min/day**, the run's own duration.
+
+    projected 09-13 build        ~03:2xZ   (Sat ~22:2x CDT)
+    last served wk-2 kickoffs     02:00Z Air Force, 02:15Z Utah, 02:30Z Fresno State, 03:00Z USC
+    New Mexico State @ Hawai'i    ~04:00Z   (OddsAPI 04:00Z / ESPN 03:59Z, per lane ncaaf-kickoff-rollover)
+    => week 2 unplayed > 0 at that build -> target stays 2 -> the board serves the finished week 2 all Sunday
+    => advance at the 09-14 build, ~03:4xZ (Sun ~22:4x CDT), about 24 h late
+
+This is the 2026-09-08 recurrence ("every week whose final game ends after the daily build"). It repeats every Saturday that the drifting build lands between the first evening kickoff and the last final. **FAIL criterion for a Sunday-daytime reading on this code:** `resolved_active_weeks` lacks 3 and `cards?week=3` serves `"2026 Week 2"`. **If week 3 is served on Sunday daytime on this code, the prediction is wrong,** and the thing to re-read is the build clock, not the rule. Readings armed: scheduled tasks `ncaaf-week3-advance-sunday` (2026-09-13 11:30 CDT) and `ncaaf-week3-advance-monday` (2026-09-14 08:00 CDT).
+
+verify: **MET for both prescribed readings.** `resolved_active_weeks [1, 2]`; `cards?week=1` and `?week=2` differ (51 `1_` vs 49 `2_` games, same instant); week_state reads week 1 99/99 against a 403 control; and the producer published it at 2026-09-09T02:07:00Z and 2026-09-10T02:26:07Z. The Saturday prediction above is a prediction and is NOT verified.
+
+## 2026-09-10 18:39:43Z — reading only, no deploy — `SETTLED_SAMPLE` NFL re-read: **`nfl: 12`, credibility `0.25`**. Lane `settled-sample-nfl-reconcile` CLOSED on its 2026-09-04 reading `[lane settled-sample-nfl-reconcile, session a8d753fe]`
+
+refresh-worker, running `a9bafa9d` before the 18:44:23Z redeploy to `6c727968`: `[portfolio_commit] SETTLED_SAMPLE date=2026-09-10 samples={'mlb': 657, 'ncaaf': 226, 'nfl': 12, 'soccer': 79, 'wnba': 40} credibility={'mlb': 1.0, 'ncaaf': 1.0, 'nfl': 0.25, 'soccer': 1.0, 'wnba': 0.8...`. Every line from 15:47:16Z to 18:39:43Z today reads `nfl: 12`. The first line on the new code, `6c727968` (`finishedAt` 18:44:23Z), came at 18:54:54Z and reads the same: `samples={'mlb': 654, 'ncaaf': 226, 'nfl': 12, 'soccer': 79, 'wnba': 40} credibility={... 'nfl': 0.25 ...}`.
+
+The lane's owed reading was already on record, so this is a re-read. The 2026-09-04 evening row (lane `soccer-player-producer`) carries `SETTLED_SAMPLE date=2026-09-04 ... 'nfl': 12 ... 'nfl': 0.25` at 21:48:41Z, after refresh-worker `6c8672b7` went live at 21:36:35Z, and `git merge-base --is-ancestor 53d8f9c9 6c8672b7` exits 0. The 2026-09-06 row that still listed this reading as owed had missed that line. `53d8f9c9` is also an ancestor of the live `6c727968`.
+
+NFL is still the 12 preseason totals, because no regular-season NFL decision has settled. Lane `nfl-prop-grading` has been told (message queued to desktop `local_c05fdbca`) that its first graded NFL order should move `nfl` above 12.
+
+verify: **MET.** Production printed `nfl: 12` / `0.25` on three occasions: 2026-09-04T21:48:41Z (the first line after that deploy), 2026-09-10T18:39:43Z (`a9bafa9d`), and 2026-09-10T18:54:54Z (live `6c727968`, the first line after its `finishedAt`).
+
 ## 2026-09-10 13:57 CT — refresh-worker `6c727968` (lane `mlb-stop-publishing-edges`, adopted by session `df26ac0c`) — **MLB LIVE GAME LINES ATTACH AGAIN: `BOOK_GRID_LIVE_GAMELINE_FAILURE` STOPS, AND THE MLB PUBLISH SWITCH IS LIVE ON ALL THREE MARKETS FOR THE FIRST TIME**
 
 Deploy `dep-dahfi8ek1f9s73fkb1i0`, triggered 13:38:25 CT on a CLEAR preflight at 13:38:13 CT. Two
