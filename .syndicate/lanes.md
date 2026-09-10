@@ -425,6 +425,14 @@ death, never life — do not invert it.
 - Verification: the new tests pass on this build and fail on `3e02f854` (per-machine lock only). Two separate clones get 101 and 102 through a real bare remote, and that remote rejects a stale-base reservation. A real reservation lands one claim-only `[skip ci]` commit on `main`. The existing tests still pass.
 - Blocked by: none.
 
+### wnba-slate-prop-ev-refusal — OPEN — opened 2026-09-10 — session 8c631ba2-16bd-41a6-a384-d655570b10ba (desktop `local_f4eeac0a-49e0-49f6-8320-610fd1ae3d14`)
+- Goal: no PROP pick in the served WNBA `recommendations_slate_2026-09-17.json` carries |ev_pct| > 100 — read as `prop_ev_over_100 = 0` by `py -3 scripts/verify_wnba_slate_hygiene.py --date 2026-09-17 --check slate` on the first post-break slate.
+- Files: `scripts/refresh_wnba_oddsapi_props.py` (the prop loop of `_build_local_recommendations_slate_artifact` ONLY), `tests/test_wnba_recommendation_hygiene.py` (additive tests only), `scripts/verify_wnba_slate_hygiene.py`, `tests/test_verify_wnba_slate_hygiene.py`.
+- Hypothesis: n/a — a missed site of an already-decided fix. User decision 2026-09-10: "fix the prop EV refusal before 09-17".
+- Falsification test: `prop_ev_over_100 > 0` on 09-17 while live-odds-worker's live SHA carries the fix BY CONTENT means the served slate came from another writer (a refresh-worker run on older code), or the fix is on the wrong site.
+- Verification: (1) off != on unit tests, plus a source tripwire that no raw `top_play.get("ev_pct")` remains in either producer; (2) live-odds-worker's live SHA carries the fix BY CONTENT after a deploy; (3) the 09-17 reading in the Goal.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
