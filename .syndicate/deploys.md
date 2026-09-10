@@ -30775,3 +30775,39 @@ calendar dates, so there is no retry today; next window 2026-09-10 ~06:00 CT.
 
 Lane `restore-measurement` stays OPEN with a STATUS line naming READING 1. Three
 readings landing is worth banking — do not re-take 2, 3 or 4.
+
+### live-odds-worker 2888c2f2 — NCAAF PROP DATE SHARD, the reading
+
+READ 2026-09-10 13:39:53Z by scheduled task `ncaaf-props-shard-reading`. READ-ONLY; no deploy, no env change.
+verify: PASS -- `player_name` rows exist in NCAAF Central-date shards, every one captured after the 20:32:20Z deploy, and `/api/board/book-grid?sport=ncaaf` serves them as `kind=prop`.
+
+Code on the services at read time: live-odds-worker `26c8cfc6` (live 2026-09-10T01:13:46Z), refresh-worker `7ae7ced4` (live 12:12:50Z). Both contain `ecaa6b57` (`git merge-base --is-ancestor`), and `SYNDICATE_NCAAF_PROP_QUOTES_DATE_SHARD=1` is set on both (read from `/env-vars`, not recalled).
+
+BOARD, `limit=20000`, `total_rows` vs `returned` checked (all NCAAF reads `returned == total_rows`, `rows_truncated=0`, source `precomputed_artifact`); a prop is `player_name`, not `player`:
+
+    date        baseline 09-09 20:2xZ     now 13:39Z                      projected
+    2026-09-10  0 props of 0              19 props of 19                  +18
+    2026-09-11  0 props of 36             167 props of 200 (33 game)      +172   (97%)
+    2026-09-12  0 props of 506            746 props of 1,240 (494 game)   +526   (142%)
+    2026-09-13  0 props of 66 (commit)    0 props of 60                   --
+    2026-09-05  0 of 650                  0 of 650 (past; shard not rewritten)
+
+09-13 is NOT a miss: its shard carries 0 `player_name` rows of 8,560, so the board agrees with the artifact. 09-12 beating the projection by 42% is books posting more cards since the projection's snapshot.
+
+ARTIFACT (web disk, `ncaaf_source/tracking/book_quotes/`, via `/api/ops/artifacts/export?names_only=1` and `/stream`):
+
+    shard        size      rows     player_name  players  events  scope
+    2026-09-10   0.02 MB   52       52           10       1       full
+    2026-09-11   3.34 MB   7,289    889          99       5       full
+    2026-09-12   44.95 MB 17,547   3,069        431      22      LAST 8 MB of 45 MB only (lower bound)
+    2026-09-13   3.87 MB   8,560    0            0        0       full
+
+Freshest prop `captured_at` 2026-09-10T13:24:22.804721Z; freshest row of any kind 13:32:01Z. 100% of prop rows are stamped after 20:32:20Z.
+
+THE WRITER RAN -- established by ARTIFACT, not by log (it is a DEVNULL sweep child; 0 `ncaaf prop date-shard` lines, as predicted, and that absence was never going to be evidence). EIGHT distinct capture stamps: 00:22:17 (the first, and the bulk -- 497 of 889 on 09-11), 07:10:41, 08:04:14, 08:38:28, 09:04:45, 12:10:38, 12:18:24, 13:24:22Z. `PREGAME_CADENCE_DETAIL` on live-odds-worker shows the NCAAF marker resetting at ~08:35:54Z (age 28,784 -> 1,008) and ~12:08:30Z, and the interval dropping 28,800 -> 7,200 by 12:24Z. 08:38:28 and 12:10:38 line up with those two launches; the other six stamps do NOT come from the 8h cadence. A second launcher also writes this capture -- UNATTRIBUTED, not investigated (refresh-worker carries the same flag and code). Not a defect; do not quote "8h" as the prop capture cadence.
+
+CAPS: worst live date is 09-12 at 1,240 / 6,000 = 20.7% of `BOOK_GRID_ARTIFACT_MAX_ROWS`; `rows_truncated=0` on all five NCAAF dates read. `LAYER2_SHARD_TRIMMED`: 0 lines on refresh-worker since 20:21Z -- but 0 for EVERY sport, and the emitter (`pipeline/intelligence_state.py:2429`) prints only when rows are dropped, so this window has no positive control. The load-bearing check is `rows_truncated=0`, not the log. The projected full-Saturday 2,786 rows (46.4%) is still UNMEASURED: it lands as 09-12's cards fill.
+
+REGRESSION: MLB 09-10 752 props of 1,038; soccer 09-10 / 09-12 / 09-13 `total_rows` 3,094 / 9,935 / 5,143. There is NO same-date pre-change baseline for either sport, so non-regression is UNEVIDENCED, not shown. It is structurally isolated: the grid artifact is one file per (sport, date) with its own `max_rows`. Soccer's `kind` split is a PAGE CAP (`returned=2000`, `book-grid` clamps `limit` to 2000), not the slate. Soccer 09-12 carries `rows_truncated=3935` -- soccer's own artifact at its own 6,000 cap, which an NCAAF change cannot reach. Noted, not owned here. NCAAF `game` rows: 33 / 494 / 60 against 33-36 / 503-506 / 66 at the two earlier reads. No truncation, so this is not a cap displacing them; the -2.4% on 09-12 is unattributed market churn and is NOT claimed to be "unchanged".
+
+SIZES (a disk and publish-volume question, not a row cap): 09-05 97.01 MB (unchanged since 09-06), 09-12 44.95 MB (37 MB at commit time, so +~8 MB so far against ~27 MB projected), 09-11 3.34 MB, 09-13 3.87 MB, `2026_wk1` 28.07 MB, `2026_wk2` 1.91 MB. The week shard is still written first, so every prop quote is now stored twice.
