@@ -4229,7 +4229,14 @@ the measurement to repeat on this sprint.
 >   - WNBA needs, in order: a manifest; a non-empty WNBA quote shard for the date; rows still in the `opportunity` lane; a kickoff that is not stale (≤ 2h past start without live/final state); and quotes seen within 14h. The `opportunity` lane needs game state once kickoff passes, and `_LIVE_GAME_STATE_SPORTS` is `{mlb, soccer}`, so WNBA's game state comes from the chips alone. `wnba cand=1225 … opps=0` on 08-25 was this gate.
 > - **RISK FOR 09-17 — WNBA chips are FROZEN at the last slate.**
 >   - `/api/board/game-chips?date=2026-09-10` serves ESPN `401857186..189`, which is exactly the 2026-08-30 Central slate, all FINAL with an empty `start_time_utc`. That is where `scheduled_games: 4` comes from on a day ESPN lists no WNBA game.
->   - The mechanism is NOT established. Start at `game_chip_scoreboard.build_game_chips` for wnba.
+>   - **MECHANISM ESTABLISHED 2026-09-10** (lane `wnba-chip-frozen-trace`, in `lanes_closed.md`).
+>     - `has_games_for_date(today)` fetches `site.api.espn.com`, which refuses Render, so it returns None. The guard at `wnba/cards.py:607` blocks only on False.
+>     - So a worker's `build_live_state_payload(today, allow_stored_date_fallback=True)` (`scripts/refresh_wnba_oddsapi_props.py:609`) builds from the substituted 08-30 slate and persists it under TODAY's `live_state` key (`cards.py:6672`). The chip path reads that key as today.
+>   - **Prognosis:** frozen on 09-17 until that day's `game_cards` has rows, then self-healing, because each of the four stale games shares a team with the 09-17 slate and is dropped. Unverified until the 09-17 `--check layer2` reading.
+>   - **Fixes, not taken:**
+>     - point `has_games_for_date` at `site.web.api.espn.com`, which restores the 07-23 guard;
+>     - treat None as unknown at `cards.py:607`;
+>     - never persist another date's games under today's key (`cards.py:6672`).
 >   - If the chips still show 08-30 at tip-off, every WNBA row loses game state and is demoted after 23:30Z. The pregame rows are unaffected.
 > - **Budget — not breaking the other sports.**
 >   - Refresh-worker has `SYNDICATE_LAYER2_ROWS_TOTAL=6000`, `ROWS_PER_SPORT=2000`, `CARDS_INLINE=0` and `COMBINED_ROWS=0`.

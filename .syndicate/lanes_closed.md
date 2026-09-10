@@ -5725,3 +5725,54 @@ carried-forward work in `docs/ai_context/todo.md` `#650`/`#651`/`#652`.
 - **IT RECURS NIGHTLY, NOT ONCE.** Census of the served payload, 2026-09-01..09-09 (ended 18:56:16Z today): **9 games on 7 of 9 dates still served `Live`** -- 09-01 823908; 09-02 823906; 09-03 823095, 823907; 09-04 823905, 823093; 09-05 824553; 09-06 823903; 09-09 823900. 09-07 and 09-08: 0. The mechanism predicts exactly this population -- games still in progress when the live-lens loop rolls at midnight Central -- because their report row is frozen mid-game and the merge serves it indefinitely.
 - **VERIFICATION STATUS: the trace is DONE and measured; the "test pinning the Final-payload case" is NOT written yet, so this lane stays OPEN.** The fix belongs in `mlb/cards.py`, which no OPEN lane claims (checked with `lane_claims._claims` 2026-09-10). It is not made here, because this lane claims nothing.
 - **CORRECTION 2026-09-10 20:07Z, AFTER THE FIX DEPLOYED AND DID NOT MOVE WEB `[session 218b778c]`. The verdict above holds for REFRESH-WORKER and is wrong for WEB.** The 09-04 contradiction compared `FEED_LIVE_STATUS` -- which prints only when `not _render_web_dyno()`, i.e. refresh-worker's feed map, Final for all nine -- against `/mlb/api/cards` served by WEB. On refresh-worker the merge does overwrite that Final (the board-artifact path; fixed in `c2dcd525`). WEB holds ZERO `feed_live` files for 2026-09-01..09-09 (`export?names_only=1` `count=0`; control `2026-06-1*` -> 78), so on web `_source_status(None)` is `Pregame/Scheduled` and the frozen lens row is the ONLY status source -- nothing is overwritten there; the served `Live` is web never receiving the feed's Final. Same single place in code (the merge copies the row's `status`), two different reasons it is wrong. The web fix is lane `mlb-lens-final-status`. Measurement: `deploys.md` 2026-09-10 19:56:53-20:04:10Z.
+
+### wnba-chip-frozen-trace — CLOSED 2026-09-10 — opened 2026-09-10 — session 8c631ba2-16bd-41a6-a384-d655570b10ba (desktop `local_f4eeac0a-49e0-49f6-8320-610fd1ae3d14`) — **GOAL: MET.**
+- **Root:** the "schedule is authoritative" guard is blind on Render. `has_games_for_date` fetches a host that refuses Render and returns None, and None is not False.
+- **Carrier:** a WORKER rebuilds today's live state from the substituted 2026-08-30 slate and persists it under TODAY's key. The chip path reads that key as today.
+- **GOAL VERDICT — Goal (verbatim): "a file:line trace naming the single place that makes production serve the four 2026-08-30 WNBA games (ESPN `401857186..189`, all FINAL, no start time) as chips for 2026-09-10, plus a stated prognosis for 2026-09-17." → GOAL: MET.** Verification ran: every hop below is backed by a production reading or a reproduction. The 09-17 prognosis is stated, and it stays code reasoning until the 09-17 reading.
+- **THE CHAIN, writer to chip:**
+  1. **The verdict is None.** For TODAY, `has_games_for_date(today)` (`wnba/sources.py:90-139`) always fetches `https://site.api.espn.com/...scoreboard?dates=` (`:125`), and any exception returns None (`:130-131`).
+     - REPRODUCED on the code: None for 2026-09-10. The host refused this machine too, and the ledger records it refusing all three Render services (`[espn-egress-and-wnba-boxscores]`).
+     - `site.web.api.espn.com` answers the same query with 0 events.
+  2. **The guard does not block None.** `if has_games_for_date(requested_date) is False: return requested_date` (`wnba/cards.py:607`) blocks only on an explicit False.
+     - REPRODUCED, with no cards for today: verdict None → `2026-08-30`; False → `2026-09-10`; True → `2026-08-30`.
+     - PRODUCTION, web: `/wnba/api/cards?date=2026-09-10` answers `date 2026-09-09` for `requested_date 2026-09-10`. The substitution fires on a no-game today.
+  3. **The WRITER persists the substituted slate under today's key.**
+     - The producer's `_build_local_live_snapshot_payload` calls `build_live_state_payload(today, allow_stored_date_fallback=True)` (`scripts/refresh_wnba_oddsapi_props.py:609`).
+     - On a worker, that builds `build_cards_page_context(today, True)` (`wnba/cards.py:6515`), which resolves to the substituted date.
+     - The result is persisted under TODAY's key with `date` stamped today and `source: syndicate_cards_fallback` (`:6672` → `_maybe_persist_current_day_live_snapshot_artifact`, `:235`). That helper skips web, so only a worker writes this key.
+     - PRODUCTION: `live_state_2026-09-10` holds ESPN `401857186..189`, all `final`, `source syndicate_cards_fallback`, `generated_at 15:21:29 CT`. `live_state_2026-09-09` holds the same four games, written on 09-09: a daily carry-forward.
+     - Web lands on 09-09, whose cards file is empty. The payload shows the worker lands on 08-30, the newest date with card rows there. That is INFERRED from content, not read off the worker.
+  4. **The READER takes that key as today.**
+     - `_WNBADataProvider.games` (`home.py:6160`) calls `build_cards_page_context(today, allow_stored_date_fallback=False)`. Its no-games return (`cards.py:3834`) also needs `is False`, so it is skipped.
+     - Games then come from today's live-state key: `_artifact_bundle`'s worker-only fallback (`:1700` → `_games_from_live_state_fallback`, `:3089`) and the provider's own `_wnba_live_state_games` (`home.py:6167` → `:802`).
+     - Those rows carry no `startTime`, which is why every chip has an empty `start_time_utc`.
+     - PRODUCTION: `/api/board/game-chips?date=2026-09-10` serves the same four ids, FINAL, with no start time. Layer 2 counts them as `scheduled_games: 4`.
+- **HYPOTHESIS SCORE:**
+  - (1) SURVIVED, and it is the root.
+  - (2) SURVIVED on its carrier: the key holds the 08-30 games under today's date.
+  - WRONG: my framing "NOT a date substitution". It IS the stored-date substitution. It happens in the WRITER, which passes `allow_stored_date_fallback=True`, not in the chip reader, which passes False.
+- **PROGNOSIS, 2026-09-17 (code reasoning, unverified):**
+  - The verdict stays None on Render. So until `game_cards_2026-09-17.csv` has rows, the writer substitutes 08-30 again and the chips stay frozen.
+  - Once the pregame autorun writes that day's cards (its first full run after ~06:15Z), the resolver keeps 09-17 and the key is rewritten from the real slate. `_supplement_games_with_live_state` then drops the four stale games, because each shares a team with the 09-17 slate (`cards.py:3313-3329`).
+  - So it should self-heal hours before the 23:30Z tip. If it does not, `verify_wnba_slate_hygiene.py --check layer2` prints `FROZEN?`.
+  - Every future no-game day (playoff gaps) repeats the freeze until it is fixed.
+- **NOT FIXED — the user asked for a trace. Three fixes, cheapest first:**
+  - (a) `wnba/sources.py:125`: use `site.web.api.espn.com`, the host that answers Render. That restores the 2026-07-23 guard as designed.
+  - (b) `cards.py:607`: treat None as unknown and do not substitute for today (unknown must not default permissive).
+  - (c) `cards.py:6672` / `:6507`: never persist a payload built from a different resolved date under today's key.
+- **ALSO CORRECTED IN STATE:** `[wnba-cards-fallback-recursion]` called `_artifact_bundle`'s live-state fallback "always a cold/dev path" because it is off on Render. It is off on WEB only. It runs on every worker, and it is one of the reads serving this freeze.
+- **Named, not traced:** whether the live-lens loop (`live_lens_loop._wnba_build_wrapper`) is a second writer. The key's `generated_at` falls 23 s after a lens tick. It is not needed for the root.
+- Goal: a file:line trace naming the single place that makes production serve the four 2026-08-30 WNBA games (ESPN `401857186..189`, all FINAL, no start time) as chips for 2026-09-10, plus a stated prognosis for 2026-09-17.
+- Files: none — a read-only trace. A claim is for editing.
+- Hypothesis (written BEFORE testing):
+  - It is NOT a date substitution. The chip path asks with `allow_stored_date_fallback=False` (`home.py:6163`).
+  - (1) The schedule gate `has_games_for_date(today) is False` (`wnba/cards.py:3834`) never fires on Render. For today it always fetches `site.api.espn.com` (`wnba/sources.py:125`), which answers Render with HTTP 403 (`state_basketball [espn-egress-and-wnba-boxscores]`), and any exception returns None (`:130-131`).
+  - (2) With the gate open, the build reads date-keyed keyvalue live state (`_games_from_live_state_fallback` `wnba/cards.py:3089`; `_wnba_live_state_games` `home.py:802`). The key `live_state_2026-09-10.jsonl` ITSELF holds the 08-30 games, written under today's key by something that carries the last known slate forward.
+  - The missing start time fits (2): games built from live state carry no `startTime`.
+- Falsification test: `/wnba/api/live_state?date=2026-09-10` reads that same keyvalue key first (`wnba/cards.py:6438`).
+  - If it returns NO games, or games other than `401857186..189`, then (2) is wrong and the carrier is elsewhere: `game_cards_2026-09-10.csv`, or an in-process cache.
+  - If it returns them, the payload's `source` / `generated_at` names the writer, which is the next hop.
+  - (1) is a deduction until measured: ESPN lists no 09-10 game, so the chips can only exist if the gate saw None, not False.
+- Verification: the file:line chain from the writer to the served chip, each hop backed by a production reading or a reproduction; then the 09-17 prognosis.
+- Blocked by: none.

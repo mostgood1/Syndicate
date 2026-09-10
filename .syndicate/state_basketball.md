@@ -386,7 +386,12 @@ POINT estimate (MAE 6.636 vs 7.453) and a naive 50/50 blend beat **neither**
   - WNBA IS iterated on every build. At 2026-09-10 18:38:45Z `per_sport_ingest.wnba` read `quote_rows 0, grid_rows 0, opportunities 0, sweep_state pending, scheduled_games 4`, while `active_sports` read `mlb, ncaaf, nfl, soccer`. The "ncaaf and soccer" reading was 08-30's.
   - The gates, in order (code, 2026-09-10): manifest; the date's quote shard; per-sport exception; the lane gate (a row with no game state after kickoff is demoted — `wnba cand=1225 … opps=0` on 08-25 was this); horizon / stale kickoff / quote age ≤ 14h; value floor / per-game cap.
   - `scripts/verify_wnba_slate_hygiene.py --check layer2` names the gate that stopped WNBA.
-  - **`scheduled_games: 4` IS FALSE.** `/api/board/game-chips?date=2026-09-10` serves ESPN `401857186..189`, which is the 2026-08-30 Central slate, all FINAL with an empty `start_time_utc`. WNBA chips are frozen at the last slate; the mechanism is not established.
+  - **`scheduled_games: 4` IS FALSE, and the mechanism is ESTABLISHED (2026-09-10, lane `wnba-chip-frozen-trace`).**
+    - `/api/board/game-chips?date=2026-09-10` serves ESPN `401857186..189` (the 2026-08-30 slate), all FINAL, with no start time.
+    - `has_games_for_date(today)` fetches `site.api.espn.com`, which refuses Render, so it returns None. The guard at `wnba/cards.py:607` blocks only on False.
+    - So a worker's `build_live_state_payload(today, allow_stored_date_fallback=True)` builds from the substituted 08-30 slate and persists it under TODAY's `live_state` key (`cards.py:6672`). The chip path reads that key as today.
+    - It repeats every no-game day. It should self-heal on 09-17 once that day's cards exist.
+    - NOT FIXED. Three fixes are named in `lanes_closed.md`, `wnba-chip-frozen-trace`.
   - `_LIVE_GAME_STATE_SPORTS` is `{mlb, soccer}`, so the chips are WNBA's only game state. If they are still frozen at tip-off on 09-17, every WNBA row is demoted after kickoff.
   - Layer 2 is the only surface that persists what it recommended. WNBA profitability stays unmeasurable there until WNBA rows reach it.
 - **Layer 1 model coverage is 4–6%** — `rows_modelled_fair` is 20–56 of
@@ -841,7 +846,7 @@ Full write-up: `docs/ai_context/basketball_sim_engine_reference.md`,
 straight back; neither is memoised. **Trigger is an EMPTY artifact, not a date:**
 no `game_cards_<today>.csv` -> 247 calls / depth 247 / 2 RecursionErrors; ONE row
 -> depth 1 and the fallback never runs (back-control confirmed). Disabled on
-Render by `_render_web_dyno()`, so it was always a cold/dev path.
+Render WEB by `_render_web_dyno()` -- but NOT on the workers, where it runs on every no-game day and reads today's frozen `live_state` key (corrected 2026-09-10, lane `wnba-chip-frozen-trace`).
 
 Fixed with `_artifact_bundle(..., allow_fallback: bool = True)`; the fallback's
 call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
