@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 959 rules `[generated]`
+## Index — 960 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5336,3 +5336,15 @@ the instrument rather than the system.**
 - **How we found out**: a test that runs `close` with `REPO_ROOT` set to the closed tree reproduces `[WinError 267]` on the unfixed script and passes on the fix. The lab showed `git worktree remove` run with its own cwd inside the target exits 255, and a retry exits 128 `is not a working tree` — the two codes in session transcripts.
 - **The rule going forward**: a script under `scripts/` that deletes a checkout, or reads or writes state shared across sessions (claims, locks, the worktree registry), resolves the main worktree — `git worktree list` names it first, and `--git-common-dir`'s parent breaks if `.git` ever moves — and uses THAT, never `REPO_ROOT`. Test it with `REPO_ROOT` pointed at a session worktree.
 - **Cost**: one crashed close, one orphaned branch, and two exit codes nobody had attributed.
+
+## 2026-09-10 — REQUIRED: before recording a producer fix as "in force once the artifact is rebuilt", check EVERY site on the path that WRITES that artifact. The WNBA EV refusal covered 2 of 3 prop sites, and the one it missed is the slate writer `[lane wnba-accuracy-assessment, session 8c631ba2]`
+
+- **What we believed**: the WNBA EV refusal (`_plausible_ev_pct`, 2026-09-01) would reach the served slate on the first post-break rebuild. `state_basketball.md [wnba-settlement-live]` and the lane said so for nine days.
+- **What was actually true**: it is applied at `refresh_wnba_oddsapi_props.py:2081` (game picks) and at `:2286` and `:2354` (props). It is NOT applied at `:2192`, the prop loop of `_build_local_recommendations_slate_artifact`, which is the one that writes `recommendations_slate_<date>.json`. NBA's port applies it at both of its prop sites. On the slate, `ev_pct` is also `score` and the within-game sort key, so the omission is not cosmetic.
+- **How we found out**: a code trace of what the 09-17 rebuild actually runs, then a grep of every `top_play.get("ev_pct")` in both producers. Four sites apply the refusal; one does not.
+- **The rule going forward**: a fix is in force on an artifact only if it is on the path that WRITES that artifact.
+  - Name the writer.
+  - Grep the fixed input (here `top_play.get("ev_pct")`) across the writer's call chain.
+  - List the sites with and without the fix before writing "in force after rebuild".
+  - A complete sibling port (NBA here) is the fastest diff.
+- **Cost**: nothing in money (no WNBA slate was written 08-31..09-16). Nine days of a ledger line overstating a fix, found seven days before it would have been read as proven.

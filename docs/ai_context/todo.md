@@ -4162,6 +4162,57 @@ route volume to sim ML picks — `#615` withdrew that; the unblock condition is
 `corr(sim − market, market residual)` clearing zero out-of-sample, and it is
 the measurement to repeat on this sprint.
 
+> **PRE-SPRINT READINESS, 2026-09-10** `[lane wnba-accuracy-assessment, adopted by session 8c631ba2 on user reassignment and CLOSED GOAL: MET the same day]`. **Owner: NO LANE until 2026-09-17.** The block at the end of this note is PRE-REGISTERED — written before any sprint data exists; open it verbatim.
+>
+> **VERIFIED NOW (substrate `render`):**
+> - **The four producer fixes are in the code that writes the slate.** By content at refresh-worker `a9bafa9d` (and `6c727968`, deploying at the time) and live-odds-worker `332e596d`: `_plausible_ev_pct`, `_wnba_totals_recommendations_enabled`, `_CERTAINTY_CEILING` and `* (1.0 + (ev` are all present; the additive `implied_prob + (ev` occurs 0 times.
+> - **The rebuild WILL fire.**
+>   - Live-odds-worker's WNBA pregame autorun is enabled: `SYNDICATE_ENABLE_WNBA_PREGAME_REFRESH_AUTORUN=true`, interval `7200`, `SYNDICATE_LIVE_ODDS_REFRESH_MODE=full`.
+>   - `WNBA_PREGAME_AUTORUN_LAUNCHED` fired every ~2h from 09-09 02:00Z to 09-10 18:52Z, with the date rolling at Central midnight.
+>   - The WNBA season gate covers months 5-10, there is no break detection, and `SYNDICATE_ACTIVE_SPORTS` includes wnba on both workers.
+>   - It writes a slate even on a no-game day (`recommendations_slate_2026-09-10.json`, 94 B, 0 games), so 09-17's file comes from the same writer.
+>   - `SYNDICATE_WNBA_TOTALS_RECOMMENDATIONS` is absent on both workers, which means WITHHOLD.
+> - **GAP — the EV refusal does NOT cover PROP picks on the slate.**
+>   - `refresh_wnba_oddsapi_props.py:2192` reads `top_play.ev_pct` raw. The file's other prop sites (`:2286`, `:2354`) and both NBA sites (`refresh_nba_oddsapi_props.py:1352`, `:1418`) call `_plausible_ev_pct`.
+>   - On the slate, `ev_pct` is also `score` and the within-game sort key (`:2231`, `:2250`), so an implausible prop EV ranks FIRST today. Refusing it would sink that pick to the bottom.
+>   - **DECISION OWED (user): fix before 09-17 or accept and measure.** It would ride any live-odds-worker deploy from main.
+> - **Including WNBA in Layer 2 needs no Layer 2 code change.**
+>   - There is no sport allowlist and no WNBA-specific code. `active_sports` is derived from the rows that arrive. WNBA IS iterated every build: at 18:38:45Z `per_sport_ingest.wnba` read `quote_rows 0, grid_rows 0, opportunities 0, sweep_state pending, scheduled_games 4`, while `active_sports` read `mlb, ncaaf, nfl, soccer`.
+>   - WNBA needs, in order: a manifest; a non-empty WNBA quote shard for the date; rows still in the `opportunity` lane; a kickoff that is not stale (≤ 2h past start without live/final state); and quotes seen within 14h. The `opportunity` lane needs game state once kickoff passes, and `_LIVE_GAME_STATE_SPORTS` is `{mlb, soccer}`, so WNBA's game state comes from the chips alone. `wnba cand=1225 … opps=0` on 08-25 was this gate.
+> - **RISK FOR 09-17 — WNBA chips are FROZEN at the last slate.**
+>   - `/api/board/game-chips?date=2026-09-10` serves ESPN `401857186..189`, which is exactly the 2026-08-30 Central slate, all FINAL with an empty `start_time_utc`. That is where `scheduled_games: 4` comes from on a day ESPN lists no WNBA game.
+>   - The mechanism is NOT established. Start at `game_chip_scoreboard.build_game_chips` for wnba.
+>   - If the chips still show 08-30 at tip-off, every WNBA row loses game state and is demoted after 23:30Z. The pregame rows are unaffected.
+> - **Budget — not breaking the other sports.**
+>   - Refresh-worker has `SYNDICATE_LAYER2_ROWS_TOTAL=6000`, `ROWS_PER_SPORT=2000`, `CARDS_INLINE=0` and `COMBINED_ROWS=0`.
+>   - `allocate_row_budget` water-fills pre-filter pool sizes (`layer2_board.py:237`, `:4339`), with a 60-row floor. WNBA's rows come out of the sports above their fair share — nfl and soccer at today's pools, never mlb or ncaaf. This is arithmetic from code, not a measurement.
+>   - If WNBA must cost them nothing, the lever is raising `ROWS_TOTAL`. The combined key is flat in row count since the `CARDS_INLINE=0` flip, but an env change needs the user plus a refresh-worker deploy.
+>
+> **READINGS OWED ON 2026-09-17, in order:**
+> 1. `py -3 scripts/verify_wnba_slate_hygiene.py --date 2026-09-17 --check slate` — expect PASS.
+>    - FAIL means a fix is not in force.
+>    - UNREADABLE before the day's first full run is normal; the autorun launches every ~2h from ~06:15Z.
+>    - It read FAIL on the pre-fix 08-30 slate (`p_win` 1.0, 1 TOTAL), so it can read red.
+> 2. `--check layer2`, pre-tip and again after 23:30Z. It names the gate (`#614`).
+>    - `FROZEN?` in the output means the chip source never moved.
+> 3. `prop_ev_over_100` from (1). Record it whatever the verdict.
+> 4. `_run_wnba_postgame_producer_tick` cost, once 09-17 games complete. This was the closed lane's owed (b).
+> 5. `#626`(d): `book_quotes` `captured_at` advances during a live WNBA game. `#626`(e): zero `line_source=model` rows with `klass: BET` in the live signal file.
+> 6. `#616`: a WNBA-tickered Kalshi/Polymarket fill or refusal, never `venue_priced`. Also the 8 gates and `prereg_wnba_favourite_lean.py`, over the full window.
+>
+> **ARMED:** the scheduled task `wnba-0917-slate-rebuild-reading`, one-time 2026-09-17 17:15 CT. It runs readings 1–3 and opens the lane below.
+> - Scheduled tasks run only while the app is open, and this machine sleeps. If the task does not fire, any session can take readings 1–2 with those two commands.
+>
+> **PRE-REGISTERED LANE BLOCK — copy verbatim to the end of `## OPEN` on 09-17 (EM DASH separators):**
+>
+>     ### wnba-sprint-0917 — OPEN — opened 2026-09-17 — session <id>
+>     - Goal: run `#623` as a test over 2026-09-17..09-25: a PASS / FAIL / UNREADABLE verdict, with n and window, for each of the 8 gates in `findings_2026-08-31_wnba_accuracy_assessment.md` ("What to measure over 2026-09-17 .. 2026-09-25"), for `prereg_wnba_favourite_lean.py`, and for `verify_wnba_slate_hygiene.py --check slate`.
+>     - Files: none at open (readings only). Claim a path before editing it.
+>     - Hypothesis: n/a — the gates were pre-registered 2026-08-31 and 2026-09-01; this lane executes them.
+>     - Falsification test: the gates' own thresholds, as written; the favourite lean is frozen at 0.528, with UNREADABLE at n < 150.
+>     - Verification: one table in `deploys.md` holding the 8 gates, the prereg verdict, the slate-hygiene verdict, `#614` (the gate named by `--check layer2`) and `#616` (a WNBA ticker, never `venue_priced`), each with n and window.
+>     - Blocked by: none.
+
 ---
 
 ### `#622` — **PHASE 3 — THE PROBABILITY PLANE + FITTED BLEND (late Sept → Oct). One pricing pipeline for every staked probability.** — lane `edge-plan`, 2026-09-01 — **OPEN**

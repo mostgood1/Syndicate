@@ -266,6 +266,12 @@ does not rebuild until **2026-09-17**. A read-time clamp covers the display gap
 (verified: max `p_win` 0.99, zero certainty claims) but the withholding does not
 take effect until a rebuild.
 
+**RE-CHECKED 2026-09-10** `[session 8c631ba2, substrate render]`:
+- **The fixes are in the running code.** All four are present BY CONTENT at refresh-worker `a9bafa9d` and live-odds-worker `332e596d`.
+- **The rebuild trigger is live.** The live-odds-worker WNBA pregame autorun is `true`, interval `7200`, mode `full`, and launches every ~2h. It writes a slate even on a no-game day, so the 09-17 slate goes through the same writer.
+- **The EV refusal does NOT cover PROP picks on the slate.** `refresh_wnba_oddsapi_props.py:2192` has no `_plausible_ev_pct`. The other two prop sites and both NBA sites do. There, `ev_pct` is also the within-game sort key, so an implausible prop EV ranks first.
+- **The in-force reading** is `scripts/verify_wnba_slate_hygiene.py --date 2026-09-17`. It is proven to read FAIL on the pre-fix 08-30 slate (`p_win` 1.0, 1 TOTAL pick). It is scheduled as `wnba-0917-slate-rebuild-reading` (09-17 17:15 CT) and listed in `todo #623`.
+
 ### The three original causes, and what each turned out to be
 
 ## [wnba-instruments-all-zero] THE THREE CAUSES, AS FOUND `[historical, 2026-08-31; all three now fixed — see above]`
@@ -375,11 +381,14 @@ POINT estimate (MAE 6.636 vs 7.453) and a naive 50/50 blend beat **neither**
   betmgm, betonlineag, williamhill_us, bovada, mybookieag, betus — while **29
   Kalshi and 3 Polymarket WNBA orders have filled**. The surface that picks the
   bet cannot see the price the bet is filled at.
-- **Layer 2 excludes WNBA upstream, not on value.** `/api/board/layer2-shortlist`
-  reports `active_sports: ['ncaaf', 'soccer']`; WNBA has no `per_sport` entry at
-  all. 0 rows on 13 of 14 days; 8 rows on 08-29 (all `game`, **0 `prop`**). Layer
-  2 is the only surface that persists what it recommended and can be settled, so
-  this is a second independent reason WNBA profitability is unmeasurable.
+- **Layer 2 does NOT exclude WNBA upstream. CORRECTED 2026-09-10** `[session 8c631ba2]`. The correction has sat in `todo #614` since 09-01 and had never reached this line.
+  - There is no sport allowlist and no WNBA-specific code on the Layer 2 path. `active_sports` is `sorted(per_sport_report.keys())` (`layer2_board.py:4511`), so it is derived from the rows that arrive.
+  - WNBA IS iterated on every build. At 2026-09-10 18:38:45Z `per_sport_ingest.wnba` read `quote_rows 0, grid_rows 0, opportunities 0, sweep_state pending, scheduled_games 4`, while `active_sports` read `mlb, ncaaf, nfl, soccer`. The "ncaaf and soccer" reading was 08-30's.
+  - The gates, in order (code, 2026-09-10): manifest; the date's quote shard; per-sport exception; the lane gate (a row with no game state after kickoff is demoted — `wnba cand=1225 … opps=0` on 08-25 was this); horizon / stale kickoff / quote age ≤ 14h; value floor / per-game cap.
+  - `scripts/verify_wnba_slate_hygiene.py --check layer2` names the gate that stopped WNBA.
+  - **`scheduled_games: 4` IS FALSE.** `/api/board/game-chips?date=2026-09-10` serves ESPN `401857186..189`, which is the 2026-08-30 Central slate, all FINAL with an empty `start_time_utc`. WNBA chips are frozen at the last slate; the mechanism is not established.
+  - `_LIVE_GAME_STATE_SPORTS` is `{mlb, soccer}`, so the chips are WNBA's only game state. If they are still frozen at tip-off on 09-17, every WNBA row is demoted after kickoff.
+  - Layer 2 is the only surface that persists what it recommended. WNBA profitability stays unmeasurable there until WNBA rows reach it.
 - **Layer 1 model coverage is 4–6%** — `rows_modelled_fair` is 20–56 of
   522–1,276 rows/day over 13 playing days. For the other ~95% it is a pure
   price-shopping board.
