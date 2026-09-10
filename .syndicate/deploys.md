@@ -5,6 +5,29 @@
 
 ---
 
+## 2026-09-10 14:29 CT — refresh-worker `2d53fdf7` (lane `football-layer2-live-parity`) — **DEPLOYED; READING OWED: NCAAF LAYER 2 ROWS WITH NO `game_state` SHOULD GO 34 → 0 (FAMU @ MIA). CLAIM RELEASED BEFORE THE READING, ON PURPOSE.**
+
+Deploy `dep-dahga4ifngtc739c8rb0`, triggered 14:29:22 CT after a CLEAR preflight at 14:29:03 CT
+(preflight HELD at 14:10 and 14:21 CT on the MLB daily sim and `ui-daily`), on top of `6c727968`
+(lane `mlb-stop-publishing-edges`, live 13:44:23 CT). Code: `board_enrichment.attach_game_state`
+falls back to the NCAAF registry id when `teams_match` cannot place a school (`4a7bd8aa`), plus
+tests. No `render.yaml`, no env change.
+
+**Baseline** (production `/api/board/layer2-shortlist?sport=ncaaf&limit=2000`, 14:00 CT): 931 NCAAF
+rows, 897 with `game_state`, **34 without, every one Florida A&M Rattlers @ Miami Hurricanes**. The
+cause: `teams_match("ncaaf", "Florida A&M", "Florida A&M Rattlers")` is False (`canonical_team` None
+for both), while the registry resolves both to id 50. Blast radius, run BEFORE the deploy over
+production's own rows and chips with the fallback off vs on: ncaaf 872 → 899 matched; nfl, mlb and
+soccer unchanged; 0 rows moved to a different game in any sport.
+
+**Why the claim was released before the reading:** the claim's TTL lapsed at 14:45:33 CT, and the
+first post-boot board cycle has taken ~13–15 min on every deploy today, so the reading could not land
+inside it. Lane `ncaaf-games-cache-refresh` is waiting to deploy `ab787363`, which DESCENDS FROM
+`2d53fdf7`, so their deploy carries this change and the reading can be taken off either build.
+
+**verify: OWED** — NCAAF rows with no `game_state` 34 → 0 on the served Layer 2 board after the first
+post-deploy cycle, with NFL, MLB and soccer game-state counts unchanged.
+
 ## 2026-09-10 18:39-18:45Z — reading only, no deploy — NCAAF WEEK ADVANCE, SECOND READING — **BOTH PRESCRIBED READINGS PASS; the 2026-09-08 prediction held. The Saturday build is predicted to land mid-slate.** `[lane ncaaf-games-cache-refresh, session a8d753fe]`
 
 This reading has been owed since `cc1feccc` (2026-09-01). It FAILED once, on 2026-09-08, when the build caught SMU @ Florida State mid-game. Substrate `render`. Live SHAs: web `2224dec0`; refresh-worker `a9bafa9d` at read time, redeployed to `6c727968` at 18:44:23Z by another lane. `cc1feccc` is an ancestor of both.
