@@ -2605,3 +2605,280 @@ def test_an_order_WITH_a_venue_id_absent_from_the_book_KEEPS_blocking(monkeypatc
     assert result["not_found"] == 1
     assert mod.find_order(key)["status"] == mod.STATUS_SUBMITTED
     assert [o["idempotency_key"] for o in mod.unreconciled_orders()] == [key]
+
+
+# --------------------------------------------------------------------------
+# A refusal at BUILD writes nothing  [2026-09-10, lane write-ahead-build-refusal]
+#
+# The write-ahead row exists for an order that MAY have reached the venue. An
+# order the builder refuses never can -- and its row was the one a lost update
+# stranded. On 2026-09-04 a Polymarket order refused at build
+# (`market_unresolved_for_position`) was completed `rejected` by
+# live-odds-worker at 18:27:25.083, and refresh-worker's paper write at
+# 18:27:25.228 put the write-ahead copy back. Both venues froze for six days.
+# --------------------------------------------------------------------------
+
+
+class _TwoPhase:
+    """A venue adapter with a BUILD phase -- the shape the real adapters have.
+
+    `build(request)` does everything that can refuse without sending and hands
+    back the sender. Calling the adapter directly is build-then-send, so a
+    caller that knows nothing of the phases still works.
+    """
+
+    def __init__(self, *, refuse=None, on_send=None, events=None):
+        self.refuse = refuse
+        self.on_send = on_send
+        self.events = events if events is not None else []
+        self.built = []
+        self.sent = []
+
+    def build(self, request):
+        self.events.append("build")
+        self.built.append(request)
+        if self.refuse is not None:
+            raise self.refuse
+
+        def send():
+            self.events.append("send")
+            self.sent.append(request)
+            if self.on_send is not None:
+                self.on_send(request)
+            return {"status": STATUS_FILLED, "fill_price": 0.4, "fill_stake_dollars": 4.8}
+
+        return send
+
+    def __call__(self, request):
+        return self.build(request)()
+
+
+def _ledger_writes(monkeypatch):
+    """Every write the ledger makes, so a test can assert that NONE happened."""
+    writes = []
+    real = ledger.write_json_file
+
+    def counting(path, payload):
+        writes.append(path)
+        return real(path, payload)
+
+    monkeypatch.setattr(ledger, "write_json_file", counting)
+    return writes
+
+
+def _armed(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+
+
+def test_a_build_refusal_writes_no_ledger_row(monkeypatch):
+    from syndicate.features.shared.polymarket_us_orders import OrderBuildError
+
+    _armed(monkeypatch)
+    writes = _ledger_writes(monkeypatch)
+    adapter = _TwoPhase(refuse=OrderBuildError("market_unresolved_for_position"))
+
+    record = place_order(_request(venue="polymarket"), submit=adapter, mode=LIVE)
+
+    # THE BRANCH: the builder ran, nothing was sent, and nothing was written.
+    assert len(adapter.built) == 1
+    assert adapter.sent == []
+    assert writes == [], "a refused build wrote the ledger"
+    assert record["recorded"] is False
+    assert record["refusal"] == "market_unresolved_for_position"
+    # What a caller that reads only `status` gets is unchanged.
+    assert record["status"] == STATUS_REJECTED
+    assert "market_unresolved_for_position" in record["error"]
+    assert ledger_summary()["orders"] == 0
+    assert unreconciled_orders() == []
+
+
+def test_ANY_build_exception_is_a_refusal_because_a_build_never_sends(monkeypatch):
+    """`venue_contacted` defaults to True because an exception from a SEND may
+    have reached the venue. A build sends no order by construction -- it only
+    resolves and assembles -- so an unreadable artifact there is a refusal,
+    not a `failed` row charged against the day's budget and never retried."""
+    _armed(monkeypatch)
+    writes = _ledger_writes(monkeypatch)
+    adapter = _TwoPhase(refuse=RuntimeError("slate artifact unreadable"))
+
+    record = place_order(_request(position_key="build-bug"), submit=adapter, mode=LIVE)
+
+    assert len(adapter.built) == 1
+    assert record["recorded"] is False
+    assert record["refusal"] == "RuntimeError"
+    assert writes == []
+
+
+def test_a_built_order_is_STILL_recorded_before_it_is_sent(monkeypatch):
+    """The write-ahead is not weakened for an order that CAN be sent: at the
+    moment the sender runs, the row must already exist in `submitted`. And the
+    build must come BEFORE the row, or a refusal would still have written it."""
+    _armed(monkeypatch)
+    events = []
+    real_record_order = ledger.record_order
+
+    def recording(request, *, mode=None):
+        events.append("record")
+        return real_record_order(request, mode=mode)
+
+    monkeypatch.setattr(ledger, "record_order", recording)
+    seen = {}
+
+    def at_send(request):
+        stored = ledger.find_order(idempotency_key(request))
+        seen["status"] = None if stored is None else stored.get("status")
+
+    adapter = _TwoPhase(on_send=at_send, events=events)
+    record = place_order(_request(venue="kalshi"), submit=adapter, mode=LIVE)
+
+    assert events == ["build", "record", "send"]
+    assert seen["status"] == STATUS_SUBMITTED
+    assert record["status"] == STATUS_FILLED
+    assert "recorded" not in record
+
+
+def test_a_send_that_raises_after_a_clean_build_is_still_FAILED(monkeypatch):
+    """The conservative reading belongs to the SEND. A send that blew up may have
+    reached the venue, so it keeps its row and reads `failed`."""
+    _armed(monkeypatch)
+
+    def boom(_request):
+        raise RuntimeError("connection reset mid-POST")
+
+    adapter = _TwoPhase(on_send=boom)
+    record = place_order(_request(position_key="send-raised"), submit=adapter, mode=LIVE)
+
+    assert adapter.built and adapter.sent
+    assert record["status"] == STATUS_FAILED
+    assert ledger_summary()["orders"] == 1
+
+
+def test_a_retry_refused_at_build_leaves_the_rejected_row_exactly_as_it_was(monkeypatch):
+    """The 09-04 order was a RETRY. Its `prior_attempts` show it refused at build
+    on every pass from 07:48Z, each pass popping the rejected row and writing a
+    fresh `submitted` one -- the write the lost update then preserved. A refused
+    rebuild must leave the old row byte-for-byte and write nothing."""
+    from syndicate.features.shared.polymarket_us_orders import OrderBuildError
+
+    _armed(monkeypatch)
+    request = _request(venue="polymarket", position_key="retry-refused")
+
+    def refused_inside_the_submit(_request):
+        raise OrderBuildError("market_unresolved_for_position")
+
+    # The row as the single-phase path leaves it: written, refused, rejected.
+    first = place_order(request, submit=refused_inside_the_submit, mode=LIVE)
+    assert first["status"] == STATUS_REJECTED
+    before = ledger.find_order(first["idempotency_key"])
+
+    writes = _ledger_writes(monkeypatch)
+    adapter = _TwoPhase(refuse=OrderBuildError("market_unresolved_for_position"))
+    again = place_order(request, submit=adapter, mode=LIVE)
+
+    assert len(adapter.built) == 1
+    assert again["recorded"] is False
+    assert writes == []
+    assert ledger.find_order(first["idempotency_key"]) == before
+    assert ledger_summary()["orders"] == 1
+
+
+def test_a_duplicate_is_answered_WITHOUT_building(monkeypatch):
+    """A build can read the venue (Kalshi's live price). A position already
+    placed must not pay that read every pass, and must never be refused as
+    though it were new: it is a duplicate, and its existing row answers."""
+    _armed(monkeypatch)
+    request = _request(venue="kalshi", position_key="already-placed")
+    record_order(request, mode=LIVE)
+    adapter = _TwoPhase()
+
+    again = place_order(request, submit=adapter, mode=LIVE)
+
+    assert adapter.built == []
+    assert again["status"] == STATUS_SUBMITTED
+    assert "recorded" not in again
+
+
+def test_a_disarmed_live_order_writes_nothing(monkeypatch):
+    """Disarmed is a refusal made without a venue call, like a refused build. It
+    wrote a row per position per pass, each one strandable -- and a stranded row
+    turns the re-arm into a freeze."""
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    writes = _ledger_writes(monkeypatch)
+    adapter = _TwoPhase()
+
+    record = place_order(_request(), submit=adapter, mode=LIVE)
+
+    assert record["recorded"] is False
+    assert record["refusal"] == "live_not_armed"
+    assert "LIVE_ARMED" in record["error"]
+    assert adapter.built == []
+    assert writes == []
+
+
+def test_live_with_no_adapter_writes_nothing(monkeypatch):
+    _armed(monkeypatch)
+    writes = _ledger_writes(monkeypatch)
+
+    record = place_order(_request(), submit=None, mode=LIVE)
+
+    assert record["recorded"] is False
+    assert record["refusal"] == "no_venue_adapter"
+    assert "no venue adapter" in record["error"]
+    assert writes == []
+
+
+def test_KNOWN_HAZARD_a_write_landing_between_merge_read_and_SET_is_lost(monkeypatch):
+    """THE 2026-09-04 LOST UPDATE, REPLAYED. THIS TEST PASSES BECAUSE THE DEFECT
+    EXISTS. When `_persist` gains a compare-and-swap, invert it.
+
+    `_merge_onto_current` re-reads the store, then `write_json_file` SETs, and
+    nothing makes the two atomic. Measured from both services' own
+    `KEYVALUE_WRITE_LARGE` sizes:
+
+        18:27:24.711  refresh-worker    2,701,710 B  paper Q written (K submitted)
+        18:27:25.083  live-odds-worker  2,700,666 B  K -> rejected
+        18:27:25.228  refresh-worker    2,701,758 B  = its 24.711 doc + 48 B (Q filled)
+
+    refresh-worker's merge-read fell between 24.711 and 25.083, and its SET
+    landed after 25.083 carrying K as it had read it. The stored row still
+    reads `submitted_at 18:27:23.597740Z` with `error` and `venue_resolved_at`
+    null -- the write-ahead version, WITH NO ERROR ON IT. That is why no
+    reconcile rule keyed on a recorded build error could ever have cleared it,
+    and why the close is to not write the row at all.
+    """
+    _armed(monkeypatch)
+    k, _ = record_order(_request(venue="polymarket", position_key="K"), mode=LIVE)
+    q, _ = record_order(_request(position_key="Q"), mode=PAPER)
+
+    real_write = ledger.write_json_file
+    rival = []
+
+    def write_with_a_rival_inside_the_window(path, payload):
+        if not rival:
+            rival.append(1)
+            # live-odds-worker's WHOLE write, landing after refresh-worker's
+            # merge-read and before its SET.
+            complete_order(
+                k["idempotency_key"],
+                status=STATUS_REJECTED,
+                error="OrderBuildError: market_unresolved_for_position",
+            )
+        return real_write(path, payload)
+
+    # refresh-worker completes its paper fill: load, change Q, persist.
+    state = ledger._load()
+    for order in state["orders"]:
+        if order["idempotency_key"] == q["idempotency_key"]:
+            order["status"] = STATUS_FILLED
+    monkeypatch.setattr(ledger, "write_json_file", write_with_a_rival_inside_the_window)
+    ledger._persist(state)
+
+    assert rival == [1], "the rival write never landed inside the window"
+    stored = ledger.find_order(k["idempotency_key"])
+    # LOST. The rejection was written, then overwritten by the stale copy.
+    assert stored["status"] == STATUS_SUBMITTED
+    assert stored["error"] is None
+    assert stored["venue_resolved_at"] is None
+    assert ledger.find_order(q["idempotency_key"])["status"] == STATUS_FILLED
+    assert [o["idempotency_key"] for o in unreconciled_orders()] == [k["idempotency_key"]]

@@ -451,3 +451,58 @@ def test_a_venue_that_BROKE_still_spends_because_a_position_may_exist():
     assert _is_venue_refusal({"status": "failed", "error": ""}) is False
     # A fill is never a refusal, whatever its error field says.
     assert _is_venue_refusal({"status": "filled", "error": "http_404"}) is False
+
+
+class _TwoPhaseAdapter:
+    """The real adapters' shape: `build` refuses or hands back the sender."""
+
+    def __init__(self, events):
+        self.events = events
+
+    def build(self, request):
+        self.events.append("build")
+        return lambda: self.events.append("sent") or {"status": "filled"}
+
+    def __call__(self, request):
+        return self.build(request)()
+
+
+def test_the_guard_passes_the_BUILD_through_and_keeps_the_switch_on_the_SEND(monkeypatch):
+    """`[2026-09-10, lane write-ahead-build-refusal]` `place_order` refuses a
+    build before writing only when the adapter it is handed exposes `build` --
+    and live mode hands it THIS wrapper, so the wrapper must pass it through.
+    The switch stays on the send, with nothing between the check and the call:
+    a switch pulled after the build must still stop the order."""
+    events: list[str] = []
+    guarded = guard.guarded_submit(_TwoPhaseAdapter(events))
+    assert callable(getattr(guarded, "build", None))
+
+    send = guarded.build(_request())
+    monkeypatch.setenv("SYNDICATE_EXECUTION_KILL_SWITCH", "1")
+    with pytest.raises(guard.KillSwitchEngaged):
+        send()
+    assert events == ["build"], "the switch was pulled after the build and the order still went"
+
+    monkeypatch.delenv("SYNDICATE_EXECUTION_KILL_SWITCH")
+    assert guarded.build(_request())()["status"] == "filled"
+    assert events == ["build", "build", "sent"]
+
+
+def test_a_two_phase_order_stopped_by_the_switch_is_still_recorded_failed(monkeypatch, tmp_path):
+    """The switch fires AFTER the write-ahead, on the send -- so a stopped order
+    keeps its row, exactly as `test_a_stopped_order_is_recorded_as_failed_not_
+    forgotten` requires of the single-phase path."""
+    from syndicate.features.shared import execution_ledger
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_KILL_SWITCH", "1")
+    events: list[str] = []
+
+    record = execution_ledger.place_order(
+        _request(), submit=guard.guarded_submit(_TwoPhaseAdapter(events))
+    )
+    assert "sent" not in events
+    assert record["status"] == "failed"
+    assert "kill_switch" in str(record.get("error"))
+    assert record.get("recorded") is not False

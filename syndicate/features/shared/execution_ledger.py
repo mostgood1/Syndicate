@@ -1083,7 +1083,7 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
                 " 2026-08-30)",
                 flush=True,
             )
-        if str(order.get("status") or "") != STATUS_REJECTED and not _is_retryable_venue_pause(order):
+        if _blocks_a_new_attempt(order):
             return order, False
         # A REJECTED ORDER NEVER REACHED THE VENUE, so re-attempting it cannot
         # double anything -- and refusing to is how a transient refusal becomes
@@ -1195,6 +1195,100 @@ def complete_order(
     return updated
 
 
+def _blocks_a_new_attempt(order: Mapping[str, Any]) -> bool:
+    """A row under this bet's key that makes a new attempt a DUPLICATE.
+
+    Only `rejected` (and a `failed` the exchange refused while paused) frees
+    the key: `filled`, `submitted` and `failed` all mean the venue may hold the
+    order. Shared by `record_order` and `place_order`'s pre-build check, so the
+    two cannot disagree about what a duplicate is.
+    """
+    return str(order.get("status") or "") != STATUS_REJECTED and not _is_retryable_venue_pause(order)
+
+
+def _blocking_record_for(request: OrderRequest) -> dict[str, Any] | None:
+    """The row `record_order` would hand back as a duplicate, found WITHOUT
+    writing. The first row under the key or its legacy shape decides, as it
+    does there."""
+    match_keys = {idempotency_key(request)}
+    legacy_key = _legacy_idempotency_key(request)
+    if legacy_key:
+        match_keys.add(legacy_key)
+    for order in _load().get("orders") or []:
+        if order.get("idempotency_key") in match_keys:
+            return order if _blocks_a_new_attempt(order) else None
+    return None
+
+
+def _refusal_token(exc: BaseException) -> str:
+    """A bounded COUNTER KEY for a refused build.
+
+    `verify_order_paths`' rule: an `OrderBuildError` -- three venues each
+    define one, so it is matched by NAME -- or anything declaring
+    `venue_contacted = False` carries its reason as the text before the first
+    colon. Anything else is keyed by its class. Never by the message: that
+    carries tickers and prices, and a counter keyed on it is unbounded.
+    """
+    if type(exc).__name__ == "OrderBuildError" or getattr(exc, "venue_contacted", True) is False:
+        token = str(exc).split(":", 1)[0].strip()
+        if token and " " not in token:
+            return token
+    return type(exc).__name__
+
+
+def _build_before_record(
+    request: OrderRequest, submit: Callable[[OrderRequest], dict[str, Any]] | None
+) -> tuple[Callable[[], dict[str, Any]] | None, tuple[str, str] | None]:
+    """`(send, None)`, or `(None, (token, message))` with NOTHING sent.
+
+    A build resolves and assembles; it never sends an order. Every two-phase
+    adapter keeps that contract, and it is why ANY exception here is a refusal
+    rather than the conservative `failed` an exception from a SEND earns:
+    `venue_contacted` defaults to True because a send that blew up may have
+    landed, and a build cannot have.
+    """
+    # Both switches, per order rather than at startup, so the kill switch can
+    # stop an in-flight slate.
+    if not live_execution_armed():
+        return None, (
+            "live_not_armed",
+            "live mode requested but SYNDICATE_EXECUTION_LIVE_ARMED is not set",
+        )
+    if submit is None:
+        return None, ("no_venue_adapter", "live mode requested with no venue adapter wired")
+    build = getattr(submit, "build", None)
+    if not callable(build):
+        # A SINGLE-PHASE adapter. Nothing about it can be validated before the
+        # write, so it keeps the old order: record, then submit.
+        return (lambda: submit(request)), None
+    try:
+        return build(request), None
+    except Exception as exc:  # noqa: BLE001 -- a build never sends; see above
+        return None, (_refusal_token(exc), f"{type(exc).__name__}: {exc}")
+
+
+def _unrecorded_refusal(request: OrderRequest, token: str, message: str) -> dict[str, Any]:
+    """The answer for an order refused before its row existed.
+
+    NOT A LEDGER ROW, and `recorded=False` says so -- a caller that needs to
+    know must not have to infer it. `status` reads `rejected`, which is what
+    the old path completed these rows as, so a caller that reads only the
+    status is told what it always was.
+    """
+    return {
+        "idempotency_key": idempotency_key(request),
+        "position_key": request.position_key,
+        "selected_date": request.selected_date,
+        "mode": LIVE,
+        "venue": request.venue,
+        "venue_ticker": request.venue_ticker,
+        "status": STATUS_REJECTED,
+        "error": message,
+        "recorded": False,
+        "refusal": token,
+    }
+
+
 def place_order(
     request: OrderRequest,
     *,
@@ -1203,17 +1297,41 @@ def place_order(
 ) -> dict[str, Any]:
     """The one seam money goes through. Same code in paper and in live.
 
-    Order of operations is the whole safety argument and does not vary by mode:
-    record first, submit second, complete third. `submit` is only ever called
-    for an order this call newly created -- an already-recorded key returns its
-    existing record without touching the venue.
+    Order of operations is the whole safety argument: record first, send
+    second, complete third. The send is only ever made for an order this call
+    newly created -- an already-recorded key returns its existing record
+    without touching the venue.
+
+    ----------------------------------------------------------------------
+    LIVE BUILDS BEFORE IT RECORDS  [2026-09-10, lane write-ahead-build-refusal]
+    ----------------------------------------------------------------------
+
+    The write-ahead row exists for an order that MAY have reached the venue.
+    One the builder refuses never can, so it gets no row. An adapter exposing
+    `build(request) -> send` is built first, and a refusal there -- like a
+    disarmed worker or a missing adapter -- returns `_unrecorded_refusal` with
+    nothing written.
+
+    That row is the one a lost update stranded. On 2026-09-04 a Polymarket
+    order refused at build (`market_unresolved_for_position`) was completed
+    `rejected` at 18:27:25.083. At 25.228 refresh-worker's paper write put the
+    write-ahead copy back: `_persist` merges on a fresh read and then SETs,
+    and nothing between the two is atomic, so a SET landing in that window is
+    overwritten by the stale copy. The reverted row carried `error=None`, so no
+    rule keyed on a recorded build error could have cleared it. Any
+    unreconciled live order blocks every venue, and nothing reconciles an
+    order with no venue id. Both venues were frozen six days, until an operator
+    resolved it. A row that is never written cannot be stranded.
+
+    A SINGLE-PHASE adapter (a bare callable, as every test double is) keeps the
+    old order: record, then submit, and a refusal inside the submit is
+    completed `rejected`.
     """
     resolved_mode = mode or execution_mode()
-    record, created = record_order(request, mode=resolved_mode)
-    if not created:
-        return record
-
     if resolved_mode != LIVE:
+        record, created = record_order(request, mode=resolved_mode)
+        if not created:
+            return record
         # PAPER: the fill is the price that was available at decision time.
         # Same shape as a real fill so nothing downstream can tell them apart
         # except by `mode`, which is what makes the paper run evidence about
@@ -1226,23 +1344,24 @@ def place_order(
             venue_order_id=None,
         ) or record
 
-    # LIVE. Both switches, checked here rather than at startup so the kill
-    # switch can stop an in-flight slate.
-    if not live_execution_armed():
-        return complete_order(
-            record["idempotency_key"],
-            status=STATUS_REJECTED,
-            error="live mode requested but SYNDICATE_EXECUTION_LIVE_ARMED is not set",
-        ) or record
-    if submit is None:
-        return complete_order(
-            record["idempotency_key"],
-            status=STATUS_REJECTED,
-            error="live mode requested with no venue adapter wired",
-        ) or record
+    # LIVE. A duplicate is answered by its existing row BEFORE anything is
+    # built: a build can read the venue (Kalshi's live price), and a position
+    # already placed must neither pay that read every pass nor be refused as
+    # though it were new. `record_order` still makes the final call.
+    existing = _blocking_record_for(request)
+    if existing is not None:
+        return existing
+
+    send, refusal = _build_before_record(request, submit)
+    if refusal is not None:
+        return _unrecorded_refusal(request, *refusal)
+
+    record, created = record_order(request, mode=resolved_mode)
+    if not created:
+        return record
 
     try:
-        result = submit(request) or {}
+        result = send() or {}
     except Exception as exc:
         # The order STAYS recorded and is marked failed rather than deleted. A
         # submit that raised may still have reached the venue, so the record is

@@ -836,9 +836,18 @@ def polymarket_us_submitter(resolve_market):
     works -- but a team side then refuses in `_side_to_outcome` rather than
     being placed positionally, which is the failure that made this argument
     necessary.
+
+    TWO PHASES `[2026-09-10, lane write-ahead-build-refusal]`. `submit.build`
+    resolves the market AND builds the body -- so every refusal this module
+    raises (`market_unresolved_for_position`, a side it will not map, a price
+    off the grid, a stake under the minimum) fires there -- and returns the
+    sender. `place_order` calls it before writing the write-ahead row. The
+    2026-09-04 order that froze both venues for six days was refused on the
+    line below AFTER its row had been written, and a lost update kept the row.
+    Calling `submit` directly is build-then-send, unchanged.
     """
 
-    def submit(request: Any) -> dict[str, Any]:
+    def build(request: Any):
         resolved = resolve_market(request)
         if not resolved:
             raise OrderBuildError("market_unresolved_for_position")
@@ -859,17 +868,25 @@ def polymarket_us_submitter(resolve_market):
             slug, price, tick, min_qty, outcome_index = resolved
         else:
             slug, price, tick, min_qty = resolved
-        return submit_order(
-            request,
-            price_dollars=price,
-            market_slug=slug,
-            tick_size=tick,
-            minimum_trade_qty=min_qty,
-            outcome_index=outcome_index,
-            yes_leg_index=yes_leg_index,
-            yes_leg_reason=yes_leg_reason,
-        )
+        fields = {
+            "price_dollars": price,
+            "market_slug": slug,
+            "tick_size": tick,
+            "minimum_trade_qty": min_qty,
+            "outcome_index": outcome_index,
+            "yes_leg_index": yes_leg_index,
+            "yes_leg_reason": yes_leg_reason,
+        }
+        # VALIDATION, NOT A SECOND BODY. `order_body` is PURE and `submit_order`
+        # rebuilds the identical body from these same fields, so every refusal
+        # it raises fires here, before the row is written.
+        order_body(request, **fields)
+        return lambda: submit_order(request, **fields)
 
+    def submit(request: Any) -> dict[str, Any]:
+        return build(request)()
+
+    submit.build = build
     return submit
 
 

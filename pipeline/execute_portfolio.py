@@ -525,8 +525,11 @@ def run_execution(
         # 2026-09-04T18:27:25Z a Polymarket position with no slug was written,
         # refused at build and logged `rejected` (`LIVE_ORDER ... ticker=None`,
         # and `POLYMARKET_NO_SLUG ... type=NoneType` the same instant) -- and
-        # the stored row still read `submitted` on 2026-09-10 (a lost update;
-        # the mechanism is unproven).
+        # the stored row still read `submitted` on 2026-09-10. A lost update,
+        # PROVEN 2026-09-10 (lane `write-ahead-build-refusal`): `_persist`
+        # merges on a fresh read and then SETs, with nothing atomic between,
+        # and refresh-worker's paper SET at 18:27:25.228 carried the copy it
+        # had read before live-odds-worker's `rejected` SET at 25.083.
         # Any unreconciled live order blocks every placement on every venue
         # (`BLOCKED_ON_UNRECONCILED`), and nothing reconciles an order that never
         # got a venue id, so it held until an operator resolved it. The first
@@ -664,6 +667,35 @@ def run_execution(
                 continue
 
         record = place_order(request, submit=submitter)
+        if record.get("recorded") is False:
+            # REFUSED AT BUILD -- NOTHING WAS WRITTEN.  [2026-09-10, lane
+            # write-ahead-build-refusal]
+            #
+            # `place_order` builds a live order before its write-ahead row, so a
+            # contract that cannot be built -- a slug missing from the slate, a
+            # side the body refuses, Kalshi's `no_live_price` -- is refused with
+            # no row a lost update could strand. Counted by name like every
+            # refusal; NOT a retry, since nothing reached the venue; and NOT a
+            # `LIVE_ORDER`, because that line means a row exists.
+            reason = str(record.get("refusal") or "refused_at_build")
+            skipped += 1
+            refused[reason] = refused.get(reason, 0) + 1
+            print(
+                f"[execute_portfolio] REFUSED_AT_BUILD venue={venue} reason={reason}"
+                f" ticker={getattr(request, 'venue_ticker', None)!r}"
+                f" sport={getattr(request, 'sport', None)}"
+                f" market={getattr(request, 'market', None)}"
+                f" player={getattr(request, 'player_name', None)!r}"
+                f" side={getattr(request, 'side', None)}"
+                f" line={getattr(request, 'line', None)}"
+                f" stake={getattr(request, 'requested_stake_dollars', None)}"
+                f" retry_of_rejected={before == STATUS_REJECTED}"
+                f" error={record.get('error')!r}"
+                f" {_ev_fields_of(position)}"
+                " -- the order could not be built; no ledger row written",
+                flush=True,
+            )
+            continue
         if not retryable:
             duplicates += 1
             continue
@@ -1349,8 +1381,9 @@ def _polymarket_cross_ticks() -> int:
 def _polymarket_resolve_market(request) -> tuple | None:
     """`(slug, price, tick_size, min_qty)` for one Polymarket US position, or
     `None` to refuse cleanly -- which `polymarket_us_submitter` turns into an
-    `OrderBuildError` (recorded as failed, never sent at a price nobody chose,
-    same discipline `_kalshi_price_for` returning `None` uses).
+    `OrderBuildError` at BUILD, before any ledger row is written (see
+    `place_order`), and never sent at a price nobody chose -- the same
+    discipline `_kalshi_price_for` returning `None` uses.
 
     --------------------------------------------------------------------------
     READS THE PERSISTED ARTIFACT, NEVER CALLS THE VENUE DIRECTLY

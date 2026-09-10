@@ -232,9 +232,27 @@ def test_roi_counts_settled_stake_only():
 
 
 def test_an_unfilled_order_is_not_counted_as_a_loss(monkeypatch):
-    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
-    monkeypatch.delenv("SYNDICATE_EXECUTION_LIVE_ARMED", raising=False)
-    record = _place()
+    # A LIVE order that never filled: written ahead, then `rejected` -- what
+    # `reconcile_live_orders` makes of an order the venue cancelled unfilled.
+    # It used to be made by placing live while DISARMED; since 2026-09-10 a
+    # disarmed order is refused before any row exists (lane
+    # write-ahead-build-refusal), so the row is built directly.
+    from syndicate.features.shared.execution_ledger import (
+        LIVE, STATUS_REJECTED, complete_order, record_order,
+    )
+
+    written, _ = record_order(
+        OrderRequest(
+            position_key="p1", selected_date=DATE, venue="paper", sport="mlb",
+            event_id="evt-1", market="strikeouts", side="over",
+            requested_price=-110.0, requested_stake_dollars=10.0, line=6.5,
+            player_name="Andrew Abbott", game_pk="777",
+        ),
+        mode=LIVE,
+    )
+    record = complete_order(
+        written["idempotency_key"], status=STATUS_REJECTED, error="venue_canceled"
+    )
     assert record["status"] == "rejected"
 
     result = settle.settle_orders(DATE, resolver=_resolver(3.0))

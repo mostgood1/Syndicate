@@ -273,9 +273,12 @@ def test_force_does_not_bypass_the_live_arm(monkeypatch):
 
     result = runner.run_execution("2026-08-22", force=True, venue_scope="kalshi")
     assert result["status"] == "ok"
-    # Every order rejected for want of the arm; nothing filled.
+    # Every order refused for want of the arm; nothing placed. Since
+    # 2026-09-10 the refusal writes no row (lane write-ahead-build-refusal):
+    # a disarmed order never leaves the process, so it gets no write-ahead.
     assert result["placed"] == 0
-    assert ledger_summary("2026-08-22")["by_status"].get("rejected") == 1
+    assert result["refused"] == {"live_not_armed": 1}
+    assert ledger_summary("2026-08-22")["orders"] == 0
 
 
 # --------------------------------------------------------------------------
@@ -327,8 +330,10 @@ def test_the_non_inline_path_is_unchanged(monkeypatch):
     result = runner.run_execution("2026-08-22", venue_scope="kalshi")
     assert result["status"] == "ok"
     assert result["mode"] == "live"
-    # Rejected for want of the arm, NOT refused for being inline.
-    assert ledger_summary("2026-08-22")["by_status"].get("rejected") == 1
+    # Refused for want of the arm, NOT refused for being inline: the run got as
+    # far as the per-order arm check. That refusal writes no row since
+    # 2026-09-10 (lane write-ahead-build-refusal), so it is read off `refused`.
+    assert result["refused"] == {"live_not_armed": 1}
 
 
 def test_the_commit_and_execution_jobs_have_a_CALLER():
@@ -1099,10 +1104,20 @@ def test_venue_submitter_polymarket_end_to_end(monkeypatch):
                 "requested_contracts": 1.0}
 
     monkeypatch.setattr(polymarket_us_orders, "submit_order", fake_submit_order)
+    # THE BUILD VALIDATES THE BODY FIRST `[2026-09-10]`, before the write-ahead
+    # row, from the SAME fields the send receives. Recorded rather than run:
+    # `_PolyReq` is a team side on a row naming no YES leg, which the real
+    # `order_body` refuses -- and this test is about the plumbing, not the side.
+    built = []
+    monkeypatch.setattr(
+        polymarket_us_orders, "order_body",
+        lambda request, **kwargs: built.append(kwargs) or {},
+    )
 
     submitter = runner._venue_submitter("polymarket")
     result = submitter(_PolyReq())
     assert result["status"] == "submitted"
+    assert built == calls
     assert calls == [{
         "price_dollars": 0.55,
         "market_slug": "aec-mlb-tex-chw-2026-08-24",
@@ -2078,3 +2093,224 @@ def test_junk_in_the_model_fields_reads_as_ABSENT_rather_than_crashing() -> None
         "2026-09-03", "kalshi")
     assert request.model_edge_pct is None
     assert request.ev_pct is None
+
+
+# --------------------------------------------------------------------------
+# A contract that cannot be BUILT writes nothing either
+#   [2026-09-10, lane write-ahead-build-refusal]
+#
+# `332e596d` refuses a live position with no `venue_ticker` before
+# `place_order`. A position that HAS a contract and still cannot be built -- a
+# slug missing from the slate, a side the body refuses, Kalshi's
+# `no_live_price` -- went through `place_order`, which wrote the `submitted`
+# row before the adapter refused. The 2026-09-04 order was one of these.
+# --------------------------------------------------------------------------
+
+
+_POLY_CONTRACT = {
+    "slug": "tsc-epl-ars-che-2026-09-04-2pt5", "tick_size": 0.01, "minimum_trade_qty": 1.0,
+}
+
+
+def _slate(monkeypatch, rows):
+    """The persisted Polymarket game slate -- and ONLY that path. Every other
+    read reaches the real store, so the ledger and the caps are not handed a
+    slate. (`_artifact_env` answers every path, which suits a resolver test and
+    not a whole run.)"""
+    from syndicate.features.shared import refresh_state_store
+    from syndicate.features.shared.polymarket_us_markets import GAME_SLATE_ARTIFACT
+
+    real = refresh_state_store.read_json_file
+
+    def fake(path):
+        if str(path) == str(refresh_state_store.reports_root().joinpath(*GAME_SLATE_ARTIFACT)):
+            return {"fetched_at": time.time(), "markets": rows, "count": len(rows)}
+        return real(path)
+
+    monkeypatch.setattr(refresh_state_store, "read_json_file", fake)
+
+
+def _record_order_calls(monkeypatch):
+    from syndicate.features.shared import execution_ledger
+
+    calls = []
+    real = execution_ledger.record_order
+
+    def spy(request, *, mode=None):
+        calls.append(request)
+        return real(request, mode=mode)
+
+    monkeypatch.setattr(execution_ledger, "record_order", spy)
+    return calls
+
+
+def test_a_polymarket_slug_missing_from_the_slate_writes_no_row(monkeypatch, capsys):
+    """THE 2026-09-04 REFUSAL, on a position that HAS a contract.
+
+    `6bc5617ccc3bf1f54d02bb35` carried no slug at all (`venue_ticker` null,
+    `POLYMARKET_NO_SLUG ... type=NoneType`) -- the shape `332e596d` now refuses
+    before `place_order`. The same refusal, `market_unresolved_for_position`,
+    is still raised for a slug the slate does not hold, and such a position
+    still reached `place_order`, which wrote the `submitted` row first. Real
+    adapter, real resolver.
+    """
+    from pipeline import execute_portfolio as runner
+
+    _write_live_plan(monkeypatch, [_row(venue_ticker=dict(_POLY_CONTRACT))], venue="polymarket")
+    _arm_live(monkeypatch, venue="polymarket")
+    _slate(monkeypatch, [_polymarket_row()])  # a DIFFERENT slug
+    writes = _record_order_calls(monkeypatch)
+
+    result = runner.run_execution("2026-08-22", venue_scope="polymarket")
+
+    assert result["status"] == "ok"
+    assert result["refused"] == {"market_unresolved_for_position": 1}
+    assert result["placed"] == 0
+    assert result["retried"] == 0
+    out = capsys.readouterr().out
+    # THE BRANCH: the real resolver looked for the slug and missed it...
+    assert f"POLYMARKET_MARKET_NOT_FOUND slug={_POLY_CONTRACT['slug']}" in out
+    # ...and the refusal was named before anything was written.
+    assert "REFUSED_AT_BUILD venue=polymarket reason=market_unresolved_for_position" in out
+    assert "LIVE_ORDER" not in out
+    assert writes == []
+    assert ledger_summary("2026-08-22")["orders"] == 0
+
+
+def test_a_polymarket_body_the_venue_would_refuse_writes_no_row(monkeypatch, capsys):
+    """A REFUSED SIDE, not a missing market. The market resolves, and
+    `order_body` refuses the side: a team side on a market that names no YES
+    leg. That refusal lived INSIDE the submit, after the write; building the
+    body before `record_order` is what moves it in front."""
+    from pipeline import execute_portfolio as runner
+
+    monkeypatch.delenv("SYNDICATE_POLYMARKET_ALLOW_TEAM_SIDE", raising=False)
+    _write_live_plan(monkeypatch, [_row(venue_ticker=dict(_POLY_CONTRACT))], venue="polymarket")
+    _arm_live(monkeypatch, venue="polymarket")
+    resolved = []
+
+    def resolves(request):
+        resolved.append(request.venue_ticker)
+        return (_POLY_CONTRACT["slug"], 0.55, "0.01", "1", 0, (None, None))
+
+    monkeypatch.setattr(runner, "_polymarket_resolve_market", resolves)
+    writes = _record_order_calls(monkeypatch)
+
+    result = runner.run_execution("2026-08-22", venue_scope="polymarket")
+
+    assert resolved == [_POLY_CONTRACT["slug"]]
+    assert result["refused"] == {"team_side_needs_verified_yes_leg": 1}
+    assert writes == []
+    assert ledger_summary("2026-08-22")["orders"] == 0
+    out = capsys.readouterr().out
+    assert "REFUSED_AT_BUILD venue=polymarket reason=team_side_needs_verified_yes_leg" in out
+    assert "LIVE_ORDER" not in out
+
+
+def test_a_kalshi_contract_with_no_live_price_writes_no_row(monkeypatch, capsys):
+    from pipeline import execute_portfolio as runner
+
+    _write_live_plan(monkeypatch, [_row(venue_ticker=_TICKER)])
+    _arm_live(monkeypatch)
+    asked = []
+
+    def no_price(request):
+        asked.append(request.venue_ticker)
+        return None
+
+    monkeypatch.setattr(runner, "_kalshi_price_for", no_price)
+    writes = _record_order_calls(monkeypatch)
+
+    result = runner.run_execution("2026-08-22", venue_scope="kalshi")
+
+    # THE BRANCH: the real Kalshi adapter's build asked for the price.
+    assert asked == [_TICKER]
+    assert result["refused"] == {"no_live_price": 1}
+    assert writes == []
+    assert ledger_summary("2026-08-22")["orders"] == 0
+    out = capsys.readouterr().out
+    assert "REFUSED_AT_BUILD venue=kalshi reason=no_live_price" in out
+    assert "LIVE_ORDER" not in out
+
+
+def test_a_rejected_row_refused_again_at_build_is_left_alone_and_is_not_a_retry(monkeypatch):
+    """The churn the 09-04 row's `prior_attempts` records: one pop and one fresh
+    `submitted` write per pass, for ten hours. A row the old code left
+    `rejected` must survive a refused rebuild untouched, and the pass must not
+    count a retry, because nothing was attempted at the venue."""
+    from pipeline import execute_portfolio as runner
+    from syndicate.features.shared.execution_ledger import (
+        LIVE, STATUS_REJECTED, complete_order, find_order, record_order,
+    )
+
+    plan = _write_live_plan(monkeypatch, [_row(venue_ticker=_TICKER)])
+    _arm_live(monkeypatch)
+    request = runner._order_from_position(plan["positions"][0], "2026-08-22", "kalshi")
+    row, _ = record_order(request, mode=LIVE)
+    complete_order(
+        row["idempotency_key"], status=STATUS_REJECTED,
+        error=f"OrderBuildError: no_live_price: {_TICKER}",
+    )
+    before = find_order(row["idempotency_key"])
+    monkeypatch.setattr(runner, "_kalshi_price_for", lambda request: None)
+
+    result = runner.run_execution("2026-08-22", venue_scope="kalshi")
+
+    assert result["refused"] == {"no_live_price": 1}
+    assert result["retried"] == 0
+    assert find_order(row["idempotency_key"]) == before
+    assert ledger_summary("2026-08-22")["orders"] == 1
+
+
+def test_a_buildable_neighbour_still_places_and_its_row_exists_before_the_send(monkeypatch):
+    """The control, through the real Kalshi adapter and its real body builder.
+    A refusal that stopped the whole slate, or a build that swallowed the
+    write-ahead, would each pass every test above."""
+    from pipeline import execute_portfolio as runner
+    from syndicate.features.shared import kalshi_orders
+    from syndicate.features.shared.execution_ledger import find_order, idempotency_key
+
+    unpriced = "KXMLBGAME-26AUG22AWAYHOME2-HOME"
+    _write_live_plan(
+        monkeypatch,
+        [_row(venue_ticker=_TICKER), _row(event_id="evt-2", venue_ticker=unpriced)],
+    )
+    _arm_live(monkeypatch)
+    monkeypatch.setattr(
+        runner, "_kalshi_price_for",
+        lambda request: 0.46 if request.venue_ticker == _TICKER else None,
+    )
+    at_send = []
+
+    def send(request, *, price_dollars=None):
+        stored = find_order(idempotency_key(request))
+        at_send.append(
+            (request.venue_ticker, None if stored is None else stored.get("status"), price_dollars)
+        )
+        return {"status": "filled", "fill_price": price_dollars,
+                "fill_stake_dollars": 0.92, "venue_order_id": "o-1"}
+
+    monkeypatch.setattr(kalshi_orders, "submit_order", send)
+
+    result = runner.run_execution("2026-08-22", venue_scope="kalshi")
+
+    assert result["placed"] == 1
+    assert result["refused"] == {"no_live_price": 1}
+    assert at_send == [(_TICKER, "submitted", 0.46)]
+    assert ledger_summary("2026-08-22")["orders"] == 1
+
+
+def test_every_venue_adapter_wired_today_BUILDS_before_it_sends():
+    """`place_order` can refuse before the write only for an adapter that
+    exposes `build`. A venue wired without one silently brings back the
+    write-ahead-before-build -- the row a lost update stranded on 2026-09-04.
+    Same shape as the every-submitter-has-a-reader tripwire (`learnings.md`
+    2026-08-25). A venue added to `_venue_submitter` belongs in this list."""
+    from pipeline import execute_portfolio as runner
+    from syndicate.features.shared.execution_guard import guarded_submit
+
+    for venue in ("kalshi", "polymarket"):
+        adapter = runner._venue_submitter(venue)
+        assert callable(getattr(adapter, "build", None)), venue
+        # And the wrapper live mode actually hands to `place_order`.
+        assert callable(getattr(guarded_submit(adapter), "build", None)), venue

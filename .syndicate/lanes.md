@@ -407,6 +407,23 @@ death, never life — do not invert it.
   - (3) the same-day 09-10 chip reading, then the 09-11 reading in the Goal.
 - Blocked by: none.
 
+### write-ahead-build-refusal — OPEN — opened 2026-09-10 — session 192abc41-d901-4b94-93d7-43922ae75c81
+- Goal: [user 2026-09-10] a LIVE order whose build is refused persists NO write-ahead `submitted` row, so a lost update has nothing to strand. The refusals in scope: Polymarket `market_unresolved_for_position` (the slug is missing from the slate), a refused spread or team side, and Kalshi `no_live_price`. Also: the 2026-09-04 lost-update mechanism is named from evidence. This is the residual of `exchange-execution-unblock`: `332e596d` covered only positions with no `venue_ticker`.
+- Files: `syndicate/features/shared/execution_ledger.py`, `syndicate/features/shared/kalshi_orders.py`, `syndicate/features/shared/polymarket_us_orders.py`, `syndicate/features/shared/execution_guard.py`, `pipeline/execute_portfolio.py`, `tests/test_execution_ledger.py`, `tests/test_execute_portfolio.py`, `tests/test_execution_guard.py`, `tests/test_kalshi_orders.py`, `tests/test_polymarket_us_orders.py`, `tests/test_paper_settlement.py` (ADDED 2026-09-10: one test made its unfilled row by placing live while disarmed, which now writes no row; unclaimed on origin/main). Collision check 2026-09-10: the only other claim on any of these was `exchange-execution-unblock`, which is CLOSED on origin/main.
+- Hypothesis (written before any code, from Render logs and the stored row, read 2026-09-10): the lost update is a cross-service TOCTOU in `_persist`. `_merge_onto_current` re-reads the store, then `write_json_file` SETs, and nothing between them is atomic. So a writer whose merge-read→SET window straddles another writer's SET writes back its stale copy of every row it "kept theirs".
+  - Byte ledger, 2026-09-04. At 18:27:25.083, live-odds-worker SET K `rejected`: 2,700,666 B, 2445 orders. Its merge-read came before refresh-worker's 24.711 SET, so this write dropped paper order Q.
+  - At 18:27:25.228, refresh-worker SET exactly its own 24.711 doc + 48 B (Q filled). That doc carried K as `submitted`.
+  - The stored row agrees: `submitted_at 18:27:23.597740Z`, `pre_resolution_error null`, `venue_resolved_at null`, and `prior_attempts` n=5, the newest `replaced_at 18:27:23.597672Z`. K was a retry refused at build every pass since 07:48Z.
+  - The same burst reverted paper order `4aa69211…`, whose first `UNRECONCILABLE_ORDER` line is at 18:27:36Z.
+  - Consequence: a reverted row carries `error=None`, so no reconcile rule keyed on the recorded error can ever see it. The close is build-before-record.
+- Falsification test: (1) A test that replays the interleaving (a SET landing between another writer's merge-read and its SET) leaves K `rejected` on the current code. If so, the TOCTOU is not the mechanism. (2) After the live-odds-worker deploy, a pass logs `LIVE_ORDER status=rejected … OrderBuildError` for a position that has a contract.
+- Verification:
+  - The new tests fail on origin/main and pass on the fix.
+  - On production after the deploy: `EXECUTED … refused={'<build token>': N}` with `REFUSED_AT_BUILD` lines and zero `LIVE_ORDER status=rejected … OrderBuildError` lines in the same pass. The ledger order count holds across a pass whose only live outcomes are build refusals.
+  - The measurement is recorded in `deploys.md`.
+- Blocked by: none. Deploy owed: live-odds-worker only.
+- **NOT IN SCOPE, AND FLAGGED:** the TOCTOU itself still threatens a SENT order's completion. Its fix is a compare-and-swap in `_persist` on every writer, which means all three services.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

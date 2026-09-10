@@ -759,12 +759,36 @@ def guarded_submit(submit):
     after it, with nothing in between but the call itself. That gap is what
     "stops an in-flight slate" actually means -- a switch pulled during a
     twelve-order loop must stop order four, not order one.
+
+    A TWO-PHASE ADAPTER'S `build` PASSES THROUGH, AND ITS SEND IS GUARDED
+    `[2026-09-10, lane write-ahead-build-refusal]`. `place_order` refuses
+    before the write only for an adapter exposing `build`, and live mode hands
+    it THIS wrapper -- so dropping the attribute here would put every build
+    refusal back behind a write-ahead row, silently. A build sends nothing, so
+    the switch has nothing to stop there; it stays on the send, still with
+    nothing between the check and the call.
     """
 
-    def _submit(request):
+    def _check():
         switch = kill_switch_engaged()
         if switch.get("engaged"):
             raise KillSwitchEngaged(f"kill_switch:{switch.get('source')}")
+
+    def _submit(request):
+        _check()
         return submit(request)
 
+    build = getattr(submit, "build", None)
+    if callable(build):
+
+        def _build(request):
+            send = build(request)
+
+            def _guarded_send():
+                _check()
+                return send()
+
+            return _guarded_send
+
+        _submit.build = _build
     return _submit

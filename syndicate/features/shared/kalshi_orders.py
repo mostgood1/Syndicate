@@ -1437,11 +1437,17 @@ def kalshi_submitter(price_for):
     """An adapter bound to a price resolver, for `place_order(submit=...)`.
 
     `price_for(request) -> float | None`. A resolver that cannot price the
-    contract makes the adapter RAISE, so the order is recorded as failed rather
-    than sent at a price nobody chose.
+    contract makes the adapter RAISE, so nothing is sent at a price nobody
+    chose.
+
+    TWO PHASES `[2026-09-10, lane write-ahead-build-refusal]`. `_submit.build`
+    does everything that can refuse -- the ticker, the price, the whole body
+    -- and returns the sender. `place_order` calls it BEFORE writing the
+    write-ahead row, so a refused build leaves no `submitted` row for a lost
+    update to strand. Calling `_submit` directly is build-then-send, unchanged.
     """
 
-    def _submit(request):
+    def _build(request):
         # NO CONTRACT ID IS NOT NO PRICE, and calling it one sent three real
         # orders to the ledger under the wrong cause on 2026-08-25.
         #
@@ -1466,8 +1472,19 @@ def kalshi_submitter(price_for):
         price = price_for(request)
         if price is None:
             raise OrderBuildError(f"no_live_price: {ticker}")
-        return submit_order(request, price_dollars=float(price))
+        price = float(price)
+        # THE BODY, BUILT HERE -- before the write-ahead row. `submit_order`
+        # rebuilds it from the same inputs, so this is VALIDATION: every refusal
+        # the body raises (a stake below one contract, a side it cannot map)
+        # fires before anything is written, not inside the send after the row
+        # exists.
+        build_order_body(request, price_dollars=price)
+        return lambda: submit_order(request, price_dollars=price)
 
+    def _submit(request):
+        return _build(request)()
+
+    _submit.build = _build
     return _submit
 
 
