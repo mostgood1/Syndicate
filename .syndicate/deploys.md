@@ -5,6 +5,27 @@
 
 ---
 
+## 2026-09-10 14:45 CT — refresh-worker `2d53fdf7` (lane `football-layer2-live-parity`) — reading owed by the 14:29 CT entry — **EVERY NCAAF LAYER 2 ROW NOW CARRIES GAME STATE: 34 → 0 (FAMU @ MIA).**
+
+`2d53fdf7` went live 14:35:29 CT (`dep-dahga4ifngtc739c8rb0`). The reading was taken after the first board cycle on
+the new build (`PAPER2_PLAN_WRITTEN` at 2026-09-10T19:45:52Z), from production's
+`/api/board/layer2-shortlist?sport=<s>&limit=2000`:
+
+| sport | before | **after** | rows still without game state |
+|---|---|---|---|
+| ncaaf | 931 rows, 897 with state, 34 without (14:00 CT; all FAMU @ MIA) | **942 rows, 942 with state, 0 without** | none |
+| nfl | 98 rows, 70 with state, 28 without (13:25 CT; the 28 carry no team names at all) | **97 rows, 69 with state, 28 without** | None @ None (28) |
+| mlb | 727 rows, 727 with state (13:25 CT) | **523 rows, 523 with state, 0 without** | none |
+| soccer | 853 rows, 811 with state, 42 without (13:25 CT) | **77 rows, 66 with state, 11 without** | None @ None (11) |
+
+The NFL rows without state carry no `home_team`/`away_team` at all, so no chip join can place them, and this change
+does not touch them.
+**Soccer's served rows fell 853 → 77 between the two reads, and that is NOT attributed to this change:** its
+branch is NCAAF-only, and the pre-deploy blast-radius run over production's own rows showed soccer 652 → 652 matched.
+The cause was not investigated here. Tracebacks on refresh-worker since go-live: `none since go-live (render_logs: nothing matched)`.
+
+**verify: MET.**
+
 ## 2026-09-10 14:29 CT — refresh-worker `2d53fdf7` (lane `football-layer2-live-parity`) — **DEPLOYED; READING OWED: NCAAF LAYER 2 ROWS WITH NO `game_state` SHOULD GO 34 → 0 (FAMU @ MIA). CLAIM RELEASED BEFORE THE READING, ON PURPOSE.**
 
 Deploy `dep-dahga4ifngtc739c8rb0`, triggered 14:29:22 CT after a CLEAR preflight at 14:29:03 CT
