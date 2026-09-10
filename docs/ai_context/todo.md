@@ -3747,8 +3747,30 @@ worker-local export-only set once (2) unblocks.
    **Precondition to run the other five: graded rows must retain the mechanism
    payload.** Full result stamped into the pre-registration doc; its rules were
    NOT edited.
-5. **Exchange prop economics — MEASURED 2026-09-01. Worth ~+0.64% to +0.84%
-   ROI net of fees, NOT the +1.45% the gross number implies.**
+5. **Exchange prop economics — CLOSED 2026-09-09. THE GATE IS NOT MET.
+   Book-wide ROI **+1.10%** against a **>= +3%** requirement, and hold **6.58%**
+   against **<= 5%**. n=46,567 over 9 dates, with the `segment`-fixed key.**
+   **THE HEADLINE BELOW IS SUPERSEDED AND WAS WRONG IN BOTH DIRECTIONS** — it read
+   *"MEASURED 2026-09-01. Worth ~+0.64% to +0.84% ROI net of fees, NOT the +1.45%
+   the gross number implies"*. That rested on ONE date AND on a `quote_key` that
+   omitted `segment`, so it paired full-game exchange prices against first-5 book
+   prices. The original text is kept below because the DIRECTION it moved is the
+   lesson; the full re-run is recorded at the end of this item. **Do not quote any
+   figure from the block below.**
+   **AND DO NOT QUOTE THE +6.72% EXCHANGE-QUOTED SUBSET AS THE BOOK'S NUMBER** —
+   the exchange does not quote 91.9% of cells, and a price you cannot take is not
+   an edge. That substitution is the single most likely way this closure gets
+   reopened wrongly.
+   **Corroborated independently:** `findings_2026-09-09_entry_cost_scored.md`
+   scored venue routing on REALISED OUTCOMES rather than hold and found ~±1 ROI
+   point (−1.67 vs a sharp book). Two methods, two populations, same conclusion.
+   **WHAT STAYS OPEN:** the CAPTURE is good and should keep running — this closes
+   the economics question, not the feed. Re-open only on a materially different
+   exchange fee schedule or a step change in exchange COVERAGE (8.1% of cells
+   today); a new month of the same shape will not move it.
+   *(superseded text follows)*
+   ~~5. **Exchange prop economics — MEASURED 2026-09-01. Worth ~+0.64% to +0.84%
+   ROI net of fees, NOT the +1.45% the gross number implies.**~~
    `scripts/measure_exchange_prop_option_value.py`. The capture works: **6,523
    exchange prop rows** on day one (polymarket 3,330, kalshi 3,193) against
    37,391 sportsbook prop rows — before this it was zero everywhere.
