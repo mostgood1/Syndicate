@@ -3570,6 +3570,53 @@ worker-local export-only set once (2) unblocks.
 > a producer/publisher question, not a mirror question, and it should be settled
 > before Phase 1 work is scheduled. **Do not read this as the mirror failing.**
 
+
+> **WHY `feed_live` AND `props_history` "STOPPED PUBLISHING": THEY NEVER
+> PUBLISHED. The question's premise is wrong, and one of the two must NEVER be
+> fixed.** `[lane web-oom-census, session 2026-09-09 23:0x CT]`
+>
+> **BOTH ARE IN `EXPORT_ONLY_ARTIFACT_PATTERNS` (`artifact_publisher.py:1311+`),
+> NOT in `HOT_ARTIFACT_PATTERNS`.** That is the READ list. Export-only means a
+> service can SERVE the file it already has; it is never transferred between
+> services. **No worker has ever published either family, and none can.**
+> Everything visible on web arrived via `bootstrap_data_root` from the git
+> checkout — proven, not inferred:
+>
+>     feed_live      git-tracked on origin/main: 146 files, 2026-06-14..06-25
+>                    on web (measured `#625`(2)):  146 files, 2026-06-14..06-25
+>     props_history  git-tracked: 6 files;  on web: 18 (older/wider checkout state)
+>
+> The 146/146 and the identical date range are the whole argument: **web's copy IS
+> the checkout.**
+>
+> **`feed_live` IS DELIBERATE AND MUST STAY THIS WAY — `#413`.**
+> `_mlb_feed_live_payload` returns the cached file **IF IT EXISTS** and reaches the
+> live fetch ONLY when it is absent (`home.py:3560`). **Publishing a current-date
+> `feed_live` file would permanently FREEZE that game's live scores.** The
+> publisher carries a regression test that no hot pattern may ever mention
+> `feed_live`. **Do not "fix" this by allowlisting it.** The named prerequisite
+> for ever mirroring it safely is gating that reader on FRESHNESS rather than
+> PRESENCE.
+>
+> **`props_history` IS DIFFERENT: THERE IS NO PRODUCER, AND THERE NEVER WAS.**
+> `git log --all -S "hitter_props_history" -- '*.py' '*.ps1'` returns **nothing but
+> the allowlist-split commit `8da0eddc`**. The only occurrence of the name in the
+> tree outside a pattern is a TEST FIXTURE. The 18 files are historical data,
+> committed to git, produced by something that is not in this codebase — which is
+> why the dates are scattered (06-10, 07-02, 07-04, 07-05, 07-08, 07-09, 08-06)
+> rather than daily. **Nothing broke. It was never wired.**
+>
+> **CONSEQUENCE FOR `#624`, and it is NOT "fix publishing":**
+> - `feed_live` for grading must come from somewhere other than a publish — the
+>   worker's own disk, or a direct StatsAPI re-fetch for a settled date
+>   (`load_final_feed(fetch_if_missing=True)` already does exactly that;
+>   `box_score_stats.py:132-141`).
+> - `props_history` needs a PRODUCER decision: write it from the odds refresh, or
+>   drop the family from the mirror and grade props from a source that exists.
+>   **Do not leave a family in the manifest that nothing can ever fill** — a
+>   permanently-empty family trains readers to ignore the empty-family warning,
+>   which is the one instrument that made this findable.
+
 ### `#624` — **PHASE 1 — MLB PROP PROGRAM (Sept). The +8.5pp-gross under book, converted from vig into ROI.** — lane `edge-plan`, 2026-09-01 — **OPEN; order is load-bearing**
 
 1. **Tail calibration FIRST**: per-(market, line) isotonic/Platt on
