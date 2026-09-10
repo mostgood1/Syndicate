@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 953 rules `[generated]`
+## Index — 955 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 378**
+**FORBIDDEN — 380**
 
 - [2026-09-06 — FORBIDDEN: instrumenting join A, reading it, and concluding about a value…](#2026-09-06-forbidden-instrumenting-join-a-reading-it-and-concluding-about-a-value-written-by-join-b-name-the-writer-of-the-field-in-the-falsification-test-itself-lane-mlb-first5-kalshi-fanin-mismatch-vs-15410ca7)
 - [2026-09-06 — FORBIDDEN: concluding a guard covers a symptom because the guard is deploy…](#2026-09-06-forbidden-concluding-a-guard-covers-a-symptom-because-the-guard-is-deployed-firing-and-named-after-it-find-the-code-that-wrote-the-field-you-are-looking-at-lane-mlb-first5-kalshi-fanin-mismatch)
@@ -198,6 +198,8 @@
 - [2026-09-09 FORBIDDEN: scoping a fix from the COUNT written in the lead that reported it…](#2026-09-09-forbidden-scoping-a-fix-from-the-count-written-in-the-lead-that-reported-it-a-leads-number-is-the-authors-hypothesis-at-the-moment-of-noticing-re-census-first-lane-probability-converter-registry)
 - [2026-09-09 FORBIDDEN: reporting a STAGE, FEATURE or MECHANISM as OFF because its env fl…](#2026-09-09-forbidden-reporting-a-stage-feature-or-mechanism-as-off-because-its-env-flag-is-absent-without-finding-the-resolution-site-and-checking-for-an-unconditional-installer-a-stages-state-is-a-property-of-the-process-that-ran-it-not-of-the-environment-lane-segments-joint-v1-my-second-instance-of-this-shape-in-six-hours)
 - [2026-09-09 FORBIDDEN: trusting a season/week (or any period) resolver that derives from…](#2026-09-09-forbidden-trusting-a-seasonweek-or-any-period-resolver-that-derives-from-a-different-artifact-family-than-the-one-you-are-about-to-read-it-lags-by-exactly-as-long-as-the-two-families-disagree-and-the-join-then-returns-nothing----which-is-indistinguishable-from-the-model-has-no-view-lane-nfl-prop-model-coverage-caught-by-a-reachability-run-not-by-13-green-unit-tests)
+- [2026-09-09 - FORBIDDEN: predicting that a consumer-side key fix will start resolving, w…](#2026-09-09---forbidden-predicting-that-a-consumer-side-key-fix-will-start-resolving-without-first-checking-that-the-producers-data-reaches-its-key-builder-at-all-the-field-being-absent-from-a-key-and-the-data-being-absent-from-the-function-are-different-defects-and-the-second-makes-the-firsts-fix-inert-lane-odds-history-segment-term-commits-cff0cd4e-26c8cfc6-deployed)
+- [2026-09-09 FORBIDDEN: measuring a change against a harness that SUPPLIES AN INPUT PRODU…](#2026-09-09-forbidden-measuring-a-change-against-a-harness-that-supplies-an-input-production-does-not-have-the-result-describes-the-harness-and-the-gap-can-be-the-entire-effect-lane-nfl-prop-model-coverage-caught-only-because-the-prediction-was-written-down-before-the-reading)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`

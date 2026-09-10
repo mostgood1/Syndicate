@@ -663,6 +663,44 @@ THE SAME PROCESS, and `inflight` guarantees no other REQUEST, not no other
 THREAD. Of three sources — cross-worker, merge children, same-process threads —
 two are gone.
 
+
+### `[web-oom-leak]` UPDATE 2026-09-09 22:2x CT `[lane web-oom-census, session 2edf8b82]` — THE KILLS ARE 16 NOT 2, THE MEMORY IS ANON NOT CACHE, AND A SECOND PATH IS NAMED
+
+**THIS DOES NOT DISPLACE THE `/api/intelligence/query` SUSPECT ABOVE.** That was
+measured per-PROCESS, per-ENDPOINT (`process_anon_smaps_rollup`), which is a
+better attribution instrument than anything used here. The two have not been
+compared on one instrument and **must be before either is called the cause.**
+
+VERIFIED this session:
+
+- **16 `oomKilled` at `memoryLimit=2Gi`, 2026-08-25..09-09** (events API), against
+  the **2** `#632` records. 14 landed after that item was written; one was
+  2026-09-09 17:54 CT. By Central day: 08-29 x1, 08-31 x1, 09-02 x3, 09-03 x1,
+  09-06 x3, 09-07 x1, **09-08 x5**, 09-09 x1. 37 `unhealthy` in the same window,
+  so a raw `server_failed` count inflates this ~3.3x.
+- **ANON is the dominant and volatile term, not page cache.** Web emits
+  `CONTAINER_MEMORY` (NOT `ALL_PROCESS_MEMORY` — that is worker-only, and looking
+  for it on web is why this split had not been taken). 60 samples:
+  `memory_anon_mb` **546 -> 1,168** (+621), `memory_inactive_file_mb` 242 -> 635,
+  `memory_current_mb` up to **1,961 of 2,048**, **minimum headroom 87 MB**.
+  **`#566`'s page-cache explanation does not transfer to this service.**
+- **A SECOND PATH: `/api/home` rebuilds live state payloads ON THE REQUEST PATH.**
+  Chain read link by link in `syndicate/blueprints/home.py`: `@home_bp.get("/api/home")`
+  and `@home_bp.get("/syndicate")` -> `api_home:8418` -> `_home_payload:8295` ->
+  `build_home_overview:8240` -> `_build_sport_overview:7616` ->
+  `_load_home_prop_items:7100` -> `_load_home_live_prop_items:5953` ->
+  `build_live_state_payload`. **`live_refresh_loop.py` calls none of these**, so
+  the request path is the only entry. Every `CONTAINER_MEMORY` sample is tagged
+  with those stages.
+
+**NOT ESTABLISHED:** which of the two paths dominates, or whether this one is the
+largest allocator at all — no per-allocation profile was taken here. **The next
+action is running the `/api/home` path through the SAME per-process anon
+instrument that produced the 82 MB/call figure**, so the two are comparable.
+
+**If the request-path build is confirmed material, the fix is architectural** —
+`CLAUDE.md` puts this payload in a worker-written artifact that web READS.
+
 ### `[web-oom-leak]` UPDATE 2 — the payload is down ~74% and the instrument is honest, 2026-09-04T02:3xZ `[session b2b5b45b]`
 
 * **Per-request attribution now measures THIS PROCESS** (`/proc/self/smaps_rollup`),

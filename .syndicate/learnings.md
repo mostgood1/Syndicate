@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 953 rules `[generated]`
+## Index — 955 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5271,3 +5271,46 @@ partition it addressed.
   `_KEY_FIELDS` consumers, board joins, settlement identity. `presence != reachability`
   already exists as a rule; this is the producer-side twin of it.
 
+
+## 2026-09-09 FORBIDDEN: measuring a change against a harness that SUPPLIES AN INPUT PRODUCTION DOES NOT HAVE. The result describes the harness, and the gap can be the entire effect `[lane nfl-prop-model-coverage, caught only because the prediction was written down BEFORE the reading]`
+
+**WHAT HAPPENED.** To estimate how many NFL prop rows a new join would give a
+usable model edge, I ran the real code over real served board rows. Those rows
+carry no two-sided `consensus`/`sides`, and the de-vig needs both, so I
+RECONSTRUCTED the consensus by pairing the board's own over/under best prices.
+That produced **950 edged rows of 1,019**, and a prediction of ~726 reaching the
+sizer.
+
+**PRODUCTION PRODUCED ZERO.** Not 726, not 64 -- **0 of 112 rows carry
+`edge_vs_market_pct`**, every one reporting *"one-sided market: no two-sided fair
+to price against"*. Served prop rows are one-sided, always. The 950 was entirely
+manufactured by the reconstruction. The join still works -- the value arrives
+through a FALLBACK path I had not designed for -- but the number, the mechanism
+and the confidence were all wrong.
+
+**I LABELLED IT AND SHIPPED IT ANYWAY.** The commit said the figure was
+"INDICATIVE, not exact". That was too generous by a category: an indicative
+number is the right quantity measured roughly, and this was a different quantity.
+**I had ALSO measured the honest number in the same run -- 64 edged without
+reconstruction -- and set it aside as the less interesting one.** The correct
+reading was in hand and was discarded for the flattering one.
+
+**WHAT MADE IT RECOVERABLE.** The prediction went into `deploys.md` BEFORE the
+reading, with the reasoning and the caveat. When the reading came back it could
+not be quietly re-narrated, because the number it had to beat was already
+written down. **Pre-registration is what turns a wrong prediction into a
+finding instead of an embarrassment.**
+
+**HOW TO APPLY.** Before trusting any local measurement of a production effect,
+ask: *which fields did I provide that production does not?* Any such field
+invalidates the reading for that quantity. If a required input is absent in
+production, that ABSENCE IS THE FINDING -- report it, do not synthesise around
+it. And when a run yields both a flattering number and a plain one, the plain one
+is the measurement; the flattering one needs a reason to exist that is not "it
+looks better".
+
+Fourth instance this session of the same family
+([[feedback_instrument_blindness]]): caps read from env when a store governed;
+a counter that is structurally zero on the path being taken; a flag read instead
+of its unconditional installer; and this. **All four were the reading being about
+the instrument rather than the system.**
