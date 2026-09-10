@@ -439,6 +439,16 @@ death, never life — do not invert it.
   - The measurement is recorded in `deploys.md`.
 - Blocked by: none. Deploy owed: live-odds-worker only.
 - **NOT IN SCOPE, AND FLAGGED:** the TOCTOU itself still threatens a SENT order's completion. Its fix is a compare-and-swap in `_persist` on every writer, which means all three services.
+- 2026-09-10: **LANDED `2914b6c7`, LIVE on live-odds-worker since 21:55:18Z** (`dep-dahibm4s728c73b851ig`).
+  - The first pass after boot (22:03:37Z) read `duplicates=1 retried=0 refused={'no_venue_ticker': 17}`.
+    - Zero `LIVE_ORDER`, `REFUSED_AT_BUILD`, `BLOCKED_ON_UNRECONCILED` and `Traceback` lines.
+    - The `live:kalshi` 09-10 order count held at 14.
+    - Details in `deploys.md` 21:49:12-21:55:18Z.
+  - Falsification (1) did not fire: the replay test leaves K `submitted` on the current code, so the TOCTOU is the mechanism.
+  - Falsification (2) did not fire either: no rejected `LIVE_ORDER` since the deploy. But the population is empty, so that is not a pass.
+  - Tests: 540 pass across the execution suites. The 39-file sweep had 13 errors, all `test_live_refresh_loop.py` MLB lineup tests writing into the absent `data/` mirror of a data-less worktree; they touch no code this lane changed.
+  - **OWED, and it keeps this lane OPEN:** the `REFUSED_AT_BUILD` reading, on the first live pass in which a position WITH a contract fails its build. It is marked pending in `deploys.md`.
+  - Follow-up filed: `todo.md #656` (a CAS in `_persist`, on all three services), also chipped as a task. Learnings 2026-09-10: FORBIDDEN, clearing a stranded row on a field the lost write set.
 
 ### wnba-public-scoreboard-host — OPEN — opened 2026-09-10 — session 8c631ba2-16bd-41a6-a384-d655570b10ba (desktop `local_f4eeac0a-49e0-49f6-8320-610fd1ae3d14`)
 - Goal: `_public_scoreboard_live_state_payload` reaches ESPN from Render. Read as ZERO `[wnba_cards] SCOREBOARD_FETCH_FAILED` lines on a worker running the fix, across a window in which the same worker logged them before the fix.

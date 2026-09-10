@@ -5356,3 +5356,20 @@ the instrument rather than the system.**
 - **How we found out**: the post-deploy reading, +31 s after `finishedAt`, matched the pre-deploy baseline game for game. The discriminating fields had been in the served payload all along: `gameDate` empty and `detail` = the date on ALL nine games, Final and Live alike. A present feed payload populates both.
 - **The rule going forward** -- the same family as 2026-09-06 "instrumenting join A, reading it, and concluding about a value written by join B". Before predicting a served value from an instrument, read the instrument's own GATE (`if not _render_web_dyno()`, `in_request=`) and confirm it ran on the service that SERVES the surface. If it cannot have, read the INPUT on that service first; here that was a 30-second `export?names_only=1` for the feed files, taken with a control that can read non-zero.
 - **Cost**: one web deploy that moved nothing, plus a closed-lane verdict and a state paragraph corrected within the hour. The fix itself stands: it is correct for refresh-worker's board builds.
+
+## 2026-09-10 — FORBIDDEN: clearing a stranded ledger row on a field that the LOST write set. A lost update restores the other writer's stale copy of the WHOLE row, so every field that write carried is gone with it `[lane write-ahead-build-refusal]`
+
+- **What we believed**: the order refused at build on 2026-09-04 (`6bc5617ccc3bf1f54d02bb35`) could be auto-cleared by reconcile. The rule proposed was: a `submitted` row with no `venue_order_id`, whose recorded error shows `venue_contacted=False`, never reached the venue. It was one of the two remedies proposed for the residual.
+- **What was actually true**: the stored row had `error`, `venue_resolved_at` and `pre_resolution_error` all null. It was the WRITE-AHEAD version, not a `rejected` row with only its status flipped back.
+  - `_persist` merges on a fresh read and then SETs, with nothing atomic between the two.
+  - refresh-worker's paper SET at 18:27:25.228 was exactly its own 24.711 document + 48 B. It carried the row as it stood before live-odds-worker's `rejected` SET at 25.083.
+  - The merge is last-writer-wins at ROW grain, so the error, the timestamps and the status reverted together. A predicate on `error` could never have reached the exact row it was meant to clear.
+- **How we found out**:
+  - Byte accounting of both services' `KEYVALUE_WRITE_LARGE` sizes over a 1.1-second window.
+  - Then the stored row, off `/api/portfolio/live?on=2026-09-04&show=all`. Its `prior_attempts` also showed a build refused on every pass since 07:48Z.
+  - `test_KNOWN_HAZARD_a_write_landing_between_merge_read_and_SET_is_lost` replays the interleaving on the real `_persist`.
+- **The rule going forward**: before writing a rule that clears a row a lost update stranded, read the STORED row and list which fields survived.
+  - Key only on evidence the lost write did not carry, or on a separate key no other writer touches.
+  - If nothing survives, the fix is upstream: either do not write the row (`2914b6c7` builds before the write-ahead), or make the write atomic (`#656`).
+  - A unit test cannot catch this. A fixture builds the row WITH the error, the predicate passes, and production never has that row.
+- **Cost**: none paid; it was caught before shipping. It would have been a dead predicate on the money path that tested green and never fired.

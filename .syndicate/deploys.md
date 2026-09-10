@@ -31752,3 +31752,82 @@ truncated=0`, 150-165k records, 7.5-9.5 GB, in-run anon ~2,155-2,200 MiB (revert
 - 0 WNBA chips;
 - `per_sport_ingest.wnba.sweep_state = no_slate`.
 The `#626(h)` autorun reading belongs to lane `accuracy-ledger-budget-raise`; its first run is at 07:00 CT or later on 09-11.
+
+## 2026-09-10 21:49:12-21:55:18Z — live-odds-worker `6ebec70e` -> `2914b6c7` — lane `write-ahead-build-refusal`
+
+**What:** code `2914b6c7`. A LIVE order is now BUILT before its write-ahead row.
+- `place_order` answers a duplicate from its existing row first. It then calls the adapter's
+  `build(request) -> send`: for Kalshi, the ticker, the live price and `build_order_body`; for
+  Polymarket, the slate resolution and `order_body`. Only then does it write `submitted` and send.
+- A refused build, a disarmed worker or a missing adapter returns an unrecorded refusal and
+  writes NO row. Refused builds include a slug missing from the slate
+  (`market_unresolved_for_position`), a side the body refuses, and Kalshi `no_live_price`.
+  Each refusal logs `REFUSED_AT_BUILD` and is counted by name in `refused`.
+- This is the residual of `332e596d`, which covered only positions with no `venue_ticker`.
+
+**The mechanism, now proven, and the reason for the change:** `_persist` merges on a fresh read
+and then SETs, with nothing atomic between the two.
+- On 2026-09-04 live-odds-worker SET the rejection at 18:27:25.083 (2,700,666 B).
+- refresh-worker's paper SET at 18:27:25.228 was exactly its own 24.711 document + 48 B. It carried
+  `6bc5617ccc3bf1f54d02bb35` back to `submitted`.
+- The stored row reads `submitted_at 18:27:23.597740Z`, with `error`, `pre_resolution_error` and
+  `venue_resolved_at` all null. A rule keyed on a recorded build error could never have cleared it.
+- **NOT closed by this deploy:** the same race can still revert a SENT order's completion. The fix
+  is a compare-and-swap in `_persist` on all three services: `todo.md #656`, also chipped as a task.
+
+**Ride-along:** 5 commits since the live build.
+- Runtime code: this lane's commit plus `c29a7d4e` (`#626(h)`, lane `accuracy-ledger-budget-raise`).
+- `c29a7d4e` is inert here. Its only callers are `scripts/run_refresh_worker.py:3553` and
+  `scripts/build_accuracy_summary.py`. This service's startCommand is
+  `scripts/run_live_odds_refresh_worker.py`, which reaches neither.
+- `render.yaml` and `requirements*.txt` are unchanged across the range.
+- Live `6ebec70e` is an ancestor of the target, so nothing is reverted.
+
+**Baseline, pre-deploy:**
+- `EXECUTED … venue=kalshi` at 21:28:18Z, 21:33:30Z and 21:40:24Z: `positions=22 placed=0
+  duplicates=1 retried=0 skipped=21 refused={'no_venue_ticker': 21}`. Polymarket read `positions=0`.
+- `LIVE_ORDER` since 18:10Z: 4 lines, all `status=submitted`, and zero `status=rejected`.
+  **The population this change targets was EMPTY at deploy time.** No position holding a contract
+  was failing its build.
+- `/api/ops/execution/ledger-summary` at 21:44:14Z: `live:kalshi` 2026-09-10 `orders=14`
+  (`filled 4`, `rejected 10`), and `last_blind_write None`.
+- Paper rows stuck at `submitted`: 09-06 2, 09-07 5, 09-08 2, 09-09 2, 09-11 2. Each is a
+  lost-update witness, because paper completes `filled` in the same call.
+
+**Locks:**
+- Claim `write-ahead-build-refusal`, acquired at 21:48:20Z. The previous claim,
+  `wnba-schedule-guard-fix`, had EXPIRED at 45.3 min and was replaced, not forced. Its deploy
+  `6ebec70e` had been live since 21:19:20Z and is contained in this target.
+- Preflight returned CLEAR for `2914b6c7`: sample at 21:47:40Z, 40 s old. Only infrastructure
+  processes were running (pid 39 `run_live_odds_refresh_worker.py`) plus 2 defunct children.
+- Deploy `dep-dahibm4s728c73b851ig` via `render_deploy.py --service live-odds-worker --commit
+  2914b6c7…`: created 21:49:12Z, `build_ended` 21:53:15Z, **live 21:55:18Z** on the SHA requested.
+  The service events show no failure after `deploy_ended`.
+- The new process printed `REFRESH_STATE_BACKEND = keyvalue` at 21:56:15Z.
+- Coordinated with two peers:
+  - `mlb-lens-final-status` is queued behind this claim, to deploy `3cb3b76a`, which contains `2914b6c7`.
+  - `ncaaf-fcs-market-implied-rating` asked for no live-odds-worker restart in 18:45-22:30 CDT.
+    This deploy was at 16:55 CDT.
+
+**verify — MEASURED 22:03:37-22:04:37Z, on the first executor pass after boot:**
+- Kalshi, 22:03:37Z: `EXECUTED date=2026-09-10 mode=live venue=kalshi … positions=18 placed=0
+  filled=0 failed=0 duplicates=1 retried=0 skipped=17 refused={'no_venue_ticker': 17}`, with 17
+  `REFUSED_NO_VENUE_TICKER` lines. Polymarket, 22:03:47Z: `positions=1 skipped=1
+  refused={'pregame_price_too_high': 1}`.
+- **`duplicates=1` is the new branch running.** In LIVE, `place_order` now answers an existing
+  non-rejected row from `_blocking_record_for` before building anything. That is the only path an
+  already-placed position takes. The count matches the pre-deploy passes, with no `LIVE_ORDER` for
+  it.
+- Since boot: zero `LIVE_ORDER`, zero `REFUSED_AT_BUILD`, zero `BLOCKED_ON_UNRECONCILED`, zero
+  `Traceback`, zero `RECONCILE_FAILED`, and zero `LEDGER_MERGE`.
+- Ledger at 22:04:37Z: `live:kalshi` 2026-09-10 `orders=14` (`filled 4`, `rejected 10`). That is
+  unchanged from 21:44:14Z and 21:56:34Z, and `last_blind_write` is still None.
+- **WHAT THIS DOES NOT SHOW: the refusal branch.** No position holding a contract failed its build
+  in this pass. So no `LIVE_ORDER status=rejected … OrderBuildError` line is an empty population,
+  not a pass. The tests carry that branch until production produces one.
+- MEASUREMENT: <pending> — owed by lane `write-ahead-build-refusal`: the `REFUSED_AT_BUILD` reading.
+  - The first live pass in which a position WITH a contract fails its build must read
+    `refused={'<token>': N}` with a `REFUSED_AT_BUILD … retry_of_rejected=…` line.
+  - That pass must carry no `LIVE_ORDER status=rejected … OrderBuildError` line.
+  - The date's `live:*` order count must not move for it.
+  - To find it: `py -3 scripts/render_logs.py --service live-odds-worker --text REFUSED_AT_BUILD --start 2026-09-10T21:55:18Z`.

@@ -1,5 +1,15 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#656` — **THE EXECUTION LEDGER'S WRITE IS NOT ATOMIC: a SET landing between another writer's merge-read and its SET is silently lost. It froze both venues for six days from 2026-09-04. A compare-and-swap in `_persist` is owed on all three services.** — lane `write-ahead-build-refusal`, 2026-09-10 — **OPEN; fix not started (chipped as a task)**
+
+- **Mechanism, proven.** `execution_ledger._persist` → `_merge_onto_current` re-reads the store and three-way merges; then `write_json_file` SETs the whole ~2.7 MB document. Nothing between the read and the SET is atomic, so a writer whose window straddles another writer's SET writes back its stale copy of every row it "kept theirs". 2026-09-04: live-odds-worker SET at 18:27:25.083 (K `rejected`; it also dropped paper Q), then refresh-worker SET at 18:27:25.228 = its own 24.711 doc + 48 B (Q filled, K back to `submitted`). The stored row: `submitted_at 18:27:23.597740Z`, `error` and `venue_resolved_at` null.
+- **Rate.** Paper rows stuck at `submitted` are the witness, since paper completes `filled` in the same call: 13 across 09-06..09-11 on `/api/ops/execution/ledger-summary`.
+- **Already closed.** `2914b6c7`: a live order whose BUILD is refused writes no row, so the 09-04 class cannot recur. **Not closed:** a SENT order's completion (fill, `venue_order_id`) can still be reverted to its write-ahead copy. With no venue id, Polymarket's per-order reconcile cannot find it, and `BLOCKED_ON_UNRECONCILED` stops every venue.
+- **Fix direction.** Redis WATCH/MULTI/EXEC on the ledger key, with a bounded retry (re-read, re-merge, re-SET); the disk backend is unchanged. Invert `tests/test_execution_ledger.py::test_KNOWN_HAZARD_a_write_landing_between_merge_read_and_SET_is_lost`, which passes today BECAUSE the defect exists. Every writer must run it: refresh-worker, live-odds-worker and web.
+- **Close when** the CAS is live on all three services and the stuck-paper-`submitted` count stops growing across a placement burst that overlaps live placement.
+
+---
+
 ### `#655` — **THE NCAAF BOARD HELD A FINISHED WEEK UNTIL THE NEXT DAILY BUILD — read-time grace SHIPPED (`ab787363`); the Saturday reading is owed** — lane `ncaaf-games-cache-refresh`, 2026-09-10 — **OPEN until the 2026-09-13 reading**
 
 - **What.** week_state is rebuilt once a day inside the NCAAF projection run, and that run drifts ~19 min/day (01:47:45Z -> 02:07:00Z -> 02:26:07Z on 09-08..10). A build that lands mid-slate counts the evening's games as unplayed, and `target_week_from_state` then held the board on a FINISHED week for a day. Measured on 2026-09-08 (SMU @ Florida State, caught 137.8 min after kickoff). Predicted for 2026-09-13 (a ~03:2xZ build against last kickoffs at 03:00-04:00Z).

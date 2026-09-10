@@ -53,7 +53,15 @@ IS NOW REFUSED BEFORE IT CAN RECUR** `[verified on production 2026-09-10T18:17:3
 exchange-execution-unblock]`.
 
 - **The freeze.** One Polymarket order with no slug was written `submitted` (the write-ahead), refused at
-  build, and logged `rejected`. The stored row stayed `submitted` anyway: a lost update, mechanism unproven.
+  build, and logged `rejected`. The stored row stayed `submitted` anyway.
+  - **A LOST UPDATE, MECHANISM PROVEN 2026-09-10** (lane `write-ahead-build-refusal`).
+    `execution_ledger._persist` merges on a fresh read and then SETs, with nothing atomic between the two.
+  - live-odds-worker SET the rejection at 18:27:25.083. refresh-worker's paper SET at 25.228 was exactly its
+    own 24.711 document + 48 B, and it carried the write-ahead copy back.
+  - The stored row has `error` and `venue_resolved_at` null, so no rule keyed on a recorded build error could
+    ever have seen it.
+  - Paper rows stuck at `submitted` are this race's witnesses: 13 across 09-06..09-11, since paper completes
+    `filled` in the same call.
   - Any unreconciled live order blocks every venue.
   - Nothing reconciles an order that never got a venue id.
   - It was cleared by the operator path, `/portfolio/live/unknown/<key>/resolve` with `not_placed`.
@@ -61,6 +69,15 @@ exchange-execution-unblock]`.
   `place_order` (`refused['no_venue_ticker']`, a `REFUSED_NO_VENUE_TICKER` line). No write-ahead row is ever
   written for an order that cannot be built.
   - First pass: 11 refused, and 1 placed and filled, the first live Kalshi fill since 09-04.
+- **The residual is closed too** `[live-odds-worker 2914b6c7, live 2026-09-10T21:55:18Z, lane write-ahead-build-refusal]`.
+  A LIVE order is now BUILT before its write-ahead row.
+  - These write NO row, log `REFUSED_AT_BUILD`, and are counted by name in `refused`:
+    - a contract that cannot be built (a slug missing from the slate, a side `order_body` refuses, Kalshi `no_live_price`)
+    - a disarmed worker
+    - a missing adapter
+  - First pass after boot: `duplicates=1 refused={'no_venue_ticker': 17}`, and the `live:kalshi` order count held at 14.
+  - **The refusal branch itself is UNMEASURED in production**, because no contract has failed its build since. That reading is owed in `deploys.md`.
+  - NOT closed: the same race can revert a SENT order's completion (`todo.md #656`, a CAS in `_persist`).
 - **Kalshi NCAAF/NFL forward-date matching** (`SYNDICATE_KALSHI_FORWARD_DATE_SPORTS=soccer,ncaaf,nfl`) is live
   on live-odds-worker. On refresh-worker, where the join reads it: LIVE since `86c82220` (20:13:21Z). `forward_date_sport_not_enabled` went from 7,617 to absent, and the first NCAAF Kalshi orders were placed and filled at 20:27:54Z.
   - `167b2841`'s "gains zero NCAAF rows" caveat is stale. `04a82c38` gave NCAAF its alias map.
