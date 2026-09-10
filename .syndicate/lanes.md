@@ -376,6 +376,21 @@ death, never life — do not invert it.
 - Blocked by: none. `ncaaf-live-resim-wire` (the producer's lane) CLOSED 2026-09-10; no OPEN lane claims these files.
 - **PREGAME HALF MET 2026-09-10 15:17 CDT on `86c82220`**, deployed by `exchange-execution-unblock` and carrying this lane's `3e33f083` plus `football-layer2-live-parity`'s ESPN-date chip fix, which FAMU @ MIA also needed. Lens 49 → 50 games with FAMU @ MIA present (`game_not_in_progress`, correct before kickoff). Tick `fcs` {`candidates 1`, `lines_captured 1`, `priced_on_implied_rating 1`}. FAMU @ MIA board rows with a `game` block 0 → 13. **IN-GAME HALF OWED** (`deploys.md` 15:17 CT): a persistent monitor in session `df26ac0c` from 18:58 CDT, with scheduled task `ncaaf-famu-mia-live-gameline-reading` at 20:05 CDT as backup.
 
+### wnba-chip-frozen-trace — OPEN — opened 2026-09-10 — session 8c631ba2-16bd-41a6-a384-d655570b10ba (desktop `local_f4eeac0a-49e0-49f6-8320-610fd1ae3d14`)
+- Goal: a file:line trace naming the single place that makes production serve the four 2026-08-30 WNBA games (ESPN `401857186..189`, all FINAL, no start time) as chips for 2026-09-10, plus a stated prognosis for 2026-09-17.
+- Files: none — a read-only trace. A claim is for editing.
+- Hypothesis (written BEFORE testing):
+  - It is NOT a date substitution. The chip path asks with `allow_stored_date_fallback=False` (`home.py:6163`).
+  - (1) The schedule gate `has_games_for_date(today) is False` (`wnba/cards.py:3834`) never fires on Render. For today it always fetches `site.api.espn.com` (`wnba/sources.py:125`), which answers Render with HTTP 403 (`state_basketball [espn-egress-and-wnba-boxscores]`), and any exception returns None (`:130-131`).
+  - (2) With the gate open, the build reads date-keyed keyvalue live state (`_games_from_live_state_fallback` `wnba/cards.py:3089`; `_wnba_live_state_games` `home.py:802`). The key `live_state_2026-09-10.jsonl` ITSELF holds the 08-30 games, written under today's key by something that carries the last known slate forward.
+  - The missing start time fits (2): games built from live state carry no `startTime`.
+- Falsification test: `/wnba/api/live_state?date=2026-09-10` reads that same keyvalue key first (`wnba/cards.py:6438`).
+  - If it returns NO games, or games other than `401857186..189`, then (2) is wrong and the carrier is elsewhere: `game_cards_2026-09-10.csv`, or an in-process cache.
+  - If it returns them, the payload's `source` / `generated_at` names the writer, which is the next hop.
+  - (1) is a deduction until measured: ESPN lists no 09-10 game, so the chips can only exist if the gate saw None, not False.
+- Verification: the file:line chain from the writer to the served chip, each hop backed by a production reading or a reproduction; then the 09-17 prognosis.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
