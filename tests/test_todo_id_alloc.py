@@ -14,18 +14,34 @@ sessions -- 514/515 -> 520/521, 522 -> 523, 524 -> 525, 527/528 -> 530/531,
 The mechanism is the one `deploy_claim.py` already uses and whose docstring
 explains why messaging cannot substitute for it. These tests pin the property
 that matters (no two callers get the same number) rather than the file layout.
+
+2026-09-10: the same property ACROSS TREES. With one worktree per session, the
+O_EXCL directory was each tree's own copy of the tracked `.syndicate/todo_ids/`,
+so two worktrees both won the same number (`#562`/`#563`), and a tree behind
+`origin/main` re-issued a landed id (`#569`). The last test drives the real
+script in two real worktrees of a throwaway repo.
 """
 
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 from scripts import todo_id_alloc as alloc
+
+# Captured before any fixture patches them, for the tests that need the real ones.
+REAL_ORIGIN_IDS = getattr(alloc, "_origin_ids", None)
+
+
+def _no_git(*args, **kwargs):
+    raise AssertionError(f"a unit test reached the real repo's git: {args}")
 
 
 @pytest.fixture
@@ -37,6 +53,13 @@ def _sandbox(tmp_path, monkeypatch):
     monkeypatch.setattr(alloc, "TODO", todo)
     monkeypatch.setattr(alloc, "CLOSED", closed)
     monkeypatch.setattr(alloc, "CLAIM_DIR", tmp_path / "ids")
+    # Every source that is not a file in the sandbox, pinned -- a unit test must
+    # never read this repo's origin/main or write its shared claim dir.
+    # `raising=False` so the same fixture also drives an unfixed module.
+    monkeypatch.setattr(alloc, "_origin_ids", lambda fetch: set(), raising=False)
+    monkeypatch.setattr(alloc, "_shared_claim_dir", lambda: tmp_path / "shared", raising=False)
+    monkeypatch.setattr(alloc, "_main_claim_dir", lambda: None, raising=False)
+    monkeypatch.setattr(alloc, "_git", _no_git, raising=False)
     return tmp_path
 
 
@@ -107,3 +130,117 @@ def test_a_missing_ledger_is_not_a_crash(_sandbox):
     of somebody's work, and a tool that fails there gets bypassed."""
     (_sandbox / "todo_closed.md").unlink()
     assert alloc.high_water() == 102
+
+
+# --- 2026-09-10: across trees -------------------------------------------------
+
+
+def test_two_worktrees_never_get_the_same_id(_sandbox, monkeypatch):
+    """THE LEAD. Same base commit, two trees, two private copies of the tracked
+    claim dir: O_EXCL in either one could not see the other. The lock is now the
+    shared dir, which both trees reach."""
+    first = alloc.allocate("tree-a")
+    tree_b = _sandbox / "tree_b"
+    tree_b.mkdir()
+    for name in ("todo.md", "todo_closed.md"):
+        (tree_b / name).write_text((_sandbox / name).read_text(encoding="utf-8"), encoding="utf-8")
+    monkeypatch.setattr(alloc, "TODO", tree_b / "todo.md")
+    monkeypatch.setattr(alloc, "CLOSED", tree_b / "todo_closed.md")
+    monkeypatch.setattr(alloc, "CLAIM_DIR", tree_b / "ids")
+    second = alloc.allocate("tree-b")
+    assert (first, second) == ([103], [104])
+
+
+def test_a_tree_behind_origin_does_not_reissue_a_landed_id(_sandbox, monkeypatch):
+    """`#569`: the local ledger stops at 102, `origin/main` already has 110."""
+    monkeypatch.setattr(alloc, "_origin_ids", lambda fetch: {110}, raising=False)
+    assert alloc.allocate("stale-tree") == [111]
+
+
+def test_a_claim_an_older_copy_left_in_the_main_tree_counts(_sandbox, monkeypatch):
+    """The primary tree routinely runs a stale copy of this script, and that copy
+    writes only into the primary tree's own claim dir."""
+    main_ids = _sandbox / "main_ids"
+    main_ids.mkdir()
+    (main_ids / "120.claim").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(alloc, "_main_claim_dir", lambda: main_ids, raising=False)
+    assert alloc.allocate("lane-a") == [121]
+
+
+def test_the_shared_claim_is_the_lock_and_the_tracked_one_is_the_record(_sandbox):
+    (value,) = alloc.allocate("lane-a")
+    assert (_sandbox / "shared" / f"{value}.claim").is_file()
+    assert (_sandbox / "ids" / f"{value}.claim").is_file()
+
+
+def test_an_unreachable_origin_warns_and_still_allocates(_sandbox, monkeypatch, capsys):
+    """Offline must not block the start of someone's work -- and must not pass
+    silently either, because the mark then covers this machine only."""
+    assert REAL_ORIGIN_IDS is not None, "no _origin_ids: origin/main is never read"
+    monkeypatch.setattr(alloc, "_origin_ids", REAL_ORIGIN_IDS)
+    monkeypatch.setattr(alloc, "_git", lambda *a, **k: subprocess.CompletedProcess(a, 128, "", "fatal"))
+    assert alloc.high_water(fetch=True) == 102
+    err = capsys.readouterr().err
+    assert "fetch origin main` failed" in err and "unreadable" in err
+
+
+# --- the real script, in two real worktrees ------------------------------------
+
+
+def _git(*args, cwd):
+    done = subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True)
+    assert done.returncode == 0, f"git {' '.join(args)}: {done.stderr}"
+    return done.stdout.strip()
+
+
+def _run(tree: Path, *args) -> subprocess.CompletedProcess:
+    return subprocess.run([sys.executable, str(tree / "scripts" / "todo_id_alloc.py"), *args],
+                          cwd=str(tree), capture_output=True, text=True)
+
+
+@pytest.fixture
+def real_repo(tmp_path, monkeypatch):
+    base = tmp_path.resolve()
+    (base / "gitconfig").write_text("")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(base / "gitconfig"))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    for key in ("GIT_AUTHOR", "GIT_COMMITTER"):
+        monkeypatch.setenv(f"{key}_NAME", "test")
+        monkeypatch.setenv(f"{key}_EMAIL", "test@example.invalid")
+    origin, main, peer, tree = base / "origin.git", base / "main", base / "peer", base / "wt"
+    _git("init", "-q", "--bare", "-b", "main", str(origin), cwd=base)
+    _git("init", "-q", "-b", "main", str(main), cwd=base)
+    (main / "docs" / "ai_context").mkdir(parents=True)
+    (main / "docs" / "ai_context" / "todo.md").write_text("### `#100` — a\n", encoding="utf-8")
+    (main / "docs" / "ai_context" / "todo_closed.md").write_text("", encoding="utf-8")
+    (main / ".syndicate" / "todo_ids").mkdir(parents=True)
+    (main / ".syndicate" / "todo_ids" / "100.claim").write_text("{}", encoding="utf-8")
+    (main / "scripts").mkdir()
+    (main / "scripts" / "todo_id_alloc.py").write_bytes((ROOT / "scripts" / "todo_id_alloc.py").read_bytes())
+    _git("add", ".", cwd=main)
+    _git("commit", "-q", "-m", "base", cwd=main)
+    _git("remote", "add", "origin", str(origin), cwd=main)
+    _git("push", "-q", "-u", "origin", "main", cwd=main)
+    _git("worktree", "add", "-q", "-b", "session/w", str(tree), "origin/main", cwd=main)
+    # A peer lands #107 after both trees were cut: both are now BEHIND origin.
+    _git("clone", "-q", str(origin), str(peer), cwd=base)
+    with (peer / "docs" / "ai_context" / "todo.md").open("a", encoding="utf-8") as fh:
+        fh.write("\n### `#107` — landed by a peer\n")
+    _git("commit", "-q", "-am", "peer lands 107", cwd=peer)
+    _git("push", "-q", "origin", "main", cwd=peer)
+    return main, tree
+
+
+def test_the_real_script_in_two_real_worktrees(real_repo):
+    """No monkeypatch: each tree runs ITS OWN copy, exactly as sessions do."""
+    main, tree = real_repo
+    in_tree = _run(tree, "--holder", "session-w")
+    in_main = _run(main, "--holder", "primary")
+    assert in_tree.returncode == 0, in_tree.stderr
+    assert in_main.returncode == 0, in_main.stderr
+    got = (in_tree.stdout.strip(), in_main.stdout.strip())
+    assert got == ("108", "109"), got          # above the peer's 107, and never the same
+    assert (main / ".git" / "syndicate" / "todo_ids" / "108.claim").is_file()   # the lock
+    assert (main / ".git" / "syndicate" / "todo_ids" / "109.claim").is_file()
+    assert (tree / ".syndicate" / "todo_ids" / "108.claim").is_file()           # the record
+    assert (main / ".syndicate" / "todo_ids" / "109.claim").is_file()

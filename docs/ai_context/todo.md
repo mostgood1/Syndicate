@@ -85,6 +85,34 @@ until a rebuild). Task `nfl-wk1-prop-artifact-refresh` fires once at 2026-09-09
 scheduled offline producer.
 
 ---
+
+### `#653` — **CLOSED 2026-09-10: `todo_id_alloc.py` could hand ONE id to two worktrees, and re-issue an id already on `origin/main`. One lock per machine now, and the mark includes `origin/main`.** — lane `todo-id-alloc-worktrees`
+
+The O_EXCL claim dir was the TRACKED `.syndicate/todo_ids/` of whichever tree ran
+the script, so every session worktree had its own copy (the `#562`/`#563` report
+in this file), and the high-water mark read only the local tree (the `#569`
+report). Measured on the unfixed script from two real worktrees of a throwaway
+repo: both got **101**, and neither saw a peer's already-landed **107**. The fix
+gives 108 and 109.
+
+- The lock is `<git common dir>/syndicate/todo_ids/`, shared by every worktree of
+  the clone and never tracked. The tracked claim is still written in the tree:
+  **commit it with the entry**, because that is what makes a collision with a
+  SEPARATE clone (another machine, a cloud container) fail loudly at land.
+  Nothing local can prevent that case; a push-reserved id would (`#563`). Not built.
+- The mark also reads `origin/main`'s two ledgers and tracked claims after a
+  best-effort fetch (`--no-fetch` skips it; a failure warns and never blocks),
+  plus the MAIN worktree's claim dir, where the primary tree's often-stale copy
+  writes.
+- Verified: 15/15 tests, and the 6 new ones fail on the unfixed script. `--show`
+  from a real worktree read 652, equal to the mark computed independently. This
+  item's own id came from the fixed tool, with its lock claim in
+  `.git/syndicate/todo_ids/653.claim`.
+- Six stragglers from the old behaviour (612, 613, 646-649) sit untracked in the
+  primary tree's `.syndicate/todo_ids/`. They are harmless (all below the mark,
+  and now counted), and not removed, because that tree is shared.
+
+---
 ### `#649` — **CLOSED 2026-09-08: `test_retainer_census` is ORDER-SENSITIVE, not a change. It joins the chunk-reshuffling group.** — lane `render-cron-failures`
 
 **DISCRIMINATOR RUN, substrate render:** `crn-dafg4h0u01pc73aavs6g-1788909461`,
