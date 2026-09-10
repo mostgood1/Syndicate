@@ -872,14 +872,6 @@ death, never life — do not invert it.
 - LEFT OPEN, owned by nobody yet: the 7 HELD husks are the only pointer to 25 commits and need a human per commit — `todo.md` is claimed by lane `accuracy-ledger-budget-raise`, so it lives in `state_ledger.md [git-store-onedrive]` only. Husks still accrue from sessions on older copies and bare `git worktree remove` (1 new between 17:40Z and 17:50Z) — `session_worktree.py prune` clears the free ones. Pausing OneDrive UNTESTED.
 - Blocked by: none.
 
-### watcher-admin-token — OPEN — opened 2026-09-10 — session 78cad512-3dbb-4e20-bc19-a001eed9a27f (desktop `local_b85a1f7c-02bf-4240-87f8-fb1c893aae14`)
-- Goal: the Windows task `Syndicate unknown-submit watcher` gets HTTP 200 from `/api/portfolio/live` again, because `scripts/watch_unknown_submit.ps1` sends `X-Admin-Token` (from `ADMIN_TOKEN` in the environment, else `.env`) — without the token appearing on any command line, in the heartbeat, in the findings file or in output. `[user decision 2026-09-10: "Add the admin token to the watcher"]`
-- Files: `scripts/watch_unknown_submit.ps1`.
-- Hypothesis: n/a — the 401 cause is measured: the portfolio-auth deploy `df60b3e3` gated the route, and the heartbeat reads `2026-09-10T17:25:11Z ... http=401 ... note=fetch_failed`.
-- Falsification test: n/a.
-- Verification: a run of the SCHEDULED task (not a hand run) writes a heartbeat line with `http=200` and `auth=token`; the token string is absent from the heartbeat, the findings file, the task's output and `$env:TEMP`.
-- Blocked by: none. Promotes the 2026-09-10 lead in `leads.md` ("had no scheduler for 9 days").
-
 ### exchange-execution-unblock — OPEN — opened 2026-09-10 — session 7a239b89-c8fd-49b7-ba5a-e41bb9d4d9bc
 - Goal: [user 2026-09-10] the exchange portfolio places orders again. (1) clear the one unreconciled live order that blocked ALL live placement on BOTH venues since 2026-09-04T18:27Z, through the operator path — DONE, log below. (2) [user: "do 2"] Kalshi forward-date matching for NCAAF and NFL: `SYNDICATE_KALSHI_FORWARD_DATE_SPORTS=soccer,ncaaf,nfl` on refresh-worker AND live-odds-worker — both read `kalshi_board_join._forward_date_sports()` (the board join in `portfolio_commit`, and the market trim in `kalshi_odds_refresh.trim_windows`). (3) [user: "do 3"] a LIVE position with no venue contract is refused BY NAME before `place_order`, so no write-ahead `submitted` row can exist for an order that can never be built — a lost update then has nothing to strand, and cannot freeze both venues again.
 - Files: `pipeline/execute_portfolio.py`, `tests/test_execute_portfolio.py`. Config, no file: the env key above on the two workers, set by the single-key endpoint and never read back from the env-vars LIST.
