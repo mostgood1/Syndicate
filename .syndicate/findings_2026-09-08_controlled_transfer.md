@@ -108,6 +108,12 @@ scoring is P1 CONFIRMED (~8% edge-log deficit, pager artifact ruled out), P2 VOI
 (the emitter died at 23:45:58Z, 20 minutes before the transfer), P3 a coefficient
 of **1.516–1.575** on real delivered bytes after correcting for P1.
 
+> **`[CORRECTED 2026-09-10, session 92a71e78, which adopted this lane at the user's direction]` P3 above was read from the WRONG BUCKET.** A bandwidth bucket is labelled by its hour's START (`findings_2026-09-10_spike_crossing_and_labelling.md`), so this transfer (00:06:27-00:11:09Z) is in bucket `2026-09-09T00:00:00Z` = **437.73 MB**, not `01:00Z` = 401.11 MB. Re-read with the fixed reader (`ba6383b9`) into `controlled_transfer_20260909T000627Z_reading.json`; the old reading is kept there under `superseded`.
+> - **P1 is UNCHANGED:** 2,384 of 2,596 requests, 137.750 of 150.881 MB (**0.9130**). The log window was always the transfer's own hour; only the meter's bucket was off.
+> - **P2 is still void** (the access-log emitter was dead).
+> - **P3:** metered/known **2.9011**; metered/whole-hour edge (241.521 MB) **1.8124**. Corrected for P1's ~8% deficit (delivered 254.65-264.53 MB), **the coefficient is 1.655-1.719, not 1.516-1.575.** It is still nowhere near the 10-24x of the spike hours, so the conclusion that the meter is close to true in a normal hour stands; the number moves.
+> - **The table in (a) below pairs each bucket with the hour BEFORE its label.** Paired correctly, the controlled hour is `00:00Z`: 437.73 MB against 241.52 MB / 2,531 reqs (**1.81**). `01:00Z` is 401.11 MB against the 01:00-02:00 edge of 260.2 MB (**1.54**). Treat the ratios in that table as pairings of adjacent hours, not as the hours named.
+
 I reached the same three conclusions independently before seeing theirs, by a
 different route, and the numbers agree: my narrow-window rescan found **2,403 of
 2,596** (0.9257) against their 2,399 (0.9187) — same finding, ~7–8%, and I also

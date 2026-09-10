@@ -1,9 +1,11 @@
 """Arm the controlled transfer for the ONE hour that can separate the horns: a live spike.
 
 WHY A SECOND ARM. Arm 1 (`controlled_transfer_20260909T000627Z`, bucket
-`2026-09-09T01:00:00Z`) calibrated both instruments in a NORMAL hour and found
-them both close to true: the edge log recorded 0.913-0.919 of requests we knew
-we made, and the meter charged 1.516-1.575x real delivered bytes. Neither is
+`2026-09-09T00:00:00Z` -- read as `01:00Z` until 2026-09-10, when bandwidth
+buckets turned out to be labelled by their hour's START) calibrated both
+instruments in a NORMAL hour and found them both close to true: the edge log
+recorded 0.913-0.919 of requests we knew we made, and the meter charged
+1.655-1.719x real delivered bytes (1.516-1.575x on the wrong bucket). Neither is
 anywhere near the 10.77x and 24.37x that the spike hours need. So the
 calibration is a CONTROL, and it narrowed the contradiction without resolving
 it: whatever happens in a spike hour is specific to spike hours.

@@ -9,8 +9,11 @@ component when the contradiction is between two numbers (cost: four web deploys,
 three of them wasted). The remaining move is to make ONE number known.
 
 WHAT IT MEASURES. Every request carries a unique `ctprobe` query value and a
-dedicated user agent, so the same bytes can be counted three ways over one
-right-labelled bucket:
+dedicated user agent, so the same bytes can be counted three ways over the one
+bandwidth bucket its hour falls in. A bandwidth bucket is labelled by its hour's
+START; this said "right-labelled" until 2026-09-10, which is true of the
+`http-requests` metric, not bandwidth
+(`.syndicate/findings_2026-09-10_spike_crossing_and_labelling.md`):
 
   (a) wire bytes this client actually received   -- ground truth, to the byte
   (b) what Render's edge log and app log record  -- completeness of the logs
@@ -32,8 +35,8 @@ THREE THINGS IT REFUSES TO DO, each because a written rule says so:
    `--require-quiet-mb` is checked against the edge log immediately before
    firing, and the run aborts rather than proceeding dirty.
 
-2. **Straddle an hour boundary.** Buckets are RIGHT-labelled and hourly; a
-   transfer split across two of them is attributable to neither. The run refuses
+2. **Straddle an hour boundary.** Buckets are hourly, labelled by their hour's
+   START; a transfer split across two of them is attributable to neither. The run refuses
    to start unless the whole planned transfer fits in the current hour with
    `--boundary-margin-s` to spare, and stops early if it runs late.
 
@@ -52,8 +55,8 @@ USAGE
 
 It writes `reports/bandwidth_spikes/controlled_transfer_<stamp>.json`, which is
 the input to the reading taken once the bucket has settled (>= 70 minutes after
-the hour closes -- a bucket grows for ~50 minutes and a fresh low reading is
-INCOMPLETE, not low).
+its LABEL, i.e. ~10 minutes after its hour ends -- a bucket keeps growing for
+~60 minutes as its hour fills in, and a fresh low reading is INCOMPLETE, not low).
 """
 
 from __future__ import annotations
@@ -99,6 +102,18 @@ def _now() -> dt.datetime:
 
 def _stamp(when: dt.datetime | None = None) -> str:
     return (when or _now()).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _bucket_label(now: dt.datetime) -> str:
+    """The bandwidth bucket this moment falls in: labelled by the hour's START.
+
+    Recorded the hour AFTER until 2026-09-10 (the `http-requests` metric's
+    convention, not bandwidth's). Taken from the reader's `_bucket_for` so the
+    two scripts cannot disagree about it again.
+    """
+    sys.path.insert(0, str(REPO_ROOT))
+    from scripts import controlled_transfer_read  # noqa: PLC0415
+    return controlled_transfer_read._bucket_for(_stamp(now))
 
 
 class Health:
@@ -281,15 +296,14 @@ def main() -> int:
             print("ABORT: web is being loaded by someone else. learnings.md 2026-09-07 / 2026-09-08.")
             return 3
 
-    # Trap: buckets are hourly and RIGHT-labelled; a straddling transfer is
-    # attributable to neither bucket.
+    # Trap: buckets are hourly, and a straddling transfer is attributable to
+    # neither. The label is the bucket this hour's bytes land IN (_bucket_label).
     now = _now()
     seconds_left = 3600 - (now.minute * 60 + now.second)
     per_request = max(calibration["seconds"], 0.2)
     estimate = planned * per_request / max(args.concurrency, 1)
     report["hour"] = {
-        "bucket_label": (now.replace(minute=0, second=0, microsecond=0)
-                         + dt.timedelta(hours=1)).strftime("%Y-%m-%dT%H:00:00Z"),
+        "bucket_label": _bucket_label(now),
         "seconds_left_in_hour": seconds_left,
         "estimated_seconds": round(estimate, 1),
     }

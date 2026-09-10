@@ -25,6 +25,13 @@ hour, and the lane's own conclusion is that **both are close to true**:
     edge log recorded   0.913-0.919 of requests we knew we made   (P1, ~8% deficit)
     meter charged       1.516-1.575x real delivered bytes         (P3)
 
+`[CORRECTED 2026-09-10, session 92a71e78]` Arm 1's own bucket is `2026-09-09T00:00:00Z`
+(437.73 MB), not `01:00Z`: a bandwidth bucket is labelled by its hour's START. Re-read,
+**P3 is 1.655-1.719x**, not 1.516-1.575x. P1 is unchanged. The argument below does not move:
+both numbers are two orders from 10.77x / 24.37x. See
+`findings_2026-09-08_controlled_transfer.md` §4 and
+`findings_2026-09-10_spike_crossing_and_labelling.md`.
+
 Neither is within two orders of the **10.77x** (2026-09-08 17:00Z) and **24.37x**
 (16:00Z) that the spike hours need. The lane says so itself: *"A follow-up firing
 DURING a live spike is the experiment that would separate the horns; this one
