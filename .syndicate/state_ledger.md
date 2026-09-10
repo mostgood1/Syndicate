@@ -524,9 +524,19 @@ sample. The 35m49s duration matters: it is well past the 240 s staleness window
 that used to age the ncaaf record out, so a long run is the STRONGER test of
 that fix.
 
-## [github-actions-dead] GITHUB ACTIONS HAS RUN NOTHING SINCE 2026-08-22 — THE ACCOUNT IS BILLING-LOCKED, SO `ci.yml` HAS GATED NOTHING FOR 15 DAYS `[measured 2026-09-06/07, lane vendor-sync-schedule]`
+## [github-actions-dead] GITHUB ACTIONS RUNS AGAIN FROM 2026-09-10 (billing fixed by the user); `ci.yml` GATED NOTHING 2026-08-22..2026-09-10 `[measured 2026-09-06/07, lane vendor-sync-schedule; resolved 2026-09-10, lane census-rescue-0910]`
 
-**Every workflow run fails before it starts.** A dispatched run returns
+**RESOLVED 2026-09-10** `[user: "github billing issue is solved"; measured by lane census-rescue-0910]`.
+The last billing-locked run was CI `34500561778` at 16:11:57Z. Both of its jobs had
+`steps: 0` and the annotation *"The job was not started because your account is
+locked due to a billing issue."* The next two runs EXECUTE: CI `34504456195`
+(16:49:32Z, `2224dec0`) and `34504768711` (16:52:37Z, `ab43454d`), with `test`
+running 9 steps and `pytest-baseline` 6. Read their outcome with
+`gh run list --workflow ci.yml --limit 3`. By ~17:05Z `test` had PASSED on both runs, including `ab43454d`; `pytest-baseline` was still running. **Everything below is the record of the
+dead window and stays true about it:** no commit landed between 2026-08-22 and
+2026-09-10 was CI-gated.
+
+**Every workflow run failed before it started, 2026-08-22..2026-09-10.** A dispatched run returned
 `completed/failure` in ~1 second with **zero steps executed** and the annotation
 *"The job was not started because your account is locked due to a billing
 issue."*
@@ -536,7 +546,7 @@ issue."*
   2026-09-05 shows the same signature (`steps: 0`, job never started).
 - **The consequence is the part that matters:** `ci.yml` runs the archive suite,
   the ledger-coherence checks and the `pytest_baseline` gate. It has therefore
-  **gated nothing since 2026-08-22** — every commit landed in that window is
+  **gated nothing 2026-08-22..2026-09-10** — every commit landed in that window is
   unverified by CI, including all of this session's. Nothing announces this. **A
   repo whose CI silently stopped looks identical to one whose CI keeps passing**,
   from the commit log, from a green-looking branch, and from the workflow files.

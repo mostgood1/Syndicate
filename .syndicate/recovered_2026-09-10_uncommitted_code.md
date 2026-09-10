@@ -271,19 +271,17 @@ if __name__ == "__main__":
 - **Status:** it is two months stale against a vendored engine that has moved
   since, so it will not apply cleanly. It is kept as a record of the experiment.
 
-## 4. `recover/stash-intelligence` WIP — staged on a rescue branch, too large for here
+## 4. `recover/stash-intelligence` WIP — pushed as a rescue branch, too large for here
 
-This is 234 KB of uncommitted work from the `Syndicate-recover-intelligence`
-worktree, dating from June 2026:
+This is 234 KB of formerly uncommitted work from the
+`Syndicate-recover-intelligence` worktree, dating from June 2026:
 - parlay fallback tests, `_freshness_label` and `_sample_mlb_overview`;
 - 47 of its 97 added functions are not on main.
 
-It is **staged, not yet committed or pushed**, on local branch
-`rescue/intelligence-wip-2026-06-05` in that worktree. On 2026-09-10 the
-permission classifier refused the commit-and-push, and it waits on the user's
-go-ahead. Until then its only copy is still that worktree: do NOT remove
-`Syndicate-recover-intelligence`. It is probably superseded, but kept so that
-deleting it is someone's decision, not an accident.
+It was committed and pushed as `rescue/intelligence-wip-2026-06-05`
+(`398f02f8`) on 2026-09-10, after the user approved. That worktree is no longer
+its only copy. The work is probably superseded; it is kept so that deleting it
+is someone's decision, not an accident. It is not for `main`.
 
 ## 5. DROPPED, with the reason: `ncaaf-chip-compact`'s "alias map must stay empty" guard
 

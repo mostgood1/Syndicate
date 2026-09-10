@@ -845,16 +845,6 @@ death, never life — do not invert it.
 - Verification: LOCAL, done — 186 portfolio tests green, including a plain password in the HASH key → 503 with the named problem and the value never echoed (page, login POST, JSON), a malformed key locking off Render too, and scrypt / pbkdf2 hashes still signing in. PRODUCTION, owed — the next web deploy's boot line must carry `problem=none`; with today's credentials it should read `credentials_configured=True hash=no problem=none`.
 - Blocked by: none. Deploy when convenient — web only, ~60-90 s of 502s, and no change for a signed-in user (the session key is derived from the credentials, which do not change).
 
-### census-rescue-0910 — OPEN — opened 2026-09-10 — session 78cad512-3dbb-4e20-bc19-a001eed9a27f (desktop `local_b85a1f7c-02bf-4240-87f8-fb1c893aae14` — both ids recorded, because a lane header carrying only the CLI id reads as "owner absent from roster" even while the owner is live)
-- Goal: every item the 2026-09-10 open-work census found existing ONLY on this machine is on `origin/main` — landed, or preserved inert under `.syndicate/recovered_2026-09-10_*` with the reason — and the three shipped lanes (`evaluation-ledger-projected-mirror`, `mlb-feed-live-terminal-refresh`, `soccer-unfed-inputs`) are CLOSED on their recorded verification. `[user decision 2026-09-10: "go, and close the 3 shipped lanes"]`
-- Files: `scripts/deploy_preflight.py`, `scripts/render_deploy.py`, `scripts/watch_unknown_submit.ps1` (new), `scripts/snapshot_live_gameline_score.py`, `tests/test_snapshot_live_gameline_score_row.py` (new).
-- NOT CLAIMED, deliberately, own bullet so no parser reads it as a claim: a 2-row append-only write into the nightly live-gameline history file under `reports/`, whose writer is the scheduled snapshot task.
-- Hypothesis: n/a — not diagnostic.
-- Falsification test: n/a.
-- Verification: each rescued path resolves on `origin/main`; `tests/test_deploy_preflight.py` and the snapshot tests pass in this worktree; `deploy_preflight.py` run FROM this worktree (which has no `.env`) reaches the Render API via the main-tree fallback; the three lanes read CLOSED; the session-start digest's unmeasured-deploy count moves 3 -> 1 (three reconciled, one never-recorded deploy newly recorded).
-- Blocked by: none. No OPEN lane claims any of these paths (checked against `origin/main` `df60b3e3`). No deploy in scope.
-- Status 2026-09-10 ~17:00Z: every rescue item, the three closures and the `deploys.md` reconciliation are in ONE landing commit, verified before it (42 + 360 tests, `check_lane_invariants` HOLD). It waited on the user's go-ahead because the permission classifier refused `git commit` and every push. After the push: `git cat-file -e origin/main:<path>` for each rescued path, then CLOSE this lane.
-
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
@@ -862,6 +852,7 @@ death, never life — do not invert it.
 > map and its 'to resume' note. ORPHANED means ABANDONED, NOT DONE: none of the
 > swept lanes had a Verification result, which is why they were not CLOSED.
 
+- `census-rescue-0910` — CLOSED 2026-09-10 — opened 2026-09-10 — session 78cad512 — **GOAL: MET: census rescue landed (`ab43454d`), three shipped lanes closed, unmeasured-deploy count 3 -> 1**
 - `chunk-assignment-stable` — CLOSED-REVERTED 2026-09-09 — opened 2026-09-08 — session e371dfde — **the fix worked and was unaffordable: it OOM'd the suite twice and is reverted**
 - `convergence-phase7-crps` — ORPHANED, **UNOWNED** `[session abf487e4 ARCHIVED 2026-08-20T21:1xZ]` — — **FIVE FINDINGS: FOUR DEFECTS FIXED AND MEASURED, ONE NOT A DEFECT.** Ladder
 - `cron-deploy-locks` — CLOSED-VERIFIED 2026-09-08 — opened 2026-09-08 — session e371dfde — **the three cron services cannot be claimed, and the guard's refusal to say so rea
