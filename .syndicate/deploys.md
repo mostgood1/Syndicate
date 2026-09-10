@@ -31519,3 +31519,127 @@ in-flight work to restart onto identical code. Same precedent as 2026-09-04 15:0
   anon > 2,600 MiB) are in lane `accuracy-ledger-budget-raise`. OPEN MEASUREMENT.
 - MLB lens guard, worker side: live but narrow in reach -- see lane `mlb-lens-final-status`.
   The web side was measured at 20:04:41Z and did NOT move (entry above).
+
+## 2026-09-10 20:10:16-20:13:21Z — refresh-worker `2d53fdf7` -> `86c82220` + env `SYNDICATE_KALSHI_FORWARD_DATE_SPORTS=soccer,ncaaf,nfl` — lane `exchange-execution-unblock`
+
+**What:** the flag, plus code.
+- **Why it became a code deploy.** The plan was an env-only same-commit redeploy. Lane `ncaaf-games-cache-refresh`
+  asked for `ab787363` (the `origin/main` tip): their NCAAF week_state fix, where a finished week stops holding
+  the board 12 h after its last unplayed kickoff, needed refresh-worker before Saturday's slate. One deploy
+  spares a second 4 GB restart and a second 25-min spacing wait.
+  - Lane `ncaaf-fcs-market-implied-rating` then asked for `3e33f083` or later. Its NCAAF live re-sim fix had to
+    be live before FAMU @ MIA at 00:00Z. `3e33f083` was the tip and contains `ab787363`.
+  - The tip then became `86c82220` (lane `football-layer2-live-parity`): `board_enrichment.py` (+20), football
+    rows also fetch scoreboard chips for the kickoff's ESPN date, which FAMU @ MIA also needs. It contains
+    `3e33f083`, so it is a strict superset, and one restart carries all four lanes' changes.
+- **What changes over the live `2d53fdf7`.** `ab787363` (`ncaaf/week_state.py`, `ncaaf/sources.py`) and `57019962`
+  (#626(h), `intelligence_evaluation.py`: the accuracy-summary ledger read is bounded by chunk count).
+  - From `ab787363` to `3e33f083`:
+    - `3e33f083`: the NCAAF live re-sim tick in `scripts/run_refresh_worker.py` (+203) and `ncaaf/live_resim.py` (+146).
+    - `c2dcd525`: `mlb/cards.py` (+19), so a final game cannot un-finish.
+    - Two WNBA scripts: `refresh_wnba_oddsapi_props.py` and `verify_wnba_slate_hygiene.py`.
+  - None of it touches the join, the plan, venue scope, the aliases or the Kalshi refresh.
+  - `render.yaml` is unchanged.
+  - `86c82220` contains `3e33f083`, `ab787363`, `04a82c38` (the NCAAF alias map), `167b2841` (the flag's code), `332e596d`, and every
+    earlier live commit.
+- **The flag.** It was set by the single-key endpoint and never read back from the env-vars LIST. `167b2841`
+  shipped it off, saying it would gain zero NCAAF rows for want of an alias map; `04a82c38` supplied the map two
+  hours later.
+
+**Which reading isolates what.**
+- `forward_date_sport_not_enabled` is counted at the join's date gate, on the market side, before any board row is
+  compared. Only the flag moves it.
+- `matched` and `placeable_committed` can ALSO move with the week_state fix, because a new NCAAF week on the board
+  means new rows to match. They are joint readings, not this flag's alone.
+
+**The claim, and a hazard found on the way.**
+- **How this lane got it.** The refresh-worker claim passed `ncaaf-kickoff-rollover` -> `mlb-stop-publishing-edges`
+  -> `football-layer2-live-parity` before this lane took it by a normal acquire at 19:32:26Z. It was never forced.
+  The user's "force at 2:03 PM CT" was scoped to `mlb-stop-publishing-edges`, and it was withdrawn before it fired,
+  once a different lane had taken the claim.
+- **The hazard.** `football-layer2-live-parity` released the claim while its own deploy `dep-dahga4ifngtc739c8rb0`
+  (`2d53fdf7`) was still `update_in_progress`.
+  - This lane's chain read `6c727968` as live and set the flag at 19:32:30Z, inside that deploy's window.
+  - **The flag did NOT ride it.** The first join on `2d53fdf7` (19:45:50Z) still read
+    `forward_date_sport_not_enabled: 7617`. The env was set after that deploy was CREATED (19:29:22Z) and
+    before it went live (19:35:29Z), and the new instance did not read it. That is consistent with Render
+    snapshotting env when a deploy is created, though the mechanism is not proven here. So THIS deploy is
+    the one that turns the flag on, and its before/after is clean.
+  - That deploy went live at 19:35:29Z (created 19:29:22Z). The 25-min minimum spacing therefore ran to
+    20:00:29Z, and this deploy did not go before it; `--allow-rapid` was not used.
+  - A redeploy of `6c727968` would then have been a ROLLBACK of `2d53fdf7`, so it was not attempted.
+
+**Baseline, pre-deploy:**
+- `KALSHI_BOARD_JOIN` 17:35:28Z: `markets=14229 board_rows=1902 matched=324 … forward_date_sport_not_enabled: 7617`.
+  At 17:47:14Z: `board_rows=2425 matched=15 … forward_date_sport_not_enabled: 7056`. `matched` swings with WHICH
+  board is being joined, so it does not compare across builds.
+- `PAPER2_PLAN_WRITTEN date=2026-09-10 venue=kalshi` 17:35:28Z: `rows_in=528 positions=10 venue_priced=319
+  placeable_committed=0/10`.
+- On `a9bafa9d`, 18:15:07Z: `matched=291 … forward_date_sport_not_enabled: 7617`. The plan was `positions=12
+  venue_priced=264 placeable_committed=1/12`. Its one placeable position, an MLB total, filled on live-odds-worker
+  at 18:17:30Z.
+- On `6c727968`, 18:55:17Z: `markets=14061 board_rows=1716 matched=302 … event_not_on_our_board: 911,
+  forward_date_sport_not_enabled: 7642, market_is_for_another_date: 505`. The plan was `rows_in=507 positions=8
+  venue_priced=295 placeable_committed=0/8`.
+- **On `2d53fdf7`, this deploy's exact predecessor, 19:45:50Z (the first build after its boot). The flag reads OFF.**
+  - `KALSHI_BOARD_JOIN markets=13711 board_rows=1639 matched=180 … event_not_on_our_board: 921,
+    forward_date_sport_not_enabled: 7617, market_is_for_another_date: 447`.
+  - `PAPER2_PLAN_WRITTEN date=2026-09-10 venue=kalshi rows_in=370 positions=14 venue_priced=177
+    placeable_committed=1/14`.
+
+**Locks:**
+- **Claim.** `exchange-execution-unblock` took it by a normal acquire at 19:32:26Z (token `eaa2f2de…`).
+- **Preflight history.**
+  - 19:32Z: HOLD (6 jobs).
+  - Until 20:00:41Z: TOO_SOON, the 25-min spacing after `2d53fdf7`.
+  - 20:01–20:02Z: HOLD (10 jobs: `run_mlb_daily_sim_job` → `daily_update --workflow ui-daily` with multiprocessing
+    workers, plus an odds refresh).
+  - 20:09:13Z: CLEAR for `86c82220`, with only infrastructure processes running.
+- **The deploy guard then BLOCKED the deploy.** Another session had run a preflight on refresh-worker after 20:09:13Z
+  and got CLAIMED, since this lane held the claim, and the guard trusts only the newest verdict. The preflight was
+  re-run under this lane's holder and returned CLEAR at 20:10:04Z.
+- **Deploy.** `dep-dahgta67bikc73e4i64g` via `render_deploy.py --service refresh-worker --commit 86c82220…`, with no
+  `--reinject-env` and no `--allow-rapid`. It was created 20:10:16Z, reached `update_in_progress` by 20:12:18Z, and went **live
+  at 20:13:21Z**, on the SHA requested.
+- **Releasing before the reading.** The claim's TTL (20:17:26Z) ran out before the post-boot join. That was deliberate:
+  the 25-min spacing after this deploy bars every other deploy through the reading anyway, and two lanes asked for a
+  prompt release so `football-layer2-live-parity` can follow.
+
+**verify — MEASURED 20:13:21-20:35Z, on the first build after boot (20:25:20Z) and the two executor passes after it:**
+- **The flag's own reading.** `forward_date_sport_not_enabled` is ABSENT from `reasons`; the build before this deploy
+  (`2d53fdf7`, 19:45:50Z) read 7,617. The markets it held now reach the matcher and resolve to NAMED downstream
+  refusals:
+  - `no_matching_board_row` 1,115 -> 6,679;
+  - `event_not_on_our_board` 921 -> 2,691;
+  - `market_is_for_another_date` 447 -> 505;
+  - `segment_has_no_matching_series` 21 -> 91;
+  - `spread_line_orientation_mismatch` 20 -> 77;
+  - `team_side_unresolved` 12 -> 32.
+  `segment_refused_series` now carries `KXNCAAF1Q..4QSPREAD` (44) and `KXNFL2HTOTAL` (2). None of these
+  reasons existed for NCAAF/NFL forward markets before: they were stopped at the date gate.
+- `KALSHI_BOARD_JOIN markets=13687 board_rows=3278 matched=438`, against `board_rows=1639 matched=180`. **This is a joint
+  reading:** `board_rows` doubled with the `ab787363` week_state fix in the same deploy, so the +258 matches are not the
+  flag's alone. No log line splits Kalshi matches by sport (`KALSHI_BOARD_JOIN`, `KALSHI_UNMATCHED` and
+  `KALSHI_SOCCER_RESOLVERS` are the only per-build lines), so the flag's NCAAF/NFL share of `matched` cannot be
+  separated from logs. The date-gate reason above is the flag's own reading.
+- `PAPER2_PLAN_WRITTEN date=2026-09-10 venue=kalshi rows_in=652 positions=13 venue_priced=454 placeable_committed=2/13`,
+  against `rows_in=370 positions=14 venue_priced=177 placeable_committed=1/14`. Also joint. `no_model_edge_pct` 253
+  (NFL 220) is now the largest refusal on this plan.
+- No `Traceback` on refresh-worker since boot. The new NCAAF live re-sim tick ran (50 games, 0 re-simmed, none in
+  progress yet).
+- **Executor, live-odds-worker: the first pass on the new plan (20:27:54Z).**
+  - `positions=13 placed=2 skipped=11 refused={'no_venue_ticker': 11}`, `EXECUTION status=ok`, and no
+    `BLOCKED_ON_UNRECONCILED`.
+  - **These are the first NCAAF orders this system has placed on Kalshi.** Both are forward-dated (09-11) totals, the
+    exact population the date gate used to refuse:
+    - `KXNCAAFTOTAL-26SEP11MIZZKU-53` over 52.5, $3.23. Ledger `status=filled`: 6 contracts at $0.48,
+      `venue_status=executed`.
+    - `KXNCAAFTOTAL-26SEP11RUTGBC-54` under 53.5, $3.37. 2 contracts filled at $0.4824, and 4.99 still resting
+      (`venue_status=resting`).
+  - Both carry a venue order id, and both reconciled at 20:27:57Z. `/api/portfolio/live` reads `unreconciled: []`.
+  - The 11 refused were 10 NCAAF and 1 MLB, all `price_source='aggregator'`, and nothing was written for them.
+  - Re-read one pass later, at 20:34:43Z: `positions=13 placed=0 duplicates=2 retried=0 skipped=11
+    refused={'no_venue_ticker': 11}`.
+    - The two NCAAF orders count as duplicates and were not re-placed.
+    - There were zero `LIVE_ORDER` lines and no `BLOCKED_ON_UNRECONCILED`.
+    - The ledger's order count held at 466 across the pass.

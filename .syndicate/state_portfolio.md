@@ -62,7 +62,7 @@ exchange-execution-unblock]`.
   written for an order that cannot be built.
   - First pass: 11 refused, and 1 placed and filled, the first live Kalshi fill since 09-04.
 - **Kalshi NCAAF/NFL forward-date matching** (`SYNDICATE_KALSHI_FORWARD_DATE_SPORTS=soccer,ncaaf,nfl`) is live
-  on live-odds-worker. On refresh-worker, where the join reads it: OWED. Another lane held the claim at 18:2xZ, and the env is deliberately unset until this lane holds it.
+  on live-odds-worker. On refresh-worker, where the join reads it: LIVE since `86c82220` (20:13:21Z). `forward_date_sport_not_enabled` went from 7,617 to absent, and the first NCAAF Kalshi orders were placed and filled at 20:27:54Z.
   - `167b2841`'s "gains zero NCAAF rows" caveat is stale. `04a82c38` gave NCAAF its alias map.
 
 **`/portfolio/live` NO LONGER EXISTS as a page** — it is a 302 to
