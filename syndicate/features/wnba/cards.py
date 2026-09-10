@@ -602,9 +602,33 @@ def _nearest_available_cards_date(selected_date: str) -> str | None:
     return dated_values[-1][1]
 
 
+def _stored_date_substitution_allowed(requested_date: str, schedule_verdict: bool | None) -> bool:
+    """May another date's games stand in for this date's? For TODAY, only when
+    the schedule CONFIRMS games (`True`).
+
+    UNKNOWN IS NOT PERMISSION (2026-09-10, lane `wnba-schedule-guard-fix`). The
+    2026-07-23 guard below refused only on `False`, and `has_games_for_date`
+    returns None whenever ESPN refuses the request -- which on Render was every
+    call for TODAY. Read as "go ahead", None let every no-game day substitute
+    the last real slate under today's date, and a worker saved it under today's
+    live_state key.
+
+    ONE RULE, TWO SITES: `_resolved_source_cards_date` and the
+    `_nearest_available_cards_date` branch of `_build_cards_page_context_uncached`.
+    The second never consulted the schedule at all, so guarding only the first
+    left the writer substituting anyway -- a correct `False` verdict included.
+    Past dates keep the stored-date fallback unchanged: that is the standalone
+    cards page recovering a missing artifact, not a day presenting as live.
+    """
+    if str(requested_date or "").strip() != central_today_iso():
+        return True
+    return schedule_verdict is True
+
+
 def _resolved_source_cards_date(selected_date: str, *, allow_stored_date_fallback: bool = False) -> str:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
-    if has_games_for_date(requested_date) is False:
+    schedule_verdict = has_games_for_date(requested_date)
+    if schedule_verdict is False:
         # The schedule is authoritative: if it confirms zero games for this
         # date, never substitute a different date's real slate under this
         # date's request -- that's not "recovering from a missing
@@ -623,6 +647,8 @@ def _resolved_source_cards_date(selected_date: str, *, allow_stored_date_fallbac
     if bundle["rows"]:
         return resolved_date
     if not allow_stored_date_fallback:
+        return requested_date
+    if not _stored_date_substitution_allowed(requested_date, schedule_verdict):
         return requested_date
     fallback_date = None
     dates = available_dates()
@@ -4039,7 +4065,7 @@ def _build_cards_page_context_uncached(
                 cards_path = live_source_path
                 recs_path = live_source_path
                 source_title = "WNBA live scoreboard fallback"
-        if not games and allow_stored_date_fallback:
+        if not games and allow_stored_date_fallback and _stored_date_substitution_allowed(requested_date, schedule_has_games):
             fallback_date = _nearest_available_cards_date(resolved_date)
             if fallback_date and fallback_date != resolved_date:
                 resolved_date = fallback_date

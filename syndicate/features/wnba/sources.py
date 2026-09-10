@@ -5,6 +5,7 @@ from functools import lru_cache
 from datetime import date
 from datetime import datetime
 import json
+import os
 from pathlib import Path
 from typing import Any
 from urllib import parse as urllib_parse
@@ -87,6 +88,14 @@ _HAS_GAMES_CONFIRMED_TRUE_CACHE: set[str] = set()
 _WNBA_FOUNDING_YEAR = 1997
 
 
+_DEFAULT_WNBA_SCOREBOARD_URL = "https://site.web.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard"
+
+
+def _wnba_scoreboard_url() -> str:
+    """`SYNDICATE_WNBA_SCOREBOARD_URL` wins, exactly as it does for the boxscore producer."""
+    return str(os.environ.get("SYNDICATE_WNBA_SCOREBOARD_URL") or "").strip() or _DEFAULT_WNBA_SCOREBOARD_URL
+
+
 def has_games_for_date(date_str: str) -> bool | None:
     selected_date = str(date_str or "").strip()
     if not selected_date:
@@ -122,8 +131,21 @@ def has_games_for_date(date_str: str) -> bool | None:
     # A confirmed True is stable and safe to remember above.
     warn_if_compute_in_request_path("wnba_has_games_for_date_espn_fetch")
     score_date = selected_date.replace("-", "")
-    url = f"https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard?dates={score_date}"
-    request = urllib_request.Request(url, headers={"User-Agent": "Syndicate-WNBA/1.0"})
+    # THE HOST THAT ANSWERS RENDER (2026-09-10, lane `wnba-schedule-guard-fix`).
+    # `site.api.espn.com` returns HTTP 403 to all three Render services
+    # (`state_basketball [espn-egress-and-wnba-boxscores]`), and the `except`
+    # below turns that into None -- so for TODAY the verdict was permanently
+    # "unknown" on Render and the "schedule is authoritative" guard in
+    # wnba/cards.py never fired. On every no-game day a worker then saved the
+    # last real slate (2026-08-30) under today's live_state key, and the
+    # board's WNBA chips showed four finished games for eleven days.
+    #
+    # Same host, override and headers as scripts/build_wnba_boxscores.py, the
+    # scoreboard fetch verified FROM RENDER. ESPN discriminates on request
+    # headers from Render specifically (see wnba/cards.py's public-scoreboard
+    # note), so do not "tidy" these without re-verifying there.
+    url = f"{_wnba_scoreboard_url()}?dates={score_date}"
+    request = urllib_request.Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"})
     try:
         with urllib_request.urlopen(request, timeout=8) as response:
             payload = json.loads(response.read().decode("utf-8"))
