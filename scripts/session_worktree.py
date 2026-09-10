@@ -38,11 +38,13 @@ with `--with-data` and thereby says so out loud.
     python scripts/session_worktree.py list
     python scripts/session_worktree.py land --lane my-lane --dry-run
     python scripts/session_worktree.py close --lane my-lane
+    python scripts/session_worktree.py prune             # --apply to delete
 
 STATUS: PROTOTYPE. `land` pushes to `main` and is the one command here that
 changes anything shared; it refuses on a dirty tree and prints what it would do
 under `--dry-run`. It REPORTS the ledger checkers rather than gating on them --
-see `_run_checkers`.
+see `_run_checkers`. `prune` deletes stale admin dirs under `.git/worktrees/`
+and is a dry run unless given `--apply`.
 """
 from __future__ import annotations
 
@@ -51,6 +53,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -108,9 +111,14 @@ SPARSE_PATTERNS_TEST_DATA = (
 )
 
 
-def git(*args, cwd: Path | None = None, check: bool = False) -> subprocess.CompletedProcess:
-    result = subprocess.run(["git", *args], cwd=str(cwd or REPO_ROOT),
-                            capture_output=True, text=True, timeout=900)
+def git(*args, cwd: Path | None = None, check: bool = False,
+        input: str | None = None) -> subprocess.CompletedProcess:
+    # UTF-8, not the locale: git emits UTF-8, and the cp1252 default has no
+    # mapping for 0x9D -- the last byte of a right double quote -- so a single
+    # curly quote in a commit subject would raise UnicodeDecodeError here.
+    result = subprocess.run(["git", *args], cwd=str(cwd or REPO_ROOT), input=input,
+                            capture_output=True, text=True, encoding="utf-8",
+                            errors="replace", timeout=900)
     if check and result.returncode != 0:
         sys.stderr.write((result.stderr or result.stdout).strip() + "\n")
         raise SystemExit(f"FATAL: git {' '.join(args)} failed ({result.returncode})")
@@ -397,47 +405,275 @@ def cmd_land(args) -> int:
     return 0
 
 
+def _main_root() -> Path:
+    """The PRIMARY worktree -- the one tree `close` can never be deleting.
+
+    `REPO_ROOT` is wherever THIS FILE lives, and sessions run their worktree's
+    own copy (`py -3 C:/tmp/syndicate-sessions/<lane>/scripts/session_worktree.py
+    close --lane <lane>`). There `REPO_ROOT` IS the tree being closed, and it was
+    the default `cwd` of every `git()` call. Measured 2026-09-10: `close --lane
+    census-rescue-0910-land` deleted the directory in its fallback, then raised
+    `NotADirectoryError: [WinError 267]` on the next call and never deleted the
+    branch. `git worktree list` names the main worktree first -- still true if
+    `.git` is moved out of the checkout (`move_git_store.py`), where the parent
+    of `--git-common-dir` would not be.
+    """
+    records = _worktrees()
+    main = Path(records[0]["worktree"]) if records and "worktree" in records[0] else None
+    if main is None or "bare" in records[0] or not main.is_dir():
+        raise SystemExit("FATAL: cannot find the main worktree in `git worktree list`")
+    return main
+
+
+def _admin_dir(path: Path) -> Path | None:
+    """`.git/worktrees/<id>` for the worktree at `path` -- read BEFORE removing it."""
+    found = git("rev-parse", "--absolute-git-dir", cwd=path)
+    admin = Path(found.stdout.strip()) if found.returncode == 0 else None
+    return admin if admin is not None and admin.parent.name == "worktrees" else None
+
+
+def _clear_readonly(root: Path) -> int:
+    """Clear FILE_ATTRIBUTE_READONLY on `root` and everything under it.
+
+    WHY. OneDrive sets READONLY on every `.git/worktrees/<id>` directory and its
+    subdirectories a few minutes after git creates them -- measured 2026-09-10 on
+    a fresh one: clear at +70 s, set at ~6 min; 188 of 188 admin dirs carry it.
+    Windows refuses `rmdir` on a read-only directory, so git deletes the files,
+    stops at the first read-only subdirectory and reports `failed to delete
+    '.git/worktrees/<id>': Permission denied` -- exit 255 from `worktree remove`,
+    and again from every `worktree prune`. Reproduced OUTSIDE OneDrive with the
+    attribute alone. `attrib -R <dir> /S /D` does not clear it (with /S it
+    matches the NAME `<dir>`, not its contents); `os.chmod(S_IWRITE)` does, and
+    on POSIX it only adds owner-write. Returns how many entries had it.
+    """
+    cleared = 0
+    for entry in (root, *root.rglob("*")):
+        try:
+            mode = entry.lstat().st_mode
+            if not mode & stat.S_IWRITE:
+                os.chmod(entry, stat.S_IMODE(mode) | stat.S_IWRITE)
+                cleared += 1
+        except OSError:
+            continue
+    return cleared
+
+
+def _unlanded(branch: str, cwd: Path) -> int | None:
+    """Commits on `branch` that origin/main lacks; None when git cannot say.
+
+    Callers must treat None as NOT zero. This used to be `.stdout.strip()`, and
+    a failed `rev-list` prints nothing -- so "could not count" read as "nothing
+    unlanded" and the branch went with `-D`.
+    """
+    counted = git("rev-list", "--count", f"origin/main..{branch}", cwd=cwd)
+    try:
+        return int(counted.stdout.strip()) if counted.returncode == 0 else None
+    except ValueError:
+        return None
+
+
+def _delete_branch(branch: str, main: Path, force: bool) -> int:
+    """Delete `branch` only if origin/main already has every commit on it.
+
+    Checked against origin/main explicitly rather than trusting `git branch -d`,
+    whose reference is the branch's upstream when one is set and otherwise the
+    HEAD of whichever tree runs it -- from the primary tree, a checkout that is
+    routinely hundreds of commits behind.
+    """
+    if git("rev-parse", "--verify", "--quiet", f"refs/heads/{branch}", cwd=main).returncode != 0:
+        return 0
+    unlanded = _unlanded(branch, main)
+    if unlanded != 0 and not force:
+        why = ("git could not count its commits" if unlanded is None
+               else f"{unlanded} commit(s) not on origin/main")
+        print(f"KEPT branch {branch}: {why}. Land them, or re-run with --force to discard.")
+        return 1
+    deleted = git("branch", "-D", branch, cwd=main)
+    if deleted.returncode != 0:
+        print(f"could not delete branch {branch}: {(deleted.stderr or deleted.stdout).strip()[:300]}")
+        return 1
+    return 0
+
+
+def _report_prune(pruned: subprocess.CompletedProcess) -> None:
+    stuck = (pruned.stderr or "").count("failed to delete")
+    if stuck:
+        print(f"note: `git worktree prune` could not delete {stuck} stale admin dir(s) -- "
+              "`session_worktree.py prune` says which are safe to remove.")
+
+
 def cmd_close(args) -> int:
     slug = _slug(args.lane)
     path, branch = _path_for(slug, args.root), BRANCH_PREFIX + slug
+    main = _main_root()                  # resolved while REPO_ROOT still exists
     if not path.exists():
         print(f"nothing to close at {path}")
-        git("worktree", "prune")
-        return 0
+        _report_prune(git("worktree", "prune", cwd=main))
+        # A close that died after deleting the directory left its branch here.
+        return _delete_branch(branch, main, args.force)
 
-    dirty = git("status", "--porcelain", cwd=path).stdout.splitlines()
-    git("fetch", "origin")
-    unlanded = git("rev-list", "--count", f"origin/main..{branch}", cwd=path).stdout.strip()
+    here = Path.cwd().resolve()
+    if here == path.resolve() or path.resolve() in here.parents:
+        print(f"REFUSING: this process is running inside {path}, and Windows will not")
+        print("delete a directory that is a process's working directory. Run close")
+        print("from the primary tree.")
+        return 1
 
-    if (dirty or unlanded not in ("", "0")) and not args.force:
+    status = git("status", "--porcelain", cwd=path)
+    dirty = status.stdout.splitlines()
+    git("fetch", "origin", cwd=main)
+    unlanded = _unlanded(branch, main)
+
+    if (status.returncode != 0 or dirty or unlanded != 0) and not args.force:
         print(f"REFUSING to close {slug}:")
+        if status.returncode != 0:
+            print(f"  `git status` failed in {path} -- its state is unknown, not clean")
         if dirty:
             print(f"  {len(dirty)} uncommitted change(s)")
-        if unlanded not in ("", "0"):
+        if unlanded is None:
+            print(f"  could not count {branch} against origin/main -- unknown is not zero")
+        elif unlanded:
             print(f"  {unlanded} commit(s) not on origin/main")
         print("\nLand them, or pass --force to discard. Nothing here is recoverable")
         print("from another session -- this worktree's index is its own.")
         return 1
 
-    # `git worktree remove` fails on this machine when anything still holds a
-    # handle under the checkout -- OneDrive's scanner and a just-exited python
-    # both do. Observed twice at adoption: "Permission denied", then exit 255.
-    # Falling back to a plain delete + prune is safe because at this point the
-    # refusal checks above have already passed: the tree is clean and its
-    # commits are on origin/main, so there is nothing in it that git needs.
-    removed = git("worktree", "remove", "--force", str(path))
+    admin = _admin_dir(path)
+    if admin is not None:
+        cleared = _clear_readonly(admin)
+        if cleared:
+            print(f"note: cleared READONLY on {cleared} entr{'y' if cleared == 1 else 'ies'} of "
+                  f"{admin} -- OneDrive sets it, and git cannot delete the admin dir under it.")
+
+    # EVERY git call from here on runs from the main worktree: this one so git's
+    # own cwd is not inside the tree it is deleting (Windows refuses, exit 255,
+    # and a retry exits 128 "is not a working tree"), and the ones after the
+    # fallback because `path` -- possibly REPO_ROOT itself -- is gone.
+    #
+    # Falling back to a plain delete + prune is safe because the refusal checks
+    # above have already passed: the tree is clean and its commits are on
+    # origin/main, so there is nothing in it that git needs.
+    removed = git("worktree", "remove", "--force", str(path), cwd=main)
     if removed.returncode != 0:
         shutil.rmtree(path, ignore_errors=True)
         if path.exists():
             print(f"could not delete {path} -- something is holding it open.")
             print("Close anything using it and re-run; the branch is left intact.")
             return 1
-        print(f"note: `git worktree remove` failed ({removed.returncode}); "
-              "deleted the directory and pruned instead.")
-    git("branch", "-D", branch)
-    git("worktree", "prune")
-    print(f"closed {slug}")
-    return 0
+        said = (removed.stderr or removed.stdout).strip().splitlines()
+        print(f"note: `git worktree remove` failed ({removed.returncode})"
+              + (f": {said[-1][:200]}" if said else "")
+              + "; deleted the directory and pruned instead.")
+        if admin is not None and admin.exists():
+            _clear_readonly(admin)
+    _report_prune(git("worktree", "prune", cwd=main))
+    code = _delete_branch(branch, main, args.force)
+    print(f"closed {slug}" + ("" if code == 0 else " -- but its branch was KEPT (above)"))
+    return code
+
+
+_SHA = re.compile(r"\b[0-9a-f]{40}\b")
+
+
+def _lost_commits(shas: set[str], cwd: Path) -> set[str] | None:
+    """The commits in `shas` that nothing else keeps. None = could not tell.
+
+    Kept means reachable from a ref, OR rebased onto one: `land` rebases, so a
+    closed lane's reflog is full of pre-rebase SHAs whose content is on main
+    under another id. A twin is a reachable commit with the same author time,
+    email and subject. Measured 2026-09-10 over 122 husks: 1,461 SHAs, 413
+    unreachable, 388 of those with a twin on origin/main, 25 with none.
+    """
+    reach = git("rev-list", "--all", cwd=cwd)
+    if reach.returncode != 0:
+        return None
+    left = sorted(shas - set(reach.stdout.split()))
+    if not left:
+        return set()
+    kinds = git("cat-file", "--batch-check=%(objectname) %(objecttype)", cwd=cwd,
+                input="\n".join(left) + "\n")
+    if kinds.returncode != 0:
+        return None
+    # An object that is already gone, or is not a commit, has nothing left to keep.
+    commits = [line.split()[0] for line in kinds.stdout.splitlines() if line.endswith(" commit")]
+    if not commits:
+        return set()
+    fmt = "--format=%H%x09%at%x09%ae%x09%s"
+    known = git("log", "--all", fmt, cwd=cwd)
+    mine = git("log", "--no-walk=unsorted", "--stdin", fmt, cwd=cwd, input="\n".join(commits) + "\n")
+    if known.returncode != 0 or mine.returncode != 0:
+        return None
+    twins = {tuple(line.split("\t")[1:]) for line in known.stdout.splitlines()}
+    return {line.split("\t")[0] for line in mine.stdout.splitlines()
+            if tuple(line.split("\t")[1:]) not in twins}
+
+
+def cmd_prune(args) -> int:
+    """Delete the stale admin dirs `git worktree prune` wants gone and cannot remove.
+
+    GIT decides which dirs are stale (`prune --dry-run`). This decides only
+    whether deleting one could lose something: a husk's leftover `ORIG_HEAD` and
+    `logs/HEAD` can be the last pointer to a commit. Git no longer counts them as
+    reachability roots (405 of the 413 unreachable SHAs were outside `rev-list
+    --all --reflog`), so a husk keeps the RECORD of a SHA, not the object -- but
+    that record is the only way back to it. So a husk naming a lost commit is
+    HELD and printed, never deleted.
+
+    Deletes directly rather than clearing READONLY and re-running `git worktree
+    prune`, because that prune would take the HELD dirs too.
+    """
+    main = _main_root()
+    common = git("rev-parse", "--path-format=absolute", "--git-common-dir", cwd=main, check=True)
+    admin_root = Path(common.stdout.strip()) / "worktrees"
+    dry = git("worktree", "prune", "--dry-run", "--verbose", cwd=main)
+    ids = re.findall(r"^Removing worktrees/(.+?): ", dry.stdout + dry.stderr, re.M)
+    ids = [d for d in ids if d not in (".", "..") and not re.search(r"[\\/]", d)]   # one dir name
+    if not ids:
+        print("nothing to prune -- git reports no stale admin dirs")
+        return 0
+
+    shas: dict[str, set[str]] = {}
+    for dir_id in ids:
+        found: set[str] = set()
+        for entry in (admin_root / dir_id).rglob("*"):
+            if entry.is_file() and entry.name != "index":
+                try:
+                    found |= set(_SHA.findall(entry.read_text(encoding="utf-8", errors="replace")))
+                except OSError:
+                    continue
+        found.discard("0" * 40)
+        shas[dir_id] = found
+    lost = _lost_commits(set().union(*shas.values()), main)
+    if lost is None:
+        print("could not tell which commits are reachable -- deleting nothing")
+        return 1
+    held = {d: sorted(s & lost) for d, s in shas.items() if s & lost}
+    free = [d for d in ids if d not in held]
+
+    print(f"{len(ids)} stale admin dir(s) under {admin_root}: "
+          f"{len(free)} free, {len(held)} HELD (the last pointer to a commit)")
+    for dir_id, commits in sorted(held.items()):
+        print(f"  HELD {dir_id}: {len(commits)} commit(s) nothing else keeps")
+        shown = git("log", "--no-walk=unsorted", "--format=%H %s", *commits[:3], cwd=main)
+        for line in shown.stdout.splitlines():
+            print(f"      {line[:12]}{line[40:110]}")
+    if not args.apply:
+        print("\ndry run -- re-run with --apply to delete the free ones. A HELD dir stays")
+        print("until its commits are rescued (`git branch rescue/<id> <sha>`) or judged")
+        print("disposable, and is then deleted by hand.")
+        return 0
+
+    failed = []
+    for dir_id in free:
+        target = admin_root / dir_id
+        _clear_readonly(target)
+        shutil.rmtree(target, ignore_errors=True)
+        if target.exists():
+            failed.append(dir_id)
+    print(f"\ndeleted {len(free) - len(failed)} of {len(free)} free admin dir(s); {len(held)} held")
+    for dir_id in failed:
+        print(f"  could not delete {admin_root / dir_id} -- something holds a handle in it")
+    return 1 if failed else 0
 
 
 def main() -> int:
@@ -475,6 +711,11 @@ def main() -> int:
     p.add_argument("--lane", required=True)
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_close)
+
+    p = sub.add_parser("prune", help="delete stale .git/worktrees admin dirs git cannot remove")
+    p.add_argument("--apply", action="store_true",
+                   help="delete the free ones (default: report only)")
+    p.set_defaults(func=cmd_prune)
 
     args = ap.parse_args()
     return args.func(args)
