@@ -1315,9 +1315,34 @@ it — `git check-ignore` answers 1 for anything in the index — so
 `source_artifacts/` being ignored wholesale does not blind the guard to
 overwriting one of its thousands of tracked files.
 
-**WHAT IT CANNOT SEE, stated so a clean run is not over-read:** `os.open` and
-anything below it (MEASURED, not theoretical: an append via `Path.open("a")` is
-refused where the same append via `os.open(..., O_WRONLY|O_APPEND)` lands), a
+**`os.open` IS NOW CLOSED (2026-09-09, lane `data-mirror-write-guard-sweep`).** It
+was a MEASURED hole, not a theoretical one — an append via `Path.open("a")` was
+refused where the same append via `os.open(..., O_WRONLY|O_APPEND)` landed — and
+`scripts/refresh_*_oddsapi.py::_copy_file_with_fallback` already copies through
+that call on EINVAL, so it was one fallback from being a production path. A read
+costs one bitwise AND: `O_RDONLY` is 0, so read-only opens never reach the path
+check. It does NOT explain the `live_lens` symptom — its own A/B falsified that.
+
+**THE GUARD IS NOW TWO INSTRUMENTS WITH DIFFERENT BLIND SPOTS.** The interceptor
+names the offending TEST and cannot see a child process. A session-level SENTINEL
+(`pytest_sessionstart`/`sessionfinish`, controller-only) diffs `git status` over
+`data`/`vendor`/`reports` across the run and sees EVERY writer — `os.open`, a C
+extension, a subprocess — but cannot say which test. **A sentinel hit with no
+interceptor hit is itself the finding.** It reports only what CHANGED, so the
+primary tree's pre-existing dirt is not attributed to the run, and returns None
+rather than {} when git cannot answer, because an empty snapshot would read as
+"the tree was clean" and then blame every pre-existing file.
+
+**`reports/` WAS LEAKING TOO, AND IS NOW WALLED AT IMPORT.** Its five fixtures are
+all FUNCTION-scoped, so `monkeypatch` restores the env at teardown and anything
+still running writes to the real tree. Caught by the `os.replace` seam: a DAEMON
+thread from `run_live_odds_refresh_worker.main()` (started at line 2343) ticking
+every >=1s for the rest of the session, one hit landing in another test's
+`(setup)` phase. `SYNDICATE_REPORTS_ROOT` is now `os.environ.setdefault` at
+conftest IMPORT and never lifted, so the value the fixture restores TO is already
+isolated. An isolation must be scoped to the LIFETIME of what it isolates.
+
+**STILL NOT SEEN BY THE INTERCEPTOR:** a
 write from a CHILD PROCESS, and every `python -m unittest` entrypoint — CI runs
 `tests.test_archives` that way and unittest never imports a conftest, which is why
 the two redirects live in `tests/_artifact_isolation.py` and are applied from both
@@ -1333,6 +1358,7 @@ anything in the index — so one query for an ignored name exempted every TRACKE
 file in that directory for the rest of the process (208 of them under
 `source_artifacts/data/live_lens/`). Reproduced on `e44e1d79`. The guard's own
 self-check was the poisoner: it ended on a priming query, which is why it passed
-alone and failed only in a parallel run. Fix `ba732005`, lane
-`data-mirror-write-guard-sweep`. **A cache key coarser than the predicate it
+alone and failed only in a parallel run. Fix landed as **`70d9b4a7`** (verified on `origin/main`); the duplicate
+`ba732005` from lane `data-mirror-write-guard-sweep` was SKIPPED on rebase and is
+NOT on main — do not go looking for it. Found independently by both lanes. **A cache key coarser than the predicate it
 caches is a correctness bug, not a performance trade.**
