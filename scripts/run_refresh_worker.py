@@ -2405,6 +2405,170 @@ def _run_nfl_live_resim_tick() -> dict[str, Any] | None:
     return result
 
 
+def _espn_location_key(event: Mapping[str, Any]) -> str:
+    """`"{away_location}@{home_location}"` for one ESPN event -- the SAME key
+    `_ncaaf_live_resim_live_index` builds, through the same `_norm_name`."""
+    from syndicate.features.ncaaf.live_resim import _norm_name
+
+    competitions = event.get("competitions")
+    competition = (
+        competitions[0]
+        if isinstance(competitions, list) and competitions and isinstance(competitions[0], Mapping)
+        else {}
+    )
+    sides: dict[str, Mapping[str, Any]] = {}
+    for row in competition.get("competitors") or ():
+        if isinstance(row, Mapping) and isinstance(row.get("team"), Mapping):
+            sides[str(row.get("homeAway") or "").strip().lower()] = row["team"]
+    return (
+        f"{_norm_name((sides.get('away') or {}).get('location'))}"
+        f"@{_norm_name((sides.get('home') or {}).get('location'))}"
+    )
+
+
+def _ncaaf_fcs_market_implied_games(
+    *,
+    projections: Any,
+    live_index: Mapping[str, Mapping[str, Any]],
+    sp_index: dict[str, tuple[float, float]],
+    ratings: dict[str, tuple[float, float]],
+    fcs_lines: dict[str, Any],
+    now_utc: datetime,
+    stats: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """FBS-vs-FCS games, re-simmed on a MARKET-IMPLIED rating for the FCS side.
+
+    `[2026-09-10, user decision: "Market-implied rating", for FAMU @ MIA.]` The
+    projections artifact is FBS-vs-FBS only (`SKIPPED_NOT_FBS_VS_FBS`), so these
+    games never reached `games` above, and `_ratings_for` would refuse them anyway
+    (`no_pregame_ratings`: the FCS side has no SP+ row, and a neutral default would
+    rate it league-average). This adds them from the ESPN live index instead, and
+    rates the FCS side off the market's PREGAME spread and total through
+    `live_resim.market_implied_sp_components`.
+
+    THE LINE IS CAPTURED PREGAME AND ONLY PREGAME. ESPN's scoreboard carries the
+    book's line on a `pre` event; the worker's live-state record does not carry
+    odds, so one scoreboard fetch per tick is made ONLY while a candidate is still
+    pregame and has no captured line. The line is persisted in the tick's keyvalue
+    status (`fcsPregameLines`), so a reboot mid-game still has it, and a live quote
+    is never read as a pregame one (`pregame_line_from_espn_event` returns None on
+    anything but `pre`). A live game with no captured line is refused by name
+    (`no_pregame_line`), never priced.
+
+    Mutates `ratings` (both sides of every priced game) and `fcs_lines`.
+    """
+    from scripts.generate_smartsim2_ncaaf_projections import (
+        norm as sp_norm,
+        sp_league_means,
+        sp_offense_defense_rating,
+    )
+    from syndicate.features.ncaaf.live_resim import (
+        MARKET_IMPLIED_RATING_SOURCE,
+        _norm_name,
+        market_implied_sp_components,
+        pregame_line_from_espn_event,
+    )
+
+    stats.update({
+        "enabled": True, "candidates": 0, "priced_on_implied_rating": 0, "no_pregame_line": 0,
+        "lines_captured": 0, "line_fetch_failures": 0, "implied_rating_refused": 0,
+        "both_unrated": 0, "both_rated_unprojected": 0,
+    })
+    means = sp_league_means(sp_index)
+    projected = {f"{_norm_name(p.away_team)}@{_norm_name(p.home_team)}" for p in projections}
+
+    candidates: list[tuple[str, Mapping[str, Any], str, str, Any, Any]] = []
+    for key, row in live_index.items():
+        if key in projected or not isinstance(row, Mapping) or bool(row.get("final")):
+            continue
+        away_key, _, home_key = key.partition("@")
+        away_name = str(row.get("away_location") or away_key).strip()
+        home_name = str(row.get("home_location") or home_key).strip()
+        home_pair = sp_offense_defense_rating(home_name, sp_index, means)
+        away_pair = sp_offense_defense_rating(away_name, sp_index, means)
+        if home_pair is None and away_pair is None:
+            stats["both_unrated"] += 1
+            continue
+        if home_pair is not None and away_pair is not None:
+            # Not this path's question: an FBS-vs-FBS game missing from the
+            # projections is a projections defect, and rating it here would hide it.
+            stats["both_rated_unprojected"] += 1
+            continue
+        candidates.append((key, row, away_name, home_name, home_pair, away_pair))
+    stats["candidates"] = len(candidates)
+    if not candidates:
+        return []
+
+    wanted = {c[0] for c in candidates if c[0] not in fcs_lines and not bool(c[1].get("in_progress"))}
+    if wanted:
+        from scripts.poll_ncaaf_live_state import _fetch_scoreboard
+
+        for iso_date in _ncaaf_live_resim_espn_dates(now_utc):
+            payload = _fetch_scoreboard(iso_date)
+            if not isinstance(payload, Mapping):
+                stats["line_fetch_failures"] += 1
+                continue
+            for event in payload.get("events") or ():
+                if not isinstance(event, Mapping):
+                    continue
+                event_key = _espn_location_key(event)
+                if event_key not in wanted:
+                    continue
+                line = pregame_line_from_espn_event(event)
+                if line is None:
+                    continue
+                fcs_lines[event_key] = {
+                    **line, "event_id": str(event.get("id") or ""), "captured_at": now_utc.isoformat(),
+                }
+                stats["lines_captured"] += 1
+
+    games: list[dict[str, Any]] = []
+    for key, _row, away_name, home_name, home_pair, away_pair in candidates:
+        entry: dict[str, Any] = {"away_team": away_name, "home_team": home_name, "live_key": key}
+        line = fcs_lines.get(key)
+        if not isinstance(line, Mapping):
+            stats["no_pregame_line"] += 1
+            entry["refusal"] = (
+                "no_pregame_line",
+                "FBS-vs-FCS game with no pregame spread/total captured before kickoff; "
+                "the market-implied rating needs one and a live quote is never used",
+            )
+            games.append(entry)
+            continue
+        rated_is_home = home_pair is not None
+        rated_name, unrated_name = (home_name, away_name) if rated_is_home else (away_name, home_name)
+        raw_rated = sp_index.get(sp_norm(rated_name))
+        raw = None
+        if raw_rated is not None:
+            raw = market_implied_sp_components(
+                rated_offense=float(raw_rated[0]),
+                rated_defense=float(raw_rated[1]),
+                rated_is_home=rated_is_home,
+                home_margin=float(line.get("home_margin")),
+                total=float(line.get("total")),
+                league_means=means,
+            )
+        if raw is None:
+            stats["implied_rating_refused"] += 1
+            entry["refusal"] = ("implied_rating_refused", f"line cannot imply non-negative scores: {dict(line)}")
+            games.append(entry)
+            continue
+        # THROUGH THE GENERATOR'S OWN CENTRING, exactly as every FBS team is rated.
+        implied_pair = sp_offense_defense_rating(unrated_name, {sp_norm(unrated_name): raw}, means)
+        ratings[_norm_name(rated_name)] = home_pair if rated_is_home else away_pair
+        ratings[_norm_name(unrated_name)] = implied_pair
+        entry["rating_provenance"] = {
+            "source": MARKET_IMPLIED_RATING_SOURCE,
+            "unrated_team": unrated_name,
+            "implied_sp_offense": round(raw[0], 2),
+            "implied_sp_defense": round(raw[1], 2),
+            "line": {k: line.get(k) for k in ("home_margin", "total", "provider", "details", "event_id", "captured_at")},
+        }
+        stats["priced_on_implied_rating"] += 1
+        games.append(entry)
+    return games
+
+
 def _run_ncaaf_live_resim_tick() -> dict[str, Any] | None:
     """Re-sim every live NCAAF game from its current state and publish the lens.
 
@@ -2494,6 +2658,27 @@ def _run_ncaaf_live_resim_tick() -> dict[str, Any] | None:
         }
         for projection in projections
     ]
+
+    # FBS-vs-FCS games on a market-implied FCS rating -- see
+    # `_ncaaf_fcs_market_implied_games`. Captured pregame lines ride the status.
+    from syndicate.features.ncaaf.live_resim import fcs_market_implied_enabled
+
+    fcs_lines: dict[str, Any] = {
+        str(k): dict(v)
+        for k, v in dict(last_status.get("fcsPregameLines") or {}).items()
+        if isinstance(v, Mapping)
+    }
+    fcs_stats: dict[str, Any] = {"enabled": False}
+    if fcs_market_implied_enabled() and sp_index:
+        games.extend(_ncaaf_fcs_market_implied_games(
+            projections=projections,
+            live_index=live_index,
+            sp_index=sp_index,
+            ratings=ratings,
+            fcs_lines=fcs_lines,
+            now_utc=now_utc,
+            stats=fcs_stats,
+        ))
 
     snapshot = build_live_lens_snapshot(
         now_utc.date().isoformat(),
@@ -2598,8 +2783,24 @@ def _run_ncaaf_live_resim_tick() -> dict[str, Any] | None:
         # slate or a dead producer; `refusals_by_reason` is what separates them,
         # and it is the second half of this lane's closing reading.
         "coverage": snapshot.get("coverage") or {},
+        "fcs": fcs_stats,
     }
-    store["write_json_file"](status_path, {"lastRunEpoch": now, "last": result})
+    # CAPTURED PREGAME LINES OUTLIVE THE TICK, bounded: a line is only needed
+    # until its game is final, so anything captured more than two days ago goes.
+    cutoff = now_utc - timedelta(days=2)
+    kept_lines: dict[str, Any] = {}
+    for key, line in fcs_lines.items():
+        try:
+            captured = datetime.fromisoformat(str(line.get("captured_at")))
+        except (TypeError, ValueError):
+            continue
+        if captured.tzinfo is None:
+            captured = captured.replace(tzinfo=timezone.utc)
+        if captured >= cutoff:
+            kept_lines[key] = line
+    store["write_json_file"](
+        status_path, {"lastRunEpoch": now, "last": result, "fcsPregameLines": kept_lines}
+    )
     return result
 
 

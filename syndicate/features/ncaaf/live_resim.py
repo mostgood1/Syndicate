@@ -587,13 +587,23 @@ def build_live_lens_snapshot(
             resolved = live_state_from_espn_event(
                 state_row, away_team=away_team, home_team=home_team
             )
+        # A CALLER-NAMED REFUSAL, applied only to a game that is actually live.
+        # The FBS-vs-FCS path uses it for `no_pregame_line`: a game still in its
+        # pregame state keeps the more informative not-started reason above.
+        preset = game.get("refusal")
+        if isinstance(resolved, NcaafLiveGameState) and isinstance(preset, (tuple, list)) and preset:
+            resolved = NcaafResimRefusal(str(preset[0]), str(preset[1]) if len(preset) > 1 else "")
         # Remaining regulation seconds: the cost proxy, and it is a good one --
         # 154 ms/sim with a full game left, 0.7 ms with 15 seconds left.
         if isinstance(resolved, NcaafLiveGameState):
             remaining = (4 - resolved.period) * 900 + resolved.clock_seconds
         else:
             remaining = -1.0
-        prepared.append((float(remaining), {"away_team": away_team, "home_team": home_team}, resolved))
+        names = {"away_team": away_team, "home_team": home_team}
+        provenance = game.get("rating_provenance")
+        if isinstance(provenance, Mapping):
+            names["provenance"] = dict(provenance)
+        prepared.append((float(remaining), names, resolved))
 
     prepared.sort(key=lambda item: item[0])
 
@@ -627,12 +637,22 @@ def build_live_lens_snapshot(
                     away_defense=away_def,
                     sims=sims,
                 )
+        lanes = build_game_lens(
+            state, result, live_state_as_of=state.as_of if state is not None else generated_at
+        )
+        # PROVENANCE ON THE LANE, never only in a log. A probability resting on a
+        # market-implied rating must be distinguishable from one resting on SP+
+        # by anyone holding the snapshot. FBS lanes get no key at all, so their
+        # payload is unchanged.
+        provenance = names.get("provenance")
+        if isinstance(provenance, Mapping):
+            for lane in lanes:
+                lane["ratingSource"] = provenance.get("source")
+                lane["marketImplied"] = {k: v for k, v in provenance.items() if k != "source"}
         out_games.append({
             "away_name": names["away_team"],
             "home_name": names["home_team"],
-            "gameLens": build_game_lens(
-                state, result, live_state_as_of=state.as_of if state is not None else generated_at
-            ),
+            "gameLens": lanes,
         })
 
     snapshot = {
@@ -646,6 +666,124 @@ def build_live_lens_snapshot(
     }
     snapshot["coverage"] = summarise(out_games)
     return snapshot
+
+
+# ---------------------------------------------------------------------------
+# FBS-vs-FCS: A MARKET-IMPLIED RATING FOR THE UNRATED SIDE
+# `[2026-09-10, user decision: "Market-implied rating", for FAMU @ MIA]`
+# ---------------------------------------------------------------------------
+# SP+ covers FBS only, so an FBS-vs-FCS game has no rating for one side and
+# `_ratings_for` refuses it rather than rate the unknown team league-average.
+# This does NOT relax that rule. It supplies a MEASURED number for the missing
+# side -- the market's own pregame view -- and stamps it, so a probability that
+# rests on it can never pass as one resting on SP+.
+#
+# AN ESTIMATOR, NOT A MECHANISM (`model_engine_standard.md` §4.4): it changes how
+# one input is measured, not what the engine does, so there is no re-fit
+# obligation. It IS unvalidated on FCS games -- nothing has graded one -- which
+# is why the stamp exists.
+MARKET_IMPLIED_RATING_SOURCE = "market_implied"
+
+
+def fcs_market_implied_enabled() -> bool:
+    """ABSENT MEANS ON, like `SYNDICATE_NCAAF_LIVE_RESIM`: turning it off needs
+    only the env var (`off`/`0`/`false`/`no`) and a deploy, never a code change."""
+    raw = str(os.environ.get("SYNDICATE_NCAAF_FCS_MARKET_IMPLIED") or "").strip().lower()
+    return raw not in {"off", "0", "false", "no"}
+
+
+def pregame_line_from_espn_event(event: Any) -> dict[str, Any] | None:
+    """The book's PREGAME spread and total off an ESPN scoreboard event, or None.
+
+    `pre` EVENTS ONLY. An in-progress event's odds object is not guaranteed to be
+    the pregame line, and reading a live quote as a pregame one would make the
+    FCS team's rating move with the score -- the one thing a pregame prior must
+    not do. The caller captures the line while the game is `pre` and persists it.
+
+    THE SIGN COMES FROM THE FAVOURITE FLAGS, not from `spread`'s sign, which is
+    not documented as home-relative. A line with no single favourite and a
+    non-zero spread is refused rather than guessed.
+    """
+    if not isinstance(event, Mapping):
+        return None
+    status = event.get("status") if isinstance(event.get("status"), Mapping) else {}
+    status_type = status.get("type") if isinstance(status.get("type"), Mapping) else {}
+    if str(status_type.get("state") or "").strip().lower() != "pre":
+        return None
+    competitions = event.get("competitions")
+    competition = (
+        competitions[0]
+        if isinstance(competitions, list) and competitions and isinstance(competitions[0], Mapping)
+        else {}
+    )
+    for odds in competition.get("odds") or ():
+        if not isinstance(odds, Mapping):
+            continue
+        try:
+            magnitude = abs(float(odds.get("spread")))
+            total = float(odds.get("overUnder"))
+        except (TypeError, ValueError):
+            continue
+        if not (total > 0.0):
+            continue
+        home_odds = odds.get("homeTeamOdds") if isinstance(odds.get("homeTeamOdds"), Mapping) else {}
+        away_odds = odds.get("awayTeamOdds") if isinstance(odds.get("awayTeamOdds"), Mapping) else {}
+        home_fav, away_fav = bool(home_odds.get("favorite")), bool(away_odds.get("favorite"))
+        if magnitude == 0.0:
+            home_margin = 0.0
+        elif home_fav and not away_fav:
+            home_margin = magnitude
+        elif away_fav and not home_fav:
+            home_margin = -magnitude
+        else:
+            continue
+        provider = odds.get("provider") if isinstance(odds.get("provider"), Mapping) else {}
+        return {
+            "home_margin": home_margin,
+            "total": total,
+            "provider": str(provider.get("name") or ""),
+            "details": str(odds.get("details") or ""),
+        }
+    return None
+
+
+def market_implied_sp_components(
+    *,
+    rated_offense: float,
+    rated_defense: float,
+    rated_is_home: bool,
+    home_margin: float,
+    total: float,
+    league_means: tuple[float, float],
+) -> tuple[float, float] | None:
+    """Raw SP+ (offense, defense) POINTS for the unrated side, or None.
+
+    SP+'s own additive form: a team's expected points = its offense rating + the
+    opponent's defense rating (points ALLOWED) - the league baseline, taken as
+    the mean of the two component means so an average team scores the baseline
+    against an average team. The market's pregame line gives both expected
+    scores, `(total +/- home_margin) / 2`, and the rated side's components are
+    known, which leaves exactly two unknowns and two equations.
+
+    The result is in SP+'s RAW scale, so the caller runs it through
+    `sp_offense_defense_rating` -- the same centring and scaling every FBS team
+    gets. Home field is NOT separated out: the market's margin includes it and so
+    does this rating, a bias of at most a few points against spreads this path
+    exists for (MIA -59.5).
+
+    None when the line implies a negative score -- it cannot be a real line.
+    """
+    off_mean, def_mean = league_means
+    baseline = (float(off_mean) + float(def_mean)) / 2.0
+    home_points = (float(total) + float(home_margin)) / 2.0
+    away_points = (float(total) - float(home_margin)) / 2.0
+    if home_points < 0.0 or away_points < 0.0:
+        return None
+    rated_points_allowed = home_points if not rated_is_home else away_points
+    rated_points_scored = home_points if rated_is_home else away_points
+    unrated_defense = rated_points_scored - float(rated_offense) + baseline
+    unrated_offense = rated_points_allowed - float(rated_defense) + baseline
+    return float(unrated_offense), float(unrated_defense)
 
 
 def _ratings_for(
