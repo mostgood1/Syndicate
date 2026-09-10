@@ -5,6 +5,52 @@
 
 ---
 
+## 2026-09-10 00:20 CT — refresh-worker `80930e6d` — **MLB roster-substrate probe. THE HYPOTHESIS IS REFUTED, AND THE REAL CAUSE IS A ROOT THAT RESOLVES TO THE EPHEMERAL CHECKOUT.**
+
+Deploy 00:20:50 CT, `dep-dah3scht0dsc73ef8vmg`, boot line at **00:25:16 CT** — a
+boot probe, so the reading arrives in minutes rather than after a build cycle.
+Read-only; changes nothing, publishes nothing, fits no model.
+
+**verify:** the probe's own unconditional line, `MLB_ROSTER_SUBSTRATE`:
+
+    data_root      /opt/render/project/src/data/mlb_source/source_artifacts/data
+    refit_tree     13 dates  2026-06-15..06-27   clean 0
+    producer_tree  26 dates  2026-06-15..07-12   clean 0
+
+**IT IS BYTE-FOR-BYTE THE LOCAL CHECKOUT.** 13/26, identical ranges, zero clean
+in both — the same numbers this probe printed against my own tree before deploy.
+That coincidence is the finding, and `data_root` says why: **`/opt/render/project/
+`*`src`*`/data/...` is the EPHEMERAL CHECKOUT**, not the mounted disk.
+
+**THE MOUNT IS A DIFFERENT PATH AND THE RE-FIT NEVER LOOKS AT IT.** Read from
+refresh-worker's env (paginated, 167 keys):
+
+    SYNDICATE_DATA_ROOT        /opt/render/project/data          <- the MOUNT (no `src/`)
+    MLB_BETTING_DATA_ROOT      /opt/render/project/data/mlb_source/source_artifacts/data
+    SYNDICATE_MLB_DATA_ROOT    **UNSET**
+
+`refit_mlb_rates.py:59` reads `SYNDICATE_MLB_DATA_ROOT` and falls back to a
+REPO-RELATIVE path. That variable is not set here, so it took the checkout —
+which git ships carrying exactly the HRR-contaminated dates.
+
+**THIS IS `#441`'s TRAP, IN A SECOND PLACE.** That one is on record for the NFL
+props path: *"`default_nfl_source_root()` resolves a root by probing for the
+UNRELATED `upcoming_recs_*.csv` family: git ships 5 of those and the mounted disk
+has none, so it always picks the ephemeral CHECKOUT."* Same shape, different
+module — **a default that silently prefers the checkout over the mount.**
+
+**WHAT THIS CHANGES.** "Run the re-fit on refresh-worker" as scoped would have
+read the SAME 13 poisoned dates and produced a confident wrong answer with a
+production-looking provenance. **The probe cost one boot line and stopped that.**
+
+**WHAT IS STILL UNKNOWN, AND MUST NOT BE ASSUMED:** whether the MOUNT holds clean
+dates. The probe cannot see it — the path resolution never goes there. Setting
+`SYNDICATE_MLB_DATA_ROOT` to `MLB_BETTING_DATA_ROOT`'s value and re-reading the
+same boot line answers it, and needs one env set plus a deploy to inject.
+
+Claim released.
+
+
 ## 2026-09-09 22:08 CT — refresh-worker `a101c437` — **THE LIKE-FOR-LIKE NFL READING, AND IT CORRECTS MY OWN PREDICTION. The join works; the MECHANISM is not the one I designed for.**
 
 Discharges the reading owed by the 21:08 CT row. Same-size boards at last, so the
