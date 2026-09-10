@@ -67,6 +67,11 @@ def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
         from syndicate.features.shared.game_chip_scoreboard import build_game_chips
         from syndicate.features.shared.team_aliases import teams_match
 
+        try:
+            from syndicate.features.shared.ncaaf_team_registry import resolve_ncaaf_team_id
+        except Exception:  # pragma: no cover - deploy-skew guard; the name match still runs
+            resolve_ncaaf_team_id = None
+
         # CHIPS FOR THE DATES THE ROWS ACTUALLY SPAN, not just this artifact's
         # date (`#348`).
         #
@@ -149,6 +154,22 @@ def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
             token = (chip_side or {}).get(key)
             if token and teams_match(sport, token, row_team):
                 return True
+        if sport == "ncaaf" and resolve_ncaaf_team_id is not None:
+            # NCAAF FALLS BACK TO THE REGISTRY ID when the name match fails.
+            # `team_aliases`' NCAAF vocabulary does not reach every school the
+            # books list: measured 2026-09-10, `teams_match("ncaaf", "Florida
+            # A&M", "Florida A&M Rattlers")` is False (`canonical_team` is None
+            # for both) while `ncaaf_team_registry` resolves both to id 50. So
+            # every row of FAMU @ MIA -- 27 on production's board -- carried no
+            # `game_state`, and any game with such a school would do the same.
+            # The registry DROPS ambiguous names, so this can join a row to
+            # its own team or to nothing, never to a "Michigan State" guess.
+            row_id = resolve_ncaaf_team_id(row_team)
+            if row_id:
+                for key in ("name", "abbr"):
+                    token = (chip_side or {}).get(key)
+                    if token and resolve_ncaaf_team_id(token) == row_id:
+                        return True
         return False
 
     for row in grid:
