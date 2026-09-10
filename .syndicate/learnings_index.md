@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 955 rules `[generated]`
+## Index — 957 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -400,7 +400,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](learnings_evidence.md#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated) `[evidence]`
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 
-**Rules and corrections — 569**
+**Rules and corrections — 571**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -510,6 +510,7 @@
 - [2026-09-08 When reconciling two divergent copies of a ledger, RECENCY ALONE MAY NOT PIC…](#2026-09-08-when-reconciling-two-divergent-copies-of-a-ledger-recency-alone-may-not-pick-the-winner-check-the-losing-side-for-unique-content-before-overwriting-it-lanesmd-status-reconcile-no-lane)
 - [2026-09-09 — DISCHARGED, not overridden: the 2026-08-29 NCAAF alias-map prohibition was…](#2026-09-09-discharged-not-overridden-the-2026-08-29-ncaaf-alias-map-prohibition-was-conditional-and-both-its-conditions-are-now-met)
 - [2026-09-09 A REPLACEMENT THAT IS LESS INFORMATIVE THAN WHAT IT REPLACED IS A REGRESSION…](#2026-09-09-a-replacement-that-is-less-informative-than-what-it-replaced-is-a-regression-however-much-better-it-looks-a-generic-branded-404-discarded-the-routes-own-abort404-description-lane-brand-mascot-logo-commit-00902dd1)
+- [2026-09-10 — REQUIRED: before restoring a shared ledger file over its working copy, aud…](#2026-09-10-required-before-restoring-a-shared-ledger-file-over-its-working-copy-audit-it-for-sections-that-exist-only-there-and-audit-by-inner-content-because-a-header-set-comparison-lies-in-both-directions-lane-odds-history-segment-term)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
@@ -959,6 +960,7 @@
 - [2026-09-06 A schedule is a claim about a platform you have not tested](learnings_evidence.md#2026-09-06-a-schedule-is-a-claim-about-a-platform-you-have-not-tested) `[evidence]`
 - [2026-09-06 A guard that infers its postcondition from an artefact's existence cannot se…](learnings_evidence.md#2026-09-06-a-guard-that-infers-its-postcondition-from-an-artefacts-existence-cannot-see-a-half-built-one) `[evidence]`
 - [2026-09-07 A convention you copy may be a decision you are overturning](learnings_evidence.md#2026-09-07-a-convention-you-copy-may-be-a-decision-you-are-overturning) `[evidence]`
+- [2026-09-10 — REQUIRED: before restoring a shared ledger file over its working copy, aud…](learnings_evidence.md#2026-09-10-required-before-restoring-a-shared-ledger-file-over-its-working-copy-audit-it-for-sections-that-exist-only-there-and-audit-by-inner-content-lane-odds-history-segment-term) `[evidence]`
 - [2026-08-12 — Do not batch changes during a diagnosis](learnings_archive.md#2026-08-12-do-not-batch-changes-during-a-diagnosis) `[evidence]`
 - [2026-08-12 — A rate ceiling is not a fix](learnings_archive.md#2026-08-12-a-rate-ceiling-is-not-a-fix) `[evidence]`
 - [2026-08-12 — Parallel sessions on one problem need lane discipline](learnings_archive.md#2026-08-12-parallel-sessions-on-one-problem-need-lane-discipline) `[evidence]`

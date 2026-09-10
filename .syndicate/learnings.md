@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 955 rules `[generated]`
+## Index — 957 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5314,3 +5314,9 @@ Fourth instance this session of the same family
 a counter that is structurally zero on the path being taken; a flag read instead
 of its unconditional installer; and this. **All four were the reading being about
 the instrument rather than the system.**
+
+## 2026-09-10 — REQUIRED: before restoring a shared ledger file over its working copy, audit it for sections that exist ONLY there — and audit by inner CONTENT, because a header-set comparison lies in BOTH directions `[lane odds-history-segment-term]`
+
+- **The primary tree is where work goes to be forgotten.** Cleaning my own redundant edits out of its `lanes.md` and `deploys.md`, I found a complete 9,889-char deploy row from lane `ncaaf-games-cache-refresh` — a finished verification, its lane still OPEN — that existed in **no commit, no worktree and no stash**. A plain `git checkout origin/main -- <files>` would have destroyed it, and I would never have known. This is the same hazard as `2026-09-02 FORBIDDEN: a git command that can DISCARD work taking its tree from the working directory`, where `m625-env-snapshots` was actually lost; **that entry has the mechanism, this one has the check.**
+- **How to apply.** Before any restore/checkout over a shared ledger file, diff the two versions at SECTION level and list what exists only in the working copy. Then confirm each hit by **distinctive inner content** — a SHA, a byte count, a measured figure — never by header text: my header-set pass reported **two** unpushed rows and one of them was a false positive, because these headers carry em-dashes that encode differently through `git show` than in the working copy. The same encoding gap can hide a real orphan, so the failure runs both ways. Rescue by landing the block from a worktree based on `origin/main` (append-only files: 0 deletions), never by keeping the stale file. **And `git checkout <rev> -- <path>` STAGES what it writes** — on this repo's shared index that parks the change where another session's commit can sweep it up, so `git restore --staged` immediately and verify the index is empty.
+- *(evidence in `learnings_evidence.md`)*
