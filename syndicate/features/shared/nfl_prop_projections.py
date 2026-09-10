@@ -102,9 +102,71 @@ class NflPropProjectionIndex:
     week: int | None = None
     row_count: int = 0
     generated_at: str | None = None
+    #: `"resolved"` when `latest_season`/`default_week` answered and their
+    #: artifact had rows; `"artifact_scan"` when that answer was empty and the
+    #: disk was asked instead. A fallback must never read as a clean resolution.
+    resolution: str = "resolved"
 
     def get(self, key: str) -> Mapping[str, Any] | None:
         return self.entries.get(key)
+
+
+def _season_candidates(resolved_season: Any, selected_date: Any) -> list[int]:
+    """Seasons to probe, newest first.
+
+    THE DATE'S OWN YEAR COMES FIRST, AND THAT IS THE WHOLE FIX. Measured
+    2026-09-09 against the real published artifact: `latest_season()` answered
+    **2025** while the artifact on disk was `nfl_prop_projections_2026_wk1.json`.
+    `latest_season` derives from `week_summaries()`, which globs a DIFFERENT
+    artifact family (SmartSim2 projections), so early in a season -- exactly
+    when week 1 props exist and last season's projections still dominate the
+    glob -- it lags by a year.
+
+    A first draft of this scan probed only `[resolved, resolved - 1]` and
+    therefore could never reach 2026 from a resolved 2025. It found nothing on
+    the real data and the reachability run caught it; the season the DATE names
+    is the signal that does not depend on which artifact family is on this disk.
+    """
+    candidates: list[int] = []
+    text = str(selected_date or "").strip()
+    if len(text) >= 4 and text[:4].isdigit():
+        year = int(text[:4])
+        # An NFL season spans a new year: January belongs to the PREVIOUS
+        # season's playoffs, so a January date names `year - 1` first.
+        month = int(text[5:7]) if len(text) >= 7 and text[5:7].isdigit() else 0
+        candidates.extend([year - 1, year] if month and month <= 2 else [year, year - 1])
+    if resolved_season is not None:
+        candidates.extend([int(resolved_season), int(resolved_season) + 1, int(resolved_season) - 1])
+    ordered: list[int] = []
+    for value in candidates:
+        if value not in ordered:
+            ordered.append(value)
+    return ordered
+
+
+def _newest_available_artifact(
+    reader: Any, resolved_season: Any, selected_date: Any
+) -> tuple[int, int, list] | None:
+    """The most recent (season, week) that HAS a populated prop artifact.
+
+    Walks weeks downward rather than globbing, because the reader already owns
+    root resolution (`nfl_prop_projection_artifact_path` prefers a root whose
+    copy has ROWS, so a zero-row stub on one disk cannot shadow a real file on
+    another) and reimplementing that here would be a second, weaker copy of it.
+
+    Bounded and cheap: at most a handful of seasons x 22 weeks of a file probe
+    that short-circuits on the first hit, and it runs only when the primary
+    resolution already came back empty.
+    """
+    for candidate_season in _season_candidates(resolved_season, selected_date):
+        for candidate_week in range(22, 0, -1):
+            try:
+                rows = reader(candidate_season, candidate_week)
+            except Exception:
+                continue
+            if rows:
+                return candidate_season, candidate_week, list(rows)
+    return None
 
 
 def _resolve_season_week(season: Any, week: Any) -> tuple[int | None, int | None]:
@@ -138,14 +200,40 @@ def load_nfl_prop_projections(
     """
     resolved_season, resolved_week = _resolve_season_week(season, week)
     index = NflPropProjectionIndex(season=resolved_season, week=resolved_week)
-    if resolved_season is None or resolved_week is None:
-        return index
     try:
         from syndicate.features.nfl.props import read_nfl_prop_projection_artifact
-
-        rows = read_nfl_prop_projection_artifact(resolved_season, resolved_week)
     except Exception:
         return index
+
+    rows = None
+    if resolved_season is not None and resolved_week is not None:
+        try:
+            rows = read_nfl_prop_projection_artifact(resolved_season, resolved_week)
+        except Exception:
+            rows = None
+
+    if not rows and season is None and week is None:
+        # THE WEEK-PINNING FAILURE MODE, CLOSED RATHER THAN DOCUMENTED.
+        #
+        # `latest_season`/`default_week` resolve by probing for OTHER artifact
+        # families (`week_summaries` globs projection files), so on a service
+        # whose disk carries a different mix they can answer a season/week that
+        # has no prop artifact -- and the join then returns nothing, which is
+        # indistinguishable from "the model has no view on these players". This
+        # repo has already shipped that exact defect once: `#471`, NFL week
+        # self-pinning to 1.
+        #
+        # So when the resolved week yields nothing, ASK THE DISK what weeks
+        # actually exist and take the newest populated one. The index reports
+        # which it used, and `resolution` records that this branch ran, so a
+        # fallback is never mistaken for a clean primary resolution.
+        found = _newest_available_artifact(
+            read_nfl_prop_projection_artifact, resolved_season, selected_date
+        )
+        if found is not None:
+            found_season, found_week, rows = found
+            index.season, index.week = found_season, found_week
+            index.resolution = "artifact_scan"
     if not rows:
         # None ("cannot answer") and [] ("answered, nothing there") are both an
         # empty index HERE, but the caller distinguishes them by row_count == 0

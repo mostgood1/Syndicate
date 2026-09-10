@@ -964,6 +964,49 @@ def attach_projections(grid: list, *, sport: str, selected_date: str) -> dict:
     return coverage
 
 
+def _merge_nfl_coverage(game_coverage: dict, prop_coverage: dict) -> dict:
+    """Merge NFL's game-line and player-prop coverage into one payload.
+
+    THE NUMERATOR AND THE DENOMINATOR MOVE TOGETHER, OR NEITHER. This is `#425`
+    applied before it can be broken rather than after: WNBA spread its prop
+    coverage and then overwrote ONLY `rows_with_projection` with props + games,
+    leaving `rows_considered` prop-only, and shipped a payload whose numerator
+    counted a population its denominator never saw ("100% projected and 20
+    refusals in the same breath is arithmetically impossible for one
+    population"). Both totals are summed here and `pct_projected` is recomputed
+    over the merged pair rather than inherited from either half.
+
+    Both halves stay reachable under `prop_coverage` / `game_coverage`, so
+    "what fraction of NFL PROPS got a model view" remains answerable and is
+    never silently diluted by game rows.
+    """
+    prop_considered = int(prop_coverage.get("rows_considered") or 0)
+    game_considered = int(game_coverage.get("rows_considered") or 0)
+    prop_projected = int(prop_coverage.get("rows_with_projection") or 0)
+    game_projected = int(game_coverage.get("rows_with_projection") or 0)
+    merged_considered = prop_considered + game_considered
+    merged_projected = prop_projected + game_projected
+    merged: dict[str, Any] = {
+        **game_coverage,
+        "supported": True,
+        "rows_considered": merged_considered,
+        "rows_with_projection": merged_projected,
+        "pct_projected": (
+            round(100.0 * merged_projected / merged_considered, 1) if merged_considered else 0.0
+        ),
+        "prop_rows_considered": prop_considered,
+        "prop_rows_with_projection": prop_projected,
+        "game_rows_considered": game_considered,
+        "game_rows_with_projection": game_projected,
+        "prop_coverage": prop_coverage,
+        "game_coverage": game_coverage,
+    }
+    # A `reason` from either half describes only that half once they are merged,
+    # so it must not sit at the top level asserting something about both.
+    merged.pop("reason", None)
+    return merged
+
+
 def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) -> dict:
     """Stamp the sim's projection and edge onto player-prop rows (S3).
 
@@ -1197,6 +1240,22 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
         # `load_nfl_game_projections` iterates EVERY source root rather than the
         # first, so it resolves whether a given service serves these from its
         # runtime disk or from the git checkout.
+        # GAME LINES AND PLAYER PROPS ARE TWO INDEPENDENT JOINS, exactly as WNBA
+        # established in `#364` and merged in `#425`. They read different
+        # artifacts (smartsim2 projections vs `nfl_prop_projections_*.json`) and
+        # either can be present without the other, so a missing prop artifact
+        # must not suppress game lines -- and, the direction that actually bit
+        # here, a season with no SmartSim2 projections must not suppress props,
+        # which is what the old `if not index.games: return` did.
+        #
+        # WHY THE PROP JOIN EXISTS, from production's own counter
+        # (`PLAN_WRITTEN`, 2026-09-10T00:11:12Z): `no_model_edge_pct` refused
+        # **1,872 of 3,029 rows -- 61.8% of the funnel -- and NFL was 1,503 of
+        # that**, top market `receiving yards:473`. The model for those rows was
+        # already published, allowlisted and current; `attach_nfl_game_projections`
+        # simply skips prop rows (`nfl_game_projections.py:361`) and nothing else
+        # on the board path had ever read the prop artifact.
+        game_coverage: dict[str, Any] = {"supported": True, "rows_with_projection": 0}
         try:
             from syndicate.features.shared.nfl_game_projections import (
                 attach_nfl_game_projections,
@@ -1205,15 +1264,52 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
 
             index = load_nfl_game_projections(selected_date)
             if not index.games:
-                return {
+                game_coverage = {
                     "supported": True,
                     "rows_with_projection": 0,
                     "reason": "no NFL SmartSim2 projections for this season",
                 }
-            return attach_nfl_game_projections(grid, index)
+            else:
+                game_coverage = attach_nfl_game_projections(grid, index)
         except Exception:
             _LOGGER.exception("BOOK_GRID_PROJECTION_FAILURE sport=nfl date=%s", selected_date)
-            return {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
+            game_coverage = {
+                "supported": True,
+                "error": "projection join failed",
+                "rows_with_projection": 0,
+            }
+
+        prop_coverage: dict[str, Any] = {"supported": True, "rows_with_projection": 0}
+        try:
+            from syndicate.features.shared.nfl_prop_projections import (
+                attach_nfl_prop_projections,
+                load_nfl_prop_projections,
+            )
+
+            prop_index = load_nfl_prop_projections(selected_date)
+            if not prop_index.entries:
+                # NAMED, and carrying the season/week it looked for: an empty
+                # join caused by a wrong week and one caused by a genuinely
+                # unrated slate are otherwise identical from the outside.
+                prop_coverage = {
+                    "supported": True,
+                    "rows_with_projection": 0,
+                    "reason": "no NFL prop projection artifact for this season/week",
+                    "artifact_season": prop_index.season,
+                    "artifact_week": prop_index.week,
+                }
+            else:
+                prop_coverage = attach_nfl_prop_projections(grid, prop_index)
+        except Exception:
+            # Independent of the game join above, and never able to break it.
+            _LOGGER.exception("BOOK_GRID_PROP_PROJECTION_FAILURE sport=nfl date=%s", selected_date)
+            prop_coverage = {
+                "supported": True,
+                "error": "prop projection join failed",
+                "rows_with_projection": 0,
+            }
+
+        return _merge_nfl_coverage(game_coverage, prop_coverage)
 
     if sport == "ncaaf":
         # `#555`. Layer 1 gained real NCAAF prices with `#552` and then reported

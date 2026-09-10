@@ -236,3 +236,75 @@ def test_coverage_names_which_artifact_answered():
     assert coverage["artifact_season"] == 2026
     assert coverage["artifact_week"] == 1
     assert coverage["artifact_rows"] == 1
+
+
+# ---------------------------------------------------------------------------
+# 6. THE WEEK-PINNING FAILURE MODE
+# ---------------------------------------------------------------------------
+
+
+def test_artifact_scan_recovers_when_the_resolved_week_is_empty(monkeypatch):
+    """A wrong resolved week must not read as 'the model has no view'.
+
+    `#471` shipped exactly this once (NFL week self-pinning to 1). Here
+    `default_week` answers a week with no artifact, and the scan finds the one
+    that exists -- reporting `resolution == "artifact_scan"` so the fallback is
+    never mistaken for a clean primary resolution.
+    """
+    from syndicate.features.shared import nfl_prop_projections as mod
+
+    calls: list[tuple[int, int]] = []
+
+    def fake_reader(season: int, week: int):
+        calls.append((season, week))
+        if (season, week) == (2026, 1):
+            return [_artifact_row("receiving_yards::aj barner::24.5")]
+        return None
+
+    monkeypatch.setattr(mod, "_resolve_season_week", lambda s, w: (2026, 9))
+    import syndicate.features.nfl.props as props_mod
+
+    monkeypatch.setattr(props_mod, "read_nfl_prop_projection_artifact", fake_reader)
+
+    index = mod.load_nfl_prop_projections("2026-09-09")
+    assert index.row_count == 1
+    assert (index.season, index.week) == (2026, 1)
+    assert index.resolution == "artifact_scan"
+    assert (2026, 9) in calls  # the resolved week WAS tried first
+
+
+def test_explicit_season_week_never_falls_back(monkeypatch):
+    """An explicit ask must answer about THAT week or not at all."""
+    from syndicate.features.shared import nfl_prop_projections as mod
+    import syndicate.features.nfl.props as props_mod
+
+    monkeypatch.setattr(
+        props_mod,
+        "read_nfl_prop_projection_artifact",
+        lambda season, week: [_artifact_row("receiving_yards::aj barner::24.5")]
+        if (season, week) == (2026, 1)
+        else None,
+    )
+    index = mod.load_nfl_prop_projections("2026-09-09", season=2026, week=9)
+    assert index.row_count == 0
+    assert (index.season, index.week) == (2026, 9)
+    assert index.resolution == "resolved"
+
+
+def test_season_candidates_lead_with_the_dates_own_year():
+    """The regression that the reachability run caught.
+
+    `latest_season()` answered 2025 on 2026-09-09 while the artifact on disk was
+    `nfl_prop_projections_2026_wk1.json`; a scan over `[resolved, resolved - 1]`
+    could never reach 2026 and the join silently found nothing.
+    """
+    from syndicate.features.shared.nfl_prop_projections import _season_candidates
+
+    assert _season_candidates(2025, "2026-09-09")[0] == 2026
+    # January belongs to the PREVIOUS season's playoffs.
+    assert _season_candidates(2025, "2027-01-11")[0] == 2026
+    # No date still works off the resolved season, and reaches season+1.
+    assert 2026 in _season_candidates(2025, None)
+    # No duplicates, so the probe stays bounded.
+    candidates = _season_candidates(2025, "2026-09-09")
+    assert len(candidates) == len(set(candidates))
