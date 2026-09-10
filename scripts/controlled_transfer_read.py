@@ -2,8 +2,8 @@
 
 Pairs with `controlled_transfer_probe.py`. That script put a KNOWN number of
 bytes through web's public edge; this one reads back the three numbers that the
-`[render-egress-spikes]` contradiction is between, over the same right-labelled
-bucket:
+`[render-egress-spikes]` contradiction is between, over the bandwidth bucket
+labelled with the hour the transfer ran in:
 
   P1  the EDGE log's count and bytes for requests we know we made
   P2  the APP log's size field for those same requests
@@ -15,9 +15,17 @@ from the background inside the same hour -- and the probe recorded exactly how
 many it sent and how many bytes came back. A log that under-reports THOSE is
 under-reporting something we counted independently.
 
-TRAP THE CALLER CANNOT SKIP: a bucket SETTLES for ~50 minutes and can grow 39x
-while doing so. This refuses to score P3 until the bucket's hour closed at least
-`--settle-minutes` ago, and prints the unsettled value as informational only.
+A BANDWIDTH BUCKET IS LABELLED BY ITS HOUR'S START. Bucket `X:00` holds the
+bytes of `X:00..(X+1):00` (`.syndicate/findings_2026-09-10_spike_crossing_and_labelling.md`).
+Until 2026-09-10 this read the bucket labelled with the hour AFTER the transfer:
+the log window was still the transfer's own hour, so P1 and P2 were read over
+the right hour, but P3 took the meter of the FOLLOWING hour. A re-read keeps the
+earlier reading under `superseded` rather than overwriting it.
+
+TRAP THE CALLER CANNOT SKIP: a bucket keeps growing for ~60 minutes after its
+label -- its own hour filling in -- and a fresh low reading is INCOMPLETE, not
+low. This refuses to score P3 until the bucket's LABEL is at least
+`--settle-minutes` old, and prints the unsettled value as informational only.
 
     py -3 scripts/controlled_transfer_read.py reports/bandwidth_spikes/controlled_transfer_<stamp>.json
 """
@@ -43,10 +51,17 @@ SETTLE_MINUTES = 70
 
 
 def _bucket_for(when: str) -> str:
-    """The RIGHT-labelled bucket covering the hour that contains `when`."""
+    """The bandwidth bucket holding the moment `when`: the hour it falls in.
+
+    A bandwidth bucket is labelled by its hour's START. This returned that label
+    PLUS ONE HOUR until 2026-09-10, which is the `http-requests` metric's
+    convention, not bandwidth's. `controlled_transfer_probe.py` still records its
+    own end-labelled `bucket_label`; that file is claimed by lane
+    `bandwidth-controlled-transfer` and was NOT changed here. This reader never
+    uses that field -- it derives the bucket from the transfer's own timestamps.
+    """
     moment = dt.datetime.strptime(when[:19], "%Y-%m-%dT%H:%M:%S")
-    label = moment.replace(minute=0, second=0, microsecond=0) + dt.timedelta(hours=1)
-    return label.strftime("%Y-%m-%dT%H:00:00Z")
+    return moment.replace(minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:00:00Z")
 
 
 def main() -> int:
@@ -61,8 +76,8 @@ def main() -> int:
     bucket = _bucket_for(started)
     if _bucket_for(ended) != bucket:
         print(f"WARNING: transfer straddles buckets ({_bucket_for(started)} .. {_bucket_for(ended)})")
-    window_end = dt.datetime.strptime(bucket[:19], "%Y-%m-%dT%H:%M:%S")
-    window_start = window_end - dt.timedelta(hours=1)
+    window_start = dt.datetime.strptime(bucket[:19], "%Y-%m-%dT%H:%M:%S")
+    window_end = window_start + dt.timedelta(hours=1)
     start_s = window_start.strftime("%Y-%m-%dT%H:%M:%SZ")
     end_s = window_end.strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -77,7 +92,7 @@ def main() -> int:
 
     # --- the meter -------------------------------------------------------
     now = dt.datetime.utcnow()
-    age_min = (now - window_end).total_seconds() / 60
+    age_min = (now - window_start).total_seconds() / 60
     values = _metric(
         key, "bandwidth", SERVICE_IDS["web"],
         (window_start - dt.timedelta(hours=3)).strftime("%Y-%m-%dT%H:00:00Z"),
@@ -85,7 +100,7 @@ def main() -> int:
     )
     metered = values.get(bucket)
     settled = age_min >= args.settle_minutes
-    print(f"\n== METER  bucket age {age_min:.0f} min "
+    print(f"\n== METER  bucket label is {age_min:.0f} min old "
           f"({'SETTLED' if settled else 'UNSETTLED -- informational only'})")
     for b in sorted(values):
         mark = "  <-- transfer" if b == bucket else ""
@@ -164,12 +179,11 @@ def main() -> int:
             print("   NOTE: 'metered / known' is only the meter's coefficient on OUR bytes if the "
                   "background is small; read it beside the background line above.")
 
-    out = Path(args.transfer_json).with_name(
-        Path(args.transfer_json).stem + "_reading.json")
-    out.write_text(json.dumps({
+    reading = {
         "transfer": args.transfer_json,
         "bucket": bucket,
         "window": {"start": start_s, "end": end_s},
+        "labelling": "bandwidth bucket labelled by its hour's START (corrected 2026-09-10)",
         "bucket_age_minutes": round(age_min, 1),
         "settled": settled,
         "metered_mb": metered,
@@ -182,7 +196,20 @@ def main() -> int:
         "app": {"ours_count": mine_app_count, "ours_bytes": mine_app_bytes,
                 "hour_served_bytes": app_total},
         "neighbour_buckets": values,
-    }, indent=2, sort_keys=True), encoding="utf-8")
+    }
+    out = Path(args.transfer_json).with_name(
+        Path(args.transfer_json).stem + "_reading.json")
+    # A reading of a DIFFERENT bucket is evidence, not a draft: ledger entries
+    # quote it. Keep it rather than overwrite it.
+    if out.exists():
+        try:
+            previous = json.loads(out.read_text(encoding="utf-8"))
+        except ValueError:
+            previous = None
+        if isinstance(previous, dict) and previous.get("bucket") != bucket:
+            reading["superseded"] = previous
+            print(f"   (earlier reading of bucket {previous.get('bucket')} kept under `superseded`)")
+    out.write_text(json.dumps(reading, indent=2, sort_keys=True), encoding="utf-8")
     print(f"\n-> {out}")
     return 0
 
