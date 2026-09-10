@@ -4076,6 +4076,47 @@ worker-local export-only set once (2) unblocks.
 > **This is the largest remaining modelling item in Phase 1 and it is one
 > data-reachability decision away from being runnable.**
 
+
+> **RUNNING THE RE-FIT ON refresh-worker: TWO OBSTACLES, AND THE PATH ASSUMPTION IS
+> NOT YET VERIFIED. NOTHING WAS DEPLOYED.** `[2026-09-10 00:0x CT, lane web-oom-census]`
+>
+> **GOOD NEWS FIRST: refresh-worker IS writing roster artifacts.**
+> `vendor/mlb_bettingv2/tools/daily_update.py:5292` `--write-roster-artifacts`
+> defaults **`on`**, and the live cmdline observed in `ALL_PROCESS_MEMORY` does not
+> override it. So they are being produced daily on that disk.
+>
+> **BUT THE PATHS DO NOT MATCH, AND THIS IS THE UNVERIFIED PART.** The producer
+> writes `data/daily/snapshots/<date>/roster_objs/` (its own `--help` says so). The
+> re-fit reads `<MLB_DATA_ROOT>/daily_pitcher_props/snapshots/<date>/roster_objs/`.
+> Those are different trees. `SYNDICATE_MLB_DATA_ROOT` moves the ROOT but the
+> `daily_pitcher_props/snapshots` suffix is hard-coded, so the override cannot
+> bridge it. **The local checkout happens to have BOTH; whether refresh-worker does
+> is UNKNOWN and cannot be checked from here** — the export API serves web, and
+> that tree is not allowlisted.
+>
+> **ALSO NOTE, and it bears on capacity:** the live cmdline shows
+> `--use-roster-artifacts off` in production, i.e. the sim is NOT currently reading
+> them back. `CLAUDE.md` says that flag defaults `on`; production passes `off`.
+> Writing and reading are separately controlled and only writing is on.
+>
+> **THIS IS NOT A ONE-OFF — IT IS A CLASS. ELEVEN scripts read that same path:**
+> `refit_mlb_rates`, `measure_all_inputs_effect`, `measure_combined_sim_features`,
+> `measure_count_progression`, `measure_pitch_splits_effect`,
+> `measure_substitution_effect`, `grade_mlb_hitter_props_vs_market`,
+> `mlb_opportunity_haircut`, `reproject_mlb_props_with_subs`, `scope_sim_memory`,
+> and **`sim_input_checklist`** — which `CLAUDE.md` names as the GATING input
+> checklist every model engine must pass. **The whole MLB analysis and gating
+> substrate rests on a tree that exists only in the checkout, on 13 contaminated
+> dates, and is unreachable from production.**
+>
+> **SMALLEST NEXT STEP, and it is deliberately not the re-fit:** a one-tick PROBE on
+> refresh-worker that only REPORTS whether
+> `daily_pitcher_props/snapshots/*/roster_objs/roster_obj_*.json` resolves there and
+> how many dates are `>= 2026-07-20` (clean of the HRR boundary). **Shipping a
+> re-fit runner before that is shipping on an unverified path** — the exact
+> deployed-inert shape `#625`(3) exists to catch, and one this session already hit
+> once tonight.
+
 ### `#623` — **PHASE 2 — WNBA SPRINT 2026-09-17..09-25, run as a TEST (30 games in 9 days).** — lane `edge-plan`, 2026-09-01 — **OPEN; preconditions are `#626` (c)(d)(e)**
 
 Execute against the pre-registered gates — nothing here is discretionary:
