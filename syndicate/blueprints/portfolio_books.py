@@ -89,7 +89,16 @@ def portfolio_login():
     if auth.auth_mode() == "off":
         return redirect(next_target, code=303 if request.method == "POST" else 302)
     if not auth.credentials().configured:
-        return render_template("portfolio_login.html", next_target=next_target, not_configured=True, error=None), 503
+        return (
+            render_template(
+                "portfolio_login.html",
+                next_target=next_target,
+                not_configured=True,
+                problem=auth.credentials().problem,
+                error=None,
+            ),
+            503,
+        )
     if request.method == "GET":
         if auth.current_user(request):
             return redirect(next_target, code=302)

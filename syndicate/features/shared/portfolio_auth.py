@@ -45,6 +45,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
+import re
 import threading
 import time
 from dataclasses import dataclass
@@ -70,6 +71,15 @@ _failures: dict[str, list[float]] = {}
 _failures_lock = threading.Lock()
 _not_configured_reported = False
 
+# What a werkzeug password hash looks like: `<method>$<salt>$<hex>`, the method
+# `scrypt[:n:r:p]` or `pbkdf2:<digest>[:iterations]`. ANYTHING ELSE in the HASH
+# key is a configuration error -- most likely the plain password pasted into the
+# wrong box -- and `check_password_hash` answers False to it for every login,
+# without raising and without a word. Measured on production 2026-09-10: exactly
+# that, five failed sign-ins and nothing anywhere saying why. So a malformed
+# hash is refused AS A MISCONFIGURATION, loudly, instead of as a wrong password.
+_WERKZEUG_HASH = re.compile(r"(?:scrypt(?::\d+){0,3}|pbkdf2:[A-Za-z0-9_]+(?::\d+)?)\$[^$\s]+\$[0-9a-f]+")
+
 
 def _env(name: str) -> str:
     return str(os.environ.get(name) or "").strip()
@@ -92,8 +102,19 @@ class Credentials:
     password_hash: str
 
     @property
+    def problem(self) -> str | None:
+        """A named configuration error, or None. Names only -- never the value."""
+        if self.password_hash and not _WERKZEUG_HASH.fullmatch(self.password_hash):
+            return "password_hash_not_a_hash"
+        return None
+
+    @property
+    def any_set(self) -> bool:
+        return bool(self.username or self.password or self.password_hash)
+
+    @property
     def configured(self) -> bool:
-        return bool(self.username and (self.password or self.password_hash))
+        return bool(self.username and (self.password or self.password_hash)) and self.problem is None
 
     def _material(self) -> str:
         return f"{self.username}\0{self.password_hash or self.password}"
@@ -123,7 +144,9 @@ def auth_mode() -> str:
         return "off"
     if raw in {"required", "on", "1", "true", "yes"}:
         return "required"
-    return "required" if (_on_render() or credentials().configured) else "off"
+    # ANY credential key present means somebody meant to lock this -- a
+    # malformed one included, which must lock (503) rather than open.
+    return "required" if (_on_render() or credentials().any_set) else "off"
 
 
 def is_gated_path(path: str) -> bool:
@@ -150,7 +173,10 @@ def check_credentials(username: Any, password: Any) -> bool:
             from werkzeug.security import check_password_hash
 
             password_ok = bool(check_password_hash(creds.password_hash, str(password or "")))
-        except Exception:
+        except Exception as exc:  # noqa: BLE001
+            # Said out loud: a hash the runtime cannot check reads to the user as
+            # a wrong password, which is the silent failure this module refuses.
+            print(f"[portfolio_auth] PORTFOLIO_AUTH_HASH_CHECK_ERROR type={type(exc).__name__}", flush=True)
             password_ok = False
     else:
         password_ok = hmac.compare_digest(str(password or "").encode("utf-8"), creds.password.encode("utf-8"))
@@ -306,9 +332,10 @@ def _report_not_configured(path: str) -> None:
     # print, not logger.info -- logger.info never reaches Render's collector.
     print(
         "[portfolio_auth] PORTFOLIO_AUTH_NOT_CONFIGURED "
-        f"path={path} -- serving 503 on every portfolio path. Set "
-        "SYNDICATE_PORTFOLIO_USERNAME and SYNDICATE_PORTFOLIO_PASSWORD (or "
-        "SYNDICATE_PORTFOLIO_PASSWORD_HASH) on this service.",
+        f"path={path} problem={credentials().problem or 'missing'} -- serving 503 on "
+        "every portfolio path. Set SYNDICATE_PORTFOLIO_USERNAME and "
+        "SYNDICATE_PORTFOLIO_PASSWORD (or a real SYNDICATE_PORTFOLIO_PASSWORD_HASH) "
+        "on this service.",
         flush=True,
     )
 
@@ -344,7 +371,16 @@ def gate(request: Any, config: Mapping[str, Any] | None = None) -> Any:
             )
             response.status_code = 503
             return response
-        return render_template("portfolio_login.html", next_target="/portfolio", not_configured=True, error=None), 503
+        return (
+            render_template(
+                "portfolio_login.html",
+                next_target="/portfolio",
+                not_configured=True,
+                problem=credentials().problem,
+                error=None,
+            ),
+            503,
+        )
 
     if current_user(request):
         return None
@@ -388,7 +424,8 @@ def install_portfolio_auth(app: Any) -> None:
     print(
         "[portfolio_auth] PORTFOLIO_AUTH_MODE "
         f"mode={auth_mode()} credentials_configured={creds.configured} "
-        f"hash={'yes' if creds.password_hash else 'no'} on_render={_on_render()}",
+        f"hash={'yes' if creds.password_hash else 'no'} problem={creds.problem or 'none'} "
+        f"on_render={_on_render()}",
         flush=True,
     )
 

@@ -299,3 +299,50 @@ def test_with_the_gate_off_the_sign_in_page_steps_aside(env, client):
     response = client.get("/portfolio/login?next=/portfolio/books/manual")
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/portfolio/books/manual")
+
+
+# ---------------------------------------------------------------- a malformed hash
+
+
+def test_a_plain_password_in_the_hash_key_locks_loudly_instead_of_failing_every_login(env, client, handlers_must_not_run):
+    """Measured on production 2026-09-10: the plain password went into
+    SYNDICATE_PORTFOLIO_PASSWORD_HASH, werkzeug answered False to every login
+    without raising, and nothing said why -- five `LOGIN_FAILED` and no cause.
+    It is a CONFIGURATION error, so it must read as one, and never echo the value."""
+    secret = "Plain-Text-Pw1!"
+    env.setenv("RENDER", "true")
+    env.setenv("SYNDICATE_PORTFOLIO_USERNAME", USER)
+    env.setenv("SYNDICATE_PORTFOLIO_PASSWORD_HASH", secret)
+    creds = portfolio_auth.credentials()
+    assert creds.problem == "password_hash_not_a_hash"
+    assert not creds.configured
+    assert portfolio_auth.auth_mode() == "required"
+
+    page = client.get("/portfolio")
+    assert page.status_code == 503
+    body = html.unescape(page.get_data(as_text=True))
+    assert "doesn't hold a password hash" in body
+    assert secret not in body
+    login = client.post("/portfolio/login", data={"username": USER, "password": secret})
+    assert login.status_code == 503
+    assert secret not in login.get_data(as_text=True)
+    api = client.get("/api/portfolio/books")
+    assert (api.status_code, api.get_json()["error"]) == (503, "portfolio_login_not_configured")
+
+
+def test_a_malformed_hash_locks_off_render_too(env, client):
+    """Any credential key present means somebody meant to lock the page. A
+    malformed one must not fall through to the off-Render default of OPEN."""
+    env.setenv("SYNDICATE_PORTFOLIO_USERNAME", USER)
+    env.setenv("SYNDICATE_PORTFOLIO_PASSWORD_HASH", "not-a-hash")
+    assert portfolio_auth.auth_mode() == "required"
+    assert client.get("/api/portfolio/books").status_code == 503
+
+
+@pytest.mark.parametrize("method", ["scrypt", "pbkdf2:sha256", "pbkdf2:sha256:1000"])
+def test_real_werkzeug_hashes_are_recognised_and_work(env, client, method):
+    env.setenv("SYNDICATE_PORTFOLIO_USERNAME", USER)
+    env.setenv("SYNDICATE_PORTFOLIO_PASSWORD_HASH", generate_password_hash("hashed secret", method=method))
+    assert portfolio_auth.credentials().problem is None
+    assert _login(client, password="hashed secret").status_code == 303
+    assert client.get("/api/portfolio/books").status_code == 200
