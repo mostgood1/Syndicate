@@ -6429,6 +6429,98 @@ def _kalshi_series_catalogue_at_boot() -> None:
         )
 
 
+#: The date the MLB HRR producer had healed by. `#624` step 2 measured the
+#: boundary exactly: 100% zero-probability HRR rows on 2026-06-14..06-25, 0% on
+#: all 43 dates from 07-20 onward. A rate re-fit on a date at or before this sits
+#: in the poisoned window that already "produced a confident wrong conclusion".
+_MLB_CLEAN_DATE_FLOOR = "2026-07-20"
+
+
+def _mlb_roster_substrate_probe_at_boot() -> None:
+    """Does the MLB rate re-fit's input tree exist HERE, and is any of it clean?
+
+    A READ-ONLY directory count at boot. It changes nothing, writes nothing,
+    publishes nothing and fits no model. It exists to answer one question that
+    cannot be answered from outside this service.
+
+    WHY A PROBE AND NOT THE RE-FIT `[#624 step 3]`. `refit_mlb_rates.py:264`
+    enumerates jobs from
+    `<MLB_DATA_ROOT>/daily_pitcher_props/snapshots/<date>/roster_objs/roster_obj_*.json`.
+    Measured 2026-09-09: the local checkout holds **13 dates, 2026-06-15..06-27 --
+    every one at or before the boundary above** -- and production's export API
+    cannot see the tree at all (`daily_pitcher_props` is in NEITHER
+    `HOT_ARTIFACT_PATTERNS` nor `EXPORT_ONLY_ARTIFACT_PATTERNS`, and there are
+    ZERO exportable artifacts named `roster_obj*`). So no reachable source can
+    supply a clean window, and shipping a re-fit runner would be shipping on an
+    unverified path -- the deployed-inert shape `model_engine_standard.md`
+    mandates a reachability test for, and one this session hit once already.
+
+    **IT REPORTS BOTH TREES, BECAUSE THE MISMATCH IS THE HYPOTHESIS.**
+    `daily_update.py`'s `--write-roster-artifacts` (default `on`, and the live
+    cmdline does not override it) writes `data/daily/snapshots/<date>/roster_objs/`.
+    The re-fit reads `daily_pitcher_props/snapshots/...`. `SYNDICATE_MLB_DATA_ROOT`
+    moves the ROOT but that suffix is hard-coded, so the override cannot bridge
+    them. **If only the producer tree is populated here, the defect is the
+    re-fit's PATH, not the data** -- which is a far cheaper fix than an allowlist
+    change, and is exactly the distinction this probe exists to make.
+
+    NOT ONLY THE RE-FIT: eleven scripts read that same path, including
+    `sim_input_checklist.py`, which `CLAUDE.md` names as the gating input
+    checklist every model engine must pass.
+
+    PRINTS UNCONDITIONALLY, INCLUDING WHEN BOTH TREES ARE ABSENT. A probe silent
+    on the absent case cannot be told apart from one that never ran -- the
+    ambiguity `correlation_wiring`'s `installed=` counter exists to kill, and
+    which cost this session a wrong reading earlier tonight. BOOT ONLY, never per
+    tick: `#241` is on record that worker periodic work is never free.
+    """
+    payload: dict[str, object] = {"clean_floor": _MLB_CLEAN_DATE_FLOOR}
+    try:
+        from pathlib import Path as _Path
+
+        data_root = _Path(
+            os.environ.get("SYNDICATE_MLB_DATA_ROOT")
+            or (_Path(__file__).resolve().parents[1] / "data/mlb_source/source_artifacts/data")
+        )
+        payload["data_root"] = str(data_root)
+        payload["data_root_exists"] = data_root.is_dir()
+        for label, relative in (
+            ("refit_tree", "daily_pitcher_props/snapshots"),
+            ("producer_tree", "daily/snapshots"),
+        ):
+            root = data_root / relative
+            if not root.is_dir():
+                payload[label] = {"exists": False}
+                continue
+            dates: list[str] = []
+            for child in sorted(root.iterdir()):
+                try:
+                    if not child.is_dir():
+                        continue
+                    # THE RE-FIT'S OWN GLOB, not a looser one. A count that does
+                    # not match what the consumer actually reads is not an answer
+                    # to the consumer's question.
+                    if any((child / "roster_objs").glob("roster_obj_*.json")):
+                        dates.append(child.name)
+                except OSError:
+                    continue
+            clean = [d for d in dates if d >= _MLB_CLEAN_DATE_FLOOR]
+            payload[label] = {
+                "exists": True,
+                "dates_with_roster_objs": len(dates),
+                "clean_dates": len(clean),
+                "first": dates[0] if dates else None,
+                "last": dates[-1] if dates else None,
+                "first_clean": clean[0] if clean else None,
+            }
+    except Exception as exc:  # noqa: BLE001 - a diagnostic must never stop boot
+        payload["error"] = f"{type(exc).__name__}: {exc}"
+    print(
+        "[refresh_worker] MLB_ROSTER_SUBSTRATE " + json.dumps(payload, sort_keys=True),
+        flush=True,
+    )
+
+
 def _kalshi_auth_probe_at_boot() -> None:
     """One signed READ-ONLY call, at process boot, before anything long runs.
 
@@ -6881,6 +6973,7 @@ def main() -> int:
     assert_refresh_state_backend_ready(process_name="refresh-worker")
     _kalshi_auth_probe_at_boot()
     _kalshi_series_catalogue_at_boot()
+    _mlb_roster_substrate_probe_at_boot()
     _bootstrap_soccer_player_seed_files()
     _bootstrap_soccer_schedule_seed_files()
     _bootstrap_soccer_history_seed_files()
