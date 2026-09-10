@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 960 rules `[generated]`
+## Index — 961 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5348,3 +5348,11 @@ the instrument rather than the system.**
   - List the sites with and without the fix before writing "in force after rebuild".
   - A complete sibling port (NBA here) is the fastest diff.
 - **Cost**: nothing in money (no WNBA slate was written 08-31..09-16). Nine days of a ledger line overstating a fix, found seven days before it would have been read as proven.
+
+## 2026-09-10 — RECURRENCE, not a new rule: I shipped a fix predicted from a REFRESH-WORKER instrument and measured it on WEB. It was right for the service the instrument read, and inert on the service that serves the symptom `[lanes mlb-final-state-mapping / mlb-lens-final-status]`
+
+- **What I believed**: `/mlb/api/cards?date=2026-09-03` served ATH@SEA `Live` because `_merge_live_lens_row_into_game` overwrote a feed-derived Final. The basis was 09-04's `FEED_LIVE_STATUS ... source_status_abstract='Final'` for all nine games.
+- **What was actually true**: `FEED_LIVE_STATUS` prints only when `not _render_web_dyno()`, so it is refresh-worker's feed map. WEB serves the route, and it holds ZERO `feed_live` files for September (`export?names_only=1` `count=0`; June control 78). On web the base status is `Pregame/Scheduled` and the frozen lens row is the only status. A guard that protects a Final base cannot fire where there is none.
+- **How we found out**: the post-deploy reading, +31 s after `finishedAt`, matched the pre-deploy baseline game for game. The discriminating fields had been in the served payload all along: `gameDate` empty and `detail` = the date on ALL nine games, Final and Live alike. A present feed payload populates both.
+- **The rule going forward** -- the same family as 2026-09-06 "instrumenting join A, reading it, and concluding about a value written by join B". Before predicting a served value from an instrument, read the instrument's own GATE (`if not _render_web_dyno()`, `in_request=`) and confirm it ran on the service that SERVES the surface. If it cannot have, read the INPUT on that service first; here that was a 30-second `export?names_only=1` for the feed files, taken with a control that can read non-zero.
+- **Cost**: one web deploy that moved nothing, plus a closed-lane verdict and a state paragraph corrected within the hour. The fix itself stands: it is correct for refresh-worker's board builds.

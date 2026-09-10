@@ -31387,3 +31387,59 @@ live-odds-worker --commit 332e596d…`: created 18:03:41Z -> `update_in_progress
 - The reading: `py -3 scripts/verify_wnba_slate_hygiene.py --date 2026-09-17 --check slate` must show picks > 0 and `prop_ev_over_100 = 0`. The check now FAILs a slate on it.
 - Why nothing can exercise the new line earlier: no WNBA game is played before then (FIBA break), and every slate until then is written with 0 picks.
 - Armed as scheduled task `wnba-0917-slate-rebuild-reading` (09-17 17:15 CT), which also closes the lane on a pass.
+
+## 2026-09-10 19:56:53-20:04:10Z — web `ab787363` -> `c2dcd525` — lane `mlb-lens-final-status`
+
+**What:** exactly ONE commit over the live build, `c2dcd525` (parent `ab787363`, live since
+19:38:09Z): `syndicate/features/mlb/cards.py` +19 / `tests/test_mlb_cards_lens_status_precedence.py`
++88. `_merge_live_lens_row_into_game` no longer replaces a feed-Final `status` with a non-final
+live-lens row (shared finality predicate, so `Game Over` / `Completed Early` count). The cause was
+measured in lane `mlb-final-state-mapping` (CLOSED, GOAL: MET): the per-date live-lens report
+freezes at the midnight-Central roll, and the merge served its mid-game row for games that ended
+after it. No ride-along: nothing else is in the range.
+
+**Baseline, pre-deploy (19:41:38-47Z, on `ab787363`, +210 s after it went live):**
+- `/mlb/api/cards?date=2026-09-03`: 823095 and 823907 `abstract=Live detailed=In Progress`.
+- Served-payload census, 2026-09-01..09-09: **9 games `Live` on 7 of 9 dates** -- 09-01 823908;
+  09-02 823906; 09-03 823095, 823907; 09-04 823905, 823093; 09-05 824553; 09-06 823903; 09-09 823900.
+- `/api/board/game-chips?date=2026-09-03&sports=mlb`: `source=inline_artifact_stale`,
+  `{'final': 7, 'live': 2}`, live = 823095, 823907.
+
+**Locks:** claim `mlb-lens-final-status` (acquired 19:56:11Z, token `b3f5c236...`) the moment
+`ncaaf-games-cache-refresh` released it. Preflight at 19:56:12Z returned **CLEAR** for
+`c2dcd525`: only infrastructure processes running, plus 2 defunct children awaiting reap. Deploy
+`dep-dahgn1ad0e5s739bv7cg` via `render_deploy.py --service web --commit c2dcd525`, created
+19:56:53Z -> **live 20:04:10Z**.
+
+**Expected, stated before the reading:** the two 09-03 games read `Final`, the census reads 0
+`Live`, and the chips read 9 `final`. Fetches must be taken AFTER `finishedAt`. Web builds a
+past date's cards context per request, and its in-process cache died with the old process.
+
+**Rollback:** `render_deploy.py --service web --commit ab787363 --allow-rollback`.
+
+**verify -- MEASURED 20:04:41-20:04:56Z (+31 s after `finishedAt`). THE ANSWER IS NO.**
+- `/mlb/api/cards?date=2026-09-03`: 823095 and 823907 still `Live / In Progress`.
+- Census 2026-09-01..09-09: still **9 games `Live` on 7 of 9 dates**, the same pks as the baseline.
+- `/api/board/game-chips?date=2026-09-03&sports=mlb`: `inline_artifact_stale`, `{'final': 7,
+  'live': 2}`, the same two.
+
+**WHY, MEASURED 20:07:39Z ON WEB'S OWN DISK: web holds ZERO `feed_live` files for September.**
+`/api/ops/artifacts/export?names_only=1`, pattern
+`mlb_source/source_artifacts/data/raw/statsapi/feed_live/2026/2026-09-0*/*` -> `count=0`, and the
+same for the `mlb_source/data/...` form. The CONTROL pattern `.../2026-06-1*/*` returns `count=78`
+over 06-14..06-19, so the instrument reads non-zero and this zero is ABSENCE. So on web
+`_daily_actual_by_game` returns nothing for a past September date, `_source_status(None)` gives
+`Pregame/Scheduled` for every game (the served payload agrees: `gameDate` empty and `detail` = the
+date on all nine, Final and Live alike), and **the frozen lens row is web's ONLY status source.**
+`c2dcd525` holds a lens row back only over a FINAL base, so on web it cannot fire, by construction.
+The pre-registered falsifier fired; its expected direction ("a second writer downstream") was
+wrong -- the gap is UPSTREAM: web never receives the feed's Final.
+
+**WHERE THE 09-04 "FINAL FOR ALL NINE" CAME FROM:** `FEED_LIVE_STATUS` prints only when
+`not _render_web_dyno()`, so it measured REFRESH-WORKER's feed map and was then compared with WEB's
+served payload. On refresh-worker the merge DID overwrite a Final base, so `c2dcd525` is the right
+fix THERE (board builds), and it reaches production only with a refresh-worker deploy.
+
+**KEPT, NOT ROLLED BACK.** The change is correct on both services and inert on web; a rollback
+would only remove the worker-side fix. The web fix is a decision, recorded in lane
+`mlb-lens-final-status`. Claim released after this entry.

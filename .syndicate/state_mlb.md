@@ -1268,17 +1268,26 @@ only. `pipeline/layer2_shortlist.py:511` calls `build_game_chips`, which imports
 `home.py` to register the sport providers. Do not use that tool as a coverage
 answer for this file.
 
-**THE PER-DATE REPORT FREEZES AT THE MIDNIGHT-CENTRAL ROLL, AND FOR A PAST DATE
-IT USED TO OUTRANK THE FEED `[verified 2026-09-10, lanes mlb-final-state-mapping
-CLOSED / mlb-lens-final-status]`.** The live-lens loop stops writing a date's
-report when it rolls to the next date at midnight Central, so a game still in
-progress then keeps a `Live` row for good: web's `live_lens_report_2026_09_03.json`
-(generatedAt 23:59:10 CT) holds 823095 and 823907 at `Live / In Progress`, and
-both ended 00:05/00:09 CT. `_merge_live_lens_row_into_game` (`mlb/cards.py:3026`)
-copied that row's `status` over the feed's Final, so the cards payload and the
-board chips (inline build) served them `live` -- **9 games on 7 of 9 dates,
-09-01..09-09**, every one a game still running at the roll. **Fixed on main
-`c2dcd525`** (a feed-Final status is no longer replaced by a non-final lens row);
-**NOT LIVE on web** at 19:37Z, where `ab787363`, which predates it, was deploying.
-The frozen rows themselves are not repaired: those games' other lens fields
-(`gameLens`, `liveProps`) are still the mid-game snapshot.
+**THE PER-DATE REPORT FREEZES AT THE MIDNIGHT-CENTRAL ROLL, AND ON WEB IT IS A PAST
+DATE'S ONLY STATUS SOURCE `[verified 2026-09-10, corrected 20:07Z; lanes
+mlb-final-state-mapping CLOSED / mlb-lens-final-status OPEN]`.** The live-lens loop
+stops writing a date's report when it rolls to the next date at midnight Central,
+so a game still in progress then keeps a `Live` row for good: web's
+`live_lens_report_2026_09_03.json` (generatedAt 23:59:10 CT) holds 823095 and 823907
+at `Live / In Progress`, and both ended 00:05/00:09 CT. **9 games on 7 of 9 dates,
+09-01..09-09, are served `Live`.** The two services get there differently:
+
+- **WEB** (`/mlb/api/cards`, and `/api/board/game-chips` when the chip artifact is
+  stale) holds **ZERO `feed_live` files for September** (`export?names_only=1`
+  `count=0`; control `2026-06-1*` -> 78). So `_source_status(None)` is
+  `Pregame/Scheduled` and the lens row, merged by `_merge_live_lens_row_into_game`
+  (`mlb/cards.py:3026`), is the ONLY status. Nothing is overwritten; web simply
+  never receives the feed's Final. **Unfixed**; the options are in lane
+  `mlb-lens-final-status`.
+- **REFRESH-WORKER** holds the feed payloads (`FEED_LIVE_STATUS` read Final for all
+  nine on 09-04), and there the merge DID overwrite that Final. **Fixed on main
+  `c2dcd525`**, and live on web since 20:04:10Z, where it is inert by construction.
+  It reaches refresh-worker's board builds only with a refresh-worker deploy.
+
+`FEED_LIVE_STATUS` prints only when `not _render_web_dyno()`: it is a
+refresh-worker instrument, and it says nothing about what web serves.

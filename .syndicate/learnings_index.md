@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 960 rules `[generated]`
+## Index — 961 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -402,7 +402,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](learnings_evidence.md#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated) `[evidence]`
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 
-**Rules and corrections — 572**
+**Rules and corrections — 573**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -514,6 +514,7 @@
 - [2026-09-09 A REPLACEMENT THAT IS LESS INFORMATIVE THAN WHAT IT REPLACED IS A REGRESSION…](#2026-09-09-a-replacement-that-is-less-informative-than-what-it-replaced-is-a-regression-however-much-better-it-looks-a-generic-branded-404-discarded-the-routes-own-abort404-description-lane-brand-mascot-logo-commit-00902dd1)
 - [2026-09-10 — REQUIRED: before restoring a shared ledger file over its working copy, aud…](#2026-09-10-required-before-restoring-a-shared-ledger-file-over-its-working-copy-audit-it-for-sections-that-exist-only-there-and-audit-by-inner-content-because-a-header-set-comparison-lies-in-both-directions-lane-odds-history-segment-term)
 - [2026-09-10 — REQUIRED: before recording a producer fix as "in force once the artifact i…](#2026-09-10-required-before-recording-a-producer-fix-as-in-force-once-the-artifact-is-rebuilt-check-every-site-on-the-path-that-writes-that-artifact-the-wnba-ev-refusal-covered-2-of-3-prop-sites-and-the-one-it-missed-is-the-slate-writer-lane-wnba-accuracy-assessment-session-8c631ba2)
+- [2026-09-10 — RECURRENCE, not a new rule: I shipped a fix predicted from a REFRESH-WORKE…](#2026-09-10-recurrence-not-a-new-rule-i-shipped-a-fix-predicted-from-a-refresh-worker-instrument-and-measured-it-on-web-it-was-right-for-the-service-the-instrument-read-and-inert-on-the-service-that-serves-the-symptom-lanes-mlb-final-state-mapping-mlb-lens-final-status)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
