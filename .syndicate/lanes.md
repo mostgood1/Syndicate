@@ -404,6 +404,14 @@ death, never life — do not invert it.
 - Blocked by: none.
 - 2026-09-10 — BOTH HYPOTHESES SURVIVE, measured on the UNFIXED script run from two real worktrees of a throwaway repo: each handed out **101**, and neither saw the peer's already-landed **107**. The fix gives 108 and 109. Tests: 15/15 on the fix (also under the repo's conftest); on the unfixed script the 9 existing pass and the 6 new fail.
 
+### mlb-lens-final-status — OPEN — opened 2026-09-10 — session 218b778c-1a91-4ff0-b90d-55d1133b09eb
+- Goal: a past-date MLB game the feed calls Final is SERVED Final. After a web deploy, `/mlb/api/cards?date=2026-09-03` reads Final for 823095 and 823907, and the served-payload census for 2026-09-01..09-09 reads 0 games `Live` (9 games on 7 of 9 dates before).
+- Files: `syndicate/features/mlb/cards.py`, `tests/test_mlb_cards_lens_status_precedence.py` (new).
+- Hypothesis: n/a -- the cause was measured in `mlb-final-state-mapping` (2026-09-10 18:50:43Z): `_merge_live_lens_row_into_game` (`cards.py:3026`) copies a frozen per-date live-lens row's `status` over the feed's Final.
+- Falsification test: if 823095/823907 still read `Live` on the served payload after the deploy, a second writer exists downstream of the merge -- find it; do not re-fix the merge.
+- Verification: that reading on web, `/api/board/game-chips?date=2026-09-03&sports=mlb` reading 9 `final`, and a test that goes RED with the fix reverted.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

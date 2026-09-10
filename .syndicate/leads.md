@@ -73,6 +73,7 @@ because the work kept deviating:
 - [ ] 2026-09-10 — from `ncaaf-live-resim-wire` (closed) — NFL drive priors measured null (178 paired games, MAE 10.573 -> 10.537, paired t=+0.61, flag stays OFF), but the ON arm ran on a profile calibrated for OFF, so the null is a lower bound; the untried step is a profile re-fit with `SYNDICATE_NFL_DRIVE_PRIORS` on — evidence: `log/2026-09-06.md` 'NFL DRIVE PRIORS: MEASURED'
 - [ ] 2026-09-10 — from `ncaaf-live-resim-wire` (closed) — NCAAF drive-prior refit blocked: feature snapshots are single-season and the wrong one (returning_production/coach_continuity 2026, pace 2025) and `build_payload(season=2024)` returns {}; the builders take `--season`, and CFBD pulls are quota-bound (`#633`) — evidence: `log/2026-09-06.md` 'NCAAF refit still blocked'
 - [ ] 2026-09-10 — from `ncaaf-live-resim-wire` (closed) — sim input checklists for soccer (9 unfed) and basketball (WNBA 0.0%) were left untouched when that lane's sim audit found 4 of 5 engines failing; MLB's report reads 65/65 since 2026-09-07 — evidence: `log/2026-09-06.md` PART 2; `deploys.md` 2026-09-07 17:44:53Z
+- [ ] 2026-09-10 — from `accuracy-ledger-budget-raise` — `load_recent_evaluation_records(days=14)` (`pipeline/intelligence_state.py:5656`) refuses EVERY recent ledger chunk at its 64 MB per-file ceiling, so its caller reads nothing — evidence: refresh-worker `SKIP_OVERSIZED_LEDGER_CHUNK ... ceiling=64000000` x14 (08-28..09-10, 96-358 MB) at 2026-09-10T18:52:04Z
 
 ## Promoted
 
