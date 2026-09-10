@@ -3944,6 +3944,62 @@ worker-local export-only set once (2) unblocks.
 > set of numbers currently in the ledger that are known to rest on a broken key,
 > and it needs no new production capture.
 
+
+> **STEP 5 RE-RUN OVER THE MULTI-DAY WINDOW WITH THE FIXED `quote_key`
+> `[2026-09-09 23:4x CT, lane web-oom-census]`. THE GATE IS **NOT MET**, on 12x the
+> evidence. Every one-day figure above is SUPERSEDED.**
+>
+> `measure_exchange_prop_option_value.py --since 2026-08-27 --until 2026-09-09`,
+> post-`1f988642` (the `segment`-omitting key is fixed and now asserted).
+>
+> **IT RAN ON 9 DATES, NOT 14, AND SAID SO.** 2026-08-27..08-31 were REFUSED —
+> *"a feed is entirely absent"* — not silently folded into the total. **The window
+> is 2026-09-01..09-09.** That refusal behaviour is the `#630` clobber lesson
+> working: a shard problem must not read as a market problem.
+>
+> **n = 46,567 time-aligned comparisons**, against **3,774** on the healed
+> single shard and **2,062** in the first version. Twelve times the evidence.
+>
+>     venue           n   exch taken     mean    median      p90
+>     polymarket 23,634       34.7%   +0.754    +0.000   +2.065
+>     kalshi     22,933       52.1%   +1.477    +0.137   +3.185
+>     ALL        46,567       43.3%   +1.110    +0.000   +2.704
+>
+> **THE BOOK (all 183,898 cells; a cell with no exchange quote gains 0, it is not
+> dropped):**
+>
+>     exchange coverage  14,811/183,898 = 8.1% of cells
+>     4.218pp -> 3.978pp   gain +0.239pp   hold 7.01% -> 6.58%
+>     ROI  +1.10%  [needs >= +3%]  -> NOT MET
+>     HOLD 6.58%  [needs <= 5%]    -> NOT MET
+>     GATE -> NOT MET
+>
+> **The exchange-quoted subset (14,811 cells) DOES clear it — +2.969pp, ROI +6.72%,
+> hold 1.63% — and that is the population mismatch the script itself names:** *"you
+> cannot take a price that is not there, and it is not there on 91.9% of cells."*
+> **Do not quote +6.72% as the book's number.**
+>
+> **THIS CONVERGES WITH AN INDEPENDENT RESULT.** `findings_2026-09-09_entry_cost_scored.md`
+> scored venue routing on REALISED outcomes (not hold) and found it worth **~±1 ROI
+> point, −1.67 against a sharp book**. This run, by a completely different method
+> on a different population, reads **+1.10%** book-wide. Two methods, same order of
+> magnitude, both far below the +3% gate.
+>
+> **MY PRE-REGISTERED PREDICTION, SCORED HONESTLY: PARTIALLY RIGHT.** I recorded
+> before the run that the 67% "no time-aligned sportsbook price" exclusion should
+> *fall sharply* now that both sides come from one file and one cadence. It fell to
+> **50.1%** (46,823 excluded of 93,390). Directionally correct; **"sharply" was too
+> strong** — half the exchange quotes still have no book price within 30 minutes,
+> and `matchable` is **100.0% on every one of the 9 dates**, so this is NOT a shard
+> artefact. It is a real statement about when the two venues quote.
+>
+> **STEP 6 CONSEQUENCE, measured not asserted:** per-side entry cost reads
+> **4.218pp** against the asserted 4.05pp (drift +0.168pp), and the script warns
+> that **4.218 is OUTSIDE item 07's measured ROI table, which ends at 4.05** — so
+> **every ROI at or above that point is CLAMPED and is a FLOOR, not a reading.**
+> The two-way hold measures 7.007%, and `2 x per-side = 8.44%` is the 4.05 error
+> restated — do not reintroduce it.
+
 ### `#623` — **PHASE 2 — WNBA SPRINT 2026-09-17..09-25, run as a TEST (30 games in 9 days).** — lane `edge-plan`, 2026-09-01 — **OPEN; preconditions are `#626` (c)(d)(e)**
 
 Execute against the pre-registered gates — nothing here is discretionary:
