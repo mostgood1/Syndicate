@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 964 rules `[generated]`
+## Index — 966 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5408,3 +5408,11 @@ the instrument rather than the system.**
 - **How we found out**: lane `execution-ledger-cas`, scoping `#656`, read the reader's exception handling. I confirmed both functions from code.
 - **The rule going forward**: before citing a status field as evidence, find the code path that sets its UNHEALTHY value and confirm that path can execute in production. A field that can only ever read healthy is not an instrument. Same family as this file's instrument-blindness rules, and the 2026-09-09 FORBIDDEN on harness-supplied failure modes.
 - **Cost**: two uninformative readings in a deploy entry, corrected the same evening. The entry's other readings stand.
+
+## 2026-09-10 — OVERTURNED (my own docstring): a producer rewrite of a PAST-dated artifact does NOT reach web through the publish sweep. The sweep refuses slates more than a day old, and web serves whichever of its two copies is newer `[lane mlb-lens-final-status]`
+
+- **What I believed**: the final pass rewrites live-odds-worker's copy of an old live-lens report, and `live_lens_loop`'s own publish sweep, which runs right after the tick, carries the rewrite to web "the same cycle". I wrote that into the module docstring and the lane, and pre-registered a reading on it.
+- **What was actually true**: `artifact_publisher._publish_skip_reason` refuses any file whose NAME dates it more than `_PUBLISH_MAX_AGE_DAYS = 1` back, and the code calls that check "never exempted". Every sweep after the deploy logged `stale_slate=[..09_03, 09_01, 09_06..]`. The one date inside the window, 09-09, did reach web, and was undone within a second: web's `sources._resolve_data_path_with_reconcile` copies the NEWER of its two published forms over the served target, and the slim frozen form arrived 175 ms after the full final one.
+- **How we found out**: the pre-registered reading. The producer's line said `finalized=6 still_open=0`, while web's copy of 09-03 still had `finalPass_entries=0`, and the publisher's own `SWEEP_SKIPPED_DETAIL` named the skipped files. The reconcile took three reads: web's `[ops.publish] ACCEPTED` lines (two publishes 175 ms apart), both web copies by export, and one more export after a cards read (8,736,835 B -> 132,548 B).
+- **The rule going forward** (the same family as the 2026-09-10 RECURRENCE above, lanes mlb-final-state-mapping / mlb-lens-final-status): a fix is on the path to the surface only once the TRANSPORT and the READER have been read, not just the writer. For an artifact a worker writes and web serves, check two things before predicting "it reaches web". (1) The sweep's skip rules (`_publish_skip_reason`: age AND size) against the file's NAME and SIZE. (2) How web RESOLVES the path. If there is more than one published form and a reconcile, the newest copy wins, not the one you wrote.
+- **Cost**: one live-odds-worker deploy whose reading could not move. A second change is now owed: a status-only patch of web's own served copy (`e035c829`), which must ship before the 10-day look-back loses 09-01.

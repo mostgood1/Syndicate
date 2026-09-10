@@ -1282,8 +1282,18 @@ at `Live / In Progress`, and both ended 00:05/00:09 CT. **9 games on 7 of 9 date
   `count=0`; control `2026-06-1*` -> 78). So `_source_status(None)` is
   `Pregame/Scheduled` and the lens row, merged by `_merge_live_lens_row_into_game`
   (`mlb/cards.py:3026`), is the ONLY status. Nothing is overwritten; web simply
-  never receives the feed's Final. **Unfixed**; the options are in lane
-  `mlb-lens-final-status`.
+  never receives the feed's Final. **Still unfixed on web `[verified 22:22-22:31Z]`.**
+  A producer rewrite CANNOT reach web by the normal path, for two measured reasons.
+  (1) The publish sweep refuses any artifact dated more than a day old
+  (`artifact_publisher._PUBLISH_MAX_AGE_DAYS = 1`); every sweep logs `stale_slate=[...]`.
+  (2) Web reads through `sources._resolve_data_path_with_reconcile`, which copies the
+  slim `mlb_source/data/` form over the served `source_artifacts` target whenever the
+  slim one is NEWER. 09-09's full 8.7 MB final copy was replaced by the slim `Live`
+  copy, published 175 ms after it, at the next read. So web's served copy differs by
+  date: 09-04/09-05 serve the FULL reports (2.28/1.59 MB), 09-03 and 09-09 the slim
+  ones. The fix for both is a status-only patch of web's OWN served copy, sent from
+  live-odds-worker. It is on main `e035c829` and NOT LIVE; lane
+  `mlb-lens-final-status` holds its pre-registered reading.
 - **REFRESH-WORKER** holds the feed payloads (`FEED_LIVE_STATUS` read Final for all
   nine on 09-04), and there the merge DID overwrite that Final. **Fixed on main
   `c2dcd525`**, and live on web since 20:04:10Z, where it is inert by construction.
