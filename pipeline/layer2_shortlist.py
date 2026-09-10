@@ -2224,4 +2224,49 @@ def _attach_projections_over_window(
         merged["reason"] = f"no projections across {len(dates)} window dates"
         if reasons:
             merged["reasons_by_date"] = sorted(reasons)
+    elif len(dates) > 1:
+        # THE OTHER HALF OF THE SAME BUG, AND THE HALF THAT WAS ACTUALLY LIVE.
+        #
+        # The branch above only fires when the window produced NOTHING. The case
+        # `#633` describes is the opposite and far more common: a window that
+        # MOSTLY SUCCEEDED, with one trailing date that legitimately has no CSV
+        # yet (next week's slate, not yet generated). The copy loop above admits
+        # that date's `reason` under "first non-falsy wins", nothing overwrites
+        # it, and the payload then reports a failure beside its own successful
+        # counts.
+        #
+        # MEASURED ON PRODUCTION 2026-09-10 02:41 CT, six days after `#633`
+        # recorded the first half as fixed:
+        #
+        #     PREGAME_PROJECTION_JOIN sport=ncaaf considered=590 projected=329
+        #       reason=no NCAAF SmartSim2 projections for this date
+        #
+        # **329 of 590 rows (55.8%) DID get a projection**, and the same line
+        # says there are none. That contradiction is what made `#633` read as a
+        # producer outage and get filed as "NCAAF SEASON PROJECTIONS CANNOT
+        # REFRESH" -- a claim whose own item text later had to refute both
+        # halves of its headline.
+        #
+        # A REASON IS FOR A FAILURE. A window that produced rows has nothing to
+        # excuse, so the top-level field is DROPPED rather than reworded: any
+        # string here is read as "this join did not work". The per-date detail
+        # is not lost -- it stays in `per_date`, and the dates that really were
+        # empty are named explicitly, which is the fact somebody actually wants.
+        empty_dates = sorted(
+            date_key
+            for date_key, value in per_date.items()
+            if isinstance(value, Mapping)
+            and value.get("reason")
+            and not value.get("rows_with_projection")
+        )
+        merged.pop("reason", None)
+        if empty_dates:
+            merged["empty_window_dates"] = empty_dates
+            merged["reasons_by_date"] = sorted(
+                {
+                    str(per_date[date_key].get("reason"))
+                    for date_key in empty_dates
+                    if isinstance(per_date.get(date_key), Mapping)
+                }
+            )
     return merged

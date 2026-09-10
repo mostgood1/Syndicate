@@ -309,3 +309,66 @@ def test_single_date_soccer_is_untouched(counting_attach):
     )
     assert counting_attach == ["2026-09-03"]
     assert out["rows_considered"] == 1036
+
+
+# ---------------------------------------------------------------------------
+# `#633`'s SECOND bug, the half that stayed live
+# ---------------------------------------------------------------------------
+
+
+def test_a_window_that_produced_rows_carries_no_failure_reason(fake_attach):
+    """A mostly-successful window must not report a per-date failure.
+
+    MEASURED ON PRODUCTION 2026-09-10 02:41 CT, six days after `#633` recorded
+    the other half of this bug as fixed:
+
+        PREGAME_PROJECTION_JOIN sport=ncaaf considered=590 projected=329
+          reason=no NCAAF SmartSim2 projections for this date
+
+    329 of 590 rows had a projection and the same line said there were none.
+    The fix that already existed only replaced `reason` when the window
+    produced NOTHING; this is the far more common case where one trailing date
+    legitimately has no CSV yet and the other dates worked.
+    """
+    out = l2._attach_projections_over_window(
+        [], sport="ncaaf", selected_date="2026-08-27",
+        window_dates=["2026-08-27", "2026-08-29", "2026-08-30"],
+    )
+    assert out["rows_with_projection"] == 45
+    # A reason is for a failure. This window did not fail.
+    assert "reason" not in out
+    # The empty date is NAMED rather than silently dropped -- that is the fact
+    # a reader actually wants, and it is what the misleading string replaced.
+    assert out["empty_window_dates"] == ["2026-08-27"]
+    assert out["reasons_by_date"] == ["no NCAAF SmartSim2 projections for this date"]
+
+
+def test_a_window_that_produced_nothing_still_says_so(fake_attach, monkeypatch):
+    """The branch above this fix must keep working -- no reason is worse."""
+    import syndicate.features.shared.board_enrichment as be
+
+    def _empty(grid, *, sport, selected_date):
+        return {
+            "supported": True,
+            "rows_considered": 3,
+            "rows_with_projection": 0,
+            "reason": "no NCAAF SmartSim2 projections for this date",
+        }
+
+    monkeypatch.setattr(be, "attach_projections", _empty)
+    out = l2._attach_projections_over_window(
+        [], sport="ncaaf", selected_date="2026-08-27",
+        window_dates=["2026-08-27", "2026-08-29"],
+    )
+    assert out["rows_with_projection"] == 0
+    assert out["reason"] == "no projections across 2 window dates"
+    assert out["reasons_by_date"] == ["no NCAAF SmartSim2 projections for this date"]
+
+
+def test_a_single_date_window_is_untouched(fake_attach):
+    """One date is not a window; its own reason is the whole story and stays."""
+    out = l2._attach_projections_over_window(
+        [], sport="ncaaf", selected_date="2026-08-27", window_dates=["2026-08-27"],
+    )
+    assert out["rows_with_projection"] == 0
+    assert out["reason"] == "no NCAAF SmartSim2 projections for this date"
