@@ -2429,6 +2429,48 @@ request allocated" and not "which arena leaked".
 > doing heavy computation. **The two have different fixes, so the next step is
 > establishing which — not optimising either.**
 
+
+> **ROOT CAUSE, 2026-09-09 22:2x CT: `/api/home` REBUILDS LIVE STATE PAYLOADS ON
+> THE REQUEST PATH. This is `CLAUDE.md`'s load-bearing web/worker rule broken
+> directly, not a leak.** `[lane web-oom-census, session 2edf8b82]`
+>
+> The open question from the split above is closed. The chain, every link read in
+> `syndicate/blueprints/home.py`:
+>
+>     @home_bp.get("/api/home")   and   @home_bp.get("/syndicate")
+>       api_home()                        :8418
+>         _home_payload()                 :8295   (called :8421)
+>           build_home_overview()         :8240   (called :8313)
+>             _build_sport_overview()     :7616   (called :8252)
+>               _load_home_prop_items()   :7100   (called :7633)
+>                 _load_home_live_prop_items()  :5953  (called :7121)
+>                   build_live_state_payload / _nba_live_state_games
+>
+> **AND THE BACKGROUND LOOP IS NOT AN ALTERNATIVE ENTRY.** `syndicate/app.py:593`
+> starts `start_live_refresh_background_loop`, but `live_refresh_loop.py` calls
+> NONE of these builders. **The request path is the only way in**, which is what
+> makes this attributable rather than circumstantial.
+>
+> `CLAUDE.md`: *"The web service does no heavy computation... There is no path
+> where a request handler recomputes a simulation or rebuilds a full game context
+> from scratch."* This is that path, on the **home page** — the most-hit route on
+> the site, reached from BOTH `/api/home` and the `/syndicate` shell.
+>
+> **IT EXPLAINS EVERY OBSERVATION ABOVE.** Continuous 200-400 MB sawtoothing:
+> every home request rebuilds payloads. Anon peaking at 1,168 MB: the payloads are
+> anonymous allocations, not cache. Kills CLUSTERING after boot rather than
+> recurring on a period: caches are cold after a restart, so more requests do the
+> full rebuild, and at 87 MB of headroom a handful of concurrent ones is a kill.
+>
+> **WHAT IS STILL NOT PROVEN:** that this path is the LARGEST allocator, as
+> opposed to one of several. The stage tag on every `CONTAINER_MEMORY` sample is
+> `build_live_state_payload_*`, which is strong, but no per-allocation profile was
+> taken. Do not size a fix off "this is all of it" without one.
+>
+> **THE FIX IS ARCHITECTURAL, NOT AN OPTIMISATION.** Per `CLAUDE.md` the payload
+> belongs in a worker-written artifact that web READS. Tuning the request-path
+> build would keep the violation and buy headroom that the next slate erases.
+
 ### `#631` — **SOCCER BOARD STALENESS: a soccer-only date never becomes eligible to build, so its rows age forever** — lane `game-market-entry-roi-curve` (handed over on closing `soccer-overview-cost`), 2026-09-01 — **OPEN**
 
 Inherited on closing lane `soccer-overview-cost`, whose GOAL (find and remove
