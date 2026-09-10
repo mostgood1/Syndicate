@@ -1,0 +1,285 @@
+{
+  "app": {
+    "access_lines": 4666,
+    "log_lines": 9087,
+    "note": "served_bytes is RESPONSE size only; a POST body (e.g. artifacts/publish) is NOT counted here",
+    "served_bytes": 148031204,
+    "served_mb": 141.17,
+    "top_clients": [
+      {
+        "bytes": 27151005,
+        "count": 17,
+        "key": "10.192.81.130"
+      },
+      {
+        "bytes": 26561714,
+        "count": 1091,
+        "key": "10.193.204.13"
+      },
+      {
+        "bytes": 20627305,
+        "count": 655,
+        "key": "10.192.43.15"
+      },
+      {
+        "bytes": 19356085,
+        "count": 1157,
+        "key": "10.192.43.77"
+      },
+      {
+        "bytes": 15734117,
+        "count": 845,
+        "key": "10.197.246.216"
+      },
+      {
+        "bytes": 13741573,
+        "count": 22,
+        "key": "10.196.86.141"
+      },
+      {
+        "bytes": 8167497,
+        "count": 11,
+        "key": "10.199.110.30"
+      },
+      {
+        "bytes": 5916011,
+        "count": 17,
+        "key": "10.194.209.140"
+      },
+      {
+        "bytes": 5270530,
+        "count": 17,
+        "key": "10.192.43.130"
+      },
+      {
+        "bytes": 2752775,
+        "count": 11,
+        "key": "10.194.67.129"
+      },
+      {
+        "bytes": 2724814,
+        "count": 6,
+        "key": "10.196.115.130"
+      },
+      {
+        "bytes": 27778,
+        "count": 817,
+        "key": "10.228.19.11"
+      }
+    ],
+    "top_paths": [
+      {
+        "bytes": 73627886,
+        "count": 252,
+        "key": "/api/ops/artifacts/export"
+      },
+      {
+        "bytes": 56881104,
+        "count": 21,
+        "key": "/api/intelligence/query"
+      },
+      {
+        "bytes": 8220515,
+        "count": 636,
+        "key": "/api/ops/artifacts/stream"
+      },
+      {
+        "bytes": 8072958,
+        "count": 3,
+        "key": "/"
+      },
+      {
+        "bytes": 458086,
+        "count": 3,
+        "key": "/api/board/book-grid"
+      },
+      {
+        "bytes": 430820,
+        "count": 2860,
+        "key": "/api/ops/artifacts/publish"
+      },
+      {
+        "bytes": 298305,
+        "count": 21,
+        "key": "/api/board/game-chips"
+      },
+      {
+        "bytes": 27778,
+        "count": 817,
+        "key": "/healthz"
+      },
+      {
+        "bytes": 8896,
+        "count": 1,
+        "key": "/mlb/hr-targets"
+      },
+      {
+        "bytes": 4752,
+        "count": 24,
+        "key": "/wnba/api/live_player_boxscore"
+      },
+      {
+        "bytes": 104,
+        "count": 2,
+        "key": "/wnba/api/final_player_boxscore"
+      },
+      {
+        "bytes": 0,
+        "count": 2,
+        "key": "/static/shared/board_cards.css"
+      }
+    ]
+  },
+  "bucket": "2026-09-09T21:00:00Z",
+  "captured_at": "2026-09-10T01:23:30Z",
+  "deploys_in_window": [],
+  "edge": {
+    "bytes": 63676147,
+    "mb": 60.73,
+    "requests": 105,
+    "top_clients": [
+      {
+        "bytes": 63653992,
+        "count": 74,
+        "key": "73.75.177.190"
+      },
+      {
+        "bytes": 9123,
+        "count": 1,
+        "key": "9.129.24.4"
+      },
+      {
+        "bytes": 5156,
+        "count": 16,
+        "key": "74.220.48.154"
+      },
+      {
+        "bytes": 4226,
+        "count": 2,
+        "key": "51.8.102.165"
+      },
+      {
+        "bytes": 3621,
+        "count": 11,
+        "key": "74.220.48.178"
+      },
+      {
+        "bytes": 29,
+        "count": 1,
+        "key": "9.129.56.247"
+      }
+    ],
+    "top_paths": [
+      {
+        "bytes": 57110646,
+        "count": 22,
+        "key": "/api/intelligence/query"
+      },
+      {
+        "bytes": 5550623,
+        "count": 3,
+        "key": "/"
+      },
+      {
+        "bytes": 527805,
+        "count": 22,
+        "key": "/api/board/game-chips"
+      },
+      {
+        "bytes": 458505,
+        "count": 3,
+        "key": "/api/board/book-grid"
+      },
+      {
+        "bytes": 9123,
+        "count": 1,
+        "key": "/mlb/hr-targets"
+      },
+      {
+        "bytes": 8229,
+        "count": 25,
+        "key": "/wnba/api/live_player_boxscore"
+      },
+      {
+        "bytes": 4226,
+        "count": 2,
+        "key": "/robots.txt"
+      },
+      {
+        "bytes": 548,
+        "count": 2,
+        "key": "/wnba/api/final_player_boxscore"
+      },
+      {
+        "bytes": 536,
+        "count": 2,
+        "key": "/static/shared/syndicate-mascot-192.png"
+      },
+      {
+        "bytes": 528,
+        "count": 2,
+        "key": "/static/shared/apple-touch-icon.png"
+      },
+      {
+        "bytes": 526,
+        "count": 2,
+        "key": "/static/shared/board_rail_toggle.js"
+      },
+      {
+        "bytes": 514,
+        "count": 2,
+        "key": "/static/shared/board_cards.css"
+      }
+    ],
+    "top_user_agents": [
+      {
+        "bytes": 63195487,
+        "count": 71,
+        "key": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, l"
+      },
+      {
+        "bytes": 466734,
+        "count": 28,
+        "key": "Python-urllib/3.11"
+      },
+      {
+        "bytes": 9152,
+        "count": 2,
+        "key": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatib"
+      },
+      {
+        "bytes": 4226,
+        "count": 2,
+        "key": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/"
+      },
+      {
+        "bytes": 548,
+        "count": 2,
+        "key": "Mozilla/5.0"
+      }
+    ]
+  },
+  "metered_mb": 180.50928,
+  "note": "bucket is RIGHT-labelled: it covers window_covered, i.e. the hour BEFORE its label. edge_* is public traffic only; app_* includes internal service-to-service.",
+  "other_services_same_hour": {
+    "live-odds-worker": 16.3,
+    "refresh-worker": 5.5
+  },
+  "publish_into_web": {
+    "live-odds-worker": {
+      "bytes": 197327179,
+      "mb": 188.19,
+      "publishes": 723
+    },
+    "refresh-worker": {
+      "bytes": 215333644,
+      "mb": 205.36,
+      "publishes": 365
+    }
+  },
+  "service": "web",
+  "window_covered": {
+    "end": "2026-09-09T21:00:00Z",
+    "start": "2026-09-09T20:00:00Z"
+  }
+}

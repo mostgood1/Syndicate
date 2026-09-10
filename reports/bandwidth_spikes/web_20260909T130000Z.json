@@ -1,0 +1,173 @@
+{
+  "app": {
+    "access_lines": 0,
+    "log_lines": 2101,
+    "note": "served_bytes is RESPONSE size only; a POST body (e.g. artifacts/publish) is NOT counted here",
+    "served_bytes": 0,
+    "served_mb": 0.0,
+    "top_clients": [],
+    "top_paths": []
+  },
+  "bucket": "2026-09-09T13:00:00Z",
+  "captured_at": "2026-09-10T00:36:23Z",
+  "deploys_in_window": [],
+  "edge": {
+    "bytes": 3709908,
+    "mb": 3.54,
+    "requests": 130,
+    "top_clients": [
+      {
+        "bytes": 3425245,
+        "count": 67,
+        "key": "73.75.177.190"
+      },
+      {
+        "bytes": 264670,
+        "count": 2,
+        "key": "52.167.144.210"
+      },
+      {
+        "bytes": 11953,
+        "count": 35,
+        "key": "74.220.48.175"
+      },
+      {
+        "bytes": 7309,
+        "count": 23,
+        "key": "74.220.48.178"
+      },
+      {
+        "bytes": 702,
+        "count": 2,
+        "key": "51.8.102.35"
+      },
+      {
+        "bytes": 29,
+        "count": 1,
+        "key": "9.129.2.12"
+      }
+    ],
+    "top_paths": [
+      {
+        "bytes": 2774857,
+        "count": 1,
+        "key": "/api/intelligence/query"
+      },
+      {
+        "bytes": 595575,
+        "count": 5,
+        "key": "/api/board/layer2-shortlist"
+      },
+      {
+        "bytes": 264670,
+        "count": 2,
+        "key": "/nfl/fantasy"
+      },
+      {
+        "bytes": 17070,
+        "count": 50,
+        "key": "/wnba/api/live_player_boxscore"
+      },
+      {
+        "bytes": 14400,
+        "count": 1,
+        "key": "/api/board/game-chips"
+      },
+      {
+        "bytes": 14058,
+        "count": 49,
+        "key": "/api/ops/artifacts/export"
+      },
+      {
+        "bytes": 8678,
+        "count": 3,
+        "key": "/api/ops/execution/ledger-summary"
+      },
+      {
+        "bytes": 6656,
+        "count": 3,
+        "key": "/api/ops/memory"
+      },
+      {
+        "bytes": 5904,
+        "count": 3,
+        "key": "/api/ops/evaluation-settlement/status"
+      },
+      {
+        "bytes": 4766,
+        "count": 1,
+        "key": "/api/portfolio/live"
+      },
+      {
+        "bytes": 2192,
+        "count": 8,
+        "key": "/wnba/api/final_player_boxscore"
+      },
+      {
+        "bytes": 702,
+        "count": 2,
+        "key": "/robots.txt"
+      }
+    ],
+    "top_user_agents": [
+      {
+        "bytes": 2789257,
+        "count": 2,
+        "key": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, l"
+      },
+      {
+        "bytes": 383558,
+        "count": 112,
+        "key": "Python-urllib/3.11"
+      },
+      {
+        "bytes": 269500,
+        "count": 3,
+        "key": "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowe"
+      },
+      {
+        "bytes": 264670,
+        "count": 2,
+        "key": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatibl"
+      },
+      {
+        "bytes": 2192,
+        "count": 8,
+        "key": "Mozilla/5.0"
+      },
+      {
+        "bytes": 702,
+        "count": 2,
+        "key": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/"
+      },
+      {
+        "bytes": 29,
+        "count": 1,
+        "key": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatib"
+      }
+    ]
+  },
+  "metered_mb": 12.466379,
+  "note": "bucket is RIGHT-labelled: it covers window_covered, i.e. the hour BEFORE its label. edge_* is public traffic only; app_* includes internal service-to-service.",
+  "other_services_same_hour": {
+    "live-odds-worker": 16.9,
+    "refresh-worker": 8.6
+  },
+  "publish_into_web": {
+    "live-odds-worker": {
+      "bytes": 99131474,
+      "mb": 94.54,
+      "publishes": 418
+    },
+    "refresh-worker": {
+      "bytes": 55507914,
+      "mb": 52.94,
+      "publishes": 202
+    }
+  },
+  "service": "web",
+  "window_covered": {
+    "end": "2026-09-09T13:00:00Z",
+    "start": "2026-09-09T12:00:00Z"
+  }
+}

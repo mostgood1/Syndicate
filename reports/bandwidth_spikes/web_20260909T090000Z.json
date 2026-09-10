@@ -1,0 +1,78 @@
+{
+  "app": {
+    "access_lines": 0,
+    "log_lines": 3151,
+    "note": "served_bytes is RESPONSE size only; a POST body (e.g. artifacts/publish) is NOT counted here",
+    "served_bytes": 0,
+    "served_mb": 0.0,
+    "top_clients": [],
+    "top_paths": []
+  },
+  "bucket": "2026-09-09T09:00:00Z",
+  "captured_at": "2026-09-10T00:29:46Z",
+  "deploys_in_window": [],
+  "edge": {
+    "bytes": 22506,
+    "mb": 0.02,
+    "requests": 66,
+    "top_clients": [
+      {
+        "bytes": 11613,
+        "count": 34,
+        "key": "74.220.48.175"
+      },
+      {
+        "bytes": 10893,
+        "count": 32,
+        "key": "74.220.48.159"
+      }
+    ],
+    "top_paths": [
+      {
+        "bytes": 20862,
+        "count": 60,
+        "key": "/wnba/api/live_player_boxscore"
+      },
+      {
+        "bytes": 1644,
+        "count": 6,
+        "key": "/wnba/api/final_player_boxscore"
+      }
+    ],
+    "top_user_agents": [
+      {
+        "bytes": 20862,
+        "count": 60,
+        "key": "Python-urllib/3.11"
+      },
+      {
+        "bytes": 1644,
+        "count": 6,
+        "key": "Mozilla/5.0"
+      }
+    ]
+  },
+  "metered_mb": 0.41175175,
+  "note": "bucket is RIGHT-labelled: it covers window_covered, i.e. the hour BEFORE its label. edge_* is public traffic only; app_* includes internal service-to-service.",
+  "other_services_same_hour": {
+    "live-odds-worker": 15.4,
+    "refresh-worker": 11.2
+  },
+  "publish_into_web": {
+    "live-odds-worker": {
+      "bytes": 97596294,
+      "mb": 93.08,
+      "publishes": 415
+    },
+    "refresh-worker": {
+      "bytes": 116214268,
+      "mb": 110.83,
+      "publishes": 303
+    }
+  },
+  "service": "web",
+  "window_covered": {
+    "end": "2026-09-09T09:00:00Z",
+    "start": "2026-09-09T08:00:00Z"
+  }
+}

@@ -103,3 +103,103 @@ holds ~200 MB/h across a 3x swing in edge, the ratio framing should be retired f
 ledger in favour of the excess — including from arm 2's fire discriminator.
 
 **Not acted on further.** No lane opened, no lane block edited, no deploy, no probe fired.
+
+---
+
+## RESULT — the falsifier ran. BOTH framings are dead, and a THIRD column separates cleanly
+
+`[2026-09-09 ~19:5x local / 2026-09-10 ~00:5xZ, lane bandwidth-excess-vs-ratio, session
+local_7fa9d375. Nine quiet hours captured for this, spanning metered 0.41 -> 315.35 MB
+and edge 0.02 -> 135.77 MB — a 6,000x swing in edge, far past the 3x the falsifier asked
+for. Deploy-adjacent hours (2026-09-09 14:00Z/15:00Z/16:00Z, web env redeploy 14:38Z and
+ship-forward 15:05Z) and both arm-1 probe hours EXCLUDED by name. Read-only: no bytes sent.]`
+
+### The table — every captured web bucket, 2026-09-08..09
+
+| bucket | metered | edge | reqs | m/edge | excess | app served | m/app |
+|---|---|---|---|---|---|---|---|
+| 09-08 00:00Z | 1660.78 | 49.45 | 213 | 33.58 | 1611.33 | 147.60 | 11.25 |
+| 09-08 01:00Z | 927.21 | 266.49 | 407 | 3.48 | 660.72 | 325.79 | 2.85 |
+| 09-08 15:00Z | 420.55 | 59.29 | 348 | 7.09 | 361.26 | 137.75 | 3.05 |
+| 09-08 16:00Z | 2470.66 | 101.39 | 449 | 24.37 | 2369.27 | 146.71 | 16.84 |
+| 09-08 17:00Z | 2962.71 | 275.03 | 536 | 10.77 | 2687.68 | 317.75 | 9.32 |
+| 09-08 18:00Z | 2817.15 | 275.39 | 572 | 10.23 | 2541.76 | 343.74 | 8.20 |
+| 09-08 19:00Z | 2904.79 | 245.13 | 417 | 11.85 | 2659.66 | 339.55 | 8.55 |
+| 09-08 21:00Z | 78.19 | 29.19 | 211 | 2.68 | 49.00 | 112.58 | 0.69 |
+| 09-08 22:00Z | 136.33 | 18.33 | 356 | 7.44 | 118.00 | 97.82 | 1.39 |
+| 09-08 23:00Z | 315.35 | 88.48 | 285 | 3.56 | 226.87 | 176.36 | 1.79 |
+| 09-09 00:00Z | 437.73 | 203.57 | 366 | 2.15 | 234.16 | 249.16 | 1.76 |
+| 09-09 01:00Z | 401.11 | 241.52 | 2531 | 1.66 | 159.59 | — | — |
+| 09-09 09:00Z | 0.41 | 0.02 | 66 | **20.59** | 0.39 | — | — |
+| 09-09 13:00Z | 12.47 | 3.54 | 130 | 3.52 | 8.93 | — | — |
+| 09-09 18:00Z | 110.38 | 122.41 | 445 | **0.90** | **-12.03** | 186.50 | 0.59 |
+| 09-09 20:00Z | 62.72 | 121.40 | 480 | **0.52** | **-58.68** | 179.13 | 0.35 |
+| 09-09 21:00Z | 180.51 | 60.73 | 105 | 2.97 | 119.78 | 141.17 | 1.28 |
+| 09-09 22:00Z | 257.36 | 135.77 | 481 | 1.90 | 121.59 | 247.96 | 1.04 |
+| 09-09 23:00Z | 605.10 | 178.28 | 389 | 3.39 | 426.82 | 261.01 | 2.32 |
+
+`app served` is blank where web's access-log emitter was dead (`2026-09-08T23:45:58Z` to
+the restore at `2026-09-09T14:38Z`); the tool marks those `instrument_blind` rather than
+printing a number. `09-08 14:00Z` and `20:00Z` are omitted — their captures carry no
+`metered_mb`. **`09-08 23:00Z` is now RECOMPUTED, not quoted: 88.48 MB / 315.35 metered,
+matching section 4(a)'s table exactly.**
+
+### 1. Additive is dead — TWO HOURS HAVE NEGATIVE EXCESS
+
+`09-09 18:00Z` metered **110.38** against **122.41** edge-logged; `09-09 20:00Z` metered
+**62.72** against **121.40**. The meter charged LESS than the edge log recorded. Whatever
+the meter is doing, `metered = edge + hidden extra` is not it, and that framing should be
+retired rather than re-fitted.
+
+### 2. My own r ~ 0 is NOT the confirmation it looks like — this is the trap in this result
+
+Across the nine non-spike hours, `excess` vs `edge` gives **r = +0.049, r2 = 0.002**. Read
+carelessly that is "excess is independent of edge volume" — the hypothesis CONFIRMED. It is
+not. Excess over those hours runs **-58.68 to +226.87, mean 63.8, sd 89.4** — the spread is
+LARGER than the mean. **r ~ 0 with high variance means NO RELATIONSHIP, not a constant
+offset.** A constant offset would show r ~ 0 AND small variance; only the second half
+distinguishes them, and only the first half is what a correlation reports. The additive
+hypothesis is falsified by the variance, and it would have been "confirmed" by the
+correlation alone.
+
+For completeness, neither straight fit is any better: `metered ~ edge` gives r2 = 0.301
+(n = 9), `metered ~ app-served` r2 = 0.200 (n = 7). **The meter is not a function of either
+logged quantity.**
+
+### 3. metered/edge DOES NOT SEPARATE SPIKES — so it is the wrong fire discriminator
+
+Taking the five big anomalous hours (`09-08 00, 16, 17, 18, 19:00Z`, all >= 1,660 MB)
+against everything else:
+
+    metered/edge   big  10.23 - 33.58   |   everything else   0.52 - 20.59   OVERLAPS
+    metered/app     big   8.20 - 16.84   |   everything else   0.35 -  3.05   SEPARATES
+
+A **near-idle** hour — `09-09 09:00Z`, 0.41 MB metered, 66 requests — sits at **20.59**,
+inside the band `09-08 16:00Z` occupies at 2,470 MB. And `09-08 22:00Z` (7.44 at 136 MB)
+is indistinguishable from `09-08 15:00Z` (7.09 at 420 MB). **The ratio carries no
+information about whether an hour is anomalous.** This directly answers section 4(a): the
+"ladder" is not a continuum of one mechanism, it is a ratio whose denominator wanders.
+
+### 4. What to use instead: metered / app-served, now that the emitter is back
+
+`metered/app` separates the five big hours from all twelve others with a clean gap —
+**8.20 at the bottom of the anomalous set against 3.05 at the top of the rest**. That is
+actionable for arm 2, whose fire gate currently reads the ratio that does not work, and it
+became available only today when the access-log emitter was restored at 14:38Z.
+
+**Two honest limits on that recommendation.** (i) `09-08 01:00Z` (2.85) and `15:00Z` (3.05)
+are elevated hours sitting just above the quiet maximum of 2.32, so the margin there is
+thin — a threshold near **5.0** catches the big five and deliberately does not claim those
+two. (ii) app-served is itself the log whose completeness is the open question; a clean
+separation makes it a good DISCRIMINATOR and does not make it a validated MEASUREMENT.
+
+### 5. Scope
+
+n = 9 quiet hours, 5 big hours, 12 hours with a live app log, one service, two days. Two of
+the negative-excess hours are post-`15:05Z`-deploy — but so are `21:00Z`, `22:00Z` and
+`23:00Z`, which are all positive, so it is not a simple post-deploy artifact. Flagged, not
+concluded.
+
+**Lane `bandwidth-excess-vs-ratio` closes on this.** No probe fired, no bytes sent, no
+deploy, no `render.yaml`, and neither the controlled-transfer lane's files nor its block
+were touched.
