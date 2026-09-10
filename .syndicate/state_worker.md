@@ -563,6 +563,8 @@ is measuring something none of these logs contain, or the log is materially
 incomplete in exactly the high-volume hours.** I could not separate those from
 outside.
 
+**`[CORRECTED 2026-09-10, session 92a71e78]` THE LABELLING HALF OF THE NEXT PARAGRAPH IS TRUE FOR REQUEST COUNTS AND FALSE FOR BANDWIDTH.** Same-instant read at 15:13:07Z: the hour in flight is bucket `16:00Z` in `http-requests` and bucket `15:00Z` in `bandwidth`. Bandwidth bucket `X:00` holds `X:00-(X+1):00`, so every capture here paired a metered hour with the previous hour's logs. The "settling" is that hour filling in. `findings_2026-09-10_spike_crossing_and_labelling.md`.
+
 **INSTRUMENT FACTS LEARNED HERE, both of which produced wrong readings first:**
 buckets are **RIGHT-labelled** (bucket `15:00` covers 14:00-15:00; confirmed twice
 against request counts), and **values SETTLE UPWARD for hours** after a bucket
@@ -677,10 +679,11 @@ workers fetch, web reads artifacts, and `request_path_guard` logged **205 "compu
 request path" warnings in a 1,200-line sample**. `live-odds-worker` (**78.5% of billed
 worker egress**) was still undeployed at checkpoint.
 
-**Instrument note 3 — A BANDWIDTH BUCKET TAKES ~50 MINUTES AFTER ITS HOUR CLOSES TO SETTLE, AND GROWS UP TO 39x WHILE DOING IT.** Sampled every 5 min, bucket `2026-09-06T16:00` (covering 15:00-16:00Z): `3.2 -> 5.2 -> 13.3 -> 22.3 -> 44.2 -> 64.7 -> 79.3 -> 95.7 -> 110.3 -> 124.6 -> 125.9`, then flat for 70 further minutes. **A bucket read within an hour of closing is not a low reading, it is an INCOMPLETE one** — and reading it as low is how I got `edge/meter = 2.24` for an hour whose settled ratio is `3.05`. Wait for two consecutive equal samples before quoting a bucket. Buckets days old are settled and safe.
+**`[CORRECTED 2026-09-10, session 92a71e78]` The series below is right; the reading of it is not. That bucket held 16:00-17:00Z, and "settling" was that hour filling in as it happened. The curves jump in the same minutes as served bursts. `findings_2026-09-10_spike_crossing_and_labelling.md`.** **Instrument note 3 — A BANDWIDTH BUCKET TAKES ~50 MINUTES AFTER ITS HOUR CLOSES TO SETTLE, AND GROWS UP TO 39x WHILE DOING IT.** Sampled every 5 min, bucket `2026-09-06T16:00` (covering 15:00-16:00Z): `3.2 -> 5.2 -> 13.3 -> 22.3 -> 44.2 -> 64.7 -> 79.3 -> 95.7 -> 110.3 -> 124.6 -> 125.9`, then flat for 70 further minutes. **A bucket read within an hour of closing is not a low reading, it is an INCOMPLETE one** — and reading it as low is how I got `edge/meter = 2.24` for an hour whose settled ratio is `3.05`. Wait for two consecutive equal samples before quoting a bucket. Buckets days old are settled and safe.
 
 **Instrument note 2 — WORKER bandwidth buckets LAG WEB'S BY 45-90+ MINUTES, and a missing bucket is NOT a zero.** Observed twice: at 00:45Z web had the `00:00Z` bucket while both workers did not; at **02:40Z web reported `02:00Z` (38.6 MB) while refresh-worker and live-odds-worker still stopped at `01:00Z`** — 1h40m after that bucket closed. The services were verified **healthy and emitting logs** at the time, so the gap is the metrics pipeline, not the workload. **Do not read an absent bucket as 0** — a naive `dict.get(ts, 0)` renders the gap as a real reading of zero, which I did once tonight. Budget 90+ minutes before a worker's post-deploy hour is readable, and check web's latest bucket to tell lag from fault.
 
+**`[CORRECTED 2026-09-10, session 92a71e78]` Hourly-only: still true. RIGHT-labelled: true of `http-requests`, FALSE for `bandwidth`, whose `00:00Z` bucket covers 00:00-01:00. Same-instant read in `findings_2026-09-10_spike_crossing_and_labelling.md`.**
 **Instrument note:** bandwidth metrics are **hourly-only and RIGHT-labelled**
 (`resolutionSeconds < 3600` is silently ignored; the `00:00Z` bucket covers 23:00-00:00).
 
