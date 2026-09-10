@@ -31992,3 +31992,21 @@ lost no protection and no open lane left the session-start digest.
 - **CROSS-LANE WRITE INTO YOUR `docs/ai_context/todo.md`, DECLARED** `[2026-09-09, lane `ncaaf-window-reason`, session 2edf8b82, commit landing now]`: **+36 lines, 0 deletions, entirely inside the `#633` block**, which this lane does not own — recording that `#633`'s last live half is fixed (`353650c7`) and its deploy is pending by user decision. Your `#6xx` items are untouched. Noted because it is a real tension rather than an oversight: **`CLAUDE.md` instructs EVERY session to read `todo.md` before starting and update it before finishing**, so an exclusive lane claim on that file cannot be honoured by anyone following the protocol. Worth resolving as a convention (per-item ownership, or todo.md exempted from claims) rather than each session declaring around it.
 - **SECOND CROSS-LANE WRITE INTO YOUR `docs/ai_context/todo.md`, DECLARED** `[2026-09-09, lane `web-oom-census`, session 2edf8b82]`: additive only, inside the **`#632`** block, re-censusing its OOM count from 2 to 16. Your items untouched. Same protocol tension noted in the bullet above.
 - **CROSS-LANE WRITE INTO YOUR `docs/ai_context/todo.md`, DECLARED** `[2026-09-10, lane `wnba-accuracy-assessment`, session 8c631ba2]`: additive only, **+51 / -0, entirely inside the `#623` block** (a pre-sprint readiness note and a pre-registered lane block for the 09-17 WNBA sprint). Your items untouched; same protocol tension as the declarations above.
+
+### write-ahead-build-refusal — superseded status lines, moved verbatim at the 2026-09-10 checkpoint (session 192abc41)
+- Hypothesis (written before any code, from Render logs and the stored row, read 2026-09-10): the lost update is a cross-service TOCTOU in `_persist`. `_merge_onto_current` re-reads the store, then `write_json_file` SETs, and nothing between them is atomic. So a writer whose merge-read→SET window straddles another writer's SET writes back its stale copy of every row it "kept theirs".
+  - Byte ledger, 2026-09-04. At 18:27:25.083, live-odds-worker SET K `rejected`: 2,700,666 B, 2445 orders. Its merge-read came before refresh-worker's 24.711 SET, so this write dropped paper order Q.
+  - At 18:27:25.228, refresh-worker SET exactly its own 24.711 doc + 48 B (Q filled). That doc carried K as `submitted`.
+  - The stored row agrees: `submitted_at 18:27:23.597740Z`, `pre_resolution_error null`, `venue_resolved_at null`, and `prior_attempts` n=5, the newest `replaced_at 18:27:23.597672Z`. K was a retry refused at build every pass since 07:48Z.
+  - The same burst reverted paper order `4aa69211…`, whose first `UNRECONCILABLE_ORDER` line is at 18:27:36Z.
+  - Consequence: a reverted row carries `error=None`, so no reconcile rule keyed on the recorded error can ever see it. The close is build-before-record.
+- 2026-09-10: **LANDED `2914b6c7`, LIVE on live-odds-worker since 21:55:18Z** (`dep-dahibm4s728c73b851ig`).
+  - The first pass after boot (22:03:37Z) read `duplicates=1 retried=0 refused={'no_venue_ticker': 17}`.
+    - Zero `LIVE_ORDER`, `REFUSED_AT_BUILD`, `BLOCKED_ON_UNRECONCILED` and `Traceback` lines.
+    - The `live:kalshi` 09-10 order count held at 14.
+    - Details in `deploys.md` 21:49:12-21:55:18Z.
+  - Falsification (1) did not fire: the replay test leaves K `submitted` on the current code, so the TOCTOU is the mechanism.
+  - Falsification (2) did not fire either: no rejected `LIVE_ORDER` since the deploy. But the population is empty, so that is not a pass.
+  - Tests: 540 pass across the execution suites. The 39-file sweep had 13 errors, all `test_live_refresh_loop.py` MLB lineup tests writing into the absent `data/` mirror of a data-less worktree; they touch no code this lane changed.
+  - **OWED, and it keeps this lane OPEN:** the `REFUSED_AT_BUILD` reading, on the first live pass in which a position WITH a contract fails its build. It is marked pending in `deploys.md`.
+  - Follow-up filed: `todo.md #656` (a CAS in `_persist`, on all three services), also chipped as a task. Learnings 2026-09-10: FORBIDDEN, clearing a stranded row on a field the lost write set.

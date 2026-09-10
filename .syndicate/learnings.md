@@ -5373,3 +5373,21 @@ the instrument rather than the system.**
   - If nothing survives, the fix is upstream: either do not write the row (`2914b6c7` builds before the write-ahead), or make the write atomic (`#656`).
   - A unit test cannot catch this. A fixture builds the row WITH the error, the predicate passes, and production never has that row.
 - **Cost**: none paid; it was caught before shipping. It would have been a dead predicate on the money path that tested green and never fired.
+
+## 2026-09-10 — OVERTURNED: `#600`'s three-way merge does NOT stop different orders clobbering each other, because its re-read and its SET are not atomic `[lane write-ahead-build-refusal, correcting state_model.md [execution-ledger-cross-service-race], 2026-08-28]`
+
+- **What we believed**: since `f66c7441` (2026-08-28), `_persist` three-way merges onto a fresh read. So "different orders no longer clobber; the same order in one window is still last-writer-wins, blast radius one row". `LEDGER_MERGE` had not been seen firing.
+- **What was actually true**: the fresh read and the SET are separate operations, ~0.3-0.5 s apart at 2.7 MB. A SET that lands between them is overwritten by the late writer's stale copy of every row it kept.
+  - On 2026-09-04 that hit three different orders in 1.1 s:
+    - paper `4aa69211…` lost its fill to live-odds-worker's SET at 24.160;
+    - paper Q was dropped at 25.083;
+    - live `6bc5617c…` was reverted to `submitted` by refresh-worker's SET at 25.228.
+  - `LEDGER_MERGE concurrent=6/1/2` fired in those same seconds. The merge ran, and still lost the writes.
+- **How we found out**:
+  - Byte accounting of both services' `KEYVALUE_WRITE_LARGE` sizes, read as document versions.
+  - The stored rows.
+  - `test_KNOWN_HAZARD_a_write_landing_between_merge_read_and_SET_is_lost` replays it.
+- **The rule going forward**: a merge-on-write protects a ledger only if the read it merges onto and the write are ONE atomic step, via compare-and-swap (WATCH/MULTI) or a lock. Otherwise it narrows the window without closing it, and the narrowed window is still hit.
+  - Paper rows stuck at `submitted` count the hits: 13 across 09-06..09-11. That is an upper bound, since a crash mid-`place_order` leaves the same shape.
+  - Fix: `todo.md #656`.
+- **Cost**: six days with no live placement on either venue (09-04 to 09-10), plus paper fills silently lost.

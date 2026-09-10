@@ -264,18 +264,28 @@ services on `a36e3c1a` 2026-08-28 ~18:57Z; web on `89678782` 19:09Z.**
 `/api/ops/execution/ledger-summary` and reads `None` — a meaningful null, since
 `_persist` only writes that field and never clears it.
 
-**NOT YET PROVEN: `LEDGER_MERGE` has not fired.** `concurrent=0` since 18:58Z is
-an absence in a short window, not a pass — a collision needs a settlement pass
-overlapping a placement cycle. What settles it: one `concurrent>0`, or a
-`SETTLED ... graded=N` whose outcomes actually appear on the served payload.
+**`LEDGER_MERGE` HAS FIRED, AND THE MERGE IS NOT ENOUGH** `[measured 2026-09-10 off the 2026-09-04
+logs, lane write-ahead-build-refusal]`.
+- It fired as `concurrent=6` on live-odds-worker at 18:27:21Z, and as `concurrent=1` and `=2` on
+  refresh-worker at 18:27:13Z and 18:27:24.508Z.
+- The merge's fresh read and its SET are NOT atomic. They are ~0.3-0.5 s apart at 2.7 MB. A SET that
+  lands between them is overwritten by the late writer's stale copy of every row it kept.
 
-**The mechanism, unchanged:** `_load()`
-captures a fingerprint per order; a row the writer did not touch is left to
-whoever did. A per-order upsert would NOT have fixed it — the stale writer held
-every graded order, so overlaying "its" rows discards the grades exactly as
-before. Guarantee stated narrowly: different orders no longer clobber; the same
-order in one window is still last-writer-wins at field level, blast radius one
-row. `off != on` 7 of 10.
+**The mechanism:** `_load()` captures a fingerprint per order, and a row the writer did not touch is left
+to whoever did, as of the merge-read. A per-order upsert would NOT have fixed `#600`, because the stale
+writer held every graded order.
+
+**GUARANTEE, CORRECTED 2026-09-10: DIFFERENT ORDERS STILL CLOBBER** when a SET lands inside another
+writer's merge-read→SET window. Measured 2026-09-04, three different orders in 1.1 s:
+- Paper order `4aa69211…` lost its fill to live-odds-worker's 24.160 SET.
+- Paper order Q was dropped by live-odds-worker's 25.083 SET.
+- Live order `6bc5617c…` was reverted to `submitted` by refresh-worker's 25.228 SET. That froze both venues
+  for six days.
+
+The witness is paper rows stuck at `submitted`: 13 across 09-06..09-11. That is an upper bound, since a
+crash mid-`place_order` leaves the same shape. `2914b6c7` stops a refused BUILD from writing a row, but a
+SENT order's completion is still exposed. The fix owed is a CAS in `_persist`, on all three services
+(`todo.md #656`). The `off != on` 7 of 10 figure is from 08-28 and covers the whole-document clobber only.
 
 **SEVERITY IS HIGHER THAN A LOST GRADE.** `reconcile_live_orders` writes
 `reconciled_at` through the same path and the unreconciled gate is a GLOBAL

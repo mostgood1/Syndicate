@@ -423,32 +423,22 @@ death, never life — do not invert it.
   - (3) the same-day 09-10 chip reading, then the 09-11 reading in the Goal.
 - Blocked by: none.
 
-### write-ahead-build-refusal — OPEN — opened 2026-09-10 — session 192abc41-d901-4b94-93d7-43922ae75c81
-- Goal: [user 2026-09-10] a LIVE order whose build is refused persists NO write-ahead `submitted` row, so a lost update has nothing to strand. The refusals in scope: Polymarket `market_unresolved_for_position` (the slug is missing from the slate), a refused spread or team side, and Kalshi `no_live_price`. Also: the 2026-09-04 lost-update mechanism is named from evidence. This is the residual of `exchange-execution-unblock`: `332e596d` covered only positions with no `venue_ticker`.
+### write-ahead-build-refusal — OPEN — opened 2026-09-10 — session 192abc41-d901-4b94-93d7-43922ae75c81 — **GOAL: NOT MET. The code is live; the production refusal reading is owed.**
+- Goal: [user 2026-09-10] a LIVE order whose build is refused persists NO write-ahead `submitted` row, so a lost update has nothing to strand. The refusals in scope: Polymarket `market_unresolved_for_position` (the slug is missing from the slate), a refused spread or team side, and Kalshi `no_live_price`. Also: the 2026-09-04 lost-update mechanism is named from evidence. This is the residual of `exchange-execution-unblock`: `332e596d` covered only positions with no `venue_ticker`. — **GOAL: NOT MET.**
+  - Done: the mechanism is named and proven. `2914b6c7` is live on live-odds-worker since 21:55:18Z. The tests went red to green.
+  - LEFT: the production `REFUSED_AT_BUILD` reading.
+  - BLOCKED BY: no live population. No position holding a contract has failed its build since the deploy, nor since 18:10Z before it.
 - Files: `syndicate/features/shared/execution_ledger.py`, `syndicate/features/shared/kalshi_orders.py`, `syndicate/features/shared/polymarket_us_orders.py`, `syndicate/features/shared/execution_guard.py`, `pipeline/execute_portfolio.py`, `tests/test_execution_ledger.py`, `tests/test_execute_portfolio.py`, `tests/test_execution_guard.py`, `tests/test_kalshi_orders.py`, `tests/test_polymarket_us_orders.py`, `tests/test_paper_settlement.py` (ADDED 2026-09-10: one test made its unfilled row by placing live while disarmed, which now writes no row; unclaimed on origin/main). Collision check 2026-09-10: the only other claim on any of these was `exchange-execution-unblock`, which is CLOSED on origin/main.
-- Hypothesis (written before any code, from Render logs and the stored row, read 2026-09-10): the lost update is a cross-service TOCTOU in `_persist`. `_merge_onto_current` re-reads the store, then `write_json_file` SETs, and nothing between them is atomic. So a writer whose merge-read→SET window straddles another writer's SET writes back its stale copy of every row it "kept theirs".
-  - Byte ledger, 2026-09-04. At 18:27:25.083, live-odds-worker SET K `rejected`: 2,700,666 B, 2445 orders. Its merge-read came before refresh-worker's 24.711 SET, so this write dropped paper order Q.
-  - At 18:27:25.228, refresh-worker SET exactly its own 24.711 doc + 48 B (Q filled). That doc carried K as `submitted`.
-  - The stored row agrees: `submitted_at 18:27:23.597740Z`, `pre_resolution_error null`, `venue_resolved_at null`, and `prior_attempts` n=5, the newest `replaced_at 18:27:23.597672Z`. K was a retry refused at build every pass since 07:48Z.
-  - The same burst reverted paper order `4aa69211…`, whose first `UNRECONCILABLE_ORDER` line is at 18:27:36Z.
-  - Consequence: a reverted row carries `error=None`, so no reconcile rule keyed on the recorded error can ever see it. The close is build-before-record.
-- Falsification test: (1) A test that replays the interleaving (a SET landing between another writer's merge-read and its SET) leaves K `rejected` on the current code. If so, the TOCTOU is not the mechanism. (2) After the live-odds-worker deploy, a pass logs `LIVE_ORDER status=rejected … OrderBuildError` for a position that has a contract.
+- Hypothesis: **CONFIRMED 2026-09-10.** It is a cross-service TOCTOU in `_persist`: the merge-read and the SET are not atomic. The evidence is in `deploys.md` 21:49:12-21:55:18Z and `state_model.md [execution-ledger-cross-service-race]`. The pre-registered text was moved verbatim to `lanes_history.md`.
+- Falsification test:
+  - (1) The replay leaves K `rejected` on the current code. Did NOT fire: K stays `submitted`.
+  - (2) A post-deploy `LIVE_ORDER status=rejected … OrderBuildError` for a position holding a contract. None seen, but on an EMPTY population, so that is not a pass.
 - Verification:
-  - The new tests fail on origin/main and pass on the fix.
-  - On production after the deploy: `EXECUTED … refused={'<build token>': N}` with `REFUSED_AT_BUILD` lines and zero `LIVE_ORDER status=rejected … OrderBuildError` lines in the same pass. The ledger order count holds across a pass whose only live outcomes are build refusals.
-  - The measurement is recorded in `deploys.md`.
-- Blocked by: none. Deploy owed: live-odds-worker only.
-- **NOT IN SCOPE, AND FLAGGED:** the TOCTOU itself still threatens a SENT order's completion. Its fix is a compare-and-swap in `_persist` on every writer, which means all three services.
-- 2026-09-10: **LANDED `2914b6c7`, LIVE on live-odds-worker since 21:55:18Z** (`dep-dahibm4s728c73b851ig`).
-  - The first pass after boot (22:03:37Z) read `duplicates=1 retried=0 refused={'no_venue_ticker': 17}`.
-    - Zero `LIVE_ORDER`, `REFUSED_AT_BUILD`, `BLOCKED_ON_UNRECONCILED` and `Traceback` lines.
-    - The `live:kalshi` 09-10 order count held at 14.
-    - Details in `deploys.md` 21:49:12-21:55:18Z.
-  - Falsification (1) did not fire: the replay test leaves K `submitted` on the current code, so the TOCTOU is the mechanism.
-  - Falsification (2) did not fire either: no rejected `LIVE_ORDER` since the deploy. But the population is empty, so that is not a pass.
-  - Tests: 540 pass across the execution suites. The 39-file sweep had 13 errors, all `test_live_refresh_loop.py` MLB lineup tests writing into the absent `data/` mirror of a data-less worktree; they touch no code this lane changed.
-  - **OWED, and it keeps this lane OPEN:** the `REFUSED_AT_BUILD` reading, on the first live pass in which a position WITH a contract fails its build. It is marked pending in `deploys.md`.
-  - Follow-up filed: `todo.md #656` (a CAS in `_persist`, on all three services), also chipped as a task. Learnings 2026-09-10: FORBIDDEN, clearing a stranded row on a field the lost write set.
+  - (1) The new tests are red on origin/main and green on the fix: **MET** (540 pass across 12 execution files).
+  - (2) In production, `EXECUTED … refused={'<build token>': N}` with `REFUSED_AT_BUILD`, no rejected `LIVE_ORDER`, and the order count held: **OWED**. It is the pending marker in `deploys.md`. Find it with `py -3 scripts/render_logs.py --service live-odds-worker --text REFUSED_AT_BUILD --start 2026-09-10T21:55:18Z`.
+  - (3) The measurement is in `deploys.md`: **DONE for the first pass**, `duplicates=1 refused={'no_venue_ticker': 17}`, with the count held at 14.
+- Blocked by: nothing for the code. The reading waits on production producing a refused build. No claim is held, and no deploy is owed.
+- Not in scope, filed: the same race can revert a SENT order's completion. That is `todo.md #656`, a CAS in `_persist` on all three services.
 
 ### wnba-public-scoreboard-host — OPEN — opened 2026-09-10 — session 8c631ba2-16bd-41a6-a384-d655570b10ba (desktop `local_f4eeac0a-49e0-49f6-8320-610fd1ae3d14`)
 - Goal: `_public_scoreboard_live_state_payload` reaches ESPN from Render. Read as ZERO `[wnba_cards] SCOREBOARD_FETCH_FAILED` lines on a worker running the fix, across a window in which the same worker logged them before the fix.
