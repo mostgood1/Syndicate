@@ -1,0 +1,47 @@
+{#
+  The portfolio dropdown, on every portfolio page. `[user request 2026-09-10]`
+  `portfolio_nav` comes from `portfolio_books._portfolio_chrome`, which only
+  fills it on portfolio paths -- elsewhere this renders nothing.
+
+  A <details> menu rather than a <select>: every entry is a plain link, so it
+  works with scripts off, and each portfolio can say what kind of book it is.
+#}
+{% set nav = portfolio_nav if portfolio_nav is defined else none %}
+{% if nav %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/portfolio_books.css') }}" />
+<div class="pf-switch-bar">
+  <details class="pf-switch" id="portfolio-switcher">
+    <summary class="pf-switch__current" aria-label="Switch portfolio">
+      <span class="pf-switch__kicker">Portfolio</span>
+      <span class="pf-switch__name">{{ nav.active.name }}</span>
+      <span class="pf-switch__caret" aria-hidden="true">&#9662;</span>
+    </summary>
+    <div class="pf-switch__menu">
+      {% for group in nav.groups %}
+        <div class="pf-switch__group">{{ group.label }}</div>
+        {% for entry in group.entries %}
+          <a class="pf-switch__item{% if entry.id == nav.active.id %} is-active{% endif %}"
+             href="{{ entry.url }}"{% if entry.id == nav.active.id %} aria-current="page"{% endif %}>
+            <span class="pf-switch__item-name">{{ entry.name }}</span>
+            <span class="pf-switch__item-note">{{ entry.note }}</span>
+          </a>
+        {% endfor %}
+      {% endfor %}
+      <form class="pf-switch__new" method="post" action="/portfolio/books">
+        <input class="pf-input" name="name" maxlength="60" placeholder="New manual portfolio" aria-label="New portfolio name" required />
+        <button type="submit" class="pf-btn">Create</button>
+      </form>
+    </div>
+  </details>
+  {% if nav.store_error %}
+    <span class="pf-switch-bar__warn" title="{{ nav.store_error }}">Manual portfolios couldn't be read.</span>
+  {% endif %}
+  {% set pa = portfolio_auth if portfolio_auth is defined else none %}
+  {% if pa and pa.user %}
+    <form class="pf-signout" method="post" action="/portfolio/logout">
+      <span>Signed in as <strong>{{ pa.user }}</strong></span>
+      <button type="submit" class="pf-btn pf-btn--quiet">Sign out</button>
+    </form>
+  {% endif %}
+</div>
+{% endif %}

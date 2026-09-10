@@ -695,16 +695,24 @@ def test_the_editable_inputs_survived_the_merge(app_client, live_env):
     assert 'action="/portfolio/settings"' in body
 
 
-def test_the_live_and_logged_books_are_both_on_the_page_and_labelled(app_client, live_env):
-    """Two ledgers, one page. They are never summed, so they must never read
-    as one table -- each half carries its own heading."""
+def test_the_logged_bets_moved_to_their_own_portfolio(app_client, live_env, monkeypatch, tmp_path):
+    """[user request 2026-09-10] One portfolio per page. The user's logged bets
+    used to be this page's second half; they are a manual portfolio now, one
+    entry in the dropdown. So `/portfolio` carries the live book, the dropdown
+    and a pointer -- and NOT the logged-bets table, which would put a second
+    book's totals under the live book's heading."""
+    from syndicate.features.shared import portfolio_books
+
+    monkeypatch.setattr(portfolio_books, "store_path", lambda: tmp_path / "portfolio_books.json")
     live_env["orders"] = [_order()]
     body = app_client.get("/portfolio").get_data(as_text=True)
     assert 'id="live"' in body
-    assert 'id="tracked"' in body
-    # The live half's own row, and the logged half's own container.
     assert "KXWNBAPTS-25AUG23-TG-17.5" in body
-    assert 'id="portfolio-positions"' in body
+    assert 'id="portfolio-switcher"' in body
+    assert 'href="/portfolio/books/manual"' in body
+    assert 'id="tracked"' not in body
+    assert 'id="portfolio-positions"' not in body
+    assert "portfolio_pulse.js" not in body
 
 
 def test_the_live_links_carry_a_real_date(app_client, live_env):

@@ -34,10 +34,12 @@ from syndicate.blueprints.ncaaf import ncaaf_bp
 from syndicate.blueprints.nba import nba_bp
 from syndicate.blueprints.mlb import mlb_bp
 from syndicate.blueprints.opportunity_board import opportunity_board_bp
+from syndicate.blueprints.portfolio_books import portfolio_books_bp
 from syndicate.blueprints.soccer import soccer_bp
 from syndicate.blueprints.sports import sports_bp
 from syndicate.blueprints.wnba import wnba_bp
 from syndicate.features.shared.json_safety import json_safe_value
+from syndicate.features.shared.portfolio_auth import install_portfolio_auth
 from syndicate.features.shared.response_compression import install_response_compression
 from syndicate.features.shared.live_refresh_loop import start_live_refresh_background_loop
 from pipeline.intelligence_state import start_intelligence_state_background_loop
@@ -435,6 +437,7 @@ def create_app() -> Flask:
 
     app.register_blueprint(home_bp)
     app.register_blueprint(intelligence_bp)
+    app.register_blueprint(portfolio_books_bp)
     app.register_blueprint(opportunity_board_bp)
     app.register_blueprint(ask_the_syndicate_bp)
     app.register_blueprint(ops_bp)
@@ -636,6 +639,11 @@ def create_app() -> Flask:
     # `response_compression.py` carries the measurement and the exclusions
     # (notably: `send_file` passthrough bodies are NOT touched).
     install_response_compression(app)
+
+    # Sign-in for every `/portfolio*` page and `/api/portfolio/*` endpoint
+    # [user request 2026-09-10]. Installed AFTER the memory hook above, so a
+    # request the gate turns away is still counted by it.
+    install_portfolio_auth(app)
 
     @app.teardown_request
     def _note_request_memory_end(_exc: BaseException | None = None) -> None:

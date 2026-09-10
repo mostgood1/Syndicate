@@ -282,6 +282,7 @@
 {% set bankroll = p.bankroll_units or 0 %}
 
 <main class="paper-page">
+  {% include "shared/_portfolio_switcher.html" %}
   <div class="paper-pulse" id="paper-pulse" role="status" aria-live="polite">
     <span class="paper-pulse__dot"></span>
     <span id="paper-pulse-text">Live</span>

@@ -257,7 +257,11 @@ def fetch_orders(day: str, cache_dir: Path) -> list[dict]:
     dest = cache_dir / f"paper_{day}.json"
     if not dest.exists():
         dest.parent.mkdir(parents=True, exist_ok=True)
-        with urllib.request.urlopen(f"{BASE}/api/portfolio/paper?date={day}", timeout=600) as response:
+        # Behind the portfolio sign-in since 2026-09-10; the ops token passes it.
+        request = urllib.request.Request(
+            f"{BASE}/api/portfolio/paper?date={day}", headers={"X-Admin-Token": admin_token("")}
+        )
+        with urllib.request.urlopen(request, timeout=600) as response:
             dest.write_bytes(response.read())
     payload = json.loads(dest.read_text(encoding="utf-8"))
     rows = list(payload.get("orphan_orders") or [])

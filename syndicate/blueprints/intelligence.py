@@ -2652,6 +2652,20 @@ def portfolio_bets_api():
                 response.status_code = 400
                 return _no_cache_response(response)
 
+        # WHICH PORTFOLIO (2026-09-10). The slip's picker sends one of the manual
+        # books (`portfolio_books.py`); absent means the default book. An id that
+        # names no book is REFUSED rather than stored -- stored, the bet would be
+        # filed under a portfolio nobody can open, and read back in the default
+        # book only by the fallback that exists for deleted ones.
+        portfolio_id = str(payload.get("portfolio_id") or "").strip() or None
+        if portfolio_id is not None:
+            from syndicate.features.shared.portfolio_books import get_book
+
+            if get_book(portfolio_id) is None:
+                response = jsonify({"ok": False, "error": f"unknown portfolio {portfolio_id!r}."})
+                response.status_code = 400
+                return _no_cache_response(response)
+
         # Record the price we struck at, across every book quoting it. This is
         # the OPENING half of CLV; nothing else in the system captures it, and a
         # bet logged without it can never have a closing-line value no matter
@@ -2688,6 +2702,7 @@ def portfolio_bets_api():
             prediction_id=payload.get("prediction_id"),
             features_snapshot=features_snapshot,
             quote=quote,
+            portfolio_id=portfolio_id,
         )
         return _no_cache_response(jsonify({"ok": True, "bet": record}))
     except Exception:
@@ -5230,22 +5245,21 @@ def portfolio_paper_home():
 
 @intelligence_bp.get("/portfolio")
 def portfolio_home():
-    """The primary portfolio page, and the live buying engine is anchored here.
+    """The primary portfolio page: the Kalshi + Polymarket live buying engine.
 
-    TWO LEDGERS ON ONE PAGE, LABELLED AND NEVER SUMMED: the execution ledger's
-    real orders (what `/portfolio/live` used to render on its own) above, and
-    the prediction ledger's user-logged bets below. `portfolio_summary.
-    _is_user_placed_bet` exists because auto-tracked model rows once flooded
-    this page with 1000+ "tracked plays" nobody had bet -- that wall stays up,
-    which is why the two halves carry their own headings, their own totals and
-    their own JSON links rather than a merged tile row.
+    ONE PORTFOLIO PER PAGE since 2026-09-10 [user request]. A dropdown switches
+    between this book, `/portfolio/paper`, and the user's MANUAL books at
+    `/portfolio/books/<id>` (`portfolio_books.py`). The prediction ledger's
+    user-logged bets used to render as this page's second half; they are a
+    manual book now ("Other books" by default), so this handler no longer reads
+    that multi-MB ledger on every view. The wall the old layout kept still
+    stands: every count here comes from the execution ledger and is never
+    summed with another book.
 
-    PAPER STAYS ON ITS OWN PAGE. The old argument for splitting live off was
-    that simulated positions beside real ones get mistaken for wagers somebody
-    placed; that argument is about SIMULATION, and `/portfolio/paper` is
-    untouched and still linked. Real money and real logged bets are both real.
+    PAPER STAYS ON ITS OWN PAGE, for the reason it always did: simulated
+    positions beside real ones get mistaken for wagers somebody placed.
 
-    STILL A PURE READ. Both payloads read artifacts the workers wrote -- no
+    STILL A PURE READ. The payload reads artifacts the workers wrote -- no
     simulation, no order placement, nothing recomputed in a request handler.
     """
     from syndicate.features.shared.execution_limits_settings import resolve_view
@@ -5255,7 +5269,6 @@ def portfolio_home():
     show_all = str(request.args.get("show") or "").strip().lower() == "all"
     on_date = str(request.args.get("on") or "").strip() or None
     venue = request.args.get("venue")
-    summary = build_portfolio_summary(limit=100)
     # THE CAPS AS *THIS* PROCESS RESOLVES THEM, which is not the same object as
     # the worker's stamped `limits` in the live payload. The form must edit the
     # values it will actually write, and the banner must keep reporting what the
@@ -5268,7 +5281,6 @@ def portfolio_home():
         execution_limits = {"store_error": f"{type(exc).__name__}: {exc}", "sources": {}, "ceiling_notes": []}
     return render_template(
         "portfolio.html",
-        portfolio_summary=summary,
         portfolio_settings=resolve_settings().as_dict(),
         execution_limits=execution_limits,
         live=_live_portfolio_payload(

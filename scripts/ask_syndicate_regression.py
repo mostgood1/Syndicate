@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -236,8 +237,12 @@ def _post(base: str, question: str, context: dict | None, timeout: float) -> tup
 
 
 def _get(base: str, path: str, timeout: float = 90.0) -> dict | None:
+    # `/api/portfolio/*` is behind the portfolio sign-in since 2026-09-10; the
+    # ops token passes it without a browser session.
+    token = str(os.environ.get("ADMIN_TOKEN") or os.environ.get("SYNDICATE_ADMIN_TOKEN") or "").strip()
+    request = urllib.request.Request(f"{base}{path}", headers={"X-Admin-Token": token} if token else {})
     try:
-        with urllib.request.urlopen(f"{base}{path}", timeout=timeout) as resp:
+        with urllib.request.urlopen(request, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8", "replace"))
     except Exception:
         return None

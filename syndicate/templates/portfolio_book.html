@@ -1,0 +1,354 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | {{ view.book.name }}{% endblock %}
+{% block page_title %}Portfolio{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/dense_cards.css') }}" />
+{% endblock %}
+
+{#
+  A MANUAL PORTFOLIO. `[user request 2026-09-10, lane portfolio-login-multibook]`
+
+  Bets the user placed at other sportsbooks, entered and settled by hand, plus
+  bets logged from the Betting Board's slip into this book (which the
+  refresh-worker grades when the board can match them). One table, because they
+  are the same kind of thing; every row names its source, because they settle
+  differently. `portfolio_books.py` explains why the two are stored apart.
+
+  NEVER SUMMED WITH THE LIVE OR PAPER BOOKS. Those are different portfolios,
+  one dropdown away, with their own totals.
+#}
+
+{% block content %}
+{% set book = view.book %}
+{% set s = view.summary %}
+{% set c = s.counts %}
+{% set fv = form_values or {} %}
+{% set fe = form_errors or {} %}
+{% set open_rows = view.rows | selectattr('status', 'equalto', 'pending') | list %}
+{% set settled_rows = view.rows | rejectattr('status', 'equalto', 'pending') | list %}
+
+{% macro odds(v) -%}
+  {%- if v is none -%}&mdash;{%- else -%}{{ ('+' if v > 0 else '') ~ ('%g' | format(v)) }}{%- endif -%}
+{%- endmacro %}
+{% macro money(v) -%}
+  {%- if v is none -%}&mdash;{%- else -%}${{ '{:,.2f}'.format(v) }}{%- endif -%}
+{%- endmacro %}
+{% macro signed(v) -%}
+  {%- if v is none -%}&mdash;{%- else -%}{{ '+' if v > 0 else ('-' if v < 0 else '') }}${{ '{:,.2f}'.format(v | abs) }}{%- endif -%}
+{%- endmacro %}
+{% macro tone(v) -%}{%- if v is not none and v > 0 -%}pos{%- elif v is not none and v < 0 -%}neg{%- endif -%}{%- endmacro %}
+{% macro field(label, err=none, required=false, wide=false, hint=none) -%}
+  <label class="pf-field{{ ' pf-field--wide' if wide }}{{ ' has-error' if err }}">
+    <span class="pf-field__label">{{ label }}{% if required %}<em aria-hidden="true"> *</em>{% endif %}</span>
+    {{ caller() }}
+    {% if err %}<span class="pf-field__error">{{ err }}</span>{% elif hint %}<span class="pf-field__hint">{{ hint }}</span>{% endif %}
+  </label>
+{%- endmacro %}
+{% macro bet_cell(r) -%}
+  <td class="pf-bet">
+    <span class="pf-bet__sel">{{ r.selection or '—' }}</span>
+    <span class="pf-sub">
+      {{- (r.sport or '') | upper }}{% if r.market %} · {{ r.market }}{% endif %}{% if r.event %} · {{ r.event }}{% endif %}{% if r.bet_type == 'parlay' and (r.market or '') | lower != 'parlay' %} · parlay{% endif %}
+    </span>
+    {% if r.legs %}
+      <details class="pf-legs"><summary>{{ r.legs | length }} legs</summary>
+        <ul>{% for leg in r.legs %}<li>{{ leg.selection or leg.name or '—' }}{% if leg.market %} ({{ leg.market }}){% endif %}</li>{% endfor %}</ul>
+      </details>
+    {% endif %}
+    {% if r.notes %}<span class="pf-sub pf-notes">{{ r.notes }}</span>{% endif %}
+  </td>
+{%- endmacro %}
+{% macro book_cell(r) -%}
+  <td>
+    {{ r.sportsbook or '—' }}
+    <span class="pf-source pf-source--{{ r.source }}"
+          title="{{ 'Logged from the Betting Board slip. Graded automatically when the board can match it.' if r.source == 'slip' else 'Entered by hand. You settle it.' }}">
+      {{- 'board slip' if r.source == 'slip' else 'entered' -}}
+    </span>
+  </td>
+{%- endmacro %}
+{% macro placed_cell(r) -%}
+  <td class="pf-nowrap">{{ r.placed_on or '—' }}{% if r.event_date and r.event_date != r.placed_on %}<span class="pf-sub">game {{ r.event_date }}</span>{% endif %}</td>
+{%- endmacro %}
+
+<main class="pf-book">
+  {% include "shared/_portfolio_switcher.html" %}
+
+  <div class="pf-band">
+    <h2 id="book">{{ book.name }}</h2>
+    <span class="pf-band__note">Bets placed at other sportsbooks. Enter them here, settle them here.</span>
+    <span class="pf-band__links"><a href="/api/portfolio/books/{{ book.id }}">JSON</a></span>
+  </div>
+
+  {% if notice %}<div class="pf-alert pf-alert--ok" role="status">{{ notice }}</div>{% endif %}
+  {% if error %}<div class="pf-alert pf-alert--error" role="alert">{{ error }}</div>{% endif %}
+  {% if view.store_error %}
+    <div class="pf-alert pf-alert--error" role="alert">
+      The manual bet store couldn't be read, so hand-entered bets are missing from this page and saving is refused
+      until it can be. Nothing has been overwritten. <span class="pf-sub">{{ view.store_error }}</span>
+    </div>
+  {% endif %}
+  {% if view.ledger_error %}
+    <div class="pf-alert pf-alert--error" role="alert">
+      Bets logged from the board slip couldn't be read, so they're missing from this page.
+      <span class="pf-sub">{{ view.ledger_error }}</span>
+    </div>
+  {% endif %}
+
+  <div class="pf-tiles" id="pf-tiles">
+    <div class="pf-tile">
+      <div class="pf-tile__label">Open bets</div>
+      <div class="pf-tile__value">{{ s.pending_count }}</div>
+      <div class="pf-tile__meta">{{ money(s.open_stake) }} at risk · to win {{ money(s.open_to_win) }}</div>
+    </div>
+    <div class="pf-tile">
+      <div class="pf-tile__label">Record</div>
+      <div class="pf-tile__value">{{ c.win }}-{{ c.loss }}{% if c.push %}-{{ c.push }}{% endif %}</div>
+      <div class="pf-tile__meta">won-lost{% if c.push %}-push{% endif %}{% if c.void %} · {{ c.void }} void{% endif %}{% if c.cashout %} · {{ c.cashout }} cashed out{% endif %}</div>
+    </div>
+    <div class="pf-tile">
+      <div class="pf-tile__label">Win rate</div>
+      <div class="pf-tile__value">{{ '%.1f%%' | format(s.win_rate * 100) if s.win_rate is not none else '—' }}</div>
+      <div class="pf-tile__meta">of bets won or lost</div>
+    </div>
+    <div class="pf-tile">
+      <div class="pf-tile__label">Profit / loss</div>
+      <div class="pf-tile__value {{ tone(s.pnl) }}">{{ signed(s.pnl) if s.settled_count else '—' }}</div>
+      <div class="pf-tile__meta">{{ s.settled_count }} settled</div>
+    </div>
+    <div class="pf-tile">
+      <div class="pf-tile__label">ROI</div>
+      <div class="pf-tile__value {{ tone(s.roi) }}">{{ '%+.1f%%' | format(s.roi * 100) if s.roi is not none else '—' }}</div>
+      <div class="pf-tile__meta">P/L per $ settled, voids excluded</div>
+    </div>
+    <div class="pf-tile">
+      <div class="pf-tile__label">Total staked</div>
+      <div class="pf-tile__value">{{ money(s.total_staked) }}</div>
+      <div class="pf-tile__meta">{{ s.total }} bet{{ '' if s.total == 1 else 's' }}</div>
+    </div>
+  </div>
+
+  <details class="pf-panel" id="add"{% if form_open or not view.rows %} open{% endif %}>
+    <summary class="pf-panel__summary"><span class="pf-panel__plus" aria-hidden="true">+</span> Add a bet</summary>
+    <form method="post" action="/portfolio/books/{{ book.id }}/bets" class="pf-form" id="pf-add-form" novalidate>
+      <div class="pf-form__grid">
+        {% call field('Sportsbook', fe.get('sportsbook'), required=true) %}
+          <input class="pf-input" name="sportsbook" list="pf-sportsbooks" maxlength="40" required
+                 value="{{ fv.get('sportsbook', '') }}" placeholder="DraftKings" autocomplete="off" />
+        {% endcall %}
+        {% call field('Sport', fe.get('sport'), required=true) %}
+          <select class="pf-input" name="sport" required>
+            {% set chosen_sport = fv.get('sport', 'nfl') %}
+            {% for code, label in options.sports %}
+              <option value="{{ code }}"{% if code == chosen_sport %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        {% endcall %}
+        {% call field('Bet type') %}
+          <select class="pf-input" name="bet_type">
+            <option value="straight"{% if fv.get('bet_type') != 'parlay' %} selected{% endif %}>Straight</option>
+            <option value="parlay"{% if fv.get('bet_type') == 'parlay' %} selected{% endif %}>Parlay</option>
+          </select>
+        {% endcall %}
+        {% call field('Placed on', fe.get('placed_on')) %}
+          <input class="pf-input" type="date" name="placed_on" value="{{ fv.get('placed_on') or options.today }}" />
+        {% endcall %}
+        {% call field('Event', fe.get('event'), hint='Optional') %}
+          <input class="pf-input" name="event" maxlength="120" value="{{ fv.get('event', '') }}" placeholder="Chiefs @ Ravens" />
+        {% endcall %}
+        {% call field('Market', fe.get('market'), hint='Optional') %}
+          <input class="pf-input" name="market" list="pf-markets" maxlength="60" value="{{ fv.get('market', '') }}" placeholder="Spread" autocomplete="off" />
+        {% endcall %}
+        {% call field('Your pick', fe.get('selection'), required=true, wide=true, hint='For a parlay, list the legs') %}
+          <input class="pf-input" name="selection" maxlength="200" required value="{{ fv.get('selection', '') }}" placeholder="Chiefs -3.5" />
+        {% endcall %}
+        {% call field('Odds (American)', fe.get('odds'), required=true) %}
+          <input class="pf-input" name="odds" inputmode="text" maxlength="9" required value="{{ fv.get('odds', '') }}" placeholder="-110" data-pf-odds />
+        {% endcall %}
+        {% call field('Stake ($)', fe.get('stake'), required=true) %}
+          <input class="pf-input" name="stake" inputmode="decimal" maxlength="12" required value="{{ fv.get('stake', '') }}" placeholder="50" data-pf-stake />
+        {% endcall %}
+        {% call field('Game date', fe.get('event_date'), hint='Optional') %}
+          <input class="pf-input" type="date" name="event_date" value="{{ fv.get('event_date', '') }}" />
+        {% endcall %}
+        {% call field('Notes', fe.get('notes'), wide=true, hint='Optional') %}
+          <input class="pf-input" name="notes" maxlength="500" value="{{ fv.get('notes', '') }}" placeholder="Boosted, free bet, etc." />
+        {% endcall %}
+      </div>
+      <div class="pf-form__foot">
+        <span class="pf-form__towin" id="pf-towin" aria-live="polite"></span>
+        <button type="submit" class="pf-btn pf-btn--primary">Add bet</button>
+      </div>
+      <datalist id="pf-sportsbooks">{% for b in options.sportsbooks %}<option value="{{ b }}"></option>{% endfor %}</datalist>
+      <datalist id="pf-markets">{% for m in options.markets %}<option value="{{ m }}"></option>{% endfor %}</datalist>
+    </form>
+  </details>
+
+  <h3 class="pf-section-title">Open bets <span class="pf-count">{{ open_rows | length }}</span></h3>
+  <div class="pf-table-wrap" id="pf-open">
+    {% if open_rows %}
+      <table class="pf-table">
+        <thead>
+          <tr>
+            <th>Placed</th><th>Book</th><th>Bet</th>
+            <th class="num">Odds</th><th class="num">Stake</th><th class="num">To win</th>
+            <th>Settle</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in open_rows %}
+            <tr>
+              {{ placed_cell(r) }}
+              {{ book_cell(r) }}
+              {{ bet_cell(r) }}
+              <td class="num">{{ odds(r.odds) }}</td>
+              <td class="num">{{ money(r.stake) }}</td>
+              <td class="num">{{ money(r.to_win) }}</td>
+              <td>
+                <form method="post" action="/portfolio/books/{{ book.id }}/bets/{{ r.id }}/settle" class="pf-settle">
+                  <input type="hidden" name="source" value="{{ r.source }}" />
+                  <button type="submit" name="outcome" value="win" class="pf-chip pf-chip--win">Won</button>
+                  <button type="submit" name="outcome" value="loss" class="pf-chip pf-chip--loss">Lost</button>
+                  <button type="submit" name="outcome" value="push" class="pf-chip">Push</button>
+                  <button type="submit" name="outcome" value="void" class="pf-chip">Void</button>
+                  <details class="pf-cashout">
+                    <summary class="pf-chip">Cash out</summary>
+                    <span class="pf-cashout__row">
+                      <input class="pf-input pf-input--sm" name="cashout_amount" inputmode="decimal" placeholder="$ returned" aria-label="Amount returned" />
+                      <button type="submit" name="outcome" value="cashout" class="pf-chip pf-chip--win">Save</button>
+                    </span>
+                  </details>
+                </form>
+              </td>
+              <td>
+                <form method="post" action="/portfolio/books/{{ book.id }}/bets/{{ r.id }}/delete" onsubmit="return confirm('Delete this bet?');">
+                  <input type="hidden" name="source" value="{{ r.source }}" />
+                  <button type="submit" class="pf-icon-btn" aria-label="Delete bet" title="Delete">&times;</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="pf-empty">No open bets.{% if not view.rows %} Add one above.{% endif %}</div>
+    {% endif %}
+  </div>
+
+  <h3 class="pf-section-title">Settled <span class="pf-count">{{ settled_rows | length }}</span></h3>
+  <div class="pf-table-wrap" id="pf-settled">
+    {% if settled_rows %}
+      <table class="pf-table">
+        <thead>
+          <tr>
+            <th>Placed</th><th>Book</th><th>Bet</th>
+            <th class="num">Odds</th><th class="num">Stake</th><th>Result</th><th class="num">P/L</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in settled_rows %}
+            <tr>
+              {{ placed_cell(r) }}
+              {{ book_cell(r) }}
+              {{ bet_cell(r) }}
+              <td class="num">{{ odds(r.odds) }}</td>
+              <td class="num">{{ money(r.stake) }}</td>
+              <td><span class="pf-status pf-status--{{ r.status }}">{{ r.status_label }}</span>{% if r.cashout_amount is not none %}<span class="pf-sub">returned {{ money(r.cashout_amount) }}</span>{% endif %}</td>
+              <td class="num {{ tone(r.pnl) }}">{{ signed(r.pnl) }}</td>
+              <td class="pf-actions">
+                <form method="post" action="/portfolio/books/{{ book.id }}/bets/{{ r.id }}/reopen">
+                  <input type="hidden" name="source" value="{{ r.source }}" />
+                  <button type="submit" class="pf-chip" title="Mark as open again">Reopen</button>
+                </form>
+                <form method="post" action="/portfolio/books/{{ book.id }}/bets/{{ r.id }}/delete" onsubmit="return confirm('Delete this bet?');">
+                  <input type="hidden" name="source" value="{{ r.source }}" />
+                  <button type="submit" class="pf-icon-btn" aria-label="Delete bet" title="Delete">&times;</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="pf-empty">Nothing settled yet.</div>
+    {% endif %}
+  </div>
+
+  {% if view.rows %}
+    <div class="pf-breakdowns">
+      {% for title, groups in [('By sportsbook', s.by_sportsbook), ('By sport', s.by_sport)] %}
+        <section class="pf-breakdown">
+          <h3 class="pf-section-title">{{ title }}</h3>
+          <div class="pf-table-wrap">
+            <table class="pf-table pf-table--compact">
+              <thead><tr><th></th><th class="num">Bets</th><th class="num">Open</th><th class="num">W-L</th><th class="num">P/L</th><th class="num">ROI</th></tr></thead>
+              <tbody>
+                {% for g in groups %}
+                  <tr>
+                    <td class="pf-bet__sel">{{ g.key | upper if title == 'By sport' else g.key }}</td>
+                    <td class="num">{{ g.bets }}</td>
+                    <td class="num">{{ g.open }}</td>
+                    <td class="num">{{ g.wins }}-{{ g.losses }}</td>
+                    <td class="num {{ tone(g.pnl) }}">{{ signed(g.pnl) if (g.bets - g.open) else '—' }}</td>
+                    <td class="num {{ tone(g.roi) }}">{{ '%+.1f%%' | format(g.roi * 100) if g.roi is not none else '—' }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <details class="pf-panel pf-panel--quiet" id="manage">
+    <summary class="pf-panel__summary">Manage this portfolio</summary>
+    <div class="pf-manage">
+      <form method="post" action="/portfolio/books/{{ book.id }}/rename" class="pf-inline-form">
+        <input class="pf-input" name="name" maxlength="60" required value="{{ book.name }}" aria-label="Portfolio name" />
+        <button type="submit" class="pf-btn">Rename</button>
+      </form>
+      {% if book.default %}
+        <p class="pf-sub">This is the default manual portfolio. Board-slip bets logged without a portfolio chosen land here, so it can't be deleted.</p>
+      {% else %}
+        <form method="post" action="/portfolio/books/{{ book.id }}/delete" onsubmit="return confirm('Delete this portfolio? It has to be empty.');">
+          <button type="submit" class="pf-btn pf-btn--danger">Delete portfolio</button>
+        </form>
+      {% endif %}
+    </div>
+  </details>
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // "To win" preview while typing. Display only -- the server recomputes P/L
+  // from the stored odds when the bet is settled.
+  (function () {
+    var form = document.getElementById("pf-add-form");
+    if (!form) return;
+    var oddsEl = form.querySelector("[data-pf-odds]");
+    var stakeEl = form.querySelector("[data-pf-stake]");
+    var out = document.getElementById("pf-towin");
+    function parseOdds(text) {
+      var t = String(text || "").trim().toLowerCase();
+      if (t === "ev" || t === "even" || t === "evens") return 100;
+      var n = Number(t.replace(/^\+/, ""));
+      if (!isFinite(n) || (n > -100 && n < 100)) return null;
+      return n;
+    }
+    function update() {
+      var odds = parseOdds(oddsEl.value);
+      var stake = Number(String(stakeEl.value || "").replace(/[$,]/g, ""));
+      if (odds === null || !isFinite(stake) || stake <= 0) { out.textContent = ""; return; }
+      var win = odds > 0 ? stake * odds / 100 : stake * 100 / Math.abs(odds);
+      out.textContent = "To win $" + win.toFixed(2) + " · returns $" + (win + stake).toFixed(2);
+    }
+    oddsEl.addEventListener("input", update);
+    stakeEl.addEventListener("input", update);
+    update();
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | Portfolio sign in{% endblock %}
+{% block page_title %}Portfolio{% endblock %}
+
+{#
+  Sign-in for every portfolio page. `[user request 2026-09-10]`
+  `portfolio_auth.py` holds the rules; this only renders them. `not_configured`
+  is the fail-closed state: on Render the portfolio stays locked (503) until
+  credentials are set, rather than opening.
+#}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/portfolio_books.css') }}" />
+<main class="pf-login">
+  <section class="pf-login__card" aria-labelledby="pf-login-title">
+    <div class="pf-login__kicker">Syndicate</div>
+    <h1 class="pf-login__title" id="pf-login-title">Portfolio</h1>
+    {% if not_configured %}
+      <p class="pf-login__lead">Sign-in isn't set up on this server, so the portfolio is locked.</p>
+      <p class="pf-login__hint">
+        Set <code>SYNDICATE_PORTFOLIO_USERNAME</code> and <code>SYNDICATE_PORTFOLIO_PASSWORD</code>
+        (or <code>SYNDICATE_PORTFOLIO_PASSWORD_HASH</code>) on the web service, then redeploy it.
+      </p>
+    {% else %}
+      <p class="pf-login__lead">Sign in to see your portfolios.</p>
+      {% if error %}<div class="pf-alert pf-alert--error" role="alert">{{ error }}</div>{% endif %}
+      <form method="post" action="/portfolio/login" class="pf-login__form">
+        <input type="hidden" name="next" value="{{ next_target }}" />
+        <label class="pf-field">
+          <span class="pf-field__label">Username</span>
+          <input class="pf-input" name="username" autocomplete="username" autocapitalize="none" spellcheck="false"
+                 required {% if not username %}autofocus{% endif %} value="{{ username or '' }}" />
+        </label>
+        <label class="pf-field">
+          <span class="pf-field__label">Password</span>
+          <input class="pf-input" name="password" type="password" autocomplete="current-password" required
+                 {% if username %}autofocus{% endif %} />
+        </label>
+        <button type="submit" class="pf-btn pf-btn--primary pf-login__submit">Sign in</button>
+      </form>
+    {% endif %}
+  </section>
+</main>
+{% endblock %}

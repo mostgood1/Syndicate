@@ -11,8 +11,8 @@
 // [data-slip-action="toggle"] button stages a leg into a client-side array
 // persisted to localStorage -- no network call. (2) The panel's "Log to
 // portfolio" button POSTs each staged leg (or one combined parlay) to
-// /api/portfolio/bets, which persists into prediction_ledger.json -- the
-// same store /portfolio reads.
+// /api/portfolio/bets, which persists into prediction_ledger.json, tagged with
+// the manual portfolio picked below -- read back by /portfolio/books/<id>.
 window.SyndicateBetSlip = (function () {
   "use strict";
 
@@ -38,6 +38,14 @@ window.SyndicateBetSlip = (function () {
   let betSlipMode = loadBetSlipMode();
   let parlayStake = DEFAULT_SLIP_STAKE;
   let betSlipPanelWired = false;
+  // WHICH PORTFOLIO the slip logs into `[2026-09-10]`. The manual portfolios
+  // (/portfolio/books/<id>) come from /api/portfolio/books, which sits behind
+  // the portfolio sign-in -- so "signed_out" is a real state, and the slip says
+  // so up front instead of failing at the moment of logging.
+  const BET_SLIP_PORTFOLIO_STORAGE_KEY = "syndicate_bet_slip_portfolio_v1";
+  let portfolioOptions = null;
+  let portfolioLoadState = "idle";
+  let selectedPortfolioId = loadSelectedPortfolio();
 
   function escapeHtml(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, (char) => ({
@@ -50,6 +58,66 @@ window.SyndicateBetSlip = (function () {
     if (!element) return;
     element.textContent = message;
     element.setAttribute("aria-busy", tone === "loading" || tone === "refreshing" ? "true" : "false");
+  }
+
+  function loadSelectedPortfolio() {
+    try {
+      return window.localStorage.getItem(BET_SLIP_PORTFOLIO_STORAGE_KEY) || "";
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function saveSelectedPortfolio() {
+    try {
+      window.localStorage.setItem(BET_SLIP_PORTFOLIO_STORAGE_KEY, selectedPortfolioId || "");
+    } catch (error) {
+      /* a remembered choice is a convenience, not a requirement */
+    }
+  }
+
+  async function loadPortfolioOptions() {
+    if (portfolioLoadState === "loading") return;
+    portfolioLoadState = "loading";
+    try {
+      const response = await fetch("/api/portfolio/books", {
+        headers: { Accept: "application/json" },
+        credentials: "same-origin",
+      });
+      if (response.status === 401) {
+        portfolioLoadState = "signed_out";
+      } else if (!response.ok) {
+        portfolioLoadState = "error";
+      } else {
+        const data = await response.json();
+        portfolioOptions = Array.isArray(data.books) ? data.books : [];
+        if (!portfolioOptions.some((book) => book.id === selectedPortfolioId)) {
+          selectedPortfolioId = data.default || (portfolioOptions[0] && portfolioOptions[0].id) || "";
+        }
+        portfolioLoadState = "ready";
+      }
+    } catch (error) {
+      portfolioLoadState = "error";
+    }
+    renderBetSlip();
+  }
+
+  function portfolioPickerHtml() {
+    if (portfolioLoadState === "signed_out") {
+      const next = encodeURIComponent(window.location.pathname + window.location.search);
+      return `<div class="bet-slip__portfolio" style="font-size:11px;margin:6px 0 2px;"><a href="/portfolio/login?next=${next}">Sign in</a> to log bets to your portfolio.</div>`;
+    }
+    // One manual portfolio means there is nothing to choose.
+    if (!Array.isArray(portfolioOptions) || portfolioOptions.length < 2) return "";
+    const options = portfolioOptions
+      .map((book) => `<option value="${escapeHtml(book.id)}"${book.id === selectedPortfolioId ? " selected" : ""}>${escapeHtml(book.name)}</option>`)
+      .join("");
+    return `
+      <label class="bet-slip__portfolio" style="display:flex;align-items:center;gap:6px;font-size:11px;margin:6px 0 2px;">
+        Log to
+        <select id="bet-slip-portfolio" style="font:inherit;font-size:11px;color:inherit;background:transparent;border:1px solid rgba(132,166,196,0.3);border-radius:6px;padding:2px 4px;color-scheme:dark;">${options}</select>
+      </label>
+    `;
   }
 
   function loadBetSlip() {
@@ -239,7 +307,9 @@ window.SyndicateBetSlip = (function () {
       body: JSON.stringify(bet),
     });
     if (!response.ok) {
-      throw new Error(`portfolio bet failed: ${response.status}`);
+      const error = new Error(`portfolio bet failed: ${response.status}`);
+      error.status = response.status;
+      throw error;
     }
     return response.json();
   }
@@ -264,7 +334,13 @@ window.SyndicateBetSlip = (function () {
         }));
         const combinedDecimal = combinedDecimalOdds(betSlip);
         const combinedAmerican = combinedDecimal === null ? null : americanOddsFromDecimal(combinedDecimal);
-        await postPortfolioBet({ bet_type: "parlay", legs, odds: combinedAmerican, stake: Number(parlayStake) || 0 });
+        await postPortfolioBet({
+          bet_type: "parlay",
+          legs,
+          odds: combinedAmerican,
+          stake: Number(parlayStake) || 0,
+          portfolio_id: selectedPortfolioId || undefined,
+        });
       } else {
         for (const leg of betSlip.slice()) {
           await postPortfolioBet({
@@ -279,6 +355,7 @@ window.SyndicateBetSlip = (function () {
             line: leg.propLine || undefined,
             event_id: leg.eventId || undefined,
             game_date: leg.gameDate || undefined,
+            portfolio_id: selectedPortfolioId || undefined,
           });
         }
       }
@@ -288,7 +365,14 @@ window.SyndicateBetSlip = (function () {
       syncSlipButtonStates();
       setRefreshStatus("Slip logged to portfolio", "idle");
     } catch (error) {
-      setRefreshStatus("Failed to log slip to portfolio", "error");
+      if (error && error.status === 401) {
+        portfolioLoadState = "signed_out";
+        renderBetSlip();
+        setRefreshStatus("Sign in to the portfolio to log bets", "error");
+      } else {
+        if (error && error.status === 400) portfolioLoadState = "idle"; // a stale portfolio id; re-list
+        setRefreshStatus("Failed to log slip to portfolio", "error");
+      }
     } finally {
       if (commitButton) commitButton.disabled = false;
     }
@@ -349,6 +433,7 @@ window.SyndicateBetSlip = (function () {
       `;
       return;
     }
+    if (portfolioLoadState === "idle") void loadPortfolioOptions();
     const modeToggle = `
       <div class="bet-slip__mode" role="group" aria-label="Slip mode">
         <button type="button" class="bet-slip__mode-btn" data-slip-mode="straight" aria-pressed="${betSlipMode === "straight"}">Straight bets</button>
@@ -430,6 +515,7 @@ window.SyndicateBetSlip = (function () {
       <div class="bet-slip__body">
         ${modeToggle}
         ${bodyHtml}
+        ${portfolioPickerHtml()}
         <div class="bet-slip__actions">
           <button type="button" class="bet-slip__clear" id="bet-slip-clear">Clear</button>
           <button type="button" class="bet-slip__commit" id="bet-slip-commit">Log to portfolio</button>
@@ -472,6 +558,12 @@ window.SyndicateBetSlip = (function () {
       saveBetSlip();
       renderBetSlip();
       syncSlipButtonStates();
+    });
+    const portfolioSelect = document.getElementById("bet-slip-portfolio");
+    if (portfolioSelect) portfolioSelect.addEventListener("change", (event) => {
+      event.stopPropagation();
+      selectedPortfolioId = portfolioSelect.value;
+      saveSelectedPortfolio();
     });
     const commitButton = document.getElementById("bet-slip-commit");
     if (commitButton) commitButton.addEventListener("click", (event) => {

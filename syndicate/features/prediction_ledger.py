@@ -350,6 +350,10 @@ class PredictionRecord:
     # failure mode as #208: the books were not discarded by decision, they were
     # lost because nothing wrote them down.
     quote: dict[str, Any] | None = None
+    # WHICH MANUAL PORTFOLIO a slip-logged bet belongs to (`portfolio_books.py`,
+    # 2026-09-10). None means the default book -- every row written before this
+    # field existed is None, and so it still lands in a portfolio.
+    portfolio_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -369,6 +373,7 @@ class PredictionRecord:
             "bet_type": self.bet_type,
             "legs": [dict(leg) for leg in self.legs] if self.legs else None,
             "quote": dict(self.quote) if self.quote else None,
+            "portfolio_id": self.portfolio_id,
         }
 
 
@@ -469,6 +474,7 @@ def _prediction_from_payload(payload: Mapping[str, Any]) -> PredictionRecord:
         bet_type=_normalize_text(payload.get("bet_type")) or "straight",
         legs=_normalize_legs(payload.get("legs")),
         quote=dict(payload["quote"]) if isinstance(payload.get("quote"), Mapping) else None,
+        portfolio_id=_normalize_text(payload.get("portfolio_id")) or None,
     )
 
 
@@ -516,6 +522,7 @@ def record_prediction(
     bet_type: Any = None,
     legs: Any = None,
     quote: Any = None,
+    portfolio_id: Any = None,
     ledger_path: Path | str | None = None,
 ) -> dict[str, Any]:
     payload = _prediction_from_payload(
@@ -536,6 +543,7 @@ def record_prediction(
             "bet_type": bet_type,
             "legs": legs,
             "quote": quote,
+            "portfolio_id": portfolio_id,
         }
     )
     path = Path(ledger_path) if ledger_path is not None else _default_ledger_path()
@@ -622,6 +630,40 @@ def delete_prediction(prediction_id: Any, ledger_path: Path | str | None = None)
         return False
 
     payload["predictions"] = remaining_predictions
+    payload["results"] = remaining_results
+    payload["updated_at"] = _utc_now()
+    _write_payload(path, payload)
+    return True
+
+
+def clear_result(prediction_id: Any, ledger_path: Path | str | None = None) -> bool:
+    """Undo a settlement: drop a prediction's result so it reads as open again.
+
+    For the manual portfolios' "Reopen" button (`portfolio_books.reopen_slip_bet`).
+    `record_result` is first-write-wins, so without this a wrong grade -- the
+    user's own mis-click, or the matcher's -- could never be corrected short of
+    deleting the bet. The prediction itself is kept; if reconciliation can grade
+    it, it will again on its next pass. Returns whether anything was removed.
+    """
+    target_id = _normalize_text(prediction_id)
+    if not target_id:
+        return False
+    path = Path(ledger_path) if ledger_path is not None else _default_ledger_path()
+    payload = _read_payload(path)
+    predictions = [dict(item) for item in payload.get("predictions", []) if isinstance(item, Mapping)]
+    results = [dict(item) for item in payload.get("results", []) if isinstance(item, Mapping)]
+
+    remaining_results = [item for item in results if _normalize_text(item.get("prediction_id")) != target_id]
+    changed = len(remaining_results) != len(results)
+    for prediction in predictions:
+        if _normalize_text(prediction.get("id")) == target_id and "result" in prediction:
+            prediction.pop("result", None)
+            prediction["updated_at"] = _utc_now()
+            changed = True
+    if not changed:
+        return False
+
+    payload["predictions"] = predictions
     payload["results"] = remaining_results
     payload["updated_at"] = _utc_now()
     _write_payload(path, payload)
@@ -923,6 +965,7 @@ __all__ = [
     "PredictionResult",
     "record_prediction",
     "record_result",
+    "clear_result",
     "result_exists",
     "load_all_predictions",
     "get_performance_summary",
