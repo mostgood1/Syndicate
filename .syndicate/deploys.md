@@ -5,6 +5,64 @@
 
 ---
 
+## 2026-09-09 ~22:15 CT — **USER DECISION, ASKED AND GIVEN: NFL player props STAY STAKEABLE through the week-1 card. Recorded because the deploy above changed a live-money surface as a SIDE EFFECT.**
+
+No deploy. This records a decision and the reasoning presented before it.
+
+### What changed without anyone asking for it
+
+`a101c437` was scoped as a COVERAGE fix — put a model view on NFL prop rows.
+But `model_edge_pct` is not only a ranking term: `sizing_inputs_with_provenance`
+derives `model_probability = fair + model_edge_pct/100` from it, and its absence
+is the `no_model_edge_pct` REFUSAL. **So giving NFL props a model edge converted
+~1,500 unstakeable refusals into rows the sizer can stake.** That was a real
+consequence of a change whose stated goal was coverage, and it was surfaced
+BEFORE the Sunday card rather than discovered in a settlement report.
+
+### The evidence put to the user
+
+- **`#651` is OPEN on exactly these rows**: NFL prop projections are PRIOR-SEASON
+  rates, biased HIGH, and the residual is ROLE CHANGE — its own example is
+  backup-usage unders priced against a market expecting a starter (model 5.2
+  carries vs a 12.5 line). **The highest-edge rows are the least trustworthy**,
+  and the board ranks on edge.
+- **MLB player props are ALREADY excluded from staking** by
+  `resolve_excluded_families`'s default `mlb:player_prop`, on measurement:
+  **−19.27% ROI on $561.23** over 16 dates against game lines at +15.55%.
+- **That docstring explicitly refuses to generalise**: *"NFL and NBA prop books
+  have not been measured this way and must not inherit an MLB verdict silently."*
+  Part of the MLB rationale was that prop rows carried **no model view at all**
+  (`model_edge_pct` numeric on 0 of 103) — the very gap this deploy closed for NFL.
+- Live caps, read from `/api/portfolio/limits` with `sources` all **`stored`**:
+  `max_order_dollars 35.01`, `max_day_dollars_all_venues 251.01`, 25 orders/day.
+
+### The decision
+
+**Leave NFL props live and let the Sunday card grade them.** The user's reasoning
+is the one real argument for it: a settled sample is the ONLY thing that can
+close `#651`, and excluding the family prevents the sample from ever existing.
+The cost is that the sample is bought with money against a model known to be
+biased high.
+
+**The alternative offered and declined** was adding `nfl:player_prop` to
+`SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES` — board keeps showing the edges,
+settlement keeps grading them, staking stops — which is the
+`mlb-stop-publishing-edges` shape ("publication stops, measurement does not").
+It remains available and is one env var plus a deploy.
+
+### What makes this decision honest rather than a gamble
+
+Scheduled task **`nfl-prop-settled-grade`, 2026-09-15 10:00 CT**: settled NFL
+prop ROI/hit rate by market and side, NFL GAME markets over identical dates as
+the control, realised hit rate bucketed by `model_edge_pct` to test `#651`'s
+bias claim directly, and **CI bootstrapped over GAMES not rows**. It is
+instructed to recommend the `nfl:player_prop` exclusion if the numbers say so,
+and to report "sample too small, N more games needed" rather than manufacture a
+verdict from one Sunday.
+
+**If that task does not run, this decision bought nothing.**
+
+
 ## 2026-09-09 22:0x CT — correction to the row above: the owed NFL reading is on a SCHEDULED TASK, not a monitor
 
 The entry above says *"A monitor is armed"* for the full-size NFL board reading.
