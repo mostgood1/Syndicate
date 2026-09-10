@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-09-10 19:32:11-19:38:09Z — web `2224dec0` -> `ab787363` — **NCAAF week_state read-time grace, READER HALF LIVE; no regression (the artifact has no field yet, so the reader answered by the old rule)** `[lane ncaaf-games-cache-refresh, session a8d753fe]`
+
+Deploy `dep-dahgbeuk1f9s73fmnovg`, trigger `api`: created 19:32:11Z, build done ~19:36:20Z, live 19:38:09Z. Claim `ncaaf-games-cache-refresh` (acquired 19:30:52Z). Preflight CLEAR at 19:31:17Z for `ab787363`: only gunicorn running, last web deploy 156 min earlier. User decision 2026-09-10: "land it and deploy both before Saturday". Range `2224dec0..ab787363` is 47 commits and 9 runtime files (+434/-36). This lane's are `ncaaf/week_state.py` and `ncaaf/sources.py`; the rest are other lanes' landed work: `execute_portfolio.py`, `bet_status_nfl.py`, `bet_status_ncaaf.py`, `ncaaf_team_registry.py`, `board_enrichment.py`, `live_gameline_join.py`, `intelligence_evaluation.py`. `requirements.txt` and `render.yaml` are unchanged. One new env read in range, `SYNDICATE_ACCURACY_SUMMARY_LEDGER_MAX_CHUNKS`: absent means BOUNDED (the owning lane's own docstring), and only refresh-worker's accuracy autorun reads it.
+
+Reading 19:38:33-19:38:45Z:
+- `/api/ops/version` commit `ab787363`; `/healthz` 200.
+- `/api/ops/ncaaf/season-weeks` `resolved_active_weeks [1, 2]`. Unchanged, as it must be: week 2 has future games, so the grace has nothing to skip.
+- week_state export HTTP 200 (control 403). It is still the `2026-09-10T02:26:07Z` artifact from the OLD producer, with `unplayed_kickoffs` ABSENT, so the new reader took the absent-field branch, which is the old rule. That is the deploy-order guard observed in production, not only in a test.
+- `cards?week=2` = `2026 Week 2`, 49 games, all `2_`. `?week=3` = `2026 Week 2` (the pregame-window trim, unchanged).
+- Events: `render_events.py --service web --since 2026-09-10T19:38:09Z`, read through 19:54:43Z (16.6 min): 1 event (`deploy_ended` 19:38:09Z), **CLEAN, with no `server_failed` and no kill** across the whole window read.
+
+verify: **LIVE, NO REGRESSION.** web serves `ab787363`, `/healthz` is 200, `resolved_active_weeks` is `[1, 2]`, week 2 is served, and with the field absent the reader answered by the old rule. The grace itself is NOT yet exercised. It needs refresh-worker on a commit containing `ab787363` (the producer half, riding lane `exchange-execution-unblock`'s code deploy by agreement) and then a finished slate. Owed readings: `ncaaf-week-state-field-tonight` (23:00 CDT: the field is present), `ncaaf-week3-advance-sunday` (11:30 CDT 09-13: week 3 served after ~16:00Z).
+
 ## 2026-09-10 14:45 CT — refresh-worker `2d53fdf7` (lane `football-layer2-live-parity`) — reading owed by the 14:29 CT entry — **EVERY NCAAF LAYER 2 ROW NOW CARRIES GAME STATE: 34 → 0 (FAMU @ MIA).**
 
 `2d53fdf7` went live 14:35:29 CT (`dep-dahga4ifngtc739c8rb0`). The reading was taken after the first board cycle on
