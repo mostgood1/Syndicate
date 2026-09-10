@@ -4220,10 +4220,10 @@ the measurement to repeat on this sprint.
 >   - The WNBA season gate covers months 5-10, there is no break detection, and `SYNDICATE_ACTIVE_SPORTS` includes wnba on both workers.
 >   - It writes a slate even on a no-game day (`recommendations_slate_2026-09-10.json`, 94 B, 0 games), so 09-17's file comes from the same writer.
 >   - `SYNDICATE_WNBA_TOTALS_RECOMMENDATIONS` is absent on both workers, which means WITHHOLD.
-> - **GAP — the EV refusal does NOT cover PROP picks on the slate.**
+>   **GAP (FIXED 2026-09-10, `5bb0158a`) — the EV refusal did NOT cover PROP picks on the slate.**
 >   - `refresh_wnba_oddsapi_props.py:2192` reads `top_play.ev_pct` raw. The file's other prop sites (`:2286`, `:2354`) and both NBA sites (`refresh_nba_oddsapi_props.py:1352`, `:1418`) call `_plausible_ev_pct`.
 >   - On the slate, `ev_pct` is also `score` and the within-game sort key (`:2231`, `:2250`), so an implausible prop EV ranks FIRST today. Refusing it would sink that pick to the bottom.
->   - **DECISION OWED (user): fix before 09-17 or accept and measure.** It would ride any live-odds-worker deploy from main.
+>   - **RESOLVED 2026-09-10 — user decision: "fix the prop EV refusal before 09-17".** Landed `5bb0158a` (lane `wnba-slate-prop-ev-refusal`); live on live-odds-worker since 19:47:07Z. `verify_wnba_slate_hygiene.py` now FAILs a slate on prop |ev_pct| > 100.
 > - **Including WNBA in Layer 2 needs no Layer 2 code change.**
 >   - There is no sport allowlist and no WNBA-specific code. `active_sports` is derived from the rows that arrive. WNBA IS iterated every build: at 18:38:45Z `per_sport_ingest.wnba` read `quote_rows 0, grid_rows 0, opportunities 0, sweep_state pending, scheduled_games 4`, while `active_sports` read `mlb, ncaaf, nfl, soccer`.
 >   - WNBA needs, in order: a manifest; a non-empty WNBA quote shard for the date; rows still in the `opportunity` lane; a kickoff that is not stale (≤ 2h past start without live/final state); and quotes seen within 14h. The `opportunity` lane needs game state once kickoff passes, and `_LIVE_GAME_STATE_SPORTS` is `{mlb, soccer}`, so WNBA's game state comes from the chips alone. `wnba cand=1225 … opps=0` on 08-25 was this gate.
@@ -4243,7 +4243,7 @@ the measurement to repeat on this sprint.
 >    - It read FAIL on the pre-fix 08-30 slate (`p_win` 1.0, 1 TOTAL), so it can read red.
 > 2. `--check layer2`, pre-tip and again after 23:30Z. It names the gate (`#614`).
 >    - `FROZEN?` in the output means the chip source never moved.
-> 3. `prop_ev_over_100` from (1). Record it whatever the verdict.
+> 3. `prop_ev_over_100` from (1) must be 0. It is GATED now, and it is what closes lane `wnba-slate-prop-ev-refusal`.
 > 4. `_run_wnba_postgame_producer_tick` cost, once 09-17 games complete. This was the closed lane's owed (b).
 > 5. `#626`(d): `book_quotes` `captured_at` advances during a live WNBA game. `#626`(e): zero `line_source=model` rows with `klass: BET` in the live signal file.
 > 6. `#616`: a WNBA-tickered Kalshi/Polymarket fill or refusal, never `venue_priced`. Also the 8 gates and `prereg_wnba_favourite_lean.py`, over the full window.

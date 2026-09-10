@@ -269,7 +269,7 @@ take effect until a rebuild.
 **RE-CHECKED 2026-09-10** `[session 8c631ba2, substrate render]`:
 - **The fixes are in the running code.** All four are present BY CONTENT at refresh-worker `a9bafa9d` and live-odds-worker `332e596d`.
 - **The rebuild trigger is live.** The live-odds-worker WNBA pregame autorun is `true`, interval `7200`, mode `full`, and launches every ~2h. It writes a slate even on a no-game day, so the 09-17 slate goes through the same writer.
-- **The EV refusal does NOT cover PROP picks on the slate.** `refresh_wnba_oddsapi_props.py:2192` has no `_plausible_ev_pct`. The other two prop sites and both NBA sites do. There, `ev_pct` is also the within-game sort key, so an implausible prop EV ranks first.
+- **The EV refusal now covers PROP picks on the slate too. FIXED `5bb0158a`, live on live-odds-worker 2026-09-10 19:47:07Z.** Until then the slate builder's prop loop read `ev_pct` raw, and because `ev_pct` is the within-game sort key, an implausible prop EV ranked first. By content, 3 of 3 prop EV reads are now refused. It is in force from the first 09-17 slate and unverified in production until then.
 - **The in-force reading** is `scripts/verify_wnba_slate_hygiene.py --date 2026-09-17`. It is proven to read FAIL on the pre-fix 08-30 slate (`p_win` 1.0, 1 TOTAL pick). It is scheduled as `wnba-0917-slate-rebuild-reading` (09-17 17:15 CT) and listed in `todo #623`.
 
 ### The three original causes, and what each turned out to be

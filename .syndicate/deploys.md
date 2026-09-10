@@ -31358,3 +31358,32 @@ live-odds-worker --commit 332e596d…`: created 18:03:41Z -> `update_in_progress
   - The filled order counts as a duplicate, so there was no second placement.
   - The 11 were refused again, with zero `LIVE_ORDER` lines and no block.
   - The ledger's order count held at 430 across that pass, so nothing was written for the 11.
+
+## 2026-09-10 19:40:50-19:47:07Z — live-odds-worker `332e596d` -> `5bb0158a` — lane `wnba-slate-prop-ev-refusal`
+
+**What:** code `5bb0158a`.
+- The prop loop of `_build_local_recommendations_slate_artifact` in `scripts/refresh_wnba_oddsapi_props.py` now routes `top_play["ev_pct"]` through `_plausible_ev_pct`. This was the third prop site; the other two and both NBA sites already did.
+- On the slate `ev_pct` is also `score` and the within-game sort key, so an implausible prop EV used to rank FIRST. Refused, the pick stays, its EV is absent, and it sorts last in its game.
+- User decision 2026-09-10: "fix the prop EV refusal before 09-17".
+- **This service is the slate's writer.** Its WNBA pregame autorun is `true`, 7200s, mode `full`. refresh-worker writes a slate only on a manual ops run, and web's boot bootstrap is off for WNBA (`SYNDICATE_BOOTSTRAP_WNBA_TODAY=0`).
+- **Ride-along:** 37 commits since the live build, 11 of them touching runtime paths. Besides this lane's two:
+  - `c2dcd525` (mlb cards), `ab787363` (ncaaf week_state) and `57019962` (the accuracy-summary chunk bound);
+  - `2d53fdf7` and `6c727968`, both already live on refresh-worker;
+  - tooling no worker runs: `1797b3e4` and `3e02f854` (todo_id_alloc), `e080f97c` and `ba6383b9` (the controlled-transfer probe).
+  - `render.yaml` and `requirements*.txt` are unchanged across the range. Live `332e596d` is an ancestor of the target, so nothing is reverted.
+
+**Preflight:**
+- 19:39:18Z: HOLD, with 3 odds jobs in flight (`run_refresh_odds_job.py` -> `refresh_odds_sources.py` -> `fetch_soccer_oddsapi_props_local.py`).
+- 19:40:22Z: CLEAR. Only infrastructure processes and 1 defunct child were running. No MLB sim process was on the service, and the claim was held by this lane.
+- Deployed at 19:40:50Z, `dep-dahgfgm7bikc73fq3sf0`.
+
+**Reading, post-deploy:**
+- Live `5bb0158a`, `finishedAt 2026-09-10T19:47:07.934Z`.
+- By content in `5bb0158a`, every raw prop EV read is refused: the WNBA producer has 3 `top_play.get("ev_pct")` reads and all 3 are refused; the NBA producer has 2 of 2.
+- The new process runs the autorun path: `WNBA_PREGAME_AUTORUN_PREV date=2026-09-10 launched=ok` at 19:53:46Z. The log feed was empty for ~6 min after boot. That was the feed, not the path.
+- Tests: 84 + 2 targeted pass. Mutation check: with the fix removed, both new tests turn red.
+
+**verify: OWED — 2026-09-17.**
+- The reading: `py -3 scripts/verify_wnba_slate_hygiene.py --date 2026-09-17 --check slate` must show picks > 0 and `prop_ev_over_100 = 0`. The check now FAILs a slate on it.
+- Why nothing can exercise the new line earlier: no WNBA game is played before then (FIBA break), and every slate until then is written with 0 picks.
+- Armed as scheduled task `wnba-0917-slate-rebuild-reading` (09-17 17:15 CT), which also closes the lane on a pass.
