@@ -5,6 +5,30 @@
 
 ---
 
+## 2026-09-11 11:20 CT — refresh-worker `78e4623f` -> `889d4e12` (lane `ncaaf-tbd-kickoff-date`, session `53eaee9c`, user decision "Take claims, fix + deploy") — **FRIDAY'S NCAAF CHIPS: MET. Chips went from 9 to 5, with 0 at the 00:00-Eastern placeholder, and the four TBD Saturday games are gone. SATURDAY'S HALF: NOT MET YET. `?date=2026-09-12` is web's INLINE build on `4c373107`, which lacks the fix and omits the four games. It resolves at the midnight date roll, when refresh-worker's artifact serves 09-12, or sooner with a web deploy.**
+
+- **Preflight and deploy:**
+  - Preflight read HOLD from 10:55 to 11:10 CT. The MLB daily update, a soccer artifact build and odds-refresh jobs were in flight.
+  - It turned CLEAR at 11:12:21. A fresh preflight read CLEAR at 11:12:43 CT, with only infrastructure processes running.
+  - Deploy `dep-dai2h2u1egvs73d681sg` went live at 16:18:23Z (11:18:23 CT).
+  - `render_events` was CLEAN from 16:12Z to 16:20Z, with no `server_failed`.
+  - The claim was released after the reading.
+- **Collateral** (code commits in `78e4623f..889d4e12`):
+  - `7c248328`: Kalshi precap, board rungs first, flag-gated.
+  - `f8b67afa`: Polymarket, deletes the pregame near-even hold. Already live on live-odds-worker.
+- **Baseline (15:28Z, same endpoint):** the default-date chips carried 9 NCAAF chips. Four of them sat at `2026-09-12T04:00:00+00:00` reading "11:00P CT": MER @ NM, SM @ AUB, NMS @ HAW and CP @ SJS. The board's own odds rows put those games on Saturday at 3:00 PM, 6:45 PM, 11:00 PM and 8:00 PM CT respectively.
+- **Reading at 16:19:34Z**, on the first worker publish after boot (`published_at 16:19:06Z`, `source worker_artifact`):
+  - **(1) Default date 2026-09-11: PASS.** 5 NCAAF chips, 0 at a placeholder start, and none of the four named games.
+  - **(2) `?date=2026-09-12`: NOT MET.** The source is `inline_artifact_stale`, so web built it on its own code (`4c373107`, without the fix). It returned 76 NCAAF chips, and the four named games were ABSENT: web's old resolver still files them on Friday. The local replay predicted exactly 76 without the fix and 80 with it. The gap is attributable to web's code, not to the fix.
+  - **(3)** 76 of the 09-12 chips carry real clocks. They come from web's old code, so this is not a test of this change.
+- **WNBA, same reading:** the first post-boot publish carries 0 WNBA chips. The 45-minute watcher before it saw 22 publishes (15:28-16:12Z), also with 0. The restart did not bring back the user-reported WNBA FINAL cards. Not reproduced; lane `wnba-schedule-guard-fix` owns it.
+- **OWED**, either of:
+  - After the 2026-09-12 00:00 CT date roll, the default-date chips come from refresh-worker's artifact with the fix. They must carry MER @ NM, SM @ AUB, NMS @ HAW and CP @ SJS with a `status_token` ending "TBD", or a real clock if CFBD updates the kickoff.
+  - A web deploy, which is a user decision.
+- **Measured:** Friday MET. Saturday OWED.
+
+---
+
 ## 2026-09-11 10:49 CT — reading only, no deploy — refresh-worker `1e1285a4` (lane `nfl-prop-grading`, CORRECTION to this lane's 08:50 CT entry) — **`SETTLED_SAMPLE` IS NOT A MOVING WINDOW: THE EXECUTION LEDGER IS AT ITS 5,000-RECORD CAP AND EVICTS THE OLDEST, SETTLED ORDERS ON EVERY WRITE**
 
 The 08:50 CT entry said the nfl `SETTLED_SAMPLE` drop (12 -> 4) meant "the sample window moved". **That was wrong.**
