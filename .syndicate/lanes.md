@@ -590,7 +590,7 @@ death, never life — do not invert it.
   - live-odds-worker is DONE: `78e4623f`, reading recorded, claim released.
   - The deploy order was never a safety question. A reader without a live plan falls back to paper2's plan and says so (`LIVE_PLAN_ABSENT`).
 
-### polymarket-e2e-review — OPEN — opened 2026-09-11 — session 7a239b89-c8fd-49b7-ba5a-e41bb9d4d9bc — **review GOAL MET; OPEN only for the first-pass reading of `f8b67afa` (live 2026-09-11T15:09:21Z)**
+### polymarket-e2e-review — CLOSED 2026-09-11 — opened 2026-09-11 — session 7a239b89-c8fd-49b7-ba5a-e41bb9d4d9bc — **GOAL MET: the review went to the user, who decided. The decision was executed in `f8b67afa` and verified at 15:51:04Z (`refused={'market_paused': 3}`, near-even pregame h2h placed, no hold key)**
 - **GOAL: MET.** The goal is restated verbatim below.
   - The end-to-end reading and the evidence verdict are in `state_polymarket.md` `[polymarket-pregame-hold-premise-falsified]` (`8d588016`).
   - The user decided on 2026-09-11 ("yes do it"), and the decision is recorded in `log/2026-09-11.md`.
@@ -612,7 +612,14 @@ death, never life — do not invert it.
   - any Polymarket position past kickoff refused as `game_started`;
   - near-even pregame h2h positions reaching `LIVE_ORDER`;
   - `paper:polymarket` totals still being filled.
-  - **Status 15:19Z: OWED.** The first post-boot pass (15:16:42Z) was read only partially: 0 HELD (guaranteed by the deletion), 0 `REFUSED_AT_BUILD`, 0 `LIVE_ORDER`, 1 `REFUSED_NO_VENUE_TICKER`. No falsifier has fired.
+  - **VERIFIED 15:51:04Z**, on the first pass on the 15:36Z plan (`plan_source=live positions=5 placed=2 refused={'market_paused': 3}`):
+    - (a) no HELD line, and no `pregame_price_too_high` key;
+    - (b) all three totals refused `REFUSED_AT_BUILD reason=market_paused`;
+    - (d) Jets–Titans h2h at 0.49, a price the hold held, and Mariners–A's h2h at 0.415 reached `LIVE_ORDER status=submitted`.
+    - NOT OBSERVED:
+      - (c): no unpaused position was past kickoff. It is covered by `test_a_position_past_kickoff_is_refused_before_the_market_resolves`.
+      - (e): paper placed no Polymarket order after 09:56Z, and it does not build through this submitter.
+    - No falsifier fired.
 - Falsification of (1) and (3): any of these after the deploy:
   - a `HELD_PREGAME_NEAR_EVEN` line;
   - a `LIVE_ORDER venue=polymarket market=totals`;
@@ -621,6 +628,16 @@ death, never life — do not invert it.
 - Close when the verification above is in `deploys.md` 2026-09-11 15:06:25Z. Closing releases the four file claims.
 - History: the hypotheses H1–H4, their verdicts and the decision text were moved VERBATIM to `lanes_history.md` on 2026-09-11. The readings are in `state_polymarket.md`.
 
+
+### polymarket-ask-pricing — OPEN — opened 2026-09-11 — session 7a239b89-c8fd-49b7-ba5a-e41bb9d4d9bc
+- Goal: todo `#662`, the user's decision (2) of 2026-09-11 ("start pricing off the executable ask plus fees").
+  - STEP 1, this lane's first deliverable, an instrument with its own deploy: at every Polymarket order build, read the slug's book with the signed client. Log our side's best ask and its size next to the price we would send, and the EV at that ask. A failed read never blocks an order.
+  - STEP 2, after step 1 has a population, and only on the user's go: price EV and Kelly at the ask net of fees, refuse below the minimum, and cap the stake at the size available at the ask.
+- Files: `syndicate/features/shared/polymarket_us_orders.py`, `tests/test_polymarket_us_orders.py`.
+- Hypothesis (to test, not believed): the displayed `outcomePrices` number that EV is priced on is often not the executable ask for our side. The largest claimed edges are the least executable, which would explain paper h2h at +50.5% while live h2h is −23.4%, and the whole live loss sitting in the above-median stakes.
+- Falsification test: over the first 20 or more logged builds, our side's best ask sits within one tick of the price we send, and the EV at that ask is within 1 point of the plan's `ev_pct`, in the large-EV rows as well as the small ones.
+- Verification (step 1): at least 20 `POLYMARKET_BOOK_AT_BUILD` lines on live-odds-worker, each with ask, size, sent price and EV at the ask. Recorded in `state_polymarket.md` with the distribution of (EV at ask − planned EV) by planned-EV bucket, and zero orders blocked by a failed read.
+- Blocked by: none.
 
 ### kalshi-precap-board-lines — OPEN — opened 2026-09-11 — session 49bfef11-a4a3-4fe4-8df4-76ec94e45893
 - Goal: [user 2026-09-11] `#661`'s residual. The per-series cap (`MAX_MARKETS_PER_SERIES=400`, unchanged) keeps the Kalshi rungs AT or next to each board row's spread/total line, so that NCAAF Saturday rows get a venue contract. Done when refresh-worker prints `LIVE_PLAN_WRITTEN venue=kalshi ... placeable_committed=N/N` with N > 0 on an NCAAF Saturday slate, and live-odds-worker prints `EXECUTED ... venue=kalshi plan_source=live placed>0`.

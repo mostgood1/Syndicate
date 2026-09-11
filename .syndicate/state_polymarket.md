@@ -1324,5 +1324,5 @@ whatever game lines displace them. `dropped_by_date` still reports every one.
 **DECIDED AND DONE 2026-09-11.** On the user's decision the hold is DELETED, in `f8b67afa` on live-odds-worker, live 2026-09-11T15:09:21Z.
 - A Polymarket order is now built pregame or not at all. `polymarket_us_submitter.build` refuses `game_started` and `commence_unknown`.
 - Polymarket totals are paused by config: `SYNDICATE_POLYMARKET_PAUSED_MARKETS=total`, refused at build as `market_paused`. Paper still measures them.
-- The first post-boot pass (15:16:42Z) was read only partially, at 15:19Z. It showed 0 Polymarket build refusals, 0 Polymarket orders and 1 no-ticker refusal; the 0 HELD lines are guaranteed by the deletion. The lane's verification readings are OWED.
+- **Verified at 15:51:04Z**, on the first pass on a plan holding totals and near-even pregame moneylines: `positions=5 placed=2 refused={'market_paused': 3}`, with no hold key. Jets–Titans at 0.49 and Mariners–A's at 0.415 were submitted pregame. `game_started` has not yet had a population in production, because no unpaused position was past kickoff.
 - The pricing follow-up, trading off the executable ask and net of fees, is todo `#662`.

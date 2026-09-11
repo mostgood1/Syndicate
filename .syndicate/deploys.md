@@ -32766,3 +32766,19 @@ Both NCAAF ones are FRIDAY games: the cap keeps the nearest dates first, so Satu
 - ATTRIBUTION: under the old code, those same 5 contracted rows would have been attempted from paper2's 19. What this change REMOVED is the 14 uncontracted positions. It did not cause the 3 orders.
 - One sizing effect was measured: `MIZZ5` is $1.64 in paper2 and went out at $3.28 live. The per-game exposure budget is no longer shared with an uncontracted leg; verified in the served book: in paper2 `MIZZ5` sits in an exposure group of 2 with the uncontracted aggregator h2h on Missouri @ Kansas (stake_fraction_pre_exposure 0.00328 -> 0.00164); alone in the live plan it keeps 0.00328 = $3.28, the stake that went out.
 
+
+## 2026-09-11 15:51:04Z — reading only, no deploy — live-odds-worker `f8b67afa` — lane `polymarket-e2e-review` — the first pass on a plan holding totals and near-even pregame moneylines
+
+**verify — MEASURED 15:50:47-15:51:04Z.** This was the first Polymarket pass on the plan refresh-worker wrote at 15:36:00Z (`LIVE_PLAN_WRITTEN venue=polymarket positions=5 placeable_committed=5/5`).
+- `EXECUTED date=2026-09-11 mode=live venue=polymarket plan_source=live armed=True positions=5 placed=2 filled=0 failed=0 duplicates=0 retried=0 skipped=3 refused={'market_paused': 3}`. There is no `pregame_price_too_high` key, and no `HELD_PREGAME_NEAR_EVEN` line since boot.
+- **The totals pause works.** All three totals were refused as `REFUSED_AT_BUILD venue=polymarket reason=market_paused`, with no ledger row: `tsc-sea-ven-fio-2026-09-11-2pt5`, `tsc-nfl-tb-cin-2026-09-13-total-50pt5` and `tsc-nfl-was-phi-2026-09-13-total-44pt5`.
+- **Near-even pregame moneylines are placed.**
+  - `aec-nfl-nyj-ten-2026-09-13`, NO leg (Titans), at 0.49, qty 7.48. That is a price the hold would have HELD.
+  - `aec-mlb-sea-ath-2026-09-11`, YES (Mariners), at 0.415, qty 23.85.
+  - Both are `LIVE_ORDER status=submitted`, both GTC, and both were placed pregame (kickoffs 09-12 01:40Z and 09-13 17:00Z).
+- Not observable in this window:
+  - `game_started`: no unpaused position was past kickoff. It is covered by `test_a_position_past_kickoff_is_refused_before_the_market_resolves`.
+  - `paper:polymarket` totals: paper placed no Polymarket order at all after 09:56Z, and paper does not build through this submitter.
+- No falsifier fired: there was no HELD line, no `LIVE_ORDER venue=polymarket market=totals`, and both orders were submitted before kickoff.
+- The `POLYMARKET_CROSS` and `POLYMARKET_ARTIFACT_PRICE` lines for all five slugs at 15:50:07-08Z, the totals included, come from a second caller of `_polymarket_resolve_market` (`execute_portfolio.py:1776`). It runs before the pass's `LIMITS` line, and it is not order building.
+- Fills are not read yet: both orders read `submitted` at 15:51Z.
