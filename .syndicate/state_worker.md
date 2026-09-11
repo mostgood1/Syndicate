@@ -1317,13 +1317,13 @@ times a build. **NFL live rows with no model view are the guard working.** Do no
 read that as a coverage regression; the grid join is healthy at
 `considered=1427 projected=1021` (71.5%).
 
-**Live-projection registries, for reference** (`board_enrichment.py:176,1128,1130`):
+**Live-projection registries, for reference** (`board_enrichment.py:366,1931,1947`, re-read on `main` 2026-09-10):
 
-    _LIVE_GAME_STATE_SPORTS = {mlb, soccer}
+    _LIVE_GAME_STATE_SPORTS = {mlb, soccer, ncaaf}   # ncaaf: 42d49364, live on refresh-worker 5767e3ac
     _LIVE_PROP_SPORTS       = {mlb, wnba, soccer}
-    _LIVE_GAMELINE_SPORTS   = {mlb, wnba, soccer}
+    _LIVE_GAMELINE_SPORTS   = {mlb, wnba, soccer, ncaaf}
 
-nfl/nba/nhl/ncaaf/ncaab are in none of them.
+nfl/nba/nhl/ncaab are in none of them; ncaaf is in two.
 
 ## [shortlist-payload-budget] THE PERSISTED SHORTLIST IS ONE KEYVALUE WRITE, and the cliff was on the calendar `[verified 2026-08-23, lane layer2-sim-view-and-live-projection]`
 

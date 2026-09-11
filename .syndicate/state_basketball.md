@@ -392,7 +392,7 @@ POINT estimate (MAE 6.636 vs 7.453) and a naive 50/50 blend beat **neither**
     - So a worker's `build_live_state_payload(today, allow_stored_date_fallback=True)` builds from the substituted 08-30 slate and persists it under TODAY's `live_state` key (`cards.py:6672`). The chip path reads that key as today.
     - With fix (b), today may be substituted only on a CONFIRMED slate, at both substitution sites. The writer is read on 09-11. Today's `live_state_2026-09-10` key stays frozen until the date roll.
     - Fixes (a) and (b) applied (`6ebec70e`). Fix (c), never persisting another date's games under today's key, was not taken.
-  - `_LIVE_GAME_STATE_SPORTS` is `{mlb, soccer}`, so the chips are WNBA's only game state. If they are still frozen at tip-off on 09-17, every WNBA row is demoted after kickoff.
+  - `_LIVE_GAME_STATE_SPORTS` is `{mlb, soccer, ncaaf}` (ncaaf added 2026-09-10 in `42d49364`, live on refresh-worker `5767e3ac`), so the chips are still WNBA's only game state. If they are still frozen at tip-off on 09-17, every WNBA row is demoted after kickoff.
   - Layer 2 is the only surface that persists what it recommended. WNBA profitability stays unmeasurable there until WNBA rows reach it.
 - **Layer 1 model coverage is 4–6%** — `rows_modelled_fair` is 20–56 of
   522–1,276 rows/day over 13 playing days. For the other ~95% it is a pure

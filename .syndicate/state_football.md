@@ -856,6 +856,15 @@ no engine rows, so the board always falls through to standalone and the engine
 path is UNREACHABLE while 2026 is active. The live lens's state PATH is tested;
 its DATA cannot be until a game is in progress.
 
+**2026-09-10: board ROWS take NCAAF live game state from the ESPN capture, not only from the chip** `[measured 2026-09-11T03:33:22Z, refresh-worker 5767e3ac, lane football-layer2-live-parity]`.
+- `42d49364` added `ncaaf` to `_LIVE_GAME_STATE_SPORTS`. `attach_live_game_state_from_lens` now reads the poller's persisted capture (`scripts.poll_ncaaf_live_state.live_state_path`) for the ESPN dates of the grid's kickoffs, with a 900 s bound.
+- First post-deploy build: `LIVE_GAME_STATE_JOIN sport=ncaaf supported=True corrected=35 pregame->final` (FAMU @ MIA).
+- Why it mattered on 09-10:
+  - The chip stayed `pregame` all game, because its index read UTC dates. The peer lane fixed that in `48621d65`.
+  - `select_shortlist` dropped the rows at kickoff + 2 h (`rows_stale_kickoff` 58).
+  - A final game's rows go to the unserved `dead` lane, not the served board.
+- The in-play `pregame->live` flip is NOT yet measured. It is owed Saturday 09-12.
+
 ## [ncaaf-props-live] NCAAF PLAYER PROPS ARE ON THE BOARD — first capture in this platform's history `[measured 2026-08-27T03:07:03Z, lane ncaaf-opener-regions-props]`
 
     prop_rows=38  status_rows=38  games_with_props=6  with_model_prob=33

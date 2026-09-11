@@ -5424,3 +5424,16 @@ the instrument rather than the system.**
 - **How we found out**: before acting on the 404, I grepped the READER (`live_lens_loop.py:327`), then read that key per service, then read the tick lines.
 - **The rule going forward**: the 09-09 rule says find the resolution site. What this adds: take the KEY NAME from the function that reads it, never from a comment or a docstring. A comment can name a key nothing reads, and a 404 on that key is an answer about nothing. Then confirm the behaviour from a line the reader itself emits.
 - **Cost**: none paid. It was caught before the refresh-worker deploy, and the timing question went to the user, who chose to carry the passes.
+
+## 2026-09-10 — OVERTURNED (mine): a finished game's rows are NOT served as `final` on the Layer 2 board. They leave through the unserved `dead` lane, so "served rows read `final`" is a check the board cannot produce `[lane football-layer2-live-parity]`
+
+- **What I believed**:
+  - After `42d49364` corrected FAMU @ MIA's 35 rows `pregame -> final`, `rows_stale_kickoff` fell 58 -> 0. I read that as the rows being "back on the board as final", told a peer so, and wrote it into a draft `deploys.md` entry.
+  - My game watcher's BOARD_FINAL check (served rows with `game_state == final`) rested on the same belief.
+- **What was actually true**: the served shortlist at 03:33:26Z had 0 rows for either finished game. `per_sport_ingest.<sport>.by_lane.dead` rose (ncaaf 173 -> 219, nfl 550 -> 577). Settled games are classed dead and not served. The counter fell because the rows now fail a DIFFERENT gate, not because they came back.
+- **How we found out**: the watcher went silent after both ESPN finals. To explain it I compared the served rows' `game_state` with `game.state`, and there were no rows at all.
+- **The rule going forward**:
+  - A counter falling to 0 says the row left THAT filter, never that it was served.
+  - To verify a final transition on Layer 2, read the enrichment coverage (`live_game_state.transitions`) and `by_lane.dead`, not the served rows.
+  - Before trusting a watcher's terminal check, probe it on a game that already finished.
+- **Cost**: one wrong claim to a peer (corrected within ~25 min, before its reading). The watcher could only end by being stopped.
