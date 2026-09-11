@@ -542,7 +542,7 @@ deployed three times on the evening of 2026-08-26. Same family as
   - Identity is stamped from the same event's board rows, for ALL sports.
   - nfl/ncaaf rows are filed by kickoff date.
 - Replayed over production's shards: 180/180 rows relabelled. 15/15 (09-10) and 77/77 (09-13) Kalshi instances merge into their sportsbook rows.
-- **The production reading is OWED:** the first tick with an NFL prop match. The two ticks after the deploy had none.
+- **The production reading is OWED:** the first tick with an NFL prop match. The two ticks after the deploy had none. It is ARMED as scheduled task `nfl-kalshi-identity-sunday-reading`, which fires once on 2026-09-13 at 12:30 CDT (verified enabled via `list_scheduled_tasks`, 2026-09-11). The task takes R1 (relabel), R2 (the 09-13 shard) and R3 (served rows with no game state during live games), and closes the lane only if all three pass.
 
 **Artifact half: MEASURED.**
 

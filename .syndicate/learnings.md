@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 969 rules `[generated]`
+## Index — 972 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5473,3 +5473,16 @@ the instrument rather than the system.**
 - **Also, tooling:**
   - PreToolUse hooks resolve `CLAUDE_PROJECT_DIR` to the PRIMARY tree, even in a `session_worktree` session. So lane-guard enforces the primary's STALE `lanes.md`. On 2026-09-11 it blocked two unclaimed files for a lane that was CLOSED on origin/main.
   - Check the claim on origin/main before believing a block. The remedy is `git restore --source=origin/main --worktree -- .syndicate/lanes.md` in the primary, with no local edits there and the index untouched. Never a bypass.
+
+## 2026-09-11 — FORBIDDEN: reporting a lane's file claims as RELEASED on the strength of the edit you meant to make. Read the claim set back with `claims_by_path`, the same parser `lane-guard` enforces with `[lane nfl-layer2-kalshi-identity]`
+
+- **What I believed:** my 2026-09-10 checkpoint rewrote this lane's block with a new header and a goal verdict. So I told the user the lane "no longer claims any files".
+- **What was true:**
+  - That edit's anchor was the header plus the `- Goal:` line. The old `- Files:` line, naming five code paths, sat below it untouched, so lane-guard kept enforcing those claims against every other session.
+  - The next fix wrote `Files: NONE claimed ... verbatim in` a backticked `lanes_history.md`. The parser read that filename as a NEW claim.
+- **How it was found:** I ran `claims_by_path(text)` over the file as written, filtered to this lane. It returned the five paths the first time and `{'lanes_history.md': ...}` the second. `check_lane_invariants.py` printed INVARIANTS HOLD both times, because a claim on a real path violates no invariant.
+- **The rule:**
+  - After any edit meant to release claims, run `claims_by_path` over the WRITTEN file, filter to your lane, and require NONE before saying so to anyone.
+  - A `Files:` line that claims nothing must carry no backticked path-like token.
+  - "Invariants hold" is not evidence that claims were released.
+- **Cost:** one false statement to the user, corrected before it caused a blocked edit elsewhere, and three extra ledger commits.

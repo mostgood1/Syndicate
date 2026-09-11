@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 969 rules `[generated]`
+## Index — 972 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 385**
+**FORBIDDEN — 386**
 
 - [2026-09-06 — FORBIDDEN: instrumenting join A, reading it, and concluding about a value…](#2026-09-06-forbidden-instrumenting-join-a-reading-it-and-concluding-about-a-value-written-by-join-b-name-the-writer-of-the-field-in-the-falsification-test-itself-lane-mlb-first5-kalshi-fanin-mismatch-vs-15410ca7)
 - [2026-09-06 — FORBIDDEN: concluding a guard covers a symptom because the guard is deploy…](#2026-09-06-forbidden-concluding-a-guard-covers-a-symptom-because-the-guard-is-deployed-firing-and-named-after-it-find-the-code-that-wrote-the-field-you-are-looking-at-lane-mlb-first5-kalshi-fanin-mismatch)
@@ -205,6 +205,7 @@
 - [2026-09-10 — FORBIDDEN: clearing a stranded ledger row on a field that the LOST write s…](#2026-09-10-forbidden-clearing-a-stranded-ledger-row-on-a-field-that-the-lost-write-set-a-lost-update-restores-the-other-writers-stale-copy-of-the-whole-row-so-every-field-that-write-carried-is-gone-with-it-lane-write-ahead-build-refusal)
 - [2026-09-10 — FORBIDDEN: recording an ESPN refusal from Render as a property of the HOST…](#2026-09-10-forbidden-recording-an-espn-refusal-from-render-as-a-property-of-the-host-it-is-a-host-headers-pair-siteapiespncom-answered-web-5-of-5-with-urllibs-default-user-agent-in-the-same-hour-it-refused-has_games_for_dates-syndicate-wnba10-lane-wnba-public-scoreboard-host)
 - [2026-09-10 — FORBIDDEN: a repair guard that protects ANY POPULATED local copy, on a ser…](#2026-09-10-forbidden-a-repair-guard-that-protects-any-populated-local-copy-on-a-service-that-cannot-produce-the-artifact-itself-has-rows-is-not-is-current-and-nothing-else-will-ever-refresh-it-lane-nfl-layer2-kalshi-identity)
+- [2026-09-11 — FORBIDDEN: reporting a lane's file claims as RELEASED on the strength of t…](#2026-09-11-forbidden-reporting-a-lanes-file-claims-as-released-on-the-strength-of-the-edit-you-meant-to-make-read-the-claim-set-back-with-claims_by_path-the-same-parser-lane-guard-enforces-with-lane-nfl-layer2-kalshi-identity)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -405,7 +406,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](learnings_evidence.md#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated) `[evidence]`
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 
-**Rules and corrections — 578**
+**Rules and corrections — 580**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -523,6 +524,8 @@
 - [2026-09-10 — OVERTURNED (my own docstring): a producer rewrite of a PAST-dated artifact…](#2026-09-10-overturned-my-own-docstring-a-producer-rewrite-of-a-past-dated-artifact-does-not-reach-web-through-the-publish-sweep-the-sweep-refuses-slates-more-than-a-day-old-and-web-serves-whichever-of-its-two-copies-is-newer-lane-mlb-lens-final-status)
 - [2026-09-10 — RECURRENCE (the 09-09 absent-is-not-off rule): I read the env key a COMMEN…](#2026-09-10-recurrence-the-09-09-absent-is-not-off-rule-i-read-the-env-key-a-comment-named-got-a-404-and-nearly-called-another-lanes-pass-inert-on-refresh-worker-the-code-reads-a-different-key-and-it-is-true-there-lane-execution-ledger-cas)
 - [2026-09-10 — OVERTURNED (mine): a finished game's rows are NOT served as `final` on the…](#2026-09-10-overturned-mine-a-finished-games-rows-are-not-served-as-final-on-the-layer-2-board-they-leave-through-the-unserved-dead-lane-so-served-rows-read-final-is-a-check-the-board-cannot-produce-lane-football-layer2-live-parity)
+- [2026-09-10 — OVERTURNED (mine): "non-card NCAAF chips never get live state". The chip W…](#2026-09-10-overturned-mine-non-card-ncaaf-chips-never-get-live-state-the-chip-was-on-the-live-state-join-it-read-the-utc-date-and-espn-files-an-evening-et-kickoff-under-the-previous-utc-day-lane-ncaaf-fcs-market-implied-rating)
+- [2026-09-11 — OVERTURNED: "uncontracted rows crowd real Kalshi edges out of the plan's s…](#2026-09-11-overturned-uncontracted-rows-crowd-real-kalshi-edges-out-of-the-plans-slots-the-cuts-own-counters-said-neither-the-cap-nor-the-ceiling-bound-lane-kalshi-plan-placeable)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
