@@ -196,3 +196,49 @@ start to finish. **The 2026-09-08 run is now the only anomalous set in the captu
 **What would falsify that:** none of the other nine 09-01..04 spike buckets is captured.
 Capturing them (Render's logs still reach 09-01) would show whether `09-04 18:00Z` is typical
 of that week or the exception.
+
+## 9. The other nine 09-01..04 spike buckets, captured — addendum `[2026-09-11 ~15:5xZ, lane sept-spike-captures, CLOSED]`
+
+User directed: "capture the other nine 09-01..04 spike buckets". Together with `09-04 18:00Z`,
+they are the metered top ten of 09-01..04, holding 70.8% of that period's 19.24 GB: the
+ledger's "~68% in about ten spike buckets". Each was captured on its own hour. `capture()` was
+called with the bucket's metered value, because `--capture` leaves it null. All nine are
+clean: no BLIND or PARTIAL flag, no deploy in any window, and both workers flat at 6-63 MB, so
+web-only as before. The lane's falsification test was written before any number was read.
+
+| bucket | metered MB | edge MB / reqs | app-served MB | **m/app** | metered/edge | publish-in MB |
+|---|---|---|---|---|---|---|
+| 09-01 22:00Z | 1,774.8 | 61.08 / 223 | 2,707.25 | **0.66** | 29.1 | 1,158.9 |
+| 09-01 23:00Z | 2,809.1 | 144.45 / 235 | 4,865.53 | **0.58** | 19.4 | 1,142.5 |
+| 09-03 20:00Z | 632.2 | 236.79 / 1,241 | 3,748.17 | **0.17** | 2.7 | 1,934.1 |
+| 09-03 21:00Z | 356.4 | 77.61 / 778 | 1,556.27 | **0.23** | 4.6 | 926.6 |
+| 09-03 22:00Z | 937.0 | 283.67 / 408 | 3,794.61 | **0.25** | 3.3 | 1,158.0 |
+| 09-03 23:00Z | 562.8 | 178.16 / 412 | 2,953.30 | **0.19** | 3.2 | 1,245.7 |
+| 09-04 00:00Z | 914.1 | 226.19 / 306 | 3,558.06 | **0.26** | 4.0 | 1,594.2 |
+| 09-04 01:00Z | 1,006.9 | 148.90 / 434 | 2,797.53 | **0.36** | 6.8 | 1,605.6 |
+| 09-04 18:00Z *(§8)* | 4,050.1 | 178.16 / 1,366 | 1,452.38 | **2.79** | 22.7 | see capture |
+| 09-04 19:00Z | 901.1 | 46.78 / 160 | 1,625.35 | **0.55** | 19.3 | 1,513.7 |
+
+**Verdict against the pre-registered test: the SECOND branch.** All nine read m/app at or
+below 0.66. Early September's "spikes" were HEAVY SERVED TRAFFIC: 1.5-4.9 GB an hour through
+web's app log, nearly all of it internal (the edge carried 47-284 MB). And the meter charged
+LESS than that served traffic in every one of those hours. The 09-08 run is the opposite: modest
+served traffic, ~300 MB an hour, metered 5.1-9.4x ABOVE it. **The 09-08 run stands alone.**
+`09-04 18:00Z` is the outlier of its own week, the only hour above 1x.
+
+**What this does NOT settle.** The meter is still 2.7-29x the edge bytes, so it counts some
+share of internal traffic, but that share has no stable ratio (m/app 0.17-0.66). Publish-in
+(worker POST bodies, invisible to every response count) ran 0.9-1.9 GB an hour and does not
+track the meter either. No mechanism is proposed from this.
+
+**ELIMINATED entries in `state_worker.md` `[render-egress-spikes]` that quote spike-hour numbers
+from the OLD pairing.** They are listed with corrected values and NOT rewritten; whether each
+elimination still stands is the user's call.
+
+| entry | as recorded (hour BEFORE the label) | correctly paired (the bucket's own hour) |
+|---|---|---|
+| public edge traffic | "carries 2.6-61 MB in the spike hours" | 46.8-283.7 MB across the ten; `09-04 18:00Z` 178.16 MB, `09-01 23:00Z` 144.45 MB. Its completeness half (edge log vs `http-requests`, 223 vs 221) compared two END-labelled views and is unaffected. Metered/edge is 2.7-29x, so edge still cannot be the whole meter. |
+| internal worker<->web HTTP | "matches the meter in ONE spike hour and contradicts it in two others" | App-served exceeds metered in 9 of the 10 early-September hours (m/app 0.17-0.66) and is below it in `09-04 18:00Z` (2.79) and every 09-08 run hour (5.10-9.41). Which three hours the old entry compared is not recorded, so its "one match" cannot be re-scored. |
+| bootstrap disk sync | "the 4,050 MB hour had 37 bootstrap lines" | Counted over 17:00-18:00, the hour BEFORE that bucket. Its own hour, 18:00-19:00, was not recounted here. |
+| the unresolved contradiction | "09-01 22:00-23:00 served 2,707 / metered 2,809 (1.04)" | 22:00-23:00 is bucket `09-01 22:00Z` = 1,774.8 MB: served/metered **1.53** (m/app 0.66). |
+| the unresolved contradiction | "09-04 17:00-18:00 served 699 / metered 4,050 (0.17)" | 4,050 MB is 18:00-19:00, against 1,452.38 MB served: served/metered **0.36** (m/app 2.79). 17:00-18:00 is the 21 MB bucket. |
