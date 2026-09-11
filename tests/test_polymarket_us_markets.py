@@ -1590,6 +1590,157 @@ def test_a_slate_that_fits_drops_nothing_and_says_so():
     assert len(result["markets"]) == 30
 
 
+# ==========================================================================
+# What the join can PRICE is kept ahead of what it cannot (2026-09-11)
+# ==========================================================================
+
+
+def _game_line(slug, date, market_type="SPORTS_MARKET_TYPE_MONEYLINE"):
+    return _slate_row(slug, date, sportsMarketTypeV2=market_type)
+
+
+def _prop(slug, date):
+    return _slate_row(slug, date, sportsMarketTypeV2="SPORTS_MARKET_TYPE_PROP")
+
+
+def _one_row_budget(rows, n=1):
+    import json
+
+    return max(len(json.dumps(r)) + 1 for r in rows) * n
+
+
+def test_this_weekends_game_lines_outrank_tonights_props():
+    """MEASURED 2026-09-11T03:28Z: fetched=83,516, kept 21,786, and every market
+    from 09-12 on was cut -- while ~15k player props and half/quarter markets for
+    09-10/11 were stored. The join then priced 19 of 3,799 board rows, and every
+    NFL row read `no_candidates`: not one Sunday game line had been kept.
+
+    Date order alone ranks tonight's props ahead of Sunday's moneylines. This is
+    that slate in miniature, with a budget that cannot hold both."""
+    import datetime as dt
+
+    props = [_prop(f"astatc-cfb-a{i}-b{i}-2026-09-11-passyds", "2026-09-11") for i in range(30)]
+    sunday = [
+        _game_line("aec-nfl-cle-jax-2026-09-13", "2026-09-13"),
+        _game_line("tsc-nfl-cle-jax-2026-09-13-41pt5", "2026-09-13", "SPORTS_MARKET_TYPE_TOTAL"),
+        _game_line("asc-nfl-cle-jax-2026-09-13-neg-3pt5", "2026-09-13", "SPORTS_MARKET_TYPE_SPREAD"),
+    ]
+    rows = props + sunday
+    result = mod._slate_within_budget(rows, budget=_one_row_budget(rows, 5), today=dt.date(2026, 9, 11))
+
+    kept = {r["slug"] for r in result["markets"]}
+    assert {r["slug"] for r in sunday} <= kept, result
+    assert result["tiering"] == "game_lines_first"
+    assert result["kept_game_lines"] == 3
+    assert result["dropped_game_lines"] == 0
+    assert result["game_lines_kept_through"] == "2026-09-13"
+    # The props paid for it -- and the drop is still reported, by date.
+    assert set(result["dropped_by_date"]) == {"2026-09-11"}, result
+    assert result["dropped"] >= 25
+
+
+def test_a_half_or_quarter_market_is_not_a_game_line():
+    """The join refuses `segment_market_not_full_game`. Ranking a first-half total
+    as a game line would spend the budget on a row the join throws away, so a
+    segment competes by date with everything else -- and here it loses to a prop
+    with an earlier game."""
+    import datetime as dt
+
+    segment = _game_line("tsc-cfb-psu-tem-2026-09-12-1h-24pt5", "2026-09-12", "SPORTS_MARKET_TYPE_TOTAL")
+    full = _game_line("tsc-cfb-psu-tem-2026-09-12-50pt5", "2026-09-12", "SPORTS_MARKET_TYPE_TOTAL")
+    tonight = _prop("astatc-cfb-x-y-2026-09-11-rushyds", "2026-09-11")
+    rows = [segment, tonight, full]
+    result = mod._slate_within_budget(rows, budget=_one_row_budget(rows, 2), today=dt.date(2026, 9, 11))
+
+    kept = [r["slug"] for r in result["markets"]]
+    assert kept[0] == full["slug"], kept
+    assert segment["slug"] not in kept, kept
+    assert result["kept_game_lines"] == 1
+
+
+def test_btts_is_a_game_line_and_a_half_time_btts_is_not():
+    """BTTS is typed PROP by the venue and admitted by the join on its slug
+    modifier. `fh-btts` / `sh-btts` are halves, which the join refuses -- 124 of
+    them were once admitted as full-game BTTS (see `_has_segment`)."""
+    classify = mod._game_line_classifier()
+    assert classify is not None
+    assert classify(_prop("atc-sea-juv-par-2026-09-12-btts", "2026-09-12")) is True
+    assert classify(_prop("atc-sea-juv-par-2026-09-12-fh-btts", "2026-09-12")) is False
+    assert classify(_prop("astatc-cfb-x-y-2026-09-12-rushyds", "2026-09-12")) is False
+    # Not the join's slug shape at all: never promoted.
+    assert classify(_game_line("tonight-cin-sf", "2026-09-12")) is False
+
+
+def test_a_game_line_beyond_the_boards_horizon_is_not_promoted():
+    """Tier 0 is bounded by the board's window. A moneyline sixteen days out is
+    no more useful than a prop, so it competes by date and loses to tonight."""
+    import datetime as dt
+
+    far = _game_line("aec-nfl-kc-lv-2026-09-27", "2026-09-27")
+    tonight = _prop("astatc-cfb-x-y-2026-09-11-rushyds", "2026-09-11")
+    rows = [far, tonight]
+    result = mod._slate_within_budget(rows, budget=_one_row_budget(rows, 1), today=dt.date(2026, 9, 11))
+
+    assert [r["slug"] for r in result["markets"]] == [tonight["slug"]]
+    assert result["kept_game_lines"] == 0
+    assert result["dropped_by_date"] == {"2026-09-27": 1}
+
+
+def test_when_game_lines_alone_overflow_the_furthest_go_first():
+    """Date order still holds WITHIN the game-line tier."""
+    import datetime as dt
+
+    saturday = _game_line("aec-cfb-psu-tem-2026-09-12", "2026-09-12")
+    sunday = _game_line("aec-nfl-cle-jax-2026-09-13", "2026-09-13")
+    rows = [sunday, saturday]
+    result = mod._slate_within_budget(rows, budget=_one_row_budget(rows, 1), today=dt.date(2026, 9, 11))
+
+    assert [r["slug"] for r in result["markets"]] == [saturday["slug"]]
+    assert result["dropped_game_lines_by_date"] == {"2026-09-13": 1}
+    assert result["game_lines_kept_through"] == "2026-09-12"
+
+
+def test_without_the_join_the_budget_ranks_by_date_and_says_so(monkeypatch):
+    """Off != on. With no classifier the cut is the old date-only cut -- and the
+    result names that, rather than inventing a vocabulary of its own."""
+    import datetime as dt
+
+    monkeypatch.setattr(mod, "_game_line_classifier", lambda: None)
+    sunday = _game_line("aec-nfl-cle-jax-2026-09-13", "2026-09-13")
+    tonight = _prop("astatc-cfb-x-y-2026-09-11-rushyds", "2026-09-11")
+    rows = [sunday, tonight]
+    result = mod._slate_within_budget(rows, budget=_one_row_budget(rows, 1), today=dt.date(2026, 9, 11))
+
+    assert result["tiering"].startswith("off")
+    assert [r["slug"] for r in result["markets"]] == [tonight["slug"]]
+    assert result["kept_game_lines"] == 0
+
+
+def test_the_write_reports_what_the_cut_spent_its_budget_on(monkeypatch, tmp_path, capsys):
+    """The write line's `dropped_by_date` cannot say whether the dropped rows were
+    game lines or props; on 2026-09-11 that difference was the whole outage. The
+    split is printed every run and carried on the artifact."""
+    from syndicate.features.shared import refresh_state_store
+
+    written: dict = {}
+    monkeypatch.setattr(refresh_state_store, "reports_root", lambda: tmp_path)
+    monkeypatch.setattr(refresh_state_store, "write_json_file",
+                        lambda _p, payload: written.update(payload))
+    rows = [mod.trimmed_row(_row(id="g-1", slug="aec-nfl-cle-jax-2026-09-13",
+                                 sportsMarketTypeV2="SPORTS_MARKET_TYPE_MONEYLINE",
+                                 gameStartTime="2026-09-13T17:00:00Z"))]
+    monkeypatch.setattr(mod, "fetch_game_markets", lambda **_k: {"status": "ok", "markets": rows})
+    result = mod.persist_game_slate()
+
+    assert result["status"] == "ok", result
+    out = capsys.readouterr().out
+    assert "[polymarket_us_markets] SLATE_BUDGET tiering=game_lines_first" in out, out
+    for key in ("tiering", "game_line_window", "kept_game_lines", "dropped_game_lines",
+                "game_lines_kept_through"):
+        assert key in written, key
+    assert "kept_game_lines" in result
+
+
 def test_the_slate_pages_far_enough_to_reach_the_end_of_the_block(monkeypatch):
     """`max_pages` defaulted to 30, so at limit=500 the fetch stopped at 15,000
     rows whether or not the venue had more -- and it did. The repo measured

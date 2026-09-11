@@ -1600,6 +1600,50 @@ def _slate_row_for_storage(row: Mapping[str, Any]) -> dict[str, Any]:
 # rather than re-serialised at every step.
 _SLATE_BYTE_BUDGET = int(_KEYVALUE_CEILING_BYTES * 0.90)
 
+# THE GAME-LINE WINDOW, in days either side of today (UTC). Yesterday is inside
+# it so a game still being played stays priceable; seven days ahead is the
+# board's own horizon for NCAAF and NFL (`kalshi_board_join._FORWARD_HORIZON_DAYS`).
+_GAME_LINE_WINDOW_BEFORE_DAYS = 1
+_GAME_LINE_WINDOW_AFTER_DAYS = 7
+
+
+def _game_line_classifier():
+    """`row -> bool` for a market the game-line join can PRICE, or None.
+
+    Reuses the join's own vocabulary -- `MARKET_TYPE_TO_BOARD` and
+    `_has_segment` -- rather than a second copy of it. Two guards that must
+    agree should not be two literals: a type the join admits but this ranked as
+    noise would be cut first, which is exactly the failure this replaces. BTTS
+    is typed PROP by the venue and admitted by the join on its slug modifier,
+    so it is admitted here the same way.
+
+    None when the join cannot be imported. The caller then ranks by date alone,
+    the old behaviour, and SAYS so (`tiering=off:join_unavailable`) -- it never
+    silently guesses a vocabulary of its own.
+    """
+    try:
+        from syndicate.features.shared.polymarket_board_join import (
+            MARKET_TYPE_TO_BOARD,
+            _has_segment,
+            parse_slug,
+        )
+    except Exception:  # noqa: BLE001 -- reported by the caller as tiering=off
+        return None
+
+    def is_game_line(row: Mapping[str, Any]) -> bool:
+        parsed = parse_slug(row.get("slug"))
+        if parsed is None:
+            return False
+        modifiers = parsed.get("modifiers") or []
+        if _has_segment(modifiers):
+            return False
+        venue_type = str(row.get("sportsMarketTypeV2") or "").strip().upper()
+        if venue_type in MARKET_TYPE_TO_BOARD:
+            return True
+        return venue_type == "SPORTS_MARKET_TYPE_PROP" and "btts" in modifiers
+
+    return is_game_line
+
 
 def _slate_date(row: Mapping[str, Any]) -> str:
     """The row's game DATE, or "" when it carries none.
@@ -1613,9 +1657,12 @@ def _slate_date(row: Mapping[str, Any]) -> str:
 
 
 def _slate_within_budget(
-    markets: Sequence[Mapping[str, Any]], *, budget: int = _SLATE_BYTE_BUDGET
+    markets: Sequence[Mapping[str, Any]],
+    *,
+    budget: int = _SLATE_BYTE_BUDGET,
+    today: Any = None,
 ) -> dict[str, Any]:
-    """Keep the NEAREST games and drop the furthest-out ones, by name.
+    """Keep what the join can PRICE first, then the nearest of everything else.
 
     THE OLD TRUNCATION CUT BY OFFSET, WHICH IS ARBITRARY WITH RESPECT TO DATE.
     `fetch_markets` stopped after `max_pages` and set `truncated=True`, so
@@ -1641,28 +1688,87 @@ def _slate_within_budget(
     step: an exact check on the finished payload still runs in
     `persist_game_slate`, and this only has to get the ORDER and the rough size
     right.
+
+    DATE ALONE STOPPED BEING ENOUGH. Measured 2026-09-11T03:28Z:
+
+        POLYMARKET_US_SLATE_WRITE count=21786 fetched=83516
+          dropped_for_size=61730 kept_through=2026-09-12
+          dropped_by_date={'2026-09-12': 10962, '2026-09-13': 14744, ...}
+
+    Every market from 09-12 on was cut, while ~15k of the rows kept for 09-10/11
+    were player props and half/quarter markets the join refuses
+    (`POLYMARKET_OUT_OF_SCOPE`: 9,438 cfb PROP, 4,291 cfb segment spreads and
+    totals). The join then priced 19 of 3,799 board rows, and every NFL row read
+    `no_candidates`: not one Sunday game line had been stored. The cut was
+    ordered by date but not by USE, so tonight's college-football player props
+    outranked Sunday's NFL moneylines.
+
+    So the rank is (tier, date). Tier 0 is a market the game-line join can price
+    (`_game_line_classifier`) whose game falls in the board's window; tier 1 is
+    everything else. Date order is unchanged WITHIN a tier, so everything the
+    tests above pin about nearest-first still holds. The ceiling is not raised
+    (#60: shrink the payload, never raise the ceiling) -- only the order of the
+    cut changes. The cost is named: `polymarket_daily_rows` archives what this
+    keeps, so the near-term props it records shrink by whatever game lines
+    displace them, and `dropped_by_date` still reports every one of them.
     """
+    import datetime as _dt
     import json as _json
 
-    ordered = sorted(markets, key=_slate_date)
+    classify = _game_line_classifier()
+    day = today or _dt.datetime.now(_dt.timezone.utc).date()
+    window_start = (day - _dt.timedelta(days=_GAME_LINE_WINDOW_BEFORE_DAYS)).isoformat()
+    window_end = (day + _dt.timedelta(days=_GAME_LINE_WINDOW_AFTER_DAYS)).isoformat()
+
+    def tier(row: Mapping[str, Any]) -> int:
+        if classify is None or not classify(row):
+            return 1
+        date = _slate_date(row)
+        # Undated: we cannot prove it lies outside the window, and a row we
+        # cannot rank is not a row we may drop first.
+        if not date or window_start <= date <= window_end:
+            return 0
+        return 1
+
+    # `sorted` is stable, so rows tied on (tier, date) keep the venue's order.
+    ranked = sorted(
+        ((tier(row), _slate_date(row), row) for row in markets),
+        key=lambda item: (item[0], item[1]),
+    )
     kept: list[Mapping[str, Any]] = []
     used = 0
     dropped_by_date: dict[str, int] = {}
-    for row in ordered:
+    dropped_game_lines_by_date: dict[str, int] = {}
+    kept_game_lines = 0
+    game_lines_kept_through: str | None = None
+    for row_tier, date, row in ranked:
         size = len(_json.dumps(row)) + 1
+        label = date or "<undated>"
         if used + size > budget and kept:
-            dropped_by_date[_slate_date(row) or "<undated>"] = (
-                dropped_by_date.get(_slate_date(row) or "<undated>", 0) + 1
-            )
+            dropped_by_date[label] = dropped_by_date.get(label, 0) + 1
+            if row_tier == 0:
+                dropped_game_lines_by_date[label] = dropped_game_lines_by_date.get(label, 0) + 1
             continue
         kept.append(row)
         used += size
+        if row_tier == 0:
+            kept_game_lines += 1
+            if date and (game_lines_kept_through is None or date > game_lines_kept_through):
+                game_lines_kept_through = date
     return {
         "markets": kept,
         "dropped": sum(dropped_by_date.values()),
         "dropped_by_date": dict(sorted(dropped_by_date.items())),
+        # How far the date-ranked REMAINDER reaches: the last row kept in rank
+        # order, which is tier 1 whenever any of it survived.
         "kept_through": _slate_date(kept[-1]) if kept else None,
         "estimated_bytes": used,
+        "tiering": "game_lines_first" if classify is not None else "off:join_unavailable",
+        "game_line_window": [window_start, window_end],
+        "kept_game_lines": kept_game_lines,
+        "dropped_game_lines": sum(dropped_game_lines_by_date.values()),
+        "dropped_game_lines_by_date": dict(sorted(dropped_game_lines_by_date.items())),
+        "game_lines_kept_through": game_lines_kept_through,
     }
 
 
@@ -1928,6 +2034,24 @@ def persist_game_slate(*, limit: int = 500, max_pages: int = 200) -> dict[str, A
     fetched = [_slate_row_for_storage(m) for m in (slate.get("markets") or [])]
     budgeted = _slate_within_budget(fetched)
     markets = budgeted["markets"]
+    # WHAT THE CUT SPENT ITS BUDGET ON, on its own line and every run. The
+    # write line's `dropped_by_date` cannot say whether the dropped rows were
+    # game lines the join needed or props it refuses -- and on 2026-09-11 that
+    # difference was the whole outage. `.get` because the budget result is
+    # stubbed with the older shape elsewhere.
+    print(
+        "[polymarket_us_markets] SLATE_BUDGET"
+        f" tiering={budgeted.get('tiering')}"
+        f" window={budgeted.get('game_line_window')}"
+        f" kept={len(markets)} of={len(fetched)}"
+        f" kept_game_lines={budgeted.get('kept_game_lines')}"
+        f" dropped_game_lines={budgeted.get('dropped_game_lines')}"
+        f" game_lines_kept_through={budgeted.get('game_lines_kept_through')}"
+        f" dropped_game_lines_by_date={budgeted.get('dropped_game_lines_by_date')}"
+        f" kept_through={budgeted.get('kept_through')}"
+        f" dropped_by_date={budgeted.get('dropped_by_date')}",
+        flush=True,
+    )
     payload = {
         "fetched_at": _time.time(),
         "markets": markets,
@@ -1942,6 +2066,11 @@ def persist_game_slate(*, limit: int = 500, max_pages: int = 200) -> dict[str, A
         "dropped_for_size": budgeted["dropped"],
         "dropped_by_date": budgeted["dropped_by_date"],
         "kept_through": budgeted["kept_through"],
+        "tiering": budgeted.get("tiering"),
+        "game_line_window": budgeted.get("game_line_window"),
+        "kept_game_lines": budgeted.get("kept_game_lines"),
+        "dropped_game_lines": budgeted.get("dropped_game_lines"),
+        "game_lines_kept_through": budgeted.get("game_lines_kept_through"),
         "game_types": slate.get("game_types"),
         "game_start_min": slate.get("game_start_min"),
         "game_start_max": slate.get("game_start_max"),
@@ -1991,5 +2120,9 @@ def persist_game_slate(*, limit: int = 500, max_pages: int = 200) -> dict[str, A
         "dropped_for_size": budgeted["dropped"],
         "dropped_by_date": budgeted["dropped_by_date"],
         "kept_through": budgeted["kept_through"],
+        "tiering": budgeted.get("tiering"),
+        "kept_game_lines": budgeted.get("kept_game_lines"),
+        "dropped_game_lines": budgeted.get("dropped_game_lines"),
+        "game_lines_kept_through": budgeted.get("game_lines_kept_through"),
         "game_types": slate.get("game_types"),
     }
