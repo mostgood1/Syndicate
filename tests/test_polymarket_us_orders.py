@@ -879,3 +879,57 @@ def test_the_book_read_can_be_switched_off(monkeypatch, capsys):
     send, reads = _book_build(_priced(), monkeypatch, price=0.45)
     assert callable(send) and reads == []
     assert "POLYMARKET_BOOK_AT_BUILD" not in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------
+# EXPIRE AT KICKOFF  [2026-09-11, lane polymarket-ask-pricing]. A resting
+# pregame order must die at kickoff, not fill into the game at a stale price.
+# --------------------------------------------------------------------------
+
+
+def test_an_order_with_a_kickoff_is_good_till_date_and_expires_AT_kickoff():
+    request = _Request(side="over")
+    request.commence_time = "2026-09-12T01:40:00Z"
+    body = _body(request=request)
+    assert body["tif"] == "TIME_IN_FORCE_GOOD_TILL_DATE"
+    assert body["goodTillTime"] == "2026-09-12T01:40:00Z"
+
+
+def test_an_offset_kickoff_is_sent_as_the_same_instant_in_UTC():
+    request = _Request(side="over")
+    request.commence_time = "2026-09-11T20:40:00-05:00"
+    assert _body(request=request)["goodTillTime"] == "2026-09-12T01:40:00Z"
+
+
+def test_an_unreadable_kickoff_falls_back_to_good_till_cancel_with_no_expiry():
+    """Reachable only by callers that skip `build`, which refuses such a
+    position first (`commence_unknown`)."""
+    for when in (None, "", "tonight"):
+        request = _Request(side="over")
+        request.commence_time = when
+        body = _body(request=request)
+        assert body["tif"] == "TIME_IN_FORCE_GOOD_TILL_CANCEL"
+        assert "goodTillTime" not in body
+
+
+def test_the_submitted_order_carries_the_expiry(monkeypatch, capsys):
+    """Through the real submit: the body sent is the body built, and the
+    expiry is not dropped between validation and send."""
+    from syndicate.features.shared import polymarket_us_auth as auth
+    from syndicate.features.shared import polymarket_us_orders as orders
+
+    sent = {}
+
+    def fake_signed_request(method, url, body=None, **kw):
+        sent.update(method=method, body=body)
+        return {"id": "C1"}
+
+    monkeypatch.setattr(auth, "signed_request", fake_signed_request)
+    request = _Request(side="over")
+    request.commence_time = "2026-09-12T01:40:00Z"
+    orders.submit_order(request, price_dollars=0.45, market_slug="aec-mlb-sea-ath-2026-09-11",
+                        tick_size="0.005", minimum_trade_qty="0.01")
+    assert sent["method"] == "POST"
+    assert sent["body"]["tif"] == "TIME_IN_FORCE_GOOD_TILL_DATE"
+    assert sent["body"]["goodTillTime"] == "2026-09-12T01:40:00Z"
+    assert "goodTillTime=2026-09-12T01:40:00Z" in capsys.readouterr().out

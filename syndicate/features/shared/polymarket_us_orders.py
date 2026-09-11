@@ -483,11 +483,11 @@ def _log_order_states(rows: Any, *, mode: str) -> None:
             f" price={row.get('price')}"
             f" cum={row.get('cumQuantity')!r} leaves={row.get('leavesQuantity')!r}"
             f" avgPx={row.get('avgPx')!r}"
-            # THE EXPIRY WE NEVER SET AND NEVER READ.
+            # THE EXPIRY. We have set it since 2026-09-11; before that it was the venue's default.
             #
-            # `order_body` sends `tif=TIME_IN_FORCE_GOOD_TILL_CANCEL` and NO
-            # `goodTillTime`, so whatever expiry these orders carry is the
-            # venue's own default -- and the venue RETURNS it on every read.
+            # `order_body` now sends good-till-date with `goodTillTime` set to the
+            # game's kickoff. It used to send good-till-cancel and NO expiry. The
+            # venue RETURNS the stored value on every read.
             # `ORDERS_READ` prints the KEY NAMES only, so the value has been
             # fetched on every poll all along and thrown away.
             #
@@ -501,7 +501,7 @@ def _log_order_states(rows: Any, *, mode: str) -> None:
             # and cannot be tested without this value.
             #
             # `tif` alongside it because we assume the venue STORED the
-            # good-till-cancel we sent. That is an assumption, not a reading,
+            # time in force we sent. That is an assumption, not a reading,
             # and this is the line that can check it.
             f" tif={row.get('tif')!r} goodTillTime={row.get('goodTillTime')!r}"
             f" created={row.get('createTime')!r} inserted={row.get('insertTime')!r}"
@@ -616,6 +616,29 @@ def quantity_for_stake(stake_dollars: float, price: float, minimum_qty: float) -
     return quantity
 
 
+#: Expires at `goodTillTime`. Every live order uses it since 2026-09-11, so an
+#: unfilled pregame order dies at kickoff instead of resting into the game.
+_TIF_GTD = "TIME_IN_FORCE_GOOD_TILL_DATE"
+
+
+def _kickoff_expiry(request: Any) -> str | None:
+    """`commence_time` as an RFC 3339 UTC instant for `goodTillTime`, or None if unreadable.
+
+    PURE -- it parses a string the request already carries and reads no clock --
+    so `order_body` keeps its contract.
+    """
+    text = str(getattr(request, "commence_time", None) or "").strip()
+    if not text:
+        return None
+    try:
+        starts = _dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if starts.tzinfo is None:
+        starts = starts.replace(tzinfo=_dt.timezone.utc)
+    return starts.astimezone(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def order_body(
     request: Any,
     *,
@@ -674,6 +697,18 @@ def order_body(
 
     from syndicate.features.shared.execution_ledger import idempotency_key
 
+    # EXPIRE AT KICKOFF  [2026-09-11, user decision, lane polymarket-ask-pricing].
+    # A good-till-cancel order that does not fill RESTS, and we never cancel one:
+    # two orders placed at 15:51Z on 2026-09-11 read `order_state_new` with 0
+    # filled twenty minutes later. Left alone, a resting pregame order fills
+    # after kickoff at its pregame price, which is exactly when the game has
+    # moved through it. Good-till-date at `commence_time` makes the VENUE expire
+    # it at kickoff (`TIME_IN_FORCE_GOOD_TILL_DATE` + RFC 3339 `goodTillTime`,
+    # docs.polymarket.us create-order). An unreadable kickoff falls back to
+    # good-till-cancel; that case is reachable only by callers that skip
+    # `build`, because every live order passes `_refuse_after_commence` first.
+    expiry = _kickoff_expiry(request)
+
     return {
         "marketSlug": slug,
         "type": _TYPE_LIMIT,
@@ -681,7 +716,8 @@ def order_body(
         # `Amount` shape, used for every price and cash field on this venue.
         "price": {"value": f"{snapped:.6f}".rstrip("0").rstrip("."), "currency": _CURRENCY},
         "quantity": quantity,
-        "tif": _TIF_GTC,
+        "tif": _TIF_GTD if expiry else _TIF_GTC,
+        **({"goodTillTime": expiry} if expiry else {}),
         # THE NO SIDE IS REAL. See the module docstring: an under is a BUY of
         # NO, not a SELL of YES at the complement. Kalshi's inversion does not
         # belong here and its absence is deliberate.
@@ -784,7 +820,7 @@ def submit_order(
         f"[polymarket_us_orders] SUBMIT url={url} slug={body.get('marketSlug')}"
         f" side={body.get('outcomeSide')} action={body.get('action')}"
         f" qty={body.get('quantity')} price={body.get('price')}"
-        f" tif={body.get('tif')}"
+        f" tif={body.get('tif')} goodTillTime={body.get('goodTillTime')}"
         # OUR side beside the venue's, and the index that connects them. The
         # inverted order of 2026-08-25 was invisible in this line: it read
         # `side=OUTCOME_SIDE_YES` and said nothing about WHICH TEAM that buys,
@@ -1122,23 +1158,21 @@ def _order_url(order_id: str) -> str:
     return f"{base.rstrip('/')}{path.rstrip('/')}/{urllib.parse.quote(str(order_id), safe='')}"
 
 
-# THE CANCEL ROUTE IS A GUESS UNTIL A REAL CALL CONFIRMS IT, and that is why
-# `cancel_order` will not fire without `execute=True`.
+# THE CANCEL ROUTE, FROM THE DOCS  [2026-09-11].
 #
-# This venue is a gRPC-gateway API -- prefixed enums (`ORDER_STATUS_CANCELED`)
-# and `{"code":12}` UNIMPLEMENTED bodies. Its create route is `POST /v1/orders`
-# and its read is `GET /v1/order/{id}`: sibling spellings differing by one
-# character and one verb, which is exactly how the list route was guessed wrong
-# once already. `DELETE /v1/order/{id}` is the convention-consistent cancel and
-# is the default here, overridable by env without a deploy.
+# The documented call is `POST /v1/order/{orderId}/cancel` with the body
+# `{"marketSlug": ...}`, and the response is empty on success
+# (docs.polymarket.us/api-reference/orders/cancel-order). The route this used to
+# default to, `DELETE /v1/order/{id}`, was a gRPC-gateway guess and is NOT the
+# documented one: a cancel sent through it would have failed on the one day it
+# was needed. The route is still overridable by env, with `{order_id}` substituted.
 #
-# IT CANNOT BE PROBED the way the list route was. `probe_order_list_routes` is
-# safe only because every candidate is a GET; there is no read-only way to ask
-# "would this write path work", and a blind write against a money account can
-# create or destroy something. So the first real cancel IS the probe -- which is
-# why this logs the exact method, URL and raw response.
-_ORDER_CANCEL_PATH = "/v1/order"
-_ORDER_CANCEL_METHOD = "DELETE"
+# IT IS STILL UNEXERCISED against the live venue. There is no read-only way to
+# ask "would this write work", so the first real cancel is the probe. That is
+# why `cancel_order` will not fire without `execute=True`, and why it logs the
+# exact method, URL, body and raw response.
+_ORDER_CANCEL_PATH = "/v1/order/{order_id}/cancel"
+_ORDER_CANCEL_METHOD = "POST"
 
 #: Venue statuses meaning there is nothing left to cancel. Matched as substrings
 #: because this API prefixes its enums (`ORDER_STATUS_CANCELED`, not `canceled`).
@@ -1152,7 +1186,11 @@ def _order_cancel_url(order_id: str) -> str:
     path = (os.environ.get("POLYMARKET_US_ORDER_CANCEL_PATH") or _ORDER_CANCEL_PATH).strip()
     if not path.startswith("/"):
         path = "/" + path
-    return base.rstrip("/") + path.rstrip("/") + "/" + urllib.parse.quote(str(order_id), safe="")
+    quoted = urllib.parse.quote(str(order_id), safe="")
+    if "{order_id}" in path:
+        return base.rstrip("/") + path.replace("{order_id}", quoted)
+    # A bare prefix, which is the old override form: put the documented shape under it.
+    return base.rstrip("/") + path.rstrip("/") + "/" + quoted + "/cancel"
 
 
 def cancel_order(
@@ -1235,6 +1273,8 @@ def cancel_order(
         "filled_count": view.get("filled_count"),
         "method": _ORDER_CANCEL_METHOD,
         "url": _order_cancel_url(order_id),
+        # THE DOCUMENTED BODY: the venue cancels "into" a market slug.
+        "body": {"marketSlug": slug},
     }
 
     if any(token in venue_status for token in _NOT_CANCELLABLE):
@@ -1256,6 +1296,11 @@ def cancel_order(
             print("[polymarket_us_orders] CANCEL_REFUSED %s" % plan, flush=True)
             return plan
 
+    if not slug:
+        plan.update(status="refused", reason="market_slug_unknown: the documented cancel requires it")
+        print("[polymarket_us_orders] CANCEL_REFUSED %s" % plan, flush=True)
+        return plan
+
     if not execute:
         plan.update(status="dry_run", reason="execute=False; nothing was sent")
         print("[polymarket_us_orders] CANCEL_DRY_RUN %s" % plan, flush=True)
@@ -1268,7 +1313,7 @@ def cancel_order(
         flush=True,
     )
     try:
-        response = auth.signed_request(_ORDER_CANCEL_METHOD, plan["url"])
+        response = auth.signed_request(_ORDER_CANCEL_METHOD, plan["url"], body=plan["body"])
     except Exception as exc:  # noqa: BLE001
         plan.update(status="error", reason=("%s: %s" % (type(exc).__name__, exc))[:300])
         print("[polymarket_us_orders] CANCEL_FAILED %s" % plan, flush=True)

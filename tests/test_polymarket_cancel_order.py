@@ -39,7 +39,7 @@ def _venue(monkeypatch, order=RESTING, *, sends: list | None = None, fail_read=F
                 raise RuntimeError("http_503")
             return dict(order)
         if sends is not None:
-            sends.append((method, url))
+            sends.append((method, url, kw.get("body")))
         return {"ok": True}
 
     monkeypatch.setattr(auth, "signed_request", signed_request)
@@ -57,8 +57,9 @@ def test_the_DEFAULT_is_a_dry_run_and_sends_NOTHING(monkeypatch):
     assert out["status"] == "dry_run"
     assert sends == [], "a dry run contacted the venue with a write"
     # And it still reports what it WOULD do, or the dry run is useless.
-    assert out["method"] == "DELETE"
-    assert out["url"].endswith("/v1/order/C6HN0XD92KDE")
+    assert out["method"] == "POST"
+    assert out["url"].endswith("/v1/order/C6HN0XD92KDE/cancel")
+    assert out["body"] == {"marketSlug": "tsc-mlb-lad-det-2026-08-30-7pt5"}
     assert out["client_order_id"] == "0f0e2a675e86ed5589a9d913"
 
 
@@ -72,9 +73,11 @@ def test_execute_TRUE_actually_sends_the_cancel(monkeypatch):
 
     assert out["status"] == "sent"
     assert len(sends) == 1
-    method, url = sends[0]
-    assert method == "DELETE"
-    assert url.endswith("/v1/order/C6HN0XD92KDE")
+    method, url, body = sends[0]
+    # THE DOCUMENTED ROUTE (docs.polymarket.us cancel-order), not the old DELETE guess.
+    assert method == "POST"
+    assert url.endswith("/v1/order/C6HN0XD92KDE/cancel")
+    assert body == {"marketSlug": "tsc-mlb-lad-det-2026-08-30-7pt5"}
 
 
 def test_a_FILLED_order_is_REFUSED(monkeypatch):
@@ -182,12 +185,23 @@ def test_an_empty_order_id_is_refused_before_any_call(monkeypatch):
 
 
 def test_the_cancel_route_is_overridable_without_a_deploy(monkeypatch):
-    """The route is a GUESS until a real call confirms it -- `DELETE
-    /v1/order/{id}` by gRPC-gateway convention. It must be correctable by env,
-    because discovering the true path should not need a code change on a day
-    when a duplicate is resting."""
-    monkeypatch.setenv("POLYMARKET_US_ORDER_CANCEL_PATH", "/v1/orders/cancel")
-    assert mod._order_cancel_url("ABC").endswith("/v1/orders/cancel/ABC")
+    """Documented since 2026-09-11 (`POST /v1/order/{orderId}/cancel`), and
+    still correctable by env, because a documented route has moved before.
+    `{order_id}` is substituted; a bare prefix gets the documented shape."""
+    monkeypatch.setenv("POLYMARKET_US_ORDER_CANCEL_PATH", "/v2/order/{order_id}/cancel")
+    assert mod._order_cancel_url("ABC").endswith("/v2/order/ABC/cancel")
+    monkeypatch.setenv("POLYMARKET_US_ORDER_CANCEL_PATH", "/v1/order")
+    assert mod._order_cancel_url("ABC").endswith("/v1/order/ABC/cancel")
+
+
+def test_an_order_with_no_market_slug_is_refused_because_the_cancel_needs_one(monkeypatch):
+    """The documented cancel carries `marketSlug`. Sending it empty would be a
+    guess about what the venue does with a blank field, on a write."""
+    sends: list = []
+    _venue(monkeypatch, dict(RESTING, marketSlug=""), sends=sends)
+    out = mod.cancel_order("C6HN0XD92KDE", execute=True)
+    assert out["status"] == "refused" and "market_slug_unknown" in out["reason"]
+    assert sends == []
 
 
 def test_the_POLYMARKET_cancel_is_not_yet_wired_into_any_automatic_path():
