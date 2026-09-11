@@ -32347,3 +32347,62 @@ on the SHA requested.
   - No ledger row carries that slug on 2026-09-10 (19 live orders), 09-11 or 09-15 (`/api/portfolio/live?show=all`). `live:kalshi` 09-10 went 14 -> 19, exactly the 5 submitted orders, so nothing was written for the refused build.
   - Sendable orders still go out: the Kalshi pass at 04:10:51Z placed 3 NFL prop orders through build -> write-ahead -> send.
   - Measured live: `unmappable_side` only. `market_unresolved_for_position` and `no_live_price` run the same branch and are covered by tests, not by a production reading.
+
+## 2026-09-11 04:49:50-04:52:40Z — refresh-worker `48621d65` -> `1e1285a4` — lane `polymarket-slate-budget`
+
+**What:** `1e1285a4` changes the Polymarket game-line join on refresh-worker.
+- (1) NCAAF and NFL widen forward to their weekend fixtures. `_forward_horizon_days`: soccer 14; NCAAF and NFL READ from
+  `kalshi_board_join._FORWARD_HORIZON_DAYS` (7); MLB never.
+- (2) `_teams_match` is memoised within one join, through a ContextVar set by a thin `join_polymarket_to_board` wrapper.
+- Ride-along: 13 commits since live. The only runtime ones are this lane's `1e1285a4` and `3bafdd2b` (the slate writer,
+  inert here because live-odds-worker writes the slate). Nothing touches the plan, venue scope, the executor or the worker
+  loop. `requirements*.txt` and `render.yaml` are unchanged, and live `48621d65` is an ancestor.
+- Off != on: `origin/main`'s join matches 0 on an NFL row against its Sunday total, and this matches 1.
+- A/B on a synthetic NFL slate (real alias functions): the uncached body took 1.317 s and the memoised join 0.020 s, with
+  identical results (168/168).
+
+**Baseline, pre-deploy, on the new slate (old join code):**
+- 04:07:31Z: `POLYMARKET_BOARD_JOIN elapsed_s=94.91 indexed=13346 board_rows=3802 matched=109`, `portfolio_commit` 150.71 s,
+  `QUOTE_CAPTURE sports=['soccer']`, `no_candidates` ncaaf 520 and nfl 66.
+- 04:18:40Z: `elapsed_s=20.79 indexed=13348 board_rows=4408 matched=48`, `portfolio_commit` 103.9 s, `no_candidates|nfl|totals` 46.
+- On the OLD slate the join took 0.71–0.8 s and `portfolio_commit` 59–95 s.
+- **The slate change's prop trade-off, measured** from `POLYMARKET_OUT_OF_SCOPE`, props held in the kept slate, 03:36Z
+  (old) -> 04:18Z (new):
+  - cfb 9,473 -> 2,401
+  - nfl 647 -> 44
+  - **mlb 324 -> 360, NOT cut.**
+
+  The MLB prop board rows reading `no_candidates` (`batter_hits` 272, `batter_hits_runs_rbis` 248, …) are therefore not
+  this lane's doing. The prop join matched 0 before the change, so the cost is the daily book's archive of cfb/nfl
+  player props, which nothing reads.
+
+**Locks:**
+- Claim `polymarket-slate-budget`: token `ecabbe9e…`, acquired 04:26:21Z.
+- Preflight HOLD from 04:26:52Z to 04:49:17Z, 23 minutes. It was ONE odds-refresh run
+  (`run_refresh_odds_job` -> `refresh_odds_sources` -> WNBA props, then `build_soccer_artifacts --league serie_a`),
+  with 1–4 jobs in flight on every poll. It was polled every 15–40 s and never overridden.
+- CLEAR at 04:49:35Z for `1e1285a4`, with only infrastructure processes running.
+- Deploy `dep-dahogrh42hec739qjub0` via `render_deploy.py --service refresh-worker --commit 1e1285a4…`, created
+  04:49:50Z -> `update_in_progress` by 04:51:49Z -> **live 04:52:40Z**, on the SHA requested.
+- The claim's TTL (05:11:21Z) may expire before the first post-boot join. That is deliberate: the 25-min spacing after
+  this deploy bars every other refresh-worker deploy until 05:17:40Z anyway.
+
+**verify — MEASURED 05:03:03Z, on the first build after boot:**
+- **`portfolio_commit` took 41.3 s** (05:02:22–05:03:03Z). With the old join on the new slate it took 150.71 s and
+  103.9 s, and before the slate fix 59–95 s, so it is now faster than before either change. The build's stages ran as
+  before: `layer2_shortlist_build` 58.1 s, `kalshi_odds_refresh` 42.7 s, `kalshi_board_join` 13.4 s.
+- No `Traceback` and no `POLYMARKET_RESOLVER` failure line since boot.
+- `POLYMARKET_BOARD_JOIN elapsed_s=3.18 markets=21767 indexed=13346 board_rows=2927 matched=65`. **The join takes 3.18 s**,
+  against 94.91 and 20.79 s with the old join code (and ~0.8 s before the slate fix).
+- **Football reaches its markets.** `POLYMARKET_QUOTE_CAPTURE matches=65 sports=['ncaaf', 'nfl', 'soccer']`; before this
+  deploy it read `sports=['soccer']`. `forward_date_widened` fired for NCAAF (spreads 224, totals 224, h2h 105) and NFL
+  (totals 45, h2h 19, spreads 2); before, it held soccer keys only.
+- The `POLYMARKET_UNMATCHED` football counts:
+  - `no_candidates|nfl` went from 66 to **0**.
+  - NCAAF moved from `no_candidates` (520) to `no_match` (totals 154, spreads 146). Those rows now reach their game's
+    candidates, and the rest differ on the LINE. That is a coverage question the join answers correctly, not a reading gap.
+- `VENUE_SCOPE venue=polymarket rows_in=2927 scoped=67`. `PAPER2_PLAN_WRITTEN date=2026-09-10 venue=polymarket positions=6
+  staked=$22.27 venue_priced=65 placeable_committed=6/6`.
+- `board_rows` and `matched` vary with the board being joined (2,927 here, against 3,802 and 4,408 on the two prior builds),
+  so they are not compared across builds.
+- The lane's verification (2) is met on every named reading, and falsification (2) did not trigger.

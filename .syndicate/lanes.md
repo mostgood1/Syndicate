@@ -483,7 +483,7 @@ death, never life — do not invert it.
     - How: read `/api/ops/execution/ledger-summary?days=14` with the ops token, and sum `by_status.submitted` over the `paper:*` buckets of each date.
 - Blocked by: no code and no lane. The owed readings wait on production: an operator write on web, and a paper burst that overlaps live placement.
 
-### polymarket-slate-budget — OPEN — opened 2026-09-11 — session 7a239b89-c8fd-49b7-ba5a-e41bb9d4d9bc
+### polymarket-slate-budget — CLOSED 2026-09-11 — opened 2026-09-11 — session 7a239b89-c8fd-49b7-ba5a-e41bb9d4d9bc — **GOAL MET: the slate keeps what the join can price (`3bafdd2b`: 13,540 game lines kept, 0 dropped), and NCAAF/NFL reach their weekend markets (`1e1285a4`: `QUOTE_CAPTURE sports=['ncaaf','nfl','soccer']`, join 3.18 s).**
 - Goal: [user 2026-09-10: "we need to fix this - clearly we aren't reading polymarket correctly"] the Polymarket slate keeps the markets we can trade. Full-game lines for the board's horizon (this weekend's NCAAF and NFL) survive the ~8 MB keyvalue budget instead of being cut behind player props and half/quarter markets that nothing reads.
 - Files: `syndicate/features/shared/polymarket_us_markets.py`, `tests/test_polymarket_us_markets.py`, `syndicate/features/shared/polymarket_board_join.py`, `tests/test_polymarket_board_join.py` (the last two ADDED 2026-09-11 for the football forward-date widening; no open lane claimed them).
 - Hypothesis:
@@ -512,6 +512,23 @@ death, never life — do not invert it.
 - Verification (2): `forward_date_widened` shows `ncaaf|…` and `nfl|…` keys; `POLYMARKET_QUOTE_CAPTURE sports=` includes them; `no_candidates|nfl` falls from 66.
 - Cost to watch: this join's `elapsed_s` rose from ~0.8 to 94.91. It is re-read on the next build BEFORE football is widened too.
 - Deploy owed (2): refresh-worker.
+- 2026-09-11 05:03:03Z (2): refresh-worker `1e1285a4` (live 04:52:40Z).
+  - The first join after boot took `elapsed_s=3.18`, where it had taken 20.79–94.91.
+  - `QUOTE_CAPTURE sports=['ncaaf','nfl','soccer']`, where it had been soccer only. `forward_date_widened` fired for 553 NCAAF rows and 66 NFL rows.
+  - `no_candidates|nfl` went from 66 to 0. NCAAF went from 520 `no_candidates` to 300 `no_match`: the rows find candidates now, and the lines differ.
+  - `portfolio_commit` took 41.3 s. The Polymarket plan holds 6 placeable positions.
+  - Recorded in `deploys.md` 2026-09-11 04:49:50Z.
+- **GOAL: MET.** Verification (1) and (2) are met on production, and falsification (2) did not trigger.
+  - Residuals, NOT this lane's and NOT claimed fixed:
+    - (a) Polymarket placed an order again, after the slate fix: at 04:43:03Z, `LIVE_ORDER status=submitted venue=polymarket ticker=tsc-lal-get-dep-2026-09-13-1pt5 side=over line=1.5`, $1.05 at 0.45, GTC.
+      - It is a 09-13 fixture, which the old slate dropped. At 04:59:09Z it was still resting unfilled (`duplicates=1`).
+      - The other positions are gated at the executor. At 04:10Z the pregame 0.35 ceiling held 4 of 6, and an unmappable draw and the $35 order cap refused two.
+      - The ceiling is a user decision, and it is open. The 05:03Z plan's 6 positions had no executor pass by 05:09Z.
+    - (b) Held bets are lost when the plan drops a game once it starts (Pirates–White Sox, 09-10). The files involved are held by other lanes.
+    - (c) The 300 NCAAF rows that reach candidates but differ on the line are a line-coverage question.
+    - (d) KALSHI, not Polymarket: the 05:02:59Z plan reads `venue=kalshi positions=22 placeable_committed=4/22`.
+      - The 04:59:04Z pass refused 16 as `no_venue_ticker`: NCAAF spreads 9 and totals 7, all `price_source='aggregator'`.
+      - The executor guard is doing its job. The plan spends slots on bets Kalshi cannot take. Handed off as a separate task, "Stop Kalshi plan committing uncontracted bets".
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
