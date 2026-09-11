@@ -5,6 +5,34 @@
 
 ---
 
+## 2026-09-11 12:40 CT — refresh-worker `889d4e12` -> `9d580145` (lane `pricing-plane-v1`, user decision "Withhold, all sports") — **MET: ONE-SIDED ROWS WHOSE ONLY VALUE WAS AN UNMEASURED MODEL ARE OFF THE BOARD. 0 SERVED, `unmeasured_model_only=3107` WITHHELD; MLB HR ROWS 116 -> 0**
+
+**Trigger.** User report: "these pregame MLB opps make no sense, a lot are extremely long odds".
+- On the served board (build 16:27:27Z): all 116 MLB `batter_home_runs` rows were one-sided (`book_margin_model`, so `ev_pct` is the book's hold restated) with `model_skill.sample_games: 0`.
+- 8 of them sat in the top 25, seated by the hitter model's edge alone: Acuna 1+ HR at model 0.321 vs implied 0.196, and 2+ HR longshots at +2400..+6000 on model means of 0.38-0.59 HR/game.
+- The same shape: NFL 93 `Anytime TD`, soccer 221 shots/assists rows. The user chose "Withhold, all sports".
+
+**Deploy.** `dep-dai3io8jo6nc73daj780`, finished 2026-09-11T17:27:41Z (12:27 PM CT), claim held by `pricing-plane-v1`, preflight CLEAR (infrastructure processes only).
+- Collateral from `889d4e12`: `16de339b` and `1afec00f` (polymarket), already live on live-odds-worker.
+
+**Reading**, on the FIRST post-deploy build (served `written_at` 17:37:25Z), gated on the artifact time:
+
+| sport | predicted withheld (17:06:50Z served rows) | served after | rows matching the rule | notes |
+|---|---|---|---|---|
+| mlb | 418 (417 HR, 1 outs) | 1,499 | **0** | HR rows **0**; rows at >= +300: 20 (19 `batter_rbis`, 1 runs) vs predicted 19 |
+| nfl | 93 (`Anytime TD`) | 1,299 | **0** | rows at >= +300: 2 (h2h) |
+| soccer | 483 (shots, SOT, assists) | 1,203 | **0** | rows at >= +300: 230 (183 `alternate_totals_corners`, 47 h2h) — two-sided markets, outside this rule |
+| ncaaf | 0 | 985 | **0** | unaffected, as predicted |
+
+- **Worker log.** refresh-worker 17:37:25Z: `[intelligence_state] LAYER2_SHORTLIST date=2026-09-11 rows=4986 ... uninformative_ev=10911 **unmeasured_model_only=3107** ... served_by_sport={'mlb': 1499, 'ncaaf': 985, 'nfl': 1299, 'soccer': 1203}`.
+  - The 3,107 is the whole candidate pool across the 7-day window, before the budget. It is larger than the served-level prediction by construction.
+- **The board did not shrink.** Each sport's row budget refilled the freed slots with market-priced rows: MLB 1,498 -> 1,499, NFL 1,301 -> 1,299.
+  - MLB top 10 after: totals over -113 (+3.19), totals over +108 (+2.70), totals under +117 (+4.41), totals over +113 (+3.78), Kikuchi strikeouts -125 (+4.15), spread home +168 (+5.08), Nimmo hits +194 (+4.99), Moran RBIs +299 (+4.12), Harper hits +114 (+4.99), Murakami hits -120 (+2.02).
+- **Not yet visible:** the served payload's `rows_unmeasured_model_only`, `unmeasured_model_only_by_market` and `unmeasured_model_only_mode` keys. web still runs `0022ecb1`, whose explicit key list predates them; they arrive with the next web deploy of main's tip.
+- **Stated consequence.** The portfolio sizes from the shortlist, so paper orders on these markets stop. That removes the order-based route to measuring these models' skill. A grader of the models' predictions against box scores is the only path back, and it is recorded as a lead. Until then the rows stay withheld.
+- **Reverse-out:** `SYNDICATE_LAYER2_UNMEASURED_MODEL_ONLY=admit` on refresh-worker (an env change needs a deploy).
+- verify: **MET**. 0 of 4,986 served rows match the rule, `unmeasured_model_only=3107` is logged, and MLB HR rows went 116 -> 0.
+
 ## 2026-09-11 11:52 CT — web `4c373107` -> `0022ecb1` (lane `ncaaf-tbd-kickoff-date`, session `53eaee9c`, user decision "Deploy web now") — **SATURDAY'S NCAAF CHIPS: MET. `?date=2026-09-12` now carries 80 NCAAF chips (was 76), and the four TBD games sit on Saturday reading "Sat Sep 12 · TBD". Friday stays at 5 with 0 placeholders, and real kickoffs keep their clocks. LANE GOAL MET.**
 
 - **Preflight and deploy:**
