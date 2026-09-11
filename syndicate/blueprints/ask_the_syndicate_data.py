@@ -380,6 +380,31 @@ def _mlb_match_game(question: str, context: dict[str, Any]) -> tuple[dict[str, A
     name_context = _mlb_name_context(iso_date)
     words = _question_words(question)
 
+    # A BOARD ROW NAMES ITS GAME EXACTLY -- use that before any scoring.
+    # `_mlb_game_score` gives 100 for ANY shared team word and keeps the first
+    # of equal scores, so "New York Mets @ Atlanta Braves" ties with a Yankees
+    # game (so do "Chicago", "Los Angeles", "Sox", "San") and slate order picks
+    # between them. A row resolved from the board carries both full names
+    # (`collect_focused_evidence` passes them as `board_away_team` /
+    # `board_home_team`), and matching BOTH, exactly, cannot collide. A
+    # doubleheader matches twice and falls through to the scoring below.
+    board_away = str(context.get("board_away_team") or "").strip().casefold()
+    board_home = str(context.get("board_home_team") or "").strip().casefold()
+    if board_away and board_home:
+        exact: list[tuple[dict[str, Any], dict[str, Any], str]] = []
+        for game in outputs:
+            if not isinstance(game, dict):
+                continue
+            try:
+                names = name_context.get(int(game.get("game_pk")), {})
+            except (TypeError, ValueError):
+                names = {}
+            if (str(names.get("away_name") or "").strip().casefold() == board_away
+                    and str(names.get("home_name") or "").strip().casefold() == board_home):
+                exact.append((game, names, iso_date))
+        if len(exact) == 1:
+            return exact[0]
+
     best_score = 0
     best: tuple[dict[str, Any], dict[str, Any], str] | None = None
     for game in outputs:
@@ -3692,29 +3717,28 @@ def _entity_fetchers_for_sport(sport: str, question: str) -> list:
         return [lambda q, c: _basketball_last10_evidence(q, c, "nba")]
     if sport == "nhl":
         return [_nhl_last10_evidence]
-    if sport in {"soccer", "ncaab"}:
-        # DELIBERATELY EMPTY, and that is the honest state (`K2`/`K11`).
-        #
-        # Neither sport has ANY entity fetcher in this module -- there is no
-        # soccer player/fixture fetcher and no ncaab one to call. Before
-        # `M1` this branch did not exist at all and both fell through to
-        # `return []` below, which looked identical but meant something
-        # different: they were also unroutable, because neither had a
-        # `_SPORT_HINTS` entry, so a soccer question could not even be
-        # identified as soccer.
-        #
-        # What changed is upstream, not here: with soccer now routable,
-        # `_fetchers_for_sport` prepends `_board_candidates_evidence`, which
-        # filters the published board to `sport=soccer` exactly. Soccer is
-        # 100 of 200 published rows, so that is a real answer rather than a
-        # placeholder. This branch is written out instead of left to fall
-        # through so the absence is visibly intentional and so the next
-        # person adding a soccer fetcher has somewhere obvious to put it.
+    if sport == "soccer":
+        # `K2`/`K11` left this empty: there was no soccer fixture fetcher, so
+        # every soccer answer carried no evidence while the board priced the
+        # same rows from the soccer sim (measured on the production board
+        # 2026-09-11). `_soccer_match_evidence` reads that sim for the fixture
+        # of the board row the question was asked from.
+        return [_soccer_match_evidence]
+    if sport == "ncaab":
+        # DELIBERATELY EMPTY, and that is the honest state (`K2`/`K11`): there
+        # is no ncaab entity fetcher to call. `_fetchers_for_sport` still
+        # prepends `_board_candidates_evidence`, which answers aggregation
+        # questions from the published board filtered to `sport=ncaab`. The
+        # branch is written out so the absence is visibly intentional.
         return []
     if sport == "ncaaf":
-        return [_ncaaf_matchup_projection_evidence, _ncaaf_team_profile_evidence, _ncaaf_ats_evidence]
+        # Player first, as MLB leads with the player's own log; the player
+        # fetcher answers only a prop row, and the team fetchers every row.
+        return [_ncaaf_player_log_evidence, _ncaaf_matchup_projection_evidence, _ncaaf_team_profile_evidence,
+                _ncaaf_ats_evidence]
     if sport == "nfl":
-        return [_nfl_matchup_evidence, _nfl_preseason_matchup_evidence, _nfl_team_profile_evidence, _nfl_ats_evidence]
+        return [_nfl_player_projection_evidence, _nfl_matchup_evidence, _nfl_preseason_matchup_evidence,
+                _nfl_team_profile_evidence, _nfl_ats_evidence]
     if sport == "":
         if _is_ranking_intent_question(_question_words(question)):
             return [_mlb_top_candidates_evidence]
@@ -3882,6 +3906,275 @@ def _board_row_evidence_question(question: str, row: dict[str, Any], sport: str)
     return " ".join(parts)
 
 
+# ---------------------------------------------------------------------------
+# Board-row evidence for the sports whose answers carried none (lane
+# `ask-sport-parity`, measured on the production board 2026-09-11). Each reads
+# the resolved Layer 2 row -- player, teams, market -- which
+# `collect_focused_evidence` puts in the context as `board_row`; without one
+# they return None and the sport's question-text fetchers answer as before.
+# All of them READ published artifacts; none computes a projection.
+# ---------------------------------------------------------------------------
+
+
+def _board_row_from_context(context: dict[str, Any], sport: str) -> dict[str, Any] | None:
+    row = context.get("board_row")
+    if not isinstance(row, dict) or str(row.get("sport") or "").strip().lower() != sport:
+        return None
+    return row
+
+
+def _pct_text(value: Any) -> str:
+    number = _to_float(value)
+    return f"{100.0 * number:.1f}%" if number is not None else "—"
+
+
+def _num_text(value: Any, digits: int = 2) -> str:
+    number = _to_float(value)
+    return f"{number:.{digits}f}" if number is not None else "—"
+
+
+def _rows_with_values(rows: list[list[str]]) -> list[list[str]]:
+    """Drop rows whose every value cell is blank -- a table of dashes is noise."""
+    return [row for row in rows if any(cell != "—" for cell in row[1:])]
+
+
+def _soccer_match_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
+    """The soccer sim's own view of the fixture a board row is on.
+
+    Soccer had NO entity fetcher (`K2`/`K11`), so every soccer answer carried
+    zero evidence while the board priced those very rows from this artifact
+    (`projection.source == "soccer_recommendations"`). It is read through the
+    SAME loader, join and slate window the board uses (`load_soccer_projections`
+    + `SoccerProjectionIndex.match_for`, `resolve_window_dates(..., "slate")`),
+    so the evidence and the row's price cannot come from two different sims.
+    `match_for` returns nothing on an ambiguous fixture rather than guessing.
+    """
+    row = _board_row_from_context(context, "soccer")
+    if row is None:
+        return None
+    from syndicate.features.shared import soccer_projections
+    from syndicate.features.shared.layer1_board import resolve_window_dates
+    from syndicate.features.shared.source_roots import preferred_artifact_roots
+    from syndicate.features.shared.timezone import central_today_iso
+
+    selected_date = str(context.get("selected_date") or "").strip() or central_today_iso()
+    # Anchored on the soccer module rather than this file: the board's caller
+    # (`board_enrichment`) sits in the same package, so both resolve one root set.
+    roots = list(preferred_artifact_roots(
+        soccer_projections.__file__, env_var="SYNDICATE_SOCCER_SOURCE_ROOT", local_dir_name="soccer_source",
+    ))
+    try:
+        window = resolve_window_dates("soccer", selected_date, window="slate")
+    except Exception:
+        window = [selected_date]
+    index = soccer_projections.load_soccer_projections(roots, selected_date, window_dates=window)
+    match = index.match_for(row)
+    if not isinstance(match, dict):
+        return None
+
+    matchup = match.get("matchup") or {}
+    home = str(matchup.get("home_team") or row.get("home_team") or "Home")
+    away = str(matchup.get("away_team") or row.get("away_team") or "Away")
+    label = f"{away} @ {home}"
+    kickoff = str(match.get("kickoff") or match.get("date") or "")[:10]
+    league = str(match.get("league") or "")
+    win = match.get("win_probability") or {}
+    team = match.get("team_projection") or {}
+    volume = match.get("volume_projection") or {}
+    goals = match.get("total_distribution") or {}
+    ratings = match.get("adapter_metadata") or {}
+    home_rating = ratings.get("home_rating_detail") or {}
+    away_rating = ratings.get("away_rating_detail") or {}
+
+    tables = [
+        {
+            "title": f"Match sim outlook — {label} ({kickoff or selected_date})",
+            "columns": ["Metric", away, home],
+            "rows": _rows_with_values([
+                ["Win probability", _pct_text(win.get("away")), _pct_text(win.get("home"))],
+                ["Expected goals", _num_text(team.get("away_mean")), _num_text(team.get("home_mean"))],
+                ["Shots", _num_text(volume.get("away_shots"), 1), _num_text(volume.get("home_shots"), 1)],
+                ["Shots on target", _num_text(volume.get("away_shots_on_target"), 1),
+                 _num_text(volume.get("home_shots_on_target"), 1)],
+                ["Corners", _num_text(volume.get("away_corners"), 1), _num_text(volume.get("home_corners"), 1)],
+            ]),
+        },
+        {
+            "title": f"Match sim goals — {label}",
+            "columns": ["Metric", "Value"],
+            "rows": _rows_with_values([
+                ["Draw probability", _pct_text(win.get("draw"))],
+                ["Total goals (mean)", _num_text(goals.get("mean") if goals.get("mean") is not None else team.get("total_mean"))],
+                ["Over 2.5 goals", _pct_text(goals.get("over_2_5_probability"))],
+                ["Both teams to score", _pct_text(goals.get("both_teams_scored_probability"))],
+            ]),
+        },
+        {
+            "title": f"Team ratings the sim used — {label}",
+            "columns": ["Rating", away, home],
+            "rows": _rows_with_values([
+                ["Attack rating", _num_text(away_rating.get("attack_rating")), _num_text(home_rating.get("attack_rating"))],
+                ["Defense rating", _num_text(away_rating.get("defense_rating")), _num_text(home_rating.get("defense_rating"))],
+                ["xG for / match", _num_text(away_rating.get("xg_for_per_match")), _num_text(home_rating.get("xg_for_per_match"))],
+                ["xG against / match", _num_text(away_rating.get("xg_against_per_match")),
+                 _num_text(home_rating.get("xg_against_per_match"))],
+                ["PPDA", _num_text(away_rating.get("ppda"), 1), _num_text(home_rating.get("ppda"), 1)],
+                ["Matches rated", _num_text(away_rating.get("matches"), 0), _num_text(home_rating.get("matches"), 0)],
+            ]),
+        },
+    ]
+    tables = [table for table in tables if table["rows"]]
+
+    # Total goals, summed from the sim's own scoreline distribution -- the soccer
+    # analog of MLB's "Simulated total runs". Arithmetic over published
+    # probabilities; nothing is re-simulated.
+    goals_by_total: dict[str, float] = {}
+    for score, probability in (match.get("scoreline_probabilities") or {}).items():
+        parts = str(score).split("-")
+        weight = _to_float(probability)
+        try:
+            total = int(parts[0]) + int(parts[1])
+        except (IndexError, ValueError):
+            continue
+        if weight is not None:
+            goals_by_total[str(total)] = goals_by_total.get(str(total), 0.0) + weight
+    charts = []
+    goals_chart = _dist_chart(goals_by_total, title=f"Simulated total goals — {label}", x_label="Total goals")
+    if goals_chart:
+        charts.append(goals_chart)
+    if not tables and not charts:
+        return None
+    as_of = index.generated_at_by_league.get(league) or kickoff or selected_date
+    evidence = {"source": "soccer_recommendations", "as_of": as_of, "matchup": label, "league": league}
+    return {"evidence": evidence, "tables": tables, "charts": charts, "as_of": str(as_of)[:10], "sport": "soccer"}
+
+
+# Board market label -> CFBD snapshot stat (`ncaaf.player_stats.STAT_KEYS`).
+_NCAAF_MARKET_STAT = {
+    "receiving yards": "receiving_yards", "receptions": "receptions",
+    "rushing yards": "rushing_yards", "rushing attempts": "rushing_attempts",
+    "passing yards": "passing_yards", "passing attempts": "passing_attempts",
+    "passing tds": "passing_tds", "interceptions": "interceptions", "anytime td": "anytime_td",
+}
+_NCAAF_LOG_COLUMNS = {
+    "receiving": (("receptions", "Rec"), ("receiving_yards", "Rec yds"), ("anytime_td", "TD")),
+    "rushing": (("rushing_attempts", "Att"), ("rushing_yards", "Rush yds"), ("anytime_td", "TD")),
+    "passing": (("passing_attempts", "Att"), ("passing_yards", "Pass yds"), ("passing_tds", "Pass TD"),
+                ("interceptions", "INT")),
+    "scoring": (("rushing_yards", "Rush yds"), ("receiving_yards", "Rec yds"), ("anytime_td", "TD")),
+}
+
+
+def _ncaaf_log_family(stat: str | None) -> str:
+    if stat in ("receptions", "receiving_yards"):
+        return "receiving"
+    if stat in ("rushing_yards", "rushing_attempts"):
+        return "rushing"
+    if stat in ("passing_yards", "passing_attempts", "passing_tds", "interceptions"):
+        return "passing"
+    return "scoring"
+
+
+def _ncaaf_player_log_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
+    """A college player's real game log -- the NCAAF analog of MLB's "Last N games".
+
+    NCAAF props carried no evidence (measured 2026-09-11): the sport had team
+    fetchers only. The CFBD player-game snapshot is published and allowlisted,
+    so the player's actual box-score lines can be shown. No projection is
+    computed here -- none is published for NCAAF props, and web does not model.
+    """
+    row = _board_row_from_context(context, "ncaaf")
+    if row is None or not str(row.get("player_name") or "").strip():
+        return None
+    from syndicate.features.ncaaf import player_stats
+
+    player = str(row.get("player_name")).strip()
+    stat = _NCAAF_MARKET_STAT.get(str(row.get("market") or "").strip().casefold())
+    start = str((row.get("game") or {}).get("start_time_utc") or row.get("commence_time") or "")
+    try:
+        season = int(start[:4])
+    except ValueError:
+        season = int((str(context.get("selected_date") or "").strip() or "0000")[:4] or 0) or None
+    if not season:
+        return None
+
+    games: list[tuple[int, dict[str, Any]]] = []
+    for year in (season, season - 1):
+        player_id = player_stats.resolve_player_id(year, player)
+        if player_id:
+            games.extend((year, game) for game in reversed(player_stats.player_game_log(year, player_id)))
+        if len(games) >= LAST_N_GAMES:
+            break
+    games = games[:LAST_N_GAMES]
+    if not games:
+        return None
+
+    columns = _NCAAF_LOG_COLUMNS[_ncaaf_log_family(stat)]
+    rows = [[str(year), str(game.get("week")), *(_num_text(game.get(key), 0) for key, _ in columns)] for year, game in games]
+    averages = [sum(float(game.get(key) or 0) for _, game in games) / len(games) for key, _ in columns]
+    rows.append(["Avg", "", *(_num_text(value, 1) for value in averages)])
+    count = len(games)
+    table = {
+        "title": f"Last {count} games — {player} (CFBD box scores)",
+        "columns": ["Season", "Week", *(label for _, label in columns)],
+        "rows": rows,
+    }
+    charts = []
+    if stat:
+        line = _to_float(row.get("line"))
+        stat_label = str(row.get("market") or stat).strip()
+        charts.append({
+            "type": "bar",
+            "title": f"{stat_label} by game — {player}" + (f" (line {line:g})" if line is not None else ""),
+            "x_label": "Game",
+            "y_label": stat_label,
+            "points": [{"x": f"{year} W{game.get('week')}", "y": float(game.get(stat) or 0)} for year, game in reversed(games)],
+        })
+    evidence = {"source": "ncaaf_player_game_stats", "player": player, "games": count}
+    return {"evidence": evidence, "tables": [table], "charts": charts, "as_of": "", "sport": "ncaaf"}
+
+
+def _nfl_player_projection_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
+    """Every line the published NFL prop model prices for this player.
+
+    The NFL analog of MLB's "Today's simulated matchup probabilities": the
+    artifact (`nfl_prop_projections_<season>_wk<week>.json`) is published,
+    allowlisted and joined onto board rows by `attach_nfl_prop_projections`,
+    and Ask never showed it. NFL player HISTORY is not on web (nflverse
+    play-by-play is a developer-machine file), so this is the player-level
+    evidence there is. Keys are `stat::player::line` (`_nfl_prop_join_market_key`).
+    """
+    row = _board_row_from_context(context, "nfl")
+    if row is None or not str(row.get("player_name") or "").strip():
+        return None
+    from syndicate.features.shared.nfl_prop_projections import load_nfl_prop_projections
+
+    index = load_nfl_prop_projections(str(context.get("selected_date") or "").strip() or None)
+    player = str(row.get("player_name")).strip()
+    wanted = player.casefold()
+    entries: list[tuple[str, float | None, Any]] = []
+    for key, entry in index.entries.items():
+        parts = str(key).split("::")
+        if len(parts) >= 2 and parts[1] == wanted:
+            entries.append((parts[0], _to_float(parts[2]) if len(parts) > 2 else None, entry))
+    if not entries:
+        return None
+    entries.sort(key=lambda item: (item[0], item[1] if item[1] is not None else -1.0))
+    rows = [
+        [stat.replace("_", " ").capitalize(), _num_text(line, 1) if line is not None else "—",
+         _num_text(entry.get("projected_value"), 1), _pct_text(entry.get("sim_projection"))]
+        for stat, line, entry in entries
+    ]
+    week = f" week {index.week}" if index.week else ""
+    table = {
+        "title": f"Prop model projections — {player} (NFL {index.season or ''}{week})".replace("( ", "("),
+        "columns": ["Market", "Line", "Projected", "P(over)"],
+        "rows": rows,
+    }
+    evidence = {"source": "nfl_prop_model", "season": index.season, "week": index.week, "lines": len(rows)}
+    return {"evidence": evidence, "tables": [table], "charts": [], "as_of": "", "sport": "nfl"}
+
+
 def collect_focused_evidence(
     question: str, context: dict[str, Any], *, board_row: dict[str, Any] | None = None
 ) -> dict[str, Any] | None:
@@ -3889,12 +4182,19 @@ def collect_focused_evidence(
 
     `board_row` is the Layer 2 row the question was asked from (see
     `resolve_board_row`). With it, the fetchers are pointed at that row's game
-    and player, not only at whatever the question's words happen to name.
+    and player, not only at whatever the question's words happen to name, and
+    the row itself travels in the context for the fetchers that need it.
     """
     sport = str(context.get("sport_slug") or context.get("sport") or "").strip().lower()
     if isinstance(board_row, dict):
         sport = sport or str(board_row.get("sport") or "").strip().lower()
         question = _board_row_evidence_question(question, board_row, sport)
+        context = {
+            **context,
+            "board_row": board_row,
+            "board_away_team": str(board_row.get("away_team") or "").strip(),
+            "board_home_team": str(board_row.get("home_team") or "").strip(),
+        }
     sections: list[dict[str, Any]] = []
     for fetcher in _fetchers_for_sport(sport, question):
         try:

@@ -231,10 +231,12 @@ class RegistrationTests(unittest.TestCase):
 
     def test_soccer_and_ncaab_are_no_longer_empty(self) -> None:
         # Both returned `[]` before M1 -- a correctly-routed soccer question got
-        # no evidence at all, and soccer is half the published board.
-        for sport in ("soccer", "ncaab"):
-            with self.subTest(sport=sport):
-                self.assertEqual(len(_fetchers_for_sport(sport, "best edges today")), 1)
+        # no evidence at all, and soccer is half the published board. ncaab is
+        # still the board fetcher alone; soccer now also reads its own sim for a
+        # board row's fixture (lane `ask-sport-parity`), after the board fetcher.
+        names = {sport: [f.__name__ for f in _fetchers_for_sport(sport, "best edges today")] for sport in ("soccer", "ncaab")}
+        self.assertEqual(names["ncaab"], ["_board_candidates_evidence"])
+        self.assertEqual(names["soccer"], ["_board_candidates_evidence", "_soccer_match_evidence"])
 
     def test_the_mlb_ranking_branch_still_takes_precedence_for_its_own_markets(self) -> None:
         # M1 must not displace the MLB leaderboard for a question that names an

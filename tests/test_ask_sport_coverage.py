@@ -159,11 +159,16 @@ class FetcherDispatchTests(unittest.TestCase):
         self.assertIn(data_module._wnba_focused_evidence, fetchers)
 
     def test_soccer_and_ncaab_still_reach_the_board_fetcher(self) -> None:
-        """They have no entity fetcher of their own -- the point of K2/K11 is
-        that being ROUTABLE lets the board fetcher filter to them exactly."""
+        """Being ROUTABLE lets the board fetcher filter to them exactly (K2/K11).
+        ncaab still has no entity fetcher of its own. Soccer now has one, for
+        the fixture of a board row (lane `ask-sport-parity`), and the board
+        fetcher must still come first for both."""
+        self.assertEqual(data_module._entity_fetchers_for_sport("ncaab", "best bets"), [])
+        self.assertEqual(
+            data_module._entity_fetchers_for_sport("soccer", "best bets"), [data_module._soccer_match_evidence]
+        )
         for sport in ("soccer", "ncaab"):
-            self.assertEqual(data_module._entity_fetchers_for_sport(sport, "best bets"), [])
-            self.assertIn(data_module._board_candidates_evidence, data_module._fetchers_for_sport(sport, "best bets tonight"))
+            self.assertIs(data_module._fetchers_for_sport(sport, "best bets tonight")[0], data_module._board_candidates_evidence)
 
     def test_nfl_matchup_fetcher_is_reachable_from_a_nickname(self) -> None:
         """The falsification test for K9, kept as a regression: if this returns

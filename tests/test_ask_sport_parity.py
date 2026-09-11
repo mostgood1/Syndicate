@@ -191,5 +191,186 @@ class AskFromTheBoardRowTests(unittest.TestCase):
         self.assertIs(seen["board_row"], BEN_UNDER)
 
 
+class FetcherWiringTests(unittest.TestCase):
+    """Reachability before correctness: each new fetcher is dispatched, and it
+    receives the row and both team names it reads."""
+
+    def test_each_sport_dispatches_its_board_row_fetcher(self) -> None:
+        self.assertIn(ask_data._soccer_match_evidence, ask_data._entity_fetchers_for_sport("soccer", "q"))
+        self.assertIs(ask_data._entity_fetchers_for_sport("ncaaf", "q")[0], ask_data._ncaaf_player_log_evidence)
+        self.assertIs(ask_data._entity_fetchers_for_sport("nfl", "q")[0], ask_data._nfl_player_projection_evidence)
+
+    def test_the_fetchers_are_handed_the_row_and_its_teams(self) -> None:
+        seen: list[dict] = []
+
+        def recorder(question, context):
+            seen.append(context)
+            return None
+
+        with mock.patch.object(ask_data, "_fetchers_for_sport", return_value=[recorder]):
+            ask_data.collect_focused_evidence("q", {"sport": "ncaaf"}, board_row=TOTAL_UNDER)
+        self.assertIs(seen[0]["board_row"], TOTAL_UNDER)
+        self.assertEqual(
+            (seen[0]["board_away_team"], seen[0]["board_home_team"]),
+            ("Georgia State Panthers", "Kennesaw State Owls"),
+        )
+
+
+class MlbExactGameTests(unittest.TestCase):
+    """A board row names its game exactly. `_mlb_game_score` alone scores ANY
+    shared team word ("New York") at 100 and keeps slate order on a tie."""
+
+    QUESTION = "What's the case for and against Under 8.5 in New York Mets @ Atlanta Braves?"
+
+    def setUp(self) -> None:
+        import json
+        import os
+        import tempfile
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        daily = os.path.join(self._tmp.name, "mlb", "daily")
+        os.makedirs(daily)
+        full = {"home_win_prob": 0.5, "away_win_prob": 0.5, "away_runs_mean": 4.0, "home_runs_mean": 4.0,
+                "total_runs_dist": {"8": 10}, "run_margin_dist": {"1": 5}}
+        summary = {"date": "2026-09-11", "outputs": [
+            {"game_pk": 1, "away": "NYY", "home": "BOS", "starter_names": {}, "full": full, "pitcher_props": {}},
+            {"game_pk": 2, "away": "NYM", "home": "ATL", "starter_names": {}, "full": full, "pitcher_props": {}},
+        ]}
+        targets = {"games": [
+            {"game_pk": 1, "away": "New York Yankees", "home": "Boston Red Sox", "away_abbr": "NYY",
+             "home_abbr": "BOS", "targets": []},
+            {"game_pk": 2, "away": "New York Mets", "home": "Atlanta Braves", "away_abbr": "NYM",
+             "home_abbr": "ATL", "targets": []},
+        ]}
+        with open(os.path.join(daily, "daily_summary_2026_09_11.json"), "w", encoding="utf-8") as handle:
+            json.dump(summary, handle)
+        with open(os.path.join(daily, "daily_summary_2026_09_11_hr_targets.json"), "w", encoding="utf-8") as handle:
+            json.dump(targets, handle)
+        self.env = {"MLB_BETTING_DATA_ROOT": os.path.join(self._tmp.name, "mlb")}
+
+    def test_the_board_rows_teams_pick_the_game(self) -> None:
+        with mock.patch.dict("os.environ", self.env):
+            found = ask_data._mlb_match_game(self.QUESTION, {
+                "selected_date": "2026-09-11",
+                "board_away_team": "New York Mets", "board_home_team": "Atlanta Braves",
+            })
+        self.assertEqual(found[0]["game_pk"], 2)
+
+    def test_without_them_new_york_collides_and_slate_order_decides(self) -> None:
+        # off != on: the collision the exact match exists for.
+        with mock.patch.dict("os.environ", self.env):
+            found = ask_data._mlb_match_game(self.QUESTION, {"selected_date": "2026-09-11"})
+        self.assertEqual(found[0]["game_pk"], 1)
+
+
+class SoccerMatchEvidenceTests(unittest.TestCase):
+    ROW = {"sport": "soccer", "event_id": "2a284d621fe10e2a722fd9b6d17814a2", "market": "totals", "side": "under",
+           "line": 2.5, "home_team": "Lorient", "away_team": "Toulouse",
+           "game": {"start_time_utc": "2026-09-12T18:45:00+00:00"}}
+    MATCH = {
+        "matchup": {"home_team": "Lorient", "away_team": "Toulouse"},
+        "kickoff": "2026-09-12T18:45:00Z", "league": "ligue_1",
+        "win_probability": {"home": 0.41, "draw": 0.27, "away": 0.32},
+        "team_projection": {"home_mean": 1.42, "away_mean": 1.18, "total_mean": 2.6},
+        "total_distribution": {"mean": 2.6, "over_2_5_probability": 0.52, "both_teams_scored_probability": 0.55},
+        "volume_projection": {"home_shots": 12.4, "away_shots": 10.9},
+        "scoreline_probabilities": {"0-0": 0.08, "1-0": 0.11, "1-1": 0.13, "2-1": 0.09, "0-2": 0.05},
+        "adapter_metadata": {"home_rating_detail": {"attack_rating": 1.05, "xg_for_per_match": 1.4},
+                             "away_rating_detail": {"attack_rating": 0.97, "xg_for_per_match": 1.2}},
+    }
+    LOADER = "syndicate.features.shared.soccer_projections.load_soccer_projections"
+
+    def _index(self):
+        from syndicate.features.shared import soccer_projections as sp
+
+        index = sp.SoccerProjectionIndex()
+        index.by_teams[(sp._norm_team("Lorient"), sp._norm_team("Toulouse"))] = dict(self.MATCH)
+        index.generated_at_by_league["ligue_1"] = "2026-09-11T13:28:12-05:00"
+        return index
+
+    def test_a_soccer_row_gets_the_sims_view_of_its_fixture(self) -> None:
+        with mock.patch(self.LOADER, return_value=self._index()):
+            result = ask_data._soccer_match_evidence("q", {"board_row": self.ROW, "selected_date": "2026-09-11"})
+        titles = [table["title"] for table in result["tables"]]
+        self.assertTrue(titles[0].startswith("Match sim outlook — Toulouse @ Lorient"), titles)
+        outlook = {row[0]: row[1:] for row in result["tables"][0]["rows"]}
+        self.assertEqual(outlook["Win probability"], ["32.0%", "41.0%"])  # away, home
+        self.assertNotIn("Corners", outlook)  # not published -> absent, not a row of dashes
+        goals = {row[0]: row[1] for row in result["tables"][1]["rows"]}
+        self.assertEqual(goals["Over 2.5 goals"], "52.0%")
+        self.assertIn("Team ratings the sim used — Toulouse @ Lorient", titles)
+        self.assertEqual(result["charts"][0]["title"], "Simulated total goals — Toulouse @ Lorient")
+
+    def test_only_a_soccer_row_with_a_matching_fixture_answers(self) -> None:
+        with mock.patch(self.LOADER, return_value=self._index()):
+            self.assertIsNone(ask_data._soccer_match_evidence("q", {}))
+            self.assertIsNone(ask_data._soccer_match_evidence("q", {"board_row": dict(self.ROW, sport="mlb")}))
+            other = dict(self.ROW, event_id="x", home_team="Nantes", away_team="Brest")
+            self.assertIsNone(ask_data._soccer_match_evidence("q", {"board_row": other}))
+
+
+class NcaafPlayerLogTests(unittest.TestCase):
+    ROW = dict(BEN_UNDER, game={"start_time_utc": "2026-09-11T23:30:00+00:00"})
+    LOG = [
+        {"game_id": "g1", "week": 1, "receptions": 3.0, "receiving_yards": 31.0, "anytime_td": 0.0},
+        {"game_id": "g2", "week": 2, "receptions": 5.0, "receiving_yards": 57.0, "anytime_td": 1.0},
+    ]
+
+    def test_a_college_prop_gets_the_players_real_game_log(self) -> None:
+        with mock.patch(
+            "syndicate.features.ncaaf.player_stats.resolve_player_id",
+            side_effect=lambda season, name: "p1" if season == 2026 and name == "Ben Black" else None,
+        ), mock.patch("syndicate.features.ncaaf.player_stats.player_game_log", return_value=list(self.LOG)):
+            result = ask_data._ncaaf_player_log_evidence("q", {"board_row": self.ROW})
+        table = result["tables"][0]
+        self.assertEqual(table["title"], "Last 2 games — Ben Black (CFBD box scores)")
+        self.assertEqual(table["columns"], ["Season", "Week", "Rec", "Rec yds", "TD"])
+        self.assertEqual(table["rows"][0], ["2026", "2", "5", "57", "1"])  # newest first
+        self.assertEqual(table["rows"][-1], ["Avg", "", "4.0", "44.0", "0.5"])
+        chart = result["charts"][0]
+        self.assertEqual(chart["title"], "Receiving Yards by game — Ben Black (line 24.5)")
+        self.assertEqual([point["y"] for point in chart["points"]], [31.0, 57.0])  # chronological
+
+    def test_a_game_row_or_an_unknown_player_gets_no_log(self) -> None:
+        with mock.patch("syndicate.features.ncaaf.player_stats.resolve_player_id", return_value=None):
+            self.assertIsNone(ask_data._ncaaf_player_log_evidence("q", {"board_row": self.ROW}))
+        self.assertIsNone(ask_data._ncaaf_player_log_evidence("q", {"board_row": TOTAL_UNDER}))
+
+
+class NflPlayerProjectionTests(unittest.TestCase):
+    ROW = dict(MODEL_H2H, market="Receptions", side="over", line=4.5, player_name="Michael Pittman Jr.", kind="prop")
+
+    def test_an_nfl_prop_gets_every_line_the_model_prices_for_the_player(self) -> None:
+        from syndicate.features.shared.nfl_prop_projections import NflPropProjectionIndex
+
+        index = NflPropProjectionIndex(season=2026, week=1, entries={
+            "receptions::michael pittman jr.::5.5": {"projected_value": 4.9, "sim_projection": 0.41},
+            "receptions::michael pittman jr.::4.5": {"projected_value": 4.9, "sim_projection": 0.55},
+            "receiving_yards::michael pittman jr.::52.5": {"projected_value": 55.1, "sim_projection": 0.53},
+            "receptions::someone else::3.5": {"projected_value": 3.0, "sim_projection": 0.4},
+        })
+        with mock.patch(
+            "syndicate.features.shared.nfl_prop_projections.load_nfl_prop_projections", return_value=index
+        ):
+            result = ask_data._nfl_player_projection_evidence("q", {"board_row": self.ROW})
+        table = result["tables"][0]
+        self.assertEqual(table["title"], "Prop model projections — Michael Pittman Jr. (NFL 2026 week 1)")
+        self.assertEqual(table["rows"], [
+            ["Receiving yards", "52.5", "55.1", "53.0%"],
+            ["Receptions", "4.5", "4.9", "55.0%"],
+            ["Receptions", "5.5", "4.9", "41.0%"],
+        ])
+
+    def test_a_player_the_model_does_not_price_gets_nothing(self) -> None:
+        from syndicate.features.shared.nfl_prop_projections import NflPropProjectionIndex
+
+        with mock.patch(
+            "syndicate.features.shared.nfl_prop_projections.load_nfl_prop_projections",
+            return_value=NflPropProjectionIndex(season=2026, week=1, entries={}),
+        ):
+            self.assertIsNone(ask_data._nfl_player_projection_evidence("q", {"board_row": self.ROW}))
+
+
 if __name__ == "__main__":
     unittest.main()
