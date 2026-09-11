@@ -5,6 +5,30 @@
 
 ---
 
+## 2026-09-11 11:52 CT — web `4c373107` -> `0022ecb1` (lane `ncaaf-tbd-kickoff-date`, session `53eaee9c`, user decision "Deploy web now") — **SATURDAY'S NCAAF CHIPS: MET. `?date=2026-09-12` now carries 80 NCAAF chips (was 76), and the four TBD games sit on Saturday reading "Sat Sep 12 · TBD". Friday stays at 5 with 0 placeholders, and real kickoffs keep their clocks. LANE GOAL MET.**
+
+- **Preflight and deploy:**
+  - Web preflight read CLEAR at 11:44:22 CT: only infrastructure processes, plus 2 defunct children.
+  - Deploy `dep-dai2vt8jo6nc73d7p8og` went live at 16:49:58Z (11:49:58 CT).
+  - `render_events` from 16:44Z through the read showed `server_available` and `deploy_ended`, with no `server_failed`.
+  - The claim was released after the reading.
+- **Health at 16:50Z:** `/healthz` 200 in 0.3s, `/` 200 in 3.3s, `/intelligence` 200 in 4.3s.
+- **Collateral:** `4c373107..0022ecb1` holds 11 code commits and 0 touching `render.yaml`:
+  - Polymarket: `1afec00f`, `f8b67afa`, `1e1285a4`, `3bafdd2b`.
+  - Live venue plan: `78e4623f` (#661).
+  - Kalshi precap: `7c248328`, flag-gated.
+  - NCAAF live state: `48621d65`, `42d49364`.
+  - A comment only: `b50ee608`.
+  - The NFL Kalshi identity fix: `5767e3ac`. Web does not run the capture.
+  - This fix: `889d4e12`.
+- **Reading at 16:50:34Z:**
+  - **(1) PASS.** Default date 2026-09-11, `worker_artifact` published 16:49:55Z: 5 NCAAF chips, 0 at a placeholder start, and none of the four games. This is unchanged from the refresh-worker reading.
+  - **(2) PASS.** `?date=2026-09-12`, web's inline build, now running the fix, carries **80** NCAAF chips, up from 76. The local replay predicted exactly 76 -> 80. MER @ NM, SM @ AUB, NMS @ HAW and CP @ SJS are present, each with `status_token` "Sat Sep 12 · TBD" and `start_time_utc` 17:00Z (noon Central, used for date and sort only).
+  - **(3) PASS.** 76 of the 09-12 chips keep a real clock, e.g. "Sat Sep 12 · 11:00A CT". This is the falsification test: a fix keyed on the clock would have moved real late kickoffs.
+- **Measured:** MET. Lane `ncaaf-tbd-kickoff-date` is CLOSED on this reading.
+
+---
+
 ## 2026-09-11 11:20 CT — refresh-worker `78e4623f` -> `889d4e12` (lane `ncaaf-tbd-kickoff-date`, session `53eaee9c`, user decision "Take claims, fix + deploy") — **FRIDAY'S NCAAF CHIPS: MET. Chips went from 9 to 5, with 0 at the 00:00-Eastern placeholder, and the four TBD Saturday games are gone. SATURDAY'S HALF: NOT MET YET. `?date=2026-09-12` is web's INLINE build on `4c373107`, which lacks the fix and omits the four games. It resolves at the midnight date roll, when refresh-worker's artifact serves 09-12, or sooner with a web deploy.**
 
 - **Preflight and deploy:**
