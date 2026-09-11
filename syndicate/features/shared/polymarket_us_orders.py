@@ -65,6 +65,7 @@ survived its own contract change.
 
 from __future__ import annotations
 
+import datetime as _dt
 import math
 import os
 import urllib.parse
@@ -845,9 +846,17 @@ def polymarket_us_submitter(resolve_market):
     2026-09-04 order that froze both venues for six days was refused on the
     line below AFTER its row had been written, and a lost update kept the row.
     Calling `submit` directly is build-then-send, unchanged.
+
+    KICKOFF AND PAUSE COME FIRST `[2026-09-11, user decision, lane
+    polymarket-e2e-review]`. Before the market is even resolved, `build`
+    refuses a position at or after its kickoff (`game_started`), one whose
+    kickoff cannot be read (`commence_unknown`), and a market paused by
+    configuration (`market_paused`). See `_refuse_after_commence`.
     """
 
     def build(request: Any):
+        _refuse_paused_market(request)
+        _refuse_after_commence(request)
         resolved = resolve_market(request)
         if not resolved:
             raise OrderBuildError("market_unresolved_for_position")
@@ -888,6 +897,75 @@ def polymarket_us_submitter(resolve_market):
 
     submit.build = build
     return submit
+
+
+# --------------------------------------------------------------------------
+# NEVER AFTER KICKOFF, AND A PAUSE BY MARKET  [2026-09-11, user decision,
+# lane polymarket-e2e-review]
+# --------------------------------------------------------------------------
+#
+# Every position the executor places was PRICED PREGAME. The plan's model
+# probability is a pregame number, and nothing re-checks it once the game is
+# under way, so placing it after kickoff buys a stale edge at an in-play price.
+# Measured over every Polymarket live order 08-27..09-11: near-even bets placed
+# IN-PLAY went 3-10 against 5.7 expected at their own prices (-46.6%), and
+# PREGAME 10-9 against 8.6. The pregame hold that sent bets in-play is deleted
+# from `execute_portfolio`, and this makes the rule explicit: a Polymarket order
+# is built pregame or not at all.
+#
+# Both checks run in `build`, the one build every Polymarket order passes, and
+# BEFORE the market is resolved. A refusal at build writes no ledger row, and
+# `execution_ledger._refusal_token` counts it by the text before the colon.
+
+_PAUSED_MARKETS_ENV = "SYNDICATE_POLYMARKET_PAUSED_MARKETS"
+
+
+def _paused_market_tokens() -> tuple[str, ...]:
+    """Market-name substrings refused LIVE on this venue. EMPTY BY DEFAULT.
+
+    `SYNDICATE_POLYMARKET_PAUSED_MARKETS`, comma-separated, matched as a
+    substring of the position's `market`, so `total` covers `totals` and
+    `alternate_totals_corners`. `none`, `off` or `0` pauses nothing.
+
+    A PAUSE IS CONFIGURATION, NOT CODE. It was set 2026-09-11 because
+    Polymarket totals lost in BOTH books: paper -40.7% over 106 settled, live
+    -34.0% over 33. It ends when that is explained. Paper never builds through
+    this submitter, so paper keeps measuring the paused markets.
+    """
+    raw = str(os.environ.get(_PAUSED_MARKETS_ENV) or "").strip().lower()
+    if raw in ("", "none", "off", "0"):
+        return ()
+    return tuple(token for token in (part.strip() for part in raw.split(",")) if token)
+
+
+def _refuse_paused_market(request: Any) -> None:
+    market = str(getattr(request, "market", "") or "").strip().lower()
+    for token in _paused_market_tokens():
+        if token in market:
+            raise OrderBuildError(f"market_paused: {market!r} matches {token!r} in {_PAUSED_MARKETS_ENV}")
+
+
+def _refuse_after_commence(request: Any, *, now: _dt.datetime | None = None) -> None:
+    """Refuse a build at or after kickoff, or when kickoff cannot be read.
+
+    UNKNOWN IS REFUSED, NOT PLACED. "We cannot tell whether the game has
+    started" is exactly the case this exists for. 9 of the 144 Polymarket live
+    orders to 2026-09-11 carried no `commence_time` (all soccer `atc-` h2h), and
+    placing one of them could be the silent in-play bet this is here to stop.
+    """
+    text = str(getattr(request, "commence_time", None) or "").strip()
+    if not text:
+        raise OrderBuildError("commence_unknown: no commence_time on the position")
+    try:
+        starts = _dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        raise OrderBuildError(f"commence_unknown: unreadable {text!r}") from None
+    if starts.tzinfo is None:
+        starts = starts.replace(tzinfo=_dt.timezone.utc)
+    current = now or _dt.datetime.now(_dt.timezone.utc)
+    if current >= starts:
+        minutes = (current - starts).total_seconds() / 60.0
+        raise OrderBuildError(f"game_started: {minutes:.0f} min after commence {text}")
 
 
 # --------------------------------------------------------------------------

@@ -674,3 +674,114 @@ def test_a_small_marketMetadata_is_NOT_clipped(capsys):
     }], mode="per_order")
     out = capsys.readouterr().out
     assert "MARKET_STATE_OPEN" in out and "...+" not in out
+
+
+# --------------------------------------------------------------------------
+# NEVER AFTER KICKOFF, AND A PAUSE BY MARKET  [2026-09-11, lane
+# polymarket-e2e-review]. Both refuse in `build`, BEFORE the market resolves,
+# so a refused order writes no ledger row and is counted by its token.
+# --------------------------------------------------------------------------
+
+_FUTURE = "2099-01-01T00:00:00Z"
+_PAST = "2026-08-22T23:05:00Z"
+_PAUSED = "SYNDICATE_POLYMARKET_PAUSED_MARKETS"
+
+
+def _gated(market="h2h", commence=_FUTURE):
+    request = _Request(side="over")
+    request.market = market
+    request.commence_time = commence
+    return request
+
+
+def _build(request):
+    """`(counter token, resolver calls)` for one build through the real adapter.
+
+    The resolver returns None, so a build that PASSES the gates refuses with
+    `market_unresolved_for_position` -- which is the proof it got that far."""
+    from syndicate.features.shared.execution_ledger import _refusal_token
+    from syndicate.features.shared.polymarket_us_orders import polymarket_us_submitter
+
+    calls = []
+
+    def resolve(req):
+        calls.append(req)
+        return None
+
+    with pytest.raises(OrderBuildError) as raised:
+        polymarket_us_submitter(resolve).build(request)
+    return _refusal_token(raised.value), calls
+
+
+def test_a_position_past_kickoff_is_refused_before_the_market_resolves(monkeypatch):
+    monkeypatch.delenv(_PAUSED, raising=False)
+    token, calls = _build(_gated(commence=_PAST))
+    assert token == "game_started"
+    assert calls == [], "a started game must not even reach the resolver"
+
+
+def test_a_position_with_no_kickoff_is_refused_not_placed(monkeypatch):
+    """Unknown is the case this exists for: it may be in-play."""
+    monkeypatch.delenv(_PAUSED, raising=False)
+    token, calls = _build(_gated(commence=None))
+    assert token == "commence_unknown" and calls == []
+
+
+def test_an_unreadable_kickoff_is_refused(monkeypatch):
+    monkeypatch.delenv(_PAUSED, raising=False)
+    token, calls = _build(_gated(commence="tonight"))
+    assert token == "commence_unknown" and calls == []
+
+
+def test_a_pregame_position_still_reaches_the_resolver(monkeypatch):
+    """OFF != ON: the gate must let a pregame bet through, or it is a kill switch."""
+    monkeypatch.delenv(_PAUSED, raising=False)
+    request = _gated(commence=_FUTURE)
+    token, calls = _build(request)
+    assert token == "market_unresolved_for_position"
+    assert calls == [request]
+
+
+def test_kickoff_itself_is_refused_and_one_second_before_is_not():
+    import datetime as dt
+
+    from syndicate.features.shared.polymarket_us_orders import _refuse_after_commence
+
+    request = _gated(commence="2026-09-11T23:00:00Z")
+    kickoff = dt.datetime(2026, 9, 11, 23, 0, tzinfo=dt.timezone.utc)
+    with pytest.raises(OrderBuildError, match="^game_started"):
+        _refuse_after_commence(request, now=kickoff)
+    _refuse_after_commence(request, now=kickoff - dt.timedelta(seconds=1))
+
+
+def test_totals_are_not_paused_by_default(monkeypatch):
+    """The pause is CONFIGURATION: absent means nothing is paused."""
+    monkeypatch.delenv(_PAUSED, raising=False)
+    token, calls = _build(_gated(market="totals"))
+    assert token == "market_unresolved_for_position" and len(calls) == 1
+
+
+def test_a_paused_market_is_refused_before_the_market_resolves(monkeypatch):
+    monkeypatch.setenv(_PAUSED, "total")
+    token, calls = _build(_gated(market="totals"))
+    assert token == "market_paused" and calls == []
+
+
+def test_the_pause_covers_alternate_totals_and_spares_moneylines(monkeypatch):
+    monkeypatch.setenv(_PAUSED, "total")
+    assert _build(_gated(market="alternate_totals_corners"))[0] == "market_paused"
+    token, calls = _build(_gated(market="h2h"))
+    assert token == "market_unresolved_for_position" and len(calls) == 1
+
+
+def test_none_pauses_nothing(monkeypatch):
+    monkeypatch.setenv(_PAUSED, "none")
+    token, calls = _build(_gated(market="totals"))
+    assert token == "market_unresolved_for_position" and len(calls) == 1
+
+
+def test_the_pause_is_checked_before_kickoff(monkeypatch):
+    """A paused market past kickoff reads `market_paused`: the configured
+    refusal names itself first, so the pause is countable on its own."""
+    monkeypatch.setenv(_PAUSED, "total")
+    assert _build(_gated(market="totals", commence=_PAST))[0] == "market_paused"

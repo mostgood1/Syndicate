@@ -15,8 +15,6 @@ problem.
 
 from __future__ import annotations
 
-import datetime as _dt
-import hashlib as _hashlib
 import os
 import time
 from collections.abc import Sequence
@@ -578,93 +576,15 @@ def run_execution(
             )
             continue
 
-        # TOO EARLY TO PLACE  [2026-08-31, user decision]
-        #
-        # >>> THE ORIGINAL PREMISE OF THIS GATE IS REFUTED. READ THIS FIRST. <<<
-        #
-        # It was built on "pregame orders do not fill at any price -- 8 of 8
-        # fills came on live-or-past markets, 3 of 3 pregame orders rest".
-        # **THAT IS FALSE**, measured 2026-08-31T05:29Z, ONE HOUR after it
-        # shipped:
-        #
-        #     aec-mlb-ath-tex-2026-08-31  h2h  kickoff +18.6h  FILLED in ~18 min
-        #     tsc-sea-lec-rom-...-2pt5    tot  kickoff +11.0h  resting
-        #     tsc-epl-ast-ars-...-2pt5    tot  kickoff +13.5h  resting
-        #
-        # **The order that FILLED was FURTHER from kickoff than the two that did
-        # not.** Time does not separate them. Confirmed independently by
-        # `polymarket-yes-leg-binding`, whose filled/resting bands OVERLAP
-        # (+18.8h filled between +16.8h and +20.4h resting).
-        #
-        # The original 8-of-8 reading was CONFOUNDED: those fills were older
-        # orders on games ALREADY UNDER WAY, so "past" was doing the work, not
-        # "hours to kickoff".
-        #
-        # WHY THE GATE STAYS ANYWAY, on a DIFFERENT and still-standing argument:
-        # CHURN. An order that cannot fill rests, the venue cancels it, the next
-        # tick re-places it -- and that submit/cancel/resubmit loop is what
-        # produced a DUPLICATE LIVE BET ($9.12 on lad-det, two orders for one
-        # intended position). Holding costs no stake: an unfilled order reserves
-        # no funds (balance flat at $87.26 across a cancellation).
-        #
-        # **THIS GATE IS ON THE WRONG AXIS. IT IS TIME; THE SEPARATOR IS PRICE.**
-        #
-        # Measured 2026-08-31T05:33Z over 12 tracked orders, verified in this
-        # session independently of the lane that first reported it:
-        #
-        #     PREGAME   filled   0.240  0.250  0.335
-        #               resting  0.410  0.435  0.460  0.460  0.490 x3
-        #               -> max filled 0.335 < min resting 0.410, ZERO OVERLAP
-        #     PAST      filled   0.210  0.490      resting: none
-        #
-        # **Pregame, only CHEAP sides fill -- near-even sides have no book.
-        # Once the market is live, everything fills, including 0.490.** That is
-        # a 2-D structure, and every one-variable story broke on it: the +18.6h
-        # fill that killed the time rule was CHEAP (0.335); the 0.490 fill that
-        # kills a price-only rule was PAST (`lar-lac`, 08-27).
-        #
-        # CONSEQUENCE FOR THIS GATE: `hours_to_commence > 24` filters the wrong
-        # thing in BOTH directions -- it suppresses cheap pregame sides that DO
-        # fill, while still placing near-even ones that never will. A PRICE
-        # condition pregame would keep everything the churn argument wants held
-        # and stop suppressing the fills.
-        #
-        # ALSO CORRECTED: an earlier revision of this comment said "no soccer
-        # `tsc-` total has ever filled". FALSE -- `tsc-sea-juv-par-2026-08-29`
-        # filled at 0.210, and two soccer h2h filled pregame at 0.240 and 0.250.
-        # Soccer fills; it fills CHEAP.
-        #
-        # NOT YET ACTED ON, deliberately: n=3 pregame fills. The boundary lies
-        # somewhere in the unobserved gap 0.335 -> 0.410, so ~0.37 is a midpoint
-        # GUESS, not a measured threshold, and "already started" is currently
-        # derived from the slug date rather than a live-state feed.
-        #
-        # WHAT PLACING EARLY ACTUALLY COSTS. Not the stake -- an unfilled order
-        # holds no reserved funds (balance was flat at $87.26 across a
-        # cancellation). It costs CHURN: the order rests, the venue cancels it,
-        # the next tick re-places it, and that submit -> cancel -> resubmit loop
-        # is where the duplicate exposure came from ($9.12 on lad-det, two live
-        # orders for one intended bet).
-        #
-        # HOLD, DO NOT DROP. `skipped` means "not placed on this pass", and the
-        # position stays in the plan, so the next tick inside the window places
-        # it normally. Nothing is abandoned.
-        held = _polymarket_hold_price(request, venue, position)
-        if held is not None:
-            price, hours = held
-            skipped += 1
-            refused["pregame_price_too_high"] = refused.get("pregame_price_too_high", 0) + 1
-            print(
-                f"[execute_portfolio] HELD_PREGAME_NEAR_EVEN venue={venue}"
-                f" ticker={getattr(request, 'venue_ticker', None)!r}"
-                f" market={getattr(request, 'market', None)}"
-                f" submit_price={price:.3f} ceiling={_polymarket_max_pregame_price()}"
-                f" {_ev_fields_of(position)}"
-                f" hours_to_commence={hours:.1f}"
-                " -- pregame, no book on a near-even side; it places once live",
-                flush=True,
-            )
-            continue
+        # THE PREGAME NEAR-EVEN HOLD IS GONE  [2026-09-11, user decision, lane
+        # polymarket-e2e-review]. It held pregame Polymarket orders priced above
+        # 0.35 on a one-day sample of 11, and its own stated falsifier -- "a
+        # PREGAME FILL above 0.410" -- was already in the ledger more than ten
+        # times (08-28..08-31). Of the 51 held bets whose games started, 36 were
+        # never placed and 4 became fills, and near-even bets sent in-play went
+        # 3-10 against 5.7 expected. A Polymarket order is now built pregame or
+        # not at all: `polymarket_us_orders._refuse_after_commence`. Evidence:
+        # `state_polymarket.md` [polymarket-pregame-hold-premise-falsified].
 
         before = _status_of(request)
         # A REJECTED order never reached the venue, so a fresh attempt is a
@@ -1105,162 +1025,13 @@ def _polymarket_max_price_age_seconds() -> float:
     return parsed if parsed > 0 else _slate_ceiling_default()
 
 
-def _polymarket_explore_rate() -> float:
-    """Fraction of would-be-held boundary orders to PLACE anyway, 0.0-1.0.
-
-    `SYNDICATE_POLYMARKET_EXPLORE_RATE`, default 0.50 `[2026-08-31, user
-    decision]`. `0` disables exploration.
-
-    **RAISED FROM 0.10 BECAUSE 0.10 SAMPLED ALMOST NOTHING.** 0.10 was chosen
-    for a large population; the real boundary population is 1-3 positions per
-    tick. Measured on the first live tick: four orders held at 0.485, 0.465,
-    0.461 and 0.450 against a 0.35-0.45 band, so exactly ONE qualified -- and at
-    0.10 a single qualifying order explores a tenth of the time.
-
-    **AND THE ARM SAMPLES POSITIONS, NOT TICKS.** Assignment is deterministic on
-    `position_key` (see `_polymarket_explores`), so re-evaluating the same held
-    order every five minutes gives no further chances -- it never re-rolls. With
-    a handful of NEW boundary positions a day, 0.10 yielded roughly one
-    exploration order every several days, which cannot re-derive a threshold.
-
-    The cost of a higher rate is CHURN, not stake: these orders do not fill, so
-    what is spent is cancel/re-place cycles inside a 10c-wide band, not money.
-
-    WHY THIS EXISTS: WITHOUT IT THE GATE CANNOT BE RE-DERIVED. Asked on
-    2026-08-31 whether `sf-atl` (pregame, ~0.400, the closest observation to the
-    boundary) had filled, the answer was that it was NEVER PLACED -- the gate
-    held it. Every surviving order then fitted the rule, which is what a
-    self-confirming filter looks like. The stated falsifier ("a pregame fill
-    above 0.410") can only come from the population the gate suppresses, so the
-    evidence was frozen at n=3 and could not grow, and any threshold inside
-    0.335-0.410 would look correct forever.
-    """
-    raw = str(os.environ.get("SYNDICATE_POLYMARKET_EXPLORE_RATE") or "").strip()
-    if not raw:
-        return 0.50
-    try:
-        return max(0.0, min(1.0, float(raw)))
-    except (TypeError, ValueError):
-        print(
-            f"[execute_portfolio] EXPLORE_RATE_UNREADABLE {raw!r} -- not exploring",
-            flush=True,
-        )
-        return 0.0
-
-
-def _polymarket_explore_band() -> float:
-    """How far ABOVE the ceiling still counts as boundary. Default 0.10.
-
-    Exploration is aimed, not uniform. The unknown is the gap 0.335-0.410; a
-    0.490 side has already been observed resting FOUR times and re-testing it
-    buys nothing but churn. With ceiling 0.35 and band 0.10 the arm probes
-    0.35-0.45, which is where the boundary actually lies.
-    """
-    raw = str(os.environ.get("SYNDICATE_POLYMARKET_EXPLORE_BAND") or "").strip()
-    if not raw:
-        return 0.10
-    try:
-        return max(0.0, float(raw))
-    except (TypeError, ValueError):
-        return 0.0
-
-
-def _polymarket_explores(request, price: float, ceiling: float) -> bool:
-    """Deterministically: is this order the exploration arm rather than held?
-
-    **DETERMINISTIC ON `position_key`, NEVER RANDOM PER TICK.** A coin flip each
-    pass would place an order, hold it next tick, place it again after -- which
-    is precisely the submit -> cancel -> resubmit churn this gate exists to stop,
-    and it produced a duplicate live bet once already. The same position must
-    get the same verdict every time it is evaluated.
-    """
-    rate = _polymarket_explore_rate()
-    if rate <= 0:
-        return False
-    # ROUNDED, because the band's top edge is a price we will actually see.
-    #
-    # MEASURED 2026-08-31T15:53Z, minutes after the gate started reading SUBMIT
-    # prices: `0.35 + 0.10` is `0.44999999999999996`, so `0.45 > band_top` is
-    # True and a 0.450 order fell OUTSIDE a band whose configured top is 0.45.
-    # Both live experiments -- bal-col and ast-ars, each submit_price=0.450 --
-    # were held instead of explored, and the arm stopped being able to fire.
-    #
-    # THIS WAS LATENT UNTIL THE SUBMIT-PRICE FIX MADE IT REACHABLE. Planned
-    # prices are arbitrary (0.441, 0.444) and essentially never land on the
-    # edge; submit prices are SNAPPED TO THE TICK, so they land on round
-    # boundaries constantly -- and 0.45 is exactly where a 0.44 or 0.445 quote
-    # crosses to. The arm's most probable price was the one value it excluded.
-    band_top = round(ceiling + _polymarket_explore_band(), 9)
-    if price > band_top:
-        return False
-    key = str(getattr(request, "position_key", "") or "").strip()
-    if not key:
-        # No stable key means no stable verdict, and an unstable verdict is the
-        # churn. Hold, as the gate would have.
-        return False
-    bucket = int(_hashlib.sha1(key.encode("utf-8")).hexdigest()[:8], 16) % 10000
-    return bucket < int(round(rate * 10000))
-
-
-def _polymarket_max_pregame_price() -> float:
-    """Hold a PREGAME Polymarket order priced above this. Place it if cheaper.
-
-    `SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE`. **0.35 IS A RISK CHOICE, NOT A
-    MEASUREMENT.** Observed pregame, with no overlap across 11 orders:
-
-        FILLED   0.240  0.250  0.335
-        RESTING  0.410  0.435  0.460  0.460  0.490 x4
-
-    **Nothing has ever been observed between 0.335 and 0.410**, so every
-    threshold in that gap fits the data equally well and the choice is about
-    which way to be wrong:
-
-      0.35  places only what has actually been WATCHED to fill. Worst case it
-            misses fills in the unmeasured 0.35-0.41 band.
-      0.41  places that whole band on the assumption it behaves like the cheap
-            side. If it behaves like the near-even side instead, all of it
-            rests -- and resting is what drives the submit -> cancel -> resubmit
-            churn that produced a DUPLICATE LIVE BET ($9.12 on lad-det).
-
-    Since churn is the stated harm, the threshold errs toward NOT placing into
-    an unmeasured band. **0.37 was used first and was the worst available
-    choice: the midpoint of the gap is the one value with no evidence behind it
-    at all.** Argument owed to `polymarket-yes-leg-binding`.
-
-    THE FALSIFIER, either of which ends this rule: a PREGAME FILL above 0.410,
-    or a PREGAME REST below 0.335. Only the ORDERING is claimed.
-
-    `0` disables the hold entirely.
-    """
-    raw = str(os.environ.get("SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE") or "").strip()
-    if not raw:
-        return 0.35
-    try:
-        return max(0.0, float(raw))
-    except (TypeError, ValueError):
-        print(
-            f"[execute_portfolio] MAX_PREGAME_PRICE_UNREADABLE {raw!r} -- not holding",
-            flush=True,
-        )
-        return 0.0
-
-
 def _ev_fields_of(position) -> str:
-    """`ev_pct=` / `edge_pct=` for a gate log line, or explicit unknowns.
+    """`ev_pct=` / `edge_pct=` for a refusal log line, or explicit unknowns.
 
-    WHY THE GATE LOGS EV AT ALL. The held population is the ONLY population this
-    gate creates, and a held order is `skipped` -- it is never recorded in the
-    execution ledger, so it exists nowhere except this log line. Asked to score
-    the holds on EV on 2026-08-31, the answer was that it could not be done from
-    outside the worker at all: `ev_pct` sits on the PLAN position, the
-    venue-scoped plan is served by no endpoint (`/api/portfolio/paper` exposes
-    per-venue COUNTS only), and the unscoped plan is a different selection
-    entirely -- it picks props where Polymarket picks h2h and totals, so a join
-    by matchup silently matches the wrong rows.
-
-    So the number is stamped where the decision is made, by the code that makes
-    it, rather than reconstructed later from something that was never the same
-    set. `None` prints as `?` and never as a number.
+    A refused position never reaches the execution ledger, so its EV exists
+    nowhere except the log line that names the refusal. The number is stamped
+    there, by the code that refused it. `None` prints as `?` and never as a
+    number: a plausible figure taken from the wrong row is worse than none.
     """
     def _one(key):
         value = position.get(key) if hasattr(position, "get") else None
@@ -1269,117 +1040,6 @@ def _ev_fields_of(position) -> str:
         return f"{value:.2f}"
 
     return f"ev_pct={_one('ev_pct')} edge_pct={_one('model_edge_pct')}"
-
-
-def _polymarket_submit_price(request) -> float | None:
-    """The price this order will ACTUALLY BE SENT AT, or `None` if unknowable.
-
-    THE GATE HAS TO JUDGE THE PRICE THE VENUE RECEIVES. This function exists
-    because it did not. MEASURED 2026-08-31T15:25Z on two live orders:
-
-        gate saw   0.444 / 0.441   `planned_probability(requested_price)`
-        venue got  0.45  / 0.45    SUBMIT price={'value': '0.45'}
-
-    `_polymarket_resolve_market` snaps UP to the tick and then crosses UP by
-    `SYNDICATE_POLYMARKET_CROSS_TICKS`, so the submitted price is systematically
-    ABOVE the planned one. A ceiling checked against the planned price bounds a
-    number nobody pays: planned 0.349 under a 0.35 ceiling is bought at ~0.355+.
-
-    This is the SAME correction `_polymarket_resolve_market` already applied one
-    level down -- its own comment reads "SNAP FIRST, THEN GUARD -- the guard has
-    to judge the price we will ACTUALLY SEND", for the slippage check, for
-    exactly this reason. The pregame gate was the same bug one layer up.
-
-    `None` MEANS "CANNOT TELL", AND THE GATE TREATS THAT AS PLACE. Every way
-    this returns `None` -- an unresolvable side, a stale artifact, a slippage
-    raise -- is a condition the REAL placement path is about to refuse by name,
-    a few lines later, with a log line that says which. Holding here would
-    replace a named refusal with a silent skip and hide it. Refusal ownership
-    stays in one place.
-    """
-    try:
-        resolved = _polymarket_resolve_market(request)
-    except Exception:
-        # INCLUDING `_SlippageExceeded`, which this call CAN raise. Nothing at
-        # the gate's call site catches it -- it is handled around the real
-        # submit -- so letting it escape here would take down the placement
-        # loop for every remaining position on the tick. The order is refused
-        # by that same raise moments later, where it is caught and recorded.
-        return None
-    if not resolved or len(resolved) < 2:
-        return None
-    try:
-        price = float(resolved[1])
-    except (TypeError, ValueError):
-        return None
-    # A price outside (0,1) is not a probability and cannot be compared to a
-    # ceiling. `order_body` refuses it downstream; say nothing about it here.
-    if not 0.0 < price < 1.0:
-        return None
-    return price
-
-
-def _polymarket_hold_price(request, venue: str, position=None) -> tuple[float, float] | None:
-    """`(price, hours_to_commence)` if this order should be HELD, else None.
-
-    THE RULE, and it is two-dimensional because one dimension never fitted:
-
-        PREGAME  + near-even  -> HOLD   (no book on that side yet)
-        PREGAME  + cheap      -> PLACE  (these demonstrably fill)
-        LIVE/PAST + anything  -> PLACE  (everything fills, including 0.490)
-
-    RETURNS None ON ANYTHING IT CANNOT ESTABLISH. An unknown kickoff or an
-    unreadable price must not suppress a bet: "we cannot tell" and "this will
-    not fill" are different facts and only the second is a reason not to place.
-    """
-    if "polymarket" not in str(venue or "").lower():
-        return None
-    ceiling = _polymarket_max_pregame_price()
-    if ceiling <= 0:
-        return None
-
-    raw_when = getattr(request, "commence_time", None)
-    if not raw_when:
-        return None
-    try:
-        text = str(raw_when).strip().replace("Z", "+00:00")
-        starts = _dt.datetime.fromisoformat(text)
-        if starts.tzinfo is None:
-            starts = starts.replace(tzinfo=_dt.timezone.utc)
-    except (TypeError, ValueError):
-        return None
-    hours = (starts - _dt.datetime.now(_dt.timezone.utc)).total_seconds() / 3600.0
-    # ALREADY STARTED PLACES, WHATEVER THE PRICE. Live is the regime where
-    # everything fills -- a 0.490 fill on a past market is what refuted the
-    # price-only rule, and holding it would suppress a side that works.
-    if hours <= 0:
-        return None
-
-    # THE PRICE THE VENUE WILL RECEIVE, not the one we planned. See
-    # `_polymarket_submit_price`: snap and cross both round UP, so the planned
-    # price this used to read is always at or below what is actually bought,
-    # and a ceiling tested against it does not bound the purchase.
-    price = _polymarket_submit_price(request)
-    if price is None:
-        return None
-    if price <= ceiling:
-        return None
-    # THE EXPLORATION ARM. A bounded, deterministic slice of boundary orders is
-    # placed so the threshold keeps being TESTED. Logged distinctly so these are
-    # separable in any later analysis -- an exploration fill and an ordinary one
-    # mean different things and must not be pooled.
-    if _polymarket_explores(request, price, ceiling):
-        print(
-            f"[execute_portfolio] EXPLORE_PREGAME_BOUNDARY"
-            f" ticker={getattr(request, 'venue_ticker', None)!r}"
-            f" submit_price={price:.3f} ceiling={ceiling} band={_polymarket_explore_band()}"
-            f" rate={_polymarket_explore_rate()} hours_to_commence={hours:.1f}"
-            f" {_ev_fields_of(position)}"
-            " -- placed ON PURPOSE to keep the boundary testable",
-            flush=True,
-        )
-        return None
-    return (price, hours)
 
 
 def _polymarket_cross_ticks() -> int:
