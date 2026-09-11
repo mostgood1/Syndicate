@@ -1735,7 +1735,8 @@ def test_soccer_board_row_reaches_a_FORWARD_dated_fixture(monkeypatch):
 
 
 def test_MLB_is_NOT_widened_across_dates(monkeypatch):
-    """THE SAFETY GATE, and the reason the widening is soccer-only.
+    """THE SAFETY GATE, and the reason MLB is never widened (soccer, NCAAF and
+    NFL are -- see `_forward_horizon_days`).
 
     MLB plays the SAME club pair on consecutive days -- a three-game series is
     one fixture on three dates. Widening by date there could price tonight's
@@ -1814,6 +1815,119 @@ def test_a_repeated_club_pair_across_dates_refuses_as_AMBIGUOUS(monkeypatch):
         selected_date="2026-08-28")
     assert out["matched"] == 0, out
     assert out["refusals"].get("ambiguous_polymarket_match") == 1, out["refusals"]
+
+
+# --------------------------------------------------------------------------
+# Football widens too, and the join no longer asks the same question 8M times
+# (2026-09-11, lane polymarket-slate-budget)
+# --------------------------------------------------------------------------
+
+
+def _football_total(slug):
+    return {"slug": slug, "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL",
+            "outcomes": '["Over","Under"]', "outcomePrices": '["0.52","0.48"]'}
+
+
+def _football_row(sport, line, selected_date="2026-09-11", event_id="e1"):
+    return {"market": "totals", "side": "over", "line": line, "sport": sport,
+            "selected_date": selected_date, "home_team": "Jacksonville Jaguars",
+            "away_team": "Cleveland Browns", "event_id": event_id}
+
+
+def test_an_NFL_board_row_reaches_its_SUNDAY_fixture(monkeypatch):
+    """MEASURED 2026-09-11T04:07:31Z. With this weekend's game lines finally in the
+    slate, every NFL row still read `no_candidates` -- `wanted nfl|2026-09-10|...`
+    -- because the forward-date widening was soccer-only. NFL plays a pair once a
+    week, so the soccer safety argument holds at the board's 7-day horizon."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        [_football_total("tsc-nfl-cle-jax-2026-09-13-41pt5")],
+        [_football_row("nfl", 41.5)],
+        selected_date="2026-09-11")
+    assert out["matched"] == 1, out
+    assert out["forward_date_widened"] == {"nfl|totals": 1}, out["forward_date_widened"]
+
+
+def test_an_NCAAF_board_row_reaches_its_SATURDAY_fixture_under_the_cfb_token(monkeypatch):
+    """Polymarket files college football under `cfb`, which the join folds to
+    `ncaaf`. 6,558 NCAAF spreads sat in the slate while every NCAAF row read
+    `no_candidates`."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        [_football_total("tsc-cfb-cle-jax-2026-09-12-50pt5")],
+        [_football_row("ncaaf", 50.5)],
+        selected_date="2026-09-11")
+    assert out["matched"] == 1, out
+    assert out["forward_date_widened"] == {"ncaaf|totals": 1}, out["forward_date_widened"]
+
+
+def test_a_football_fixture_beyond_seven_days_is_not_reached(monkeypatch):
+    """Football's horizon is a week, not soccer's fortnight."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        [_football_total("tsc-nfl-cle-jax-2026-09-20-41pt5")],
+        [_football_row("nfl", 41.5)],
+        selected_date="2026-09-11")
+    assert out["matched"] == 0, out
+    assert out["forward_date_widened"] == {}, out["forward_date_widened"]
+
+
+def test_the_football_horizon_is_the_kalshi_joins_own():
+    """Read, not retyped: two venues' joins must not disagree about how far ahead a
+    football board row reaches. MLB has no entry, by design."""
+    from syndicate.features.shared.kalshi_board_join import _FORWARD_HORIZON_DAYS as kalshi
+
+    assert mod._forward_horizon_days("ncaaf") == kalshi["ncaaf"]
+    assert mod._forward_horizon_days("nfl") == kalshi["nfl"]
+    assert mod._forward_horizon_days("soccer") == mod._FORWARD_HORIZON_DAYS
+    assert mod._forward_horizon_days("mlb") is None
+    assert mod._forward_horizon_days("nba") is None
+
+
+def test_team_matching_is_memoised_within_one_join(monkeypatch):
+    """MEASURED 2026-09-11T04:07:31Z: the join took 94.91 s against ~0.8 s once the
+    slate carried nine days of game lines -- ~8.4M `teams_match` calls at 11.3 us,
+    nearly all the SAME (token, club) question asked again. Thirty rows on one
+    fixture must not ask it thirty times."""
+    import syndicate.features.shared.team_aliases as aliases
+
+    calls = []
+
+    def counting(sport, token, team):
+        calls.append((sport, token, team))
+        return False
+
+    monkeypatch.setattr(aliases, "teams_match", counting)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: None)
+    markets = [_football_total(f"tsc-nfl-cle-jax-2026-09-11-{n}pt5") for n in range(30, 60)]
+    rows = [_football_row("nfl", n + 0.5, event_id=f"e{n}") for n in range(30, 60)]
+    out = mod.join_polymarket_to_board(markets, rows, selected_date="2026-09-11")
+
+    assert out["matched"] == 0, out
+    # One question per orientation of the one fixture; unmemoised it is one per row per pass.
+    assert len(calls) <= 4, len(calls)
+
+
+def test_the_memo_is_scoped_to_one_join(monkeypatch):
+    """The memo must not outlive the join that filled it: the same fixture asked
+    again under a different alias answer must get the new answer."""
+    import syndicate.features.shared.team_aliases as aliases
+
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    markets = [_football_total("tsc-nfl-cle-jax-2026-09-11-41pt5")]
+    rows = [_football_row("nfl", 41.5)]
+
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
+    assert mod.join_polymarket_to_board(markets, rows, selected_date="2026-09-11")["matched"] == 0
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    assert mod.join_polymarket_to_board(markets, rows, selected_date="2026-09-11")["matched"] == 1
+    assert mod._TEAMS_MATCH_MEMO.get() is None
 
 
 def _threeway(subject, price="0.55"):

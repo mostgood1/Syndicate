@@ -57,6 +57,7 @@ by reason, so coverage is diagnosable instead of merely low.
 
 from __future__ import annotations
 
+import contextvars
 import datetime as _dt
 import re
 from typing import Any, Collection, Iterable, Mapping, Sequence
@@ -750,6 +751,44 @@ def _canonical_fixture(sport: Any, home: Any, away: Any) -> frozenset[str] | Non
 _FORWARD_HORIZON_DAYS = 14
 
 
+def _forward_horizon_days(league: str) -> int | None:
+    """How far past the board's date this LEAGUE's fixture may be looked up, or None.
+
+    None means the league is never widened. The gate is a SAFETY argument, not a
+    coverage one: widening pairs a board row dated today with a market filed
+    under the day it is PLAYED, which is only sound where a club pair cannot
+    repeat inside the horizon.
+
+      soccer  14  two matchdays per league (`#545`); pairs do not repeat.
+      ncaaf    7  one game a week; the board's own football horizon.
+      nfl      7  one game a week; the board's own football horizon.
+      mlb     --  NEVER. A series plays the SAME pair on consecutive days, so a
+                  widened lookup could price tonight's game off tomorrow's market.
+
+    The football numbers are READ from `kalshi_board_join._FORWARD_HORIZON_DAYS`
+    rather than retyped, so the two venues' joins cannot disagree about how far
+    ahead a football board row reaches. That dict has no MLB entry by design.
+
+    Added 2026-09-11, lane `polymarket-slate-budget`. With this weekend's game
+    lines finally stored, every NCAAF and NFL row still read `no_candidates`
+    because this gate was soccer-only: `wanted ncaaf|2026-09-10|spreads`,
+    `markets_for_our_league_date: []`, while 6,558 NCAAF spreads and 540 NFL
+    spreads sat in the slate under Saturday and Sunday.
+    """
+    if league == "soccer":
+        return _FORWARD_HORIZON_DAYS
+    if league not in {"ncaaf", "nfl"}:
+        return None
+    try:
+        from syndicate.features.shared.kalshi_board_join import (
+            _FORWARD_HORIZON_DAYS as _BY_SPORT,
+        )
+    except Exception:  # noqa: BLE001 -- a horizon we cannot source is no widening
+        return None
+    days = _BY_SPORT.get(league)
+    return int(days) if days else None
+
+
 def _resolved_line(
     parsed: Mapping[str, Any],
     row: Mapping[str, Any],
@@ -1249,6 +1288,29 @@ def _outcome_probabilities(row: Mapping[str, Any]) -> tuple[list[tuple[str, floa
 
 
 def join_polymarket_to_board(
+    markets: Sequence[Mapping[str, Any]],
+    board_rows: Sequence[Mapping[str, Any]],
+    *,
+    sport: str | None = None,
+    selected_date: str | None = None,
+) -> dict[str, Any]:
+    """Pair each board row with the Polymarket market quoting the same bet.
+
+    The body is `_join_polymarket_to_board_impl`. This wrapper gives that one
+    call its own `_teams_match` memo (see `_TEAMS_MATCH_MEMO`) and always
+    clears it afterwards, so no memoised answer outlives the join -- or the
+    alias maps, or a test's monkeypatch -- that produced it.
+    """
+    token = _TEAMS_MATCH_MEMO.set({})
+    try:
+        return _join_polymarket_to_board_impl(
+            markets, board_rows, sport=sport, selected_date=selected_date
+        )
+    finally:
+        _TEAMS_MATCH_MEMO.reset(token)
+
+
+def _join_polymarket_to_board_impl(
     markets: Sequence[Mapping[str, Any]],
     board_rows: Sequence[Mapping[str, Any]],
     *,
@@ -1896,11 +1958,13 @@ def join_polymarket_to_board(
         # 2,038 markets the board cannot see, because every one is filed under
         # the day it is played and the board asked for today.
         #
-        # SOCCER ONLY, AND THE GATE IS THE WHOLE SAFETY ARGUMENT. MLB plays the
-        # SAME FIXTURE on consecutive days -- a three-game series is one club
-        # pair on three dates -- so widening by date there could price tonight's
-        # game off tomorrow's market, which is a worse bug than the one being
-        # fixed. Soccer club pairs do not repeat inside a two-matchday horizon.
+        # BY SPORT, AND THE GATE IS THE WHOLE SAFETY ARGUMENT -- see
+        # `_forward_horizon_days`. MLB plays the SAME FIXTURE on consecutive
+        # days -- a three-game series is one club pair on three dates -- so
+        # widening by date there could price tonight's game off tomorrow's
+        # market, which is a worse bug than the one being fixed. Soccer club
+        # pairs do not repeat inside a two-matchday horizon, and NCAAF and NFL
+        # play a pair once a week, so those three widen and MLB never does.
         #
         # FORWARD ONLY. `d >= date` excludes SETTLED markets: the slate still
         # carries 2026-08-16 rows, and matching one would price a live board row
@@ -1910,10 +1974,11 @@ def join_polymarket_to_board(
         # same `_teams_match` loop and the same ambiguity refusal below, so a
         # two-legged tie that does repeat a club pair refuses as ambiguous
         # rather than guessing a leg.
-        if not candidates and date and _norm(board_row.get("sport") or sport) == "soccer":
+        _widen_days = _forward_horizon_days(league) if (not candidates and date) else None
+        if _widen_days:
             try:
                 _horizon = (
-                    _dt.date.fromisoformat(date) + _dt.timedelta(days=_FORWARD_HORIZON_DAYS)
+                    _dt.date.fromisoformat(date) + _dt.timedelta(days=_widen_days)
                 ).isoformat()
             except ValueError:
                 _horizon = ""
@@ -2743,7 +2808,53 @@ def _venue_club(parsed: Mapping[str, Any], token: Any) -> str | None:
     return canonical_team("soccer", name)
 
 
+# ONE JOIN'S MEMO OF `_teams_match`. `join_polymarket_to_board` sets a fresh dict
+# for the length of one call and resets it after; everywhere else it is None and
+# nothing is cached.
+#
+# MEASURED 2026-09-11T04:07:31Z. Once the slate carried nine days of game lines
+# the join took `elapsed_s=94.91`, against 0.71-0.8 on the old slate, and
+# `portfolio_commit` went from 59-95 s to 150.71 s. Each widened row walks every
+# candidate its (league, market) holds across the horizon, and unmatched rows walk
+# them a second time for the orientation count. `teams_match` costs 11.3 us a call
+# (`canonical_team` 5.7), so 94.9 s is ~8.4M calls -- nearly all of them the SAME
+# few thousand (token, club) questions asked again.
+#
+# `_teams_match_uncached` is a pure function of the key below within one join: the
+# alias maps are fixed for the process and `fixtures` is one join's list, keyed by
+# identity because it is built once per (league, date) and never mutated while
+# rows are matched.
+_TEAMS_MATCH_MEMO: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
+    "polymarket_teams_match_memo", default=None
+)
+
+
 def _teams_match(
+    board_row: Mapping[str, Any],
+    parsed: Mapping[str, Any],
+    sport: Any,
+    fixtures: Sequence[tuple[str, str]] | None = None,
+) -> bool:
+    """`_teams_match_uncached`, memoised within one `join_polymarket_to_board` call."""
+    memo = _TEAMS_MATCH_MEMO.get()
+    if memo is None:
+        return _teams_match_uncached(board_row, parsed, sport, fixtures)
+    key = (
+        str(sport or "").strip().lower(),
+        parsed.get("league"),
+        parsed.get("prefix"),
+        parsed.get("home"),
+        parsed.get("away"),
+        board_row.get("home") or board_row.get("home_team"),
+        board_row.get("away") or board_row.get("away_team"),
+        id(fixtures) if fixtures is not None else None,
+    )
+    if key not in memo:
+        memo[key] = _teams_match_uncached(board_row, parsed, sport, fixtures)
+    return memo[key]
+
+
+def _teams_match_uncached(
     board_row: Mapping[str, Any],
     parsed: Mapping[str, Any],
     sport: Any,
