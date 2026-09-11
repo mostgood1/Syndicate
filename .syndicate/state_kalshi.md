@@ -689,8 +689,14 @@ header records for NFL (`ticker_substring_n=317 classified_n=0`).
 **LADDERS: THE RECORD IS WHOLE, THE JOIN'S INPUT IS NOT.**
 `MAX_MARKETS_PER_SERIES=400` against `KXNCAAFSPREAD`'s **1994** real markets is
 one rung in five; `KXNFLSPREAD` **795** is one in two. Per-tick `trimmed=`
-862-2983. Surviving rungs are `markets[:400]` in API order, not the ones near
-the line. `_record_daily_book(full_markets)` runs before both bounds
+862-2983. **Which rungs survive, as of 2026-09-11:** `SYNDICATE_KALSHI_PRECAP_BOARD_LINES`
+is ON on both writers (refresh-worker 16:56:44Z, live-odds-worker 17:05:55Z). The
+rung AT each board line is kept first, then those within 1 point, then the date
+rule: `date_aware` on refresh-worker, `arrival` on live-odds-worker. Measured
+`kept_at_line_total=103 cut_at_line_total=0` on both. The first plan after it held
+20/20 NCAAF 09-12 Kalshi rows with a contract, against 1/13 before `[verified
+2026-09-11, lane kalshi-precap-board-lines]`. `_record_daily_book(full_markets)`
+runs before both bounds
 (`e4ae9ebec`, live 18:56Z), so the dated capture files ARE whole.
 
 **SOCCER REGISTERS AS OF `461ee74be` (live 20:20:57Z).** `AUTO_SERIES`
@@ -775,9 +781,12 @@ reconciling clean (15 orders, `not_found=0`). Bankroll $1000, caps $10/order,
     still holds 19 positions, 14 of them uncontracted.
   - The next live pass: 15:50:40Z `EXECUTED venue=kalshi plan_source=live positions=5 placed=3 filled=0 failed=1 duplicates=0 skipped=1 refused={'insufficient_venue_balance': 1}`. Its failed order and its
     refusal were both Kalshi `insufficient_balance`: the account's FUNDING.
-  - WHY the rows are aggregator-priced: `MAX_MARKETS_PER_SERIES=400` cut
-    `KXNCAAFSPREAD` 2,141 of 2,541 and `KXNCAAFTOTAL` 1,608 of 2,008 before the
-    join, so Saturday's NCAAF rungs never reach it.
+  - WHY the rows WERE aggregator-priced: the per-series cap kept 400 rungs by
+    date and then by arrival order, so Saturday's NCAAF rungs at the board's lines
+    never reached the join. FIXED by lane `kalshi-precap-board-lines` (`#663`):
+    the first plan after the fix (17:41:08Z) is `LIVE_PLAN_WRITTEN venue=kalshi
+    positions=22 placeable_committed=22/22 aggregator_priced=221`, and paper2's
+    NCAAF 09-12 Kalshi rows are 20/20 contracted `[verified 2026-09-11]`.
   - NOT the date gate: `SYNDICATE_KALSHI_FORWARD_DATE_SPORTS=soccer,ncaaf,nfl`
     on both workers.
 - Polymarket per-order reads cannot detect orphans by construction (no list

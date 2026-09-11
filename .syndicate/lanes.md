@@ -652,80 +652,24 @@ death, never life — do not invert it.
 - To pick this up: read the `SUBMIT url=https://api.polymarket.us` and `POLYMARKET_BOOK_AT_BUILD` lines on live-odds-worker after 16:53:31Z with `scripts/render_logs.py`. For passes, match `EXECUTED date=` and filter, because `plan_source=` sits between `venue=` and `armed=`.
 - History: the 16:02–16:53Z progress entries were moved VERBATIM to `lanes_history.md` at this checkpoint.
 
-### kalshi-precap-board-lines — OPEN — opened 2026-09-11 — session 49bfef11-a4a3-4fe4-8df4-76ec94e45893
+### kalshi-precap-board-lines — OPEN — opened 2026-09-11 — session 49bfef11-a4a3-4fe4-8df4-76ec94e45893 — **HALF 1 MET (NCAAF 09-12 Kalshi rows 1/13 -> 20/20 contracted); `placed>0` OWED**
+- **GOAL VERDICT.** Goal (verbatim): "[user 2026-09-11] `#661`'s residual. The per-series cap (`MAX_MARKETS_PER_SERIES=400`, unchanged) keeps the Kalshi rungs AT or next to each board row's spread/total line, so that NCAAF Saturday rows get a venue contract. Done when refresh-worker prints `LIVE_PLAN_WRITTEN venue=kalshi ... placeable_committed=N/N` with N > 0 on an NCAAF Saturday slate, and live-odds-worker prints `EXECUTED ... venue=kalshi plan_source=live placed>0`." → **GOAL: NOT MET.**
+  - **Half 1: MET.** The reading is refresh-worker 17:41:08Z, `LIVE_PLAN_WRITTEN venue=kalshi positions=22 placeable_committed=22/22 aggregator_priced=221`; before it was 3/3 and 316. The discriminator is `/api/portfolio/paper` 17:43:53Z: paper2 Kalshi NCAAF 09-12 rows are 20/20 `venue_feed` with a ticker, against 1/13 at 15:40Z. Both workers read `kept_at_line_total=103 cut_at_line_total=0`. Recorded in `deploys.md` 2026-09-11 16:50:20Z and 17:00:19Z.
+  - **LEFT: half 2.** live-odds-worker `EXECUTED ... mode=live venue=kalshi plan_source=live placed>0`.
+    - Its passes at 17:15Z and 17:31Z read the pre-fix plan (`positions=3 duplicates=3`).
+    - The first pass that can read the 22-position plan is the one after 17:41:08Z.
+    - The 09-11 Kalshi spend was $30.07 of the $50/day cap.
+  - **BLOCKED BY:** nothing but the next live pass.
 - Goal: [user 2026-09-11] `#661`'s residual. The per-series cap (`MAX_MARKETS_PER_SERIES=400`, unchanged) keeps the Kalshi rungs AT or next to each board row's spread/total line, so that NCAAF Saturday rows get a venue contract. Done when refresh-worker prints `LIVE_PLAN_WRITTEN venue=kalshi ... placeable_committed=N/N` with N > 0 on an NCAAF Saturday slate, and live-odds-worker prints `EXECUTED ... venue=kalshi plan_source=live placed>0`.
-- Files: `pipeline/kalshi_odds_refresh.py`, `tests/test_kalshi_precap_board_lines.py` (NEW).
-  - USER DECISION 2026-09-11: "Proceed". OPEN `nfl-layer2-kalshi-identity` lists "Files: NONE claimed" and has no code left; it owes only a Sunday reading on NFL prop identity.
-  - USER DECISION 2026-09-11: the rule ships behind a NEW env flag, `SYNDICATE_KALSHI_PRECAP_BOARD_LINES` (absent = today's rule), set on BOTH workers. Then land and deploy: refresh-worker first, then live-odds-worker.
-- Hypothesis (written BEFORE the replay):
-  - 09-11's 16 aggregator NCAAF Kalshi positions have no contract because the rung at the board's line is CUT. `mode=date_aware` keeps the nearest date first: Friday rungs, then Saturday rungs in arrival order, up to 400.
-  - A selection that first keeps, for each Kalshi event that resolves to a board game, the rungs nearest that game's board line (spread magnitude, or total) recovers most of the 16.
-- Falsification test:
-  - Replay the selection over the full live `KXNCAAFSPREAD`/`KXNCAAFTOTAL` ladders, fetched with production's own `fetch_series`, against the 09-11 Kalshi paper2 plan's rows.
-  - The hypothesis FALLS for any row whose board-line rung is ABSENT from Kalshi's full list. Kalshi does not list that strike, so no selection can recover it.
-  - It also FALLS if board-line selection recovers no more rows than `date_aware` already does.
-- Verification: the Goal's two production readings, plus a `PRECAP_SELECT mode=` that names the new rule and prints its own kept-at-board-line counters, plus an off != on test in the suite. Recorded in `deploys.md`.
-- Blocked by: none (user decisions above).
-- 2026-09-11 ~15:00Z, REPLAY (pre-deploy, substrate: production inputs, local code).
-  - Inputs:
-    - the full live `KXNCAAFSPREAD` 2,541, `KXNCAAFTOTAL` 2,008 and `KXNCAAFGAME` 478 ladders at 14:44Z, fetched with production's `fetch_series`;
-    - web's 09-11 `layer2-shortlist` (`limit=2000`, 365 NCAAF spread/total rows over 82 games);
-    - the 09-11 Kalshi `paper2` plan's 16 aggregator rows;
-    - the git-tracked NCAAF team registry. `data/` is absent in the worktree, so the harness pointed at that file.
-    - `KXNCAAFSPREAD`/`KXNCAAFGAME` were registered as ncaaf, which production's `JOIN_EVENTS` confirms (`'sport': 'ncaaf'` on `KXNCAAFSPREAD` tickers, 04:38:59Z).
-  - Results, same 400 per series:
-
-    | rule | 16-row contracts | join matched |
-    |---|---|---|
-    | no cap | 11/16 | 152 |
-    | `arrival` | 0/16 | 0 |
-    | `date_aware` (production) | 0/16 | 11 |
-    | **board lines, SHIPPED functions** | **11/16** | **152** |
-
-  - Board-line counters: `cut_at_line=0` on all three series; `kept_at_line` 40 / 54 / 80; `events_resolved` 49 of 120.
-  - Cost: 0.44–0.84 s per series, and the demand is 97 games / 19.7 KB. The document is 7.0 MB of 8 MB (`/api/ops/keyvalue/usage`).
-  - HYPOTHESIS: CONFIRMED for 11 of 16.
-  - FALSIFIED for 5, and they are not the cap's. Kalshi lists every one of those rungs (`UCDSMU-59` "Over 58.5", `HOWIND-65`/`-66`, `UNCOWYO-48`, `MIZZKU` h2h). The event resolver does not place UC Davis, Howard or Northern Colorado, or the `MIZZKU` pair. Lead, not this lane.
-- 2026-09-11, FOUND: live-odds-worker ALSO runs the Kalshi refresh, every ~2 min, at `PRECAP_SELECT mode=arrival` (14:49:52Z). `SYNDICATE_KALSHI_PRECAP_DATE_AWARE` was never set there. Both workers write the same `kalshi_markets.json` working set that `portfolio_commit` and the executor read via `markets_from_state`. So the flag goes on BOTH, or live-odds-worker's ticks overwrite the selection within minutes.
-- 2026-09-11 15:3xZ: LANDED `7c248328` on origin/main. It is flag-gated, so it is inert on any service until `SYNDICATE_KALSHI_PRECAP_BOARD_LINES` is set AND that service is deployed.
-  - Tests: 82 pass across the precap/trim files; 333 pass across every other test file that imports `kalshi_odds_refresh`.
-  - The first commit attempt was REFUSED by the ledger-commit guard: the branch base was 11 behind, and the commit would have reverted upstream's `lanes.md` compaction and two `deploys.md` sections. Fixed with `reset --mixed origin/main`, after hash-checking that every non-lane file was the stale base. Nothing was bypassed.
-  - Deploy order: refresh-worker first, but WAITING. `kalshi-plan-placeable` holds refresh-worker for its `78e4623f` reading (live 15:21:32Z; no `LIVE_PLAN_WRITTEN` yet at 15:34Z). Then live-odds-worker (live: `f8b67afa`).
-  - `todo.md` is not edited here: OPEN `kalshi-plan-placeable` lists it in Files (`#661`). This residual's record is this lane plus `deploys.md`.
-- 2026-09-11 BEFORE (production, pre-flag). This is the reading the after is compared against:
-  - refresh-worker `78e4623f`, 15:33:45Z: `PRECAP_SELECT mode=date_aware`. `KXNCAAFSPREAD` kept 400 and cut 2,141 (`cut_in_window` 2,110). `KXNCAAFTOTAL` kept 400 and cut 1,608.
-  - live-odds-worker `f8b67afa`, 15:32:36Z: `mode=arrival`, `KXNCAAFTOTAL` kept 400 (381 in-window).
-  - Build 15:35:54Z:
-    - `PAPER2_PLAN_WRITTEN venue=kalshi positions=19 venue_priced=859 placeable_committed=5/19`.
-    - `LIVE_PLAN_WRITTEN venue=kalshi positions=5 placeable_committed=5/5`, with `refusals['aggregator_priced']=287`.
-  - The paper2 Kalshi rows at ~15:40Z hold 13 NCAAF 09-12 rows. **1 is `venue_feed` with a ticker; 12 are aggregator** (5 spreads, 6 totals, 1 h2h).
-  - `LIVE_PLAN placeable_committed=N/N` is ALREADY > 0 (5/5), so "N > 0" cannot discriminate this change. The readings that can are: NCAAF 09-12 venue_feed rows up from 1, `aggregator_priced` down from 287, and `PRECAP_SELECT mode=board_lines kept_at_line_total > 0`.
-- 2026-09-11 16:13Z: the code is in production on BOTH workers with the flag OFF, carried as a ride-along by other lanes. Both SHAs are content-verified to contain `7c248328`.
-  - live-odds-worker `1afec00f` (lane `polymarket-ask-pricing`), live 16:02:43Z. The OFF reading: `PRECAP_SELECT mode=arrival` at 16:13:02Z, with none of the board-line fields. That is the old line, byte for byte in shape.
-  - refresh-worker `889d4e12` (lane `ncaaf-tbd-kickoff-date`), `build_in_progress` at 16:13Z.
-  - So each of this lane's deploys is ENV-ONLY: set the flag, then `render_deploy.py --reinject-env` of the live commit. It carries no collateral code.
-- 2026-09-11 16:21Z — refresh-worker:
-  - **Claim** held by this lane (token `bba67290`, TTL to ~17:06Z).
-  - **ENV SET**: `SYNDICATE_KALSHI_PRECAP_BOARD_LINES` went from `None` to `1` through `render_env_set.py`'s single-key PUT. It is **NOT IN THE PROCESS YET**, because no deploy has run.
-  - **Preflight** for `889d4e12 --reinject-env` returned **TOO_SOON**. `ncaaf-tbd-kickoff-date`'s deploy went live at 16:18:23Z; the minimum spacing is 25 min and the first board publish takes ~21 min (`#563`).
-  - **Next:** re-run preflight after ~16:43:30Z, then deploy, then do live-odds-worker.
-  - **If this session is gone:** the key is set and undeployed. The next refresh-worker deploy by anyone carries it; the effect is `PRECAP_SELECT mode=board_lines`. It is removable with the same script.
-- 2026-09-11 16:50–17:00Z, ROLLOUT:
-  - **refresh-worker** `889d4e12`, `--reinject-env`, deploy `dep-dai32j6k1f9s73bp20ig`.
-    - Preflight: HOLD at 16:44Z (3 refresh-odds jobs), then CLEAR at 16:50:04Z.
-    - **LIVE 16:56:44Z.** The first tick after boot, at 16:57:53Z, read `PRECAP_SELECT mode=board_lines fill=date_aware demand_events=0 events_resolved=0/0 kept_at_line_total=0`. That is **reachability on production** (off read `mode=date_aware`), in a cold start: nothing had been recorded yet, and selection is identical to date_aware until the first board build's join records lines.
-    - Claim released 16:58Z.
-  - **live-odds-worker**:
-    - Claim taken at 16:59:04Z (token `597a1e5d`). ENV SET, `None` -> `1`.
-    - Its live commit had moved to `16de339b` (`polymarket-ask-pricing`, live 16:53:31Z; contains `7c248328`). So the target is `16de339b`, NOT `1afec00f`: deploying `1afec00f` would have rolled back their GTD change.
-    - Preflight CLEAR at 17:00:01Z. Deploy `dep-dai378uq1p3s73atkdn0`, `--reinject-env`, created 17:00:19Z.
-    - Heads-up sent to that lane's session.
-  - OWED:
-    - refresh-worker `BOARD_DEMAND line_events=` / `line_bytes=`;
-    - `PRECAP_SELECT ... demand_events>0 kept_at_line_total>0` on both workers;
-    - the next `LIVE_PLAN_WRITTEN venue=kalshi` and the paper2 NCAAF 09-12 venue_feed count (from 1);
-    - live-odds-worker `EXECUTED ... mode=live venue=kalshi plan_source=live placed>0`.
-
+- Files: `pipeline/kalshi_odds_refresh.py`, `tests/test_kalshi_precap_board_lines.py` (NEW). Landed as `7c248328` and in production. They are held only until half 2 is read.
+- Hypothesis: CONFIRMED.
+  - Replay: 11/16 recovered, which equals no cap; the 5 are resolver gaps, recorded in `leads.md`.
+  - Production: NCAAF 09-12 rows went 1/13 -> 20/20 contracted.
+- Verification: the Goal's two readings, plus `PRECAP_SELECT mode=board_lines` with its counters (MET), plus off != on in the suite (MET).
+- Rollback: set `SYNDICATE_KALSHI_PRECAP_BOARD_LINES=0` on both workers with `render_env_set.py`, then `--reinject-env` deploy each. Off records nothing and selects exactly as before.
+- Todo: `#663`.
+- Blocked by: none.
+- History: the opening fields, the replay, the BEFORE readings and the rollout log were moved VERBATIM to `lanes_history.md` at the 2026-09-11 checkpoint. The narrative is in `log/2026-09-11.md`.
 ### ncaaf-tbd-kickoff-date — CLOSED 2026-09-11 — opened 2026-09-11 — session 53eaee9c-46e9-4c34-8075-d63d7f63c933 — **GOAL MET: the TBD Saturday games left Friday's strip and read "Sat Sep 12 · TBD" on Saturday, on refresh-worker `889d4e12` and web `0022ecb1`.**
 - **GOAL VERDICT.** Goal (verbatim): "[user 2026-09-11: NFL/NCAAF compact cards show "games on the wrong day"] NCAAF games whose kickoff CFBD lists as TBD are filed on their real calendar day, not the day before, and their chip reads TBD instead of a fabricated "11:00P CT". ONE testable outcome: after a refresh-worker deploy, `/api/board/game-chips` for 2026-09-11 carries no NCAAF chip for a Saturday game (Mercyhurst @ New Mexico, Southern Miss @ Auburn, NMSU @ Hawai'i, Cal Poly @ SJSU), and the 2026-09-12 chips carry them with a TBD token." → **GOAL: MET.**
   - **Friday: MET.** The first refresh-worker publish after its deploy (16:19:06Z) carries 5 NCAAF chips on 2026-09-11, 0 at a placeholder start, and none of the four games. It was re-read at 16:50:34Z with the same result.

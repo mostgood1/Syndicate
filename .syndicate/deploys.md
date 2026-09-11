@@ -32914,3 +32914,98 @@ No `requirements*` or `render.yaml` change; live `f8b67afa` is an ancestor.
 - A watcher is reading for the first such submit, with a 3-hour deadline.
 - No cancel is sent by this deploy: `cancel_order` stays a dry run by default, and nothing automatic calls it.
 - The two orders resting from 15:51Z were placed as good-till-cancel BEFORE this deploy, so they are unaffected and are the user's to cancel.
+
+## 2026-09-11 16:50:20Z — refresh-worker `889d4e12` -> `889d4e12` (`--reinject-env`) — lane `kalshi-precap-board-lines` — `#661`'s residual: the per-series Kalshi cap keeps the board's own rungs (`SYNDICATE_KALSHI_PRECAP_BOARD_LINES=1`)
+
+**What:** ENV-ONLY, zero code delta.
+- `SYNDICATE_KALSHI_PRECAP_BOARD_LINES` went `None` -> `1` via `render_env_set.py`'s single-key PUT at 16:21Z. This deploy puts it in the process.
+- The code, `7c248328` (`pipeline/kalshi_odds_refresh.py`), was already live on `889d4e12`: it rode along with `ncaaf-tbd-kickoff-date`'s deploy (live 16:18:23Z) and was inert with the flag absent.
+- With the flag on:
+  - the join (`_record_board_demand`) records the board's full-game spread/total/h2h lines into `kalshi_markets.json` as `board_line_demand` (bounded at 400 games, ~20 KB measured);
+  - the next refresh tick's per-series cap keeps the rungs AT each board line, then those within 1 point, then fills with the existing rule (`date_aware` on this worker);
+  - the budget is the same 400 per series.
+- Replay (pre-deploy; production inputs, local code; lane block): the Kalshi plan's 16 NCAAF Saturday rows got a contract **0/16 under `date_aware`, 11/16 under board lines**, which equals the no-cap ceiling. The other 5 are resolver gaps (UC Davis, Howard, N Colorado, `MIZZKU`), filed as a lead.
+
+**Ride-along:** none (same SHA).
+
+**Locks:**
+- Claim `kalshi-precap-board-lines`, token `bba67290…`, acquired 16:21:04Z.
+- Preflight for `889d4e12 --reinject-env`:
+  - TOO_SOON at 16:21Z, because `ncaaf-tbd-kickoff-date`'s deploy went live at 16:18:23Z (#563 spacing);
+  - HOLD at 16:44Z, with 3 refresh-odds jobs in flight (`build_soccer_artifacts --league primeira_liga`);
+  - **CLEAR at 16:50:04Z**, infrastructure only, redundancy waived by `--reinject-env`.
+- Deploy `dep-dai32j6k1f9s73bp20ig`, created 16:50:20Z -> **live 16:56:44Z** (deploys API).
+- Claim released 16:58Z, after the first reading below. The 25-min spacing protects the reading window.
+
+**First reading on the new process** — reachability, cold start:
+- 16:57:53Z: `PRECAP_SELECT mode=board_lines window=2026-09-10..2026-09-13 cap=400 undated_reserve=40 fill=date_aware demand_events=0 events_resolved=0/0 kept_at_line_total=0 cut_at_line_total=0 kept_adjacent_total=0 line_select_s=0.00 capped_series=3 fetched_total=5532 kept_total=1200`.
+- Off read `mode=date_aware` (15:33:45Z). `demand_events=0` because no board build had joined since boot. With no demand the selection is identical to `date_aware`, by construction and by test.
+
+**Demand recorded** by the first board build's join after boot, ~17:10Z: `BOARD_DEMAND seen={'mlb': 1498, 'ncaaf': 1034, 'nfl': 1301, 'soccer': 1153} ... date=2026-09-11 dates=['2026-09-11', '2026-09-12'] line_events=204 line_bytes=37645`.
+- 204 games' full-game lines.
+- 37.6 KB, against a document of 7.0 MB of 8 MB and under the 400-game bound.
+
+**The first tick WITH demand**, 17:13:33Z: `PRECAP_SELECT mode=board_lines fill=date_aware demand_events=204 events_resolved=114/254 kept_at_line_total=103 cut_at_line_total=0 kept_adjacent_total=147 line_select_s=2.19 capped_series=3 fetched_total=5532 kept_total=1200`.
+- 103 rungs sit AT a board line and were kept; none were cut.
+- The budget is unchanged: 1,200 over 3 capped series, as before.
+- Cost: 2.19 s per tick.
+
+**The 8 MB document, with the demand in it.** `KEYVALUE_WRITE_LARGE key=.../kalshi_markets.json size_bytes=` read:
+- refresh-worker: 6,986,823 at 17:29:06Z and 6,987,135 at 17:34:31Z;
+- live-odds-worker: 6,987,675 at 17:29:34Z and 6,987,450 at 17:33:48Z;
+- `max_bytes=8388608`, so ~1.4 MB of headroom.
+
+That is SMALLER than the 7,340,144 `/api/ops/keyvalue/usage` read at ~15:00Z: the 37.6 KB of demand sits inside the normal swing of market counts. `[kalshi_odds] WRITE_FAILED` has 0 matches on EITHER worker since 16:56:44Z. That is the line the refresh prints on a store refusal.
+
+**BEFORE** (this worker, flag not in the process):
+- 15:33:45Z: `PRECAP_SELECT mode=date_aware`. `KXNCAAFSPREAD` kept 400 and cut 2,141 (`cut_in_window` 2,110). `KXNCAAFTOTAL` kept 400 and cut 1,608.
+- 15:35:54Z: `PAPER2_PLAN_WRITTEN venue=kalshi positions=19 placeable_committed=5/19`; `LIVE_PLAN_WRITTEN venue=kalshi positions=5 placeable_committed=5/5 aggregator_priced=287`.
+- Paper2 Kalshi NCAAF 09-12 rows: 13, of which **1** is venue_feed with a ticker.
+- Note: `placeable_committed=N/N` is already 5/5, so "N > 0" does not discriminate this change.
+- The Kalshi join, same-day and pre-flag (`portfolio_commit KALSHI_BOARD_JOIN`):
+  - `matched=233` on 4,376 board rows, 15:50:13Z;
+  - `matched=229` on 4,303 rows, 16:44:28Z;
+  - `matched=769` on 3,019 rows, 16:30:49Z. That is a different board population, so compare like for like, not against it.
+- live-odds-worker's Kalshi daily spend on the 09-11 plan: `spent=$30.07 / 9 orders` against the $50/day cap (17:15:17Z). A new 09-11 Kalshi order therefore has ~$20 of room.
+
+**verify:** PARTIAL -> the Goal's first half MET; the second half is in the next entry.
+- **MET, the mechanism** (production; readings above):
+  - reachability: `mode=board_lines` at 16:57:53Z; before the flag it read `mode=date_aware` (15:33:45Z);
+  - demand recorded: `line_events=204 line_bytes=37645` (~17:10Z);
+  - selection: `kept_at_line_total=103 cut_at_line_total=0 kept_adjacent_total=147` (17:13:33Z), with `kept_total=1200` unchanged;
+  - the document stayed at ~6.99 MB of 8 MB, with 0 `[kalshi_odds] WRITE_FAILED` on either worker.
+- **MET, the plan: the Goal's first half, on the discriminating reading.** The first plan built from the new working set, 17:41:08Z, compared with the pre-fix build on the SAME 4,986-row board (17:11:56Z):
+  - `KALSHI_BOARD_JOIN matched`: 836 -> **1017**;
+  - `PAPER2_PLAN_WRITTEN venue=kalshi venue_priced`: 806 -> **1030**, and `placeable_committed` 3/17 -> **21/21**;
+  - `LIVE_PLAN_WRITTEN venue=kalshi positions`: 3 -> **22**, `placeable_committed=22/22`, `aggregator_priced` 316 -> **221**.
+  - `/api/portfolio/paper` at 17:43:53Z: the paper2 Kalshi plan's **NCAAF 09-12 rows are 20 of 20 `venue_feed` with a `venue_ticker`**, against 1 of 13 at 15:40Z. All 21 paper2 positions carry a contract: the other is an NCAAF 09-11 spread, and there are no aggregator rows.
+
+## 2026-09-11 17:00:19Z — live-odds-worker `16de339b` -> `16de339b` (`--reinject-env`) — lane `kalshi-precap-board-lines` — the same flag on the SECOND writer of the Kalshi working set
+
+**What:** ENV-ONLY, zero code delta.
+- `SYNDICATE_KALSHI_PRECAP_BOARD_LINES` went `None` -> `1` (single-key PUT, 16:59Z).
+- live-odds-worker runs the SAME Kalshi refresh every ~2 min and writes the SAME `kalshi_markets.json` working set that `portfolio_commit` and the executor read (`markets_from_state`). With the flag off on this worker, its ticks would overwrite the board-lines selection within minutes.
+- Its fill rule stays `arrival`: `SYNDICATE_KALSHI_PRECAP_DATE_AWARE` was never set here, and this change does not set it, so this deploy changes one thing.
+- Target `16de339b`, NOT `1afec00f`. The live commit had moved (lane `polymarket-ask-pricing`, GTD expiry, live 16:53:31Z; it contains `7c248328`), so deploying `1afec00f` would have rolled that change back. Heads-up sent to that session; its SUBMIT/GTD watcher reads logs, and its code is unchanged.
+
+**Ride-along:** none (same SHA).
+
+**Locks:**
+- Claim `kalshi-precap-board-lines`, token `597a1e5d…`, acquired 16:59:04Z.
+- Preflight CLEAR at 17:00:01Z for `16de339b`, infrastructure only, redundancy waived by `--reinject-env`.
+- Deploy `dep-dai378uq1p3s73atkdn0`, created 17:00:19Z -> **live 17:05:55Z**.
+- Claim released ~17:14Z, after the reading below.
+
+**BEFORE** (this worker): `PRECAP_SELECT mode=arrival` at 16:13:02Z, on `1afec00f` with the code present and the flag off, and no board-line fields. `KXNCAAFSPREAD` kept 400, with 369 in the window, and cut 2,141.
+
+**AFTER, the first tick on the new process**, 17:12:19Z: `PRECAP_SELECT mode=board_lines fill=arrival demand_events=204 events_resolved=213/558 kept_at_line_total=103 cut_at_line_total=0 kept_adjacent_total=147 line_select_s=1.55 capped_series=5 fetched_total=7193 kept_total=2000`.
+- The demand refresh-worker's join recorded (~17:10Z, `line_events=204`) reached this worker through the shared state.
+- 103 rungs sit AT a board line and were kept; none were cut.
+- The budget is unchanged: 400 per series, 2,000 total over 5 capped series.
+
+**verify:** PARTIAL -> the mechanism MET; the Goal's second half OWED.
+- **MET, the mechanism:** the AFTER reading above. `kept_at_line_total=103 cut_at_line_total=0` on this writer too, so both writers of the shared working set now select the same rungs.
+- **OWED, the Goal's second half:** `EXECUTED ... mode=live venue=kalshi plan_source=live placed>0`.
+  - The passes at 17:15:17Z and 17:31:39Z read the PRE-fix live plan (17:11:56Z): `positions=3 placed=0 duplicates=3 refused={}`.
+  - The 22-position contracted plan was written at 17:41:08Z; the first pass that can read it is the one after that.
+  - The 09-11 Kalshi spend is `spent={'dollars': 30.07, 'orders': 9}` against the $50/day cap, which leaves ~$20 of room.

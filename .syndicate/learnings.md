@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 977 rules `[generated]`
+## Index — 979 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5548,3 +5548,15 @@ the instrument rather than the system.**
 - **What I predicted:** `deploys.md` 2026-09-10 ~22:20 CT said the raw Kalshi rows leave "with the midnight CT date roll".
 - **What happened:** the user reported the phantom "Matchup" card again on 09-11. Web's NFL 09-11 shard held 205 pre-deploy Kalshi rows, captured 09-10 20:35-23:31Z, because the intelligence loop also builds the NEXT day's board. The roll moved the residue forward a day instead of ending it.
 - **The rule:** before saying "old rows expire at X", list every shard or date the old code wrote, from the rows' own `captured_at`. Then name the LAST date the residue can appear.
+
+## 2026-09-11 — RECURRENCE (the 2026-09-10 "check EVERY site that WRITES that artifact" rule): the Kalshi per-series cap had TWO writers and a selection flag on ONE `[lane kalshi-precap-board-lines]`
+
+- **What was believed:** the per-series cap was refresh-worker's. `SYNDICATE_KALSHI_PRECAP_DATE_AWARE` and every `PRECAP_SELECT` reading quoted in the lanes and in todo `#661` came from refresh-worker's logs.
+- **What was measured:** live-odds-worker runs the SAME `run_kalshi_odds_refresh` every ~2 min, at `PRECAP_SELECT mode=arrival` (14:49:52Z, 2026-09-11). It writes the SAME `kalshi_markets.json` working set that `portfolio_commit` and the executor read (`markets_from_state`). The date-aware flag was never set there, so once it shipped, roughly every other write of the working set was the old arbitrary slice.
+- **The rule going forward:** before calling a selection or cap rule ON, grep EVERY service's logs for the rule's own line (`PRECAP_SELECT mode=`), not only the service you deployed. A shared keyvalue artifact is written by whichever service runs the writer, and loop ownership moves with env.
+
+## 2026-09-11 — FORBIDDEN: passing a live commit remembered from an earlier read to `deploy_preflight.py --target-commit ... --reinject-env`. Its "ALREADY LIVE" is ANCESTRY, and `--reinject-env` turns that into a CLEAR for a ROLLBACK `[lane kalshi-precap-board-lines]`
+
+- **What happened:** live-odds-worker's live commit moved `1afec00f` -> `16de339b` between my reads (another lane's deploy, 16:53:31Z). Preflight for `--target-commit 1afec00f --reinject-env` printed `live commit 16de339b`, then `target commit 1afec00f ALREADY LIVE -- redundant`, then `CLEAR` (16:59Z). Deploying it would have rolled back `16de339b`'s change.
+- **Why:** `deploy_preflight.py:792-796` sets `target_already_live = is_ancestor(target, live)`, and lines 806-808 waive that redundancy under `--reinject-env`. An ancestor is "already live" by containment, so a rollback target reads as the same-commit case the flag exists for. `render_deploy.py`'s descendant check is the only remaining guard, and it was not exercised here.
+- **The rule:** for `--reinject-env`, use the `live commit` printed by THAT preflight run as the target, and require target == live, not merely contained. Caught here only by reading the `live commit` line on the same output.

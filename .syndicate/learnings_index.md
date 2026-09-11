@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 977 rules `[generated]`
+## Index — 979 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 387**
+**FORBIDDEN — 388**
 
 - [2026-09-06 — FORBIDDEN: instrumenting join A, reading it, and concluding about a value…](#2026-09-06-forbidden-instrumenting-join-a-reading-it-and-concluding-about-a-value-written-by-join-b-name-the-writer-of-the-field-in-the-falsification-test-itself-lane-mlb-first5-kalshi-fanin-mismatch-vs-15410ca7)
 - [2026-09-06 — FORBIDDEN: concluding a guard covers a symptom because the guard is deploy…](#2026-09-06-forbidden-concluding-a-guard-covers-a-symptom-because-the-guard-is-deployed-firing-and-named-after-it-find-the-code-that-wrote-the-field-you-are-looking-at-lane-mlb-first5-kalshi-fanin-mismatch)
@@ -207,6 +207,7 @@
 - [2026-09-10 — FORBIDDEN: a repair guard that protects ANY POPULATED local copy, on a ser…](#2026-09-10-forbidden-a-repair-guard-that-protects-any-populated-local-copy-on-a-service-that-cannot-produce-the-artifact-itself-has-rows-is-not-is-current-and-nothing-else-will-ever-refresh-it-lane-nfl-layer2-kalshi-identity)
 - [2026-09-11 — FORBIDDEN: reporting a lane's file claims as RELEASED on the strength of t…](#2026-09-11-forbidden-reporting-a-lanes-file-claims-as-released-on-the-strength-of-the-edit-you-meant-to-make-read-the-claim-set-back-with-claims_by_path-the-same-parser-lane-guard-enforces-with-lane-nfl-layer2-kalshi-identity)
 - [2026-09-11 — FORBIDDEN: predicting that legacy rows "expire at the date roll" without e…](#2026-09-11-forbidden-predicting-that-legacy-rows-expire-at-the-date-roll-without-enumerating-every-shard-the-old-writer-touched-the-board-loop-writes-tomorrows-shard-too-lane-nfl-layer2-kalshi-identity)
+- [2026-09-11 — FORBIDDEN: passing a live commit remembered from an earlier read to `deplo…](#2026-09-11-forbidden-passing-a-live-commit-remembered-from-an-earlier-read-to-deploy_preflightpy---target-commit---reinject-env-its-already-live-is-ancestry-and---reinject-env-turns-that-into-a-clear-for-a-rollback-lane-kalshi-precap-board-lines)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -407,7 +408,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](learnings_evidence.md#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated) `[evidence]`
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 
-**Rules and corrections — 584**
+**Rules and corrections — 585**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -531,6 +532,7 @@
 - [2026-09-11 — OVERTURNED: "pregame near-even Polymarket sides have no book, so hold them…](#2026-09-11-overturned-pregame-near-even-polymarket-sides-have-no-book-so-hold-them-until-live-our-own-ledger-held-the-rules-falsifier-more-than-ten-times-before-the-rule-shipped-lane-polymarket-e2e-review)
 - [2026-09-11 — OVERTURNED (mine, same morning): I explained a falling ALL-TIME count as "…](#2026-09-11-overturned-mine-same-morning-i-explained-a-falling-all-time-count-as-the-window-moved-without-reading-how-the-count-is-taken-it-was-data-loss-lane-nfl-prop-grading)
 - [2026-09-11 — OVERTURNED (mine, same day) and REQUIRED: `claims_by_path` is NOT the matc…](#2026-09-11-overturned-mine-same-day-and-required-claims_by_path-is-not-the-matcher-lane-guard-enforces-with-and-a-claim-transfer-is-not-in-force-until-the-primary-trees-lanesmd-says-so-lane-ncaaf-tbd-kickoff-date)
+- [2026-09-11 — RECURRENCE (the 2026-09-10 "check EVERY site that WRITES that artifact" ru…](#2026-09-11-recurrence-the-2026-09-10-check-every-site-that-writes-that-artifact-rule-the-kalshi-per-series-cap-had-two-writers-and-a-selection-flag-on-one-lane-kalshi-precap-board-lines)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
