@@ -135,7 +135,7 @@ slot.
 
 ## [refresh-worker-headroom-2026-09-02] THE ~1.4GB HEADROOM FIGURE IS STALE, AND THE METRIC EVERYONE READS IS THE WRONG ONE `[2026-09-02, lane m625-env-snapshots, measured off 200 MEMORY_WATCHDOG samples 15:30-16:10Z]`
 
-> ### CORRECTION 2026-09-09/10 -- THE NUMBERS ABOVE ARE SUPERSEDED. THE METHOD IS NOT. `[lane refresh-worker-anon-ratchet]`
+> ### CORRECTION 2026-09-09/10, RE-READ 2026-09-10/11 ON THE NEW CODE -- THE NUMBERS ABOVE ARE SUPERSEDED. THE METHOD IS NOT. `[lane refresh-worker-anon-ratchet]`
 >
 > **The band and the peak stage have both moved. "~2.26GB headroom" is no
 > longer true and must not be used to size new periodic work.** The 2026-09-02
@@ -175,8 +175,59 @@ slot.
 > `d84840a9`. The post-deploy row is lower on every column and is NOT evidence
 > of an improvement: it starts 11 minutes after a reboot, covered 15 of the 30
 > minutes asked, and ran at roughly a third of the job load (process_count mean
-> 7.0 pre against 3.1 post). A full-slate window on `26c8cfc6` is owed and is
-> the only thing that can price the +17% odds_history shard that deploy carried.
+> 7.0 pre against 3.1 post -- *re-read 2026-09-11 with the same
+> `ALL_PROCESS_MEMORY` parse used below: 6.98 / 6.25 / 6.99 pre and **9.41**
+> post over 61 lines, so "a third of the job load" does NOT reproduce by that
+> method; the post row's post-reboot start and half coverage are the caveats
+> that stand*). The full-slate window on the new code that this paragraph said
+> was owed is the re-read below.
+>
+> **RE-READ 2026-09-10/11 -- THE RATCHET REPRODUCES ON THE NEW CODE.** `[scheduled
+> task refresh-worker-anon-ratchet-band, adopting the lane per user reassignment
+> 2026-09-10]` Fixed band `2026-09-10T22:00Z..2026-09-11T05:00Z`, read at
+> 2026-09-11 13:52Z -- the run fired ~8.5 h after its 00:20-local dispatch, which
+> loses nothing because the band is a timestamp range. `slate_band_anon_report.py`
+> and `oom_band_report.py`, segments cut on refresh-worker's three in-band deploys.
+> **Every segment's commit CONTAINS `26c8cfc6`** (`git merge-base --is-ancestor`).
+>
+> | segment (UTC) | live | n | anon min | anon mean | **anon MAX** | headroom at peak | min inactive_file |
+> |---|---|--:|--:|--:|--:|--:|--:|
+> | 22:00-03:24:50 | `c29a7d4e` (live 21:50:27Z) | 8,835 | 1,212.8 | 2,002.8 | **3,020.0** | **1,076.0** | **19.4** |
+> | 03:24:50-03:55:29 | `5767e3ac` | 738 | 1,073.5 | 1,455.7 | 1,955.8 | 2,140.2 | 1,238.8 |
+> | 03:55:29-04:52:40 | `48621d65` | 1,510 | 970.2 | 1,534.9 | 2,091.6 | 2,004.4 | 700.7 |
+> | 04:52:40-05:00 | `1e1285a4` | 138 | 988.2 | 1,133.3 | 1,557.1 | 2,538.9 | 1,280.5 |
+>
+> **CONFIRMED AGAIN: worst peak 3,020.0 MB against the 2,500 MB test**, in the one
+> segment long enough to ratchet. The three later segments start 0-57 minutes
+> after a reboot and read the ratchet in neither direction.
+>
+> **THE FLOOR CLIMBS AGAIN, hour by hour, on ONE process** (no restart
+> 21:50:27Z-03:24:50Z; hourly queries, coverage checked): anon MIN 1,361.5
+> (22:30-23:00) -> 1,586.9 -> 1,735.1 -> 1,802.3 -> 1,894.6 -> 1,919.9
+> (03:00-03:24), **+558 MB in ~5 h**, hourly MAX 2,269.3 -> 2,375.4 -> 2,789.6
+> -> 2,867.8 -> 3,020.0. (22:00-22:30 answered only the whole-segment query; the
+> segment MIN 1,212.8 falls there, since every later hour's MIN is higher.)
+>
+> **Against 3,138.7: BELOW, by 118.7 MB -- and NOT attributable to the deploy in
+> either direction.** Same-method `process_count` (`ALL_PROCESS_MEMORY`) ran
+> hourly means 3.3 / 5.2 / 5.7 / 5.8 / 4.9 / 3.0 across the long segment, against
+> 6.98 / 6.25 / 6.99 in the three 09-09/10 windows. The new-code band ran ~20-30%
+> lighter and still reached 3,020. **The +17% `odds_history` shard is still NOT
+> priced on its own:** a lighter band peaking 119 MB lower fits "the shard is
+> cheap" and "the shard costs and the lighter load hid it" equally.
+>
+> **KILL-BAND FLAG: `min inactive_file` 19.4 MB (23:00-00:00, at
+> `board_contract_end`) is BELOW the kill band (26.3, 42.2)**, lower than either
+> real OOM kill, and 00:00-01:00 read 38.2, inside it; survived runs read
+> 164-240. The events API shows **0 kills** and `oom_band_report.py` **0
+> excursions** in the band. Second night running with the kill-band trough and no
+> kill; a clean excursion count is still not a clean band.
+>
+> **Worst-case real headroom is ~1.0 GB on both nights (957.3, 1,076.0), not
+> ~2.26 GB.** The high-water sample's `last_stage` moved again, to
+> `build_live_state_payload_fallback_return` in the worst segment (and
+> `cards_context_sim_games_loaded` in 00:00-01:00; `board_contract_end` only in
+> 03:00-03:24 and the 03:55 segment). Size nothing against one named stage.
 >
 > **CONSTRAINT ON ANY REMEDY: `state.md [user-decisions]` 2026-08-16 -- DO NOT
 > BUMP THE refresh-worker PLAN, REDUCE INSTEAD.** Taken with the numbers in
