@@ -453,17 +453,17 @@ death, never life — do not invert it.
 - Verification: refresh-worker `[build_nfl_prop_projections] REPAIR_PULLED_NEWER` then `/api/board/layer2-shortlist?sport=nfl` ingest `prop_coverage.artifact_rows` = 1,140; `/api/intelligence/query` NFL prop rows with `sim_view` in (agrees, disagrees, unpriced, contradicts) on markets other than Anytime TD > 0; `[kalshi_odds] QUOTE_CAPTURE` with `relabelled>0`; web's NFL `book_quotes` shard carrying Kalshi rows with display labels and `commence_time`. Recorded in `deploys.md`.
 - Blocked by: only the readings armed as scheduled task `nfl-kalshi-identity-sunday-reading`. Landing and the deploy are done: user yes 2026-09-10, `5767e3ac` live on refresh-worker at 03:24:50Z.
 
-### execution-ledger-cas — OPEN — opened 2026-09-10 — session 58b96f04-c47e-4c85-802c-0e2b850241d0 — **GOAL: NOT MET. The CAS commits in production on both workers; web's line and the per-date close reading are owed.**
+### execution-ledger-cas — OPEN — opened 2026-09-10 — session 58b96f04-c47e-4c85-802c-0e2b850241d0 (archived 2026-09-11) — **GOAL: NOT MET, one reading left. The first close window PASSED (7 collisions caught, 0 new stuck rows); the second is handed to scheduled task `execution-ledger-cas-close-reading` (2026-09-12 10:15 CDT), which closes the lane on a pass.**
 - Goal: [user 2026-09-10] `execution_ledger._persist`'s merge-read and its SET are ONE compare-and-swap, so a write landing between another writer's merge-read and its SET is never lost (`todo.md #656`). Done when (1) the replay tests are red on origin/main and green on the fix, (2) every writer — web, refresh-worker, live-odds-worker — runs it and logs `LEDGER_CAS_ACTIVE`, and (3) paper rows stuck at `submitted` stop growing across a paper-placement burst that overlaps live placement. — **GOAL: NOT MET.**
   - Done:
     - The fix and its tests: off != on, 8 red to green, and 877 pass.
-    - All three writers are live on it: web 2026-09-10T23:19:34Z, live-odds-worker 03:22:35Z, refresh-worker 03:24:50Z.
+    - All three writers are live on it, content-verified on the current SHAs: web `4c373107`, live-odds-worker `3bafdd2b`, refresh-worker `1e1285a4`.
     - `LEDGER_CAS_ACTIVE` on live-odds-worker at 03:23:41Z and on refresh-worker at 03:36:13Z.
-  - LEFT:
-    - web's `LEDGER_CAS_ACTIVE`, which needs the first operator resolve or acknowledge.
-    - (3), read per date.
-  - BLOCKED BY: production population, not code. Web has had no operator write since its deploy, and (3) needs a paper burst overlapping live placement after 03:36Z.
-- Files: `syndicate/features/shared/execution_ledger.py` (`_load`, `_merge_onto_current`, `_persist` and a new strict merge-read only), `syndicate/features/shared/refresh_state_store.py` (a new `compare_and_swap_json_file` beside `write_json_file`, and an `announce_large` flag on `_guard_keyvalue_payload_size`), `tests/test_execution_ledger.py` (the KNOWN_HAZARD test only), `tests/test_execution_ledger_concurrent_writers.py`, `tests/test_execution_ledger_forced_collision.py`, `tests/test_refresh_state_store_cas.py` (NEW), `tests/test_execution_ledger_cas.py` (NEW).
+    - (3), first window, 2026-09-11T13:41Z: 0 new stuck paper rows across 245 new paper orders, with live placement in the window, and **7 collisions CAUGHT** (6 in one 16 s two-writer burst at 05:15Z).
+  - LEFT: (3)'s second window, owned by scheduled task `execution-ledger-cas-close-reading` (2026-09-12 10:15 CDT).
+  - **CLOSE RULE, USER DECISION 2026-09-11:** if that reading passes, close the lane as GOAL: MET with web's `LEDGER_CAS_ACTIVE` recorded as NOT EXERCISED. Web writes the ledger only on an operator resolve or acknowledge. Its deployed code is the same, content-verified, and both workers show that code committing.
+  - BLOCKED BY: nothing but time.
+- Files: none held. **NOT claimed, RELEASED 2026-09-11** once the lane's code was deployed and read, so `#657` can take them: `syndicate/features/shared/execution_ledger.py`, `syndicate/features/shared/refresh_state_store.py`, `tests/test_execution_ledger.py`, `tests/test_execution_ledger_concurrent_writers.py`, `tests/test_execution_ledger_forced_collision.py`, `tests/test_refresh_state_store_cas.py`, `tests/test_execution_ledger_cas.py`.
 - Handoff: the ledger module and its main test file came from lane write-ahead-build-refusal on origin/main 1dc55b0c, which had no pending edits to either.
 - Hypothesis: n/a for the mechanism, which lane write-ahead-build-refusal proved. The DESIGN claim under test: a WATCH armed BEFORE the merge-read makes any SET landing inside the window abort our EXEC, and a re-read and re-merge then carry it. Found on the way in (filed as `#657`): `read_json_file` returns None for a FAILED read, so `_load()` returns an empty ledger on a store blip and its `LedgerError` is dead on both backends. A CAS whose merge-read reads empty would commit a blind write atomically, so the merge-read must be strict, and a blind fallback from an EMPTY baseline is refused.
 - Falsification test: (1) the replays PASS on origin/main, in which case they do not reproduce the loss and prove nothing; (2) the rival's write is missing from the stored document after the fixed `_persist`; (3) in production, a paper row written after all three writers run the fix stays `submitted` with no `LEDGER_CAS_EXHAUSTED` or `MERGE_READ_FAILED` line to explain it. A crash mid-`place_order` leaves the same shape, so (3) is an upper bound.
@@ -473,14 +473,23 @@ death, never life — do not invert it.
     - live-odds-worker `4c373107`, live 2026-09-11T03:22:35Z: `LEDGER_CAS_ACTIVE backend=keyvalue` at 03:23:41Z, from `reconcile_live_orders`. **MET.**
     - web `4c373107`, live 2026-09-10T23:19:34Z, healthy: its CAS line is **OWED**. Web writes only on operator actions, and there were 0 of those from 23:19Z to 03:16Z.
     - refresh-worker `5767e3ac`, live 03:24:50Z: `LEDGER_CAS_ACTIVE` at 03:36:13Z, its first ledger write after boot. None was attempted from 03:24:50Z to 03:34Z. 25 landed SETs followed by 03:37:27Z, from paper placement and settlement. **MET.** It was lane nfl-layer2-kalshi-identity's deploy, which contains the CAS by content.
-    - Collisions caught: 0 on either worker, 03:22:35Z..03:37:53Z.
+    - Collisions caught by 2026-09-11T13:41Z: **7**.
+      - refresh-worker: `LEDGER_CAS conflicts=1` at 05:15:11, 05:15:18, 05:15:24 and 09:56:05Z.
+      - live-odds-worker: `conflicts=1` at 05:15:17Z and `conflicts=2` at 05:15:26Z.
+      - 0 `LEDGER_CAS_EXHAUSTED`, 0 `MERGE_READ_FAILED`, 0 `LedgerError`.
+    - web: NOT EXERCISED. There has been no operator write since its deploy, so no line; see the close rule above.
     - USER DECISION ~03:14Z: "both as soon as each is CLEAR". Both worker deploys carried lane mlb-lens-final-status's final passes, whose lane had asked for "after tonight's slate" and could not be reached.
-  - (3) the stuck-paper count: **OWED, and read PER DATE.**
+  - (3) the stuck-paper count, read PER DATE: **FIRST WINDOW MET 2026-09-11T13:41:50Z; the second window is owed.**
     - The ledger is at its 5,000-record cap, so `TRIMMED` drops old dates and a 14-day total can fall with no fix at all.
-    - Pass: 2026-09-11 stays at 2 stuck paper rows and 2026-09-12 at 0, while their paper order counts grow across a window that also has live placement (`EXECUTED ... mode=live` on live-odds-worker).
-    - Baseline 2026-09-11T03:26:45Z: 09-11 2 of 386, 09-10 2 of 564; the total is 37 across 08-29..09-11.
+    - First window (03:26:45Z -> 13:41:50Z):
+      - 09-10: 2 of 564 -> 2 of 595.
+      - 09-11: 2 of 386 -> 2 of 468.
+      - 09-12: 0 of 132 (new).
+      - Live: 0 stuck.
+      - Overlap: 79 `PAPER2_EXECUTED` (03:36-09:56Z) and 15 `LIVE_ORDER` (04:10-06:23Z).
+    - Second window: 09-11 still at 2 and 09-12 and 09-13 still at 0, with paper order counts grown and `LIVE_ORDER` lines in the window.
     - How: read `/api/ops/execution/ledger-summary?days=14` with the ops token, and sum `by_status.submitted` over the `paper:*` buckets of each date.
-- Blocked by: no code and no lane. The owed readings wait on production: an operator write on web, and a paper burst that overlaps live placement.
+- Blocked by: nothing. Scheduled task `execution-ledger-cas-close-reading` owns the last reading and the close.
 
 ### polymarket-slate-budget — CLOSED 2026-09-11 — opened 2026-09-11 — session 7a239b89-c8fd-49b7-ba5a-e41bb9d4d9bc — **GOAL MET: the slate keeps what the join can price (`3bafdd2b`: 13,540 game lines kept, 0 dropped), and NCAAF/NFL reach their weekend markets (`1e1285a4`: `QUOTE_CAPTURE sports=['ncaaf','nfl','soccer']`, join 3.18 s).**
 - Goal: [user 2026-09-10: "we need to fix this - clearly we aren't reading polymarket correctly"] the Polymarket slate keeps the markets we can trade. Full-game lines for the board's horizon (this weekend's NCAAF and NFL) survive the ~8 MB keyvalue budget instead of being cut behind player props and half/quarter markets that nothing reads.

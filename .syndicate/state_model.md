@@ -308,12 +308,19 @@ shape. `2914b6c7` stops a refused BUILD from writing a row.
   contains the CAS by content. `LEDGER_CAS_ACTIVE` at 03:36:13Z was its first ledger write after boot.
   25 landed SETs followed by 03:37:27Z, from paper placement (`execution_ledger.py:1351 <- :1496`)
   and `paper_settlement.py:543`.
-- Collisions caught so far: 0 `LEDGER_CAS conflicts` lines on either worker (03:22:35Z..03:37:53Z).
+- **Collisions CAUGHT: 7 by 2026-09-11T13:41Z** `[verified]`.
+  - refresh-worker 4 (05:15:11, :18 and :24, then 09:56:05Z).
+  - live-odds-worker 3 (05:15:17Z `conflicts=1`, 05:15:26Z `conflicts=2`).
+  - Six fell in one 16 s window with both workers writing: the 2026-09-04 shape. Each is a write the old
+    code would have overwritten.
+  - 0 `LEDGER_CAS_EXHAUSTED`, 0 `MERGE_READ_FAILED`, 0 `LedgerError`.
 - **Size: BOUNDED.** The document is at the 5,000-record cap, at 1,192 B/order. That is 5,960,805 B,
   71% of the 8,388,608 B refusal ceiling (`SIZE_WARNING` 2026-09-11T03:30:23Z). `TRIMMED` drops the
   oldest rows, so any count summed over dates can fall as old dates leave. Read stuck rows per date.
-- OWED: stuck paper rows, per date, staying flat across a paper burst that overlaps live placement.
-  2026-09-11 must stay at 2 and 2026-09-12 at 0 while their paper order counts grow.
+- **Stuck paper, first window: MET** `[2026-09-11T13:41:50Z]`. 0 new stuck rows across 245 new paper
+  orders (09-10: 2 of 595; 09-11: 2 of 468; 09-12: 0 of 132), with live placement in the window.
+  A second window is owed, scheduled for 2026-09-12 10:15 CDT. web's `LEDGER_CAS_ACTIVE` is not
+  exercised, because there has been no operator write.
 
 The `off != on` 7 of 10 figure is from 08-28 and covers the whole-document clobber only.
 

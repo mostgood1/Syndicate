@@ -82,7 +82,8 @@ exchange-execution-unblock]`.
     - `market_unresolved_for_position` and `no_live_price` share the branch and are tested, not yet seen live.
   - **The same race could revert a SENT order's completion. A CAS now closes it, and it is committing on both workers; the close reading is owed** `[verified on production 2026-09-11T03:36Z, lane execution-ledger-cas]`. `_persist`'s merge-read and SET are one compare-and-swap (`todo.md #656`, `de8a3f2a`).
     - `LEDGER_CAS_ACTIVE` on live-odds-worker at 03:23:41Z and on refresh-worker at 03:36:13Z. web has run it since 23:19:34Z; its line waits on an operator write.
-    - Owed: stuck paper rows, PER DATE, staying flat across an overlapping burst: 2026-09-11 at 2, 2026-09-12 at 0. The 5,000-record cap trims old dates, so a total can fall with no fix at all.
+    - **It works in production** `[2026-09-11T13:41Z]`: 7 collisions caught (6 in one 16 s two-writer burst at 05:15Z), and 0 new stuck paper rows across 245 new paper orders while live orders ran. A second reading is scheduled for 2026-09-12 10:15 CDT.
+    - Read stuck rows per date: the 5,000-record cap trims old dates.
 - **Kalshi NCAAF/NFL forward-date matching** (`SYNDICATE_KALSHI_FORWARD_DATE_SPORTS=soccer,ncaaf,nfl`) is live
   on live-odds-worker. On refresh-worker, where the join reads it: LIVE since `86c82220` (20:13:21Z). `forward_date_sport_not_enabled` went from 7,617 to absent, and the first NCAAF Kalshi orders were placed and filled at 20:27:54Z.
   - `167b2841`'s "gains zero NCAAF rows" caveat is stale. `04a82c38` gave NCAAF its alias map.

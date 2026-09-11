@@ -72,7 +72,7 @@
 
 ---
 
-### `#656` — **THE EXECUTION LEDGER'S WRITE IS NOT ATOMIC: a SET landing between another writer's merge-read and its SET is silently lost. It froze both venues for six days from 2026-09-04. A compare-and-swap in `_persist` is owed on all three services.** — lane `write-ahead-build-refusal`, 2026-09-10; fix by lane `execution-ledger-cas` — **OPEN; DEPLOYED ON ALL THREE WRITERS 2026-09-11 — the close reading is owed**
+### `#656` — **THE EXECUTION LEDGER'S WRITE IS NOT ATOMIC: a SET landing between another writer's merge-read and its SET is silently lost. It froze both venues for six days from 2026-09-04. A compare-and-swap in `_persist` is owed on all three services.** — lane `write-ahead-build-refusal`, 2026-09-10; fix by lane `execution-ledger-cas` — **OPEN; WORKING IN PRODUCTION: 7 collisions caught and 0 new stuck paper rows on 2026-09-11. The second close reading is scheduled for 2026-09-12 10:15 CDT and closes this item on a pass.**
 
 - **The fix (lane `execution-ledger-cas`).** `refresh_state_store.compare_and_swap_json_file`: WATCH the key, run the merge (which does its own re-read), then MULTI/SET/EXEC; a WatchError re-reads and re-merges, up to `_CAS_MAX_ATTEMPTS = 5`. The disk backend does the same with a content hash under an in-process lock. The three-way rules are unchanged. After 5 lost attempts it writes ONE non-atomic merge, loud (`LEDGER_CAS_EXHAUSTED`) and stamped (`last_blind_write.reason=cas_retries_exhausted`), because refusing would drop a recorded fill. The merge re-read is now STRICT (`_read_for_merge`), and a blind fallback from an EMPTY baseline is REFUSED — without both, a masked read (`#657`) would commit a whole-ledger overwrite atomically. Instruments: `LEDGER_CAS_ACTIVE` once per process, `LEDGER_CAS conflicts=N` per caught collision. Tests: 8 discriminating tests red on the pre-fix module, green on the fix; 877 green across the ledger, store and execution suites.
 - **`#658` is WITHDRAWN, not reused.** It was reserved for the `_load` masking minutes before `#657` filed the same item.
@@ -82,13 +82,19 @@
   - refresh-worker `5767e3ac`, live 03:24:50Z. It was lane `nfl-layer2-kalshi-identity`'s deploy, and it contains the CAS by content. `LEDGER_CAS_ACTIVE` at 03:36:13Z, its first ledger write after boot. 25 landed SETs by 03:37:27Z, from paper placement and `paper_settlement`. 0 collisions caught on either worker by 03:37:53Z.
   - The worker deploys carried lane `mlb-lens-final-status`'s MLB final passes onto both workers, on a user decision ("both as soon as each is CLEAR").
   - The ledger document is 5,960,803 B: 71% of the 8 MB ceiling. The CAS does not change it.
+- **Reading, 2026-09-11T13:41Z (first close window): MET** (`deploys.md`, "the #656 close reading, first window"):
+  - 0 new stuck paper rows across 245 new paper orders, per date, with live orders in the window.
+  - **The CAS caught 7 collisions**, 6 of them in one 16 s window at 05:15Z where both workers wrote, which is the 2026-09-04 shape. It retried at most `conflicts=2 attempts=3` of 5.
+  - 0 `LEDGER_CAS_EXHAUSTED`, 0 `MERGE_READ_FAILED`, 0 `LedgerError`.
+  - All three live SHAs carry the CAS by content (`4c373107`, `3bafdd2b`, `1e1285a4`).
+  - Scheduled task `execution-ledger-cas-close-reading` owns the second window and the close.
 
 - **Mechanism, proven.** `execution_ledger._persist` → `_merge_onto_current` re-reads the store and three-way merges; then `write_json_file` SETs the whole ~2.7 MB document. Nothing between the read and the SET is atomic, so a writer whose window straddles another writer's SET writes back its stale copy of every row it "kept theirs". 2026-09-04: live-odds-worker SET at 18:27:25.083 (K `rejected`; it also dropped paper Q), then refresh-worker SET at 18:27:25.228 = its own 24.711 doc + 48 B (Q filled, K back to `submitted`). The stored row: `submitted_at 18:27:23.597740Z`, `error` and `venue_resolved_at` null.
 - **Rate.** Paper rows stuck at `submitted` are the witness, since paper completes `filled` in the same call. On `/api/ops/execution/ledger-summary` the 13 across 09-06..09-11 counted the `paper:paper` bucket alone. Across ALL paper buckets it is 24 for 09-06..09-11, and 37 for 08-29..09-11 (2026-09-10T22:31Z, unchanged at 2026-09-11T03:26Z). That 37 is the pre-fix baseline.
 - **Already closed.** `2914b6c7`: a live order whose BUILD is refused writes no row, so the 09-04 class cannot recur. **Not closed:** a SENT order's completion (fill, `venue_order_id`) can still be reverted to its write-ahead copy. With no venue id, Polymarket's per-order reconcile cannot find it, and `BLOCKED_ON_UNRECONCILED` stops every venue.
 - **Fix direction.** Redis WATCH/MULTI/EXEC on the ledger key, with a bounded retry (re-read, re-merge, re-SET); the disk backend is unchanged. Invert `tests/test_execution_ledger.py::test_KNOWN_HAZARD_a_write_landing_between_merge_read_and_SET_is_lost`, which passes today BECAUSE the defect exists. Every writer must run it: refresh-worker, live-odds-worker and web.
 - **Close when** the CAS is live on all three services and the stuck-paper-`submitted` count stops growing across a placement burst that overlaps live placement.
-  - The first half is DONE (2026-09-11). web's `LEDGER_CAS_ACTIVE` waits on an operator write.
+  - The first half is DONE (2026-09-11). **USER DECISION 2026-09-11:** if no operator write has happened, web's `LEDGER_CAS_ACTIVE` counts as NOT EXERCISED, and it does not hold this item open.
   - **Read the second half PER DATE**, for dates written after 2026-09-11T03:36Z: 2026-09-11 stays at 2 and 2026-09-12 at 0 while their paper order counts grow.
   - The ledger is at its 5,000-record cap, so `TRIMMED` drops old dates. A 14-day total can fall with no fix at all.
 

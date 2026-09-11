@@ -32471,3 +32471,42 @@ on the SHA requested.
 - `board_rows` and `matched` vary with the board being joined (2,927 here, against 3,802 and 4,408 on the two prior builds),
   so they are not compared across builds.
 - The lane's verification (2) is met on every named reading, and falsification (2) did not trigger.
+
+## 2026-09-11 13:41Z — reading only, no deploy — lane `execution-ledger-cas` — the #656 close reading, first window
+
+**Services, checked BY CONTENT** for `compare_and_swap_json_file(_ledger_path()` and `def compare_and_swap_json_file`:
+- web `4c373107`, live 2026-09-10T23:19:34Z.
+- live-odds-worker `3bafdd2b`, redeployed by another lane at 03:44:23Z.
+- refresh-worker `1e1285a4`, redeployed by another lane at 04:52:40Z.
+
+All three are on `origin/main`, and all three carry the CAS.
+
+**verify -- the reading (2026-09-11 13:41-13:50Z):**
+
+```
+stuck paper, /api/ops/execution/ledger-summary?days=14: by_status.submitted summed over paper:*, per date
+             03:26:45Z        13:41:50Z
+  09-10      2 of 564         2 of 595        (+31 paper orders, +0 stuck)
+  09-11      2 of 386         2 of 468        (+82, +0)
+  09-12      --               0 of 132        (new date, 0 stuck)
+  live       0 stuck          0 stuck (09-10: 0 of 23; 09-11: 0 of 8)
+  14-day total 37, unchanged; last_blind_write None
+
+overlap     paper: 79 PAPER2_EXECUTED on refresh-worker, 03:36:58Z..09:56:55Z
+            live:  15 LIVE_ORDER on live-odds-worker, 04:10:43Z..06:23:55Z; 174 mode=live lines to 13:28Z
+collisions  CAUGHT: 7, each a write the pre-#656 code would have overwritten
+            refresh-worker    LEDGER_CAS conflicts=1 at 05:15:11, 05:15:18, 05:15:24, 09:56:05
+            live-odds-worker  LEDGER_CAS conflicts=1 at 05:15:17, conflicts=2 at 05:15:26
+            6 of them fell in one 16 s window in which BOTH workers wrote: the 2026-09-04 shape
+failures    0 LEDGER_CAS_EXHAUSTED, 0 MERGE_READ_FAILED, 0 LedgerError on either worker since deploy.
+            The window's tracebacks (live-odds-worker 3, refresh-worker 7) have NO frame in
+            execution_ledger.py or refresh_state_store.py; the 12:53:45Z ones are ESPN ReadTimeouts.
+web         LEDGER_CAS_ACTIVE not seen: no operator write since its deploy
+```
+
+**Verdict: FIRST WINDOW MET.**
+- 245 new paper orders, 0 new stuck rows.
+- The window had live placement and a real two-writer burst, and the CAS caught 7 collisions instead of losing them.
+- Most retries in one write: `conflicts=2 attempts=3` of 5.
+- Web's line is NOT EXERCISED.
+- The second window is scheduled (`execution-ledger-cas-close-reading`, 2026-09-12 10:15 CDT). By user decision it closes the lane on a pass, recording web as not exercised.
