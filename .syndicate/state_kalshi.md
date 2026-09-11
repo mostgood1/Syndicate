@@ -769,8 +769,9 @@ reconciling clean (15 orders, `not_found=0`). Bankroll $1000, caps $10/order,
     with `price_source=venue_feed` AND a `venue_ticker`.
   - The reader is live on live-odds-worker `78e4623f`: 14:29:29Z,
     `LIVE_PLAN_ABSENT` + `plan_source=paper2_fallback`.
-  - The writer (refresh-worker) was NOT yet deployed at checkpoint; its
-    preflight was on HOLD for an MLB sim.
+  - The writer (refresh-worker `78e4623f`, `dep-dai1m4u743jc73djqon0`) was
+    triggered at 15:15:31Z, after the MLB-sim HOLD cleared. It was NOT live yet
+    at the 15:17Z checkpoint.
   - WHY the rows are aggregator-priced: `MAX_MARKETS_PER_SERIES=400` cut
     `KXNCAAFSPREAD` 2,141 of 2,541 and `KXNCAAFTOTAL` 1,608 of 2,008 before the
     join, so Saturday's NCAAF rungs never reach it.

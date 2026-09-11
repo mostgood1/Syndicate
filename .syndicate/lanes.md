@@ -537,9 +537,9 @@ death, never life — do not invert it.
 - Blocked by: none. NOT changed, flagged: `bandwidth_tripwire.py --capture` leaves `metered_mb` null (it calls `capture()` without it, which is how five older captures got nulls). Worked around by calling `capture()` with each bucket's metered value, as `--check` does. Also flagged for the addendum, not rewritten: several of `[render-egress-spikes]`'s ELIMINATED entries quote spike-hour numbers from the old pairing, e.g. "public edge traffic ... carries 2.6-61 MB in the spike hours", whose correctly paired values are 178.2 and 144.5 MB.
 
 ### kalshi-plan-placeable — OPEN — opened 2026-09-11 — session 82c5bc07-6f67-47d7-9564-3a14f9d916ad
-- Goal: todo `#661` (`#659` residual (b), "Stop Kalshi plan committing uncontracted bets"). LIVE placement reads a venue plan committed ONLY over rows that carry a venue contract (`price_source=='venue_feed'` AND a `venue_ticker`), written as a SEPARATE live-plan artifact. `paper2`'s venue plans, the paper books and the executor's `no_venue_ticker` guard (`332e596d`) stay unchanged. — **GOAL: NOT MET** (checkpoint 2026-09-11 ~14:55Z).
+- Goal: todo `#661` (`#659` residual (b), "Stop Kalshi plan committing uncontracted bets"). LIVE placement reads a venue plan committed ONLY over rows that carry a venue contract (`price_source=='venue_feed'` AND a `venue_ticker`), written as a SEPARATE live-plan artifact. `paper2`'s venue plans, the paper books and the executor's `no_venue_ticker` guard (`332e596d`) stay unchanged. — **GOAL: NOT MET** (checkpoint 2026-09-11 15:17Z).
   - The reader half is verified: live-odds-worker `78e4623f` printed `LIVE_PLAN_ABSENT` + `plan_source=paper2_fallback` at 14:29:29Z (`deploys.md` 14:17Z).
-  - LEFT: refresh-worker `78e4623f`, the plan WRITER, is BLOCKED by a preflight HOLD while the MLB daily sim is in flight. Then readings (b) and (c) under Verification.
+  - LEFT: refresh-worker `78e4623f`, the plan WRITER. Deploy `dep-dai1m4u743jc73djqon0` was triggered at 15:15:31Z, once the MLB-sim HOLD cleared at 15:14:03Z, and was still building at 15:17Z. Then readings (b) and (c) under Verification.
   - Expected: `positions=0` on 09-11, and no new Kalshi order. The orders are gated by the per-series cap (follow-up session "Keep Kalshi NCAAF rungs near board lines under cap").
 - Files: `pipeline/portfolio_commit.py`, `tests/test_kalshi_plan_placeable.py` (NEW), `docs/ai_context/todo.md` (`#661`). NOT `syndicate/features/shared/portfolio_commit.py`: OPEN lane `pricing-plane-v1` holds it, so the filter goes in the caller.
 - RELEASED 2026-09-11, at the request of lane `polymarket-e2e-review` (session 7a239b89): the execute_portfolio module and its test file.
@@ -557,7 +557,7 @@ death, never life — do not invert it.
   - live-odds-worker's next `EXECUTED ... venue=kalshi` prints `plan_source=live`, and `no_venue_ticker` is absent from `refused=`.
   - `PAPER2_PLAN_WRITTEN venue=kalshi` is unchanged in shape.
   - An off != on reachability test is in the suite.
-- Blocked by: refresh-worker's preflight reports HOLD while the MLB daily sim is in flight (7 processes at 14:14Z, and a deploy kills them). The refresh-worker deploy claim is held by this lane.
+- Blocked by: nothing. The HOLD cleared at 15:14:03Z, and the writer's deploy is in flight. The refresh-worker deploy claim is held by this lane: re-acquired at 15:14:45Z, after the first claim expired at 14:58Z while waiting.
   - live-odds-worker is DONE: `78e4623f`, reading recorded, claim released.
   - The deploy order was never a safety question. A reader without a live plan falls back to paper2's plan and says so (`LIVE_PLAN_ABSENT`).
 
