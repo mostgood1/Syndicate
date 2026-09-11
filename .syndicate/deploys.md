@@ -5,6 +5,45 @@
 
 ---
 
+## 2026-09-10 22:15 CT — reading only, no deploy — refresh-worker `c29a7d4e` (lane `ncaaf-fcs-market-implied-rating`, FAMU @ MIA live) — **FAIL AT THE BOARD HOP: THE LIVE RE-SIM RAN ALL GAME ON THE MARKET-IMPLIED RATING, BUT FAMU @ MIA'S BOARD ROWS NEVER LEFT `pregame`, SO NO LIVE GAME LINE ATTACHED. CAUSE: NCAAF CHIPS GET ESPN LIVE STATE ONLY THROUGH THE WEEK CARDS, AND THE CARDS ARE FBS-vs-FBS.**
+
+Read live by a persistent monitor in session `df26ac0c`, every 2 min from 18:58 to 21:30 CDT, plus Render logs
+(substrate `render`). FAMU @ MIA kicked off at 19:00 CT and went FINAL **Miami 77, FAMU 7** (ESPN event 401858213).
+Live code: `c29a7d4e`, live 16:50:27 CT (lane `wnba-schedule-guard-fix`'s deploy). It contains this lane's
+`3e33f083` and `football-layer2-live-parity`'s chip-date fix (`86c82220`), both by ancestry.
+
+**verify, per hop, in pipeline order:**
+
+| hop | reading | verdict |
+|---|---|---|
+| pregame line survives a restart | first tick after the 16:50 CT boot (16:54:41 CT): `lines_captured 0`, `priced_on_implied_rating 1`, i.e. reused from the tick's keyvalue status, not re-fetched | **MEASURED** |
+| lens: a `live_resim` lane on the implied rating | tick 19:06:25 CT: `live_resimmed 1`, `in_progress 1`, 10.5 s. Every snapshot 19:08–21:27 CT: `live_resim`, `modelHomeWinProb 1.0` | **MET** |
+| join sees the lane | `live_gamelines.index_size 1` on every board 19:14–21:26 CT | **MET** |
+| board rows go live | all FAMU @ MIA full-game rows `game.state = pregame` on all 11 boards 19:14–21:26 CT (7–23 rows per board) | **FAIL, the first broken hop** |
+| `live_gameline` blocks on those rows | 0 (`rows_live_gameline_considered 0`), a consequence of the hop above | — |
+| `BOOK_GRID_LIVE_GAMELINE_FAILURE sport=ncaaf` | 0 lines since 19:00 CT | clean |
+
+**Root cause, measured.** `GET /api/board/game-chips?sport=ncaaf&date=2026-09-10`, published 19:15:20 CT, 91 s
+old: the FAMU @ MIA chip read `state pregame`, `status_token "7:00P CT"`, with score, clock and period all null,
+while ESPN had the game in progress. The board's `live_game_state` reads `no live status source wired for ncaaf`,
+so nothing corrects a stale chip. ESPN live state reaches NCAAF chips ONLY through
+`ncaaf/cards._attach_live_state` → `live_game_state.attach_ncaaf_live_game_state`, joined on ESPN ids parsed
+from each card's `logo_url` (`_lookup`, `live_game_state.py:452`), and the chip's state is
+`"live" if shared_is_live else "pregame"` (`cards.py:856`). Production's `/ncaaf/api/cards?week=2` has **49
+games and FAMU @ MIA is not one of them**, because the cards are the FBS-vs-FBS projection slate. The chip
+therefore comes from the provider's `include_upcoming` games (`game_chip_scoreboard.py:694-697`), which never
+get live state. This is the FBS-only boundary a third time, after the projections and this lane's lens. The
+exact function in the NCAAF provider (registered at `blueprints/home.py:6989`) is not yet pinned.
+
+**User decision, 2026-09-10 ~19:20 CDT: "Fix after the game."** No mid-game restart; the 18:45–22:30 CDT
+no-restart window agreed with three lanes held. **OWED:** live state for NCAAF chips that are not cards, with
+tests, deployed before Saturday 09-12. The tick already holds market-implied pregame lines for 3 more
+FBS-vs-FCS games (`fcs.candidates 3`, `priced_on_implied_rating 3` at 22:14 CT). Then re-take this reading on
+one of them. The board side is lane `football-layer2-live-parity`'s tonight; coordinate before editing.
+
+Engine note, one game and therefore not evidence: actual margin +70 against the market's -59.5 and the engine's
++49.4 from kickoff.
+
 ## 2026-09-10 16:16 CT — reading only, no deploy — refresh-worker `86c82220` (lane `mlb-stop-publishing-edges`, the soccer half of the 13:57 CT entry) — **NOT TAKEN: 0 SOCCER FAILURE LINES SINCE THE FIX, BUT NO SOCCER ROW REACHED PRICING. EVERY LIVE ROW WAS REFUSED AT THE TEAM-KEY LOOKUP, APPARENTLY ON "CF Estrela" vs "Estrela".**
 
 Scheduled task `soccer-live-gameline-reading`, measurement only: no code, env or deploy touched. It was set for 3:25 PM CT and actually started at 3:50 PM CT.
