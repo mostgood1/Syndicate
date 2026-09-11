@@ -32510,3 +32510,28 @@ web         LEDGER_CAS_ACTIVE not seen: no operator write since its deploy
 - Most retries in one write: `conflicts=2 attempts=3` of 5.
 - Web's line is NOT EXERCISED.
 - The second window is scheduled (`execution-ledger-cas-close-reading`, 2026-09-12 10:15 CDT). By user decision it closes the lane on a pass, recording web as not exercised.
+
+## 2026-09-11 14:17Z — live-odds-worker `3bafdd2b` → `78e4623f` — lane `kalshi-plan-placeable` — `#661`, live places a contracted-only venue plan (reader half)
+
+**Deploy.** `dep-dai0qp6k1f9s73fkbkn0`. Created 14:17:08Z, live 14:22:35Z. Claim held by `kalshi-plan-placeable`; preflight CLEAR (infrastructure only) for the exact SHA at 14:17:07Z.
+- `78e4623f` is on origin/main. Code riding along: `78e4623f` itself, plus `1e1285a4` (the polymarket join change, live on refresh-worker since 04:52:40Z).
+- `render.yaml`: unchanged.
+
+**Why the reader went first.** The writer (refresh-worker) preflighted HOLD at 14:14Z: 7 MLB daily-sim processes were in flight, and a deploy kills them. The reader is safe alone. With no live plan it falls back to paper2's venue plan and says so (`LIVE_PLAN_ABSENT`). That is the previous behaviour exactly, and the `no_venue_ticker` refusal is unchanged.
+
+**Before.** Every pass on `3bafdd2b` read the same (13:08, 13:28, 13:48, 14:04Z): `EXECUTED date=2026-09-11 mode=live venue=kalshi armed=True positions=16 placed=0 skipped=16 refused={'no_venue_ticker': 16}`. The book behind it is refresh-worker 09:55:11Z, `PAPER2_PLAN_WRITTEN date=2026-09-11 venue=kalshi rows_in=1129 positions=16 venue_priced=870 placeable_committed=0/16`: 16 NCAAF rows, all `price_source='aggregator'`, all Saturday games.
+
+**verify.** The reading is live-odds-worker's first pass on `78e4623f`. It prints `plan_source=` and nothing before this deploy did, so it proves the new branch ran.
+
+```
+14:29:29.27Z  LIVE_PLAN_ABSENT date=2026-09-11 venue=kalshi -- no live plan; placing paper2's venue plan, ...
+14:29:29.90Z  EXECUTED date=2026-09-11 mode=live venue=kalshi plan_source=paper2_fallback armed=True
+              positions=16 placed=0 skipped=16 refused={'no_venue_ticker': 16} spent={'dollars': 13.64, 'orders': 5}
+14:29:35.61Z  LIVE_PLAN_ABSENT date=2026-09-11 venue=polymarket -- ...
+14:29:36.33Z  EXECUTED ... venue=polymarket plan_source=paper2_fallback positions=1 refused={'no_venue_ticker': 1}
+Traceback since 14:22Z: none
+```
+
+**Verdict: READER HALF MET, as predicted.** The new executor branch is reached in production. It falls back loudly, and with the fallback the pass is byte-for-byte the old outcome: 16 refused, no write-ahead row, and no order.
+- The goal is NOT met yet. That needs refresh-worker `78e4623f` to write the live plan, then a pass reading `plan_source=live`, with `no_venue_ticker` absent from `refused=`.
+- Prediction for that pass, written now: `positions=0`. None of 09-11's 870 venue-priced rows cleared the gates. The contracted Saturday rungs are the ones `MAX_MARKETS_PER_SERIES=400` evicts (`#661`, and the follow-up task).
