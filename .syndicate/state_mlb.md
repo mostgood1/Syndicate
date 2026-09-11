@@ -1282,8 +1282,10 @@ at `Live / In Progress`, and both ended 00:05/00:09 CT. **9 games on 7 of 9 date
   `count=0`; control `2026-06-1*` -> 78). So `_source_status(None)` is
   `Pregame/Scheduled` and the lens row, merged by `_merge_live_lens_row_into_game`
   (`mlb/cards.py:3026`), is the ONLY status. Nothing is overwritten; web simply
-  never receives the feed's Final. **Still unfixed on web `[verified 22:22-22:31Z]`.**
-  A producer rewrite CANNOT reach web by the normal path, for two measured reasons.
+  never receives the feed's Final. **FIXED on web `[verified 2026-09-11 after 03:22:35Z]`** by a status-only patch of web's OWN served copy,
+  sent by live-odds-worker's final pass (`e035c829`, live `4c373107`). Reading: see the
+  closed lane `mlb-lens-final-status`. The producer-only version was inert, and both of the
+  reasons why still hold for ANY past-dated artifact, as measured.
   (1) The publish sweep refuses any artifact dated more than a day old
   (`artifact_publisher._PUBLISH_MAX_AGE_DAYS = 1`); every sweep logs `stale_slate=[...]`.
   (2) Web reads through `sources._resolve_data_path_with_reconcile`, which copies the

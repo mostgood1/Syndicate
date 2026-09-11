@@ -31953,3 +31953,42 @@ web, which form is served (22:28-22:31Z):
 
 **Rollback:** `render_deploy.py --service live-odds-worker --commit 2914b6c7 --allow-rollback`. The
 pass also has a kill switch, `SYNDICATE_MLB_LIVE_LENS_FINAL_PASS=0`, which needs a deploy to inject.
+
+## 2026-09-11 03:17:22-03:22:35Z — live-odds-worker `e4410f37` -> `4c373107` — lane `mlb-lens-final-status` (the WEB half, carried by lane `execution-ledger-cas`'s deploy)
+
+**What:** the WEB half of the MLB live-lens final pass, `e035c829`. It is a status-only patch of web's OWN served copy
+of each past report: it probes both copies headers-only, finalizes the served one from StatsAPI, and publishes it
+back from a temp file. NOT this lane's deploy. Lane `execution-ledger-cas` deployed `4c373107` for `#656` (CAS in `execution_ledger._persist`), and it carried every runtime change on main since `e4410f37`, this lane's `e035c829` among them. Its own entry lists the rest.
+
+**Baseline** (2026-09-10 22:22-22:31Z, after the LOCAL pass went live on `e4410f37`):
+- the served census for 09-01..09-09 read 9 `Live` on 7 of 9 dates;
+- the 09-03 cards read 823095/823907 `Live`, and the 09-03 chips 7 final + 2 live;
+- web's 09-04 target was 2,280,218 B (full), and its 09-09 target 132,548 B (slim, reconciled).
+
+**Locks:** This lane took NO claim. `execution-ledger-cas` held the live-odds-worker claim (target `4c373107`, reason naming `e035c829`) and deployed `dep-dahn5gid0e5s7383ldvg`: created 03:17:22Z, live 03:22:35Z (`finishedAt`). The slate was over first: ESPN had FAMU @ MIA `Final`, and all 5 of the 09-10 MLB games were Final (StatsAPI, 03:16Z). Checked BY CONTENT: `probe_web_copy` (line 276), `_finalize_web_copies` (362) and the `MLB_LIVE_LENS_FINAL_PASS_WEB` line (571) are in `4c373107`'s tree, and `e035c829` is an ancestor.
+
+**verify -- the reading:**
+
+```
+reading at 03:24:47Z, finishedAt 03:22:35Z (+133s) -- scratchpad verify_web_half.py
+live-odds-worker `4c373107`:
+  03:24:06Z MLB_LIVE_LENS_FINAL_PASS today=2026-09-10 lookback=10 dates_checked=10 open_rows=0 finalized=0
+            (its own copies have been final since 22:19Z)
+  03:24:09Z MLB_LIVE_LENS_FINAL_PASS_WEB dates_checked=10 skipped_verified=0 served_slim=0 absent=0 read_failed=0
+            too_large=0 open_rows=10 finalized=10 still_open=0 published=8 publish_failed=0 fetch_failed=0 deferred=0
+            games=['2026-09-09:823900', '2026-09-06:823903', '2026-09-05:824553', '2026-09-04:823905', '2026-09-04:823093',
+                   '2026-09-03:823095', '2026-09-03:823907', '2026-09-02:823906', '2026-09-01:823908', '2026-08-31:824314']
+web [ops.publish] ACCEPTED, publisher=live-odds-worker, source_artifacts targets, 03:24:06-03:24:09Z:
+  09-09 133,243 B (+695) | 09-06 49,238 (+695) | 09-05 1,590,427 (+695) | 09-04 2,281,200 (+982)
+  09-03 185,745 (+982)   | 09-02 82,659 (+695) | 09-01 107,701 (+695)   | 08-31 1,629,038 (+695)
+web's two copies per date, headers only: all nine dates 09-01..09-09 serve the TARGET (it is the newest copy)
+served /mlb/api/cards?date=2026-09-03: 823095 Final/Final, 823907 Final/Final
+served census 09-01..09-09: 0,0,0,0,0,0,0,0,0 = 0 Live          (before: 9 on 7 of 9 dates)
+chips 2026-09-03 source=inline_artifact_stale states={'final': 9}  (before: 7 final + 2 live)
+```
+
+**Verdict: MET.** The first `MLB_LIVE_LENS_FINAL_PASS_WEB` line came at 03:24:09Z, 94 s after live. It read `published=8 finalized=10 still_open=0 publish_failed=0 read_failed=0` and named all 9 games, plus 824314 on 08-31. Web ACCEPTED 8 publishes from live-odds-worker, each only +695/+982 B (the `finalizedBy`/`finalPass` stamps), so web's own content was kept: its 09-04 target is 2,281,200 B, the full report. At 03:24:47Z (+133 s), `/mlb/api/cards?date=2026-09-03` read `Final` for 823095 and 823907. The served census for 09-01..09-09 read **0** `Live`, against 9 on 7 of 9 dates before, and the 09-03 chips read 9 `final`, against 7 + 2 `live` before. All nine dates now serve their newest copy, the target.
+
+**Rollback:** `render_deploy.py --service live-odds-worker --commit e4410f37 --allow-rollback`, or the kill
+switch `SYNDICATE_MLB_LIVE_LENS_FINAL_PASS_WEB=0`, which needs a deploy to inject. Patches already published to web
+stay: they are status-only, stamped `finalizedBy` / `finalPass`.
