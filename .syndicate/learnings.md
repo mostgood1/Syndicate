@@ -5560,3 +5560,11 @@ the instrument rather than the system.**
 - **What happened:** live-odds-worker's live commit moved `1afec00f` -> `16de339b` between my reads (another lane's deploy, 16:53:31Z). Preflight for `--target-commit 1afec00f --reinject-env` printed `live commit 16de339b`, then `target commit 1afec00f ALREADY LIVE -- redundant`, then `CLEAR` (16:59Z). Deploying it would have rolled back `16de339b`'s change.
 - **Why:** `deploy_preflight.py:792-796` sets `target_already_live = is_ancestor(target, live)`, and lines 806-808 waive that redundancy under `--reinject-env`. An ancestor is "already live" by containment, so a rollback target reads as the same-commit case the flag exists for. `render_deploy.py`'s descendant check is the only remaining guard, and it was not exercised here.
 - **The rule:** for `--reinject-env`, use the `live commit` printed by THAT preflight run as the target, and require target == live, not merely contained. Caught here only by reading the `live commit` line on the same output.
+
+## 2026-09-11 — OVERTURNED (mine): I offered the user an option saying withheld rows would "still be recorded, so skill can be measured" before checking who consumes the filtered artifact `[lane pricing-plane-v1]`
+
+- **What I believed**: withholding rows from the shortlist changes only the display, and measurement continues.
+- **What was actually true**: `portfolio_commit` sizes from the persisted shortlist (`read_layer2_shortlist`). Withholding a row also stops its paper orders, and those orders were the only order-based route to measuring those models.
+- **How we found out**: tracing the shortlist's consumers while implementing, after the user had already chosen.
+- **The rule going forward**: before describing a filter's side effects to the user, trace every consumer of the artifact it filters. The Layer 2 board is also the portfolio's input. State the consequence IN the question, not after the answer.
+- **Cost**: small. The consequence was surfaced before the deploy and recorded as a lead, and the decision stood.

@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-09-11 12:51 CT — reading only, no deploy — refresh-worker `9d580145` (lane `ncaaf-window-reason`) — **MET: A PROJECTION WINDOW THAT PRODUCED ROWS NO LONGER REPORTS THAT IT PRODUCED NONE (`#633`'s second half). LANE CLOSED.**
+
+- The fix `353650c7` (2026-09-09) is an ancestor of every refresh-worker build since at least `c29a7d4e` (live 2026-09-10 16:50 CT), and now of `9d580145`.
+  - The lane's verdict still said "DEPLOY PENDING". The fix had ridden deploys of main's tip, and no reading was taken until now.
+- **Before**, 2026-09-10 02:41 CT: `PREGAME_PROJECTION_JOIN sport=ncaaf considered=590 projected=329 ... reason=no NCAAF SmartSim2 projections for this date`.
+- **After**, refresh-worker 2026-09-11 17:36:32Z: `PREGAME_PROJECTION_JOIN sport=ncaaf considered=605 projected=344 ... reason=None error=None`.
+- The lane's falsification test holds in production: a window with `projected > 0` carries no top-level `reason`.
+  - The zero-rows branch (a window that produced nothing keeps its reason) is not exercised by this reading. The lane's tests pin it.
+- verify: **MET**.
+
 ## 2026-09-11 12:40 CT — refresh-worker `889d4e12` -> `9d580145` (lane `pricing-plane-v1`, user decision "Withhold, all sports") — **MET: ONE-SIDED ROWS WHOSE ONLY VALUE WAS AN UNMEASURED MODEL ARE OFF THE BOARD. 0 SERVED, `unmeasured_model_only=3107` WITHHELD; MLB HR ROWS 116 -> 0**
 
 **Trigger.** User report: "these pregame MLB opps make no sense, a lot are extremely long odds".

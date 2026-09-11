@@ -1766,6 +1766,21 @@ what would make the shed unreachable rather than merely rare.
   came from a construction I could not reproduce (this instrument reads the
   pre-divisor window at 0.925). Only before/after on ONE instrument is valid.
 
+**ADMISSION, NOT RANKING: a one-sided row whose ONLY value is an UNMEASURED model's edge is now WITHHELD from the shortlist** `[2026-09-11, user decision "Withhold, all sports"; 9d580145 live on refresh-worker 12:27 CT, lane pricing-plane-v1]`.
+- **Why.** The 08-31 ranking change reduced the HR takeover but did not end it. On 2026-09-11 all 116 MLB `batter_home_runs` rows were `book_margin_model`
+  with `model_skill.sample_games: 0`, 8 of them in the top 25:
+  - Acuna 1+ HR: model 0.321 vs implied 0.196.
+  - 2+ HR longshots rested on model means of 0.38-0.59 HR/game.
+- **The rule.** `select_shortlist` drops a `book_margin_model` row with a model edge whose `model_skill.status` is not `measured` (an absent note
+  counts as unmeasured). It is counted as `rows_unmeasured_model_only` plus `unmeasured_model_only_by_market`.
+- **Measured, first post-deploy build (17:37:25Z):**
+  - 0 of 4,986 served rows match the rule; `unmeasured_model_only=3107`.
+  - MLB HR rows: 0.
+  - The row budgets refilled the freed slots with market-priced rows.
+- **Reverse-out:** `SYNDICATE_LAYER2_UNMEASURED_MODEL_ONLY=admit`.
+- **The consequence:** those markets get no paper orders, so their skill can only become measured through a prediction-vs-box-score grader
+  (lead, 2026-09-11). The served counter keys wait on a web deploy.
+
 ## [artifact-delivery-topology] AN ARTIFACT AN ENGINE READS IS A THREE-SERVICE CHANGE `[measured 2026-08-31]`
 
 Getting an 867-byte calibration file to the engine that reads it required all
