@@ -5,6 +5,27 @@
 
 ---
 
+## 2026-09-10 ~22:20 CT — refresh-worker `c29a7d4e` -> `5767e3ac` (lane `nfl-layer2-kalshi-identity`, session `53eaee9c`, user decision "Land + deploy now") — **DEPLOYING; PREDICTIONS WRITTEN BEFORE ANY READING. NFL Layer 2: Kalshi prop quotes merge into their sportsbook rows with game identity, and the worker takes the newer published prop artifact.**
+
+- **Preflight:** CLEAR at 03:14:56Z. Only infrastructure processes were running, with no MLB sim. The claim is held by this lane, and the target is on `origin/main`.
+- **Collateral:** `c29a7d4e..5767e3ac` carries six other code commits. `2914b6c7` and `cfec04ef` are already live on web and live-odds-worker. `f73a140f`, `e035c829` and `de8a3f2a` (#656 CAS) are already live on web. **`42d49364` (NCAAF frozen-chip live-state overlay) is live NOWHERE yet**, so this deploy is its first appearance in production, on refresh-worker only.
+- **Baseline, measured 2026-09-10 ~22:20Z:**
+  - Web's NFL `book_quotes/2026-09-10.jsonl` holds 261 Kalshi prop rows. All carry `player_receptions`/`player_pass_tds` and none has a `commence_time`. 150 of them are Sunday or Monday games.
+  - Board ingest shows `prop_coverage.artifact_rows 683`, `rows_with_projection 237`, `unsupported_markets {player_receptions: 66, player_pass_tds: 33}`.
+  - Page (`/api/intelligence/query`): 119 of 119 NFL prop rows with a sim view are Anytime TD. Zero rows in the other 8 markets have one.
+  - Refresh-worker logs `REPAIR_SKIPPED_LOCAL_OK local_rows=980` hourly, while web serves 1,140 rows (`generated_at` 2026-09-10T00:09:04Z).
+- **Prediction 1, Kalshi capture:** the first `[kalshi_odds] QUOTE_CAPTURE` line after deploy that shows NFL prop matches should read `relabelled` equal to those matches and `identity_stamped` above 0. Its `shards=` should include NFL dates other than the board date.
+  - **Falsifier:** `relabelled=0` on a tick that has NFL prop matches.
+- **Prediction 2, prop artifact:**
+  - The next NFL prop autorun on refresh-worker should log `REPAIR_PULLED_NEWER outcome=pulled_newer local_rows=980 ... -> rows=1140`.
+  - The next board build should then report `prop_coverage.artifact_rows 1140`, with `rows_with_projection` above 237.
+  - NFL prop rows other than Anytime TD should carry a sim view (currently 0).
+  - Replayed against the published artifact, the 22:20Z page matched 599 of 967 prop rows. The exact count will drift with lines and with the date roll, so it is not the falsifier.
+  - **Falsifiers:** `REPAIR_ROLLED_BACK` or `REPAIR_LOCAL_CURRENT` while web's copy is newer. Or 0 non-Anytime-TD sim views after `REPAIR_PULLED_NEWER`.
+- **Not predicted to change tonight:** rows already written into the 09-10 shard under `player_*` keys stay in the 09-10 grid until the board date rolls at midnight CT. The "Matchup" card can persist until then. From 09-11 on, NFL Kalshi-derived board rows should carry a `matchup`.
+- **Measured:** OWED.
+
+
 ## 2026-09-10 22:15 CT — reading only, no deploy — refresh-worker `c29a7d4e` (lane `ncaaf-fcs-market-implied-rating`, FAMU @ MIA live) — **FAIL AT THE BOARD HOP: THE LIVE RE-SIM RAN ALL GAME ON THE MARKET-IMPLIED RATING, BUT FAMU @ MIA'S BOARD ROWS NEVER LEFT `pregame`, SO NO LIVE GAME LINE ATTACHED. CAUSE: NCAAF CHIPS GET ESPN LIVE STATE ONLY THROUGH THE WEEK CARDS, AND THE CARDS ARE FBS-vs-FBS.**
 
 Read live by a persistent monitor in session `df26ac0c`, every 2 min from 18:58 to 21:30 CDT, plus Render logs
