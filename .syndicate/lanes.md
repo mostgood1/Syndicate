@@ -566,7 +566,7 @@ death, never life — do not invert it.
   - (1) An end-to-end reading of the Polymarket path: markets read → join → scope → plan → executor gates → order → fill → settlement. It needs a production count at every stage, and the realized results to date with denominators and dates.
   - (2) A verdict from evidence on the pregame near-even hold (`HELD_PREGAME_NEAR_EVEN`, counted as `refused['pregame_price_too_high']`, ceiling 0.35): what it holds, what becomes of held bets, and what it costs or saves. It goes to the user as a decision, with a recommendation.
   - No code change without the user's decision.
-- Files: `syndicate/features/shared/polymarket_us_orders.py`, `tests/test_polymarket_us_orders.py` (ADDED 2026-09-11 on the user's decision; before that the lane was diagnostic and ledger-only).
+- Files: `syndicate/features/shared/polymarket_us_orders.py`, `tests/test_polymarket_us_orders.py`, `pipeline/execute_portfolio.py`, `tests/test_execute_portfolio.py`. All ADDED 2026-09-11 on the user's decision; before that the lane was diagnostic and ledger-only. The last two were released to this lane by kalshi-plan-placeable (`ee7c8691`). With them the hold is DELETED, not switched off by config.
 - Hypothesis (to test, not believed):
   - H1: most held bets are never placed. The plan drops a game once it starts, so the hold turns positive-EV positions into no position.
   - H2: held bets that do place live pay a different price from the one they were held at. The hold's value is that price gap plus any difference in fill rate, and neither has been measured.
