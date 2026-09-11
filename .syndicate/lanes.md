@@ -588,6 +588,13 @@ death, never life — do not invert it.
   - H4 falls if the two fields share a baseline by design and agree in sign once put on one.
 - Verification: the readings above are written to `state_polymarket.md` and the day log with n and dates, and the user's decision on the hold is recorded.
 - Blocked by: none.
+- 2026-09-11 ~14:20Z: readings are in `state_polymarket.md` `[polymarket-pregame-hold-premise-falsified]`.
+  - H3 CONFIRMED. The rule's own falsifier, a pregame fill above 0.410, occurs more than ten times in the ledger (08-28..08-31). Near-even pregame orders filled 24 of 41 times, and every miss was a venue cancel within 2 s.
+  - H4 FALSIFIED as a bug: the two fields have different baselines by design.
+  - H1: CONFIRMED. Of the 51 held bets whose games started, 36 (71%) were never placed and 4 (8%) became fills.
+  - H2: indeterminate on n=4. Prices were within ±0.03 of the held price, and the 3 fills went 1-2.
+  - Live Polymarket overall: 19-29, −$47.76, ROI −31% on 48 settled. Near-even in-play went 3-10 against 5.7 expected; near-even pregame 10-9 against 8.6.
+  - The decision on the hold is WITH THE USER.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

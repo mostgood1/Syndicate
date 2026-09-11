@@ -577,6 +577,7 @@ once this index exists: re-splitting would orphan the parts.
 | [polymarket-fill-time-to-event] | 2026-08-30 — the leading hypothesis is TIME TO EVENT, not liquidity at our size | `state_polymarket.md` |
 | [polymarket-order-fills] | 2026-08-30 — four causes REFUTED; fills are mostly fine | `state_polymarket.md` |
 | [polymarket-slate-budget-kept-props-dropped-game-lines] | THE POLYMARKET SLATE SPENT ITS 8 MB ON PROPS AND DROPPED THE WEEKEND'S GAME LINES — fixed in `3bafdd2b` `[veri | `state_polymarket.md` |
+| [polymarket-pregame-hold-premise-falsified] | THE PREGAME NEAR-EVEN HOLD'S OWN FALSIFIER WAS ALREADY IN THE LEDGER — and the live Polymarket book shows no e | `state_polymarket.md` |
 | [portfolio-sign-in-and-books] | EVERY PORTFOLIO PAGE IS BEHIND A SIGN-IN, AND THERE IS MORE THAN ONE PORTFOLIO `[verified on production 2026-0 | `state_portfolio.md` |
 | [portfolio-live-surface] | `/portfolio` IS THE LIVE BUYING ENGINE, the venue caps BIND, and the VENUE now settles our bets `[verified 202 | `state_portfolio.md` |
 | [portfolio-settlement] | PORTFOLIO SETTLEMENT — the ledger crossed no service boundary, and the join keyed on a value that drifts `[ver | `state_portfolio.md` |

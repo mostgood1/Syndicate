@@ -1253,3 +1253,72 @@ whatever game lines displace them. `dropped_by_date` still reports every one.
 
 **Watch.** If the catalogue keeps growing, tier 0 alone can overflow the budget. `dropped_game_lines_by_date` on the
 `SLATE_BUDGET` line is the early warning, and it read `{}` at the first write.
+
+## [polymarket-pregame-hold-premise-falsified] THE PREGAME NEAR-EVEN HOLD'S OWN FALSIFIER WAS ALREADY IN THE LEDGER — and the live Polymarket book shows no edge at the price we read `[measured 2026-09-11 ~13:50-14:20Z from production, lane polymarket-e2e-review]`
+
+**Population.** Every Polymarket LIVE order at `/api/portfolio/live?on=all&show=all&venue=polymarket`, read 2026-09-11 ~13:50Z.
+- 144 orders across 08-27..09-11: 58 filled and 86 rejected.
+- The rejections: 47 `OrderBuildError: market_unresolved_for_position`, 18 `venue_order_state_canceled`, 10 `_SlippageExceeded`, 7 `team_side_needs_verified_yes_leg`, 2 `venue_order_state_expired`, 1 `unmappable_side: 'draw'`, 1 `http_503`.
+- 48 of the fills are settled.
+
+**The rule's own falsifier is met.** `_polymarket_max_pregame_price` (`pipeline/execute_portfolio.py:1177-1218`) says: "THE FALSIFIER, either of which ends this rule: a PREGAME FILL above 0.410".
+- The ledger holds more than ten, every one resolved within about 2 s of submit. Among them:
+  - 0.47 at −821 min and 0.47 at −124 min (08-29);
+  - 0.455 at −125 min (08-30);
+  - 0.45 at −214 min and at −555 min (08-31);
+  - 0.44–0.48 across 08-28..08-29.
+- The rule's n=11 came from one day. It missed these fills, and it read instant venue CANCELS as "resting".
+
+**Pregame fill rate, orders that reached the venue:**
+- below 0.35: 14/14;
+- 0.35–0.45: 11/21;
+- 0.45–0.55: 13/20.
+
+  Near-even combined is 24/41, or 59%. Every miss was CANCELED by the venue 0.6–1.6 s after submit (`order_state_canceled`). None rested. In-play near-even: 13/15.
+
+**Settled results against the market's own probability** (the fill price):
+
+| Group | W-L | Expected wins | z | Staked | ROI |
+|---|---|---|---|---|---|
+| Near-even PREGAME | 10-9 | 8.6 | +0.62 | $66.06 | −35.7% |
+| Near-even IN-PLAY | 3-10 | 5.7 | −1.50 | $49.14 | −46.6% |
+| Longshots (<0.35) | 5-8 | 3.6 | +0.86 | $32.74 | +1.5% |
+| All | 19-29 | | | | −31.0% |
+
+- All: −$47.76 on $153.83 settled.
+- Win COUNTS sit at the market's rate. The DOLLARS were lost on the largest Kelly stakes, which are the largest claimed edges. Split at the median stake of $2.12:
+  - at or below it: 11-13 against 9.1 expected, +$4.68 (+13%);
+  - above it: 8-16 against 10.1, −$52.44 (−44.5%);
+  - near-even above its median ($2.52): 5-12 against 7.7, −$48.22 (−53%).
+- Every n here is small. Nothing is significant except the direction: the hold moves near-even bets from its best cell (pregame) to its worst (in-play).
+
+**Paper against live, by market family** (paper `settlement_all_time`):
+- `paper:polymarket/game_line`: +50.5% (n=103 settled). Live h2h: −23.4% (n=15).
+- `paper:polymarket/game_total`: −40.7% (n=106). Live totals: −34.0% (n=33).
+- Paper totals lose on Kalshi as well: −29.8%, n=190.
+- The h2h gap is between the price paper assumes and what live can trade. The totals loss appears in both books, so it is not execution.
+
+**Code facts** (origin/main `728b7087`, traced read-only):
+- A held bet is not stored (`execute_portfolio.py:631-646`). Each pass re-derives it from the current plan. It places only if the plan still holds its row after kickoff.
+- A row with no confirmed game state is demoted at kickoff (`opportunity_gate.py:240`). MLB and WNBA were measured matching zero such rows (`layer2_shortlist.py:1546-1562`).
+- EV is not re-checked in-play, and no switch exists to refuse an in-play placement (`execute_portfolio.py` has none). The pregame model probability is used against the live price. The slippage anchor is re-based on every rebuild (`venue_scope.py:167`), so drift from the hold decision is unbounded.
+- The explore arm has band 0.10 and rate 0.50 by default (`execute_portfolio.py:1080-1135`), so roughly half of the positions priced 0.35–0.45 are placed anyway.
+- On live-odds-worker, `SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE`, `_EXPLORE_BAND`, `_EXPLORE_RATE`, `_CROSS_TICKS` and `SYNDICATE_EXECUTION_MAX_SLIPPAGE_DOLLARS` are ALL absent, so the code defaults apply. Read by single-key endpoint, 2026-09-11 ~14:05Z.
+- **Price basis:** `ev_pct` is the consensus fair against Polymarket `outcomePrices`, a sizeless number with no bid, ask, mid or last label (`polymarket_us_markets.py:1433,1591`). Orders are LIMIT GTC at snap plus one tick. Polymarket orders are never cancelled by us (`polymarket_us_orders.py:970` has no caller).
+
+**H1 (held bets never placed):** The log join covers `HELD_PREGAME_NEAR_EVEN` from 2026-08-31T05:58:34Z (the gate's first line) to 09-11T08:46Z. Coverage is complete: 1,255 lines and 59 distinct held tickers, at a mean held price of 0.471 and a mean model EV of +11.1% (n=56).
+  - Of the 51 whose games have started, **36 were never placed (71%)**.
+  - 4 were placed after commence. 3 filled, going 1-2 for −$1.28, and 1 expired.
+  - 11 were placed pregame, through the explore arm or a price move. 10 of them were rejected, mostly `_SlippageExceeded`. The one that filled (`ast-ars`, the 08-31 explore probe) lost $8.99.
+  - **So 4 of the 51 held bets (8%) ever became a filled position.**
+  - 8 are still pending: today's BAL–TOR and Sunday's NFL games.
+  - The hold refused 427, 353, 142, 134 and 100 position-passes over 08-31..09-04, and 49 and 50 on 09-10 and 09-11. There was no `EXECUTED` polymarket pass 09-05..09-09 (the ledger freeze, #656).
+  - The join is `scratchpad/held_bets.py`: log lines joined by ticker to later `LIVE_ORDER` lines, with commence estimated from `hours_to_commence`.
+
+**Verdicts on the lane's hypotheses:**
+- H3 (the premise is stale): CONFIRMED.
+- H4 (the ev/edge sign split is a bug): FALSIFIED as a bug. `ev_pct` is consensus against venue price and `edge_pct` is model against consensus, by design. On the model-against-price baseline the example agrees in sign: model 0.493 against 0.46.
+- H2: INDETERMINATE on n=4. The four bets placed after commence were priced within ±0.03 of the price they were held at (0.50→0.49, 0.47→0.50, 0.46→0.455, 0.455→0.455). Three filled, going 1-2.
+- H1: CONFIRMED. 36 of the 51 held bets whose games started were never placed, and 4 of the 51 became fills.
+
+The decision on the hold is the user's, and it is pending.
