@@ -786,7 +786,9 @@ reconciling clean (15 orders, `not_found=0`). Bankroll $1000, caps $10/order,
     never reached the join. FIXED by lane `kalshi-precap-board-lines` (`#663`):
     the first plan after the fix (17:41:08Z) is `LIVE_PLAN_WRITTEN venue=kalshi
     positions=22 placeable_committed=22/22 aggregator_priced=221`, and paper2's
-    NCAAF 09-12 Kalshi rows are 20/20 contracted `[verified 2026-09-11]`.
+    NCAAF 09-12 Kalshi rows are 20/20 contracted. The first live pass on it
+    (17:49:20Z) placed 6 NCAAF 09-12 orders (`plan_source=live`); 14 more
+    were refused `over_max_day_orders` `[verified 2026-09-11]`.
   - NOT the date gate: `SYNDICATE_KALSHI_FORWARD_DATE_SPORTS=soccer,ncaaf,nfl`
     on both workers.
 - Polymarket per-order reads cannot detect orphans by construction (no list

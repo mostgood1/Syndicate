@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#663` — **The Kalshi per-series cap keeps the board's own rungs, so NCAAF Saturday rows get a venue contract** — lane `kalshi-precap-board-lines` (`#661`'s residual), 2026-09-11 — **OPEN: half 1 MET (20/20 NCAAF 09-12 Kalshi rows contracted, from 1/13); live `placed>0` owed**
+### `#663` — **The Kalshi per-series cap keeps the board's own rungs, so NCAAF Saturday rows get a venue contract** — lane `kalshi-precap-board-lines` (`#661`'s residual), 2026-09-11 — **CLOSED 2026-09-11: NCAAF 09-12 Kalshi rows 1/13 -> 20/20 contracted; live placed 6 NCAAF Saturday orders**
 
 - **Why.** `MAX_MARKETS_PER_SERIES=400` kept the nearest date first, then that day's ladder in arrival order. On 09-11 the Kalshi plan's 16 NCAAF Saturday rows were all `price_source=aggregator` with no ticker (`placeable_committed=0/16`), so live could not place them.
 - **What shipped (`7c248328`).** The flag `SYNDICATE_KALSHI_PRECAP_BOARD_LINES` is ON on both writers (refresh-worker `889d4e12`, live-odds-worker `16de339b`, by `--reinject-env`).
@@ -11,7 +11,7 @@
   - Replay: 0/16 -> 11/16, which equals no cap.
   - Production, 17:41:08Z: `LIVE_PLAN_WRITTEN venue=kalshi positions=22 placeable_committed=22/22 aggregator_priced=221` (before: 3 and 316). The paper2 Kalshi NCAAF 09-12 rows are 20/20 contracted, against 1/13 before.
   - `deploys.md` 2026-09-11 16:50:20Z / 17:00:19Z.
-- **Close when** live-odds-worker prints `EXECUTED ... mode=live venue=kalshi plan_source=live placed>0`.
+- **Closed on** live-odds-worker 17:49:20Z `EXECUTED date=2026-09-11 mode=live venue=kalshi plan_source=live armed=True positions=22 placed=6 filled=0 failed=0 duplicates=2 retried=0 skipped=14 refused={'over_max_day_orders': 14} spent={'dollars': 58.84, 'orders': 15}`. All six orders are NCAAF 09-12 tickers (GASTKENN, UNLVUNT, OKLAMICH, TLSASHSU, ODUVT, USUWASH). The next constraint is the Kalshi daily ORDER cap, which refused 14 of 22 contracted positions (`leads.md`).
 - **Not this item:** 5 of the original 16 miss even with no cap, because the resolver does not place UC Davis, Howard, N Colorado or `MIZZKU`. That is in `leads.md`.
 
 ### `#662` — **Price Polymarket off the executable ask, and include fees** — lane `polymarket-ask-pricing` (opened from `polymarket-e2e-review`), 2026-09-11 — **OPEN; step 1, the instrument, is LIVE in `1afec00f` since 16:02:43Z; its population is owed**

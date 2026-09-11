@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 979 rules `[generated]`
+## Index — 981 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5568,3 +5568,9 @@ the instrument rather than the system.**
 - **How we found out**: tracing the shortlist's consumers while implementing, after the user had already chosen.
 - **The rule going forward**: before describing a filter's side effects to the user, trace every consumer of the artifact it filters. The Layer 2 board is also the portfolio's input. State the consequence IN the question, not after the answer.
 - **Cost**: small. The consequence was surfaced before the deploy and recorded as a lead, and the decision stood.
+
+## 2026-09-11 — RECURRENCE (a stale ledger number read as a live constraint): I quoted a 16-day-old cap from `state.md` as the binding limit and planned around it `[lane kalshi-precap-board-lines]`
+
+- **What I said:** the 09-11 Kalshi spend of $30.07 left "~$20 of room" under a "$50/day cap". The cap came from `state.md`'s 2026-08-25 caps line; `EXECUTED` prints `spent=` but no cap.
+- **What happened:** the next pass spent to $58.84 and was bound by the ORDER count: `refused={'over_max_day_orders': 14}`.
+- **The rule:** a cap quoted as binding must come from the running service's env, or from its own refusal counter, never from a dated ledger line. The executor's `refused=` dict names the cap that actually bound.

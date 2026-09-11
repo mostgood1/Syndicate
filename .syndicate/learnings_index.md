@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 979 rules `[generated]`
+## Index — 981 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -408,7 +408,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](learnings_evidence.md#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated) `[evidence]`
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 
-**Rules and corrections — 585**
+**Rules and corrections — 587**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -533,6 +533,8 @@
 - [2026-09-11 — OVERTURNED (mine, same morning): I explained a falling ALL-TIME count as "…](#2026-09-11-overturned-mine-same-morning-i-explained-a-falling-all-time-count-as-the-window-moved-without-reading-how-the-count-is-taken-it-was-data-loss-lane-nfl-prop-grading)
 - [2026-09-11 — OVERTURNED (mine, same day) and REQUIRED: `claims_by_path` is NOT the matc…](#2026-09-11-overturned-mine-same-day-and-required-claims_by_path-is-not-the-matcher-lane-guard-enforces-with-and-a-claim-transfer-is-not-in-force-until-the-primary-trees-lanesmd-says-so-lane-ncaaf-tbd-kickoff-date)
 - [2026-09-11 — RECURRENCE (the 2026-09-10 "check EVERY site that WRITES that artifact" ru…](#2026-09-11-recurrence-the-2026-09-10-check-every-site-that-writes-that-artifact-rule-the-kalshi-per-series-cap-had-two-writers-and-a-selection-flag-on-one-lane-kalshi-precap-board-lines)
+- [2026-09-11 — OVERTURNED (mine): I offered the user an option saying withheld rows would…](#2026-09-11-overturned-mine-i-offered-the-user-an-option-saying-withheld-rows-would-still-be-recorded-so-skill-can-be-measured-before-checking-who-consumes-the-filtered-artifact-lane-pricing-plane-v1)
+- [2026-09-11 — RECURRENCE (a stale ledger number read as a live constraint): I quoted a 1…](#2026-09-11-recurrence-a-stale-ledger-number-read-as-a-live-constraint-i-quoted-a-16-day-old-cap-from-statemd-as-the-binding-limit-and-planned-around-it-lane-kalshi-precap-board-lines)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

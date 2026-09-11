@@ -33019,3 +33019,21 @@ That is SMALLER than the 7,340,144 `/api/ops/keyvalue/usage` read at ~15:00Z: th
   - The passes at 17:15:17Z and 17:31:39Z read the PRE-fix live plan (17:11:56Z): `positions=3 placed=0 duplicates=3 refused={}`.
   - The 22-position contracted plan was written at 17:41:08Z; the first pass that can read it is the one after that.
   - The 09-11 Kalshi spend is `spent={'dollars': 30.07, 'orders': 9}` against the $50/day cap, which leaves ~$20 of room.
+
+## 2026-09-11 17:49:20Z — reading only, no deploy — lane `kalshi-precap-board-lines` — the Goal's second half: live Kalshi placement from the board-lines plan
+
+**Reading**, live-odds-worker `16de339b` (flag ON since 17:05:55Z), the first live Kalshi pass on the 17:41:08Z plan:
+- `EXECUTED date=2026-09-11 mode=live venue=kalshi plan_source=live armed=True positions=22 placed=6 filled=0 failed=0 duplicates=2 retried=0 skipped=14 refused={'over_max_day_orders': 14} spent={'dollars': 58.84, 'orders': 15}`.
+- The six `LIVE_ORDER status=submitted venue=kalshi` orders, 17:48:55Z–17:49:15Z, are all NCAAF 09-12:
+  - `KXNCAAFTOTAL-26SEP12GASTKENN-54` (side=under line=53.5 stake=6.75);
+  - `KXNCAAFTOTAL-26SEP12UNLVUNT-58` (under 57.5, 3.35);
+  - `KXNCAAFSPREAD-26SEP12OKLAMICH-OKLA6` (away -5.5, 2.30);
+  - `KXNCAAFTOTAL-26SEP12TLSASHSU-53` (over 52.5, 7.22);
+  - `KXNCAAFSPREAD-26SEP12ODUVT-VT18` (away 17.5, 4.70);
+  - `KXNCAAFTOTAL-26SEP12USUWASH-57` (over 56.5, 4.45).
+- UNLVUNT and ODUVT are two of the 16 aggregator rows that opened this residual of `#661`.
+- They were resting (`submitted`, `fill_price=None`) when read. Fills are not part of this Goal.
+
+**verify:** MET. This is the Goal's second half: `placed=6 > 0` on `plan_source=live`, and every order is on a contract this change unlocked.
+
+**Correction to the 16:50:20Z and 17:00:19Z entries above.** They said the 09-11 Kalshi spend of $30.07 left "~$20 of room" under a "$50/day cap". That figure came from `state.md`'s 2026-08-25 caps line, and it did NOT bind: this pass spent to $58.84. The binding limit was the daily ORDER count, `over_max_day_orders`, which refused 14 of the 22 contracted positions. The current caps are unread; see `leads.md`.

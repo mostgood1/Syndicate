@@ -32177,3 +32177,24 @@ Moved verbatim; nothing summarised. Each lane's current verdict and status stay 
     - `PRECAP_SELECT ... demand_events>0 kept_at_line_total>0` on both workers;
     - the next `LIVE_PLAN_WRITTEN venue=kalshi` and the paper2 NCAAF 09-12 venue_feed count (from 1);
     - live-odds-worker `EXECUTED ... mode=live venue=kalshi plan_source=live placed>0`.
+
+### kalshi-precap-board-lines — block superseded at CLOSE 2026-09-11, moved VERBATIM from `lanes.md` (session 49bfef11)
+
+### kalshi-precap-board-lines — OPEN — opened 2026-09-11 — session 49bfef11-a4a3-4fe4-8df4-76ec94e45893 — **HALF 1 MET (NCAAF 09-12 Kalshi rows 1/13 -> 20/20 contracted); `placed>0` OWED**
+- **GOAL VERDICT.** Goal (verbatim): "[user 2026-09-11] `#661`'s residual. The per-series cap (`MAX_MARKETS_PER_SERIES=400`, unchanged) keeps the Kalshi rungs AT or next to each board row's spread/total line, so that NCAAF Saturday rows get a venue contract. Done when refresh-worker prints `LIVE_PLAN_WRITTEN venue=kalshi ... placeable_committed=N/N` with N > 0 on an NCAAF Saturday slate, and live-odds-worker prints `EXECUTED ... venue=kalshi plan_source=live placed>0`." → **GOAL: NOT MET.**
+  - **Half 1: MET.** The reading is refresh-worker 17:41:08Z, `LIVE_PLAN_WRITTEN venue=kalshi positions=22 placeable_committed=22/22 aggregator_priced=221`; before it was 3/3 and 316. The discriminator is `/api/portfolio/paper` 17:43:53Z: paper2 Kalshi NCAAF 09-12 rows are 20/20 `venue_feed` with a ticker, against 1/13 at 15:40Z. Both workers read `kept_at_line_total=103 cut_at_line_total=0`. Recorded in `deploys.md` 2026-09-11 16:50:20Z and 17:00:19Z.
+  - **LEFT: half 2.** live-odds-worker `EXECUTED ... mode=live venue=kalshi plan_source=live placed>0`.
+    - Its passes at 17:15Z and 17:31Z read the pre-fix plan (`positions=3 duplicates=3`).
+    - The first pass that can read the 22-position plan is the one after 17:41:08Z.
+    - The 09-11 Kalshi spend was $30.07 of the $50/day cap.
+  - **BLOCKED BY:** nothing but the next live pass.
+- Goal: [user 2026-09-11] `#661`'s residual. The per-series cap (`MAX_MARKETS_PER_SERIES=400`, unchanged) keeps the Kalshi rungs AT or next to each board row's spread/total line, so that NCAAF Saturday rows get a venue contract. Done when refresh-worker prints `LIVE_PLAN_WRITTEN venue=kalshi ... placeable_committed=N/N` with N > 0 on an NCAAF Saturday slate, and live-odds-worker prints `EXECUTED ... venue=kalshi plan_source=live placed>0`.
+- Files: `pipeline/kalshi_odds_refresh.py`, `tests/test_kalshi_precap_board_lines.py` (NEW). Landed as `7c248328` and in production. They are held only until half 2 is read.
+- Hypothesis: CONFIRMED.
+  - Replay: 11/16 recovered, which equals no cap; the 5 are resolver gaps, recorded in `leads.md`.
+  - Production: NCAAF 09-12 rows went 1/13 -> 20/20 contracted.
+- Verification: the Goal's two readings, plus `PRECAP_SELECT mode=board_lines` with its counters (MET), plus off != on in the suite (MET).
+- Rollback: set `SYNDICATE_KALSHI_PRECAP_BOARD_LINES=0` on both workers with `render_env_set.py`, then `--reinject-env` deploy each. Off records nothing and selects exactly as before.
+- Todo: `#663`.
+- Blocked by: none.
+- History: the opening fields, the replay, the BEFORE readings and the rollout log were moved VERBATIM to `lanes_history.md` at the 2026-09-11 checkpoint. The narrative is in `log/2026-09-11.md`.
