@@ -5,6 +5,57 @@
 
 ---
 
+## 2026-09-11 08:50 CT — refresh-worker `c29a7d4e` / `5767e3ac` (the grading runs; now `1e1285a4`) (lane `nfl-prop-grading`, reading owed by the 2026-09-10 09:59 CT entry) — **NCAAF GRADED IN PRODUCTION (FAMU @ MIA, 20 orders, every outcome consistent with the score); NFL: NO ORDERS ON SF @ LAR, SO THE NFL PROP GRADE IS OWED AFTER SUNDAY 09-13**
+
+Taken by hand by session 2edf8b82. Scheduled task `nfl-ncaaf-first-grade-reading` (11:15 PM CT) never dispatched: it has no
+`lastRunAt`, because the machine was asleep. The task is now disabled as discharged. Read-only; no deploy.
+
+- **Finals** (ESPN, re-read 09-11): SF @ LAR 401872657 Final, SF 27 - LAR 7. FAMU @ MIA 401858213 Final, FAMU 7 - MIA 77.
+- **Code in the grading builds.** `2259edf8`, `0ceb9636`, `ce31cc7a`, `a9bafa9d` and `2d53fdf7` are ancestors of all three:
+  - `c29a7d4e`: live until 22:24:50 CT, ran the 21:55 CT settlement.
+  - `5767e3ac`: live 22:24:50-22:55:29 CT, ran 22:37 CT.
+  - `1e1285a4`: live since 23:52:40 CT.
+
+| `SETTLED date=2026-09-10` | baseline 09-10 1:16 PM CT | 09-10 21:55:40 CT | 09-10 22:37:27 CT | 09-11 04:56:57 CT (latest) |
+|---|---|---|---|---|
+| orders | 429 | 580 | 592 | 618 |
+| graded in the run | 0 | 8 (`lost 6, won 2`) | 1 (`won 1`) | 0 |
+| already_graded | 0 | 45 | 53 | 54 |
+| `game_not_in_nfl_live_state` / `game_not_in_ncaaf_live_state` | 0 | 0 | 0 | 0 |
+
+Plan date 09-08 also graded 4 (`lost 4`) at 21:55:44 CT: FAMU @ MIA unders filed under that date. The SETTLED line has no
+sport split, and `already_graded` includes MLB, soccer and WNBA games from 09-10. The football grades are attributed by the
+per-order read below.
+
+- **NCAAF — MET, a production grade.** Per-order read of `/api/portfolio/paper`, plan dates 09-08, 09-09 and 09-10:
+  - 20 distinct FAMU @ MIA orders, all `filled`, 5 won and 15 lost.
+  - Each has a `graded_at` stamped by `paper_settlement`: the 21:55:39-43 CT run, plus 22:37:26 CT for the spread.
+  - **Every outcome agrees with its recorded `settled_value`:**
+    - Full-game totals were decided once the line was crossed, at 84: over 66.5 WON, unders 60.5-65.5 LOST.
+    - Segment totals graded in play: under 49.5 WON on the 49-point first half, over 40.5 WON at 42, under 62.5 LOST at 63.
+    - FAMU +73.5 WON on the 70-point margin, in the first run after the final.
+  - `settled_by` is `inferred`: graded from the score, not a venue report. That is the normal paper path (`paper_settlement.py:1497`).
+- **NFL — no grade was possible last night, and that is not a failure.**
+  - 0 orders on SF @ LAR on plan dates 09-08 to 09-10.
+  - Every NFL order on plans 09-10 (14) and 09-11 (15) is on a later game, all `filled`, outcome none:
+    - player props on 09-13 games: TB @ CIN, MIA @ LV, WAS @ PHI, ARI @ LAC, NO @ DET, GB @ MIN, CHI @ CAR
+    - player props on SNF DAL @ NYG and MNF DEN @ KC
+    - 1 DAL @ NYG game line
+  - **The NFL prop grade is OWED after the 09-13..09-15 games.** Scheduled task `nfl-prop-settled-grade` (09-15, 10:00 AM CT) grades it.
+- **NCAAF props:** `BET_STATUS` still carries `ncaaf_props_not_gradeable_from_scoreboard: 1`. One NCAAF prop order is refused by
+  name, the NCAAF counterpart of the refusal `2259edf8` removed for NFL. Outside this lane's goal; noted as a lead.
+- **`SETTLED_SAMPLE`:**
+  - 09-11 04:53:40 CT: `samples={mlb: 495, ncaaf: 238, nfl: 4, soccer: 76, wnba: 23}`, credibility nfl 0.25.
+  - Baseline: {mlb 657, ncaaf 226, nfl 12, soccer 79, wnba 40}.
+  - nfl FELL 12 -> 4 with no NFL grade, and mlb and wnba fell too, so the sample window moved.
+  - ncaaf +12 is consistent with FAMU @ MIA's decisions, but not attributed.
+  - **The nfl drop is not explained by this reading.**
+- **Regression: none.** No `game_not_in_nfl_live_state` or `game_not_in_ncaaf_live_state` in any line since the finals.
+  - Tracebacks on refresh-worker since 7 PM CT: 2 bursts (23:14 CT, 06:06 CT).
+  - Both are `soccer/ingestion/espn_lineups.fetch_espn_scoreboard` network errors (SSL, read timeout to `site.api.espn.com`), not settlement.
+- **NFL prop cross-check (step 5):** not applicable, because none graded.
+- verify: NCAAF **MET**. NFL prop grade **OWED** (the 09-13 games; grading task 09-15).
+
 ## 2026-09-11 13:38Z — reading only, no deploy — NCAAF week_state carries unplayed_kickoffs? — **PASS: the 02:35:40Z worker build carries it, week 2 `last` 2026-09-13T03:59:00Z with `undated 0`, and web still serves week 2** [lane ncaaf-games-cache-refresh, scheduled task ncaaf-week-state-field-tonight]
 
 Read 2026-09-11 13:38-13:46Z (08:38 CDT), substrate `render`, read-only. The task was scheduled for 23:00 CDT 09-10 (04:00Z 09-11) and dispatched ~9.6 h late, so this reading comes after the build rather than just ahead of it.
