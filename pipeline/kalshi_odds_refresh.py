@@ -370,6 +370,59 @@ DEFAULT_PRECAP_WINDOW_BACK_DAYS = 1
 # unparseable props out of existence.
 PRECAP_UNDATED_RESERVE = 40
 
+# THE BOARD'S OWN RUNGS FIRST. `date_aware` fixed WHICH DAY survives the cap;
+# it did not fix WHICH RUNG. Inside the window a ladder is still cut in arrival
+# order, and one Saturday of NCAAF overfills 400 on its own.
+#
+# MEASURED 2026-09-11 on production refresh-worker `1e1285a4`:
+#
+#   PRECAP_SELECT mode=date_aware window=2026-09-10..2026-09-13 cap=400
+#     KXNCAAFSPREAD fetched 2541 kept 400 cut 2141 (cut_in_window 2110)
+#     KXNCAAFTOTAL  fetched 2008 kept 400 cut 1608 (1,570 of them 09-12)
+#   PAPER2_PLAN_WRITTEN date=2026-09-11 venue=kalshi positions=16
+#     placeable_committed=0/16 -- all 16 NCAAF Saturday, price_source=aggregator
+#
+# The Saturday rungs that survived were the first to arrive: `JOIN_EVENTS`
+# named `UTUMONT`, `UWGAARST` and `NHCSDST`, FCS games that are not on our board.
+#
+# REPLAYED over the full live ladders (production's own `fetch_series`,
+# 14:44Z) and web's 09-11 shortlist, same 400 per series:
+#
+#   rule                        16-row contracts   join matched
+#   no cap (upper bound)             11/16             152
+#   arrival                           0/16               0
+#   date_aware (production)           0/16              11
+#   board lines first                11/16             152
+#
+# The other 5 are not the cap's. Kalshi lists every one of those rungs; the
+# event resolver does not place the FCS opponent (UC Davis, Howard, Northern
+# Colorado) or `MIZZKU`.
+#
+# THE SIGNAL IS `_record_board_demand`'S, ONE MORE FIELD. The cap runs during
+# the REFRESH, before any join, so it cannot see the board. The join records
+# the board's game lines into the same state, and the next tick reads them.
+# Event resolution, the market vocabulary and spread orientation are the JOIN'S
+# OWN functions, imported rather than copied, because a second copy is a
+# second place for "which rung is this row's" to drift.
+#
+# `SYNDICATE_KALSHI_PRECAP_BOARD_LINES` -- ABSENT MEANS TODAY'S RULE, AND ABSENT
+# RECORDS NOTHING, so the stored document is byte-identical with it off. Both
+# workers run this refresh and write the same working set, so it is set on
+# both. `PRECAP_SELECT mode=board_lines` names it on every capped tick.
+#
+# ADJACENT = one point either side. A board line can move between the build
+# that recorded it and the plan that prices it; one rung each side covers a
+# half-point move at a cost of two slots per line.
+PRECAP_BOARD_LINE_ADJACENT_POINTS = 1.0
+# Markets whose rung is chosen by the GAME'S line. A player prop keys on the
+# player, not the game, and stays on the date rule.
+_BOARD_LINE_MARKETS = frozenset({"spreads", "totals", "h2h"})
+# Bounds on what `_record_board_demand` adds to a document measured at 7.0MB
+# of an 8MB ceiling (`/api/ops/keyvalue/usage`, 2026-09-11). ~215 bytes a game,
+# so the bound is ~100KB; `BOARD_DEMAND line_bytes=` prints the real size.
+_BOARD_LINE_EVENT_LIMIT = 400
+_BOARD_LINE_PER_KEY_LIMIT = 8
+
 
 def precap_date_aware_enabled() -> bool:
     """OFF unless set. Absent is the old date-blind `markets[:400]`."""
@@ -377,6 +430,228 @@ def precap_date_aware_enabled() -> bool:
     if raw is None:
         return False
     return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def precap_board_lines_enabled() -> bool:
+    """OFF unless set. Absent is `date_aware`/`arrival` exactly as before."""
+    raw = os.environ.get("SYNDICATE_KALSHI_PRECAP_BOARD_LINES")
+    if raw is None:
+        return False
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def board_line_entries(rows: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+    """`{event_id: entry}` -- the board's FULL-GAME lines, compact, for the next cap.
+
+    One entry per game: the two clubs and the kickoff, which is what
+    `_resolve_event` matches a Kalshi blob against, and per market the lines
+    the board carries.
+
+    SPREADS ARE STORED HOME-RELATIVE (`away -3.5` is `home +3.5`). A Kalshi
+    spread names a CLUB and a margin, and which club it names decides whether
+    it is this row's rung or the opposite bet's. That is the inversion
+    `kalshi_board_join` refuses as `spread_line_orientation_mismatch`, so a
+    bare magnitude would spend slots on rungs the join cannot use.
+
+    FULL GAME ONLY. A segment row's rung lives in its own series, and
+    `segment_for_board_row` and `segment_for_series` speak different
+    vocabularies. Matching across them is the join's job (`_segments_agree`),
+    not the cap's.
+    """
+    from syndicate.features.shared.kalshi_board_join import _row_market
+    from syndicate.features.shared.kalshi_catalogue import segment_for_board_row
+
+    out: dict[str, dict[str, Any]] = {}
+    for row in rows or ():
+        if not isinstance(row, Mapping):
+            continue
+        event_id = str(row.get("event_id") or "").strip()
+        if not event_id or not row.get("home_team") or not row.get("away_team"):
+            continue
+        if segment_for_board_row(row) != "full":
+            continue
+        market = _row_market(row)
+        if market not in _BOARD_LINE_MARKETS:
+            continue
+        try:
+            line = float(row.get("line"))
+        except (TypeError, ValueError):
+            # A moneyline has no number; the join keys it at 0.0 as well.
+            line = 0.0
+        if line != line:  # NaN
+            continue
+        if market == "spreads":
+            side = str(row.get("side") or "").strip().lower()
+            if side == "away":
+                line = -line
+            elif side != "home":
+                continue
+        entry = out.setdefault(
+            event_id,
+            {
+                "h": row.get("home_team"),
+                "a": row.get("away_team"),
+                "t": row.get("commence_time"),
+                "s": str(row.get("sport") or "").strip().lower(),
+                "l": {},
+            },
+        )
+        lines = entry["l"].setdefault(market, [])
+        if line not in lines:
+            lines.append(line)
+    return out
+
+
+def merge_board_line_demand(
+    existing: Mapping[str, Any] | None,
+    fresh: Mapping[str, Mapping[str, Any]],
+    *,
+    now: float,
+) -> dict[str, dict[str, Any]]:
+    """A UNION over the demand window, per game, bounded. The date samples' rule.
+
+    Builds alternate between the full slate and a smaller forward-date board,
+    so last-write-wins would drop a game's lines on every other build. A game
+    stays until it is unseen for `_DEMAND_WINDOW_SECONDS`, and a moved line
+    keeps its previous value beside the new one, newest last, up to
+    `_BOARD_LINE_PER_KEY_LIMIT`.
+    """
+    merged: dict[str, dict[str, Any]] = {}
+    for event_id, entry in (existing or {}).items():
+        if not isinstance(entry, Mapping):
+            continue
+        at = entry.get("at")
+        if not isinstance(at, (int, float)) or (now - float(at)) > _DEMAND_WINDOW_SECONDS:
+            continue
+        merged[str(event_id)] = dict(entry)
+    for event_id, entry in fresh.items():
+        lines = {
+            key: list(values)
+            for key, values in ((merged.get(event_id) or {}).get("l") or {}).items()
+            if isinstance(values, list)
+        }
+        for key, values in (entry.get("l") or {}).items():
+            carried = [value for value in lines.get(key, []) if value not in values]
+            lines[key] = (carried + list(values))[-_BOARD_LINE_PER_KEY_LIMIT:]
+        merged[event_id] = {**entry, "l": lines, "at": now}
+    if len(merged) > _BOARD_LINE_EVENT_LIMIT:
+        newest = sorted(merged.items(), key=lambda item: float(item[1].get("at") or 0.0), reverse=True)
+        merged = dict(newest[:_BOARD_LINE_EVENT_LIMIT])
+    return merged
+
+
+def board_line_demand_from_state(state: Mapping[str, Any] | None) -> dict[str, dict[str, Any]]:
+    """The recorded board lines still inside the demand window. `{}` on a cold start."""
+    if not isinstance(state, Mapping):
+        return {}
+    raw = state.get("board_line_demand")
+    if not isinstance(raw, Mapping):
+        return {}
+    now = time.time()
+    return {
+        str(event_id): entry
+        for event_id, entry in raw.items()
+        if isinstance(entry, Mapping)
+        and isinstance(entry.get("at"), (int, float))
+        and (now - float(entry["at"])) <= _DEMAND_WINDOW_SECONDS
+    }
+
+
+def board_line_distances(
+    markets: Sequence[Mapping[str, Any]],
+    demand: Mapping[str, Mapping[str, Any]],
+    *,
+    code_names: Mapping[str, Mapping[str, str]] | None = None,
+    stats: dict[str, int] | None = None,
+) -> list[float | None]:
+    """How far each rung sits from a line the board carries for ITS game.
+
+    `0.0` is the rung the join would pair with a board row. `None` means no
+    demand: the event resolves to none of the board's games, the board has no
+    line in that market, the market is not a full-game line, or the join would
+    refuse it anyway (`team_side_unresolved`).
+
+    RESOLVED ONCE PER EVENT, AND CLASSIFIED ONLY INSIDE A RESOLVED ONE. Most of
+    a Saturday ladder is games we do not carry, and the resolver is the cost.
+    Candidate games are the market's own sport: the join passes every sport,
+    so this can only be STRICTER than the join, never admit a rung it would not.
+    """
+    from syndicate.features.shared.kalshi_board_join import (
+        _classify,
+        _resolve_event,
+        _side_for_team,
+    )
+    from syndicate.features.shared.kalshi_catalogue import (
+        GRAMMAR_TEAM_SPREAD,
+        segment_for_series,
+        sport_for_series,
+    )
+
+    out: list[float | None] = [None] * len(markets)
+    if not demand:
+        return out
+    games_by_sport: dict[str, list[dict[str, Any]]] = {}
+    resolved: dict[str, Mapping[str, Any]] = {}
+    for index, market in enumerate(markets):
+        if not isinstance(market, Mapping):
+            continue
+        parts = str(market.get("ticker") or "").split("-")
+        if len(parts) < 3:
+            continue
+        event = f"{parts[0]}-{parts[1]}"
+        resolution = resolved.get(event)
+        if resolution is None:
+            sport = str(sport_for_series(market.get("series")) or "")
+            games = games_by_sport.get(sport)
+            if games is None:
+                games = [
+                    {
+                        "event_id": event_id,
+                        "home_team": entry.get("h"),
+                        "away_team": entry.get("a"),
+                        "commence_time": entry.get("t"),
+                    }
+                    for event_id, entry in demand.items()
+                    if str(entry.get("s") or "") in {"", sport}
+                ]
+                games_by_sport[sport] = games
+            resolution = (
+                _resolve_event(market, games, code_names) if games else {"status": "no_match"}
+            )
+            resolved[event] = resolution
+        if resolution.get("status") != "ok":
+            continue
+        verdict = _classify(market)
+        if verdict.get("status") != "ok" or not verdict.get("needs_event_identity"):
+            continue
+        if segment_for_series(verdict.get("series") or market.get("series")) != "full":
+            continue
+        entry = demand.get(str(resolution.get("event_id") or "")) or {}
+        wanted = (entry.get("l") or {}).get(verdict.get("market"))
+        if not wanted:
+            continue
+        strike = 0.0 if verdict.get("line") is None else float(verdict["line"])
+        if verdict.get("grammar") == GRAMMAR_TEAM_SPREAD and verdict.get("subject"):
+            named = _side_for_team(
+                verdict.get("subject"),
+                resolution,
+                sport=verdict.get("sport") or resolution.get("sport"),
+            )
+            if named == "home":
+                effective = -strike
+            elif named == "away":
+                effective = strike
+            else:
+                continue
+            out[index] = min(abs(effective - float(value)) for value in wanted)
+        else:
+            out[index] = min(abs(strike - float(value)) for value in wanted)
+    if stats is not None:
+        stats["events"] = stats.get("events", 0) + len(resolved)
+        stats["events_resolved"] = stats.get("events_resolved", 0) + sum(
+            1 for resolution in resolved.values() if resolution.get("status") == "ok"
+        )
+    return out
 
 
 def _precap_window_days(name: str, default: int) -> int:
@@ -651,6 +926,7 @@ def select_markets_for_cap(
     window: tuple[str, str],
     *,
     date_aware: bool,
+    line_distance: Sequence[float | None] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, int]]:
     """Choose which `cap` markets survive. Returns `(kept, cut, counters)`.
 
@@ -666,6 +942,13 @@ def select_markets_for_cap(
       3. the remaining undated
       4. dated outside it -- nearest FUTURE first, then the recent past
 
+    `line_distance` (see `board_line_distances`, aligned with `markets`) puts
+    two tiers IN FRONT of that order: the rungs AT a board line, nearest date
+    first, then those within `PRECAP_BOARD_LINE_ADJACENT_POINTS`, nearest
+    first. The rest of the budget is filled by the rule above, or by arrival
+    order when `date_aware` is off. `None` returns exactly what it always did
+    and adds no counters.
+
     The kept set is emitted in the INPUT'S OWN ORDER, not in priority order.
     Nothing downstream should depend on market order, and a selection change
     that also reorders makes an unrelated regression impossible to attribute.
@@ -677,14 +960,34 @@ def select_markets_for_cap(
     dates = [game_date_from_ticker((m or {}).get("ticker")) for m in rows]
     in_window = [d is not None and start <= d <= end for d in dates]
 
+    first: list[int] = []
+    if len(rows) > cap and line_distance is not None:
+        at_line = sorted(
+            (i for i in range(len(rows)) if line_distance[i] == 0),
+            key=lambda i: (dates[i] or "", i),
+        )
+        adjacent = sorted(
+            (
+                i
+                for i in range(len(rows))
+                if line_distance[i] is not None
+                and 0 < line_distance[i] <= PRECAP_BOARD_LINE_ADJACENT_POINTS
+            ),
+            key=lambda i: (line_distance[i], dates[i] or "", i),
+        )
+        first = (at_line + adjacent)[:cap]
+    first_set = set(first)
+    rest = [i for i in range(len(rows)) if i not in first_set]
+    room = cap - len(first)
+
     if len(rows) <= cap:
         keep_index = set(range(len(rows)))
     elif not date_aware:
-        keep_index = set(range(cap))
+        keep_index = first_set | set(rest[:room])
     else:
-        keep_index = select_by_relevance(
-            range(len(rows)),
-            cap,
+        keep_index = first_set | select_by_relevance(
+            rest,
+            room,
             dates,
             in_window,
             window_end=end,
@@ -695,6 +998,21 @@ def select_markets_for_cap(
     kept = [rows[i] for i in range(len(rows)) if i in keep_index]
     cut = [rows[i] for i in range(len(rows)) if i not in keep_index]
     counters = {"fetched": len(rows), **relevance_counters(keep_index, cut_index, in_window, dates)}
+    if line_distance is not None:
+        # WHAT THE BOARD ASKED FOR, AND WHAT THE BUDGET COST IT. `cut_at_line`
+        # is the number to watch: a rung the join would have priced and now
+        # cannot. It is zero unless one series' at-line rungs alone exceed `cap`.
+        at = {i for i in range(len(rows)) if line_distance[i] == 0}
+        near = {
+            i
+            for i in range(len(rows))
+            if line_distance[i] is not None
+            and 0 < line_distance[i] <= PRECAP_BOARD_LINE_ADJACENT_POINTS
+        }
+        counters["demand_rungs"] = sum(1 for d in line_distance if d is not None)
+        counters["kept_at_line"] = len(at & keep_index)
+        counters["cut_at_line"] = len(at & cut_index)
+        counters["kept_adjacent"] = len(near & keep_index)
     return kept, cut, counters
 
 
@@ -1644,6 +1962,15 @@ def _run_kalshi_odds_refresh_unbounded(*, force: bool = False) -> dict[str, Any]
     precap_select: list[tuple[int, str, dict[str, int]]] = []
     precap_window = board_window_dates()
     precap_date_aware = precap_date_aware_enabled()
+    # THE BOARD'S LINES, as the previous join recorded them -- see
+    # `PRECAP_BOARD_LINE_ADJACENT_POINTS`. `{}` with the flag on is a cold start
+    # (nothing joined within the demand window) and selects exactly as the
+    # fill rule would; `demand_events=0` on the line says so.
+    precap_board_lines = precap_board_lines_enabled()
+    line_demand = board_line_demand_from_state(state) if precap_board_lines else {}
+    line_code_names: dict[str, dict[str, str]] | None = None
+    line_stats: dict[str, int] = {}
+    line_seconds = 0.0
     # The kept lists, reused by the persistence shrink below so the ARTIFACT and
     # the working set hold the same 400. Selecting twice by two rules would give
     # the board a different set from the one this tick's join measured.
@@ -1653,11 +1980,41 @@ def _run_kalshi_odds_refresh_unbounded(*, force: bool = False) -> dict[str, Any]
         markets = list(entry.get("markets") or [])
         full_markets.extend(markets)
         if len(markets) > MAX_MARKETS_PER_SERIES:
+            distances: list[float | None] | None = None
+            if line_demand:
+                line_started = time.monotonic()
+                try:
+                    if line_code_names is None:
+                        # Kalshi's own club code -> name pairing, derived the way
+                        # the join derives it: from every series, not this one.
+                        from syndicate.features.shared.kalshi_board_join import (
+                            build_club_code_names,
+                        )
+
+                        line_code_names = build_club_code_names(
+                            [
+                                market
+                                for name in wanted
+                                for market in ((per_series.get(name) or {}).get("markets") or [])
+                            ]
+                        )
+                    distances = board_line_distances(
+                        markets, line_demand, code_names=line_code_names, stats=line_stats
+                    )
+                except Exception as exc:  # noqa: BLE001 -- an optimisation must not cost the tick its write
+                    distances = None
+                    print(
+                        f"[kalshi_odds] PRECAP_BOARD_LINES_FAILED series={series}"
+                        f" {type(exc).__name__}: {exc}",
+                        flush=True,
+                    )
+                line_seconds += time.monotonic() - line_started
             markets, cut_markets, select_counts = select_markets_for_cap(
                 markets,
                 MAX_MARKETS_PER_SERIES,
                 precap_window,
                 date_aware=precap_date_aware,
+                line_distance=distances,
             )
             trimmed += select_counts["cut"]
             precap_select.append((select_counts["cut_in_window"], series, select_counts))
@@ -1712,12 +2069,34 @@ def _run_kalshi_odds_refresh_unbounded(*, force: bool = False) -> dict[str, Any]
     if precap_select:
         precap_select.sort(reverse=True)
         shown_sel = precap_select[:MAX_CAP_COST_SERIES]
+        # `mode=board_lines` carries its own fields; off prints exactly what it
+        # always did. `fill=` is the rule that spends what the board did not
+        # ask for, `cut_at_line_total` is the rungs the join could have priced
+        # and cannot, and `events_resolved` says whether the demand met Kalshi
+        # at all -- a flag that is on and resolving nothing reads as `0/N`.
+        line_fields = ""
+        if precap_board_lines:
+            line_fields = (
+                f" fill={'date_aware' if precap_date_aware else 'arrival'}"
+                f" demand_events={len(line_demand)}"
+                f" events_resolved={line_stats.get('events_resolved', 0)}/{line_stats.get('events', 0)}"
+                f" kept_at_line_total={sum(item[2].get('kept_at_line', 0) for item in precap_select)}"
+                f" cut_at_line_total={sum(item[2].get('cut_at_line', 0) for item in precap_select)}"
+                f" kept_adjacent_total={sum(item[2].get('kept_adjacent', 0) for item in precap_select)}"
+                f" line_select_s={line_seconds:.2f}"
+            )
+        mode = (
+            "board_lines"
+            if precap_board_lines
+            else ("date_aware" if precap_date_aware else "arrival")
+        )
         print(
             "[kalshi_odds] PRECAP_SELECT"
-            f" mode={'date_aware' if precap_date_aware else 'arrival'}"
+            f" mode={mode}"
             f" window={precap_window[0]}..{precap_window[1]}"
             f" cap={MAX_MARKETS_PER_SERIES}"
             f" undated_reserve={PRECAP_UNDATED_RESERVE}"
+            f"{line_fields}"
             f" capped_series={len(precap_select)}"
             f" fetched_total={sum(item[2]['fetched'] for item in precap_select)}"
             f" kept_total={sum(item[2]['kept'] for item in precap_select)}"
@@ -2726,6 +3105,25 @@ def _record_board_demand(
         date_samples = date_samples[-_DATE_SAMPLE_LIMIT:]
         state["board_date_samples"] = date_samples
 
+        # THE BOARD'S GAME LINES, for the per-series cap's next tick -- see
+        # `PRECAP_BOARD_LINE_ADJACENT_POINTS`. Recorded ONLY with the flag on,
+        # so the document is byte-identical with it off, and its size is printed
+        # because it rides in a document measured at 7.0MB of an 8MB ceiling.
+        line_note = ""
+        if precap_board_lines_enabled():
+            import json
+
+            prior_lines = state.get("board_line_demand")
+            state["board_line_demand"] = merge_board_line_demand(
+                prior_lines if isinstance(prior_lines, Mapping) else None,
+                board_line_entries(rows),
+                now=now,
+            )
+            line_note = (
+                f" line_events={len(state['board_line_demand'])}"
+                f" line_bytes={len(json.dumps(state['board_line_demand'], separators=(',', ':'), default=str))}"
+            )
+
         merged: dict[str, int] = {}
         for sample in samples:
             for sport, value in (sample.get("counts") or {}).items():
@@ -2746,7 +3144,8 @@ def _record_board_demand(
             # board_dates=[]` means one tick later -- and that is the difference
             # between the trim reading the board and the trim guessing.
             f" date={board_day or None}"
-            f" dates={board_dates_from_state(state)}",
+            f" dates={board_dates_from_state(state)}"
+            f"{line_note}",
             flush=True,
         )
     except Exception as exc:  # noqa: BLE001 -- an optimisation must not cost the join

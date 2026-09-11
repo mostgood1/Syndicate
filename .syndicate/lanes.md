@@ -617,6 +617,43 @@ death, never life — do not invert it.
 - Close when the verification above is in `deploys.md` 2026-09-11 15:06:25Z. Closing releases the four file claims.
 - History: the hypotheses H1–H4, their verdicts and the decision text were moved VERBATIM to `lanes_history.md` on 2026-09-11. The readings are in `state_polymarket.md`.
 
+
+### kalshi-precap-board-lines — OPEN — opened 2026-09-11 — session 49bfef11-a4a3-4fe4-8df4-76ec94e45893
+- Goal: [user 2026-09-11] `#661`'s residual. The per-series cap (`MAX_MARKETS_PER_SERIES=400`, unchanged) keeps the Kalshi rungs AT or next to each board row's spread/total line, so that NCAAF Saturday rows get a venue contract. Done when refresh-worker prints `LIVE_PLAN_WRITTEN venue=kalshi ... placeable_committed=N/N` with N > 0 on an NCAAF Saturday slate, and live-odds-worker prints `EXECUTED ... venue=kalshi plan_source=live placed>0`.
+- Files: `pipeline/kalshi_odds_refresh.py`, `tests/test_kalshi_precap_board_lines.py` (NEW).
+  - USER DECISION 2026-09-11: "Proceed". OPEN `nfl-layer2-kalshi-identity` lists "Files: NONE claimed" and has no code left; it owes only a Sunday reading on NFL prop identity.
+  - USER DECISION 2026-09-11: the rule ships behind a NEW env flag, `SYNDICATE_KALSHI_PRECAP_BOARD_LINES` (absent = today's rule), set on BOTH workers. Then land and deploy: refresh-worker first, then live-odds-worker.
+- Hypothesis (written BEFORE the replay):
+  - 09-11's 16 aggregator NCAAF Kalshi positions have no contract because the rung at the board's line is CUT. `mode=date_aware` keeps the nearest date first: Friday rungs, then Saturday rungs in arrival order, up to 400.
+  - A selection that first keeps, for each Kalshi event that resolves to a board game, the rungs nearest that game's board line (spread magnitude, or total) recovers most of the 16.
+- Falsification test:
+  - Replay the selection over the full live `KXNCAAFSPREAD`/`KXNCAAFTOTAL` ladders, fetched with production's own `fetch_series`, against the 09-11 Kalshi paper2 plan's rows.
+  - The hypothesis FALLS for any row whose board-line rung is ABSENT from Kalshi's full list. Kalshi does not list that strike, so no selection can recover it.
+  - It also FALLS if board-line selection recovers no more rows than `date_aware` already does.
+- Verification: the Goal's two production readings, plus a `PRECAP_SELECT mode=` that names the new rule and prints its own kept-at-board-line counters, plus an off != on test in the suite. Recorded in `deploys.md`.
+- Blocked by: none (user decisions above).
+- 2026-09-11 ~15:00Z, REPLAY (pre-deploy, substrate: production inputs, local code).
+  - Inputs:
+    - the full live `KXNCAAFSPREAD` 2,541, `KXNCAAFTOTAL` 2,008 and `KXNCAAFGAME` 478 ladders at 14:44Z, fetched with production's `fetch_series`;
+    - web's 09-11 `layer2-shortlist` (`limit=2000`, 365 NCAAF spread/total rows over 82 games);
+    - the 09-11 Kalshi `paper2` plan's 16 aggregator rows;
+    - the git-tracked NCAAF team registry. `data/` is absent in the worktree, so the harness pointed at that file.
+    - `KXNCAAFSPREAD`/`KXNCAAFGAME` were registered as ncaaf, which production's `JOIN_EVENTS` confirms (`'sport': 'ncaaf'` on `KXNCAAFSPREAD` tickers, 04:38:59Z).
+  - Results, same 400 per series:
+
+    | rule | 16-row contracts | join matched |
+    |---|---|---|
+    | no cap | 11/16 | 152 |
+    | `arrival` | 0/16 | 0 |
+    | `date_aware` (production) | 0/16 | 11 |
+    | **board lines, SHIPPED functions** | **11/16** | **152** |
+
+  - Board-line counters: `cut_at_line=0` on all three series; `kept_at_line` 40 / 54 / 80; `events_resolved` 49 of 120.
+  - Cost: 0.44–0.84 s per series, and the demand is 97 games / 19.7 KB. The document is 7.0 MB of 8 MB (`/api/ops/keyvalue/usage`).
+  - HYPOTHESIS: CONFIRMED for 11 of 16.
+  - FALSIFIED for 5, and they are not the cap's. Kalshi lists every one of those rungs (`UCDSMU-59` "Over 58.5", `HOWIND-65`/`-66`, `UNCOWYO-48`, `MIZZKU` h2h). The event resolver does not place UC Davis, Howard or Northern Colorado, or the `MIZZKU` pair. Lead, not this lane.
+- 2026-09-11, FOUND: live-odds-worker ALSO runs the Kalshi refresh, every ~2 min, at `PRECAP_SELECT mode=arrival` (14:49:52Z). `SYNDICATE_KALSHI_PRECAP_DATE_AWARE` was never set there. Both workers write the same `kalshi_markets.json` working set that `portfolio_commit` and the executor read via `markets_from_state`. So the flag goes on BOTH, or live-odds-worker's ticks overwrite the selection within minutes.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
