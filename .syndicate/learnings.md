@@ -5449,3 +5449,13 @@ the instrument rather than the system.**
   - A guard written against one failure (empty over good) must not create the opposite one (stale forever). Test BOTH directions; `tests/test_nfl_props_prior_season_fallback.py` has five repair cases.
 - **Measured after the fix:** `REPAIR_PULLED_NEWER 980 -> 1140` at 2026-09-11T03:50:19Z, then 486 non-Anytime-TD NFL props carried a sim view (was 0).
 - **Generalises to:** any worker-side copy of an artifact that only another machine produces.
+
+## 2026-09-10 — OVERTURNED (mine): "non-card NCAAF chips never get live state". The chip WAS on the live-state join; it read the UTC date, and ESPN files an evening-ET kickoff under the previous UTC day `[lane ncaaf-fcs-market-implied-rating]`
+
+- **What I believed**: FAMU @ MIA's chip stayed `pregame` all game because only the FBS-vs-FBS week cards receive ESPN live state. I read "the cards have 49 games and FAMU @ MIA is not one of them" as the mechanism, wrote it into `deploys.md` (22:15 CT), a lane line and a lead, and told a peer.
+- **What was actually true**: `build_ncaaf_chip_games` builds FBS-vs-FCS chips and calls `_attach_live_state` with the right ESPN ids (registry ids ARE ESPN ids: Florida A&M 50, Miami 2390). The index was built for `_ncaaf_week_kickoff_dates`, the UTC dates `2026-09-11/12/13`, and ESPN filed the 00:00Z kickoff under 09-10. It was the same UTC-vs-ESPN-date shape as `a9bafa9d` (settlement) and `86c82220` (board chips) that same day: the THIRD instance in one day.
+- **How I found out**: before promoting the lead, I tested each input of the join in code. The ids came first, and disproved my first guess (a missing logo id). The date set came second, and confirmed the cause.
+- **The rule going forward**:
+  - Any NCAAF/NFL lookup into an ESPN capture must use `bet_status_nfl.kickoff_capture_dates` (the Eastern date, plus the previous day for a small-hours kickoff), never `commence_time[:10]` or `startDate.split("T")[0]`.
+  - A row or card COUNT ("X is not among the 49") is not a mechanism. Trace the join's actual inputs before naming a structural boundary as the cause.
+- **Cost**: one wrong mechanism in the ledger, a lead and a peer message, corrected about 30 min later (append-only). The fix was smaller than the wrong diagnosis implied: one call site. Also this session: a watcher reported a false "0 dates" because its filter matched `render_logs.py`'s own header line. I read the log directly before believing it.

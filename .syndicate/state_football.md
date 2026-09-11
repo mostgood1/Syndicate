@@ -945,6 +945,8 @@ weekend, **43 on 09-03..09-07**, all under one undated `WEEK 1` badge. And the
 FBS-only filter drops **48 of 99** week-1 games (every FBS-vs-FCS matchup) —
 free this weekend, half the slate from 09-05.
 
+**NCAAF LIVE RE-SIM NOW COVERS FBS-vs-FCS `[2026-09-10, MEASURED, lane ncaaf-fcs-market-implied-rating]`.** Pregame projections stay FBS-vs-FBS (the filter above still holds for them). The live tick (`3e33f083`) adds FBS-vs-FCS games from the ESPN live index and rates the FCS side off the market's PREGAME spread and total. That line is captured only on a `pre` event and persisted in the tick's status, and it survives a restart (measured 16:54 CDT). Lanes are stamped `ratingSource: market_implied`, and `SYNDICATE_NCAAF_FCS_MARKET_IMPLIED` defaults on. FAMU @ MIA ran `live_resim` all game on 2026-09-10. NCAAF chip/card live state now reads ESPN capture dates (`48621d65`, verified 22:56 CDT); before that, an evening kickoff alone on its Eastern date never went live.
+
 ### THE BLOCKER IS ONE ARTIFACT FAMILY WITH NO PRODUCER `[the part that does not self-clear]`
 
 `_smartsim2_standalone_market_lines` (cards.py:237) reads exactly
