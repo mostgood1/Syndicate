@@ -111,7 +111,7 @@ death, never life — do not invert it.
 - Files: syndicate/features/football/sim_engine/smartsim2/historical_truth/ncaaf_historical_loader.py,
   released: `scripts/generate_smartsim2_ncaaf_projections.py` **[RELEASED 2026-09-07 to `ncaaf-live-resim-wire` (session 520cd594), user: "take the ncaaf claim and fix it"]** -- owning session b85e895e is absent from `list_sessions` including archived. Moved BELOW the marker rather than merely annotated: a note above the `Files:` line does not change what `claims_by_path` parses, and lane-guard correctly kept blocking until this line was reworded.
   syndicate/features/ncaaf/week_state.py (NEW),
-  syndicate/features/ncaaf/sources.py,
+  released: `syndicate/features/ncaaf/sources.py` **[RELEASED 2026-09-11 to `ncaaf-tbd-kickoff-date` (session 53eaee9c), user decision "Take claims, fix + deploy"; owning session a8d753fe is archived, and this lane's own change to the file (`ab787363`) is landed and live]**,
   released: syndicate/features/shared/artifact_publisher.py (CONTESTED — see below) **[RELEASED 2026-09-02 by lane `soccer-players-csv-allowlist`. This lane's OWN body, three bullets down, already records the edit as "finished and landed" and the file as "claimed by NOBODY and is FREE TO TAKE" under a user override — it only ever registered as a claim because the path sits inside a `Files:` block, which the parser reads as a claim regardless of the prose beside it. Owning session `b85e895e` is absent from the session roster. Nothing else in this lane is touched; its other claims stand.]**,
   tests/test_ncaaf_games_cache_refresh.py (NEW),
   tests/test_ncaaf_week_state.py (NEW),
@@ -369,7 +369,8 @@ death, never life — do not invert it.
 - Goal `[user, 2026-09-10: "we need this fixed for tonights game"; chose "Market-implied rating"]`: FAMU @ MIA (2026-09-10, 7:00 PM CDT) gets a `live_resim` lane in the NCAAF live lens, so its live game lines attach on the served board, read as `live_gamelines.index_size >= 1` with FAMU @ MIA rows carrying a `live_gameline` block during the game.
 - Cause, measured on production 2026-09-10 ~14:28 CDT: `/api/ops/live-lens/snapshot-index?sport=ncaaf` had 49 games and no FAMU @ MIA. The generator projects FBS-vs-FBS only (`generate_smartsim2_ncaaf_projections.py:1023`, `SKIPPED_NOT_FBS_VS_FBS`), and `live_resim._ratings_for` refuses an unrated side (`no_pregame_ratings`, by design: no neutral default).
 - Method (ESTIMATOR, not a mechanism — no re-fit obligation under `model_engine_standard.md` §4.4): for a live-index game with exactly one SP+-rated side, back the unrated side's SP+ components out of the market's PREGAME spread and total with SP+'s own additive form (expected points = own offense + opponent defense - league mean), then run them through the generator's `sp_offense_defense_rating` centring. The pregame line is ESPN's scoreboard odds, captured only while the game is `pre`, persisted in the tick's keyvalue status, and never read from a live quote. Every such lane is stamped `ratingSource: market_implied` with the line it came from. Absent line → refused `no_pregame_line` by name. Default ON, `SYNDICATE_NCAAF_FCS_MARKET_IMPLIED=off` turns it off without a deploy of code.
-- Files: `syndicate/features/ncaaf/live_resim.py`, `scripts/run_refresh_worker.py` (the NCAAF live re-sim tick only), `tests/test_ncaaf_fcs_market_implied_rating.py` (NEW), `syndicate/features/ncaaf/cards.py` (`_ncaaf_week_espn_capture_dates` + `_attach_live_state`'s index call ONLY; user 2026-09-10: "Yes, before Saturday"), `tests/test_ncaaf_live_state_capture_dates.py` (NEW)
+- Files: `syndicate/features/ncaaf/live_resim.py`, `scripts/run_refresh_worker.py` (the NCAAF live re-sim tick only), `tests/test_ncaaf_fcs_market_implied_rating.py` (NEW), `tests/test_ncaaf_live_state_capture_dates.py` (NEW)
+  released: `syndicate/features/ncaaf/cards.py` (`_ncaaf_week_espn_capture_dates` + `_attach_live_state`'s index call) **[RELEASED 2026-09-11 to `ncaaf-tbd-kickoff-date` (session 53eaee9c), user decision "Take claims, fix + deploy"; this lane's session df26ac0c is archived and its `cards.py` change is landed (`48621d65`)]**
 - Hypothesis: n/a — not diagnostic.
 - Falsification test: with the flag off the tick's snapshot must be byte-identical to today's (FBS-only); with it on, an FBS-vs-FCS live game must gain exactly one `live_resim` lane stamped `market_implied`, and an FBS-vs-FBS game's lane must be unchanged. A game with no captured pregame line must refuse by name, never price.
 - Verification: production, during FAMU @ MIA — the NCAAF snapshot index shows the game with a `live_resim` lane, and `/api/board/book-grid?sport=ncaaf&date=2026-09-11` shows `index_size >= 1` with FAMU @ MIA rows carrying `live_gameline`.
@@ -666,6 +667,20 @@ death, never life — do not invert it.
     - `LIVE_PLAN_WRITTEN venue=kalshi positions=5 placeable_committed=5/5`, with `refusals['aggregator_priced']=287`.
   - The paper2 Kalshi rows at ~15:40Z hold 13 NCAAF 09-12 rows. **1 is `venue_feed` with a ticker; 12 are aggregator** (5 spreads, 6 totals, 1 h2h).
   - `LIVE_PLAN placeable_committed=N/N` is ALREADY > 0 (5/5), so "N > 0" cannot discriminate this change. The readings that can are: NCAAF 09-12 venue_feed rows up from 1, `aggregator_priced` down from 287, and `PRECAP_SELECT mode=board_lines kept_at_line_total > 0`.
+
+### ncaaf-tbd-kickoff-date — OPEN — opened 2026-09-11 — session 53eaee9c-46e9-4c34-8075-d63d7f63c933
+- Goal: [user 2026-09-11: NFL/NCAAF compact cards show "games on the wrong day"] NCAAF games whose kickoff CFBD lists as TBD are filed on their real calendar day, not the day before, and their chip reads TBD instead of a fabricated "11:00P CT". ONE testable outcome: after a refresh-worker deploy, `/api/board/game-chips` for 2026-09-11 carries no NCAAF chip for a Saturday game (Mercyhurst @ New Mexico, Southern Miss @ Auburn, NMSU @ Hawai'i, Cal Poly @ SJSU), and the 2026-09-12 chips carry them with a TBD token.
+- Files: `syndicate/features/ncaaf/sources.py` (`ncaaf_week_and_card_keys_for_date`'s date test and a new TBD-aware date helper ONLY), `syndicate/features/ncaaf/cards.py` (`build_ncaaf_chip_games` ONLY), `syndicate/features/shared/game_chip_scoreboard.py` (`_scheduled_status_token`'s TBD token ONLY), `tests/test_ncaaf_tbd_kickoff.py` (NEW)
+- Hypothesis (MEASURED 2026-09-11 ~15:28Z, before any code):
+  - CFBD dates a TBD kickoff at 00:00 US/Eastern on the game day (04:00Z EDT, 05:00Z EST) and sets `startTimeTBD: true`. That is 443 of 888 2026 games in the local mirror, including all four named in the Goal.
+  - `ncaaf_week_and_card_keys_for_date` (`sources.py:452`) converts that sentinel to a CENTRAL date, which is the PREVIOUS day. `build_ncaaf_chip_games` then passes it through as `startTime`, so the chip reads "11:00P CT" on Friday.
+  - Production's 09-11 chips carry exactly 4 such chips (`2026-09-12T04:00:00+00:00`, "11:00P CT").
+  - The board's own OddsAPI rows for the same games commence Sat 3:00 PM / 6:45 PM / 8:00 PM / 11:00 PM CT.
+  - Nothing in the repo reads `startTimeTBD`.
+- Falsification test: a REAL (non-TBD) 04:00Z kickoff, i.e. a genuine 11:00 PM CT game, must stay on its Central date. If the fix moves it, the fix keys on the clock instead of the flag, and it is wrong.
+- Verification: after a refresh-worker deploy, `/api/board/game-chips` (default date 2026-09-11) has 0 NCAAF chips for a 09-12 game, and `?date=2026-09-12` carries the four with a TBD `status_token`. Recorded in `deploys.md`.
+- Claims taken 2026-09-11 by user decision ("Take claims, fix + deploy"): `sources.py` from `ncaaf-games-cache-refresh`, and `cards.py` from `ncaaf-fcs-market-implied-rating`. Both owning sessions are archived.
+- Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
