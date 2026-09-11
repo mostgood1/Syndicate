@@ -1,5 +1,40 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#661` — **OPEN 2026-09-11: the live Kalshi plan committed bets Kalshi cannot take (`placeable_committed=4/22`). Live now places a plan built only from rows with a venue contract.** — lane `kalshi-plan-placeable`, 2026-09-11 (`#659` residual (b), "Stop Kalshi plan committing uncontracted bets")
+
+- **Measured before any code, on production.**
+  - refresh-worker `1e1285a4` at 05:02:59Z: `PAPER2_PLAN_WRITTEN date=2026-09-10 venue=kalshi rows_in=532 positions=22 venue_priced=310 placeable_committed=4/22`.
+  - live-odds-worker at 04:59:04Z refused 16 of them as `no_venue_ticker`: NCAAF spreads 9 and totals 7, all `price_source='aggregator'`.
+  - **The cap and the ceiling were NOT what cost the Kalshi bets.**
+    - Only 1 row was cut at `max_positions`, and `prefer_placeable` already ranks contracted rows first.
+    - `slate_scale_factor=1.0`: the ceiling is $251 and $67.76 was staked.
+    - So on this build the uncontracted rows cost the contracted ones no slot and no dollars.
+    - This item removes 18 unplaceable positions from what live reads. It does not add a Kalshi order by itself.
+- **Why the NCAAF rows had no contract (the residual that WOULD add orders; not this item's):**
+  - NOT the date gate: `SYNDICATE_KALSHI_FORWARD_DATE_SPORTS=soccer,ncaaf,nfl`.
+  - NOT an unjoined series: `KXNCAAFTOTAL-26SEP11RUTGBC-54` is a `venue_feed` position.
+  - It is `kalshi_odds_refresh.MAX_MARKETS_PER_SERIES=400`. `PRECAP_SELECT mode=date_aware window=2026-09-10..2026-09-13` cut:
+    - `KXNCAAFSPREAD` 2,141 of 2,541 (04:38:14Z);
+    - `KXNCAAFTOTAL` 1,608 of 2,008 (04:59:09Z, 1,570 of them dated 09-12).
+  - The cut keeps the nearest dates first, so Friday's rungs survive and Saturday's do not. All 17 aggregator NCAAF positions are Saturday games.
+  - The fix belongs in `pipeline/kalshi_odds_refresh.py`, which OPEN lane `nfl-layer2-kalshi-identity` holds. The likely shape: keep the rungs nearest each board line rather than the first 400 in date order.
+- **What changed (lane `kalshi-plan-placeable`).**
+  - `pipeline/portfolio_commit.py`:
+    - `commit_live_venue_plan` runs the same `commit_portfolio` over only the rows with `price_source=='venue_feed'` AND a `venue_ticker`.
+    - The dropped rows are counted as `aggregator_priced` / `no_venue_contract`.
+    - The plan is written to `portfolio_live_plan_<venue>_<date>.json` beside paper2's, and a failure writes an EMPTY live plan (fail closed).
+    - `LIVE_PLAN_WRITTEN` prints `placeable_committed` and the self-check `paper2_placeable_missing`.
+  - `pipeline/execute_portfolio.py`:
+    - LIVE reads `read_placeable_plan_for_venue`: the live plan, or paper2's with a loud `LIVE_PLAN_ABSENT`.
+    - `EXECUTED` prints `plan_source=`, and `verify_order_paths` reads the same plan.
+  - Unchanged: paper2's plans, paper runs (they still book paper2's plan) and the `no_venue_ticker` refusal.
+  - Not edited: `syndicate/features/shared/portfolio_commit.py`, which OPEN lane `pricing-plane-v1` holds.
+- **Closes on:**
+  - `LIVE_PLAN_WRITTEN venue=kalshi ... placeable_committed=N/N paper2_placeable_missing=0` on refresh-worker;
+  - then live-odds-worker's `EXECUTED ... venue=kalshi plan_source=live` with no `no_venue_ticker` in `refused=`.
+
+---
+
 ### `#660` — **CLOSED 2026-09-10: every portfolio page sits behind a sign-in, and there is more than one portfolio: the live exchange book, paper, and hand-entered manual books.** — lanes `portfolio-login-multibook` and `portfolio-auth-hash-guard`, 2026-09-10
 
 - **What shipped.**

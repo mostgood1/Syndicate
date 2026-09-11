@@ -404,15 +404,36 @@ def run_execution(
             "reason": "live_mode_requires_venue_scope",
             "date": normalized,
         }
+    plan_source = "unrestricted"
     if scope:
-        from pipeline.portfolio_commit import read_portfolio_plan_for_venue
+        from pipeline import portfolio_commit as _plans
 
-        plan = read_portfolio_plan_for_venue(normalized, scope)
+        if mode == LIVE:
+            # THE LIVE PLAN, committed over only the rows this venue can take
+            # (`portfolio_commit.commit_live_venue_plan`). paper2's venue plan
+            # is a comparison book that keeps uncontracted rows on purpose, and
+            # placing it spent the plan's positions on bets the `no_venue_ticker`
+            # refusal below then stopped -- 16 of 20 on 2026-09-11T04:59:04Z.
+            plan, plan_source = _plans.read_placeable_plan_for_venue(normalized, scope)
+            if plan_source != _plans.PLAN_SOURCE_LIVE:
+                # Loud, because the fallback is the OLD behaviour and must not
+                # quietly become the permanent one.
+                print(
+                    f"[execute_portfolio] LIVE_PLAN_ABSENT date={normalized} venue={scope}"
+                    " -- no live plan; placing paper2's venue plan, whose uncontracted"
+                    " rows the no_venue_ticker refusal still stops",
+                    flush=True,
+                )
+        else:
+            # PAPER IS UNCHANGED: a scoped paper run books paper2's comparison
+            # book, uncontracted rows included, exactly as before.
+            plan = _plans.read_portfolio_plan_for_venue(normalized, scope)
+            plan_source = "paper2"
     else:
         plan = read_portfolio_plan(normalized)
     if not isinstance(plan, dict):
-        print(f"[execute_portfolio] NO_PLAN date={normalized}", flush=True)
-        return {"status": "skipped", "reason": "no_plan", "date": normalized}
+        print(f"[execute_portfolio] NO_PLAN date={normalized} plan_source={plan_source}", flush=True)
+        return {"status": "skipped", "reason": "no_plan", "date": normalized, "plan_source": plan_source}
 
     positions = plan.get("positions")
     if not isinstance(positions, list):
@@ -761,6 +782,10 @@ def run_execution(
     summary = ledger_summary(normalized)
     print(
         f"[execute_portfolio] EXECUTED date={normalized} mode={mode} venue={venue} "
+        # WHICH BOOK, beside what it did. `live` is the contracted-only plan;
+        # `paper2_fallback` is the old book, and reading it here means the
+        # writer on refresh-worker has not produced a live plan for this date.
+        f"plan_source={plan_source} "
         f"armed={live_execution_armed()} positions={len(positions)} placed={placed} "
         f"filled={filled} failed={failed} "
         f"duplicates={duplicates} retried={retried} skipped={skipped} refused={refused} "
@@ -772,6 +797,9 @@ def run_execution(
         "date": normalized,
         "mode": mode,
         "venue": venue,
+        # `live`, `paper2_fallback`, `paper2` or `unrestricted` -- the book
+        # these positions came from, so a caller never has to infer it.
+        "plan_source": plan_source,
         "positions": len(positions),
         "placed": placed,
         # Reported apart from `placed` because a resting order is placed and
@@ -2032,7 +2060,12 @@ def verify_order_paths(
                 examples[f"{market}|{verdict}"] = detail[:160]
 
         try:
-            plan = portfolio_commit.read_portfolio_plan_for_venue(normalized, venue) or {}
+            # WHAT LIVE WOULD PLACE, so the live plan first -- the same read
+            # `run_execution` makes. Reading paper2's comparison book here kept
+            # reporting `no_venue_ticker` for rows the placer never sees.
+            plan, plan_source = portfolio_commit.read_placeable_plan_for_venue(normalized, venue)
+            plan = plan or {}
+            out.setdefault("plan_source", {})[venue] = plan_source
         except Exception as exc:
             out["venues"][venue] = {"status": "plan_unreadable", "reason": f"{type(exc).__name__}: {exc}"}
             continue

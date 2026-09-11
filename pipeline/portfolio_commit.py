@@ -92,6 +92,253 @@ def read_portfolio_plan_for_venue(
     return payload if isinstance(payload, dict) else None
 
 
+# ---- the LIVE plan: only what a venue can actually take ---------------------
+#
+# `paper2`'s venue plan is a COMPARISON BOOK. It keeps every row the venue
+# quotes, including rows `scope_rows_to_venue` priced from the AGGREGATOR, which
+# carry no contract, because "what would this strategy have done at this venue"
+# needs its whole population. It was ALSO the book live mode placed, so
+# uncontracted rows held positions in a plan that could never buy them.
+#
+# Measured 2026-09-11 on production: `PAPER2_PLAN_WRITTEN date=2026-09-10
+# venue=kalshi positions=22 ... placeable_committed=4/22`, and the live pass
+# refused 16 of them `no_venue_ticker` (NCAAF spreads 9, totals 7, every one
+# `price_source='aggregator'`). The executor's refusal (`332e596d`) is right
+# and stays; the defect was upstream of it.
+#
+# So live gets its OWN plan, committed over only the rows the venue can take,
+# and the comparison book stays exactly as it was. Sizing the live book over its
+# own rows matters beyond the slot count: the slate ceiling and the per-game
+# exposure budget are shared by every committed row, so an uncontracted row can
+# shrink a contracted one's stake. Neither bound on the measured build
+# (`slate_scale_factor=1.0`, one row cut at the cap), so there the change is 18
+# unplaceable positions removed, not stakes raised.
+PLAN_SOURCE_LIVE = "live"
+PLAN_SOURCE_PAPER2_FALLBACK = "paper2_fallback"
+
+# WHY A ROW IS NOT IN THE LIVE PLAN -- two reasons, because they call for
+# opposite work. `aggregator_priced`: the venue's own feed never priced the
+# row, i.e. the join did not pair it (on 2026-09-11, the per-series working-set
+# cap in `kalshi_odds_refresh` had evicted Saturday's NCAAF rungs).
+# `no_venue_contract`: the venue DID price it and the contract id was lost
+# between the join and the plan, which is a defect in this pipeline.
+REFUSAL_AGGREGATOR_PRICED = "aggregator_priced"
+REFUSAL_NO_VENUE_CONTRACT = "no_venue_contract"
+
+
+def live_portfolio_plan_path_for_venue(selected_date: str, venue: str) -> Path:
+    """The plan LIVE placement reads -- a separate file from paper2's.
+
+    Separate for `portfolio_plan_path_for_venue`'s own reason: two books that
+    answer different questions must not share a document. Same date-tokened
+    shape, so the store gives it the same 10-day TTL.
+    """
+    suffix = str(selected_date or "").strip().replace("-", "_")
+    token = str(venue or "").strip().lower().replace("-", "_")
+    return reports_root() / "intelligence" / f"portfolio_live_plan_{token}_{suffix}.json"
+
+
+def read_live_portfolio_plan_for_venue(
+    selected_date: str | None, venue: str
+) -> dict[str, Any] | None:
+    normalized = str(selected_date or "").strip()
+    if not normalized:
+        return None
+    payload = read_json_file(live_portfolio_plan_path_for_venue(normalized, venue))
+    return payload if isinstance(payload, dict) else None
+
+
+def read_placeable_plan_for_venue(
+    selected_date: str | None, venue: str
+) -> tuple[dict[str, Any] | None, str]:
+    """What LIVE placement reads, and WHICH file that was.
+
+    The live plan when one exists. Otherwise paper2's venue plan -- the book
+    live read before the live plan existed -- under `paper2_fallback`, so no
+    reader has to infer the source. The fallback is not a relaxation: it is the
+    previous behaviour exactly, and the executor's `no_venue_ticker` refusal
+    still stops every uncontracted row in it before anything is written. It
+    exists because the two workers deploy separately, and the reader must not
+    stop placing because the writer has not shipped yet.
+    """
+    plan = read_live_portfolio_plan_for_venue(selected_date, venue)
+    if isinstance(plan, dict):
+        return plan, PLAN_SOURCE_LIVE
+    return read_portfolio_plan_for_venue(selected_date, venue), PLAN_SOURCE_PAPER2_FALLBACK
+
+
+def placeable_refusal(row: Any) -> str | None:
+    """None when the venue can take this row; otherwise the reason it cannot.
+
+    Both halves, because an order needs both: the venue's OWN price
+    (`price_source == 'venue_feed'`) and its contract id (`venue_ticker`), which
+    `scope_rows_to_venue` stamps from one match. The ticker test is the
+    executor's own (`not request.venue_ticker`), so the plan and the refusal
+    cannot disagree about what "no contract" means.
+    """
+    if not isinstance(row, Mapping):
+        return "row_not_a_mapping"
+    if str(row.get("price_source") or "") != "venue_feed":
+        return REFUSAL_AGGREGATOR_PRICED
+    ticker = row.get("venue_ticker")
+    if not ticker or (isinstance(ticker, str) and not ticker.strip()):
+        return REFUSAL_NO_VENUE_CONTRACT
+    return None
+
+
+def commit_live_venue_plan(
+    scoped: list[Mapping[str, Any]],
+    *,
+    selected_date: str,
+    settings: Any,
+    settled_sample_size_by_sport: Mapping[str, int] | None = None,
+) -> dict[str, Any]:
+    """paper2's scoped rows -> the plan live may place. Pure; writes nothing.
+
+    The SAME `commit_portfolio` over the rows that pass `placeable_refusal`, so
+    every gate, the sizing and the refusal names are unchanged. The rows it
+    drops are counted under their own reasons and folded into `refusals`, so the
+    plan still accounts for every scoped row: `sum(refusals) + positions ==
+    rows_in`, the contract `commit_portfolio` states for itself.
+    """
+    placeable: list[Mapping[str, Any]] = []
+    dropped: list[tuple[str, Any]] = []
+    rows_in = 0
+    for row in scoped or ():
+        rows_in += 1
+        reason = placeable_refusal(row)
+        if reason is None:
+            placeable.append(row)
+        else:
+            dropped.append((reason, row))
+
+    plan = commit_portfolio(
+        placeable,
+        selected_date=selected_date,
+        settings=settings,
+        settled_sample_size_by_sport=settled_sample_size_by_sport,
+        prefer_placeable=True,
+    )
+
+    refusals = dict(plan.get("refusals") or {})
+    by_market = {reason: dict(counts) for reason, counts in (plan.get("refusals_by_market") or {}).items()}
+    by_sport = {reason: dict(counts) for reason, counts in (plan.get("refusals_by_sport") or {}).items()}
+    for reason, row in dropped:
+        refusals[reason] = refusals.get(reason, 0) + 1
+        market = sport = ""
+        if isinstance(row, Mapping):
+            market = str(row.get("market") or "").strip().lower()
+            sport = str(row.get("sport") or "").strip().lower()
+        # `unkeyed`, the same contract `commit_portfolio`'s own counters keep,
+        # so the per-market and per-sport totals still sum to `refusals`.
+        market_bucket = by_market.setdefault(reason, {})
+        market_bucket[market or "unkeyed"] = market_bucket.get(market or "unkeyed", 0) + 1
+        sport_bucket = by_sport.setdefault(reason, {})
+        sport_bucket[sport or "unkeyed"] = sport_bucket.get(sport or "unkeyed", 0) + 1
+
+    def _ordered(table: Mapping[str, Mapping[str, int]]) -> dict[str, dict[str, int]]:
+        return {
+            reason: dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
+            for reason, counts in sorted(table.items())
+        }
+
+    plan["refusals"] = dict(sorted(refusals.items()))
+    plan["refusals_by_market"] = _ordered(by_market)
+    plan["refusals_by_sport"] = _ordered(by_sport)
+    # `rows_in` is every scoped row, so the accounting holds; `sim_coverage`
+    # keeps describing the rows that were actually sized.
+    plan["rows_in"] = rows_in
+    plan["placeable_rows_in"] = len(placeable)
+    plan["plan_kind"] = PLAN_SOURCE_LIVE
+    return plan
+
+
+def _write_live_venue_plan(
+    scoped: list[Mapping[str, Any]],
+    *,
+    normalized: str,
+    venue: str,
+    settings: Any,
+    settled_sample_size_by_sport: Mapping[str, int] | None,
+    paper2_plan: Mapping[str, Any],
+    scope_refusals: Mapping[str, int],
+    job_state: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Commit and persist the live plan, and print the line that verifies it."""
+    path = live_portfolio_plan_path_for_venue(normalized, venue)
+    try:
+        live_plan = commit_live_venue_plan(
+            scoped,
+            selected_date=normalized,
+            settings=settings,
+            settled_sample_size_by_sport=settled_sample_size_by_sport,
+        )
+        live_plan["venue"] = venue
+        live_plan["venue_scope_refusals"] = dict(scope_refusals or {})
+        live_plan["job_state"] = dict(job_state or {})
+        live_plan["paper2_generated_at"] = paper2_plan.get("generated_at")
+        write_json_file(path, live_plan)
+    except Exception as exc:
+        print(
+            f"[portfolio_commit] LIVE_PLAN_FAILED date={normalized} venue={venue} "
+            f"error={type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        # FAIL CLOSED. Leaving the previous build's live plan in place would
+        # have live place an OLDER plan than the comparison book just written,
+        # with nothing saying so. An empty plan places nothing until the next
+        # build, and the line above says why.
+        try:
+            write_json_file(
+                path,
+                {
+                    "selected_date": normalized,
+                    "venue": venue,
+                    "plan_kind": PLAN_SOURCE_LIVE,
+                    "generated_at": _utc_now_iso(),
+                    "positions": [],
+                    "totals": {"positions": 0, "staked_dollars": 0.0},
+                    "error": f"{type(exc).__name__}: {exc}",
+                },
+            )
+        except Exception as stub_exc:
+            print(
+                f"[portfolio_commit] LIVE_PLAN_STUB_FAILED date={normalized} venue={venue} "
+                f"error={type(stub_exc).__name__}: {stub_exc}",
+                flush=True,
+            )
+        return None
+
+    positions = [p for p in (live_plan.get("positions") or []) if isinstance(p, Mapping)]
+    totals = live_plan.get("totals") or {}
+    live_keys = {p.get("position_key") for p in positions}
+    paper2_placeable = [
+        p
+        for p in (paper2_plan.get("positions") or [])
+        if isinstance(p, Mapping) and placeable_refusal(p) is None
+    ]
+    print(
+        f"[portfolio_commit] LIVE_PLAN_WRITTEN date={normalized} venue={venue} "
+        f"rows_in={live_plan.get('rows_in')} placeable_in={live_plan.get('placeable_rows_in')} "
+        f"positions={totals.get('positions')} staked=${totals.get('staked_dollars')} "
+        f"scale={totals.get('slate_scale_factor')} "
+        # COMPUTED FROM THE OUTPUT, not asserted from the construction: a
+        # position that lost its contract on the way through `commit_portfolio`
+        # reads here as N-1/N rather than hiding behind the filter above.
+        f"placeable_committed={sum(1 for p in positions if placeable_refusal(p) is None)}"
+        f"/{totals.get('positions')} "
+        # THE SELF-CHECK. Every placeable position paper2 committed must also be
+        # in the live plan: same rows, same gates, fewer rows competing for the
+        # cap and the budget. Non-zero here is a regression, never noise.
+        f"paper2_positions={(paper2_plan.get('totals') or {}).get('positions')} "
+        f"paper2_placeable={len(paper2_placeable)} "
+        f"paper2_placeable_missing={sum(1 for p in paper2_placeable if p.get('position_key') not in live_keys)} "
+        f"refusals={live_plan.get('refusals')}",
+        flush=True,
+    )
+    return live_plan
+
+
 # The venues `paper2` runs a book for. EXCHANGES AND PREDICTION MARKETS ONLY --
 # the venue class that has a real order API and does not limit an account for
 # winning. Traditional sportsbooks (draftkings, fanduel, betmgm, betrivers,
@@ -1333,10 +1580,13 @@ def run_portfolio_commit(
                 venue_scope_report_line(venue, len(rows), len(scoped), scope_refusals),
                 flush=True,
             )
+            # ONE read per venue, shared by that venue's paper2 book and its
+            # live book, so the two are never sized under different settings.
+            venue_settings = resolve_settings()
             venue_plan = commit_portfolio(
                 scoped,
                 selected_date=normalized,
-                settings=resolve_settings(),
+                settings=venue_settings,
                 settled_sample_size_by_sport=settled_sample_size_by_sport,
                 # A row this venue cannot PLACE must not hold one of its
                 # `max_positions` slots. See the cut in `commit_portfolio`.
@@ -1388,6 +1638,27 @@ def run_portfolio_commit(
                 flush=True,
             )
             venue_plans[venue] = venue_plan
+            # THE BOOK LIVE PLACES, from the same scoped rows and the same
+            # settings, and only once paper2 is on disk. In its own guard: it
+            # must never cost the comparison book it is derived from, nor the
+            # next venue's measurements.
+            try:
+                _write_live_venue_plan(
+                    scoped,
+                    normalized=normalized,
+                    venue=venue,
+                    settings=venue_settings,
+                    settled_sample_size_by_sport=settled_sample_size_by_sport,
+                    paper2_plan=venue_plan,
+                    scope_refusals=scope_refusals,
+                    job_state=plan.get("job_state"),
+                )
+            except Exception as exc:
+                print(
+                    f"[portfolio_commit] LIVE_PLAN_FAILED date={normalized} venue={venue} "
+                    f"error={type(exc).__name__}: {exc}",
+                    flush=True,
+                )
         except Exception as exc:
             print(
                 f"[portfolio_commit] PAPER2_FAILED date={normalized} venue={venue} error={exc}",

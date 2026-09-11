@@ -72,6 +72,14 @@ def _write_live_plan(monkeypatch, rows, venue="kalshi"):
         "pipeline.portfolio_commit.read_portfolio_plan_for_venue",
         lambda date, scope: plan,
     )
+    # AND THE LIVE PLAN, which live mode reads first since 2026-09-11
+    # (`read_placeable_plan_for_venue`). `_write_plan` now writes a real one
+    # from the fixture rows, which no venue prices -- so without this every
+    # live test here would read an empty book instead of the plan it was handed.
+    monkeypatch.setattr(
+        "pipeline.portfolio_commit.read_live_portfolio_plan_for_venue",
+        lambda date, scope: plan,
+    )
     return plan
 
 
