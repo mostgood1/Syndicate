@@ -5503,3 +5503,21 @@ the instrument rather than the system.**
   - Before building on one, or before writing a task or a disable-note that assumes it, count it in production and date the count.
   - A lane that lifts such a gate owes the superseding line in the section that stated it.
 - **Cost**: none paid this time. The reading counted before concluding. A reader trusting the section would have skipped NCAAF settlement verification entirely.
+
+## 2026-09-11 — OVERTURNED: "pregame near-even Polymarket sides have no book, so hold them until live". Our own ledger held the rule's falsifier more than ten times before the rule shipped `[lane polymarket-e2e-review]`
+
+- **What was believed:** 11 orders on 08-31 showed pregame orders above ~0.41 "resting" and never filling, while live everything filled. So a 0.35 pregame ceiling held near-even bets until live (`0c3f102f`, `97fe50b2`). The rule's own stated falsifier was "a PREGAME FILL above 0.410".
+- **What was true:**
+  - 24 of the 41 near-even pregame orders that reached the venue FILLED within about 2 s (08-28..09-01), including fills at 0.44–0.48 taken 31 to 821 minutes before kickoff. The other 17 were CANCELED by the venue 0.6–1.6 s after submit. None rested; what was read as "resting" was instant cancels.
+  - The deferral path failed. Of the 51 held bets whose games started, 36 were never placed, because the plan drops started games, and 4 became fills. Near-even bets placed in-play went 3-10 against 5.7 expected.
+  - The venue's own book (`GET /v1/markets/{slug}/book`, signed) showed BAL–TOR pregame at 0.445/0.45, with 151,604 shares at the offer.
+- **How it was found:**
+  - `/api/portfolio/live?on=all&show=all&venue=polymarket`: `venue_status`, `submitted_at` and `venue_resolved_at` were already on every order.
+  - A log join of every `HELD_PREGAME_NEAR_EVEN` line to later `LIVE_ORDER` lines.
+- **The rule:**
+  - Run a gate's stated falsifier against the population ALREADY in the ledger before the gate ships, not only going forward. A gate that suppresses its own falsifier can never see it later.
+  - "Did not fill" has three readings: rested, canceled by the venue, or never sent. Read `venue_status` and the submit-to-resolve lag before calling an order resting.
+  - A gate that DEFERS ("places once live") owns a measurement of whether the deferred path completes. Here 71% of deferrals never completed, and nothing counted them.
+- **Also, tooling:**
+  - The discard-guard hook resolves EVERY path named in a command containing `checkout --` against the PRIMARY tree. A worktree command that also ran `scripts\check_lane_invariants.py` was blocked for that second path. Run the discard as its own command.
+  - `lane_claims` reads every backticked path in a `- Files:` line as a claim, including one inside a "NOT ..." clause. That made `check_lane_invariants` report a contested file. Name unclaimed files outside the Files line.

@@ -32606,3 +32606,35 @@ end of run 12:52:24.99Z: anon 2735.7, current 4095.7 of 4096, inactive_file 843.
   - a re-read of peak anon about a week out (~09-18). Retained records grow ~4-10k a day until the 45-chunk horizon fills (39 of 45 now, ~09-16/17). After that, `skipped_chunks` > 0 and `truncated=1` are by design.
 
 `verify:` this entry IS the reading. Nothing was deployed.
+
+## 2026-09-11 15:06:25Z — live-odds-worker `78e4623f` -> `f8b67afa` — lane `polymarket-e2e-review`
+
+**What** (user decision 2026-09-11):
+- Deleted the Polymarket pregame near-even hold (`HELD_PREGAME_NEAR_EVEN`, `refused['pregame_price_too_high']`) from `pipeline/execute_portfolio.py`, together with its explore arm and `_polymarket_submit_price`.
+- `polymarket_us_submitter.build` now refuses three cases before the market resolves, so no ledger row is written:
+  - `game_started`: at or after kickoff;
+  - `commence_unknown`: kickoff unreadable;
+  - `market_paused`: `SYNDICATE_POLYMARKET_PAUSED_MARKETS`, empty in code.
+- Config: `SYNDICATE_POLYMARKET_PAUSED_MARKETS=total` was set on live-odds-worker (single-key PUT, 15:05Z, readback `total`) BEFORE the deploy was created.
+- Ride-along: none. `78e4623f..f8b67afa` holds one runtime commit, this one. There is no requirements or `render.yaml` change, and the live `78e4623f` is an ancestor.
+- Tests: 637 passed across the 20 Polymarket-path test files, 10 of them new in `tests/test_polymarket_us_orders.py`. They include off != on: a pregame position still reaches the resolver.
+
+**Locks:**
+- Claim `polymarket-e2e-review`, token `7839c08d…`, acquired 15:05:07Z.
+- Preflight CLEAR at 15:05:30Z for `f8b67afa`, with infrastructure processes only.
+- Deploy `dep-dai1hsek1f9s73bhoilg` created 15:06:25Z -> live 2026-09-11T15:09:21Z.
+
+**verify — MEASURED 15:09:21-15:19:17Z, PARTIAL: the first post-boot pass, read before its `EXECUTED` line was readable:**
+- The first post-boot Polymarket pass began at 15:16:42Z: `LIMITS date=2026-09-11 mode=live venue=polymarket already={'dollars': 14.63, 'orders': 2}`.
+- Read at 15:19:17Z, covering everything since 15:09:21Z:
+  - `HELD_PREGAME_NEAR_EVEN`: 0 lines. That is GUARANTEED by the deletion, since the string no longer exists, so it is not evidence.
+  - `REFUSED_AT_BUILD venue=polymarket`: 0.
+  - `LIVE_ORDER venue=polymarket`: 0.
+  - `REFUSED_NO_VENUE_TICKER venue=polymarket`: 1, a soccer h2h with `price_source='aggregator'`, at 15:16:42Z.
+- The pass's `EXECUTED ... venue=polymarket` line was not yet readable, so its `positions`, `placed` and `refused` are UNREAD.
+- **VERIFY OWED.** The lane's Verification lines must be read on the first complete passes:
+  - `market_paused` on a Polymarket total;
+  - `game_started` on a position past kickoff;
+  - a near-even pregame h2h reaching `LIVE_ORDER`;
+  - `paper:polymarket` totals still filling.
+- No falsifier has fired: there is no `LIVE_ORDER venue=polymarket market=totals`.

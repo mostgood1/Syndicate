@@ -1,5 +1,23 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#662` — **Price Polymarket off the executable ask, and include fees** — lane `polymarket-e2e-review`, 2026-09-11 — **OPEN; started (the endpoint is found), no code yet**
+
+- **Why.** EV and Kelly are computed on `outcomePrices`, a single sizeless number per outcome with no bid or ask label (`polymarket_us_markets.py:43-48`).
+  - Paper fills at that number and shows h2h at +50.5% (n=103 settled). Live h2h is −23.4% (n=15).
+  - The whole live loss sits in the above-median stakes, 8-16 for −$52.44, which are the largest claimed edges.
+  - Detail: `state_polymarket.md` `[polymarket-pregame-hold-premise-falsified]`.
+- **Found 2026-09-11.** Polymarket US documents:
+  - `GET /v1/markets/{slug}/book`: `bids` and `offers`, each with `px` and `qty`, plus `stats`;
+  - `GET /v1/markets/{slug}/bbo`: `bestBid`, `bestAsk`, `lastTradePx`, depth.
+  - Both need signing: unsigned calls return 401 "Missing required API key headers", though one unsigned read returned 200.
+  - BAL–TOR h2h, pregame, ~14:50Z: best bid 0.445 x1,660, best offer 0.45 x151,604, $1.29M traded, `MARKET_STATE_OPEN`. Near-even pregame books can be deep.
+- **Fees.** `feeCoefficient` is fetched and then dropped (`polymarket_us_markets.py:149`). Fees ran about 2% of settled stake ($3.30 on $153.83).
+- **Step 1, an instrument with its own deploy.** At build, read the slug's book with the signed client. Log our side's best ask and its size next to the price we would send, and the EV at that ask. A failed read must never block an order.
+- **Step 2, once step 1 has a population.** Price EV and Kelly at the ask, net of fees. Refuse below the minimum, and cap the stake at the size available at the ask.
+- **Close when** live Polymarket orders are sized and gated on the executable ask, and the step-1 population is recorded.
+
+---
+
 ### `#661` — **OPEN 2026-09-11: the live Kalshi plan committed bets Kalshi cannot take (`placeable_committed=4/22`). Live now places a plan built only from rows with a venue contract.** — lane `kalshi-plan-placeable`, 2026-09-11 (`#659` residual (b), "Stop Kalshi plan committing uncontracted bets")
 
 - **Measured before any code, on production.**
@@ -78,7 +96,7 @@
   - Polymarket placed an order again at 04:43:03Z: `tsc-lal-get-dep-2026-09-13-1pt5` Over 1.5, $1.05 at 0.45, GTC. That is a 09-13 fixture the old slate dropped.
   - Readings are in `deploys.md` 2026-09-11. The state is in `state_polymarket.md` `[polymarket-slate-budget-kept-props-dropped-game-lines]`.
 - **Residuals. These are OPEN, and not this item's:**
-  - (a) The pregame 0.35 price ceiling holds most near-even Polymarket bets. Keeping it is a USER decision, and it is pending.
+  - (a) **RESOLVED 2026-09-11:** the user decided to remove the pregame hold, and it is deleted in `f8b67afa` (live 2026-09-11T15:09:21Z). `#662` carries the pricing follow-up. Before that, the pregame 0.35 price ceiling held most near-even Polymarket bets.
     - 04:10Z: 4 of 6 held.
     - 05:15:40Z, the first pass on the football-joined plan: `positions=6 placed=1`, with 4 held. Three of the 4 are NFL 09-13 positions (TB–CIN total, WAS–PHI total, NYJ–TEN h2h), and they place only once the game is live.
     - It placed `aec-mlb-cin-mil-2026-09-11` h2h away, $8.87 at 0.37. One MLB spread priced from the aggregator was refused `no_venue_ticker`.

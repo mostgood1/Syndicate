@@ -561,53 +561,36 @@ death, never life — do not invert it.
   - live-odds-worker is DONE: `78e4623f`, reading recorded, claim released.
   - The deploy order was never a safety question. A reader without a live plan falls back to paper2's plan and says so (`LIVE_PLAN_ABSENT`).
 
-### polymarket-e2e-review — OPEN — opened 2026-09-11 — session 7a239b89-c8fd-49b7-ba5a-e41bb9d4d9bc
+### polymarket-e2e-review — OPEN — opened 2026-09-11 — session 7a239b89-c8fd-49b7-ba5a-e41bb9d4d9bc — **review GOAL MET; OPEN only for the first-pass reading of `f8b67afa` (live 2026-09-11T15:09:21Z)**
+- **GOAL: MET.** The goal is restated verbatim below.
+  - The end-to-end reading and the evidence verdict are in `state_polymarket.md` `[polymarket-pregame-hold-premise-falsified]` (`8d588016`).
+  - The user decided on 2026-09-11 ("yes do it"), and the decision is recorded in `log/2026-09-11.md`.
 - Goal: [user request 2026-09-11: "can we re-evaluate polymarket end to end and this held bet strategy? I'm not sure I agree with this"]
   - (1) An end-to-end reading of the Polymarket path: markets read → join → scope → plan → executor gates → order → fill → settlement. It needs a production count at every stage, and the realized results to date with denominators and dates.
   - (2) A verdict from evidence on the pregame near-even hold (`HELD_PREGAME_NEAR_EVEN`, counted as `refused['pregame_price_too_high']`, ceiling 0.35): what it holds, what becomes of held bets, and what it costs or saves. It goes to the user as a decision, with a recommendation.
   - No code change without the user's decision.
 - Files: `syndicate/features/shared/polymarket_us_orders.py`, `tests/test_polymarket_us_orders.py`, `pipeline/execute_portfolio.py`, `tests/test_execute_portfolio.py`. All ADDED 2026-09-11 on the user's decision; before that the lane was diagnostic and ledger-only. The last two were released to this lane by kalshi-plan-placeable (`ee7c8691`). With them the hold is DELETED, not switched off by config.
-- Hypothesis (to test, not believed):
-  - H1: most held bets are never placed. The plan drops a game once it starts, so the hold turns positive-EV positions into no position.
-  - H2: held bets that do place live pay a different price from the one they were held at. The hold's value is that price gap plus any difference in fill rate, and neither has been measured.
-  - H3: the premise of the hold is stale, or was never measured for the current order type (a GTC limit crossed by one tick). The premise is that a pregame near-even order does not fill, or fills badly.
-  - H4: on held positions the plan's `ev_pct` and `edge_pct` can disagree in sign (BAL–TOR h2h at 05:15Z: ev +14.61, edge −3.47). If so, the executor may be acting on a number the market contradicts.
-- Falsification test:
-  - H1 falls if most held tickers show a later `LIVE_ORDER` for the same ticker.
-  - H2 is answered by the pairs of held and placed prices.
-  - H3 falls if pregame near-even Polymarket orders in the ledger filled at a rate comparable to orders at other prices.
-  - H4 falls if the two fields share a baseline by design and agree in sign once put on one.
-- Verification: the readings above are written to `state_polymarket.md` and the day log with n and dates, and the user's decision on the hold is recorded.
-- Blocked by: none.
-- 2026-09-11 ~14:20Z: readings are in `state_polymarket.md` `[polymarket-pregame-hold-premise-falsified]`.
-  - H3 CONFIRMED. The rule's own falsifier, a pregame fill above 0.410, occurs more than ten times in the ledger (08-28..08-31). Near-even pregame orders filled 24 of 41 times, and every miss was a venue cancel within 2 s.
-  - H4 FALSIFIED as a bug: the two fields have different baselines by design.
-  - H1: CONFIRMED. Of the 51 held bets whose games started, 36 (71%) were never placed and 4 (8%) became fills.
-  - H2: indeterminate on n=4. Prices were within ±0.03 of the held price, and the 3 fills went 1-2.
-  - Live Polymarket overall: 19-29, −$47.76, ROI −31% on 48 settled. Near-even in-play went 3-10 against 5.7 expected; near-even pregame 10-9 against 8.6.
-  - The decision on the hold is WITH THE USER.
-- 2026-09-11 ~14:50Z: **USER DECISION ("yes do it"):**
-  - (1) Remove the pregame hold, and never place a Polymarket pregame position after kickoff.
-  - (2) Start pricing off the executable ask plus fees.
-  - (3) Pause Polymarket totals.
-  - (4) Keep stakes small.
-  - **How (1) and (3) are done:**
-    - The hold is switched off by config: `SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE=0` on live-odds-worker. `0` disables it (execute_portfolio.py lines 1233 and 1338).
-    - The in-play block and the totals pause go into `polymarket_us_submitter.build`, the one build every Polymarket order passes (execute_portfolio.py lines 841-844). They refuse at build, so no ledger row is written. The reasons are `game_started`, `commence_unknown` and `market_paused`.
-    - The totals pause is `SYNDICATE_POLYMARKET_PAUSED_MARKETS`, a substring match that defaults to `total`; `none` disables it. It is LIVE only: paper does not use this submitter, so paper keeps measuring totals.
-    - execute_portfolio.py and its test are NOT edited here, because OPEN lane kalshi-plan-placeable holds them. The dead hold and explore-arm code waits for their release, which was asked for by message on 2026-09-11.
-  - (4): no change. The caps are $35 per order and $150 per day per venue, and actual stakes run $1–9.
-  - (2) is STARTED. `/v1/markets` carries no bid, ask or size (polymarket_us_markets.py lines 43-48), and no book route is known (`state_polymarket.md:1083`). The first step is finding one.
+- **Decision executed:**
+  - `f8b67afa` is live on live-odds-worker, `dep-dai1hsek1f9s73bhoilg`, since 15:09:21Z.
+  - The hold and explore arm are deleted.
+  - `polymarket_us_submitter.build` refuses `game_started`, `commence_unknown` and `market_paused`.
+  - `SYNDICATE_POLYMARKET_PAUSED_MARKETS=total` is set on live-odds-worker, readback `total`.
+  - (4): no change.
+  - (2), trading off the executable ask plus fees, is todo `#662`. It has NO lane yet; the next session opens one, and it gets its own deploy.
 - Verification of (1) and (3), on the first live-odds-worker passes after the deploy:
   - zero `HELD_PREGAME_NEAR_EVEN` lines, and no `pregame_price_too_high` key;
   - Polymarket totals refused as `REFUSED_AT_BUILD reason=market_paused`;
   - any Polymarket position past kickoff refused as `game_started`;
   - near-even pregame h2h positions reaching `LIVE_ORDER`;
   - `paper:polymarket` totals still being filled.
+  - **Status 15:19Z: OWED.** The first post-boot pass (15:16:42Z) was read only partially: 0 HELD (guaranteed by the deletion), 0 `REFUSED_AT_BUILD`, 0 `LIVE_ORDER`, 1 `REFUSED_NO_VENUE_TICKER`. No falsifier has fired.
 - Falsification of (1) and (3): any of these after the deploy:
   - a `HELD_PREGAME_NEAR_EVEN` line;
   - a `LIVE_ORDER venue=polymarket market=totals`;
   - a Polymarket order whose `submitted_at` is later than its `commence_time`.
+- Blocked by: none.
+- Close when the verification above is in `deploys.md` 2026-09-11 15:06:25Z. Closing releases the four file claims.
+- History: the hypotheses H1–H4, their verdicts and the decision text were moved VERBATIM to `lanes_history.md` on 2026-09-11. The readings are in `state_polymarket.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

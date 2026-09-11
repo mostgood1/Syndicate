@@ -32049,3 +32049,36 @@ Moved verbatim; nothing summarised. Each lane's current verdict and status stay 
     - NOT scope admitting a whole game: the scope reads per row.
     - IT IS THE WORKING SET. `MAX_MARKETS_PER_SERIES=400` cut `KXNCAAFSPREAD` 2,141 of 2,541 (04:38:14Z) and `KXNCAAFTOTAL` 1,608 of 2,008 (04:59:09Z, 1,570 of them dated 09-12), under `mode=date_aware window=2026-09-10..2026-09-13`, which keeps the nearest dates first. Friday rungs survive and Saturday rungs do not. All 17 aggregator NCAAF positions are Saturday games: 8 spreads, 8 totals, 1 h2h.
   - The fix for THAT is in `pipeline/kalshi_odds_refresh.py`, which OPEN `nfl-layer2-kalshi-identity` holds. Recorded as a lead, not done here.
+
+### polymarket-e2e-review — lines superseded at the 2026-09-11 checkpoint, moved VERBATIM from `lanes.md`
+- Hypothesis (to test, not believed):
+  - H1: most held bets are never placed. The plan drops a game once it starts, so the hold turns positive-EV positions into no position.
+  - H2: held bets that do place live pay a different price from the one they were held at. The hold's value is that price gap plus any difference in fill rate, and neither has been measured.
+  - H3: the premise of the hold is stale, or was never measured for the current order type (a GTC limit crossed by one tick). The premise is that a pregame near-even order does not fill, or fills badly.
+  - H4: on held positions the plan's `ev_pct` and `edge_pct` can disagree in sign (BAL–TOR h2h at 05:15Z: ev +14.61, edge −3.47). If so, the executor may be acting on a number the market contradicts.
+- Falsification test:
+  - H1 falls if most held tickers show a later `LIVE_ORDER` for the same ticker.
+  - H2 is answered by the pairs of held and placed prices.
+  - H3 falls if pregame near-even Polymarket orders in the ledger filled at a rate comparable to orders at other prices.
+  - H4 falls if the two fields share a baseline by design and agree in sign once put on one.
+- Verification: the readings above are written to `state_polymarket.md` and the day log with n and dates, and the user's decision on the hold is recorded.
+- Blocked by: none.
+- 2026-09-11 ~14:20Z: readings are in `state_polymarket.md` `[polymarket-pregame-hold-premise-falsified]`.
+  - H3 CONFIRMED. The rule's own falsifier, a pregame fill above 0.410, occurs more than ten times in the ledger (08-28..08-31). Near-even pregame orders filled 24 of 41 times, and every miss was a venue cancel within 2 s.
+  - H4 FALSIFIED as a bug: the two fields have different baselines by design.
+  - H1: CONFIRMED. Of the 51 held bets whose games started, 36 (71%) were never placed and 4 (8%) became fills.
+  - H2: indeterminate on n=4. Prices were within ±0.03 of the held price, and the 3 fills went 1-2.
+  - Live Polymarket overall: 19-29, −$47.76, ROI −31% on 48 settled. Near-even in-play went 3-10 against 5.7 expected; near-even pregame 10-9 against 8.6.
+  - The decision on the hold is WITH THE USER.
+- 2026-09-11 ~14:50Z: **USER DECISION ("yes do it"):**
+  - (1) Remove the pregame hold, and never place a Polymarket pregame position after kickoff.
+  - (2) Start pricing off the executable ask plus fees.
+  - (3) Pause Polymarket totals.
+  - (4) Keep stakes small.
+  - **How (1) and (3) are done:**
+    - The hold is switched off by config: `SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE=0` on live-odds-worker. `0` disables it (execute_portfolio.py lines 1233 and 1338).
+    - The in-play block and the totals pause go into `polymarket_us_submitter.build`, the one build every Polymarket order passes (execute_portfolio.py lines 841-844). They refuse at build, so no ledger row is written. The reasons are `game_started`, `commence_unknown` and `market_paused`.
+    - The totals pause is `SYNDICATE_POLYMARKET_PAUSED_MARKETS`, a substring match that defaults to `total`; `none` disables it. It is LIVE only: paper does not use this submitter, so paper keeps measuring totals.
+    - execute_portfolio.py and its test are NOT edited here, because OPEN lane kalshi-plan-placeable holds them. The dead hold and explore-arm code waits for their release, which was asked for by message on 2026-09-11.
+  - (4): no change. The caps are $35 per order and $150 per day per venue, and actual stakes run $1–9.
+  - (2) is STARTED. `/v1/markets` carries no bid, ask or size (polymarket_us_markets.py lines 43-48), and no book route is known (`state_polymarket.md:1083`). The first step is finding one.

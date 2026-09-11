@@ -1321,4 +1321,8 @@ whatever game lines displace them. `dropped_by_date` still reports every one.
 - H2: INDETERMINATE on n=4. The four bets placed after commence were priced within ±0.03 of the price they were held at (0.50→0.49, 0.47→0.50, 0.46→0.455, 0.455→0.455). Three filled, going 1-2.
 - H1: CONFIRMED. 36 of the 51 held bets whose games started were never placed, and 4 of the 51 became fills.
 
-The decision on the hold is the user's, and it is pending.
+**DECIDED AND DONE 2026-09-11.** On the user's decision the hold is DELETED, in `f8b67afa` on live-odds-worker, live 2026-09-11T15:09:21Z.
+- A Polymarket order is now built pregame or not at all. `polymarket_us_submitter.build` refuses `game_started` and `commence_unknown`.
+- Polymarket totals are paused by config: `SYNDICATE_POLYMARKET_PAUSED_MARKETS=total`, refused at build as `market_paused`. Paper still measures them.
+- The first post-boot pass (15:16:42Z) was read only partially, at 15:19Z. It showed 0 Polymarket build refusals, 0 Polymarket orders and 1 no-ticker refusal; the 0 HELD lines are guaranteed by the deletion. The lane's verification readings are OWED.
+- The pricing follow-up, trading off the executable ask and net of fees, is todo `#662`.
