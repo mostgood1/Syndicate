@@ -3667,6 +3667,13 @@ def board_layer2_shortlist_api():
                 # from "soccer's whole slate was one-book longshots", and those
                 # need opposite responses.
                 "rows_uninformative_ev": shortlist.get("rows_uninformative_ev"),
+                # `[2026-09-11, user decision]`: one-sided rows withheld because
+                # their ONLY value was an unmeasured model's edge. Added to this
+                # explicit list in the same commit as the rule, or the counter
+                # would reach nobody (`#373`, `#381`, `#397`, `#400`).
+                "rows_unmeasured_model_only": shortlist.get("rows_unmeasured_model_only"),
+                "unmeasured_model_only_by_market": shortlist.get("unmeasured_model_only_by_market"),
+                "unmeasured_model_only_mode": shortlist.get("unmeasured_model_only_mode"),
                 "max_quote_age_seconds": shortlist.get("max_quote_age_seconds"),
                 "rows_beyond_quote_age": shortlist.get("rows_beyond_quote_age"),
                 "stale_kickoff_seconds": shortlist.get("stale_kickoff_seconds"),

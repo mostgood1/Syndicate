@@ -26,6 +26,11 @@ from syndicate.features.shared.opportunity_signals import expected_value_pct
 
 _NOW = datetime(2026, 8, 14, 20, 0, tzinfo=timezone.utc)
 
+# A MEASURED model view. Since 2026-09-11 a one-sided row whose model is
+# unmeasured is withheld (`tests/test_layer2_unmeasured_model_only.py`);
+# the keepers here test the hold-restatement rule, so their model is measured.
+_MEASURED = {"model_skill": {"status": "measured", "sample_games": 120}}
+
 
 def _modelled_row(*, price: int, hold: float, market: str = "player_shots", **extra: object) -> dict:
     """A one-sided row priced exactly the way `book_margin_model` prices one."""
@@ -86,7 +91,9 @@ def test_a_row_with_no_fair_method_is_never_touched():
 
 def test_select_shortlist_drops_them_and_counts_them():
     rows = [_modelled_row(price=2200, hold=6.514, market=f"player_shots_{i}") for i in range(5)]
-    keeper = _modelled_row(price=2200, hold=6.514, market="player_assists", model_edge_pct=4.1)
+    keeper = _modelled_row(
+        price=2200, hold=6.514, market="player_assists", model_edge_pct=4.1, projection=_MEASURED,
+    )
     keeper["ev_pct"] = 2.5
     keeper["score"] = {"score": 2.5, "value_pct": 2.5}
 
@@ -100,7 +107,7 @@ def test_select_shortlist_drops_them_and_counts_them():
 def test_the_counter_is_zero_when_nothing_is_dropped():
     # A counter that only ever appears when it fires is unreadable as "the rule
     # ran and rejected nothing" -- this module's own recurring lesson.
-    keeper = _modelled_row(price=2200, hold=6.514, model_edge_pct=4.1)
+    keeper = _modelled_row(price=2200, hold=6.514, model_edge_pct=4.1, projection=_MEASURED)
     keeper["ev_pct"] = 2.5
     keeper["score"] = {"score": 2.5, "value_pct": 2.5}
     result = select_shortlist([keeper], now=_NOW)

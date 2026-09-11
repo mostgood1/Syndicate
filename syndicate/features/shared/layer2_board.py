@@ -815,6 +815,67 @@ def _row_ev_is_hold_restatement(row: Mapping[str, Any]) -> bool:
     return _as_float(row.get("model_edge_pct")) is None
 
 
+def _unmeasured_model_only_mode() -> str:
+    """`withhold` (default) or `admit`: may an UNMEASURED model alone seat a one-sided row?
+
+    `[2026-09-11, user decision: "Withhold, all sports"]`, taken on the served board,
+    reading the `written_at` 16:27:27Z build:
+
+        MLB   116 `batter_home_runs` rows, EVERY ONE one-sided (`book_margin_model`)
+              and EVERY ONE `model_skill.sample_games: 0`; 8 of the top 25, 33 of
+              the top 100. Acuna 1+ HR: model 0.321 vs implied 0.196 at +410;
+              2+ HR longshots at +2400..+6000 carrying model means of 0.38-0.59
+              HR a game, 2-3x what any hitter averages.
+        NFL    93 `Anytime TD` rows, same shape, 7 of the top 25.
+        soccer 221 shots / shots-on-target / assists rows, same shape.
+
+    A one-sided row's `ev_pct` is the book's own hold restated
+    (`_row_ev_is_hold_restatement`), so the market says nothing about it. What
+    seated these rows was the model's edge ALONE -- from a model that has never
+    been checked against a result. That is not an opportunity; it is an
+    unvalidated claim ranked beside measured ones. NCAAF already runs the same
+    principle the other way round (`football/pick_gate.py`: default deny, serving
+    needs a recorded win), and MLB's live edges were stopped for a MEASURED loss
+    to the market (lane `mlb-stop-publishing-edges`).
+
+    This is ADMISSION, not ranking. The 2026-08-31 decision ("rank on edge") is
+    untouched: a one-sided row whose model IS measured still ranks on its edge.
+
+    Absent means WITHHOLD. Only the exact word `admit` reverts, so an
+    unrecognised value cannot silently re-seat unvalidated rows.
+    """
+    raw = str(os.environ.get("SYNDICATE_LAYER2_UNMEASURED_MODEL_ONLY") or "").strip().lower()
+    return "admit" if raw == "admit" else "withhold"
+
+
+def _row_rests_on_unmeasured_model(row: Mapping[str, Any]) -> bool:
+    """True for a one-sided row whose ONLY value signal is an unmeasured model.
+
+    Three conditions, all required:
+
+    1. `fair_method == book_margin_model` -- one-sided, so `ev_pct` is the hold
+       restated and carries nothing about the bet. A two-sided consensus row has
+       a MEASURED market EV and is never touched here.
+    2. A model view (`model_edge_pct` numeric). Without one the row is already
+       dropped as `rows_uninformative_ev`; this rule never double-counts it.
+    3. The model is not stamped `measured`. `projection_skill.attach_projection_skill`
+       stamps every projection on the grid, so an ABSENT note is treated as
+       unmeasured rather than as measured -- unknown must not default permissive.
+    """
+    quote = row.get("quote")
+    method = quote.get("fair_method") if isinstance(quote, Mapping) else None
+    if str(method or "").strip() != "book_margin_model":
+        return False
+    if _as_float(row.get("model_edge_pct")) is None:
+        return False
+    from syndicate.features.shared.projection_skill import STATUS_MEASURED
+
+    projection = row.get("projection")
+    skill = projection.get("model_skill") if isinstance(projection, Mapping) else None
+    status = str(skill.get("status") or "").strip().lower() if isinstance(skill, Mapping) else ""
+    return status != STATUS_MEASURED
+
+
 def _row_quote_age_seconds(row: Mapping[str, Any]) -> float | None:
     """How stale is our OBSERVATION of this quote (`#370`).
 
@@ -4235,6 +4296,10 @@ def select_shortlist(
     implausible_book = 0
     stale_kickoff = 0
     uninformative_ev = 0
+    # `[2026-09-11, user decision]` -- see `_unmeasured_model_only_mode`.
+    unmeasured_model_mode = _unmeasured_model_only_mode()
+    unmeasured_model_only = 0
+    unmeasured_model_only_by_market: dict[str, int] = {}
     for row in opportunities:
         if not _within_horizon(row, reference_now, horizon_days):
             beyond_horizon += 1
@@ -4316,6 +4381,18 @@ def select_shortlist(
         # what this rejected.
         if _row_ev_is_hold_restatement(row):
             uninformative_ev += 1
+            continue
+        # The mirror of the rule above: THAT drops a one-sided row with no model
+        # view; THIS drops one whose only view is a model nobody has measured.
+        # Placed with the pre-bucket rules for the same reason -- so
+        # `kind_floor`/`per_sport` cannot re-seat what it withheld.
+        if unmeasured_model_mode == "withhold" and _row_rests_on_unmeasured_model(row):
+            unmeasured_model_only += 1
+            key = "%s:%s" % (
+                str(row.get("sport") or "unknown").strip().lower() or "unknown",
+                str(row.get("market") or "unknown"),
+            )
+            unmeasured_model_only_by_market[key] = unmeasured_model_only_by_market.get(key, 0) + 1
             continue
         sport = str(row.get("sport") or "unknown").strip().lower() or "unknown"
         by_sport.setdefault(sport, []).append(row)
@@ -4550,6 +4627,12 @@ def select_shortlist(
         # `syndicate/blueprints/intelligence.py`, which is held by another lane;
         # see this lane's entry in `lanes.md`.
         "rows_uninformative_ev": uninformative_ev,
+        # `[2026-09-11, user decision]`: one-sided rows withheld because their
+        # ONLY value was an unmeasured model's edge. Counter, per-market
+        # breakdown and mode ship in the SAME commit as the rule (`#397`).
+        "rows_unmeasured_model_only": unmeasured_model_only,
+        "unmeasured_model_only_by_market": dict(sorted(unmeasured_model_only_by_market.items())),
+        "unmeasured_model_only_mode": unmeasured_model_mode,
         # `#369`: named separately from the value floor, because "the book is
         # impossible" and "this row is priced below our floor" are different
         # rejections and collapsing them would hide a feed problem as taste.

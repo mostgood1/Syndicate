@@ -6450,6 +6450,7 @@ class IntelligenceStateService:
                 f"implausible_book={layer2_shortlist.get('rows_implausible_book')} "
                 f"excluded_market={layer2_shortlist.get('rows_excluded_market')} "
                 f"uninformative_ev={layer2_shortlist.get('rows_uninformative_ev')} "
+                f"unmeasured_model_only={layer2_shortlist.get('rows_unmeasured_model_only')} "
                 f"beyond_game_cap={layer2_shortlist.get('rows_beyond_game_cap')} "
                 f"sports={layer2_shortlist.get('active_sports')} "
                 # PER-SPORT SERVED COUNTS. `rows` above is the total, and every
