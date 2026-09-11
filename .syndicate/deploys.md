@@ -32782,3 +32782,37 @@ Both NCAAF ones are FRIDAY games: the cap keeps the nearest dates first, so Satu
 - No falsifier fired: there was no HELD line, no `LIVE_ORDER venue=polymarket market=totals`, and both orders were submitted before kickoff.
 - The `POLYMARKET_CROSS` and `POLYMARKET_ARTIFACT_PRICE` lines for all five slugs at 15:50:07-08Z, the totals included, come from a second caller of `_polymarket_resolve_market` (`execute_portfolio.py:1776`). It runs before the pass's `LIMITS` line, and it is not order building.
 - Fills are not read yet: both orders read `submitted` at 15:51Z.
+
+## 2026-09-11 15:59:52Z — live-odds-worker `f8b67afa` -> `1afec00f` — lane `polymarket-ask-pricing` — #662 step 1, the book-at-build instrument
+
+**What:** `polymarket_us_submitter.build`, once `order_body` validates, now makes one signed `GET /v1/markets/{slug}/book` and logs `POLYMARKET_BOOK_AT_BUILD`. The line carries:
+- our side's executable ask and its size: the best offer for YES, or 1 minus the best YES bid for NO;
+- the price sent;
+- the EV at that ask;
+- `marketable`.
+
+It is an instrument, never a gate:
+- A failure logs `POLYMARKET_BOOK_READ_FAILED` and the order proceeds.
+- With no credentials there is no call.
+- `SYNDICATE_POLYMARKET_BOOK_AT_BUILD=0` turns it off; it is absent on live-odds-worker, so it is ON.
+
+Tests: 643 passed across the 20 Polymarket-path test files, 6 of them new.
+
+**Ride-along** (`f8b67afa..1afec00f`, runtime files), neither live anywhere before this deploy:
+- `7c248328`, lane `kalshi-precap-board-lines`: `pipeline/kalshi_odds_refresh.py`. It is flag-gated. `SYNDICATE_KALSHI_PRECAP_BOARD_LINES` is ABSENT on both workers (single-key reads, 15:59Z), so it ships INERT, and absent reproduces today's rule exactly (`precap_board_lines_enabled`).
+- `889d4e12`, lane `ncaaf-tbd-kickoff-date`: the NCAAF TBD-kickoff date fix (`ncaaf/cards.py`, `ncaaf/sources.py`, `game_chip_scoreboard.py`). Its own target is refresh-worker, whose claim that lane holds.
+
+No `requirements*` or `render.yaml` change; live `f8b67afa` is an ancestor.
+
+**Locks:**
+- Claim `polymarket-ask-pricing`, token `87e9fda4…`, acquired 15:58:56Z.
+- Preflight CLEAR at 15:59:33Z for `1afec00f`, with infrastructure processes only.
+- Deploy `dep-dai2au6q1p3s73api140`, created 15:59:52Z -> live 16:02:43Z.
+
+**verify:** PARTIAL; the instrument's reading is OWED.
+- **Live at 16:02:43Z** on `1afec00f` (deploys API).
+- The first Polymarket pass after boot, at 16:11:45Z: `EXECUTED date=2026-09-11 mode=live venue=polymarket plan_source=live armed=True positions=5 placed=0 duplicates=2 skipped=3 refused={'market_paused': 3}`.
+- The two 15:51Z orders reconciled at 16:03:51Z (`RECONCILE venue=polymarket candidates=12 venue_orders=12 changed=2`). There was no `BLOCKED_ON_UNRECONCILED`.
+- `POLYMARKET_BOOK_AT_BUILD` and `POLYMARKET_BOOK_READ_FAILED`: 0 lines, because the pass built nothing new. The three totals are refused before build (`market_paused`), and the two moneylines are duplicates. The instrument is DEPLOYED but UNREAD.
+- **The two 15:51Z orders are RESTING, not filled.** At the 16:11:38Z reconcile both read `order_state_new` with 0 contracts: `aec-nfl-nyj-ten-2026-09-13` has 7.48 left at 0.49, and `aec-mlb-sea-ath-2026-09-11` has 23.85 left at 0.415. See the lane for the kickoff risk.
+- **VERIFY OWED:** the first book line comes with the first NEW Polymarket order build. Step 1's reading needs at least 20 (lane `polymarket-ask-pricing`).

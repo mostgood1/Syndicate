@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#662` — **Price Polymarket off the executable ask, and include fees** — lane `polymarket-e2e-review`, 2026-09-11 — **OPEN; started (the endpoint is found), no code yet**
+### `#662` — **Price Polymarket off the executable ask, and include fees** — lane `polymarket-ask-pricing` (opened from `polymarket-e2e-review`), 2026-09-11 — **OPEN; step 1, the instrument, is LIVE in `1afec00f` since 16:02:43Z; its population is owed**
 
 - **Why.** EV and Kelly are computed on `outcomePrices`, a single sizeless number per outcome with no bid or ask label (`polymarket_us_markets.py:43-48`).
   - Paper fills at that number and shows h2h at +50.5% (n=103 settled). Live h2h is −23.4% (n=15).

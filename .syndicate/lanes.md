@@ -638,6 +638,15 @@ death, never life — do not invert it.
 - Falsification test: over the first 20 or more logged builds, our side's best ask sits within one tick of the price we send, and the EV at that ask is within 1 point of the plan's `ev_pct`, in the large-EV rows as well as the small ones.
 - Verification (step 1): at least 20 `POLYMARKET_BOOK_AT_BUILD` lines on live-odds-worker, each with ask, size, sent price and EV at the ask. Recorded in `state_polymarket.md` with the distribution of (EV at ask − planned EV) by planned-EV bucket, and zero orders blocked by a failed read.
 - Blocked by: none.
+- 2026-09-11 16:02:43Z: step 1 is LIVE on live-odds-worker `1afec00f` (`dep-dai2au6q1p3s73api140`).
+  - The first pass after boot (16:11:45Z) built nothing new (`placed=0 duplicates=2 refused={'market_paused': 3}`), so there are 0 book lines yet. Nothing blocked.
+  - **RISK FOUND, and put to the user.** The two 15:51Z orders are RESTING (`order_state_new`, 0 filled at 16:11:38Z): Jets–Titans has 7.48 left at 0.49, and Mariners–A's 23.85 left at 0.415.
+  - Polymarket GTC orders are never cancelled by us (`polymarket_us_orders.py`'s `cancel_order` has no caller). So a resting pregame order can fill AFTER kickoff at its pregame price, which is exactly when the market has moved through it.
+  - The `game_started` refusal covers BUILDS, not resting orders.
+  - Mariners–A's starts 2026-09-12T01:40Z, and Jets–Titans 2026-09-13T17:00Z.
+  - The candidate fixes are a good-till-date at kickoff or a cancel at kickoff. Both need the venue contract verified, and both are the user's decision.
+  - Verification is OWED: at least 20 `POLYMARKET_BOOK_AT_BUILD` lines, which need NEW order builds. Totals are paused before build, and orders already placed do not rebuild, so the population arrives as the plan changes.
+  - Recorded in `deploys.md` 2026-09-11 15:59:52Z.
 
 ### kalshi-precap-board-lines — OPEN — opened 2026-09-11 — session 49bfef11-a4a3-4fe4-8df4-76ec94e45893
 - Goal: [user 2026-09-11] `#661`'s residual. The per-series cap (`MAX_MARKETS_PER_SERIES=400`, unchanged) keeps the Kalshi rungs AT or next to each board row's spread/total line, so that NCAAF Saturday rows get a venue contract. Done when refresh-worker prints `LIVE_PLAN_WRITTEN venue=kalshi ... placeable_committed=N/N` with N > 0 on an NCAAF Saturday slate, and live-odds-worker prints `EXECUTED ... venue=kalshi plan_source=live placed>0`.
