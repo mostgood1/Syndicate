@@ -530,6 +530,14 @@ death, never life — do not invert it.
       - The 04:59:04Z pass refused 16 as `no_venue_ticker`: NCAAF spreads 9 and totals 7, all `price_source='aggregator'`.
       - The executor guard is doing its job. The plan spends slots on bets Kalshi cannot take. Handed off as a separate task, "Stop Kalshi plan committing uncontracted bets".
 
+### sept-spike-captures — OPEN — opened 2026-09-11 — session 92a71e78-b21c-4366-a900-f7a3f6fc434d
+- Goal: capture the nine uncaptured 2026-09-01..04 web spike buckets on the corrected window (label..label+1h), before Render's logs age out. Together with the already-captured `09-04 18:00Z`, they are the metered top ten of 09-01..04, holding 70.8% of that period's 19.24 GB: the ledger's "~68% in about ten spike buckets" (`state_worker.md` `[render-egress-spikes]`). Then say whether `09-04 18:00Z`'s m/app 2.79 is typical of that week. User directed 2026-09-11: "capture the other nine 09-01..04 spike buckets".
+- Files: `reports/bandwidth_spikes/web_20260901T220000Z.json`, `web_20260901T230000Z.json`, `web_20260903T200000Z.json`, `web_20260903T210000Z.json`, `web_20260903T220000Z.json`, `web_20260903T230000Z.json`, `web_20260904T000000Z.json`, `web_20260904T010000Z.json`, `web_20260904T190000Z.json` (all NEW), plus an addendum to `.syndicate/findings_2026-09-10_spike_crossing_and_labelling.md`.
+- Hypothesis: n/a. This is evidence preservation. The question it answers comes from `findings_2026-09-10` §8: the 4,050 MB headline hour, correctly paired, reads m/app 2.79, inside the ordinary range.
+- Falsification test (written while the captures were running, BEFORE any of their numbers was read): if most of the nine read m/app >= 5, as the 09-08 run hours do (5.10-9.41), then `09-04 18:00Z` is the exception, and early September is the same phenomenon as 09-08. If most read <= ~3.9 (the top of the ordinary range), then early September's "spikes" were heavy served traffic metered at a normal ratio, and the 09-08 run stands alone. A BLIND or PARTIAL capture is reported as such and scores neither way.
+- Verification: nine capture files committed, each with `window_covered = label..label+1h` and a non-null `metered_mb`, with every BLIND or PARTIAL flag reported, not divided by.
+- Blocked by: none. NOT changed, flagged: `bandwidth_tripwire.py --capture` leaves `metered_mb` null (it calls `capture()` without it, which is how five older captures got nulls). Worked around by calling `capture()` with each bucket's metered value, as `--check` does. Also flagged for the addendum, not rewritten: several of `[render-egress-spikes]`'s ELIMINATED entries quote spike-hour numbers from the old pairing, e.g. "public edge traffic ... carries 2.6-61 MB in the spike hours", whose correctly paired values are 178.2 and 144.5 MB.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
