@@ -715,6 +715,21 @@ death, never life — do not invert it.
   - **Preflight** for `889d4e12 --reinject-env` returned **TOO_SOON**. `ncaaf-tbd-kickoff-date`'s deploy went live at 16:18:23Z; the minimum spacing is 25 min and the first board publish takes ~21 min (`#563`).
   - **Next:** re-run preflight after ~16:43:30Z, then deploy, then do live-odds-worker.
   - **If this session is gone:** the key is set and undeployed. The next refresh-worker deploy by anyone carries it; the effect is `PRECAP_SELECT mode=board_lines`. It is removable with the same script.
+- 2026-09-11 16:50–17:00Z, ROLLOUT:
+  - **refresh-worker** `889d4e12`, `--reinject-env`, deploy `dep-dai32j6k1f9s73bp20ig`.
+    - Preflight: HOLD at 16:44Z (3 refresh-odds jobs), then CLEAR at 16:50:04Z.
+    - **LIVE 16:56:44Z.** The first tick after boot, at 16:57:53Z, read `PRECAP_SELECT mode=board_lines fill=date_aware demand_events=0 events_resolved=0/0 kept_at_line_total=0`. That is **reachability on production** (off read `mode=date_aware`), in a cold start: nothing had been recorded yet, and selection is identical to date_aware until the first board build's join records lines.
+    - Claim released 16:58Z.
+  - **live-odds-worker**:
+    - Claim taken at 16:59:04Z (token `597a1e5d`). ENV SET, `None` -> `1`.
+    - Its live commit had moved to `16de339b` (`polymarket-ask-pricing`, live 16:53:31Z; contains `7c248328`). So the target is `16de339b`, NOT `1afec00f`: deploying `1afec00f` would have rolled back their GTD change.
+    - Preflight CLEAR at 17:00:01Z. Deploy `dep-dai378uq1p3s73atkdn0`, `--reinject-env`, created 17:00:19Z.
+    - Heads-up sent to that lane's session.
+  - OWED:
+    - refresh-worker `BOARD_DEMAND line_events=` / `line_bytes=`;
+    - `PRECAP_SELECT ... demand_events>0 kept_at_line_total>0` on both workers;
+    - the next `LIVE_PLAN_WRITTEN venue=kalshi` and the paper2 NCAAF 09-12 venue_feed count (from 1);
+    - live-odds-worker `EXECUTED ... mode=live venue=kalshi plan_source=live placed>0`.
 
 ### ncaaf-tbd-kickoff-date — CLOSED 2026-09-11 — opened 2026-09-11 — session 53eaee9c-46e9-4c34-8075-d63d7f63c933 — **GOAL MET: the TBD Saturday games left Friday's strip and read "Sat Sep 12 · TBD" on Saturday, on refresh-worker `889d4e12` and web `0022ecb1`.**
 - **GOAL VERDICT.** Goal (verbatim): "[user 2026-09-11: NFL/NCAAF compact cards show "games on the wrong day"] NCAAF games whose kickoff CFBD lists as TBD are filed on their real calendar day, not the day before, and their chip reads TBD instead of a fabricated "11:00P CT". ONE testable outcome: after a refresh-worker deploy, `/api/board/game-chips` for 2026-09-11 carries no NCAAF chip for a Saturday game (Mercyhurst @ New Mexico, Southern Miss @ Auburn, NMSU @ Hawai'i, Cal Poly @ SJSU), and the 2026-09-12 chips carry them with a TBD token." → **GOAL: MET.**
