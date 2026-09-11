@@ -546,6 +546,29 @@ death, never life — do not invert it.
 - Verification: nine capture files committed, each with `window_covered = label..label+1h` and a non-null `metered_mb`, with every BLIND or PARTIAL flag reported, not divided by.
 - Blocked by: none. NOT changed, flagged: `bandwidth_tripwire.py --capture` leaves `metered_mb` null (it calls `capture()` without it, which is how five older captures got nulls). Worked around by calling `capture()` with each bucket's metered value, as `--check` does. Also flagged for the addendum, not rewritten: several of `[render-egress-spikes]`'s ELIMINATED entries quote spike-hour numbers from the old pairing, e.g. "public edge traffic ... carries 2.6-61 MB in the spike hours", whose correctly paired values are 178.2 and 144.5 MB.
 
+### kalshi-plan-placeable — OPEN — opened 2026-09-11 — session 82c5bc07-6f67-47d7-9564-3a14f9d916ad
+- Goal: todo `#661` (`#659` residual (b), "Stop Kalshi plan committing uncontracted bets"). LIVE placement reads a venue plan committed ONLY over rows that carry a venue contract (`price_source=='venue_feed'` AND a `venue_ticker`), written as a SEPARATE live-plan artifact. `paper2`'s venue plans, the paper books and the executor's `no_venue_ticker` guard (`332e596d`) stay unchanged.
+- Files: `pipeline/portfolio_commit.py`, `pipeline/execute_portfolio.py`, `tests/test_kalshi_plan_placeable.py` (NEW). NOT `syndicate/features/shared/portfolio_commit.py`: OPEN lane `pricing-plane-v1` holds it, so the filter goes in the caller.
+- Hypothesis (diagnosis, measured on production BEFORE any code, 2026-09-11):
+  - The 05:02:59Z Kalshi plan (`1e1285a4`) reads `rows_in=532 positions=22 placeable_committed=4/22`. Refusals: `below_min_ev_pct` 294, `no_model_edge_pct` 210, `below_min_stake` 3, `zero_kelly_stake` 2, `beyond_max_positions` 1. `slate_scale_factor=1.0`: the ceiling is $251 and $67.76 is staked.
+  - So in THIS build the aggregator rows cost placeable rows no slot (`prefer_placeable` already ranks them first, and only 1 row was cut) and no dollars (the ceiling did not bind). The fix removes 18 uncontracted positions from what live reads. It does NOT by itself add a Kalshi order.
+  - Why the 17 NCAAF rows are aggregator-priced:
+    - NOT the date gate: `SYNDICATE_KALSHI_FORWARD_DATE_SPORTS=soccer,ncaaf,nfl` on both workers.
+    - NOT an unjoined series: the one NCAAF `venue_feed` position is `KXNCAAFTOTAL-26SEP11RUTGBC-54`.
+    - NOT scope admitting a whole game: the scope reads per row.
+    - IT IS THE WORKING SET. `MAX_MARKETS_PER_SERIES=400` cut `KXNCAAFSPREAD` 2,141 of 2,541 (04:38:14Z) and `KXNCAAFTOTAL` 1,608 of 2,008 (04:59:09Z, 1,570 of them dated 09-12), under `mode=date_aware window=2026-09-10..2026-09-13`, which keeps the nearest dates first. Friday rungs survive and Saturday rungs do not. All 17 aggregator NCAAF positions are Saturday games: 8 spreads, 8 totals, 1 h2h.
+  - The fix for THAT is in `pipeline/kalshi_odds_refresh.py`, which OPEN `nfl-layer2-kalshi-identity` holds. Recorded as a lead, not done here.
+- Falsification test (any one of these):
+  - The first refresh-worker build after deploy prints `LIVE_PLAN_WRITTEN venue=kalshi` with `placeable_committed` below `positions`.
+  - The next live-odds-worker pass still logs `REFUSED_NO_VENUE_TICKER venue=kalshi`.
+  - `PAPER2_PLAN_WRITTEN venue=kalshi` loses its aggregator positions (paper drift).
+- Verification:
+  - refresh-worker prints `LIVE_PLAN_WRITTEN venue=kalshi ... placeable_committed=N/N`.
+  - live-odds-worker's next `EXECUTED ... venue=kalshi` prints `plan_source=live`, and `no_venue_ticker` is absent from `refused=`.
+  - `PAPER2_PLAN_WRITTEN venue=kalshi` is unchanged in shape.
+  - An off != on reachability test is in the suite.
+- Blocked by: none. Two deploys: refresh-worker (writes the plan), then live-odds-worker (reads it). A reader without a live plan falls back to the paper2 plan and says so (`LIVE_PLAN_ABSENT`), so the deploy order is not a safety question.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
