@@ -244,6 +244,20 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
 
 **The LLM is off by decision. The deterministic snapshot path is the product.**
 
+- **THE ASK RAIL RENDERS EVERY EVIDENCE TABLE AND CHART `[verified 2026-09-11, lane ask-rail-evidence, web 422698e0]`.**
+  `ask_bar.js` draws each `visuals` table and chart as a collapsible section (the
+  first two tables open, all rows). It used to draw 2 tables of 6 rows and name the
+  rest "Also computed". Board-row asks now carry `sport`: the Layer 2 BLOTTER row
+  sets only `data-syndicate-sport`, and `contextFromCard` read only
+  `data-syndicate-sport-slug`, so those asks ran every sport's fetchers.
+  `_person_conflicts_with_question_name` now sees initials first names ("AJ",
+  "A.J."). Measured: the no-sport "Konnor Griffin" replay went from 2 AJ Griffin
+  titles to 0.
+  - **A typed question with an empty context and no domain word is refused
+    `out_of_scope` before any evidence is built** (`ask_the_syndicate.py:632`). The
+    card's `context_subject` is what gets the Ask button through.
+  - **Every answer carries the whole board twice** (`engine` + `board_contract`,
+    17.46 MB each on an unrouted question). Both are leads, not fixed.
 - **CURRENT BASELINE: 37/52** (advice 4/5, entity 9/10, explain 4/6, history 2/5,
   lookup 8/8, ranking 7/10, refusal 3/8), measured 2026-08-16 18:0xZ and again
   post-deploy with **zero pass/fail flips**, in

@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 981 rules `[generated]`
+## Index — 983 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5574,3 +5574,15 @@ the instrument rather than the system.**
 - **What I said:** the 09-11 Kalshi spend of $30.07 left "~$20 of room" under a "$50/day cap". The cap came from `state.md`'s 2026-08-25 caps line; `EXECUTED` prints `spent=` but no cap.
 - **What happened:** the next pass spent to $58.84 and was bound by the ORDER count: `refused={'over_max_day_orders': 14}`.
 - **The rule:** a cap quoted as binding must come from the running service's env, or from its own refusal counter, never from a dated ledger line. The executor's `refused=` dict names the cap that actually bound.
+
+## 2026-09-11 — OVERTURNED: the 2026-08-01 same-surname guard ("Yordan", not "Jose", Alvarez) could never fire for a player who goes by initials, because it took first names from the SCORER's filtered tokens `[lane ask-rail-evidence]`
+
+- **What was believed:** `_person_conflicts_with_question_name` downgrades a bare-surname match whenever the question pairs that surname with a different first name.
+- **What was measured:** production served "Last 10 games — AJ Griffin (through 2024-04-17)" for "What's the case for and against Konnor Griffin?". The guard reused `_person_matches`' token list, which drops every token under 3 letters. "AJ Griffin" reduced to `["griffin"]`, the guard's `len(parts) < 2` early return fired, and with no first name to compare, the match was allowed.
+- **The rule going forward:** a guard must not inherit the normalisation of the thing it guards. A filter that is right for SCORING (ignore short tokens) removed exactly the tokens the GUARD needed, and the failure was silent and in the permissive direction. Test a disambiguation guard on the short and initial forms (`AJ`, `A.J.`, `N.`) in both directions: the conflict must fire, and a question that names the initials player must still match.
+
+## 2026-09-11 — FORBIDDEN: running a ledger script by ABSOLUTE PATH from a shell whose cwd is another checkout. `build_learnings_index.py` resolves `.syndicate/...` against the CWD, not its own checkout, so the worktree's copy rewrote the PRIMARY tree's `learnings_index.md` `[lane ask-rail-evidence]`
+
+- **What happened:** `py -3 /c/tmp/syndicate-sessions/ask-rail-evidence/scripts/build_learnings_index.py`, run from a Bash whose cwd had reset to the primary tree, printed "index written: 965 rules" and changed nothing in the worktree. It wrote the SHARED tree's `.syndicate/learnings_index.md` (mtime 18:16:08Z) from that tree's stale `learnings.md`. `INDEX_PATH = ".syndicate/learnings_index.md"` (line 28) and the `learnings.md` rewrite (line 199) are both cwd-relative.
+- **How it was caught:** the printed count (965) disagreed with the worktree index's own header (981), and the worktree's diff for the file was empty.
+- **The rule:** run ledger scripts with the cwd set to the tree you mean (`(cd <worktree> && py -3 scripts/...)`), and afterwards read `git status` in BOTH trees. A script run by absolute path is not scoped to the checkout it came from. This is the other side of the 2026-09-10 `REPO_ROOT` rule: there the path came from `__file__`, here from the cwd.
