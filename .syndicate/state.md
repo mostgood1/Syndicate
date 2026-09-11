@@ -544,7 +544,7 @@ once this index exists: re-splitting would orphan the parts.
 | [replay-diff-gate] | A PRODUCTION DAY NOW REPRODUCES OFFLINE, 0 MISMATCHES — and two board blocks provably CANNOT `[verified 2026-0 | `state_model.md` |
 | [lane-ledger-conflict-guard] | THE LANE CHECKER USED TO PASS A FILE WITH CONFLICT MARKERS IN IT `[fixed 2026-08-30, `10f45a0c`; scope MEASURE | `state_model.md` |
 | [settlement-resolver-coverage] | SETTLEMENT: NFL CAN BE GRADED, NCAAF IS WIRED-BUT-UNVERIFIED, and three sports still cannot settle a bet `[ver | `state_model.md` |
-| [execution-ledger-cross-service-race] | THE MONEY LEDGER IS READ-MODIFY-WRITTEN BY TWO SERVICES WITH NO LOCK, and settlement writes are being silently | `state_model.md` |
+| [execution-ledger-cross-service-race] | THE MONEY LEDGER IS WRITTEN BY THREE SERVICES, AND SINCE 2026-09-11 EVERY WRITE IS ONE COMPARE-AND-SWAP (#656) | `state_model.md` |
 | [probability-statistic-ownership] | PROBABILITY-STATISTIC OWNERSHIP `[measured 08-15, shipped `2ac3c6bc`]` | `state_model.md` |
 | [nhl-sim-engine] | NHL SIM (hockeysim) — `nhl_sim_input_checklist.py` PASSES, exit 0 `[measured 2026-08-20, lane nhl-model-owner] | `state_model.md` |
 | [model-skill] | MODEL SKILL (`#428`) — measured vs not | `state_model.md` |

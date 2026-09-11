@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 966 rules `[generated]`
+## Index — 967 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5416,3 +5416,11 @@ the instrument rather than the system.**
 - **How we found out**: the pre-registered reading. The producer's line said `finalized=6 still_open=0`, while web's copy of 09-03 still had `finalPass_entries=0`, and the publisher's own `SWEEP_SKIPPED_DETAIL` named the skipped files. The reconcile took three reads: web's `[ops.publish] ACCEPTED` lines (two publishes 175 ms apart), both web copies by export, and one more export after a cards read (8,736,835 B -> 132,548 B).
 - **The rule going forward** (the same family as the 2026-09-10 RECURRENCE above, lanes mlb-final-state-mapping / mlb-lens-final-status): a fix is on the path to the surface only once the TRANSPORT and the READER have been read, not just the writer. For an artifact a worker writes and web serves, check two things before predicting "it reaches web". (1) The sweep's skip rules (`_publish_skip_reason`: age AND size) against the file's NAME and SIZE. (2) How web RESOLVES the path. If there is more than one published form and a reconcile, the newest copy wins, not the one you wrote.
 - **Cost**: one live-odds-worker deploy whose reading could not move. A second change is now owed: a status-only patch of web's own served copy (`e035c829`), which must ship before the 10-day look-back loses 09-01.
+
+## 2026-09-10 — RECURRENCE (the 09-09 absent-is-not-off rule): I read the env key a COMMENT named, got a 404, and nearly called another lane's pass inert on refresh-worker. The code reads a different key, and it is `true` there `[lane execution-ledger-cas]`
+
+- **What I believed**: `e035c829`'s MLB web pass would be inert on refresh-worker. `run_refresh_worker.py:7223` says "LIVE_LENS_LOOP already defaults False", and a single-key read of `LIVE_LENS_LOOP` on refresh-worker returned HTTP 404.
+- **What was actually true**: `live_lens_loop._is_live_lens_loop_enabled()` reads `SYNDICATE_ENABLE_LIVE_LENS_LOOP` (default False). That key is `true` on refresh-worker and live-odds-worker, and refresh-worker logged `TICK_COMPLETE results={'mlb': True, ...}` every cycle. A refresh-worker deploy would switch that lane's passes on there, on a service the lane never targeted.
+- **How we found out**: before acting on the 404, I grepped the READER (`live_lens_loop.py:327`), then read that key per service, then read the tick lines.
+- **The rule going forward**: the 09-09 rule says find the resolution site. What this adds: take the KEY NAME from the function that reads it, never from a comment or a docstring. A comment can name a key nothing reads, and a 404 on that key is an answer about nothing. Then confirm the behaviour from a line the reader itself emits.
+- **Cost**: none paid. It was caught before the refresh-worker deploy, and the timing question went to the user, who chose to carry the passes.

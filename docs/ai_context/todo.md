@@ -26,7 +26,7 @@
 - **Deployed** (`deploys.md` 2026-09-10 23:16:09Z and 2026-09-11 03:17:22Z):
   - web `4c373107`, live 2026-09-10T23:19:34Z. It is healthy. Its `LEDGER_CAS_ACTIVE` is owed, because web writes only on operator actions and none has happened.
   - live-odds-worker `4c373107`, live 2026-09-11T03:22:35Z. `LEDGER_CAS_ACTIVE backend=keyvalue` at 03:23:41Z, from `reconcile_live_orders`: a committed WATCH/MULTI/EXEC on production Redis 7.2.4.
-  - refresh-worker `5767e3ac`, live 03:24:50Z. It was lane `nfl-layer2-kalshi-identity`'s deploy, and it contains the CAS by content. Its first CAS line is owed.
+  - refresh-worker `5767e3ac`, live 03:24:50Z. It was lane `nfl-layer2-kalshi-identity`'s deploy, and it contains the CAS by content. `LEDGER_CAS_ACTIVE` at 03:36:13Z, its first ledger write after boot. 25 landed SETs by 03:37:27Z, from paper placement and `paper_settlement`. 0 collisions caught on either worker by 03:37:53Z.
   - The worker deploys carried lane `mlb-lens-final-status`'s MLB final passes onto both workers, on a user decision ("both as soon as each is CLEAR").
   - The ledger document is 5,960,803 B: 71% of the 8 MB ceiling. The CAS does not change it.
 
@@ -35,6 +35,9 @@
 - **Already closed.** `2914b6c7`: a live order whose BUILD is refused writes no row, so the 09-04 class cannot recur. **Not closed:** a SENT order's completion (fill, `venue_order_id`) can still be reverted to its write-ahead copy. With no venue id, Polymarket's per-order reconcile cannot find it, and `BLOCKED_ON_UNRECONCILED` stops every venue.
 - **Fix direction.** Redis WATCH/MULTI/EXEC on the ledger key, with a bounded retry (re-read, re-merge, re-SET); the disk backend is unchanged. Invert `tests/test_execution_ledger.py::test_KNOWN_HAZARD_a_write_landing_between_merge_read_and_SET_is_lost`, which passes today BECAUSE the defect exists. Every writer must run it: refresh-worker, live-odds-worker and web.
 - **Close when** the CAS is live on all three services and the stuck-paper-`submitted` count stops growing across a placement burst that overlaps live placement.
+  - The first half is DONE (2026-09-11). web's `LEDGER_CAS_ACTIVE` waits on an operator write.
+  - **Read the second half PER DATE**, for dates written after 2026-09-11T03:36Z: 2026-09-11 stays at 2 and 2026-09-12 at 0 while their paper order counts grow.
+  - The ledger is at its 5,000-record cap, so `TRIMMED` drops old dates. A 14-day total can fall with no fix at all.
 
 ---
 

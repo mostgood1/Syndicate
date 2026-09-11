@@ -215,7 +215,7 @@ on a quiet log.
 so adding a sport to the board without a resolver now FAILS instead of quietly
 demonstrating the bug. Pinned is not fixed.
 
-## [execution-ledger-cross-service-race] THE MONEY LEDGER IS READ-MODIFY-WRITTEN BY TWO SERVICES WITH NO LOCK, and settlement writes are being silently lost `[verified 2026-08-28T17:4xZ, lane portfolio-venue-and-side-integrity]`
+## [execution-ledger-cross-service-race] THE MONEY LEDGER IS WRITTEN BY THREE SERVICES, AND SINCE 2026-09-11 EVERY WRITE IS ONE COMPARE-AND-SWAP (#656); the lost-update history is below `[CAS verified on production 2026-09-11T03:36Z, lane execution-ledger-cas; history verified 2026-08-28, lane portfolio-venue-and-side-integrity]`
 
 `execution_ledger._persist` does a blind whole-document `write_json_file` — no
 lock, no compare-and-swap, no merge. **refresh-worker** (settlement, grading)
@@ -305,8 +305,15 @@ shape. `2914b6c7` stops a refused BUILD from writing a row.
 - live-odds-worker since 03:22:35Z: `LEDGER_CAS_ACTIVE backend=keyvalue` at 03:23:41Z, from
   `reconcile_live_orders`. That is a committed WATCH/MULTI/EXEC on production Redis 7.2.4.
 - refresh-worker since 03:24:50Z, by lane `nfl-layer2-kalshi-identity`'s deploy of `5767e3ac`, which
-  contains the CAS by content. Its first CAS line is owed.
-- OWED: the stuck-paper count staying flat across a paper burst that overlaps live placement.
+  contains the CAS by content. `LEDGER_CAS_ACTIVE` at 03:36:13Z was its first ledger write after boot.
+  25 landed SETs followed by 03:37:27Z, from paper placement (`execution_ledger.py:1351 <- :1496`)
+  and `paper_settlement.py:543`.
+- Collisions caught so far: 0 `LEDGER_CAS conflicts` lines on either worker (03:22:35Z..03:37:53Z).
+- **Size: BOUNDED.** The document is at the 5,000-record cap, at 1,192 B/order. That is 5,960,805 B,
+  71% of the 8,388,608 B refusal ceiling (`SIZE_WARNING` 2026-09-11T03:30:23Z). `TRIMMED` drops the
+  oldest rows, so any count summed over dates can fall as old dates leave. Read stuck rows per date.
+- OWED: stuck paper rows, per date, staying flat across a paper burst that overlaps live placement.
+  2026-09-11 must stay at 2 and 2026-09-12 at 0 while their paper order counts grow.
 
 The `off != on` 7 of 10 figure is from 08-28 and covers the whole-document clobber only.
 
