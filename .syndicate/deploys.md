@@ -5,6 +5,27 @@
 
 ---
 
+## 2026-09-11 13:06 CT — web `0022ecb1` -> `422698e0` (lane `ask-rail-evidence`, user decision "yes deploy") — **MET: THE ASK RAIL RENDERS EVERY EVIDENCE TABLE AND CHART, AND "KONNOR GRIFFIN" NO LONGER RETURNS AJ GRIFFIN'S 2024 NBA BOX SCORES (2 -> 0 ON THE SAME REPLAY)**
+
+**Deploy.** `dep-dai44ke1egvs73dddgc0`, triggered 18:02:57Z, serving `422698e0` from 18:06:29Z (1:06 PM CT) by `/versionz`. Claim held by `ask-rail-evidence`; preflight CLEAR at 18:01:44Z for `422698e0` (infrastructure processes only).
+- Ride-along, web-executed: `9d580145` (layer2 unmeasured-model withhold, live on refresh-worker since 12:27 CT), `21c26db1` (`#573` Kalshi shard balance) and `16de339b` (Polymarket GTD, live on live-odds-worker). No `requirements*` or `render.yaml` change in `0022ecb1..422698e0`.
+
+**Reading**, a same-shape control at 18:01:50Z against 18:06:36Z:
+
+| | before `0022ecb1` | after `422698e0` |
+|---|---|---|
+| served `ask_bar.js`: `ROUTABLE_SPORTS` / `sectionState` / "Also computed" | 0 / 0 / 1 | 2 / 3 / 0 |
+| served `board_cards.css` `.ask-bar__chart` rules | 0 | 7 |
+| replay, card context WITHOUT sport (what the old rail sent from a blotter row) | 8 tables, 2 charts, **2 AJ Griffin** | 7 tables, 1 chart, **0 AJ Griffin** |
+| replay, the same with `sport: "mlb"` | 7 + 1 (earlier the same day) | 7 + 1, 0 AJ Griffin |
+
+- The no-sport replay is a curl, so the rail's sport fallback plays no part: the 2 -> 0 is the server's name guard (`_person_conflicts_with_question_name`). None of the three ride-alongs touch `ask_the_syndicate_data.py`.
+- Typed questions (empty context, no sport) that pass the router, after only: "How many hits does Konnor Griffin have in his last 10 games?" and "Konnor Griffin total bases prop tonight" each return 7 tables + 1 chart, 8 Konnor Griffin sections, 0 AJ Griffin.
+- **Not a regression, and not fixed:** the TYPED "What's the case for and against Konnor Griffin?" with an EMPTY context returns 0 tables. The router answers it `out_of_scope` (`no_domain_vocabulary`) and returns at `ask_the_syndicate.py:632`, before `collect_focused_evidence`; that module imports nothing else from `ask_the_syndicate_data.py`. The board's Ask works only because the card adds `context_subject`. Logged as a lead.
+- The panel itself was verified headlessly before the deploy (real `ask_bar.js` + `board_cards.css`, the production payload, a blotter-shaped row): the request carried `sport: "mlb"`; 8 sections, the first two open; rows 7/7/1/4/22/4/6; 6 chart bars; open state survives a re-render; 0 console errors.
+- Both assets are `Cache-Control: no-cache`, `cf-cache-status: DYNAMIC`, so a normal reload picks up the new JS/CSS. An answer already in a browser's transcript keeps its old tables until it is asked again.
+- verify: **MET**.
+
 ## 2026-09-11 12:51 CT — reading only, no deploy — refresh-worker `9d580145` (lane `ncaaf-window-reason`) — **MET: A PROJECTION WINDOW THAT PRODUCED ROWS NO LONGER REPORTS THAT IT PRODUCED NONE (`#633`'s second half). LANE CLOSED.**
 
 - The fix `353650c7` (2026-09-09) is an ancestor of every refresh-worker build since at least `c29a7d4e` (live 2026-09-10 16:50 CT), and now of `9d580145`.

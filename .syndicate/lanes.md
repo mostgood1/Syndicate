@@ -710,9 +710,11 @@ death, never life — do not invert it.
   - An off != on reachability test is in the suite.
 - Blocked by: none. One deploy, live-odds-worker, coordinated with `polymarket-e2e-review` (which also plans one) under the claim lock.
 
-### ask-rail-evidence — OPEN — opened 2026-09-11 — session 7d69025a-1bfa-4440-9eae-04c5299fe99f
+### ask-rail-evidence — CLOSED 2026-09-11 — opened 2026-09-11 — session 7d69025a-1bfa-4440-9eae-04c5299fe99f — **GOAL MET: the Ask rail renders every evidence table and chart, and "Konnor Griffin" no longer returns AJ Griffin (2 -> 0 on production)**
+- **GOAL VERDICT — MET on all three verification items.** (1) 3 new tests: 2 red on the pre-fix module, all 3 green on the fix; the one other failure in the file (`test_matchup_evidence_pairs_model_and_market`, NFL) fails identically on the pre-fix module. (2) Headless render of the real panel from the production payload: 7 tables + 1 chart, no AJ Griffin, `sport: "mlb"` sent from a blotter-shaped row. (3) web `422698e0` live 18:06:29Z: the no-sport replay went from 2 AJ Griffin titles to 0, and typed questions that pass the router carry 0. Reading in `deploys.md` 2026-09-11 13:06 CT. Code `dfecea84`.
+- **"Or typed" is only half true, and not because of this lane:** a typed "What's the case for and against Konnor Griffin?" with an empty context is refused `out_of_scope` by the router before any evidence is built. Logged as a lead.
 - Goal: [user 2026-09-11, with screenshots of the Layer 2 board] the Ask the Syndicate side rail renders EVERY evidence table and chart `/api/syndicate/query` returns -- not 2 tables plus an "Also computed" title list -- with no silent row truncation, and "What's the case for and against Konnor Griffin?" no longer carries AJ Griffin's 2024 NBA box scores, whether asked from a board row or typed.
-- Files: syndicate/static/shared/ask_bar.js, syndicate/static/shared/board_cards.css, syndicate/blueprints/ask_the_syndicate_data.py, tests/test_ask_the_syndicate.py
+- Files: released: (a RECORD since the 2026-09-11 close; nothing is held) syndicate/static/shared/ask_bar.js, syndicate/static/shared/board_cards.css, syndicate/blueprints/ask_the_syndicate_data.py, tests/test_ask_the_syndicate.py
 - Hypothesis (MEASURED 2026-09-11 before any code, production replay of the exact question):
   - `ask_bar.js` `renderEvidence` draws `tables.slice(0, 2)` and each table `rows.slice(0, 6)`. 6 of 8 tables and both charts are title-only, and "Last 6 games" loses its 7th row (`L6 avg`).
   - Context WITHOUT `sport` returns 8 tables + 2 charts; the last of each is "AJ Griffin (through 2024-04-17)" from `_basketball_last10_evidence(..., "nba")`, which runs only on the no-sport branch. The SAME request with `sport: "mlb"` returns 7 tables + 1 chart, all Konnor Griffin. The blotter's `rowAttrs` (`intelligence.html:3245`) emits `data-syndicate-sport` and no `data-syndicate-sport-slug`, and `contextFromCard` reads only the slug.
@@ -720,7 +722,7 @@ death, never life — do not invert it.
 - Falsification test: a question that NAMES an initials player ("A.J. Griffin", "AJ Griffin") must still match them, and NHL's stored "N. MacKinnon" must still match "Nathan MacKinnon". If the conflict fix zeroes either, it keys on token length rather than first-name compatibility and is wrong.
 - Verification: (1) new tests red on origin/main and green on the fix; existing ask tests still pass; (2) the real panel, rendered headlessly from the production payload for this question, shows all 7 tables + 1 chart and no AJ Griffin; (3) after a web deploy, the production replay of the typed question (no `sport`) returns zero "AJ Griffin" titles. Recorded in `deploys.md`.
 - Note: the inline `STYLE` block in `ask_bar.js` said to move into `board_cards.css` "when that lane closes"; that lane (`layer2-board-quality`) was RELEASED in the 2026-08-18 orphan sweep, so this lane does the move.
-- Blocked by: none. The web deploy waits on user approval.
+- Blocked by: none. Web deployed on the user's decision ("yes deploy"), `422698e0`, 2026-09-11 13:06 CT.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
