@@ -5459,3 +5459,17 @@ the instrument rather than the system.**
   - Any NCAAF/NFL lookup into an ESPN capture must use `bet_status_nfl.kickoff_capture_dates` (the Eastern date, plus the previous day for a small-hours kickoff), never `commence_time[:10]` or `startDate.split("T")[0]`.
   - A row or card COUNT ("X is not among the 49") is not a mechanism. Trace the join's actual inputs before naming a structural boundary as the cause.
 - **Cost**: one wrong mechanism in the ledger, a lead and a peer message, corrected about 30 min later (append-only). The fix was smaller than the wrong diagnosis implied: one call site. Also this session: a watcher reported a false "0 dates" because its filter matched `render_logs.py`'s own header line. I read the log directly before believing it.
+
+## 2026-09-11 — OVERTURNED: "uncontracted rows crowd real Kalshi edges out of the plan's slots". The cut's own counters said neither the cap nor the ceiling bound `[lane kalshi-plan-placeable]`
+
+- **What was believed:** `placeable_committed=4/22` meant 18 aggregator-priced NCAAF rows were holding slots that contracted Kalshi rows needed. The task was written on that premise, and it is the natural reading of the ratio.
+- **What was true:**
+  - On that build, `beyond_max_positions=1` and `slate_scale_factor=1.0` ($67.76 staked against a $251 ceiling). `prefer_placeable` has ranked contracted rows first since 2026-08-25, so the one row cut was an aggregator row. The 18 rows cost the 4 nothing.
+  - There were 4 contracted rows only because the join never saw Saturday's rungs: `MAX_MARKETS_PER_SERIES=400` cut `KXNCAAFSPREAD` 2,141 of 2,541 before the join ran.
+- **How it was found:** the PAPER2 line's own `refusals=`, and each position's `sizing.slate_scale_factor`. Both were read before any code, and both were already in fetched payloads.
+- **The rule:**
+  - Before fixing a crowding-out, read the constraint's own counter: `beyond_max_positions`, `slate_scale_factor`, `exposure_capped`. A wanted/total ratio is a symptom, not a mechanism.
+  - A working-set histogram (`BY_GAME_DATE`, 6,000 markets) is not the join's population (`markets_from_state`, 14,818 markets). Read `PRECAP_SELECT` for what the join can see.
+- **Also, tooling:**
+  - PreToolUse hooks resolve `CLAUDE_PROJECT_DIR` to the PRIMARY tree, even in a `session_worktree` session. So lane-guard enforces the primary's STALE `lanes.md`. On 2026-09-11 it blocked two unclaimed files for a lane that was CLOSED on origin/main.
+  - Check the claim on origin/main before believing a block. The remedy is `git restore --source=origin/main --worktree -- .syndicate/lanes.md` in the primary, with no local edits there and the index untouched. Never a bypass.

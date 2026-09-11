@@ -537,21 +537,17 @@ death, never life — do not invert it.
 - Blocked by: none. NOT changed, flagged: `bandwidth_tripwire.py --capture` leaves `metered_mb` null (it calls `capture()` without it, which is how five older captures got nulls). Worked around by calling `capture()` with each bucket's metered value, as `--check` does. Also flagged for the addendum, not rewritten: several of `[render-egress-spikes]`'s ELIMINATED entries quote spike-hour numbers from the old pairing, e.g. "public edge traffic ... carries 2.6-61 MB in the spike hours", whose correctly paired values are 178.2 and 144.5 MB.
 
 ### kalshi-plan-placeable — OPEN — opened 2026-09-11 — session 82c5bc07-6f67-47d7-9564-3a14f9d916ad
-- Goal: todo `#661` (`#659` residual (b), "Stop Kalshi plan committing uncontracted bets"). LIVE placement reads a venue plan committed ONLY over rows that carry a venue contract (`price_source=='venue_feed'` AND a `venue_ticker`), written as a SEPARATE live-plan artifact. `paper2`'s venue plans, the paper books and the executor's `no_venue_ticker` guard (`332e596d`) stay unchanged.
+- Goal: todo `#661` (`#659` residual (b), "Stop Kalshi plan committing uncontracted bets"). LIVE placement reads a venue plan committed ONLY over rows that carry a venue contract (`price_source=='venue_feed'` AND a `venue_ticker`), written as a SEPARATE live-plan artifact. `paper2`'s venue plans, the paper books and the executor's `no_venue_ticker` guard (`332e596d`) stay unchanged. — **GOAL: NOT MET** (checkpoint 2026-09-11 ~14:55Z).
+  - The reader half is verified: live-odds-worker `78e4623f` printed `LIVE_PLAN_ABSENT` + `plan_source=paper2_fallback` at 14:29:29Z (`deploys.md` 14:17Z).
+  - LEFT: refresh-worker `78e4623f`, the plan WRITER, is BLOCKED by a preflight HOLD while the MLB daily sim is in flight. Then readings (b) and (c) under Verification.
+  - Expected: `positions=0` on 09-11, and no new Kalshi order. The orders are gated by the per-series cap (follow-up session "Keep Kalshi NCAAF rungs near board lines under cap").
 - Files: `pipeline/portfolio_commit.py`, `tests/test_kalshi_plan_placeable.py` (NEW), `docs/ai_context/todo.md` (`#661`). NOT `syndicate/features/shared/portfolio_commit.py`: OPEN lane `pricing-plane-v1` holds it, so the filter goes in the caller.
 - RELEASED 2026-09-11, at the request of lane `polymarket-e2e-review` (session 7a239b89): the execute_portfolio module and its test file.
   - This lane's edits to them are done and live on live-odds-worker `78e4623f`: `read_placeable_plan_for_venue`, `plan_source`, and the `_write_live_plan` harness.
   - This lane plans NO further live-odds-worker deploy. Its one remaining deploy is refresh-worker (the plan writer).
-- 2026-09-11, recorded so it is not silent: lane-guard blocked `pipeline/execute_portfolio.py` and `tests/test_execute_portfolio.py` as claimed by OPEN `write-ahead-build-refusal`. Hooks resolve `CLAUDE_PROJECT_DIR` to the PRIMARY tree, whose `lanes.md` was its stale HEAD `e88447a2`, where that lane was still OPEN. On origin/main it is CLOSED 2026-09-10 (GOAL MET). The primary's `lanes.md` had no local edits, so its WORKING COPY was refreshed with `git restore --source=origin/main --worktree -- .syndicate/lanes.md`. The index was not touched. No guard was bypassed.
-- Hypothesis (diagnosis, measured on production BEFORE any code, 2026-09-11):
-  - The 05:02:59Z Kalshi plan (`1e1285a4`) reads `rows_in=532 positions=22 placeable_committed=4/22`. Refusals: `below_min_ev_pct` 294, `no_model_edge_pct` 210, `below_min_stake` 3, `zero_kelly_stake` 2, `beyond_max_positions` 1. `slate_scale_factor=1.0`: the ceiling is $251 and $67.76 is staked.
-  - So in THIS build the aggregator rows cost placeable rows no slot (`prefer_placeable` already ranks them first, and only 1 row was cut) and no dollars (the ceiling did not bind). The fix removes 18 uncontracted positions from what live reads. It does NOT by itself add a Kalshi order.
-  - Why the 17 NCAAF rows are aggregator-priced:
-    - NOT the date gate: `SYNDICATE_KALSHI_FORWARD_DATE_SPORTS=soccer,ncaaf,nfl` on both workers.
-    - NOT an unjoined series: the one NCAAF `venue_feed` position is `KXNCAAFTOTAL-26SEP11RUTGBC-54`.
-    - NOT scope admitting a whole game: the scope reads per row.
-    - IT IS THE WORKING SET. `MAX_MARKETS_PER_SERIES=400` cut `KXNCAAFSPREAD` 2,141 of 2,541 (04:38:14Z) and `KXNCAAFTOTAL` 1,608 of 2,008 (04:59:09Z, 1,570 of them dated 09-12), under `mode=date_aware window=2026-09-10..2026-09-13`, which keeps the nearest dates first. Friday rungs survive and Saturday rungs do not. All 17 aggregator NCAAF positions are Saturday games: 8 spreads, 8 totals, 1 h2h.
-  - The fix for THAT is in `pipeline/kalshi_odds_refresh.py`, which OPEN `nfl-layer2-kalshi-identity` holds. Recorded as a lead, not done here.
+- Diagnosis: measured before any code, in todo `#661`. The lane-guard note and the full hypothesis moved VERBATIM to `lanes_history.md` under this slug. In short:
+  - The cap and the ceiling did not bind.
+  - The NCAAF rows are aggregator-priced because `MAX_MARKETS_PER_SERIES=400` evicts Saturday's rungs.
 - Falsification test (any one of these):
   - The first refresh-worker build after deploy prints `LIVE_PLAN_WRITTEN venue=kalshi` with `placeable_committed` below `positions`.
   - The next live-odds-worker pass still logs `REFUSED_NO_VENUE_TICKER venue=kalshi`.
@@ -561,7 +557,9 @@ death, never life — do not invert it.
   - live-odds-worker's next `EXECUTED ... venue=kalshi` prints `plan_source=live`, and `no_venue_ticker` is absent from `refused=`.
   - `PAPER2_PLAN_WRITTEN venue=kalshi` is unchanged in shape.
   - An off != on reachability test is in the suite.
-- Blocked by: none. Two deploys: refresh-worker (writes the plan), then live-odds-worker (reads it). A reader without a live plan falls back to the paper2 plan and says so (`LIVE_PLAN_ABSENT`), so the deploy order is not a safety question.
+- Blocked by: refresh-worker's preflight reports HOLD while the MLB daily sim is in flight (7 processes at 14:14Z, and a deploy kills them). The refresh-worker deploy claim is held by this lane.
+  - live-odds-worker is DONE: `78e4623f`, reading recorded, claim released.
+  - The deploy order was never a safety question. A reader without a live plan falls back to paper2's plan and says so (`LIVE_PLAN_ABSENT`).
 
 ### polymarket-e2e-review — OPEN — opened 2026-09-11 — session 7a239b89-c8fd-49b7-ba5a-e41bb9d4d9bc
 - Goal: [user request 2026-09-11: "can we re-evaluate polymarket end to end and this held bet strategy? I'm not sure I agree with this"]
