@@ -520,3 +520,38 @@ deployed three times on the evening of 2026-08-26. Same family as
 `[board-quote-staleness]` and `#563`'s deploy-cadence finding.
 
 **Open as `todo.md #585`, not fixed.**
+
+## [kalshi-prop-quote-identity] KALSHI PROP QUOTES WERE FILED UNDER THE CANONICAL KEY WITH NO GAME, AND REFRESH-WORKER'S NFL PROP ARTIFACT WAS FROZEN FOR TWO DAYS — both fixed; the artifact half MEASURED, the quote half owes a production reading `[2026-09-10/11, refresh-worker 5767e3ac, lane nfl-layer2-kalshi-identity]`
+
+**What the user saw on the NFL board:** a "Matchup" game card holding 65 opportunities from eight games. Every row read NO SIM VIEW at -0.9% EV, the "fair" price was the row's own price +2, and the labels were raw `player_pass_tds`.
+
+**Quote half.**
+
+- The defect had three parts:
+  - `odds_book_quotes.quote_rows_from_kalshi_matches` (#617) wrote Kalshi prop quotes under the join's CANONICAL key, with no `home_team`/`away_team`/`commence_time`, into the BOARD-date shard.
+  - The NFL/NCAAF OddsAPI capture writes DISPLAY labels (`Receptions`) into Central KICKOFF-date shards.
+  - `book_grid._instance_key` keys on the raw market.
+- Consequences:
+  - Each Kalshi price became its own one-book row. Its fair was de-vigged against itself, so EV = -hold/2.
+  - The NFL prop join refused these rows as `unsupported_markets`.
+  - The rows had no game and no `game_state`, so no live gate could refuse them. Peer `2edf8b82` measured SF @ LAR's 16 served as pregame during the game.
+  - `game_date` fell back to the board date. The rail then folded the label-less groups into one card.
+- Measured on web's NFL 09-10 shard: 261 such rows, 0 with `commence_time`, and 150 of them for other days' games.
+- Fix:
+  - `book_quote_prop_market` relabels nfl/ncaaf props.
+  - Identity is stamped from the same event's board rows, for ALL sports.
+  - nfl/ncaaf rows are filed by kickoff date.
+- Replayed over production's shards: 180/180 rows relabelled. 15/15 (09-10) and 77/77 (09-13) Kalshi instances merge into their sportsbook rows.
+- **The production reading is OWED:** the first tick with an NFL prop match. The two ticks after the deploy had none.
+
+**Artifact half: MEASURED.**
+
+- `build_nfl_prop_projections` repaired only an EMPTY local copy, and refresh-worker cannot build the artifact.
+- So the worker kept a 980-row copy built 2026-09-08T20:17:22Z, before the line key existed. Only Anytime TD could match it.
+- The builder now pulls over a populated copy and keeps the pull only if it is populated and not older. Otherwise it rolls back.
+- Production readings:
+  - `REPAIR_PULLED_NEWER 980 -> 1140` at 03:50:19Z.
+  - Ingest `artifact_rows` 683 -> 1140, and `rows_with_projection` 237 -> 877.
+  - Page sim views 116 -> 602, of which 486 are not Anytime TD.
+
+**Standing rule:** a Kalshi prop price is filed in the shard's own vocabulary and on the shard's own date. `tests/test_kalshi_book_quote_capture.py` pins the label map against both fetchers' `MARKET_STD_MAP`. `Interceptions` is the one label `market_keys` cannot canonicalise, so it passes through unrelabelled.

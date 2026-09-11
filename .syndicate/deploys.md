@@ -5,6 +5,28 @@
 
 ---
 
+## 2026-09-10 23:06 CT — reading, no deploy — refresh-worker `5767e3ac` (lane `nfl-layer2-kalshi-identity`, session `53eaee9c`) — **PREDICTION 2 MET: the worker took the newer prop artifact, and 486 non-Anytime-TD NFL props now carry a sim view (was 0). PREDICTION 1: the identity stamp ran on every match; the RELABEL IS UNMEASURED, because no NFL prop match has happened since the deploy.**
+
+- **Deploy and claim:** `5767e3ac` went live at 03:24:50Z (22:24:50 CT) as `dep-dahn6dqfngtc73d7k340`. `render_events` was CLEAN from 03:19:00Z through the read, with no `server_failed`. **The claim was released before the readings, on purpose:** a user-approved peer deploy (`48621d65`, lane `ncaaf-fcs-market-implied-rating`) contains `5767e3ac`, and the readings wait on worker ticks. The board readings below were therefore taken on `48621d65`.
+- **P2, MET:**
+  - `03:50:19Z NFL_PROP_PROJECTION_LAUNCHING reason=artifact_stale age_seconds=198549` fired. It was followed by `REPAIR_PULLED_NEWER outcome=pulled_newer local_rows=980 generated_at=2026-09-08T20:17:22Z -> rows=1140 generated_at=2026-09-10T00:09:04Z path=/opt/render/project/data/nfl_source/...`.
+  - The worker's old copy predates the 2026-09-08 ~22:00Z line-key fix. That confirms H2's mechanism.
+  - `[nfl_props] JOIN week=1 sim_source=artifact`: `sim_rows=980` at 03:25:44Z, then **1140** at 04:02:16Z.
+  - Shortlist at `written_at 04:03:18Z`, `prop_coverage`: `artifact_rows` 683 -> **1140**, `rows_with_projection` 237 -> **877**, `unmatched_key_rows` 1428 -> 790.
+  - Page NFL props with a sim view went from 116 (all Anytime TD) to **602**, spread across all 9 markets. **486 of them are not Anytime TD.** The pre-registered replay said 599 of 967.
+- **P1, NOT YET TESTABLE:**
+  - `03:35:05Z QUOTE_CAPTURE matches=59 ... relabelled=0 identity_stamped=59 unfiled=0 shards={'soccer:2026-09-10': 4}`
+  - `03:46:00Z matches=117 ... relabelled=0 identity_stamped=117 shards={'mlb:2026-09-11': 73, 'soccer:2026-09-11': 5}`
+  - Neither tick had an NFL prop match, and neither had the last pre-deploy ticks at 02:53Z and 03:05Z. So `relabelled=0` here is a null of population, not the falsifier.
+- **As predicted:** 87 shortlist rows and 67 page NFL rows still carry a `player_*` market with no `matchup` and no `game_state`. All of them are Kalshi legacy rows, and they leave with the midnight CT date roll.
+- **OWED, three readings:**
+  1. The first `QUOTE_CAPTURE` with `nfl` in `appended_by_sport` must read `relabelled>0` and show `nfl:2026-09-13`/`-14` shard keys.
+  2. Web's NFL shard must carry Kalshi rows under `Receptions`/`Passing TDs` with `commence_time`.
+  3. On Sunday, during live games, served NFL rows with neither `game` nor `game_state` should number 0. This check came from peer `2edf8b82`.
+- **Measured:** P2 MET. P1 OWED.
+
+---
+
 ## 2026-09-10 22:33 CT — refresh-worker `5767e3ac` (carried, deployed by lane `nfl-layer2-kalshi-identity`) — `42d49364` + `f73a140f` MEASURED (lane `football-layer2-live-parity`) — **NCAAF LIVE STATE CORRECTION MET ON A FINAL; IN-PLAY FLIP OWED SATURDAY**
 
 This lane ran NO deploy. Both commits rode `dep-dahn6dqfngtc73d7k340` (refresh-worker `c29a7d4e -> 5767e3ac`, finishedAt

@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 967 rules `[generated]`
+## Index — 969 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5437,3 +5437,15 @@ the instrument rather than the system.**
   - To verify a final transition on Layer 2, read the enrichment coverage (`live_game_state.transitions`) and `by_lane.dead`, not the served rows.
   - Before trusting a watcher's terminal check, probe it on a game that already finished.
 - **Cost**: one wrong claim to a peer (corrected within ~25 min, before its reading). The watcher could only end by being stopped.
+
+## 2026-09-10 — FORBIDDEN: a repair guard that protects ANY POPULATED local copy, on a service that cannot produce the artifact itself. "Has rows" is not "is current", and nothing else will ever refresh it `[lane nfl-layer2-kalshi-identity]`
+
+- **What was believed:** `scripts/build_nfl_prop_projections.py` held that "a local copy with rows is left alone no matter what web is serving". The rule was written after web's EMPTY 111-byte copy had been pulled over a good local one, and it was correct about that failure.
+- **What was true:** refresh-worker cannot build this artifact, because it has no player pbp. So the copy it held from 2026-09-08 was never replaced. That copy had 980 rows, was generated at 20:17:22Z, and predates the `stat::player::line` key. The worker logged `REPAIR_SKIPPED_LOCAL_OK local_rows=980` every hour for two days while web served 1,140 rows. The NFL board's sim view survived only on Anytime TD, the one lineless market: 119 of 119 rows.
+- **How it was found:** production's published artifact matched my local copy, while the board reported `artifact_rows 683`. The worker's own log line named the skip.
+- **The rule:**
+  - Gate a repair on the pulled copy's VINTAGE, not on the local copy's presence.
+  - Keep a pull only if it is populated and not older by the artifact's own `generated_at`. Otherwise roll it back byte-for-byte, mtime included, so neither the next pull nor the publish sweep reads it as a fresh edit.
+  - A guard written against one failure (empty over good) must not create the opposite one (stale forever). Test BOTH directions; `tests/test_nfl_props_prior_season_fallback.py` has five repair cases.
+- **Measured after the fix:** `REPAIR_PULLED_NEWER 980 -> 1140` at 2026-09-11T03:50:19Z, then 486 non-Anytime-TD NFL props carried a sim view (was 0).
+- **Generalises to:** any worker-side copy of an artifact that only another machine produces.

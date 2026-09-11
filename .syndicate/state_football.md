@@ -2474,7 +2474,9 @@ it over web's good copy after every restart -- `PUBLISH_OK ... bytes=284` at
 `PUBLISH_SKIPPED_UNCHANGED checksum=77a9ed3cd0c7` between. Web's published
 artifact measured **111 bytes**. A guard that only declines to WRITE does not fix
 this, because the damaging file already exists; the builder now REPAIRS its local
-copy from the published one, and the autorun's staleness gate no longer reads a
+copy from the published one (**ONLY when that copy was EMPTY, until 2026-09-10** --
+a POPULATED stale copy froze refresh-worker on a 2026-09-08 build for two days;
+now repaired by vintage, see `[kalshi-prop-quote-identity]`), and the autorun's staleness gate no longer reads a
 zero-row artifact as `artifact_fresh` (mtime said fresh for 24 h, which would have
 made the repair unreachable for a day).
    Three services, three disks.
