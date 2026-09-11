@@ -653,6 +653,19 @@ death, never life — do not invert it.
   - HYPOTHESIS: CONFIRMED for 11 of 16.
   - FALSIFIED for 5, and they are not the cap's. Kalshi lists every one of those rungs (`UCDSMU-59` "Over 58.5", `HOWIND-65`/`-66`, `UNCOWYO-48`, `MIZZKU` h2h). The event resolver does not place UC Davis, Howard or Northern Colorado, or the `MIZZKU` pair. Lead, not this lane.
 - 2026-09-11, FOUND: live-odds-worker ALSO runs the Kalshi refresh, every ~2 min, at `PRECAP_SELECT mode=arrival` (14:49:52Z). `SYNDICATE_KALSHI_PRECAP_DATE_AWARE` was never set there. Both workers write the same `kalshi_markets.json` working set that `portfolio_commit` and the executor read via `markets_from_state`. So the flag goes on BOTH, or live-odds-worker's ticks overwrite the selection within minutes.
+- 2026-09-11 15:3xZ: LANDED `7c248328` on origin/main. It is flag-gated, so it is inert on any service until `SYNDICATE_KALSHI_PRECAP_BOARD_LINES` is set AND that service is deployed.
+  - Tests: 82 pass across the precap/trim files; 333 pass across every other test file that imports `kalshi_odds_refresh`.
+  - The first commit attempt was REFUSED by the ledger-commit guard: the branch base was 11 behind, and the commit would have reverted upstream's `lanes.md` compaction and two `deploys.md` sections. Fixed with `reset --mixed origin/main`, after hash-checking that every non-lane file was the stale base. Nothing was bypassed.
+  - Deploy order: refresh-worker first, but WAITING. `kalshi-plan-placeable` holds refresh-worker for its `78e4623f` reading (live 15:21:32Z; no `LIVE_PLAN_WRITTEN` yet at 15:34Z). Then live-odds-worker (live: `f8b67afa`).
+  - `todo.md` is not edited here: OPEN `kalshi-plan-placeable` lists it in Files (`#661`). This residual's record is this lane plus `deploys.md`.
+- 2026-09-11 BEFORE (production, pre-flag). This is the reading the after is compared against:
+  - refresh-worker `78e4623f`, 15:33:45Z: `PRECAP_SELECT mode=date_aware`. `KXNCAAFSPREAD` kept 400 and cut 2,141 (`cut_in_window` 2,110). `KXNCAAFTOTAL` kept 400 and cut 1,608.
+  - live-odds-worker `f8b67afa`, 15:32:36Z: `mode=arrival`, `KXNCAAFTOTAL` kept 400 (381 in-window).
+  - Build 15:35:54Z:
+    - `PAPER2_PLAN_WRITTEN venue=kalshi positions=19 venue_priced=859 placeable_committed=5/19`.
+    - `LIVE_PLAN_WRITTEN venue=kalshi positions=5 placeable_committed=5/5`, with `refusals['aggregator_priced']=287`.
+  - The paper2 Kalshi rows at ~15:40Z hold 13 NCAAF 09-12 rows. **1 is `venue_feed` with a ticker; 12 are aggregator** (5 spreads, 6 totals, 1 h2h).
+  - `LIVE_PLAN placeable_committed=N/N` is ALREADY > 0 (5/5), so "N > 0" cannot discriminate this change. The readings that can are: NCAAF 09-12 venue_feed rows up from 1, `aggregator_priced` down from 287, and `PRECAP_SELECT mode=board_lines kept_at_line_total > 0`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
