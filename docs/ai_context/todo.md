@@ -1,5 +1,31 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#660` — **CLOSED 2026-09-10: every portfolio page sits behind a sign-in, and there is more than one portfolio: the live exchange book, paper, and hand-entered manual books.** — lanes `portfolio-login-multibook` and `portfolio-auth-hash-guard`, 2026-09-10
+
+- **What shipped.**
+  - `609b45c6`: the `/portfolio*` pages and `/api/portfolio/*` require a username/password sign-in.
+    - The credentials come from web's env. `X-Admin-Token` still passes, for tooling.
+    - On Render a missing credential FAILS CLOSED with 503.
+  - A dropdown switches between three kinds of book:
+    - the live Kalshi + Polymarket book (`/portfolio`);
+    - paper (`/portfolio/paper`);
+    - manual books (`/portfolio/books/<id>`), for bets placed at other sportsbooks and settled by hand.
+  - Manual bets live in `data_root()/portfolio_books.json` on web's disk, NOT in `prediction_ledger.json`. `prediction_reconciliation._match_result_row` takes the first result row that shares any key, so a typed bet could be graded off another game.
+  - `38bef205`: a value in `SYNDICATE_PORTFOLIO_PASSWORD_HASH` that is not a werkzeug hash now locks the portfolio LOUDLY: 503 with a named problem, and the value is never echoed.
+    - Before, every sign-in was rejected in silence. Found in production: five `LOGIN_FAILED` at 16:12Z, and nothing said why.
+- **Measured on production.**
+  - web `df60b3e3` (`dep-dahd8erl550s73frivpg`, live 16:05:19Z), 10 readings. Among them:
+    - boot `PORTFOLIO_AUTH_MODE mode=required credentials_configured=True`;
+    - signed-out `/portfolio` → 302 to the sign-in page;
+    - signed-out `/api/portfolio/{live,summary,books}` → 401;
+    - `X-Admin-Token` → 200.
+    - Recorded in `deploys.md` 2026-09-10 16:00:58Z.
+  - A real sign-in: `LOGIN_OK` at 16:43:56Z.
+  - web `2224dec0` (`dep-dahe0bafngtc739487lg`, live 16:55:19Z): both workers boot `credentials_configured=True hash=no problem=none`, and the 10 readings passed again. Recorded in `deploys.md` 2026-09-10 16:51:56Z.
+- **Follow-ups** live in `state_portfolio.md` `[portfolio-sign-in-and-books]`. `watch_unknown_submit.ps1` was getting 401s behind the new sign-in; it now sends `X-Admin-Token` (`f3cb58dc`).
+
+---
+
 ### `#659` — **CLOSED 2026-09-11: the exchange portfolios placed no orders. Kalshi froze on no-contract write-ahead rows and could not reach weekend football. Polymarket's slate dropped the lines the join prices, and its join could not reach weekend football either.** — lanes `exchange-execution-unblock` (2026-09-10) and `polymarket-slate-budget` (2026-09-11)
 
 - **Kalshi (lane `exchange-execution-unblock`).**
@@ -17,7 +43,10 @@
   - Polymarket placed an order again at 04:43:03Z: `tsc-lal-get-dep-2026-09-13-1pt5` Over 1.5, $1.05 at 0.45, GTC. That is a 09-13 fixture the old slate dropped.
   - Readings are in `deploys.md` 2026-09-11. The state is in `state_polymarket.md` `[polymarket-slate-budget-kept-props-dropped-game-lines]`.
 - **Residuals. These are OPEN, and not this item's:**
-  - (a) The pregame 0.35 price ceiling holds most near-even Polymarket bets: 4 of 6 at 04:10Z. Keeping it is a USER decision, and it is pending.
+  - (a) The pregame 0.35 price ceiling holds most near-even Polymarket bets. Keeping it is a USER decision, and it is pending.
+    - 04:10Z: 4 of 6 held.
+    - 05:15:40Z, the first pass on the football-joined plan: `positions=6 placed=1`, with 4 held. Three of the 4 are NFL 09-13 positions (TB–CIN total, WAS–PHI total, NYJ–TEN h2h), and they place only once the game is live.
+    - It placed `aec-mlb-cin-mil-2026-09-11` h2h away, $8.87 at 0.37. One MLB spread priced from the aggregator was refused `no_venue_ticker`.
   - (b) The Kalshi plan reads `placeable_committed=4/22`: 16 NCAAF spread/total positions, priced from the aggregator, are refused `no_venue_ticker`. Handed off as its own task, "Stop Kalshi plan committing uncontracted bets".
   - (c) Held bets are lost when the plan drops a game at first pitch (Pirates–White Sox, 09-10). Other lanes hold those files.
   - (d) 300 NCAAF rows reach Polymarket candidates but differ on the line. That is line coverage, not a reading gap.
