@@ -32713,3 +32713,56 @@ end of run 12:52:24.99Z: anon 2735.7, current 4095.7 of 4096, inactive_file 843.
 - It discharges their chip half and their Layer 2 half: both PASS.
 - It answers their writer half with a FAIL.
 - Still owed: 0 games under a no-game day's `live_state` key, read after the third path is found and fixed.
+
+## 2026-09-11 15:15Z — refresh-worker `1e1285a4` → `78e4623f` — lane `kalshi-plan-placeable` — `#661`, the writer half: live venue plans hold only contracted rows
+
+**Deploy.** `dep-dai1m4u743jc73djqon0`: created 15:15:31Z, update 15:19:58Z, live 15:21:32Z.
+- Claim held by `kalshi-plan-placeable`, re-acquired at 15:14:45Z (the first claim had expired while waiting).
+- Preflight CLEAR for the exact SHA at 15:15:07Z. It had read HOLD from 14:14Z to 15:14:03Z, while an MLB daily sim with 7 processes was in flight, and the deploy waited for it.
+- Code riding along: only `78e4623f` (`1e1285a4..78e4623f`). `render.yaml` unchanged.
+
+**Prediction, written at 14:40Z before any reading, from the 09:55Z book:** `positions=0 placeable_committed=0/0` for 09-11.
+
+**verify.** The readings.
+
+```
+(b) refresh-worker, first build on 78e4623f (build 15:23:52Z, portfolio_commit entered 15:34:34Z):
+15:35:54Z  VENUE_SCOPE venue=kalshi rows_in=5041 scoped=1146 refusals={'venue_not_quoting': 3895}
+15:35:54Z  PAPER2_PLAN_WRITTEN date=2026-09-11 venue=kalshi rows_in=1146 positions=19 staked=$82.1
+           venue_priced=859 placeable_committed=5/19 refusals={... 'below_min_stake': 3, ...}
+15:35:54Z  LIVE_PLAN_WRITTEN date=2026-09-11 venue=kalshi rows_in=1146 placeable_in=859 positions=5
+           staked=$36.82 scale=1.0 placeable_committed=5/5 paper2_positions=19 paper2_placeable=5
+           paper2_placeable_missing=0 refusals={'aggregator_priced': 287, 'below_min_ev_pct': 136,
+           'below_min_stake': 2, 'market_family_excluded': 523, 'no_model_edge_pct': 185, 'zero_kelly_stake': 8}
+15:35:54Z  LIVE_PLAN_WRITTEN ... venue=novig    placeable_in=0 positions=0 placeable_committed=0/0 refusals={'aggregator_priced': 440}
+15:35:54Z  LIVE_PLAN_WRITTEN ... venue=prophetx placeable_in=0 positions=0 placeable_committed=0/0 refusals={'aggregator_priced': 531}
+15:36:00Z  PAPER2_PLAN_WRITTEN ... venue=polymarket positions=6 placeable_committed=5/6
+15:36:00Z  LIVE_PLAN_WRITTEN ... venue=polymarket placeable_in=92 positions=5 placeable_committed=5/5
+           paper2_placeable=5 paper2_placeable_missing=0
+LIVE_PLAN_FAILED since deploy: none.  Traceback since deploy: none.
+The 5 contracted Kalshi positions are paper2's `venue_feed` rows (paper2_placeable=5, missing=0).
+Both NCAAF ones are FRIDAY games: the cap keeps the nearest dates first, so Saturday stays aggregator (#661).
+  ncaaf spreads home -3.5  Rutgers @ Boston College   KXNCAAFSPREAD-26SEP11RUTGBC-BC4
+  ncaaf spreads home 4.5   Missouri @ Kansas          KXNCAAFSPREAD-26SEP11MIZZKU-MIZZ5
+  nfl   Receptions o3.5    Shakir, BUF @ HOU          KXNFLREC-26SEP13BUFHOU-BUFKSHAKIR10-4
+  mlb   spreads away -1.5  Orioles @ Blue Jays        KXMLBSPREAD-26SEP111907BALTOR-BAL2
+  nfl   totals under 38.5  Jets @ Titans              KXNFLTOTAL-26SEP13NYJTEN-39
+(c) live-odds-worker, the next pass after (b):
+2026-09-11T15:50:40.914428611Z  [execute_portfolio] EXECUTED date=2026-09-11 mode=live venue=kalshi plan_source=live armed=True positions=5 placed=3 filled=0 failed=1 duplicates=0 retried=0 skipped=1 refused={'insufficient_venue_balance': 1} spent={'dollars': 29.61, 'orders': 9}
+```
+
+**The prediction MISSED on the count and HELD on the mechanism.**
+- The board moved between 09:55Z and 15:35Z. By then 5 contracted Kalshi rows cleared the gates, where 0 had before, so the live plan holds 5.
+- What the lane's verification asks for holds on every venue: `placeable_committed=N/N` and `paper2_placeable_missing=0`.
+- The comparison book is unchanged in shape. paper2 Kalshi still holds 19, 14 of them uncontracted.
+- Polymarket's one uncontracted position left the live book too, 6 → 5.
+
+**Verdict:** **GOAL MET.** Live places a contracted-only plan.
+- (b) reads `placeable_committed=N/N paper2_placeable_missing=0` on every venue with a feed.
+- (c) reads `plan_source=live`, with no `no_venue_ticker` in `refused=`.
+- paper2's books and the executor's refusal are unchanged. Both claims are released.
+- The pass placed 3 new Kalshi orders, all resting: `KXNCAAFSPREAD-26SEP11RUTGBC-BC4` $3.23, `KXNCAAFSPREAD-26SEP11MIZZKU-MIZZ5` $3.28, `KXNFLREC-26SEP13BUFHOU-BUFKSHAKIR10-4` $5.39.
+- `KXNFLTOTAL-26SEP13NYJTEN-39` FAILED on the venue's own `http_400 insufficient_balance`, and one more position was refused `insufficient_venue_balance`. Both are Kalshi account FUNDING, not this lane's.
+- ATTRIBUTION: under the old code, those same 5 contracted rows would have been attempted from paper2's 19. What this change REMOVED is the 14 uncontracted positions. It did not cause the 3 orders.
+- One sizing effect was measured: `MIZZ5` is $1.64 in paper2 and went out at $3.28 live. The per-game exposure budget is no longer shared with an uncontracted leg; verified in the served book: in paper2 `MIZZ5` sits in an exposure group of 2 with the uncontracted aggregator h2h on Missouri @ Kansas (stake_fraction_pre_exposure 0.00328 -> 0.00164); alone in the live plan it keeps 0.00328 = $3.28, the stake that went out.
+

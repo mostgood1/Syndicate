@@ -18,7 +18,7 @@
 
 ---
 
-### `#661` — **OPEN 2026-09-11: the live Kalshi plan committed bets Kalshi cannot take (`placeable_committed=4/22`). Live now places a plan built only from rows with a venue contract.** — lane `kalshi-plan-placeable`, 2026-09-11 (`#659` residual (b), "Stop Kalshi plan committing uncontracted bets")
+### `#661` — **CLOSED 2026-09-11: the live Kalshi plan committed bets Kalshi cannot take (`placeable_committed=4/22`). Live now places a plan built only from rows with a venue contract.** — lane `kalshi-plan-placeable`, 2026-09-11 (`#659` residual (b), "Stop Kalshi plan committing uncontracted bets")
 
 - **Measured before any code, on production.**
   - refresh-worker `1e1285a4` at 05:02:59Z: `PAPER2_PLAN_WRITTEN date=2026-09-10 venue=kalshi rows_in=532 positions=22 venue_priced=310 placeable_committed=4/22`.
@@ -47,9 +47,10 @@
     - `EXECUTED` prints `plan_source=`, and `verify_order_paths` reads the same plan.
   - Unchanged: paper2's plans, paper runs (they still book paper2's plan) and the `no_venue_ticker` refusal.
   - Not edited: `syndicate/features/shared/portfolio_commit.py`, which OPEN lane `pricing-plane-v1` holds.
-- **Closes on:**
-  - `LIVE_PLAN_WRITTEN venue=kalshi ... placeable_committed=N/N paper2_placeable_missing=0` on refresh-worker;
-  - then live-odds-worker's `EXECUTED ... venue=kalshi plan_source=live` with no `no_venue_ticker` in `refused=`.
+- **Closed on production.** The readings are in `deploys.md` 2026-09-11, entries 14:17Z and 15:15Z.
+  - refresh-worker `78e4623f`, 15:35:54Z: `LIVE_PLAN_WRITTEN venue=kalshi positions=5 placeable_committed=5/5 paper2_placeable_missing=0`. paper2 still holds 19 positions, 14 of them uncontracted.
+  - live-odds-worker: 15:50:40Z `EXECUTED venue=kalshi plan_source=live positions=5 placed=3 filled=0 failed=1 duplicates=0 skipped=1 refused={'insufficient_venue_balance': 1}`. The failed order and the refusal were both Kalshi `insufficient_balance`, which is FUNDING.
+  - Still open, and NOT this item's: Saturday NCAAF has no Kalshi contract in the join, because of the per-series cap. That is the follow-up session "Keep Kalshi NCAAF rungs near board lines under cap".
 
 ---
 

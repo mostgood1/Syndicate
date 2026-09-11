@@ -762,16 +762,19 @@ reconciling clean (15 orders, `not_found=0`). Bankroll $1000, caps $10/order,
   `[USER DECISION 2026-08-26]`. `unmappable_side` is currently a GUARD, not a
   gap: the join pairs a `+1.5` board row with the same team's `-1.5` market, so
   clearing the refusal without fixing the join inverts ~10 bets a cycle.
-- `no_venue_ticker` on aggregator-priced rows. **Held by lane
-  `kalshi-plan-placeable` (`#661`) `[verified 2026-09-11]`.**
+- `no_venue_ticker` on aggregator-priced rows. **Fixed by lane
+  `kalshi-plan-placeable` (`#661`, closed) `[verified 2026-09-11]`.**
   - Live no longer places paper2's comparison book. It reads
     `portfolio_live_plan_<venue>_<date>.json`: the same commit over only the rows
     with `price_source=venue_feed` AND a `venue_ticker`.
   - The reader is live on live-odds-worker `78e4623f`: 14:29:29Z,
     `LIVE_PLAN_ABSENT` + `plan_source=paper2_fallback`.
-  - The writer (refresh-worker `78e4623f`, `dep-dai1m4u743jc73djqon0`) was
-    triggered at 15:15:31Z, after the MLB-sim HOLD cleared. It was NOT live yet
-    at the 15:17Z checkpoint.
+  - The writer is live on refresh-worker `78e4623f` (15:21:32Z). Its first build,
+    at 15:35:54Z, printed `LIVE_PLAN_WRITTEN venue=kalshi positions=5
+    placeable_committed=5/5 paper2_placeable_missing=0`. paper2's comparison book
+    still holds 19 positions, 14 of them uncontracted.
+  - The next live pass: 15:50:40Z `EXECUTED venue=kalshi plan_source=live positions=5 placed=3 filled=0 failed=1 duplicates=0 skipped=1 refused={'insufficient_venue_balance': 1}`. Its failed order and its
+    refusal were both Kalshi `insufficient_balance`: the account's FUNDING.
   - WHY the rows are aggregator-priced: `MAX_MARKETS_PER_SERIES=400` cut
     `KXNCAAFSPREAD` 2,141 of 2,541 and `KXNCAAFTOTAL` 1,608 of 2,008 before the
     join, so Saturday's NCAAF rungs never reach it.
