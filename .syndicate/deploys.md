@@ -5,6 +5,97 @@
 
 ---
 
+## 2026-09-10 22:33 CT — refresh-worker `5767e3ac` (carried, deployed by lane `nfl-layer2-kalshi-identity`) — `42d49364` + `f73a140f` MEASURED (lane `football-layer2-live-parity`) — **NCAAF LIVE STATE CORRECTION MET ON A FINAL; IN-PLAY FLIP OWED SATURDAY**
+
+This lane ran NO deploy. Both commits rode `dep-dahn6dqfngtc73d7k340` (refresh-worker `c29a7d4e -> 5767e3ac`, finishedAt
+2026-09-11T03:24:50Z = 10:24 PM CT), whose pre-deploy entry lists them as collateral. Reading taken on the FIRST post-deploy
+build (served ncaaf `written_at` 03:33:26Z), gated on that artifact time, not on the deploy time.
+
+- verify (`42d49364`, NCAAF in the #413 frozen-chip overlay): refresh-worker 03:33:22Z
+  `[layer2_shortlist] LIVE_GAME_STATE_JOIN sport=ncaaf supported=True corrected=35 transitions={'pregame->final': 35} snapshot_age_s=212.5 reason=None error=None`.
+  Served `per_sport_ingest.ncaaf.enrichment.live_game_state` agrees (`lens_games` 1, states `{final: 1}`). Before: `supported: false,
+  reason: "no live status source wired for ncaaf"` on every build tonight. **MET** for the path, the ESPN-date lookup and the
+  final transition: FAMU @ MIA's 35 rows went `pregame -> final` off the 09-10 capture.
+- collateral effect, measured: served ncaaf `rows_stale_kickoff` 58 (02:05:56Z build) -> **0**. FAMU @ MIA's rows had been REMOVED
+  at kickoff + 2 h by `layer2_board.select_shortlist` (`:4245`; `pregame` is not `_has_usable_game_state`) while the game was in
+  its 3rd quarter. Corrected to `final` they no longer hit that filter, but they are NOT served again: they are classed into the
+  unserved `dead` lane (ncaaf `by_lane.dead` 173 -> 219), the designed end state for a settled game (SF @ LAR's rows: nfl dead
+  550 -> 577). Served FAMU @ MIA rows at 03:33:26Z: 0. On Saturday the value is DURING play: a `live` row survives the 2 h clock.
+- verify (`f73a140f`, per-sport counts): refresh-worker 03:33:26Z `LAYER2_SHORTLIST date=2026-09-10 rows=3874 ... served_by_sport={'ncaaf': 1074, 'nfl': 1836, 'soccer': 964}`. **MET.**
+- `f73a140f`'s capture fallback for chip-less NCAAF rows: matched 0 rows this build (no `rows_matched_by_capture` in coverage).
+  Expected -- the chip-less games (NMSU @ HAW, USM @ AUB) kick off 09-12/13 and those ESPN dates are not captured yet. **OWED**
+  Saturday 09-12.
+- NOT proven here: the in-play `pregame -> live` flip (tonight's only NCAAF game was final before the build). OWED on a Saturday
+  09-12 FBS-vs-FCS game; lane `ncaaf-fcs-market-implied-rating` takes that reading off its lens, and should see rows survive past
+  kickoff + 2 h.
+- Capture freshness against the overlay's bound (`_LENS_STATE_MAX_AGE_SECONDS` 900 s): 27 gaps between live-odds-worker
+  `ncaaf_live_state` step-ends 00:32:49Z..03:18:52Z, min 305 / median 359 / p90 445 / max 509 s, **0 over 900 s**, one `rc=1`.
+
+## 2026-09-10 22:25 CT — reading only, no deploy — tonight's football on the board (lane `football-layer2-live-parity`) — **SF @ LAR WENT LIVE ON THE BOARD (~18 MIN LAG, LIVE EDGES CORRECTLY REFUSED); FAMU @ MIA NEVER WENT LIVE AND WAS DROPPED AT KICKOFF + 2 H (FROZEN NCAAF CHIP) -- FIXED BY 42d49364, NOW LIVE; 94 KALSHI NFL ROWS SERVED WITHOUT GAME IDENTITY (OWNED BY nfl-layer2-kalshi-identity)**
+
+Board-side live reading for FAMU @ MIA (NCAAF, ESPN 401858213) and SF @ LAR (NFL, ESPN 401872657), taken by a
+watcher polling production's `/api/board/layer2-shortlist?sport=<s>&limit=2000` and ESPN every 3 min from 6:40 PM CDT.
+Build on refresh-worker for the whole game window: `c29a7d4e` (live 16:50:27 CT); `5767e3ac` went live at 22:24:50 CT, after both finals. The LENS side and the live game-line join's output on FAMU @
+MIA's rows (`live_gameline` blocks, `index_size`, withheld reasons) are recorded by lane
+`ncaaf-fcs-market-implied-rating` in its `... (lane ncaaf-fcs-market-implied-rating, FAMU @ MIA live) ...` entry. Cite
+that for `live_gameline`; this entry is `game.state` and the Layer 2 projection/edge fields.
+
+Pregame (6:40 PM CDT): `FAMU@MIA: ESPN pre '9/10 - 8:00 PM EDT', board {"rows": 29, "states": {"pregame": 29}, "live_aware": 0, "sources": {}, "with_edge": 0, "edge_refusals": {}} | SF@LAR: ESPN pre '9/10 - 8:35 PM EDT', board {"rows": 171, "states": {"pregame": 171}, "live_aware": 0, "sources": {"nfl_prop_model": 9, "nfl_smartsim2": 6}, "with_edge": 10, "edge_refusals": {"one-sided market: no two-sided fair to price against; priced": 9, "no cover probability: the margin model has no measured skill": 1}}`
+
+| game | ESPN live | board live (lag) | first live-aware projection on Layer 2 | ESPN final | board final |
+|---|---|---|---|---|---|
+| FAMU@MIA | 7:04 PM | ? (lag ?) | none seen | 10:10 PM | not seen |
+| SF@LAR | 7:37 PM | 7:56 PM (~18 min) | none seen | 10:25 PM | not seen |
+
+7 in-play snapshots were taken; the last, at 10:07 PM CDT:
+`FAMU@MIA: ESPN '0:55 - 4th' 7-77; board {"rows": 0, "states": {}, "live_aware": 0, "sources": {}, "with_edge": 0, "edge_refusals": {}} | SF@LAR: ESPN '7:54 - 4th' 27-7; board {"rows": 10, "states": {"live": 10}, "live_aware": 0, "sources": {"nfl_smartsim2": 10}, "with_edge": 0, "edge_refusals": {"game is live: a pregame projection cannot be priced against ": 10}} | ncaaf lens {"index_size": 1, "sources_seen": {"live_resim": 1, "pregame": 52}, "live_resimmed": 1}`
+
+Checks: board rows went live — FAMU @ MIA FAIL, SF @ LAR PASS;
+board rows went final — NOT MEASURABLE by this watcher: a finished game's rows move to the unserved `dead` lane rather than being served as `final` (ncaaf dead 173 -> 219, nfl 550 -> 577 on the 03:33Z build);
+FAMU @ MIA live-aware projection on Layer 2 — NOT SEEN; SF @ LAR — none, as expected (NFL live game lines are not wired; the NFL re-sim is off and shares its key with the live-lens loop, awaiting a user decision).
+The watcher output has no end line; no poll errors.
+
+Measured during the game (same session, production reads):
+
+**SF @ LAR board lag attribution (measured 2026-09-10, CDT = UTC-5)**
+- ESPN in-progress seen by watcher 00:37:53Z (7:37 PM CDT).
+- NFL live state on live-odds-worker: `[nfl_cards] LIVE_STATE ... 'live': 0` at 00:37:25Z, `'live': 1` at 00:39:00Z (~1 min). Chip source is NOT the lag.
+- refresh-worker board build (`LAYER2_SHORTLIST date=` lines): 11 cycles 22:10:55Z..00:48:43Z, gap min 751 s / median 896 s / max 1511 s. Cycles at 00:33:47Z and 00:48:43Z bracket kickoff; 00:48:43Z is the first build after the chip went live (9.7 min wait).
+- Watcher saw served rows live at 00:56:10Z: ~7.5 min after that build (publish/serve + 3-min poll resolution).
+- So the ~18 min = ~1 min chip + ~10 min wait for the next build + ~7 min build-to-served. The dominant term is the ~15-min board cycle.
+- Row count at flip: 185 team-matched pregame rows -> 8 (7 totals, 1 h2h), all live. Which step removed the ~177 props is NOT established: no board counter moved (stale_kickoff=0); likeliest is books pulling pregame props at kickoff, with NFL not in _LIVE_PROP_SPORTS. Unverified.
+**NCAAF capture (for 42d49364)**
+- live-odds-worker `ncaaf_live_state` step rc=0 at 00:26:05Z and 00:32:49Z (404 s). Cadence sampler bt104iwjq runs to 03:30Z.
+- NCAAF re-sim 00:06..00:26Z: 5/10 cycles read the 09-10 record under its 400 s bound, 5/10 fell back on record_stale. 09-11 record 9 h stale (expected: producer covers past-or-current Central dates).
+**Served NFL rows with no game identity (measured ~01:05Z 09-11, served /api/board/layer2-shortlist?sport=nfl)**
+- 94 of 1806 served NFL rows have no home_team/away_team/commence_time/game/game_state. ALL `price_source: kalshi`, markets `player_pass_tds` (50) / `player_receptions` (44), 15 event_ids across week 1 (SF@LAR 16, DEN@KC 12, DAL@NYG 10, ...). 0 with model edge, 94 with ev_pct, lane opportunity, market_state pregame, gate book_age up to 14,716 s.
+- Mechanism: `odds_book_quotes.quote_rows_from_kalshi_matches` (~:606) emits Kalshi prop quote rows with no teams/kickoff under Kalshi's canonical market key; NFL books use display labels ("Passing TDs"), so `book_grid` never merges them.
+- OWNED by lane `nfl-layer2-kalshi-identity` (session 53eaee9c, opened 09-10): its H1 is exactly this, falsification replay 15/15 SF@LAR merge. Needs a user yes to land+deploy. NOT my lane: cite, don't edit.
+- Live consequence tonight: SF@LAR's 16 Kalshi rows are served as pregame opportunities during the game; no game state means `live_edge_policy`/opportunity_gate cannot refuse them. Sunday: every game.
+- Watcher's SF@LAR 185->8 counted team-matched rows only; these 16 were never in its count. The 185->8 itself stays unattributed (likely pregame props pulled at kickoff; NFL not in _LIVE_PROP_SPORTS).
+- Soccer: 15 served rows with no home_team (13 no price_source: totals/h2h/corners; 2 Kalshi KXBUNDESLIGATOTAL). Separate class, not investigated.
+- MLB 0, NCAAF 0 such rows.
+- Contrast, watcher SNAPSHOT 01:05:18Z (8:05 PM CDT): SF@LAR's 14 team-matched rows are `live`, 10 carry an `nfl_smartsim2` projection, and all 10 edges are refused "game is live: a pregame projection cannot be priced against" -- the live refusal WORKS where game state exists. The 16 Kalshi SF@LAR rows with no game state are outside it.
+- FAMU@MIA at the same snapshot: ESPN 0-35, 8:36 2nd; all 33 board rows still `pregame` (the defect 42d49364 fixes; not deployed).
+**FAMU @ MIA rows REMOVED at kickoff + 2 h (measured 02:06Z 09-11)**
+- Watcher SNAPSHOT 02:06:14Z (9:06 PM CDT): FAMU@MIA board rows 0 (was 29 at 01:35Z), ESPN 11:09 3rd 0-56.
+- Served ncaaf shortlist written 02:05:56Z: `rows_stale_kickoff=58` (0 earlier tonight), `stale_kickoff_seconds=7200`, Miami rows 0. Kickoff 00:00Z + 7200 s = 02:00Z.
+- Mechanism: `layer2_board.select_shortlist` drops a row `if not _has_usable_game_state(row)` and it is > 2 h past commence (`layer2_board.py:4245`). `_STARTED_GAME_STATES` = live/in/in_progress/final/post/... ; `pregame` is not usable. The frozen chip kept the rows `pregame`, so the clock removed a game in its 3rd quarter.
+- 42d49364 covers this too: the overlay runs in enrichment (`layer2_shortlist.py:1058`) before `select_shortlist` (`:1621`), so corrected `live` rows are exempt. Saturday verification: an FBS-vs-FCS game's rows still served after kickoff + 2 h, and `rows_stale_kickoff` not climbing from in-play NCAAF games.
+- Consequence for tonight's watcher: its BOARD_FINAL check (served rows with state `final`) could never pass for EITHER game -- a finished game's rows move to the unserved `dead` lane rather than being served as `final`. Instrument limit, not a board failure. Watcher stopped ~03:59Z after both ESPN finals.
+- Owner's caveat (lane `nfl-layer2-kalshi-identity`, deploy dep-dahn6dqfngtc73d7k340, refresh-worker <- 5767e3ac, created 03:19:19Z): the fix applies to Kalshi rows WRITTEN after it; the ~94 legacy `player_*` rows in the 09-10 shard keep no identity until the board date rolls at midnight CT. So "served NFL rows with null game_state = 0" will NOT read 0 tonight -- legacy rows, not a failed fix. Clean check: Sunday 12:00 CT kickoffs, split legacy vs display-label rows (owner's reading). Soccer: the 2 Kalshi rows may gain home_team via the identity stamp; the 13 without price_source are another writer.
+- The same deploy carries this lane's 42d49364 + f73a140f (listed as collateral in its pre-deploy entry, 55c2f3e7); this lane runs no separate deploy.
+**NCAAF capture cadence, the whole game (sampler over /api/ops/odds-refresh/status, 60 s polls)**
+- 28 `step_end:ncaaf_live_state` markers 00:32:49Z..03:18:52Z (7:32-10:18 PM CDT), 27 gaps: min 305 s / median 359 s / p90 445 s / max 509 s. **0 gaps over the overlay's 900 s bound**; 6 over the re-sim's 400 s bound (consistent with its 5-of-10 record/fetch split). One `rc=1` at 00:44:35Z, the rest rc=0.
+- No markers after 03:18:52Z: live-odds-worker began its own `4c373107` deploy at 03:17:22Z (lane execution-ledger-cas), which restarts the sweep. Post-restart cadence not measured; games were final by then.
+- Verdict for 42d49364's freshness bound: held on every cycle tonight. No live/pregame flap expected from capture age at this cadence.
+**42d49364 + f73a140f MEASURED on refresh-worker 5767e3ac (carried by nfl-layer2-kalshi-identity's dep-dahn6dqfngtc73d7k340, live 03:24:50Z / 10:24 PM CDT)**
+- First post-deploy build: served ncaaf `written_at` 03:33:26Z (10:33 PM CDT).
+- refresh-worker 03:33:22Z: `[layer2_shortlist] LIVE_GAME_STATE_JOIN sport=ncaaf supported=True corrected=35 transitions={'pregame->final': 35} snapshot_age_s=212.5 reason=None error=None`. Served `per_sport_ingest.ncaaf.enrichment.live_game_state` agrees (lens_games 1, states {final: 1}).
+- `rows_stale_kickoff` 58 (02:05:56Z build) -> 0, but the rows did NOT return to the served board: corrected to `final`, they are classed into the unserved `dead` lane instead (ncaaf `by_lane.dead` 173 -> 219, opportunity 2364 -> 2274; served FAMU @ MIA rows 0 at 03:33:26Z). That is the designed end state for a settled game -- SF @ LAR's rows left the same way (nfl dead 550 -> 577).
+- f73a140f: `LAYER2_SHORTLIST date=2026-09-10 rows=3874 ... served_by_sport={'ncaaf': 1074, 'nfl': 1836, 'soccer': 964}` (03:33:26Z). Capture fallback matched 0 rows this build (game_state coverage has no `rows_matched_by_capture`): the chip-less games kick off 09-12/13 and those dates are not captured yet -- owed Saturday.
+- Proves the path, the ESPN-date lookup and the final transition; the in-play `pregame->live` flip is owed on a Saturday 09-12 FBS-vs-FCS game (peer lane ncaaf-fcs-market-implied-rating takes that reading).
+
 ## 2026-09-10 22:57 CT — refresh-worker `5767e3ac` -> `48621d65` (lane `ncaaf-fcs-market-implied-rating`, session `df26ac0c`, user: "Yes, before Saturday") — **VERIFIED: the NCAAF live-state join now reads ESPN's capture dates (2, was 1), and FAMU @ MIA's SERVED chip reads FINAL 77–7 (it read `pregame` with a null score all game).**
 
 Deploy `dep-dahnl3rm8hqs73cjs88g`, triggered 22:50:39 CT on a CLEAR preflight at 22:50:30 CT (only infrastructure
