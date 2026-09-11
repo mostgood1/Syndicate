@@ -35,7 +35,6 @@ because the work kept deviating:
 ---
 
 ## Open
-- [ ] 2026-09-10 — from `ncaaf-fcs-market-implied-rating` — NCAAF scoreboard chips for non-card games never get ESPN live state (only the FBS-vs-FBS week cards are stamped), so FAMU @ MIA's chip read pregame all game; board rows are covered by 42d49364's overlay, the chip strip is not — evidence: `GET /api/board/game-chips?sport=ncaaf&date=2026-09-10`, `syndicate/features/ncaaf/cards.py:3189` `_attach_live_state`, deploys.md 2026-09-10 22:15 CT
 - [ ] 2026-09-09 - from `bandwidth-controlled-transfer` - metered/edge is NOT bounded below by 1: settled 20:00Z read metered 62.72 MB against edge-logged 121.40 MB (0.52), 18:00Z 110.38 vs 122.41 (0.90); the [render-egress-spikes] ladder only ever recorded 1.66 and above, so "the meter counts something extra" cannot be the whole shape - evidence: `py -3 scripts/controlled_transfer_arm2_watch.py` + `edge_mb_for_bucket()`, same scan that reproduces the ledger's own edge bytes for 09-08 16:00Z (101.39/449) and 09-09 00:00Z (203.57/366)
 
 - [ ] 2026-09-09 — from `probability-converter-registry` — a TEST RUN writes into the tracked repo: `python -m unittest tests.test_archives` leaves an untracked `reports/intelligence/game_chips_<today>.json` behind (9,600 B, `written_at` inside the run), and NO `game_chips_*` file is tracked or gitignored, so every suite run dirties the tree and `session_worktree.py land` refuses on it. Adjacent to `data-mirror-write-guard-sweep`'s subject but a different tree (`reports/`, not `data/`) — evidence: `git status --porcelain` immediately after the archive suite in a clean worktree; `git ls-files reports/intelligence/ | grep -c game_chips` = 0
@@ -77,6 +76,8 @@ because the work kept deviating:
 - [ ] 2026-09-10 — from `accuracy-ledger-budget-raise` — `load_recent_evaluation_records(days=14)` (`pipeline/intelligence_state.py:5656`) refuses EVERY recent ledger chunk at its 64 MB per-file ceiling, so its caller reads nothing — evidence: refresh-worker `SKIP_OVERSIZED_LEDGER_CHUNK ... ceiling=64000000` x14 (08-28..09-10, 96-358 MB) at 2026-09-10T18:52:04Z
 
 ## Promoted
+
+- ~~[ ] 2026-09-10 — from `ncaaf-fcs-market-implied-rating` — NCAAF scoreboard chips for non-card games never get ESPN live state, so FAMU @ MIA's chip read pregame all game~~ -> promoted to lane `ncaaf-fcs-market-implied-rating` (user: "Yes, before Saturday"). **The stated cause was WRONG:** the chip is on the live-state join but read UTC dates (`_ncaaf_week_kickoff_dates`), while ESPN filed FAMU @ MIA under 09-10. Fixed by `_ncaaf_week_espn_capture_dates`.
 
 - ~~[ ] 2026-09-10 — from `worktree-close-and-prune` — `todo_id_alloc.py` resolves REPO from `__file__` and its `.syndicate/todo_ids/<n>.claim` files are TRACKED (32 in git), so O_EXCL only sees one worktree's copy: two session worktrees can take the same id, and it surfaces as an add/add rebase conflict at land rather than being prevented (docstring: "Two sessions cannot get the same one"; same shape as `#497`) — evidence: `scripts/todo_id_alloc.py:53-56`; `git ls-files .syndicate/todo_ids | wc -l`~~ -> promoted to lane `todo-id-alloc-worktrees`, CLOSED 2026-09-10, GOAL: MET (one lock per machine in the git common dir, and a mark that includes `origin/main`; recorded as `todo.md #653`)
 

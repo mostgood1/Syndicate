@@ -357,6 +357,43 @@ def _ncaaf_week_kickoff_dates(season: int, week: int) -> tuple[str, ...]:
     )
 
 
+@lru_cache(maxsize=8)
+def _ncaaf_week_espn_capture_dates(season: int, week: int) -> tuple[str, ...]:
+    """The ESPN SCOREBOARD dates a week's games are filed under -- for the live-state join ONLY.
+
+    NOT `_ncaaf_week_kickoff_dates`, which is the UTC date of `startDate` and is
+    right for the quote-log shards it was written for. ESPN files a game under
+    its EASTERN date, plus the previous day for a small-hours kickoff, so an
+    evening kickoff lands on the NEXT UTC date. Measured 2026-09-10: FAMU @ MIA
+    had `startDate 2026-09-11T00:00Z` and ESPN date 20260910. Week 2's UTC dates
+    were ('2026-09-11', '2026-09-12', '2026-09-13'), so the 09-10 record was never
+    read. The game's scoreboard chip read `pregame` for the whole game while the
+    poller's record had it in progress under `50@2390`. Any night game alone on
+    its Eastern date has the same shape; it is not FCS-specific.
+
+    A UNION, not a replacement. The UTC dates stay, since an extra date costs one
+    record read. To them it adds every date `bet_status_nfl.kickoff_capture_dates`
+    can file the kickoff under. That is the SAME helper settlement and the board's
+    live-state overlay use, so the three cannot disagree about which ESPN day
+    holds a game.
+    """
+    from syndicate.features.shared.bet_status_nfl import kickoff_capture_dates
+
+    try:
+        schedule = load_games_season(season)
+    except Exception:
+        return ()
+    dates: dict[str, None] = {}
+    for game in schedule:
+        if not (isinstance(game, dict) and game.get("week") == week and game.get("startDate")):
+            continue
+        start = str(game.get("startDate"))
+        dates.setdefault(start.split("T")[0], None)
+        for capture_date in kickoff_capture_dates(start):
+            dates.setdefault(capture_date, None)
+    return tuple(dates)
+
+
 def _smartsim2_standalone_rows(season: int, week: int) -> list[dict[str, Any]]:
     """Real schedule + real SmartSim 2.0 projections, joined directly --
     used only for a (season, week) the legacy engine has no rows for, so
@@ -3211,8 +3248,10 @@ def _attach_live_state(games: list[dict[str, Any]], season: int, week: int) -> N
         # identically and emit identical coverage counters, and the second is
         # the regression this path was changed to prevent.
         state_sources: dict[str, str] = {}
+        # ESPN'S dates, not the UTC ones: an evening kickoff is filed under the
+        # previous UTC day. See `_ncaaf_week_espn_capture_dates` (FAMU @ MIA, 09-10).
         index = ncaaf_game_state_index(
-            _ncaaf_week_kickoff_dates(season, week), sources=state_sources
+            _ncaaf_week_espn_capture_dates(season, week), sources=state_sources
         )
         coverage = attach_ncaaf_live_game_state(games, index)
         # Every card, not just today's: the ESPN join only reaches dates that

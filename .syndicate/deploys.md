@@ -5,6 +5,38 @@
 
 ---
 
+## 2026-09-10 ~22:45 CT — reading only, no deploy — (lane `ncaaf-fcs-market-implied-rating`) — **CORRECTION to the 22:15 CT entry's ROOT CAUSE: FAMU @ MIA's chip WAS on the live-state join; it read the WRONG ESPN DATE. The fix is on main, not deployed.**
+
+**What the 22:15 CT entry claimed, and why it was wrong.** It said ESPN live state reaches NCAAF chips only
+through the week cards, so a non-card game's chip never gets it. False. `build_ncaaf_chip_games` builds
+FBS-vs-FCS chips (`fbs_relevant`) and calls `_attach_live_state` on them. The ids resolve: the registry maps
+Florida A&M to `50` and Miami to `2390`, which are ESPN's ids, and the logo URLs carry them (checkout:
+primary tree's registry CSV). So the join key was `50@2390`, the poller record's own key. **The production
+observations in that entry stand** (chip `pregame` with null score, rows `pregame`, 0 `live_gameline`).
+Only the mechanism is corrected.
+
+**The real cause** (checkout: code plus the tracked schedule). `_attach_live_state` built its index from
+`_ncaaf_week_kickoff_dates(2026, 2)` = `('2026-09-11', '2026-09-12', '2026-09-13')`, the UTC date of
+`startDate`. FAMU @ MIA's `startDate` is `2026-09-11T00:00:00Z`, and ESPN files it under **09-10**, so the
+09-10 record was never read. **Not FCS-specific:** any night game alone on its Eastern date. This week, FAMU
+@ MIA was the only one; Friday's and Saturday's night games share their Eastern dates with earlier kickoffs.
+
+**Fix** (user: "Yes, before Saturday"): `_ncaaf_week_espn_capture_dates` = the UTC dates UNION
+`bet_status_nfl.kickoff_capture_dates(startDate)`, the helper settlement and `football-layer2-live-parity`'s
+board overlay already use. It is used ONLY by `_attach_live_state`; `_ncaaf_week_kickoff_dates`, which feeds
+the odds quote-shard lookup, is unchanged. Tests: 4 new in `tests/test_ncaaf_live_state_capture_dates.py`,
+incl. off != on (the chip goes `live` off an index that answers only for 09-10, and stays `pregame` on the
+old date set). Mutation (call site reverted) fails exactly that test. 151 pass across the NCAAF chip,
+live-state, re-sim and card suites. The 3 `test_ncaaf_cards_local` errors are the tracked-data write guard,
+identical on origin/main.
+
+**verify (OWED, after the next refresh-worker deploy of main's tip; chips are published only by
+refresh-worker, `GAME_CHIPS_PUBLISHED`):** the `NCAAF_LIVE_STATE week=2 ...` line counts the ESPN dates the
+join read. Before: `index=5 ... source=cache=1` (one date; 03:27–03:28Z). After: the `source=` counts sum to
+**2** (09-10 plus 09-11) and `index` grows by FAMU @ MIA's final entry. That is reachability. The visible
+chip flip (`pregame` → `live`) needs the next night game alone on its Eastern date. The 09-10 chips artifact
+is not republished after the date roll, so FAMU @ MIA's own chip cannot be re-read.
+
 ## 2026-09-10 ~22:20 CT — refresh-worker `c29a7d4e` -> `5767e3ac` (lane `nfl-layer2-kalshi-identity`, session `53eaee9c`, user decision "Land + deploy now") — **DEPLOYING; PREDICTIONS WRITTEN BEFORE ANY READING. NFL Layer 2: Kalshi prop quotes merge into their sportsbook rows with game identity, and the worker takes the newer published prop artifact.**
 
 - **Preflight:** CLEAR at 03:14:56Z. Only infrastructure processes were running, with no MLB sim. The claim is held by this lane, and the target is on `origin/main`.
