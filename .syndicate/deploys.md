@@ -5,6 +5,27 @@
 
 ---
 
+## 2026-09-11 17:32 CT — web `422698e0` -> `1421ee3c` (lane `ask-sport-parity`, user decision "proceed") — **MET: EVERY SPORT ON THE BOARD NOW ANSWERS ABOUT THE ROW THE BUTTON WAS ON AND CARRIES ITS GAME'S EVIDENCE; MLB UNCHANGED**
+
+**Deploy.** `dep-dai81igae00c73fl2hlg`, triggered 22:29:30Z, `deploy_ended` 22:32:37Z, serving `1421ee3c` from 22:32:51Z (5:32 PM CT) by `/versionz`. Claim held by `ask-sport-parity`; preflight CLEAR at 22:27:06Z for `1421ee3c` (infrastructure processes only, plus 2 defunct children awaiting reap).
+- Ride-along: **NONE.** `422698e0..1421ee3c` is this lane's own `e8ac4c03` (exact-row answers) and `d2369dae` (per-sport evidence), plus one ledger commit. No `requirements*` or `render.yaml` change.
+
+**Reading**, the same headless click-through of the production `/intelligence` board (one prop and one game row per sport, sending the rail's own request), control 22:2xZ on `422698e0` against 22:4xZ on `1421ee3c`:
+
+| row clicked | before | after |
+|---|---|---|
+| MLB prop | right bet, 8 tables + 3 charts | **unchanged**, 8 + 3 — the falsification test |
+| MLB game (moneyline) | selection `— away`, 1 + 1 | selection **`Cincinnati Reds`**, 1 + 1 |
+| NCAAF prop | right bet, **0 tables** | **3 tables + 1 chart**: CFBD game log, week-2 projection, team profile |
+| NCAAF total | asked "against Over?", no bet, 0 | **`over 51.5 (Missouri Tigers @ Kansas Jayhawks)`**, 2 tables |
+| NFL prop | right bet, **0 tables** | **1 table, 10 model lines** (`Prop model projections — Jordan Love (NFL 2026 week 1)`) |
+| soccer total | asked "against Under?", no bet, 0 | **`under 2.5 (Toulouse @ Lorient)`**, 3 tables + a simulated total-goals chart |
+
+- **Cost of the per-request row resolution, measured on production:** the same MLB prop ask took 1.6s WITHOUT the row identity (the old path), 14.2s on the first call with it (cold shortlist read) and 2.6s warm. Every replay returned 200.
+- **The post-deploy blip was a health-check timeout, not an OOM.** Events: `unhealthy` (HTTP health check timed out after 5s) 22:37:13Z, `server_available` 22:37:24Z. The board page served 200 in 63.1s at 22:37:30Z, 14.5s at 22:38:58Z and 8.0s at 22:39:36Z. The first survey run lost 3 of 6 clicks to that window (non-JSON bodies); the re-run five minutes later completed all six. No OOM event in the window.
+- Cosmetic, left open: a player with a single game in the CFBD snapshot renders "Last 1 games".
+- verify: **MET** for every sport with rows on today's board (MLB, NCAAF, NFL, soccer). NBA/WNBA/NHL/NCAAB have no rows today; they are recorded as not covered, with reasons, in the lane block.
+
 ## 2026-09-11 13:06 CT — web `0022ecb1` -> `422698e0` (lane `ask-rail-evidence`, user decision "yes deploy") — **MET: THE ASK RAIL RENDERS EVERY EVIDENCE TABLE AND CHART, AND "KONNOR GRIFFIN" NO LONGER RETURNS AJ GRIFFIN'S 2024 NBA BOX SCORES (2 -> 0 ON THE SAME REPLAY)**
 
 **Deploy.** `dep-dai44ke1egvs73dddgc0`, triggered 18:02:57Z, serving `422698e0` from 18:06:29Z (1:06 PM CT) by `/versionz`. Claim held by `ask-rail-evidence`; preflight CLEAR at 18:01:44Z for `422698e0` (infrastructure processes only).

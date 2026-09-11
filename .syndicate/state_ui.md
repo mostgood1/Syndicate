@@ -244,6 +244,23 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
 
 **The LLM is off by decision. The deterministic snapshot path is the product.**
 
+- **ASK ANSWERS ABOUT THE EXACT BOARD ROW, IN EVERY SPORT ON THE BOARD `[verified 2026-09-11, lane ask-sport-parity, web `1421ee3c`]`.**
+  The rail sends the row's identity (`event_id` + market + side + line + segment,
+  plus the matchup); `resolve_board_row` finds that row in the SAME shortlist the
+  board serves and answers from it, or falls back to the old question-word match
+  when it cannot pin exactly one. The resolved game is handed to the evidence
+  fetchers, so totals and spreads finally get their game's tables. New fetchers:
+  soccer match sim (outlook, goals, team ratings, total-goals chart), NCAAF player
+  CFBD game log, NFL published prop-model lines. Measured before/after on the
+  production board: NCAAF prop 0 -> 3 tables + 1 chart, NCAAF total (no bet named)
+  -> named bet + 2 tables, NFL prop 0 -> 1 table, soccer total (no bet named) ->
+  named bet + 3 tables + chart, MLB prop unchanged at 8 + 3.
+  - **NOT covered, with the reason:** NBA/WNBA (`smart_sim_*.json` has per-player
+    mean/sd only, no Ask reader, no slate); NHL (projections are not allowlisted and
+    are generated per service); NCAAB (no fetcher); NCAAF player projections (none
+    published, and web must not model).
+  - **Cost:** an Ask from a board row now reads the shortlist artifact — 1.6s -> 2.6s
+    warm, 14.2s on the first cold read, measured on production.
 - **THE ASK RAIL RENDERS EVERY EVIDENCE TABLE AND CHART `[verified 2026-09-11, lane ask-rail-evidence, web 422698e0]`.**
   `ask_bar.js` draws each `visuals` table and chart as a collapsible section (the
   first two tables open, all rows). It used to draw 2 tables of 6 rows and name the
