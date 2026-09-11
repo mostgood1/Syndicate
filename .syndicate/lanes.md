@@ -744,6 +744,29 @@ death, never life — do not invert it.
 - Claims taken 2026-09-11 by user decision ("Take claims, fix + deploy"): `sources.py` from `ncaaf-games-cache-refresh`, and `cards.py` from `ncaaf-fcs-market-implied-rating`. Both owning sessions are archived.
 - Blocked by: none.
 
+### kalshi-shard-balance-gate — OPEN — opened 2026-09-11 — session 82c5bc07-6f67-47d7-9564-3a14f9d916ad
+- Goal: todo `#573`, "Refuse a Kalshi order by READING the shard balance, not by consulting a hardcoded list" `[user decision 2026-09-11: "Visibility + gate"]`.
+  - (1) live-odds-worker records each Kalshi shard's cash from `balance_breakdown` and prints it (`KALSHI_SHARD_BALANCES`).
+  - (2) `check_order` refuses a live Kalshi order by name (`insufficient_shard_balance`) when the shard its market routes to cannot cover the stake.
+  - It stays PERMISSIVE on every unknown, exactly like the account-level gate. The account-level `insufficient_venue_balance` check is unchanged.
+- Files: `syndicate/features/shared/venue_balances.py`, `syndicate/features/shared/execution_guard.py`, `tests/test_kalshi_shard_balance.py` (NEW), `docs/ai_context/todo.md` (`#573`).
+  - NOT `pipeline/execute_portfolio.py`, which `polymarket-e2e-review` holds: the gate lives in `check_order`, which the executor already calls before any ledger row.
+  - NOT `pipeline/kalshi_odds_refresh.py`, which `kalshi-precap-board-lines` holds: each ticker's shard is read with `kalshi_client.fetch_market`, not from the stored markets.
+- Hypothesis, measured 2026-09-11 and read-only:
+  - Kalshi keeps cash PER EXCHANGE SHARD. MLB, tennis and, from 2026-09-10, basketball are on shard 3; NFL, NCAAF and the rest are on shard 0.
+  - `balance_dollars` = $101.61 is the SUM across shards (docs: "includes all exchange indexes when `exchange_index` is omitted"). That sum is all `_venue_available_dollars` compares against.
+  - Since 15:45Z, every Kalshi `insufficient_balance` 400 landed on a shard short of cash:
+    - MLB `BAL2` $20.85 and `LADMIA-8` $18.91, both on shard 3;
+    - NFL `NYJTEN-39` $4.07 on shard 0, 8 s after three shard-0 orders had reserved $11.90.
+- Falsification test (either one):
+  - After the deploy, the `KALSHI_SHARD_BALANCES` shards do not sum to `balance_dollars`.
+  - A Kalshi order still dies `insufficient_balance` at the venue while its shard's recorded cash, minus orders placed since the reading, was already below the stake.
+- Verification:
+  - live-odds-worker on the deployed SHA prints `KALSHI_SHARD_BALANCES status=ok` with per-shard dollars that sum to `balance_dollars`.
+  - A pass that meets an under-funded shard refuses by name (`insufficient_shard_balance`), with no venue 400 for that order.
+  - An off != on reachability test is in the suite.
+- Blocked by: none. One deploy, live-odds-worker, coordinated with `polymarket-e2e-review` (which also plans one) under the claim lock.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
