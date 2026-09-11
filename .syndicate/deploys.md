@@ -5,6 +5,35 @@
 
 ---
 
+## 2026-09-10 22:57 CT — refresh-worker `5767e3ac` -> `48621d65` (lane `ncaaf-fcs-market-implied-rating`, session `df26ac0c`, user: "Yes, before Saturday") — **VERIFIED: the NCAAF live-state join now reads ESPN's capture dates (2, was 1), and FAMU @ MIA's SERVED chip reads FINAL 77–7 (it read `pregame` with a null score all game).**
+
+Deploy `dep-dahnl3rm8hqs73cjs88g`, triggered 22:50:39 CT on a CLEAR preflight at 22:50:30 CT (only infrastructure
+processes, one defunct child already dead). The claim was taken at 22:35:45 CT after `nfl-layer2-kalshi-identity`
+released it; spacing counted from `5767e3ac`'s 22:24:50 CT finish. Live 22:55:29 CT. Code over `5767e3ac`:
+`ncaaf/cards.py` (`_ncaaf_week_espn_capture_dates` + `_attach_live_state`'s index call), its test, and `b50ee608`
+(a 3-line comment in `layer2_shortlist.py`, lane `football-layer2-live-parity`). No `render.yaml`, no env change.
+Render events were not read.
+
+**verify:** the same instruments before and after (substrate `render`):
+
+| | before: `5767e3ac`, 22:27 CT | **after: `48621d65`, 22:56 CT** |
+|---|---|---|
+| `NCAAF_LIVE_STATE week=2` `source=` (ESPN dates the join read) | `cache=1` (1) | **`fetch=1,worker=1` (2)** |
+| `index` | 5 | **6** (FAMU @ MIA from the 09-10 capture) |
+| the one-game build, `matched` / `final` | 0 / 0 | **1 / 1** |
+| served chip, `game-chips?sport=ncaaf&date=2026-09-10`, `source: worker_artifact` | FAMU @ MIA `pregame`, `7:00P CT`, scores null (19:15 CT) | **`final`, `FINAL`, MIA 77, FAMU 7** (published 22:56:18 CT, 34 s old) |
+
+**Two corrections to my own ~22:45 CT entry.** (1) It said FAMU @ MIA's own chip "cannot be re-read" because the
+09-10 artifact is not republished after the date roll. Wrong: the worker republished the 09-10 chips artifact right
+after the boot, and it is the reading above. (2) The watcher I armed for this reading reported "dates read: 0",
+because its filter matched `render_logs.py`'s own header line (`# refresh-worker text='NCAAF_LIVE_STATE week=2'`). The
+line above was read directly. A null from that watcher would have been an instrument artifact, not a fact.
+
+**Still owed (lane stays OPEN):** an in-play `pregame -> live` chip flip needs the next night game alone on its
+Eastern date. The lane's Saturday 09-12 FBS-vs-FCS reading also remains: the lens `live_resim` lane on the
+`market_implied` rating, board rows `live` via `42d49364`, `live_gameline` blocks, and rows surviving past kickoff
++ 2 h.
+
 ## 2026-09-10 ~22:45 CT — reading only, no deploy — (lane `ncaaf-fcs-market-implied-rating`) — **CORRECTION to the 22:15 CT entry's ROOT CAUSE: FAMU @ MIA's chip WAS on the live-state join; it read the WRONG ESPN DATE. The fix is on main, not deployed.**
 
 **What the 22:15 CT entry claimed, and why it was wrong.** It said ESPN live state reaches NCAAF chips only
