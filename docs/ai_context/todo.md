@@ -1,5 +1,29 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#659` — **CLOSED 2026-09-11: the exchange portfolios placed no orders. Kalshi froze on no-contract write-ahead rows and could not reach weekend football. Polymarket's slate dropped the lines the join prices, and its join could not reach weekend football either.** — lanes `exchange-execution-unblock` (2026-09-10) and `polymarket-slate-budget` (2026-09-11)
+
+- **Kalshi (lane `exchange-execution-unblock`).**
+  - `332e596d`, live-odds-worker: a LIVE position with no venue contract is refused BEFORE any write-ahead row (`REFUSED_NO_VENUE_TICKER`). Before, such a row went to `rejected`/`submitted`, and `BLOCKED_ON_UNRECONCILED` then froze every venue.
+    - Measured on the first pass: `refused={'no_venue_ticker': 11} retried=0`, zero `LIVE_ORDER … no_venue_ticker`, and no block.
+  - `SYNDICATE_KALSHI_FORWARD_DATE_SPORTS` now enables forward-date matching for NCAAF and NFL on refresh-worker (live `86c82220`, 2026-09-10T20:13:21Z).
+  - Both readings are in `deploys.md` 2026-09-10.
+- **Polymarket (lane `polymarket-slate-budget`).**
+  - `3bafdd2b`, live-odds-worker, live 2026-09-11T03:44:23Z. `_slate_within_budget` now keeps joinable full-game lines inside [today-1, today+7] BEFORE props and later dates. The slate had been cut by date alone, which kept the whole of tonight's props and dropped the weekend's game lines.
+    - Measured: 13,540 game lines kept, 0 dropped (`SLATE_BUDGET`).
+  - `1e1285a4`, refresh-worker, live 04:52:40Z. `polymarket_board_join` now widens NCAAF and NFL forward to their weekend fixtures, 7 days read from `kalshi_board_join._FORWARD_HORIZON_DAYS`; soccer stays at 14 and MLB is never widened. `_teams_match` is memoised within one join.
+    - Measured at 05:03:03Z: the join took 3.18 s against 94.91 s, and `portfolio_commit` 41.3 s against 150.7 s.
+    - `QUOTE_CAPTURE sports=['ncaaf','nfl','soccer']`, where it had been soccer only. `no_candidates|nfl` went from 66 to 0.
+    - The Polymarket plan committed 6 positions, all 6 placeable.
+  - Polymarket placed an order again at 04:43:03Z: `tsc-lal-get-dep-2026-09-13-1pt5` Over 1.5, $1.05 at 0.45, GTC. That is a 09-13 fixture the old slate dropped.
+  - Readings are in `deploys.md` 2026-09-11. The state is in `state_polymarket.md` `[polymarket-slate-budget-kept-props-dropped-game-lines]`.
+- **Residuals. These are OPEN, and not this item's:**
+  - (a) The pregame 0.35 price ceiling holds most near-even Polymarket bets: 4 of 6 at 04:10Z. Keeping it is a USER decision, and it is pending.
+  - (b) The Kalshi plan reads `placeable_committed=4/22`: 16 NCAAF spread/total positions, priced from the aggregator, are refused `no_venue_ticker`. Handed off as its own task, "Stop Kalshi plan committing uncontracted bets".
+  - (c) Held bets are lost when the plan drops a game at first pitch (Pirates–White Sox, 09-10). Other lanes hold those files.
+  - (d) 300 NCAAF rows reach Polymarket candidates but differ on the line. That is line coverage, not a reading gap.
+
+---
+
 ### `#657` — **`execution_ledger._load` READS A FAILED READ AS AN EMPTY LEDGER, and every money gate that reads it fails OPEN on a Redis blip** — lane `write-ahead-build-refusal`, filed for lane `execution-ledger-cas`, 2026-09-10 — **OPEN; not started**
 
 - **Mechanism.** `refresh_state_store.read_json_file_result` catches every read failure on both backends (keyvalue and disk) and returns `(None, False)`. `read_json_file` drops the `ok` flag, and `_load` turns `None` into `{"orders": []}`. So `_load`'s `LedgerError` "refuse rather than look empty" path cannot fire in production. `test_an_unreadable_ledger_refuses_rather_than_looking_empty` passes only because it monkeypatches the reader to raise.
