@@ -449,6 +449,22 @@ death, never life — do not invert it.
   - (3) the stuck-paper count: **OWED**. Baseline 2026-09-10T22:31:52Z, `/api/ops/execution/ledger-summary?days=14`: 37 paper rows at `submitted` across 08-29..09-11, 24 of them in 09-06..09-11.
 - Blocked by: none.
 
+### polymarket-slate-budget — OPEN — opened 2026-09-11 — session 7a239b89-c8fd-49b7-ba5a-e41bb9d4d9bc
+- Goal: [user 2026-09-10: "we need to fix this - clearly we aren't reading polymarket correctly"] the Polymarket slate keeps the markets we can trade. Full-game lines for the board's horizon (this weekend's NCAAF and NFL) survive the ~8 MB keyvalue budget instead of being cut behind player props and half/quarter markets that nothing reads.
+- Files: `syndicate/features/shared/polymarket_us_markets.py`, `tests/test_polymarket_us_markets.py`.
+- Hypothesis:
+  - `_slate_within_budget` (`polymarket_us_markets.py:1615`) ranks by DATE ONLY. Measured 2026-09-11T03:07–03:28Z: fetched 83,516, kept 21,786, `dropped_for_size` 61,730 (09-12: 10,962; 09-13: 14,744; 09-19: 19,108; 09-20: 9,814).
+  - About 15k of the kept rows are types the game-line join refuses. `POLYMARKET_OUT_OF_SCOPE` counts 9,438 cfb PROP and 4,291 cfb segment spreads/totals; the join refuses `market_type_not_a_game_line` 10,974 and `segment_market_not_full_game` 4,533. Meanwhile every game line from 09-12 on is cut.
+  - The join then indexes 5,962 game lines and matches 19 of 3,799 board rows. `POLYMARKET_UNMATCHED` shows `no_candidates|nfl` (not one NFL game line indexed for the date), and NCAAF rows offered only the few surviving Friday games. The prop join matches 0 (`POLYMARKET_PROP_RESOLVERS prop_matches=0`).
+  - The fix: rank the join's own full-game lines (`MARKET_TYPE_TO_BOARD` types without `_has_segment`, plus BTTS) dated from yesterday to 7 days out, AHEAD of everything else, inside the SAME budget. That puts this weekend's game lines in the slate.
+- Falsification test: after the live-odds-worker deploy, the slate holds NFL/NCAAF full-game lines for 09-12/09-13, but the next `POLYMARKET_BOARD_JOIN` still shows `no_candidates|nfl` and `matched` does not rise. Then the join's date keying, not the slate, is the blocker.
+- Verification:
+  - A new `SLATE_BUDGET` line shows full-game lines kept through at least 2026-09-13.
+  - On the next refresh-worker build, `POLYMARKET_BOARD_JOIN` `indexed` and `matched` rise from 5,962 and 19, `POLYMARKET_UNMATCHED no_candidates|nfl` falls from 72, and `VENUE_SCOPE venue=polymarket scoped` rises from ~25.
+  - The trade-off is named: the daily book archives what the slate keeps, so the near-term props it records shrink by whatever the game lines displace.
+- Blocked by: none. Deploy owed: live-odds-worker, the slate writer.
+- Out of scope, flagged: the pregame near-even hold loses its held bets at first pitch (2026-09-10, Pirates–White Sox: held through 23:41Z, and the 23:46Z plan no longer carried them). The files involved are held by other lanes.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
