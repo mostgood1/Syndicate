@@ -8219,7 +8219,7 @@ the 19m43s.** Next question is where inside `collect_candidates` it goes — the
 per-stage `CANDIDATE_STAGE` lines are already emitted and timestamped, so this
 is a reading, not an instrumentation job.
 
-### `#573` — **Refuse a Kalshi order by READING the shard balance, not by consulting a hardcoded list.** — lane `kalshi-shard-balance-gate`, 2026-09-11, IN PROGRESS (handed over from `kalshi-exchange-index`, 2026-08-26)
+### `#573` — **Refuse a Kalshi order by READING the shard balance, not by consulting a hardcoded list.** — lane `kalshi-shard-balance-gate`, 2026-09-11, IN PROGRESS (handed over from `kalshi-exchange-index`, 2026-08-26) — deployed live-odds-worker `21c26db1` 18:03:20Z. Per-shard cash VERIFIED (18:10:39Z `KALSHI_SHARD_BALANCES status=ok shards={'0': 13.28, '1': 0.01, '2': 0.0, '3': 60.99} sum=74.28 balance=74.28`): SHARD 0 is short ($13.28) and shard 3 holds $60.99. The refusal is OWED until 09-12's first Kalshi pass, because the day order cap (15/15) ran first on 09-11.
 
 `GET /portfolio/balance` accepts an `exchange_index` parameter — *"both values
 include all exchange indexes unless exchange_index is provided"*. That makes the

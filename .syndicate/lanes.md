@@ -688,7 +688,7 @@ death, never life — do not invert it.
 - Blocked by: none.
 
 ### kalshi-shard-balance-gate — OPEN — opened 2026-09-11 — session 82c5bc07-6f67-47d7-9564-3a14f9d916ad
-- Goal: todo `#573`, "Refuse a Kalshi order by READING the shard balance, not by consulting a hardcoded list" `[user decision 2026-09-11: "Visibility + gate"]`.
+- Goal: todo `#573`, "Refuse a Kalshi order by READING the shard balance, not by consulting a hardcoded list" `[user decision 2026-09-11: "Visibility + gate"]`. — **GOAL: NOT MET** (2026-09-11). (1) Visibility VERIFIED: 18:10:39Z `KALSHI_SHARD_BALANCES status=ok shards={'0': 13.28, '1': 0.01, '2': 0.0, '3': 60.99} sum=74.28 balance=74.28` on live-odds-worker `21c26db1` (live 18:03:20Z). (2) The refusal is OWED: 18:11:25Z Kalshi pass `positions=22 placed=0 refused={'over_max_day_orders': 14}`. The day order cap (15/15) runs BEFORE the shard gate, so the gate's first live population is 09-12's first Kalshi pass (after 05:00Z). The reading REFUTES the hypothesis about WHICH shard. Shard 3 (MLB) holds $60.99. SHARD 0 (NFL/NCAAF) is the short one at $13.28, after six NCAAF 09-12 orders reserved ~$28.77 at 17:49Z. The NFL total's 400 on shard 0 fits. The MLB 400s on shard 3 at 16:11Z and 16:44Z are UNEXPLAINED: no breakdown existed before 18:10Z, and a rebalance since cannot be ruled out.
   - (1) live-odds-worker records each Kalshi shard's cash from `balance_breakdown` and prints it (`KALSHI_SHARD_BALANCES`).
   - (2) `check_order` refuses a live Kalshi order by name (`insufficient_shard_balance`) when the shard its market routes to cannot cover the stake.
   - It stays PERMISSIVE on every unknown, exactly like the account-level gate. The account-level `insufficient_venue_balance` check is unchanged.
@@ -708,7 +708,7 @@ death, never life — do not invert it.
   - live-odds-worker on the deployed SHA prints `KALSHI_SHARD_BALANCES status=ok` with per-shard dollars that sum to `balance_dollars`.
   - A pass that meets an under-funded shard refuses by name (`insufficient_shard_balance`), with no venue 400 for that order.
   - An off != on reachability test is in the suite.
-- Blocked by: none. One deploy, live-odds-worker, coordinated with `polymarket-e2e-review` (which also plans one) under the claim lock.
+- Blocked by: the calendar, for reading (2). Kalshi's day order cap (15/15 on 09-11) is checked before the shard gate. The deploy is DONE: live-odds-worker `21c26db1`, live 18:03:20Z, claim released.
 
 ### ask-rail-evidence — CLOSED 2026-09-11 — opened 2026-09-11 — session 7d69025a-1bfa-4440-9eae-04c5299fe99f — **GOAL MET: the Ask rail renders every evidence table and chart, and "Konnor Griffin" no longer returns AJ Griffin (2 -> 0 on production)**
 - **GOAL VERDICT — MET on all three verification items.** (1) 3 new tests: 2 red on the pre-fix module, all 3 green on the fix; the one other failure in the file (`test_matchup_evidence_pairs_model_and_market`, NFL) fails identically on the pre-fix module. (2) Headless render of the real panel from the production payload: 7 tables + 1 chart, no AJ Griffin, `sport: "mlb"` sent from a blotter-shaped row. (3) web `422698e0` live 18:06:29Z: the no-sport replay went from 2 AJ Griffin titles to 0, and typed questions that pass the router carry 0. Reading in `deploys.md` 2026-09-11 13:06 CT. Code `dfecea84`.

@@ -761,9 +761,17 @@ reconciling clean (15 orders, `not_found=0`). Bankroll $1000, caps $10/order,
   `op_order_side`/`op_side` are UI params, not body fields.
 
 **Still open, none of it blocking:**
-- `#573` — refuse by READING `GET /portfolio/balance?exchange_index=N` instead
-  of a hardcoded `funded_shards` list. Self-heals the moment the shard is
-  funded; turns the last inferred step into a measurement.
+- `#573` — **DEPLOYED 2026-09-11, live-odds-worker `21c26db1`** (lane
+  `kalshi-shard-balance-gate`).
+  - The per-shard cash is read from `balance_breakdown` and printed every
+    balance tick. VERIFIED: 18:10:39Z `KALSHI_SHARD_BALANCES status=ok shards={'0': 13.28, '1': 0.01, '2': 0.0, '3': 60.99} sum=74.28 balance=74.28`.
+  - `check_order` refuses `insufficient_shard_balance` when the order's own
+    shard cannot cover the stake. Every unknown ALLOWS, and the kill switch
+    is `SYNDICATE_KALSHI_SHARD_BALANCE_GATE=off`.
+  - The refusal is NOT yet seen live: the day order cap (15) bound first on 09-11.
+  - At 18:10Z SHARD 0 was the short one ($13.28) and shard 3 held $60.99. So a
+    short shard 3 does NOT explain the MLB `insufficient_balance` 400s at
+    16:11Z and 16:44Z; no breakdown was recorded then.
 - Kalshi spreads/h2h side plumbing — **owned by syndicate-43**
   `[USER DECISION 2026-08-26]`. `unmappable_side` is currently a GUARD, not a
   gap: the join pairs a `+1.5` board row with the same team's `-1.5` market, so

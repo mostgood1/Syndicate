@@ -33058,3 +33058,46 @@ That is SMALLER than the 7,340,144 `/api/ops/keyvalue/usage` read at ~15:00Z: th
 **verify:** MET. This is the Goal's second half: `placed=6 > 0` on `plan_source=live`, and every order is on a contract this change unlocked.
 
 **Correction to the 16:50:20Z and 17:00:19Z entries above.** They said the 09-11 Kalshi spend of $30.07 left "~$20 of room" under a "$50/day cap". That figure came from `state.md`'s 2026-08-25 caps line, and it did NOT bind: this pass spent to $58.84. The binding limit was the daily ORDER count, `over_max_day_orders`, which refused 14 of the 22 contracted positions. The current caps are unread; see `leads.md`.
+
+## 2026-09-11 17:57Z — live-odds-worker `16de339b` → `21c26db1` — lane `kalshi-shard-balance-gate` — `#573`, refuse a Kalshi order its SHARD cannot cover, and record per-shard cash
+
+**Deploy.** `dep-dai420e7bikc73bfn1d0`: created 17:57:21Z, live 18:03:20Z (build 17:57:58Z, update 18:01:42Z).
+- Claim held by `kalshi-shard-balance-gate` (acquired 17:53:03Z). Preflight CLEAR for the exact SHA at 17:56:4xZ (and the watcher's own CLEAR at 17:57:00Z).
+- It had read HOLD at 17:53:07Z: an odds-refresh cycle (`run_refresh_odds_job.py` → `refresh_odds_sources.py` → `build_soccer_artifacts.py --league serie_a`) was in flight, and a deploy kills it.
+- Code riding along (`16de339b..21c26db1`):
+  - `21c26db1`, this change.
+  - `9d580145`, another lane's user decision: "layer2 board: withhold one-sided rows whose only value is an UNMEASURED model's edge". It touches `layer2_board.py`, `blueprints/intelligence.py` and `intelligence_state.py`.
+  - INERT HERE, and checked, not assumed. The board is built by the intelligence loop, and on this service:
+    - `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP='false'`; it is `'true'` on refresh-worker, which owns the loop;
+    - the boot line reads `INTELLIGENCE_LOOP_DISABLED` (17:06:56Z).
+  - The worker's odds job only QUEUES a refresh (`run_refresh_odds_job.py:408`).
+- `render.yaml`: unchanged.
+
+**Prediction, written BEFORE any reading.**
+- (1) The first balance tick prints `KALSHI_SHARD_BALANCES status=ok` with one entry per funded shard, summing to that tick's `balance_dollars`. It read $101.61 at 17:31Z.
+- (2) Shard 3 (MLB, tennis, and basketball from 09-10) is the short one. The next MLB order whose stake exceeds shard 3's cash, net of orders placed since the reading, is refused `insufficient_shard_balance` and never reaches the venue: no `LIVE_ORDER status=failed ... insufficient_balance` for it.
+
+**Reading (2) CANNOT OCCUR ON 09-11, and that is measured, not assumed.**
+- Kalshi's day order cap is `max_day_orders_kalshi = 15` (served `/api/portfolio/live` limits).
+- The 17:49:20Z pass already read `spent={'orders': 15}`, with `refused={'over_max_day_orders': 14}`.
+- `check_order` applies the caps BEFORE either balance gate. Every further Kalshi order on 09-11 is refused `over_max_day_orders` without reaching this one.
+- The gate's first live population is 09-12's first Kalshi pass, after the date rolls on `central_today_iso` at 05:00Z. A null on 09-11 is no evidence either way.
+
+**Falsification (either one):**
+- (1) reads `status=absent`, `unreadable` or `sum_disagrees`: the gate stands down, prints `SHARD_BALANCE_UNKNOWN reason=shards_*`, and there is no per-shard visibility.
+- A Kalshi order still dies with a venue `insufficient_balance` while `KALSHI_SHARD_BALANCES` showed its shard below the stake.
+
+**verify.** The readings:
+
+```
+2026-09-11T18:10:39.433581823Z  [venue_balances] KALSHI_SHARD_BALANCES status=ok shards={'0': 13.28, '1': 0.01, '2': 0.0, '3': 60.99} sum=74.28 balance=74.28
+2026-09-11T18:11:25.206965918Z  [execute_portfolio] EXECUTED date=2026-09-11 mode=live venue=kalshi plan_source=live armed=True positions=22 placed=0 filled=0 failed=0 duplicates=8 retried=0 skipped=14 refused={'over_max_day_orders': 14} spent={'dollars': 57.41, 'orders': 15}
+(18:04:30Z LIVE_LEDGER_ROW x4 status=failed insufficient_balance = a boot RE-LISTING of the day's pre-deploy failures, BAL2/LADMIA-8/BALTOR-9/NYJTEN-39, not new orders.)
+```
+
+**Verdict:** **READING (1) MET; READING (2) OWED, NOT FAILED.**
+- Kalshi's per-shard cash is now recorded and printed, and the shards sum to the account balance to the cent.
+- The gate had no live population on 09-11. The Kalshi day order cap (15/15) refuses first: at 18:11:25Z, `refused={'over_max_day_orders': 14}`, with no new order, no `SHARD_BALANCE_UNKNOWN` and no Traceback.
+- The first Kalshi pass on 09-12 (after 05:00Z) is where `insufficient_shard_balance`, or its absence beside a venue 400, is read.
+- **PREDICTION (2) NAMED THE WRONG SHARD.** The reading REFUTES the hypothesis about WHICH shard. Shard 3 (MLB) holds $60.99. SHARD 0 (NFL/NCAAF) is the short one at $13.28, after six NCAAF 09-12 orders reserved ~$28.77 at 17:49Z. The NFL total's 400 on shard 0 fits. The MLB 400s on shard 3 at 16:11Z and 16:44Z are UNEXPLAINED: no breakdown existed before 18:10Z, and a rebalance since cannot be ruled out.
+- 09-12's NCAAF book runs on shard 0, which is the shard to fund.
