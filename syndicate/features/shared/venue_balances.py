@@ -278,11 +278,14 @@ def fetch_kalshi_balance() -> dict[str, Any]:
             disagreement = {"balance_dollars": dollars_string, "balance_cents": cents}
 
     portfolio_cents = _as_number(payload.get("portfolio_value"))
+    shards, shards_status, shards_sum = _kalshi_shards(payload.get("balance_breakdown"), round(dollars, 2))
     return {
         "venue": "kalshi",
         "status": "ok",
         "path": KALSHI_BALANCE_PATH,
         # SPENDABLE CASH, which is what a day cap should be compared against.
+        # It is the SUM ACROSS EXCHANGE SHARDS (docs: "includes all exchange
+        # indexes when `exchange_index` is omitted") -- see `shards` below.
         "dollars": round(dollars, 2),
         # CASH PLUS OPEN POSITIONS. A different question -- "what is the book
         # worth" rather than "what can I deploy" -- and conflating them over a
@@ -294,7 +297,56 @@ def fetch_kalshi_balance() -> dict[str, Any]:
         "unit_assumption": "documented",
         # Non-None means the venue's own two representations disagree.
         "unit_disagreement": disagreement,
+        # EACH SHARD'S CASH (`#573`). Kalshi checks an order against ITS OWN
+        # shard only, so the sum above can cover a stake that the shard it
+        # routes to cannot. Measured 2026-09-11: `dollars` read $101.61 while
+        # every Kalshi `insufficient_balance` 400 landed on a short shard.
+        # `shards_status` is `ok` only when every row parsed AND they sum to
+        # `dollars`; anything else is shown but must not be gated on.
+        "shards": shards,
+        "shards_status": shards_status,
+        "shards_sum_dollars": shards_sum,
     }
+
+
+def _kalshi_shards(breakdown: Any, total_dollars: float) -> tuple[dict[str, float] | None, str, float | None]:
+    """`balance_breakdown` -> `({"<exchange_index>": dollars}, status, sum)`.
+
+    `IndexedBalance` is `{exchange_index, balance}` with `balance` a
+    FixedPointDollars STRING (docs.kalshi.com, read 2026-09-11), so it is read
+    as dollars and never divided.
+
+    `absent` when the venue sent none (a subaccount-restricted key omits it), and
+    that is "we do not know", never "every shard is empty". ONE UNREADABLE ROW
+    POISONS THE WHOLE BREAKDOWN: half a breakdown would make the missing shard
+    read as unfunded. And a breakdown that does not sum to the account balance
+    is kept for display but marked `sum_disagrees` -- that is the check that
+    catches a unit or a missing shard, which is the one way this could refuse
+    orders it should not.
+    """
+    if breakdown is None or breakdown == []:
+        return None, "absent", None
+    if not isinstance(breakdown, list):
+        return None, "unreadable", None
+    shards: dict[str, float] = {}
+    for row in breakdown:
+        if not isinstance(row, Mapping):
+            return None, "unreadable", None
+        index = row.get("exchange_index")
+        if isinstance(index, bool):
+            return None, "unreadable", None
+        try:
+            index = int(index)
+        except (TypeError, ValueError):
+            return None, "unreadable", None
+        dollars = _as_number(row.get("balance"))
+        if dollars is None:
+            return None, "unreadable", None
+        shards[str(index)] = round(dollars, 2)
+    total = round(sum(shards.values()), 2)
+    if abs(total - total_dollars) > 0.02:
+        return shards, "sum_disagrees", total
+    return shards, "ok", total
 
 
 def fetch_polymarket_balance() -> dict[str, Any]:
@@ -468,6 +520,9 @@ def _history_entry(stamp: Mapping[str, Any]) -> dict[str, Any]:
                 "dollars": reading.get("dollars"),
                 "cash_dollars": reading.get("cash_dollars"),
                 "open_orders_dollars": reading.get("open_orders_dollars"),
+                # Kalshi's per-shard cash (`#573`), so "which shard ran dry
+                # when that order failed" is answerable later. Absent elsewhere.
+                "shards": reading.get("shards"),
             }
     return row
 
@@ -545,6 +600,20 @@ def record_venue_balances(*, recorded_by: str) -> dict[str, Any]:
             venues[venue] = {"venue": venue, "status": "auth_error", "detail": f"{type(exc).__name__}: {exc}"}
 
     stamp = {"recorded_by": str(recorded_by), "recorded_at": _utc_now(), "venues": venues}
+    # EACH KALSHI SHARD'S CASH, on its own line (`#573`). The worker's
+    # `VENUE_BALANCES` line carries only the cross-shard SUM, and "how much sits
+    # on which shard" is the question every `insufficient_balance` raises.
+    # `print`, not `logger.info`: the latter never reaches Render's collector.
+    kalshi = venues.get("kalshi") or {}
+    if isinstance(kalshi, Mapping) and kalshi.get("status") == "ok":
+        print(
+            "[venue_balances] KALSHI_SHARD_BALANCES"
+            f" status={kalshi.get('shards_status')}"
+            f" shards={kalshi.get('shards')}"
+            f" sum={kalshi.get('shards_sum_dollars')}"
+            f" balance={kalshi.get('dollars')}",
+            flush=True,
+        )
     # BEFORE the stamp write, so a trail exists even on the tick whose stamp
     # write is the thing that fails. `append_balance_history` never raises.
     append_balance_history(stamp)

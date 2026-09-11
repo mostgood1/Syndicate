@@ -570,18 +570,21 @@ def _age_seconds(stamp: Any) -> float | None:
     return (datetime.now(timezone.utc) - parsed).total_seconds()
 
 
-def _live_stake_since(stamp: Any, *, venue: str) -> float:
-    """Live dollars committed at `venue` since `stamp`. Never raises.
+def _live_orders_since(stamp: Any, *, venue: str) -> list[tuple[str | None, float]]:
+    """`(venue_ticker, dollars)` for each live order committed at `venue` since
+    `stamp`. Never raises.
 
+    Split out of `_live_stake_since` (`#573`) so the SHARD gate can charge each
+    order to the shard it routed to; the account-level gate still sums them all.
     A balance gate that threw would stop the tick that places orders, which is
     a far worse failure than the one it is preventing.
     """
     if not stamp:
-        return 0.0
+        return []
     try:
         parsed = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
     except (TypeError, ValueError):
-        return 0.0
+        return []
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
 
@@ -589,13 +592,13 @@ def _live_stake_since(stamp: Any, *, venue: str) -> float:
         from syndicate.features.shared.execution_ledger import LIVE as _LIVE
         from syndicate.features.shared.execution_ledger import _load
     except Exception:
-        return 0.0
+        return []
     try:
         orders = (_load() or {}).get("orders") or []
     except Exception:
-        return 0.0
+        return []
 
-    total = 0.0
+    rows: list[tuple[str | None, float]] = []
     want = str(venue).strip().lower()
     for order in orders:
         if str(order.get("mode") or "") != _LIVE:
@@ -620,10 +623,145 @@ def _live_stake_since(stamp: Any, *, venue: str) -> float:
         if amount is None:
             amount = order.get("requested_stake_dollars")
         try:
-            total += float(amount or 0.0)
+            rows.append((order.get("venue_ticker") or None, float(amount or 0.0)))
         except (TypeError, ValueError):
             continue
-    return total
+    return rows
+
+
+def _live_stake_since(stamp: Any, *, venue: str) -> float:
+    """Live dollars committed at `venue` since `stamp`. Never raises."""
+    return sum(amount for _, amount in _live_orders_since(stamp, venue=venue))
+
+
+# ---- `#573`: the SHARD an order routes to must be able to cover it ----------
+#
+# KALSHI HOLDS CASH PER EXCHANGE SHARD, and checks an order against ITS OWN
+# shard only (docs.kalshi.com, "Exchange Sharding": "Programmatic traders must
+# preallocate collateral on a given exchange shard before order placement").
+# `balance_dollars` -- all `_venue_available_dollars` reads -- is the SUM
+# across shards, so a sum that covers the stake says nothing about the shard
+# that has to.
+#
+# MEASURED 2026-09-11: `balance_dollars` read $101.61 while every Kalshi
+# `insufficient_balance` 400 since 15:45Z landed on a short shard -- MLB `BAL2`
+# $20.85 and `LADMIA-8` $18.91 on shard 3, and NFL `NYJTEN-39` $4.07 on shard 0
+# eight seconds after three shard-0 orders had reserved $11.90. Each doomed
+# order went to the venue every pass, because nothing here could see it.
+#
+# SAME HOUSE RULE AS THE ACCOUNT GATE: every unknown ALLOWS, each under its own
+# reason, and the venue's own 400 stays the backstop. Failing closed on a broken
+# read would stop live trading and look exactly like a quiet slate.
+_SHARD_GATE_ENV = "SYNDICATE_KALSHI_SHARD_BALANCE_GATE"
+_SHARD_CACHE: dict[str, int] = {}
+_SHARD_CACHE_LIMIT = 512
+
+
+def _shard_gate_enabled() -> bool:
+    """ON unless switched off. It only ever REFUSES on known data, so absent
+    meaning on cannot widen what is placed; `off` restores the old gate exactly."""
+    return str(os.environ.get(_SHARD_GATE_ENV) or "").strip().lower() not in {"0", "off", "false", "no"}
+
+
+def _kalshi_shard_of(ticker: Any) -> tuple[int | None, str | None]:
+    """`(exchange_index, None)` for a Kalshi market, or `(None, reason)`.
+
+    From the market's own public `exchange_index` -- the docs call it "the
+    authoritative source of truth", and it needs no credential -- and CACHED,
+    because a market does not move shards. A failure is NOT cached, so one bad
+    read cannot pin an unknown for the life of the process.
+    """
+    key = str(ticker or "").strip()
+    if not key:
+        return None, "no_ticker"
+    cached = _SHARD_CACHE.get(key)
+    if cached is not None:
+        return cached, None
+    try:
+        from syndicate.features.shared.kalshi_client import fetch_market
+
+        probe = fetch_market(key)
+    except Exception as exc:
+        return None, f"fetch_failed:{type(exc).__name__}"
+    if not isinstance(probe, Mapping) or probe.get("status") != "ok":
+        detail = probe.get("reason") if isinstance(probe, Mapping) else "no_answer"
+        return None, f"fetch_failed:{str(detail)[:80]}"
+    raw = (probe.get("market") or {}).get("exchange_index")
+    if isinstance(raw, bool):
+        return None, "no_exchange_index"
+    try:
+        shard = int(raw)
+    except (TypeError, ValueError):
+        return None, "no_exchange_index"
+    if shard < 0:
+        return None, "no_exchange_index"
+    if len(_SHARD_CACHE) >= _SHARD_CACHE_LIMIT:
+        _SHARD_CACHE.clear()
+    _SHARD_CACHE[key] = shard
+    return shard, None
+
+
+def _shard_available_dollars(request: Any) -> dict[str, Any]:
+    """`{"known": bool, "available": float, "shard": int, ...}` for one order.
+
+    Kalshi only, from the stamp's per-shard breakdown, minus the live orders
+    placed since the stamp ON THE SAME SHARD. An order whose shard cannot be read
+    is charged to EVERY shard: over-counting it costs one cycle of a smaller book,
+    under-counting it is the overspend this exists to stop.
+    """
+    venue = str(getattr(request, "venue", "") or "").strip().lower()
+    if venue != "kalshi":
+        return {"known": False, "reason": "venue_has_no_shards"}
+    if not _shard_gate_enabled():
+        return {"known": False, "reason": "gate_off"}
+    ticker = getattr(request, "venue_ticker", None)
+    if not ticker:
+        return {"known": False, "reason": "no_ticker"}
+    try:
+        from syndicate.features.shared.venue_balances import read_venue_balances
+
+        stamp = read_venue_balances()
+    except Exception as exc:
+        return {"known": False, "reason": f"read_error:{type(exc).__name__}"}
+    if not stamp:
+        return {"known": False, "reason": "never_recorded"}
+    row = ((stamp.get("venues") or {}).get("kalshi")) or {}
+    if str(row.get("status") or "") != "ok":
+        return {"known": False, "reason": f"balance_{row.get('status') or 'unknown'}"}
+    shards = row.get("shards")
+    if str(row.get("shards_status") or "") != "ok" or not isinstance(shards, Mapping):
+        return {"known": False, "reason": f"shards_{row.get('shards_status') or 'absent'}"}
+    age = _age_seconds(stamp.get("recorded_at"))
+    if age is None:
+        return {"known": False, "reason": "unstamped_reading"}
+    if age > _BALANCE_MAX_AGE_SECONDS:
+        return {"known": False, "reason": "stale_reading", "age_seconds": round(age, 1)}
+
+    shard, why = _kalshi_shard_of(ticker)
+    if shard is None:
+        return {"known": False, "reason": f"shard_unresolved:{why}"}
+    raw = shards.get(str(shard))
+    if raw is None or isinstance(raw, bool):
+        return {"known": False, "reason": "shard_absent_from_breakdown", "shard": shard}
+    try:
+        dollars = float(raw)
+    except (TypeError, ValueError):
+        return {"known": False, "reason": "shard_absent_from_breakdown", "shard": shard}
+
+    committed = 0.0
+    for order_ticker, amount in _live_orders_since(stamp.get("recorded_at"), venue="kalshi"):
+        order_shard, _ = _kalshi_shard_of(order_ticker)
+        if order_shard is None or order_shard == shard:
+            committed += amount
+    available = dollars - committed
+    return {
+        "known": True,
+        "shard": shard,
+        "available": round(available if available > 0 else 0.0, 4),
+        "shard_dollars": round(dollars, 4),
+        "committed_since_reading": round(committed, 4),
+        "age_seconds": round(age, 1),
+    }
 
 
 def check_order(
@@ -725,6 +863,29 @@ def check_order(
                 "balance": balance,
                 "limits": caps,
             }
+
+        # AND ON THE SHARD THIS ORDER ROUTES TO (`#573`). The account balance
+        # above is the SUM across Kalshi's exchange shards; the venue checks
+        # only the order's own. See `_shard_available_dollars`.
+        shard_balance = _shard_available_dollars(request)
+        if shard_balance.get("known") and stake > float(shard_balance["available"]):
+            return {
+                "allowed": False,
+                "reason": "insufficient_shard_balance",
+                "stake": stake,
+                "shard_balance": shard_balance,
+                "limits": caps,
+            }
+        if not shard_balance.get("known") and shard_balance.get("reason") not in {"venue_has_no_shards", "gate_off"}:
+            # SAID OUT LOUD, because an unknown ALLOWS: a gate that stood down
+            # in silence would read exactly like a gate that checked and passed.
+            print(
+                f"[execution_guard] SHARD_BALANCE_UNKNOWN venue={request_venue}"
+                f" ticker={getattr(request, 'venue_ticker', None)}"
+                f" reason={shard_balance.get('reason')}"
+                " -- allowing; the venue's own balance check is the backstop",
+                flush=True,
+            )
 
         # Checked LAST among the live-only gates but before anything is placed,
         # and checked again immediately before submit by `guarded_submit`.
