@@ -357,7 +357,13 @@ _LENS_ABSTRACT_TO_STATE = {"live": "live", "final": "final", "preview": "pregame
 # Adding a sport here without a source that actually carries finished matches
 # turns a stated "unsupported" into a silent "supported, corrected 0" -- the
 # reading this module exists to keep distinguishable.
-_LIVE_GAME_STATE_SPORTS = frozenset({"mlb", "soccer"})
+# `ncaaf` JOINED 2026-09-10. Measured that night: FAMU @ MIA was in progress on
+# ESPN from 00:03Z while its NCAAF chip still read `pregame`, `7:00P CT`, no
+# clock, no score (chip artifact republished every ~90 s, state never moving),
+# so all its board rows stayed pregame and no live game line could attach even
+# though the live re-sim had indexed the game. NCAAF's source is the poller's
+# persisted ESPN capture, read with the same staleness bound as the others.
+_LIVE_GAME_STATE_SPORTS = frozenset({"mlb", "soccer", "ncaaf"})
 
 
 def _lens_generated_age_seconds(snapshot: dict) -> float | None:
@@ -688,6 +694,62 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
                     "snapshot_age_seconds": round(age_seconds, 1),
                     "rows_corrected": 0,
                 }
+        elif sport == "ncaaf":
+            # THE POLLER'S ESPN CAPTURE, per ESPN date, for the dates this grid's
+            # kickoffs fall on (the same Eastern-date helper settlement uses).
+            # Only in-play and finished games are offered: a pregame capture
+            # has nothing to correct. A capture older than the bound is skipped
+            # rather than trusted -- a mid-game record never refreshed must not
+            # set a state -- and FINAL IS TERMINAL is enforced below as for
+            # every sport. Football teams play weekly, so a team pair cannot
+            # match a different game across these adjacent dates.
+            try:
+                from syndicate.features.shared.bet_status_nfl import kickoff_capture_dates
+            except Exception:  # pragma: no cover - deploy-skew guard
+                kickoff_capture_dates = None
+            capture_dates: set[str] = {str(selected_date)}
+            for row in grid:
+                raw_kickoff = str((row or {}).get("commence_time") or "").strip() if isinstance(row, dict) else ""
+                if kickoff_capture_dates is not None and raw_kickoff:
+                    capture_dates.update(kickoff_capture_dates(raw_kickoff))
+            now_epoch = time.time()
+            lens_games = []
+            ages: list[float] = []
+            stale_dates = 0
+            for capture_date in sorted(capture_dates):
+                captured, fetched_at = _read_ncaaf_capture(capture_date)
+                if not captured:
+                    continue
+                if fetched_at is None or now_epoch - fetched_at > _LENS_STATE_MAX_AGE_SECONDS:
+                    stale_dates += 1
+                    continue
+                ages.append(now_epoch - fetched_at)
+                for captured_game in captured:
+                    if captured_game.get("final"):
+                        state = "final"
+                    elif captured_game.get("in_progress"):
+                        state = "live"
+                    else:
+                        continue
+                    lens_games.append(
+                        {
+                            "state": state,
+                            "home": {"name": captured_game.get("home_team"), "abbr": captured_game.get("home_abbr")},
+                            "away": {"name": captured_game.get("away_team"), "abbr": captured_game.get("away_abbr")},
+                            "detailed": captured_game.get("status"),
+                            "home_score": captured_game.get("home_score"),
+                            "away_score": captured_game.get("away_score"),
+                        }
+                    )
+            age_seconds = min(ages) if ages else None
+            if not lens_games:
+                return {
+                    "supported": True,
+                    "reason": ("ncaaf capture is staler than the chip it would correct" if stale_dates and not ages
+                               else "ncaaf capture carries no in-play or finished games"),
+                    "capture_dates": sorted(capture_dates),
+                    "rows_corrected": 0,
+                }
         else:
             snapshot = read_json_file(data_root() / "live" / f"{sport}_live_lens.json")
             if not isinstance(snapshot, dict):
@@ -786,11 +848,29 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
         _LOGGER.exception("BOOK_GRID_LENS_STATE_FAILURE sport=%s date=%s", sport, selected_date)
         return {"supported": True, "error": "live status join failed", "rows_corrected": 0}
 
+    registry_id = None
+    if sport == "ncaaf":
+        try:
+            from syndicate.features.shared.ncaaf_team_registry import resolve_ncaaf_team_id as registry_id
+        except Exception:  # pragma: no cover - deploy-skew guard; the name match still runs
+            registry_id = None
+
     def _side_matches(row_team, lens_side) -> bool:
         for key in ("name", "abbr"):
             token = (lens_side or {}).get(key)
             if token and teams_match(sport, row_team, token):
                 return True
+        if registry_id is not None:
+            # NCAAF ONLY, and only after the name match fails: Florida A&M is
+            # the school `teams_match` cannot place (canonical_team None) while
+            # the registry resolves both spellings to id 50. The registry drops
+            # ambiguous names, so this joins a row to its own team or nothing.
+            row_id = registry_id(row_team)
+            if row_id:
+                for key in ("name", "abbr"):
+                    token = (lens_side or {}).get(key)
+                    if token and registry_id(token) == row_id:
+                        return True
         return False
 
     # The team-pair resolution is memoised: `teams_match` over every row against
@@ -827,7 +907,7 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
             game["home_score"] = hit["home_score"]
         if hit.get("away_score") is not None:
             game["away_score"] = hit["away_score"]
-        game["state_source"] = "soccer_live_state" if sport == "soccer" else "mlb_live_lens"
+        game["state_source"] = {"soccer": "soccer_live_state", "ncaaf": "ncaaf_live_state_capture"}.get(sport, "mlb_live_lens")
         corrected += 1
         transitions[f"{before or 'unknown'}->{hit['state']}"] = transitions.get(f"{before or 'unknown'}->{hit['state']}", 0) + 1
 

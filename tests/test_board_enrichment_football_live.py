@@ -272,3 +272,101 @@ def test_other_sports_never_read_the_NCAAF_capture(capture, monkeypatch):
     board_enrichment.attach_game_state([row], sport="nfl", selected_date="2026-09-10")
 
     assert calls == []
+
+
+
+# ---------------------------------------------------------------------------
+# NCAAF IN THE FROZEN-CHIP LIVE-STATE OVERLAY (2026-09-10, FAMU @ MIA in play)
+# ---------------------------------------------------------------------------
+# The chip kept reading `pregame` while ESPN had the game in progress, so the
+# rows never went live. The overlay now corrects NCAAF from the ESPN capture.
+
+
+def _famu_grid(state="pregame"):
+    row = _row("Miami Hurricanes", "Florida A&M Rattlers")
+    row["game"] = {"state": state, "status_token": "7:00P CT", "home_score": None, "away_score": None}
+    return [row]
+
+
+@pytest.fixture
+def overlay_capture(monkeypatch):
+    import time as _time
+
+    def install(games, *, age_seconds=60, ids=_IDS, dates=("2026-09-10",)):
+        monkeypatch.setattr(ncaaf_team_registry, "resolve_ncaaf_team_id", lambda name: ids.get(str(name)))
+        stamp = _time.time() - age_seconds
+        by_date = {d: list(games) for d in dates}
+        monkeypatch.setattr(board_enrichment, "_read_ncaaf_capture",
+                            lambda d: (list(by_date.get(d, [])), stamp if d in by_date else None))
+    return install
+
+
+def _famu_captured(**over):
+    game = {"home_team": "Miami Hurricanes", "away_team": "Florida A&M Rattlers", "home_abbr": "MIA", "away_abbr": "FAMU",
+            "in_progress": True, "final": False, "home_score": 21, "away_score": 0, "status": "5:12 - 2nd"}
+    game.update(over)
+    return game
+
+
+def test_a_FRESH_ncaaf_capture_flips_a_frozen_pregame_chip_to_LIVE(overlay_capture):
+    overlay_capture([_famu_captured()])
+    grid = _famu_grid()
+
+    coverage = board_enrichment.attach_live_game_state_from_lens(grid, sport="ncaaf", selected_date="2026-09-11")
+
+    assert grid[0]["game"]["state"] == "live"
+    assert grid[0]["game"]["home_score"] == 21
+    assert grid[0]["game"]["status_token"] == "5:12 - 2nd"
+    assert grid[0]["game"]["state_source"] == "ncaaf_live_state_capture"
+    assert coverage["rows_corrected"] == 1
+    assert coverage["transitions"] == {"pregame->live": 1}
+
+
+def test_the_FAMU_row_matches_by_REGISTRY_ID_when_the_name_match_fails(overlay_capture):
+    # ESPN's names differ from the board's; only the registry can place FAMU.
+    overlay_capture([_famu_captured(home_team="Miami", away_team="Florida A&M", home_abbr="MIA", away_abbr="FAM")])
+    grid = _famu_grid()
+
+    board_enrichment.attach_live_game_state_from_lens(grid, sport="ncaaf", selected_date="2026-09-11")
+
+    assert grid[0]["game"]["state"] == "live"
+
+
+def test_a_STALE_ncaaf_capture_corrects_nothing(overlay_capture):
+    overlay_capture([_famu_captured()], age_seconds=board_enrichment._LENS_STATE_MAX_AGE_SECONDS + 60)
+    grid = _famu_grid()
+
+    coverage = board_enrichment.attach_live_game_state_from_lens(grid, sport="ncaaf", selected_date="2026-09-11")
+
+    assert grid[0]["game"]["state"] == "pregame"
+    assert coverage["rows_corrected"] == 0
+    assert "staler" in coverage["reason"]
+
+
+def test_a_FINAL_row_is_never_reopened(overlay_capture):
+    overlay_capture([_famu_captured()])
+    grid = _famu_grid(state="final")
+
+    board_enrichment.attach_live_game_state_from_lens(grid, sport="ncaaf", selected_date="2026-09-11")
+
+    assert grid[0]["game"]["state"] == "final"
+
+
+def test_a_PREGAME_capture_changes_nothing(overlay_capture):
+    overlay_capture([_famu_captured(in_progress=False, home_score=None, away_score=None)])
+    grid = _famu_grid()
+
+    coverage = board_enrichment.attach_live_game_state_from_lens(grid, sport="ncaaf", selected_date="2026-09-11")
+
+    assert grid[0]["game"]["state"] == "pregame"
+    assert coverage["rows_corrected"] == 0
+
+
+def test_the_capture_also_closes_a_game_to_FINAL(overlay_capture):
+    overlay_capture([_famu_captured(in_progress=False, final=True, home_score=52, away_score=10, status="Final")])
+    grid = _famu_grid(state="live")
+
+    board_enrichment.attach_live_game_state_from_lens(grid, sport="ncaaf", selected_date="2026-09-11")
+
+    assert grid[0]["game"]["state"] == "final"
+    assert grid[0]["game"]["status_token"] == "FINAL"
