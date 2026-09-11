@@ -569,6 +569,25 @@ death, never life — do not invert it.
   - An off != on reachability test is in the suite.
 - Blocked by: none. Two deploys: refresh-worker (writes the plan), then live-odds-worker (reads it). A reader without a live plan falls back to the paper2 plan and says so (`LIVE_PLAN_ABSENT`), so the deploy order is not a safety question.
 
+### polymarket-e2e-review — OPEN — opened 2026-09-11 — session 7a239b89-c8fd-49b7-ba5a-e41bb9d4d9bc
+- Goal: [user request 2026-09-11: "can we re-evaluate polymarket end to end and this held bet strategy? I'm not sure I agree with this"]
+  - (1) An end-to-end reading of the Polymarket path: markets read → join → scope → plan → executor gates → order → fill → settlement. It needs a production count at every stage, and the realized results to date with denominators and dates.
+  - (2) A verdict from evidence on the pregame near-even hold (`HELD_PREGAME_NEAR_EVEN`, counted as `refused['pregame_price_too_high']`, ceiling 0.35): what it holds, what becomes of held bets, and what it costs or saves. It goes to the user as a decision, with a recommendation.
+  - No code change without the user's decision.
+- Files: none (diagnostic). Ledger writes only.
+- Hypothesis (to test, not believed):
+  - H1: most held bets are never placed. The plan drops a game once it starts, so the hold turns positive-EV positions into no position.
+  - H2: held bets that do place live pay a different price from the one they were held at. The hold's value is that price gap plus any difference in fill rate, and neither has been measured.
+  - H3: the premise of the hold is stale, or was never measured for the current order type (a GTC limit crossed by one tick). The premise is that a pregame near-even order does not fill, or fills badly.
+  - H4: on held positions the plan's `ev_pct` and `edge_pct` can disagree in sign (BAL–TOR h2h at 05:15Z: ev +14.61, edge −3.47). If so, the executor may be acting on a number the market contradicts.
+- Falsification test:
+  - H1 falls if most held tickers show a later `LIVE_ORDER` for the same ticker.
+  - H2 is answered by the pairs of held and placed prices.
+  - H3 falls if pregame near-even Polymarket orders in the ledger filled at a rate comparable to orders at other prices.
+  - H4 falls if the two fields share a baseline by design and agree in sign once put on one.
+- Verification: the readings above are written to `state_polymarket.md` and the day log with n and dates, and the user's decision on the hold is recorded.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
