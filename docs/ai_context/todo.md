@@ -14,6 +14,12 @@
 - **Fees.** `feeCoefficient` is fetched and then dropped (`polymarket_us_markets.py:149`). Fees ran about 2% of settled stake ($3.30 on $153.83).
 - **Step 1, an instrument with its own deploy.** At build, read the slug's book with the signed client. Log our side's best ask and its size next to the price we would send, and the EV at that ask. A failed read must never block an order.
 - **Step 2, once step 1 has a population.** Price EV and Kelly at the ask, net of fees. Refuse below the minimum, and cap the stake at the size available at the ask.
+- **Step 1 at the 2026-09-11 checkpoint:** the instrument is live (`1afec00f`, 16:02:43Z) with 0 book lines, because no new Polymarket order has been built since.
+- **Also shipped under this lane, on the user's decision of 2026-09-11:**
+  - Every Polymarket order is sent good-till-date and expires at kickoff (`16de339b`, live on live-odds-worker 16:53:31Z).
+  - `cancel_order` uses the documented `POST /v1/order/{id}/cancel`.
+  - The trigger: two pregame orders rested unfilled at 15:51Z, and a resting good-till-cancel order can fill in-play at a stale price.
+  - The first good-till-date `SUBMIT` is owed.
 - **Close when** live Polymarket orders are sized and gated on the executable ask, and the step-1 population is recorded.
 
 ---

@@ -32082,3 +32082,23 @@ Moved verbatim; nothing summarised. Each lane's current verdict and status stay 
     - execute_portfolio.py and its test are NOT edited here, because OPEN lane kalshi-plan-placeable holds them. The dead hold and explore-arm code waits for their release, which was asked for by message on 2026-09-11.
   - (4): no change. The caps are $35 per order and $150 per day per venue, and actual stakes run $1–9.
   - (2) is STARTED. `/v1/markets` carries no bid, ask or size (polymarket_us_markets.py lines 43-48), and no book route is known (`state_polymarket.md:1083`). The first step is finding one.
+
+### polymarket-ask-pricing — progress entries superseded at the 2026-09-11 checkpoint (2), moved VERBATIM from `lanes.md`
+- 2026-09-11 16:02:43Z: step 1 is LIVE on live-odds-worker `1afec00f` (`dep-dai2au6q1p3s73api140`).
+  - The first pass after boot (16:11:45Z) built nothing new (`placed=0 duplicates=2 refused={'market_paused': 3}`), so there are 0 book lines yet. Nothing blocked.
+  - **RISK FOUND, and put to the user.** The two 15:51Z orders are RESTING (`order_state_new`, 0 filled at 16:11:38Z): Jets–Titans has 7.48 left at 0.49, and Mariners–A's 23.85 left at 0.415.
+  - Polymarket GTC orders are never cancelled by us (`polymarket_us_orders.py`'s `cancel_order` has no caller). So a resting pregame order can fill AFTER kickoff at its pregame price, which is exactly when the market has moved through it.
+  - The `game_started` refusal covers BUILDS, not resting orders.
+  - Mariners–A's starts 2026-09-12T01:40Z, and Jets–Titans 2026-09-13T17:00Z.
+  - The candidate fixes are a good-till-date at kickoff or a cancel at kickoff. Both need the venue contract verified, and both are the user's decision.
+  - Verification is OWED: at least 20 `POLYMARKET_BOOK_AT_BUILD` lines, which need NEW order builds. Totals are paused before build, and orders already placed do not rebuild, so the population arrives as the plan changes.
+  - Recorded in `deploys.md` 2026-09-11 15:59:52Z.
+- 2026-09-11 ~16:35Z: **ADDED on the user's decision ("yes proceed"):**
+  - Every Polymarket order now expires at kickoff: `TIME_IN_FORCE_GOOD_TILL_DATE`, with `goodTillTime` = `commence_time`.
+  - `cancel_order` moves to the documented `POST /v1/order/{id}/cancel`, with `{"marketSlug"}` in the body.
+  - Why: the two 15:51Z orders RESTED (`order_state_new`, 0 filled), and a resting good-till-cancel order can fill after kickoff at its pregame price. The two already resting are the user's to cancel; this covers new orders only.
+  - Verification: the next Polymarket `SUBMIT` shows `tif=TIME_IN_FORCE_GOOD_TILL_DATE goodTillTime=<kickoff>`, its `LIVE_ORDER` is not `failed`, and the next `ORDER_STATE` read of it shows the stored `goodTillTime`.
+  - Falsification: the venue rejects the good-till-date body, or stores `goodTillTime=None`.
+- 2026-09-11 16:53:31Z: the kickoff expiry and the documented cancel route are LIVE on live-odds-worker `16de339b` (`dep-dai32oe7bikc73bc23ng`).
+  - Verification is OWED: the first new Polymarket `SUBMIT` must carry `tif=TIME_IN_FORCE_GOOD_TILL_DATE goodTillTime=<kickoff>`, and its `LIVE_ORDER` must not be `failed`.
+  - Recorded in `deploys.md` 2026-09-11 16:50:41Z.

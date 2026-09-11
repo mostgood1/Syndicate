@@ -1274,7 +1274,7 @@ whatever game lines displace them. `dropped_by_date` still reports every one.
 - 0.35–0.45: 11/21;
 - 0.45–0.55: 13/20.
 
-  Near-even combined is 24/41, or 59%. Every miss was CANCELED by the venue 0.6–1.6 s after submit (`order_state_canceled`). None rested. In-play near-even: 13/15.
+  Near-even combined is 24/41, or 59%. Through 09-02 every miss was CANCELED by the venue 0.6–1.6 s after submit (`order_state_canceled`), and none rested. That changed on 2026-09-11: two near-even pregame orders placed at 15:51Z RESTED (`order_state_new`, 0 filled at 16:11:38Z). That is why every Polymarket order now expires at kickoff (`16de339b`, live 16:53:31Z). In-play near-even: 13/15.
 
 **Settled results against the market's own probability** (the fill price):
 

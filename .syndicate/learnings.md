@@ -5508,7 +5508,8 @@ the instrument rather than the system.**
 
 - **What was believed:** 11 orders on 08-31 showed pregame orders above ~0.41 "resting" and never filling, while live everything filled. So a 0.35 pregame ceiling held near-even bets until live (`0c3f102f`, `97fe50b2`). The rule's own stated falsifier was "a PREGAME FILL above 0.410".
 - **What was true:**
-  - 24 of the 41 near-even pregame orders that reached the venue FILLED within about 2 s (08-28..09-01), including fills at 0.44–0.48 taken 31 to 821 minutes before kickoff. The other 17 were CANCELED by the venue 0.6–1.6 s after submit. None rested; what was read as "resting" was instant cancels.
+  - 24 of the 41 near-even pregame orders that reached the venue FILLED within about 2 s (08-28..09-01), including fills at 0.44–0.48 taken 31 to 821 minutes before kickoff. The other 17 were CANCELED by the venue 0.6–1.6 s after submit, and none of THOSE rested; what was read as "resting" was instant cancels.
+  - **But resting does happen.** On 2026-09-11 two near-even pregame orders RESTED unfilled (`order_state_new`). A venue behavior seen in one window is not the venue's behavior, and a resting good-till-cancel order can fill in-play at a stale price. Orders now expire at kickoff (`16de339b`).
   - The deferral path failed. Of the 51 held bets whose games started, 36 were never placed, because the plan drops started games, and 4 became fills. Near-even bets placed in-play went 3-10 against 5.7 expected.
   - The venue's own book (`GET /v1/markets/{slug}/book`, signed) showed BAL–TOR pregame at 0.445/0.45, with 151,604 shares at the offer.
 - **How it was found:**
