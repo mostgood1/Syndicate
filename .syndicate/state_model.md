@@ -291,10 +291,24 @@ writer's merge-read→SET window. Measured 2026-09-04, three different orders in
 - Live order `6bc5617c…` was reverted to `submitted` by refresh-worker's 25.228 SET. That froze both venues
   for six days.
 
-The witness is paper rows stuck at `submitted`: 13 across 09-06..09-11. That is an upper bound, since a
-crash mid-`place_order` leaves the same shape. `2914b6c7` stops a refused BUILD from writing a row, but a
-SENT order's completion is still exposed. The fix owed is a CAS in `_persist`, on all three services
-(`todo.md #656`). The `off != on` 7 of 10 figure is from 08-28 and covers the whole-document clobber only.
+The witness is paper rows stuck at `submitted`. Counted in the `paper:paper` bucket alone that was 13
+across 09-06..09-11; across ALL paper buckets it is 24, and 37 over 08-29..09-11 `[re-counted 2026-09-10T22:31Z,
+unchanged at 2026-09-11T03:26Z]`. It is an upper bound, since a crash mid-`place_order` leaves the same
+shape. `2914b6c7` stops a refused BUILD from writing a row.
+
+**THE SENT-ORDER EXPOSURE IS CLOSED BY A CAS IN `_persist`, DEPLOYED ON ALL THREE WRITERS**
+`[2026-09-11, lane execution-ledger-cas, todo.md #656, de8a3f2a]`.
+- The unchanged three-way merge now runs inside `refresh_state_store.compare_and_swap_json_file`: WATCH,
+  merge, MULTI/SET/EXEC, and a WatchError re-reads and re-merges. The merge re-read is strict, and a
+  blind fallback from an empty baseline is refused.
+- web since 2026-09-10T23:19:34Z. Its CAS line is owed, because web writes only on operator actions.
+- live-odds-worker since 03:22:35Z: `LEDGER_CAS_ACTIVE backend=keyvalue` at 03:23:41Z, from
+  `reconcile_live_orders`. That is a committed WATCH/MULTI/EXEC on production Redis 7.2.4.
+- refresh-worker since 03:24:50Z, by lane `nfl-layer2-kalshi-identity`'s deploy of `5767e3ac`, which
+  contains the CAS by content. Its first CAS line is owed.
+- OWED: the stuck-paper count staying flat across a paper burst that overlaps live placement.
+
+The `off != on` 7 of 10 figure is from 08-28 and covers the whole-document clobber only.
 
 **SEVERITY IS HIGHER THAN A LOST GRADE.** `reconcile_live_orders` writes
 `reconciled_at` through the same path and the unreconciled gate is a GLOBAL

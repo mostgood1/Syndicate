@@ -441,7 +441,11 @@ death, never life — do not invert it.
 - Falsification test: (1) the replays PASS on origin/main, in which case they do not reproduce the loss and prove nothing; (2) the rival's write is missing from the stored document after the fixed `_persist`; (3) in production, a paper row written after all three writers run the fix stays `submitted` with no `LEDGER_CAS_EXHAUSTED` or `MERGE_READ_FAILED` line to explain it. A crash mid-`place_order` leaves the same shape, so (3) is an upper bound.
 - Verification:
   - (1) off != on: **MET 2026-09-10.** Against the pre-fix `execution_ledger.py`, all 8 discriminating tests fail on their own assertions (K `submitted` not `rejected`; `['get','set']` with no WATCH; no `LEDGER_CAS_ACTIVE`; no `LEDGER_CAS_EXHAUSTED`; no `MERGE_READ_FAILED`; no refusal; the stamp erased). All pass on the fix, and 877 pass across the ledger, store and execution suites.
-  - (2) per service, a deploy behind `deploy_claim.py` + `deploy_preflight.py`, `LEDGER_CAS_ACTIVE` in its logs, and a measurement in `deploys.md`: **OWED**.
+  - (2) per service, a deploy behind `deploy_claim.py` + `deploy_preflight.py`, `LEDGER_CAS_ACTIVE` in its logs, and a measurement in `deploys.md`: **2 OF 3 DEPLOYED BY THIS LANE, ALL 3 LIVE; 1 OF 3 CAS LINES SEEN.**
+    - live-odds-worker `4c373107`, live 2026-09-11T03:22:35Z: `LEDGER_CAS_ACTIVE backend=keyvalue` at 03:23:41Z, from `reconcile_live_orders`. **MET.**
+    - web `4c373107`, live 2026-09-10T23:19:34Z, healthy: its CAS line is **OWED**. Web writes only on operator actions, and there were 0 of those from 23:19Z to 03:16Z.
+    - refresh-worker `5767e3ac`, live 03:24:50Z: **OWED**. It was lane nfl-layer2-kalshi-identity's deploy, which contains the CAS by content. No ledger write had happened by 03:29Z, while it was still booting its board.
+    - USER DECISION ~03:14Z: "both as soon as each is CLEAR". Both worker deploys carried lane mlb-lens-final-status's final passes, whose lane had asked for "after tonight's slate" and could not be reached.
   - (3) the stuck-paper count: **OWED**. Baseline 2026-09-10T22:31:52Z, `/api/ops/execution/ledger-summary?days=14`: 37 paper rows at `submitted` across 08-29..09-11, 24 of them in 09-06..09-11.
 - Blocked by: none.
 

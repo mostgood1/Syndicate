@@ -32024,3 +32024,113 @@ chips 2026-09-03 source=inline_artifact_stale states={'final': 9}  (before: 7 fi
 **Rollback:** `render_deploy.py --service live-odds-worker --commit e4410f37 --allow-rollback`, or the kill
 switch `SYNDICATE_MLB_LIVE_LENS_FINAL_PASS_WEB=0`, which needs a deploy to inject. Patches already published to web
 stay: they are status-only, stamped `finalizedBy` / `finalPass`.
+
+## 2026-09-10 23:16:09-23:19:34Z — web `c2dcd525` -> `4c373107` — lane `execution-ledger-cas`
+
+**What:** `de8a3f2a` (`todo.md #656`), plus its ledger commit `4c373107`.
+- `execution_ledger._persist` runs its unchanged three-way merge INSIDE
+  `refresh_state_store.compare_and_swap_json_file`: WATCH, merge (the re-read happens after the
+  WATCH), then MULTI/SET/EXEC. A WatchError re-reads and re-merges, up to 5 attempts.
+- If every attempt is lost, it writes one non-atomic merge (`LEDGER_CAS_EXHAUSTED`, stamped
+  `last_blind_write.reason=cas_retries_exhausted`).
+- The merge re-read is strict (`_read_for_merge`). A blind fallback from an EMPTY baseline is refused.
+- Instruments: `LEDGER_CAS_ACTIVE` once per process, and `LEDGER_CAS conflicts=N` per collision
+  caught.
+
+**Why web first:** web writes the ledger only on operator actions (`resolve_unknown_submit`,
+`acknowledge_grade_conflict`), so it is the lowest-risk first deploy. It closes only web's own
+writes; the workers are the ones that matter.
+
+**Ride-along:** 9 other runtime commits since live `c2dcd525`:
+- `e035c829` and `cfec04ef`, the lane `mlb-lens-final-status` passes. INERT HERE: they hang off
+  `live_lens_loop._run_live_lens_tick`, and `SYNDICATE_ENABLE_LIVE_LENS_LOOP` is ABSENT on web
+  (single-key read: HTTP 404), with a code default of False (`live_lens_loop.py:327`).
+- `f73a140f`, `2914b6c7`, `c29a7d4e`, `6ebec70e`, `86c82220`, `3e33f083` and `5bb0158a`.
+- `dce7c172`, which is a script.
+- `render.yaml` and `requirements*.txt` are unchanged across the range. Live `c2dcd525` is an
+  ancestor of the target, so nothing is reverted.
+
+**State before, not caused by this:** web was in its 4th `unhealthy` episode of the day. The Render
+event reads `HTTP health check failed (timed out after 5 seconds)` at 23:11:06Z; the earlier episodes
+began 17:24, 17:41 and 18:46Z. This is the known health-check starvation (`todo.md` item 56). There
+was no OOM or kill event, and gunicorn rebooted its workers at 22:59:00 and 23:01:23Z.
+- `/` returned 502 at 23:10:40Z, and preflight read UNKNOWN because `/api/ops/memory` did not answer.
+- It recovered, and preflight read CLEAR at 23:15:47Z.
+
+**Locks:** claim `execution-ledger-cas` acquired 23:07:41Z (token `b1643b1b...`), preflight CLEAR
+23:15:47Z for `4c373107`. Deploy `dep-dahjkeafngtc73a0ho50`: created 23:16:09Z, `build_ended`
+23:17:53Z, `server_available` 23:19:33.96Z, **live 23:19:34.25Z**. The claim lapsed on TTL at about
+23:52Z; it was released after this entry.
+
+**verify -- the reading (2026-09-11 ~03:16Z, +3h56m):**
+
+```
+health     /api/ops/execution/ledger-summary?days=2  200  0.3 s  6,928 B   (ops token)
+           /api/portfolio/live                        200  0.4 s  25,890 B  (ops token)
+events     web since 23:15Z: build_started, deploy_started, build_ended, server_available,
+           deploy_ended -- NO `unhealthy` after the deploy
+CAS        LEDGER_CAS_ACTIVE on web: NOT SEEN, and it could not have been. From 23:19:34Z to
+           03:16Z web logged 0 `[execution_ledger]` lines, 0 OPERATOR_RESOLUTION and
+           0 GRADE_CONFLICT_ACKNOWLEDGED. Web writes the ledger only on those actions.
+baseline   paper rows at `submitted`, /api/ops/execution/ledger-summary?days=14 (08-29..09-11):
+           23:14:31Z  37     03:16:02Z  37     (09-10: 2 of 500 -> 2 of 564; 09-11: 2 of 314 -> 2 of 386)
+           Neither worker ran the CAS in that window, so this is the PRE-fix baseline, not a result.
+```
+
+**Verdict: DEPLOYED, health verified. CAS REACHABILITY ON WEB IS OWED.** It needs the first
+operator write, found with `py -3 scripts/render_logs.py --service web --text LEDGER_CAS_ACTIVE --start
+2026-09-10T23:19:34Z`. The workers carry the goal reading.
+
+**Rollback:** `render_deploy.py --service web --commit c2dcd525 --allow-rollback`.
+
+## 2026-09-11 03:17:22-03:22:35Z — live-odds-worker `e4410f37` -> `4c373107` — lane `execution-ledger-cas`
+
+**What:** `de8a3f2a` (`#656`), the compare-and-swap in `execution_ledger._persist`. The mechanism is
+in the web entry above. This service places and reconciles live orders, and settles them from the venue.
+
+**Ride-along:**
+- `e035c829`, lane `mlb-lens-final-status`'s web half of the MLB final pass. It is ACTIVE here: this
+  service runs the live-lens loop.
+- `f73a140f`.
+- `render.yaml` and `requirements*` are unchanged. Live `e4410f37` is an ancestor of the target.
+
+**USER DECISION 2026-09-11 ~03:14Z:** "Both as soon as each is CLEAR". It was asked rather than
+assumed. That lane had written "deployed after tonight's slate", and its session could not be reached.
+
+**Locks:** claim acquired 03:14:4xZ (token `7980836c...`).
+- Preflight read HOLD at 03:14:43Z: one `fetch_espn_live_status` job in flight.
+- A read-only watcher, which writes no receipt, read CLEAR at 03:16:27Z.
+- Preflight read CLEAR at ~03:17:08Z (sample 03:16:21Z) for `4c373107`.
+- Deploy `dep-dahn5gid0e5s7383ldvg`: created 03:17:22.8Z, `update_in_progress` 03:21:26Z,
+  **live 03:22:35.62Z**.
+
+**verify -- the reading:**
+
+```
+03:23:41.367Z  [refresh_state_store] KEYVALUE_WRITE_LARGE key=...execution_ledger.json size_bytes=5960803
+               caller=execution_ledger.py:984 <- execution_ledger.py:2673 <- run_live_odds_refresh_worker.py:1928
+03:23:41.370Z  [execution_ledger] LEDGER_CAS_ACTIVE backend=keyvalue max_attempts=5 -- the merge-read
+               and the SET are one compare-and-swap (#656)
+03:23:43.879Z  KEYVALUE_WRITE_LARGE ... size_bytes=5960803 ... <- run_live_odds_refresh_worker.py:1930
+03:22:35Z..~03:25Z: 0 Traceback, 0 LedgerError, 0 LEDGER_CAS_EXHAUSTED, 0 MERGE_READ_FAILED, 0 CAS_CONFLICT
+```
+
+- **Reachability, not presence.** `LEDGER_CAS_ACTIVE` prints only after `compare_and_swap_json_file`
+  returns a COMMITTED result. So this is a real WATCH/MULTI/EXEC round trip on production Redis 7.2.4,
+  66 s after boot, from reconcile: `execution_ledger.py:2673` is `reconcile_live_orders`' `_persist`.
+- There is one `KEYVALUE_WRITE_LARGE` per landed SET, 3 ms before the ACTIVE line. That is the
+  post-commit announcement order.
+- **The ledger is 5,960,803 B**, not the ~2.7 MB of 09-04: 71% of the 8,388,608 B ceiling.
+  `#643` projected 65% at the record cap. The CAS changes neither size nor count, so this is
+  flagged, not acted on.
+- No collision has been caught yet. `LEDGER_CAS conflicts=N` is the line that would show one.
+
+**Ride-along observation, for lane `mlb-lens-final-status`** (not this lane's measurement):
+- 03:24:06Z `MLB_LIVE_LENS_FINAL_PASS ... finalized=0`
+- 03:24:09Z `MLB_LIVE_LENS_FINAL_PASS_WEB dates_checked=10 open_rows=10 finalized=10 published=8 publish_failed=0`
+
+**Verdict: THE CAS IS REACHED AND COMMITTING on live-odds-worker.** The goal reading, that stuck paper
+stops growing across a burst overlapping live placement, needs refresh-worker on the fix too; see
+the next entry.
+
+**Rollback:** `render_deploy.py --service live-odds-worker --commit e4410f37 --allow-rollback`.
