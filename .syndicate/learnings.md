@@ -5486,3 +5486,20 @@ the instrument rather than the system.**
   - A `Files:` line that claims nothing must carry no backticked path-like token.
   - "Invariants hold" is not evidence that claims were released.
 - **Cost:** one false statement to the user, corrected before it caused a blocked edit elsewhere, and three extra ledger commits.
+
+## 2026-09-11 — OVERTURNED (a ledger state claim, by this session's measurement): "NCAAF serves ZERO orders by design" and "#593 can never be verified end-to-end" were both false by 2026-09-10 `[lane nfl-prop-grading]`
+
+- **What the ledger said:**
+  - `state_football.md [ncaaf-zero-orders-is-two-gates]` (verified 2026-09-01): NCAAF places 0 orders, because `pick_gate` and `portfolio_commit.py:267` hold by design.
+  - Its state line said NCAAF settlement was "NEVER verified end-to-end".
+  - Scheduled task `verify-ncaaf-settlement-593` was disabled with "Do NOT re-enable ... a Friday run was GUARANTEED to report PENDING".
+- **What was actually true:**
+  - Plan date 2026-09-10 held **517 distinct NCAAF orders on 72 games**, 211 of them in the portfolio book.
+  - 20 FAMU @ MIA orders were graded end-to-end by `paper_settlement` on 2026-09-10, every outcome consistent with the score.
+  - Some change after 09-01 let NCAAF orders through. No state line recorded it.
+- **How we found out**: the first-grade reading counted orders per game in `/api/portfolio/paper` instead of assuming them.
+- **The rule going forward:**
+  - A state claim of the form "zero BY DESIGN" describes a configuration that other lanes can change without touching that section.
+  - Before building on one, or before writing a task or a disable-note that assumes it, count it in production and date the count.
+  - A lane that lifts such a gate owes the superseding line in the section that stated it.
+- **Cost**: none paid this time. The reading counted before concluding. A reader trusting the section would have skipped NCAAF settlement verification entirely.

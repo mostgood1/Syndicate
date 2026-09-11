@@ -459,7 +459,7 @@ once this index exists: re-splitting would orphan the parts.
 | [live-edge-basis-label] | `edge_basis` WAS WRONG ON EVERY LIVE MONEYLINE ROW, AND THE MEASUREMENT THAT CERTIFIED IT COULD NOT HAVE SEEN  | `state_board.md` |
 | [coverage-report-artifact] | THE DATA-COVERAGE PAGE IS ARTIFACT-BACKED — worker publishes, web reads, and the cross-service read is PROVEN  | `state_board.md` |
 | [nfl-board-projection-coverage] | NFL BOARD PROJECTION COVERAGE IS 100% `[measured 2026-09-04T23:19:34Z on the served payload, lanes nfl-project | `state_football.md` |
-| [ncaaf-zero-orders-is-two-gates] | NCAAF SERVES ZERO ORDERS BY DESIGN, and it is TWO gates, not one `[verified 2026-09-01, lane game-market-entry | `state_football.md` |
+| [ncaaf-zero-orders-is-two-gates] | NCAAF ZERO ORDERS — SUPERSEDED 2026-09-11: the portfolio holds NCAAF orders (517 on plan 09-10) and they grade end-to-end; the two-gate analysis is the 09-01 state | `state_football.md` |
 | [ncaaf-team-registry-two-files] | THE RESOLVER READS THE *SNAPSHOT*, AND THE FILE BESIDE IT IS OLDER AND DIFFERENT `[measured 2026-09-03]` | `state_football.md` |
 | [nfl-rating-units] | NFL'S SIM COULD NOT TELL TEAMS APART. THE CAUSE WAS THE SCALE CONSTANT, **NOT** A UNITS DEFECT — that diagnosi | `state_football.md` |
 | [football-smartsim2] | FOOTBALL (NFL + NCAAF) — smartsim2 runs on FOUR SCALARS `[measured 2026-08-18, lane football-model-owner]` | `state_football.md` |

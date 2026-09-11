@@ -36,7 +36,14 @@ for a rebuild before reading. Tells that the request path did not run: no
 32 distinct codes, `LA` (Rams) and `LAC` (Chargers) present, **`LAR` absent entirely**,
 `WAS` not `WSH`. `_NFL_ALIAS_TO_NAME` now resolves all 32.
 
-## [ncaaf-zero-orders-is-two-gates] NCAAF SERVES ZERO ORDERS BY DESIGN, and it is TWO gates, not one `[verified 2026-09-01, lane game-market-entry-roi-curve]`
+## [ncaaf-zero-orders-is-two-gates] NCAAF ZERO ORDERS — SUPERSEDED 2026-09-11: the paper portfolio HOLDS NCAAF orders and they GRADE end-to-end; the two-gate analysis below is the 2026-09-01 state `[verified 2026-09-01, lane game-market-entry-roi-curve; superseded 2026-09-11, lane nfl-prop-grading]`
+
+**SUPERSEDED 2026-09-11** (measured on `/api/portfolio/paper`; `deploys.md` 2026-09-11 08:50 CT, `4d7213d1`).
+- **NCAAF orders exist.** Plan date 2026-09-10 holds **517 distinct NCAAF orders on 72 games**:
+  - 211 in the portfolio book (`venue: paper`)
+  - venue-comparison: `paper:prophetx` 178, `paper:novig` 74, `paper:kalshi` 54
+- **They GRADE end-to-end.** On 2026-09-10, `paper_settlement` graded 20 FAMU @ MIA orders (plans 09-08 to 09-10) in its 21:55 and 22:37 CT runs. Every outcome is consistent with its `settled_value`.
+- **Which change let NCAAF orders past the two gates below is NOT established here.** Read the analysis below as the 2026-09-01 state, not the current one.
 
 The board is alive: `/api/board/layer2-shortlist?sport=ncaaf` serves **480 rows**,
 `per_sport.ncaaf.selected=480`. The first zero is the SIZING input.
@@ -56,8 +63,8 @@ The board is alive: `/api/board/layer2-shortlist?sport=ncaaf` serves **480 rows*
 **`pick_gate`'s 2026-08-29 `(sport, market, BASIS)` re-key cannot produce orders
 on its own** — it un-blocked RANKING; sizing still needs a model edge the gate
 denies. Changing this is a PRODUCT DECISION, the position `#624` step 6 holds for
-MLB props. **NCAAF settlement is shipped and NEVER verified end-to-end**; tripwire
-at `#627`'s LIFT_CONDITION.
+MLB props. **NCAAF settlement was verified end-to-end on 2026-09-11** (FAMU @ MIA, 20 orders; see the
+SUPERSEDED note above). Re-read `#627`'s LIFT_CONDITION tripwire against that.
 
 ## [ncaaf-team-registry-two-files] THE RESOLVER READS THE *SNAPSHOT*, AND THE FILE BESIDE IT IS OLDER AND DIFFERENT `[measured 2026-09-03]`
 
