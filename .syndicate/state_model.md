@@ -317,6 +317,12 @@ shape. `2914b6c7` stops a refused BUILD from writing a row.
 - **Size: BOUNDED.** The document is at the 5,000-record cap, at 1,192 B/order. That is 5,960,805 B,
   71% of the 8,388,608 B refusal ceiling (`SIZE_WARNING` 2026-09-11T03:30:23Z). `TRIMMED` drops the
   oldest rows, so any count summed over dates can fall as old dates leave. Read stuck rows per date.
+  **The trim is also eroding SETTLED history, which sizing reads** `[verified 2026-09-11, lane nfl-prop-grading]`:
+  - `SETTLED_SAMPLE` counts ALL-TIME settled decisions over this document, and it feeds `_sample_credibility`
+    on every stake. It fell mlb 666 -> 495, nfl 12 -> 4 and wnba 40 -> 23 between 09-10 18Z and 09-11 10Z.
+  - `TRIMMED dropped=1` fires about 800 times a day and rising.
+  - Raising the cap alone hits the 8 MB ceiling at about 7,000 orders.
+  - The fix is a user decision: `deploys.md` 2026-09-11 10:49 CT, `leads.md`.
 - **Stuck paper, first window: MET** `[2026-09-11T13:41:50Z]`. 0 new stuck rows across 245 new paper
   orders (09-10: 2 of 595; 09-11: 2 of 468; 09-12: 0 of 132), with live placement in the window.
   A second window is owed, scheduled for 2026-09-12 10:15 CDT. web's `LEDGER_CAS_ACTIVE` is not

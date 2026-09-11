@@ -5,6 +5,50 @@
 
 ---
 
+## 2026-09-11 10:49 CT — reading only, no deploy — refresh-worker `1e1285a4` (lane `nfl-prop-grading`, CORRECTION to this lane's 08:50 CT entry) — **`SETTLED_SAMPLE` IS NOT A MOVING WINDOW: THE EXECUTION LEDGER IS AT ITS 5,000-RECORD CAP AND EVICTS THE OLDEST, SETTLED ORDERS ON EVERY WRITE**
+
+The 08:50 CT entry said the nfl `SETTLED_SAMPLE` drop (12 -> 4) meant "the sample window moved". **That was wrong.**
+`pipeline/portfolio_commit._settled_sample_size_by_sport` (`:1190`) delegates to
+`paper_settlement.settled_decisions_by_sport`, which counts distinct settled decisions over the WHOLE ledger (`_load()`, all
+time). There is no window, so an all-time count that falls means records are LEAVING the ledger.
+
+- **The mechanism, measured.** `execution_ledger._MAX_RECORDS = 5000` (`execution_ledger.py:98`); the trim is at `:971-976`
+  and keeps `orders[-5000:]`. refresh-worker logs `[execution_ledger] TRIMMED dropped=1 kept=5000 cap=5000` on writes:
+  - 1,208 lines from 09-09 13:24Z (the start of log retention; it was already trimming then) to 09-11 15:37Z.
+  - The rate is rising: 215 trims 09-10 00-12Z, 432 trims 09-10 12Z-09-11 00Z, 354 trims 09-11 00-16Z.
+  - Each new order evicts the OLDEST record, and the oldest records are the settled ones.
+- **The effect on the all-time count** (`SETTLED_SAMPLE`, same builds):
+
+| 2026 (UTC) | mlb | ncaaf | nfl | soccer | wnba |
+|---|---|---|---|---|---|
+| 09-10 18:14Z | 666 | 226 | 12 | 79 | 40 |
+| 09-11 00:49Z | 577 | 226 | 10 | 78 | 34 |
+| 09-11 04:51Z | 550 | 238 | 9 | 77 | 27 |
+| 09-11 09:53Z | 495 | 238 | 4 | 76 | 23 |
+
+  - The decline is steady, a few decisions per cycle, and not a step at any deploy.
+  - NFL's 12 were late-August preseason decisions, the oldest in the ledger.
+  - ncaaf rises only because its 09-10 grades are the newest. They will be evicted in turn.
+- **What depends on it:**
+  - `SETTLED_SAMPLE` feeds `_sample_credibility`, which scales EVERY stake (0.25 floor -> 1.0 at 50 decisions). wnba credibility
+    is already 0.46 (it was 0.80 at 40 decisions).
+  - `paper_settlement.py` writes no separate copy of graded outcomes.
+  - The readers of settled outcomes I found all read this one document: `paper_settlement`, `pipeline/portfolio_commit`,
+    `execution_guard`, the intelligence blueprint.
+  - The module's own docstring says "a record of money placed must not expire". It does not expire by TTL (the path is
+    date-free), but it is evicted by the cap.
+- **Why simply raising the cap is not the fix.** `[execution_ledger] SIZE_WARNING bytes=5970776 ... orders=5000
+  bytes_per_order=1194 ... ceiling=8388608 -- BOUNDED ... 71%` (09-11 15:37Z). At 1,194 B/order, the store's 8 MB refusal
+  ceiling is reached at about 7,000 orders.
+  - The volume grew once `e6d5ab29` (09-04) let NCAAF size on market fair: 517 NCAAF orders on plan 09-10, 306 of them
+    venue-comparison shadow copies.
+  - The fix is structural: move settled orders into a date-free archive document, keep the venue-comparison shadow books out
+    of the money ledger, or shrink records.
+- **NOT fixed here.** `execution_ledger.py` is the money ledger, claimed by lane `execution-ledger-cas`. This is recorded as a
+  lead in `leads.md` and put to the user for a decision.
+- verify: n/a (reading). The OWED item is a decision, and then a fix whose reading is `TRIMMED` stopping while `SETTLED_SAMPLE`
+  stays flat or rising.
+
 ## 2026-09-11 08:50 CT — refresh-worker `c29a7d4e` / `5767e3ac` (the grading runs; now `1e1285a4`) (lane `nfl-prop-grading`, reading owed by the 2026-09-10 09:59 CT entry) — **NCAAF GRADED IN PRODUCTION (FAMU @ MIA, 20 orders, every outcome consistent with the score); NFL: NO ORDERS ON SF @ LAR, SO THE NFL PROP GRADE IS OWED AFTER SUNDAY 09-13**
 
 Taken by hand by session 2edf8b82. Scheduled task `nfl-ncaaf-first-grade-reading` (11:15 PM CT) never dispatched: it has no

@@ -5521,3 +5521,11 @@ the instrument rather than the system.**
 - **Also, tooling:**
   - The discard-guard hook resolves EVERY path named in a command containing `checkout --` against the PRIMARY tree. A worktree command that also ran `scripts\check_lane_invariants.py` was blocked for that second path. Run the discard as its own command.
   - `lane_claims` reads every backticked path in a `- Files:` line as a claim, including one inside a "NOT ..." clause. That made `check_lane_invariants` report a contested file. Name unclaimed files outside the Files line.
+
+## 2026-09-11 — OVERTURNED (mine, same morning): I explained a falling ALL-TIME count as "the window moved" without reading how the count is taken. It was data loss `[lane nfl-prop-grading]`
+
+- **What I believed**: `SETTLED_SAMPLE` nfl 12 -> 4 (mlb and wnba down too) meant a rolling window. I wrote that into `deploys.md` at 08:50 CT.
+- **What was actually true**: the counter reads the whole execution ledger, and the ledger is at its 5,000-record cap. `TRIMMED dropped=1` fires on every write and evicts the oldest orders, which are the settled ones. Every stake's credibility input is shrinking.
+- **How we found out**: the next session step read `_settled_sample_size_by_sport` -> `settled_decisions_by_sport` (whole ledger, all time). A count with no window cannot fall unless records leave, and `TRIMMED` showed them leaving.
+- **The rule going forward**: before explaining a count that moved, read the function that takes it and name its UNIT and its WINDOW. A count documented as all-time that decreases is a data-loss alarm, never a window.
+- **Cost**: one wrong line in `deploys.md`, corrected the same morning. The eviction itself had been running since at least 09-09 13:24Z, unremarked.

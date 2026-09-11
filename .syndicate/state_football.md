@@ -43,7 +43,12 @@ for a rebuild before reading. Tells that the request path did not run: no
   - 211 in the portfolio book (`venue: paper`)
   - venue-comparison: `paper:prophetx` 178, `paper:novig` 74, `paper:kalshi` 54
 - **They GRADE end-to-end.** On 2026-09-10, `paper_settlement` graded 20 FAMU @ MIA orders (plans 09-08 to 09-10) in its 21:55 and 22:37 CT runs. Every outcome is consistent with its `settled_value`.
-- **Which change let NCAAF orders past the two gates below is NOT established here.** Read the analysis below as the 2026-09-01 state, not the current one.
+- **What let them past the two gates below:**
+  - `e6d5ab29` (2026-09-04, an operator decision) lets a NAMED sport size on market fair through the allowlist `SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS`.
+  - That key reads `'ncaaf'` on refresh-worker (single-key read, 2026-09-11).
+  - `pick_gate`'s model denial is unchanged; sizing no longer needs the model edge.
+  - This is the "explicit choice to size on market basis" that `#627`'s LIFT_CONDITION named.
+- Read the analysis below as the 2026-09-01 state, not the current one.
 
 The board is alive: `/api/board/layer2-shortlist?sport=ncaaf` serves **480 rows**,
 `per_sport.ncaaf.selected=480`. The first zero is the SIZING input.
