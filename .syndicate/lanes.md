@@ -696,6 +696,16 @@ death, never life — do not invert it.
     - `LIVE_PLAN_WRITTEN venue=kalshi positions=5 placeable_committed=5/5`, with `refusals['aggregator_priced']=287`.
   - The paper2 Kalshi rows at ~15:40Z hold 13 NCAAF 09-12 rows. **1 is `venue_feed` with a ticker; 12 are aggregator** (5 spreads, 6 totals, 1 h2h).
   - `LIVE_PLAN placeable_committed=N/N` is ALREADY > 0 (5/5), so "N > 0" cannot discriminate this change. The readings that can are: NCAAF 09-12 venue_feed rows up from 1, `aggregator_priced` down from 287, and `PRECAP_SELECT mode=board_lines kept_at_line_total > 0`.
+- 2026-09-11 16:13Z: the code is in production on BOTH workers with the flag OFF, carried as a ride-along by other lanes. Both SHAs are content-verified to contain `7c248328`.
+  - live-odds-worker `1afec00f` (lane `polymarket-ask-pricing`), live 16:02:43Z. The OFF reading: `PRECAP_SELECT mode=arrival` at 16:13:02Z, with none of the board-line fields. That is the old line, byte for byte in shape.
+  - refresh-worker `889d4e12` (lane `ncaaf-tbd-kickoff-date`), `build_in_progress` at 16:13Z.
+  - So each of this lane's deploys is ENV-ONLY: set the flag, then `render_deploy.py --reinject-env` of the live commit. It carries no collateral code.
+- 2026-09-11 16:21Z — refresh-worker:
+  - **Claim** held by this lane (token `bba67290`, TTL to ~17:06Z).
+  - **ENV SET**: `SYNDICATE_KALSHI_PRECAP_BOARD_LINES` went from `None` to `1` through `render_env_set.py`'s single-key PUT. It is **NOT IN THE PROCESS YET**, because no deploy has run.
+  - **Preflight** for `889d4e12 --reinject-env` returned **TOO_SOON**. `ncaaf-tbd-kickoff-date`'s deploy went live at 16:18:23Z; the minimum spacing is 25 min and the first board publish takes ~21 min (`#563`).
+  - **Next:** re-run preflight after ~16:43:30Z, then deploy, then do live-odds-worker.
+  - **If this session is gone:** the key is set and undeployed. The next refresh-worker deploy by anyone carries it; the effect is `PRECAP_SELECT mode=board_lines`. It is removable with the same script.
 
 ### ncaaf-tbd-kickoff-date — OPEN — opened 2026-09-11 — session 53eaee9c-46e9-4c34-8075-d63d7f63c933 — **LIVE ON refresh-worker `889d4e12` (16:18:23Z). FRIDAY MET; SATURDAY OWED. Web lacks the fix; Saturday resolves at the 09-12 date roll or with a web deploy.**
 - **GOAL VERDICT.** Goal (verbatim): "[user 2026-09-11: NFL/NCAAF compact cards show "games on the wrong day"] NCAAF games whose kickoff CFBD lists as TBD are filed on their real calendar day, not the day before, and their chip reads TBD instead of a fabricated "11:00P CT". ONE testable outcome: after a refresh-worker deploy, `/api/board/game-chips` for 2026-09-11 carries no NCAAF chip for a Saturday game (Mercyhurst @ New Mexico, Southern Miss @ Auburn, NMSU @ Hawai'i, Cal Poly @ SJSU), and the 2026-09-12 chips carry them with a TBD token." → **GOAL: NOT MET.**
