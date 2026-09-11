@@ -506,11 +506,11 @@ once this index exists: re-splitting would orphan the parts.
 | [layer1-board-date-scoping] | THE BOARD WAS DROPPING GAMES TWO WAYS — both FIXED AND VERIFIED `[verified 2026-08-30 05:0x-05:5xZ, web+refres | `state_layer2.md` |
 | [board-chip-coverage] | Layer 2 compact game cards — FULL chip coverage, verified 2026-08-26 | `state_layer2.md` |
 | [chip-artifact-content-age] | A chip artifact's TIMESTAMP and its CONTENT age are different numbers — verified 2026-08-27 (lane `mlb-chip-li | `state_layer2.md` |
-| [kalshi-prop-quote-identity] | KALSHI PROP QUOTES WERE FILED UNDER THE CANONICAL KEY WITH NO GAME, AND REFRESH-WORKER'S NFL PROP ARTIFACT WA | `state_layer2.md` |
+| [kalshi-prop-quote-identity] | KALSHI PROP QUOTES WERE FILED UNDER THE CANONICAL KEY WITH NO GAME, AND REFRESH-WORKER'S NFL PROP ARTIFACT WAS | `state_layer2.md` |
 | [segment-misgrade-regrade] | 53 OF 173 SETTLED SEGMENT ORDERS WERE GRADED AGAINST THE WRONG ACTUAL — 30.6%, AND THE ERRORS NEARLY CANCEL `[ | `state_ledger.md` |
 | [stale-test-triage] | "THE TEST IS STALE" IS A HYPOTHESIS, AND IT WAS WRONG FOR 4 OF 18 `[2026-09-05, lane stale-test-repair, commit | `state_ledger.md` |
 | [full-suite-completes] | THE FULL SUITE RAN TO COMPLETION FOR THE FIRST TIME -- 15,307 tests, 61m06s, and the 27 "NEW" failures are 6 p | `state_ledger.md` |
-| [github-actions-dead] | GITHUB ACTIONS RUNS AGAIN FROM 2026-09-10 (billing fixed); `ci.yml` GATED NOTHING 2026-08-22..09-10 | `state_ledger.md` |
+| [github-actions-dead] | GITHUB ACTIONS RUNS AGAIN FROM 2026-09-10 (billing fixed by the user); `ci.yml` GATED NOTHING 2026-08-22..2026 | `state_ledger.md` |
 | [ci-suite-red-test] | CI'S OWN SUITE IS GREEN. THE "ONE RED TEST" WAS THE 31st DATA-ABSENCE FAILURE, NOT A SURVIVOR OF THEM `[correc | `state_ledger.md` |
 | [state-file-split] | state.md IS AN INDEX PLUS NINE PARTS `[2026-09-03, scripts/split_state.py, commit 23bf6bc7]` | `state_ledger.md` |
 | [session-harness] | SESSION HARNESS — what the hooks actually enforce | `state_ledger.md` |
@@ -576,7 +576,8 @@ once this index exists: re-splitting would orphan the parts.
 | [polymarket-pregame-orders-rest] | 2026-08-31 — THREE pending orders, ALL pregame, ALL bid AT the quote | `state_polymarket.md` |
 | [polymarket-fill-time-to-event] | 2026-08-30 — the leading hypothesis is TIME TO EVENT, not liquidity at our size | `state_polymarket.md` |
 | [polymarket-order-fills] | 2026-08-30 — four causes REFUTED; fills are mostly fine | `state_polymarket.md` |
-| [portfolio-sign-in-and-books] | EVERY PORTFOLIO PAGE IS BEHIND A SIGN-IN, AND THERE IS MORE THAN ONE PORTFOLIO `[verified on production 2026-09-1 | `state_portfolio.md` |
+| [polymarket-slate-budget-kept-props-dropped-game-lines] | THE POLYMARKET SLATE SPENT ITS 8 MB ON PROPS AND DROPPED THE WEEKEND'S GAME LINES — fixed in `3bafdd2b` `[veri | `state_polymarket.md` |
+| [portfolio-sign-in-and-books] | EVERY PORTFOLIO PAGE IS BEHIND A SIGN-IN, AND THERE IS MORE THAN ONE PORTFOLIO `[verified on production 2026-0 | `state_portfolio.md` |
 | [portfolio-live-surface] | `/portfolio` IS THE LIVE BUYING ENGINE, the venue caps BIND, and the VENUE now settles our bets `[verified 202 | `state_portfolio.md` |
 | [portfolio-settlement] | PORTFOLIO SETTLEMENT — the ledger crossed no service boundary, and the join keyed on a value that drifts `[ver | `state_portfolio.md` |
 | [order-model-attribution] | AN ORDER RECORDS THE SIM'S VERDICT — DEPLOYED AND VERIFIED ON PRODUCTION; THE COMMIT GATE MAKES FOUR OF THE NI | `state_portfolio.md` |

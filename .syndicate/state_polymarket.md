@@ -1226,3 +1226,30 @@ three refusing paths keep blocking). My `63661af1` auto-reject was UNSAFE and is
 reverted (`ef0d2d47`) — absent from the OPEN book is not absent from the venue.
 
 ﻿
+
+## [polymarket-slate-budget-kept-props-dropped-game-lines] THE POLYMARKET SLATE SPENT ITS 8 MB ON PROPS AND DROPPED THE WEEKEND'S GAME LINES — fixed in `3bafdd2b` `[verified on production 2026-09-11T03:50:33Z, live-odds-worker, lane polymarket-slate-budget]`
+
+**What broke.** `_slate_within_budget` (`polymarket_us_markets.py`) ranked the ~8 MB keyvalue cut by DATE ONLY.
+- It dropped nothing from 08-26 to at least 08-31 (`kept_through` 09-20), when coverage was 167–436 matches.
+- By 09-11 the catalogue had grown to 83,516 markets, swollen by college-football player props. The cut then kept ~15k
+  props and half/quarter markets for 09-10/11 (`POLYMARKET_OUT_OF_SCOPE`: 9,438 cfb PROP, 4,291 cfb segment spreads and
+  totals) and dropped every market from 09-12 on.
+- The join indexed 5,962 game lines and priced 19 of 3,799 board rows. Every NFL row read `no_candidates`: not one
+  Sunday game line had been stored. `VENUE_SCOPE venue=polymarket` scoped ~25 of ~3,800 (0.6%), against ~20% on Kalshi.
+
+**The fix.** Rank by (tier, date).
+- Tier 0 is a market the game-line join can price, dated from yesterday to 7 days out. The test reuses the join's own
+  `parse_slug`, `MARKET_TYPE_TO_BOARD` and `_has_segment`, plus BTTS.
+- Everything else comes after, by date.
+- The ceiling is unchanged (#60).
+
+**Measured.**
+- `SLATE_BUDGET tiering=game_lines_first kept_game_lines=13540 dropped_game_lines=0 game_lines_kept_through=2026-09-18`.
+  Every joinable game line in the window is stored, where 5,962 were indexed before.
+- The join on the new slate: the first build on the new slate (04:07:31Z) indexed 13,346 game lines (was 5,962-6,108), matched 109 (was 0-38), scoped 126 rows (was 13-26) and planned 6 placeable Polymarket positions (was 0). ALL of them are SOCCER. Football still reads `no_candidates`: the join's forward-date widening is soccer-only (`polymarket_board_join.py:1913`), so a board row dated today cannot reach a Saturday or Sunday market. That is the next fix. The join took 94.91 s against ~0.8 s before; that is to be re-read on the next build.
+
+**Cost, named.** `polymarket_daily_rows` archives what the slate keeps, so the near-term props it records shrink by
+whatever game lines displace them. `dropped_by_date` still reports every one.
+
+**Watch.** If the catalogue keeps growing, tier 0 alone can overflow the budget. `dropped_game_lines_by_date` on the
+`SLATE_BUDGET` line is the early warning, and it read `{}` at the first write.

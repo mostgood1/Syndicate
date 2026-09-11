@@ -479,7 +479,7 @@ death, never life — do not invert it.
 
 ### polymarket-slate-budget — OPEN — opened 2026-09-11 — session 7a239b89-c8fd-49b7-ba5a-e41bb9d4d9bc
 - Goal: [user 2026-09-10: "we need to fix this - clearly we aren't reading polymarket correctly"] the Polymarket slate keeps the markets we can trade. Full-game lines for the board's horizon (this weekend's NCAAF and NFL) survive the ~8 MB keyvalue budget instead of being cut behind player props and half/quarter markets that nothing reads.
-- Files: `syndicate/features/shared/polymarket_us_markets.py`, `tests/test_polymarket_us_markets.py`.
+- Files: `syndicate/features/shared/polymarket_us_markets.py`, `tests/test_polymarket_us_markets.py`, `syndicate/features/shared/polymarket_board_join.py`, `tests/test_polymarket_board_join.py` (the last two ADDED 2026-09-11 for the football forward-date widening; no open lane claimed them).
 - Hypothesis:
   - `_slate_within_budget` (`polymarket_us_markets.py:1615`) ranks by DATE ONLY. Measured 2026-09-11T03:07–03:28Z: fetched 83,516, kept 21,786, `dropped_for_size` 61,730 (09-12: 10,962; 09-13: 14,744; 09-19: 19,108; 09-20: 9,814).
   - About 15k of the kept rows are types the game-line join refuses. `POLYMARKET_OUT_OF_SCOPE` counts 9,438 cfb PROP and 4,291 cfb segment spreads/totals; the join refuses `market_type_not_a_game_line` 10,974 and `segment_market_not_full_game` 4,533. Meanwhile every game line from 09-12 on is cut.
@@ -492,6 +492,20 @@ death, never life — do not invert it.
   - The trade-off is named: the daily book archives what the slate keeps, so the near-term props it records shrink by whatever the game lines displace.
 - Blocked by: none. Deploy owed: live-odds-worker, the slate writer.
 - Out of scope, flagged: the pregame near-even hold loses its held bets at first pitch (2026-09-10, Pirates–White Sox: held through 23:41Z, and the 23:46Z plan no longer carried them). The files involved are held by other lanes.
+- 2026-09-11 03:50:33Z: the slate half is VERIFIED on live-odds-worker `3bafdd2b` (live 03:44:23Z).
+  - `SLATE_BUDGET kept_game_lines=13540 dropped_game_lines=0 game_lines_kept_through=2026-09-18`. Every joinable game line in the window is stored, against 5,962 indexed before.
+  - Recorded in `deploys.md` 2026-09-11 03:41:40Z.
+- 2026-09-11 04:07:31Z: the first join on the new slate.
+  - It indexed 13,346 and matched 109 (was 0–38). It scoped 126 rows (was 13–26) and planned 6 placeable Polymarket positions (was 0).
+  - **All of it is soccer.** NFL `no_candidates` went from 72 to 66, and NCAAF now has 520 `no_candidates`.
+- Hypothesis (2), written before the change:
+  - A shortlist row carries the FILE's date (`selected_date`), while Polymarket files a market under its PLAY date, and `polymarket_board_join.py:1913` widens forward ONLY for soccer. So a football row dated today cannot reach a Saturday or Sunday market.
+  - Widening NCAAF and NFL forward by 7 days (the board's horizon, and the Kalshi join's per-sport horizon for both) is safe for the reason soccer is: a club pair does not repeat inside a week.
+  - The fixture test and the ambiguity refusal still apply. MLB stays excluded, because a series repeats the pair on consecutive days.
+- Falsification (2): after a refresh-worker deploy, NFL/NCAAF `no_candidates` do not fall, and `POLYMARKET_QUOTE_CAPTURE sports=` still carries no `nfl` or `ncaaf`.
+- Verification (2): `forward_date_widened` shows `ncaaf|…` and `nfl|…` keys; `POLYMARKET_QUOTE_CAPTURE sports=` includes them; `no_candidates|nfl` falls from 66.
+- Cost to watch: this join's `elapsed_s` rose from ~0.8 to 94.91. It is re-read on the next build BEFORE football is widened too.
+- Deploy owed (2): refresh-worker.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

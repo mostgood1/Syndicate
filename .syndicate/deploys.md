@@ -32276,3 +32276,65 @@ stops growing across a burst overlapping live placement, needs refresh-worker on
 the next entry.
 
 **Rollback:** `render_deploy.py --service live-odds-worker --commit e4410f37 --allow-rollback`.
+
+## 2026-09-11 03:41:40-03:44:23Z — live-odds-worker `4c373107` -> `3bafdd2b` — lane `polymarket-slate-budget`
+
+**What:** `3bafdd2b` changes `_slate_within_budget`, the ~8 MB cut on the Polymarket US slate.
+- It used to rank by date only. It now ranks by (tier, date).
+  - Tier 0 is a market the game-line join can price whose game falls from yesterday to 7 days out. It reuses the join's
+    own `parse_slug`, `MARKET_TYPE_TO_BOARD` and `_has_segment`, plus BTTS on its slug modifier.
+  - Tier 1 is everything else.
+- The ceiling is unchanged (#60). A new `SLATE_BUDGET` line says what the cut spent its budget on.
+- Ride-along: 14 commits since the live build, 5 of them touching runtime code. Besides this lane's, the other four are:
+  - `48621d65`: NCAAF live state reads ESPN capture dates;
+  - `42d49364`: NCAAF frozen-chip overlay;
+  - `b50ee608`: a Layer 2 note;
+  - `5767e3ac`: NFL Kalshi prop quotes, already live on refresh-worker.
+  None of them touches the Polymarket join, the order path, the executor, the ledger or the worker script.
+  `requirements*.txt` and `render.yaml` are unchanged, and live `4c373107` is an ancestor of the target.
+
+**Baseline, pre-deploy:**
+- `POLYMARKET_US_SLATE_WRITE` 03:28:58Z: `count=21786 fetched=83516 dropped_for_size=61730 kept_through=2026-09-12
+  dropped_by_date={'2026-09-12': 10962, '2026-09-13': 14744, '2026-09-19': 19108, '2026-09-20': 9814, ...}`.
+- `POLYMARKET_BOARD_JOIN` 03:07:12Z (refresh-worker): `markets=21787 indexed=5962 board_rows=3799 matched=19`,
+  `market_type_not_a_game_line` 10,974, `segment_market_not_full_game` 4,533, `no_matching_polymarket_market` 1,144.
+  The two later joins on the OLD slate read `indexed=6092 board_rows=3874 matched=0` at 03:36:04Z and
+  `indexed=6108 board_rows=4348 matched=38` at 03:47:21Z. `matched` swings with the board being joined, so the
+  baseline is a RANGE, 0–38. `indexed` (5,962–6,108) and the NFL `no_candidates` count are the steadier comparisons.
+- `POLYMARKET_UNMATCHED`: `no_candidates|nfl` 72 (totals 52, h2h 18, spreads 2). Not one NFL game line was indexed for the date.
+- `VENUE_SCOPE venue=polymarket rows_in=3799 scoped=23`; `PAPER2_PLAN_WRITTEN date=2026-09-11 venue=polymarket positions=0`.
+- `POLYMARKET_OUT_OF_SCOPE`: 9,438 cfb PROP and 4,291 cfb segment spreads/totals held in the kept slate.
+
+**Locks:** claim `polymarket-slate-budget` (token `1da85107…`, acquired 03:40:58Z); preflight CLEAR 03:41:24Z for `3bafdd2b`
+(only infrastructure processes, 2 defunct children). Deploy `dep-dahngt1594qs73fpb2kg` via `render_deploy.py --service
+live-odds-worker --commit 3bafdd2b…`: created 03:41:40Z -> `update_in_progress` by 03:43:23Z -> **live 03:44:23Z**,
+on the SHA requested.
+
+**verify — MEASURED 03:50:33Z-04:07:31Z:**
+- The new code ran. The first write after boot printed a line only `3bafdd2b` emits:
+  `SLATE_BUDGET tiering=game_lines_first window=['2026-09-10', '2026-09-18'] kept=21776 of=83408 kept_game_lines=13540
+  dropped_game_lines=0 game_lines_kept_through=2026-09-18 dropped_game_lines_by_date={} kept_through=2026-09-12`.
+  - **Every joinable full-game line from 09-10 through 09-18 is stored: 13,540 of them.** The last join on the old slate
+    indexed 5,962.
+  - This weekend's NCAAF (09-12) and NFL (09-13, 09-14) game lines are in the slate.
+- `dropped_by_date` shows what paid for it:
+  - 09-12 went from 10,962 to 15,267 dropped. Those are now props and half/quarter markets; Saturday's game lines are kept.
+  - 09-13 went from 14,744 to 11,502. The difference is Sunday's game lines, now kept.
+  - Beyond the window nothing changed: 09-19 19,108 and 09-20 9,818.
+  - Payload 7,572,495 B with 816,113 B headroom, which is the same budget.
+- The first refresh-worker build on the new slate, at 04:07:31Z:
+  - `POLYMARKET_BOARD_JOIN indexed=13346 board_rows=3802 matched=109`. The old slate read `indexed` 5,962–6,108 and
+    `matched` 0–38. `market_type_not_a_game_line` fell from 10,974 to 3,715, and `no_matching_polymarket_market` from 1,144
+    to 552.
+  - `VENUE_SCOPE venue=polymarket scoped=126` (3.3%), from 13–26 (0.6%).
+  - `PAPER2_PLAN_WRITTEN date=2026-09-10 venue=polymarket positions=6 staked=$140.76 venue_priced=109
+    placeable_committed=6/6`, from 0 positions.
+  - **All 109 matches are soccer** (`POLYMARKET_QUOTE_CAPTURE matches=109 sports=['soccer']`). They were reached through
+    the join's forward-date widening (`forward_date_widened`: corners 389, h2h 140, btts 88, totals 73).
+  - **Football still reads `no_candidates`.** NFL went from 72 to 66, and NCAAF now has 520 `no_candidates`. The key miss
+    reads `wanted ncaaf|2026-09-10|spreads` with `markets_for_our_league_date: []`. A shortlist row carries the FILE's
+    date, and the widening that bridges it to the play date is SOCCER ONLY (`polymarket_board_join.py:1913`). This is
+    the lane's falsification case, for football alone: the game lines are stored now, and the join's date keying is
+    the remaining blocker.
+  - **Cost to watch:** this join took `elapsed_s=94.91`, against 0.71–0.8 on the old slate. The widened soccer
+    candidate lists now span 09-10..09-18. Whether it persists is owed on the next build.
