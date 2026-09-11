@@ -568,7 +568,7 @@ death, never life — do not invert it.
   - (1) An end-to-end reading of the Polymarket path: markets read → join → scope → plan → executor gates → order → fill → settlement. It needs a production count at every stage, and the realized results to date with denominators and dates.
   - (2) A verdict from evidence on the pregame near-even hold (`HELD_PREGAME_NEAR_EVEN`, counted as `refused['pregame_price_too_high']`, ceiling 0.35): what it holds, what becomes of held bets, and what it costs or saves. It goes to the user as a decision, with a recommendation.
   - No code change without the user's decision.
-- Files: none (diagnostic). Ledger writes only.
+- Files: `syndicate/features/shared/polymarket_us_orders.py`, `tests/test_polymarket_us_orders.py` (ADDED 2026-09-11 on the user's decision; before that the lane was diagnostic and ledger-only).
 - Hypothesis (to test, not believed):
   - H1: most held bets are never placed. The plan drops a game once it starts, so the hold turns positive-EV positions into no position.
   - H2: held bets that do place live pay a different price from the one they were held at. The hold's value is that price gap plus any difference in fill rate, and neither has been measured.
@@ -588,6 +588,28 @@ death, never life — do not invert it.
   - H2: indeterminate on n=4. Prices were within ±0.03 of the held price, and the 3 fills went 1-2.
   - Live Polymarket overall: 19-29, −$47.76, ROI −31% on 48 settled. Near-even in-play went 3-10 against 5.7 expected; near-even pregame 10-9 against 8.6.
   - The decision on the hold is WITH THE USER.
+- 2026-09-11 ~14:50Z: **USER DECISION ("yes do it"):**
+  - (1) Remove the pregame hold, and never place a Polymarket pregame position after kickoff.
+  - (2) Start pricing off the executable ask plus fees.
+  - (3) Pause Polymarket totals.
+  - (4) Keep stakes small.
+  - **How (1) and (3) are done:**
+    - The hold is switched off by config: `SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE=0` on live-odds-worker. `0` disables it (execute_portfolio.py lines 1233 and 1338).
+    - The in-play block and the totals pause go into `polymarket_us_submitter.build`, the one build every Polymarket order passes (execute_portfolio.py lines 841-844). They refuse at build, so no ledger row is written. The reasons are `game_started`, `commence_unknown` and `market_paused`.
+    - The totals pause is `SYNDICATE_POLYMARKET_PAUSED_MARKETS`, a substring match that defaults to `total`; `none` disables it. It is LIVE only: paper does not use this submitter, so paper keeps measuring totals.
+    - execute_portfolio.py and its test are NOT edited here, because OPEN lane kalshi-plan-placeable holds them. The dead hold and explore-arm code waits for their release, which was asked for by message on 2026-09-11.
+  - (4): no change. The caps are $35 per order and $150 per day per venue, and actual stakes run $1–9.
+  - (2) is STARTED. `/v1/markets` carries no bid, ask or size (polymarket_us_markets.py lines 43-48), and no book route is known (`state_polymarket.md:1083`). The first step is finding one.
+- Verification of (1) and (3), on the first live-odds-worker passes after the deploy:
+  - zero `HELD_PREGAME_NEAR_EVEN` lines, and no `pregame_price_too_high` key;
+  - Polymarket totals refused as `REFUSED_AT_BUILD reason=market_paused`;
+  - any Polymarket position past kickoff refused as `game_started`;
+  - near-even pregame h2h positions reaching `LIVE_ORDER`;
+  - `paper:polymarket` totals still being filled.
+- Falsification of (1) and (3): any of these after the deploy:
+  - a `HELD_PREGAME_NEAR_EVEN` line;
+  - a `LIVE_ORDER venue=polymarket market=totals`;
+  - a Polymarket order whose `submitted_at` is later than its `commence_time`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
