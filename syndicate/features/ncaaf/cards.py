@@ -22,7 +22,7 @@ from syndicate.features.ncaaf.sources import default_ncaaf_source_root
 from syndicate.features.ncaaf.sources import default_season
 from syndicate.features.ncaaf.sources import _legacy_default_season_from_summary_index
 from syndicate.features.ncaaf.sources import default_week
-from syndicate.features.ncaaf.sources import fbs_relevant, ncaaf_week_and_card_keys_for_date
+from syndicate.features.ncaaf.sources import fbs_relevant, ncaaf_game_calendar_date, ncaaf_week_and_card_keys_for_date
 from syndicate.features.ncaaf.sources import format_moneyline
 from syndicate.features.ncaaf.sources import format_num
 from syndicate.features.ncaaf.sources import format_pct
@@ -785,6 +785,14 @@ def build_ncaaf_chip_games(context_label: str, *, season: int | None = None) -> 
 
         away_branding = _resolve_branding(str((_resolve_team(away_team) or {}).get("team_id") or ""))
         home_branding = _resolve_branding(str((_resolve_team(home_team) or {}).get("team_id") or ""))
+        # A TBD KICKOFF IS A DATE, NOT A TIME. CFBD dates a game with no kickoff
+        # yet at 00:00 US/Eastern and says so with `startTimeTBD`; passed on as
+        # `startTime`, that placeholder became a Friday "11:00P CT" chip for a
+        # Saturday game (measured 2026-09-11: four of them). So a TBD row gives
+        # the chip its DAY and a flag, never a clock -- `build_game_chip` places
+        # it on that day and reads it "TBD". A real kickoff is untouched.
+        start_time_tbd = row.get("startTimeTBD") is True
+        tbd_day = ncaaf_game_calendar_date(row) if start_time_tbd else None
         games.append(
             {
                 "gamePk": game_pk,
@@ -792,7 +800,9 @@ def build_ncaaf_chip_games(context_label: str, *, season: int | None = None) -> 
                 # `status` is the week label until the ESPN join replaces it on
                 # a started game -- identical to the full card's behaviour.
                 "status": _week_label(week, season=resolved_season),
-                "startTime": row.get("startDate"),
+                "startTime": None if start_time_tbd else row.get("startDate"),
+                "game_date": tbd_day.isoformat() if tbd_day else None,
+                "start_time_tbd": start_time_tbd,
                 "away": {
                     "abbr": _abbr(away_team),
                     "name": away_team,

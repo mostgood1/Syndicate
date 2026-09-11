@@ -371,6 +371,12 @@ def _scheduled_status_token(game: dict[str, Any]) -> str | None:
         if match:
             time_token = f"{int(match.group(1))}:{match.group(2)}{match.group(3).upper()} CT"
             return f"{day_prefix} · {time_token}" if day_prefix else time_token
+    # A KICKOFF THE SCHEDULE HAS NOT SET YET (`start_time_tbd`, from CFBD's
+    # `startTimeTBD`) reads TBD on its own day, never an invented clock. Until
+    # 2026-09-11 the NCAAF chip carried CFBD's 00:00-Eastern placeholder as its
+    # start, so four Saturday games read "11:00P CT" on Friday's strip.
+    if game.get("start_time_tbd"):
+        return f"{day_prefix} · TBD" if day_prefix else "TBD"
     return None
 
 

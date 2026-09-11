@@ -436,7 +436,6 @@ def ncaaf_week_and_card_keys_for_date(season: int, date_text: str) -> tuple[int,
         return None
 
     from syndicate.features.football.sim_engine.smartsim2.historical_truth.ncaaf_historical_loader import load_games_season
-    from syndicate.features.shared.timezone import central_date_from_iso
 
     try:
         schedule = load_games_season(season)
@@ -448,8 +447,10 @@ def ncaaf_week_and_card_keys_for_date(season: int, date_text: str) -> tuple[int,
         if not isinstance(game, dict):
             continue
         # CENTRAL, never the UTC prefix -- see the docstring. A 9pm Central
-        # kickoff is the next UTC day, and prefix matching drops it.
-        if central_date_from_iso(game.get("startDate")) != target_day:
+        # kickoff is the next UTC day, and prefix matching drops it. AND A TBD
+        # KICKOFF IS A DATE, NOT A TIME: the schedule's 00:00-Eastern placeholder,
+        # read as a time, filed Saturday games on Friday. See `ncaaf_game_calendar_date`.
+        if ncaaf_game_calendar_date(game) != target_day:
             continue
         # DELIBERATELY WIDER than `_smartsim2_standalone_rows`, which needs a
         # SmartSim 2.0 projection and so stays FBS-vs-FBS. A chip needs teams,
@@ -475,3 +476,46 @@ def ncaaf_week_and_card_keys_for_date(season: int, date_text: str) -> tuple[int,
     # cannot capture the date.
     week = max(keys_by_week, key=lambda item: (len(keys_by_week[item]), -item))
     return week, keys_by_week[week]
+
+
+def ncaaf_game_calendar_date(game: Any) -> date | None:
+    """The calendar day a CFBD schedule row's game is played on, in Central.
+
+    A TBD KICKOFF IS A DATE, NOT A TIME. CFBD dates a game whose kickoff is not
+    set yet at 00:00 US/Eastern on the game day -- `2026-09-12T04:00:00.000Z`
+    under EDT, `05:00Z` under EST -- and says so with `startTimeTBD: true`.
+    Converted to Central like a real kickoff, that placeholder is 11:00 PM on
+    the PREVIOUS day.
+
+    MEASURED 2026-09-11: 443 of 888 2026 schedule rows carry the flag, and
+    production's Friday 09-11 chip strip listed four Saturday games (Mercyhurst
+    @ New Mexico, Southern Miss @ Auburn, NMSU @ Hawai'i, Cal Poly @ SJSU) as
+    "11:00P CT", while the board's own odds rows put them Saturday between
+    3:00 PM and 11:00 PM CT. User-reported as "games on the wrong day".
+
+    So a TBD row answers with its EASTERN date, and every other row keeps the
+    Central date of its real kickoff. THE FLAG DECIDES, NEVER THE CLOCK: a
+    genuine 11:00 PM CT Hawai'i kickoff is also `04:00Z`, and it belongs to
+    the Central day it is played on.
+
+    None for anything unreadable -- an unknown day is not a guessed one.
+    """
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+
+    from syndicate.features.shared.timezone import central_date_from_iso
+
+    if not isinstance(game, dict):
+        return None
+    if game.get("startTimeTBD") is True:
+        text = str(game.get("startDate") or "").strip()
+        if not text:
+            return None
+        try:
+            parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(ZoneInfo("America/New_York")).date()
+    return central_date_from_iso(game.get("startDate"))
