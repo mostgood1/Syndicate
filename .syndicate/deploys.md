@@ -32864,3 +32864,25 @@ No `requirements*` or `render.yaml` change; live `f8b67afa` is an ancestor.
 - `POLYMARKET_BOOK_AT_BUILD` and `POLYMARKET_BOOK_READ_FAILED`: 0 lines, because the pass built nothing new. The three totals are refused before build (`market_paused`), and the two moneylines are duplicates. The instrument is DEPLOYED but UNREAD.
 - **The two 15:51Z orders are RESTING, not filled.** At the 16:11:38Z reconcile both read `order_state_new` with 0 contracts: `aec-nfl-nyj-ten-2026-09-13` has 7.48 left at 0.49, and `aec-mlb-sea-ath-2026-09-11` has 23.85 left at 0.415. See the lane for the kickoff risk.
 - **VERIFY OWED:** the first book line comes with the first NEW Polymarket order build. Step 1's reading needs at least 20 (lane `polymarket-ask-pricing`).
+
+## 2026-09-11 16:50:41Z — live-odds-worker `1afec00f` -> `16de339b` — lane `polymarket-ask-pricing` — Polymarket orders expire at kickoff; cancel on the documented route
+
+**What** (user decision 2026-09-11, "yes proceed"):
+- `order_body` sends `TIME_IN_FORCE_GOOD_TILL_DATE`, with `goodTillTime` = `commence_time` in RFC 3339 UTC. An unreadable kickoff falls back to good-till-cancel, and only callers that skip `build` can reach that, because `build` refuses `commence_unknown` first.
+- `cancel_order` moves to `POST /v1/order/{orderId}/cancel` with `{"marketSlug"}` (docs.polymarket.us cancel-order), replacing the `DELETE /v1/order/{id}` guess. It refuses when there is no slug. It is still a dry run by default, and nothing automatic calls it.
+- The `SUBMIT` line now logs `goodTillTime`.
+- Why: the two 15:51Z orders RESTED (`order_state_new`, 0 filled at 16:11:38Z). A resting good-till-cancel order can fill after kickoff at its pregame price. Those two were placed before this change, so they are the user's to cancel.
+- Tests: 662 passed across 21 Polymarket-path test files. 4 new expiry tests; the cancel tests moved to the documented route and body, plus a missing-slug refusal.
+- Ride-along: none. `1afec00f..16de339b` holds only this commit's runtime files. No `requirements*` or `render.yaml` change.
+
+**Locks:**
+- Claim `polymarket-ask-pricing`, token `42811724…`, acquired 16:50:00Z.
+- Preflight CLEAR at 16:50:17Z for `16de339b`, with infrastructure processes only.
+- Deploy `dep-dai32oe7bikc73bc23ng`, created 16:50:41Z -> live 16:53:31Z.
+
+**verify:** OWED.
+- **Live at 16:53:31Z** on `16de339b` (deploys API).
+- The expiry shows only when a NEW Polymarket order is built and sent. The next `SUBMIT url=https://api.polymarket.us` line must read `tif=TIME_IN_FORCE_GOOD_TILL_DATE goodTillTime=<that position's kickoff>`, and its `LIVE_ORDER` must not be `failed`. The next `ORDER_STATE` read of that order must show the stored `goodTillTime`.
+- A watcher is reading for the first such submit, with a 3-hour deadline.
+- No cancel is sent by this deploy: `cancel_order` stays a dry run by default, and nothing automatic calls it.
+- The two orders resting from 15:51Z were placed as good-till-cancel BEFORE this deploy, so they are unaffected and are the user's to cancel.

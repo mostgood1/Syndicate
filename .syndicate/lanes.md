@@ -653,6 +653,9 @@ death, never life — do not invert it.
   - Why: the two 15:51Z orders RESTED (`order_state_new`, 0 filled), and a resting good-till-cancel order can fill after kickoff at its pregame price. The two already resting are the user's to cancel; this covers new orders only.
   - Verification: the next Polymarket `SUBMIT` shows `tif=TIME_IN_FORCE_GOOD_TILL_DATE goodTillTime=<kickoff>`, its `LIVE_ORDER` is not `failed`, and the next `ORDER_STATE` read of it shows the stored `goodTillTime`.
   - Falsification: the venue rejects the good-till-date body, or stores `goodTillTime=None`.
+- 2026-09-11 16:53:31Z: the kickoff expiry and the documented cancel route are LIVE on live-odds-worker `16de339b` (`dep-dai32oe7bikc73bc23ng`).
+  - Verification is OWED: the first new Polymarket `SUBMIT` must carry `tif=TIME_IN_FORCE_GOOD_TILL_DATE goodTillTime=<kickoff>`, and its `LIVE_ORDER` must not be `failed`.
+  - Recorded in `deploys.md` 2026-09-11 16:50:41Z.
 
 ### kalshi-precap-board-lines — OPEN — opened 2026-09-11 — session 49bfef11-a4a3-4fe4-8df4-76ec94e45893
 - Goal: [user 2026-09-11] `#661`'s residual. The per-series cap (`MAX_MARKETS_PER_SERIES=400`, unchanged) keeps the Kalshi rungs AT or next to each board row's spread/total line, so that NCAAF Saturday rows get a venue contract. Done when refresh-worker prints `LIVE_PLAN_WRITTEN venue=kalshi ... placeable_committed=N/N` with N > 0 on an NCAAF Saturday slate, and live-odds-worker prints `EXECUTED ... venue=kalshi plan_source=live placed>0`.
