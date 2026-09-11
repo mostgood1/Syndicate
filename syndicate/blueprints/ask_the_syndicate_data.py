@@ -110,19 +110,54 @@ def _question_name_bigrams(question: str) -> set[tuple[str, str]]:
     }
 
 
+def _name_token(text: str) -> str:
+    """One word of a name, folded and reduced to letters/digits/apostrophes:
+    "A.J." -> "aj", "N." -> "n", "Pérez" -> "perez"."""
+    return "".join(re.findall(r"[a-z0-9']+", _fold_diacritics(str(text or "")).lower()))
+
+
+def _first_names_compatible(candidate_first: str, question_first: str) -> bool:
+    """Whether two first names can belong to the same person. An initial on
+    either side ("N.", "AJ", "A.J.") agrees with any name sharing its first
+    letter, so NHL's stored "N. MacKinnon" still answers "Nathan MacKinnon"."""
+    if not candidate_first or not question_first or candidate_first == question_first:
+        return True
+    if len(candidate_first) <= 2:
+        return question_first[0] == candidate_first[0]
+    if len(question_first) <= 2:
+        return candidate_first[0] == question_first[0]
+    return False
+
+
 def _person_conflicts_with_question_name(name: str, question_bigrams: set[tuple[str, str]]) -> bool:
     """True when the question pairs this person's surname with a different
     first name (e.g. "Yordan Alvarez" in the question vs. a candidate named
     "Jose Alvarez") -- a bare surname match should not count as this person
     when the question itself names someone else with that surname.
+
+    The candidate's FIRST NAME is its first whitespace word, not the first of
+    the 3+-letter tokens `_person_matches` scores on. Those drop every short
+    token, so "AJ Griffin" and "A.J. Griffin" reduced to ["griffin"], no first
+    name was left to compare, and this guard could never fire for a player who
+    goes by initials. Measured on production 2026-09-11: "What's the case for
+    and against Konnor Griffin?" was served "Last 10 games — AJ Griffin
+    (through 2024-04-17)" from the NBA box-score history.
     """
     if not question_bigrams:
         return False
     parts = [p for p in re.findall(r"[a-z0-9']+", _fold_diacritics(str(name or "")).lower()) if len(p) >= 3]
-    if len(parts) < 2:
+    if not parts:
         return False
-    first, last = parts[0], parts[-1]
-    return any(b == last and a != first for a, b in question_bigrams)
+    last = parts[-1]
+    words = [w for w in (_name_token(t) for t in str(name or "").split()) if w]
+    if len(words) < 2 or words[0] == last:
+        return False
+    first = words[0]
+    for a, b in question_bigrams:
+        b_parts = re.findall(r"[a-z0-9']+", b)
+        if b_parts and b_parts[-1] == last and not _first_names_compatible(first, _name_token(a)):
+            return True
+    return False
 
 
 def _person_matches(name: str, words: set[str], question: str = "") -> int:

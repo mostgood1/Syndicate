@@ -1414,6 +1414,37 @@ class AskTheSyndicateFocusedEvidenceTests(unittest.TestCase):
         self.assertIsNotNone(nhl_result)
         self.assertIn("Nathan MacKinnon", nhl_result["tables"][0]["title"])
 
+    def test_unrouted_konnor_griffin_question_does_not_pull_aj_griffin(self) -> None:
+        # Production, 2026-09-11 (lane ask-rail-evidence): a board-row ask for
+        # Konnor Griffin reached this no-sport branch, and the NBA fetcher
+        # matched AJ Griffin on surname alone -- "Last 10 games — AJ Griffin
+        # (through 2024-04-17)" was served beside the real MLB evidence.
+        nba_processed = os.path.join(self.root, "nba", "processed")
+        os.makedirs(nba_processed, exist_ok=True)
+        header = "game_id,gameId,TEAM_ABBREVIATION,PLAYER_ID,PLAYER_NAME,MIN,PTS,REB,AST,STL,BLK,TOV,OREB,DREB,PF,FGM,FGA,FG3M,FG3A,FTM,FTA,PLUS_MINUS,STARTER,START_POSITION,source,date"
+        rows = [
+            f"g{i},g{i},ATL,1631100,AJ Griffin,14.0,{4 + i},2,1,0,0,1,0,2,1,2,5,1,3,0,0,-2,False,,espn,2024-04-{i + 1:02d}"
+            for i in range(10)
+        ]
+        with open(os.path.join(nba_processed, "boxscores_history.csv"), "w", encoding="utf-8") as f:
+            f.write(header + "\n" + "\n".join(rows) + "\n")
+        question = "What's the case for and against Konnor Griffin?"
+
+        with patch.dict(os.environ, {"NBA_BETTING_DATA_ROOT": os.path.join(self.root, "nba")}):
+            # Reachability first: the same fixture DOES answer a question that
+            # names AJ Griffin, so the None below is the guard and not a
+            # fixture the fetcher cannot read.
+            named = ask_data._basketball_last10_evidence("How has AJ Griffin looked lately?", {}, "nba")
+            direct = ask_data._basketball_last10_evidence(question, {}, "nba")
+            merged = ask_data.collect_focused_evidence(question, {})
+
+        self.assertIsNotNone(named)
+        self.assertIn("AJ Griffin", named["tables"][0]["title"])
+        self.assertIsNone(direct)
+        titles = [t.get("title", "") for t in (merged or {}).get("tables", [])]
+        titles += [c.get("title", "") for c in (merged or {}).get("charts", [])]
+        self.assertEqual([t for t in titles if "AJ Griffin" in t], [])
+
     def _write_bvp_fixtures(self) -> None:
         bvp_dir = os.path.join(self.root, "mlb", "cache", "statcast", "bvp", "statcast_bvp_file_daily")
         os.makedirs(bvp_dir, exist_ok=True)
@@ -2052,6 +2083,31 @@ class AskTheSyndicateNameDisambiguationTests(unittest.TestCase):
         self.assertEqual(ask_data._person_matches("Jose Alvarez", words, question), 0)
         # Without the question arg (back-compat), last-name-only still scores 1.
         self.assertEqual(ask_data._person_matches("Jose Alvarez", words), 1)
+
+    def test_person_matches_conflict_guard_sees_an_initials_first_name(self) -> None:
+        # Reported 2026-09-11 from the Layer 2 board's Ask rail: "What's the
+        # case for and against Konnor Griffin?" came back carrying AJ Griffin's
+        # 2024 NBA box scores. The guard took first names from the 3+-letter
+        # tokens only, so "AJ Griffin" had no first name to compare and a bare
+        # surname match went through.
+        question = "What's the case for and against Konnor Griffin?"
+        words = ask_data._question_words(question)
+        self.assertEqual(ask_data._person_matches("Konnor Griffin", words, question), 2)
+        self.assertEqual(ask_data._person_matches("AJ Griffin", words, question), 0)
+        self.assertEqual(ask_data._person_matches("A.J. Griffin", words, question), 0)
+
+    def test_person_matches_initials_still_answer_a_question_that_names_them(self) -> None:
+        # The falsification side of the test above: a fix keyed on token
+        # LENGTH rather than first-name agreement would zero every one of these.
+        for question in ("How has AJ Griffin looked lately?", "How has A.J. Griffin looked lately?"):
+            words = ask_data._question_words(question)
+            for stored in ("AJ Griffin", "A.J. Griffin"):
+                self.assertEqual(ask_data._person_matches(stored, words, question), 1, (question, stored))
+            self.assertEqual(ask_data._person_matches("Konnor Griffin", words, question), 0, question)
+        # NHL stores skaters as an initial plus surname.
+        question = "How is Nathan MacKinnon trending?"
+        words = ask_data._question_words(question)
+        self.assertEqual(ask_data._person_matches("N. MacKinnon", words, question), 1)
 
 
 class AskTheSyndicateMlbPlayerHistoryTests(unittest.TestCase):

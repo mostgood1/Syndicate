@@ -72,6 +72,9 @@ window.SyndicateAskBar = (function () {
     }
   }
 
+  // The sports with a branch in the server's `_entity_fetchers_for_sport`.
+  const ROUTABLE_SPORTS = new Set(["mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"]);
+
   // Same data-syndicate-* attributes bet_slip.js/watchlist.js already read
   // off a rendered card -- the exact context keys getPageContext() on the
   // standalone /syndicate page pulls from URL params instead.
@@ -90,6 +93,19 @@ window.SyndicateAskBar = (function () {
       const value = String(card.getAttribute(attr) || "").trim();
       if (value) context[key] = value;
     });
+    // The Layer 2 board's BLOTTER row -- its default view above 900px --
+    // carries `data-syndicate-sport` (the slug, uppercased) and no
+    // `data-syndicate-sport-slug`, so every ask from it went out with NO sport
+    // and the server ran every sport's player fetchers. Measured on production
+    // 2026-09-11: "What's the case for and against Konnor Griffin?" came back
+    // with AJ Griffin's 2024 NBA box scores beside the MLB evidence; the same
+    // request with `sport: "mlb"` did not. Only a routable slug is taken here:
+    // an unrecognised label sent as the sport would select no fetchers at all,
+    // which is worse than sending none.
+    if (!context.sport) {
+      const sport = String(card.getAttribute("data-syndicate-sport") || "").trim().toLowerCase();
+      if (ROUTABLE_SPORTS.has(sport)) context.sport = sport;
+    }
     return context;
   }
 
@@ -220,26 +236,10 @@ window.SyndicateAskBar = (function () {
     return bits.join(" · ");
   }
 
-  // INLINE STYLES, DELIBERATELY, AND THEY SHOULD NOT STAY THAT WAY.
-  // These belong next to `.ask-bar__answer-pick-*` in
-  // `syndicate/static/shared/board_cards.css`, which is claimed by the OPEN
-  // lane `layer2-board-quality`. Editing across lanes is forbidden, and the
-  // evidence table genuinely needs `overflow-x` or a 7-column starter
-  // projection breaks the sidebar layout -- so shipping unstyled was not an
-  // option either. The class names are already correct; move the declarations
-  // into the stylesheet and delete this block when that lane closes.
-  const STYLE = {
-    numbers: "font-size:11px;font-variant-numeric:tabular-nums;",
-    flag: "align-self:flex-start;margin-top:3px;padding:1px 6px;border-radius:999px;"
-      + "border:1px solid rgba(255,196,120,0.45);background:rgba(255,176,80,0.12);"
-      + "color:#ffd9a8;font-size:10px;letter-spacing:0.02em;text-transform:uppercase;",
-    evidence: "margin-top:8px;display:flex;flex-direction:column;gap:6px;",
-    table: "overflow-x:auto;",
-    tableEl: "border-collapse:collapse;font-size:10.5px;white-space:nowrap;",
-    tableTitle: "font-size:10.5px;text-transform:uppercase;letter-spacing:0.04em;opacity:0.65;margin-bottom:2px;",
-    th: "padding:2px 6px 2px 0;text-align:left;font-weight:600;opacity:0.7;",
-    td: "padding:2px 6px 2px 0;text-align:left;font-variant-numeric:tabular-nums;opacity:0.85;",
-  };
+  // Styles for the pick row and the evidence below live in `board_cards.css`
+  // with the other `.ask-bar__*` rules. They sat inline here while that file
+  // was claimed by lane `layer2-board-quality`, released 2026-08-18. The one
+  // inline style left is each chart bar's height, which is data.
 
   function renderPickRow(row) {
     const name = safeText(row.selection || row.name, "Opportunity");
@@ -256,27 +256,80 @@ window.SyndicateAskBar = (function () {
       <div class="ask-bar__answer-pick">
         <span class="ask-bar__answer-pick-name">${escapeHtml(name)}</span>
         ${facts ? `<span class="ask-bar__answer-pick-why">${escapeHtml(facts)}</span>` : ""}
-        ${numbers ? `<span class="ask-bar__answer-pick-numbers" style="${STYLE.numbers}">${escapeHtml(numbers)}</span>` : ""}
+        ${numbers ? `<span class="ask-bar__answer-pick-numbers">${escapeHtml(numbers)}</span>` : ""}
         ${why ? `<div class="ask-bar__answer-pick-detail">${escapeHtml(why)}</div>` : ""}
-        ${unvalidated ? `<span class="ask-bar__answer-pick-flag" style="${STYLE.flag}">model unvalidated</span>` : ""}
+        ${unvalidated ? `<span class="ask-bar__answer-pick-flag">model unvalidated</span>` : ""}
       </div>`;
   }
 
-  function renderEvidenceTable(table) {
+  // Which evidence sections the reader opened or closed, by entry and section.
+  // The panel re-renders its whole transcript on every question and every
+  // header toggle, so without this an opened table snaps shut the moment
+  // anything else happens.
+  const sectionState = new Map();
+
+  function sectionOpen(key, byDefault) {
+    return sectionState.has(key) ? sectionState.get(key) : byDefault;
+  }
+
+  function sectionAttrs(key, open) {
+    return ` data-ask-section="${escapeHtml(key)}"${open ? " open" : ""}`;
+  }
+
+  // Every row. This sliced to 6, which silently dropped the summary row a
+  // "Last N games" table ends with -- Konnor Griffin's `L6 avg`, 2026-09-11.
+  function renderEvidenceTable(table, key, open) {
     const cols = Array.isArray(table.columns) ? table.columns : [];
     const rows = Array.isArray(table.rows) ? table.rows : [];
-    if (!rows.length) return "";
-    const cell = (value) => `<td style="${STYLE.td}">${escapeHtml(String(value == null ? "—" : value))}</td>`;
+    const cell = (value) => `<td>${escapeHtml(String(value == null ? "—" : value))}</td>`;
     return `
-      <div class="ask-bar__answer-table" style="${STYLE.table}">
-        <div class="ask-bar__answer-table-title" style="${STYLE.tableTitle}">${escapeHtml(safeText(table.title, "Evidence"))}</div>
-        <table style="${STYLE.tableEl}">
-          ${cols.length ? `<thead><tr>${cols.map((c) => `<th style="${STYLE.th}">${escapeHtml(String(c))}</th>`).join("")}</tr></thead>` : ""}
-          <tbody>
-            ${rows.slice(0, 6).map((r) => `<tr>${(Array.isArray(r) ? r : [r]).map(cell).join("")}</tr>`).join("")}
-          </tbody>
-        </table>
-      </div>`;
+      <details class="ask-bar__answer-section ask-bar__answer-table"${sectionAttrs(key, open)}>
+        <summary class="ask-bar__answer-table-title">${escapeHtml(safeText(table.title, "Evidence"))}</summary>
+        <div class="ask-bar__answer-table-scroll">
+          <table>
+            ${cols.length ? `<thead><tr>${cols.map((c) => `<th>${escapeHtml(String(c))}</th>`).join("")}</tr></thead>` : ""}
+            <tbody>
+              ${rows.map((r) => `<tr>${(Array.isArray(r) ? r : [r]).map(cell).join("")}</tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+      </details>`;
+  }
+
+  // Same rounding and `%` handling as syndicate.html's formatChartValue.
+  function formatChartValue(y, yLabel) {
+    const rounded = Math.round(y * 10) / 10;
+    const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+    return /%/.test(String(yLabel || "")) ? `${text}%` : text;
+  }
+
+  // A sidebar-sized port of syndicate.html's renderVisualChart: one bar per
+  // point, scaled to the largest value, every other label once it is crowded.
+  function renderEvidenceChart(chart, key, open) {
+    const points = (Array.isArray(chart.points) ? chart.points : []).slice(0, 30);
+    const values = points.map((p) => finiteNumber(Number(p && p.y)) ?? 0);
+    const maxY = Math.max(...values, 0.0001);
+    const labelEvery = points.length > 12 ? 2 : 1;
+    const bars = points.map((p, i) => {
+      const x = safeText(p && p.x, "");
+      const value = formatChartValue(values[i], chart.y_label);
+      const show = i % labelEvery === 0;
+      const height = Math.max(2, Math.round((Math.max(values[i], 0) / maxY) * 100));
+      return `
+        <div class="ask-bar__chart-col" title="${escapeHtml(x)}: ${escapeHtml(value)}">
+          <span class="ask-bar__chart-value">${show ? escapeHtml(value) : ""}</span>
+          <div class="ask-bar__chart-track"><div class="ask-bar__chart-bar" style="height:${height}%"></div></div>
+          <span class="ask-bar__chart-label">${show ? escapeHtml(x) : ""}</span>
+        </div>`;
+    }).join("");
+    const xLabel = safeText(chart.x_label, "");
+    const yLabel = safeText(chart.y_label, "");
+    return `
+      <details class="ask-bar__answer-section ask-bar__answer-chart"${sectionAttrs(key, open)}>
+        <summary class="ask-bar__answer-table-title">${escapeHtml(safeText(chart.title, "Chart"))}</summary>
+        <div class="ask-bar__chart">${bars}</div>
+        ${xLabel || yLabel ? `<div class="ask-bar__chart-axes"><span>${escapeHtml(xLabel)}</span><span>${escapeHtml(yLabel)}</span></div>` : ""}
+      </details>`;
   }
 
   // The sim and advanced evidence has been in every response all along:
@@ -287,22 +340,29 @@ window.SyndicateAskBar = (function () {
   // MLB prop question returned 7 tables and 3 charts of real simulation output
   // (starter sim projections, last 5 starts, opposing-lineup Statcast, a full
   // simulated-strikeout distribution) and the panel showed a name and one
-  // number. Two tables inline, everything else named, so a sidebar stays one.
-  function renderEvidence(response) {
+  // number.
+  //
+  // It then drew the first TWO tables and listed the rest by title under "Also
+  // computed" -- reported 2026-09-11 from the Layer 2 board, where 6 of 8
+  // tables and both charts could be named but not read. Every table and chart
+  // is now its own collapsible section: the first two tables open, the rest
+  // one click away, so the rail stays short without hiding anything.
+  function renderEvidence(response, entryKey) {
     const visuals = response && typeof response.visuals === "object" ? response.visuals : null;
     if (!visuals) return "";
     const tables = (Array.isArray(visuals.tables) ? visuals.tables : [])
       .filter((t) => t && Array.isArray(t.rows) && t.rows.length);
-    const charts = Array.isArray(visuals.charts) ? visuals.charts : [];
+    const charts = (Array.isArray(visuals.charts) ? visuals.charts : [])
+      .filter((c) => c && Array.isArray(c.points) && c.points.length);
     if (!tables.length && !charts.length) return "";
-    const more = tables.slice(2).map((t) => safeText(t.title, ""))
-      .concat(charts.map((c) => safeText(c && c.title, "")))
-      .filter(Boolean);
-    return `
-      <div class="ask-bar__answer-evidence" style="${STYLE.evidence}">
-        ${tables.slice(0, 2).map(renderEvidenceTable).join("")}
-        ${more.length ? `<div class="ask-bar__answer-pick-why">Also computed: ${escapeHtml(more.join(" · "))}</div>` : ""}
-      </div>`;
+    const sections = tables.map((table, i) => {
+      const key = `${entryKey}|t${i}`;
+      return renderEvidenceTable(table, key, sectionOpen(key, i < 2));
+    }).concat(charts.map((chart, i) => {
+      const key = `${entryKey}|c${i}`;
+      return renderEvidenceChart(chart, key, sectionOpen(key, false));
+    }));
+    return `<div class="ask-bar__answer-evidence">${sections.join("")}</div>`;
   }
 
   // Compact rendering of the same `briefing` block syndicate.html's
@@ -400,7 +460,7 @@ window.SyndicateAskBar = (function () {
         <div class="ask-bar__answer">
           ${entry.error
             ? `<div class="ask-bar__answer-error">${escapeHtml(entry.error)}</div>`
-            : renderBriefingCompact(response) + renderEvidence(response)}
+            : renderBriefingCompact(response) + renderEvidence(response, safeText(entry.askedAt, entry.question))}
         </div>
       </div>
     `;
@@ -410,6 +470,13 @@ window.SyndicateAskBar = (function () {
     const panel = document.getElementById("ask-bar-panel");
     if (panel && !panelWired) {
       panelWired = true;
+      // `toggle` does not bubble, so it is caught in the capture phase.
+      panel.addEventListener("toggle", (event) => {
+        const section = event.target;
+        if (section && section.matches && section.matches("details[data-ask-section]")) {
+          sectionState.set(section.getAttribute("data-ask-section"), section.open);
+        }
+      }, true);
       panel.addEventListener("click", (event) => {
         if (event.target.closest(".ask-bar__header")) {
           collapsed = !collapsed;

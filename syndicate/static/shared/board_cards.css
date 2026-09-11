@@ -2000,6 +2000,129 @@ table.board-blotter tbody tr:last-child td {
   padding: 8px 0;
 }
 
+/* The pick row's numbers/flag and the answer's evidence. These sat inline in
+   `ask_bar.js` while this file was claimed by lane `layer2-board-quality`
+   (released 2026-08-18). Every table and chart the answer carries is a
+   collapsible section -- the first two tables open, the rest one click away. */
+.ask-bar__answer-pick-numbers {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ask-bar__answer-pick-flag {
+  align-self: flex-start;
+  margin-top: 3px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 196, 120, 0.45);
+  background: rgba(255, 176, 80, 0.12);
+  color: #ffd9a8;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.ask-bar__answer-evidence {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ask-bar__answer-table-title {
+  cursor: pointer;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cards-text-dim);
+  margin-bottom: 2px;
+}
+
+.ask-bar__answer-section[open] > .ask-bar__answer-table-title {
+  color: var(--cards-text-soft);
+}
+
+/* A 7-column starter projection is wider than the rail; it scrolls, the rail
+   does not. */
+.ask-bar__answer-table-scroll {
+  overflow-x: auto;
+}
+
+.ask-bar__answer-table table {
+  border-collapse: collapse;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.ask-bar__answer-table th {
+  padding: 2px 6px 2px 0;
+  text-align: left;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.ask-bar__answer-table td {
+  padding: 2px 6px 2px 0;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+.ask-bar__chart {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 96px;
+  padding-top: 4px;
+}
+
+.ask-bar__chart-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ask-bar__chart-value {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--cards-text);
+  white-space: nowrap;
+}
+
+.ask-bar__chart-track {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.ask-bar__chart-bar {
+  width: 70%;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(180deg, rgba(167, 139, 250, 0.95), rgba(139, 92, 246, 0.55));
+}
+
+.ask-bar__chart-label {
+  max-width: 100%;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9px;
+  color: var(--cards-text-dim);
+}
+
+.ask-bar__chart-axes {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  font-size: 9.5px;
+  color: var(--cards-text-dim);
+}
+
 
 /* A row whose own price beats every book we hold a quote for. Impossible for
    the same wager, so the join is on a different line or a stale snapshot --
