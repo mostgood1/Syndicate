@@ -456,6 +456,7 @@ death, never life — do not invert it.
     - Shortlist `prop_coverage.artifact_rows 1140` at 04:03:18Z.
     - 486 non-Anytime-TD NFL props carry a sim view; before the fix there were 0.
   - **Half (1): UNMEASURED.** This is a null of population, not a failure. Neither post-deploy `QUOTE_CAPTURE` tick had an NFL prop match, and `identity_stamped` covered 176 of 176 matches.
+    - **Early evidence 2026-09-11, NOT the formal reading:** web's NFL 09-13 shard holds 498 post-deploy Kalshi prop rows, 498 of 498 with a display label, a commence time and a home team. The 09-11 "Matchup" card the user re-reported is pre-deploy residue (205 rows captured 09-10 20:35-23:31Z); by user decision it expires at tonight's date roll. Details: the 2026-09-11 daily log.
   - **LEFT.** All three readings are ARMED as scheduled task `nfl-kalshi-identity-sunday-reading`, which fires once on Sun 2026-09-13 at 12:30 PM CDT `[user 2026-09-11: "schedule it and close the lane after"]`:
     - R1: the first tick with `nfl` in `appended_by_sport` reads `relabelled>0` and shows `nfl:2026-09-13` shard keys.
     - R2: web's NFL 09-13 shard carries Kalshi prop rows under display labels, with `commence_time`.

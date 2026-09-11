@@ -543,6 +543,7 @@ deployed three times on the evening of 2026-08-26. Same family as
   - nfl/ncaaf rows are filed by kickoff date.
 - Replayed over production's shards: 180/180 rows relabelled. 15/15 (09-10) and 77/77 (09-13) Kalshi instances merge into their sportsbook rows.
 - **The production reading is OWED:** the first tick with an NFL prop match. The two ticks after the deploy had none. It is ARMED as scheduled task `nfl-kalshi-identity-sunday-reading`, which fires once on 2026-09-13 at 12:30 CDT (verified enabled via `list_scheduled_tasks`, 2026-09-11). The task takes R1 (relabel), R2 (the 09-13 shard) and R3 (served rows with no game state during live games), and closes the lane only if all three pass.
+- **Early evidence, 2026-09-11 -- NOT the formal reading:** web's NFL 09-13 shard holds 498 Kalshi prop rows, all captured after the deploy (04:05-09:53Z). All 498 carry a display label (`Receptions` 316, `Passing TDs` 182), `commence_time` and `home_team`. The user's 09-11 "Matchup" card is residue: web's NFL 09-11 shard holds 205 Kalshi rows, all captured 09-10 20:35-23:31Z by the pre-deploy code, which filed under the board date and also built TOMORROW's board. No 09-12 NFL shard existed at 15:3xZ.
 
 **Artifact half: MEASURED.**
 

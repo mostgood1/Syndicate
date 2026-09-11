@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 972 rules `[generated]`
+## Index — 977 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5529,3 +5529,21 @@ the instrument rather than the system.**
 - **How we found out**: the next session step read `_settled_sample_size_by_sport` -> `settled_decisions_by_sport` (whole ledger, all time). A count with no window cannot fall unless records leave, and `TRIMMED` showed them leaving.
 - **The rule going forward**: before explaining a count that moved, read the function that takes it and name its UNIT and its WINDOW. A count documented as all-time that decreases is a data-loss alarm, never a window.
 - **Cost**: one wrong line in `deploys.md`, corrected the same morning. The eviction itself had been running since at least 09-09 13:24Z, unremarked.
+
+## 2026-09-11 — OVERTURNED (mine, same day) and REQUIRED: `claims_by_path` is NOT the matcher `lane-guard` enforces with, and a claim transfer is not in force until the PRIMARY tree's `lanes.md` says so `[lane ncaaf-tbd-kickoff-date]`
+
+- **What it overturns:** my FORBIDDEN entry above ("reporting a lane's file claims as RELEASED on the strength of the edit you meant to make") tells you to read the claim set back with `claims_by_path`, "the same parser `lane-guard` enforces with". It is not the same. `lane-guard` matches every `_claims()` token against the target path by SUFFIX; `claims_by_path` indexes exact keys.
+- **What happened:**
+  - I landed `released:` markers for two files on `origin/main` (`22d7cbd6`), and lane-guard still BLOCKED my edits to both. It reads `$CLAUDE_PROJECT_DIR/.syndicate/lanes.md`, the primary checkout's copy, not `origin/main`.
+  - That copy was 63 commits behind and held 188 lines of OTHER sessions' uncommitted edits, so overwriting it would have destroyed them. The three changes were mirrored into it surgically: one atomic read-modify-write, each anchor asserted to occur exactly once, CRLF preserved.
+  - One line still blocked. Another lane's `Files:` continuation line read "... `ncaaf/sources.py` was `released:`.". Its bare token suffix-matched my file, and a `released:` in mid-line is not a disclaimer. My `claims_by_path` check printed NONE while the guard printed BLOCKED.
+- **How to apply:**
+  - After landing a claim change, mirror it into the primary copy, touching only its own lines.
+  - Verify with the guard's `_claims()` plus a SUFFIX match against every target path.
+  - Put `released:` at the START of a line, and keep path tokens out of prose inside a `Files:` block.
+
+## 2026-09-11 — FORBIDDEN: predicting that legacy rows "expire at the date roll" without enumerating every shard the old writer touched. The board loop writes TOMORROW's shard too `[lane nfl-layer2-kalshi-identity]`
+
+- **What I predicted:** `deploys.md` 2026-09-10 ~22:20 CT said the raw Kalshi rows leave "with the midnight CT date roll".
+- **What happened:** the user reported the phantom "Matchup" card again on 09-11. Web's NFL 09-11 shard held 205 pre-deploy Kalshi rows, captured 09-10 20:35-23:31Z, because the intelligence loop also builds the NEXT day's board. The roll moved the residue forward a day instead of ending it.
+- **The rule:** before saying "old rows expire at X", list every shard or date the old code wrote, from the rows' own `captured_at`. Then name the LAST date the residue can appear.

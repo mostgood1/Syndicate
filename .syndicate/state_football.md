@@ -2516,3 +2516,23 @@ and has NEVER FIRED -- the live artifact is hand-published and does not refresh
 itself. And **these are not edges**: every card is prior-season form, blind to
 depth-chart moves; the largest are UNDER on players the market now prices as
 starters.
+
+## [ncaaf-tbd-kickoff] A TBD NCAAF KICKOFF IS A DATE, NOT A TIME — fixed, deployed to refresh-worker `889d4e12` and web `0022ecb1`, verified on production chips `[2026-09-11, lane ncaaf-tbd-kickoff-date, CLOSED GOAL MET]`
+
+**The defect:**
+- CFBD dates a game with no kickoff set at 00:00 US/Eastern (04:00Z EDT, 05:00Z EST) and flags it `startTimeTBD: true`. That is 443 of 888 2026 rows in the mirror.
+- `ncaaf_week_and_card_keys_for_date` read that placeholder as a real time and converted it to Central, which is the PREVIOUS day.
+- The chip then carried it as `startTime`, so Saturday games showed on Friday at "11:00P CT". User-reported 2026-09-11.
+
+**The fix:**
+- `ncaaf/sources.py` `ncaaf_game_calendar_date`: the TBD flag decides the day, never the clock.
+- `cards.py`: chip games carry `game_date` and `start_time_tbd`.
+- `game_chip_scoreboard._scheduled_status_token` returns "<day> · TBD".
+
+**Measured on production:**
+- 09-11 default chips: 9 -> 5 NCAAF, 0 at the placeholder.
+- 09-12: 76 -> 80, with MER @ NM, SM @ AUB, NMS @ HAW and CP @ SJS each reading "Sat Sep 12 · TBD".
+- Real kickoffs keep their clocks: 76 on 09-12.
+- The readings are `deploys.md` 2026-09-11 11:20 CT and 11:52 CT.
+
+**Still true, from code and NOT measured:** the NCAAF CARDS pages and other kickoff labels (`cards.py` `kickoff_label` via `_format_kickoff_label(start_date)`, and `betting_card.py`) still format the placeholder as a time. Only the day selection and the chips changed.

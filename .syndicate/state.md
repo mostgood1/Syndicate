@@ -492,6 +492,7 @@ once this index exists: re-splitting would orphan the parts.
 | [nfl-season-open-date] | THE 09-09 vs 09-10 DISAGREEMENT IS A TIMEZONE, NOT AN ERROR — READ 2026-09-07 `[lane soccer-unfed-inputs]` | `state_football.md` |
 | [nfl-ncaaf-ui-parity] | NFL RENDERED THE GENERIC BOARD PARTIALS WHILE NCAAF RENDERED THE FOOTBALL ONES — one string, three surfaces `[ | `state_football.md` |
 | [nfl-props-week1-dead] | NFL PLAYER PROPS WERE STRUCTURALLY DEAD EVERY WEEK 1, AND THE MODEL RAN ON THE SERVICE WITHOUT THE DATA `[FIXE | `state_football.md` |
+| [ncaaf-tbd-kickoff] | A TBD NCAAF KICKOFF IS A DATE, NOT A TIME — fixed, deployed to refresh-worker `889d4e12` and web `0022ecb1`, v | `state_football.md` |
 | [kalshi-in-play-and-real-fees] | KALSHI TRADES IN-PLAY AND PUBLISHES ITS OWN FEE PARAMETERS; THE ARB THRESHOLD WAS ABOVE BREAK-EVEN EVERYWHERE  | `state_kalshi.md` |
 | [kalshi-segment-on-full-game] | KALSHI PLACED SEGMENT BETS ON FULL-GAME CONTRACTS: the join key had no `segment` `[verified 2026-08-28, lane p | `state_kalshi.md` |
 | [kalshi-venue-execution] | KALSHI ORDERS: the blocker was SHARD COLLATERAL, and spreads were inverting the bet `[verified 2026-08-26, lan | `state_kalshi.md` |
