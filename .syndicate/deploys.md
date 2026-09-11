@@ -32638,3 +32638,34 @@ end of run 12:52:24.99Z: anon 2735.7, current 4095.7 of 4096, inactive_file 843.
   - a near-even pregame h2h reaching `LIVE_ORDER`;
   - `paper:polymarket` totals still filling.
 - No falsifier has fired: there is no `LIVE_ORDER venue=polymarket market=totals`.
+
+## 2026-09-11 15:17-15:21Z — reading only, no deploy — lane `wnba-schedule-guard-fix` — the Goal's 09-11 reading: GOAL NOT MET, falsification (2) fired
+
+**What was read:** scheduled task `wnba-0911-no-game-chips-reading`, session fbc82f9f, 10:17-10:21 CDT.
+- **Live commits** (Render deploys API):
+  - web `4c373107`, live since 09-10 23:19:34Z.
+  - refresh-worker `1e1285a4`, live since 04:52:40Z. `78e4623f` was `build_in_progress` from 15:15:31Z; it is not this lane's.
+  - live-odds-worker `f8b67afa`, live since 15:09:21Z. Before it: `3bafdd2b` 03:44:23Z-14:22Z, then `78e4623f` 14:22Z-15:06Z.
+- **By content, both fixes were live on every service that could have written at 13:24Z.** Checked: each of the live commits above, plus `3bafdd2b`, `78e4623f` and `c29a7d4e`.
+  - `wnba/sources.py`: 1 line with `site.web.api.espn.com`.
+  - `wnba/cards.py`: 3 lines with `_stored_date_substitution_allowed`.
+  - `6ebec70e` is an ancestor, and each commit is on `origin/main`.
+
+**Readings for 2026-09-11:**
+
+| # | reading | numbers | verdict |
+|---|---|---|---|
+| a | Layer 2: `verify_wnba_slate_hygiene.py --date 2026-09-11 --check layer2` (board `written_at 15:11:58Z`) | `wnba_chips []`, `frozen_chips None`, no `FROZEN?`; `per_sport_ingest.wnba` `no_slate`, `scheduled_games 0`, quote/grid/opps 0; script exit 3, UNREADABLE = no slate in the window | PASS |
+| b | `/wnba/api/live_state?date=2026-09-11` (15:17:02Z, 15:19:03Z) | **4 games: ESPN `401857186..189`, all `Final`, the 08-30 slate**; `source syndicate_cards_fallback`; `generated_at 08:24:04 CDT` (13:24:04Z), unchanged across reads | **FAIL** |
+| c | `/api/board/game-chips?date=2026-09-11` (`worker_artifact`, published 15:17:07Z, age 119 s) | 263 chips: mlb 15, ncaaf 9, soccer 239, **wnba 0** | PASS |
+
+**Verdict: GOAL NOT MET. Falsification (2) FIRED.**
+- **A worker running both fixes wrote the 08-30 games under `live_state_2026-09-11`.** `syndicate_cards_fallback` is emitted by the worker branch only (`cards.py:6698`), and web never persists (`:240`). A third substitution path therefore exists. It is not yet named; the lane block lists what reading ruled out.
+- **Web serves the same 4 ids at `/wnba/api/source/cards?date=2026-09-11`.** Web `/wnba/api/cards` returns 0.
+- **The chips are clean.** Their no-games gate fires first.
+- Not done by this reading: no deploy, no code change, no env change. The lane stays OPEN.
+
+`verify:` this entry IS the 09-11 reading owed by the 2026-09-10 21:12:58Z and 21:44:08Z entries.
+- It discharges their chip half and their Layer 2 half: both PASS.
+- It answers their writer half with a FAIL.
+- Still owed: 0 games under a no-game day's `live_state` key, read after the third path is found and fixed.
