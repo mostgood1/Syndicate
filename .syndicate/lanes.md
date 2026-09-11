@@ -633,7 +633,7 @@ death, never life — do not invert it.
 - Goal: todo `#662`, the user's decision (2) of 2026-09-11 ("start pricing off the executable ask plus fees").
   - STEP 1, this lane's first deliverable, an instrument with its own deploy: at every Polymarket order build, read the slug's book with the signed client. Log our side's best ask and its size next to the price we would send, and the EV at that ask. A failed read never blocks an order.
   - STEP 2, after step 1 has a population, and only on the user's go: price EV and Kelly at the ask net of fees, refuse below the minimum, and cap the stake at the size available at the ask.
-- Files: `syndicate/features/shared/polymarket_us_orders.py`, `tests/test_polymarket_us_orders.py`.
+- Files: `syndicate/features/shared/polymarket_us_orders.py`, `tests/test_polymarket_us_orders.py`, `tests/test_polymarket_cancel_order.py`. The last was ADDED 2026-09-11 for the kickoff expiry and the cancel-route fix.
 - Hypothesis (to test, not believed): the displayed `outcomePrices` number that EV is priced on is often not the executable ask for our side. The largest claimed edges are the least executable, which would explain paper h2h at +50.5% while live h2h is −23.4%, and the whole live loss sitting in the above-median stakes.
 - Falsification test: over the first 20 or more logged builds, our side's best ask sits within one tick of the price we send, and the EV at that ask is within 1 point of the plan's `ev_pct`, in the large-EV rows as well as the small ones.
 - Verification (step 1): at least 20 `POLYMARKET_BOOK_AT_BUILD` lines on live-odds-worker, each with ask, size, sent price and EV at the ask. Recorded in `state_polymarket.md` with the distribution of (EV at ask − planned EV) by planned-EV bucket, and zero orders blocked by a failed read.
@@ -647,6 +647,12 @@ death, never life — do not invert it.
   - The candidate fixes are a good-till-date at kickoff or a cancel at kickoff. Both need the venue contract verified, and both are the user's decision.
   - Verification is OWED: at least 20 `POLYMARKET_BOOK_AT_BUILD` lines, which need NEW order builds. Totals are paused before build, and orders already placed do not rebuild, so the population arrives as the plan changes.
   - Recorded in `deploys.md` 2026-09-11 15:59:52Z.
+- 2026-09-11 ~16:35Z: **ADDED on the user's decision ("yes proceed"):**
+  - Every Polymarket order now expires at kickoff: `TIME_IN_FORCE_GOOD_TILL_DATE`, with `goodTillTime` = `commence_time`.
+  - `cancel_order` moves to the documented `POST /v1/order/{id}/cancel`, with `{"marketSlug"}` in the body.
+  - Why: the two 15:51Z orders RESTED (`order_state_new`, 0 filled), and a resting good-till-cancel order can fill after kickoff at its pregame price. The two already resting are the user's to cancel; this covers new orders only.
+  - Verification: the next Polymarket `SUBMIT` shows `tif=TIME_IN_FORCE_GOOD_TILL_DATE goodTillTime=<kickoff>`, its `LIVE_ORDER` is not `failed`, and the next `ORDER_STATE` read of it shows the stored `goodTillTime`.
+  - Falsification: the venue rejects the good-till-date body, or stores `goodTillTime=None`.
 
 ### kalshi-precap-board-lines — OPEN — opened 2026-09-11 — session 49bfef11-a4a3-4fe4-8df4-76ec94e45893
 - Goal: [user 2026-09-11] `#661`'s residual. The per-series cap (`MAX_MARKETS_PER_SERIES=400`, unchanged) keeps the Kalshi rungs AT or next to each board row's spread/total line, so that NCAAF Saturday rows get a venue contract. Done when refresh-worker prints `LIVE_PLAN_WRITTEN venue=kalshi ... placeable_committed=N/N` with N > 0 on an NCAAF Saturday slate, and live-odds-worker prints `EXECUTED ... venue=kalshi plan_source=live placed>0`.
