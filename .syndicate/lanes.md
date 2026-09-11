@@ -79,6 +79,7 @@ death, never life — do not invert it.
 - **CFBD IS NOT EXHAUSTED — checked before taking the item, because that was the premise.** Zero `cfbd_quota` log lines on refresh-worker since the 09-01 month roll, and `[ppa] season=2025 source=api` succeeded at 2026-09-10T02:26:09Z. The quota latch expires at the month roll; the original headline was already false.
 - Bug 1 of `#633` (`considered` counted every grid row on all seven passes) is ALREADY FIXED on main — `ncaaf/game_projections.py` now filters by `commence_time` date before `considered += 1`. Verified, not assumed.
 - Falsification test: if a window with `rows_with_projection > 0` still carries a top-level `reason`, the fix is wrong. If a window that produced nothing loses its reason, the fix broke the branch above it.
+- NOTE 2026-09-10 (cross-lane, same session): a COMMENT-ONLY edit to `pipeline/layer2_shortlist.py` (~1591, the `LIVE_GAME_STATE_JOIN` note: `_LIVE_GAME_STATE_SPORTS` now includes `ncaaf` after `42d49364`) was made from lane `football-layer2-live-parity`'s worktree. Session 2edf8b82 holds both lanes; no behaviour change, this lane's goal is untouched.
 - Files: `pipeline/layer2_shortlist.py`, `tests/test_layer2_projection_window.py`
 
 ### mlb-roster-substrate-probe — OPEN — opened 2026-09-10 — session 2edf8b82-9f8a-4d32-bf26-ca43ecd1ea5a

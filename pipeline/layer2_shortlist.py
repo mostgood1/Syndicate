@@ -1589,7 +1589,8 @@ def build_layer2_shortlist(
             # never fires.
             #
             # `supported` is the field that matters: `_LIVE_GAME_STATE_SPORTS` is
-            # `{mlb, soccer}`, so this returns `supported: False` for wnba and
+            # `{mlb, soccer, ncaaf}` (ncaaf joined 2026-09-10 in `42d49364`), so
+            # this returns `supported: False` for wnba and nfl -- for wnba it
             # always has. That is a stated refusal nobody could read.
             live_step = ((stat or {}).get("enrichment") or {}).get("live_game_state")
             if isinstance(live_step, dict):
