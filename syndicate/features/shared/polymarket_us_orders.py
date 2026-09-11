@@ -889,7 +889,10 @@ def polymarket_us_submitter(resolve_market):
         # VALIDATION, NOT A SECOND BODY. `order_body` is PURE and `submit_order`
         # rebuilds the identical body from these same fields, so every refusal
         # it raises fires here, before the row is written.
-        order_body(request, **fields)
+        body = order_body(request, **fields)
+        # AN INSTRUMENT, NOT A GATE [#662 step 1]. It logs our side's executable
+        # ask next to the price we send, and it can never refuse an order.
+        _log_book_at_build(request, body)
         return lambda: submit_order(request, **fields)
 
     def submit(request: Any) -> dict[str, Any]:
@@ -966,6 +969,113 @@ def _refuse_after_commence(request: Any, *, now: _dt.datetime | None = None) -> 
     if current >= starts:
         minutes = (current - starts).total_seconds() / 60.0
         raise OrderBuildError(f"game_started: {minutes:.0f} min after commence {text}")
+
+
+# --------------------------------------------------------------------------
+# THE BOOK AT BUILD  [2026-09-11, #662 step 1, lane polymarket-ask-pricing]
+# --------------------------------------------------------------------------
+#
+# EV and Kelly are priced on `outcomePrices`, a single sizeless number per
+# outcome that says nothing about bid, ask or depth. Paper, which fills at that
+# number, shows h2h at +50.5% over 103 settled; live h2h is -23.4%, and the
+# whole live loss sits in the above-median stakes. So before anything is PRICED
+# off the book, this MEASURES it: one signed `GET /v1/markets/{slug}/book` per
+# built order. It logs our side's executable ask and its size next to the price
+# we send, and the EV at that ask. For YES the ask is the best offer. For NO it
+# is 1 minus the best YES bid, because buying NO takes the other side of a YES
+# bid.
+#
+# AN INSTRUMENT, NEVER A GATE: every failure is caught, logged and ignored.
+
+_BOOK_AT_BUILD_ENV = "SYNDICATE_POLYMARKET_BOOK_AT_BUILD"
+
+
+def _book_at_build_enabled() -> bool:
+    """On unless `SYNDICATE_POLYMARKET_BOOK_AT_BUILD` is `0`, `off`, `false` or `no`."""
+    return str(os.environ.get(_BOOK_AT_BUILD_ENV) or "").strip().lower() not in ("0", "off", "false", "no")
+
+
+def _read_book(slug: Any) -> Any:
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    # NO CREDENTIALS, NO CALL. Tests and any unkeyed process get a named
+    # refusal, which the instrument logs, instead of a network attempt.
+    if not auth.credentials_present():
+        raise RuntimeError("no_polymarket_us_credentials")
+    base = (os.environ.get("POLYMARKET_US_API_BASE") or "").strip() or auth.BASE_URL
+    url = f"{base.rstrip('/')}/v1/markets/{urllib.parse.quote(str(slug), safe='')}/book"
+    return auth.signed_request("GET", url, timeout=5.0)
+
+
+def _book_level(levels: Any) -> tuple[float, float] | None:
+    """`(price, quantity)` of a side's best level, or None if it is empty or unreadable."""
+    try:
+        best = levels[0]
+        px = best["px"]
+        return float(px["value"] if isinstance(px, Mapping) else px), float(best["qty"])
+    except (IndexError, KeyError, TypeError, ValueError):
+        return None
+
+
+def _implied_probability(price: Any) -> float | None:
+    """A planned price as a probability: American odds, or already inside (0, 1)."""
+    if isinstance(price, bool):
+        return None
+    try:
+        value = float(price)
+    except (TypeError, ValueError):
+        return None
+    if 0.0 < value < 1.0:
+        return value
+    if value >= 100.0:
+        return 100.0 / (value + 100.0)
+    if value <= -100.0:
+        return -value / (-value + 100.0)
+    return None
+
+
+def _log_book_at_build(request: Any, body: Mapping[str, Any]) -> None:
+    if not _book_at_build_enabled():
+        return
+    slug = body.get("marketSlug")
+    side = body.get("outcomeSide")
+    try:
+        sent = float(body["price"]["value"])
+    except (KeyError, TypeError, ValueError):
+        sent = None
+    try:
+        data = _read_book(slug)
+        book = data.get("marketData", data) if isinstance(data, Mapping) else {}
+        best_bid = _book_level(book.get("bids") or [])
+        best_offer = _book_level(book.get("offers") or [])
+        if side == _SIDE_NO:
+            ask = (round(1.0 - best_bid[0], 6), best_bid[1]) if best_bid else None
+        else:
+            ask = best_offer
+        planned = _implied_probability(getattr(request, "requested_price", None))
+        ev = getattr(request, "ev_pct", None)
+        ev_at_ask = None
+        if ask and planned and ask[0] > 0 and isinstance(ev, (int, float)) and not isinstance(ev, bool):
+            # `ev_pct` is priced against the venue quote, so the fair it implies
+            # is planned * (1 + ev), and the EV at the ask is that fair over the ask.
+            ev_at_ask = round((planned * (1.0 + ev / 100.0) / ask[0] - 1.0) * 100.0, 2)
+        marketable = None if (ask is None or sent is None) else sent >= ask[0]
+        print(
+            f"[polymarket_us_orders] POLYMARKET_BOOK_AT_BUILD slug={slug} side={side}"
+            f" sent={sent} ask={ask[0] if ask else None} ask_qty={ask[1] if ask else None}"
+            f" best_bid={best_bid[0] if best_bid else None} best_offer={best_offer[0] if best_offer else None}"
+            f" planned_p={round(planned, 4) if planned else None} planned_ev_pct={ev}"
+            f" ev_at_ask_pct={ev_at_ask} marketable={marketable}"
+            f" levels=bids:{len(book.get('bids') or [])},offers:{len(book.get('offers') or [])}"
+            f" state={book.get('state')} -- instrument only",
+            flush=True,
+        )
+    except Exception as exc:  # noqa: BLE001 -- an instrument must never refuse an order
+        print(
+            f"[polymarket_us_orders] POLYMARKET_BOOK_READ_FAILED slug={slug} reason={type(exc).__name__}"
+            " -- instrument only; the order is unaffected",
+            flush=True,
+        )
 
 
 # --------------------------------------------------------------------------

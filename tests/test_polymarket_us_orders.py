@@ -785,3 +785,97 @@ def test_the_pause_is_checked_before_kickoff(monkeypatch):
     refusal names itself first, so the pause is countable on its own."""
     monkeypatch.setenv(_PAUSED, "total")
     assert _build(_gated(market="totals", commence=_PAST))[0] == "market_paused"
+
+
+# --------------------------------------------------------------------------
+# THE BOOK AT BUILD  [#662 step 1, lane polymarket-ask-pricing]. An INSTRUMENT:
+# it logs our side's executable ask next to the price we send, and it can
+# never block an order.
+# --------------------------------------------------------------------------
+
+_BOOK_ENV = "SYNDICATE_POLYMARKET_BOOK_AT_BUILD"
+
+
+def _book(bids=(("0.4450", "1659.69"),), offers=(("0.4500", "151604.01"),)):
+    return {"marketData": {
+        "bids": [{"px": {"value": p, "currency": "USD"}, "qty": q} for p, q in bids],
+        "offers": [{"px": {"value": p, "currency": "USD"}, "qty": q} for p, q in offers],
+        "state": "MARKET_STATE_OPEN",
+    }}
+
+
+def _book_build(request, monkeypatch, *, price, book=None, raises=None):
+    """Build through the real adapter with the book read replaced; `(sender, reads)`."""
+    from syndicate.features.shared import polymarket_us_orders as orders
+
+    monkeypatch.delenv(_PAUSED, raising=False)
+    reads = []
+
+    def fake_read(slug):
+        reads.append(slug)
+        if raises is not None:
+            raise raises
+        return _book() if book is None else book
+
+    monkeypatch.setattr(orders, "_read_book", fake_read)
+    resolve = lambda req: ("aec-mlb-bal-tor-2026-09-11", price, "0.005", "0.01")  # noqa: E731
+    return orders.polymarket_us_submitter(resolve).build(request), reads
+
+
+def _priced(side="over", american=122.0, ev=10.0):
+    request = _gated(market="h2h")
+    request.side = side
+    request.requested_price = american
+    request.ev_pct = ev
+    return request
+
+
+def test_the_book_line_reports_the_YES_ask_its_size_and_the_EV_there(monkeypatch, capsys):
+    monkeypatch.delenv(_BOOK_ENV, raising=False)
+    send, reads = _book_build(_priced(), monkeypatch, price=0.45)
+    out = capsys.readouterr().out
+    assert callable(send) and reads == ["aec-mlb-bal-tor-2026-09-11"]
+    assert "POLYMARKET_BOOK_AT_BUILD" in out
+    assert "side=OUTCOME_SIDE_YES" in out and "sent=0.45 " in out
+    assert "ask=0.45 " in out and "ask_qty=151604.01" in out
+    # +122 -> 0.4505; fair = 0.4505 * 1.10 = 0.4955; at a 0.45 ask that is +10.11%.
+    assert "ev_at_ask_pct=10.11" in out
+    assert "marketable=True" in out
+
+
+def test_a_NO_order_is_priced_against_one_minus_the_best_YES_bid(monkeypatch, capsys):
+    """Buying NO takes the other side of the best YES bid: 1 - 0.445 = 0.555."""
+    monkeypatch.delenv(_BOOK_ENV, raising=False)
+    _book_build(_priced(side="under"), monkeypatch, price=0.56)
+    out = capsys.readouterr().out
+    assert "side=OUTCOME_SIDE_NO" in out and "ask=0.555 " in out and "ask_qty=1659.69" in out
+    assert "marketable=True" in out
+
+
+def test_a_limit_under_the_ask_is_logged_as_NOT_marketable(monkeypatch, capsys):
+    """The instant venue cancels: a limit that does not reach the ask."""
+    monkeypatch.delenv(_BOOK_ENV, raising=False)
+    _book_build(_priced(), monkeypatch, price=0.44)
+    assert "marketable=False" in capsys.readouterr().out
+
+
+def test_a_failed_book_read_never_blocks_the_order(monkeypatch, capsys):
+    monkeypatch.delenv(_BOOK_ENV, raising=False)
+    send, reads = _book_build(_priced(), monkeypatch, price=0.45, raises=RuntimeError("http_401"))
+    out = capsys.readouterr().out
+    assert callable(send), "an instrument failure must not refuse the order"
+    assert "POLYMARKET_BOOK_READ_FAILED" in out and "reason=RuntimeError" in out
+
+
+def test_an_empty_book_side_reads_as_unknown_not_as_a_price(monkeypatch, capsys):
+    monkeypatch.delenv(_BOOK_ENV, raising=False)
+    _book_build(_priced(), monkeypatch, price=0.45, book=_book(offers=()))
+    out = capsys.readouterr().out
+    assert "ask=None " in out and "marketable=None" in out and "ev_at_ask_pct=None" in out
+
+
+def test_the_book_read_can_be_switched_off(monkeypatch, capsys):
+    monkeypatch.setenv(_BOOK_ENV, "0")
+    send, reads = _book_build(_priced(), monkeypatch, price=0.45)
+    assert callable(send) and reads == []
+    assert "POLYMARKET_BOOK_AT_BUILD" not in capsys.readouterr().out
