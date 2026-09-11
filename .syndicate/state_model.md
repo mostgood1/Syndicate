@@ -736,10 +736,17 @@ peak. **A chunk-count bound (45 days; the byte budget kept as a 45 x 256 MB
 backstop) is LIVE on refresh-worker `86c82220` since 2026-09-10 20:13:21Z**, carried by
 a peer's deploy and verified BY CONTENT, with both env overrides absent. **The
 SINGLE-PASS autorun (one ledger read for all eight sports) is LIVE on
-`c29a7d4e` since 21:50:27Z**, also through a peer's deploy. Both are
-UNEXERCISED until the 2026-09-11 autorun. The first reading, with five
-pre-registered predictions and a revert line (in-run anon > 2,600 MiB), is in
-the lane.
+`c29a7d4e` since 21:50:27Z**, also through a peer's deploy. Both were
+EXERCISED by the 2026-09-11 autorun on `1e1285a4` (12:48:08-12:52:24Z, both
+lines present BY CONTENT). It logged ONE `LEDGER_CHUNKS_ACCEPTED count=39
+bytes=8538595882 records=205482 skipped_budget=0 skipped_chunks=0 dates=39
+truncated=0`, which is the whole ledger, in `elapsed_s=255.5` (09-10: 1,359). The
+in-run peak anon was 3,179.0 MiB, over the 2,600 revert line as written. But the
+peak sample is `board_contract_end` 10 s in, the pre-run ambient was HIGHER (peak
+3,540.0, median 3,305.7), and anon fell across the read. It was not reverted: the
+job's own anon cost is not yet separable from ambient, and the user decides.
+Predictions 1 and 3 HELD; 2, 4 and 5 MISSED. The lane stays OPEN
+(`deploys.md` 2026-09-11, 'the pre-registered reading').
 
 **A LEDGER RECORD IS ONE PER BOARD RECOMMENDATION PER `source_fingerprint` CHANGE**
 (`maybe_record_board_state_to_evaluation_ledger`, `pipeline/intelligence_state.py:3023`),

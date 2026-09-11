@@ -32535,3 +32535,74 @@ Traceback since 14:22Z: none
 **Verdict: READER HALF MET, as predicted.** The new executor branch is reached in production. It falls back loudly, and with the fallback the pass is byte-for-byte the old outcome: 16 refused, no write-ahead row, and no order.
 - The goal is NOT met yet. That needs refresh-worker `78e4623f` to write the live plan, then a pass reading `plan_source=live`, with `no_venue_ticker` absent from `refused=`.
 - Prediction for that pass, written now: `positions=0`. None of 09-11's 870 venue-priced rows cleared the gates. The contracted Saturday rungs are the ones `MAX_MARKETS_PER_SERIES=400` evicts (`#661`, and the follow-up task).
+
+## 2026-09-11 14:37Z — refresh-worker accuracy autorun: the pre-registered reading (chunk-count bound + single pass) — lane accuracy-ledger-budget-raise
+
+**Reading only.** No deploy, revert, restart or env change. Taken by scheduled task `accuracy-autorun-reading-0911`.
+
+**The code that ran.** refresh-worker deploy `dep-dahogrh42hec739qjub0` was live throughout the autorun.
+- It moved `48621d65` -> `1e1285a4`: trigger `api`, created 04:49:50Z, live 04:52:40Z. It is the newest deploy in the list.
+- `render_events.py` reads 12:00-13:10Z as QUIET: no deploy, restart or kill. Its control read answered.
+- Verified BY CONTENT with `git show 1e1285a4:<path>`:
+  - `syndicate/features/shared/intelligence_evaluation.py:628` carries `DEFAULT_ACCURACY_SUMMARY_LEDGER_MAX_CHUNKS = 45`.
+  - `scripts/run_refresh_worker.py:3553` carries `computed = build_accuracy_summaries(sports)`.
+- `57019962` and `c29a7d4e` are both ancestors of `1e1285a4`, which is on origin/main.
+- `SYNDICATE_ACCURACY_SUMMARY_LEDGER_MAX_CHUNKS` and `SYNDICATE_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES` both returned HTTP 404 from the single-key env API, so both are absent. No value was read.
+
+**Run window.** 12:48:08.6Z .. 12:52:24.1Z (`AUTORUN_DONE` minus `elapsed_s`).
+- `LEDGER_CHUNKS_ACCEPTED`: 1 match over the requested 12:47:08-12:52:25Z.
+- `SPORT_SCORED`: 8 matches.
+- `PROJECTION_DONE`: 1 match. Every read printed its COVERED window, and it matched the request.
+
+```
+12:51:19.290Z [intelligence_evaluation] LEDGER_CHUNKS_ACCEPTED count=39 bytes=8538595882 ceiling=256000000 records=205482 streamed=1 budget=11520000000 partial=0 skipped_budget=0 max_chunks=45 skipped_chunks=0 skipped_bytes=0 dates=39 truncated=0
+12:51:23.766Z [accuracy_summary] SPORT_SCORED sport=mlb sample_size=98736 settled=7683
+12:51:23.766Z [accuracy_summary] SPORT_SCORED sport=nba sample_size=0 settled=0
+12:51:23.766Z [accuracy_summary] SPORT_SCORED sport=ncaab sample_size=0 settled=0
+12:51:23.766Z [accuracy_summary] SPORT_SCORED sport=ncaaf sample_size=6722 settled=0
+12:51:23.766Z [accuracy_summary] SPORT_SCORED sport=nfl sample_size=1839 settled=0
+12:51:23.766Z [accuracy_summary] SPORT_SCORED sport=nhl sample_size=0 settled=0
+12:51:23.766Z [accuracy_summary] SPORT_SCORED sport=soccer sample_size=842 settled=0
+12:51:23.766Z [accuracy_summary] SPORT_SCORED sport=wnba sample_size=9270 settled=244
+12:52:24.099Z [ledger_projection] PROJECTION_DONE seen=39 written=8 fresh=26 deferred=5 failed=0 records=40694 bytes_in=1816938381 bytes_out=25599175 ratio=0.014089 reduction=71.0x published=4 over_ceiling=0
+12:52:24.099Z [accuracy_summary] AUTORUN_DONE sports=8 elapsed_s=255.506 error=none
+```
+
+**Memory: `MEMORY_WATCHDOG` on refresh-worker, `memory_anon_mb`.** All windows fully covered.
+
+```
+window                                  samples  median   max      max sample
+pre-run   12:18:08-12:48:08Z            842      3305.7   3540.0   12:32:26.90Z last_stage=board_contract_end
+  (last 5 min before start)             135      3349.0   3507.2
+in-run    12:48:08-12:52:25Z            122      --       3179.0   12:48:18.40Z last_stage=board_contract_end climb=11.7 MB/s
+  ledger read, to the accept 12:51:19Z   89      3004.7   3179.0
+  after the accept                       33      2732.5   2735.7
+end of run 12:52:24.99Z: anon 2735.7, current 4095.7 of 4096, inactive_file 843.0, headroom 0.277
+```
+
+**Is the peak this job's? The reading does not show it is.** "Not shown to be the job" is not "shown not to be".
+- The autorun runs inline in the loop (`run_refresh_worker.py:7549`) and emits no watchdog stage of its own. So `last_stage` can name only concurrent work. Here that work is the board contract, which is the `last_stage` on 53 of the 89 ledger-read samples.
+- The peak comes 10 s into a run whose ledger accept is at +191 s.
+- The pre-run ambient was HIGHER: 3,540.0 peak, 3,305.7 median.
+- Anon FELL across the read: 3,120.8 at the start, 2,705.1 at 12:51:02Z, 2,735.7 at the end.
+- The job's own anon cost cannot be separated from ambient with this instrument.
+
+**Separate finding, not this lane's code:** the pre-run ambient peak is 807 MiB above 09-10's, 3,540.0 against 2,732.6, and it formed before the autorun started.
+
+| # | pre-registered | measured | verdict |
+|---|---|---|---|
+| 1 | ONE line; `skipped_budget=0 skipped_chunks=0 truncated=0`; `count`=`dates` ~39-41 | 1 line; 0 / 0 / 0; `count=39 dates=39` | **HELD** |
+| 2 | `records` 150,000-165,000 | 205,482 | **MISSED** (24.5% over the top of the range; the 622 B/record estimate undercounted) |
+| 3 | `bytes` 7.5-9.5 GB | 8,538,595,882 (8.54 GB); `skipped_bytes=0` | **HELD** |
+| 4 | in-run peak anon ~2,155-2,200 MiB; above 2,600 = revert | 3,179.0 MiB | **MISSED.** The revert line is crossed as written. The peak sample's `last_stage` is `board_contract_end`, and the pre-run ambient was higher (3,540.0). |
+| 5 | `elapsed_s` 450-1,200 | 255.506 | **MISSED**, below the range: 0.19x of 09-10's 1,359 s |
+
+**Verdict: GOAL NOT MET, as written.**
+- **Coverage half: MET.** `skipped_budget=0 truncated=0` and `dates=39`, materially above 8, on a live SHA that carries both changes.
+- **Memory half: NOT MET.** The in-run peak is 3,179.0 MiB, and the goal requires under 2,600.
+- **Revert: the pre-registered line is crossed. This reading does NOT recommend acting on it.** The peak sample belongs to the board contract, and the ambient was higher before the job started. Not reverted, since this is a read-only task. **The user decides.**
+- The lane stays OPEN. **Left:**
+  - an attributable memory reading, meaning an anon sample the job itself emits at start / accept / end, or a user decision to restate the criterion. With the pre-run ambient already above 2,600, the goal's memory clause cannot read true on a day like this one whatever this code costs.
+  - a re-read of peak anon about a week out (~09-18). Retained records grow ~4-10k a day until the 45-chunk horizon fills (39 of 45 now, ~09-16/17). After that, `skipped_chunks` > 0 and `truncated=1` are by design.
+
+`verify:` this entry IS the reading. Nothing was deployed.
