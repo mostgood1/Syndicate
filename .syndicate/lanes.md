@@ -724,6 +724,19 @@ death, never life — do not invert it.
 - Note: the inline `STYLE` block in `ask_bar.js` said to move into `board_cards.css` "when that lane closes"; that lane (`layer2-board-quality`) was RELEASED in the 2026-08-18 orphan sweep, so this lane does the move.
 - Blocked by: none. Web deployed on the user's decision ("yes deploy"), `422698e0`, 2026-09-11 13:06 CT.
 
+### ask-sport-parity — OPEN — opened 2026-09-11 — session 7d69025a-1bfa-4440-9eae-04c5299fe99f
+- Goal: [user 2026-09-11: "we need to make sure that all sports work the same way as MLB when using ask the syndicate"] an Ask from any Layer 2 board row, in every sport on the board, answers about THAT bet (its event, market, side and line) and carries the resolved game's evidence the way MLB does: the bet's own sim and market numbers, the game's sim outlook and team context, and the player's recent form wherever a player log exists.
+- Files: syndicate/static/shared/ask_bar.js, syndicate/templates/intelligence.html, syndicate/blueprints/ask_the_syndicate_adapter.py, syndicate/blueprints/ask_the_syndicate_data.py, syndicate/blueprints/ask_the_syndicate.py, tests/test_ask_the_syndicate.py, tests/test_ask_sport_parity.py
+- Hypothesis (MEASURED 2026-09-11 ~18:4xZ before any code: a headless run of the real production `/intelligence` board, clicking the rail's Ask on one prop and one game row per sport and capturing the rail's own request):
+  - MLB prop (Alec Bohm) 7 tables + 1 chart; MLB h2h 1 + 1. **NCAAF prop (Ben Black, Receiving Yards) was answered with a DIFFERENT bet, "— home -3.5", and 0 evidence.** NCAAF total, NFL prop (Jordan Love) and soccer total: 0 evidence. The NCAAF and soccer totals asked "What's the case for and against Under?".
+  - Cause 1 (client): every blotter row carries `data-syndicate-event-id` (equal to the shortlist's `event_id`) and `data-syndicate-prop-line` ("Under · 24.5 · Receiving Yards"), but `contextFromCard` sends neither, and the blotter has no matchup attribute, so a total's title is its side word.
+  - Cause 2 (server): `_reorder_by_relevance` picks the bet by question words, and "what's"/"case" are not stopwords, so "Under" matches nothing and "Ben Black" matches any row containing "black".
+  - Cause 3 (server): the evidence fetchers key on team and player names in the QUESTION, so NFL/NCAAF team fetchers and MLB's game outlook never fire for totals, spreads or football props; soccer and ncaab have no fetcher at all.
+- Falsification test: MLB's prop answer (Alec Bohm: 7 tables + 1 chart, the same bet) must be unchanged. If exact resolution changes any MLB prop answer's selection, it keys on the wrong field.
+- Verification: (1) new tests red on origin/main, green on the fix; (2) the same survey re-run on production after a web deploy: every surveyed row's answered selection names the clicked row's side and line, and the NCAAF prop, NCAAF game, NFL prop and MLB total rows carry at least one evidence table. Recorded in `deploys.md`.
+- Phase 2, inside this goal where the data exists: per-player logs for NFL/NCAAF props, soccer match evidence, NBA/WNBA `smart_sim` per-player distributions, NHL game projections. NBA/NHL/NCAAB have no board rows today, so their reading waits for a slate.
+- Blocked by: none. The web deploy waits on user approval.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
