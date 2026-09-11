@@ -3753,9 +3753,148 @@ def _entity_fetchers_for_sport(sport: str, question: str) -> list:
     return []
 
 
-def collect_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
-    """Best-effort question-specific evidence; merges all matching sections. Never raises."""
+# Sports whose PROP rows have no player-level fetcher in this module, so a prop
+# asked from the board is answered with the player's GAME: the matchup is added
+# to the evidence question and the team-level fetchers (matchup projection, team
+# profile, ATS) answer it. MLB, NBA, WNBA and NHL props have player fetchers and
+# are left alone -- adding the matchup there would change MLB's reference answer.
+_PROP_SPORTS_ANSWERED_BY_THE_GAME = {"nfl", "ncaaf", "ncaab", "soccer"}
+
+
+def _same_text(a: Any, b: Any) -> bool:
+    return str(a or "").strip().casefold() == str(b or "").strip().casefold()
+
+
+def _board_row_segment(row: dict[str, Any]) -> str:
+    return str(row.get("segment") or "full").strip().lower()
+
+
+def _narrow_board_rows(rows: list[dict[str, Any]], context: dict[str, Any]) -> list[dict[str, Any]]:
+    """Rows of one event and market, narrowed to the ONE bet the context names.
+
+    Returns one row or none. Two rows that differ in any identity field are two
+    bets, and guessing between them is the failure this replaces.
+    """
+    side = str(context.get("side") or "").strip().lower()
+    if not side:
+        # A team side arrives as the team (the row's `selection`), not as
+        # "home"/"away" -- map it through the rows' own team names.
+        selection = context.get("selection")
+        if selection and any(_same_text(selection, row.get("home_team")) for row in rows):
+            side = "home"
+        elif selection and any(_same_text(selection, row.get("away_team")) for row in rows):
+            side = "away"
+    if side:
+        rows = [row for row in rows if str(row.get("side") or "").strip().lower() == side]
+
+    line = _to_float(context.get("line"))
+    if line is not None:
+        rows = [
+            row for row in rows
+            if _to_float(row.get("line")) is not None and abs(float(_to_float(row.get("line"))) - line) < 1e-6
+        ]
+
+    if any(row.get("player_name") for row in rows):
+        names = {str(context.get(key) or "").strip().casefold() for key in ("player_name", "name", "selection")}
+        names.discard("")
+        rows = [row for row in rows if str(row.get("player_name") or "").strip().casefold() in names]
+
+    segment = str(context.get("segment") or "").strip().lower()
+    if segment:
+        rows = [row for row in rows if _board_row_segment(row) == segment]
+    elif len(rows) > 1:
+        rows = [row for row in rows if _board_row_segment(row) == "full"] or rows
+
+    # The same bet can sit in the shortlist twice; identical identity is one bet.
+    identities = {
+        (str(row.get("side") or "").strip().lower(), _to_float(row.get("line")),
+         str(row.get("player_name") or "").strip().casefold(), _board_row_segment(row))
+        for row in rows
+    }
+    return rows[:1] if len(identities) == 1 else []
+
+
+def resolve_board_row(context: dict[str, Any]) -> tuple[dict[str, Any] | None, Any]:
+    """The Layer 2 row an Ask button was pressed on -- `(row, written_at)` -- or
+    `(None, None)` when the context does not name exactly one row.
+
+    **WHY.** The answer used to pick its bet by matching the QUESTION's words
+    against the snapshot (`_reorder_by_relevance`). Measured on the production
+    board 2026-09-11, clicking Ask on one row per sport: an NCAAF "Ben Black"
+    receiving-yards prop was answered with an unrelated spread ("— home -3.5"),
+    and every game total asked "What's the case for and against Under?", which
+    names no game. The row already knew which bet it was -- its event id IS the
+    shortlist's `event_id` -- and nothing sent it.
+
+    Exact or nothing: event and market must match, then side, line, player and
+    segment narrow it, and anything still ambiguous returns None so the caller
+    keeps today's behaviour instead of guessing. It reads the SAME artifact the
+    board serves (`read_layer2_shortlist`, a plain read, legal on the request
+    path), so the answer and the row cannot disagree. Never raises.
+    """
+    event_id = str(context.get("event_id") or "").strip()
+    market = str(context.get("market") or "").strip()
+    if not event_id or not market:
+        return None, None
+    try:
+        from pipeline.intelligence_state import read_layer2_shortlist
+        from syndicate.features.shared.timezone import central_today_iso
+
+        payload = read_layer2_shortlist(str(context.get("selected_date") or "").strip() or central_today_iso())
+    except Exception:
+        logger.exception("Ask board-row resolution could not read the Layer 2 shortlist")
+        return None, None
+    if not isinstance(payload, dict):
+        return None, None
+    rows = [
+        row for row in (payload.get("rows") or [])
+        if isinstance(row, dict)
+        and str(row.get("event_id") or "").strip() == event_id
+        and _same_text(row.get("market"), market)
+    ]
+    rows = _narrow_board_rows(rows, context)
+    if not rows:
+        return None, None
+    return rows[0], payload.get("written_at")
+
+
+def _board_row_evidence_question(question: str, row: dict[str, Any], sport: str) -> str:
+    """The question the evidence fetchers see for a resolved board row.
+
+    Every fetcher here finds its subject by NAME in the question text. A game
+    total's question names no team, so the NFL/NCAAF team fetchers and MLB's
+    game outlook never fired for totals or spreads, and a football prop names
+    only a player, which football has no fetcher for. The row carries both
+    teams' full names -- the form `_nfl_teams_in_question`,
+    `_ncaaf_teams_in_question` (full school names, never mascots) and
+    `_mlb_match_game` already match -- so they are appended.
+    """
+    lowered = question.casefold()
+    parts = [question]
+    player = str(row.get("player_name") or "").strip()
+    if player and player.casefold() not in lowered:
+        parts.append(player)
+    away = str(row.get("away_team") or "").strip()
+    home = str(row.get("home_team") or "").strip()
+    wants_game = not player or sport in _PROP_SPORTS_ANSWERED_BY_THE_GAME
+    if wants_game and away and home and not (away.casefold() in lowered and home.casefold() in lowered):
+        parts.append(f"{away} @ {home}")
+    return " ".join(parts)
+
+
+def collect_focused_evidence(
+    question: str, context: dict[str, Any], *, board_row: dict[str, Any] | None = None
+) -> dict[str, Any] | None:
+    """Best-effort question-specific evidence; merges all matching sections. Never raises.
+
+    `board_row` is the Layer 2 row the question was asked from (see
+    `resolve_board_row`). With it, the fetchers are pointed at that row's game
+    and player, not only at whatever the question's words happen to name.
+    """
     sport = str(context.get("sport_slug") or context.get("sport") or "").strip().lower()
+    if isinstance(board_row, dict):
+        sport = sport or str(board_row.get("sport") or "").strip().lower()
+        question = _board_row_evidence_question(question, board_row, sport)
     sections: list[dict[str, Any]] = []
     for fetcher in _fetchers_for_sport(sport, question):
         try:

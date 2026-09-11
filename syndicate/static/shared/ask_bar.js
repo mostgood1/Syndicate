@@ -80,6 +80,12 @@ window.SyndicateAskBar = (function () {
   // standalone /syndicate page pulls from URL params instead.
   function contextFromCard(card) {
     const context = {};
+    // `event_id` + `market` + `side` + `line` (+ the player, + `segment`) are
+    // the row's IDENTITY: the server resolves the exact Layer 2 row from them
+    // (`resolve_board_row`) instead of guessing the bet from the question's
+    // words. Without them, measured on the production board 2026-09-11, an
+    // NCAAF "Ben Black" receiving-yards prop was answered with an unrelated
+    // spread, and every game total asked about "Under" with no game named.
     const attrMap = {
       sport: "data-syndicate-sport-slug",
       market: "data-syndicate-market",
@@ -88,6 +94,11 @@ window.SyndicateAskBar = (function () {
       player_name: "data-syndicate-player-name",
       name: "data-syndicate-name",
       candidate_type: "data-syndicate-candidate-type",
+      event_id: "data-syndicate-event-id",
+      side: "data-syndicate-side",
+      line: "data-syndicate-line",
+      segment: "data-syndicate-segment",
+      odds: "data-syndicate-odds",
     };
     Object.entries(attrMap).forEach(([key, attr]) => {
       const value = String(card.getAttribute(attr) || "").trim();
@@ -169,6 +180,16 @@ window.SyndicateAskBar = (function () {
   function askSubjectFromContext(context) {
     const name = safeText(context.name, "");
     const selection = safeText(context.selection, "");
+    // A game total's title IS its side, so this still produced "What's the
+    // case for and against Under?" for every total on the board (measured
+    // 2026-09-11, NCAAF and soccer): no game, no number. Name the bet and the
+    // game. The server resolves the row from `event_id` either way; this is
+    // the question a reader sees in the transcript.
+    if (["over", "under"].includes(name.toLowerCase())) {
+      const bet = [name, safeText(context.line, "")].filter(Boolean).join(" ");
+      const matchup = safeText(context.matchup, "");
+      return matchup ? `${bet} in ${matchup}` : bet;
+    }
     if (name && selection && !selection.toLowerCase().includes(name.toLowerCase())) {
       return `${name} ${selection}`;
     }

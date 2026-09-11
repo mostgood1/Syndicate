@@ -277,7 +277,13 @@ def _supporting_points(explanation: dict[str, Any]) -> list[str]:
     return deduped[:_MAX_SUPPORTING_POINTS]
 
 
-def _bet_analysis_schema(result: Any, *, question: str = "", relevance_matched: bool | None = None) -> dict[str, Any]:
+def _bet_analysis_schema(
+    result: Any,
+    *,
+    question: str = "",
+    relevance_matched: bool | None = None,
+    artifact_as_of: Any = None,
+) -> dict[str, Any]:
     explanation = _explanation_payload(result)
 
     if relevance_matched is False:
@@ -316,7 +322,7 @@ def _bet_analysis_schema(result: Any, *, question: str = "", relevance_matched: 
     top = _first_recommendation(result)
     # The snapshot's own computed_at, so the quote age advances with the
     # artifact instead of being frozen at build time. See `_bet_facts`.
-    facts = _bet_facts(top, artifact_as_of=_result_as_of(result))
+    facts = _bet_facts(top, artifact_as_of=artifact_as_of or _result_as_of(result))
     sim = _sim_terms(top)
 
     # `selection` was `top.get("selection")`, which on a layer2-sourced
@@ -1521,7 +1527,37 @@ def _reorder_by_relevance(items: list[dict[str, Any]], question: str) -> tuple[l
     return [item for item, _ in ranked], True
 
 
-def build_syndicate_query_response(*, question: str, context: dict[str, Any], decision: RouteDecision, result: Any) -> dict[str, Any]:
+def _board_row_recommendation(row: dict[str, Any]) -> dict[str, Any]:
+    """A resolved Layer 2 row, in the shape `_bet_analysis_schema` reads.
+
+    The RAW row, not `_board_top_opportunities`' display dict: the schema
+    recomputes price, book and quote age from the row's own `quote`, and reads
+    `model_edge_pct` as the edge. The display dict carries neither, and its
+    percent-valued `edge` would be scaled by 100 a second time. The model and
+    market probabilities are the row's OWN side's, reconciled against its edge
+    (`_board_row_probabilities`), and are passed as FRACTIONS because `_to_pct`
+    reads any value <= 1 as one -- a 1% probability passed as 1.0 would render
+    as 100%.
+    """
+    model_pct, market_pct = _board_row_probabilities(row)
+    recommendation = dict(row)
+    recommendation.update({
+        "model_probability": model_pct / 100.0 if model_pct is not None else None,
+        "market_probability": market_pct / 100.0 if market_pct is not None else None,
+        "source": "layer2_shortlist",
+    })
+    return recommendation
+
+
+def build_syndicate_query_response(
+    *,
+    question: str,
+    context: dict[str, Any],
+    decision: RouteDecision,
+    result: Any,
+    board_row: dict[str, Any] | None = None,
+    board_as_of: Any = None,
+) -> dict[str, Any]:
     query_type = _result_value(result, "query_type", None) or decision.intent or "bet_analysis"
     pipeline_context = _mapping_or_empty(_result_value(result, "pipeline_context", {}))
     structured_response = _mapping_or_empty(_result_value(result, "structured_response", {}))
@@ -1537,7 +1573,17 @@ def build_syndicate_query_response(*, question: str, context: dict[str, Any], de
     # not serialize pipeline_context, for one).
     recommendations = _items_to_dicts(_result_value(result, "recommendations", ()))
     relevance_matched: bool | None = None
-    if recommendations:
+    exact_row = isinstance(board_row, dict)
+    if exact_row:
+        # The rail named the exact row it was pressed on (`resolve_board_row`),
+        # so the answer is about THAT bet -- not whichever snapshot
+        # recommendation the question's words happen to match. Measured
+        # 2026-09-11: an NCAAF receiving-yards prop was answered with an
+        # unrelated spread that way.
+        result = _result_payload(result)
+        result["recommendations"] = [_board_row_recommendation(board_row)] + recommendations
+        relevance_matched = True
+    elif recommendations:
         reordered, relevance_matched = _reorder_by_relevance(recommendations, question)
         if reordered is not recommendations:
             result = _result_payload(result)
@@ -1550,7 +1596,12 @@ def build_syndicate_query_response(*, question: str, context: dict[str, Any], de
             result, question=question, relevance_matched=relevance_matched, context=context
         )
     else:
-        schema = _bet_analysis_schema(result, question=question, relevance_matched=relevance_matched)
+        schema = _bet_analysis_schema(
+            result, question=question, relevance_matched=relevance_matched,
+            # The shortlist's own `written_at`: exact for a resolved row, where
+            # the snapshot's `computed_at` would only bound the quote's age.
+            artifact_as_of=board_as_of if exact_row else None,
+        )
 
     return {
         "ok": True,

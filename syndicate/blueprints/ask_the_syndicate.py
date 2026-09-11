@@ -643,11 +643,20 @@ def ask_the_syndicate_query_api():
     snapshot = read_latest_intelligence_state(shaped_payload)
     has_snapshot = isinstance(snapshot, dict) and bool(snapshot)
     result = snapshot if has_snapshot else _empty_ask_result(shaped_payload, decision, reason="snapshot_missing")
+    # The exact Layer 2 row an Ask button was pressed on, resolved ONCE and
+    # shared by the answer and the evidence below, so the two cannot describe
+    # different bets. None for a typed question (no `event_id`), which keeps the
+    # question-word matching it has always had.
+    from syndicate.blueprints.ask_the_syndicate_data import resolve_board_row
+
+    board_row, board_as_of = resolve_board_row({**shaped_payload, **_coerce_context(shaped_payload)})
     response = build_syndicate_query_response(
         question=str(shaped_payload.get("original_question") or shaped_payload.get("question") or "").strip(),
         context=_coerce_context(shaped_payload),
         decision=decision,
         result=result,
+        board_row=board_row,
+        board_as_of=board_as_of,
     )
 
     response["answer_source"] = "snapshot"
@@ -681,7 +690,7 @@ def ask_the_syndicate_query_api():
     # renders even when the LLM path is unavailable.
     request_context = dict(shaped_payload)
     request_context.update(_coerce_context(shaped_payload))
-    focused_evidence = collect_focused_evidence(question, request_context)
+    focused_evidence = collect_focused_evidence(question, request_context, board_row=board_row)
 
     # `K6`. AN AS-OF ON EVERY ANSWER, not only the ones a sport branch matched.
     #
