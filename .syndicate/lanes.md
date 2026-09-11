@@ -408,15 +408,21 @@ death, never life — do not invert it.
 - Blocked by: none.
 - **OWNER SESSION 8c631ba2 DELIBERATELY ARCHIVED 2026-09-10 [user: "checkpoint and archive if complete"] — NOT ABANDONED, HANDED OFF.** The Goal's 2026-09-11 reading is all that remains. Scheduled task `wnba-0911-no-game-chips-reading` (one-time, 2026-09-11 10:00 CT) takes it and closes this lane on a pass. If it does not fire (tasks run only while the desktop app is open), any session can take the reading: `py -3 scripts/verify_wnba_slate_hygiene.py --date 2026-09-11 --check layer2`, plus `/wnba/api/live_state?date=2026-09-11` (0 games). Then close per this block's Verification. The lane holds no files and no deploy claim. At archive every service ran both fixes: web `4c373107`, refresh-worker `c29a7d4e`, live-odds-worker `e4410f37`, all checked by ancestry and content.
 
-### write-ahead-build-refusal — OPEN — opened 2026-09-10 — session 192abc41-d901-4b94-93d7-43922ae75c81 — **GOAL: NOT MET. The code is live; the production refusal reading is owed.**
-- Goal: [user 2026-09-10] a LIVE order whose build is refused persists NO write-ahead `submitted` row, so a lost update has nothing to strand. The refusals in scope: Polymarket `market_unresolved_for_position` (the slug is missing from the slate), a refused spread or team side, and Kalshi `no_live_price`. Also: the 2026-09-04 lost-update mechanism is named from evidence. This is the residual of `exchange-execution-unblock`: `332e596d` covered only positions with no `venue_ticker`. — **GOAL: NOT MET.**
-  - Done:
-    - The mechanism is named and proven.
-    - `2914b6c7` has been live on live-odds-worker since 21:55:18Z. `e4410f37` carries it by content since 22:18:17Z.
-    - The tests went red to green.
-    - `execution_ledger.py` and its test are handed to `execution-ledger-cas` (`#656`); released in `1dc55b0c` and verified with `claims_by_path`.
-  - LEFT: the production `REFUSED_AT_BUILD` reading.
-  - BLOCKED BY: no live population. No position holding a contract has failed its build since the deploy, nor since 18:10Z before it. Re-read at 22:20:13Z, three passes in: still none.
+### write-ahead-build-refusal — CLOSED 2026-09-10 — opened 2026-09-10 — session 192abc41-d901-4b94-93d7-43922ae75c81 — **GOAL: MET. A LIVE order refused at build writes no row, measured on production 2026-09-11T04:10:57Z.**
+- Goal: [user 2026-09-10] a LIVE order whose build is refused persists NO write-ahead `submitted` row, so a lost update has nothing to strand. The refusals in scope: Polymarket `market_unresolved_for_position` (the slug is missing from the slate), a refused spread or team side, and Kalshi `no_live_price`. Also: the 2026-09-04 lost-update mechanism is named from evidence. This is the residual of `exchange-execution-unblock`: `332e596d` covered only positions with no `venue_ticker`. — **GOAL: MET.**
+  - **THE READING (Verification 2), on live-odds-worker `3bafdd2b` (7 of 7 markers by content):**
+    - `REFUSED_AT_BUILD venue=polymarket reason=unmappable_side` on slug `atc-lal-elc-rma-2026-09-15-draw` at 04:10:57Z.
+    - The same pass read `refused={'unmappable_side': 1, …} placed=0`.
+    - There has been no rejected `LIVE_ORDER` since the deploy.
+    - No ledger row carries that slug, and `live:kalshi` 09-10 moved 14 -> 19, exactly the 5 sent orders.
+    - Recorded as a `RECONCILED` line in `deploys.md`, 2026-09-11.
+  - Measured live: `unmappable_side` only. `market_unresolved_for_position` and `no_live_price` run the same branch and are covered by tests.
+  - Also done:
+    - The mechanism is named and proven: a cross-service TOCTOU in `_persist`.
+    - `2914b6c7` has been live since 2026-09-10T21:55:18Z.
+    - The tests went red to green (540 pass).
+    - `execution_ledger.py` and its test were handed to `execution-ledger-cas`.
+  - Follow-ups filed: `#656`, a CAS in `_persist` (lane `execution-ledger-cas`), and `#657`, where `_load` reads a failed read as an empty ledger across 29 sites (unassigned).
 - Files: `syndicate/features/shared/kalshi_orders.py`, `syndicate/features/shared/polymarket_us_orders.py`, `syndicate/features/shared/execution_guard.py`, `pipeline/execute_portfolio.py`, `tests/test_execute_portfolio.py`, `tests/test_execution_guard.py`, `tests/test_kalshi_orders.py`, `tests/test_polymarket_us_orders.py`, `tests/test_paper_settlement.py` (ADDED 2026-09-10: one test made its unfilled row by placing live while disarmed, which now writes no row; unclaimed on origin/main). Collision check 2026-09-10: the only other claim on any of these was `exchange-execution-unblock`, which is CLOSED on origin/main.
   - **NOT claimed, RELEASED 2026-09-10** to lane `execution-ledger-cas` (`#656`), at its request: `syndicate/features/shared/execution_ledger.py` and `tests/test_execution_ledger.py`. This lane had no pending edits to either. That lane touches `_load`, `_merge_onto_current` and `_persist`, and inverts `test_KNOWN_HAZARD_…`; it leaves `record_order`, `_build_before_record` and `place_order` alone.
 - Hypothesis: **CONFIRMED 2026-09-10.** It is a cross-service TOCTOU in `_persist`: the merge-read and the SET are not atomic. The evidence is in `deploys.md` 21:49:12-21:55:18Z and `state_model.md [execution-ledger-cross-service-race]`. The pre-registered text was moved verbatim to `lanes_history.md`.

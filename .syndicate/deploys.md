@@ -32338,3 +32338,12 @@ on the SHA requested.
     the remaining blocker.
   - **Cost to watch:** this join took `elapsed_s=94.91`, against 0.71–0.8 on the old slate. The widened soccer
     candidate lists now span 09-10..09-18. Whether it persists is owed on the next build.
+
+**Obligation reconciliation, lane `write-ahead-build-refusal`, 2026-09-11:**
+- RECONCILED: the live-odds-worker `2914b6c7` entry's owed `REFUSED_AT_BUILD` reading (2026-09-10 21:49:12-21:55:18Z). It was measured on `3bafdd2b` (live 03:44:23Z; carries the change, 7 of 7 markers by content), on the first production refused build since that deploy.
+  - `REFUSED_AT_BUILD venue=polymarket reason=unmappable_side ticker='atc-lal-elc-rma-2026-09-15-draw' sport=soccer market=h2h side=draw stake=3.36` at 04:10:57.138Z. Only this lane's branch emits that line, so the branch RAN.
+  - The same pass, 04:10:58Z: `EXECUTED … venue=polymarket positions=6 placed=0 skipped=6 refused={'unmappable_side': 1, …}`. The refusal is counted by name.
+  - No `LIVE_ORDER status=rejected` since 21:55:18Z: all 5 `LIVE_ORDER` lines are `status=submitted`. Zero `BLOCKED_ON_UNRECONCILED` and zero `Traceback`.
+  - No ledger row carries that slug on 2026-09-10 (19 live orders), 09-11 or 09-15 (`/api/portfolio/live?show=all`). `live:kalshi` 09-10 went 14 -> 19, exactly the 5 submitted orders, so nothing was written for the refused build.
+  - Sendable orders still go out: the Kalshi pass at 04:10:51Z placed 3 NFL prop orders through build -> write-ahead -> send.
+  - Measured live: `unmappable_side` only. `market_unresolved_for_position` and `no_live_price` run the same branch and are covered by tests, not by a production reading.

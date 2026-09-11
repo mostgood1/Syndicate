@@ -76,7 +76,10 @@ exchange-execution-unblock]`.
     - a disarmed worker
     - a missing adapter
   - Passes at 22:03, 22:09 and 22:14Z all read `duplicates=1 refused={'no_venue_ticker': 17}`, and the `live:kalshi` order count held at 14.
-  - **The refusal branch itself is UNMEASURED in production**, because no contract has failed its build since. That reading is owed in `deploys.md`.
+  - **The refusal branch is MEASURED in production** `[2026-09-11T04:10:57Z, live-odds-worker 3bafdd2b, which carries it by content]`.
+    - A Polymarket draw side (`unmappable_side`, slug `atc-lal-elc-rma-2026-09-15-draw`) was refused at build and counted in `refused`, and it wrote NO ledger row.
+    - No rejected `LIVE_ORDER` has occurred since the deploy.
+    - `market_unresolved_for_position` and `no_live_price` share the branch and are tested, not yet seen live.
   - **The same race could revert a SENT order's completion. A CAS now closes it, and it is committing on both workers; the close reading is owed** `[verified on production 2026-09-11T03:36Z, lane execution-ledger-cas]`. `_persist`'s merge-read and SET are one compare-and-swap (`todo.md #656`, `de8a3f2a`).
     - `LEDGER_CAS_ACTIVE` on live-odds-worker at 03:23:41Z and on refresh-worker at 03:36:13Z. web has run it since 23:19:34Z; its line waits on an operator write.
     - Owed: stuck paper rows, PER DATE, staying flat across an overlapping burst: 2026-09-11 at 2, 2026-09-12 at 0. The 5,000-record cap trims old dates, so a total can fall with no fix at all.
