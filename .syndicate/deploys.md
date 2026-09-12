@@ -33683,3 +33683,38 @@ ships      vs live 77f8d890: syndicate/templates/intelligence.html ONLY
 - The user, verbatim, ~4:53 PM CT, after looking at the live Layer 2 board: "the board shows age and it's plausible".
 - This closes the one item the 21:45Z entry left unverified: a live card rendering the "Price seen ≈Xm ago" chip. That entry already content-verified the served page.
 - verify: MET for the price-age display, on two readings — served-page content (21:44Z) and the user's view of live cards (~21:53Z).
+
+## 2026-09-12 22:31:32Z — live-odds-worker `58736a69` — lane `live-odds-worker-oom` — glibc arena cap + malloc_trim. **PENDING reading.**
+
+**Deploy.**
+- `dep-dait5h0ae00c73frm83g`, trigger `api`.
+- Live before: `21c26db1` (since 2026-09-11T18:03:20Z).
+- Claim held by lane `live-odds-worker-oom`.
+- Preflight **CLEAR** at 22:31:17Z for this exact SHA, with only infra running (the parent had just restarted, rss 184.8 MB). No grant used.
+
+**User decision:** "Main now (Recommended)", chosen 2026-09-12 ~22:30Z after being told the deploy carries `8d4aceff`'s in-play gate and in-play `market_fair` sizing refusal onto the EXECUTION worker, and that preflight had read HOLD at 22:05Z.
+
+**Collateral**, code commits in `21c26db1..58736a69`:
+- `8d4aceff`, `a989e256` (lane `layer2-live-scorecard-gate`; already live on web and refresh-worker by the 20:08Z override);
+- `064fb6af` (board price age, web-facing);
+- `77f8d890` (NFL prop certainty refusal);
+- `bad972ff`, `c7852ac8`, `e82e95ef` (offline pool tool);
+- `dfecea84`, `e8ac4c03`, `d2369dae` (ask rail).
+
+**The change.**
+- `run_live_odds_refresh_worker.main()` calls `configure_malloc_arenas(2)` before any thread starter.
+- `live_lens_loop` calls `release_freed_memory_to_os` after `live_lens_pull` (no gc) and `live_lens_publish` (with gc).
+- Kill switch `SYNDICATE_LIVE_LENS_MALLOC_TRIM`, default on; no env change was made.
+
+**Why** (full readings in `lanes.md`, lane `live-odds-worker-oom`):
+- 70 `oomKilled memoryLimit=2Gi` since 09-10, ~every 11 min after each restart on 09-12.
+- The parent stepped 160 -> 997/1,172 MB within ~10 min of boot.
+- 0 `MALLOC` lines on this service, while refresh-worker trims 30-129 MB per call.
+
+**verify — pre-registered predictions** (live-odds-worker only; windows must not straddle a restart):
+- **P1** `MALLOC_ARENA_INIT {"applied": true, "max_arenas": 2}` on the first boot. Falsifier: absent, or `applied: false`.
+- **P2** `MALLOC_TRIM reason=post_live_lens_pull` and `reason=post_live_lens_publish` every cycle, with `anon_released_by_trim_mb > 0` on a majority of lines in the first 30 min. Falsifier: ~0 released, which would mean live retention and an inert fix.
+- **P3** parent rss at ~10 min after boot **<= 700 MB** (against 997 / 1,172 MB on 09-12). Falsifier: >= 950 MB.
+- **P4, THE GOAL:** **0 `oomKilled` over >= 6 h spanning a live slate**, read with `render_events.py --service live-odds-worker`. Falsifier: any kill. If one occurs, read that lifetime's last `ALL_PROCESS_MEMORY` first; a child-only spike is a different lever.
+
+**Rollback:** `py -3 scripts/render_deploy.py --service live-odds-worker --commit 21c26db1 --allow-rollback` under a claim. Or set `SYNDICATE_LIVE_LENS_MALLOC_TRIM=false` and deploy; that removes the trim but not the arena cap.
