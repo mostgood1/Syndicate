@@ -33677,3 +33677,9 @@ ships      vs live 77f8d890: syndicate/templates/intelligence.html ONLY
 - **NOT verified:** a live card rendering the chip in a browser. No headless render against live data was run; the user's view of the board is that reading.
 - Tests: `tests/js/board_live_price_age.test.mjs` 23/23; both inline `<script>` blocks pass `node --check`.
 - Rollback: `render_deploy.py --service web --commit 77f8d890 --allow-rollback`, or revert the template hunk in `064fb6af` and redeploy.
+
+## 2026-09-12 21:53Z — reading only — lane `layer2-live-scorecard-gate` — web `064fb6af` live price-age chip: RENDER VERIFIED by the user
+
+- The user, verbatim, ~4:53 PM CT, after looking at the live Layer 2 board: "the board shows age and it's plausible".
+- This closes the one item the 21:45Z entry left unverified: a live card rendering the "Price seen ≈Xm ago" chip. That entry already content-verified the served page.
+- verify: MET for the price-age display, on two readings — served-page content (21:44Z) and the user's view of live cards (~21:53Z).
