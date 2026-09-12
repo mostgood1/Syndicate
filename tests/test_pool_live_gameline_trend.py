@@ -287,3 +287,28 @@ def test_an_era_with_no_dates_for_the_cut_does_not_crash(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "No date in this era carries cut=fresh_quotes_only" in out
     assert "134" not in out
+
+
+def test_an_era_that_carries_the_cut_on_no_date_is_not_enumerated(tmp_path, capsys):
+    """Structural absence is not a gap.
+
+    `--era each --cut fresh_quotes_only` is the command the scheduled task
+    runs, and pre-fix rows never carry that cut. Listing all ten pre-fix dates
+    buries the one or two real gaps -- the same failure era-scoping fixed.
+    """
+    path = _hist(tmp_path, [
+        row("2026-08-24", 10, "2026-08-25T04:00:00", cut="priceable_only"),
+        row("2026-08-25", 15, "2026-08-26T04:00:00", cut="priceable_only"),
+        bare_row("2026-08-30", 14, "2026-08-31T04:00:00"),
+        row("2026-09-11", 13, "2026-09-12T04:00:00", stamped=True,
+            cut="fresh_quotes_only"),
+    ])
+    assert mod.main(
+        ["--history", path, "--era", "each", "--cut", "fresh_quotes_only"]) == 0
+    out = capsys.readouterr().out
+    # the post-fix date that genuinely lacks the cut IS named
+    assert "2026-08-30" in out
+    # the pre-fix era, which carries the cut on no date at all, is not
+    assert "2026-08-24" not in out
+    assert "2026-08-25" not in out
+    assert "Nothing to pool" in out

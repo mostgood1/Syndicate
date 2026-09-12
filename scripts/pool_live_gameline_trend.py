@@ -274,12 +274,19 @@ def main(argv=None):
               "pooled number across the boundary measures the scorer fix, not "
               "the model (learnings.md:3430).")
 
-    # Scope the gap to the eras being REPORTED. A post-fix query that
-    # lists pre-fix dates -- which legitimately predate the cut -- buries
-    # the one date that matters under ten that do not, and a block the
-    # reader learns to skip is the same as no block.
+    # Scope the gap to the eras being REPORTED, and WITHIN those, to eras that
+    # actually carry the cut. A post-fix query listing pre-fix dates -- which
+    # legitimately predate the cut -- buries the one date that matters under
+    # ten that do not, and a block the reader learns to skip is the same as no
+    # block. An era carrying the cut on NO date is a structural absence, not a
+    # gap, and `main` has already said "Nothing to pool" for it.
     scoped = [r for r in rows if row_era(r) in set(wanted)]
-    gap = coverage_gap(scoped, args.cut)
+    gap = []
+    for era in wanted:
+        if not (out.get(era) or {}).get("games"):
+            continue
+        gap.extend(coverage_gap(by_era.get(era) or [], args.cut))
+    gap.sort()
     newest = latest_dated(scoped)
     stale = bool(gap) and newest is not None and newest in {d for d, _ in gap}
     out["coverage_gap"] = {"cut": args.cut, "newest_date": newest,
