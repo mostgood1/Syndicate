@@ -556,3 +556,22 @@ deployed three times on the evening of 2026-08-26. Same family as
   - Page sim views 116 -> 602, of which 486 are not Anytime TD.
 
 **Standing rule:** a Kalshi prop price is filed in the shard's own vocabulary and on the shard's own date. `tests/test_kalshi_book_quote_capture.py` pins the label map against both fetchers' `MARKET_STD_MAP`. `Interceptions` is the one label `market_keys` cannot canonicalise, so it passes through unrelabelled.
+
+## [layer2-live-quote-age] LIVE LAYER 2 ROWS ARE AGED ON THE MOVEMENT CLOCK — NCAAF live quotes reach the board minutes to hours old; the fix is on main, NOT DEPLOYED `[verified 2026-09-12 18:39-19:28Z, lane layer2-live-scorecard-gate]`
+
+**Production behaviour, measured on `/api/board/layer2-shortlist`:**
+
+- `opportunity_gate.evaluate` judges an in-play row on `book_age_seconds` (time since the price MOVED, ceiling 900s) and never on `quote_seen_age_seconds` (time since we LOOKED). `quote_seen_age_seconds` is stamped at BUILD time, so what is served is older by the shortlist's own age.
+- Build 18:34:57Z: NCAAF live opportunity rows at seen age p50 351s, p90 1,013s; read 267s and 562s after build. Example: WF @ PUR Q4 10:32 ranked +4.8% EV on book age 618s, seen age 1,013s.
+- Build 18:44:05Z, live opportunity rows: MLB 12, all <=120s. NCAAF 53: 26 <=180s, every one venue-quoted; 13 >900s and 14 with no seen clock, every one sportsbook-priced.
+- Every NCAAF row is `ev_basis=market_fair` (model edge withheld by the measured gate). Both sides of one total were +EV at once on 2 of 8 two-sided live lines, and 9 of 29 live markets carried more than one line.
+- 09-12 builds served: 18:34:57, 18:44:05, 18:54:48, 19:10:31, 19:21:09, 19:28:10Z (gaps 421-943s). Refresh-worker `LAYER2_BOARD_HEALTH sport=ncaaf` at 19:21:06Z: `age_p50s=697 age_p90s=9025`.
+- `portfolio_commit` has no in-play or quote-age refusal on the deployed code, and `execute_portfolio._kalshi_price_for` refuses only when our side got DEARER than planned.
+
+**One-build NCAAF collapse, 19:21:09Z:** refresh-worker `MARKET_GONE_DROPPED ... ncaaf=868 ... total=1214 of 4929` (the four builds before: 1/33/22/1) served 356 of 1,224 selected; the 19:28:10Z build served 1,166. Not the shard merge: web logged 0 `LAYER2_SHARD_MERGE` lines 18:55-19:27Z. The API does not return `rows_market_gone_dropped`, so only refresh-worker's log shows it. Cause (books pulling in-play markets vs a capture gap) is UNPROVEN; see `leads.md` 2026-09-12.
+
+**live-odds-worker, Render events:** `server_failed` oomKilled 2Gi at 18:08:51, 18:30:14, 18:42:16 and 18:59:57Z on 09-12, during the NCAAF slate.
+
+**On origin/main, NOT DEPLOYED (`8d4aceff`):** in-play rows must also be observed within `LIVE_QUOTE_MAX_OBSERVED_AGE_SECONDS` = 300s (`live_quote_unobserved`; env `SYNDICATE_GATE_LIVE_MAX_OBSERVED_AGE_SECONDS`); `portfolio_commit` refuses `in_play_market_fair` (revert `SYNDICATE_PORTFOLIO_IN_PLAY_MARKET_FAIR=allow`); openings record `game_state`, `book_age_seconds`, `quote_seen_age_seconds`, `quote_source`. **The gate is NOT shown to improve results** — the 09-12 capture at 19:04Z did not discriminate at n=7 vs n=9.
+
+**Grading:** `scripts/layer2_live_scorecard.py` (`a989e256`) settles `reports/intelligence/clv_openings/<date>.jsonl` against `/api/board/game-chips`. First reading, 09-12 NCAAF: 932 +EV opportunities, 4 finals, pregame 15-10 +6.23u, in-play 30-28 +2.76u, in-play per game +5.28/+5.50/-2.85/-5.16. Its team join is complete only with the NCAAF registry reachable (0 unmatched vs 32 without). The opening ledger is heavy: 09-11 closed at 22,607,063 B, 67.4% of the 32 MiB tripwire.

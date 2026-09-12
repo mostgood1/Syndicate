@@ -5668,3 +5668,31 @@ nobody re-audited the tool against the new cut.
 - When a cut, a population or a field becomes the HEADLINE, re-audit the tool
   that computes it against that cut specifically. A defect latent under the old
   headline goes live the moment you switch.
+
+
+## 2026-09-12 FORBIDDEN: grading in-play price movement on the markets that are still there `[lane layer2-live-scorecard-gate]`
+
+Grading live NCAAF Layer 2 opportunities by re-pricing the SAME market 10 minutes
+later: 65 live +EV first sightings, 48 re-checkable, and **32 of those 48 (67%) had
+vanished** -- mostly because the line moved, which is exactly what a stale price being
+picked off looks like. Pregame, 13 of 258 (5%) vanished. The survivors' median then
+said the rows a staleness gate would REMOVE held +1.85 EV points and the rows it would
+keep held +0.68 -- the opposite of the mechanism, measured only on the markets that
+did not move.
+
+Before printing denominators I also quoted a mean split in chat ("<5m held +2.11,
+10m+ fell to -11.28"). It rested on n=3 vs n=13 and three William Hill rows at median
+-69, and was retracted within the hour.
+
+The same session's first scorecard joined **0 of 932** opportunities while two games
+were final, and printed it as `no_final_score`: run from a session worktree, the NCAAF
+team alias registry under `data/` did not exist, so feed names never met scoreboard
+names.
+
+**How to apply:**
+- Print the vanish rate beside any in-play re-price metric, per cell, and never read
+  survivors' movement as "the edge held". Settle against results, or price the moved
+  line; do not drop it.
+- Print n beside every mean, and a median beside any mean a few rows can swing.
+- A join that can fail must name its failure (`no_chip_match`), and a known-final game
+  must be shown to join before any result from it is read.
