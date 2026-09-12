@@ -788,6 +788,16 @@ death, never life — do not invert it.
 - NOTE: the serve-time re-gate location for Layer 2 cards is NOT yet chosen — `_regate_board_rows` does not cover them, and the board-state module that hydrates them is held by lane `football-layer2-live-parity`. Files will be amended (or that lane consulted) before any edit there.
 - Blocked by: none. The deploy waits for every 09-12 NCAAF game to go final (user decision "deploy after slate", then "proceed next steps"), and then proceeds per the PLAN in OWED (3).
 
+### nfl-prop-certainty-refusal — OPEN — opened 2026-09-12 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: the NFL prop projection writer (`nfl_prop_projections.py`, `row["projection"] = projection`, added in bdbb2fb0 2026-09-09) routes through `probability_refusal.refuse_published_certainty`, so `tests/test_platform_certainty_refusal.py` passes on main.
+- Files: syndicate/features/shared/nfl_prop_projections.py, tests/test_nfl_prop_projections.py
+- RESULT (2026-09-12): `nfl_prop_projections.py:360` now `row["projection"] = refuse_published_certainty(projection)`, import at module top as in `ncaaf/game_projections.py:42`. `tests/test_platform_certainty_refusal.py` 2 failed/8 passed -> **10 passed**; `pytest tests -k nfl_prop` **124 passed, 0 failed** (before the new test). Added `test_an_exact_certainty_is_refused_on_this_path_not_just_wrapped[0.0|1.0]` driving the real `attach_nfl_prop_projections` join: passes with the wrap (16/16 in file), **both params FAIL with the wrap removed** (2 failed/14 passed) — the AST scan proves the substring, this proves the path. Worktree has no `data/`; no test needed it. NOT DEPLOYED.
+- Hypothesis: n/a (pre-existing failure, reproduced in this worktree at origin/main e2e197e5 before any edit: 2 failed / 8 passed, both on `nfl_prop_projections.py:359`).
+- Field-list check (learnings 2026-09-06, a guard's scope is its field list): the NFL prop projection is one-sided (`side: over`); `_attach_sim_probability_edge` sets `model_prob_over` and `edge_vs_market_pct` — the exact field the guard reads and one it clears. No other probability legs, so the guard's predicate covers this path.
+- Falsification test: the certainty test still failing after the wrap, or any `-k nfl_prop` test failing that passes on origin/main.
+- Verification: `python -m pytest -q tests/test_platform_certainty_refusal.py` 10/10 and `python -m pytest -q tests -k nfl_prop` same-or-better than origin/main.
+- Blocked by: none. Code-only; NOT DEPLOYED (runtime effect only when an NFL prop sim_projection is exactly 0.0/1.0).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

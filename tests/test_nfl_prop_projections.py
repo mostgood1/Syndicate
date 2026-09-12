@@ -95,6 +95,28 @@ def test_off_vs_on_reachability():
     assert isinstance(on_row["projection"]["edge_vs_market_pct"], float)
 
 
+@pytest.mark.parametrize("certainty", [0.0, 1.0])
+def test_an_exact_certainty_is_refused_on_this_path_not_just_wrapped(certainty):
+    """`refuse_published_certainty` on the REAL join, not the AST scan's substring.
+
+    The platform test proves the assignment line names the guard; this proves a
+    0/N or N/N sim cover probability actually arrives unpriced, with the edge
+    derived from it cleared and the projected MEAN kept.
+    """
+    row = _board_row()
+    coverage = attach_nfl_prop_projections(
+        [row], _index(_artifact_row("receiving_yards::aj barner::24.5", sim=certainty))
+    )
+    projection = row["projection"]
+    assert coverage["rows_with_projection"] == 1
+    assert projection["model_prob_over"] is None
+    assert projection["model_prob_over_refused"] == "exact_certainty"
+    assert projection["model_prob_over_refused_value"] == certainty
+    assert projection.get("edge_vs_market_pct") is None
+    assert projection["edge_unavailable_reason"]
+    assert projection["projected"] == pytest.approx(28.833)
+
+
 # ---------------------------------------------------------------------------
 # 2. THE LINE IS PART OF THE JOIN
 # ---------------------------------------------------------------------------

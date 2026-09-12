@@ -65,6 +65,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping
 
+from syndicate.features.shared.probability_refusal import refuse_published_certainty
 from syndicate.features.shared.wnba_game_projections import _attach_sim_probability_edge
 
 #: Stamped on every projection this module writes, so a board row's model view
@@ -356,7 +357,7 @@ def attach_nfl_prop_projections(
         # rather than hand-rolled -- this would otherwise be the sixth copy of
         # one de-vig.
         _attach_sim_probability_edge(projection, row=row, model_prob=model_prob)
-        row["projection"] = projection
+        row["projection"] = refuse_published_certainty(projection)
         rows_with_projection += 1
 
     coverage: dict[str, Any] = {
