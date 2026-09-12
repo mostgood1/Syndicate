@@ -33618,3 +33618,36 @@ live-odds-worker `21c26db1` (untouched).
   data, and nothing it touches regressed.** Collateral `8d4aceff`/`a989e256` readings belong to
   `layer2-live-scorecard-gate`.
 - Claims: web released ~20:22Z; refresh-worker released after this entry.
+
+## 2026-09-12 20:45Z — reading only — lane `layer2-live-scorecard-gate` — first post-deploy reading of `8d4aceff` (deployed by lane `nfl-prop-certainty-refusal`)
+
+No deploy, no env change, no code change by this lane. The deploy is lane `nfl-prop-certainty-refusal`'s (entry 2026-09-12 20:08:28Z). That session reports it as a user override of this lane's after-slate hold.
+
+```
+deployed     web            dep-dair2f15efls73ek9jkg  77f8d890  live 20:11:32Z
+             refresh-worker dep-dair51lg1s2s738eri5g  77f8d890  live 20:20:09Z
+             live-odds-worker unchanged 21c26db1 -- needs no deploy for this lane
+content      git show 77f8d890:syndicate/features/shared/opportunity_gate.py -> live_quote_unobserved present (3 matches)
+boot         refresh-worker server_available 20:20:09Z; 0 Traceback/NameError 20:19-20:21Z;
+             0 MEMORY_GUARD_ABORT 20:20-20:40Z (it fired every cycle 19:42-20:08Z before the deploy)
+first build  heavy path pull_hot_artifacts 20:20:57-20:22:00Z; shortlist written_at 20:38:54Z
+```
+
+Same method before and after: `/api/board/layer2-shortlist?sport=<s>&date=2026-09-12&limit=2000`, live opportunity rows, observed age = `quote_seen_age_seconds`, else `book_age_seconds`.
+
+| | baseline, build 20:07:07Z | post-deploy, build 20:38:54Z |
+|---|---|---|
+| MLB live opp | 24; observed p90 4s; 0 over 300s | 16; observed p90 59s; 0 over 300s |
+| NCAAF live opp | 145 across 24 live games | 41 across 13 live games |
+| NCAAF, no venue quote (FanDuel/ProphetX/Kalshi/DraftKings via aggregator) | **80**, all over 300s, served p50 585s | **0** |
+| NCAAF, Polymarket-repriced | 50 (48 with venue basis), served p50 95s | 39, served 353s; the gate saw 256s |
+| NCAAF, Kalshi-sourced | 15, served ~21s | 2 |
+| soccer live opp | 20 | 0 |
+
+- **MLB is not collapsed by the gate:** 16 of 16 live rows are under 300s. The board total of 1,095 -> 381 is not this gate, which touches live rows only. Lane `nfl-prop-certainty-refusal` reports the deploy killed the in-flight MLB sim.
+- **NCAAF's stale aggregator class went 80 -> 0. That is CONSISTENT WITH the gate firing, NOT PROOF.** Live games fell 24 -> 13, and the fresh Kalshi class also fell 15 -> 2, which the gate cannot cause. No log or payload counts gate reasons (`pipeline/layer2_shortlist.py:1534` prints `lanes=` only), and dead rows are not served. So `live_quote_unobserved` firing on a production row is **UNOBSERVED**.
+- **STAGE ORDER, verified by line:** `build_layer2_rows`, which runs the gate, is at `pipeline/layer2_shortlist.py:1359`. It runs BEFORE `apply_venue_quotes` at `:1495`, whose `stamp_candidate_freshness` (`venue_quote_fanin.py:433`) re-stamps `quote_seen_age_seconds` with a later clock. On all 39 served Polymarket rows the gate judged 256s and passed; the row publishes at 353s and is served ~74s later. **The gate is a build-time floor, not a served-age guarantee.**
+- 8 of the 39 show a sportsbook `bookmaker` (e.g. draftkings -120) with `quote_source=polymarket_us` and `book_age_source=polymarket_us`. The displayed price carries the VENUE quote's age; this is the lead in the lane block, now with rows.
+- Opening ledger: `OPENINGS date=2026-09-12 rows_in=2001 written=119 ... truncated=False` at 20:38:53Z. The four new fields on production records are NOT READ (the export is ~18 MB mid-slate).
+- verify: `in_play_market_fair` in the refusals of the next `PLAN_WRITTEN date=2026-09-12` — PENDING, none written 20:20-20:43Z. Proving `live_quote_unobserved` fires needs a gate-reason counter that does not exist yet.
+- Rollback without code: `SYNDICATE_GATE_LIVE_MAX_OBSERVED_AGE_SECONDS=900` neutralises the new ceiling (typos fall back to 300), and `SYNDICATE_PORTFOLIO_IN_PLAY_MARKET_FAIR=allow` reverts the refusal. Env changes need a deploy to take effect.
