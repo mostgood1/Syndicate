@@ -5723,3 +5723,17 @@ printed at `acquire`.
 - If a HOLD is overridden by the user, write the grant with a minutes-scale expiry immediately before
   the trigger. Delete it in the same command, and log it in `deploys.md`.
 - *(evidence in `.syndicate/log/2026-09-12.md`, section "Deploy of `77f8d890`")*
+
+## 2026-09-12 FORBIDDEN: reporting "the code has no X" from a search whose pattern was never shown to match anything `[lane layer2-live-scorecard-gate]`
+
+A Grep over `syndicate` with the glob `{templates/**/*.html,static/**/*.js}` returned "No files found" for `quote_seen_age|book_age|written_at|...`. I told the user the board's templates and JS read no age field at all. That was false: the same tokens with single-extension globs found 25 matches in `intelligence.html` alone, including the card's existing `renderFreshness` book-age strip. A second query with the same brace glob also returned zero. The glob, not the code, was empty.
+
+This is the search-tool twin of the 2026-09-02 rule about filters that have never been shown to match.
+
+**How to apply:** before stating an absence, run the same search for a token you KNOW is there, with the same path and glob. A zero on that control means the search is broken, not the code.
+
+## 2026-09-12 FORBIDDEN: calling a production endpoint "small" without checking its size first `[lane layer2-live-scorecard-gate]`
+
+Mid-slate, with the user betting off the web service, I fetched `/api/intelligence/status` as a "small" endpoint to read freshness fields. It returned 87,903,243 B, the whole state payload. Its neighbour `POST /api/intelligence/query` was already measured at ~67 MB (`#632`), and the route was one grep away.
+
+**How to apply:** read the route, or use a size-first form (`names_only`, a limit, a HEAD), before fetching from a live service, and pick the narrowest endpoint that carries the field.
