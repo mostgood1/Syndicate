@@ -788,21 +788,18 @@ death, never life — do not invert it.
 - NOTE: the serve-time re-gate location for Layer 2 cards is NOT yet chosen — `_regate_board_rows` does not cover them, and the board-state module that hydrates them is held by lane `football-layer2-live-parity`. Files will be amended (or that lane consulted) before any edit there.
 - Blocked by: none. USER DECISION 2026-09-12 ~3:57 PM CT on the build-time-vs-served age gap: "Show price age on board" — display each live price's served age (seen age + time since the build) next to it; no rows removed; web deploy. Also left: the full-slate scorecard once every 09-12 NCAAF game is final (session watcher from 06:30Z).
 
-### nfl-prop-certainty-refusal — CLOSED 2026-09-12 — opened 2026-09-12 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **GOAL MET: `77f8d890` live on web (20:11:32Z) and refresh-worker (20:20:09Z); certainty test 10/10; NFL prop coverage unchanged post-boot (717/1470, 0 join failures, 0 refused against an artifact with 0 certainties). Readings: `deploys.md` 2026-09-12 20:08:28Z.**
+### nfl-prop-certainty-refusal — CLOSED 2026-09-12 — opened 2026-09-12 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- **GOAL VERDICT — Goal (verbatim): "the NFL prop projection writer (`nfl_prop_projections.py`, `row["projection"] = projection`, added in bdbb2fb0 2026-09-09) routes through `probability_refusal.refuse_published_certainty`, so `tests/test_platform_certainty_refusal.py` passes on main." → GOAL: MET.**
+  - Reading: `tests/test_platform_certainty_refusal.py` returned **10 passed** on rebased main `77f8d890`, against 2 failed / 8 passed at `e2e197e5`. `-k nfl_prop` returned **126 passed**. The join-level test fails with the wrap removed.
+  - Beyond the goal, a user override deployed it to web (live 20:11:32Z) and refresh-worker (live 20:20:09Z). First post-boot NFL shortlist: `prop_coverage` 717/1470, 0 join failures, 0 refused against an artifact with 0 certainties.
+  - Narrative: `log/2026-09-12.md`. Readings: `deploys.md` 2026-09-12 20:08:28Z.
 - Goal: the NFL prop projection writer (`nfl_prop_projections.py`, `row["projection"] = projection`, added in bdbb2fb0 2026-09-09) routes through `probability_refusal.refuse_published_certainty`, so `tests/test_platform_certainty_refusal.py` passes on main.
 - Files: syndicate/features/shared/nfl_prop_projections.py, tests/test_nfl_prop_projections.py
-- RESULT (2026-09-12): `nfl_prop_projections.py:360` now `row["projection"] = refuse_published_certainty(projection)`, import at module top as in `ncaaf/game_projections.py:42`. `tests/test_platform_certainty_refusal.py` 2 failed/8 passed -> **10 passed**; `pytest tests -k nfl_prop` **124 passed, 0 failed** (before the new test). Added `test_an_exact_certainty_is_refused_on_this_path_not_just_wrapped[0.0|1.0]` driving the real `attach_nfl_prop_projections` join: passes with the wrap (16/16 in file), **both params FAIL with the wrap removed** (2 failed/14 passed) — the AST scan proves the substring, this proves the path. Worktree has no `data/`; no test needed it. NOT DEPLOYED.
 - Hypothesis: n/a (pre-existing failure, reproduced in this worktree at origin/main e2e197e5 before any edit: 2 failed / 8 passed, both on `nfl_prop_projections.py:359`).
 - Field-list check (learnings 2026-09-06, a guard's scope is its field list): the NFL prop projection is one-sided (`side: over`); `_attach_sim_probability_edge` sets `model_prob_over` and `edge_vs_market_pct` — the exact field the guard reads and one it clears. No other probability legs, so the guard's predicate covers this path.
 - Falsification test: the certainty test still failing after the wrap, or any `-k nfl_prop` test failing that passes on origin/main.
 - Verification: `python -m pytest -q tests/test_platform_certainty_refusal.py` 10/10 and `python -m pytest -q tests -k nfl_prop` same-or-better than origin/main.
-- Blocked by: none. Landed `77f8d890`. Runtime effect only when an NFL prop sim_projection is exactly 0.0/1.0.
-- DEPLOY `[2026-09-12, user override "Both now, override"]`: web `dep-dair2f15efls73ek9jkg` triggered 20:08:28Z (live before `1421ee3c`), refresh-worker to follow (live before `9d580145`, preflight HOLD — MLB daily sim + odds refresh in flight, killed by the user's choice). **This ships lane `layer2-live-scorecard-gate`'s held `8d4aceff`/`a989e256` before the 09-12 slate ends**; that session was messaged first.
-  - Pre-deploy readings:
-    - Production's only NFL prop artifact (wk1, 1,140 rows) has 0 exact certainties (min 0.0321, max 0.9576), so the fix is INERT today.
-    - `clv_openings/2026-09-12.jsonl` was 17.55 MiB of the 32 MiB tripwire at ~20:07Z, with the evening slate still to accrue and the Layer 2 fields adding bytes per record.
-    - No served baseline: shortlist and book-grid both returned 502 at 20:10:37Z, mid-restart.
-  - Readings and verify: `deploys.md` 2026-09-12 20:08:28Z.
+- Blocked by: none. CLOSED. Deployed by user override "Both now, override". That deploy shipped lane `layer2-live-scorecard-gate`'s held `8d4aceff`/`a989e256`; its owner was messaged first and owns their readings.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

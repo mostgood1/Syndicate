@@ -5696,3 +5696,30 @@ names.
 - Print n beside every mean, and a median beside any mean a few rows can swing.
 - A join that can fail must name its failure (`no_chip_match`), and a known-final game
   must be shown to join before any result from it is read.
+
+## 2026-09-12 RULE: from a session WORKTREE, the deploy locks live in the PRIMARY tree. The lane marker must be written THERE, and a claim is released with its TOKEN. `[lane nfl-prop-certainty-refusal]`
+
+**What I believed.** `/lane open` step 6 ("Write the slug to `.syndicate/.current-lane.<id>`")
+was enough for `deploy-guard.py`, and `deploy_claim.py release --service <svc>` would release my
+own claim.
+
+**What happened.** I did step 6 inside `C:/tmp/syndicate-sessions/<lane>`, as the worktree protocol
+directs. I then held the claim and a CLEAR preflight for the exact SHA, and the guard still refused
+the deploy with `your lane: <none>`. The hook resolves its root to the PRIMARY tree and reads the
+marker there. `deploy_claim.py` says so in its own banner ("claims live in the MAIN tree"); the
+lane marker has no such banner. After deploying, `release --service web` returned
+`REFUSED ... the token does not match`, and it succeeded only with `--token` set to the value
+printed at `acquire`.
+
+**Also measured.**
+- The guard has NO override for a preflight HOLD. The only way past a user-approved HOLD is
+  `.syndicate/deploy/grants/<session_id>.json`.
+- `_grant()` checks `expires_epoch` ONLY, not `service`. A grant therefore opens EVERY service for
+  this session until it expires.
+
+**How to apply.**
+- In a worktree, write `.current-lane.<session id>` in BOTH trees before any deploy.
+- Record the `acquire` token and pass it to `release`.
+- If a HOLD is overridden by the user, write the grant with a minutes-scale expiry immediately before
+  the trigger. Delete it in the same command, and log it in `deploys.md`.
+- *(evidence in `.syndicate/log/2026-09-12.md`, section "Deploy of `77f8d890`")*
