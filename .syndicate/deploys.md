@@ -33651,3 +33651,13 @@ Same method before and after: `/api/board/layer2-shortlist?sport=<s>&date=2026-0
 - Opening ledger: `OPENINGS date=2026-09-12 rows_in=2001 written=119 ... truncated=False` at 20:38:53Z. The four new fields on production records are NOT READ (the export is ~18 MB mid-slate).
 - verify: `in_play_market_fair` in the refusals of the next `PLAN_WRITTEN date=2026-09-12` — PENDING, none written 20:20-20:43Z. Proving `live_quote_unobserved` fires needs a gate-reason counter that does not exist yet.
 - Rollback without code: `SYNDICATE_GATE_LIVE_MAX_OBSERVED_AGE_SECONDS=900` neutralises the new ceiling (typos fall back to 300), and `SYNDICATE_PORTFOLIO_IN_PLAY_MARKET_FAIR=allow` reverts the refusal. Env changes need a deploy to take effect.
+
+## 2026-09-12 20:58Z — reading only — lane `layer2-live-scorecard-gate` — `in_play_market_fair` FIRES in production on refresh-worker `77f8d890`
+
+- This is the first 09-12 portfolio plan since the deploy. Before it, NO plan had run since 14:34:17Z: the heavy build aborted every cycle on `MEMORY_GUARD_ABORT`, and 0 `in_play_market_fair` lines existed.
+- Base plan: `PLAN_WRITTEN date=2026-09-12 rows_in=2001 sized=25 positions=22 staked=$95.71` at 20:43:45Z, `refusals={'below_min_ev_pct': 834, 'below_min_stake': 3, 'beyond_max_positions': 40, 'in_play_market_fair': 41, 'market_family_excluded': 310, 'no_model_edge_pct': 748, 'zero_kelly_stake': 3}`.
+- Venue plans, 20:45:01-20:45:12Z. `PAPER2_PLAN_WRITTEN`: kalshi `in_play_market_fair` 4, prophetx 1, polymarket 41. `LIVE_PLAN_WRITTEN venue=polymarket` (the live-money plan): 13.
+- `PORTFOLIO_COMMIT date=2026-09-12 positions=22 staked=$95.71` at 20:45:13Z; the commit span took 152.11s.
+- **Reachability of the refusal: MET on production.** The named reason is in the counters of both the paper plans and the live plan.
+- NOT shown: that every refused row was genuinely in play at refusal time. The log carries counts, not rows.
+- The gate half is unchanged from the 20:45Z entry: `live_quote_unobserved` firing on a production row is still UNOBSERVED.
