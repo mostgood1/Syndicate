@@ -33177,3 +33177,133 @@ Each ticker's shard, read from `market.exchange_index` on the public market:
 **Also read, and clean:** no `SHARD_BALANCE_UNKNOWN` (so the gate never stood down), no `REFUSED_NO_VENUE_TICKER`, no `Traceback`. A 1c gap between `sum` and `balance` (13.34 vs 13.35; 20.22 vs 20.23) is inside the tolerance and still reports `ok`.
 
 **verify:** **GOAL NOT MET as of 2026-09-12 15:11Z (10:11 CDT).** Reading (2) is no longer OWED — it happened. The gate's refusal is live and fires on real orders: first at 05:41:10Z `refused={'insufficient_shard_balance': 8}`, sustained on every Kalshi pass through 15:04:11Z, against a shard 0 holding $0.66. What blocks MET is the second clause: three Kalshi orders (05:05:54Z, 05:05:59Z shard 0; 12:57:44Z shard 3) still took a venue `insufficient_balance` 400 in the same window. All three are OPEN QUESTIONs by the rule — their shard had enough cash at the preceding reading — with the subtraction discrepancy above as the lane's next thread. Lane stays OPEN; `#573` stays open.
+
+### pricing-plane-v1 — 3-DAY CLV READING 2026-09-12 (sharp anchor vs consensus) + STEP 2 VERDICT
+
+Scheduled one-shot `pricing-plane-clv-reading-0912`, run 2026-09-12 15:04–15:4xZ. READ-ONLY
+against production (web `1421ee3c`); no deploy, no env change, no code change. The pre-registered
+reading that decides step 2 of the Engine Room Audit.
+
+**Source.** `/api/ops/clv/report?sport=<sport>&date=<date>&rows=1` — the endpoint is PER-DATE
+(`date` defaults to Central today), so the window was walked date by date: 5 sports × 15 Central
+dates 2026-08-29..2026-09-12 = 75 requests, 75 OK, 0 errors. 40,566 resolved rows pulled.
+The split is exact by the P1d stamps, not by era: 258/258 `sharp_anchor` rows opened after
+02:43:20Z carry `fair_anchor_book=pinnacle` AND `fair_devig_method=power`; all 421 `consensus`
+rows in the same frame carry `fair_anchor_book=None` and `multiplicative`. The cross-check the
+task asked for holds exactly.
+
+**Scopes and exclusions, stated before the numbers.**
+- Headline scope is `same_book` (3,019 pregame rows). `book_agnostic_close` (27,712) is reported
+  beside it and NEVER pooled with it.
+- Pregame only: 8,306 of 40,566 rows (20.5%) excluded as non-pregame — 8,299 `unknown` timing
+  (`close_age_seconds` is None) + 7 `in_play`. Only **6** of those were `same_book`, so the
+  timing filter barely touches the headline (3,025 -> 3,019).
+- Tiers outside the comparison, `same_book` pregame: `exchange_mid` n=3 (mean -0.557),
+  `book_margin_model` n=0, `two_sided_same_book` n=0. In `book_agnostic_close` pregame:
+  `book_margin_model` n=2,723 (mean +0.273), `exchange_mid` n=2.
+
+**HEADLINE — `same_book`, pregame, MLB (the only sport with same-book rows; see the blocker below).**
+Post-anchor era = rows opened at/after 2026-09-09T00:40:13Z, the instant `sharp_only` went live.
+Both cells share the slate, so this is the pre-registered paired comparison.
+
+| era | family | tier | n rows | n games | mean CLV pt | median | share >0 | 95% CI (normal) | bootstrap 95% (2,000) |
+|---|---|---|---|---|---|---|---|---|---|
+| post-anchor | h2h | sharp_anchor | 103 | 31 | +0.128 | 0.000 | 43.7% | [-0.130, +0.386] | [-0.131, +0.391] |
+| post-anchor | h2h | consensus | 180 | 36 | +0.171 | 0.000 | 28.3% | [-0.051, +0.393] | [-0.043, +0.392] |
+| post-anchor | spreads | sharp_anchor | 93 | 34 | UNMEASURED (n<100) | — | — | — | (+1.690; [+0.482,+3.139]) |
+| post-anchor | spreads | consensus | 101 | 35 | -0.199 | 0.000 | 46.5% | [-1.446, +1.047] | [-1.497, +0.971] |
+| post-anchor | totals | sharp_anchor | 63 | 26 | UNMEASURED (n<100) | — | — | — | (+0.269; [-0.154,+0.685]) |
+| post-anchor | totals | consensus | 141 | 39 | +0.042 | 0.000 | 29.1% | [-0.195, +0.286] | [-0.195, +0.286] |
+| whole window | h2h | sharp_anchor | 107 | 35 | +0.120 | 0.000 | 43.0% | [-0.128, +0.369] | [-0.129, +0.371] |
+| whole window | h2h | consensus | 1,159 | 183 | -0.036 | 0.000 | 34.8% | [-0.131, +0.059] | [-0.130, +0.065] |
+| whole window | spreads | sharp_anchor | 93 | 34 | UNMEASURED (n<100) | — | — | — | (+1.690; [+0.466,+3.199]) |
+| whole window | spreads | consensus | 867 | 181 | +0.410 | 0.000 | 43.4% | [+0.071, +0.750] | [+0.075, +0.774] |
+| whole window | totals | sharp_anchor | 64 | 27 | UNMEASURED (n<100) | — | — | — | (+0.246; [-0.156,+0.704]) |
+| whole window | totals | consensus | 726 | 170 | +0.009 | 0.000 | 32.9% | [-0.096, +0.113] | [-0.101, +0.110] |
+
+Differences, sharp_anchor minus consensus (Welch 95% CI), and the n each would need PER ARM for
+80% power at the OBSERVED variance:
+
+| era | family | n sharp | n cons | diff (pt) | 95% CI | powered? | n/arm needed |
+|---|---|---|---|---|---|---|---|
+| post-anchor | h2h | 103 | 180 | -0.043 | [-0.383, +0.297] | POWERED (both >=100) | 17,352 |
+| post-anchor | spreads | 93 | 101 | +1.890 | [+0.029, +3.750] | underpowered (sharp 93) | 192 |
+| post-anchor | totals | 63 | 141 | +0.226 | [-0.264, +0.717] | underpowered (sharp 63) | 778 |
+| whole window | h2h | 107 | 1,159 | +0.156 | [-0.110, +0.423] | POWERED | 1,428 |
+| whole window | spreads | 93 | 867 | +1.280 | [-0.142, +2.702] | underpowered (sharp 93) | 346 |
+| whole window | totals | 64 | 726 | +0.238 | [-0.200, +0.675] | underpowered (sharp 64) | 702 |
+
+`book_agnostic_close`, pregame, beside it and not pooled: MLB props `consensus` n=24,987 / 193
+games, mean +1.141, median +0.947, 65.1% >0, CI [+1.112, +1.169]. **There is no `sharp_anchor`
+cell in this scope at all (n=0), and no `props` cell in `same_book` at all (n=0).**
+
+**VERDICT: INCONCLUSIVE — and specifically INCONCLUSIVE-NOT-WORSE.**
+Applying the pre-registered rule unchanged, on `same_book` pregame rows:
+1. *No family with n >= 100 shows the sharp cells worse with a CI excluding zero.* The only
+   powered family in either era is **h2h**; its difference CI spans zero both times
+   (post-anchor [-0.383,+0.297], whole window [-0.110,+0.423]). The FAIL clause does not fire.
+2. *At least one family shows a positive difference whose CI excludes zero* — **not satisfied by a
+   powered cell.** Spreads is the only family whose difference CI excludes zero (+1.890,
+   [+0.029,+3.750]), and its sharp cell is n=93, under the pre-registered 100 floor, so by rule (f)
+   it prints UNMEASURED rather than a rate. It is suggestive, not a pass.
+
+Therefore neither PASS nor FAIL: **INCONCLUSIVE**. The anchor is not harming realised CLV in the
+one family that is powered, and the one cell that looks positive is not yet measurable.
+
+Underpowered cells and what they need, at the observed variance: **spreads** needs 192 rows/arm
+(has 93 sharp) — the reachable one; at the observed accrual of ~25 sharp spreads rows/day
+(09-09: 24, 09-10: 19, 09-11: 43) that is **~4 more days**. **totals** needs 778/arm (has 63).
+**h2h** needs 17,352/arm to resolve its -0.043 point difference — that is not an underpowered
+cell to be topped up, it is a **measured null**: on 283 rows the anchor moves h2h CLV by less
+than +/-0.4 pt, and chasing it further is not worth a reading.
+
+**CAVEATS — three, and the first two are load-bearing.**
+1. **`same_book` is NOT the book the decision was about** (`learnings.md` 2026-09-01, "measure on
+   the BOOK THE DECISION IS ABOUT, not on the convenient superset"). The scope pairs a book that
+   quoted BOTH ends and overrides the open to that book's own price
+   (`clv_join` `open_price_override`). Measured here: **`bookmaker == matched_bookmaker` on only
+   104 of 3,019 rows (3.4%)**. The matched books are fanduel (1,797) and draftkings (1,197); the
+   books the board actually picked are novig (776), prophetx (668), kalshi (582), polymarket (384).
+   So this reading answers "would the board's selection have beaten the close at a book that
+   quoted both ends", NOT "did the anchor improve realised entry at the venue we chose". The
+   task's framing ("realised entry") is stronger than what this scope can support. Fixing it is a
+   capture problem (both-ended quotes at the exchange venues), not an analysis choice.
+2. **The Pinnacle-did-not-quote confound, stated both ways.** The consensus cell in the post-anchor
+   era is BY CONSTRUCTION the rows Pinnacle did not quote two-sided inside the hold <= 5% / >= 2
+   books gates. So sharp-vs-consensus is not a clean randomisation: it partly compares
+   Pinnacle-quotable markets against markets Pinnacle declined. That cuts against reading the
+   spreads result as anchor skill, and it equally cuts against reading the h2h null as proof the
+   anchor is inert — the two cells are different populations of markets, not the same markets
+   priced two ways. The era-matched design removes the SLATE confound only.
+3. In-play exclusion is real but tiny in this scope (6 of 3,025 same_book rows). The 8,299
+   `unknown`-timing exclusions sit almost entirely in `book_agnostic_close` (8,061) and so do not
+   touch the headline.
+
+**BLOCKER FOUND, and it is bigger than the verdict: CLV is structurally UNMEASURABLE for 4 of the
+5 sports the reading was scoped to.** Over the full 15-date window:
+
+| sport | openings | resolved | same_book | dominant refusal |
+|---|---|---|---|---|
+| mlb | 127,343 | 39,434 | 3,019 | `no_pregame_observation` 36,574 |
+| soccer | 59,584 | 1,132 | **0** | `no_market_in_history` 58,113 |
+| ncaaf | 31,483 | **0** | 0 | `no_market_in_history` 30,895 |
+| nfl | 15,955 | **0** | 0 | `no_market_in_history` 15,352 |
+| wnba | 7,447 | **0** | 0 | `no_market_in_history` 6,330 |
+
+NFL, NCAAF and WNBA produced **zero** resolved CLV rows from 54,885 openings; soccer produced
+1,132, **all of them `different_book_close`** (the most biased scope) and all `consensus`, so
+soccer contributes nothing to any cell above. The refusal is `no_market_in_history` on ~97% of
+non-MLB openings — the openings are being recorded but the odds-history store has no key the
+join can find for those markets. This is a CAPTURE/KEYING defect on the odds tape, not a CLV-math
+defect, and it means every per-sport CLV number outside MLB is currently None for a reason nobody
+had counted. Recorded here rather than fixed (read-only task).
+
+Second structural fact: **the sharp anchor never touches props.** 0 `sharp_anchor` rows in
+`book_agnostic_close` (where all 24,987 prop rows live) and 0 props rows in `same_book`. The
+anchor's blast radius is MLB game lines only — h2h/spreads/totals — which is consistent with
+Pinnacle two-sided coverage, but it bounds what step 2 could ever have improved.
+
+**Verify:** the readings above, from 75/75 successful per-date pulls against web `1421ee3c`,
+2026-09-12 15:0x–15:4xZ; anchor-stamp cross-check 258/258 `pinnacle`+`power` vs 421/421
+`None`+`multiplicative`; headline `same_book` pregame n=3,019 rows / 183 distinct games.
+No production state was changed by this task.
