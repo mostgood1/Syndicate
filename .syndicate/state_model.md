@@ -325,7 +325,14 @@ shape. `2914b6c7` stops a refused BUILD from writing a row.
   - The fix is a user decision: `deploys.md` 2026-09-11 10:49 CT, `leads.md`.
 - **Stuck paper, first window: MET** `[2026-09-11T13:41:50Z]`. 0 new stuck rows across 245 new paper
   orders (09-10: 2 of 595; 09-11: 2 of 468; 09-12: 0 of 132), with live placement in the window.
-  A second window is owed, scheduled for 2026-09-12 10:15 CDT. web's `LEDGER_CAS_ACTIVE` is not
+- **Stuck rows, second window: PAPER MET, LIVE FAILED** `[2026-09-12T16:37:01Z]`. Paper 09-11 2 of 586,
+  09-12 0 of 354, 09-13 0 of 36 -- +340 orders and 0 new stuck paper rows, with 31 collisions CAUGHT and
+  0 `LEDGER_CAS_EXHAUSTED` / `MERGE_READ_FAILED` / `LedgerError`. But 4 LIVE rows now sit at `submitted`
+  (09-11 polymarket 1 of 4, 09-12 polymarket 3 of 8) where the first window read 0, so the close rule's
+  "0 live rows stuck on any date" is not met and the lane did NOT close. No line blames the CAS:
+  live-odds-worker was `oomKilled` 47 times in the window, once 2 min 25 s after the last stranded
+  order was written -- the crash shape named as this verification's upper bound, attributed by timing
+  and not by row. web's `LEDGER_CAS_ACTIVE` is still not
   exercised, because there has been no operator write.
 
 The `off != on` 7 of 10 figure is from 08-28 and covers the whole-document clobber only.

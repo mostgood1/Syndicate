@@ -33307,3 +33307,106 @@ Pinnacle two-sided coverage, but it bounds what step 2 could ever have improved.
 2026-09-12 15:0x–15:4xZ; anchor-stamp cross-check 258/258 `pinnacle`+`power` vs 421/421
 `None`+`multiplicative`; headline `same_book` pregame n=3,019 rows / 183 distinct games.
 No production state was changed by this task.
+
+## 2026-09-12 16:37Z — reading only, no deploy — lane `execution-ledger-cas` — the #656 close reading, second window
+
+**Nothing was deployed, restarted or changed. Read-only.** The scheduled task
+`execution-ledger-cas-close-reading` owned this window and the close.
+
+**Services, checked BY CONTENT** for `compare_and_swap_json_file(_ledger_path()` and `def compare_and_swap_json_file`:
+- web `1421ee3c`, live 2026-09-11T22:32:37Z. Both markers. On `origin/main`.
+- refresh-worker `9d580145`, live 2026-09-11T17:27:41Z. Both markers. On `origin/main`.
+- live-odds-worker `21c26db1`, live 2026-09-11T18:03:20Z. Both markers. On `origin/main`.
+
+All three SHAs MOVED since the first window (web `4c373107`, refresh-worker `1e1285a4`,
+live-odds-worker `3bafdd2b`). Other lanes redeployed them; the CAS rode along, and the
+content check is what proves it rather than ancestry.
+
+**verify -- the reading (2026-09-12 16:37:01Z, `/api/ops/execution/ledger-summary?days=14`):**
+
+```
+stuck rows, by_status.submitted summed over the paper:* and live:* buckets, PER DATE
+             first window            now
+             2026-09-11T13:41:50Z    2026-09-12T16:37:01Z
+  paper
+    09-10    2 of 595                2 of 595     (+0 orders,  +0 stuck)
+    09-11    2 of 468                2 of 586     (+118,       +0 stuck)
+    09-12    0 of 132                0 of 354     (+222,       +0 stuck)
+    09-13    --                      0 of 36      (new date,   0 stuck)
+  live
+    09-10    0 of 23                 0 of 23
+    09-11    0 of 8                  1 of 23      <-- NEW, live:polymarket 1 of 4
+    09-12    --                      3 of 26      <-- NEW, live:polymarket 3 of 8
+  14-day paper total 35 (was 37). NOT evidence: the ledger is at its 5,000-record cap
+  and TRIMMED drops whole old dates, so a total can fall with no fix at all.
+  last_blind_write None -- and that field cannot be set in production (learnings 2026-09-10).
+
+overlap     paper: 52 PAPER2_EXECUTED on refresh-worker
+                   COVERED 2026-09-11T15:36:54Z .. 2026-09-12T14:36:17Z
+            live:  41 LIVE_ORDER on live-odds-worker
+                   COVERED 2026-09-11T15:50:18Z .. 2026-09-12T15:24:05Z
+            Both tools were asked for 13:41:00Z and COVERED only from ~15:36Z/15:50Z:
+            13:41-15:36Z is UNREAD. That weakens no claim made here -- both counts are
+            PRESENCE claims, and presence in a sub-window is presence -- but any zero
+            below is a zero over the covered window, not over the whole window.
+            The two interleave on 09-12 (live 12:57-12:59Z, paper 13:35Z and 14:35Z),
+            so the overlap the goal asks for is EXERCISED.
+
+collisions  CAUGHT: 31, each a write the pre-#656 code would have overwritten.
+            refresh-worker    21 LEDGER_CAS conflicts (..2026-09-12T13:02:11Z)
+            live-odds-worker  10 LEDGER_CAS conflicts (..2026-09-12T12:59:17Z)
+            Deepest: conflicts=3 attempts=4 of 5 (live-odds-worker 12:58:07Z).
+            13 of the 31 fell in the 12:57-13:02Z two-writer burst on 09-12.
+            LEDGER_CAS_ACTIVE: live-odds-worker 53, refresh-worker 5.
+
+failures    0 LEDGER_CAS_EXHAUSTED, 0 MERGE_READ_FAILED, 0 LedgerError on either worker.
+            0 traceback frames in execution_ledger.py on either worker
+            (searched `shared/execution_ledger.py`; nothing matched).
+            refresh_state_store.py frames DO appear, and NEITHER is a ledger write:
+              live-odds-worker 40 frames, all write_json_file:706 -> _guard_keyvalue_
+              payload_size:682 raising KeyValuePayloadTooLarge for mlb_live_lens.json;
+              refresh-worker 103 frames, all in a faulthandler ALL-THREAD dump
+              (`line 472 in <lambda>`, no comma) under MEMORY_WATCHDOG -- not an exception.
+            KEYVALUE_WRITE_REJECTED in the window, by key: mlb_live_lens.json 63,
+            query_state_cache.json 85, novig_markets.json 29, execution_ledger.json 0.
+            Ledger payload 6,003,621 B against max_bytes 8,388,608 -- 72% of the ceiling.
+
+web         LEDGER_CAS_ACTIVE not seen since its live deploy finished (22:32:37Z).
+            OPERATOR_RESOLUTION 0, GRADE_CONFLICT_ACKNOWLEDGED 0 over the same window.
+            NOT EXERCISED, exactly as the close rule anticipated.
+```
+
+**Verdict: NOT PASS. The lane stays OPEN. The paper clause MET; the live clause FAILED.**
+
+- The lane's own goal (3) -- *paper* rows stuck at `submitted` stop growing across a paper
+  burst that overlaps live placement -- is **MET a second time**: +340 paper orders over
+  09-11/09-12/09-13 and **0 new stuck paper rows**, with live placement interleaved and
+  31 collisions caught.
+- The close rule also requires **0 live rows stuck on any date**, and there are now **4**:
+  09-11 `live:polymarket` 1 of 4, 09-12 `live:polymarket` 3 of 8. The first window read 0.
+  That is a stated PASS condition, so this reading cannot close the lane.
+
+**What the 4 live rows are, and what they are NOT.** No line blames the CAS, and the timing
+blames a crash -- which is the upper bound this lane wrote down for itself on 2026-09-10
+("a crash mid-`place_order` leaves the same shape").
+
+- **live-odds-worker was `oomKilled memoryLimit=2Gi` 47 times** between 2026-09-11T14:17Z
+  and 2026-09-12T15:56Z. refresh-worker: 1 (2026-09-12T12:10:48Z, 4Gi).
+- 09-12: six `LIVE_ORDER status=submitted venue=polymarket` were written 12:58:10-12:59:19Z.
+  The container was OOM-killed at **13:01:44Z, 2 min 25 s after the last of them**. Four of
+  the six later read `filled` and one `rejected`; three never got reconciled.
+- 09-11: the two `submitted` polymarket lines are 15:50:57Z and 15:51:02Z. A deploy restarted
+  live-odds-worker 15:59:52 -> 16:02:44Z, nine minutes later.
+- 0 `LEDGER_CAS_EXHAUSTED` and 0 `MERGE_READ_FAILED` anywhere near either.
+- **This is attribution by TIMING, not by row.** `ledger-summary` returns counts, not row ids,
+  so nothing here identifies *which* rows are stuck. The correlation is strong and the
+  mechanism is named, but a per-row read is what would settle it.
+
+**FLAGGED, and no lane owns it: live-odds-worker is OOM-killing roughly every 20 minutes.**
+47 kills in 25.6 hours, on a 2Gi limit. It strands live orders between `place_order` and
+`reconcile_live_orders`, and while it continues, every future window of this reading will
+strand live rows for a reason that is not the CAS. `#656`'s remaining clause cannot be read
+cleanly until that is fixed or the user rules that a crash-stranded live row does not block
+this close the way it does not block the paper clause.
+
+**Rollback:** n/a -- nothing was deployed.
