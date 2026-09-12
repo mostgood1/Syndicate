@@ -42,6 +42,24 @@ same few games across builds, so a date with 1,449 rows and 3 games carries
 three games of evidence. Every pooled figure here is game-weighted and printed
 with its game count.
 
+A CUT CAN GO PERMANENTLY EMPTY, AND THAT USED TO BE SILENT. `best_per_date`
+skips any date whose cut carries no brier, so a cut that stops being populated
+does not shrink the pool -- it FREEZES it, and the tool keeps printing the same
+total while new dates vanish. Measured 2026-09-12: MLB `priceable_only` went to
+`model.n == 0` on 2026-09-11 and the pool still read "12 dates, 146 games",
+unchanged and unmarked. `priceable` is a PUBLICATION verdict, not a
+measurement-validity one -- the per-record ledger for 09-11 has 13,187 records,
+`priceable=True` on ZERO, with `model_edge_publishing_disabled_for_sport` on 245
+(09-09, before the switch: 41 priceable, that reason absent). The forecasts were
+still recorded; only publication stopped.
+
+So `coverage_gap()` below names every date that HAS outcomes and contributes
+nothing to the requested cut, and `main` exits non-zero when the newest such
+date is the most recent in the history. A frozen headline must announce itself.
+Note that `fresh_quotes_only` is the age-conditioned cut, which `priceable_only`
+is not -- `learnings.md:854` FORBIDS comparing model against market without
+conditioning on quote age, because staleness flatters the model.
+
 THIS TOOL NEVER WRITES to the history. It is append-only and concurrently
 written by other sessions; rewriting it to tidy or dedupe destroys their rows.
 """
@@ -99,6 +117,37 @@ def best_per_date(rows, cut):
         if prior is None or games > (prior.get("games_with_outcome") or 0):
             best[row["date"]] = row
     return best
+
+
+def coverage_gap(rows, cut):
+    """Dates that HAVE outcomes but contribute NOTHING to `cut`.
+
+    A date counts as covered if ANY capture of it carries a brier for the cut
+    with a non-zero model n, so a single thin snapshot does not mask a date that
+    a later, fuller capture did measure. Returns [(date, games), ...] sorted.
+    """
+    seen = {}
+    for row in rows:
+        date = row.get("date")
+        games = row.get("games_with_outcome") or 0
+        if not date or not games:
+            continue
+        vals = cut_values(row, cut)
+        covered = vals is not None and (vals.get("model_n") or 0) > 0
+        prior = seen.get(date)
+        if prior is None:
+            seen[date] = {"games": games, "covered": covered}
+        else:
+            prior["games"] = max(prior["games"], games)
+            prior["covered"] = prior["covered"] or covered
+    return sorted((d, v["games"]) for d, v in seen.items() if not v["covered"])
+
+
+def latest_dated(rows):
+    """Most recent date in the history that actually has outcomes."""
+    dates = [r["date"] for r in rows
+             if r.get("date") and (r.get("games_with_outcome") or 0)]
+    return max(dates) if dates else None
 
 
 def pool(rows, cut):
@@ -164,6 +213,12 @@ def main(argv=None):
     )
     ap.add_argument("--era", default=POST, choices=[PRE, POST, "each"])
     ap.add_argument("--json-out", default="")
+    ap.add_argument(
+        "--allow-stale-cut", action="store_true",
+        help="Exit 0 even when the most recent date in the history carries no "
+             "data for --cut. Off by default: a headline cut that has stopped "
+             "being populated otherwise re-prints an unchanged pool forever.",
+    )
     args = ap.parse_args(argv)
 
     try:
@@ -189,6 +244,13 @@ def main(argv=None):
         out[era] = res
         print("\n=== %s | cut=%s | %d dates, %d games ==="
               % (era, args.cut, res["dates"], res["games"]))
+        if not res["games"]:
+            # No date in this era carries this cut. Normal, not an error:
+            # pre-fix rows predate `fresh_quotes_only` entirely. Say so and
+            # move on -- the pooled keys are absent from `res` here.
+            print("  No date in this era carries cut=%s. Nothing to pool."
+                  % args.cut)
+            continue
         print("%-12s%6s%10s%10s%11s%18s"
               % ("date", "games", "model", "market", "diff", "n model/market"))
         for date, d in res["per_date"].items():
@@ -212,10 +274,42 @@ def main(argv=None):
               "pooled number across the boundary measures the scorer fix, not "
               "the model (learnings.md:3430).")
 
+    # Scope the gap to the eras being REPORTED. A post-fix query that
+    # lists pre-fix dates -- which legitimately predate the cut -- buries
+    # the one date that matters under ten that do not, and a block the
+    # reader learns to skip is the same as no block.
+    scoped = [r for r in rows if row_era(r) in set(wanted)]
+    gap = coverage_gap(scoped, args.cut)
+    newest = latest_dated(scoped)
+    stale = bool(gap) and newest is not None and newest in {d for d, _ in gap}
+    out["coverage_gap"] = {"cut": args.cut, "newest_date": newest,
+                           "stale": stale,
+                           "dates": [{"date": d, "games": g} for d, g in gap]}
+    if gap:
+        missed = sum(g for _, g in gap)
+        print("\n** COVERAGE GAP -- %d date(s) / %d game(s) have outcomes but "
+              "contribute NOTHING to cut=%s: **" % (len(gap), missed, args.cut))
+        for date, games in gap:
+            print("       %s  games=%-3d  (no brier for this cut)" % (date, games))
+        print("  These dates are NOT in the pool above. The pooled total does "
+              "not shrink when a cut stops being populated -- it FREEZES.")
+    if stale:
+        print("\n** HEADLINE CUT IS STALE: the most recent date with outcomes "
+              "(%s) carries no data for cut=%s. **" % (newest, args.cut))
+        print("  The pool above describes an era that has STOPPED accumulating. "
+              "Do not report it as current.")
+        print("  `priceable` is a PUBLICATION verdict, not a measurement one: "
+              "it goes to zero when edge publishing is switched off for the "
+              "sport, while the forecasts are still recorded.")
+        print("  Try --cut fresh_quotes_only (age-conditioned, per "
+              "learnings.md:854), or --allow-stale-cut to accept a frozen pool.")
+
     if args.json_out:
         with open(args.json_out, "w", encoding="utf-8") as fh:
             json.dump(out, fh, indent=2, sort_keys=True)
         print("\nwrote %s" % args.json_out)
+    if stale and not args.allow_stale_cut:
+        return 3
     return 0
 
 

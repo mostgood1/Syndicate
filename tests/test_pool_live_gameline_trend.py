@@ -148,3 +148,142 @@ def test_the_tool_never_writes_to_the_history(tmp_path):
     before = hist.read_bytes()
     assert mod.main(["--history", str(hist), "--era", "each"]) == 0
     assert hist.read_bytes() == before
+
+
+# --- coverage gap: a cut that stops being populated ------------------------
+#
+# The regression these guard is SILENT in the worst way. `best_per_date` skips
+# a date whose cut has no brier, so a cut going permanently empty does not
+# shrink the pool -- it freezes it, and the tool keeps printing the same total
+# while new dates disappear. Measured 2026-09-12: MLB `priceable_only` hit
+# model.n == 0 on 2026-09-11 (edge publishing switched off for the sport) and
+# the pool still read "12 dates, 146 games", unchanged and unmarked.
+
+def bare_row(date, games, captured, stamped=True):
+    """A row with outcomes and NO cut block at all."""
+    payload = {"date": date, "games_with_outcome": games, "captured_at": captured}
+    if stamped:
+        payload["scored_markets"] = ["h2h"]
+    return payload
+
+
+def test_coverage_gap_names_a_date_with_outcomes_but_no_brier():
+    rows = [
+        row("2026-09-10", 14, "2026-09-11T04:00:00", stamped=True),
+        bare_row("2026-09-11", 13, "2026-09-12T04:00:00"),
+    ]
+    assert mod.coverage_gap(rows, "priceable_only") == [("2026-09-11", 13)]
+
+
+def test_a_zero_model_n_counts_as_UNCOVERED():
+    """n == 0 with a null brier is exactly how the real collapse presented."""
+    r = row("2026-09-11", 13, "2026-09-12T04:00:00", stamped=True, n=0)
+    r["priceable_only"]["model"]["brier"] = None
+    r["priceable_only"]["market"]["brier"] = None
+    assert mod.coverage_gap([r], "priceable_only") == [("2026-09-11", 13)]
+
+
+def test_a_date_is_covered_if_ANY_capture_of_it_carries_the_cut():
+    """A thin early snapshot must not mask a date a fuller capture measured."""
+    rows = [
+        bare_row("2026-09-11", 2, "2026-09-11T20:00:00"),
+        row("2026-09-11", 13, "2026-09-12T04:00:00", stamped=True),
+    ]
+    assert mod.coverage_gap(rows, "priceable_only") == []
+
+
+def test_dates_without_outcomes_are_not_a_gap():
+    """A zero-outcome row is the post-roll artifact, not a missing measurement."""
+    assert mod.coverage_gap(
+        [bare_row("2026-09-12", 0, "2026-09-12T05:00:00")], "priceable_only") == []
+
+
+def test_latest_dated_ignores_zero_outcome_rows():
+    rows = [
+        row("2026-09-11", 13, "2026-09-12T04:00:00", stamped=True),
+        bare_row("2026-09-12", 0, "2026-09-12T05:00:00"),
+    ]
+    assert mod.latest_dated(rows) == "2026-09-11"
+
+
+# --- the exit code ---------------------------------------------------------
+
+def _hist(tmp_path, payload):
+    h = tmp_path / "history.jsonl"
+    h.write_text("\n".join(json.dumps(p) for p in payload) + "\n", encoding="utf-8")
+    return str(h)
+
+
+def test_a_stale_headline_cut_exits_NONZERO(tmp_path, capsys):
+    """The frozen-pool case: newest date carries nothing for the cut."""
+    path = _hist(tmp_path, [
+        row("2026-09-10", 14, "2026-09-11T04:00:00", stamped=True),
+        bare_row("2026-09-11", 13, "2026-09-12T04:00:00"),
+    ])
+    assert mod.main(["--history", path, "--era", "post-fix"]) == 3
+    out = capsys.readouterr().out
+    assert "HEADLINE CUT IS STALE" in out
+    assert "2026-09-11" in out
+
+
+def test_allow_stale_cut_accepts_the_frozen_pool(tmp_path):
+    path = _hist(tmp_path, [
+        row("2026-09-10", 14, "2026-09-11T04:00:00", stamped=True),
+        bare_row("2026-09-11", 13, "2026-09-12T04:00:00"),
+    ])
+    assert mod.main(
+        ["--history", path, "--era", "post-fix", "--allow-stale-cut"]) == 0
+
+
+def test_a_populated_cut_exits_zero(tmp_path):
+    path = _hist(tmp_path, [
+        row("2026-09-10", 14, "2026-09-11T04:00:00", stamped=True),
+        row("2026-09-11", 13, "2026-09-12T04:00:00", stamped=True),
+    ])
+    assert mod.main(["--history", path, "--era", "post-fix"]) == 0
+
+
+def test_a_cut_populated_on_the_newest_date_is_not_stale_despite_older_gaps(tmp_path, capsys):
+    """An old uncovered date is reported, but does not fail the run."""
+    path = _hist(tmp_path, [
+        bare_row("2026-09-09", 11, "2026-09-10T04:00:00"),
+        row("2026-09-11", 13, "2026-09-12T04:00:00", stamped=True),
+    ])
+    assert mod.main(["--history", path, "--era", "post-fix"]) == 0
+    out = capsys.readouterr().out
+    assert "COVERAGE GAP" in out and "2026-09-09" in out
+    assert "HEADLINE CUT IS STALE" not in out
+
+
+def test_the_gap_is_scoped_to_the_eras_being_reported(tmp_path, capsys):
+    """A post-fix query must not list pre-fix dates that predate the cut.
+
+    Ten such dates once buried the single date that mattered; a block the
+    reader learns to skip is the same as no block.
+    """
+    path = _hist(tmp_path, [
+        bare_row("2026-08-25", 15, "2026-08-26T04:00:00", stamped=False),
+        row("2026-09-11", 13, "2026-09-12T04:00:00", stamped=True),
+    ])
+    assert mod.main(["--history", path, "--era", "post-fix"]) == 0
+    out = capsys.readouterr().out
+    assert "2026-08-25" not in out
+
+
+def test_an_era_with_no_dates_for_the_cut_does_not_crash(tmp_path, capsys):
+    """Pre-fix rows predate `fresh_quotes_only` entirely.
+
+    `pool()` omits the pooled keys when nothing carries the cut, and `main`
+    used to print them regardless -- a KeyError on the EXACT command the
+    scheduled task prescribes (`--era each --cut fresh_quotes_only`).
+    """
+    path = _hist(tmp_path, [
+        row("2026-08-25", 15, "2026-08-26T04:00:00", cut="priceable_only"),
+        row("2026-09-11", 13, "2026-09-12T04:00:00", stamped=True,
+            cut="fresh_quotes_only"),
+    ])
+    assert mod.main(
+        ["--history", path, "--era", "each", "--cut", "fresh_quotes_only"]) == 0
+    out = capsys.readouterr().out
+    assert "No date in this era carries cut=fresh_quotes_only" in out
+    assert "134" not in out
