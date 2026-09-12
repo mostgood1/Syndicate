@@ -839,6 +839,24 @@ death, never life — do not invert it.
   - P3 parent `run_live_odds_refresh_worker.py` rss at ~10 min after boot is **<= 700 MB**, against 997 MB (A) and 1,172 MB (B) on 09-12. **Falsifier:** >= 950 MB at the same stage.
   - P4, the GOAL: **0 `oomKilled` on live-odds-worker over >= 6 h spanning a live slate**. **Falsifier:** any `oomKilled` in that window. Then read that lifetime's last `ALL_PROCESS_MEMORY` before calling the mechanism wrong: a child-only spike is a different lever (the NCAAF live-refresh child tree).
   - Memory is boot-confounded (learnings), so P3 alone proves little. P2 + P4 are the load-bearing pair.
+- **H4 — SECOND MECHANISM, peer-reported, then RE-DERIVED here** `[2026-09-12 ~22:45Z]`. Peer: lane `live-odds-worker-oom-loop` (session 791399da), opened independently; it released its claim on this lane's files, never edited them, and will not deploy while this reading is open.
+  - **Peer claims:**
+    - Onset is 09-09T19:43Z, not 09-11: 76 kills since, 0 before, the first 2.9 h after the depth-field commits 52a995f2/0b8c1e11 went live. **So the `3bafdd2b` quiet stretch is not a clean baseline for H1.**
+    - Kills land in the window between `[kalshi_odds] TRIM_SELECT` and `DAILY_BOOK`: 48 of 69 vs a 17.2% chance rate. That window runs `kalshi_odds_refresh.py:2191 _record_daily_book` -> `venue_daily_odds.record_daily_odds`, which reads the whole file, appends, and writes it back through a recursive normalize plus indented `json.dumps`, on the PARENT's venue-poll thread.
+    - Local amplitude: 8,000 markets x 48 points = +1,378 MB RSS. Production `ncaaf 2026-09-12` sits at the 8,000-market cap.
+  - **MY RE-DERIVATION**, from live-odds-worker logs 20:30-22:31Z, 22 `TRIM_SELECT` and 12 `DAILY_BOOK` lines: **6 of 6 kills landed 17-40 s after a `TRIM_SELECT` and BEFORE its `DAILY_BOOK` printed** (20:43:36 +17.4 s, 20:57:05 +26.0 s, 21:07:05 +39.8 s, 21:18:54 +24.3 s, 21:30:32 +31.3 s, 22:30:03 +22.6 s). `TRIM_SELECT` runs every ~5.3 min, so a 45 s window is ~14% of the time; 6/6 is not chance.
+  - **This also explains this lane's own blind spot:** the stage samples went silent 40-66 s before each kill, because the spike is on a thread they do not sample.
+  - **REVISED READING OF THIS LANE'S FIX:** `58736a69` targets the parent's allocator plateau (1.0-1.3 GB). The kill TRIGGER is most likely H4's transient of LIVE objects during the write, which `malloc_trim` cannot release. **Expectation: kills continue under `58736a69` at a lower rate, landing in `TRIM_SELECT`->`DAILY_BOOK` windows.** A kill under `58736a69` falsifies its SUFFICIENCY, not P1-P3.
+  - **Agreed sequencing:** the peer's streaming `_write_daily_file` fix deploys as a SEPARATE, staggered live-odds-worker deploy after this lane's claim is released, so each change gets its own reading. P4 is NOT read off a short quiet window: the old code once went ~23 h clean on 09-10.
+- **DEPLOYED `58736a69` to live-odds-worker, live 22:34:15Z (user: "Main now"). Readings 22:34-22:47Z** (`deploys.md` 2026-09-12 22:31:32Z):
+  - **P1 MET:** `MALLOC_ARENA_INIT applied true, max_arenas 2, rc 1`.
+  - **P2 MET:** 9 of 9 trims released, 915.9 MB in 12 min.
+  - **P3 FALSIFIED:** parent 1,013.8 MB at 10.2 min and 1,235.5 MB at 11.5 min, against a <= 700 MB target and a >= 950 MB falsifier.
+  - Remaining growth is LIVE objects in the live-lens tick builds: `after_build_mlb` +384 MB, `after_build_soccer` +558 MB transient to a 1,403 MB parent. No trim can release these.
+  - **P4 OWED and expected to fail.** 0 kills in the first 12 min, which is not evidence.
+- **NEXT LEVERS, not yet owned by code:**
+  - (a) H4, the peer's streaming daily-book writer: built, not pushed, needs the user's approval.
+  - (b) allocation sites inside `_run_live_lens_tick` for MLB and soccer on this worker: unmeasured, and `tracemalloc` is not wired here.
 - Blocked by: none. NOTE: `#656` (lane `execution-ledger-cas`) is blocked on this. No deploy without the user's go-ahead: live-odds-worker places live venue orders, and a deploy carries origin/main collateral.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

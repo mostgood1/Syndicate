@@ -33718,3 +33718,28 @@ ships      vs live 77f8d890: syndicate/templates/intelligence.html ONLY
 - **P4, THE GOAL:** **0 `oomKilled` over >= 6 h spanning a live slate**, read with `render_events.py --service live-odds-worker`. Falsifier: any kill. If one occurs, read that lifetime's last `ALL_PROCESS_MEMORY` first; a child-only spike is a different lever.
 
 **Rollback:** `py -3 scripts/render_deploy.py --service live-odds-worker --commit 21c26db1 --allow-rollback` under a claim. Or set `SYNDICATE_LIVE_LENS_MALLOC_TRIM=false` and deploy; that removes the trim but not the arena cap.
+
+**READINGS.**
+- **LIVE:** `58736a69` finished 2026-09-12T22:34:15Z. The new process logged its first line at 22:35:17Z (pid 39).
+- **Last kill on the OLD code:** `oomKilled memoryLimit=2Gi` at 22:30:03Z, pre-deploy. None between the 22:34:15Z boot and the 22:35Z read (`render_events.py`, OUTPUT COMPLETE).
+- **P1 — MET.** `2026-09-12T22:35:17.522502326Z MALLOC_ARENA_INIT {"applied": true, "cpu_count": 32, "env_malloc_arena_max": null, "max_arenas": 2, "pid": 39, "platform": "linux", "rc": 1, "unavailable_reason": null}`.
+  - glibc's default is 8 x cores = 256 arenas on this host.
+  - The null is controlled: an earlier read at 22:35:00Z returned nothing for this AND for a startup-sample control in the same window, which was log ingestion, not absence. The 22:35:28Z re-read carried 2 `ALL_PROCESS_MEMORY` and 201 `[live_odds_worker]` lines in the same window.
+- **P2 — MET.** Window 22:34:15Z-22:47:15Z, one process lifetime (pid 39, first line 22:35:17Z).
+  - `MALLOC_TRIM_INIT {"available": true, "library": "libc.so.6"}`.
+  - **9 trims, 9 with `anon_released_by_trim_mb > 0`, 915.9 MB total in 12 min.**
+  - `post_live_lens_pull`: n=5, median 129.6, max 162.6 MB. `post_live_lens_publish`: n=4, median 68.3, max 148.0 MB, gc 131-743 ms.
+  - Allocator retention on this worker was REAL, and the trim is reached and effective.
+- **P3 — FALSIFIED** on its pre-registered falsifier (>= 950 MB at ~10 min). Parent `run_live_odds_refresh_worker.py` rss by stage:
+  - **1,013.8 MB at 22:45:29Z** (`live_lens_pull_after`, 10.2 min after start); 851.2 MB after that cycle's trim.
+  - **1,235.5 MB at 22:46:48Z** (`live_lens_tick_after_build_mlb`, **+384.3 MB in the MLB build**).
+  - Earlier, 22:42:04Z `live_lens_tick_after_build_soccer`: **parent 1,403.1 MB (+557.9 MB)**, 1,134 MB one sample later.
+  - Unreclaimable peaked at 1,444.6 MB at 22:46:53Z with children 319 MB, the same band as the last pre-deploy lifetime (B, 1,410 MB).
+  - **Reading:** the pull-stage steps are smaller and now handed back, but the remaining growth is LIVE objects in the live-lens tick BUILDS (MLB, soccer), which no trim can release. **The parent plateau is NOT fixed.**
+- **Kills:** 0 `oomKilled` between the 22:34:15Z boot and the 22:47:15Z read. Twelve minutes is NOT evidence; pre-deploy kill-to-kill was 10-25 min.
+- **VERDICT SO FAR:** P1 MET, P2 MET, P3 FALSIFIED. `58736a69` is REAL and INSUFFICIENT: it hands back ~76 MB/min of allocator retention. Two levers remain: (a) live objects in the live-lens MLB/soccer builds, unmeasured by allocation site; (b) H4, the daily-book whole-file write transient, whose peer fix is built and not deployed. P4 is expected to fail and is still owed as a reading.
+- **P4 — OWED:** >= 6 h with 0 `oomKilled` spanning a live slate.
+- **INTERPRETATION CHANGED BEFORE P2-P4 WERE READ** (lane `live-odds-worker-oom`, H4). A peer lane (`live-odds-worker-oom-loop`) found the kill trigger in `[kalshi_odds] TRIM_SELECT`->`DAILY_BOOK` windows: `venue_daily_odds.record_daily_odds` rewrites whole daily files of up to 8,000 markets (+1,378 MB locally).
+  - **Re-derived here:** 6 of 6 kills 20:43-22:30Z landed 17-40 s after `TRIM_SELECT` and before `DAILY_BOOK`, against a ~14% chance window.
+  - `58736a69` addresses the parent's allocator plateau, not that live-object transient. **A kill under `58736a69` falsifies its sufficiency for P4, not its mechanism.** P1-P3 stand on their own.
+  - The peer's streaming-writer fix is to deploy SEPARATELY and staggered, after this claim is released.
