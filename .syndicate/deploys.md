@@ -33743,3 +33743,32 @@ ships      vs live 77f8d890: syndicate/templates/intelligence.html ONLY
   - **Re-derived here:** 6 of 6 kills 20:43-22:30Z landed 17-40 s after `TRIM_SELECT` and before `DAILY_BOOK`, against a ~14% chance window.
   - `58736a69` addresses the parent's allocator plateau, not that live-object transient. **A kill under `58736a69` falsifies its sufficiency for P4, not its mechanism.** P1-P3 stand on their own.
   - The peer's streaming-writer fix is to deploy SEPARATELY and staggered, after this claim is released.
+
+## 2026-09-12 23:3xZ — live-odds-worker `58736a69` -> `e332b531` — lane `live-odds-worker-oom-loop` — stream the daily venue book writer (`bc4dd317`). **PENDING: deploys on the first preflight CLEAR.**
+
+**User decisions, 2026-09-12.** "Push + deploy now (Recommended)" (~23:1xZ). Then, after the user was told preflight read HOLD (3 sweep jobs in flight) and that `58736a69` had run 46 min with 0 kills, "Deploy on the first CLEAR tonight" (~23:2xZ), with no further check-in before firing.
+
+**Locks.**
+- Claim `live-odds-worker-oom-loop`, re-acquired with `--ttl 7200` for the wait (the first claim, acquired 23:20:47Z, was released with its token). The token is recorded in the session, not here.
+- Preflight 23:21:14Z sample: **HOLD** (`refresh_odds_sources.py`, `build_soccer_artifacts.py --league epl --week 5`, `run_refresh_odds_job.py` in flight). A watcher polls preflight about every 60 s and the deploy fires on its CLEAR notification, inside the guard's 15-min window.
+- Target `e332b5315a7089721c4bcd49a991835910d81c1b` is on `origin/main`; live `58736a69` is its ancestor.
+
+**Ride-along, `58736a69..e332b531`, code only:** `bc4dd317` alone (`syndicate/features/shared/venue_daily_odds.py` +89/-3, `tests/test_venue_daily_odds.py` +122). `requirements*.txt` and `render.yaml` are unchanged. ONE change.
+
+**The change.** `record_daily_odds` wrote each (sport, date) file through `write_json_file`. On a disk path that holds the parsed book, a recursive `normalize_timestamped_payload` copy and a `json.dumps(indent=2)` string at once. `_write_daily_file` streams one market at a time, compact, temp file + `os.replace`. Keyvalue paths are unchanged. Same markets, points and depth fields. Local, 8,000 x 48: RSS peak +1,378 MB -> +339 MB (+400 MB on the first tick, which reads today's indented file).
+
+**Why.** 79 `oomKilled memoryLimit=2Gi` from 2026-09-09T19:43Z. 62 of the 66 kills within 180 s of a Kalshi tick landed after `TRIM_SELECT` and before that tick's `DAILY_BOOK`. Lane `live-odds-worker-oom` re-derived that as 6 of 6 over 20:30-22:31Z. Full readings in `findings_2026-09-12_live_odds_worker_oom.md`.
+
+**Baseline on the live `58736a69`**, read 22:34:15-23:21:52Z (`render_logs.py --text "[kalshi_odds] "`, 1,208 lines, 14 pages):
+- `TRIM_SELECT`->`DAILY_BOOK`: p50 36.0 s, p90 44.9 s, max 51.6 s (n=12).
+- `DAILY_BOOK`: 12 lines, 0 not `status=ok errors=0`, ~17.0/h over 0.65 h.
+- 0 `oomKilled` 22:34:15-23:20:11Z (46 min); by chance that is ~13% at the afternoon kill rate.
+- Pre-`58736a69` kill regime, 09-12 13-21Z: 8.4 `DAILY_BOOK`/h, 2.67 kills/h.
+
+**verify — pre-registered, windows start at `live` and must not straddle a restart:**
+- **R1, reachability (the new writer is what runs):** `TRIM_SELECT`->`DAILY_BOOK` p50 **<= 24 s** over the first 12 paired ticks after boot. Falsifier: p50 >= 32 s. Locally the write path is ~3x faster, but production adds CPU contention and row building.
+- **R2, no regression:** >= 95% of `[kalshi_odds] DAILY_BOOK` lines read `status=ok errors=0`, and `files=` stays 25-29. Falsifier: any `DAILY_BOOK_FAILED` or `errors>0` on consecutive ticks.
+- **R3, capture cadence:** `[kalshi_odds] DAILY_BOOK` >= 15/h per full hour after warm-up, and `ODDS_SWEEP_LAUNCHED` in live hours not below the same hours before the deploy.
+- **R4, THE GOAL, read as a COMBINATION with `58736a69`:** 0 `oomKilled` over >= 6 h spanning a live slate, via `render_events.py --service live-odds-worker --since <live>` with `OUTPUT COMPLETE`. The deploy lands inside `58736a69`'s P4 window, so a clean window is NOT attributed to either fix alone. Falsifier: any kill. Classify it by its offset from `TRIM_SELECT`/`DAILY_BOOK` and by the last live-lens stage. A kill during an MLB/soccer build, after `DAILY_BOOK` printed, points at the builds (the third lever).
+
+**Rollback:** `py -3 scripts/render_deploy.py --service live-odds-worker --commit 58736a69 --allow-rollback` under a claim.
