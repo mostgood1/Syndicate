@@ -33538,3 +33538,50 @@ not a measured failure.
   (`grant removed: True`). The guard's grant check is not service-scoped, which is why it was kept
   single-use.
 - **The in-flight MLB daily sim was killed by this deploy, by user decision.**
+
+**PEER-REPORTED CONTEXT (session `local_bcc8ce22`, lane `layer2-live-scorecard-gate`, ~20:20Z) — NOT re-derived here unless stated:**
+- **Heavy build.** Refresh-worker's HEAVY build was aborting every cycle before this deploy:
+  `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900`, headroom 1,475-1,871 MB
+  from 19:42 to 20:08Z. Last `PLAN_WRITTEN` 14:34:01Z, last `PORTFOLIO_COMMIT` 14:34:17Z. Only the
+  fast shortlist path runs.
+  - Any post-deploy absence of a heavy build or portfolio commit is **NOT attributable to this
+    deploy**.
+  - A clean first cycle after reboot proves little, because memory is boot-confounded.
+- **Opening ledger.**
+  - Peer reading: 09-12 at 17,880,640 B, 19:37Z, growing ~706,523 B/h, projected ~24-25 MB at the
+    midnight-CT roll. The new fields add ~110 B per record.
+  - **My two-point re-derivation disagrees on rate:** 17,880,640 B at 19:37Z (peer) -> 18,403,574 B
+    at 20:07:06Z (mine, export mtime `1789243626`). That is +522,934 B in ~30 min, about 1.05 MB/h.
+  - Held to 05:00Z at that rate, plus ~110/950 field overhead, the file closes near **~27-28 MiB**:
+    still under the 32 MiB tripwire, with less headroom than the peer projection. The evening rate
+    is the unknown.
+  - **Peer re-derivation, ~20:25Z:**
+    - Reading: 18,421,897 B at 20:12:12Z.
+    - Rates: 19:04:48->19:37:08Z at 706,757 B/h; 19:37:08->20:12:12Z at 925,710 B/h. Accelerating
+      into the evening.
+    - Projected close at 05:00Z with ~11.7% field overhead: 85.5% of the cap at 1.05 MB/h, 98.8% at
+      1.5 MB/h. The tripwire is reached only above an average of ~1.54 MB/h.
+    - A hit truncates evening openings (`truncated_at_ceiling`). Grading data is lost; the board is
+      unaffected.
+    - **OWNED AND WATCHED by `layer2-live-scorecard-gate`:** names_only inventory every 15 min
+      until 05:15Z, plus a log grep for `truncated=True`. It alerts on a projected close over 95%,
+      size over 90%, or any truncation.
+- **Baseline.** The peer took its own pre-deploy baseline at 20:09Z (build 20:07:07Z) and owns the
+  Layer 2 post-deploy readings.
+  - Live opportunity rows: mlb 24 (obs p90 4 s); ncaaf 145 (p50 = p90 585 s, 80 over 300 s);
+    soccer 20.
+  - `LAYER2_BOARD_HEALTH sport=mlb` at 20:07:02Z read `pregame_proj=0 no_proj=1095`, down from 1,306
+    one build earlier. **That predates this deploy.** The peer filed it as a lead.
+
+**refresh-worker — LIVE `77f8d890`, finished 2026-09-12T20:20:09Z** (watch: `update_in_progress`
+20:18:38Z -> live 20:20:14Z). All 3 services' content: web `77f8d890`, refresh-worker `77f8d890`,
+live-odds-worker `21c26db1` (untouched).
+- **MLB sim, measured:** the post-boot process sample at 20:20:57Z shows ONLY infra (`run_refresh_worker.py`
+  rss 311.9 MB, down from 2,304.8 MB pre-boot). The pre-deploy `run_mlb_daily_sim_job.py` ->
+  `daily_update.py --workflow ui-daily` tree and `run_refresh_odds_job.py` are gone — **killed by
+  this deploy, as the user accepted** — and not relaunched as of that sample.
+- **Last pre-boot builds still served at 20:20:54Z:** NFL shortlist `written_at 20:12:13Z`, same
+  coverage as the 20:12:29Z reading. Book grid `generated_at 20:05:38Z`.
+- **POST-BOOT reading PENDING.** Taken on the first shortlist whose `written_at` is later than the
+  20:20:09Z boot: `prop_coverage`, refused count, `BOOK_GRID_PROP_PROJECTION_FAILURE`, the
+  `[nfl_props]` JOIN line, the MLB sim relaunch, and a process sample.
