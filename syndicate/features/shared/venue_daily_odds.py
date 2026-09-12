@@ -216,6 +216,89 @@ def _serialized_bytes(payload: Any) -> int:
     return len(serialized.encode("utf-8", errors="replace"))
 
 
+def _write_daily_file(path: Any, state: dict[str, Any]) -> None:
+    """Write one daily file WITHOUT building the whole document a second time.
+
+    THE OOM, MEASURED 2026-09-12 (lane `live-odds-worker-oom-loop`). live-odds-worker
+    was `oomKilled` at 2Gi 76 times from 2026-09-09T19:43Z, and 62 of the 66 kills
+    that followed a Kalshi tick landed while that tick's book was still being
+    written here. On a DISK path `refresh_state_store.write_json_file` holds three
+    copies at once -- the parsed state, a recursive `normalize_timestamped_payload`
+    rebuild of every dict in it, and a `json.dumps(indent=2)` string -- and nothing
+    bounds the document, because `#637` took these files off keyvalue and
+    `_trim_to_budget` only reacts to a keyvalue refusal. Real `record_daily_odds`,
+    8,000 markets x 48 points x the eight `DEPTH_FIELDS`:
+
+        write_json_file          file 139.8 MB   RSS peak +1,378 MB
+        parse alone                              RSS peak   +279 MB
+        streamed, per market     file  75.7 MB   RSS peak   +279 MB
+
+    `ncaaf 2026-09-12` sat at the 8,000-market cap from 09-09 on. The extra
+    ~1.1 GB was the WRITE, not the data.
+
+    THE SAME DOCUMENT, NOT A SMALLER ONE. Every market, point and depth field is
+    written, and each entry goes through the store's own
+    `normalize_timestamped_payload`, one market at a time, so the file parses
+    back equal to what `write_json_file` would have written (pinned by a test).
+    Two deliberate differences: no indentation -- nothing reads these files
+    (`#637`), and indentation doubled them -- and the transient copy is one
+    market's, not the book's.
+
+    KEYVALUE IS UNTOUCHED. A keyvalue-backed path still goes through the store,
+    because the 8 MB refusal and the trim-and-retry below live there. Atomic like
+    the store's disk write: a temp file beside the target, then `os.replace`,
+    and the temp file is removed on any failure.
+    """
+    import json
+    import os
+    import uuid
+
+    from syndicate.features.shared import refresh_state_store as store
+    from syndicate.features.shared.timezone import normalize_timestamped_payload
+
+    if store._keyvalue_backed(path) or not all(isinstance(key, str) for key in state):
+        store.write_json_file(path, state)
+        return
+
+    def _dump(value: Any) -> str:
+        return json.dumps(value, separators=(",", ":"))
+
+    def _normalized(key: str, value: Any) -> Any:
+        # Through a one-key dict, so the store's key rule -- a timestamp-named key
+        # is centralised, anything else is recursed -- applies exactly as it would
+        # have to the whole document.
+        return normalize_timestamped_payload({key: value})[key]
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = path.parent / f"{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
+    try:
+        with open(temp_path, "w", encoding="utf-8") as handle:
+            handle.write("{")
+            for index, (key, value) in enumerate(state.items()):
+                if index:
+                    handle.write(",")
+                handle.write(_dump(key) + ":")
+                if key == "markets" and isinstance(value, dict) and all(
+                    isinstance(market_id, str) for market_id in value
+                ):
+                    handle.write("{")
+                    for market_index, (market_id, entry) in enumerate(value.items()):
+                        if market_index:
+                            handle.write(",")
+                        handle.write(_dump(market_id) + ":" + _dump(_normalized(market_id, entry)))
+                    handle.write("}")
+                else:
+                    handle.write(_dump(_normalized(key, value)))
+            handle.write("}")
+        os.replace(temp_path, path)
+    finally:
+        try:
+            if temp_path.exists():
+                temp_path.unlink()
+        except Exception:
+            pass
+
+
 def _trim_to_budget(
     state: dict[str, Any], budget_bytes: int
 ) -> tuple[dict[str, Any], int, int]:
@@ -379,7 +462,7 @@ def record_daily_odds(
     INCLUDING `market`. A row whose market we cannot name is stored with its
     `raw_title` so the family can be counted and, later, parsed.
     """
-    from syndicate.features.shared.refresh_state_store import read_json_file, write_json_file
+    from syndicate.features.shared.refresh_state_store import read_json_file
 
     stamp = now or _utc_now()
     path = daily_odds_path(venue, sport, game_date)
@@ -606,7 +689,7 @@ def record_daily_odds(
     except Exception:  # pragma: no cover - the store always defines it
         KeyValuePayloadTooLarge = ()  # type: ignore[assignment]
     try:
-        write_json_file(path, state)
+        _write_daily_file(path, state)
     except KeyValuePayloadTooLarge:
         from syndicate.features.shared.refresh_state_store import _keyvalue_max_bytes
 
@@ -627,7 +710,7 @@ def record_daily_odds(
             flush=True,
         )
         try:
-            write_json_file(path, state)
+            _write_daily_file(path, state)
         except Exception as exc:
             return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
     except Exception as exc:

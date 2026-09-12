@@ -595,6 +595,16 @@ def test_an_oversized_write_is_RETRIED_and_the_report_says_so(monkeypatch):
             raise KeyValuePayloadTooLarge(f"{size} bytes")
 
     monkeypatch.setattr(mod, "MAX_POINTS_PER_MARKET", 48)
+    # THE REFUSAL ONLY EXISTS ON KEYVALUE. `#637` put these files on disk, where
+    # `_write_daily_file` streams and nothing refuses, so the trim-and-retry is
+    # exercised on the branch that can still raise. The read is stubbed so the
+    # routed path never tries to reach a store.
+    monkeypatch.setattr(
+        "syndicate.features.shared.refresh_state_store._keyvalue_backed", lambda path: True
+    )
+    monkeypatch.setattr(
+        "syndicate.features.shared.refresh_state_store.read_json_file", lambda path: None
+    )
     monkeypatch.setattr(
         "syndicate.features.shared.refresh_state_store.write_json_file", _fake_write
     )
@@ -951,3 +961,115 @@ def test_polymarket_supplies_no_depth_so_its_rows_fill_none_of_the_six():
     assert report["depth_absent"] == {
         field: report["depth_points"] for field in mod.DEPTH_FIELDS
     }
+
+
+# --------------------------------------------------------------------------
+# The write itself -- the live-odds-worker OOM, 2026-09-12
+#
+# `record_daily_odds` rewrote every file through `write_json_file`, which on a
+# disk path holds the parsed book, a recursive normalized copy of it and an
+# indented string at once. Measured at 8,000 markets x 48 points: +1,378 MB for
+# one write, on a 2Gi worker that was oomKilled 76 times. `_write_daily_file`
+# streams one market at a time. These pin that it writes the SAME document, that
+# the production entry point actually takes it, and that it is cheaper.
+# --------------------------------------------------------------------------
+
+
+def _timestamped_state(markets=50, points=6):
+    state = _big_state(markets=markets, points=points)
+    # A timestamp-named key at the top AND inside an entry, so the equality
+    # below is not vacuous: normalization rewrites both to Central.
+    state["updated_at"] = "2026-09-12T21:00:00Z"
+    state["markets"]["m00000"]["updated_at"] = "2026-09-12T20:00:00Z"
+    return state
+
+
+def test_the_streamed_disk_write_parses_back_EQUAL_to_the_store_writer():
+    import json
+
+    from syndicate.features.shared import refresh_state_store as store
+    from syndicate.features.shared.timezone import normalize_timestamped_payload
+
+    state = _timestamped_state()
+    expected = json.loads(json.dumps(normalize_timestamped_payload(state)))
+    assert expected["updated_at"] != state["updated_at"], "normalization did nothing; the check is vacuous"
+    assert expected["markets"]["m00000"]["updated_at"] != state["markets"]["m00000"]["updated_at"]
+
+    path = mod.daily_odds_path("kalshi", "ncaaf", "2026-09-05")
+    mod._write_daily_file(path, state)
+
+    assert store.read_json_file(path) == expected
+    assert list(json.loads(path.read_text(encoding="utf-8"))) == list(state), "top-level key order moved"
+
+
+def test_the_production_entry_point_does_NOT_route_a_disk_file_through_the_store_writer(monkeypatch):
+    """REACHABILITY. A cheaper writer nobody calls fixes nothing; this fails if
+    `record_daily_odds` ever goes back to `write_json_file` on a disk path."""
+
+    def _refuse(path, payload):
+        raise AssertionError("record_daily_odds wrote a disk file through write_json_file")
+
+    monkeypatch.setattr("syndicate.features.shared.refresh_state_store.write_json_file", _refuse)
+    report = mod.record_daily_odds(
+        "kalshi", "mlb", "2026-08-25", [_row("m1"), _row("m2", yes=0.4, no=0.6)]
+    )
+    assert report["status"] == "ok"
+    from syndicate.features.shared.refresh_state_store import read_json_file
+    state = read_json_file(mod.daily_odds_path("kalshi", "mlb", "2026-08-25"))
+    assert set(state["markets"]) == {"m1", "m2"}
+
+
+def test_a_KEYVALUE_path_still_goes_through_the_store_writer(monkeypatch):
+    """The 8 MB refusal and the trim-and-retry live in the store. The streamed
+    writer must not bypass them where they can still fire."""
+    calls = []
+    monkeypatch.setattr(
+        "syndicate.features.shared.refresh_state_store._keyvalue_backed", lambda path: True
+    )
+    monkeypatch.setattr(
+        "syndicate.features.shared.refresh_state_store.write_json_file",
+        lambda path, payload: calls.append(path),
+    )
+    path = mod.daily_odds_path("kalshi", "mlb", "2026-08-25")
+    mod._write_daily_file(path, {"markets": {}})
+    assert calls == [path]
+    assert not path.exists(), "a keyvalue-backed path was also written to disk"
+
+
+def test_the_streamed_write_holds_a_fraction_of_the_store_writers_peak():
+    """THE PROPERTY THE FIX EXISTS FOR, measured the same way on the same state.
+    Relative, not absolute, so it holds on any machine: the store writer builds
+    the whole document twice over and the streamed one never does."""
+    import tracemalloc
+
+    from syndicate.features.shared import refresh_state_store as store
+
+    state = _big_state(markets=300, points=48)
+    old_path = mod.daily_odds_path("kalshi", "ncaaf", "2026-09-06")
+    new_path = mod.daily_odds_path("kalshi", "ncaaf", "2026-09-07")
+    old_path.parent.mkdir(parents=True, exist_ok=True)
+
+    tracemalloc.start()
+    try:
+        store.write_json_file(old_path, state)
+        _, old_peak = tracemalloc.get_traced_memory()
+        tracemalloc.reset_peak()
+        mod._write_daily_file(new_path, state)
+        _, new_peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+
+    assert old_peak > 0 and new_peak > 0
+    assert new_peak < old_peak * 0.10, (old_peak, new_peak)
+
+
+def test_a_failed_streamed_write_leaves_the_previous_file_and_no_temp_file():
+    path = mod.daily_odds_path("kalshi", "mlb", "2026-08-25")
+    mod._write_daily_file(path, {"markets": {"m1": {"opening_yes": 0.4}}})
+    before = path.read_text(encoding="utf-8")
+    with pytest.raises(TypeError):
+        mod._write_daily_file(
+            path, {"markets": {"m1": {"opening_yes": 0.4}, "m2": {"bad": object()}}}
+        )
+    assert path.read_text(encoding="utf-8") == before
+    assert not list(path.parent.glob("*.tmp")), "a temp file was left behind"

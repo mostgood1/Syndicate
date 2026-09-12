@@ -371,7 +371,12 @@ still genuinely absent — `conditional_mix` etc. return `count: 0` and `POST
   `SYNDICATE_ENABLE_NCAAF_LINES_REFRESH_AUTORUN=1` on live-odds-worker, 300s,
   game-day gated, 9 credits/run. **Measure on `quote_seen_age_seconds` (time since
   we LOOKED), never `book_age_seconds` (time since the price MOVED).**
-- **live-odds-worker has NEVER been evicted.** `evicted: false` on all 23
+- **FALSE FROM 2026-09-09 — corrected 2026-09-12 by lane `live-odds-worker-oom-loop`:** 76
+  `oomKilled memoryLimit=2Gi` between 2026-09-09T19:43:39Z and 2026-09-12T21:54:43Z (still
+  firing), 0 before, timed to the Kalshi daily-book write
+  (`.syndicate/findings_2026-09-12_live_odds_worker_oom.md`). The claim below was true of
+  2026-08-26..09-04 only and is kept for the record:
+- ~~**live-odds-worker has NEVER been evicted.**~~ `evicted: false` on all 23
   `server_failed` since 2026-08-26; 20 are a scheduled self-recycle
   (`SYNDICATE_LIVE_ODDS_WORKER_MAX_UPTIME_SECONDS`, default 21600) that exits at
   ~82% of max. Nine days at 95-100% of 2GB, zero platform kills. The autorun costs
@@ -408,7 +413,10 @@ still genuinely absent — `conditional_mix` etc. return `count: 0` and `POST
   rows.** Both venue plans size 0: kalshi 534 rows -> 274 `market_family_excluded`
   + 252 `no_model_edge_pct` + 8 `below_min_ev_pct`; polymarket 383 -> 180/180/20/3.
   Venues are healthy (`venue_priced` 276/534 and 264/383, funded, caps slack).
-- **live-odds-worker memory is uptime-driven, not load-driven.** 100.0% at
+- ~~**live-odds-worker memory is uptime-driven, not load-driven.**~~ **SUPERSEDED
+  2026-09-12 (lane `live-odds-worker-oom-loop`): the kills since 2026-09-09 are a per-tick
+  ANON transient (~0.5-0.9 GB, between samples) during `venue_daily_odds.record_daily_odds`,
+  not uptime; kill-to-kill runs 10-13 min.** Original reading, true of 09-04 only: 100.0% at
   23:37Z, 66.0% at 02:00Z after a recycle. `evicted: false` on all 23
   `server_failed` since 2026-08-26 — nine days at 95-100%, zero platform kills.
 
