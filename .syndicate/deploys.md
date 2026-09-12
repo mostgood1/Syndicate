@@ -33582,6 +33582,39 @@ live-odds-worker `21c26db1` (untouched).
   this deploy, as the user accepted** — and not relaunched as of that sample.
 - **Last pre-boot builds still served at 20:20:54Z:** NFL shortlist `written_at 20:12:13Z`, same
   coverage as the 20:12:29Z reading. Book grid `generated_at 20:05:38Z`.
-- **POST-BOOT reading PENDING.** Taken on the first shortlist whose `written_at` is later than the
-  20:20:09Z boot: `prop_coverage`, refused count, `BOOK_GRID_PROP_PROJECTION_FAILURE`, the
-  `[nfl_props]` JOIN line, the MLB sim relaunch, and a process sample.
+- **POST-BOOT READING: the first shortlist after boot was `written_at 2026-09-12T20:38:54Z`**
+  (18m45s after boot). Read at 20:39:16Z (`/api/board/layer2-shortlist?sport=nfl`, 485,460 B).
+  1. **Content:** web and refresh-worker both run `77f8d890`, which carries
+     `refuse_published_certainty(projection)` at `nfl_prop_projections.py:360`. **PASS.**
+  2. **Not broken:**
+     - `prop_coverage` reads `rows_considered 1470`, `rows_with_projection 717`,
+       `artifact_rows 1140`, `unmatched_key_rows 753`, `no_probability_rows 0`, `error null`.
+       That is identical to the 20:12Z pre-boot build.
+     - `BOOK_GRID_PROP_PROJECTION_FAILURE` since 20:19:00Z: **0 matches**. The null is valid for
+       that window, because the same window returned 29 `[nfl_props] JOIN` lines
+       (20:21:05-20:39:08Z). The latest reads `season=2026 week=1 sim_source=artifact
+       odds_rows=2637 sim_rows=1140`.
+     - **PASS.**
+  3. **Refusals consistent with the artifact:** 111 served NFL prop rows with a projection,
+     `model_prob_over_refused` = **0**, exact 0/1 `model_prob_over` = **0**. The artifact has 0
+     certainties. **PASS — consistent, and INERT as predicted.** This does NOT exercise the refusal
+     itself; that is proven only by the join-level test
+     `test_an_exact_certainty_is_refused_on_this_path_not_just_wrapped`, which fails with the wrap
+     removed.
+  4. **MLB sim:** **RELAUNCHED.** The process sample at 20:38:56Z shows `run_mlb_daily_sim_job.py`
+     pid 720 -> `daily_update.py --workflow ui-daily` pid 723 -> vendor `eval` pid 725. The
+     pre-deploy run was killed at the ~20:18Z restart; the relaunch cost is the rerun from its start.
+  - **Book grid:** `generated_at 20:36:55Z`, NFL prop `rows_considered 0`. The same was true
+    pre-deploy, so it is unchanged.
+- **MEMORY, recorded and NOT concluded (boot-confounded):**
+  - `ALL_PROCESS_MEMORY` climbed from 92.3% at 20:36:33Z to **98.3% of 4096 MB at 20:38:56Z**. The
+    `container_memory_headroom_mb` field read 71 MB.
+  - `container_memory_unreclaimable_mb` was **2,388 MB**, so unreclaimable headroom was about
+    1,708 MB.
+  - The headroom field is known to be misleading, since page cache inflates it. This is one post-boot
+    cycle with the MLB sim and a board build together.
+  - The peer's `MEMORY_GUARD_ABORT floor_mb=1900` observation predates the deploy.
+- **VERDICT: DEPLOY MEASURED. The lane's change is live on both services and inert on today's
+  data, and nothing it touches regressed.** Collateral `8d4aceff`/`a989e256` readings belong to
+  `layer2-live-scorecard-gate`.
+- Claims: web released ~20:22Z; refresh-worker released after this entry.
