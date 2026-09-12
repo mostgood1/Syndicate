@@ -33661,3 +33661,19 @@ Same method before and after: `/api/board/layer2-shortlist?sport=<s>&date=2026-0
 - **Reachability of the refusal: MET on production.** The named reason is in the counters of both the paper plans and the live plan.
 - NOT shown: that every refused row was genuinely in play at refusal time. The log carries counts, not rows.
 - The gate half is unchanged from the 20:45Z entry: `live_quote_unobserved` firing on a production row is still UNOBSERVED.
+
+## 2026-09-12 21:45Z — web `064fb6af` — lane `layer2-live-scorecard-gate` — live price age on Layer 2 cards (user, verbatim: "Deploy now")
+
+```
+claim      web ACQUIRED 21:40:14Z by layer2-live-scorecard-gate
+preflight  CLEAR 21:40:33Z, target 064fb6af; live commit 77f8d890; only gunicorn infra processes (2 defunct children)
+deploy     dep-daisdp7qj5pc73bd36bg   created 21:40:52Z   update_in_progress 21:42:33Z   live 21:43:49Z
+ships      vs live 77f8d890: syndicate/templates/intelligence.html ONLY
+           (git diff --name-only 77f8d890 064fb6af -- syndicate pipeline app.py requirements.txt render.yaml)
+```
+
+- **What changed:** `renderFreshness` adds "Price seen ≈Xm ago" to live cards. The age is `quote_seen_age_seconds` (book age only when that is absent) plus the time since the board was built, where the build time is the FRESHEST artifact (`state_meta.read_at - newest_age_seconds`), with `state_last_updated` as the fallback. Over 300s the chip is styled stale and says "check the book before betting". With no stamp it reads "Price age unknown". Pregame cards are unchanged.
+- **verify (content): MET.** The served `/intelligence` page, 18,404,059 B fetched ~21:44Z, contains `function boardBuildEpochMs`, `function liveServedPriceAgeSeconds` and `LIVE_PRICE_STALE_AFTER_SECONDS = 300` — all True. A fourth check for the literal "Price seen ≈" did not run: the local console could not encode `≈`.
+- **NOT verified:** a live card rendering the chip in a browser. No headless render against live data was run; the user's view of the board is that reading.
+- Tests: `tests/js/board_live_price_age.test.mjs` 23/23; both inline `<script>` blocks pass `node --check`.
+- Rollback: `render_deploy.py --service web --commit 77f8d890 --allow-rollback`, or revert the template hunk in `064fb6af` and redeploy.
