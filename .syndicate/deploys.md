@@ -33122,3 +33122,58 @@ That is SMALLER than the 7,340,144 `/api/ops/keyvalue/usage` read at ~15:00Z: th
 - The first Kalshi pass on 09-12 (after 05:00Z) is where `insufficient_shard_balance`, or its absence beside a venue 400, is read.
 - **PREDICTION (2) NAMED THE WRONG SHARD.** The reading REFUTES the hypothesis about WHICH shard. Shard 3 (MLB) holds $60.99. SHARD 0 (NFL/NCAAF) is the short one at $13.28, after six NCAAF 09-12 orders reserved ~$28.77 at 17:49Z. The NFL total's 400 on shard 0 fits. The MLB 400s on shard 3 at 16:11Z and 16:44Z are UNEXPLAINED: no breakdown existed before 18:10Z, and a rebalance since cannot be ruled out.
 - 09-12's NCAAF book runs on shard 0, which is the shard to fund.
+
+## 2026-09-12 15:11Z — reading only, no deploy — lane kalshi-shard-balance-gate — #573 reading (2)
+
+**No deploy, no env change, no code change.** Scheduled task `kalshi-shard-gate-0912-reading`, taken by session `ba98ac40` after the owning session `82c5bc07` was archived. This is the reading owed by the 2026-09-11 17:57Z entry.
+
+**The gate is live and ON, checked before reading anything.**
+- `deploy_preflight.py --service live-odds-worker` at 2026-09-12T15:05:11Z: `live commit 21c26db1  finished 2026-09-11T18:03:20.107091Z`. That IS the gate commit, not merely an ancestor of it. No later deploy dropped it.
+- `SYNDICATE_KALSHI_SHARD_BALANCE_GATE`, single-key read `GET /v1/services/srv-d91dpertqb8s73co8lt0/env-vars/<key>`: **HTTP 404 = absent = gate ON**. (Keys only; the list API was not used.)
+
+**Reading (1) holds all day: `status=ok` on every tick, no unknowns.**
+Sampled 05:04:40Z .. 15:03:37Z, ~37 ticks, every one `status=ok`. Zero `SHARD_BALANCE_UNKNOWN`, zero `REFUSED_NO_VENUE_TICKER`, zero `Traceback` in the whole 09-12 window.
+
+```
+2026-09-12T05:04:40.628597356Z  [venue_balances] KALSHI_SHARD_BALANCES status=ok shards={'0': 56.27, '1': 0.01, '2': 0.0, '3': 19.55} sum=75.83 balance=75.83
+2026-09-12T05:40:19.723656334Z  [venue_balances] KALSHI_SHARD_BALANCES status=ok shards={'0': 0.66, '1': 0.01, '2': 0.0, '3': 19.55} sum=20.22 balance=20.23
+2026-09-12T12:57:00.006972863Z  [venue_balances] KALSHI_SHARD_BALANCES status=ok shards={'0': 0.66, '1': 0.01, '2': 0.0, '3': 19.55} sum=20.22 balance=20.23
+2026-09-12T15:03:37.910368668Z  [venue_balances] KALSHI_SHARD_BALANCES status=ok shards={'0': 0.66, '1': 0.01, '2': 0.0, '3': 12.67} sum=13.34 balance=13.35
+```
+
+**Reading (2): THE REFUSAL FIRED, at scale, and it is the first live population of the gate.**
+First refusal pass 05:41:10Z, and every Kalshi pass since carries one. Shard 0 (NFL/NCAAF, and 09-12's book is mostly NCAAF) sat at $0.66 from 05:40Z onward, so the gate held 8 orders a pass off the venue:
+
+```
+2026-09-12T05:41:10.854256645Z  [execute_portfolio] EXECUTED date=2026-09-12 mode=live venue=kalshi plan_source=live armed=True positions=23 placed=0 filled=0 failed=0 duplicates=15 retried=0 skipped=8 refused={'insufficient_shard_balance': 8} spent={'dollars': 55.6, 'orders': 13}
+2026-09-12T12:57:47.003267223Z  [execute_portfolio] EXECUTED date=2026-09-12 mode=live venue=kalshi plan_source=live armed=True positions=7 placed=1 filled=0 failed=1 duplicates=0 retried=0 skipped=5 refused={'insufficient_shard_balance': 2, 'over_max_day_orders': 3} spent={'dollars': 75.39, 'orders': 15}
+2026-09-12T15:04:11.75645141Z   [execute_portfolio] EXECUTED date=2026-09-12 mode=live venue=kalshi plan_source=live armed=True positions=7 placed=0 filled=0 failed=0 duplicates=2 retried=0 skipped=5 refused={'insufficient_shard_balance': 4, 'insufficient_venue_balance': 1} spent={'dollars': 62.48, 'orders': 14}
+```
+
+**But THREE Kalshi orders still died at the venue with `insufficient_balance` in the same window**, which is what keeps this off MET:
+
+```
+2026-09-12T05:05:54.278138683Z  [execute_portfolio] LIVE_ORDER status=failed venue=kalshi ticker=KXNCAAFTOTAL-26SEP12BGSUNEB-51 sport=ncaaf market=totals side=over line=50.5 price=104.0 stake=2.3 error='KalshiAuthError: http_400: {"error":{"code":"insufficient_balance","message":"insufficient balance"}}'
+2026-09-12T05:05:59.242877624Z  [execute_portfolio] LIVE_ORDER status=failed venue=kalshi ticker=KXNCAAFTOTAL-26SEP12TENNGT-56 sport=ncaaf market=totals side=under line=55.5 price=104.0 stake=1.16 error='KalshiAuthError: http_400: {"error":{"code":"insufficient_balance","message":"insufficient balance"}}'
+2026-09-12T12:57:44.295164368Z  [execute_portfolio] LIVE_ORDER status=failed venue=kalshi ticker=KXMLBSPREAD-26SEP121507BALTOR-TOR2 sport=mlb market=spreads side=home line=-1.5 price=203.0 stake=13.0 error='KalshiAuthError: http_400: {"error":{"code":"insufficient_balance","message":"insufficient balance"}}'
+```
+
+Each ticker's shard, read from `market.exchange_index` on the public market:
+- `KXNCAAFTOTAL-26SEP12BGSUNEB-51` → **shard 0**
+- `KXNCAAFTOTAL-26SEP12TENNGT-56` → **shard 0**
+- `KXMLBSPREAD-26SEP121507BALTOR-TOR2` → **shard 3**
+
+**Verdict: OPEN QUESTION on all three. NOT falsified, and NOT met.** Applying the rule exactly:
+- Not FALSIFIED. No `KALSHI_SHARD_BALANCES` status other than `ok` all day. And no venue 400 landed on an order whose shard, **in the preceding reading**, was already below its stake: shard 0 read **$56.27** against stakes of $2.30 and $1.16; shard 3 read **$19.55** against a $13.00 stake.
+- Not MET. MET requires the refusal **and no venue-400 `insufficient_balance` for a Kalshi order in the same window**. Three of them are in the window.
+- So each is the third category: a venue 400 on an order whose shard DID have enough cash at the reading.
+
+**The numbers, because the OPEN QUESTION has a shape and it is not simply invisible resting collateral.**
+- Episode A, 05:05Z. Reading at 05:04:40Z: shard 0 = $56.27. Between 05:05:00Z and 05:05:49Z the pass submitted **13** shard-0 orders (12 NCAAF + 1 NFL), cumulative stake **$55.70**, leaving $0.57 by that arithmetic. The 14th (BGSUNEB, $2.30) and 15th (TENNGT, $1.16) then took the venue 400. The 05:40:19Z reading confirms the cash actually went: shard 0 $56.27 → $0.66, i.e. **$55.61 consumed**, within 9c of the submitted total.
+- Episode B, 12:57Z. Reading at 12:57:00Z: shard 3 = $19.55. At 12:57:33Z the pass submitted `KXMLBTOTAL-26SEP121810HOUTB-9`, shard 3, stake **$6.79**. 19.55 − 6.79 = **$12.76**. Eleven seconds later BALTOR-TOR2 asked for **$13.00** and died at the venue — over by **$0.24**. The 13:08:23Z reading shows shard 3 settled at $12.67.
+- In BOTH episodes, the gate's own advertised arithmetic — its own printed reading, minus the orders it printed as placed on that shard since — lands BELOW the stake of the order that then failed. That points at the net-of-live-orders subtraction not reaching these orders, rather than at collateral the ledger cannot see.
+- **Stated as a candidate defect, not as proven.** `stake` in the ledger row is not known to equal the collateral Kalshi holds: in episode A the 13th order (MEMBSU, $2.30) submitted successfully with only $0.57 left by the same arithmetic, so the mapping is imperfect and the sums above are indicative. The lane should confirm against what `check_order` actually compares before changing anything.
+
+**Also read, and clean:** no `SHARD_BALANCE_UNKNOWN` (so the gate never stood down), no `REFUSED_NO_VENUE_TICKER`, no `Traceback`. A 1c gap between `sum` and `balance` (13.34 vs 13.35; 20.22 vs 20.23) is inside the tolerance and still reports `ok`.
+
+**verify:** **GOAL NOT MET as of 2026-09-12 15:11Z (10:11 CDT).** Reading (2) is no longer OWED — it happened. The gate's refusal is live and fires on real orders: first at 05:41:10Z `refused={'insufficient_shard_balance': 8}`, sustained on every Kalshi pass through 15:04:11Z, against a shard 0 holding $0.66. What blocks MET is the second clause: three Kalshi orders (05:05:54Z, 05:05:59Z shard 0; 12:57:44Z shard 3) still took a venue `insufficient_balance` 400 in the same window. All three are OPEN QUESTIONs by the rule — their shard had enough cash at the preceding reading — with the subtraction discrepancy above as the lane's next thread. Lane stays OPEN; `#573` stays open.
