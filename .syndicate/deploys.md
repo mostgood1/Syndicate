@@ -5,6 +5,46 @@
 
 ---
 
+## 2026-09-12 13:25 CT — reading only, no deploy — refresh-worker `9d580145` (lane `football-layer2-live-parity`, NCAAF Saturday in-play rows) — **PASS: FBS-vs-FCS ROWS WENT `live` AND STAYED SERVED PAST KICKOFF + 2 H; STATE CAME FROM THE CHIP, NOT THE OVERLAY**
+
+**Written by scheduled task `ncaaf-saturday-live-rows-reading` on behalf of session 2edf8b82.** Read-only: no code, settings or deploy touched.
+
+**Live code.** refresh-worker `9d58014588fa` (`live`, trigger `api`, finished 2026-09-11 17:27:41Z = 12:27 PM CDT) by `/v1/services/srv-d91dpertqb8s73co8ls0/deploys`. `git merge-base --is-ancestor` YES for `42d49364` (lens join), `48621d65` (chip index reads ESPN capture dates) and `f73a140f` (capture fallback). Note: the live commit is `9d580145`, not the `5767e3ac` the task context named; both fixes are inside it.
+
+**Gate.** Served payload `written_at` **2026-09-12T18:23:08Z** (1:23 PM CDT), later than kickoff + 2 h (18:00Z). `server_time` 18:25:10Z, `source=layer2_shortlist_artifact`, `date=2026-09-12`, 653 NCAAF rows served (`pregame` 534, `live` 119).
+
+**ESPN** (`site.api.espn.com` scoreboard, dates=20260912, groups=80, urllib default UA, read 18:24:55Z = 1:24 PM CDT): all four games IN PROGRESS.
+
+| game (ESPN id) | ESPN at 18:24:55Z | served rows | `game_state` | `game.state` / `state_source` | `status_token` / score on row | rows with `live_gameline` block | `projection.live_aware` |
+|---|---|---|---|---|---|---|---|
+| Howard @ Indiana (401858439) | in, End of 3rd, IU 55-0 | 3 | live 3 | live / absent (chip) | Q3 0:09, 55-0 | 3 (all withheld: `live_resim_published_no_distribution_for_this_market`) | True |
+| ETSU @ North Carolina (401858218) | in, 0:59 3rd, UNC 35-0 | 3 | live 3 | live / absent (chip) | Q3 1:56, 35-0 | 3 (all withheld: same reason) | True |
+| Wofford @ Kent State (401866416) | in, 2:06 3rd, WOF 15-14 | 8 | live 8 | live / absent (chip) | Q3 4:12, 15-14 | 8 (7 `live_resim_published_no_distribution_for_this_market`, 1 `no_two_sided_market_price`) | True |
+| Gardner-Webb @ Liberty (401868187) | in, 9:08 3rd, GWEB 20-17 | 7 | live 7 | live / absent (chip) | Q3 10:28, 20-17 | **0** (block null) | None |
+
+The row clocks trail ESPN by one board cycle, as expected for an artifact written 18:23:08Z.
+
+**Payload counters** (`per_sport_ingest.ncaaf`):
+- `rows_stale_kickoff` **0** (09-10 FAMU @ MIA went 0 -> 58). `stale_kickoff_seconds` 7200.
+- `by_lane` `{dead: 1130, opportunity: 3049}`.
+- `enrichment.live_game_state`: `supported=true`, `rows_corrected=0`, `transitions={}`, `lens_games=19` (all `live`), `snapshot_age_seconds=270.4`. The overlay agreed with the chip and had nothing to correct.
+- `enrichment.game_state`: `chips=89`, `rows_matched=3136`, `unmatched_teams=[Arkansas State Red Wolves, South Alabama Jaguars]`. **`rows_matched_by_capture` is ABSENT** from the block, so not reported as a number. Not a failure: 0 of 653 served rows lack a `game` block.
+- `enrichment.live_gamelines`: `index_size=19` (accepted `live_resim` 19, skipped `pregame` 63), `rows_live_gameline_considered=438`, `projected=156`, `priceable=0`, `edged=0`, `withheld=438`. `withheld_by_reason`: `live_resim_published_no_distribution_for_this_market` 146, `segment_is_not_full_game` 134, `quote_older_than_live_pricing_ceiling` 121, `no_live_gameline_projection` 27, `no_two_sided_market_price` 10. Board-wide, 73 served NCAAF rows carry a `live_gameline` block; none is priceable.
+
+**Worker logs** (refresh-worker, from 16:00Z):
+- `LIVE_GAME_STATE_JOIN sport=ncaaf` (25 matches), last: `18:23:02Z supported=True corrected=0 transitions={} snapshot_age_s=270.4 reason=None error=None`; the same `corrected=0` at 18:01:50Z, 18:11:24Z and 18:18:07Z.
+- `NCAAF_LIVE_STATE week=` (283 matches), last week 2: `18:23:50Z week=2 games=80 index=86 matched=80 live=19 final=0 source=worker=3`. Week-3 lines read `index=0 matched=0` (no week-3 games yet).
+- `NCAAF_LIVE_RESIM`, last `18:19:01Z`: `coverage.live_resimmed=19` of 82 games (refused 63: `game_not_in_progress` 61, `no_live_state` 2); `espn.record_dates=1`, `fetch_dates=0`, `in_progress=19`, `keyed=80`; `fcs.candidates=33`, `priced_on_implied_rating=33`. At 18:08:12Z it read `fetch_dates=1` (`record_stale`), `record_dates=0`.
+
+**Verdicts.**
+- **Row survival: PASS.** All four in-progress FBS-vs-FCS games have served rows with `game_state == live` (21 rows) in a build written 18:23:08Z, 23 min past kickoff + 2 h, with `rows_stale_kickoff=0`. State came from the **chip** (`state_source` absent on all 21 rows; the lens overlay `42d49364` ran and corrected 0). So `48621d65` is the fix doing the work in play. No game is served `pregame` while ESPN says in progress.
+- **`live_gameline` on an FBS-vs-FCS row** (goal of UNOWNED lane `ncaaf-fcs-market-implied-rating`, data only, no verdict): 14 of 21 rows carry a block, **0 priceable**. 13 are withheld `live_resim_published_no_distribution_for_this_market`, 1 `no_two_sided_market_price`. Liberty's 7 rows carry no block at all and read `live_aware=None`, although the re-sim covered 19 in-progress games.
+- **Capture fallback (`f73a140f`):** `rows_matched_by_capture` is absent from the payload. No served NCAAF row lacks a game block, so this is not a failure.
+
+verify: MET for the in-play row survival owed on 42d49364 + 48621d65 (rows `live` and served at written_at 18:23:08Z > 18:00Z, rows_stale_kickoff=0). The NFL live half of the lane stays blocked on a user decision.
+
+---
+
 ## 2026-09-11 17:32 CT — web `422698e0` -> `1421ee3c` (lane `ask-sport-parity`, user decision "proceed") — **MET: EVERY SPORT ON THE BOARD NOW ANSWERS ABOUT THE ROW THE BUTTON WAS ON AND CARRIES ITS GAME'S EVIDENCE; MLB UNCHANGED**
 
 **Deploy.** `dep-dai81igae00c73fl2hlg`, triggered 22:29:30Z, `deploy_ended` 22:32:37Z, serving `1421ee3c` from 22:32:51Z (5:32 PM CT) by `/versionz`. Claim held by `ask-sport-parity`; preflight CLEAR at 22:27:06Z for `1421ee3c` (infrastructure processes only, plus 2 defunct children awaiting reap).
