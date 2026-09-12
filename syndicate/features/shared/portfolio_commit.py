@@ -272,6 +272,59 @@ def _market_fair_sports() -> frozenset[str]:
     return frozenset(part.strip().lower() for part in raw.split(",") if part.strip())
 
 
+def _in_play_market_fair_allowed() -> bool:
+    """May an IN-PLAY row be sized on market fair alone? Default NO.
+
+    The market-fair edge is the best book's price against the no-vig consensus
+    of every book that quoted. Before kickoff those quotes sit still, so the
+    consensus describes one moment and the dispersion is real. During a game
+    every play reprices the market and the books are captured at different
+    moments, so the "best" price is disproportionately the one that has not
+    updated yet.
+
+    MEASURED 2026-09-12 on production's NCAAF live board (lane
+    `layer2-live-scorecard-gate`): both sides of one total ranked +EV at the
+    same instant on 2 of 8 two-sided live lines; 9 of 29 live markets carried
+    more than one line at once; every sportsbook-priced live row was unclocked
+    or over 900s since last observed; and 32 of 48 live +EV markets that could
+    be re-checked were gone from the board within 10 minutes, against 13 of 258
+    pregame. The live-money ledger held 15 NCAAF orders over 09-11/09-12 sized
+    on this basis (how many were in play is not recoverable from its
+    aggregates). `execute_portfolio._kalshi_price_for` does re-read the ask, but
+    refuses only when our side got DEARER, so the fills it lets through are the
+    ones the market moved against.
+
+    A MODEL-edge row is untouched: this refuses the basis that needs no model,
+    not live betting. Only the exact word `allow` in
+    `SYNDICATE_PORTFOLIO_IN_PLAY_MARKET_FAIR` reverts, so an unrecognised value
+    cannot silently re-admit these rows.
+    """
+    raw = str(os.environ.get("SYNDICATE_PORTFOLIO_IN_PLAY_MARKET_FAIR") or "").strip().lower()
+    return raw == "allow"
+
+
+def _refuses_in_play_market_fair(row: Mapping[str, Any]) -> bool:
+    """True for an in-play row that would otherwise be sized on market fair alone.
+
+    Scoped to the allowlisted sports on purpose: a row outside
+    `_market_fair_sports()` is already refused `no_model_edge_pct`, and moving it
+    to this counter would change a refusal count other readings depend on.
+    """
+    if _as_float(row.get("model_edge_pct")) is not None:
+        return False
+    if str(row.get("sport") or "").strip().lower() not in _market_fair_sports():
+        return False
+    if _in_play_market_fair_allowed():
+        return False
+    from syndicate.features.shared.opportunity_gate import game_state_of
+
+    # `is_live` counts on its own: `game_state_of` resolves an EMPTY state text
+    # to pregame before it reads `is_live`, and an in-play row whose state text
+    # is missing must not land on the permissive branch.
+    market_state = str(row.get("market_state") or "").strip().lower()
+    return market_state == "live" or row.get("is_live") is True or game_state_of(row) == "live"
+
+
 def sizing_basis_of(row: Mapping[str, Any]) -> str:
     """`"model_edge"` or `"market_fair"` -- what this row's stake is bet ON.
 
@@ -826,6 +879,13 @@ def commit_portfolio(
             if family in excluded_families:
                 refuse("market_family_excluded", row)
                 continue
+        # IN-PLAY PRICE SHOPPING (lane `layer2-live-scorecard-gate`). Before
+        # pricing, for the same reason as the exclusion above: a refused row must
+        # not be re-seated, and the counters below describe only rows in scope.
+        # See `_in_play_market_fair_allowed` for the measurement.
+        if _refuses_in_play_market_fair(row):
+            refuse("in_play_market_fair", row)
+            continue
         inputs, reason, provenance = sizing_inputs_with_provenance(row, profile=blend_profile)
         if inputs is None:
             refuse(reason or "unknown", row)

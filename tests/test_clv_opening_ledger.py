@@ -152,6 +152,30 @@ def test_the_recorded_shape_carries_what_a_join_will_need(tmp_path):
     assert json.dumps(rec)  # serialisable
 
 
+def test_an_opening_carries_its_in_play_context(tmp_path):
+    # lane layer2-live-scorecard-gate: without these an opening cannot be split
+    # live vs pregame, or by how stale our view of the price was when we chose.
+    # 2026-09-12, WF @ PUR Q4 10:32: the row that motivated the lane.
+    row = _row(
+        game_state="live",
+        quote={"book_age_seconds": 618.0, "quote_seen_age_seconds": 1013.2, "quote_source": "kalshi"},
+    )
+    record_openings([row], date="2026-09-12", now=_NOW, root=tmp_path)
+    rec = load_openings("2026-09-12", root=tmp_path)[0]
+    assert rec["game_state"] == "live"
+    assert (rec["book_age_seconds"], rec["quote_seen_age_seconds"]) == (618.0, 1013.2)
+    assert rec["quote_source"] == "kalshi"
+
+
+def test_an_opening_with_no_in_play_context_records_none_never_a_default(tmp_path):
+    # A non-string `quote_source` (production carries dicts in neighbouring
+    # fields) must record None rather than an object the joiner cannot key on.
+    record_openings([_row(quote={"quote_source": {"venue": "kalshi"}})], date="2026-08-14", now=_NOW, root=tmp_path)
+    rec = load_openings("2026-08-14", root=tmp_path)[0]
+    for field in ("game_state", "book_age_seconds", "quote_seen_age_seconds", "quote_source"):
+        assert field in rec and rec[field] is None, field
+
+
 def test_the_shortlist_build_records_openings_and_never_raises(tmp_path, monkeypatch):
     """The wiring, not just the module.
 
@@ -343,7 +367,10 @@ def test_the_stamps_are_additive_and_the_prior_record_is_byte_for_byte_unchanged
     # ones are the only additions.
     built = _opening_record(_row(), _opening_key(_row()), "2026-08-14T19:00:00Z")
     assert tuple(k for k in built if k in _PRIOR_KEYS_IN_ORDER) == _PRIOR_KEYS_IN_ORDER
-    assert set(built) - set(_PRIOR_KEYS_IN_ORDER) == set(FAIR_PROVENANCE_FIELDS) - {"fair_method"}
+    # P1d added the fair-price provenance; lane `layer2-live-scorecard-gate`
+    # (2026-09-12) added the in-play context. Nothing else may appear.
+    in_play = {"game_state", "book_age_seconds", "quote_seen_age_seconds", "quote_source"}
+    assert set(built) - set(_PRIOR_KEYS_IN_ORDER) == (set(FAIR_PROVENANCE_FIELDS) - {"fair_method"}) | in_play
     assert set(rec) == set(built)
 
     # And the prior values, as written to disk, are exactly what they were before P1d.

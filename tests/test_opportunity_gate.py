@@ -123,3 +123,52 @@ def test_annotate_stamps_the_row_and_never_raises():
     broken = {"player_name": "X", "quote": "not-a-mapping"}
     annotate(broken)
     assert broken["board_lane"] in {LANE_OPPORTUNITY, LANE_WATCHLIST, LANE_DEAD, LANE_REJECTED}
+
+
+_LIVE_ROW = {"event_id": "evt", "market": "spreads", "is_live": True, "game_state": "live"}
+
+
+def test_a_live_quote_we_have_not_looked_at_recently_is_dead_on_a_fresh_book_clock():
+    # 2026-09-12, WF @ PUR Q4 10:32: book_age 618s cleared the 900s book
+    # ceiling while the price had not been observed for 1,013s, and it ranked
+    # as a +4.8% EV opportunity on the live board.
+    verdict = evaluate(dict(_LIVE_ROW), _quote(book_age_seconds=618.0, quote_seen_age_seconds=1013.0))
+    assert verdict.lane == LANE_DEAD
+    assert verdict.reasons == ("live_quote_unobserved",)
+
+
+def test_a_live_quote_observed_recently_is_still_an_opportunity():
+    # MLB's live rows on the same build: seen age p50 64s, 12 of 12 under 120s.
+    verdict = evaluate(dict(_LIVE_ROW), _quote(book_age_seconds=64.0, quote_seen_age_seconds=64.0))
+    assert verdict.lane == LANE_OPPORTUNITY
+
+
+def test_a_live_row_with_no_observation_clock_is_judged_on_its_book_clock():
+    # A recorded move is an observation, so the book clock bounds the capture
+    # clock from above when the latter is absent: fresh passes, old does not.
+    assert evaluate(dict(_LIVE_ROW), _quote(book_age_seconds=134.0)).lane == LANE_OPPORTUNITY
+    stale = evaluate(dict(_LIVE_ROW), _quote(book_age_seconds=600.0))
+    assert stale.lane == LANE_DEAD
+    assert stale.reasons == ("live_quote_unobserved",)
+
+
+def test_the_book_ceiling_still_names_itself_before_the_observation_ceiling():
+    verdict = evaluate(dict(_LIVE_ROW), _quote(book_age_seconds=30556.0, quote_seen_age_seconds=30556.0))
+    assert verdict.reasons == ("live_market_stale",)
+
+
+def test_a_pregame_row_is_never_judged_on_the_observation_clock():
+    verdict = evaluate(
+        {"event_id": "evt", "market": "totals", "is_live": False, "game_state": "scheduled"},
+        _quote(book_age_seconds=60.0, quote_seen_age_seconds=50_000.0),
+    )
+    assert verdict.lane == LANE_OPPORTUNITY
+
+
+def test_the_observation_ceiling_moves_without_a_deploy_but_cannot_be_typoed_off(monkeypatch):
+    quote = _quote(book_age_seconds=60.0, quote_seen_age_seconds=600.0)
+    monkeypatch.setenv("SYNDICATE_GATE_LIVE_MAX_OBSERVED_AGE_SECONDS", "900")
+    assert evaluate(dict(_LIVE_ROW), quote).lane == LANE_OPPORTUNITY
+    for typo in ("0", "-5", "off", "abc", "nan"):
+        monkeypatch.setenv("SYNDICATE_GATE_LIVE_MAX_OBSERVED_AGE_SECONDS", typo)
+        assert evaluate(dict(_LIVE_ROW), quote).lane == LANE_DEAD, typo

@@ -29,6 +29,12 @@ DESIGN RULES, so this does not rot back into the same shape
    that shows junk, and is harder to debug.
 4. JUDGED ON THE BOOK CLOCK, never our capture clock. We may have looked a
    second ago; what matters is whether the book has moved the number.
+   ONE EXCEPTION, IN-PLAY ONLY: a live row must ALSO have been observed
+   recently (`LIVE_QUOTE_MAX_OBSERVED_AGE_SECONDS`). The book clock answers
+   "has the number moved"; during a game the question that decides whether a
+   price is collectable is "do we know the number NOW", and only the capture
+   clock answers it. The rule above still holds for everything else: a recent
+   look never makes a row fresher, it can only make one staler.
 """
 
 from __future__ import annotations
@@ -46,6 +52,47 @@ LIVE_MARKET_MAX_AGE_SECONDS = 900.0
 # Pregame prices are allowed to sit still -- books post early and leave numbers
 # alone. This is only a ceiling against a price so old the slate has moved on.
 PREGAME_MARKET_MAX_AGE_SECONDS = 86_400.0
+
+# IN-PLAY OBSERVATION CEILING: how long ago we must have LOOKED at a live
+# market's price. The book-clock ceiling above cannot catch a price nobody has
+# re-read: `book_age_seconds` is "time since the number moved", so a quote that
+# stopped being captured keeps a young book clock while the game moves on.
+#
+# MEASURED 2026-09-12 on production's shortlist, NCAAF in progress:
+#
+#     WF @ PUR, Q4 10:32   book_age 618s (passes 900s)   seen_age 1,013s
+#                          -> ranked +4.8% EV, ProphetX +107 vs a 14-book consensus
+#
+#     build 18:44:05Z, live opportunity rows     <=180s  181-900s  >900s  no seen clock
+#       ncaaf (53)                                   26         0     13            14
+#       mlb   (12)                                   12         0      0             0
+#
+# Every NCAAF row over 900s and every one with no clock was sportsbook-priced;
+# every row under 180s carried a venue quote. So 300s keeps each row captured
+# on the latest pass and removes each one that was not -- on that build it
+# costs MLB nothing. Served rows are older still (the shortlist was read 267s
+# and 562s after build), so this is a floor on freshness, not the whole fix.
+#
+# `SYNDICATE_GATE_LIVE_MAX_OBSERVED_AGE_SECONDS` moves it without a deploy. A
+# non-positive or unparseable value falls back to this default rather than
+# disabling the rule, the same shape `live_gameline_join.max_quote_age_seconds`
+# uses: a knob that can be typo'd into "off" is not a guard.
+LIVE_QUOTE_MAX_OBSERVED_AGE_SECONDS = 300.0
+
+
+def live_quote_max_observed_age_seconds() -> float:
+    """The in-play observation ceiling, read per call so the env override applies without a restart."""
+    import os
+
+    raw = str(os.environ.get("SYNDICATE_GATE_LIVE_MAX_OBSERVED_AGE_SECONDS") or "").strip()
+    if raw:
+        try:
+            value = float(raw)
+        except ValueError:
+            value = 0.0
+        if value > 0.0 and value == value:
+            return value
+    return LIVE_QUOTE_MAX_OBSERVED_AGE_SECONDS
 
 # `game_state` is not normalised across sports. Production carries "live",
 # "In Progress", "scheduled", "Pre-Game", a bare clock ("3:39"), and a score
@@ -256,6 +303,14 @@ def evaluate(
             return GateVerdict(LANE_DEAD, state, tuple(reasons), book_age, fair_method)
         if book_age > LIVE_MARKET_MAX_AGE_SECONDS:
             reasons.append("live_market_stale")
+            return GateVerdict(LANE_DEAD, state, tuple(reasons), book_age, fair_method)
+        # The in-play OBSERVATION ceiling (`LIVE_QUOTE_MAX_OBSERVED_AGE_SECONDS`).
+        # With no capture clock the book clock stands in: a recorded move is an
+        # observation, so it bounds the capture clock from above.
+        seen_age = _number(quote.get("quote_seen_age_seconds"))
+        observed_age = seen_age if seen_age is not None else book_age
+        if observed_age > live_quote_max_observed_age_seconds():
+            reasons.append("live_quote_unobserved")
             return GateVerdict(LANE_DEAD, state, tuple(reasons), book_age, fair_method)
     elif book_age is not None and book_age > PREGAME_MARKET_MAX_AGE_SECONDS:
         reasons.append("pregame_market_stale")

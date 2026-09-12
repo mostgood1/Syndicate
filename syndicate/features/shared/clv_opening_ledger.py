@@ -238,6 +238,24 @@ def _opening_record(row: Mapping[str, Any], key: str, captured_at: str) -> dict[
         # first-class. Absent stays absent rather than becoming null.
         "model_edge_pct": _as_float(row.get("model_edge_pct")),
         "ev_pct": _as_float(row.get("ev_pct")),
+        # IN-PLAY CONTEXT, AT THE INSTANT OF SIGHTING (lane
+        # `layer2-live-scorecard-gate`, 2026-09-12). Without these an opening
+        # cannot be split in-play vs pregame, or by how stale our view of the
+        # price was -- the split the live board's results turn on. An in-play
+        # reprice usually moves the line, which is a NEW key, so first-sighting-
+        # only still records most in-play entries rather than their pregame
+        # ancestor.
+        #
+        # FOUR FIELDS, NOT TEN, BY MEASUREMENT: the 2026-09-12 file was already
+        # 17,499,898 B over 18,683 records (52% of `_MAX_LEDGER_BYTES`) at 2 PM
+        # CT on a Saturday with the evening slate still to come, and every byte
+        # here is paid on every record. Clock, score, lane and basis at sighting
+        # were cut: useful, not needed for the split, ~150 B each record.
+        # Copied from the row, never re-derived; absent stays None.
+        "game_state": row.get("game_state"),
+        "book_age_seconds": _as_float(quote.get("book_age_seconds")),
+        "quote_seen_age_seconds": _as_float(quote.get("quote_seen_age_seconds")),
+        "quote_source": quote.get("quote_source") if isinstance(quote.get("quote_source"), str) else None,
     }
 
 
