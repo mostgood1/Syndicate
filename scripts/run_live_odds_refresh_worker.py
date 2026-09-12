@@ -2239,6 +2239,19 @@ def main() -> int:
     _log_worker_memory("startup", argv=list(sys.argv), pid=os.getpid())
     log_all_process_memory("startup", worker="run_live_odds_refresh_worker", pid=os.getpid(), argv=list(sys.argv))
     log_runtime_memory("startup", worker="run_live_odds_refresh_worker", pid=os.getpid(), argv=list(sys.argv))
+    # Lane `live-odds-worker-oom`, 2026-09-12. Cap glibc arenas BEFORE anything
+    # below starts a thread: `mallopt` only governs arenas created after it
+    # returns. refresh-worker has done this since `#285`
+    # (`run_refresh_worker.py`, `MALLOC_ARENA_INIT ... arenas 2`); this service
+    # never did, and it is the one that OOMs. Measured 2026-09-12: 70
+    # `oomKilled memoryLimit=2Gi` since 09-10, the parent (this process) holding
+    # 1.0-1.3GB within ~10 min of boot. `MALLOC_ARENA_INIT` is the proof line.
+    try:
+        from syndicate.features.shared.memory_observability import configure_malloc_arenas
+
+        configure_malloc_arenas(2)
+    except Exception as exc:  # noqa: BLE001 - a memory hint must never stop boot
+        print(f"[live_odds_worker] MALLOC_ARENA_SETUP_FAILED {type(exc).__name__}: {exc}", flush=True)
     assert_refresh_state_backend_ready(process_name="live-odds-worker")
 
     # THIS SERVICE BUILDS THE SOCCER ARTIFACTS, SO IT NEEDS SOCCER'S SEED FILES.

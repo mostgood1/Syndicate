@@ -237,3 +237,37 @@ class LiveOddsRefreshWorkerWnbaPregameAutorunTests(unittest.TestCase):
             module._launch_autorun_wnba_pregame_refresh()  # must not raise
             status = module.read_json_file(module._wnba_pregame_autorun_status_path()) or {}
             self.assertIn("boom", str(status.get("error")))
+
+
+# Lane `live-odds-worker-oom` (2026-09-12). `mallopt(M_ARENA_MAX)` only governs
+# arenas created AFTER it returns, so the cap is worthless if it runs after this
+# worker's first thread. Measured: 70 `oomKilled memoryLimit=2Gi` since 09-10,
+# 0 `MALLOC_ARENA_INIT` lines, and a parent at 1.0-1.3GB within ~10 min of boot.
+# Read off the AST, not by running `main()`: main() asserts a live keyvalue
+# backend and starts real loops, and the property under test is ORDER.
+class LiveOddsWorkerMallocArenaOrderTests(unittest.TestCase):
+    @staticmethod
+    def _main_calls():
+        import ast
+
+        source = (Path(__file__).resolve().parents[1] / "scripts" / "run_live_odds_refresh_worker.py").read_text(encoding="utf-8-sig")
+        tree = ast.parse(source)
+        main = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main")
+        names: list[tuple[int, str]] = []
+        for node in ast.walk(main):
+            if isinstance(node, ast.Call):
+                fn = node.func
+                name = fn.id if isinstance(fn, ast.Name) else (fn.attr if isinstance(fn, ast.Attribute) else "")
+                if name:
+                    names.append((node.lineno, name))
+        return sorted(names)
+
+    def test_main_caps_malloc_arenas(self) -> None:
+        self.assertIn("configure_malloc_arenas", [name for _, name in self._main_calls()])
+
+    def test_the_cap_runs_before_any_thread_starter(self) -> None:
+        calls = self._main_calls()
+        cap_line = min(line for line, name in calls if name == "configure_malloc_arenas")
+        starters = [line for line, name in calls if name in {"_start_live_lens_reports", "start_intelligence_state_background_loop", "start_venue_poll_loop"}]
+        self.assertTrue(starters, "the thread starters moved or were renamed -- this test no longer guards anything")
+        self.assertLess(cap_line, min(starters))

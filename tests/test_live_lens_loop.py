@@ -77,6 +77,64 @@ class LiveLensLoopTests(unittest.TestCase):
         mock_pull.assert_called_once()
         self.assertEqual(mock_pull.call_args.kwargs.get("date_str"), live_lens_loop.central_today_iso())
 
+    # Lane `live-odds-worker-oom` (2026-09-12). live-odds-worker's parent held
+    # 1.0-1.3GB within ~10 min of boot, stepping up across `live_lens_pull` and
+    # the publish sweep, with no `malloc_trim` anywhere in the process. These
+    # drive the REAL loop and assert the trim is REACHED -- and that the off
+    # switch really removes it, so a green run cannot mean "never called".
+    def _run_one_cycle(self, *, pull: bool, publish: bool, env: dict[str, str]) -> Mock:
+        class _Sweep:
+            published_count = 0
+            failed_paths: tuple = ()
+            all_succeeded = True
+
+        with patch.dict(os.environ, env, clear=False), patch.object(
+            live_lens_loop, "_live_lens_pull_enabled", return_value=pull
+        ), patch.object(live_lens_loop, "pull_hot_artifacts", return_value=0), patch.object(
+            live_lens_loop, "_run_live_lens_tick", return_value={"ok": True, "results": {}}
+        ), patch.object(live_lens_loop, "_live_lens_publish_enabled", return_value=publish), patch.object(
+            live_lens_loop, "sweep_changed_hot_artifacts", return_value=_Sweep()
+        ), patch.object(live_lens_loop, "_record_live_lens_publish_watermark"), patch.object(
+            live_lens_loop, "_live_lens_publish_since_epoch", return_value=0.0
+        ), patch.object(live_lens_loop, "log_and_persist_process_memory"), patch.object(
+            live_lens_loop, "write_json_file"
+        ), patch.object(live_lens_loop, "_live_lens_loop_interval_seconds", return_value=60), patch.object(
+            live_lens_loop, "release_freed_memory_to_os", return_value=None
+        ) as mock_trim:
+            live_lens_loop._LIVE_LENS_LOOP_STOP.clear()
+
+            def stop_after_first_wait(_seconds: float) -> bool:
+                live_lens_loop._LIVE_LENS_LOOP_STOP.set()
+                return True
+
+            with patch.object(live_lens_loop._LIVE_LENS_LOOP_STOP, "wait", side_effect=stop_after_first_wait):
+                live_lens_loop._live_lens_background_loop()
+        return mock_trim
+
+    def test_malloc_trim_is_on_by_default(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertTrue(live_lens_loop._live_lens_malloc_trim_enabled())
+
+    def test_trim_runs_after_the_pull_without_a_collect(self) -> None:
+        mock_trim = self._run_one_cycle(pull=True, publish=False, env={})
+        mock_trim.assert_called_once_with("post_live_lens_pull", collect_first=False)
+
+    def test_trim_runs_after_the_publish_with_a_collect(self) -> None:
+        mock_trim = self._run_one_cycle(pull=False, publish=True, env={})
+        mock_trim.assert_called_once_with("post_live_lens_publish", collect_first=True)
+
+    def test_both_trims_run_in_one_full_cycle_in_order(self) -> None:
+        mock_trim = self._run_one_cycle(pull=True, publish=True, env={})
+        self.assertEqual(
+            [c.args[0] for c in mock_trim.call_args_list],
+            ["post_live_lens_pull", "post_live_lens_publish"],
+        )
+
+    def test_off_switch_removes_every_trim(self) -> None:
+        # off != on: the same full cycle with the switch off calls nothing.
+        mock_trim = self._run_one_cycle(pull=True, publish=True, env={"SYNDICATE_LIVE_LENS_MALLOC_TRIM": "false"})
+        mock_trim.assert_not_called()
+
     def test_run_tick_for_sport_writes_valid_snapshot(self) -> None:
         snapshot = {"date": "2026-07-13", "rank_cards": [], "cards": [], "games": []}
         with TemporaryDirectory() as tmp_dir:

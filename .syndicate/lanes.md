@@ -801,6 +801,46 @@ death, never life — do not invert it.
 - Verification: `python -m pytest -q tests/test_platform_certainty_refusal.py` 10/10 and `python -m pytest -q tests -k nfl_prop` same-or-better than origin/main.
 - Blocked by: none. CLOSED. Deployed by user override "Both now, override". That deploy shipped lane `layer2-live-scorecard-gate`'s held `8d4aceff`/`a989e256`; its owner was messaged first and owns their readings.
 
+### live-odds-worker-oom — OPEN — opened 2026-09-12 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: live-odds-worker stops being OOM-killed. The mechanism is identified from production readings, and a fix is deployed under the locks. Success is 0 `oomKilled` events on live-odds-worker over a window of at least 6 h that spans a live slate, read from the Render events API.
+- Files: scripts/run_live_odds_refresh_worker.py, syndicate/features/shared/live_lens_loop.py, tests/test_live_lens_loop.py, tests/test_live_odds_refresh_worker.py. Amended 2026-09-12 before any edit; no OPEN lane claims these paths (checked against origin/main).
+- Context, measured 2026-09-12 ~21:35Z with `render_events.py --service live-odds-worker --since 2026-09-10T00:00:00Z`: OUTPUT COMPLETE, 184 events.
+  - **70 `oomKilled memoryLimit=2Gi`**, plus 3 `earlyExit`, matching the scheduled self-recycle (learnings 2026-09-03).
+  - Kills 09-09 night: 6. The `3bafdd2b` lifetime (live 09-11 03:44Z to 14:17Z, 10.5 h): **0 kills**.
+  - 09-11 brought five deploys: `78e4623f` 14:22Z, `f8b67afa` 15:09Z, `1afec00f` 16:02Z, `16de339b` 16:53Z and 17:05Z, `21c26db1` 18:03Z.
+  - **The first kill came 13 min after `21c26db1`, then continuously to 21:30Z 09-12 with no deploy since.**
+  - Recent kill-to-kill spacing after restart is ~10-13 min: 20:34->20:43, 20:57->21:07, 21:07->21:18, 21:18->21:30Z.
+  - Several restarts took 47-70 min to report `server_available`.
+- Hypotheses, pre-registered BEFORE any memory reading:
+  - **H1 (code).** A commit in `3bafdd2b..21c26db1` added memory on a path live-odds-worker runs every cycle. Candidates: #661 venue plan; Polymarket order build/ask logging/GTD cancel; #573 per-shard balance read. Hourly deploys from 14:17Z to 18:03Z masked any of the five.
+  - **H2 (input size).** The code is unchanged in effect, and the weekend slate grew an input the service loads whole: book_quotes date shards (NFL 09-13), Kalshi/Polymarket slate payloads, the NCAAF Saturday card.
+  - **H3 (shape).** The kill is ONE stage spiking ~10-12 min after boot (a periodic job or a boot catch-up), not a slow anon ratchet.
+- Falsification tests:
+  - H3 is false if `container_memory_unreclaimable_mb` climbs steadily across a lifetime with no step in the last samples before a kill.
+  - H1 is false if the stage or child process at the peak is on a path none of the five commits touches.
+  - H2 is false if peak anon does not scale with the size of the input that stage loads, e.g. overnight kills at the same peak on small inputs.
+  - The discriminator for all three: `ALL_PROCESS_MEMORY` across the two lifetimes 20:57->21:07Z and 21:18->21:30Z on 09-12, unreclaimable trajectory and per-process rss at the last sample before each kill, against a baseline from the `3bafdd2b` lifetime 09-11 03:44-14:17Z. **Windows must not straddle a restart** (learnings 2026-09-02).
+- Verification: 0 `oomKilled` on live-odds-worker for at least 6 h spanning a live slate after the fix deploy, with unreclaimable p95 over the same window recorded in `deploys.md`.
+- READINGS `[2026-09-12 21:40-22:00Z, substrate render: render_logs ALL_PROCESS_MEMORY stage samples, export names_only, env single-key API]`:
+  - **The parent, not a child, holds the memory.** `run_live_odds_refresh_worker.py` pid 39 climbs 160 MB -> 997 MB (A, 8 min) and 1,172 MB (B, 10 min) in steps at `live_lens_pull_before->after` (+130-260 MB) and in the minute after `live_lens_publish` (+146-171 MB). Children: `refresh_odds_sources.py --sports mlb,ncaaf,soccer` 180-250 MB, plus NCAAF props, game-line and live-state and soccer-artifact grandchildren at 50-115 MB. Last samples before the kills: unreclaimable 1,216 MB (A) and 1,410 MB (B). **40-66 s went unsampled before each kill.**
+  - **H1 WEAKENED.** The `16de339b` lifetime, before #573, shows the same climb (163 -> 1,197 MB parent by 8 min) and plateaued at 1.13-1.30 GB. Children reached 769 MB, and the peak was **1,717 MB at 17:47:15Z, ~330 MB short**. It is the same shape with less margin, not a new mechanism from one commit.
+  - **H2 SUPPORTED.** The live refresh now carries NCAAF (`mlb,ncaaf,soccer` vs `mlb,soccer` at the 09-11 13:07Z no-kill peak: 1,293 parent + 524 child = 1,759 MB). Each cycle's `*2026_09_12*` pull holds 18 changed files, 32.7 MiB (`daily_ladders` 16.3 MiB). The body is read whole and `json.loads`-ed as one envelope (`artifact_publisher.py:2518`). Season pulls are small (0.08-0.57 MiB), so they are excluded as the high-water setter.
+  - **H3 HALF-SUPPORTED.** Not a slow leak: a stepwise parent ratchet to a plateau within ~10 min of boot.
+  - **THE GAP, named and confirmed from production.** live-odds-worker runs default glibc: `MALLOC_ARENA_MAX`, `MALLOC_TRIM_THRESHOLD_`, `MALLOC_MMAP_THRESHOLD_`, `PYTHONMALLOC` and `LD_PRELOAD` all return 404. **0 `MALLOC` log lines since 21:30Z while the same window carries 8 startup samples.** `scripts/run_live_odds_refresh_worker.py` never calls `configure_malloc_arenas` or `malloc_trim`. refresh-worker does both: `MALLOC_ARENA ... "arenas": 2` and `MALLOC_TRIM ... anon_released_by_trim_mb` 29.8-128.9 MB per call, 21:36-21:53Z. `memory_observability.py`'s own note records the trim returning 1,109.6 MB in 46 min on refresh-worker.
+- Candidate mechanism, NOT yet proven by a fix: a multi-threaded parent on uncapped glibc arenas with no trim keeps the high-water of every whole-envelope parse, so it plateaus at 1.0-1.3 GB. A concurrent weekend odds-refresh child tree then crosses 2 GiB.
+- FIX BUILT (code only, NOT DEPLOYED):
+  - `run_live_odds_refresh_worker.main()` calls `configure_malloc_arenas(2)` before any thread starter, mirroring `run_refresh_worker.py:7106-7111`.
+  - `live_lens_loop` calls `release_freed_memory_to_os` after the `live_lens_pull_after` sample (`post_live_lens_pull`, no gc) and after the `live_lens_publish_after` sample (`post_live_lens_publish`, with gc). Kill switch `SYNDICATE_LIVE_LENS_MALLOC_TRIM`, default ON.
+  - Tests: 5 trim tests drive the real loop; 2 AST tests check the arena cap is present and ordered before `_start_live_lens_reports`, `start_intelligence_state_background_loop` and `start_venue_poll_loop`.
+  - **Unwired checks:** trim call replaced by `pass` -> 3 failed / 2 passed (the passing two are the flag default and the off-switch test, which asserts NOT called). Arena line replaced -> 2 failed. Both files restored byte-identical.
+- PREDICTIONS, pre-registered BEFORE any deploy (readings on live-odds-worker only, windows never straddling a restart):
+  - P1 `MALLOC_ARENA_INIT {"applied": true, "max_arenas": 2}` on the first boot of the fix commit. **Falsifier:** absent, or `applied: false`.
+  - P2 `MALLOC_TRIM reason=post_live_lens_pull` and `reason=post_live_lens_publish` each cycle, with `anon_released_by_trim_mb > 0` on a majority of lines in the first 30 min. **Falsifier:** trims run with ~0 released. Then the parent's plateau is LIVE retention, not allocator retention, and this fix is inert.
+  - P3 parent `run_live_odds_refresh_worker.py` rss at ~10 min after boot is **<= 700 MB**, against 997 MB (A) and 1,172 MB (B) on 09-12. **Falsifier:** >= 950 MB at the same stage.
+  - P4, the GOAL: **0 `oomKilled` on live-odds-worker over >= 6 h spanning a live slate**. **Falsifier:** any `oomKilled` in that window. Then read that lifetime's last `ALL_PROCESS_MEMORY` before calling the mechanism wrong: a child-only spike is a different lever (the NCAAF live-refresh child tree).
+  - Memory is boot-confounded (learnings), so P3 alone proves little. P2 + P4 are the load-bearing pair.
+- Blocked by: none. NOTE: `#656` (lane `execution-ledger-cas`) is blocked on this. No deploy without the user's go-ahead: live-odds-worker places live venue orders, and a deploy carries origin/main collateral.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

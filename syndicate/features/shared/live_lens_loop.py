@@ -32,6 +32,7 @@ from syndicate.features.nfl.sources import preseason_target_week as _nfl_preseas
 from syndicate.features.shared.memory_observability import container_memory_current_mb
 from syndicate.features.shared.memory_observability import log_and_persist_process_memory
 from syndicate.features.shared.memory_observability import memory_headroom_snapshot
+from syndicate.features.shared.memory_observability import release_freed_memory_to_os
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
@@ -832,6 +833,35 @@ def _live_lens_pull_enabled() -> bool:
 	return _env_bool("SYNDICATE_LIVE_LENS_LOOP_PULL_ARTIFACTS", default=True)
 
 
+def _live_lens_malloc_trim_enabled() -> bool:
+	# Lane `live-odds-worker-oom`, 2026-09-12. ON by default, because an
+	# opt-in needs an env write AND a deploy on Render and would arrive one
+	# incident late. `SYNDICATE_LIVE_LENS_MALLOC_TRIM=false` is the off switch.
+	return _env_bool("SYNDICATE_LIVE_LENS_MALLOC_TRIM", default=True)
+
+
+def _release_freed_memory_after(stage: str, *, collect_first: bool) -> None:
+	"""Hand freed heap back to the kernel after a stage that parsed a big body.
+
+	WHY HERE. Measured on live-odds-worker 2026-09-12 (stage samples, two
+	lifetimes that ended in `oomKilled`): this loop's process steps up
+	+130-260MB across `live_lens_pull` -- `pull_hot_artifacts` reads each export
+	envelope whole and `json.loads` it (`*2026_09_12*` alone: 18 changed files,
+	32.7 MiB) -- and a further +146-171MB around the publish sweep, then never
+	comes back down, plateauing at 1.0-1.3GB. The service ran with no
+	`malloc_trim` and uncapped arenas; refresh-worker's identical trim returns
+	30-129MB per call. `MALLOC_TRIM reason=post_live_lens_*` is the proof line.
+
+	Never raises: an allocator hint must not cost the tick it follows.
+	"""
+	if not _live_lens_malloc_trim_enabled():
+		return
+	try:
+		release_freed_memory_to_os(f"post_{stage}", collect_first=collect_first)
+	except Exception as exc:  # pragma: no cover - release_freed_memory_to_os never raises
+		print(f"[live_lens_loop] MALLOC_TRIM_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
+
+
 def _live_lens_background_loop() -> None:
 	status_path = _meta_dir() / "live_lens_loop_status.json"
 	interval_seconds = _live_lens_loop_interval_seconds()
@@ -919,6 +949,11 @@ def _live_lens_background_loop() -> None:
 				date=cycle_date,
 				pulled_count=pulled_count if isinstance(pulled_count, int) else None,
 			)
+			# AFTER the sample, so `live_lens_pull_after` stays the before-trim
+			# reading and the MALLOC_TRIM line carries what came back. No gc: the
+			# envelope is freed by refcount, and a full collect every cycle is
+			# cost the pull does not need.
+			_release_freed_memory_after("live_lens_pull", collect_first=False)
 		meta = _run_live_lens_tick()
 		if _live_lens_publish_enabled():
 			# #327. THE GAP THIS ITEM POINTED AT. The last per-sport sample
@@ -1050,6 +1085,9 @@ def _live_lens_background_loop() -> None:
 				peak_container_mb_in_sweep=sweep_peak["peak_mb"],
 				peak_sample_count=sweep_peak["samples"],
 			)
+			# Once per cycle WITH a collect: the tick's builds run between the two
+			# trims and can leave cycle garbage that refcounting does not free.
+			_release_freed_memory_after("live_lens_publish", collect_first=True)
 		write_json_file(
 			status_path,
 			{
