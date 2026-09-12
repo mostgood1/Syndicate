@@ -1790,17 +1790,70 @@
   // a 4-hour book age with a 30-second capture age is a DEAD MARKET, and the
   // single loop-time "Updated" stamp renders it as perfectly fresh. Staleness
   // is judged on the book clock, never on ours.
+  //
+  // EXCEPT A LIVE PRICE (lane `layer2-live-scorecard-gate`, user decision
+  // 2026-09-12 "Show price age on board"). In play every snap reprices the
+  // market, so what a bettor needs is "how long since anyone saw this number",
+  // as of NOW. The worker stamps `quote_seen_age_seconds` when it BUILDS the
+  // board, and the page is read minutes later -- measured 2026-09-12: NCAAF live
+  // prices published 353s old and served ~74s after that. So a live card adds
+  // the time since the board was built. The build time is the FRESHEST artifact
+  // (`state_meta.read_at - newest_age_seconds`): `state_last_updated` is the
+  // OLDEST artifact and would age a live card by another date's shortlist. It is
+  // only the fallback, because overstating a live price's age is the safe error.
+  const LIVE_PRICE_STALE_AFTER_SECONDS = 300;
+
+  function boardBuildEpochMs(response) {
+    const r = response && typeof response === "object" ? response : {};
+    const meta = r.state_meta && typeof r.state_meta === "object" ? r.state_meta : null;
+    if (meta && meta.newest_age_seconds !== null && meta.newest_age_seconds !== undefined) {
+      const readAt = Date.parse(String(meta.read_at || ""));
+      const newest = Number(meta.newest_age_seconds);
+      if (Number.isFinite(readAt) && Number.isFinite(newest) && newest >= 0) return readAt - newest * 1000;
+    }
+    const oldest = Date.parse(String(r.state_last_updated || ""));
+    return Number.isFinite(oldest) ? oldest : null;
+  }
+
+  function itemIsLiveForPriceAge(item) {
+    if (!item || typeof item !== "object") return false;
+    if (String(item.market_state || "").trim().toLowerCase() === "live") return true;
+    return recommendationState(item) === "live";
+  }
+
+  function liveServedPriceAgeSeconds(item, response, nowMs) {
+    const quote = item && item.quote;
+    if (!quote) return null;
+    const pick = (value) => (value === null || value === undefined || value === "" || !Number.isFinite(Number(value)) ? null : Number(value));
+    const seen = pick(quote.quote_seen_age_seconds) ?? pick(quote.book_age_seconds);
+    if (seen === null || seen < 0) return null;
+    const builtAt = boardBuildEpochMs(response);
+    if (builtAt === null) return null;
+    const now = Number.isFinite(nowMs) ? nowMs : Date.now();
+    return seen + Math.max(0, (now - builtAt) / 1000);
+  }
+
   function renderFreshness(item) {
     const quote = item && item.quote;
     if (!quote) return "";
+    const parts = [];
+    if (itemIsLiveForPriceAge(item)) {
+      const served = liveServedPriceAgeSeconds(item, lastResponseForActions);
+      if (served === null) {
+        // Unknown must read as unknown -- never as fresh.
+        parts.push('<span class="board-card__clock board-card__clock--unknown" title="No price timestamp or board build time is available for this live price">Price age unknown</span>');
+      } else {
+        const priceStale = served > LIVE_PRICE_STALE_AFTER_SECONDS;
+        parts.push(`<span class="board-card__clock board-card__clock--price${priceStale ? " board-card__clock--stale" : ""}" title="How old this live price is now: when it was last observed, plus the time since this board was built. Live prices move every play.">Price seen ≈${escapeHtml(formatAge(served))} ago${priceStale ? " &middot; check the book before betting" : ""}</span>`);
+      }
+    }
     const bookAge = formatAge(quote.book_age_seconds);
     const captureAge = formatAge(quote.capture_age_seconds);
-    if (!bookAge && !captureAge) return "";
+    if (!bookAge && !captureAge && !parts.length) return "";
     const stale = Number(quote.book_age_seconds) >= 3600;
-    const parts = [];
     if (bookAge) {
       parts.push(`<span class="board-card__clock${stale ? " board-card__clock--stale" : ""}" title="When this book last moved the number">Book ${escapeHtml(bookAge)} ago</span>`);
-    } else {
+    } else if (!parts.length) {
       // Unknown must read as unknown. Falling back to capture time here would
       // rebuild exactly the conflation the separate field exists to remove.
       parts.push('<span class="board-card__clock board-card__clock--unknown" title="This source does not publish a book timestamp">Book age unknown</span>');
