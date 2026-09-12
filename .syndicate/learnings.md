@@ -5586,3 +5586,56 @@ the instrument rather than the system.**
 - **What happened:** `py -3 /c/tmp/syndicate-sessions/ask-rail-evidence/scripts/build_learnings_index.py`, run from a Bash whose cwd had reset to the primary tree, printed "index written: 965 rules" and changed nothing in the worktree. It wrote the SHARED tree's `.syndicate/learnings_index.md` (mtime 18:16:08Z) from that tree's stale `learnings.md`. `INDEX_PATH = ".syndicate/learnings_index.md"` (line 28) and the `learnings.md` rewrite (line 199) are both cwd-relative.
 - **How it was caught:** the printed count (965) disagreed with the worktree index's own header (981), and the worktree's diff for the file was empty.
 - **The rule:** run ledger scripts with the cwd set to the tree you mean (`(cd <worktree> && py -3 scripts/...)`), and afterwards read `git status` in BOTH trees. A script run by absolute path is not scoped to the checkout it came from. This is the other side of the 2026-09-10 `REPO_ROOT` rule: there the path came from `__file__`, here from the cwd.
+
+## 2026-09-12 FORBIDDEN: measuring model quality on a population defined by a PUBLICATION filter. When publishing is switched off the metric does not go noisy, it goes SILENT — and a pool FREEZES rather than shrinking `[lane live-gameline-accuracy-cut-repoint]`
+
+The MLB live-gameline accuracy task headlined the `priceable_only` cut for
+months. `priceable` is a verdict about whether the board will PUBLISH an edge:
+it folds in `prob_interval_swamps_edge`, `no_two_sided_market_price`, and —
+from 2026-09-10 — `model_edge_publishing_disabled_for_sport`. None of those are
+statements about whether a forecast can be scored.
+
+When MLB edge publishing was switched off, the cut went to n=0 permanently.
+Measured on the per-record ledger: 2026-09-11 has 13,187 records with
+`priceable=True` on **zero** and that reason on 245, while 2026-09-09 has 41
+priceable and the reason absent. The forecasts were still being recorded the
+whole time.
+
+**The failure mode is the part worth keeping.** `best_per_date` SKIPS a date
+whose cut carries no brier, so the pooled total did not fall — it stayed at
+"12 dates, 146 games", unchanged and unmarked, and would have re-printed that
+same number every night forever while new dates vanished. A metric that dies
+by *freezing* looks exactly like a metric that is stable. **A shrinking sample
+is visible; a frozen one is not.** Any pooled statistic that drops
+non-conforming rows needs a counter for what it dropped, and must fail loudly
+when the newest period contributes nothing.
+
+**How to apply:** condition on properties of the FORECAST and the OUTCOME
+(quote age, market, segment, whether a final exists), never on whether the
+product chose to act on it. Selection on a publication decision is selection on
+the model's own confidence, which biases the comparison even while it is
+populated. `fresh_quotes_only` was the right headline all along for an
+independent reason: `learnings.md:854` already FORBADE comparing model against
+market without conditioning on quote age, and `priceable_only` never did.
+
+## 2026-09-12 FORBIDDEN: writing an instruction that asks for a reading without naming the instrument, when a known-broken instrument is the obvious one to reach for `[lane live-gameline-accuracy-cut-repoint]`
+
+`learnings.md:1584` has said since 2026-09-03 that Git Bash `date` in this repo
+is badly skewed. The scheduled task's step 3 nonetheless said *"state your
+actual wall-clock run time"* and named no tool. I reached for `date`, got
+`Fri Sep 11 23:34:45 CDT` against a true local time of `2026-09-12 11:52`, and
+published that the run was **ON TIME**. It was standby-displaced by ~12 hours —
+the exact failure the task file documents at length as happening on 6 of 10
+nights.
+
+**The skew runs in the flattering direction**, which is what made it stick: a
+displaced run reads as punctual, so the one instruction designed to catch
+displacement instead certified its absence.
+
+**How to apply:** a rule that forbids a tool is only half a rule. Name the
+replacement AT THE POINT OF USE, in the file that asks for the reading — not
+only in the ledger that forbids it, which the actor may never open. Better
+still, add a check that needs no instrument: here, *if the served date is
+tomorrow relative to the slate you meant to capture, the run was displaced
+regardless of what any clock says.* Both were added to the task file.
+

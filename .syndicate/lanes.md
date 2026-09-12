@@ -755,6 +755,17 @@ death, never life — do not invert it.
   - NOT covered, with the reason: NBA/WNBA (`smart_sim_*.json` carries per-player mean/sd only, no Ask reader, no slate today); NHL (game projections are not allowlisted and are generated per service); NCAAB (no fetcher, offseason); NCAAF player projections (none published, and computing them on web is forbidden). A typed question with an empty context is still refused `out_of_scope` (lead).
 - Blocked by: none. Deployed on the user's "proceed", web `1421ee3c`, 2026-09-11 17:32 CT. Open follow-ups, none owed by this lane: the per-request shortlist read costs ~1s warm (14.2s cold); the "Last 1 games" grammar; NBA/WNBA/NHL/NCAAB await a slate.
 
+### live-gameline-accuracy-cut-repoint — CLOSED 2026-09-12 — session 50d991d1
+- **GOAL VERDICT — Goal (verbatim): "the MLB live-gameline accuracy task reports a headline model-vs-market cut that still has data after model-edge publishing was disabled for MLB, and a zero-n headline cut is reported as a FINDING rather than silently re-printing an unchanged pool." → GOAL: MET.**
+- READINGS, not intentions: (1) the prescribed command `pool_live_gameline_trend.py --era each --cut fresh_quotes_only` runs clean IN THE PRIMARY TREE, where the scheduled task actually executes, EXIT=0, pooling 134 games / 11 dates. (2) The guard FAILS the run on the dead cut: `--era post-fix` EXIT=3 printing `HEADLINE CUT IS STALE ... 2026-09-11`; `--allow-stale-cut` EXIT=0; `--era pre-fix` EXIT=0. (3) 23 tests pass, and the empty-era test FAILS with its guard removed (reachability before correctness).
+- Hypothesis SUPPORTED by measurement: ledger 2026-09-11 = 13,187 records, `priceable=True` on ZERO, `model_edge_publishing_disabled_for_sport` on 245; 2026-09-09 = 12,967 records, 41 priceable, that reason ABSENT.
+- Landed `bad972ff`, `c7852ac8`. Offline analysis tooling — NOT DEPLOYED, needs no deploy (no runtime path, no importers outside its own tests).
+- Files: scripts/pool_live_gameline_trend.py, tests/test_pool_live_gameline_trend.py, C:/Users/tempadmin/.claude/scheduled-tasks/live-gameline-accuracy-snapshot/SKILL.md (OUTSIDE the repo, NOT version-controlled, backup `.bak-20260912`).
+- Did NOT touch `syndicate/features/shared/live_gameline_score.py` (claimed at lanes.md:159); the scorer already emits every cut this needed.
+- CARRIED FORWARD, unverified: the fresh cut's model/market n imbalance on 2026-09-01..09-04 was not investigated (09-11 read 114/114); only MLB was examined, other sports PRESUMED unaffected by the per-sport switch, not measured.
+- Narrative, evidence, dead ends: `.syndicate/log/2026-09-12.md`.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
