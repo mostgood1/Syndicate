@@ -875,7 +875,7 @@ its DATA cannot be until a game is in progress.
   - The chip stayed `pregame` all game, because its index read UTC dates. The peer lane fixed that in `48621d65`.
   - `select_shortlist` dropped the rows at kickoff + 2 h (`rows_stale_kickoff` 58).
   - A final game's rows go to the unserved `dead` lane, not the served board.
-- The in-play `pregame->live` flip is NOT yet measured. It is owed Saturday 09-12.
+- **In play, MEASURED 2026-09-12T18:23:08Z (build `written_at`), refresh-worker `9d580145`:** four FBS-vs-FCS games (Indiana, North Carolina, Kent State, Liberty; all in the 3rd quarter on ESPN) served 21 rows, all `game_state=live`, past kickoff + 2 h, `rows_stale_kickoff=0`. The state came from the CHIP (`48621d65`; `state_source` absent). The lens overlay ran with `corrected=0`, so in play it is a backstop, not the source. `live_gameline`: 14 of 21 rows carry a block, 0 priceable; Liberty's rows carry none. deploys.md 2026-09-12 13:25 CT.
 
 ## [ncaaf-props-live] NCAAF PLAYER PROPS ARE ON THE BOARD — first capture in this platform's history `[measured 2026-08-27T03:07:03Z, lane ncaaf-opener-regions-props]`
 
