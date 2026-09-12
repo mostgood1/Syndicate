@@ -32198,3 +32198,7 @@ Moved verbatim; nothing summarised. Each lane's current verdict and status stay 
 - Todo: `#663`.
 - Blocked by: none.
 - History: the opening fields, the replay, the BEFORE readings and the rollout log were moved VERBATIM to `lanes_history.md` at the 2026-09-11 checkpoint. The narrative is in `log/2026-09-11.md`.
+
+## 2026-09-12 — moved VERBATIM from lane mlb-stop-publishing-edges (superseded verdict line, replaced by the 2026-09-12 isolation reading)
+
+- **GOAL VERDICT (checkpoint 2026-09-11, session df26ac0c) — Goal (verbatim): "MLB live game-line rows are never marked `priceable`, are refused under a NAMED reason, and are STILL RECORDED in the ledger — publication stops, measurement does not — while WNBA, soccer and NCAAF are provably unaffected." → GOAL: NOT MET.** The MLB half is MET on production: the served MLB book grid at 13:45 CDT 2026-09-10 on `6c727968` read `error` null, 4 rows refused `model_edge_publishing_disabled_for_sport` with `edge_pp`/`prob_std_err` kept, 0 priceable, ledger `written 7` (`deploys.md` 13:57 CT). **Left:** "WNBA, soccer and NCAAF provably unaffected" has no production reading. Soccer at 16:16 CT was NOT TAKEN: rows were refused at the team-key lookup, `CF Estrela` vs `Estrela`, INFERRED by the scheduled task. Backup task `soccer-live-gameline-reading-fri` fires 2026-09-11 14:55 CDT. WNBA is on break until 09-17. NCAAF's FAMU @ MIA never reached pricing (board rows not live). **Owner:** session `df26ac0c` is archived, so the lane is UNOWNED; the next reader takes the backup's result.

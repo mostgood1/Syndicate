@@ -5639,3 +5639,32 @@ still, add a check that needs no instrument: here, *if the served date is
 tomorrow relative to the slate you meant to capture, the run was displaced
 regardless of what any clock says.* Both were added to the task file.
 
+
+## 2026-09-12 FORBIDDEN: quoting a tool's aggregate without recomputing it once from the components the tool printed beside it `[lane gameline-trend-paired-pool]`
+
+`pool_live_gameline_trend.py` printed, per date, `model`, `market` and `diff` —
+where `diff` was the row's own PAIRED `model_minus_market_brier` and `model` was
+the model's brier over ALL its rows — then pooled from `model` and `market`. On
+2026-09-01 the one line read model 0.13160, market 0.13198 (a difference of
+-0.00038) and diff **+0.00077**. Visibly inconsistent, on the same line.
+
+I ran that output at least three times in one session, repointed a scheduled
+task's headline at it, published **+0.00571** to `state.md` and the task file,
+and checkpointed — without once checking `model - market` against `diff`. The
+paired figure is **+0.00460**. The discriminating field (`model_paired`) was in
+every row since scorer contract 2, and the scorer's own `_paired` docstring
+names this exact failure ("THE DIFFERENCE MUST NOT USE `model`").
+
+**Why it survived:** the old headline cut (`priceable_only`) always had
+matched n, so the defect produced no visible symptom for two weeks. Switching
+the headline to `fresh_quotes_only` made it live, and the switch was the moment
+nobody re-audited the tool against the new cut.
+
+**How to apply:**
+- When a table prints components and an aggregate, recompute the aggregate from
+  the printed components once before quoting it. When a row prints two terms
+  and their difference, check term - term = difference. A disagreement beyond
+  rounding is a bug in the tool, not noise.
+- When a cut, a population or a field becomes the HEADLINE, re-audit the tool
+  that computes it against that cut specifically. A defect latent under the old
+  headline goes live the moment you switch.

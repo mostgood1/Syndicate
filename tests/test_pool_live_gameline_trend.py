@@ -312,3 +312,92 @@ def test_an_era_that_carries_the_cut_on_no_date_is_not_enumerated(tmp_path, caps
     assert "2026-08-24" not in out
     assert "2026-08-25" not in out
     assert "Nothing to pool" in out
+
+
+# --- the pooled difference is PAIRED -----------------------------------------
+#
+# `live_gameline_score._paired`: a record carries a model probability whenever
+# it is scored, but `market_fair_prob` can be absent, so `model` spans MORE rows
+# than `market`. Only `model_paired` may be subtracted. `cut_values` ignored it,
+# and on the real history the post-fix fresh cut pooled to +0.00571 unpaired
+# against +0.00460 paired, while the per-date `diff` column above it was
+# already paired -- the table and its own POOLED line disagreed.
+
+def paired_row(date, games, *, model, model_n, paired, paired_n, market, market_n,
+               cut="fresh_quotes_only", captured="2026-09-12T04:00:00"):
+    return {
+        "date": date,
+        "games_with_outcome": games,
+        "captured_at": captured,
+        "scored_markets": ["h2h"],
+        cut: {
+            "model": {"brier": model, "n": model_n},
+            "model_paired": {"brier": paired, "n": paired_n},
+            "market": {"brier": market, "n": market_n},
+            "model_minus_market_brier": round(paired - market, 5),
+        },
+    }
+
+
+def test_the_pool_uses_the_PAIRED_model_brier_when_the_row_carries_one():
+    """The unpaired and paired differences here have OPPOSITE signs on purpose."""
+    r = paired_row("2026-09-01", 10, model=0.30, model_n=100,
+                   paired=0.20, paired_n=90, market=0.25, market_n=90)
+    res = mod.pool([r], "fresh_quotes_only")
+    assert res["diff"] == pytest.approx(-0.05)       # paired: model AHEAD
+    assert res["model"] == pytest.approx(0.20)
+    assert res["per_date"]["2026-09-01"]["paired"] is True
+
+
+def test_a_paired_row_is_like_for_like_and_its_exclusion_is_COUNTED(tmp_path, capsys):
+    r = paired_row("2026-09-01", 10, model=0.30, model_n=100,
+                   paired=0.20, paired_n=90, market=0.25, market_n=90)
+    res = mod.pool([r], "fresh_quotes_only")
+    assert res["population_mismatch"] == []
+    assert res["paired_exclusions"] == [("2026-09-01", 10)]
+    path = _hist(tmp_path, [r])
+    assert mod.main(["--history", path, "--era", "post-fix",
+                     "--cut", "fresh_quotes_only"]) == 0
+    out = capsys.readouterr().out
+    assert "NOT LIKE-FOR-LIKE" not in out
+    assert "The model column is PAIRED" in out
+
+
+def test_a_row_without_model_paired_falls_back_and_is_still_flagged():
+    """Pre-contract-2 rows carry no paired block. Nothing to pair on, so say so."""
+    r = row("2026-08-29", 16, "2026-08-30T16:36:47", model=0.3, market=0.25,
+            n=100, market_n=90)
+    res = mod.pool([r], "priceable_only")
+    assert res["per_date"]["2026-08-29"]["paired"] is False
+    assert res["population_mismatch"] == [("2026-08-29", 100, 90)]
+    assert res["paired_exclusions"] == []
+
+
+def test_a_matched_row_pools_identically_paired_or_not():
+    same = paired_row("2026-09-05", 14, model=0.18428, model_n=116,
+                      paired=0.18428, paired_n=116, market=0.17587, market_n=116)
+    res = mod.pool([same], "fresh_quotes_only")
+    assert res["diff"] == pytest.approx(0.18428 - 0.17587)
+    assert res["paired_exclusions"] == []
+
+
+def test_real_history_pooled_diff_equals_the_rows_own_paired_diff():
+    """The fix must reproduce the SCORER's arithmetic, not invent its own.
+
+    Skips when the history is absent or no longer spans an unpaired date, so it
+    does not break every time the scheduled task appends.
+    """
+    hist = pathlib.Path(mod.DEFAULT_HISTORY)
+    if not hist.exists():
+        pytest.skip("history.jsonl not present")
+    rows = [r for r in mod.load(str(hist)) if mod.row_era(r) == mod.POST]
+    cut = "fresh_quotes_only"
+    best = mod.best_per_date(rows, cut)
+    if not any((b[cut].get("model") or {}).get("n") != (b[cut].get("market") or {}).get("n")
+               for b in best.values()):
+        pytest.skip("history no longer holds a date with unpaired populations")
+    res = mod.pool(rows, cut)
+    games = sum(r["games_with_outcome"] for r in best.values())
+    weighted = sum(r[cut]["model_minus_market_brier"] * r["games_with_outcome"]
+                   for r in best.values()) / games
+    assert res["diff"] == pytest.approx(weighted, abs=5e-5)

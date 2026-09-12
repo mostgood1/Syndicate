@@ -60,6 +60,20 @@ Note that `fresh_quotes_only` is the age-conditioned cut, which `priceable_only`
 is not -- `learnings.md:854` FORBIDS comparing model against market without
 conditioning on quote age, because staleness flatters the model.
 
+THE POOLED DIFFERENCE IS PAIRED. `live_gameline_score._paired` is explicit
+that a difference must not use `model`: a record carries a model probability
+whenever it is scored, but `market_fair_prob` can be absent, so `model` spans
+MORE rows than `market` and subtracting them compares two populations. Rows
+from scorer contract 2 on carry `model_paired` -- the model scored on exactly
+the market's rows -- and `cut_values` uses it whenever it is present. Until
+2026-09-12 it did not, and the POOLED line disagreed with the per-date `diff`
+column printed above it: `fresh_quotes_only` pooled to +0.00571 unpaired
+against +0.00460 paired, the whole gap from 2026-09-01..09-04 (model n
+497/293/67/66 vs market n 452/263/61/56). `priceable_only` was immune only
+because priceable rows happen to carry a price -- the scorer's own words.
+Older rows with no `model_paired` fall back to `model` and are still flagged
+NOT LIKE-FOR-LIKE when the two n differ.
+
 THIS TOOL NEVER WRITES to the history. It is append-only and concurrently
 written by other sessions; rewriting it to tidy or dedupe destroys their rows.
 """
@@ -88,16 +102,27 @@ def row_era(row):
 
 
 def cut_values(row, cut):
+    """The per-date briers a pool may combine -- PAIRED whenever the row allows.
+
+    `model` is the model's score over every row it scored; `model_paired` is
+    the same model restricted to the rows that also carry a market price. Only
+    the second may be subtracted from `market`. See the module docstring.
+    """
     block = row.get(cut) or {}
     model = block.get("model") or {}
     market = block.get("market") or {}
+    paired = block.get("model_paired") or {}
     if model.get("brier") is None or market.get("brier") is None:
         return None
+    use_paired = paired.get("brier") is not None
+    src = paired if use_paired else model
     return {
-        "model": model["brier"],
+        "model": src["brier"],
         "market": market["brier"],
-        "model_n": model.get("n"),
+        "model_n": src.get("n"),
         "market_n": market.get("n"),
+        "model_all_n": model.get("n"),
+        "paired": use_paired,
         "diff": block.get("model_minus_market_brier"),
     }
 
@@ -164,6 +189,7 @@ def pool(rows, cut):
     model = 0.0
     market = 0.0
     mismatched = []
+    paired_exclusions = []
     for date, row in best.items():
         vals = cut_values(row, cut)
         n = row["games_with_outcome"]
@@ -172,10 +198,17 @@ def pool(rows, cut):
         market += vals["market"] * n
         if vals["model_n"] != vals["market_n"]:
             mismatched.append((date, vals["model_n"], vals["market_n"]))
+        extra = (vals["model_all_n"] or 0) - (vals["model_n"] or 0)
+        if vals["paired"] and extra > 0:
+            # Rows the model scored with no market price. Pairing drops them
+            # from the comparison, correctly -- but COUNT the drop, because an
+            # exclusion nobody counts is how "n 94 vs 90" had to be spotted by
+            # eye (live_gameline_score._paired).
+            paired_exclusions.append((date, extra))
     if not games:
         return {"era": eras.pop() if eras else None, "cut": cut,
                 "dates": 0, "games": 0, "per_date": {},
-                "population_mismatch": []}
+                "population_mismatch": [], "paired_exclusions": []}
     return {
         "era": eras.pop() if eras else None,
         "cut": cut,
@@ -185,6 +218,7 @@ def pool(rows, cut):
         "market": market / games,
         "diff": (model - market) / games,
         "population_mismatch": mismatched,
+        "paired_exclusions": paired_exclusions,
         "per_date": dict(
             (d, dict(games=r["games_with_outcome"], **cut_values(r, cut)))
             for d, r in sorted(best.items())
@@ -268,6 +302,13 @@ def main(argv=None):
                   "is not a comparison: **")
             for date, mn, kn in res["population_mismatch"]:
                 print("       %s  model n=%s  market n=%s" % (date, mn, kn))
+        if res.get("paired_exclusions"):
+            print("  The model column is PAIRED -- scored only on rows that also "
+                  "carry a market price, so both columns span the same rows. "
+                  "Rows the model scored with NO market price, excluded from "
+                  "the comparison:")
+            for date, extra in res["paired_exclusions"]:
+                print("       %s  %d row(s)" % (date, extra))
 
     if len(wanted) > 1:
         print("\nThe eras are reported SEPARATELY and are never combined: a "
