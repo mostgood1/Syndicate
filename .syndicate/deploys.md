@@ -33450,3 +33450,91 @@ cleanly until that is fixed or the user rules that a crash-stranded live row doe
 this close the way it does not block the paper clause.
 
 **Rollback:** n/a -- nothing was deployed.
+
+## 2026-09-12 20:08:28Z — web `77f8d890` (then refresh-worker) — lane `nfl-prop-certainty-refusal` — **USER OVERRIDE of two holds. PENDING reading.**
+
+**What.** origin/main tip `77f8d890`: the NFL prop projection writer now goes through
+`refuse_published_certainty` (`nfl_prop_projections.py:360`).
+- web: `dep-dair2f15efls73ek9jkg`, trigger `api`. Claim held by this lane; preflight CLEAR
+  for this SHA at ~20:05Z. Live before: `1421ee3c`.
+- refresh-worker: follows web. Live before: `9d580145`.
+
+**OVERRIDE, logged.** The user chose "Both now, override" in chat on 2026-09-12 ~20:05Z, after
+being told three things:
+- This deploy SHIPS `8d4aceff` and `a989e256` (lane `layer2-live-scorecard-gate`, the in-play
+  observation gate and the in-play `market_fair` sizing refusal). That lane was held "NOT
+  DEPLOYED by user decision until after the 09-12 slate".
+- refresh-worker preflight is **HOLD**: the MLB daily sim (`run_mlb_daily_sim_job.py` ->
+  `daily_update.py --workflow ui-daily`, plus multiprocessing children) and
+  `run_refresh_odds_job.py` are in flight, and a deploy kills them.
+- The fix is INERT today (next paragraph).
+
+The Layer 2 lane's session was messaged before the web trigger.
+
+**Collateral, code commits since live:**
+- web `1421ee3c..77f8d890`: `bad972ff`, `c7852ac8`, `e82e95ef` (offline pool tool), `8d4aceff`,
+  `a989e256`, `77f8d890`.
+- refresh-worker `9d580145..77f8d890`: the same, plus `21c26db1` (#573 Kalshi shard balance,
+  already live on live-odds-worker), `dfecea84`, `e8ac4c03`, `d2369dae` (ask rail/evidence).
+
+**Expected effect of THIS lane's change: none measurable today.** Production's only NFL prop
+artifact (`nfl_prop_projections_2026_wk1.json`, generated_at 2026-09-10T00:09:04Z) was read
+at ~20:03Z:
+- 1,140 rows; exact 0.0/1.0 `sim_projection` = **0**; within 0.005 of either bound = 0.
+- min 0.0321, max 0.9576.
+- wk2 and wk3 artifacts return 404.
+
+**verify (the readings that decide it):**
+1. **Content:** the live commit on each service equals `77f8d890`, and
+   `git show 77f8d890:syndicate/features/shared/nfl_prop_projections.py` carries
+   `refuse_published_certainty(projection)` (line 360).
+2. **Not broken:** the NFL prop join still stamps rows after the refresh-worker boot. Shortlist
+   `prop_coverage.rows_with_projection` > 0 with `error` absent, and no
+   `BOOK_GRID_PROP_PROJECTION_FAILURE` in the logs.
+3. **Refusal count consistent with the artifact:** served NFL prop rows with
+   `projection.model_prob_over_refused` = 0, since the artifact has 0 certainties.
+   A non-zero count against a 0-certainty artifact would mean the guard fired on something else.
+4. **MLB sim killed by this deploy:** record whether refresh-worker relaunches it after boot.
+
+**Rollback:** `py -3 scripts/render_deploy.py --service <svc> --commit <prior live> --allow-rollback`
+(web `1421ee3c`, refresh-worker `9d580145`), under a claim.
+
+**Pre-deploy check owed by `layer2-live-scorecard-gate`** (OWED item 2, read as far as it can be
+before the day closes). The web export listing for `reports/intelligence/clv_openings/` gives:
+
+| date | size |
+|---|---|
+| 09-10 | 14.68 MiB |
+| 09-11 | 21.56 MiB (largest full day) |
+| 09-12 | **17.55 MiB at ~20:07Z**, evening slate still to accrue |
+| 09-13 | 2.60 MiB |
+
+The tripwire is 32 MiB. The four new opening fields enlarge only records written after
+refresh-worker boots, so truncating tonight's evening openings is a RISK to read at the date roll,
+not a measured failure.
+
+**web — LIVE `77f8d890`, finished 2026-09-12T20:11:32Z** (preflight watch: `update_in_progress`
+20:10:24Z -> live 20:12:04Z).
+- **No pre-deploy served baseline:** shortlist and book-grid both returned HTTP 502 at 20:10:37Z,
+  mid-restart.
+- **Reading 20:12:29Z** (`/api/board/layer2-shortlist?sport=nfl`, 484,417 B):
+  - `prop_coverage` reads `rows_considered 1470`, `rows_with_projection 717`, `artifact_rows 1140`,
+    `unmatched_key_rows 753`, `no_probability_rows 0`, `error null`.
+  - Served NFL prop rows with a projection: 111. `model_prob_over_refused` = **0**; exact 0/1
+    `model_prob_over` = **0**. This matches the artifact's 0 certainties.
+  - **This payload is refresh-worker's build, so it still reflects `9d580145` code.** It shows
+    web serves the NFL prop path without error; it is not yet the post-fix build.
+- `/api/board/book-grid?sport=nfl&limit=20000` (2,962,745 B) shows prop rows_considered 0 and 0
+  refused.
+
+**refresh-worker — `dep-dair51lg1s2s738eri5g`, triggered 2026-09-12T20:13:58Z.**
+- **BREAK-GLASS GRANT USED.** Preflight at 20:13:00Z returned HOLD for ONE reason: 5 jobs in flight,
+  `run_mlb_daily_sim_job.py` -> `daily_update.py --workflow ui-daily` -> vendor `daily_update` +
+  multiprocessing children. The claim was held by this lane, the target is on main, and spacing
+  was OK (last deploy 1,605 min ago).
+- `deploy-guard.py` has no HOLD override, so
+  `.syndicate/deploy/grants/0f5b256e-5e9a-4a7d-99be-c421cd010fa8.json` was written with a ~10 min
+  expiry immediately before the trigger. It was removed in the same command right after the trigger
+  (`grant removed: True`). The guard's grant check is not service-scoped, which is why it was kept
+  single-use.
+- **The in-flight MLB daily sim was killed by this deploy, by user decision.**

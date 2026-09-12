@@ -796,7 +796,13 @@ death, never life — do not invert it.
 - Field-list check (learnings 2026-09-06, a guard's scope is its field list): the NFL prop projection is one-sided (`side: over`); `_attach_sim_probability_edge` sets `model_prob_over` and `edge_vs_market_pct` — the exact field the guard reads and one it clears. No other probability legs, so the guard's predicate covers this path.
 - Falsification test: the certainty test still failing after the wrap, or any `-k nfl_prop` test failing that passes on origin/main.
 - Verification: `python -m pytest -q tests/test_platform_certainty_refusal.py` 10/10 and `python -m pytest -q tests -k nfl_prop` same-or-better than origin/main.
-- Blocked by: none. Code-only; NOT DEPLOYED (runtime effect only when an NFL prop sim_projection is exactly 0.0/1.0).
+- Blocked by: none. Landed `77f8d890`. Runtime effect only when an NFL prop sim_projection is exactly 0.0/1.0.
+- DEPLOY `[2026-09-12, user override "Both now, override"]`: web `dep-dair2f15efls73ek9jkg` triggered 20:08:28Z (live before `1421ee3c`), refresh-worker to follow (live before `9d580145`, preflight HOLD — MLB daily sim + odds refresh in flight, killed by the user's choice). **This ships lane `layer2-live-scorecard-gate`'s held `8d4aceff`/`a989e256` before the 09-12 slate ends**; that session was messaged first.
+  - Pre-deploy readings:
+    - Production's only NFL prop artifact (wk1, 1,140 rows) has 0 exact certainties (min 0.0321, max 0.9576), so the fix is INERT today.
+    - `clv_openings/2026-09-12.jsonl` was 17.55 MiB of the 32 MiB tripwire at ~20:07Z, with the evening slate still to accrue and the Layer 2 fields adding bytes per record.
+    - No served baseline: shortlist and book-grid both returned 502 at 20:10:37Z, mid-restart.
+  - Readings and verify: `deploys.md` 2026-09-12 20:08:28Z.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
