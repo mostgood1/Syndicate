@@ -34162,3 +34162,37 @@ No deploy, no env change, no code change to a service. The deploy is recorded at
 **Rollback:** `py -3 scripts/render_deploy.py --service refresh-worker --commit 77f8d890 --allow-rollback` under a claim. The inventory itself changes nothing on disk.
 
 **Claim** `refresh-worker-disk-inventory` on refresh-worker RELEASED with its token after this entry.
+
+## 2026-09-13 14:11:16Z — refresh-worker `92a271b8` -> `3e18be8e` — lane `refresh-worker-disk-inventory` — disk compaction (verified duplicates, gzip closed history CSVs, stop the history re-append). **LIVE; MEASURED: free space 0 -> 16.44 GB, ENOSPC stopped, NFL grid rebuilding.**
+
+**Deploy.** `dep-dajau10jo6nc73d4rvdg`, trigger `api`.
+- Preflight **CLEAR** at ~14:10Z (only infra processes; 28 min since last deploy vs 25 min spacing). Claim held by `refresh-worker-disk-inventory`, token acquired 14:10:07Z.
+- **User decision:** a multi-select of "Remove verified duplicates", "Gzip props-history CSVs" and "Stop history re-append". **NOT** "Also resize to 100 GB".
+- **Collateral:** `e498f0b8` (departure log, lane `layer2-live-scorecard-gate`: `clv_departure_ledger.py`, `clv_opening_ledger.py`, `artifact_publisher.py` +11, `scripts/layer2_live_scorecard.py`). Its refresh-worker effect has no clean before/after of its own.
+
+**What shipped (`3e18be8e`):**
+- `disk_compaction.py`: a one-shot thread from `run_disk_maintenance`.
+  - Order: orphan temps (>1 h), then plain `*_source/tracking/book_quotes/<date>.jsonl` removed only when the `.gz` twin has an equal line count, then closed (>=2 day) `odds_*_history_<date>.csv` gzipped via `.gz.tmp`, verified by line count, and the original removed.
+  - Free space is re-read per file.
+  - Default is `RENDER` truthy AND service `refresh-worker`; `SYNDICATE_DISK_COMPACTION` overrides.
+- `odds_refresh_tracking._persist_tracking_snapshot`: the full-snapshot history append is opt-in via `SYNDICATE_TRACKING_HISTORY_CSV`.
+- Tests: compaction, inventory and maintenance suites, 45 passed. The tracking suites fail identically with the flag off and on (14 failed / 13 errors / 122 passed), so those failures pre-date this change.
+
+**verify — READINGS, substrate render logs + web API:**
+- `DISK_COMPACTION_STARTED` 14:15:08Z, `free_bytes_before: 0`.
+- `DISK_COMPACTION` summary 14:44:15Z, `seconds: 1747`:
+  - temp_files: removed 12 (37,007,177 B), kept_recent 29, errors 0. Free after: 51,093,504 B.
+  - shard_duplicates: removed 96 (3,649,991,980 B), kept_mismatch 18, kept_recent 38, no_twin 0, errors 0. Free after: 3,678,240,768 B.
+  - history_csvs: compressed 203, 13,641,474,097 B -> 1,014,351,428 B, kept_recent 6, verify_failed 0, skipped_low_space 0, errors 0. Free after: **16,441,896,960 B**.
+- `No space left` on refresh-worker: 288 matches 13:50:11Z..14:11:23Z before; **0 matches** 14:16:00Z..14:44:58Z. Last 14:15:53Z.
+- `BOOK_GRID_BUILD_ERROR`: 0 matches 14:16:00Z..14:44:58Z; before, it failed for mlb, nfl and soccer.
+- NFL `/api/board/book-grid?sport=nfl&date=2026-09-13`: `generated_at` 07:24:21Z (1,275 rows) at 14:12:59Z, then **14:21:17Z (1,251)** and **14:38:52Z (1,251)** at 14:45:18Z. `/nfl` HTTP 200.
+- The 18 kept mismatches are MLB 09-03 onward: the `.gz` is 1-132 lines LONGER than the plain file, so the plain copy is a stale prefix and still sits on disk.
+
+**Not done / caveats:**
+- Compaction runs once per process: the 6 recent CSVs and 38 recent shards are compacted only on the next boot.
+- Not approved: evaluation-ledger slimming (8.01 GB), `odds_history` triple copies, retention, resize.
+
+**Rollback:** `py -3 scripts/render_deploy.py --service refresh-worker --commit 92a271b8 --allow-rollback` under a claim. Rolling back re-enables the history append; files already compacted stay compacted (the gzipped CSVs are readable with `gzip`).
+
+**Claim** `refresh-worker-disk-inventory` on refresh-worker RELEASED with its token after this entry.
