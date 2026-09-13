@@ -887,6 +887,12 @@ death, never life — do not invert it.
   - `No space left` and `BOOK_GRID_BUILD_ERROR`: **0** from 14:16Z to 14:44Z. The last was 14:15:53Z; the pre-deploy rate was 288 in 13:50-14:11Z.
   - NFL served grid `generated_at` 14:38:52Z with 1,251 rows (was frozen at 07:24:21Z); `/nfl` 200.
   - Caveats: compaction is one-shot per process, so the 6 recent CSVs and 38 recent shards wait for the next boot. The 18 mismatched plain shards are untouched. Evaluation-ledger slimming, `odds_history` triple copies and retention are not approved.
+- **READING 2026-09-13 15:50Z (NFL missing, found downstream of the disk outage): NFL restored on the served board.**
+  - Cause: refresh-worker's NFL 09-13 `book_quotes` copy was frozen behind a `since=` 304 from web's stream route.
+  - Fix: web's copy re-published byte-identical at 15:43:33Z (merge added 0).
+  - Readings: refresh-worker `STREAM_TAIL_OK appended_bytes=8842672` at 15:45:34Z; served board 15:49:54Z has 1,422 NFL rows for today, 124 game rows. Detail: `deploys.md` 2026-09-13 15:43:33Z.
+  - **Durable fix NOT made:** `artifact_publisher.pull_streamed_artifact` still sends `since=` for append-only shards; the file is claimed by `layer2-live-scorecard-gate`.
+  - `c114e1aa` (remove plain shards that are a byte prefix of their `.gz`) is on origin/main, not deployed. refresh-worker's claim is held by `layer2-prior-date-live-carryover` (preflight HOLD 15:08Z, MLB daily sim).
 - Blocked by: none. **User decisions 2026-09-13 ~13:30Z:** "Resize + diagnose (Recommended)", then **"check content on the disk and ensure that we compact items that can be compacted first"**, so the resize is held until the inventory and compaction are done. A refresh-worker deploy needs claim + preflight; a HOLD goes back to the user. **2026-09-13 ~14:00Z:** the user approved "Remove verified duplicates, Gzip props-history CSVs, Stop history re-append", NOT the 100 GB resize.
 
 ### layer2-prior-date-live-carryover — OPEN — opened 2026-09-13 — session 887508de-2233-46fd-ae82-2ad385de111c

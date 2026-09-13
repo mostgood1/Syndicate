@@ -34287,3 +34287,44 @@ ships      vs live 064fb6af: 10 code paths
   - Render events since 14:11Z show the deploy only, and no kills.
   - The deploy waits for a CLEAR; this lane has held the claim since 15:07:54Z.
 - Web claim released after this entry.
+- Web claim released after this entry.
+
+## 2026-09-13 15:43:33Z — web data write (no deploy) — lane `refresh-worker-disk-inventory` — NFL missing from the board: refresh-worker's NFL 09-13 quote shard frozen behind a `since=` 304; web's copy re-published byte-identical to advance its mtime. **MEASURED: NFL back on the served board at 15:49:54Z.**
+
+**User decision:** "NFL is still missing and is the priority to fix asap". Then "Re-save web's copy (Recommended)" as the fallback, and "proceed with getting this fixed asap".
+
+**Symptom, measured on served payloads:**
+- 15:11Z `/api/board/layer2-shortlist?sport=nfl`: 93 rows, all DEN @ KC (09-15). `per_sport.nfl` `available_today: 0`, `game: 0`. `by_lane` dead 2,069 / opportunity 161.
+- 15:25Z `/api/board/layer1?sport=nfl&date=2026-09-13`: 1,236 of 1,251 rows had book age >24 h (`opportunity_gate.PREGAME_MARKET_MAX_AGE_SECONDS` = 86,400, so they fell in the dead lane). No game markets on any Sunday game. The newest per-book `observed_at` for every sportsbook was 2026-09-12 08:01-08:02Z.
+
+**Root cause, stage by stage:**
+- **Capture was fine.** Web's `nfl_source/tracking/book_quotes/2026-09-13.jsonl`, streamed at 15:30Z: 62,333 lines, 28,757,424 B, `Last-Modified` 13:40:14Z. Every sportsbook's newest `captured_at` was 13:40:12Z (game lines 13:40:12Z, props 09:34:48Z).
+- **refresh-worker held a 19,914,752 B copy** (`SWEEP_SKIPPED_DETAIL too_large`, 13:49:57Z).
+- **Its pulls failed during the outage.** `STREAM_PULL_FAILED ... [Errno 28]` at 09:38:21Z and 13:43:43Z. After the disk recovered (14:16Z) there was no STREAM_* line for the shard at all.
+- **The mechanism.** `artifact_publisher.pull_streamed_artifact` sends `since=<local mtime>` AND `Range: bytes=<local size>-`. Web's `/api/ops/artifacts/stream` checks `since` BEFORE Range (`ops.py:2878-2888`). Probed at 15:3xZ with Range from 19,914,752:
+  - `since` 13:30Z -> 206, 8.8 MB tail;
+  - `since` = web mtime -> 304;
+  - `since` 13:43:43Z -> 304;
+  - `since` 15:30Z -> 304.
+- **A 304 is logged as nothing and returns success**, so the board kept building from yesterday's prices.
+- **Why local mtime was ahead of web: NOT established.** Candidates are the torn ENOSPC append at 13:43:43Z and a local `append_book_quotes` write. Also not established: why it stayed frozen from 09-12 ~08:02Z, before the disk filled. live-odds-worker had 56 `oomKilled` events since 09-12 (lane `live-odds-worker-oom`).
+
+**The write:**
+- `scratchpad/nfl_mtime_bump.py`, dry run at 15:36:21Z, real run at 15:43Z.
+- Downloaded web's shard (28,757,424 B, sha256 `afd317d25869...`), re-probed that it was unchanged, then POSTed the same bytes with `X-Artifact-Checksum` and `X-Artifact-Publisher: operator-nfl-mtime-bump`.
+- Web: `ARTIFACT_MERGE_DEFERRED` at 15:43:33.75Z, then `ARTIFACT_MERGE_CHILD {"added": 0, "duplicates": 62333, "existing_lines": 62333, "bytes": 28757424, "merged": true}`.
+- **Content unchanged, size unchanged; mtime 13:40:14Z -> 15:43:33Z.**
+
+**verify, READINGS:**
+- refresh-worker `STREAM_TAIL_OK path=nfl_source/tracking/book_quotes/2026-09-13.jsonl appended_bytes=8842672 from_offset=19914752` at 15:45:34Z.
+- Served `/api/board/layer2-shortlist?sport=nfl` `written_at` 15:49:54Z: 1,637 rows, 1,422 commencing 2026-09-13, 124 game rows. `per_sport.nfl` `available_today` 1,423, `game` 124. `by_lane` dead 419 / opportunity 4,125 (was 2,069 / 161).
+- Combined board 15:50:35Z: 2,000 rows, nfl 1,299 / mlb 508 / soccer 193.
+- Production page `/` 15:50Z: NFL rows ranked #3 (CLE @ JAX h2h, FanDuel +270) and #6. With the NFL filter and TODAY: 1,567 candidates, 581 pregame shown.
+- live-odds-worker's regular NFL sweep did not fire at 15:41Z. `PREGAME_CADENCE_DETAIL nfl:marker_age_s=7198/interval_s=7200` at 15:39:38Z. It launched at 15:48:15Z (`sports=mlb,nfl,soccer`); no publish of the shard had landed on web by 15:53:10Z.
+
+**Not fixed (the recurrence risk):**
+- `pull_streamed_artifact` still sends `since=` for append-only shards. Any local mtime at or past web's freezes the copy silently until web's next write.
+- `artifact_publisher.py` is claimed by OPEN lane `layer2-live-scorecard-gate`; the durable fix is not made here.
+- A watcher (`scratchpad/watch_nfl_sync.py`) runs to 17:45Z. It alerts if web's shard grows and refresh-worker does not tail it within 6 min.
+
+**Rollback:** none needed. The content is byte-identical (merge added 0); only web's mtime moved.
