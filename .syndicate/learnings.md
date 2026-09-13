@@ -5774,3 +5774,15 @@ A watcher on the 09-12 opening ledger projected its 05:00Z close from the latest
 - When a preflight on a live-slate night returns CLEAR, read `render_events` up to that minute before calling the worker quiet. A post-kill restart reads identically.
 - Any "0 kills up to event X" must come from a read whose window reaches X.
 - *(evidence in `.syndicate/deploys.md` 2026-09-13 00:14:31Z and 01:14Z, and `.syndicate/log/2026-09-12.md`)*
+
+## 2026-09-13 FORBIDDEN: grading "still there N minutes later" from a poller without checking that the later poll read a NEWER build `[lane layer2-live-scorecard-gate]`
+
+A session capture polled `/api/board/layer2-shortlist` every 2 min and graded the vanish rate as "a poll at least 10 min later still carries the market". Two things made later polls re-read the build the market was sighted in:
+- Build gaps of up to 1,601s during the slate.
+- The 09-12 shortlist stopped rebuilding at 04:58:55Z (the Central date roll), leaving 2 h of polls on one build.
+
+A re-read of one build reports every market as still there. On the same final capture (80 builds), skipping same-build polls moved live vanish from 400 of 663 (60%) to 426 of 648 (66%). Rows served 5-10 min old moved from 56% to 69%, and the first gate window from 56% to 78%. The obvious alternative, "a build at least 10 min newer", read 77% because it also lengthened every row's horizon.
+
+**How to apply:**
+- Measure persistence against a NEWER artifact (its `written_at`), not a later poll. A re-read of the same artifact is "no new look", never "still there".
+- When fixing such a rule, change only the defective case and report both readings. A fix that also moves the horizon changes the thing it is correcting.

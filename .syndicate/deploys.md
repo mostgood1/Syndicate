@@ -34051,3 +34051,24 @@ The prediction points that way: a smaller transient. `ALL_PROCESS_MEMORY` is sam
 **Claim** `mlb-live-lens-payload-dup` on live-odds-worker RELEASED with its token after this entry.
 
 **verify:** V2, V3 MET; V1 MET on n=5. OWED: V1 over Sunday's live MLB window (`live_lens_tick_after_mlb` ok ratio >= 90%, 0 `KeyValuePayloadTooLarge` for `mlb_live_lens.json`).
+
+## 2026-09-13 07:45Z — reading only — lane `layer2-live-scorecard-gate` — full-slate reading of the in-play observation gate (refresh-worker `77f8d890`, live 2026-09-12 20:20:09Z)
+
+No deploy, no env change, no code change to a service. The deploy is recorded at 2026-09-12 20:08:28Z (lane `nfl-prop-certainty-refusal`) and first read at 20:45Z.
+
+- **verify, the gate's effect on the served board.** Session capture of `/api/board/layer2-shortlist?sport=ncaaf&date=2026-09-12&limit=2000` every 2 min from 18:41:48Z, split by build `written_at`:
+  - Live `opportunity` row-polls observed more than 400s old at build: 1,637 of 3,716 over 13 builds before 20:20:09Z; 0 of 14,103 over 60 builds after (through ~04:20Z).
+  - 659 after were 300-400s old: the ~97s gap between where the gate judges and where the age is stamped.
+  - `live_quote_unobserved` is never served (dead rows are not), so the reason itself is still unread.
+- **Real openings.** NCAAF in-play `quote_seen_age_seconds` max 378s, 0 over 400s. The four new fields are keyed on 4,731 of 4,731 records from 20:20:09Z and on 0 of 19,658 before.
+- **Results, worker ledger** (all 80 NCAAF finals; first sighting per market, flat 1u at the published price; `scripts/layer2_live_scorecard.py --split-at`):
+  - In-play after the deploy: 264-246-1, +23.56u, +4.61%, 61 games.
+  - By window: 20:20:09Z-22:34:15Z +8.60% (27 games); 22:34:15Z-00:14:31Z +1.31% (34); from 00:14:31Z +3.51% (38).
+  - In-play before the deploy, by clock: 149-161, -9.41u, -3.04%, 33 games.
+  - Those are different games and hours: NOT a gate effect.
+- **What the gate removes, from the capture** (first +EV sighting per market, flat 1u at the shown price, +10 min look = first poll at least 10 min later that reads a NEWER build):
+  - Rows a 300s gate would kill: +13.63% on 37 games, gone at +10 min 73 of 93 (78%).
+  - Rows it passes: +7.62% on 75 games, gone 353 of 555 (64%).
+  - On paper the gate removes better-settling rows, and they were less often still there to bet. Per-game swings of about 5u make the ROI gap indistinguishable, and no fill rate is recorded, so the net effect on REALIZED results is unmeasured.
+- **Opening ledger closed:** 23,513,778 B (70.1% of 32 MiB), last record 04:58:46Z. Not truncated.
+- Rollback without code is unchanged (entry 2026-09-12 20:45Z).
