@@ -5757,3 +5757,20 @@ A watcher on the 09-12 opening ledger projected its 05:00Z close from the latest
 - Discount any "quiet" interval that contains deploys: every deploy reboots, and memory is boot-confounded.
 - When a per-stage sampler shows nothing in the last N seconds before a kill, list the OTHER threads that run in that window before reading the silence as "nothing happened". Log timing against their own markers (here `TRIM_SELECT`/`DAILY_BOOK`).
 - *(evidence in `.syndicate/log/2026-09-12.md`, section "live-odds-worker OOM")*
+
+## 2026-09-13 FORBIDDEN: using the wall time between two log lines as the COST of the code between them when another thread shares the GIL. And a preflight CLEAR on a slate night may be a post-kill restart, not a quiet worker. `[lane live-odds-worker-oom-loop]`
+
+**What I believed.**
+- I pre-registered R1: if the streaming daily-book writer runs, `TRIM_SELECT`->`DAILY_BOOK` drops to a p50 of <= 24 s (the 58736a69 baseline was 36.0 s). The only code between those two lines is the book write, and the new writer was ~3x faster locally.
+- Separately, I read the deploy preflight's `CLEAR: only infrastructure processes running` as the worker being between sweeps.
+
+**What was true.**
+- **R1:** the first 12 paired ticks gave p50 31.1 s, neither met nor falsified. The slowest ticks carried the FEWEST appended points (82.8 s / 1,398 and 97.8 s / 1,404), interleaved with 9-11 s ticks. The venue-poll thread shares the interpreter with the live-lens thread's Monte Carlo builds, so its wall time measured contention as much as work. A reachability test that cannot read healthy when the code runs is instrument blindness.
+- **CLEAR:** the worker had been oomKilled at 00:07:50Z and restarted at 00:07:51Z. The CLEAR at 00:09:13Z was a fresh process, 83 s old. Separately, I told the user "no kills to the deploy" from event reads that ended at 00:00:32Z and ~00:02Z; that kill landed 5-7 min after them.
+
+**How to apply.**
+- To prove a code path ran, emit a line FROM that path (a counter or a stamp), or measure a property only it can change. Never use the gap between two neighbouring log lines on a multi-threaded process.
+- If you pre-register a duration anyway, first show over the baseline that it tracks the work, e.g. correlate it with `appended` before trusting it.
+- When a preflight on a live-slate night returns CLEAR, read `render_events` up to that minute before calling the worker quiet. A post-kill restart reads identically.
+- Any "0 kills up to event X" must come from a read whose window reaches X.
+- *(evidence in `.syndicate/deploys.md` 2026-09-13 00:14:31Z and 01:14Z, and `.syndicate/log/2026-09-12.md`)*

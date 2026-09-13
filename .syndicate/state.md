@@ -371,9 +371,11 @@ still genuinely absent — `conditional_mix` etc. return `count: 0` and `POST
   `SYNDICATE_ENABLE_NCAAF_LINES_REFRESH_AUTORUN=1` on live-odds-worker, 300s,
   game-day gated, 9 credits/run. **Measure on `quote_seen_age_seconds` (time since
   we LOOKED), never `book_age_seconds` (time since the price MOVED).**
-- **FALSE FROM 2026-09-09 — corrected 2026-09-12 by lane `live-odds-worker-oom-loop`:** 76
-  `oomKilled memoryLimit=2Gi` between 2026-09-09T19:43:39Z and 2026-09-12T21:54:43Z (still
-  firing), 0 before, timed to the Kalshi daily-book write
+- **FALSE FROM 2026-09-09 — corrected 2026-09-12 by lane `live-odds-worker-oom-loop`:** 80
+  `oomKilled memoryLimit=2Gi` between 2026-09-09T19:43:39Z and 2026-09-13T00:07:50Z, 0 before,
+  timed to the Kalshi daily-book write. After `e332b531` (streaming writer, live
+  2026-09-13T00:14:31Z, on top of `58736a69`'s arena cap + trim): 0 `server_failed` through
+  04:04Z, events fully paged. The 6 h reading is OWED; the kills are NOT yet shown stopped
   (`.syndicate/findings_2026-09-12_live_odds_worker_oom.md`). The claim below was true of
   2026-08-26..09-04 only and is kept for the record:
 - ~~**live-odds-worker has NEVER been evicted.**~~ `evicted: false` on all 23
