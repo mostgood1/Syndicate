@@ -880,6 +880,10 @@ death, never life — do not invert it.
   - MECHANISM AMPLITUDE, LOCAL, real `record_daily_odds` on a synthetic file shaped to production (48 points x 8 depth fields, 1/3 moved): 2,000 markets = 34.9 MB file, +316 MB RSS peak (+337 tracemalloc); 4,000 = 69.9 MB, +670; 8,000 = 139.8 MB, +1,378 (+1,350). Linear, ~3.5 KB per stored point. Production `DAILY_BOOK detail=`: `ncaaf 2026-09-12` at the 8,000-market cap (`MAX_MARKETS_PER_FILE`) on every day 09-09..09-12; `mlb 2026-09-12` 5,702. Files are on disk since `#637`, so `_trim_to_budget` never fires.
   - (c) NOT slate-only: 7 kills 06:00-12:00Z 09-12 with no US game live; the file size, not the slate, sets the transient. Falsification (1) and (3) did not fire; (2) fired as worded and is recorded.
   - ATTRIBUTION: the Kalshi daily-book write (`venue_daily_odds.record_daily_odds`, whole-file read + copy + indented dump) on files grown ~3x per point by `52a995f2`/`0b8c1e11`. Not yet proven by a production intervention.
+- DEPLOYED 2026-09-13 `e332b531` (`bc4dd317` only), live 00:14:31.414Z (`dep-daiuje7qj5pc73bkiub0`). User decisions: "Push + deploy now", then "Deploy on the first CLEAR tonight". Preflight CLEAR 00:09:13Z. `deploys.md` 2026-09-12 23:3xZ (PENDING, R1-R4 registered) and 2026-09-13 00:14:31Z (LIVE).
+  - **`58736a69` alone was killed at 00:07:50.534Z**, 93.6 min after it went live. Its sufficiency is falsified. This session had wrongly told the user "no kills to the deploy": the reads ended at 00:00:32Z and ~00:02Z. Corrected to the user and to the parallel lane.
+  - That kill: 25.1 s after `TRIM_SELECT`, before its `DAILY_BOOK`. Last live-lens stage `tick_before_mlb`, 60.5 s prior.
+  - OWED: R1-R3 at ~01:15Z; R4, 0 kills over 6 h from 00:14:31Z, read as the COMBINATION.
 - Blocked by: none. Deploys to this service need the user's explicit OK (real-money orders; a restart mid-placement strands orders) and must avoid lane `layer2-live-scorecard-gate`'s 2026-09-13 06:30-08:00Z scorecard window without asking.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

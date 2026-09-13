@@ -33785,3 +33785,29 @@ ships      vs live 77f8d890: syndicate/templates/intelligence.html ONLY
 - **R4, THE GOAL, read as a COMBINATION with `58736a69`:** 0 `oomKilled` over >= 6 h spanning a live slate, via `render_events.py --service live-odds-worker --since <live>` with `OUTPUT COMPLETE`. The deploy lands inside `58736a69`'s P4 window, so a clean window is NOT attributed to either fix alone. Falsifier: any kill. Classify it by its offset from `TRIM_SELECT`/`DAILY_BOOK` and by the last live-lens stage. A kill during an MLB/soccer build, after `DAILY_BOOK` printed, points at the builds (the third lever).
 
 **Rollback:** `py -3 scripts/render_deploy.py --service live-odds-worker --commit 58736a69 --allow-rollback` under a claim.
+
+### 2026-09-13 00:14:31Z — live-odds-worker `e332b531` LIVE — lane `live-odds-worker-oom-loop` — the deploy pre-registered above
+
+- **Preflight CLEAR 00:09:13Z** ("only infrastructure processes running"), after 60 HOLD/UNKNOWN polls from 23:34Z. The CLEAR existed because the previous process had just been killed (see below) and had restarted at 00:08:50Z.
+- **Deploy** `dep-daiuje7qj5pc73bkiub0`: created 00:09:28.698Z, build ended 00:13:07Z, **live 00:14:31.414Z**.
+- **New process** booted 00:15:33Z: `MALLOC_ARENA_INIT applied true max_arenas 2`, `INTELLIGENCE_LOOP_DISABLED`.
+- **Ride-along** as registered: `bc4dd317` only.
+
+**CORRECTION to the baseline above: `58736a69` alone was NOT kill-free up to this deploy.**
+- `oomKilled memoryLimit=2Gi` at 2026-09-13T00:07:50.534Z, followed by `server_available` 00:07:51Z. Source: `render_events.py --since 2026-09-12T23:59:00Z`, OUTPUT COMPLETE.
+- The earlier "0 kills" readings stop at 23:20:11Z and 00:00:32Z. They were true for their windows only.
+- `58736a69` alone ran **93.6 min**, 22:34:15Z -> 00:07:50Z. Its sufficiency is FALSIFIED.
+
+**That kill, read the same way as the 66 before it:**
+- Last `TRIM_SELECT` at 00:07:25Z, 25.1 s before the kill. That tick's `DAILY_BOOK` never printed; the previous tick's printed 40 s after its `TRIM_SELECT`.
+- Last `ALL_PROCESS_MEMORY` at 00:06:50Z, 60.5 s before, stage `live_lens_tick_before_mlb`: unreclaimable 1,188 MB, parent 1,074 MB, `refresh_odds_sources.py` 114 MB, `build_soccer_artifacts.py` 89 MB. One minute earlier, at `pull_after`: unreclaimable 1,338 MB.
+- So it sits inside a TRIM->DAILY_BOOK window again, possibly stacked on the MLB live-lens build. The samples cannot separate the two.
+
+**Boot `Traceback`s** at 00:09:25Z (old process) and 00:16:14Z (new process): both are the PRE-EXISTING `KeyValuePayloadTooLarge` on `mlb_live_lens.json` (9,993,027 B and 10,411,299 B, `live_lens_loop.py:719`). They are unrelated to either fix.
+
+**Claim** held until the R1-R3 reading (~01:15Z), then released with its token.
+
+**verify: OWED.**
+- R1-R3 at ~01:15Z, read with the same instrument as the 58736a69 baseline (`TRIM_SELECT`->`DAILY_BOOK` there: n=21, p50 37.6 s, p90 51.6 s, max 66.8 s).
+- R4 (6 h, the combination) runs from 00:14:31.414Z; earliest close 06:14:31Z.
+- A watcher polls events every 3 min and exits on the first `server_failed` or on any other deploy.
