@@ -5,6 +5,32 @@
 
 ---
 
+## 2026-09-13 1:01 PM CT — reading only, no deploy — refresh-worker `5767e3ac` (carried) + web (lane `nfl-layer2-kalshi-identity`, scheduled task `nfl-kalshi-identity-sunday-reading`; discharges the three readings OWED by the 2026-09-10 23:06 CT row) — **R1 PASS, R2 PASS, R3 PASS: Kalshi NFL prop quotes are relabelled and identity-stamped on every NFL capture, web's 09-13 shard carries 1,299 of them all under display labels with a kickoff, and with 24 LIVE NFL rows on the board 0 served rows lack identity. LANE CLOSED.**
+
+All readings are on PRODUCTION, taken 1:01–1:02 PM CDT [18:01–18:02Z] during the Sunday 12:00 CT window. The local `data/` mirror was not used. No code was changed.
+
+- **R1, PASS — `[kalshi_odds] QUOTE_CAPTURE` on refresh-worker** (`scripts/render_logs.py --start 2026-09-11T03:24:50Z --tail 500`):
+  - Requested window 2026-09-11T03:24:50Z .. now (18:00Z); **COVERED** 03:35:05Z .. 2026-09-13T17:33:14Z; 50 lines.
+  - The first 10 min are uncovered, but the 23:06 CT row already read both ticks in them (03:35Z, 03:46Z): no NFL appended. The last 27 min are uncovered too.
+  - **33 lines have `nfl` in `appended_by_sport`; 0 of 33 read `relabelled=0`** (minimum 35). The first is 2026-09-10 11:05 PM CT [04:05:01Z]: `appended_by_sport={'soccer': 5, 'nfl': 72} relabelled=72 shards={'nfl:2026-09-13': 68, 'nfl:2026-09-14': 4}`. The last is 12:33 PM CT today [17:33:14Z]: `nfl: 18, relabelled=53`.
+  - Shard keys summed over those 33 lines: `nfl:2026-09-13` **1,299**, `nfl:2026-09-14` 30.
+  - **Completeness cross-check:** the log has overnight gaps up to 17 h, but its `nfl:2026-09-13` total (1,299) equals R2's Kalshi prop row count in that shard exactly. So no NFL-appending tick for that shard is missing from what was read.
+- **R2, PASS — web's `nfl_source/tracking/book_quotes/2026-09-13.jsonl`** (`/api/ops/artifacts/stream`, HTTP 200, 34,766,501 B, 75,446 rows, 3 unparsable):
+  - `bookmaker == "kalshi"` and `kind == "prop"`: **1,299** rows. By market: `Receptions` 906, `Passing TDs` 393.
+  - With `commence_time`: 1,299. With `home_team`: 1,299. Market starting `player_`: **0**. Missing `commence_time`: **0**.
+  - `captured_at` runs 2026-09-11T04:05:00Z .. 2026-09-13T17:33:13Z. Every row is post-deploy, and the first matches R1's first NFL tick.
+- **R3, PASS — the served board with games LIVE:**
+  - `/api/board/layer2-shortlist?sport=nfl&limit=2000` (HTTP 200): 525 rows, all NFL. `game_state`: pregame 501, **live 24** (ATL @ PIT 8; CLE @ JAX, NO @ DET and TB @ CIN 4 each; BAL @ IND and BUF @ HOU 2 each).
+    - **(a)** NFL rows with neither `game` nor `game_state`: **0**. **(b)** `market` starting `player_`: **0**.
+  - `/api/intelligence/query` (the task's body, HTTP 200): `ranked_all` has 790 rows (nfl 316, mlb 235, soccer 177, ncaaf 62).
+    - **(c)** NFL rows with an empty `matchup`: **0**. None of its NFL markets start with `player_`.
+    - This slim payload carries no `game_state` on NFL rows (all 316 read None), so the live count comes from the shortlist.
+  - The 2026-09-10 baseline was 94 identity-less NFL rows served as pregame during a live game. Today it is 0, with 24 live rows present.
+- **Not claimed:** this row does not say Kalshi prices MERGE into the sportsbook rows on the served board. That is the grid's mechanism, proven pre-code by the H1 replay (15 of 15). The served rows were not split by `price_source`.
+- **Measured:** R1 PASS, R2 PASS, R3 PASS. verify: MET. Nothing owed.
+
+---
+
 ## 2026-09-13 18:01Z — reading only, no deploy — NCAAF WEEK 3 ADVANCE, SUNDAY READING — **PASS: the fix is live on both services, `resolved_active_weeks [1, 2, 3]`, and `cards?week=3` serves "2026 Week 3" (57 of 57 `3_`)** [lane ncaaf-games-cache-refresh, scheduled task ncaaf-week3-advance-sunday]
 
 Read 2026-09-13 18:01:14-18:01:42Z (13:01 CDT), substrate `render`, read-only. The task ran on Sunday daytime, before the 2026-09-14T03:00Z cutoff, so the prescribed reading was taken.
