@@ -174,6 +174,21 @@ def run_disk_maintenance(*, sports: tuple[str, ...] = ("mlb", "wnba", "nba", "nh
     try:
         if not _flag("SYNDICATE_DISK_MAINTENANCE_ENABLED"):
             return {"ran": False, "reason": "disabled"}
+
+        # Lane `refresh-worker-disk-inventory` (2026-09-13). BEFORE the daily
+        # gate on purpose: the disk filled mid-day and the next daily pass was
+        # ~18 h away, so the inventory starts on the first call after boot. It
+        # is read-only, one-shot per process, runs in its own thread, and is on
+        # by default only where `SYNDICATE_DISK_INVENTORY_SERVICES` says
+        # (default `refresh-worker`) -- see `disk_inventory.py`.
+        try:
+            from syndicate.features.shared.artifact_publisher import _data_root
+            from syndicate.features.shared.disk_inventory import start_disk_inventory_once
+
+            start_disk_inventory_once(_data_root(), _service_slug())
+        except Exception as exc:
+            print(f"[disk_maintenance] DISK_INVENTORY_START_FAILED {type(exc).__name__}: {exc}", flush=True)
+
         if not _due():
             return {"ran": False, "reason": "not_due"}
 
