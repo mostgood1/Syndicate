@@ -835,7 +835,8 @@ death, never life — do not invert it.
   - The pre-checkpoint block moved VERBATIM to `lanes_history.md` 2026-09-13.
 - **OWED:**
   - (1) At >= 06:14:31Z run `render_events.py --service live-odds-worker --since 2026-09-13T00:14:31Z`; require OUTPUT COMPLETE and 0 `oomKilled`, and record the result in `deploys.md`. Classify any kill by its `TRIM_SELECT`/`DAILY_BOOK` offset and by the last live-lens stage: during a build and after `DAILY_BOOK` points at the builds.
-  - (2) The quote-age half of Verification.
+  - (2) MEASURED 04:2xZ, CONFOUNDED (`deploys.md` 2026-09-13 04:2xZ): served NCAAF quote age p50/p90 went 701/2,753 s (kill regime) -> 545/994 s (`58736a69` alone) -> 202/723 s (`e332b531`). MLB and soccer also fell. Cadence was NOT reduced. The row mix changed as games finished, so this is not an A/B.
+  - (3a) refresh-worker checked, read-only: 1 `oomKilled` since 09-09. Its `MEMORY_GUARD_ABORT`s are NOT timed to the daily-book write (29/172 = 16.9% inside a window, against a 12.0% null).
   - (3) refresh-worker runs the same writer. User decision: later, with its own measurement and deploy. Not claimed.
   - The session's events watcher dies with the session; read events directly.
 - Blocked by: none. Deploys to this service need the user's explicit OK (real-money orders; a restart mid-placement strands orders) and must avoid lane `layer2-live-scorecard-gate`'s 2026-09-13 06:30-08:00Z scorecard window without asking.

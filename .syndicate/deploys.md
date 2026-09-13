@@ -33937,3 +33937,27 @@ The prediction points that way: a smaller transient. `ALL_PROCESS_MEMORY` is sam
 **Claim** `live-odds-worker-oom-loop` RELEASED with its token after this entry. The events watcher keeps running.
 
 **verify:** R2 met; R1 inconclusive, instrument blind; R3 and R4 OWED. R4 is the reading that matters: `render_events.py --service live-odds-worker --since 2026-09-13T00:14:31Z` with OUTPUT COMPLETE and 0 `oomKilled` at >= 06:14:31Z, spanning the NCAAF/MLB late slate.
+
+### 2026-09-13 04:2xZ — reading only, no deploy — live-odds-worker `e332b531` — lane `live-odds-worker-oom-loop` — the quote-age half of Verification, and refresh-worker checked against the same mechanism
+
+**Quote age served on the Layer 2 board.**
+- Source: refresh-worker `[layer2_shortlist] LAYER2_BOARD_HEALTH`, 537 lines, 7 pages, 2026-09-12T12:01Z .. 2026-09-13T04:22Z.
+- `age_p50s`/`age_p90s` come from `_row_quote_age`, which prefers `quote.quote_seen_age_seconds` and falls back to book age (`layer2_shortlist.py:1934-1945`).
+- Split at the two capture boundaries on live-odds-worker (22:34:15Z `58736a69`, 00:14:31Z `e332b531`). Each figure is the MEDIAN of the per-build p50/p90.
+
+| sport | kill regime (12:01-22:34Z) | `58736a69` alone (22:34-00:14Z) | `e332b531` (00:14-04:22Z) |
+|---|---|---|---|
+| ncaaf | p50 701 s, p90 2,753 s, rows 703, n=81 | 545 / 994 s, rows 243, n=18 | **202 / 723 s**, rows 159, n=44 |
+| mlb | 1,409 / 1,504 s, rows 1,490, n=60 | 99 / 229 s, rows 410, n=14 | 72 / 103 s, rows 10, n=34 |
+| soccer | 128 / 332 s, rows 171, n=81 | 179 / 1,470 s, rows 157, n=18 | 82 / 200 s, rows 107, n=44 |
+| nfl | pregame only (8 h cadence), ages 12k-42k s | NOT a capture-cadence reading | |
+
+- **Reading:** served quote age FELL after the fix on every live-slate sport. Capture cadence was NOT reduced, which is the half of this lane's goal that could have failed.
+- **CONFOUNDED, and not an A/B:** the row mix changed heavily as games finished (NCAAF 703 -> 159, MLB 1,490 -> 10). The kill regime spans the pregame-heavy afternoon; the later windows are fewer, mostly in-play rows. Supporting evidence only.
+- It agrees with the capture counters from the same windows: `DAILY_BOOK` 8.4/h -> 15-21/h, sweeps 14-20/h.
+
+**refresh-worker vs the daily-book mechanism (read-only; no change, per the user's "Later, own reading").**
+- **Kills:** `render_events.py --service refresh-worker --since 2026-09-09`, fully paged: **1** `oomKilled memoryLimit=4Gi`, at 2026-09-12T12:10:48Z. There is no kill loop there.
+- **Build aborts:** `MEMORY_GUARD_ABORT`, 173 lines 09-12 12:02Z .. 09-13 04:13Z, still about every 5-6 min (169 at `stage=pre_source_state_fingerprint floor_mb=1900`).
+- **Timing:** **29 of 172 (16.9%)** fall inside a refresh-worker `TRIM_SELECT`->`DAILY_BOOK` window (<= 180 s, book not yet printed). A random instant gives **12.0%** (TRIM gap p50 310 s, TRIM->DAILY_BOOK p50 37 s). The guard aborts are NOT timed to the daily-book write; this lane's mechanism does NOT explain them.
+- **Not attributed:** the guard's `snapshot` shows `current_mb` 3,917-4,096 of 4,096. That field may include page cache; see `state_worker.md` [refresh-worker-headroom-2026-09-02] on the wrong headroom field. Left to the existing `leads.md` entry.
