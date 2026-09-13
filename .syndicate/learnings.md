@@ -5786,3 +5786,4 @@ A re-read of one build reports every market as still there. On the same final ca
 **How to apply:**
 - Measure persistence against a NEWER artifact (its `written_at`), not a later poll. A re-read of the same artifact is "no new look", never "still there".
 - When fixing such a rule, change only the defective case and report both readings. A fix that also moves the horizon changes the thing it is correcting.
+- Judge presence AT the check point, never "did it ever leave before it". A replay of the worker's departure log over the same 80 builds wrote 1,109 returns against 2,245 departures, and an "ever left" join called 108 live sightings gone that were back by the deciding build.
