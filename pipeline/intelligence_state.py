@@ -216,6 +216,59 @@ def _layer2_carryover_max_hours() -> float:
     return max(0.0, min(value, 23.0))
 
 
+def _layer2_fast_kalshi_capture(selected_date: str, shortlist: dict[str, Any] | None) -> str:
+    """Kalshi quote capture on the fast path, from the CACHED markets artifact.
+
+    WHY (lane `kalshi-nfl-quote-gap`, 2026-09-13). `_capture_kalshi_quotes` was
+    reachable only through the heavy build's `join_to_board` call. refresh-worker
+    refused that build 403 times (09-12 21:34Z .. 09-13 16:14Z,
+    `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint`, 1,900 MB floor vs
+    ~1,810 MB headroom) while this fast path rebuilt the board 13-51 times an
+    hour -- so no Kalshi quote was captured for ANY sport for ~16 h, and the NFL
+    grid served Kalshi prices observed at 09-12 21:20Z into Sunday afternoon.
+
+    CACHED ONLY. The venue loop owns fetching (~120 s on refresh-worker); calling
+    `run_kalshi_odds_refresh` here could add venue calls and network time to the
+    path that exists because it is cheap. Same shortlist rows the heavy path
+    joins (`build_layer2_shortlist`), so the capture is the same capture.
+
+    A STALE ARTIFACT IS REFUSED, not captured. `append_book_quotes` stamps
+    `captured_at` now, so re-capturing hours-old markets would present old venue
+    prices as freshly observed -- worse than the gap this closes.
+
+    Never raises. Returns a short status for the `LAYER2_FAST_REFRESH` line, so
+    "captured", "skipped because stale" and "failed" read apart in production.
+    """
+    if not _env_bool("SYNDICATE_LAYER2_FAST_KALSHI_CAPTURE", default=True):
+        return "disabled"
+    rows = (shortlist or {}).get("rows") or []
+    if not rows:
+        return "no_rows"
+    started = time.time()
+    try:
+        from pipeline.kalshi_odds_refresh import (
+            _seconds_since,
+            join_to_board,
+            markets_artifact_path,
+            markets_from_state,
+        )
+        from syndicate.features.shared.refresh_state_store import read_json_file as _read_state
+
+        state = _read_state(markets_artifact_path()) or {}
+        age = _seconds_since(state.get("fetched_at")) if isinstance(state, dict) else None
+        max_age = max(60, _env_int("SYNDICATE_LAYER2_FAST_KALSHI_MAX_AGE_SECONDS", 900))
+        if age is None or age > max_age:
+            return f"stale_markets:{'unknown' if age is None else int(age)}s"
+        markets = markets_from_state(state)
+        del state
+        if not markets:
+            return "no_markets"
+        join_to_board(markets, list(rows), selected_date=str(selected_date or ""))
+        return f"joined:{len(markets)}:{round(time.time() - started, 1)}s"
+    except Exception as exc:
+        return f"failed:{type(exc).__name__}"
+
+
 def _layer2_fast_refresh_min_interval_seconds() -> int:
     """The fast path's per-date rate limit. One definition for both callers."""
     return max(60, _env_int("SYNDICATE_LAYER2_FAST_REFRESH_SECONDS", 300))
@@ -5111,6 +5164,10 @@ class IntelligenceStateService:
         # ran" produced identical evidence. `rows` and `considered` here are
         # what makes this path's liveness readable, and they are what the
         # verification query counts.
+        # AFTER the write, so a slow or failing join can never cost the board its
+        # rebuild. Lane `kalshi-nfl-quote-gap`: this path is what runs when the
+        # heavy build is refused, and Kalshi capture used to live only there.
+        _kalshi_capture = _layer2_fast_kalshi_capture(normalized_date, shortlist)
         _live_signal = self._note_layer2_live_signal(normalized_date, shortlist)
         print(
             f"[intelligence_state] LAYER2_FAST_REFRESH date={normalized_date} "
@@ -5118,6 +5175,7 @@ class IntelligenceStateService:
             f"live_rows={_live_signal.get('live_rows')} chips_live={_live_signal.get('chips_live')} "
             f"considered={shortlist.get('opportunities_considered')} "
             f"sports={shortlist.get('active_sports')} "
+            f"kalshi_capture={_kalshi_capture} "
             f"elapsed_s={round(time.time() - started, 2)}",
             flush=True,
         )

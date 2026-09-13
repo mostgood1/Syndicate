@@ -213,5 +213,99 @@ class Layer2FastRefreshTests(unittest.TestCase):
         )
 
 
+class Layer2FastKalshiCaptureTests(unittest.TestCase):
+    """Kalshi quote capture must run on the path that runs (lane `kalshi-nfl-quote-gap`).
+
+    MEASURED 2026-09-13 on refresh-worker: the heavy build -- the only caller of
+    `join_to_board`, and so of `_capture_kalshi_quotes` -- was refused 403 times
+    over ~16 h while `LAYER2_FAST_REFRESH` ran 13-51 times an hour, so no Kalshi
+    quote was captured for any sport.
+    """
+
+    MARKETS_STATE = {"fetched_at": "stamp", "series": {"KXNFLREC": {"markets": [{"ticker": "m1"}, {"ticker": "m2"}]}}}
+
+    def setUp(self) -> None:
+        self.service = IntelligenceStateService()
+        self.joins: list[tuple[list, list, str]] = []
+
+    def _run(self, *, age_seconds: float | None = 30.0, join_side_effect=None, env: dict | None = None):
+        from syndicate.features.shared import refresh_state_store
+
+        original_read = refresh_state_store.read_json_file
+
+        def _read(path, *args, **kwargs):
+            if str(path).replace("\\", "/").rsplit("/", 1)[-1] == "kalshi_markets.json":
+                return dict(self.MARKETS_STATE)
+            return original_read(path, *args, **kwargs)
+
+        def _join(markets, rows, *, selected_date=None):
+            if join_side_effect is not None:
+                raise join_side_effect
+            self.joins.append((list(markets), list(rows), selected_date))
+            return {}
+
+        patches = [
+            patch(
+                "syndicate.features.shared.memory_observability.memory_headroom_snapshot",
+                return_value=_headroom(sufficient=True),
+            ),
+            patch(
+                "pipeline.layer2_shortlist.build_layer2_shortlist",
+                return_value={"rows": [{"id": "r1"}], "opportunities_considered": 5},
+            ),
+            patch("syndicate.features.shared.artifact_publisher.pull_hot_artifacts", return_value=None),
+            patch.object(IntelligenceStateService, "_available_sport_manifests", return_value={"nfl": {}}),
+            patch.object(intelligence_state_module, "write_layer2_shortlist", return_value=None),
+            patch("syndicate.features.shared.refresh_state_store.read_json_file", side_effect=_read),
+            patch("pipeline.kalshi_odds_refresh._seconds_since", return_value=age_seconds),
+            patch("pipeline.kalshi_odds_refresh.join_to_board", side_effect=_join),
+            # The fast path must NEVER fetch from the venue; the loop owns that.
+            patch(
+                "pipeline.kalshi_odds_refresh.run_kalshi_odds_refresh",
+                side_effect=AssertionError("fast path fetched from Kalshi"),
+            ),
+            patch.dict("os.environ", env or {}),
+        ]
+        for p in patches:
+            p.start()
+        self.addCleanup(lambda: [p.stop() for p in patches])
+        import io
+        from contextlib import redirect_stdout
+
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            result = self.service._refresh_layer2_shortlist_only("2026-09-13")
+        return result, buffer.getvalue()
+
+    def test_fresh_cached_markets_are_joined_to_the_fast_path_shortlist(self) -> None:
+        result, emitted = self._run()
+        self.assertIsNotNone(result)
+        self.assertEqual(len(self.joins), 1, "the fast path did not reach join_to_board")
+        markets, rows, selected_date = self.joins[0]
+        self.assertEqual([m["ticker"] for m in markets], ["m1", "m2"])
+        self.assertEqual(rows, [{"id": "r1"}])
+        self.assertEqual(selected_date, "2026-09-13")
+        self.assertIn("kalshi_capture=joined:2:", emitted)
+
+    def test_stale_markets_are_not_captured(self) -> None:
+        result, emitted = self._run(age_seconds=7200.0)
+        self.assertIsNotNone(result)
+        self.assertEqual(self.joins, [], "hours-old Kalshi markets were captured as freshly observed")
+        self.assertIn("kalshi_capture=stale_markets:7200s", emitted)
+
+    def test_kill_switch_turns_capture_off(self) -> None:
+        """Reachability both ways: off must differ from on."""
+        result, emitted = self._run(env={"SYNDICATE_LAYER2_FAST_KALSHI_CAPTURE": "false"})
+        self.assertIsNotNone(result)
+        self.assertEqual(self.joins, [])
+        self.assertIn("kalshi_capture=disabled", emitted)
+
+    def test_a_failing_join_does_not_cost_the_board_its_rebuild(self) -> None:
+        result, emitted = self._run(join_side_effect=RuntimeError("boom"))
+        self.assertIsNotNone(result, "a Kalshi failure took the fast refresh down with it")
+        self.assertIn("kalshi_capture=failed:RuntimeError", emitted)
+        self.assertIn("LAYER2_FAST_REFRESH date=2026-09-13", emitted)
+
+
 if __name__ == "__main__":
     unittest.main()

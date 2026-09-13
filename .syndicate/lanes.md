@@ -911,7 +911,7 @@ death, never life — do not invert it.
 
 ### kalshi-nfl-quote-gap — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - Goal: explain why Kalshi NFL quotes on the served NFL grid carried `observed_at` 2026-09-12 21:20Z until 2026-09-13 17:33Z. Say which stage stalled (capture, append, transport or board read) and whether it recurs without a full disk. Propose a fix only if it can recur. Read-only on production until the user approves a change.
-- Files: none claimed (read-only diagnostic). A code change reopens this block with a Files claim first.
+- Files: `pipeline/intelligence_state.py` (`_refresh_layer2_shortlist_only` Kalshi capture only; TAKEN 2026-09-13 ~23:00Z from `layer2-prior-date-live-carryover`, user decision "Capture on lightweight rebuild"), `tests/test_layer2_fast_refresh.py` (Kalshi capture tests only). Mirrored into the primary checkout's `lanes.md`.
 - Origin: lead from closed lane `refresh-worker-disk-inventory`. User decision 2026-09-13 ~19:40Z: "Kalshi NFL staleness (Recommended)".
 - **Measured before hypotheses** (refresh-worker, `[kalshi_odds] QUOTE_CAPTURE`, 09-12 20:00Z..09-13 18:30Z):
   - 15 lines; live-odds-worker has none.
@@ -934,6 +934,50 @@ death, never life — do not invert it.
   - **Recurs without a full disk:** any stretch where the fast path serves the board and the heavy build is refused stops Kalshi quote capture for all sports.
   - Fix NOT proposed yet. Options for the user: move `_capture_kalshi_quotes` to the fast path or venue loop, or accept the coupling.
   - Remaining unknown: why the heavy build stopped at 21:4xZ. Its refusal lines were not read yet.
+- **FINDINGS 2026-09-13 ~22:50Z (17:50 CT), refresh-worker logs + code. Why the heavy build stopped: RESOLVED.**
+  - `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900`: **403** of 405 aborts 09-12 21:34:04Z..09-13 16:14:12Z (6-36/h, all 17 hours).
+  - Snapshot basis `unreclaimable`: headroom 1,807.3 MB at 21:34Z and 1,835.1 MB at 16:14Z, both under the 1,900 MB floor.
+  - **The same refusal stopped the whole heavy path.** Counts per hour 09-12 20Z..09-13 17Z: `PORTFOLIO_COMMIT` (paper orders) 24/24 at 20-21Z, then **0 from 22Z to 12Z**. `CANDIDATE_POOL` and `BOARD_PUBLICATION` show the same gap. All resumed 13Z.
+  - `LAYER2_FAST_REFRESH` has its own lower guard (`_LAYER2_MIN_SAFE_HEADROOM_BYTES`, `intelligence_state.py:5081`) and kept the board alive.
+  - Both paths call the same `build_layer2_shortlist(date, manifests)` (`:5099` fast, `:6609` heavy), so fast-path rows are the same input `join_to_board` gets.
+  - Costs on refresh-worker since 14Z (n=18): `kalshi_board_join` 11.9 / 20.8 / 47.0 s (min / median / max); `kalshi_odds_refresh` median 59 s; `layer2_shortlist_build` median 87 s.
+  - The venue loop runs on refresh-worker only (122 `REFRESH venue=kalshi` since 12Z, ~120 s cadence); live-odds-worker has none.
+- **User decisions 2026-09-13 ~17:55 CT:**
+  - "Capture on lightweight rebuild (Recommended)": run the Kalshi join + capture in `_refresh_layer2_shortlist_only`, reading the CACHED markets artifact (no venue fetch on this path), taking `intelligence_state.py` from the carryover lane.
+  - "Open a diagnostic lane (Recommended)" for the heavy-build refusal: lane `heavy-build-memory-refusal` below.
+- **User decision ~18:25 CT:** "Bundle into tonight (Recommended)". Ship with `57b67127` in the scheduled refresh-worker deploy `book-quotes-fuller-copy-deploy-0914` (after the slate, on first CLEAR, cutoff Mon 09-14 11:00 CT).
+- **STATUS 2026-09-13 ~23:30Z (18:30 CT): CODE WRITTEN + TESTED, landing now; deploy bundled into the scheduled task.**
+  - `pipeline/intelligence_state.py`: new `_layer2_fast_kalshi_capture(selected_date, shortlist)`, called in `_refresh_layer2_shortlist_only` AFTER `write_layer2_shortlist` succeeds.
+    - Reads the cached `reports/intelligence/kalshi_markets.json` (`markets_from_state`). It never calls `run_kalshi_odds_refresh`.
+    - Refuses markets older than `SYNDICATE_LAYER2_FAST_KALSHI_MAX_AGE_SECONDS` (default 900, min 60) or with an unparseable `fetched_at` (`_seconds_since` parses `%Y-%m-%dT%H:%M:%SZ`, the format `_now_stamp` writes).
+    - Then runs `join_to_board(markets, rows, selected_date=...)`, the same join and capture as the heavy path.
+    - Kill switch `SYNDICATE_LAYER2_FAST_KALSHI_CAPTURE` (absent = on). Never raises.
+    - `LAYER2_FAST_REFRESH` now prints `kalshi_capture=` as one of `joined:<n>:<s>s`, `stale_markets:<age>s`, `no_markets`, `no_rows`, `disabled` or `failed:<Type>`.
+  - No double capture: a good heavy build stamps the fast-path rate limit (`_mark_layer2_fast_refresh` after the heavy write), so the fast path skips within its interval.
+  - Tests: `tests/test_layer2_fast_refresh.py` +4 (`Layer2FastKalshiCaptureTests`), 13 passed. The related suites (`test_clv_opening_ledger`, `test_kalshi_board_join`, `test_layer2_fast_refresh*`, `test_layer2_prior_date_carryover`) pass 108.
+  - Unwired check: all 4 new tests FAIL against HEAD's `intelligence_state.py` and pass with the change; bytes restored identical.
+  - Verification owed after the refresh-worker deploy:
+    - `LAYER2_FAST_REFRESH ... kalshi_capture=joined:` lines;
+    - `[kalshi_odds] QUOTE_CAPTURE` lines at the fast-path cadence during a stretch with `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` and no `LAYER2_SHORTLIST date=`;
+    - no rise in `LAYER2_GUARD_SKIP` or restarts.
+- Blocked by: none.
+
+### heavy-build-memory-refusal — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: explain why refresh-worker's heavy board build (candidate pool, board publication, portfolio commit / paper orders) was refused by `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` for ~16 h (2026-09-12 21:34Z .. 2026-09-13 13Z) with unreclaimable headroom ~1,810 MB. Measure what the build actually needs against that floor and what holds ~2.3 GB unreclaimable. Then bring the user options with numbers (retarget/lower the check, cut the build's cost, or add memory). Read-only on production; no code or deploy without the user's OK.
+- Files: none claimed (read-only diagnostic).
+- Origin: finding in lane `kalshi-nfl-quote-gap` (above). User decision 2026-09-13 ~17:55 CT: "Open a diagnostic lane (Recommended)".
+- Measured so far (refresh-worker logs):
+  - 403 `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` 09-12 21:34Z..09-13 16:14Z. 21:34Z snapshot: current 3,531.7 MB, unreclaimable 2,288.7 MB (anon 2,281.2), reclaimable file 1,243.0, headroom 1,807.3.
+  - `PORTFOLIO_COMMIT` / `CANDIDATE_POOL` / `BOARD_PUBLICATION` 0 from 22Z to 12Z; `LAYER2_FAST_REFRESH` 13-51/h throughout. Prior occurrence: `state_layer2.md:583` (09-12 19:42-20:08Z).
+- Hypotheses (to test, not believed):
+  - H1: the floor is stale against the stage's real peak (standing rule: check guard thresholds against stage cost). The build's measured peak delta may be far below 1,900 MB.
+  - H2: long-lived process anon (~2.3 GB in `run_refresh_worker.py` pid 39, e.g. caches, venue loop artifacts, fast-path residue) ratchets up after boot and starves the heavy build. It self-heals only on reboot: 13Z resumed after deploys at 13:42Z / 14:14Z.
+  - H3: concurrent child jobs (MLB daily sim, soccer odds refresh) hold the headroom during the refused hours.
+- Falsification:
+  - H1 is false if a completed heavy build's peak delta over its pre-build anon is >= ~1,800 MB.
+  - H2 is false if pid 39 rss is flat across the refused window while headroom stays short.
+  - H3 is false if refusals continue with `process_count` 1-2 (no child jobs).
+- Verification: a table of pre-build anon, peak anon and delta for completed heavy builds (from `ALL_PROCESS_MEMORY` / `MALLOC_TRIM` / `BUILD_SPAN_*` lines), plus pid-39 rss and child-job counts across the refused window. Recorded in the log, with options and numbers put to the user.
 - Blocked by: none.
 
 ### book-quotes-prefer-fuller-copy — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
@@ -981,7 +1025,7 @@ death, never life — do not invert it.
 - Goal: games still in progress from the prior Central date keep a rebuilding Layer 2 shortlist after the midnight CT roll, and a frozen board does not present stale rows as `game_state=live`; measured on the next slate with a game live across midnight CT. From the 2026-09-13 lead of lane `layer2-live-scorecard-gate`. User decisions 2026-09-13 ~8:45 AM CT: "Take the claim (Recommended)", "Worker carryover + API label (Recommended)", "Push code to main" (a deploy is a separate OK).
 - Hypothesis: H1 — at 05:00:00Z the window rolled to 09-13..09-15, so no 09-12 payload was queued again (and any leftover one is refused as `stale_date:2026-09-12`); neither the heavy build nor the fast path ran for 09-12 after the 04:58:55Z build. Alternative to rule out: 09-12 builds kept running and their writes failed, since refresh-worker's disk has been ENOSPC since 09-12 23:39Z (lane `refresh-worker-disk-inventory`), although the shortlist is written to keyvalue.
 - Falsification test: any refresh-worker `LAYER2_SHORTLIST date=2026-09-12`, `LAYER2_FAST_REFRESH date=2026-09-12`, `LAYER2_FAST_REFRESH_WRITE_FAILED` or `BOARD_WINDOW_QUEUED date=2026-09-12` line after 05:00:00Z falsifies H1. If `BOARD_WINDOW_QUEUED date=2026-09-15` never appears after 05:00Z, the window did not roll as described. For the fix: the carryover test must fail with the loop call unwired, and the API test must fail with the label removed.
-- Files: `pipeline/intelligence_state.py` (TAKEN 2026-09-13 from UNOWNED lane `football-layer2-live-parity`, user decision "Take the claim"), `pipeline/layer2_shortlist.py` (a live-chip count on the returned shortlist only), `syndicate/blueprints/intelligence.py` (the layer2-shortlist API handler only), `tests/test_layer2_prior_date_carryover.py` (NEW), `tests/test_layer2_shortlist_api.py`
+- Files: `pipeline/layer2_shortlist.py` (a live-chip count on the returned shortlist only), `syndicate/blueprints/intelligence.py` (the layer2-shortlist API handler only), `tests/test_layer2_prior_date_carryover.py` (NEW), `tests/test_layer2_shortlist_api.py`. RELEASED 2026-09-13 ~23:00Z: `pipeline/intelligence_state.py` to lane `kalshi-nfl-quote-gap` (user decision "Capture on lightweight rebuild"; this lane owes readings only, no code). It had been TAKEN 2026-09-13 from UNOWNED lane `football-layer2-live-parity`.
 - Verification: the tests above, run targeted. Then, after user-approved deploys of refresh-worker (carryover) and web (label), on the next slate with a game live across midnight CT: refresh-worker `LAYER2_CARRYOVER` lines for the prior date after 05:00Z; `/api/board/layer2-shortlist?date=<prior>` `written_at` advancing past 05:00Z while `/api/board/game-chips?date=<prior>` shows a live game; the carryover stopping after a build with 0 live rows and 0 live chips; and live rows from a build older than the threshold served as not live. Recorded in `deploys.md`.
 - Blocked by: nothing but the slate. R2 needs the next midnight CT roll; R3 needs a game live across midnight CT. No deploy is owed by this lane, and both deploy claims are released. The scheduled tasks run only while the Claude app is open, and they read the logs after the fact.
 
