@@ -842,7 +842,7 @@ death, never life — do not invert it.
     - Pre-deploy baseline, from log `2026-09-13.md`: `MEMORY_GUARD_ABORT` 30-36/h (05Z-12Z).
     - Kalshi `DAILY_BOOK` 80/100 `status=partial` with ENOSPC (06:48Z-13:37Z).
     - The unpruned `venue_odds` files on disk are a lead in `leads.md`, not claimed here.
-  - The session's events watcher dies with the session; read events directly.
+  - OWNER OF OWED (1): the one-time scheduled task `live-odds-worker-oom-live-slate-reading`, firing 2026-09-13 23:15Z (6:15 PM CT). It takes the census (`render_events.py --since 2026-09-13T11:15:04Z`, with designed recycles checked against their `RECYCLING` line) and the capture-cadence check. It then records `deploys.md`, sets this verdict, and closes the lane if met. Owning session 791399da is ARCHIVED after scheduling; no watcher is running. If the task did not run, take the reading by hand.
 - Blocked by: none. Deploys to this service need the user's explicit OK (real-money orders; a restart mid-placement strands orders) and must avoid lane `layer2-live-scorecard-gate`'s 2026-09-13 06:30-08:00Z scorecard window without asking.
 
 ### mlb-live-lens-payload-dup — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
