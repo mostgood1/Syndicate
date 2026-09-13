@@ -840,6 +840,21 @@ death, never life — do not invert it.
   - The session's events watcher dies with the session; read events directly.
 - Blocked by: none. Deploys to this service need the user's explicit OK (real-money orders; a restart mid-placement strands orders) and must avoid lane `layer2-live-scorecard-gate`'s 2026-09-13 06:30-08:00Z scorecard window without asking.
 
+### mlb-live-lens-payload-dup — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: the MLB live-lens snapshot write stops failing with `KeyValuePayloadTooLarge` on live-odds-worker — `live_lens_tick_after_mlb ok=True` on >= 90% of ticks through the next live MLB window — and the board's lens state join corrects exactly the rows it corrected before.
+- Files: syndicate/features/mlb/live_lens.py, tests/test_mlb_live_lens_snapshot_payload.py (NEW). NOT `syndicate/features/shared/board_enrichment.py`: that file is claimed by OPEN lane `football-layer2-live-parity`, and this fix is built to need no change there.
+- Measured before any code `[2026-09-13 04:05Z, substrate render]`:
+  - `live_lens_tick_after_mlb` 00:14:31-04:03Z: **57 of 61 `ok=False`**, each `KeyValuePayloadTooLarge` for `live/mlb_live_lens.json` at 10,006,089 B (23:54Z) rising to 10,803,367 B (03:59Z), against the 8,388,608 B ceiling.
+  - Onset: 09-11 15:00-23:59Z 215/215 ok; 09-12 15:00-22:31Z 111/111 ok; the 09-12 23:00Z hour 13 ok / 4 fail; from 09-13 00:00Z nearly all fail. The snapshot crossed the ceiling as `games` grew through live play. **Not caused by `58736a69` or `e332b531`**: the 22:35-23:00Z ticks on `58736a69` were 8/8 ok.
+  - Served `/mlb/api/live-lens?date=2026-09-12` (generatedAt 04:16:59Z): `games` 15 games, 5,548,330 B for ONE copy; largest game 471,029 B; `home`/`away` = `{abbr, name}`, 41 B.
+- Hypothesis: `mlb/live_lens.py` stores `games` TWICE, at `page_context["games"]` (`:1932`) and top-level `"games"` (`:1973`). `#371` removed a third copy (`api_payload`) and left these two.
+  - Top-level readers: `_snapshot_games`, `_snapshot_route_context` (it replaces `base["games"]` with top-level whenever non-empty, `:1655-1656`), `_snapshot_api_payload`, the validator, `board_enrichment.py:1678`, `live_gameline_join.py:1318`, `ops.py`.
+  - The ONLY reader of the `page_context` copy is `board_enrichment.py:757/815`, reading `status.abstract`, `status.detailed`, `home`/`away` `name`/`abbr` (`_side_matches`, `:858-874`) and `matchup.score`. `_live_state_lens_by_game_pk` falls back to it only when top-level is absent.
+  - **So storing `page_context["games"]` as a projection of exactly those fields (3,399 B for 15 games) takes the snapshot from ~10.8 MB to ~5.3 MB, with no change to any reader.**
+- Falsification test: after deploy, `live_lens_tick_after_mlb ok=False` with `KeyValuePayloadTooLarge` still dominates a live MLB window, OR the board's lens join corrects fewer rows. Offline, the same join on slim vs full `page_context["games"]` must give identical corrections and transitions. Unwiring the projection must fail the builder-level test.
+- Verification: tests as above; then on production after the live-odds-worker deploy: `live_lens_tick_after_mlb` ok ratio >= 90% over the next live MLB window, 0 `KeyValuePayloadTooLarge` for `mlb_live_lens.json`, and served `/mlb/api/live-lens` `games` n and bytes unchanged in shape. Recorded in `deploys.md`.
+- Blocked by: none. **User decision 2026-09-13 ~04:10Z: "Build and deploy now"**, knowingly resetting lane `live-odds-worker-oom` P4 and lane `live-odds-worker-oom-loop` R4 windows before they could be read; that lane was messaged first. A live-odds-worker deploy needs claim + preflight; a HOLD goes back to the user.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

@@ -1591,6 +1591,52 @@ def _snapshot_games(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
     return [dict(game) for game in games if isinstance(game, dict)][:50]
 
 
+def _board_state_games_projection(games: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The STORED `page_context["games"]`: only what its one reader reads.
+
+    Lane `mlb-live-lens-payload-dup`, 2026-09-13. The snapshot kept `games` TWICE
+    -- here and at top level -- after `#371` removed a third copy, and the pair
+    crossed the keyvalue ceiling mid-slate again: `KeyValuePayloadTooLarge`
+    10,803,367 B > 8,388,608 on 57 of 61 live-lens ticks, 2026-09-13
+    00:14-04:03Z, so the MLB lens stopped updating. One copy measured 5,548,330 B
+    for 15 games.
+
+    WHY A PROJECTION AND NOT A DELETE. Every other reader takes TOP-LEVEL
+    `games` (`_snapshot_games`, `_snapshot_route_context` overwrites
+    `base["games"]` whenever it is non-empty, `_snapshot_api_payload`, the
+    validator, `live_gameline_join`, `ops`). The one reader of THIS copy is
+    `board_enrichment.attach_live_game_state_from_lens`
+    (`page.get("games")`), which reads `status.abstract`, `status.detailed`,
+    `home`/`away` `name`/`abbr` and `matchup.score` -- and nothing else.
+    Deleting the key would make that join read "snapshot carries no games" on
+    every build, which is the silent-empty shape `#371`'s own note warns about.
+    This keeps its answer identical at ~3.4 KB instead of ~5.5 MB.
+
+    If a new reader of `page_context["games"]` needs more fields, read
+    top-level `games` instead -- it is the full copy.
+    """
+    projected: list[dict[str, Any]] = []
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        status = game.get("status") if isinstance(game.get("status"), dict) else {}
+        matchup = game.get("matchup") if isinstance(game.get("matchup"), dict) else {}
+
+        def _side(value: Any) -> dict[str, Any]:
+            return {key: value.get(key) for key in ("name", "abbr") if key in value} if isinstance(value, dict) else {}
+
+        projected.append(
+            {
+                "gamePk": game.get("gamePk"),
+                "status": {"abstract": status.get("abstract"), "detailed": status.get("detailed")},
+                "home": _side(game.get("home")),
+                "away": _side(game.get("away")),
+                "matchup": {"score": matchup.get("score")},
+            }
+        )
+    return projected
+
+
 def _snapshot_counts(games: list[dict[str, Any]]) -> dict[str, int]:
     return {
         "archivedLiveProps": sum(len(game.get("archivedLiveProps") or []) for game in games),
@@ -1962,6 +2008,12 @@ def build_live_lens_snapshot_internal(selected_date: str, *, season: int | None 
     # returns it, so that version would have served a 200 with zero games during
     # a live slate -- reading as "no games tonight" rather than as an error.
     # Deleting the whole key is what reaches the rebuild branch.
+    #
+    # And `page_context["games"]` is stored as a PROJECTION, not a second full
+    # copy -- see `_board_state_games_projection`. Assigned here, after `counts`,
+    # `scoreboard_items` and `header_stats` were derived from the full `games`,
+    # so nothing above reads the slim form. Top-level `games` stays full.
+    page_context["games"] = _board_state_games_projection(games)
     snapshot = {
         "ok": True,
         "date": page_context.get("date") or selected_date,
