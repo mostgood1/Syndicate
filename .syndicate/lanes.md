@@ -1062,6 +1062,8 @@ death, never life — do not invert it.
 - User decisions 2026-09-13: "Retry the lost state publish (Recommended)" (~23:08Z, over a gate `min(seen, book)` change that reverses the 09-12 rule at `tests/test_opportunity_gate.py:131`); "Deploy on first CLEAR (Recommended)" (~23:14Z).
 - Verification: successive live Layer 2 NFL builds, live props > 0, `quote_seen_age_seconds` p50 < 300 s, and no NFL state `PUBLISH_RETRY_EXHAUSTED`; recorded in `deploys.md`. Deploy claim released at checkpoint 23:36Z.
 - Narrative: `log/2026-09-13.md` "lane `quote-state-publish-retry`". Superseded opening block moved verbatim to `lanes_history.md`.
+- **Reading delegated 2026-09-13 ~23:42Z** to scheduled task `quote-state-retry-board-reading-0913` (one-time, 2026-09-14T00:45Z / 7:45 PM CT; runs only while the Claude app is open). It records `deploys.md`, sets this block's verdict, and closes the lane on MET. Owning session ed8bb082 archived after handoff.
+  - Interaction: scheduled task `book-quotes-fuller-copy-deploy-0914` (11:50 PM CT) deploys refresh-worker; if it ships a SHA at or after `54f3d662`, refresh-worker gains the same retry, which covers its un-retried NFL state publishes.
 - Blocked by: none — needs a live NFL game (DAL@NYG 00:20Z).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
