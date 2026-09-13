@@ -375,10 +375,11 @@ still genuinely absent — `conditional_mix` etc. return `count: 0` and `POST
   `oomKilled memoryLimit=2Gi` between 2026-09-09T19:43:39Z and 2026-09-13T00:07:50Z, 0 before,
   timed to the Kalshi daily-book write. Since `e332b531` (streaming writer, live
   2026-09-13T00:14:31Z, over `58736a69`'s arena cap + trim, then `77199c48` MLB live-lens
-  payload fix at 04:43:50Z): 0 `oomKilled` through 2026-09-13T18:20Z (18 h, events fully
-  paged). Two DESIGNED recycles, read at the exit: 11:15:00Z and 17:27:42Z. Only ~1 h 20 m of
-  that window is live slate. A kill-free LIVE slate (>= 6 h) is still OWED, so the kills are NOT
-  yet shown stopped under load
+  payload fix at 04:43:50Z): VERIFIED 0 `oomKilled` / 0 unexplained exits from 00:14:31Z to
+  22:31:19Z (22 h 17 m, events fully paged; designed recycles 11:15:00Z and 17:27:42Z, each
+  matched to its `RECYCLING` line). That window was ENDED BY A DEPLOY (`637278e3`, 22:31Z)
+  after only 5 h 31 m of the 09-13 live slate, so a >= 6 h kill-free LIVE slate is still OWED
+  and the kills are NOT yet shown stopped under full load (`deploys.md` 2026-09-13 23:23Z)
   (`.syndicate/findings_2026-09-12_live_odds_worker_oom.md`). The claim below was true of
   2026-08-26..09-04 only and is kept for the record:
 - ~~**live-odds-worker has NEVER been evicted.**~~ `evicted: false` on all 23

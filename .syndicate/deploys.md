@@ -34542,3 +34542,38 @@ No deploy in this entry. It corrects the 22:46Z reading.
 - **Not chosen:** a gate `min(seen, book)` change. It reverses the 09-12 rule tested at `tests/test_opportunity_gate.py:131` (book 618 s / seen 1,013 s must die).
 - **Remedy:** `quote-state-publish-retry`. `publish_hot_artifact` retries a quote-state publish refused with 503 at 1/2/4 s. It ships on live-odds-worker. The deploy is PENDING the user's OK.
 - **The 22:46Z entry's claim release stands.** Its "verify — MET" is superseded by this entry: capture MET, board presence INTERMITTENT.
+
+### 2026-09-13 23:23Z — reading only — live-odds-worker `77199c48` — lane `live-odds-worker-oom-loop` — live-slate kill census: ENDED BY DEPLOY
+
+No deploy, restart or env change in this entry. Taken by scheduled task `live-odds-worker-oom-live-slate-reading` (session 25601f56) for the archived owner 791399da.
+
+- **Census:** `py -3 scripts/render_events.py --service live-odds-worker --since 2026-09-13T11:15:04Z`
+  - `# READ 2026-09-13T11:15:04Z .. (now, i.e. this read) fully paged, 1 page(s)`; `# OUTPUT COMPLETE`. 9 events.
+  - Rows: 11:15:04Z `server_available`; **17:27:44.81Z `earlyExit`**; 17:27:45Z `server_available`; **22:31:19.91Z `deploy_started`** (mostgood@gmail.com); 22:31:19Z `build_started`; 22:33:00Z `build_ended`; **22:34:03.75Z `deploy_ended`**; **23:18:27.11Z `deploy_started`** (mostgood@gmail.com); 23:18:27Z `build_started`.
+  - 0 `oomKilled`, 0 `nonZeroExit`, 0 `unhealthy`, 0 `evicted`.
+- **The one `earlyExit` is the designed recycle:** `py -3 scripts/render_logs.py --service live-odds-worker --text RECYCLING --start 2026-09-13T17:22:44Z --end 2026-09-13T17:27:45Z` -> `2026-09-13T17:27:42.012968085Z LIVE ODDS REFRESH WORKER RECYCLING after 22302s uptime to reset accumulated page cache` (1 match, 2 pages).
+- **Deploys API** (`/v1/services/srv-d91dpertqb8s73co8lt0/deploys?limit=5`, read 23:2xZ):
+  - `637278e3` live, created 22:31:19.59Z, finished 22:34:03.65Z. Lane `nfl-live-props-missing` (`deploys.md` 22:34Z), user-decided. It CHANGES the workload: in-play NFL/NCAAF props are now captured (props CSV 131 KB -> 282 KB).
+  - `54f3d662` (`quote-state-publish-retry`) `update_in_progress`, created 23:18:26.77Z.
+  - `77199c48` deactivated. `58736a69`, `e332b531`, `77199c48` are all ancestors of `637278e3` (`git merge-base --is-ancestor`, all true).
+- **Post-deploy sub-window:** `render_events.py --since 2026-09-13T22:34:03Z` -> `READ ... fully paged`, `CLEAN no server_failed`, `OUTPUT COMPLETE`. That is 44 m on `637278e3`, too short to count.
+- **Window:** the three-change build `77199c48` ran 11:15:04Z -> 22:31:19Z (the old instance served until 22:34:03Z) with **0 failures**, i.e. 11 h 16 m clean across one designed recycle. **Live play inside it: 17:00Z -> 22:31:19Z = 5 h 31 m, under the 6 h bar.** Verdict: **ENDED BY A DEPLOY** — neither pass nor fail. The live-slate goal stays OWED.
+- **Capture cadence, 17:00Z -> read** (`render_logs.py --service live-odds-worker --text "[kalshi_odds] DAILY_BOOK " --start 2026-09-13T17:00:00Z --json`: 107 matches, 3 pages, covered 17:02:35Z..23:21:08Z; `--text "ODDS_SWEEP_LAUNCHED"` same start: 91 matches, 2 pages, covered 17:01:35Z..23:20:34Z):
+
+  | UTC hour | DAILY_BOOK | ODDS_SWEEP_LAUNCHED |
+  |---|---|---|
+  | 17Z (recycle 17:27-17:28Z) | 12 | 11 |
+  | 18Z | 16 | 13 |
+  | 19Z | **14** | 14 |
+  | 20Z | 19 | 11 |
+  | 21Z | 19 | 20 |
+  | 22Z (deploy 22:31-22:34Z) | 19 | 15 |
+  | 23Z (partial, to 23:21Z) | 8 | 7 |
+
+  - Non-ok DAILY_BOOK lines (not `status=ok` with ` errors=0 `): **0 of 107**.
+  - Not reduced against the kill regime (8.4/h). But 19Z = 14 and 17Z = 12 fall below the 15/h bar, so the cadence clause was not strictly met on every full hour. 17Z includes the recycle gap. 20Z sweeps = 11 overlaps the refused NFL sweeps 19:48Z-20:38Z recorded by lane `nfl-live-props-missing` (one long refresh run holding the slot), and `ODDS_SWEEP_LAUNCHED` also counts refused launches, so it is not a clean cadence instrument.
+- **Kill classification:** none — there was no kill.
+- **Attribution:** none claimed. A clean 11 h 16 m (5 h 31 m live) on the THREE-CHANGE COMBINATION (`58736a69` + `e332b531` + `77199c48`) is consistent with the kills being stopped. It is not the Verification reading.
+- **Next reading:** re-base on `54f3d662`'s `finishedAt`. It needs >= 6 h of live play on one build with no deploy between, e.g. the 2026-09-14 MLB day slate into Monday Night Football (>= ~23:00Z if the slate goes live ~17:00Z). No task owns it yet.
+
+verify: `render_events.py --service live-odds-worker --since <54f3d662 finishedAt>` taken >= 6 h into a live slate — `fully paged` + `OUTPUT COMPLETE`, 0 `oomKilled`/`nonZeroExit`/`unhealthy`/`evicted`, every `earlyExit` matched to a `RECYCLING after <N>s` line, and `DAILY_BOOK` >= 15 on each full live hour with 0 non-ok lines.
