@@ -5875,3 +5875,16 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - When one sport's live markets work and another's do not, diff the EVENT SELECTION first. MLB selects by slate date (`fetch_mlb_oddsapi_local.py:772`); NFL and NCAAF selected by `commence_time >= now`.
   - Instrument corollary from the same lane: `[live_refresh_loop] ODDS_SWEEP_LAUNCHED` is printed BEFORE `launch_refresh_run` (`live_refresh_loop.py:5741` vs `:5767`). It fires for launches then refused with `A refresh run is already active`. Count runs from the refresh run itself, never from that line.
   - *(evidence: `log/2026-09-13.md`, section "lane `nfl-live-props-missing` — checkpoint")*
+
+## 2026-09-13 — OVERTURNED: "the fast path keeps the board fresh, so nothing is lost when the heavy build is refused" `[lane kalshi-nfl-quote-gap]`
+
+- **What was believed:** `_refresh_layer2_shortlist_only` exists so the board survives `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint`. Its docstring frames the refusal as "the expensive path stays refused exactly as often as before; this only stops the cheap path being refused WITH it", as if the heavy path's only product were the board.
+- **What falsified it:**
+  - 403 refusals, 09-12 21:34Z..09-13 16:14Z. The board rebuilt 13-51 times an hour.
+  - But every side effect that lived ONLY in the heavy build stopped for ~16 h: Kalshi quote capture for all sports (`QUOTE_CAPTURE` 0), `PORTFOLIO_COMMIT` (paper orders) 0, `CANDIDATE_POOL` and `BOARD_PUBLICATION` 0.
+  - Nothing reported that as a failure. A fresh board looked like health.
+- **How to apply:**
+  - When a cheap path replaces an expensive one under a guard, list EVERYTHING the expensive path does besides its headline output: joins, captures, commits, publications. Decide for each whether it moves, or name it as dropped.
+  - Grade a refused-build stretch by the side effects' own log lines (`QUOTE_CAPTURE`, `PORTFOLIO_COMMIT`), never by board freshness.
+  - Tooling corollary: `git merge-file` between a working copy and a `git show` blob can report the whole file as one conflict when their line endings differ. Fast-forward and re-apply the edit instead of trusting that conflict.
+  - *(evidence: `log/2026-09-13.md`, section "lanes `kalshi-nfl-quote-gap`, `heavy-build-memory-refusal` — checkpoint")*

@@ -911,6 +911,10 @@ death, never life — do not invert it.
 - Blocked by: none. **User decisions 2026-09-13 ~13:30Z:** "Resize + diagnose (Recommended)", then **"check content on the disk and ensure that we compact items that can be compacted first"**, so the resize is held until the inventory and compaction are done. A refresh-worker deploy needs claim + preflight; a HOLD goes back to the user. **2026-09-13 ~14:00Z:** the user approved "Remove verified duplicates, Gzip props-history CSVs, Stop history re-append", NOT the 100 GB resize.
 
 ### kalshi-nfl-quote-gap — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- VERDICT 2026-09-13 ~23:40Z (18:40 CT) — Goal: explain why Kalshi NFL quotes on the served NFL grid carried `observed_at` 2026-09-12 21:20Z until 2026-09-13 17:33Z. Say which stage stalled (capture, append, transport or board read) and whether it recurs without a full disk. Propose a fix only if it can recur. Read-only on production until the user approves a change.
+  - **GOAL: MET.** The CAPTURE stage stalled: `_capture_kalshi_quotes` ran only inside the heavy build, which `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` refused 403 times (09-12 21:34Z..09-13 16:14Z). It recurs without a full disk. After 13Z the NFL shortlist had nothing for Kalshi to match.
+  - Fix proposed and, by user decision, landed as `cb248a95`: fast-path capture from cached markets. **NOT deployed.** It ships in scheduled task `book-quotes-fuller-copy-deploy-0914` (23:50 CT, cutoff Mon 09-14 11:00 CT).
+  - Lane stays OPEN for the fix readings: `kalshi_capture=joined` after boot, then `QUOTE_CAPTURE` during a refused-heavy-build stretch.
 - Goal: explain why Kalshi NFL quotes on the served NFL grid carried `observed_at` 2026-09-12 21:20Z until 2026-09-13 17:33Z. Say which stage stalled (capture, append, transport or board read) and whether it recurs without a full disk. Propose a fix only if it can recur. Read-only on production until the user approves a change.
 - Files: `pipeline/intelligence_state.py` (`_refresh_layer2_shortlist_only` Kalshi capture only; TAKEN 2026-09-13 ~23:00Z from `layer2-prior-date-live-carryover`, user decision "Capture on lightweight rebuild"), `tests/test_layer2_fast_refresh.py` (Kalshi capture tests only). Mirrored into the primary checkout's `lanes.md`.
 - Origin: lead from closed lane `refresh-worker-disk-inventory`. User decision 2026-09-13 ~19:40Z: "Kalshi NFL staleness (Recommended)".
@@ -964,6 +968,10 @@ death, never life — do not invert it.
 - Blocked by: none.
 
 ### heavy-build-memory-refusal — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- VERDICT 2026-09-13 ~23:40Z (18:40 CT) — Goal: explain why refresh-worker's heavy board build (candidate pool, board publication, portfolio commit / paper orders) was refused by `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` for ~16 h (2026-09-12 21:34Z .. 2026-09-13 13Z) with unreclaimable headroom ~1,810 MB. Measure what the build actually needs against that floor and what holds ~2.3 GB unreclaimable. Then bring the user options with numbers (retarget/lower the check, cut the build's cost, or add memory). Read-only on production; no code or deploy without the user's OK.
+  - **GOAL: NOT MET.** Only opened. The refusal count and snapshots are measured; H1-H3 are untested.
+  - Next: build the per-heavy-build table (pre-build anon, peak, delta) from `ALL_PROCESS_MEMORY` / `BUILD_SPAN_*` for completed builds after 13Z, plus pid-39 rss and child-job counts across the refused window.
+  - Blocked by nothing. Unowned after this session.
 - Goal: explain why refresh-worker's heavy board build (candidate pool, board publication, portfolio commit / paper orders) was refused by `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` for ~16 h (2026-09-12 21:34Z .. 2026-09-13 13Z) with unreclaimable headroom ~1,810 MB. Measure what the build actually needs against that floor and what holds ~2.3 GB unreclaimable. Then bring the user options with numbers (retarget/lower the check, cut the build's cost, or add memory). Read-only on production; no code or deploy without the user's OK.
 - Files: none claimed (read-only diagnostic).
 - Origin: finding in lane `kalshi-nfl-quote-gap` (above). User decision 2026-09-13 ~17:55 CT: "Open a diagnostic lane (Recommended)".
