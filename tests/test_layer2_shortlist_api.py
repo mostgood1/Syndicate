@@ -294,3 +294,85 @@ def test_written_at_is_stamped_by_the_writer(tmp_path, monkeypatch):
     monkeypatch.setattr(istate, "reports_root", lambda: tmp_path)
     istate.write_layer2_shortlist("2026-08-08", {"rows": [], "cards": []})
     assert istate.read_layer2_shortlist("2026-08-08")["written_at"]
+
+
+# ---------------------------------------------------------------------------
+# `layer2-prior-date-live-carryover`: a FROZEN build must not serve rows as live.
+# Measured 2026-09-13: `?sport=ncaaf&date=2026-09-12` served the 04:58:55Z build
+# at 13:23:59Z with 28 rows still `live`, five of their six games final for hours.
+# ---------------------------------------------------------------------------
+
+
+def _stamp(seconds_ago):
+    from datetime import datetime, timedelta, timezone
+
+    return (datetime.now(timezone.utc) - timedelta(seconds=seconds_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _live_board(written_at):
+    live = _row("ncaaf", "home", 2.0)
+    live.update({"game_state": "live", "is_live": True, "market_state": "live", "game": {"state": "live", "matchup": "NMS @ HAW"}})
+    pregame = _row("ncaaf", "away", 1.0)
+    pregame.update({"game_state": "pregame", "is_live": False, "market_state": "pregame", "game": {"state": "pregame"}})
+    return {"selected_date": "2026-09-12", "written_at": written_at, "rows": [live, pregame], "active_sports": ["ncaaf"]}
+
+
+def test_live_rows_from_a_frozen_build_are_not_served_as_live(client, monkeypatch):
+    monkeypatch.delenv("SYNDICATE_LAYER2_LIVE_STATE_MAX_BUILD_AGE_SECONDS", raising=False)
+    board = _live_board(_stamp(8 * 3600))
+    monkeypatch.setattr("pipeline.intelligence_state.read_layer2_shortlist", lambda date: board)
+
+    served = client.get("/api/board/layer2-shortlist?date=2026-09-12&sport=ncaaf").get_json()
+    live, pregame = served["rows"]
+
+    assert live["game_state"] == "unknown"
+    assert live["game_state_at_build"] == "live"
+    assert live["live_state_stale"] is True
+    assert live["is_live"] is None
+    assert live["market_state"] == "unknown"
+    assert live["game"]["state"] == "unknown"
+    assert live["game"]["state_at_build"] == "live"
+    assert live["game"]["matchup"] == "NMS @ HAW"
+    assert pregame["game_state"] == "pregame"
+    assert "live_state_stale" not in pregame
+    assert served["rows_live_state_stale"] == 1
+    assert served["build_age_seconds"] > 1800
+    assert served["live_state_max_build_age_seconds"] == 1800.0
+    # The artifact read is shared; relabelling must copy, never mutate it.
+    assert board["rows"][0]["game_state"] == "live"
+    assert board["rows"][0]["game"]["state"] == "live"
+
+
+def test_live_rows_from_a_fresh_build_stay_live(client, monkeypatch):
+    monkeypatch.delenv("SYNDICATE_LAYER2_LIVE_STATE_MAX_BUILD_AGE_SECONDS", raising=False)
+    monkeypatch.setattr("pipeline.intelligence_state.read_layer2_shortlist", lambda date: _live_board(_stamp(60)))
+
+    served = client.get("/api/board/layer2-shortlist?date=2026-09-13&sport=ncaaf").get_json()
+
+    assert served["rows"][0]["game_state"] == "live"
+    assert served["rows"][0]["is_live"] is True
+    assert "live_state_stale" not in served["rows"][0]
+    assert served["rows_live_state_stale"] == 0
+
+
+def test_the_ceiling_is_env_tunable_and_zero_disables_it(client, monkeypatch):
+    monkeypatch.setattr("pipeline.intelligence_state.read_layer2_shortlist", lambda date: _live_board(_stamp(120)))
+    monkeypatch.setenv("SYNDICATE_LAYER2_LIVE_STATE_MAX_BUILD_AGE_SECONDS", "60")
+    assert client.get("/api/board/layer2-shortlist?date=2026-09-13").get_json()["rows_live_state_stale"] == 1
+
+    monkeypatch.setattr("pipeline.intelligence_state.read_layer2_shortlist", lambda date: _live_board(_stamp(8 * 3600)))
+    monkeypatch.setenv("SYNDICATE_LAYER2_LIVE_STATE_MAX_BUILD_AGE_SECONDS", "0")
+    served = client.get("/api/board/layer2-shortlist?date=2026-09-12").get_json()
+    assert served["rows_live_state_stale"] == 0
+    assert served["rows"][0]["game_state"] == "live"
+
+
+def test_an_unreadable_build_stamp_does_not_vouch_for_live_rows(client, monkeypatch):
+    monkeypatch.delenv("SYNDICATE_LAYER2_LIVE_STATE_MAX_BUILD_AGE_SECONDS", raising=False)
+    monkeypatch.setattr("pipeline.intelligence_state.read_layer2_shortlist", lambda date: _live_board(None))
+
+    served = client.get("/api/board/layer2-shortlist?date=2026-09-12").get_json()
+
+    assert served["build_age_seconds"] is None
+    assert served["rows"][0]["game_state"] == "unknown"
+    assert served["rows_live_state_stale"] == 1

@@ -624,6 +624,22 @@ def _reprice_grid_from_venues(grid: Any, sport: Any, selected_date: Any) -> dict
         return {"error": f"{type(exc).__name__}: {exc}"}
 
 
+def _live_chip_count(chips: Any) -> int | None:
+    """Games this date's scoreboard calls live, or None when there were no chips.
+
+    `layer2-prior-date-live-carryover`: the worker keeps rebuilding a date that
+    has rolled out of its board window only while something on it is in play,
+    and rows alone cannot say that -- a live game whose rows all failed the gate
+    reads like a finished one. None, not 0, for an empty chip list: an unbuilt
+    scoreboard is not a scoreboard with nothing live on it.
+    """
+    if not chips:
+        return None
+    return sum(
+        1 for chip in chips if isinstance(chip, Mapping) and str(chip.get("state") or "").strip().lower() == "live"
+    )
+
+
 def build_layer2_shortlist(
     selected_date: str,
     sport_slugs: Iterable[str],
@@ -2004,6 +2020,10 @@ def build_layer2_shortlist(
     #
     # Never raises, per this function's contract: a board that already works
     # must not be taken down by instrumentation added beside it.
+    try:
+        shortlist["chips_live"] = _live_chip_count(_published_chips)
+    except Exception:
+        shortlist["chips_live"] = None
     try:
         from syndicate.features.shared.clv_opening_ledger import (
             opening_ledger_enabled,

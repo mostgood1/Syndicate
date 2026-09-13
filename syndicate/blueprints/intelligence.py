@@ -3475,6 +3475,73 @@ def _clv_block(rows: Any, selected_date: str, sport: str) -> dict[str, Any]:
     return {"rows": joined.get("rows", served), "clv_coverage": joined.get("coverage")}
 
 
+def _layer2_live_state_max_build_age_seconds() -> float:
+    """Oldest build whose `live` rows `/api/board/layer2-shortlist` serves as live. 0 disables.
+
+    Default 1800 s, about twice the widest gap between consecutive NCAAF builds
+    measured on a live slate (943 s, 2026-09-12), so a board that is rebuilding
+    normally never trips it.
+    """
+    raw = str(os.environ.get("SYNDICATE_LAYER2_LIVE_STATE_MAX_BUILD_AGE_SECONDS") or "").strip()
+    if not raw:
+        return 1800.0
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return 1800.0
+
+
+def _layer2_build_age_seconds(written_at: Any) -> float | None:
+    """Seconds since the shortlist build was stamped, or None when unreadable."""
+    text = str(written_at or "").strip()
+    if not text:
+        return None
+    try:
+        stamp = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    return round(max(0.0, (datetime.now(timezone.utc) - stamp).total_seconds()), 1)
+
+
+def _label_stale_live_rows(
+    rows: list[dict[str, Any]], build_age_seconds: float | None, ceiling_seconds: float
+) -> tuple[list[dict[str, Any]], int]:
+    """Serve rows a stale build stamped `live` as `unknown`. Returns (rows, relabelled).
+
+    An UNREADABLE build stamp counts as stale: an age nobody can read cannot
+    vouch that a game is still in play. Copies every row it changes, because the
+    artifact read may be shared with other requests.
+    """
+    if ceiling_seconds <= 0:
+        return rows, 0
+    if build_age_seconds is not None and build_age_seconds <= ceiling_seconds:
+        return rows, 0
+    labelled_rows: list[dict[str, Any]] = []
+    relabelled = 0
+    for row in rows:
+        game = row.get("game") if isinstance(row.get("game"), dict) else None
+        row_state = str(row.get("game_state") or "").strip().lower()
+        game_state = str((game or {}).get("state") or "").strip().lower()
+        if row_state != "live" and game_state != "live":
+            labelled_rows.append(row)
+            continue
+        labelled = dict(row)
+        labelled["game_state_at_build"] = row.get("game_state")
+        labelled["game_state"] = "unknown"
+        labelled["live_state_stale"] = True
+        if row.get("is_live") is True:
+            labelled["is_live"] = None
+        if str(row.get("market_state") or "").strip().lower() == "live":
+            labelled["market_state"] = "unknown"
+        if game is not None and game_state == "live":
+            labelled["game"] = {**game, "state": "unknown", "state_at_build": game.get("state")}
+        labelled_rows.append(labelled)
+        relabelled += 1
+    return labelled_rows, relabelled
+
+
 @intelligence_bp.get("/api/board/layer2-shortlist")
 def board_layer2_shortlist_api():
     """L2-A: the ranked shortlist, READ from the artifact the worker built.
@@ -3564,6 +3631,17 @@ def board_layer2_shortlist_api():
     if sport != "all":
         rows = [row for row in rows if str(row.get("sport") or "").strip().lower() == sport]
 
+    # `layer2-prior-date-live-carryover`. A LIVE STATE IS ONLY AS CURRENT AS THE
+    # BUILD THAT STAMPED IT, and this endpoint serves builds of any age. Measured
+    # 2026-09-13: `?sport=ncaaf&date=2026-09-12` served the 04:58:55Z build at
+    # 13:23:59Z with 28 rows still `live` over six games, five of them final for
+    # hours, because that date stopped rebuilding at the midnight-CT roll. Rows a
+    # stale build stamped live are served as `unknown`, the build-time state kept
+    # beside it. Relabelling only: no chips, no IO, nothing recomputed.
+    live_state_ceiling = _layer2_live_state_max_build_age_seconds()
+    build_age_seconds = _layer2_build_age_seconds(shortlist.get("written_at"))
+    rows, rows_live_state_stale = _label_stale_live_rows(rows, build_age_seconds, live_state_ceiling)
+
     return _no_cache_response(
         jsonify(
             {
@@ -3579,6 +3657,11 @@ def board_layer2_shortlist_api():
                 # exactly that purpose polled for ten minutes against a
                 # pre-fix artifact and could never have known.
                 "written_at": shortlist.get("written_at"),
+                # `layer2-prior-date-live-carryover`: the age every `live` row
+                # is judged against, and how many rows were relabelled.
+                "build_age_seconds": build_age_seconds,
+                "live_state_max_build_age_seconds": live_state_ceiling,
+                "rows_live_state_stale": rows_live_state_stale,
                 "cards_present": len(shortlist.get("cards") or []),
                 # Both halves of the accounting, so a sport showing zero rows is
                 # attributable to its slate rather than to a broken read:

@@ -60,6 +60,7 @@ from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
 from syndicate.features.shared.source_roots import repo_root_from
+from syndicate.features.shared.timezone import central_now
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared.timezone import normalize_timestamped_payload
 from syndicate.features.mlb.sources import available_daily_summary_dates as mlb_available_daily_summary_dates
@@ -175,6 +176,75 @@ def _default_board_window_dates(today: str | None = None) -> list[str]:
     candidate_dates = _board_window_candidate_dates(today)
     supported = set(_supported_intelligence_dates())
     return [value for value in candidate_dates if value == reference or value in supported]
+
+
+# `layer2-prior-date-live-carryover`. THE BOARD WINDOW ABOVE STARTS AT CENTRAL
+# TODAY, SO A GAME STILL IN PLAY AT MIDNIGHT LOSES ITS BOARD.
+#
+# Measured on refresh-worker 2026-09-13: `BOARD_WINDOW_QUEUED date=2026-09-12`
+# last fired at 04:56:07Z; from 05:00:08Z only 2026-09-13 was queued, and
+# `LAYER2_FAST_REFRESH date=2026-09-12` never ran after 04:58:57Z. NMS @ HAW
+# (kickoff 11:05 PM CT) was still being played, and
+# `/api/board/layer2-shortlist?date=2026-09-12` kept serving that build's 28
+# `live` rows -- six games, five already final -- for eight more hours.
+#
+# QUEUING THE PRIOR DATE IS NOT THE FIX. `_watched_payload_eviction_reason`
+# refuses it as `stale_date` for a real reason: a full publication of a rolled-
+# over date once replaced the served board with an empty one (2026-07-25). The
+# carryover rebuilds ONLY the Layer 2 shortlist, through
+# `_refresh_layer2_shortlist_only` -- no candidate pool, no latest key, no
+# portfolio commit -- and only while that date's last build still had something
+# live, so the last rebuild is the first one that finds nothing in play.
+_LAYER2_CARRYOVER_DEFAULT_MAX_HOURS = 6.0
+
+
+def _layer2_carryover_max_hours() -> float:
+    """Hours past Central midnight the prior date may keep rebuilding. 0 disables.
+
+    Default 6: a Hawaii kickoff (11 PM CT) is final by ~2:30 AM CT, which leaves
+    room for overtime and delays while bounding the cost -- the fast path
+    measured 133-182 s PER BUILD on 2026-09-13, not the 14-27 s its own
+    2026-08-14 docstring records.
+    """
+    raw = str(os.environ.get("SYNDICATE_LAYER2_CARRYOVER_MAX_HOURS") or "").strip()
+    if not raw:
+        return _LAYER2_CARRYOVER_DEFAULT_MAX_HOURS
+    try:
+        value = float(raw)
+    except ValueError:
+        return _LAYER2_CARRYOVER_DEFAULT_MAX_HOURS
+    return max(0.0, min(value, 23.0))
+
+
+def _layer2_fast_refresh_min_interval_seconds() -> int:
+    """The fast path's per-date rate limit. One definition for both callers."""
+    return max(60, _env_int("SYNDICATE_LAYER2_FAST_REFRESH_SECONDS", 300))
+
+
+def _shortlist_live_signal(shortlist: Any) -> dict[str, Any]:
+    """How much of a built shortlist was in play: live rows and live chips.
+
+    A row counts when EITHER `game_state` or `game.state` says live -- both are
+    published and either can be the one a consumer reads. `chips_live` is None
+    when the build carried no chip count (no chips built, or an older producer):
+    unknown, reported as unknown, and contributing nothing to the decision.
+    """
+    live_rows = 0
+    rows = shortlist.get("rows") if isinstance(shortlist, Mapping) else None
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, Mapping):
+            continue
+        game = row.get("game") if isinstance(row.get("game"), Mapping) else {}
+        states = {
+            str(row.get("game_state") or "").strip().lower(),
+            str(game.get("state") or "").strip().lower(),
+        }
+        if "live" in states:
+            live_rows += 1
+    chips_live = shortlist.get("chips_live") if isinstance(shortlist, Mapping) else None
+    if isinstance(chips_live, bool) or not isinstance(chips_live, int):
+        chips_live = None
+    return {"live_rows": live_rows, "chips_live": chips_live}
 
 
 def _state_backend_kind() -> str:
@@ -4702,6 +4772,14 @@ class IntelligenceStateService:
         # times, because heavy builds alternated the two dates every 10-20 min
         # and kept the shared clock permanently fresh. The fast path was inert.
         self._layer2_fast_refresh_at: dict[str, float] = {}
+        # `layer2-prior-date-live-carryover`: per DATE, how much of it was still
+        # in play at its last shortlist build (`_shortlist_live_signal`). This
+        # is what lets a date that has rolled out of the board window keep
+        # rebuilding while a game on it is live. Process-local on purpose: after
+        # a restart the entry is absent, which the carryover reads as UNKNOWN and
+        # answers with one build to learn, not with silence.
+        self._layer2_live_signal: dict[str, dict[str, Any]] = {}
+        self._layer2_carryover_last_logged: tuple[str, str] | None = None
         self._app: Flask | None = None
 
     def _artifact_signature(self, relative_path: str | None) -> dict[str, Any]:
@@ -4802,6 +4880,127 @@ class IntelligenceStateService:
             for stale_key in sorted(stamps, key=lambda k: stamps[k])[:len(stamps) - 16]:
                 stamps.pop(stale_key, None)
 
+    def _note_layer2_live_signal(self, selected_date: str, shortlist: Any) -> dict[str, Any]:
+        """Remember how much of THIS date was live at its last good build."""
+        signal = _shortlist_live_signal(shortlist)
+        key = str(selected_date or "").strip()
+        if not key:
+            return signal
+        signals = getattr(self, "_layer2_live_signal", None)
+        if not isinstance(signals, dict):
+            signals = {}
+            self._layer2_live_signal = signals
+        signals[key] = {**signal, "at": time.time()}
+        if len(signals) > 16:
+            for stale_key in sorted(signals, key=lambda k: signals[k].get("at") or 0.0)[: len(signals) - 16]:
+                signals.pop(stale_key, None)
+        return signal
+
+    def _layer2_carryover_decision(self, now: datetime | None = None) -> tuple[str | None, str, dict[str, Any]]:
+        """(prior date to rebuild or None, reason, detail for the log line).
+
+        Rebuilds while the prior date's LAST build had live rows or live chips.
+        No build of that date in this process (a restart) is UNKNOWN and earns
+        one build to learn -- the permissive answer here costs one build, while
+        the other answer is exactly the frozen board this exists to prevent.
+        """
+        moment = now or central_now()
+        prior = (moment.date() - timedelta(days=1)).isoformat()
+        midnight = moment.replace(hour=0, minute=0, second=0, microsecond=0)
+        hours = (moment - midnight).total_seconds() / 3600.0
+        max_hours = _layer2_carryover_max_hours()
+        detail: dict[str, Any] = {"date": prior, "hours_since_roll": round(hours, 2), "max_hours": max_hours}
+        if max_hours <= 0:
+            return None, "disabled", detail
+        if hours >= max_hours:
+            return None, "past_cap", detail
+        signals = getattr(self, "_layer2_live_signal", None)
+        signal = signals.get(prior) if isinstance(signals, dict) else None
+        if not isinstance(signal, Mapping):
+            return prior, "unknown_since_restart", detail
+        detail["live_rows"] = signal.get("live_rows")
+        detail["chips_live"] = signal.get("chips_live")
+        if int(signal.get("live_rows") or 0) > 0 or int(signal.get("chips_live") or 0) > 0:
+            return prior, "live_at_last_build", detail
+        return None, "nothing_live_at_last_build", detail
+
+    def _log_layer2_carryover(
+        self, prior: str, decision: str, reason: str, detail: Mapping[str, Any], *, once: bool
+    ) -> None:
+        """One line per (date, decision, reason) change when `once`; always otherwise.
+
+        The carryover is consulted on EVERY loop pass (~30 s when idle), so a line
+        per pass would bury the lines that matter. Both branches still log -- a
+        skip nobody can see cannot be told apart from a carryover never wired.
+        """
+        key = (str(prior or ""), f"{decision}:{reason}")
+        if once and getattr(self, "_layer2_carryover_last_logged", None) == key:
+            return
+        self._layer2_carryover_last_logged = key
+        extras = " ".join(f"{name}={value}" for name, value in detail.items() if name != "date")
+        print(
+            f"[intelligence_state] LAYER2_CARRYOVER date={prior} decision={decision} reason={reason} {extras}".rstrip(),
+            flush=True,
+        )
+
+    def _maybe_carry_over_prior_date_layer2(self) -> dict[str, Any] | None:
+        """Rebuild the PRIOR Central date's Layer 2 shortlist while a game on it is live.
+
+        Called once per background-loop pass. Never queues a payload (see
+        `_LAYER2_CARRYOVER_DEFAULT_MAX_HOURS` for why not). Checks the fast path's
+        own rate limit BEFORE any IO, then yields to a deploy drain, a resident
+        MLB sim and a board build holding the execution guard -- and holds that
+        guard itself while building, so the MLB sim launcher sees the pipeline
+        busy exactly as it does for a board build.
+        """
+        prior, reason, detail = self._layer2_carryover_decision()
+        if prior is None:
+            self._log_layer2_carryover(str(detail.get("date") or ""), "skip", reason, detail, once=True)
+            return None
+        last = self._layer2_fast_refresh_seen(prior)
+        if last and (time.time() - last) < _layer2_fast_refresh_min_interval_seconds():
+            self._log_layer2_carryover(prior, "wait", "rate_limited", detail, once=True)
+            return None
+        hold: str | None = None
+        try:
+            from syndicate.features.shared.deploy_drain import drain_hold_reason
+
+            hold = drain_hold_reason() or None
+        except Exception:
+            hold = None
+        if hold is None and _mlb_sim_subprocess_running():
+            hold = "sim_subprocess_resident"
+        if hold is not None:
+            self._log_layer2_carryover(prior, "wait", str(hold), detail, once=True)
+            return None
+        if not self._execution_guard.acquire(blocking=False):
+            self._log_layer2_carryover(prior, "wait", "board_build_in_flight", detail, once=True)
+            return None
+        started = time.time()
+        try:
+            shortlist = self._refresh_layer2_shortlist_only(prior)
+        finally:
+            self._execution_guard.release()
+        if shortlist is None:
+            # Refused by its own floor or failed; the fast path names which.
+            self._log_layer2_carryover(prior, "wait", "fast_path_declined", detail, once=True)
+            return None
+        signal = _shortlist_live_signal(shortlist)
+        self._log_layer2_carryover(
+            prior,
+            "built",
+            reason,
+            {
+                **detail,
+                "rows": len(shortlist.get("rows") or []),
+                "live_rows_now": signal.get("live_rows"),
+                "chips_live_now": signal.get("chips_live"),
+                "elapsed_s": round(time.time() - started, 2),
+            },
+            once=False,
+        )
+        return shortlist
+
     def _refresh_layer2_shortlist_only(self, selected_date: str | None) -> dict[str, Any] | None:
         """Rebuild and persist JUST the Layer 2 shortlist, off the heavy path.
 
@@ -4869,7 +5068,7 @@ class IntelligenceStateService:
         # ~8%, which is comfortably below the 498.7s/3h (4.6%) the Layer 1
         # collection was already spending, and still caps board age at ~5min
         # against the 104.7min measured.
-        min_interval = max(60, _env_int("SYNDICATE_LAYER2_FAST_REFRESH_SECONDS", 300))
+        min_interval = _layer2_fast_refresh_min_interval_seconds()
         now = time.time()
         last = self._layer2_fast_refresh_seen(normalized_date)
         if last and (now - last) < min_interval:
@@ -4912,9 +5111,11 @@ class IntelligenceStateService:
         # ran" produced identical evidence. `rows` and `considered` here are
         # what makes this path's liveness readable, and they are what the
         # verification query counts.
+        _live_signal = self._note_layer2_live_signal(normalized_date, shortlist)
         print(
             f"[intelligence_state] LAYER2_FAST_REFRESH date={normalized_date} "
             f"rows={len(shortlist.get('rows') or [])} "
+            f"live_rows={_live_signal.get('live_rows')} chips_live={_live_signal.get('chips_live')} "
             f"considered={shortlist.get('opportunities_considered')} "
             f"sports={shortlist.get('active_sports')} "
             f"elapsed_s={round(time.time() - started, 2)}",
@@ -6485,6 +6686,9 @@ class IntelligenceStateService:
                 # is what made the fast path inert -- see the field's own
                 # comment. The reasoning below still holds WITHIN a date.
                 self._mark_layer2_fast_refresh(str(selected_date or ""), time.time())
+                # `layer2-prior-date-live-carryover`: the carryover decides from
+                # the last GOOD build of a date, whichever path produced it.
+                self._note_layer2_live_signal(str(selected_date or ""), layer2_shortlist)
         except Exception as exc:
             print(f"[intelligence_state] LAYER2_SHORTLIST_WRITE_FAILED error={exc}", flush=True)
         _build_span_exit("layer2_shortlist_build", _layer2_mark)
@@ -7220,6 +7424,14 @@ class IntelligenceStateService:
                     print(f"[intelligence_state] BOARD_WINDOW_WATCH_TRACEBACK {traceback.format_exc()}", flush=True)
                 except Exception:
                     pass
+            # `layer2-prior-date-live-carryover`. After the window watch, so the
+            # prior date is judged on the same Central clock that just dropped it
+            # from the window. Wrapped for the reason the call above is: a failure
+            # here must never kill this loop.
+            try:
+                self._maybe_carry_over_prior_date_layer2()
+            except Exception as exc:
+                print(f"[intelligence_state] LAYER2_CARRYOVER_FAILED {type(exc).__name__}: {exc}", flush=True)
             if canonical_board_state_enabled() or canonical_board_state_shadow_compare_enabled():
                 # Additive dual-write during the migration-step-2 validation
                 # window: drains _watched_board_dates and writes the new
