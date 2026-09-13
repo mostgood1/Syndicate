@@ -977,6 +977,14 @@ death, never life — do not invert it.
 - Verification: the tests above, run targeted. Then, after user-approved deploys of refresh-worker (carryover) and web (label), on the next slate with a game live across midnight CT: refresh-worker `LAYER2_CARRYOVER` lines for the prior date after 05:00Z; `/api/board/layer2-shortlist?date=<prior>` `written_at` advancing past 05:00Z while `/api/board/game-chips?date=<prior>` shows a live game; the carryover stopping after a build with 0 live rows and 0 live chips; and live rows from a build older than the threshold served as not live. Recorded in `deploys.md`.
 - Blocked by: nothing but the slate. R2 needs the next midnight CT roll; R3 needs a game live across midnight CT. No deploy is owed by this lane, and both deploy claims are released. The scheduled tasks run only while the Claude app is open, and they read the logs after the fact.
 
+### nfl-live-props-missing — OPEN — opened 2026-09-13 — session ed8bb082-2b7f-4de3-8f8c-f33071f42ce0
+- Goal: name the first pipeline stage that is zero for NFL LIVE (in-play) player props on the 2026-09-13 slate (user report ~4:20 PM CT: "NFL live props are not hitting the board"; layer2 21:20:05Z had 0 live prop rows), with file:line and a production reading. Read-only on production; a code change or deploy needs the user's approval.
+- Files: none claimed (read-only diagnostic). A code change reopens this block with a Files claim first.
+- Hypothesis: H1 — capture stops at kickoff. `events_in_scope` (`scripts/fetch_nfl_oddsapi_props_local.py:235`, `if when < now: continue`) drops every event that has started, so the live-odds-worker sweep (which does run in live phase, `refresh_odds_sources.py:973` `phases=("pregame","live")`) never requests props for an in-progress game. Their last quote is the pre-kickoff one, aged past `LIVE_MARKET_MAX_AGE_SECONDS` 900 s, and `opportunity_gate` kills them. Pre-test evidence: NFL props CSV publishes shrank 438,221 B (17:22Z) -> 377,485 B (19:08Z) -> 131,281 B (20:38Z), tracking the 17:00Z and ~20:05-20:25Z kickoff windows.
+- Falsification test: H1 is false if (a) the fetcher's `OddsAPI events: N in season, M in the next slate` count does NOT fall as games kick off, or (b) any game with state live on layer1 has a prop quote observed/last-seen AFTER its `start_time_utc`.
+- Verification: a per-game table (state, kickoff, prop rows, newest prop observed/seen) from served `/api/board/layer1?sport=nfl&date=2026-09-13`, plus the per-sweep scoped-event counts from live-odds-worker logs, recorded here and in the log; MLB's live-props path compared for the missing wiring.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
