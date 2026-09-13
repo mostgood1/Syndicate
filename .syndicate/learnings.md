@@ -5888,3 +5888,13 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - Grade a refused-build stretch by the side effects' own log lines (`QUOTE_CAPTURE`, `PORTFOLIO_COMMIT`), never by board freshness.
   - Tooling corollary: `git merge-file` between a working copy and a `git show` blob can report the whole file as one conflict when their line endings differ. Fast-forward and re-apply the edit instead of trusting that conflict.
   - *(evidence: `log/2026-09-13.md`, section "lanes `kalshi-nfl-quote-gap`, `heavy-build-memory-refusal` — checkpoint")*
+## 2026-09-13 — OVERTURNED: "a served board showing the rows = the fix is verified" — ONE build is a sample of a process that FLAPS `[lanes nfl-live-props-missing, quote-state-publish-retry]`
+
+- **What I believed:** Layer 2 NFL `written_at` 22:44:36Z served 278 live props (0 before the capture fix), so I recorded "verify MET", released the deploy claim and closed the lane.
+- **What falsified it:** the next builds read 0 (22:49:15Z), 216 (23:05:18Z), then 0 (23:09:02Z). Capture was fixed. The in-play gate still depended on a last-seen clock that went stale whenever web answered a quote-state publish with 503 at merge capacity. My own watcher's stop condition had broken out after the FIRST build.
+- **Also overturned in the same hour:** "the 503 on the state sidecar is transient and heals" (I wrote it after one repaired publish). It heals by the NEXT sweep, and 2-8 minutes of lag is exactly longer than the 300 s in-play observation ceiling.
+- **How to apply:**
+  - A board-presence verification needs at least TWO consecutive builds, spanning more than one capture cycle, and the read must include the clock the gate uses (`quote_seen_age_seconds`), not only the row count.
+  - A watcher must not `break` on the first success when the claim is "it stays fixed". Stop on N distinct builds instead.
+  - Do not release a claim or close a lane on a first reading of a periodic process. Write "part 1 MET / part 2 OWED" instead.
+  - *(evidence: `deploys.md` 22:46Z, 23:12Z correction, 23:24Z; `log/2026-09-13.md` "lane `quote-state-publish-retry`")*

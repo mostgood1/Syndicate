@@ -1689,11 +1689,11 @@ confirm the publish path once nflverse actually has data to return.
 
 ## [nfl-player-props] NFL player props: capture fixed, model priced and BEATEN by the market
 
-- **IN-PLAY CAPTURE (2026-09-13, lane `nfl-live-props-missing`) — cause VERIFIED, fix DEPLOYED AND VERIFIED.** Layer 2 served 278 live NFL prop rows at 22:44:36Z (0 before), all opportunity lane, book age 160-284 s (`deploys.md` 22:46Z).
+- **IN-PLAY CAPTURE (2026-09-13, lane `nfl-live-props-missing`) — capture fix DEPLOYED AND VERIFIED; board presence was INTERMITTENT.** Layer 2 live NFL props read 278 / 0 / 216 / 0 across builds 22:44-23:09Z (`deploys.md` 22:46Z, 23:12Z correction).
   - NFL (and NCAAF) OddsAPI prop capture stopped at each game's kickoff. `events_in_scope` dropped `commence_time < now` (`scripts/fetch_nfl_oddsapi_props_local.py`, NCAAF twin).
   - Served layer1 NFL 21:26:42Z: 0 of 1,998 prop rows had been seen after their own kickoff, so no live NFL prop could pass `opportunity_gate` (`live_market_stale`).
   - OddsAPI DOES serve in-play NFL props (probe 22:26Z: in-progress games listed by `/events`, 6 books, 25/25 markets updated after kickoff; finished games not listed).
-  - Fix `637278e3` (`ODDS_API_LIVE_LOOKBACK_HOURS`, default 4.5) is live on live-odds-worker since 22:34:03Z. Residual: layer1 `seen_age_seconds` still reads hours stale on those rows (web's quote-state merge cap=1 503s concurrent publishes).
+  - Fix `637278e3` (`ODDS_API_LIVE_LOOKBACK_HOURS`, default 4.5) is live on live-odds-worker since 22:34:03Z. The flap: web merges `book_quotes/*.state.json` one at a time (cap=1) and 503s a concurrent publish, so the in-play last-seen clock lagged past the gate's 300 s ceiling. live-odds-worker `54f3d662` (live 23:24:15Z) retries that 503 in-call; verified `PUBLISH_RETRY_OK` on NFL state 23:29:59Z. Board persistence across builds is NOT yet measured (lane `quote-state-publish-retry`). refresh-worker (`cae4713e`) also publishes these paths without the retry.
   - The NFL odds sweep runs on **live-odds-worker** (09-13 logs), superseding the 08-21 line below.
   - `[live_refresh_loop] ODDS_SWEEP_LAUNCHED` prints before `launch_refresh_run` and counts refused launches too.
 

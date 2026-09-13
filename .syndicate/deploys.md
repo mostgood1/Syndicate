@@ -34577,3 +34577,22 @@ No deploy, restart or env change in this entry. Taken by scheduled task `live-od
 - **Next reading:** re-base on `54f3d662`'s `finishedAt`. It needs >= 6 h of live play on one build with no deploy between, e.g. the 2026-09-14 MLB day slate into Monday Night Football (>= ~23:00Z if the slate goes live ~17:00Z). No task owns it yet.
 
 verify: `render_events.py --service live-odds-worker --since <54f3d662 finishedAt>` taken >= 6 h into a live slate — `fully paged` + `OUTPUT COMPLETE`, 0 `oomKilled`/`nonZeroExit`/`unhealthy`/`evicted`, every `earlyExit` matched to a `RECYCLING after <N>s` line, and `DAILY_BOOK` >= 15 on each full live hour with 0 non-ok lines.
+
+## 2026-09-13 23:24Z — live-odds-worker `637278e3` -> `54f3d662` — lane `quote-state-publish-retry` — quote-state publish refused at merge capacity is retried in-call
+
+- **Deploy:** `dep-dajiugh5efls73942m40`, trigger api, created 23:18:26Z, `live` finishedAt 2026-09-13T23:24:15.193908Z.
+- **Preflight:** CLEAR 23:18:09Z ("only infrastructure processes running"), 17 s before the POST, target `54f3d662`, claim held by `quote-state-publish-retry` (acquired 23:14:26Z). Earlier reads 23:13:18Z and 23:17:15Z were HOLD (odds refresh run). No override.
+- **Change:** `artifact_publisher.publish_hot_artifact` retries a `book_quotes/*.state.json` publish answered HTTP 503 at 1/2/4 s. Other paths and statuses are unchanged.
+- **Collateral:** `cb248a95` (`pipeline/intelligence_state.py`, Kalshi quote capture on the Layer 2 fast path). That code path runs on refresh-worker. render.yaml unchanged.
+- **Baseline:** Layer 2 NFL `written_at` 23:13:31Z, 0 live props, opportunity 1,744. Previous builds flapped 278/0/216/0 (`deploys.md` 23:12Z).
+- **verify, part 1 (the mechanism): MET.** live-odds-worker, first post-boot sweep:
+  - NFL 09-13 state: `PUBLISH_FAILED` (web `ARTIFACT_MERGE_AT_CAPACITY` 23:29:55.88Z), `RETRY attempt=1`, failed again (web 23:29:56.98Z), `RETRY attempt=2`, `PUBLISH_OK` + `PUBLISH_RETRY_OK attempt=2` at 23:29:59.07Z.
+  - NFL 09-14 state `_OK attempt=1` (23:30:00Z).
+  - mlb 09-13 and soccer 09-13/18/19/20 state each `_OK attempt=1` (23:30:01-06Z).
+  - 0 `PUBLISH_RETRY_EXHAUSTED` through 23:33Z.
+- **verify, part 2 (the board): OWED.**
+  - The reading that proves it: successive Layer 2 NFL builds on a live game with live prop rows > 0 and `quote.quote_seen_age_seconds` p50 < 300 s. DAL@NYG kicks 00:20Z.
+  - Only post-deploy build so far: 23:24:38Z, 3 live props (GB@MIN, WSH@PHI, games ending).
+- **Residual, not fixed:** web still refused NFL state publishes at 23:32:49Z (09-13 and 09-14) while live-odds-worker logged `SKIPPED_UNCHANGED` at 23:32:05Z. The likely sender is refresh-worker (`cae4713e`, no retry), which publishes the same paths; this attribution is not verified.
+- **Rollback:** `py -3 scripts/render_deploy.py --service live-odds-worker --commit 637278e3 --allow-rollback` behind claim + preflight. That drops the retry but keeps the in-play capture fix.
+- **Claim:** `quote-state-publish-retry` on live-odds-worker RELEASED after this entry.
