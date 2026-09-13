@@ -919,6 +919,11 @@ death, never life — do not invert it.
   - Fix: `.gz` wins only after one streaming decompress confirms it ends cleanly at exactly ISIZE.
   - That result is cached per (path, st_size, st_mtime_ns).
   - Cost: one inflate per process per dual-form shard whose trailer claims more data, ~18 shards today.
+- **STATUS 2026-09-13 ~19:25Z: LANDED `57b67127` on main, NOT DEPLOYED.**
+  - Tests: book_quotes, book grid, layer1, cross-book and last-seen suites, 219 passed. The 1 error, `test_odds_book_quotes.py::MlbEndToEndQuoteLogTests`, errors identically on HEAD's module (conftest mkdir guard), so it is pre-existing.
+  - Unwired check: `test_a_fuller_gz_wins_over_a_shorter_plain_copy` fails on HEAD's resolver and passes with the change.
+  - refresh-worker preflight at 19:20Z was HOLD (10 jobs: MLB daily sim + soccer odds refresh). Collateral vs live `cae4713e`: `odds_book_quotes.py` only.
+  - **User decision:** "After tonight's slate (Recommended)". Deploy delegated to scheduled task `book-quotes-fuller-copy-deploy-0914`: fires 2026-09-13 23:50 CT (04:50Z), deploys only on the first CLEAR with no NFL/MLB game live, hard cutoff Mon 09-14 11:00 CT (16:00Z). It records `deploys.md`, sets this lane's verdict and releases its claim.
 - Blocked by: none.
 
 ### layer2-prior-date-live-carryover — OPEN — opened 2026-09-13 — session 887508de-2233-46fd-ae82-2ad385de111c — **GOAL: NOT MET. The fix is live on both services: web `822ee0ba` (15:07:20Z) and refresh-worker `c114e1aa` (16:23:12Z). W1 and R1 are MET. The midnight crossing (R2, R3) is owed to scheduled tasks.** The owning session 887508de was ARCHIVED 2026-09-13 at the user's request. The readings, and closing the lane on MET, belong to scheduled tasks `layer2-carryover-roll-reading-0914`, `layer2-carryover-crossing-reading-0915`, `-0919` and `-0920`.
