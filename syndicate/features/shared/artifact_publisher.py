@@ -684,6 +684,17 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # `record_openings` calls `publish_hot_artifact` itself, and only when it
     # actually wrote something.
     "reports/intelligence/clv_openings/*.jsonl",
+    # The DEPARTURE log beside it (`clv_departure_ledger`, lane
+    # `layer2-live-scorecard-gate`, 2026-09-13): which +EV prices LEFT the Layer 2
+    # board between builds, so "was it still there to bet" is measured by the
+    # service that builds the board instead of by a PC polling it. Bounded the
+    # same way -- by distinct markets that leave per day, plus one heartbeat per
+    # build -- under an 8 MiB tripwire in the producer. `.jsonl` ONLY: the
+    # `<date>.state.json` beside it is rewritten whole every build and must never
+    # be swept. `record_departures` publishes it itself, only when a market left
+    # or came back. Web must carry this pattern BEFORE refresh-worker pushes, or
+    # the push is refused as not allowlisted.
+    "reports/intelligence/clv_departures/*.jsonl",
     # The PROJECTED evaluation ledger (`evaluation_ledger_projection.py`). This
     # is the only form of the ledger that can cross to web at all: the RAW
     # chunks are 95-332 MB/day against the 12 MiB `_PUBLISH_MAX_BYTES` below,

@@ -269,3 +269,114 @@ def test_main_split_at_adds_the_window_tables_and_names_the_boundaries(tmp_path,
 def test_main_refuses_a_split_time_without_a_zone(capsys):
     assert mod.main(["--date", "2026-09-12", "--split-at", "2026-09-12 22:34:15"]) == 2
     assert "--split-at" in capsys.readouterr().err
+
+
+# ---- the worker's departure log: was the price still there 10 min later? ----
+# On 09-12 a PC capture measured it (61% of live +EV prices served under 5 min
+# old gone at +10 min, 75% of those served 10+ min old). `clv_departure_ledger`
+# records the same thing on refresh-worker; these pin the join.
+
+
+def _identity(**over):
+    from syndicate.features.shared.clv_departure_ledger import market_identity
+
+    return market_identity(_rec(**over))
+
+
+def _log():
+    # _rec() is sighted 18:34:57Z; +600s is 18:44:57Z, so the 18:46:00Z build decides.
+    return [
+        {"type": "build", "at": "2026-09-12T18:34:57Z", "sports": {"ncaaf": 40}},
+        {"type": "build", "at": "2026-09-12T18:41:00Z", "sports": {"ncaaf": 38}},
+        {"type": "build", "at": "2026-09-12T18:46:00Z", "sports": {"ncaaf": 35}},
+        {"type": "departure", "identity": _identity(), "gone_by": "2026-09-12T18:41:00Z"},
+        {"type": "departure", "identity": _identity(market="totals", side="over", line=47.5),
+         "gone_by": "2026-09-12T18:52:00Z"},
+        {"type": "departure", "identity": _identity(market="h2h", side="home", line=None),
+         "gone_by": "2026-09-12T18:30:00Z"},
+    ]
+
+
+def test_look_after_judges_at_the_first_build_ten_minutes_on():
+    builds, timeline = mod.index_departures(_log())
+    assert mod.look_after(_rec(), builds, timeline) == "gone"
+    # Left AFTER the deciding build: still there at +10 min.
+    assert mod.look_after(_rec(market="totals", side="over", line=47.5), builds, timeline) == "kept"
+    # The identity ignores the book: a later best book is the same market.
+    assert mod.look_after(_rec(bookmaker="draftkings"), builds, timeline) == "gone"
+    # A departure BEFORE the sighting is an earlier life of the market.
+    assert mod.look_after(_rec(market="h2h", side="home", line=None), builds, timeline) == "kept"
+    # Sighted 18:40:00Z needs a build at >= 18:50:00Z; there is none, and a board
+    # that stopped building must not read as a price still there.
+    assert mod.look_after(_rec(captured_at="2026-09-12T18:40:00Z"), builds, timeline) == "unobserved"
+
+
+def test_a_market_that_came_back_by_the_deciding_build_was_still_there():
+    # The 09-12 replay wrote 1,109 returns against 2,245 departures: blinking off
+    # for a build is common, and "ever left" would call those prices gone.
+    log = _log() + [
+        {"type": "departure", "identity": _identity(segment="h1"), "gone_by": "2026-09-12T18:41:00Z"},
+        {"type": "return", "identity": _identity(segment="h1"), "gone_by": "2026-09-12T18:41:00Z",
+         "back_at": "2026-09-12T18:46:00Z"},
+        {"type": "departure", "identity": _identity(side="home"), "gone_by": "2026-09-12T18:41:00Z"},
+        {"type": "return", "identity": _identity(side="home"), "gone_by": "2026-09-12T18:41:00Z",
+         "back_at": "2026-09-12T18:43:00Z"},
+        {"type": "departure", "identity": _identity(side="home"), "gone_by": "2026-09-12T18:45:00Z"},
+    ]
+    builds, timeline = mod.index_departures(log)
+    assert mod.look_after(_rec(segment="h1"), builds, timeline) == "kept"
+    assert mod.look_after(_rec(side="home"), builds, timeline) == "gone", "left again before the deciding build"
+
+
+def test_gone10_is_counted_per_cell_and_is_not_measured_without_a_log():
+    records = [
+        _rec(),
+        _rec(key="k2", market="totals", side="over", line=47.5, price=-110),
+        _rec(key="k3", event_id="late", captured_at="2026-09-12T18:40:00Z"),
+    ]
+    with_log = mod.settle(records, [_chip()], departures=_log())
+    assert sorted(r["look10"] for r in with_log["rows"]) == ["gone", "kept", "unobserved"]
+    (cell,) = mod.summarize(with_log["rows"], ["phase"])
+    assert (cell["n10"], cell["gone10"], cell["gone10_pct"]) == (2, 1, 50.0)
+
+    without = mod.settle(records, [_chip()])
+    assert {r["look10"] for r in without["rows"]} == {None}
+    (cell,) = mod.summarize(without["rows"], ["phase"])
+    assert (cell["n10"], cell["gone10"], cell["gone10_pct"]) == (0, 0, None)
+
+
+def test_main_reads_a_departures_file_and_reports_it(tmp_path, capsys):
+    openings = tmp_path / "openings.jsonl"
+    openings.write_text(json.dumps(_rec()) + "\n", encoding="utf-8")
+    chips = tmp_path / "chips.json"
+    chips.write_text(json.dumps({"chips": [_chip()]}), encoding="utf-8")
+    departures = tmp_path / "departures.jsonl"
+    departures.write_text("\n".join(json.dumps(r) for r in _log()) + "\n", encoding="utf-8")
+    code = mod.main(["--date", "2026-09-12", "--sport", "ncaaf", "--openings-file", str(openings),
+                     "--chips-file", str(chips), "--departures-file", str(departures), "--json"])
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["departures"] == {"available": True, "records": 6, "builds": 3}
+    phase = payload["tables"]["phase"][0]
+    assert (phase["n10"], phase["gone10"]) == (1, 1)
+
+
+def test_main_without_a_departure_log_says_it_is_not_measured(tmp_path, capsys):
+    openings = tmp_path / "openings.jsonl"
+    openings.write_text(json.dumps(_rec()) + "\n", encoding="utf-8")
+    chips = tmp_path / "chips.json"
+    chips.write_text(json.dumps({"chips": [_chip()]}), encoding="utf-8")
+    assert mod.main(["--date", "2026-09-12", "--openings-file", str(openings), "--chips-file", str(chips)]) == 0
+    assert "not measured" in capsys.readouterr().out
+
+
+def test_fetch_departures_reads_a_refusal_or_an_absent_file_as_not_measured(monkeypatch):
+    import urllib.error
+
+    def refuse(url, headers=None, timeout=180.0):
+        raise urllib.error.HTTPError(url, 403, "path is not an allowed hot or export-only artifact.", None, None)
+
+    monkeypatch.setattr(mod, "_http_json", refuse)
+    assert mod.fetch_departures("https://example.invalid", "2026-09-12", "t") is None
+    monkeypatch.setattr(mod, "_http_json", lambda url, headers=None, timeout=180.0: {"ok": True, "count": 0, "artifacts": {}})
+    assert mod.fetch_departures("https://example.invalid", "2026-09-12", "t") is None

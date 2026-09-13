@@ -20,6 +20,12 @@ scores and reports the split that decides whether live Layer 2 value is real:
           results can be read across an upstream regime change. On 2026-09-12
           two live-odds-worker deploys changed how often odds were captured,
           and one pooled number would average three different pipelines.
+  gone10  only with a departure log (`clv_departure_ledger`; --departures-file,
+          or fetched beside the openings): of openings with a build >=10 min
+          after sighting, how many were ABSENT from the board at that build
+          (a market that left and came back before it counts as kept). Gone from
+          the board, not proven gone from the book -- what a person watching
+          the board sees. `n10` excludes sightings with no build that late.
 
 Every cell reports `games` beside `n`. Bets on one game are not independent --
 measured 2026-09-12, four final NCAAF games swung the in-play cell by -5.2 to
@@ -70,9 +76,10 @@ import json
 import os
 import sys
 import unicodedata
+import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -89,6 +96,8 @@ except Exception:  # tzdata missing: the date split is disabled, and main() says
 
 DEFAULT_BASE_URL = "https://syndicate-an21.onrender.com"
 OPENINGS_PATH_TEMPLATE = "reports/intelligence/clv_openings/{date}.jsonl"
+DEPARTURES_PATH_TEMPLATE = "reports/intelligence/clv_departures/{date}.jsonl"
+LOOK_HORIZON_SECONDS = 600.0
 AGE_BUCKETS: tuple[tuple[float, str], ...] = ((120.0, "<=120s"), (300.0, "<=300s"), (900.0, "<=900s"))
 GRADABLE_MARKETS = frozenset({"h2h", "spreads", "totals"})
 _IN_PLAY_STATES = frozenset({"live", "in progress", "in_progress", "halftime"})
@@ -204,6 +213,72 @@ def window_legend(boundaries: Sequence[datetime]) -> list[str]:
     return legend
 
 
+def index_departures(
+    records: Sequence[Mapping[str, Any]],
+) -> tuple[dict[str, list[datetime]], dict[str, list[tuple[datetime, str]]]]:
+    """(sport -> sorted build times, market identity -> sorted (time, "departure" | "return"))."""
+    builds: dict[str, list[datetime]] = collections.defaultdict(list)
+    timeline: dict[str, list[tuple[datetime, str]]] = collections.defaultdict(list)
+    for record in records:
+        if not isinstance(record, Mapping):
+            continue
+        kind = record.get("type")
+        if kind == "build":
+            at = _parse_ts(record.get("at"))
+            sports = record.get("sports") if isinstance(record.get("sports"), Mapping) else {}
+            if at is not None:
+                for sport in sports:
+                    builds[str(sport).strip().lower()].append(at)
+            continue
+        identity = record.get("identity")
+        if not isinstance(identity, str) or not identity or kind not in ("departure", "return"):
+            continue
+        at = _parse_ts(record.get("gone_by") if kind == "departure" else record.get("back_at"))
+        if at is not None:
+            timeline[identity].append((at, kind))
+    for series in builds.values():
+        series.sort()
+    for events in timeline.values():
+        events.sort(key=lambda event: event[0])
+    return dict(builds), dict(timeline)
+
+
+def look_after(
+    record: Mapping[str, Any],
+    builds: Mapping[str, Sequence[datetime]],
+    timeline: Mapping[str, Sequence[tuple[datetime, str]]],
+    horizon_seconds: float = LOOK_HORIZON_SECONDS,
+) -> str:
+    """`gone` | `kept` | `unobserved`: is the market ABSENT at the first build >= horizon after sighting?
+
+    Judged AT that build, not "did it ever leave in between". A replay of the
+    recorder over the 80 real 09-12 NCAAF builds wrote 1,109 returns against
+    2,245 departures, so a market that blinked off for one build and came back
+    was still there to bet at +10 min. `unobserved` when no build that late
+    exists for the sport -- a board that stopped building (the 09-12 date roll)
+    must not read as a price still there.
+    """
+    from syndicate.features.shared.clv_departure_ledger import market_identity
+
+    sighted = _parse_ts(record.get("captured_at"))
+    identity = market_identity(record)
+    if sighted is None or sighted.tzinfo is None or identity is None:
+        return "unobserved"
+    horizon = sighted + timedelta(seconds=horizon_seconds)
+    sport = str(record.get("sport") or "").strip().lower()
+    later = next((build for build in builds.get(sport, ()) if build >= horizon), None)
+    if later is None:
+        return "unobserved"
+    state = "kept"
+    for when, kind in timeline.get(identity, ()):
+        if when <= sighted:
+            continue  # an earlier life of the market, before this sighting
+        if when > later:
+            break
+        state = "gone" if kind == "departure" else "kept"
+    return state
+
+
 def grade(record: Mapping[str, Any], away_score: int, home_score: int) -> str | None:
     """'win' | 'loss' | 'push', or None when a final score cannot settle it."""
     market = str(record.get("market") or "").strip().lower()
@@ -311,6 +386,7 @@ def settle(
     min_ev_pct: float = 0.0,
     dedupe_markets: bool = True,
     split_at: Sequence[datetime] = (),
+    departures: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """One settled row per published opportunity, plus the counts of what was not settled.
 
@@ -324,6 +400,9 @@ def settle(
 
     `split_at` stamps each row's `window` from the KEPT sighting, so with
     dedupe a bet stays in the window where it was first published.
+
+    `departures` (the worker's departure log) stamps `look10` per row; without
+    it every row's `look10` is None, which is "not measured", never "kept".
     """
     wanted = str(sport or "").strip().lower()
     chosen: dict[Any, Mapping[str, Any]] = {}
@@ -346,6 +425,7 @@ def settle(
             chosen[key] = record
 
     by_sport = index_chips(chips)
+    departure_index = index_departures(departures) if departures is not None else None
     settled: list[dict[str, Any]] = []
     ungraded: collections.Counter[str] = collections.Counter()
     for record in chosen.values():
@@ -357,6 +437,7 @@ def settle(
             "book": str(record.get("bookmaker") or "unknown"),
             "market": f"{record.get('market')}/{record.get('segment')}",
             "window": window_of(record.get("captured_at"), split_at),
+            "look10": look_after(record, *departure_index) if departure_index is not None else None,
             "ev_pct": _as_float(record.get("ev_pct")),
             "price": price,
             "game": None,
@@ -399,9 +480,13 @@ def summarize(rows: Sequence[Mapping[str, Any]], dims: Sequence[str]) -> list[di
     for row in rows:
         key = tuple(row.get(d) for d in dims)
         cell = cells.setdefault(
-            key, {"n": 0, "ev_sum": 0.0, "win": 0, "loss": 0, "push": 0, "units": 0.0, "games": set()}
+            key, {"n": 0, "ev_sum": 0.0, "win": 0, "loss": 0, "push": 0, "units": 0.0, "games": set(),
+                  "look_n": 0, "look_gone": 0}
         )
         cell["n"] += 1
+        if row.get("look10") in ("gone", "kept"):
+            cell["look_n"] += 1
+            cell["look_gone"] += row["look10"] == "gone"
         cell["ev_sum"] += row.get("ev_pct") or 0.0
         if row.get("result"):
             cell[row["result"]] += 1
@@ -419,6 +504,9 @@ def summarize(rows: Sequence[Mapping[str, Any]], dims: Sequence[str]) -> list[di
             "w_l_p": f"{cell['win']}-{cell['loss']}-{cell['push']}",
             "units": round(cell["units"], 3),
             "roi_pct": round(cell["units"] / graded * 100.0, 2) if graded else None,
+            "n10": cell["look_n"],
+            "gone10": cell["look_gone"],
+            "gone10_pct": round(cell["look_gone"] / cell["look_n"] * 100.0, 1) if cell["look_n"] else None,
         })
     return sorted(out, key=lambda c: (-c["n"],) + tuple(str(c[d]) for d in dims))
 
@@ -439,6 +527,26 @@ def fetch_openings(base_url: str, date: str, token: str) -> list[dict[str, Any]]
     if not artifacts:
         # ABSENT is a real answer and must not print as an empty scorecard.
         raise RuntimeError(f"no opening ledger on web for {date} ({path})")
+    return parse_openings(next(iter(artifacts.values())))
+
+
+def fetch_departures(base_url: str, date: str, token: str) -> list[dict[str, Any]] | None:
+    """None when web has no departure log for `date`, or does not allowlist it yet.
+
+    A date from before the log existed is a real answer, printed as "not
+    measured" -- unlike a missing opening ledger, which leaves nothing to grade.
+    """
+    path = DEPARTURES_PATH_TEMPLATE.format(date=date)
+    url = f"{base_url.rstrip('/')}/api/ops/artifacts/export?path={urllib.parse.quote(path, safe='')}"
+    try:
+        payload = _http_json(url, headers={"X-Admin-Token": token})
+    except urllib.error.HTTPError as exc:
+        if exc.code in (403, 404):
+            return None
+        raise
+    artifacts = payload.get("artifacts") if isinstance(payload, Mapping) else None
+    if not isinstance(artifacts, Mapping) or not artifacts:
+        return None
     return parse_openings(next(iter(artifacts.values())))
 
 
@@ -466,12 +574,15 @@ _SPLIT_TABLES: tuple[tuple[str, tuple[str, ...]], ...] = (
 def _print_table(title: str, cells: Sequence[Mapping[str, Any]], dims: Sequence[str]) -> None:
     print(f"\n{title}")
     print(" ".join(f"{d:>18}" for d in dims)
-          + f" {'n':>5} {'graded':>6} {'games':>5} {'evShown':>8} {'W-L-P':>10} {'units':>8} {'ROI%':>7}")
+          + f" {'n':>5} {'graded':>6} {'games':>5} {'evShown':>8} {'W-L-P':>10} {'units':>8} {'ROI%':>7}"
+          + f" {'n10':>5} {'gone10':>6} {'gone%':>6}")
     for cell in cells:
         roi = "-" if cell["roi_pct"] is None else f"{cell['roi_pct']:.2f}"
+        gone_pct = "-" if cell["gone10_pct"] is None else f"{cell['gone10_pct']:.1f}"
         print(" ".join(f"{str(cell[d])[:18]:>18}" for d in dims)
               + f" {cell['n']:5d} {cell['graded']:6d} {cell['games']:5d} {cell['mean_ev_shown_pct']:8.2f}"
-              + f" {cell['w_l_p']:>10} {cell['units']:8.2f} {roi:>7}")
+              + f" {cell['w_l_p']:>10} {cell['units']:8.2f} {roi:>7}"
+              + f" {cell['n10']:5d} {cell['gone10']:6d} {gone_pct:>6}")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -487,6 +598,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true", help="print the full result as JSON")
     parser.add_argument("--split-at", action="append", default=[],
                         help="ISO time with a zone; repeat to split results into windows by captured_at")
+    parser.add_argument("--departures-file", default=None,
+                        help="local clv_departures JSONL; fetched beside the openings when those are fetched")
     args = parser.parse_args(argv)
 
     boundaries: list[datetime] = []
@@ -508,6 +621,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"set {args.admin_token_env} or pass --openings-file", file=sys.stderr)
             return 2
         records = fetch_openings(args.base_url, args.date, token)
+    departures: list[dict[str, Any]] | None = None
+    if args.departures_file:
+        departures = parse_openings(Path(args.departures_file).read_text(encoding="utf-8"))
+    elif not args.openings_file:
+        departures = fetch_departures(args.base_url, args.date, token)
     if args.chips_file:
         chips_payload = json.loads(Path(args.chips_file).read_text(encoding="utf-8"))
         chips = [c for c in (chips_payload.get("chips") or []) if isinstance(c, Mapping)]
@@ -515,22 +633,34 @@ def main(argv: Sequence[str] | None = None) -> int:
         chips = fetch_chips(args.base_url, args.date, args.sport)
 
     result = settle(records, chips, sport=args.sport, board_date=args.date,
-                    min_ev_pct=args.min_ev_pct, dedupe_markets=not args.no_dedupe, split_at=boundaries)
+                    min_ev_pct=args.min_ev_pct, dedupe_markets=not args.no_dedupe, split_at=boundaries,
+                    departures=departures)
     rows = result["rows"]
     finals = sum(1 for c in chips if str(c.get("state") or "").strip().lower() == "final")
     specs = _TABLES + (_SPLIT_TABLES if boundaries else ())
     tables = {name: summarize(rows, dims) for name, dims in specs}
     legend = window_legend(boundaries)
+    departure_summary = {
+        "available": departures is not None,
+        "records": len(departures or []),
+        "builds": sum(1 for r in departures or [] if isinstance(r, Mapping) and r.get("type") == "build"),
+    }
     if args.json:
         print(json.dumps({"date": args.date, "sport": args.sport, "records_in": len(records),
                           "chips": len(chips), "finals": finals, "opportunities": len(rows),
                           "ungraded": result["ungraded"], "skipped": result["skipped"],
-                          "windows": legend, "tables": tables}, indent=1, default=str))
+                          "windows": legend, "departures": departure_summary, "tables": tables},
+                         indent=1, default=str))
         return 0
     print(f"date={args.date} sport={args.sport or 'all'} records_in={len(records)} "
           f"opportunities={len(rows)} chips={len(chips)} finals={finals}")
     print(f"skipped={result['skipped']}")
     print(f"ungraded={result['ungraded']}")
+    if departure_summary["available"]:
+        print(f"departures: {departure_summary['records']} records, {departure_summary['builds']} builds "
+              f"(gone10 = left the board by the first build >= {LOOK_HORIZON_SECONDS:.0f}s after sighting)")
+    else:
+        print("departures: no log for this date -- n10/gone10 are not measured")
     if legend:
         print("windows by captured_at: " + "; ".join(legend))
     for name, dims in specs:

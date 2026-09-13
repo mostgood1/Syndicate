@@ -303,6 +303,9 @@ def record_openings(
     stamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     captured_at = stamp.strftime("%Y-%m-%dT%H:%M:%SZ")
     path = opening_ledger_path(date, root=root)
+    # Read twice below (openings, then departures), so an iterator must not be
+    # consumed by the first pass.
+    rows = list(rows)
 
     seen: set[str] = set()
     for record in load_openings(date, root=root):
@@ -381,6 +384,26 @@ def record_openings(
         "truncated_at_ceiling": truncated,
         "total_openings": already + written,
     }
+    # WHICH +EV PRICES LEFT THE BOARD SINCE THE LAST BUILD (lane
+    # `layer2-live-scorecard-gate`, 2026-09-13; `clv_departure_ledger`). Called
+    # HERE because every Layer 2 build already reaches this function with its
+    # full row set, and with the same clock: a departure's `gone_by` and an
+    # opening's `captured_at` are the same build stamp, which is what lets the
+    # scorecard join them. Never raises into the openings -- losing a departure
+    # costs a measurement, losing an opening costs a day.
+    try:
+        from syndicate.features.shared.clv_departure_ledger import (
+            departure_ledger_enabled,
+            record_departures,
+        )
+
+        report["departures"] = (
+            record_departures(rows, date=str(date), now=stamp, root=root)
+            if departure_ledger_enabled()
+            else {"enabled": False}
+        )
+    except Exception as exc:
+        report["departures"] = {"error": f"{type(exc).__name__}: {exc}"}
     print(
         "[clv_opening_ledger] OPENINGS date=%s rows_in=%d written=%d already=%d "
         "duplicate=%d unkeyable=%d truncated=%s"
