@@ -247,6 +247,15 @@ def _event_window_days() -> float:
         return 8.0
 
 
+def _live_lookback_hours() -> float:
+    """How long after kickoff an event stays in scope. A college game runs
+    ~3h30m-4h; 4.5h clears it without carrying a finished slate."""
+    try:
+        return max(0.0, float(os.environ.get("ODDS_API_LIVE_LOOKBACK_HOURS", "4.5") or 0))
+    except Exception:
+        return 4.5
+
+
 def events_in_scope(events: list[dict[str, Any]], *, window_days: float | None = None) -> list[dict[str, Any]]:
     """The next slate only -- events kicking off within `window_days` of the
     earliest upcoming kickoff.
@@ -258,6 +267,11 @@ def events_in_scope(events: list[dict[str, Any]], *, window_days: float | None =
     """
     window = float(window_days if window_days is not None else _event_window_days())
     now = datetime.now(tz=timezone.utc)
+    # GAMES IN PROGRESS STAY IN SCOPE -- the same fix as the NFL fetcher's
+    # `events_in_scope` (lane `nfl-live-props-missing`): `commence_time < now`
+    # dropped a game at kickoff, so no in-play prop was ever requested.
+    # `ODDS_API_LIVE_LOOKBACK_HOURS=0` restores upcoming-only.
+    earliest_allowed = now - timedelta(hours=_live_lookback_hours())
     dated: list[tuple[datetime, dict[str, Any]]] = []
     for event in events or []:
         raw = event.get("commence_time") or event.get("commenceTime")
@@ -269,7 +283,7 @@ def events_in_scope(events: list[dict[str, Any]], *, window_days: float | None =
             continue
         if when.tzinfo is None:
             when = when.replace(tzinfo=timezone.utc)
-        if when < now:
+        if when < earliest_allowed:
             continue
         dated.append((when, event))
     if not dated:

@@ -204,6 +204,15 @@ def _event_window_days() -> float:
         return 8.0
 
 
+def _live_lookback_hours() -> float:
+    """How long after kickoff an event stays in scope. An NFL game runs ~3h15m,
+    ~3h45m with overtime; 4.5h clears both without carrying a finished slate."""
+    try:
+        return max(0.0, float(os.environ.get("ODDS_API_LIVE_LOOKBACK_HOURS", "4.5") or 0))
+    except Exception:
+        return 4.5
+
+
 def events_in_scope(events: list[dict[str, Any]], *, window_days: float | None = None) -> list[dict[str, Any]]:
     """The next slate only -- every event kicking off within `window_days` of
     the EARLIEST upcoming kickoff.
@@ -216,11 +225,25 @@ def events_in_scope(events: list[dict[str, Any]], *, window_days: float | None =
     one slate.
 
     Bounding on the earliest KICKOFF rather than on `--week` is deliberate: the
-    live endpoint can only ever serve upcoming events, so the week number names
-    the output shard -- it cannot widen what the API is willing to return.
+    week number names the output shard -- it cannot widen what the API is
+    willing to return. The live endpoint serves upcoming AND IN-PROGRESS events
+    (this docstring used to say "only ever upcoming", which is false): probed
+    2026-09-13T22:26Z, `/events` listed the 4 games in progress, and each
+    returned player props from 6 books with 25 of 25 markets updated after
+    kickoff. Finished games drop off `/events`.
     """
     window = float(window_days if window_days is not None else _event_window_days())
     now = datetime.now(tz=timezone.utc)
+    # GAMES IN PROGRESS STAY IN SCOPE (lane `nfl-live-props-missing`). This used
+    # to drop every event with `commence_time < now`, so a game's props were
+    # never requested again once it kicked off. Measured 2026-09-13 on the
+    # served layer1 board: 0 of 1,998 NFL prop rows had been seen after their
+    # own kickoff, and every live prop died in the opportunity gate as
+    # `live_market_stale`. MLB keeps started games by selecting on slate DATE
+    # (`fetch_mlb_oddsapi_local._fetch_live_events_for_date`). A finished game
+    # still inside the lookback costs one request and returns no bookmakers.
+    # `ODDS_API_LIVE_LOOKBACK_HOURS=0` restores upcoming-only.
+    earliest_allowed = now - timedelta(hours=_live_lookback_hours())
     dated: list[tuple[datetime, dict[str, Any]]] = []
     for event in events or []:
         raw = event.get("commence_time") or event.get("commenceTime")
@@ -232,7 +255,7 @@ def events_in_scope(events: list[dict[str, Any]], *, window_days: float | None =
             continue
         if when.tzinfo is None:
             when = when.replace(tzinfo=timezone.utc)
-        if when < now:
+        if when < earliest_allowed:
             continue
         dated.append((when, event))
     if not dated:

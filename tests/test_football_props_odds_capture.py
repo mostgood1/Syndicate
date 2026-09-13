@@ -134,6 +134,32 @@ def test_events_in_scope_handles_an_empty_schedule():
     assert nfl.events_in_scope([{"id": "x"}]) == []
 
 
+def _scope_fixture(now):
+    return [
+        {"id": "live", "commence_time": (now - timedelta(hours=1)).isoformat()},
+        {"id": "finished", "commence_time": (now - timedelta(hours=6)).isoformat()},
+        {"id": "upcoming", "commence_time": (now + timedelta(hours=2)).isoformat()},
+        {"id": "next_week", "commence_time": (now + timedelta(days=10)).isoformat()},
+    ]
+
+
+@pytest.mark.parametrize("module", [nfl, ncaaf], ids=["nfl", "ncaaf"])
+def test_events_in_scope_keeps_games_in_progress(module, monkeypatch):
+    """Lane `nfl-live-props-missing`: dropping `commence_time < now` meant a
+    game's props were never requested after kickoff -- 0 of 1,998 NFL prop
+    rows on the 2026-09-13 board were seen after their own kickoff."""
+    monkeypatch.delenv("ODDS_API_LIVE_LOOKBACK_HOURS", raising=False)
+    kept = {e["id"] for e in module.events_in_scope(_scope_fixture(datetime.now(tz=timezone.utc)), window_days=8)}
+    assert kept == {"live", "upcoming"}, kept
+
+
+@pytest.mark.parametrize("module", [nfl, ncaaf], ids=["nfl", "ncaaf"])
+def test_events_in_scope_zero_lookback_is_upcoming_only(module, monkeypatch):
+    monkeypatch.setenv("ODDS_API_LIVE_LOOKBACK_HOURS", "0")
+    kept = {e["id"] for e in module.events_in_scope(_scope_fixture(datetime.now(tz=timezone.utc)), window_days=8)}
+    assert kept == {"upcoming"}, kept
+
+
 @pytest.mark.parametrize("module", [nfl, ncaaf], ids=["nfl", "ncaaf"])
 def test_all_markets_invalid_raises_instead_of_returning_empty(module, monkeypatch):
     """THE anti-regression guard. A bad market key must not look like a quiet
