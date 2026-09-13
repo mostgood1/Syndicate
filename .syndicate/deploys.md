@@ -34458,3 +34458,21 @@ Refresh-worker claim released after this entry.
 **Rollback:** `python scripts/render_deploy.py --service refresh-worker --commit c114e1aa --allow-rollback` behind a claim + preflight. That restores the 304 trap.
 
 **Claim** `refresh-worker-disk-inventory` on refresh-worker RELEASED with its token after this entry.
+
+## 2026-09-13 21:50Z — reading only — lane `layer2-live-scorecard-gate` — departure log verified end-to-end on a live slate (refresh-worker `3e18be8e`, web `9c7d34bc`)
+
+No deploy, no env change. This closes the OWED item of the 14:47Z entry.
+
+- **verify — MET.**
+  - Production departure log: web export at 21:45:33Z, 1,034,914 B, 34 builds, 1,739 departures, 665 returns.
+  - Compared against the session capture of `/api/board/layer2-shortlist?sport=nfl&date=2026-09-13&limit=2000`: 206 polls over 33 builds, all 33 matched to log builds within 5 s.
+  - For each first +EV opportunity sighting, the verdict at the first log build at least 600 s later: live 57 compared, 57 agree (40 gone); pregame 152 of 152 (72 gone). 0 disagreements.
+- **Build gaps move the rate.** Live gone was 19 of 30 (63%) when the deciding build came within 15 min, and 21 of 27 (78%) beyond. NFL builds were 222-1,421 s apart.
+- **The scorecard CLI on production** (`--date 2026-09-13 --sport nfl`, openings and departure log fetched from web):
+  - departures available, 2,448 records, 35 builds;
+  - in-play `n10` 52, `gone10` 42 (80.8%);
+  - pregame `n10` 46, `gone10` 25 (54.3%).
+- **A defect found by that run, fixed in `b6ff319a`** (offline script, no deploy).
+  - 64 openings captured the previous morning, before the log's first build, read 64 kept and 0 gone.
+  - `look_after` now requires a log build at the sighting stamp (within 5 s), otherwise `unobserved`. Those rows' `n10` went from 64 to 0.
+- The capture is kept at `C:/tmp/layer2_capture_durable/2026-09-13/`. The recorder was stopped at ~21:46Z once the comparison held.
