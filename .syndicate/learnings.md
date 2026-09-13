@@ -5799,3 +5799,26 @@ Re-resolving also showed refresh-worker already live on `3e18be8e`, which contai
 **How to apply:**
 - Immediately before preflight, re-run `git diff --stat <live>..<target>` for every service you deploy. If the ship list grew past what was approved, either re-ask or deploy the approved SHA (it must still be on origin/main), and say which in `deploys.md`.
 - Never deploy a SHA OLDER than what a service already runs. Read each service's live commit first: a peer's newer deploy may already carry yours.
+## 2026-09-13 FORBIDDEN: gating a ledger commit on a PowerShell function's return value without `@()` at the call site. A single match unrolls to a bare string, so `.Count` reads 1 and `[0]` is its FIRST CHARACTER. `[lane live-odds-worker-oom-loop]`
+
+**What I believed.** A deleted-lines gate was sound as written:
+
+```
+$d = Get-DeletedLines 'x'
+$d.Count -eq 1 -and $d[0] -like '...'
+```
+
+It was meant to confirm that a commit removed exactly the one line I had edited.
+
+**What was true.**
+- The gate refused two correct commits in a row. PowerShell unrolls a one-element pipeline result, so `$d` was a string: `.Count` was 1 and `$d[0]` was `-`.
+- The only visible symptom was `[System.Char] does not contain a method named 'Contains'`, and that appeared only once I split the conditions apart.
+- It failed CLOSED, which is the safe direction. But a gate that cannot pass on correct input teaches people to override it.
+- Separately, the harness refused a helper named `Del` as `Remove-Item` (its alias) before anything ran.
+
+**How to apply.**
+- Write `$d = @(Get-DeletedLines ...)` at EVERY call site, and cast each element with `[string]` before calling string methods.
+- Print each gate condition on its own line before AND-ing them. A combined `False` names no culprit.
+- Never name a helper after a PowerShell alias: `del`, `rm`, `ri`, `sl`, `gc`, `cat`, `ls`, `echo`.
+- After `session_worktree.py land`, check `rebase-merge` is absent BEFORE testing `merge-base --is-ancestor HEAD origin/main`. During a paused rebase HEAD is upstream, so that test passes trivially.
+- *(evidence in `.syndicate/log/2026-09-13.md`, section "live-odds-worker-oom-loop — session 791399da — ~1:25 PM CT")*
