@@ -2409,12 +2409,21 @@ def _persist_tracking_snapshot(
     normalized = normalized.sort_values(key_cols + ["snapshot_ts"], kind="mergesort").reset_index(drop=True)
     history_rows = normalized.copy()
     history_rows["snapshot_ts"] = history_rows["snapshot_ts"].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-    _trace_log("before_write_history_csv", path=str(history_path), rows=int(len(history_rows)), size_bytes=_trace_file_size(history_path))
-    if history_path.exists():
-        history_rows.to_csv(history_path, mode="a", header=False, index=False)
-    else:
-        history_rows.to_csv(history_path, index=False)
-    _trace_log("after_write_history_csv", path=str(history_path), rows=int(len(history_rows)), size_bytes=_trace_file_size(history_path))
+    # Lane `refresh-worker-disk-inventory`, 2026-09-13, user decision "Stop
+    # history re-append". This appended the FULL snapshot on every refresh to a
+    # CSV that nothing reads (no reader in syndicate/, pipeline/ or scripts/; the
+    # opening and movement files below are built from `normalized` and the
+    # opening file, never from history). On refresh-worker it reached 300-711 MB
+    # per soccer day and filled a 50 GB disk to 0.0 MB free, freezing the board.
+    # OFF by default; `SYNDICATE_TRACKING_HISTORY_CSV=1` restores the append.
+    history_written = str(os.environ.get("SYNDICATE_TRACKING_HISTORY_CSV") or "").strip().lower() in {"1", "true", "yes", "on"}
+    if history_written:
+        _trace_log("before_write_history_csv", path=str(history_path), rows=int(len(history_rows)), size_bytes=_trace_file_size(history_path))
+        if history_path.exists():
+            history_rows.to_csv(history_path, mode="a", header=False, index=False)
+        else:
+            history_rows.to_csv(history_path, index=False)
+        _trace_log("after_write_history_csv", path=str(history_path), rows=int(len(history_rows)), size_bytes=_trace_file_size(history_path))
 
     _trace_log("before_read_opening_csv", path=str(opening_path), size_bytes=_trace_file_size(opening_path))
     existing_open = _read_csv(opening_path)

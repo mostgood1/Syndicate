@@ -189,6 +189,19 @@ def run_disk_maintenance(*, sports: tuple[str, ...] = ("mlb", "wnba", "nba", "nh
         except Exception as exc:
             print(f"[disk_maintenance] DISK_INVENTORY_START_FAILED {type(exc).__name__}: {exc}", flush=True)
 
+        # Same lane, user decision 2026-09-13 ("Remove verified duplicates",
+        # "Gzip props-history CSVs"). One-shot, verified, its own thread, and on
+        # by default only for `SYNDICATE_DISK_COMPACTION_SERVICES` (default
+        # `refresh-worker`) -- see `disk_compaction.py`. Before the daily gate for
+        # the same reason as the inventory: the disk was full mid-day.
+        try:
+            from syndicate.features.shared.artifact_publisher import _data_root as _compaction_root
+            from syndicate.features.shared.disk_compaction import start_disk_compaction_once
+
+            start_disk_compaction_once(_compaction_root(), _service_slug())
+        except Exception as exc:
+            print(f"[disk_maintenance] DISK_COMPACTION_START_FAILED {type(exc).__name__}: {exc}", flush=True)
+
         if not _due():
             return {"ran": False, "reason": "not_due"}
 
