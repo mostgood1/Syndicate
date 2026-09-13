@@ -33999,3 +33999,30 @@ The prediction points that way: a smaller transient. `ALL_PROCESS_MEMORY` is sam
 - Lane `execution-ledger-cas`'s entry (2026-09-12 16:37Z) also counted 63 rejections over 09-11T15:50Z..09-12T15:24Z.
 - The original windows started at 15:00Z and missed the prior night. "Not caused by `58736a69`/`e332b531`" STANDS, and is stronger for it.
 - **Attribution for any later OOM reading:** a kill-free window after this deploy reads `58736a69` + `e332b531` + `77199c48` together, because the payload fix shrinks the MLB build and serialize.
+
+### 2026-09-13 04:43Z — reading only — live-odds-worker — lane `live-odds-worker-oom-loop` — R4 ENDED BY a user-decided deploy, NOT a pass or a fail
+
+**What ended it.** Lane `mlb-live-lens-payload-dup` (session 0f5b256e) deployed `77199c48` to live-odds-worker under its own claim and a user decision for a SEPARATE defect: `mlb_live_lens.json` exceeding the 8 MB keyvalue ceiling.
+- Deploy `dep-daj2hi9594qs73ak0k7g`: `deploy_started` 2026-09-13T04:38:33.556Z, live `2026-09-13T04:43:50.026Z` (events `deploy_ended`).
+- Code in `e332b531..77199c48`, verified here with `git diff --stat`: `syndicate/features/mlb/live_lens.py` +52 and `tests/test_mlb_live_lens_snapshot_payload.py` +200. Nothing else ships to the worker.
+
+**R4 as it stood: the COMBINATION `58736a69` + `e332b531`.**
+- `render_events.py --service live-odds-worker --since 2026-09-13T00:14:31Z`, fully paged, OUTPUT COMPLETE, read at 04:39:17Z: **0 `server_failed`** from `e332b531`'s `deploy_ended` 00:14:31.528Z to that `deploy_started` 04:38:33.556Z.
+- That is **4 h 24 m 02 s clean**, extending to go-live `2026-09-13T04:43:50.026Z`: **4 h 29 m 18 s clean**, with 0 `server_failed` in the same read re-taken at 04:44Z (OUTPUT COMPLETE).
+- This lane's 3-min events watcher agrees through its last poll.
+- **The 6 h criterion was NOT reached.** Record it as ENDED, not MET.
+
+**Context for the 4 h 24 m, so it is not over-read.**
+- `58736a69` alone: 93.6 min to its first kill (00:07:50Z).
+- Before either fix, 09-12 13-21Z: 2.67 kills/h.
+- Under that rate, 0 kills in 4.4 h is ~e^-11.7; under `58736a69`-alone's 1 kill per 1.56 h it is ~e^-2.8, about 6%.
+- Most of the window was the late, thinning slate (MLB finished; late NCAAF). On 09-10 the old code went 23 h clean off-slate.
+
+**Capture during the window: cadence NOT reduced.**
+- `DAILY_BOOK` 15/h (01Z), 16/h (02Z), 21 lines in 03:00-04:02Z, all `status=ok errors=0`.
+- `ODDS_SWEEP_LAUNCHED` 14/h (01Z), 20/h (02Z).
+- Served NCAAF quote age p50/p90 202/723 s, against 701/2,753 s in the kill regime; confounded by row mix (entry 04:2xZ).
+
+**WHAT ANY LATER WINDOW MEASURES.** From `2026-09-13T04:43:50.026Z` the worker runs THREE changes: the arena cap + trim, the streaming daily-book writer, and the MLB live-lens payload fix. The last shrinks the MLB live-lens build, the third memory lever this lane named. A kill-free window from here is attributable only to the three together.
+
+**verify (this lane):** OWED. 0 `oomKilled` over >= 6 h spanning a LIVE slate on the three-change build, via `render_events.py --service live-odds-worker --since 2026-09-13T04:43:50.026Z` with OUTPUT COMPLETE. The first full-slate opportunity is the 2026-09-13 NFL/MLB afternoon (~17:00Z onward). Any kill is classified by its `TRIM_SELECT`/`DAILY_BOOK` offset and last live-lens stage.

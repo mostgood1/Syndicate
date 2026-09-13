@@ -814,7 +814,7 @@ death, never life — do not invert it.
 - Verification: 0 `oomKilled` on live-odds-worker for at least 6 h spanning a live slate after the fix deploy, with unreclaimable p95 over the same window recorded in `deploys.md`.
 - History: context, hypotheses H1-H4, the readings, the fix detail, pre-registered P1-P4 and the 58736a69-alone verdict were moved VERBATIM to `lanes_history.md` at the 2026-09-13 checkpoint. Narrative: `log/2026-09-12.md`. Readings: `deploys.md` 2026-09-12 22:31:32Z.
 - Blocked by: none. NOTE: `#656` (lane `execution-ledger-cas`) is blocked on this. No deploy without the user's go-ahead: live-odds-worker places live venue orders, and a deploy carries origin/main collateral.
-### live-odds-worker-oom-loop — OPEN — opened 2026-09-12 — session 791399da-baf0-48a5-a708-e99f4ae7fd00 — **DEPLOYED `e332b531` (live 2026-09-13T00:14:31Z). GOAL: NOT MET — the 6 h kill-free reading is owed at >= 2026-09-13T06:14:31Z**
+### live-odds-worker-oom-loop — OPEN — opened 2026-09-12 — session 791399da-baf0-48a5-a708-e99f4ae7fd00 — **DEPLOYED `e332b531` (live 2026-09-13T00:14:31Z). GOAL: NOT MET — its kill-free window ENDED at 4 h 29 m 18 s by a user-decided deploy (`77199c48`, live 04:43:50Z); a >= 6 h window on the three-change build is owed**
 - **GOAL VERDICT (checkpoint 2026-09-13 ~04:1xZ, session 791399da) — Goal (verbatim): "name, with evidence, the loop or allocation that drives live-odds-worker (`srv-d91dpertqb8s73co8lt0`, 2Gi) to `oomKilled` during live slates, and stop the kills WITHOUT reducing odds-capture cadence. Evidence at open: events API `server_failed reason=oomKilled memoryLimit=2Gi` at 2026-09-12 18:08:51Z, 18:30:14Z, 18:42:16Z, 18:59:57Z (NCAAF slate); lane `execution-ledger-cas` counted 47 between 2026-09-11T14:17Z and 2026-09-12T15:56Z (`deploys.md` 2026-09-12 16:37Z) and records the loop strands LIVE orders between `place_order` and `reconcile_live_orders`. This worker places REAL-MONEY orders (`SYNDICATE_EXECUTION_MODE=live`, `LIVE_ARMED=1`)." → GOAL: NOT MET.**
   - **Reached.**
     - The component is named with evidence: the Kalshi daily-book write (`venue_daily_odds.record_daily_odds`, venue-poll thread). 62 of 66 kills landed inside its `TRIM_SELECT`->`DAILY_BOOK` window, against a 17.2% null. Onset is the first deploy carrying `52a995f2`.
@@ -822,7 +822,7 @@ death, never life — do not invert it.
     - 0 `server_failed` 00:14:31Z-04:04Z (events fully paged).
     - Capture cadence RECOVERED, not reduced: `DAILY_BOOK` 15-21/h against 8.4/h in the kill regime; sweeps 14-20/h per full hour.
   - **Left.**
-    - 0 `oomKilled` over >= 6 h from 00:14:31Z, read as the COMBINATION with lane `live-odds-worker-oom`'s `58736a69`. Alone, that build was killed at 00:07:50Z.
+    - 0 `oomKilled` over >= 6 h spanning a live slate. The two-fix window (`58736a69` + `e332b531`) ran 00:14:31Z-04:43:50Z, 4 h 29 m 18 s with 0 `server_failed`. It was ENDED by lane `mlb-live-lens-payload-dup`'s user-decided deploy of `77199c48`, not passed or failed (`deploys.md` 2026-09-13 04:43Z). Any window from 04:43:50Z reads THREE changes together. Alone, `58736a69` was killed at 00:07:50Z.
     - The quote-age half of Verification (`quote_seen_age_seconds` p50/p90) is not measured.
     - Not proven sufficient: the live-lens MLB/soccer builds are a named third lever.
   - **Blocking:** time only. The slate is winding down, so a clean late-night window is weaker evidence than a clean afternoon.
@@ -837,7 +837,7 @@ death, never life — do not invert it.
   - `log/2026-09-12.md`.
   - The pre-checkpoint block moved VERBATIM to `lanes_history.md` 2026-09-13.
 - **OWED:**
-  - (1) At >= 06:14:31Z run `render_events.py --service live-odds-worker --since 2026-09-13T00:14:31Z`; require OUTPUT COMPLETE and 0 `oomKilled`, and record the result in `deploys.md`. Classify any kill by its `TRIM_SELECT`/`DAILY_BOOK` offset and by the last live-lens stage: during a build and after `DAILY_BOOK` points at the builds.
+  - (1) Run `render_events.py --service live-odds-worker --since 2026-09-13T04:43:50Z`, reading from the three-change build's go-live, over >= 6 h that span a LIVE slate. The first full slate is the 2026-09-13 NFL/MLB afternoon, ~17:00Z onward. Require OUTPUT COMPLETE and 0 `oomKilled`, and record the result in `deploys.md`; re-base the window on any later deploy. Classify any kill by its `TRIM_SELECT`/`DAILY_BOOK` offset and by the last live-lens stage: during a build and after `DAILY_BOOK` points at the builds.
   - (2) MEASURED 04:2xZ, CONFOUNDED (`deploys.md` 2026-09-13 04:2xZ): served NCAAF quote age p50/p90 went 701/2,753 s (kill regime) -> 545/994 s (`58736a69` alone) -> 202/723 s (`e332b531`). MLB and soccer also fell. Cadence was NOT reduced. The row mix changed as games finished, so this is not an A/B.
   - (3a) refresh-worker checked, read-only: 1 `oomKilled` since 09-09. Its `MEMORY_GUARD_ABORT`s are NOT timed to the daily-book write (29/172 = 16.9% inside a window, against a 12.0% null).
   - (3) refresh-worker runs the same writer. User decision: later, with its own measurement and deploy. Not claimed.
