@@ -34519,3 +34519,26 @@ No deploy, no env change. This closes the OWED item of the 14:47Z entry.
   - Today the gate does not read that field for these rows. If a consumer does, it would mark live props unobserved.
 - **Next-build persistence reading:** a watcher is polling for the build after 22:44:36Z; appended below if it changes the verdict.
 - **Claim:** `nfl-live-props-missing` on live-odds-worker RELEASED after this entry.
+
+## 2026-09-13 23:12Z — CORRECTION — lane `nfl-live-props-missing` / `quote-state-publish-retry` — the 22:46Z "verify MET" rested on ONE Layer 2 build; live NFL props FLAP
+
+No deploy in this entry. It corrects the 22:46Z reading.
+
+- **Successive NFL Layer 2 builds** (`/api/board/layer2-shortlist?sport=nfl`), live prop rows:
+
+  | `written_at` | live props | opportunity lane |
+  |---|---|---|
+  | 22:44:36Z | 278 | 2,041 |
+  | 22:49:15Z | **0** | 1,673 |
+  | 23:05:18Z | 216 (`quote_seen_age_seconds` 280.7 s on all 216, book age p50 317 s) | 2,246 |
+  | 23:09:02Z | **0** | 1,744 |
+
+- **Capture is fixed; the in-play last-seen clock is not.**
+  - Layer1 22:48:12Z: the 4 live games' prop quotes had book age p50 94-154 s, while every live row's `seen_age_seconds` read 461.6 s (one stamp, ~22:40:30Z).
+  - The gate uses the last-seen age when present and kills a live row past 300 s (`opportunity_gate.py:80`, `:310-313`, `live_quote_unobserved`).
+- **Why the clock goes stale:** web merges `book_quotes/*.state.json` one child at a time and answers 503 to a publish arriving mid-merge (`ops.py:2059-2067`, `:2407-2419`). The publisher leaves it for next-sweep repair.
+  - Web `ARTIFACT_MERGE_AT_CAPACITY` on `nfl_source/tracking/book_quotes/2026-09-13.state.json`: 22:37:02, 22:38:40, 22:41:15, 22:47:54 (x2), 22:49:20Z.
+  - Each merge child took ~0.3-0.7 s. The 22:47Z sweep's update merged only at 22:49:24Z (`added 557`).
+- **Not chosen:** a gate `min(seen, book)` change. It reverses the 09-12 rule tested at `tests/test_opportunity_gate.py:131` (book 618 s / seen 1,013 s must die).
+- **Remedy:** `quote-state-publish-retry`. `publish_hot_artifact` retries a quote-state publish refused with 503 at 1/2/4 s. It ships on live-odds-worker. The deploy is PENDING the user's OK.
+- **The 22:46Z entry's claim release stands.** Its "verify — MET" is superseded by this entry: capture MET, board presence INTERMITTENT.
