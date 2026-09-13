@@ -34432,3 +34432,29 @@ Refresh-worker claim released after this entry.
 - Readers still get the shorter plain file for those dates. **Not fixed; not a safe delete.**
 
 **Not done:** `48c1fc61` (no `since=` on append-only tails) is on main, NOT deployed.
+
+## 2026-09-13 18:28:12Z — refresh-worker `c114e1aa` -> `cae4713e` — lane `refresh-worker-disk-inventory` — `48c1fc61`: no `since=` on an append-only streamed tail. **LIVE 18:31:22Z; MEASURED: NFL shard tails and the NFL board rebuild after boot.**
+
+**User decision:** "deploy it".
+
+**Deploy.** `dep-dajemf15efls738l5vog`, trigger `api`.
+- Claim acquired 18:22:31Z (token held by this lane).
+- Preflight HOLD at 18:22:41Z: MLB daily sim in flight (`run_mlb_daily_sim_job.py` -> `tools/daily_update.py --workflow ui-daily`).
+- A read-only watcher (`scratchpad/wait_rw_clear.py`) polled every 60 s. **CLEAR at 18:27:45Z** for tip `cae4713e` (only infra; 2 defunct children).
+- Deploy posted 18:28:12Z; build_ended 18:29:59Z; deploy_ended 18:31:22Z.
+- Live commit `cae4713e`, finished 18:31:22.73Z (preflight re-read reports ALREADY LIVE).
+- **Collateral: none.** `git diff --name-only c114e1aa cae4713e` over code = `syndicate/features/shared/artifact_publisher.py` only (`48c1fc61`). Other commits since are ledger-only.
+
+**Baseline, 18:28:54Z, before the reboot (same probes as after):**
+- layer1 nfl `generated_at` 18:26:51Z; newest sportsbook `observed_at` 18:18:56Z; live 8 / pregame 5.
+- layer2 nfl `written_at` 18:22:55Z, 596 rows, 71 live.
+- Last `STREAM_TAIL_OK path=nfl_source/tracking/book_quotes/2026-09-13.jsonl appended_bytes=313079 from_offset=35066218` at 18:19:50Z.
+
+**verify — READINGS after boot:**
+- **The tail pull still lands on the new code:** `STREAM_TAIL_OK path=nfl_source/tracking/book_quotes/2026-09-13.jsonl appended_bytes=355849 from_offset=35379297` at 18:39:40Z, the first shard pull after boot.
+- **The board rebuilt cold:** layer2 nfl `written_at` 18:53:50Z, 808 rows, 23 live. layer1 nfl `generated_at` 18:49:33Z, newest sportsbook `observed_at` 18:36:29Z, live 8 / pregame 5.
+- **Not directly observable:** that the request carried no `since=`. Neither the puller nor web's stream route logs query strings. The change is proven by the test (`test_append_only_tail_sends_range_without_since` fails on `c114e1aa`'s module) plus a pull that tailed after boot. The regression it closes needs a local mtime at or past web's, which today's live cadence did not reproduce.
+
+**Rollback:** `python scripts/render_deploy.py --service refresh-worker --commit c114e1aa --allow-rollback` behind a claim + preflight. That restores the 304 trap.
+
+**Claim** `refresh-worker-disk-inventory` on refresh-worker RELEASED with its token after this entry.
