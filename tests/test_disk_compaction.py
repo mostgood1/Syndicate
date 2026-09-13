@@ -87,6 +87,40 @@ def test_plain_shard_removed_only_when_gz_twin_has_same_lines(tmp_path):
     assert recent.exists() and result["kept_recent"] == 1
 
 
+def test_stale_plain_prefix_removed_so_readers_get_the_fuller_gz(tmp_path):
+    """Measured 2026-09-13: 18 MLB shards whose .gz held 1-132 MORE lines than the plain
+    file, and `resolve_book_quotes_path` serves plain whenever it exists."""
+    shard_dir = tmp_path / "mlb_source/tracking/book_quotes"
+    stale = shard_dir / "2026-09-03.jsonl"
+    diverged = shard_dir / "2026-09-04.jsonl"
+    torn = shard_dir / "2026-09-05.jsonl"
+    _write_lines(stale, 40); _write_gz_lines(stale.with_name(stale.name + ".gz"), 52)
+    diverged.parent.mkdir(parents=True, exist_ok=True)
+    diverged.write_text('{"row": 0}\n{"row": 999}\n', encoding="utf-8")
+    _write_gz_lines(diverged.with_name(diverged.name + ".gz"), 30)
+    # A write torn mid-line by ENOSPC is still a byte prefix of the complete copy.
+    torn.write_text('{"row": 0}\n{"row": 1}\n{"ro', encoding="utf-8")
+    _write_gz_lines(torn.with_name(torn.name + ".gz"), 30)
+
+    result = dc.remove_verified_shard_duplicates(tmp_path, today=TODAY, apply=True, printer=_quiet)
+
+    assert not stale.exists() and stale.with_name(stale.name + ".gz").exists()
+    assert not torn.exists()
+    assert diverged.exists(), "a plain file that differs from the .gz is not provably redundant"
+    assert result["removed_stale_prefix"] == 2 and result["kept_mismatch"] == 1 and result["removed"] == 0
+
+
+def test_stale_plain_prefix_dry_run_only_reports(tmp_path):
+    stale = tmp_path / "mlb_source/tracking/book_quotes/2026-09-03.jsonl"
+    _write_lines(stale, 40); _write_gz_lines(stale.with_name(stale.name + ".gz"), 52)
+    printed: list[str] = []
+
+    result = dc.remove_verified_shard_duplicates(tmp_path, today=TODAY, apply=False, printer=lambda line, **_k: printed.append(line))
+
+    assert stale.exists() and result["removed_stale_prefix"] == 1
+    assert any("shard_stale_prefix_would_remove" in line for line in printed)
+
+
 # ---------------------------------------------------------------------------
 # 3. CLOSED HISTORY CSVs, gzipped with verify
 # ---------------------------------------------------------------------------

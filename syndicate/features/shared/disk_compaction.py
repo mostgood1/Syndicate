@@ -161,8 +161,40 @@ def remove_orphan_temp_files(root: Path, *, apply: bool, now: float | None = Non
     return result
 
 
+def _read_up_to(stream: Any, size: int) -> bytes:
+    parts: list[bytes] = []
+    remaining = size
+    while remaining > 0:
+        piece = stream.read(remaining)
+        if not piece:
+            break
+        parts.append(piece)
+        remaining -= len(piece)
+    return b"".join(parts)
+
+
+def _plain_is_prefix_of_packed(plain: Path, packed: Path) -> bool:
+    """True when every byte of `plain` is the leading bytes of `packed`, decompressed.
+
+    WHY. The 2026-09-13 run kept 18 MLB shards (09-03 onward) whose `.gz` held
+    1-132 MORE lines than the plain file. `resolve_book_quotes_path` prefers the
+    plain file whenever it exists, so every reader of those dates -- book grid,
+    CLV, movement -- was served the SHORTER copy, silently. A plain file that is a
+    byte prefix of its `.gz` carries nothing the `.gz` lacks; removing it hands
+    those readers the fuller copy. Anything else (a plain file that grew past the
+    `.gz`, or diverged from it) is still kept.
+    """
+    with plain.open("rb") as left, gzip.open(packed, "rb") as right:
+        while True:
+            chunk = left.read(_CHUNK_BYTES)
+            if not chunk:
+                return True
+            if _read_up_to(right, len(chunk)) != chunk:
+                return False
+
+
 def remove_verified_shard_duplicates(root: Path, *, today: date, apply: bool, printer: Printer = print, min_age_days: int = 2) -> dict[str, Any]:
-    result = {"removed": 0, "bytes": 0, "kept_mismatch": 0, "kept_recent": 0, "no_twin": 0, "errors": 0}
+    result = {"removed": 0, "removed_stale_prefix": 0, "bytes": 0, "kept_mismatch": 0, "kept_recent": 0, "no_twin": 0, "errors": 0}
     for sport_dir in sorted(root.glob("*_source")):
         shard_dir = sport_dir / "tracking" / "book_quotes"
         if not shard_dir.is_dir():
@@ -192,8 +224,32 @@ def remove_verified_shard_duplicates(root: Path, *, today: date, apply: bool, pr
                 _log(printer, "shard_verify_failed", path=rel, error=f"{type(exc).__name__}: {exc}")
                 continue
             if plain_lines != packed_lines:
-                result["kept_mismatch"] += 1
-                _log(printer, "shard_kept_line_mismatch", path=rel, plain_lines=plain_lines, gz_lines=packed_lines)
+                stale_prefix = False
+                if packed_lines > plain_lines:
+                    try:
+                        stale_prefix = _plain_is_prefix_of_packed(path, twin)
+                    except (OSError, EOFError, gzip.BadGzipFile) as exc:
+                        result["errors"] += 1
+                        _log(printer, "shard_verify_failed", path=rel, error=f"{type(exc).__name__}: {exc}")
+                        continue
+                if not stale_prefix:
+                    result["kept_mismatch"] += 1
+                    _log(printer, "shard_kept_line_mismatch", path=rel, plain_lines=plain_lines, gz_lines=packed_lines)
+                    continue
+                if apply:
+                    try:
+                        path.unlink()
+                    except OSError as exc:
+                        result["errors"] += 1
+                        _log(printer, "shard_remove_failed", path=rel, error=f"{type(exc).__name__}: {exc}")
+                        continue
+                result["removed_stale_prefix"] += 1
+                result["bytes"] += size
+                _log(
+                    printer,
+                    "shard_stale_prefix_removed" if apply else "shard_stale_prefix_would_remove",
+                    path=rel, bytes=size, plain_lines=plain_lines, gz_lines=packed_lines,
+                )
                 continue
             if apply:
                 try:
