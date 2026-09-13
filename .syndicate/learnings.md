@@ -5855,3 +5855,13 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - Grade a launch by what LANDED (web shard mtime and size, `ODDS_SWEEP_OUTCOME`), never by the launch line.
   - When a board sport looks stale, compare web's shard (ops stream probe: `X-Artifact-Mtime`/`X-Artifact-Size`) against the reader's copy BEFORE diagnosing capture.
   - *(evidence: `deploys.md` 2026-09-13 15:43:33Z and 16:09-18:02Z)*
+
+## 2026-09-13 — OVERTURNED: "gzip magic + a trailer ISIZE bigger than the compressed size proves a `.gz` is complete" is FALSE `[lane book-quotes-prefer-fuller-copy]`
+
+- **What I believed:** a `.gz` that starts with `1f 8b` and whose last 4 bytes (ISIZE) are >= its on-disk size is trustworthy enough to prefer over a plain copy.
+- **What falsified it:** `test_a_truncated_gz_never_wins` (write a 500-row `.gz`, cut it in half) resolved to the truncated `.gz`. A stream cut mid-way keeps its header, and its "trailer" is 4 arbitrary bytes of compressed data, which easily read as a large ISIZE.
+- **How to apply:**
+  - The gzip trailer is an estimate, not proof of completeness. That is fine for a memory guard that over-estimates (`book_quotes_logical_bytes`), and wrong for a decision about WHICH file readers get.
+  - To prefer a `.gz`, inflate it to the end once (EOFError/CRC failure = incomplete) and cache by (path, size, mtime).
+  - Write the truncation test BEFORE trusting a cheap check. Here it was the only thing that caught this.
+  - *(evidence: `log/2026-09-13.md`, section "lane `book-quotes-prefer-fuller-copy` — checkpoint")*
