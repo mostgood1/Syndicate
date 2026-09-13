@@ -583,3 +583,34 @@ deployed three times on the evening of 2026-08-26. Same family as
 **Before the deploy, refresh-worker's heavy build aborted every cycle** (`MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900`, 19:42-20:08Z), so no `PORTFOLIO_COMMIT` ran from 14:34:17Z to 20:45:13Z. There were 0 aborts 20:20-20:40Z after the reboot, which is boot-confounded. **The gate is NOT shown to improve results:** the 09-12 capture at 19:04Z did not discriminate, n=7 vs n=9.
 
 **Grading:** `scripts/layer2_live_scorecard.py` (`a989e256`) settles `reports/intelligence/clv_openings/<date>.jsonl` against `/api/board/game-chips`. `--split-at` splits results into windows by `captured_at`. Departures: refresh-worker records which +EV markets LEFT the board at each build (`clv_departure_ledger`, live since `3e18be8e` 2026-09-13 14:14:19Z); web exports `reports/intelligence/clv_departures/<date>.jsonl` since `9c7d34bc` (14:44:53Z, `PUBLISH_OK` 14:45:37Z); the scorecard reports `n10`/`gone10` from it. First production day, web export read 2026-09-13 18:23Z: 17 builds since 14:25Z, 1,066 departures and 312 returns (mlb 799/199, nfl 202/88, soccer 64/25, ncaaf 1/0), 614,918 B; builds were 13-23 min apart, against ~7 min on 09-12. Openings captured from refresh-worker's 20:20:09Z deploy carry `game_state`, `book_age_seconds`, `quote_seen_age_seconds` and `quote_source` (4,731 of 4,731; 0 of 19,658 before). FULL-SLATE reading (all 80 09-12 NCAAF finals, 1,661 +EV opportunities): in-play after the deploy 264-246-1, +23.56u (+4.61%, 61 games); in-play before it (by clock) 149-161, -9.41u (-3.04%, 33 games). Those are different games and hours, so the gap is not a gate effect. At the shown price, stale live rows did not settle worse (session capture: served under 5 min +5.81% on 71 games, 10 min+ +15.80% on 25), but they were gone at +10 min more often (61% vs 75%). Its team join is complete only with the NCAAF registry reachable (0 unmatched vs 32 without). The opening ledger is heavy: 09-11 closed at 22,607,063 B, 67.4% of the 32 MiB tripwire; 09-12 closed at 23,513,778 B (70.1%), last record captured 04:58:46Z, the Central date roll (full export 2026-09-13 07:35:57Z).
+
+## [layer2-prior-date-carryover] A GAME STILL LIVE AT MIDNIGHT CT LOST ITS LAYER 2 BOARD — the carryover and the stale-live label are LIVE; the midnight crossing itself is NOT yet measured `[verified 2026-09-13 13:23-16:24Z, lane layer2-prior-date-live-carryover]`
+
+**Mechanism, measured on refresh-worker logs 2026-09-13:**
+- The board window is `_default_board_window_dates(central_today_iso())`: today..today+2, with future days kept only if they are in `_supported_intelligence_dates()`. At 05:00:00Z (midnight CDT) the prior date leaves it. The last `BOARD_WINDOW_QUEUED date=2026-09-12` was at 04:56:07Z; from 05:00:08Z only 09-13 was queued.
+- A queued prior-date payload would be refused anyway: `_watched_payload_eviction_reason` returns `stale_date`. That guard exists because a full publication of a rolled-over date once emptied the served board (2026-07-25).
+- The next date's board cannot carry the game. `resolve_window_dates` is forward-only, and NCAAF quote shards are keyed by Central kickoff date (NMS @ HAW kicked off 11:05 PM CT on 09-12).
+- Result: `/api/board/layer2-shortlist?sport=ncaaf&date=2026-09-12` kept serving its 04:58:55Z build, 28 rows `live` over six games (five already final), until at least 15:00:41Z.
+- On 09-12 every build of that date was the FAST path (`LAYER2_FAST_REFRESH`, `elapsed_s` 133-182); the heavy build was refused throughout.
+
+**Live now:**
+- refresh-worker `c114e1aa` (live 16:23:12Z, contains `822ee0ba`):
+  - Each `_background_loop` pass calls `_maybe_carry_over_prior_date_layer2`.
+  - It rebuilds the prior Central date through `_refresh_layer2_shortlist_only`, never a queued payload, so there is no pool build, no latest-key write and no portfolio commit.
+  - It keeps rebuilding while that date's last good build had `live_rows` or `chips_live` > 0. With no signal after a restart, it builds once.
+  - Capped by `SYNDICATE_LAYER2_CARRYOVER_MAX_HOURS`: default 6 (absent = 6); 0 disables.
+  - It yields to the fast path's 300 s per-date rate limit, a deploy drain, a resident MLB sim and the execution guard.
+  - Log lines: `LAYER2_CARRYOVER date= decision= reason=`; `LAYER2_FAST_REFRESH` gains `live_rows=` and `chips_live=`.
+- web `822ee0ba` (live 15:07:20Z): `/api/board/layer2-shortlist` serves rows a build older than `SYNDICATE_LAYER2_LIVE_STATE_MAX_BUILD_AGE_SECONDS` stamped `live` as `game_state=unknown`, `is_live=null`, `market_state=unknown`, keeping `game_state_at_build`.
+  - The ceiling defaults to 1800 s (absent = 1800); 0 disables.
+  - Top-level fields: `build_age_seconds`, `live_state_max_build_age_seconds`, `rows_live_state_stale`.
+  - It relabels rows only. The combined board's cards are restated separately, by `_refresh_layer2_live_state`.
+
+**Readings:**
+- W1 MET, 15:08:17Z: the 09-12 NCAAF board went 28 -> 0 `game_state=live`, with `rows_live_state_stale` 28. The 09-13 board (build 746 s old) kept its 10 live rows, 0 relabelled.
+- R1 MET, 16:23:59Z: `LAYER2_CARRYOVER date=2026-09-12 decision=skip reason=past_cap hours_since_roll=11.4 max_hours=6.0`, 6 s after `BACKGROUND_LOOP_START`.
+
+**NOT measured:**
+- Whether the carryover keeps rebuilding a board while a game is live across midnight CT, what spacing it holds under production contention, and whether it stops with 0 live rows.
+- These are owed to scheduled tasks `layer2-carryover-roll-reading-0914` (the 09-14 roll), `layer2-carryover-crossing-reading-0915`, and backup `layer2-carryover-crossing-reading-0919`.
+- Cost: while the carryover runs, today's board and the prior date alternate ~3-minute fast builds.

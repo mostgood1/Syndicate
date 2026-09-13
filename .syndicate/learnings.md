@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 983 rules `[generated]`
+## Index — 998 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5822,3 +5822,21 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
 - Never name a helper after a PowerShell alias: `del`, `rm`, `ri`, `sl`, `gc`, `cat`, `ls`, `echo`.
 - After `session_worktree.py land`, check `rebase-merge` is absent BEFORE testing `merge-base --is-ancestor HEAD origin/main`. During a paused rebase HEAD is upstream, so that test passes trivially.
 - *(evidence in `.syndicate/log/2026-09-13.md`, section "live-odds-worker-oom-loop — session 791399da — ~1:25 PM CT")*
+
+## 2026-09-13 — RECURRENCE (the 2026-09-11 REQUIRED rule that a claim transfer is not in force until the PRIMARY `lanes.md` says so): I released a claim in my worktree, read it back as free, and both code edits were BLOCKED `[lane layer2-prior-date-live-carryover]`
+
+- **What I did:** I released `football-layer2-live-parity`'s claim on `pipeline/intelligence_state.py` in the WORKTREE copy of `lanes.md`, confirmed with `claims_by_path` that only my lane held it, and started editing.
+- **What happened:** `lane-guard` read `$CLAUDE_PROJECT_DIR/.syndicate/lanes.md`. That is the PRIMARY tree: 163 commits behind origin/main, carrying +205/-55 uncommitted edits from other sessions.
+  - My release did not exist there.
+  - `ncaaf-window-reason`, CLOSED on origin/main since 09-11, still read OPEN there and held `pipeline/layer2_shortlist.py`.
+  - Both edits blocked. Getting past them cost a user override question.
+- **The rule going forward:**
+  - Mirror a claim change into the primary copy BEFORE the first edit: anchors asserted exactly once, CRLF preserved.
+  - Check the result with the guard's own `_claims()` plus a suffix `matches()` against the primary file.
+  - Also look there for claims that origin/main has already CLOSED. They block exactly like live ones.
+
+## 2026-09-13 — OVERTURNED: the Layer 2 fast path is NOT a 14-27 s stage. It measured 133-182 s per build on refresh-worker, and the docstring figure had sized my plan `[lane layer2-prior-date-live-carryover]`
+
+- **What was believed:** `_refresh_layer2_shortlist_only`'s docstring (2026-08-14) says "the shortlist stage measured 14-27s". It uses that figure to call a 300 s rate limit a ~8% duty cycle. I carried the figure into the carryover's cost estimate.
+- **What was measured:** refresh-worker, `LAYER2_FAST_REFRESH date=2026-09-12`, 2026-09-13 04:34:59-04:58:57Z: `elapsed_s` 176.89, 182.04, 133.53, 166.74 and 164.11. Against builds ~5-7 min apart, that is roughly half the loop's time, not 8%.
+- **How to apply:** before sizing periodic worker work off a stage's cost, read that stage's own elapsed line from production logs for a comparable slate. A cost quoted in a comment is a dated measurement taken on a different board size. The carryover's cost is restated in its lane and in `state_layer2.md [layer2-prior-date-carryover]`.

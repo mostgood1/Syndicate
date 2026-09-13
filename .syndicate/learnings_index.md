@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 983 rules `[generated]`
+## Index — 998 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 389**
+**FORBIDDEN — 399**
 
 - [2026-09-06 — FORBIDDEN: instrumenting join A, reading it, and concluding about a value…](#2026-09-06-forbidden-instrumenting-join-a-reading-it-and-concluding-about-a-value-written-by-join-b-name-the-writer-of-the-field-in-the-falsification-test-itself-lane-mlb-first5-kalshi-fanin-mismatch-vs-15410ca7)
 - [2026-09-06 — FORBIDDEN: concluding a guard covers a symptom because the guard is deploy…](#2026-09-06-forbidden-concluding-a-guard-covers-a-symptom-because-the-guard-is-deployed-firing-and-named-after-it-find-the-code-that-wrote-the-field-you-are-looking-at-lane-mlb-first5-kalshi-fanin-mismatch)
@@ -209,6 +209,16 @@
 - [2026-09-11 — FORBIDDEN: predicting that legacy rows "expire at the date roll" without e…](#2026-09-11-forbidden-predicting-that-legacy-rows-expire-at-the-date-roll-without-enumerating-every-shard-the-old-writer-touched-the-board-loop-writes-tomorrows-shard-too-lane-nfl-layer2-kalshi-identity)
 - [2026-09-11 — FORBIDDEN: passing a live commit remembered from an earlier read to `deplo…](#2026-09-11-forbidden-passing-a-live-commit-remembered-from-an-earlier-read-to-deploy_preflightpy---target-commit---reinject-env-its-already-live-is-ancestry-and---reinject-env-turns-that-into-a-clear-for-a-rollback-lane-kalshi-precap-board-lines)
 - [2026-09-11 — FORBIDDEN: running a ledger script by ABSOLUTE PATH from a shell whose cwd…](#2026-09-11-forbidden-running-a-ledger-script-by-absolute-path-from-a-shell-whose-cwd-is-another-checkout-build_learnings_indexpy-resolves-syndicate-against-the-cwd-not-its-own-checkout-so-the-worktrees-copy-rewrote-the-primary-trees-learnings_indexmd-lane-ask-rail-evidence)
+- [2026-09-12 FORBIDDEN: measuring model quality on a population defined by a PUBLICATION…](#2026-09-12-forbidden-measuring-model-quality-on-a-population-defined-by-a-publication-filter-when-publishing-is-switched-off-the-metric-does-not-go-noisy-it-goes-silent-and-a-pool-freezes-rather-than-shrinking-lane-live-gameline-accuracy-cut-repoint)
+- [2026-09-12 FORBIDDEN: writing an instruction that asks for a reading without naming the…](#2026-09-12-forbidden-writing-an-instruction-that-asks-for-a-reading-without-naming-the-instrument-when-a-known-broken-instrument-is-the-obvious-one-to-reach-for-lane-live-gameline-accuracy-cut-repoint)
+- [2026-09-12 FORBIDDEN: quoting a tool's aggregate without recomputing it once from the c…](#2026-09-12-forbidden-quoting-a-tools-aggregate-without-recomputing-it-once-from-the-components-the-tool-printed-beside-it-lane-gameline-trend-paired-pool)
+- [2026-09-12 FORBIDDEN: grading in-play price movement on the markets that are still ther…](#2026-09-12-forbidden-grading-in-play-price-movement-on-the-markets-that-are-still-there-lane-layer2-live-scorecard-gate)
+- [2026-09-12 FORBIDDEN: reporting "the code has no X" from a search whose pattern was nev…](#2026-09-12-forbidden-reporting-the-code-has-no-x-from-a-search-whose-pattern-was-never-shown-to-match-anything-lane-layer2-live-scorecard-gate)
+- [2026-09-12 FORBIDDEN: calling a production endpoint "small" without checking its size f…](#2026-09-12-forbidden-calling-a-production-endpoint-small-without-checking-its-size-first-lane-layer2-live-scorecard-gate)
+- [2026-09-12 FORBIDDEN: alerting on a projection from ONE interval's rate, or applying a…](#2026-09-12-forbidden-alerting-on-a-projection-from-one-intervals-rate-or-applying-a-correction-factor-to-readings-already-taken-after-the-change-lane-layer2-live-scorecard-gate)
+- [2026-09-13 FORBIDDEN: using the wall time between two log lines as the COST of the code…](#2026-09-13-forbidden-using-the-wall-time-between-two-log-lines-as-the-cost-of-the-code-between-them-when-another-thread-shares-the-gil-and-a-preflight-clear-on-a-slate-night-may-be-a-post-kill-restart-not-a-quiet-worker-lane-live-odds-worker-oom-loop)
+- [2026-09-13 FORBIDDEN: grading "still there N minutes later" from a poller without check…](#2026-09-13-forbidden-grading-still-there-n-minutes-later-from-a-poller-without-checking-that-the-later-poll-read-a-newer-build-lane-layer2-live-scorecard-gate)
+- [2026-09-13 FORBIDDEN: gating a ledger commit on a PowerShell function's return value wi…](#2026-09-13-forbidden-gating-a-ledger-commit-on-a-powershell-functions-return-value-without-at-the-call-site-a-single-match-unrolls-to-a-bare-string-so-count-reads-1-and-0-is-its-first-character-lane-live-odds-worker-oom-loop)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -409,7 +419,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](learnings_evidence.md#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated) `[evidence]`
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 
-**Rules and corrections — 588**
+**Rules and corrections — 593**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -537,6 +547,11 @@
 - [2026-09-11 — OVERTURNED (mine): I offered the user an option saying withheld rows would…](#2026-09-11-overturned-mine-i-offered-the-user-an-option-saying-withheld-rows-would-still-be-recorded-so-skill-can-be-measured-before-checking-who-consumes-the-filtered-artifact-lane-pricing-plane-v1)
 - [2026-09-11 — RECURRENCE (a stale ledger number read as a live constraint): I quoted a 1…](#2026-09-11-recurrence-a-stale-ledger-number-read-as-a-live-constraint-i-quoted-a-16-day-old-cap-from-statemd-as-the-binding-limit-and-planned-around-it-lane-kalshi-precap-board-lines)
 - [2026-09-11 — OVERTURNED: the 2026-08-01 same-surname guard ("Yordan", not "Jose", Alvar…](#2026-09-11-overturned-the-2026-08-01-same-surname-guard-yordan-not-jose-alvarez-could-never-fire-for-a-player-who-goes-by-initials-because-it-took-first-names-from-the-scorers-filtered-tokens-lane-ask-rail-evidence)
+- [2026-09-12 RULE: from a session WORKTREE, the deploy locks live in the PRIMARY tree. Th…](#2026-09-12-rule-from-a-session-worktree-the-deploy-locks-live-in-the-primary-tree-the-lane-marker-must-be-written-there-and-a-claim-is-released-with-its-token-lane-nfl-prop-certainty-refusal)
+- [2026-09-12 RULE: a kill census's START DATE is a claim about ONSET, and a stage sampler…](#2026-09-12-rule-a-kill-censuss-start-date-is-a-claim-about-onset-and-a-stage-sampler-on-one-thread-is-blind-to-a-spike-on-another-lane-live-odds-worker-oom)
+- [2026-09-13 An approval covers a SHIP LIST, not "main": when main moves between the answ…](#2026-09-13-an-approval-covers-a-ship-list-not-main-when-main-moves-between-the-answer-and-the-deploy-re-ask-or-deploy-the-approved-sha-lane-layer2-live-scorecard-gate)
+- [2026-09-13 — RECURRENCE (the 2026-09-11 REQUIRED rule that a claim transfer is not in f…](#2026-09-13-recurrence-the-2026-09-11-required-rule-that-a-claim-transfer-is-not-in-force-until-the-primary-lanesmd-says-so-i-released-a-claim-in-my-worktree-read-it-back-as-free-and-both-code-edits-were-blocked-lane-layer2-prior-date-live-carryover)
+- [2026-09-13 — OVERTURNED: the Layer 2 fast path is NOT a 14-27 s stage. It measured 133-…](#2026-09-13-overturned-the-layer-2-fast-path-is-not-a-14-27-s-stage-it-measured-133-182-s-per-build-on-refresh-worker-and-the-docstring-figure-had-sized-my-plan-lane-layer2-prior-date-live-carryover)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
