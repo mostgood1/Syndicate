@@ -1857,6 +1857,7 @@ def _publish_streamed(
             )
             return None
         _note_direct_publish_failed(relative_path)
+        _note_publish_failure_status(relative_path, exc)
         print(
             f"[artifact_publisher] PUBLISH_FAILED path={relative_path} url={url} transport=stream error={exc}",
             flush=True,
@@ -1988,12 +1989,86 @@ def _publish_refused_no_producer_input(relative_path: str) -> str:
     return ""
 
 
+# A QUOTE-STATE PUBLISH REFUSED AT MERGE CAPACITY IS RETRIED NOW, NOT NEXT SWEEP
+# (lane `quote-state-publish-retry`).
+#
+# Web merges `book_quotes/*.state.json` in a child process and runs ONE at a
+# time (`ops._merge_published_artifact`, cap=1); a publish arriving while
+# another merge is in flight is refused BEFORE staging with HTTP 503 "retry next
+# sweep". The failure branches below then only mark the path for sweep repair,
+# so the sidecar's last-seen stamps reach web 2-8 minutes late -- and the
+# in-play gate kills a live row whose last-seen age passes 300 s
+# (`opportunity_gate.LIVE_QUOTE_MAX_OBSERVED_AGE_SECONDS`).
+#
+# Measured 2026-09-13, NFL live: web refused the 09-13 state publish at
+# 22:37:02, 22:38:40, 22:41:15, 22:47:54 (x2) and 22:49:20Z, while each merge
+# child took ~0.3-0.7 s. Layer 2 live NFL props read 278 (22:44:36Z), 0
+# (22:49:15Z, every live row seen 461.6 s ago with book quotes 94-154 s old),
+# then 216 (23:05:18Z, seen 280.7 s).
+#
+# SCOPED TO QUOTE STATE AND TO 503 ONLY. Other paths keep next-sweep repair: an
+# `odds_history` shard is tens of MB and re-sending it seconds later is
+# bandwidth the at-capacity refusal exists to shed. Any other status is not a
+# capacity refusal and is not made more likely to succeed by waiting.
+_QUOTE_STATE_RETRY_DELAYS_SECONDS: tuple[float, ...] = (1.0, 2.0, 4.0)
+_LAST_PUBLISH_FAILURE_STATUS: dict[str, int] = {}
+
+
+def _is_quote_state_path(relative_path: str | None) -> bool:
+    """Same predicate as `artifact_merge.is_mergeable_quote_state`, inlined so
+    the publisher does not import the receiver's merge module."""
+    text = str(relative_path or "")
+    return "/book_quotes/" in text and text.endswith(".state.json")
+
+
+def _note_publish_failure_status(relative_path: str | None, exc: BaseException) -> None:
+    code = getattr(exc, "code", None)
+    if relative_path and isinstance(code, int):
+        _LAST_PUBLISH_FAILURE_STATUS[relative_path] = code
+
+
+def _retry_sleep(seconds: float) -> None:
+    time.sleep(seconds)
+
+
 def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
     """Best-effort push of a single allowlisted artifact to the web service.
 
     Returns False (and never raises) on any condition that prevents publishing:
     not configured, not an allowlisted path, file missing, or a network error.
+    A quote-state sidecar refused with HTTP 503 is retried in-call; see
+    `_QUOTE_STATE_RETRY_DELAYS_SECONDS`.
     """
+    relative_path = relative_to_data_root(Path(path)) or ""
+    _LAST_PUBLISH_FAILURE_STATUS.pop(relative_path, None)
+    if _publish_hot_artifact_once(path, timeout_seconds=timeout_seconds):
+        return True
+    if not _is_quote_state_path(relative_path):
+        return False
+    for attempt, delay in enumerate(_QUOTE_STATE_RETRY_DELAYS_SECONDS, start=1):
+        if _LAST_PUBLISH_FAILURE_STATUS.get(relative_path) != 503:
+            return False
+        print(
+            f"[artifact_publisher] PUBLISH_RETRY_AT_CAPACITY path={relative_path} "
+            f"attempt={attempt} delay_s={delay}",
+            flush=True,
+        )
+        _retry_sleep(delay)
+        _LAST_PUBLISH_FAILURE_STATUS.pop(relative_path, None)
+        if _publish_hot_artifact_once(path, timeout_seconds=timeout_seconds):
+            print(f"[artifact_publisher] PUBLISH_RETRY_OK path={relative_path} attempt={attempt}", flush=True)
+            return True
+    print(
+        f"[artifact_publisher] PUBLISH_RETRY_EXHAUSTED path={relative_path} "
+        f"attempts={len(_QUOTE_STATE_RETRY_DELAYS_SECONDS)} "
+        f"last_status={_LAST_PUBLISH_FAILURE_STATUS.get(relative_path)}",
+        flush=True,
+    )
+    return False
+
+
+def _publish_hot_artifact_once(path: Path, *, timeout_seconds: int = 10) -> bool:
+    """One publish attempt; `publish_hot_artifact` owns the quote-state retry."""
     url = _publish_url()
     token = _admin_token()
     if not url or not token:
@@ -2130,6 +2205,8 @@ def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
         return True
     except (urllib_error.URLError, TimeoutError, OSError) as exc:
         _note_direct_publish_failed(relative_path)
+        # `HTTPError` is a `URLError`, so a 503 merge-capacity refusal lands here.
+        _note_publish_failure_status(relative_path, exc)
         print(f"[artifact_publisher] PUBLISH_FAILED path={relative_path} url={url} error={exc}", flush=True)
         return False
     except Exception as exc:  # pragma: no cover - defensive, must never raise

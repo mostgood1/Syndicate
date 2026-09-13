@@ -1034,12 +1034,22 @@ death, never life — do not invert it.
   - Reading: served layer1 NFL 21:26:42Z, 0 of 1,998 prop rows seen after their own kickoff.
   - Stage: `scripts/fetch_nfl_oddsapi_props_local.py:235`.
   - Fix verified: `deploys.md` 22:46Z. Layer2 `written_at` 22:44:36Z has 278 live prop rows, all opportunity lane, book age 160-284 s.
+  - **CORRECTION 2026-09-13 ~23:10Z: "fix verified" rested on ONE build.** The next NFL builds read 0 live props (22:49:15Z) then 216 (23:05:18Z). Capture works; the board FLAPS because the in-play last-seen clock goes stale when web 503s a quote-state publish (lead (1) below is the operative blocker, not a cosmetic one). Continued in lane `quote-state-publish-retry`.
 - Goal: name the first pipeline stage that is zero for NFL LIVE (in-play) player props on the 2026-09-13 slate (user report ~4:20 PM CT: "NFL live props are not hitting the board"; layer2 21:20:05Z had 0 live prop rows), with file:line and a production reading. Read-only on production; a code change or deploy needs the user's approval.
 - Files: none (claims released at close).
 - Leads NOT taken (no lane opened; see `log/2026-09-13.md` close entry):
   - (1) web's `book_quotes/*.state.json` merge cap=1 503s concurrent publishes from both workers, leaving layer1 `seen_age_seconds` hours stale on fresh live rows;
   - (2) one long refresh run starves NFL sweeps (12 refusals 19:48Z..20:38Z);
   - (3) `ODDS_SWEEP_LAUNCHED` counts refused launches.
+- Blocked by: none.
+
+### quote-state-publish-retry — OPEN — opened 2026-09-13 — session ed8bb082-2b7f-4de3-8f8c-f33071f42ce0
+- Goal: live NFL props stop flapping off the Layer 2 board because a quote-state last-seen publish was refused — a `book_quotes/*.state.json` publish that web answers `503` (merge at capacity) is retried within the same publish call, measured as no lost NFL state publish across live builds on the next live slate. Code and deploy need the user's approval.
+- Files: syndicate/features/shared/artifact_publisher.py (`publish_hot_artifact` retry wrapper + failure-status record in its JSON and stream failure branches only), tests/test_quote_state_publish_retry.py (NEW).
+- Origin: lane `nfl-live-props-missing` correction. User decision 2026-09-13 ~23:08Z: "Retry the lost state publish (Recommended)", chosen over a gate `min(seen, book)` change that would reverse the 09-12 rule tested at `tests/test_opportunity_gate.py:131`.
+- Hypothesis: web refuses a quote-state publish with 503 whenever another merge child is in flight (`syndicate/blueprints/ops.py:2059-2067`, `:2407-2419`, cap=1). The publisher only marks the path for NEXT-sweep repair (`artifact_publisher.py:2131-2133`, `:1859`), so last-seen lags 2-8 min and live rows cross `LIVE_QUOTE_MAX_OBSERVED_AGE_SECONDS` 300 s. Evidence: web `ARTIFACT_MERGE_AT_CAPACITY` for the NFL 09-13 state at 22:37:02, 22:38:40, 22:41:15, 22:47:54 (x2), 22:49:20Z; merges take ~0.3-0.7 s (DEFERRED -> CHILD); layer1 22:48:12Z live rows book age p50 94-154 s vs seen 461.6 s; Layer 2 live props 278 (22:44:36Z) -> 0 (22:49:15Z) -> 216 (23:05:18Z, seen 280.7 s).
+- Falsification test: a unit test where urlopen answers 503 then 200 must end `True` with 2 calls for a quote-state path, and must NOT retry a non-quote-state path or a non-503 failure; the retry test must fail against HEAD's publisher. In production, the hypothesis is false if `ARTIFACT_MERGE_AT_CAPACITY` on NFL state paths is followed by a `PUBLISH_RETRY` that still fails every attempt (cap held longer than the backoff).
+- Verification: tests above; after a user-approved live-odds-worker deploy, on live NFL games: live-odds-worker `PUBLISH_RETRY_OK` for `nfl_source/tracking/book_quotes/*.state.json` after a 503, no NFL state `PUBLISH_FAILED ... 503`, and successive Layer 2 NFL builds with live prop rows > 0 and `quote_seen_age_seconds` p50 < 300 s. Recorded in `deploys.md`.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
