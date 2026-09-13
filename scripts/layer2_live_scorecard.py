@@ -248,6 +248,7 @@ def look_after(
     builds: Mapping[str, Sequence[datetime]],
     timeline: Mapping[str, Sequence[tuple[datetime, str]]],
     horizon_seconds: float = LOOK_HORIZON_SECONDS,
+    anchor_tolerance_seconds: float = 5.0,
 ) -> str:
     """`gone` | `kept` | `unobserved`: is the market ABSENT at the first build >= horizon after sighting?
 
@@ -257,6 +258,13 @@ def look_after(
     was still there to bet at +10 min. `unobserved` when no build that late
     exists for the sport -- a board that stopped building (the 09-12 date roll)
     must not read as a price still there.
+
+    ALSO `unobserved` when the log has no build AT the sighting. An opening's
+    `captured_at` is the same stamp as its build's heartbeat, so a sighting
+    without one was never tracked -- and reading "no departure" for it as
+    "kept" is a failed join passed off as a result. Measured 2026-09-13 on the
+    NFL scorecard: 64 openings captured the previous morning, before the log
+    began at 14:25Z, read 64 kept and 0 gone.
     """
     from syndicate.features.shared.clv_departure_ledger import market_identity
 
@@ -264,9 +272,12 @@ def look_after(
     identity = market_identity(record)
     if sighted is None or sighted.tzinfo is None or identity is None:
         return "unobserved"
-    horizon = sighted + timedelta(seconds=horizon_seconds)
     sport = str(record.get("sport") or "").strip().lower()
-    later = next((build for build in builds.get(sport, ()) if build >= horizon), None)
+    sport_builds = builds.get(sport, ())
+    if not any(abs((build - sighted).total_seconds()) <= anchor_tolerance_seconds for build in sport_builds):
+        return "unobserved"
+    horizon = sighted + timedelta(seconds=horizon_seconds)
+    later = next((build for build in sport_builds if build >= horizon), None)
     if later is None:
         return "unobserved"
     state = "kept"

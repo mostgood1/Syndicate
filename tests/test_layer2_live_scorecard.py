@@ -328,6 +328,17 @@ def test_a_market_that_came_back_by_the_deciding_build_was_still_there():
     assert mod.look_after(_rec(side="home"), builds, timeline) == "gone", "left again before the deciding build"
 
 
+def test_a_sighting_the_log_never_saw_is_unobserved_not_kept():
+    # 2026-09-13 NFL: 64 openings captured the previous morning, before the log's
+    # first build, read 64 kept / 0 gone -- "no departure" from a log that was
+    # not running yet.
+    builds, timeline = mod.index_departures(_log())
+    before_the_log = _rec(captured_at="2026-09-12T18:00:00Z")  # a build >= 18:10 exists, none at 18:00
+    assert mod.look_after(before_the_log, builds, timeline) == "unobserved"
+    # A sighting on a build stamp (the production case) is still judged.
+    assert mod.look_after(_rec(), builds, timeline) == "gone"
+
+
 def test_gone10_is_counted_per_cell_and_is_not_measured_without_a_log():
     records = [
         _rec(),
