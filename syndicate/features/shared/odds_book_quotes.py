@@ -239,18 +239,109 @@ def bucket_quote_rows_by_kickoff_date(
     return buckets, unfiled
 
 
-def resolve_book_quotes_path(sport: str, date_str: str) -> Path:
-    """The READ path: the plain shard if present, else its compressed form.
+def _trusted_gzip_uncompressed_bytes(path: Path) -> int | None:
+    """Uncompressed size from a `.gz` trailer, or None when it cannot be trusted.
 
-    Plain wins when both exist, which is the state during a compaction that has
-    written the `.gz` but not yet removed the original. Reading the plain file
-    there is not just a tiebreak -- it is the only one of the two guaranteed
-    complete at that instant.
+    STRICT, and deliberately unlike `book_quotes_logical_bytes`. That function
+    is a memory guard and must over-estimate when unsure; this one decides which
+    file a reader gets, where over-estimating would send readers to a truncated
+    `.gz`. So anything doubtful answers None and the caller keeps the plain file:
+    not a gzip header, a trailer smaller than the compressed file (ISIZE wrapped,
+    or the file was cut short -- a gzip member never expands), or any I/O error.
+    """
+    try:
+        size = int(path.stat().st_size)
+        if size < 18:  # smallest valid gzip member: 10-byte header + 8-byte trailer
+            return None
+        with path.open("rb") as handle:
+            if handle.read(2) != b"\x1f\x8b":
+                return None
+            handle.seek(-4, os.SEEK_END)
+            isize = int.from_bytes(handle.read(4), "little")
+    except Exception:
+        return None
+    if isize < size:
+        return None
+    return isize
+
+
+# (path, st_size, st_mtime_ns) -> whether the gzip stream decompressed cleanly to
+# exactly its trailer's ISIZE. Bounded; a shard that changes gets a new key.
+_GZIP_COMPLETE_CACHE: dict[tuple[str, int, int], bool] = {}
+
+
+def _gzip_stream_is_complete(path: Path, expected_bytes: int) -> bool:
+    """Decompress the whole `.gz` once and confirm it ends cleanly at `expected_bytes`.
+
+    WHY THE TRAILER ALONE IS NOT ENOUGH, caught by
+    `test_a_truncated_gz_never_wins`: a `.gz` cut mid-stream still starts with the
+    gzip magic, and its last four bytes are then arbitrary compressed data, which
+    reads as a plausible ISIZE. Only inflating to the end can tell. A truncated
+    stream raises EOFError and a corrupt one fails its CRC, so both answer False
+    and the reader keeps the plain file.
+
+    Streaming, one chunk resident at a time, and cached per file signature, so
+    the cost is paid once per process per shard, and only for a shard that
+    exists in BOTH forms with a trailer claiming more data than the plain copy.
+    """
+    try:
+        stat = path.stat()
+    except OSError:
+        return False
+    key = (str(path), int(stat.st_size), int(getattr(stat, "st_mtime_ns", int(stat.st_mtime * 1_000_000_000))))
+    cached = _GZIP_COMPLETE_CACHE.get(key)
+    if cached is not None:
+        return cached
+    total = 0
+    try:
+        with gzip.open(path, "rb") as handle:
+            while True:
+                chunk = handle.read(8 * 1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+        complete = total == int(expected_bytes)
+    except Exception:
+        complete = False
+    if len(_GZIP_COMPLETE_CACHE) >= 256:
+        _GZIP_COMPLETE_CACHE.clear()
+    _GZIP_COMPLETE_CACHE[key] = complete
+    return complete
+
+
+def resolve_book_quotes_path(sport: str, date_str: str) -> Path:
+    """The READ path: whichever of the plain shard and its `.gz` holds MORE data.
+
+    PLAIN WINS TIES AND ANY DOUBT. Mid-compaction the `.gz` exists before the
+    original is removed, and only the original is guaranteed complete at that
+    instant; an untrusted trailer (see `_trusted_gzip_uncompressed_bytes`) keeps
+    it too.
+
+    THE `.gz` WINS ONLY WHEN IT IS PROVABLY FULLER (2026-09-13). This used to
+    return plain whenever it existed. Measured on refresh-worker: 18 shards
+    (mlb 09-03..09-09, ncaaf 09-05, soccer 08-22..09-09) kept a plain copy that
+    was SHORTER than its `.gz` and not a byte prefix of it -- e.g. mlb 09-03 plain
+    140,224 lines vs gz 140,236 -- so every reader of those dates (book grid,
+    CLV, actuals joins) silently read fewer rows than existed. Comparing the
+    plain file's size with the gzip trailer costs two small reads per call.
     """
     plain = book_quotes_path(sport, date_str)
-    if plain.is_file():
-        return plain
     packed = plain.with_name(plain.name + ".gz")
+    if plain.is_file():
+        if packed.is_file():
+            packed_bytes = _trusted_gzip_uncompressed_bytes(packed)
+            try:
+                plain_bytes = int(plain.stat().st_size)
+            except OSError:
+                plain_bytes = None
+            if (
+                packed_bytes is not None
+                and plain_bytes is not None
+                and packed_bytes > plain_bytes
+                and _gzip_stream_is_complete(packed, packed_bytes)
+            ):
+                return packed
+        return plain
     if packed.is_file():
         return packed
     # Neither exists. Return the plain path so callers' `.is_file()` checks read

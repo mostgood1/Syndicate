@@ -901,6 +901,26 @@ death, never life — do not invert it.
   - **`c114e1aa` LIVE on refresh-worker 16:23:12Z** (deployed by `layer2-prior-date-live-carryover`). DISK_COMPACTION 16:30:45Z: `removed_stale_prefix 0`, `kept_mismatch 18`; no mismatched plain shard is a byte prefix of its `.gz`. Readers still take the shorter plain file for those 18 dates: needs a reader-side rule, not a delete.
 - Blocked by: none. **User decisions 2026-09-13 ~13:30Z:** "Resize + diagnose (Recommended)", then **"check content on the disk and ensure that we compact items that can be compacted first"**, so the resize is held until the inventory and compaction are done. A refresh-worker deploy needs claim + preflight; a HOLD goes back to the user. **2026-09-13 ~14:00Z:** the user approved "Remove verified duplicates, Gzip props-history CSVs, Stop history re-append", NOT the 100 GB resize.
 
+### book-quotes-prefer-fuller-copy — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: when a `book_quotes` shard exists both plain and as `.gz`, every reader gets the copy holding MORE data, so the 18 mismatched shards on refresh-worker (mlb 09-03..09-09, ncaaf 09-05, soccer 08-22..09-09) stop serving their shorter plain file — without ever preferring a truncated or unverifiable `.gz`.
+- Files: syndicate/features/shared/odds_book_quotes.py (`resolve_book_quotes_path` + a new private gzip-size helper only), tests/test_book_quotes_compaction.py (resolver tests only). No OPEN lane claims these (checked on origin/main 2026-09-13 ~19:10Z).
+- Origin: lead from closed lane `refresh-worker-disk-inventory`. `DISK_COMPACTION` 16:30:45Z on `c114e1aa`: `kept_mismatch 18`, none a byte prefix. 17 have `.gz` 1-1,176 lines longer than the plain file; soccer 08-30 has the plain file 6 lines longer. `resolve_book_quotes_path` returns plain whenever it exists (`odds_book_quotes.py:250-252`).
+- User decision 2026-09-13 ~19:10Z: "proceed next action" (the reader-side rule named in the checkpoint).
+- Hypothesis: comparing the plain file's `st_size` with the `.gz` trailer ISIZE picks the fuller copy at O(1) cost per read.
+  - The trailer is trusted only when the file starts with the gzip magic `1f 8b` and `ISIZE >= st_size` (a gzip member never expands; a smaller ISIZE means wrapped or not trustworthy).
+  - Ties and untrusted trailers go to plain, preserving the mid-compaction guarantee. `compress_closed_shards` writes one member and renames only after a line-count verify, so ISIZE is exact for its output.
+- Falsification: a test where the `.gz` is empty or truncated, or its trailer is garbage, must still resolve to plain; so must equal sizes. A `.gz` with more bytes must resolve to `.gz`, and `read_book_quotes` must return its rows. The new tests must fail against HEAD's resolver.
+- Verification: tests pass and the unwired check fails without the change.
+  - Production reading after a refresh-worker deploy: a read of an affected date returns the `.gz` row count, not the plain one.
+  - `mlb 2026-09-03`: `gz_lines 140236` vs `plain_lines 140224` (from `DISK_COMPACTION_FILE`).
+  - Instrument: `[odds_book_quotes] LATEST_CACHE_EVICT` carries `evicted_path` and `evicted_rows`. After deploy, an eviction for an affected date must name `<date>.jsonl.gz`, not `<date>.jsonl`. A `book_grid_artifact` build for such a date also reports `source_quote_rows`.
+  - **Absent is not "not fixed".** Past dates are read only when a consumer asks for them (actuals/settlement windows include 09-03), so a null over a short window says nothing.
+- Test note (2026-09-13 ~19:17Z): the truncated-`.gz` falsification test FAILED against the first cut, which trusted the gzip magic plus trailer ISIZE. A stream cut mid-way still starts with `1f 8b`, and its last 4 bytes are arbitrary.
+  - Fix: `.gz` wins only after one streaming decompress confirms it ends cleanly at exactly ISIZE.
+  - That result is cached per (path, st_size, st_mtime_ns).
+  - Cost: one inflate per process per dual-form shard whose trailer claims more data, ~18 shards today.
+- Blocked by: none.
+
 ### layer2-prior-date-live-carryover — OPEN — opened 2026-09-13 — session 887508de-2233-46fd-ae82-2ad385de111c — **GOAL: NOT MET. The fix is live on both services: web `822ee0ba` (15:07:20Z) and refresh-worker `c114e1aa` (16:23:12Z). W1 and R1 are MET. The midnight crossing (R2, R3) is owed to scheduled tasks.** The owning session 887508de was ARCHIVED 2026-09-13 at the user's request. The readings, and closing the lane on MET, belong to scheduled tasks `layer2-carryover-roll-reading-0914`, `layer2-carryover-crossing-reading-0915`, `-0919` and `-0920`.
 - **GOAL VERDICT (checkpoint 2026-09-13 ~11:40 AM CT, session 887508de) — Goal (verbatim): "games still in progress from the prior Central date keep a rebuilding Layer 2 shortlist after the midnight CT roll, and a frozen board does not present stale rows as `game_state=live`; measured on the next slate with a game live across midnight CT." → GOAL: NOT MET.** Reached:
   - (1) Root cause confirmed on refresh-worker logs: the board window starts at Central today, and nothing rebuilt 09-12 after 04:58:57Z.

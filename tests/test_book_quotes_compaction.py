@@ -97,6 +97,52 @@ def test_plain_wins_when_both_exist(_root):
     assert len(obq.read_book_quotes("mlb", "2026-08-09")) == 7
 
 
+# --- the fuller copy wins (2026-09-13: 18 shards served a SHORTER plain file) --
+
+def _write_gz(plain, rows):
+    packed = plain.with_name(plain.name + ".gz")
+    with gzip.open(packed, "wb") as dst:
+        for r in rows:
+            dst.write((json.dumps(r, separators=(",", ":")) + "\n").encode("utf-8"))
+    return packed
+
+
+def test_a_fuller_gz_wins_over_a_shorter_plain_copy(_root):
+    """Measured on refresh-worker: mlb 09-03 plain 140,224 lines vs gz 140,236."""
+    plain = _write_plain(_root, "mlb", "2026-09-03", _rows(40))
+    packed = _write_gz(plain, _rows(52))
+    assert obq.resolve_book_quotes_path("mlb", "2026-09-03") == packed
+    assert len(obq.read_book_quotes("mlb", "2026-09-03")) == 52
+
+
+def test_equal_copies_keep_plain(_root):
+    plain = _write_plain(_root, "mlb", "2026-09-04", _rows(30))
+    _write_gz(plain, _rows(30))
+    assert obq.resolve_book_quotes_path("mlb", "2026-09-04") == plain
+
+
+def test_a_plain_copy_that_grew_past_its_gz_keeps_plain(_root):
+    """soccer 08-30 on refresh-worker: plain 125,119 lines vs gz 125,113."""
+    plain = _write_plain(_root, "soccer", "2026-08-30", _rows(60))
+    _write_gz(plain, _rows(50))
+    assert obq.resolve_book_quotes_path("soccer", "2026-08-30") == plain
+
+
+def test_a_truncated_gz_never_wins(_root):
+    plain = _write_plain(_root, "mlb", "2026-09-05", _rows(10))
+    packed = _write_gz(plain, _rows(500))
+    data = packed.read_bytes()
+    packed.write_bytes(data[: len(data) // 2])  # cut mid-stream: the trailer is now garbage
+    assert obq.resolve_book_quotes_path("mlb", "2026-09-05") == plain
+
+
+def test_a_non_gzip_file_named_gz_never_wins(_root):
+    plain = _write_plain(_root, "mlb", "2026-09-06", _rows(3))
+    packed = plain.with_name(plain.name + ".gz")
+    packed.write_bytes(b"not gzip at all" + (10**9).to_bytes(4, "little"))
+    assert obq.resolve_book_quotes_path("mlb", "2026-09-06") == plain
+
+
 # --- the memory guard must not be disarmed by compression ------------------
 
 def test_logical_bytes_reports_UNCOMPRESSED_size_for_a_gz(_root):
