@@ -33961,3 +33961,33 @@ The prediction points that way: a smaller transient. `ALL_PROCESS_MEMORY` is sam
 - **Build aborts:** `MEMORY_GUARD_ABORT`, 173 lines 09-12 12:02Z .. 09-13 04:13Z, still about every 5-6 min (169 at `stage=pre_source_state_fingerprint floor_mb=1900`).
 - **Timing:** **29 of 172 (16.9%)** fall inside a refresh-worker `TRIM_SELECT`->`DAILY_BOOK` window (<= 180 s, book not yet printed). A random instant gives **12.0%** (TRIM gap p50 310 s, TRIM->DAILY_BOOK p50 37 s). The guard aborts are NOT timed to the daily-book write; this lane's mechanism does NOT explain them.
 - **Not attributed:** the guard's `snapshot` shows `current_mb` 3,917-4,096 of 4,096. That field may include page cache; see `state_worker.md` [refresh-worker-headroom-2026-09-02] on the wrong headroom field. Left to the existing `leads.md` entry.
+
+## 2026-09-13 04:38:33Z — live-odds-worker `e332b531` -> `77199c48` — lane `mlb-live-lens-payload-dup` — MLB live-lens snapshot fits its keyvalue key. **FIRED; reading PENDING.**
+
+**Deploy.** `dep-daj2hi9594qs73ak0k7g`, trigger `api`, created 2026-09-13T04:38:33Z.
+- Preflight **CLEAR** at 04:37:56Z (watcher poll 2, after HOLD at 04:22:10Z and 04:36:58Z), re-checked **CLEAR** at 04:38:28Z immediately before the trigger. **No grant used.**
+- Claim held by `mlb-live-lens-payload-dup` since 04:21:20Z.
+
+**Why.** `live_lens_tick_after_mlb` on live-odds-worker 00:14:31-04:03Z: **57 of 61 `ok=False`**, each `KeyValuePayloadTooLarge` for `live/mlb_live_lens.json`, 10,006,089 B (23:54Z) rising to 10,803,367 B (03:59Z) against 8,388,608 B.
+- The MLB lens stopped updating mid-slate.
+- Onset: 09-11 15:00-23:59Z 215/215 ok; 09-12 15:00-22:31Z 111/111 ok; 09-12 23:00Z hour 13 ok / 4 fail; nearly all fail from 09-13 00:00Z.
+- **Not caused by `58736a69` or `e332b531`**: the 22:35-23:00Z ticks on `58736a69` were 8/8 ok. The snapshot crossed the ceiling as `games` grew through live play.
+
+**The change.** `77199c48` is the ONLY code commit in `e332b531..77199c48`, +52 lines in `syndicate/features/mlb/live_lens.py`.
+- `page_context["games"]` is stored as `_board_state_games_projection(games)`: `gamePk`, `status.{abstract,detailed}`, `home`/`away` `{name,abbr}`, `matchup.score`. Top-level `games` stays full.
+- Served `/mlb/api/live-lens` measured one full copy at 5,548,330 B for 15 games; the projection is 3,399 B. Expected snapshot ~5.3 MB.
+- Every reader but `board_enrichment.attach_live_game_state_from_lens` takes top-level `games`, and that one reads exactly the projected fields. `board_enrichment.py` is untouched (claimed by `football-layer2-live-parity`).
+- Tests: 40 + 6 passed. The builder test fails with the assignment unwired, and the board lens join gives identical corrections on slim vs full.
+
+**User decisions:**
+- "Build and deploy now" (~04:10Z), knowingly ending lane `live-odds-worker-oom` P4 and lane `live-odds-worker-oom-loop` R4 windows before they could be read. That lane was messaged before and at the trigger.
+- **The combination `58736a69`+`e332b531` window therefore ENDS at this deploy, ended by a user-decided deploy, neither a pass nor a fail.** Last full read at 04:04:02Z: 0 `oomKilled`, 0 restarts in 3 h 50 min (events fully paged).
+- Preflight HOLD at 04:22:10Z, so the user chose "Deploy on first CLEAR": the watcher polled preflight and the deploy was triggered by hand on CLEAR, with no grant.
+
+**verify — pre-registered:**
+- **V1** `live_lens_tick_after_mlb ok=True` on >= 90% of ticks in the first live MLB window after go-live, and 0 `KeyValuePayloadTooLarge` for `mlb_live_lens.json`. **Falsifier:** a `KeyValuePayloadTooLarge` for that key after go-live.
+- **V2** served `/mlb/api/live-lens` still returns full `games` (n and per-game keys unchanged in shape) with a `generatedAt` newer than go-live.
+- **V3** the board lens join still corrects rows: a `book-grid`/shortlist build on MLB shows no new `"snapshot carries no games"` reason.
+- **Caveat:** this deploy lands after MLB's live window is largely over (~05Z), so V1 may need Sunday's slate. It is read then, not called on an empty window.
+
+**Rollback:** `py -3 scripts/render_deploy.py --service live-odds-worker --commit e332b531 --allow-rollback` under a claim.
