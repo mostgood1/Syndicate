@@ -985,26 +985,18 @@ death, never life — do not invert it.
 - Verification: the tests above, run targeted. Then, after user-approved deploys of refresh-worker (carryover) and web (label), on the next slate with a game live across midnight CT: refresh-worker `LAYER2_CARRYOVER` lines for the prior date after 05:00Z; `/api/board/layer2-shortlist?date=<prior>` `written_at` advancing past 05:00Z while `/api/board/game-chips?date=<prior>` shows a live game; the carryover stopping after a build with 0 live rows and 0 live chips; and live rows from a build older than the threshold served as not live. Recorded in `deploys.md`.
 - Blocked by: nothing but the slate. R2 needs the next midnight CT roll; R3 needs a game live across midnight CT. No deploy is owed by this lane, and both deploy claims are released. The scheduled tasks run only while the Claude app is open, and they read the logs after the fact.
 
-### nfl-live-props-missing — OPEN — opened 2026-09-13 — session ed8bb082-2b7f-4de3-8f8c-f33071f42ce0
-- **GOAL VERDICT (checkpoint 2026-09-13 ~22:45Z) — Goal (verbatim): "name the first pipeline stage that is zero for NFL LIVE (in-play) player props on the 2026-09-13 slate (user report ~4:20 PM CT: "NFL live props are not hitting the board"; layer2 21:20:05Z had 0 live prop rows), with file:line and a production reading. Read-only on production; a code change or deploy needs the user's approval." → GOAL: MET.**
-  - Reading: served layer1 NFL 21:26:42Z, **0 of 1,998** prop rows seen after their own kickoff (0 of 1,999 at 22:29:58Z).
-  - First zero stage: OddsAPI prop capture of started events, `scripts/fetch_nfl_oddsapi_props_local.py:235` (`if when < now: continue` in `events_in_scope`).
-  - Probe 22:26Z: OddsAPI serves in-play props (25/25 markets updated after kickoff).
-  - Lane stays OPEN only for the user-approved fix's owed deploy measurement.
+### nfl-live-props-missing — CLOSED 2026-09-13 — opened 2026-09-13 — session ed8bb082-2b7f-4de3-8f8c-f33071f42ce0 — **GOAL MET: first zero stage was `events_in_scope` dropping started events (0 of 1,998 props seen after kickoff); fix `637278e3` live on live-odds-worker, and Layer 2 served 278 live NFL props at 22:44:36Z (0 before).**
+- **GOAL VERDICT (close 2026-09-13 ~22:50Z) — Goal (verbatim): "name the first pipeline stage that is zero for NFL LIVE (in-play) player props on the 2026-09-13 slate (user report ~4:20 PM CT: "NFL live props are not hitting the board"; layer2 21:20:05Z had 0 live prop rows), with file:line and a production reading. Read-only on production; a code change or deploy needs the user's approval." → GOAL: MET.**
+  - Reading: served layer1 NFL 21:26:42Z, 0 of 1,998 prop rows seen after their own kickoff.
+  - Stage: `scripts/fetch_nfl_oddsapi_props_local.py:235`.
+  - Fix verified: `deploys.md` 22:46Z. Layer2 `written_at` 22:44:36Z has 278 live prop rows, all opportunity lane, book age 160-284 s.
 - Goal: name the first pipeline stage that is zero for NFL LIVE (in-play) player props on the 2026-09-13 slate (user report ~4:20 PM CT: "NFL live props are not hitting the board"; layer2 21:20:05Z had 0 live prop rows), with file:line and a production reading. Read-only on production; a code change or deploy needs the user's approval.
-- Files: scripts/fetch_nfl_oddsapi_props_local.py (`events_in_scope` only), scripts/fetch_ncaaf_oddsapi_props_local.py (`events_in_scope` only), tests/test_football_props_odds_capture.py (`events_in_scope` tests only).
-- Status:
-  - Fix `637278e3` on main. DEPLOYED to live-odds-worker, live 22:34:03Z (`dep-daji8du7bikc73c6a9pg`). User decisions: "Probe, then fix", "Read prod key from Render", "Deploy now, kill the run" (preflight HOLD overridden via break-glass grant; see `deploys.md` 22:34Z).
-  - **Deploy verify OWED:**
-    - live-odds-worker `PUBLISH_OK nfl_source/oddsapi_player_props_2026_wk1.csv` bytes grow while a game is live, from a POST-BOOT sweep. The 22:36:58Z 131,422 B publish came ~3 min after boot with no `ODDS_SWEEP_LAUNCHED`, so it is not evidence either way.
-    - Served layer1 NFL prop rows seen after kickoff > 0.
-    - Layer2 live NFL props > 0.
-    - The 20:25Z games end ~23:40Z; DAL@NYG kicks 00:20Z.
-  - **Deploy claim on live-odds-worker STILL HELD** by this lane (acquired 22:30:07Z, ttl 2700 s, so it expires ~23:15Z). Release after the reading: `py -3 scripts/deploy_claim.py release --service live-odds-worker`.
-  - Separate cause, not fixed: one long refresh run holds the single refresh slot and refuses NFL sweeps (12 refusals 19:48Z..20:38Z).
-  - Lead: `ODDS_SWEEP_LAUNCHED` fires for refused launches (`live_refresh_loop.py:5741` vs `:5767`).
-- Narrative and evidence: `log/2026-09-13.md` "lane `nfl-live-props-missing` — checkpoint"; superseded findings blocks moved verbatim to `lanes_history.md`.
-- Blocked by: none. Next: the owed board reading on a live NFL game.
+- Files: none (claims released at close).
+- Leads NOT taken (no lane opened; see `log/2026-09-13.md` close entry):
+  - (1) web's `book_quotes/*.state.json` merge cap=1 503s concurrent publishes from both workers, leaving layer1 `seen_age_seconds` hours stale on fresh live rows;
+  - (2) one long refresh run starves NFL sweeps (12 refusals 19:48Z..20:38Z);
+  - (3) `ODDS_SWEEP_LAUNCHED` counts refused launches.
+- Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

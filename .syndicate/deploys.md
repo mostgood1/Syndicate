@@ -34498,3 +34498,24 @@ No deploy, no env change. This closes the OWED item of the 14:47Z entry.
 - **Rollback:** `py -3 scripts/render_deploy.py --service live-odds-worker --commit 77199c48 --allow-rollback` behind claim + preflight. Or, without rollback, set `ODDS_API_LIVE_LOOKBACK_HOURS=0` and deploy.
 - **Claim:** still HELD by `nfl-live-props-missing` pending the verify reading. Release: `py -3 scripts/deploy_claim.py release --service live-odds-worker`.
 - **Post-boot note 22:39:02Z:** live-odds-worker logs since 22:34:00Z show NO `ODDS_SWEEP_LAUNCHED`, no `already active`, no `LIVE ODDS REFRESH`, no `TICK_COMPLETE phase` line. The 22:36:58Z props publish (131,422 B) came with a batch of NFL artifact publishes ~3 min after boot, so it is not a post-fix sweep. Web returned `HTTP 503` to 4 `book_quotes` publishes at 22:37:02Z. Absent in a 5-minute post-boot window is not a failure; re-read before calling it.
+
+## 2026-09-13 22:46Z — reading — live-odds-worker `637278e3` (22:34Z entry) — lane `nfl-live-props-missing` — **verify MET: live NFL props are on the board**
+
+- **First post-boot NFL sweep:** `ODDS_SWEEP_LAUNCHED ... nfl` at 22:40:01Z.
+  - `PUBLISH_OK nfl_source/oddsapi_player_props_2026_wk1.csv` **282,435 B** at 22:41:03Z, up from 131,289-131,422 B, the pregame-only size since 20:38Z. At 22:44:19Z it was `SKIPPED_UNCHANGED`.
+  - The 22:36:58Z 131,422 B publish predates any post-boot sweep and is not a reading.
+- **Served layer1 NFL 22:41:30Z:** the 4 live games (kick 20:25Z) carry 94-102 prop rows each with book quote `updated_at` after kickoff and `age_seconds <= 900`. Freshest was 66.5 s. Baseline 22:29:58Z: 0.
+- **Served `/api/board/layer2-shortlist?sport=nfl`, `written_at` 22:44:36Z:**
+  - **278 live prop rows**. Baseline 0 at 22:33:34Z and 21:20:05Z.
+  - By game: ARI@LAC 75, WSH@PHI 74, GB@MIN 65, MIA@LV 64.
+  - All `board_lane` opportunity, `gate.reasons` [].
+  - `quote.book_age_seconds` n=278, min 160.5, p50 192.5, max 284.5.
+  - `quote.quote_seen_age_seconds` absent on all 278, so the gate used book age.
+  - `per_sport_ingest.nfl.by_lane`: opportunity **2,041** (1,634 at 21:20Z), dead 2,764.
+- **Residual defect, NOT fixed (not this lane's files).**
+  - Layer1 `seen_age_seconds` on those live rows still reads ~10,400 s, since 19:50Z.
+  - Web merges `book_quotes/*.state.json` one at a time (`ARTIFACT_MERGE_AT_CAPACITY ... cap=1`) and 503s a concurrent publish. live-odds-worker's post-fetch NFL state publish at 22:41:15Z was refused; refresh-worker also publishes the same path. The 22:40:13Z state merge predated the props fetch (rows updated 22:40:19Z).
+  - It healed partly: `SWEEP_REPAIRING` then `PUBLISH_OK` 3,689,380 B at 22:44:41Z.
+  - Today the gate does not read that field for these rows. If a consumer does, it would mark live props unobserved.
+- **Next-build persistence reading:** a watcher is polling for the build after 22:44:36Z; appended below if it changes the verdict.
+- **Claim:** `nfl-live-props-missing` on live-odds-worker RELEASED after this entry.
