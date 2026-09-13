@@ -34268,3 +34268,22 @@ ships      vs live 064fb6af: 10 code paths
 - Kill switches: `SYNDICATE_LAYER2_CARRYOVER_MAX_HOURS=0` (refresh-worker) and `SYNDICATE_LAYER2_LIVE_STATE_MAX_BUILD_AGE_SECONDS=0` (web), each followed by a deploy.
 
 **Reminders.** W1/R1 by 2026-09-13 16:30Z (11:30 AM CT). R2 by 2026-09-14 15:00Z. R3 by 2026-09-15 15:00Z, else 2026-09-19 15:00Z.
+
+## 2026-09-13 15:08Z -- reading -- web `822ee0ba` (live 15:07:20Z) -- lane `layer2-prior-date-live-carryover` -- **W1 MET**; refresh-worker deploy HELD by preflight (MLB daily sim in flight)
+
+- Deploy `dep-dajbldfqj5pc73d00slg`: created 15:01:09Z, live 15:07:20Z.
+  - Preflight CLEAR at 15:00:35Z, with only infrastructure processes running.
+  - The previous deploy (14:44:53Z) was a deploy, not a post-kill restart.
+  - Claim held by this lane from 14:59:37Z.
+- W1 baseline, 15:00:41Z, before the deploy. `/api/board/layer2-shortlist?sport=ncaaf&date=2026-09-12&limit=2000`: `written_at` 04:58:55Z, 36 rows, **28** `game_state=live`. No `rows_live_state_stale` or `build_age_seconds` field.
+- W1 reading, 15:08:17Z, same URL. **All 28 live rows are now served as `unknown`; W1 MET.**
+  - `written_at` 04:58:55Z, `build_age_seconds` 36,562.7, `live_state_max_build_age_seconds` 1800.0.
+  - 36 rows: **0** `game_state=live`, `rows_live_state_stale` **28**.
+  - The 28 relabelled rows carry `live_state_stale: true` and cover all six matchups: ARK @ UTA, LOU @ USC, MS @ NEV, NMS @ HAW, NDS @ AF, SS @ FS.
+  - Sample, LOU @ USC: `game_state=unknown`, `game_state_at_build=live`, `is_live=null`, `market_state=unknown`, `game.state=unknown`, `game.state_at_build=live`.
+- Control, same instant. `?sport=all&date=2026-09-13&limit=2000`: `written_at` 14:55:52Z, `build_age_seconds` 746.3, 918 rows. Its 10 `game_state=live` rows are still served live; `rows_live_state_stale` 0.
+- refresh-worker: preflight **HOLD** at 15:08:09Z.
+  - 4 jobs in flight (`run_mlb_daily_sim_job.py` -> `tools/daily_update.py --workflow ui-daily`); a deploy would kill the MLB daily sim.
+  - Render events since 14:11Z show the deploy only, and no kills.
+  - The deploy waits for a CLEAR; this lane has held the claim since 15:07:54Z.
+- Web claim released after this entry.
