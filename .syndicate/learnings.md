@@ -5840,3 +5840,18 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
 - **What was believed:** `_refresh_layer2_shortlist_only`'s docstring (2026-08-14) says "the shortlist stage measured 14-27s". It uses that figure to call a 300 s rate limit a ~8% duty cycle. I carried the figure into the carryover's cost estimate.
 - **What was measured:** refresh-worker, `LAYER2_FAST_REFRESH date=2026-09-12`, 2026-09-13 04:34:59-04:58:57Z: `elapsed_s` 176.89, 182.04, 133.53, 166.74 and 164.11. Against builds ~5-7 min apart, that is roughly half the loop's time, not 8%.
 - **How to apply:** before sizing periodic worker work off a stage's cost, read that stage's own elapsed line from production logs for a comparable slate. A cost quoted in a comment is a dated measurement taken on a different board size. The carryover's cost is restated in its lane and in `state_layer2.md [layer2-prior-date-carryover]`.
+
+## 2026-09-13 — OVERTURNED: "a 304 from /api/ops/artifacts/stream means refresh-worker's copy is current" is FALSE for append-only tails, and "ODDS_SWEEP_LAUNCHED means the sweep ran" is FALSE. Together they took NFL off the Sunday board `[lane refresh-worker-disk-inventory]`
+
+- **Belief 1 (the puller's own comment): a 304 is the cheap steady state.**
+  - `pull_streamed_artifact` sent `since=<local mtime>` AND `Range: bytes=<local size>-`. The route answers 304 on `st_mtime <= since` BEFORE it reads Range.
+  - Measured: refresh-worker's `nfl_source/tracking/book_quotes/2026-09-13.jsonl` sat at 19,914,752 B (books from 09-12 08:02Z) while web held 28,757,424 B (13:40Z).
+  - Probes with Range from 19,914,752: `since` older than web -> 206 (8.8 MB); `since` >= web -> 304.
+  - The served board had 0 NFL rows for today. Fixed in `48c1fc61`.
+- **Belief 2: `ODDS_SWEEP_LAUNCHED ... sports=mlb,nfl,soccer` at 15:48:15Z meant NFL was swept.** It was refused 32 s later: `A refresh run is already active (pid=17018)`. The per-sport marker had already been stamped (`#25`), so NFL's next sweep moved past kickoff.
+- **How to apply:**
+  - A silent success path (304/416) needs its own "current since when" reading, not an inferred one.
+  - For append-only files the byte offset is the watermark; a clock is a second, conflicting one.
+  - Grade a launch by what LANDED (web shard mtime and size, `ODDS_SWEEP_OUTCOME`), never by the launch line.
+  - When a board sport looks stale, compare web's shard (ops stream probe: `X-Artifact-Mtime`/`X-Artifact-Size`) against the reader's copy BEFORE diagnosing capture.
+  - *(evidence: `deploys.md` 2026-09-13 15:43:33Z and 16:09-18:02Z)*

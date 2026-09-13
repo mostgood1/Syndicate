@@ -2127,3 +2127,29 @@ a 1.7x isolation penalty, four mechanism exonerations, and "do not split the slo
 tests into their own job". All rested on ONE unreplicated comparison with an
 outlier cold reading. Three paired replications erased it: **cold 31.32s vs warm
 31.45s**. The rule is in `learnings.md` 2026-09-03.
+
+## [refresh-worker-disk-2026-09-13] refresh-worker's 48.9 GB disk: FULL 09-12 23:39Z -> 09-13 14:15Z, COMPACTED to 16.3 GB free `[verified 2026-09-13, lane refresh-worker-disk-inventory]`
+
+- **Inventory, 13:44Z, 0.0 MB free.**
+  - `soccer_source/tracking` 13.32 GB: daily `odds_*_history_<date>.csv`, export-only, no reader in code.
+  - `evaluation_ledger_chunks` 8.01 GB; `mlb_source/source_artifacts/data` 6.74 GB; `mlb_source/data/market` 3.88 GB.
+  - MLB `book_quotes` 3.48 GB, including 3.15 GB of plain shards beside their `.gz`.
+- **Compaction (`disk_compaction.py`).** A one-shot thread at boot from `run_disk_maintenance`, default only when `RENDER` is set AND the service is refresh-worker.
+  - First run (`3e18be8e`, 14:44:15Z): free 0 -> 16.44 GB. 96 verified duplicate shards removed; 203 closed history CSVs gzipped, 13.64 -> 1.01 GB.
+  - Post-`c114e1aa` run (16:30:45Z): free 16,296,890,368 B; nothing new to compact.
+- **History re-append is OFF by default.** `SYNDICATE_TRACKING_HISTORY_CSV=1` restores `_persist_tracking_snapshot`'s full-snapshot CSV append.
+- **18 plain/gz mismatched shards remain:** mlb 09-03..09-09, ncaaf 09-05, soccer 08-22..09-09. None is a byte prefix of its `.gz`, and `resolve_book_quotes_path` serves the shorter plain file.
+- **Not approved / not done:** resize, retention, evaluation-ledger slimming, `odds_history` triple copies.
+
+## [streamed-pull-append-only-tail] `pull_streamed_artifact` sends NO `since=` on append-only tails — web's stream route 304'd before Range and froze NFL `[verified 2026-09-13 in production, refresh-worker `cae4713e` live 18:31:22Z]`
+
+- **The route.** `/api/ops/artifacts/stream` returns 304 on `st_mtime <= since` BEFORE honouring Range (`ops.py`). Probed live: since >= web mtime -> 304; since older -> 206 tail. A 304 or 416 is a silent success in the puller.
+- **Measured failure.** refresh-worker's `nfl_source/tracking/book_quotes/2026-09-13.jsonl` stayed at 19,914,752 B (books from 09-12 08:02Z) while web held 28,757,424 B. The served board had 0 NFL rows for the Sunday slate.
+- **Now.**
+  - `_is_append_only` paths with a local copy send Range only.
+  - Whole-file families keep `since=`.
+  - Verified after boot: `STREAM_TAIL_OK` on that shard at 18:39:40Z; NFL layer2 rebuilt 18:53:50Z (808 rows, 23 live).
+- **Related.**
+  - Web's append-only publish MERGES: line-digest dedupe, then `os.replace`, so a byte-identical republish advances only the mtime.
+  - Web's merge concurrency cap is 1, so a second publish seconds later gets `ARTIFACT_MERGE_AT_CAPACITY` (503, retried by a later publish).
+  - `_FAILED_DIRECT_PUBLISH` is in-process and lost on reboot.

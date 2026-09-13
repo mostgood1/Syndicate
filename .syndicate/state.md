@@ -657,6 +657,8 @@ once this index exists: re-splitting would orphan the parts.
 | [web-preflight-dead-sample] | WEB'S PREFLIGHT SAMPLE HAS BEEN DEAD SINCE 2026-08-14 — CAUSE STILL UNKNOWN AFTER FOUR WRONG ANSWERS `[2026-08 | `state_worker.md` |
 | [refresh-worker-deploy-hold] | refresh-worker: THE OOM DEPLOY HOLD IS ORPHANED. Branch READY, NOT DEPLOYED. `[2026-08-18]` — **ARCHIVED 2026- | `state_worker.md` |
 | [test-intelligence-runtime] | `tests/test_intelligence.py` IS SLOW, NOT STALLED — and the "warm state" finding is RETRACTED `[2026-09-03, la | `state_worker.md` |
+| [refresh-worker-disk-2026-09-13] | refresh-worker's 48.9 GB disk: FULL 09-12 23:39Z -> 09-13 14:15Z, COMPACTED to 16.3 GB free `[verified 2026-09 | `state_worker.md` |
+| [streamed-pull-append-only-tail] | `pull_streamed_artifact` sends NO `since=` on append-only tails — web's stream route 304'd before Range and fr | `state_worker.md` |
 
 ### `[web-oom-leak]` UPDATE — the instrument is fixed and the growth has a SUSPECT, 2026-09-04T00:4xZ `[session b2b5b45b]`
 
