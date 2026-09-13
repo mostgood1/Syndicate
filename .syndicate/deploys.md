@@ -34101,3 +34101,64 @@ No deploy, no env change, no code change to a service. The deploy is recorded at
 - 0 `oomKilled` over >= 6 h spanning live play, via `render_events.py --service live-odds-worker --since 2026-09-13T11:15:04Z` with OUTPUT COMPLETE.
 - A designed recycle inside the window is NOT a failure. Read the `RECYCLING` line at the exit, then continue the window from the next `server_available`.
 - A session watcher polls events every 5 min from 11:15:04Z. It ignores `earlyExit`, and exits on any other `server_failed` or any deploy.
+
+## 2026-09-13 13:39:54Z — refresh-worker `77f8d890` -> `92a271b8` — lane `refresh-worker-disk-inventory` — read-only disk inventory. **LIVE; INVENTORY READ. No file changed.**
+
+**Deploy.** `dep-dajafah594qs73be5h8g`, trigger `api`.
+- Preflight **CLEAR** at 13:39:08Z and re-checked **CLEAR** at 13:39:49Z (only infra). Claim held by `refresh-worker-disk-inventory`.
+- Live `92a271b8`, `finishedAt` 2026-09-13T13:42:53.935Z.
+- **User decision "Deploy main"**, told that the deploy carries `bc4dd317` (the streaming venue-book writer, lane `live-odds-worker-oom-loop`), which that lane had parked as a later, separately measured refresh-worker deploy. **Its refresh-worker effect therefore has no clean before/after of its own.**
+- Other collateral: `58736a69` and `77199c48` (mostly inert here), `6861cd6d` (offline script), `064fb6af` (web template).
+
+**Why.** refresh-worker's disk is full. There were 3,905 `No space left on device` lines 09-12 23:39Z..09-13 13:23Z, and the served book grids are frozen at 07:24Z.
+- The user noticed because NFL was missing from the combined Layer 2 board: 200 rows = soccer 158 + mlb 42 + **nfl 0**. The NFL shortlist held 98 props dated 09-15, with no book and no game rows.
+- live-odds-worker and web: 0 ENOSPC.
+
+**INVENTORY** (`DISK_INVENTORY_*`, 13:43:41-13:44:21Z, 40.3 s, `truncated: false`, 0 errors, walk of `/opt/render/project/data`):
+- **Filesystem: 48.91 GB total, 48.90 GB used, 0.0 MB available.** Inodes 3,115,406 free of 3,276,800. 115,456 files, 45,926 dirs, 48.48 GB.
+- Age: <1d 2.81 GB, 1-7d 8.55 GB, 7-30d 22.71 GB, >30d 14.41 GB. Orphan temps: 23 files, 40.3 MB.
+- Depth 1: `mlb_source` 19.50 GB (74,732 files), `soccer_source` 13.89 GB (2,228), `reports` 11.05 GB (35,154), `odds_events` 1.85 GB (64), `wnba_source` 0.99 GB, `nfl_source` 0.70 GB, `ncaaf_source` 0.41 GB, `settlement_inputs` 94 MB, `nba_source` 49 MB.
+- Depth 3, top:
+  - `reports/intelligence/evaluation_ledger_chunks` 8.01 GB (42 files)
+  - `mlb_source/source_artifacts/data` 6.74 GB (26,962)
+  - `mlb_source/data/market` 3.88 GB (45,568)
+  - `mlb_source/tracking/book_quotes` 3.48 GB (109)
+  - `mlb_source/artifacts/mlb` 1.89 GB
+  - `mlb_source/tracking/odds_history` 1.62 GB
+  - `soccer_source/tracking/book_quotes` 889 MB
+  - `reports/odds_control_plane/odds_history` 506 MB
+  - `reports/intelligence/venue_odds` 480 MB (56)
+  - `mlb_source/data/book_grid` 341 MB
+  - `reports/intelligence/clv_openings` 252 MB
+  - `reports/migration_runs` 1.16 GB (34,743, depth 2)
+- **`soccer_source/tracking` is 13.32 GB, mostly `odds_soccer_player_props_history_<date>.csv`:** 09-10 711 MB, 08-27 650, 08-28 642, 09-03 639, 09-04 605, 09-11 581, 09-09 566, 09-02 543, 09-08 431, 09-01 361, 09-12 336, 09-07 306 ...
+- Extensions: `.json` 16.91 GB (102,588), `.jsonl` 16.79 GB (1,143), `.csv` 13.93 GB (2,370), `.jsonl.gz` 132 MB, `.csv.gz` 121 MB, `.json.gz` 96 MB.
+- **INSTRUMENT CAVEAT:** `DISK_INVENTORY_COMPACTABLE` stopped admitting new families at its 20,000-family cap before the walk reached `soccer_source`. MLB's per-game names filled it, so the soccer props CSV family is ABSENT from that list. Use `DISK_INVENTORY_FILES`/`_DIRS` for soccer, not `_COMPACTABLE`.
+
+**FINDINGS, measured unless labelled:**
+- **`book_quotes` plain shards beside their `.gz`.**
+  - `mlb_source/tracking/book_quotes/<date>.jsonl` holds **3.15 GB in 30 plain files**, and the daily compaction reports mlb `already_compressed: 30`.
+  - `resolve_book_quotes_path` reads the PLAIN file whenever it exists and falls back to `.gz` only if it is absent.
+  - **Not re-pull churn in the window read:** 20,000 refresh-worker log lines touching `tracking/book_quotes/` (09-12 14:10Z..09-13 13:46Z) show no pull of a plain shard >= 2 days old (only 4 `STREAM_PULL_ABSENT` for nba/wnba/nhl/ncaab 09-11).
+  - A plain shard whose `.gz` holds the same line count is a lossless duplicate. One that grew after compression must be skipped.
+- **`odds_*_props_history_*.csv` exists ONLY on this disk and is unread.**
+  - It is in `EXPORT_ONLY_ARTIFACT_PATTERNS`, so never published.
+  - Web holds just 18 small historical files (0.01 GB, 06-10..08-07).
+  - `mirror_manifest.py:163-195` (lane `web-oom-census`, 09-09): "Nothing reads it"; `book_quotes` carries the same fields at 83x.
+  - Yet refresh-worker holds daily soccer files of 300-711 MB from 08-27, plus `odds_mlb_hitter_props_history_<date>.csv` 858 MB (17) and `odds_mlb_game_lines_history_<date>.csv` 167 MB (32). Something on this worker writes them.
+  - Gzip keeps the only copy and breaks no reader.
+- **`evaluation_ledger_chunks` (8.01 GB).**
+  - The reader globs `*.jsonl` only (`intelligence_evaluation.py:920`), so gzip would hide chunks.
+  - `scripts/compact_evaluation_ledger.py` slims embedded manifests in place (record count preserved) but writes `.compact_tmp` beside each chunk, so it needs free space first.
+- **Existing daily compaction cannot help a full disk:** `compress_closed_shards` writes `<name>.gz.tmp` before removing the original. Retention (`SYNDICATE_ARTIFACT_RETENTION_ENABLED`) has never run.
+- `reports/intelligence/venue_odds` (peer lead): 480 MB, not the driver.
+
+**NEXT (not yet approved):**
+- Step 1: remove plain `book_quotes` shards whose `.gz` verifies by line count (~3.3 GB), plus orphan temps (40 MB). Neither needs write space.
+- Step 2: gzip closed `odds_*_props_history_*.csv` files one at a time, verify-then-delete (~7-8 GB).
+- Then evaluation-ledger slimming, and find and stop the props-history producer.
+- The resize stays held per the user's "compact first".
+
+**Rollback:** `py -3 scripts/render_deploy.py --service refresh-worker --commit 77f8d890 --allow-rollback` under a claim. The inventory itself changes nothing on disk.
+
+**Claim** `refresh-worker-disk-inventory` on refresh-worker RELEASED with its token after this entry.
