@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-09-13 18:01Z — reading only, no deploy — NCAAF WEEK 3 ADVANCE, SUNDAY READING — **PASS: the fix is live on both services, `resolved_active_weeks [1, 2, 3]`, and `cards?week=3` serves "2026 Week 3" (57 of 57 `3_`)** [lane ncaaf-games-cache-refresh, scheduled task ncaaf-week3-advance-sunday]
+
+Read 2026-09-13 18:01:14-18:01:42Z (13:01 CDT), substrate `render`, read-only. The task ran on Sunday daytime, before the 2026-09-14T03:00Z cutoff, so the prescribed reading was taken.
+
+- **Step 1: live commits.** Web: `/api/ops/version` gives `commit 822ee0ba4c94` on branch `main`. refresh-worker: the deploys API (limit=1) gives `c114e1aa509e`, `live`, finishedAt 2026-09-13T16:23:12.98Z. After `git fetch origin`, `git merge-base --is-ancestor ab787363 <c>` exits 0 for BOTH commits, and both are on `origin/main`. **Fix shipped = YES**: the lane names `ab787363`, both services contain it, and the artifact carries `unplayed_kickoffs`.
+- **Step 2: web.** `/api/ops/ncaaf/season-weeks` (admin) gives **`resolved_active_weeks [1, 2, 3]`**. On 09-11 it gave `[1, 2]`.
+- **Step 3: artifact.** `GET /api/ops/artifacts/export?path=ncaaf_source/data/week_state/ncaaf_week_state_2026.json` (admin) returns 200 with 2739 bytes. The control path `.../definitely_not_allowlisted.txt` returns **403**. Top-level keys: `games, generated_at, season, source, stale_completion_flags, unplayed_kickoffs, weeks`. **`generated_at` is 2026-09-13T15:59:56.274Z.** `stale_completion_flags` is 0. **Week 2: 86 games / 86 completed / 0 unplayed. Week 3: 75 / 0 / 75.** **`unplayed_kickoffs` is PRESENT.**
+- **Step 4: cards, same instant (both requests started at 18:01:15Z).** `/ncaaf/api/cards?week=2` returns 200 (1,012,700 B, 26.4 s) with `date "2026 Week 2"` and 49 games, all `2_`. **`?week=3` returns 200 (675,077 B, 10.6 s) with `date "2026 Week 3"` and 57 games, all `3_`.** On 09-10, `?week=3` served "2026 Week 2".
+- **Step 5: builds.** `py -3 scripts/render_logs.py --service refresh-worker --text "ncaaf_week_state_2026" --start 2026-09-12T20:00:00Z` returns 98 matches over 2 pages, covering 03:04:23Z to 16:17:21Z. The results:
+  - The 09-13 overnight build: `PUBLISH_FAILED` at 03:04:23Z (`urlopen error [Errno -2] Name or service not known`), then **`PUBLISH_OK` at 03:07:45Z** (bytes=2906). The 09-10 row projected ~03:2xZ, so the build landed about 15-20 min early, still mid-slate: USC kicked off at 03:00Z and New Mexico State @ Hawai'i at ~04:00Z.
+  - 03:12Z to 07:43:21Z: `PUBLISH_SKIPPED_UNCHANGED` only, all with checksum `091aa380541f`.
+  - **No matches from 07:43:21Z to 15:59:56Z**, a gap of about 8h17m. This reading does not explain it.
+  - **`PUBLISH_OK` at 15:59:56.29Z** (bytes=2813, 16 ms after the served `generated_at`). Another `PUBLISH_OK` at 16:09:39Z carries the same 2813 bytes, and 16:17:21Z is `PUBLISH_SKIPPED_UNCHANGED` with checksum `8bd38f54d6e3`.
+  - Both 15:59Z and 16:09Z predate the live worker deploy `c114e1aa` (finished 16:23:12Z). This reading did not read which worker commit built them.
+- **What this does NOT isolate.** The rebuild at 15:59:56Z already has week 2 at 86/86 completed, and that alone advances the target. So this reading cannot tell the read-time grace (`unplayed_kickoffs["2"].last` 03:59Z + 12 h = 15:59Z) apart from a plain producer rebuild after the slate went final. The rebuild landing within a minute of the grace expiry is a coincidence this reading did not explain. The goal reading holds either way: week 3 was on the board Sunday daytime, instead of at ~03:4xZ 09-14 as predicted on the pre-fix code.
+
+verify: PASS on the task's criteria, measured by these readings. Both live services contain `ab787363` (web `822ee0ba`, refresh-worker `c114e1aa`; ancestor checks exit 0). The served week_state (200, against a 403 control) carries `unplayed_kickoffs` and week 2 86/86, with `generated_at` 2026-09-13T15:59:56Z. `resolved_active_weeks` is `[1, 2, 3]`. At the same instant, `cards?week=3` served `2026 Week 3` with 57 of 57 `3_` gamePks, and `?week=2` served `2026 Week 2` with 49 of 49 `2_`. The week-3 advance on Sunday daytime is MEASURED. Which mechanism caused it (grace or rebuild) is NOT isolated.
+
+---
+
 ## 2026-09-12 22:10 CT — reading only, no deploy — refresh-worker (lane `nfl-prop-join-sunday-reading`, scheduled task; discharges the full-size-board reading owed by the 2026-09-10 02:08:07Z `a101c437` row) — **YES: ON THE SUNDAY-CARD BOARD, NFL MODEL COVERAGE IS 3.8% -> 51.6% OF ROWS (71 -> 548 PROJECTED, 63 -> 546 EDGED). THE SLATE CONFOUND IS GONE. `a101c437` IS NO LONGER THE ONLY CAUSE: THIS MEASURES THE JOIN AS IT STANDS NOW, NOT ONE COMMIT.**
 
 All times Central; the log stamps are UTC (+5h). No code was changed.
