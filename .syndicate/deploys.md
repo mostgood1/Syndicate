@@ -34072,3 +34072,32 @@ No deploy, no env change, no code change to a service. The deploy is recorded at
   - On paper the gate removes better-settling rows, and they were less often still there to bet. Per-game swings of about 5u make the ROI gap indistinguishable, and no fill rate is recorded, so the net effect on REALIZED results is unmeasured.
 - **Opening ledger closed:** 23,513,778 B (70.1% of 32 MiB), last record 04:58:46Z. Not truncated.
 - Rollback without code is unchanged (entry 2026-09-12 20:45Z).
+
+### 2026-09-13 11:15Z — reading only — live-odds-worker `77199c48` (three-change build) — lane `live-odds-worker-oom-loop` — first lifetime ran to the DESIGNED 6 h recycle, 0 kills; OFF-SLATE, so NOT the Verification reading
+
+**The event.** `render_events.py --service live-odds-worker --since 2026-09-13T04:43:50Z`, fully paged, OUTPUT COMPLETE:
+- `deploy_ended` 04:43:50.026Z
+- `earlyExit` 11:15:03.453Z
+- `server_available` 11:15:04.375Z
+- NOTHING else: 0 `oomKilled`, 0 `nonZeroExit`, 0 `unhealthy`.
+
+**It is the scheduled recycle, read AT the exit** (learnings 2026-09-03):
+- `LIVE ODDS REFRESH WORKER RECYCLING after 23407s uptime to reset accumulated page cache` at 11:15:00.065Z.
+- The next process booted at 11:15:59.990Z (`MALLOC_ARENA_INIT applied true max_arenas 2`).
+- 23,407 s = 6 h 30 m, inside the designed 19,440-23,760 s jittered bound (`SYNDICATE_LIVE_ODDS_WORKER_MAX_UPTIME_SECONDS` default 21,600 ±10%).
+
+**What it shows.**
+- The three-change build (`58736a69` arena cap + trim, `e332b531` streaming daily-book writer, `77199c48` MLB live-lens payload) ran **6 h 31 m 13 s with 0 kills**, 04:43:50Z-11:15:03Z. The process lived to its designed recycle.
+- The previous natural recycle on this service was `earlyExit` 2026-09-11T09:20:11Z. From 2026-09-11T18:16Z to 2026-09-13T00:07:50Z, every lifetime that ended without a deploy ended in `oomKilled` (census in `findings_2026-09-12_live_odds_worker_oom.md`).
+- Together with the two-fix window before it: **0 `oomKilled` from 2026-09-13T00:14:31Z to 11:15:03Z (11 h 0 m)**, across two builds and three changes.
+
+**What it does NOT show.** The window was 23:43 CT to 06:15 CT, overnight, with no US live slate.
+- This lane's Verification asks for a kill-free window "covering a live slate of comparable size".
+- On 2026-09-10 the pre-fix code ran ~23 h without a kill in a comparable off-slate stretch.
+- Recorded as a clean lifetime, NOT as GOAL MET.
+
+**verify:** OWED, unchanged in substance.
+- The window is now the lifetime from 11:15:04Z through the 2026-09-13 NFL/MLB afternoon slate (~17:00Z onward).
+- 0 `oomKilled` over >= 6 h spanning live play, via `render_events.py --service live-odds-worker --since 2026-09-13T11:15:04Z` with OUTPUT COMPLETE.
+- A designed recycle inside the window is NOT a failure. Read the `RECYCLING` line at the exit, then continue the window from the next `server_available`.
+- A session watcher polls events every 5 min from 11:15:04Z. It ignores `earlyExit`, and exits on any other `server_failed` or any deploy.

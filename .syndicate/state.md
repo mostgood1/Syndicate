@@ -373,9 +373,11 @@ still genuinely absent — `conditional_mix` etc. return `count: 0` and `POST
   we LOOKED), never `book_age_seconds` (time since the price MOVED).**
 - **FALSE FROM 2026-09-09 — corrected 2026-09-12 by lane `live-odds-worker-oom-loop`:** 80
   `oomKilled memoryLimit=2Gi` between 2026-09-09T19:43:39Z and 2026-09-13T00:07:50Z, 0 before,
-  timed to the Kalshi daily-book write. After `e332b531` (streaming writer, live
-  2026-09-13T00:14:31Z, on top of `58736a69`'s arena cap + trim): 0 `server_failed` through
-  04:04Z, events fully paged. The 6 h reading is OWED; the kills are NOT yet shown stopped
+  timed to the Kalshi daily-book write. Since `e332b531` (streaming writer, live
+  2026-09-13T00:14:31Z, over `58736a69`'s arena cap + trim, then `77199c48` MLB live-lens
+  payload fix at 04:43:50Z): 0 `oomKilled` through 11:15:03Z (11 h, events fully paged). The
+  last lifetime ended in the DESIGNED recycle, but overnight and off-slate; a kill-free LIVE
+  slate is still OWED, so the kills are NOT yet shown stopped under load
   (`.syndicate/findings_2026-09-12_live_odds_worker_oom.md`). The claim below was true of
   2026-08-26..09-04 only and is kept for the record:
 - ~~**live-odds-worker has NEVER been evicted.**~~ `evicted: false` on all 23
