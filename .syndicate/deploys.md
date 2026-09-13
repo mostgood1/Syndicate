@@ -34232,3 +34232,39 @@ ships      vs live 064fb6af: 10 code paths
 - **OWED:** `gone10` from this log on a LIVE slate, against a same-slate session capture. The NFL 09-13 capture runs to 01:00Z.
 - **Off switch without code:** `SYNDICATE_CLV_DEPARTURE_LEDGER_ENABLED=off` on refresh-worker (needs a deploy). Web's allowlist entry is inert without the recorder.
 - Claim: web released after this entry.
+
+## 2026-09-13 15:00Z — web `9c7d34bc` -> `822ee0ba`, then refresh-worker `3e18be8e` -> `822ee0ba` — lane `layer2-prior-date-live-carryover` — prior-date Layer 2 carryover + stale-live label. **PENDING: preflight gate PASS, not yet deployed.**
+
+**User decision 2026-09-13 ~9:55 AM CT:** "Deploy both now (Recommended)", staggered, web first. Live SHAs read from Render at ~15:05Z: web `9c7d34bc` (finished 14:44:53Z), refresh-worker `3e18be8e` (finished 14:14:19Z).
+
+**Why.** At the midnight CT roll, refresh-worker stops queuing the prior date; its board window is central today..today+2. So `/api/board/layer2-shortlist?sport=ncaaf&date=2026-09-12` served its 04:58:55Z build, 28 `live` rows over six games, for 8+ hours while NMS @ HAW was still being played. Refresh-worker logs: last `LAYER2_FAST_REFRESH date=2026-09-12` 04:58:57Z; 09-13 `throttled=no` from 05:00:08Z.
+
+**Ships.**
+- refresh-worker `3e18be8e..822ee0ba`: this lane's 3 files only (+316/-1).
+  - Each loop pass rebuilds the PRIOR Central date's shortlist through `_refresh_layer2_shortlist_only`, never a queued publication, while that date's last good build had live rows or live chips.
+  - After a restart, when that is unknown, it builds once.
+  - Capped by `SYNDICATE_LAYER2_CARRYOVER_MAX_HOURS` (default 6, 0 disables).
+  - Yields to the fast path's rate limit, a deploy drain, a resident MLB sim and the execution guard.
+  - New `LAYER2_CARRYOVER` lines; `LAYER2_FAST_REFRESH` gains `live_rows=` / `chips_live=`.
+- web `9c7d34bc..822ee0ba`: this lane's 3 files, plus lane `refresh-worker-disk-inventory`'s `disk_compaction.py`, `disk_maintenance.py` and `odds_refresh_tracking.py`.
+  - Web never executes those three: `run_disk_maintenance` is called only from the two worker scripts, and the tracking sync runs only inside a worker's odds refresh.
+  - `/api/board/layer2-shortlist` serves `live` rows from a build older than `SYNDICATE_LAYER2_LIVE_STATE_MAX_BUILD_AGE_SECONDS` (default 1800) as `unknown`, adding `game_state_at_build`, `build_age_seconds` and `rows_live_state_stale`.
+
+**verify (READINGS; each left empty until taken):**
+- W1 web, within 10 min of live: `?sport=ncaaf&date=2026-09-12&limit=2000` `game_state=live` rows 28 -> 0, `rows_live_state_stale` = 28; the current-date board `rows_live_state_stale` = 0. Reading: _
+- R1 refresh-worker, within 30 min of live: one `LAYER2_CARRYOVER date=2026-09-12 decision=skip reason=past_cap` line. Reading: _
+- R2 tonight's roll, 2026-09-14 05:00-05:10Z: a `LAYER2_CARRYOVER date=2026-09-13` line, built or skip, with its reason. Reading: _
+- R3 first game live across midnight CT (Mon 09-14 SEA @ LAA 8:38 PM CT / MIA @ ARI 8:40 PM CT if long, else Fri 09-18 LAD 9:15 PM CT):
+  - prior-date `LAYER2_FAST_REFRESH` builds after 05:00Z at <= 15 min spacing while a prior-date chip is live;
+  - `reason=nothing_live_at_last_build` within 2 builds of the last final;
+  - that last build serves 0 `game_state=live` rows.
+  - Reading: _
+
+**Blast radius.** Both services restart stop-then-start (persistent disks, no overlap). refresh-worker: the in-flight board build is lost (cold rebuild ~12 min), the disk lane's one-shot compaction re-runs at boot, and the departure recorder's state is on disk.
+
+**Rollback.** Each behind a claim + preflight:
+- `python scripts/render_deploy.py --service web --commit 9c7d34bc --allow-rollback`
+- `python scripts/render_deploy.py --service refresh-worker --commit 3e18be8e --allow-rollback`
+- Kill switches: `SYNDICATE_LAYER2_CARRYOVER_MAX_HOURS=0` (refresh-worker) and `SYNDICATE_LAYER2_LIVE_STATE_MAX_BUILD_AGE_SECONDS=0` (web), each followed by a deploy.
+
+**Reminders.** W1/R1 by 2026-09-13 16:30Z (11:30 AM CT). R2 by 2026-09-14 15:00Z. R3 by 2026-09-15 15:00Z, else 2026-09-19 15:00Z.
