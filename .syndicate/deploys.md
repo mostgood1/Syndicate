@@ -34196,3 +34196,39 @@ No deploy, no env change, no code change to a service. The deploy is recorded at
 **Rollback:** `py -3 scripts/render_deploy.py --service refresh-worker --commit 92a271b8 --allow-rollback` under a claim. Rolling back re-enables the history append; files already compacted stay compacted (the gzipped CSVs are readable with `gzip`).
 
 **Claim** `refresh-worker-disk-inventory` on refresh-worker RELEASED with its token after this entry.
+
+## 2026-09-13 14:47Z — web `9c7d34bc` — lane `layer2-live-scorecard-gate` — departure-log allowlist; refresh-worker got the recorder inside `3e18be8e` (user, verbatim: "Deploy both now")
+
+```
+claim      web ACQUIRED 14:37:00Z by layer2-live-scorecard-gate
+preflight  HOLD 14:37:57Z (2 merge_published_artifacts jobs in flight); CLEAR 14:38:43Z, target 9c7d34bc
+deploy     dep-dajbb37qj5pc73cuqfo0   created 14:39:08Z   update_in_progress 14:43:16Z   live 14:44:53Z
+ships      vs live 064fb6af: 10 code paths
+           (git diff --stat 064fb6af..9c7d34bc -- syndicate pipeline scripts app.py requirements.txt render.yaml vendor)
+```
+
+- **Target `9c7d34bc`, not origin/main `3e18be8e`.** Main moved at 09:09 CT to lane `refresh-worker-disk-inventory`'s disk compaction, which deletes and gzips files on refresh-worker. Shipping that inside this deploy was not what the user approved. `9c7d34bc` is on origin/main.
+- **This deploy carries other lanes' code that web had never run.** The user was told before choosing.
+  - `mlb/live_lens.py` (`77199c48`, lane `mlb-live-lens-payload-dup`).
+  - `live_lens_loop.py` and `scripts/run_live_odds_refresh_worker.py` (`58736a69`, lane `live-odds-worker-oom`).
+  - `venue_daily_odds.py` (`bc4dd317`, lane `live-odds-worker-oom-loop`).
+  - `disk_inventory.py` and `disk_maintenance.py` (`92a271b8`, lane `refresh-worker-disk-inventory`).
+  - Plus this lane's offline `scripts/layer2_live_scorecard.py`.
+- **refresh-worker needed no deploy from this lane.** It went live on `3e18be8e` at 14:14:19Z (lane `refresh-worker-disk-inventory`'s deploy), which contains `e498f0b8`. **That deploy carried this lane's recorder as collateral.** Its claim was held by that lane throughout.
+
+**verify — MET for recording and transfer; the live-slate comparison is OWED.**
+- **Recorder reached in production.**
+  - First build: `[clv_departure_ledger] DEPARTURES date=2026-09-13 rows_in=1951 sports=4 tracked=154 departed=0 ... written=1` at 14:25:34Z.
+  - Next: `rows_in=949 sports=4 tracked=189 departed=117 returned=0 written=118` at 14:40:57Z.
+- **Transfer.**
+  - refresh-worker `PUBLISH_FAILED ... clv_departures/2026-09-13.jsonl ... HTTP Error 403` at 14:28:40, 14:32:47, 14:37:00, 14:40:57 and 14:42:19Z, while web lacked the pattern.
+  - After web went live: `PUBLISH_OK path=reports/intelligence/clv_departures/2026-09-13.jsonl ... bytes=64421` at 14:45:37Z (sweep repair).
+  - Web export at 14:45:56Z: 57,546 B, 2 builds, 117 departures.
+- **Web health after the deploy.** `/api/board/layer2-shortlist?sport=ncaaf&limit=5` returned 200 in 0.4s; `/api/board/game-chips?sports=ncaaf` returned 200.
+- **The 117 departures are board churn, not a price reading.** They are 116 MLB pregame and 1 soccer pregame: the MLB shortlist shrank from 1,569 rows (build 14:25:33Z) to 532 (14:40:57Z). Returns in later builds will show how much came back.
+- **Context read by this lane (lane `refresh-worker-disk-inventory`'s area, not re-derived).**
+  - Served combined board at 14:46:01Z (written 14:40:58Z): 949 rows, soccer 257 / mlb 532 / **nfl 93** / ncaaf 67.
+  - Since 14:14Z, refresh-worker logged `No space left on device` twice (14:15:41Z, 14:15:53Z) and `DISK_COMPACTION_FILE csv_gzipped` lines from 14:32Z.
+- **OWED:** `gone10` from this log on a LIVE slate, against a same-slate session capture. The NFL 09-13 capture runs to 01:00Z.
+- **Off switch without code:** `SYNDICATE_CLV_DEPARTURE_LEDGER_ENABLED=off` on refresh-worker (needs a deploy). Web's allowlist entry is inert without the recorder.
+- Claim: web released after this entry.
