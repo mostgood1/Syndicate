@@ -34349,3 +34349,40 @@ ships      vs live 064fb6af: 10 code paths
 **Rollback.** `python scripts/render_deploy.py --service refresh-worker --commit 3e18be8e --allow-rollback` behind a claim + preflight. That also drops the disk lane's `disk_compaction.py` change, so tell that lane first. Kill switch: `SYNDICATE_LAYER2_CARRYOVER_MAX_HOURS=0`, then a deploy.
 
 Refresh-worker claim released after this entry.
+
+## 2026-09-13 16:09-18:02Z — ops-triggered NFL-only odds refreshes on refresh-worker (no deploy) + DISK_COMPACTION reading on `c114e1aa` — lane `refresh-worker-disk-inventory`. **MEASURED: NFL odds fresh pregame and live; stale-prefix rule removed 0.**
+
+**User decisions:** "Queue NFL refresh now (Recommended)" (~16:00Z, NFL odds stale at 13:40Z); then "Queue 2nd NFL refresh (Recommended)" (asked ~16:25Z, answered after kickoff).
+
+**Why odds were stale after the 15:43Z fix:**
+- live-odds-worker's 15:48:15Z launch (`sports=mlb,nfl,soccer`) was refused: `LIVE ODDS REFRESH SKIP/ERROR DETAIL: A refresh run is already active (pid=17018)` at 15:48:47Z.
+- The per-sport marker was stamped before launch (`#25`), so NFL's next pregame sweep became ~17:48Z, after the 17:00Z kickoff.
+- `/api/ops/odds-refresh/run` also refused at 16:06:26Z (`already active (pid=6638)`): refresh-worker runs live soccer refreshes back to back.
+
+**Run 1:**
+- `scratchpad/queue_nfl_refresh.py` submitted the moment pid 6638 finished, at 16:09:33Z. Payload `{date: 2026-09-13, sports: nfl, phase: pregame, mode: full, launch_mode: manifest_only}`, job `6e74a3ad62af47e49945be3cfd0d71b0`.
+- runStamp `20260913_160933`, `finished` exit 0 at 16:12:33Z.
+- Web merge: `publisher=refresh-worker added=878` at 16:12:10Z (28,757,424 -> 29,148,136 B). The second publish at 16:12:17Z was refused with `ARTIFACT_MERGE_AT_CAPACITY` (inflight=1, cap=1), leaving web ~2 MB behind refresh-worker's 31,128,098 B until later publishes merged.
+- **Readings, 16:13:11-16:13:35Z:**
+  - `/api/board/layer1?sport=nfl&date=2026-09-13`: every sportsbook's newest `observed_at` 16:10:31-16:12:11Z (was 09-12 08:02Z); game markets 5-13 on all 13 games (was 0).
+  - `layer2-shortlist?sport=nfl` `written_at` 16:12:53Z, 1,144 rows.
+
+**Run 2:**
+- Queued 18:00:30Z (job `b0741023a8974ce99afd67547cc66a8e`), `finished` exit 0 at 18:01:47Z.
+- Web: 18:01:35Z `ARTIFACT_MERGE_AT_CAPACITY` (33.4 MB), then 18:01:39Z `ARTIFACT_MERGE_DEFERRED publisher=refresh-worker bytes=35066218`, child `added=669 duplicates=75453`. Web shard 35,066,218 B at 18:01:41Z.
+
+**Live after kickoff, reading 18:00:57Z:**
+- layer1 nfl `generated_at` 17:58:36Z, `by_state` live 8 / pregame 5. DraftKings, FanDuel, BetMGM, BetRivers, Bovada, Fanatics and William Hill newest `observed_at` 17:56:12-17:56:47Z; Kalshi 17:33:13Z.
+- layer2 nfl `written_at` 17:59:47Z: 525 rows, 24 live. `by_lane` dead 1,936 / opportunity 2,406.
+- refresh-worker kept tailing web: `STREAM_TAIL_OK ... 2026-09-13.jsonl appended_bytes=8539 from_offset=34346255` at 17:51:57Z, and `appended_bytes=411707 from_offset=34354794` at 17:58:28Z.
+
+**DISK_COMPACTION after `c114e1aa` boot (deploy by lane `layer2-prior-date-live-carryover`, live 16:23:12Z):**
+- `DISK_COMPACTION_STARTED` 16:24:01Z, `free_bytes_before` 16,310,919,168.
+- Summary 16:30:45Z, 404 s: shard_duplicates `removed 0, removed_stale_prefix 0, kept_mismatch 18, kept_recent 38`; history_csvs `compressed 0, kept_recent 6`; temp_files 0. Free 16,296,890,368 B.
+- **The stale-prefix rule found no byte-prefix pair among the 18.**
+  - 17 have a `.gz` longer than the plain file, but the plain file differs somewhere before its end.
+  - `soccer_source/tracking/book_quotes/2026-08-30.jsonl` has plain 125,119 > gz 125,113.
+  - The 18 are mlb 09-03..09-09 (7), ncaaf 09-05, and soccer 08-22..09-09 (10).
+- Readers still get the shorter plain file for those dates. **Not fixed; not a safe delete.**
+
+**Not done:** `48c1fc61` (no `since=` on append-only tails) is on main, NOT deployed.
