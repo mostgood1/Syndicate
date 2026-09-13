@@ -5745,3 +5745,15 @@ A watcher on the 09-12 opening ledger projected its 05:00Z close from the latest
 **How to apply:**
 - Project from a rolling window (an hour here) with a minimum span, never from the newest single interval, and state which window the alert used.
 - Apply an adjustment for a change only to readings taken BEFORE it; after the change, the readings already contain it.
+
+## 2026-09-12 RULE: a kill census's START DATE is a claim about ONSET, and a stage sampler on ONE thread is blind to a spike on ANOTHER. `[lane live-odds-worker-oom]`
+
+**What I believed.** Kills began 13 min after the 09-11 18:03Z deploy of `21c26db1`, and the preceding 10.5 h `3bafdd2b` lifetime (0 kills) was a clean baseline. I pre-registered H1 on that commit range.
+
+**What was true.** I had read `render_events` from 09-10, a start I chose. A peer read from 09-07 and found the onset at 09-09T19:43Z. The "clean" stretch was quiet partly because 09-11 carried a deploy roughly every hour, each resetting memory. Separately, my `ALL_PROCESS_MEMORY` stage samples went silent 40-66 s before every kill. They are emitted by the live-lens thread, and the spike was on the venue-poll thread (the Kalshi daily-book write), which those samples never cover. 7 of 7 kills sat in that other thread's window.
+
+**How to apply.**
+- Before naming an onset or a baseline, widen the events window until kills stop appearing, and write the read's start next to the claim.
+- Discount any "quiet" interval that contains deploys: every deploy reboots, and memory is boot-confounded.
+- When a per-stage sampler shows nothing in the last N seconds before a kill, list the OTHER threads that run in that window before reading the silence as "nothing happened". Log timing against their own markers (here `TRIM_SELECT`/`DAILY_BOOK`).
+- *(evidence in `.syndicate/log/2026-09-12.md`, section "live-odds-worker OOM")*

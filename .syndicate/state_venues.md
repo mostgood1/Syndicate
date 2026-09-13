@@ -5,7 +5,19 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
-## [live-odds-worker-memory-is-page-cache] live-odds-worker READS 96% AND IS NOT IN DANGER — THE FIELD EVERYONE REACHES FOR IS THE WRONG ONE `[measured 2026-09-06, 200 samples, 3.7h uptime with NCAAF segment capture live]`
+## [live-odds-worker-memory-is-page-cache] live-odds-worker memory: THE 09-06 "NOT IN DANGER" VERDICT WAS OVERTAKEN — 70+ OOM kills 09-09..09-13; allocator fix LIVE and NOT SUFFICIENT ALONE; combination reading OWED `[updated 2026-09-13, lane live-odds-worker-oom; original body measured 2026-09-06]`
+
+**UPDATE 2026-09-13 — verified on Render; read this before the 09-06 body below.**
+
+- **live-odds-worker WAS being OOM-killed.** `render_events.py --since 2026-09-10T00:00:00Z`, OUTPUT COMPLETE: **70 `oomKilled memoryLimit=2Gi`** 09-10..09-12, with restart-to-kill of 10-25 min on 09-12. The 09-06 "not in danger" conclusion no longer holds. Its INSTRUMENT point still does: read `container_memory_unreclaimable_mb`, never `container_memory_mb`.
+- **Two mechanisms, both confirmed from production:**
+  1. The PARENT `run_live_odds_refresh_worker.py` ran default glibc: no arena cap, no `malloc_trim`, `MALLOC_*` env all absent, 0 `MALLOC` log lines. It plateaued at 1.0-1.3 GB within ~10 min of boot.
+  2. Kalshi `venue_daily_odds.record_daily_odds` rewrote whole daily files (up to 8,000 markets) on the venue-poll thread. **7 of 7 kills checked landed 17-40 s after `[kalshi_odds] TRIM_SELECT` and before `DAILY_BOOK`.**
+- **LIVE `58736a69`** (22:34:15Z 09-12): arena cap 2, plus trim after the live-lens pull and publish. `MALLOC_ARENA_INIT applied true`; trims released 915.9 MB in the first 12 min. **Alone it ran 93.6 min, then `oomKilled` at 2026-09-13T00:07:50Z: necessary, not sufficient.**
+- **LIVE `e332b531`** (lane `live-odds-worker-oom-loop`, streaming daily-book writer) since 2026-09-13T00:14:31Z. **The combination's >= 6 h no-kill reading is OWED**, closing >= 06:14:31Z; it is not a verified fact yet.
+- **Unmeasured:** live objects in the live-lens MLB/soccer builds (+384 / +558 MB stage deltas on 09-12), the next lever if the combination still kills.
+
+**The original 09-06 body follows, unchanged.**
 
 **The reading that looks like an emergency:**
 
