@@ -5787,3 +5787,15 @@ A re-read of one build reports every market as still there. On the same final ca
 - Measure persistence against a NEWER artifact (its `written_at`), not a later poll. A re-read of the same artifact is "no new look", never "still there".
 - When fixing such a rule, change only the defective case and report both readings. A fix that also moves the horizon changes the thing it is correcting.
 - Judge presence AT the check point, never "did it ever leave before it". A replay of the worker's departure log over the same 80 builds wrote 1,109 returns against 2,245 departures, and an "ever left" join called 108 live sightings gone that were back by the deciding build.
+
+## 2026-09-13 An approval covers a SHIP LIST, not "main": when main moves between the answer and the deploy, re-ask or deploy the approved SHA `[lane layer2-live-scorecard-gate]`
+
+This refines the 2026-09-07 corollary above ("re-resolve the world before acting"; roll forward from `main`).
+
+The user approved "Deploy both now" against a named ship list: web would carry this lane's allowlist line plus six named files from other lanes, and refresh-worker would carry this lane's four files. Between that answer and the web claim, origin/main moved to `3e18be8e`, another lane's refresh-worker disk COMPACTION, which deletes and gzips files. Re-resolving showed web growing from 10 to 12 code paths and refresh-worker from 4 to 7. Rolling forward to "main" would have shipped a destructive, unmeasured change under an approval that never covered it.
+
+Re-resolving also showed refresh-worker already live on `3e18be8e`, which contains this lane's commit. No refresh-worker deploy was needed, and deploying the approved (older) SHA there would have reverted the compaction.
+
+**How to apply:**
+- Immediately before preflight, re-run `git diff --stat <live>..<target>` for every service you deploy. If the ship list grew past what was approved, either re-ask or deploy the approved SHA (it must still be on origin/main), and say which in `deploys.md`.
+- Never deploy a SHA OLDER than what a service already runs. Read each service's live commit first: a peer's newer deploy may already carry yours.
