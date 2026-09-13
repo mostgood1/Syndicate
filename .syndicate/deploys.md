@@ -33991,3 +33991,11 @@ The prediction points that way: a smaller transient. `ALL_PROCESS_MEMORY` is sam
 - **Caveat:** this deploy lands after MLB's live window is largely over (~05Z), so V1 may need Sunday's slate. It is read then, not called on an empty window.
 
 **Rollback:** `py -3 scripts/render_deploy.py --service live-odds-worker --commit e332b531 --allow-rollback` under a claim.
+
+**CORRECTION `[2026-09-13 ~04:45Z]` to this entry's "Onset" line.** The defect RECURS in each long late MLB slate; it did not first appear ~23:30Z 09-12.
+- Peer lane `live-odds-worker-oom-loop` flagged it; re-derived here on live-odds-worker, positive control first: 09-13 00:16Z, 1 `KEYVALUE_WRITE_REJECTED` plus 2 `KeyValuePayloadTooLarge` lines at 10,411,299 B.
+- 09-12 00:00-12:00Z: **20** `KEYVALUE_WRITE_REJECTED` for `mlb_live_lens.json`, 01:52:24-04:42:16Z, **8,782,308 -> 9,271,572 B**.
+- 09-12 12:00-23:00Z: 0.
+- Lane `execution-ledger-cas`'s entry (2026-09-12 16:37Z) also counted 63 rejections over 09-11T15:50Z..09-12T15:24Z.
+- The original windows started at 15:00Z and missed the prior night. "Not caused by `58736a69`/`e332b531`" STANDS, and is stronger for it.
+- **Attribution for any later OOM reading:** a kill-free window after this deploy reads `58736a69` + `e332b531` + `77199c48` together, because the payload fix shrinks the MLB build and serialize.

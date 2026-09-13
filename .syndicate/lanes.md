@@ -807,7 +807,7 @@ death, never life — do not invert it.
   - LEFT: P4. `58736a69` ALONE ran 93.6 min, then `oomKilled` at 2026-09-13T00:07:50Z (was 10-25 min): necessary, not sufficient.
   - **COMBINATION `58736a69` + `e332b531`: 0 `oomKilled`, 0 restarts from 00:14:31Z to 04:38:33.555Z, 4 h 24 min.** Measured by this session's events monitor: the 04:04:02Z full read, then its 04:39:37Z poll, whose only new event was `deploy_started`.
   - **ENDED BY A USER-DECIDED DEPLOY**, lane `mlb-live-lens-payload-dup` `77199c48`, before the 6 h mark. This is **NEITHER A PASS NOR A FAIL**. The best observed run, against 10-25 min before either fix and 93.6 min on `58736a69` alone.
-  - **P4 re-reads on the build carrying `77199c48`**: >= 6 h, 0 `oomKilled`, spanning a live slate, from that deploy's go-live.
+  - **P4 re-reads on the build carrying `77199c48`, as a THREE-change combination** (`58736a69` + `e332b531` + `77199c48`). The payload fix also shrinks the MLB live-lens build and serialize, which is this lane's named third lever, so a clean window cannot be credited to either OOM fix alone.: >= 6 h, 0 `oomKilled`, spanning a live slate, from that deploy's go-live.
   - IF R4 FAILS, the next lever is live objects in the live-lens MLB/soccer builds (+384 / +558 MB stage deltas). Candidate: `mlb_live_lens.json` ~10 MB with `page_context` and `games` duplicated (`KeyValuePayloadTooLarge`, `live_lens_loop.py:719`, peer-reported). No tracemalloc on this worker.
 - Goal: live-odds-worker stops being OOM-killed. The mechanism is identified from production readings, and a fix is deployed under the locks. Success is 0 `oomKilled` events on live-odds-worker over a window of at least 6 h that spans a live slate, read from the Render events API.
 - Files: scripts/run_live_odds_refresh_worker.py, syndicate/features/shared/live_lens_loop.py, tests/test_live_lens_loop.py, tests/test_live_odds_refresh_worker.py. Amended 2026-09-12 before any edit; no OPEN lane claims these paths (checked against origin/main).
@@ -849,7 +849,12 @@ death, never life — do not invert it.
 - Files: syndicate/features/mlb/live_lens.py, tests/test_mlb_live_lens_snapshot_payload.py (NEW). NOT `syndicate/features/shared/board_enrichment.py`: that file is claimed by OPEN lane `football-layer2-live-parity`, and this fix is built to need no change there.
 - Measured before any code `[2026-09-13 04:05Z, substrate render]`:
   - `live_lens_tick_after_mlb` 00:14:31-04:03Z: **57 of 61 `ok=False`**, each `KeyValuePayloadTooLarge` for `live/mlb_live_lens.json` at 10,006,089 B (23:54Z) rising to 10,803,367 B (03:59Z), against the 8,388,608 B ceiling.
-  - Onset: 09-11 15:00-23:59Z 215/215 ok; 09-12 15:00-22:31Z 111/111 ok; the 09-12 23:00Z hour 13 ok / 4 fail; from 09-13 00:00Z nearly all fail. The snapshot crossed the ceiling as `games` grew through live play. **Not caused by `58736a69` or `e332b531`**: the 22:35-23:00Z ticks on `58736a69` were 8/8 ok.
+  - **ONSET CORRECTED `[2026-09-13 ~04:45Z]`: it RECURS in each long late MLB slate; it did not start tonight.** Peer lane `live-odds-worker-oom-loop` found it, and it was re-derived here with a positive control (09-13 00:16Z: 1 `KEYVALUE_WRITE_REJECTED`).
+    - 09-12 00:00-12:00Z: **20** rejections for `mlb_live_lens.json`, 01:52:24-04:42:16Z, 8,782,308 -> 9,271,572 B.
+    - 09-12 12:00-23:00Z: 0.
+    - Back from ~23:30Z 09-12.
+    - The windows below started at 15:00Z and missed the night before; "onset ~23:30Z" was wrong. ALSO: lane `execution-ledger-cas` (`deploys.md` 2026-09-12 16:37Z) counted 63 `mlb_live_lens.json` rejections over 09-11T15:50Z..09-12T15:24Z.
+  - Original onset reading: 09-11 15:00-23:59Z 215/215 ok; 09-12 15:00-22:31Z 111/111 ok; the 09-12 23:00Z hour 13 ok / 4 fail; from 09-13 00:00Z nearly all fail. The snapshot crossed the ceiling as `games` grew through live play. **Not caused by `58736a69` or `e332b531`**: the 22:35-23:00Z ticks on `58736a69` were 8/8 ok.
   - Served `/mlb/api/live-lens?date=2026-09-12` (generatedAt 04:16:59Z): `games` 15 games, 5,548,330 B for ONE copy; largest game 471,029 B; `home`/`away` = `{abbr, name}`, 41 B.
 - Hypothesis: `mlb/live_lens.py` stores `games` TWICE, at `page_context["games"]` (`:1932`) and top-level `"games"` (`:1973`). `#371` removed a third copy (`api_payload`) and left these two.
   - Top-level readers: `_snapshot_games`, `_snapshot_route_context` (it replaces `base["games"]` with top-level whenever non-empty, `:1655-1656`), `_snapshot_api_payload`, the validator, `board_enrichment.py:1678`, `live_gameline_join.py:1318`, `ops.py`.
