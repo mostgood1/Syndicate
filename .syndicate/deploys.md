@@ -33811,3 +33811,51 @@ ships      vs live 77f8d890: syndicate/templates/intelligence.html ONLY
 - R1-R3 at ~01:15Z, read with the same instrument as the 58736a69 baseline (`TRIM_SELECT`->`DAILY_BOOK` there: n=21, p50 37.6 s, p90 51.6 s, max 66.8 s).
 - R4 (6 h, the combination) runs from 00:14:31.414Z; earliest close 06:14:31Z.
 - A watcher polls events every 3 min and exits on the first `server_failed` or on any other deploy.
+
+### 2026-09-13 01:14Z — live-odds-worker `e332b531` — lane `live-odds-worker-oom-loop` — first readings (58 min after live); claim RELEASED
+
+Window: 00:14:31.414Z (live) to 01:13:48Z. There was no restart inside it, per events. Read with `post_deploy_read.py`, the same instrument as the `58736a69` baseline.
+
+**R1, reachability via `TRIM_SELECT`->`DAILY_BOOK` duration: INCONCLUSIVE, and the instrument does NOT discriminate.**
+- First 12 paired ticks: p50 31.1 s, p90 82.8 s. Pre-registered: met at p50 <= 24 s, falsified at >= 32 s. The p50 falls in between.
+- All 14 paired ticks: p50 29.9 s, max 97.8 s. The tail is worse than the baseline (p90 44.9 s, max 66.8 s).
+- In time order, as `+seconds / appended`:
+  - 00:22 +27.6 / 4,392
+  - 00:26 +37.5 / 2,552
+  - 00:28 +19.9 / 3,708
+  - 00:33 +29.9 / 3,056
+  - 00:35 **+82.8 / 1,398**
+  - 00:39 +42.8 / 2,799
+  - 00:44 +9.3 / 3,920
+  - 00:49 +16.2 / 2,928
+  - 00:51 **+97.8 / 1,404**
+  - 00:56 +48.0 / 2,003
+  - 01:01 +31.1 / 1,790
+  - 01:06 +10.9 / 3,179
+  - 01:08 +20.8 / 3,220
+  - 01:12 +18.3 / 1,821
+- The slowest ticks carry the FEWEST appended points. The fast and slow ticks interleave, and the long ones are not early boot ticks.
+- So the duration is set by something other than write volume. The likely candidate is GIL contention with the live-lens thread's builds; that is NOT measured.
+- The pre-registration assumed duration tracks the write. That assumption was wrong, so R1 can neither confirm nor refute that the new writer runs.
+
+**R2, no regression: MET so far.** 14 of 14 `[kalshi_odds] DAILY_BOOK` lines read `status=ok errors=0`, `files=29` on all 14, 0 `DAILY_BOOK_FAILED`. Counters are in the normal band: `appended` 1,398-4,392, `listed` 13,045-14,091.
+
+**R3, cadence: ON TRACK, first full hour not complete.**
+- `DAILY_BOOK`: 10 lines from 00:22Z to 00:56Z, 4 in 01:00-01:13Z.
+- `ODDS_SWEEP_LAUNCHED`: 7 in 00:15-00:59Z, 4 in 01:00-01:13Z.
+- The 12 sweeps/h of the baseline hour 23Z was a heavier slate phase. There is no like-hour comparison yet.
+
+**Memory, supporting only.** These are different windows, not a same-instant A/B.
+
+| build | window | samples | unreclaimable p50 / p90 / p99 / max | parent RSS p50 / max |
+|---|---|---|---|---|
+| `e332b531` | since boot, 00:15:33-01:12:56Z | 226 | 1,161 / 1,246 / 1,447 / 1,456 MB | 1,006 / 1,087 MB |
+| `58736a69` | 22:37-00:02Z | 393 | 1,349 / 1,469 / 1,788 / 1,790 MB | 1,192 / 1,803 MB |
+
+The prediction points that way: a smaller transient. `ALL_PROCESS_MEMORY` is sampled on the live-lens thread, so a book-write peak is caught only by coincidence.
+
+**R4, the goal, read as the COMBINATION: 0 `oomKilled` 00:14:31Z-01:12:01Z** (events fully paged; the watcher polls every 3 min). NOT evidence yet: `58736a69` alone lasted 93.6 min. Owed at >= 06:14:31Z.
+
+**Claim** `live-odds-worker-oom-loop` RELEASED with its token after this entry. The events watcher keeps running.
+
+**verify:** R2 met; R1 inconclusive, instrument blind; R3 and R4 OWED. R4 is the reading that matters: `render_events.py --service live-odds-worker --since 2026-09-13T00:14:31Z` with OUTPUT COMPLETE and 0 `oomKilled` at >= 06:14:31Z, spanning the NCAAF/MLB late slate.

@@ -883,7 +883,13 @@ death, never life — do not invert it.
 - DEPLOYED 2026-09-13 `e332b531` (`bc4dd317` only), live 00:14:31.414Z (`dep-daiuje7qj5pc73bkiub0`). User decisions: "Push + deploy now", then "Deploy on the first CLEAR tonight". Preflight CLEAR 00:09:13Z. `deploys.md` 2026-09-12 23:3xZ (PENDING, R1-R4 registered) and 2026-09-13 00:14:31Z (LIVE).
   - **`58736a69` alone was killed at 00:07:50.534Z**, 93.6 min after it went live. Its sufficiency is falsified. This session had wrongly told the user "no kills to the deploy": the reads ended at 00:00:32Z and ~00:02Z. Corrected to the user and to the parallel lane.
   - That kill: 25.1 s after `TRIM_SELECT`, before its `DAILY_BOOK`. Last live-lens stage `tick_before_mlb`, 60.5 s prior.
-  - OWED: R1-R3 at ~01:15Z; R4, 0 kills over 6 h from 00:14:31Z, read as the COMBINATION.
+  - READINGS at 01:14Z, 58 min after live (`deploys.md` 2026-09-13 01:14Z):
+    - R2 MET so far: 14/14 `DAILY_BOOK` ok, 0 errors.
+    - R1 INCONCLUSIVE: p50 31.1 s against the 24/32 s bounds. The instrument is BLIND: the slowest ticks append the fewest points, so the duration is not set by the write.
+    - Memory supports the prediction, but the windows differ: unreclaimable max 1,790 -> 1,456 MB, parent RSS max 1,803 -> 1,087 MB.
+    - R4: 0 kills in 58 min. Not evidence yet.
+    - Claim RELEASED.
+  - OWED: R4, 0 `oomKilled` over 6 h from 00:14:31Z, read as the COMBINATION at >= 06:14:31Z. Also R3's first full hour. An events watcher is running in this session.
 - Blocked by: none. Deploys to this service need the user's explicit OK (real-money orders; a restart mid-placement strands orders) and must avoid lane `layer2-live-scorecard-gate`'s 2026-09-13 06:30-08:00Z scorecard window without asking.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
