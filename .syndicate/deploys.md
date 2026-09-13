@@ -5,6 +5,84 @@
 
 ---
 
+## 2026-09-12 22:10 CT — reading only, no deploy — refresh-worker (lane `nfl-prop-join-sunday-reading`, scheduled task; discharges the full-size-board reading owed by the 2026-09-10 02:08:07Z `a101c437` row) — **YES: ON THE SUNDAY-CARD BOARD, NFL MODEL COVERAGE IS 3.8% -> 51.6% OF ROWS (71 -> 548 PROJECTED, 63 -> 546 EDGED). THE SLATE CONFOUND IS GONE. `a101c437` IS NO LONGER THE ONLY CAUSE: THIS MEASURES THE JOIN AS IT STANDS NOW, NOT ONE COMMIT.**
+
+All times Central; the log stamps are UTC (+5h). No code was changed.
+
+### The pair
+
+Newest `LAYER2_BOARD_HEALTH sport=nfl` with rows >= 1,000 is **17:04:51 CT**. Every full-size build ran from 14:40 to 17:04 CT, and all of them read within 2% of each other.
+
+| `LAYER2_BOARD_HEALTH sport=nfl` | baseline, 09-09 board, pre-deploy | **09-12 board, 17:04:51 CT** |
+|---|--:|--:|
+| rows | 1,884 | **1,063** |
+| **pregame_proj** | **71** (3.8%) | **548** (51.6%) |
+| no_proj | 1,813 | 515 |
+| **edged** | **63** (3.3%) | **546** (51.4%) |
+
+**The 09-12 board IS the Sunday card.** It runs `horizon_days=1` from 09-12. In the served copy, 578 of 704 prop rows kick off on 09-13. So this is the full-size slate the owed reading asked for.
+
+**The size difference cannot produce the result.** This board is 56% the size of the baseline's but carries 7.7x the projections. A thinner board can only lower an absolute count, so the gap runs against the finding, not for it. Why the board is smaller: rows are budgeted per sport (the 09-11 12:40 CT row saw the NFL budget refill freed slots), and `rows_beyond_quote_age=5795` on the served payload.
+
+### The matching unrestricted plan (09-12, 16:21:14 CT, 3.5 min after the 16:17:45 CT board at rows=1,063)
+
+| `PLAN_WRITTEN` | 09-09, 19:11 CT | **09-12, 16:21:14 CT** |
+|---|--:|--:|
+| rows_in | 3,029 | 2,894 |
+| no_model_edge_pct | 1,872 (61.8%) | **727 (25.1%)** |
+| `no_model_edge_by_sport['nfl']` | **1,503** | **656** |
+| `top_market_per_refusal['no_model_edge_pct']` | `receiving yards:473` | **`receiving yards:267`** |
+
+- `rows_in` is close to the baseline, but the sport mix is not: MLB, NCAAF and soccer are all present. So the NFL refusal count is not normalised to NFL rows. The board-health pair above is the clean number.
+- `market_family_excluded` (973) is applied BEFORE pricing (`portfolio_commit.py:877-881`), so an exclusion could hide NFL rows from `no_model_edge_pct`. It does not happen here: the top excluded family is `batter_total_bases:199`, and NFL player props still produce 656 refusals led by receiving yards.
+- The last unrestricted `PLAN_WRITTEN` in the logs is 16:21 CT. None has been logged since, through 22:02 CT.
+
+### CORRECTION TO THE 09-09 21:41 CT ROW: its "strongest evidence" did not survive the full slate
+
+That row found the top `no_model_edge_pct` market had moved from `receiving yards:473` to `h2h:70`. It called that a COMPOSITION change a thinner slate cannot explain. **On the Sunday card, receiving yards leads again (267).** The reorder was the thin 09-10 slate after all. Props without a model view are still the largest refusal term for NFL; the join shrank that term but did not remove it.
+
+### Served cross-check
+
+`/api/board/layer2-shortlist?sport=nfl&date=2026-09-12`, `written_at` 2026-09-13T03:05:53Z (22:05 CT). That is after the deploy, so the gate passes. This is a later, 759-row build, not the 1,063-row one.
+
+    nfl prop rows                                704   (Anytime TD: 0; 118 withheld as unmeasured_model_only)
+    projection.source == nfl_prop_model          381   (54.1% of props)
+      model_edge_pct non-null                    293   model_edge_basis = market_fair on 293 of 293
+      projected, no model_edge_pct                88   basis None
+    model_edge_pct p50 1.58 / max 14.93 / >= 10: 46
+    game rows 55, of which model_edge_pct non-null 29
+
+- `[nfl_props] JOIN season=2026 week=1 sim_source=artifact odds_rows=2637 sim_rows=1140`. The worker now holds the 1,140-row artifact; it held 980 at deploy time.
+- `PREGAME_PROJECTION_JOIN sport=nfl considered=17031 projected=11767` is recorded as COUNTS only. Its denominator changed at the deploy, so its percentage is not comparable to any pre-deploy percentage.
+- Not used as evidence: `refused_wrong_team` / `refused_unknown_team` = 0. They are structurally zero on the artifact path (`props.py:603`).
+
+### ATTRIBUTION: what this number is and is not
+
+The 09-09 -> 09-12 gap spans four changes, not one:
+
+1. **`a101c437`** (09-09 21:11 CT) — the join itself.
+2. **`5767e3ac`** (09-10 ~22:20 CT) — the worker pulled the newer 1,140-row artifact. That entry measured "486 non-Anytime-TD props carry a sim view (was 0)", and those markets now make up all of the edged rows.
+3. **The Kalshi identity merge** (same deploy) — every served edge is now `model_edge_basis=market_fair`. On 09-09, all 112 edges came from the modelled-fair fallback ("one-sided market").
+4. **`pricing-plane-v1` withhold** (09-11 12:40 CT) — Anytime TD, the ONLY market the join covered on 09-09, is now withheld (118 rows). **This change pushes the count DOWN**, so it cannot explain the rise.
+
+Also checked: `77f8d890`, the certainty refusal (live 15:20:09 CT today), moved nothing. Full-size builds read 1,071 / 552 / 550 just before it and 1,069 / 550 / 548 just after.
+
+So **the a101c437-alone, same-size increment is still the 09-09 22:08 CT reading: +114.** Today's reading measures the NFL prop join as it now stands on production (join, current artifact and market-fair pricing together) against the pre-join board.
+
+### VERDICT
+
+**Does the NFL prop join measurably raise model coverage on a full-size board? YES.** NFL rows with a pregame projection went 3.8% -> 51.6%, and rows with a model edge went 3.3% -> 51.4%. Both were measured on the full Sunday card, and the board-size difference works against the finding. The coverage is still well below the 71.7% local prediction: 46% of rows have no projection, and 88 of 381 projected props carry no edge.
+
+### CARRY INTO `nfl-prop-settled-grade` (09-15 10:00 CT)
+
+The 09-09 staking caveat was that NFL prop edges were "the model disagreeing with itself, with no market cross-check". **That no longer describes the served board:** every served NFL prop edge is now `market_fair`-based. The grading should bucket by `model_edge_basis` as well as by edge size, because orders placed before 09-10 ~22:20 CT were priced on the other basis. `#651`'s high-bias claim is untouched by this reading.
+
+### Observed, not investigated
+
+From 18:18 CT the NFL board fell from 1,063 to 677-784 rows. At the same time, the served NFL quote age read `age_p50s=32626` (9.1 h) and `worst_seen_by_sport nfl=44589` (12.4 h), with `STALE_ROW_CAUSE nfl[stale=712 ...]`, on the eve of the Sunday card. This is recorded as a lead only; nothing here diagnoses it.
+
+verify: MEASURED. The readings are `LAYER2_BOARD_HEALTH sport=nfl rows=1063 pregame_proj=548 no_proj=515 edged=546` (17:04:51 CT) against the recorded baseline `rows=1884 pregame_proj=71 no_proj=1813 edged=63`, plus the served artifact gated on `written_at` 22:05:53 CT.
+
 ## 2026-09-12 13:25 CT — reading only, no deploy — refresh-worker `9d580145` (lane `football-layer2-live-parity`, NCAAF Saturday in-play rows) — **PASS: FBS-vs-FCS ROWS WENT `live` AND STAYED SERVED PAST KICKOFF + 2 H; STATE CAME FROM THE CHIP, NOT THE OVERLAY**
 
 **Written by scheduled task `ncaaf-saturday-live-rows-reading` on behalf of session 2edf8b82.** Read-only: no code, settings or deploy touched.
