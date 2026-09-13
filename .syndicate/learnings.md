@@ -5737,3 +5737,11 @@ This is the search-tool twin of the 2026-09-02 rule about filters that have neve
 Mid-slate, with the user betting off the web service, I fetched `/api/intelligence/status` as a "small" endpoint to read freshness fields. It returned 87,903,243 B, the whole state payload. Its neighbour `POST /api/intelligence/query` was already measured at ~67 MB (`#632`), and the route was one grep away.
 
 **How to apply:** read the route, or use a size-first form (`names_only`, a limit, a HEAD), before fetching from a live service, and pick the narrowest endpoint that carries the field.
+
+## 2026-09-12 FORBIDDEN: alerting on a projection from ONE interval's rate, or applying a correction factor to readings already taken after the change `[lane layer2-live-scorecard-gate]`
+
+A watcher on the 09-12 opening ledger projected its 05:00Z close from the latest single poll interval, times 1.117 for the four new per-record fields. At 00:48:53Z it fired `ALERT_PROJECTION_OVER_95PCT 97.4%` off one 11-minute interval growing at 2.25 MB/h. The same log showed intervals as low as 0.29 MB/h, and the 20:12->00:44Z average was 0.78 MB/h, which projects ~75%. The 1.117 was also double-counted: every reading after the 20:20Z deploy already included the new fields. Reaching the tripwire needed a sustained 2.73 MB/h. The rearmed rolling-60-minute watcher then read 770,795 -> 296,075 B/h, projecting ~71%.
+
+**How to apply:**
+- Project from a rolling window (an hour here) with a minimum span, never from the newest single interval, and state which window the alert used.
+- Apply an adjustment for a change only to readings taken BEFORE it; after the change, the readings already contain it.
