@@ -34026,3 +34026,28 @@ The prediction points that way: a smaller transient. `ALL_PROCESS_MEMORY` is sam
 **WHAT ANY LATER WINDOW MEASURES.** From `2026-09-13T04:43:50.026Z` the worker runs THREE changes: the arena cap + trim, the streaming daily-book writer, and the MLB live-lens payload fix. The last shrinks the MLB live-lens build, the third memory lever this lane named. A kill-free window from here is attributable only to the three together.
 
 **verify (this lane):** OWED. 0 `oomKilled` over >= 6 h spanning a LIVE slate on the three-change build, via `render_events.py --service live-odds-worker --since 2026-09-13T04:43:50.026Z` with OUTPUT COMPLETE. The first full-slate opportunity is the 2026-09-13 NFL/MLB afternoon (~17:00Z onward). Any kill is classified by its `TRIM_SELECT`/`DAILY_BOOK` offset and last live-lens stage.
+
+## 2026-09-13 04:56Z — reading — live-odds-worker `77199c48` — lane `mlb-live-lens-payload-dup` — V1-V3 on the first live-lens ticks. **V2, V3 MET; V1 MET on n=5, formal read owed over Sunday's slate. Claim RELEASED.**
+
+**LIVE.** `dep-daj2hi9594qs73ak0k7g`, `finishedAt` 2026-09-13T04:43:49.926Z (`deploy_ended` 04:43:50.026Z). `render_events.py --since 04:38:00Z`, fully paged, OUTPUT COMPLETE: only `deploy_started` 04:38:33.556Z, `build_started`, `build_ended` 04:42:26.795Z and `deploy_ended`. **No `oomKilled`, `earlyExit` or `server_failed` across the rollout.**
+
+**Readings at 04:56:05Z, window from go-live:**
+- **V1 — MET on a small window.**
+  - `live_lens_tick_after_mlb` **5 of 5 `ok=True`**, 04:45:26-04:55:15Z; before the fix, 4 of 61.
+  - **0 `KeyValuePayloadTooLarge` for `mlb_live_lens.json` since go-live.**
+  - n=5 as tonight's MLB slate ends, so the >= 90% Verification is read over Sunday 2026-09-13's live MLB window, when `games` grows again. A `KeyValuePayloadTooLarge` for that key is the falsifier.
+- **V2 — MET.** `/mlb/api/live-lens`, 5,318,580 B served: `generatedAt` 2026-09-12T23:56:10-05:00 (04:56:10Z, after go-live), `games` n=15, 5,667,244 B, with `archivedLiveProps`, `gameMarkets`, `liveProps` and `gameLens` all present. **The full top-level copy is still served.**
+- **V3 — MET.** The board lens join reads the slim `page_context["games"]` and finds every game:
+  - `/api/board/book-grid?sport=mlb` (generated 04:54:14Z) `live_game_state` = `{supported: true, rows_corrected: 0, lens_games: 15, transitions: {}, snapshot_age_seconds: 143.9}`.
+  - `/api/board/layer2-shortlist` (written 04:51:51Z) `per_sport_ingest.mlb.enrichment.live_game_state` = `{supported: true, rows_corrected: 0, lens_games: 15, snapshot_age_seconds: 106.1}`.
+  - No `"snapshot carries no games"` anywhere.
+  - `rows_corrected: 0` means no chip disagreed with the lens at that instant. It is NOT evidence the correction path fires; that path is covered by `test_join_on_slim_equals_join_on_full`, which asserts a control of >= 2 corrections.
+  - The snapshot ages (106-144 s) show the lens is being WRITTEN again. On the failing build every write was refused, so the stored snapshot only aged.
+
+**TWO-FIX OOM WINDOW, refined.** `58736a69` + `e332b531`, from 00:14:31.528Z (`deploy_ended`) to 04:43:50.026Z (`77199c48` `deploy_ended`): **4 h 29 m 18 s, 0 `server_failed`**, ended by a user-decided deploy, neither a pass nor a fail. The peer lane `live-odds-worker-oom-loop` records the same figure at `85a77d2a`. This supersedes the 4 h 24 min figure that ended at `deploy_started`.
+
+**From 04:43:50Z every OOM reading is the THREE-change combination** `58736a69` + `e332b531` + `77199c48`: >= 6 h, 0 `oomKilled`, spanning a live slate. The peer lane holds a 5-min events watcher on it.
+
+**Claim** `mlb-live-lens-payload-dup` on live-odds-worker RELEASED with its token after this entry.
+
+**verify:** V2, V3 MET; V1 MET on n=5. OWED: V1 over Sunday's live MLB window (`live_lens_tick_after_mlb` ok ratio >= 90%, 0 `KeyValuePayloadTooLarge` for `mlb_live_lens.json`).
