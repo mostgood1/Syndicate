@@ -3090,9 +3090,6 @@ def pull_streamed_artifact(relative_path: str, *, timeout_seconds: int = 120) ->
         local_mtime = None
         local_size = 0
 
-    url = _stream_url(normalized, since_epoch=local_mtime)
-    if not url:
-        return False, 0
     headers = {"Authorization": f"Bearer {token}"}
     # #248: APPEND-ONLY families are fetched by their TAIL, not whole.
     #
@@ -3106,6 +3103,18 @@ def pull_streamed_artifact(relative_path: str, *, timeout_seconds: int = 120) ->
     # The server needs no change: /api/ops/artifacts/stream serves via
     # send_file(conditional=True), which honours HTTP Range already.
     tail_from = local_size if (local_size > 0 and _is_append_only(normalized)) else 0
+    # NO `since=` ON A TAIL (2026-09-13). The stream route answers 304 on
+    # `st_mtime <= since` BEFORE it looks at Range (`ops.py`), and a 304 is a
+    # silent success below. So any local mtime at or past web's -- a torn append
+    # on a full disk, a local write, or this very tail's `open("ab")` stamping
+    # now() -- froze the copy until web's next write. Measured: refresh-worker's
+    # NFL 09-13 shard sat at 19,914,752 B with sportsbook prices from 09-12
+    # 08:02Z while web held 28,757,424 B captured 13:40Z, and the board served 0
+    # NFL rows for the Sunday slate. For an append-only file the byte offset IS
+    # the watermark: 206 carries the new tail, 416 means we hold everything.
+    url = _stream_url(normalized, since_epoch=None if tail_from else local_mtime)
+    if not url:
+        return False, 0
     if tail_from:
         headers["Range"] = f"bytes={tail_from}-"
     request_obj = urllib_request.Request(url, method="GET", headers=headers)

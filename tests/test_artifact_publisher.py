@@ -1479,6 +1479,32 @@ class OddsHistoryStreamedPullTests(unittest.TestCase):
         self.assertIn("/api/ops/artifacts/stream?path=", url)
         self.assertIn("since=1785700000.0", url)
 
+    def test_append_only_tail_sends_range_without_since(self) -> None:
+        """2026-09-13: `since=` made web answer 304 before honouring Range, so a
+        book_quotes copy whose mtime was at or past web's never tailed again."""
+        mocked_response = MagicMock()
+        mocked_response.__enter__.return_value = mocked_response
+        mocked_response.status = 206
+        mocked_response.read.side_effect = [b'{"k":2}\n', b""]
+        mocked_response.headers = {}
+
+        with TemporaryDirectory() as tmp_dir:
+            target = Path(tmp_dir) / "nfl_source/tracking/book_quotes/2026-09-13.jsonl"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b'{"k":1}\n')
+            # A local mtime far in the FUTURE of web's: exactly the frozen state.
+            os.utime(target, (4102444800.0, 4102444800.0))
+            with patch.dict(os.environ, self._stream_env(tmp_dir), clear=False):
+                with patch("urllib.request.urlopen", return_value=mocked_response) as mocked_urlopen:
+                    ok, written = pull_streamed_artifact("nfl_source/tracking/book_quotes/2026-09-13.jsonl")
+            request = mocked_urlopen.call_args.args[0]
+            content = target.read_bytes()
+        self.assertNotIn("since=", request.full_url)
+        self.assertEqual(request.get_header("Range"), "bytes=8-")
+        self.assertTrue(ok)
+        self.assertEqual(written, 1)
+        self.assertEqual(content, b'{"k":1}\n{"k":2}\n')
+
     def test_not_modified_is_a_success_that_writes_nothing(self) -> None:
         # The steady state -- and the reason this is cheap enough to call on
         # every board-build cycle instead of re-sending 51MB every ~30s.
