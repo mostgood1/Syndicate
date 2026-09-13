@@ -218,3 +218,54 @@ def test_main_refuses_to_fetch_without_a_token(monkeypatch, capsys):
     monkeypatch.delenv("ADMIN_TOKEN", raising=False)
     assert mod.main(["--date", "2026-09-12"]) == 2
     assert "ADMIN_TOKEN" in capsys.readouterr().err
+
+
+def test_window_is_decided_by_the_sighting_clock_and_a_boundary_starts_the_later_window():
+    # 2026-09-12's live-odds-worker regimes, given out of order: order must not matter.
+    boundaries = [mod._parse_ts("2026-09-13T00:14:31Z"), mod._parse_ts("2026-09-12T22:34:15Z")]
+    assert mod.window_of("2026-09-12T22:34:14Z", boundaries) == "w0"
+    assert mod.window_of("2026-09-12T22:34:15Z", boundaries) == "w1"
+    assert mod.window_of("2026-09-13T00:14:30Z", boundaries) == "w1"
+    assert mod.window_of("2026-09-13T00:14:31Z", boundaries) == "w2"
+    assert mod.window_of("not a time", boundaries) == "unknown_time"
+    assert mod.window_of(None, boundaries) == "unknown_time"
+    assert mod.window_of("2026-09-12T22:34:14Z", []) == "all"
+    assert mod.window_legend(boundaries) == [
+        "w0: before 2026-09-12T22:34:15Z",
+        "w1: 2026-09-12T22:34:15Z to 2026-09-13T00:14:31Z",
+        "w2: from 2026-09-13T00:14:31Z",
+    ]
+
+
+def test_a_bet_stays_in_the_window_of_its_earliest_sighting():
+    # The same market re-sighted at a later best book, after the boundary, is
+    # still the decision published before it.
+    boundary = [mod._parse_ts("2026-09-12T18:40:00Z")]
+    later = _rec(key="k1b", bookmaker="draftkings", price=-111, captured_at="2026-09-12T18:44:05Z")
+    (row,) = mod.settle([later, _rec()], [_chip()], split_at=boundary)["rows"]
+    assert (row["book"], row["window"]) == ("prophetx", "w0")
+    (unsplit,) = mod.settle([_rec()], [_chip()])["rows"]
+    assert unsplit["window"] == "all"
+
+
+def test_main_split_at_adds_the_window_tables_and_names_the_boundaries(tmp_path, capsys):
+    openings = tmp_path / "openings.jsonl"
+    openings.write_text("\n".join(json.dumps(r) for r in [
+        _rec(),  # 18:34:57Z -> w0, 27-13 covers -6.5
+        _rec(key="k2", event_id="pst", away_team="Penn State Nittany Lions", home_team="Temple Owls",
+             market="h2h", side="away", line=None, price=-500, captured_at="2026-09-12T23:00:00Z"),  # w1, wins
+    ]) + "\n", encoding="utf-8")
+    chips = tmp_path / "chips.json"
+    chips.write_text(json.dumps({"chips": [_chip(), _chip("Penn State", "Temple", 27, 9)]}), encoding="utf-8")
+    code = mod.main(["--date", "2026-09-12", "--sport", "ncaaf", "--openings-file", str(openings),
+                     "--chips-file", str(chips), "--split-at", "2026-09-12T22:34:15Z", "--json"])
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert {"window", "phase_x_window", "phase_x_window_x_age"} <= set(payload["tables"])
+    assert payload["windows"] == ["w0: before 2026-09-12T22:34:15Z", "w1: from 2026-09-12T22:34:15Z"]
+    assert {(c["window"], c["w_l_p"]) for c in payload["tables"]["window"]} == {("w0", "1-0-0"), ("w1", "1-0-0")}
+
+
+def test_main_refuses_a_split_time_without_a_zone(capsys):
+    assert mod.main(["--date", "2026-09-12", "--split-at", "2026-09-12 22:34:15"]) == 2
+    assert "--split-at" in capsys.readouterr().err

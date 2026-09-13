@@ -16,6 +16,10 @@ scores and reports the split that decides whether live Layer 2 value is real:
           `unclocked`.
   book    the published best book.
   market  market/segment.
+  window  only with --split-at: `w0`..`wN` by the sighting's `captured_at`, so
+          results can be read across an upstream regime change. On 2026-09-12
+          two live-odds-worker deploys changed how often odds were captured,
+          and one pooled number would average three different pipelines.
 
 Every cell reports `games` beside `n`. Bets on one game are not independent --
 measured 2026-09-12, four final NCAAF games swung the in-play cell by -5.2 to
@@ -26,6 +30,8 @@ Usage (read-only against production unless files are given):
 
   py -3 scripts/layer2_live_scorecard.py --date 2026-09-12 --sport ncaaf
   py -3 scripts/layer2_live_scorecard.py --date 2026-09-12 --openings-file o.jsonl --chips-file c.json
+  py -3 scripts/layer2_live_scorecard.py --date 2026-09-12 --sport ncaaf \
+      --split-at 2026-09-12T22:34:15Z --split-at 2026-09-13T00:14:31Z
 
 The opening ledger comes through `/api/ops/artifacts/export?path=` with
 `ADMIN_TOKEN`. On 2026-09-12 that file was 17.5 MB by 2 PM CT, so run this once
@@ -66,7 +72,7 @@ import sys
 import unicodedata
 import urllib.parse
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -172,6 +178,30 @@ def age_bucket(record: Mapping[str, Any]) -> str:
         if age <= ceiling:
             return label
     return ">900s"
+
+
+def window_of(captured_at: Any, boundaries: Sequence[datetime]) -> str:
+    """`wI` = on or after I boundaries. A sighting AT a boundary belongs to the later window.
+
+    Unsplit runs read `all`; a sighting whose time cannot be parsed is named
+    `unknown_time` rather than guessed into a window.
+    """
+    if not boundaries:
+        return "all"
+    parsed = _parse_ts(captured_at)
+    if parsed is None or parsed.tzinfo is None:
+        return "unknown_time"
+    return f"w{sum(1 for boundary in boundaries if parsed >= boundary)}"
+
+
+def window_legend(boundaries: Sequence[datetime]) -> list[str]:
+    if not boundaries:
+        return []
+    stamps = [b.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") for b in sorted(boundaries)]
+    legend = [f"w0: before {stamps[0]}"]
+    legend += [f"w{i}: {stamps[i - 1]} to {stamps[i]}" for i in range(1, len(stamps))]
+    legend.append(f"w{len(stamps)}: from {stamps[-1]}")
+    return legend
 
 
 def grade(record: Mapping[str, Any], away_score: int, home_score: int) -> str | None:
@@ -280,6 +310,7 @@ def settle(
     board_date: str | None = None,
     min_ev_pct: float = 0.0,
     dedupe_markets: bool = True,
+    split_at: Sequence[datetime] = (),
 ) -> dict[str, Any]:
     """One settled row per published opportunity, plus the counts of what was not settled.
 
@@ -290,6 +321,9 @@ def settle(
     `board_date` names the date the chips describe. A row whose kickoff falls on
     another Central date cannot be settled by them and is counted as
     `not_on_board_date`; omitted, every row is matched against the chips.
+
+    `split_at` stamps each row's `window` from the KEPT sighting, so with
+    dedupe a bet stays in the window where it was first published.
     """
     wanted = str(sport or "").strip().lower()
     chosen: dict[Any, Mapping[str, Any]] = {}
@@ -322,6 +356,7 @@ def settle(
             "age": age_bucket(record),
             "book": str(record.get("bookmaker") or "unknown"),
             "market": f"{record.get('market')}/{record.get('segment')}",
+            "window": window_of(record.get("captured_at"), split_at),
             "ev_pct": _as_float(record.get("ev_pct")),
             "price": price,
             "game": None,
@@ -421,6 +456,11 @@ _TABLES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("phase_x_book", ("phase", "book")),
     ("phase_x_market", ("phase", "market")),
 )
+_SPLIT_TABLES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("window", ("window",)),
+    ("phase_x_window", ("phase", "window")),
+    ("phase_x_window_x_age", ("phase", "window", "age")),
+)
 
 
 def _print_table(title: str, cells: Sequence[Mapping[str, Any]], dims: Sequence[str]) -> None:
@@ -445,7 +485,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--admin-token-env", default="ADMIN_TOKEN")
     parser.add_argument("--no-dedupe", action="store_true", help="grade every ledger key, including best-book changes")
     parser.add_argument("--json", action="store_true", help="print the full result as JSON")
+    parser.add_argument("--split-at", action="append", default=[],
+                        help="ISO time with a zone; repeat to split results into windows by captured_at")
     args = parser.parse_args(argv)
+
+    boundaries: list[datetime] = []
+    for value in args.split_at:
+        parsed = _parse_ts(value)
+        if parsed is None or parsed.tzinfo is None:
+            print(f"--split-at needs an ISO time with a zone, e.g. 2026-09-12T22:34:15Z; got {value!r}", file=sys.stderr)
+            return 2
+        boundaries.append(parsed)
+    boundaries.sort()
 
     if _CENTRAL is None:
         print("WARNING: no tz data for America/Chicago; other-date games count as no_chip_match", file=sys.stderr)
@@ -464,21 +515,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         chips = fetch_chips(args.base_url, args.date, args.sport)
 
     result = settle(records, chips, sport=args.sport, board_date=args.date,
-                    min_ev_pct=args.min_ev_pct, dedupe_markets=not args.no_dedupe)
+                    min_ev_pct=args.min_ev_pct, dedupe_markets=not args.no_dedupe, split_at=boundaries)
     rows = result["rows"]
     finals = sum(1 for c in chips if str(c.get("state") or "").strip().lower() == "final")
-    tables = {name: summarize(rows, dims) for name, dims in _TABLES}
+    specs = _TABLES + (_SPLIT_TABLES if boundaries else ())
+    tables = {name: summarize(rows, dims) for name, dims in specs}
+    legend = window_legend(boundaries)
     if args.json:
         print(json.dumps({"date": args.date, "sport": args.sport, "records_in": len(records),
                           "chips": len(chips), "finals": finals, "opportunities": len(rows),
                           "ungraded": result["ungraded"], "skipped": result["skipped"],
-                          "tables": tables}, indent=1, default=str))
+                          "windows": legend, "tables": tables}, indent=1, default=str))
         return 0
     print(f"date={args.date} sport={args.sport or 'all'} records_in={len(records)} "
           f"opportunities={len(rows)} chips={len(chips)} finals={finals}")
     print(f"skipped={result['skipped']}")
     print(f"ungraded={result['ungraded']}")
-    for name, dims in _TABLES:
+    if legend:
+        print("windows by captured_at: " + "; ".join(legend))
+    for name, dims in specs:
         _print_table(name, tables[name], dims)
     return 0
 
