@@ -901,6 +901,33 @@ death, never life — do not invert it.
   - **`c114e1aa` LIVE on refresh-worker 16:23:12Z** (deployed by `layer2-prior-date-live-carryover`). DISK_COMPACTION 16:30:45Z: `removed_stale_prefix 0`, `kept_mismatch 18`; no mismatched plain shard is a byte prefix of its `.gz`. Readers still take the shorter plain file for those 18 dates: needs a reader-side rule, not a delete.
 - Blocked by: none. **User decisions 2026-09-13 ~13:30Z:** "Resize + diagnose (Recommended)", then **"check content on the disk and ensure that we compact items that can be compacted first"**, so the resize is held until the inventory and compaction are done. A refresh-worker deploy needs claim + preflight; a HOLD goes back to the user. **2026-09-13 ~14:00Z:** the user approved "Remove verified duplicates, Gzip props-history CSVs, Stop history re-append", NOT the 100 GB resize.
 
+### kalshi-nfl-quote-gap — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: explain why Kalshi NFL quotes on the served NFL grid carried `observed_at` 2026-09-12 21:20Z until 2026-09-13 17:33Z. Say which stage stalled (capture, append, transport or board read) and whether it recurs without a full disk. Propose a fix only if it can recur. Read-only on production until the user approves a change.
+- Files: none claimed (read-only diagnostic). A code change reopens this block with a Files claim first.
+- Origin: lead from closed lane `refresh-worker-disk-inventory`. User decision 2026-09-13 ~19:40Z: "Kalshi NFL staleness (Recommended)".
+- **Measured before hypotheses** (refresh-worker, `[kalshi_odds] QUOTE_CAPTURE`, 09-12 20:00Z..09-13 18:30Z):
+  - 15 lines; live-odds-worker has none.
+  - 09-12 20:42Z `nfl:2026-09-13 21, nfl:2026-09-14 1`; 21Z `nfl:2026-09-13 3`.
+  - **No QUOTE_CAPTURE at all from ~21:4xZ until 09-13 13Z.**
+  - 13Z-15Z: 9 lines with 0 NFL appends. 16Z: NFL 139 + 34. 17:33Z: NFL 18.
+- H1: capture is emitted from a step that did not run 09-12 ~21:40Z .. 09-13 13Z. Candidates: the join lives in a board/Layer 2 build that failed or was skipped during the refresh-worker ENOSPC window (23:39Z..14:15Z), plus some earlier cause for 21:40Z..23:39Z (MLB sim hold, deploy, or cadence).
+- H2: 13Z..16Z captured NFL matches but appended 0 because Kalshi prices had not changed. `append_book_quotes` is a change log, so the grid's `observed_at` stays at the last change; the "staleness" in that stretch is the change-log reading, not a stall. It would be refuted if 13Z..16Z lines show `nfl` absent from `sports=` (no matches).
+- Falsification: H1 is false if `QUOTE_CAPTURE_FAILED` or capture lines exist in the gap under another name, or the gap is explained by the join's own cadence gate. H2 is false if NFL is not in `sports=` during 13Z..16Z.
+- Verification: a per-hour table of the stage reached (join ran / capture printed / NFL appended / web shard has kalshi rows) across 09-12 20Z..09-13 18Z, recorded in the log, with the caller chain file:line.
+- **FINDINGS 2026-09-13 ~19:50Z (refresh-worker logs; caller chain read in code). H1 CONFIRMED, and the cause is structural, not the disk.**
+  - Caller chain: Kalshi quote capture is `_capture_kalshi_quotes` (`pipeline/kalshi_odds_refresh.py:2809`), called only from `join_to_board` (`:2805`), called only from the HEAVY Layer 2 build (`pipeline/intelligence_state.py:6776`), gated on `kalshi_markets and shortlist_rows` (`:6769`). It captures only Kalshi markets MATCHED to shortlist rows.
+  - Per-hour counts, 09-12 20Z..09-13 14Z:
+    - `LAYER2_SHORTLIST date=` and `[kalshi_odds] BOARD_JOIN`: 1 at 20Z, 1 at 21Z, then **0 until 09-13 13Z**.
+    - `LAYER2_FAST_REFRESH`: 13-51/h every hour of the gap. It does not call the join.
+    - `BOARD_PUBLICATION_FAILED` (ENOSPC): 08Z-13Z only.
+    - `[kalshi_odds] TICK`/`DAILY_BOOK`/`CATALOGUE` ran every hour (venue refresh fine). `QUOTE_CAPTURE_FAILED`: 0.
+  - So from 21:4xZ (before the disk filled at 23:39Z) the fast path owned the board, the heavy build never ran, and Kalshi capture stopped for every sport.
+  - **H2 CONFIRMED.** 13:53-15:51Z lines list `nfl` in `sports=` with NFL appended 0, while the NFL shortlist held only Monday's DEN @ KC (Sunday rows in the dead lane). NFL capture resumed (139 at 16Z) after the NFL board recovered.
+  - **Recurs without a full disk:** any stretch where the fast path serves the board and the heavy build is refused stops Kalshi quote capture for all sports.
+  - Fix NOT proposed yet. Options for the user: move `_capture_kalshi_quotes` to the fast path or venue loop, or accept the coupling.
+  - Remaining unknown: why the heavy build stopped at 21:4xZ. Its refusal lines were not read yet.
+- Blocked by: none.
+
 ### book-quotes-prefer-fuller-copy — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - VERDICT 2026-09-13 ~19:30Z — Goal: when a `book_quotes` shard exists both plain and as `.gz`, every reader gets the copy holding MORE data, so the 18 mismatched shards on refresh-worker (mlb 09-03..09-09, ncaaf 09-05, soccer 08-22..09-09) stop serving their shorter plain file — without ever preferring a truncated or unverifiable `.gz`.
   - **GOAL: NOT MET.** Code is on main (`57b67127`, tests + unwired check pass) but NOT deployed, and the production reading is owed.
@@ -923,6 +950,9 @@ death, never life — do not invert it.
   - Fix: `.gz` wins only after one streaming decompress confirms it ends cleanly at exactly ISIZE.
   - That result is cached per (path, st_size, st_mtime_ns).
   - Cost: one inflate per process per dual-form shard whose trailer claims more data, ~18 shards today.
+  - **Measured offline 2026-09-13 ~19:35Z** (dev machine, `scratchpad/bench_fuller_copy.py`): plain 157,286,185 B / 469,511 rows with a `.gz` 12 rows fuller.
+    - Cold resolve (inflate) 0.444 s, tracemalloc peak 23.2 MiB. Warm (cached) 0.001 s. Re-inflate after an mtime change 0.400 s.
+    - **Caveat:** the synthetic shard compresses 229x against production's ~39x, so real inflate is likely slower. It is still seconds per process across ~18 shards, paid only when those dates are read. Not measured on refresh-worker.
 - **STATUS 2026-09-13 ~19:25Z: LANDED `57b67127` on main, NOT DEPLOYED.**
   - Tests: book_quotes, book grid, layer1, cross-book and last-seen suites, 219 passed. The 1 error, `test_odds_book_quotes.py::MlbEndToEndQuoteLogTests`, errors identically on HEAD's module (conftest mkdir guard), so it is pre-existing.
   - Unwired check: `test_a_fuller_gz_wins_over_a_shorter_plain_copy` fails on HEAD's resolver and passes with the change.
