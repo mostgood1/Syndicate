@@ -34476,3 +34476,25 @@ No deploy, no env change. This closes the OWED item of the 14:47Z entry.
   - 64 openings captured the previous morning, before the log's first build, read 64 kept and 0 gone.
   - `look_after` now requires a log build at the sighting stamp (within 5 s), otherwise `unobserved`. Those rows' `n10` went from 64 to 0.
 - The capture is kept at `C:/tmp/layer2_capture_durable/2026-09-13/`. The recorder was stopped at ~21:46Z once the comparison held.
+
+## 2026-09-13 22:34Z — live-odds-worker `77199c48` -> `637278e3` — lane `nfl-live-props-missing` — NFL/NCAAF in-play prop capture (`events_in_scope` keeps games in progress)
+
+- **Deploy:** `dep-daji8du7bikc73c6a9pg`, trigger api, created 22:31:19Z, `live` finishedAt 2026-09-13T22:34:03.645192Z.
+- **Change:** `scripts/fetch_nfl_oddsapi_props_local.py` + `scripts/fetch_ncaaf_oddsapi_props_local.py`. `events_in_scope` bound `commence_time < now` -> `< now - ODDS_API_LIVE_LOOKBACK_HOURS` (default 4.5; `0` restores the old behaviour, no env change made).
+- **Collateral:** 49 commits since `77199c48`, 14 code files:
+  - pipeline/intelligence_state.py, pipeline/layer2_shortlist.py, scripts/layer2_live_scorecard.py, syndicate/blueprints/intelligence.py;
+  - shared/{artifact_publisher, clv_departure_ledger, clv_opening_ledger, disk_compaction, disk_inventory, disk_maintenance, odds_book_quotes, odds_refresh_tracking}.py;
+  - the two fetchers. render.yaml unchanged.
+- **PREFLIGHT OVERRIDDEN — HOLD at 22:28:33Z and 22:30:28Z.** In flight: `run_refresh_odds_job` / `refresh_odds_sources.py` / `build_soccer_artifacts.py --league la_liga`, and `wnba_betting.cli fetch-schedule`. User decision "Deploy now, kill the run", to be live before SNF DAL@NYG 00:20Z.
+  - Break-glass grant `.syndicate/deploy/grants/ed8bb082-2b7f-4de3-8f8c-f33071f42ce0.json` (service live-odds-worker, expires_epoch 1789339850), deleted after the POST.
+  - Claim held by `nfl-live-props-missing` (token acquired 22:30:07Z).
+- **Baseline (served layer1 nfl 22:29:58Z):** 1,999 prop rows, **0 seen after their own kickoff**. The 4 live games (kick 20:25Z) newest seen 19:50:25Z; DAL@NYG pregame 22:08:45Z. Layer2 22:33:34Z: 171 rows, 0 live NFL props.
+- **Pre-deploy probe (production key, in-process only):** OddsAPI lists in-progress NFL events and returns in-play props. WSH@PHI 6 books / 25 of 25 markets updated after kickoff; GB@MIN the same.
+- **verify — OWED, NOT YET READ.** The reading that proves it, in order:
+  1. live-odds-worker `PUBLISH_OK path=nfl_source/oddsapi_player_props_2026_wk1.csv` bytes GROW while a game is live, after the first post-boot NFL sweep.
+  2. Served `/api/board/layer1?sport=nfl&date=2026-09-13`: prop rows whose newest `seen` is AFTER their own kickoff > 0. Use the 20:25Z games before ~23:40Z, else DAL@NYG after 00:20Z.
+  3. `/api/board/layer2-shortlist?sport=nfl` rows with kind prop and `game_state` live > 0.
+  - As of 22:36:37Z: 0/720 and 0 live props, with no post-boot NFL sweep/publish line yet (22:35:53Z). Absent in that window is not a failure: the first sweep had not run.
+- **Rollback:** `py -3 scripts/render_deploy.py --service live-odds-worker --commit 77199c48 --allow-rollback` behind claim + preflight. Or, without rollback, set `ODDS_API_LIVE_LOOKBACK_HOURS=0` and deploy.
+- **Claim:** still HELD by `nfl-live-props-missing` pending the verify reading. Release: `py -3 scripts/deploy_claim.py release --service live-odds-worker`.
+- **Post-boot note 22:39:02Z:** live-odds-worker logs since 22:34:00Z show NO `ODDS_SWEEP_LAUNCHED`, no `already active`, no `LIVE ODDS REFRESH`, no `TICK_COMPLETE phase` line. The 22:36:58Z props publish (131,422 B) came with a batch of NFL artifact publishes ~3 min after boot, so it is not a post-fix sweep. Web returned `HTTP 503` to 4 `book_quotes` publishes at 22:37:02Z. Absent in a 5-minute post-boot window is not a failure; re-read before calling it.

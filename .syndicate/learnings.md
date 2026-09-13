@@ -5865,3 +5865,13 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - To prefer a `.gz`, inflate it to the end once (EOFError/CRC failure = incomplete) and cache by (path, size, mtime).
   - Write the truncation test BEFORE trusting a cheap check. Here it was the only thing that caught this.
   - *(evidence: `log/2026-09-13.md`, section "lane `book-quotes-prefer-fuller-copy` — checkpoint")*
+
+## 2026-09-13 — OVERTURNED: "the OddsAPI live endpoint can only ever serve upcoming events" is FALSE, and a fetcher filtered on it for a whole season `[lane nfl-live-props-missing]`
+
+- **What was believed:** the NFL props fetcher's `events_in_scope` docstring said the endpoint serves only upcoming events, and the code dropped every event with `commence_time < now`. So no prop was ever requested for a game in progress. The board showed 0 live NFL props all afternoon, and every live prop died in the opportunity gate as `live_market_stale`.
+- **What falsified it:** a probe at 2026-09-13T22:26Z. `/events` listed the 4 games in progress (and not the finished ones). Each game's `/events/{id}/odds` returned props from 6 books with 25 of 25 markets updated after kickoff. The OddsAPI v4 guide says `/events` returns "in-play and pre-match events".
+- **How to apply:**
+  - A filter justified by a claim about an external API is a belief until probed. One call costs credits in single digits; a season of missing in-play markets does not.
+  - When one sport's live markets work and another's do not, diff the EVENT SELECTION first. MLB selects by slate date (`fetch_mlb_oddsapi_local.py:772`); NFL and NCAAF selected by `commence_time >= now`.
+  - Instrument corollary from the same lane: `[live_refresh_loop] ODDS_SWEEP_LAUNCHED` is printed BEFORE `launch_refresh_run` (`live_refresh_loop.py:5741` vs `:5767`). It fires for launches then refused with `A refresh run is already active`. Count runs from the refresh run itself, never from that line.
+  - *(evidence: `log/2026-09-13.md`, section "lane `nfl-live-props-missing` — checkpoint")*
