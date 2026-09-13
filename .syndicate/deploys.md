@@ -34328,3 +34328,24 @@ ships      vs live 064fb6af: 10 code paths
 - A watcher (`scratchpad/watch_nfl_sync.py`) runs to 17:45Z. It alerts if web's shard grows and refresh-worker does not tail it within 6 min.
 
 **Rollback:** none needed. The content is byte-identical (merge added 0); only web's mtime moved.
+
+## 2026-09-13 16:23:12Z — refresh-worker `3e18be8e` -> `c114e1aa` — lane `layer2-prior-date-live-carryover` — prior-date Layer 2 carryover (+ lane `refresh-worker-disk-inventory`'s `disk_compaction.py`, by user decision). **LIVE; R1 MET.** R2/R3 owed.
+
+**Deploy.** `dep-dajcpb15efls738e497g`: created 16:17:48Z, build ended 16:21:47Z, live 16:23:12Z. Render events after it show deploy_ended only, with no kill and no restart.
+- **Target `c114e1aa`, not `822ee0ba`.** User decision ~10:45 AM CT: "c114e1aa, one reboot". Lane `refresh-worker-disk-inventory` proposed it to avoid a second reboot. `822ee0ba..c114e1aa` over code is only `syndicate/features/shared/disk_compaction.py` (+62/-3) and its test (verified here). This lane's three files are byte-identical. The boot-time compaction now also deletes plain `book_quotes` shards >=2 days old that are an exact byte prefix of their fuller `.gz`. **That lane owns and records its own `DISK_COMPACTION` reading.**
+- **Held twice before firing:**
+  - Preflight HOLD 15:08:09Z..16:15:17Z for two back-to-back MLB daily sims. There was a brief CLEAR at 15:37:31Z while the bundling question was with the user.
+  - Held at the other lane's request for a user-requested one-off NFL odds refresh on refresh-worker (runStamp 20260913_160933, finished 16:12:33Z). It released the hold by message.
+- **Claim lapsed and was re-acquired.** The first claim (15:07:54Z) expired at 15:52:54Z during the wait. It was re-acquired once at 15:58:12Z with target `c114e1aa`; nothing deployed in between.
+- **Preflight CLEAR 16:17:23Z.** Jobs drained 4 -> 2 -> 1 -> 0 over 16:13-16:17Z as the sim finished, not a post-kill restart.
+
+**verify — READINGS:**
+- **R1 MET.** `BACKGROUND_LOOP_START` 16:23:53Z. Six seconds later, exactly one `[intelligence_state] LAYER2_CARRYOVER date=2026-09-12 decision=skip reason=past_cap hours_since_roll=11.4 max_hours=6.0` at 16:23:59Z, and 0 `LAYER2_CARRYOVER_FAILED` (render_logs 16:22:30Z-16:24:05Z, covered). That puts the new code on the loop path in production. It is the skip branch only, logged once as designed.
+- **W1 MET** earlier on web `822ee0ba` (15:08:17Z section above).
+- **R2 OWED:** the 2026-09-14 05:00Z roll, read by scheduled task `layer2-carryover-roll-reading-0914` (Mon 09-14 9:15 AM CT).
+- **R3 OWED:** the first game live across midnight CT, read by tasks `layer2-carryover-crossing-reading-0915` (Tue 09-15 8:30 AM CT) and backup `layer2-carryover-crossing-reading-0919` (Sat 09-19 9:00 AM CT). Each first checks by content that refresh-worker runs `_maybe_carry_over_prior_date_layer2`.
+- NOT YET SEEN: a `LAYER2_FAST_REFRESH` line carrying `live_rows=`/`chips_live=`. The fast path runs only when the heavy build is refused; R2 reads it.
+
+**Rollback.** `python scripts/render_deploy.py --service refresh-worker --commit 3e18be8e --allow-rollback` behind a claim + preflight. That also drops the disk lane's `disk_compaction.py` change, so tell that lane first. Kill switch: `SYNDICATE_LAYER2_CARRYOVER_MAX_HOURS=0`, then a deploy.
+
+Refresh-worker claim released after this entry.
