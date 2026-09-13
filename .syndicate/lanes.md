@@ -857,6 +857,11 @@ death, never life — do not invert it.
 - **NEXT LEVERS, not yet owned by code:**
   - (a) H4, the peer's streaming daily-book writer: built, not pushed, needs the user's approval.
   - (b) allocation sites inside `_run_live_lens_tick` for MLB and soccer on this worker: unmeasured, and `tracemalloc` is not wired here.
+- **P4 FALSIFIED for `58736a69` ALONE** `[interval closed 2026-09-13T00:14:31Z]`:
+  - `oomKilled` at 2026-09-13T00:07:50Z, **93.6 min after boot**, against 10-25 min restart-to-kill before the deploy.
+  - The kill was 25.1 s after `TRIM_SELECT` with no `DAILY_BOOK` between (H4 window, 7 of 7 kills checked), while the live-lens thread was at `tick_before_mlb` with the parent at 1,074 MB after trim.
+  - **Verdict for this lane's change: necessary, not sufficient.** It cut kill frequency sharply and removed allocator retention (P1, P2 MET), but not the kill.
+- **The COMBINATION with the peer's `e332b531` (streaming daily-book writer, live 00:14:31Z) is read under lane `live-odds-worker-oom-loop` R1-R4.** This lane's Goal stays OPEN until that reading, or a follow-on on the live-lens builds, shows >= 6 h clean.
 - Blocked by: none. NOTE: `#656` (lane `execution-ledger-cas`) is blocked on this. No deploy without the user's go-ahead: live-odds-worker places live venue orders, and a deploy carries origin/main collateral.
 ### live-odds-worker-oom-loop — OPEN — opened 2026-09-12 — session 791399da-baf0-48a5-a708-e99f4ae7fd00
 - Goal: name, with evidence, the loop or allocation that drives live-odds-worker (`srv-d91dpertqb8s73co8lt0`, 2Gi) to `oomKilled` during live slates, and stop the kills WITHOUT reducing odds-capture cadence. Evidence at open: events API `server_failed reason=oomKilled memoryLimit=2Gi` at 2026-09-12 18:08:51Z, 18:30:14Z, 18:42:16Z, 18:59:57Z (NCAAF slate); lane `execution-ledger-cas` counted 47 between 2026-09-11T14:17Z and 2026-09-12T15:56Z (`deploys.md` 2026-09-12 16:37Z) and records the loop strands LIVE orders between `place_order` and `reconcile_live_orders`. This worker places REAL-MONEY orders (`SYNDICATE_EXECUTION_MODE=live`, `LIVE_ARMED=1`).
