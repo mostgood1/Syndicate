@@ -984,6 +984,12 @@ death, never life — do not invert it.
     - Later builds add +58..+138 MB each. Up to 12 cached pools could still add ~1 GB by the cap, which fits earlier boots reaching 2.1-2.4 GB after hours. So H-cache stays OPEN for the tail, not the step.
     - **The container reading is confounded by child jobs.** `MALLOC_TRIM` anon (container-wide) stepped +580 MB after build 4 while pid 39 moved +58; child-job RSS was 842-886 MB in that window. The refusal guard reads CONTAINER unreclaimable, so child jobs push the heavy build into refusal. A recycle (which holds while children run) cannot relieve that part.
     - Correction to this block's earlier "Measured" line: post-build `MALLOC_TRIM` "anon 1.8-2.5 GB" is container-wide, not pid 39.
+  - **INSTRUMENT LIVE, shipped as collateral (not this lane's deploy):** lane accuracy-assessment-0914 deployed refresh-worker `6fe6c6e9` -> `17c8208e` (`dep-dak2qk61egvs739bga2g`, created 17:22:24Z, live 17:28:28Z). `53d989af` and `339dc6e9` are ancestors; there is no `render.yaml` change.
+    - This came BEFORE the user's chosen order (recycle observed first). The recycle reading on `6fe6c6e9` stayed unexercised: 0 refusals in 100+ min of uptime. The reboot restarts the uptime clock again.
+    - Boot `MALLOC_ARENA_INIT` 17:29:03Z; 0 Traceback through 17:43Z.
+    - **First production reading:** `CANDIDATE_POOL_CACHE date=2026-09-14 cached=True entries=1 limit=12 pool_json_bytes=19717698 cache_json_bytes=19717698` at 17:43:04Z.
+    - One 09-14 pool is **19.7 MB of JSON**. Twelve of that size would be ~236 MB of JSON, which is above the falsification line (~200 MB). But builds alternate with small 09-15 pools (count 14), so the total at the cap is NOT yet measured.
+    - The JSON-to-live-memory multiplier is also unmeasured. A background watch (to >= 4 entries, 90 min cap) pairs each line with pid 39 RSS.
 
 ### heavy-build-memory-refusal — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - DECISION 2026-09-14 ~15:10Z (10:10 CT): user chose "Restart at 1 + build isolation lane (Recommended)".
