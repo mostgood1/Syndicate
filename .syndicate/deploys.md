@@ -34899,3 +34899,16 @@ User decision in chat: "Deploy, recorder ON (Recommended)". Both claims held by 
   - Reading OWED: background `scratchpad/cap_reading.py` (6 builds, 150 min cap). It is also the recycle reading on this boot (threshold 1 still set).
 - **Rollback:** `python scripts/render_deploy.py --service refresh-worker --commit ae53a1a5 --allow-rollback`. Or, without code, set `SYNDICATE_CANDIDATE_POOL_CACHE_MAX` back to 12 (or delete it) and deploy.
 - Claim released after this entry is pushed.
+
+## 2026-09-14 20:29Z (15:29 CT) — reading only, no deploy — refresh-worker `0a18557a` — pool-cache cap: verify (1) MET, verify (2) PARTIAL
+Source: refresh-worker logs 19:07Z-20:29Z (`render_logs.py`, `--json` for `ALL_PROCESS_MEMORY`), session 0f5b256e. Measures the 19:00:54Z entry above.
+- **(1) Reachability: MET, by `entries`, not `limit=`.**
+  - Six `CANDIDATE_POOL_CACHE` lines: 19:20:05Z `entries=1`, then 19:30:45Z / 19:42:31Z / 19:56:47Z / 20:09:57Z / 20:27:58Z all `entries=2`. `cache_json_bytes` held 29.1-31.9 MB while pools of 6.5-25.4 MB kept arriving.
+  - Every line printed `limit=12`. That is a logging bug in `0a18557a` (the print used `_max_snapshots`). The env reads back 2 (single-key GET 19:21Z). The fix is `d4deb502` on main, not deployed.
+- **(2) pid 39 RSS per build:** 1,223 / 1,277 (+55) / 1,440 (+163) / 1,451 (+10) / 1,486 (+36) / 1,568 (+82) MB. Boot 94.8 MB; child-job RSS max 32-891 MB.
+  - Uncapped comparison (`17c8208e`, 17:43-18:14Z): 1,133 / 1,190 (+57) / 1,373 (+183) / 1,524 (+151).
+  - Builds 1-4: capped +227 vs uncapped +391, so ~164 MB less.
+  - **Prediction "near flat after build 2": NOT MET** (+291 MB over builds 3-6). **Falsification "within ~+/-50 MB of the uncapped curve": NOT MET** (clearly lower).
+  - **Verdict PARTIAL:** the cache is part of the per-build growth, not all of it. Live memory is ~6x the cached JSON (inferred from 2 entries' difference, n=1 boot each).
+- 0 `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint`, 0 `[worker_recycle]`, 0 Traceback, 1 boot. The threshold-1 recycle is still unexercised on this boot.
+- Env `SYNDICATE_CANDIDATE_POOL_CACHE_MAX=2` left set. The undisturbed-window hold for lane accuracy-assessment-0914 is released ("reading done" posted in lanes.md).

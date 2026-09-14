@@ -1019,6 +1019,18 @@ death, never life — do not invert it.
       - The test meant to pin `limit=` ran with both values at 12, so it could not fail. The commit message and this block's "reports the real cap" were wrong.
       - Reachability therefore rests on `entries` staying <= 2 from build 3 on, not on `limit=`.
       - Fix (log field + a test at env 2): on main, NOT deployed. It rides the next refresh-worker deploy.
+    - **2026-09-14 20:29Z (15:29 CT) — reading done.** Six builds on `0a18557a`, one boot (19:07:43Z), 0 refusals, 0 `[worker_recycle]`, 0 Traceback. accuracy-assessment-0914 may deploy.
+      - **Reachability MET:** `entries` 1 -> 2 and then stayed 2 on builds 3-6 while pools kept arriving. The cache total held at 29-32 MB of JSON; alternating pools are 22.6-25.4 MB (09-14) and 6.5-7.2 MB (09-15).
+      - pid 39 RSS minimum in the 5 min after each build (`scratchpad/cap_reading.py`, 363 `ALL_PROCESS_MEMORY` samples): 1,223 -> 1,277 (+55) -> 1,440 (+163) -> 1,451 (+10) -> 1,486 (+36) -> 1,568 (+82). Child-job RSS max 32-891 MB.
+      - Against the uncapped boot of `17c8208e`: 1,133 -> 1,190 (+57) -> 1,373 (+183) -> 1,524 (+151).
+        - Builds 1-4: capped +227 MB vs uncapped +391 MB, **~164 MB less**. By build 4 the uncapped cache held 2 more pools (~26 MB of JSON), which puts live memory at roughly 6x JSON.
+        - Extrapolated to the default cap of 12 (~156 MB of JSON), that is **~0.9 GB, INFERRED, not measured**.
+      - **Verdict H-cache: PARTIAL.**
+        - The pre-registered "near flat after build 2" was NOT met: +291 MB over builds 3-6 with the cap in force. So something else also grows per build.
+        - The falsification line was NOT met either: growth was clearly below the uncapped curve.
+        - Confidence is limited: one boot each, per-build steps are noisy (+10 vs +151 at build 4), and boots differ by ~90 MB at build 1.
+      - **State left:** env `SYNDICATE_CANDIDATE_POOL_CACHE_MAX=2` stays set. It measurably slowed growth with no refusal or error, and cache hits were never measured to matter. Revert by setting it to 12 (or deleting it) and deploying.
+      - **Next for this lane:** name the remaining per-build growth (~+70 MB/build with the cap), plus the +1.1 GB first-build step, before choosing between more caching fixes and the child-process build.
     - **Undisturbed window requested from accuracy-assessment-0914:** the first ~6 heavy builds after this deploy (~90 min from live). "Reading done" goes on this line when the 6th `CANDIDATE_POOL_CACHE` line is in.
 
 ### heavy-build-memory-refusal — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
