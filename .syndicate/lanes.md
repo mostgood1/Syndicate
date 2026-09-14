@@ -971,6 +971,10 @@ death, never life — do not invert it.
 ### heavy-build-memory-refusal — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - VERDICT 2026-09-13 ~23:40Z (18:40 CT) — Goal: explain why refresh-worker's heavy board build (candidate pool, board publication, portfolio commit / paper orders) was refused by `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` for ~16 h (2026-09-12 21:34Z .. 2026-09-13 13Z) with unreclaimable headroom ~1,810 MB. Measure what the build actually needs against that floor and what holds ~2.3 GB unreclaimable. Then bring the user options with numbers (retarget/lower the check, cut the build's cost, or add memory). Read-only on production; no code or deploy without the user's OK.
   - ~~GOAL: NOT MET. Only opened.~~ Superseded by the verdict below.
+- CHECKPOINT 2026-09-14 ~04:45Z (23:45 CT 09-13), same Goal as below, verbatim: explain why refresh-worker's heavy board build (candidate pool, board publication, portfolio commit / paper orders) was refused by `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` for ~16 h (2026-09-12 21:34Z .. 2026-09-13 13Z) with unreclaimable headroom ~1,810 MB. Measure what the build actually needs against that floor and what holds ~2.3 GB unreclaimable. Then bring the user options with numbers (retarget/lower the check, cut the build's cost, or add memory). Read-only on production; no code or deploy without the user's OK.
+  - **GOAL: MET** (diagnosis, readings below).
+  - Lane stays OPEN for the user-chosen fix: `339dc6e9` (self-restart) is landed, NOT deployed. It ships in scheduled task `book-quotes-fuller-copy-deploy-0914` (00:50 CT 09-14, cutoff 11:00 CT).
+  - Owed: `RECYCLE_EXIT` observed during a real refusal stretch, followed by heavy builds resuming.
 - VERDICT 2026-09-14 ~00:30Z (19:30 CT, 09-13): **GOAL: MET.** Measured, options with numbers put to the user, and the user chose a fix.
   - **Readings** (refresh-worker; `scratchpad/rw_memory_samples.csv`):
     - 8,829 `ALL_PROCESS_MEMORY` samples, 09-12 18:00Z..09-13 23:30Z. Every hour fully covered except 09-13 14:00-15:00Z (fetch failed; after the refusals ended).

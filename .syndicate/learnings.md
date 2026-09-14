@@ -5898,3 +5898,19 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - A watcher must not `break` on the first success when the claim is "it stays fixed". Stop on N distinct builds instead.
   - Do not release a claim or close a lane on a first reading of a periodic process. Write "part 1 MET / part 2 OWED" instead.
   - *(evidence: `deploys.md` 22:46Z, 23:12Z correction, 23:24Z; `log/2026-09-13.md` "lane `quote-state-publish-retry`")*
+
+## 2026-09-14 — OVERTURNED: "the 1,900 MB heavy-build floor is stale" AND "refresh-worker's memory ratchets slowly until the build is refused". Both are false. The main process STEPS up once after its first full build and holds it `[lane heavy-build-memory-refusal]`
+
+- **What was believed (the lane's own H1/H2, and the floor's comment):**
+  - The floor was sized 2026-08-07 for an in-process MLB hydration transient that now runs in a capped child, so it must be too high.
+  - The ~16 h refusal came from a slow anon ratchet or from concurrent child jobs.
+- **What falsified it** (refresh-worker, 09-12 18Z..09-13 23:30Z, 8,829 `ALL_PROCESS_MEMORY` samples plus 2 s `MEMORY_WATCHDOG` in 16 builds):
+  - Steady-state builds still peak +296 / 719 / 1,416 MB at parent stages, with minimum headroom 633 MB. The floor is about right.
+  - After every boot, unreclaimable jumps from ~75 MB past the 2,196 MB refusal line within 16-60 min, then barely moves (+~190 MB in 16 h).
+  - 3,303 refused-level samples had no child process.
+  - Only restarts cleared it.
+- **How to apply:**
+  - Before lowering a memory guard whose sizing comment is out of date, measure the current build's continuous peak (watchdog cadence, not stage-boundary samples). The stage that moved may not have been the only cost.
+  - Split "step after first build" from "ratchet" by the per-hour MINIMUM within one boot. A flat minimum after the first hour is a step, and restarts, not trims, are what reset it.
+  - Ledger corollary from the same lane: a claim-transfer note on a `- Files:` line that still names the file (backticked OR bare) is parsed as a live claim by `lane_claims._claims`. Wording like "is also claimed by ..." there reads as a disclaimer and drops the path after it. Describe moved claims without the file name, then re-run `_claims` on the PRIMARY `lanes.md` before editing.
+  - *(evidence: `log/2026-09-14.md`, section "lane `heavy-build-memory-refusal` — checkpoint"; `state_worker.md [refresh-worker-heavy-build-refusal]`)*

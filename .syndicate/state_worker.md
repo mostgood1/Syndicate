@@ -2153,3 +2153,15 @@ outlier cold reading. Three paired replications erased it: **cold 31.32s vs warm
   - Web's append-only publish MERGES: line-digest dedupe, then `os.replace`, so a byte-identical republish advances only the mtime.
   - Web's merge concurrency cap is 1, so a second publish seconds later gets `ARTIFACT_MERGE_AT_CAPACITY` (503, retried by a later publish).
   - `_FAILED_DIRECT_PUBLISH` is in-process and lost on reboot.
+
+## [refresh-worker-heavy-build-refusal] refresh-worker's heavy build is refused for hours once the MAIN PROCESS settles above ~2.2 GB after its first full build — child jobs are not the cause, and only a restart clears it `[verified 2026-09-13 in production logs, lane heavy-build-memory-refusal]`
+
+- **Guard.** `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` at the top of `_compute_board_publication_response`; basis = 4096 - unreclaimable. 403 refusals 09-12 21:34Z..09-13 16:14Z.
+  - It stopped `CANDIDATE_POOL`, `BOARD_PUBLICATION`, `PORTFOLIO_COMMIT` (paper orders) and Kalshi capture. `LAYER2_FAST_REFRESH` (600 MB floor) kept the board alive.
+- **Cause measured.**
+  - After each boot unreclaimable starts ~75 MB. It crosses 2,196 MB 16-60 min later (the first full build) and then holds: hourly min 2,049 -> 2,241 MB over 16 h.
+  - pid 39 rss 2.1-2.4 GB. `UNTRACKED_BYTES_CENSUS` explains only 16% of anon as Python objects.
+  - 3,303 of 7,159 refused-level samples had `process_count` 2, i.e. no children.
+  - Heavy builds resumed within minutes of the 13:42Z, 16:23Z and 18:31Z boots.
+- **The floor is roughly right.** Steady-state builds peak +296 / 719 / 1,416 MB above start (2 s `MEMORY_WATCHDOG`, n=12), minimum headroom at peak 633 MB, at parent stages (`board_contract_end`, `build_live_state_payload_fallback`). The MLB hydrated overview runs in a capped child (`[overview_isolation] OK` 33/33, 0 `MEMORY_CAP_HIT`), so the floor's 08-07 sizing comment describes a stage no longer in pid 39.
+- **Fix on main, NOT deployed:** `339dc6e9` `worker_recycle`. The worker exits (Render restarts it) after >= 15 consecutive refusals (`SYNDICATE_REFRESH_WORKER_RECYCLE_AFTER_REFUSALS`, 0 disables), uptime >= 30 min, no live child, no drain. Scheduled in task `book-quotes-fuller-copy-deploy-0914`.
