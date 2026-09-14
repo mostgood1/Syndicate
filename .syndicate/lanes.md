@@ -1645,6 +1645,12 @@ death, never life — do not invert it.
     - Recorded in `deploys.md`.
   - Claim RELEASED by token at ~21:14:40Z, right after the `deploys.md` entry was pushed (`9869fcae`); `status` then read `free`.
     - CORRECTION: this line and the `deploys.md` entry first said the claim "lapsed at its TTL (21:16:44Z) before this entry was pushed". That was written before reading the clock. The push finished 21:14:28Z, inside the TTL. A correction is appended to `deploys.md`.
+  - FOLLOW-UP READINGS `[21:16-21:29Z]`:
+    - The other lane's health check MET: the first `CANDIDATE_POOL_CACHE` on the new code (21:16:30Z) shows `limit=2 entries=1`.
+    - Scores MET on the first post-live 09-15 build (21:27:00Z): all factor rows `category`, 0 falsifiers. That was a 2,000-row sample; the 21:11:04Z census stands.
+    - Recorder names: 832 of 832 post-live records named, ALL soccer. MLB/NFL/NCAAF have written no post-live keys, so their share is unread.
+    - PREDICTION ASSUMPTION WRONG: 09-15 was not a post-live population. The pre-live 20:53:26Z build had already recorded first sightings for every 09-15 key, and keys are recorded once per day.
+    - The MLB/NFL/NCAAF reading moves to post-live keys from tonight's in-play line moves (MLB from 22:40Z), or to the 09-16 board after the Central date roll.
     - soccer `no_chip_match` 710.
     - MLB props: `prop_player_not_in_boxscore` 3,124 (void), `prop_no_commence_time` 1,169.
   - The first real search: >= 5 dates of recorder data with finals, i.e. no earlier than 2026-09-19.

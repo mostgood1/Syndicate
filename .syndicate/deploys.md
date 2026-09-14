@@ -34961,3 +34961,19 @@ User decision in chat: "Deploy #3 after their reading is done".
 - `d4deb502` reached refresh-worker as part of lane accuracy-assessment-0914's deploy #3: `dep-dak5v1jl550s73a1i3r0`, created 20:56:38Z, live 21:03:17Z. Boot `MALLOC_ARENA_INIT` 21:03:51Z; 0 `Traceback` through 21:16Z.
 - **verify MET:** the first post-boot line is `CANDIDATE_POOL_CACHE date=2026-09-14 cached=True entries=1 limit=2 pool_json_bytes=28181421 cache_json_bytes=28181421` (21:16:30Z). `limit=` now reports the pool-cache cap, and env `SYNDICATE_CANDIDATE_POOL_CACHE_MAX=2` carried through the redeploy.
 - This lane's 19:07Z boot series ended at this reboot, and its readings were recorded before it. The evening live-lens reading (23:10Z) does not depend on uptime.
+
+## 2026-09-14 21:30Z (16:30 CT) — FOLLOW-UP readings for the 20:56Z refresh-worker `0a18557a` -> `6438830d` entry — lane `accuracy-assessment-0914`, session 498e87fd
+
+- **The other lane's health check on this boot: MET.** The first `CANDIDATE_POOL_CACHE` line on `6438830d` printed at 21:16:30Z: `date=2026-09-14 cached=True entries=1 limit=2`. `limit=2` confirms `d4deb502`'s log fix, and `entries` is <= 2.
+- **Scores on the first 2026-09-15 shortlist after live (21:27:00Z): MET.**
+  - Every factor row is `skill_source: "category"` at its predicted factor: ncaaf totals 220 x 0.514, spreads 85 x 0.814, h2h 54 x 0.814; soccer h2h 168 x 0.877.
+  - Falsifiers 0. This fetch returned exactly 2,000 rows (the limit), so it is a confirming sample, not a census; the 21:11:04Z 09-14 build is the full census.
+- **Recorder team names: MET on everything written after live, but soccer is all that exists.**
+  - Post-live records named: 832 of 832 (09-14: 418; 09-15: 414). All soccer. Pre-live records: 0%.
+  - MLB, NFL and NCAAF have written NO post-live keys yet, so their share is still UNREAD.
+- **WRONG ASSUMPTION in the prediction.** It named "the first board date written entirely after live (09-15 CT)" as the full recorder reading.
+  - The pre-live 20:53:26Z build had already written first sightings for every 09-15 key, and the recorder writes a key once per day. So 09-15 is not a post-live population.
+  - Where the MLB/NFL/NCAAF reading can come from instead:
+    - new keys from tonight's in-play line moves (MLB first pitch 22:40Z; NFL if a game is on);
+    - or the 09-16 board, first built after the Central date roll (~05:00Z 09-15).
+- **OWED:** MLB/NFL/NCAAF team-name share on post-live records; MLB live-row notes from 22:40Z.
