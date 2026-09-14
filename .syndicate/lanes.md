@@ -1220,7 +1220,7 @@ death, never life — do not invert it.
   - Falsified if: the fresh-cut, paired, era-split CI over games still excludes zero against the model.
 - Hypothesis H4: NCAAF totals, never scored against the close, lose to it (1.67x over-dispersed). The ledger's -34.8% on `contradicts` is selection on the sim's disagreement, not evidence the sim is informative.
   - Falsified if: the NCAAF totals model-vs-close MAE CI spans zero or favours the model on 2026 games.
-- Method: five read-only measurement agents (MLB pregame, MLB live, football, soccer, WNBA + other-sport census).
+- Method: six read-only measurement agents (MLB pregame, MLB live, football, soccer, WNBA + other-sport census, and MLB props the board calls unmeasured: pitcher strikeouts/outs/hits_allowed/earned_runs/walks_allowed and batter HRR).
   - They use production data, one request at a time.
   - Scoring: full projection population, paired, de-vigged closing lines, bootstrap over games.
   - Outputs go to this session's scratchpad; the numbers that decide anything are copied into the findings file.
@@ -1228,6 +1228,27 @@ death, never life — do not invert it.
   1. The findings file carries the table.
   2. A served-board census of `model_skill.status` by sport x market, taken before and after the registry ships. The after-reading needs a deploy: user approval plus both locks.
   3. Each shipped optimization names the number that justifies it.
+- H1 BEFORE-CENSUS `[2026-09-14 ~16:40Z, served /api/board/layer2-shortlist?date=2026-09-14&limit=2000]`: H1 NOT FALSIFIED.
+  - 605 of 1,394 rows carry "model never backtested": mlb 268, soccer 268, nfl 69.
+  - They include markets that WERE measured: mlb game `h2h` (16) and `totals` (28), soccer `h2h` (80).
+  - They also include markets with no measurement on record: mlb pitcher props and `batter_hits_runs_rbis`, soccer `totals` / `alternate_totals_corners`, nfl regular-season games.
+  - NCAAF rows already read `measured` (the 2024 backtest note). MLB hitter hits / total_bases / rbis read `measured` (`mlb_prop_calibration`).
+  - Served MLB book grid (1,546 rows) adds mlb `spreads` 22 and `batter_home_runs` 252, both unmeasured.
+- ADMISSION CHECKED BEFORE RELABELLING: every unmeasured mlb/soccer/nfl game row on that shortlist is `fair_method=consensus` (two-sided).
+  - `layer2_board._row_rests_on_unmeasured_model` only withholds `book_margin_model` rows, so relabelling them changes no admission.
+  - The only one-sided rows were 15 hitter-prop rows, already measured. `batter_home_runs` (one-sided, user-withheld 2026-09-11) is out of scope.
+- CODE, on branch `session/accuracy-assessment-0914`, NOT landed: `syndicate/features/shared/measured_market_skill.py` behind `attach_projection_skill`.
+  - Precedence: producer note > registry keyed (sport, market, segment, phase) > unmeasured.
+  - Phase is `live` only when `projection.live_aware`, so a pregame number never labels a live re-sim.
+  - Pinned by test: a non-game market whose verdict is not `beats_market` needs `admission_checked`.
+  - Table EMPTY until the agents report.
+  - Tests: 43 passed / 2 skipped (empty-table parametrizations) from the worktree, imports verified to resolve there.
+  - Mutation check: against HEAD's `projection_skill.py` the two registry-dependent tests FAIL (label replacement, per-row copy); the file hash was identical after restore.
+- CLV SAMPLE (context, one date): `/api/ops/clv/report?date=2026-09-13&sport=mlb`, 13.5 s on web.
+  - Same-book pregame CLV +0.0388% over 267 rows; beat-close rate 29.2%.
+  - The biased book-agnostic scope reads +1.35% / 66.4% (n 3,180): the best-of-N effect the endpoint names.
+  - 1,199 of 3,081 unresolved are `segment_absent_from_history`.
+  - The 14-day x 4-sport sweep is deferred until the agents stop loading web.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
