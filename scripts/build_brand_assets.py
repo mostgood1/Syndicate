@@ -1,29 +1,36 @@
 """Derive every brand asset in `syndicate/static/shared/` from two sources.
 
-Syndicate carries TWO marks and they are not interchangeable. This script is
-where the split is made mechanical, so a future re-render cannot quietly put
-the wrong one in the wrong slot:
+Syndicate carries TWO marks, split on the size the slot actually renders at.
+This script is where the split is made mechanical, so a future re-render
+cannot quietly put the wrong one in the wrong slot:
 
-  * the WORDMARK (`syndicate-logo.png`, 815x193) -- understated, and the only
-    mark whose "S" is still legible at 16px. It owns the browser chrome
-    (favicons) and the in-app header lockup, which no code here touches.
-  * the MASCOT CREST (an opaque 1254x1254 illustration) -- loud, square, and
-    mud below ~64px. It owns every slot that renders large: the iOS home
-    screen icon, the PWA install icons, the link-preview card, and the
-    `/syndicate` hero.
+  * the LOGO (`docs/brand/syndicate-logo-source.png`, an opaque 1536x1024
+    piece: hooded mascot, crown, the green/blue S swoosh and its own
+    "SYNDICATE" lettering). It is THE brand `[user decision, 2026-09-14]` and
+    owns every slot that renders at ~100px and up: the header on every page,
+    the four hero panels, the iOS/PWA icons and the link-preview card.
+  * the WORDMARK's S (`syndicate-logo.png`, 815x193) -- kept for the favicons
+    ONLY. The mascot art was measured unreadable at 32px and mud at 16px on
+    2026-09-09; the logo puts lettering on top of that same art, so it can
+    only be worse. The S is the swoosh the logo is built around, so the tab
+    icon still matches `[user decision, 2026-09-14: keep the S favicon]`.
 
-That split was measured, not assumed: `--contact-sheets` regenerates the
-16/32/64/128/512 grids the decision rests on, for the full art, for a tight
-hood-only crop, and for the squared S on both a light and a dark ground.
+THE LOGO IS NEVER CROPPED `[user decision, 2026-09-14: "dont crop the image,
+resize it. The logo must be maintained"]`. Every asset is the whole piece,
+resized. A slot whose shape differs from 3:2 (the square icons, the 1200x630
+card) gets the whole logo fitted inside it and the remainder filled with the
+logo's own ground colour -- padding, never trimming. The pages hold the same
+line in CSS: the hero panels use `object-fit: contain` at the art's own
+aspect ratio, because `cover` would crop in the browser a file this script
+kept whole.
 
-The mascot art contains its OWN "SYNDICATE" lettering (top edge at y~715 in
-source pixels). Anything that pairs it with the wordmark crops above that
-line -- two wordmarks on one image reads as a mistake, not as branding.
+`--contact-sheets` regenerates the 16/32/64/128/512 grids that split rests on,
+for the logo's icon and for the squared S on a light and a dark ground.
 
-The master art is checked in at `docs/brand/syndicate-mascot-source.png`
-(2.4 MB, deliberately OUTSIDE `static/` so it is never served) -- without it
-this script would only be re-runnable from whoever's Downloads folder the art
-last landed in.
+The master art is checked in at `docs/brand/syndicate-logo-source.png`
+(deliberately OUTSIDE `static/` so it is never served) -- without it this
+script would only be re-runnable from whoever's Downloads folder the art last
+landed in.
 
 Usage:
     py -3 scripts/build_brand_assets.py
@@ -40,44 +47,78 @@ import os
 import sys
 
 try:
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image
 except ImportError:  # pragma: no cover - offline tool, not part of the app
     sys.exit("Pillow is required: py -3 -m pip install pillow")
 
 
 SHARED = os.path.join("syndicate", "static", "shared")
-SOURCE_ART = os.path.join("docs", "brand", "syndicate-mascot-source.png")
+SOURCE_ART = os.path.join("docs", "brand", "syndicate-logo-source.png")
 
-# Page ground, kept in sync with --cards-bg / theme-color in app.css.
+# Page ground, kept in sync with --cards-bg / theme-color in app.css. Used
+# only behind the transparent favicon contact sheets -- the logo pads with
+# its OWN ground (read from the art), or the padding would show as a band.
 BG = (8, 19, 31)
-
-# The figure alone, stopping above the art's own "SYNDICATE" lettering.
-FIGURE_BOX = (110, 0, 1150, 712)
-# Same crop with a little more headroom, for the wide social card.
-FIGURE_BOX_WIDE = (110, 0, 1150, 770)
 
 
 def _quantized(img: Image.Image, path: str, colors: int = 256) -> None:
-    """Save a PNG at `colors`. The art is stylized flat-shaded neon, so a
-    256-colour palette is visually indistinguishable at icon sizes and cuts
-    the 512px icon from 494 KB to ~172 KB."""
+    """Save a PNG at `colors`. A 256-colour palette with dithering is visually
+    indistinguishable at icon sizes and keeps the 512px icon a fraction of
+    the full-colour PNG's size."""
     img.convert("RGB").quantize(
         colors=colors, method=Image.MEDIANCUT, dither=Image.FLOYDSTEINBERG
     ).save(path, optimize=True)
 
 
-def build_app_icons(mascot: Image.Image, out: str) -> None:
-    """Square icons for the home screen and the PWA install prompt.
+def _jpeg(img: Image.Image, path: str, quality: int) -> None:
+    """JPEG for the opaque slots: the swooshes are smooth gradients, which a
+    256-colour PNG bands and a JPEG does not, at a fraction of the bytes."""
+    img.convert("RGB").save(path, quality=quality, optimize=True, progressive=True)
 
-    Full square art, uncropped: these render at 180px and up, where the whole
-    crest reads, and a home-screen icon should fill its tile.
-    """
+
+def _ground(logo: Image.Image) -> tuple:
+    """The logo's own background colour, from its four corners."""
+    w, h = logo.size
+    corners = [logo.getpixel(p) for p in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1))]
+    return tuple(sum(c[i] for c in corners) // 4 for i in range(3))
+
+
+def _fitted(logo: Image.Image, size: tuple) -> Image.Image:
+    """The WHOLE logo, resized to fit inside `size` and centred on its own
+    ground. Nothing is cropped; only the leftover space is filled."""
+    scale = min(size[0] / logo.size[0], size[1] / logo.size[1])
+    art = logo.resize(
+        (round(logo.size[0] * scale), round(logo.size[1] * scale)), Image.LANCZOS
+    )
+    canvas = Image.new("RGB", size, _ground(logo))
+    canvas.paste(art, ((size[0] - art.size[0]) // 2, (size[1] - art.size[1]) // 2))
+    return canvas
+
+
+def build_header_logo(logo: Image.Image, out: str) -> None:
+    """The header lockup on every page. 480x320 for a slot that renders at
+    ~210x140 CSS px, so it stays sharp on a 2x screen and is still small."""
+    _jpeg(_fitted(logo, (480, 320)), os.path.join(out, "syndicate-brand-header.jpg"),
+          quality=88)
+
+
+def build_hero(logo: Image.Image, out: str) -> None:
+    """The hero panels (`/syndicate`, market-board hub, error page,
+    `/intelligence/status`) -- the whole piece at 960x640, which covers the
+    widest stacked panel (~420 CSS px) on a 2x screen."""
+    _jpeg(_fitted(logo, (960, 640)), os.path.join(out, "syndicate-brand-hero.jpg"),
+          quality=86)
+
+
+def build_app_icons(logo: Image.Image, out: str) -> None:
+    """Square icons for the iOS home screen and the PWA install prompt: the
+    whole 3:2 logo fitted across the square, black above and below."""
     for name, size in (
-        ("syndicate-mascot.png", 512),
-        ("syndicate-mascot-192.png", 192),
-        ("apple-touch-icon.png", 180),
+        ("syndicate-icon-512.png", 512),
+        ("syndicate-icon-192.png", 192),
+        ("syndicate-icon-180.png", 180),
     ):
-        _quantized(mascot.resize((size, size), Image.LANCZOS), os.path.join(out, name))
+        _quantized(_fitted(logo, (size, size)), os.path.join(out, name))
 
 
 def build_favicons(wordmark: Image.Image, out: str) -> None:
@@ -86,11 +127,8 @@ def build_favicons(wordmark: Image.Image, out: str) -> None:
     The S is isolated by the alpha gap between it and the lettering rather
     than a hardcoded x -- measured at columns 247..274 in the current
     wordmark, but re-derived here so a re-exported wordmark still works.
-    There is deliberately NO scalable favicon. `syndicate-logo.svg` looks
-    like the obvious source and is not: rendered at 240px beside the PNG it
-    draws two parallel bars where the real mark is an interlocking S, and
-    sets the wordmark in Arial. It is referenced nowhere in the app. A real
-    SVG icon needs the mark re-vectorised first.
+    There is deliberately NO scalable favicon: a real SVG icon needs the mark
+    re-vectorised first.
     """
     alpha = wordmark.split()[-1]
     width, height = wordmark.size
@@ -134,85 +172,19 @@ def build_favicons(wordmark: Image.Image, out: str) -> None:
     )
 
 
-def build_hero_crest(mascot: Image.Image, out: str) -> None:
-    """The `/syndicate` hero art: the figure only, as a plain rectangle.
-
-    No feathering and no cutout. The source is opaque to its edges with no
-    separable background, so a fade just looks like a failed mask; the page
-    frames it with border-radius + a hairline border instead, which is the
-    card language the rest of the app already speaks. JPEG because the art is
-    photographic smoke -- 108 KB against 584 KB for the same PNG.
-    """
-    crest = mascot.crop(FIGURE_BOX)
-    width = 720
-    crest.resize(
-        (width, int(width * crest.size[1] / crest.size[0])), Image.LANCZOS
-    ).save(
-        os.path.join(out, "syndicate-crest.jpg"),
-        quality=86,
-        optimize=True,
-        progressive=True,
-    )
+def build_social_card(logo: Image.Image, out: str) -> None:
+    """1200x630 og:image / twitter:image: the whole logo fitted to the card's
+    height, its own black ground either side. The logo carries the name, and
+    the page's og:description carries the words."""
+    _jpeg(_fitted(logo, (1200, 630)), os.path.join(out, "syndicate-social.jpg"),
+          quality=88)
 
 
-def build_social_card(mascot: Image.Image, wordmark: Image.Image, out: str) -> None:
-    """1200x630 og:image. Both marks, each doing the job it can do.
-
-    The wordmark carries the NAME on flat ground at the left; the crest
-    carries the personality at the right, cropped above its own lettering and
-    faded into the page ground on all four sides so the crop never reads as a
-    hard cut.
-    """
-    width, height = 1200, 630
-    card = Image.new("RGB", (width, height), BG)
-
-    crest = mascot.crop(FIGURE_BOX_WIDE)
-    scale = height / crest.size[1]
-    art = crest.resize((int(crest.size[0] * scale), height), Image.LANCZOS)
-    art_x = width - art.size[0] + 60
-    card.paste(art, (art_x, 0))
-
-    # Left fade has to be wide enough that the text sits on flat ground, not
-    # on smoke -- 340px was tuned against the wordmark's rendered width.
-    fade = Image.linear_gradient("L").rotate(270, expand=True).resize((340, height))
-    card.paste(Image.new("RGB", (340, height), BG), (art_x, 0), fade)
-    right = Image.linear_gradient("L").rotate(90, expand=True).resize((140, height))
-    card.paste(Image.new("RGB", (140, height), BG), (width - 140, 0), right)
-    vignette = Image.linear_gradient("L").resize((width, 100))
-    card.paste(Image.new("RGB", (width, 100), BG), (0, height - 100), vignette)
-    card.paste(
-        Image.new("RGB", (width, 100), BG),
-        (0, 0),
-        vignette.transpose(Image.FLIP_TOP_BOTTOM),
-    )
-
-    mark = wordmark.resize(
-        (520, int(520 * wordmark.size[1] / wordmark.size[0])), Image.LANCZOS
-    )
-    card.paste(mark, (66, 214), mark)
-
-    draw = ImageDraw.Draw(card)
-    bold = ImageFont.truetype(os.path.join(os.environ.get("WINDIR", r"C:\Windows"),
-                                           "Fonts", "arialbd.ttf"), 25)
-    plain = ImageFont.truetype(os.path.join(os.environ.get("WINDIR", r"C:\Windows"),
-                                            "Fonts", "arial.ttf"), 23)
-    draw.text((74, 330), "MULTI-SPORT BETTING INTELLIGENCE", font=bold,
-              fill=(154, 243, 222))
-    draw.text((74, 372), "Sim-backed edges, live boards, graded results.",
-              font=plain, fill=(191, 208, 223))
-
-    card.save(os.path.join(out, "syndicate-og.jpg"), quality=88, optimize=True,
-              progressive=True)
-
-
-def build_contact_sheets(mascot: Image.Image, wordmark: Image.Image, out: str) -> None:
+def build_contact_sheets(logo: Image.Image, wordmark: Image.Image, out: str) -> None:
     """Regenerate the evidence the mark split rests on.
 
     Each row is one candidate rendered at 512/128/64/32/16 and blown back up
-    nearest-neighbour, so what a tab strip actually shows is visible. The
-    conclusion these produced: mascot unreadable at 32 and mud at 16, in both
-    the full-art and the hood-crop framing; the squared S clean at 32 and
-    legible at 16 on light AND dark.
+    nearest-neighbour, so what a tab strip actually shows is visible.
     """
     os.makedirs(out, exist_ok=True)
     sizes = (512, 128, 64, 32, 16)
@@ -230,9 +202,8 @@ def build_contact_sheets(mascot: Image.Image, wordmark: Image.Image, out: str) -
         canvas.convert("RGB").save(path)
 
     opaque = BG + (255,)
-    sheet(mascot.convert("RGBA"), os.path.join(out, "contact_mascot_full.png"), opaque)
-    sheet(mascot.crop((230, 30, 1030, 830)).convert("RGBA"),
-          os.path.join(out, "contact_mascot_hood.png"), opaque)
+    sheet(_fitted(logo, (512, 512)).convert("RGBA"),
+          os.path.join(out, "contact_logo_icon.png"), opaque)
 
     alpha_bbox = wordmark.crop((0, 0, 261, wordmark.size[1]))
     alpha_bbox = alpha_bbox.crop(alpha_bbox.getbbox())
@@ -249,32 +220,26 @@ def build_contact_sheets(mascot: Image.Image, wordmark: Image.Image, out: str) -
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", default=SOURCE_ART,
-                        help="the square mascot illustration (default: %(default)s)")
+                        help="the logo art (default: %(default)s)")
     parser.add_argument("--out", default=SHARED,
                         help="target directory (default: %(default)s)")
     parser.add_argument("--contact-sheets", metavar="DIR",
                         help="also regenerate the legibility contact sheets there")
     args = parser.parse_args()
 
-    mascot = Image.open(args.source).convert("RGB")
-    if mascot.size[0] != mascot.size[1]:
-        return int(bool(sys.stderr.write(
-            "source must be square -- every crop offset here is in the "
-            "1254x1254 frame and will be wrong otherwise\n")))
-    if mascot.size[0] != 1254:
-        mascot = mascot.resize((1254, 1254), Image.LANCZOS)
-
+    logo = Image.open(args.source).convert("RGB")
     wordmark = Image.open(os.path.join(args.out, "syndicate-logo.png")).convert("RGBA")
 
-    build_app_icons(mascot, args.out)
+    build_header_logo(logo, args.out)
+    build_hero(logo, args.out)
+    build_app_icons(logo, args.out)
     build_favicons(wordmark, args.out)
-    build_hero_crest(mascot, args.out)
-    build_social_card(mascot, wordmark, args.out)
+    build_social_card(logo, args.out)
     if args.contact_sheets:
-        build_contact_sheets(mascot, wordmark, args.contact_sheets)
+        build_contact_sheets(logo, wordmark, args.contact_sheets)
 
     for name in sorted(os.listdir(args.out)):
-        if name.startswith(("syndicate-", "apple-", "favicon")):
+        if name.startswith(("syndicate-", "favicon")):
             size_kb = os.path.getsize(os.path.join(args.out, name)) // 1024
             print(f"{name:28s} {size_kb:>5d} KB")
     return 0

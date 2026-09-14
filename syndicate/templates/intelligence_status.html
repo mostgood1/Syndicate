@@ -29,10 +29,10 @@
       box-shadow: var(--cards-shadow);
     }
 
-    /* Same crest, same framing rules as the /syndicate hero, the market-board
-       masthead and the error pages -- rounded, bordered, cover-cropped on the
-       hood and eyes -- so every brand moment in the product reads as one
-       system. Border uses this page's own --intel-status-border rather than
+    /* Same logo, same framing rules as the /syndicate hero, the market-board
+       masthead and the error pages -- rounded, bordered, shown whole at 3:2
+       -- so every brand moment in the product reads as one system. Border
+       uses this page's own --intel-status-border rather than
        --cards-line-strong, because the rest of the page does. */
     .intel-status-hero {
       padding: 24px;
@@ -44,25 +44,26 @@
 
     .intel-status-hero__body { display: grid; gap: 14px; align-content: start; }
 
+    /* Contain at the art's own 3:2, never cover `[user decision, 2026-09-14]:
+       the logo is shown whole`. */
     .intel-status-hero__art {
       width: 100%;
-      height: 100%;
-      min-height: 180px;
+      height: auto;
+      aspect-ratio: 3 / 2;
+      align-self: center;
       display: block;
-      object-fit: cover;
-      object-position: center 34%;
+      object-fit: contain;
       border-radius: 18px;
       border: 1px solid var(--intel-status-border);
       box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
     }
 
     /* Stacked, not dropped -- this is a reference page, not navigation and not
-       an input surface, so nothing here has to stay above the fold. Height
-       tracks width for the reason measured on the market-board hub: `cover`
-       on a fixed-height box crops past the eyes as the box widens. */
+       an input surface, so nothing here has to stay above the fold. The art
+       keeps its whole shape, capped at 300px wide like the market-board hub. */
     @media (max-width: 900px) {
       .intel-status-hero { grid-template-columns: 1fr; gap: 18px; }
-      .intel-status-hero__art { min-height: 0; height: clamp(132px, 30vw, 240px); object-position: center 26%; }
+      .intel-status-hero__art { width: min(100%, 300px); }
     }
 
     .intel-status-topline {
@@ -259,8 +260,8 @@
       {# alt="" -- the h1 beside it already names the page, so a described
          image would only make a screen reader say it twice. #}
       <img class="intel-status-hero__art"
-           src="{{ url_for('static', filename='shared/syndicate-crest.jpg') }}"
-           alt="" role="presentation" width="720" height="492" />
+           src="{{ url_for('static', filename='shared/syndicate-brand-hero.jpg') }}"
+           alt="" role="presentation" width="960" height="640" />
     </section>
 
     <section class="intel-status-summary-grid">

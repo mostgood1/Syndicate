@@ -70,12 +70,18 @@ body {
   min-width: 0;
 }
 
+/* The whole logo, never cropped `[user decision, 2026-09-14]`: width drives
+   height through the img's 480x320 attributes, so it stays 3:2 at every
+   size. It is opaque art on its own black ground, so it is framed like the
+   hero panels (radius + hairline) rather than floated on the header. */
 .syndicate-title-lockup__logo {
-  width: clamp(188px, 22vw, 300px);
+  width: clamp(180px, 15vw, 228px);
   height: auto;
   display: block;
   flex: 0 0 auto;
-  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.22));
+  border-radius: 14px;
+  border: 1px solid var(--cards-line-strong);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
 }
 
 h1,
@@ -119,7 +125,7 @@ h3 {
   }
 
   .syndicate-title-lockup__logo {
-    width: min(220px, 100%);
+    width: min(180px, 100%);
   }
 }
 

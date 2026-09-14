@@ -48,12 +48,15 @@
   min-width: 0;
 }
 
+/* Same logo and framing as `.syndicate-title-lockup__logo` in app.css. */
 .standalone-app-header__logo {
-  width: clamp(190px, 22vw, 310px);
+  width: clamp(180px, 15vw, 228px);
   height: auto;
   display: block;
   flex: 0 0 auto;
-  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.22));
+  border-radius: 14px;
+  border: 1px solid var(--cards-line-strong);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
 }
 
 .standalone-app-header__nav {

@@ -46,8 +46,8 @@ class ErrorPageTests(unittest.TestCase):
         # The whole point of extending base.html: a person can leave.
         self.assertIn('href="/market-board"', body)
         self.assertIn('href="/syndicate"', body)
-        # And the crest is the page's brand moment.
-        self.assertIn("shared/syndicate-crest.jpg", body)
+        # And the logo is the page's brand moment.
+        self.assertIn("shared/syndicate-brand-hero.jpg", body)
 
     def test_api_404_is_json_even_with_no_accept_header(self) -> None:
         # An XHR that forgot its Accept header is the common case, and it is

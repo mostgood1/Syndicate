@@ -242,9 +242,9 @@ class StatusPageRouteTests(unittest.TestCase):
         self.assertEqual(target.status_code, 200)
         self.assertIn("text/html", target.headers["Content-Type"])
 
-    def test_the_crest_is_on_the_page(self) -> None:
+    def test_the_logo_is_on_the_page(self) -> None:
         response = self.client.get("/intelligence/status?date=2026-09-09")
-        self.assertIn("shared/syndicate-crest.jpg", response.get_data(as_text=True))
+        self.assertIn("shared/syndicate-brand-hero.jpg", response.get_data(as_text=True))
 
 
 if __name__ == "__main__":
