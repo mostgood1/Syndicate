@@ -26,6 +26,14 @@
      `100%` resolves against the shell, which is already inside the
      scrollbar. */
   width: min(1640px, 100%);
+  /* The width above INCLUDES the padding and border. Without this the header
+     is content-box on every page that does not bring its own reset (the
+     border-box reset lives in dense_cards.css, scoped to body.cards-body):
+     `100%` plus 2x16 padding and 2 border made it 34px wider than the page and
+     scrolled it sideways -- measured 2026-09-14 on /mlb/market-accuracy and
+     /nba/market-accuracy at 1440 (1474 vs 1440), 900 (934) and 400 (414),
+     while /mlb, which has a reset, read exactly its width. */
+  box-sizing: border-box;
   margin: 0 auto 12px;
   padding: 14px 16px;
   border: 1px solid var(--cards-line);

@@ -133,6 +133,15 @@ class BrandAssetReferenceTests(unittest.TestCase):
             # the pills draw across it.
             self.assertRegex(_css_rules(text, brand), r"flex:\s*0 0 auto", sheet)
 
+    def test_the_standalone_header_is_never_wider_than_the_page(self) -> None:
+        """Its `width: min(1640px, 100%)` only fits when padding and border sit
+        INSIDE it. Pages that include the header without a global border-box
+        reset scrolled sideways by 34px (measured 2026-09-14)."""
+        text = (SHARED / "standalone_shell.css").read_text(encoding="utf-8")
+        rules = _css_rules(text, "standalone-app-header")
+        self.assertRegex(rules, r"width:\s*min\(1640px,\s*100%\)")
+        self.assertRegex(rules, r"box-sizing:\s*border-box")
+
 
 class LogoIsNeverCroppedTests(unittest.TestCase):
     def test_hero_panels_contain_the_art_and_never_cover_it(self) -> None:
