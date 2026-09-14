@@ -236,6 +236,49 @@ def test_a_game_that_has_not_started_reads_not_started_not_unnamed():
     assert ungraded == {"no_team_names": 1}
 
 
+def test_mlb_props_grade_through_the_prop_settler_and_other_sports_props_do_not():
+    hitter = _record_from(_candidate(market="batter_hits", player_name="A Hitter", side="over", line=0.5))
+    pitcher = _record_from(_candidate(event_id="evt-2", market="strikeouts", player_name="A Pitcher",
+                                      side="over", line=5.5))
+    striker = _record_from(_candidate(sport="soccer", market="player_shots", player_name="A Striker",
+                                      side="over", line=1.5))
+    calls = []
+
+    def settler(shaped):
+        calls.append(shaped["player_name"])
+        return ("win", None) if shaped["market"] == "batter_hits" else (None, "game_not_final")
+
+    graded, ungraded = bs.grade_population([hitter, pitcher, striker], {}, prop_settler=settler)
+    assert [tuple(sorted(row["buckets"]))[0].split("|")[1] for row in graded] == ["batter_hits"]
+    assert graded[0]["y"] == 1.0 and graded[0]["game"] == "mlb|evt-1"
+    assert ungraded == {"prop_game_not_final": 1, "player_prop": 1}
+    assert sorted(calls) == ["a hitter", "a pitcher"]
+    _graded, ungraded = bs.grade_population([hitter], {})
+    assert ungraded == {"player_prop": 1}
+
+
+def test_a_published_opening_falls_into_the_same_buckets_as_its_recorder_record():
+    """One definition across populations: an opening is converted through the recorder's own builders."""
+    from syndicate.features.shared import clv_opening_ledger as clv
+
+    for candidate in (_candidate(), _candidate(market="batter_hits", player_name="A Hitter", line=0.5,
+                                               game_state="live", model_edge_pct=-4.0)):
+        opening = clv._opening_record(candidate, clv._opening_key(candidate), "2026-09-01T18:00:00Z")
+        [record] = bs.records_from_openings([opening])
+        expected = _record_from(candidate)
+        assert record["k"] == expected["k"]
+        assert mbs.bucket_ids(mbs.view_from_record(record)) == mbs.bucket_ids(mbs.view_from_record(expected))
+        assert (record["ht"], record["at"], record["t"]) == ("Home Team", "Away Team", "2026-09-01T18:00:00Z")
+
+
+def test_the_published_population_can_never_write_the_scoring_table(tmp_path):
+    before = mbs.TABLE_PATH.read_bytes()
+    with pytest.raises(SystemExit):
+        bs.main(["--population", "published", "--openings-dir", str(tmp_path), "--no-props",
+                 "--out-dir", str(tmp_path / "out"), "--write-table"])
+    assert mbs.TABLE_PATH.read_bytes() == before
+
+
 def test_team_lookups_try_the_kickoff_date_then_the_sighting_date_one_market_at_a_time():
     """A board date carries games for days ahead, and a late kickoff can sit only on the next date's grid."""
     first = _record_from(_candidate(event_id="evt-1"))

@@ -60,7 +60,13 @@ from syndicate.features.shared import measured_bucket_skill as mbs  # noqa: E402
 from syndicate.features.shared.opportunity_population_ledger import (  # noqa: E402
     POPULATION_SUBDIR,
     parse_population_key,
+    population_key,
+    population_record,
 )
+
+PROP_GRADED_SPORTS = frozenset({"mlb"})
+OPENINGS_PATH_TEMPLATE = "reports/intelligence/clv_openings/{date}.jsonl"
+POPULATIONS = ("recorder", "published")
 
 
 def _load_scorecard() -> Any:
@@ -120,6 +126,94 @@ def load_chips_dir(path: Path | str) -> dict[str, list[dict[str, Any]]]:
         chips = payload.get("chips") if isinstance(payload, Mapping) else payload
         out[file.stem] = [chip for chip in (chips or []) if isinstance(chip, Mapping)]
     return out
+
+
+def parse_openings_text(text: str) -> list[dict[str, Any]]:
+    openings: list[dict[str, Any]] = []
+    for line in str(text or "").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            parsed = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(parsed, dict) and parsed.get("key"):
+            openings.append(parsed)
+    return openings
+
+
+def load_openings_dir(path: Path | str) -> list[dict[str, Any]]:
+    """Offline: `<YYYY-MM-DD>.jsonl` published-opening ledgers."""
+    openings: list[dict[str, Any]] = []
+    for file in sorted(Path(path).glob("????-??-??.jsonl")):
+        openings.extend(parse_openings_text(file.read_text(encoding="utf-8")))
+    return openings
+
+
+def records_from_openings(openings: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """PUBLISHED openings -> population records, through the recorder's own key and record builders.
+
+    The openings ledger holds only what the shortlist PUBLISHED (one row per side per book), so
+    anything measured on these records is conditioned on admission: a preview, never a scoring input.
+    """
+    records: list[dict[str, Any]] = []
+    for opening in openings:
+        row = {
+            "sport": opening.get("sport"),
+            "event_id": opening.get("event_id"),
+            "kind": opening.get("kind"),
+            "market": opening.get("market"),
+            "segment": opening.get("segment"),
+            "side": opening.get("side"),
+            "line": opening.get("line"),
+            "player_name": opening.get("player_name"),
+            "home_team": opening.get("home_team"),
+            "away_team": opening.get("away_team"),
+            "commence_time": opening.get("commence_time"),
+            "game_state": opening.get("game_state"),
+            "model_edge_pct": opening.get("model_edge_pct"),
+            "ev_pct": opening.get("ev_pct"),
+            "quote": {
+                "price": opening.get("price"),
+                "fair_probability": opening.get("fair_probability"),
+                "fair_method": opening.get("fair_method"),
+                "books_quoting": opening.get("books_quoting"),
+                "book_age_seconds": opening.get("book_age_seconds"),
+            },
+        }
+        key = population_key(row)
+        if key:
+            records.append(population_record(row, key, str(opening.get("captured_at") or ""), sport=opening.get("sport")))
+    return records
+
+
+def fetch_openings(base_url: str, token: str, day: str, *, cache_dir: Path | None = None,
+                   complete: bool = False) -> list[dict[str, Any]]:
+    """One date's published-opening ledger from web's copy; [] when web has none.
+
+    With `cache_dir`, a file for a date that is over (`complete`) is kept, so a rerun does not
+    pull it again: a Saturday file measured 17.5 MB.
+    """
+    cached = cache_dir / f"{day}.jsonl" if cache_dir else None
+    if cached is not None and cached.is_file():
+        return parse_openings_text(cached.read_text(encoding="utf-8"))
+    relative = OPENINGS_PATH_TEMPLATE.format(date=day)
+    url = f"{base_url.rstrip('/')}/api/ops/artifacts/export?path={urllib.parse.quote(relative, safe='')}"
+    try:
+        payload = _get_json(url, token)
+    except urllib.error.HTTPError as exc:
+        if exc.code in (403, 404):
+            return []
+        raise
+    artifacts = payload.get("artifacts") if isinstance(payload, Mapping) else None
+    if not isinstance(artifacts, Mapping) or not artifacts:
+        return []
+    text = str(next(iter(artifacts.values())))
+    if cached is not None and complete:
+        cached.parent.mkdir(parents=True, exist_ok=True)
+        cached.write_text(text, encoding="utf-8")
+    return parse_openings_text(text)
 
 
 def _main_worktree() -> Path | None:
@@ -348,11 +442,17 @@ def grade_population(
     event_teams: Mapping[tuple[str, str], tuple[str, str]] | None = None,
     *,
     today: str | None = None,
+    prop_settler: Any = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """One graded row per priced side, plus the count of what could not be graded and why.
 
     With `today` (a Central date), a kickoff after it is counted `not_started` before anything
     that needs a join, so an unplayed game does not read as a join failure.
+
+    With `prop_settler(shaped) -> (result, reason)`, player props in `PROP_GRADED_SPORTS` are
+    settled by it (MLB: `prop_outcomes.MlbPropGrader.settle`, from box scores) and graded like
+    game lines, with their reasons prefixed `prop_`. Without it, and for every other sport, a
+    prop is counted `player_prop`.
     """
     chosen: dict[tuple[str, str], Mapping[str, Any]] = {}
     # The EARLIEST sighting is the one graded, and it can predate the recorder carrying team
@@ -380,10 +480,11 @@ def grade_population(
         if shaped is None:
             ungraded[reason or "unparseable_key"] += 1
             continue
-        if shaped["player_name"]:
+        is_prop = bool(shaped["player_name"])
+        if is_prop and (prop_settler is None or sport not in PROP_GRADED_SPORTS):
             ungraded["player_prop"] += 1
             continue
-        if view["market"] not in mbs.GRADABLE_MARKETS:
+        if not is_prop and view["market"] not in mbs.GRADABLE_MARKETS:
             ungraded["market_not_gradeable_from_score"] += 1
             continue
         if view["segment"] not in ("full", "full_game"):
@@ -393,26 +494,35 @@ def grade_population(
         if day and today is not None and day > today:
             ungraded["not_started"] += 1
             continue
-        if not (shaped["home_team"] and shaped["away_team"]):
-            ungraded["no_team_names"] += 1
-            continue
-        if not day or day not in indexed:
-            ungraded["no_chips_for_kickoff_date"] += 1
-            continue
-        chip, why = SCORECARD.match_chip(shaped, indexed[day].get(sport, []))
-        if chip is None:
-            ungraded[why or "no_chip_match"] += 1
-            continue
-        if chip["state"] != "final":
-            ungraded["game_not_final"] += 1
-            continue
-        if chip["scores"] is None:
-            ungraded["final_score_unparseable"] += 1
-            continue
-        result = settle_from_score(shaped, *chip["scores"])
-        if result is None:
-            ungraded["unsettleable_side_or_line"] += 1
-            continue
+        if is_prop:
+            if not day:
+                ungraded["prop_no_commence_time"] += 1
+                continue
+            result, why = prop_settler(shaped)
+            if result is None:
+                ungraded[f"prop_{why}" if why else "prop_unsettled"] += 1
+                continue
+        else:
+            if not (shaped["home_team"] and shaped["away_team"]):
+                ungraded["no_team_names"] += 1
+                continue
+            if not day or day not in indexed:
+                ungraded["no_chips_for_kickoff_date"] += 1
+                continue
+            chip, why = SCORECARD.match_chip(shaped, indexed[day].get(sport, []))
+            if chip is None:
+                ungraded[why or "no_chip_match"] += 1
+                continue
+            if chip["state"] != "final":
+                ungraded["game_not_final"] += 1
+                continue
+            if chip["scores"] is None:
+                ungraded["final_score_unparseable"] += 1
+                continue
+            result = settle_from_score(shaped, *chip["scores"])
+            if result is None:
+                ungraded["unsettleable_side_or_line"] += 1
+                continue
         if result == "push":
             ungraded["push"] += 1
             continue
@@ -632,10 +742,16 @@ def table_payload(results: Sequence[Mapping[str, Any]], *, window: str, method: 
     }
 
 
-def markdown_report(results: Sequence[Mapping[str, Any]], cov: Mapping[str, Any], ungraded: Mapping[str, int]) -> str:
-    lines = [
-        "# Bucket search",
-        "",
+def markdown_report(results: Sequence[Mapping[str, Any]], cov: Mapping[str, Any], ungraded: Mapping[str, int],
+                    population: str = "recorder") -> str:
+    lines = ["# Bucket search", ""]
+    if population == "published":
+        lines += [
+            "> **PUBLISHED POPULATION: A PREVIEW, NOT SCORING-ELIGIBLE.** These are rows the shortlist ADMITTED, "
+            "so every bucket is conditioned on publication. No verdict here reaches `measured_bucket_skill.json`.",
+            "",
+        ]
+    lines += [
         f"Graded rows {cov['graded_rows']}, games {cov['graded_games']}, dates {len(cov['graded_dates'])} "
         f"({', '.join(cov['graded_dates'][:3])}{' ...' if len(cov['graded_dates']) > 3 else ''}).",
         f"Record kickoff dates {len(cov['record_kickoff_dates'])}, chip dates {len(cov['chip_dates'])}, "
@@ -681,19 +797,38 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--resamples", type=int, default=RESAMPLES)
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument("--fdr-q", type=float, default=FDR_Q)
+    parser.add_argument("--population", choices=POPULATIONS, default="recorder",
+                        help="recorder: the pre-publication population (scoring-eligible); "
+                             "published: the clv_openings ledger (a PREVIEW, never written to the table)")
+    parser.add_argument("--openings-dir", help="offline: directory of <date>.jsonl published-opening ledgers")
+    parser.add_argument("--no-props", action="store_true",
+                        help="do not grade MLB props from statsapi.mlb.com box scores")
     parser.add_argument("--write-table", action="store_true",
                         help="write validated skill buckets to measured_bucket_skill.json (a behaviour change)")
     args = parser.parse_args(argv)
+    if args.write_table and args.population != "recorder":
+        parser.error("--write-table needs --population recorder: the published population is conditioned on "
+                     "publication and can never set a scoring factor")
+    if args.openings_dir and args.population != "published":
+        parser.error("--openings-dir holds published openings; pass --population published")
 
     sports = [s.strip().lower() for s in args.sports.split(",") if s.strip()]
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     event_teams: dict[tuple[str, str], tuple[str, str]] = {}
+    prop_settler = None
+    if not args.no_props:
+        from syndicate.features.mlb.prop_outcomes import MlbPropGrader
 
-    if args.records_dir:
-        records = load_records_dir(args.records_dir)
+        prop_settler = MlbPropGrader(cache_dir=out_dir / "statsapi_cache").settle
+
+    if args.records_dir or args.openings_dir:
+        if args.openings_dir:
+            records = records_from_openings(load_openings_dir(args.openings_dir))
+        else:
+            records = load_records_dir(args.records_dir)
         chips_by_date = load_chips_dir(args.chips_dir) if args.chips_dir else {}
-        window = f"offline:{args.records_dir}"
+        window = f"offline:{args.openings_dir or args.records_dir}"
     else:
         if not (args.start and args.end):
             parser.error("--start and --end are required unless --records-dir is given")
@@ -703,23 +838,32 @@ def main(argv: Sequence[str] | None = None) -> int:
             parser.error(f"no ADMIN_TOKEN in the environment or in: {searched}")
         records = []
         days = _date_range(args.start, args.end)
-        for day in days:
-            day_records = fetch_records(args.base_url, token, day, sports)
-            records.extend(day_records)
-            print(f"[bucket_search] RECORDS day={day} records={len(day_records)}", flush=True)
         today = SCORECARD.central_date(datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+        for day in days:
+            if args.population == "published":
+                openings = fetch_openings(args.base_url, token, day, cache_dir=out_dir / "openings_cache",
+                                          complete=bool(today and day < today))
+                day_records = [r for r in records_from_openings(openings) if r.get("sport") in sports]
+                print(f"[bucket_search] OPENINGS day={day} openings={len(openings)} records={len(day_records)}",
+                      flush=True)
+            else:
+                day_records = fetch_records(args.base_url, token, day, sports)
+                print(f"[bucket_search] RECORDS day={day} records={len(day_records)}", flush=True)
+            records.extend(day_records)
         event_teams, lookups = resolve_event_teams(
             records,
             lambda day, sport, market: fetch_event_teams(args.base_url, token, day, sport, market),
             today=today,
         )
         print(f"[bucket_search] TEAM_LOOKUPS grids={lookups} events_named={len(event_teams)}", flush=True)
-        kickoff_days = sorted({d for d in (SCORECARD.central_date(r.get("ct")) for r in records) if d})
+        kickoff_days = sorted({d for d in (SCORECARD.central_date(r.get("ct")) for r in records)
+                               if d and (today is None or d <= today)})
         chips_by_date = {day: SCORECARD.fetch_chips(args.base_url, day, None) for day in kickoff_days}
-        window = f"{args.start}..{args.end}"
+        window = f"{args.population}:{args.start}..{args.end}"
 
     now_central = SCORECARD.central_date(datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
-    graded, ungraded = grade_population(records, chips_by_date, event_teams, today=now_central)
+    graded, ungraded = grade_population(records, chips_by_date, event_teams, today=now_central,
+                                        prop_settler=prop_settler)
     cov = coverage(records, chips_by_date, graded)
     print("[bucket_search] COVERAGE " + json.dumps(cov, default=str), flush=True)
     print("[bucket_search] UNGRADED " + json.dumps(ungraded), flush=True)
@@ -727,10 +871,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                                resamples=args.resamples, seed=args.seed, q=args.fdr_q)
     method = {"min_games": args.min_games, "min_dates": args.min_dates, "resamples": args.resamples,
               "seed": args.seed, "fdr_q": args.fdr_q, "unit": "game",
-              "skill_metric": "brier(model)-brier(market) on the side", "profit_metric": "flat 1u ROI, model side"}
-    report = {"window": window, "method": method, "coverage": cov, "ungraded": ungraded, "buckets": results}
+              "skill_metric": "brier(model)-brier(market) on the side", "profit_metric": "flat 1u ROI, model side",
+              "props": "none" if prop_settler is None else "mlb via statsapi box scores"}
+    report = {"population": args.population, "scoring_eligible": args.population == "recorder",
+              "window": window, "method": method, "coverage": cov, "ungraded": ungraded, "buckets": results}
     (out_dir / "bucket_search_report.json").write_text(json.dumps(report, indent=1, default=str), encoding="utf-8")
-    (out_dir / "bucket_search_report.md").write_text(markdown_report(results, cov, ungraded), encoding="utf-8")
+    (out_dir / "bucket_search_report.md").write_text(markdown_report(results, cov, ungraded, args.population),
+                                                     encoding="utf-8")
     counts = collections.Counter(r["verdict"] for r in results)
     profit = sum(1 for r in results if r["profit_verdict"])
     print(f"[bucket_search] VERDICTS {dict(counts)} profit_pockets={profit} report={out_dir}", flush=True)
