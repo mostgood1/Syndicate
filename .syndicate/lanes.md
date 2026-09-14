@@ -1382,7 +1382,77 @@ death, never life — do not invert it.
     - The first build writes roughly each sport's candidate count (mlb ~2.5k, soccer ~14.7k, ncaaf ~0.8k, nfl ~0.5k), with `published` > 0.
     - Later builds are mostly `duplicate`.
   - FALSIFIED IF: a parity or unmeasured row carries `skill_reliability`; a positive-value measured-loss row lacks it; or no POPULATION line appears within two builds of live.
-- Blocked by: none (deploy #2 in progress).
+- LANDED `ae53a1a5` on origin/main (scoring `7220d1da`, recorder `a537ea67`, ledger `ae53a1a5`).
+- DEPLOY #2 `[2026-09-14]`, both claims held by this lane:
+  - web `17c8208e` -> `ae53a1a5`: preflight CLEAR 18:10:20Z (infrastructure only); deploy `dep-dak3hc142hec73bsoru0` 18:10:57Z; **live 18:14:19Z**. Shortlist route 200 `ok` on the new code afterwards (still serving the 18:02:02Z build, as expected).
+  - refresh-worker env: `SYNDICATE_OPPORTUNITY_POPULATION_LEDGER` set via the single-key endpoint (`render_env_set.py`: before None, after `on`). Not in the process until the deploy below.
+  - refresh-worker `17c8208e` -> `ae53a1a5`: preflight CLEAR 18:14:25Z (infrastructure only, no MLB sim); deploy `dep-dak3j83m8hqs7399fg5g` 18:14:57Z. Readings owed on the first post-live today shortlist carrying MLB projections (watcher running).
+- USER REQUEST `[2026-09-14, in chat]`: "then build the bucket search on the recorder data".
+- BUCKET SEARCH, PRE-REGISTERED BEFORE ANY CODE RUNS ON DATA:
+  - Population: `opportunity_population_ledger` records (pre-publication). GRADABLE: full-game h2h, spreads, totals, from final scores via `layer2_live_scorecard`'s `grade` / `match_chip`. Props and segments are counted UNGRADED by reason until box-score graders exist.
+  - Join: record team names (added to the recorder for future records); for records without them, an event_id -> teams map from that date's served book grid.
+  - Unit: the GAME (event). Per bucket, rows are averaged within a game before any inference.
+  - Metrics:
+    - `brier_diff` = Brier(model) - Brier(market) on the side's probability, with p_model = fair_probability + model_edge_pct/100 clamped to [0.001, 0.999] and p_market = fair_probability.
+    - `roi_model_side` = flat 1u ROI at the recorded price on rows with model_edge_pct > 0.
+    - Pushes are dropped.
+  - Buckets: sport x market family x phase (pregame/live) x ONE band from a fixed list (never a cross-product, to bound comparisons):
+    - disagreement |model_edge_pct|: [0,2) [2,5) [5,10) [10,inf)
+    - direction: model for / against the side
+    - price (fair prob): <0.35 / 0.35-0.65 / >0.65
+    - quote age: <=120 s / 120-600 s / >600 s
+    - books quoting: 1-2 / 3-6 / 7+
+    - fair_method: consensus / sharp_anchor / book_margin_model / other
+  - VALIDATED requires ALL of:
+    - >= 60 games and >= 5 dates;
+    - a 95% bootstrap CI over games excluding 0 (2,000+ resamples, seeded);
+    - the point estimate keeping its sign with EACH date left out;
+    - Benjamini-Hochberg at q = 0.10 across every bucket tested in that run.
+  - Verdicts:
+    - `skill_pocket` (brier_diff < 0 validated) / `skill_loss` (> 0 validated) / `parity` / `insufficient`.
+    - Separately `profit_pocket` (roi_model_side CI > 0, same rules): reported, NOT used by scoring.
+  - Scoring (the existing `_apply_skill_reliability` hook):
+    - A row in a validated `skill_pocket` gets factor 1.0, cancelling the category demotion and never raising above 1.
+    - A row in a validated `skill_loss` gets max(0.5, 1 - 5 x L) with L = CI lower / market Brier.
+    - A row matching both a pocket and a loss keeps the category factor. No match keeps the category factor.
+  - ONE DEFINITION: the bucket predicates live in one module imported by both the search script and the scorer.
+  - Falsifier for the tool itself: on a fixture with a planted pocket the search validates it; with shuffled outcomes it validates nothing.
+  - CORRECTION to the line above, made before any test was run `[2026-09-14]`: "shuffled outcomes validate nothing" is the WRONG null.
+    - Shuffling keeps the base rate, so a model genuinely closer to the truth than the market still shows a pocket.
+    - A confident model on coin-flip outcomes correctly shows a skill LOSS.
+    - The corrected falsifiers:
+      1. With outcomes drawn from the MARKET's own probability, the search validates NO `skill_pocket` and NO `profit_pocket`.
+      2. A bucket whose whole effect sits on ONE date fails leave-one-date-out and is not validated.
+- Files added for the bucket search: `syndicate/features/shared/measured_bucket_skill.py` (NEW), `syndicate/features/shared/measured_bucket_skill.json` (NEW), `scripts/bucket_search.py` (NEW), `tests/test_bucket_search.py` (NEW).
+- READING for deploy #2: **MET.** Recorded in `deploys.md` (18:10Z entry, pushed `4c8cd24a`); both claims released after the push.
+  - Every `skill_reliability` factor equals its prediction; all three falsifiers read 0.
+  - Recorder first build: mlb 2,549, nfl 473, ncaaf 845, soccer 14,776, all published.
+  - Later builds are mostly duplicates: soccer records for 09-14 went 14,776 (~18:34Z) -> 14,778 (~19:00Z).
+- BUCKET SEARCH BUILT `8d9248f9`, then fixed on the first production runs. Runs on soccer, board date 2026-09-14, one date. These are TOOL readings, not verdicts.
+  - Run 1: HTTP 401. From a session worktree `REPO_ROOT` has no `.env`. The token now resolves from env, `--env-file`, this checkout, then the MAIN worktree (learnings 2026-09-10).
+  - Run 2 was read by MARKET before its counts were trusted. Three measurement defects:
+    1. 12,337 player props (83% of 14,776) were counted `market_not_gradeable_from_score`, because of the reason order. Props are now counted first.
+    2. Soccer `h2h` is 3-way: home / draw / away, 123 keys each.
+       - `layer2_live_scorecard.grade` makes a draw a PUSH for home/away and cannot settle `draw`, so drawn games left the population.
+       - `settle_from_score` treats a draw as a result and settles `btts` (117 yes / 117 no).
+       - The scorecard itself is unchanged; filed as a lead.
+    3. The team-name join was broken for these records:
+       - 0 of 867 settleable records carry team names (the recorder deploy predates `ht`/`at`).
+       - The book-grid fallback serves at most 2,000 rows (09-14 soccer: 2,000 of 3,082, covering 9 events) and was read on the board date only.
+       - It now asks one market at a time (h2h, totals, spreads): kickoff date first, then sighting date. Names are also lent across sightings of the same event, because dedup keeps the EARLIEST sighting, which will lack names even after deploy #3.
+  - Regression caught by reading the rerun, fixed before commit: a kickoff-date-only lookup LOST the one 09-13 final, which sits only on the 09-14 grid. Graded rows went 25 -> 16; the sighting-date step restores 25.
+  - Future kickoffs now count `not_started` (with `today`) instead of reading as a join failure.
+  - Final reading, 14,778 records:
+    - graded: 25 rows / 3 games (09-13, 09-14);
+    - ungraded: player_prop 12,337, corners 1,520, not_started 798, segment h1 52, no_chip_match 19, game_not_final 17, no_chips_for_kickoff_date 6, no_team_names 4;
+    - 38 buckets, all `insufficient` (expected on one date); 4 grid lookups.
+  - Tests: 190 pass across the bucket search, recorder and skill-score suites. Each new grading test FAILS against the commit lacking its fix (mutation check against `8d9248f9` / `f4268297`).
+  - Coverage the search can reach today: full-game h2h / spreads / totals / btts. Props (83% of soccer) and corners wait for box-score graders.
+- OWED:
+  - Deploy #3 (bucket override in the scorer + recorder `ht`/`at`) needs the user's decision. Scoring is unchanged until a search validates a bucket, because the table ships empty.
+  - The first real search: >= 5 dates of recorder data with finals, i.e. no earlier than 2026-09-19.
+  - Live-row notes on tonight's MLB slate (first pitch 22:40Z).
+- Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
