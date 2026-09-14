@@ -34711,3 +34711,13 @@ verify: `render_events.py --service live-odds-worker --since <54f3d662 finishedA
 - **Rollback:** `python scripts/render_deploy.py --service refresh-worker --commit cae4713e --allow-rollback`. It also removes the three collateral commits from refresh-worker.
 - **Self-restart kill switch without code:** set `SYNDICATE_REFRESH_WORKER_RECYCLE_AFTER_REFUSALS=0` on refresh-worker (single-key env API), then a deploy. A restart does not re-inject env.
 - Claim released with its token at ~14:08Z. Owed readings: (b) an affected-date `.jsonl.gz` eviction; (c) `kalshi_capture=joined:`, then fast-path capture during a refusal stretch; (d) `RECYCLE_EXIT` during a real refusal stretch, then heavy builds resuming.
+
+## 2026-09-14 14:45Z (09:45 CT) — reading only, no deploy — refresh-worker `fb0c91cf` — (c) Kalshi fast-path capture: **MET** [lane kalshi-nfl-quote-gap, CLOSED]
+Source: refresh-worker logs, read with `render_logs.py --text` from 13:39Z. Session 0f5b256e. Discharges reading (c) owed by the 13:36:43Z deploy entry above.
+- **First refusal after boot:** `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` at 14:30:34Z, headroom 1,804.1 MB, 50m45s after live.
+- **Fast-path capture, verified:**
+  - `[kalshi_odds] QUOTE_CAPTURE matches=910 sports=['mlb','ncaaf','nfl','soccer'] appended=87 appended_by_sport={'mlb': 71, 'nfl': 2, 'soccer': 14} relabelled=18` at 14:33:08.903Z.
+  - Then `[intelligence_state] LAYER2_FAST_REFRESH date=2026-09-14 rows=1507 ... kalshi_capture=joined:8248:30.0s elapsed_s=152.89` at 14:33:08.934Z, 31 ms later from the same pass. So `_layer2_fast_kalshi_capture` ran and appended during a refused heavy build.
+  - Contrast on `cae4713e`: 35 refusals and 0 QUOTE_CAPTURE, 12:36:43-13:36:43Z.
+- **Not measured, fast-path cost:** 40 `LAYER2_FAST_REFRESH` runs on `cae4713e` 08:00-13:36Z took 52.3-166.0 s. The one run since took 152.9 s, 30.0 s of it capture. n=1 cannot size the added time. The env gate `SYNDICATE_LAYER2_FAST_KALSHI_CAPTURE=0` turns it off; needs a deploy.
+- (b) and (d) are still owed. (d) is watched by session 0f5b256e (Monitor, 5 min polls). Its first refusal is in, and uptime is past the 1,800 s floor.

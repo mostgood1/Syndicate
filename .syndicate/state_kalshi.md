@@ -836,4 +836,7 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
 - **Call chain:** `_capture_kalshi_quotes` (`pipeline/kalshi_odds_refresh.py`) <- `join_to_board` <- heavy build only (`pipeline/intelligence_state.py`, after `run_kalshi_odds_refresh`). It captures only Kalshi markets MATCHED to Layer 2 shortlist rows.
 - **Measured impact:** `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` 403x from 09-12 21:34Z to 09-13 16:14Z. `QUOTE_CAPTURE` / `BOARD_JOIN` 0 from 22Z to 12Z, while `LAYER2_FAST_REFRESH` ran 13-51/h and the venue loop kept refreshing (`[venue_odds_loop] REFRESH venue=kalshi`, refresh-worker only, ~120 s).
 - **Change-log reading:** `QUOTE_CAPTURE ... appended=0` with `nfl` in `sports=` means matched and unchanged, not stalled.
-- **Fix on main, NOT deployed:** `cb248a95` makes `LAYER2_FAST_REFRESH` join the cached markets (<= 900 s old) and print `kalshi_capture=<status>`. Deploy scheduled with `57b67127` (task `book-quotes-fuller-copy-deploy-0914`).
+- **Fixed, live and verified reachable `[verified 2026-09-14 14:33Z, refresh-worker fb0c91cf logs]`:** `cb248a95` makes `LAYER2_FAST_REFRESH` join the cached markets (<= 900 s old) and print `kalshi_capture=<status>`.
+  - Deployed in `fb0c91cf` at 13:39:49Z.
+  - First refused heavy build after boot at 14:30:34Z. The fast path then printed `QUOTE_CAPTURE matches=910 appended=87` (nfl 2) and `kalshi_capture=joined:8248:30.0s`.
+  - The capture's added fast-path time is not measured (n=1: 152.9 s vs 52-166 s before). Off switch `SYNDICATE_LAYER2_FAST_KALSHI_CAPTURE=0`, plus a deploy.
