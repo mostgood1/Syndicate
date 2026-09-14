@@ -114,6 +114,44 @@ class BrandAssetReferenceTests(unittest.TestCase):
         for name in ("shared/base.html", "shared/_standalone_app_header.html"):
             text = (TEMPLATES / name).read_text(encoding="utf-8")
             self.assertIn("shared/syndicate-brand-header.jpg", text, name)
+            self.assertIn("shared/syndicate-wordmark.png", text, name)
+
+    def test_the_wordmark_image_matches_its_markup(self) -> None:
+        size = _image_size(SHARED / "syndicate-wordmark.png")
+        for name in ("shared/base.html", "shared/_standalone_app_header.html"):
+            text = (TEMPLATES / name).read_text(encoding="utf-8")
+            match = re.search(
+                r"syndicate-wordmark\.png'\) \}\}\" alt=\"\" width=\"(\d+)\" height=\"(\d+)\"", text
+            )
+            self.assertIsNotNone(match, name)
+            self.assertEqual(size, (int(match.group(1)), int(match.group(2))), name)
+
+    def test_the_wordmark_shows_only_where_the_row_has_room(self) -> None:
+        """`[user decision, 2026-09-14]`: the silver lettering sits beside the
+        logo only where the menu row has room. The mechanism is pure CSS and
+        every part is load-bearing: a GROWING nav leaves the slot nothing; a
+        slot with a basis takes width from the pills; without the zero-width
+        first item and the clip, lettering that does not fit shows cut
+        part-way instead of hiding; a row gap sits on both sides of the empty
+        slot and takes width from the pills on a phone."""
+        for sheet, slot, img, nav, row in (
+            ("app.css", "syndicate-title-wordmark", "syndicate-title-wordmark__img",
+             "syndicate-menu-row .syndicate-nav", "syndicate-menu-row"),
+            ("standalone_shell.css", "standalone-app-header__wordmark",
+             "standalone-app-header__wordmark-img", "standalone-app-header__nav",
+             "standalone-app-header__inner"),
+        ):
+            text = (SHARED / sheet).read_text(encoding="utf-8")
+            slot_rules = _css_rules(text, slot)
+            self.assertRegex(slot_rules, r"flex:\s*1 1 0\b", sheet)
+            self.assertRegex(slot_rules, r"overflow:\s*hidden", sheet)
+            self.assertRegex(slot_rules, r"flex-wrap:\s*wrap", sheet)
+            self.assertRegex(_css_rules(text, slot + "::before"), r"width:\s*0", sheet)
+            self.assertRegex(_css_rules(text, img), r"flex:\s*0 0 auto", sheet)
+            nav_rules = _css_rules(text, nav)
+            self.assertRegex(nav_rules, r"flex:\s*0 1 auto", sheet)
+            self.assertNotRegex(nav_rules, r"flex:\s*1\b", sheet)
+            self.assertNotRegex(_css_rules(text, row), r"\bgap:\s*[1-9]", sheet)
 
     def test_the_logo_is_inline_on_the_menu_row(self) -> None:
         """`[user decision, 2026-09-14]`: the logo sits on the menu row and the

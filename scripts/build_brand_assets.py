@@ -7,13 +7,20 @@ cannot quietly put the wrong one in the wrong slot:
   * the LOGO (`docs/brand/syndicate-logo-source.png`, an opaque 1536x1024
     piece: hooded mascot, crown, the green/blue S swoosh and its own
     "SYNDICATE" lettering). It is THE brand `[user decision, 2026-09-14]` and
-    owns every slot that renders at ~100px and up: the header on every page,
+    owns every slot that renders at ~50px and up: the header on every page,
     the four hero panels, the iOS/PWA icons and the link-preview card.
-  * the WORDMARK's S (`syndicate-logo.png`, 815x193) -- kept for the favicons
-    ONLY. The mascot art was measured unreadable at 32px and mud at 16px on
-    2026-09-09; the logo puts lettering on top of that same art, so it can
-    only be worse. The S is the swoosh the logo is built around, so the tab
-    icon still matches `[user decision, 2026-09-14: keep the S favicon]`.
+  * the WORDMARK (`syndicate-logo.png`, 815x193: the S swoosh plus silver
+    "SYNDICATE" lettering), split in two:
+      - its S feeds the favicons. The mascot art was measured unreadable at
+        32px and mud at 16px on 2026-09-09; the logo puts lettering on top of
+        that same art, so it can only be worse. The S is the swoosh the logo
+        is built around, so the tab icon still matches `[user decision,
+        2026-09-14: keep the S favicon]`.
+      - its LETTERING, without the S, sits beside the logo in the header where
+        the menu row has room for it `[user decision, 2026-09-14]`. At header
+        size the logo's own lettering is ~68px wide and hard to read; this is
+        what names the site there. The S is left out because the logo beside
+        it already carries the swoosh.
 
 THE LOGO IS NEVER CROPPED `[user decision, 2026-09-14: "dont crop the image,
 resize it. The logo must be maintained"]`. Every asset is the whole piece,
@@ -95,11 +102,55 @@ def _fitted(logo: Image.Image, size: tuple) -> Image.Image:
     return canvas
 
 
+def _s_cut(wordmark: Image.Image) -> int:
+    """The x between the wordmark's S and its lettering.
+
+    Found from the alpha gap rather than a hardcoded x -- measured at columns
+    247..274 in the current wordmark (cut 261), but re-derived here so a
+    re-exported wordmark still works. Both the favicons (left of the cut) and
+    the header lettering (right of it) depend on this one answer.
+    """
+    alpha = wordmark.split()[-1]
+    width, height = wordmark.size
+    run_start = None
+    for x in range(int(width * 0.15), int(width * 0.45)):
+        column_empty = not any(
+            alpha.getpixel((x, y)) > 10 for y in range(0, height, 3)
+        )
+        if column_empty:
+            if run_start is None:
+                run_start = x
+        else:
+            if run_start is not None and x - run_start >= 12:
+                return (run_start + x) // 2
+            run_start = None
+    raise SystemExit(
+        "could not find the gap between the S and the wordmark -- the "
+        "source logo changed shape; re-check the crop before shipping"
+    )
+
+
 def build_header_logo(logo: Image.Image, out: str) -> None:
     """The header lockup on every page. 480x320 for a slot that renders at
-    ~210x140 CSS px, so it stays sharp on a 2x screen and is still small."""
+    60-84px tall, so it stays sharp on a 2x screen and is still small."""
     _jpeg(_fitted(logo, (480, 320)), os.path.join(out, "syndicate-brand-header.jpg"),
           quality=88)
+
+
+def build_header_wordmark(wordmark: Image.Image, out: str) -> None:
+    """The silver "SYNDICATE" lettering alone, for the header beside the logo.
+
+    Everything right of the S, trimmed to its alpha bbox, at NATIVE size
+    (521x58 today). It renders 28px tall, so native is already ~2x for a retina
+    screen, and resampling would only soften it. Transparent PNG: it sits on
+    the header's own gradient. The page shows it only where the menu row has
+    room (see `.syndicate-title-wordmark` in app.css).
+    """
+    width, height = wordmark.size
+    letters = wordmark.crop((_s_cut(wordmark), 0, width, height))
+    letters.crop(letters.getbbox()).save(
+        os.path.join(out, "syndicate-wordmark.png"), optimize=True
+    )
 
 
 def build_hero(logo: Image.Image, out: str) -> None:
@@ -124,35 +175,11 @@ def build_app_icons(logo: Image.Image, out: str) -> None:
 def build_favicons(wordmark: Image.Image, out: str) -> None:
     """16/32/48px favicons and a .ico from the wordmark's S, squared and padded.
 
-    The S is isolated by the alpha gap between it and the lettering rather
-    than a hardcoded x -- measured at columns 247..274 in the current
-    wordmark, but re-derived here so a re-exported wordmark still works.
     There is deliberately NO scalable favicon: a real SVG icon needs the mark
     re-vectorised first.
     """
-    alpha = wordmark.split()[-1]
-    width, height = wordmark.size
-    cut = None
-    run_start = None
-    for x in range(int(width * 0.15), int(width * 0.45)):
-        column_empty = not any(
-            alpha.getpixel((x, y)) > 10 for y in range(0, height, 3)
-        )
-        if column_empty:
-            if run_start is None:
-                run_start = x
-        else:
-            if run_start is not None and x - run_start >= 12:
-                cut = (run_start + x) // 2
-                break
-            run_start = None
-    if cut is None:
-        raise SystemExit(
-            "could not find the gap between the S and the wordmark -- the "
-            "source logo changed shape; re-check the crop before shipping"
-        )
-
-    s_mark = wordmark.crop((0, 0, cut, height))
+    height = wordmark.size[1]
+    s_mark = wordmark.crop((0, 0, _s_cut(wordmark), height))
     s_mark = s_mark.crop(s_mark.getbbox())
     side = max(s_mark.size)
     pad = int(side * 0.06)
@@ -205,7 +232,7 @@ def build_contact_sheets(logo: Image.Image, wordmark: Image.Image, out: str) -> 
     sheet(_fitted(logo, (512, 512)).convert("RGBA"),
           os.path.join(out, "contact_logo_icon.png"), opaque)
 
-    alpha_bbox = wordmark.crop((0, 0, 261, wordmark.size[1]))
+    alpha_bbox = wordmark.crop((0, 0, _s_cut(wordmark), wordmark.size[1]))
     alpha_bbox = alpha_bbox.crop(alpha_bbox.getbbox())
     side = max(alpha_bbox.size)
     pad = int(side * 0.06)
@@ -231,6 +258,7 @@ def main() -> int:
     wordmark = Image.open(os.path.join(args.out, "syndicate-logo.png")).convert("RGBA")
 
     build_header_logo(logo, args.out)
+    build_header_wordmark(wordmark, args.out)
     build_hero(logo, args.out)
     build_app_icons(logo, args.out)
     build_favicons(wordmark, args.out)

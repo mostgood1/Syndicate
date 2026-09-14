@@ -60,6 +60,12 @@
             <div class="syndicate-title-lockup">
               <img class="syndicate-title-lockup__logo" src="{{ url_for('static', filename='shared/syndicate-brand-header.jpg') }}" alt="Syndicate" width="480" height="320" />
             </div>
+            {# The silver SYNDICATE lettering, shown ONLY where the row has room for
+               it -- `.syndicate-title-wordmark` in app.css. Hidden from assistive
+               tech: the logo's alt already names the site. #}
+            <div class="syndicate-title-wordmark" aria-hidden="true">
+              <img class="syndicate-title-wordmark__img" src="{{ url_for('static', filename='shared/syndicate-wordmark.png') }}" alt="" width="521" height="58" />
+            </div>
             <nav class="syndicate-nav" aria-label="Sports">
               <a class="cards-nav-pill{% if nav_path == '/' %} cards-nav-pill--active{% endif %}" href="/">Home</a>
               <a class="cards-nav-pill{% if nav_path.startswith('/syndicate') %} cards-nav-pill--active{% endif %}" href="/syndicate{% if nav_date %}?date={{ nav_date }}{% endif %}">The Syndicate</a>

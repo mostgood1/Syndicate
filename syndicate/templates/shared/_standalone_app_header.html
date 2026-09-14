@@ -3,6 +3,11 @@
     <div class="standalone-app-header__brand">
       <img class="standalone-app-header__logo" src="{{ url_for('static', filename='shared/syndicate-brand-header.jpg') }}" alt="Syndicate" width="480" height="320" />
     </div>
+    {# Silver SYNDICATE lettering, shown only where the row has room for it --
+       `.standalone-app-header__wordmark` in standalone_shell.css. #}
+    <div class="standalone-app-header__wordmark" aria-hidden="true">
+      <img class="standalone-app-header__wordmark-img" src="{{ url_for('static', filename='shared/syndicate-wordmark.png') }}" alt="" width="521" height="58" />
+    </div>
     <nav class="standalone-app-header__nav" aria-label="Sports">
       <a class="standalone-app-header__link{% if active_sport_slug == 'home' %} standalone-app-header__link--active{% endif %}" href="/">Home</a>
       <a class="standalone-app-header__link" href="/syndicate">The Syndicate</a>

@@ -49,7 +49,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 0; /* margins instead, so the empty wordmark slot adds no second gap */
   flex-wrap: nowrap;
 }
 
@@ -61,6 +61,35 @@
   flex: 0 0 auto;
   align-items: center;
   min-width: 0;
+  margin-inline-end: 16px;
+}
+
+/* Silver SYNDICATE lettering beside the logo, only where the row has room --
+   the same mechanism as `.syndicate-title-wordmark` in app.css: no basis, a
+   zero-width first item, and a fixed height that clips the lettering once it
+   wraps to a second line. Shown whole or not at all. */
+.standalone-app-header__wordmark {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 28px;
+  overflow: hidden;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.standalone-app-header__wordmark::before {
+  content: "";
+  width: 0;
+  height: 28px;
+}
+
+.standalone-app-header__wordmark-img {
+  flex: 0 0 auto;
+  height: 28px;
+  width: auto;
+  display: block;
+  margin-inline-end: 16px;
 }
 
 /* Same logo, size and framing as `.syndicate-title-lockup__logo` in app.css:
@@ -77,7 +106,7 @@
 
 .standalone-app-header__nav {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   gap: 8px;
   flex-wrap: wrap;
@@ -128,8 +157,11 @@
 /* Still inline on a phone; the logo pins to the top of the wrapped pills. */
 @media (max-width: 640px) {
   .standalone-app-header__inner {
-    gap: 12px;
     align-items: flex-start;
+  }
+
+  .standalone-app-header__brand {
+    margin-inline-end: 12px;
   }
 
   .standalone-app-header__logo {

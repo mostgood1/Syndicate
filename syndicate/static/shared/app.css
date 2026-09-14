@@ -75,8 +75,10 @@ body {
    It is never cropped: height drives width through the img's 480x320
    attributes, so it stays 3:2 at every size. Opaque art on its own black
    ground, so it is framed like the hero panels (radius + hairline). */
+/* Spacing is margins, not `gap`: a gap would sit on BOTH sides of the wordmark
+   slot below even while it is empty, and take 16px from the pills on a phone. */
 .syndicate-menu-row {
-  gap: 16px;
+  gap: 0;
   align-items: center;
   flex-wrap: nowrap;
 }
@@ -87,11 +89,47 @@ body {
    across it (measured 2026-09-14). */
 .syndicate-menu-row .syndicate-title-lockup {
   flex: 0 0 auto;
+  margin-inline-end: 16px;
 }
 
+/* The nav keeps its one-line width and does not GROW: the wordmark slot takes
+   whatever the row has left. It still shrinks (and its pills wrap) when even
+   the logo and one line of pills do not fit. */
 .syndicate-menu-row .syndicate-nav {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
+}
+
+/* The silver SYNDICATE lettering beside the logo, ONLY where the row has room
+   for it `[user decision, 2026-09-14]`. The slot has no basis (`1 1 0`), so it
+   gets the row's leftover and never takes width from the pills. Its first flex
+   item is a zero-width `::before`; when the leftover is narrower than the
+   lettering (plus its 16px margin), the lettering cannot share line one, wraps
+   to line two, and the slot's fixed height clips it. So it shows whole or not
+   at all -- never cut part-way -- with no breakpoint to go stale when a sport
+   is added to the nav. */
+.syndicate-title-wordmark {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 28px;
+  overflow: hidden;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.syndicate-title-wordmark::before {
+  content: "";
+  width: 0;
+  height: 28px;
+}
+
+.syndicate-title-wordmark__img {
+  flex: 0 0 auto;
+  height: 28px;
+  width: auto;
+  display: block;
+  margin-inline-end: 16px;
 }
 
 .syndicate-title-lockup__logo {
@@ -142,8 +180,11 @@ h3 {
    logo pins to the top of the row instead of floating mid-stack. */
 @media (max-width: 640px) {
   .syndicate-menu-row {
-    gap: 12px;
     align-items: flex-start;
+  }
+
+  .syndicate-menu-row .syndicate-title-lockup {
+    margin-inline-end: 12px;
   }
 
   .syndicate-title-lockup__logo {
