@@ -1614,6 +1614,14 @@ death, never life — do not invert it.
     - Among PUBLISHED pregame MLB props, the model's side loses to the market, consistently across the disagreement, price, book-count and fair-method bands.
     - No published pocket survives.
     - It cannot set a factor. The recorder's pre-publication population, from 2026-09-19, is the test.
+- DEPLOY #3 `[2026-09-14]`:
+  - Trigger met: "reading done" is on origin/main (`6438830d`, `heavy-build-child-process` block, "2026-09-14 20:29Z (15:29 CT)"), verified from the ledger, not from the message.
+  - Target `6438830d` on refresh-worker only. The code since live `0a18557a`: this lane's `e4ef34d4`, `bedb99b2`, `f7984e8a`, `74588c50`, `ca40dba1`, `95d1f8b1`; `d4deb502` (the other lane's log line); `9e2685e3` (an evidence JSON). No `render.yaml` or requirements change. Env `SYNDICATE_CANDIDATE_POOL_CACHE_MAX=2` left as set.
+  - Claim acquired 20:31:44Z.
+  - Preflight 20:31:53Z: HOLD. MLB daily sim job pid 6587 (`run_mlb_daily_sim_job`) in flight, and a deploy kills it. Waiting for CLEAR with a status-only poller that never re-acquires the claim.
+  - HOLD persisted from 20:31:53Z to 20:53Z: 1-7 jobs (the MLB `daily_update.py --workflow ui-daily` under the sim job, `refresh_odds_sources.py`, soccer `build_soccer_artifacts.py`).
+  - Preflight 20:56:12Z: CLEAR, infrastructure only, plus 1 defunct child already dead.
+  - DEPLOY TRIGGERED 20:56:38Z (15:56 CT): refresh-worker `0a18557a` -> `6438830d`, `dep-dak5v1jl550s73a1i3r0`, trigger api. Readings owed per the prediction above.
     - soccer `no_chip_match` 710.
     - MLB props: `prop_player_not_in_boxscore` 3,124 (void), `prop_no_commence_time` 1,169.
   - The first real search: >= 5 dates of recorder data with finals, i.e. no earlier than 2026-09-19.
