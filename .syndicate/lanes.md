@@ -969,9 +969,23 @@ death, never life — do not invert it.
 
 ### heavy-build-memory-refusal — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - VERDICT 2026-09-13 ~23:40Z (18:40 CT) — Goal: explain why refresh-worker's heavy board build (candidate pool, board publication, portfolio commit / paper orders) was refused by `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` for ~16 h (2026-09-12 21:34Z .. 2026-09-13 13Z) with unreclaimable headroom ~1,810 MB. Measure what the build actually needs against that floor and what holds ~2.3 GB unreclaimable. Then bring the user options with numbers (retarget/lower the check, cut the build's cost, or add memory). Read-only on production; no code or deploy without the user's OK.
-  - **GOAL: NOT MET.** Only opened. The refusal count and snapshots are measured; H1-H3 are untested.
-  - Next: build the per-heavy-build table (pre-build anon, peak, delta) from `ALL_PROCESS_MEMORY` / `BUILD_SPAN_*` for completed builds after 13Z, plus pid-39 rss and child-job counts across the refused window.
-  - Blocked by nothing. Unowned after this session.
+  - ~~GOAL: NOT MET. Only opened.~~ Superseded by the verdict below.
+- VERDICT 2026-09-14 ~00:30Z (19:30 CT, 09-13): **GOAL: MET.** Measured, options with numbers put to the user, and the user chose a fix.
+  - **Readings** (refresh-worker; `scratchpad/rw_memory_samples.csv`):
+    - 8,829 `ALL_PROCESS_MEMORY` samples, 09-12 18:00Z..09-13 23:30Z. Every hour fully covered except 09-13 14:00-15:00Z (fetch failed; after the refusals ended).
+    - 2 s `MEMORY_WATCHDOG` inside 16 completed heavy builds, 71-95% sample coverage each.
+  - **H3 FALSE.** 3,303 of 7,159 refused-level samples (headroom < 1,900 MB) had `process_count` 2, meaning no child jobs. 08Z-12Z averaged 2.2 processes and stayed refused.
+  - **H2 CONFIRMED, as a step rather than a slow ratchet.** After each boot (09-12 20:20Z; 09-13 13:42Z, 14:14Z, 16:23Z, 18:31Z) unreclaimable starts ~75 MB. It crosses the refusal line (unreclaimable > 2,196 MB) 16-60 min later, after the first full build. It then holds: hourly MIN 2,049 -> 2,241 MB over 16 h (+~190 MB). pid 39 rss 2.1-2.4 GB throughout.
+  - **~84% of that anon is not Python objects.** `UNTRACKED_BYTES_CENSUS` 20:26Z: `explained_pct_of_anon` 16.0. `HEAP_CENSUS` shallow dicts 89-157 MB.
+  - **Every refusal cleared only by a restart.** Heavy builds resumed within minutes of the 13:42Z, 16:23Z and 18:31Z boots.
+  - **H1 FALSE as stated: the 1,900 MB floor is roughly right, not grossly stale.**
+    - 12 steady-state builds (not first after boot), watchdog peak minus start: 296 / 719 / 1,416 MB (min / median / max).
+    - Minimum headroom at peak 633 MB (09-12 21:02Z build). Peak stages were parent stages (`board_contract_end`, `build_live_state_payload_fallback`, `cards_context_*`).
+    - First-after-boot builds added 160-1,619 MB.
+  - **The MLB hydrated overview is NOT the peak.** It runs isolated (`OVERVIEW_SPORT_BEGIN sport=mlb ... isolated=True` 33/33, `[overview_isolation] OK` 33/33, cap 1,541-3,123 MB, 0 `MEMORY_CAP_HIT`, 0 fall-through). The floor's 08-07 sizing comment describes an in-process stage that no longer runs in pid 39.
+  - **User decision 2026-09-13 ~19:25 CT: "Self-restart when stuck (Recommended)".** refresh-worker restarts its own process when the heavy build is refused N times in a row AND no refresh jobs are in flight (same test as the deploy preflight). Constraint kept: `state.md [user-decisions]` 2026-08-16, no plan bump.
+  - Not chosen: find what holds the 2.3 GB; lower the floor to ~1,450 MB (a max delta of 1,416 would leave ~480 MB); leave as is.
+  - Next: the design (files, counter placement, restart mechanism, job test), claimed before any edit. Code, tests and any deploy each come back to the user.
 - Goal: explain why refresh-worker's heavy board build (candidate pool, board publication, portfolio commit / paper orders) was refused by `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` for ~16 h (2026-09-12 21:34Z .. 2026-09-13 13Z) with unreclaimable headroom ~1,810 MB. Measure what the build actually needs against that floor and what holds ~2.3 GB unreclaimable. Then bring the user options with numbers (retarget/lower the check, cut the build's cost, or add memory). Read-only on production; no code or deploy without the user's OK.
 - Files: none claimed (read-only diagnostic).
 - Origin: finding in lane `kalshi-nfl-quote-gap` (above). User decision 2026-09-13 ~17:55 CT: "Open a diagnostic lane (Recommended)".
