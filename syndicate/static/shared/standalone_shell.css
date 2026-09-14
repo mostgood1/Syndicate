@@ -34,33 +34,43 @@
   box-shadow: var(--cards-shadow);
 }
 
+/* Logo inline on the menu row, centred on it, pills wrapping beside it and
+   never under it `[user decision, 2026-09-14]` -- same rule as
+   `.syndicate-menu-row` in app.css. */
 .standalone-app-header__inner {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
+/* Must not shrink: as a shrinkable flex item it collapsed below the logo's
+   width on a phone and the nav's pills drew across the logo (measured
+   2026-09-14, see `.syndicate-menu-row .syndicate-title-lockup` in app.css). */
 .standalone-app-header__brand {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   min-width: 0;
 }
 
-/* Same logo and framing as `.syndicate-title-lockup__logo` in app.css. */
+/* Same logo, size and framing as `.syndicate-title-lockup__logo` in app.css:
+   height drives width through the 480x320 attributes, so it stays 3:2. */
 .standalone-app-header__logo {
-  width: clamp(180px, 15vw, 228px);
-  height: auto;
+  height: clamp(60px, 6vw, 84px);
+  width: auto;
   display: block;
   flex: 0 0 auto;
-  border-radius: 14px;
+  border-radius: 10px;
   border: 1px solid var(--cards-line-strong);
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
 }
 
 .standalone-app-header__nav {
   display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -104,5 +114,17 @@
 
   .standalone-app-header__nav {
     justify-content: flex-start;
+  }
+}
+
+/* Still inline on a phone; the logo pins to the top of the wrapped pills. */
+@media (max-width: 640px) {
+  .standalone-app-header__inner {
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .standalone-app-header__logo {
+    height: 52px;
   }
 }

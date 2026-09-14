@@ -115,6 +115,24 @@ class BrandAssetReferenceTests(unittest.TestCase):
             text = (TEMPLATES / name).read_text(encoding="utf-8")
             self.assertIn("shared/syndicate-brand-header.jpg", text, name)
 
+    def test_the_logo_is_inline_on_the_menu_row(self) -> None:
+        """`[user decision, 2026-09-14]`: the logo sits on the menu row and the
+        pills wrap beside it. A `wrap` on the row itself is what drops the
+        whole nav onto its own line under the logo."""
+        base = (TEMPLATES / "shared/base.html").read_text(encoding="utf-8")
+        self.assertIn('class="cards-title-row syndicate-menu-row"', base)
+        for sheet, row, brand in (
+            ("app.css", "syndicate-menu-row", "syndicate-menu-row .syndicate-title-lockup"),
+            ("standalone_shell.css", "standalone-app-header__inner", "standalone-app-header__brand"),
+        ):
+            text = (SHARED / sheet).read_text(encoding="utf-8")
+            rules = _css_rules(text, row)
+            self.assertRegex(rules, r"flex-wrap:\s*nowrap", sheet)
+            self.assertNotRegex(rules, r"flex-wrap:\s*wrap\b", sheet)
+            # A shrinkable logo wrapper collapses under the logo on a phone and
+            # the pills draw across it.
+            self.assertRegex(_css_rules(text, brand), r"flex:\s*0 0 auto", sheet)
+
 
 class LogoIsNeverCroppedTests(unittest.TestCase):
     def test_hero_panels_contain_the_art_and_never_cover_it(self) -> None:
