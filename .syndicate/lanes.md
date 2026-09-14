@@ -1203,6 +1203,33 @@ death, never life — do not invert it.
 - User decision 2026-09-14 ~09:10 CT: "Deploy before first pitch (Recommended)". First pitch 22:40Z (5:40 PM CT).
 - Blocked by: none. The HOLD for lane `heavy-build-memory-refusal` reading (d) ended at 15:21:35Z: the refusal streak broke with no recycle (8 refusals 14:30:34-15:11:03Z, 0 `[worker_recycle]`). Then preflight went HOLD (odds refresh job) -> CLEAR, the deploy ran at 15:30:33Z, and the claim was released.
 
+### accuracy-assessment-0914 — OPEN — opened 2026-09-14 — session 498e87fd-3228-4c0d-a05c-9fccc81e2926
+- Goal: one table, per sport x bet type active 2026-08-31..09-14 (MLB game lines/totals/segments, NCAAF lines/totals, NFL lines/totals/props, soccer lines/totals), PREGAME and LIVE, of model vs de-vigged market vs outcome (n, dates, Brier/log-loss or MAE, calibration), measured on the full projection population rather than the published/ordered subset; every active market that has a measurement serves `model_skill.status=measured` carrying it; unmeasured active markets backtested; optimizations shipped only where a measurement justifies them.
+- Files: `syndicate/features/shared/projection_skill.py`, `tests/test_projection_skill.py`, `syndicate/features/shared/measured_market_skill.py` (NEW), `tests/test_measured_market_skill.py` (NEW), `scripts/assess_active_market_accuracy.py` (NEW), `.syndicate/findings_2026-09-14_accuracy_assessment.md` (NEW).
+- Not claimed, read only: `board_enrichment.py` (lane `football-layer2-live-parity`) and `layer2_board.py` (lane `layer2-live-scorecard-gate`). The registry goes in behind `attach_projection_skill`, which the wrapper already calls, so neither needs an edit.
+- Activity in the window, from `/api/ops/execution/ledger-summary?days=14` (read 2026-09-14): orders on mlb, ncaaf, nfl and soccer only. No wnba, nba, nhl or ncaab orders.
+  - Settled paper ROI by `sim_view`: mlb game_line `agrees` -5.27% (120), mlb game_total `agrees` -7.21% (109), ncaaf game_total `contradicts` -34.77% (79), ncaaf game_total `unpriced` +17.11% (216), soccer game_line `agrees` -44.30% (31), soccer game_total `agrees` +15.31% (33).
+  - These are ORDERS, a publication-filtered population. They are context, not a model measurement (learnings 2026-09-12).
+- Hypothesis H1 (written before any test): the board's "model never backtested" label on active MLB game markets, totals included, is a WIRING gap and not an absence of measurement.
+  - Mechanism: `attach_projection_skill` stamps `unmeasured` whenever a producer attaches no note, and MLB game markets attach none.
+  - Yet `state_mlb.md [mlb-sim-edge-is-anti-predictive]` measured them: 482 finals / 39 dates to 08-30.
+  - Falsified if: MLB game-market rows on the served board already carry `model_skill.status=measured`, OR no measurement exists for the market keys those rows use.
+- Hypothesis H2: on every active game main line with a prior measurement (MLB ML/totals, soccer 1X2, NCAAF margins), the 08-31..09-13 window does not overturn "loses to or ties the market".
+  - Falsified if: a market's model-minus-market Brier (or MAE) CI over games excludes zero in the model's favour on the window.
+- Hypothesis H3: MLB live h2h no longer shows a CI-excluding-zero deficit after the September changes. The history rows 09-07..09-11 read near parity.
+  - Falsified if: the fresh-cut, paired, era-split CI over games still excludes zero against the model.
+- Hypothesis H4: NCAAF totals, never scored against the close, lose to it (1.67x over-dispersed). The ledger's -34.8% on `contradicts` is selection on the sim's disagreement, not evidence the sim is informative.
+  - Falsified if: the NCAAF totals model-vs-close MAE CI spans zero or favours the model on 2026 games.
+- Method: five read-only measurement agents (MLB pregame, MLB live, football, soccer, WNBA + other-sport census).
+  - They use production data, one request at a time.
+  - Scoring: full projection population, paired, de-vigged closing lines, bootstrap over games.
+  - Outputs go to this session's scratchpad; the numbers that decide anything are copied into the findings file.
+- Verification:
+  1. The findings file carries the table.
+  2. A served-board census of `model_skill.status` by sport x market, taken before and after the registry ships. The after-reading needs a deploy: user approval plus both locks.
+  3. Each shipped optimization names the number that justifies it.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
