@@ -34721,3 +34721,13 @@ Source: refresh-worker logs, read with `render_logs.py --text` from 13:39Z. Sess
   - Contrast on `cae4713e`: 35 refusals and 0 QUOTE_CAPTURE, 12:36:43-13:36:43Z.
 - **Not measured, fast-path cost:** 40 `LAYER2_FAST_REFRESH` runs on `cae4713e` 08:00-13:36Z took 52.3-166.0 s. The one run since took 152.9 s, 30.0 s of it capture. n=1 cannot size the added time. The env gate `SYNDICATE_LAYER2_FAST_KALSHI_CAPTURE=0` turns it off; needs a deploy.
 - (b) and (d) are still owed. (d) is watched by session 0f5b256e (Monitor, 5 min polls). Its first refusal is in, and uptime is past the 1,800 s floor.
+
+## 2026-09-14 14:55Z (09:55 CT) — reading only, no deploy — refresh-worker `fb0c91cf` — **CORRECTION: the (e) "PUBLISH_FAILED 0 -> 9" red flag is a baseline artifact, not a regression**
+Source: refresh-worker logs, `render_logs.py --text "PUBLISH_FAILED path="`, session 0f5b256e. Supersedes the red-flag reading in the 13:36:43Z entry above. That reading is kept as written.
+- **Longer baseline on `cae4713e`**, requested 09-13 12:00Z..09-14 13:36Z, covered 13:49:57Z..11:37:40Z:
+  - **4,053** PUBLISH_FAILED. That is 94-261 per hour in every hour 09-13 14Z..09-14 11Z, almost all HTTP 503, plus some non-HTTP bursts (65 at 14Z, 62 at 10Z).
+  - The task's baseline hour (12:36-13:36Z) read 0 because it sat inside the refusal stretch: 35 heavy-build refusals, and the heavy build is what publishes. That hour was quiet by construction.
+- **After deploy**, 13:47:04..14:37:19Z: **62** PUBLISH_FAILED. That is 61 HTTP 503 (state 9, book_quotes jsonl 9, soccer `odds_history` 43) and 1 non-HTTP. By 10 min: 13:40 1, 13:50 8, 14:10 4, 14:20 26, 14:30 23.
+  - ~62/50 min is about the old rate's low end or below. It is not a rise.
+- **Web:** no deploy since `822ee0ba` (live 09-13 15:07:20Z), and the only event since 13:00Z is `server_available` 13:42:35Z. The 503s are web refusing publishes (the known merge-capacity lead, unassigned), not web restarting.
+- **(b) fuller copy:** `LATEST_CACHE_EVICT` is now present (14:31:28-14:31:46Z). The evicted paths are all `.jsonl` for non-affected dates (soccer 09-14..09-19, mlb 09-14). No affected date (mlb 09-03..09-09, ncaaf 09-05, soccer 08-22..09-09) has been read yet, so (b) is still owed, not failed.
