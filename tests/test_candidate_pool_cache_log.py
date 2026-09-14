@@ -121,6 +121,16 @@ class CandidatePoolCacheCapTests(unittest.TestCase):
     def test_never_below_one(self) -> None:
         self.assertEqual(_service_with_env("0")._candidate_pool_cache_max, 1)
 
+    def test_the_log_reports_the_cap_in_force_not_the_snapshot_limit(self) -> None:
+        # Production 2026-09-14 19:20:05Z, env set to 2: the line read `limit=12`.
+        # The log printed `_max_snapshots`, and the only test of `limit=` ran with
+        # both values at their default of 12, so it could not tell them apart.
+        service = _service_with_env("2")
+        buffer = StringIO()
+        with redirect_stdout(buffer):
+            service._log_candidate_pool_cache("2026-09-14", "k", "{}", cached=False)
+        self.assertEqual(_cache_line(buffer.getvalue())["limit"], "2")
+
 
 class CandidatePoolCacheWiringTests(unittest.TestCase):
     def test_build_candidate_pool_logs_the_serialization_it_returns(self) -> None:

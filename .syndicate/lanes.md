@@ -1013,6 +1013,12 @@ death, never life — do not invert it.
     - Env `SYNDICATE_CANDIDATE_POOL_CACHE_MAX=2` was set on refresh-worker (single-key PUT ~18:25Z, HTTP 200, read back 2).
     - Claim: released by accuracy-assessment-0914 at ~18:43Z (their message), `free` at 18:55Z.
     - Preflight at 18:55:47Z: HOLD, 2 jobs (MLB daily sim `run_mlb_daily_sim_job` / `daily_update.py --workflow ui-daily`). A deploy kills them, so this lane waits (background poller, 2 min).
+    - **LIVE 19:07:04Z (`dep-dak48pgae00c73fk27f0`), clean boot 19:07:43Z, claim released ~19:14Z.** The first post-deploy line (19:20:05Z) is `CANDIDATE_POOL_CACHE date=2026-09-14 cached=True entries=1 limit=12 pool_json_bytes=25295955`.
+      - **`limit=12` is a LOGGING BUG, not an inactive cap.** In `0a18557a` the print still reads `limit={self._max_snapshots}` (`:7133`), while the cap reads the env (`:4814`) and the trim uses it (`:7108`).
+      - The env IS present on refresh-worker and equals 2 (single-key GET, 19:21Z).
+      - The test meant to pin `limit=` ran with both values at 12, so it could not fail. The commit message and this block's "reports the real cap" were wrong.
+      - Reachability therefore rests on `entries` staying <= 2 from build 3 on, not on `limit=`.
+      - Fix (log field + a test at env 2): on main, NOT deployed. It rides the next refresh-worker deploy.
     - **Undisturbed window requested from accuracy-assessment-0914:** the first ~6 heavy builds after this deploy (~90 min from live). "Reading done" goes on this line when the 6th `CANDIDATE_POOL_CACHE` line is in.
 
 ### heavy-build-memory-refusal — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8

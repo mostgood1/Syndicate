@@ -7130,7 +7130,7 @@ class IntelligenceStateService:
                 cache_json_bytes = sum(sizes.values())
             print(
                 f"[intelligence_state] CANDIDATE_POOL_CACHE date={selected_date} cached={cached} "
-                f"entries={entries} limit={self._max_snapshots} pool_json_bytes={pool_json_bytes} "
+                f"entries={entries} limit={self._candidate_pool_cache_max} pool_json_bytes={pool_json_bytes} "
                 f"cache_json_bytes={cache_json_bytes}",
                 flush=True,
             )
