@@ -34800,3 +34800,12 @@ Read-only reading by scheduled task `layer2-carryover-roll-reading-0914`, taken 
 - **(2) OWED, in progress: exactly one line per MLB build.** 0 `BOOK_GRID_TICK` lines by 15:40:09Z (the first post-boot tick was still running). A pairing watcher in this session is reading it.
 - **(3) OWED: the live-slate reading from 22:40Z.** On live MLB builds, compare `full_games` vs `index` vs `considered` (H2 vs H3) and check `written_by_segment` for `full`.
 - Claim released after this entry was pushed.
+
+## 2026-09-14 16:30Z (11:30 CT) — reading only, no deploy — refresh-worker `6fe6c6e9` — lane `book-grid-gameline-ledger-log` — (2) exactly one LIVE_GAMELINE_BUILD line per MLB build: **MET on 3 pregame builds**
+
+Source: refresh-worker logs, read with `render_logs.py --text` from 15:37:05Z (live). Discharges reading (2) of the 15:30:33Z deploy entry above, for PREGAME builds only.
+- `BOOK_GRID_TICK` lines whose JSON `written` list carries `mlb:`: **3** (15:41:04Z `rebuilt_previous=2026-09-13`, 16:14:47Z, 16:26:03Z).
+- `[book_grid] LIVE_GAMELINE_BUILD sport=mlb` lines: **4**. `date=2026-09-14` **3** (15:38:19, 16:14:24, 16:24:59Z), one just before each tick. `date=2026-09-13` **1** (15:38:42Z), matching the first tick's `rebuilt_previous`.
+- So: one line per MLB build per date, 0 duplicates, 0 missing.
+- All four read `index=0 considered=0 full_games=0` (no game live). The line's DISCRIMINATING values are therefore still unexercised.
+- **Still OWED:** the live-slate reading (H2 / H3 / NEITHER) and exactly-once on LIVE builds. Owned by the one-time scheduled task `book-grid-gameline-live-reading-0914`, firing 19:00 CT over 22:40Z-05:30Z.
