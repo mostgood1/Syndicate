@@ -127,6 +127,20 @@ skill note, and never fires on MLB.
    P(over) RISING with the line (median slope -0.047 per run vs the model's -0.092).
 3. **The scorer's hit-rate baseline is 0.50** (`live_gameline_score._directional`)
    instead of the market's own lean, inflating directional results by ~+12pp.
+   **NOT CHANGED, deliberately.** Three reasons, all read in code:
+   - `test_market_fair_prob_is_never_read_on_a_line_priced_row` pins that the
+     whole `point_forecast` block must not move with `market_fair_prob`. That
+     guard exists so a ~0.50 de-vig cannot creep back into the comparison.
+   - The market probability a lean baseline would read is the one defect 2 shows
+     is degraded (14-16% inverted line pairs).
+   - On spreads, `line` is the away/over-frame line (`#262`). Whether
+     `market_fair_prob` is P(home covers) or P(away covers) in that frame is not
+     settled by the code, so a lean baseline could carry the wrong sign.
+
+   Fix defect 2 first (same-book, same-line de-vig), then add the lean baseline as
+   a SEPARATE block beside `point_forecast`. Until then, read any live
+   totals/spreads hit rate against 55.9% ("always over", totals) and 62.3% (the
+   market's lean, MLB run lines), never against 50%.
 4. Early-game live totals run ~+1.7 remaining runs high at under a third of the game
    (60 games). Unexplained.
 
@@ -139,3 +153,87 @@ skill note, and never fires on MLB.
   0.134, and its lean hits 62.3%.
 - The worker history counts more fresh h2h rows than the web ledger holds (88 vs 84
   on 09-10, 114 vs 100 on 09-11). Unresolved.
+
+## SOCCER — pregame and live
+
+Source: odds_history closes (per book, proportionally de-vigged: 3-way for 1X2,
+two-way at the line, then averaged; median h2h close 69 min before kickoff),
+soccer projection artifacts, the live game-line ledger, ESPN finals with draws
+counted. 54 production requests, every shard landed. Bootstrap over matches,
+4,000 resamples.
+
+**Population.** 246 completed matches in 10 leagues; 229 with a 1X2 close.
+- 7 on 08-31: that shard is 0.11 MB and holds no closes.
+- 8 are name-join misses on 4 clubs (1. FC Köln / FC Cologne, Sporting Lisbon /
+  Sporting CP, Rennes / Stade Rennais, SK Beveren / Waasland-Beveren). Production's
+  own `teams_match` fails on them too.
+- 2 had no market event.
+
+**Model versions split at 2026-09-07 20:12Z**, when ESPN match-stats inputs reached
+the worker. The market prior was off (`armed=False`) on all 127 later builds.
+
+**THE CAVEAT THAT BOUNDS THE PREGAME RESULTS.** All 246 projection files were
+REBUILT after their match (median 10.3 h after kickoff). The code path reads no
+result, but the number actually published before kickoff is kept nowhere, and
+`pregame_home_win_prob` is null on all 8,210 soccer ledger rows. A leak can only
+flatter the model, so **"loses" verdicts are robust and "parity" verdicts are an
+upper bound on skill.**
+
+| market | phase | dates | matches (rows) | model | market | diff [95% CI] | verdict |
+|---|---|---|---|---|---|---|---|
+| 1X2 multiclass Brier | pre, built >=09-07 | 7 | 121 | 0.6474 | 0.6028 | **+0.0446 [+0.0148, +0.0742]** | **loses to market** |
+| 1X2 multiclass Brier | pre, built <09-07 | 6 | 108 | 0.6481 | 0.6334 | +0.0148 [-0.0187, +0.0497] | parity |
+| 1X2, pooled (mixed versions, secondary) | pre | 13 | 229 | 0.6477 | 0.6172 | +0.0305 [+0.0087, +0.0527] | loses |
+| Over/Under 2.5 | pre | 13 | 145 | 0.2557 | 0.2488 | +0.0069 [-0.0060, +0.0197] | parity |
+| Totals, main half/whole line | pre | 13 | 194 | 0.2603 | 0.2505 | +0.0099 [-0.0037, +0.0237] | parity |
+| Asian handicap, main line | pre, <09-07 | 6 | 84 | 0.2527 | 0.2490 | +0.0038 [-0.0216, +0.0304] | parity |
+| Asian handicap, main line | pre, >=09-07 | 7 | 100 | 0.2698 | 0.2433 | +0.0265 [+0.0001, +0.0542] | loses (borderline) |
+| BTTS | pre | 14 | 236 | 0.2465 | 0.2432 | +0.0033 [-0.0048, +0.0113] | parity (market side ~14 h old, no BTTS close) |
+| Live P(home win) | live, <=120 s | 12 | 118 (1,136) | 0.1490 | 0.1340 | +0.0150 [-0.0032, +0.0319] | parity |
+| Live totals, model mean vs line | live, <=120 s | — | 44 (258) | hit 52.7% | 50% | [44.2%, 61.3%] | parity (thin) |
+| Corners | both | — | — | — | — | — | unmeasurable: no corners distribution or corners results source |
+
+- 1X2 after 09-07: the model scored worse on 78 of 121 matches (p=0.002). The
+  version gap itself is NOT proven: post minus pre +0.0298 [-0.0155, +0.0741].
+- The deficit is RESOLUTION, not reliability: reliability 0.027 model vs 0.025
+  market, resolution 0.047 vs 0.070; home-probability spread 0.153 vs 0.168.
+- **The favourite defect persists.** On 46 matches with a market favourite >=0.60,
+  the model gives the favourite 0.627, the market 0.728, and 0.717 won. Favourite-leg
+  diff +0.042 [+0.005, +0.081].
+- The 1,112-match verdict holds in DIRECTION with a bigger gap (+0.030 pooled vs
+  +0.014), but "worse in 8 of 9 leagues" does not replicate: 6 of 10 (p=0.75).
+  Significant only in Championship (+0.088, n=44) and Primeira Liga (+0.051, n=15).
+- Totals: model mean bias -0.095 goals; its lean hits 49%.
+- **No blend beats the market out of sample** (leave-one-date-out). 1X2 after 09-07:
+  blend minus market +0.021 [-0.005, +0.048], full-sample model weight -0.73 and
+  linear-pool weight 0. Over 2.5 blends lose in both periods; BTTS blend loses
+  +0.005 [+0.001, +0.010].
+- Live: the model is worse in 76 of 118 matches (p=0.002), concentrated where it
+  disagrees by 10+ points: +0.037 [+0.004, +0.068] over 95 matches vs -0.0005 under
+  2 points. 80 sims explain only 0.0019 of the gap.
+
+**The paper ledger, read against the full population.** Soccer game_line "agrees" at
+-44.3% (31 settled) is CONSISTENT: 1X2 loses, and model edges >=4 points hit 24.3%
+against 29.3% implied (-16.6% ROI at the fair close, 164 matches, secondary cut).
+Game_total "agrees" at +15.3% (33 settled) is NOT supported: totals are parity.
+
+**Data defects found:**
+1. Pregame projections are overwritten after the match (246 of 246), so no pregame
+   soccer measurement can be taken on the published number.
+2. The 20-entry odds_history cap evicts closes: on 09-05, 147 of 2,960 book-side keys
+   (5.0%) lost every pre-kickoff quote to in-play captures; 08-31 captured no closes.
+3. Four club aliases missing (3.3% of matches unjoinable).
+
+**Contradicts the ledger:**
+- The live gap recorded as +0.108 (51 games, priceable rows, 08-21..08-26) is +0.015
+  on fresh quotes and +0.022 on priceable rows in this window. Direction holds.
+- The live source docstring says 400 sims; every fresh ledger row says 80.
+- odds_history now carries IN-PLAY soccer quotes, and they are evicting closes.
+- 09-12 priceable is 504 of 1,541 on the final ledger, not 276 of 928 (a mid-day read).
+
+**Proposed, not implemented:** keep 1X2 model edges unpublished; fix favourite
+under-dispersion by widening the rating spread and re-fit in the leak-free 1,112-match
+harness (not on this window, which fails out of sample); treat totals "agrees" orders
+as no signal; test a 10pp-disagreement refusal on live h2h with leave-one-date-out
+first (the MLB precedent failed out of sample); snapshot the pregame projection on
+first sighting; protect closes from the history cap; add the 4 aliases.

@@ -65,6 +65,11 @@ _MLB_LIVE_SOURCE = (
     "lane accuracy-assessment-0914: production live_gameline_ledger (web copy) vs "
     "StatsAPI finals, fresh quotes <=120s, paired rows, bootstrap over games"
 )
+_SOCCER_SOURCE = (
+    "lane accuracy-assessment-0914: production odds_history closes (per book, "
+    "proportional de-vig, averaged) vs soccer projection artifacts vs ESPN finals, "
+    "draws counted, bootstrap over matches"
+)
 
 # (sport, market, segment, phase) -> entry.
 MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
@@ -116,6 +121,62 @@ MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
         "verdict": "live: parity with the market, Brier +0.000 [-0.014, +0.015] over 159 games",
         "verdict_class": VERDICT_PARITY,
         "source": _MLB_LIVE_SOURCE,
+    },
+    # ---- SOCCER, PREGAME --------------------------------------------------------
+    # Every projection artifact in the window was REBUILT after its match, so the
+    # scored number is not the one published before kickoff. A leak can only
+    # flatter the model: "loses" is robust, "parity" is an upper bound on skill.
+    ("soccer", "h2h", "full", PHASE_PREGAME): {
+        "sample_games": 121,
+        "seasons": "2026-09-07..09-13 pregame, current model version",
+        "brier_model": 0.6474,
+        "brier_market": 0.6028,
+        "diff": 0.0446,
+        "ci95": (0.0148, 0.0742),
+        "verdict": "loses to the de-vigged close: 1X2 Brier +0.045 [+0.015, +0.074] over 121 matches; under-prices favourites",
+        "verdict_class": VERDICT_LOSES,
+        "source": _SOCCER_SOURCE,
+    },
+    ("soccer", "totals", "full", PHASE_PREGAME): {
+        "sample_games": 194,
+        "seasons": "2026-08-31..09-13 pregame, main line",
+        "brier_model": 0.2603,
+        "brier_market": 0.2505,
+        "diff": 0.0099,
+        "ci95": (-0.0037, 0.0237),
+        "verdict": "parity with the de-vigged close: main-line Brier +0.010 [-0.004, +0.024] over 194 matches",
+        "verdict_class": VERDICT_PARITY,
+        "source": _SOCCER_SOURCE,
+    },
+    ("soccer", "spreads", "full", PHASE_PREGAME): {
+        "sample_games": 100,
+        "seasons": "2026-09-07..09-13 pregame, main Asian handicap line",
+        "brier_model": 0.2698,
+        "brier_market": 0.2433,
+        "diff": 0.0265,
+        "ci95": (0.0001, 0.0542),
+        "verdict": "loses to the close, borderline: Asian handicap Brier +0.027 [+0.000, +0.054] over 100 matches",
+        "verdict_class": VERDICT_LOSES,
+        "source": _SOCCER_SOURCE,
+    },
+    # ---- SOCCER, LIVE -----------------------------------------------------------
+    ("soccer", "h2h", "full", PHASE_LIVE): {
+        "sample_games": 118,
+        "seasons": "2026-08-31..09-13 live, fresh quotes",
+        "brier_model": 0.1490,
+        "brier_market": 0.1340,
+        "diff": 0.0150,
+        "ci95": (-0.0032, 0.0319),
+        "verdict": "live: parity with the market, Brier +0.015 [-0.003, +0.032] over 118 matches; worse when it disagrees 10pp+",
+        "verdict_class": VERDICT_PARITY,
+        "source": _SOCCER_SOURCE + "; live_gameline_ledger, quotes <=120s, 80 sims",
+    },
+    ("soccer", "totals", "full", PHASE_LIVE): {
+        "sample_games": 44,
+        "seasons": "2026-08-31..09-13 live, fresh quotes",
+        "verdict": "live: parity, model-mean lean hit 52.7% [44.2%, 61.3%] over 44 matches",
+        "verdict_class": VERDICT_PARITY,
+        "source": _SOCCER_SOURCE + "; live_gameline_ledger point forecast, quotes <=120s",
     },
 }
 

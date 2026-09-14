@@ -638,6 +638,17 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
                 "live_aware": True,
             }
         )
+        # THE SKILL NOTE FOLLOWS THE MODEL `[2026-09-14, lane accuracy-assessment-0914]`.
+        # The update above switches this projection to the live re-sim (`basis`,
+        # `source`, `model_prob_over`) but used to leave the PREGAME `model_skill`
+        # in place, so a live prop row carried e.g. `mlb_prop_calibration`'s
+        # "biased high ~29%" -- a measurement of a different model. Replaced by
+        # the live measurement, or the declared absence; never kept.
+        from syndicate.features.shared.projection_skill import live_skill_note
+
+        projection["model_skill"] = live_skill_note(
+            sport=row.get("sport"), market=row.get("market"), segment=row.get("segment")
+        )
         if live_prob_over is None:
             # A blank probability must say why, for the same reason a blank edge
             # does: "the re-sim could not price this" and "the join failed" are
