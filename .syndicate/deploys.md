@@ -34772,3 +34772,31 @@ Read-only reading by scheduled task `layer2-carryover-roll-reading-0914`, taken 
 **verify: R2 MET.** At the 09-14 roll, refresh-worker made the carryover decision for the prior date within 22 s. It skipped for the right reason (the last build had 0 live rows and 0 live chips) and did not rebuild a finished slate. This exercises only the skip branch. **`decision=built` has never been seen in production.**
 - **R3 is still OWED:** a game live across midnight CT, where the carryover should build and `written_at` should move past 05:00Z. It belongs to tasks `layer2-carryover-crossing-reading-0915`, `-0919` and `-0920`.
 - The lane stays OPEN.
+
+## 2026-09-14 15:30:33Z (10:30 CT) — refresh-worker `fb0c91cf` -> `6fe6c6e9` — deploy `dep-dak166ad0e5s738af5g0` — lane `book-grid-gameline-ledger-log`, session 8518e917
+
+- **User decision 2026-09-14 ~09:10 CT:** "Deploy before first pitch (Recommended)"; later "keep waiting and deploy when clear". First pitch 22:40Z.
+- **What ships (collateral check):**
+  - `git diff --name-only fb0c91cf 6fe6c6e9 -- syndicate pipeline scripts app.py requirements.txt render.yaml vendor` = exactly `syndicate/features/shared/book_grid_artifact.py` and `syndicate/features/shared/live_gameline_ledger.py`.
+  - Plus `tests/test_book_grid_gameline_ledger_log.py`; the rest is ledger commits. +402/-0, no `render.yaml`.
+  - Code commit: `05ca745c`, a per-build `[book_grid] LIVE_GAMELINE_BUILD` line, plus `written_by_segment` / `skipped_unchanged_by_segment` in `append_records`' counters.
+- **Held first, for another lane's reading:** lane `heavy-build-memory-refusal` reading (d), the first `339dc6e9` self-restart on `fb0c91cf`.
+  - Watched refresh-worker logs from 09:55 CT.
+  - The streak broke WITHOUT a recycle: 8 `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` 14:30:34-15:11:03Z, then a heavy build admitted at 15:21:35Z (`PORTFOLIO_COMMIT date=2026-09-14 positions=24` 15:22:14Z).
+  - 0 `[worker_recycle]` lines since boot 13:39Z.
+  - That session could NOT be messaged: this session began as a scheduled-task run.
+- **Gates:**
+  - Claim acquired 15:25:32Z (holder `book-grid-gameline-ledger-log`, TTL 2700 s).
+  - Preflight 15:25:33Z: **HOLD**, 3 jobs in flight (`refresh_odds_sources.py` -> `build_soccer_artifacts.py --league mls`).
+  - Re-polled every 60 s: **CLEAR** ("only infrastructure processes running") on poll 5, ~15:30Z, for the full target SHA.
+  - Deploy POST 15:30:33Z, in the next tool call.
+- **Events** (`/v1/services/srv-d91dpertqb8s73co8ls0/events`, 15:30:00Z -> 15:39:44Z): deploy_started 15:30:33, build_started 15:30:33, build_ended 15:35:00, deploy_ended `succeeded` 15:37:06Z. **0 `server_failed`.** Live `6fe6c6e9`, finishedAt 15:37:05.739Z.
+- **verify: reading (1) MET — the DEPLOYED build emits the line.**
+  - First `[book_grid] LIVE_GAMELINE_BUILD` at 15:38:19.998Z, 74 s after live. By 15:38:42Z it had printed for mlb 2026-09-14, nfl, soccer, and the mlb 2026-09-13 rebuild.
+  - Read from the RAW Render logs API (`/v1/logs`, not `render_logs.py`): each mlb message is 513 chars and ends with `}`, every field present.
+  - Pregame, as expected: `index=0 seg_index=0 considered=0 ... full_games=0 ... index_why={..."games_in_snapshot":10,"indexed":0,"skipped_no_accepted_lane":10,...,"sources_seen":{"segment_projection":40}}`.
+  - The "(truncated)" in this session's watcher notification was the NOTIFICATION's display, not Render.
+  - nfl/soccer print `index=na`: their coverage carries no `index_size`. A visible absence, not a defaulted 0.
+- **(2) OWED, in progress: exactly one line per MLB build.** 0 `BOOK_GRID_TICK` lines by 15:40:09Z (the first post-boot tick was still running). A pairing watcher in this session is reading it.
+- **(3) OWED: the live-slate reading from 22:40Z.** On live MLB builds, compare `full_games` vs `index` vs `considered` (H2 vs H3) and check `written_by_segment` for `full`.
+- Claim released after this entry was pushed.
