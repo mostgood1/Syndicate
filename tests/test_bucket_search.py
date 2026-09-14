@@ -271,6 +271,29 @@ def test_a_published_opening_falls_into_the_same_buckets_as_its_recorder_record(
         assert (record["ht"], record["at"], record["t"]) == ("Home Team", "Away Team", "2026-09-01T18:00:00Z")
 
 
+def test_without_a_game_state_the_phase_comes_from_when_it_was_sighted():
+    """Published openings carried no game state before 2026-09-12; the sighting time decides instead."""
+    from datetime import datetime, timezone
+
+    pre = _record_from(_candidate(game_state=None))          # sighted 18:00Z, first pitch 23:00Z
+    assert mbs.view_from_record(pre)["phase"] == "pregame"
+    assert mbs.view_from_record(dict(pre, t="2026-09-01T23:30:00Z"))["phase"] == "live"
+    assert mbs.view_from_record(dict(pre, gs="live"))["phase"] == "live"      # the field wins when present
+    assert mbs.view_from_record(dict(pre, ct=None))["phase"] == "unknown"
+    candidate = _candidate(game_state=None)
+    assert mbs.view_from_candidate(candidate, now=datetime(2026, 9, 1, 18, tzinfo=timezone.utc))["phase"] == "pregame"
+    assert mbs.view_from_candidate(candidate, now=datetime(2026, 9, 1, 23, 30, tzinfo=timezone.utc))["phase"] == "live"
+
+
+def test_ungraded_reasons_are_also_counted_per_sport():
+    prop = _record_from(_candidate(market="batter_hits", player_name="A Hitter", line=0.5))
+    corners = _record_from(_candidate(sport="soccer", market="alternate_totals_corners", line=9.5))
+    by_sport = {}
+    _graded, ungraded = bs.grade_population([prop, corners], {}, ungraded_by_sport=by_sport)
+    assert by_sport == {"mlb": {"player_prop": 1}, "soccer": {"market_not_gradeable_from_score": 1}}
+    assert ungraded == {"player_prop": 1, "market_not_gradeable_from_score": 1}
+
+
 def test_the_published_population_can_never_write_the_scoring_table(tmp_path):
     before = mbs.TABLE_PATH.read_bytes()
     with pytest.raises(SystemExit):

@@ -443,6 +443,7 @@ def grade_population(
     *,
     today: str | None = None,
     prop_settler: Any = None,
+    ungraded_by_sport: dict[str, dict[str, int]] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """One graded row per priced side, plus the count of what could not be graded and why.
 
@@ -474,57 +475,63 @@ def grade_population(
     indexed = {day: SCORECARD.index_chips(list(chips)) for day, chips in chips_by_date.items()}
     graded: list[dict[str, Any]] = []
     ungraded: collections.Counter[str] = collections.Counter()
+    by_sport: dict[str, collections.Counter[str]] = collections.defaultdict(collections.Counter)
+
+    def skip(sport_name: str, reason: str) -> None:
+        ungraded[reason] += 1
+        by_sport[sport_name][reason] += 1
+
     for (sport, _key), record in chosen.items():
         view = mbs.view_from_record(record)
         shaped, reason = scorecard_record(record, event_teams)
         if shaped is None:
-            ungraded[reason or "unparseable_key"] += 1
+            skip(sport, reason or "unparseable_key")
             continue
         is_prop = bool(shaped["player_name"])
         if is_prop and (prop_settler is None or sport not in PROP_GRADED_SPORTS):
-            ungraded["player_prop"] += 1
+            skip(sport, "player_prop")
             continue
         if not is_prop and view["market"] not in mbs.GRADABLE_MARKETS:
-            ungraded["market_not_gradeable_from_score"] += 1
+            skip(sport, "market_not_gradeable_from_score")
             continue
         if view["segment"] not in ("full", "full_game"):
-            ungraded["segment_not_full_game"] += 1
+            skip(sport, "segment_not_full_game")
             continue
         day = SCORECARD.central_date(shaped["commence_time"])
         if day and today is not None and day > today:
-            ungraded["not_started"] += 1
+            skip(sport, "not_started")
             continue
         if is_prop:
             if not day:
-                ungraded["prop_no_commence_time"] += 1
+                skip(sport, "prop_no_commence_time")
                 continue
             result, why = prop_settler(shaped)
             if result is None:
-                ungraded[f"prop_{why}" if why else "prop_unsettled"] += 1
+                skip(sport, f"prop_{why}" if why else "prop_unsettled")
                 continue
         else:
             if not (shaped["home_team"] and shaped["away_team"]):
-                ungraded["no_team_names"] += 1
+                skip(sport, "no_team_names")
                 continue
             if not day or day not in indexed:
-                ungraded["no_chips_for_kickoff_date"] += 1
+                skip(sport, "no_chips_for_kickoff_date")
                 continue
             chip, why = SCORECARD.match_chip(shaped, indexed[day].get(sport, []))
             if chip is None:
-                ungraded[why or "no_chip_match"] += 1
+                skip(sport, why or "no_chip_match")
                 continue
             if chip["state"] != "final":
-                ungraded["game_not_final"] += 1
+                skip(sport, "game_not_final")
                 continue
             if chip["scores"] is None:
-                ungraded["final_score_unparseable"] += 1
+                skip(sport, "final_score_unparseable")
                 continue
             result = settle_from_score(shaped, *chip["scores"])
             if result is None:
-                ungraded["unsettleable_side_or_line"] += 1
+                skip(sport, "unsettleable_side_or_line")
                 continue
         if result == "push":
-            ungraded["push"] += 1
+            skip(sport, "push")
             continue
         outcome = 1.0 if result == "win" else 0.0
         fair = view["fair_probability"]
@@ -547,6 +554,8 @@ def grade_population(
             "model_edge_pct": edge,
             "pnl": pnl,
         })
+    if ungraded_by_sport is not None:
+        ungraded_by_sport.update({name: dict(counts) for name, counts in sorted(by_sport.items())})
     return graded, dict(ungraded)
 
 
@@ -862,19 +871,30 @@ def main(argv: Sequence[str] | None = None) -> int:
         window = f"{args.population}:{args.start}..{args.end}"
 
     now_central = SCORECARD.central_date(datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+    ungraded_by_sport: dict[str, dict[str, int]] = {}
     graded, ungraded = grade_population(records, chips_by_date, event_teams, today=now_central,
-                                        prop_settler=prop_settler)
+                                        prop_settler=prop_settler, ungraded_by_sport=ungraded_by_sport)
     cov = coverage(records, chips_by_date, graded)
+    graded_by_sport = {
+        sport_name: {"rows": sum(1 for row in graded if row["sport"] == sport_name),
+                     "games": len({row["game"] for row in graded if row["sport"] == sport_name}),
+                     "dates": len({row["date"] for row in graded if row["sport"] == sport_name})}
+        for sport_name in sorted({row["sport"] for row in graded})
+    }
     print("[bucket_search] COVERAGE " + json.dumps(cov, default=str), flush=True)
+    print("[bucket_search] GRADED_BY_SPORT " + json.dumps(graded_by_sport), flush=True)
     print("[bucket_search] UNGRADED " + json.dumps(ungraded), flush=True)
+    print("[bucket_search] UNGRADED_BY_SPORT " + json.dumps(ungraded_by_sport), flush=True)
     results = evaluate_buckets(graded, min_games=args.min_games, min_dates=args.min_dates,
                                resamples=args.resamples, seed=args.seed, q=args.fdr_q)
     method = {"min_games": args.min_games, "min_dates": args.min_dates, "resamples": args.resamples,
               "seed": args.seed, "fdr_q": args.fdr_q, "unit": "game",
               "skill_metric": "brier(model)-brier(market) on the side", "profit_metric": "flat 1u ROI, model side",
-              "props": "none" if prop_settler is None else "mlb via statsapi box scores"}
+              "props": "none" if prop_settler is None else "mlb via statsapi box scores",
+              "phase": "game_state when present, else sighted before/after commence"}
     report = {"population": args.population, "scoring_eligible": args.population == "recorder",
-              "window": window, "method": method, "coverage": cov, "ungraded": ungraded, "buckets": results}
+              "window": window, "method": method, "coverage": cov, "graded_by_sport": graded_by_sport,
+              "ungraded": ungraded, "ungraded_by_sport": ungraded_by_sport, "buckets": results}
     (out_dir / "bucket_search_report.json").write_text(json.dumps(report, indent=1, default=str), encoding="utf-8")
     (out_dir / "bucket_search_report.md").write_text(markdown_report(results, cov, ungraded, args.population),
                                                      encoding="utf-8")

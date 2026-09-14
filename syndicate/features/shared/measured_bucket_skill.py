@@ -94,12 +94,36 @@ def _band(value: float | None, bands: tuple[tuple[str, float, float | None], ...
     return None
 
 
-def _phase(game_state: Any) -> str:
+def _parse_time(value: Any) -> Any:
+    from datetime import datetime, timezone
+
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _phase(game_state: Any, *, sighted_at: Any = None, commence_time: Any = None) -> str:
+    """live / pregame from the row's game state; when that is absent, from WHEN it was sighted.
+
+    The published openings carried no game state before 2026-09-12. Where both exist (the
+    2026-09-13 openings) the time rule agrees with the field: MLB field-live 1,116 vs sighted
+    after first pitch 1,106; NFL 1,359 vs 1,359.
+    """
     state = _norm(game_state)
     if state in LIVE_STATES:
         return "live"
     if state in PREGAME_STATES:
         return "pregame"
+    sighted, start = _parse_time(sighted_at), _parse_time(commence_time)
+    if sighted is not None and start is not None:
+        return "pregame" if sighted < start else "live"
     return "unknown"
 
 
@@ -107,14 +131,17 @@ def _mapping(value: Any) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
 
 
-def view_from_candidate(row: Mapping[str, Any]) -> dict[str, Any]:
-    """The bucket view of a Layer 2 candidate, read at score time."""
+def view_from_candidate(row: Mapping[str, Any], *, now: Any = None) -> dict[str, Any]:
+    """The bucket view of a Layer 2 candidate, read at score time (`now`, default the clock)."""
+    from datetime import datetime, timezone
+
     quote = _mapping(row.get("quote"))
     return {
         "sport": _norm(row.get("sport")),
         "market": _norm(row.get("market")),
         "segment": _norm(row.get("segment")) or "full",
-        "phase": _phase(row.get("game_state")),
+        "phase": _phase(row.get("game_state"), sighted_at=now or datetime.now(timezone.utc),
+                        commence_time=row.get("commence_time")),
         "model_edge_pct": _num(row.get("model_edge_pct")),
         "fair_probability": _num(quote.get("fair_probability")),
         "book_age_seconds": _num(quote.get("book_age_seconds")),
@@ -132,7 +159,7 @@ def view_from_record(record: Mapping[str, Any]) -> dict[str, Any]:
         "sport": _norm(record.get("sport")),
         "market": _norm(identity.get("market")),
         "segment": _norm(identity.get("segment")) or "full",
-        "phase": _phase(record.get("gs")),
+        "phase": _phase(record.get("gs"), sighted_at=record.get("t"), commence_time=record.get("ct")),
         "model_edge_pct": _num(record.get("me")),
         "fair_probability": _num(record.get("fp")),
         "book_age_seconds": _num(record.get("ba")),
