@@ -1450,6 +1450,9 @@ death, never life — do not invert it.
   - Coverage the search can reach today: full-game h2h / spreads / totals / btts. Props (83% of soccer) and corners wait for box-score graders.
 - OWED:
   - Deploy #3 (bucket override in the scorer + recorder `ht`/`at`) needs the user's decision. Scoring is unchanged until a search validates a bucket, because the table ships empty.
+    - COORDINATION `[2026-09-14 ~19:00Z, lane heavy-build-child-process, session 0f5b256e]`: that lane deploys refresh-worker at `0a18557a` itself (a pool-cache cap). It does not deploy main's tip, which carries this lane's undeployed scorer/recorder code.
+    - It needs its first ~6 heavy builds undisturbed, about 90 min from its live time. It will post "reading done" under `heavy-build-child-process`.
+    - Before acquiring the refresh-worker claim for deploy #3, read that line or message the session. If the user's deploy cannot wait, deploy and tell them: 3-4 builds still give a partial reading.
   - The first real search: >= 5 dates of recorder data with finals, i.e. no earlier than 2026-09-19.
   - Live-row notes on tonight's MLB slate (first pitch 22:40Z).
 - Blocked by: none.
