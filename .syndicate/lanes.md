@@ -996,6 +996,9 @@ death, never life — do not invert it.
     - Blocked minutes, hold ignored -> respected: N=1 118 -> **242** (worst 51, 1 streak never fired); N=2 169 -> 246; N=5 283 -> 361; N=15 435 -> **450** (worst 107).
     - Threshold 1 still wins, by about half, not the ~3x first shown.
     - The later 14 streaks (09-13 23:29Z..09-14 15Z) are NOT re-run: `render_logs.py` text output cuts `ALL_PROCESS_MEMORY` lines to 232 chars, so the process list needs `--json`.
+    - **Re-run ~17:20Z on that later window with `--json`** (7,478 samples 09-13 23:29Z..09-14 15:35Z, 15 streaks; the first is cut at the window edge). No child job in only 32% of samples.
+      - Blocked minutes, hold ignored -> respected: N=1 193 -> **370** (worst 53); N=2 252 -> 441; N=5 380 -> 498; N=15 562 -> **594** (worst 63).
+      - Both windows (24 streaks, one edge overlap): N=1 ~612 vs N=15 ~1,044 blocked minutes. **Threshold 1 is ~40% better, not ~3x.** It still wins in every window.
     - Structural implication for lane heavy-build-child-process: child jobs are present ~55% of the time, which caps how much any restart-based stopgap can recover.
   - Env `SYNDICATE_REFRESH_WORKER_RECYCLE_AFTER_REFUSALS=1` is set on refresh-worker (single-key PUT ~15:12Z, HTTP 200, read back 1). It is **not live until a deploy**; any refresh-worker deploy carries it.
   - **USER DECISION ~15:40Z (10:40 CT): "One tip deploy after reading (d) (Recommended)".** This lane runs ONE refresh-worker deploy of main's tip (`6fe6c6e9` at decision time).
