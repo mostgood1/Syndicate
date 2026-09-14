@@ -1651,6 +1651,12 @@ death, never life — do not invert it.
     - Recorder names: 832 of 832 post-live records named, ALL soccer. MLB/NFL/NCAAF have written no post-live keys, so their share is unread.
     - PREDICTION ASSUMPTION WRONG: 09-15 was not a post-live population. The pre-live 20:53:26Z build had already recorded first sightings for every 09-15 key, and keys are recorded once per day.
     - The MLB/NFL/NCAAF reading moves to post-live keys from tonight's in-play line moves (MLB from 22:40Z), or to the 09-16 board after the Central date roll.
+- SCHEDULED `[2026-09-14 ~21:40Z, user request "schedule the remaining actions"]`. The remaining owed work is one-time scheduled tasks. Each is read-only on production, commits ledger-only, and records UNREAD rather than substituting a population:
+  - `accuracy-0914-mlb-live-rows-reading`, 2026-09-14 20:00 CT: MLB live-row notes (owed since deploy #1), plus MLB/NFL recorder names on post-deploy in-play keys.
+  - `accuracy-0914-recorder-names-0916-board`, 2026-09-15 12:30 CT: recorder names per sport on the 09-16 board, every record of which is post-deploy.
+  - `accuracy-0914-first-recorder-bucket-search`, 2026-09-20 11:30 CT: the first scoring-eligible bucket search (recorder 09-14..09-19). REPORT ONLY, never `--write-table`; any validated bucket is a DECISION OWED TO THE USER.
+  - They run from this worktree and from C:\tmp\syndicate-sessions\accuracy-assessment-0914-readings (copies of the reading scripts). Keep both until the 09-20 run has recorded.
+  - Times are staggered off the other tasks that evening and morning, because a hung scheduled run blocks later fires. They run only while the app is open; a slept machine runs them late.
     - soccer `no_chip_match` 710.
     - MLB props: `prop_player_not_in_boxscore` 3,124 (void), `prop_no_commence_time` 1,169.
   - The first real search: >= 5 dates of recorder data with finals, i.e. no earlier than 2026-09-19.
