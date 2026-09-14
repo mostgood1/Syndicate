@@ -17,6 +17,17 @@ work takes the next free number (see the counter at the top of `todo.md`).
 ---
 
 
+### `#655` — **THE NCAAF BOARD HELD A FINISHED WEEK UNTIL THE NEXT DAILY BUILD — read-time grace SHIPPED (`ab787363`); the Saturday reading is owed** — lane `ncaaf-games-cache-refresh`, 2026-09-10 — **OPEN until the 2026-09-13 reading**
+
+- **What.** week_state is rebuilt once a day inside the NCAAF projection run, and that run drifts ~19 min/day (01:47:45Z -> 02:07:00Z -> 02:26:07Z on 09-08..10). A build that lands mid-slate counts the evening's games as unplayed, and `target_week_from_state` then held the board on a FINISHED week for a day. Measured on 2026-09-08 (SMU @ Florida State, caught 137.8 min after kickoff). Predicted for 2026-09-13 (a ~03:2xZ build against last kickoffs at 03:00-04:00Z).
+- **Fix, `ab787363`.** The producer adds `unplayed_kickoffs`: per week, the latest unplayed kickoff and a count of undated games. The reader skips a week once every unplayed game in it kicked off more than 12 h ago (`_COMPLETION_GRACE_SECONDS`, the stale-flag threshold). An absent field or an undated game keeps the old rule, and the highest candidate week is never skipped. Tests 59 passed / 1 skipped; 4 of 4 mutations caught.
+- **Deployed.** web: live 2026-09-10T19:38:09Z, no regression (`deploys.md`). refresh-worker: `86c82220` live 2026-09-10T20:13:21Z, deployed by lane `exchange-execution-unblock`; `ab787363` is an ancestor (checked).
+- **Owed readings.** `ncaaf-week-state-field-tonight` (23:00 CDT 09-10: the artifact carries the field). `ncaaf-week3-advance-sunday` (11:30 CDT 09-13: PASS = week 3 served). `ncaaf-week3-advance-monday` (08:00 CDT 09-14).
+- **Close when** the Sunday reading shows week 3 served on the grace; then move this item to `todo_closed.md`.
+- **CLOSED 2026-09-14** (scheduled task `ncaaf-week3-advance-monday`; lane `ncaaf-games-cache-refresh` closed GOAL: MET). Week 3 advanced on the grace at ~15:59Z 2026-09-13. The refresh-worker launched `week=3` at 15:59:53.985Z, 54 s after 03:59:00Z + 12 h and 2.3 s before the week_state rebuild published at 15:59:56.29Z. At 2026-09-14 13:35Z it read `resolved_active_weeks [1, 2, 3]` and `cards?week=3` = `2026 Week 3` (57 of 57 `3_`). Detail: `deploys.md` 2026-09-14 13:35Z.
+
+---
+
 ## Closed 2026-08-29 — NCAAF live surfaces, opening Saturday: four defects, lanes `ncaaf-live-lens-state` / `ncaaf-compact-card-state` / `ncaaf-chip-grid-join`
 
 All four found and fixed during the first NCAAF slate of the season, each
