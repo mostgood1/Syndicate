@@ -955,7 +955,7 @@ death, never life — do not invert it.
   - **Whole-boot attribution (`0a18557a`, 19:07-20:56Z):** of pid 39's +1,516 MB, the heavy build accounts for only ~+497. The live-lens loop's builds account for +883, startup +390, and the MLB sim tick +149. Isolating the heavy build alone would leave most growth in place.
   - **Done:** pool-cache cap live at env 2 (`0a18557a`; log field `d4deb502` verified 21:16:30Z `limit=2`). Over builds 1-4 it grew ~164 MB less than uncapped; H-cache PARTIAL.
   - **Left:**
-    - (1) The 23:10Z live-slate reading (background job in session 0f5b256e): which worker publishes `live/<sport>_live_lens.json`, and what MLB's live-lens build costs each worker.
+    - (1) The live-slate reading, now OWNED BY SCHEDULED TASK `live-lens-dual-loop-reading-0914` (one-time, 2026-09-14 18:15 CDT / 23:15Z, read-only, records to deploys.md, this block and the log; it also checks refresh-worker recycle). It survives this session's close but only runs while the Claude app is open.: which worker publishes `live/<sport>_live_lens.json`, and what MLB's live-lens build costs each worker.
     - (2) A user decision: `SYNDICATE_ENABLE_LIVE_LENS_LOOP` off refresh-worker vs off live-odds-worker. It is true on both.
     - (3) Re-scope or re-title this lane after that decision; the child-process design may no longer be the right fix.
   - **Blocking:** live games (from 22:40Z), then the user's decision.
