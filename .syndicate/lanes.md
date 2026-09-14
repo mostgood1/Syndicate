@@ -976,6 +976,12 @@ death, never life — do not invert it.
     - Real path: the existing full-path test `test_build_candidate_pool_does_not_embed_full_odds_history_payload` printed `CANDIDATE_POOL_CACHE date=2026-06-10 cached=True entries=1 limit=12 pool_json_bytes=9283` (a 1-candidate fixture, so it says nothing about production size).
     - In that targeted run (`-k "candidate_pool or malloc or cache"`), 28 passed and 2 errored at TEARDOWN on the `data/` mirror write guard (`_refresh_wnba_boxscores` -> `data/wnba_source/data/processed`, `intelligence_state.py:7016`, before the new code). Not attributed to this change; the baseline was NOT run.
     - Ships on the next refresh-worker deploy after the threshold-1 recycle is observed (user decision).
+  - **PRE-INSTRUMENT READING ~16:40Z, boot of `6fe6c6e9` (15:37:05Z live):** pid 39 RSS from `ALL_PROCESS_MEMORY` (`render_logs.py --json`, 314 samples 15:37Z..~16:37Z), minimum per window between `CANDIDATE_POOL_READY` lines.
+    - Boot 95 MB. After build 1 (15:50:36Z, count 168) 1,181 MB (**+1,085**). After build 2 (count 14) 1,167 MB (-14). After build 3 (count 165) 1,305 MB (+138). After build 4 (count 14) 1,363 MB (+58).
+    - **Partly against H-cache as the majority cause:** the FIRST build alone adds ~1.1 GB, which a count-bounded pool cache holding one ~9 KB-per-candidate pool cannot be. More likely it is one-time loads (imports, shards, module data), NOT measured.
+    - Later builds add +58..+138 MB each. Up to 12 cached pools could still add ~1 GB by the cap, which fits earlier boots reaching 2.1-2.4 GB after hours. So H-cache stays OPEN for the tail, not the step.
+    - **The container reading is confounded by child jobs.** `MALLOC_TRIM` anon (container-wide) stepped +580 MB after build 4 while pid 39 moved +58; child-job RSS was 842-886 MB in that window. The refusal guard reads CONTAINER unreclaimable, so child jobs push the heavy build into refusal. A recycle (which holds while children run) cannot relieve that part.
+    - Correction to this block's earlier "Measured" line: post-build `MALLOC_TRIM` "anon 1.8-2.5 GB" is container-wide, not pid 39.
 
 ### heavy-build-memory-refusal — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - DECISION 2026-09-14 ~15:10Z (10:10 CT): user chose "Restart at 1 + build isolation lane (Recommended)".
