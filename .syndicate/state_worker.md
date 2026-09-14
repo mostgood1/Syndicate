@@ -2164,4 +2164,7 @@ outlier cold reading. Three paired replications erased it: **cold 31.32s vs warm
   - 3,303 of 7,159 refused-level samples had `process_count` 2, i.e. no children.
   - Heavy builds resumed within minutes of the 13:42Z, 16:23Z and 18:31Z boots.
 - **The floor is roughly right.** Steady-state builds peak +296 / 719 / 1,416 MB above start (2 s `MEMORY_WATCHDOG`, n=12), minimum headroom at peak 633 MB, at parent stages (`board_contract_end`, `build_live_state_payload_fallback`). The MLB hydrated overview runs in a capped child (`[overview_isolation] OK` 33/33, 0 `MEMORY_CAP_HIT`), so the floor's 08-07 sizing comment describes a stage no longer in pid 39.
-- **Fix on main, NOT deployed:** `339dc6e9` `worker_recycle`. The worker exits (Render restarts it) after >= 15 consecutive refusals (`SYNDICATE_REFRESH_WORKER_RECYCLE_AFTER_REFUSALS`, 0 disables), uptime >= 30 min, no live child, no drain. Scheduled in task `book-quotes-fuller-copy-deploy-0914`.
+- **Fix LIVE, NOT yet exercised `[deploy verified 2026-09-14, Render deploys API]`:** `339dc6e9` `worker_recycle` is in refresh-worker `fb0c91cf` (`dep-dajvgqqd0e5s73dt6r9g`, live 13:39:49Z).
+  - The worker exits (Render restarts it) after >= 15 consecutive refusals (`SYNDICATE_REFRESH_WORKER_RECYCLE_AFTER_REFUSALS`, 0 disables), uptime >= 30 min, no live child, no drain.
+  - On this boot, refusals came back 50m45s after live (first 14:30:34Z; 5 by 14:50:48Z), which fits the ratchet above.
+  - No `RECYCLE_EXIT` has been observed yet, so whether it restarts and heavy builds resume is still unverified.

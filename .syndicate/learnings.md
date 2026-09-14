@@ -5929,3 +5929,16 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - Before naming an infrastructure event (OOM storm, deploy) as the cause of a data loss, pull the same event count on a night that did NOT lose data. Here that was one events-API call, and it killed the attribution.
   - A producer's health line and a join's index count are both UPSTREAM of the ledger write. Neither shows the write happened.
   - *(evidence: `log/2026-09-14.md` section "no lane — `live-gameline-accuracy-snapshot` run")*
+
+## 2026-09-14 — OVERTURNED: "PUBLISH_FAILED rose 0 -> 9 after the refresh-worker deploy" — the baseline hour sat inside the defect window `[lane heavy-build-memory-refusal]`
+
+- **What was believed:** the scheduled deploy of `fb0c91cf` recorded a red flag. There were 0 `PUBLISH_FAILED` in the hour before the deploy and 9 in the first 16 min after it.
+- **What falsified it:**
+  - The baseline hour (12:36-13:36Z) was a heavy-build refusal stretch: 35 refusals, 0 `PORTFOLIO_COMMIT`. The heavy build is what publishes, so it publishes nothing and cannot fail to publish. The hour was quiet by construction.
+  - The 22 h before it on the same old commit: 4,053 `PUBLISH_FAILED` (94-261/h).
+  - After the deploy: 62 in ~50 min, the low end of the old rate.
+- **How to apply:**
+  - Before comparing a post-deploy count to a pre-deploy window, check the window was doing the work that produces the count. A deploy that fixes a stall re-enables every side effect the stall had suppressed. "0 before" then means "not running", not "not failing".
+  - Pick a baseline outside the defect window, or report the count per unit of work (per heavy build), not per hour.
+  - Specialises [[re-baseline before judging]]: the one-hour window was not stale, it was unrepresentative.
+  - *(evidence: `deploys.md` 2026-09-14 14:55Z; `log/2026-09-14.md` session 0f5b256e ~14:45Z section)*
