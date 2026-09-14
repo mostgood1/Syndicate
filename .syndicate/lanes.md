@@ -1002,6 +1002,14 @@ death, never life — do not invert it.
       - The 3 failures reproduce identically on a clean origin/main (`58618252`) worktree, so they are pre-existing: `test_bootstrap_soccer_player_seed_files_backfills_missing_leagues_only`, `test_bootstrap_soccer_schedule_seed_files_backfills_missing_leagues_only`, `test_soccer_history_seed_bootstrap_copies_match_history` (need the git-tracked data mirror).
       - The 9 unreached tests each pass in their own process, on this change AND with HEAD's two hooked files swapped in (bytes restored identical).
       - **Unverified:** why the single-process full run dies after ~61 tests. It was not reproduced on HEAD as a full run.
+- **LANDED `339dc6e9` 2026-09-14 04:35:54Z (23:36 CT 09-13). NOT DEPLOYED.**
+  - User decision ~23:25 CT: "Bundle into tonight (Recommended)". It ships with `57b67127` + `cb248a95` in scheduled task `book-quotes-fuller-copy-deploy-0914`, moved from 23:50 CT to **00:50 CT 09-14** to allow bundling; cutoff Mon 09-14 11:00 CT.
+  - Collateral found between live `cae4713e` and tip `339dc6e9`:
+    - `54f3d662` `artifact_publisher.py` (+77), lane `quote-state-publish-retry`, whose block expects this deploy to carry the retry to refresh-worker;
+    - `637278e3` NFL/NCAAF props fetch scripts (+45/-4), lane `nfl-live-props-missing`, live on live-odds-worker;
+    - `b6ff319a` `scripts/layer2_live_scorecard.py` (+13/-2, offline).
+  - User decision ~23:40 CT: "Allow all three (Recommended)". The task allows exactly those eight code files and six commits, and adds a collateral check (publish retry / props capture errors after boot).
+  - Verification owed is in the task prompt (step 6d) and above.
   - Verification owed after a refresh-worker deploy:
     - no `RECYCLE_EXIT` while builds are admitted;
     - during a refusal stretch, `RECYCLE_CHECK held=...` then `RECYCLE_EXIT` once >= 15 consecutive `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` with no children;
