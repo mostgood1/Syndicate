@@ -1196,6 +1196,10 @@ death, never life — do not invert it.
   - `57b67127` is LIVE on refresh-worker in `fb0c91cf`: deploy `dep-dajvgqqd0e5s73dt6r9g`, POST 13:36:43Z, live 13:39:49Z, clean boot.
   - `[odds_book_quotes] LATEST_CACHE_EVICT`: 0 lines, 13:39:49-14:07:43Z. No affected-date eviction was observed. Absent is not failure: past dates are read only on demand.
   - Still owed: an eviction naming `<affected date>.jsonl.gz`. Details and the rollback are in `deploys.md` 2026-09-14 13:36:43Z.
+  - **Re-read 2026-09-14 ~21:48Z (16:48 CT), session 0f5b256e: still UNEXERCISED, not failed.**
+    - refresh-worker `[odds_book_quotes] LATEST_CACHE_EVICT` (`render_logs.py --json`, covered 14:19:13Z-21:44:09Z, across boots `fb0c91cf`->`6fe6c6e9`->`17c8208e`->`ae53a1a5`->`0a18557a`->`6438830d`): 170 evictions, ALL plain `.jsonl`, 0 for an affected date.
+    - 13:39-14:07Z was read by the deploy task (0 lines).
+    - No consumer read an affected past date today. The reading needs one that does (e.g. a settlement or actuals window reaching 09-03..09-09).
 - VERDICT 2026-09-13 ~19:30Z — Goal: when a `book_quotes` shard exists both plain and as `.gz`, every reader gets the copy holding MORE data, so the 18 mismatched shards on refresh-worker (mlb 09-03..09-09, ncaaf 09-05, soccer 08-22..09-09) stop serving their shorter plain file — without ever preferring a truncated or unverifiable `.gz`.
   - **GOAL: NOT MET.** Code is on main (`57b67127`, tests + unwired check pass) but NOT deployed, and the production reading is owed.
   - Blocking: refresh-worker preflight HOLD at 19:20Z, plus the user's choice to deploy after tonight's slate.
