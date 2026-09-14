@@ -1622,6 +1622,12 @@ death, never life — do not invert it.
   - HOLD persisted from 20:31:53Z to 20:53Z: 1-7 jobs (the MLB `daily_update.py --workflow ui-daily` under the sim job, `refresh_odds_sources.py`, soccer `build_soccer_artifacts.py`).
   - Preflight 20:56:12Z: CLEAR, infrastructure only, plus 1 defunct child already dead.
   - DEPLOY TRIGGERED 20:56:38Z (15:56 CT): refresh-worker `0a18557a` -> `6438830d`, `dep-dak5v1jl550s73a1i3r0`, trigger api. Readings owed per the prediction above.
+  - LIVE 21:03:17Z. READING on the first post-live shortlist (21:11:04Z, 3,038 rows, read per sport so the 2,000-row limit cut nothing):
+    - Scores MET: 626 factor rows, all `skill_source: "category"`, every factor its prediction; 0 bucket, 0 without a source.
+    - Recorder MET on soccer: 418 of 418 post-live records named, 0% before live. MLB/NFL/NCAAF wrote no new 09-14 keys after live; owed on the first post-live 09-15 build.
+    - No Traceback. `CANDIDATE_POOL_CACHE` had not printed on the new code by 21:11Z; owed.
+    - Recorded in `deploys.md`.
+  - Claim lapsed at its TTL (21:16:44Z), deliberately not held to protect a reading; the preflight's 25-minute deploy spacing covered the first builds.
     - soccer `no_chip_match` 710.
     - MLB props: `prop_player_not_in_boxscore` 3,124 (void), `prop_no_commence_time` 1,169.
   - The first real search: >= 5 dates of recorder data with finals, i.e. no earlier than 2026-09-19.

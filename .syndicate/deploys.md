@@ -34912,3 +34912,40 @@ Source: refresh-worker logs 19:07Z-20:29Z (`render_logs.py`, `--json` for `ALL_P
   - **Verdict PARTIAL:** the cache is part of the per-build growth, not all of it. Live memory is ~6x the cached JSON (inferred from 2 entries' difference, n=1 boot each).
 - 0 `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint`, 0 `[worker_recycle]`, 0 Traceback, 1 boot. The threshold-1 recycle is still unexercised on this boot.
 - Env `SYNDICATE_CANDIDATE_POOL_CACHE_MAX=2` left set. The undisturbed-window hold for lane accuracy-assessment-0914 is released ("reading done" posted in lanes.md).
+
+## 2026-09-14 20:56Z (15:56 CT) — refresh-worker `0a18557a` -> `6438830d` — deploy `dep-dak5v1jl550s73a1i3r0` — lane `accuracy-assessment-0914`, session 498e87fd
+
+User decision in chat: "Deploy #3 after their reading is done".
+- **Waited for:**
+  - Lane `heavy-build-child-process`'s six-build memory window. Its "reading done" is on origin/main `6438830d` (20:29Z), verified in the ledger rather than taken from the message.
+  - An MLB daily update in flight.
+    - Preflight read HOLD from 20:31:53Z to 20:53Z: 1-7 jobs (`daily_update.py --workflow ui-daily` under the sim job, `refresh_odds_sources.py`, `build_soccer_artifacts.py`).
+    - CLEAR at 20:56:12Z, infrastructure processes only.
+- **Claim:** acquired 20:31:44Z by this lane. It lapsed at its TTL (21:16:44Z) before this entry was pushed.
+  - Deliberate: there is no renew, and holding a deploy lock only to protect a reading would block other lanes.
+  - The preflight's 25-minute deploy spacing kept the first post-live builds undisturbed.
+- **Ships (code since live `0a18557a`):**
+  - `layer2_board._apply_skill_reliability` prefers a validated bucket factor over the category factor and stamps `skill_source`. `measured_bucket_skill.json` is EMPTY, so every factor is still the category's.
+  - `measured_bucket_skill._phase` falls back to sighting time vs commence when a row has no game state; the search and the scorer share it. Inert while the table is empty.
+  - The population recorder writes team names (`ht`/`at`).
+  - Carried from lane `heavy-build-child-process`: `d4deb502`, log-only (`CANDIDATE_POOL_CACHE limit=` reports the cap).
+  - Offline only, never run by the worker: `scripts/bucket_search.py`, `syndicate/features/mlb/prop_outcomes.py` and their tests; `9e2685e3`, an evidence JSON.
+  - No `render.yaml` or requirements change. Env `SYNDICATE_CANDIDATE_POOL_CACHE_MAX=2` untouched.
+- **Live:** 21:03:17Z (Render deploy API `finishedAt`).
+- **verify:** the prediction pre-registered in the lane (pushed before the deploy), read on the first Layer 2 shortlist written after live.
+  - That shortlist: 21:11:04Z, 3,038 rows. It was fetched per sport, so the 2,000-row limit cut nothing: ncaaf 428, mlb 960, soccer 1,579, nfl 71. MLB `rows_with_projection` 1,279 of 1,461.
+  - **Scores: MET.** 626 rows carry `skill_reliability`, all with `skill_source: "category"`, each factor equal to its prediction:
+    - ncaaf totals 221 x 0.514; ncaaf spreads 84 x 0.814; ncaaf h2h 53 x 0.814;
+    - soccer h2h 167 x 0.877;
+    - mlb outs 35 x 0.877; mlb earned_runs 33 x 0.979;
+    - nfl totals 32 x 0.859; nfl spreads 1 x 0.958.
+  - **Falsifiers, all 0:** `skill_source: "bucket"` rows 0; a factor different from its prediction 0; a factor without `skill_source` 0.
+  - **Recorder: MET so far, on soccer only.**
+    - Records written after live carry `ht`/`at`: 418 of 418 (soccer game 14/14, props 367/367, other 37/37). Records written before live: 0%.
+    - MLB, NFL and NCAAF wrote no NEW keys for 09-14 after live (all duplicates), so their share is not yet readable.
+  - POPULATION: one line per sport on the first build (mlb/nfl/ncaaf duplicates only; soccer wrote 418, published), with `PUBLISH_OK` for the parts.
+  - No `Traceback` on refresh-worker since live.
+- **NOT verified, OWED:**
+  - Team-name share on MLB/NFL/NCAAF game records, on the first 09-15 shortlist written after live. The 09-15 shortlist read at 21:13Z was written 20:53:26Z, BEFORE live, so it is not evidence. A watcher is on it.
+  - The other lane's health check on this boot: the first `CANDIDATE_POOL_CACHE` line, expected `limit=2` and `entries` <= 2. None had printed by 21:11Z.
+  - MLB live-row notes (owed since the 17:22Z entry): first pitch 22:40Z.
