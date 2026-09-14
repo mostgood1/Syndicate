@@ -1532,7 +1532,7 @@ death, never life — do not invert it.
     3. v2 runs with `SYNDICATE_NCAAF_SOURCE_ROOT` pointed at the primary checkout's `data/ncaaf_source`.
   - HYPOTHESIS for v2 (H-live): the MLB prop losses sit mainly in LIVE sightings; PREGAME MLB hitter props read parity.
     - FALSIFIED IF pregame hitter-prop buckets validate a loss of similar size (Brier diff >= +0.004) on >= 60 games.
-- PREVIEW v2 READING `[same window, commit b0dbdb78 landed in ca40dba1, NCAAF registry from the primary checkout, finished ~20:05Z]`: 66,385 graded rows / 547 games.
+- PREVIEW v2 READING `[same window, commit b0dbdb78 landed in ca40dba1, NCAAF registry from the primary checkout, finished before 20:00Z (corrected from "~20:05Z", which was estimated, not read off the clock)]`: 66,385 graded rows / 547 games.
   - Coverage by sport:
     - MLB 56,047 rows / 188 games / 14 dates;
     - NCAAF 8,480 / 176 / 8;
@@ -1553,6 +1553,21 @@ death, never life — do not invert it.
     - MLB game lines grade on only 7 of 14 dates (totals 69 games, spreads 82, h2h 49): `final_score_unparseable` 2,701, all MLB.
       - CAUSE: `/api/board/game-chips` serves past MLB dates' finals with `away.score` / `home.score` null. 09-02: 15 of 15 finals; 09-10: 5 of 5, and only 5 MLB chips that day. Filed as a lead; the live scorecard has the same blind spot.
       - CORRECTION, PRE-REGISTERED BEFORE v3 IS READ: an MLB game line whose chip is missing or scoreless settles from the StatsAPI schedule's final score for the matched game, using the prop grader's own team/start matching. A chip that says not-final still counts `game_not_final`.
+- PREVIEW v3 READING `[same window, commit 419a927f, finished before 20:04Z]`: 69,041 graded rows / 547 games.
+  - The correction worked: `final_score_unparseable` 2,701 -> 0. MLB game lines now grade on all 14 dates:
+    - pregame totals 69 -> 130 games, spreads 82 -> 166, h2h 49 -> 99;
+    - live totals 63 games and live spreads 55 games, both on 8 dates.
+  - Verdicts: skill_loss 29 (the same 29 buckets as v2, all pregame), parity 118, insufficient 348; skill_pocket 0; profit_pocket 0.
+  - MLB game lines, published pregame, consensus fair:
+    - totals +0.0130 [-0.0000, +0.0261], p 0.051, ROI -8.9%: leans to a loss but does not validate;
+    - h2h +0.0046, ROI -11.2%;
+    - spreads -0.0007, ROI +6.8% [-5.9%, +19.6%]: parity.
+  - Largest positive ROI anywhere: MLB live spreads +22.5% [-6.6%, +49.4%] on 55 games / 8 dates. INSUFFICIENT (< 60 games), not a finding.
+  - Prediction status unchanged from v2: (1) HELD, (2) HELD, (3) FALSIFIED (pregame). H-live FALSIFIED.
+  - What the preview says, with its limit:
+    - Among PUBLISHED pregame MLB props, the model's side loses to the market, consistently across the disagreement, price, book-count and fair-method bands.
+    - No published pocket survives.
+    - It cannot set a factor. The recorder's pre-publication population, from 2026-09-19, is the test.
     - soccer `no_chip_match` 710.
     - MLB props: `prop_player_not_in_boxscore` 3,124 (void), `prop_no_commence_time` 1,169.
   - The first real search: >= 5 dates of recorder data with finals, i.e. no earlier than 2026-09-19.
