@@ -983,6 +983,12 @@ death, never life — do not invert it.
   - Boot to first admitted build: median 13.1 min (6 boots, 9.6-24.8). Self-clearing streaks took 10-80 min.
   - **Overturned:** "only a restart clears it". 18 of 23 streaks ended with an admitted build and no boot; only the 24-, 401- and 120-refusal streaks needed a boot.
   - Replay assumption: a restart does not change when the next streak starts (boots ran ~50 min before refusing).
+  - **CORRECTION ~16:25Z: that replay ignored recycle's child-job hold and its 30 min uptime floor, so it overstated the gain.**
+    - Re-run on the window that has process samples (`scratchpad/rw_memory_samples.csv`, 8,829 `ALL_PROCESS_MEMORY` samples 09-12 18:00Z..09-13 23:29Z, 9 streaks). A restart fires at the first sample with `process_count <= 2` after the Nth refusal and before the streak ends. No child job in 45% of samples.
+    - Blocked minutes, hold ignored -> respected: N=1 118 -> **242** (worst 51, 1 streak never fired); N=2 169 -> 246; N=5 283 -> 361; N=15 435 -> **450** (worst 107).
+    - Threshold 1 still wins, by about half, not the ~3x first shown.
+    - The later 14 streaks (09-13 23:29Z..09-14 15Z) are NOT re-run: `render_logs.py` text output cuts `ALL_PROCESS_MEMORY` lines to 232 chars, so the process list needs `--json`.
+    - Structural implication for lane heavy-build-child-process: child jobs are present ~55% of the time, which caps how much any restart-based stopgap can recover.
   - Env `SYNDICATE_REFRESH_WORKER_RECYCLE_AFTER_REFUSALS=1` is set on refresh-worker (single-key PUT ~15:12Z, HTTP 200, read back 1). It is **not live until a deploy**; any refresh-worker deploy carries it.
   - **USER DECISION ~15:40Z (10:40 CT): "One tip deploy after reading (d) (Recommended)".** This lane runs ONE refresh-worker deploy of main's tip (`6fe6c6e9` at decision time).
     - Code blast radius vs live `fb0c91cf`: only `05ca745c` (book_grid_artifact.py +138, live_gameline_ledger.py +27, its test +237; 0 deletions; no `render.yaml`). The deploy carries threshold 1 plus that lane's logging.
