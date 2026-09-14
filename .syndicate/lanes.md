@@ -830,7 +830,7 @@ death, never life — do not invert it.
 
 ### mlb-live-lens-payload-dup — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - Goal: the MLB live-lens snapshot write stops failing with `KeyValuePayloadTooLarge` on live-odds-worker — `live_lens_tick_after_mlb ok=True` on >= 90% of ticks through the next live MLB window — and the board's lens state join corrects exactly the rows it corrected before.
-- Files: syndicate/features/mlb/live_lens.py, tests/test_mlb_live_lens_snapshot_payload.py (NEW). NOT `syndicate/features/shared/board_enrichment.py`: that file is claimed by OPEN lane `football-layer2-live-parity`, and this fix is built to need no change there.
+- Files: syndicate/features/mlb/live_lens.py, tests/test_mlb_live_lens_snapshot_payload.py (NEW). The shared board-enrichment module is out of scope: lane `football-layer2-live-parity` holds it, and this fix is built to need no change there.
 - Measured before any code `[2026-09-13 04:05Z, substrate render]`:
   - `live_lens_tick_after_mlb` 00:14:31-04:03Z: **57 of 61 `ok=False`**, each `KeyValuePayloadTooLarge` for `live/mlb_live_lens.json` at 10,006,089 B (23:54Z) rising to 10,803,367 B (03:59Z), against the 8,388,608 B ceiling.
   - **ONSET CORRECTED `[2026-09-13 ~04:45Z]`: it RECURS in each long late MLB slate; it did not start tonight.** Peer lane `live-odds-worker-oom-loop` found it, and it was re-derived here with a positive control (09-13 00:16Z: 1 `KEYVALUE_WRITE_REJECTED`).
@@ -947,7 +947,34 @@ death, never life — do not invert it.
     - no rise in `LAYER2_GUARD_SKIP` or restarts.
 - Blocked by: none.
 
+### heavy-build-child-process — OPEN — opened 2026-09-14 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: stop refresh-worker's main process from keeping ~2.2 GB of live data after a full board build, by running `_compute_board_publication_response` in a child process whose memory is released on exit (the pattern `overview_subprocess.py` uses for the MLB overview). Then show heavy-build refusals staying at ~0 over a full slate day with no recycle restarts. No deploy without the user's OK.
+- Origin: user decision 2026-09-14 ~15:10Z (10:10 CT), "Restart at 1 + build isolation lane (Recommended)". The user's prompt was "why do we need 15? if we know its a problem we should fix it". The restart setting (lane heavy-build-memory-refusal) is the stopgap; this lane is the root-cause fix.
+- Measured before design (refresh-worker logs, 09-12 18:00Z..09-14 15:05Z):
+  - The allocator is already tuned: `MALLOC_ARENA_INIT max_arenas 2` on the 13:40:27Z boot, and post-build `MALLOC_TRIM` returns 58-180 MB per call while anon sits at 1.8-2.5 GB. So the retained memory is live, not free heap waiting to be returned.
+  - The build runs in-process in the intelligence loop thread (`pipeline/intelligence_state.py:7635`). Its return value feeds `maybe_record_board_state_to_evaluation_ledger` and `write_latest_intelligence_state` in the parent (`:7642`, `:7645`).
+- Risks known up front: a subprocess per build is periodic work, and `#241` put this worker into a restart loop that way (`overview_subprocess.py` docstring). The child also needs the build's peak (+296 to +1,416 MB) plus interpreter and import cost inside a 4,096 MB container shared with the MLB sim.
+- Hypothesis (to test before code): what the parent holds after a build is state built during it (module caches, loaded frames), which a child's exit would release. Falsified if a parent that has never run a full build still settles above ~2 GB once its other loops (fast path, venue loop, book grid) have run for 60 min.
+- Verification: refusal and recycle counts per hour across a full slate day on the isolated build, against this lane's baseline (restart-at-1 period), plus parent anon after build and the child's peak and elapsed time.
+- Files: none claimed yet. The design step comes first, and it will name new modules before any edit.
+
 ### heavy-build-memory-refusal — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- DECISION 2026-09-14 ~15:10Z (10:10 CT): user chose "Restart at 1 + build isolation lane (Recommended)".
+  - Why not 15: a replay of 23 closed refusal streaks (09-12 18Z..09-14 15Z) counted minutes with no full build. No policy 2,144 (worst 969). N=15 987 / 8 restarts / worst 92. N=5 647 / 17 / 59. N=2 405 / 21 / 26. **N=1 300 / 23 / worst 13.**
+  - Boot to first admitted build: median 13.1 min (6 boots, 9.6-24.8). Self-clearing streaks took 10-80 min.
+  - **Overturned:** "only a restart clears it". 18 of 23 streaks ended with an admitted build and no boot; only the 24-, 401- and 120-refusal streaks needed a boot.
+  - Replay assumption: a restart does not change when the next streak starts (boots ran ~50 min before refusing).
+  - Env `SYNDICATE_REFRESH_WORKER_RECYCLE_AFTER_REFUSALS=1` is set on refresh-worker (single-key PUT ~15:12Z, HTTP 200, read back 1). It is **not live until a deploy**; any refresh-worker deploy carries it.
+  - **USER DECISION ~15:40Z (10:40 CT): "One tip deploy after reading (d) (Recommended)".** This lane runs ONE refresh-worker deploy of main's tip (`6fe6c6e9` at decision time).
+    - Code blast radius vs live `fb0c91cf`: only `05ca745c` (book_grid_artifact.py +138, live_gameline_ledger.py +27, its test +237; 0 deletions; no `render.yaml`). The deploy carries threshold 1 plus that lane's logging.
+    - Order: wait for the jobs to end and the current process's `RECYCLE_EXIT` (reading d), then take the claim, run preflight CLEAR on the tip, and deploy.
+    - **Deadline 21:40Z (16:40 CT), one hour before first pitch:** deploy on the first CLEAR even without reading (d), so lane book-grid-gameline-ledger-log still gets its first-pitch reading.
+    - Afterwards: record the deploy in `deploys.md` for both lanes; that lane's reading stays with that lane.
+  - **Deploy composition, NOT delivered, so the deploy fell to this lane (decided above).** Lane book-grid-gameline-ledger-log's CLI id 8518e917 maps (transcript search) to `local_4bdcafe4` "Live gameline accuracy snapshot", an UNATTENDED scheduled-task run that cannot receive messages. The direct id was "not found". Nobody interactive owns that lane's deploy. The situation: that lane's user-approved deploy of main's tip (`05ca745c` code) is HELD for this lane's reading (d).
+    - Preflight at 15:12Z was HOLD with 10 jobs (MLB daily sim, soccer la_liga build, odds refresh), and recycle also holds while children run.
+    - When the jobs end, the current process (threshold 15, >= 10 refusals at 15:11Z) should `RECYCLE_EXIT` at once. That is reading (d); a restart does not re-inject env.
+    - Then ONE deploy of main's tip carries both that lane's code and threshold 1. No separate `--reinject-env` deploy from this lane.
+  - The root cause moved to lane `heavy-build-child-process`.
 - CHECKPOINT 2026-09-14 ~14:55Z (09:55 CT), session 0f5b256e — Goal: explain why refresh-worker's heavy board build (candidate pool, board publication, portfolio commit / paper orders) was refused by `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` for ~16 h (2026-09-12 21:34Z .. 2026-09-13 13Z) with unreclaimable headroom ~1,810 MB. Measure what the build actually needs against that floor and what holds ~2.3 GB unreclaimable. Then bring the user options with numbers (retarget/lower the check, cut the build's cost, or add memory). Read-only on production; no code or deploy without the user's OK.
   - **GOAL: MET (diagnosis, unchanged).** Lane stays OPEN only for the user-chosen fix's reading: `339dc6e9` is LIVE in refresh-worker `fb0c91cf` (`dep-dajvgqqd0e5s73dt6r9g`, live 13:39:49Z), and **recycle is NOT yet exercised**.
   - The refusal stretch is back on the new boot: first refusal 14:30:34Z (50m45s after live), 5 by 14:50:48Z.

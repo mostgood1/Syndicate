@@ -2154,7 +2154,10 @@ outlier cold reading. Three paired replications erased it: **cold 31.32s vs warm
   - Web's merge concurrency cap is 1, so a second publish seconds later gets `ARTIFACT_MERGE_AT_CAPACITY` (503, retried by a later publish).
   - `_FAILED_DIRECT_PUBLISH` is in-process and lost on reboot.
 
-## [refresh-worker-heavy-build-refusal] refresh-worker's heavy build is refused for hours once the MAIN PROCESS settles above ~2.2 GB after its first full build — child jobs are not the cause, and only a restart clears it `[verified 2026-09-13 in production logs, lane heavy-build-memory-refusal]`
+## [refresh-worker-heavy-build-refusal] refresh-worker's heavy build is refused for hours once the MAIN PROCESS settles above ~2.2 GB after its first full build — child jobs are not the cause. Short streaks clear on their own in 10-80 min; long ones clear only on a restart `[verified 2026-09-13 in production logs, corrected 2026-09-14 by a 45 h streak replay, lane heavy-build-memory-refusal]`
+
+- **Streak shape, 09-12 18Z..09-14 15Z** (23 closed streaks): 18 ended with an admitted build and no boot (1-22 refusals, 10-80 min). 5 ended only at a boot, among them streaks of 24, 401 and 120 refusals. Boot to first admitted build has a median of 13.1 min (6 boots).
+- **Stopgap by user decision 2026-09-14:** recycle threshold 1. The env is set; it goes live on the next refresh-worker deploy (see lane). The replay gives 300 blocked minutes vs 987 at 15. The root-cause fix is lane `heavy-build-child-process`.
 
 - **Guard.** `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` at the top of `_compute_board_publication_response`; basis = 4096 - unreclaimable. 403 refusals 09-12 21:34Z..09-13 16:14Z.
   - It stopped `CANDIDATE_POOL`, `BOARD_PUBLICATION`, `PORTFOLIO_COMMIT` (paper orders) and Kalshi capture. `LAYER2_FAST_REFRESH` (600 MB floor) kept the board alive.

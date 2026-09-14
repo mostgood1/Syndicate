@@ -5959,3 +5959,15 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - Never export a patch through a PowerShell pipeline (`Out-File`, `-NoNewline`, `>`). Use `git diff --output=<file>`.
   - Prove the patch with `git apply --check` BEFORE discarding its source.
   - *(evidence: `log/2026-09-14.md` section "lane `book-grid-gameline-ledger-log` — checkpoint")*
+
+## 2026-09-14 — OVERTURNED: "only a restart clears a heavy-build refusal stretch" — and a safety threshold chosen without that data cost ~11 h of builds in 45 h `[lane heavy-build-memory-refusal]`
+
+- **What was believed:** once refresh-worker's main process settled above ~2.2 GB, heavy builds stayed refused until a boot. That belief set `339dc6e9`'s recycle threshold at 15 consecutive refusals, "to avoid restarting over a transient spike".
+- **What falsified it:**
+  - A replay of 23 closed streaks. 18 ended with an admitted build and no boot, after 10-80 min.
+  - The same replay against thresholds: 15 leaves 987 minutes with no full build, while 1 leaves 300, because a boot resumes builds in a median 13.1 min.
+  - The user asked "why do we need 15?" before anyone had measured it.
+- **How to apply:**
+  - A safety margin on a recovery action is a number, and it needs the same evidence as any other number. Replay candidate thresholds against the logged history before shipping one, and count the cost the margin buys (here, minutes without builds), not only the failure it guards against.
+  - "Clears only on X" needs the population where it did NOT clear, counted. The original diagnosis looked at the 16 h stall and the boots, never at the streaks between them.
+  - *(evidence: lane heavy-build-memory-refusal DECISION 2026-09-14 ~15:10Z; `scratchpad/threshold_sim.py` from session 0f5b256e)*
