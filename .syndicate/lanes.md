@@ -1097,6 +1097,28 @@ death, never life — do not invert it.
   - Interaction: scheduled task `book-quotes-fuller-copy-deploy-0914` (11:50 PM CT) deploys refresh-worker; if it ships a SHA at or after `54f3d662`, refresh-worker gains the same retry, which covers its un-retried NFL state publishes.
 - Blocked by: none — needs a live NFL game (DAL@NYG 00:20Z).
 
+### book-grid-gameline-ledger-log — OPEN — opened 2026-09-14 — session 8518e917-502e-4212-b876-11d6eb76ab71
+- Goal: Every MLB (and other live-gameline sport) book-grid build prints one flush=True line naming what the live-gameline attach produced and what the ledger write did (index size, rows attached by segment, candidates, written, skipped_unchanged, truncated, error), so the 09-12 dropping hop becomes measurable from refresh-worker logs
+- Files: syndicate/features/shared/book_grid_artifact.py, syndicate/features/shared/live_gameline_ledger.py, tests/test_book_grid_gameline_ledger_log.py (NEW)
+- Hypothesis H1, written BEFORE code: the 500-record per-build cap cut full-game rows on 09-12. **TESTED BEFORE CODE, EXONERATED.** Evidence from the per-record ledger for 09-12:
+  - The largest of 139 builds wrote 243 records.
+  - Refusal records, which are emitted last, are present in most builds.
+  - `('full','h2h')` sits at grid index 0.
+- Hypothesis H2 (OPEN, what the line measures): the book-grid build's OWN attach projected full-game rows for few games, while layer2's join indexed `live_mc` for 1-9.
+  - Measured: first5 projected rows were written in ~120 of 139 builds, full-game rows in 4.
+  - Evidence: `log/2026-09-14.md` "no lane — `live-gameline-accuracy-snapshot` run".
+- Hypothesis H3 (OPEN, written before any test): the join had full-game projections but considered no rows, because the book grid did not mark those games' `game.state` as live.
+  - Shape observed: running the new line over the served 09-12 artifact gave `index=11 considered=0 full_games=0`.
+  - That artifact is a post-final rebuild, so it CANNOT settle H3 either way.
+- Falsification test for H2/H3, on a live MLB slate:
+  - The line shows `full_games` near the join's `index`, and `written_by_segment` carries `full` on changed builds -> the loss is NOT at attach.
+  - `full_games` stays well below `index`, with `considered` LOW -> H3 (state gate).
+  - `full_games` stays well below `index`, with `considered` HIGH -> H2 at the join itself.
+- Verification:
+  - Offline: new tests pass, and the build-prints-once test FAILS against HEAD's `book_grid_artifact.py`.
+  - Production, after a refresh-worker deploy (needs user approval, locks, no in-flight MLB sim): exactly one `[book_grid] LIVE_GAMELINE_BUILD sport=mlb` line per MLB build on a live slate, with every field, recorded in `deploys.md`.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

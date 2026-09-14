@@ -536,12 +536,34 @@ def read_last_by_key(path: Path) -> dict[tuple, dict[str, Any]]:
     return out
 
 
+def segment_label(row: Mapping[str, Any]) -> str:
+    """A record's or grid row's segment, `full` when absent or blank.
+
+    Same reading `live_gameline_score` gives a blank segment, so a counter keyed
+    on this cannot disagree with the scorer about which rows are the full game.
+    """
+    return str(row.get("segment") or "full").strip().lower() or "full"
+
+
+def _bump_segment(counts: dict[str, int], rec: Mapping[str, Any]) -> None:
+    seg = segment_label(rec)
+    counts[seg] = counts.get(seg, 0) + 1
+
+
 def append_records(path: Path, records: list[dict[str, Any]]) -> dict[str, Any]:
     """Append the records that MOVED. Returns counters, never raises."""
     coverage: dict[str, Any] = {
         "candidates": len(records),
         "written": 0,
         "skipped_unchanged": 0,
+        # SPLIT BY SEGMENT, because the totals above cannot answer the question
+        # that made this necessary. Measured on MLB 2026-09-12: first5 records
+        # outnumbered full-game records about 170 to 1, and the scorer capped at
+        # 5 of 15 games because full-game rows came from only 4 of 139 builds.
+        # A `written` total dominated by first5 reads healthy on every one of
+        # those builds. Lane `book-grid-gameline-ledger-log`.
+        "written_by_segment": {},
+        "skipped_unchanged_by_segment": {},
         "truncated_build_cap": 0,
         "truncated_file_cap": 0,
         "enabled": True,
@@ -565,6 +587,7 @@ def append_records(path: Path, records: list[dict[str, Any]]) -> dict[str, Any]:
                 to_write.append(rec)
             else:
                 coverage["skipped_unchanged"] += 1
+                _bump_segment(coverage["skipped_unchanged_by_segment"], rec)
         if existing_lines >= _MAX_RECORDS_PER_FILE:
             coverage["truncated_file_cap"] = len(to_write)
             return coverage
@@ -573,6 +596,10 @@ def append_records(path: Path, records: list[dict[str, Any]]) -> dict[str, Any]:
             for rec in to_write:
                 handle.write(json.dumps(rec, separators=(",", ":"), default=str) + "\n")
         coverage["written"] = len(to_write)
+        # Counted only AFTER the write returned, same as `written`, so the split
+        # can never claim a row the file does not hold.
+        for rec in to_write:
+            _bump_segment(coverage["written_by_segment"], rec)
     except Exception as exc:
         # A ledger failure must never take down the board build. The board is
         # the product; this is instrumentation for a measurement that does not

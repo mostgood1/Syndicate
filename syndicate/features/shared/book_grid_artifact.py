@@ -48,6 +48,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -207,6 +209,131 @@ def score_block_for_grid(
     return live_gameline_score
 
 
+LIVE_GAMELINE_BUILD_TAG = "[book_grid] LIVE_GAMELINE_BUILD"
+# Below the ~1,200 chars at which Render's logs API cut a payload on 2026-09-02
+# (`learnings.md`: the visible half read all zeros and was published as fact).
+LIVE_GAMELINE_BUILD_MAX_CHARS = 1000
+
+
+def _log_token(value: Any, limit: int = 80) -> str:
+    """One whitespace-free token, so a reason with spaces cannot split a field."""
+    text = re.sub(r"\s+", "_", str(value if value is not None else "")).strip("_")
+    return text[:limit] or "none"
+
+
+def _log_count(value: Any) -> str:
+    try:
+        return str(int(value))
+    except (TypeError, ValueError):
+        return "na"
+
+
+def _log_dict(value: Any) -> str:
+    try:
+        text = json.dumps(value if isinstance(value, Mapping) else {},
+                          sort_keys=True, separators=(",", ":"), default=str)
+    except Exception:
+        text = "{}"
+    return re.sub(r"\s+", "_", text)
+
+
+def live_gameline_build_line(
+    sport: Any, date_str: Any, grid: Any, coverage: Any, ledger: Any
+) -> str:
+    """The one per-build log line for the live-gameline attach and ledger write.
+
+    WHY THIS LINE EXISTS. Measured 2026-09-14 on MLB 2026-09-12: the score capped
+    at 5 of 15 games with every final present. The ledger held `segment=full`
+    rows from only 4 of 139 builds, while refresh-worker's layer2 join logged
+    full-game `live_mc` projections for 1-9 games. This build's `live_gamelines`
+    and `live_gameline_ledger` counters ride the artifact, which the NEXT build
+    overwrites, and nothing printed them -- so the hop between "the join had a
+    projection" and "the ledger wrote a row" could not be read after the fact.
+    Lane `book-grid-gameline-ledger-log`.
+
+    `full_games` is the number that was missing: distinct GAMES with a
+    full-game projection attached on THIS build's grid. Rows are not games (one
+    game carries h2h, spreads and totals), and first5 rows never count.
+
+    MACHINE-READ, so its shape is the contract (`learnings.md` 2026-09-06): each
+    name once, whitespace-free values, dict-valued fields LAST. When the line
+    would exceed `LIVE_GAMELINE_BUILD_MAX_CHARS`, the widest dicts are dropped
+    and COUNTED in `clipped` -- the scalars are never the casualty.
+
+    Pure and NEVER RAISES: the board is the product and this is instrumentation.
+    """
+    try:
+        from syndicate.features.shared.live_gameline_join import REFUSAL_KEY
+        from syndicate.features.shared.live_gameline_ledger import segment_label
+
+        cov = coverage if isinstance(coverage, Mapping) else {}
+        led = ledger if isinstance(ledger, Mapping) else {}
+        attached: dict[str, int] = {}
+        refused: dict[str, int] = {}
+        full_games: set[str] = set()
+        for row in grid if isinstance(grid, (list, tuple)) else ():
+            if not isinstance(row, Mapping):
+                continue
+            seg = segment_label(row)
+            lg = row.get("live_gameline")
+            if isinstance(lg, Mapping):
+                attached[seg] = attached.get(seg, 0) + 1
+                if seg == "full":
+                    game = str(lg.get("game_pk") or row.get("event_id") or "").strip()
+                    if game:
+                        full_games.add(game)
+            elif row.get(REFUSAL_KEY):
+                refused[seg] = refused.get(seg, 0) + 1
+
+        if cov.get("error"):
+            error = _log_token(cov.get("error"))
+        elif led.get("error"):
+            error = "ledger:" + _log_token(led.get("error"))
+        else:
+            error = "none"
+
+        scalars = [
+            ("sport", _log_token(sport)),
+            ("date", _log_token(date_str)),
+            ("index", _log_count(cov.get("index_size"))),
+            ("seg_index", _log_count(cov.get("segment_index_size"))),
+            ("considered", _log_count(cov.get("rows_live_gameline_considered"))),
+            ("projected", _log_count(cov.get("rows_live_gameline_projected"))),
+            ("priceable", _log_count(cov.get("rows_live_gameline_priceable"))),
+            ("withheld", _log_count(cov.get("rows_live_gameline_withheld"))),
+            ("full_games", str(len(full_games))),
+            ("candidates", _log_count(led.get("candidates"))),
+            ("written", _log_count(led.get("written"))),
+            ("skipped_unchanged", _log_count(led.get("skipped_unchanged"))),
+            ("truncated_build", _log_count(led.get("truncated_build_cap"))),
+            ("truncated_file", _log_count(led.get("truncated_file_cap"))),
+            ("error", error),
+        ]
+        dicts = [
+            ("attached_by_segment", _log_dict(attached)),
+            ("refused_by_segment", _log_dict(refused)),
+            ("written_by_segment", _log_dict(led.get("written_by_segment"))),
+            ("skipped_by_segment", _log_dict(led.get("skipped_unchanged_by_segment"))),
+            ("withheld_by_reason", _log_dict(cov.get("withheld_by_reason"))),
+            ("index_why", _log_dict(cov.get("index_diagnostics"))),
+        ]
+
+        def _render(kept: list[tuple[str, str]], clipped: int) -> str:
+            head = scalars + ([("clipped", str(clipped))] if clipped else [])
+            return " ".join([LIVE_GAMELINE_BUILD_TAG] + [f"{k}={v}" for k, v in head + kept])
+
+        kept = list(dicts)
+        line = _render(kept, 0)
+        while len(line) > LIVE_GAMELINE_BUILD_MAX_CHARS and kept:
+            widest = max(range(len(kept)), key=lambda i: len(kept[i][1]))
+            kept.pop(widest)
+            line = _render(kept, len(dicts) - len(kept))
+        return line[:LIVE_GAMELINE_BUILD_MAX_CHARS]
+    except Exception as exc:
+        return (f"{LIVE_GAMELINE_BUILD_TAG} sport={_log_token(sport)} "
+                f"date={_log_token(date_str)} error=line_failed:{type(exc).__name__}")
+
+
 def build_book_grid_artifact(
     sport: str, date_str: str, *, max_rows: int = BOOK_GRID_ARTIFACT_MAX_ROWS
 ) -> dict[str, Any] | None:
@@ -347,6 +474,17 @@ def build_book_grid_artifact(
     from syndicate.features.shared.live_gameline_ledger import record_live_gamelines
 
     live_gameline_ledger = record_live_gamelines(grid, sport=sport, date_str=date_str)
+    # PRINTED, not only carried in the payload: the payload is overwritten by
+    # the next build, so these two counter sets were unreadable after the fact
+    # -- which is what hid the 2026-09-12 loss of full-game rows (see
+    # `live_gameline_build_line`). `print(flush=True)`, because `logger.info`
+    # never reaches Render's log collector.
+    print(
+        live_gameline_build_line(
+            sport, date_str, grid, live_gameline_coverage, live_gameline_ledger
+        ),
+        flush=True,
+    )
 
     # SCORE THE LEDGER HERE, because here is the only place the sample and the
     # outcomes are both in hand. Measured 2026-08-17 01:0xZ: the ledger matches
