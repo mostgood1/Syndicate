@@ -1170,9 +1170,9 @@ death, never life — do not invert it.
 
 ### book-grid-gameline-ledger-log — OPEN — opened 2026-09-14 — session 8518e917-502e-4212-b876-11d6eb76ab71
 - VERDICT 2026-09-14 ~10:00 CT — Goal: Every MLB (and other live-gameline sport) book-grid build prints one flush=True line naming what the live-gameline attach produced and what the ledger write did (index size, rows attached by segment, candidates, written, skipped_unchanged, truncated, error), so the 09-12 dropping hop becomes measurable from refresh-worker logs
-  - **GOAL: NOT MET.** The code is on main (`05ca745c`, offline verification passed), but refresh-worker still runs `fb0c91cf`, so no build prints the line yet.
-  - Left: one refresh-worker deploy (user-approved, before 22:40Z first pitch), then a live-slate reading of exactly one `[book_grid] LIVE_GAMELINE_BUILD sport=mlb` line per MLB build, into `deploys.md`.
-  - Blocking: the deliberate HOLD below, for lane `heavy-build-memory-refusal` reading (d). Narrative: `log/2026-09-14.md` "lane `book-grid-gameline-ledger-log` — checkpoint".
+  - **GOAL: NOT MET.** Deployed: refresh-worker `6fe6c6e9`, live 15:37:05Z, 0 `server_failed`. The line prints (first at 15:38:19Z; raw Render message 513 chars, complete). Exactly-once and the live-slate reading are owed.
+  - Left: exactly one line per MLB build, and the live-slate H2/H3 reading. Owner: one-time scheduled task `book-grid-gameline-live-reading-0914` (user-approved; fires 19:00 CT, runs only while the app is open). It reads 22:40Z-05:30Z and records `deploys.md` plus this verdict.
+  - Blocking: nothing but a live slate (first pitch 22:40Z). Deploy record: `deploys.md` 2026-09-14 15:30:33Z. Narrative: `log/2026-09-14.md` "lane `book-grid-gameline-ledger-log` — checkpoint".
 - Goal: Every MLB (and other live-gameline sport) book-grid build prints one flush=True line naming what the live-gameline attach produced and what the ledger write did (index size, rows attached by segment, candidates, written, skipped_unchanged, truncated, error), so the 09-12 dropping hop becomes measurable from refresh-worker logs
 - Files: syndicate/features/shared/book_grid_artifact.py, syndicate/features/shared/live_gameline_ledger.py, tests/test_book_grid_gameline_ledger_log.py (NEW)
 - Hypothesis H1, written BEFORE code: the 500-record per-build cap cut full-game rows on 09-12. **TESTED BEFORE CODE, EXONERATED.** Evidence from the per-record ledger for 09-12:
@@ -1195,10 +1195,7 @@ death, never life — do not invert it.
 - Landed: `05ca745c` on main 2026-09-14 ~09:00 CT (13 new tests red on HEAD / green; 85 neighbouring tests green; rendered cleanly over the served 09-12 and 09-13 artifacts).
 - Deploy blast radius: `fb0c91cf..05ca745c` on refresh-worker = these 3 files only, no `render.yaml`.
 - User decision 2026-09-14 ~09:10 CT: "Deploy before first pitch (Recommended)". First pitch 22:40Z (5:40 PM CT).
-- Blocked by: a deliberate HOLD. The claim freed ~09:15 CT, but session `local_d77a58da` (lane `heavy-build-memory-refusal`) is reading reading (d) of `fb0c91cf`: the first `339dc6e9` self-restart.
-  - A reboot now would reset that refusal streak. As of 14:52Z: 5 refusals since 14:30:34Z, 0 `[worker_recycle]`.
-  - Release condition, watched in the background: `RECYCLE_EXIT` followed by a heavy build admitted (`PORTFOLIO_COMMIT` / `CANDIDATE_POOL_READY`); OR a heavy build admitted with no recycle; OR 16:15 CT at the latest.
-  - NOT coordinated by message: `send_message` is unavailable because this session began as a scheduled-task run (tried 09:55 CT). The hold is enforced by the watcher alone; the other session has not been told.
+- Blocked by: none. The HOLD for lane `heavy-build-memory-refusal` reading (d) ended at 15:21:35Z: the refusal streak broke with no recycle (8 refusals 14:30:34-15:11:03Z, 0 `[worker_recycle]`). Then preflight went HOLD (odds refresh job) -> CLEAR, the deploy ran at 15:30:33Z, and the claim was released.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
