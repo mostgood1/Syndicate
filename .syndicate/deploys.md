@@ -34956,3 +34956,8 @@ User decision in chat: "Deploy #3 after their reading is done".
   - The entry's push finished at 21:14:28Z, inside the TTL.
   - The claim was then RELEASED by token at ~21:14:40Z, and `deploy_claim.py status` read `refresh-worker free`.
 - Cause: the lapse line was written from an expected time, not read off the clock. No other statement in that entry depends on it.
+
+## 2026-09-14 21:16:30Z (16:16 CT) — reading only, no deploy by this lane — refresh-worker `6438830d` — `d4deb502` (pool-cache log field) verified [lane heavy-build-child-process]
+- `d4deb502` reached refresh-worker as part of lane accuracy-assessment-0914's deploy #3: `dep-dak5v1jl550s73a1i3r0`, created 20:56:38Z, live 21:03:17Z. Boot `MALLOC_ARENA_INIT` 21:03:51Z; 0 `Traceback` through 21:16Z.
+- **verify MET:** the first post-boot line is `CANDIDATE_POOL_CACHE date=2026-09-14 cached=True entries=1 limit=2 pool_json_bytes=28181421 cache_json_bytes=28181421` (21:16:30Z). `limit=` now reports the pool-cache cap, and env `SYNDICATE_CANDIDATE_POOL_CACHE_MAX=2` carried through the redeploy.
+- This lane's 19:07Z boot series ended at this reboot, and its readings were recorded before it. The evening live-lens reading (23:10Z) does not depend on uptime.

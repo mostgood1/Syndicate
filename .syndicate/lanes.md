@@ -1019,6 +1019,7 @@ death, never life — do not invert it.
       - The test meant to pin `limit=` ran with both values at 12, so it could not fail. The commit message and this block's "reports the real cap" were wrong.
       - Reachability therefore rests on `entries` staying <= 2 from build 3 on, not on `limit=`.
       - Fix (log field + a test at env 2): on main, NOT deployed. It rides the next refresh-worker deploy.
+      - **Fix VERIFIED 21:16:30Z:** `d4deb502` shipped in accuracy-assessment-0914's deploy #3 (`6438830d`, `dep-dak5v1jl550s73a1i3r0`, live 21:03:17Z; boot 21:03:51Z; 0 Traceback). The first line on that boot reads `CANDIDATE_POOL_CACHE date=2026-09-14 cached=True entries=1 limit=2 pool_json_bytes=28181421`, so both the log field and the env cap of 2 carried through the redeploy.
     - **2026-09-14 20:29Z (15:29 CT) — reading done.** Six builds on `0a18557a`, one boot (19:07:43Z), 0 refusals, 0 `[worker_recycle]`, 0 Traceback. accuracy-assessment-0914 may deploy.
       - **Reachability MET:** `entries` 1 -> 2 and then stayed 2 on builds 3-6 while pools kept arriving. The cache total held at 29-32 MB of JSON; alternating pools are 22.6-25.4 MB (09-14) and 6.5-7.2 MB (09-15).
       - pid 39 RSS minimum in the 5 min after each build (`scratchpad/cap_reading.py`, 363 `ALL_PROCESS_MEMORY` samples): 1,223 -> 1,277 (+55) -> 1,440 (+163) -> 1,451 (+10) -> 1,486 (+36) -> 1,568 (+82). Child-job RSS max 32-891 MB.
