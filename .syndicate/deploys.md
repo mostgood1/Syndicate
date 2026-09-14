@@ -34878,3 +34878,24 @@ User decision in chat: "Deploy, recorder ON (Recommended)". Both claims held by 
   - Live-row notes, carried over from the 17:22Z entry (first MLB pitch 22:40Z).
 - Scoring from buckets is NOT in this deploy: `measured_bucket_skill.json` is empty and the bucket override is not deployed.
 - Claims released after this entry is pushed.
+
+## 2026-09-14 19:00:54Z (14:00 CT) — refresh-worker `ae53a1a5` -> `0a18557a` — deploy `dep-dak48pgae00c73fk27f0` — lane heavy-build-child-process (claim holder heavy-build-memory-refusal, same session 0f5b256e) — pool-cache cap experiment
+- **What:** `0a18557a` adds `SYNDICATE_CANDIDATE_POOL_CACHE_MAX` (a cap on `_candidate_pools` only; default `_max_snapshots` = 12, floor 1) and the `_cache_candidate_pool` helper. `CANDIDATE_POOL_CACHE limit=` now reports the real cap.
+  - Env `SYNDICATE_CANDIDATE_POOL_CACHE_MAX=2` set on refresh-worker via single-key PUT at ~18:25Z (HTTP 200, read back 2). This deploy injects it.
+  - User decision ~18:20Z: "Cap pool cache at 2, measure (Recommended)".
+- **Why this commit, not main's tip:** tip `f8ca2745` carried lane accuracy-assessment-0914's undeployed `e4ef34d4` / `bedb99b2` / `f7984e8a`, which that lane's user had not approved. `0a18557a` is on main and descends from live `ae53a1a5`.
+  - Code blast radius vs live: `pipeline/intelligence_state.py` and `tests/test_candidate_pool_cache_log.py` only. No `render.yaml`.
+  - That lane agreed by message and holds its deploy #3 until this lane posts reading done.
+- **Locks:**
+  - Claim acquired 19:00:42Z (token `bcf295f02d74f1d6`), after accuracy-assessment-0914 released it ~18:43Z.
+  - Preflight `--target-commit 0a18557a` at 19:00:4xZ: CLEAR, only infrastructure processes. The earlier HOLD was the MLB daily sim, which had finished, so no job was killed.
+  - The first combined acquire+preflight+deploy call was refused by deploy-guard (it reads the locks before the command runs); the deploy went as a separate call.
+- **Result:** POST 19:00:54Z, live 19:07:04Z (14:07 CT). Boot `MALLOC_ARENA_INIT` pid 39 at 19:07:43Z. 0 `Traceback` through 19:11Z.
+- **verify:**
+  - (1) Reachability: the first post-boot `CANDIDATE_POOL_CACHE` line reads `limit=2`, and `entries` never exceeds 2.
+  - (2) The pre-registered prediction (lanes.md heavy-build-child-process, before this deploy). Take pid 39 RSS minimum in the 5 min after each of the first 6 builds. If H-cache carries the tail, growth after build 2 stays near flat, against yesterday's-boot curve of +57 / +183 / +151 MB per build (1,133 -> 1,524 MB over 4 builds on `17c8208e`).
+  - **Falsified if** per-build growth after build 2 is within ~+/-50 MB of that curve.
+  - Confound: child-job RSS moves container memory, not pid 39; compare pid 39 only.
+  - Reading OWED: background `scratchpad/cap_reading.py` (6 builds, 150 min cap). It is also the recycle reading on this boot (threshold 1 still set).
+- **Rollback:** `python scripts/render_deploy.py --service refresh-worker --commit ae53a1a5 --allow-rollback`. Or, without code, set `SYNDICATE_CANDIDATE_POOL_CACHE_MAX` back to 12 (or delete it) and deploy.
+- Claim released after this entry is pushed.
