@@ -1347,7 +1347,7 @@ death, never life — do not invert it.
 
 ### brand-logo-v3 — OPEN — opened 2026-09-14 — session 08fb3eec-6daf-4680-a64d-bd7f914ad2e7
 - Goal: the new combined Syndicate logo (mascot + S swoosh + lettering, 1536x1024 opaque, from the user 2026-09-14) is what renders in the header on every page, the four crest hero slots, the apple-touch/PWA icons and the og/twitter card; the S favicon is KEPT `[user decision 2026-09-14: the full art was measured mud at 16/32px on 09-09]`.
-- Files: syndicate/templates/shared/base.html, syndicate/templates/shared/_standalone_app_header.html, syndicate/static/shared/app.css, syndicate/static/shared/standalone_shell.css, syndicate/templates/syndicate.html, syndicate/templates/market_board_hub.html, syndicate/templates/errors/error.html, syndicate/templates/intelligence_status.html, syndicate/static/shared/manifest.json, syndicate/static/shared/syndicate-brand-header.jpg, syndicate/static/shared/syndicate-brand-hero.jpg, syndicate/static/shared/syndicate-icon-180.png, syndicate/static/shared/syndicate-icon-192.png, syndicate/static/shared/syndicate-icon-512.png, syndicate/static/shared/syndicate-social.jpg, syndicate/static/shared/apple-touch-icon.png, syndicate/static/shared/syndicate-og.jpg, syndicate/static/shared/syndicate-crest.jpg, syndicate/static/shared/syndicate-mascot.png, syndicate/static/shared/syndicate-mascot-192.png, syndicate/static/shared/syndicate-logo.svg, scripts/build_brand_assets.py, docs/brand/syndicate-logo-source.png, docs/brand/syndicate-mascot-source.png, tests/test_error_pages.py, tests/test_coverage_report_artifact.py, tests/test_brand_assets.py, .syndicate/state_ui.md
+- Files: syndicate/templates/shared/base.html, syndicate/templates/shared/_standalone_app_header.html, syndicate/static/shared/app.css, syndicate/static/shared/standalone_shell.css, syndicate/templates/syndicate.html, syndicate/templates/market_board_hub.html, syndicate/templates/errors/error.html, syndicate/templates/intelligence_status.html, syndicate/static/shared/manifest.json, syndicate/static/shared/syndicate-brand-header.jpg, syndicate/static/shared/syndicate-wordmark.png, syndicate/static/shared/syndicate-brand-hero.jpg, syndicate/static/shared/syndicate-icon-180.png, syndicate/static/shared/syndicate-icon-192.png, syndicate/static/shared/syndicate-icon-512.png, syndicate/static/shared/syndicate-social.jpg, syndicate/static/shared/apple-touch-icon.png, syndicate/static/shared/syndicate-og.jpg, syndicate/static/shared/syndicate-crest.jpg, syndicate/static/shared/syndicate-mascot.png, syndicate/static/shared/syndicate-mascot-192.png, syndicate/static/shared/syndicate-logo.svg, scripts/build_brand_assets.py, docs/brand/syndicate-logo-source.png, docs/brand/syndicate-mascot-source.png, tests/test_error_pages.py, tests/test_coverage_report_artifact.py, tests/test_brand_assets.py, .syndicate/state_ui.md
 - Hypothesis: n/a (not diagnostic)
 - Falsification test: n/a
 - Verification: served HTML on web references only the new asset names (0 `syndicate-crest.jpg`, 0 `syndicate-logo.png` in `<img>`), each new asset returns 200 with its expected dimensions, and a screenshot of the header + `/syndicate` hero at desktop and ~400px shows the logo legible and uncropped where it must be. Favicon links unchanged.
@@ -1378,7 +1378,28 @@ death, never life — do not invert it.
   - The old wordmark's lettering without its S (`syndicate-logo.png`, cut at x=261) is 521x58, about 9:1. It needs 252px wide at 28px tall and 287px at 32px, plus a 16px gap.
   - So it does not fit base.html's row at 1440 without wrapping the pills.
   - Recommended: lettering only, shown only where it fits on the row. Alternative: left-align the pills beside the logo.
-  - Lane stays OPEN until the user answers.
+  - USER ANSWER: "go with your recomendation".
+- WORDMARK IN THE HEADER (built 2026-09-14; NOT deployed, the user is asked first):
+  - Asset: `syndicate-wordmark.png`, 521x58. It is the old wordmark to the right of the S cut (x=261), trimmed, at native size, and renders 28px tall (252px wide).
+  - Mechanism, the same in both headers:
+    - The nav is `flex: 0 1 auto`: it keeps its one-line width and no longer grows.
+    - The wordmark slot is `flex: 1 1 0` with `overflow: hidden`, `flex-wrap: wrap`, a fixed 28px height and a zero-width `::before`. The lettering therefore shows whole or wraps out of view.
+    - The row's `gap` became margins, so the empty slot adds no second gap.
+    - There is no breakpoint to go stale when a sport is added.
+  - Local reading (worktree app). Each cell: lettering state / pill rows with the lettering vs. with the slot force-hidden, same instant:
+    - `/market-board`:
+      - 1920: SHOWN (32px to first pill), 1/1.
+      - 1600: SHOWN, 1/1.
+      - 1500: SHOWN (slot 273, needs 268), 1/1.
+      - 1440: hidden (slot 213), 1/1.
+      - 1100: hidden, 2/2. 900: hidden, 2/2. 400: hidden, 5/5.
+    - `/mlb/market-accuracy`:
+      - 1920: SHOWN, 1/1.
+      - 1600: SHOWN, 1/1.
+      - 1440: SHOWN (96px to first pill), 1/1.
+      - 1100: hidden (slot 34), 1/1. 900: hidden, 2/2. 400: hidden, 4/4.
+    - 0 PARTIAL states, 0 pills overlapping, and scroll == client at all 13 readings.
+  - The desktop app stopped the preview server once mid-reading, after 5 min. The remaining readings were retaken on a restarted server.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
