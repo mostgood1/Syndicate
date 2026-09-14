@@ -34596,3 +34596,54 @@ verify: `render_events.py --service live-odds-worker --since <54f3d662 finishedA
 - **Residual, not fixed:** web still refused NFL state publishes at 23:32:49Z (09-13 and 09-14) while live-odds-worker logged `SKIPPED_UNCHANGED` at 23:32:05Z. The likely sender is refresh-worker (`cae4713e`, no retry), which publishes the same paths; this attribution is not verified.
 - **Rollback:** `py -3 scripts/render_deploy.py --service live-odds-worker --commit 637278e3 --allow-rollback` behind claim + preflight. That drops the retry but keeps the in-play capture fix.
 - **Claim:** `quote-state-publish-retry` on live-odds-worker RELEASED after this entry.
+
+## 2026-09-14 04:15Z — reading — lane quote-state-publish-retry — board persistence after live-odds-worker 54f3d662
+
+**Verdict: board reading UNEXERCISED by the prescribed poll. The retroactive evidence is consistent with MET, but one leg is unmeasured. Worker-side leg MET.**
+
+- **Why unexercised.** Scheduled task `quote-state-retry-board-reading-0913` was due at 00:45Z. It first ran at 04:04Z (11:04 PM CT), 3h19m late, most likely the Modern Standby stall. By then DAL@NYG was over. The served NFL board, `written_at` 04:02:18Z, had 175 rows (85 game + 90 prop), all `pregame`, with no DAL@NYG row; `by_lane` was `{dead: 2820, opportunity: 1576}`. So no live build could be polled. Per-build live prop counts and the `quote.quote_seen_age_seconds` p50 were NOT measured.
+- **Retroactive substitute: refresh-worker's departure ledger.** Read via `/api/ops/artifacts/export?path=reports/intelligence/clv_departures/2026-09-13.jsonl` (3,169 records).
+  - Coverage is partial: it tracks only markets that were +EV at some build, and its `build` record counts all NFL rows, not live props.
+  - Game window 00:20Z-03:37Z (7:20-10:37 PM CT) held 25 builds. None dropped to 0 NFL rows. Across 00:43-03:29Z the count ran 166-287, against 111-112 in the three pre-kick builds.
+  - The most NFL live-prop departures in one build was 9 (00:55:33Z). Before the fix, builds flapped 278 / 0 / 216 / 0.
+  - Live props > 0 is proven for >= 3 consecutive builds. Each departure's previous build held that live prop, and `prop_live` departures at 02:59:03, 03:04:57 and 03:11:48Z put live props in the 02:54:49, 02:59:03 and 03:04:57Z builds.
+
+| build_at (Z) | CT | NFL rows | NFL departures (kind_state) | NFL returns |
+|---|---|---|---|---|
+| 00:13:35 | 7:13 PM | 112 | prop_pregame 5 | 0 |
+| 00:20:45 | 7:20 PM | 112 | - | 0 |
+| 00:26:21 | 7:26 PM | 111 | - | 0 |
+| 00:36:55 | 7:36 PM | 132 | prop_pregame 15 | 2 |
+| 00:43:31 | 7:43 PM | 287 | prop_pregame 2 | 11 |
+| 00:55:33 | 7:55 PM | 209 | prop_live 9, game_live 2, game_pregame 1 | 1 |
+| 01:07:09 | 8:07 PM | 175 | prop_live 8, game_live 2 | 1 |
+| 01:16:24 | 8:16 PM | 176 | - | 1 |
+| 01:22:07 | 8:22 PM | 184 | - | 0 |
+| 01:28:54 | 8:28 PM | 272 | prop_pregame 4 | 4 |
+| 01:38:42 | 8:38 PM | 252 | prop_live 2 | 2 |
+| 01:48:09 | 8:48 PM | 186 | prop_live 5, game_live 1 | 0 |
+| 01:57:33 | 8:57 PM | 242 | - | 7 |
+| 02:03:25 | 9:03 PM | 246 | prop_live 2, game_live 1 | 3 |
+| 02:11:13 | 9:11 PM | 166 | prop_live 8 | 1 |
+| 02:28:05 | 9:28 PM | 166 | game_live 1, prop_pregame 2 | 0 |
+| 02:34:21 | 9:34 PM | 195 | game_live 1 | 1 |
+| 02:37:52 | 9:37 PM | 179 | game_live 2 | 2 |
+| 02:54:49 | 9:54 PM | 279 | prop_live 1 | 6 |
+| 02:59:03 | 9:59 PM | 256 | prop_live 6 | 0 |
+| 03:04:57 | 10:04 PM | 234 | prop_live 3, game_live 3, prop_pregame 1 | 1 |
+| 03:11:48 | 10:11 PM | 199 | prop_live 8, game_live 1 | 2 |
+| 03:20:43 | 10:20 PM | 188 | game_live 3, prop_pregame 3 | 0 |
+| 03:29:35 | 10:29 PM | 174 | prop_live 2, game_live 2 | 0 |
+| 03:37:34 | 10:37 PM | 85 | game_live 2, prop_pregame 5 | 0 |
+| 03:43:18 | 10:43 PM | 175 | - | 5 |
+
+- **live-odds-worker logs** (`render_logs.py --text PUBLISH_RETRY --start 2026-09-14T00:15:00Z`, covered 00:35:43-03:28:37Z):
+  - NFL `book_quotes/*.state.json`: 203 `PUBLISH_RETRY_AT_CAPACITY`, 173 `PUBLISH_RETRY_OK` (146 at attempt=1, 24 at attempt=2, 3 at attempt=3), 0 `PUBLISH_RETRY_EXHAUSTED`.
+  - Reconciles exactly: 146x1 + 24x2 + 3x3 = 203 refusals, all recovered in-call.
+  - NFL-state `PUBLISH_FAILED` = 203, one per refused attempt, each followed by its retry. So **0 lost NFL state publishes on live-odds-worker**.
+  - All paths: 369 / 323 / 1 EXHAUSTED. The one exhausted publish was `mlb_source/tracking/book_quotes/2026-09-13.state.json` at 02:25:48Z (`attempts=3 last_status=503`), NOT NFL.
+- **web logs**: 541 `ARTIFACT_MERGE_AT_CAPACITY path=nfl_source/tracking/book_quotes` between 00:35:43Z and 04:03:27Z. By path: 09-14.jsonl 192, 09-13.state 94, 09-14.state 91, 09-17.state 66, wk1.state 39, 09-13.jsonl 32, 09-17.jsonl 15, wk1.jsonl 12. The 09-14.state refusals peaked at 6-9 per 10 min, 02:00-03:10Z.
+- **refresh-worker (`cae4713e`, no retry)**: 105 `PUBLISH_FAILED path=nfl_source/tracking/book_quotes` between 00:37:20Z and 03:52:46Z. **74 of those were state files, lost without retry** (09-14.state 32, 09-13.state 25, 09-17.state 17), plus 31 jsonl. In the ledger they did not coincide with a zero-row build or a mass live-prop departure. Not joined build by build.
+- **Left:** one prescribed live reading (>= 3 consecutive live builds with live NFL props > 0 and seen-age p50 < 300 s) on the next live NFL game.
+  - Scheduled task `book-quotes-fuller-copy-deploy-0914` (04:50Z / 11:50 PM CT) deploys refresh-worker. If it ships >= `54f3d662`, refresh-worker's 74 un-retried state losses are covered too.
+  - No deploy was made by this reading.
