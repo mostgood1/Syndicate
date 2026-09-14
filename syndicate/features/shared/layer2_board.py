@@ -2633,6 +2633,7 @@ def _model_prob_for_side(row: Mapping[str, Any], side: Any = None) -> float | No
 def build_layer2_rows(
     grid: Iterable[Mapping[str, Any]],
     openings: Mapping[str, Mapping[str, Any]] | None = None,
+    population_sink: Any = None,
 ) -> dict[str, Any]:
     """Fan a market grid out into ranked, gated one-side candidates.
 
@@ -3081,6 +3082,17 @@ def build_layer2_rows(
     # nothing to rank, and scoring it zero would place it above genuinely
     # negative rows (blended_score's own reasoning).
     opportunities.sort(key=lambda item: item["score"]["score"], reverse=True)
+
+    # THE WHOLE PRICED POPULATION, for grading without the publication filter
+    # (`opportunity_population_ledger`). Every candidate, every lane, scored or not,
+    # AFTER scoring -- `select_shortlist` has not cut anything yet. Optional and
+    # side-effect free by default: the builder stays pure unless a caller passes a
+    # sink. Never raises into the board.
+    if population_sink is not None:
+        try:
+            population_sink(candidates)
+        except Exception:
+            pass
 
     return {
         "rows_in": rows_in,

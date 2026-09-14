@@ -695,6 +695,17 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # or came back. Web must carry this pattern BEFORE refresh-worker pushes, or
     # the push is refused as not allowlisted.
     "reports/intelligence/clv_departures/*.jsonl",
+    # The PRE-PUBLICATION population (`opportunity_population_ledger`, lane
+    # `accuracy-assessment-0914`, user decision "Build it for all sports"): every
+    # candidate a Layer 2 build priced, published or not, first sighting per side per
+    # day, so buckets can be graded without the publication filter. Bounded the same
+    # way as the two ledgers above -- by distinct markets per day -- in ~320 B records,
+    # written to PARTS that close at 4 MiB under a 64 MiB/day tripwire, and only parts
+    # written in a build are pushed. `.jsonl` ONLY: the `<date>__<sport>.keys` dedup
+    # sidecar beside them is never swept. The producer is default-OFF
+    # (`SYNDICATE_OPPORTUNITY_POPULATION_LEDGER`); web must carry this pattern BEFORE
+    # refresh-worker is switched on, or its pushes are refused.
+    "reports/intelligence/opportunity_population/*.jsonl",
     # The PROJECTED evaluation ledger (`evaluation_ledger_projection.py`). This
     # is the only form of the ledger that can cross to web at all: the RAW
     # chunks are 95-332 MB/day against the 12 MiB `_PUBLISH_MAX_BYTES` below,

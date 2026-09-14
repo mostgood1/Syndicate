@@ -1372,7 +1372,26 @@ def build_layer2_shortlist(
             except Exception:
                 pass
 
-            result = build_layer2_rows(grid, openings=openings_index)
+            # THE PRE-PUBLICATION POPULATION (`opportunity_population_ledger`, lane
+            # `accuracy-assessment-0914`, user decision "Build it for all sports").
+            # Every candidate this sport's build priced, recorded once per side per
+            # day BEFORE `select_shortlist` cuts anything, so buckets can be graded
+            # without the publication filter. Per sport, here, so the candidate list
+            # is never held across sports. Default OFF; a failure to build the sink
+            # leaves the board exactly as it was.
+            _population_sink = None
+            try:
+                from syndicate.features.shared.opportunity_population_ledger import (
+                    population_ledger_enabled,
+                    record_population,
+                )
+
+                if population_ledger_enabled():
+                    def _population_sink(candidates, _sport=sport):
+                        record_population(candidates, sport=_sport, date=str(selected_date or ""))
+            except Exception:
+                _population_sink = None
+            result = build_layer2_rows(grid, openings=openings_index, population_sink=_population_sink)
             sport_opportunities = list(result.get("opportunities") or [])
             # `sport` is carried on the grid row already, but stamp defensively:
             # select_shortlist buckets per sport and a missing slug would
