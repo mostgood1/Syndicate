@@ -950,6 +950,15 @@ death, never life — do not invert it.
 - Blocked by: none.
 
 ### heavy-build-child-process — OPEN — opened 2026-09-14 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- CHECKPOINT 2026-09-14 ~21:30Z (16:30 CT), session 0f5b256e — Goal: stop refresh-worker's main process from keeping ~2.2 GB of live data after a full board build, by running `_compute_board_publication_response` in a child process whose memory is released on exit (the pattern `overview_subprocess.py` uses for the MLB overview). Then show heavy-build refusals staying at ~0 over a full slate day with no recycle restarts. No deploy without the user's OK.
+  - **GOAL: NOT MET.** No child process was built. The measurements WEAKENED the goal's premise.
+  - **Whole-boot attribution (`0a18557a`, 19:07-20:56Z):** of pid 39's +1,516 MB, the heavy build accounts for only ~+497. The live-lens loop's builds account for +883, startup +390, and the MLB sim tick +149. Isolating the heavy build alone would leave most growth in place.
+  - **Done:** pool-cache cap live at env 2 (`0a18557a`; log field `d4deb502` verified 21:16:30Z `limit=2`). Over builds 1-4 it grew ~164 MB less than uncapped; H-cache PARTIAL.
+  - **Left:**
+    - (1) The 23:10Z live-slate reading (background job in session 0f5b256e): which worker publishes `live/<sport>_live_lens.json`, and what MLB's live-lens build costs each worker.
+    - (2) A user decision: `SYNDICATE_ENABLE_LIVE_LENS_LOOP` off refresh-worker vs off live-odds-worker. It is true on both.
+    - (3) Re-scope or re-title this lane after that decision; the child-process design may no longer be the right fix.
+  - **Blocking:** live games (from 22:40Z), then the user's decision.
 - Goal: stop refresh-worker's main process from keeping ~2.2 GB of live data after a full board build, by running `_compute_board_publication_response` in a child process whose memory is released on exit (the pattern `overview_subprocess.py` uses for the MLB overview). Then show heavy-build refusals staying at ~0 over a full slate day with no recycle restarts. No deploy without the user's OK.
 - Origin: user decision 2026-09-14 ~15:10Z (10:10 CT), "Restart at 1 + build isolation lane (Recommended)". The user's prompt was "why do we need 15? if we know its a problem we should fix it". The restart setting (lane heavy-build-memory-refusal) is the stopgap; this lane is the root-cause fix.
 - Measured before design (refresh-worker logs, 09-12 18:00Z..09-14 15:05Z):
@@ -1069,6 +1078,12 @@ death, never life — do not invert it.
     - **Undisturbed window requested from accuracy-assessment-0914:** the first ~6 heavy builds after this deploy (~90 min from live). "Reading done" goes on this line when the 6th `CANDIDATE_POOL_CACHE` line is in.
 
 ### heavy-build-memory-refusal — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- CHECKPOINT 2026-09-14 ~21:30Z (16:30 CT), session 0f5b256e — Goal: explain why refresh-worker's heavy board build (candidate pool, board publication, portfolio commit / paper orders) was refused by `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` for ~16 h (2026-09-12 21:34Z .. 2026-09-13 13Z) with unreclaimable headroom ~1,810 MB. Measure what the build actually needs against that floor and what holds ~2.3 GB unreclaimable. Then bring the user options with numbers (retarget/lower the check, cut the build's cost, or add memory). Read-only on production; no code or deploy without the user's OK.
+  - **GOAL: MET (diagnosis, unchanged).** The lane stays OPEN only for the user-chosen stopgap's reading.
+  - Recycle `339dc6e9` has been live with env threshold 1 since `6fe6c6e9` (15:37:05Z). **It has never been exercised.** 0 `pre_source_state_fingerprint` refusals and 0 `[worker_recycle]` lines on the boots of 15:38Z (111 min), 17:29Z (~49 min), 19:07Z (~116 min) and 21:03Z (to 21:27Z). Every boot was ended by another deploy before a refusal came.
+  - The replay's gain is ~40% (N=1 ~612 vs N=15 ~1,044 blocked minutes, recycle's child-job hold included), not the ~3x first shown.
+  - **Left:** `RECYCLE_EXIT` on a real refusal, then a Render restart, then `PORTFOLIO_COMMIT` resuming. Session Monitor `b1k43gk33` watches it and dies with the session.
+  - **Blocking:** a refusal must actually occur. Today's boots were short and did not refuse.
 - DECISION 2026-09-14 ~15:10Z (10:10 CT): user chose "Restart at 1 + build isolation lane (Recommended)".
   - Why not 15: a replay of 23 closed refusal streaks (09-12 18Z..09-14 15Z) counted minutes with no full build. No policy 2,144 (worst 969). N=15 987 / 8 restarts / worst 92. N=5 647 / 17 / 59. N=2 405 / 21 / 26. **N=1 300 / 23 / worst 13.**
   - Boot to first admitted build: median 13.1 min (6 boots, 9.6-24.8). Self-clearing streaks took 10-80 min.

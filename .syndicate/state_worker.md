@@ -2157,7 +2157,15 @@ outlier cold reading. Three paired replications erased it: **cold 31.32s vs warm
 ## [refresh-worker-heavy-build-refusal] refresh-worker's heavy build is refused for hours once the MAIN PROCESS settles above ~2.2 GB after its first full build — child jobs are not the cause. Short streaks clear on their own in 10-80 min; long ones clear only on a restart `[verified 2026-09-13 in production logs, corrected 2026-09-14 by a 45 h streak replay, lane heavy-build-memory-refusal]`
 
 - **Streak shape, 09-12 18Z..09-14 15Z** (23 closed streaks): 18 ended with an admitted build and no boot (1-22 refusals, 10-80 min). 5 ended only at a boot, among them streaks of 24, 401 and 120 refusals. Boot to first admitted build has a median of 13.1 min (6 boots).
-- **Stopgap by user decision 2026-09-14:** recycle threshold 1. The env is set; it goes live on the next refresh-worker deploy (see lane). The replay gives 300 blocked minutes vs 987 at 15. The root-cause fix is lane `heavy-build-child-process`.
+- **Stopgap by user decision 2026-09-14:** recycle threshold 1 (env `SYNDICATE_REFRESH_WORKER_RECYCLE_AFTER_REFUSALS=1`). Live since refresh-worker `6fe6c6e9` (15:37:05Z) `[verified 2026-09-14, deploy + env single-key read]`.
+  - A replay with recycle's child-job hold gives ~612 blocked minutes at 1 vs ~1,044 at 15 over 24 streaks, i.e. ~40% better. Child jobs were present in 55-68% of samples, so a restart is often held.
+  - The root-cause work is lane `heavy-build-child-process`.
+- **Where pid 39's growth comes from `[verified 2026-09-14, one boot of 0a18557a, 504 staged ALL_PROCESS_MEMORY samples; shares are rough because threads interleave]`:** +1,516 MB in 109 min.
+  - Live-lens loop builds +883 (soccer +414, mlb +388); heavy build +497; startup +390 (before any build); MLB sim tick +149 net; live-lens pulls -426 net (the spike is trimmed right after).
+  - The live-lens loop runs on BOTH workers: `SYNDICATE_ENABLE_LIVE_LENS_LOOP=true` on refresh-worker and live-odds-worker, same 4 sports. It was left undecided since 2026-08-17.
+- **Candidate-pool cache `[verified 2026-09-14]`:** one 09-14 pool is 19.7-28.2 MB of JSON; a 09-15 pool is 6.2-7.2 MB.
+  - `SYNDICATE_CANDIDATE_POOL_CACHE_MAX=2` (code `0a18557a`, log field `d4deb502`) holds `entries` at 2.
+  - Over builds 1-4 pid 39 grew ~164 MB less than on an uncapped boot, but kept growing (+291 MB over builds 3-6). The cache is part of the tail, not all of it.
 
 - **Guard.** `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` at the top of `_compute_board_publication_response`; basis = 4096 - unreclaimable. 403 refusals 09-12 21:34Z..09-13 16:14Z.
   - It stopped `CANDIDATE_POOL`, `BOARD_PUBLICATION`, `PORTFOLIO_COMMIT` (paper orders) and Kalshi capture. `LAYER2_FAST_REFRESH` (600 MB floor) kept the board alive.
@@ -2167,7 +2175,7 @@ outlier cold reading. Three paired replications erased it: **cold 31.32s vs warm
   - 3,303 of 7,159 refused-level samples had `process_count` 2, i.e. no children.
   - Heavy builds resumed within minutes of the 13:42Z, 16:23Z and 18:31Z boots.
 - **The floor is roughly right.** Steady-state builds peak +296 / 719 / 1,416 MB above start (2 s `MEMORY_WATCHDOG`, n=12), minimum headroom at peak 633 MB, at parent stages (`board_contract_end`, `build_live_state_payload_fallback`). The MLB hydrated overview runs in a capped child (`[overview_isolation] OK` 33/33, 0 `MEMORY_CAP_HIT`), so the floor's 08-07 sizing comment describes a stage no longer in pid 39.
-- **Fix LIVE, NOT yet exercised `[deploy verified 2026-09-14, Render deploys API]`:** `339dc6e9` `worker_recycle` is in refresh-worker `fb0c91cf` (`dep-dajvgqqd0e5s73dt6r9g`, live 13:39:49Z).
-  - The worker exits (Render restarts it) after >= 15 consecutive refusals (`SYNDICATE_REFRESH_WORKER_RECYCLE_AFTER_REFUSALS`, 0 disables), uptime >= 30 min, no live child, no drain.
-  - On this boot, refusals came back 50m45s after live (first 14:30:34Z; 5 by 14:50:48Z), which fits the ratchet above.
-  - No `RECYCLE_EXIT` has been observed yet, so whether it restarts and heavy builds resume is still unverified.
+- **Fix LIVE, NEVER exercised `[verified 2026-09-14 through 21:27Z]`:** `339dc6e9` `worker_recycle` has been on refresh-worker since `fb0c91cf` (13:39:49Z); refresh-worker was on `6438830d` from 21:03:17Z.
+  - The worker exits (Render restarts it) after >= N consecutive refusals (env, now 1; 0 disables), uptime >= 30 min, no live child, no drain.
+  - On `fb0c91cf`, refusals came back 50m45s after live (14:30:34Z). They were then reset by an admitted build at 15:22Z before any recycle.
+  - The later boots (15:38Z, 17:29Z, 19:07Z, 21:03Z) logged 0 refusals before the next deploy. No `RECYCLE_EXIT` has ever been observed.

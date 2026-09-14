@@ -5971,3 +5971,13 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - A safety margin on a recovery action is a number, and it needs the same evidence as any other number. Replay candidate thresholds against the logged history before shipping one, and count the cost the margin buys (here, minutes without builds), not only the failure it guards against.
   - "Clears only on X" needs the population where it did NOT clear, counted. The original diagnosis looked at the 16 h stall and the boots, never at the streaks between them.
   - *(evidence: lane heavy-build-memory-refusal DECISION 2026-09-14 ~15:10Z; `scratchpad/threshold_sim.py` from session 0f5b256e)*
+
+## 2026-09-14 — OVERTURNED: "CANDIDATE_POOL_CACHE limit= reports the real cap" — the test pinning it compared two values that are EQUAL by default `[lane heavy-build-child-process]`
+
+- **What was believed:** `0a18557a` made the log line report the pool-cache cap. Its commit message and lane text said so, and `test_reports_this_pool_and_the_cache_total` passed, asserting `limit == service._candidate_pool_cache_max`.
+- **What falsified it:** production at 19:20:05Z with the env read back as 2 printed `limit=12`. The print still used `_max_snapshots`. The test built the service with the env unset, where both attributes are 12, so it passed against the wrong field.
+- **How to apply:**
+  - A test that a value comes from X and not Y must run in a state where X != Y. When a new knob defaults to the old value, every default-state assertion about the knob is vacuous. Set the knob to a non-default value in the test.
+  - Also run the new test against HEAD's file: a test that passes on the old code proves nothing about the change. Here the cap tests failed on HEAD, but the log-field test had no case that could.
+  - Before quoting a log field as proof that config reached production, check the field reads the variable you changed.
+  - *(evidence: `deploys.md` 2026-09-14 20:29Z and 21:16:30Z; fix `d4deb502`)*
