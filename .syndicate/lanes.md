@@ -1123,6 +1123,10 @@ death, never life — do not invert it.
   - The NFL live-slate reading this lane owes is still owed.
 
 ### book-grid-gameline-ledger-log — OPEN — opened 2026-09-14 — session 8518e917-502e-4212-b876-11d6eb76ab71
+- VERDICT 2026-09-14 ~10:00 CT — Goal: Every MLB (and other live-gameline sport) book-grid build prints one flush=True line naming what the live-gameline attach produced and what the ledger write did (index size, rows attached by segment, candidates, written, skipped_unchanged, truncated, error), so the 09-12 dropping hop becomes measurable from refresh-worker logs
+  - **GOAL: NOT MET.** The code is on main (`05ca745c`, offline verification passed), but refresh-worker still runs `fb0c91cf`, so no build prints the line yet.
+  - Left: one refresh-worker deploy (user-approved, before 22:40Z first pitch), then a live-slate reading of exactly one `[book_grid] LIVE_GAMELINE_BUILD sport=mlb` line per MLB build, into `deploys.md`.
+  - Blocking: the deliberate HOLD below, for lane `heavy-build-memory-refusal` reading (d). Narrative: `log/2026-09-14.md` "lane `book-grid-gameline-ledger-log` — checkpoint".
 - Goal: Every MLB (and other live-gameline sport) book-grid build prints one flush=True line naming what the live-gameline attach produced and what the ledger write did (index size, rows attached by segment, candidates, written, skipped_unchanged, truncated, error), so the 09-12 dropping hop becomes measurable from refresh-worker logs
 - Files: syndicate/features/shared/book_grid_artifact.py, syndicate/features/shared/live_gameline_ledger.py, tests/test_book_grid_gameline_ledger_log.py (NEW)
 - Hypothesis H1, written BEFORE code: the 500-record per-build cap cut full-game rows on 09-12. **TESTED BEFORE CODE, EXONERATED.** Evidence from the per-record ledger for 09-12:

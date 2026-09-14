@@ -5942,3 +5942,20 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - Pick a baseline outside the defect window, or report the count per unit of work (per heavy build), not per hour.
   - Specialises [[re-baseline before judging]]: the one-hour window was not stale, it was unrepresentative.
   - *(evidence: `deploys.md` 2026-09-14 14:55Z; `log/2026-09-14.md` session 0f5b256e ~14:45Z section)*
+
+## 2026-09-14 — OVERTURNED: "my commit gate checked the deleted lines". It passed on an EMPTY set, and a `-NoNewline` patch export then destroyed the edits it was protecting `[lane book-grid-gameline-ledger-log]`
+
+- **What was believed:** a PowerShell gate verified that a `lanes.md` commit removed only my own lines:
+  - `$deleted = git diff -U0 | ? { $_ -match "^-[^-]" }`
+  - then "fail if any deleted line is foreign".
+- **What falsified it:**
+  - My one deleted line was `-- Blocked by: none.`. Its second character is `-`, so the filter dropped it.
+  - `$foreign` was empty because `$deleted` was empty. The gate printed an empty list and passed, while numstat beside it read `7 1`.
+  - Minutes later, recovering from a stale-base ledger-guard block, `git diff --cached | Out-File -NoNewline` joined every patch line into one.
+  - `git restore` had already discarded the worktree copy, and `git apply` refused: "No valid patches in input".
+- **How to apply:**
+  - A "none of X is foreign" gate must ALSO assert the size of X. numstat's deletion count is the cross-check: `7 1` must yield exactly 1 deleted line.
+  - Exclude only the `---` file header, never a `^-[^-]` class. A markdown bullet is `- `, so a deleted bullet starts `-- `.
+  - Never export a patch through a PowerShell pipeline (`Out-File`, `-NoNewline`, `>`). Use `git diff --output=<file>`.
+  - Prove the patch with `git apply --check` BEFORE discarding its source.
+  - *(evidence: `log/2026-09-14.md` section "lane `book-grid-gameline-ledger-log` — checkpoint")*
