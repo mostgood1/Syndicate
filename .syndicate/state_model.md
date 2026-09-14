@@ -652,10 +652,17 @@ map with the tool, not the prose.
   carrying `model_skill` with correlation and verdict. `batter_hits_runs_rbis`
   correctly stays `unmeasured` — it must not inherit a neighbour's number.
   Label-only: no projection, mean or edge changed. `[measured 08-15 00:35Z]`
-- **`#425` skill declaration is LIVE on both services** — every projection
-  carries `model_skill`, `unmeasured` is first-class: `nfl 20 measured`, **mlb
-  1631 / wnba 209 / soccer 12 unmeasured**. Counts surface in the `projections`
-  coverage block, **not** in `counts`. `[measured 08-14]`
+- **`#425` skill declaration is LIVE, and measured markets carry their measurement** `[verified 2026-09-14, lane accuracy-assessment-0914]`:
+  - `measured_market_skill` (31 measured (sport, market, segment, phase) entries) fills `model_skill` where no producer note exists. Live rows carry the LIVE entry; the MLB live-row reading is still owed.
+  - Served census after web + refresh-worker `17c8208e`: Layer 2 shortlist unmeasured 605 -> 24 (NFL props, soccer corners / first-half totals); MLB book grid unmeasured 563 -> 252, exactly `batter_home_runs`.
+  - Counts surface in the `projections` coverage block, **not** in `counts`.
+- **Measured skill moves the Layer 2 SCORE, not admission or stake** `[verified on the 2026-09-14 21:11:04Z shortlist, refresh-worker 6438830d, all 3,038 rows]`:
+  - A row whose note establishes a loss gets `score = min(score, score x factor)`, where `factor = max(0.5, 1 - 5 x CI-lower / market error)`, stamped `skill_source`.
+  - Live factors: ncaaf totals 0.514; ncaaf spreads/h2h 0.814; soccer h2h 0.877; mlb outs 0.877; mlb earned_runs 0.979; nfl totals 0.859; nfl spreads 0.958. That is 626 rows, all `skill_source: "category"`.
+  - A validated bucket overrides the category factor, but `measured_bucket_skill.json` is EMPTY. Only `scripts/bucket_search.py --write-table` on the recorder population fills it, and that is a user decision plus a deploy.
+- **The pre-publication opportunity recorder is ON** on refresh-worker (`SYNDICATE_OPPORTUNITY_POPULATION_LEDGER=on`) `[verified 2026-09-14]`:
+  - It records the first sighting per key per board date under `reports/intelligence/opportunity_population/`, published to web.
+  - Team names since `6438830d`: soccer 832/832 post-live; the other sports not yet read.
 - **`#425` degeneracy detection is LIVE and VERIFIED** — reports any
   `(kind, market, segment)` collapsed to one value across ≥4 distinct GAMES, all
   sports. It found a real defect unprompted on its first live board.
@@ -664,8 +671,8 @@ map with the tool, not the prose.
 - **PRODUCTION HAS FAR MORE HISTORY THAN THE CHECKOUT** — 81 WNBA dates vs "4
   files" locally, and the local files are 7-column stubs with no projection
   column. **Never scope a backtest from the checkout.** `[measured 08-14]`
-- **Freeze breadth:** 69 sport × market pairs ship predictions; 2 have a
-  backtest. No new pair ships without archive-replay coverage. `[policy]`
+- **Freeze breadth:** no new pair ships without archive-replay coverage. `[policy]`
+  - The "69 pairs ship, 2 backtested" count dates from 08-14. On 2026-09-14 `measured_market_skill` carries 31 measured entries; the 69 was not re-counted.
 
 ---
 

@@ -5981,3 +5981,26 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - Also run the new test against HEAD's file: a test that passes on the old code proves nothing about the change. Here the cap tests failed on HEAD, but the log-field test had no case that could.
   - Before quoting a log field as proof that config reached production, check the field reads the variable you changed.
   - *(evidence: `deploys.md` 2026-09-14 20:29Z and 21:16:30Z; fix `d4deb502`)*
+
+## 2026-09-14 — OVERTURNED: "the 09-15 board is a post-deploy population because its date begins after the deploy" — a per-day first-sighting ledger is written by builds that ran BEFORE its date `[lane accuracy-assessment-0914]`
+
+- **What was believed:** deploy #3's prediction named "the first board date written entirely after live (09-15 CT)" as the full read of the recorder's new team-name fields.
+- **What falsified it:**
+  - The pre-live 20:53:26Z build on 09-14 had already recorded every 2026-09-15 key; the shortlist builds the next date inside its horizon.
+  - The recorder writes a key once per board date, so the post-live 09-15 builds only added 414 new keys, all soccer.
+- **How to apply:**
+  - A "post-change population" is defined by each record's own written-at time (`t` vs the live time), never by the date label on the file.
+  - Before naming a date as the reading, check when its first part was written.
+  - *(evidence: deploys.md 2026-09-14 21:30Z follow-up; `deploy3_reading.py 2026-09-15 2026-09-14T21:03:17Z`)*
+
+## 2026-09-14 — OVERTURNED: "I can write the time from how long things usually take" — two ledger times this session were written from expectation, and both were wrong `[lane accuracy-assessment-0914]`
+
+- **What was believed:** a finish time, or a claim's expiry, could be written into the ledger from the expected duration.
+- **What falsified it:**
+  - "preview v2 finished ~20:05Z": it finished before 20:00Z; the clock read 20:01:50Z.
+  - "the claim lapsed at its TTL (21:16:44Z) before this entry was pushed": the push finished 21:14:28Z, and the claim was released by token.
+  - Both reached origin/main before a clock read caught them.
+- **How to apply:**
+  - Read the clock in the same command that writes a ledger time. The corrected appends stamp their heading from `datetime.now(timezone.utc)` at write time.
+  - Something that has not happened yet ("will lapse", "should finish") goes in the future tense, never as a past fact.
+  - *(evidence: deploys.md 2026-09-14 21:15Z correction; lanes.md PREVIEW v2 heading correction)*
