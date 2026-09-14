@@ -1048,6 +1048,14 @@ death, never life — do not invert it.
     - **Implication:** the "+1.1 GB first build" is roughly startup ~+480, live-lens loop builds ~+210-330 (soccer recurring), MLB sim tick samples ~+290, and the heavy build's own pulls and overview ~+270. These are all rough.
     - A child-process HEAVY BUILD alone would not remove the live-lens or MLB-tick growth in pid 39, which weakens this lane's original design.
     - Next: find which env flags put the live-lens loop and the MLB sim tick on refresh-worker, and whether soccer's live-lens build retains memory per tick.
+  - **LIVE-LENS LOOP RUNS ON BOTH WORKERS (read ~20:50Z; a known, never-closed question):**
+    - `SYNDICATE_ENABLE_LIVE_LENS_LOOP` reads `true` on refresh-worker AND live-odds-worker (single-key GETs, boolean only).
+    - The owning comment (`scripts/run_refresh_worker.py:7222-7226`) says the flag "must be removed from live-odds-worker in the same change or BOTH will run it". The ledger has recorded it on both since 2026-08-17 (`lanes_history.md:1146` "OPEN QUESTION FOR THE DEPLOYER"; `deploys_history.md:14843` "live-odds-worker is the effective owner", marked "Not conclusive"). No decision was ever recorded.
+    - **Both run the same sports now.** `live_lens_tick_after_build_<sport>` since 20:00Z: live-odds-worker mlb 13 / soccer 14 / wnba 13 / nfl 14; refresh-worker mlb 8 / soccer 9 / wnba 8 / nfl 9; ncaaf 0 on both.
+    - In pid 39 those builds appear as some of the growth steps (build 1: WNBA +117, soccer +93/+118; build 3: soccer +54/+58).
+    - **Not established:** whether both PUBLISH `live/<sport>_live_lens.json` during live play (two writers). Since 20:00Z both only pulled the snapshot (refresh-worker 33 `PULL_LIVE_LENS_SNAPSHOT`, live-odds-worker 42, all `written=0`; web serves 37-byte files), so there are no live games in the window. Absence here says nothing.
+    - **Reading owed before any flag change:** during the evening slate (MLB from 22:40Z), count each worker's live-lens publishes per sport and web's `[ops.publish]` accepts per publisher. Then compare refresh-worker pid 39 growth with its live-lens copy on and off.
+    - Turning refresh-worker's copy off is a production config change and needs the user's decision. live-odds-worker headroom read 138-147 MB at 20:43-20:44Z, so it must not take on more.
     - **Undisturbed window requested from accuracy-assessment-0914:** the first ~6 heavy builds after this deploy (~90 min from live). "Reading done" goes on this line when the 6th `CANDIDATE_POOL_CACHE` line is in.
 
 ### heavy-build-memory-refusal — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
