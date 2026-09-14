@@ -34836,3 +34836,45 @@ User decision in chat: "Deploy both now (Recommended)". Both claims held by the 
   - **OWED:** the next Layer 2 build's MLB `rows_with_projection` (recovery).
 - **NOT verified, OWED:** live-row notes. No MLB game is live until first pitch at 22:40Z.
 - Claims released after this entry is pushed.
+
+## 2026-09-14 18:10Z (13:10 CT) — web `17c8208e` -> `ae53a1a5` and refresh-worker `17c8208e` -> `ae53a1a5` — deploys `dep-dak3hc142hec73bsoru0` / `dep-dak3j83m8hqs7399fg5g` — lane `accuracy-assessment-0914`, session 498e87fd
+
+User decision in chat: "Deploy, recorder ON (Recommended)". Both claims held by the lane. Preflight CLEAR on both: web 18:10:20Z, refresh-worker 18:14:25Z, infrastructure processes only, no MLB sim in flight.
+- **Ships:**
+  - `layer2_board._apply_skill_reliability`: when a row's measured note establishes a loss, its Layer 2 SCORE is scaled.
+    - `score = min(score, score * factor)`, with `factor = max(0.5, 1 - 5 * L)` and L = CI lower bound / market error.
+    - Admission (`value_pct`) and stake sizing do not read it.
+  - `opportunity_population_ledger`: records the first sighting of every candidate per sport per day, BEFORE publication filters. It sits behind `SYNDICATE_OPPORTUNITY_POPULATION_LEDGER`.
+  - `HOT_ARTIFACT_PATTERNS` allowlists `reports/intelligence/opportunity_population/*.jsonl`, so web can serve the parts.
+  - refresh-worker env: `SYNDICATE_OPPORTUNITY_POPULATION_LEDGER=on`, set with the single-key endpoint before its deploy (before: absent).
+  - No `render.yaml` or requirements change.
+- **Carried:** no other lane's code. `17c8208e..ae53a1a5` holds this lane's `7220d1da` and `a537ea67`, plus ledger-only commits (two of them other lanes').
+- **Live:** web 18:14:19Z, refresh-worker 18:18:10Z (Render deploy API `finishedAt`).
+- **verify:** the served Layer 2 shortlist, read with the same census instrument as the before-reading (the 18:02:02Z build).
+  - The build read: the first one written after refresh-worker went live that also carried MLB projections — `written_at` 18:27:09Z, 1,379 rows, MLB `rows_with_projection` 1,297 of 1,482.
+  - The prediction was pre-registered in the lane before the reading.
+  - `score.skill_reliability`, as rows / factor. Every factor equals its prediction:
+    - ncaaf totals 221 / 0.514; ncaaf spreads 85 / 0.814; ncaaf h2h 53 / 0.814;
+    - soccer h2h 100 / 0.877;
+    - mlb outs 38 / 0.877; mlb earned_runs 28 / 0.979;
+    - nfl totals 29 / 0.859.
+  - **Falsifiers, all 0:**
+    - parity, unmeasured or no-projection rows carrying a factor: 0;
+    - positive-value measured-loss rows lacking one: 0;
+    - positive rows with `score > value_pct * factor`: 0.
+  - **Not exercised:** soccer spreads (~0.998) and nfl spreads (~0.958); this build had no rows in either.
+  - **Median rank, before -> after:**
+    - ncaaf totals 281 -> 1,153; ncaaf spreads 100 -> 972; ncaaf h2h 114 -> 986; soccer h2h 553 -> 791.
+    - Rank is relative to the row mix, so it can move against the factor: mlb outs 854 -> 191 and mlb earned_runs 984 -> 344 went UP, because ~360 NCAAF rows fell below them.
+    - The per-row check above is the reading for the mechanism, not the rank.
+  - **Recorder:** the first post-live build printed one `[opportunity_population] POPULATION` line per sport.
+    - Written: mlb 2,549, nfl 473, ncaaf 845, soccer 14,776 (2 parts).
+    - Every line has `published` > 0, `unkeyable=0` and `truncated=False`.
+    - Predicted: ~2.5k / ~0.5k / ~0.8k / ~14.7k. **MET.**
+  - **Web serves the parts:** after 18:30Z, `scripts/bucket_search.py` read 14,776 soccer records for 2026-09-14 through `/api/ops/artifacts/export`. That equals the recorder's written count.
+  - refresh-worker after live: memory unreclaimable ~1,070-1,195 MB over the first builds; build duration unchanged by the log reading (per-build seconds not retained).
+- **NOT verified, OWED:**
+  - That later builds are mostly `duplicate`; only the first build's lines were read.
+  - Live-row notes, carried over from the 17:22Z entry (first MLB pitch 22:40Z).
+- Scoring from buckets is NOT in this deploy: `measured_bucket_skill.json` is empty and the bucket override is not deployed.
+- Claims released after this entry is pushed.
