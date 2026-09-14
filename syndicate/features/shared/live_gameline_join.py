@@ -1508,7 +1508,17 @@ def attach_live_gamelines(
             # which is finer than any Brier or calibration question this series
             # will be asked at these sample sizes.
             obs_model = obs_market = obs_edge = None
-            if isinstance(seg_hit, Mapping):
+            # H2H ONLY `[2026-09-14, lane accuracy-assessment-0914]`. The model
+            # side is a home-WIN probability, and on an h2h row the market side
+            # is the de-vigged home price. On a totals or spreads row
+            # `market_fair_prob_over` is P(over) / P(home covers), so pairing the
+            # two is a category error. Measured on the production ledger
+            # 09-08..09-13: 43,269 first5 totals/spreads observation rows carried
+            # a home-win probability, 97.8% identical to the same build's h2h
+            # row, and they were ~85% of ledger volume. Those rows stay
+            # recorded with the refusal; they carry no observation, so a
+            # constant record dedupes to one write a day.
+            if isinstance(seg_hit, Mapping) and market_key == "h2h":
                 try:
                     _mp, _n, _why = segment_home_win_prob(seg_hit, row)
                     _market = (row.get("projection") or {}).get("market_fair_prob_over") \
@@ -1602,7 +1612,7 @@ def attach_live_gamelines(
                     sport=sport,
                 )
             _apply_verdict(row, projection, verdict, hit, coverage,
-                           live_projected=verdict.get("model_prob"))
+                           live_projected=verdict.get("model_prob"), sport=sport)
             continue
 
         # THE LEG FRAME MUST MATCH. On a full-game row this is the raw home
@@ -1617,7 +1627,7 @@ def attach_live_gamelines(
             model_home_prob, effective_sims, frame_reason = segment_home_win_prob(hit, row)
         if frame_reason is not None:
             verdict = {"priceable": False, "withheld_reason": frame_reason}
-            _apply_verdict(row, projection, verdict, hit, coverage)
+            _apply_verdict(row, projection, verdict, hit, coverage, sport=sport)
             continue
         verdict = price_moneyline(
             model_prob=model_home_prob,
@@ -1638,7 +1648,7 @@ def attach_live_gamelines(
             sport=sport,
         )
 
-        _apply_verdict(row, projection, verdict, hit, coverage)
+        _apply_verdict(row, projection, verdict, hit, coverage, sport=sport)
 
     return coverage
 
@@ -1651,6 +1661,7 @@ def _apply_verdict(
     coverage: dict[str, Any],
     *,
     live_projected: Any = None,
+    sport: Any = None,
 ) -> None:
     """Write one verdict onto the row, for BOTH the moneyline and distribution
     paths.
@@ -1693,6 +1704,18 @@ def _apply_verdict(
         row["live_gameline"] = block
         updated = dict(projection)
         updated["live_aware"] = True
+        # THE SKILL NOTE DESCRIBES THE LIVE MODEL NOW, NOT THE PREGAME ONE.
+        # `dict(projection)` used to carry the pregame `model_skill` across, so
+        # every live row stated a different model's record. Replaced, never
+        # filled: a pregame note is wrong on a live row even when a producer
+        # measured it. See `projection_skill.live_skill_note`.
+        from syndicate.features.shared.projection_skill import live_skill_note
+
+        updated["model_skill"] = live_skill_note(
+            sport=row.get("sport") or sport,
+            market=row.get("market"),
+            segment=row.get("segment"),
+        )
         if live_projected is not None:
             # The LIVE model probability, kept next to the pregame one rather
             # than overwriting it. `projected` on a game row is the pregame

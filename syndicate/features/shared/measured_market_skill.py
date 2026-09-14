@@ -61,8 +61,63 @@ NOTE_BASIS = "measured_market_skill"
 
 REQUIRED_ENTRY_KEYS = ("sample_games", "seasons", "verdict", "verdict_class", "source")
 
+_MLB_LIVE_SOURCE = (
+    "lane accuracy-assessment-0914: production live_gameline_ledger (web copy) vs "
+    "StatsAPI finals, fresh quotes <=120s, paired rows, bootstrap over games"
+)
+
 # (sport, market, segment, phase) -> entry.
-MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
+    # ---- MLB, LIVE ------------------------------------------------------------
+    # Full-game h2h is the market MLB live publication was switched off for
+    # (lane `mlb-stop-publishing-edges`). This window re-confirms the loss.
+    # Since the 09-08 changes it reads parity (+0.00356 [-0.00966, +0.01610],
+    # 69 games) -- under-powered, so the pooled window is what the row carries.
+    ("mlb", "h2h", "full", PHASE_LIVE): {
+        "sample_games": 176,
+        "seasons": "2026-08-31..09-13 live",
+        "brier_model": 0.16949,
+        "brier_market": 0.15931,
+        "diff": 0.01019,
+        "ci95": (0.00089, 0.02045),
+        "verdict": "live: loses to the market, Brier +0.010 [+0.001, +0.020] over 176 games; worst where it disagrees most",
+        "verdict_class": VERDICT_LOSES,
+        "source": _MLB_LIVE_SOURCE,
+    },
+    ("mlb", "h2h", "first5", PHASE_LIVE): {
+        "sample_games": 67,
+        "seasons": "2026-09-08..09-13 live",
+        "brier_model": 0.16821,
+        "brier_market": 0.15916,
+        "diff": 0.00905,
+        "ci95": (-0.00869, 0.02806),
+        "verdict": "live first-5: parity with the market, Brier +0.009 [-0.009, +0.028] over 67 games",
+        "verdict_class": VERDICT_PARITY,
+        "source": _MLB_LIVE_SOURCE + "; first5 observation rows, ties dropped, no quote age",
+    },
+    ("mlb", "totals", "full", PHASE_LIVE): {
+        "sample_games": 159,
+        "seasons": "2026-08-31..09-13 live (no 09-09)",
+        "brier_model": 0.24824,
+        "brier_market": 0.24342,
+        "diff": 0.00482,
+        "ci95": (-0.00847, 0.01889),
+        "verdict": "live: parity with the market, Brier +0.005 [-0.008, +0.019] over 159 games; runs high early",
+        "verdict_class": VERDICT_PARITY,
+        "source": _MLB_LIVE_SOURCE,
+    },
+    ("mlb", "spreads", "full", PHASE_LIVE): {
+        "sample_games": 159,
+        "seasons": "2026-08-31..09-13 live (no 09-09)",
+        "brier_model": 0.22852,
+        "brier_market": 0.22849,
+        "diff": 0.00002,
+        "ci95": (-0.0139, 0.01468),
+        "verdict": "live: parity with the market, Brier +0.000 [-0.014, +0.015] over 159 games",
+        "verdict_class": VERDICT_PARITY,
+        "source": _MLB_LIVE_SOURCE,
+    },
+}
 
 
 def _norm(value: Any) -> str:

@@ -84,6 +84,26 @@ def normalize_existing_note(note: dict[str, Any]) -> dict[str, Any]:
     return note
 
 
+def live_skill_note(*, sport: Any, market: Any, segment: Any) -> dict[str, Any]:
+    """The `model_skill` a projection carries once a LIVE model has priced it.
+
+    `live_gameline_join._apply_verdict` copies the pregame projection and marks
+    it `live_aware`. Before this, the copy kept the PREGAME note, so a live row
+    described a different model's record (measured 2026-09-14, lane
+    `accuracy-assessment-0914`: every MLB live game-line row inherited "model
+    never backtested" while the live model had its own 176-game measurement).
+    A pregame note is never correct on a live row, even a producer's own, so
+    this REPLACES rather than fills: the live measurement if one exists, else
+    the declared absence.
+    """
+    note = measured_market_skill.skill_note(
+        sport=sport, market=market, segment=segment, phase=measured_market_skill.PHASE_LIVE
+    )
+    if note:
+        return normalize_existing_note(note)
+    return unmeasured_note()
+
+
 def attach_projection_skill(grid: list, *, sport: str) -> dict[str, Any]:
     """Ensure every projection on the grid carries a `model_skill` block.
 
