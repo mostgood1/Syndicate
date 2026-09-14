@@ -57,7 +57,8 @@ def test_phase_comes_from_the_projection_not_the_game():
 
 def test_note_is_compact_and_carries_no_status(table):
     note = mms.skill_note(sport="mlb", market="totals")
-    assert set(note) == {"correlation", "sample_games", "seasons", "verdict", "verdict_class", "basis"}
+    assert set(note) == {"correlation", "sample_games", "seasons", "verdict", "verdict_class", "basis",
+                         "established_loss_rel"}
     assert note["basis"] == mms.NOTE_BASIS
 
 

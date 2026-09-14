@@ -44,6 +44,7 @@ keys. The numbers behind a verdict live in the entry, not on the row.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from typing import Any
 
@@ -419,6 +420,62 @@ def _norm(value: Any) -> str:
     return str(value or "").strip().lower()
 
 
+# ---- SCORING: how far a measured loss moves a row's Layer 2 score ------------------
+#
+# `[2026-09-14, user decisions: "Category now, buckets next", "Scale by measured loss",
+# "Switch directly"]`. The multiplier folds into the score's RELIABILITY, so it moves
+# ranking, caps and which rows get staked, and never admission (`value_pct`) or stake
+# size (the sizer does not read the score).
+#
+# ONLY AN ESTABLISHED LOSS MOVES A SCORE. `established_loss_rel` is the CI's LOWER
+# bound divided by the market's own error (Brier or MAE), so Brier and point markets
+# share one unit-free scale. Parity has a lower bound below zero and moves nothing; a
+# borderline loss barely moves; a clear one moves more.
+#
+# GAIN AND FLOOR ARE A TUNING CHOICE, NOT A MEASUREMENT: a 10% established loss halves
+# the score, and no category is discounted below half. The strongest measured loss at
+# the time of writing (NCAAF pregame totals, 9.7%) lands near the floor.
+SKILL_GAIN = 5.0
+SKILL_FLOOR = 0.5
+
+
+def established_loss_rel(entry: Mapping[str, Any]) -> float | None:
+    """The relative loss the CI's lower bound establishes, or None if unscoreable."""
+    ci = entry.get("ci95")
+    market = entry.get("brier_market")
+    if market is None:
+        market = entry.get("mae_market")
+    try:
+        lower = float(ci[0])  # type: ignore[index]
+        market_value = float(market)  # type: ignore[arg-type]
+    except (TypeError, ValueError, IndexError, KeyError):
+        return None
+    if not math.isfinite(lower) or not math.isfinite(market_value) or market_value <= 0:
+        return None
+    return round(max(0.0, lower) / market_value, 5)
+
+
+def skill_reliability(note: Any) -> float:
+    """The score multiplier a row's `model_skill` note earns: 1.0 unless a loss is established.
+
+    1.0 for an unmeasured note, a note without `established_loss_rel` (a comparison
+    against something other than the market, e.g. NFL preseason correlation or the MLB
+    hitter notes' constant baseline), and any malformed value. Unknown must not be
+    punished with an invented midpoint any more than it may be rewarded with one.
+    """
+    if not isinstance(note, Mapping):
+        return 1.0
+    if _norm(note.get("status")) != "measured":
+        return 1.0
+    try:
+        loss = float(note.get("established_loss_rel"))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 1.0
+    if not math.isfinite(loss) or loss <= 0:
+        return 1.0
+    return max(SKILL_FLOOR, 1.0 - SKILL_GAIN * loss)
+
+
 def projection_phase(projection: Mapping[str, Any]) -> str:
     """`live` only when the projection itself knows the game state."""
     return PHASE_LIVE if projection.get("live_aware") else PHASE_PREGAME
@@ -445,4 +502,7 @@ def skill_note(
         "verdict": entry["verdict"],
         "verdict_class": entry["verdict_class"],
         "basis": NOTE_BASIS,
+        # The one number Layer 2 scoring reads (`skill_reliability`). None when the
+        # entry has no CI against the market, which scores as 1.0.
+        "established_loss_rel": established_loss_rel(entry),
     }

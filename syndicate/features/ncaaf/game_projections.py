@@ -72,6 +72,9 @@ NCAAF_MEASURED_SKILL: Mapping[str, Any] = {
         "delta_mae_2026": 1.75,
         "ci95_2026": (0.45, 3.06),
         "dispersion_ratio_2026": 1.28,
+        # For Layer 2 scoring (`measured_market_skill.skill_reliability`): the 2026 CI's
+        # lower bound over the 2026 close's MAE, 0.45 / 12.102.
+        "established_loss_rel": 0.03718,
         "verdict": (
             "loses to the closing line: 2026 margin MAE +1.75 [+0.45, +3.06] over "
             "100 games (2024 backtest +3.56 over 2,233)"
@@ -92,6 +95,8 @@ NCAAF_MEASURED_SKILL: Mapping[str, Any] = {
         "ci95": (1.119, 4.594),
         "dispersion_ratio": 2.48,
         "bias_points": 4.6,
+        # For Layer 2 scoring: the CI's lower bound over the close's MAE, 1.119 / 11.51.
+        "established_loss_rel": 0.09722,
         "verdict": (
             "loses to the closing line by 2.86 points of total MAE [+1.12, +4.59] "
             "over 100 games; 2.48x over-dispersed and 4.6 points high"

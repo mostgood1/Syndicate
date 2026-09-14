@@ -891,6 +891,53 @@ def _row_rests_on_unmeasured_model(row: Mapping[str, Any]) -> bool:
     return verdict_class == VERDICT_LOSES
 
 
+def _apply_skill_reliability(score: Any, projection: Any) -> Any:
+    """Fold the model's MEASURED skill into the row's Layer 2 score.
+
+    `[2026-09-14, user decisions: "Category now, buckets next", "Scale by measured
+    loss", "Switch directly"]`, lane `accuracy-assessment-0914`. Every opportunity
+    is still evaluated; what was measured moves where it SURFACES.
+
+    THE SAME ALGEBRA AS `blended_score`'s OWN RELIABILITY. There the stored score is
+    `min(value, value * reliability)`, so `min(score, score * factor)` here is exactly
+    `min(value, value * reliability * factor)` on a positive row, and leaves a
+    negative row on its value -- the "a discount lowers, never raises" rule that
+    `opportunity_signals.blended_score` documents (a trusted-less bad row must not
+    outrank a trusted bad one). The factor is `measured_market_skill.skill_reliability`:
+    1.0 unless the note establishes a loss against the market.
+
+    WHAT MOVES, AND WHAT DOES NOT, BY CONSTRUCTION:
+    - `score["score"]` -- board order, the kind/per-sport/game caps in
+      `select_shortlist`, and `portfolio_commit`'s position truncation and exposure
+      ordering. That is the decision.
+    - `score["value_pct"]` is NOT touched, so the value-floor admission
+      (`_row_value_pct`) cannot shift.
+    - Stake SIZE is not touched: the sizer derives from `ev_pct`, `model_edge_pct`
+      and the fair price, never from the score.
+
+    Applied at THE one place a Layer 2 score is computed (`build_layer2_rows`, right
+    after `blended_score`). `quote_enrichment._attach_board_score` scores a different
+    surface (the home/Layer 1 candidate pools) and is deliberately not part of this.
+    """
+    if not isinstance(score, Mapping):
+        return score
+    from syndicate.features.shared.measured_market_skill import skill_reliability
+
+    skill = projection.get("model_skill") if isinstance(projection, Mapping) else None
+    factor = skill_reliability(skill)
+    if factor >= 1.0:
+        return score
+    raw = _as_float(score.get("score"))
+    if raw is None:
+        return score
+    adjusted = dict(score)
+    adjusted["score"] = round(min(raw, raw * factor), 4)
+    # Stamped only when it bit, beside the other reliability terms, so a reader can
+    # see which term ranked the row down.
+    adjusted["skill_reliability"] = round(factor, 4)
+    return adjusted
+
+
 def _row_quote_age_seconds(row: Mapping[str, Any]) -> float | None:
     """How stale is our OBSERVATION of this quote (`#370`).
 
@@ -3014,6 +3061,10 @@ def build_layer2_rows(
                 # falling through to None.
                 model_edge_basis(row, side, fair) if model_edge is not None else None
             )
+            # MEASURED SKILL MOVES THE SCORE, NOT THE ADMISSION OR THE STAKE.
+            # See `_apply_skill_reliability`: 1.0 unless the row's `model_skill`
+            # establishes a loss against the market.
+            score = _apply_skill_reliability(score, candidate.get("projection"))
             candidate["score"] = score
             if score is not None:
                 scored += 1
