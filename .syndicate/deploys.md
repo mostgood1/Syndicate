@@ -35056,3 +35056,41 @@ User decision in chat: "Deploy #3 after their reading is done".
     - new keys from tonight's in-play line moves (MLB first pitch 22:40Z; NFL if a game is on);
     - or the 09-16 board, first built after the Central date roll (~05:00Z 09-15).
 - **OWED:** MLB/NFL/NCAAF team-name share on post-live records; MLB live-row notes from 22:40Z.
+
+## 2026-09-14 23:25Z (18:25 CT) — reading only, no deploy — live-lens loop on both workers + refresh-worker recycle [lanes heavy-build-child-process, heavy-build-memory-refusal]
+- Scheduled task `live-lens-dual-loop-reading-0914`. Read-only: no deploy, no env or flag change, no code.
+- **Window W** = 2026-09-14T22:40:00Z (17:40 CT, first MLB pitch) .. ~23:17Z (18:17 CT), ~37 min. Covered windows (`render_logs.py --json`):
+  - `ALL_PROCESS_MEMORY`: refresh-worker 22:40:01Z..23:17:22Z (224 samples); live-odds-worker 22:40:05Z..23:17:04Z (245 samples).
+  - `_live_lens.json`: refresh-worker 22:40:56Z..23:16:19Z (81); live-odds-worker 22:41:03Z..23:17:04Z (104).
+  - web `[ops.publish]`: 22:40:14Z..23:17:10Z (1,580 lines).
+- **Precondition: EXERCISED.** Both workers wrote `live/mlb_live_lens.json` at 1.05-1.52 MB (`KEYVALUE_WRITE_LARGE`), against 37-byte files in the afternoon.
+  - `live_lens_tick_after_build_<sport>` in W: refresh-worker mlb 10 / wnba 10 / soccer 10 / nfl 10; live-odds-worker mlb 15 / wnba 15 / soccer 15 / nfl 15; ncaaf 0 on both.
+- **Who writes: TWO writers for MLB, measured.**
+  - Both workers write the SAME keyvalue key `syndicate:refresh-state:/opt/render/project/data/live/mlb_live_lens.json`, from the same call (`live_lens_loop.py:719` <- `:775`).
+  - refresh-worker: 3 writes logged (23:09:19Z 1,262,877 B; 23:12:01Z 1,507,742 B; 23:16:19Z 1,509,107 B).
+  - live-odds-worker: 8 writes logged (from 22:54:59Z; 1,050,207-1,051,307 B through 23:01Z, 1,522,279 B at 23:17:32Z).
+  - Non-`PULL_` line kinds naming `live/<sport>_live_lens.json`: only `KEYVALUE_WRITE_LARGE`, MLB only. The rest were `PULL_*` (refresh-worker 78, live-odds-worker 96).
+  - **web `[ops.publish]` lines naming `_live_lens.json`: 0 of 1,580.** Live-lens snapshots reach web through the shared keyvalue store, not the HTTP publish, so no publisher/ACCEPTED count exists for them.
+  - Both workers also ran the hot-artifact publish sweep: `published_hot_artifacts` refresh-worker 9 lines (count 214-230), live-odds-worker 16 (count 172-191).
+  - **wnba / soccer / nfl: two writers INFERRED, not measured.** `KEYVALUE_WRITE_LARGE` fires only above 1 MiB (`warn_bytes=1048576`), and a non-MLB invalid snapshot returns before `:719` without logging. Both workers built those sports every tick, and there were 0 `LIVE_LENS_TICK_DIAG` lines on either.
+  - Not measured: which copy web serves at a given moment (last write wins), or whether the two copies differ in content. The byte sizes differed at nearby times.
+- **MLB live-lens build cost** (`live_lens_tick_before_mlb` -> next `live_lens_tick_after_build_mlb`, same pid):
+  - refresh-worker pid 39 RSS: min +0.3 / median +51.3 / max +101.2 MB, n=10. Container: -107.4 / +18.4 / +119.5 MB.
+  - live-odds-worker main process (`run_live_odds_refresh_worker.py`) RSS: +6.1 / +78.4 / +130.7 MB, n=15. Container: -194.9 / +78.2 / +174.7 MB.
+  - These are the transient per-tick build costs, not retained growth. Retained growth was NOT re-measured in live play.
+  - Nothing near the 2026-08-08 "+1,445 MB" MLB live Monte Carlo figure (`run_refresh_worker.py:7201-7215`) appeared in W on either worker. Whether live MC ran inside these builds (`liveMcSources`) was not read.
+- **Headroom in W:**
+  - refresh-worker (4,096 MB): `container_memory_headroom_mb` min 1.7 MB at 23:14:34Z (15 samples < 50 MB). Unreclaimable headroom (max - unreclaimable) min **1,755 MB** at 23:02:48Z (unreclaimable 2,341, 9 processes).
+  - live-odds-worker (2,048 MB): headroom field min **0.0 MB** at 22:43:47Z and 22:54:18Z (28 samples < 50 MB). Unreclaimable headroom min **887 MB** at 23:04:57Z (unreclaimable 1,161, 4 processes).
+  - The headroom field includes page cache, so 0.0 is not an OOM.
+- **Kills (Render events API, limit 50):**
+  - refresh-worker: none in W. The last events were the 21:03:17Z deploy.
+  - live-odds-worker: `server_failed` 22:56:22Z (17:56 CT), `earlyExit=true, evicted=false`. It was the worker's own planned recycle, NOT an OOM: `LIVE ODDS REFRESH WORKER RECYCLING after 19871s uptime to reset accumulated page cache` at 22:56:19Z, `before_exit` container 1,665 MB / headroom 383 MB, 0 children, 0 Traceback / Killed / MemoryError in W. Restart line 22:56:23Z, boot `MALLOC_ARENA_INIT` 22:57:24Z, first MLB build 22:57:59Z.
+- **refresh-worker recycle (lane heavy-build-memory-refusal): still UNEXERCISED.**
+  - Live deploy `dep-dak5v1jl550s73a1i3r0` (`6438830d`), `finishedAt` 21:03:17Z. Since then (requested 21:00Z..now):
+    - 0 `MEMORY_GUARD_ABORT`, 0 `[worker_recycle]` (no `RECYCLE_CHECK held=`, no `RECYCLE_EXIT`, no `RECYCLE_CHECK_FAILED`).
+    - 1 `MALLOC_ARENA_INIT` (21:03:51Z boot).
+    - `PORTFOLIO_COMMIT date=` kept running: 10 commits 21:14:40Z..23:07:18Z (last `date=2026-09-15 positions=24`).
+  - No refusal in ~2h14m of uptime, so no recycle was owed. No red flag.
+- **Unknown:** retained (not per-tick) live-play growth on either worker; non-MLB writes; which copy web reads; MLB live-MC inside the builds. W is one ~37-min window with a planned live-odds-worker restart inside it.
+- **DECISION OWED TO USER (not acted on):** `SYNDICATE_ENABLE_LIVE_LENS_LOOP` off refresh-worker (a) vs off live-odds-worker (b). Numbers in lanes.md `### heavy-build-child-process`.

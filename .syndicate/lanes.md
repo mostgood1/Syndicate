@@ -951,6 +951,14 @@ death, never life — do not invert it.
 - Blocked by: none.
 
 ### heavy-build-child-process — OPEN — opened 2026-09-14 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- STATUS 2026-09-14 23:25Z (18:25 CT), scheduled reading `live-lens-dual-loop-reading-0914`, live MLB 22:40Z..~23:17Z (`deploys.md` 23:25Z):
+  - **Writers: TWO for MLB, measured.** Both workers write the same keyvalue key `live/mlb_live_lens.json` from `live_lens_loop.py:719`: refresh-worker 3 logged writes (1.26-1.51 MB), live-odds-worker 8 (1.05-1.52 MB). web `[ops.publish]` has 0 live-lens lines (keyvalue path). wnba/soccer/nfl: two writers INFERRED (both build every tick; writes under 1 MiB are unlogged). ncaaf: 0 builds on both.
+  - **MLB live-lens build cost per tick:** refresh-worker pid 39 RSS median +51 MB (min +0.3, max +101, n=10), container median +18; live-odds-worker main RSS median +78 MB (min +6, max +131, n=15), container median +78. Nothing near 08-08's +1,445 MB.
+  - Kills: none on refresh-worker. The live-odds-worker `server_failed` at 22:56:22Z was its planned uptime recycle (19,871 s), not an OOM.
+  - DECISION OWED TO USER: flag off refresh-worker (a) vs off live-odds-worker (b).
+    - **(a)** removes refresh-worker's per-tick MLB build (median +51 / max +101 MB) and the loop's +883 MB whole-boot retained share (afternoon, no live games; not re-measured live). Unreclaimable headroom in W was min 1,755 MB. live-odds-worker ALREADY builds every sport every tick (15 vs 10 ticks), so it takes on no new build, only sole-writer status. Its W minimum was 887 MB unreclaimable headroom, with the headroom field at 0.0 twice (page cache).
+    - **(b)** removes live-odds-worker's median +78 / max +131 MB per tick and leaves refresh-worker's retained share in place. That is what the code comment intends.
+    - Either way the double write to one key ends.
 - CHECKPOINT 2026-09-14 ~21:30Z (16:30 CT), session 0f5b256e — Goal: stop refresh-worker's main process from keeping ~2.2 GB of live data after a full board build, by running `_compute_board_publication_response` in a child process whose memory is released on exit (the pattern `overview_subprocess.py` uses for the MLB overview). Then show heavy-build refusals staying at ~0 over a full slate day with no recycle restarts. No deploy without the user's OK.
   - **GOAL: NOT MET.** No child process was built. The measurements WEAKENED the goal's premise.
   - **Whole-boot attribution (`0a18557a`, 19:07-20:56Z):** of pid 39's +1,516 MB, the heavy build accounts for only ~+497. The live-lens loop's builds account for +883, startup +390, and the MLB sim tick +149. Isolating the heavy build alone would leave most growth in place.
@@ -1079,6 +1087,10 @@ death, never life — do not invert it.
     - **Undisturbed window requested from accuracy-assessment-0914:** the first ~6 heavy builds after this deploy (~90 min from live). "Reading done" goes on this line when the 6th `CANDIDATE_POOL_CACHE` line is in.
 
 ### heavy-build-memory-refusal — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- STATUS 2026-09-14 23:25Z (18:25 CT), scheduled reading: **recycle still UNEXERCISED.**
+  - Since `6438830d` went live at 21:03:17Z (~2h14m uptime): 0 `MEMORY_GUARD_ABORT` refusals and 0 `[worker_recycle]` lines (no `RECYCLE_CHECK held=` / `RECYCLE_EXIT` / `RECYCLE_CHECK_FAILED`).
+  - 1 `MALLOC_ARENA_INIT` boot (21:03:51Z). `PORTFOLIO_COMMIT` ran 10 times through 23:07:18Z.
+  - No refusal, so no recycle was owed and there is no red flag.
 - CHECKPOINT 2026-09-14 ~21:30Z (16:30 CT), session 0f5b256e — Goal: explain why refresh-worker's heavy board build (candidate pool, board publication, portfolio commit / paper orders) was refused by `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` for ~16 h (2026-09-12 21:34Z .. 2026-09-13 13Z) with unreclaimable headroom ~1,810 MB. Measure what the build actually needs against that floor and what holds ~2.3 GB unreclaimable. Then bring the user options with numbers (retarget/lower the check, cut the build's cost, or add memory). Read-only on production; no code or deploy without the user's OK.
   - **GOAL: MET (diagnosis, unchanged).** The lane stays OPEN only for the user-chosen stopgap's reading.
   - Recycle `339dc6e9` has been live with env threshold 1 since `6fe6c6e9` (15:37:05Z). **It has never been exercised.** 0 `pre_source_state_fingerprint` refusals and 0 `[worker_recycle]` lines on the boots of 15:38Z (111 min), 17:29Z (~49 min), 19:07Z (~116 min) and 21:03Z (to 21:27Z). Every boot was ended by another deploy before a refusal came.
