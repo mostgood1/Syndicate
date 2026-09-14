@@ -1,0 +1,6 @@
+{
+  "generated_at": null,
+  "window": null,
+  "note": "Empty until scripts/bucket_search.py validates a bucket on opportunity_population_ledger records. An empty table leaves every Layer 2 score on its category factor.",
+  "buckets": {}
+}

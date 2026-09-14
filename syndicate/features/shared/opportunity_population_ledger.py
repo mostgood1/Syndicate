@@ -35,7 +35,7 @@ build's cost has been read.
 THE RECORD, compact on purpose (it repeats tens of thousands of times a day). The
 identity lives in `k` in `KEY_FIELDS` order; `parse_population_key` splits it back.
     k  identity key                  t  captured_at (UTC)
-    sport, kind, ct (commence_time)
+    sport, kind, ct (commence_time), ht / at (home / away team, for the final-score join)
     px price       fp fair_probability   fm fair_method   bq books_quoting
     ba book_age_seconds
     ev ev_pct      me model_edge_pct     eb ev_basis
@@ -176,6 +176,10 @@ def population_record(row: Mapping[str, Any], key: str, captured_at: str, *, spo
         "sport": str(row.get("sport") or sport or "").strip().lower() or None,
         "kind": row.get("kind"),
         "ct": row.get("commence_time"),
+        # Team names, so a record joins to a final score (`layer2_live_scorecard.match_chip`
+        # matches on names; the scoreboard does not carry the odds feed's event id).
+        "ht": row.get("home_team"),
+        "at": row.get("away_team"),
         "px": quote.get("price"),
         "fp": _as_float(quote.get("fair_probability")),
         "fm": quote.get("fair_method"),

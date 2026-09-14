@@ -34,6 +34,8 @@ def _row(event_id="evt-1", market="totals", side="over", line=8.5, player=None, 
         "line": line,
         "segment": segment,
         "commence_time": "2026-09-14T23:05:00Z",
+        "home_team": "Home Team",
+        "away_team": "Away Team",
         "board_lane": "opportunity",
         "game_state": "pregame",
         "ev_pct": 2.4,
@@ -114,6 +116,8 @@ def test_a_record_is_compact_and_copies_rather_than_derives():
     assert record["ev"] == 2.4 and record["me"] == 1.1 and record["sc"] == 1.9
     assert record["vc"] == "parity" and record["ln"] == "opportunity" and record["fm"] == "consensus"
     assert record["la"] is None
+    # team names are what a final score joins on
+    assert record["ht"] == "Home Team" and record["at"] == "Away Team"
 
 
 # --------------------------------------------------------------------------

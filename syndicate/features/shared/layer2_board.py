@@ -891,7 +891,7 @@ def _row_rests_on_unmeasured_model(row: Mapping[str, Any]) -> bool:
     return verdict_class == VERDICT_LOSES
 
 
-def _apply_skill_reliability(score: Any, projection: Any) -> Any:
+def _apply_skill_reliability(score: Any, projection: Any, row: Any = None) -> Any:
     """Fold the model's MEASURED skill into the row's Layer 2 score.
 
     `[2026-09-14, user decisions: "Category now, buckets next", "Scale by measured
@@ -918,6 +918,15 @@ def _apply_skill_reliability(score: Any, projection: Any) -> Any:
     Applied at THE one place a Layer 2 score is computed (`build_layer2_rows`, right
     after `blended_score`). `quote_enrichment._attach_board_score` scores a different
     surface (the home/Layer 1 candidate pools) and is deliberately not part of this.
+
+    A VALIDATED BUCKET OUTRANKS THE CATEGORY `[2026-09-14, user request: "then build
+    the bucket search on the recorder data"]`. When `row` is given,
+    `measured_bucket_skill.bucket_factor` is consulted first: a validated pocket
+    returns 1.0 (the category demotion is cancelled for that row, never raised past
+    its value), a validated bucket loss returns its own scaled factor, and no match or
+    a pocket/loss conflict leaves the category factor. The shipped bucket table is
+    empty, so until a search validates something this is exactly the category factor.
+    `skill_source` says which one ranked the row down.
     """
     if not isinstance(score, Mapping):
         return score
@@ -925,6 +934,17 @@ def _apply_skill_reliability(score: Any, projection: Any) -> Any:
 
     skill = projection.get("model_skill") if isinstance(projection, Mapping) else None
     factor = skill_reliability(skill)
+    source = "category"
+    if isinstance(row, Mapping):
+        try:
+            from syndicate.features.shared.measured_bucket_skill import bucket_factor, view_from_candidate
+
+            bucket = bucket_factor(view_from_candidate(row))
+        except Exception:
+            bucket = None
+        if bucket is not None:
+            factor = bucket
+            source = "bucket"
     if factor >= 1.0:
         return score
     raw = _as_float(score.get("score"))
@@ -935,6 +955,7 @@ def _apply_skill_reliability(score: Any, projection: Any) -> Any:
     # Stamped only when it bit, beside the other reliability terms, so a reader can
     # see which term ranked the row down.
     adjusted["skill_reliability"] = round(factor, 4)
+    adjusted["skill_source"] = source
     return adjusted
 
 
@@ -3064,8 +3085,9 @@ def build_layer2_rows(
             )
             # MEASURED SKILL MOVES THE SCORE, NOT THE ADMISSION OR THE STAKE.
             # See `_apply_skill_reliability`: 1.0 unless the row's `model_skill`
-            # establishes a loss against the market.
-            score = _apply_skill_reliability(score, candidate.get("projection"))
+            # establishes a loss against the market, or a validated bucket says
+            # otherwise (the row is passed so its bucket can be looked up).
+            score = _apply_skill_reliability(score, candidate.get("projection"), row=candidate)
             candidate["score"] = score
             if score is not None:
                 scored += 1
