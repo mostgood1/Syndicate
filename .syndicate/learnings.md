@@ -5914,3 +5914,18 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - Split "step after first build" from "ratchet" by the per-hour MINIMUM within one boot. A flat minimum after the first hour is a step, and restarts, not trims, are what reset it.
   - Ledger corollary from the same lane: a claim-transfer note on a `- Files:` line that still names the file (backticked OR bare) is parsed as a live claim by `lane_claims._claims`. Wording like "is also claimed by ..." there reads as a disclaimer and drops the path after it. Describe moved claims without the file name, then re-run `_claims` on the PRIMARY `lanes.md` before editing.
   - *(evidence: `log/2026-09-14.md`, section "lane `heavy-build-memory-refusal` — checkpoint"; `state_worker.md [refresh-worker-heavy-build-refusal]`)*
+
+## 2026-09-14 — OVERTURNED: "a capped `games_with_outcome` is a finals-side loss" — and, twice in the same diagnosis, "the producer failed" `[no lane]`
+
+- **What was believed:**
+  - Every documented cause of a capped `games_with_outcome` is finals-side (0-0 placeholder, no numeric score, game_pk/event_id join), so a 5-of-15 night reads as a finals problem.
+  - Then, in turn: "the live-odds-worker OOM storm starved the lens", and "the lens produced no full-game projection".
+- **What falsified it:**
+  - 09-12 served `unscored: {}` with 15/15 finals. The cap was the ledger population: 8 `segment=full` h2h records.
+  - The OOM storm was as bad on 09-11 (32 kills), which scored 13 games.
+  - `TICK_COMPLETE` read mlb True, and layer2's `sources_seen.live_mc` showed full-game projections for 1-9 games while the ledger wrote none.
+- **How to apply:**
+  - On a capped date, read `unscored` FIRST. If it is empty, the loss is in the ledger population. The next reading is `records_by_market.h2h` and per-game `segment=full` counts in the per-record ledger, not the finals index.
+  - Before naming an infrastructure event (OOM storm, deploy) as the cause of a data loss, pull the same event count on a night that did NOT lose data. Here that was one events-API call, and it killed the attribution.
+  - A producer's health line and a join's index count are both UPSTREAM of the ledger write. Neither shows the write happened.
+  - *(evidence: `log/2026-09-14.md` section "no lane — `live-gameline-accuracy-snapshot` run")*
