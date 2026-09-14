@@ -134,6 +134,18 @@ What that means for everything in this file:
 - The "withhold", "weight 0" and "drop the gate" items below are therefore INTERIM
   positions until the pocket search runs on the updated models, not end states.
 
+**SECOND USER DIRECTION `[2026-09-14, in chat]`:** "we should still evaluate EVERYTHING but
+based on what we learn about models/optimizations/and bucketing - this should impact the
+actual SCORING and where the opps end up surfaced on the layer 2 board".
+- Every opportunity stays evaluated. What is measured — category skill now, bucket-level
+  success once the modelling is updated — moves a row's Layer 2 SCORE and its placement.
+  A measured loss ranks lower; a validated pocket ranks higher.
+- `measured_market_skill` (and a later bucket table keyed the same way, plus bucket
+  dimensions) is the input that scoring reads. The Layer 2 admission clause shipped here is
+  a status-quo holder; a scoring design would replace it rather than add a second gate.
+- Scoring decides what `portfolio_commit` stakes, including live Kalshi/Polymarket orders,
+  so the design (insertion point, what moves for orders, tests) goes to the user before code.
+
 **Recommended, NOT implemented — each needs a model change, a data-retention change or a
 user decision (details and falsifiers in the sections below):**
 - MLB: re-fit the game-total level (sim ~2.1 runs over the line since 09-05) with a deploy

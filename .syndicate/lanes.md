@@ -1289,7 +1289,23 @@ death, never life — do not invert it.
   - Category verdicts are averages, not bans.
   - Order: fix the modelling defects the measurement found, then run a pre-registered, per-game, leave-one-date-out pocket search, then gate at that level.
   - Nothing this lane shipped removes a category. The Layer 2 clause keeps already-withheld rows withheld; a proven pocket can carry its own `verdict_class`.
-- Blocked by: user approval to deploy (and a check for an in-flight MLB sim).
+- USER DIRECTION `[2026-09-14, in chat]`: "we should still evaluate EVERYTHING but based on what we learn about models/optimizations/and bucketing - this should impact the actual SCORING and where the opps end up surfaced on the layer 2 board".
+  - So measured skill (and later, measured bucket-level results) becomes an input to the Layer 2 SCORE and placement, not an admission gate.
+  - Next design step: a read-only map of the scoring path, its recorded decisions (08-31 "rank on edge", `_SCORE_SIM_WEIGHT` "leave alone", 09-11 withhold) and the every-opportunity substrate (`clv_opening_ledger`, `layer2_live_scorecard`). The design comes back to the user before any code, because the shortlist feeds real-money orders.
+- LANDED `17c8208e` on origin/main (code commits `6011384b`, `a2c73427`, `9b51dfc6`, `17c8208e`).
+- USER DECISION `[2026-09-14, in chat]`: "Deploy both now (Recommended)" — web + refresh-worker, after preflight CLEAR and both locks; verification is the served-board census, recorded in `deploys.md`.
+- DEPLOYS TRIGGERED `[2026-09-14 17:22Z / 12:22 CT]`, both at `17c8208e`, after preflight CLEAR on both (17:19:56Z web, 17:20:04Z refresh-worker; infrastructure processes only, no MLB sim in flight):
+  - web `822ee0ba` -> `17c8208e`, `dep-dak2qejl550s73bqlkdg`. Carries 10 other lanes' commits already on main (53d989af, 05ca745c, 339dc6e9, 54f3d662, cb248a95, 637278e3, b6ff319a, 57b67127, 48c1fc61, c114e1aa); 18 code files. No render.yaml or requirements change.
+  - refresh-worker `6fe6c6e9` -> `17c8208e`, `dep-dak2qk61egvs739bga2g`. Carries one other commit (53d989af, a log line); 8 code files. `17c8208e` descends from `6fe6c6e9`, so `book-grid-gameline-ledger-log`'s line keeps printing.
+- BEFORE-READING, same instrument (`census_after.py` in this session's scratchpad), pre-deploy payloads:
+  - served shortlist (written_at 16:10:18Z): 672 measured (producer notes), **605 unmeasured**, 117 no projection, of 1,394.
+  - served MLB book grid (generated 16:14:25Z): 797 measured, **563 unmeasured**, 186 no projection, of 1,546.
+- PREDICTION, written BEFORE the after-reading, on a build whose stamp postdates both deploys going live:
+  - Shortlist: every MLB unmeasured market there has a table entry, so MLB unmeasured goes 268 -> 0. NFL goes 69 -> ~7 (props remain). Soccer goes 268 -> ~86 (`alternate_totals_corners` and first-half totals have no entry). Overall ~93 of ~1,400 on a comparable row mix (43% -> ~7%), with ~500 rows carrying `basis: measured_market_skill`.
+  - MLB book grid: unmeasured 563 -> ~252, which is exactly the `batter_home_runs` rows (no entry, deliberately out of scope).
+  - FALSIFIED IF a post-live build still shows MLB game, pitcher-prop or HRR rows `unmeasured`, or zero rows with basis `measured_market_skill`.
+  - NOT testable now: live-row notes (no MLB game is live until first pitch at 22:40Z). That reading is owed on tonight's slate.
+- Blocked by: none (deploy in progress).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
