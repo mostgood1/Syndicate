@@ -1056,6 +1056,15 @@ death, never life — do not invert it.
     - **Not established:** whether both PUBLISH `live/<sport>_live_lens.json` during live play (two writers). Since 20:00Z both only pulled the snapshot (refresh-worker 33 `PULL_LIVE_LENS_SNAPSHOT`, live-odds-worker 42, all `written=0`; web serves 37-byte files), so there are no live games in the window. Absence here says nothing.
     - **Reading owed before any flag change:** during the evening slate (MLB from 22:40Z), count each worker's live-lens publishes per sport and web's `[ops.publish]` accepts per publisher. Then compare refresh-worker pid 39 growth with its live-lens copy on and off.
     - Turning refresh-worker's copy off is a production config change and needs the user's decision. live-odds-worker headroom read 138-147 MB at 20:43-20:44Z, so it must not take on more.
+  - **WHOLE-BOOT ATTRIBUTION ~20:58Z** (`scratchpad/stage_attribution.py`; 504 staged `ALL_PROCESS_MEMORY` samples 19:07:43Z-20:56:21Z on one boot):
+    - pid 39 grew 94.8 -> 1,610.6 MB (+1,516). Each change is credited to the stage of the NEXT sample, and threads interleave, so shares are rough.
+    - Net by family: live-lens builds **+883** (soccer +414, mlb +388, nfl +69, wnba +12); heavy build +497; startup +390; MLB sim tick +149 (+1,867/-1,718 churn); live-lens publish +5.
+    - Live-lens pull +1,696 and the other live-lens stages -2,122 net to **-426**: the pull spike is given back at `live_lens_tick_before_*`.
+    - **Reading:** the live-lens loop's builds are the largest retained share on refresh-worker, bigger than the heavy build itself. This is with NO live games (builds over empty slates); live play will differ.
+    - **Two opposite cleanups, and the evening reading decides between them:**
+      - (a) Drop the flag from refresh-worker. That removes the largest retained share here, but live-odds-worker (2 Gi, 138-147 MB headroom at 20:44Z) then carries MLB's live Monte Carlo alone, and the `:7201-7215` comment measured that at +1,445 MB, which killed it on 2026-08-08.
+      - (b) Drop it from live-odds-worker, as the code comment intends. That relieves live-odds-worker, not refresh-worker.
+      - Neither is proposed until the 23:10Z reading shows who publishes and what MLB's live-lens build costs each worker in live play.
     - **Undisturbed window requested from accuracy-assessment-0914:** the first ~6 heavy builds after this deploy (~90 min from live). "Reading done" goes on this line when the 6th `CANDIDATE_POOL_CACHE` line is in.
 
 ### heavy-build-memory-refusal — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
