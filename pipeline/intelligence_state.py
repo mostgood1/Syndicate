@@ -4807,6 +4807,10 @@ class IntelligenceStateService:
         # canonical builds.
         self._board_state_drain_thread: threading.Thread | None = None
         self._candidate_pools: OrderedDict[str, dict[str, Any]] = OrderedDict()
+        # Serialized size per cached pool, for CANDIDATE_POOL_CACHE only. Lane
+        # heavy-build-child-process, hypothesis H-cache: the pool cache is
+        # trimmed by COUNT, and nothing records what those entries weigh.
+        self._candidate_pool_json_bytes: dict[str, int] = {}
         self._source_fingerprints: OrderedDict[str, tuple[float, str]] = OrderedDict()
         self._latest_key: str | None = None
         self._last_run_started_at: float = 0.0
@@ -7090,7 +7094,39 @@ class IntelligenceStateService:
                 self._candidate_pools[cache_key] = pool
                 self._candidate_pools.move_to_end(cache_key)
                 self._trim_ordered_dict(self._candidate_pools, self._max_snapshots)
-        return json.loads(json.dumps(pool, default=str))
+        serialized_pool = json.dumps(pool, default=str)
+        self._log_candidate_pool_cache(selected_date, cache_key, serialized_pool, cached=pool["candidate_count"] > 0)
+        return json.loads(serialized_pool)
+
+    def _log_candidate_pool_cache(self, selected_date: str | None, cache_key: str, serialized_pool: str, *, cached: bool) -> None:
+        """Print what the candidate-pool cache weighs after this build.
+
+        Lane heavy-build-child-process, hypothesis H-cache: refresh-worker keeps
+        ~2.2 GB after its first full build, and this cache holds up to
+        `_max_snapshots` full pools trimmed by count only. `pool_json_bytes` is the
+        length of the serialization the return path already does (ASCII, since
+        `ensure_ascii` is on, so characters == bytes). JSON bytes undercount live
+        Python objects, so read it as a lower bound. Instrumentation must never
+        break a build, so it swallows its own failures.
+        """
+        try:
+            pool_json_bytes = len(serialized_pool)
+            with self._condition:
+                sizes = self._candidate_pool_json_bytes
+                if cached:
+                    sizes[cache_key] = pool_json_bytes
+                for stale_key in [key for key in sizes if key not in self._candidate_pools]:
+                    del sizes[stale_key]
+                entries = len(self._candidate_pools)
+                cache_json_bytes = sum(sizes.values())
+            print(
+                f"[intelligence_state] CANDIDATE_POOL_CACHE date={selected_date} cached={cached} "
+                f"entries={entries} limit={self._max_snapshots} pool_json_bytes={pool_json_bytes} "
+                f"cache_json_bytes={cache_json_bytes}",
+                flush=True,
+            )
+        except Exception as exc:
+            print(f"[intelligence_state] CANDIDATE_POOL_CACHE_LOG_FAILED {type(exc).__name__}: {exc}", flush=True)
 
     def start(self, app: Flask | None = None) -> bool:
         with self._lock:

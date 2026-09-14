@@ -956,7 +956,26 @@ death, never life — do not invert it.
 - Risks known up front: a subprocess per build is periodic work, and `#241` put this worker into a restart loop that way (`overview_subprocess.py` docstring). The child also needs the build's peak (+296 to +1,416 MB) plus interpreter and import cost inside a 4,096 MB container shared with the MLB sim.
 - Hypothesis (to test before code): what the parent holds after a build is state built during it (module caches, loaded frames), which a child's exit would release. Falsified if a parent that has never run a full build still settles above ~2 GB once its other loops (fast path, venue loop, book grid) have run for 60 min.
 - Verification: refusal and recycle counts per hour across a full slate day on the isolated build, against this lane's baseline (restart-at-1 period), plus parent anon after build and the child's peak and elapsed time.
-- Files: none claimed yet. The design step comes first, and it will name new modules before any edit.
+- Files: none claimed yet. The design step comes first, and it will name new modules before any edit. The H-cache instrument below edits the intelligence-state module under lane heavy-build-memory-refusal's existing claim (same session).
+- **DESIGN SURVEY 2026-09-14 ~15:35Z** (subagent, then re-read by this session; file:line below is re-derived):
+  - The build's return value is plain JSON-shaped (`_build_candidate_pool` already round-trips through `json.dumps(..., default=str)`, `intelligence_state.py:7093`). Its parent consumers are pure functions over that dict (`:7642`, `:7645`). A file-based child handoff like `overview_subprocess.py` is feasible.
+  - Must stay in the parent: `self._execution_guard` (`:7623`); `note_heavy_build_guard` and the memory guard (a child would measure its own memory and blind the recycle signal); the two in-memory build caches (they go cold per child).
+  - Money-path side effects (`run_portfolio_commit`, `run_execution`) would run inside a killable child. Their idempotence must be confirmed first (see todo #657).
+- **Hypothesis H-cache (written BEFORE any test, and cheaper than a child process):** the retained ~2.2 GB is mostly `self._candidate_pools`.
+  - It is an OrderedDict keyed by (date, source_fingerprint) (`:5955`), filled at every successful build (`:7090`) and trimmed only by COUNT to `self._max_snapshots` = `max(5, SYNDICATE_INTELLIGENCE_MAX_SNAPSHOTS or 12)` (`:4779`, `:8501`).
+  - The fingerprint changes as sources change, so the cache should fill to 12 full pools over ~12 builds and then hold. That fits the measured rise-then-plateau, and post-trim anon rising 1,989 -> 2,482 MB over 14:48-15:01Z.
+  - The comment at `:7060-7064` records that this same cache was once "the dominant memory driver" when each pool embedded the sport odds-history payload. That embed was removed; the pool's current size is unmeasured.
+  - `self._snapshots` is NOT the suspect: `STATE_PERSIST_TRIMMED ... of=4` means 4 entries, keyed by payload (`:394`, `:7757`).
+  - **Falsified if** the cache's serialized total at 12 entries is well under ~200 MB. Python objects run several times larger than their JSON, so ~200 MB of JSON could plausibly be ~1 GB live; the multiplier is not measured here. Also falsified if the plateau is reached within the first 1-2 builds after boot.
+- **USER DECISION ~15:45Z (10:45 CT): "Add a pool-size log line (Recommended)".**
+  - `[intelligence_state] CANDIDATE_POOL_CACHE`, printed at every pool build with: `cached`, `entries`, `limit`, `pool_json_bytes` (length of the `json.dumps` the return path already computes, so zero extra serialization) and `cache_json_bytes` (sum over the cached keys).
+  - It ships on the next refresh-worker deploy after the threshold-1 recycle has been observed once. Each deploy reboots and delays that reading ~50 min.
+  - Result: cap the cache by bytes or entries if H-cache holds; otherwise the child-process design continues.
+  - **Instrument written ~16:05Z, NOT deployed.** `pipeline/intelligence_state.py`: `_log_candidate_pool_cache` plus the `_candidate_pool_json_bytes` dict. `_build_candidate_pool` now logs the same `json.dumps` string it returns. New `tests/test_candidate_pool_cache_log.py` (5 tests).
+    - Offline: the 5 new tests pass on the edit and all 5 fail against HEAD's file.
+    - Real path: the existing full-path test `test_build_candidate_pool_does_not_embed_full_odds_history_payload` printed `CANDIDATE_POOL_CACHE date=2026-06-10 cached=True entries=1 limit=12 pool_json_bytes=9283` (a 1-candidate fixture, so it says nothing about production size).
+    - In that targeted run (`-k "candidate_pool or malloc or cache"`), 28 passed and 2 errored at TEARDOWN on the `data/` mirror write guard (`_refresh_wnba_boxscores` -> `data/wnba_source/data/processed`, `intelligence_state.py:7016`, before the new code). Not attributed to this change; the baseline was NOT run.
+    - Ships on the next refresh-worker deploy after the threshold-1 recycle is observed (user decision).
 
 ### heavy-build-memory-refusal — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - DECISION 2026-09-14 ~15:10Z (10:10 CT): user chose "Restart at 1 + build isolation lane (Recommended)".
