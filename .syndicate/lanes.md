@@ -1014,6 +1014,11 @@ death, never life — do not invert it.
     - `b6ff319a` `scripts/layer2_live_scorecard.py` (+13/-2, offline).
   - User decision ~23:40 CT: "Allow all three (Recommended)". The task allows exactly those eight code files and six commits, and adds a collateral check (publish retry / props capture errors after boot).
   - Verification owed is in the task prompt (step 6d) and above.
+- **PRE-DEPLOY BASELINE 2026-09-14 05:11Z (00:11 CT), refresh-worker still `cae4713e`: a refusal stretch is IN PROGRESS.**
+  - `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` per hour: 03Z 14, 04Z 23, 05Z 2 so far (last 05:09:44Z).
+  - Last heavy build `LAYER2_SHORTLIST date=` at 04:25:09Z; last `PORTFOLIO_COMMIT` at 04:27:14Z.
+  - In flight at 05:11Z: MLB daily sim (`run_mlb_daily_sim_job.py` -> `daily_update.py --workflow ui-daily`, 7 processes, preflight HOLD). The recycle would also hold (`children_running`) until it drains.
+  - The post-deploy reading (task `book-quotes-fuller-copy-deploy-0914`, 00:50 CT) compares against this.
   - Verification owed after a refresh-worker deploy:
     - no `RECYCLE_EXIT` while builds are admitted;
     - during a refusal stretch, `RECYCLE_CHECK held=...` then `RECYCLE_EXIT` once >= 15 consecutive `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` with no children;
