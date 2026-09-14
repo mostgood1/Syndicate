@@ -5,6 +5,29 @@
 
 ---
 
+## 2026-09-14 5:12 PM CT — web `dd3a4fda` -> `70f44f05` (lane `brand-logo-v3`, user decision "Deploy web now") — **MET: THE STANDALONE APP HEADER NO LONGER SCROLLS THE PAGE SIDEWAYS. scrollWidth == clientWidth on `/mlb/market-accuracy` at 1440/900/400 and `/nba/market-accuracy` at 1440; before the deploy they read 1473, 933, 414 and 1473.**
+
+**Deploy.** `dep-dak70sqd0e5s73b84rlg`, triggered 22:08:51Z. `/versionz` returned 502 from 22:10:57Z to 22:12:18Z and served `70f44f05` from 22:12:38Z (5:12 PM CT). Claim held by `brand-logo-v3` from 22:07:45Z. Preflight CLEAR at 22:08:23Z for `70f44f05` (infrastructure processes only, plus 2 defunct children).
+- **Ride-along: none in code.** `dd3a4fda..70f44f05` is this fix, `9e11e0c1` (`standalone_shell.css` +8, `tests/test_brand_assets.py` +9), plus the ledger-only `a4a2c531`, `014916d3` and `70f44f05`. No `requirements*`, `render.yaml`, `wsgi.py` or `app.py` change.
+- **Cause** (diagnosed by session `local_06ae690f`, handed to this lane with the user's approval): `.standalone-app-header` computed `content-box`, so `width: min(1640px, 100%)` plus 2x16 padding and a 1px border came out 34px too wide. The border-box reset lives in `dense_cards.css`, scoped to `body.cards-body`. Fix: `box-sizing: border-box` on the header only.
+- `70f44f05`'s commit subject names the fix by its pre-rebase id `322b5e36`. The landed SHA is `9e11e0c1`.
+
+**Reading** on production, in the browser pane: `document.documentElement` scrollWidth / clientWidth, plus the header's computed `box-sizing` and width.
+
+| page, viewport | before (22:08:02-04Z, web `dd3a4fda`) | after (22:13:30-34Z, web `70f44f05`) |
+|---|---|---|
+| `/mlb/market-accuracy`, 1440 | 1473 / 1440, content-box, header 1473 | **1440 / 1440**, border-box, header 1440 |
+| `/nba/market-accuracy`, 1440 | 1473 / 1440, content-box, header 1473 | **1425 / 1425**, border-box, header 1425 |
+| `/mlb/market-accuracy`, 900 | 933 / 900, content-box, header 933 | **900 / 900**, border-box, header 900 |
+| `/mlb/market-accuracy`, 400 | 414 / 400, content-box, header 413 | **400 / 400**, border-box, header 384 |
+
+- Menu pill rows unchanged, before and after: 1 at 1440, 2 at 900, 4 at 400.
+- `/nba`'s clientWidth is 1425 in the after frame because a vertical scrollbar was present. What the row reads is scroll == client within each frame.
+- **NOT measured on production:** `/nba/market-accuracy` at 900 and 400, and `/mlb`, the control. Those are the local 9-of-9 reading in the lane block.
+- verify: **MET.** The handoff's acceptance test, `scrollWidth == clientWidth`, holds on production for `/mlb/market-accuracy` at 1440, 900 and 400 and for `/nba/market-accuracy` at 1440.
+
+---
+
 ## 2026-09-14 5:01 PM CT — web `ae53a1a5` -> `dd3a4fda` (lane `brand-logo-v3`, user decision "Commit, push, deploy web") — **MET: EVERY SERVED PAGE NAMES ONLY THE NEW LOGO, ALL SIX NEW ASSETS SERVE 200 AT THEIR EXACT SIZES, ALL SIX RETIRED ASSETS 404, S FAVICON UNCHANGED**
 
 **Deploy.** `dep-dak6rqifngtc73c0jh90`, triggered 21:58:02Z. `/versionz` returned 502 from 21:59:53Z to 22:01:15Z and served `dd3a4fda` from 22:01:35Z (5:01 PM CT). Claim held by `brand-logo-v3` from 21:47:48Z. Preflight CLEAR at 21:56:15Z for `dd3a4fda` (infrastructure processes only, plus 2 defunct children).

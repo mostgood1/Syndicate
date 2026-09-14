@@ -1372,7 +1372,13 @@ death, never life — do not invert it.
   - Fix: `box-sizing: border-box` on the header only.
   - After: scroll == client on all 9 readings. Pill rows unchanged at 1 / 2 / 4. `/mlb` unchanged.
   - `BUTTON.theme-toggle` (right=470 at 400px) sits inside `.nav` with `overflow-x: auto` ending at 390. It scrolls in its own strip and does not widen the page, so it is not a second source.
-  - **Committed and pushed, NOT deployed:** waiting on the user's deploy decision.
+  - **DEPLOYED** as `9e11e0c1`, riding `70f44f05`, to web (user decision "Deploy web now"). Live 22:12:38Z. **MET on production**, see `deploys.md`: scroll == client on `/mlb/market-accuracy` at 1440/900/400 (was 1473/933/414) and `/nba/market-accuracy` at 1440 (was 1473). Pill rows unchanged.
+- OPEN QUESTION TO THE USER (22:14Z): "a lot of dead space on the header -- bring the SYNDICATE lettering back?"
+  - Measured on production, logo right edge to first pill: 229px at 1440 on base.html pages, 309px at 1920, and 363px at 1440 on standalone pages.
+  - The old wordmark's lettering without its S (`syndicate-logo.png`, cut at x=261) is 521x58, about 9:1. It needs 252px wide at 28px tall and 287px at 32px, plus a 16px gap.
+  - So it does not fit base.html's row at 1440 without wrapping the pills.
+  - Recommended: lettering only, shown only where it fits on the row. Alternative: left-align the pills beside the logo.
+  - Lane stays OPEN until the user answers.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
