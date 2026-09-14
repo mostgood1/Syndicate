@@ -97,6 +97,40 @@ def test_a_two_sided_consensus_row_is_never_touched_even_on_an_unmeasured_model(
     assert _row_rests_on_unmeasured_model(_two_sided_total()) is False
 
 
+# ---------------------------------------------------- a MEASURED loss `[2026-09-14]`
+
+_MEASURED_LOSS = {"model_skill": {"status": "measured", "sample_games": 196,
+                                  "verdict_class": "loses_to_market"}}
+
+
+def test_a_MEASURED_LOSS_rests_on_the_model_exactly_like_an_unmeasured_one():
+    """Lane `accuracy-assessment-0914` stamps measured notes on markets that read
+    "never backtested", and most say the model loses. A model known to be worse
+    than the book must not seat a one-sided row an unknown model could not."""
+    assert _row_rests_on_unmeasured_model(_one_sided(projection=dict(_MEASURED_LOSS))) is True
+
+
+@pytest.mark.parametrize("verdict_class", ["parity", "beats_market"])
+def test_a_measured_parity_or_win_does_not(verdict_class):
+    note = {"model_skill": {"status": "measured", "sample_games": 180, "verdict_class": verdict_class}}
+    assert _row_rests_on_unmeasured_model(_one_sided(projection=note)) is False
+
+
+def test_a_measured_loss_on_a_TWO_SIDED_row_is_still_never_touched():
+    assert _row_rests_on_unmeasured_model(_two_sided_total(projection=dict(_MEASURED_LOSS))) is False
+
+
+def test_the_shortlist_withholds_a_measured_loss_and_counts_it():
+    rows = [
+        _one_sided(price=410, market="outs", projection=dict(_MEASURED_LOSS)),
+        _one_sided(price=500, market="batter_home_runs", projection=dict(_MEASURED)),
+    ]
+    result = select_shortlist(rows, now=_NOW)
+    assert result["rows_unmeasured_model_only"] == 1
+    assert result["unmeasured_model_only_by_market"] == {"mlb:outs": 1}
+    assert [r["market"] for r in result["rows"]] == ["batter_home_runs"]
+
+
 def test_a_one_sided_row_with_NO_model_view_is_left_to_the_hold_restatement_rule():
     assert _row_rests_on_unmeasured_model(_one_sided(model_edge_pct=None)) is False
 

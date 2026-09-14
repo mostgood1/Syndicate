@@ -861,6 +861,17 @@ def _row_rests_on_unmeasured_model(row: Mapping[str, Any]) -> bool:
     3. The model is not stamped `measured`. `projection_skill.attach_projection_skill`
        stamps every projection on the grid, so an ABSENT note is treated as
        unmeasured rather than as measured -- unknown must not default permissive.
+
+    A MEASURED LOSS SEATS NOTHING EITHER `[2026-09-14, lane accuracy-assessment-0914]`.
+    That lane gave markets that read "never backtested" their measurements
+    (`measured_market_skill`), and most of those measurements say the model LOSES
+    to the market. Without this clause, relabelling a market would have admitted
+    exactly the one-sided rows the 2026-09-11 decision withholds -- a model now
+    known to be worse than the book would seat rows that an unknown one could not.
+    A note carrying `verdict_class: loses_to_market` is therefore treated as
+    resting on the model. Producer notes that carry no `verdict_class` (NFL
+    preseason, NCAAF, MLB hitter props) are unchanged, and so is every row on the
+    2026-09-14 board: the relabelled markets were all two-sided there.
     """
     quote = row.get("quote")
     method = quote.get("fair_method") if isinstance(quote, Mapping) else None
@@ -868,12 +879,16 @@ def _row_rests_on_unmeasured_model(row: Mapping[str, Any]) -> bool:
         return False
     if _as_float(row.get("model_edge_pct")) is None:
         return False
+    from syndicate.features.shared.measured_market_skill import VERDICT_LOSES
     from syndicate.features.shared.projection_skill import STATUS_MEASURED
 
     projection = row.get("projection")
     skill = projection.get("model_skill") if isinstance(projection, Mapping) else None
     status = str(skill.get("status") or "").strip().lower() if isinstance(skill, Mapping) else ""
-    return status != STATUS_MEASURED
+    if status != STATUS_MEASURED:
+        return True
+    verdict_class = str(skill.get("verdict_class") or "").strip().lower()
+    return verdict_class == VERDICT_LOSES
 
 
 def _row_quote_age_seconds(row: Mapping[str, Any]) -> float | None:

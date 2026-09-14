@@ -24,7 +24,9 @@ def test_skill_note_is_never_absent():
     for market in ("h2h", "spreads", "totals", "", None, "anything"):
         note = gp.skill_note(market)
         assert note, market
-        assert note["sample_games"] == 2233
+        # Each block carries the denominator it was measured on: margins the
+        # 2024 backtest, totals the 2026 closes.
+        assert note["sample_games"] == (100 if market == "totals" else 2233)
         assert note["verdict"]
 
 
@@ -36,13 +38,27 @@ def test_margin_note_carries_the_measured_loss():
     assert note["model_mae"] > note["market_mae"], "the model is the WORSE of the two"
 
 
-def test_totals_note_reports_dispersion_not_a_correlation():
-    """There is no totals correlation to report -- NCAAF totals were never
-    scored against the close. Claiming one would be inventing a measurement."""
+def test_margin_note_carries_the_2026_season_and_the_tooltip_quotes_it():
+    """The 2024 gap lies outside the 2026 CI, so the row leads with 2026."""
+    note = gp.skill_note("spreads")
+    assert note["delta_mae_2026"] == 1.75
+    assert note["ci95_2026"][0] > 0, "the 2026 loss excludes zero"
+    assert note["sample_games_2026"] == 100
+    reason = gp._skill_reason(note)
+    assert "1.75" in reason and "this season" in reason
+    assert "3.563" in reason, "the backtest stays beside it"
+
+
+def test_totals_note_carries_the_measured_loss_against_the_close():
+    """`[2026-09-14]` totals were scored against the close for the first time.
+    Still no correlation FIELD -- the measurement is MAE against the line."""
     note = gp.skill_note("totals")
     assert "correlation" not in note
-    assert note["dispersion_ratio"] == 1.67
-    assert note["model_sd"] > note["market_sd"]
+    assert note["delta_mae"] == 2.864
+    assert note["model_mae"] > note["market_mae"], "the model is the WORSE of the two"
+    assert note["ci95"][0] > 0
+    assert note["dispersion_ratio"] == 2.48
+    assert "never scored" not in note["verdict"]
 
 
 # --------------------------------------------------------------------------
@@ -165,15 +181,17 @@ def test_the_caveat_rides_on_the_field_the_board_can_show():
 
 
 def test_totals_keep_the_mean_but_publish_no_percentage_edge():
-    """The mean is the model's own statement and is not itself inflated. The
-    EDGE derived from it is: pricing a line against a 1.67x over-dispersed
-    distribution manufactures conviction."""
+    """The mean is the model's own statement. The EDGE derived from it is not:
+    pricing a line against a distribution 2.48x as spread as the close
+    manufactures conviction, and the totals model loses to that close."""
     grid = _grid()
     gp.attach_ncaaf_game_projections(grid, _index())
     totals = next(r["projection"] for r in grid if r["market"] == "totals")
     assert totals["projected"] == pytest.approx(50.337)
     assert totals["edge_vs_market_pct"] is None
     assert "over-dispersed" in totals["edge_unavailable_reason"]
+    assert "lose to the closing line" in totals["edge_unavailable_reason"]
+    assert "never scored" not in totals["edge_unavailable_reason"]
     # The raw diagnostic survives so an auditor can still see the input.
     assert totals["edge_vs_line"] == pytest.approx(7.337)
 

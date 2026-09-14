@@ -65,6 +65,20 @@ _MLB_LIVE_SOURCE = (
     "lane accuracy-assessment-0914: production live_gameline_ledger (web copy) vs "
     "StatsAPI finals, fresh quotes <=120s, paired rows, bootstrap over games"
 )
+_MLB_PREGAME_SOURCE = (
+    "lane accuracy-assessment-0914: production daily_summary game probabilities "
+    "(post-first-pitch re-sims, so parity is an upper bound) vs the single-book "
+    "pregame freeze, de-vigged, vs StatsAPI finals, bootstrap over games"
+)
+_MLB_PROPS_SOURCE = (
+    "lane accuracy-assessment-0914: production daily_summary prop projections "
+    "(re-simulated after the games, so parity is an upper bound) vs de-vigged book "
+    "prices vs StatsAPI box scores, bootstrap over games"
+)
+_FOOTBALL_SOURCE = (
+    "lane accuracy-assessment-0914: production NCAAF/NFL projection CSVs (inputs "
+    "verified pregame) vs OddsAPI closes vs ESPN finals, bootstrap over games"
+)
 _SOCCER_SOURCE = (
     "lane accuracy-assessment-0914: production odds_history closes (per book, "
     "proportional de-vig, averaged) vs soccer projection artifacts vs ESPN finals, "
@@ -177,6 +191,226 @@ MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
         "verdict": "live: parity, model-mean lean hit 52.7% [44.2%, 61.3%] over 44 matches",
         "verdict_class": VERDICT_PARITY,
         "source": _SOCCER_SOURCE + "; live_gameline_ledger point forecast, quotes <=120s",
+    },
+    # ---- MLB GAME MARKETS, PREGAME --------------------------------------------------
+    # Scored against the single-book pregame freeze (the best-price `closing_lines`
+    # file was >2h stale on 49% of full-game totals), 188 games / 14 dates, the whole
+    # slate. The served `daily_summary` is a re-sim written after first pitch, and the
+    # sim changed three times inside the window (e3bdbc8b 09-01, ead7c6c5 09-05,
+    # 72499c2a 09-08): every verdict below is parity at best, and on moneyline, run
+    # line and first5 run line ADDING the sim to the market made out-of-sample Brier
+    # worse. "Parity" here is not "useful".
+    ("mlb", "h2h", "full", PHASE_PREGAME): {
+        "sample_games": 188,
+        "seasons": "2026-08-31..09-13 pregame",
+        "brier_model": 0.24715, "brier_market": 0.23805, "diff": 0.0091, "ci95": (-0.0046, 0.0236),
+        "verdict": "parity with the close, point worse: Brier +0.009 [-0.005, +0.024] over 188 games; adding it to the market hurts",
+        "verdict_class": VERDICT_PARITY,
+        "source": _MLB_PREGAME_SOURCE,
+    },
+    ("mlb", "spreads", "full", PHASE_PREGAME): {
+        "sample_games": 188,
+        "seasons": "2026-08-31..09-13 pregame",
+        "brier_model": 0.24526, "brier_market": 0.23752, "diff": 0.0077, "ci95": (-0.0055, 0.0207),
+        "verdict": "parity with the close, point worse: run line Brier +0.008 [-0.006, +0.021] over 188 games; adding it hurts",
+        "verdict_class": VERDICT_PARITY,
+        "source": _MLB_PREGAME_SOURCE,
+    },
+    ("mlb", "totals", "full", PHASE_PREGAME): {
+        "sample_games": 177,
+        "seasons": "2026-08-31..09-13 pregame",
+        "brier_model": 0.25424, "brier_market": 0.25033, "diff": 0.0039, "ci95": (-0.0166, 0.0246),
+        "verdict": "parity with the close over 177 games, but only because scoring ran high: the sim sits ~2 runs above the line since 09-05",
+        "verdict_class": VERDICT_PARITY,
+        "source": _MLB_PREGAME_SOURCE,
+    },
+    ("mlb", "h2h", "first5", PHASE_PREGAME): {
+        "sample_games": 148,
+        "seasons": "2026-08-31..09-13 pregame",
+        "brier_model": 0.24983, "brier_market": 0.24094, "diff": 0.0089, "ci95": (-0.0094, 0.0272),
+        "verdict": "first 5: parity with the close, point worse: Brier +0.009 [-0.009, +0.027] over 148 games",
+        "verdict_class": VERDICT_PARITY,
+        "source": _MLB_PREGAME_SOURCE,
+    },
+    ("mlb", "spreads", "first5", PHASE_PREGAME): {
+        "sample_games": 168,
+        "seasons": "2026-08-31..09-13 pregame",
+        "brier_model": 0.25688, "brier_market": 0.24992, "diff": 0.0070, "ci95": (-0.0084, 0.0227),
+        "verdict": "first 5: parity with the close: run line Brier +0.007 [-0.008, +0.023] over 168 games; adding it hurts",
+        "verdict_class": VERDICT_PARITY,
+        "source": _MLB_PREGAME_SOURCE,
+    },
+    ("mlb", "totals", "first5", PHASE_PREGAME): {
+        "sample_games": 168,
+        "seasons": "2026-08-31..09-13 pregame",
+        "brier_model": 0.24937, "brier_market": 0.25120, "diff": -0.0018, "ci95": (-0.0190, 0.0157),
+        "verdict": "first 5: parity with the close: totals Brier -0.002 [-0.019, +0.016] over 168 games",
+        "verdict_class": VERDICT_PARITY,
+        "source": _MLB_PREGAME_SOURCE,
+    },
+    ("mlb", "h2h", "first3", PHASE_PREGAME): {
+        "sample_games": 124,
+        "seasons": "2026-08-31..09-13 pregame",
+        "brier_model": 0.23951, "brier_market": 0.24617, "diff": -0.0067, "ci95": (-0.0244, 0.0120),
+        "verdict": "first 3: parity with the close: Brier -0.007 [-0.024, +0.012] over 124 games",
+        "verdict_class": VERDICT_PARITY,
+        "source": _MLB_PREGAME_SOURCE,
+    },
+    ("mlb", "spreads", "first3", PHASE_PREGAME): {
+        "sample_games": 168,
+        "seasons": "2026-08-31..09-13 pregame",
+        "brier_model": 0.24341, "brier_market": 0.24360, "diff": -0.0002, "ci95": (-0.0123, 0.0122),
+        "verdict": "first 3: parity with the close: run line Brier -0.000 [-0.012, +0.012] over 168 games",
+        "verdict_class": VERDICT_PARITY,
+        "source": _MLB_PREGAME_SOURCE,
+    },
+    ("mlb", "totals", "first3", PHASE_PREGAME): {
+        "sample_games": 163,
+        "seasons": "2026-08-31..09-13 pregame",
+        "brier_model": 0.23789, "brier_market": 0.25052, "diff": -0.0126, "ci95": (-0.0267, 0.0022),
+        "verdict": "first 3: parity with the close: totals Brier -0.013 [-0.027, +0.002] over 163 games; not confirmed out of sample",
+        "verdict_class": VERDICT_PARITY,
+        "source": _MLB_PREGAME_SOURCE,
+    },
+    ("mlb", "totals", "first1", PHASE_PREGAME): {
+        "sample_games": 168,
+        "seasons": "2026-08-31..09-13 pregame",
+        "brier_model": 0.25228, "brier_market": 0.25331, "diff": -0.0010, "ci95": (-0.0116, 0.0098),
+        "verdict": "first inning: parity with the close: over/under 0.5 Brier -0.001 [-0.012, +0.010] over 168 games",
+        "verdict_class": VERDICT_PARITY,
+        "source": _MLB_PREGAME_SOURCE,
+    },
+    # ---- MLB PROPS the hitter calibration does not cover, PREGAME ----------------------
+    # `mlb_prop_calibration.skill_note` returns None for these, so the row fell to
+    # "never backtested". Every projection in the window was RE-SIMULATED after the
+    # games (`daily_summary` rebuilds nightly), with player stats carrying no date
+    # cutoff: "loses" is robust, "parity" is an upper bound. `sample_games` counts
+    # starts / player-games; the CI resamples games.
+    ("mlb", "outs", "full", PHASE_PREGAME): {
+        "sample_games": 196,
+        "seasons": "2026-09-06..09-13 pregame, post 09-04 refit",
+        "brier_model": 0.2801, "brier_market": 0.2437, "diff": 0.036, "ci95": (0.006, 0.068),
+        "verdict": "loses to the de-vigged market: Brier +0.036 [+0.006, +0.068] over 196 starts; starters projected ~7% too long",
+        "verdict_class": VERDICT_LOSES,
+        "source": _MLB_PROPS_SOURCE,
+        "admission_checked": "2026-09-14 served shortlist: all 33 outs rows fair_method=consensus",
+    },
+    ("mlb", "earned_runs", "full", PHASE_PREGAME): {
+        "sample_games": 200,
+        "seasons": "2026-09-06..09-13 pregame, post 09-04 refit",
+        "brier_model": 0.2597, "brier_market": 0.2430, "diff": 0.017, "ci95": (0.001, 0.033),
+        "verdict": "loses to the de-vigged market: Brier +0.017 [+0.001, +0.033] over 200 starts; biased high ~13%",
+        "verdict_class": VERDICT_LOSES,
+        "source": _MLB_PROPS_SOURCE,
+        "admission_checked": "2026-09-14 served shortlist: all 19 earned_runs rows fair_method=consensus",
+    },
+    ("mlb", "strikeouts", "full", PHASE_PREGAME): {
+        "sample_games": 193,
+        "seasons": "2026-09-06..09-13 pregame, post 09-04 refit",
+        "brier_model": 0.2621, "brier_market": 0.2452, "diff": 0.017, "ci95": (-0.009, 0.042),
+        "verdict": "parity with the market: Brier +0.017 [-0.009, +0.042] over 193 starts; biased high ~13%",
+        "verdict_class": VERDICT_PARITY,
+        "source": _MLB_PROPS_SOURCE,
+        "admission_checked": "2026-09-14 served shortlist: all 39 strikeouts rows fair_method=consensus",
+    },
+    ("mlb", "hits_allowed", "full", PHASE_PREGAME): {
+        "sample_games": 192,
+        "seasons": "2026-09-06..09-13 pregame, post 09-04 refit",
+        "brier_model": 0.2599, "brier_market": 0.2496, "diff": 0.010, "ci95": (-0.014, 0.035),
+        "verdict": "parity with the market: Brier +0.010 [-0.014, +0.035] over 192 starts; biased high ~11%",
+        "verdict_class": VERDICT_PARITY,
+        "source": _MLB_PROPS_SOURCE,
+        "admission_checked": "2026-09-14 served shortlist: all 30 hits_allowed rows fair_method=consensus",
+    },
+    ("mlb", "walks_allowed", "full", PHASE_PREGAME): {
+        "sample_games": 186,
+        "seasons": "2026-09-06..09-13 pregame, post 09-04 refit",
+        "brier_model": 0.2358, "brier_market": 0.2390, "diff": -0.003, "ci95": (-0.015, 0.010),
+        "verdict": "parity with the market: Brier -0.003 [-0.015, +0.010] over 186 starts",
+        "verdict_class": VERDICT_PARITY,
+        "source": _MLB_PROPS_SOURCE,
+        "admission_checked": "2026-09-14 served shortlist: all 7 walks_allowed rows fair_method=consensus",
+    },
+    ("mlb", "batter_hits_runs_rbis", "full", PHASE_PREGAME): {
+        "sample_games": 1266,
+        "seasons": "2026-09-06..09-13 pregame, post 09-04 refit",
+        "brier_model": 0.2456, "brier_market": 0.2487, "diff": -0.003, "ci95": (-0.009, 0.003),
+        "verdict": "parity with the market: Brier -0.003 [-0.009, +0.003] over 1,266 player-games; biased high ~15%",
+        "verdict_class": VERDICT_PARITY,
+        "source": _MLB_PROPS_SOURCE,
+        "admission_checked": "2026-09-14 served shortlist: all 103 batter_hits_runs_rbis rows fair_method=consensus",
+    },
+    # ---- NCAAF, LIVE --------------------------------------------------------------
+    # NCAAF PREGAME is not here on purpose: `ncaaf.game_projections` attaches its own
+    # note, and a producer's note outranks this table.
+    ("ncaaf", "totals", "full", PHASE_LIVE): {
+        "sample_games": 75,
+        "seasons": "2026 weeks 1-2 live",
+        "mae_model": 10.28,
+        "mae_market": 8.40,
+        "diff": 1.88,
+        "ci95": (0.79, 3.04),
+        "verdict": "live: loses to the live line, total MAE +1.9 [+0.8, +3.0] pts over 75 games, in every game phase",
+        "verdict_class": VERDICT_LOSES,
+        "source": _FOOTBALL_SOURCE + "; live_gameline_ledger",
+    },
+    ("ncaaf", "spreads", "full", PHASE_LIVE): {
+        "sample_games": 75,
+        "seasons": "2026 weeks 1-2 live",
+        "mae_model": 9.44,
+        "mae_market": 8.93,
+        "diff": 0.51,
+        "ci95": (-0.40, 1.40),
+        "verdict": "live: parity with the live line, margin MAE +0.5 [-0.4, +1.4] pts over 75 games",
+        "verdict_class": VERDICT_PARITY,
+        "source": _FOOTBALL_SOURCE + "; live_gameline_ledger",
+    },
+    ("ncaaf", "h2h", "full", PHASE_LIVE): {
+        "sample_games": 76,
+        "seasons": "2026 weeks 1-2 live",
+        "brier_model": 0.078,
+        "brier_market": 0.092,
+        "diff": -0.014,
+        "ci95": (-0.031, 0.002),
+        "verdict": "live: parity with the market, Brier -0.014 [-0.031, +0.002] over 76 games",
+        "verdict_class": VERDICT_PARITY,
+        "source": _FOOTBALL_SOURCE + "; live_gameline_ledger",
+    },
+    # ---- NFL, PREGAME (regular season) ----------------------------------------------
+    # `nfl_preseason_calibration` answers for the PRESEASON profile only; regular-season
+    # game rows carried no note. Week 1 is 15 games -- the verdict says so on the row.
+    ("nfl", "spreads", "full", PHASE_PREGAME): {
+        "sample_games": 15,
+        "seasons": "2026 week 1, after the rating-units fix",
+        "mae_model": 12.59,
+        "mae_market": 10.80,
+        "diff": 1.79,
+        "ci95": (0.09, 3.49),
+        "verdict": "week 1 only: loses to the close, margin MAE +1.8 [+0.1, +3.5] pts over 15 games; underpowered",
+        "verdict_class": VERDICT_LOSES,
+        "source": _FOOTBALL_SOURCE,
+    },
+    ("nfl", "totals", "full", PHASE_PREGAME): {
+        "sample_games": 15,
+        "seasons": "2026 week 1, after the rating-units fix",
+        "mae_model": 14.94,
+        "mae_market": 12.37,
+        "diff": 2.57,
+        "ci95": (0.35, 4.67),
+        "verdict": "week 1 only: loses to the close, total MAE +2.6 [+0.4, +4.7] pts over 15 games; underpowered",
+        "verdict_class": VERDICT_LOSES,
+        "source": _FOOTBALL_SOURCE,
+    },
+    ("nfl", "h2h", "full", PHASE_PREGAME): {
+        "sample_games": 15,
+        "seasons": "2026 week 1, after the rating-units fix",
+        "brier_model": 0.260,
+        "brier_market": 0.214,
+        "diff": 0.046,
+        "ci95": (-0.012, 0.101),
+        "verdict": "week 1 only: parity with the close, Brier +0.046 [-0.012, +0.101] over 15 games; underpowered",
+        "verdict_class": VERDICT_PARITY,
+        "source": _FOOTBALL_SOURCE,
     },
 }
 

@@ -62,23 +62,39 @@ NCAAF_MEASURED_SKILL: Mapping[str, Any] = {
         "market_mae": 12.212,
         "delta_mae": 3.563,
         "t_stat": 17.20,
+        # THE 2026 SEASON AGAINST REAL CLOSES `[2026-09-14, lane
+        # accuracy-assessment-0914]`: weeks 1-2, 100 FBS games, inputs verified
+        # pregame (SP+ unchanged 09-05..09-14), bootstrap over games. Same sign,
+        # smaller gap -- the 2024 +3.563 lies OUTSIDE the 2026 CI, so the row
+        # quotes 2026 and keeps the backtest beside it. Margins are 1.28x as
+        # spread as the close, not calibrated.
+        "sample_games_2026": 100,
+        "delta_mae_2026": 1.75,
+        "ci95_2026": (0.45, 3.06),
+        "dispersion_ratio_2026": 1.28,
         "verdict": (
-            "loses to the closing line by 3.56 points of margin MAE at 17 sigma, "
-            "and to the opening line by nearly as much"
+            "loses to the closing line: 2026 margin MAE +1.75 [+0.45, +3.06] over "
+            "100 games (2024 backtest +3.56 over 2,233)"
         ),
     },
     "totals": {
-        # Deliberately NOT a correlation: there isn't one. `state.md`
-        # [ncaaf-margin-calibration] records that no model-vs-market accuracy
-        # measurement exists for NCAAF totals AT ALL, which is why default-deny
-        # applies to them on its own terms.
-        "model_sd": 5.77,
-        "market_sd": 3.46,
-        "dispersion_ratio": 1.67,
+        # FIRST SCORE AGAINST THE CLOSE `[2026-09-14, lane accuracy-assessment-0914]`.
+        # Until then this block said "never scored against the close" and carried
+        # only the 2026-08-19 dispersion reading (SD 5.77 vs 3.46 = 1.67x). Measured
+        # over 100 FBS games in 2026 weeks 1-2 it LOSES, and the dispersion is worse
+        # than recorded. Correlation with actual totals is 0.14; shrinking to the
+        # mean only reaches parity. Still deliberately not a correlation field.
+        "sample_games": 100,
+        "seasons": "2026 weeks 1-2 vs the close, inputs verified pregame",
+        "model_mae": 14.374,
+        "market_mae": 11.51,
+        "delta_mae": 2.864,
+        "ci95": (1.119, 4.594),
+        "dispersion_ratio": 2.48,
+        "bias_points": 4.6,
         "verdict": (
-            "never scored against the close, and 1.67x over-dispersed against it "
-            "-- an inflated spread of projected totals crosses more lines by "
-            "further, which reads as conviction"
+            "loses to the closing line by 2.86 points of total MAE [+1.12, +4.59] "
+            "over 100 games; 2.48x over-dispersed and 4.6 points high"
         ),
     },
 }
@@ -93,17 +109,31 @@ def skill_note(market: Any) -> dict[str, Any]:
     """
     key = "totals" if str(market).strip().lower() == "totals" else "margins"
     block = NCAAF_MEASURED_SKILL[key]
+    # A block that was measured on its own sample says so; otherwise it inherits
+    # the backtest's. Totals were scored on a different population (2026 closes)
+    # from margins (the 2024 backtest), and one shared `sample_games` would put the
+    # wrong denominator on one of them.
     note = {
-        "sample_games": NCAAF_MEASURED_SKILL["sample_games"],
-        "seasons": NCAAF_MEASURED_SKILL["seasons"],
+        "sample_games": block.get("sample_games", NCAAF_MEASURED_SKILL["sample_games"]),
+        "seasons": block.get("seasons", NCAAF_MEASURED_SKILL["seasons"]),
         "verdict": block["verdict"],
     }
-    note.update({k: v for k, v in block.items() if k != "verdict"})
+    note.update({k: v for k, v in block.items() if k not in ("verdict", "sample_games", "seasons")})
     return note
 
 
 def _skill_reason(note: Mapping[str, Any]) -> str:
-    """The measured verdict, phrased for a tooltip on the board."""
+    """The measured verdict, phrased for a tooltip on the board.
+
+    Quotes the 2026 season when the note carries it: the 2024 backtest's gap lies
+    outside the 2026 CI, so leading with it would overstate the current loss.
+    """
+    if note.get("delta_mae_2026") is not None:
+        return (
+            f"margin model loses to the closing line by {note.get('delta_mae_2026')} points "
+            f"of MAE over {note.get('sample_games_2026')} games this season "
+            f"(2024 backtest: {note.get('delta_mae')} over {note.get('sample_games')})"
+        )
     return (
         f"margin model loses to the closing line by {note.get('delta_mae')} points "
         f"of MAE over {note.get('sample_games')} games (t={note.get('t_stat')})"
@@ -474,8 +504,9 @@ def attach_ncaaf_game_projections(
                     # auditing this can see the input.
                     projection["edge_vs_market_pct"] = None
                     projection["edge_unavailable_reason"] = (
-                        f"totals are {note.get('dispersion_ratio')}x over-dispersed against the "
-                        f"market and were never scored against the close"
+                        f"totals lose to the closing line by {note.get('delta_mae')} points of "
+                        f"MAE over {note.get('sample_games')} games and are "
+                        f"{note.get('dispersion_ratio')}x over-dispersed against the market"
                     )
                     market_fair = _no_vig_over_probability(row)
                     if market_fair is not None:

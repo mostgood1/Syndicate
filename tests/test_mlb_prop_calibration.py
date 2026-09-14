@@ -10,7 +10,10 @@ THE TEST THAT MATTERS MOST is that an UNMEASURED market gets nothing. Handing a
 market a neighbour's number would be `#377` all over again — an authoritative
 figure that does not describe the thing it is attached to. `batter_hits_runs_rbis`
 is the live example: it was the degenerate `0.0` throughout the backtest window
-(`#429`), so it has no measurement and must stay `unmeasured`.
+(`#429`), so THIS module has no measurement for it and must return None.
+`[2026-09-14]` HRR has since been measured on its own window by lane
+`accuracy-assessment-0914`; that number lives in `measured_market_skill`, not here,
+and this module still lends HRR nothing.
 """
 
 from __future__ import annotations
@@ -168,17 +171,43 @@ def test_an_unmeasured_market_row_carries_NO_note_so_projection_skill_can_stamp_
     assert "model_skill" not in out, "an unmeasured market must reach projection_skill bare"
 
 
-def test_projection_skill_then_stamps_that_row_unmeasured():
+def test_projection_skill_then_stamps_that_row_unmeasured(monkeypatch):
     """The two halves compose: the producer says nothing, the shared pass says
-    `unmeasured`. Neither invents a number."""
+    `unmeasured`. Neither invents a number.
+
+    The shared measured-market table is emptied here on purpose: since
+    2026-09-14 (`accuracy-assessment-0914`) it carries its own HRR measurement,
+    and this test pins the composition when NO measurement exists anywhere."""
+    import syndicate.features.shared.measured_market_skill as mms
     from syndicate.features.shared.projection_skill import attach_projection_skill
 
+    monkeypatch.setattr(mms, "MEASURED_MARKET_SKILL", {})
     index = _index_with_row("hits_runs_rbis_2plus", "hrr_mean", 2.1)
     out = index.project(player_name="Test Player", market="batter_hits_runs_rbis", line=1.5)
     grid = [{"kind": "prop", "market": "batter_hits_runs_rbis", "segment": "full",
              "event_id": "g1", "projection": out}]
     attach_projection_skill(grid, sport="mlb")
     assert grid[0]["projection"]["model_skill"]["status"] == "unmeasured"
+
+
+def test_hrr_now_carries_its_own_measurement_and_not_a_neighbours():
+    """`[2026-09-14]` HRR was measured on its OWN window (2026-09-06..09-13, 1,266
+    player-games vs the de-vigged market). The producer still says nothing -- it
+    must never lend HRR a hitter market's number -- and the shared table supplies
+    HRR's own figure."""
+    from syndicate.features.shared.projection_skill import attach_projection_skill
+
+    assert skill_note("batter_hits_runs_rbis") is None, "the producer must not invent one"
+    index = _index_with_row("hits_runs_rbis_2plus", "hrr_mean", 2.1)
+    out = index.project(player_name="Test Player", market="batter_hits_runs_rbis", line=1.5)
+    grid = [{"kind": "prop", "market": "batter_hits_runs_rbis", "segment": "full",
+             "event_id": "g1", "projection": out}]
+    attach_projection_skill(grid, sport="mlb")
+    skill = grid[0]["projection"]["model_skill"]
+    assert skill["status"] == "measured"
+    assert skill["basis"] == "measured_market_skill"
+    assert skill["sample_games"] == 1266
+    assert skill["sample_games"] != SAMPLE_PLAYER_GAMES, "not the hitter backtest's denominator"
 
 
 def test_projection_skill_leaves_a_measured_note_intact():

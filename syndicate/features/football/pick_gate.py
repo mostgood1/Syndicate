@@ -135,15 +135,22 @@ _SERVING_REGISTRY: dict[tuple[str, str, str], MarketVerdict] = {
     ),
     ("ncaaf", "total", MODEL_BASIS): MarketVerdict(
         servable=False,
-        reason="NCAAF totals are over-dispersed and were never scored against the close",
-        measured_on="2026-08-19",
+        reason="NCAAF totals lose to the closing line and are over-dispersed",
+        measured_on="2026-09-14",
+        model_metric=14.374,
+        market_metric=11.51,
+        sample_size=100,
         detail=(
-            "Model total SD 5.77 vs market 3.46 = 1.67x. Over-dispersion "
+            "First score against the close (lane accuracy-assessment-0914): 2026 "
+            "weeks 1-2, 100 FBS games, inputs verified pregame. Total MAE 14.37 vs "
+            "the close's 11.51, +2.86 [+1.12, +4.59] bootstrapped over games; "
+            "projections 2.48x as spread as the close and 4.6 points high; "
+            "correlation with actual totals 0.14, and shrinking to the mean only "
+            "reaches parity. The 2026-08-19 dispersion finding stands and is worse "
+            "than recorded then (SD 5.77 vs 3.46 = 1.67x). Over-dispersion "
             "MANUFACTURES edges: an inflated spread of projected totals crosses "
             "more lines by further, so it reads as conviction. Carrier is the "
-            "drive-loop scoring rate (20.8 -> 53.9 percent against a real "
-            "35-45). No model-vs-market accuracy measurement exists for totals "
-            "at all, so default-deny applies on its own terms."
+            "drive-loop scoring rate (20.8 -> 53.9 percent against a real 35-45)."
         ),
     ),
 }
