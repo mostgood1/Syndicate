@@ -1031,6 +1031,23 @@ death, never life — do not invert it.
         - Confidence is limited: one boot each, per-build steps are noisy (+10 vs +151 at build 4), and boots differ by ~90 MB at build 1.
       - **State left:** env `SYNDICATE_CANDIDATE_POOL_CACHE_MAX=2` stays set. It measurably slowed growth with no refusal or error, and cache hits were never measured to matter. Revert by setting it to 12 (or deleting it) and deploying.
       - **Next for this lane:** name the remaining per-build growth (~+70 MB/build with the cap), plus the +1.1 GB first-build step, before choosing between more caching fixes and the child-process build.
+  - **HYPOTHESES H-stage (written ~20:40Z BEFORE reading the per-stage data), for the `0a18557a` boot of 19:07:43Z:**
+    - **H-pull:** most of build 1's +1.1 GB pid 39 step lands between `ALL_PROCESS_MEMORY stage=build_candidate_pool_start` and `post_pull_hot_artifacts`, i.e. the two artifact pulls.
+      - Prior: the code comment at the odds-history pull records a cold boot 2026-08-07 "171MB -> 1629MB anon in six seconds, across BOTH pulls". But that was container anon, not pid 39.
+      - **Falsified if** that span moves pid 39 by < 300 MB in build 1.
+    - **H-overview:** the rest lands at `post_build_overview`. Falsified if that stage moves pid 39 < 200 MB in build 1.
+    - **H-tail:** build 3's +163 MB lands in one named stage, not spread across all stages. Falsified if no stage accounts for >= 50% of it.
+    - Reading: pid 39 RSS per `stage=` sample from `ALL_PROCESS_MEMORY --json`, build 1 (19:07-19:21Z) and build 3 (19:31-19:43Z). Existing logs only, no deploy.
+  - **H-stage RESULTS ~20:45Z** (`scratchpad/stage_rss.py`; build 1 had 59 staged samples, build 3 had 62; stages come from several threads, so each delta is only roughly attributable):
+    - **pid 39 is not just the heavy build.** The same process logs `live_lens_pull_*`, `live_lens_tick_before/after_build_<sport>`, `live_lens_publish_*` and `post_mlb_sim_tick`, interleaved with the build stages.
+    - **Startup before any build: +477 MB** (boot 94.8 -> `start_live_lens_loop_before` 571.8 MB at 19:07:50Z).
+    - **H-pull FALSIFIED:** `build_candidate_pool_start` 576.0 -> `post_pull_hot_artifacts` 761.6 = **+186 MB** (< 300). A +410 MB `live_lens_pull_after` spike inside the span was given back (-293).
+    - **H-overview FALSIFIED as stated:** `post_pull_hot_artifacts` 761.6 -> `post_build_overview` 1,011.1 (+249). Inside that span the live-lens WNBA build added +117 and the soccer build +93; the overview's own sample shows +87 (< 200).
+    - Overview -> `post_candidate_building` 1,251.0 (+240), carried mostly by `post_mlb_sim_tick` samples (+81 / +110 / +98).
+    - **H-tail FALSIFIED:** build 3's rise is spread across stages. The largest are `post_mlb_sim_tick` +103 and +90, `live_lens_tick_after_build_soccer` +54 and +58, and `post_layer2_shortlist` +34; none is >= 50%.
+    - **Implication:** the "+1.1 GB first build" is roughly startup ~+480, live-lens loop builds ~+210-330 (soccer recurring), MLB sim tick samples ~+290, and the heavy build's own pulls and overview ~+270. These are all rough.
+    - A child-process HEAVY BUILD alone would not remove the live-lens or MLB-tick growth in pid 39, which weakens this lane's original design.
+    - Next: find which env flags put the live-lens loop and the MLB sim tick on refresh-worker, and whether soccer's live-lens build retains memory per tick.
     - **Undisturbed window requested from accuracy-assessment-0914:** the first ~6 heavy builds after this deploy (~90 min from live). "Reading done" goes on this line when the 6th `CANDIDATE_POOL_CACHE` line is in.
 
 ### heavy-build-memory-refusal — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
