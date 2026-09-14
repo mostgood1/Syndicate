@@ -444,6 +444,7 @@ def grade_population(
     today: str | None = None,
     prop_settler: Any = None,
     ungraded_by_sport: dict[str, dict[str, int]] | None = None,
+    score_source: Any = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """One graded row per priced side, plus the count of what could not be graded and why.
 
@@ -513,20 +514,28 @@ def grade_population(
             if not (shaped["home_team"] and shaped["away_team"]):
                 skip(sport, "no_team_names")
                 continue
-            if not day or day not in indexed:
-                skip(sport, "no_chips_for_kickoff_date")
-                continue
-            chip, why = SCORECARD.match_chip(shaped, indexed[day].get(sport, []))
-            if chip is None:
-                skip(sport, why or "no_chip_match")
-                continue
-            if chip["state"] != "final":
+            if day and day in indexed:
+                chip, why = SCORECARD.match_chip(shaped, indexed[day].get(sport, []))
+            else:
+                chip, why = None, "no_chips_for_kickoff_date"
+            if chip is not None and chip["state"] != "final":
                 skip(sport, "game_not_final")
                 continue
-            if chip["scores"] is None:
+            scores = chip["scores"] if chip is not None else None
+            if scores is None and score_source is not None and sport in PROP_GRADED_SPORTS:
+                # The scoreboard served past MLB finals with null scores (2026-09-02: 15 of 15);
+                # the schedule's official final settles them, matched the way the prop grader matches.
+                scores, source_why = score_source(shaped)
+                if scores is None:
+                    skip(sport, f"final_{source_why}" if source_why else "final_unavailable")
+                    continue
+            elif chip is None:
+                skip(sport, why or "no_chip_match")
+                continue
+            elif scores is None:
                 skip(sport, "final_score_unparseable")
                 continue
-            result = settle_from_score(shaped, *chip["scores"])
+            result = settle_from_score(shaped, *scores)
             if result is None:
                 skip(sport, "unsettleable_side_or_line")
                 continue
@@ -811,7 +820,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                              "published: the clv_openings ledger (a PREVIEW, never written to the table)")
     parser.add_argument("--openings-dir", help="offline: directory of <date>.jsonl published-opening ledgers")
     parser.add_argument("--no-props", action="store_true",
-                        help="do not grade MLB props from statsapi.mlb.com box scores")
+                        help="do not read statsapi.mlb.com: no MLB prop grading from box scores, and no "
+                             "schedule final score for an MLB game line whose scoreboard chip has none")
     parser.add_argument("--write-table", action="store_true",
                         help="write validated skill buckets to measured_bucket_skill.json (a behaviour change)")
     args = parser.parse_args(argv)
@@ -825,11 +835,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     event_teams: dict[tuple[str, str], tuple[str, str]] = {}
-    prop_settler = None
+    prop_settler = score_source = None
     if not args.no_props:
         from syndicate.features.mlb.prop_outcomes import MlbPropGrader
 
-        prop_settler = MlbPropGrader(cache_dir=out_dir / "statsapi_cache").settle
+        mlb_grader = MlbPropGrader(cache_dir=out_dir / "statsapi_cache")
+        prop_settler, score_source = mlb_grader.settle, mlb_grader.final_score
 
     if args.records_dir or args.openings_dir:
         if args.openings_dir:
@@ -873,7 +884,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     now_central = SCORECARD.central_date(datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
     ungraded_by_sport: dict[str, dict[str, int]] = {}
     graded, ungraded = grade_population(records, chips_by_date, event_teams, today=now_central,
-                                        prop_settler=prop_settler, ungraded_by_sport=ungraded_by_sport)
+                                        prop_settler=prop_settler, ungraded_by_sport=ungraded_by_sport,
+                                        score_source=score_source)
     cov = coverage(records, chips_by_date, graded)
     graded_by_sport = {
         sport_name: {"rows": sum(1 for row in graded if row["sport"] == sport_name),

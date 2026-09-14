@@ -294,6 +294,27 @@ def test_ungraded_reasons_are_also_counted_per_sport():
     assert ungraded == {"player_prop": 1, "market_not_gradeable_from_score": 1}
 
 
+def test_a_scoreless_mlb_chip_settles_from_the_score_source_and_other_sports_do_not():
+    record = _record_from(_candidate())                                            # mlb totals over 8.5
+    soccer = _record_from(_candidate(sport="soccer", market="totals", side="over", line=2.5))
+    chips = {"2026-09-01": [_chip("Home Team", "Away Team", None, None),
+                            _chip("Home Team", "Away Team", None, None, sport="soccer")]}
+    calls = []
+
+    def source(shaped):
+        calls.append(shaped["sport"])
+        return (4, 6), None
+
+    graded, ungraded = bs.grade_population([record, soccer], chips, score_source=source)
+    assert [(row["sport"], row["y"]) for row in graded] == [("mlb", 1.0)]         # 10 runs > 8.5
+    assert ungraded == {"final_score_unparseable": 1} and calls == ["mlb"]
+    _graded, ungraded = bs.grade_population([record], chips)
+    assert ungraded == {"final_score_unparseable": 1}
+    live = {"2026-09-01": [_chip("Home Team", "Away Team", 1, 2, state="live")]}
+    _graded, ungraded = bs.grade_population([record], live, score_source=source)
+    assert ungraded == {"game_not_final": 1}
+
+
 def test_the_published_population_can_never_write_the_scoring_table(tmp_path):
     before = mbs.TABLE_PATH.read_bytes()
     with pytest.raises(SystemExit):

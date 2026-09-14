@@ -173,3 +173,24 @@ def test_a_west_coast_evening_start_asks_for_its_eastern_date():
                        "/game/111/boxscore": BOX})
     assert po.MlbPropGrader(fetch=fetch).settle(_record(commence_time="2026-09-02T02:10:00Z")) == ("win", None)
     assert any("date=2026-09-01" in url for url in fetch.calls)
+
+
+def _scored(state="Final", detailed="Final", away=4, home=6):
+    payload = _schedule((111, "2026-09-01T23:10:00Z", HOME, AWAY, state, detailed))
+    teams = payload["dates"][0]["games"][0]["teams"]
+    teams["away"]["score"], teams["home"]["score"] = away, home
+    return payload
+
+
+def test_a_final_games_score_comes_from_the_schedule():
+    """For game lines whose scoreboard chip is scoreless (past MLB dates were served null scores)."""
+    grader = po.MlbPropGrader(fetch=FakeFetch({"date=2026-09-01": _scored()}))
+    assert grader.final_score(_record()) == ((4, 6), None)
+
+
+@pytest.mark.parametrize("payload, reason", [
+    (_scored(state="Live", detailed="In Progress"), "game_not_final"),
+    (_scored(away=None, home=None), "score_absent"),
+])
+def test_no_final_score_is_invented(payload, reason):
+    assert po.MlbPropGrader(fetch=FakeFetch({"date=2026-09-01": payload})).final_score(_record()) == (None, reason)

@@ -142,6 +142,8 @@ def schedule_games(payload: Any) -> list[dict[str, Any]]:
                     "game_date": game.get("gameDate"),
                     "state": str(status.get("abstractGameState") or ""),
                     "detailed_state": str(status.get("detailedState") or ""),
+                    "away_score": (teams.get("away") or {}).get("score"),
+                    "home_score": (teams.get("home") or {}).get("score"),
                 }
             )
     return games
@@ -220,11 +222,8 @@ class MlbPropGrader:
         payload = self._get(f"boxscore_{game_pk}.json", f"{STATSAPI}/game/{game_pk}/boxscore", keep=lambda _p: True)
         return {"liveData": {"boxscore": payload}} if isinstance(payload, Mapping) else None
 
-    def settle(self, record: Mapping[str, Any]) -> tuple[str | None, str | None]:
-        """(result, None) or (None, reason) for a record shaped like `layer2_live_scorecard`'s."""
-        market = str(record.get("market") or "").strip().lower()
-        if market not in MARKET_STATS:
-            return None, "prop_market_unmapped"
+    def _final_game(self, record: Mapping[str, Any]) -> tuple[Mapping[str, Any] | None, str | None]:
+        """The Final scheduled game for a record's teams and start, or (None, reason)."""
         if not (record.get("home_team") and record.get("away_team")):
             return None, "no_team_names"
         start = _parse_ts(record.get("commence_time"))
@@ -241,6 +240,30 @@ class MlbPropGrader:
             return None, "game_not_played"
         if game["state"] != "Final":
             return None, "game_not_final"
+        return game, None
+
+    def final_score(self, record: Mapping[str, Any]) -> tuple[tuple[int, int] | None, str | None]:
+        """((away, home) runs, None) for a Final game, or (None, reason).
+
+        For MLB game lines whose scoreboard chip is missing or scoreless: `/api/board/game-chips`
+        served past dates' finals with null scores (2026-09-02: 15 of 15).
+        """
+        game, reason = self._final_game(record)
+        if game is None:
+            return None, reason
+        try:
+            return (int(game["away_score"]), int(game["home_score"])), None
+        except (TypeError, ValueError):
+            return None, "score_absent"
+
+    def settle(self, record: Mapping[str, Any]) -> tuple[str | None, str | None]:
+        """(result, None) or (None, reason) for a record shaped like `layer2_live_scorecard`'s."""
+        market = str(record.get("market") or "").strip().lower()
+        if market not in MARKET_STATS:
+            return None, "prop_market_unmapped"
+        game, reason = self._final_game(record)
+        if game is None:
+            return None, reason
         feed = self.box_score(game["game_pk"])
         if feed is None:
             return None, "boxscore_unavailable"
