@@ -213,6 +213,57 @@ def test_a_record_without_team_names_joins_through_the_event_map():
     assert len(graded) == 1
 
 
+def test_a_later_sighting_lends_its_team_names_to_the_earliest_one():
+    """Dedup keeps the EARLIEST sighting; one written before the recorder carried names still joins."""
+    early = _record_from(_candidate())
+    early.pop("ht"), early.pop("at")
+    early["t"] = "2026-09-01T12:00:00Z"
+    late = _record_from(_candidate())
+    other_side = _record_from(_candidate(side="under"))
+    other_side.pop("ht"), other_side.pop("at")
+    chips = {"2026-09-01": [_chip("Home Team", "Away Team", 4, 6)]}
+    graded, ungraded = bs.grade_population([early, late, other_side], chips)
+    assert ungraded == {} and len(graded) == 2
+
+
+def test_a_game_that_has_not_started_reads_not_started_not_unnamed():
+    """On soccer 09-14, ~800 of 802 'no_team_names' were games days from kickoff."""
+    record = _record_from(_candidate(commence_time="2026-09-05T23:00:00Z"))
+    record.pop("ht"), record.pop("at")
+    _graded, ungraded = bs.grade_population([record], {}, today="2026-09-02")
+    assert ungraded == {"not_started": 1}
+    _graded, ungraded = bs.grade_population([record], {})
+    assert ungraded == {"no_team_names": 1}
+
+
+def test_team_lookups_try_the_kickoff_date_then_the_sighting_date_one_market_at_a_time():
+    """A board date carries games for days ahead, and a late kickoff can sit only on the next date's grid."""
+    first = _record_from(_candidate(event_id="evt-1"))
+    second = _record_from(_candidate(event_id="evt-2", home_team="B Home", away_team="B Away"))
+    late = _record_from(_candidate(event_id="evt-6", home_team="D Home", away_team="D Away"))
+    late["t"] = "2026-09-02T15:00:00Z"
+    future = _record_from(_candidate(event_id="evt-3", commence_time="2026-09-03T23:00:00Z"))
+    prop = _record_from(_candidate(event_id="evt-4", market="batter_hits", player_name="A Hitter", line=0.5))
+    named = _record_from(_candidate(event_id="evt-5", home_team="C Home", away_team="C Away"))
+    for record in (first, second, late, future, prop):
+        record.pop("ht"), record.pop("at")
+    grids = {("2026-09-01", "h2h"): {("mlb", "evt-1"): ("Home Team", "Away Team")},
+             ("2026-09-01", "totals"): {("mlb", "evt-2"): ("B Home", "B Away")},
+             ("2026-09-02", "h2h"): {("mlb", "evt-6"): ("D Home", "D Away")}}
+    calls = []
+
+    def fetch(day, sport, market):
+        calls.append((day, sport, market))
+        return grids.get((day, market), {})
+
+    teams, lookups = bs.resolve_event_teams([first, second, late, future, prop, named], fetch, today="2026-09-02")
+    assert calls == [("2026-09-01", "mlb", "h2h"), ("2026-09-01", "mlb", "totals"),
+                     ("2026-09-01", "mlb", "spreads"), ("2026-09-02", "mlb", "h2h")]
+    assert lookups == 4
+    assert teams == {("mlb", "evt-1"): ("Home Team", "Away Team"), ("mlb", "evt-2"): ("B Home", "B Away"),
+                     ("mlb", "evt-6"): ("D Home", "D Away")}
+
+
 def test_a_session_worktree_finds_the_token_in_the_main_worktree(tmp_path, monkeypatch):
     """REPO_ROOT is the session worktree, which has no .env; the main worktree's is used."""
     session_tree, main_tree = tmp_path / "session", tmp_path / "main"

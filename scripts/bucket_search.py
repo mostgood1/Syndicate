@@ -200,19 +200,86 @@ def fetch_records(base_url: str, token: str, day: str, sports: Sequence[str] = S
     return records
 
 
-def fetch_event_teams(base_url: str, token: str, day: str, sport: str) -> dict[tuple[str, str], tuple[str, str]]:
+TEAM_LOOKUP_MARKETS = ("h2h", "totals", "spreads")
+
+
+def fetch_event_teams(base_url: str, token: str, day: str, sport: str,
+                      market: str | None = None) -> dict[tuple[str, str], tuple[str, str]]:
     """(sport, event_id) -> (home, away) from that date's served book grid.
 
-    Only for records written before the recorder carried team names.
+    Only for records written before the recorder carried team names. The grid serves at most
+    2,000 rows — soccer 2026-09-14 returned 2,000 of 3,082, covering 9 events — so ask for
+    one market at a time.
     """
-    query = urllib.parse.urlencode({"sport": sport, "date": day, "limit": 2000})
-    payload = _get_json(f"{base_url.rstrip('/')}/api/board/book-grid?{query}", token)
+    params: dict[str, Any] = {"sport": sport, "date": day, "limit": 2000}
+    if market:
+        params["market"] = market
+    payload = _get_json(f"{base_url.rstrip('/')}/api/board/book-grid?{urllib.parse.urlencode(params)}", token)
     out: dict[tuple[str, str], tuple[str, str]] = {}
     for row in (payload.get("rows") or []) if isinstance(payload, Mapping) else []:
         event_id = str(row.get("event_id") or "").strip()
         if event_id and row.get("home_team") and row.get("away_team"):
             out.setdefault((sport, event_id), (row["home_team"], row["away_team"]))
     return out
+
+
+def resolve_event_teams(
+    records: Iterable[Mapping[str, Any]],
+    fetch: Any,
+    *,
+    today: str | None = None,
+) -> tuple[dict[tuple[str, str], tuple[str, str]], int]:
+    """Team names for unnamed score-gradeable records, from the served book grids.
+
+    `fetch(day, sport, market)` returns a (sport, event_id) -> (home, away) map. Grids are tried
+    on each record's KICKOFF date, then on the dates it was SIGHTED: a board date carries games
+    for days ahead, and a late kickoff can sit only on the next date's grid (soccer's one 09-13
+    final was on the 09-14 grid and not on 09-13's). Games that have not kicked off by `today`
+    are not looked up, nor are events a sibling record already names. Returns (map, grids fetched).
+    """
+    named: set[tuple[str, str]] = set()
+    missing: dict[str, set[str]] = collections.defaultdict(set)
+    kickoff_days: dict[str, set[str]] = collections.defaultdict(set)
+    sighted_days: dict[str, set[str]] = collections.defaultdict(set)
+    for record in records:
+        identity = parse_population_key(str(record.get("k") or ""))
+        if not identity:
+            continue
+        sport = str(record.get("sport") or "").strip().lower()
+        if record.get("ht") and record.get("at"):
+            named.add((sport, identity["event_id"]))
+            continue
+        if identity["player_name"] or identity["market"] not in mbs.GRADABLE_MARKETS:
+            continue
+        if (identity["segment"] or "full") not in ("full", "full_game"):
+            continue
+        kickoff = SCORECARD.central_date(record.get("ct"))
+        if not kickoff or (today is not None and kickoff > today):
+            continue
+        missing[sport].add(identity["event_id"])
+        kickoff_days[sport].add(kickoff)
+        sighted = SCORECARD.central_date(record.get("t"))
+        if sighted and (today is None or sighted <= today):
+            sighted_days[sport].add(sighted)
+
+    out: dict[tuple[str, str], tuple[str, str]] = {}
+    lookups = 0
+    for sport in sorted(missing):
+        still = {event for event in missing[sport] if (sport, event) not in named}
+        grid_days = sorted(kickoff_days[sport]) + sorted(sighted_days[sport] - kickoff_days[sport])
+        for day in grid_days:
+            for market in TEAM_LOOKUP_MARKETS:
+                if not still:
+                    break
+                found = fetch(day, sport, market) or {}
+                lookups += 1
+                for (found_sport, event), teams in found.items():
+                    if found_sport == sport and event in still:
+                        out[(sport, event)] = teams
+                still -= {event for (named_sport, event) in out if named_sport == sport}
+            if not still:
+                break
+    return out, lookups
 
 
 # ---------------------------------------------------------------------------
@@ -279,16 +346,30 @@ def grade_population(
     records: Iterable[Mapping[str, Any]],
     chips_by_date: Mapping[str, Sequence[Mapping[str, Any]]],
     event_teams: Mapping[tuple[str, str], tuple[str, str]] | None = None,
+    *,
+    today: str | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
-    """One graded row per priced side, plus the count of what could not be graded and why."""
+    """One graded row per priced side, plus the count of what could not be graded and why.
+
+    With `today` (a Central date), a kickoff after it is counted `not_started` before anything
+    that needs a join, so an unplayed game does not read as a join failure.
+    """
     chosen: dict[tuple[str, str], Mapping[str, Any]] = {}
+    # The EARLIEST sighting is the one graded, and it can predate the recorder carrying team
+    # names while a later sighting of the same event carries them: lend them across.
+    named: dict[tuple[str, str], tuple[str, str]] = {}
     for record in records:
         key = (str(record.get("sport") or "").strip().lower(), str(record.get("k") or ""))
         if not key[1]:
             continue
+        if record.get("ht") and record.get("at"):
+            identity = parse_population_key(key[1])
+            if identity:
+                named.setdefault((key[0], identity["event_id"]), (record["ht"], record["at"]))
         held = chosen.get(key)
         if held is None or str(record.get("t") or "") < str(held.get("t") or ""):
             chosen[key] = record
+    event_teams = {**(event_teams or {}), **named}
 
     indexed = {day: SCORECARD.index_chips(list(chips)) for day, chips in chips_by_date.items()}
     graded: list[dict[str, Any]] = []
@@ -308,10 +389,13 @@ def grade_population(
         if view["segment"] not in ("full", "full_game"):
             ungraded["segment_not_full_game"] += 1
             continue
+        day = SCORECARD.central_date(shaped["commence_time"])
+        if day and today is not None and day > today:
+            ungraded["not_started"] += 1
+            continue
         if not (shaped["home_team"] and shaped["away_team"]):
             ungraded["no_team_names"] += 1
             continue
-        day = SCORECARD.central_date(shaped["commence_time"])
         if not day or day not in indexed:
             ungraded["no_chips_for_kickoff_date"] += 1
             continue
@@ -622,16 +706,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         for day in days:
             day_records = fetch_records(args.base_url, token, day, sports)
             records.extend(day_records)
-            if any(not (r.get("ht") and r.get("at")) for r in day_records):
-                for sport in {str(r.get("sport") or "") for r in day_records if not (r.get("ht") and r.get("at"))}:
-                    if sport:
-                        event_teams.update(fetch_event_teams(args.base_url, token, day, sport))
             print(f"[bucket_search] RECORDS day={day} records={len(day_records)}", flush=True)
+        today = SCORECARD.central_date(datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+        event_teams, lookups = resolve_event_teams(
+            records,
+            lambda day, sport, market: fetch_event_teams(args.base_url, token, day, sport, market),
+            today=today,
+        )
+        print(f"[bucket_search] TEAM_LOOKUPS grids={lookups} events_named={len(event_teams)}", flush=True)
         kickoff_days = sorted({d for d in (SCORECARD.central_date(r.get("ct")) for r in records) if d})
         chips_by_date = {day: SCORECARD.fetch_chips(args.base_url, day, None) for day in kickoff_days}
         window = f"{args.start}..{args.end}"
 
-    graded, ungraded = grade_population(records, chips_by_date, event_teams)
+    now_central = SCORECARD.central_date(datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+    graded, ungraded = grade_population(records, chips_by_date, event_teams, today=now_central)
     cov = coverage(records, chips_by_date, graded)
     print("[bucket_search] COVERAGE " + json.dumps(cov, default=str), flush=True)
     print("[bucket_search] UNGRADED " + json.dumps(ungraded), flush=True)
