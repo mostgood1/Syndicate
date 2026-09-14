@@ -44,6 +44,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from syndicate.features.shared import measured_market_skill
+
 STATUS_MEASURED = "measured"
 STATUS_UNMEASURED = "unmeasured"
 
@@ -94,9 +96,18 @@ def attach_projection_skill(grid: list, *, sport: str) -> dict[str, Any]:
     gap. Returns coverage counts so "every model on this board is unmeasured"
     is a number someone can read, rather than something they would have to
     notice.
+
+    Between the two sits `measured_market_skill`: a market measured OUTSIDE its
+    producer (2026-09-14 census: MLB and soccer game markets that had been
+    measured still read "never backtested") gets that measurement instead of
+    the declared absence. Keyed on the projection's own phase, so a pregame
+    number never labels a live re-sim. `rows_with_measured_skill_from_registry`
+    appears only when non-zero; it is how a census tells a producer's note from
+    the table's.
     """
     measured = 0
     unmeasured = 0
+    from_registry = 0
     for row in grid:
         if not isinstance(row, dict):
             continue
@@ -108,12 +119,26 @@ def attach_projection_skill(grid: list, *, sport: str) -> dict[str, Any]:
             projection["model_skill"] = normalize_existing_note(existing)
             measured += 1
             continue
+        registry_note = measured_market_skill.skill_note(
+            sport=sport,
+            market=row.get("market"),
+            segment=row.get("segment"),
+            phase=measured_market_skill.projection_phase(projection),
+        )
+        if registry_note:
+            projection["model_skill"] = normalize_existing_note(registry_note)
+            measured += 1
+            from_registry += 1
+            continue
         projection["model_skill"] = unmeasured_note()
         unmeasured += 1
 
     if not (measured or unmeasured):
         return {}
-    return {
+    coverage = {
         "rows_with_measured_skill": measured,
         "rows_with_unmeasured_skill": unmeasured,
     }
+    if from_registry:
+        coverage["rows_with_measured_skill_from_registry"] = from_registry
+    return coverage

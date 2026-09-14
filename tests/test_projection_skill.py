@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import pytest
 
+import syndicate.features.shared.measured_market_skill as mms
 from syndicate.features.shared.projection_skill import (
     STATUS_MEASURED,
     STATUS_UNMEASURED,
@@ -26,6 +27,14 @@ from syndicate.features.shared.projection_skill import (
     normalize_existing_note,
     unmeasured_note,
 )
+
+
+@pytest.fixture(autouse=True)
+def _empty_registry(monkeypatch):
+    """These tests pin the declared-absence mechanism, so the measured-market
+    table must not answer for their `totals` rows. Registry tests inject their
+    own entries below."""
+    monkeypatch.setattr(mms, "MEASURED_MARKET_SKILL", {})
 
 
 # The real NFL note, as `nfl_preseason_calibration.skill_note` emits it.
@@ -150,6 +159,68 @@ def test_mixed_board_reports_both_counts():
     coverage = attach_projection_skill(grid, sport="nfl")
     assert coverage["rows_with_measured_skill"] == 1
     assert coverage["rows_with_unmeasured_skill"] == 2
+
+
+# --------------------------------------------------------------------------
+# a market measured outside its producer
+# --------------------------------------------------------------------------
+
+REGISTRY_ENTRY = {
+    "sample_games": 196,
+    "seasons": "2026-08-31..09-13, production",
+    "correlation": None,
+    "verdict": "loses to the de-vigged close by 0.004 Brier over 196 games",
+    "verdict_class": mms.VERDICT_LOSES,
+    "source": "lane accuracy-assessment-0914",
+}
+
+
+@pytest.fixture
+def registry(monkeypatch):
+    table = {("mlb", "totals", "full", mms.PHASE_PREGAME): dict(REGISTRY_ENTRY)}
+    monkeypatch.setattr(mms, "MEASURED_MARKET_SKILL", table)
+    return table
+
+
+def test_a_measured_market_replaces_the_never_backtested_label(registry):
+    grid = [_row({"projected": 8.5})]
+    coverage = attach_projection_skill(grid, sport="mlb")
+    skill = grid[0]["projection"]["model_skill"]
+    assert skill["status"] == STATUS_MEASURED
+    assert skill["sample_games"] == 196
+    assert skill["verdict"] == REGISTRY_ENTRY["verdict"]
+    assert skill["basis"] == mms.NOTE_BASIS
+    assert coverage == {
+        "rows_with_measured_skill": 1,
+        "rows_with_unmeasured_skill": 0,
+        "rows_with_measured_skill_from_registry": 1,
+    }
+
+
+def test_a_producer_note_outranks_the_registry(registry):
+    grid = [_row({"projected": 8.5, "model_skill": dict(NFL_NOTE)})]
+    coverage = attach_projection_skill(grid, sport="mlb")
+    assert grid[0]["projection"]["model_skill"]["correlation"] == -0.047
+    assert "rows_with_measured_skill_from_registry" not in coverage
+
+
+def test_a_live_re_sim_is_not_labelled_with_the_pregame_measurement(registry):
+    grid = [_row({"projected": 8.5, "live_aware": True})]
+    attach_projection_skill(grid, sport="mlb")
+    assert grid[0]["projection"]["model_skill"]["status"] == STATUS_UNMEASURED
+
+
+def test_the_registry_is_keyed_by_sport(registry):
+    grid = [_row({"projected": 2.5})]
+    attach_projection_skill(grid, sport="soccer")
+    assert grid[0]["projection"]["model_skill"]["status"] == STATUS_UNMEASURED
+
+
+def test_each_row_gets_its_own_copy_of_the_note(registry):
+    grid = [_row({"projected": 8.5}), _row({"projected": 9.5})]
+    attach_projection_skill(grid, sport="mlb")
+    grid[0]["projection"]["model_skill"]["verdict"] = "rewritten downstream"
+    assert grid[1]["projection"]["model_skill"]["verdict"] == REGISTRY_ENTRY["verdict"]
 
 
 # --------------------------------------------------------------------------
