@@ -462,31 +462,54 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
 
 ---
 
-## [brand-marks-and-error-pages] TWO BRAND MARKS, SPLIT BY RENDER SIZE — and the app finally has error pages `[verified 2026-09-09, lane brand-mascot-logo, live on web]`
+## [brand-marks-and-error-pages] TWO BRAND MARKS, SPLIT BY RENDER SIZE — and the app finally has error pages `[verified 2026-09-09, lane brand-mascot-logo; logo replaced and verified in production 2026-09-14, lane brand-logo-v3, web dd3a4fda]`
 
-**Two marks, and they are not interchangeable.** The split was measured on
-16/32/64/128/512 contact sheets before anything was wired, not chosen:
+**THE LOGO** (`docs/brand/syndicate-logo-source.png`, 1536x1024: hooded mascot,
+crown, the green/blue S swoosh and its own "SYNDICATE" lettering) **is the brand**
+`[user decision 2026-09-14]`. It replaced both the header wordmark and the mascot
+crest, and owns every slot that renders at ~50px and up:
 
-- **wordmark's S** (`syndicate-logo.png`, squared) — clean at 32px, legible at
-  16px on a light AND a dark tab strip. Owns the **browser chrome**
-  (`favicon-48/32/16.png`, `favicon.ico`) and the **header lockup on every
-  page**, which is unchanged.
-- **mascot crest** (`syndicate-crest.jpg` / `syndicate-mascot*.png`) —
-  unreadable at 32px and mud at 16px, in BOTH full-art and a tight hood-only
-  crop. Owns every slot that renders large: `apple-touch-icon.png`, the PWA
-  192/512 icons, the `og:`/`twitter:` card, and four page surfaces —
-  `/syndicate` hero, market-board masthead, the error page, and
-  `/intelligence/status`.
+- **The header on EVERY page:** `syndicate-brand-header.jpg` (480x320). It sits
+  INLINE on the main menu row `[user decision 2026-09-14]`, 60-84px tall and 52px
+  on a phone, vertically centred, with the pills wrapping beside it and never
+  under it. This covers both headers: `base.html`'s `.syndicate-menu-row` and the
+  standalone app header (37 templates).
+- **The four hero panels** (`/syndicate`, market-board hub, error page,
+  `/intelligence/status`): `syndicate-brand-hero.jpg` (960x640).
+- **`syndicate-icon-180/192/512.png`** (apple-touch and PWA) and
+  **`syndicate-social.jpg`** (1200x630, og/twitter).
 
-**There is deliberately NO `favicon.svg`.** The obvious source,
-`syndicate-logo.svg`, **is not the logo** — rendered at 240px beside the PNG it
-draws two parallel bars where the real mark is an interlocking S, and sets the
-wordmark in Arial. Nothing in the app references that file. A scalable icon
-needs the mark re-vectorised first.
+**THE LOGO IS NEVER CROPPED, only resized `[user decision 2026-09-14]`.** The
+square icons and the 1200x630 card carry the whole 3:2 piece, padded with the
+logo's own black ground. The hero panels are `object-fit: contain` at
+`aspect-ratio: 3 / 2`. They were `cover`, cropped on the hood, and `cover` would
+crop in the browser a file the build kept whole. The logo wrapper in both
+headers is `flex: 0 0 auto`: as a shrinkable flex item it collapsed to 25px at
+400px wide under an 80px logo, and the pills drew across the logo.
+`tests/test_brand_assets.py` pins all of this, with a control proving the cover
+check can fail.
+
+**The favicon stays the wordmark's S** `[user decision 2026-09-14]`
+(`favicon-48/32/16.png`, `favicon.ico`). The mascot art was measured unreadable
+at 32px and mud at 16px on 16/32/64/128/512 contact sheets (2026-09-09), and the
+logo is that art plus lettering. The S is the swoosh the logo is built around.
+`syndicate-logo.png` now feeds the favicons only (plus
+`scripts/controlled_transfer_probe.py`) and appears in no `<img>`. There is NO
+`favicon.svg`: a scalable icon needs the S re-vectorised first.
+
+**Every asset whose content changed was RENAMED** (crest to brand-hero, mascot
+to icon, apple-touch-icon to icon-180, og to social), so browser and
+link-preview caches cannot serve the old art at a live URL. The retired names
+return 404 in production. The unused `syndicate-logo.svg` and the old master art
+are deleted; git history keeps both.
+
+**MEASURED IN PRODUCTION** at 22:01:35Z on web `dd3a4fda`: 5 served pages name 0
+retired assets, 7 of 7 assets return 200 at their exact dimensions, and 6 of 6
+retired assets return 404 (`deploys.md`). The rendered layout was measured
+locally at 400, 900 and 1440px, not in production.
 
 Rebuild every asset with `py -3 scripts/build_brand_assets.py` (master art at
-`docs/brand/syndicate-mascot-source.png`, outside `static/`, never served). It
-reproduces all nine byte-identically.
+`docs/brand/syndicate-logo-source.png`, outside `static/`, never served).
 
 **THE APP NOW HAS ERROR PAGES. It had NONE before 2026-09-09** — `grep
 errorhandler` over `app.py` and every blueprint returned nothing, so a typo'd

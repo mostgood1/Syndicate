@@ -5,6 +5,35 @@
 
 ---
 
+## 2026-09-14 5:01 PM CT — web `ae53a1a5` -> `dd3a4fda` (lane `brand-logo-v3`, user decision "Commit, push, deploy web") — **MET: EVERY SERVED PAGE NAMES ONLY THE NEW LOGO, ALL SIX NEW ASSETS SERVE 200 AT THEIR EXACT SIZES, ALL SIX RETIRED ASSETS 404, S FAVICON UNCHANGED**
+
+**Deploy.** `dep-dak6rqifngtc73c0jh90`, triggered 21:58:02Z. `/versionz` returned 502 from 21:59:53Z to 22:01:15Z and served `dd3a4fda` from 22:01:35Z (5:01 PM CT). Claim held by `brand-logo-v3` from 21:47:48Z. Preflight CLEAR at 21:56:15Z for `dd3a4fda` (infrastructure processes only, plus 2 defunct children).
+- **Ride-along.** 39 commits in `ae53a1a5..dd3a4fda`, with no `requirements*`, `render.yaml` or `wsgi.py` change. Besides this lane's `d126eeb4` and `dd3a4fda`, the non-ledger code is:
+  - `accuracy-assessment-0914`: `e4ef34d4`, `bedb99b2`, `f7984e8a`, `74588c50`, `ca40dba1`, `95d1f8b1` (`scripts/bucket_search.py`, `measured_bucket_skill.py`/`.json`, `mlb/prop_outcomes.py`, `layer2_board.py`, `opportunity_population_ledger.py`).
+  - candidate-pool cache cap: `0a18557a`, `d4deb502` (`pipeline/intelligence_state.py`).
+  - All of it had been live on refresh-worker `6438830d` since 21:03:17Z.
+  - I read those diffs before deploying. The pool-cache cap defaults to `_max_snapshots`, so nothing changes unless `SYNDICATE_CANDIDATE_POOL_CACHE_MAX` is set. The bucket table ships empty, so Layer 2 scores stay on the category factor and only gain a `skill_source` stamp. Population records gain `ht`/`at`.
+
+**Control** (21:56:46Z, web on `ae53a1a5`), served HTML of `/definitely-not-a-real-page`: `syndicate-logo.png` 1, `syndicate-crest.jpg` 1, `apple-touch-icon.png` 1, `syndicate-og.jpg` 2. Every new asset name: 0.
+
+**Reading** (22:01:35Z, the first poll that served `dd3a4fda`), occurrences in the served HTML:
+
+| page | logo.png / crest / apple-touch / og | brand-header | brand-hero | social | icon-180 | menu-row | favicon-32 |
+|---|---|---|---|---|---|---|---|
+| `/definitely-not-a-real-page` (404) | 0 / 0 / 0 / 0 | 1 | 1 | 2 | 1 | 1 | 1 |
+| `/syndicate` | 0 / 0 / 0 / 0 | 1 | 1 | 2 | 1 | 1 | 1 |
+| `/market-board` | 0 / 0 / 0 / 0 | 1 | 1 | 2 | 1 | 1 | 1 |
+| `/intelligence/status` | 0 / 0 / 0 / 0 | 1 | 1 | 2 | 1 | 1 | 1 |
+| `/mlb/market-accuracy` (standalone header) | 0 / 0 / 0 / 0 | 1 | 0 | 0 | 0 | 0 | 1 |
+
+- The standalone pages do not extend `base.html`. They carry no hero, og or apple-touch and no `syndicate-menu-row` class, so those zeros are expected, not misses.
+- **Assets, dimensions read from the served bytes:** `syndicate-brand-header.jpg` 480x320, `syndicate-brand-hero.jpg` 960x640, `syndicate-icon-180/192/512.png` at 180/192/512 square, `syndicate-social.jpg` 1200x630, `favicon-32.png` 32x32. **7 of 7 return 200 at the expected size.**
+- **Retired:** `syndicate-crest.jpg`, `syndicate-mascot.png`, `syndicate-mascot-192.png`, `apple-touch-icon.png`, `syndicate-og.jpg` and `syndicate-logo.svg` all return **404**. `manifest.json` icons are `syndicate-icon-192.png` and `syndicate-icon-512.png`.
+- **NOT measured on production:** rendered layout (the inline menu row, the 3:2 boxes, no pill overlap). That was measured locally on the worktree's own app at 400, 900 and 1440px before landing; the numbers are in the lane block.
+- verify: **MET** against the lane's clause. Served HTML references only the new asset names: 0 retired names on 5 pages. Each new asset serves 200 at its expected dimensions: 7 of 7. The favicon links are unchanged: `favicon-32.png` present, 200, 32x32. The layout half of the clause rests on the local measurement above, not on production.
+
+---
+
 ## 2026-09-14 13:35Z — reading only, no deploy — NCAAF WEEK 3 ADVANCE, MONDAY READING — **PASS: `resolved_active_weeks [1, 2, 3]`, `cards?week=3` serves "2026 Week 3" (57 of 57 `3_`), and the advance came ON THE READ-TIME GRACE at ~15:59Z 09-13 — the worker's target flipped to 3 at 15:59:53.99Z, 2.3 s BEFORE the week_state rebuild published** [lane ncaaf-games-cache-refresh, scheduled task ncaaf-week3-advance-monday]
 
 Read 2026-09-14 13:35:29-13:35:43Z (08:35 CDT), substrate `render`, read-only. Logs read afterwards through ~13:45Z. No deploy, no code edited. This is the lane's closing reading: its owner (session a8d753fe) is archived and handed the close to this task.

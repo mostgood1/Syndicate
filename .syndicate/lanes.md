@@ -1352,6 +1352,27 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: served HTML on web references only the new asset names (0 `syndicate-crest.jpg`, 0 `syndicate-logo.png` in `<img>`), each new asset returns 200 with its expected dimensions, and a screenshot of the header + `/syndicate` hero at desktop and ~400px shows the logo legible and uncropped where it must be. Favicon links unchanged.
 - Blocked by: none.
+- USER DECISIONS, in order, all 2026-09-14:
+  - Keep the S favicon.
+  - Commit, push and deploy web.
+  - "dont crop the image, resize it. The logo must be maintained." This replaced crop boxes with whole-logo fitting and made the hero CSS `contain`.
+  - "the logo needs to be inline on the main menu row."
+  - Take over the standalone-header overflow handed off by session `local_06ae690f`, and ask before deploying that fix.
+- LOCAL LAYOUT READING (worktree app, port 5072; the primary tree's preview runs stale code):
+  - Header logo 3:2 at every width: 127x85 at 1440, 92x62 at 900, 80x54 at 400.
+  - 0 px centre offset at 900 and 1440. Pinned to the top at 400.
+  - 0 pills overlapping the logo on both headers.
+  - Hero boxes 3:2 `contain`: 285x189 on `/syndicate` at 1440, 300x200 stacked at 400.
+- BUG FOUND BY THAT READING, FIXED BEFORE LANDING: the logo wrapper shrank to 25px under an 80px logo at 400px. The nav started at x=68 and its second pill row drew across the logo (which ends at x=111). After `flex: 0 0 auto`: nav x=123, 0 overlapping.
+- DEPLOY `dd3a4fda` -> web, live 22:01:35Z. **MET**, see `deploys.md`: 0 retired names on 5 pages, 7 of 7 assets 200 at exact size, 6 of 6 retired 404.
+- STANDALONE HEADER OVERFLOW (pre-existing; handed to this lane):
+  - Cause: `.standalone-app-header` computed `content-box`, so `width: min(1640px, 100%)` plus 2x16 padding and 2 border came out 34px too wide.
+  - The border-box reset lives only in `dense_cards.css`, under `body.cards-body`.
+  - Before, scroll/client: `/mlb/market-accuracy` 1474/1440, 934/900, 414/400. `/nba/market-accuracy` 1459/1425, 919/885, 414/400. `/mlb` 1440/1440, 900/900, 400/400 (it has its own reset; this is the control).
+  - Fix: `box-sizing: border-box` on the header only.
+  - After: scroll == client on all 9 readings. Pill rows unchanged at 1 / 2 / 4. `/mlb` unchanged.
+  - `BUTTON.theme-toggle` (right=470 at 400px) sits inside `.nav` with `overflow-x: auto` ending at 390. It scrolls in its own strip and does not widen the page, so it is not a second source.
+  - **Committed and pushed, NOT deployed:** waiting on the user's deploy decision.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
