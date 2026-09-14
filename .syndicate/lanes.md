@@ -1142,7 +1142,13 @@ death, never life — do not invert it.
 - Verification:
   - Offline: new tests pass, and the build-prints-once test FAILS against HEAD's `book_grid_artifact.py`.
   - Production, after a refresh-worker deploy (needs user approval, locks, no in-flight MLB sim): exactly one `[book_grid] LIVE_GAMELINE_BUILD sport=mlb` line per MLB build on a live slate, with every field, recorded in `deploys.md`.
-- Blocked by: none.
+- Landed: `05ca745c` on main 2026-09-14 ~09:00 CT (13 new tests red on HEAD / green; 85 neighbouring tests green; rendered cleanly over the served 09-12 and 09-13 artifacts).
+- Deploy blast radius: `fb0c91cf..05ca745c` on refresh-worker = these 3 files only, no `render.yaml`.
+- User decision 2026-09-14 ~09:10 CT: "Deploy before first pitch (Recommended)". First pitch 22:40Z (5:40 PM CT).
+- Blocked by: a deliberate HOLD. The claim freed ~09:15 CT, but session `local_d77a58da` (lane `heavy-build-memory-refusal`) is reading reading (d) of `fb0c91cf`: the first `339dc6e9` self-restart.
+  - A reboot now would reset that refusal streak. As of 14:52Z: 5 refusals since 14:30:34Z, 0 `[worker_recycle]`.
+  - Release condition, watched in the background: `RECYCLE_EXIT` followed by a heavy build admitted (`PORTFOLIO_COMMIT` / `CANDIDATE_POOL_READY`); OR a heavy build admitted with no recycle; OR 16:15 CT at the latest.
+  - NOT coordinated by message: `send_message` is unavailable because this session began as a scheduled-task run (tried 09:55 CT). The hold is enforced by the watcher alone; the other session has not been told.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
