@@ -375,7 +375,8 @@ death, never life — do not invert it.
 - Goal `[user, 2026-09-10: "we need this fixed for tonights game"; chose "Market-implied rating"]`: FAMU @ MIA (2026-09-10, 7:00 PM CDT) gets a `live_resim` lane in the NCAAF live lens, so its live game lines attach on the served board, read as `live_gamelines.index_size >= 1` with FAMU @ MIA rows carrying a `live_gameline` block during the game.
 - Cause, measured on production 2026-09-10 ~14:28 CDT: `/api/ops/live-lens/snapshot-index?sport=ncaaf` had 49 games and no FAMU @ MIA. The generator projects FBS-vs-FBS only (`generate_smartsim2_ncaaf_projections.py:1023`, `SKIPPED_NOT_FBS_VS_FBS`), and `live_resim._ratings_for` refuses an unrated side (`no_pregame_ratings`, by design: no neutral default).
 - Method (ESTIMATOR, not a mechanism — no re-fit obligation under `model_engine_standard.md` §4.4): for a live-index game with exactly one SP+-rated side, back the unrated side's SP+ components out of the market's PREGAME spread and total with SP+'s own additive form (expected points = own offense + opponent defense - league mean), then run them through the generator's `sp_offense_defense_rating` centring. The pregame line is ESPN's scoreboard odds, captured only while the game is `pre`, persisted in the tick's keyvalue status, and never read from a live quote. Every such lane is stamped `ratingSource: market_implied` with the line it came from. Absent line → refused `no_pregame_line` by name. Default ON, `SYNDICATE_NCAAF_FCS_MARKET_IMPLIED=off` turns it off without a deploy of code.
-- Files: `syndicate/features/ncaaf/live_resim.py`, `scripts/run_refresh_worker.py` (the NCAAF live re-sim tick only), `tests/test_ncaaf_fcs_market_implied_rating.py` (NEW), `tests/test_ncaaf_live_state_capture_dates.py` (NEW)
+- Files: `syndicate/features/ncaaf/live_resim.py`, `tests/test_ncaaf_fcs_market_implied_rating.py` (NEW), `tests/test_ncaaf_live_state_capture_dates.py` (NEW)
+  released: `scripts/run_refresh_worker.py` (had: the NCAAF live re-sim tick only) **[RELEASED 2026-09-14 ~00:45Z to `heavy-build-memory-refusal` (session 0f5b256e), user decision "Approve, default ON at 15"; this lane is UNOWNED and its tick code is landed]**
   released: `syndicate/features/ncaaf/cards.py` (`_ncaaf_week_espn_capture_dates` + `_attach_live_state`'s index call) **[RELEASED 2026-09-11 to `ncaaf-tbd-kickoff-date` (session 53eaee9c), user decision "Take claims, fix + deploy"; this lane's session df26ac0c is archived and its `cards.py` change is landed (`48621d65`)]**
 - Hypothesis: n/a — not diagnostic.
 - Falsification test: with the flag off the tick's snapshot must be byte-identical to today's (FBS-only); with it on, an FBS-vs-FCS live game must gain exactly one `live_resim` lane stamped `market_implied`, and an FBS-vs-FBS game's lane must be unchanged. A game with no captured pregame line must refuse by name, never price.
@@ -916,7 +917,7 @@ death, never life — do not invert it.
   - Fix proposed and, by user decision, landed as `cb248a95`: fast-path capture from cached markets. **NOT deployed.** It ships in scheduled task `book-quotes-fuller-copy-deploy-0914` (23:50 CT, cutoff Mon 09-14 11:00 CT).
   - Lane stays OPEN for the fix readings: `kalshi_capture=joined` after boot, then `QUOTE_CAPTURE` during a refused-heavy-build stretch.
 - Goal: explain why Kalshi NFL quotes on the served NFL grid carried `observed_at` 2026-09-12 21:20Z until 2026-09-13 17:33Z. Say which stage stalled (capture, append, transport or board read) and whether it recurs without a full disk. Propose a fix only if it can recur. Read-only on production until the user approves a change.
-- Files: `pipeline/intelligence_state.py` (`_refresh_layer2_shortlist_only` Kalshi capture only; TAKEN 2026-09-13 ~23:00Z from `layer2-prior-date-live-carryover`, user decision "Capture on lightweight rebuild"), `tests/test_layer2_fast_refresh.py` (Kalshi capture tests only). Mirrored into the primary checkout's `lanes.md`.
+- Files: `tests/test_layer2_fast_refresh.py` (Kalshi capture tests only). MOVED 2026-09-14 ~00:50Z: its intelligence-state module claim went to lane heavy-build-memory-refusal (same session; this lane's code cb248a95 is landed and owes readings only). Mirrored into the primary checkout's lanes.md.
 - Origin: lead from closed lane `refresh-worker-disk-inventory`. User decision 2026-09-13 ~19:40Z: "Kalshi NFL staleness (Recommended)".
 - **Measured before hypotheses** (refresh-worker, `[kalshi_odds] QUOTE_CAPTURE`, 09-12 20:00Z..09-13 18:30Z):
   - 15 lines; live-odds-worker has none.
@@ -986,8 +987,29 @@ death, never life — do not invert it.
   - **User decision 2026-09-13 ~19:25 CT: "Self-restart when stuck (Recommended)".** refresh-worker restarts its own process when the heavy build is refused N times in a row AND no refresh jobs are in flight (same test as the deploy preflight). Constraint kept: `state.md [user-decisions]` 2026-08-16, no plan bump.
   - Not chosen: find what holds the 2.3 GB; lower the floor to ~1,450 MB (a max delta of 1,416 would leave ~480 MB); leave as is.
   - Next: the design (files, counter placement, restart mechanism, job test), claimed before any edit. Code, tests and any deploy each come back to the user.
+- **STATUS 2026-09-14 ~01:15Z (20:15 CT, 09-13): CODE WRITTEN + TESTED, not yet landed or deployed.** User decision ~19:40 CT: "Approve, default ON at 15 (Recommended)".
+  - `syndicate/features/shared/worker_recycle.py` (NEW):
+    - `note_heavy_build_guard(refused)` keeps a consecutive-refusal counter; any admitted build resets it.
+    - `recycle_decision(...)` returns True only when refusals >= `SYNDICATE_REFRESH_WORKER_RECYCLE_AFTER_REFUSALS` (default 15; 0 or negative disables; junk -> 15), uptime >= `SYNDICATE_REFRESH_WORKER_RECYCLE_MIN_UPTIME_SECONDS` (default 1800), no live non-zombie child of the worker pid (`/proc/<pid>/stat` ppid scan; unreadable table -> `children_unknown`, refuses), and no deploy drain (`deploy_drain.drain_active`).
+    - `maybe_recycle(parent_pid)` logs `[worker_recycle] RECYCLE_CHECK held=<reason>` once per change at or over threshold, and `RECYCLE_EXIT reason=heavy_build_refused` when it fires.
+  - `pipeline/intelligence_state.py`: the `pre_source_state_fingerprint` guard result feeds `note_heavy_build_guard` (try/except; the build path is unchanged).
+  - `scripts/run_refresh_worker.py`: before `time.sleep(poll_seconds)`, `maybe_recycle(parent_pid=os.getpid())` -> `return 0` (process exits; every background thread is `daemon=True`; Render restarts the service).
+  - Tests:
+    - `tests/test_worker_recycle.py` 18 passed. With `test_layer2_fast_refresh*.py` and `test_layer2_prior_date_carryover.py`: 53 passed.
+    - Unwired check PASS: HEAD `intelligence_state.py` fails `test_refused_guard_increments_the_counter`; HEAD `run_refresh_worker.py` fails `test_main_loop_asks_maybe_recycle_before_sleeping`. Bytes restored identical.
+    - `tests/test_refresh_worker.py` (70 tests), 2026-09-14 ~04:30-04:40Z:
+      - Full in-process runs died silently twice: no pytest summary; the second recorded 61 results, 58 passed / 3 failed.
+      - The 3 failures reproduce identically on a clean origin/main (`58618252`) worktree, so they are pre-existing: `test_bootstrap_soccer_player_seed_files_backfills_missing_leagues_only`, `test_bootstrap_soccer_schedule_seed_files_backfills_missing_leagues_only`, `test_soccer_history_seed_bootstrap_copies_match_history` (need the git-tracked data mirror).
+      - The 9 unreached tests each pass in their own process, on this change AND with HEAD's two hooked files swapped in (bytes restored identical).
+      - **Unverified:** why the single-process full run dies after ~61 tests. It was not reproduced on HEAD as a full run.
+  - Verification owed after a refresh-worker deploy:
+    - no `RECYCLE_EXIT` while builds are admitted;
+    - during a refusal stretch, `RECYCLE_CHECK held=...` then `RECYCLE_EXIT` once >= 15 consecutive `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` with no children;
+    - a Render restart event within ~1 min of it;
+    - `CANDIDATE_POOL` / `PORTFOLIO_COMMIT` resuming after boot;
+    - no restart loop (min uptime holds).
 - Goal: explain why refresh-worker's heavy board build (candidate pool, board publication, portfolio commit / paper orders) was refused by `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` for ~16 h (2026-09-12 21:34Z .. 2026-09-13 13Z) with unreclaimable headroom ~1,810 MB. Measure what the build actually needs against that floor and what holds ~2.3 GB unreclaimable. Then bring the user options with numbers (retarget/lower the check, cut the build's cost, or add memory). Read-only on production; no code or deploy without the user's OK.
-- Files: none claimed (read-only diagnostic).
+- Files: `syndicate/features/shared/worker_recycle.py` (NEW), `tests/test_worker_recycle.py` (NEW), `pipeline/intelligence_state.py` (refusal-counter hook in `_compute_board_publication_response`; also holds the `_refresh_layer2_shortlist_only` Kalshi capture moved from `kalshi-nfl-quote-gap`), `scripts/run_refresh_worker.py` (main-loop recycle check; TAKEN 2026-09-14 ~00:45Z from UNOWNED `ncaaf-fcs-market-implied-rating`). User decision 2026-09-13 ~19:40 CT: "Approve, default ON at 15 (Recommended)".
 - Origin: finding in lane `kalshi-nfl-quote-gap` (above). User decision 2026-09-13 ~17:55 CT: "Open a diagnostic lane (Recommended)".
 - Measured so far (refresh-worker logs):
   - 403 `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` 09-12 21:34Z..09-13 16:14Z. 21:34Z snapshot: current 3,531.7 MB, unreclaimable 2,288.7 MB (anon 2,281.2), reclaimable file 1,243.0, headroom 1,807.3.

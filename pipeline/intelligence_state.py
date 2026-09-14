@@ -7870,7 +7870,18 @@ class IntelligenceStateService:
             log_heap_census("pre_source_state_fingerprint", min_container_mb=1200.0)
         except Exception:
             pass
-        if _abort_build_candidate_pool_if_memory_critical("pre_source_state_fingerprint"):
+        _heavy_build_refused = _abort_build_candidate_pool_if_memory_critical("pre_source_state_fingerprint")
+        # Lane `heavy-build-memory-refusal`: count consecutive refusals so the
+        # worker's main loop can restart a process stuck above this floor (the
+        # 2026-09-12/13 16-hour refusal cleared only on restarts). Recording is
+        # instrumentation and must never change the build's own path.
+        try:
+            from syndicate.features.shared.worker_recycle import note_heavy_build_guard
+
+            note_heavy_build_guard(bool(_heavy_build_refused))
+        except Exception:
+            pass
+        if _heavy_build_refused:
             # THE REFUSAL IS SPLIT HERE, and this is the whole change.
             #
             # This guard refuses the Layer 1 pool build, correctly -- it is

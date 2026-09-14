@@ -7769,6 +7769,16 @@ def main() -> int:
                 refresh_cycle=refresh_cycle,
             )
             return 0
+        # Lane `heavy-build-memory-refusal`: exit (Render restarts the service)
+        # when the heavy build has been refused many cycles in a row and nothing
+        # a restart could kill is running. See `worker_recycle` for the rules.
+        try:
+            from syndicate.features.shared.worker_recycle import maybe_recycle
+
+            if maybe_recycle(parent_pid=os.getpid()):
+                return 0
+        except Exception as exc:
+            print(f"[refresh_worker] RECYCLE_CHECK_FAILED {type(exc).__name__}: {exc}", flush=True)
         time.sleep(poll_seconds)
 
 
