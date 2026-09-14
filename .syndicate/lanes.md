@@ -1532,6 +1532,29 @@ death, never life — do not invert it.
     3. v2 runs with `SYNDICATE_NCAAF_SOURCE_ROOT` pointed at the primary checkout's `data/ncaaf_source`.
   - HYPOTHESIS for v2 (H-live): the MLB prop losses sit mainly in LIVE sightings; PREGAME MLB hitter props read parity.
     - FALSIFIED IF pregame hitter-prop buckets validate a loss of similar size (Brier diff >= +0.004) on >= 60 games.
+- PREVIEW v2 READING `[same window, commit b0dbdb78 landed in ca40dba1, NCAAF registry from the primary checkout, finished ~20:05Z]`: 66,385 graded rows / 547 games.
+  - Coverage by sport:
+    - MLB 56,047 rows / 188 games / 14 dates;
+    - NCAAF 8,480 / 176 / 8;
+    - NFL 423 / 15 / 3;
+    - soccer 1,435 / 168 / 14.
+    - NCAAF `no_chip_match` is now 4, so the registry fix worked.
+  - Verdicts: skill_loss 29, parity 102, insufficient 364; skill_pocket 0 (v1's HR "pocket" was a pooled-phase artifact); profit_pocket 0.
+  - EVERY validated loss is PREGAME:
+    - MLB RBIs (+0.0054 on 187 games, ROI -7%), total bases (+0.005..+0.008, ROI -1..-6%), HRR (+0.0047..+0.0068), hits (books 1-2, +0.0042);
+    - one-sided HR pricing (ROI -28%), strikeouts (+0.02, ROI -23%), walks allowed (+0.015, ROI -19%);
+    - soccer h2h price=long (+0.0076).
+  - H-live is FALSIFIED: pregame hitter-prop buckets validate losses >= +0.004 on 181-187 games.
+  - Predictions: (1) HELD, 0 pockets. (2) HELD: soccer h2h is a loss, and NCAAF has no validated bucket either way. (3) FALSIFIED again, now pregame.
+  - READ AS: in the PUBLISHED pregame MLB prop population, the model's side loses to the de-vigged market.
+    - The registry's parity (full projection population) and a loss on the published subset are both expected if publication selects the model's largest disagreements (winner's curse).
+    - This is a PREVIEW and cannot set a factor. The test is the recorder's pre-publication population, from 2026-09-19.
+  - COVERAGE GAPS in v2:
+    - MLB game lines grade on only 7 of 14 dates (totals 69 games, spreads 82, h2h 49): `final_score_unparseable` 2,701, all MLB.
+      - CAUSE: `/api/board/game-chips` serves past MLB dates' finals with `away.score` / `home.score` null. 09-02: 15 of 15 finals; 09-10: 5 of 5, and only 5 MLB chips that day. Filed as a lead; the live scorecard has the same blind spot.
+      - CORRECTION, PRE-REGISTERED BEFORE v3 IS READ: an MLB game line whose chip is missing or scoreless settles from the StatsAPI schedule's final score for the matched game, using the prop grader's own team/start matching. A chip that says not-final still counts `game_not_final`.
+    - soccer `no_chip_match` 710.
+    - MLB props: `prop_player_not_in_boxscore` 3,124 (void), `prop_no_commence_time` 1,169.
   - The first real search: >= 5 dates of recorder data with finals, i.e. no earlier than 2026-09-19.
   - Live-row notes on tonight's MLB slate (first pitch 22:40Z).
 - Blocked by: none.
