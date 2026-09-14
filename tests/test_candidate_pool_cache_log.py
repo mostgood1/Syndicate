@@ -1,4 +1,4 @@
-"""CANDIDATE_POOL_CACHE: what refresh-worker's candidate-pool cache weighs.
+"""CANDIDATE_POOL_CACHE: what refresh-worker's candidate-pool cache weighs, and its cap.
 
 Lane heavy-build-child-process, hypothesis H-cache. refresh-worker's main
 process keeps ~2.2 GB after its first full build, and `_candidate_pools` holds
@@ -6,18 +6,25 @@ up to `_max_snapshots` full pools trimmed by COUNT only -- nothing recorded what
 those entries weigh. The line these tests pin is the instrument that answers it,
 so it must (a) actually be called from the build's return path, (b) report the
 cache total, not just this pool, and (c) never break a build.
+
+`SYNDICATE_CANDIDATE_POOL_CACHE_MAX` is the test lever: unset it must leave the
+cache exactly as it was, and set it must actually bound what is kept.
 """
 
 from __future__ import annotations
 
 import inspect
 import json
+import os
 import re
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
+from unittest.mock import patch
 
 from pipeline.intelligence_state import IntelligenceStateService
+
+_CAP_ENV = "SYNDICATE_CANDIDATE_POOL_CACHE_MAX"
 
 
 def _cache_line(output: str) -> dict[str, str]:
@@ -27,9 +34,17 @@ def _cache_line(output: str) -> dict[str, str]:
     return dict(re.findall(r"(\w+)=(\S+)", lines[0]))
 
 
+def _service_with_env(value: str | None) -> IntelligenceStateService:
+    environ = {key: val for key, val in os.environ.items() if key != _CAP_ENV}
+    if value is not None:
+        environ[_CAP_ENV] = value
+    with patch.dict(os.environ, environ, clear=True):
+        return IntelligenceStateService()
+
+
 class CandidatePoolCacheLogTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.service = IntelligenceStateService()
+        self.service = _service_with_env(None)
 
     def _log(self, key: str, pool: dict, *, cached: bool) -> dict[str, str]:
         serialized = json.dumps(pool, default=str)
@@ -48,7 +63,7 @@ class CandidatePoolCacheLogTests(unittest.TestCase):
 
         self.assertEqual(fields["cached"], "True")
         self.assertEqual(fields["entries"], "2")
-        self.assertEqual(fields["limit"], str(self.service._max_snapshots))
+        self.assertEqual(fields["limit"], str(self.service._candidate_pool_cache_max))
         self.assertEqual(int(fields["pool_json_bytes"]), len(json.dumps(second)))
         self.assertEqual(int(fields["cache_json_bytes"]), len(json.dumps(first)) + len(json.dumps(second)))
 
@@ -79,6 +94,34 @@ class CandidatePoolCacheLogTests(unittest.TestCase):
         self.assertIn("CANDIDATE_POOL_CACHE_LOG_FAILED", buffer.getvalue())
 
 
+class CandidatePoolCacheCapTests(unittest.TestCase):
+    def test_unset_keeps_the_old_cap(self) -> None:
+        service = _service_with_env(None)
+        self.assertEqual(service._candidate_pool_cache_max, service._max_snapshots)
+        for key in [f"k{i}" for i in range(service._max_snapshots + 3)]:
+            service._cache_candidate_pool(key, {"candidate_count": 1})
+        self.assertEqual(len(service._candidate_pools), service._max_snapshots)
+
+    def test_set_to_two_keeps_only_the_newest_two(self) -> None:
+        service = _service_with_env("2")
+        for key in ("a", "b", "c", "d"):
+            service._cache_candidate_pool(key, {"candidate_count": 1})
+        self.assertEqual(list(service._candidate_pools), ["c", "d"])
+
+    def test_off_and_on_differ(self) -> None:
+        # Reachability before correctness: a knob that reads but never bites
+        # would pass the two tests above only by coincidence of defaults.
+        keys = [f"k{i}" for i in range(6)]
+        unset, capped = _service_with_env(None), _service_with_env("2")
+        for key in keys:
+            unset._cache_candidate_pool(key, {"candidate_count": 1})
+            capped._cache_candidate_pool(key, {"candidate_count": 1})
+        self.assertNotEqual(len(unset._candidate_pools), len(capped._candidate_pools))
+
+    def test_never_below_one(self) -> None:
+        self.assertEqual(_service_with_env("0")._candidate_pool_cache_max, 1)
+
+
 class CandidatePoolCacheWiringTests(unittest.TestCase):
     def test_build_candidate_pool_logs_the_serialization_it_returns(self) -> None:
         # The build's full path needs mirror data and network, so the wiring is
@@ -88,6 +131,12 @@ class CandidatePoolCacheWiringTests(unittest.TestCase):
         tail = source[source.rindex("serialized_pool = json.dumps(pool, default=str)"):]
         self.assertIn("self._log_candidate_pool_cache(selected_date, cache_key, serialized_pool", tail)
         self.assertTrue(tail.rstrip().endswith("return json.loads(serialized_pool)"))
+
+    def test_build_candidate_pool_stores_through_the_capped_helper(self) -> None:
+        source = inspect.getsource(IntelligenceStateService._build_candidate_pool)
+        self.assertIn("self._cache_candidate_pool(cache_key, pool)", source)
+        self.assertNotIn("self._candidate_pools[cache_key] = pool", source)
+        self.assertNotIn("_trim_ordered_dict(self._candidate_pools", source)
 
 
 if __name__ == "__main__":

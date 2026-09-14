@@ -990,6 +990,23 @@ death, never life — do not invert it.
     - **First production reading:** `CANDIDATE_POOL_CACHE date=2026-09-14 cached=True entries=1 limit=12 pool_json_bytes=19717698 cache_json_bytes=19717698` at 17:43:04Z.
     - One 09-14 pool is **19.7 MB of JSON**. Twelve of that size would be ~236 MB of JSON, which is above the falsification line (~200 MB). But builds alternate with small 09-15 pools (count 14), so the total at the cap is NOT yet measured.
     - The JSON-to-live-memory multiplier is also unmeasured. A background watch (to >= 4 entries, 90 min cap) pairs each line with pid 39 RSS.
+  - **GROWTH READING 18:15Z (4 entries, `scratchpad/pool_cache_growth.py`):**
+    - 17:43:04Z 09-14 pool 19.7 MB / cache 19.7 MB / pid 39 RSS min in next 5 min 1,133 MB (child jobs 775 MB).
+    - 17:54:16Z 09-15 6.2 / 25.9 / 1,190 (+57) (426).
+    - 18:04:26Z 09-14 19.6 / 45.5 / 1,373 (+183) (293).
+    - 18:14:24Z 09-15 6.3 / 51.8 / 1,524 (+151) (0).
+    - **Projected cache JSON at the 12-entry cap ~156 MB** (6 x 19.7 + 6 x 6.3). That is under the pre-registered ~200 MB line but not "well under", so NOT falsified.
+    - **pid 39 grew +391 MB while cache JSON grew +32 MB** over builds 2-4 (~12x). JSON also double-counts: the pool stores the same list under `global_pool` and `candidates` (`intelligence_state.py:7070-7071`), so live memory per JSON byte is higher still.
+    - Build 4 added 6.3 MB JSON with +151 MB RSS. The cache is at most PART of the tail; passive reading cannot size it.
+    - Do NOT use `SYNDICATE_INTELLIGENCE_MAX_SNAPSHOTS` for the cap test: it also trims `_watched_payloads` (`:7157`, `:7246`), whose production size is unmeasured.
+  - **USER DECISION ~18:20Z (13:20 CT): "Cap pool cache at 2, measure (Recommended)".**
+    - Code: env `SYNDICATE_CANDIDATE_POOL_CACHE_MAX` (default `_max_snapshots`, so unchanged until set; floor 1); cache write moved to `_cache_candidate_pool`; `CANDIDATE_POOL_CACHE limit=` reports the real cap.
+    - Offline: 10 tests pass on the edit. Against HEAD's file 6 fail (cap, limit, wiring) and 4 pass (log-only). The existing `-k "candidate_pool or malloc or cache"` run: 28 passed, and the same 2 `data/`-guard teardown errors as before the change.
+    - Then: set the env to 2 on refresh-worker (single-key PUT), and deploy main's tip at the first preflight CLEAR (blast radius re-read at deploy time).
+    - At 18:21Z the claim was held by accuracy-assessment-0914 (since 18:09:35Z), which deployed `ae53a1a5` live 18:18:10Z; that reboot also reset the recycle clock.
+    - **Prediction (written before the deploy):** if H-cache carries the tail, pid 39 RSS after builds 3-6 stays near the value after builds 1-2 (the 2-entry cache is full by then), instead of today's +150-180 MB per build (1,133 -> 1,190 -> 1,373 -> 1,524 MB).
+    - **Falsified if** the per-build growth after build 2 is within ~+/-50 MB of today's curve.
+    - Confound to report, not remove: child-job RSS (0-886 MB) moves container memory but not pid 39. Compare pid 39 only.
 
 ### heavy-build-memory-refusal — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - DECISION 2026-09-14 ~15:10Z (10:10 CT): user chose "Restart at 1 + build isolation lane (Recommended)".

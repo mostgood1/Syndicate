@@ -4807,6 +4807,11 @@ class IntelligenceStateService:
         # canonical builds.
         self._board_state_drain_thread: threading.Thread | None = None
         self._candidate_pools: OrderedDict[str, dict[str, Any]] = OrderedDict()
+        # How many full pools to keep. The default is `_max_snapshots`, i.e. the
+        # behaviour this cache always had. Lane heavy-build-child-process sets it
+        # low on refresh-worker to test whether this cache is what the main
+        # process keeps after builds (19.7 MB of JSON per 09-14 pool, measured).
+        self._candidate_pool_cache_max = max(1, _env_int("SYNDICATE_CANDIDATE_POOL_CACHE_MAX", self._max_snapshots))
         # Serialized size per cached pool, for CANDIDATE_POOL_CACHE only. Lane
         # heavy-build-child-process, hypothesis H-cache: the pool cache is
         # trimmed by COUNT, and nothing records what those entries weigh.
@@ -7090,13 +7095,17 @@ class IntelligenceStateService:
             # run fresh on a freshly-restarted process, produced 72 real
             # candidates. Not caching empty results means a bad early read
             # just gets retried next cycle instead of sticking forever.
-            with self._condition:
-                self._candidate_pools[cache_key] = pool
-                self._candidate_pools.move_to_end(cache_key)
-                self._trim_ordered_dict(self._candidate_pools, self._max_snapshots)
+            self._cache_candidate_pool(cache_key, pool)
         serialized_pool = json.dumps(pool, default=str)
         self._log_candidate_pool_cache(selected_date, cache_key, serialized_pool, cached=pool["candidate_count"] > 0)
         return json.loads(serialized_pool)
+
+    def _cache_candidate_pool(self, cache_key: str, pool: dict[str, Any]) -> None:
+        """Store a built pool, keeping only the newest `_candidate_pool_cache_max` entries."""
+        with self._condition:
+            self._candidate_pools[cache_key] = pool
+            self._candidate_pools.move_to_end(cache_key)
+            self._trim_ordered_dict(self._candidate_pools, self._candidate_pool_cache_max)
 
     def _log_candidate_pool_cache(self, selected_date: str | None, cache_key: str, serialized_pool: str, *, cached: bool) -> None:
         """Print what the candidate-pool cache weighs after this build.
