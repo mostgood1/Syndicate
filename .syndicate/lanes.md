@@ -1249,6 +1249,11 @@ death, never life — do not invert it.
   - The biased book-agnostic scope reads +1.35% / 66.4% (n 3,180): the best-of-N effect the endpoint names.
   - 1,199 of 3,081 unresolved are `segment_absent_from_history`.
   - The 14-day x 4-sport sweep is deferred until the agents stop loading web.
+- USER DECISION `[2026-09-14, in chat]`: "yes, take the claims if needed".
+  - Asked about files held by lanes whose sessions are archived: `mlb-stop-publishing-edges` (`live_gameline_join.py`) and `restore-measurement` (graders).
+  - Scope: a claim is taken only when a measurement from this lane calls for an edit in that file.
+  - Each transfer is recorded in BOTH lanes' blocks and in the PRIMARY `lanes.md` (learnings 2026-09-11 REQUIRED).
+  - This does NOT cover deploys, which still need their own approval.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
