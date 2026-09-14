@@ -34731,3 +34731,44 @@ Source: refresh-worker logs, `render_logs.py --text "PUBLISH_FAILED path="`, ses
   - ~62/50 min is about the old rate's low end or below. It is not a rise.
 - **Web:** no deploy since `822ee0ba` (live 09-13 15:07:20Z), and the only event since 13:00Z is `server_available` 13:42:35Z. The 503s are web refusing publishes (the known merge-capacity lead, unassigned), not web restarting.
 - **(b) fuller copy:** `LATEST_CACHE_EVICT` is now present (14:31:28-14:31:46Z). The evicted paths are all `.jsonl` for non-affected dates (soccer 09-14..09-19, mlb 09-14). No affected date (mlb 09-03..09-09, ncaaf 09-05, soccer 08-22..09-09) has been read yet, so (b) is still owed, not failed.
+
+## 2026-09-14 14:54Z -- reading -- refresh-worker `fb0c91cf` -- lane `layer2-prior-date-live-carryover` -- R2 MET
+
+Read-only reading by scheduled task `layer2-carryover-roll-reading-0914`, taken 14:54Z (09:54 CDT). Nothing was deployed and no env var was changed.
+
+**STEP 0: the code is on the loop path, checked by content.**
+- `fleet_live_commits` at ~14:51Z (09:51 CDT):
+  - web `822ee0ba`, live 2026-09-13 15:07:20Z.
+  - refresh-worker `fb0c91cf`, live 2026-09-14 13:39:48Z (08:39 CDT).
+  - live-odds-worker `54f3d662`, live 2026-09-13 23:24:15Z.
+- `git show fb0c91cf:pipeline/intelligence_state.py` has 2 matches for `_maybe_carry_over_prior_date_layer2`.
+- **The roll ran on an earlier commit, `cae4713e`.** refresh-worker was on `cae4713e` at 05:00Z; `fb0c91cf` went live 8h40m later. `cae4713e` has the same 2 matches, so the 05:00Z decision came from the carryover code.
+
+**STEP 1: the roll at 2026-09-14 05:00:00Z (00:00 CDT).**
+- `render_logs --text "LAYER2_CARRYOVER"`, 04:50-11:00Z: 1 match over 2 pages, exactly this line:
+  `2026-09-14T05:00:22.272446389Z  [intelligence_state] LAYER2_CARRYOVER date=2026-09-13 decision=skip reason=nothing_live_at_last_build hours_since_roll=0.01 max_hours=6.0 live_rows=0 chips_live=0`
+  - **R2 PASS:** a `date=2026-09-13` line at 05:00:22Z (00:00:22 CDT), 22 s after the roll, carrying both a decision and a reason.
+  - Distinct (decision, reason): only `(skip, nothing_live_at_last_build)`, first and last at 05:00:22Z.
+  - Why only one line: the skip branch logs with `once=True` (`_maybe_carry_over_prior_date_layer2` on `fb0c91cf`). That fits the single R1 line.
+- **The window was covered.** `# COVERED` spans matches only, so one match does not prove coverage by itself. A same-window probe, `--text "LAYER2_FAST_REFRESH"` 04:50-11:00Z, covered 04:52:58Z..10:58:57Z with 161 matches over 3 pages.
+- `LAYER2_CARRYOVER_FAILED`, 04:50-11:00Z: nothing matched (1 page).
+- **decision=built: none.** So no rows, live_rows_now, chips_live_now or elapsed_s to report, and no later `nothing_live_at_last_build` or `past_cap` line after a build.
+- **The skip was correct.** 09-13's last build before the roll had nothing live:
+  `2026-09-14T04:57:07.635553196Z  [intelligence_state] LAYER2_FAST_REFRESH date=2026-09-13 rows=1323 live_rows=0 chips_live=0 considered=7132 sports=['ncaaf', 'nfl', 'soccer'] elapsed_s=106.85`
+  (04:57:07Z = 23:57:07 CDT.)
+- **Reachability MET.** `LAYER2_FAST_REFRESH date=2026-09-13` carries `live_rows=` and `chips_live=`, which the 16:23:12Z section listed as NOT YET SEEN. Readings over 03:00-11:00Z (covered 03:04:58Z..04:57:07Z, 14 matches):
+  - 03:04:58Z: `rows=328 live_rows=62 chips_live=2` (the last build with anything live).
+  - 03:37:35Z: `rows=164 live_rows=0 chips_live=0`.
+  - The 12 builds from 03:43:21Z to 04:57:07Z all read `live_rows=0 chips_live=0` (rows 1263-1332).
+  - DAL@NYG ended before the roll, so no game on 09-13 was live across midnight CT.
+
+**STEP 2: the served artifact.**
+- `GET /api/board/layer2-shortlist?sport=all&date=2026-09-13&limit=2000`. The first attempt returned Cloudflare `error code: 520`; a retry answered at 14:52:27Z (09:52 CDT).
+- `written_at` 2026-09-14T04:57:07Z (23:57:07 CDT 09-13), `build_age_seconds` 35719.1. The payload matches the 04:57:07Z fast-refresh line.
+- Rows: 1,323 in total. By `game_state`: 0 live, 1,155 pregame, 168 empty.
+- `rows_live_state_stale` 0.
+- **09-13 was NOT rebuilt after the roll.** That is correct: the carryover skipped because nothing was live.
+
+**verify: R2 MET.** At the 09-14 roll, refresh-worker made the carryover decision for the prior date within 22 s. It skipped for the right reason (the last build had 0 live rows and 0 live chips) and did not rebuild a finished slate. This exercises only the skip branch. **`decision=built` has never been seen in production.**
+- **R3 is still OWED:** a game live across midnight CT, where the carryover should build and `written_at` should move past 05:00Z. It belongs to tasks `layer2-carryover-crossing-reading-0915`, `-0919` and `-0920`.
+- The lane stays OPEN.
