@@ -1345,7 +1345,7 @@ death, never life — do not invert it.
   - Session narrative: `.syndicate/log/2026-09-14.md`.
 - Blocked by: none.
 
-### brand-logo-v3 — OPEN — opened 2026-09-14 — session 08fb3eec-6daf-4680-a64d-bd7f914ad2e7
+### brand-logo-v3 — CLOSED — opened 2026-09-14, closed 2026-09-14 — session 08fb3eec-6daf-4680-a64d-bd7f914ad2e7
 - Goal: the new combined Syndicate logo (mascot + S swoosh + lettering, 1536x1024 opaque, from the user 2026-09-14) is what renders in the header on every page, the four crest hero slots, the apple-touch/PWA icons and the og/twitter card; the S favicon is KEPT `[user decision 2026-09-14: the full art was measured mud at 16/32px on 09-09]`.
 - Files: syndicate/templates/shared/base.html, syndicate/templates/shared/_standalone_app_header.html, syndicate/static/shared/app.css, syndicate/static/shared/standalone_shell.css, syndicate/templates/syndicate.html, syndicate/templates/market_board_hub.html, syndicate/templates/errors/error.html, syndicate/templates/intelligence_status.html, syndicate/static/shared/manifest.json, syndicate/static/shared/syndicate-brand-header.jpg, syndicate/static/shared/syndicate-wordmark.png, syndicate/static/shared/syndicate-brand-hero.jpg, syndicate/static/shared/syndicate-icon-180.png, syndicate/static/shared/syndicate-icon-192.png, syndicate/static/shared/syndicate-icon-512.png, syndicate/static/shared/syndicate-social.jpg, syndicate/static/shared/apple-touch-icon.png, syndicate/static/shared/syndicate-og.jpg, syndicate/static/shared/syndicate-crest.jpg, syndicate/static/shared/syndicate-mascot.png, syndicate/static/shared/syndicate-mascot-192.png, syndicate/static/shared/syndicate-logo.svg, scripts/build_brand_assets.py, docs/brand/syndicate-logo-source.png, docs/brand/syndicate-mascot-source.png, tests/test_error_pages.py, tests/test_coverage_report_artifact.py, tests/test_brand_assets.py, .syndicate/state_ui.md
 - Hypothesis: n/a (not diagnostic)
@@ -1400,6 +1400,17 @@ death, never life — do not invert it.
       - 1100: hidden (slot 34), 1/1. 900: hidden, 2/2. 400: hidden, 4/4.
     - 0 PARTIAL states, 0 pills overlapping, and scroll == client at all 13 readings.
   - The desktop app stopped the preview server once mid-reading, after 5 min. The remaining readings were retaken on a restarted server.
+  - **DEPLOYED** as `c9cc175b`, riding `ff7ec8be`, to web. Live 22:34:48Z. **MET on production** (8 readings, `deploys.md`):
+    - Shown whole at 1920 on both headers and at 1440 standalone.
+    - Hidden at 1500, 1440, 900 and 400 on the main pages, and at 400 standalone.
+    - 0 partial states. Pill rows equal the force-hidden control everywhere.
+    - At 1500 on the main pages it is hidden in production (slot 264) where it showed locally (slot 273). That is the fit rule working, not a regression.
+- **CLOSED 2026-09-14 — GOAL MET.**
+  - The new logo renders in the header, inline on the menu row, in the four hero panels, the apple-touch/PWA icons and the social card. Whole and never cropped.
+  - The S favicon is kept.
+  - The silver lettering shows beside the logo where it fits.
+  - The standalone header no longer scrolls sideways.
+  - Three web deploys, each MET in production: `dd3a4fda`, `70f44f05`, `ff7ec8be`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

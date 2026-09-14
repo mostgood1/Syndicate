@@ -5,6 +5,33 @@
 
 ---
 
+## 2026-09-14 5:34 PM CT — web `70f44f05` -> `ff7ec8be` (lane `brand-logo-v3`, user decisions "go with your recommendation" then "Deploy web now") — **MET: THE SILVER SYNDICATE LETTERING SHOWS BESIDE THE HEADER LOGO WHERE THE MENU ROW HAS ROOM AND IS HIDDEN WHERE IT DOES NOT. 0 partial states in 8 production readings, pill rows identical to the slot force-hidden in every one, no overflow.**
+
+**Deploy.** `dep-dak7b8u1egvs739d5o7g`, triggered 22:30:59Z. `/versionz` returned 502 from 22:33:06Z to 22:34:27Z and served `ff7ec8be` from 22:34:48Z (5:34 PM CT). Claim held by `brand-logo-v3` from 22:29:24Z. Preflight CLEAR at 22:30:34Z for `ff7ec8be` (infrastructure processes only, plus 2 defunct children).
+- **Ride-along: none.** `70f44f05..ff7ec8be` is `c9cc175b` plus the ledger-only `28d15a97` and `ff7ec8be`.
+  - `c9cc175b` is this change: `scripts/build_brand_assets.py`, `app.css`, `standalone_shell.css`, both header templates, `syndicate-wordmark.png`, `tests/test_brand_assets.py`.
+  - No `requirements*`, `render.yaml`, `wsgi.py` or `app.py` change.
+
+**Control** (22:30:39Z, web `70f44f05`): the served HTML of `/market-board` and `/mlb/market-accuracy` has 0 `syndicate-wordmark.png` and 0 wordmark-slot class. `/static/shared/syndicate-wordmark.png` returns 404.
+
+**Reading** (22:35:58–22:37:10Z, production, browser pane). Each cell gives the lettering state, then the menu's pill rows with the lettering vs with the slot force-hidden in the same instant. Every reading had the new CSS (nav `flex: 0 1 auto`), 0 pills overlapping and scrollWidth == clientWidth. The lettering image loaded at 521x58.
+
+| viewport | `/market-board` (base header) | `/mlb/market-accuracy` (standalone header) |
+|---|---|---|
+| 1920 | SHOWN whole, 42px to the first pill; 1/1 | SHOWN whole, 296px to the first pill; 1/1 |
+| 1500 | hidden (slot 264, needs 268); 1/1 | not read |
+| 1440 | hidden (slot 204); 1/1 | SHOWN whole, 87px to the first pill; 1/1 |
+| 900 | hidden; 2/2 | not read |
+| 400 | hidden; 5/5 | hidden; 4/4 |
+
+- **Production differs from the local reading at one point.** `/market-board` at 1500 is hidden here (slot 264) but was shown locally (slot 273), because the live pills are ~9px wider. That is the fit rule doing its job, not a regression. It puts the main-page threshold between 1500 and 1920 in production.
+- **NOT read on production:**
+  - `/mlb/market-accuracy` at 1500 and 900 (locally: shown, and hidden 2/2).
+  - No screenshot: the pane's capture timed out ("the page did not finish rendering in time"). The geometry above is the evidence.
+- verify: **MET.** The lettering is shown whole where the row has room (3 readings) and hidden where it does not (5). There are 0 partial states, and the pill-row count never differed from the force-hidden control.
+
+---
+
 ## 2026-09-14 5:12 PM CT — web `dd3a4fda` -> `70f44f05` (lane `brand-logo-v3`, user decision "Deploy web now") — **MET: THE STANDALONE APP HEADER NO LONGER SCROLLS THE PAGE SIDEWAYS. scrollWidth == clientWidth on `/mlb/market-accuracy` at 1440/900/400 and `/nba/market-accuracy` at 1440; before the deploy they read 1473, 933, 414 and 1473.**
 
 **Deploy.** `dep-dak70sqd0e5s73b84rlg`, triggered 22:08:51Z. `/versionz` returned 502 from 22:10:57Z to 22:12:18Z and served `70f44f05` from 22:12:38Z (5:12 PM CT). Claim held by `brand-logo-v3` from 22:07:45Z. Preflight CLEAR at 22:08:23Z for `70f44f05` (infrastructure processes only, plus 2 defunct children).

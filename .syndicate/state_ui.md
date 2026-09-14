@@ -462,7 +462,7 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
 
 ---
 
-## [brand-marks-and-error-pages] TWO BRAND MARKS, SPLIT BY RENDER SIZE — and the app finally has error pages `[verified 2026-09-09, lane brand-mascot-logo; logo replaced and verified in production 2026-09-14, lane brand-logo-v3, web dd3a4fda]`
+## [brand-marks-and-error-pages] TWO BRAND MARKS, SPLIT BY RENDER SIZE — and the app finally has error pages `[verified 2026-09-09, lane brand-mascot-logo; logo replaced and verified in production 2026-09-14, lane brand-logo-v3, web dd3a4fda; header lettering web ff7ec8be]`
 
 **THE LOGO** (`docs/brand/syndicate-logo-source.png`, 1536x1024: hooded mascot,
 crown, the green/blue S swoosh and its own "SYNDICATE" lettering) **is the brand**
@@ -474,6 +474,17 @@ crest, and owns every slot that renders at ~50px and up:
   on a phone, vertically centred, with the pills wrapping beside it and never
   under it. This covers both headers: `base.html`'s `.syndicate-menu-row` and the
   standalone app header (37 templates).
+  - **Beside the logo, the old wordmark's silver lettering** without its S
+    (`syndicate-wordmark.png`, 521x58, rendered 28px tall) appears ONLY where the
+    row has room `[user decision 2026-09-14]`.
+  - **How the fit works:** the nav keeps its one-line width
+    (`flex: 0 1 auto`), and the lettering's slot takes the leftover
+    (`flex: 1 1 0`). A zero-width first item plus a fixed-height clip make it
+    show whole or not at all. There is no breakpoint to go stale when a sport is
+    added.
+  - **Production, 2026-09-14:** shown at 1920 on both headers and at 1440 on
+    standalone pages. Hidden at 1500 and 1440 on base.html pages and on phones.
+    The menu never gained a row.
 - **The four hero panels** (`/syndicate`, market-board hub, error page,
   `/intelligence/status`): `syndicate-brand-hero.jpg` (960x640).
 - **`syndicate-icon-180/192/512.png`** (apple-touch and PWA) and
@@ -493,8 +504,8 @@ check can fail.
 (`favicon-48/32/16.png`, `favicon.ico`). The mascot art was measured unreadable
 at 32px and mud at 16px on 16/32/64/128/512 contact sheets (2026-09-09), and the
 logo is that art plus lettering. The S is the swoosh the logo is built around.
-`syndicate-logo.png` now feeds the favicons only (plus
-`scripts/controlled_transfer_probe.py`) and appears in no `<img>`. There is NO
+`syndicate-logo.png` now feeds the favicons and `syndicate-wordmark.png` (plus
+`scripts/controlled_transfer_probe.py`) and appears in no `<img>` itself. There is NO
 `favicon.svg`: a scalable icon needs the S re-vectorised first.
 
 **Every asset whose content changed was RENAMED** (crest to brand-hero, mascot
