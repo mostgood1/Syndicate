@@ -1511,6 +1511,27 @@ death, never life — do not invert it.
     2. Where a category loss is measured (NCAAF totals, soccer h2h), any validated bucket there is `skill_loss`, not `skill_pocket`.
     3. MLB hitter props (hits, total bases, RBIs, HRR) validate NO `skill_loss`, consistent with the registry's parity.
   - FALSIFIED IF a validated `skill_pocket` appears in a measured-loss category, or an MLB hitter prop validates a loss. Either is read first as a selection effect of publication, then as a finding.
+- PREVIEW v1 READING `[published openings 2026-08-31..09-14, commit 142543b5, finished ~19:50Z]`: 65,949 graded rows / 535 games / 15 dates.
+  - Verdicts: skill_pocket 1, skill_loss 31, parity 93, insufficient 522; profit_pocket 0.
+  - Against the predictions:
+    1. HELD. One pocket: `mlb|batter_home_runs|direction=against`, Brier diff -0.0005, with no model-side bet.
+    2. HELD for soccer h2h (`price=long` is a skill_loss). NCAAF not evaluable, see defect 2.
+    3. FALSIFIED. MLB hitter props validate losses:
+       - RBIs (4 buckets, +0.005, ROI -6%), total bases, HRR, hits;
+       - also strikeouts (+0.02, ROI -24%), walks allowed, outs, and one-sided HR pricing (ROI -28%).
+       - Read first, as pre-registered, as a selection effect of publication: admission selects the rows where the model disagrees, which is where its errors concentrate.
+  - DEFECTS in v1, found in the output BEFORE interpreting any bucket:
+    1. Every bucket's phase is `unknown`. The openings carry no `game_state` before 2026-09-12: 09-01 has 0 of 16,825, 09-13 has 11,438 of 15,787. So pregame and live sightings are pooled; on 09-01, 3,790 of 10,783 MLB openings were sighted after first pitch.
+    2. The session worktree has no `data/`, so NCAAF team matching ran without its registry (`TEAM_REGISTRY_EMPTY`).
+    3. Ungraded reasons were totals only, with no split by sport.
+  - CORRECTIONS, PRE-REGISTERED BEFORE v2 IS READ:
+    1. Phase falls back to WHEN the side was sighted: pregame if sighted before commence, else live. For a record that is `t` vs `ct`; for a candidate, score time vs `commence_time`. The game-state field wins when present.
+       - Validated where both exist (09-13 openings): MLB field-live 1,116 vs sighted-after-start 1,106; NFL 1,359 vs 1,359.
+       - It lives in `measured_bucket_skill._phase`, one definition for the search and the scorer. The table is empty, so deploy #3's behaviour is unchanged by it.
+    2. Ungraded reasons are counted per sport in the report.
+    3. v2 runs with `SYNDICATE_NCAAF_SOURCE_ROOT` pointed at the primary checkout's `data/ncaaf_source`.
+  - HYPOTHESIS for v2 (H-live): the MLB prop losses sit mainly in LIVE sightings; PREGAME MLB hitter props read parity.
+    - FALSIFIED IF pregame hitter-prop buckets validate a loss of similar size (Brier diff >= +0.004) on >= 60 games.
   - The first real search: >= 5 dates of recorder data with finals, i.e. no earlier than 2026-09-19.
   - Live-row notes on tonight's MLB slate (first pitch 22:40Z).
 - Blocked by: none.
