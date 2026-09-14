@@ -1460,6 +1460,24 @@ death, never life — do not invert it.
     - COORDINATION `[2026-09-14 ~19:00Z, lane heavy-build-child-process, session 0f5b256e]`: that lane deploys refresh-worker at `0a18557a` itself (a pool-cache cap). It does not deploy main's tip, which carries this lane's undeployed scorer/recorder code.
     - It needs its first ~6 heavy builds undisturbed, about 90 min from its live time. It will post "reading done" under `heavy-build-child-process`.
     - Before acquiring the refresh-worker claim for deploy #3, read that line or message the session. If the user's deploy cannot wait, deploy and tell them: 3-4 builds still give a partial reading.
+- USER DECISION `[2026-09-14, in chat]`: "Deploy #3 after their reading is done".
+  - Trigger: a new "reading done" line under `heavy-build-child-process` (watcher `watch_reading_done.py` in this session's scratchpad, polling origin/main every 3 min).
+  - Service: refresh-worker ONLY. `build_layer2_rows` has one caller, `pipeline/layer2_shortlist.py` on the worker, and no blueprint imports it. The recorder runs inside that same call.
+  - Commit: origin/main's tip at deploy time, re-enumerated then. At 19:10Z the code since refresh-worker's live `ae53a1a5` was `0a18557a` (the other lane's cap, deployed by them first) plus `e4ef34d4`, `bedb99b2`, `f7984e8a` (this lane). No `render.yaml`.
+- PREDICTION for deploy #3, written BEFORE any reading.
+  - Read on the first Layer 2 shortlist written after refresh-worker is live that carries MLB projections, and on recorder records written after live.
+  1. Scores do not move. The `skill_reliability` rows and factors follow the deploy #2 rule exactly: loss categories only, the same factors (ncaaf totals 0.514; ncaaf spreads/h2h 0.814; soccer h2h 0.877; mlb outs 0.877; mlb earned_runs 0.979; nfl totals 0.859; plus soccer/nfl spreads if rows exist).
+     - Every row carrying `skill_reliability` now also carries `skill_source: "category"`.
+     - 0 rows carry `skill_source: "bucket"`, because `measured_bucket_skill.json` is empty.
+  2. Recorder: game-market records (h2h/spreads/totals/btts) with `t` after live carry `ht` and `at` in >= 95% of cases in each of mlb, nfl, ncaaf and soccer; records with `t` before live carry them 0%.
+     - 09-14 only writes NEW keys after live, so the full reading is the first board date written entirely after live (09-15 CT).
+  3. Bucket search over 09-15 records: `no_team_names` is ~0 among started games, without a grid lookup for those records.
+  4. POPULATION lines continue once per sport per build. No new error lines from `layer2_board` or the recorder.
+  - FALSIFIED IF any of these:
+    - any row carries `skill_source: "bucket"`;
+    - any `skill_reliability` factor differs from its measured_market_skill value;
+    - a row with `skill_reliability` lacks `skill_source`;
+    - post-live game records carry `ht`/`at` in < 95% of cases.
   - The first real search: >= 5 dates of recorder data with finals, i.e. no earlier than 2026-09-19.
   - Live-row notes on tonight's MLB slate (first pitch 22:40Z).
 - Blocked by: none.
