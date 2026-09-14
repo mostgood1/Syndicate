@@ -34664,3 +34664,50 @@ verify: `render_events.py --service live-odds-worker --since <54f3d662 finishedA
 - **Left:** one prescribed live reading (>= 3 consecutive live builds with live NFL props > 0 and seen-age p50 < 300 s) on the next live NFL game.
   - Scheduled task `book-quotes-fuller-copy-deploy-0914` (04:50Z / 11:50 PM CT) deploys refresh-worker. If it ships >= `54f3d662`, refresh-worker's 74 un-retried state losses are covered too.
   - No deploy was made by this reading.
+
+## 2026-09-14 13:36:43Z (08:36 CT) — refresh-worker `cae4713e` -> `fb0c91cf` — deploy `dep-dajvgqqd0e5s73dt6r9g` — scheduled task `book-quotes-fuller-copy-deploy-0914`, holder lane `book-quotes-prefer-fuller-copy`
+
+- **User decisions (2026-09-13 CT):**
+  - "After tonight's slate (Recommended)" for `57b67127`.
+  - "Bundle into tonight (Recommended)" for `cb248a95`.
+  - For `339dc6e9`: "Approve, default ON at 15 (Recommended)", then "Bundle into tonight (Recommended)".
+  - ~11:40 PM CT: "Allow all three (Recommended)" for collateral `54f3d662`, `637278e3`, `b6ff319a`.
+  - One refresh-worker deploy of main's tip, on the first CLEAR, with no NFL/MLB game live, cutoff Mon 09-14 16:00Z.
+- **Why it ran at 13:36Z, not ~05Z:** the task started at 13:35Z (08:35 CT). The machine was asleep overnight; Monday morning before MLB day games was an allowed window.
+- **Collateral check** (tip `fb0c91cf`, live `cae4713e`):
+  - `git diff --name-only cae4713e origin/main -- syndicate pipeline scripts app.py requirements.txt render.yaml vendor` listed exactly the 8 allowed files. `render.yaml` did not change.
+  - `git log --no-merges` over the same paths listed exactly the six approved commits, each an ancestor of the tip:
+    - `57b67127` `odds_book_quotes.py`: resolve to the fuller, verified-complete `.gz`.
+    - `cb248a95` `intelligence_state.py`: fast-path Kalshi capture from cached markets.
+    - `339dc6e9` `worker_recycle.py` (new), `intelligence_state.py`, `run_refresh_worker.py`: self-restart after >= 15 consecutive heavy-build refusals.
+    - `54f3d662` `artifact_publisher.py` (lane `quote-state-publish-retry`): in-call retry of a quote-state publish refused at capacity.
+    - `637278e3` `fetch_nfl_oddsapi_props_local.py`, `fetch_ncaaf_oddsapi_props_local.py` (lane `nfl-live-props-missing`, CLOSED): in-play props capture.
+    - `b6ff319a` `scripts/layer2_live_scorecard.py`: offline script.
+- **Gates:**
+  - Claim acquired 13:35:56Z.
+  - Games at 13:35Z: NFL `live 0` (pregame 1), MLB `live 0` (pregame 10), from `/api/board/layer1`.
+  - Preflight `CLEAR` (exit 0) at 13:36:41Z on the full tip SHA: only infra processes (pid 39 rss 2,741.6 MB).
+  - Deploy POST 13:36:43Z, in the same shell call as the preflight.
+- **Events** (`render_events.py --since 13:36:00Z`, read to 14:07:43Z, OUTPUT COMPLETE):
+  - build_started 13:36:43, build_ended 13:38:37, deploy_ended 13:39:49Z.
+  - **0 server_failed.** The pre-deploy hour 12:36:43-13:36:43Z had 0 events.
+  - Preflight after the deploy: live commit `fb0c91cf`, finished 13:39:48.84Z.
+- **verify: readings.** Post-boot window 13:39:49-14:07:43Z (27m54s); baseline 12:36:43-13:36:43Z on `cae4713e`.
+  - (a) Clean boot. 0 server_failed / oomKilled. Positive control: 23 `ALL_PROCESS_MEMORY` lines by 13:42:11Z, unreclaimable 1,063 MB (2,752 MB at 13:34:57Z before the deploy).
+  - (b) `[odds_book_quotes] LATEST_CACHE_EVICT`: **0 lines**. No affected-date eviction in the window. **Reading owed, not failed**: past dates are read only on consumer demand.
+  - (c) `kalshi_capture=`: **0 lines**, because `[intelligence_state] LAYER2_FAST_REFRESH` ran 0 times after boot. The heavy build was admitted: `LAYER2_SHORTLIST date=2026-09-14 rows=4089` at 13:50:48Z, then heavy-path `[kalshi_odds] QUOTE_CAPTURE matches=849 appended=355` (mlb 297, nfl 16, soccer 42) at 13:53:28Z. Baseline hour: **0 QUOTE_CAPTURE** during a refusal stretch, which is the defect `cb248a95` addresses, observed on the old code. The fast-path reachability reading is owed.
+  - (d) Self-restart:
+    - After boot: 0 `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint`, 0 `[worker_recycle]` lines (0 RECYCLE_CHECK, 0 RECYCLE_EXIT, 0 RECYCLE_CHECK_FAILED). Heavy builds admitted: `PORTFOLIO_COMMIT date=2026-09-14 positions=23` 13:55:02Z, `CANDIDATE_POOL_READY count=176` 14:00:28Z.
+    - Baseline hour: **35 refusals** (12:37:48-13:35:52Z, headroom 1,331.9-1,336.7 MB vs floor 1,900) and 0 PORTFOLIO_COMMIT. A refusal stretch was in progress, and the deploy's own reboot cleared it.
+    - **Recycle not yet exercised.** No red flags.
+  - (e) Collateral publish:
+    - Post boot: 2 `PUBLISH_RETRY_AT_CAPACITY`, 2 `PUBLISH_RETRY_OK` (ncaaf `2026-09-18.state.json` and `2026-09-19.state.json`, both attempt=1), **0 `PUBLISH_RETRY_EXHAUSTED`**, so 0 lost state publishes.
+    - `[artifact_publisher] PUBLISH_FAILED`: **9**. That is 2 state (both recovered by the retry), 4 ncaaf book_quotes jsonl (09-17, 09-18, 09-20, 2026_wk3), 2 nfl `2026-09-14.jsonl` and 1 wnba props csv, all 13:47:04-13:55:54Z, all HTTP 503. jsonl is not in the retry's scope by design.
+    - Baseline hour: 0 PUBLISH_FAILED, 0 retries. **RED FLAG as specified (a rise 0 -> 9), recorded for the user, not rolled back.** All 9 fall in the first ~16 min after boot, around the first post-boot build, and none follow in the next 12 min. Not attributed to any commit; that is an observation, not a cause.
+    - 0 `Traceback` after boot.
+  - (f) Current-date health:
+    - `BOOK_GRID_TICK` resumed: 13:48:26, 13:52:05, 14:03:04Z. 0 `BOOK_GRID_BUILD_ERROR`, 0 `LAYER2_GUARD_SKIP` (baseline 0), 0 restarts (baseline 0).
+    - **Lead:** on `cae4713e` the last `BOOK_GRID_TICK` before the deploy was 11:25:11Z, silent 2h11m through the refusal stretch (371 ticks in 09-13 12:03Z..09-14 11:25Z). Not diagnosed.
+- **Rollback:** `python scripts/render_deploy.py --service refresh-worker --commit cae4713e --allow-rollback`. It also removes the three collateral commits from refresh-worker.
+- **Self-restart kill switch without code:** set `SYNDICATE_REFRESH_WORKER_RECYCLE_AFTER_REFUSALS=0` on refresh-worker (single-key env API), then a deploy. A restart does not re-inject env.
+- Claim released with its token at ~14:08Z. Owed readings: (b) an affected-date `.jsonl.gz` eviction; (c) `kalshi_capture=joined:`, then fast-path capture during a refusal stretch; (d) `RECYCLE_EXIT` during a real refusal stretch, then heavy builds resuming.

@@ -885,6 +885,11 @@ death, never life — do not invert it.
 - Blocked by: none. **User decisions 2026-09-13 ~13:30Z:** "Resize + diagnose (Recommended)", then **"check content on the disk and ensure that we compact items that can be compacted first"**, so the resize is held until the inventory and compaction are done. A refresh-worker deploy needs claim + preflight; a HOLD goes back to the user. **2026-09-13 ~14:00Z:** the user approved "Remove verified duplicates, Gzip props-history CSVs, Stop history re-append", NOT the 100 GB resize.
 
 ### kalshi-nfl-quote-gap — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- DEPLOY READING 2026-09-14 ~14:10Z (09:10 CT), scheduled task `book-quotes-fuller-copy-deploy-0914`. Goal: explain why Kalshi NFL quotes on the served NFL grid carried `observed_at` 2026-09-12 21:20Z until 2026-09-13 17:33Z. Say which stage stalled (capture, append, transport or board read) and whether it recurs without a full disk. Propose a fix only if it can recur. Read-only on production until the user approves a change.
+  - **Diagnosis GOAL: MET (unchanged). Fix `cb248a95` is LIVE on refresh-worker in `fb0c91cf`** (`dep-dajvgqqd0e5s73dt6r9g`, live 13:39:49Z). **Reachability NOT yet MET.**
+  - (c) 13:39:49-14:07:43Z: `kalshi_capture=` 0 lines, because `[intelligence_state] LAYER2_FAST_REFRESH` ran 0 times after boot. The heavy build was admitted (`LAYER2_SHORTLIST` 13:50:48Z) and captured on the heavy path: `QUOTE_CAPTURE matches=849 appended=355`, nfl 16, 13:53:28Z. That is owed, not failed.
+  - Baseline hour 12:36:43-13:36:43Z on `cae4713e`: 35 heavy-build refusals and **0 QUOTE_CAPTURE**, the defect itself observed once more before the fix shipped.
+  - Owed: a `kalshi_capture=joined:` line, then the refused-heavy-build capture reading.
 - VERDICT 2026-09-13 ~23:40Z (18:40 CT) — Goal: explain why Kalshi NFL quotes on the served NFL grid carried `observed_at` 2026-09-12 21:20Z until 2026-09-13 17:33Z. Say which stage stalled (capture, append, transport or board read) and whether it recurs without a full disk. Propose a fix only if it can recur. Read-only on production until the user approves a change.
   - **GOAL: MET.** The CAPTURE stage stalled: `_capture_kalshi_quotes` ran only inside the heavy build, which `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` refused 403 times (09-12 21:34Z..09-13 16:14Z). It recurs without a full disk. After 13Z the NFL shortlist had nothing for Kalshi to match.
   - Fix proposed and, by user decision, landed as `cb248a95`: fast-path capture from cached markets. **NOT deployed.** It ships in scheduled task `book-quotes-fuller-copy-deploy-0914` (23:50 CT, cutoff Mon 09-14 11:00 CT).
@@ -942,6 +947,12 @@ death, never life — do not invert it.
 - Blocked by: none.
 
 ### heavy-build-memory-refusal — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- DEPLOY READING 2026-09-14 ~14:10Z (09:10 CT), scheduled task `book-quotes-fuller-copy-deploy-0914`. Goal: explain why refresh-worker's heavy board build (candidate pool, board publication, portfolio commit / paper orders) was refused by `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` for ~16 h (2026-09-12 21:34Z .. 2026-09-13 13Z) with unreclaimable headroom ~1,810 MB. Measure what the build actually needs against that floor and what holds ~2.3 GB unreclaimable. Then bring the user options with numbers (retarget/lower the check, cut the build's cost, or add memory). Read-only on production; no code or deploy without the user's OK.
+  - **Diagnosis GOAL: MET (unchanged). Fix `339dc6e9` is LIVE, recycle not yet exercised.** It went out in refresh-worker `fb0c91cf` (`dep-dajvgqqd0e5s73dt6r9g`, POST 13:36:43Z, live 13:39:49Z), with 0 server_failed.
+  - (d) After boot, 13:39:49-14:07:43Z: 0 `stage=pre_source_state_fingerprint` refusals; 0 `[worker_recycle]` lines (RECYCLE_CHECK, RECYCLE_EXIT and RECYCLE_CHECK_FAILED all 0). Heavy builds were admitted: `PORTFOLIO_COMMIT positions=23` 13:55:02Z, `CANDIDATE_POOL_READY count=176` 14:00:28Z.
+  - Baseline hour 12:36:43-13:36:43Z: 35 refusals (headroom 1,331.9-1,336.7 MB) and 0 PORTFOLIO_COMMIT. A refusal stretch was in progress, and the deploy's reboot cleared it, as every earlier boot did.
+  - No red flags. Owed: `RECYCLE_EXIT` in a real refusal stretch (expected 16-60 min after the first full build, by the H2 reading), then heavy builds resuming.
+  - Kill switch: `SYNDICATE_REFRESH_WORKER_RECYCLE_AFTER_REFUSALS=0` via the single-key env API, plus a deploy.
 - VERDICT 2026-09-13 ~23:40Z (18:40 CT) — Goal: explain why refresh-worker's heavy board build (candidate pool, board publication, portfolio commit / paper orders) was refused by `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` for ~16 h (2026-09-12 21:34Z .. 2026-09-13 13Z) with unreclaimable headroom ~1,810 MB. Measure what the build actually needs against that floor and what holds ~2.3 GB unreclaimable. Then bring the user options with numbers (retarget/lower the check, cut the build's cost, or add memory). Read-only on production; no code or deploy without the user's OK.
   - ~~GOAL: NOT MET. Only opened.~~ Superseded by the verdict below.
 - CHECKPOINT 2026-09-14 ~04:45Z (23:45 CT 09-13), same Goal as below, verbatim: explain why refresh-worker's heavy board build (candidate pool, board publication, portfolio commit / paper orders) was refused by `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` for ~16 h (2026-09-12 21:34Z .. 2026-09-13 13Z) with unreclaimable headroom ~1,810 MB. Measure what the build actually needs against that floor and what holds ~2.3 GB unreclaimable. Then bring the user options with numbers (retarget/lower the check, cut the build's cost, or add memory). Read-only on production; no code or deploy without the user's OK.
@@ -1016,6 +1027,11 @@ death, never life — do not invert it.
 - Blocked by: none.
 
 ### book-quotes-prefer-fuller-copy — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- VERDICT 2026-09-14 ~14:10Z (09:10 CT), scheduled task `book-quotes-fuller-copy-deploy-0914`. Goal: when a `book_quotes` shard exists both plain and as `.gz`, every reader gets the copy holding MORE data, so the 18 mismatched shards on refresh-worker (mlb 09-03..09-09, ncaaf 09-05, soccer 08-22..09-09) stop serving their shorter plain file — without ever preferring a truncated or unverifiable `.gz`.
+  - **GOAL: NOT MET — deployed, reading owed.**
+  - `57b67127` is LIVE on refresh-worker in `fb0c91cf`: deploy `dep-dajvgqqd0e5s73dt6r9g`, POST 13:36:43Z, live 13:39:49Z, clean boot.
+  - `[odds_book_quotes] LATEST_CACHE_EVICT`: 0 lines, 13:39:49-14:07:43Z. No affected-date eviction was observed. Absent is not failure: past dates are read only on demand.
+  - Still owed: an eviction naming `<affected date>.jsonl.gz`. Details and the rollback are in `deploys.md` 2026-09-14 13:36:43Z.
 - VERDICT 2026-09-13 ~19:30Z — Goal: when a `book_quotes` shard exists both plain and as `.gz`, every reader gets the copy holding MORE data, so the 18 mismatched shards on refresh-worker (mlb 09-03..09-09, ncaaf 09-05, soccer 08-22..09-09) stop serving their shorter plain file — without ever preferring a truncated or unverifiable `.gz`.
   - **GOAL: NOT MET.** Code is on main (`57b67127`, tests + unwired check pass) but NOT deployed, and the production reading is owed.
   - Blocking: refresh-worker preflight HOLD at 19:20Z, plus the user's choice to deploy after tonight's slate.
@@ -1096,6 +1112,12 @@ death, never life — do not invert it.
 - **Reading delegated 2026-09-13 ~23:42Z** to scheduled task `quote-state-retry-board-reading-0913` (one-time, 2026-09-14T00:45Z / 7:45 PM CT; runs only while the Claude app is open). It records `deploys.md`, sets this block's verdict, and closes the lane on MET. Owning session ed8bb082 archived after handoff.
   - Interaction: scheduled task `book-quotes-fuller-copy-deploy-0914` (11:50 PM CT) deploys refresh-worker; if it ships a SHA at or after `54f3d662`, refresh-worker gains the same retry, which covers its un-retried NFL state publishes.
 - Blocked by: none — needs a live NFL game (DAL@NYG 00:20Z).
+- READING 2026-09-14 ~14:10Z (09:10 CT), appended by scheduled task `book-quotes-fuller-copy-deploy-0914`. The verdict above is NOT changed.
+  - `54f3d662` is now LIVE on refresh-worker too, in `fb0c91cf` (`dep-dajvgqqd0e5s73dt6r9g`, live 13:39:49Z).
+  - refresh-worker 13:39:49-14:07:43Z (no live game): 2 `PUBLISH_RETRY_AT_CAPACITY`, 2 `PUBLISH_RETRY_OK` (ncaaf `2026-09-18.state.json` and `2026-09-19.state.json`, attempt=1), 0 `PUBLISH_RETRY_EXHAUSTED`, so 0 lost state publishes.
+  - `[artifact_publisher] PUBLISH_FAILED` 9, all HTTP 503, 13:47:04-13:55:54Z: 2 state (both retried OK), 6 book_quotes jsonl (ncaaf 4, nfl 2), 1 wnba csv.
+  - Baseline hour 12:36:43-13:36:43Z on `cae4713e`: 0 and 0. **Recorded as a red flag (rise 0 -> 9).** The failures are clustered around the first post-boot build, with none in the following 12 min; the cause is not attributed. 0 Traceback.
+  - The NFL live-slate reading this lane owes is still owed.
 
 ### book-grid-gameline-ledger-log — OPEN — opened 2026-09-14 — session 8518e917-502e-4212-b876-11d6eb76ab71
 - Goal: Every MLB (and other live-gameline sport) book-grid build prints one flush=True line naming what the live-gameline attach produced and what the ledger write did (index size, rows attached by segment, candidates, written, skipped_unchanged, truncated, error), so the 09-12 dropping hop becomes measurable from refresh-worker logs
