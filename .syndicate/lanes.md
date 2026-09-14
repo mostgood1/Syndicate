@@ -1007,6 +1007,13 @@ death, never life — do not invert it.
     - **Prediction (written before the deploy):** if H-cache carries the tail, pid 39 RSS after builds 3-6 stays near the value after builds 1-2 (the 2-entry cache is full by then), instead of today's +150-180 MB per build (1,133 -> 1,190 -> 1,373 -> 1,524 MB).
     - **Falsified if** the per-build growth after build 2 is within ~+/-50 MB of today's curve.
     - Confound to report, not remove: child-job RSS (0-886 MB) moves container memory but not pid 39. Compare pid 39 only.
+  - **DEPLOY TARGET 18:56Z: `0a18557a`, NOT main's tip.**
+    - Tip `f8ca2745` also carries lane accuracy-assessment-0914's undeployed `e4ef34d4` / `bedb99b2` / `f7984e8a` (bucket-skill scoring, +1,524 lines incl. tests), whose deploy #3 awaits that lane's user decision.
+    - `0a18557a` is on main and descends from live `ae53a1a5`. Its code delta vs live is only this lane's cap (`pipeline/intelligence_state.py` +17/-7 net with its test); no `render.yaml`.
+    - Env `SYNDICATE_CANDIDATE_POOL_CACHE_MAX=2` was set on refresh-worker (single-key PUT ~18:25Z, HTTP 200, read back 2).
+    - Claim: released by accuracy-assessment-0914 at ~18:43Z (their message), `free` at 18:55Z.
+    - Preflight at 18:55:47Z: HOLD, 2 jobs (MLB daily sim `run_mlb_daily_sim_job` / `daily_update.py --workflow ui-daily`). A deploy kills them, so this lane waits (background poller, 2 min).
+    - **Undisturbed window requested from accuracy-assessment-0914:** the first ~6 heavy builds after this deploy (~90 min from live). "Reading done" goes on this line when the 6th `CANDIDATE_POOL_CACHE` line is in.
 
 ### heavy-build-memory-refusal — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - DECISION 2026-09-14 ~15:10Z (10:10 CT): user chose "Restart at 1 + build isolation lane (Recommended)".
