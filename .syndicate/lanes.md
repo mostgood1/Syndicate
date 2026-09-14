@@ -1312,6 +1312,33 @@ death, never life — do not invert it.
   - FALSIFIED IF a post-live build still shows MLB game, pitcher-prop or HRR rows `unmeasured`, or zero rows with basis `measured_market_skill`.
   - NOT testable now: live-row notes (no MLB game is live until first pitch at 22:40Z). That reading is owed on tonight's slate.
 - Blocked by: none (deploy in progress).
+- USER DECISIONS `[2026-09-14, in chat, four questions]`:
+  - First step: "Category now, buckets next (Recommended)".
+  - Loss weight: "Scale by measured loss (Recommended)".
+  - Rollout: "Switch directly" (no shadow period).
+  - Recorder: "Build it for all sports (Recommended)" — record the pre-publication grid so buckets can be searched without the publication-filter bias.
+- SCORING DESIGN, written before code:
+  - Hook: a skill multiplier folded into the Layer 2 score's reliability, applied in `layer2_board.py` right after `blended_score` (this lane's claim). `opportunity_signals.py` is untouched, because its `pricing-plane-v1` claim state is ambiguous (header CLOSED-MEASURED, census OPEN).
+  - Effect: moves `score.score` (board order, per-sport and game caps, `portfolio_commit` truncation and exposure ordering). Does NOT move `value_pct` (admission floor) or stake size (sizing never reads the score). Both are proven with a fixture diff before landing.
+  - Formula: established relative loss `L = max(0, ci95_lower) / market_metric` (Brier or MAE of the market, so units cancel); multiplier `m = max(0.5, 1 - 5 * L)`.
+    - Parity (lower bound < 0) moves nothing.
+    - Examples: MLB live moneyline L=0.56% -> m=0.972; soccer 1X2 L=2.5% -> 0.877; MLB outs L=2.5% -> 0.877; NCAAF live totals L=9.4% -> 0.53; NCAAF pregame totals L=9.7% -> 0.515.
+    - GAIN 5 and FLOOR 0.5 are a stated tuning choice: a 10% established loss halves the score. They are not a measurement.
+  - Never raises: the score already applies `min(value, value * reliability)`. A validated bucket later cancels the demotion for its rows (m back to 1.0); it cannot lift a row above its value.
+  - Notes without a market comparison (NFL preseason correlation, MLB hitter-prop vs-mean notes) get m=1.0. So do unmeasured notes; no midpoint is invented.
+  - Trade-off, stated to the user: a row whose value is mostly a market-price edge is also demoted when its category's model measured as losing. Scaling only the sim term instead would contradict `[sim-weight-clv-decomposition]` (leave (0.125, 1.5) alone).
+- DEPLOYS LIVE: web 17:28:02Z, refresh-worker 17:28:29Z, both `17c8208e`.
+- AFTER-READING `[same instrument, on builds stamped after both went live]`:
+  - Served MLB book grid (generated 17:39:56Z, `precomputed_artifact`, built on refresh-worker): unmeasured **563 -> 252**, exactly the `batter_home_runs` rows, as PREDICTED. 293 rows carry `basis: measured_market_skill`. no_projection 186 -> 185. MLB projection coverage 1,303 of 1,488 (1,304 before).
+  - Served shortlist (written 17:38:47Z): unmeasured **605 -> 24** (22 NFL props, 1 soccer corners, 1 soccer first-half totals); 218 rows carry registry notes (nfl 48, soccer 170); MLB unmeasured 268 -> 0.
+  - PREDICTION: MET on the grid. MET in direction on the shortlist. Its ~93 / ~500 figures assumed a comparable row mix, and this build's mix differs (fewer corners rows).
+- ANOMALY FOUND BY THE READING, NOT CAUSED BY THIS CHANGE: that 17:38:47Z shortlist carried **0 MLB projections** (`games_in_summary: 0` on 1,488 MLB rows), so 765 of 1,366 rows had no projection (117 before).
+  - Refresh-worker log: `PULL_REPAIR_MISSING path=mlb_source/source_artifacts/data/daily/daily_summary_2026_09_14.json ok=True written=1` at 17:39:11Z, 24 s AFTER that build. The deploy recreated the checkout path (`/opt/render/project/data/...`), and today's summary is not in git.
+  - The book grid built at 17:39:56Z, on the same code, found it (1,303 projections).
+  - Any refresh-worker deploy therefore yields one Layer 2 build with no MLB model views until the repair pull lands. In that window MLB rows carry no model edge, so the sizer refuses them (`no_model_edge_pct`): fewer MLB orders, not wrong ones.
+  - Recovery reading OWED: the next Layer 2 build's MLB `rows_with_projection` (background poller).
+- CODE ON BRANCH, NOT LANDED: `d51d4293`, the skill-aware score. 53 tests in `tests/test_layer2_skill_reliability.py`; removing only the call site fails exactly the 2 wiring/ranking tests. Sweep 2,840 pass across 120 files importing a changed module, 3 pre-existing failures. Held until the recovery reading, so a second restart is not stacked on an open question.
+- Blocked by: the MLB recovery reading on the next Layer 2 build.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

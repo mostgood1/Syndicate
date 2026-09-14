@@ -34809,3 +34809,30 @@ Source: refresh-worker logs, read with `render_logs.py --text` from 15:37:05Z (l
 - So: one line per MLB build per date, 0 duplicates, 0 missing.
 - All four read `index=0 considered=0 full_games=0` (no game live). The line's DISCRIMINATING values are therefore still unexercised.
 - **Still OWED:** the live-slate reading (H2 / H3 / NEITHER) and exactly-once on LIVE builds. Owned by the one-time scheduled task `book-grid-gameline-live-reading-0914`, firing 19:00 CT over 22:40Z-05:30Z.
+
+## 2026-09-14 17:22Z (12:22 CT) — web `822ee0ba` -> `17c8208e` and refresh-worker `6fe6c6e9` -> `17c8208e` — deploys `dep-dak2qejl550s73bqlkdg` / `dep-dak2qk61egvs739bga2g` — lane `accuracy-assessment-0914`, session 498e87fd
+
+User decision in chat: "Deploy both now (Recommended)". Both claims held by the lane. Preflight CLEAR on both: web 17:19:56Z, refresh-worker 17:20:04Z, infrastructure processes only, no MLB sim in flight.
+- **Ships:**
+  - `measured_market_skill` (31 entries) replaces "model never backtested" where a measurement exists.
+  - Live game-line and live prop rows carry the LIVE model's measurement, not the pregame note.
+  - first5 live observations are computed on h2h only.
+  - `NCAAF_MEASURED_SKILL` is current (2026 margins; totals measured against the close).
+  - `layer2_board` withholds a one-sided row whose measured verdict is `loses_to_market`.
+  - No `render.yaml` or requirements change.
+- **Carried:**
+  - web: +10 other lanes' commits already on main (53d989af, 05ca745c, 339dc6e9, 54f3d662, cb248a95, 637278e3, b6ff319a, 57b67127, 48c1fc61, c114e1aa).
+  - refresh-worker: +53d989af (a log line).
+- **Live:** web 17:28:02Z, refresh-worker 17:28:29Z (Render deploy API `finishedAt`).
+- **verify:** the served-board `model_skill.status` census, same instrument before and after, on builds stamped AFTER both went live.
+  - Prediction pre-registered on main in `002b2e41` before the reading.
+  - **MLB book grid** (generated 17:39:56Z, `precomputed_artifact` from refresh-worker): unmeasured **563 -> 252**, exactly the `batter_home_runs` rows (no entry, out of scope). 293 rows `basis: measured_market_skill`. MLB projection coverage 1,303 / 1,488 (1,304 before). **MET as predicted.**
+  - **Layer 2 shortlist** (written 17:38:47Z): unmeasured **605 -> 24** (22 NFL props, 2 soccer); 218 registry-basis rows (nfl 48, soccer 170); MLB unmeasured 268 -> 0. **MET in direction.** The ~93 prediction assumed a comparable row mix; this build carried fewer corners rows.
+- **ANOMALY SURFACED BY THE READING, NOT CAUSED BY THIS CHANGE:** the 17:38:47Z shortlist carried **0 MLB projections** (`games_in_summary: 0` on 1,488 MLB rows), so 765 of 1,366 rows had no projection (117 before).
+  - Refresh-worker log at 17:39:11Z, 24 s after that build: `PULL_REPAIR_MISSING path=mlb_source/source_artifacts/data/daily/daily_summary_2026_09_14.json ok=True written=1`.
+  - The deploy recreated the checkout path the summary is read from.
+  - The 17:39:56Z book grid, same code, found it (1,303 projections).
+  - So any refresh-worker deploy yields one Layer 2 build without MLB model views. Recorded as a lead.
+  - **OWED:** the next Layer 2 build's MLB `rows_with_projection` (recovery).
+- **NOT verified, OWED:** live-row notes. No MLB game is live until first pitch at 22:40Z.
+- Claims released after this entry is pushed.
