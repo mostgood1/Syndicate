@@ -34949,3 +34949,10 @@ User decision in chat: "Deploy #3 after their reading is done".
   - Team-name share on MLB/NFL/NCAAF game records, on the first 09-15 shortlist written after live. The 09-15 shortlist read at 21:13Z was written 20:53:26Z, BEFORE live, so it is not evidence. A watcher is on it.
   - The other lane's health check on this boot: the first `CANDIDATE_POOL_CACHE` line, expected `limit=2` and `entries` <= 2. None had printed by 21:11Z.
   - MLB live-row notes (owed since the 17:22Z entry): first pitch 22:40Z.
+
+## 2026-09-14 21:15Z (16:15 CT) — CORRECTION to the 20:56Z refresh-worker `0a18557a` -> `6438830d` entry — lane `accuracy-assessment-0914`, session 498e87fd
+
+- That entry says the claim "lapsed at its TTL (21:16:44Z) before this entry was pushed". **False.**
+  - The entry's push finished at 21:14:28Z, inside the TTL.
+  - The claim was then RELEASED by token at ~21:14:40Z, and `deploy_claim.py status` read `refresh-worker free`.
+- Cause: the lapse line was written from an expected time, not read off the clock. No other statement in that entry depends on it.

@@ -1627,7 +1627,8 @@ death, never life — do not invert it.
     - Recorder MET on soccer: 418 of 418 post-live records named, 0% before live. MLB/NFL/NCAAF wrote no new 09-14 keys after live; owed on the first post-live 09-15 build.
     - No Traceback. `CANDIDATE_POOL_CACHE` had not printed on the new code by 21:11Z; owed.
     - Recorded in `deploys.md`.
-  - Claim lapsed at its TTL (21:16:44Z), deliberately not held to protect a reading; the preflight's 25-minute deploy spacing covered the first builds.
+  - Claim RELEASED by token at ~21:14:40Z, right after the `deploys.md` entry was pushed (`9869fcae`); `status` then read `free`.
+    - CORRECTION: this line and the `deploys.md` entry first said the claim "lapsed at its TTL (21:16:44Z) before this entry was pushed". That was written before reading the clock. The push finished 21:14:28Z, inside the TTL. A correction is appended to `deploys.md`.
     - soccer `no_chip_match` 710.
     - MLB props: `prop_player_not_in_boxscore` 3,124 (void), `prop_no_commence_time` 1,169.
   - The first real search: >= 5 dates of recorder data with finals, i.e. no earlier than 2026-09-19.
