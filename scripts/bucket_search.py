@@ -122,13 +122,54 @@ def load_chips_dir(path: Path | str) -> dict[str, list[dict[str, Any]]]:
     return out
 
 
-def _admin_token() -> str:
-    env_file = REPO_ROOT / ".env"
-    if env_file.exists():
-        for line in env_file.read_text(encoding="utf-8-sig").splitlines():
-            if line.strip().startswith("ADMIN_TOKEN"):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return os.environ.get("ADMIN_TOKEN", "")
+def _main_worktree() -> Path | None:
+    """The repository's MAIN worktree — `git worktree list` names it first.
+
+    `REPO_ROOT` is only the checkout this copy of the script lives in; from a session
+    worktree that is not where the gitignored `.env` is (learnings 2026-09-10).
+    """
+    import subprocess
+
+    try:
+        listed = subprocess.run(["git", "-C", str(REPO_ROOT), "worktree", "list", "--porcelain"],
+                                capture_output=True, text=True, timeout=30, check=True).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for line in listed.splitlines():
+        if line.startswith("worktree "):
+            return Path(line[len("worktree "):].strip())
+    return None
+
+
+def env_file_candidates(env_file: Path | str | None = None) -> list[Path]:
+    """Where ADMIN_TOKEN is looked for, in order: `--env-file`, this checkout, the main worktree."""
+    candidates = [Path(env_file)] if env_file else []
+    candidates.append(REPO_ROOT / ".env")
+    main_tree = _main_worktree()
+    if main_tree is not None:
+        candidates.append(main_tree / ".env")
+    unique: list[Path] = []
+    for path in candidates:
+        if path not in unique:
+            unique.append(path)
+    return unique
+
+
+def _admin_token(env_file: Path | str | None = None) -> str:
+    """ADMIN_TOKEN from the environment, else the first candidate `.env` that holds one. Never printed."""
+    from_env = str(os.environ.get("ADMIN_TOKEN") or "").strip()
+    if from_env:
+        return from_env
+    for path in env_file_candidates(env_file):
+        if not path.is_file():
+            continue
+        for line in path.read_text(encoding="utf-8-sig").splitlines():
+            key, sep, value = line.strip().partition("=")
+            if sep and key.strip() == "ADMIN_TOKEN":
+                token = value.strip().strip('"').strip("'")
+                if token:
+                    return token
+    return ""
 
 
 def _get_json(url: str, token: str | None = None, timeout: float = 180.0) -> Any:
@@ -208,6 +249,32 @@ def scorecard_record(
     }, None
 
 
+THREE_WAY_H2H_SPORTS = frozenset({"soccer"})
+
+
+def settle_from_score(record: Mapping[str, Any], away_score: int, home_score: int) -> str | None:
+    """'win' | 'loss' | 'push', or None: the scorecard's rules, plus what they get wrong or skip.
+
+    - A 3-way moneyline (soccer `h2h` quotes home / draw / away): a draw is a RESULT, so home
+      and away lose and the draw side wins. `layer2_live_scorecard.grade` calls it a push and
+      cannot settle the draw side, which drops every drawn game from the measurement.
+    - Both teams to score (`btts` yes / no), which a final score settles.
+    """
+    sport = str(record.get("sport") or "").strip().lower()
+    market = str(record.get("market") or "").strip().lower()
+    side = str(record.get("side") or "").strip().lower()
+    if market == "h2h" and sport in THREE_WAY_H2H_SPORTS:
+        if side == "draw":
+            return "win" if away_score == home_score else "loss"
+        if side in {"home", "away"} and away_score == home_score:
+            return "loss"
+    if market == "btts":
+        if side not in {"yes", "no"}:
+            return None
+        return "win" if (away_score > 0 and home_score > 0) == (side == "yes") else "loss"
+    return SCORECARD.grade(record, away_score, home_score)
+
+
 def grade_population(
     records: Iterable[Mapping[str, Any]],
     chips_by_date: Mapping[str, Sequence[Mapping[str, Any]]],
@@ -228,15 +295,15 @@ def grade_population(
     ungraded: collections.Counter[str] = collections.Counter()
     for (sport, _key), record in chosen.items():
         view = mbs.view_from_record(record)
-        if view["market"] not in mbs.GRADABLE_MARKETS:
-            ungraded["market_not_gradeable_from_score"] += 1
-            continue
         shaped, reason = scorecard_record(record, event_teams)
         if shaped is None:
             ungraded[reason or "unparseable_key"] += 1
             continue
         if shaped["player_name"]:
             ungraded["player_prop"] += 1
+            continue
+        if view["market"] not in mbs.GRADABLE_MARKETS:
+            ungraded["market_not_gradeable_from_score"] += 1
             continue
         if view["segment"] not in ("full", "full_game"):
             ungraded["segment_not_full_game"] += 1
@@ -258,7 +325,7 @@ def grade_population(
         if chip["scores"] is None:
             ungraded["final_score_unparseable"] += 1
             continue
-        result = SCORECARD.grade(shaped, *chip["scores"])
+        result = settle_from_score(shaped, *chip["scores"])
         if result is None:
             ungraded["unsettleable_side_or_line"] += 1
             continue
@@ -523,6 +590,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--records-dir", help="offline: directory of recorder part files")
     parser.add_argument("--chips-dir", help="offline: directory of <date>.json game-chips payloads")
     parser.add_argument("--base-url", default=BASE_URL)
+    parser.add_argument("--env-file", help="a .env holding ADMIN_TOKEN (default: this checkout, then the main worktree)")
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--min-games", type=int, default=MIN_GAMES)
     parser.add_argument("--min-dates", type=int, default=MIN_DATES)
@@ -545,7 +613,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         if not (args.start and args.end):
             parser.error("--start and --end are required unless --records-dir is given")
-        token = _admin_token()
+        token = _admin_token(args.env_file)
+        if not token:
+            searched = ", ".join(str(p) for p in env_file_candidates(args.env_file))
+            parser.error(f"no ADMIN_TOKEN in the environment or in: {searched}")
         records = []
         days = _date_range(args.start, args.end)
         for day in days:

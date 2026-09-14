@@ -153,11 +153,54 @@ def test_records_grade_through_the_scorecards_own_rules():
 
 def test_what_cannot_be_graded_is_counted_by_reason():
     prop = _record_from(_candidate(market="batter_hits", player_name="A Hitter", line=0.5))
+    corners = _record_from(_candidate(sport="soccer", market="alternate_totals_corners", line=9.5))
     segment = _record_from(_candidate(segment="first5"))
     no_final = _record_from(_candidate(event_id="evt-2", home_team="Other Home", away_team="Other Away"))
     chips = {"2026-09-01": [_chip("Other Home", "Other Away", 1, 2, state="live")]}
-    _graded, ungraded = bs.grade_population([prop, segment, no_final], chips)
-    assert ungraded == {"market_not_gradeable_from_score": 1, "segment_not_full_game": 1, "game_not_final": 1}
+    _graded, ungraded = bs.grade_population([prop, corners, segment, no_final], chips)
+    assert ungraded == {"player_prop": 1, "market_not_gradeable_from_score": 1,
+                        "segment_not_full_game": 1, "game_not_final": 1}
+
+
+def test_a_player_prop_is_counted_as_a_prop_whatever_its_market():
+    """83% of one soccer day (12,337 of 14,776) was player props; they must not read as 'market not gradeable'."""
+    scorer = _record_from(_candidate(sport="soccer", market="player_goal_scorer_anytime",
+                                     player_name="A Striker", side="yes", line=None))
+    _graded, ungraded = bs.grade_population([scorer], {})
+    assert ungraded == {"player_prop": 1}
+
+
+@pytest.mark.parametrize("away, home, side, expected", [
+    (1, 1, "home", "loss"), (1, 1, "away", "loss"), (1, 1, "draw", "win"),
+    (1, 2, "home", "win"), (1, 2, "away", "loss"), (1, 2, "draw", "loss"),
+])
+def test_a_soccer_draw_is_a_result_not_a_push(away, home, side, expected):
+    record = {"sport": "soccer", "market": "h2h", "side": side, "line": None}
+    assert bs.settle_from_score(record, away, home) == expected
+
+
+def test_a_two_way_moneyline_tie_is_still_the_scorecards_push():
+    assert bs.settle_from_score({"sport": "nfl", "market": "h2h", "side": "home"}, 20, 20) == "push"
+
+
+@pytest.mark.parametrize("away, home, side, expected", [
+    (1, 1, "yes", "win"), (1, 1, "no", "loss"), (0, 2, "yes", "loss"), (0, 0, "no", "win"), (0, 0, "maybe", None),
+])
+def test_both_teams_to_score_settles_from_the_final(away, home, side, expected):
+    assert bs.settle_from_score({"sport": "soccer", "market": "btts", "side": side}, away, home) == expected
+
+
+def test_drawn_soccer_games_reach_the_graded_population():
+    """All three sides of a 1-1 game are graded; before, home/away were pushes and draw was unsettleable."""
+    sides = [_candidate(sport="soccer", market="h2h", side=side, line=None,
+                        quote={"price": 200, "fair_probability": 0.3, "fair_method": "consensus",
+                               "books_quoting": 8, "book_age_seconds": 60.0})
+             for side in ("home", "draw", "away")]
+    btts = _candidate(sport="soccer", market="btts", side="yes", line=None)
+    chips = {"2026-09-01": [_chip("Home Team", "Away Team", 1, 1, sport="soccer")]}
+    graded, ungraded = bs.grade_population([_record_from(c) for c in sides + [btts]], chips)
+    assert ungraded == {}
+    assert sorted(row["y"] for row in graded) == [0.0, 0.0, 1.0, 1.0]
 
 
 def test_a_record_without_team_names_joins_through_the_event_map():
@@ -168,6 +211,31 @@ def test_a_record_without_team_names_joins_through_the_event_map():
     assert graded == [] and ungraded == {"no_team_names": 1}
     graded, _ = bs.grade_population([record], chips, {("mlb", "evt-1"): ("Home Team", "Away Team")})
     assert len(graded) == 1
+
+
+def test_a_session_worktree_finds_the_token_in_the_main_worktree(tmp_path, monkeypatch):
+    """REPO_ROOT is the session worktree, which has no .env; the main worktree's is used."""
+    session_tree, main_tree = tmp_path / "session", tmp_path / "main"
+    session_tree.mkdir()
+    main_tree.mkdir()
+    (main_tree / ".env").write_text('OTHER=1\nADMIN_TOKEN_OLD=nope\nADMIN_TOKEN="from-main"\n', encoding="utf-8")
+    monkeypatch.delenv("ADMIN_TOKEN", raising=False)
+    monkeypatch.setattr(bs, "REPO_ROOT", session_tree)
+    monkeypatch.setattr(bs, "_main_worktree", lambda: main_tree)
+    assert bs._admin_token() == "from-main"
+    explicit = tmp_path / "explicit.env"
+    explicit.write_text("ADMIN_TOKEN=from-flag\n", encoding="utf-8")
+    assert bs._admin_token(explicit) == "from-flag"
+    monkeypatch.setenv("ADMIN_TOKEN", "from-env")
+    assert bs._admin_token(explicit) == "from-env"
+
+
+def test_no_token_anywhere_is_empty_not_a_guess(tmp_path, monkeypatch):
+    monkeypatch.delenv("ADMIN_TOKEN", raising=False)
+    monkeypatch.setattr(bs, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(bs, "_main_worktree", lambda: None)
+    assert bs._admin_token() == ""
+    assert bs.env_file_candidates() == [tmp_path / ".env"]
 
 
 # --------------------------------------------------------------------------

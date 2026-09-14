@@ -49,7 +49,7 @@ VERDICT_PROFIT_POCKET = "profit_pocket"
 VERDICT_PARITY = "parity"
 VERDICT_INSUFFICIENT = "insufficient"
 
-GRADABLE_MARKETS = frozenset({"h2h", "spreads", "totals"})
+GRADABLE_MARKETS = frozenset({"h2h", "spreads", "totals", "btts"})
 LIVE_STATES = frozenset({"live", "in_progress"})
 PREGAME_STATES = frozenset({"pregame", "scheduled", "pre"})
 
