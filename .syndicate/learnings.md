@@ -6004,3 +6004,16 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - Read the clock in the same command that writes a ledger time. The corrected appends stamp their heading from `datetime.now(timezone.utc)` at write time.
   - Something that has not happened yet ("will lapse", "should finish") goes in the future tense, never as a past fact.
   - *(evidence: deploys.md 2026-09-14 21:15Z correction; lanes.md PREVIEW v2 heading correction)*
+
+## 2026-09-14 — OVERTURNED: "a layout fit measured on the worktree app predicts production" — the same commit at the same viewport put the header lettering ON screen locally and OFF screen in production `[lane brand-logo-v3]`
+
+- **What was believed:** a 13-reading local sweep of the header gives production's shape, and production only needs a spot check.
+- **What falsified it:**
+  - `/market-board` at 1500px. Locally the wordmark slot was 273px, so the lettering (which needs 268) was SHOWN.
+  - On production web `ff7ec8be`, same viewport, the slot was 264px and the lettering was hidden. The live pills are ~9px wider.
+  - The cause is undiagnosed: font availability, or the nav's contents.
+- **Why it did not ship a defect:** the fit rule is content-driven (a flex basis plus wrap and clip, no breakpoint), so it hid correctly. A breakpoint tuned on the local numbers would have put the pills onto a second row in production at 1500.
+- **How to apply:**
+  - Any size-sensitive layout claim ("shows from N px", "fits at N px") is read on PRODUCTION after the deploy, at the edge widths. A local reading is a prediction, not the result.
+  - Prefer a content-driven fit over a breakpoint tuned on one environment's metrics.
+  - *(evidence: `lanes_history.md` brand-logo-v3 local reading; `deploys.md` 2026-09-14 5:34 PM CT)*

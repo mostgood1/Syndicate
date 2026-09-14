@@ -1346,71 +1346,16 @@ death, never life — do not invert it.
 - Blocked by: none.
 
 ### brand-logo-v3 — CLOSED — opened 2026-09-14, closed 2026-09-14 — session 08fb3eec-6daf-4680-a64d-bd7f914ad2e7
-- Goal: the new combined Syndicate logo (mascot + S swoosh + lettering, 1536x1024 opaque, from the user 2026-09-14) is what renders in the header on every page, the four crest hero slots, the apple-touch/PWA icons and the og/twitter card; the S favicon is KEPT `[user decision 2026-09-14: the full art was measured mud at 16/32px on 09-09]`.
+- Goal: the new combined Syndicate logo (mascot + S swoosh + lettering, 1536x1024 opaque, from the user 2026-09-14) is what renders in the header on every page, the four crest hero slots, the apple-touch/PWA icons and the og/twitter card; the S favicon is KEPT `[user decision 2026-09-14: the full art was measured mud at 16/32px on 09-09]`. **GOAL: MET.**
+  - Reading, web `dd3a4fda`, 22:01:35Z: 5 served pages name 0 retired assets; 7/7 assets serve 200 at their exact dimensions; 6/6 retired assets 404; `favicon-32.png` unchanged.
+  - Layout half of the clause: rendered logo boxes 3:2 at 400/900/1440 with screenshots, measured on the worktree app, not on production.
+  - Follow-ups in this lane, each MET in production (`deploys.md`): `70f44f05`, the inline menu row plus the standalone-header overflow fix (scroll == client at 1440/900/400); `ff7ec8be`, the header lettering (8 readings, 0 partial).
 - Files: syndicate/templates/shared/base.html, syndicate/templates/shared/_standalone_app_header.html, syndicate/static/shared/app.css, syndicate/static/shared/standalone_shell.css, syndicate/templates/syndicate.html, syndicate/templates/market_board_hub.html, syndicate/templates/errors/error.html, syndicate/templates/intelligence_status.html, syndicate/static/shared/manifest.json, syndicate/static/shared/syndicate-brand-header.jpg, syndicate/static/shared/syndicate-wordmark.png, syndicate/static/shared/syndicate-brand-hero.jpg, syndicate/static/shared/syndicate-icon-180.png, syndicate/static/shared/syndicate-icon-192.png, syndicate/static/shared/syndicate-icon-512.png, syndicate/static/shared/syndicate-social.jpg, syndicate/static/shared/apple-touch-icon.png, syndicate/static/shared/syndicate-og.jpg, syndicate/static/shared/syndicate-crest.jpg, syndicate/static/shared/syndicate-mascot.png, syndicate/static/shared/syndicate-mascot-192.png, syndicate/static/shared/syndicate-logo.svg, scripts/build_brand_assets.py, docs/brand/syndicate-logo-source.png, docs/brand/syndicate-mascot-source.png, tests/test_error_pages.py, tests/test_coverage_report_artifact.py, tests/test_brand_assets.py, .syndicate/state_ui.md
 - Hypothesis: n/a (not diagnostic)
 - Falsification test: n/a
 - Verification: served HTML on web references only the new asset names (0 `syndicate-crest.jpg`, 0 `syndicate-logo.png` in `<img>`), each new asset returns 200 with its expected dimensions, and a screenshot of the header + `/syndicate` hero at desktop and ~400px shows the logo legible and uncropped where it must be. Favicon links unchanged.
 - Blocked by: none.
-- USER DECISIONS, in order, all 2026-09-14:
-  - Keep the S favicon.
-  - Commit, push and deploy web.
-  - "dont crop the image, resize it. The logo must be maintained." This replaced crop boxes with whole-logo fitting and made the hero CSS `contain`.
-  - "the logo needs to be inline on the main menu row."
-  - Take over the standalone-header overflow handed off by session `local_06ae690f`, and ask before deploying that fix.
-- LOCAL LAYOUT READING (worktree app, port 5072; the primary tree's preview runs stale code):
-  - Header logo 3:2 at every width: 127x85 at 1440, 92x62 at 900, 80x54 at 400.
-  - 0 px centre offset at 900 and 1440. Pinned to the top at 400.
-  - 0 pills overlapping the logo on both headers.
-  - Hero boxes 3:2 `contain`: 285x189 on `/syndicate` at 1440, 300x200 stacked at 400.
-- BUG FOUND BY THAT READING, FIXED BEFORE LANDING: the logo wrapper shrank to 25px under an 80px logo at 400px. The nav started at x=68 and its second pill row drew across the logo (which ends at x=111). After `flex: 0 0 auto`: nav x=123, 0 overlapping.
-- DEPLOY `dd3a4fda` -> web, live 22:01:35Z. **MET**, see `deploys.md`: 0 retired names on 5 pages, 7 of 7 assets 200 at exact size, 6 of 6 retired 404.
-- STANDALONE HEADER OVERFLOW (pre-existing; handed to this lane):
-  - Cause: `.standalone-app-header` computed `content-box`, so `width: min(1640px, 100%)` plus 2x16 padding and 2 border came out 34px too wide.
-  - The border-box reset lives only in `dense_cards.css`, under `body.cards-body`.
-  - Before, scroll/client: `/mlb/market-accuracy` 1474/1440, 934/900, 414/400. `/nba/market-accuracy` 1459/1425, 919/885, 414/400. `/mlb` 1440/1440, 900/900, 400/400 (it has its own reset; this is the control).
-  - Fix: `box-sizing: border-box` on the header only.
-  - After: scroll == client on all 9 readings. Pill rows unchanged at 1 / 2 / 4. `/mlb` unchanged.
-  - `BUTTON.theme-toggle` (right=470 at 400px) sits inside `.nav` with `overflow-x: auto` ending at 390. It scrolls in its own strip and does not widen the page, so it is not a second source.
-  - **DEPLOYED** as `9e11e0c1`, riding `70f44f05`, to web (user decision "Deploy web now"). Live 22:12:38Z. **MET on production**, see `deploys.md`: scroll == client on `/mlb/market-accuracy` at 1440/900/400 (was 1473/933/414) and `/nba/market-accuracy` at 1440 (was 1473). Pill rows unchanged.
-- OPEN QUESTION TO THE USER (22:14Z): "a lot of dead space on the header -- bring the SYNDICATE lettering back?"
-  - Measured on production, logo right edge to first pill: 229px at 1440 on base.html pages, 309px at 1920, and 363px at 1440 on standalone pages.
-  - The old wordmark's lettering without its S (`syndicate-logo.png`, cut at x=261) is 521x58, about 9:1. It needs 252px wide at 28px tall and 287px at 32px, plus a 16px gap.
-  - So it does not fit base.html's row at 1440 without wrapping the pills.
-  - Recommended: lettering only, shown only where it fits on the row. Alternative: left-align the pills beside the logo.
-  - USER ANSWER: "go with your recomendation".
-- WORDMARK IN THE HEADER (built 2026-09-14; NOT deployed, the user is asked first):
-  - Asset: `syndicate-wordmark.png`, 521x58. It is the old wordmark to the right of the S cut (x=261), trimmed, at native size, and renders 28px tall (252px wide).
-  - Mechanism, the same in both headers:
-    - The nav is `flex: 0 1 auto`: it keeps its one-line width and no longer grows.
-    - The wordmark slot is `flex: 1 1 0` with `overflow: hidden`, `flex-wrap: wrap`, a fixed 28px height and a zero-width `::before`. The lettering therefore shows whole or wraps out of view.
-    - The row's `gap` became margins, so the empty slot adds no second gap.
-    - There is no breakpoint to go stale when a sport is added.
-  - Local reading (worktree app). Each cell: lettering state / pill rows with the lettering vs. with the slot force-hidden, same instant:
-    - `/market-board`:
-      - 1920: SHOWN (32px to first pill), 1/1.
-      - 1600: SHOWN, 1/1.
-      - 1500: SHOWN (slot 273, needs 268), 1/1.
-      - 1440: hidden (slot 213), 1/1.
-      - 1100: hidden, 2/2. 900: hidden, 2/2. 400: hidden, 5/5.
-    - `/mlb/market-accuracy`:
-      - 1920: SHOWN, 1/1.
-      - 1600: SHOWN, 1/1.
-      - 1440: SHOWN (96px to first pill), 1/1.
-      - 1100: hidden (slot 34), 1/1. 900: hidden, 2/2. 400: hidden, 4/4.
-    - 0 PARTIAL states, 0 pills overlapping, and scroll == client at all 13 readings.
-  - The desktop app stopped the preview server once mid-reading, after 5 min. The remaining readings were retaken on a restarted server.
-  - **DEPLOYED** as `c9cc175b`, riding `ff7ec8be`, to web. Live 22:34:48Z. **MET on production** (8 readings, `deploys.md`):
-    - Shown whole at 1920 on both headers and at 1440 standalone.
-    - Hidden at 1500, 1440, 900 and 400 on the main pages, and at 400 standalone.
-    - 0 partial states. Pill rows equal the force-hidden control everywhere.
-    - At 1500 on the main pages it is hidden in production (slot 264) where it showed locally (slot 273). That is the fit rule working, not a regression.
-- **CLOSED 2026-09-14 — GOAL MET.**
-  - The new logo renders in the header, inline on the menu row, in the four hero panels, the apple-touch/PWA icons and the social card. Whole and never cropped.
-  - The S favicon is kept.
-  - The silver lettering shows beside the logo where it fits.
-  - The standalone header no longer scrolls sideways.
-  - Three web deploys, each MET in production: `dd3a4fda`, `70f44f05`, `ff7ec8be`.
+- Narrative (user decisions, local and production readings, the two follow-ups): `.syndicate/log/2026-09-14.md`, and moved verbatim to `lanes_history.md` on 2026-09-14.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
