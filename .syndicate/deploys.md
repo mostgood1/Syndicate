@@ -35207,3 +35207,45 @@ User decision in chat: "Deploy #3 after their reading is done".
   - (b) refresh-worker pid 39 per-build growth vs the 19:07Z boot curve now that the live-lens builds are gone.
 - Rollback: set the env back to `true` and deploy.
 - Claim released after this entry is pushed.
+
+## 2026-09-15 14:02Z -- reading -- refresh-worker `c4f45fee` -- lane `layer2-prior-date-live-carryover` -- R3 NOT EXERCISED
+
+Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, taken 13:57-14:02Z (08:57-09:02 CDT). Nothing was deployed and no env var was changed. **No 09-14 game was live across midnight CT, so the `decision=built` branch was not exercised. R3 is still owed; the lane stays OPEN.**
+
+**STEP 0: the code is on the loop path, checked by content.**
+- `fleet_live_commits` at ~13:57Z (08:57 CDT):
+  - web `c4f45fee`, live 2026-09-15 02:32:26Z (21:32 CDT 09-14).
+  - refresh-worker `c4f45fee`, live 2026-09-15 02:32:47Z (21:32 CDT 09-14).
+  - live-odds-worker `54f3d662`, live 2026-09-13 23:24:15Z.
+- `git show c4f45fee:pipeline/intelligence_state.py` has 2 matches for `_maybe_carry_over_prior_date_layer2`. `c4f45fee` is an ancestor of origin/main. It was live across the whole 05:00Z roll.
+
+**STEP 1: nothing was live across midnight CT.**
+- statsapi schedule for 09-14: 10 games, all `Final`. Three started at or after 00:30Z. Their last play's `about.endTime`:
+  - SD @ COL (824308), first pitch 00:40Z: **03:42:31Z** (22:42 CDT).
+  - SEA @ LAA (823981), first pitch 01:38Z: **04:07:48Z** (23:07 CDT).
+  - MIA @ AZ (825034), first pitch 01:40Z: **04:45:27Z** (23:45 CDT). This was the last final, 14.5 min before the roll.
+- Not checked: whether any non-MLB 09-14 event was live after 05:00Z. The carryover line below reads `chips_live=0`, which covers all sports' chips as of the last build.
+
+**Roll decision lines, 04:50-12:00Z.** `render_logs --text "LAYER2_CARRYOVER"`: 2 matches over 2 pages, and nothing else:
+  `2026-09-15T05:05:22.119652778Z  [intelligence_state] LAYER2_CARRYOVER date=2026-09-14 decision=skip reason=nothing_live_at_last_build hours_since_roll=0.09 max_hours=6.0 live_rows=0 chips_live=0`
+  `2026-09-15T11:05:26.012914736Z  [intelligence_state] LAYER2_CARRYOVER date=2026-09-14 decision=skip reason=past_cap hours_since_roll=6.09 max_hours=6.0`
+- The skip came 5 min 22 s after the roll (00:05 CDT), against 22 s on 09-14. In between, the loop was inside a heavy 09-14 build (next bullet). The expected skip reason appeared. The `past_cap` line is new: the first time the 6 h cap was seen closing a night, at 06:05 CDT.
+- **A heavy 09-14 build ran AFTER the roll.** `BUILD_SPAN_ENTER stage=layer2_shortlist_build date=2026-09-14` at 05:00:40Z, then `LAYER2_SHORTLIST date=2026-09-14 rows=2031 ... beyond_quote_age=6402` at 05:01:24Z. That is not the carryover, which has no `built` line. It is the regular build path starting 40 s after the roll, so a pre-roll queue or in-progress payload may have still been honoured. The cause is not attributed. It is harmless here: that build has 0 live rows.
+- Heavy 09-14 builds before the roll: 02:13:20, 02:43:36, 03:16:41, 03:32:01, 03:44:50, 04:11:41, 04:25:55, 04:37:21, 04:51:18Z (covered 02:13:20..05:01:24Z, 10 matches).
+- `LAYER2_FAST_REFRESH date=2026-09-14`: **0 matches** from 03:30Z to 12:00Z. From 00:00Z to 05:00Z, 3 matches, the last at 01:33:31Z (`rows=1341 live_rows=572 chips_live=10`). Earlier ones: 00:55:01Z `live_rows=778 chips_live=9` and 01:29:12Z `live_rows=595 chips_live=9`. So no fast build for 09-14 ran after the roll, and none was expected, because nothing was carried over.
+- Failure markers, 04:50-12:00Z: `LAYER2_GUARD_SKIP` nothing matched (1 page); `LAYER2_FAST_REFRESH_FAILED` nothing matched (1 page); `LAYER2_CARRYOVER_FAILED` had no match inside the `LAYER2_CARRYOVER` search above. Window coverage came from `--text "LAYER2_SHORTLIST"` 03:30-06:00Z: covered 03:30:59..05:59:17Z, 668 matches.
+
+**STEP 3: the served artifact.** `GET /api/board/layer2-shortlist?sport=all&date=2026-09-14&limit=10000` at 13:59:16Z (08:59 CDT):
+- `written_at` 2026-09-15T05:01:24Z (00:01 CDT), i.e. the post-roll heavy build above. `build_age_seconds` 32,271.3.
+- `total_rows` 2,031; `returned` 2,000, capped by `per_sport_limit` 2000.
+- Of the returned rows: **0** `game_state=live`, 1,849 pregame, 151 empty. `rows_live_state_stale` **0**.
+- `active_sports` ncaaf/nfl/soccer. MLB `per_sport_ingest.by_lane` is dead 3,552 (all MLB finals).
+- `live_state_max_build_age_seconds` 1800.0, so web `c4f45fee` still carries the stale-live label.
+
+**Criteria:**
+- (a) NOT EXERCISED: 0 `decision=built` and 0 post-roll `LAYER2_FAST_REFRESH date=2026-09-14`. Correct, because nothing was live.
+- (b) Satisfied trivially: `skip reason=nothing_live_at_last_build` 05:05:22Z, 20 min after the last final (04:45:27Z), with no carryover build in between.
+- (c) `live_rows=0 chips_live=0` is read from the carryover line itself. No fast build preceded it.
+- (d) `written_at` 05:01:24Z is after 05:00Z and there are 0 live rows, but the build that wrote it is NOT the carryover.
+
+**verify: R3 NOT EXERCISED.** The skip branch was seen for a second night and the 6 h `past_cap` close for the first time. **`decision=built` has still never been seen in production.** R3 passes to backup tasks `layer2-carryover-crossing-reading-0919` (Friday night) and `-0920` (Saturday night), which stay enabled. Lead: the prior-date heavy build entering at 05:00:40Z, after the roll, contradicts the `stale_date` refusal in this lane's H1 wording. Not investigated.
