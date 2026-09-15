@@ -36231,3 +36231,15 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
 - **A FAILED pull still does not advance the floor, as designed:** live-odds-worker repeated `since=22:26:31Z` across two DNS failures (22:28:29Z, 22:29:39Z, `Name or service not known`) and one `timed out` (22:31:20Z), then succeeded at 22:33:01Z.
 - **Leads, untouched by this fix:** web `/export?pattern=*<today>*` still times out (live-odds-worker 22:31:20Z and 22:39:54Z), and live-odds-worker hit two DNS resolution errors reaching web at 22:28-22:29Z.
 - Rollback: n/a, reading only.
+
+## 2026-09-15 22:12:03Z (17:12 CT) — READING on lane soccer-player-role-allocation's refresh-worker `f833f7ec` -> `2d579fd1` deploy — lane book-quotes-splice-repair — **P5 on refresh-worker MET: 0 sync failures, the stale glued copies healed, 0 web refusals in 45 min**
+- **No deploy by this lane.** `070a05bf` (P5 write faults) rode that lane's pinned deploy; the reading is this lane's.
+- **Window** 22:12:03Z (live) to 22:57:13Z, watcher `p5_rw_watch.py`, rounds of 5 min:
+  - `STREAM_TAIL_SYNC_FAILED` **0**; `STREAM_TAIL_SYNC_OK` **16**; `STREAM_SYNC_WHOLE` **15**.
+  - Web `MERGE_REFUSED_BAD_LINES` **0** across **15** book_quotes merges from `publisher=refresh-worker`.
+- **The stale glued copies healed, which is what the P5 apply predicted:** the first resyncs after boot each dropped exactly the one glued line web's repair had split.
+  - `nfl 09-14` 22:13:22Z `local_bad_dropped=1`; `soccer 09-18` 22:13:56Z 1; `soccer 09-19` 22:14:12Z 1; `soccer 09-20` 22:14:39Z 1.
+  - Later resyncs (soccer 09-15 22:23:32Z, 09-16 22:25:56Z, 09-18 22:26:04Z, 09-17 22:54:04Z) report `local_bad_dropped=0`: nothing bad left to drop.
+  - The 21:45:19Z refusal recorded in the 21:44:39Z entry was refresh-worker's pre-deploy copy; it has not recurred.
+- **Not observed:** no `.pending` sidecar was exercised (it only appears when a sync fails mid-write), and `BOOK_QUOTES_LOCAL_BAD_DROPPED` stayed absent on this worker too.
+- **Left for the lane's goal:** live-odds-worker's mlb 09-15 merge, and a full clean capture day.
