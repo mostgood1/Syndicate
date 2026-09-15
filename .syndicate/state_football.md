@@ -2570,9 +2570,9 @@ starters.
 - Side: no Anytime TD "No" side exists in the shards, and the row's display pick never narrowed the side. **Fixed, LIVE on refresh-worker `2d579fd1`** (`6d526851`, ridden along in `dep-daks2irm8hqs73efhhh0`, finished 22:12:03Z; lane `anytime-td-quote-side-yes`): `enrich_prop_rows` and `enrich_candidate_rows` pass "yes" for Anytime TD unless the pick names a side.
   - Post-deploy `ncaaf intelligence_prop with_quote` 256/256 in the new process (`deploys.md` 22:15:53Z).
   - The side choice itself cannot be exercised in production until a No side is captured. It rests on `tests/test_quote_enrichment_anytime_td_side.py` and the production-shard replay.
-  - Web's live commit was NOT read for this fix.
+  - **Web also runs it** `[read 2026-09-15 22:25:43Z, Render deploys API + git]`: web live `dd014d14` (`dep-dakrjuqfngtc73e09q70`, finished 21:40:47Z, on origin/main) contains `6d526851` and `3157bb7b`, by ancestry AND by content (`_anytime_td_side_hint` in `quote_enrichment.py`, `_ncaaf_game_kickoff_slate_date` in `home.py`). The web deploy building at read time, `c35284dc` (main tip, lane legacy-steam-crossing-delta), contains both too.
 
-**NOT measured:** whether web runs `3157bb7b`.
+**Web runs `3157bb7b`** `[read 2026-09-15 22:25:43Z]`: web live `dd014d14` contains it by ancestry and content (see the side line below). A web-side EFFECT reading (served dashboard props dated and quoted) was NOT taken.
 
 **Still true, from code:**
 - `_row_slate_date` slices `commence_time[:10]` (the UTC date) for rows WITHOUT `slate_date`, so other sports' evening kickoffs can join the next day's shard (a lead in `leads.md`).
