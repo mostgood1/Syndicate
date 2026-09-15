@@ -2042,6 +2042,18 @@ def _retry_sleep(seconds: float) -> None:
     time.sleep(seconds)
 
 
+def _sanitize_append_only_before_publish(path: Path) -> None:
+    """[lane book-quotes-splice-repair] Drop unreadable lines from a local
+    book_quotes shard before it is sent; see
+    `odds_book_quotes.sanitize_book_quotes_shard`. Never blocks a publish."""
+    try:
+        from syndicate.features.shared.odds_book_quotes import sanitize_book_quotes_shard
+
+        sanitize_book_quotes_shard(path)
+    except Exception as exc:
+        print(f"[artifact_publisher] PUBLISH_SANITIZE_FAILED path={path} error={type(exc).__name__}: {exc}", flush=True)
+
+
 def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
     """Best-effort push of a single allowlisted artifact to the web service.
 
@@ -2051,6 +2063,8 @@ def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
     `_QUOTE_STATE_RETRY_DELAYS_SECONDS`.
     """
     relative_path = relative_to_data_root(Path(path)) or ""
+    if _is_append_only(relative_path):
+        _sanitize_append_only_before_publish(Path(path))
     _LAST_PUBLISH_FAILURE_STATUS.pop(relative_path, None)
     if _publish_hot_artifact_once(path, timeout_seconds=timeout_seconds):
         return True
@@ -3323,6 +3337,37 @@ def _ends_with_newline(path: Path) -> bool:
         return True
 
 
+def _pending_path(target_path: Path) -> Path:
+    return target_path.with_name(f".{target_path.name}.pending")
+
+
+def _read_pending_rows(target_path: Path) -> list[bytes]:
+    """Local-only rows parked by a sync that cut the shard and then failed."""
+    try:
+        data = _pending_path(target_path).read_bytes()
+    except OSError:
+        return []
+    return [line for line in (raw.rstrip(b"\r") for raw in data.split(b"\n")) if line]
+
+
+def _write_pending_rows(target_path: Path, rows: list[bytes]) -> None:
+    """RAISES on failure, deliberately: the caller must not cut the shard
+    without these rows safe somewhere else first."""
+    pending = _pending_path(target_path)
+    temp = pending.with_name(f"{pending.name}.{os.getpid()}.tmp")
+    with open(temp, "wb") as out:
+        for line in rows:
+            out.write(line + b"\n")
+    os.replace(temp, pending)
+
+
+def _clear_pending(target_path: Path) -> None:
+    try:
+        _pending_path(target_path).unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def _pull_append_only_synced(
     normalized: str, target_path: Path, headers: dict[str, str], timeout_seconds: int
 ) -> tuple[bool, int]:
@@ -3409,17 +3454,30 @@ def _apply_synced_tail(
         with shard_append_lock(target_path):
             with open(target_path, "r+b") as handle:
                 handle.seek(webpos)
-                for raw in handle.read().split(b"\n"):
+                candidates = handle.read().split(b"\n") + _read_pending_rows(target_path)
+                kept_digests: set[bytes] = set()
+                for raw in candidates:
                     line = raw.rstrip(b"\r")
                     if not line:
                         continue
-                    if _line_digest(line) in web_digests:
+                    digest = _line_digest(line)
+                    if digest in web_digests:
                         merged += 1
+                        continue
+                    if digest in kept_digests:
                         continue
                     if not _is_json_object_line(line):
                         dropped_bad += 1
                         continue
+                    kept_digests.add(digest)
                     keep.append(line)
+                # Local-only rows exist nowhere else once the cut below runs. Park
+                # them in a sidecar FIRST, so a write that fails after the cut
+                # (ENOSPC, a kill) leaves them for the next sync instead of losing
+                # them. A sidecar that cannot be written aborts here, before any
+                # byte of the shard is cut. [lane book-quotes-splice-repair]
+                if keep:
+                    _write_pending_rows(target_path, keep)
                 handle.seek(webpos)
                 handle.truncate()
                 with open(temp, "rb") as source:
@@ -3437,6 +3495,7 @@ def _apply_synced_tail(
                     for line in keep:
                         handle.write(line + b"\n")
             _write_webpos(target_path, webpos + new_bytes)
+            _clear_pending(target_path)
     except Exception as exc:
         print(f"[artifact_publisher] STREAM_TAIL_SYNC_FAILED path={normalized} error={type(exc).__name__}: {exc}", flush=True)
         return False, 0
@@ -3498,6 +3557,12 @@ def _resync_append_only_whole(
                             continue
                         web_digests.add(digest)
                         keep.append(line)
+            for line in _read_pending_rows(target_path):
+                digest = _line_digest(line)
+                if digest in web_digests or not _is_json_object_line(line):
+                    continue
+                web_digests.add(digest)
+                keep.append(line)
             if keep:
                 needs_newline = bool(total) and not _ends_with_newline(temp)
                 with open(temp, "ab") as out:
@@ -3507,6 +3572,7 @@ def _resync_append_only_whole(
                         out.write(line + b"\n")
             os.replace(temp, target_path)
             _write_webpos(target_path, total)
+            _clear_pending(target_path)
     except (urllib_error.URLError, TimeoutError, OSError) as exc:
         print(f"[artifact_publisher] STREAM_PULL_FAILED path={normalized} error={exc}", flush=True)
         return False, 0

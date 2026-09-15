@@ -1608,6 +1608,54 @@ class AppendOnlySyncedPullTests(unittest.TestCase):
     def _webpos(target: Path) -> int:
         return int((target.parent / f".{target.name}.webpos").read_text(encoding="utf-8"))
 
+    def test_a_failed_write_after_the_cut_leaves_local_rows_in_pending(self) -> None:
+        """The cut runs before web's tail is written, so a failure after it (ENOSPC,
+        a kill) must not take the local-only rows with it."""
+        a, local, web_new = self._rows("a", "b"), self._rows("local"), self._rows("web")
+        with TemporaryDirectory() as tmp_dir:
+            target = self._shard(tmp_dir, a + local, webpos=len(a))
+            with patch(
+                "syndicate.features.shared.artifact_publisher._write_webpos",
+                side_effect=OSError("[Errno 28] No space left on device"),
+            ):
+                result, _ = self._pull(tmp_dir, [self._resp(a + web_new)])
+            self.assertEqual(result, (False, 0))
+            self.assertEqual((target.parent / f".{target.name}.pending").read_bytes(), local)
+
+    def test_pending_rows_are_restored_by_the_next_sync_and_the_sidecar_cleared(self) -> None:
+        a, local, web_new = self._rows("a", "b"), self._rows("local"), self._rows("web")
+        with TemporaryDirectory() as tmp_dir:
+            target = self._shard(tmp_dir, a, webpos=len(a))
+            pending = target.parent / f".{target.name}.pending"
+            pending.write_bytes(local)
+            result, _ = self._pull(tmp_dir, [self._resp(a + web_new)])
+            self.assertEqual(result, (True, 1))
+            self.assertEqual(target.read_bytes(), a + web_new + local)
+            self.assertFalse(pending.exists())
+
+    def test_a_pending_row_web_already_has_is_not_duplicated(self) -> None:
+        a, web_new = self._rows("a", "b"), self._rows("web")
+        with TemporaryDirectory() as tmp_dir:
+            target = self._shard(tmp_dir, a, webpos=len(a))
+            pending = target.parent / f".{target.name}.pending"
+            pending.write_bytes(web_new)
+            self._pull(tmp_dir, [self._resp(a + web_new)])
+            self.assertEqual(target.read_bytes(), a + web_new)
+            self.assertFalse(pending.exists())
+
+    def test_publishing_a_shard_sanitizes_it_first_and_other_files_are_not_touched(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            shard = self._shard(tmp_dir, self._rows("a"))
+            state = shard.with_name("2026-09-15.state.json")
+            state.write_text("{}", encoding="utf-8")
+            with patch.dict(os.environ, self._env(tmp_dir), clear=False):
+                with patch("syndicate.features.shared.odds_book_quotes.sanitize_book_quotes_shard") as sanitize, patch(
+                    "syndicate.features.shared.artifact_publisher._publish_hot_artifact_once", return_value=True
+                ):
+                    publish_hot_artifact(shard)
+                    publish_hot_artifact(state)
+            self.assertEqual([call.args[0] for call in sanitize.call_args_list], [shard])
+
     def test_a_matching_tail_keeps_a_local_row_web_has_not_merged(self) -> None:
         a, local, web_new = self._rows("a", "b"), self._rows("local"), self._rows("web")
         with TemporaryDirectory() as tmp_dir:

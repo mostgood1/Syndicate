@@ -114,6 +114,27 @@ def test_the_endpoint_refuses_a_bad_date_or_sport(monkeypatch, tmp_path):
     assert spawned == []
 
 
+def test_a_glued_line_gives_back_its_complete_row(tmp_path):
+    """ENOSPC tore a row head; the next append glued a whole row onto it."""
+    torn = _row()[:40]
+    whole = _row(price=-125, captured_at="2026-09-03T05:00:00Z")
+    p = _shard(tmp_path, [_row(), torn + whole])
+    dry = repair.repair_shard(p)
+    assert (dry["glued_lines"], dry["salvaged_rows"], dry["orphan_bad_lines"], dry["verified_fragments"]) == (1, 1, 1, 0)
+    result = repair.repair_shard(p, apply=True)
+    assert (result["split_lines"], result["rows_written_from_glued"], result["removed"]) == (1, 1, 0)
+    assert p.read_text(encoding="utf-8").splitlines() == [_row(), torn, whole], "the torn head is kept, never deleted"
+
+
+def test_a_glued_row_already_intact_is_not_written_twice(tmp_path):
+    torn = _row()[:40]
+    p = _shard(tmp_path, [_row(), torn + _row()])
+    dry = repair.repair_shard(p)
+    assert (dry["glued_lines"], dry["salvaged_rows"]) == (1, 0)
+    repair.repair_shard(p, apply=True)
+    assert p.read_text(encoding="utf-8").splitlines() == [_row(), torn]
+
+
 def test_the_scope_is_sport_and_since(tmp_path, capsys):
     _shard(tmp_path, [_row(), _row()[-10:]], date="2026-08-31")
     _shard(tmp_path, [_row(), _row()[-10:]], date="2026-09-03")

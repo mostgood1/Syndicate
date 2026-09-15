@@ -674,6 +674,98 @@ def shard_append_lock(path: Path):
             handle.close()
 
 
+def _ends_without_newline(path: Path) -> bool:
+    """True only for a non-empty file whose last byte is not a newline."""
+    try:
+        with open(path, "rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            if handle.tell() == 0:
+                return False
+            handle.seek(-1, os.SEEK_END)
+            return handle.read(1) != b"\n"
+    except OSError:
+        return False
+
+
+def _is_json_object_bytes(line: bytes) -> bool:
+    try:
+        return isinstance(json.loads(line), dict)
+    except Exception:
+        return False
+
+
+# path -> ((st_dev, st_ino), bytes already verified clean). Per process: the first
+# publish of a shard scans it whole, later publishes scan only what was appended.
+_SANITIZED_CLEAN_BYTES: dict[str, tuple[tuple[int, int], int]] = {}
+
+
+def sanitize_book_quotes_shard(path: Path) -> dict[str, Any] | None:
+    """Drop lines that are not JSON objects from a LOCAL shard before it is published.
+
+    [2026-09-15, lane book-quotes-splice-repair] After web's copy was repaired,
+    live-odds-worker kept republishing its own pre-repair copies of the day's
+    shards, fragments included (`publisher=live-odds-worker`, 10 and 43 refused
+    lines per publish). It never re-syncs a shard it already holds, so nothing
+    else would ever clean them. Web's merge refuses such lines anyway and holds
+    every intact row, so dropping them here loses nothing web would keep.
+
+    Under `shard_append_lock`. Never raises. Returns None when already clean.
+    """
+    target = Path(path)
+    key = str(target)
+    try:
+        with shard_append_lock(target):
+            stat = target.stat()
+            identity = (int(stat.st_dev), int(stat.st_ino))
+            size = int(stat.st_size)
+            prior = _SANITIZED_CLEAN_BYTES.get(key)
+            start = prior[1] if prior and prior[0] == identity and prior[1] <= size else 0
+            dirty = False
+            with open(target, "rb") as handle:
+                handle.seek(start)
+                for raw in handle:
+                    line = raw.rstrip(b"\r\n")
+                    if line and not _is_json_object_bytes(line):
+                        dirty = True
+                        break
+            if not dirty:
+                if not _ends_without_newline(target):
+                    _SANITIZED_CLEAN_BYTES[key] = (identity, size)
+                return None
+            import uuid
+
+            temp = target.with_name(f"{target.name}.{os.getpid()}.{uuid.uuid4().hex}.sanitize")
+            dropped = kept = 0
+            try:
+                with open(target, "rb") as source, open(temp, "wb") as out:
+                    for raw in source:
+                        line = raw.rstrip(b"\r\n")
+                        if not line:
+                            continue
+                        if _is_json_object_bytes(line):
+                            out.write(line + b"\n")
+                            kept += 1
+                        else:
+                            dropped += 1
+                os.replace(temp, target)
+            finally:
+                try:
+                    temp.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            after = target.stat()
+            _SANITIZED_CLEAN_BYTES[key] = ((int(after.st_dev), int(after.st_ino)), int(after.st_size))
+    except Exception as exc:
+        print(f"[odds_book_quotes] BOOK_QUOTES_SANITIZE_FAILED path={target} error={type(exc).__name__}: {exc}", flush=True)
+        return None
+    print(
+        f"[odds_book_quotes] BOOK_QUOTES_LOCAL_BAD_DROPPED path={target} dropped={dropped} kept={kept}"
+        f" bytes_before={size} bytes_after={int(after.st_size)}",
+        flush=True,
+    )
+    return {"path": str(target), "dropped": dropped, "kept": kept, "bytes_before": size, "bytes_after": int(after.st_size)}
+
+
 def append_book_quotes(
     *,
     sport: str,
@@ -743,9 +835,21 @@ def append_book_quotes(
             appended.append(normalized)
 
         if appended:
-            with shard_append_lock(path), path.open("a", encoding="utf-8") as handle:
-                for row in appended:
-                    handle.write(json.dumps(row, separators=(",", ":")) + "\n")
+            with shard_append_lock(path):
+                # A torn last line (a write cut by ENOSPC or a kill) has no
+                # newline, and appending straight after it glues the next intact
+                # row onto it: one unreadable line where there should be a bad
+                # line and a good one. 16 of the 20 lines left unreadable after
+                # the 2026-09-15 repair are that shape, all captured during
+                # refresh-worker's 09-13 ENOSPC outage. [lane book-quotes-splice-repair]
+                torn = _ends_without_newline(path)
+                with path.open("a", encoding="utf-8") as handle:
+                    if torn:
+                        handle.write("\n")
+                    for row in appended:
+                        handle.write(json.dumps(row, separators=(",", ":")) + "\n")
+            if torn:
+                print(f"[odds_book_quotes] BOOK_QUOTES_TORN_TAIL_TERMINATED path={path}", flush=True)
         # Written whenever anything was OBSERVED, not only when something
         # changed. Previously this was inside `if appended`, so a refresh that
         # confirmed every price unchanged left no trace it had run -- which is
