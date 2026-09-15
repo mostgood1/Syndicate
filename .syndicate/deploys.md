@@ -36011,3 +36011,33 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Falsification (a refusal 30 min after the first drop) not triggered.
   - **Owed:** mlb 09-15, which web refused 10 lines per merge before, had no live-odds-worker merge by 21:29Z.
 - Rollback: redeploy `18be9107`. Superseded in any case by the soccer-player-role-allocation tip deploy.
+
+## 2026-09-15 21:33:10Z (16:33 CT) — live-odds-worker `991a94d5` -> `8c089e8c` (soccer fix #2: shot divisor retired, shot/SOT props conditional on appearing) — deploy `dep-dakrj5m7bikc73fnvmf0` — lane soccer-player-role-allocation — **LIVE 21:38:19Z; verify OWED**
+- **What:**
+  - `e53274f2`: the 1.393 shot divisor is removed from `project_player_props`, with its loader, fitter and checks. The dated artifact on disk is inert (tested `off == on`).
+  - `b33ef901`: `shots_over_probabilities` / `shots_on_target_over_probabilities` become P(over | appears), a start/sub mixture from role inputs production already carries, with season-scoped on-pitch shares.
+  - Held out (dates >= 08-26), the shipped engine replay scored shots 0.6107 / 0.4690 against 0.6414 / 0.5169 and SOT 0.4931 / 0.1988 against 0.5122 / 0.2154, in 9/10 leagues.
+  - User decisions: "After 21:25Z quiet window", then "go ahead with the 21:25Z deploy when it's clear".
+- **Target `8c089e8c`** (full `8c089e8c4bd813c8f3046fdd62eb10286e86322b`) = origin/main at 21:21:38Z. Verified to contain `e53274f2`, `b33ef901` and every ride-along below.
+- **Ride-alongs, code only, each by agreement with its lane; each lane owns its verify reading:**
+  - `20568eff` soccer live poller single-date scoreboard (`soccer-live-scoreboard-range-stale`).
+  - `070a05bf` book_quotes write faults (`book-quotes-splice-repair`).
+  - `6d526851` quote_enrichment Anytime TD joins the YES side (`anytime-td-quote-side-yes`).
+  - `082da3e3` hot-artifact pull watermark per (service, date) (`soccer-live-scoreboard-range-stale`).
+  - NOT carried: `e115cd6b` (soccer goal count incl. penalties and own goals). It landed after this deploy started; its owning lane deploys it to live-odds-worker separately.
+- **`--allow-rollback`, used deliberately.** `render_deploy.py` refused `8c089e8c` as a rollback because the live commit, `991a94d5`, was OFF-MAIN (`18be9107` + `070a05bf`, deployed by `book-quotes-splice-repair`). An ancestry check always reads that as a rollback. Checked before overriding:
+  - the live commit was still `991a94d5` at 21:32:31Z and in the 21:33:08Z preflight, so no concurrent deploy;
+  - `git cherry -v 8c089e8c 991a94d5 f833f7ec` marks BOTH `18be9107` and `991a94d5` with `-`: equivalent patches are already in `8c089e8c`, so nothing live was dropped.
+- **Gates:**
+  - Tracked-league in-play check (ESPN single-date scoreboards): RMA @ ELC at 90'+6' at 21:27:45Z, clear at 21:28:19Z.
+  - Claim 21:22:44Z.
+  - Preflight 21:24:02Z CLEAR (dry run); 21:28:23Z HOLD (1 job); 21:30:47Z CLEAR (watcher); 21:31:49Z CLEAR, but `render_deploy` refused as above; 21:33:08Z CLEAR.
+  - POST 21:33:10Z; live 21:38:19Z.
+  - Expectation `--expect unconditional_ladder_share=0.0 --baseline unconditional_ladder_share=1.000 --baseline-read-at 2026-09-15T21:23:24Z`.
+- **Baseline** (21:23:24Z, newest recommendations artifact per league, `ladder_basis_reading.py`): `unconditional_ladder_share=1.000` over 931 non-GK rows in 10 leagues; `shot_mean_vs_ladder_ratio=1.000`. Every published shot price was a Poisson over the divided unconditional mean.
+- **Prediction:** on recommendations artifacts GENERATED after the deploy that built them, `unconditional_ladder_share` about 0.0 and `shot_mean_vs_ladder_ratio` > 1.
+- **verify (OWED):**
+  - `ladder_basis_reading.py 2026-09-15T21:38:19Z`, watched every 5 min for 3 h.
+  - Until refresh-worker also runs the new code, an artifact written by its OLD build (refresh-worker `f833f7ec`) still reads 1.000. The reading must therefore split by `generated_at` against refresh-worker's live time and say which worker plausibly wrote each artifact.
+- Rollback: `991a94d5`, which restores the divisor and the unconditional ladder.
+- Claim released 21:38Z with its token.
