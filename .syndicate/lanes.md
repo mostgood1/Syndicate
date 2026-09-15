@@ -2093,6 +2093,22 @@ death, never life — do not invert it.
 - Verification: the decomposition and replay tables are recorded in the log, with a reachability test (`off != on`) per change, landed on origin/main.
 - Blocked by: none
 
+### fotmob-season-scoped-league-ids — CLOSED 2026-09-15 — opened 2026-09-15 — session da346015-cd58-450a-a9e0-bba6bdb00403 — **GOAL: MET: FotMob league matching is season-proof (primaryId + country), deployed to live-odds-worker `c725cc29`, verified on a LIVE Eredivisie match 18:18:47Z**
+- **VERDICT.** Goal: Championship/Eredivisie/Belgian fixtures resolve in 2026-27, the harvest classifies the same way, deployed and verified on a LIVE match. — **GOAL: MET.**
+  - Code: `c725cc29` on main. Resolver matches country AND FotMob `primaryId` (exact-name allowlist only for a row without one). `_norm` folds accents. Harvest script + `fotmob_league_ids.json` use the same predicate, and the script refuses to run on drift.
+  - Tests: the recorded-listing (09-13) resolve cases gave 5 failed / 21 passed on the old ids. After the change, 59 passed across the fotmob + soccer live-state suites.
+  - Vendor, real code, ESPN names (09-12 + 09-15): Championship 12/12 and Eredivisie 5/5 (both 0 before), Belgian 2/4, EPL 7/7, LaLiga 7/7, MLS 11/12. Harvest smoke for 09-13: 35/35 matches, 10 of 10 leagues.
+  - Production: live 18:15:16Z. The first post-live eredivisie `live_state_2026-09-15.json` (generated 18:17:24Z) shows Ajax v Willem II at 16', `supported True`, `source fotmob`, `fotmob_match_id 5781718`, 16 events. See `deploys.md` 2026-09-15 18:08:50Z.
+  - Hypothesis CONFIRMED: league `id` is season-scoped and `primaryId` is stable. The falsification case (still unresolved on a live match) did not occur.
+  - NOT read on production: Championship and Belgian matches in play (none were live at the reading). Left as a lead: 3 team-name alias misses (`leads.md`).
+  - Ledger: `state_soccer.md` `[soccer-live-momentum]` updated. `fotmob_2y.json.gz` covers only one season for 4 of its 10 leagues.
+- Goal: FotMob league matching is season-proof. `resolve_fotmob_match_id` resolves Championship, Eredivisie and Belgian Pro League fixtures in 2026-27 (it returned None for 9 of 9 on 2026-09-12), and the 2y harvest script classifies leagues the same way. Deployed to live-odds-worker and verified on a LIVE match.
+- Files: `syndicate/features/soccer/ingestion/fotmob_match_id.py`, `syndicate/features/soccer/ingestion/fotmob_shots.py`, `scripts/soccer_fotmob_harvest_2y.py`, `reports/soccer_backtest/fotmob_league_ids.json`, `tests/test_fotmob_match_id.py`, `tests/fixtures/fotmob_matches_20260913.json` (NEW)
+- Hypothesis: FotMob's league `id` is SEASON-SCOPED for 4 of the 10 leagues (Eredivisie, Championship, Belgian Pro League, MLS) while the league's `primaryId` is stable. Read from FotMob `/api/data/matches` on 2024-10-19, 2025-03-01, 2025-10-18, 2026-09-13 and 2026-09-15: primaryId 57/48/40/130 every season, ids 892939/893033/892857/889747 -> 900368/900638/900433/896669 -> 937276/938218/937988/913550. The other six have id == primaryId, which is why only these broke. Belgian's NAME was `First Division A` in 2024-25, so an exact-name key alone would also have broken.
+- Falsification test: after deploy, a LIVE Championship/Eredivisie match whose live_state row shows `momentum.supported == false` with reason `fotmob match id unresolved` means league matching was not the (only) cause -- look at team-name normalisation next.
+- Verification: `soccer_source/<league>/api/live_state/live_state_2026-09-15.json` on production shows `games[].momentum.supported == true` and `source == 'fotmob'` for an in-play Eredivisie (Ajax v Willem II, 18:00Z) or Championship (Bristol City v Lincoln City / Middlesbrough v Millwall, 18:45Z) match; reading recorded in `deploys.md`. A finished date's file carries only `match_box` and proves nothing.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

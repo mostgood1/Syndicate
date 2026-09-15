@@ -35620,3 +35620,30 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
 - The fragments are still being produced upstream (refresh-worker's tail pull, P2 not built yet); web now refuses them.
 - `BOOK_QUOTES_BAD_LINES` on web: 0 lines in the window (web read no damaged shard through the readers yet).
 - **verify (2) still OWED:** a bounded re-read of today's web mlb/soccer shards showing no fragment appended after 17:35:11Z.
+
+## 2026-09-15 18:08:50Z (13:08 CT) — live-odds-worker `1efdea18` -> `c725cc29` — deploy `dep-dakojch594qs73f97img` — lane fotmob-season-scoped-league-ids — **verify MET (live Eredivisie match, 18:18:47Z)**
+- **What:** `c725cc29`. FotMob league matching is season-proof, and `_norm` folds accents.
+  - `_FOTMOB_LEAGUE_IDS` pinned FotMob's league `id`, which is SEASON-SCOPED for Eredivisie, Championship and Belgian Pro League: 900368/900638/900433 in 2025-26, 937276/938218/937988 in 2026-27. MLS 913550 is the 2026 season's id.
+  - Before this deploy, every live match in those three leagues wrote `momentum.supported: False` ("fotmob match id unresolved").
+  - `fotmob_league_slug` now matches country AND FotMob `primaryId` (57/48/40/130, stable in every season read, 2024-25..2026-27). An exact-name allowlist applies only when a row has no primaryId.
+  - Harvest script + `fotmob_league_ids.json` classify the same way; the script refuses to run if they disagree.
+- **Measured before deploying, real code against the live vendor with ESPN's own names:** Championship 12/12 and Eredivisie 5/5 (09-12 + 09-15), all None on the old ids; Belgian 2/4, EPL 7/7, LaLiga 7/7, MLS 11/12.
+  - The 3 misses are team-name aliases, not leagues (lead in `leads.md`).
+  - Tests: new recorded-listing cases fail on the old ids (5 failed / 21 passed) and pass after. 59 passed across the fotmob + soccer live-state suites.
+- **Ride-along** (`1efdea18..c725cc29`, runtime):
+  - `9ed5c5ad` book_quotes P0/P1: live on web since 17:29Z. On this service it adds only the bad-line counter in the readers.
+  - `55fee786` book_quotes P2 (lane `book-quotes-splice-repair`): live on NO service before this deploy. On this service it adds a blocking `flock` (`shard_append_lock`) around every `append_book_quotes` write. The lock never stops a write. Its synced-pull branch is not reached here: that lane's block says live-odds-worker never tail-pulls the shard.
+  - **User decision, asked with that stated: "Deploy main as-is".** `book-quotes-splice-repair`: your P2 is on live-odds-worker from 18:15:16Z.
+  - `e1afe4ac` soccer_season_audit scripts: analysis only, never run by the worker.
+- **Locks:**
+  - Claim acquired 18:05:10Z (token `2effc08c…`, holder fotmob-season-scoped-league-ids).
+  - Preflight CLEAR ~18:05:58Z for `c725cc29`, with only the worker parent running. Expectation: `eredivisie_inplay_momentum_supported false -> true`, `eredivisie_inplay_momentum_source none -> fotmob`, `eredivisie_inplay_games 1 -> 1`.
+  - Baseline read 18:05:48Z from `/api/ops/artifacts/export`: file generated 18:04:14Z, 1 in-play game, Ajax Amsterdam v Willem II at 4', `supported False`, reason `fotmob match id unresolved`.
+  - `build_in_progress` 18:09:38Z, `update_in_progress` 18:13:10Z, live **18:15:16Z**. Claim released 18:16:17Z with its token.
+- **verify: MET 18:18:47Z (13:18 CT).**
+  - Instrument: watcher polling `/api/ops/artifacts/export` every 60 s, gated on the file's `generated_at` being later than the 18:15:16Z go-live.
+  - The pre-live file (generated 18:10:46Z) was read at 18:15:42, 18:16:45 and 18:17:45Z and still said `supported False` / `fotmob match id unresolved` at 10'.
+  - The first post-live file, `soccer_source/eredivisie/api/live_state/live_state_2026-09-15.json` generated **18:17:24Z**, game `401875602` Ajax Amsterdam v Willem II at 16': `momentum.supported True`, `source fotmob`, `fotmob_match_id 5781718` (FotMob's own id for that fixture on its 09-15 listing), `events 16`, `series_len 16`, `current 54.0`.
+  - Expectation met on all three fields: supported false -> true, source none -> fotmob, in-play games 1 -> 1.
+  - **NOT read on production:** Championship (0 in play at 18:17Z; kickoffs 18:45Z) and Belgian Pro League (0 in play). For those, the evidence is the pre-deploy vendor run (Championship 12/12) through the same predicate, not a served reading.
+- Rollback: redeploy `1efdea18` to live-odds-worker (`render_deploy.py --service live-odds-worker --commit 1efdea18 --allow-rollback`, behind claim + preflight). It also removes `55fee786` from this service.

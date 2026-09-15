@@ -440,15 +440,28 @@ FotMob's measured 0-100 scale (40/60/80, was 1.0/2.5/5.0 on the old proxy's
 unbounded scale). No fallback to the ESPN proxy on a join/fetch miss --
 `supported: False` hides the panel instead.
 
-**NOT YET VERIFIED: the FotMob match-id join has never resolved a real
-production fixture.** Confirmed the deploy is live and the new code path runs
-each 60s tick (`generated_at` on the live-state artifact postdates the
-deploy), but every league checked had zero live matches at verification time.
-First real test: 6 MLS fixtures kick off 2026-08-23T01:30Z. Read
-`soccer_source/mls/api/live_state/live_state_2026-08-23.json` after and check
-for `momentum.source == "fotmob"` with a real match id on at least one game --
-a silent 0% resolve rate looks identical to a quiet slate. Full detail:
-`.syndicate/deploys.md` 2026-08-22 22:18:35Z entry.
+**VERIFIED ON PRODUCTION 2026-09-15 18:18:47Z, after a season-rollover fix.
+Until then no Championship, Eredivisie or Belgian Pro League match could
+resolve in the 2026-27 season** (measured: 9 of 9 fixtures None on 09-12).
+`fotmob_match_id.py` had pinned FotMob's league `id`, which is SEASON-SCOPED
+for Eredivisie, Championship, Belgian Pro League and MLS: 900368/900638/900433
+in 2025-26 became 937276/938218/937988. MLS 913550 is 2026's id and would have
+broken in 2027. Leagues now match on country AND FotMob `primaryId`
+(57/48/40/130, the same in every season read 2024-25..2026-27; the other six
+leagues have `id == primaryId`). The exact-name allowlist is a fallback only.
+Commit `c725cc29`, lane `fotmob-season-scoped-league-ids`. live-odds-worker went
+live at 18:15:16Z. The first post-live eredivisie `live_state_2026-09-15.json`
+(generated 18:17:24Z) shows Ajax v Willem II at 16' with `supported True`,
+`source fotmob`, `fotmob_match_id 5781718` and 16 events. Known misses left are
+TEAM-NAME aliases (Waasland-Beveren/SK Beveren, Sint-Truidense/St.Truiden,
+LAFC/Los Angeles FC: 3 of 44 fixtures), in `leads.md`. Detail: `.syndicate/deploys.md`
+2026-09-15 18:08:50Z entry.
+
+**THE DATASET ABOVE IS NOT TWO SEASONS FOR ALL TEN LEAGUES.** The harvest
+used the same 2025-26 ids, so `fotmob_2y.json.gz` holds 2025-26 ONLY for
+belgian_pro_league (240), championship (552), eredivisie (306) and mls (299).
+The other six have both seasons. Read 2026-09-15, split at 2025-07-15. Any
+finding quoted from it rests on one season for those four leagues.
 
 ## [soccer-compact-cards] Pregame + final compact cards redesigned and DEPLOYED, verified on production HTML (2026-08-22)
 
