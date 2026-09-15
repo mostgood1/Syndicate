@@ -1745,8 +1745,8 @@ death, never life — do not invert it.
   - H19 FALSIFIED, the shrink placed in the producer. Local commit `507ea9b6` put it in `espn_player_stats.py`, never landed. The engine replay did not reproduce H16: prior-season player files win the dedupe in `build_soccer_artifacts._load_player_rows`, so the shrunk rows never reach `build_usage_profiles`. Evidence is in `log/2026-09-15.md`.
   - LEFT:
     - ~~Move the shrink to load time~~ DONE (`ef9f18fc`), H19-b NOT FALSIFIED.
-    - Put goals on the start/sub mixture in `player_props.py` (H17).
-    - Tests, the user's board-field decision, and a deploy.
+    - ~~Put goals on the start/sub mixture~~ DONE (`88df44cd`), H17 REPRODUCED by the shipped code: DIV 0.2716 -> MIX 0.2673 on 9,810 TEST rows, level 1.16 -> 0.96, better in 9/10 leagues and better than today's board field in 8/10.
+    - LEFT: the user's board-field decision (unconditional vs conditional) and a deploy. Tests are done: 35 targeted tests, reachability and mutation checks included.
   - Blocking: two file claims, both held by this session's own lanes (see `Blocked by`).
 - Goal: soccer anytime-scorer probabilities stop pricing players at exactly 0, and are conditional on the player appearing. ESPN-league goal and assist rates are shrunk toward a positional prior, and goals use the same start/sub mixture as shots. On held-out dates, with production-shaped inputs, the SHIPPED engine beats today's anytime field on log loss, pooled and in >= 8 of 10 leagues. Landed on main with reachability tests. Which anytime field the board prices (unconditional or conditional) is put to the user. Deploy per user.
 - Files:
