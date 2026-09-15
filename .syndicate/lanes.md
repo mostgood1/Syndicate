@@ -1768,6 +1768,15 @@ death, never life — do not invert it.
   - After deploy, the zero share of anytime probabilities on published non-GK rows is 0.
 - Blocked by: two claims, both held by lanes of this session. `soccer-player-role-allocation` holds `player_props.py` until refresh-worker's ladder reading. `soccer-player-substrate` holds `build_soccer_artifacts.py` until fix #1's verify closes it (7/10 leagues read at 22:15Z); that file then transfers here.
 
+### fotmob-join-coverage-check — OPEN — opened 2026-09-15 — session da346015-cd58-450a-a9e0-bba6bdb00403
+- Goal: a checker resolves every upcoming ESPN fixture in the 10 tracked leagues through production's `resolve_fotmob_match_id`, with production's inputs (`espn_lineups.fetch_events` names, league slug, ESPN date). It exits non-zero on any unresolved fixture, or on any fetch it could not complete, and lists ESPN's names beside FotMob's unmatched fixtures. An ESPN respelling, or a new alias gap, is then caught days before kickoff instead of as a hidden momentum panel. Built, tested, run once over the next 7 days and landed on main; how it runs on a schedule is the user's call.
+- Files: `scripts/check_fotmob_join_coverage.py` (NEW), `tests/test_check_fotmob_join_coverage.py` (NEW)
+- Hypothesis: n/a (a detector). Why detection and not more aliases: an alias for a spelling nobody has seen is a guess (`learnings.md` 2026-09-06 FORBIDDEN: a refusal keyed to one spelling of a value with synonyms), while ESPN and FotMob both publish fixtures days ahead.
+- Falsification test: an injected respelling (ESPN "Stade Rennais FC" on a recorded fixture) does NOT make the checker exit non-zero, OR an ESPN or FotMob fetch failure exits 0.
+- Verification: tests (a respelling exits 1 with both vendors' names listed; a fetch failure exits 2; all resolved exits 0), and one real run over today..+7 days across all 10 leagues, reporting resolved/total and any misses.
+- Blocked by: none
+- **STATUS 2026-09-15 22:3xZ: BUILT + LANDED `60e695c0`, NOT SCHEDULED.** Tests 63 passed: a "1. FC Cologne" respelling exits 1 against the recorded 09-12 listing and prints FotMob's unclaimed `1. FC Köln` fixture; an ESPN or FotMob fetch failure exits 2 (not read as a respelling); a resolved fixture is never offered as a candidate; the poller's single-date window is asserted. Real run 22:2xZ, today (Central) + 6 days, all 10 leagues: **114/114 fixtures resolved, 0 unresolved, 0 unknown, exit 0** — no respelling or alias gap is pending this week, and that covers the weekend's Bayern, Rennes, Köln, Belgian and Championship fixtures. Nothing runs it on a schedule yet; the user is choosing between a local daily task, a GitHub Actions cron and on demand.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
