@@ -312,6 +312,141 @@ def _tag_season_evidence(frame: "pd.DataFrame", latest_frame: "pd.DataFrame | No
     return rows
 
 
+#: ESPN player rows carry NO goals column: for them `xg_per90` IS actual goals per
+#: 90 (source `espn_true_per90`, `espn_player_stats.py`). 53.0% of APPEARED
+#: ESPN-league outfield rows were priced at exactly 0.0 anytime-scorer probability
+#: because of it (H15), and shrinking these two fields toward a positional prior
+#: moved ESPN-league held-out log loss 0.3551 -> 0.2666 with this stabilizer fitted
+#: on TRAIN (H16, lane `soccer-anytime-scorer`).
+#:
+#: IT RUNS HERE, AFTER THE DEDUPE, AND THE PLACEMENT IS THE WHOLE POINT. The same
+#: shrink applied in the PRODUCER never reached the engine: the dedupe above keeps
+#: the row with the MOST MINUTES, and a completed prior season outweighs eight
+#: matchweeks -- measured 2026-09-15 on production's own files, the 2025 row wins
+#: for 129 of 196 championship players present in both files (65.8%) and 187 of 201
+#: in eredivisie (93.0%). H19 was falsified on exactly that, and the producer
+#: commit was reverted (`d2d7b398`). A transform that runs and changes nothing the
+#: engine reads is indistinguishable from a working one at every level except the
+#: data, which is why the test asserts `off != on` through `_load_player_rows`.
+_ESPN_GOAL_SHRINK_STABILIZER = 180.0
+_ESPN_GOAL_SHRINK_FIELDS = ("xg_per90", "xa_per90")
+_ESPN_GOAL_SHRINK_SOURCE = "espn_true_per90"
+
+
+def _espn_goal_shrink_enabled() -> bool:
+    """On unless explicitly disabled. The off switch exists so the reachability
+    test can compare the two paths through the real loader."""
+    raw = str(os.environ.get("SYNDICATE_SOCCER_ESPN_GOAL_SHRINK") or "").strip().lower()
+    return raw not in ("0", "off", "false", "no")
+
+
+def _position_bucket(position: Any) -> str:
+    """Keyword buckets, because ESPN spells positions in prose ("Center Left
+    Defender", "Left Midfielder") and 100-213 rows per league file say only
+    "Substitute" or nothing -- those take the league prior rather than a
+    fabricated one."""
+    text = str(position or "").lower()
+    if "goalkeeper" in text:
+        return "GK"
+    if "defender" in text or "back" in text or "sweeper" in text:
+        return "D"
+    if "midfielder" in text:
+        return "M"
+    if "forward" in text or "striker" in text or "wing" in text:
+        return "F"
+    return "?"
+
+
+def _row_float(row: dict[str, Any], keys: tuple[str, ...]) -> float:
+    for key in keys:
+        value = row.get(key)
+        if value is None or str(value).strip() == "":
+            continue
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            continue
+        if number == number:  # not NaN
+            return number
+    return 0.0
+
+
+def _shrink_espn_goal_rates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Shrink ESPN rows' `xg_per90` / `xa_per90` toward a (bucket, league)
+    minutes-weighted prior: `w * own + (1 - w) * prior`, `w = minutes / (minutes +
+    180)`. Shots are untouched -- the conditional shot ladder owns those.
+
+    Mutates and returns `rows`, and records what it did in the published
+    `player_substrate` audit, so the mechanism is observable in production rather
+    than only in a test.
+    """
+    audit = _PLAYER_LOAD_AUDIT
+    if not _espn_goal_shrink_enabled():
+        audit["espn_goal_shrink"] = {"state": "disabled"}
+        return rows
+    espn = [
+        row for row in rows
+        if str(row.get("source")) == _ESPN_GOAL_SHRINK_SOURCE
+        and _position_bucket(row.get("position")) != "GK"
+    ]
+    if not espn:
+        audit["espn_goal_shrink"] = {"state": "no_espn_rows"}
+        return rows
+
+    def minutes_of(row: dict[str, Any]) -> float:
+        return _row_float(row, ("minutes_played", "minutes"))
+
+    def weighted_prior(group: list[dict[str, Any]]) -> dict[str, float] | None:
+        total = sum(minutes_of(row) for row in group)
+        if total <= 0:
+            return None
+        return {
+            field: sum(_row_float(row, (field,)) * minutes_of(row) for row in group) / total
+            for field in _ESPN_GOAL_SHRINK_FIELDS
+        }
+
+    league_prior = weighted_prior(espn) or {field: 0.0 for field in _ESPN_GOAL_SHRINK_FIELDS}
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for row in espn:
+        groups.setdefault(_position_bucket(row.get("position")), []).append(row)
+    zeros_before = sum(1 for row in espn if _row_float(row, ("xg_per90",)) == 0.0)
+    for bucket, group in groups.items():
+        # The "?" bucket is Substitute/blank -- no position information, so it
+        # takes the league outfield prior rather than a prior of other unknowns.
+        prior = (weighted_prior(group) if bucket != "?" else None) or league_prior
+        for row in group:
+            minutes = minutes_of(row)
+            weight = minutes / (minutes + _ESPN_GOAL_SHRINK_STABILIZER)
+            for field in _ESPN_GOAL_SHRINK_FIELDS:
+                row[field] = weight * _row_float(row, (field,)) + (1.0 - weight) * prior[field]
+    zeros_after = sum(1 for row in espn if _row_float(row, ("xg_per90",)) == 0.0)
+    audit["espn_goal_shrink"] = {
+        "state": "applied",
+        "stabilizer": _ESPN_GOAL_SHRINK_STABILIZER,
+        "rows": len(espn),
+        "buckets": {bucket: len(group) for bucket, group in sorted(groups.items())},
+        "xg_zero_rows_before": zeros_before,
+        "xg_zero_rows_after": zeros_after,
+    }
+    print(
+        f"[build_soccer_artifacts] SOCCER_ESPN_GOAL_SHRINK rows={len(espn)} "
+        f"stabilizer={_ESPN_GOAL_SHRINK_STABILIZER:.0f} "
+        f"buckets={ {bucket: len(group) for bucket, group in sorted(groups.items())} } "
+        f"xg_zero {zeros_before} -> {zeros_after}",
+        flush=True,
+    )
+    return rows
+
+
+def _finalize_player_rows(
+    frame: "pd.DataFrame", latest_frame: "pd.DataFrame | None"
+) -> list[dict[str, Any]]:
+    """The single exit every non-empty `_load_player_rows` path takes: tag season
+    evidence, then shrink ESPN goal rates. Both act on the DEDUPED rows, which is
+    the only place a change reaches `build_usage_profiles`."""
+    return _shrink_espn_goal_rates(_tag_season_evidence(frame, latest_frame))
+
+
 def _drop_departed_players(
     league: str,
     deduped: "pd.DataFrame",
@@ -497,7 +632,7 @@ def _load_player_rows(league: str, source_root: Path) -> list[dict[str, Any]]:
         # this state until their producer ran (see `refresh_odds_sources.py`
         # `_SOCCER_ESPN_PLAYER_LEAGUES`); MLS still is.
         audit["departed_filter"] = "single_season"
-        return _tag_season_evidence(deduped, None)
+        return _finalize_player_rows(deduped, None)
     latest_frame, previous_frame = frames[-1], frames[-2]
     # A NEW SEASON'S FILE STARTS EMPTY AND FILLS UP. Filtering against a file
     # that is still being populated would delete most of the league on the
@@ -561,7 +696,7 @@ def _load_player_rows(league: str, source_root: Path) -> list[dict[str, Any]]:
             "partially-populated file cannot define the current squad)",
             flush=True,
         )
-        return _tag_season_evidence(deduped, latest_frame)
+        return _finalize_player_rows(deduped, latest_frame)
     before = len(deduped)
     deduped = _drop_departed_players(
         league,
@@ -572,7 +707,7 @@ def _load_player_rows(league: str, source_root: Path) -> list[dict[str, Any]]:
     )
     audit["departed_filter"] = "per_club"
     audit["dropped"] = int(before - len(deduped))
-    return _tag_season_evidence(deduped, latest_frame)
+    return _finalize_player_rows(deduped, latest_frame)
 
 
 def _fill_promoted(ratings: dict[str, dict[str, float]], team_names: list[str]) -> list[str]:
