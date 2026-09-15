@@ -164,14 +164,46 @@ is below detection.
 
 ## Owed (not done in this scheduled run)
 
-1. **Harness:** wire point-forecast scoring into `main()`, with a null that is
-   *not* a constant 0.50: "always the model's majority side" for totals, and
-   "back the currently covering side" plus the market price where it departs from
-   0.50 for spreads. Until then the docstring overclaims, and the script cannot
-   measure totals or spreads.
+1. ~~**Harness:** wire point-forecast scoring into `main()` with a non-constant
+   null.~~ **DONE later on 2026-09-15**, see the addendum below.
 2. **Model-engine lead, not this lane:** live `total_mean` runs ~1.4 runs above
    finals early in the game (q1: model − line +2.55 vs actual − line +1.19) and
    is less accurate than the line (MAE 3.46 vs 3.05). It is calibrated by q4.
 3. **Ledger coverage lead:** no v5 totals/full rows on 09-09 (12,967 rows that
    day), and 4-5 games on 09-10 and 09-12. That is thin v5 point-forecast
    coverage, cause unknown.
+
+## Addendum, later 2026-09-15: the harness now does this itself
+
+`main()` now scores totals and spreads through `point_forecast_side`, against
+four nulls, and headlines the edge against the HARDEST one (`binding_null`):
+
+| null | what it is |
+|---|---|
+| `coin_flip` | 0.50, the old read, kept for continuity |
+| `side_base_rate` | the bucket's own win rate for the side the model backed |
+| `scoreboard` | the win rate of "back the side the current score already sits on" |
+| `market_price` | the backed side's de-vig; refused per market if mis-oriented |
+
+The point-forecast gate is corr(line, actual) ≥ 0.2 per game, replacing the
+`market_fair_prob` calibration gate for these markets. A bet missing a score or a
+price is skipped by name. `--rows-jsonl` replays a saved pull, and `ADMIN_TOKEN`
+is read from the environment first. Tests: `tests/test_bucket_realised_performance.py`,
+14/14 including the reachability test.
+
+Replay of the same 86,965-row pull through the harness, edge vs binding null:
+
+| market | q1_early | q2_midearly | q3_midlate | q4_late |
+|---|---|---|---|---|
+| totals | +1.42 (side_base_rate, 65) | −3.97 (side_base_rate, 55) | +2.74 (side_base_rate, 54) | −6.52 (scoreboard, 46) |
+| spreads | +1.56 (scoreboard, 64) | +2.92 (market_price, 55) | −8.33 (market_price, 54) | **−2.08 (scoreboard, 48)**; was +20.8 vs coin_flip |
+| h2h | −0.66 | +6.81 | +5.90 | −1.57 (unchanged) |
+
+Every |σ| ≤ 1.61. The harness now reaches the same verdict as the scratch
+analysis on its own: no bucket survives. The spreads games per band are a little
+lower than in the scratch run because rows with no price now skip. The line gate
+reads +0.422 (totals) and +0.357 (spreads) over 142 games, where the scratch run
+had 0.518 on 74; the gate covers v4 rows too.
+
+Still using 0.50: the production scorer `live_gameline_score.py`
+(`POINT_FORECAST_BASELINE`). Flagged separately.
