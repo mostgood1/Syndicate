@@ -647,7 +647,7 @@ death, never life — do not invert it.
 
 ### polymarket-rejected-resubmit-loop — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - Goal: [user 2026-09-15: "open a lane for the rejection loop"] a Polymarket order the venue REJECTS is not re-submitted unchanged on every pass, and its reject reason is logged. Read on production: after the fix, a venue rejection produces ONE `submitted->rejected` per (ticker, price, qty), a named reason on the log line, and no further `SUBMIT` for that ticker until something about the order changes. Accepted orders are unaffected (fills, rests and expiries continue).
-- Files: none yet. Diagnostic first; files are declared before any edit. `syndicate/features/shared/polymarket_us_orders.py` is held by `polymarket-ask-pricing` (the same session); any edit there is coordinated in both blocks.
+- Files: none yet. Diagnostic first; files are declared before any edit. (The Polymarket orders module is held by lane polymarket-ask-pricing, owned by the same session; any edit there is coordinated in both blocks.)
 - Origin: found while reading step 1 of `polymarket-ask-pricing` (`deploys.md` 2026-09-15 ~15:55Z).
 - **MEASURED 2026-09-15 before any code, live-odds-worker `54f3d662`:**
   - `aec-nfl-phi-ten-2026-09-20`, `OUTCOME_SIDE_NO`, qty 6.53 @ 0.245 ($1.60), GTD to kickoff 09-20 17:00Z.
@@ -686,7 +686,33 @@ death, never life — do not invert it.
     - Since 09-12, Polymarket reconciles are 23 filled / 34 rejected (all 34 this one ticker) / 8 expired / 9 new.
     - Untested candidate: a venue minimum on order notional (the $1.60 stake is the smallest seen).
     - Precedent: `state_polymarket.md [polymarket-orders-are-cancelled]` (08-30).
-    - Owner: needs its own lane or todo, on the user's decision.
+    - Owner: needs its own lane or todo, on the user's decision. **Opened 2026-09-15 as lane `polymarket-rejected-resubmit-loop`.**
+  - **STEP 2, USER DECISION 2026-09-15 ~11:20 CDT: "build step 2".** Pre-registered BEFORE code:
+    - **Switch.** `SYNDICATE_POLYMARKET_PRICE_AT_ASK`, ON only for `1/true/yes/on`. Absent means off, reproducing today's build byte-for-byte (the step-1 instrument unchanged). Nothing changes on production until the env is set AND a deploy carries it, and both are the user's call.
+    - **Where.** `polymarket_us_submitter.build`, after `order_body` validates (the same place as step 1). No other file changes behaviour. `execute_portfolio`, `portfolio_commit` and `check_order` are untouched.
+    - **Book.** One signed book read. If the ask for our side is unreadable (read failure, empty side), it REFUSES `ask_unreadable`. Unknown must not default permissive; this reverses step 1's never-block rule on purpose, and only when the switch is on.
+    - **EV at the ask, net of fees.**
+      - `p_model = planned_p * (1 + ev_pct/100)`, the same fair step 1 logs.
+      - `cost = ask + fee_per_contract`, with `fee_per_contract = POLYMARKET_ASSUMED_WORST_CASE_RATE` (0.02, `venue_fees.py:465`). That is a bound above the measured 0.015 at mid-price and the 0.0107 measured at 0.235, stated as a bound.
+      - `ev_net_pct = (p_model / cost - 1) * 100`.
+      - It refuses `ask_ev_below_min` when `ev_net_pct < resolve_settings().min_ev_pct` (the plan's own minimum, default 2.0).
+    - **Kelly at the ask.**
+      - `k(c) = (p_model - c) / (1 - c)`.
+      - `stake_at_ask = planned_stake * min(1, k(cost) / k(planned_p))`, so it only ever shrinks. `check_order` already charged the planned stake, so no cap can be exceeded.
+    - **Price and size.**
+      - The price sent is the ask, snapped up to the tick.
+      - `quantity = min(floor(stake_at_ask / ask), floor(ask_qty))` to the market's increment.
+      - Below one increment it refuses `ask_size_below_minimum`.
+    - **Log.** One `POLYMARKET_PRICED_AT_ASK` line per build: planned price and stake, ask and size, fee bound, `ev_net_pct`, Kelly ratio, the stake and quantity sent, and the decision.
+    - **Falsification.**
+      - (a) With the switch off, a build is byte-identical to today's.
+      - (b) With it on, a 20%-planned build whose ask sits 34 ticks above the quote (the measured `aec-nfl-car-atl` shape, planned 17.7, `ev_at_ask` 1.39) must REFUSE.
+      - (c) A small-edge build at the quote must place at the ask with its stake at or below plan.
+      - (d) A thin ask must cap quantity at `ask_qty`.
+      - (e) A read failure must refuse.
+      - Any of these failing means step 2 is not what it claims.
+    - **Verification after an enabled deploy:** `POLYMARKET_PRICED_AT_ASK` lines on live-odds-worker, refusals by reason, and every placed order's sent price equal to the logged ask. Then fills vs refusals against step 1's population.
+    - **Files:** unchanged (the orders module and its test file).
   - Left: STEP 1's reading, 20 or more `POLYMARKET_BOOK_AT_BUILD` lines. There are 0 so far. The instrument has been live since 16:02:43Z, but no NEW Polymarket order has been built since: the totals are paused before build, and the placed moneylines are duplicates.
   - STEP 2 waits on that population and on the user's go. Nothing blocks it except the population.
   - Also carried, added on the user's decision rather than part of this goal: every Polymarket order expires at kickoff (`16de339b`, live 16:53:31Z). Its first good-till-date `SUBMIT` is owed.
@@ -1347,6 +1373,16 @@ death, never life — do not invert it.
 - Blocked by: none.
 
 ### book-quotes-prefer-fuller-copy — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- **VERDICT 2026-09-15 ~11:25 CDT, session 0f5b256e — THE FORCED READ RAN; FALSIFICATION FIRED.** Goal: when a `book_quotes` shard exists both plain and as `.gz`, every reader gets the copy holding MORE data, so the 18 mismatched shards on refresh-worker (mlb 09-03..09-09, ncaaf 09-05, soccer 08-22..09-09) stop serving their shorter plain file — without ever preferring a truncated or unverifiable `.gz`. — **GOAL: NOT MET. The resolver is correct for the shape it tests, and that shape is the minority.**
+  - **The reading.** refresh-worker `d4c8814f` (live 16:10:11Z). `RESOLVE_PROBE_SCHEDULED` at 16:11:03Z, then 20 `RESOLVE_PROBE` lines from 16:21:03Z, and `RESOLVE_PROBE_DONE {"chose_gz": 2, "chose_plain": 18, "errors": 0, "shards": 20}` at 16:21:12Z.
+  - **MET on 2 of 18:** soccer 08-22 (gz ISIZE 50,874,719 > plain 50,858,878, **lines 106,993 = `gz_lines`**) and soccer 08-29 (54,103,253 > 53,572,366, **lines 113,635 = `gz_lines`**). A byte-fuller `.gz` wins, and readers get every line of it.
+  - **Correct on the 2 plain-longer shards:** mlb 09-13 plain (123,949) and soccer 08-30 plain (125,119).
+  - **FIRED on the other 16:** mlb 09-03..09-09, ncaaf 09-05, and soccer 08-23, 09-02, 09-04, 09-05, 09-06, 09-07, 09-09, 09-13.
+    - Every one has **`gz_trailer_bytes == plain_bytes` exactly** (e.g. mlb 09-03: 63,389,054 both), while the compaction log counts MORE lines in the `.gz` (140,236 vs 140,224).
+    - A tie goes to plain by design, so readers still get the SHORTER copy.
+    - The pre-registered caveat ("compares BYTES, not lines") covered a gz with fewer bytes. It did not foresee EQUAL bytes.
+  - **What equal size with more lines means (unverified):** the two copies differ in content at the same length. The `.gz` has newlines where the plain file has other bytes. Candidates: interleaved appends that overwrote record boundaries in the plain file, or NUL/garbage runs. This is a data-integrity question about the plain shards, not a resolver bug.
+  - **Next:** a read-only content diff of one tied shard (mlb 09-03) on refresh-worker: first differing offset, bytes around it, and whether the plain file's "missing" lines are corrupted records. The probe marker (`.resolve_probe_2026-09-15-fuller-copy.done`) stops a re-run; bump the version for a second probe. Decision for the user: extend the resolver to break byte ties on line count (one extra streaming pass per tied shard), or repair or remove the corrupted plain copies.
 - **VERDICT 2026-09-15 ~10:20 CDT, session 0f5b256e.** Goal: when a `book_quotes` shard exists both plain and as `.gz`, every reader gets the copy holding MORE data, so the 18 mismatched shards on refresh-worker (mlb 09-03..09-09, ncaaf 09-05, soccer 08-22..09-09) stop serving their shorter plain file — without ever preferring a truncated or unverifiable `.gz`. — **GOAL: NOT MET — still UNEXERCISED, not failed.**
   - refresh-worker `LATEST_CACHE_EVICT` from 21:44:09Z 09-14 to 14:56:53Z 09-15: 464 evictions, ALL plain `.jsonl`, 0 for an affected date. The builds since then (`9b214a33` live 14:37Z) still carry `57b67127`.
   - **What blocks it:** no production consumer reads 09-03..09-09 by itself, so passive waiting will not produce the reading. The next step is a deliberate one-shot read of an affected date on refresh-worker (e.g. `mlb 2026-09-03`, expecting `evicted_rows 140236`), which is a code or ops change needing its own decision. Otherwise, close this lane as UNVERIFIABLE-by-demand.

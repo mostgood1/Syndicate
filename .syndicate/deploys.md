@@ -35453,3 +35453,25 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Polymarket reconciles since 09-12: 23 `order_state_filled`, 8 `order_state_expired`, 9 `order_state_new`, 34 `order_state_rejected`. No `LIVE_ORDER status=failed`.
 - **FOUND, not fixed:** all 34 rejections are ONE order. `aec-nfl-phi-ten-2026-09-20` NO, 6.53 @ 0.245 ($1.60 stake), was re-submitted every ~17 min from 05:18Z 09-15. Each one reconciled `submitted->rejected cum=0`, so no fill and no spend. No reject reason is logged. Lane lead; owner undecided.
 - No claim taken (read-only).
+
+## 2026-09-15 16:03:59Z (11:04 CT) — refresh-worker `9b214a33` -> `d4c8814f` — deploy `dep-dakmoruk1f9s73dro8ig` — lane book-quotes-prefer-fuller-copy — **verify: FALSIFICATION FIRED (2 of 18 predicted `.gz` choices)**
+- **What:** a one-shot `RESOLVE_PROBE` reads every dual-form `book_quotes` shard through `resolve_book_quotes_path` + `_open_book_quotes_text`. It is started from `run_disk_maintenance` on refresh-worker only, once per process, once per disk (marker), 600 s after the call. User decision: "force the book-quotes read", then "Deploy now".
+- **Ride-along** to refresh-worker, all on main and already live on web: `da013b77` (`_read_state_payload` returns the expanded payload) and `da268e07` (`by_date.stored_candidate_count` + `COMBINED_BOARD_STATE_ROWS_UNREADABLE`). No `requirements*` or `render.yaml` change. `9b214a33` is an ancestor.
+- **Locks:**
+  - Claim acquired 15:48:23Z (token `2654b19a…`, holder book-quotes-prefer-fuller-copy).
+  - Preflight HOLD 15:49Z-16:02Z: 3 jobs, the soccer odds refresh with `build_soccer_artifacts.py --league serie_a`.
+  - The `ace4498c` preflight then required a stated expectation: `--expect resolve_probe_chose_gz=18 --expect resolve_probe_chose_plain=2`, baseline 0/0 (0 `RESOLVE_PROBE` lines since 14:37Z, re-read on every try).
+  - CLEAR 16:03:46Z (baseline read 16:03:42Z).
+  - Live **16:10:11Z**. Claim released ~16:25Z.
+- **Expected vs measured:**
+  - `resolve_probe_chose_gz`: expected 18, **measured 2**.
+  - `resolve_probe_chose_plain`: expected 2, **measured 18**.
+  - `errors` 0. `RESOLVE_PROBE_DONE` at 16:21:12Z; the 20 shards were read in 9 s.
+- **The 2 `.gz` choices are correct and complete:**
+  - soccer 08-22: ISIZE 50,874,719 > plain 50,858,878, lines 106,993 = compaction `gz_lines`.
+  - soccer 08-29: 54,103,253 > 53,572,366, lines 113,635 = `gz_lines`.
+- **The prediction's error:** the 16 other gz-longer shards have `gz_trailer_bytes == plain_bytes` EXACTLY (e.g. mlb 09-03 63,389,054 both) while holding more lines (140,236 vs 140,224). The resolver compares bytes and ties go to plain, so readers still get the shorter copy on those 16.
+- Equal length with more newlines means the copies differ in CONTENT. The plain shards are suspected corrupted at record boundaries; not measured.
+- The 2 plain-longer shards (mlb 09-13, soccer 08-30) correctly stayed plain.
+- **verify: NOT MET** for the lane goal. Lane `book-quotes-prefer-fuller-copy` holds the next step: a content diff of one tied shard, then the user's choice between a line-count tie-break and repairing the plain copies.
+- Rollback: redeploy `9b214a33` to refresh-worker. The probe is read-only and one-shot, and the marker stops it re-running.

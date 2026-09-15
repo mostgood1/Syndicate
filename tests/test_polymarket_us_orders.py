@@ -882,6 +882,114 @@ def test_the_book_read_can_be_switched_off(monkeypatch, capsys):
 
 
 # --------------------------------------------------------------------------
+# PRICED AT THE ASK  [#662 step 2, lane polymarket-ask-pricing]. Behind
+# SYNDICATE_POLYMARKET_PRICE_AT_ASK; absent is the step-1 build exactly.
+# --------------------------------------------------------------------------
+
+_ASK_ENV = "SYNDICATE_POLYMARKET_PRICE_AT_ASK"
+
+
+def _ask_build(request, monkeypatch, *, price=0.45, book=None, raises=None, min_ev=2.0, enabled=True):
+    """`(fields sent, refusal token)` through the real adapter, the network replaced."""
+    from syndicate.features.shared import polymarket_us_orders as orders
+    from syndicate.features.shared import portfolio_settings
+    from syndicate.features.shared.execution_ledger import _refusal_token
+
+    if enabled:
+        monkeypatch.setenv(_ASK_ENV, "1")
+    else:
+        monkeypatch.delenv(_ASK_ENV, raising=False)
+    monkeypatch.delenv(_BOOK_ENV, raising=False)
+    monkeypatch.setattr(portfolio_settings, "resolve_settings",
+                        lambda: portfolio_settings.PortfolioSettings(min_ev_pct=min_ev))
+    sent = {}
+    monkeypatch.setattr(orders, "submit_order", lambda req, **fields: sent.update(fields) or {"status": "submitted"})
+    try:
+        send, _reads = _book_build(request, monkeypatch, price=price, book=book, raises=raises)
+    except OrderBuildError as exc:
+        return None, _refusal_token(exc)
+    send()
+    return sent, None
+
+
+def test_off_by_default_the_build_is_the_step_one_build(monkeypatch, capsys):
+    """(a) OFF != ON: absent switch sends the plan's price and stake, uncapped."""
+    sent, refused = _ask_build(_priced(), monkeypatch, enabled=False)
+    assert refused is None
+    assert sent["price_dollars"] == 0.45
+    assert sent.get("stake_dollars") is None and sent.get("max_quantity") is None
+    out = capsys.readouterr().out
+    assert "POLYMARKET_BOOK_AT_BUILD" in out and "POLYMARKET_PRICED_AT_ASK" not in out
+
+
+def test_the_measured_car_atl_shape_is_refused(monkeypatch, capsys):
+    """(b) Planned 17.7% at 0.47 against a 0.545 ask x 30 (production 2026-09-15 15:00:21Z):
+    fair 0.5526 over a 0.565 cost is -2.2% net, under the 2% minimum."""
+    request = _priced(american=0.4695, ev=17.702522)
+    sent, refused = _ask_build(request, monkeypatch, price=0.47,
+                               book=_book(bids=(("0.54", "10"),), offers=(("0.545", "30.0"),)))
+    assert sent is None and refused == "ask_ev_below_min"
+    assert "decision=refuse reason=ask_ev_below_min" in capsys.readouterr().out
+
+
+def test_a_small_edge_places_at_the_ask_with_the_stake_kelly_shrunk(monkeypatch, capsys):
+    """(c) +122 (p = 100/222 = 0.45045) at 10% EV, ask 0.45: fair 0.49550 over the 0.47
+    cost (ask + 0.02 fee bound) is +5.42% net, and Kelly at that cost is 0.5869 of
+    Kelly at plan, so $10 becomes $5.86 (floored to the cent)."""
+    sent, refused = _ask_build(_priced(), monkeypatch)
+    assert refused is None
+    assert sent["price_dollars"] == 0.45
+    assert sent["stake_dollars"] == 5.86
+    assert sent["stake_dollars"] <= 10.0
+    assert sent["max_quantity"] == 151604.01
+    assert "decision=place" in capsys.readouterr().out
+
+
+def test_a_thin_ask_caps_the_quantity(monkeypatch):
+    """(d) 3 contracts at the ask means 3 contracts sent, not the 13.04 the stake buys."""
+    from syndicate.features.shared.polymarket_us_orders import order_body
+
+    request = _priced()
+    sent, refused = _ask_build(request, monkeypatch, book=_book(offers=(("0.4500", "3.0"),)))
+    assert refused is None
+    body = order_body(request, **sent)
+    assert body["quantity"] == 3.0 and body["price"]["value"] == "0.45"
+
+
+def test_a_failed_read_refuses_when_pricing_at_the_ask(monkeypatch):
+    """(e) Unknown is not a price once the book decides."""
+    sent, refused = _ask_build(_priced(), monkeypatch, raises=RuntimeError("http_401"))
+    assert sent is None and refused == "ask_unreadable"
+
+
+def test_an_empty_ask_side_refuses(monkeypatch):
+    sent, refused = _ask_build(_priced(), monkeypatch, book=_book(offers=()))
+    assert sent is None and refused == "ask_unreadable"
+
+
+def test_the_minimum_is_the_plans_own_setting(monkeypatch):
+    """The same +5.43% build refuses when the portfolio minimum is 6%."""
+    sent, refused = _ask_build(_priced(), monkeypatch, min_ev=6.0)
+    assert sent is None and refused == "ask_ev_below_min"
+
+
+def test_a_no_order_is_priced_at_one_minus_the_best_yes_bid(monkeypatch):
+    """NO at plan 0.2398 / 7.2% EV against the measured PHI-TEN book (bid 0.76):
+    ask 0.24, cost 0.26, fair 0.2571 -> -1.1% net, refused. The measured order
+    that re-submitted 34 times would not have been sent."""
+    request = _priced(side="under", american=0.2398, ev=7.197926)
+    sent, refused = _ask_build(request, monkeypatch, price=0.245,
+                               book=_book(bids=(("0.76", "8192.7"),), offers=(("0.765", "100"),)))
+    assert sent is None and refused == "ask_ev_below_min"
+
+
+def test_a_cap_below_one_increment_is_a_named_refusal():
+    request = _Request(stake=10.0)
+    with pytest.raises(OrderBuildError, match="^ask_size_below_minimum"):
+        _body(request=request, max_quantity=0.5)
+
+
+# --------------------------------------------------------------------------
 # EXPIRE AT KICKOFF  [2026-09-11, lane polymarket-ask-pricing]. A resting
 # pregame order must die at kickoff, not fill into the game at a stale price.
 # --------------------------------------------------------------------------

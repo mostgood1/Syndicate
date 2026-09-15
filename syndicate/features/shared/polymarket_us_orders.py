@@ -649,8 +649,14 @@ def order_body(
     outcome_index: Any = None,
     yes_leg_index: Any = None,
     yes_leg_reason: Any = None,
+    stake_dollars: Any = None,
+    max_quantity: Any = None,
 ) -> dict[str, Any]:
     """The JSON body for one order. PURE -- no clock, no network, no env.
+
+    `stake_dollars` and `max_quantity` are None on every path except pricing at
+    the ask (#662 step 2): a stake re-sized by Kelly at the ask, and the size
+    resting at that ask. None reproduces the planned stake and no cap exactly.
 
     `tick_size` and `minimum_trade_qty` are REQUIRED arguments rather than
     optional ones with defaults. The documentation says not to infer them, and
@@ -689,11 +695,25 @@ def order_body(
             f"price_out_of_range_after_snap: price={price} tick={tick_size} snapped={snapped}"
         )
 
-    stake = float(getattr(request, "requested_stake_dollars", 0.0) or 0.0)
+    if stake_dollars is None:
+        stake = float(getattr(request, "requested_stake_dollars", 0.0) or 0.0)
+    else:
+        stake = float(stake_dollars)
     # SIZED AGAINST THE PRICE WE WILL PAY, which is the snapped one. Sizing off
     # the unsnapped price would buy a quantity the order cannot afford at the
     # price actually sent.
     quantity = quantity_for_stake(stake, snapped, minimum_trade_qty)
+    if max_quantity is not None:
+        # NO MORE THAN RESTS AT THE PRICE WE PAY (#662 step 2). Floored to the
+        # increment for the same reason the stake is: a cap the rounding exceeds
+        # is not a cap.
+        increment = _positive_float(minimum_trade_qty, "minimum_trade_qty")
+        available = math.floor(round(float(max_quantity) / increment, 9)) * increment
+        quantity = round(min(quantity, available), 9)
+        if quantity < increment:
+            raise OrderBuildError(
+                f"ask_size_below_minimum: available={max_quantity} min_qty={increment}"
+            )
 
     from syndicate.features.shared.execution_ledger import idempotency_key
 
@@ -793,6 +813,8 @@ def submit_order(
     outcome_index: Any = None,
     yes_leg_index: Any = None,
     yes_leg_reason: Any = None,
+    stake_dollars: Any = None,
+    max_quantity: Any = None,
 ) -> dict[str, Any]:
     """Send one order. Returns the shape `place_order` expects from an adapter.
 
@@ -811,6 +833,8 @@ def submit_order(
         outcome_index=outcome_index,
         yes_leg_index=yes_leg_index,
         yes_leg_reason=yes_leg_reason,
+        stake_dollars=stake_dollars,
+        max_quantity=max_quantity,
     )
     url = _orders_url()
     # THE REQUEST, BEFORE THE RESPONSE. If the venue rejects the body, the
@@ -926,9 +950,17 @@ def polymarket_us_submitter(resolve_market):
         # rebuilds the identical body from these same fields, so every refusal
         # it raises fires here, before the row is written.
         body = order_body(request, **fields)
-        # AN INSTRUMENT, NOT A GATE [#662 step 1]. It logs our side's executable
-        # ask next to the price we send, and it can never refuse an order.
-        _log_book_at_build(request, body)
+        if _price_at_ask_enabled():
+            # PRICED AT THE ASK [#662 step 2]. Refuses when the ask is unreadable
+            # or its EV net of fees is under the plan's minimum; otherwise sends
+            # at the ask with the stake re-sized by Kelly there and capped at the
+            # resting size. Re-validated so every refusal still fires in build.
+            fields = _price_at_ask(request, body, fields)
+            order_body(request, **fields)
+        else:
+            # AN INSTRUMENT, NOT A GATE [#662 step 1]. It logs our side's executable
+            # ask next to the price we send, and it can never refuse an order.
+            _log_book_at_build(request, body)
         return lambda: submit_order(request, **fields)
 
     def submit(request: Any) -> dict[str, Any]:
@@ -1112,6 +1144,110 @@ def _log_book_at_build(request: Any, body: Mapping[str, Any]) -> None:
             " -- instrument only; the order is unaffected",
             flush=True,
         )
+
+
+# --------------------------------------------------------------------------
+# PRICED AT THE ASK  [2026-09-15, #662 step 2, lane polymarket-ask-pricing,
+# user decision "build step 2"]
+# --------------------------------------------------------------------------
+#
+# Step 1 measured what the plan's price is worth at the book: over 28 builds,
+# planned EV under 5% priced within a point of the ask 11 of 13 times, and every
+# build planned above 10% was not executable at plan -- at >= 20%, 0 of 3 were
+# marketable, the ask 34-40 ticks above the price sent and the EV there 32-50
+# points below plan (`state_polymarket.md [polymarket-ask-at-build-step1]`).
+#
+# So with the switch on, the book decides: EV and Kelly are re-priced at our
+# side's ask NET OF A FEE BOUND, the order refuses below the plan's own minimum
+# EV, is sent AT the ask, and buys no more than rests there. The stake only
+# ever shrinks -- `check_order` has already charged the planned stake.
+#
+# OFF UNLESS `SYNDICATE_POLYMARKET_PRICE_AT_ASK` is 1/true/yes/on. Absent is the
+# step-1 build exactly. And UNKNOWN REFUSES here, unlike the step-1 instrument:
+# once the book is the price, an unreadable book is not a price.
+
+_PRICE_AT_ASK_ENV = "SYNDICATE_POLYMARKET_PRICE_AT_ASK"
+
+
+def _price_at_ask_enabled() -> bool:
+    return str(os.environ.get(_PRICE_AT_ASK_ENV) or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _kelly_fraction(p_model: float, cost: float) -> float:
+    """Full Kelly for a binary contract bought at `cost` that pays $1: (p - c) / (1 - c)."""
+    if not 0.0 < cost < 1.0:
+        return 0.0
+    return (p_model - cost) / (1.0 - cost)
+
+
+def _price_at_ask(request: Any, body: Mapping[str, Any], fields: Mapping[str, Any]) -> dict[str, Any]:
+    """`fields` re-priced at our side's ask, or an `OrderBuildError` naming why not."""
+    from syndicate.features.shared.venue_fees import POLYMARKET_ASSUMED_WORST_CASE_RATE
+
+    slug = body.get("marketSlug")
+    side = body.get("outcomeSide")
+    facts: dict[str, Any] = {"slug": slug, "side": side, "sent_plan": fields.get("price_dollars")}
+
+    def refuse(reason: str, detail: str) -> None:
+        print(
+            f"[polymarket_us_orders] POLYMARKET_PRICED_AT_ASK decision=refuse reason={reason} "
+            + " ".join(f"{k}={v}" for k, v in facts.items()),
+            flush=True,
+        )
+        raise OrderBuildError(f"{reason}: {detail}")
+
+    try:
+        data = _read_book(slug)
+    except Exception as exc:  # noqa: BLE001 -- named, then refused
+        refuse("ask_unreadable", f"book read failed {type(exc).__name__}")
+    book = data.get("marketData", data) if isinstance(data, Mapping) else {}
+    best_bid = _book_level(book.get("bids") or [])
+    best_offer = _book_level(book.get("offers") or [])
+    if side == _SIDE_NO:
+        ask = (round(1.0 - best_bid[0], 6), best_bid[1]) if best_bid else None
+    else:
+        ask = best_offer
+    facts.update(ask=ask[0] if ask else None, ask_qty=ask[1] if ask else None)
+    if not ask or not 0.0 < ask[0] < 1.0 or ask[1] <= 0:
+        refuse("ask_unreadable", f"no executable ask on {side}")
+
+    planned = _implied_probability(getattr(request, "requested_price", None))
+    ev = getattr(request, "ev_pct", None)
+    if not planned or not isinstance(ev, (int, float)) or isinstance(ev, bool):
+        refuse("ask_ev_unknown", "no planned price or ev_pct on the position")
+    p_model = planned * (1.0 + float(ev) / 100.0)
+    fee = float(POLYMARKET_ASSUMED_WORST_CASE_RATE)
+    cost = ask[0] + fee
+    ev_net = (p_model / cost - 1.0) * 100.0
+    facts.update(planned_p=round(planned, 4), planned_ev_pct=ev, fee_bound=fee, ev_net_at_ask_pct=round(ev_net, 2))
+
+    try:
+        from syndicate.features.shared.portfolio_settings import resolve_settings
+
+        min_ev = float(resolve_settings().min_ev_pct)
+    except Exception as exc:  # noqa: BLE001 -- the threshold is not optional
+        refuse("ask_min_ev_unknown", f"portfolio settings unreadable {type(exc).__name__}")
+    facts["min_ev_pct"] = min_ev
+    if ev_net < min_ev:
+        refuse("ask_ev_below_min", f"ev_net_at_ask={ev_net:.2f} < min_ev={min_ev}")
+
+    k_plan = _kelly_fraction(p_model, planned)
+    k_ask = _kelly_fraction(p_model, cost)
+    ratio = 0.0 if k_plan <= 0 else max(0.0, min(1.0, k_ask / k_plan))
+    planned_stake = float(getattr(request, "requested_stake_dollars", 0.0) or 0.0)
+    stake = math.floor(planned_stake * ratio * 100.0) / 100.0
+    facts.update(kelly_ratio=round(ratio, 4), planned_stake=planned_stake, stake=stake)
+    if stake <= 0:
+        refuse("ask_kelly_non_positive", f"kelly_ratio={ratio:.4f}")
+
+    priced = dict(fields)
+    priced.update(price_dollars=ask[0], stake_dollars=stake, max_quantity=ask[1])
+    print(
+        "[polymarket_us_orders] POLYMARKET_PRICED_AT_ASK decision=place "
+        + " ".join(f"{k}={v}" for k, v in facts.items()),
+        flush=True,
+    )
+    return priced
 
 
 # --------------------------------------------------------------------------
