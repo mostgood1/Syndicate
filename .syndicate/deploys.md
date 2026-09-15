@@ -36142,3 +36142,12 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Pooled over those plus one old artifact: share 0.156, `shot_mean_vs_ladder_ratio` 1.241 (> 1, as predicted).
   - epl `recommendations_2026-09-18.json`, gen 21:45:50Z: 43/43 unconditional. An OLD-code writer: its `expected_shots_if_playing` equals `expected_shots / 0.25`, the pre-step-B floor that `build_usage_profiles` at `b33ef901` can no longer produce. Most likely refresh-worker (`f833f7ec`, odds refresh job in flight); not proven from logs.
   - **Verdict for live-odds-worker: prediction MET** on 3 leagues' post-deploy artifacts, restricted to rows that can discriminate. The other 7 leagues had no artifact built by it yet at 22:05Z; the watcher continues.
+
+## 2026-09-15 22:13Z (17:13 CT) — FOLLOW-UP to the 22:04:17Z live-odds-worker `8c089e8c` -> `2d579fd1` entry — lane soccer-live-scoreboard-range-stale — **FIRST POST-DEPLOY SOCCER TICK CLEAN: the new scoring code imports and runs; claim released 22:13:09Z**
+- No deploy. Reading taken from live-odds-worker's logs since the 22:09:41Z go-live (`render_logs.py`, polled 22:11:39Z and 22:12:43Z).
+- **Soccer poller ran on the new code:** `wrote /opt/render/project/data/soccer_source/<league>/api/live_state/live_state_2026-09-15.json` at 22:11:22Z for bundesliga, serie_a, ligue_1, mls and others (8 write lines, `0 live games`).
+- **Loop tick:** `[live_lens_loop] TICK_COMPLETE results={'mlb': True, 'wnba': True, 'soccer': True, 'nfl': True} skipped=['nba']` at 22:12:26Z.
+- **Errors since go-live:** `LEAGUE_POLL_FAILED` 0, `Traceback` 0.
+- **What this proves and what it does not:** `build_live_state`, `extract_goals` and `extract_shot_events` import and run inside the production poller (reachability). It does NOT show a corrected score: no match was in play. **Still OWED:** on the first live match with a penalty or own goal, the served `games` score equals ESPN's.
+- **Claim released** 22:13:09Z (status `free`). `book-quotes-splice-repair` (env + same `2d579fd1`) and then `legacy-steam-crossing-delta` (main tip) were told.
+- **refresh-worker** went live on `2d579fd1` at 22:12:03Z (entry above, lane `soccer-player-role-allocation`), so `082da3e3` is now live there. This lane's option-1 reading, refresh-worker's first `pull_hot_artifacts` `since=` equals its own previous pull start, is being read and follows separately.
