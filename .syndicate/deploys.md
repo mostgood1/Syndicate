@@ -35418,3 +35418,25 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
 - Served `/mlb/api/live-lens?date=2026-09-14`: 15 games, 749,835 B (final slate; bytes not comparable to a live one).
 
 **book-quotes-prefer-fuller-copy — verify still UNEXERCISED.** refresh-worker `LATEST_CACHE_EVICT` 21:44:09Z 09-14 to 14:56:53Z 09-15: 464 evictions, all plain `.jsonl`, 0 for an affected date (mlb 09-03..09-09, ncaaf 09-05, soccer 08-22..09-09). No consumer reads those dates on demand. The reading needs a deliberate one-shot read, which is a separate decision.
+
+## 2026-09-15 15:30:14Z (10:30 CT) — web `b6a0e346` -> `da268e07` — deploy `dep-dakm91id0e5s73efe1d0` — lane combined-board-rows-unreadable-tripwire — **verify MET; the instrument reads stored > rows by the per-sport cap, as designed**
+- **What:** `by_date[date].stored_candidate_count` (the writer's stored `candidate_count`; `None` on `DATE_MISS`) beside `candidate_count` (rows read), plus a `COMBINED_BOARD_STATE_ROWS_UNREADABLE date= stored= rows=0 stamp= by_sport_shape=` print when rows are 0 and stored is above 0. Postmortem check (2). User decisions: "build check 2, take the claim" and "go ahead, deploy it".
+- **Locks:** web claim acquired 15:29:21Z (token `0f1e2ea2d9dd04b6`, holder combined-board-rows-unreadable-tripwire). Preflight `--target-commit da268e07` CLEAR at 15:29:52Z (infra only, 2 defunct children). `da268e07` on origin/main.
+- **Baseline** (15:29:24Z on `b6a0e346`, taken at preflight per the 2026-09-15 FORBIDDEN rule):
+  - `by_date` 09-15 111; 09-16 and 09-17 0 (`DATE_MISS`). `legacy_candidate_count 111`, `layer2_fallback_rows 4393`.
+  - Served 3,060 = 111 state (rows carrying `candidate_id`) + 2,949 `source layer2_shortlist`.
+  - `computed_at 15:13:40Z` `stale`. 0 `VINTAGE_IGNORED`.
+- **Prediction** (derived from that baseline): 09-15 `stored_candidate_count` == `candidate_count`; 09-16 and 09-17 `None`; 0 `ROWS_UNREADABLE`; served rows and `computed_at` unchanged apart from build churn.
+- **Result:** POST 15:30:14Z; `update_in_progress` 15:34:47Z; live 15:36:46Z.
+- **Reading** (15:37:01Z and 15:38:34Z):
+  - The field is present on every date. 09-16 and 09-17 are `None`, as predicted.
+  - Web 15:36:46-15:37:19Z: **0** `COMBINED_BOARD_STATE_ROWS_UNREADABLE`, 0 `VINTAGE_IGNORED`, 0 `Traceback`, 4 `DATE_MISS` (09-16/09-17).
+  - Served 3,060 = 111 state + 2,949 L2-A, and `computed_at 15:13:40Z`: unchanged from baseline.
+- **PREDICTION WRONG, BENIGN: 09-15 `stored_candidate_count 113` vs `candidate_count 111`.**
+  - refresh-worker `CANDIDATE_POOL_READY date=2026-09-15 count=113` (15:16:36Z) and `STATE_PERSIST_BEGIN candidate_count=113` (15:17:46Z): the stored number is the full pool.
+  - The writer builds `by_sport` from the ranked pool with a PER-SPORT cap, `_default_unbounded_by_sport_cap()` = 60 (`pipeline/intelligence_state.py` ~375), and sets `candidate_count = len(candidates)`.
+  - Served state rows by sport: **La Liga 60 (exactly the cap)**, MLB 44, Championship 7. `SYNDICATE_INTELLIGENCE_DEFAULT_BY_SPORT_CAP` is unset on refresh-worker and web (single-key env GET, HTTP 404), so the default 60 applies.
+  - So the gap of 2 is La Liga beyond the cap. That is INFERRED: the per-sport pool count is not served.
+  - The tripwire fires only at `rows == 0`, so it is correctly silent. The prediction missed the cap, which was already documented at the call site.
+- Rollback: redeploy `b6a0e346` to web (instrument only; no rows, ranking or `state_meta` change).
+- Claim released after this entry is pushed.

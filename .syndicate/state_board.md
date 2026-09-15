@@ -933,3 +933,17 @@ and adds risk:
 - **If an oversized snapshot ever returns, the fix is allowlist + disk-aware read +
   a max-age refusal on disk copies, TOGETHER**, and it needs a web + refresh-worker
   deploy. Not before.
+
+**`by_date[date].stored_candidate_count` IS LIVE (web `da268e07`, 15:36:46Z
+2026-09-15)** beside `candidate_count`, with the log line
+`COMBINED_BOARD_STATE_ROWS_UNREADABLE` when rows are 0 and stored is above 0. **Read
+the two numbers correctly:**
+- `stored` is the writer's full pool.
+- `candidate_count` is the rows in `by_sport`, which the writer caps at 60 PER SPORT
+  (`SYNDICATE_INTELLIGENCE_DEFAULT_BY_SPORT_CAP`, unset on refresh-worker and web).
+- So `stored >= rows` is normal. First reading: 09-15 stored 113, rows 111, with La
+  Liga served at exactly 60.
+- Only `rows 0 / stored > 0` is the unreadable-payload defect.
+- `stored None` means no payload was read for that date.
+- 0 unreadable lines since go-live. The firing branch is proven by
+  `tests/test_combined_board_rows_unreadable.py`, not yet by production.

@@ -9272,6 +9272,14 @@ def read_combined_intelligence_response(
         # payload, which carried only the reader's number. The log line below
         # names the shape `by_sport` actually arrived in, so the next occurrence
         # is diagnosed from one line instead of a day.
+        #
+        # `stored > rows` IS NORMAL AND IS NOT THIS DEFECT. The writer stores the
+        # full pool as `candidate_count` but caps each `by_sport` list at
+        # `_default_unbounded_by_sport_cap()` (60, `SYNDICATE_INTELLIGENCE_DEFAULT_BY_SPORT_CAP`).
+        # Measured on web `da268e07` 2026-09-15 15:38Z: 09-15 stored 113, rows
+        # 111, with La Liga at exactly 60 served state rows. Only `rows == 0`
+        # with `stored > 0` is unreadable, which is why the line fires there
+        # and nowhere else.
         stored_candidate_count = _optional_int(date_response.get("candidate_count"))
         by_date_summary[requested_date] = {
             "candidate_count": date_candidate_count,
