@@ -6123,3 +6123,15 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - A result whose line numbers, HEAD or `git status` do not match the worktree you meant is the signal. Stop and re-read the tree before running a mutating command.
   - A mutating git command (`rebase`, `reset`, `add`, `commit`) never shares a batch with a call that changes directory.
   - *(evidence: `log/2026-09-15.md` session 3a65723e, dead ends)*
+
+## 2026-09-15 — OVERTURNED: "a deploy the guard let through was a deploy the guard checked" — two web deploys passed `deploy-guard.py` because it never classified them as deploys `[lane deploy-guard-python-post]`
+
+- **What was believed:** the two 2026-09-15 web deploys (`b6a0e346`, `da268e07`) went through the two-lock gate. The claim and a CLEAR preflight had been taken, the deploy call was not refused, and that read as "the guard checked the locks".
+- **What was actually true:** `POST_INTENT` knew only curl/PowerShell. The Python `urllib` POST matched `DEPLOYS_ENDPOINT` but not the intent, so the guard returned exit 0 WITHOUT looking at a claim or a receipt. The locks were held only because the session took them voluntarily. Any session deploying the same way would have skipped both, and `NO_EXPECTATION` too, silently.
+- **How we found out:** a smoke test of the updated guard in the primary tree. A first synthetic command ALSO returned 0 (its "POST" was only in a comment), and asking why led to the pattern. The guard's own blocked shape (`render_deploy.py`) returned 2, while a command shaped exactly like that day's deploys returned 0. Fixed in `11167fdf`; the primary tree now returns 2 for it.
+- **The rule going forward:**
+  - A guard's SILENCE is evidence only for shapes the guard is known to classify. Before relying on "not refused", run the guard on the EXACT command shape you are about to use and see it refuse without locks. Same family as `feedback_instrument_blindness`: a healthy reading means nothing until you have seen what makes it read unhealthy.
+  - When a deploy goes through, look for the guard's own "DEPLOY GUARD: clear" line. Its absence means the command was never classified.
+  - A text guard cannot see into a script run from a FILE; deploy inline, with `scripts/render_deploy.py`, or with curl.
+- **Cost:** two production deploys ran outside the gate they were believed to pass. No harm, because the locks happened to be held, but that was luck of habit, not enforcement.
+  - *(evidence: `leads.md` 2026-09-15 lead, promoted; `log/2026-09-15.md` session 3a65723e; lane `deploy-guard-python-post`)*
