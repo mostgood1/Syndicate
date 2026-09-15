@@ -6351,3 +6351,10 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - Grep the ledger for the last time that value changed on that service. An outage with a revert is usually already written down.
   - Ask what would become observable. If no served surface reads the thing the flip enables, the change is cost with no reading to verify it by.
 - *(evidence: `home.py:691/8305/6709-6713`, `deploys.md` 2026-08-29 12:18 CT and 12:46 CT; `/api/home` read 2026-09-15 22:31:13Z; user decision "Don't add it")*
+
+## 2026-09-15 — OVERTURNED: "`git diff | grep '^-[^-]'` lists the lines a change removes". It SKIPS every removed line that itself starts with `-`, which on a bulleted ledger is most of them `[lane soccer-live-scoreboard-range-stale]`
+
+- **What happened:** re-applying a lane-block edit onto a moved `main`, `--numstat` said **9** deletions while the grep listed **6**. The 3 it hid were ordinary ledger bullets (`- **VERDICT ...`, `- Files: ...`, `- Blocked by: ...`): in a diff they read `-- Files: ...`, and `^-[^-]` rejects them.
+- **Why it matters here:** the standing rule on a shared ledger is "0 deletions, and every deletion is mine". A grep that under-counts deletions makes that check pass while another lane's lines are being dropped.
+- **The rule:** count deletions with `--numstat`, and list them with `grep -E '^-' | grep -v '^---'`. Reconcile the two numbers before staging; if they disagree, the listing is wrong, not the count.
+  - *(evidence: this session's 22:4xZ re-sync; `git diff --cached --numstat` 2/2 on `lanes.md` after the reconciliation)*

@@ -414,13 +414,13 @@ Three facts worth not rediscovering:
   `live_state_{date}.json` (already allowlisted), covering `in` AND `post`,
   separate from `games` so a finished match never reads as live.
 
-## [soccer-live-espn-inputs] SOCCER LIVE STATE: ESPN's RANGE scoreboard is stale (fixed, LIVE); the live score dropped penalties and own goals (fixed on main, NOT DEPLOYED) `[verified 2026-09-15, lane soccer-live-scoreboard-range-stale]`
+## [soccer-live-espn-inputs] SOCCER LIVE STATE: ESPN's RANGE scoreboard is stale (fixed, LIVE); the live score dropped penalties and own goals (fixed, LIVE on both workers 22:09-22:12Z; live-match reading owed) `[verified 2026-09-15, lane soccer-live-scoreboard-range-stale]`
 
 - **ESPN `scoreboard?dates=YYYYMMDD-YYYYMMDD` served a copy ~1 h behind** the single-date form, the undated scoreboard and the summary, in the same second, on both `site.api.espn.com` and `site.web.api.espn.com`. At 20:10:46Z: eng.2 range 5'/6' 0-0, single-date 69'/70'.
 - The range form also returned HTTP 400 on 31 of 60 league-dates probed. Those were other dates; today's answered 200, and live-odds-worker logged 1 `LEAGUE_POLL_FAILED` on 09-15 (a `ReadTimeout`). The single-date form answered 200 on 60/60 with identical event sets.
 - `poll_soccer_live_state.py` read the range form at both call sites, and its stale clock became `build_live_state(as_of_seconds=)`, which cut live goals. **Fixed `20568eff`; live on live-odds-worker since 20:34:57Z** (`18be9107`, since superseded by `991a94d5` / `8c089e8c`, both carrying it). The first post-deploy la_liga `live_state` (20:36:43Z) was within one tick of ESPN.
 - **The live team score dropped penalties and own goals:** `type.startswith("goal")` reproduced ESPN's final score on 68 of 95 finished matches (10 leagues, 09-12..14). Every non-shootout `scoringPlay` for the team ESPN tags gave 95/95, and ESPN tags an own goal with the team it counts for. `extract_goals` also dropped penalties, and `espn_shot_events` dropped a converted penalty from its taker.
-- **Fix `e115cd6b` (`espn_match_events.counts_toward_score`) is on main; replay of the shipped code 95/95. NOT DEPLOYED** as of 21:35Z: `8c089e8c` predates it. Production reading owed on a live match with a penalty or own goal.
+- **Fix `e115cd6b` (`espn_match_events.counts_toward_score`): replay of the shipped code 95/95; LIVE on live-odds-worker 22:09:41Z and refresh-worker 22:12:03Z (`2d579fd1`), first post-deploy soccer tick clean (writes 22:11:22Z, `TICK_COMPLETE` soccer True 22:12:26Z, 0 `LEAGUE_POLL_FAILED`, 0 tracebacks). A CORRECTED SCORE IS NOT YET OBSERVED** as of 21:35Z: `8c089e8c` predates it. Production reading owed on a live match with a penalty or own goal.
 
 ## [soccer-live-momentum] FotMob momentum is production's signal now; the ESPN proxy carries none (2026-08-22)
 
