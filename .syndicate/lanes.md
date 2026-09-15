@@ -2067,6 +2067,43 @@ death, never life — do not invert it.
 - Blocked by: none (the deploy waits on user approval by design)
 - **STATUS 2026-09-15 19:3xZ: BUILT + LANDED `867f1481`, NOT DEPLOYED.** Tests: 78 passed; the new alias cases fail on the previous resolver (12 failed / 3 passed). Measured with production's arguments against live ESPN + FotMob: 230 fixtures over 7 tuning dates, strict 212 -> 230; 159 fixtures over 9 HELD-OUT dates, strict 141 -> 159; loose-vs-strict disagreement 0; true FotMob row removed, wrong ids 0 of 389. **User decision: "After tonight's matches (Recommended)"**: deploy main to live-odds-worker once no tracked league is in play (La Liga Real Madrid at Elche ends ~21:25Z). Ride-along `8b563ca9` `4a1ca2c4` `5686a555` `af7c895c` are live on web only. Production verify owed Sat 2026-09-19 18:45Z (13:45 CT), Zulte-Waregem at Anderlecht, which only the loose pass resolves.
 
+### soccer-player-role-allocation — OPEN — opened 2026-09-15 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Goal: soccer shot and shots-on-target props are priced on a ladder CONDITIONAL ON THE PLAYER APPEARING (start/sub mixture, substitute intensity fitted held-out), and the 1.393 shot divisor is retired with its re-fit machinery. On held-out dates, that ladder beats the post-divisor unconditional ladder on log loss at lines 0.5 and 1.5, pooled and in >= 8 of 10 leagues, on production-shaped inputs. Landed on main with reachability tests; deploy per user.
+- Files:
+  - `syndicate/features/soccer/sim_engine/soccersim/player_props.py`
+  - `syndicate/features/soccer/sim_engine/soccersim/shot_calibration.py` (DELETE)
+  - `tests/test_soccer_shot_shrinkage.py` (DELETE)
+  - `tests/test_soccersim_player_props.py`
+  - `scripts/fit_soccer_shot_shrinkage.py`, `scripts/check_soccer_divisor_reached_engine.py`, `scripts/check_soccer_shot_divisor_vs_season_rate.py` (DELETE)
+  - `syndicate/features/shared/soccer_projections.py` (`_PLAYER_PROB_BY_LINE` only)
+  - `syndicate/features/soccer/features/loaders.py` (`usage_metrics` role fields only)
+  - `syndicate/features/soccer/ingestion/espn_player_stats.py`
+  - `tests/test_soccer_player_role_ladder.py` (NEW)
+  - `scripts/soccer_season_audit/calibration_role_mixture.py`, `calibration_role_mixture2.py`, `calibration_role_mixture3.py` (NEW)
+  - NOT here: `scripts/build_soccer_artifacts.py` and `scripts/refresh_odds_sources.py` stay with `soccer-player-substrate` (same session) until that lane closes.
+- Hypotheses. Each run's hypotheses were written into the script docstring BEFORE that run.
+  - Population: 16,377 appeared outfield (player, match) rows, 07-22..09-14, fix #1 squads, ESPN box scores. Log loss is P(shots >= 1) / P(shots >= 2).
+  - Run 1:
+    - H1, retire the divisor. **SUPPORTED.** Board ladder today 0.690 / 0.570; at 1.5 that is WORSE than a constant (0.553). Without the divisor, 0.632 / 0.498: better in both halves and in 10/10 leagues.
+    - H2, Understat share is per APPEARANCE, not per team minute. **SUPPORTED for starters**: big-five mixture starters 0.57 -> 0.67.
+    - H3, a start/sub mixture beats the better of the unconditional and `/max(share, 0.25)` ladders. **FALSIFIED as registered.** It passed pooled and on both halves, but won only 5/10 leagues against >= 7.
+    - H4, the confirmed-lineup ceiling is 0.020 / 0.013.
+  - Run 2:
+    - H5, team-minutes shares improve the UNCONDITIONAL ladder. **FALSIFIED**: big five 0.644 -> 0.664. So T ships only inside the conditional ladder, and never replaces `expected_minutes_share`, which the live and unconditional paths read.
+    - H6, roles are under-separated. **SUPPORTED**: P(start | appear) averages 0.751 for actual starters and 0.409 for actual subs.
+    - H7, substitute per-minute intensity > 1.5. **SUPPORTED**: 1.87.
+  - Run 3, fitted on dates < 08-26 and scored on >= 08-26:
+    - H8, the refitted mixture beats both the run-1 mixture and the post-divisor ladder. **SUPPORTED**: test 0.611 / 0.469 against 0.621 / 0.474 and 0.641 / 0.517; 9/10 leagues at 0.5, 10/10 at 1.5.
+    - H9, fitted k is in [1.5, 2.2]. **SUPPORTED**: k = 1.8, c = 2.
+  - Residual: level 0.88 (starters 0.75, subs 1.57); Serie A 0.72. That is the next re-fit, not this lane's goal.
+- Falsification test (production-shaped): the shipped ladder, fed production's own inputs (role counts from the ESPN producer, not outcomes.json), fails H8's held-out test. Or SOT, pre-registered separately before any board switch, fails the same test.
+- Verification:
+  - `off != on` reachability: the shot divisor artifact on disk no longer moves `expected_shots`; the board reads the conditional ladder when present and the unconditional one when absent.
+  - A held-out replay over production-shaped inputs.
+  - Tests A/B against a baseline.
+  - After deploy, the first artifacts carry the conditional ladder, and `soccer_projections` prices from it.
+- Blocked by: none. Step A (divisor retirement) needs nothing from step B.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
