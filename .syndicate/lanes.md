@@ -457,6 +457,22 @@ death, never life — do not invert it.
     - `C8ZAFJ9S6MW0` YES avgPx 0.2200 booked 0.22; atc-lal-rso-cel-2026-09-03-cel x 4.86, fee 0.05, cost $1.12, created 2026-09-03T11:38Z, soccer h2h line None stake 1.12
     - `C9B0G201JMVG` YES avgPx 0.2800 booked 0.28; aec-mlb-stl-lad-2026-09-03 x 5.26, fee 0.06, cost $1.53, created 2026-09-04T01:07Z, mlb h2h line None stake 1.5
     - `C9CHPYTAJMVG` YES avgPx 0.2450 booked 0.245; aec-mlb-ath-sea-2026-09-03 x 5.84, fee 0.06, cost $1.49, created 2026-09-04T02:57Z, mlb h2h line None stake 1.55
+- **KALSHI LOSSES COUNTED 2026-09-15 ~22:20Z (read-only; scratchpad `kalshi_trim_scan.py`, raw lines `live_order_raw_lines.jsonl`, report `trim_scan_report.json`).**
+  - Window 2026-09-01T22:15Z..22:06Z today, 0 gaps. live-odds-worker `LIVE_ORDER` placements (149) and `RECONCILED` transitions (159) were checked against the served book (177 rows read 22:05:42Z).
+  - Positive control: the 09-10 18:00-18:10Z window returned 10 Kalshi `LIVE_ORDER` lines matching the book's rows within 2 s. The windows with no lines (09-04T22Z..09-10T10Z) are a real no-live-Kalshi stretch, which matches the book's 09-05..09-09 gap.
+  - **10 live Kalshi fills are missing from the book, $55.73 incl. fees, all placed 09-01..09-04.** Each has a `submitted->filled` reconcile and a `LIVE_ORDER status=submitted` placement for the same ticker, so 10 orders, not 20.
+  - Method check: the same scan finds 12 of the 20 known lost Polymarket fills. The other 8 predate the window.
+  - Rows:
+    - `e8f428191e6e7fe4619b6fb7` KXMLBTOTAL-26SEP011840TORCLE-7 over 6.5: 8 @ 0.51 fee 0.14, stake 4.55, submitted 2026-09-01T23:02:35Z, reconciled 2026-09-01T23:02:37Z
+    - `5588591618c12ce924e460c0` KXMLBSPREAD-26SEP021940DETMIN-MIN2 home -1.5: 3 @ 0.35 fee 0.0239, stake 1.31, submitted 2026-09-02T09:37:53Z, reconciled 2026-09-02T09:37:55Z
+    - `4b7f70492ec2b49efd1da77c` KXMLBTOTAL-26SEP021540PHIAZ-6 over 5.5: 10 @ 0.35 fee 0.1593, stake 3.88, submitted 2026-09-02T20:40:03Z, reconciled 2026-09-02T20:40:06Z
+    - `0ddcbeb1087243302e6af69b` KXMLBTOTAL-26SEP021940MIAKC-9 under 8.5: 19 @ 0.46 fee 0.1652, stake 9.03, submitted 2026-09-02T20:58:23Z, reconciled 2026-09-02T20:58:26Z
+    - `b5c619d43febeecc16993e8d` KXMLBTOTAL-26SEP021940MILCHC-9 under 8.5: 11 @ 0.49 fee 0.0963, stake 5.57, submitted 2026-09-02T21:45:13Z, reconciled 2026-09-02T21:45:16Z
+    - `7a751f80634b54e1c51cc0fc` KXMLBTOTAL-26SEP022210STLLAD-8 under 7.5: 12 @ 0.46 fee 0.1044, stake 5.78, submitted 2026-09-03T01:33:24Z, reconciled 2026-09-03T01:33:26Z
+    - `7cd3ecdf3875c6838165c40d` KXMLBTOTAL-26SEP022138NYYLAA-5 over 4.5: 19 @ 0.5 fee 0.3325, stake 10.12, submitted 2026-09-03T02:14:56Z, reconciled 2026-09-03T02:14:57Z
+    - `ffd3ed75e9e0b14d6e30be8e` KXMLBTOTAL-26SEP031235SFPIT-9 under 8.5: 19 @ 0.45 fee 0.1646, stake 8.71, submitted 2026-09-03T15:27:35Z, reconciled 2026-09-03T15:27:37Z
+    - `92860aac7abf94b13ab6704f` KXMLBTOTAL-26SEP042210ATHSEA-8 over 7.5: 12 @ 0.46 fee 0.1044, stake 5.96, submitted 2026-09-04T07:31:42Z, reconciled 2026-09-04T07:31:49Z
+    - `ff62fde8eb851cfcf65bc57d` KXMLBTOTAL-26SEP042005TBTEX-9 under 8.5: 5 @ 0.51 fee 0.0438, stake 2.59, submitted 2026-09-04T14:41:46Z, reconciled 2026-09-04T14:41:50Z
 - Blocked by: none for code. Deploys to live-odds-worker and refresh-worker are the user's call, sequenced after lane `soccer-player-role-allocation`'s ~21:25Z tip deploys.
 
 ### book-quotes-splice-repair — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **P5 LIVE on all services (live-odds-worker 8c089e8c, web dd014d14, refresh-worker pending 2d579fd1); glued rows salvaged; GOAL NOT MET: clean capture day + refresh-worker reading owed**
