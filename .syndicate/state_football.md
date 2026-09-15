@@ -2567,7 +2567,7 @@ starters.
 - 102 of 102 rows choose their own market, side and line (101 Anytime TD / yes, 1 Receiving Yards / over / 34.5).
 - Shard `market` is the DISPLAY string ("Anytime TD"), so the row's display market narrows by exact match despite `missing_market_key`.
 - An identity-only control picks the wrong market on 1 row, so the filter is doing work. 23 of 102 players have more than 1 market.
-- Latent: no Anytime TD "No" side exists in the shards, and the row's pick does not narrow the side (lead in `leads.md`).
+- Side: no Anytime TD "No" side exists in the shards, and the row's display pick never narrowed the side. **Fixed on main, NOT DEPLOYED** (lane `anytime-td-quote-side-yes`): `enrich_prop_rows` and `enrich_candidate_rows` now pass "yes" for Anytime TD unless the pick names a side. Until deployed, a captured No side with more books would still win on production.
 
 **NOT measured:** whether web runs `3157bb7b`.
 

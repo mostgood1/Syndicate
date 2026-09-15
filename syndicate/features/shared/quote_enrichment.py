@@ -259,6 +259,36 @@ def _selection_hint(row: Mapping[str, Any]) -> str | None:
     return None
 
 
+_SIDE_WORDS = frozenset({"yes", "no", "over", "under"})
+
+
+def _anytime_td_side_hint(hint: Any, sport_slug: Any, *markets: Any) -> Any:
+    """The selection to join an Anytime TD prop on: "yes" unless the pick names a side.
+
+    Anytime TD quotes are one-sided rows, `selection="yes"` with no line (measured
+    2026-09-15: 950 NFL rows on 09-17, 706 NCAAF rows on 09-19). The board's pick
+    is display text instead -- "Anytime TD" (NFL) or "Anytime TD - 3 books"
+    (NCAAF) -- which `_selection_matches` never accepts. So the side filter in
+    `quote_ref_for_bet` fell through, and the group with the MOST BOOKS won: the
+    moment a "No" side is quoted by more books than the Yes, the row prices the
+    No. It was right on 102 of 102 NCAAF rows only because no No side existed.
+
+    An explicit side ("No", "Under ...") is kept, and every other market's hint
+    passes through untouched.
+    """
+    try:
+        from syndicate.features.shared.market_keys import canonical_market_key
+
+        if canonical_market_key(sport_slug, *markets) != "player_anytime_td":
+            return hint
+        words = str(hint or "").strip().lower().split()
+        if words and words[0] in _SIDE_WORDS:
+            return hint
+        return "yes"
+    except Exception:
+        return hint
+
+
 def _market_hint(row: Mapping[str, Any]) -> str | None:
     for key in ("market_label", "market", "label"):
         value = str(row.get(key) or "").strip()
@@ -474,7 +504,12 @@ def enrich_candidate_rows(
                 date_str=date_str,
                 event_id=event_id,
                 market=candidate.get("market"),
-                selection=candidate.get("pick") or candidate.get("selection"),
+                selection=_anytime_td_side_hint(
+                    candidate.get("pick") or candidate.get("selection"),
+                    sport_slug,
+                    candidate.get("market_key"),
+                    candidate.get("market"),
+                ),
                 line=candidate.get("line"),
                 # Same display-string-as-identity repair as enrich_prop_rows:
                 # WNBA's candidates carry the whole pick here too.
@@ -623,7 +658,12 @@ def enrich_prop_rows(
                 # signal either way, so a sport with no canonical key still
                 # matches on player identity.
                 market=row.get("market_key") or row.get("market"),
-                selection=row.get("pick") or row.get("selection"),
+                selection=_anytime_td_side_hint(
+                    row.get("pick") or row.get("selection"),
+                    sport_slug,
+                    row.get("market_key"),
+                    row.get("market"),
+                ),
                 line=row.get("line"),
                 player_name=player,
                 now=now,

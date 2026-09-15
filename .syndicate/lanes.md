@@ -1571,6 +1571,34 @@ death, never life — do not invert it.
 - Verification: per quoted row, the chosen market key against the row's market, counted (right / wrong / no own-market quote in the shard). Substrate stated: web's synced shard copy read via `/api/ops/artifacts/export`, not refresh-worker's disk.
 - Blocked by: none
 
+### anytime-td-quote-side-yes — CLOSED — opened 2026-09-15 — closed 2026-09-15 ~15:55 CT — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
+- **VERDICT.** Goal (verbatim): "prop rows whose market is Anytime TD pass `selection="yes"` to `quote_ref_for_bet` from `enrich_prop_rows` and from `enrich_candidate_rows` (the two joins that pass a display pick as the selection hint), unless their pick/selection already names a side, so a "No" side quoted by more books cannot be chosen. Shown by an `off != on` test on a shard holding yes and no, where No has more books: before the fix the row prices the No, after it the Yes. Other markets' join arguments unchanged. Landed on main; deploy only on the user's go." — **GOAL: MET. NOT DEPLOYED.**
+  - **Code:** `quote_enrichment._anytime_td_side_hint` is used at both joins. It returns "yes" when `canonical_market_key(sport, market_key, market)` is `player_anytime_td` and the hint's first word is not yes/no/over/under. Otherwise it returns the hint unchanged, including on any exception.
+  - **Tests:** `tests/test_quote_enrichment_anytime_td_side.py`, 6 tests.
+    - Fixed code: 62 passed across it plus the 6 existing quote suites. Baseline before the edit: 56 passed.
+    - Fix switched off (a scratch plugin makes the helper return the hint): 4 failed. They are the two prop Yes-side tests, the candidate Yes-side test and the join-arguments test. 2 passed: the precondition (the display pick alone prices the No, 3 books at -190) and the explicit-No test.
+  - **Production replay** through the real `enrich_prop_rows` over web's exported 09-17..09-19 NCAAF shards: the selection passed is "yes" on 101 rows (the Receiving Yards row unchanged), 102 of 102 are quoted, and 102 of 102 are right on market, side and line.
+  - **Shard vocabulary:** Anytime TD quotes read `yes`, line None, on NFL 09-17 (950 rows) and NCAAF 09-19 (706). No "no" rows.
+  - **Owed if deployed** (refresh-worker runs both joins; web runs `enrich_prop_rows` in `home.py`): nothing measurable changes until a No side is captured. The instrument is a replay against a shard holding one, not a production counter.
+- Goal: prop rows whose market is Anytime TD pass `selection="yes"` to `quote_ref_for_bet` from `enrich_prop_rows` and from `enrich_candidate_rows` (the two joins that pass a display pick as the selection hint), unless their pick/selection already names a side, so a "No" side quoted by more books cannot be chosen. Shown by an `off != on` test on a shard holding yes and no, where No has more books: before the fix the row prices the No, after it the Yes. Other markets' join arguments unchanged. Landed on main; deploy only on the user's go.
+- Files: `syndicate/features/shared/quote_enrichment.py`, `tests/test_quote_enrichment_anytime_td_side.py` (NEW)
+- Hypothesis / design (from lane `ncaaf-prop-quote-market-check`, closed):
+  - **The defect:** NCAAF legacy rows pass pick "Anytime TD - N books" as the selection hint, which `_selection_matches` never matches. The side filter falls through, and `max(grouped, key=len)` picks the group with the most books.
+  - **Today:** 102/102 are right only because the shards hold no "no" side (0 of 101).
+  - **Fix at the shared entry:**
+    - In `enrich_prop_rows`, when `canonical_market_key(sport, market_key, market)` is `player_anytime_td` and the hint is not a side word (yes/no/over/under), pass "yes".
+    - An explicit "No" pick stays No.
+    - This covers NFL rows too, because they share the `_FOOTBALL` map.
+- Falsification test:
+  - With the fix, the test row still prices the No side.
+  - A non-Anytime-TD row's `quote_ref_for_bet` arguments change.
+  - An explicit "No"/"Under" pick is rewritten.
+- Verification:
+  - The new test file passes, including the `off != on` side test with the real `quote_ref_for_bet` over a temp shard.
+  - Existing quote-enrichment and NCAAF prop tests pass.
+  - The replay over web's exported 09-17..09-19 NCAAF shards still reads 102/102 right.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
