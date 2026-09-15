@@ -511,7 +511,7 @@ NAMES only, and `ORDER_STATE` logs cum/leaves/avgPx but not this. One line added
 to `ORDER_STATE` would settle it. `polymarket_us_orders.py` is claimed by
 `polymarket-yes-leg-binding`, so it needs that lane or an override, plus a deploy.
 
-## [polymarket-no-fill-size-is-gross-capped] A POLYMARKET **NO** ORDER FILLS FAR LESS THAN OUR CASH BUYS — the cap fits `buying power / YES price` twice, book depth is REFUTED, and **the mechanism is NOT settled: the same balance is CONSUMED net** `[measured 2026-09-15 ~23:05Z from live-odds-worker logs, lane polymarket-ask-pricing]`
+## [polymarket-no-fill-size-is-gross-capped] A POLYMARKET **NO** ORDER IS CHECKED AGAINST **$1.00 PER CONTRACT** AND CHARGED THE **NET** — **5 of 5 NO orders behave that way**, book depth is REFUTED, and the only two orders that DISCRIMINATE gross from net are the two partial fills `[measured 2026-09-15 ~23:05Z from live-odds-worker logs, lane polymarket-ask-pricing]`
 
 **The population, stated before the result:** every filled Polymarket order
 09-13..09-15, joining `SUBMIT` (qty, price, side) to `ORDER_STATE mode=per_order`
@@ -561,17 +561,39 @@ The sea-ari row is the SAME ORDER as the first partial fill above, so this is no
 two regimes: on one order, the balance fell by the net cost while the fill was
 capped as if the gross were charged.
 
-**Two measured facts that no single rule I have produces:**
-- the fill stops at about `buying power / YES price` (gross), twice;
-- the balance falls by `filled x our cost` (net), twice.
+**THE TENSION RESOLVES INTO ONE RULE: CHECKED ON GROSS, CHARGED NET.** Every NO
+order in the log window, with the buying power read before it:
 
-Anyone building on this must treat the **CAP as the fitted regularity** (n=2) and
-the **CONSUMPTION as the established one**, and must not assume the $1.00 margin
-story just because it fits the first. A candidate worth testing: the venue checks
-affordability against the WORST CASE at submit time and releases the difference
-after the match, in which case a balance read BETWEEN submit and fill would show
-a dip the post-fill balance has already erased. Nothing in this session read that
-instant.
+    order         slug                              gross   bp before   covered   outcome
+    C4N3GPYA4GNQ  tsc-nfl-lar-lac-2026-08-27-tot     3.34      100.60     yes      FILLED IN FULL   3.34
+    CDZ89ZCJ8SJR  aec-nfl-dal-nyg-2026-09-13        13.57       91.52     yes      FILLED IN FULL  13.57
+    CE7V6BXQETMQ  aec-nfl-nyj-ten-2026-09-13         7.48       93.99     yes      FILLED IN FULL   7.48
+    CGVRPD7SWVB8  aec-nfl-sea-ari-2026-09-20         7.94        2.84     NO       PARTIAL          4.07
+    CGZJPS97RVNK  aec-nfl-phi-ten-2026-09-20         4.72        1.42     NO       PARTIAL          1.80
+    (x34)         aec-nfl-phi-ten-2026-09-20         6.53        2.84     NO       REJECTED         0
+
+**Gross covered -> filled in full, 3 of 3. Gross not covered -> never a full
+fill, 3 of 3** (two partials and a 34-deep rejection loop). The scan found **44
+distinct NO orders: 5 filled, 34 rejected, 5 resting.**
+
+**ONLY THE TWO PARTIALS DISCRIMINATE GROSS FROM NET, AND THAT IS THE HONEST n.**
+For the three full fills the balance was $90-100 against a gross of $3-14 — the
+NET cost was comfortably covered too, so those rows are consistent with the gross
+rule without being evidence FOR it over the net rule. The discriminating cases
+are the two partials, where the net cost WAS covered ($2.66 of $2.84; $1.16 of
+$1.42) and the fill was capped anyway. **Read the table as n=3 for "gross covered
+-> full fill" and n=2 for "gross is the binding constraint".**
+
+**And the consumption really is net, measured twice:**
+
+    dal-nyg   91.52 -> 85.97   = 13.57 x 0.395 + 0.19 fee
+    sea-ari    2.84 ->  1.42   =  4.07 x 0.335 + 0.05 fee
+
+So the venue tests affordability against the payout and then bills the price.
+**STILL NOT DIRECTLY OBSERVED: the hold itself.** A balance read BETWEEN submit
+and fill should show a dip the post-fill balance has already erased; no reading
+in this session caught that instant, and until one does, "checked on gross" is
+inferred from the cap, not seen.
 
 **NOT in tension with `[polymarket-resting-orders-do-not-encumber-cash]`.** That
 measured $10.09 of NEW RESTING orders moving `buyingPower` by $0.00. This is what
@@ -616,17 +638,28 @@ ticks the wrong side of a 0.755 market — a venue price-band rejection.** No
 reject reason is logged anywhere in the path, so this is a candidate, not a
 finding.
 
-**THE CANDIDATE IS IN DOUBT ALREADY, FROM THE LEDGER'S OWN AUDIT: 6 live NO orders FILLED between 09-01 and 09-13, every one of them BEFORE the convention fix.** If those were sent under the old convention, then sending the NO price does not by itself cause a rejection, and this candidate is dead. A read-only scan (`prefix_no_convention.py`, 09-11..09-15T17:26Z) is comparing each pre-fix NO order's SUBMIT price against its `avgPx` to settle it: sent + avgPx ~= 1.0 means the old convention was in force on an order that filled. **Until that returns, the candidate is UNTESTED, not leading.**
+**THE PRICE-BAND CANDIDATE IS DEAD, killed by the scan it asked for.**
+`CDZ89ZCJ8SJR` (dal-nyg, 09-11T05:50:41Z) was sent at **0.40 while the YES price
+was 0.605** — sent + avgPx = 1.005, so the OLD convention was in force — and it
+**filled IN FULL, 13.57 of 13.57**. Two more pre-fix NO orders filled in full the
+same way. **Sending the NO price does not cause a rejection.**
 
 **TWO OF THAT LANE'S OWN HYPOTHESES DIE HERE, BY THEIR OWN STATED FALSIFIERS:**
 - **(H1) a venue minimum on notional or size is DEAD.** Its falsifier was "any
   accepted order with stake <= $1.60 or qty <= 6.53". The 22:02:39Z order was
   accepted at **qty 4.72** and a stake of about **$1.16**. Both clauses fire.
-- **(H2) insufficient buying power is DEAD.** Its falsifier was "the balance
-  covered $1.60 at a rejected submit". Buying power was **flat at $2.84 across
-  all 34 rejections** — it covered the stake every time. The gross reading of H2
-  fails too: gross exceeded buying power at 22:02 as well, and that order was
-  accepted and partially filled instead of rejected.
+- **(H2) insufficient buying power: DEAD AS WRITTEN, ALIVE IN ITS GROSS FORM —
+  and I got this wrong once tonight before the table was complete.** Its
+  falsifier was stated in NET terms ("the balance covered $1.60 at a rejected
+  submit") and the balance did cover it, flat at $2.84 across all 34. **In GROSS
+  terms it was never covered ($6.53 needed), and that is now the leading
+  explanation**, since it is the same condition that capped both partial fills.
+  - **What is STILL unexplained is the FORM of the failure, not its cause:**
+    insufficient gross produced a REJECT pre-fix and a PARTIAL FILL post-fix. The
+    venue's collateral docs say "no partial fills on insufficient buying power",
+    which would mean `1efdea18` changed more than the price field.
+  - Evidence is one ticker for the reject arm, so do not treat pre/post as
+    established until a second rejected ticker exists.
 
 **THE TIMING IS NOT A CLEAN BEFORE/AFTER, AND THE FIX MUST NOT BE CREDITED WITH
 STOPPING THE LOOP.** The convention fix `1efdea18` went live 17:26:07Z, but the
