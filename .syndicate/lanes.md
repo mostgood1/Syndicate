@@ -645,6 +645,20 @@ death, never life — do not invert it.
 - History: the hypotheses H1–H4, their verdicts and the decision text were moved VERBATIM to `lanes_history.md` on 2026-09-11. The readings are in `state_polymarket.md`.
 
 
+### book-quotes-splice-repair — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: [user 2026-09-15: "open the lane and bring me the plan"] no `book_quotes` shard gains a headless fragment line, and the shards already damaged are repaired. Read on production after the fix: 0 lines failing `json.loads` in newly written shards on web and refresh-worker across a full capture day; the refresh-worker byte-offset tail pull never appends into a file that is not a byte prefix of web's copy (the mismatch case is logged by name); and the affected historical shards read clean or are listed with their bad-line counts.
+- Files: none yet. The plan is being mapped read-only and goes to the user before any file is claimed.
+- Origin: lane `book-quotes-prefer-fuller-copy`, root cause 2026-09-15 ~12:40 CDT (that block and `deploys.md` 2026-09-15 16:03:59Z).
+- **Established before this lane, cited from that block:**
+  - refresh-worker appends venue quote rows locally (`append_book_quotes`, no lock) AND tail-pulls web's copy with `Range: bytes=<local size>-` (`pull_streamed_artifact`), so after a local append the pull starts mid-line.
+  - Web's line-union merge keeps the fragment.
+  - Web's mlb 09-03 has 29 lines failing `json.loads` at 63,389,054 B / 140,224 lines, the same size and line count as refresh-worker's plain copy.
+  - live-odds-worker never tail-pulls that shard.
+- Hypothesis for the plan: two independent guards close it: (a) refuse a tail append unless local bytes are a prefix of web's, and (b) web's merge refuses non-JSON lines. Repair: re-derive each damaged shard as the union of its parseable lines, dropping fragments that are the tail of an intact line.
+- Falsification test: a fragment appears in a shard written after both guards are live, OR a dropped "fragment" turns out not to be a suffix of any intact line (that would be data loss, not repair).
+- Verification: per the Goal, recorded in `deploys.md`.
+- Blocked by: the user's approval of the plan.
+
 ### polymarket-rejected-resubmit-loop — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - Goal: [user 2026-09-15: "open a lane for the rejection loop"] a Polymarket order the venue REJECTS is not re-submitted unchanged on every pass, and its reject reason is logged. Read on production: after the fix, a venue rejection produces ONE `submitted->rejected` per (ticker, price, qty), a named reason on the log line, and no further `SUBMIT` for that ticker until something about the order changes. Accepted orders are unaffected (fills, rests and expiries continue).
 - Files: `syndicate/features/shared/execution_ledger.py` (a venue-rejected-unchanged refusal in `place_order` only), `tests/test_execution_ledger.py` (those tests only). DECLARED 2026-09-15 ~11:55 CDT before any edit, on user decision "do all 3". Claims checked with lane-guard's own `_claims()`: none held. NOT `pipeline/execute_portfolio.py`, which OPEN lane `kalshi-shard-balance-gate` claims; the fix is built to need no change there. The submit-response log goes in the Polymarket orders module under lane polymarket-ask-pricing (same session).
