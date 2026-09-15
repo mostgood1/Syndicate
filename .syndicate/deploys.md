@@ -35877,3 +35877,21 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
 - **verify (OWED):** all ten leagues get a `players_2026.csv` written after the deploys, and the first recommendations artifact per league written after them carries `player_substrate` plus `squad_audit` on every match, with no side at `listed: 0`.
   - The export cannot tell which worker wrote an artifact, so the reading must say so. The weekly build covers the week's dates; the pregame refresh covers near dates.
 - Rollback: `5686a555`. On this service only, that reverts fix #1, `867f1481` and `3157bb7b`.
+
+## 2026-09-15 20:22:24Z (15:22 CT) — READING on the 2026-09-15 20:10:02Z refresh-worker `5686a555` -> `f833f7ec` entry — lane ncaaf-prop-kickoff-slate-date — **ride-along `3157bb7b` VERIFIED on refresh-worker: ncaaf `intelligence_prop` with_quote 0/416 -> 104/104**
+- **No deploy by this lane.** `3157bb7b` (NCAAF legacy prop rows get `slate_date` from the game's Central kickoff date) rode along in `soccer-player-substrate`'s deploy `dep-dakqc6h5efls73d8r3og`. The entry above calls it "web path", but refresh-worker runs `_finalize_home_prop_rows` too, in its home-games prop feed into `collect_candidates`. This lane waited for that claim's release (FREE at 20:19:21Z) and did not deploy a second time.
+- **Baseline** (`/api/ops/opportunity-contract/status`, read 20:00:31Z, `generated_at` 19:58:57Z, `service_role` refresh-worker, the previous process):
+  - `ncaaf 2026-09-15 intelligence_prop rows=416 with_quote=0`.
+  - The counters are cumulative per process, so 416 is 4 builds of 104 rows, none quoted.
+- **Prediction** (lane Verification): `with_quote` > 0 in a same-process build.
+- **Reading** (same endpoint, read 20:22:24Z, flushed 20:19:01Z):
+  - `source` refresh-worker, `service_role` refresh-worker-4tx2.
+  - BOOTED 20:16:32Z, with no BOOTED line since. The first NCAAF enrich was at 20:18:44Z, rows=104.
+  - `ncaaf 2026-09-15 intelligence_prop rows=104 with_quote=104 missing_market_key=104`.
+  - Context in the same payload: soccer 14/17 quoted, MLB 36/36.
+- **Verify: MET** for the lane's stated reading. One build in one process: the rate went from 0 of 416 to 104 of 104.
+- **Not verified:**
+  - That each attached quote is the right MARKET. `missing_market_key=104`, and the join matches on the player first.
+  - Whether web's live commit carries `3157bb7b` was not read.
+  - Counts from non-today builds are still filed under today's key (a separate, known defect with no lane). So "2026-09-15" here is the counter key, not the shard date the rows joined.
+- Rollback: as in the entry above.

@@ -1374,9 +1374,13 @@ death, never life — do not invert it.
   - Instrument limits stated with each reading.
 - Blocked by: none
 
-### ncaaf-prop-kickoff-slate-date — CLOSED 2026-09-15 — opened 2026-09-15 — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
-- **VERDICT.** Goal (verbatim): "NCAAF legacy prop rows carry their game's CENTRAL kickoff date as `slate_date`, so `enrich_prop_rows` joins the kickoff-date quote shard instead of falling back to the worker's today. Shown by a test through the real path and a replay over the production week 3 cards payload. No other sport's behaviour changes. Code landed on main; deploy only on the user's go." — **GOAL: MET** (code, tests, production replay). **NOT DEPLOYED**; the post-deploy reading is owed if the user approves a deploy.
-  - Readings:
+### ncaaf-prop-kickoff-slate-date — CLOSED — opened 2026-09-15 — closed 2026-09-15 ~15:25 CT — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
+- **VERDICT.** Goal (verbatim): "NCAAF legacy prop rows carry their game's CENTRAL kickoff date as `slate_date`, so `enrich_prop_rows` joins the kickoff-date quote shard instead of falling back to the worker's today. Shown by a test through the real path and a replay over the production week 3 cards payload. No other sport's behaviour changes. Code landed on main; deploy only on the user's go." — **GOAL: MET, and LIVE on refresh-worker.**
+  - **Deploy:** `3157bb7b` rode along in `soccer-player-substrate`'s refresh-worker deploy `dep-dakqc6h5efls73d8r3og` (`f833f7ec`, live 20:15:58Z). This lane waited for that claim and did not deploy.
+  - **Post-deploy reading** (`deploys.md` 2026-09-15 20:22:24Z): `ncaaf 2026-09-15 intelligence_prop rows=104 with_quote=104`, in a same-process build flushed 20:19:01Z. The baseline, read 20:00:31Z in the previous process, was rows=416, with_quote=0.
+  - **Not verified:** that each quote is the right market (`missing_market_key=104`), and web's live commit.
+  - **Lead correction:** the 18:14:03Z refresh-worker BOOTED was deploy `dep-dakoid2fngtc73ev1rjg` (`55fee786`, finished 18:13:26Z), read from the deploys API; I had checked only `deploys.md`. The lead was deleted from `leads.md`.
+  - Readings before the deploy:
     - `tests/test_home_ncaaf_prop_kickoff_date.py` 10 passed, on the production game shape, including a match precondition and an `off != on` join-date test (`quote_ref_for_bet` gets 2026-09-18 vs fallback 2026-09-15).
     - Existing prop tests (`test_game_board_contract_prop_team.py` + `test_home.py -k prop`) 37 passed.
     - Diagnostic over production `/ncaaf/api/cards?week=3`: 102/102 rows matched, 102/102 with a kickoff date.
