@@ -863,3 +863,37 @@ build every tick. Untouched by this lane; see `leads.md`.
 
 **UNVERIFIED:** the staleness branch (`DEFAULT_MAX_AGE_SECONDS`, 6 h). Unit
 tested, never seen in production.
+
+## [combined-board-state-rows-lost] THE COMBINED BOARD DROPS EVERY PERSISTED STATE ROW; ITS AGE IS TOMORROW'S SHORTLIST — DIAGNOSED 2026-09-15, NOT FIXED
+
+Lane `combined-board-state-rows-lost` (full readings there). Read-only; no deploy.
+
+**1. The board's `computed_at` is the 09-15 Layer 2 shortlist's `written_at`.**
+Served 03:56:31Z: `computed_at 02:59:43Z` = `/api/board/layer2-shortlist?date=2026-09-15`
+`written_at`; 09-14's was `03:44:50Z`. The earlier `00:49:16Z` was the same
+artifact, written by `LAYER2_FAST_REFRESH date=2026-09-15` (logged 00:50:06Z).
+Tomorrow is rebuilt only in its own board-build slots: 5 in 4 h, one of them
+aborted at `post_collect_candidates_with_fallback_merge` before the shortlist
+stage, so it sat 2h10m. The age is TRUE — 1,869 of 2,538 served rows came from
+that shortlist — and the 900 s SLA makes the board read `stale` almost always.
+
+**2. Every per-date state row is dropped by the reader, not missed by key.**
+Web read the worker's exact payloads (stamps equal `CANDIDATE_POOL_READY`, e.g.
+09-14 `01:54:49Z` for 374 candidates) and logged `VINTAGE_IGNORED reason=no_rows`.
+`_read_single_date_response_for_combining` (`pipeline/intelligence_state.py:9075`)
+reads through `_read_state_payload` and never calls `_expand_persisted_state`;
+the writer stores `by_sport` MEMBER-ALIASED, and the combine loop's
+`isinstance(items, list)` skips every entry while scalar `candidate_count` keeps
+the gate open. Reproduced with the real writer and reader: 40 and 1,500 rows ->
+0; expand-on-read -> 40 and 1,500; a 3-row plain control reads 3 either way
+(`tests/test_combined_board_persisted_state_rows.py`, strict xfail until fixed).
+`read_intelligence_state` (:4248) already expands; :9075 is the only caller that does not.
+
+**So `by_date.candidate_count == 0` is NOT evidence that production has no state
+rows.** A standing learning (2026-09-15 OVERTURNED, nfl-live-props) read it that way.
+
+**Fixing (2) would not move the age in (1):** the state stamps it adds are newer
+than the 09-15 shortlist. It would change CONTENT — state rows merge ahead of
+L2-A cards under first-wins dedupe — so it is a product change. Both the fix
+(file claimed by `heavy-build-memory-refusal` and `layer2-prior-date-live-carryover`)
+and whether tomorrow's shortlist should set the board's age are USER DECISIONS.
