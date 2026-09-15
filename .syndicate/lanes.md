@@ -1408,6 +1408,31 @@ death, never life — do not invert it.
 - Blocked by: none.
 
 ### book-quotes-prefer-fuller-copy — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- **ROOT CAUSE 2026-09-15 ~12:40 CDT (read-only agent for session 0f5b256e: GETs on `/api/ops/artifacts/stream` + logs; nothing edited or deployed): BOTH COPIES ARE DAMAGED, BY A SPLICE BETWEEN TWO WRITERS. The "fuller copy" rule has nothing sound to choose between.**
+  - **Web's copy measured:** `mlb_source/tracking/book_quotes/2026-09-03.jsonl` at 63,389,054 B and 140,224 newlines (sha256 prefix `a0b1c293927f1665`), identical in size and lines to refresh-worker's plain copy.
+    - 0 NULs and 0 `}{`, but **29 lines fail `json.loads`**. Every one is a headless tail of a record (e.g. at offset 15,278,834: `Z","sport":"mlb",...,"price":340}`).
+    - 27 of the 29 are the exact tail of an intact line elsewhere in the file, mostly `venue_direct` Kalshi/Polymarket rows.
+    - Fragment lengths repeat in runs (321x4, 263x4, 272x7, 131x8): a fixed byte shift, not random tears.
+    - Web's sizes also equal refresh-worker's `plain_bytes` for mlb 09-03..09-09 and 09-13, ncaaf 09-05, and soccer 08-22/08-29.
+  - **Mechanism, from code plus refresh-worker logs:**
+    - (1) refresh-worker APPENDS its own venue quotes into the shard (`kalshi_odds_refresh.py:2951` -> `append_book_quotes`, a plain `open("a")` with no lock, `odds_book_quotes.py:703`): 62 Kalshi + 60 Polymarket appends to mlb 09-03.
+    - (2) It ALSO tail-pulls web's copy by BYTE OFFSET (`artifact_publisher.py:3193,3222` `Range: bytes=<local size>-`, called from `run_refresh_worker.py:6472`; 115 `STREAM_TAIL_OK`). After a local append, local size runs ahead of the web bytes it mirrors, so the pull skips web's bytes and starts mid-line, leaving a headless fragment. The last pull was 09-04T05:00:39Z, `from_offset=63326210` + 62,844 = 63,389,054.
+    - (3) It PUBLISHES the spliced file. Web's merge is a union of whole lines (`artifact_merge.py:176`), so each fragment is a "new" line (last merge 04:59:11Z: `existing_lines 140082 + added 142`). `artifact_merge.py:146-152` itself states the Range pull requires each copy to be a byte prefix of the other, which a second local writer breaks.
+    - (4) Compaction gzips the spliced plain file and deletes it (`odds_book_quotes.py:2444-2469`). A later rebuild finds the plain file missing and pulls web's whole copy back (`2026-09-05T04:00:24Z STREAM_PULL_OK bytes=63389054`). Hence equal length and different contents. **Step 4 is inferred:** the COMPACT line carries no path.
+  - **Consequences:**
+    - Every reader of these shards parses around fragments, which are dropped or fail.
+    - The mechanism is STILL LIVE for current shards.
+    - This lane's resolver change is correct but cannot help.
+  - **Only refresh-worker splices (live-odds-worker logs, 09-03T00:09Z..09-04T05:34Z, 8,428 lines for this shard):**
+    - 0 `STREAM_TAIL_OK` / `STREAM_PULL_OK` for this shard; 34 `PUBLISH_OK`, 49 `PUBLISH_SKIPPED_UNCHANGED`; 3 refused pulls and 46 empty repair attempts.
+    - live-odds-worker writes its shard only by whole-row appends and never received web's copy, so its copy is the only candidate clean reference.
+    - It has no HTTP route, so reading it needs a one-shot read on that service.
+  - **Unverified:** the gz side. The proposed probe `probe_plain_vs_gz` streams both and logs a `PLAIN_GZ_DIFF` per dual-form shard: sha prefixes, first differing offset (expected near 2.8 MB, the first tail pull `from_offset=2797268`), differing bytes, NULs, bad-JSON lines per copy, and escaped excerpts.
+  - **Fix direction, NOT started, a user decision:**
+    - refresh-worker must not both append locally and byte-offset tail-pull the same file. Either verify prefix equality (a hash of the bytes before the offset) before appending a Range reply, or keep venue appends in a separate file.
+    - web's merge should refuse lines that are not valid JSON.
+    - Then repair or rebuild the affected shards.
+    - This deserves its own lane: it is the artifact publisher's contract, not this resolver.
 - **VERDICT 2026-09-15 ~11:25 CDT, session 0f5b256e — THE FORCED READ RAN; FALSIFICATION FIRED.** Goal: when a `book_quotes` shard exists both plain and as `.gz`, every reader gets the copy holding MORE data, so the 18 mismatched shards on refresh-worker (mlb 09-03..09-09, ncaaf 09-05, soccer 08-22..09-09) stop serving their shorter plain file — without ever preferring a truncated or unverifiable `.gz`. — **GOAL: NOT MET. The resolver is correct for the shape it tests, and that shape is the minority.**
   - **The reading.** refresh-worker `d4c8814f` (live 16:10:11Z). `RESOLVE_PROBE_SCHEDULED` at 16:11:03Z, then 20 `RESOLVE_PROBE` lines from 16:21:03Z, and `RESOLVE_PROBE_DONE {"chose_gz": 2, "chose_plain": 18, "errors": 0, "shards": 20}` at 16:21:12Z.
   - **MET on 2 of 18:** soccer 08-22 (gz ISIZE 50,874,719 > plain 50,858,878, **lines 106,993 = `gz_lines`**) and soccer 08-29 (54,103,253 > 53,572,366, **lines 113,635 = `gz_lines`**). A byte-fuller `.gz` wins, and readers get every line of it.
