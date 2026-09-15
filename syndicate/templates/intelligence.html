@@ -1417,16 +1417,22 @@
     return { points: [], oriented: false };
   }
 
-  // What the Layer 2 sparkline shows, in words -- the probability window it
-  // spans and on what basis. Empty for legacy rows, which carry no window.
+  // What the Layer 2 sparkline shows, in words: the LABEL's own price as an
+  // implied probability, from our publish to now, and whose price it is (user
+  // decision 2026-09-15 "Plot the label's price from our open" -- the first
+  // design plotted the no-vig fair from a later start, and 45 of 94 lines
+  // sloped against their own arrow). Empty for legacy rows, which carry no window.
   function _movementSeriesCaption(item, values) {
     if (!String(item.movement_state || "").trim() || values.length < 2) return "";
     const first = (values[0] / 100).toFixed(1);
     const last = (values[values.length - 1] / 100).toFixed(1);
     const basis = String(item.movement_series_basis || "").trim().toLowerCase();
-    const basisText = basis === "fair" ? "no-vig fair" : basis === "price" ? "implied from one book's price" : "";
+    const book = String(item.movement_book || "").trim();
+    const basisText = basis === "same_book"
+      ? `${book ? `${book}'s` : "one book's"} price`
+      : basis === "best_price" ? "best price across books" : "";
     const since = _movementClock(item.movement_series_start);
-    return `Market probability for this pick${since ? ` since ${since}` : ""}: ${first}% → ${last}%${basisText ? ` (${basisText})` : ""}`;
+    return `Implied probability of this pick's price${since ? ` since ${since}` : ""}: ${first}% → ${last}%${basisText ? ` (${basisText})` : ""}`;
   }
 
   function _movementSparkline(item) {
@@ -1530,6 +1536,11 @@
       if (basis === "same_book") tip.push(book ? `Same book: ${book}` : "Same book");
       else if (basis === "best_of_n") tip.push("Best price across books (the quoting book can change)");
       else if (basis === "line_moved") tip.push("Line moved, so the prices are not the same bet");
+      // The no-vig consensus move, in words only: the line draws the label's
+      // price, and a book that lags the consensus is worth knowing but must not
+      // be the thing drawn beside the arrow.
+      const fairDelta = numericValue(item.movement_fair_delta_pp);
+      if (fairDelta !== null) tip.push(`Market consensus (no-vig) ${fairDelta > 0 ? "+" : ""}${fairDelta.toFixed(1)} pts since publish`);
       const caption = _movementSeriesCaption(item, _movementSeries(item).points.map((point) => point.v));
       if (caption && sparkline) tip.push(caption);
       // The steam BADGE (renderCard's own badges row, "⚡ Steam") already

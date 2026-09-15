@@ -87,7 +87,7 @@ from syndicate.features.shared.opportunity_signals import (
     hold_pct,
     implied_probability,
 )
-from syndicate.features.shared.clv_price_trail import price_trail_series, row_trail_point
+from syndicate.features.shared.clv_price_trail import price_move_series
 from syndicate.features.shared.probability_refusal import refuse_published_certainty
 from syndicate.features.shared.sharp_books import EXCHANGE_ANCHOR_PRIORITY, SHARP_ANCHOR_PRIORITY
 
@@ -3529,7 +3529,14 @@ def layer2_rows_to_board_cards(
                 "segment_label": _segment_label(row.get("segment"), sport),
                 **_layer2_board_columns(row, quote, score),
                 **(row.get("movement") if isinstance(row.get("movement"), Mapping) else _movement_from_opening(row, openings)),
-                **_movement_series_columns(row, price_trail),
+                # The sparkline draws the SAME price pair the movement label states,
+                # so it reads the movement just spread above (recomputed only for a
+                # row that arrived without one; `_movement_from_opening` does no IO).
+                **_movement_series_columns(
+                    row,
+                    price_trail,
+                    row.get("movement") if isinstance(row.get("movement"), Mapping) else _movement_from_opening(row, openings),
+                ),
                 **_live_projection_columns(row),
                 # `layer2-row-parity`: the face and the sentence the legacy rows
                 # had, built from THIS row's own numbers.
@@ -3605,8 +3612,38 @@ def _line_move_vs_pick(side: str, line_delta: Any) -> str:
     return "unknown"
 
 
-def _movement_series_columns(row: Mapping[str, Any], price_trail: Mapping[str, Any] | None) -> dict[str, Any]:
-    """The card's sparkline, from the price trail loaded once per build. No IO.
+def _epoch_seconds(value: Any) -> int | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        stamp = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    return int(stamp.timestamp())
+
+
+def _movement_series_columns(
+    row: Mapping[str, Any],
+    price_trail: Mapping[str, Any] | None,
+    movement: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """The card's sparkline: the LABEL's own price pair, from our publish to now. No IO.
+
+    User decision 2026-09-15 "Plot the label's price from our open". The first
+    version plotted the no-vig fair probability from the first trail point, and on
+    the served board 18:08:02Z 45 of 94 series sloped against their own arrow --
+    every one started after the row's opening, and in 31 of 35 fair-basis
+    disagreements the label's price would have matched. So the series now takes
+    its two ends from `movement_price_from` / `movement_price_to` and its time
+    from `movement_opened_at`, and only fills the middle from the trail. Arrow,
+    label, colour and line agree by construction, and a row with a price move
+    draws a line even before the trail has a second point.
+
+    Line-moved rows carry no price pair and get no series: their verdict comes
+    from the line, and a price line beside it would be a different claim.
 
     Built here and NOT inside `_movement_from_opening`, deliberately: that
     function's output is stamped on the shortlist ROWS as well as the cards, and
@@ -3614,18 +3651,23 @@ def _movement_series_columns(row: Mapping[str, Any], price_trail: Mapping[str, A
     The series is display-only, so it rides the card alone instead of being
     stored twice.
     """
-    if not price_trail:
+    if not isinstance(movement, Mapping):
+        return {}
+    price_from = movement.get("movement_price_from")
+    price_to = movement.get("movement_price_to")
+    opened = _epoch_seconds(movement.get("movement_opened_at"))
+    if price_from is None or price_to is None or opened is None:
         return {}
     key = movement_join_key(row)
-    if not key:
-        return {}
-    quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
-    epoch = int(datetime.now(timezone.utc).timestamp())
-    series = price_trail_series(
-        price_trail.get(key) or (),
+    points = ((price_trail or {}).get(key) or ()) if key else ()
+    series = price_move_series(
+        points,
         line=row.get("line"),
-        book=quote.get("bookmaker"),
-        current=row_trail_point(row, epoch=epoch),
+        price_from=price_from,
+        price_to=price_to,
+        opened_epoch=opened,
+        now_epoch=int(datetime.now(timezone.utc).timestamp()),
+        book=movement.get("movement_book") if movement.get("movement_basis") == "same_book" else None,
     )
     return series or {}
 
@@ -3834,6 +3876,17 @@ def _movement_from_opening(
         prob_to = implied_probability(price_to)
         if prob_from is not None and prob_to is not None:
             out["movement_prob_delta_pp"] = round((prob_to - prob_from) * 100.0, 2)
+
+    # THE MARKET CONSENSUS MOVE, for the tooltip only (user decision 2026-09-15
+    # "Plot the label's price from our open"). The sparkline draws the label's
+    # price; the no-vig fair's own move since publish is said beside it in words,
+    # because one book lengthening while the consensus shortens is real and worth
+    # knowing -- it just must not be the line the arrow sits next to. Same line
+    # only: a fair probability at a different handicap is a different bet.
+    fair_open = _as_float(opened.get("fair_probability"))
+    fair_now = _as_float(quote.get("fair_probability"))
+    if lines_comparable and fair_open is not None and fair_now is not None and 0 < fair_open < 1 and 0 < fair_now < 1:
+        out["movement_fair_delta_pp"] = round((fair_now - fair_open) * 100.0, 2)
 
     if open_line is not None and now_line is not None:
         out["movement_line_delta"] = round(now_line - open_line, 2)

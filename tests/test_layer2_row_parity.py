@@ -7,9 +7,10 @@ are unit-tested in `test_clv_price_trail.py` and `test_layer2_row_context.py`.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from syndicate.features.shared.layer2_board import layer2_rows_to_board_cards, movement_join_key
+from syndicate.features.shared.opportunity_signals import implied_probability
 
 
 def _row(**over):
@@ -48,23 +49,40 @@ def test_an_mlb_prop_card_has_a_face_and_a_sentence():
     )
 
 
-def test_the_sparkline_rides_the_card_from_the_trail():
-    row = _row()
+def _bp(price):
+    return int(round(implied_probability(price) * 10000))
+
+
+def _opened(row, *, price, minutes_ago, book="polymarket"):
+    key = movement_join_key(row)
+    stamp = (datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return {key: {"key": key, "captured_at": stamp, "price": price, "line": row["line"],
+                  "bookmaker": book, "book_prices": {book: price}}}
+
+
+def test_the_sparkline_draws_the_labels_price_from_our_open():
+    """User decision 2026-09-15 "Plot the label's price from our open": 45 of 94
+    first-design series sloped against their own arrow. The ends are now the
+    label's pair, so the line and the arrow cannot disagree."""
+    row = _row()  # published now at +138 on polymarket
     now = int(datetime.now(timezone.utc).timestamp())
-    trail = {
-        movement_join_key(row): [
-            (now - 3600, 6.5, 0.40, 150.0, "polymarket"),
-            (now - 1800, 6.5, 0.42, 145.0, "polymarket"),
-        ]
-    }
-    card = layer2_rows_to_board_cards([row], price_trail=trail)[0]
-    assert card["movement_series_basis"] == "fair"
-    values = [value for _, value in card["movement_series"]]
-    assert values[0] == 4000 and values[-1] == 4417, "rising: the market moved toward the over"
-    assert card["movement_series"][-1][0] >= 59, "x is minutes since the first point"
+    trail = {movement_join_key(row): [(now - 1800, 6.5, 150.0, "polymarket"), (now - 900, 6.5, 120.0, "betmgm")]}
+    card = layer2_rows_to_board_cards([row], openings=_opened(row, price=160, minutes_ago=60), price_trail=trail)[0]
+    assert card["movement_basis"] == "same_book"
+    assert card["movement_series_basis"] == "same_book"
+    assert [v for _, v in card["movement_series"]] == [_bp(160), _bp(150), _bp(138)], "betmgm's point is another book"
+    assert card["movement_vs_pick"] == "toward"
+    assert card["movement_series"][-1][1] > card["movement_series"][0][1]
+    assert card["movement_series"][-1][0] >= 59, "x is minutes since our publish"
 
 
-def test_no_trail_means_no_sparkline():
+def test_a_price_move_draws_a_line_before_the_trail_has_points():
+    row = _row()
+    card = layer2_rows_to_board_cards([row], openings=_opened(row, price=160, minutes_ago=30))[0]
+    assert [v for _, v in card["movement_series"]] == [_bp(160), _bp(138)]
+
+
+def test_no_price_move_means_no_sparkline():
     card = layer2_rows_to_board_cards([_row()])[0]
     assert "movement_series" not in card
 

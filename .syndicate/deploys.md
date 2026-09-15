@@ -35647,3 +35647,19 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Expectation met on all three fields: supported false -> true, source none -> fotmob, in-play games 1 -> 1.
   - **NOT read on production:** Championship (0 in play at 18:17Z; kickoffs 18:45Z) and Belgian Pro League (0 in play). For those, the evidence is the pre-deploy vendor run (Championship 12/12) through the same predicate, not a served reading.
 - Rollback: redeploy `1efdea18` to live-odds-worker (`render_deploy.py --service live-odds-worker --commit 1efdea18 --allow-rollback`, behind claim + preflight). It also removes `55fee786` from this service.
+
+## 2026-09-15 18:08:02Z (13:08 CT) — FOLLOW-UP (1) for the 17:32:07Z refresh-worker `d4c8814f` -> `87558f2f` entry — lane layer2-row-parity — **sparklines PRESENT and well-formed, but 45 of 94 contradict their own arrow; user chose a redesign**
+- **Trigger:** the second 09-15 build, `TRAIL date=2026-09-15 rows_in=1843 written=154 unchanged=1689 keys=2111` at 18:05:55Z.
+  - A first waiter fired on `TRAIL date=2026-09-16` (17:55:41Z). That was tomorrow's FIRST build, which cannot draw a series. Measured anyway at 17:59:17Z: series 0, `not_tracked` 0, explainers 2,660 / 2,660, steam 0, legacy 0.
+- **Reading, served payload 18:08:02Z:**
+  - Series on **98** Layer 2 rows (mlb 76, soccer 19, nfl 3), **0 malformed**. Basis: fair 83, price 15.
+  - `not_tracked` 0, steam 0, crossing-not-cents 0, explainers 1,369 / 1,369, legacy 0.
+- **VERIFY NOT MET ON MEANING: series direction agrees with `movement_vs_pick` on only 49 of 94.** Diagnosed on the same payload (~18:10Z):
+  - All 98 series start more than 5 min after the row's opening. The trail began at 17:45:02Z, while the arrow measures since our publish, hours earlier. The WINDOW differs on every row.
+  - 35 of the 45 disagreements are fair-basis. In 31 of those 35, the price basis the label uses would have matched the arrow. The QUANTITY differs.
+  - The other 10 are price-basis, so window alone.
+- **User decision "Plot the label's price from our open":**
+  - The series becomes the implied probability of the label's own price pair: first point our published price, last point now, trail points at the same line in between (same book when the basis is same-book).
+  - Arrow, label, colour and line then agree by construction. 839 rows carried a price move since open at ~18:10Z.
+  - The no-vig consensus move moves to the tooltip.
+- **Same window, not this lane:** book-quotes-splice-repair deployed refresh-worker `55fee786` at 18:06:44Z, carrying this lane's commits, and holds the claim. The score-sign change `11e24313` is not on main and waits for that claim.

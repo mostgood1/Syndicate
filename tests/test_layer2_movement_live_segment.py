@@ -235,6 +235,21 @@ def test_a_best_book_switch_cannot_fire_steam():
     assert "steam" not in got
 
 
+def test_the_consensus_move_is_reported_beside_the_price_move_at_the_same_line_only():
+    """The line draws the label's price; the no-vig fair's own move since publish
+    is carried separately for the tooltip -- and only at an unchanged line."""
+    row = _row(quote={"price": -105, "bookmaker": "draftkings", "book_prices": {"draftkings": -105},
+                      "fair_probability": 0.512})
+    opening = _openings(row, price=-125, books={"draftkings": -125})
+    next(iter(opening.values()))["fair_probability"] = 0.530
+    got = _movement_from_opening(row, opening)
+    assert got["movement_fair_delta_pp"] == -1.8
+    moved = _row(line=9.0, quote={"price": -105, "bookmaker": "draftkings", "fair_probability": 0.40})
+    other_line = _openings(moved, line=8.5)
+    next(iter(other_line.values()))["fair_probability"] = 0.53
+    assert "movement_fair_delta_pp" not in _movement_from_opening(moved, other_line)
+
+
 # --------------------------------------------------------------------------
 # The score: capped, so movement breaks ties and never dominates.
 # --------------------------------------------------------------------------

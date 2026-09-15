@@ -77,6 +77,20 @@ def measure(payload: dict) -> dict[str, Any]:
     no_verdict = [r for r in layer2 if r.get("movement_state") in ("tracked", "flat") and not r.get("movement_vs_pick")]
 
     with_series = [r for r in layer2 if r.get("movement_series")]
+    # A LINE THAT SLOPES AGAINST ITS OWN ARROW. Goal 0: after the 2026-09-15
+    # redesign the series' ends are the label's price pair, so the two cannot
+    # disagree. The first design read 45 of 94 at 18:08:02Z.
+    series_vs_arrow_disagree = 0
+    series_vs_arrow_judged = 0
+    for r in with_series:
+        verdict = r.get("movement_vs_pick")
+        series = r.get("movement_series")
+        if verdict not in ("toward", "away") or not isinstance(series, list) or len(series) < 2:
+            continue
+        series_vs_arrow_judged += 1
+        rising = series[-1][1] > series[0][1]
+        if rising != (verdict == "toward"):
+            series_vs_arrow_disagree += 1
     malformed = 0
     for r in with_series:
         series = r.get("movement_series")
@@ -115,6 +129,8 @@ def measure(payload: dict) -> dict[str, Any]:
         },
         "sparkline": {
             "rows_with_series": len(with_series),
+            "series_vs_arrow_disagree": series_vs_arrow_disagree,
+            "series_vs_arrow_judged": series_vs_arrow_judged,
             "malformed": malformed,
             "basis": dict(collections.Counter(str(r.get("movement_series_basis")) for r in with_series)),
         },

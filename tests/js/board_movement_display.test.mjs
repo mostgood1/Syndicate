@@ -142,21 +142,25 @@ console.log('\n--- 6. the sparkline is movement_series: rising green, falling re
   // Label and sparkline agree on one row: a shortening price, a rising series.
   const row = layer2({
     movement_vs_pick: 'toward', movement_price_from: -117, movement_price_to: -131, movement_prob_delta_pp: 1.9,
-    movement_basis: 'same_book', movement_book: 'kalshi',
-    movement_series: [[0, 4390], [42, 4520], [120, 4710]],
-    movement_series_start: minutesAgo(120), movement_series_basis: 'fair',
+    movement_basis: 'same_book', movement_book: 'kalshi', movement_fair_delta_pp: -0.8,
+    // The series' ends ARE the label's pair (-117 -> 53.9%, -131 -> 56.7%): the
+    // backend now builds it that way (user decision "Plot the label's price from
+    // our open"), so a rising line beside a toward arrow is the only possible pair.
+    movement_series: [[0, 5392], [42, 5500], [120, 5671]],
+    movement_series_start: minutesAgo(120), movement_series_basis: 'same_book',
   });
   const cell = api.renderMovement(row);
   has('toward arrow', cell, 'board-card__movement-arrow--up');
   has('and a green sparkline in the same cell', cell, 'board-sparkline--up');
   has('tooltip carries the implied change', cell, '+1.9 pts implied');
   has('tooltip names the book', cell, 'Same book: kalshi');
-  has('sparkline caption: the probability window', cell, '43.9% → 47.1%');
-  has('sparkline caption: the basis', cell, 'no-vig fair');
-  has('sparkline caption is an svg <title>', cell, '<title>Market probability for this pick since ');
+  has('tooltip carries the no-vig consensus move in words', cell, 'Market consensus (no-vig) -0.8 pts since publish');
+  has('sparkline caption: the probability window', cell, '53.9% → 56.7%');
+  has('sparkline caption: whose price', cell, 'kalshi&#39;s price');
+  has('sparkline caption is an svg <title>', cell, '<title>Implied probability of this pick&#39;s price since ');
   lacks('the implied change is not in the visible label', text(cell), 'pts implied');
-  const priceBasis = api._movementSparkline(layer2({ movement_series: [[0, 4390], [60, 4710]], movement_series_basis: 'price' }));
-  has('price basis is named', priceBasis, 'implied from one book&#39;s price');
+  const bestBasis = api._movementSparkline(layer2({ movement_series: [[0, 4390], [60, 4710]], movement_series_basis: 'best_price' }));
+  has('best-price basis is named', bestBasis, 'best price across books');
 }
 
 console.log('\n--- 7. the x axis is TIME-scaled ---');
