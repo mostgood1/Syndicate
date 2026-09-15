@@ -6622,3 +6622,120 @@ carried-forward work in `docs/ai_context/todo.md` `#650`/`#651`/`#652`.
 - Verification: served HTML on web references only the new asset names (0 `syndicate-crest.jpg`, 0 `syndicate-logo.png` in `<img>`), each new asset returns 200 with its expected dimensions, and a screenshot of the header + `/syndicate` hero at desktop and ~400px shows the logo legible and uncropped where it must be. Favicon links unchanged.
 - Blocked by: none.
 - Narrative (user decisions, local and production readings, the two follow-ups): `.syndicate/log/2026-09-14.md`, and moved verbatim to `lanes_history.md` on 2026-09-14.
+
+### polymarket-no-price-convention — CLOSED 2026-09-15 — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **GOAL: MET (n=1)**
+- **GOAL VERDICT 2026-09-15 ~12:50 CT.** Goal (verbatim): "every live Polymarket NO order is sent with `price` on the YES scale (`1 - p_NO`, snapped DOWN so the YES sell stays marketable), and every NO fill is booked at `1 - avgPx`. Read on production after deploy: a NO `SUBMIT` whose `price` equals 1 minus our NO limit, its fill booked at `1 - avgPx` at or below our NO limit, and the venue buying-power drop equal to that NO cost x contracts + fee." — **GOAL: MET.**
+  - The reading: `deploys.md` 2026-09-15 17:36:46-17:44:18Z, order `CGVRPD7SWVB8` (sea-ari NO).
+  - NO limit 0.34, wire price 0.66; filled 4.07 @ YES avgPx 0.665, booked 0.335 (<= 0.34, no `FILL_ABOVE_LIMIT`).
+  - Polymarket buying power 2.84 -> 1.42 = 4.07 x 0.335 + 0.05 fee.
+  - n=1; the live population will keep reading it.
+  - Deployed `1efdea18` on live-odds-worker, live 17:26:07Z.
+  - **Left, not this goal:** (iv) re-check `C65VD0R72KDG`'s recorded cost (0.235 / $3.09; 0.765 by the rule) against the venue balance ledger. Also the partial fill (4.07 of 7.94, leaves 0) is unexplained. Both noted in lane `polymarket-ask-pricing`.
+  - **Claims RETURNED at close:** the Polymarket orders module and its test file go back to `polymarket-ask-pricing`. `tests/test_polymarket_fill_price_side.py` and `tests/test_market_basis_picks.py` are released.
+- Goal: [user 2026-09-15: "Build the NO fix now"] every live Polymarket NO order is sent with `price` on the YES scale (`1 - p_NO`, snapped DOWN so the YES sell stays marketable), and every NO fill is booked at `1 - avgPx`. Read on production after deploy: a NO `SUBMIT` whose `price` equals 1 minus our NO limit, its fill booked at `1 - avgPx` at or below our NO limit, and the venue buying-power drop equal to that NO cost x contracts + fee.
+- Files: `syndicate/features/shared/polymarket_us_orders.py`, `tests/test_polymarket_us_orders.py` (both TAKEN 2026-09-15 from lane `polymarket-ask-pricing`, same session), `tests/test_polymarket_fill_price_side.py`, `tests/test_market_basis_picks.py` (NO-fill expectations only). NOT `execution_guard.py` (see below).
+- Origin: lane `polymarket-rejected-resubmit-loop`, NO CONVENTION SETTLED 2026-09-15 ~12:50 CDT. The evidence (venue docs, balance moves to the cent, 29/29 YES fills at or below their limit while NO fills landed above it) is in that block and commit `fa8faf14`.
+- Plan, pre-registered BEFORE code:
+  - (i) **`order_body`, NO:** body `price = round_price_to_tick(1 - p_NO, tick, direction="down")`; NO cost = `1 - that`; quantity is sized against the NO cost. YES is unchanged. Step 2's NO ask (= 1 - best YES bid) then sends the best YES bid.
+  - (ii) **`submit_order`:** a synchronously FILLED NO books `fill_price` = NO cost, not the YES number.
+  - (iii) **`venue_order_view` fill price, NO:** always `1 - avgPx`; the limit-proximity choice is removed. The limit check reads the venue's YES-scale `price` against YES `avgPx`, as a SELL for a NO order (a NO buy is a YES sell).
+  - (iv) **The step-1 instrument's `sent` and `marketable` for NO:** read on the NO scale (`1 - body price`).
+  - (v) **Balance gate: NO CHANGE NEEDED once (i) ships.** The venue reserves `(1 - YES price) x qty` = NO cost x qty ≈ our stake, which `check_order` already charges. `execution_guard.py` stays untouched, and is claimed by `kalshi-shard-balance-gate` anyway.
+- Falsification tests:
+  - (a) a NO body at p_NO 0.24 on a 0.005 tick sends price 0.76 and sizes against 0.24;
+  - (b) the phi-ten book sends the best YES bid;
+  - (c) `C65VD0R72KDG`'s shape (YES price 0.22, avgPx 0.235, SELL) books 0.765 and does NOT withhold;
+  - (d) dal-nyg (sent 0.40, avgPx 0.605) books 0.395;
+  - (e) a YES body is byte-identical to today's.
+- Known changed expectations: BOS/MIA 08-26 (limit 0.43, avgPx 0.43, NO) books 0.57, which the 08-26 ledger originally recorded before the 08-30 proximity rule "corrected" it to 0.43. The proximity rule's own table is re-read under the YES-scale convention.
+- Verification: per the Goal, in `deploys.md`, after a live-odds-worker deploy the user approves.
+- Blocked by: none.
+
+### live-odds-worker-oom — CLOSED 2026-09-15 — opened 2026-09-12 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **GOAL: MET**
+- **GOAL VERDICT 2026-09-15 ~10:15 CDT, session 0f5b256e.** Goal (verbatim): "live-odds-worker stops being OOM-killed. The mechanism is identified from production readings, and a fix is deployed under the locks. Success is 0 `oomKilled` events on live-odds-worker over a window of at least 6 h that spans a live slate, read from the Render events API." — **GOAL: MET.**
+  - **The reading** is the Render events API for `srv-d91dpertqb8s73co8lt0`, `startTime` 2026-09-13T23:00Z, read at ~15:05Z 09-15. Since the `54f3d662` deploy ended at 23:24:15Z (39.6 h, spanning the 09-13 SNF + MLB and 09-14 MLB + MNF slates):
+    - **0 `oomKilled`**.
+    - 6 `server_failed`, all `earlyExit: true, evicted: false`: 09-14 05:07:39Z, 11:02:54Z, 16:36:12Z, 22:56:22Z; 09-15 05:09:30Z, 10:49:05Z.
+    - 1 user-triggered `server_restarted` at 17:23:36Z.
+  - **Every `earlyExit` is the designed uptime recycle.** Each is preceded 1-61 s earlier by `LIVE_ODDS_WORKER_MEMORY` `stage loop_recycle_for_uptime` then `loop_finally recycled_for_uptime: true`, at 05:06:38Z, 11:01:33Z (RSS 772 MB), 16:35:35Z, 22:56:19Z, 05:09:25Z and 10:49:04Z (RSS 792 MB). This is `SYNDICATE_LIVE_ODDS_WORKER_MAX_UPTIME_SECONDS`, default 21600 (`run_live_odds_refresh_worker.py:2451`).
+  - **Unreclaimable memory** over the same window: 18,967 `ALL_PROCESS_MEMORY` samples, p50 723 MB, **p95 1,082 MB**, max 1,498 MB, of 2,048 MB.
+  - **Credit, stated:** a combination on one build, not any single fix. `58736a69` (arena cap + trim), `e332b531` (peer lane `live-odds-worker-oom-loop`), `77199c48` (the MLB live-lens payload halved) and later main. Refresh-worker's live-lens loop has also been OFF since 09-14. Peer lane `live-odds-worker-oom-loop` holds its own verdict and was not edited.
+- **GOAL VERDICT (checkpoint 2026-09-13 ~01:25Z, session 0f5b256e) -- Goal (verbatim): "live-odds-worker stops being OOM-killed. The mechanism is identified from production readings, and a fix is deployed under the locks. Success is 0 `oomKilled` events on live-odds-worker over a window of at least 6 h that spans a live slate, read from the Render events API." -> GOAL: NOT MET.**
+  - REACHED: mechanism identified from production -- (1) the parent `run_live_odds_refresh_worker.py` on uncapped glibc arenas with no trim, plateauing at 1.0-1.3 GB; (2) H4 from peer lane `live-odds-worker-oom-loop`, the Kalshi daily-book whole-file write, re-derived here as 7 of 7 kills inside the `TRIM_SELECT`->`DAILY_BOOK` window. Fix `58736a69` deployed under the locks, live 22:34:15Z: P1 MET (`MALLOC_ARENA_INIT applied`), P2 MET (9/9 trims, 915.9 MB in 12 min), P3 FALSIFIED (parent 1,014 MB at 10.2 min).
+  - LEFT: P4. `58736a69` ALONE ran 93.6 min, then `oomKilled` at 2026-09-13T00:07:50Z (was 10-25 min): necessary, not sufficient.
+  - **COMBINATION `58736a69` + `e332b531`: 0 `oomKilled`, 0 restarts from 00:14:31Z to 04:38:33.555Z, 4 h 24 min.** Measured by this session's events monitor: the 04:04:02Z full read, then its 04:39:37Z poll, whose only new event was `deploy_started`.
+  - **ENDED BY A USER-DECIDED DEPLOY**, lane `mlb-live-lens-payload-dup` `77199c48`, before the 6 h mark. This is **NEITHER A PASS NOR A FAIL**. The best observed run, against 10-25 min before either fix and 93.6 min on `58736a69` alone.
+  - **P4 re-reads on the build carrying `77199c48`, as a THREE-change combination** (`58736a69` + `e332b531` + `77199c48`). The payload fix also shrinks the MLB live-lens build and serialize, which is this lane's named third lever, so a clean window cannot be credited to either OOM fix alone.: >= 6 h, 0 `oomKilled`, spanning a live slate, from that deploy's go-live.
+  - IF R4 FAILS, the next lever is live objects in the live-lens MLB/soccer builds (+384 / +558 MB stage deltas). Candidate: `mlb_live_lens.json` ~10 MB with `page_context` and `games` duplicated (`KeyValuePayloadTooLarge`, `live_lens_loop.py:719`, peer-reported). No tracemalloc on this worker.
+- Goal: live-odds-worker stops being OOM-killed. The mechanism is identified from production readings, and a fix is deployed under the locks. Success is 0 `oomKilled` events on live-odds-worker over a window of at least 6 h that spans a live slate, read from the Render events API.
+- Files: scripts/run_live_odds_refresh_worker.py, syndicate/features/shared/live_lens_loop.py, tests/test_live_lens_loop.py, tests/test_live_odds_refresh_worker.py. Amended 2026-09-12 before any edit; no OPEN lane claims these paths (checked against origin/main).
+- Verification: 0 `oomKilled` on live-odds-worker for at least 6 h spanning a live slate after the fix deploy, with unreclaimable p95 over the same window recorded in `deploys.md`.
+- History: context, hypotheses H1-H4, the readings, the fix detail, pre-registered P1-P4 and the 58736a69-alone verdict were moved VERBATIM to `lanes_history.md` at the 2026-09-13 checkpoint. Narrative: `log/2026-09-12.md`. Readings: `deploys.md` 2026-09-12 22:31:32Z.
+- Blocked by: none. NOTE: `#656` (lane `execution-ledger-cas`) is blocked on this. No deploy without the user's go-ahead: live-odds-worker places live venue orders, and a deploy carries origin/main collateral.
+
+### mlb-live-lens-payload-dup — CLOSED 2026-09-15 — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **GOAL: MET**
+- **GOAL VERDICT 2026-09-15 ~10:20 CDT, session 0f5b256e.** Goal (verbatim): "the MLB live-lens snapshot write stops failing with `KeyValuePayloadTooLarge` on live-odds-worker — `live_lens_tick_after_mlb ok=True` on >= 90% of ticks through the next live MLB window — and the board's lens state join corrects exactly the rows it corrected before." — **GOAL: MET.**
+  - **V1:** `live_lens_tick_after_mlb`, 09-13 16:00Z to 09-15 15:00Z, is **1,316 / 1,316 `ok: true`** (09-13 145, 09-14 682, 09-15 489). `KeyValuePayloadTooLarge` 0 and `KEYVALUE_WRITE_REJECTED` 0, from go-live (04:43:50Z 09-13) to 15:00Z 09-15.
+  - **The population was live, not trivially ok:** 09-14 23:30Z to 09-15 04:30Z carried 138 `KEYVALUE_WRITE_LARGE` for `mlb_live_lens.json`, growing 1.1 MB -> 3.97 MB max through play. The ceiling is 8.39 MB, against 10.8 MB before the fix. The rejection emitter is proven live by the 09-13 00:16Z positive control.
+  - **V2:** served `/mlb/api/live-lens?date=2026-09-14` at 10:14 CDT 09-15 had `games` 15. Bytes 749,835 for a FINAL slate, which cannot be compared with 09-12's live 5.5 MB, so the byte shape was not re-derived. V2 was MET on the live slate at 04:56Z 09-13.
+  - **V3:** MET at 04:56Z 09-13 (`lens_games: 15`). Not re-read.
+  - Since 09-14, live-odds-worker is the sole writer (refresh-worker's live-lens loop is off).
+- Goal: the MLB live-lens snapshot write stops failing with `KeyValuePayloadTooLarge` on live-odds-worker — `live_lens_tick_after_mlb ok=True` on >= 90% of ticks through the next live MLB window — and the board's lens state join corrects exactly the rows it corrected before.
+- Files: syndicate/features/mlb/live_lens.py, tests/test_mlb_live_lens_snapshot_payload.py (NEW). The shared board-enrichment module is out of scope: lane `football-layer2-live-parity` holds it, and this fix is built to need no change there.
+- Measured before any code `[2026-09-13 04:05Z, substrate render]`:
+  - `live_lens_tick_after_mlb` 00:14:31-04:03Z: **57 of 61 `ok=False`**, each `KeyValuePayloadTooLarge` for `live/mlb_live_lens.json` at 10,006,089 B (23:54Z) rising to 10,803,367 B (03:59Z), against the 8,388,608 B ceiling.
+  - **ONSET CORRECTED `[2026-09-13 ~04:45Z]`: it RECURS in each long late MLB slate; it did not start tonight.** Peer lane `live-odds-worker-oom-loop` found it, and it was re-derived here with a positive control (09-13 00:16Z: 1 `KEYVALUE_WRITE_REJECTED`).
+    - 09-12 00:00-12:00Z: **20** rejections for `mlb_live_lens.json`, 01:52:24-04:42:16Z, 8,782,308 -> 9,271,572 B.
+    - 09-12 12:00-23:00Z: 0.
+    - Back from ~23:30Z 09-12.
+    - The windows below started at 15:00Z and missed the night before; "onset ~23:30Z" was wrong. ALSO: lane `execution-ledger-cas` (`deploys.md` 2026-09-12 16:37Z) counted 63 `mlb_live_lens.json` rejections over 09-11T15:50Z..09-12T15:24Z.
+  - Original onset reading: 09-11 15:00-23:59Z 215/215 ok; 09-12 15:00-22:31Z 111/111 ok; the 09-12 23:00Z hour 13 ok / 4 fail; from 09-13 00:00Z nearly all fail. The snapshot crossed the ceiling as `games` grew through live play. **Not caused by `58736a69` or `e332b531`**: the 22:35-23:00Z ticks on `58736a69` were 8/8 ok.
+  - Served `/mlb/api/live-lens?date=2026-09-12` (generatedAt 04:16:59Z): `games` 15 games, 5,548,330 B for ONE copy; largest game 471,029 B; `home`/`away` = `{abbr, name}`, 41 B.
+- Hypothesis: `mlb/live_lens.py` stores `games` TWICE, at `page_context["games"]` (`:1932`) and top-level `"games"` (`:1973`). `#371` removed a third copy (`api_payload`) and left these two.
+  - Top-level readers: `_snapshot_games`, `_snapshot_route_context` (it replaces `base["games"]` with top-level whenever non-empty, `:1655-1656`), `_snapshot_api_payload`, the validator, `board_enrichment.py:1678`, `live_gameline_join.py:1318`, `ops.py`.
+  - The ONLY reader of the `page_context` copy is `board_enrichment.py:757/815`, reading `status.abstract`, `status.detailed`, `home`/`away` `name`/`abbr` (`_side_matches`, `:858-874`) and `matchup.score`. `_live_state_lens_by_game_pk` falls back to it only when top-level is absent.
+  - **So storing `page_context["games"]` as a projection of exactly those fields (3,399 B for 15 games) takes the snapshot from ~10.8 MB to ~5.3 MB, with no change to any reader.**
+- Falsification test: after deploy, `live_lens_tick_after_mlb ok=False` with `KeyValuePayloadTooLarge` still dominates a live MLB window, OR the board's lens join corrects fewer rows. Offline, the same join on slim vs full `page_context["games"]` must give identical corrections and transitions. Unwiring the projection must fail the builder-level test.
+- Verification: tests as above; then on production after the live-odds-worker deploy: `live_lens_tick_after_mlb` ok ratio >= 90% over the next live MLB window, 0 `KeyValuePayloadTooLarge` for `mlb_live_lens.json`, and served `/mlb/api/live-lens` `games` n and bytes unchanged in shape. Recorded in `deploys.md`.
+- **READING 2026-09-13 04:56Z on `77199c48` (live 04:43:49.926Z, clean rollout): V2 MET (full `games` still served, 15 games); V3 MET (board lens join `lens_games: 15`, snapshot age 106-144 s, no `snapshot carries no games`); V1 MET on n=5 (5/5 `ok=True`, 0 `KeyValuePayloadTooLarge` since go-live), and the >= 90% Verification is OWED over Sunday 2026-09-13's live MLB window. GOAL: NOT MET until that window is read. Claim released. Detail: `deploys.md` 2026-09-13 04:56Z.**
+- Blocked by: none. **User decision 2026-09-13 ~04:10Z: "Build and deploy now"**, knowingly resetting lane `live-odds-worker-oom` P4 and lane `live-odds-worker-oom-loop` R4 windows before they could be read; that lane was messaged first. A live-odds-worker deploy needs claim + preflight; a HOLD goes back to the user.
+
+### nfl-live-props-board-lane — CLOSED 2026-09-15 — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: live NFL props that the Layer 2 shortlist serves as live (`/api/board/layer2-shortlist?sport=nfl`, `market_state live`, lane `opportunity`) must also be served live on the main board (`POST /api/intelligence/query`, the page's default Opportunity lane). Prove it with a failing test first, then a production reading on the next live NFL game.
+- Origin: user report 2026-09-15 ~01:45Z (20:45 CT 09-14), "why are there no props for the live nfl game right now"; user decision ~02:00Z: "fix it open the lane".
+- **Measured before hypotheses (DEN @ KC live, 00:15Z kickoff):**
+  - Layer 2 API 01:48:28Z: 124 live rows (113 props), all `market_state live`, lane `opportunity`, `gate.reasons []`. At 01:50:22Z (new build): 49 live, 37 props.
+  - The page's query 01:52-01:57Z: state `computed_at 2026-09-15T00:49:16Z` (stale), source `combined_board_window+layer2_fallback`, `layer2_fallback_rows 2178`. There are 50 DEN @ KC rows (25 game, 25 prop), ALL `board_lane watchlist`, `market_state unknown`, `is_live None`, `lane pregame`, gate reason `no_game_state`, `source layer2_shortlist`, `source_board_date` 09-14 x37 / 09-15 x13.
+  - Cards restated live on the page: mlb 209, **nfl 0**.
+  - Web logged `LAYER2_LIVE_RESTATED cards=812 of 2737` (01:49Z) and `397 of 2248` (01:52Z).
+  - The chip join is NOT the miss: `/api/board/game-chips?sports=mlb,ncaaf,nfl,soccer&date=2026-09-14` holds DEN @ KC `state live` with keys `denver broncos`/`kansas city chiefs`, identical to the cards' `away_key`/`home_key`. `dates_covered` = 09-14/15/16.
+  - The page's default lane is `opportunity` (`intelligence.html:653-655`), so watchlist rows are hidden.
+- **H1 (written BEFORE any test):** legacy per-date state rows are appended to `merged_recommendations` FIRST (`intelligence_state.py:9091-9116`), and the restated L2-A fallback cards AFTER (`:9230`).
+  - The DEN @ KC legacy rows (state computed 00:49Z, not live-stamped) and the restated cards share a dedupe identity in `build_intelligence_board_contract`, which keeps the first copy. The live restate is discarded, and the serve-time re-gate (`blueprints/intelligence.py:1269-1302`, `has_game_state` false) demotes the survivor to watchlist.
+  - **Falsified if** the dedupe keeps the later or the richer copy, or if the two copies do not share an identity key.
+- **H2 (alternative):** a step after the merge strips `is_live`/`lane`/`market_state` from NFL cards specifically. Falsified if a unit test of the merge path keeps a restated NFL card live.
+- Verification:
+  - (1) A unit test through the real `combined_board_window` merge, with a legacy non-live row plus a restated live L2-A card for the same NFL prop, asserts the served card is `is_live True`, `market_state live`, lane opportunity after `annotate`. It fails on HEAD and passes with the fix.
+  - (2) Production, next live NFL game: page query DEN-style rows `is_live True` / `board_lane opportunity` count > 0 while the Layer 2 API shows live props.
+- **RESULT ~02:08Z: H1 CONFIRMED offline, fix written, NOT deployed (web serves `/api/intelligence/query`).**
+  - `tests/test_board_live_restate_merge.py` drives the REAL `read_combined_intelligence_response`: a pre-kickoff state row, the same prop as an L2-A card read through the real `_layer2_fallback_recommendations`, and a live chip. On HEAD it reproduced production exactly: served `is_live None`, and after `annotate` `watchlist / unknown / no_game_state`.
+  - Fix in `pipeline/intelligence_state.py`:
+    - (a) `read_combined_intelligence_response` restates the per-date STATE rows against the same scoreboard before the first contract build (`attach_actual=False`; logs `COMBINED_STATE_LIVE_RESTATED` / `_FAILED`).
+    - (b) `_refresh_layer2_live_state` gains `attach_actual` (default True, unchanged) and fills `status_context` = `live`/`final` only when a matched row has NO state text. That is needed because `game_state_of` resolves empty text to `pregame` before `is_live`: the restated row passed `no_game_state` but was still gated on pregame rules and labelled `market_state: pregame`.
+  - Tests: new 3/3 pass on the edit, and the 2 live tests FAIL on HEAD. The related suites (chip join, L2-A fallback, vintage gating, freshness, pool-cache log, opportunity gate) pass 67.
+  - 2 chip-join failures (`test_it_still_joins_when_NEITHER_side_publishes_a_key`, `test_a_final_chip_still_reaches_final`, `assert 0 == 1`) fail identically on HEAD. Pre-existing, not this change, not taken here.
+  - Owed: a web deploy (user decision), then verify (2) on the next live NFL game.
+- **CORRECTION ~02:30Z: H1 was FALSE for production; `dedfede6` is live on web but INERT.**
+  - Web deployed `dedfede6` (user decision "Deploy web now", live 02:18:36Z). At 02:20-02:22Z the page query still served DEN @ KC 89 rows / 72 props, all watchlist / unknown / `no_game_state`, NFL `is_live True` 0, MLB 387. No `COMBINED_STATE_LIVE_RESTATED` line, because every `by_date` candidate_count was 0: there were NO state rows to shadow anything. All served rows were L2-A fallback cards. The same result held with `slim_aliases` / `drop_row_diagnostics` off.
+  - **ACTUAL CAUSE:** `_refresh_layer2_live_state` indexed chips only from an in-process `build_game_chips` (per-sport providers, `except: continue`). On web that yields MLB chips but not live NFL ones. `/api/board/game-chips` serves `read_game_chips(date)`, the worker-published artifact (`blueprints/intelligence.py:2871-2901`), which had DEN @ KC `state live`. `LAYER2_LIVE_RESTATED cards=798 of 2718` = MLB only.
+  - The local test missed it because it stubbed `build_game_chips` with the live chip, the one thing production lacked.
+  - **Fix 2 (written ~02:28Z):** the restate reads `read_game_chips(date)` too. A fresh artifact (`<= SYNDICATE_LAYER2_RESTATE_CHIP_ARTIFACT_MAX_AGE_SECONDS`, default 600) wins over the inline build; a stale one only fills gaps. An inline-build import failure no longer returns 0.
+  - New tests: published live NFL chip plus an inline build returning [] plus no state rows (the production shape) gives a served card `is_live True`, re-gated `opportunity` / `live`; a stale published chip does not override a fresher inline chip. 5/5 pass on the edit, and the production-shape test FAILS on `dedfede6`. Related suites 69 pass; the same 2 chip-join failures are pre-existing on HEAD.
+  - `dedfede6`'s state-row restate stays (harmless, and covers a real ordering case), but it did not fix tonight.
+- VERDICT 2026-09-15 ~02:36Z (21:36 CT 09-14) — Goal: live NFL props that the Layer 2 shortlist serves as live (`/api/board/layer2-shortlist?sport=nfl`, `market_state live`, lane `opportunity`) must also be served live on the main board (`POST /api/intelligence/query`, the page's default Opportunity lane). Prove it with a failing test first, then a production reading on the next live NFL game.
+  - **GOAL: MET.**
+    - Failing test first: the production-shape test fails on `dedfede6` and passes on `c4f45fee`.
+    - Production reading on the same live game after web `c4f45fee` (live 02:32:26Z), page payload 02:34:57Z: DEN @ KC 72 props all `opportunity` / `live` / `is_live True`, gate reasons `[]`; NFL live cards 87 (was 0).
+  - The first fix (`dedfede6`) was inert, and the lane records why (`deploys.md` 02:15:21Z and 02:29:09Z).
+  - Lane CLOSED. Left for others: the 2 pre-existing chip-join test failures (`test_layer2_lane_chip_join.py`), and board state `computed_at` pinned at 00:49:16Z.
+- Files: tests/test_board_live_restate_merge.py (NEW). The intelligence-state module edits run under lane heavy-build-memory-refusal's existing claim (same session). If the fix lands in the board dedupe module instead, that claim is taken here first.
