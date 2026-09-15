@@ -35983,3 +35983,31 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - The first fixtures only the new code resolves are Sat 2026-09-19 13:30Z (08:30 CT) Hamburg SV v FC Cologne (bundesliga, expected `fotmob_match_id 5881174`) and 18:45Z Anderlecht v Zulte-Waregem (belgian_pro_league, `5811767`).
   - Both ids come from running `867f1481`'s resolver against FotMob's published 09-19 listing at 19:30:51Z; `c725cc29`'s resolver returned None for both.
   - Read `live_state_2026-09-19.json` while those matches are in play.
+
+## 2026-09-15 20:52:30Z (15:52 CT) — live-odds-worker `18be9107` -> `991a94d5` (OFF-MAIN: `18be9107` + cherry-pick of `070a05bf`) — deploy `dep-dakr03nf3r2c73e0hh30` — lane book-quotes-splice-repair — **LIVE 21:02:40Z. Web refusals on live-odds-worker's soccer 09-15 merges 43/43/43 -> 0/0/0. mlb 09-15 not yet republished**
+- **What:** `070a05bf` (P5 book_quotes write faults):
+  - `publish_hot_artifact` sanitizes an append-only shard before sending (`sanitize_book_quotes_shard`);
+  - `append_book_quotes` terminates a torn tail before appending;
+  - the tail-sync `.pending` sidecar;
+  - repair splits glued lines.
+  - User decisions: "do 1-3", "All three, staggered (Recommended)".
+- **Why off-main:** main carried lane `soccer-player-role-allocation` steps A `e53274f2` / B `b33ef901`, recorded then as not approved. That owner later confirmed approval and plans a tip deploy (~21:25Z) that contains `070a05bf`, so this deploy is superseded without a revert. Branch `deploy/live-odds-worker-bq-write-faults`. Tests 207 passed on `991a94d5`.
+- **Locks:**
+  - Claim ~20:52Z, token `63292e21…`, released 21:14:09Z for that tip deploy.
+  - Baseline read 20:47:42Z and re-read 20:51:47Z: web `MERGE_REFUSED_BAD_LINES` 11 since 20:00Z; live-odds-worker `BOOK_QUOTES_LOCAL_BAD_DROPPED` 0, `BOOK_QUOTES_TORN_TAIL_TERMINATED` 0.
+  - Preflight `--allow-off-main` CLEAR about 20:52Z. Expectations: drop lines present once per stale shard; web refusals from live-odds-worker 0 after the first drop.
+- **Reading 21:02:40-21:29:14Z** (watcher `p5_lodw_watch.py`, 4-min rounds):
+  - Web `MERGE_REFUSED_BAD_LINES` **0** since 21:02:40Z. live-odds-worker book_quotes `.jsonl` publisher lines on web: 27 (soccer 09-15 x3, 09-16 x21, 09-18 x3).
+  - **soccer 09-15 from live-odds-worker, same shard before and after:**
+    - merges 20:40:35 / 20:47:27 / 20:54:47Z refused **43 / 43 / 43**;
+    - merges 21:08:50 / 21:24:49 / 21:27:35Z refused **0 / 0 / 0**;
+    - incoming bytes 15,446,798 -> 16,168,481 (capture growth; it masks the ~9 KB a 43-line drop removes).
+  - live-odds-worker `BOOK_QUOTES_LOCAL_BAD_DROPPED` 0, `BOOK_QUOTES_TORN_TAIL_TERMINATED` 0, `SANITIZE_FAILED` 0.
+    - **The drop line was NOT observed although the refusals stopped.** BELIEVED, not verified: the publish ran in a child process (odds refresh) whose stdout does not reach Render logs, the same gap lane `soccer-live-scoreboard-range-stale` traced for `refresh_odds_sources` children.
+  - `PUBLISH_FAILED` 41 lines since 21:02Z, all `HTTP Error 503: SERVICE UNAVAILABLE` (web merge capacity), including `odds_history` files the sanitize never touches. Retried by later sweeps; not this change.
+- **verify:**
+  - Expectation (2), web refusals 0: **MET for soccer 09-15** (3 of 3 merges clean after vs 3 of 3 refused before).
+  - Expectation (1), the drop line: **NOT OBSERVED** (instrument gap, above).
+  - Falsification (a refusal 30 min after the first drop) not triggered.
+  - **Owed:** mlb 09-15, which web refused 10 lines per merge before, had no live-odds-worker merge by 21:29Z.
+- Rollback: redeploy `18be9107`. Superseded in any case by the soccer-player-role-allocation tip deploy.
