@@ -35853,3 +35853,27 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
 - At 19:29:06Z the 09-16 shard carried 2 disagreements, 3 `fair`-basis rows and 30 old-sign rows. It has been rebuilt since.
 - **Instrument note:** the first sign read matched the first component key containing "movement". That is the boolean `movement_capped`, and it reported 12 "away positive". Discarded; the numbers above read `movement_component` by name.
 - Verify: MET in full. This lane owes no further reading.
+
+## 2026-09-15 20:10:02Z (15:10 CT) — refresh-worker `5686a555` -> `f833f7ec` (soccer props player substrate, fix #1) — deploy `dep-dakqc6h5efls73d8r3og` — lane soccer-player-substrate — **LIVE 20:15:58Z; verify OWED on the next soccer builds**
+- **What:** the same commit as live-odds-worker's 19:31:33Z entry above. refresh-worker runs the weekly soccer builds (`SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN=true`); the players step runs in both phases on both workers.
+- **Ride-along from `5686a555`** (9 commits, code only):
+  - `867f1481` FotMob alias loose pass (already live on live-odds-worker since 19:37:29Z)
+  - `3157bb7b` home NCAAF prop `slate_date` (web path)
+  - `f833f7ec` itself
+- **Locks:**
+  - Claim 19:38:19Z.
+  - Preflight 19:38:40Z TOO_SOON (25-min spacing after `5686a555` finished 19:19:27Z).
+  - 19:45:16Z HOLD: 4 jobs, the MLB daily sim.
+  - 19:47:20Z CLEAR, but not deployed. A direct re-preflight at 19:48:45Z read HOLD: a new `run_mlb_daily_sim_job` (pid 2413) had started about 80 s after the CLEAR.
+  - A background loop re-ran preflight about every 60 s from 19:50:08Z (HOLD with 1, then 6, then 7, 3 and 1 jobs). It deployed in the same pass as the first CLEAR: CLEAR 20:10:01Z, POST 20:10:02Z.
+  - `f833f7ec` is on origin/main. Live 20:15:58Z.
+- **Marker note:** at ~19:59Z this session's per-session marker moved to lane `soccer-player-role-allocation`, because lane-guard blocked its edits. The loop had been launched earlier under `soccer-player-substrate`, which holds this claim. The deploy belongs to that lane.
+- **Baseline and prediction:** as in the live-odds-worker entry above. Before either deploy, `players_2026.csv` was absent for the 4 ESPN leagues, and no artifact carried `player_substrate` or `squad_audit`.
+- **First reading** (production export 20:05Z, after live-odds-worker's deploy only):
+  - `players_2026.csv` NEW for championship and eredivisie (19:50:05Z); la_liga re-written 19:48:55Z.
+  - belgian_pro_league and primeira_liga still absent. bundesliga, epl, ligue_1, serie_a and mls still dated 09-12.
+  - No recommendations artifact written after 19:37:29Z yet.
+  - A watcher polls every 5 min for 3 h.
+- **verify (OWED):** all ten leagues get a `players_2026.csv` written after the deploys, and the first recommendations artifact per league written after them carries `player_substrate` plus `squad_audit` on every match, with no side at `listed: 0`.
+  - The export cannot tell which worker wrote an artifact, so the reading must say so. The weekly build covers the week's dates; the pregame refresh covers near dates.
+- Rollback: `5686a555`. On this service only, that reverts fix #1, `867f1481` and `3157bb7b`.
