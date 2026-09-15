@@ -6235,3 +6235,18 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - Treat "live, or has an uncommitted ledger edit" as "do not touch".
   - The lane's CLOSER can differ from its OWNER: check the liveness of both.
 - *(evidence: `log/2026-09-15.md` addenda "archived 26 lanes closed before 2026-09-15" and "owner liveness of the 13 closed lanes"; commits `7e721cfa`, `d1d74ce9`)*
+
+## 2026-09-15 — OVERTURNED: "a mechanism that passed a held-out test is ready to build". The test fed it an input production does not have, and on production's own inputs it failed until a join defect was fixed `[lane soccer-player-role-allocation]`
+
+- **What was believed:** the start/sub shot mixture was validated. It passed held out (H8: 9/10 leagues), with P(start | appear) taken from ESPN box-score roles.
+- **What was actually true:**
+  - Production has no box-score role table.
+  - Built from what production does carry (Understat minutes per appearance, ESPN counts, a minutes prior), the same mechanism FAILED: H11 won 6/10 leagues, and H12 was +0.031 log loss.
+  - The cause was a join, not the mechanism. A side's rows mix seasons, and one match count across them pushed the big five's shot means to 1.15-1.67x actual.
+  - Scoped per season, it passed (H13). A replay of the SHIPPED engine then reproduced it within 0.0001 (H14).
+- **The rule going forward:**
+  - When a mechanism passes on a convenient input, pre-register a second test on the input the production code will actually read.
+  - Then replay the shipped code itself before landing.
+  - A pass on outcome-derived features is a pass for the mechanism, not for the build.
+- **Cost:** none shipped. The failure surfaced before code.
+  - *(evidence: `log/2026-09-15.md` session abacd435; `scripts/soccer_season_audit/calibration_role_mixture5.py`, `calibration_role_mixture6.py`, `calibration_engine_replay.py`; commit `b33ef901`)*

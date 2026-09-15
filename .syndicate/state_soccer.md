@@ -688,7 +688,7 @@ Do not change it without a larger sample.
 
 ## [soccer-shots-prop-skill] SOCCER SHOTS PROPS â€” THE POISSON SHAPE IS RIGHT AND THE MEAN IS INFLATED `[measured 2026-08-31, lane layer1-model-edge-join]`
 
-> **CORRECTED 2026-09-15 by `[soccer-season-market-audit]` — DO NOT SHIP THE 1.33 DIVISOR.**
+> **CORRECTED 2026-09-15 by `[soccer-season-market-audit]`. STATUS 2026-09-15 20:25Z, lane `soccer-player-role-allocation`:** the divisor that shipped was 1.393, not 1.33. It was LIVE from 2026-08-31 (`shot_calibration`, applied in `project_player_props`). It is RETIRED IN CODE by `e53274f2`: the division, the loader, the fitter and both check scripts are removed, and the monthly refit task is disabled. From `b33ef901`, shot and SOT props are priced CONDITIONAL ON APPEARING (a start/sub mixture). Held out, shots scored 0.6107 / 0.4690 against the divisor ladder's 0.690 / 0.570 and the unconditional ladder's 0.641 / 0.517. NEITHER COMMIT IS DEPLOYED as of this line.
 > Season to date, on ESPN box scores with one-to-one name binding, players who appear are
 > UNDER-predicted: 0.87 held-out, regular starters 0.68, fringe players 1.08. This section's
 > 1.40 came from unconditional means over every predicted row, with unmatched players scored

@@ -1293,6 +1293,11 @@ death, never life — do not invert it.
   - H4 is false if any league stays under 85% on replay.
 - Verification: the decomposition and replay tables are recorded in the log, with a reachability test (`off != on`) per change, landed on origin/main.
 - Blocked by: none
+- **STATUS 2026-09-15 20:25Z — GOAL: NOT MET (deployed on both workers; verify owed).**
+  - Landed `f833f7ec`. A/B test failure sets are identical (37 = 37).
+  - live-odds-worker live 19:37:29Z, refresh-worker live 20:15:58Z (`deploys.md`).
+  - First reading: `players_2026.csv` is new for championship and eredivisie, and la_liga was re-written. No recommendations artifact carrying `player_substrate` has been seen yet. An EPL one generated at 20:02:04Z lacks it: BELIEVED to be refresh-worker's pre-deploy build.
+  - Owed: the `verify:` in both deploy entries. Close the lane on it.
 
 ### fotmob-season-scoped-league-ids — CLOSED 2026-09-15 — opened 2026-09-15 — session da346015-cd58-450a-a9e0-bba6bdb00403 — **GOAL: MET: FotMob league matching is season-proof (primaryId + country), deployed to live-odds-worker `c725cc29`, verified on a LIVE Eredivisie match 18:18:47Z**
 - **VERDICT.** Goal (verbatim): "FotMob league matching is season-proof. `resolve_fotmob_match_id` resolves Championship, Eredivisie and Belgian Pro League fixtures in 2026-27 (it returned None for 9 of 9 on 2026-09-12), and the 2y harvest script classifies leagues the same way. Deployed to live-odds-worker and verified on a LIVE match." — **GOAL: MET.** Reading: eredivisie `live_state_2026-09-15.json` generated 18:17:24Z (after the 18:15:16Z go-live), Ajax v Willem II 16' `momentum.supported True`, `source fotmob`, `fotmob_match_id 5781718`.
@@ -1454,6 +1459,18 @@ death, never life — do not invert it.
   - Tests A/B against a baseline.
   - After deploy, the first artifacts carry the conditional ladder, and `soccer_projections` prices from it.
 - Blocked by: none. Step A (divisor retirement) needs nothing from step B.
+- **STATUS 2026-09-15 20:25Z — GOAL: NOT MET (landed on main, NOT deployed).**
+  - Step A `e53274f2`: divisor retired, `refit-soccer-shot-shrinkage` task disabled.
+  - Step B `b33ef901`: conditional-on-appearing shot/SOT ladder.
+  - Later hypotheses:
+    - H10, SOT: SUPPORTED.
+    - H11, production-shaped inputs: FALSIFIED (6/10 leagues).
+    - H12: FALSIFIED (+0.031).
+    - H13, season-scoped match count: SUPPORTED.
+    - H14: SUPPORTED. The shipped engine reproduces the model within 0.0001 held out: shots 0.6107 / 0.4690 against 0.6414 / 0.5169, SOT 0.4931 / 0.1988 against 0.5122 / 0.2154, 9/10 leagues.
+  - Mutation checks are red for each guarded mechanism; 108 targeted tests pass.
+  - Files added beyond the list: `scripts/soccer_season_audit/calibration_role_mixture4.py`, `5.py`, `6.py`, `calibration_engine_replay.py`.
+  - Owed: the deploy (user decision), then the reading that the first post-deploy artifacts carry the conditional ladder and `soccer_projections` prices from it.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
