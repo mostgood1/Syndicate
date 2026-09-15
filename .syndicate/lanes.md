@@ -1740,9 +1740,10 @@ death, never life — do not invert it.
 ### soccer-anytime-scorer — OPEN — opened 2026-09-15 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
 - **VERDICT 2026-09-15 22:20Z.** Goal (verbatim): "soccer anytime-scorer probabilities stop pricing players at exactly 0, and are conditional on the player appearing. ESPN-league goal and assist rates are shrunk toward a positional prior, and goals use the same start/sub mixture as shots. On held-out dates, with production-shaped inputs, the SHIPPED engine beats today's anytime field on log loss, pooled and in >= 8 of 10 leagues. Landed on main with reachability tests. Which anytime field the board prices (unconditional or conditional) is put to the user. Deploy per user." — **GOAL: NOT MET.**
   - Met so far: the measurement. H15, H16 and H17 are SUPPORTED and H18 is FALSIFIED (below). No code has landed.
+  - **H19-b NOT FALSIFIED** (pre-registered `38c3eee9`, landed `ef9f18fc`): the shrink at LOAD TIME, after the dedupe, reproduces H16 to four decimals — ESPN-league TEST log loss 0.3551 (off) -> 0.2666 (on) over 3,935 appeared outfield rows, and the 53.6% priced at exactly 0.0 go to 0. `off != on` through the real loader; mutation-checked; 10 targeted tests pass.
   - H19 FALSIFIED, the shrink placed in the producer. Local commit `507ea9b6` put it in `espn_player_stats.py`, never landed. The engine replay did not reproduce H16: prior-season player files win the dedupe in `build_soccer_artifacts._load_player_rows`, so the shrunk rows never reach `build_usage_profiles`. Evidence is in `log/2026-09-15.md`.
   - LEFT:
-    - Move the shrink to load time in `_load_player_rows`, after the dedupe. Re-register H19 at that location, then replay to within 0.002 of H16.
+    - ~~Move the shrink to load time~~ DONE (`ef9f18fc`), H19-b NOT FALSIFIED.
     - Put goals on the start/sub mixture in `player_props.py` (H17).
     - Tests, the user's board-field decision, and a deploy.
   - Blocking: two file claims, both held by this session's own lanes (see `Blocked by`).
