@@ -1776,21 +1776,6 @@ death, never life — do not invert it.
 - Blocked by: none.
 - Narrative (user decisions, local and production readings, the two follow-ups): `.syndicate/log/2026-09-14.md`, and moved verbatim to `lanes_history.md` on 2026-09-14.
 
-### combined-board-state-rows-lost — CLOSED 2026-09-15 — opened 2026-09-14 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: Q1-Q3 answered with production readings. The reader fix is live on web `b6a0e346` (14:10:07Z): `by_date` 09-15 106 (was 0), 0 `VINTAGE_IGNORED`. One prediction was WRONG (`computed_at` moved to the refused heavy build's state stamp). User decision 2026-09-15: keep the `stale` label, it is true. Postmortem in `learnings.md`.**
-- **VERDICT.** Goal (verbatim): "name, with production readings, (1) which artifact carries the `computed_at = 2026-09-15T00:49:16Z` stamp on `POST /api/intelligence/query` (board payload) and why it is not rewritten, (2) why every `by_date` candidate_count is 0 while refresh-worker logs `STATE_PERSIST_BEGIN candidate_count=374` (01:56:23Z), and (3) whether the page serves stale ROWS or only a wrong AGE. Diagnostic; no deploy without the user." — **GOAL: MET.**
-  - (1) `/api/board/layer2-shortlist?date=2026-09-15` `written_at`, plus `LAYER2_FAST_REFRESH date=2026-09-15` at 00:50:06Z.
-  - (2) Web stamps equal `CANDIDATE_POOL_READY` on 4 payloads, and the real-writer test reads 0.
-  - (3) Rows really old: 1,869 of 2,538 served came from the 57-min shortlist.
-  - The reader fix then deployed on the user's decisions: web `b6a0e346`, `by_date` 09-15 0 -> 106 (`deploys.md` 14:03:51Z).
-- Goal: name, with production readings, (1) which artifact carries the `computed_at = 2026-09-15T00:49:16Z` stamp on `POST /api/intelligence/query` (board payload) and why it is not rewritten, (2) why every `by_date` candidate_count is 0 while refresh-worker logs `STATE_PERSIST_BEGIN candidate_count=374` (01:56:23Z), and (3) whether the page serves stale ROWS or only a wrong AGE. Diagnostic; no deploy without the user.
-- Files: released: (a RECORD since the 2026-09-15 close; nothing is held) `tests/test_combined_board_persisted_state_rows.py` (NEW, landed), `pipeline/intelligence_state.py` (`_read_single_date_response_for_combining` only; taken 2026-09-15 ~04:40Z from `heavy-build-memory-refusal` on user decision "proceed next steps", RETURNED to that lane at this close, in both this copy and the primary checkout's).
-- Observations handed in (user, 2026-09-15 ~01:52-02:35Z, read-only): `state_meta.computed_at 00:49:16Z`, `freshness_status stale`, `source combined_board_window+layer2_fallback`, `artifacts_dated 2`, `layer2_fallback_rows` 2,178-2,628; web logged `COMBINED_BOARD_VINTAGE_IGNORED date=2026-09-14 stamp=2026-09-15T01:54:49Z reason=no_rows` and `COMBINED_BOARD_STATE_DATE_MISS` for 09-15 and 09-16. Central today = 09-14, window 09-14..09-16.
-- Hypothesis H1 (Q2, written from code BEFORE any production read): NOT a key/date mismatch -- web finds the worker's 09-14 file (its 01:54:49Z stamp is fresh). The rows are lost IN THE READER. `_read_single_date_response_for_combining` (`pipeline/intelligence_state.py:9075`) reads the on-disk state through `_read_state_payload` and never calls `_expand_persisted_state`. The writer (`write_latest_intelligence_state` :4431/:4434) runs `_compact_state_for_persist` (member-aliases `by_sport` lists, :3729-3732) and `_write_state_payload` runs `_compress_oversized_values` (zlib envelope for any top-level value >= 262,144 bytes, :3781). So `by_sport` arrives as an envelope `{__compressed__, raw_bytes, data}` or as alias dicts; `read_combined_intelligence_response`'s `isinstance(items, list)` (:9179) skips every entry -> 0 rows, while the scalar `candidate_count` keeps the `> 0` gate open and the stamp is kept -> `VINTAGE_IGNORED reason=no_rows`. Web's in-memory snapshot path is empty (loop off on web), so nothing masks it. Consistent with the 09-15 learning "Every `by_date` candidate_count was 0: there were NO state rows in production" -- H1 says there WERE rows and the reader could not see them.
-- Hypothesis H2 (Q1): the 00:49:16Z stamp is a Layer 2 shortlist `written_at` (the only other vintage source, `_layer2_fallback_recommendations` :1750/:1767); `artifacts_dated 2` = two shortlist dates with cards. The oldest is a date whose shortlist is written only by a heavy build of that date (:6815) or the fast path on a refused build (:8025) -- neither of which ran for it after 00:49Z.
-- Hypothesis H3 (Q3): the age is TRUE for the L2-A cards of the date holding 00:49:16Z (rows served from that shortlist are that old), and separately the board is missing CONTENT: the fresh legacy state rows (374 candidates) are not served at all.
-- Falsification tests: H1 is wrong if production's 09-14 state artifact carries top-level `by_sport` as a plain dict of NON-EMPTY lists (no `__compressed__` key, no alias dicts), or if expanding it with `expand_persisted_state` still yields 0 rows. H2 is wrong if no layer2 shortlist for 09-14/09-15/09-16 reads `written_at 2026-09-15T00:49:16Z`. H3's first half is wrong if the date holding 00:49:16Z contributes 0 served cards; its second half is wrong if H1 is.
-- Verification: each of Q1-Q3 answered with a named production reading (endpoint + field + timestamp) recorded here and in `state_board.md`; H1 additionally reproduced by a test that writes a real state through `write_latest_intelligence_state`, reads it back through `read_combined_intelligence_response`, and fails on HEAD (no stubbed reader).
-- Blocked by: none for diagnosis; a fix needs the `pipeline/intelligence_state.py` claim.
 ### layer2-chip-join-test-data — CLOSED 2026-09-14 — opened 2026-09-14 — session b6833544-6399-4d9c-88b9-7f6a36beb2a3
 - Goal: `tests/test_layer2_lane_chip_join.py` passes 6/6 on origin/main in a session worktree WITHOUT `data/`, and still passes with the real registry. `test_it_still_joins_when_NEITHER_side_publishes_a_key` and `test_a_final_chip_still_reaches_final` were failing (n == 0), including on the commit before `dedfede6` / `c4f45fee`. **GOAL: MET** — 6/6 in the data-less worktree on the rebased landed tree `66845b38`, and 6/6 with `SYNDICATE_NCAAF_SOURCE_ROOT` at the real registry. Mutation check: removing the stub brings the 2 failures back.
 - Outcome: the TEST was wrong, not the code. The two no-key NCAAF joins needed the `data/` registry, and the test is now data-free. Landed `66845b38`, re-run 6/6 on the rebased tree. No deploy (test + ledger only).
@@ -1818,56 +1803,6 @@ death, never life — do not invert it.
   - Owed: (a) user: accept that the board reads stale while heavy builds are refused (it is true), or scope what should set the age; (b) close this lane and return `pipeline/intelligence_state.py` to `heavy-build-memory-refusal`.
   - Owed (was): (a) USER DECISION on a fix to `pipeline/intelligence_state.py:9075` (claimed by `heavy-build-memory-refusal` and `layer2-prior-date-live-carryover`) -- one line, expand before the gate; it also changes what the board shows (state rows merge ahead of L2-A cards, first-wins dedupe), so it is a product change, not only a telemetry fix; (b) whether tomorrow's shortlist should set the board's age at all, or be refreshed on its own clock -- also a user decision.
 
-### state-read-expand-choke-point — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: `_read_state_payload` expands; the round-trip test FAILS with the expansion removed (5 failed) and passes with it; no production behaviour change, not deployed.**
-- **VERDICT.** Goal (verbatim): "a state payload written by `_write_state_payload` reaches every reader EXPANDED without the caller having to remember. Expansion moves inside `_read_state_payload`, the read every per-date and global state read shares. Pinned by a test that round-trips the REAL writer through each public reader, and by a static test that flags a raw `read_json_file` on a compacted state/snapshot path. The postmortem check (1) from lane `combined-board-state-rows-lost`." — **GOAL: MET** for `_read_state_payload`'s readers.
-  - Reading: `tests/test_state_read_choke_point.py` passes; the unwired copy gives 5 FAILED; `da013b77` is on main.
-  - The board-SNAPSHOT readers stay on `read_json_file` plus explicit expansion, by USER DECISION on measurement (not allowlisted; 0 fallbacks in 24 h; stale disk files on web). This is recorded in `state_board.md`, with no lane, and the lead is closed rather than dropped.
-- Goal: a state payload written by `_write_state_payload` reaches every reader EXPANDED without the caller having to remember. Expansion moves inside `_read_state_payload`, the read every per-date and global state read shares. Pinned by a test that round-trips the REAL writer through each public reader, and by a static test that flags a raw `read_json_file` on a compacted state/snapshot path. The postmortem check (1) from lane `combined-board-state-rows-lost`.
-- Files: released: (a RECORD since the 2026-09-15 close; nothing is held) `pipeline/intelligence_state.py` (`_read_state_payload`, `read_intelligence_state`, `_read_single_date_response_for_combining` only; taken 2026-09-15 from `heavy-build-memory-refusal` on user decision "do the first check, take the claim" and RETURNED to it at close, in this copy and the primary checkout's), `tests/test_state_read_choke_point.py` (NEW, landed).
-- **RESULTS 2026-09-15.**
-  - Change: `_read_state_payload` returns `_expand_persisted_state(chosen)` after picking the fresher of keyvalue/disk (the timestamp compare reads top-level scalars, untouched by compaction). Its two callers drop their own expansion: `read_intelligence_state`, and `_read_single_date_response_for_combining` (the line web `b6a0e346` added). No behaviour change: both already expanded.
-  - New tests (`tests/test_state_read_choke_point.py`, 6): the stored `by_sport` IS aliased (precondition asserted); `_read_state_payload` returns 40/40 rows on both the keyvalue and the artifact-only branch; `read_intelligence_state`, `read_combined_intelligence_response` and `read_latest_intelligence_board_snapshot_response` all see 40 from one REAL write; a static AST scan fails on any raw `read_json_file` of a compacted state/snapshot path not wrapped in an expander (one allowlisted with its reason); and an instrument check that the scan sees that allowlisted read.
-  - **Unwired check** (scratch copy, only the new `_expand_persisted_state(chosen)` removed): **5 FAILED** (both `_read_state_payload` branches, the every-reader round-trip, both `test_combined_board_persisted_state_rows` cases); precondition and static tests pass, as designed.
-  - Suites: 8 board/state files 65 passed; `test_intelligence_state.py` + `test_ask_the_syndicate.py` `-k "combined or single_date or read_intelligence_state or state_payload or snapshot or persist or compact or expand"` 77 passed, 1 ERROR (`test_compute_response_recomputes_when_cached_snapshot_is_stale`: the conftest guard against writing the `data/` mirror, raised inside `_refresh_wnba_boxscores`). **Same ERROR on a HEAD copy without this change** (`1 passed, 1 error`), so not this change.
-  - Lane-checker note: `check_lane_invariants.py` run from a worktree reads `$CLAUDE_PROJECT_DIR` (the PRIMARY tree) unless it is overridden. It reported this lane "in NO ledger file" until run with `CLAUDE_PROJECT_DIR=<worktree>`, when it read 54 headings and only the 2 pre-existing contested files.
-- Hypothesis: n/a (not diagnostic). This is a refactor that must change no behaviour: both current callers of `_read_state_payload` already expand, and `_expand_persisted_state` is a no-op on an expanded payload.
-- Falsification test: the round-trip test must FAIL when the expansion is removed from `_read_state_payload` (unwired check, run on a scratch copy). If it passes there, it pins nothing.
-- Verification: new tests pass with the change and the unwired check fails without it. The combined-board and state suites stay green. No deploy unless the user asks: it changes no production behaviour.
-- Blocked by: none.
-- Out of scope, surfaced to the user: `read_latest_intelligence_board_snapshot_response` and `_latest_non_empty_intelligence_board_snapshot_response` expand, but read via `read_json_file` only, while their writer (`_write_state_payload`) can divert an oversized snapshot to the artifact transport. Routing them through `_read_state_payload` would change what web serves when keyvalue holds no copy, so it is a separate decision. The empty-over-good guard (`_empty_write_would_clobber_good_board`) reads a raw state for top-level scalars only, which compaction never touches. It runs on the worker about once a minute during refusals, so it is allowlisted in the static test rather than given a decompress.
-
-### combined-board-rows-unreadable-tripwire — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: live on web `da268e07` (15:36:46Z); the field is served on every date, 0 `ROWS_UNREADABLE` lines; stored 113 vs rows 111 is the per-sport `by_sport` cap, not a defect.**
-- **VERDICT.** Goal (verbatim): "the combined board's served payload carries, for every date, the WRITER's stored `candidate_count` beside the rows the READER got (`by_date[date].stored_candidate_count`; `None` when no payload was read), and web logs `COMBINED_BOARD_STATE_ROWS_UNREADABLE date= stored= rows=0 stamp= by_sport_shape=` whenever a payload that stores candidates yields none. This is postmortem check (2) from lane `combined-board-state-rows-lost`." — **GOAL: MET.**
-  - Served board 15:37:01Z / 15:38:34Z: 09-15 `stored_candidate_count 113`, `candidate_count 111`; 09-16 and 09-17 `None`.
-  - Web 15:36:46-15:37:19Z: 0 `COMBINED_BOARD_STATE_ROWS_UNREADABLE`.
-  - The firing branch is verified by the unwired check, not in production (nothing is unreadable since `b6a0e346`).
-  - The Verification line's expectation "stored equal to candidate_count" was WRONG. The writer caps each `by_sport` list at 60 (La Liga served exactly 60), so stored >= rows is normal. Full reading in `deploys.md` 2026-09-15 15:30:14Z.
-- Goal: the combined board's served payload carries, for every date, the WRITER's stored `candidate_count` beside the rows the READER got (`by_date[date].stored_candidate_count`; `None` when no payload was read), and web logs `COMBINED_BOARD_STATE_ROWS_UNREADABLE date= stored= rows=0 stamp= by_sport_shape=` whenever a payload that stores candidates yields none. This is postmortem check (2) from lane `combined-board-state-rows-lost`.
-- Files: released: (a RECORD since the 2026-09-15 close; nothing is held) `pipeline/intelligence_state.py` (`read_combined_intelligence_response`'s per-date loop, two helpers, and a comment on the per-sport cap; taken 2026-09-15 from `heavy-build-memory-refusal` on user decision "build check 2, take the claim" and RETURNED to it at close, in this copy and the primary checkout's), `tests/test_combined_board_rows_unreadable.py` (NEW, landed).
-- Hypothesis: n/a (instrument, not diagnostic). Adds one key per `by_date` entry and one log line; it changes no rows, ranking or `state_meta`.
-- Falsification test: the tripwire test must FIRE on the historical defect, produced as a real write read back WITHOUT expansion. It must stay SILENT on a readable state and on a date with no payload. An instrument that cannot fire, or fires on healthy input, fails.
-- Verification: the new tests pass. With the new log line removed from a scratch copy, the tripwire test FAILS (unwired check). The combined-board and state suites stay green. Production needs a web deploy, which goes only on the user's approval; after it, the reading is `by_date[09-xx].stored_candidate_count` equal to `candidate_count` on the served board, and 0 `COMBINED_BOARD_STATE_ROWS_UNREADABLE` lines on web.
-- Blocked by: none. The web deploy was approved and read 2026-09-15.
-- **RESULTS 2026-09-15 (code on main, NOT deployed).**
-  - Change:
-    - Each `by_date` entry gains `stored_candidate_count` (`_optional_int(payload["candidate_count"])`; `None` on `DATE_MISS`).
-    - A `COMBINED_BOARD_STATE_ROWS_UNREADABLE date= stored= rows=0 stamp= by_sport_shape=` print fires when rows are 0 and stored is above 0.
-    - Two helpers: `_optional_int`, and `_by_sport_shape`, which returns absent/empty/compressed/aliased/lists/mixed or a type name.
-  - Tests, `tests/test_combined_board_rows_unreadable.py` (9 tests):
-    - A real write reads stored == rows == 40, silent.
-    - The same write read back WITHOUT expansion (the pre-`b6a0e346` reader) reads rows 0, stored 40, and the line fires with `by_sport_shape=aliased`; the aliased shape is asserted as a precondition.
-    - A date with no payload reports `None`, silent.
-    - Six shape cases.
-  - **Unwired check** (scratch copy, only the 7-line tripwire block removed): the historical-defect test FAILS (1 failed, 8 passed).
-  - Suites:
-    - This file + `test_state_read_choke_point` + `test_combined_board_persisted_state_rows` + 6 board/state files: 74 passed.
-    - `test_intelligence_state.py` + `test_ask_the_syndicate.py` subset: 77 passed, 1 ERROR, the pre-existing `data/`-mirror guard in `test_compute_response_recomputes_when_cached_snapshot_is_stale` (identical on a HEAD copy, measured earlier on 09-15).
-  - Consumers checked:
-    - `intelligence/opportunity_board.html:141` renders `js.by_date` from a different endpoint, as an array of bucket rows, so it is not this payload.
-    - `ask_the_syndicate_data.py:1248` is an MLB pitcher map.
-    - No test asserts a combined `by_date` entry by exact dict.
-  - **Web reading (deployed `da268e07` on the user's approval, live 15:36:46Z): see the VERDICT at the top of this block and `deploys.md` 2026-09-15 15:30:14Z.** A comment on the per-sport cap (stored >= rows is normal) was added after the deploy. It is comment-only and on main, not redeployed.
-
 ### disk-inventory-test-clock — CLOSED 2026-09-15 — opened 2026-09-15 — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
 - **VERDICT.** Goal (verbatim): "`tests/test_disk_inventory.py::test_compactable_families_are_dated_uncompressed_and_old` passes on any wall-clock date. It fails on clean origin/main since 2026-09-15; first measured on `8ac6513d`, reproduced on `8bae6851`: 1 failed, 46 passed across the inventory, compaction and maintenance test files." — **GOAL: MET.**
   - Readings:
@@ -1888,31 +1823,6 @@ death, never life — do not invert it.
   - A new assertion shows the SAME fixture becomes compactable at now+2d, so the date rule is reachable, not vacuous.
   - A run with `time.time` forced to 2030 still passes.
 - Blocked by: none
-### preflight-expectation-baseline — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: preflight returns `NO_EXPECTATION` (exit 6) without a fresh, complete expectation; reachable (6 refusal tests FAIL with the branch disabled) and green with it (124 passed across preflight/guard/cron/worktree lock tests). No deploy: a local script.**
-- **VERDICT.** Goal (verbatim): "`scripts/deploy_preflight.py` refuses to return CLEAR unless the deploy states its prediction and a fresh baseline for every field the prediction names. New verdict `NO_EXPECTATION` (exit 6), HOLD-class: no `--expect FIELD=VALUE`, a malformed pair, no or unreadable `--baseline-read-at`, a baseline older than the guard's 15-min CLEAR window or dated in the future, or an `--expect` field with no `--baseline` value. Escape hatch `--no-expectation "<reason>"`, recorded on the receipt. The receipt and the printout carry expected against baseline, so the `deploys.md` entry can list expected against measured. This is postmortem check (3) from lane `combined-board-state-rows-lost`." — **GOAL: MET.**
-  - Change:
-    - `expectation_problem()` and `_parse_pairs()`.
-    - Four new arguments.
-    - The `NO_EXPECTATION` branch, placed LAST before CLEAR, so HOLD / UNKNOWN / CLAIMED / OFF_MAIN / TOO_SOON / redundant all still preempt it.
-    - `expectation` on the report and the receipt.
-    - An `EXPECTATION WAIVED: <reason>` suffix on CLEAR.
-    - A `baseline -> expected` printout per field.
-    - The guard's two remedy strings, `CLAUDE.md`'s deploy block and `.claude/commands/preflight.md` now show the flags.
-  - Tests (`tests/test_deploy_preflight.py`):
-    - An exit-code contract test.
-    - `ExpectationVerdictTests` (10): no expectation refused; the same world with one is CLEAR (`off != on`); stale (20 min), future (-10 min), unreadable time, malformed pair and unbaselined field each refused; the waiver clears and is recorded; a job in flight still HOLDs; TOO_SOON still preempts.
-    - `TooSoonVerdictTests._run` supplies a fresh expectation by default.
-  - Unwired check (scratch copy, the branch set to `elif False and ...`): exactly the 6 refusal tests FAIL (6 failed, 47 passed).
-  - NOT run: a live CLI preflight. It writes a receipt in the primary checkout that would revoke another session's CLEAR; `main()` is covered end to end against the mocked API instead.
-  - Reaches sessions only through the code they run: the PRIMARY checkout is ~330 commits behind and runs its own copy of this script and of `deploy-guard.py`, so the gate binds there only once that tree is updated.
-- Goal: `scripts/deploy_preflight.py` refuses to return CLEAR unless the deploy states its prediction and a fresh baseline for every field the prediction names. New verdict `NO_EXPECTATION` (exit 6), HOLD-class: no `--expect FIELD=VALUE`, a malformed pair, no or unreadable `--baseline-read-at`, a baseline older than the guard's 15-min CLEAR window or dated in the future, or an `--expect` field with no `--baseline` value. Escape hatch `--no-expectation "<reason>"`, recorded on the receipt. The receipt and the printout carry expected against baseline, so the `deploys.md` entry can list expected against measured. This is postmortem check (3) from lane `combined-board-state-rows-lost`.
-- Files: released: (a RECORD since the 2026-09-15 close; nothing is held) `scripts/deploy_preflight.py`, `tests/test_deploy_preflight.py`, `.claude/hooks/deploy-guard.py` (the two remedy command strings only), `.claude/commands/preflight.md` (the preflight command line), `CLAUDE.md` (the "Before any deploy" block). No open lane claimed any of them when taken (checked on origin/main 2026-09-15); user decision "build check 3, take the claim".
-- Hypothesis: n/a (a gate, not diagnostic).
-- Falsification test: reachability, `off != on`. The same CLEAR world returns `NO_EXPECTATION` without the flags and CLEAR with them. A stale baseline, a missing baseline field and an unreadable time each refuse. `--no-expectation` clears and is recorded. Every safety verdict (HOLD, UNKNOWN, CLAIMED, OFF_MAIN, TOO_SOON) still preempts it.
-- Verification: the new tests pass and the existing `TooSoonVerdictTests` stay green once given expectations. Unwired check: with the gate removed from a scratch copy, the refusal tests FAIL. `test_deploy_guard.py` stays green. No deploy: preflight is a local script, so it binds every session that runs the landed main.
-- Deliberate deviation from the postmortem wording: the proposal said "names no row count". A row count means nothing for a worker memory or env deploy, so the enforced rule is the general one the incident taught: every field the prediction names must have a fresh baseline.
-- Blocked by: none.
-
 ### layer2-row-parity — OPEN — opened 2026-09-15 — session a0a81858-49f8-4085-a858-d4781b1dbce4
 - Goal: every Layer 2 board row carries (1) real movement, props included, with deltas correct across ±100 and steam on same-book moves only; (2) a time-scaled sparkline of the pick's market probability, where green = the market moved TOWARD the pick (user decision 2026-09-15); (3) a headshot wherever a player-id source exists; (4) a plain-language explainer; and (5) the 58 legacy candidate rows leave the board, server-side (user decision 2026-09-15). Measured on the served `/api/intelligence/query` payload.
 - Baseline `[served payload 2026-09-15 15:25Z, 3,070 rows]`: 2,959 Layer 2 rows, of which 2,119 `movement_state=not_tracked`; 59 of 651 priced rows show a raw-American delta across ±100 (e.g. "Odds +208" for -104 -> +104), and the only Layer 2 steam flag is one of them (Brest @ Auxerre U2.5, cross-book); Layer 2 headshots 0, explainers 0 (`rationale` is machine text, not rendered); 58 legacy rows (44 MLB, 14 soccer), 16 of 39 MLB props duplicating a Layer 2 row with contradictory numbers; legacy sparklines wrong-side on MLB unders, wrong-game on 6 of 14 soccer rows. The production opening ledger already records props (9,643 openings on 09-15, incl. MLB batter_hits 906, strikeouts 203).
@@ -1983,44 +1893,6 @@ death, never life — do not invert it.
 - Method rules: score per MATCH, never per row. Pick thresholds only leave-one-date-out. Compare against the market's own lean. Print per-family date coverage and the intersection. Validate outcome capture per league (Belgian shot capture was 0.13 on 2026-08-31).
 - Verification: the findings file is on origin/main with per-market and per-league tables carrying n, dates and CIs, plus the coverage/intersection table; the harness re-runs from its cache.
 - Blocked by: none
-### deploy-guard-python-post — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: the guard blocks a Python/JS POST to the deploys endpoint, in the worktree (133 passed; unwired check fails exactly the 4 Python block tests) and in the PRIMARY tree, where the urllib shape that passed with exit 0 this morning now returns exit 2.**
-- **VERDICT.** Goal (verbatim): "`.claude/hooks/deploy-guard.py` classifies a Python/JS POST to `/v1/services/<id>/deploys` as a deploy and applies the claim + CLEAR-preflight gate to it (today it returns exit 0 unchecked), while Python READS of that endpoint, and scripts that GET the deploy list beside a POST to another URL, stay allowed. A literal `"commitId"` in the body binds the receipt SHA like `--commit`. Promoted from the 2026-09-15 lead in `leads.md`." — **GOAL: MET.**
-  - Primary-tree reading, after writing main's `11167fdf` guard into its working tree (matches `origin/main`, 0 staged):
-    - The urllib deploy shape gives **exit 2** ("a Python/JS POST to the deploys endpoint").
-    - `render_deploy.py` gives exit 2.
-    - GET `/deploys?limit=3` + POST `/api/intelligence/query` gives exit 0.
-    - A plain command gives exit 0.
-  - The receipt binding is proven by `test_a_python_deploys_commit_id_is_bound_to_the_receipt`.
-  - Known limit remains: a deploy script run from a FILE is invisible to a text guard.
-- Goal: `.claude/hooks/deploy-guard.py` classifies a Python/JS POST to `/v1/services/<id>/deploys` as a deploy and applies the claim + CLEAR-preflight gate to it (today it returns exit 0 unchecked), while Python READS of that endpoint, and scripts that GET the deploy list beside a POST to another URL, stay allowed. A literal `"commitId"` in the body binds the receipt SHA like `--commit`. Promoted from the 2026-09-15 lead in `leads.md`.
-- Files: released: (a RECORD since the 2026-09-15 close; nothing is held) `.claude/hooks/deploy-guard.py`, `tests/test_deploy_guard.py`, `.syndicate/leads.md` (lead marked promoted). No open lane claimed them when taken; user decision "close the gap, take the claim".
-- Hypothesis: n/a (a guard fix). Root cause already measured: `POST_INTENT` is curl/PowerShell-only (`-X POST`, `--request POST`, `-Method Post`, `--data`, `-d`), so `DEPLOYS_ENDPOINT AND POST_INTENT` fails for `urllib.request.Request(..., method="POST")`.
-- Falsification test, both directions:
-  - BLOCK without locks: a command shaped exactly like this session's two web deploys; `requests.post`; a urllib Request with only a body.
-  - ALLOW: Python GETs of the list and of one deploy; a comment naming the endpoint; a GET-list + POST-elsewhere script; a Python deploy holding both locks.
-  - A `commitId` that disagrees with the receipt BLOCKS.
-  - Unwired check: with the new classifier removed, the Python block tests FAIL.
-- Verification: new and existing `tests/test_deploy_guard.py` pass, and the unwired check fails. Then the PRIMARY tree's guard, updated from main the same way as `preflight-expectation-baseline` (working tree only, index untouched), must BLOCK the deploy-shaped urllib command that returned exit 0 there earlier on 2026-09-15.
-- Known limit, stated rather than hidden: a text guard cannot see inside a script run from a FILE (`py -3 deploy.py`); only the command text is inspected.
-- Blocked by: none.
-- **RESULTS 2026-09-15 (code in the worktree; landing next, then the primary-tree reading).**
-  - Change in `deploy-guard.py`:
-    - `_PY_POST_INTENT`: `method="POST"`/`method: 'POST'`, `.post(`, `.request("POST"`, or a body `data=`.
-    - `_python_post_to_deploys()`: intent must be ATTACHED to a deploys URL, i.e. before it on its line (after any earlier URL there), or within 400 chars after it and before the next URL.
-    - A new classification branch after the curl one.
-    - `COMMIT_ID_FIELD`: a literal `"commitId": "<sha>"` binds the receipt like `--commit`.
-    - The docstring's shape 2 names it.
-  - Tests (`tests/test_deploy_guard.py`, +8 incl. 3 parametrized reads):
-    - BLOCK: the as-run 2026-09-15 heredoc deploy, `requests.post`, a body-only urllib Request, and a Python deploy whose `commitId` disagrees with the receipt (`but this deploys abc1234`).
-    - ALLOW: a GET of the list, a GET of one deploy, a comment naming the endpoint, a GET-list + POST-to-app script, and a Python deploy holding both locks.
-  - Suites: guard + preflight + cron + worktree lock tests, **133 passed**.
-  - **Unwired check** (full worktree copy, the new branch `elif False and ...`): **exactly the 4 Python block tests FAIL** (4 failed, 42 passed); the allow tests pass either way.
-  - **Probe on real command text**, against an empty root (no claims):
-    - The urllib deploy shape actually run twice this session gives exit 2 BLOCK ("a Python/JS POST to the deploys endpoint").
-    - This session's measurement heredoc (GET `/deploys?limit=3` + POST `/api/intelligence/query`) gives exit 0.
-    - The deploy-status poller (GET `/deploys/dep-...`) gives exit 0.
-  - Owed for GOAL (DONE): landed as `11167fdf`. Main's guard was written into the PRIMARY working tree (index untouched), and there the urllib-shaped command that returned exit 0 earlier today returns exit 2. See the VERDICT at the top of this block.
-
 ### preview-date-pin-inert — CLOSED 2026-09-15 — opened 2026-09-15 — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
 - **VERDICT.** Goal (verbatim): "`tests/test_intelligence.py::IntelligenceBlueprintTests::test_intelligence_query_api_resolves_preview_date_and_preserves_contract` pins the date the endpoint actually uses and asserts `selected_date == "2026-06-07"`. Test-only, no behaviour change." — **GOAL: MET.**
   - Readings:
@@ -2043,44 +1915,6 @@ death, never life — do not invert it.
   - The fixed test still passes with `central_today_iso` frozen at 2030-01-01 by the scratch plugin, so its own pin wins.
 - Blocked by: none
 
-### deploy-guard-file-scripts — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: `af7c895c` classifies a deploy made by a script FILE; in the PRIMARY tree a `py -3 <file>` deploy returns exit 2, while the graft builder's dry-run and a GET + `data =` assignment return exit 0.**
-- **VERDICT.** Goal (verbatim): "`.claude/hooks/deploy-guard.py` also classifies a deploy made by a SCRIPT FILE the command runs (`py`/`python <file>.py`, `bash`/`sh <file>.sh` or `./<file>.sh`, PowerShell `-File <file>.ps1`) by reading that file and applying the same attached-POST (`.py`) or same-line curl/PowerShell intent (`.sh`/`.ps1`) checks, with service and `commitId` extraction from its contents. The repo's own read-only scripts stay allowed, and a file that cannot be found or read is allowed (the guard's fail-open rule). Also fixes a false positive in the landed Python check: `data = ...` as an ASSIGNMENT after a deploys GET (`scripts/build_consolidated_graft.py:93-96`) read as a POST body." — **GOAL: MET.**
-  - Worktree: 150 passed; the unwired check fails exactly the 8 script-file block tests; the repo rescan finds only `render_deploy.py` classifying as a deploy (of 22 files naming a deploys endpoint).
-  - PRIMARY tree, after writing main's `af7c895c` guard into its working tree (matches `origin/main`, 0 staged; refused unless the prior copy was the `11167fdf` version):
-    - `py -3 <file>` whose file POSTs to the deploys endpoint gives **exit 2** ("a script file that POSTs to the deploys endpoint").
-    - `py -3 scripts/build_consolidated_graft.py --service web --dry-run` gives exit 0.
-    - An inline GET + `data =` assignment gives exit 0.
-    - `render_deploy.py` gives exit 2.
-  - Still not followed, as stated in the Goal's limit: `python -m <module>`, runtime-built paths, and deploy helpers imported from another module.
-- Goal: `.claude/hooks/deploy-guard.py` also classifies a deploy made by a SCRIPT FILE the command runs (`py`/`python <file>.py`, `bash`/`sh <file>.sh` or `./<file>.sh`, PowerShell `-File <file>.ps1`) by reading that file and applying the same attached-POST (`.py`) or same-line curl/PowerShell intent (`.sh`/`.ps1`) checks, with service and `commitId` extraction from its contents. The repo's own read-only scripts stay allowed, and a file that cannot be found or read is allowed (the guard's fail-open rule). Also fixes a false positive in the landed Python check: `data = ...` as an ASSIGNMENT after a deploys GET (`scripts/build_consolidated_graft.py:93-96`) read as a POST body.
-- Files: released: (a RECORD since the 2026-09-15 close; nothing is held) `.claude/hooks/deploy-guard.py`, `tests/test_deploy_guard.py`. No open lane claimed either when taken; user decision "proceed next action", continuing the blind spot recorded by `deploy-guard-python-post`.
-- Hypothesis: n/a (guard extension). Measured before design: 22 repo files mention a deploys endpoint. Under main's classifiers, 20 read as reads, `scripts/render_deploy.py` as a deploy (correct), and `scripts/build_consolidated_graft.py` as a deploy (WRONG: a GET followed by a `data =` assignment).
-- Falsification test:
-  - BLOCK without locks: a `.py` file that POSTs to the deploys endpoint run by `py -3 <file>`, `python <file>` and an absolute Git Bash path; a `.sh` file with `curl -X POST .../deploys`.
-  - ALLOW: running `scripts/build_consolidated_graft.py`, `scripts/deploy_preflight.py` and a GET-only file; a missing file; a file over the size cap.
-  - The inline `data = json.loads(...)` after a deploys GET gives ALLOW, while `Request(url, data=b'{}')` still gives BLOCK.
-  - Unwired check: with the file branch removed, the file block tests FAIL.
-- Verification:
-  - The tests pass, and the unwired check fails.
-  - A re-scan of all 22 repo files shows only `render_deploy.py` classifying as a deploy.
-  - The PRIMARY tree's guard, written from main (working tree only), BLOCKS a real `py -3 <file>` deploy-shaped probe and ALLOWS `py -3 scripts/build_consolidated_graft.py --service web --dry-run`.
-- Known limit: `python -m <module>`, paths built at runtime, and scripts that import a deploy helper from another module are not followed. It inspects one file, one level.
-- Blocked by: none.
-- **RESULTS 2026-09-15 (code in the worktree; landing next, then the primary-tree reading).**
-  - Change in `deploy-guard.py`:
-    - `_PY_POST_INTENT`'s body rule is now `[(,]\s*data\s*=` (a CALL ARGUMENT), not `\bdata\s*=`.
-    - `SCRIPT_RUN` (`py`/`python`/`python3`/`uv run`/`bash`/`sh` + a `.py`/`.sh` path), `PS_FILE` (`-File x.ps1`) and `DIRECT_SCRIPT` (`./x.sh`, `./x.ps1`).
-    - `_resolve_script()`: payload `cwd`, repo root and process cwd; Git Bash `/c/...` converted on Windows.
-    - `_script_file_deploy()`: <= 512 KB; attached-POST check for `.py`, same-line curl intent for `.sh`/`.ps1` with continuations joined; every failure returns no match.
-    - A final `else` branch classifies "a script file that POSTs to the deploys endpoint: <path>".
-    - Service and `commitId` extraction also read the file contents.
-  - Tests (`tests/test_deploy_guard.py`, +17 incl. parametrized):
-    - BLOCK: 4 runner forms, an absolute path, a Git Bash drive path, a `.sh` curl POST, and a file `commitId` that disagrees with the receipt.
-    - ALLOW: a GET + `data =` assignment file, a missing file, a GET `.sh` beside a POST elsewhere, an over-cap file, the REAL `scripts/build_consolidated_graft.py`, `scripts/deploy_preflight.py` and `py -3 -m pytest tests/test_deploy_guard.py` (all copied into the test root and resolved), the inline `data =` assignment, and a script deploy holding both locks.
-  - Suites: guard + preflight + cron + worktree lock tests, **150 passed**.
-  - **Unwired check** (full copy, lookup replaced by `None, ""`): **exactly the 8 script-file block tests FAIL** (8 failed, 55 passed).
-  - **Repo rescan with the patched classifier:** 22 files mention a deploys endpoint; run as files, **only `scripts/render_deploy.py` classifies as a deploy** (before the `data=` fix, `build_consolidated_graft.py` did too).
-  - Owed for GOAL (DONE): landed as `af7c895c`; main's guard is written into the PRIMARY working tree, and every probe matched (see the VERDICT at the top of this block).
 ### soccer-player-substrate — OPEN — opened 2026-09-15 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
 - Goal: the soccer prop sim lists the players who actually play. The test is a replay of squad selection over production player files and ESPN box scores for the 2026-09-01..09-14 fixtures: real shots attributable to a listed player reach >= 85% in every league (36-87% on 2026-09-15), phantom rows fall, and every recommendations artifact publishes a per-side squad-coverage field a gate can use. Code lands on origin/main with tests. A refresh-worker deploy and a production reading happen only on the user's go.
 - Files: `scripts/refresh_odds_sources.py` (`_SOCCER_PLAYER_FETCH_LEAGUES` and `_soccer_players_step` only), `scripts/build_soccer_artifacts.py` (player loading, departed filter, squad audit field), `tests/test_soccer_player_producer_step.py`, `tests/test_build_soccer_artifacts.py`, `scripts/soccer_season_audit/decompose_squads.py` (NEW)
@@ -2186,8 +2020,12 @@ death, never life — do not invert it.
 
 - `census-rescue-0910` — CLOSED 2026-09-10 — opened 2026-09-10 — session 78cad512 — **GOAL: MET: census rescue landed (`ab43454d`), three shipped lanes closed, unmeasured-deploy count 3 -> 1**
 - `chunk-assignment-stable` — CLOSED-REVERTED 2026-09-09 — opened 2026-09-08 — session e371dfde — **the fix worked and was unaffordable: it OOM'd the suite twice and is reverted**
+- `combined-board-rows-unreadable-tripwire` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: live on web `da268e07` (15:36:46Z); the field is served on every date, 0 `ROWS_UNREADABLE` lines; stored 113 vs rows 111 is the per-sport `by_sport` cap, not a defect.**
+- `combined-board-state-rows-lost` — CLOSED 2026-09-15 — opened 2026-09-14 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: Q1-Q3 answered with production readings. The reader fix is live on web `b6a0e346` (14:10:07Z): `by_date` 09-15 106 (was 0), 0 `VINTAGE_IGNORED`. One prediction was WRONG (`computed_at` moved to the refused heavy build's state stamp). User decision 2026-09-15: keep the `stale` label, it is true. Postmortem in `learnings.md`.**
 - `convergence-phase7-crps` — ORPHANED, **UNOWNED** `[session abf487e4 ARCHIVED 2026-08-20T21:1xZ]` — — **FIVE FINDINGS: FOUR DEFECTS FIXED AND MEASURED, ONE NOT A DEFECT.** Ladder
 - `cron-deploy-locks` — CLOSED-VERIFIED 2026-09-08 — opened 2026-09-08 — session e371dfde — **the three cron services cannot be claimed, and the guard's refusal to say so rea
+- `deploy-guard-file-scripts` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: `af7c895c` classifies a deploy made by a script FILE; in the PRIMARY tree a `py -3 <file>` deploy returns exit 2, while the graft builder's dry-run and a GET + `data =` assignment return exit 0.**
+- `deploy-guard-python-post` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: the guard blocks a Python/JS POST to the deploys endpoint, in the worktree (133 passed; unwired check fails exactly the 4 Python block tests) and in the PRIMARY tree, where the urllib shape that passed with exit 0 this morning now returns exit 2.**
 - `evaluation-ledger-projected-mirror` — CLOSED 2026-09-10 — opened 2026-09-04 — session 5959f891 — **GOAL: MET: projected ledger produced on the worker (`over_ceiling=0`) and served by web (HTTP 200, 09-04..09-09); closed by `census-rescue-0910` on user decision**
 - `kalshi-line-aware-rungs` — ORPHANED, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — — **CLAIMS RELEASED 2026-08-26 03:3xZ, sess
 - `kalshi-spread-join-sign` — **ORPHANED (reopened 2026-08-26)** — — session syndicate-43 (ENDED) — UNOWNED — six things verified; WNBA settlement is BUILT, LANDED and NOT DEPLOYED
@@ -2228,6 +2066,7 @@ death, never life — do not invert it.
 - `polymarket-yes-leg-binding` — ORPHANED, **UNOWNED** `[session 5611932c ARCHIVED 2026-09-01 ~01:4xZ]` — — opened 2026-08-30 — **SHIPPED + DEPLOYED; THE LEG CHOICE IS STILL UNVALIDAT
 - `portfolio-decision-and-execution` — ORPHANED, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — — opened 2026-08-22 — session 9324a3e5-364e
 - `portfolio-ledger-service-split` — ORPHANED, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — — opened 2026-08-22 — session 74a0966a-a9fe
+- `preflight-expectation-baseline` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: preflight returns `NO_EXPECTATION` (exit 6) without a fresh, complete expectation; reachable (6 refusal tests FAIL with the branch disabled) and green with it (124 passed across preflight/guard/cron/worktree lock tests). No deploy: a local script.**
 - `profitable-buckets` — **ORPHANED 2026-09-15 — RE-RUN DONE (74 games), NO BUCKET SURVIVES IN ANY MARKET; harness now scores point forecasts vs non-constant nulls** — opened 2026-09-08 — session 3492626c — **NO DEMONSTRATED LIVE-GAMELINE EDGE ON MLB. totals = always-over, spreads q4_late = scoreboard-follower; `findings_2026-09-15_bucket_rerun.md`**
 - `publish-503-rate-baseline` — CLOSED 2026-09-10 — opened 2026-09-08 — session 435e6279 — **GOAL: MET: publish 503 rate is steady state (34.2% over 24 h; ordinary hours 32.0% > the 23% spike hour); hypothesis falsified**
 - `render-cron-failures` — CLOSED 2026-09-08, **GOAL: MET 2026-09-09** — opened 2026-09-08 — session e371dfde — **all three defects fixed, deployed and MEASURED, and the SCHEDULED runs the goal asked for are now READ**: `sim-input-reports` `crn-dafj4ie7bikc738q9ol0-29815620` 07:00:35Z→ 07:02:26Z `successful` with `nhl_source ... alarms=21`; `ci-suite` `crn-dafg4h0u01pc73aavs6g-29815680` 08:00:37Z→ 08:44:58Z `nonZeroExit: 1` with **no `oomKilled`**, `collected=16668`, 9/10 steps rc=0, 15 NEW of which 14 are the 3000 MB floor on a 2048 MB runner. Shape change: the layout-independent stable core is **14, not 15**. Block updated in place in `lanes_history.md`; readings in `deploys.md` 2026-09-09 08:44:58Z.
@@ -2238,6 +2077,7 @@ death, never life — do not invert it.
 - `soccer-espn-player-leagues` — **ORPHANED 2026-09-08** — opened 2026-09-04 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **THE FETCH WORKS AND WAS RUN FOR ALL FOUR LEAGUES; THE H
 - `soccer-model-dispersion` — ORPHANED, UNOWNED (session `soccer-sport-owner` checkpointed and released 2026-08-20 ~13:3xZ) — — TESTABLE OUTCOME NOT MET; DISPERSION FALSIFIED; DISC
 - `soccer-unfed-inputs` — CLOSED 2026-09-10 — opened 2026-09-07 — session 520cd594 — **GOAL: MET: soccer gate runs in production (alarms 6 -> 2, both unsourced) and the market prior's A/B moved; prior stays OFF on a null backtest; closed by `census-rescue-0910` on user decision**
+- `state-read-expand-choke-point` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: `_read_state_payload` expands; the round-trip test FAILS with the expansion removed (5 failed) and passes with it; no production behaviour change, not deployed.**
 - `venue-candidate-key-token-guard` — ORPHANED, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — — opened 2026-08-27 — session 764eca35-178c
 - `venue-quote-line-join` — ORPHANED, **UNOWNED** (session 3515d143 archived 2026-08-27 ~21:45Z; ALL CLAIMS RELEASED, worktree clean, nothing uncommitted) — — **SIX DEFECTS FIXED
 - `watcher-admin-token` — CLOSED 2026-09-10 — opened 2026-09-10 — session 78cad512 — **GOAL: MET: the unknown-submit watcher authenticates (X-Admin-Token via a temp header file) and its scheduled run reads http=200**
