@@ -1839,7 +1839,14 @@ death, never life — do not invert it.
 - Hypothesis: n/a (build). Design choice stated so it can be checked: `movement_price_delta` keeps its American-points unit but is computed on the continuous "cents" scale (±100 both map to 0), so the score's movement weight and the steam threshold, both tuned in points, stay valid; implied probability drives the display and the toward/away verdict.
 - Falsification test: reachability, `off != on` per feature: a prop row that returned `not_tracked` now returns tracked/flat against an opening; -104 -> +104 yields 8, not 208; a best-of-N book switch cannot fire steam; a row whose trail spans a line change draws only the current line's points; an Under row's series rises when the Under shortens.
 - Verification: on the served payload after the web + refresh-worker deploys — Layer 2 `not_tracked` rows 0 wherever an opening exists; no shown delta whose open/now straddle ±100 exceeds its cents move; every `steam` row is `movement_basis=same_book`; `movement_series` present and line-consistent on rows with 2+ distinct points; MLB prop headshot coverage against rows with a projection; explainer coverage against rows with a model; legacy prop/game rows on the board 0; one screenshot of the rendered board.
-- Status `[2026-09-15 ~18:00Z (13:00 CT)]`:
+- Status `[2026-09-15 ~19:30Z (14:30 CT)]`:
+  - **ALL FIVE LIVE.**
+    - web `7ed1a18a`: live 19:06:27Z.
+    - refresh-worker `5686a555`: live 19:19:27Z (the score-sign change and the sparkline redesign bundled, user decision "Bundle into one deploy").
+  - Sparklines redesigned to plot the label's own price from our publish (user decision). Served board 19:29:06Z, 09-15 rows: 0 contradict their arrow, 0 old sign, 0 old basis. Rendered page 19:30:06Z: 519 of 519 arrow/sparkline pairs agree; 571 consensus tooltips.
+  - Leftovers are on the 09-16 shard, built pre-deploy: 2 disagreements, 3 old basis, 30 old sign. They clear on its next rebuild; that reading is owed.
+  - `deploys.md` 19:13:36Z entry.
+- Status `[2026-09-15 ~18:00Z (13:00 CT)]` (superseded above):
   - **LIVE.** refresh-worker `87558f2f` (deploy `dep-dako25vqj5pc73d8anog`, live 17:38:11Z). Web carries the same code from ANOTHER session's 17:29Z deploy; see `deploys.md` 17:32:07Z.
   - Readings: 17:47:09Z (`deploys.md`), then 17:59:17Z on the served payload: `not_tracked` 0, explainers 2,660 / 2,660, steam 0, crossing-not-cents 0, legacy prop/game rows 0. MLB headshots 491 / 501 and NFL 77 / 89 at 17:47Z.
   - **Sparklines OWED:** 0 series so far. The trail's first 09-15 points were written 17:45:02Z and a series needs a second 09-15 build with changed prices; a session waiter measures it.

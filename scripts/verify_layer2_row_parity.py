@@ -100,7 +100,10 @@ def measure(payload: dict) -> dict[str, Any]:
             and all(isinstance(p, list) and len(p) == 2 for p in series)
             and all(series[i][0] <= series[i + 1][0] for i in range(len(series) - 1))
             and len({p[1] for p in series}) >= 2
-            and r.get("movement_series_basis") in ("fair", "price")
+            # The bases the 2026-09-15 redesign emits. "fair"/"price" were the first
+            # design's; a row still carrying one was built before it and counts
+            # as malformed here on purpose, so a stale shard is visible.
+            and r.get("movement_series_basis") in ("same_book", "best_price")
         )
         malformed += 0 if ok else 1
 

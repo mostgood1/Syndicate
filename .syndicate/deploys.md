@@ -35762,3 +35762,40 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Confounder for (3): refresh-worker restarted at 19:20:02Z onto Layer2's `5686a555`, which contains P2 `55fee786`. The reason field separates the two causes.
   - Watcher `bxmoz6tu4` reads (2) and (3) from 19:27:29Z; the verify dry run reads (1).
 - Undo: none for the removed lines. They were byte suffixes of intact rows in the same shard, so their content survives in those rows.
+
+## 2026-09-15 19:13:36Z (14:13 CT) — refresh-worker `55fee786` -> `5686a555` (score movement sign + sparkline redesign) and web `8b563ca9` -> `7ed1a18a` (caption/tooltip) — deploys `dep-dakpho1594qs7393okig`, `dep-dakpcrh5efls73d55ggg` — lane layer2-row-parity — **verify MET on the 09-15 board; the 09-16 shard's pre-deploy residue is OWED its next rebuild**
+- **What:**
+  - refresh-worker:
+    - `4a1ca2c4`: the score's movement term rewards a move TOWARD the pick. The caller negates the displayed delta; the card's number is unchanged.
+    - `5686a555`: sparklines draw the label's own price pair, from our publish to now, with trail points between (same book when the pair is same-book). `movement_fair_delta_pp` carries the no-vig consensus move for the tooltip.
+  - web: the caption names whose price; the tooltip carries the consensus move.
+  - User decisions: "Toward the pick", "Plot the label's price from our open", "Bundle into one deploy".
+  - Why bundled: the MLB daily sim put refresh-worker on HOLD a second time, and the sign commit precedes the redesign on main, so shipping them separately needed two restarts. The two effects are read separately below.
+- **Web first, deliberately:** the template change is caption/tooltip only, so it cannot make the board worse against the old worker.
+  - The target was `7ed1a18a`, not `5686a555`. Web ran `8b563ca9` (book-quotes-splice-repair P3, deployed by that session 18:57:50Z), and `5686a555` is not its descendant. The only web-path commit between `8b563ca9` and `7ed1a18a` is `5686a555`.
+  - Web was taken only after that session's REPAIR_DONE and claim release (~19:03Z), at its request.
+  - Web claim 19:01:58Z (token `5da82898e9a907fe`). Preflight CLEAR 19:02:57Z. POST 19:03:10Z; `build_ended` 19:04:51Z; `deploy_ended` 19:06:27Z. 0 `server_failed`. Claim released 19:07Z.
+  - Reading, rendered `/intelligence` DOM: baseline 19:02:44Z was 259 sparklines, 259 "Market probability" captions, 0 "Implied probability". After, 19:07:18Z: 259 sparklines, **0 / 259**. Web prediction MET.
+- **refresh-worker locks:** claim 18:52:00Z (token `87f6c0b1ab564765`).
+  - Preflight 18:52:32Z **HOLD** (7 jobs, MLB daily sim again); waited, jobs clear at 19:11:02Z.
+  - The first preflight after that crashed on a Render API read timeout. Unknown is not CLEAR, so it was retried.
+  - Retry 19:13:20Z **CLEAR**. `5686a555` on origin/main; `55fee786` is its ancestor.
+- **Baseline** (served payload 19:11:17Z, on refresh-worker `55fee786`):
+  - Movement component: away-from-pick rows scoring POSITIVE 1,176; toward rows scoring NEGATIVE 224; away-negative 0; toward-positive 0.
+  - Series: on 315 rows, **132 of 294 contradicting their arrow**; basis fair 288 / price 27. Rows with a price move: 1,400.
+- **Prediction:** away-positive 0 and toward-negative 0; series-vs-arrow disagreements 0; rows with a series near rows with a price move; basis `same_book` / `best_price` only; consensus tooltips > 0 on the rendered page.
+- **Result:**
+  - POST 19:13:36Z; `build_ended` 19:18:01Z; `deploy_ended` 19:19:27Z; boot `MALLOC_ARENA_INIT` 19:20:02Z. 0 `server_failed`; 0 `Traceback` since 19:20Z.
+  - First 09-15 build: `TRAIL date=2026-09-15 rows_in=1895 written=198 unchanged=1697 keys=3233` (19:26:03Z), `LAYER2_CARD_SHARDS_WRITTEN cards=1895` (19:26:04Z).
+- **A reading taken too early, recorded so it is not cited:** 19:28:22Z still served the OLD cards: away-positive 1,200, fair basis 358, 155 / 377 disagreeing. Web picked up the new card shards between that read and 19:29:06Z. The same trap as the first deploy's 17:46:02Z read.
+- **Reading, served payload 19:29:06Z** (1,444 Layer 2 rows: 1,394 on 09-15, 50 on 09-16):
+  - Movement component: away-negative **702**, toward-positive **160**. Away-positive 26 and toward-negative 4, ALL on the 09-16 shard.
+  - Series on **870** rows (rows with a price move: 892). Basis `best_price` 561, `same_book` 306, `fair` 3 (the 3 on 09-16).
+  - Series-vs-arrow disagreements **2 / 865**. Both are 09-16 `fair`-basis rows built before the deploy (Athletic Bilbao @ Levante away; Real Betis @ Deportivo La Coruña over 2.5).
+  - On 09-15 rows: **0 disagreements, 0 old sign, 0 old basis.**
+  - `not_tracked` 0, steam 0, explainers 1,444 / 1,444, legacy 0.
+  - The verify script read "malformed 867" because its basis allow-list still named the first design's bases. Fixed in the script. Not a data defect.
+- **Reading, rendered `/intelligence` DOM 19:30:06Z:** 608 movement cells, 524 sparklines; **519 arrow/sparkline colour pairs, 519 agree, 0 disagree**; 571 "Market consensus (no-vig)" tooltips.
+  - Captions read e.g. "Implied probability of this pick's price since 12:11 AM: 49.8% → 42.9% (best price across books)".
+- **OWED:** the next 09-16 rebuild should clear the 30 old-sign, 3 old-basis and 2 disagreeing rows. One re-read after it.
+- Rollback: refresh-worker `55fee786`. Web `8b563ca9` would revert only the caption; `7ed1a18a` carries nothing else web-side.
