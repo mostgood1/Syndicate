@@ -101,6 +101,21 @@ def _write_players(source_root, season: int, rows: str) -> None:
     (players_dir / f"players_{season}.csv").write_text(_PLAYER_HEADER + rows, encoding="utf-8")
 
 
+REGULAR_NAMES = {f"Regular{i}" for i in range(11)}
+
+
+def _regulars(season: int, team: str = "Arsenal") -> str:
+    """A starting XI with real minutes.
+
+    `_load_player_rows` trims a club's prior-season players only once THAT
+    club's current-season rows show two full matches and an XI (`_clubs_ready`,
+    lane `soccer-player-substrate`, 2026-09-15). A one-player fixture is,
+    correctly, never a ready club -- so without this the tests below would pass
+    without the filter ever running.
+    """
+    return "".join(_player_row(season, f"r{i}", f"Regular{i}", team) for i in range(11))
+
+
 def _patch_roster(module, names: list[str]):
     """Control what the ESPN roster says, at the READ.
 
@@ -140,8 +155,8 @@ class DepartedPlayerTests(unittest.TestCase):
     def test_a_player_absent_from_the_latest_season_is_dropped(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             source_root = Path(tmp_dir)
-            _write_players(source_root, 2024, _player_row(2024, "u1", "Stays") + _player_row(2024, "u2", "Departed"))
-            _write_players(source_root, 2025, _player_row(2025, "u1", "Stays"))
+            _write_players(source_root, 2024, _regulars(2024) + _player_row(2024, "u1", "Stays") + _player_row(2024, "u2", "Departed"))
+            _write_players(source_root, 2025, _regulars(2025) + _player_row(2025, "u1", "Stays"))
             with patch("sys.stdout", new_callable=StringIO) as out:
                 rows = self._module()._load_player_rows("epl", source_root)
         names = {r["player_name"] for r in rows}
@@ -157,12 +172,12 @@ class DepartedPlayerTests(unittest.TestCase):
         Across the ten leagues the roster rescues 121 such players."""
         with TemporaryDirectory() as tmp_dir:
             source_root = Path(tmp_dir)
-            _write_players(source_root, 2024, _player_row(2024, "u1", "Stays") + _player_row(2024, "u2", "Nwaneri"))
-            _write_players(source_root, 2025, _player_row(2025, "u1", "Stays"))
+            _write_players(source_root, 2024, _regulars(2024) + _player_row(2024, "u1", "Stays") + _player_row(2024, "u2", "Nwaneri"))
+            _write_players(source_root, 2025, _regulars(2025) + _player_row(2025, "u1", "Stays"))
             module = self._module()
             with _patch_roster(module, ["Stays", "Nwaneri"]):
                 rows = module._load_player_rows("epl", source_root)
-        self.assertEqual({r["player_name"] for r in rows}, {"Stays", "Nwaneri"})
+        self.assertEqual({r["player_name"] for r in rows}, REGULAR_NAMES | {"Stays", "Nwaneri"})
 
     def test_the_roster_never_deletes_a_player_it_omits(self) -> None:
         """DIRECTION IS THE DESIGN. Measured 2026-08-20: used as a FILTER the
@@ -186,8 +201,8 @@ class DepartedPlayerTests(unittest.TestCase):
         one `attach_confirmed_starters` uses to match a confirmed XI."""
         with TemporaryDirectory() as tmp_dir:
             source_root = Path(tmp_dir)
-            _write_players(source_root, 2024, _player_row(2024, "u1", "A") + _player_row(2024, "u2", "Viktor Gyokeres"))
-            _write_players(source_root, 2025, _player_row(2025, "u1", "A"))
+            _write_players(source_root, 2024, _regulars(2024) + _player_row(2024, "u1", "A") + _player_row(2024, "u2", "Viktor Gyokeres"))
+            _write_players(source_root, 2025, _regulars(2025) + _player_row(2025, "u1", "A"))
             module = self._module()
             with _patch_roster(module, ["Viktor Gy\u00f6keres"]):
                 rows = module._load_player_rows("epl", source_root)
@@ -227,12 +242,12 @@ class DepartedPlayerTests(unittest.TestCase):
         leagues whose roster feed is weakest."""
         with TemporaryDirectory() as tmp_dir:
             source_root = Path(tmp_dir)
-            _write_players(source_root, 2024, _player_row(2024, "u1", "Stays") + _player_row(2024, "u2", "Departed"))
-            _write_players(source_root, 2025, _player_row(2025, "u1", "Stays"))
+            _write_players(source_root, 2024, _regulars(2024) + _player_row(2024, "u1", "Stays") + _player_row(2024, "u2", "Departed"))
+            _write_players(source_root, 2025, _regulars(2025) + _player_row(2025, "u1", "Stays"))
             module = self._module()
             with _patch_roster(module, []), patch("sys.stdout", new_callable=StringIO) as out:
                 rows = module._load_player_rows("epl", source_root)
-        self.assertEqual({r["player_name"] for r in rows}, {"Stays"})
+        self.assertEqual({r["player_name"] for r in rows}, REGULAR_NAMES | {"Stays"})
         self.assertIn("SOCCER_ROSTER_EMPTY", out.getvalue())
 
     def test_against_the_real_mirror_the_known_departures_go_and_the_known_squad_stays(self) -> None:

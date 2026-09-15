@@ -48,6 +48,7 @@ from syndicate.features.soccer.features.lineups import _norm_player_name
 from syndicate.features.soccer.sources import default_season
 from syndicate.features.soccer.sources import roster_rows
 from syndicate.features.soccer.features.loaders import team_rows_from_match_history
+from syndicate.features.soccer.features.team_names import canonical_team_name
 from syndicate.features.soccer.features.team_names import match_team_name
 from syndicate.features.soccer.ingestion.espn_lineups import LEAGUE_ESPN_SLUGS
 from syndicate.features.soccer.ingestion.espn_lineups import fetch_events
@@ -235,11 +236,88 @@ def _minutes_series(frame):
     return series
 
 
+#: When a club's CURRENT-season rows may define its squad: its busiest player
+#: has two full matches, and at least a starting XI has played.
+#:
+#: WHY PER CLUB, NOT PER LEAGUE. The league-wide guard waited for the busiest
+#: player IN THE LEAGUE to reach `_MIN_LATEST_SEASON_MINUTES` (450), i.e. five
+#: full matchweeks, and until then kept EVERY prior-season player. Measured
+#: 2026-09-15 on production's `players_2026.csv`: busiest 180 min in the
+#: bundesliga, 270 in epl/serie_a/ligue_1, 450 in la_liga. So the filter was
+#: off in four of the big five through mid-September, and phantom rows (listed,
+#: absent from the ESPN matchday squad) were prior-season-only players on 81% of
+#: bundesliga phantoms, 70% ligue_1, 69% serie_a, 62% epl, 54% la_liga.
+#: Every phantom dilutes each real teammate's allocated shot share.
+#:
+#: The per-club test keeps what the league test protected against: a club with
+#: one matchweek in the file (busiest <= 90) is never trimmed, and a truncated
+#: write is still refused league-wide by `too_few`.
+_MIN_CLUB_CURRENT_MINUTES = 180.0
+_MIN_CLUB_CURRENT_PLAYERS = 11
+
+#: What the last `_load_player_rows` call did, published into the artifact. The
+#: builder runs as a child whose stdout is discarded (`ops_refresh.py` launches
+#: it with DEVNULL -- see `_apply_market_anchor`), so a print is not an
+#: instrument here. A field is.
+_PLAYER_LOAD_AUDIT: dict[str, Any] = {}
+
+
+def _club_keys(team_value: Any) -> list[str]:
+    """Canonical club keys of a `team` cell. A comma-joined transfer row names
+    more than one club, and counts toward each."""
+    parts = [part.strip() for part in str(team_value or "").split(",") if part.strip()]
+    return [key for key in (canonical_team_name(part) for part in parts) if key]
+
+
+def _clubs_ready(latest_frame: "pd.DataFrame") -> tuple[set[str], set[str]]:
+    """(ready, seen) canonical club keys in the newest season file.
+
+    UNKNOWN IS NOT READY: no `team` column or unreadable minutes -> no club
+    qualifies, so nothing is trimmed on evidence that cannot be read.
+    """
+    if "team" not in getattr(latest_frame, "columns", []):
+        return set(), set()
+    minutes = _minutes_series(latest_frame)
+    if minutes is None:
+        return set(), set()
+    busiest: dict[str, float] = {}
+    played: dict[str, int] = {}
+    for team_value, value in zip(latest_frame["team"], minutes.fillna(0.0)):
+        for key in _club_keys(team_value):
+            busiest[key] = max(busiest.get(key, 0.0), float(value))
+            if float(value) > 0:
+                played[key] = played.get(key, 0) + 1
+    ready = {
+        key
+        for key, top in busiest.items()
+        if top >= _MIN_CLUB_CURRENT_MINUTES and played.get(key, 0) >= _MIN_CLUB_CURRENT_PLAYERS
+    }
+    return ready, set(busiest)
+
+
+def _tag_season_evidence(frame: "pd.DataFrame", latest_frame: "pd.DataFrame | None") -> list[dict[str, Any]]:
+    """Rows, each tagged `season_evidence`: `current` (in the newest season
+    file), `prior_only`, or `single_season` (only one file exists, so the
+    question cannot be asked). Nothing in the sim reads it --
+    `build_soccer_player_features` copies an explicit key list -- so it can only
+    feed the published `squad_audit`."""
+    rows = frame.to_dict("records")
+    if latest_frame is None or "player_id" not in getattr(latest_frame, "columns", []):
+        for row in rows:
+            row["season_evidence"] = "single_season"
+        return rows
+    latest_ids = {str(value) for value in latest_frame["player_id"].astype(str)}
+    for row in rows:
+        row["season_evidence"] = "current" if str(row.get("player_id")) in latest_ids else "prior_only"
+    return rows
+
+
 def _drop_departed_players(
     league: str,
     deduped: "pd.DataFrame",
     latest_frame: "pd.DataFrame",
     roster_names: set[str],
+    ready_clubs: set[str] | None = None,
 ) -> "pd.DataFrame":
     """Remove players who are in no current squad but still carry old stats.
 
@@ -276,6 +354,15 @@ def _drop_departed_players(
     if roster_names:
         on_roster = deduped["player_name"].map(lambda name: _norm_player_name(name) in roster_names)
         keep_mask = keep_mask | on_roster
+    if ready_clubs is not None:
+        # PER CLUB: a club whose current-season rows are still too thin keeps
+        # every player. `None` keeps the league-wide behaviour for callers that
+        # decided readiness themselves.
+        if "team" in deduped.columns:
+            club_ready = deduped["team"].map(lambda value: any(key in ready_clubs for key in _club_keys(value)))
+        else:
+            club_ready = pd.Series(False, index=deduped.index)
+        keep_mask = keep_mask | ~club_ready.astype(bool)
     kept = deduped[keep_mask]
     dropped = deduped[~keep_mask]
     if dropped.empty:
@@ -285,6 +372,7 @@ def _drop_departed_players(
     )
     print(
         f"[build_soccer_artifacts] SOCCER_DEPARTED_PLAYERS_DROPPED league={league} "
+        f"clubs_ready={'all' if ready_clubs is None else len(ready_clubs)} "
         f"dropped={len(dropped)} kept={len(kept)} rescued_by_roster="
         f"{int((~deduped['player_id'].astype(str).isin(latest_ids) & keep_mask).sum())} "
         f"e.g. {sample}",
@@ -296,7 +384,11 @@ def _drop_departed_players(
 def _load_player_rows(league: str, source_root: Path) -> list[dict[str, Any]]:
     players_dir = source_root / league / "players"
     player_csv_paths = sorted(players_dir.glob("players_*.csv"))
+    _PLAYER_LOAD_AUDIT.clear()
+    audit = _PLAYER_LOAD_AUDIT
+    audit.update({"league": league, "files": [path.name for path in player_csv_paths]})
     if not player_csv_paths:
+        audit["departed_filter"] = "no_files"
         # #170 follow-up to #146/#148: this was a silent `return []` with no
         # trace anywhere -- the same "no error path for missing/empty data"
         # shape as both of those fixes, just one call earlier in the chain.
@@ -317,6 +409,7 @@ def _load_player_rows(league: str, source_root: Path) -> list[dict[str, Any]]:
     frames = [pd.read_csv(path) for path in player_csv_paths]
     combined = pd.concat(frames, ignore_index=True)
     if combined.empty:
+        audit["departed_filter"] = "empty_files"
         print(
             f"[build_soccer_artifacts] SOCCER_PLAYER_ROWS_MISSING league={league} "
             f"players_dir={players_dir} files={[p.name for p in player_csv_paths]} "
@@ -360,12 +453,51 @@ def _load_player_rows(league: str, source_root: Path) -> list[dict[str, Any]]:
         .drop(columns=["_dedupe_minutes"])
     )
     deduped = pd.concat([with_id, combined[~has_id]], ignore_index=True)
+    audit["rows"] = int(len(deduped))
+
+    # THE CLUB COMES FROM THE NEWEST SEASON THE PLAYER APPEARS IN; THE RATES
+    # STAY WITH THE BIGGER SAMPLE.
+    #
+    # The dedupe above keeps the max-minutes row, and that row carries ITS
+    # season's `team`. For a player who moved within the league, that is his
+    # OLD club: the 2,000-minute 2025 row wins, he binds to a fixture he no
+    # longer plays in, and his new club lists him nowhere. Measured 2026-09-15
+    # (lane `soccer-player-substrate`): shots by players whose only file row sat
+    # under ANOTHER club of the same league were 14.4% of all championship
+    # shots, 13.3% eredivisie, 12.0% primeira_liga, 6.9% belgian_pro_league --
+    # hidden while those leagues had no current-season file, and mis-bound the
+    # moment they get one.
+    newest_team: dict[str, str] = {}
+    for frame in frames:  # oldest -> newest, so a later season overwrites
+        if "team" not in frame.columns or "player_id" not in frame.columns:
+            continue
+        for player_id, team in zip(frame["player_id"].astype(str), frame["team"]):
+            if player_id.strip() and isinstance(team, str) and team.strip():
+                newest_team[player_id] = team
+    audit["club_from_newest_season"] = 0
+    if "team" in deduped.columns and newest_team:
+        current_team = deduped["player_id"].astype(str).map(newest_team)
+        moved = current_team.notna() & (current_team != deduped["team"])
+        audit["club_from_newest_season"] = int(moved.sum())
+        if moved.any():
+            sample = ", ".join(
+                f"{row.player_name}: {row.team} -> {newest_team[str(row.player_id)]}"
+                for row in deduped[moved].head(5).itertuples()
+            )
+            print(
+                f"[build_soccer_artifacts] SOCCER_PLAYER_CLUB_FROM_NEWEST_SEASON league={league} "
+                f"moved={int(moved.sum())} e.g. {sample}",
+                flush=True,
+            )
+        deduped["team"] = current_team.where(current_team.notna(), deduped["team"])
+
     if len(frames) < 2:
         # One season on disk means no stale population is possible, and
-        # nothing to compare a thin file against. Leagues in this state
-        # (belgian_pro_league, championship, eredivisie, mls, primeira_liga
-        # as of 2026-08-20) are unaffected by any of the below.
-        return deduped.to_dict("records")
+        # nothing to compare a thin file against. The four ESPN leagues were in
+        # this state until their producer ran (see `refresh_odds_sources.py`
+        # `_SOCCER_ESPN_PLAYER_LEAGUES`); MLS still is.
+        audit["departed_filter"] = "single_season"
+        return _tag_season_evidence(deduped, None)
     latest_frame, previous_frame = frames[-1], frames[-2]
     # A NEW SEASON'S FILE STARTS EMPTY AND FILLS UP. Filtering against a file
     # that is still being populated would delete most of the league on the
@@ -392,10 +524,28 @@ def _load_player_rows(league: str, source_root: Path) -> list[dict[str, Any]]:
     #
     # The failure direction is safe either way: refusing means departed players
     # linger for one build, while a wrong pass deletes most of a league.
+    #
+    # MINUTES ARE NOW JUDGED PER CLUB (`_clubs_ready`). The league-wide
+    # `too_early` below is still computed and reported, but it no longer
+    # refuses by itself: it kept every prior-season player in four of the big
+    # five through mid-September 2026. A club trims only once ITS OWN rows show
+    # two full matches and a starting XI. `too_few` still refuses league-wide,
+    # because a truncated write is a property of the file, not of a club.
     latest_minutes = _busiest_player_minutes(latest_frame)
     too_early = latest_minutes < _MIN_LATEST_SEASON_MINUTES
     too_few = len(latest_frame) < 0.5 * max(len(previous_frame), 1)
-    if too_early or too_few:
+    ready_clubs, seen_clubs = _clubs_ready(latest_frame)
+    audit.update(
+        {
+            "latest_file_rows": int(len(latest_frame)),
+            "previous_file_rows": int(len(previous_frame)),
+            "latest_max_minutes": round(float(latest_minutes), 1),
+            "clubs_ready": len(ready_clubs),
+            "clubs_seen": len(seen_clubs),
+        }
+    )
+    if too_few or not ready_clubs:
+        audit["departed_filter"] = "refused_too_few" if too_few else "refused_no_club_ready"
         print(
             f"[build_soccer_artifacts] SOCCER_LATEST_SEASON_FILE_THIN league={league} "
             f"latest={len(latest_frame)} previous={len(previous_frame)} "
@@ -406,18 +556,23 @@ def _load_player_rows(league: str, source_root: Path) -> list[dict[str, Any]]:
             # season proceeds, too_few means a file failed to write and will
             # not resolve on its own.
             f"too_early={too_early} too_few={too_few} "
+            f"clubs_ready={len(ready_clubs)}/{len(seen_clubs)} "
             "(NOT filtering departed players this build, because a "
             "partially-populated file cannot define the current squad)",
             flush=True,
         )
-        return deduped.to_dict("records")
+        return _tag_season_evidence(deduped, latest_frame)
+    before = len(deduped)
     deduped = _drop_departed_players(
         league,
         deduped,
         latest_frame,
         _current_roster_names(league, source_root),
+        ready_clubs=ready_clubs,
     )
-    return deduped.to_dict("records")
+    audit["departed_filter"] = "per_club"
+    audit["dropped"] = int(before - len(deduped))
+    return _tag_season_evidence(deduped, latest_frame)
 
 
 def _fill_promoted(ratings: dict[str, dict[str, float]], team_names: list[str]) -> list[str]:
@@ -708,6 +863,40 @@ def _attach_confirmed_starters(league: str, iso_date: str, fixtures: list[dict[s
     return updated
 
 
+_SQUAD_EVIDENCE = ("current", "prior_only", "single_season")
+
+
+def _empty_squad_side() -> dict[str, int]:
+    return {"listed": 0, **{key: 0 for key in _SQUAD_EVIDENCE}}
+
+
+def _squad_audit(player_outputs: list[dict[str, Any]], player_rows: list[dict[str, Any]]) -> dict[str, dict[str, dict[str, int]]]:
+    """Per match, per side: how many players were listed, and on what evidence.
+
+    PUBLISHED SO A STALE SQUAD CAN BE SEEN AND GATED without rerunning an audit.
+    The 2026-09-15 season audit had to join box scores offline to learn that
+    whole sides were published with ZERO players (36% of championship shots)
+    and that listed squads were last season's. `listed == 0` is the empty side;
+    `prior_only / listed` is how much of a list rests on last season alone.
+    """
+    evidence = {
+        str(row.get("player_id")): row.get("season_evidence")
+        for row in player_rows
+        if str(row.get("player_id") or "").strip()
+    }
+    out: dict[str, dict[str, dict[str, int]]] = {}
+    for row in player_outputs:
+        side = row.get("side")
+        if side not in ("home", "away"):
+            continue
+        match = out.setdefault(str(row.get("match_id")), {"home": _empty_squad_side(), "away": _empty_squad_side()})
+        match[side]["listed"] += 1
+        tag = evidence.get(str(row.get("player_id")))
+        if tag in _SQUAD_EVIDENCE:
+            match[side][tag] += 1
+    return out
+
+
 def _top_props_for_match(player_outputs: list[dict[str, Any]], match_id: str, *, limit: int = 8) -> list[dict[str, Any]]:
     rows = [row for row in player_outputs if row.get("match_id") == match_id]
     rows.sort(key=lambda row: row.get("anytime_scorer_probability") or 0.0, reverse=True)
@@ -775,6 +964,7 @@ def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: 
     match_outputs = list(output.match_outputs)
     player_outputs = list(output.player_outputs)
     print(f"simulated {len(match_outputs)} {league} matches, {len(player_outputs)} player projections for {iso_date}")
+    squad_audit_by_match = _squad_audit(player_outputs, player_rows)
 
     fixture_meta_by_id = {fixture["event_id"] or fixtures[i]["match_id"]: fixture for i, fixture in enumerate(fixtures_raw)}
     matches: list[dict[str, Any]] = []
@@ -790,6 +980,8 @@ def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: 
                 "live_home_score": meta.get("home_score"),
                 "live_away_score": meta.get("away_score"),
                 "top_props": _top_props_for_match(player_outputs, match_id),
+                "squad_audit": squad_audit_by_match.get(str(match_id))
+                or {"home": _empty_squad_side(), "away": _empty_squad_side()},
             }
         )
 
@@ -801,6 +993,9 @@ def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: 
         "promoted_prior_teams": promoted,
         # PUBLISHED BECAUSE THE LOGS CANNOT BE READ. See `_apply_market_anchor`.
         "anchor": anchor_audit,
+        # Same reason: which player files were read, whether the departed filter
+        # ran, and how many clubs' current-season rows were ready.
+        "player_substrate": dict(_PLAYER_LOAD_AUDIT),
         "matches": matches,
         "player_props": [
             {

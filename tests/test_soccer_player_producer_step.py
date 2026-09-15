@@ -41,6 +41,7 @@ import importlib.util
 import os
 import sys
 import time
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
@@ -133,16 +134,61 @@ def test_MLS_gets_a_step_even_though_the_history_step_refuses_it(refresh, tmp_pa
     assert refresh._soccer_players_step("mls", tmp_path, sys.executable) is not None
 
 
-@pytest.mark.parametrize(
-    "league", ["eredivisie", "primeira_liga", "championship", "belgian_pro_league"]
-)
-def test_leagues_the_fetcher_CANNOT_serve_get_no_step(refresh, tmp_path, league):
-    """`fetch_players` raises SystemExit for these without `--espn-date-windows`.
-    A step for them would not be a fetch, it would be a FAILING step on every
-    tick -- noisier than the gap it was meant to close, and it would mask the
-    real one.
+ESPN_LEAGUES = ["eredivisie", "primeira_liga", "championship", "belgian_pro_league"]
+
+
+@pytest.mark.parametrize("league", ESPN_LEAGUES)
+def test_the_four_ESPN_leagues_GET_a_step_once_their_season_has_run(refresh, tmp_path, monkeypatch, league):
+    """They used to get none, and ran the sim on the COMPLETED 2025-26 file.
+
+    The exclusion predates `fetch_players` deriving ESPN windows itself. Measured
+    2026-09-15: these four were the worst-covered leagues on the board (36-62% of
+    real shots attributable to a listed player), and every promoted club in them
+    published with zero players.
     """
+    monkeypatch.setattr(refresh, "central_today", lambda: date(2026, 9, 15))
+    step = refresh._soccer_players_step(league, tmp_path, sys.executable)
+    assert step is not None
+    assert step.name == f"soccer_{league}_players"
+
+
+@pytest.mark.parametrize("league", ESPN_LEAGUES)
+def test_an_ESPN_league_DECLINES_while_min_appearances_would_leave_its_file_empty(refresh, tmp_path, monkeypatch, league):
+    """`off != on` for the gate: same league, same empty disk, and only the date
+    differs. Four days into the season the aggregation has no player with three
+    appearances, `_write_csv` refuses the empty frame, and the step would fail on
+    every tick."""
+    monkeypatch.setattr(refresh, "central_today", lambda: date(2026, 8, 5))
     assert refresh._soccer_players_step(league, tmp_path, sys.executable) is None
+
+
+def test_the_ESPN_season_gate_does_not_touch_Understat_or_ASA_leagues(refresh, tmp_path, monkeypatch):
+    """Understat and ASA emit rows from the first minute, so the same early date
+    must still produce a step for them."""
+    monkeypatch.setattr(refresh, "central_today", lambda: date(2026, 8, 5))
+    assert refresh._soccer_players_step("epl", tmp_path, sys.executable) is not None
+    assert refresh._soccer_players_step("mls", tmp_path, sys.executable) is not None
+
+
+def test_an_UNREADABLE_season_calendar_declines_for_an_ESPN_league(refresh, tmp_path, monkeypatch):
+    """Unknown must not default permissive: a blind run is the failing step the
+    gate exists to prevent."""
+
+    def _boom(*_a, **_k):
+        raise ValueError("no calendar")
+
+    monkeypatch.setattr(refresh, "soccer_season_date_range", _boom)
+    assert refresh._soccer_players_step("eredivisie", tmp_path, sys.executable) is None
+
+
+def test_the_roster_is_refreshed_DAILY_not_weekly(refresh, tmp_path):
+    """Measured 2026-09-15: shots by players listed for their club only on a LATER
+    date dominated the "listed on another date" class (EPL 66/100, La Liga 133/154,
+    Serie A 120/129, Ligue 1 130/141, MLS 343/343 shots). A two-day-old file is
+    stale."""
+    season = int(refresh.soccer_default_season("epl"))
+    _roster(tmp_path, "epl", season, age_days=2.0)
+    assert refresh._soccer_players_step("epl", tmp_path, sys.executable) is not None
 
 
 def test_it_requests_the_CURRENT_season_and_only_that(refresh, tmp_path):

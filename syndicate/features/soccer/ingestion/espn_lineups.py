@@ -80,6 +80,75 @@ def fetch_espn_scoreboard(league: str, *, date_range: str | None = None, timeout
     return response.json()
 
 
+#: Longest window the single-date fallback will expand. A window wider than this
+#: is a caller bug, not something to answer with dozens of requests.
+_MAX_FALLBACK_DAYS = 62
+
+
+def _window_days(window: str) -> list[str]:
+    """``YYYYMMDD-YYYYMMDD`` -> every ``YYYYMMDD`` in it, inclusive.
+
+    ``[]`` for anything that is not a well-formed, bounded range, so the caller
+    re-raises instead of guessing at dates.
+    """
+    from datetime import datetime, timedelta
+
+    start_text, sep, end_text = str(window or "").strip().partition("-")
+    if not sep:
+        return []
+    try:
+        start = datetime.strptime(start_text, "%Y%m%d").date()
+        end = datetime.strptime(end_text, "%Y%m%d").date()
+    except ValueError:
+        return []
+    span = (end - start).days
+    if span < 0 or span >= _MAX_FALLBACK_DAYS:
+        return []
+    return [(start + timedelta(days=offset)).strftime("%Y%m%d") for offset in range(span + 1)]
+
+
+def _scoreboard_payloads(league: str, window: str, timeout: int) -> list[dict[str, Any]]:
+    """The scoreboard for one window, retried ONE DATE AT A TIME when ESPN
+    refuses the range.
+
+    ESPN REFUSES SOME DATE RANGES, AND WHICH ONES DEPENDS ON THE DATES. Measured
+    2026-09-15 against the live endpoint (lane `soccer-player-substrate`):
+
+      - ``20260801-20260815`` returned 400 on eng.2, ned.1 and usa.1.
+      - The ONE-DAY range ``20260815-20260815`` -- the exact shape
+        ``build_soccer_artifacts._fetch_fixtures`` sends -- returned 400 on all
+        four slugs tried.
+      - ``20260915-20260915`` and ``20260901-20260915`` returned 200 on the same
+        slugs.
+      - Every bare ``YYYYMMDD`` request returned 200, including 2026-08-15 with
+        8 events on eng.2.
+
+    So the range form still exists but fails on some dates, and a refusal used
+    to raise straight out of every caller. `aggregate_season_player_stats` walks
+    the season in ranges from 1 August and died on its first window. That made
+    the four ESPN leagues' current-season producer unrunnable even once it was
+    allowlisted. A builder or live poll asking for a bad date failed the same
+    way.
+
+    ONLY a 400 on a parseable range falls back. Any other error, or a 400 on
+    something that is not a range, still raises: a 5xx is not this failure, and
+    splitting an unknown window would be guessing.
+    """
+    try:
+        return [fetch_espn_scoreboard(league, date_range=window, timeout=timeout)]
+    except requests.HTTPError as error:
+        status = getattr(getattr(error, "response", None), "status_code", None)
+        days = _window_days(window) if status == 400 else []
+        if not days:
+            raise
+    print(
+        f"[espn_lineups] ESPN_RANGE_REFUSED league={league} window={window} status=400 "
+        f"-> retrying as {len(days)} single-date request(s)",
+        flush=True,
+    )
+    return [fetch_espn_scoreboard(league, date_range=day, timeout=timeout) for day in days]
+
+
 def fetch_events(
     league: str,
     *,
@@ -91,10 +160,11 @@ def fetch_events(
     filtered by ESPN status state (``"pre"``, ``"in"``, ``"post"``; default
     None keeps all). Callers should keep each window to a few weeks --
     ESPN's scoreboard endpoint silently truncates around ~100 events per
-    call."""
+    call. A window ESPN refuses with a 400 is retried one date at a time
+    (see ``_scoreboard_payloads``)."""
     found: dict[str, dict[str, Any]] = {}
-    for window in date_windows:
-        payload = fetch_espn_scoreboard(league, date_range=window, timeout=timeout)
+    payloads = [payload for window in date_windows for payload in _scoreboard_payloads(league, window, timeout)]
+    for payload in payloads:
         for event in payload.get("events") or []:
             competition = (event.get("competitions") or [{}])[0]
             # `status_block` is ESPN's `competition.status`; `status` is its

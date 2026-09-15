@@ -66,6 +66,8 @@ from syndicate.features.soccer.sources import active_leagues_for_date as soccer_
 from syndicate.features.soccer.sources import default_season as soccer_default_season
 from syndicate.features.soccer.sources import default_week as soccer_default_week
 from syndicate.features.soccer.sources import week_date_list as soccer_week_date_list
+from syndicate.features.soccer.features.schedule import season_date_range as soccer_season_date_range
+from syndicate.features.shared.timezone import central_today
 from syndicate.features.wnba.sources import available_dates as wnba_available_dates
 
 
@@ -1445,20 +1447,51 @@ def _soccer_history_step(league: str, soccer_root: Path, python_exe: str) -> Ref
 
 
 
-#: Leagues whose player history `fetch_soccer_history_local.py --kind players`
-#: can actually fetch: MLS via ASA, and the five Understat leagues. The other
-#: four raise SystemExit without `--espn-date-windows` (`fetch_players`), so
-#: including them would turn every refresh tick into a FAILING step rather than
-#: a fetch. The ESPN path is separate work.
-_SOCCER_PLAYER_FETCH_LEAGUES = frozenset({
-    "mls", "epl", "la_liga", "bundesliga", "serie_a", "ligue_1",
+#: The four leagues served by ESPN match-summary aggregation, not Understat/ASA.
+#:
+#: THEY WERE EXCLUDED, AND THAT LEFT THEM ON THE COMPLETED 2025-26 FILE. The
+#: exclusion dated from when `fetch_players` raised SystemExit for them without
+#: `--espn-date-windows`; lane `soccer-espn-player-leagues` made it derive the
+#: windows (`season_date_windows`) and never came back to this list. Measured
+#: 2026-09-15 (`.syndicate/findings_2026-09-15_soccer_season_market_audit.md`,
+#: lane `soccer-player-substrate`): real shots attributable to a listed player
+#: were 36% championship / 53% primeira_liga / 56% belgian_pro_league / 62%
+#: eredivisie, the four worst of ten. Every promoted club -- Bolton, Cardiff,
+#: Lincoln, Cambuur, Willem II, ADO, Maritimo, Viseu -- and every club relegated
+#: from another league published with ZERO players, because no file on disk had
+#: ever seen them.
+_SOCCER_ESPN_PLAYER_LEAGUES = frozenset({
+    "eredivisie", "primeira_liga", "championship", "belgian_pro_league",
 })
 
-#: How stale a CURRENT-season roster may be before it is refetched. Weekly,
-#: because the file only changes when a match is played or a transfer registers,
-#: and rewriting it mid-slate churns every projection built from it. Cost is not
-#: the driver: this is one GET per league.
-_SOCCER_PLAYER_REFRESH_DAYS = 7.0
+#: Leagues whose CURRENT-season player rates the weekly producer refreshes:
+#: MLS via ASA, the five Understat leagues, and the four ESPN leagues above.
+_SOCCER_PLAYER_FETCH_LEAGUES = frozenset({
+    "mls", "epl", "la_liga", "bundesliga", "serie_a", "ligue_1",
+}) | _SOCCER_ESPN_PLAYER_LEAGUES
+
+#: How stale a CURRENT-season roster may be before it is refetched. DAILY.
+#:
+#: It was weekly, on the argument that the file only changes when a match is
+#: played -- which is exactly why weekly was too slow. Measured 2026-09-15 over
+#: the big five and MLS: shots by a player the sim DID list for that club on some
+#: date, but not on the date he shot, were overwhelmingly "listed on a LATER date
+#: only" -- EPL 66 of 100 shots, La Liga 133/154, Serie A 120/129, Ligue 1
+#: 130/141, MLS 343/343. That is the new signing who starts and shoots while the
+#: file still predates his debut. The file still changes at most once a day, so
+#: mid-slate churn stays bounded. Cost: one GET per Understat/ASA league, and one
+#: season of ESPN summaries per ESPN league (9-13 s each, measured 2026-09-04).
+_SOCCER_PLAYER_REFRESH_DAYS = 1.0
+
+#: Days into its season before an ESPN league's producer may run.
+#:
+#: ESPN rows need `min_appearances` (3) before a player is emitted, so an ESPN
+#: league's current-season aggregation is EMPTY for about its first three
+#: matchweeks, and `_write_csv` refuses to publish an empty file (correctly: an
+#: empty frame would overwrite a good one). Without this gate the step would FAIL
+#: on every tick of every August. Understat and ASA emit rows from the first
+#: minute (floor 1, shrunk toward a prior), so they are not gated.
+_SOCCER_PLAYER_ESPN_MIN_SEASON_DAYS = 21
 
 
 def _soccer_players_step(league: str, soccer_root: Path, python_exe: str) -> RefreshStep | None:
@@ -1486,6 +1519,16 @@ def _soccer_players_step(league: str, soccer_root: Path, python_exe: str) -> Ref
         season = int(soccer_default_season(league))
     except Exception:
         return None
+    if league in _SOCCER_ESPN_PLAYER_LEAGUES:
+        # UNKNOWN DECLINES. Declining costs one day of freshness; running
+        # blind costs a failing step on every tick until the season fills.
+        try:
+            season_start, _season_end = soccer_season_date_range(league, season)
+            elapsed_days = (central_today() - season_start).days
+        except Exception:
+            return None
+        if elapsed_days < _SOCCER_PLAYER_ESPN_MIN_SEASON_DAYS:
+            return None
     target_dir = soccer_root / league / "players"
     target = target_dir / f"players_{season}.csv"
     try:

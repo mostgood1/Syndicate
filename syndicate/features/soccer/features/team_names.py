@@ -105,6 +105,25 @@ _ALIASES: dict[str, str] = {
     "vancouver whitecaps": "vancouver whitecaps fc",
     "san jose earthquakes": "san jose",
     "columbus crew sc": "columbus crew",
+    # PLAYER-FILE vs FIXTURE spellings, measured 2026-09-15 (lane
+    # `soccer-player-substrate`). Each one published a fixture side with ZERO
+    # players on every build: `loaders._bind_player_team` binds on EXACT
+    # canonical identity, and the two feeds spell the club differently. Quoted
+    # from production `players_*.csv` (left) and the ESPN fixture (right):
+    #   bundesliga  "RasenBallsport Leipzig"  vs  "RB Leipzig"
+    #   bundesliga  "Paderborn"               vs  "SC Paderborn 07"
+    #   serie_a     "Parma Calcio 1913"       vs  "Parma"
+    #   la_liga     "Deportivo La Coruna"     vs  "Deportivo" (ESPN also says "Deportivo La Coruña")
+    #   ligue_1     "Rennes"                  vs  "Stade Rennais"
+    #   belgian     "Oud-Heverlee Leuven"     vs  "OH Leuven"
+    # Keyed on the canonical text each spelling reaches BEFORE this lookup, so
+    # "SC Paderborn 07" arrives as "paderborn 07" once "sc" is stripped.
+    "rasenballsport leipzig": "rb leipzig",
+    "paderborn 07": "paderborn",
+    "parma calcio 1913": "parma",
+    "deportivo la coruna": "deportivo",
+    "stade rennais": "rennes",
+    "oud heverlee leuven": "oh leuven",
 }
 
 
