@@ -4,7 +4,9 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 import csv
 from datetime import date as date_cls
+from datetime import datetime as datetime_cls
 from datetime import timedelta
+from datetime import timezone as timezone_cls
 from functools import lru_cache
 import io
 import json
@@ -346,6 +348,230 @@ def live_state_payload(league: str, selected_date: str) -> dict[str, Any] | None
         ("live_state", league, selected_date),
         lambda: _live_state_payload_uncached(league, selected_date),
     )
+
+
+# ---------------------------------------------------------------------------
+# THE CROSS-SERVICE LIVE AGGREGATE  `[2026-09-15, lane soccer-live-scoreboard-range-stale]`
+#
+# `live_state_payload` above reads the PER-LEAGUE file, and on refresh-worker --
+# the service that builds the board and the Layer 2 chips -- that file arrives
+# ONLY through `pull_hot_artifacts` inside the heavy board build, one date per
+# build. Measured 2026-09-15: the chips served pre-deploy soccer state for ELEVEN
+# consecutive publishes (20:38:19-21:01:41Z) while web held the correct file, and
+# went fresh on the first publish after a successful today-pull (21:02:50Z ->
+# 21:04:02Z). Fixing the pull's shared watermark (`082da3e3`) widened that window
+# but did not remove the hop: the chips still cannot be fresher than the last
+# successful pull, and ~1 in 6 of those pulls timed out on 09-15.
+#
+# `live/soccer_live_lens.json` has no such hop. `live_lens_loop.py` writes
+# `poll_active_leagues_for_tick`'s FULL return there through
+# `refresh_state_store.write_json_file`, i.e. through the KEYVALUE backend, whose
+# key is the absolute path and whose store all three services share. It is
+# already the settlement path's source (`#547`) and `soccer_live_gameline_source`
+# reads it for the live-gameline joins. The board's own card builder was the last
+# soccer reader still waiting on a disk.
+#
+# WHAT THE AGGREGATE IS AND IS NOT: `games` is IN-PLAY ONLY and flat (a list
+# carrying `league` and `event_id` per row), and `finals` carries six settlement
+# scalars per finished match -- NOT the per-player `match_box`. So this overlays
+# the two things a chip shows (who is in play, and the score) and leaves the rich
+# box alone.
+# ---------------------------------------------------------------------------
+
+
+def live_aggregate_path() -> Path:
+    """Mirrors `soccer/live_lens.py::live_lens_snapshot_path` deliberately.
+
+    Built from `data_root()` and not from `_source_roots()`, for the same reason
+    `_live_state_payload_uncached` is: `read_json_file` derives its keyvalue key
+    FROM THE PATH, so a reader that resolves a different absolute path queries a
+    key the writer never wrote.
+    """
+    from syndicate.features.shared.refresh_state_store import data_root
+
+    return data_root() / "live" / "soccer_live_lens.json"
+
+
+def _live_aggregate_snapshot_uncached(selected_date: str) -> dict[str, Any] | None:
+    try:
+        from syndicate.features.shared.refresh_state_store import read_json_file
+
+        payload = read_json_file(live_aggregate_path())
+    except Exception:
+        # Never fatal: a store hiccup degrades to the per-league read, which is
+        # the previous behaviour rather than a blank board.
+        return None
+    if not isinstance(payload, dict):
+        return None
+    # Only this date's snapshot may answer for this date -- the same refusal
+    # `soccer_live_games` makes, and for the same reason: a stale one would
+    # present yesterday's match state as today's.
+    if str(payload.get("date") or "") != str(selected_date):
+        return None
+    return payload
+
+
+def live_aggregate_snapshot(selected_date: str) -> dict[str, Any] | None:
+    """Memoized per `soccer_read_scope()`, like the per-league read.
+
+    ONE store round trip per build rather than one per league: a card build
+    walks every league and this is a single shared document.
+    """
+    return _scoped_read(
+        ("live_aggregate", selected_date),
+        lambda: _live_aggregate_snapshot_uncached(selected_date),
+    )
+
+
+def _instant(value: Any) -> Any:
+    """An ISO stamp as a comparable aware instant, or None.
+
+    BOTH representations reach here and they are NOT the same string for the
+    same moment: the per-league file is written by `poll_league` with a plain
+    `write_text`, so it keeps UTC, while the aggregate goes through
+    `write_json_file` -> `normalize_timestamped_payload`, which rewrites
+    `generated_at` into CENTRAL. Comparing these as text would rank
+    `18:22:19-05:00` below `23:22:19+00:00` -- the same instant, read as five
+    hours stale.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        stamp = datetime_cls.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone_cls.utc)
+    return stamp
+
+
+def _aggregate_covers_league(snapshot: dict[str, Any], league: str) -> bool:
+    """Whether this snapshot can speak for THIS league's in-play set.
+
+    THE ONLY QUESTION THAT MATTERS FOR A DELETION. Overlaying `games` replaces
+    the per-league set wholesale, which is what makes a finished match stop
+    presenting as live -- and that is exactly why an ABSENT league must not be
+    read as "nothing is in play". `poll_active_leagues_for_tick` polls only
+    `active_leagues_for_date`, and records a league whose poll RAISED in
+    `errors` while omitting it from `games`. Both cases look identical to a
+    reader that just counts rows, and one of them means "no data", not "no
+    matches".
+    """
+    checked = snapshot.get("leagues_checked")
+    if not isinstance(checked, list):
+        return False
+    if league not in {normalize_league(item) for item in checked if item}:
+        return False
+    errors = snapshot.get("errors")
+    failed: set[str] = set()
+    if isinstance(errors, dict):
+        failed = {normalize_league(key) for key in errors if key}
+    elif isinstance(errors, list):
+        failed = {normalize_league(item) for item in errors if isinstance(item, str) and item}
+    return league not in failed
+
+
+def _aggregate_games_for_league(snapshot: dict[str, Any], league: str) -> dict[str, Any]:
+    """The aggregate's flat `games` list, back in the per-league dict shape."""
+    rows = snapshot.get("games")
+    if not isinstance(rows, list):
+        return {}
+    out: dict[str, Any] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if normalize_league(row.get("league")) != league:
+            continue
+        event_id = str(row.get("event_id") or "").strip()
+        if not event_id:
+            continue
+        out[event_id] = {key: value for key, value in row.items() if key != "league"}
+    return out
+
+
+def _aggregate_finals_for_league(snapshot: dict[str, Any], league: str) -> dict[str, Any]:
+    rows = snapshot.get("finals")
+    if not isinstance(rows, list):
+        return {}
+    out: dict[str, Any] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if normalize_league(row.get("league")) != league:
+            continue
+        event_id = str(row.get("event_id") or "").strip()
+        if not event_id:
+            continue
+        out[event_id] = {key: value for key, value in row.items() if key != "league"}
+    return out
+
+
+def board_live_state_payload(league: str, selected_date: str) -> dict[str, Any] | None:
+    """The per-league payload a BOARD BUILD should read: disk, aggregate on top.
+
+    Same shape as `live_state_payload` -- `games` and `match_box` keyed by event
+    id -- so every existing card reader is unchanged. The overlay applies ONLY
+    when the aggregate is strictly newer, so on live-odds-worker and on a dev
+    box, where the per-league file is the freshest thing there is, this is
+    `live_state_payload` and nothing else.
+    """
+    league = normalize_league(league)
+    base = live_state_payload(league, selected_date)
+    snapshot = live_aggregate_snapshot(selected_date)
+    if not isinstance(snapshot, dict):
+        return base
+    if not _aggregate_covers_league(snapshot, league):
+        return base
+
+    aggregate_at = _instant(snapshot.get("generated_at"))
+    base_at = _instant(base.get("generated_at")) if isinstance(base, dict) else None
+    if aggregate_at is None:
+        return base
+    if base_at is not None and aggregate_at <= base_at:
+        # The disk copy is the fresher of the two. Not a fallback: this is the
+        # normal reading on the service that WRITES the file.
+        return base
+
+    games = _aggregate_games_for_league(snapshot, league)
+    finals = _aggregate_finals_for_league(snapshot, league)
+    if not isinstance(base, dict):
+        return {
+            "league": league,
+            "date": selected_date,
+            "generated_at": snapshot.get("generated_at"),
+            "games": games,
+            "match_box": finals,
+            "count": len(games),
+            "match_box_count": len(finals),
+            "source": "live_aggregate",
+        }
+
+    merged = dict(base)
+    # REPLACED, not merged. `games` means "in play right now"; a match the
+    # aggregate no longer lists has ENDED, and carrying the stale entry forward
+    # is precisely how a settled result keeps presenting as live.
+    merged["games"] = games
+    merged["count"] = len(games)
+
+    # ADDITIVE, because the shapes differ: `finals` is six settlement scalars and
+    # a `match_box` record carries the goal list and the per-player box.
+    # Replacing the rich record with the thin one would strip the card's own
+    # content to fix its score, so the scalars are written OVER the existing
+    # record and everything else is kept.
+    existing_box = merged.get("match_box")
+    box = dict(existing_box) if isinstance(existing_box, dict) else {}
+    for event_id, record in finals.items():
+        prior = box.get(event_id)
+        if isinstance(prior, dict):
+            box[event_id] = {**prior, **{k: v for k, v in record.items() if v is not None}}
+        else:
+            box[event_id] = record
+    merged["match_box"] = box
+    merged["match_box_count"] = len(box)
+    merged["generated_at"] = snapshot.get("generated_at")
+    merged["source"] = "live_aggregate"
+    return merged
 
 
 def game_markets_path(league: str, selected_date: str) -> Path:

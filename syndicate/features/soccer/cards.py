@@ -17,7 +17,7 @@ from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES
 from syndicate.features.soccer.sources import league_display_name
 from syndicate.features.soccer.sources import league_select_control
 from syndicate.features.soccer.sources import game_markets_rows
-from syndicate.features.soccer.sources import live_state_payload
+from syndicate.features.soccer.sources import board_live_state_payload
 from syndicate.features.soccer.sources import normalize_league
 from syndicate.features.soccer.sources import picks_rows
 from syndicate.features.soccer.sources import recommendations_payload
@@ -675,7 +675,12 @@ def _match_box_state(league: str, date_str: str, event_id: str) -> dict[str, Any
 def _live_state_entry(league: str, date_str: str, event_id: str, key: str) -> dict[str, Any] | None:
     if not date_str or not event_id:
         return None
-    payload = live_state_payload(league, date_str)
+    # THE BOARD READ, not the plain per-league one. On refresh-worker the
+    # per-league file arrives only through the hot-artifact pull inside the
+    # heavy build; the aggregate crosses services through the keyvalue store
+    # with no hop at all. `board_live_state_payload` is `live_state_payload`
+    # wherever the disk copy is the fresher of the two.
+    payload = board_live_state_payload(league, date_str)
     section = payload.get(key) if isinstance(payload, dict) else None
     if not isinstance(section, dict):
         return None
@@ -2692,7 +2697,11 @@ def _live_vintage(league: str) -> str:
     healthy fingerprint.
     """
     try:
-        payload = live_state_payload(league, central_today_iso())
+        # The SAME read the entries below it use. A vintage taken from the
+        # per-league file while the entries came from the aggregate would
+        # hold this 600s cache closed over data that had already moved --
+        # the freeze this key exists to prevent, reintroduced one layer up.
+        payload = board_live_state_payload(league, central_today_iso())
     except Exception:
         return "error"
     if not isinstance(payload, dict):
@@ -2713,8 +2722,19 @@ def _live_vintage(league: str) -> str:
                         str(entry.get("status") or ""),
                         str(entry.get("status_state") or ""),
                         str(entry.get("status_display_clock") or entry.get("status_detail") or ""),
-                        str(entry.get("home_score") or ""),
-                        str(entry.get("away_score") or ""),
+                        # `score_home`/`score_away` FIRST, and they are the
+                        # only names a real entry carries. `build_live_state`
+                        # writes `score_home` (espn_live_state.py:180) and the
+                        # poller copies ESPN's `home_score` INTO it
+                        # (poll_soccer_live_state.py:178) -- so reading
+                        # `home_score` here read a key nothing on this path
+                        # writes, and the SCORE was absent from a fingerprint
+                        # whose whole job is to notice that the score moved.
+                        # It still moved on the clock, so this was bounded by
+                        # one displayed minute rather than the 600s TTL --
+                        # which is exactly why it never showed up as a freeze.
+                        str(entry.get("score_home") if entry.get("score_home") is not None else (entry.get("home_score") or "")),
+                        str(entry.get("score_away") if entry.get("score_away") is not None else (entry.get("away_score") or "")),
                     )
                 )
             )
