@@ -35799,3 +35799,44 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Captions read e.g. "Implied probability of this pick's price since 12:11 AM: 49.8% → 42.9% (best price across books)".
 - **OWED:** the next 09-16 rebuild should clear the 30 old-sign, 3 old-basis and 2 disagreeing rows. One re-read after it.
 - Rollback: refresh-worker `55fee786`. Web `8b563ca9` would revert only the caption; `7ed1a18a` carries nothing else web-side.
+
+## 2026-09-15 19:31:33Z (14:31 CT) — live-odds-worker `c725cc29` -> `f833f7ec` (soccer props player substrate, fix #1) — deploy `dep-dakpq5ff3r2c73ds3v70` — lane soccer-player-substrate — **LIVE 19:37:29Z; verify OWED on the next soccer builds (artifact generated_at after 19:37:29Z)**
+- **What (`f833f7ec`):** the prop sim lists the players who actually play.
+  - `refresh_odds_sources.py`: the soccer players step adds the four ESPN leagues (eredivisie, primeira_liga, championship, belgian_pro_league). They are skipped until 21 days into the season, and an unreadable calendar declines the step. Refresh cadence for all ten leagues goes from 7 days to 1 day.
+  - `espn_lineups.py`: when ESPN refuses a scoreboard date RANGE with a 400, the step falls back to one request per day (max 62 days) and prints `ESPN_RANGE_REFUSED`.
+  - `build_soccer_artifacts.py`:
+    - The departed-player filter now applies per club, once that club has 11+ players and 180+ minutes in the current season. Previously it ran league-wide or not at all.
+    - A player's team comes from the newest season file that contains him.
+    - Every artifact publishes a `player_substrate` audit, and each match carries a `squad_audit`.
+  - `team_names.py`: six builder aliases (RB Leipzig, Paderborn, Parma, Deportivo, Rennes, OH Leuven).
+- **Tests (A/B, same 118 files: 117 soccer + `test_refresh_odds_sources.py`):**
+  - Changed tree: 30 failed, 1,228 passed, 7 errors.
+  - Baseline worktree at `20184d7e`: 30 failed, 1,185 passed, 7 errors.
+  - The FAILED/ERROR sets are IDENTICAL (37 = 37, 0 only in the changed tree). Both trees have no `data/`; the two failure groups inspected come from that (alias gaps: `canonical_team` returns None; `build_summary`: conftest's tracked-`data/` write guard). The +43 passes are the new tests.
+- **Locks:**
+  - Claim 19:30:26Z (token `1416a850c2adbd50`).
+  - Preflight 19:30:47Z CLEAR (infra only, one defunct child). `f833f7ec` is on origin/main.
+  - POST 19:31:33Z; live 19:37:29Z.
+- **Ride-along (21 commits from `c725cc29`; code commits listed):**
+  - `867f1481`: FotMob match-id alias loose pass (lane `fotmob-team-name-aliases`). Runs ON THIS SERVICE via the live-lens soccer poller.
+  - `3157bb7b`: home NCAAF prop `slate_date` (web path).
+  - `4a1ca2c4`, `5686a555`: layer2 movement sign and sparklines (refresh-worker path).
+  - `8b563ca9`: book_quotes repair (admin child).
+  - `af7c895c`: deploy guard (tooling).
+- **CONFLICT, recorded so it is not rediscovered:** lane `fotmob-team-name-aliases` recorded a user decision to deploy live-odds-worker "after tonight's matches" (no tracked league in play; Real Madrid at Elche ends ~21:25Z). This deploy carried `867f1481` mid-slate and restarted the live poller during play.
+  - I saw that lane's status line only after the POST.
+  - A cancel through the Render API was refused by the session's permission classifier. It was not retried.
+  - User decision ~19:36Z: **"Let it go live now."**
+  - So `867f1481` has been LIVE on live-odds-worker since 19:37:29Z, and that lane's deploy step is already done. Its production verify (Sat 09-19 18:45Z, Zulte-Waregem at Anderlecht) needs no further deploy.
+- **Baseline (production export, before this deploy):**
+  - `soccer_source/<league>/players/players_2026.csv` is ABSENT for belgian_pro_league, championship, eredivisie and primeira_liga. It is present for the other six, all with mtime 2026-09-12 05:08Z (the 7-day cadence).
+  - `championship/api/recommendations/recommendations_2026-09-19.json` (generated_at 19:05:19Z): no `player_substrate`, `squad_audit` on 0 of 9 matches, 275 player_props rows.
+- **Prediction (replay recorded in `log/2026-09-15.md`):**
+  - Latest-match coverage of real team shots by listed players: championship 29->95%, eredivisie 55->95%, belgian 47->92%, primeira 49->85%. The big five go to 95-99%, and MLS stays at 95%.
+  - Empty sides: 0 in every league.
+- **verify (OWED):**
+  - The first soccer players step after 19:37:29Z writes `players_2026.csv` for the four ESPN leagues and re-writes the other six (mtime > 19:37:29Z).
+  - The first recommendations artifact per league with generated_at > 19:37:29Z carries `player_substrate.departed_filter` in {`per_club`, `single_season`}.
+  - Every match in that artifact carries `squad_audit`, and no side has 0 listed players.
+  - Refresh-worker (the weekly autorun builds) gets the same commit in a separate deploy, so the reading must say which service wrote the artifact it read.
+- Rollback: `c725cc29`. It would also revert `867f1481`.
