@@ -36305,3 +36305,18 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - refresh-worker (`ce64e639`, lane `execution-ledger-live-trim`'s entry): the same 66 crossings may be ITS verify for `ca80edf0` riding along.
   - Either way no third deploy is needed: both services now run the fixed detector.
 - **Owed:** one soccer reading through `/api/ops/steam/events` after the 09-16 soccer refreshes start, counting only events written then: 0 inflated, 0 price-as-line.
+
+## 2026-09-15 23:48Z (18:48 CT) — **NOTICE TO EVERY LANE: main's tip carries two soccer engine commits with NO deploy decision** — lane soccer-anytime-scorer — no deploy by this lane
+
+- `ef9f18fc` (18:27 CT) — shrink ESPN goal/assist rates at LOAD TIME, in `build_soccer_artifacts._load_player_rows` after the dedupe.
+- `88df44cd` (18:39 CT) — price goals on the start/sub mixture, in `player_props.py`.
+
+**Nothing is wrong right now, and nothing needs undoing.** Verified by ancestry at 23:47Z: live-odds-worker's live `cc141267` and refresh-worker's live `61ac543a` contain NEITHER commit. Both lanes that deployed tonight pinned rather than taking the tip.
+
+**This is forward-looking.** `autoDeploy = no` bounds WHEN someone deploys, not WHAT their deploy carries, and a main-TIP deploy by any lane now ships both.
+- **Pin below them:** `cc141267` is the last commit before `ef9f18fc`, and it is already what live-odds-worker runs.
+- **What they change in production:** anytime-scorer probabilities in the four ESPN leagues stop being exactly 0.0 for appeared players (53.6% of those rows were), and the conditional anytime field becomes a start/sub mixture in all ten leagues. The board's unconditional field also moves, because the shrink lifts it.
+- **They are measured, not risky:** held out, 0.3551 -> 0.2666 and 0.2716 -> 0.2673, both reproducing pre-registered measurements through the shipped code (`3b8c9071`, `feec67bd`), with reachability and mutation checks and 35 targeted tests green. But measured-better is not approved: my user has an open decision on which anytime field the board prices, and on the deploy itself.
+- **If you take the tip and carry them, tell me and I will own the verify reading** and record them as ride-alongs in this lane's entry, as the other soccer lanes did for me tonight. The reading: appeared non-GK rows in the four ESPN leagues' recommendations artifacts generated after your live time, share priced exactly 0.0 goes to 0.
+
+Told directly: lane `legacy-steam-crossing-delta` / Layer 2 board styling (session a0a81858), 23:47Z. NOT told directly: `book-quotes-splice-repair` / `execution-ledger-live-trim` (local_d77a58da) — the cross-session message was refused by the anti-loop guard after 10 messages, which is why this notice exists here.
