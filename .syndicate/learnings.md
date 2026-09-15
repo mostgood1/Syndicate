@@ -6172,3 +6172,14 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - Prefer the vendor's canonical id (`primaryId`, `parentLeagueId`) when the payload carries one.
   - A dataset described as "N seasons over K groups" must print its coverage per (group, season). A narrow key truncates it silently.
 - *(evidence: `deploys.md` 2026-09-15 18:08:50Z entry; commit `c725cc29`; `state_soccer.md` `[soccer-live-momentum]`)*
+
+## 2026-09-15 — OVERTURNED: "the attached-POST classifier leaves reads alone" — it shipped tested only on hand-written commands, and the repo's own read-only graft builder classified as a deploy `[lanes deploy-guard-python-post, deploy-guard-file-scripts]`
+
+- **What was believed:** `11167fdf`'s `_PY_POST_INTENT` blocked Python deploys and ALLOWED reads, on the evidence of its test file (GETs, a comment, GET-list + POST-elsewhere) and three probes of this session's own command shapes.
+- **What was actually true:** its body rule `\bdata\s*=` matched any `data = ...`, including the ASSIGNMENT `data = json.loads(urllib.request.urlopen(req...))` that `scripts/build_consolidated_graft.py:93-96` writes right after a GET of `/deploys?limit=5`. That read-only shape, pasted inline, was already blocked on main. The test corpus was written by the author of the rule, so it contained only the shapes the author had in mind.
+- **How we found out:** the next lane scanned EVERY repo file naming a deploys endpoint (22) through the landed classifier BEFORE extending it. 2 classified as deploys; one was `render_deploy.py` (correct) and the other the graft builder (wrong). Fixed in `af7c895c`: `data=` counts only after `(` or `,`. Rescan: only `render_deploy.py`.
+- **The rule going forward:**
+  - Before landing a text classifier that can BLOCK (a guard, a gate, a filter), run it over the REAL corpus it will meet (the repo's own files and past commands that mention the pattern), and list every hit. A hand-written test set proves the cases you thought of, not the ones that exist.
+  - Put the real files in the allow tests (copied, resolved, run), not synthetic stand-ins, so a false positive is a red test rather than a user report.
+- **Cost:** one false positive shipped to main, and it was live in the primary tree's guard for about an hour. Caught before any read-only script was actually blocked.
+- *(evidence: `log/2026-09-15.md` session 3a65723e, the `deploy-guard-file-scripts` entry; commits `11167fdf`, `af7c895c`)*
