@@ -35698,3 +35698,43 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Reading: these are OLD splices in the MIDDLE of refresh-worker's local copies, which a tail sync cannot see (its overlap matched). The copies are republished whole on each append, and web's P1 refuses them each time, harmlessly.
   - They are cleared by P3: once web's copy is repaired, refresh-worker's overlap mismatches and it resyncs whole, dropping non-JSON lines.
 - Rollback: redeploy `87558f2f` to refresh-worker.
+
+## 2026-09-15 18:51:51Z (13:51 CT) — web `9ed5c5ad` -> `8b563ca9` — deploy `dep-dakp7hvf3r2c73bh4hmg` — lane book-quotes-splice-repair — **P3 dry run MET; apply approved by the user ("Apply all 4 sports (Recommended)"), reading in a follow-up**
+- **What:** `8b563ca9`.
+  - `syndicate/features/shared/book_quotes_repair.py`: `repair_shard` works under `append_only_merge_lock`. It removes a line only when the line is NOT a JSON object AND is a byte suffix of an intact line in the same shard. Every other unreadable line is an orphan: counted, never deleted. It is a DRY RUN unless `apply=True`.
+  - `scripts/repair_book_quotes_fragments.py`.
+  - `POST /api/ops/book-quotes/repair` (admin token): spawns the script as a child process. `apply` is honoured only when it is exactly JSON `true`.
+  - User decision: "while we wait, start P3 repair of the damaged shards", then "Deploy + dry run (Recommended)".
+- **Ride-along** (`9ed5c5ad..8b563ca9`):
+  - `55fee786`: P2. The pull-side code does not run on web; `shard_append_lock` is taken on web only by appends.
+  - `c725cc29`: soccer FotMob primaryId, lane fotmob-season-scoped-league-ids.
+  - `e1afe4ac`: soccer season audit script.
+  - No `render.yaml` or `requirements*` change.
+- **Locks:**
+  - Claim `480ff11b…`.
+  - Baseline read 18:50:51Z on web: `REPAIR_SHARD` 0, `BOOK_QUOTES_REPAIR_SPAWNED` 0.
+  - Preflight expectations: `repair_endpoint_spawns_dry_run 0_repair_shard_lines -> repair_shard_lines_present`; `repair_writes_without_apply endpoint_absent -> none`. CLEAR 18:51:18Z.
+  - Live **18:57:50Z**.
+  - Claim released ~19:03Z. Web handed to lane Layer2 styling (session local_de24021b), which will deploy a main commit containing both `8b563ca9` and its `5686a555`.
+- **Reading:**
+  - `POST {"since":"2026-09-01","sports":["mlb","soccer","nfl","ncaaf"]}` at 18:58:57Z returned `spawned pid=145 apply=False`.
+  - First `REPAIR_SHARD` 18:59:00Z; `REPAIR_DONE` between 18:59:58Z and 19:00:28Z (watcher polls).
+
+      REPAIR_DONE shards 85  shards_with_bad 49  bad_lines 2172  verified_fragments 2152  orphan_bad_lines 20  removed 0  errors 0  apply False
+
+      mlb     15 shards, 13 with bad, 272 bad,  268 verified, 4 orphan
+      soccer  23 shards, 20 with bad, 1638 bad, 1624 verified, 14 orphan
+      nfl     18 shards,  4 with bad, 25 bad,   23 verified,  2 orphan
+      ncaaf   29 shards, 12 with bad, 237 bad,  237 verified, 0 orphan
+
+  - The largest counts are in soccer: 09-06 205, 09-05 195, 09-13 188 (the plan's hand count was 190), 09-14 168, 09-12 158, 09-04 137. mlb 09-03 has 29, equal to the plan's hand count.
+  - **Orphans (20), three shapes, none of them the splice signature:**
+    - (a) two rows glued with no newline, e.g. `{"captured_at":"2026-09-13T07:31:59.204918+0{"captured_at":"2026-09-13T10:22:29…`;
+    - (b) a truncated head, e.g. `{"captured_at":"2026-09` (soccer 09-15), or a head cut after `book_updated_at`;
+    - (c) headless tails with no intact match (mlb 09-01 x1, soccer 09-01 x3).
+    - Most (a)/(b) carry `captured_at` 2026-09-13 between 07:31 and 10:22Z. One window, so a separate write incident. Kept.
+- **verify:**
+  - Expectation (1) `repair_shard_lines_present`: **MET** (85 lines + DONE, 0 errors).
+  - Expectation (2) no writes without apply: **MET by the counters**: `removed 0` on every shard and `apply False` end to end. Not independently re-statted: on a dry run `bytes_after` is copied from `bytes_before`, not re-read.
+- **Owed:** the apply run (user decision). After it, the P4 reading: web `MERGE_REFUSED_BAD_LINES` 0 and reader `BOOK_QUOTES_BAD_LINES` limited to the 20 orphans. Also expected: refresh-worker `STREAM_SYNC_WHOLE` once per touched shard (overlap mismatch), then `STREAM_TAIL_SYNC_OK` again.
+- Rollback: redeploy `9ed5c5ad` to web. The endpoint is inert unless called.
