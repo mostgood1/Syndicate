@@ -35530,3 +35530,45 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Falsifier "post-live game records named < 95%": `[]`.
 - SHORTLIST factor check (`written_at` 2026-09-15T17:20:21Z, `after_live=True`, **890 rows**, under the 2,000-row request limit): `skill_source=bucket` 0; factor differs from prediction or unpredicted 0; factor without skill_source 0. Categories with a factor: ncaaf totals 148 @0.514, ncaaf spreads 112 @0.814, ncaaf h2h 65 @0.814, soccer h2h 59 @0.877.
 - **Deploy #3 recorder prediction: MET for all four sports.** MLB and NFL from FOLLOW-UP (2) (09-14 post-deploy keys); NCAAF and soccer from this entry (09-16 board). The 09-16 board adds no MLB or NFL `game` evidence of its own.
+
+## 2026-09-15 17:32:07Z (12:32 CT) — refresh-worker `d4c8814f` -> `87558f2f` — deploy `dep-dako25vqj5pc73d8anog` — lane layer2-row-parity — **verify MET for movement, headshots, explainers and legacy rows; sparklines OWED (need a second build)**
+- **What:** Layer 2 cards gain:
+  - (1) movement for every market with an opening (props no longer `not_tracked`), with the price delta on the continuous cents scale (-104 -> +104 = 8, not 208), steam on same-book moves only, one `movement_vs_pick` verdict, and from/to prices and lines;
+  - (2) `movement_series` from the new per-build `clv_price_trail`;
+  - (3) `headshot_url` (MLB from the sim's own ids, NFL from ESPN roster ids);
+  - (4) a `detail` explainer built from the row's own numbers, with the MLB locked-policy baseball context appended.
+  - Web code in the same commits: the movement cell renders the new fields (green = toward the pick), and legacy prop/game rows are withheld once Layer 2 has cards.
+  - User decisions: "open the lane and do all five, green = toward pick"; "Take them"; "Server-side, ask owner first"; "Take the claim"; "deploy when the sim finishes".
+- **WEB WAS NOT DEPLOYED BY THIS LANE.** Another session deployed web from main at 17:29:19Z (`deploy_started`), live 17:35:11Z (`deploy_ended`). That deploy already carried all three lane commits; this entry records it because its consequences are this lane's.
+  - Proof web runs the lane's code: the served payload carries `legacy_rows_kept` / `legacy_counts_basis` (only in `87558f2f`), and the rendered DOM shows the new movement labels.
+  - No `deploys.md` entry for it on main as of ~17:55Z.
+  - Consequence: the template went live ~10 min before refresh-worker's first new-code build (17:45:04Z). In that window tracked rows rendered "Flat" in the movement cell, which the template's own review predicted.
+  - This lane's web claim (17:46:08Z) was released unused.
+- **Locks:** refresh-worker claim acquired 17:11:03Z (token `bd13561a418a67c7`).
+  - Preflight 17:11:25Z **HOLD**: 4 jobs (MLB daily sim `ui-daily`, NCAAF smartsim). Waited; `MLB_DAILY_SIM_END ... state=finished exit_code=0 duration_seconds=1308` at 17:30:53Z.
+  - Preflight 17:31:56Z **CLEAR** for `87558f2f` (infra only, 1 defunct child). `87558f2f` on origin/main.
+- **Baseline** (served `/api/intelligence/query` 17:31:37Z, `scripts/verify_layer2_row_parity.py`, web `da268e07` / refresh-worker `d4c8814f`):
+  - Layer 2 2,665 rows; `not_tracked` 1,877; explainers 0.
+  - MLB headshots 0 of 511 player rows (503 with a projection); NFL 0 of 89.
+  - Series 0. Steam 1, not same-book 1. Legacy prop/game rows 74.
+  - The script's ±100 counter was blind pre-deploy (the from/to fields did not exist). Reconstructed from the 15:25Z payload: 59 of 651 priced rows straddled even money.
+- **Prediction:** `not_tracked` 0; explainers on all Layer 2 rows; MLB headshots on ~all projected player rows; NFL headshots on most player rows; steam rows all same-book; crossing-delta-not-cents 0; series 0 at first, then rising; legacy prop/game rows 0.
+- **Result:**
+  - POST 17:32:07Z; `build_ended` 17:36:38Z; `deploy_ended` 17:38:11Z; boot `MALLOC_ARENA_INIT` 17:38:47Z.
+  - First new-code build: `ROW_CONTEXT date=2026-09-15 mlb_narratives=106 nfl_espn_ids=2007 errors=none` (17:43:56Z); `TRAIL rows_in=3134 written=3134 unchanged=0 keys=2105 truncated=False` (17:45:02Z); `LAYER2_CARD_SHARDS_WRITTEN cards=3134` (17:45:04Z).
+  - 0 `Traceback` since boot; 0 `server_failed` (events API).
+- **Reading, served payload 17:47:09Z:**
+  - Layer 2 2,664 rows. `not_tracked` **13**, all among 26 rows on the 2026-09-16 shard built by the old code. On 09-15: tracked 2,291, flat 360.
+  - `movement_vs_pick`: away 1,528, toward 755, flat 355.
+  - Explainers **2,638 / 2,664** (the 26 are the 09-16 rows).
+  - MLB headshots **491 / 501** player rows = 491 / 491 with a projection. NFL **77 / 89**; the 12 misses are not diagnosed.
+  - Steam 0 (not same-book 0). Crossing-delta-not-cents **0**, now measurable. Series 0, as predicted.
+  - Legacy prop/game rows **0**. A later read showed `legacy_candidate_count` 91, `legacy_rows_withheld` 72, `legacy_rows_kept` 19 (the steam rows, kept by design).
+- **Reading, rendered page** (`/intelligence`, Browser DOM, ~17:52Z):
+  - 581 blotter rows, 581 explainer rows, 474 headshots, 0 old "N moves" labels, 0 sparklines.
+  - Labels read e.g. "▼ Odds -120 → +100 · 3h ago" and "▲ Line 7.5 → 8.5 · 12h ago".
+  - Arrows: down 481, up 60, flat 40. **Observation, not a verdict:** likely survivorship. A row whose price shortens loses its EV and leaves the board; one whose price lengthens stays.
+- **Keyvalue after:** card shards mlb 2,794,883 B, ncaaf 1,726,210 B, soccer 4,023,389 B (48% of the 8,388,608 ceiling). No `LAYER2_KEY_LARGE`.
+- **Watch:** refresh-worker container at 99.9% (headroom 3.7 MB) at 17:45:04Z, right after the build. Accounted RSS was 1,467 MB, so most of that is page cache. Samples during the pre-deploy MLB sim were 93-99%.
+- **OWED:** the sparkline reading after the next build that records changed points. A session waiter measures it, and it is appended here as FOLLOW-UP (1).
+- Rollback: redeploy `d4c8814f` to refresh-worker. Web's template and filter shipped in another session's deploy, so a web rollback would also revert that session's change: coordinate first.
