@@ -384,6 +384,8 @@ def _refuse(kind, lane, service_state):
         if preflight_problem:
             lines.append("    preflight  %s" % preflight_problem)
             lines.append("      python scripts/deploy_preflight.py --service %s --holder %s"
+                         " --target-commit <sha> --expect FIELD=VALUE --baseline FIELD=VALUE"
+                         " --baseline-read-at <UTC>"
                          % (service, lane or "<your-lane>"))
         else:
             lines.append("    preflight  CLEAR and fresh")
@@ -497,7 +499,8 @@ def main():
             "DEPLOY GUARD: could not determine the target service from this command,\n"
             "so it is ALLOWED unchecked. If this really is a deploy, take the locks:\n"
             "  python scripts/deploy_claim.py acquire --service <svc> --holder <lane>\n"
-            "  python scripts/deploy_preflight.py --service <svc> --holder <lane>\n")
+            "  python scripts/deploy_preflight.py --service <svc> --holder <lane> --target-commit <sha>\n"
+            "      --expect FIELD=VALUE --baseline FIELD=VALUE --baseline-read-at <UTC>\n")
         return 0
 
     lane = _lane(root, session_id)

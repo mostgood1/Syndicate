@@ -1618,6 +1618,30 @@ death, never life — do not invert it.
   - A new assertion shows the SAME fixture becomes compactable at now+2d, so the date rule is reachable, not vacuous.
   - A run with `time.time` forced to 2030 still passes.
 - Blocked by: none
+### preflight-expectation-baseline — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: preflight returns `NO_EXPECTATION` (exit 6) without a fresh, complete expectation; reachable (6 refusal tests FAIL with the branch disabled) and green with it (124 passed across preflight/guard/cron/worktree lock tests). No deploy: a local script.**
+- **VERDICT.** Goal (verbatim): "`scripts/deploy_preflight.py` refuses to return CLEAR unless the deploy states its prediction and a fresh baseline for every field the prediction names. New verdict `NO_EXPECTATION` (exit 6), HOLD-class: no `--expect FIELD=VALUE`, a malformed pair, no or unreadable `--baseline-read-at`, a baseline older than the guard's 15-min CLEAR window or dated in the future, or an `--expect` field with no `--baseline` value. Escape hatch `--no-expectation "<reason>"`, recorded on the receipt. The receipt and the printout carry expected against baseline, so the `deploys.md` entry can list expected against measured. This is postmortem check (3) from lane `combined-board-state-rows-lost`." — **GOAL: MET.**
+  - Change:
+    - `expectation_problem()` and `_parse_pairs()`.
+    - Four new arguments.
+    - The `NO_EXPECTATION` branch, placed LAST before CLEAR, so HOLD / UNKNOWN / CLAIMED / OFF_MAIN / TOO_SOON / redundant all still preempt it.
+    - `expectation` on the report and the receipt.
+    - An `EXPECTATION WAIVED: <reason>` suffix on CLEAR.
+    - A `baseline -> expected` printout per field.
+    - The guard's two remedy strings, `CLAUDE.md`'s deploy block and `.claude/commands/preflight.md` now show the flags.
+  - Tests (`tests/test_deploy_preflight.py`):
+    - An exit-code contract test.
+    - `ExpectationVerdictTests` (10): no expectation refused; the same world with one is CLEAR (`off != on`); stale (20 min), future (-10 min), unreadable time, malformed pair and unbaselined field each refused; the waiver clears and is recorded; a job in flight still HOLDs; TOO_SOON still preempts.
+    - `TooSoonVerdictTests._run` supplies a fresh expectation by default.
+  - Unwired check (scratch copy, the branch set to `elif False and ...`): exactly the 6 refusal tests FAIL (6 failed, 47 passed).
+  - NOT run: a live CLI preflight. It writes a receipt in the primary checkout that would revoke another session's CLEAR; `main()` is covered end to end against the mocked API instead.
+  - Reaches sessions only through the code they run: the PRIMARY checkout is ~330 commits behind and runs its own copy of this script and of `deploy-guard.py`, so the gate binds there only once that tree is updated.
+- Goal: `scripts/deploy_preflight.py` refuses to return CLEAR unless the deploy states its prediction and a fresh baseline for every field the prediction names. New verdict `NO_EXPECTATION` (exit 6), HOLD-class: no `--expect FIELD=VALUE`, a malformed pair, no or unreadable `--baseline-read-at`, a baseline older than the guard's 15-min CLEAR window or dated in the future, or an `--expect` field with no `--baseline` value. Escape hatch `--no-expectation "<reason>"`, recorded on the receipt. The receipt and the printout carry expected against baseline, so the `deploys.md` entry can list expected against measured. This is postmortem check (3) from lane `combined-board-state-rows-lost`.
+- Files: released: (a RECORD since the 2026-09-15 close; nothing is held) `scripts/deploy_preflight.py`, `tests/test_deploy_preflight.py`, `.claude/hooks/deploy-guard.py` (the two remedy command strings only), `.claude/commands/preflight.md` (the preflight command line), `CLAUDE.md` (the "Before any deploy" block). No open lane claimed any of them when taken (checked on origin/main 2026-09-15); user decision "build check 3, take the claim".
+- Hypothesis: n/a (a gate, not diagnostic).
+- Falsification test: reachability, `off != on`. The same CLEAR world returns `NO_EXPECTATION` without the flags and CLEAR with them. A stale baseline, a missing baseline field and an unreadable time each refuse. `--no-expectation` clears and is recorded. Every safety verdict (HOLD, UNKNOWN, CLAIMED, OFF_MAIN, TOO_SOON) still preempts it.
+- Verification: the new tests pass and the existing `TooSoonVerdictTests` stay green once given expectations. Unwired check: with the gate removed from a scratch copy, the refusal tests FAIL. `test_deploy_guard.py` stays green. No deploy: preflight is a local script, so it binds every session that runs the landed main.
+- Deliberate deviation from the postmortem wording: the proposal said "names no row count". A row count means nothing for a worker memory or env deploy, so the enforced rule is the general one the incident taught: every field the prediction names must have a fresh baseline.
+- Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

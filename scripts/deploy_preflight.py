@@ -57,6 +57,9 @@ Read-only. Performs GETs against the Render API and never writes.
     py -3 scripts/deploy_preflight.py --service refresh-worker --target-commit f1bba90c
     py -3 scripts/deploy_preflight.py --service refresh-worker --json
     py -3 scripts/deploy_preflight.py --service web --target-commit e4552e27 --reinject-env
+    py -3 scripts/deploy_preflight.py --service web --target-commit da268e07 \
+        --expect served_rows=3060 --baseline served_rows=3060 --baseline-read-at 2026-09-15T15:29:24Z
+    py -3 scripts/deploy_preflight.py --service web --target-commit c4f45fee --no-expectation "revert of b6a0e346"
 
 Exit codes:  0 = CLEAR (only infrastructure running)
              1 = HOLD (a job would be killed, or the deploy is redundant)
@@ -64,6 +67,7 @@ Exit codes:  0 = CLEAR (only infrastructure running)
              3 = CLAIMED (another holder owns this service's deploy claim)
              4 = OFF_MAIN (the target SHA is not contained in origin/main)
              5 = TOO_SOON (deployed again inside this service's minimum spacing)
+             6 = NO_EXPECTATION (no stated prediction with a fresh baseline for its fields)
 
 THE THREE PROPERTIES, because they are independent and each was learned
 separately -- a deploy needs all three and no two of them imply the third:
@@ -187,6 +191,30 @@ EXIT_OFF_MAIN = 4
 # perfectly composed, each correctly claimed and released, and still leave the
 # board frozen all evening -- which is exactly what happened.
 EXIT_TOO_SOON = 5
+# 6 = the deploy states no prediction, or its baseline is stale or incomplete.
+# Separate from HOLD for the reason every code above is: the remedy differs.
+# HOLD means "wait"; this means "write down what you expect to see, and read
+# what it says NOW".
+#
+# WHY, measured 2026-09-15 (lane `combined-board-state-rows-lost`, `deploys.md`
+# 14:03:51Z). A web deploy went out predicting "`computed_at` will not move", a
+# prediction derived nine hours earlier in a different regime; it moved. The
+# baseline taken before it omitted the served row count, so whether the change
+# displaced Layer 2 cards is PERMANENTLY unmeasurable. Every lock passed.
+# Nothing asked for the prediction or the baseline at the moment of deploying,
+# which is the only moment either is cheap.
+#
+# THE RULE IS GENERAL, NOT "A ROW COUNT". Each `--expect FIELD` needs a
+# `--baseline FIELD` read within EXPECTATION_BASELINE_MAX_AGE_SECONDS. A row
+# count means nothing for a worker env deploy; a fresh baseline for the field
+# you predict always does.
+EXIT_NO_EXPECTATION = 6
+
+# Equal to deploy-guard.py's PREFLIGHT_TTL_SECONDS: a baseline older than the
+# CLEAR it rides on describes a world the deploy will not land in.
+EXPECTATION_BASELINE_MAX_AGE_SECONDS = 15 * 60
+# A baseline stamped ahead of this clock is unreadable evidence, not fresh evidence.
+EXPECTATION_BASELINE_MAX_FUTURE_SKEW_SECONDS = 120
 
 # THE MINIMUM SPACING, PER SERVICE, IN SECONDS. 0 disables the check.
 #
@@ -696,6 +724,63 @@ def _main_worktree_root() -> Path:
 RECEIPT_DIR = _main_worktree_root() / ".syndicate" / "deploy" / "preflight"
 
 
+def _parse_pairs(values) -> tuple[dict[str, str], list[str]]:
+    """`FIELD=VALUE` strings -> ({field: value}, [malformed]). A later pair wins."""
+    pairs: dict[str, str] = {}
+    bad: list[str] = []
+    for raw in values or []:
+        text = str(raw or "")
+        field, sep, value = text.partition("=")
+        field = field.strip()
+        if not sep or not field:
+            bad.append(text)
+            continue
+        pairs[field] = value.strip()
+    return pairs, bad
+
+
+def expectation_problem(expect, baseline, baseline_read_at, no_expectation, now):
+    """(problem or None, detail) for `NO_EXPECTATION`. Pure: `main()` owns the verdict.
+
+    Rule 1 of this file applies: an unreadable timestamp REFUSES rather than
+    passing, because "I could not tell how old the baseline is" is not fresh.
+    The waiver is checked first and recorded, never silent.
+    """
+    expected, bad_expect = _parse_pairs(expect)
+    base, bad_base = _parse_pairs(baseline)
+    detail = {
+        "expect": expected,
+        "baseline": base,
+        "baseline_read_at": baseline_read_at or None,
+        "baseline_age_seconds": None,
+        "no_expectation_reason": None,
+    }
+    waiver = str(no_expectation or "").strip()
+    if waiver:
+        detail["no_expectation_reason"] = waiver
+        return None, detail
+    if bad_expect or bad_base:
+        return "malformed FIELD=VALUE: " + ", ".join(repr(b) for b in bad_expect + bad_base), detail
+    if not expected:
+        return "no --expect FIELD=VALUE: state what this deploy should change, as numbers", detail
+    if not baseline_read_at:
+        return "no --baseline-read-at: say when the baseline was read", detail
+    age = _age_seconds(baseline_read_at, now)
+    if age is None:
+        return f"--baseline-read-at {baseline_read_at!r} is not a readable UTC time", detail
+    detail["baseline_age_seconds"] = round(age, 1)
+    if age < -EXPECTATION_BASELINE_MAX_FUTURE_SKEW_SECONDS:
+        return f"--baseline-read-at is {-age:.0f}s in the future", detail
+    if age > EXPECTATION_BASELINE_MAX_AGE_SECONDS:
+        return (f"the baseline is {age / 60:.0f} min old (limit "
+                f"{EXPECTATION_BASELINE_MAX_AGE_SECONDS // 60} min); re-read it now, in the regime "
+                f"this deploy will land in"), detail
+    missing = sorted(field for field in expected if field not in base)
+    if missing:
+        return "no --baseline for predicted field(s): " + ", ".join(missing), detail
+    return None, detail
+
+
 def _write_receipt(args, report, verdict, reason, live_commit) -> None:
     """Persist this verdict so `deploy-guard.py` can gate on it.
 
@@ -742,6 +827,9 @@ def _write_receipt(args, report, verdict, reason, live_commit) -> None:
             "min_deploy_interval_seconds": report.get("min_deploy_interval_seconds"),
             "seconds_since_last_deploy": (report.get("last_deploy") or {}).get("age_seconds"),
             "allow_rapid": report.get("allow_rapid"),
+            # `NO_EXPECTATION`. On the receipt so the stated prediction and the
+            # baseline it rests on outlive the session that made them.
+            "expectation": report.get("expectation"),
         }
         (RECEIPT_DIR / f"{args.service}.json").write_text(
             json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
@@ -766,6 +854,17 @@ def main() -> int:
                              "escape hatch is here because a rate limit with no override "
                              "turns an outage into a longer one -- a revert must always be "
                              "able to go out. Record why in deploys.md.")
+    parser.add_argument("--expect", action="append", default=[], metavar="FIELD=VALUE",
+                        help="what this deploy should make FIELD read (repeatable). Required "
+                             "unless --no-expectation; every FIELD needs a --baseline.")
+    parser.add_argument("--baseline", action="append", default=[], metavar="FIELD=VALUE",
+                        help="what FIELD reads NOW, before deploying (repeatable).")
+    parser.add_argument("--baseline-read-at", default="", metavar="UTC",
+                        help="when the baseline was read, e.g. 2026-09-15T15:29:24Z. Refused "
+                             "past 15 min, the same window as a CLEAR.")
+    parser.add_argument("--no-expectation", default="", metavar="REASON",
+                        help="waive the expectation check (a revert, an env re-inject). The "
+                             "reason is recorded on the receipt; say it in deploys.md too.")
     parser.add_argument("--max-sample-age-seconds", type=int, default=DEFAULT_MAX_SAMPLE_AGE_SECONDS)
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
@@ -942,6 +1041,10 @@ def main() -> int:
     # cron "I could not tell" is an unreadable run history, not a stale sample;
     # both land on UNKNOWN, because rule 1 does not care which instrument was
     # unavailable.
+    expectation_issue, expectation_detail = expectation_problem(
+        args.expect, args.baseline, args.baseline_read_at, args.no_expectation, now)
+    report["expectation"] = {**expectation_detail, "problem": expectation_issue}
+
     stale = (cron_in_flight is None) if is_cron else (age is None or age > args.max_sample_age_seconds)
     if off_main:
         verdict, code = "OFF_MAIN", EXIT_OFF_MAIN
@@ -1011,6 +1114,15 @@ def main() -> int:
     elif redundant:
         verdict, code = "HOLD", EXIT_HOLD
         reason = f"{args.target_commit[:8]} is already contained in live {live_commit[:8]} -- the deploy is redundant"
+    elif expectation_issue:
+        # LAST BEFORE CLEAR, deliberately. Every verdict above means "do not deploy
+        # now" for a reason the operator cannot write away; this one is fixed by
+        # writing two lines, so it must never mask them.
+        verdict, code = "NO_EXPECTATION", EXIT_NO_EXPECTATION
+        reason = (expectation_issue
+                  + ". Read the baseline now and re-run with --expect FIELD=VALUE "
+                    "--baseline FIELD=VALUE --baseline-read-at <UTC>, or pass "
+                    '--no-expectation "<reason>" for a revert or an env re-inject.')
     else:
         verdict, code = "CLEAR", EXIT_CLEAR
         reason = ("no cron run in flight" if is_cron else "only infrastructure processes running") + (
@@ -1018,6 +1130,9 @@ def main() -> int:
         ) + (
             "; REDUNDANCY WAIVED by --reinject-env -- same-commit deploy to re-inject env"
             if report.get("redundancy_waived") else ""
+        ) + (
+            "; EXPECTATION WAIVED: " + str(expectation_detail.get("no_expectation_reason"))
+            if expectation_detail.get("no_expectation_reason") else ""
         )
     report["verdict"] = verdict
     report["reason"] = reason
@@ -1057,6 +1172,17 @@ def main() -> int:
     if args.target_commit:
         state = {True: "ALREADY LIVE -- redundant", False: "not yet live", None: "git could not say"}[report.get("target_already_live")]
         print(f"target commit  {args.target_commit[:8]}   {state}")
+    _exp = report.get("expectation") or {}
+    if _exp.get("no_expectation_reason"):
+        print("expectation    WAIVED: " + str(_exp["no_expectation_reason"]))
+    elif _exp.get("expect"):
+        _age_text = "" if _exp.get("baseline_age_seconds") is None else f"   age {_exp['baseline_age_seconds']:.0f}s"
+        print(f"baseline       read at {_exp.get('baseline_read_at') or '?'}{_age_text}")
+        for _field, _value in _exp["expect"].items():
+            _before = (_exp.get("baseline") or {}).get(_field, "<NO BASELINE>")
+            print(f"  expect       {_field}: {_before} -> {_value}")
+    else:
+        print("expectation    NONE -- --expect FIELD=VALUE --baseline FIELD=VALUE --baseline-read-at <UTC>")
     # A CRON'S RECEIPT MUST NOT DISPLAY AN INSTRUMENT IT NEVER USED. Printing
     # `sample NONE` for a cron is the exact shape of a FAILED process read --
     # which for every other service means UNKNOWN -- so the line named the wrong

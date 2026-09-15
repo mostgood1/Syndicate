@@ -391,10 +391,25 @@ class ExitCodeContractTests(unittest.TestCase):
                       deploy_preflight.EXIT_OFF_MAIN):
             self.assertNotEqual(deploy_preflight.EXIT_TOO_SOON, other)
 
+    def test_no_expectation_has_its_own_non_zero_code(self) -> None:
+        # The remedy is "write down the prediction and read the baseline", which
+        # is neither a wait (HOLD/TOO_SOON) nor a coordination (CLAIMED).
+        self.assertEqual(deploy_preflight.EXIT_NO_EXPECTATION, 6)
+        for other in (deploy_preflight.EXIT_CLEAR, deploy_preflight.EXIT_HOLD,
+                      deploy_preflight.EXIT_UNKNOWN, deploy_preflight.EXIT_CLAIMED,
+                      deploy_preflight.EXIT_OFF_MAIN, deploy_preflight.EXIT_TOO_SOON):
+            self.assertNotEqual(deploy_preflight.EXIT_NO_EXPECTATION, other)
+
     def test_too_soon_is_non_zero_so_every_existing_caller_still_blocks(self) -> None:
         # Anything already treating non-zero as "do not deploy" keeps working
         # without being taught the new code.
         self.assertNotEqual(deploy_preflight.EXIT_TOO_SOON, 0)
+
+
+def _expectation_args(minutes_ago: float = 1.0, *, field: str = "served_rows") -> list[str]:
+    """A complete, fresh expectation. `main()` refuses CLEAR without one (exit 6)."""
+    read_at = (datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return ["--expect", f"{field}=3060", "--baseline", f"{field}=3060", "--baseline-read-at", read_at]
 
 
 class TooSoonVerdictTests(unittest.TestCase):
@@ -407,7 +422,12 @@ class TooSoonVerdictTests(unittest.TestCase):
     reads.
     """
 
-    def _run(self, argv, *, last_deploy_minutes_ago, jobs=(), env=None, claim=None):
+    def _run(self, argv, *, last_deploy_minutes_ago, jobs=(), env=None, claim=None,
+             with_expectation=True):
+        # Every CLEAR asserted in this class is a CLEAR WITH a stated expectation,
+        # because that is the only CLEAR `main()` can return since `NO_EXPECTATION`.
+        if with_expectation:
+            argv = [*argv, *_expectation_args()]
         receipts = {}
 
         def fake_write_receipt(args, report, verdict, reason, live_commit):
@@ -543,6 +563,87 @@ class TooSoonVerdictTests(unittest.TestCase):
         code, _receipt = self._run(["--service", "refresh-worker", "--holder", "mine"],
                                    last_deploy_minutes_ago=3,
                                    claim=_foreign_claim(holder="mine"))
+        self.assertEqual(code, deploy_preflight.EXIT_TOO_SOON)
+
+
+class ExpectationVerdictTests(unittest.TestCase):
+    """`NO_EXPECTATION` (exit 6), check 3 from lane `combined-board-state-rows-lost`.
+
+    Driven through `main()` end to end with the same mocked Render API as
+    `TooSoonVerdictTests`, and asserted on the exit code and the RECEIPT --
+    the two things `deploy-guard.py` reads. The world is CLEAR in every other
+    respect, so a refusal can only come from the thing under test.
+    """
+
+    def _run(self, extra, *, service="live-odds-worker", last=60, jobs=()):
+        return TooSoonVerdictTests._run(
+            self, ["--service", service, *extra], last_deploy_minutes_ago=last,
+            jobs=jobs, with_expectation=False)
+
+    def test_a_clear_world_with_no_expectation_is_refused(self) -> None:
+        code, receipt = self._run([])
+        self.assertEqual(code, deploy_preflight.EXIT_NO_EXPECTATION)
+        self.assertEqual(receipt["verdict"], "NO_EXPECTATION")
+        # The refusal must carry the command that clears it.
+        self.assertIn("--expect", receipt["reason"])
+        self.assertIn("--no-expectation", receipt["reason"])
+
+    def test_the_same_world_with_a_fresh_expectation_is_CLEAR(self) -> None:
+        # off != on. Without this, a preflight that refused everything would
+        # pass every test above.
+        code, receipt = self._run(_expectation_args(minutes_ago=2))
+        self.assertEqual(code, deploy_preflight.EXIT_CLEAR)
+        expectation = receipt["report"]["expectation"]
+        self.assertEqual(expectation["expect"], {"served_rows": "3060"})
+        self.assertEqual(expectation["baseline"], {"served_rows": "3060"})
+        self.assertIsNone(expectation["problem"])
+
+    def test_a_baseline_older_than_the_clear_window_is_refused(self) -> None:
+        # The incident: a prediction carried from a reading hours earlier.
+        code, receipt = self._run(_expectation_args(minutes_ago=20))
+        self.assertEqual(code, deploy_preflight.EXIT_NO_EXPECTATION)
+        self.assertIn("min old", receipt["reason"])
+
+    def test_a_predicted_field_with_no_baseline_is_refused(self) -> None:
+        # The other half: a baseline that omits a field the prediction names.
+        extra = [*_expectation_args(), "--expect", "computed_at=13:48:51Z"]
+        code, receipt = self._run(extra)
+        self.assertEqual(code, deploy_preflight.EXIT_NO_EXPECTATION)
+        self.assertIn("computed_at", receipt["reason"])
+
+    def test_an_unreadable_baseline_time_refuses_rather_than_passes(self) -> None:
+        extra = ["--expect", "rows=1", "--baseline", "rows=1", "--baseline-read-at", "this morning"]
+        code, receipt = self._run(extra)
+        self.assertEqual(code, deploy_preflight.EXIT_NO_EXPECTATION)
+        self.assertIn("not a readable UTC time", receipt["reason"])
+
+    def test_a_baseline_stamped_in_the_future_is_refused(self) -> None:
+        code, receipt = self._run(_expectation_args(minutes_ago=-10))
+        self.assertEqual(code, deploy_preflight.EXIT_NO_EXPECTATION)
+        self.assertIn("in the future", receipt["reason"])
+
+    def test_a_malformed_pair_is_refused(self) -> None:
+        extra = ["--expect", "rows", "--baseline", "rows=1",
+                 "--baseline-read-at", _expectation_args()[-1]]
+        code, receipt = self._run(extra)
+        self.assertEqual(code, deploy_preflight.EXIT_NO_EXPECTATION)
+        self.assertIn("malformed", receipt["reason"])
+
+    def test_the_waiver_clears_and_is_recorded(self) -> None:
+        # A revert must always be able to go out, and must say why.
+        code, receipt = self._run(["--no-expectation", "revert of b6a0e346"])
+        self.assertEqual(code, deploy_preflight.EXIT_CLEAR)
+        self.assertIn("EXPECTATION WAIVED: revert of b6a0e346", receipt["reason"])
+        self.assertEqual(receipt["report"]["expectation"]["no_expectation_reason"], "revert of b6a0e346")
+
+    def test_a_job_in_flight_still_HOLDs_without_an_expectation(self) -> None:
+        # Safety verdicts preempt this one: writing two lines must never be
+        # the thing that stands between an operator and "a job is running".
+        code, _receipt = self._run([], service="refresh-worker", last=60, jobs=[NFL_CHILD])
+        self.assertEqual(code, deploy_preflight.EXIT_HOLD)
+
+    def test_too_soon_still_preempts_it(self) -> None:
+        code, _receipt = self._run([], service="refresh-worker", last=3)
         self.assertEqual(code, deploy_preflight.EXIT_TOO_SOON)
 
 

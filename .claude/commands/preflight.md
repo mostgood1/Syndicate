@@ -37,8 +37,14 @@ Answer every question. A missing answer is a FAIL, not a shrug.
 
    ```bash
    python scripts/deploy_claim.py acquire --service <svc> --holder <lane>
-   python scripts/deploy_preflight.py --service <svc> --holder <lane>
+   python scripts/deploy_preflight.py --service <svc> --holder <lane> --target-commit <sha> \
+       --expect "<field>=<value>" --baseline "<field>=<value>" --baseline-read-at <UTC>
    ```
+
+   `--expect` is question 2's expected effect, one pair per field. `--baseline`
+   is what each of those fields reads NOW, read within 15 minutes — preflight
+   returns `NO_EXPECTATION` (exit 6) otherwise. For a revert or an env re-inject,
+   pass `--no-expectation "<reason>"` instead; it is recorded on the receipt.
 
    The claim answers "is this service mine"; the preflight answers "is anything
    in flight right now", and its CLEAR expires in 15 minutes — so run it LAST,

@@ -300,12 +300,19 @@ production regardless of `autoDeploy = no`.
 
 ```bash
 python scripts/deploy_claim.py acquire --service <svc> --holder <lane>
-python scripts/deploy_preflight.py --service <svc> --holder <lane>
+python scripts/deploy_preflight.py --service <svc> --holder <lane> --target-commit <sha> \
+    --expect "<field>=<value>" --baseline "<field>=<value>" --baseline-read-at <UTC>
 ```
 
 Both must pass before `.claude/hooks/deploy-guard.py` will let a deploy
 through: an unexpired claim held by YOUR lane, plus a preflight that returned
-`CLEAR` within 15 minutes **for the exact SHA you are deploying**.
+`CLEAR` within 15 minutes **for the exact SHA you are deploying**. Preflight
+also returns `NO_EXPECTATION` (exit 6) unless the deploy states its prediction
+(`--expect`) and a baseline read within 15 minutes for every field it names
+(`--baseline`, `--baseline-read-at`). A prediction carried from an earlier
+reading was wrong on 2026-09-15, and a baseline missing one field left that
+field unmeasurable. For a revert or an env re-inject, pass
+`--no-expectation "<reason>"` instead; it is recorded on the receipt.
 
 **DEPLOY A COMMIT THAT IS ON `origin/main`** `[2026-08-18, user decision]`.
 Preflight returns `OFF_MAIN` (exit 4) for anything else. Services used to run
