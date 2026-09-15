@@ -1845,6 +1845,23 @@ death, never life — do not invert it.
 - Source: 5-agent audit of ~40 `now=`/`today=` functions' tests, 2026-09-15. The other flagged tests are 2099-nominal or were only broken BEFORE 2026-08-01, so no action.
 - Blocked by: none
 
+### soccer-season-market-audit — OPEN — opened 2026-09-15 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Goal: one findings file covering soccer 2026-07-20..2026-09-14, for every market (1X2, totals, Asian handicap, BTTS, team goals, corners, team corners, player shots, shots on target, anytime scorer), overall and per league. It gives model vs de-vigged market vs outcome (n, dates, Brier / log-loss or MAE, calibration, CI over matches); the ROI of pre-registered edge rules at available prices, validated leave-one-date-out; and FotMob momentum game shape by league, tied to model residuals. Each learning names the change it implies. ANALYSIS ONLY: no engine, board or deploy change.
+- Files: `scripts/audit_soccer_season_markets.py` (NEW), `scripts/soccer_game_shape_by_league.py` (NEW), `.syndicate/findings_2026-09-15_soccer_season_market_audit.md` (NEW), `reports/soccer_backtest/season_market_audit_2026-09-15.json` (NEW)
+- Ledger (not a claim): one new soccer state section plus its index row, written at the end.
+- Hypotheses (PRE-REGISTERED before any number was read):
+  - H1: 1X2 loses to the market season-to-date, concentrated on favourites (replicating 2026-09-14), and no league shows a model win whose CI excludes zero.
+  - H2: totals, BTTS and team goals are parity with the market.
+  - H3: corner and team-corner means are biased (sign unknown), with no measurable edge.
+  - H4: shots and SOT means over-predict (ratio > 1.2) in every league with usable capture, and anytime-scorer probabilities over-predict for the top shooters.
+  - H5: no pre-registered edge rule (2/4/6/8 pp vs the de-vigged close, flat 1u at the available price) shows ROI with a match-clustered CI excluding zero on held-out dates.
+  - H6: momentum game shape (dominance, volatility, late pressure) differs by league beyond bootstrap noise, and team-level shape explains part of the totals/corners residuals.
+  - H7 (data): the final `recommendations_*.json` are rebuilt after kickoff. The 2026-09-02 cache holds true pre-kickoff snapshots for 09-02..09-09, and the difference bounds the leak.
+- Falsification test: per hypothesis, the opposite reading. A market where the model's Brier/MAE beats the close with a CI excluding 0 (H1/H2). A league with n >= 500 and shots ratio <= 1.1 (H4). A held-out ROI CI excluding 0 (H5). League shape differences inside bootstrap noise (H6). Snapshot vs final identical (H7).
+- Method rules: score per MATCH, never per row. Pick thresholds only leave-one-date-out. Compare against the market's own lean. Print per-family date coverage and the intersection. Validate outcome capture per league (Belgian shot capture was 0.13 on 2026-08-31).
+- Verification: the findings file is on origin/main with per-market and per-league tables carrying n, dates and CIs, plus the coverage/intersection table; the harness re-runs from its cache.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
