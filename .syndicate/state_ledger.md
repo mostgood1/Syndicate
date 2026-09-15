@@ -562,12 +562,23 @@ to be re-derived:
 | `daily-update.yml` | `workflow_dispatch` | pushes |
 | `pytest-baseline-update.yml` | `workflow_dispatch` | pushes, opens PR |
 | `vendor-sync.yml` | `workflow_dispatch` | pushes, opens PR |
+| `fotmob-join-coverage.yml` | `schedule` (daily 12:00Z), `workflow_dispatch` | read-only |
 
-- **No `schedule:` in any workflow, no webhooks, no deploy keys.** Nothing runs
-  unattended and nothing outside Actions can act on the repo. `#486`
-  `[2026-08-20, user decision]` removed the last cron — *"we no longer use that
-  daily update feature, everything runs on render"* — and a cron re-added by
-  `vendor-sync.yml` on 2026-09-06 was removed again on 2026-09-07 for that reason.
+- **ONE `schedule:` EXISTS AGAIN, and it is a logged override** `[2026-09-15,
+  user decision]`. `fotmob-join-coverage.yml` runs daily at 12:00Z and is
+  READ-ONLY: no secrets, no push, no deploy, nothing written to `data/`. It
+  resolves upcoming ESPN fixtures through the FotMob join so a team
+  respelling is caught before kickoff (lane `fotmob-join-coverage-check`,
+  checker `60e695c0`). No webhooks and no deploy keys; nothing else runs
+  unattended, and no workflow can deploy.
+  **The history it overrides, quoted to the user before they chose:** `#486`
+  `[2026-08-20, user decision]` removed the last cron — *"we no longer use
+  that daily update feature, everything runs on render"* — and a cron re-added
+  by `vendor-sync.yml` on 2026-09-06 was removed again on 2026-09-07 for that
+  reason (`learnings.md` 2026-09-07, "A CONVENTION YOU COPY MAY BE A DECISION
+  YOU ARE OVERTURNING"). Offered the convention-following local task as the
+  recommendation, the user answered **"Add the cron anyway (override #486)"**.
+  Detail: `.syndicate/scheduled_task_fotmob_join_coverage.md`.
 - **NO WORKFLOW CAN DEPLOY.** `daily-update.yml` used to POST to
   `RENDER_WEB_DEPLOY_HOOK_URL`, which bypassed `deploy_claim.py`,
   `deploy_preflight.py`, `deploys.md` and `deploy-guard.py` — the guard cannot see

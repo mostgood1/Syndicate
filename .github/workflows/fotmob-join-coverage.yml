@@ -1,0 +1,107 @@
+# Daily ESPN -> FotMob join coverage: catch a team RESPELLING before kickoff.
+#
+# THIS IS THE REPOSITORY'S ONLY `schedule:`, AND IT IS A DELIBERATE OVERRIDE.
+# `#486` `[2026-08-20, user decision]` removed `Daily Update`'s cron -- "we no
+# longer use that daily update feature, everything runs on render" -- and a cron
+# re-added by `vendor-sync.yml` on 2026-09-06 was removed again on 2026-09-07
+# (`learnings.md` 2026-09-07: "A CONVENTION YOU COPY MAY BE A DECISION YOU ARE
+# OVERTURNING"). On 2026-09-15 the user was shown that record, the re-removal and
+# the rule, and chose "Add the cron anyway (override #486)". Logged in
+# `.syndicate/state_ledger.md` and lane `fotmob-join-coverage-check`.
+#
+# WHY A CRON IS WORTH IT HERE, in the terms `#486` was decided on: this does not
+# generate, publish or deploy anything, and Render cannot do it. It is a
+# READ-ONLY detector -- no secrets, no push, no deploy, no write to `data/` --
+# that asks ESPN and FotMob about fixtures which have NOT kicked off yet. The
+# defect it catches is silent: the live poller writes `momentum.supported: false`
+# for a match whose name it cannot join, and nobody sees it until after kickoff.
+#
+# FAILURE POLICY, and the tension in it. Exit 1 (a fixture will not join) FAILS
+# the run: that is a real, actionable miss. Exit 2 (a fetch could not be
+# completed) only WARNS, because a vendor blip that reddens the build daily is
+# how a check becomes one people ignore -- `ci.yml`'s own comment. That does put
+# UNKNOWN on the permissive branch, which `learnings.md` warns about, so it is
+# stated here rather than hidden: an unknown-only day is SILENT, and the next
+# day's run re-asks about the same fixtures.
+name: fotmob-join-coverage
+
+on:
+  schedule:
+    # 12:00Z daily = 07:00 CT (CDT) / 06:00 CT (CST). GitHub cron is UTC only,
+    # and a scheduled run can be delayed or dropped under load; this is a
+    # detector with days of margin, so a late run still beats kickoff.
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'How many Central dates to check, starting at `start` (default 7)'
+        required: false
+        type: string
+      start:
+        description: 'First Central date, YYYY-MM-DD (default: today, Central)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fotmob-join-coverage
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Resolve upcoming fixtures through the production join
+        id: check
+        run: |
+          set +e
+          python scripts/check_fotmob_join_coverage.py \
+            --days "${{ inputs.days || '7' }}" \
+            ${{ inputs.start && format('--start {0}', inputs.start) || '' }} \
+            | tee report.txt
+          code=${PIPESTATUS[0]}
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          {
+            echo "## FotMob join coverage (exit $code)"
+            echo
+            echo '```'
+            cat report.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+
+      - name: Fail on a real miss, warn on an incomplete read
+        run: |
+          code='${{ steps.check.outputs.exit_code }}'
+          case "$code" in
+            0)
+              echo "every upcoming fixture joins"
+              ;;
+            1)
+              echo "::error::A fixture will not join. A club was probably respelled -- the summary lists ESPN's names beside FotMob's unclaimed fixtures. Fix by adding the measured spelling to _ESPN_NAME_ALIASES in syndicate/features/soccer/ingestion/fotmob_match_id.py, or by widening the loose pass, then deploy live-odds-worker."
+              exit 1
+              ;;
+            2)
+              echo "::warning::Coverage is UNKNOWN for some league/date (a fetch failed). Not failing the run; the next run re-asks. Persistent unknowns mean the checker cannot see the vendors, which is itself worth acting on."
+              ;;
+            *)
+              echo "::error::checker exited $code, which it is not supposed to produce"
+              exit 1
+              ;;
+          esac
