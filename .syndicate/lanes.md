@@ -1365,6 +1365,11 @@ death, never life — do not invert it.
 - History: hypotheses H1-H4, the census, deploys #1-#3 in detail, the bucket search and MLB prop grader pre-registrations, and preview v1-v3 readings.
   - All moved VERBATIM to `.syndicate/lanes_history.md` under `### accuracy-assessment-0914 — HISTORY moved verbatim by checkpoint 2026-09-14`.
   - Session narrative: `.syndicate/log/2026-09-14.md`.
+- Reading `accuracy-0914-mlb-live-rows-reading` `[2026-09-15 01:34Z (09-14 20:34 CT)]`, detail in deploys.md FOLLOW-UP (2):
+  - MLB live-row notes: **FAILED.** Shortlist (01:27:36Z): 77 of 390 live rows carry a PREGAME note (29 game, 48 prop), in 7 of 8 live events. Book grid (01:31:54Z, capped at 2,000 rows): 671 of 1,796 (139 game, 532 prop), in 9 of 9 live events.
+    - Registry-covered live game cells are SPLIT: the live note is served, with the right sample, on 21 shortlist / 40 grid rows, and the pregame note on 21 / 73. `h2h/first5` never got its live note. Live props carry pregame notes instead of `unmeasured`.
+    - Instrument checked: the flagged rows read `seasons='2026-08-31..09-13 pregame'` with samples 177/168/188, not a classifier artifact. Cause NOT diagnosed.
+  - Recorder names, post-deploy `game` keys: MLB **MET** 693/693; NFL **MET** 84/84. Soccer 16/16 game (+40/40 other, 385/385 prop), a different total from the earlier 832, not reconciled.
 - Blocked by: none.
 
 ### brand-logo-v3 — CLOSED — opened 2026-09-14, closed 2026-09-14 — session 08fb3eec-6daf-4680-a64d-bd7f914ad2e7

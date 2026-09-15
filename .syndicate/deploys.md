@@ -35094,3 +35094,33 @@ User decision in chat: "Deploy #3 after their reading is done".
   - No refusal in ~2h14m of uptime, so no recycle was owed. No red flag.
 - **Unknown:** retained (not per-tick) live-play growth on either worker; non-MLB writes; which copy web reads; MLB live-MC inside the builds. W is one ~37-min window with a planned live-odds-worker restart inside it.
 - **DECISION OWED TO USER (not acted on):** `SYNDICATE_ENABLE_LIVE_LENS_LOOP` off refresh-worker (a) vs off live-odds-worker (b). Numbers in lanes.md `### heavy-build-child-process`.
+
+## 2026-09-15 01:34Z (2026-09-14 20:34 CT) — FOLLOW-UP (2) for the 20:56Z refresh-worker 0a18557a -> 6438830d entry — lane accuracy-assessment-0914
+- Scheduled task `accuracy-0914-mlb-live-rows-reading` (due 20:00 CT, ran 20:32 CT). Read-only: no deploy, no env or flag change, no code.
+- Live commit at reading time was not re-read: refresh-worker assumed `6438830d` (LIVE 21:03:17Z), per the 23:25Z entry above.
+- Scripts: `mlb_live_rows_reading.py 2026-09-14` and `deploy3_reading.py 2026-09-14 2026-09-14T21:03:17Z`, in `C:\tmp\syndicate-sessions\accuracy-assessment-0914-readings`; payloads saved under its `prod\`.
+- **1. MLB LIVE rows carry the LIVE note (deploy #1 prediction): FAILED.**
+  - Layer 2 shortlist `written_at` 2026-09-15T01:27:36Z (20:27 CT): 629 MLB rows, 390 live, 8 live events.
+    - **77 live rows carry a pregame note** (29 game, 48 prop), in 7 of 8 live events.
+    - Registry-covered game cells: live note with the correct sample on 21 rows (totals/full 9 @159, h2h/full 6 @176, spreads/full 6 @159); PREGAME note on 21 (totals/full 14, spreads/full 3, h2h/full 2, h2h/first5 2).
+    - First example: totals/full, event `20dfbbb1031896904e98bed3182f9fc4`, `game_state=live`, `model_skill.seasons='2026-08-31..09-13 pregame'`, `sample_games=177`, `verdict_class=parity`.
+  - MLB book grid `generated_at` 2026-09-15T01:31:54Z (20:31 CT): 2,000 MLB rows (**= the request limit, so a truncated sample**), 1,796 live, 9 live events.
+    - **671 live rows carry a pregame note** (139 game, 532 prop), in 9 of 9 live events.
+    - Registry-covered game cells: live note with the correct sample on 40 (totals/full 17, spreads/full 16, h2h/full 7); PREGAME on 73 (totals/full 36, spreads/full 26, h2h/first5 9, h2h/full 2).
+    - First example: h2h/full, event `9c0b5b3f819915fa2cd982a14186b77d`, `game.state=live`, `seasons='2026-08-31..09-13 pregame'`, `sample_games=188`.
+  - `h2h/first5` (live entry, 67 games) was served its live note on **0** live rows on either surface.
+  - Live props, predicted `unmeasured`, carry pregame notes:
+    - `seasons='2026-08-01..2026-08-14'`, 2,487 games: shortlist 28, grid 377.
+    - `'2026-09-06..09-13 pregame, post 09-04 refit'`, 186-1,266 games: shortlist 20, grid 155.
+    - Some live rows carry no note at all (shortlist 14 prop; grid includes `h2h_lay` 9).
+  - No live-note row had a wrong sample, and no prop carried a live note.
+  - **Instrument check:** the classifier calls a note PREGAME when `status!=unmeasured` and `seasons` lacks "live". The flagged rows' `seasons` literally end "pregame", and their samples (177/168/188/148/124) match no live registry entry (176/67/159/159). This is a real wrong note, not a misread.
+  - **Shape:** the same (market, segment) on the same surface is split between the live and pregame notes, so the live note reaches some live rows and not others. Cause NOT diagnosed (candidates, untested: rows whose projection was built pregame and carried into live; the stamping path differing per row source).
+- **2. Recorder team names on post-deploy keys (day 2026-09-14, 23,720 records): MLB MET, NFL MET.**
+  - mlb `game` after_live **693/693 = 1.000** (other 1,032/1,032; prop 1,042/1,042). before_live: game 0/108, prop 0/2,583.
+  - nfl `game` after_live **84/84 = 1.000** (prop 1,040/1,040). before_live: game 0/208, prop 0/512.
+  - soccer (already MET earlier at 832/832), current: `game` after_live 16/16, other 40/40, prop 385/385; before_live game 0/959, other 0/1,520, prop 0/12,337. **This after_live total (441) is not the earlier 832; not reconciled.**
+  - ncaaf: game 108/108, prop 208/208 after_live.
+  - Falsifier "post-live game records named < 95%": `[]`.
+  - Shortlist factor sample (`after_live=True`, `written_at` 01:27:36Z, **2,000-row sample**): `skill_source=bucket` 0; factor without skill_source 0; factor differs/unpredicted 6. All 6 are `('mlb','h2h')` factor 0.972, a category the script carries no prediction for, not a mismatch against a stated one.
+- **OWED:** a diagnosis of why live MLB rows split between the live and pregame notes (lane accuracy-assessment-0914). This reading does not attempt one.
