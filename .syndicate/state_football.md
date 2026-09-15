@@ -2571,6 +2571,7 @@ starters.
   - Post-deploy `ncaaf intelligence_prop with_quote` 256/256 in the new process (`deploys.md` 22:15:53Z).
   - The side choice itself cannot be exercised in production until a No side is captured. It rests on `tests/test_quote_enrichment_anytime_td_side.py` and the production-shard replay.
   - **Web also runs it** `[read 2026-09-15 22:25:43Z, Render deploys API + git]`: web live `dd014d14` (`dep-dakrjuqfngtc73e09q70`, finished 21:40:47Z, on origin/main) contains `6d526851` and `3157bb7b`, by ancestry AND by content (`_anytime_td_side_hint` in `quote_enrichment.py`, `_ncaaf_game_kickoff_slate_date` in `home.py`). The web deploy building at read time, `c35284dc` (main tip, lane legacy-steam-crossing-delta), contains both too.
+  - **But web's home dashboard never builds NCAAF** `[read 2026-09-15 22:31-22:34Z]`: `_build_light_home_sports` (`home.py:8404`) keeps only `_active_sport_slugs()`, and web's `SYNDICATE_ACTIVE_SPORTS` is `mlb,wnba,soccer,nfl` (refresh-worker's carries `ncaaf`). `/api/home` served `sports` 1 (mlb), `top_props` 14/14 mlb quoted, and web's in-process counters showed `mlb prop_dashboard_row 46 rows / 45 quoted` with no ncaaf lane. So on THAT surface both NCAAF prop fixes are inert; refresh-worker is where they run.
 
 **Web runs `3157bb7b`** `[read 2026-09-15 22:25:43Z]`: web live `dd014d14` contains it by ancestry and content (see the side line below). A web-side EFFECT reading (served dashboard props dated and quoted) was NOT taken.
 

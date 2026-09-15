@@ -1777,6 +1777,22 @@ death, never life — do not invert it.
 - Verification: tests (a respelling exits 1 with both vendors' names listed; a fetch failure exits 2; all resolved exits 0), and one real run over today..+7 days across all 10 leagues, reporting resolved/total and any misses.
 - Blocked by: none
 - **STATUS 2026-09-15 22:3xZ: BUILT + LANDED `60e695c0`, NOT SCHEDULED.** Tests 63 passed: a "1. FC Cologne" respelling exits 1 against the recorded 09-12 listing and prints FotMob's unclaimed `1. FC Köln` fixture; an ESPN or FotMob fetch failure exits 2 (not read as a respelling); a resolved fixture is never offered as a candidate; the poller's single-date window is asserted. Real run 22:2xZ, today (Central) + 6 days, all 10 leagues: **114/114 fixtures resolved, 0 unresolved, 0 unknown, exit 0** — no respelling or alias gap is pending this week, and that covers the weekend's Bayern, Rennes, Köln, Belgian and Championship fixtures. Nothing runs it on a schedule yet; the user is choosing between a local daily task, a GitHub Actions cron and on demand.
+### web-dashboard-prop-dates-quotes — CLOSED — opened 2026-09-15 — closed 2026-09-15 ~17:35 CT — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
+- **VERDICT.** Goal (verbatim): "state, from web's own served payload, how many dashboard prop rows carry a row date and a quote, per sport, with NCAAF split out — the surface `home.py`'s `enrich_prop_rows` feeds (`home.py:3461`), on web live `c35284dc`, which carries `3157bb7b` and `6d526851`. Read-only; no code change without the user's go." — **GOAL: MET. The answer is that NCAAF is ZERO on this surface, by configuration.**
+  - **Served payload** `/api/home` (read 22:31:13Z, `selected_date` 2026-09-15): `sports` entries 1 (mlb). `dashboard.top_props` 14 rows, all mlb, 14 quoted, 0 with a row date — MLB rows fall back to `date_str` (`selected_date`), which is their own slate, so they still join.
+  - **Web's own counters**, same process (`source in_process`, `service_role syndicate-an21`, generated 22:32:25Z): `mlb 2026-09-15 prop_dashboard_row rows=46 with_quote=45` (0.978). **No ncaaf lane, no other sport.**
+  - **Why:** `_build_light_home_sports` (`home.py:8404`) keeps only `_active_sport_slugs()`, and web's `SYNDICATE_ACTIVE_SPORTS` reads `mlb,wnba,soccer,nfl` — **no ncaaf** (single-key env read 22:34Z; refresh-worker's reads `mlb,wnba,soccer,ncaaf,nfl`). So NCAAF prop rows never reach web's `enrich_prop_rows`, and `3157bb7b`/`6d526851` are inert on THIS surface while live in the code.
+  - **Other dates return nothing at all:** `?date=` is accepted (`home.py:8477`), but 2026-09-13, 2026-09-17 and 2026-09-19 each served `sports` 0 / `top_props` 0. From code: `home.py`'s `_allow_stored_date_fallback()` returns False and each sport's `is_active` requires the label to equal today.
+  - **Unexplained, not chased:** soccer and nfl are in web's active list yet absent from today's payload.
+  - **Lead filed** for the ncaaf-on-web gap.
+- Goal: state, from web's own served payload, how many dashboard prop rows carry a row date and a quote, per sport, with NCAAF split out — the surface `home.py`'s `enrich_prop_rows` feeds (`home.py:3461`), on web live `c35284dc`, which carries `3157bb7b` and `6d526851`. Read-only; no code change without the user's go.
+- Files: none (read-only sampling; probes in the session scratchpad)
+- Hypothesis:
+  - Web builds these rows from each sport's `prop_opportunities`/`home_rails`/`props_bar` items, not from the worker's candidate pool, so its coverage is its own number and need not match refresh-worker's 256/256.
+  - With `3157bb7b` live, NCAAF rows should carry a `slate_date` from the game's Central kickoff, and so join a real shard rather than today's absent one.
+- Falsification test: NCAAF dashboard rows carry no row date, or carry one and still no quote, on web's served payload.
+- Verification: counts from the served payload only, with the read time and the payload's own date fields stated. `dashboard.top_props` is capped at 14 rows (`home.py:3545`), so the served list is a shortlist; say so with any count.
+- Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
