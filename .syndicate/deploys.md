@@ -35673,3 +35673,28 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Both ids equal FotMob's own on its 09-15 listing. `events 2` each, at 1' in the artifact.
 - **eredivisie** (file generated 18:48:56Z): Ajax v Willem II at 45'+2' HT still `supported True`, `source fotmob`, `5781718`. `events 46`, up from 16 at 18:17Z, so the series keeps growing rather than freezing after the first tick.
 - **belgian_pro_league**: 0 in play, and ESPN's bel.1 scoreboard lists no 09-15 fixture. **STILL UNREAD on production**; next bel.1 fixture 2026-09-18 18:45Z (13:45 CT), Standard Liege at KAA Gent, which is also the accent-fold case. Evidence so far is the vendor run only: 2/4 on 09-12, both misses team-name aliases (`leads.md`).
+
+## 2026-09-15 18:06:44Z (13:07 CT) — refresh-worker `87558f2f` -> `55fee786` — deploy `dep-dakoid2fngtc73ev1rjg` — lane book-quotes-splice-repair — **P2 verify (1) MET; (2) owed to P3**
+- **What:** `2e2c517b`, landed as `55fee786`.
+  - `pull_streamed_artifact` syncs an append-only shard that has a local copy through `_pull_append_only_synced`: a `.<shard>.webpos` offset plus a 4 KB overlap check.
+  - A match runs `_apply_synced_tail` under `shard_append_lock`; a mismatch, 416 or non-206 runs `_resync_append_only_whole`. `append_book_quotes` takes the same lock.
+  - User decisions: "Approve all phases (Recommended)", "Take it for the pull only (Recommended)", "Sync marker + tail rewrite (Recommended)", "Deploy now (Recommended)".
+- **Ride-along** (`87558f2f..55fee786`, runtime):
+  - `9ed5c5ad`: P0/P1, whose bad-line counter now also runs on refresh-worker.
+  - `1efdea18`: Polymarket NO fix, whose order code refresh-worker does not use to place orders.
+  - `e1afe4ac`: soccer season audit script.
+  - No `render.yaml` or `requirements*` change.
+- **Locks:**
+  - Claim acquired ~18:05Z (token `8e3e1ea8…`).
+  - Preflight stated its expectation (`stream_sync_lines_on_refresh_worker` present; `web_merge_refused_bad_lines_rate` falls toward 0). The baseline was read 18:05:58Z: `STREAM_TAIL_OK` 13, `STREAM_SYNC_WHOLE` 0, `STREAM_TAIL_SYNC_OK` 0 on refresh-worker; web `MERGE_REFUSED_BAD_LINES` 10 since 17:35:11Z.
+  - CLEAR 18:06:19Z. Live **18:13:26Z** (`update_in_progress` 18:12Z). Claim released ~18:51Z.
+- **Reading 18:13-18:48Z (35 min):**
+  - `STREAM_SYNC_WHOLE` **9, flat after 18:32Z**, so it ran once per touched shard. Reasons were `status_416`, where the local copy was longer than web's (ncaaf 09-17 local 682,728 B vs web 655,709, keeping **58** local rows web lacked; ncaaf 09-18 kept **60**), and `overlap_mismatch` (soccer 09-18, kept 5).
+  - `STREAM_TAIL_SYNC_OK` **13 and rising**. For example soccer 09-15: `from_offset=14769214 web_bytes=17634 local_rows_now_on_web=39`, then `from_offset=14786848 web_bytes=52988 local_rows_kept=1 local_rows_now_on_web=8`.
+  - Old blind `STREAM_TAIL_OK` **0**; `STREAM_TAIL_SYNC_FAILED` / `STREAM_PULL_FAILED` **0**; `server_failed` **0**.
+- **verify (1) MET:** the sync replaced the blind tail, resynced once per shard, and kept local rows. No failures.
+- **verify (2) NOT YET:**
+  - Web still refused fragments on 4 merges in the window (18:16:04Z `refused=6`, 18:22:53Z, 18:23:55Z, ~18:4xZ). The samples REPEAT earlier ones (the La Liga totals tail, the Tommy Edman venue_direct tail).
+  - Reading: these are OLD splices in the MIDDLE of refresh-worker's local copies, which a tail sync cannot see (its overlap matched). The copies are republished whole on each append, and web's P1 refuses them each time, harmlessly.
+  - They are cleared by P3: once web's copy is repaired, refresh-worker's overlap mismatches and it resyncs whole, dropping non-JSON lines.
+- Rollback: redeploy `87558f2f` to refresh-worker.
