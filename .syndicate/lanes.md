@@ -1570,7 +1570,15 @@ death, never life — do not invert it.
     - A 200+ `odds_delta` is CONSISTENT with H1 but not proof: in-play prices move that far without crossing (RMA @ ELC h2h -10000 -> -13000).
   - H2 is supported on the board: the 2 h2h cards have `line` == price and `line_delta` == `odds_delta` (-49, -3000).
   - RETRACTED (said in chat 20:3xZ): "the inflation also affects ranking" came from the builder's score formula (`intelligence.py:5656`). The served `score` is 0.0, so a ranking effect is not established.
-- Blocked by: none. User decisions 2026-09-15: ~20:55Z admin read route, then ~21:00Z a separate blueprint without waiting for the owner of the ops blueprint. Next: build the steam-events route, deploy web, take the baseline reading through it.
+- Status `[2026-09-15 ~21:10Z]`: **ROUTE BUILT AND ON MAIN (`b2a9a4bb`), NOT DEPLOYED.**
+  - The change: `syndicate/blueprints/ops_steam.py` (NEW, `GET /api/ops/steam/events`, attaching the ops admin gate by import), 2 lines in `syndicate/app.py`, and `tests/test_ops_steam_events.py` (NEW).
+  - Tests: the 9 new tests FAIL with the blueprint unregistered (404) and PASS registered. `tests/test_ops_execution_ledger_summary.py`: 15 still pass.
+  - Web baseline 21:07:05Z: `/api/ops/steam/events?sport=soccer&date=2026-09-15` answers HTTP 404. Web preflight 21:07:48Z: CLEAR for `b2a9a4bb`, live `7ed1a18a`.
+  - Deploy HELD by this session. `7ed1a18a..b2a9a4bb` also carries:
+    - `e53274f2` and `b33ef901` (soccer-player-role-allocation steps A and B), which the ledger records as not approved for deploy (`deploys.md` off-main note ~L35901; this file's off-main note at L451).
+    - Four other lanes' web-code commits: `6d526851`, `070a05bf`, `3157bb7b`, `867f1481`.
+  - An off-main deploy commit (`7ed1a18a` plus a cherry-pick of `b2a9a4bb`) was refused by this session's permission classifier as a production deploy. No branch was created. The web deploy claim was released ~21:10Z.
+- Blocked by: user decision on how to ship the route to web: off-main from the live commit, main as-is, or wait until main is cleared.
 
 ### ncaaf-prop-quote-market-check — CLOSED — opened 2026-09-15 — closed 2026-09-15 ~15:45 CT — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
 - **VERDICT.** Goal (verbatim): "for the 104 NCAAF legacy prop rows refresh-worker quoted after `f833f7ec` (`intelligence_prop with_quote=104`), state how many carry a quote from the row's OWN market, measured with the real `quote_ref_for_bet` over production quote shards. If they are wrong, describe the production impact and stop before changing behaviour. Read-only diagnostic; no code change without the user's go." — **GOAL: MET. Hypothesis FALSIFIED: 102 of 102 replayed rows get their own market, side and line.**
