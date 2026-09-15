@@ -1824,7 +1824,7 @@ def _refresh_layer2_live_state(
     try:
         from syndicate.features.shared.game_chip_scoreboard import build_game_chips
     except Exception:
-        return 0
+        build_game_chips = None  # the worker-published chips below can still restate
 
     sports = sorted({str(card.get("sport") or card.get("sport_slug") or "").strip().lower() for card in cards} - {""})
     if not sports:
@@ -1885,22 +1885,76 @@ def _refresh_layer2_live_state(
                 out.append(name)
         return out
 
-    index: dict[tuple[str, str, str], dict[str, Any]] = {}
-    for requested_date in requested_dates or ():
+    # THE WORKER-PUBLISHED CHIPS, NOT ONLY AN IN-PROCESS BUILD
+    # (nfl-live-props-board-lane, 2026-09-15).
+    #
+    # `/api/board/game-chips` serves `read_game_chips(date)` -- the artifact the
+    # worker publishes (`#545`) -- and only builds inline when that artifact is
+    # stale. This restate only ever called `build_game_chips` in-process, which
+    # on web yields MLB chips but not live NFL ones. Measured 2026-09-15
+    # ~02:20Z with DEN @ KC live (Q3): the endpoint served the chip `state live`
+    # from `source worker_artifact`; the board restated 798 of 2,718 L2-A cards,
+    # 387 MLB cards `is_live True` and 0 NFL, and every DEN @ KC prop was served
+    # watchlist / `no_game_state`.
+    #
+    # Same rule as the endpoint: a FRESH artifact is authoritative and the inline
+    # build fills what it lacks; a stale or undateable artifact only fills what
+    # the inline build lacks. `setdefault` below makes "first indexed wins".
+    try:
+        max_artifact_age = float(os.environ.get("SYNDICATE_LAYER2_RESTATE_CHIP_ARTIFACT_MAX_AGE_SECONDS") or 600)
+    except (TypeError, ValueError):
+        max_artifact_age = 600.0
+    wanted_sports = set(sports)
+
+    def _published_chips(requested_date: str) -> tuple[list[Mapping[str, Any]], bool]:
         try:
-            for chip in build_game_chips(str(requested_date), list(sports)) or []:
-                sport = str(chip.get("sport") or "").strip().lower()
-                away_side = (chip.get("away") or {})
-                home_side = (chip.get("home") or {})
-                aways = _keys(sport, away_side.get("name"), away_side.get("key"))
-                homes = _keys(sport, home_side.get("name"), home_side.get("key"))
-                if not (sport and aways and homes):
-                    continue
-                for a in aways:
-                    for h in homes:
-                        index.setdefault((sport, a, h), chip)
+            payload = read_game_chips(str(requested_date))
         except Exception:
-            continue
+            return [], False
+        if not (isinstance(payload, Mapping) and isinstance(payload.get("chips"), list)):
+            return [], False
+        chips_out = [
+            chip for chip in payload["chips"]
+            if isinstance(chip, Mapping) and str(chip.get("sport") or "").strip().lower() in wanted_sports
+        ]
+        fresh = False
+        stamp = str(payload.get("written_at") or "").strip()
+        if stamp:
+            try:
+                written = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+                if written.tzinfo is None:
+                    written = written.replace(tzinfo=timezone.utc)
+                fresh = (datetime.now(timezone.utc) - written).total_seconds() <= max_artifact_age
+            except ValueError:
+                fresh = False
+        return chips_out, fresh
+
+    index: dict[tuple[str, str, str], dict[str, Any]] = {}
+
+    def _index_chip(chip: Mapping[str, Any]) -> None:
+        sport = str(chip.get("sport") or "").strip().lower()
+        away_side = (chip.get("away") or {})
+        home_side = (chip.get("home") or {})
+        aways = _keys(sport, away_side.get("name"), away_side.get("key"))
+        homes = _keys(sport, home_side.get("name"), home_side.get("key"))
+        if not (sport and aways and homes):
+            return
+        for a in aways:
+            for h in homes:
+                index.setdefault((sport, a, h), chip)
+
+    for requested_date in requested_dates or ():
+        published, published_fresh = _published_chips(str(requested_date))
+        inline: list[Mapping[str, Any]] = []
+        if build_game_chips is not None:
+            try:
+                inline = list(build_game_chips(str(requested_date), list(sports)) or [])
+            except Exception:
+                inline = []
+        ordered = (published + inline) if published_fresh else (inline + published)
+        for chip in ordered:
+            if isinstance(chip, Mapping):
+                _index_chip(chip)
     if not index:
         return 0
 

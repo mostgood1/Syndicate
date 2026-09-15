@@ -35172,3 +35172,14 @@ User decision in chat: "Deploy #3 after their reading is done".
 - **Boot:** `MALLOC_ARENA_INIT` pid 39 at 01:35:11Z; 0 `Traceback` through 01:38:55Z. `LIVE_LENS_LOOP_START_RESULT started=True`: the restart kept the old env, which is expected, so `SYNDICATE_ENABLE_LIVE_LENS_LOOP=false` (set ~01:35Z) still needs a deploy.
 - **verify MET for the exit leg:** one exit, 0 children, no restart loop. **OWED:** heavy builds resuming, i.e. the first `PORTFOLIO_COMMIT date=` after 01:35:11Z.
 - Preflight 01:39:27Z: HOLD, 3 jobs (MLB daily sim relaunched at boot).
+
+## 2026-09-15 02:15:21Z (21:15 CT 09-14) — web `ff7ec8be` -> `dedfede6` — deploy `dep-dakakeek1f9s73ck568g` — lane nfl-live-props-board-lane — **LIVE but INERT (the fix targeted the wrong mechanism)**
+- **What:** restate the per-date STATE rows against the scoreboard before the combined board's first contract build, and fill `status_context` live/final on text-less restated rows. User decision: "Deploy web now (Recommended)", during DEN @ KC (live).
+- **Locks:** web claim acquired 02:14:47Z (token `3dbc98a4b0aed105`, holder nfl-live-props-board-lane). Preflight `--target-commit dedfede6` CLEAR (infra only, 2 defunct children). Code delta vs live: only `pipeline/intelligence_state.py` plus its test; no `render.yaml`. The session lane marker was switched to nfl-live-props-board-lane so deploy-guard matched the claim.
+- **Result:** POST 02:15:21Z, live 02:18:36Z; 0 Traceback on web through 02:21Z.
+- **verify NOT MET:** page query (`POST /api/intelligence/query`, the page's own payload) 02:20:51Z with DEN @ KC live (Q3 7:34): 89 rows / 72 props, ALL `board_lane watchlist`, `market_state unknown`, `is_live None`, reasons `no_game_state`; NFL `is_live True` 0, MLB 387.
+  - No `COMBINED_STATE_LIVE_RESTATED` / `_FAILED`, because `by_date` candidate_count was 0 on 09-14 / 09-15 / 09-16 (no state rows: `COMBINED_BOARD_VINTAGE_IGNORED date=2026-09-14 ... reason=no_rows`, `COMBINED_BOARD_STATE_DATE_MISS` 09-15 and 09-16).
+  - `LAYER2_LIVE_RESTATED cards=798 of 2718` (02:18:45Z) = MLB only.
+  - The same result held with `slim_aliases` / `drop_row_diagnostics` off.
+- **Cause, established after this deploy:** the L2-A restate's chips come from in-process `build_game_chips` (no live NFL chip on web), not the worker-published `read_game_chips` artifact that `/api/board/game-chips` serves (DEN @ KC `state live`). Fix 2 follows on main; this deploy is harmless and not rolled back.
+- Claim: kept for the fix-2 web deploy (TTL covers it).

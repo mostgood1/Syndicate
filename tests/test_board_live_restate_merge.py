@@ -98,8 +98,46 @@ def board(monkeypatch):
     shortlist = {"written_at": "2026-09-15T01:50:02Z", "cards": [_prop()]}
     monkeypatch.setattr(S, "read_layer2_shortlist", lambda d: shortlist if d == DATE else None)
     monkeypatch.setattr(S, "board_l2a_fallback_enabled", lambda: True)
+    # No worker-published chips unless a test supplies them: never read real data.
+    monkeypatch.setattr(S, "read_game_chips", lambda d: None)
     yield
     S._COMBINED_INTELLIGENCE_RESPONSE_CACHE.clear()
+
+
+def _now_stamp(offset_seconds: float = 0.0) -> str:
+    from datetime import datetime, timedelta, timezone
+
+    return (datetime.now(timezone.utc) - timedelta(seconds=offset_seconds)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def test_worker_published_chips_restate_nfl_when_the_inline_build_has_none(board, monkeypatch):
+    """THE PRODUCTION CAUSE (2026-09-15 ~02:20Z).
+
+    No state rows (every `by_date` candidate_count was 0), the in-process chip
+    build yields no NFL chip on web, and the worker-published chips -- what
+    `/api/board/game-chips` serves -- carry DEN @ KC live. Before the fix the
+    restate never read the published chips, so the card stayed unrestated.
+    """
+    monkeypatch.setattr(S, "_read_single_date_response_for_combining", lambda d: None)
+    monkeypatch.setattr(S, "read_game_chips", lambda d: {"written_at": _now_stamp(30), "chips": [_live_chip()]} if d == DATE else None)
+    with patch(CHIPS, return_value=[]):
+        out = S.read_combined_intelligence_response(dates=[DATE], sport="all")
+    row = dict(_served_kelce(out))
+    assert row.get("is_live") is True, row
+    annotate(row)
+    assert row.get("board_lane") == "opportunity", row.get("gate")
+    assert row.get("market_state") == "live", row.get("gate")
+
+
+def test_a_stale_published_chip_does_not_override_a_fresher_inline_chip(board, monkeypatch):
+    """Freshness decides precedence, the same rule the endpoint uses."""
+    monkeypatch.setattr(S, "_read_single_date_response_for_combining", lambda d: None)
+    stale = _live_chip()
+    stale["state"] = "pregame"
+    monkeypatch.setattr(S, "read_game_chips", lambda d: {"written_at": _now_stamp(7200), "chips": [stale]} if d == DATE else None)
+    with patch(CHIPS, return_value=[_live_chip()]):
+        out = S.read_combined_intelligence_response(dates=[DATE], sport="all")
+    assert _served_kelce(out).get("is_live") is True
 
 
 def _served_kelce(out):
