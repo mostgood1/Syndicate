@@ -36290,3 +36290,18 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Verify: **MET.** The crossing rows are the discriminating case, and the 66 MLB crossings are all on the fixed path. MLB steam is written by THIS service (not refresh-worker, as this lane assumed), which is why the MLB evidence lands here.
 - **Live-odds-worker claim:** released after this entry.
 - Rollback: live-odds-worker `2d579fd1` (would also deactivate the env change above).
+
+## 2026-09-15 23:42Z (18:42 CT) — CORRECTION to the 23:24:56Z live-odds-worker entry — lane legacy-steam-crossing-delta — **the fix is still verified; WHICH service wrote the evidence is NOT established**
+- **What is unchanged:** the 200 steam events stamped 23:34:36Z include 66 that cross ±100, and all 66 recorded the cents move (0 the raw difference). Whichever worker wrote them was running `ca80edf0`. The fix is confirmed on production data.
+- **What was wrong:** that entry says "MLB steam is written by THIS service (not refresh-worker)". That does not follow from the reading.
+  - refresh-worker went live on `61ac543a` (which also contains `ca80edf0`) at 23:33:30.700Z, 66 s BEFORE those events. live-odds-worker went live at 23:27:50.499Z. Both were on fixed code at 23:34:36Z, so the events cannot separate them.
+- **What the evidence does say, and its limits:**
+  - `SYNDICATE_MLB_REFRESH_TICK_OWNER` is `true` on live-odds-worker and `false` on refresh-worker (read 23:38Z, keys+values for that flag only). That is the live-refresh tick.
+  - refresh-worker still has its own `_launch_autorun_mlb_refresh` path, so it is not excluded.
+  - Neither service logged any `refresh_odds_sources` child since 23:10Z, while controls in the same window matched (live-odds-worker `ALL_PROCESS_MEMORY` 180; refresh-worker `LAYER2_CARD_SHARDS_WRITTEN` 2). So the MLB refresh is running IN-PROCESS now, not as a child, on whichever service owns it.
+  - Conclusion: the tick-owner flag points at live-odds-worker; it is not proof, and the lane records it as unresolved rather than swapping one guess for another.
+- **Consequence for the two deploys:**
+  - live-odds-worker (23:24:56Z entry): the fix is live there, but its OWN discriminating evidence is still owed. Soccer wrote only 2 events after go-live, both from the outgoing instance (raw 224). The next soccer window is 2026-09-16.
+  - refresh-worker (`ce64e639`, lane `execution-ledger-live-trim`'s entry): the same 66 crossings may be ITS verify for `ca80edf0` riding along.
+  - Either way no third deploy is needed: both services now run the fixed detector.
+- **Owed:** one soccer reading through `/api/ops/steam/events` after the 09-16 soccer refreshes start, counting only events written then: 0 inflated, 0 price-as-line.
