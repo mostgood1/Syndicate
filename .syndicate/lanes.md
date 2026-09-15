@@ -1459,7 +1459,6 @@ death, never life — do not invert it.
   - `scripts/fit_soccer_shot_shrinkage.py`, `scripts/check_soccer_divisor_reached_engine.py`, `scripts/check_soccer_shot_divisor_vs_season_rate.py` (DELETE)
   - `syndicate/features/shared/soccer_projections.py` (`_PLAYER_PROB_BY_LINE` only)
   - `syndicate/features/soccer/features/loaders.py` (`usage_metrics` role fields only)
-  - `syndicate/features/soccer/ingestion/espn_player_stats.py`
   - `tests/test_soccer_player_role_ladder.py` (NEW)
   - `scripts/soccer_season_audit/calibration_role_mixture.py`, `calibration_role_mixture2.py`, `calibration_role_mixture3.py` (NEW)
   - NOT here: `scripts/build_soccer_artifacts.py` and `scripts/refresh_odds_sources.py` stay with `soccer-player-substrate` (same session) until that lane closes.
@@ -1623,6 +1622,29 @@ death, never life — do not invert it.
   - Existing quote-enrichment and NCAAF prop tests pass.
   - The replay over web's exported 09-17..09-19 NCAAF shards still reads 102/102 right.
 - Blocked by: none
+
+### soccer-anytime-scorer — OPEN — opened 2026-09-15 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Goal: soccer anytime-scorer probabilities stop pricing players at exactly 0, and are conditional on the player appearing. ESPN-league goal and assist rates are shrunk toward a positional prior, and goals use the same start/sub mixture as shots. On held-out dates, with production-shaped inputs, the SHIPPED engine beats today's anytime field on log loss, pooled and in >= 8 of 10 leagues. Landed on main with reachability tests. Which anytime field the board prices (unconditional or conditional) is put to the user. Deploy per user.
+- Files:
+  - `syndicate/features/soccer/ingestion/espn_player_stats.py` (transferred from `soccer-player-role-allocation`, which never edited it)
+  - `syndicate/features/soccer/sim_engine/soccersim/player_props.py` (goal allocation and anytime only; BLOCKED while `soccer-player-role-allocation` holds it)
+  - `tests/test_soccer_anytime_scorer.py` (NEW)
+  - `scripts/soccer_season_audit/calibration_anytime.py` (NEW)
+- Hypotheses, pre-registered in `calibration_anytime.py`'s docstring before its run (2026-09-15 ~20:58Z). Engine at `84215778`, fix #1 squads, 16,377 appeared outfield rows; TRAIN < 2026-08-26, TEST >= 2026-08-26; field c = `anytime_scorer_probability_if_playing`.
+  - H15, the zeros are the ESPN leagues. **SUPPORTED:** 53.0% of appeared ESPN-league rows were priced exactly 0.0 (the other six 0.2%). None after shrinkage.
+  - H16, shrink ESPN rows toward a keyword-bucketed (D/M/F, Substitute -> league) prior. **SUPPORTED:** fitted s = 180 min, the existing curve. ESPN-league TEST LL 0.3551 -> 0.2666 (primeira 0.410 -> 0.256, championship 0.330 -> 0.245).
+  - H17, goals on fix #2's start/sub mixture (k = 1.8). **SUPPORTED:**
+    - pooled TEST LL 0.2716 -> 0.2673, in 9/10 leagues (eredivisie the loss, 0.3199 vs 0.3250);
+    - level 1.14 -> 0.96; MLS 1.36 -> 1.04.
+  - H18, a level scale is needed. **FALSIFIED:** fitted c = 1.05. Once conditioned there is no residual over-prediction; the top decile moved 1.28 -> 0.93 without it. No constant ships.
+  - Reported for the board: the field it prices today (unconditional) scored TEST LL 0.3066, level 0.75. With shrinkage alone it scored 0.2733. The conditional mixture scored 0.2673.
+- Falsification test (production-shaped): the shipped change, replayed through `build_soccer_player_features` -> `build_usage_profiles` -> `project_player_props`, fails to reproduce H16/H17 within 0.002, or beats today's field in fewer than 8 of 10 leagues.
+- Verification:
+  - Reachability tests: a zero-goal ESPN row gets a nonzero anytime probability; `off != on` for the goal mixture.
+  - An engine replay within 0.002 of `calibration_anytime.py`.
+  - Tests A/B.
+  - After deploy, the zero share of anytime probabilities on published non-GK rows is 0.
+- Blocked by: `soccer-player-role-allocation`, which holds `player_props.py` until its post-deploy verify.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
