@@ -225,3 +225,119 @@ def test_harvest_league_ids_json_matches_the_resolver():
 
     path = Path(__file__).resolve().parents[1] / "reports" / "soccer_backtest" / "fotmob_league_ids.json"
     assert json.loads(path.read_text(encoding="utf-8")) == fotmob_leagues_record()
+
+
+# --- Team-name aliases: the loose pass -------------------------------------
+#
+# After the league fix, the join still missed fixtures whose ESPN and FotMob
+# names differ in SHAPE, not club: "Waasland-Beveren" / "SK Beveren",
+# "Sint-Truidense" / "St.Truiden", "LAFC" / "Los Angeles FC", "Bayern Munich" /
+# "Bayern München". Measured 2026-09-15 on production's inputs (ESPN
+# `team.displayName`). These run the production fetch path on FotMob's recorded
+# listings for 2026-09-12 and 2026-09-13.
+
+_FIXTURE_0912 = Path(__file__).parent / "fixtures" / "fotmob_matches_20260912.json"
+
+
+def _serve_listing(monkeypatch, fixture: Path, compact: str) -> None:
+    payload = json.loads(fixture.read_text(encoding="utf-8"))
+
+    def fake_get(url: str):
+        return payload if url.endswith(f"date={compact}") else {"leagues": []}
+
+    monkeypatch.setattr(fotmob_shots, "_get", fake_get)
+
+
+@pytest.mark.parametrize("fixture, compact, iso_date, league, home, away, expected", [
+    (_FIXTURE_0912, "20260912", "2026-09-12", "belgian_pro_league", "Waasland-Beveren", "Sint-Truidense", 5811756),
+    (_FIXTURE, "20260913", "2026-09-13", "mls", "Sporting Kansas City", "LAFC", 5071358),
+    (_FIXTURE, "20260913", "2026-09-13", "bundesliga", "Elversberg", "Bayern Munich", 5881163),
+])
+def test_loose_pass_resolves_name_shape_aliases(monkeypatch, fixture, compact, iso_date, league, home, away, expected):
+    _serve_listing(monkeypatch, fixture, compact)
+    mid = resolve_fotmob_match_id(league=league, home_team=home, away_team=away, iso_date=iso_date)
+    assert mid == expected
+
+
+def test_loose_pass_does_not_let_first_division_b_answer_for_the_pro_league(monkeypatch):
+    # "Genk U23" plays in First Division B on 09-12. The league gate refuses it
+    # before any name pass runs, loose included.
+    _serve_listing(monkeypatch, _FIXTURE_0912, "20260912")
+    mid = resolve_fotmob_match_id(
+        league="belgian_pro_league", home_team="Virton", away_team="Genk", iso_date="2026-09-12",
+    )
+    assert mid is None
+
+
+_BEL = {"league_id": 937988, "league_primary_id": 40, "league": "Belgian Pro League", "ccode": "BEL",
+        "home_id": 1, "away_id": 2, "status": None, "finished": False, "time": None}
+
+
+def test_loose_pass_refuses_an_ambiguous_fixture():
+    rows = [
+        {**_BEL, "match_id": 11, "home": "SK Beveren", "away": "St.Truiden"},
+        {**_BEL, "match_id": 12, "home": "KV Beveren", "away": "St.Truiden"},
+    ]
+    mid = resolve_fotmob_match_id(
+        league="belgian_pro_league", home_team="Waasland-Beveren", away_team="Sint-Truidense",
+        iso_date="2026-09-12", _fetch=_fixed_fetch(rows),
+    )
+    assert mid is None, "two fixtures fit loosely: refuse, never guess"
+
+
+def test_strict_match_wins_over_an_earlier_loose_only_row():
+    rows = [
+        {**_BEL, "match_id": 11, "home": "SK Beveren", "away": "St.Truiden"},          # loose only
+        {**_BEL, "match_id": 10, "home": "Waasland-Beveren", "away": "Sint-Truidense"},  # strict
+    ]
+    mid = resolve_fotmob_match_id(
+        league="belgian_pro_league", home_team="Waasland-Beveren", away_team="Sint-Truidense",
+        iso_date="2026-09-12", _fetch=_fixed_fetch(rows),
+    )
+    assert mid == 10
+
+
+def test_loose_pass_takes_a_strict_side_beside_a_loose_one():
+    # "D.C. United" has no 3+ letter word, so it can only match strictly; the
+    # fixture resolves because its other side matches by acronym.
+    mls = {"league_id": 913550, "league_primary_id": 130, "league": "Major League Soccer", "ccode": "USA",
+           "home_id": 1, "away_id": 2, "status": None, "finished": False, "time": None}
+    rows = [{**mls, "match_id": 21, "home": "DC United", "away": "Los Angeles FC"}]
+    mid = resolve_fotmob_match_id(
+        league="mls", home_team="D.C. United", away_team="LAFC", iso_date="2026-08-29", _fetch=_fixed_fetch(rows),
+    )
+    assert mid == 21
+
+
+@pytest.mark.parametrize("league, league_id, ccode, league_name, fotmob_home, espn_home", [
+    ("ligue_1", 53, "FRA", "Ligue 1", "Rennes", "Stade Rennais"),
+    ("bundesliga", 54, "GER", "Bundesliga", "1. FC Köln", "FC Cologne"),
+])
+def test_measured_espn_aliases_resolve(league, league_id, ccode, league_name, fotmob_home, espn_home):
+    rows = [{"match_id": 31, "league_id": league_id, "league_primary_id": league_id, "league": league_name,
+             "ccode": ccode, "home": fotmob_home, "away": "Visitors Athletic", "home_id": 1, "away_id": 2,
+             "status": None, "finished": False, "time": None}]
+    mid = resolve_fotmob_match_id(
+        league=league, home_team=espn_home, away_team="Visitors Athletic", iso_date="2026-08-30",
+        _fetch=_fixed_fetch(rows),
+    )
+    assert mid == 31
+
+
+@pytest.mark.parametrize("espn, fotmob, expected", [
+    ("Waasland-Beveren", "SK Beveren", True),
+    ("Paris Saint-Germain", "PSG", True),
+    ("Sint-Truidense", "St.Truiden", True),
+    ("LAFC", "Los Angeles FC", True),
+    ("Bayern Munich", "Bayern München", True),
+    ("Borussia Monchengladbach", "Gladbach", True),
+    # Sharing only a word that names a KIND of club is not evidence.
+    ("Royal Antwerp", "Royal Charleroi", False),
+    ("Real Madrid", "Real Sociedad", False),
+    ("FC Twente", "FC Utrecht", False),
+    ("Sporting Kansas City", "Sporting CP", False),
+])
+def test_loose_side_match(espn, fotmob, expected):
+    from syndicate.features.soccer.ingestion.fotmob_match_id import _loose_side_match
+
+    assert _loose_side_match(espn, fotmob) is expected

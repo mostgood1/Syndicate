@@ -1,0 +1,1389 @@
+{
+ "date": "20260912",
+ "leagues": [
+  {
+   "ccode": "GER",
+   "id": 54,
+   "primaryId": 54,
+   "name": "Bundesliga",
+   "matches": [
+    {
+     "id": 5881161,
+     "leagueId": 54,
+     "time": "12.09.2026 15:30",
+     "home": {
+      "id": 8406,
+      "score": 2,
+      "name": "Augsburg",
+      "shortName": "Augsburg",
+      "longName": "Augsburg"
+     },
+     "away": {
+      "id": 8178,
+      "score": 2,
+      "name": "Bayer Leverkusen",
+      "shortName": "Leverkusen",
+      "longName": "Bayer Leverkusen"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "3",
+     "status": {
+      "utcTime": "2026-09-12T13:30:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 15:30:17",
+       "secondHalfStarted": "12.09.2026 16:34:20"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "2 - 2",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789219800000
+    },
+    {
+     "id": 5881162,
+     "leagueId": 54,
+     "time": "12.09.2026 15:30",
+     "home": {
+      "id": 9789,
+      "score": 3,
+      "name": "Borussia Dortmund",
+      "shortName": "Dortmund",
+      "longName": "Borussia Dortmund"
+     },
+     "away": {
+      "id": 8460,
+      "score": 0,
+      "name": "Paderborn",
+      "shortName": "Paderborn",
+      "longName": "Paderborn"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "3",
+     "status": {
+      "utcTime": "2026-09-12T13:30:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 15:30:18",
+       "secondHalfStarted": "12.09.2026 16:34:57"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "3 - 0",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789219800000
+    },
+    {
+     "id": 5881165,
+     "leagueId": 54,
+     "time": "12.09.2026 15:30",
+     "home": {
+      "id": 8358,
+      "score": 5,
+      "name": "Freiburg",
+      "shortName": "Freiburg",
+      "longName": "Freiburg"
+     },
+     "away": {
+      "id": 9788,
+      "score": 0,
+      "name": "Borussia Mönchengladbach",
+      "redCards": 1,
+      "shortName": "M'gladbach",
+      "longName": "Borussia Mönchengladbach"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "3",
+     "status": {
+      "utcTime": "2026-09-12T13:30:00.000Z",
+      "numberOfAwayRedCards": 1,
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 15:30:28",
+       "secondHalfStarted": "12.09.2026 16:33:35"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "5 - 0",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789219800000
+    },
+    {
+     "id": 5881166,
+     "leagueId": 54,
+     "time": "12.09.2026 15:30",
+     "home": {
+      "id": 8226,
+      "score": 2,
+      "name": "Hoffenheim",
+      "shortName": "Hoffenheim",
+      "longName": "Hoffenheim"
+     },
+     "away": {
+      "id": 10269,
+      "score": 1,
+      "name": "VfB Stuttgart",
+      "longName": "VfB Stuttgart"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "3",
+     "status": {
+      "utcTime": "2026-09-12T13:30:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 15:30:14",
+       "secondHalfStarted": "12.09.2026 16:36:24"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "2 - 1",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789219800000
+    },
+    {
+     "id": 5881167,
+     "leagueId": 54,
+     "time": "12.09.2026 15:30",
+     "home": {
+      "id": 9905,
+      "score": 1,
+      "name": "Mainz 05",
+      "shortName": "Mainz",
+      "longName": "Mainz 05"
+     },
+     "away": {
+      "id": 9810,
+      "score": 3,
+      "name": "Eintracht Frankfurt",
+      "shortName": "Frankfurt",
+      "longName": "Eintracht Frankfurt"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "3",
+     "status": {
+      "utcTime": "2026-09-12T13:30:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 15:30:13",
+       "secondHalfStarted": "12.09.2026 16:34:46"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "1 - 3",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789219800000
+    },
+    {
+     "id": 5881164,
+     "leagueId": 54,
+     "time": "12.09.2026 18:30",
+     "home": {
+      "id": 8722,
+      "score": 1,
+      "name": "1. FC Köln",
+      "shortName": "Köln",
+      "longName": "1. FC Köln"
+     },
+     "away": {
+      "id": 8697,
+      "score": 1,
+      "name": "Werder Bremen",
+      "shortName": "Werder Bremen",
+      "longName": "Werder Bremen"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "3",
+     "status": {
+      "utcTime": "2026-09-12T16:30:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 18:30:10",
+       "secondHalfStarted": "12.09.2026 19:34:10"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "1 - 1",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789230600000
+    }
+   ],
+   "internalRank": 20,
+   "simpleLeague": false,
+   "localRank": 21
+  },
+  {
+   "ccode": "USA",
+   "id": 913550,
+   "primaryId": 130,
+   "name": "Major League Soccer",
+   "matches": [
+    {
+     "id": 5071352,
+     "leagueId": 913550,
+     "time": "13.09.2026 01:30",
+     "home": {
+      "id": 6001,
+      "score": 0,
+      "name": "Columbus Crew",
+      "shortName": "Columbus",
+      "longName": "Columbus Crew"
+     },
+     "away": {
+      "id": 6514,
+      "score": 1,
+      "name": "Red Bull New York",
+      "shortName": "NY Red Bulls",
+      "longName": "Red Bull New York"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "25",
+     "status": {
+      "utcTime": "2026-09-12T23:30:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "13.09.2026 01:40:32",
+       "secondHalfStarted": "13.09.2026 02:43:50"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "0 - 1",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789255800000
+    },
+    {
+     "id": 5071353,
+     "leagueId": 913550,
+     "time": "13.09.2026 01:30",
+     "home": {
+      "id": 6602,
+      "score": 0,
+      "name": "DC United",
+      "shortName": "DC United",
+      "longName": "DC United"
+     },
+     "away": {
+      "id": 773958,
+      "score": 0,
+      "name": "Atlanta United",
+      "shortName": "Atlanta United",
+      "longName": "Atlanta United"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "25",
+     "status": {
+      "utcTime": "2026-09-12T23:30:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "13.09.2026 01:40:53",
+       "secondHalfStarted": "13.09.2026 02:43:04"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "0 - 0",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789255800000
+    },
+    {
+     "id": 5071351,
+     "leagueId": 913550,
+     "time": "13.09.2026 01:30",
+     "home": {
+      "id": 722265,
+      "score": 3,
+      "name": "FC Cincinnati",
+      "shortName": "Cincinnati",
+      "longName": "FC Cincinnati"
+     },
+     "away": {
+      "id": 1323940,
+      "score": 3,
+      "name": "Charlotte FC",
+      "longName": "Charlotte FC"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "25",
+     "status": {
+      "utcTime": "2026-09-12T23:30:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "13.09.2026 01:41:17",
+       "secondHalfStarted": "13.09.2026 02:51:34"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "3 - 3",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789255800000
+    },
+    {
+     "id": 5071354,
+     "leagueId": 913550,
+     "time": "13.09.2026 01:30",
+     "home": {
+      "id": 960720,
+      "score": 2,
+      "name": "Inter Miami CF",
+      "longName": "Inter Miami CF"
+     },
+     "away": {
+      "id": 915807,
+      "score": 2,
+      "name": "Nashville SC",
+      "longName": "Nashville SC"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "25",
+     "status": {
+      "utcTime": "2026-09-12T23:30:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "13.09.2026 01:40:16",
+       "secondHalfStarted": "13.09.2026 02:44:38"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "2 - 2",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789255800000
+    },
+    {
+     "id": 5071355,
+     "leagueId": 913550,
+     "time": "13.09.2026 01:30",
+     "home": {
+      "id": 267810,
+      "score": 3,
+      "name": "Orlando City",
+      "shortName": "Orlando",
+      "longName": "Orlando City"
+     },
+     "away": {
+      "id": 56453,
+      "score": 0,
+      "name": "Toronto FC",
+      "shortName": "Toronto",
+      "longName": "Toronto FC"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "25",
+     "status": {
+      "utcTime": "2026-09-12T23:30:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "13.09.2026 01:41:23",
+       "secondHalfStarted": "13.09.2026 02:47:44"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "3 - 0",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789255800000
+    }
+   ],
+   "parentLeagueId": 130,
+   "internalRank": 10,
+   "simpleLeague": false,
+   "localRank": 24
+  },
+  {
+   "ccode": "BEL",
+   "id": 937988,
+   "primaryId": 40,
+   "name": "Belgian Pro League",
+   "matches": [
+    {
+     "id": 5811756,
+     "leagueId": 937988,
+     "time": "12.09.2026 16:00",
+     "home": {
+      "id": 8475,
+      "score": 2,
+      "name": "SK Beveren",
+      "longName": "SK Beveren"
+     },
+     "away": {
+      "id": 9997,
+      "score": 0,
+      "name": "St.Truiden",
+      "longName": "St.Truiden"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "6",
+     "status": {
+      "utcTime": "2026-09-12T14:00:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 16:01:42",
+       "secondHalfStarted": "12.09.2026 17:02:14"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "2 - 0",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789221600000
+    },
+    {
+     "id": 5811757,
+     "leagueId": 937988,
+     "time": "12.09.2026 18:15",
+     "home": {
+      "id": 10001,
+      "score": 4,
+      "name": "Westerlo",
+      "longName": "Westerlo"
+     },
+     "away": {
+      "id": 9985,
+      "score": 2,
+      "name": "Standard Liège",
+      "longName": "Standard Liège"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "6",
+     "status": {
+      "utcTime": "2026-09-12T16:15:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 18:18:23",
+       "secondHalfStarted": "12.09.2026 19:19:56"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "4 - 2",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789229700000
+    },
+    {
+     "id": 5811758,
+     "leagueId": 937988,
+     "time": "12.09.2026 20:45",
+     "home": {
+      "id": 1773,
+      "score": 1,
+      "name": "OH Leuven",
+      "longName": "OH Leuven"
+     },
+     "away": {
+      "id": 9984,
+      "score": 1,
+      "name": "Cercle Brugge",
+      "longName": "Cercle Brugge"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "6",
+     "status": {
+      "utcTime": "2026-09-12T18:45:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 20:47:21",
+       "secondHalfStarted": "12.09.2026 21:48:39"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "1 - 1",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789238700000
+    },
+    {
+     "id": 5811759,
+     "leagueId": 937988,
+     "time": "12.09.2026 20:45",
+     "home": {
+      "id": 7978,
+      "score": 5,
+      "name": "Union St.Gilloise",
+      "longName": "Union St.Gilloise"
+     },
+     "away": {
+      "id": 6702,
+      "score": 0,
+      "name": "Lommel",
+      "longName": "Lommel"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "6",
+     "status": {
+      "utcTime": "2026-09-12T18:45:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 20:48:34",
+       "secondHalfStarted": "12.09.2026 21:54:54"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "5 - 0",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789238700000
+    }
+   ],
+   "parentLeagueId": 40,
+   "internalRank": 9,
+   "simpleLeague": false
+  },
+  {
+   "ccode": "ENG",
+   "id": 938218,
+   "primaryId": 48,
+   "name": "Championship",
+   "matches": [
+    {
+     "id": 5836827,
+     "leagueId": 938218,
+     "time": "12.09.2026 13:30",
+     "home": {
+      "id": 8559,
+      "score": 1,
+      "name": "Bolton Wanderers",
+      "shortName": "Bolton",
+      "longName": "Bolton Wanderers"
+     },
+     "away": {
+      "id": 8344,
+      "score": 0,
+      "name": "Cardiff City",
+      "shortName": "Cardiff",
+      "longName": "Cardiff City"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "7",
+     "status": {
+      "utcTime": "2026-09-12T11:30:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 13:31:06",
+       "secondHalfStarted": "12.09.2026 14:34:01"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "1 - 0",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789212600000
+    },
+    {
+     "id": 5836829,
+     "leagueId": 938218,
+     "time": "12.09.2026 13:30",
+     "home": {
+      "id": 10170,
+      "score": 1,
+      "name": "Derby County",
+      "shortName": "Derby",
+      "longName": "Derby County"
+     },
+     "away": {
+      "id": 8658,
+      "score": 2,
+      "name": "Birmingham City",
+      "shortName": "Birmingham",
+      "longName": "Birmingham City"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "7",
+     "status": {
+      "utcTime": "2026-09-12T11:30:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 13:30:18",
+       "secondHalfStarted": "12.09.2026 14:32:54"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "1 - 2",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789212600000
+    },
+    {
+     "id": 5836836,
+     "leagueId": 938218,
+     "time": "12.09.2026 13:30",
+     "home": {
+      "id": 8659,
+      "score": 1,
+      "name": "West Bromwich Albion",
+      "shortName": "West Brom",
+      "longName": "West Bromwich Albion"
+     },
+     "away": {
+      "id": 10172,
+      "score": 1,
+      "name": "Queens Park Rangers",
+      "shortName": "QPR",
+      "longName": "Queens Park Rangers"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "7",
+     "status": {
+      "utcTime": "2026-09-12T11:30:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 13:31:09",
+       "secondHalfStarted": "12.09.2026 14:35:26"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "1 - 1",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789212600000
+    },
+    {
+     "id": 5836826,
+     "leagueId": 938218,
+     "time": "12.09.2026 16:00",
+     "home": {
+      "id": 8655,
+      "score": 3,
+      "name": "Blackburn Rovers",
+      "shortName": "Blackburn",
+      "longName": "Blackburn Rovers"
+     },
+     "away": {
+      "id": 10004,
+      "score": 1,
+      "name": "Millwall",
+      "longName": "Millwall"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "7",
+     "status": {
+      "utcTime": "2026-09-12T14:00:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 16:00:17",
+       "secondHalfStarted": "12.09.2026 17:04:11"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "3 - 1",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789221600000
+    },
+    {
+     "id": 5836828,
+     "leagueId": 938218,
+     "time": "12.09.2026 16:00",
+     "home": {
+      "id": 8451,
+      "score": 0,
+      "name": "Charlton Athletic",
+      "shortName": "Charlton",
+      "longName": "Charlton Athletic"
+     },
+     "away": {
+      "id": 8462,
+      "score": 0,
+      "name": "Portsmouth",
+      "longName": "Portsmouth"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "7",
+     "status": {
+      "utcTime": "2026-09-12T14:00:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 16:00:44",
+       "secondHalfStarted": "12.09.2026 17:04:30"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "0 - 0",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789221600000
+    },
+    {
+     "id": 5836830,
+     "leagueId": 938218,
+     "time": "12.09.2026 16:00",
+     "home": {
+      "id": 8549,
+      "score": 4,
+      "name": "Middlesbrough",
+      "longName": "Middlesbrough"
+     },
+     "away": {
+      "id": 9850,
+      "score": 3,
+      "name": "Norwich City",
+      "shortName": "Norwich",
+      "longName": "Norwich City"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "7",
+     "status": {
+      "utcTime": "2026-09-12T14:00:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 16:00:19",
+       "secondHalfStarted": "12.09.2026 17:04:35"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "4 - 3",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789221600000
+    },
+    {
+     "id": 5836831,
+     "leagueId": 938218,
+     "time": "12.09.2026 16:00",
+     "home": {
+      "id": 8411,
+      "score": 0,
+      "name": "Preston North End",
+      "shortName": "Preston",
+      "longName": "Preston North End"
+     },
+     "away": {
+      "id": 8430,
+      "score": 1,
+      "name": "Lincoln City",
+      "shortName": "Lincoln",
+      "longName": "Lincoln City"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "7",
+     "status": {
+      "utcTime": "2026-09-12T14:00:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 16:00:22",
+       "secondHalfStarted": "12.09.2026 17:01:17"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "0 - 1",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789221600000
+    },
+    {
+     "id": 5836833,
+     "leagueId": 938218,
+     "time": "12.09.2026 16:00",
+     "home": {
+      "id": 8466,
+      "score": 4,
+      "name": "Southampton",
+      "longName": "Southampton"
+     },
+     "away": {
+      "id": 8427,
+      "score": 1,
+      "name": "Bristol City",
+      "longName": "Bristol City"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "7",
+     "status": {
+      "utcTime": "2026-09-12T14:00:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 16:00:41",
+       "secondHalfStarted": "12.09.2026 17:05:18"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "4 - 1",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789221600000
+    },
+    {
+     "id": 5836834,
+     "leagueId": 938218,
+     "time": "12.09.2026 16:00",
+     "home": {
+      "id": 10003,
+      "score": 3,
+      "name": "Swansea City",
+      "shortName": "Swansea",
+      "longName": "Swansea City"
+     },
+     "away": {
+      "id": 8191,
+      "score": 1,
+      "name": "Burnley",
+      "longName": "Burnley"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "7",
+     "status": {
+      "utcTime": "2026-09-12T14:00:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 16:01:18",
+       "secondHalfStarted": "12.09.2026 17:06:56"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "3 - 1",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789221600000
+    },
+    {
+     "id": 5836835,
+     "leagueId": 938218,
+     "time": "12.09.2026 16:00",
+     "home": {
+      "id": 9817,
+      "score": 1,
+      "name": "Watford",
+      "longName": "Watford"
+     },
+     "away": {
+      "id": 10194,
+      "score": 2,
+      "name": "Stoke City",
+      "shortName": "Stoke",
+      "longName": "Stoke City"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "7",
+     "status": {
+      "utcTime": "2026-09-12T14:00:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 16:00:17",
+       "secondHalfStarted": "12.09.2026 17:05:15"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "1 - 2",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789221600000
+    }
+   ],
+   "parentLeagueId": 48,
+   "internalRank": 29,
+   "simpleLeague": false
+  },
+  {
+   "ccode": "NED",
+   "id": 937276,
+   "primaryId": 57,
+   "name": "Eredivisie",
+   "matches": [
+    {
+     "id": 5781746,
+     "leagueId": 937276,
+     "time": "12.09.2026 16:30",
+     "home": {
+      "id": 8611,
+      "score": 2,
+      "name": "FC Twente",
+      "longName": "FC Twente"
+     },
+     "away": {
+      "id": 10217,
+      "score": 0,
+      "name": "ADO Den Haag",
+      "longName": "ADO Den Haag"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "6",
+     "status": {
+      "utcTime": "2026-09-12T14:30:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 16:30:30",
+       "secondHalfStarted": "12.09.2026 17:32:18"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "2 - 0",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789223400000
+    },
+    {
+     "id": 5781748,
+     "leagueId": 937276,
+     "time": "12.09.2026 18:45",
+     "home": {
+      "id": 6433,
+      "score": 1,
+      "name": "Go Ahead Eagles",
+      "longName": "Go Ahead Eagles"
+     },
+     "away": {
+      "id": 8674,
+      "score": 1,
+      "name": "FC Groningen",
+      "longName": "FC Groningen"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "6",
+     "status": {
+      "utcTime": "2026-09-12T16:45:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 18:46:19",
+       "secondHalfStarted": "12.09.2026 19:48:50"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "1 - 1",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789231500000
+    },
+    {
+     "id": 5781747,
+     "leagueId": 937276,
+     "time": "12.09.2026 20:00",
+     "home": {
+      "id": 6422,
+      "score": 1,
+      "name": "Fortuna Sittard",
+      "longName": "Fortuna Sittard"
+     },
+     "away": {
+      "id": 8593,
+      "score": 5,
+      "name": "Ajax",
+      "longName": "Ajax"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "6",
+     "status": {
+      "utcTime": "2026-09-12T18:00:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 20:02:16",
+       "secondHalfStarted": "12.09.2026 21:07:18"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "1 - 5",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789236000000
+    },
+    {
+     "id": 5781741,
+     "leagueId": 937276,
+     "time": "12.09.2026 21:00",
+     "home": {
+      "id": 7788,
+      "score": 3,
+      "name": "Cambuur",
+      "longName": "Cambuur"
+     },
+     "away": {
+      "id": 8464,
+      "score": 0,
+      "name": "NEC Nijmegen",
+      "longName": "NEC Nijmegen"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "6",
+     "status": {
+      "utcTime": "2026-09-12T19:00:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 21:01:06",
+       "secondHalfStarted": "12.09.2026 22:03:34"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "3 - 0",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789239600000
+    }
+   ],
+   "parentLeagueId": 57,
+   "internalRank": 10,
+   "simpleLeague": false
+  },
+  {
+   "ccode": "BEL",
+   "id": 264,
+   "primaryId": 264,
+   "name": "First Division B",
+   "matches": [
+    {
+     "id": 1000015467,
+     "leagueId": 264,
+     "time": "12.09.2026 16:00",
+     "home": {
+      "id": 149408,
+      "score": 1,
+      "name": "RFC Seraing",
+      "redCards": 1,
+      "longName": "RFC Seraing"
+     },
+     "away": {
+      "id": 2263,
+      "score": 2,
+      "name": "Sporting Hasselt",
+      "longName": "Sporting Hasselt"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "5",
+     "status": {
+      "utcTime": "2026-09-12T14:00:00.000Z",
+      "numberOfHomeRedCards": 1,
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 16:01:26",
+       "secondHalfStarted": "12.09.2026 17:04:48"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "1 - 2",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789221600000
+    },
+    {
+     "id": 1000015471,
+     "leagueId": 264,
+     "time": "12.09.2026 16:00",
+     "home": {
+      "id": 1378461,
+      "score": 2,
+      "name": "Anderlecht Futures",
+      "longName": "Anderlecht Futures"
+     },
+     "away": {
+      "id": 213307,
+      "score": 6,
+      "name": "KSC Lokeren",
+      "longName": "KSC Lokeren"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "5",
+     "status": {
+      "utcTime": "2026-09-12T14:00:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 16:02:29",
+       "secondHalfStarted": "12.09.2026 17:18:36"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "2 - 6",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789221600000
+    },
+    {
+     "id": 1000015472,
+     "leagueId": 264,
+     "time": "12.09.2026 20:00",
+     "home": {
+      "id": 8174,
+      "score": 3,
+      "name": "Virton",
+      "longName": "Virton"
+     },
+     "away": {
+      "id": 1378463,
+      "score": 0,
+      "name": "Genk U23",
+      "redCards": 1,
+      "longName": "Genk U23"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "5",
+     "status": {
+      "utcTime": "2026-09-12T18:00:00.000Z",
+      "numberOfAwayRedCards": 1,
+      "halfs": {
+       "firstHalfStarted": "12.09.2026 20:00:47",
+       "secondHalfStarted": "12.09.2026 21:07:55"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "3 - 0",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1789236000000
+    }
+   ],
+   "internalRank": 0,
+   "simpleLeague": false
+  }
+ ],
+ "_recorded": "FotMob GET https://www.fotmob.com/api/data/matches?date=20260912 at 2026-09-15T18:3xZ, trimmed to Belgian Pro League, MLS, Bundesliga, Eredivisie, Championship and First Division B; league and match objects otherwise verbatim"
+}

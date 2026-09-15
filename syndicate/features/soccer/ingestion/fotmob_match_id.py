@@ -112,12 +112,15 @@ def fotmob_leagues_record() -> dict[str, dict[str, Any]]:
     }
 
 
+def _fold(name: str) -> str:
+    return unicodedata.normalize("NFKD", str(name or "")).encode("ascii", "ignore").decode("ascii")
+
+
 def _norm(name: str) -> str:
     # Fold accents BEFORE dropping non-letters. Dropping them outright turned
     # FotMob's "Standard Liège" into "standard lige", which never matched ESPN's
     # "Standard Liege" (measured 2026-09-12).
-    folded = unicodedata.normalize("NFKD", str(name or "")).encode("ascii", "ignore").decode("ascii")
-    s = re.sub(r"[^a-z ]", "", folded.lower())
+    s = re.sub(r"[^a-z ]", "", _fold(name).lower())
     for junk in _JUNK_WORDS:
         s = s.replace(junk, " ")
     return " ".join(s.split())
@@ -131,11 +134,118 @@ def _names_match(a: str, b: str) -> bool:
     return bool(a) and bool(b) and (a in b or b in a)
 
 
+# Words that name a KIND of club, a squad, or nothing in particular. Two names
+# sharing only these are not evidence of one club ("Royal Antwerp" is not
+# "Royal Charleroi", "Real Madrid" is not "Real Sociedad").
+_GENERIC_TOKENS = frozenset({
+    "ac", "afc", "as", "bk", "cd", "cf", "cp", "fc", "fk", "if", "kaa", "krc", "ksv", "kv", "kvc",
+    "nk", "rc", "rfc", "rsc", "sad", "sc", "sd", "sk", "ss", "sv", "ud", "us", "vfb", "vfl",
+    "athletic", "atletico", "club", "city", "county", "de", "del", "deportivo", "inter", "la",
+    "le", "north", "olympique", "racing", "real", "royal", "saint", "sint", "south", "sporting",
+    "st", "stade", "the", "town", "union", "united", "wanderers", "rovers", "albion",
+    "ii", "reserves", "futures", "u19", "u21", "u23", "w", "women",
+})
+
+# Club-type codes an acronym keeps WHOLE: "LAFC" is "LA" + "FC", not "L-A-F".
+_CLUB_CODES = frozenset({"ac", "afc", "as", "cf", "fc", "sc", "sk", "sv"})
+
+# ESPN `displayName` -> FotMob's name, for clubs NO name rule can bridge: a
+# translation, or a nickname against a town. Every entry is a measured miss
+# (2026-09-15, 230 ESPN fixtures across all 10 leagues, 7 dates): keep it that
+# way -- an entry nobody measured is a guess about someone else's spelling.
+_ESPN_NAME_ALIASES: dict[str, str] = {
+    "stade rennais": "Rennes",          # ligue_1 2026-08-23, 2026-08-30
+    "fc cologne": "1. FC Köln",         # bundesliga 2026-08-29, 2026-09-12
+}
+
+
+def _tokens(name: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", _fold(name).lower())
+
+
+def _espn_alias(name: str) -> str:
+    return _ESPN_NAME_ALIASES.get(" ".join(_tokens(name)), name)
+
+
+def _is_acronym(short: list[str], long: list[str]) -> bool:
+    """`LAFC` for `Los Angeles FC`, `PSG` for `Paris Saint-Germain`: one 2-5
+    letter token spelling the other name's initials, club codes kept whole or not.
+    """
+    if len(short) != 1 or len(long) < 2 or not 2 <= len(short[0]) <= 5 or short[0].isdigit():
+        return False
+    words = [t for t in long if not t.isdigit()]
+    initials = "".join(t[0] for t in words)
+    with_codes = "".join(t if t in _CLUB_CODES else t[0] for t in words)
+    return short[0] in (initials, with_codes)
+
+
+def _loose_side_match(espn_name: str, fotmob_name: str) -> bool:
+    """One team, by a DISTINCTIVE word: equal, a 5+ letter prefix, a 6+ letter
+    substring, or an acronym. Only used after the strict match has found nothing.
+    """
+    ta, tb = _tokens(espn_name), _tokens(fotmob_name)
+    da = [t for t in ta if len(t) >= 3 and not t.isdigit() and t not in _GENERIC_TOKENS]
+    db = [t for t in tb if len(t) >= 3 and not t.isdigit() and t not in _GENERIC_TOKENS]
+    for s in da:
+        for t in db:
+            short, long_ = sorted((s, t), key=len)
+            if s == t:
+                return True
+            if len(short) >= 5 and long_.startswith(short):
+                return True
+            if len(short) >= 6 and short in long_:
+                return True
+    return _is_acronym(ta, tb) or _is_acronym(tb, ta)
+
+
+def _side_match(espn_name: str, fotmob_name: str) -> bool:
+    # A side the STRICT rule already matches counts in the loose pass: "D.C.
+    # United" has no 3+ letter word to match loosely, and its fixture v "LAFC"
+    # needed the other side's acronym to resolve (measured 2026-08-29).
+    a, b = _norm(espn_name), _norm(fotmob_name)
+    return (bool(a) and bool(b) and _names_match(a, b)) or _loose_side_match(espn_name, fotmob_name)
+
+
+def _strict_match_id(rows: list[dict[str, Any]], home_team: str, away_team: str) -> int | None:
+    home_n, away_n = _norm(home_team), _norm(away_team)
+    if not home_n or not away_n:
+        return None
+    for c in rows:
+        c_home, c_away = _norm(c.get("home") or ""), _norm(c.get("away") or "")
+        if _names_match(home_n, c_home) and _names_match(away_n, c_away):
+            mid = c.get("match_id")
+            return int(mid) if mid is not None else None
+    return None
+
+
+def _loose_match_ids(rows: list[dict[str, Any]], home_team: str, away_team: str) -> set[int]:
+    return {
+        int(c["match_id"]) for c in rows
+        if c.get("match_id") is not None
+        and _side_match(home_team, c.get("home") or "")
+        and _side_match(away_team, c.get("away") or "")
+    }
+
+
 def resolve_fotmob_match_id(
     *, league: str, home_team: str, away_team: str, iso_date: str,
     _fetch: Any = None,
 ) -> int | None:
     """FotMob match id for this fixture, or None if it cannot be resolved.
+
+    ESPN names listed in `_ESPN_NAME_ALIASES` are swapped for FotMob's first.
+    Then two passes run over the league's fixtures in the date window:
+
+    1. STRICT, the original: normalised names, equal or substring, both sides.
+    2. LOOSE, only when (1) finds nothing. Each side must match strictly or by a
+       DISTINCTIVE word (`_loose_side_match`), and exactly ONE fixture may
+       qualify; two or more is refused rather than guessed. It exists for name
+       shapes (1) cannot bridge, measured on production's own inputs
+       2026-09-15: ESPN "Waasland-Beveren" / FotMob "SK Beveren",
+       "Sint-Truidense" / "St.Truiden", "LAFC" / "Los Angeles FC",
+       "Bayern Munich" / "Bayern München". Over 230 fixtures it added 13
+       resolves and disagreed with (1) on none of the 212 (1) resolved.
+       Because it runs only after (1) fails, it cannot change an id (1) returns.
 
     `_fetch` is an injection point for tests -- defaults to the real
     `matches_for_date` HTTP call.
@@ -149,8 +259,8 @@ def resolve_fotmob_match_id(
     except ValueError:
         return None
 
-    home_n, away_n = _norm(home_team), _norm(away_team)
-    if not home_n or not away_n:
+    home_team, away_team = _espn_alias(home_team), _espn_alias(away_team)
+    if not _norm(home_team) or not _norm(away_team):
         return None
 
     try:
@@ -165,14 +275,12 @@ def resolve_fotmob_match_id(
     except Exception:
         return None
 
-    for c in candidates:
-        if fotmob_league_slug(c) != league_key:
-            continue
-        c_home, c_away = _norm(c.get("home") or ""), _norm(c.get("away") or "")
-        if _names_match(home_n, c_home) and _names_match(away_n, c_away):
-            mid = c.get("match_id")
-            return int(mid) if mid is not None else None
-    return None
+    rows = [c for c in candidates if fotmob_league_slug(c) == league_key]
+    strict = _strict_match_id(rows, home_team, away_team)
+    if strict is not None:
+        return strict
+    loose = _loose_match_ids(rows, home_team, away_team)
+    return next(iter(loose)) if len(loose) == 1 else None
 
 
 __all__ = ["FOTMOB_LEAGUES", "fotmob_league_slug", "fotmob_leagues_record", "resolve_fotmob_match_id"]
