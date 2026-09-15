@@ -1485,6 +1485,35 @@ death, never life — do not invert it.
 - Blocked by: none. **User decision 2026-09-15 ~20:18Z: "Now, verify on RMA–ELC (Recommended)"**.
 - **STATUS 2026-09-15 ~20:31Z: BUILT + COMMITTED `c120ec34`.** Test fails on the old code (`('20260915-20260915',)` vs `('20260915',)`, both call sites reached); 122 passed across poller / soccer-board-parity / segment-actuals / team-ratings suites. `867f1481` turned out to be ALREADY live on live-odds-worker (in `f833f7ec`), so it does not ride along. Main DOES carry `e53274f2` (soccer-player-role-allocation step A, not approved for deploy; the poller's live props import `soccersim.player_props`), so the deploy is `18be9107` = `f833f7ec` + this commit only, `--allow-off-main`, per "one change per deploy". Owner session messaged.
 
+### legacy-steam-crossing-delta — OPEN — opened 2026-09-15 — session a0a81858-49f8-4085-a858-d4781b1dbce4
+- Goal: legacy steam (the odds tracker's `steam` events, rendered as `candidate_type=steam` board rows) fires only on real moves. A price move is sized on the continuous cents scale (±100 both map to 0), so a pair straddling even money counts its real distance (-110 → +105 = 15, not 215). A moneyline row's price is not also read as a line. The MLB market board's `odds_delta` uses the same scale. Measured on production steam events against a baseline read before any edit (user request 2026-09-15: "open a lane for the legacy steam deltas").
+- Baseline `[served payload 2026-09-15 20:26:01Z]`: 11 legacy steam rows on the board, all soccer and all `capture_phase=live`.
+  - 5 carry an `odds_delta` whose size only a crossing explains: +229, +224, -207, -222, +227.
+  - 2 are moneyline rows whose `line` equals the price: MIL @ MID `line_delta` 8.0 = `odds_delta` 8.0; RMA @ ELC 25.0 = 25.0.
+  - Not yet split into crossing vs real moves. That split is the first step.
+- Files: `syndicate/features/shared/odds_refresh_tracking.py` (`_steam_signal`'s deltas and hits only, not the `implied_prob_delta` threshold re-base its own comment defers), `tests/test_odds_refresh_tracking.py`, `syndicate/features/mlb/cards.py` (the market board's `odds_delta` / `odds_trend`, ~`:6903-6910`, only), `tests/test_mlb_market_board.py`, `tests/test_intelligence_steam_candidates.py`.
+- Hypotheses (written BEFORE any production reading):
+  - **H1.** `_steam_signal` (`odds_refresh_tracking.py:317-321`) takes `current_odds - previous_odds` on raw American odds. It fires on `abs(odds_delta) >= SYNDICATE_STEAM_ODDS_MOVE` (default 15, late phase 10, window 45 min).
+    - Any observation pair straddling ±100 adds 200 to the size, so it clears the threshold whatever the real move was.
+    - Some of today's soccer steam rows are crossings whose cents-scale move is under the threshold, with no line move of 0.5 or more.
+  - **H2.** On moneyline rows the tracker carries the price as `line`, so `line_delta` equals `odds_delta`. The 0.5 line threshold (`line_hit`, `:320`) then fires on any price change of 0.5 points or more. MIL @ MID's moneyline steam (8.0 points, under the 15-point odds threshold) can only have fired that way.
+- Falsification tests:
+  - H1 is wrong if recomputing every event in today's production `reports/steam/steam_events_*_2026-09-15.json` on the cents scale drops 0 events (every crossing also clears the odds threshold in cents, or fired on a real line move), or if the 5 flagged rows' previous and current odds do not straddle ±100.
+  - H2 is wrong if today's moneyline steam events carry `line` None or a value different from the price, or if every one of them also clears the odds threshold.
+- Scope boundary: this is the unit bug only.
+  - The comment at `:324-341` deliberately defers moving the trigger onto implied probability until steam is graded against closing lines. This lane does not re-base the threshold.
+  - The SIGN of `odds_delta`, which `_annotate_steam_book_confirmation` uses as direction (`:417`, `:427`), is unchanged by a cents-scale fix.
+- Verification:
+  - (1) Baseline, before any edit: today's steam events per sport; how many fire only through a crossing (odds hit, cents move under threshold, no line hit); and how many moneyline events fire only through `line_hit`.
+  - (2) Unit tests:
+    - -110 → +105 yields `odds_delta` 15 and no steam.
+    - +105 → -110 yields -15.
+    - -120 → -135 is unchanged.
+    - A moneyline pair -194 → -186 does not fire on the line threshold.
+    - The MLB board's -105 → +105 reads 10.
+  - (3) After the owning worker's deploy: 0 new steam events with a crossing-inflated `odds_delta`; 0 moneyline events firing only through `line_hit`; and served legacy steam rows' `odds_delta` equal to their cents move.
+- Blocked by: none. First step: find which service runs `_steam_signal` (its steam log line on Render), then read today's steam events and split them.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
