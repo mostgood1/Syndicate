@@ -36133,7 +36133,14 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Expectation `--expect unconditional_ladder_share=0.0 --baseline unconditional_ladder_share=0.650 --baseline-read-at 2026-09-15T22:05:14Z`.
 - **THE BASELINE IS NOT A PURE PRE-STATE, stated so it is not over-read.** 0.650 at 22:05:14Z already includes artifacts built by live-odds-worker's new code (see the reading below). The pre-state for both workers is the 21:23:24Z read, 1.000 over 931 rows.
 - **Prediction:** artifacts generated after 22:12:03Z by either worker price every non-zero-mean shot row on the conditional ladder. `unconditional_ladder_share`, restricted to rows with `expected_shots > 0`, reads 0.
-- **verify (OWED for refresh-worker):** `ladder_basis_reading.py` over artifacts generated after 22:12:03Z. Rows with `expected_shots == 0` are excluded: both ladders are 0.0 there, so they cannot discriminate.
+- **verify for refresh-worker: MET, read 22:38:58Z.** `ladder_basis_reading.py` over the newest recommendations artifact per league, restricted to rows with `expected_shots > 0`. Rows at 0 price 0.0 on either basis and cannot discriminate; they are counted separately, never as a pass. (The heading above is left as written when the deploy went out; this bullet carries the outcome.)
+  - epl `recommendations_2026-09-19.json`, gen 22:30:22Z: 238 discriminating rows, 0 unconditional (4 zero-mean).
+  - la_liga `recommendations_2026-09-16.json`, gen 22:38:07Z: 185 rows, 0 unconditional (2 zero-mean).
+  - championship `recommendations_2026-09-15.json`, gen 22:22:29Z: 73 rows, 0 unconditional (5 zero-mean).
+  - bundesliga `recommendations_2026-09-19.json`, gen 22:35:22Z: 197 rows, 0 unconditional (2 zero-mean).
+  - **Pooled: 693 discriminating rows, `unconditional_ladder_share` 0.0000 against the predicted 0, `shot_mean_vs_ladder_ratio` 1.287 (> 1, as predicted).** 13 zero-mean rows excluded.
+  - The other six leagues' newest artifacts still predated 22:12:03Z at this reading.
+  - **What this does and does not establish:** both workers now run fix #2, so this proves the deployed code prices conditionally in whatever wrote these artifacts. It does not attribute the writer to refresh-worker; the prediction was written 'by either worker' for that reason. The two la_liga rows that matched trivially (Fábio Cardoso, Unai Vencedor) carry `expected_shots_if_playing` 0.0 and no role inputs.
 - Rollback: refresh-worker `f833f7ec`.
 - **live-odds-worker `8c089e8c` verify reading** (entry above; ladder watcher read at 22:05:00Z, artifacts generated after its 21:38:19Z live time, refresh-worker still on OLD code):
   - la_liga `recommendations_2026-09-16.json`, gen 21:59:30Z: 185 of 185 non-zero-mean rows conditional. The 2 matching rows have `expected_shots` 0.0.
