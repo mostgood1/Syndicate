@@ -6135,3 +6135,19 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - A text guard cannot see into a script run from a FILE; deploy inline, with `scripts/render_deploy.py`, or with curl.
 - **Cost:** two production deploys ran outside the gate they were believed to pass. No harm, because the locks happened to be held, but that was luck of habit, not enforcement.
   - *(evidence: `leads.md` 2026-09-15 lead, promoted; `log/2026-09-15.md` session 3a65723e; lane `deploy-guard-python-post`)*
+
+## 2026-09-15 — OVERTURNED: "soccer shots props over-predict by 40%; ship a 1.33 divisor". A per-row skill score keyed on a PREDICTION list cannot see what the list is missing, and it read a stale squad as a level error `[lane soccer-season-market-audit]`
+
+- **What was believed:** `[soccer-shots-prop-skill]` (2026-08-31) measured predicted 0.58 vs realised 0.42 over 9,840 (player, match) rows, a ratio of 1.40, and a held-out scalar divisor of 1.33 "wins in all 9 leagues".
+- **What was actually true** (season to date, 07-22..09-14):
+  - Players who actually appeared are UNDER-predicted: 0.87 held-out; regular starters 0.68, fringe players 1.08.
+  - The predicted lists are last season's. The share of real team shots attributable to a listed player runs from 36% (Championship) to 87% (MLS).
+  - On the new data, the 08-31 method gives 1.09–1.13. That method is an unconditional mean over every predicted row, with unmatched or absent players scored as 0. Absent squad members and name misses become zero-shot rows, and shots by unlisted players are invisible; both push toward "over-predicts".
+  - The divisor now worsens MAE in the leagues props are bet on (EPL 0.828 → 0.831, Serie A 0.835 → 0.839).
+- **How we found out:** a props run on ESPN box scores, bound one-to-one per side, read 0.88 — the opposite sign. Before quoting either number, the join was measured from the OUTCOME side: the share of real shots belonging to a listed player, per league.
+- **The rule going forward:**
+  - Before reading a level error off rows keyed on a prediction list, measure coverage from the outcome side: what share of the real volume (shots, goals, minutes) belongs to entities the list contains. Below ~90%, the "error" is at least partly the list.
+  - Score a conditional quantity on the population the bet settles on — appeared players, `*_if_playing` — not an unconditional mean over a roster.
+  - A held-out fit validates a correction only for the population and method it was fitted on. Re-measure when the season, and the squads, turn over.
+- **Cost:** a standing shipping recommendation that would have cut starters' shot probabilities further. Caught before any engine change.
+  - *(evidence: `findings_2026-09-15_soccer_season_market_audit.md` "Player props"; `state_soccer.md [soccer-season-market-audit]`; `log/2026-09-15.md` session abacd435)*
