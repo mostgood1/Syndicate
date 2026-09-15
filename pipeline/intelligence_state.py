@@ -9427,9 +9427,34 @@ def read_combined_intelligence_response(
     # report a healthy number while the pool sat at zero. That is the exact trap
     # `#308`'s own monitor fell into. This keeps the pool independently readable.
     legacy_candidate_count = len(merged_recommendations)
+    legacy_rows_withheld = 0
     if board_l2a_fallback_enabled():
         fallback_cards = _layer2_fallback_recommendations(requested_dates, vintages=artifact_vintages)
         if fallback_cards:
+            # LEGACY PROP AND GAME ROWS LEAVE THE BOARD ONCE LAYER 2 HAS ROWS (lane
+            # `layer2-row-parity`, user decision 2026-09-15 "Server-side").
+            #
+            # Measured on the served board 2026-09-15 15:25Z: 58 of 3,070 rows came
+            # from the legacy candidate pool, and 16 of its 39 MLB props were the
+            # SAME BET as a Layer 2 row with contradictory numbers (Kyle Freeland
+            # over 11.5 outs: legacy "edge 43.3%", Layer 2 EV -5.1%). Their
+            # sparklines were wrong-side on MLB unders and wrong-game on 6 of 14
+            # soccer rows. Layer 2 cards now carry the headshot, explainer and
+            # movement those rows had, so the duplicates add only contradictions.
+            #
+            # Withheld here rather than at the pool so `legacy_candidate_count`
+            # above still reads the pool's own size (`#308`), and only when
+            # `fallback_cards` is non-empty, so a Layer 2 outage still shows the
+            # legacy board instead of nothing. Steam rows (`candidate_type` steam)
+            # are a different signal with no Layer 2 twin and are kept.
+            kept = [
+                item
+                for item in merged_recommendations
+                if str(item.get("source") or "") == "layer2_shortlist"
+                or str(item.get("candidate_type") or "").strip().lower() not in {"prop", "game"}
+            ]
+            legacy_rows_withheld = len(merged_recommendations) - len(kept)
+            merged_recommendations[:] = kept
             # Re-promote through the SAME contract rather than appending to the
             # output: the normaliser owns ranking, dedupe and the card shape, so
             # L2-A rows are translated to fit the board instead of the board
@@ -9535,6 +9560,9 @@ def read_combined_intelligence_response(
     # Always emitted, so "is `#308` still live" stays a one-field question now
     # that `candidate_count` includes L2-A on every request.
     combined["legacy_candidate_count"] = legacy_candidate_count
+    # `layer2-row-parity`: how many of those the board withheld because Layer 2
+    # had rows. 0 when the flag is off or Layer 2 was empty.
+    combined["legacy_rows_withheld"] = legacy_rows_withheld
     combined["layer2_is_primary"] = bool(board_l2a_fallback_enabled())
     # Named, so a board filled from L2-A is never mistaken for the legacy pool
     # having recovered. Absent when the fallback did not fire, which keeps the
