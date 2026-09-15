@@ -153,17 +153,17 @@ def test_a_fill_above_our_own_limit_is_WITHHELD_not_recorded(capsys):
     #   * a BUY above its limit  -> withheld
     #   * a SELL below its limit -> withheld
     #   * an unreadable side near 0.5 -> withheld
-    assert view["fill_price"] == 0.43
+    #
+    # REVERSED 2026-09-15 (lane polymarket-no-price-convention). `price` is the
+    # YES price and a NO buy is a YES SELL at >= 0.43, so a YES fill at 0.43 is
+    # exactly at the limit and the NO cost is 1 - 0.43 = 0.57 -- the number the
+    # ledger recorded on 08-26 before the 08-30 proximity rule "corrected" it.
+    # The "$3.06 ceiling" above assumed 0.43 was our NO limit; it was not.
+    assert view["fill_price"] == 0.57
 
     out = capsys.readouterr().out
-    assert "FILL_ABOVE_LIMIT" not in out, (
-        "nothing to refuse once the complement is chosen by the limit"
-    )
-    # `submitted_limit=` only ever appeared in the FILL_ABOVE_LIMIT line, which
-    # no longer fires here. The price itself is still logged, and that is the
-    # line this file's own header says was missing when the defect was
-    # diagnosed from a screenshot.
-    assert "avgPx='0.43'" in out and "recorded=0.43" in out
+    assert "FILL_ABOVE_LIMIT" not in out, "a YES sell filling at its limit is ordinary"
+    assert "avgPx='0.43'" in out and "recorded=0.57" in out
 
 
 def test_a_normal_NO_fill_is_untouched_by_the_limit_check(capsys):

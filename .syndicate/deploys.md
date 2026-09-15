@@ -35475,3 +35475,25 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
 - The 2 plain-longer shards (mlb 09-13, soccer 08-30) correctly stayed plain.
 - **verify: NOT MET** for the lane goal. Lane `book-quotes-prefer-fuller-copy` holds the next step: a content diff of one tied shard, then the user's choice between a line-count tie-break and repairing the plain copies.
 - Rollback: redeploy `9b214a33` to refresh-worker. The probe is read-only and one-shot, and the marker stops it re-running.
+
+## 2026-09-15 17:08:55Z (12:09 CT) — live-odds-worker `54f3d662` -> `4bd5ece9` — deploy `dep-daknn9qd0e5s73a3gnag` — lane polymarket-rejected-resubmit-loop — **verify OWED (first Polymarket submit / first venue reject)**
+- **What:** `1f9c9c62`. `execution_ledger.place_order` refuses `venue_rejected_unchanged` when the key's row was rejected BY THE VENUE (`error=venue_order_state_rejected`) and the price and stake are unchanged: nothing is built, sent or written. `polymarket_us_orders.submit_order` logs `SUBMIT_RESPONSE` (keys, order keys, id, status, executions count). User decisions: "do all 3", then "deploy it once the NO check reports" (it reported 12:50 CDT).
+- **Ride-along** (`54f3d662..4bd5ece9`, runtime; none of it changes live-odds-worker behaviour unless noted):
+  - `a7a40471` step 2 price-at-ask, behind `SYNDICATE_POLYMARKET_PRICE_AT_ASK` (absent here, so OFF).
+  - `d4c8814f` resolve probe (refresh-worker-only, via disk maintenance on a `refresh-worker` slug).
+  - `9b214a33` WNBA future-date cache.
+  - `da013b77`/`da268e07`/`b6a0e346`/`c4f45fee`/`dedfede6` board (web).
+  - accuracy-assessment-0914 recorder/skill commits (recorder default OFF).
+  - `339dc6e9`/`0a18557a`/`53d989af`/`d4deb502` refresh-worker memory.
+  - `f808186c` layer2-row-parity UI and brand assets (web).
+  - No `render.yaml` or `requirements*` change. `54f3d662` is an ancestor.
+- **NOT in this deploy:** the Polymarket NO price convention fix (lane `polymarket-no-price-convention`, built after this deploy). NO orders still send the NO price as `price` until that ships.
+- **Locks:**
+  - Claim acquired 17:05:16Z (token `e7f55ea8…`).
+  - Preflight with a stated expectation (`submit_response_logged no->yes`, `venue_rejected_unchanged ... 0_lines->yes`, baseline 0/0 read 17:05:26Z and re-read each try): HOLD 17:05-17:06Z (WNBA odds refresh, 5 jobs), then CLEAR 17:07:11Z.
+  - Live **17:14:47Z**, `update_in_progress` from 17:13Z. Claim released ~17:17Z.
+- **verify: OWED.**
+  - (1) The first Polymarket `SUBMIT` on the new process is followed by a `SUBMIT_RESPONSE` line.
+  - (2) At the next venue `ORDER_STATE_REJECTED`, the following pass logs `REFUSED_AT_BUILD ... reason=venue_rejected_unchanged` for that key with no second `SUBMIT`.
+  - A watcher is reading (1) for 45 min from go-live. (2) needs a venue reject, and none has occurred since 15:00Z.
+- Rollback: redeploy `54f3d662` to live-odds-worker.

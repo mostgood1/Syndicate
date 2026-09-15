@@ -645,6 +645,26 @@ death, never life — do not invert it.
 - History: the hypotheses H1–H4, their verdicts and the decision text were moved VERBATIM to `lanes_history.md` on 2026-09-11. The readings are in `state_polymarket.md`.
 
 
+### polymarket-no-price-convention — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: [user 2026-09-15: "Build the NO fix now"] every live Polymarket NO order is sent with `price` on the YES scale (`1 - p_NO`, snapped DOWN so the YES sell stays marketable), and every NO fill is booked at `1 - avgPx`. Read on production after deploy: a NO `SUBMIT` whose `price` equals 1 minus our NO limit, its fill booked at `1 - avgPx` at or below our NO limit, and the venue buying-power drop equal to that NO cost x contracts + fee.
+- Files: `syndicate/features/shared/polymarket_us_orders.py`, `tests/test_polymarket_us_orders.py` (both TAKEN 2026-09-15 from lane `polymarket-ask-pricing`, same session), `tests/test_polymarket_fill_price_side.py`, `tests/test_market_basis_picks.py` (NO-fill expectations only). NOT `execution_guard.py` (see below).
+- Origin: lane `polymarket-rejected-resubmit-loop`, NO CONVENTION SETTLED 2026-09-15 ~12:50 CDT. The evidence (venue docs, balance moves to the cent, 29/29 YES fills at or below their limit while NO fills landed above it) is in that block and commit `fa8faf14`.
+- Plan, pre-registered BEFORE code:
+  - (i) **`order_body`, NO:** body `price = round_price_to_tick(1 - p_NO, tick, direction="down")`; NO cost = `1 - that`; quantity is sized against the NO cost. YES is unchanged. Step 2's NO ask (= 1 - best YES bid) then sends the best YES bid.
+  - (ii) **`submit_order`:** a synchronously FILLED NO books `fill_price` = NO cost, not the YES number.
+  - (iii) **`venue_order_view` fill price, NO:** always `1 - avgPx`; the limit-proximity choice is removed. The limit check reads the venue's YES-scale `price` against YES `avgPx`, as a SELL for a NO order (a NO buy is a YES sell).
+  - (iv) **The step-1 instrument's `sent` and `marketable` for NO:** read on the NO scale (`1 - body price`).
+  - (v) **Balance gate: NO CHANGE NEEDED once (i) ships.** The venue reserves `(1 - YES price) x qty` = NO cost x qty ≈ our stake, which `check_order` already charges. `execution_guard.py` stays untouched, and is claimed by `kalshi-shard-balance-gate` anyway.
+- Falsification tests:
+  - (a) a NO body at p_NO 0.24 on a 0.005 tick sends price 0.76 and sizes against 0.24;
+  - (b) the phi-ten book sends the best YES bid;
+  - (c) `C65VD0R72KDG`'s shape (YES price 0.22, avgPx 0.235, SELL) books 0.765 and does NOT withhold;
+  - (d) dal-nyg (sent 0.40, avgPx 0.605) books 0.395;
+  - (e) a YES body is byte-identical to today's.
+- Known changed expectations: BOS/MIA 08-26 (limit 0.43, avgPx 0.43, NO) books 0.57, which the 08-26 ledger originally recorded before the 08-30 proximity rule "corrected" it to 0.43. The proximity rule's own table is re-read under the YES-scale convention.
+- Verification: per the Goal, in `deploys.md`, after a live-odds-worker deploy the user approves.
+- Blocked by: none.
+
 ### book-quotes-splice-repair — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - Goal: [user 2026-09-15: "open the lane and bring me the plan"] no `book_quotes` shard gains a headless fragment line, and the shards already damaged are repaired. Read on production after the fix: 0 lines failing `json.loads` in newly written shards on web and refresh-worker across a full capture day; the refresh-worker byte-offset tail pull never appends into a file that is not a byte prefix of web's copy (the mismatch case is logged by name); and the affected historical shards read clean or are listed with their bad-line counts.
 - Files: none yet. The plan is being mapped read-only and goes to the user before any file is claimed.
@@ -658,6 +678,32 @@ death, never life — do not invert it.
 - Falsification test: a fragment appears in a shard written after both guards are live, OR a dropped "fragment" turns out not to be a suffix of any intact line (that would be data loss, not repair).
 - Verification: per the Goal, recorded in `deploys.md`.
 - Blocked by: the user's approval of the plan.
+- **MAP 2026-09-15 ~13:30 CDT (read-only agent; code + logs + bounded GETs on web's stream route).**
+  - **Every sampled shard has fragments** (bad = fails `json.loads`):
+    - mlb 09-15 14, then 15 a quarter-hour later
+    - mlb 09-14 33
+    - soccer 09-13 190
+    - nfl 09-13 3
+    - ncaaf 09-11 36
+    - soccer 09-15 41
+    - nfl 09-14 14
+  - The damage is ongoing: a new 79-byte headless line landed at exactly web's previous file size via a merge.
+  - **The pull checks nothing.** `pull_streamed_artifact` tail path (`artifact_publisher.py:3193-3222`): `Range: bytes=<local size>-`, appends on any 206, with no prefix, hash, size or newline check. It ignores the route's `X-Artifact-Size`. A 416 counts as success.
+  - **Refresh-worker republishes the splices.** It publishes whole files (`SWEEP_REPAIRING` republishes tail-pulled bytes too).
+  - **Web keeps them.** Its merge appends every new whole-line digest, with no JSON check (`artifact_merge.py:180-193`).
+  - **Readers drop fragments silently** (`iter_book_quotes`/`read_book_quotes` `except: continue`), and NO counter exists anywhere.
+  - **A POSSIBLE SECOND WRITER:** ncaaf 09-11 fragments recur ~hourly with ~240 `STREAM_TAIL_OK` and NO logged append on refresh-worker. Its local file grew 4,098 B with no log line, which fits an unlogged child-process (weekly OddsAPI) writer. Unproven.
+  - **Claims:** `artifact_publisher.py` is held by `quote-state-publish-retry` (retry wrapper only) and possibly `accuracy-assessment-0914` (scope unverified). `artifact_merge.py` is unclaimed. `odds_book_quotes.py` is held by this session's `book-quotes-prefer-fuller-copy`.
+- **PLAN (proposed to the user 2026-09-15, NOT approved, nothing claimed):**
+  - **P0, measure first (refresh-worker + web).** A per-shard bad-line counter in `iter_book_quotes`/`read_book_quotes`: `BOOK_QUOTES_BAD_LINES sport date n`, once per shard per process. It gives the baseline and the verify instrument.
+  - **P1, the web merge refuses non-JSON lines** for `book_quotes` paths (`artifact_merge.py`), logging `MERGE_REFUSED_BAD_LINES`. This stops fragments landing on web from ANY publisher, the unproven second writer included. Web deploy.
+  - **P2, the refresh-worker tail pull verifies the prefix** (`artifact_publisher.pull_streamed_artifact`):
+    - Request from `local_size - overlap`, compare the overlap bytes with the local tail, and require the reply to start on a line boundary and `X-Artifact-Size >= local_size`.
+    - On mismatch it does NOT append. It logs `STREAM_TAIL_PREFIX_MISMATCH`, pulls web's whole copy to a temp file, and writes back the union of valid JSON lines (web ∪ local), atomically, so a local row not yet merged is not lost.
+    - Needs coordination with `quote-state-publish-retry`. Refresh-worker deploy.
+  - **P3, repair (one-shot, web first, then refresh-worker).** Per shard, drop only lines that fail `json.loads` AND are a byte suffix of an intact line in the same shard, with an atomic rewrite. Any other bad line is kept and counted (`REPAIR_ORPHAN_BAD_LINE`), never deleted blind. Refresh-worker's local plain and `.gz` copies are then replaced by web's repaired copy.
+  - **P4, verify:** a full capture day with `BOOK_QUOTES_BAD_LINES = 0` on new shards on web and refresh-worker, 0 fragments merged, and every `STREAM_TAIL_PREFIX_MISMATCH` resolved by a whole pull.
+  - **Order:** P0+P1 (web) -> P0+P2 (refresh-worker) -> P3 -> P4. Each is a separate deploy, measured before the next.
 
 ### polymarket-rejected-resubmit-loop — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - Goal: [user 2026-09-15: "open a lane for the rejection loop"] a Polymarket order the venue REJECTS is not re-submitted unchanged on every pass, and its reject reason is logged. Read on production: after the fix, a venue rejection produces ONE `submitted->rejected` per (ticker, price, qty), a named reason on the log line, and no further `SUBMIT` for that ticker until something about the order changes. Accepted orders are unaffected (fills, rests and expiries continue).
@@ -785,7 +831,7 @@ death, never life — do not invert it.
 - Goal: todo `#662`, the user's decision (2) of 2026-09-11 ("start pricing off the executable ask plus fees").
   - STEP 1, this lane's first deliverable, an instrument with its own deploy: at every Polymarket order build, read the slug's book with the signed client. Log our side's best ask and its size next to the price we would send, and the EV at that ask. A failed read never blocks an order.
   - STEP 2, after step 1 has a population, and only on the user's go: price EV and Kelly at the ask net of fees, refuse below the minimum, and cap the stake at the size available at the ask.
-- Files: `syndicate/features/shared/polymarket_us_orders.py`, `tests/test_polymarket_us_orders.py`, `tests/test_polymarket_cancel_order.py`. The last was ADDED 2026-09-11 for the kickoff expiry and the cancel-route fix.
+- Files: `tests/test_polymarket_cancel_order.py`. Released: the Polymarket orders module and its test file **[RELEASED 2026-09-15 ~13:20 CDT to lane `polymarket-no-price-convention` (same session 0f5b256e) for the NO price fix; they return here at that lane's close]**.
 - Hypothesis (to test, not believed): the displayed `outcomePrices` number that EV is priced on is often not the executable ask for our side. The largest claimed edges are the least executable, which would explain paper h2h at +50.5% while live h2h is −23.4%, and the whole live loss sitting in the above-median stakes.
 - Falsification test: over the first 20 or more logged builds, our side's best ask sits within one tick of the price we send, and the EV at that ask is within 1 point of the plan's `ev_pct`, in the large-EV rows as well as the small ones.
 - Verification (step 1): at least 20 `POLYMARKET_BOOK_AT_BUILD` lines on live-odds-worker, each with ask, size, sent price and EV at the ask. Recorded in `state_polymarket.md` with the distribution of (EV at ask − planned EV) by planned-EV bucket, and zero orders blocked by a failed read.

@@ -129,24 +129,6 @@ from syndicate.features.shared.venue_order_states import (
 
 # SHARED WITH EVERY OTHER VENUE -- see `venue_order_states`. Was a private
 # copy until 2026-08-27 and had drifted from Kalshi's in both directions.
-#: How much closer to the submitted limit one reading must be before it is
-#: allowed to decide direct-vs-complement. Near a 0.5 limit the two are almost
-#: equidistant and the test cannot discriminate; below this separation the
-#: side label decides instead, and an unreadable side still withholds.
-#: 0.10 is deliberately CONSERVATIVE and does NOT decide most recorded fills --
-#: stated precisely because the first draft of this comment claimed it did:
-#:
-#:     limit 0.4405  separation 0.1190  DECIDED by limit -> direct
-#:     limit 0.4545  separation 0.0910  falls through to the side rule
-#:     limit 0.4902  separation 0.0196  falls through to the side rule
-#:     limit 0.5192  separation 0.0384  falls through to the side rule
-#:     limit 0.2200  separation 0.5300  DECIDED by limit -> direct  <- the blocker
-#:
-#: That is the intent: the side rule is right on all four historical fills, so
-#: this must not override it where they are close. It fires only where the two
-#: readings are far apart -- which is exactly where the side rule was wrong.
-_COMPLEMENT_MARGIN = 0.10
-
 _VENUE_FILLED_STATUSES = VENUE_FILLED_STATUSES
 
 _ORDERS_PATH = "/v1/orders"
@@ -695,14 +677,44 @@ def order_body(
             f"price_out_of_range_after_snap: price={price} tick={tick_size} snapped={snapped}"
         )
 
+    outcome_side = _resolve_outcome_side(
+        getattr(request, "side", None),
+        outcome_index,
+        yes_leg_index=yes_leg_index,
+        yes_leg_reason=yes_leg_reason,
+    )
+    # `price` IS ALWAYS THE YES PRICE ON THIS VENUE  [2026-09-15, lane
+    # polymarket-no-price-convention, user decision "Build the NO fix now"].
+    # Venue docs: "price is always the YES price; there is no separate NO book"
+    # -- buying NO at 0.20 is a YES sell at 0.80. Every NO order until now sent
+    # OUR NO price as `price`, which the venue read as a YES floor, so its real
+    # NO ceiling was 1 - p: no price protection. Measured: dal-nyg NO sent 0.40
+    # filled at YES 0.605 and the balance fell 13.57 x 0.395 + 0.19 = $5.55, and
+    # phi-ten NO @ 0.245 was rejected 34 times because the venue held
+    # (1 - 0.245) x 6.53 = $4.93 against $2.84.
+    #
+    # So a NO order sends 1 - p on the YES scale, snapped DOWN: a YES SELL limit
+    # snapped down stays marketable, exactly as a buy snapped up does. Our NO
+    # cost is then 1 - that limit, and the quantity is sized against it.
+    if outcome_side == _SIDE_NO:
+        sent_price = round_price_to_tick(round(1.0 - snapped, 9), tick_size, direction="down")
+        if not 0.0 < sent_price < 1.0:
+            raise OrderBuildError(
+                f"price_out_of_range_for_no: no_price={snapped} yes_limit={sent_price} tick={tick_size}"
+            )
+        our_cost = round(1.0 - sent_price, 9)
+    else:
+        sent_price = snapped
+        our_cost = snapped
+
     if stake_dollars is None:
         stake = float(getattr(request, "requested_stake_dollars", 0.0) or 0.0)
     else:
         stake = float(stake_dollars)
-    # SIZED AGAINST THE PRICE WE WILL PAY, which is the snapped one. Sizing off
-    # the unsnapped price would buy a quantity the order cannot afford at the
-    # price actually sent.
-    quantity = quantity_for_stake(stake, snapped, minimum_trade_qty)
+    # SIZED AGAINST THE PRICE WE WILL PAY, which is our side's cost after the
+    # snap. Sizing off the unsnapped price would buy a quantity the order cannot
+    # afford at the price actually sent.
+    quantity = quantity_for_stake(stake, our_cost, minimum_trade_qty)
     if max_quantity is not None:
         # NO MORE THAN RESTS AT THE PRICE WE PAY (#662 step 2). Floored to the
         # increment for the same reason the stake is: a cap the rounding exceeds
@@ -734,7 +746,7 @@ def order_body(
         "type": _TYPE_LIMIT,
         # An OBJECT with a currency, not a bare number -- the documented
         # `Amount` shape, used for every price and cash field on this venue.
-        "price": {"value": f"{snapped:.6f}".rstrip("0").rstrip("."), "currency": _CURRENCY},
+        "price": {"value": f"{sent_price:.6f}".rstrip("0").rstrip("."), "currency": _CURRENCY},
         "quantity": quantity,
         "tif": _TIF_GTD if expiry else _TIF_GTC,
         **({"goodTillTime": expiry} if expiry else {}),
@@ -774,12 +786,7 @@ def order_body(
         # The price still comes from the matched index, and is now consistent:
         # buying YES (`Over`) at `outcomePrices[1]` (Over's price) describes
         # one outcome again.
-        "outcomeSide": _resolve_outcome_side(
-            getattr(request, "side", None),
-            outcome_index,
-            yes_leg_index=yes_leg_index,
-            yes_leg_reason=yes_leg_reason,
-        ),
+        "outcomeSide": outcome_side,
         "action": _ACTION_BUY,
         "manualOrderIndicator": _MANUAL_INDICATOR,
         # The ledger's key, sent so the venue can reject a duplicate we cannot
@@ -788,6 +795,15 @@ def order_body(
         # venue is the only place that question can be answered.
         "clientOrderId": idempotency_key(request),
     }
+
+
+def _our_side_price(body: Mapping[str, Any]) -> float | None:
+    """What one contract costs OUR side, from a body whose `price` is the YES price."""
+    try:
+        wire = float(body["price"]["value"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return round(1.0 - wire, 9) if body.get("outcomeSide") == _SIDE_NO else wire
 
 
 def _orders_url() -> str:
@@ -889,14 +905,17 @@ def submit_order(
     order = response.get("order") if isinstance(response.get("order"), Mapping) else response
     raw_status = str(order.get("status") or "").strip().lower()
     executed = raw_status in _VENUE_FILLED_STATUSES
+    # OUR SIDE'S PRICE, not the wire's: the body carries the YES price, so a NO
+    # order costs 1 - it (see `order_body`).
+    our_price = _our_side_price(body)
 
     return {
         "status": "filled" if executed else "submitted",
         "venue_order_id": order.get("id") or order.get("orderId"),
         "venue_status": raw_status or None,
-        "fill_price": price_dollars if executed else None,
+        "fill_price": our_price if executed else None,
         "fill_stake_dollars": (
-            round(float(body["quantity"]) * float(price_dollars), 2) if executed else None
+            round(float(body["quantity"]) * float(our_price), 2) if executed else None
         ),
         "contracts": float(body["quantity"]) if executed else 0,
         "requested_contracts": float(body["quantity"]),
@@ -1129,10 +1148,9 @@ def _log_book_at_build(request: Any, body: Mapping[str, Any]) -> None:
         return
     slug = body.get("marketSlug")
     side = body.get("outcomeSide")
-    try:
-        sent = float(body["price"]["value"])
-    except (KeyError, TypeError, ValueError):
-        sent = None
+    # On OUR side's scale, the same scale as `ask` below: a NO body's `price` is
+    # the YES price (`order_body`), so comparing it to a NO ask raw is wrong.
+    sent = _our_side_price(body)
     try:
         data = _read_book(slug)
         book = data.get("marketData", data) if isinstance(data, Mapping) else {}
@@ -2018,67 +2036,27 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
     is_yes = outcome_side.endswith("YES")
 
     # ------------------------------------------------------------------
-    # CHOOSE THE READING THE SUBMITTED LIMIT AGREES WITH, not the one the
-    # side label implies. (2026-08-30)
+    # THE LIMIT-PROXIMITY CHOICE IS GONE. The side decides. (2026-09-15)
     # ------------------------------------------------------------------
     #
-    # The `is_no` rule below was inferred from four fills and is right on all
-    # four. It is WRONG on the order that halted live execution for ~12 hours,
-    # and the failure is silent because the guard downstream then correctly
-    # refuses the nonsense it produces:
+    # From 2026-08-30 this picked whichever of {avgPx, 1-avgPx} sat closer to
+    # the echoed limit, on the belief that `order["price"]` was OUR limit on OUR
+    # side's scale. It is not: on this venue `price` is ALWAYS the YES price
+    # (docs: "price is always the YES price; there is no separate NO book"),
+    # and a NO buy is a YES SELL. So avgPx and price are both YES-scale, a NO
+    # fill costs 1 - avgPx every time, and the proximity rule picked the wrong
+    # reading exactly where the two are far apart:
     #
-    #     C65VD0R72KDG   avgPx 0.2350   submitted limit 0.22
-    #     outcomeSide OUTCOME_SIDE_NO -> complement -> 0.7650
-    #     0.7650 > 0.22  -> FILL_ABOVE_LIMIT -> price WITHHELD -> None
+    #     C65VD0R72KDG  NO  price 0.22  avgPx 0.235  ORDER_SIDE_SELL
+    #       proximity said 0.235; the cost was 1 - 0.235 = 0.765
+    #     dal-nyg       NO  price 0.40  avgPx 0.605  balance -$5.55
+    #       = 13.57 x 0.395 + 0.19 fee, i.e. 1 - avgPx, to the cent
     #
-    # `fill_price=None` then forced `execution_ledger` onto its contract bound,
-    # which refused `13.13 > 10.8953` and blocked every live slate. The venue
-    # had reported the fill price the whole time; three sessions diagnosed this
-    # as "this path has no fill price". It had one, and this line discarded it.
-    #
-    # THE DISCRIMINATOR NEEDS NO SIDE SEMANTICS, which is what makes it safe
-    # here: `order["price"]` is OUR submitted limit as the venue itself echoes
-    # it, so it is quoted on the same scale as `avgPx`. A real fill sits near
-    # its limit; the complement sits ~a whole unit away. So pick whichever of
-    # {avgPx, 1-avgPx} is closer to the limit.
-    #
-    # VALIDATED ON EVERY FILL THIS FILE HAS EVER RECORDED -- the four in the
-    # table above, 4/4, plus the blocking order:
-    #
-    #     limit   avgPx   |direct-lim|  |compl-lim|   picks       recorded
-    #     0.4405  0.4000       0.0405      0.1595     direct      direct
-    #     0.4545  0.5500       0.0955      0.0045     COMPLEMENT  COMPLEMENT
-    #     0.4902  0.5100       0.0198      0.0002     COMPLEMENT  COMPLEMENT
-    #     0.5192  0.5200       0.0008      0.0392     direct      direct
-    #     0.2200  0.2350       0.0150      0.5450     direct      (was withheld)
-    #
-    # AMBIGUITY IS A REFUSAL, NOT A COIN FLIP. Near a 0.5 limit the two
-    # readings are nearly equidistant and this cannot tell them apart, so it
-    # falls through to the side rule rather than guessing -- the same choice
-    # the unreadable-side branch already makes. `_COMPLEMENT_MARGIN` is the
-    # separation required before the limit is allowed to decide.
-    decided_by_limit = False
-    if price is not None and 0.0 < price < 1.0:
-        limit_hint = order.get("price")
-        if isinstance(limit_hint, Mapping):
-            limit_hint = limit_hint.get("value")
-        try:
-            limit_hint = float(limit_hint)
-        except (TypeError, ValueError):
-            limit_hint = None
-        if limit_hint is not None and 0.0 < limit_hint < 1.0:
-            direct_gap = abs(price - limit_hint)
-            complement_gap = abs((1.0 - price) - limit_hint)
-            if abs(direct_gap - complement_gap) >= _COMPLEMENT_MARGIN:
-                decided_by_limit = True
-                if complement_gap < direct_gap:
-                    price = round(1.0 - price, 4)
-
-    if decided_by_limit:
-        pass
-    elif price is not None and 0.0 < price < 1.0 and is_no:
-        price = round(1.0 - price, 4)
-    elif price is not None and not (is_yes or is_no):
+    # Across 2026-08-29..09-15, 29 of 29 YES fills landed at or below their
+    # limit while NO fills landed ABOVE it -- only a YES sell can do that. The
+    # four historical fills in the table above are unchanged under this rule.
+    # Lane `polymarket-no-price-convention`.
+    if price is not None and not (is_yes or is_no):
         # AN UNREADABLE SIDE IS A REFUSAL, NOT A COIN FLIP. Complementing a YES
         # price inverts a correct number; leaving a NO price inverts it the
         # other way. Both are wrong and neither is detectable downstream, so
@@ -2156,7 +2134,10 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
     # `outcomeSide` (which names the token). An unreadable direction keeps the
     # BUY rule -- the conservative branch, and the one this file already had.
     order_direction = str(order.get("side") or "").strip().upper()
-    is_sell = order_direction.endswith("SELL")
+    # A NO BUY IS A YES SELL, whatever `side` says (2026-09-15). The check runs
+    # on the YES scale, where both `avgPx` and `price` are quoted, BEFORE the
+    # NO complement below.
+    is_sell = order_direction.endswith("SELL") or is_no
 
     if (
         price is not None
@@ -2174,17 +2155,18 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
             f"[polymarket_us_orders] FILL_ABOVE_LIMIT"
             f" order={order.get('id') or order.get('orderId')}"
             f" slug={order.get('marketSlug')!r} outcome_side={outcome_side!r}"
-            f" avgPx={raw_price!r} recorded={price!r} submitted_limit={submitted_limit!r}"
-            f" filled={filled!r} complement_of_recorded={round(1.0 - price, 4)!r}"
-            f" direction={order_direction!r}"
-            " -- a BUY cannot fill above its own limit (nor a SELL below it), so"
-            " the recorded price is"
-            " wrong. Price WITHHELD; reconciliation falls back to the requested"
-            " price. Check whether the avgPx complement was applied to the wrong"
-            " side for this market.",
+            f" avgPx={raw_price!r} yes_fill={price!r} submitted_limit={submitted_limit!r}"
+            f" filled={filled!r} direction={order_direction!r} as_sell={is_sell}"
+            " -- on the YES scale a BUY cannot fill above its own limit (nor a"
+            " SELL below it), so the reported price is wrong. Price WITHHELD;"
+            " reconciliation falls back to the requested price.",
             flush=True,
         )
         price = None
+
+    # NOW OUR SIDE'S COST: a NO fill is the complement of the YES fill.
+    if price is not None and 0.0 < price < 1.0 and is_no:
+        price = round(1.0 - price, 4)
 
     # NOT-A-PRICE, REPORTED. A refusal nobody can read is one somebody deletes,
     # so a rejected value says which field and why -- but the two cases are

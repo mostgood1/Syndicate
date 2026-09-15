@@ -58,14 +58,16 @@ def _body(**kw):
 def test_an_under_BUYS_NO_rather_than_selling_yes():
     """Kalshi has no `no` value -- "bid means buy YES, ask means sell YES" --
     so an under there is an ASK at the complement. This venue has
-    `OUTCOME_SIDE_NO` and `ORDER_ACTION_BUY`. Copying Kalshi would send
-    `sell YES at 1-p` where `buy NO at p` was meant: both are real orders,
-    at different prices, on different legs, and the log would look fine."""
+    `OUTCOME_SIDE_NO` and `ORDER_ACTION_BUY`, so the LEG is NO.
+
+    UPDATED 2026-09-15 (lane polymarket-no-price-convention): the PRICE is not.
+    `price` is always the YES price on this venue, so a NO buy at p sends 1 - p
+    (0.55 -> 0.45), and the quantity is still sized against our NO cost 0.55."""
     body = _body(request=_Request(side="under"))
     assert body["outcomeSide"] == "OUTCOME_SIDE_NO"
     assert body["action"] == "ORDER_ACTION_BUY"
-    # The PRICE IS NOT COMPLEMENTED. 0.55 stays 0.55.
-    assert body["price"]["value"] == "0.55"
+    assert body["price"]["value"] == "0.45"
+    assert body["quantity"] == 18  # floor(10 / 0.55), sized on the NO cost
 
 
 def test_an_over_buys_yes():
@@ -1019,6 +1021,69 @@ def test_a_cap_below_one_increment_is_a_named_refusal():
     request = _Request(stake=10.0)
     with pytest.raises(OrderBuildError, match="^ask_size_below_minimum"):
         _body(request=request, max_quantity=0.5)
+
+
+# --------------------------------------------------------------------------
+# `price` IS ALWAYS THE YES PRICE  [2026-09-15, lane polymarket-no-price-convention]
+# --------------------------------------------------------------------------
+
+
+def test_a_NO_body_sends_the_YES_price_and_sizes_on_the_NO_cost():
+    """(a) p_NO 0.24 on a 0.005 tick: wire 0.76, quantity floor(10 / 0.24)."""
+    body = _body(request=_Request(side="under"), price_dollars=0.24, tick_size=0.005, minimum_trade_qty=0.01)
+    assert body["outcomeSide"] == "OUTCOME_SIDE_NO"
+    assert body["price"]["value"] == "0.76"
+    assert body["quantity"] == pytest.approx(41.66)
+
+
+def test_the_phi_ten_order_sends_0755_not_0245():
+    """The measured order: NO @ 0.245 was sent as 0.245 and the venue read a YES
+    sell at 0.245 (worst case $4.93). Correctly sent it is a YES sell at 0.755."""
+    body = _body(request=_Request(side="under", stake=1.60), price_dollars=0.245, tick_size=0.005, minimum_trade_qty=0.01)
+    assert body["price"]["value"] == "0.755"
+    assert body["quantity"] == pytest.approx(6.53)
+
+
+def test_a_YES_body_is_unchanged():
+    """(e) Only the NO leg moved."""
+    body = _body(request=_Request(side="over"), price_dollars=0.245, tick_size=0.005, minimum_trade_qty=0.01)
+    assert body["outcomeSide"] == "OUTCOME_SIDE_YES"
+    assert body["price"]["value"] == "0.245"
+    assert body["quantity"] == pytest.approx(40.81)
+
+
+def test_a_NO_price_the_YES_grid_cannot_express_is_refused():
+    with pytest.raises(OrderBuildError, match="^price_out_of_range"):
+        _body(request=_Request(side="under"), price_dollars=0.995, tick_size=0.01, minimum_trade_qty=1)
+
+
+def test_step_two_on_the_phi_ten_book_sends_the_best_YES_bid(monkeypatch):
+    """(b) With enough EV to place, the NO ask (1 - 0.76 = 0.24) is sent as the
+    YES bid 0.76 -- a sell that meets the bid -- sized on 0.24, capped at its depth."""
+    from syndicate.features.shared.polymarket_us_orders import order_body
+
+    request = _priced(side="under", american=0.2398, ev=30.0)
+    sent, refused = _ask_build(request, monkeypatch, price=0.245,
+                               book=_book(bids=(("0.76", "8192.7"),), offers=(("0.765", "100"),)))
+    assert refused is None
+    body = order_body(request, **sent)
+    assert body["price"]["value"] == "0.76"
+    assert body["outcomeSide"] == "OUTCOME_SIDE_NO"
+
+
+def test_a_synchronously_filled_NO_order_books_the_NO_cost(monkeypatch):
+    from syndicate.features.shared import polymarket_us_orders as mod
+
+    monkeypatch.setattr(
+        "syndicate.features.shared.polymarket_us_auth.signed_request",
+        lambda *a, **k: {"id": "ord-no", "status": "FILLED"},
+    )
+    result = mod.submit_order(
+        _Request(side="under", stake=10.0), price_dollars=0.55, market_slug="s",
+        tick_size=0.01, minimum_trade_qty=1,
+    )
+    assert result["fill_price"] == pytest.approx(0.55)
+    assert result["fill_stake_dollars"] == pytest.approx(9.9)
 
 
 # --------------------------------------------------------------------------

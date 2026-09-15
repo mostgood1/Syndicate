@@ -763,15 +763,29 @@ def test_the_blocking_orders_fill_price_is_no_longer_discarded():
     """REGRESSION, real money, ~12h outage.
 
     `outcomeSide=NO` complemented 0.2350 -> 0.7650, which the FILL_ABOVE_LIMIT
-    guard then correctly refused against a 0.22 limit, leaving fill_price None.
-    The ledger fell back to a contract bound and refused 13.13 > 10.8953.
+    guard then refused against a 0.22 limit, leaving fill_price None. The ledger
+    fell back to a contract bound and refused 13.13 > 10.8953.
+
+    UPDATED 2026-09-15 (lane polymarket-no-price-convention). The 08-30 fix read
+    the fill as 0.235 by limit proximity. `price` is the YES price and a NO buy
+    is a YES SELL: selling YES at 0.22 or better and filling at 0.235 is price
+    improvement, and the NO cost is 1 - 0.235 = 0.765. The price must still not
+    be discarded -- it is now the right one.
     """
     from syndicate.features.shared.polymarket_us_orders import venue_order_view
 
     view = venue_order_view(_pm_order())
     assert view["state"] == "filled"
     assert view["fill_price"] is not None, "the venue reported avgPx and we dropped it"
-    assert abs(view["fill_price"] - 0.2350) < 1e-6, view["fill_price"]
+    assert abs(view["fill_price"] - 0.7650) < 1e-6, view["fill_price"]
+
+
+def test_the_dal_nyg_NO_fill_books_one_minus_avgpx():
+    """(d) Sent 0.40, filled avgPx 0.605; the balance fell 13.57 x 0.395 + 0.19."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    view = venue_order_view(_pm_order(avgPx={"value": "0.6050"}, price={"value": "0.40"}, cumQuantity=13.57))
+    assert abs(view["fill_price"] - 0.395) < 1e-6
 
 
 def test_the_side_rule_still_decides_the_fills_it_got_right():
@@ -795,24 +809,33 @@ def test_the_side_rule_still_decides_the_fills_it_got_right():
         assert abs(view["fill_price"] - expected) < 1e-6, (limit, avg, side, view["fill_price"])
 
 
-def test_limit_rule_overrides_a_wrong_side_label_when_unambiguous():
-    """Far from 0.5 the limit decides, and it must beat the side label."""
+def test_the_side_label_decides_even_far_from_half():
+    """REVERSED 2026-09-15 (lane polymarket-no-price-convention). This test used
+    to assert that limit proximity beats the side label far from 0.5. That rule
+    rested on `price` being our own side's limit; it is the YES price, so both
+    numbers are YES-scale and only the label says which side we hold."""
     from syndicate.features.shared.polymarket_us_orders import venue_order_view
 
-    # NO label would complement 0.30 -> 0.70, absurd against a 0.28 limit.
+    # A NO buy selling YES at >= 0.28 filled at 0.30: NO cost 0.70.
     view = venue_order_view(
         _pm_order(avgPx={"value": "0.30"}, price={"value": "0.28"}, outcomeSide="OUTCOME_SIDE_NO")
     )
-    assert abs(view["fill_price"] - 0.30) < 1e-6
+    assert abs(view["fill_price"] - 0.70) < 1e-6
 
-    # And it complements when THAT is what the limit agrees with. Numbers chosen
-    # so the complement lands ABOVE the limit -- this is a SELL, and a sell
-    # filling BELOW its limit is a real violation the guard must still catch
-    # (the first draft of this test asserted the opposite and was wrong).
+    # A YES outcome is never complemented, whatever the limit says.
     view = venue_order_view(
         _pm_order(avgPx={"value": "0.75"}, price={"value": "0.22"}, outcomeSide="OUTCOME_SIDE_YES")
     )
-    assert abs(view["fill_price"] - 0.25) < 1e-6, view["fill_price"]
+    assert abs(view["fill_price"] - 0.75) < 1e-6, view["fill_price"]
+
+
+def test_a_NO_fill_below_its_YES_limit_is_withheld():
+    """The guard still bites on the YES scale: selling YES at >= 0.40 cannot
+    fill at 0.20."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    view = venue_order_view(_pm_order(avgPx={"value": "0.20"}, price={"value": "0.40"}))
+    assert view["fill_price"] is None
 
 
 def test_a_sell_filling_below_its_limit_is_still_refused():
@@ -915,8 +938,9 @@ def test_an_out_of_range_price_is_refused_and_named_as_a_units_error(capsys):
 
 
 def test_a_real_price_still_reads_through_unchanged():
-    """The blocking order must keep working -- this guard must not eat it."""
+    """The blocking order must keep working -- this guard must not eat it.
+    Its NO cost is 1 - 0.235 = 0.765 since 2026-09-15 (`price` is the YES price)."""
     from syndicate.features.shared.polymarket_us_orders import venue_order_view
 
     view = venue_order_view(_pm_order())
-    assert abs(view["fill_price"] - 0.2350) < 1e-6
+    assert abs(view["fill_price"] - 0.7650) < 1e-6
