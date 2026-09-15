@@ -4214,6 +4214,18 @@ def _read_state_payload(path: Path) -> dict[str, Any] | None:
     fresh large one -- which is the bug being fixed. Preferring the file would
     do the reverse the moment the payload shrinks back under the ceiling and
     the store resumes being authoritative.
+
+    RETURNS THE EXPANDED PAYLOAD (lane `state-read-expand-choke-point`,
+    2026-09-15). The writer compacts (`_compact_state_for_persist`) and
+    compresses (`_write_state_payload`), so the raw bytes are not a board, and
+    expansion used to be each caller's job. One caller forgot:
+    `_read_single_date_response_for_combining` read member-aliased `by_sport`
+    raw and dropped every per-date state row from the combined board -- 374
+    candidates persisted for 09-14, 0 shown, for an unknown number of weeks.
+    Expanding here, once, after the fresher copy is chosen, makes a caller
+    that forgets impossible rather than caught. The timestamp comparison above
+    reads top-level scalars, which neither compaction nor compression touches,
+    so choosing before expanding is safe and expands only the winner.
     """
     keyvalue_payload = read_json_file(path)
     disk_payload: dict[str, Any] | None = None
@@ -4224,29 +4236,27 @@ def _read_state_payload(path: Path) -> dict[str, Any] | None:
     except Exception as exc:  # noqa: BLE001
         print(f"[intelligence_state] STATE_DISK_READ_FAILED path={path.name} error={type(exc).__name__}: {exc}", flush=True)
 
-    if disk_payload is None:
-        return keyvalue_payload
-    if keyvalue_payload is None:
+    chosen = keyvalue_payload
+    if disk_payload is not None and keyvalue_payload is None:
         print(f"[intelligence_state] STATE_READ_FROM_ARTIFACT path={path.name} reason=no_keyvalue_copy", flush=True)
-        return disk_payload
-
-    keyvalue_at = _state_payload_timestamp(keyvalue_payload)
-    disk_at = _state_payload_timestamp(disk_payload)
-    if disk_at > keyvalue_at:
-        print(
-            f"[intelligence_state] STATE_READ_FROM_ARTIFACT path={path.name} "
-            f"artifact_at={disk_at} keyvalue_at={keyvalue_at}",
-            flush=True,
-        )
-        return disk_payload
-    return keyvalue_payload
+        chosen = disk_payload
+    elif disk_payload is not None:
+        keyvalue_at = _state_payload_timestamp(keyvalue_payload)
+        disk_at = _state_payload_timestamp(disk_payload)
+        if disk_at > keyvalue_at:
+            print(
+                f"[intelligence_state] STATE_READ_FROM_ARTIFACT path={path.name} "
+                f"artifact_at={disk_at} keyvalue_at={keyvalue_at}",
+                flush=True,
+            )
+            chosen = disk_payload
+    return _expand_persisted_state(chosen) if isinstance(chosen, dict) else chosen
 
 
 def read_intelligence_state() -> dict[str, Any] | None:
     path = _intelligence_state_read_path("state", INTELLIGENCE_STATE_PATH)
     print("[INTELLIGENCE STATE READ]", {"path": str(path)})
     payload = _read_state_payload(path)
-    payload = _expand_persisted_state(payload if isinstance(payload, dict) else None)
     normalized = _normalize_intelligence_state_payload(payload if isinstance(payload, dict) else None)
     if not _is_intelligence_state_payload_valid(normalized):
         print("[INTELLIGENCE STATE READ]", {"path": str(path), "valid": False, "candidate_count": 0})
@@ -9083,8 +9093,10 @@ def _read_single_date_response_for_combining(selected_date: str) -> dict[str, An
     # 09-14 and 14 for 09-15, web read those exact payloads (stamps equal to the
     # second) and logged `COMBINED_BOARD_VINTAGE_IGNORED reason=no_rows` for
     # each, and `by_date` read 0 on every date. `read_intelligence_state`
-    # already expands; this was the one reader of this file that did not.
-    on_disk = _expand_persisted_state(_read_state_payload(_intelligence_state_daily_paths(selected_date)["state"]))
+    # already expanded; this was the one reader of this file that did not.
+    # The expansion now lives INSIDE `_read_state_payload` (lane
+    # `state-read-expand-choke-point`), so no caller of it can forget again.
+    on_disk = _read_state_payload(_intelligence_state_daily_paths(selected_date)["state"])
     on_disk = on_disk if isinstance(on_disk, dict) and _intelligence_state_candidate_count(on_disk) > 0 else None
 
     if in_memory is None:
