@@ -202,6 +202,21 @@ def run_disk_maintenance(*, sports: tuple[str, ...] = ("mlb", "wnba", "nba", "nh
         except Exception as exc:
             print(f"[disk_maintenance] DISK_COMPACTION_START_FAILED {type(exc).__name__}: {exc}", flush=True)
 
+        # Lane `book-quotes-prefer-fuller-copy`, user decision 2026-09-15 ("force
+        # the book-quotes read"). A one-shot READ of every dual-form book_quotes
+        # shard through `resolve_book_quotes_path`, because no consumer reads a
+        # closed past date on its own and the fuller-copy rule stayed unexercised.
+        # refresh-worker only (the 18 mismatched shards live on its disk), once
+        # per process, once per disk by its own marker, and delayed 600 s so it
+        # does not stack on the compaction thread started just above.
+        if "refresh-worker" in _service_slug():
+            try:
+                from syndicate.features.shared.odds_book_quotes import start_resolve_probe_once
+
+                start_resolve_probe_once(600.0)
+            except Exception as exc:
+                print(f"[disk_maintenance] RESOLVE_PROBE_START_FAILED {type(exc).__name__}: {exc}", flush=True)
+
         if not _due():
             return {"ran": False, "reason": "not_due"}
 

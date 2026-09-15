@@ -365,6 +365,120 @@ def _open_book_quotes_text(path: Path):
     return path.open("r", encoding="utf-8")
 
 
+# A deliberate, ONE-SHOT production reading of `resolve_book_quotes_path`
+# (lane `book-quotes-prefer-fuller-copy`, user decision 2026-09-15 "force the
+# book-quotes read"). The fuller-copy rule shipped in `57b67127` and stayed
+# UNEXERCISED for two days: 634 cache evictions, all plain, because no consumer
+# reads a closed past date on its own. Bump the version to take it again.
+_RESOLVE_PROBE_VERSION = "2026-09-15-fuller-copy"
+_RESOLVE_PROBE_SPORTS = ("mlb", "ncaaf", "soccer", "nfl", "wnba", "nba", "nhl", "ncaab")
+
+
+def probe_dual_form_shards(*, sports: Iterable[str] | None = None, force: bool = False) -> dict[str, Any]:
+    """Read every shard present as BOTH `<date>.jsonl` and `<date>.jsonl.gz` through the READ path.
+
+    One `RESOLVE_PROBE` line per shard: which copy `resolve_book_quotes_path`
+    chose, both byte figures it compared, and the line count through
+    `_open_book_quotes_text` -- the same open `iter_book_quotes` and
+    `read_book_quotes` use, so the count IS what a reader gets. Lines are
+    counted, not parsed: one streaming pass, nothing retained.
+
+    ONCE PER DISK, not per boot. A `.resolve_probe_<version>.done` marker is
+    written into a sport's `book_quotes/` only when every shard there read
+    without error, so a failed read is retried on the next boot and a clean one
+    never costs a worker restart again (`#241`: periodic work is never free).
+
+    Always ends with `RESOLVE_PROBE_DONE`, including when there is nothing to
+    read, so "ran and found nothing" cannot be mistaken for "never ran".
+    """
+    summary: dict[str, Any] = {
+        "version": _RESOLVE_PROBE_VERSION,
+        "shards": 0,
+        "chose_gz": 0,
+        "chose_plain": 0,
+        "errors": 0,
+        "skipped_done": [],
+    }
+    for sport in tuple(sports) if sports is not None else _RESOLVE_PROBE_SPORTS:
+        directory = book_quotes_path(sport, "probe").parent
+        if not directory.is_dir():
+            continue
+        marker = directory / f".resolve_probe_{_RESOLVE_PROBE_VERSION}.done"
+        if marker.exists() and not force:
+            summary["skipped_done"].append(sport)
+            continue
+        sport_errors = 0
+        for packed in sorted(directory.glob("*.jsonl.gz")):
+            date_str = packed.name[: -len(".jsonl.gz")]
+            plain = packed.with_name(f"{date_str}.jsonl")
+            if not plain.is_file():
+                continue
+            record: dict[str, Any] = {"sport": sport, "date": date_str}
+            try:
+                chosen = resolve_book_quotes_path(sport, date_str)
+                record["chosen"] = "gz" if chosen.suffix == ".gz" else "plain"
+                record["plain_bytes"] = int(plain.stat().st_size)
+                record["gz_trailer_bytes"] = _trusted_gzip_uncompressed_bytes(packed)
+                with _open_book_quotes_text(chosen) as handle:
+                    record["lines"] = sum(1 for _ in handle)
+                summary["chose_gz" if record["chosen"] == "gz" else "chose_plain"] += 1
+            except Exception as exc:  # noqa: BLE001 - a diagnostic must name, never raise
+                record["error"] = f"{type(exc).__name__}: {exc}"
+                sport_errors += 1
+            summary["shards"] += 1
+            print("[odds_book_quotes] RESOLVE_PROBE " + json.dumps(record, sort_keys=True), flush=True)
+        summary["errors"] += sport_errors
+        if sport_errors == 0:
+            try:
+                marker.write_text(f"{_RESOLVE_PROBE_VERSION}\n", encoding="utf-8")
+            except OSError:
+                pass
+    print("[odds_book_quotes] RESOLVE_PROBE_DONE " + json.dumps(summary, sort_keys=True), flush=True)
+    return summary
+
+
+_RESOLVE_PROBE_STARTED = False
+
+
+def start_resolve_probe_once(delay_seconds: float = 600.0) -> bool:
+    """`start_resolve_probe_after`, at most once per PROCESS.
+
+    Its caller, `run_disk_maintenance`, is called on every main-loop pass; the
+    compaction and inventory threads it starts guard themselves the same way.
+    The per-DISK marker inside `probe_dual_form_shards` is the second guard.
+    """
+    global _RESOLVE_PROBE_STARTED
+    if _RESOLVE_PROBE_STARTED:
+        return False
+    _RESOLVE_PROBE_STARTED = True
+    start_resolve_probe_after(delay_seconds)
+    return True
+
+
+def start_resolve_probe_after(delay_seconds: float = 600.0):
+    """Run `probe_dual_form_shards` once, on a daemon timer, `delay_seconds` after boot.
+
+    Delayed so it does not stack on the boot `DISK_COMPACTION` pass, which
+    inflates the same shards (14:38:34-14:39:07Z on the 2026-09-15 boot).
+    """
+    import threading
+
+    def _run() -> None:
+        try:
+            probe_dual_form_shards()
+        except Exception as exc:  # noqa: BLE001 - never take the worker down
+            print(f"[odds_book_quotes] RESOLVE_PROBE_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+    timer = threading.Timer(float(delay_seconds), _run)
+    timer.daemon = True
+    timer.start()
+    print(
+        f"[odds_book_quotes] RESOLVE_PROBE_SCHEDULED delay_s={float(delay_seconds):.0f} version={_RESOLVE_PROBE_VERSION}",
+        flush=True,
+    )
+    return timer
+
+
 def book_quotes_logical_bytes(path: Path) -> int:
     """UNCOMPRESSED size of a shard, in bytes.
 
