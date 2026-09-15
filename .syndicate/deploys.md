@@ -35738,3 +35738,27 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Expectation (2) no writes without apply: **MET by the counters**: `removed 0` on every shard and `apply False` end to end. Not independently re-statted: on a dry run `bytes_after` is copied from `bytes_before`, not re-read.
 - **Owed:** the apply run (user decision). After it, the P4 reading: web `MERGE_REFUSED_BAD_LINES` 0 and reader `BOOK_QUOTES_BAD_LINES` limited to the 20 orphans. Also expected: refresh-worker `STREAM_SYNC_WHOLE` once per touched shard (overlap mismatch), then `STREAM_TAIL_SYNC_OK` again.
 - Rollback: redeploy `9ed5c5ad` to web. The endpoint is inert unless called.
+
+## 2026-09-15 19:27:29Z (14:27 CT) — FOLLOW-UP to the 2026-09-15 18:51:51Z web `9ed5c5ad` -> `8b563ca9` entry — lane book-quotes-splice-repair — **P3 APPLIED: 2152 fragments removed, 0 errors**
+- No deploy. The user approved the apply: "Apply all 4 sports (Recommended)".
+- **Web at apply time:** `7ed1a18a`, live 19:06:27Z. That is lane Layer2's deploy, which CONTAINS `8b563ca9` (checked with `git merge-base --is-ancestor`). No web deploy was in flight: the script read the deploys API first and would have refused. Layer2 confirmed no further web deploys planned.
+- **Run:** `POST {"since":"2026-09-01","sports":["mlb","soccer","nfl","ncaaf"],"apply":true}` at 19:27:29Z returned `pid=229 apply=True`. First `REPAIR_SHARD` 19:27:32Z; `REPAIR_DONE` **19:28:33.96Z**:
+
+      REPAIR_DONE shards 85  shards_with_bad 49  bad_lines 2172  verified_fragments 2152  removed 2152  orphan_bad_lines 20  errors 0  apply True
+
+- **Per shard: `removed == verified_fragments` on all 49**, and `bytes_after < bytes_before` on every one of them (re-statted after `os.replace`, unlike the dry run). Examples:
+  - mlb 09-03: 29 removed, 63,389,054 -> 63,382,470 B.
+  - soccer 09-13: 188 removed, 2 orphans kept, 84,787,632 -> 84,736,844 B.
+  - soccer 09-05: 195 removed, 132,206,113 -> 132,162,545 B.
+  - ncaaf 09-12: 61 removed, 155,931,381 -> 155,918,022 B.
+- **Live shards had grown since the dry run** (mlb 09-15 23,276,715 -> 23,483,815 B; soccer 09-15 15,156,472 -> 15,421,919 B) with the same bad count, so no new fragments had been merged since P1.
+- **Orphans (20) kept by design:** two rows glued with no newline, truncated heads, and 4 headless tails with no intact match. Most carry `captured_at` 2026-09-13 07:31-10:22Z, which reads as one separate write incident and is NOT this lane's mechanism.
+- **Owed (P4):**
+  - (1) **MET 19:29:48Z.** A post-apply dry run (`pid=245`, POST 19:29:20Z) read `REPAIR_DONE shards 85 shards_with_bad 11 bad_lines 20 verified_fragments 0 orphan_bad_lines 20 removed 0 errors 0`.
+    - The 20 remaining are exactly the orphans: mlb 09-01 x1, 09-13 x3; soccer 09-01 x3, 09-13 x2, 09-15/16/17 x1 each, 09-18/19/20 x2 each; nfl 09-14 x2.
+    - Zero splice fragments are left anywhere in scope.
+  - (2) Web `MERGE_REFUSED_BAD_LINES` reaches 0 once refresh-worker has re-synced each touched shard.
+  - (3) Refresh-worker `STREAM_SYNC_WHOLE` with `reason=overlap_mismatch` once per touched shard, then `STREAM_TAIL_SYNC_OK`.
+  - Confounder for (3): refresh-worker restarted at 19:20:02Z onto Layer2's `5686a555`, which contains P2 `55fee786`. The reason field separates the two causes.
+  - Watcher `bxmoz6tu4` reads (2) and (3) from 19:27:29Z; the verify dry run reads (1).
+- Undo: none for the removed lines. They were byte suffixes of intact rows in the same shard, so their content survives in those rows.

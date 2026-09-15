@@ -887,7 +887,16 @@ death, never life — do not invert it.
   - STEP 1, this lane's first deliverable, an instrument with its own deploy: at every Polymarket order build, read the slug's book with the signed client. Log our side's best ask and its size next to the price we would send, and the EV at that ask. A failed read never blocks an order.
   - STEP 2, after step 1 has a population, and only on the user's go: price EV and Kelly at the ask net of fees, refuse below the minimum, and cap the stake at the size available at the ask.
 - Files: `syndicate/features/shared/polymarket_us_orders.py`, `tests/test_polymarket_us_orders.py` (RETURNED 2026-09-15 ~12:50 CT by lane `polymarket-no-price-convention` at its close, GOAL MET), `tests/test_polymarket_cancel_order.py`.
-  - **Carried from that lane:** (iv) `C65VD0R72KDG`'s recorded cost is owed a balance-ledger check; the first post-fix NO order filled 4.07 of 7.94 with `leaves=0`, unexplained. Step 2 NO pricing is now correct by construction (the NO ask is sent as the best YES bid).
+  - **Carried from that lane:** (iv) `C65VD0R72KDG` **SETTLED BY RULE, not by a balance read** `[user 2026-09-15 ~14:25 CT: "Accept the rule (Recommended)"]`.
+    - True cost is 0.765 x 13.13 = $10.04 + $0.14 commission; the row is booked at 0.235 / $3.09. Any P&L graded on that row is off by $6.96.
+    - A balance read on the order itself is no longer possible:
+      - Render logs for live-odds-worker start after 08-30. Probe 19:10Z: `VENUE_BALANCES` 0 lines on 08-30, 50 on 09-05.
+      - `venue_balance_history.json` keeps 128 readings, about half a day.
+      - `/api/portfolio/live?on=all&venue=polymarket` holds 27 orders, none of them this one.
+      - The ledger ops endpoint is aggregate-only by design.
+    - The rule rests on the same mechanism (NO buy = YES sell, cost 1 - avgPx) measured on the balance twice: dal-nyg 91.52 -> 85.97 = 13.57 x 0.395 + 0.19, and sea-ari 2.84 -> 1.42 = 4.07 x 0.335 + 0.05.
+    - Correcting the stored row is NOT done and needs its own lane.
+    - The first post-fix NO order filled 4.07 of 7.94 with `leaves=0`, unexplained. Step 2 NO pricing is now correct by construction (the NO ask is sent as the best YES bid).
 - Hypothesis (to test, not believed): the displayed `outcomePrices` number that EV is priced on is often not the executable ask for our side. The largest claimed edges are the least executable, which would explain paper h2h at +50.5% while live h2h is −23.4%, and the whole live loss sitting in the above-median stakes.
 - Falsification test: over the first 20 or more logged builds, our side's best ask sits within one tick of the price we send, and the EV at that ask is within 1 point of the plan's `ev_pct`, in the large-EV rows as well as the small ones.
 - Verification (step 1): at least 20 `POLYMARKET_BOOK_AT_BUILD` lines on live-odds-worker, each with ask, size, sent price and EV at the ask. Recorded in `state_polymarket.md` with the distribution of (EV at ask − planned EV) by planned-EV bucket, and zero orders blocked by a failed read.
