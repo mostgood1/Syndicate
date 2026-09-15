@@ -37,3 +37,20 @@ and `991a94d5`). No match that only the new code resolves has been read in play 
 ## Permissions
 
 The runs use Bash/PowerShell, git, and HTTPS to ESPN, FotMob, Render and the web service. If a run pauses on a permission prompt with nobody at the machine, it records nothing. Evidence of a run is its `deploys.md` entry.
+
+## Friday 2026-09-18 -- `fotmob-belgian-verify-0918` (14:05 CT / 19:05Z, one-time)
+
+Scheduled on the user's request ("check the Belgian match on Friday"). It covers
+lane `fotmob-season-scoped-league-ids`, which is CLOSED and archived in
+`lanes_closed.md`: the season-proof league match (`c725cc29`). **Belgian Pro League
+is the one league of that fix never read in play.** Championship and Eredivisie
+were read on production on 09-15.
+
+| league | ESPN event | fixture (home v away) | kickoff | expected id |
+|---|---|---|---|---|
+| belgian_pro_league | `401878987` | KAA Gent v Standard Liege | 18:45Z (13:45 CT) | 5811764 |
+
+- Resolvers loaded from git blobs against FotMob's published 09-18 listing (read 2026-09-15 21:48Z; FotMob row "Gent" v "Standard Liège", league id 937988, primaryId 40) returned: `1efdea18` (before the fix) None, `c725cc29` 5811764, `867f1481` 5811764. The strict pass resolves it, so the reading verifies the league match and the accent fold, NOT the alias loose pass.
+- Step 0 checks that the live commit still contains `fotmob_league_slug` and `unicodedata.normalize`.
+- The same MET / NOT MET / NOT READ rules apply, with a control read before NOT MET. The run may wait up to 2 h for kickoff.
+- Recording: a `deploys.md` READING. On MET it also replaces IN PLACE the `Belgian Pro League is UNREAD on production` sentence in `state_soccer.md` and the matching bullet part in the archived lane block in `lanes_closed.md`.
