@@ -35249,3 +35249,18 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
 - (d) `written_at` 05:01:24Z is after 05:00Z and there are 0 live rows, but the build that wrote it is NOT the carryover.
 
 **verify: R3 NOT EXERCISED.** The skip branch was seen for a second night and the 6 h `past_cap` close for the first time. **`decision=built` has still never been seen in production.** R3 passes to backup tasks `layer2-carryover-crossing-reading-0919` (Friday night) and `-0920` (Saturday night), which stay enabled. Lead: the prior-date heavy build entering at 05:00:40Z, after the roll, contradicts the `stale_date` refusal in this lane's H1 wording. Not investigated.
+
+## 2026-09-15 14:03:51Z (09:03 CT) — web `c4f45fee` -> `b6a0e346` — deploy `dep-dakl0hrm8hqs73evehu0` — lane combined-board-state-rows-lost — **verify MET (rows reach the board); one prediction WRONG (`computed_at` moved)**
+- **What:** `_read_single_date_response_for_combining` expands the persisted per-date state before its row gate (`on_disk = _expand_persisted_state(_read_state_payload(...))`). Before it, a member-aliased `by_sport` contributed 0 rows to the combined board on every date. User decisions: "proceed next steps" (fix), "go ahead, deploy it" (deploy).
+- **Locks:** web claim acquired 14:02:43Z (token `7bcd8baf1174a9e0`, holder combined-board-state-rows-lost). Preflight `--target-commit b6a0e346` CLEAR at 14:03:18Z (infra only, 1 defunct child). `b6a0e346` on origin/main.
+- **Result:** POST 14:03:51Z; `update_in_progress` 14:08:14Z; live 14:10:07Z. Web 14:08:00-14:10:34Z: 0 `Traceback`, 0 `STATE_DECOMPRESS_FAILED`, 0 `STATE_FORMAT_UNSUPPORTED`, 0 `WORKER TIMEOUT`, 0 SIGKILL.
+- **Baseline** (same payload, `POST /api/intelligence/query`, 13:57:55Z on `c4f45fee`): `by_date` 0 / 0 / 0 (09-15/16/17), `legacy_candidate_count 0`, `artifacts_dated 2`, `computed_at 13:48:51Z` `fresh`, `layer2_fallback_rows 2445`. Served-row count NOT recorded (a gap, see below).
+- **verify MET** (14:10:27Z, 20 s after live):
+  - `by_date` 09-15 **106** candidates (`mlb`, `la liga`, `championship`); `legacy_candidate_count` **106**; `candidate_count 2551` = 106 + 2,445.
+  - `artifacts_dated` **3** (09-15 state + 09-15 and 09-16 shortlists; 09-17 has neither).
+  - Web logs since live: **0** `COMBINED_BOARD_VINTAGE_IGNORED`; only `COMBINED_BOARD_STATE_DATE_MISS` for 09-16 and 09-17, which have no state (refresh-worker persisted `candidate_count=0` for 09-16 at 13:13:07Z).
+  - Served: 1,323 rows = 1,217 `source layer2_shortlist` + 106 state rows (the rows carrying `candidate_id`).
+- **PREDICTION WRONG:** the lane said `computed_at` would not move. It moved to **13:39:43Z, age 1,826 s, `stale`**. That is the 09-15 state: refresh-worker `CANDIDATE_POOL_READY date=2026-09-15 count=106` at 13:39:43Z. Since 13:41:13Z every heavy build was refused (`STATE_WRITE_SKIPPED_EMPTY_OVER_GOOD` about every minute) while the fast path kept the shortlists fresh (09-15 `14:07:00Z`, 09-16 `14:10:11Z`). The prediction came from 03:56Z, when the state was NEWER than tomorrow's shortlist. It was not re-derived for the morning, when the heavy build is refused and the state is the oldest input. The age now reported is true: those 106 rows are from 13:39Z. **The board now reads stale whenever the heavy build is refused**, which is `heavy-build-memory-refusal`'s subject.
+- **NOT MEASURED:** whether state rows displaced L2-A cards under first-wins dedupe. The pre-deploy served count was not taken. At most 106 L2-A cards can be shadowed.
+- Rollback: redeploy `c4f45fee` to web (the change is one line and web-only).
+- Claim released after this entry is pushed.
