@@ -106,8 +106,8 @@ def _build_match_boxes(
     Failures are per-event and non-fatal: a box score is a display nicety and
     must never take down the live-lens projection, which is the product.
     """
-    compact = iso_date.replace("-", "")
-    window = f"{compact}-{compact}"
+    # ONE DATE, never `{compact}-{compact}` -- see `poll_league` for the measurement.
+    window = iso_date.replace("-", "")
     try:
         events = fetch_events(league, date_windows=[window], statuses={"in", "post"})
     except Exception as error:
@@ -202,8 +202,28 @@ def _build_match_boxes(
 
 
 def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path, simulations: int) -> dict[str, Any]:
-    compact = iso_date.replace("-", "")
-    window = f"{compact}-{compact}"
+    # ESPN's SINGLE-DATE scoreboard (`dates=YYYYMMDD`), NOT the one-day RANGE
+    # (`dates=YYYYMMDD-YYYYMMDD`) this used to send. They are not the same
+    # request to ESPN's edge.
+    #
+    # MEASURED 2026-09-15 20:10:46Z, same instant, both `site.api.espn.com` and
+    # `site.web.api.espn.com`: the range form served the Championship at 5' 0-0
+    # while the single-date form, the undated scoreboard and the match summary all
+    # read 69'-70' (0-1, 2-2); La Liga's range copy still had a finished match in
+    # play and a live one not yet kicked off. This read decides state, clock and
+    # WHICH matches are live -- and its clock becomes `as_of_seconds` below, which
+    # cuts the (live) summary's goals at that minute, so the stale copy also zeroed
+    # scores. Every soccer live surface ran ~an hour behind with every timestamp on
+    # the way reading fresh, because the file is re-stamped each tick.
+    #
+    # The range form is also REFUSED: HTTP 400 on 31 of 60 league-dates probed the
+    # same hour, some with fixtures on them, against 60 of 60 for the single date,
+    # which returned identical event sets wherever both answered. A 400 here raises
+    # into `LEAGUE_POLL_FAILED` for the whole league.
+    #
+    # `iso_date` is the Central date and so is the single-date form's day; the
+    # probe's event sets matched across late MLS kickoffs.
+    window = iso_date.replace("-", "")
     live_events = fetch_events(league, date_windows=[window], statuses={"in"})
     api_root = out_root / league / "api"
     out_path = api_root / "live_state" / f"live_state_{iso_date}.json"

@@ -1,10 +1,40 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from scripts import poll_soccer_live_state
+
+
+class EspnScoreboardQueryShapeTests(unittest.TestCase):
+    """The live poller must ask ESPN for ONE date, never a `YYYYMMDD-YYYYMMDD` range.
+
+    Measured 2026-09-15 20:10:46Z, both ESPN hosts, same instant: the range form
+    served Championship at 5' 0-0 while the single-date form, the undated
+    scoreboard and the match summary all read 69'-70'. Every soccer live surface
+    (live lens, Layer 2 chips) was about an hour behind while every timestamp on
+    the way read fresh.
+    """
+
+    def test_both_scoreboard_reads_use_the_single_date(self) -> None:
+        calls: list[tuple[tuple[str, ...], frozenset[str]]] = []
+
+        def _fake_fetch_events(league, *, date_windows, statuses=None, timeout=20):
+            calls.append((tuple(date_windows), frozenset(statuses or ())))
+            return []
+
+        with tempfile.TemporaryDirectory() as tmp, patch.object(
+            poll_soccer_live_state, "fetch_events", side_effect=_fake_fetch_events
+        ):
+            poll_soccer_live_state.poll_league(
+                "championship", "2026-09-15", source_root=Path(tmp), out_root=Path(tmp), simulations=10
+            )
+
+        # BOTH call sites reached: the in-play read and the box-score read.
+        self.assertEqual({statuses for _, statuses in calls}, {frozenset({"in"}), frozenset({"in", "post"})})
+        self.assertEqual({windows for windows, _ in calls}, {("20260915",)})
 
 
 class PollActiveLeaguesForTickTests(unittest.TestCase):
