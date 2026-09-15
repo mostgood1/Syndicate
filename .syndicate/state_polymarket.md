@@ -1326,3 +1326,48 @@ whatever game lines displace them. `dropped_by_date` still reports every one.
 - Polymarket totals are paused by config: `SYNDICATE_POLYMARKET_PAUSED_MARKETS=total`, refused at build as `market_paused`. Paper still measures them.
 - **Verified at 15:51:04Z**, on the first pass on a plan holding totals and near-even pregame moneylines: `positions=5 placed=2 refused={'market_paused': 3}`, with no hold key. Jets–Titans at 0.49 and Mariners–A's at 0.415 were submitted pregame. `game_started` has not yet had a population in production, because no unpaused position was past kickoff.
 - The pricing follow-up, trading off the executable ask and net of fees, is todo `#662`.
+
+## [polymarket-ask-at-build-step1] THE LARGEST CLAIMED POLYMARKET EDGES ARE NOT EXECUTABLE — 0 of 3 builds planned at >= 20% EV were marketable; the ask sat 34-40 ticks above the price we sent `[measured 2026-09-15 ~16:00Z, live-odds-worker 54f3d662, lane polymarket-ask-pricing, todo #662 step 1]`
+
+**Instrument.** `POLYMARKET_BOOK_AT_BUILD` fires at every Polymarket order build, after `order_body` validates. One signed `GET /v1/markets/{slug}/book`. It logs:
+- our side's executable ask and its size (the best offer for YES; 1 minus the best YES bid for NO);
+- the price sent (`sent`);
+- `planned_ev_pct` and `ev_at_ask_pct`;
+- `marketable`.
+
+It is an instrument only; a failed read never blocks.
+
+**Population:** 09-11 16:02Z to 09-15 16:30Z.
+- 63 lines, 28 unique (day, slug, side), 27 unique (slug, side).
+- 35 of the 63 are one ticker (`aec-nfl-phi-ten-2026-09-20`) re-built every pass after venue rejections. So the table below uses the FIRST line per (day, slug, side).
+- `POLYMARKET_BOOK_READ_FAILED`: 1 (`PolymarketUSAuthError`, 09-14 22:04:41Z). That order submitted 3 s later, so 0 orders were blocked.
+
+| planned EV | n | EV-at-ask minus planned, median (min..max) | within 1 pt | marketable | ask minus sent, ticks: median (max) |
+|---|---|---|---|---|---|
+| < 5% | 13 | -0.00 (-4.99..+6.48) | 11/13 | 12/13 | -1 (4) |
+| 5-10% | 10 | -5.11 (-7.05..+2.20) | 3/10 | 6/10 | -1.5 (6) |
+| 10-20% | 2 | -8.14 (-16.31..+0.03) | 1/2 | 1/2 | 6.5 (15) |
+| >= 20% | 3 | -39.99 (-50.34..-31.55) | 0/3 | 0/3 | 34 (40) |
+
+(Tick 0.005. A negative tick gap means the ask was below the sent price, because we cross one tick.)
+
+**Worked example, 15:00:21Z 09-15:** `aec-nfl-car-atl-2026-09-20` YES.
+- Planned p 0.4695 and `planned_ev_pct` 17.70, sent 0.47.
+- The book: best offer 0.545 x 30, so `ev_at_ask_pct` 1.39 and `marketable=False`.
+- The "edge" is the gap between the displayed `outcomePrices` number and the book.
+
+**What this establishes:**
+- **Small edges are priced right; the large ones are not.** Below 5% planned EV, the plan's price is the book's price (11/13 within a point).
+- **Above 10% planned EV the plan is not executable (5 of 5 rows).** It is either not marketable, or marketable only at an EV far below plan.
+- This is the shape `[polymarket-pregame-hold-premise-falsified]` predicted: paper h2h +50.5% vs live h2h -23.4%, with the live loss in the above-median stakes.
+- **n is small at the top (5 rows above 10%).** The direction is clear; the size is not.
+
+**Not established:**
+- Fees: `feeCoefficient` is still dropped, so every EV here is gross.
+- Whether pricing at the ask would have been profitable.
+- Why `aec-nfl-phi-ten-2026-09-20` is rejected: see the lane lead.
+
+**Also verified the same day: kickoff expiry works.**
+- 64 of 64 `SUBMIT` since 09-12 carry `tif=TIME_IN_FORCE_GOOD_TILL_DATE goodTillTime=<kickoff>`.
+- `ORDER_STATE` shows the stored `goodTillTime`.
+- 8 reconciles read `order_state_expired`.

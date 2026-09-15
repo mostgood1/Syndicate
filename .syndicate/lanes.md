@@ -645,8 +645,24 @@ death, never life — do not invert it.
 - History: the hypotheses H1–H4, their verdicts and the decision text were moved VERBATIM to `lanes_history.md` on 2026-09-11. The readings are in `state_polymarket.md`.
 
 
-### polymarket-ask-pricing — OPEN — opened 2026-09-11 — session 7a239b89-c8fd-49b7-ba5a-e41bb9d4d9bc — **step 1 and the kickoff expiry are LIVE, and both readings are OWED. The owning session was archived 2026-09-11 at the user's request: ADOPT before continuing.**
-- **GOAL: NOT MET.** The goal is restated verbatim below.
+### polymarket-ask-pricing — OPEN — opened 2026-09-11 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 (ADOPTED 2026-09-15 ~10:55 CDT from archived 7a239b89 on user instruction "adopt polymarket-ask-pricing"; `session_worktree.py adopt`: nothing of this lane's in the primary tree) — **STEP 1 VERIFIED and the kickoff expiry VERIFIED (2026-09-15); STEP 2 waits on the user's go**
+- **GOAL VERDICT 2026-09-15 ~11:05 CDT, session 0f5b256e.** Goal (verbatim): "todo `#662`, the user's decision (2) of 2026-09-11 ("start pricing off the executable ask plus fees")." — **GOAL: NOT MET.** Step 1 (the instrument) is MET; step 2 (pricing at the ask) is not built, and needs the user's go.
+  - **Step 1 Verification, MET.** Read on live-odds-worker `54f3d662`, which contains `1afec00f` and `16de339b` by ancestry, with 3 `POLYMARKET_BOOK_AT_BUILD` and 2 `TIME_IN_FORCE_GOOD_TILL_DATE` source lines. `SYNDICATE_POLYMARKET_BOOK_AT_BUILD` is absent, so the instrument is ON.
+    - 09-11 16:02Z to 09-15 16:30Z: **63 `POLYMARKET_BOOK_AT_BUILD`**, 28 unique (day, slug, side).
+    - 1 `POLYMARKET_BOOK_READ_FAILED` (09-14 22:04:41Z, `PolymarketUSAuthError`). Its order still SUBMITTED 3 s later, so **0 orders were blocked by a failed read**.
+    - Distribution: `state_polymarket.md [polymarket-ask-at-build-step1]`.
+  - **Falsification FIRED, so the hypothesis is SUPPORTED on a small tail.** The test required "within one tick and within 1 point in the large-EV rows as well". First line per (day, slug, side):
+    - planned EV < 5: 11/13 within 1 pt.
+    - 5-10: 3/10 within 1 pt (median gap -5.1).
+    - 10-20: n=2, gaps -16.3 and 0.
+    - >= 20: n=3, 0/3 marketable, ask 34-40 ticks above the sent price, EV at the ask 32-50 points below plan.
+    - n=5 above 10% planned EV: direction clear, size not.
+  - **Kickoff expiry, MET.** 64 of 64 `SUBMIT url=https://api.polymarket.us` since 09-12 carry `tif=TIME_IN_FORCE_GOOD_TILL_DATE goodTillTime=<kickoff>`. `ORDER_STATE` shows the stored `goodTillTime`, and 8 reconciles read `order_state_expired`. No `LIVE_ORDER status=failed`.
+  - **LEAD, not this goal: a venue-REJECTED order is re-submitted every pass.** `aec-nfl-phi-ten-2026-09-20` NO, 6.53 @ 0.245 ($1.60), was submitted 34+ times on 09-15 from 05:18Z, ~17 min apart. Each one reconciles `submitted->rejected` (`ORDER_STATE_REJECTED cum=0`, 0 filled, so no money moved). No reject reason is logged anywhere in the path.
+    - Since 09-12, Polymarket reconciles are 23 filled / 34 rejected (all 34 this one ticker) / 8 expired / 9 new.
+    - Untested candidate: a venue minimum on order notional (the $1.60 stake is the smallest seen).
+    - Precedent: `state_polymarket.md [polymarket-orders-are-cancelled]` (08-30).
+    - Owner: needs its own lane or todo, on the user's decision.
   - Left: STEP 1's reading, 20 or more `POLYMARKET_BOOK_AT_BUILD` lines. There are 0 so far. The instrument has been live since 16:02:43Z, but no NEW Polymarket order has been built since: the totals are paused before build, and the placed moneylines are duplicates.
   - STEP 2 waits on that population and on the user's go. Nothing blocks it except the population.
   - Also carried, added on the user's decision rather than part of this goal: every Polymarket order expires at kickoff (`16de339b`, live 16:53:31Z). Its first good-till-date `SUBMIT` is owed.

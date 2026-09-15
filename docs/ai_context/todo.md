@@ -14,7 +14,7 @@
 - **Closed on** live-odds-worker 17:49:20Z `EXECUTED date=2026-09-11 mode=live venue=kalshi plan_source=live armed=True positions=22 placed=6 filled=0 failed=0 duplicates=2 retried=0 skipped=14 refused={'over_max_day_orders': 14} spent={'dollars': 58.84, 'orders': 15}`. All six orders are NCAAF 09-12 tickers (GASTKENN, UNLVUNT, OKLAMICH, TLSASHSU, ODUVT, USUWASH). The next constraint is the Kalshi daily ORDER cap, which refused 14 of 22 contracted positions (`leads.md`).
 - **Not this item:** 5 of the original 16 miss even with no cap, because the resolver does not place UC Davis, Howard, N Colorado or `MIZZKU`. That is in `leads.md`.
 
-### `#662` — **Price Polymarket off the executable ask, and include fees** — lane `polymarket-ask-pricing` (opened from `polymarket-e2e-review`), 2026-09-11 — **OPEN; step 1, the instrument, is LIVE in `1afec00f` since 16:02:43Z; its population is owed**
+### `#662` — **Price Polymarket off the executable ask, and include fees** — lane `polymarket-ask-pricing` (opened from `polymarket-e2e-review`), 2026-09-11 — **OPEN; step 1 VERIFIED 2026-09-15 (63 book lines / 28 builds; above 10% planned EV 5 of 5 not executable at plan, `state_polymarket.md [polymarket-ask-at-build-step1]`); kickoff expiry VERIFIED; step 2 awaits the user's go. Lane ADOPTED by session 0f5b256e**
 
 - **Why.** EV and Kelly are computed on `outcomePrices`, a single sizeless number per outcome with no bid or ask label (`polymarket_us_markets.py:43-48`).
   - Paper fills at that number and shows h2h at +50.5% (n=103 settled). Live h2h is −23.4% (n=15).

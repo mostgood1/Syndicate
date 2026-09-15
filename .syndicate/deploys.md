@@ -35440,3 +35440,16 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - The tripwire fires only at `rows == 0`, so it is correctly silent. The prediction missed the cap, which was already documented at the call site.
 - Rollback: redeploy `b6a0e346` to web (instrument only; no rows, ranking or `state_meta` change).
 - Claim released after this entry is pushed.
+
+## 2026-09-15 ~15:55-16:05Z (10:55-11:05 CT) — READINGS (no deploy) — live-odds-worker `1afec00f` (book-at-build instrument) and `16de339b` (kickoff expiry), both carried in live `54f3d662` — lane polymarket-ask-pricing (ADOPTED by session 0f5b256e) — **RECONCILED: both verify MET**
+- **Live code, by content:** `1afec00f` and `16de339b` are ancestors of `54f3d662` (live since 09-13 23:24:15Z). The live file has 3 `POLYMARKET_BOOK_AT_BUILD` and 2 `TIME_IN_FORCE_GOOD_TILL_DATE` lines. `SYNDICATE_POLYMARKET_BOOK_AT_BUILD` is absent (single-key GET), so the instrument is ON.
+- **`1afec00f` verify MET.**
+  - 63 `POLYMARKET_BOOK_AT_BUILD`, 09-12 05:06Z..09-15 15:00Z (09-12 8, 09-13 9, 09-14 9, 09-15 37). That is 28 unique (day, slug, side), against the >= 20 required.
+  - 1 `POLYMARKET_BOOK_READ_FAILED` (09-14 22:04:41Z, auth). Its `SUBMIT` followed at 22:04:44Z, so 0 orders were blocked.
+  - Distribution: `state_polymarket.md [polymarket-ask-at-build-step1]`. At planned EV >= 20%, 0/3 were marketable, with the ask 34-40 ticks above the sent price. Below 5%, 11/13 were within 1 EV point.
+- **`16de339b` verify MET.**
+  - 64 / 64 `SUBMIT url=https://api.polymarket.us` since 09-12 read `tif=TIME_IN_FORCE_GOOD_TILL_DATE goodTillTime=<kickoff>`.
+  - `ORDER_STATE` lines carry `tif='TIME_IN_FORCE_GOOD_TILL_DATE' goodTillTime='2026-09-20T17:00:00Z'`.
+  - Polymarket reconciles since 09-12: 23 `order_state_filled`, 8 `order_state_expired`, 9 `order_state_new`, 34 `order_state_rejected`. No `LIVE_ORDER status=failed`.
+- **FOUND, not fixed:** all 34 rejections are ONE order. `aec-nfl-phi-ten-2026-09-20` NO, 6.53 @ 0.245 ($1.60 stake), was re-submitted every ~17 min from 05:18Z 09-15. Each one reconciled `submitted->rejected cum=0`, so no fill and no spend. No reject reason is logged. Lane lead; owner undecided.
+- No claim taken (read-only).
