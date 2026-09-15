@@ -2722,8 +2722,8 @@ def _live_vintage(league: str) -> str:
                         str(entry.get("status") or ""),
                         str(entry.get("status_state") or ""),
                         str(entry.get("status_display_clock") or entry.get("status_detail") or ""),
-                        # `score_home`/`score_away` FIRST, and they are the
-                        # only names a real entry carries. `build_live_state`
+                        # `score_home`/`score_away`, the only names a real
+                        # entry carries. `build_live_state`
                         # writes `score_home` (espn_live_state.py:180) and the
                         # poller copies ESPN's `home_score` INTO it
                         # (poll_soccer_live_state.py:178) -- so reading
@@ -2733,8 +2733,8 @@ def _live_vintage(league: str) -> str:
                         # It still moved on the clock, so this was bounded by
                         # one displayed minute rather than the 600s TTL --
                         # which is exactly why it never showed up as a freeze.
-                        str(entry.get("score_home") if entry.get("score_home") is not None else (entry.get("home_score") or "")),
-                        str(entry.get("score_away") if entry.get("score_away") is not None else (entry.get("away_score") or "")),
+                        str(entry.get("score_home") if entry.get("score_home") is not None else ""),
+                        str(entry.get("score_away") if entry.get("score_away") is not None else ""),
                     )
                 )
             )

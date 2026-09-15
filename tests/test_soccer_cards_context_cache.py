@@ -37,7 +37,15 @@ from syndicate.features.soccer import cards
 def _live(status="in", clock="12'", home=1, away=0, event_id="e1"):
     return {"games": {event_id: {
         "status": status, "status_state": status,
-        "status_display_clock": clock, "home_score": home, "away_score": away,
+        # `score_home`/`score_away`, WHICH IS WHAT THE POLLER WRITES
+        # (`espn_live_state.py:180`; `poll_soccer_live_state.py:178` copies
+        # ESPN's `home_score` INTO `score_home`). This fixture said
+        # `home_score`, the fingerprint read `home_score`, and the two
+        # agreed with each other and with nothing in production -- so
+        # `test_a_live_score_change_invalidates`, the test this file calls
+        # load-bearing, passed for two weeks over a key that could not see
+        # a score move at all. `[2026-09-15]`
+        "status_display_clock": clock, "score_home": home, "score_away": away,
     }}}
 
 
@@ -56,7 +64,7 @@ class SoccerCardsContextCacheTests(unittest.TestCase):
         return calls, patch.multiple(
             cards,
             _build_cards_page_context_uncached=fake_build,
-            live_state_payload=lambda league, date: live[0],
+            board_live_state_payload=lambda league, date: live[0],
         )
 
     def test_the_same_league_week_is_built_once_while_nothing_live_moves(self):
@@ -112,11 +120,11 @@ class SoccerCardsContextCacheTests(unittest.TestCase):
         # "I could not read live state" must not look like "same live state as
         # last time" -- that is the freeze this key exists to prevent.
         self.assertEqual(cards._live_vintage.__name__, "_live_vintage")
-        with patch.object(cards, "live_state_payload", side_effect=RuntimeError("boom")):
+        with patch.object(cards, "board_live_state_payload", side_effect=RuntimeError("boom")):
             self.assertEqual(cards._live_vintage("epl"), "error")
-        with patch.object(cards, "live_state_payload", return_value=None):
+        with patch.object(cards, "board_live_state_payload", return_value=None):
             self.assertEqual(cards._live_vintage("epl"), "absent")
-        with patch.object(cards, "live_state_payload", return_value={"games": {}}):
+        with patch.object(cards, "board_live_state_payload", return_value={"games": {}}):
             self.assertEqual(cards._live_vintage("epl"), "quiet")
         self.assertEqual(len({"error", "absent", "quiet"}), 3)
 
