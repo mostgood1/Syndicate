@@ -645,6 +645,30 @@ death, never life — do not invert it.
 - History: the hypotheses H1–H4, their verdicts and the decision text were moved VERBATIM to `lanes_history.md` on 2026-09-11. The readings are in `state_polymarket.md`.
 
 
+### polymarket-rejected-resubmit-loop — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: [user 2026-09-15: "open a lane for the rejection loop"] a Polymarket order the venue REJECTS is not re-submitted unchanged on every pass, and its reject reason is logged. Read on production: after the fix, a venue rejection produces ONE `submitted->rejected` per (ticker, price, qty), a named reason on the log line, and no further `SUBMIT` for that ticker until something about the order changes. Accepted orders are unaffected (fills, rests and expiries continue).
+- Files: none yet. Diagnostic first; files are declared before any edit. `syndicate/features/shared/polymarket_us_orders.py` is held by `polymarket-ask-pricing` (the same session); any edit there is coordinated in both blocks.
+- Origin: found while reading step 1 of `polymarket-ask-pricing` (`deploys.md` 2026-09-15 ~15:55Z).
+- **MEASURED 2026-09-15 before any code, live-odds-worker `54f3d662`:**
+  - `aec-nfl-phi-ten-2026-09-20`, `OUTCOME_SIDE_NO`, qty 6.53 @ 0.245 ($1.60), GTD to kickoff 09-20 17:00Z.
+  - First `SUBMIT` 05:18:13Z. Every ~17 min after that: `LIVE_ORDER status=submitted`, then on the next reconcile `ORDER_STATE_REJECTED cum=0 leaves=0` and `RECONCILED key=ea31ca3ed3577aca5fdf014b submitted->rejected`, then a re-build and re-submit. 34+ cycles by 14:43Z.
+  - Book at every build: `ask=0.24 ask_qty` ~8,000-9,500, `marketable=True`, `state=MARKET_STATE_OPEN`. So neither price nor depth explains a reject.
+  - No reject reason on any log line.
+  - Since 09-12, Polymarket reconciles: 23 filled, 8 expired, 9 new, 34 rejected, and all 34 are this ticker. 0 filled, so no fill and no spend.
+  - Same passes: `refused={'insufficient_venue_balance': 4-6}` for other positions.
+- Hypothesis (to test, not believed), ranked:
+  - (H1) a venue minimum on order notional or size; $1.60 is the smallest stake seen.
+  - (H2) insufficient buying power: the venue rejects rather than our pre-check refusing, because this order's stake slips under our balance gate.
+  - (H3) something specific to the NO side on this market.
+  - Separately, (R) the executor treats a `rejected` ledger row as retryable with no cap.
+  - Read-only diagnosis is running before any change.
+- Falsification test:
+  - H1 dies if any accepted Polymarket order since 09-12 had stake <= $1.60 or qty <= 6.53.
+  - H2 dies if the account's available balance covered $1.60 at a rejected submit.
+  - R dies if the re-submits come from a new plan row each pass, not from retry of the rejected row.
+- Verification: in `deploys.md` after the fix deploy, one rejection per (ticker, price, qty) with its reason logged, 0 re-submits of it on later passes, and fills/rests/expiries continuing at their prior rate.
+- Blocked by: none. A change to live order flow needs the user's go before deploy; live-odds-worker places real orders.
+
 ### polymarket-ask-pricing — OPEN — opened 2026-09-11 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 (ADOPTED 2026-09-15 ~10:55 CDT from archived 7a239b89 on user instruction "adopt polymarket-ask-pricing"; `session_worktree.py adopt`: nothing of this lane's in the primary tree) — **STEP 1 VERIFIED and the kickoff expiry VERIFIED (2026-09-15); STEP 2 waits on the user's go**
 - **GOAL VERDICT 2026-09-15 ~11:05 CDT, session 0f5b256e.** Goal (verbatim): "todo `#662`, the user's decision (2) of 2026-09-11 ("start pricing off the executable ask plus fees")." — **GOAL: NOT MET.** Step 1 (the instrument) is MET; step 2 (pricing at the ask) is not built, and needs the user's go.
   - **Step 1 Verification, MET.** Read on live-odds-worker `54f3d662`, which contains `1afec00f` and `16de339b` by ancestry, with 3 `POLYMARKET_BOOK_AT_BUILD` and 2 `TIME_IN_FORCE_GOOD_TILL_DATE` source lines. `SYNDICATE_POLYMARKET_BOOK_AT_BUILD` is absent, so the instrument is ON.
