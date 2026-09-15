@@ -2063,6 +2063,21 @@ death, never life — do not invert it.
   - **Unwired check** (full copy, lookup replaced by `None, ""`): **exactly the 8 script-file block tests FAIL** (8 failed, 55 passed).
   - **Repo rescan with the patched classifier:** 22 files mention a deploys endpoint; run as files, **only `scripts/render_deploy.py` classifies as a deploy** (before the `data=` fix, `build_consolidated_graft.py` did too).
   - Owed for GOAL (DONE): landed as `af7c895c`; main's guard is written into the PRIMARY working tree, and every probe matched (see the VERDICT at the top of this block).
+### soccer-player-substrate — OPEN — opened 2026-09-15 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Goal: the soccer prop sim lists the players who actually play. The test is a replay of squad selection over production player files and ESPN box scores for the 2026-09-01..09-14 fixtures: real shots attributable to a listed player reach >= 85% in every league (36-87% on 2026-09-15), phantom rows fall, and every recommendations artifact publishes a per-side squad-coverage field a gate can use. Code lands on origin/main with tests. A refresh-worker deploy and a production reading happen only on the user's go.
+- Files: `scripts/refresh_odds_sources.py` (`_SOCCER_PLAYER_FETCH_LEAGUES` and `_soccer_players_step` only), `scripts/build_soccer_artifacts.py` (player loading, departed filter, squad audit field), `tests/test_soccer_player_producer_step.py`, `tests/test_build_soccer_artifacts.py`, `scripts/soccer_season_audit/decompose_squads.py` (NEW)
+- Hypotheses (PRE-REGISTERED 2026-09-15, before the decomposition ran):
+  - H1: in the four ESPN leagues, which have no current-season file in production, most unattributed shots come from players in NO production player file. The missing producer is the fix.
+  - H2: in the big five, the departed filter is OFF (the busiest current-season player is under 450 min), so phantom rows are mostly prior-season-only players.
+  - H3: intra-league transfers kept at their old club are under 10% of unattributed shots. (Dedupe keeps the max-minutes row, which carries last season's team.)
+  - H4: fixing those three raises replayed coverage to >= 85% in every league.
+- Falsification test:
+  - H1 is false if "absent" is under 50% of unattributed shots in the ESPN leagues.
+  - H2 is false if prior-only rows are under half of the big-five phantoms.
+  - H3 is false if other-club classes reach >= 10%.
+  - H4 is false if any league stays under 85% on replay.
+- Verification: the decomposition and replay tables are recorded in the log, with a reachability test (`off != on`) per change, landed on origin/main.
+- Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
