@@ -1782,6 +1782,12 @@ death, never life — do not invert it.
   - **Other dates return nothing at all:** `?date=` is accepted (`home.py:8477`), but 2026-09-13, 2026-09-17 and 2026-09-19 each served `sports` 0 / `top_props` 0. From code: `home.py`'s `_allow_stored_date_fallback()` returns False and each sport's `is_active` requires the label to equal today.
   - **Unexplained, not chased:** soccer and nfl are in web's active list yet absent from today's payload.
   - **Lead filed** for the ncaaf-on-web gap.
+  - **DECISION 2026-09-15 ~17:45 CT (user: "add ncaaf to web's active sports", then "Don't add it" once the cost was shown): web's `SYNDICATE_ACTIVE_SPORTS` is LEFT AS IS. Nothing was changed, no claim taken, no deploy.**
+    - **Why:** `build_home_overview` calls `_NCAAFDataProvider.games(context, is_active_today=...)` WITHOUT `include_upcoming`, which is the heavy branch (`build_smartsim_cards_page_context(week)` + `build_ncaaf_market_board(week)`, `home.py:6709-6713`). `fccd923d` (2026-08-29) made only the CHIPS path light via `build_ncaaf_chip_games`.
+    - **Measured precedent** (`deploys.md` 2026-08-29 12:18 CT, revert `0163f904`): with NCAAF reachable on that path, `/` went 3.5s -> 37.9s and `/ncaaf/cards` 502'd; the revert restored 200s.
+    - **Payoff would be nil:** no template or JS under `syndicate/` fetches `/api/home` (only `tests/` and the run-syndicate skill), and `/` renders the Layer 2 board (`home.py:8407`). NCAAF's user-visible surfaces (`/ncaaf/*`, the Layer 2 board, chips) do not read this key.
+    - **`render.yaml` does not declare the key**, and a `blueprint_sync` upserts declared keys while leaving live-only ones alone, so no drift risk either way.
+    - **If it is ever wanted:** give the home overview a light NCAAF build first (the `build_ncaaf_chip_games` pattern), prove equivalence and cost offline, then flip the key with a deploy.
 - Goal: state, from web's own served payload, how many dashboard prop rows carry a row date and a quote, per sport, with NCAAF split out — the surface `home.py`'s `enrich_prop_rows` feeds (`home.py:3461`), on web live `c35284dc`, which carries `3157bb7b` and `6d526851`. Read-only; no code change without the user's go.
 - Files: none (read-only sampling; probes in the session scratchpad)
 - Hypothesis:
