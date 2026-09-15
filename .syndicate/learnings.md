@@ -6071,3 +6071,16 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - The user was shown a false prediction and approved a deploy partly on it. The outcome was benign (the new age is true, and the user kept the `stale` label).
   - One effect of a product change can never be measured.
 - **Check, not rule:** preflight asks for the prediction and the baseline. `deploy_preflight.py` takes `--expect "<field>=<value>"` and `--baseline-read-at <UTC>`, and returns HOLD when the baseline is older than the 15-min CLEAR window or names no row count. The post-deploy entry then lists expected against measured, one line per field.
+
+## 2026-09-15 — FORBIDDEN: caching a verdict whose validity depends on the date's relation to TODAY under a key that is only the date. At midnight "tomorrow" becomes "today" and the verdict outlives its premise. `[lane wnba-future-date-cache-carry]`
+- **The belief overturned:** `has_games_for_date` (`syndicate/features/wnba/sources.py`) said *"A confirmed True is stable and safe to remember."* It was safe for an ESPN-confirmed True. The same set also held Trues from the "not today and a slate file exists" shortcut, whose premise is the date NOT being today. It was checked before the today rule, so after midnight it answered for today.
+- **What was actually true:**
+  - refresh-worker writes an EMPTY `recommendations_slate_<tomorrow>.json` (94 B, 0 games) before midnight CT.
+  - The process that asked about tomorrow in the evening read the no-game day as confirmed. It saved the 2026-08-30 slate under today's `live_state` key, and the board showed four FINAL chips on 09-14 and 09-15.
+  - This is exactly the seed `wnba-schedule-guard-fix` left unnamed on 09-11.
+- **How we found out:** the user saw the chips. The phantom log line starts at 00:04 and 00:06 CDT, right after midnight. The empty slates were published BEFORE their date's CT midnight on the bad days and AFTER it on the clean days (`deploys.md` 2026-09-15 14:34:14Z). A writer-level test that primes tomorrow, rolls the clock and builds returned `2026-08-30` on origin/main.
+- **The rule going forward:**
+  - One cache holds one provenance.
+  - A value derived under a clock-relative condition (`!= today`, "past", "future") is either not cached, or keyed by (date, the day it was evaluated).
+  - A test for any date-keyed cache ROLLS THE CLOCK between the write and the read. Two calls on the same "today" cannot see this.
+- **Cost:** two days of stale WNBA chips and a phantom `scheduled_games 4` on Layer 2. The 09-10 fix had passed its same-day readings because they never crossed a midnight with a pre-written tomorrow file.
