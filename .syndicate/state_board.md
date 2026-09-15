@@ -905,3 +905,31 @@ the board's age is now the age of its state rows.** That is true, and the user
 decided 2026-09-15 to keep the `stale` label. Content: state rows merge ahead of
 L2-A cards under first-wins dedupe; how many L2-A cards they displaced was NOT
 measured (no pre-deploy served count; at most 106).
+
+**Expansion now lives inside `_read_state_payload`** (`da013b77`, no behaviour
+change; `tests/test_state_read_choke_point.py`), so no caller of it can skip it.
+
+**The board-SNAPSHOT readers deliberately stay keyvalue-only — user decision
+2026-09-15, on measurement.** `read_latest_intelligence_board_snapshot_response`
+and `_latest_non_empty_intelligence_board_snapshot_response` read via
+`read_json_file` and expand; they do NOT go through `_read_state_payload`.
+Routing them there was proposed and REJECTED, because alone it gains nothing on web
+and adds risk:
+- `board_snapshot*.json` is excluded from the artifact allowlist
+  (`artifact_publisher.py:1072-1095`), so a fresh snapshot can never reach web's
+  disk. That comment makes the allowlist entry and a disk-consulting read ONE
+  change — neither half is useful alone.
+- 0 `STATE_TOO_LARGE_FOR_KEYVALUE` / `STATE_PUBLISHED_AS_ARTIFACT` /
+  `STATE_ARTIFACT_FALLBACK_REFUSED` on refresh-worker or web over the 24 h to
+  14:41Z 2026-09-15. Snapshots fit keyvalue since compression (`/api/ops/board-snapshot/inspect`
+  14:40:39Z: 09-15, 98 recommendations, generated 14:37:55Z).
+- **Web's disk holds STALE state files:** `reports/intelligence/intelligence_state.json`,
+  25,784,744 bytes, stamped 2026-08-10T01:38:16Z (for 08-09), read via
+  `/api/ops/artifacts/export` 14:39:50Z. Nothing reads it today
+  (`read_intelligence_state()` has no callers; 0 `STATE_READ_FROM_ARTIFACT` on web
+  12:00-14:40Z). But `_read_state_payload` returns a disk copy whenever keyvalue has
+  none, and the snapshot fallback loop globs disk, so routing would have let a
+  month-old file be served.
+- **If an oversized snapshot ever returns, the fix is allowlist + disk-aware read +
+  a max-age refusal on disk copies, TOGETHER**, and it needs a web + refresh-worker
+  deploy. Not before.
