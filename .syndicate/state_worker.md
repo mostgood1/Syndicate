@@ -2145,10 +2145,18 @@ outlier cold reading. Three paired replications erased it: **cold 31.32s vs warm
 
 - **The route.** `/api/ops/artifacts/stream` returns 304 on `st_mtime <= since` BEFORE honouring Range (`ops.py`). Probed live: since >= web mtime -> 304; since older -> 206 tail. A 304 or 416 is a silent success in the puller.
 - **Measured failure.** refresh-worker's `nfl_source/tracking/book_quotes/2026-09-13.jsonl` stayed at 19,914,752 B (books from 09-12 08:02Z) while web held 28,757,424 B. The served board had 0 NFL rows for the Sunday slate.
-- **Now.**
-  - `_is_append_only` paths with a local copy send Range only.
-  - Whole-file families keep `since=`.
-  - Verified after boot: `STREAM_TAIL_OK` on that shard at 18:39:40Z; NFL layer2 rebuilt 18:53:50Z (808 rows, 23 live).
+- **Now `[verified 2026-09-15, refresh-worker `55fee786` live 18:13:26Z, still in `5686a555`; lane book-quotes-splice-repair]`.**
+  - Append-only paths with a local copy sync against a `.<shard>.webpos` offset with a 4 KB overlap compare (`_pull_append_only_synced`).
+  - Match: under `shard_append_lock`, cut at webpos, write web's tail, re-append local rows web lacks (`STREAM_TAIL_SYNC_OK`).
+  - Mismatch, 416 or non-206: whole pull plus local valid rows, non-JSON lines dropped (`STREAM_SYNC_WHOLE reason=...`).
+  - The blind `STREAM_TAIL_OK` path reads 0 since 18:13Z.
+  - Whole-file families keep `since=`. (09-13: `STREAM_TAIL_OK` on the NFL shard at 18:39:40Z unfroze the board.)
+  - Measured: 18:13-18:48Z SYNC_WHOLE 9 (once per shard), TAIL_SYNC_OK 13+, failures 0. After web's P3 repair (19:28Z), each touched shard resynced once on `overlap_mismatch`, dropping exactly web's refused counts.
+  - DNS blips during a web restart log `STREAM_PULL_FAILED ... Name or service not known` (10 at 18:56:59-18:57:32Z) and clear on the next pass.
+- **book_quotes on web `[verified 2026-09-15]`.**
+  - The merge refuses non-JSON lines (`MERGE_REFUSED_BAD_LINES`, P1 `9ed5c5ad`).
+  - Historical splice fragments were removed by `POST /api/ops/book-quotes/repair` (P3 `8b563ca9`, applied 19:28:33Z): 2152 from 49 shards since 09-01. 20 orphans remain, most of them 09-13 07:31-10:22Z captures.
+  - **live-odds-worker republishes its own stale copies of today's shards**, which still carry fragments (`publisher=live-odds-worker`, mlb 09-15 refused=10, soccer 09-15 refused=43). It never re-syncs a shard it already has; the repair list asks only for missing files.
 - **Related.**
   - Web's append-only publish MERGES: line-digest dedupe, then `os.replace`, so a byte-identical republish advances only the mtime.
   - Web's merge concurrency cap is 1, so a second publish seconds later gets `ARTIFACT_MERGE_AT_CAPACITY` (503, retried by a later publish).

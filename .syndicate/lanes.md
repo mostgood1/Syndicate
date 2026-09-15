@@ -406,7 +406,21 @@ death, never life — do not invert it.
 - Verification: per the Goal, in `deploys.md`, after a live-odds-worker deploy the user approves.
 - Blocked by: none.
 
-### polymarket-no-fill-booking-audit — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+### polymarket-no-fill-booking-audit — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **IN PROGRESS: 2 misbooked NO fills found; log scan 09-01..09-15 running**
+- **VERDICT (checkpoint 2026-09-15 ~15:10 CDT).** Goal: "[user 2026-09-15 ~14:45 CT: "start no fills audit"] list every live Polymarket NO fill booked before `1efdea18` (live-odds-worker, live 17:26:07Z) whose `fill_price` is avgPx rather than the true NO cost 1 - avgPx. For each: the booked and true cost, and the stake, P&L and ROI error it carries. Report the total. READ-ONLY; correcting rows is a separate decision." — **GOAL: NOT MET** (in progress).
+  - **Misbooked so far, both before the served book starts (09-02), so no row to correct:**
+    - `C65VD0R72KDG` 08-30: 13.13 @ avgPx 0.235, booked 0.235 / $3.09, true 0.765 / $10.04, error +$6.96.
+    - `tsc-mlb-bos-mia-2026-08-26-8pt5`: 7.11 @ avgPx 0.43, booked 0.43 / $3.06, true 0.57 / $4.05, error +$1.00.
+  - **Booked right:**
+    - The 3 NO fills in the served book (`CDZ89ZCJ8SJR` dal-nyg 0.395, `CE7V6BXQETMQ` nyj-ten 0.51, `CGVRPD7SWVB8` sea-ari 0.335; FILL_PRICE `recorded = 1 - avgPx`).
+    - 08-26 `C3GHTNSE0FSM` 0.435, `C3FPKCFNPFSN` 0.455, `C3E1TJPV4FSM` 0.49 (deploys.md 2026-08-26 00:37Z).
+    - 08-27 `C4N3GPYA4GNQ` lar-lac 0.51.
+    - (b) bal-col 09-02 WON: `pnl 6.7024` = n(1 - 0.515) - fee.
+  - **Served book** (`/api/portfolio/live?on=all&venue=polymarket&show=all`): 49 rows, 27 live filled from 09-02 plus 22 rejected. No hidden row carries a fill.
+  - **Left:**
+    - Discriminator (a): background scan `fill_price_scan.py` into scratchpad `fp_all.json`, one process with retries. Three parallel scans were stopped after log-API 503s left most windows empty.
+    - Discriminator (c): the `IMPOSSIBLE_PNL_CORRECTED` read failed on a 503 twice; still owed.
+    - Coverage limit: NO fills before 09-01 that no ledger entry names cannot be seen. Logs start 09-01 and the book 09-02.
 - Goal: [user 2026-09-15 ~14:45 CT: "start no fills audit"] list every live Polymarket NO fill booked before `1efdea18` (live-odds-worker, live 17:26:07Z) whose `fill_price` is avgPx rather than the true NO cost 1 - avgPx. For each: the booked and true cost, and the stake, P&L and ROI error it carries. Report the total. READ-ONLY; correcting rows is a separate decision.
 - Origin: lane `polymarket-no-price-convention` (CLOSED, GOAL MET) and `C65VD0R72KDG`, settled by rule at 0.765 against a booked 0.235 (user decision, lane `polymarket-ask-pricing`).
 - Files: none (read-only). No claim taken.
@@ -421,7 +435,15 @@ death, never life — do not invert it.
 - Falsification test: every NO fill found reads `recorded == 1 - avgPx`, and no WON row fits (b).
 - Verification: the table and totals, recorded in `state_polymarket.md` with the orders each discriminator could and could not see.
 
-### book-quotes-splice-repair — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+### book-quotes-splice-repair — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **P3 APPLIED 19:28:33Z; P4 (1) and (3) MET, (2) NOT MET: live-odds-worker republishes stale copies**
+- **VERDICT (checkpoint 2026-09-15 ~15:10 CDT).** Goal: "[user 2026-09-15: "open the lane and bring me the plan"] no `book_quotes` shard gains a headless fragment line, and the shards already damaged are repaired. Read on production after the fix: 0 lines failing `json.loads` in newly written shards on web and refresh-worker across a full capture day; the refresh-worker byte-offset tail pull never appends into a file that is not a byte prefix of web's copy (the mismatch case is logged by name); and the affected historical shards read clean or are listed with their bad-line counts." — **GOAL: NOT MET.**
+  - Done:
+    - No new fragment since P1/P2: web refuses them at the merge, and refresh-worker's tail sync logged 0 failures.
+    - Historical shards repaired: 2152 removed from 49 shards; the re-check reads 20 orphans and 0 fragments.
+  - Left, the "full capture day" reading:
+    - Web still refuses fragments on today's mlb and soccer 09-15 shards (10 and 43 per publish). Every refusal is `publisher=live-odds-worker`, which republishes its own pre-repair copies and never re-syncs a shard it already has.
+    - Blocked on a user decision: a live-odds-worker change (drop non-JSON lines before publish) plus a deploy, OR waiting for those shards to leave its publish window.
+  - The 20 orphans point to a separate 09-13 07:31-10:22Z write fault, lead #4, being investigated next.
 - Goal: [user 2026-09-15: "open the lane and bring me the plan"] no `book_quotes` shard gains a headless fragment line, and the shards already damaged are repaired. Read on production after the fix: 0 lines failing `json.loads` in newly written shards on web and refresh-worker across a full capture day; the refresh-worker byte-offset tail pull never appends into a file that is not a byte prefix of web's copy (the mismatch case is logged by name); and the affected historical shards read clean or are listed with their bad-line counts.
 - Files: `syndicate/features/shared/artifact_merge.py` (P1: refuse non-JSON lines for book_quotes paths), `tests/test_publish_append_only_merge.py` (P1 tests only), `syndicate/features/shared/odds_book_quotes.py` (P0: bad-line counter in `iter_book_quotes`/`read_book_quotes` only; TAKEN 2026-09-15 from this session's lane `book-quotes-prefer-fuller-copy`), `tests/test_book_quotes_bad_lines.py` (NEW). `syndicate/features/shared/artifact_publisher.py` (P2: `pull_streamed_artifact` and new private sync helpers ONLY; TAKEN 2026-09-15 ~13:05 CT from lane `accuracy-assessment-0914`, which held it for one `HOT_ARTIFACT_PATTERNS` entry after taking it from `quote-state-publish-retry` on 09-14. Neither owner session (498e87fd, ed8bb082) could be found by transcript search. User decision "Take it for the pull only (Recommended)". The publish retry wrapper and the pattern entry stay untouched), `tests/test_artifact_publisher.py` (P2 pull tests only). **User decision 2026-09-15 ~13:40 CDT: "Approve all phases (Recommended)".**
 - Origin: lane `book-quotes-prefer-fuller-copy`, root cause 2026-09-15 ~12:40 CDT (that block and `deploys.md` 2026-09-15 16:03:59Z).

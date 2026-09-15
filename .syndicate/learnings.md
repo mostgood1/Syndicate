@@ -6201,3 +6201,19 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - Name the quantity in the caption ("Implied probability of this pick's price … (best price across books)").
   - A verify script's allow-lists are part of the design. After the redesign the script read "malformed 867" because it still named the old bases. Change the instrument in the same commit as the code it measures.
 - *(evidence: `deploys.md` 2026-09-15 18:08:02Z FOLLOW-UP (1), the 19:13:36Z entry and its 19:57:56Z FOLLOW-UP; commits `87558f2f`, `5686a555`, `4ccbea86`)*
+
+## 2026-09-15 — OVERTURNED: "fix the puller that spliced, repair web's copy, and web's merge refusals go to 0" — a SECOND publisher kept republishing its own stale copy, and the merge log had named it all along `[lane book-quotes-splice-repair]`
+
+- **What was believed:** P2 (refresh-worker's tail sync) plus P3 (web's repair) would bring `MERGE_REFUSED_BAD_LINES` to 0. The P4 verify was written that way.
+- **What happened:**
+  - refresh-worker behaved exactly as predicted: one `STREAM_SYNC_WHOLE` per shard, dropping exactly web's refused counts.
+  - Refusals continued on today's shards (mlb 10, soccer 43 per publish), and every one was `publisher=live-odds-worker` in web's `ARTIFACT_MERGE_DEFERRED` line in the same second.
+  - live-odds-worker holds its own copies and never re-syncs a shard it already has: the repair list asks only for missing files.
+- **Also in the same hour:**
+  - I attributed the refusals to `clv_openings` publishes by timestamp adjacency. `_requires_json_lines` matches `book_quotes` only, and `dir=` prints the GRANDPARENT folder (`tracking`), not the family.
+  - Three parallel log scans drew 503s from the log API. Most windows came back empty and were printed as "non-json" rather than failing.
+- **How to apply:**
+  - Before predicting that a receiver-side count reaches 0, enumerate EVERY publisher of the path over a window. Web's merge lines carry `publisher=`; a fix scoped to one publisher is scoped to one publisher.
+  - Read the emitter's format string before interpreting a log field (`dir=` was not what its name suggests).
+  - A log-API scan runs as ONE process with retry and backoff, and it records which windows actually returned. An empty window is not an empty log.
+- *(evidence: `deploys.md` 2026-09-15 19:27:29Z follow-up; `lanes.md` book-quotes-splice-repair P4 READING; `state_worker.md` `[streamed-pull-append-only-tail]`)*

@@ -68,11 +68,13 @@ Venue payload for `C65VD0R72KDG`, read by a one-shot probe (`a6eeaf17`):
     commissionNotionalTotalCollected 0.1400
 
 1. **The complement was applied on a side LABEL.** `outcomeSide=NO` turned
-   `0.2350` into `0.7650`, absurd against a `0.22` limit — so the downstream
-   guard correctly refused it. The guard worked; the complement was wrong. The
-   reading is now chosen by which of `{avgPx, 1-avgPx}` the SUBMITTED LIMIT
-   agrees with — semantics-free, because `order["price"]` is our own limit
-   echoed back on the same scale. Reproduces 4/4 of the recorded fills.
+   `0.2350` into `0.7650` against a `0.22` limit, and the downstream guard refused it.
+   **SUPERSEDED 2026-09-15:** the guard was wrong, and 0.7650 was the TRUE cost.
+   - Polymarket's `price` is always the YES price, and a NO buy is a YES sell.
+   - Since live-odds-worker `1efdea18` (live 17:26:07Z), a NO order sends `1 - p_NO` and a NO fill books `1 - avgPx`, always. Verified on the balance: sea-ari 2.84 -> 1.42 = 4.07 x 0.335 + 0.05. dal-nyg (13.57 x 0.395 + 0.19) agrees.
+   - The 08-30 limit-proximity rule that replaced the label complement MISBOOKED the NO fills that filled near the sent price: `C65VD0R72KDG` (true 0.765, booked 0.235, +$6.96) and BOS/MIA 08-26 (true 0.57, booked 0.43, +$1.00).
+   - `C65VD0R72KDG`'s cost is settled BY RULE (user decision); a balance read is no longer possible.
+   - Audit: lane `polymarket-no-fill-booking-audit`.
 2. **The limit check was DIRECTIONAL and read one way.** "A BUY cannot fill
    above its limit" is true; the unencoded inverse — a SELL cannot fill BELOW
    its limit — is equally true. This order is a SELL, so `0.2350 > 0.22` is
