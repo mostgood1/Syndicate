@@ -6318,3 +6318,25 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - Then read the service's claim status. A claim held for a main tip is the other half of the same answer.
   - Put the read time in the question to the user. An option built on a status that is 15 minutes old or older should say so.
 - *(evidence: `lanes.md` book-quotes-splice-repair line 437 vs soccer-player-role-allocation VERDICT 2026-09-15 20:45Z; `deploys.md` 2026-09-15 22:15:53Z READING; log 2026-09-15 anytime-td-quote-side-yes stand-down entry)*
+
+## 2026-09-15 — OVERTURNED: "re-running another run's script on unchanged inputs reproduces its numbers" — `SYNDICATE_REPO_ROOT` decides WHICH checkout's `team_names.py` is imported, and that alias set changes the market join `[session abacd435, fix #5a measurement; no lane]`
+
+- **What I believed.** H22's script, re-run against the same audit cache an hour later, returned 402 priced matches and primary n=320 against the recorded 394 / 312. No cache file had been touched (fd CSVs 17:09Z, prod/recs 17:11Z, outcomes.json 17:19Z) and `audit_games.load_fd` reads local CSVs with no network path, so I wrote it up as the football-data closing-odds join drifting — and put that claim into two docstrings of the H25 runner.
+- **What was true.** Run the way it was actually run — `SYNDICATE_REPO_ROOT` pointing at the primary tree, which this session's own transcript records — the script reproduces its recorded output byte-for-byte: 394 priced, n=312, P0 +0.0117, WF60 +0.0075, WFP +0.0076, M0 +0.0097.
+- **Why.** `scripts/soccer_season_audit/common.py` puts `SYNDICATE_REPO_ROOT` on `sys.path` and imports `canonical_team_name` / `match_team_name` from THERE. The primary tree is 117+ commits behind origin/main, and the worktree's `team_names.py` (201 lines vs 182) carries six club-spelling aliases it lacks — RasenBallsport Leipzig, Paderborn 07, Parma Calcio 1913, Deportivo La Coruna, Stade Rennais, Oud-Heverlee Leuven, each mapped to its fixture spelling — added by fix #1's `f833f7ec`. They bind 8 more fixtures to football-data rows.
+- **Scope.** The alias set moves ONLY which matches carry a market price. 584 matches, 477 primary, every arm's log loss and bias, and both the H22 and H23 verdicts are identical either way.
+- **How to apply.**
+  - When reproducing another run, pin every environment variable it set — the repo root included — and print them beside the result. An unset root silently resolves to a DIFFERENT checkout, and on this machine the checkouts are hundreds of commits apart.
+  - A count that moves while every scored number holds still is pointing at a JOIN, not at data drift. Diff the helper module the join imports before blaming a cache, and check `load_*` for a network path before blaming a feed.
+  - Name the checkout (or the alias set) in any cross-run comparison of market-joined numbers. H25's Brier gap to the close is on 320 matches and is NOT comparable to H22's 312.
+- *(evidence: `log/2026-09-15.md` 17:55 CT entry; scratchpad `scoring_env_out.txt` vs `scoring_env_rerun_2248.txt` vs `scoring_env_rerun_primaryroot.txt`; `team_names.py` diff, primary tree vs worktree)*
+
+## 2026-09-15 — FORBIDDEN: running `session_worktree.py land --lane <slug>` with any slug other than the one whose branch this worktree is on. It lands THAT LANE'S BRANCH, not the commit in front of you `[session abacd435, lanes soccer-player-role-allocation / soccer-anytime-scorer]`
+
+- **What happened.** From the `soccer-player-role-allocation` worktree, with a ledger commit ready, I ran `land --lane soccer-anytime-scorer` because my per-session marker had just moved to that lane. It pushed the OTHER worktree's branch: `04b907a0`, the producer-half shrink whose H19 was FALSIFIED and which was deliberately unlanded. My ledger commit stayed local.
+- **Why it reads as success.** The tool printed "pushed session/soccer-anytime-scorer -> main" and, on the retries, "nothing to land -- no commits beyond origin/main" — both true statements about a branch I had not written. Only a verification that grepped for MY OWN subject on `origin/main` caught it.
+- **How to apply.**
+  - `--lane` selects a BRANCH. Before landing, read `git rev-parse --abbrev-ref HEAD` in the worktree and pass the lane whose branch that is — the lane marker governs edit permission, not what gets pushed.
+  - Verify a land by the COMMIT, not by the push line: `git merge-base --is-ancestor <your sha> origin/main`. A subject grep also fails when the push succeeded but pushed someone else's commit.
+  - After an accidental land, measure the exposure window against every service that can ship main — the long-running services AND the crons, which build the branch tip when they fire — before saying nothing shipped.
+- *(evidence: `log/2026-09-15.md` 18:05 CT entry; `04b907a0` and its revert `d2d7b398`; the Render deploys read at 23:02Z)*
