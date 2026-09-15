@@ -1311,11 +1311,23 @@ death, never life — do not invert it.
   - Baseline hour 12:36:43-13:36:43Z on `cae4713e`: 0 and 0. **Recorded as a red flag (rise 0 -> 9).** The failures are clustered around the first post-boot build, with none in the following 12 min; the cause is not attributed. 0 Traceback.
   - The NFL live-slate reading this lane owes is still owed.
 
-### book-grid-gameline-ledger-log — OPEN — opened 2026-09-14 — session 8518e917-502e-4212-b876-11d6eb76ab71
-- VERDICT 2026-09-14 ~10:00 CT — Goal: Every MLB (and other live-gameline sport) book-grid build prints one flush=True line naming what the live-gameline attach produced and what the ledger write did (index size, rows attached by segment, candidates, written, skipped_unchanged, truncated, error), so the 09-12 dropping hop becomes measurable from refresh-worker logs
-  - **GOAL: NOT MET.** Deployed: refresh-worker `6fe6c6e9`, live 15:37:05Z, 0 `server_failed`. The line prints (first at 15:38:19Z; raw Render message 513 chars, complete). Exactly-once and the live-slate reading are owed.
-  - Left: exactly one line per MLB build, and the live-slate H2/H3 reading. Owner: one-time scheduled task `book-grid-gameline-live-reading-0914` (user-approved; fires 19:00 CT, runs only while the app is open). It reads 22:40Z-05:30Z and records `deploys.md` plus this verdict.
-  - Blocking: nothing but a live slate (first pitch 22:40Z). Deploy record: `deploys.md` 2026-09-14 15:30:33Z. Narrative: `log/2026-09-14.md` "lane `book-grid-gameline-ledger-log` — checkpoint".
+### book-grid-gameline-ledger-log — CLOSED 2026-09-14 — opened 2026-09-14 — session 8518e917-502e-4212-b876-11d6eb76ab71
+- VERDICT 2026-09-14 20:32 CT — Goal: Every MLB (and other live-gameline sport) book-grid build prints one flush=True line naming what the live-gameline attach produced and what the ledger write did (index size, rows attached by segment, candidates, written, skipped_unchanged, truncated, error), so the 09-12 dropping hop becomes measurable from refresh-worker logs
+  - **GOAL: MET.**
+    - Coverage: every live MLB build 22:40:41Z..01:31:54Z printed the line. 70/70 carried all 21 fields, with `error=none` and 0 `clipped=`.
+    - Exactly-once held: 70 ticks wrote `mlb:` (0 wrote it twice), against 70 lines.
+    - Raw message max 887 chars, 0 truncated.
+    - Live refresh-worker is now `6438830d`, which carries `05ca745c`.
+    - Window PARTIAL: run at 01:32Z, window end 05:30Z.
+  - Finding (H2/H3, not the goal): **MIXED** over 49 builds with `index>=3`.
+    - NEITHER on 21: `full_games` = `index` on 16 and `index-1` on 5; 697 full rows written.
+    - H2-shaped on 28: `full_games=0`, `projected=0`, `considered` 237-505.
+    - H3 on 0: `considered` >= 115 on all 70.
+    - The branches alternate build to build at a steady `index`. `skipped_by_segment.full` = 0 on all 49.
+    - On the zero builds, withheld `quote_older_than_live_pricing_ceiling` summed 2,282 (929 on the attach builds), and no post-attach reason appeared.
+    - Unmeasured next hop: why a steady `index` alternates between attach and `projected=0`. Not opened as a lane.
+  - Record: `deploys.md` "2026-09-14 01:32Z ... live-slate LIVE_GAMELINE_BUILD reading".
+- Outcome 2026-09-14: the line shipped and was verified exactly-once on a live slate, so the 09-12 dropping hop is now measurable. First reading MIXED: NEITHER 21 / H2 28 / H3 0.
 - Goal: Every MLB (and other live-gameline sport) book-grid build prints one flush=True line naming what the live-gameline attach produced and what the ledger write did (index size, rows attached by segment, candidates, written, skipped_unchanged, truncated, error), so the 09-12 dropping hop becomes measurable from refresh-worker logs
 - Files: syndicate/features/shared/book_grid_artifact.py, syndicate/features/shared/live_gameline_ledger.py, tests/test_book_grid_gameline_ledger_log.py (NEW)
 - Hypothesis H1, written BEFORE code: the 500-record per-build cap cut full-game rows on 09-12. **TESTED BEFORE CODE, EXONERATED.** Evidence from the per-record ledger for 09-12:

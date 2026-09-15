@@ -35124,3 +35124,43 @@ User decision in chat: "Deploy #3 after their reading is done".
   - Falsifier "post-live game records named < 95%": `[]`.
   - Shortlist factor sample (`after_live=True`, `written_at` 01:27:36Z, **2,000-row sample**): `skill_source=bucket` 0; factor without skill_source 0; factor differs/unpredicted 6. All 6 are `('mlb','h2h')` factor 0.972, a category the script carries no prediction for, not a mismatch against a stated one.
 - **OWED:** a diagnosis of why live MLB rows split between the live and pregame notes (lane accuracy-assessment-0914). This reading does not attempt one.
+
+## 2026-09-14 01:32Z (2026-09-15 UTC, 20:32 CT) — reading only, no deploy — refresh-worker `6fe6c6e9` — lane `book-grid-gameline-ledger-log` — live-slate LIVE_GAMELINE_BUILD reading: **MIXED**
+- **Run time and window:**
+  - The run was due 19:00 CT and started at 20:32 CT (01:32Z).
+  - Requested window: 2026-09-14T22:40Z..2026-09-15T05:30Z. It was still open at run time.
+  - COVERED only **22:40:41Z..01:31:54Z** (70 matches, 2 pages). **PARTIAL:** the slate was still live, and builds after 01:32Z were NOT read.
+- **Redeploy finding:**
+  - refresh-worker was redeployed 4 times after `6fe6c6e9`: `17c8208e`, `ae53a1a5`, `0a18557a`, then `6438830d`, live since 21:03:17Z.
+  - `git merge-base --is-ancestor 05ca745c 6438830d` exit 0, so the live code carries the line.
+  - Line count 70, not zero.
+- **Line completeness:**
+  - 70 `sport=mlb date=2026-09-14` lines, 0 for any other date.
+  - All 21 field names were present on 70/70.
+  - `error=none` on 70/70. `clipped=` on 0.
+- **Builds with `index >= 3`: 49.** The verdict rests on these. `index` peaked at 8.
+  - **NEITHER branch: 21 builds.** `full_games` = `index` on 16 and `index-1` on 5. All 21 had `projected>0` and `written_by_segment.full>0`, 697 full rows written in total.
+  - **H2 branch (`full_games` well below `index`, `considered` high): 28 builds.** `full_games=0` and `projected=0` on all 28. `considered` ranged 237-505.
+  - **H3 branch (`considered` low): 0 builds.** `considered` was >= 115 on all 70 builds.
+  - The branches alternate build to build at a steady `index`, not by slate phase. Example: 23:51:29Z index=7 full_games=7 -> 23:56:15Z index=7 full_games=0 -> 23:58:41Z index=7 full_games=7.
+  - `skipped_by_segment.full` = 0 on all 49, so the dedupe skipped no full row.
+  - Summed `withheld_by_reason` on the 28 `projected=0` builds:
+    - `segment_pricing_disabled` 5,463
+    - `segment_is_not_full_game` 3,998
+    - `quote_older_than_live_pricing_ceiling` 2,282
+    - `no_live_gameline_projection` 75
+    - no `model_edge_publishing_disabled_for_sport` and no `prob_interval_swamps_edge` (the reasons that follow an attach)
+  - The same four sums on the 21 attach builds: 4,386 / 3,151 / 929 / 131.
+  - `withheld_by_reason` is not split by segment, so assigning quote-age refusals to full rows is arithmetic, not a direct reading.
+- **Layer2 join, same window:**
+  - 12 `LIVE_GAMELINE_JOIN sport=mlb` lines.
+  - `index_why.sources_seen.live_mc / 2` went 2 -> 4 -> 7 -> 8 -> 7 games, consistent with the build lines' `index`.
+  - The join's own `projected` was 0 on 10 of 12 lines, then 30 at 01:25:31Z and 43 at 01:31:56Z.
+- **Exactly-once: HELD.**
+  - 70 refresh-worker `BOOK_GRID_TICK` lines had an `mlb:` entry in `written`, and 0 had more than one.
+  - That matches 70 `LIVE_GAMELINE_BUILD sport=mlb date=2026-09-14` lines.
+  - `rebuilt_previous` was null on all 70 ticks, so there were 0 lines for 2026-09-13.
+- **Line length (raw Render logs API, 4 pages, 371 `LIVE_GAMELINE_BUILD` lines across all sports through 01:32:16Z):**
+  - Longest MLB message: **887** chars. Longest across all sports: also 887.
+  - 0 lines lacked a closing `}`, and 0 carried `clipped=`.
+- Numbers only. No model quality or accuracy is inferred.
