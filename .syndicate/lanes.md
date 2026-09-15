@@ -744,6 +744,20 @@ death, never life — do not invert it.
   - A missing local copy is a plain whole pull that now records webpos. The old blind `STREAM_TAIL_OK` append is gone.
   - Tests: 6 new `AppendOnlySyncedPullTests` (matched tail keeps an unmerged local row; a merged local row is not duplicated; a spliced copy resyncs whole and drops the fragment; 416 resyncs whole; nothing new writes nothing; a missing copy records webpos). The old tail test was updated to the overlap Range. 273 passed across the publisher, merge, book-quotes, capture, shard and retry files.
   - **Expected on the first deploy:** one `STREAM_SYNC_WHOLE reason=overlap_mismatch` per shard refresh-worker has spliced (no webpos yet and a diverged copy), then `STREAM_TAIL_SYNC_OK` each cycle. The first pass costs one whole pull per touched shard (today, yesterday and forward dates), not one per cycle.
+  - **P3 PRE-REGISTERED 2026-09-15 ~13:20 CT, BEFORE CODE (user: "while we wait, start P3 repair of the damaged shards").**
+    - **Where it runs:** on WEB's disk, the source every worker pulls from. One-off Render jobs have no disk and web has no shell, so an admin endpoint `POST /api/ops/book-quotes/repair` spawns a CHILD process (same pattern and reason as `scripts/merge_published_artifact.py`: memory returns on exit, and web does no heavy computation in-process) running `scripts/repair_book_quotes_fragments.py`.
+    - **DRY RUN BY DEFAULT.** It writes only when the body says `apply: true`, and applying is a separate user decision after the dry-run counts are read.
+    - **The rule per shard** (`syndicate/features/shared/book_quotes_repair.py`, NEW), under the SAME per-path merge lock the merge child takes (`append_only_merge_lock`):
+      - Pass 1 collects the lines that are not JSON objects.
+      - Pass 2 marks a bad line VERIFIED only if it is a byte SUFFIX of an intact line in the same shard (the splice signature measured on web: 27 of 29 in mlb 09-03).
+      - With `apply`, it rewrites via temp + `os.replace` without the verified fragments.
+      - ORPHAN bad lines (not a suffix of anything) are KEPT and counted, never deleted blind.
+      - Logs: one `REPAIR_SHARD` JSON line per shard (bytes before/after, lines, bad, verified, orphan, samples), then `REPAIR_DONE`.
+    - **Scope:** `<sport>_source/tracking/book_quotes/*.jsonl` dated >= `since`, for the sports in the body.
+    - **Consequence, stated:** a repaired web shard is no longer a byte extension of what refresh-worker holds. With P2 live, refresh-worker's next sync of that shard mismatches its overlap and does ONE `STREAM_SYNC_WHOLE`, pulling the repaired copy (intended). refresh-worker's LOCAL `.gz` compacted copies of old dates are not touched by this.
+    - **Falsification:** a dry run reporting 0 verified on a shard web already showed with fragments (mlb 09-03: 29 bad), or `apply` removing a line that parses.
+    - **Verification:** dry-run counts on production, then after `apply` the same shard re-read through the stream route with 0 verified fragments left and its intact line count unchanged.
+    - **Files:** `syndicate/features/shared/book_quotes_repair.py` (NEW), `scripts/repair_book_quotes_fragments.py` (NEW), `tests/test_book_quotes_repair.py` (NEW), `syndicate/blueprints/ops.py` (the one repair route only; no OPEN lane claims `ops.py`, checked with lane-guard's `_claims()` on both lanes copies 2026-09-15).
   - **Guard note:** lane-guard reads the PRIMARY tree's `lanes.md`, which was 350+ commits stale. The claim transfer landed on origin/main (`209bd9b8`) did not unblock the edit until the same edits were mirrored into the primary tree's copy (`accuracy-assessment-0914` Files line, `quote-state-publish-retry` Files line, and its nested `shared:` bullet, which parsed as a live claim).
 
 ### polymarket-rejected-resubmit-loop — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8

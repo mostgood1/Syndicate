@@ -1570,6 +1570,50 @@ def api_ops_keyvalue_usage() -> Any:
     return jsonify(usage)
 
 
+@ops_bp.post("/api/ops/book-quotes/repair")
+def api_ops_book_quotes_repair() -> Any:
+    # Lane `book-quotes-splice-repair`, P3 (user decision 2026-09-15). Removes
+    # splice fragments -- a book_quotes line that is not a JSON object AND is a
+    # byte suffix of an intact line in the same shard -- from web's copies, which
+    # every worker pulls. Orphan bad lines are counted, never removed.
+    #
+    # POST because it can rewrite shards. DRY RUN unless the body says
+    # `"apply": true` (exactly true). The work runs in a CHILD
+    # (`scripts/repair_book_quotes_fragments.py`) for the reason the merge does:
+    # memory returns on exit and web does no heavy work in-process. The request
+    # does not wait; the child's `REPAIR_SHARD` / `REPAIR_DONE` lines are the
+    # record.
+    import re as _re
+
+    body = request.get_json(silent=True) or {}
+    since = str(body.get("since") or "").strip()
+    if not _re.match(r"^\d{4}-\d{2}-\d{2}$", since):
+        return jsonify({"ok": False, "error": "since must be YYYY-MM-DD"}), 400
+    raw_sports = body.get("sports") or ["mlb", "soccer", "nfl", "ncaaf"]
+    if not isinstance(raw_sports, list):
+        raw_sports = str(raw_sports).split(",")
+    sports = [s for s in (str(x).strip().lower() for x in raw_sports) if _re.match(r"^[a-z0-9_]+$", s)]
+    if not sports:
+        return jsonify({"ok": False, "error": "no valid sports"}), 400
+    apply = body.get("apply") is True
+    script = Path(__file__).resolve().parents[2] / "scripts" / "repair_book_quotes_fragments.py"
+    command = [sys.executable, str(script), "--data-root", str(data_root()),
+               "--sports", ",".join(sports), "--since", since]
+    if apply:
+        command.append("--apply")
+    try:
+        # INHERIT stdout/stderr so REPAIR_SHARD reaches Render's log collector.
+        child = subprocess.Popen(command, close_fds=True)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"spawn_failed: {type(exc).__name__}: {exc}"}), 500
+    print(
+        f"[ops] BOOK_QUOTES_REPAIR_SPAWNED pid={child.pid} apply={apply} since={since} sports={','.join(sports)}",
+        flush=True,
+    )
+    return jsonify({"ok": True, "spawned": True, "pid": child.pid, "apply": apply,
+                    "since": since, "sports": sports})
+
+
 @ops_bp.post("/api/ops/keyvalue/expire-run-artifacts")
 def api_ops_keyvalue_expire_run_artifacts() -> Any:
     # Mutating. Force-expires OLD per-run diagnostic artifacts
