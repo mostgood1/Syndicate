@@ -1497,8 +1497,9 @@ death, never life — do not invert it.
 - Blocked by: none (the deploy waits on user approval by design)
 - **STATUS 2026-09-15 21:3xZ: BUILT, LANDED AND LIVE; production verify OWED.** `867f1481` has been live on live-odds-worker since 19:37:29Z as ride-along in lane `soccer-player-substrate`'s deploy of `f833f7ec`. That deploy went out DURING tonight's slate, before the user decision "After tonight's matches" could apply, and that lane recorded the conflict in `deploys.md`. Checked by CONTENT, not ancestry: the resolver blob `7bb75289` is identical in `867f1481`, `f833f7ec`, `18be9107` and `991a94d5` (live 21:02:40Z), and no later commit touches the file. This lane made no deploy and took no claim; the claim was held by `soccer-player-role-allocation`. Pre-deploy measurements: 78 tests; 230 fixtures (7 dates) and 159 held-out (9 dates) resolve in full, loose-vs-strict disagreement 0, true row removed wrong ids 0 of 389; on upcoming 09-19/09-20 fixtures, live-vs-new changes 8 of 84, all None -> id. **Verify owed:** Sat 2026-09-19 13:30Z (08:30 CT) Hamburg SV v FC Cologne (bundesliga, both sides need the new code, expected id `5881174`), then 18:45Z Anderlecht v Zulte-Waregem (`5811767`): `live_state_2026-09-19.json` must show `momentum.supported True`, `source fotmob` and that id while in play. Scheduled (user: "yes set up the Saturday check"): local tasks `fotmob-alias-verify-0919-am` (08:50 CT) and `fotmob-alias-verify-0919-pm` (14:05 CT) take the reading, record it in `deploys.md` and close this lane on MET. See `.syndicate/scheduled_task_fotmob_alias_verify.md`. Bayern (user: "pick up the Bayern Munich strict-match miss"): NOT a production miss. With live commit `8c089e8c`'s resolver (blob `7bb75289`), all 5 Bayern Bundesliga fixtures on ESPN 08-15..10-10 resolve through the LOOSE pass (strict still misses "Bayern Munich"/"Bayern München" by design), so no strict alias was added. Earliest production read added: local task `fotmob-alias-verify-0918-bayern`, Fri 09-18 13:50 CT, Bayern Munich v 1. FC Union Berlin, expected `5881171`. Rennes/Köln (user: "pick up the Stade Rennais and FC Cologne aliases"): live commit `8c089e8c` carries both `_ESPN_NAME_ALIASES` entries. Read 2026-09-15 22:1xZ with its resolver, ESPN day by day 08-01..10-15: all 6 Ligue 1 Rennes fixtures and all 5 Bundesliga Köln fixtures resolve WITH the alias and return None WITHOUT it, so each alias is load-bearing. ESPN used one spelling throughout ("Stade Rennais", "FC Cologne"). No code change. Production reads are already scheduled: Sat 09-19 08:50 CT Hamburg SV v FC Cologne `5881174`, 14:05 CT Lyon v Stade Rennais `5802940`. Residual risk: an ESPN respelling misses silently, visible only as `fotmob match id unresolved`.
 
-### soccer-player-role-allocation — OPEN — opened 2026-09-15 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
-- **VERDICT 2026-09-15 22:20Z.** Goal (verbatim): "soccer shot and shots-on-target props are priced on a ladder CONDITIONAL ON THE PLAYER APPEARING (start/sub mixture, substitute intensity fitted held-out), and the 1.393 shot divisor is retired with its re-fit machinery. On held-out dates, that ladder beats the post-divisor unconditional ladder on log loss at lines 0.5 and 1.5, pooled and in >= 8 of 10 leagues, on production-shaped inputs. Landed on main with reachability tests; deploy per user." — **GOAL: NOT MET** (one production reading left).
+### soccer-player-role-allocation — CLOSED 2026-09-15 — opened 2026-09-15 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Outcome: shot/SOT props ship conditional on appearing, the 1.393 divisor and its re-fit machinery are gone, and both workers serve it with the reading to prove it.
+- **VERDICT 2026-09-15 22:20Z.** Goal (verbatim): "soccer shot and shots-on-target props are priced on a ladder CONDITIONAL ON THE PLAYER APPEARING (start/sub mixture, substitute intensity fitted held-out), and the 1.393 shot divisor is retired with its re-fit machinery. On held-out dates, that ladder beats the post-divisor unconditional ladder on log loss at lines 0.5 and 1.5, pooled and in >= 8 of 10 leagues, on production-shaped inputs. Landed on main with reachability tests; deploy per user." — **GOAL: MET.**
   - Met so far:
     - Step A `e53274f2` (divisor, loader, fitter and checks removed; the refit task disabled).
     - Step B `b33ef901`.
@@ -1506,15 +1507,11 @@ death, never life — do not invert it.
     - Mutation checks red; 108 targeted tests pass.
     - DEPLOYED to both workers after the 21:25Z window, per the user's decision. live-odds-worker `8c089e8c` went live 21:38:19Z; refresh-worker `2d579fd1` went live 22:12:03Z. Both are recorded in `deploys.md`.
     - live-odds-worker verify MET. In artifacts it generated after 21:38:19Z, every shot row with `expected_shots > 0` is priced on the conditional ladder: la_liga 185/185, championship 73/73, eredivisie 35/35. `shot_mean_vs_ladder_ratio` is 1.241.
-  - LEFT: refresh-worker's reading.
-    - Command: `ladder_basis_reading.py 2026-09-15T22:12:03Z`, over rows with `expected_shots > 0`.
-    - Pre-deploy baseline 20:37:17Z: 1.000 over 2,024 rows. Predicted share: 0.
-    - A session-local watcher is running.
-  - Blocking: none. The lane is waiting for soccer artifacts generated after 22:12:03Z.
-  - On close: `player_props.py` passes to `soccer-anytime-scorer`.
+  - refresh-worker verify MET, read 22:38:58Z: 693 rows with `expected_shots > 0` across epl, la_liga, championship and bundesliga artifacts generated after 22:12:03Z, 0 unconditional, ratio 1.287. Baseline was 1.000 over 2,024 rows at 20:37:17Z. Recorded in `deploys.md` (`4d7c228a`).
+  - `player_props.py` passed to `soccer-anytime-scorer` on close.
 - Goal: soccer shot and shots-on-target props are priced on a ladder CONDITIONAL ON THE PLAYER APPEARING (start/sub mixture, substitute intensity fitted held-out), and the 1.393 shot divisor is retired with its re-fit machinery. On held-out dates, that ladder beats the post-divisor unconditional ladder on log loss at lines 0.5 and 1.5, pooled and in >= 8 of 10 leagues, on production-shaped inputs. Landed on main with reachability tests; deploy per user.
 - Files:
-  - `syndicate/features/soccer/sim_engine/soccersim/player_props.py`
+  - `syndicate/features/soccer/sim_engine/soccersim/player_props.py` (RELEASED 2026-09-15 to `soccer-anytime-scorer`)
   - `syndicate/features/soccer/sim_engine/soccersim/shot_calibration.py` (DELETE)
   - `tests/test_soccer_shot_shrinkage.py` (DELETE)
   - `tests/test_soccersim_player_props.py`
@@ -1750,7 +1747,7 @@ death, never life — do not invert it.
 - Goal: soccer anytime-scorer probabilities stop pricing players at exactly 0, and are conditional on the player appearing. ESPN-league goal and assist rates are shrunk toward a positional prior, and goals use the same start/sub mixture as shots. On held-out dates, with production-shaped inputs, the SHIPPED engine beats today's anytime field on log loss, pooled and in >= 8 of 10 leagues. Landed on main with reachability tests. Which anytime field the board prices (unconditional or conditional) is put to the user. Deploy per user.
 - Files:
   - `syndicate/features/soccer/ingestion/espn_player_stats.py` (transferred from `soccer-player-role-allocation`, which never edited it)
-  - `syndicate/features/soccer/sim_engine/soccersim/player_props.py` (goal allocation and anytime only; BLOCKED while `soccer-player-role-allocation` holds it)
+  - `syndicate/features/soccer/sim_engine/soccersim/player_props.py` (goal allocation and anytime only; TRANSFERRED here 2026-09-15 22:45Z when `soccer-player-role-allocation` closed with its verify MET)
   - `tests/test_soccer_anytime_scorer.py` (NEW)
   - `scripts/soccer_season_audit/calibration_anytime.py` (NEW)
 - Hypotheses, pre-registered in `calibration_anytime.py`'s docstring before its run (2026-09-15 ~20:58Z). Engine at `84215778`, fix #1 squads, 16,377 appeared outfield rows; TRAIN < 2026-08-26, TEST >= 2026-08-26; field c = `anytime_scorer_probability_if_playing`.
@@ -1767,7 +1764,7 @@ death, never life — do not invert it.
   - An engine replay within 0.002 of `calibration_anytime.py`.
   - Tests A/B.
   - After deploy, the zero share of anytime probabilities on published non-GK rows is 0.
-- Blocked by: two claims, both held by lanes of this session. `soccer-player-role-allocation` holds `player_props.py` until refresh-worker's ladder reading. `soccer-player-substrate` holds `build_soccer_artifacts.py` until fix #1's verify closes it (7/10 leagues read at 22:15Z); that file then transfers here.
+- Blocked by: `soccer-player-substrate`, which holds `build_soccer_artifacts.py` until fix #1's verify closes it; that file then transfers here. `player_props.py` is no longer blocked: `soccer-player-role-allocation` closed 2026-09-15 with its verify MET.
 
 ### fotmob-join-coverage-check — OPEN — opened 2026-09-15 — session da346015-cd58-450a-a9e0-bba6bdb00403
 - Goal: a checker resolves every upcoming ESPN fixture in the 10 tracked leagues through production's `resolve_fotmob_match_id`, with production's inputs (`espn_lineups.fetch_events` names, league slug, ESPN date). It exits non-zero on any unresolved fixture, or on any fetch it could not complete, and lists ESPN's names beside FotMob's unmatched fixtures. An ESPN respelling, or a new alias gap, is then caught days before kickoff instead of as a hidden momentum panel. Built, tested, run once over the next 7 days and landed on main; how it runs on a schedule is the user's call.
