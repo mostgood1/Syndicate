@@ -1621,12 +1621,11 @@ death, never life — do not invert it.
 - Blocked by: the live-odds-worker deploy queue `[2026-09-15 ~21:55Z]`:
   - 1. Lane `soccer-live-scoreboard-range-stale` holds the claim for `2d579fd1` (on main, predates `ca80edf0`). Its preflight is HOLD on an in-flight `refresh_odds_sources` job; it retries until 22:25Z. Its functional verify needs a live match, and a later deploy of main carries its `e115cd6b`, so it does not block us after it is live.
   - 2. Lane `book-quotes-splice-repair` sets `SYNDICATE_POLYMARKET_PRICE_AT_ASK=1` and redeploys `2d579fd1` as its own deploy (its user's decision), takes its reading, releases the claim and messages this session. AGREED ~22:00Z; the env var persists on the service.
-  - 3. This lane: deploy a PINNED `ca80edf0` (AGREED ~22:00Z), not main's tip, to live-odds-worker, then read `/api/ops/steam/events` after the next soccer refresh.
-    - Why pinned: main's tip (`0ee8cb3c` at ~22:00Z) carries `a2a1fa32` (`execution_ledger` record cap, lane `book-quotes-splice-repair`), which is not approved for deploy.
-    - Checked here: `2d579fd1`, `8c089e8c`, `070a05bf` and `e115cd6b` are ancestors of `ca80edf0`; `ca80edf0` is on origin/main; `a2a1fa32` is the only runtime commit in `ca80edf0..origin/main`.
-    - If that lane reports `a2a1fa32` approved before this lane's turn, main's tip is acceptable instead.
+  - 3. This lane: deploy main's TIP to live-odds-worker (revised ~22:05Z), then read `/api/ops/steam/events` after the next soccer refresh.
+    - Lane `book-quotes-splice-repair` reports its user approved `a2a1fa32` (`execution_ledger` record cap), so the earlier pin on `ca80edf0` is lifted. `a2a1fa32` rides as ITS ride-along; its verify (TRIMMED lines carrying `dropped_by_mode`) is that lane's.
+    - At preflight, re-list `<live>..tip` and stop for any runtime commit that is not approved.
   - HAZARD: any redeploy of `2d579fd1` (or anything before `ca80edf0`) AFTER this lane's deploy rolls the fix back. Check the live commit contains `ca80edf0` before taking the after-reading, and again before closing.
-  - refresh-worker (MLB steam + board) follows, after lane `soccer-player-role-allocation` releases its claim (held since ~21:22Z, target `8c089e8c`).
+  - refresh-worker: `ca80edf0` rides lane `soccer-player-role-allocation`'s pending tip deploy (agreed ~22:05Z with `book-quotes-splice-repair`, which asked that lane to take the tip); this lane does NOT deploy refresh-worker separately. Its after-reading is this lane's: `/api/ops/steam/events?sport=mlb` once MLB steam fires, and the MLB market board `odds_delta` on a crossing.
 
 ### ncaaf-prop-quote-market-check — CLOSED — opened 2026-09-15 — closed 2026-09-15 ~15:45 CT — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
 - **VERDICT.** Goal (verbatim): "for the 104 NCAAF legacy prop rows refresh-worker quoted after `f833f7ec` (`intelligence_prop with_quote=104`), state how many carry a quote from the row's OWN market, measured with the real `quote_ref_for_bet` over production quote shards. If they are wrong, describe the production impact and stop before changing behaviour. Read-only diagnostic; no code change without the user's go." — **GOAL: MET. Hypothesis FALSIFIED: 102 of 102 replayed rows get their own market, side and line.**
