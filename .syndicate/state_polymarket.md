@@ -511,7 +511,7 @@ NAMES only, and `ORDER_STATE` logs cum/leaves/avgPx but not this. One line added
 to `ORDER_STATE` would settle it. `polymarket_us_orders.py` is claimed by
 `polymarket-yes-leg-binding`, so it needs that lane or an override, plus a deploy.
 
-## [polymarket-no-fill-size-is-gross-capped] A POLYMARKET **NO** ORDER FILLS ONLY WHAT BUYING POWER COVERS AT **$1.00 PER CONTRACT**, NOT AT OUR NET COST — and book depth is REFUTED as the cause `[measured 2026-09-15 ~23:05Z from live-odds-worker logs, lane polymarket-ask-pricing]`
+## [polymarket-no-fill-size-is-gross-capped] A POLYMARKET **NO** ORDER FILLS FAR LESS THAN OUR CASH BUYS — the cap fits `buying power / YES price` twice, book depth is REFUTED, and **the mechanism is NOT settled: the same balance is CONSUMED net** `[measured 2026-09-15 ~23:05Z from live-odds-worker logs, lane polymarket-ask-pricing]`
 
 **The population, stated before the result:** every filled Polymarket order
 09-13..09-15, joining `SUBMIT` (qty, price, side) to `ORDER_STATE mode=per_order`
@@ -546,9 +546,32 @@ time for both:
 `state='ORDER_STATE_FILLED'` on both. It did not rest the remainder. So this is a
 cap applied at MATCH time, not a working order that never finished.
 
-**Consistent with the venue's own collateral documentation:** a short posts $1.00
-per contract of margin and the sale proceeds are credited only later, so a NO
-buy's capital requirement is the payout, not the price.
+**THE MECHANISM IS NOT SETTLED, AND THE FIRST VERSION OF THIS SECTION OVERCLAIMED
+IT.** I wrote that the venue sizes on gross, citing the collateral docs (a short
+posts $1.00 per contract and the sale proceeds are credited later). **That
+explains the CAP and predicts the WRONG CONSUMPTION.**
+
+**Buying power is consumed NET, measured twice and precisely:**
+
+    dal-nyg   91.52 -> 85.97   = 13.57 x 0.395 + 0.19 fee
+    sea-ari    2.84 ->  1.42   =  4.07 x 0.335 + 0.05 fee
+
+Both equal `filled x (1 - avgPx) + fee` — our net cost, not $1.00 per contract.
+The sea-ari row is the SAME ORDER as the first partial fill above, so this is not
+two regimes: on one order, the balance fell by the net cost while the fill was
+capped as if the gross were charged.
+
+**Two measured facts that no single rule I have produces:**
+- the fill stops at about `buying power / YES price` (gross), twice;
+- the balance falls by `filled x our cost` (net), twice.
+
+Anyone building on this must treat the **CAP as the fitted regularity** (n=2) and
+the **CONSUMPTION as the established one**, and must not assume the $1.00 margin
+story just because it fits the first. A candidate worth testing: the venue checks
+affordability against the WORST CASE at submit time and releases the difference
+after the match, in which case a balance read BETWEEN submit and fill would show
+a dip the post-fill balance has already erased. Nothing in this session read that
+instant.
 
 **NOT in tension with `[polymarket-resting-orders-do-not-encumber-cash]`.** That
 measured $10.09 of NEW RESTING orders moving `buyingPower` by $0.00. This is what
@@ -557,8 +580,11 @@ and nothing fills beyond what the balance covers at $1.00.
 
 **WHAT IT COSTS US.** We sized these at 7.94 and 4.72 contracts. Any stake sizing
 that divides available cash by our NO cost will keep sending size the venue
-cannot fill — here it asked for 2.0x and 2.5x what was fillable. The fillable
-size for a NO order is about `buying power / YES price`.
+cannot fill — here it asked for 2.0x and 2.5x what was fillable. **As a sizing
+rule, `buying power / YES price` is the right conservative bound to use today**
+— it fitted both cases and it is the smaller number — but it is a fitted bound,
+not a mechanism, so it should be re-checked on the next NO order rather than
+trusted as law.
 
 **LIMITS, stated so nobody over-reads this:**
 - **n = 2.** Both are NFL futures NO orders on the same day.
@@ -585,10 +611,22 @@ case and a partial fill in the other. **What separates them is the PRICE FIELD:
 every rejection carried the NO price (0.245); the fill carried the YES price
 (0.750).** Buying power was flat at $2.84 across all 34 rejections.
 
-**LEADING CANDIDATE for lane `polymarket-rejected-resubmit-loop`: a sell limit
-priced 51 ticks the wrong side of a 0.755 market — a venue price-band rejection.**
-No reject reason is logged anywhere in the path, so this is a candidate, not a
+**CANDIDATE for lane `polymarket-rejected-resubmit-loop`: a sell limit priced 51
+ticks the wrong side of a 0.755 market — a venue price-band rejection.** No
+reject reason is logged anywhere in the path, so this is a candidate, not a
 finding.
+
+**THE CANDIDATE IS IN DOUBT ALREADY, FROM THE LEDGER'S OWN AUDIT: 6 live NO orders FILLED between 09-01 and 09-13, every one of them BEFORE the convention fix.** If those were sent under the old convention, then sending the NO price does not by itself cause a rejection, and this candidate is dead. A read-only scan (`prefix_no_convention.py`, 09-11..09-15T17:26Z) is comparing each pre-fix NO order's SUBMIT price against its `avgPx` to settle it: sent + avgPx ~= 1.0 means the old convention was in force on an order that filled. **Until that returns, the candidate is UNTESTED, not leading.**
+
+**TWO OF THAT LANE'S OWN HYPOTHESES DIE HERE, BY THEIR OWN STATED FALSIFIERS:**
+- **(H1) a venue minimum on notional or size is DEAD.** Its falsifier was "any
+  accepted order with stake <= $1.60 or qty <= 6.53". The 22:02:39Z order was
+  accepted at **qty 4.72** and a stake of about **$1.16**. Both clauses fire.
+- **(H2) insufficient buying power is DEAD.** Its falsifier was "the balance
+  covered $1.60 at a rejected submit". Buying power was **flat at $2.84 across
+  all 34 rejections** — it covered the stake every time. The gross reading of H2
+  fails too: gross exceeded buying power at 22:02 as well, and that order was
+  accepted and partially filled instead of rejected.
 
 **THE TIMING IS NOT A CLEAN BEFORE/AFTER, AND THE FIX MUST NOT BE CREDITED WITH
 STOPPING THE LOOP.** The convention fix `1efdea18` went live 17:26:07Z, but the

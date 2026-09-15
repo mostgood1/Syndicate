@@ -580,7 +580,7 @@ once this index exists: re-splitting would orphan the parts.
 | [polymarket-low-activity] | — VERIFIED 2026-08-27, refresh-worker + live-odds-worker | `state_polymarket.md` |
 | [polymarket-venue-join] | VERIFIED 2026-08-29, all three services on `95c4fb12` | `state_polymarket.md` |
 | [polymarket-orders-are-cancelled] | 2026-08-30 — the venue cancels them, we re-place them, and nobody knows why | `state_polymarket.md` |
-| [polymarket-no-fill-size-is-gross-capped] | A Polymarket NO order fills only what buying power covers at $1.00/contract, not at our net cost; depth refuted | `state_polymarket.md` |
+| [polymarket-no-fill-size-is-gross-capped] | A Polymarket NO order fills far less than our cash buys; cap fits gross, consumption is net, mechanism NOT settled; depth refuted | `state_polymarket.md` |
 | [polymarket-resting-orders-do-not-encumber-cash] | 2026-08-31T15:45Z — CONFIRMED by a before/after pair, after I doubted it | `state_polymarket.md` |
 | [polymarket-price-gate-leaks-by-crossing] | 2026-08-31T16:05Z — FIXED AND DEPLOYED. The ceiling used to be checked against a price the venue never receive | `state_polymarket.md` |
 | [polymarket-soccer-h2h-bought-the-OPPOSITE-team] | 2026-08-31T21:25Z — FIXED AND DEPLOYED on both services; the positive case is UNVERIFIED | `state_polymarket.md` |
