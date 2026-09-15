@@ -32825,3 +32825,173 @@ Moved verbatim; nothing summarised. Each lane's current verdict and status stay 
   - The silver lettering shows beside the logo where it fits.
   - The standalone header no longer scrolls sideways.
   - Three web deploys, each MET in production: `dd3a4fda`, `70f44f05`, `ff7ec8be`.
+
+## PRIMARY-CHECKOUT MIRROR LINES PRESERVED — 2026-09-15 (session 3a65723e)
+
+Lines that sat UNCOMMITTED in the primary checkout's `.syndicate/lanes.md` (HEAD `e88447a2`) when it was fast-forwarded to `1a280739`, and that exist NOWHERE on `origin/main` `.syndicate/*.md`, either verbatim or dash/whitespace-normalized. 49 lines across 16 lanes.
+
+They are mirror copies other sessions wrote into the shared tree (lane headers, goal and claim lines, checkpoint verdicts, `Mirror:` markers), mostly from 2026-09-10..09-15. Each lane's CURRENT block lives in `lanes.md` or `lanes_closed.md` on main. These are believed SUPERSEDED, but that was NOT proven line by line, so they are kept here instead of discarded. `ratio` is the best `difflib` similarity to any line on main, and `where` is that line; below ~0.85 the wording is not on main.
+
+Each line is copied verbatim, indented 4 spaces inside the fence so that no `### <slug> — OPEN` text starts a line (the lane checkers scan for that shape). The U+FFFD characters were already in the mirror copy. Source backup: `C:	mp\primary-tree-backup-2026-09-15iles\.syndicate\lanes.md` (sha256 in its `manifest.json`).
+
+### mirror lines — `football-layer2-live-parity` (1)
+
+```text
+    - VERDICT 2026-09-10 23:10 CT — Goal: make NFL and NCAAF pregame sim and live projection data reach the Layer 2 board the way MLB and soccer do, before Saturday (NCAAF) and Sunday (NFL). — **GOAL: NOT MET.** NCAAF: the pregame projection is on the board (measured 13:25 CDT), and live game state is now corrected from the ESPN capture on refresh-worker `5767e3ac` (`corrected=35` on a final). Still owed Saturday 09-12: the in-play `pregame->live` flip and a `live_gameline` on an FBS-vs-FCS row. NFL: game state flips via chips (~18 min lag, bounded by the board cycle). NFL live game lines and projections are BLOCKED on a user decision: the `nfl_live_lens.json` two-writer conflict, `SYNDICATE_NFL_LIVE_RESIM`, `LIVE_LENS_SOURCES_BY_SPORT['nfl']` (lane `mlb-stop-publishing-edges`), and `nfl` in `_LIVE_GAMELINE_SPORTS`.
+```
+
+- best match on main: L69 ratio 0.445 at `.syndicate/lanes.md`:92
+
+### mirror lines — `accuracy-ledger-budget-raise` (2)
+
+```text
+    ### accuracy-ledger-budget-raise — OPEN — **CHUNK-COUNT BOUND + SINGLE PASS LIVE ON refresh-worker `48621d65` (since 22:55 CDT 2026-09-10, content-verified) AND UNEXERCISED -- THE READING IS THE 2026-09-11 AUTORUN, TAKEN AND RECORDED BY scheduled task `accuracy-autorun-reading-0911` (08:30 CDT; closes the lane on MET); session 218b778c ARCHIVED** — opened 2026-09-04 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885 (adopted 2026-09-10 by session 218b778c-1a91-4ff0-b90d-55d1133b09eb)
+    - **GOAL VERDICT (checkpoint and archive, 2026-09-10 ~23:0x CDT, session 218b778c).** Goal (verbatim): "`build_accuracy_summary` stops truncating its ledger read. ONE testable outcome: the next autorun logs `LEDGER_CHUNKS_ACCEPTED ... skipped_budget=0 truncated=0` with `dates` materially above 8, and peak `memory_anon_mb` stays under 2,600 MiB." -- **GOAL: NOT MET.** Latest reading, 2026-09-10, on the 4 GB byte budget and eight reads: `count=16 skipped_budget=22 dates=16 truncated=1`, in-run peak anon 2,034.9 MiB. **Left:** the first autorun on BOTH changes (the chunk-count bound and the single pass), 2026-09-11 >= 07:00 CT. Both are live on refresh-worker `48621d65` since 03:55:29Z (lane `ncaaf-fcs-market-implied-rating`'s deploy), present BY CONTENT (`intelligence_evaluation.py:628`, `run_refresh_worker.py:3553`), after `c29a7d4e` from 21:50:27Z. Judge `LEDGER_CHUNKS_ACCEPTED` (ONE line, not eight), `AUTORUN_DONE` and the `MEMORY_WATCHDOG` peak against the REVISED predictions (the bullet 'PRE-REGISTERED FOR THE FIRST AUTORUN ON BOTH CHANGES'); revert if in-run anon > 2,600 MiB. **HANDOFF:** session 218b778c is ARCHIVED. The scheduled task `accuracy-autorun-reading-0911` (enabled, fires 08:30 CDT 2026-09-11) takes the reading, records it in `deploys.md` and in this block, and CLOSES the lane on MET. On NOT MET the lane stays OPEN for whichever session the user points at it, and the task's SKILL.md is the manual procedure. A sleeping machine can dispatch it late, because `lastRunAt` records dispatch, not execution; the autorun's log lines stay readable all day. **Blocked by:** the once-per-Central-day clock, nothing else.
+```
+
+- best match on main: L135 ratio 0.274 at `.syndicate/deploys.md`:35395; L136 ratio 0.259 at `.syndicate/lanes.md`:136
+
+### mirror lines — `pricing-plane-v1` (1)
+
+```text
+      released: `syndicate/features/shared/layer2_board.py` — **TAKEN 2026-09-14 by `accuracy-assessment-0914`** (session 498e87fd; user decision in chat: "yes, take the claims if needed"; this lane's owner is archived). One ADDITIVE clause in `_row_rests_on_unmeasured_model`: a one-sided row whose model note is MEASURED with `verdict_class: loses_to_market` is withheld exactly as an unmeasured one is. Behaviour on today's board is unchanged.
+```
+
+- best match on main: L172 ratio 0.825 at `.syndicate/lanes.md`:173
+
+### mirror lines — `nfl-layer2-kalshi-identity` (10)
+
+```text
+    ### nfl-layer2-kalshi-identity — OPEN — opened 2026-09-10 — session 53eaee9c-46e9-4c34-8075-d63d7f63c933 — **CODE LIVE (`5767e3ac`, refresh-worker 2026-09-11T03:24:50Z). HALF 2 MET; HALF 1 OWES A PRODUCTION READING.**
+    - **GOAL VERDICT.** Goal (verbatim): "the NFL Layer 2 board (user-reported 2026-09-10 with a screenshot: a "Matchup" game card holding 65 opportunities, every row NO SIM VIEW at -0.9% EV, fair = own price +2, raw `player_pass_tds`/`player_receptions` labels) shows Kalshi prop prices INSIDE their sportsbook rows with game identity, and joins NFL props against the CURRENT published prop artifact. ONE testable outcome per half: (1) new NFL Kalshi quote rows in `book_quotes` carry the shard's display label and `home_team`/`away_team`/`commence_time`, and no NEW NFL board row has an empty `matchup`; (2) refresh-worker's board reports `prop_coverage.artifact_rows` of the published artifact (1,140) and NFL prop rows OTHER than Anytime TD carry a sim view." → **GOAL: NOT MET.**
+      - **Half (1): UNMEASURED.** This is a null of population, not a failure. Neither post-deploy `QUOTE_CAPTURE` tick had an NFL prop match, and `identity_stamped` covered 176 of 176 matches.
+      - **LEFT.** All three readings are ARMED as scheduled task `nfl-kalshi-identity-sunday-reading`, which fires once on Sun 2026-09-13 at 12:30 PM CDT `[user 2026-09-11: "schedule it and close the lane after"]`:
+        - R1: the first tick with `nfl` in `appended_by_sport` reads `relabelled>0` and shows `nfl:2026-09-13` shard keys.
+        - R2: web's NFL 09-13 shard carries Kalshi prop rows under display labels, with `commence_time`.
+        - R3: during live Sunday games, served NFL rows with neither `game` nor `game_state` number 0. This is peer `2edf8b82`'s check.
+        - The task records all three in `deploys.md`. It **CLOSES this lane only if all three PASS**; on any FAIL or NULL it adds a STATUS line and leaves the lane OPEN.
+        - A scheduled task runs only while the desktop app is open. Look for its row in `deploys.md`, not at `lastRunAt`, which records dispatch rather than execution.
+      - **BLOCKED BY:** nothing but those readings. No code is left.
+```
+
+- best match on main: L439 ratio 0.468 at `.syndicate/lanes.md`:1993; L440 ratio 0.962 at `.syndicate/lanes.md`:471; L445 ratio 0.377 at `.syndicate/deploys.md`:626; L446 ratio 0.521 at `.syndicate/lanes.md`:476; L447 ratio 0.833 at `.syndicate/deploys.md`:629; L448 ratio 0.688 at `.syndicate/deploys.md`:630; L449 ratio 0.794 at `.syndicate/deploys.md`:631; L450 ratio 0.406 at `.syndicate/lanes.md`:1410; L451 ratio 0.453 at `.syndicate/learnings.md`:2923; L452 ratio 0.705 at `.syndicate/lanes.md`:470
+
+### mirror lines — `execution-ledger-cas` (6)
+
+```text
+    ### execution-ledger-cas — OPEN — opened 2026-09-10 — session 58b96f04-c47e-4c85-802c-0e2b850241d0 (archived 2026-09-11) — **GOAL: NOT MET, one reading left. The first close window PASSED (7 collisions caught, 0 new stuck rows); the second is handed to scheduled task `execution-ledger-cas-close-reading` (2026-09-12 10:15 CDT), which closes the lane on a pass.**
+      - LEFT: (3)'s second window, owned by scheduled task `execution-ledger-cas-close-reading` (2026-09-12 10:15 CDT).
+      - BLOCKED BY: nothing but time.
+      - (3) the stuck-paper count, read PER DATE: **FIRST WINDOW MET 2026-09-11T13:41:50Z; the second window is owed.**
+        - Second window: 09-11 still at 2 and 09-12 and 09-13 still at 0, with paper order counts grown and `LIVE_ORDER` lines in the window.
+    - Blocked by: nothing. Scheduled task `execution-ledger-cas-close-reading` owns the last reading and the close.
+```
+
+- best match on main: L460 ratio 0.422 at `.syndicate/deploys.md`:33053; L467 ratio 0.615 at `.syndicate/deploys.md`:33053; L469 ratio 0.75 at `.syndicate/lanes_history.md`:32192; L486 ratio 0.642 at `.syndicate/lanes.md`:506; L494 ratio 0.451 at `.syndicate/deploys.md`:32295; L496 ratio 0.678 at `.syndicate/deploys.md`:33683
+
+### mirror lines — `sept-spike-captures` (1)
+
+```text
+    ### sept-spike-captures — OPEN — opened 2026-09-11 — session 92a71e78-b21c-4366-a900-f7a3f6fc434d
+```
+
+- best match on main: L545 ratio 0.608 at `.syndicate/lanes_history.md`:19986
+
+### mirror lines — `kalshi-plan-placeable` (3)
+
+```text
+    ### kalshi-plan-placeable — OPEN — opened 2026-09-11 — session 82c5bc07-6f67-47d7-9564-3a14f9d916ad
+    - Files: `pipeline/portfolio_commit.py`, `pipeline/execute_portfolio.py`, `tests/test_kalshi_plan_placeable.py` (NEW). NOT `syndicate/features/shared/portfolio_commit.py`: OPEN lane `pricing-plane-v1` holds it, so the filter goes in the caller.
+    - Blocked by: none. Two deploys: refresh-worker (writes the plan), then live-odds-worker (reads it). A reader without a live plan falls back to the paper2 plan and says so (`LIVE_PLAN_ABSENT`), so the deploy order is not a safety question.
+```
+
+- best match on main: L553 ratio 0.608 at `.syndicate/lanes_history.md`:32043; L555 ratio 0.859 at `.syndicate/lanes.md`:589; L574 ratio 0.621 at `.syndicate/lanes.md`:607
+
+### mirror lines — `polymarket-e2e-review` (2)
+
+```text
+    ### polymarket-e2e-review — OPEN — opened 2026-09-11 — session 7a239b89-c8fd-49b7-ba5a-e41bb9d4d9bc
+    - Files: none (diagnostic). Ledger writes only.
+```
+
+- best match on main: L576 ratio 0.61 at `.syndicate/lanes.md`:718; L581 ratio 0.544 at `.syndicate/lanes_history.md`:31613
+
+### mirror lines — `ncaaf-tbd-kickoff-date` (1)
+
+```text
+    ### ncaaf-tbd-kickoff-date — OPEN — opened 2026-09-11 — session 53eaee9c-46e9-4c34-8075-d63d7f63c933
+```
+
+- best match on main: L595 ratio 0.833 at `.syndicate/lanes_history.md`:32017
+
+### mirror lines — `layer2-prior-date-live-carryover` (3)
+
+```text
+    - Files: `syndicate/blueprints/intelligence.py`, `tests/test_layer2_prior_date_carryover.py` (NEW), `tests/test_layer2_shortlist_api.py`.
+      released: `pipeline/layer2_shortlist.py` — **TAKEN 2026-09-14 by `accuracy-assessment-0914`** (user decision "yes, take the claims if needed"; one additive `population_sink` argument at the per-sport `build_layer2_rows` call; the live-chip count is untouched). RELEASED 2026-09-13 ~23:00Z: `pipeline/intelligence_state.py` to lane `kalshi-nfl-quote-gap` (user decision "Capture on lightweight rebuild"; this lane owes readings only, no code).
+    - Mirror: header, goal and claim lines copied into the primary checkout per learnings 2026-09-11 REQUIRED. The full lane body is on origin/main (`f7c9969d`, code `822ee0ba`).
+```
+
+- best match on main: L611 ratio 0.873 at `.syndicate/lanes.md`:1599; L612 ratio 0.597 at `.syndicate/lanes.md`:1600; L613 ratio 0.385 at `.syndicate/lanes_history.md`:32467
+
+### mirror lines — `kalshi-nfl-quote-gap` (2)
+
+```text
+    ### kalshi-nfl-quote-gap — OPEN — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+    - Mirror: header, goal and claim lines copied into the primary checkout per learnings 2026-09-11 REQUIRED. The full lane body is on origin/main.
+```
+
+- best match on main: L615 ratio 0.919 at `.syndicate/lanes.md`:1118; L618 ratio 0.426 at `.syndicate/lanes_history.md`:31405
+
+### mirror lines — `heavy-build-memory-refusal` (2)
+
+```text
+    - Files: `syndicate/features/shared/worker_recycle.py` (NEW), `tests/test_worker_recycle.py` (NEW), `scripts/run_refresh_worker.py` (main-loop recycle check), Released: `pipeline/intelligence_state.py` **[RELEASED 2026-09-15 ~11:30 CDT to lane `layer2-row-parity` (session a0a81858), on its request, for a web-only legacy-row filter in `read_combined_intelligence_response`; it returns here at that lane's close. Asked to stay out of the candidate-pool cache, the refusal-counter hook and the `_refresh_layer2_shortlist_only` Kalshi capture. Mirrored here from origin/main by layer2-row-parity because lane-guard reads this copy.]** (main-loop recycle check; TAKEN 2026-09-14 ~00:45Z from UNOWNED `ncaaf-fcs-market-implied-rating`). User decision 2026-09-13 ~19:40 CT: "Approve, default ON at 15 (Recommended)".
+    - Mirror: header, goal and claim lines copied into the primary checkout per learnings 2026-09-11 REQUIRED. The full lane body is on origin/main.
+```
+
+- best match on main: L622 ratio 0.62 at `.syndicate/lanes.md`:1481; L623 ratio 0.426 at `.syndicate/lanes_history.md`:31405
+
+### mirror lines — `accuracy-assessment-0914` (3)
+
+```text
+    - Goal: one table, per sport x bet type active 2026-08-31..09-14 (MLB game lines/totals/segments, NCAAF lines/totals, NFL lines/totals/props, soccer lines/totals), PREGAME and LIVE, of model vs de-vigged market vs outcome (n, dates, Brier/log-loss, calibration), measured on the full projection population rather than the published/ordered subset; every active market that has a measurement serves `model_skill.status=measured` carrying it; unmeasured active markets backtested; optimizations shipped only where a measurement justifies them.
+    - Files: `syndicate/features/shared/projection_skill.py`, `tests/test_projection_skill.py`, `syndicate/features/shared/measured_market_skill.py` (NEW), `tests/test_measured_market_skill.py` (NEW), `scripts/assess_active_market_accuracy.py` (NEW), `.syndicate/findings_2026-09-14_accuracy_assessment.md` (NEW), `syndicate/features/shared/live_gameline_join.py` (TAKEN 2026-09-14 from UNOWNED `mlb-stop-publishing-edges`, user decision "yes, take the claims if needed"), `tests/test_live_gameline_skill_note.py` (NEW), `syndicate/features/shared/live_projection_join.py` (no open lane held it, checked on origin/main 2026-09-14), `tests/test_live_projection_skill_note.py` (NEW), `syndicate/features/ncaaf/game_projections.py` and `tests/test_ncaaf_game_projections.py` (no open lane held either, checked on origin/main 2026-09-14; for the `NCAAF_MEASURED_SKILL` note only), `syndicate/features/football/pick_gate.py` and `tests/test_football_pick_gate.py` (no open lane held either; the NCAAF totals verdict's reason/detail text only, `servable` unchanged), `tests/test_layer2_unmeasured_model_only.py` (no open lane held it), `tests/test_mlb_prop_calibration.py` (no open lane held it; one test's registry isolation only), `tests/test_layer2_skill_reliability.py` (NEW), `syndicate/features/shared/opportunity_population_ledger.py` (NEW), `tests/test_opportunity_population_ledger.py` (NEW), `syndicate/features/shared/artifact_publisher.py` (TAKEN 2026-09-14 from `quote-state-publish-retry`, same user decision; ONE `HOT_ARTIFACT_PATTERNS` entry only), `syndicate/features/shared/measured_bucket_skill.py` (NEW), `syndicate/features/shared/measured_bucket_skill.json` (NEW), `scripts/bucket_search.py` (NEW), `tests/test_bucket_search.py` (NEW), `syndicate/features/mlb/prop_outcomes.py` (NEW 2026-09-14, offline prop grading for the bucket search; `mlb/cards.py` only imported), `tests/test_mlb_prop_outcomes.py` (NEW).
+    - Mirror: header, goal and claim lines copied into the primary checkout per learnings 2026-09-11 REQUIRED. The full lane body is on origin/main.
+```
+
+- best match on main: L626 ratio 0.994 at `.syndicate/lanes.md`:1696; L627 ratio 0.973 at `.syndicate/lanes.md`:1697; L628 ratio 0.426 at `.syndicate/lanes_history.md`:31405
+
+### mirror lines — `layer2-chip-join-test-data` (7)
+
+```text
+    - Outcome: the test was wrong (it needed the `data/` registry) and is now data-free. Landed `66845b38`.
+    - Goal: `tests/test_layer2_lane_chip_join.py` passes 6/6 on origin/main in a session worktree WITHOUT `data/`, and still in the primary tree. `test_it_still_joins_when_NEITHER_side_publishes_a_key` and `test_a_final_chip_still_reaches_final` currently fail (n == 0).
+    - Files: `tests/test_layer2_lane_chip_join.py` only. No production code change is planned.
+    - Hypothesis (written BEFORE testing): the code is right and the tests depend on the environment. With no published key, `chip_join_key("ncaaf", name)` falls back to `_ncaaf_registry_name` -> `ncaaf.oddsapi_lines.resolve_team`. That reads `data/ncaaf_source/.../ncaaf_team_registry_snapshot.csv`, which is git-tracked but under `data/`, and `session_worktree.py` leaves `data/` out. So the registry is empty there, every name resolves to None, and only the raw names are left to join on ("akron zips" != "akron"). Probed in the primary tree, which has the data: `chip_join_key` maps all 8 test spellings to one key per club. Second risk: `read_game_chips` reads a real on-disk artifact, so the test process may not see None.
+    - Falsification test: the two tests also fail in the PRIMARY tree, or `oddsapi_lines.registry_status()` reports a populated registry in the worktree while they fail.
+    - Verification: run the file in the worktree (no data) and in the primary tree, before and after the change. Also a mutation check: the fixed tests must fail when the registry stub is removed.
+    - Mirror: header, goal and claim lines copied into the primary checkout per learnings 2026-09-11 REQUIRED. The full lane body, with the result, is on origin/main.
+```
+
+- best match on main: L631 ratio 0.568 at `.syndicate/lanes.md`:1750; L632 ratio 0.789 at `.syndicate/lanes.md`:1751; L633 ratio 0.935 at `.syndicate/lanes.md`:1752; L634 ratio 0.826 at `.syndicate/lanes.md`:1753; L635 ratio 0.786 at `.syndicate/lanes.md`:1754; L636 ratio 0.419 at `.syndicate/lanes.md`:1929; L638 ratio 0.397 at `.syndicate/learnings_evidence.md`:3935
+
+### mirror lines — `layer2-row-parity` (3)
+
+```text
+    - Goal: every Layer 2 board row carries real movement (props included, correct across ±100, steam same-book only), a time-scaled sparkline where green = the market moved toward the pick, a headshot where a player-id source exists, and a plain-language explainer; the 58 legacy candidate rows leave the board. Verified on the served `/api/intelligence/query` payload.
+    - Files: `syndicate/features/shared/layer2_board.py` and `pipeline/layer2_shortlist.py` (TAKEN 2026-09-15 from `accuracy-assessment-0914`, owner archived, user decision "Take them"), `syndicate/templates/intelligence.html`, `syndicate/static/shared/board_cards.css`, `syndicate/features/shared/clv_price_trail.py` (NEW), `syndicate/features/shared/layer2_row_context.py` (NEW), `syndicate/features/shared/prop_projections.py` (player ids only), `tests/test_layer2_movement_live_segment.py`, `tests/test_layer2_score_flatten.py`, `tests/test_prop_projections.py`, `tests/test_clv_price_trail.py` (NEW), `tests/test_layer2_row_context.py` (NEW), `tests/test_layer2_row_parity.py` (NEW), `tests/js/board_movement_display.test.mjs` (NEW), `tests/js/board_sim_view_display.test.mjs`, `scripts/verify_layer2_row_parity.py` (NEW), `tests/test_layer2_legacy_rows_withheld.py` (NEW), `pipeline/intelligence_state.py` (handed over 2026-09-15 ~11:30 CDT by `heavy-build-memory-refusal`; legacy-row filter only), `syndicate/features/shared/opportunity_signals.py` and `tests/test_score_reliability_resolution.py` (movement term sign only).
+    - Mirror: header, goal and claim lines copied into the primary checkout per learnings 2026-09-11 REQUIRED. The full lane body is on origin/main (`9d4cc6bb`).
+```
+
+- best match on main: L641 ratio 0.414 at `.syndicate/lanes.md`:1871; L642 ratio 0.595 at `.syndicate/lanes.md`:1873; L644 ratio 0.409 at `.syndicate/lanes_history.md`:32467
+
+### mirror lines — `soccer-season-market-audit` (2)
+
+```text
+    - Goal: one findings file covering soccer 2026-07-20..2026-09-14, for every market (1X2, totals, AH, BTTS, team goals, corners, team corners, player shots, SOT, anytime scorer), overall and per league: model vs de-vigged market vs outcome with CIs over matches, ROI of pre-registered edge rules validated leave-one-date-out, and FotMob momentum game shape by league. ANALYSIS ONLY: no engine, board or deploy change.
+    - Mirror: header, goal and claim lines copied into the primary checkout per learnings 2026-09-11 REQUIRED. The full lane body is on origin/main.
+```
+
+- best match on main: L647 ratio 0.725 at `.syndicate/lanes.md`:1916; L649 ratio 0.426 at `.syndicate/lanes_history.md`:31405
+
