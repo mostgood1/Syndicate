@@ -2042,6 +2042,15 @@ death, never life — do not invert it.
   - Post-deploy (if approved): refresh-worker `ncaaf intelligence_prop with_quote` > 0 in a same-process build.
 - Blocked by: none
 
+### fotmob-team-name-aliases — OPEN — opened 2026-09-15 — session da346015-cd58-450a-a9e0-bba6bdb00403
+- Goal: `resolve_fotmob_match_id` resolves fixtures whose ESPN and FotMob team names differ by alias (Waasland-Beveren/SK Beveren, Sint-Truidense/St.Truiden, LAFC/Los Angeles FC). It must not change any id the strict name match already returns, and must make no wrong match on a multi-league, multi-date sample of real ESPN fixtures. Built, tested and landed on main; the live-odds-worker deploy waits for the user's go-ahead.
+- Files: `syndicate/features/soccer/ingestion/fotmob_match_id.py`, `tests/test_fotmob_match_id.py`, `tests/fixtures/fotmob_matches_20260912.json` (NEW)
+- Hypothesis: the remaining misses are NAME-SHAPE differences: hyphen/dot punctuation, club-type prefixes, acronyms, `Munich`/`München`. A loose pass bridges them without adding wrong resolves when it runs only after the strict pass finds nothing, requires BOTH sides, uses distinctive tokens (not generic ones), and accepts only a UNIQUE fixture within (league, date window). `team_aliases` was probed 2026-09-15 and does not know FotMob's spellings (`canonical_team("soccer", ...)` is None for St.Truiden, DC United and Bayern München), so it is not used. That file also sits inside `segments-joint-v1`'s block.
+- Falsification test: on the sample, the loose pass run ALONE picks a different FotMob id than the strict pass for any fixture the strict pass resolves, or a loose-only resolve's FotMob names turn out to be a different fixture on inspection.
+- Verification: offline, real `resolve_fotmob_match_id` called with production's arguments (ESPN name as the poller passes it, league slug, ESPN date) over ESPN scoreboards for all 10 leagues across several dates. Report resolved before vs after, loose/strict disagreement (must be 0) and the tests. Production verification is owed after the separately approved deploy.
+- Blocked by: none (the deploy waits on user approval by design)
+- **STATUS 2026-09-15 19:3xZ: BUILT + LANDED `867f1481`, NOT DEPLOYED.** Tests: 78 passed; the new alias cases fail on the previous resolver (12 failed / 3 passed). Measured with production's arguments against live ESPN + FotMob: 230 fixtures over 7 tuning dates, strict 212 -> 230; 159 fixtures over 9 HELD-OUT dates, strict 141 -> 159; loose-vs-strict disagreement 0; true FotMob row removed, wrong ids 0 of 389. **User decision: "After tonight's matches (Recommended)"**: deploy main to live-odds-worker once no tracked league is in play (La Liga Real Madrid at Elche ends ~21:25Z). Ride-along `8b563ca9` `4a1ca2c4` `5686a555` `af7c895c` are live on web only. Production verify owed Sat 2026-09-19 18:45Z (13:45 CT), Zulte-Waregem at Anderlecht, which only the loose pass resolves.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
