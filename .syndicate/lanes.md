@@ -1652,9 +1652,10 @@ death, never life — do not invert it.
 - Blocked by: the live-odds-worker deploy queue `[2026-09-15 ~21:55Z]`:
   - 1. Lane `soccer-live-scoreboard-range-stale` holds the claim for `2d579fd1` (on main, predates `ca80edf0`). Its preflight is HOLD on an in-flight `refresh_odds_sources` job; it retries until 22:25Z. Its functional verify needs a live match, and a later deploy of main carries its `e115cd6b`, so it does not block us after it is live.
   - 2. Lane `book-quotes-splice-repair` sets `SYNDICATE_POLYMARKET_PRICE_AT_ASK=1` and redeploys `2d579fd1` as its own deploy (its user's decision), takes its reading, releases the claim and messages this session. AGREED ~22:00Z; the env var persists on the service.
-  - 3. This lane: deploy main's TIP to live-odds-worker (revised ~22:05Z), then read `/api/ops/steam/events` after the next soccer refresh.
-    - Lane `book-quotes-splice-repair` reports its user approved `a2a1fa32` (`execution_ledger` record cap), so the earlier pin on `ca80edf0` is lifted. `a2a1fa32` rides as ITS ride-along; its verify (TRIMMED lines carrying `dropped_by_mode`) is that lane's.
-    - At preflight, re-list `<live>..tip` and stop for any runtime commit that is not approved.
+  - 3. **DONE `[23:27:50Z]`:** live-odds-worker runs `cc141267` (contains `ca80edf0`). `deploys.md` 23:24:56Z entry.
+    - Reading 23:35:40Z, events written at/after go-live: mlb 200 events, 66 of them crossing ±100, **all 66 recorded the cents move, 0 the raw difference** (-130 -> +110 recorded 40, not 240). 0 rows carry a `line_delta` where the line IS the price.
+    - soccer: only 2 post-deploy events, both 38 s after go-live and both RAW, so they are the outgoing instance's last cycle. Soccer's slate is ending; the next soccer window is tomorrow. The discriminating evidence is the 66 MLB crossings on the same code path.
+    - CORRECTION to this lane's assumption: MLB steam is written by LIVE-ODDS-WORKER, not refresh-worker. So the refresh-worker ride-along is no longer needed for this lane's verify.
   - HAZARD: any redeploy of `2d579fd1` (or anything before `ca80edf0`) AFTER this lane's deploy rolls the fix back. Check the live commit contains `ca80edf0` before taking the after-reading, and again before closing.
   - refresh-worker `[~22:10Z]`: lane `soccer-player-role-allocation` started a PINNED `2d579fd1` deploy at 22:06:03Z (no `ca80edf0`).
     - Lane `book-quotes-splice-repair` (as `execution-ledger-live-trim`) deploys main's tip there at least 25 min after that goes live. `ca80edf0` rides as THIS lane's verify. This lane does NOT deploy refresh-worker.
