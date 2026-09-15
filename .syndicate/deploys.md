@@ -35937,3 +35937,39 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - `movement_opened_at` 18:36:03Z, `movement_vs_pick` away.
 - Verify: MET for n=1. The rule's negative half (a cross-book move must NOT fire) is still tested only.
 - The 7 legacy steam rows on the board at every poll (`candidate_type=steam`, from the odds tracker) are lane `legacy-steam-crossing-delta`'s subject, not this rule's.
+
+## 2026-09-15 21:12:18Z (16:12 CT) — web `7ed1a18a` -> `f09601a0` (OFF-MAIN: live web + the read-only steam-events route only) — deploy `dep-dakr9cm7bikc73fmp30g` — lane legacy-steam-crossing-delta — **verify MET**
+- **What:** `GET /api/ops/steam/events?sport=&date=`, read-only, in its own blueprint.
+  - Files: `syndicate/blueprints/ops_steam.py` (NEW), registered by 2 lines in `syndicate/app.py`. It attaches `ops.py`'s `_require_admin_token` by import; `ops.py` is claimed by lane `book-quotes-splice-repair` and untouched.
+  - It returns the odds tracker's raw steam record through the WRITER's path helper and the keyvalue-aware `read_json_file`.
+  - On main as `b2a9a4bb`. The deploy commit `f09601a0` = `7ed1a18a` + a cherry-pick of `b2a9a4bb`; patch-id matches (`0a264687…`); branch `deploy/web-steam-events-route-20260915`.
+- **Why the route:** the raw steam events were unreadable from outside production:
+  - keyvalue only;
+  - web's disk has no `reports/steam/*` (export count 0, control file count 1);
+  - the writer's `refresh_odds_sources` children never reach Render logs;
+  - there are no local keyvalue credentials.
+  - The lane's baseline needs each event's previous/current price. User decisions: "Admin read route", then "use a separate blueprint, don't wait for the owner".
+- **Why OFF-MAIN (`--allow-off-main`):** `7ed1a18a..b2a9a4bb` (47 commits) also carries:
+  - `e53274f2` and `b33ef901` (soccer-player-role-allocation steps A and B), recorded as not approved for deploy (this file ~L35901; `lanes.md` book-quotes-splice-repair off-main note);
+  - four other lanes' web-code commits: `6d526851`, `070a05bf`, `3157bb7b`, `867f1481`.
+  - The first attempt to build the off-main commit was refused by this session's permission classifier. User decision: "Off-main deploy (Recommended)".
+  - `b2a9a4bb` is on main, so the next main-based web deploy keeps the route. Nothing here is reverted by it.
+- **Tests on `f09601a0`:** `tests/test_ops_steam_events.py` 9 + `tests/test_ops_execution_ledger_summary.py` 15 = 24 passed. On the lane branch the 9 new tests FAILED with the blueprint unregistered (404), so they reach the route.
+- **Locks:**
+  - Web claim 21:06:22Z (token `34014d2b…`), released 21:09:40Z while the deploy question was open; re-acquired 21:10:46Z (token `8044989d42fdd137`).
+  - Preflight 21:07:48Z CLEAR for `b2a9a4bb` (unused).
+  - Preflight 21:11:39Z CLEAR for `f09601a0` with `--allow-off-main`; live `7ed1a18a`, infrastructure processes only.
+- **Baseline** (21:11:14Z): `steam_route_http=404` (`/api/ops/steam/events?sport=soccer&date=2026-09-15`, admin token).
+- **Prediction:** `steam_route_http=200`; a request without the token answers 401; soccer 2026-09-15 returns `count` > 0 with each event carrying `steam.previous_odds`.
+- **Result:**
+  - POST 21:12:18Z. `update_in_progress` by 21:20:46Z; the route read HTTP 502 during the swap.
+  - `live`, `finishedAt` 21:22:57Z. The route answered 200 at 21:23:11Z (background watcher, 20 s cadence).
+- **Reading:**
+  - 21:23:25Z: without the admin token HTTP 401. With it HTTP 200 for all 8 sports on 2026-09-15 and 2026-09-16; `truncated` false everywhere.
+  - Events exist only for soccer: 200 on 09-15, 200 on 09-16. mlb/nfl/ncaaf/wnba/nba/nhl/ncaab have 0 on both dates.
+  - 400 of 400 events carry `steam.previous_odds`, and `price == previous_odds + odds_delta` on all 400.
+  - 21:23:32Z: the board query answers HTTP 200, 1,534 rows (1,527 Layer 2, 7 legacy steam), 2.2 s.
+  - Verify: MET on every predicted field (404 -> 200; 401 without the token; the board unaffected).
+  - Each record is the writer's newest 200 events (`_STEAM_EVENTS_KEEP`), so a day is a WINDOW: 09-15 spans 2026-09-15T15:43:37-05:00 .. 2026-09-15T16:21:50-05:00; 09-16 spans 2026-09-15T12:04:37-05:00 .. 2026-09-15T12:04:37-05:00. The lane's baseline split is recorded in `lanes.md`; it is not a deploy effect.
+- **Web claim:** released after this entry. Lane `book-quotes-splice-repair` has a main-based web deploy queued next, and main carries the route (`b2a9a4bb`).
+- Rollback: web `7ed1a18a`.

@@ -1638,15 +1638,21 @@ death, never life — do not invert it.
     - A 200+ `odds_delta` is CONSISTENT with H1 but not proof: in-play prices move that far without crossing (RMA @ ELC h2h -10000 -> -13000).
   - H2 is supported on the board: the 2 h2h cards have `line` == price and `line_delta` == `odds_delta` (-49, -3000).
   - RETRACTED (said in chat 20:3xZ): "the inflation also affects ranking" came from the builder's score formula (`intelligence.py:5656`). The served `score` is 0.0, so a ranking effect is not established.
-- Status `[2026-09-15 ~21:10Z]`: **ROUTE BUILT AND ON MAIN (`b2a9a4bb`), NOT DEPLOYED.**
-  - The change: `syndicate/blueprints/ops_steam.py` (NEW, `GET /api/ops/steam/events`, attaching the ops admin gate by import), 2 lines in `syndicate/app.py`, and `tests/test_ops_steam_events.py` (NEW).
-  - Tests: the 9 new tests FAIL with the blueprint unregistered (404) and PASS registered. `tests/test_ops_execution_ledger_summary.py`: 15 still pass.
-  - Web baseline 21:07:05Z: `/api/ops/steam/events?sport=soccer&date=2026-09-15` answers HTTP 404. Web preflight 21:07:48Z: CLEAR for `b2a9a4bb`, live `7ed1a18a`.
-  - Deploy HELD by this session. `7ed1a18a..b2a9a4bb` also carries:
-    - `e53274f2` and `b33ef901` (soccer-player-role-allocation steps A and B), which the ledger records as not approved for deploy (`deploys.md` off-main note ~L35901; this file's off-main note at L451).
-    - Four other lanes' web-code commits: `6d526851`, `070a05bf`, `3157bb7b`, `867f1481`.
-  - An off-main deploy commit (`7ed1a18a` plus a cherry-pick of `b2a9a4bb`) was refused by this session's permission classifier as a production deploy. No branch was created. The web deploy claim was released ~21:10Z.
-- Blocked by: user decision on how to ship the route to web: off-main from the live commit, main as-is, or wait until main is cleared.
+- Status `[2026-09-15 ~21:30Z]`: **ROUTE LIVE on web (`f09601a0`, off-main, 21:22:57Z); BASELINE READ. H1 CONFIRMED (small as a trigger, large as a display). H2 CONFIRMED.**
+  - Route: `GET /api/ops/steam/events` answers 200 with the admin token and 401 without it (21:23:25Z). See the `deploys.md` 21:12:18Z entry.
+  - Baseline `[21:23:25Z, raw steam record read through the route]`:
+    - Soccer only; every other sport has 0 on both dates.
+    - Each file holds the writer's newest 200 events, so the denominators are a WINDOW, not a day: 09-15 spans 2026-09-15T15:43:37-05:00 .. 2026-09-15T16:21:50-05:00; 09-16 spans 2026-09-15T12:04:37-05:00 .. 2026-09-15T12:04:37-05:00.
+    - 400 of 400 events have `price == previous_odds + odds_delta`, the detector's own inputs.
+  - Split, recomputed on the cents scale at the verified default thresholds (15 points, 10 in ramp/closing, 0.5 lines):
+    - 09-15 (200): real 127; real but shown inflated by a crossing 43; fired ONLY through a crossing 4; fired ONLY through a price read as a line 26.
+    - 09-16 (200): real 126; real but shown inflated 73; only through a crossing 0; only through price-as-line 1.
+  - **H1 (±100 crossing inflation): CONFIRMED.**
+    - As a false trigger: 4 of 400 (e.g. ADO Den Haag spreads -105 -> +100: shown 205, really 5).
+    - As a displayed size: 116 of 400 (e.g. -105 -> +240 shown 345, really 145; +115 -> -115 shown -230, really -30).
+  - **H2 (price read as a line): CONFIRMED, 27 of 400.** It is not only moneylines: any market with no line carries the price as `line` (Stoke City h2h +240 -> +230, 10 points; Last Goalscorer Pulisic +390 -> +400).
+  - Seen, not yet explained: identical events repeat (Stoke City twice at one timestamp, `book` null), so counts may include per-book duplicates.
+- Blocked by: none. Next: fix `_steam_signal` (size moves on the cents scale; no line threshold where the line IS the price), write the unit tests per Verification, then deploy live-odds-worker and take the after-reading through the same route.
 
 ### ncaaf-prop-quote-market-check — CLOSED — opened 2026-09-15 — closed 2026-09-15 ~15:45 CT — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
 - **VERDICT.** Goal (verbatim): "for the 104 NCAAF legacy prop rows refresh-worker quoted after `f833f7ec` (`intelligence_prop with_quote=104`), state how many carry a quote from the row's OWN market, measured with the real `quote_ref_for_bet` over production quote shards. If they are wrong, describe the production impact and stop before changing behaviour. Read-only diagnostic; no code change without the user's go." — **GOAL: MET. Hypothesis FALSIFIED: 102 of 102 replayed rows get their own market, side and line.**
