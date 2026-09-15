@@ -9560,9 +9560,18 @@ def read_combined_intelligence_response(
     # Always emitted, so "is `#308` still live" stays a one-field question now
     # that `candidate_count` includes L2-A on every request.
     combined["legacy_candidate_count"] = legacy_candidate_count
-    # `layer2-row-parity`: how many of those the board withheld because Layer 2
-    # had rows. 0 when the flag is off or Layer 2 was empty.
+    # `layer2-row-parity`: WHICH SIDE OF THE WITHHOLDING EACH COUNT IS ON, said in
+    # the payload so a legacy-row count of 0 on the board reads as "withheld" and
+    # not as the pool breaking. `legacy_candidate_count` above, and every
+    # `by_date[...].candidate_count` / `stored_candidate_count`, are the POOL,
+    # counted BEFORE the filter. These two describe the filter:
+    #   legacy_rows_withheld  dropped because Layer 2 had cards (0 when the flag
+    #                         is off or Layer 2 was empty)
+    #   legacy_rows_kept      legacy_candidate_count - legacy_rows_withheld (what
+    #                         the normaliser then received; it may still dedupe)
     combined["legacy_rows_withheld"] = legacy_rows_withheld
+    combined["legacy_rows_kept"] = legacy_candidate_count - legacy_rows_withheld
+    combined["legacy_counts_basis"] = "pool_before_withholding"
     combined["layer2_is_primary"] = bool(board_l2a_fallback_enabled())
     # Named, so a board filled from L2-A is never mistaken for the legacy pool
     # having recovered. Absent when the fallback did not fire, which keeps the

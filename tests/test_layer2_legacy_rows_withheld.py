@@ -94,6 +94,31 @@ class LegacyRowsWithheldTests(unittest.TestCase):
         )
         self.assertEqual(out.get("legacy_candidate_count"), 2, "the pool's own size is still reported (#308)")
         self.assertEqual(out.get("legacy_rows_withheld"), 2)
+        self.assertEqual(out.get("legacy_rows_kept"), 0)
+        self.assertEqual(out.get("legacy_counts_basis"), "pool_before_withholding")
+
+    def test_layer2_cards_survive_whatever_they_carry(self):
+        """The keep-key `source == "layer2_shortlist"` applies to rows already in
+        the pool. L2-A cards -- including the live NFL props restore (`c4f45fee`)
+        -- are appended AFTER the filter, so even a card that lost its tag cannot
+        be withheld. And every card the builder emits carries the tag anyway."""
+        from syndicate.features.shared.layer2_board import layer2_rows_to_board_cards
+
+        built = layer2_rows_to_board_cards([{
+            "sport": "nfl", "event_id": "n1", "market": "Rushing Yards", "side": "over", "line": 74.5,
+            "player_name": "Jahmyr Gibbs", "kind": "prop", "ev_pct": 2.0,
+            "home_team": "Detroit Lions", "away_team": "Chicago Bears",
+            "quote": {"price": -110, "bookmaker": "kalshi"}, "score": {"score": 1.0},
+        }])
+        self.assertEqual({card.get("source") for card in built}, {"layer2_shortlist"})
+
+        untagged = _layer2_card(source=None, sport="nfl", sport_slug="nfl", event_id="n1",
+                                player_name="Jahmyr Gibbs", selection="Jahmyr Gibbs", display_name="Jahmyr Gibbs",
+                                market="Rushing Yards", line=74.5, home_team="Detroit Lions",
+                                away_team="Chicago Bears")
+        out = self._read(cards=[untagged], legacy=[_legacy("prop")])
+        self.assertIn("Jahmyr Gibbs", [r.get("player_name") for r in self._rows(out)])
+        self.assertEqual(out.get("legacy_rows_withheld"), 1)
 
     def test_steam_rows_are_kept(self):
         steam = _legacy("steam", market="To Receive Card · Steam", pick="Player over 0.5",
