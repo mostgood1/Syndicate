@@ -3074,7 +3074,20 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                 "inside_repo": True,
             }
         ]
-        with patch("router.query_router.central_today_iso", return_value="2026-06-07"):
+        # The endpoint stamps a dateless request with the BLUEPRINT's own
+        # `central_today_iso` (`_compute_intelligence_response`) before the router
+        # ever runs, so the router's clock is not reached on this path. Pinning
+        # only `router.query_router` left the test on the real date. Both are
+        # pinned to the same day so either resolution path yields it.
+        #
+        # The pool build settles its own date and the day before, and
+        # `_refresh_wnba_boxscores` fetches a real scoreboard for those dates and
+        # writes boxscores under data/. On a pinned in-season date that is a network
+        # call plus a write into the git-tracked mirror (the conftest guard fails the
+        # test), and it has nothing to do with the response contract asserted here.
+        with patch("syndicate.blueprints.intelligence.central_today_iso", return_value="2026-06-07"), patch(
+            "router.query_router.central_today_iso", return_value="2026-06-07"
+        ), patch("pipeline.intelligence_state._refresh_wnba_boxscores"):
             with _patch_build_intelligence_overview(_sample_overview()):
                 with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
                     with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
@@ -3094,7 +3107,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIn("response", payload)
         result = payload.get("response") or {}
         board_contract = result.get("board_contract") or {}
-        self.assertTrue(result.get("selected_date"))
+        self.assertEqual(result.get("selected_date"), "2026-06-07")
         self.assertTrue((board_contract.get("cards") or []))
         self.assertEqual((board_contract.get("cards") or [])[0].get("sport"), "nba")
         self.assertEqual((board_contract.get("cards") or [])[0].get("name"), "Jayson Tatum Over 28.5")

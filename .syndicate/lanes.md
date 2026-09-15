@@ -1987,6 +1987,28 @@ death, never life — do not invert it.
     - The deploy-status poller (GET `/deploys/dep-...`) gives exit 0.
   - Owed for GOAL (DONE): landed as `11167fdf`. Main's guard was written into the PRIMARY working tree (index untouched), and there the urllib-shaped command that returned exit 0 earlier today returns exit 2. See the VERDICT at the top of this block.
 
+### preview-date-pin-inert — CLOSED 2026-09-15 — opened 2026-09-15 — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
+- **VERDICT.** Goal (verbatim): "`tests/test_intelligence.py::IntelligenceBlueprintTests::test_intelligence_query_api_resolves_preview_date_and_preserves_contract` pins the date the endpoint actually uses and asserts `selected_date == "2026-06-07"`. Test-only, no behaviour change." — **GOAL: MET.**
+  - Readings:
+    - HEAD as-is: 1 passed.
+    - Control (HEAD plus the new assertion, router pin only): FAILED `'2026-09-15' != '2026-06-07'`, which proves the old pin inert and the assertion live.
+    - Fixed test: 1 passed unfrozen and 1 passed with `central_today_iso` frozen at 2030-01-01; the response date is 2026-06-07 in both.
+    - Worktree clean, no `data/`.
+  - One extra patch was needed. The first fix (blueprint pin only) gave 1 passed, **1 error**: the conftest data-mirror guard.
+    - The pool build settles `selected_date` and the day before (`pipeline/intelligence_state.py:7057-7061`), and `_refresh_wnba_boxscores` (:7106) then fetched and wrote real 2026-06-06/07 boxscores under `data/`.
+    - The test now also patches `pipeline.intelligence_state._refresh_wnba_boxscores`.
+- Goal: `tests/test_intelligence.py::IntelligenceBlueprintTests::test_intelligence_query_api_resolves_preview_date_and_preserves_contract` pins the date the endpoint actually uses and asserts `selected_date == "2026-06-07"`. Test-only, no behaviour change.
+- Files: tests/test_intelligence.py
+- Hypothesis (from the `/api/intelligence/query` clock trace, log 2026-09-15): the test's only pin, `router.query_router.central_today_iso`, is never read.
+  - With no date in the body, `_compute_intelligence_response` stamps the date from the blueprint's own module-level `central_today_iso` (`syndicate/blueprints/intelligence.py:51` import, `:1172`), so the router sees an explicit date.
+  - The test asserts only `assertTrue(selected_date)`, so it passes on any date with the real clock.
+- Falsification test: with the router pin alone, `selected_date == "2026-06-07"` already holds (then the pin was not inert).
+- Verification:
+  - The fixed test passes.
+  - A scratch copy with ONLY the router pin plus the new equality assertion fails, which proves the old pin inert and the new assertion live.
+  - The fixed test still passes with `central_today_iso` frozen at 2030-01-01 by the scratch plugin, so its own pin wins.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
