@@ -2156,7 +2156,10 @@ outlier cold reading. Three paired replications erased it: **cold 31.32s vs warm
 - **book_quotes on web `[verified 2026-09-15]`.**
   - The merge refuses non-JSON lines (`MERGE_REFUSED_BAD_LINES`, P1 `9ed5c5ad`).
   - Historical splice fragments were removed by `POST /api/ops/book-quotes/repair` (P3 `8b563ca9`, applied 19:28:33Z): 2152 from 49 shards since 09-01. 20 orphans remain, most of them 09-13 07:31-10:22Z captures.
-  - **live-odds-worker republishes its own stale copies of today's shards**, which still carry fragments (`publisher=live-odds-worker`, mlb 09-15 refused=10, soccer 09-15 refused=43). It never re-syncs a shard it already has; the repair list asks only for missing files.
+  - **P5 `[verified 2026-09-15]`:** `publish_hot_artifact` sanitizes an append-only shard before sending, `append_book_quotes` terminates a torn tail before appending, and the tail sync parks local-only rows in `.<shard>.pending` before cutting.
+    - live-odds-worker (`991a94d5`, then `8c089e8c`): web refused its soccer 09-15 merges 43/43/43 before and 0/0/0 after.
+    - It still never re-syncs a shard it already holds; the sanitize is what cleans its copy.
+    - Glued lines on web were split (21:44:39Z): 7 rows made readable. 20 unreadable lines remain as orphans (13 torn 09-13 heads, 4 headless 09-01 tails, 3 heads whose tail was glued).
 - **Related.**
   - Web's append-only publish MERGES: line-digest dedupe, then `os.replace`, so a byte-identical republish advances only the mtime.
   - Web's merge concurrency cap is 1, so a second publish seconds later gets `ARTIFACT_MERGE_AT_CAPACITY` (503, retried by a later publish).

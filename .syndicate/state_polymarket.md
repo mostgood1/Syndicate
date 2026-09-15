@@ -78,6 +78,9 @@ Venue payload for `C65VD0R72KDG`, read by a one-shot probe (`a6eeaf17`):
      - Exactly 2 misbooked NO fills are known, both before 09-01: BOS/MIA 08-26 and `C65VD0R72KDG` 08-30, +$7.96 of stake together.
      - Since 09-01 all 6 live NO fills are booked `1 - avgPx` (60/60 log windows).
      - Pre-09-01 fills not named in the ledger are unobservable.
+   - **The execution ledger's 5000-record cap DROPPED LIVE ROWS `[verified 2026-09-15]`:** oldest-first across modes, and paper volume holds the ledger at the cap (167 `TRIMMED dropped=1` lines on refresh-worker 12:00-20:50Z).
+     - 20 live Polymarket fills placed 09-01..09-04 are gone from `/api/portfolio/live`, among them `C8292W0ATMA3` and `C7CNYDJV4KDH`.
+     - Fixed on main (`a2a1fa32`, lane execution-ledger-live-trim), NOT DEPLOYED as of 16:55 CDT.
 2. **The limit check was DIRECTIONAL and read one way.** "A BUY cannot fill
    above its limit" is true; the unencoded inverse — a SELL cannot fill BELOW
    its limit — is equally true. This order is a SELL, so `0.2350 > 0.22` is

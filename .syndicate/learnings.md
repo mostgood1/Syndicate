@@ -6293,3 +6293,15 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - When a user wants to control when a change reaches a service, decide that BEFORE landing it. Either keep it off main (branch) until the window opens, or say in the question that the next deploy of main by any lane will carry it.
   - When a lane's deploy is pending, read the service's deploys API before building any schedule around it. Check by CONTENT whether an earlier deploy already carries the commit.
 - *(evidence: `deploys.md` 2026-09-15 19:31:33Z `soccer-player-substrate` entry, its "CONFLICT" bullet, and the 21:3xZ `fotmob-team-name-aliases` READING)*
+
+## 2026-09-15 — OVERTURNED: "log lines found by a scan can be re-read later" — Render's ~14-day retention is ROLLING, and 12 of 20 order records expired between the scan and the re-read, 75 minutes apart `[lanes polymarket-no-fill-booking-audit, execution-ledger-live-trim]`
+
+- **What happened:**
+  - A day-by-day FILL_PRICE scan read lines stamped 09-01T19:25:55Z at about 20:00Z on 09-15, and saved only side, avgPx and booked price.
+  - The re-read for contracts, market and stake at 21:15Z returned 0 lines for all 13 of those orders.
+  - Retention had rolled past them. One record (`C7CNYDJV4KDH`) survived only because a separate query had printed its whole `ORDER_STATE` line at 20:58Z.
+- **How to apply:**
+  - Anything older than about 13 days in Render logs is about to disappear. When a scan finds a record that matters, save the FULL raw line to disk in the same pass, not a parsed subset.
+  - State the window's age when reporting a log-based reading, so its expiry is visible.
+- **Same session, different instrument:** releasing a file claim was checked by the full path only. A bare basename in another Files-labelled bullet of the same block kept the claim (`lane_claims.matches` uses endswith), and a peer lane caught it. Diff the claim SET for every token that `matches()` the path, not the path string.
+- *(evidence: `lanes.md` execution-ledger-live-trim RESTORE MANIFEST; the lane soccer-live-scoreboard-range-stale message recorded in its block; `deploys.md` 2026-09-15 20:52:30Z)*
