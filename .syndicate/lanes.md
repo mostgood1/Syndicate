@@ -1712,6 +1712,10 @@ death, never life — do not invert it.
     - Registry-covered live game cells are SPLIT: the live note is served, with the right sample, on 21 shortlist / 40 grid rows, and the pregame note on 21 / 73. `h2h/first5` never got its live note. Live props carry pregame notes instead of `unmeasured`.
     - Instrument checked: the flagged rows read `seasons='2026-08-31..09-13 pregame'` with samples 177/168/188, not a classifier artifact. Cause NOT diagnosed.
   - Recorder names, post-deploy `game` keys: MLB **MET** 693/693; NFL **MET** 84/84. Soccer 16/16 game (+40/40 other, 385/385 prop), a different total from the earlier 832, not reconciled.
+- Reading `accuracy-0914-recorder-names-0916-board` `[2026-09-15 17:42Z (12:42 CT)]`, detail in deploys.md FOLLOW-UP (3):
+  - Recorder names, 09-16 board (all 16,249 records `after_live`): NCAAF **MET** 1,028/1,028; soccer **MET** 772/772; NFL and MLB UNREAD here (0 `game` records), both already MET in FOLLOW-UP (2).
+  - **Deploy #3 recorder prediction: MET for all four sports.** Shortlist factor check (890 rows): 0 falsifiers.
+  - The 09-16 board was being recorded before the CT date roll, not after it.
 - Blocked by: none.
 
 ### brand-logo-v3 — CLOSED — opened 2026-09-14, closed 2026-09-14 — session 08fb3eec-6daf-4680-a64d-bd7f914ad2e7

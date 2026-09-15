@@ -35517,3 +35517,16 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Watcher `b1p6x1kee` reads (1)-(2) for 90 min. At 17:26Z there were 0 Polymarket submits on the new process.
 - **Known consequence:** a historical row re-reconciled now books the other reading (e.g. `C65VD0R72KDG` 0.765 vs the recorded 0.235). Settled rows are not re-read automatically. That order's recorded cost is owed a balance-ledger check (lane `polymarket-no-price-convention` (iv)).
 - Rollback: redeploy `4bd5ece9` to live-odds-worker.
+
+## 2026-09-15 17:42Z (12:42 CT) — FOLLOW-UP (3) for the 2026-09-14 20:56Z refresh-worker 0a18557a -> 6438830d entry: recorder team names on the 09-16 board — lane accuracy-assessment-0914
+- Scheduled task `accuracy-0914-recorder-names-0916-board` (due 12:30 CT, ran 12:41 CT). Read-only: no deploy, no env or flag change, no code.
+- Script: `deploy3_reading.py 2026-09-16 2026-09-14T21:03:17Z` in `C:\tmp\syndicate-sessions\accuracy-assessment-0914-readings`.
+- **The 09-16 board was already being recorded at 12:41 CT on 09-15, BEFORE the Central date roll.** The task premise ("first built after the date roll") was wrong. It does not affect the reading: every record fell under `after_live` (written after 21:03:17Z), 0 under `before_live`.
+- **RECORDER, day 2026-09-16, 16,249 records** (named / total, all `after_live`):
+  - ncaaf `game` **1,028/1,028 = 1.000 — MET**. (prop 532/532.)
+  - soccer `game` **772/772 = 1.000 — MET** (again; earlier 832/832). (other 1,335/1,335; prop 11,887/11,887.)
+  - nfl: **0 `game` records — UNREAD on this board** (prop 695/695). NFL `game` was MET in FOLLOW-UP (2), 84/84 on 09-14 post-deploy keys.
+  - mlb: **0 records of any group — UNREAD on this board.** MLB `game` was MET in FOLLOW-UP (2), 693/693 on 09-14 post-deploy keys.
+  - Falsifier "post-live game records named < 95%": `[]`.
+- SHORTLIST factor check (`written_at` 2026-09-15T17:20:21Z, `after_live=True`, **890 rows**, under the 2,000-row request limit): `skill_source=bucket` 0; factor differs from prediction or unpredicted 0; factor without skill_source 0. Categories with a factor: ncaaf totals 148 @0.514, ncaaf spreads 112 @0.814, ncaaf h2h 65 @0.814, soccer h2h 59 @0.877.
+- **Deploy #3 recorder prediction: MET for all four sports.** MLB and NFL from FOLLOW-UP (2) (09-14 post-deploy keys); NCAAF and soccer from this entry (09-16 board). The 09-16 board adds no MLB or NFL `game` evidence of its own.
