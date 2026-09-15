@@ -78,15 +78,6 @@ def worker_disk(tmp_path: Path):
         yield tmp_path
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "lane combined-board-state-rows-lost: `_read_single_date_response_for_combining` "
-        "reads the persisted state without `_expand_persisted_state`, so a member-aliased "
-        "`by_sport` contributes 0 rows. Strict: this flips to XPASS, and fails, when the "
-        "reader is fixed -- remove the marker then."
-    ),
-)
 @pytest.mark.parametrize(
     "count,pad,shape",
     [

@@ -9072,7 +9072,19 @@ def _read_single_date_response_for_combining(selected_date: str) -> dict[str, An
     # for any oversized date, masked until now only because the in-memory
     # snapshot was (wrongly) never treated as stale. _read_state_payload
     # already checks both the store and the on-disk artifact file.
-    on_disk = _read_state_payload(_intelligence_state_daily_paths(selected_date)["state"])
+    #
+    # EXPANDED BEFORE THE GATE (lane `combined-board-state-rows-lost`,
+    # 2026-09-15). The writer stores this payload compacted -- `by_sport`
+    # member-aliased by `_compact_state_for_persist`, large values compressed
+    # by `_write_state_payload` -- and read raw, the combine loop's
+    # `isinstance(items, list)` skipped every entry while the scalar
+    # `candidate_count` still held this gate open. So every date arrived DATED
+    # AND ROWLESS. Measured: refresh-worker persisted 374/275/259 candidates for
+    # 09-14 and 14 for 09-15, web read those exact payloads (stamps equal to the
+    # second) and logged `COMBINED_BOARD_VINTAGE_IGNORED reason=no_rows` for
+    # each, and `by_date` read 0 on every date. `read_intelligence_state`
+    # already expands; this was the one reader of this file that did not.
+    on_disk = _expand_persisted_state(_read_state_payload(_intelligence_state_daily_paths(selected_date)["state"]))
     on_disk = on_disk if isinstance(on_disk, dict) and _intelligence_state_candidate_count(on_disk) > 0 else None
 
     if in_memory is None:

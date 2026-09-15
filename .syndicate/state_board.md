@@ -864,7 +864,7 @@ build every tick. Untouched by this lane; see `leads.md`.
 **UNVERIFIED:** the staleness branch (`DEFAULT_MAX_AGE_SECONDS`, 6 h). Unit
 tested, never seen in production.
 
-## [combined-board-state-rows-lost] THE COMBINED BOARD DROPS EVERY PERSISTED STATE ROW; ITS AGE IS TOMORROW'S SHORTLIST — DIAGNOSED 2026-09-15, NOT FIXED
+## [combined-board-state-rows-lost] THE COMBINED BOARD DROPS EVERY PERSISTED STATE ROW; ITS AGE IS TOMORROW'S SHORTLIST — DIAGNOSED 2026-09-15, FIX ON MAIN, NOT DEPLOYED
 
 Lane `combined-board-state-rows-lost` (full readings there). Read-only; no deploy.
 
@@ -886,7 +886,10 @@ the writer stores `by_sport` MEMBER-ALIASED, and the combine loop's
 `isinstance(items, list)` skips every entry while scalar `candidate_count` keeps
 the gate open. Reproduced with the real writer and reader: 40 and 1,500 rows ->
 0; expand-on-read -> 40 and 1,500; a 3-row plain control reads 3 either way
-(`tests/test_combined_board_persisted_state_rows.py`, strict xfail until fixed).
+(`tests/test_combined_board_persisted_state_rows.py`).
+**FIX ON MAIN, NOT DEPLOYED (2026-09-15):** the reader now expands before the
+gate; the test passes. Until web runs it, production still drops every row —
+check web's live commit before reading `by_date`.
 `read_intelligence_state` (:4248) already expands; :9075 is the only caller that does not.
 
 **So `by_date.candidate_count == 0` is NOT evidence that production has no state
