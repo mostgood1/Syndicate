@@ -36084,3 +36084,24 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Web already holds both pieces.
   - refresh-worker's copy should self-heal: its next tail sync meets web's rewritten shard, mismatches the overlap, and resyncs whole, dropping non-JSON lines (P2).
 - **live-odds-worker mlb 09-15 still unobserved:** since 20:30Z only `publisher=refresh-worker` merged that shard (6 merges, 0 refused). The 21:02:40Z entry's owed reading stays owed.
+
+## 2026-09-15 22:04:17Z (17:04 CT) — live-odds-worker `8c089e8c` -> `2d579fd1` (on origin/main) — deploy `dep-daks1obl550s73alml4g` — lane soccer-live-scoreboard-range-stale — **LIVE 22:09:41Z; expectation MET (live commit); the goal-count reading is OWED on the first live match with a penalty or own goal**
+- **What shipped:** `e115cd6b` only. Outside the ledger, `git diff 8c089e8c 2d579fd1` is exactly `soccer/ingestion/espn_match_events.py`, `espn_live_state.py`, `espn_match_box.py`, `espn_shot_events.py` and `tests/test_soccer_scoring_events.py`.
+  - The soccer live team score, the box goal list and a converted penalty's shot row now count every non-shootout `scoringPlay` for the team ESPN tags.
+  - Before this they counted `type.startswith("goal")`, which drops every penalty and own goal.
+- **Offline, before deploy:**
+  - The 6 new tests failed on the old code; 190 passed across the soccer suites.
+  - A replay of the shipped code over 95 finished matches (10 leagues, 09-12..14) reproduced ESPN's final score **95/95** (old rule 68/95), and the goal list 95/95.
+- **Preflight:** HOLD from the first reading (~21:47Z) to 22:02:29Z, with a `refresh_odds_sources` soccer schedule / artifacts / picks job in flight. CLEAR at 22:03:32Z and again at 22:04:13Z (sample 22:03:52Z, infrastructure only). Claim held by this lane from 21:46:29Z.
+  - The first deploy call named a mistyped SHA (`2d579fd1ff`); `render_deploy.py` refused it (`cannot resolve`) and nothing was sent. The second call passed the full SHA from `git rev-parse`.
+- **Prediction** (baseline read 22:04:13Z): `live_commit` `8c089e8c` -> `2d579fd1`.
+- **Reading:** deploy API at 22:10:02Z: `status live`, `finishedAt 2026-09-15T22:09:41.856541Z`, commit `2d579fd1`. **MET.**
+- **Not yet read:** the first post-deploy soccer poller tick on live-odds-worker, i.e. that the new code imports and runs. A log watcher started at 22:10Z; its reading follows as a follow-up.
+- **Why the score change cannot be seen tonight:** no soccer match was in play at go-live.
+- **Owed:** on the first live match with a penalty or an own goal (next: La Liga 2026-09-16 from 17:00Z), the served `live_state_<date>.json` `games` score equals ESPN's header score, and `/api/board/game-chips?sports=soccer` agrees.
+- **Queue after this deploy:**
+  - `book-quotes-splice-repair`: env `SYNDICATE_POLYMARKET_PRICE_AT_ASK=1` plus a redeploy of the same `2d579fd1`.
+  - Then `legacy-steam-crossing-delta`: the main tip, carrying `ca80edf0`.
+  - Both carry `e115cd6b`, so neither disturbs the owed reading.
+- **refresh-worker is NOT deployed by this entry.** Lane `soccer-player-role-allocation` holds its claim, pinned to `2d579fd1`, and is waiting on the MLB daily sim. The option-1 reading for `082da3e3` stays this lane's: refresh-worker's first `pull_hot_artifacts` request carries `since=` = its own previous pull start, never a live-odds-worker pull start.
+- Rollback: deploy `8c089e8c` to live-odds-worker.
