@@ -35264,3 +35264,25 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
 - **NOT MEASURED:** whether state rows displaced L2-A cards under first-wins dedupe. The pre-deploy served count was not taken. At most 106 L2-A cards can be shadowed.
 - Rollback: redeploy `c4f45fee` to web (the change is one line and web-only).
 - Claim released after this entry is pushed.
+
+## 2026-09-15 14:34:14Z (09:34 CT) — refresh-worker `c4f45fee` -> `9b214a33` — deploy `dep-daklepjm8hqs73f0rcsg` — lane wnba-future-date-cache-carry — **verify OWED (09-16 and 09-17 readings)**
+- **What:** `has_games_for_date` (`syndicate/features/wnba/sources.py`) no longer puts a date into `_HAS_GAMES_CONFIRMED_TRUE_CACHE` on the "not today and a slate file exists" shortcut. Only an ESPN-confirmed True is cached. Before this, the cache was checked above the "today always asks ESPN" rule. An empty `recommendations_slate_<tomorrow>.json` written before midnight CT therefore made the no-game day read as confirmed after midnight, and refresh-worker saved the 2026-08-30 slate under today's `live_state` key. User report: "stale WNBA compact game chips have returned to the layer 2 main page". User decision: "Deploy now (Recommended)".
+- **Baseline, 09-15 on `c4f45fee`:**
+  - Chips `worker_artifact` `published_at 14:17:51Z`: 4 WNBA chips, all `final` with no start. They are ESPN `401857186..189`, the 08-30 games.
+  - Layer 2 `written_at 14:18:14Z`: `sweep_state pending`, `scheduled_games 4`, `FROZEN?`.
+  - `/wnba/api/live_state?date=2026-09-15`: those 4 games, `syndicate_cards_fallback`, `generated_at 12:56:57Z`. ESPN `?dates=20260915` returns 0 events.
+  - refresh-worker `WNBA overview source missing for <date> ... dashboard_games=4` lines: 09-14 x14 (first 05:04Z) and 09-15 x19 (first 05:06Z). None for 09-12 or 09-13.
+  - live-odds-worker: 0 such lines since 09-13.
+- **Locks:** claim acquired 14:33:43Z (holder wnba-future-date-cache-carry). Preflight `--target-commit 9b214a33` CLEAR (only pid 39 and pid 1). `9b214a33` is on origin/main, and `c4f45fee` is its ancestor.
+- **Result:** POST 14:34:14Z; `update_in_progress` by 14:36:17Z; live **14:37:12Z**. By content, `9b214a33:sources.py` has 1 `NOT CACHED (2026-09-15` line and exactly 1 `_HAS_GAMES_CONFIRMED_TRUE_CACHE.add(` (the ESPN branch).
+- **verify: OWED.**
+  - (a) Scheduled task `wnba-0916-no-game-chips-reading` (09-16 09:00 CDT) expects:
+    - 0 WNBA chips in `/api/board/game-chips?date=2026-09-16`;
+    - Layer 2 `sweep_state no_slate` with no `FROZEN?`;
+    - 0 games in `/wnba/api/live_state?date=2026-09-16`;
+    - no `dashboard_games=4` line for 09-16.
+  - (b) `wnba-0917-real-slate-chips-reading` (09-17 19:15 CDT) expects ESPN `401857190..194` on the chips, i.e. no false negative.
+  - Today's key is NOT expected to clear before the date roll: `_games_from_live_state_fallback` (cards.py :4061) reads it back.
+- **Side effect:** this restarted refresh-worker ~12 h before scheduled task `full-slate-memory-reading-0915` (21:30 CDT). That reading is on a process booted 14:37Z.
+- Rollback: redeploy `c4f45fee` to refresh-worker.
+- Claim released 14:38Z.
