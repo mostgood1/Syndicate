@@ -119,10 +119,41 @@ _PY_POST_INTENT = re.compile(
     r"(method\s*[=:]\s*['\"]POST['\"]"   # urllib.request.Request(method="POST"), fetch({method: 'POST'})
     r"|\.post\s*\("                        # requests.post(, httpx.post(, session.post(
     r"|\.request\s*\(\s*['\"]POST['\"]"  # http.client / requests.request("POST", ...)
-    r"|\bdata\s*=\s*(?!None\b)[^,)\s])",   # urllib Request/urlopen with a body is a POST
+    # `data=` counts only as a CALL ARGUMENT (after "(" or ","), which is how a
+    # request body is passed. As a bare `\bdata\s*=` it also matched the
+    # ASSIGNMENT `data = json.loads(urlopen(req))` after a deploys GET and read a
+    # read as a deploy -- measured on `scripts/build_consolidated_graft.py:93-96`
+    # (lane `deploy-guard-file-scripts`, 2026-09-15).
+    r"|[(,]\s*data\s*=\s*(?!None\b)[^,)\s=])",
     re.I)
 _URL_START = re.compile(r"https?://", re.I)
 _PY_INTENT_WINDOW = 400
+
+# A DEPLOY MADE BY A SCRIPT FILE. Lane `deploy-guard-file-scripts`, 2026-09-15.
+#
+# Every check above reads COMMAND TEXT, so `py -3 deploy.py` carried nothing to
+# match and passed unchecked however the file deployed -- the blind spot the
+# `deploy-guard-python-post` lane recorded as its known limit. The guard now
+# reads the file a command runs and applies the same checks to its CONTENTS:
+# attached Python/JS POST intent for `.py`, same-line curl/PowerShell intent for
+# `.sh`/`.ps1` (backslash and backtick continuations joined first).
+#
+# MEASURED BEFORE ENABLING: 22 repo files mention a deploys endpoint; with the
+# `data=` fix above exactly one classifies as a deploy -- `render_deploy.py`,
+# which the sanctioned-entrypoint rule already guards. `deploy_preflight.py`,
+# `bandwidth_tripwire.py`, `ratchet_sample.py` and the graft builder read.
+#
+# ONE FILE, ONE LEVEL. Imports, `python -m <module>`, and paths built at runtime
+# are not followed. A file that cannot be found, is over `_SCRIPT_MAX_BYTES`, or
+# does not read is ALLOWED -- the fail-open rule at the bottom of this file --
+# because a guard that blocks on a lookup it could not make is one people remove.
+SCRIPT_RUN = re.compile(
+    r"(?:^|[|;&`(\s])(?:py|python|python3|uv\s+run(?:\s+python)?|bash|sh)"
+    r"(?:\s+-\d(?:\.\d+)?)?(?:\s+-[A-Za-z]\S*)*"
+    r"\s+['\"]?([^\s'\";|&<>]+\.(?:py|sh))['\"]?", re.I)
+PS_FILE = re.compile(r"-File\s+['\"]?([^\s'\";|&<>]+\.ps1)['\"]?", re.I)
+DIRECT_SCRIPT = re.compile(r"(?:^|[|;&`(\s])(\.{1,2}[/\\][^\s'\";|&<>]+\.(?:sh|ps1))", re.I)
+_SCRIPT_MAX_BYTES = 512 * 1024
 GIT_PUSH = re.compile(r"\bgit\s+(?:-\S+\s+|--\S+\s+)*push\b", re.I)
 
 SERVICE_ARG = re.compile(r"--service[=\s]+['\"]?([A-Za-z0-9._-]+)", re.I)
@@ -268,6 +299,56 @@ def _python_post_to_deploys(cmd):
         if _PY_POST_INTENT.search(before) or _PY_POST_INTENT.search(after):
             return True
     return False
+
+
+def _script_paths(cmd):
+    """Script-file paths a command runs, in order, de-duplicated."""
+    found = []
+    for pattern in (SCRIPT_RUN, PS_FILE, DIRECT_SCRIPT):
+        for match in pattern.finditer(cmd):
+            path = match.group(1)
+            if path not in found:
+                found.append(path)
+    return found
+
+
+def _resolve_script(path, bases):
+    """An existing file for `path`, trying it absolute and then under each base."""
+    candidate = str(path).strip("'\"")
+    drive = re.match(r"^/([a-zA-Z])/(.*)$", candidate)   # Git Bash /c/Users/... on Windows
+    if drive and os.name == "nt":
+        candidate = drive.group(1).upper() + ":/" + drive.group(2)
+    options = [candidate] if os.path.isabs(candidate) else [os.path.join(b, candidate) for b in bases if b]
+    for option in options:
+        if os.path.isfile(option):
+            return option
+    return None
+
+
+def _script_file_deploy(cmd, bases):
+    """(path, contents) of the first script file the command runs that deploys, else (None, "").
+
+    See `SCRIPT_RUN`. Every lookup failure is ignorance and returns no match.
+    """
+    for raw in _script_paths(cmd):
+        path = _resolve_script(raw, bases)
+        if not path:
+            continue
+        try:
+            if os.path.getsize(path) > _SCRIPT_MAX_BYTES:
+                continue
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                text = fh.read()
+        except Exception:
+            continue
+        if path.lower().endswith(".py"):
+            if _python_post_to_deploys(text):
+                return path, text
+            continue
+        joined = re.sub(r"(?:\\|`)\r?\n", " ", text)
+        if any(DEPLOYS_ENDPOINT.search(line) and POST_INTENT.search(line) for line in joined.splitlines()):
+            return path, text
+    return None, ""
 
 
 def _commits_agree(receipt_sha, deploy_sha):
@@ -491,6 +572,7 @@ def main():
 
     root = _root()
 
+    script_path, script_text = None, ""
     if RENDER_DEPLOY_SCRIPT.search(cmd):
         kind, shape = "a Render deploy (the sanctioned entrypoint)", "deploy"
     elif DEPLOYS_ENDPOINT.search(cmd) and POST_INTENT.search(cmd):
@@ -501,7 +583,12 @@ def main():
         kind, shape = ("a push carrying `render.yaml`, which fires `blueprint_sync` and "
                        "APPLIES TO PRODUCTION even though autoDeploy is off"), "render.yaml"
     else:
-        return 0
+        script_path, script_text = _script_file_deploy(
+            cmd, [str(payload.get("cwd") or ""), root, os.getcwd()])
+        if not script_path:
+            return 0
+        kind, shape = ("a Render deploy (a script file that POSTs to the deploys endpoint: %s)"
+                       % script_path), "deploy"
 
     session_id = re.sub(r"[^A-Za-z0-9._-]", "",
                         str(payload.get("session_id") or ""))[:128]
@@ -556,7 +643,7 @@ def main():
                 % drift_out)
             return 2
 
-    services = _target_services(cmd, shape)
+    services = _target_services(cmd + "\n" + script_text, shape)
     if not services:
         # Ignorance, not a readable "no": allow, but say so loudly.
         sys.stderr.write(
@@ -570,7 +657,7 @@ def main():
     lane = _lane(root, session_id)
     # A render.yaml push carries no --commit; the receipt-to-SHA binding applies
     # to service deploys only.
-    m = COMMIT_ARG.search(cmd) or COMMIT_ID_FIELD.search(cmd)
+    m = COMMIT_ARG.search(cmd) or COMMIT_ID_FIELD.search(cmd) or COMMIT_ID_FIELD.search(script_text)
     deploy_sha = m.group(1) if (m and shape == "deploy") else None
 
     state, blocked = [], False

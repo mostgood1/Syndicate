@@ -284,6 +284,113 @@ def test_a_python_deploys_commit_id_is_bound_to_the_receipt(root):
     assert b"but this deploys abc1234" in result.stderr
 
 
+# --------------------------------------------------------------------------
+# Deploys made by a SCRIPT FILE the command runs. Lane `deploy-guard-file-scripts`.
+# The guard read command text only, so `py -3 deploy.py` passed unchecked. Every
+# block test has an allow twin, and the repo's own read-only scripts are copied
+# in and run for real, so the allow side is not vacuous.
+# --------------------------------------------------------------------------
+
+PY_DEPLOY_FILE = (
+    "import json, urllib.request\n"
+    "req = urllib.request.Request(\n"
+    "    '" + WEB_DEPLOYS_URL + "',\n"
+    "    data=json.dumps({'commitId': 'abc1234'}).encode(), method='POST')\n"
+    "urllib.request.urlopen(req)\n"
+)
+
+# The graft builder's read, verbatim in shape: a GET, then an ASSIGNMENT named data.
+PY_GET_THEN_DATA_ASSIGNMENT = (
+    "import json, urllib.request\n"
+    "req = urllib.request.Request(\n"
+    "    '" + WEB_DEPLOYS_URL + "?limit=5',\n"
+    "    headers={'Authorization': 'Bearer k', 'Accept': 'application/json'})\n"
+    "data = json.loads(urllib.request.urlopen(req, timeout=60).read().decode())\n"
+)
+
+
+def _write(root, rel, text):
+    path = root / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+@pytest.mark.parametrize("runner", ["py -3 deploy_it.py", "python deploy_it.py", "py -3 -u deploy_it.py",
+                                    "cd somewhere && python3 deploy_it.py --flag x"])
+def test_a_script_file_that_deploys_is_guarded(root, runner):
+    _write(root, "deploy_it.py", PY_DEPLOY_FILE)
+    result = run_hook(root, runner)
+    assert result.returncode == BLOCK, result.stderr
+    assert b"script file" in result.stderr
+
+
+def test_a_script_file_run_by_absolute_path_is_guarded(root):
+    path = _write(root, "sub/deploy_it.py", PY_DEPLOY_FILE)
+    assert run_hook(root, "py -3 " + path.as_posix()).returncode == BLOCK
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Git Bash drive paths exist only on Windows")
+def test_a_git_bash_drive_path_is_resolved(root):
+    path = _write(root, "sub/deploy_it.py", PY_DEPLOY_FILE).as_posix()
+    bash_path = "/" + path[0].lower() + path[2:]
+    assert run_hook(root, "py -3 " + bash_path).returncode == BLOCK
+
+
+def test_a_shell_script_with_a_curl_post_is_guarded(root):
+    _write(root, "ship.sh", "#!/bin/sh\ncurl -X POST -H \"Authorization: Bearer $K\" \\\n  " + WEB_DEPLOYS_URL + "\n")
+    assert run_hook(root, "bash ship.sh").returncode == BLOCK
+
+
+@pytest.mark.parametrize("files,command", [
+    ({"read_it.py": PY_GET_THEN_DATA_ASSIGNMENT}, "py -3 read_it.py"),
+    ({}, "py -3 not_there.py"),
+    ({"ship_read.sh": "curl -s -H \"Authorization: Bearer $K\" " + WEB_DEPLOYS_URL + "\ncurl -X POST -d '{}' https://example.com/hook\n"},
+     "bash ship_read.sh"),
+])
+def test_read_only_or_missing_script_files_are_allowed(root, files, command):
+    for rel, text in files.items():
+        _write(root, rel, text)
+    assert run_hook(root, command).returncode == ALLOW
+
+
+def test_a_script_over_the_size_cap_is_allowed(root):
+    _write(root, "big.py", PY_DEPLOY_FILE + "#" * (600 * 1024) + "\n")
+    assert run_hook(root, "py -3 big.py").returncode == ALLOW
+
+
+@pytest.mark.parametrize("rel,command", [
+    ("scripts/build_consolidated_graft.py", "py -3 scripts/build_consolidated_graft.py --service web --dry-run"),
+    ("scripts/deploy_preflight.py", "py -3 scripts/deploy_preflight.py --service web --holder x"),
+    ("tests/test_deploy_guard.py", "py -3 -m pytest -q tests/test_deploy_guard.py"),
+])
+def test_the_repos_own_read_only_scripts_are_allowed(root, rel, command):
+    """Copied from the repo and resolved for real -- not a missing-file pass."""
+    _write(root, rel, (REPO_ROOT / rel).read_text(encoding="utf-8"))
+    assert run_hook(root, command).returncode == ALLOW
+
+
+def test_an_inline_data_assignment_after_a_deploys_get_is_not_a_post(root):
+    assert run_hook(root, "py -3 - <<'EOF'\n" + PY_GET_THEN_DATA_ASSIGNMENT + "EOF").returncode == ALLOW
+
+
+def test_a_script_deploy_with_both_locks_is_allowed(root):
+    _write(root, "deploy_it.py", PY_DEPLOY_FILE)
+    give_claim(root)
+    give_receipt(root, target_commit="abc1234")
+    result = run_hook(root, "py -3 deploy_it.py")
+    assert result.returncode == ALLOW, result.stderr
+
+
+def test_a_script_files_commit_id_is_bound_to_the_receipt(root):
+    _write(root, "deploy_it.py", PY_DEPLOY_FILE)
+    give_claim(root)
+    give_receipt(root, target_commit="fff0000")
+    result = run_hook(root, "py -3 deploy_it.py")
+    assert result.returncode == BLOCK
+    assert b"but this deploys abc1234" in result.stderr
+
+
 def test_curl_post_to_deploys_endpoint_is_guarded(root):
     cmd = ("curl -X POST -H \"Authorization: Bearer $K\" "
            "https://api.render.com/v1/services/srv-d88ahvrbc2fs73eodu30/deploys")
