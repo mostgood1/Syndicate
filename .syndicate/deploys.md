@@ -35183,3 +35183,13 @@ User decision in chat: "Deploy #3 after their reading is done".
   - The same result held with `slim_aliases` / `drop_row_diagnostics` off.
 - **Cause, established after this deploy:** the L2-A restate's chips come from in-process `build_game_chips` (no live NFL chip on web), not the worker-published `read_game_chips` artifact that `/api/board/game-chips` serves (DEN @ KC `state live`). Fix 2 follows on main; this deploy is harmless and not rolled back.
 - Claim: kept for the fix-2 web deploy (TTL covers it).
+
+## 2026-09-15 02:29:09Z (21:29 CT 09-14) — web `dedfede6` -> `c4f45fee` — deploy `dep-dakaqtek1f9s73cks0m0` — lane nfl-live-props-board-lane (fix 2) — **verify MET in live play**
+- **What:** `_refresh_layer2_live_state` indexes the worker-published chips (`read_game_chips`, what `/api/board/game-chips` serves) as well as the in-process `build_game_chips`. A fresh artifact (<= 600 s, env `SYNDICATE_LAYER2_RESTATE_CHIP_ARTIFACT_MAX_AGE_SECONDS`) wins; a stale one fills gaps. Code delta vs live `dedfede6`: `pipeline/intelligence_state.py` plus its test; no `render.yaml`.
+- **Locks:** same web claim (holder nfl-live-props-board-lane, acquired 02:14:47Z). Preflight `--target-commit c4f45fee` CLEAR at 02:28:57Z (infra only). Lane marker set to nfl-live-props-board-lane for deploy-guard.
+- **Result:** POST 02:29:09Z, live 02:32:26Z; 0 `Traceback` and 0 `LAYER2_LIVE_RESTATE_FAILED` on web through ~02:35Z.
+- **verify MET** (page payload `POST /api/intelligence/query` at 02:34:57Z, DEN @ KC chip `state live` Q3 0:35):
+  - DEN @ KC **87 rows / 72 props, ALL `board_lane opportunity`, `market_state live`, `is_live True`, `status_context live`, gate reasons `[]`**. Before this deploy (02:20:51Z): 89 rows / 72 props, all watchlist / unknown / `no_game_state`.
+  - NFL `is_live True` cards **87** (was 0). `LAYER2_LIVE_RESTATED cards=932 of 2718` (was 798 of 2718, MLB only).
+- Board state `computed_at` still 00:49:16Z (the stale combined-board vintage is a separate matter, unchanged by this fix).
+- Claim released after this entry is pushed.

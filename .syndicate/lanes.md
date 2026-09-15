@@ -950,7 +950,7 @@ death, never life — do not invert it.
     - no rise in `LAYER2_GUARD_SKIP` or restarts.
 - Blocked by: none.
 
-### nfl-live-props-board-lane — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+### nfl-live-props-board-lane — CLOSED 2026-09-15 — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - Goal: live NFL props that the Layer 2 shortlist serves as live (`/api/board/layer2-shortlist?sport=nfl`, `market_state live`, lane `opportunity`) must also be served live on the main board (`POST /api/intelligence/query`, the page's default Opportunity lane). Prove it with a failing test first, then a production reading on the next live NFL game.
 - Origin: user report 2026-09-15 ~01:45Z (20:45 CT 09-14), "why are there no props for the live nfl game right now"; user decision ~02:00Z: "fix it open the lane".
 - **Measured before hypotheses (DEN @ KC live, 00:15Z kickoff):**
@@ -982,6 +982,12 @@ death, never life — do not invert it.
   - **Fix 2 (written ~02:28Z):** the restate reads `read_game_chips(date)` too. A fresh artifact (`<= SYNDICATE_LAYER2_RESTATE_CHIP_ARTIFACT_MAX_AGE_SECONDS`, default 600) wins over the inline build; a stale one only fills gaps. An inline-build import failure no longer returns 0.
   - New tests: published live NFL chip plus an inline build returning [] plus no state rows (the production shape) gives a served card `is_live True`, re-gated `opportunity` / `live`; a stale published chip does not override a fresher inline chip. 5/5 pass on the edit, and the production-shape test FAILS on `dedfede6`. Related suites 69 pass; the same 2 chip-join failures are pre-existing on HEAD.
   - `dedfede6`'s state-row restate stays (harmless, and covers a real ordering case), but it did not fix tonight.
+- VERDICT 2026-09-15 ~02:36Z (21:36 CT 09-14) — Goal: live NFL props that the Layer 2 shortlist serves as live (`/api/board/layer2-shortlist?sport=nfl`, `market_state live`, lane `opportunity`) must also be served live on the main board (`POST /api/intelligence/query`, the page's default Opportunity lane). Prove it with a failing test first, then a production reading on the next live NFL game.
+  - **GOAL: MET.**
+    - Failing test first: the production-shape test fails on `dedfede6` and passes on `c4f45fee`.
+    - Production reading on the same live game after web `c4f45fee` (live 02:32:26Z), page payload 02:34:57Z: DEN @ KC 72 props all `opportunity` / `live` / `is_live True`, gate reasons `[]`; NFL live cards 87 (was 0).
+  - The first fix (`dedfede6`) was inert, and the lane records why (`deploys.md` 02:15:21Z and 02:29:09Z).
+  - Lane CLOSED. Left for others: the 2 pre-existing chip-join test failures (`test_layer2_lane_chip_join.py`), and board state `computed_at` pinned at 00:49:16Z.
 - Files: tests/test_board_live_restate_merge.py (NEW). The intelligence-state module edits run under lane heavy-build-memory-refusal's existing claim (same session). If the fix lands in the board dedupe module instead, that claim is taken here first.
 
 ### heavy-build-child-process — OPEN — opened 2026-09-14 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
