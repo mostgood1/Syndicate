@@ -1256,18 +1256,6 @@ death, never life — do not invert it.
   - The 09-16 board was being recorded before the CT date roll, not after it.
 - Blocked by: none.
 
-### brand-logo-v3 — CLOSED — opened 2026-09-14, closed 2026-09-14 — session 08fb3eec-6daf-4680-a64d-bd7f914ad2e7
-- Goal: the new combined Syndicate logo (mascot + S swoosh + lettering, 1536x1024 opaque, from the user 2026-09-14) is what renders in the header on every page, the four crest hero slots, the apple-touch/PWA icons and the og/twitter card; the S favicon is KEPT `[user decision 2026-09-14: the full art was measured mud at 16/32px on 09-09]`. **GOAL: MET.**
-  - Reading, web `dd3a4fda`, 22:01:35Z: 5 served pages name 0 retired assets; 7/7 assets serve 200 at their exact dimensions; 6/6 retired assets 404; `favicon-32.png` unchanged.
-  - Layout half of the clause: rendered logo boxes 3:2 at 400/900/1440 with screenshots, measured on the worktree app, not on production.
-  - Follow-ups in this lane, each MET in production (`deploys.md`): `70f44f05`, the inline menu row plus the standalone-header overflow fix (scroll == client at 1440/900/400); `ff7ec8be`, the header lettering (8 readings, 0 partial).
-- Files: syndicate/templates/shared/base.html, syndicate/templates/shared/_standalone_app_header.html, syndicate/static/shared/app.css, syndicate/static/shared/standalone_shell.css, syndicate/templates/syndicate.html, syndicate/templates/market_board_hub.html, syndicate/templates/errors/error.html, syndicate/templates/intelligence_status.html, syndicate/static/shared/manifest.json, syndicate/static/shared/syndicate-brand-header.jpg, syndicate/static/shared/syndicate-wordmark.png, syndicate/static/shared/syndicate-brand-hero.jpg, syndicate/static/shared/syndicate-icon-180.png, syndicate/static/shared/syndicate-icon-192.png, syndicate/static/shared/syndicate-icon-512.png, syndicate/static/shared/syndicate-social.jpg, syndicate/static/shared/apple-touch-icon.png, syndicate/static/shared/syndicate-og.jpg, syndicate/static/shared/syndicate-crest.jpg, syndicate/static/shared/syndicate-mascot.png, syndicate/static/shared/syndicate-mascot-192.png, syndicate/static/shared/syndicate-logo.svg, scripts/build_brand_assets.py, docs/brand/syndicate-logo-source.png, docs/brand/syndicate-mascot-source.png, tests/test_error_pages.py, tests/test_coverage_report_artifact.py, tests/test_brand_assets.py, .syndicate/state_ui.md
-- Hypothesis: n/a (not diagnostic)
-- Falsification test: n/a
-- Verification: served HTML on web references only the new asset names (0 `syndicate-crest.jpg`, 0 `syndicate-logo.png` in `<img>`), each new asset returns 200 with its expected dimensions, and a screenshot of the header + `/syndicate` hero at desktop and ~400px shows the logo legible and uncropped where it must be. Favicon links unchanged.
-- Blocked by: none.
-- Narrative (user decisions, local and production readings, the two follow-ups): `.syndicate/log/2026-09-14.md`, and moved verbatim to `lanes_history.md` on 2026-09-14.
-
 ### disk-inventory-test-clock — CLOSED 2026-09-15 — opened 2026-09-15 — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
 - **VERDICT.** Goal (verbatim): "`tests/test_disk_inventory.py::test_compactable_families_are_dated_uncompressed_and_old` passes on any wall-clock date. It fails on clean origin/main since 2026-09-15; first measured on `8ac6513d`, reproduced on `8bae6851`: 1 failed, 46 passed across the inventory, compaction and maintenance test files." — **GOAL: MET.**
   - Readings:
@@ -1567,6 +1555,7 @@ death, never life — do not invert it.
 - `ask-rail-evidence` — CLOSED 2026-09-11 — opened 2026-09-11 — session 7d69025a-1bfa-4440-9eae-04c5299fe99f — **GOAL MET: the Ask rail renders every evidence table and chart, and "Konnor Griffin" no longer returns AJ Griffin (2 -> 0 on production)**
 - `ask-sport-parity` — CLOSED 2026-09-11 — opened 2026-09-11 — session 7d69025a-1bfa-4440-9eae-04c5299fe99f — **GOAL MET for every sport with rows on the board; web `1421ee3c` live 22:32:51Z**
 - `book-grid-gameline-ledger-log` — CLOSED 2026-09-14 — opened 2026-09-14 — session 8518e917-502e-4212-b876-11d6eb76ab71
+- `brand-logo-v3` — CLOSED — opened 2026-09-14, closed 2026-09-14 — session 08fb3eec-6daf-4680-a64d-bd7f914ad2e7
 - `census-rescue-0910` — CLOSED 2026-09-10 — opened 2026-09-10 — session 78cad512 — **GOAL: MET: census rescue landed (`ab43454d`), three shipped lanes closed, unmeasured-deploy count 3 -> 1**
 - `chunk-assignment-stable` — CLOSED-REVERTED 2026-09-09 — opened 2026-09-08 — session e371dfde — **the fix worked and was unaffordable: it OOM'd the suite twice and is reverted**
 - `combined-board-rows-unreadable-tripwire` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: live on web `da268e07` (15:36:46Z); the field is served on every date, 0 `ROWS_UNREADABLE` lines; stored 113 vs rows 111 is the per-sport `by_sport` cap, not a defect.**
