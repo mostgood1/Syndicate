@@ -148,7 +148,9 @@ def test_trimming_still_happens_before_the_size_is_measured(
     monkeypatch.setattr(execution_ledger, "_ledger_path", lambda: tmp_path / "l.json")
     over = execution_ledger._MAX_RECORDS + 250
 
-    state = execution_ledger._persist({"orders": [{"k": i, "pad": "x" * 400} for i in range(over)]})
+    # PAPER rows: since lane execution-ledger-live-trim only paper rows are ever
+    # trimmed, and a row with no mode is kept as a possible money record.
+    state = execution_ledger._persist({"orders": [{"k": i, "mode": "paper", "pad": "x" * 400} for i in range(over)]})
 
     assert state["trimmed"] == 250
     assert len(state["orders"]) == execution_ledger._MAX_RECORDS

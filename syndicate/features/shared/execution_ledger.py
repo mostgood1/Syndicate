@@ -910,6 +910,43 @@ _CAS_MAX_ATTEMPTS = 5
 _cas_announced = False
 
 
+def _trim_to_cap(
+    orders: list[dict[str, Any]], cap: int
+) -> tuple[list[dict[str, Any]], int, dict[str, int], int]:
+    """Fit the document to `cap` by dropping the oldest PAPER rows, and nothing else.
+
+    [2026-09-15, lane execution-ledger-live-trim] The cap used to drop the
+    oldest rows of ANY mode. Paper volume (about 230 orders a day) holds the
+    ledger at the cap, so every write pushed out the oldest rows, and real-money
+    fills went with them: 20 live Polymarket fills placed 09-01..09-04 had
+    vanished from the served book while `TRIMMED dropped=1` ran all day.
+
+    Only a row whose mode is exactly `paper` may be dropped. A live row, or one
+    whose mode is missing or unrecognised, is a record of money until proven
+    otherwise and is kept even if that leaves the document over the cap; the
+    caller logs that as a tripwire instead. Live rows are a few a day at about
+    1 KB each, so they cannot approach the store's 8 MB ceiling on any horizon
+    that matters.
+
+    Returns (kept, dropped count, dropped rows by mode, rows still over the cap).
+    """
+    over = len(orders) - cap
+    if over <= 0:
+        return orders, 0, {}, 0
+    drop: set[int] = set()
+    for index, order in enumerate(orders):
+        if len(drop) >= over:
+            break
+        if str(order.get("mode") or "") == PAPER:
+            drop.add(index)
+    dropped_by_mode: dict[str, int] = {}
+    for index in drop:
+        mode = str(orders[index].get("mode") or "")
+        dropped_by_mode[mode] = dropped_by_mode.get(mode, 0) + 1
+    kept = [order for index, order in enumerate(orders) if index not in drop]
+    return kept, len(drop), dropped_by_mode, max(0, len(kept) - cap)
+
+
 def _persist(state: dict[str, Any]) -> dict[str, Any]:
     # MERGE BEFORE THE TRIM, not after. The cap is a property of the document
     # actually being written, and trimming our copy first would drop rows the
@@ -968,16 +1005,12 @@ def _persist(state: dict[str, Any]) -> dict[str, Any]:
         # No `else` branch: `_load` carries `last_blind_write` forward, so a
         # healthy write preserves it rather than clearing it. A successful merge
         # later does not un-lose whatever the blind one may have dropped.
-        trimmed = max(0, len(orders) - _MAX_RECORDS)
-        if trimmed:
-            # Oldest out. Reported, never silent -- a ledger that quietly
-            # forgets is worse than one that refuses to grow, because the gap is
-            # invisible.
-            orders = orders[-_MAX_RECORDS:]
+        orders, trimmed, dropped_by_mode, protected_over = _trim_to_cap(orders, _MAX_RECORDS)
         doc["orders"] = orders
         doc["updated_at"] = _utc_now()
         written.clear()
-        written.update(doc=doc, counts=merge_counts, trimmed=trimmed)
+        written.update(doc=doc, counts=merge_counts, trimmed=trimmed,
+                       dropped_by_mode=dropped_by_mode, protected_over=protected_over)
         return doc
 
     try:
@@ -1045,7 +1078,14 @@ def _persist(state: dict[str, Any]) -> dict[str, Any]:
         )
     if trimmed:
         print(
-            f"[execution_ledger] TRIMMED dropped={trimmed} kept={len(orders)} cap={_MAX_RECORDS}",
+            f"[execution_ledger] TRIMMED dropped={trimmed} kept={len(orders)} cap={_MAX_RECORDS}"
+            f" dropped_by_mode={written.get('dropped_by_mode') or {}}",
+            flush=True,
+        )
+    if written.get("protected_over"):
+        print(
+            f"[execution_ledger] LEDGER_OVER_CAP_PROTECTED over={written['protected_over']} kept={len(orders)}"
+            f" cap={_MAX_RECORDS} -- rows that are not paper exceed the cap on their own; none was dropped",
             flush=True,
         )
     # The caller's `state` becomes the document that was WRITTEN -- merged,

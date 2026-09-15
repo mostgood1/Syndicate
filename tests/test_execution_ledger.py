@@ -300,6 +300,37 @@ def test_live_mode_with_no_venue_adapter_places_nothing(monkeypatch):
 # --------------------------------------------------------------------------
 
 
+def _capped_row(key: str, mode: str) -> dict:
+    return {"idempotency_key": key, "mode": mode, "status": STATUS_FILLED, "selected_date": "2026-09-01", "venue": "polymarket"}
+
+
+def test_the_cap_drops_the_oldest_paper_rows_and_never_a_live_one(monkeypatch, capsys):
+    """[lane execution-ledger-live-trim] 20 live fills were trimmed out by paper volume."""
+    monkeypatch.setattr(ledger, "_MAX_RECORDS", 3)
+    rows = [_capped_row("live-old", LIVE), _capped_row("paper-1", PAPER), _capped_row("live-2", LIVE),
+            _capped_row("paper-2", PAPER), _capped_row("paper-3", PAPER)]
+    ledger._persist({"orders": rows})
+    assert [o["idempotency_key"] for o in ledger._load()["orders"]] == ["live-old", "live-2", "paper-3"]
+    out = capsys.readouterr().out
+    assert "TRIMMED dropped=2" in out and "dropped_by_mode={'paper': 2}" in out
+
+
+def test_rows_that_are_not_paper_are_kept_even_over_the_cap(monkeypatch, capsys):
+    monkeypatch.setattr(ledger, "_MAX_RECORDS", 2)
+    rows = [_capped_row("live-1", LIVE), _capped_row("paper-1", PAPER), _capped_row("live-2", LIVE),
+            _capped_row("unknown-mode", "")]
+    ledger._persist({"orders": rows})
+    assert [o["idempotency_key"] for o in ledger._load()["orders"]] == ["live-1", "live-2", "unknown-mode"]
+    assert "LEDGER_OVER_CAP_PROTECTED over=1" in capsys.readouterr().out
+
+
+def test_under_the_cap_nothing_is_dropped(monkeypatch, capsys):
+    monkeypatch.setattr(ledger, "_MAX_RECORDS", 5)
+    ledger._persist({"orders": [_capped_row("a", PAPER), _capped_row("b", LIVE)]})
+    assert len(ledger._load()["orders"]) == 2
+    assert "TRIMMED" not in capsys.readouterr().out
+
+
 def test_the_ledger_path_carries_no_date_token():
     """A dated path takes the store's 10-day TTL. A record of money placed must
     not expire."""

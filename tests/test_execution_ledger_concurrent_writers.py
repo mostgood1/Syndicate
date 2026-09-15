@@ -24,11 +24,11 @@ def _isolated_ledger(tmp_path, monkeypatch):
     yield
 
 
-def _seed(*keys):
+def _seed(*keys, mode=None):
     """Put orders in the store the way a real slate would leave them."""
     state = ledger._load()
     state["orders"] = [
-        {"idempotency_key": k, "status": "filled", "selected_date": "2026-08-26"}
+        {"idempotency_key": k, "status": "filled", "selected_date": "2026-08-26", **({"mode": mode} if mode else {})}
         for k in keys
     ]
     ledger._persist(state)
@@ -244,7 +244,8 @@ def test_the_trim_runs_AFTER_the_merge_so_it_cannot_resurrect_a_dropped_row(monk
     until this was pointed out.
     """
     monkeypatch.setattr(ledger, "_MAX_RECORDS", 4)
-    _seed("a", "b", "c", "d", "e", "f")
+    # PAPER rows: only paper is ever trimmed (lane execution-ledger-live-trim).
+    _seed("a", "b", "c", "d", "e", "f", mode="paper")
 
     state = ledger._load()
     state["orders"][-1]["outcome"] = "won"
