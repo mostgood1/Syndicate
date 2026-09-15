@@ -6022,7 +6022,7 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
 
 - **What was believed:** live NFL props were demoted on the main board because pre-kickoff state rows won a first-wins dedupe over restated L2-A cards. A new test through the real `read_combined_intelligence_response` failed on HEAD and passed with a fix, and the fix was deployed to web as `dedfede6`.
 - **What falsified it:** after the deploy the page still served all 72 DEN @ KC props as watchlist / `no_game_state`.
-  - Every `by_date` candidate_count was 0: there were NO state rows in production, so the fix's own log line never printed.
+  - Every `by_date` candidate_count was 0: there were NO state rows in production, so the fix's own log line never printed. **[CORRECTED 2026-09-15, lane combined-board-state-rows-lost: FALSE. There WERE state rows (refresh-worker persisted 374 for 09-14 at 01:56:23Z). The combined reader could not parse them. See the FORBIDDEN entry "a reader's zero is not the writer's absence" below. The dedfede6 conclusion (inert) still stands; its stated reason does not.]**
   - The real cause was upstream of the merge. The live restate built chips in-process (`build_game_chips`), which on web had no live NFL chip, while `/api/board/game-chips` served the worker-published artifact that did.
   - The test had patched `build_game_chips` to return the live chip, the exact thing production was missing. Fix 2 (`c4f45fee`) read the published chips, and props went live on the next read.
 - **How to apply:**
@@ -6030,3 +6030,44 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - A test may only stub an input after it has been shown to carry, in production, the value the stub returns. Stubbing an upstream source proves the code downstream of it and nothing about whether that source delivers.
   - After a fix deploys, read the fix's OWN log line (`COMBINED_STATE_LIVE_RESTATED` here) before reading the outcome. Its absence named the wrong mechanism in one query.
   - *(evidence: `deploys.md` 2026-09-15 02:15:21Z and 02:29:09Z; lane nfl-live-props-board-lane)*
+
+## 2026-09-15 — FORBIDDEN: reading a READER's zero as the WRITER's absence — `by_date` 0 was a dated state the reader could not parse, and the line quoted as proof said so `[lane combined-board-state-rows-lost]`
+
+- **What we believed:** production had no per-date state rows. So `dedfede6`'s state-row restate had nothing to act on, and the combined board was built from Layer 2 cards alone by necessity.
+  - `log/2026-09-14.md:720` "so there were no state rows"; `deploys.md` 2026-09-15 02:15:21Z entry ("no state rows: `COMBINED_BOARD_VINTAGE_IGNORED ...`"); this file's line above, now corrected.
+- **What was actually true:**
+  - TECHNICAL: refresh-worker persisted real boards: 374 / 275 / 259 candidates for 09-14 (e.g. `STATE_PERSIST_BEGIN candidate_count=374` 01:56:23Z) and 14 for 09-15.
+  - Web read those exact payloads: stamps equal the worker's `CANDIDATE_POOL_READY` to the second on 4 of 4. Then it dropped every row.
+  - The cause: `_read_single_date_response_for_combining` read through `_read_state_payload` and never called `_expand_persisted_state`. The writer stores `by_sport` member-aliased, the combine loop's `isinstance(items, list)` skipped every entry, and the scalar `candidate_count` held the `> 0` gate open.
+  - Every other reader of that file (`read_intelligence_state`) expands; this one never did.
+  - Duration unknown: aliasing landed 2026-08-09 (`2e6ad549`), and the last non-zero `by_date` in the ledger is 2026-08-29.
+  - EPISTEMIC: the line quoted as proof of absence was a contradiction. `COMBINED_BOARD_VINTAGE_IGNORED date=2026-09-14 stamp=2026-09-15T01:54:49Z reason=no_rows` means a payload WAS read (it has a stamp), and it had already passed a `candidate_count > 0` gate. "Has candidates, has no rows" is a reader defect by construction. It was read as "no data".
+  - The earlier tests of this function (`test_board_vintage_gating.py`) replace the reader with hand-built plain lists, which is exactly the shape production never delivers. That class is already FORBIDDEN (2026-09-09, harness that supplies what production lacks); it is not restated here.
+- **How we found out:** the user asked why the board said stale while the worker persisted hundreds of candidates. The writer's own line (`STATE_PERSIST_BEGIN`) was cross-read against the reader's (`VINTAGE_IGNORED`) for the same date and minute. Then a test with the REAL writer and REAL reader, nothing stubbed: 40 and 1,500 rows read back as 0 on HEAD, and expand-on-read gave 40 and 1,500. Live on web `b6a0e346`: `by_date` 09-15 0 -> 106 (`deploys.md` 2026-09-15 14:03:51Z).
+- **EXONERATED:** a key/date mismatch between the worker's writes and web's reads. Stamps matched to the second on 4 payloads, and `/api/ops/artifacts/export` showed the states travel in keyvalue, which web reads.
+- **The rule going forward:**
+  - A zero, empty or "missing" reported by a READER is a statement about that reader. Before recording it as a property of production, read the WRITER's own line for the same key and time window.
+  - A line that carries BOTH a stamp/count AND "no rows" is a contradiction to chase, never a confirmation of absence.
+- **Cost:**
+  - One web deploy shipped inert on the false precondition (`dedfede6`).
+  - A false line stood in this file for ~12 h, repeated in `deploys.md` and the session log.
+  - Every persisted state row (259-479 per build on 09-14) was absent from the main board for an unknown period, possibly weeks.
+- **Check, not rule:**
+  - (1) Put expansion INSIDE `_read_state_payload`, the choke point every state read shares, so no future caller can skip it. Pin it with a test that round-trips the real writer through every public reader.
+  - (2) Emit `by_date[date].stored_candidate_count` (the payload's scalar) beside `candidate_count` (rows read), and log `COMBINED_BOARD_STATE_ROWS_UNREADABLE` when stored > 0 and rows = 0. The contradiction then appears in the served payload, where the last three sessions looked, instead of only in a log line nobody queried.
+
+## 2026-09-15 — FORBIDDEN: carrying a deploy's predicted effect on a time-varying field from a reading taken hours earlier — re-derive it at preflight, and baseline every field it names plus the served row count `[lane combined-board-state-rows-lost]`
+
+- **What we believed:** expanding the state on read "would NOT move `computed_at`", because the state stamps it adds are newer than tomorrow's shortlist. Written into the lane and `state_board.md` before the deploy, from readings taken at 03:56Z.
+- **What was actually true:**
+  - At deploy (web `b6a0e346`, live 14:10:07Z), refresh-worker's heavy builds had been refused since 13:41:13Z. The fast path kept the shortlists fresh (09-15 `14:07:00Z`, 09-16 `14:10:11Z`), so the 09-15 state (`13:39:43Z`) was now the OLDEST input.
+  - `computed_at` moved from `13:48:51Z` `fresh` to `13:39:43Z` `stale`. The prediction had been true in the 03:56Z regime and false in the 14:10Z one, and nobody re-derived it for the regime the deploy landed in.
+  - SECOND HALF OF THE SAME ERROR: the pre-deploy baseline (13:57:55Z) recorded `by_date`, `legacy_candidate_count`, `artifacts_dated` and `computed_at`, but NOT the served row count. So whether state rows displaced Layer 2 cards under first-wins dedupe is now PERMANENTLY unmeasurable (at most 106).
+- **How we found out:** the post-deploy reading at 14:10:27Z, cross-read with refresh-worker `CANDIDATE_POOL_READY date=2026-09-15 count=106` at 13:39:43Z (`deploys.md` 2026-09-15 14:03:51Z).
+- **The rule going forward:**
+  - A deploy's expected effect on any field that depends on worker timing (ages, freshness verdicts, counts) is re-derived from readings taken inside the preflight window, not carried from the diagnosis.
+  - The baseline captures every field the prediction names PLUS the served row count and its composition by source, because a merge-order change can only be attributed against those.
+- **Cost:**
+  - The user was shown a false prediction and approved a deploy partly on it. The outcome was benign (the new age is true, and the user kept the `stale` label).
+  - One effect of a product change can never be measured.
+- **Check, not rule:** preflight asks for the prediction and the baseline. `deploy_preflight.py` takes `--expect "<field>=<value>"` and `--baseline-read-at <UTC>`, and returns HOLD when the baseline is older than the 15-min CLEAR window or names no row count. The post-deploy entry then lists expected against measured, one line per field.

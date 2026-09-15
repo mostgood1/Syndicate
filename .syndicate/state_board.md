@@ -866,7 +866,8 @@ tested, never seen in production.
 
 ## [combined-board-state-rows-lost] THE COMBINED BOARD DROPS EVERY PERSISTED STATE ROW; ITS AGE IS TOMORROW'S SHORTLIST — FIXED, LIVE ON WEB `b6a0e346` 2026-09-15
 
-Lane `combined-board-state-rows-lost` (full readings there). Read-only; no deploy.
+Lane `combined-board-state-rows-lost` (CLOSED; full readings there). Diagnosed read-only,
+then fixed and deployed to web `b6a0e346` 2026-09-15 on the user's decisions.
 
 **1. The board's `computed_at` is the 09-15 Layer 2 shortlist's `written_at`.**
 Served 03:56:31Z: `computed_at 02:59:43Z` = `/api/board/layer2-shortlist?date=2026-09-15`
@@ -895,8 +896,12 @@ L2-A + 106 state rows. Web below `b6a0e346` still drops every row.
 **So `by_date.candidate_count == 0` is NOT evidence that production has no state
 rows.** A standing learning (2026-09-15 OVERTURNED, nfl-live-props) read it that way.
 
-**Fixing (2) would not move the age in (1):** the state stamps it adds are newer
-than the 09-15 shortlist. It would change CONTENT — state rows merge ahead of
-L2-A cards under first-wins dedupe — so it is a product change. Both the fix
-(file claimed by `heavy-build-memory-refusal` and `layer2-prior-date-live-carryover`)
-and whether tomorrow's shortlist should set the board's age are USER DECISIONS.
+**The fix DID move the age, correcting what this section said before the deploy.**
+"The state stamps it adds are newer than the 09-15 shortlist" held at 03:56Z and
+was false when the deploy landed: at 14:10:27Z heavy builds had been refused since
+13:41Z, the 09-15 state (13:39:43Z) was the oldest input, and `computed_at` went
+from 13:48:51Z `fresh` to 13:39:43Z `stale`. **Whenever the heavy build is refused,
+the board's age is now the age of its state rows.** That is true, and the user
+decided 2026-09-15 to keep the `stale` label. Content: state rows merge ahead of
+L2-A cards under first-wins dedupe; how many L2-A cards they displaced was NOT
+measured (no pre-deploy served count; at most 106).
