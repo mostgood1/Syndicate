@@ -194,6 +194,96 @@ def test_corrupt_claim_blocks_rather_than_reading_as_free(root):
     assert b"does not parse" in result.stderr
 
 
+# --------------------------------------------------------------------------
+# Python/JS POSTs to the deploys endpoint. Lane `deploy-guard-python-post`.
+# Before it, a urllib POST matched the endpoint, failed the curl-only POST
+# intent, and was ALLOWED UNCHECKED -- both web deploys of 2026-09-15 were that
+# shape. Each block test has an allow twin, so neither direction is vacuous.
+# --------------------------------------------------------------------------
+
+WEB_DEPLOYS_URL = "https://api.render.com/v1/services/srv-d88ahvrbc2fs73eodu30/deploys"
+
+# The exact shape of the two 2026-09-15 web deploy commands (heredoc, urllib).
+PY_DEPLOY_AS_RUN = (
+    "( cd /c/tmp/syndicate-sessions/x && py -3 - --commit abc1234 <<'EOF'\n"
+    "# POST " + WEB_DEPLOYS_URL + "  commitId abc1234 (web)\n"
+    "import json, subprocess, sys, urllib.request\n"
+    "req = urllib.request.Request(\n"
+    "    \"" + WEB_DEPLOYS_URL + "\",\n"
+    "    data=json.dumps({\"commitId\": full}).encode(), method=\"POST\",\n"
+    "    headers={\"Authorization\": \"Bearer \" + key},\n"
+    ")\n"
+    "EOF\n)"
+)
+
+
+def test_a_python_urllib_deploy_is_guarded(root):
+    result = run_hook(root, PY_DEPLOY_AS_RUN)
+    assert result.returncode == BLOCK
+    assert b"Python/JS POST" in result.stderr
+
+
+def test_requests_post_to_deploys_is_guarded(root):
+    cmd = ("python -c \"import requests; requests.post('" + WEB_DEPLOYS_URL + "', "
+           "json={'commitId': 'abc1234'})\"")
+    assert run_hook(root, cmd).returncode == BLOCK
+
+
+def test_a_urllib_request_with_a_body_is_a_post_even_without_method(root):
+    cmd = ("python -c \"import urllib.request as u; "
+           "u.urlopen(u.Request('" + WEB_DEPLOYS_URL + "', data=b'{}'))\"")
+    assert run_hook(root, cmd).returncode == BLOCK
+
+
+@pytest.mark.parametrize("command", [
+    # List deploys, then read one: GETs, no body, no method.
+    "python -c \"import urllib.request as u; u.urlopen(u.Request('" + WEB_DEPLOYS_URL + "?limit=3', "
+    "headers={'Authorization': 'Bearer k'}))\"",
+    "python -c \"import urllib.request as u; u.urlopen('" + WEB_DEPLOYS_URL + "/dep-abc123')\"",
+    # A comment naming the endpoint is not a POST.
+    "py -3 - <<'EOF'\n# POST " + WEB_DEPLOYS_URL + " was the deploy\nprint('reading only')\nEOF",
+])
+def test_python_reads_of_the_deploys_endpoint_are_never_blocked(root, command):
+    assert run_hook(root, command).returncode == ALLOW
+
+
+def test_a_post_elsewhere_beside_a_deploys_read_is_not_a_deploy(root):
+    """The measurement-script shape: GET the deploy list, POST to the app."""
+    cmd = ("py -3 - <<'EOF'\n"
+           "import json, urllib.request\n"
+           "r = urllib.request.Request('" + WEB_DEPLOYS_URL + "?limit=3', headers={'Authorization': 'Bearer k'})\n"
+           "print(urllib.request.urlopen(r).read())\n"
+           "q = urllib.request.Request('https://syndicate-an21.onrender.com/api/intelligence/query', "
+           "data=json.dumps({'q': 1}).encode(), method='POST')\n"
+           "EOF")
+    assert run_hook(root, cmd).returncode == ALLOW
+
+
+def test_a_python_deploy_with_both_locks_is_allowed(root):
+    """off != on for the block tests above."""
+    give_claim(root)
+    give_receipt(root)
+    cmd = ("python -c \"import urllib.request as u; u.urlopen(u.Request('" + WEB_DEPLOYS_URL + "', "
+           "data=b'{\\\"commitId\\\": \\\"abc1234\\\"}', method='POST'))\"")
+    result = run_hook(root, cmd)
+    assert result.returncode == ALLOW, result.stderr
+
+
+def test_a_python_deploys_commit_id_is_bound_to_the_receipt(root):
+    """A CLEAR for one SHA must not authorise a Python deploy of another."""
+    give_claim(root)
+    give_receipt(root, target_commit="fff0000")
+    cmd = ("py -3 - <<'EOF'\n"
+           "import json, urllib.request\n"
+           "req = urllib.request.Request(\n"
+           "    '" + WEB_DEPLOYS_URL + "',\n"
+           "    data=json.dumps({\"commitId\": \"abc1234\"}).encode(), method='POST')\n"
+           "EOF")
+    result = run_hook(root, cmd)
+    assert result.returncode == BLOCK
+    assert b"but this deploys abc1234" in result.stderr
+
+
 def test_curl_post_to_deploys_endpoint_is_guarded(root):
     cmd = ("curl -X POST -H \"Authorization: Bearer $K\" "
            "https://api.render.com/v1/services/srv-d88ahvrbc2fs73eodu30/deploys")

@@ -51,6 +51,11 @@ WHAT IT GUARDS, and why exactly these three shapes:
      POST INTENT ONLY. `render_events.py`, `render_logs.py`, `oom_band_report.py`
      and `check_deploy_safety.py` read the Render API constantly and must never
      be blocked.
+     Python/JS POST intent counts too (`method="POST"`, `.post(`, a request
+     body), but only when it is ATTACHED to the deploys URL: same line before
+     it, or after it and before the next URL. `POST_INTENT` alone is
+     curl/PowerShell-only, and a Python urllib deploy used to pass UNCHECKED
+     (lane `deploy-guard-python-post`, 2026-09-15).
   3. A push carrying `render.yaml` -- because `blueprint_sync` BYPASSES
      `autoDeploy = no`. Measured 2026-08-08: a `render.yaml` push rewrote env
      vars on two live services and 502'd every route for ~2 minutes with nobody
@@ -94,6 +99,30 @@ DEPLOYS_ENDPOINT = re.compile(r"/v1/services/[^/\s'\"]+/deploys", re.I)
 # POST intent. `-d`/`--data` imply POST for curl even without -X.
 POST_INTENT = re.compile(
     r"(-X\s*'?POST|--request\s+'?POST|-Method\s+'?Post|--data\b|--data-raw\b|\s-d\s)", re.I)
+
+# POST INTENT AS PYTHON/JS WRITES IT. Lane `deploy-guard-python-post`, 2026-09-15.
+#
+# `POST_INTENT` above only knows curl/PowerShell, so a Python urllib POST to the
+# deploys endpoint matched the endpoint, failed the intent, and was ALLOWED
+# UNCHECKED -- no claim, no preflight, no `NO_EXPECTATION`. Measured 2026-09-15:
+# both web deploys of that day (`b6a0e346`, `da268e07`) were exactly that shape
+# and the guard never evaluated them; they held the locks only by choice.
+#
+# WHY THIS IS NOT ALSO A WHOLE-COMMAND AND. A read-only Python probe routinely
+# GETs `/deploys?limit=` AND POSTs to an app endpoint in one command. "Endpoint
+# anywhere AND POST anywhere" would block it, and a guard that blocks reads is
+# one people disable. So the intent must be ATTACHED to the deploys URL: written
+# before it on the same line (`requests.post("https://.../deploys"`), or after
+# it within `_PY_INTENT_WINDOW` characters and before the next URL
+# (`Request("https://.../deploys", data=..., method="POST")`).
+_PY_POST_INTENT = re.compile(
+    r"(method\s*[=:]\s*['\"]POST['\"]"   # urllib.request.Request(method="POST"), fetch({method: 'POST'})
+    r"|\.post\s*\("                        # requests.post(, httpx.post(, session.post(
+    r"|\.request\s*\(\s*['\"]POST['\"]"  # http.client / requests.request("POST", ...)
+    r"|\bdata\s*=\s*(?!None\b)[^,)\s])",   # urllib Request/urlopen with a body is a POST
+    re.I)
+_URL_START = re.compile(r"https?://", re.I)
+_PY_INTENT_WINDOW = 400
 GIT_PUSH = re.compile(r"\bgit\s+(?:-\S+\s+|--\S+\s+)*push\b", re.I)
 
 SERVICE_ARG = re.compile(r"--service[=\s]+['\"]?([A-Za-z0-9._-]+)", re.I)
@@ -104,6 +133,10 @@ SERVICE_ARG = re.compile(r"--service[=\s]+['\"]?([A-Za-z0-9._-]+)", re.I)
 # that `deploy_claim.py` then refused by `choices`. Measured 2026-09-08 (`#647`).
 SRV_ID = re.compile(r"((?:srv|crn)-[A-Za-z0-9]+)", re.I)
 COMMIT_ARG = re.compile(r"--commit[=\s]+['\"]?([0-9a-f]{7,40})", re.I)
+# The SHA a Python/JS deploy carries in its JSON body. Read like `--commit` so a
+# CLEAR receipt is bound to the commit actually being deployed, whichever form
+# the command takes.
+COMMIT_ID_FIELD = re.compile(r"['\"]commitId['\"]\s*:\s*['\"]([0-9a-f]{7,40})['\"]", re.I)
 
 SERVICE_BY_ID = {
     "srv-d88ahvrbc2fs73eodu30": "web",
@@ -206,6 +239,35 @@ def _claim(root, service, lane=""):
         if not lane or str(claim.get("holder") or "") != lane:
             return claim
     return found[0]
+
+
+def _python_post_to_deploys(cmd):
+    """True when Python/JS POST intent is ATTACHED to a deploys-endpoint URL.
+
+    See `_PY_POST_INTENT` for why attachment and not co-occurrence. Checked per
+    endpoint occurrence: the text before it on its own line (after any earlier
+    URL there), and the text after it up to the next URL or the window. A
+    comment naming the endpoint carries no intent, so it does not match on its
+    own.
+    """
+    for match in DEPLOYS_ENDPOINT.finditer(cmd):
+        line_start = cmd.rfind("\n", 0, match.start()) + 1
+        before = cmd[line_start:match.start()]
+        urls = list(_URL_START.finditer(before))
+        if urls:
+            # Drop this endpoint's own scheme+host, then anything before an
+            # earlier URL on the line: intent there belongs to that URL.
+            before = before[:urls[-1].start()]
+            earlier = list(_URL_START.finditer(before))
+            if earlier:
+                before = before[earlier[-1].end():]
+        after = cmd[match.end():match.end() + _PY_INTENT_WINDOW]
+        nxt = _URL_START.search(after)
+        if nxt:
+            after = after[:nxt.start()]
+        if _PY_POST_INTENT.search(before) or _PY_POST_INTENT.search(after):
+            return True
+    return False
 
 
 def _commits_agree(receipt_sha, deploy_sha):
@@ -433,6 +495,8 @@ def main():
         kind, shape = "a Render deploy (the sanctioned entrypoint)", "deploy"
     elif DEPLOYS_ENDPOINT.search(cmd) and POST_INTENT.search(cmd):
         kind, shape = "a Render deploy (POST to the deploys endpoint)", "deploy"
+    elif _python_post_to_deploys(cmd):
+        kind, shape = "a Render deploy (a Python/JS POST to the deploys endpoint)", "deploy"
     elif GIT_PUSH.search(cmd) and _push_carries_render_yaml(root):
         kind, shape = ("a push carrying `render.yaml`, which fires `blueprint_sync` and "
                        "APPLIES TO PRODUCTION even though autoDeploy is off"), "render.yaml"
@@ -506,7 +570,7 @@ def main():
     lane = _lane(root, session_id)
     # A render.yaml push carries no --commit; the receipt-to-SHA binding applies
     # to service deploys only.
-    m = COMMIT_ARG.search(cmd)
+    m = COMMIT_ARG.search(cmd) or COMMIT_ID_FIELD.search(cmd)
     deploy_sha = m.group(1) if (m and shape == "deploy") else None
 
     state, blocked = [], False
