@@ -36069,3 +36069,18 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Route unaffected: **MET**.
   - Apply owed on the user's decision.
 - Rollback: redeploy `f09601a0` (keeps the route); nothing written by the dry run.
+
+## 2026-09-15 21:44:39Z (16:44 CT) — FOLLOW-UP to the 21:34:51Z web `f09601a0` -> `dd014d14` entry — lane book-quotes-splice-repair — **GLUED ROWS SALVAGED: 7 split, 7 rows written, 0 errors; re-check reads glued_lines 0**
+- No deploy. The user approved the apply: "Apply (Recommended)".
+- **Apply:** `POST /api/ops/book-quotes/repair apply=true`, 21:44:39Z (`pid 185`); `REPAIR_DONE` 21:45:25Z.
+
+      shards 86  shards_with_bad 11  bad_lines 20  orphan_bad_lines 20  glued_lines 7  split_lines 7  rows_written_from_glued 7  removed 0  errors 0
+
+  - Every glued shard grew by exactly one byte per split line (the added newline): mlb 09-13 +1, soccer 09-13 +2, 09-18 +1, 09-19 +1, 09-20 +1, nfl 09-14 +1.
+  - No line was deleted: each torn head stays as its own unreadable line.
+- **Re-check dry run** 21:46:09Z (`pid 209`); `REPAIR_DONE` 21:47:31Z: `bad_lines 20 orphan_bad_lines 20 glued_lines 0 salvaged_rows 0 verified_fragments 0 errors 0`. **MET.**
+- **One refusal after the apply, expected:**
+  - 21:45:19.304Z `publisher=refresh-worker` republished soccer 09-19 one second after the apply rewrote it (21:45:18.780Z). Web refused 1 line: the glued line from refresh-worker's copy, starting `{"captured_at":"2026-09-13T07:31:59.204918+00:00"`.
+  - Web already holds both pieces.
+  - refresh-worker's copy should self-heal: its next tail sync meets web's rewritten shard, mismatches the overlap, and resyncs whole, dropping non-JSON lines (P2).
+- **live-odds-worker mlb 09-15 still unobserved:** since 20:30Z only `publisher=refresh-worker` merged that shard (6 merges, 0 refused). The 21:02:40Z entry's owed reading stays owed.
