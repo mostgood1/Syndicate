@@ -1657,7 +1657,23 @@ death, never life — do not invert it.
     - As a displayed size: 116 of 400 (e.g. -105 -> +240 shown 345, really 145; +115 -> -115 shown -230, really -30).
   - **H2 (price read as a line): CONFIRMED, 27 of 400.** It is not only moneylines: any market with no line carries the price as `line` (Stoke City h2h +240 -> +230, 10 points; Last Goalscorer Pulisic +390 -> +400).
   - Seen, not yet explained: identical events repeat (Stoke City twice at one timestamp, `book` null), so counts may include per-book duplicates.
-- Blocked by: none. Next: fix `_steam_signal` (size moves on the cents scale; no line threshold where the line IS the price), write the unit tests per Verification, then deploy live-odds-worker and take the after-reading through the same route.
+- Status `[2026-09-15 ~21:40Z]`: **FIX BUILT, TESTED, ON MAIN (`ca80edf0`), NOT DEPLOYED.**
+  - `odds_refresh_tracking.py`:
+    - New public `american_cents` / `american_cents_delta` (±100 both map to 0; a value strictly between -100 and +100 returns None, so the caller keeps the plain difference).
+    - `_steam_signal` sizes `odds_delta` on that scale.
+    - A row whose line equals its price on BOTH observations gets `line_delta` None, so the 0.5-line bar cannot fire on a price.
+  - `mlb/cards.py`: the market board's `odds_delta` uses the same helper.
+  - Tests:
+    - 7 new (6 in `SteamDetectorTests`, 1 in `MlbHydrateMarketBoardPropMovementTests`).
+    - UNWIRED CHECK: the 6 behaviour tests FAILED on the old code with the predicted values (205 not None, 215 != 15, 345 != 145, 210 != 10, a 10-point line trip, `line_delta` 25 on a price row); the non-crossing test passed. All 19 in those two classes pass with the fix.
+  - Attribution: `tests/test_odds_refresh_tracking.py`, `tests/test_mlb_market_board.py`, `tests/test_intelligence_steam_candidates.py` and `tests/test_ops_steam_events.py` fail the SAME 13 tests and error the same 12 on pre-fix `dd014d14` (178 passed) and with the fix (185 passed). Nothing is failing only with the fix.
+    - Causes seen: the conftest `data/` mirror write guard (`data/odds_events` mkdir) in the sync tests, and a team-abbreviation lookup (`LG @ IM` vs `LA @ MIA`) in one steam-candidate test. Both are worktree-without-`data/`.
+  - CORRECTION to Verification (2): -110 -> +105 is 15 cents, which MEETS the 15-point bar, so it is steam with `odds_delta` 15. The no-steam case is -105 -> +100 (5 cents).
+  - Consumers of the new `line_delta` None: `intelligence.py:5457` (`_numeric_hint`), book-confirmation direction (falls through to None), `watchlist.js:215` (`?? ""`), the template (`numericValue`). All None-safe by reading.
+  - Deploy plan: live-odds-worker (the soccer/wnba/nba steam writer, in `refresh_odds_sources` children), then refresh-worker (MLB refresh + board).
+    - Sequenced AFTER lane `soccer-player-role-allocation`'s main-tip deploys and post-deploy reading. live-odds-worker `8c089e8c` was building at 21:33Z without this fix.
+    - Main's A/B commits are that lane's own approved deploy, so a main-tip deploy after it carries no unapproved ride-along. Re-check the range at preflight.
+- Blocked by: sequencing only. Wait for `soccer-player-role-allocation` to finish its worker deploys and reading, then deploy main to live-odds-worker and read `/api/ops/steam/events` after the next soccer refresh.
 
 ### ncaaf-prop-quote-market-check — CLOSED — opened 2026-09-15 — closed 2026-09-15 ~15:45 CT — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
 - **VERDICT.** Goal (verbatim): "for the 104 NCAAF legacy prop rows refresh-worker quoted after `f833f7ec` (`intelligence_prop with_quote=104`), state how many carry a quote from the row's OWN market, measured with the real `quote_ref_for_bet` over production quote shards. If they are wrong, describe the production impact and stop before changing behaviour. Read-only diagnostic; no code change without the user's go." — **GOAL: MET. Hypothesis FALSIFIED: 102 of 102 replayed rows get their own market, side and line.**
