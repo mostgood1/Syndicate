@@ -3045,8 +3045,21 @@ def build_layer2_rows(
             score = blended_score(
                 ev_pct=value_ev,
                 model_edge=blend_model_edge,
+                # THE SCORE REWARDS A MOVE TOWARD THE PICK (lane `layer2-row-parity`,
+                # user decision 2026-09-15 "Toward the pick"). The displayed
+                # `movement_price_delta` is negative when the price SHORTENED, so
+                # passing it straight through rewarded a price that ran AWAY from
+                # the pick -- the opposite of the "CLV in miniature" rationale the
+                # term is admitted on (`opportunity_signals.py`). Negated here, at
+                # the one call site, so the card's number keeps its meaning.
                 **(
-                    {"movement_price_delta": movement.get("movement_price_delta")}
+                    {
+                        "movement_price_delta": (
+                            -float(movement["movement_price_delta"])
+                            if movement.get("movement_price_delta") is not None
+                            else None
+                        )
+                    }
                     if _blended_score_accepts("movement_price_delta")
                     else {}
                 ),

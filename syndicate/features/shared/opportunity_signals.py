@@ -765,9 +765,14 @@ def blended_score(
     if value_ev is None and value_sim is None:
         return None
     # Movement is CAPPED, not merely weighted -- see `_SCORE_MOVEMENT_CAP_PCT`.
-    # A row whose price ran 60 points contributes the same +1.0 as one that ran
-    # 20, which is the point: it orders rows that are otherwise close and never
-    # displaces a materially better price.
+    # It orders rows that are otherwise close and never displaces a materially
+    # better price.
+    #
+    # SIGN: POSITIVE MEANS THE MARKET MOVED TOWARD THE PICK (its price shortened),
+    # in American points on the continuous cents scale. The Layer 2 caller negates
+    # the displayed delta to get this (lane `layer2-row-parity`, 2026-09-15). Before
+    # that, a price that LENGTHENED -- the market moving away -- scored positive,
+    # contrary to the "CLV in miniature" rationale above.
     move = _as_float(movement_price_delta)
     value_move = 0.0
     if move:

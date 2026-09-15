@@ -304,7 +304,41 @@ def test_the_scored_movement_is_the_one_the_card_shows():
     # `round(..., 4)` because that is what the score dict publishes; comparing
     # against the raw float fails on the 5th decimal and would read as a real
     # mismatch.
-    assert candidate["score"]["movement_component"] == round(_movement_contribution(20.0), 4)
+    #
+    # SIGN (lane `layer2-row-parity`, user decision "Toward the pick"): this row's
+    # price LENGTHENED (-125 -> -105), the market moving AWAY from the over, so its
+    # movement term is NEGATIVE while the card still shows +20.
+    assert candidate["score"]["movement_component"] == round(_movement_contribution(-20.0), 4)
+    assert candidate["score"]["movement_component"] < 0
+
+
+def _scored_over_with_opening(open_price):
+    grid_row = {
+        "sport": "mlb", "kind": "game", "event_id": "e1", "market": "totals",
+        "segment": "full", "line": 8.5, "player_name": None,
+        "home_team": "H", "away_team": "A", "commence_time": "2026-08-16T20:00:00Z",
+        "sides": ["over", "under"], "books_quoting": 4,
+        "game": {"state": "pregame"},
+        "best": {
+            "over": {"price": -105, "bookmaker": "draftkings", "age_seconds": 10.0, "books_quoting": 4},
+            "under": {"price": -105, "bookmaker": "draftkings", "age_seconds": 10.0, "books_quoting": 4},
+        },
+        "cells": {"draftkings": {"over": {"price": -105, "line": 8.5}, "under": {"price": -105, "line": 8.5}}},
+    }
+    over = _row(side="over", line=8.5)
+    result = build_layer2_rows([grid_row], openings=_openings(over, price=open_price, books={"draftkings": open_price}))
+    return next(c for c in result["opportunities"] if c["side"] == "over")
+
+
+def test_a_move_toward_the_pick_scores_positive_and_away_negative():
+    """Reachability for the SIGN at the call site: one grid, two openings, so
+    only the direction of the move differs."""
+    away = _scored_over_with_opening(-125)   # -125 -> -105: price lengthened
+    toward = _scored_over_with_opening(105)  # +105 -> -105: price shortened
+    assert away["movement"]["movement_vs_pick"] == "away"
+    assert away["score"]["movement_component"] < 0
+    assert toward["movement"]["movement_vs_pick"] == "toward"
+    assert toward["score"]["movement_component"] > 0
 
 
 # --------------------------------------------------------------------------
