@@ -35973,3 +35973,13 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Each record is the writer's newest 200 events (`_STEAM_EVENTS_KEEP`), so a day is a WINDOW: 09-15 spans 2026-09-15T15:43:37-05:00 .. 2026-09-15T16:21:50-05:00; 09-16 spans 2026-09-15T12:04:37-05:00 .. 2026-09-15T12:04:37-05:00. The lane's baseline split is recorded in `lanes.md`; it is not a deploy effect.
 - **Web claim:** released after this entry. Lane `book-quotes-splice-repair` has a main-based web deploy queued next, and main carries the route (`b2a9a4bb`).
 - Rollback: web `7ed1a18a`.
+
+## 2026-09-15 21:3xZ (16:3x CT) — READING — live-odds-worker `991a94d5` — lane fotmob-team-name-aliases — **`867f1481` LIVE by content since 19:37:29Z; no deploy by this lane; verify OWED Sat 09-19**
+- Read-only: no deploy, no claim, no env change. This lane tried to acquire the live-odds-worker claim at 21:27:39Z for its own deploy of `867f1481`. The claim was held by `soccer-player-role-allocation` (target `8c089e8c`), and this lane did not force it.
+- The Render deploys API showed three live-odds-worker deploys by other lanes since this session's `c725cc29`: `f833f7ec` (live 19:37:29Z), `18be9107` (20:34:56Z) and `991a94d5` (21:02:40Z, live now).
+- **By content, not ancestry:** `git rev-parse <sha>:syndicate/features/soccer/ingestion/fotmob_match_id.py` returns blob `7bb75289` for `867f1481`, `f833f7ec`, `18be9107`, `991a94d5` and `8c089e8c`; `c725cc29` has `c56a89ca`. `_loose_match_ids` is present in all five, and `git log 867f1481..991a94d5 -- <path>` is empty.
+- So the alias loose pass has run on live-odds-worker since 19:37:29Z. It went out during tonight's slate, as ride-along in `soccer-player-substrate`'s deploy, which recorded the conflict with this lane's user decision ("After tonight's matches") in its own entry above.
+- **verify OWED, no deploy needed:**
+  - The first fixtures only the new code resolves are Sat 2026-09-19 13:30Z (08:30 CT) Hamburg SV v FC Cologne (bundesliga, expected `fotmob_match_id 5881174`) and 18:45Z Anderlecht v Zulte-Waregem (belgian_pro_league, `5811767`).
+  - Both ids come from running `867f1481`'s resolver against FotMob's published 09-19 listing at 19:30:51Z; `c725cc29`'s resolver returned None for both.
+  - Read `live_state_2026-09-19.json` while those matches are in play.
