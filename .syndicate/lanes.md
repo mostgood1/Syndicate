@@ -1595,6 +1595,30 @@ death, never life — do not invert it.
     - No test asserts a combined `by_date` entry by exact dict.
   - **Web reading (deployed `da268e07` on the user's approval, live 15:36:46Z): see the VERDICT at the top of this block and `deploys.md` 2026-09-15 15:30:14Z.** A comment on the per-sport cap (stored >= rows is normal) was added after the deploy. It is comment-only and on main, not redeployed.
 
+### disk-inventory-test-clock — CLOSED 2026-09-15 — opened 2026-09-15 — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
+- **OUTCOME: hypothesis CONFIRMED. The TEST was wrong and the classifier is right, so there is no production impact and no deploy.**
+  - The test now pins `now=FIXTURE_NOW` (2026-09-13 12:00Z).
+  - New test `test_compactable_age_is_the_name_date_against_now`: the same `clv_openings` fixture IS a family at FIXTURE_NOW+2d.
+  - Readings:
+    - Targeted files (inventory, compaction, maintenance): 48 passed (was 1 failed, 46 passed).
+    - Fixed file under a `time.time` shift of +1500, -2 and -400 days: 2 passed each.
+    - **Control:** the origin/main test file passes at shift -2d (09-13) and FAILS at shift 0 (09-15). That isolates the wall clock as the only moving part.
+  - Mechanism: `disk_inventory.py:228` compares the name date to `now` (`>=` 2.0 days). A shard named for a closed date is exactly what should be compactable, so the code is correct.
+  - `test_disk_compaction.py` already pinned `TODAY`, so no other test in the three files depends on a filename date against the wall clock. Its temp-file tests use mtime relative to the same clock, which is safe.
+- Goal: `tests/test_disk_inventory.py::test_compactable_families_are_dated_uncompressed_and_old` passes on any wall-clock date. It fails on clean origin/main since 2026-09-15; first measured on `8ac6513d`, reproduced on `8bae6851`: 1 failed, 46 passed across the inventory, compaction and maintenance test files.
+- Files: tests/test_disk_inventory.py
+- Hypothesis: the test is date-dependent, and the classifier is correct.
+  - `disk_inventory.py:228` ages a text file by the DATE IN ITS NAME (`_file_date_age_days`), with `now` defaulting to `time.time()`.
+  - The fixture `reports/intelligence/clv_openings/2026-09-13.jsonl` is commented "today". It turned exactly 2.0 days old at 2026-09-15 00:00Z, which meets `compactable_min_age_days=2.0` (`>=`).
+  - Neither file changed after `92a271b8` (09-13, the only commit on either). Sibling `test_disk_compaction.py` already pins `TODAY = date(2026, 9, 13)`, and this test never did.
+- Falsification test: under an injected `now` of 2026-09-13 12:00Z the test still reports a `clv_openings` family. Or a commit after `92a271b8` changed the classifier or the fixture naming.
+- Verification:
+  - The three targeted test files pass.
+  - The compactable test passes with `now` pinned.
+  - A new assertion shows the SAME fixture becomes compactable at now+2d, so the date rule is reachable, not vacuous.
+  - A run with `time.time` forced to 2030 still passes.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

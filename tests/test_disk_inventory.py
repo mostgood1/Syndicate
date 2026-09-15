@@ -12,11 +12,15 @@ from __future__ import annotations
 import json
 import os
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
 from syndicate.features.shared import disk_inventory as inv
+
+# The fixture tree's "today": 2026-09-13 12:00Z, the date `_tree` names as today.
+FIXTURE_NOW = datetime(2026, 9, 13, 12, tzinfo=timezone.utc).timestamp()
 
 
 def _write(path: Path, size: int, *, age_seconds: float = 0.0) -> None:
@@ -70,8 +74,10 @@ def test_extensions_group_compressed_suffixes(tmp_path):
 
 
 def test_compactable_families_are_dated_uncompressed_and_old(tmp_path):
+    # Age comes from the date in the NAME, so `now` must be pinned to the fixture's "today".
+    # Unpinned, the 2026-09-13 file turned compactable on 2026-09-15 and this test failed.
     _tree(tmp_path)
-    report = inv.build_disk_inventory(tmp_path, compactable_min_age_days=2.0)
+    report = inv.build_disk_inventory(tmp_path, compactable_min_age_days=2.0, now=FIXTURE_NOW)
     families = {row["path"]: row for row in report["compactable_text_families"]}
     assert families["soccer_source/tracking/book_quotes/<date>.jsonl"] == {
         "path": "soccer_source/tracking/book_quotes/<date>.jsonl", "bytes": 9000, "files": 2}
@@ -79,6 +85,14 @@ def test_compactable_families_are_dated_uncompressed_and_old(tmp_path):
     # Today's file is not a candidate, a .gz is already compressed, undated files are not families.
     assert not any("clv_openings" in key for key in families)
     assert not any(key.endswith(".gz") for key in families)
+
+
+def test_compactable_age_is_the_name_date_against_now(tmp_path):
+    # The exclusion above is not vacuous: two days later the same file is a family.
+    _tree(tmp_path)
+    later = inv.build_disk_inventory(tmp_path, compactable_min_age_days=2.0, now=FIXTURE_NOW + 2 * 86400)
+    families = {row["path"] for row in later["compactable_text_families"]}
+    assert "reports/intelligence/clv_openings/<date>.jsonl" in families
 
 
 def test_temp_orphans_need_age(tmp_path):
