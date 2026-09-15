@@ -406,6 +406,21 @@ death, never life — do not invert it.
 - Verification: per the Goal, in `deploys.md`, after a live-odds-worker deploy the user approves.
 - Blocked by: none.
 
+### polymarket-no-fill-booking-audit — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: [user 2026-09-15 ~14:45 CT: "start no fills audit"] list every live Polymarket NO fill booked before `1efdea18` (live-odds-worker, live 17:26:07Z) whose `fill_price` is avgPx rather than the true NO cost 1 - avgPx. For each: the booked and true cost, and the stake, P&L and ROI error it carries. Report the total. READ-ONLY; correcting rows is a separate decision.
+- Origin: lane `polymarket-no-price-convention` (CLOSED, GOAL MET) and `C65VD0R72KDG`, settled by rule at 0.765 against a booked 0.235 (user decision, lane `polymarket-ask-pricing`).
+- Files: none (read-only). No claim taken.
+- Hypothesis (to test, not believed): before `1efdea18`, a NO order sent p_NO as a YES floor, and `_fill_price` booked whichever of {avgPx, 1-avgPx} was closer to the sent limit.
+  - So a NO fill is MISBOOKED exactly when the venue sold YES near our floor (avgPx near p_NO, i.e. we paid about 1 - p_NO).
+  - It is booked RIGHT when the book was near our intended price (avgPx near 1 - p_NO): dal-nyg sent 0.40, avgPx 0.605, booked 0.395, and the balance confirmed it.
+  - The misbooked rows therefore look normal on the record (fill_price about equal to the requested probability) and hide the largest real overpays.
+- Discriminators, none of which needs the side label:
+  - (a) A retained `FILL_PRICE` log line with `outcome_side=NO` and `recorded == avgPx` (avgPx != 0.5). Logs reach back to about 09-05.
+  - (b) A venue-settled WON row whose `pnl_dollars` is about n x fill_price rather than n x (1 - fill_price).
+  - (c) A LOST row carrying `IMPOSSIBLE_PNL_CORRECTED`, where the venue loss exceeded the booked fill because the true cost was higher.
+- Falsification test: every NO fill found reads `recorded == 1 - avgPx`, and no WON row fits (b).
+- Verification: the table and totals, recorded in `state_polymarket.md` with the orders each discriminator could and could not see.
+
 ### book-quotes-splice-repair — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - Goal: [user 2026-09-15: "open the lane and bring me the plan"] no `book_quotes` shard gains a headless fragment line, and the shards already damaged are repaired. Read on production after the fix: 0 lines failing `json.loads` in newly written shards on web and refresh-worker across a full capture day; the refresh-worker byte-offset tail pull never appends into a file that is not a byte prefix of web's copy (the mismatch case is logged by name); and the affected historical shards read clean or are listed with their bad-line counts.
 - Files: `syndicate/features/shared/artifact_merge.py` (P1: refuse non-JSON lines for book_quotes paths), `tests/test_publish_append_only_merge.py` (P1 tests only), `syndicate/features/shared/odds_book_quotes.py` (P0: bad-line counter in `iter_book_quotes`/`read_book_quotes` only; TAKEN 2026-09-15 from this session's lane `book-quotes-prefer-fuller-copy`), `tests/test_book_quotes_bad_lines.py` (NEW). `syndicate/features/shared/artifact_publisher.py` (P2: `pull_streamed_artifact` and new private sync helpers ONLY; TAKEN 2026-09-15 ~13:05 CT from lane `accuracy-assessment-0914`, which held it for one `HOT_ARTIFACT_PATTERNS` entry after taking it from `quote-state-publish-retry` on 09-14. Neither owner session (498e87fd, ed8bb082) could be found by transcript search. User decision "Take it for the pull only (Recommended)". The publish retry wrapper and the pattern entry stay untouched), `tests/test_artifact_publisher.py` (P2 pull tests only). **User decision 2026-09-15 ~13:40 CDT: "Approve all phases (Recommended)".**
@@ -419,6 +434,16 @@ death, never life — do not invert it.
 - Falsification test: a fragment appears in a shard written after both guards are live, OR a dropped "fragment" turns out not to be a suffix of any intact line (that would be data loss, not repair).
 - Verification: per the Goal, recorded in `deploys.md`.
 - Blocked by: the user's approval of the plan.
+- **P4 READING 2026-09-15 19:28-19:50Z (after the P3 apply). Check (1) MET; check (2) NOT MET, and the cause is outside P2's scope.**
+  - (1) The post-apply dry run found 20 bad lines, all of them the orphans, and 0 fragments.
+  - (3) refresh-worker resynced each touched shard with `STREAM_SYNC_WHOLE reason=overlap_mismatch`, dropping exactly web's refused counts (mlb 09-15 17, soccer 09-15 43, 09-17 14, 09-18 35, 09-19 53, 09-20 20), then went back to `STREAM_TAIL_SYNC_OK`.
+  - (2) Web still refuses on today's shards: mlb 09-15 `refused=10` at 19:43:36Z, and soccer 09-15 `refused=43` at 19:43:44, 19:43:49, 19:50:04, 19:50:08 and 19:50:10Z.
+  - **Every one reads `publisher=live-odds-worker`** (web `ARTIFACT_MERGE_DEFERRED` in the same second). live-odds-worker holds its own copies of those shards, carrying the old fragments, and republishes them whole.
+  - It never re-syncs a shard it already has: `_missing_required_artifact_relative_paths` only asks for artifacts the service lacks (`artifact_publisher.py` ~2956-3001), and it logged 0 pull/sync lines for soccer 09-15 since 19:20Z.
+  - **Harmless to data:** P1 refuses the lines, so web's copy stays clean.
+  - **Cleared by:** live-odds-worker dropping non-JSON lines from its local copy (a code change plus a deploy, user decision), or those shards leaving its publish window.
+  - **Retracted in-session:** a lead that the refusals were `clv_openings/clv_departures` publishes. `_requires_json_lines` matches `book_quotes` only, and `dir=` prints the grandparent folder `tracking`.
+
 - **MAP 2026-09-15 ~13:30 CDT (read-only agent; code + logs + bounded GETs on web's stream route).**
   - **Every sampled shard has fragments** (bad = fails `json.loads`):
     - mlb 09-15 14, then 15 a quarter-hour later
