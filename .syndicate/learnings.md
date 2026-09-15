@@ -6084,3 +6084,16 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - A value derived under a clock-relative condition (`!= today`, "past", "future") is either not cached, or keyed by (date, the day it was evaluated).
   - A test for any date-keyed cache ROLLS THE CLOCK between the write and the read. Two calls on the same "today" cannot see this.
 - **Cost:** two days of stale WNBA chips and a phantom `scheduled_games 4` on Layer 2. The 09-10 fix had passed its same-day readings because they never crossed a midnight with a pre-written tomorrow file.
+
+## 2026-09-15 — OVERTURNED: "the board-snapshot readers miss the writer's disk fallback, so route them through `_read_state_payload`" — the fallback cannot reach web at all, and routing would have handed them month-old disk files `[lane state-read-expand-choke-point]`
+
+- **What was believed:** `read_latest_intelligence_board_snapshot_response` and its fallback read keyvalue only, while `_write_state_payload` can divert an oversized snapshot to disk. So they had a real gap, and the user was told so and asked for the routing.
+- **What falsified it,** measured 2026-09-15 14:39-14:41Z before any code:
+  - `board_snapshot*.json` is deliberately NOT in the artifact allowlist (`artifact_publisher.py:1072-1095`), so no fresh snapshot can reach web's disk whatever the reader does.
+  - 0 disk-fallback writes on either service in 24 h.
+  - Web's disk DOES hold a stale `reports/intelligence/intelligence_state.json` (25.8 MB, stamped 2026-08-10). `_read_state_payload` returns a disk copy whenever keyvalue has none, and the snapshot fallback loop globs disk. The "fix" would have created the failure it claimed to close.
+- **How to apply:**
+  - Before widening a reader to a new SOURCE, check two things on the SERVICE that runs the reader: (a) does the transport ever deliver a FRESH copy of that source there (allowlist, publish logs), and (b) what STALE copies already sit there.
+  - A reader and its transport are one change. Neither half is a fix alone, and the reader half is the dangerous one.
+  - A gap stated from code alone is a hypothesis. It was surfaced to the user as a finding, which is how it became an instruction.
+  - *(evidence: `state_board.md` `[combined-board-state-rows-lost]`; `log/2026-09-15.md` session 3a65723e)*
