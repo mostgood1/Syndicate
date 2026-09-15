@@ -2115,7 +2115,15 @@ death, never life — do not invert it.
   - **H1, legacy candidates:** worker counters (18:16:31Z, same process, a TODAY build) read `ncaaf intelligence_prop` rows=104, with_quote=0, missing_market_key=104; soccer 11/14 quoted, mlb 36/36.
     - `quote-feed-age`: ncaaf shard 2026-09-15 is ABSENT; 09-19 is ok (16:43Z) and 09-20 is stale.
     - Consistent with the fallback-date join (label "2026 Week 3", no ISO row date on the intelligence path), but NOT attributed: missing_market_key 104/104 is a confounder, and those rows' date fields were not sampled.
-  - **H2:** owed a same-process reading after a real 09-16 build (watcher 2 polling from 13:20 CT). The 18:15Z payload was confounded by `[refresh_worker] BOOTED` 18:14:03Z.
+  - **H2 CONFIRMED in production (13:40 CT reading):** a same-process 09-16 build filed its intelligence counts under TODAY.
+    - Build order after the 18:14:03Z boot:
+      - A (today): enrich mlb 36 / ncaaf 104 / soccer 14 at 18:15-18:16Z, `CANDIDATE_POOL_READY date=2026-09-15 count=74` at 18:25:08Z.
+      - B (09-16): enrich ncaaf 104 / soccer 14 at 18:28:52-57Z, 09-16 gate at 18:34:35Z, `date=2026-09-16 count=0` at 18:39:53Z.
+      - No other pool-ready line in between, no BOOTED since 18:14:03Z.
+    - Payload flushed at 18:29:47Z (inside B), `service_role=refresh-worker-4tx2`: `ncaaf 2026-09-15 intelligence_prop=208 intelligence_game=564` and `soccer 2026-09-15 intelligence_prop=28 intelligence_game=156` (= A + B).
+    - There is NO `2026-09-16` intelligence lane, while the same build's context_label-keyed lane landed at `soccer 2026-09-16 prop_source_in=180`.
+    - Impact: the ops coverage metric double-counts today and never shows a non-today pool. The board is unaffected.
+  - **Open, user decision:** whether to sample the 104 legacy NCAAF rows' date fields and market keys to attribute H1.
   - **H0** (refresh-worker `CANDIDATE_POOL_READY`, 09-12 05:00Z..09-15 18:08Z, 206 builds): non-today pools with candidates exist.
     - On 09-12 the 09-13 pool had 151 (x2).
     - On 09-14 the 09-15 pool had 14 (x24).
