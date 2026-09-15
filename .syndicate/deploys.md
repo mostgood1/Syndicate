@@ -35497,3 +35497,23 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - (2) At the next venue `ORDER_STATE_REJECTED`, the following pass logs `REFUSED_AT_BUILD ... reason=venue_rejected_unchanged` for that key with no second `SUBMIT`.
   - A watcher is reading (1) for 45 min from go-live. (2) needs a venue reject, and none has occurred since 15:00Z.
 - Rollback: redeploy `54f3d662` to live-odds-worker.
+
+## 2026-09-15 17:20:02Z (12:20 CT) — live-odds-worker `4bd5ece9` -> `1efdea18` — deploy `dep-daknsgh42hec73ch5tqg` — lane polymarket-no-price-convention — **verify OWED (first live Polymarket NO order)**
+- **What:** `83996893`, landed as `1efdea18`. Polymarket US `price` is always the YES price.
+  - A NO order now sends `round_price_to_tick(1 - p_NO, tick, down)` and sizes its quantity on the NO cost.
+  - A NO fill books `1 - avgPx`; the 08-30 limit-proximity rule and `_COMPLEMENT_MARGIN` are removed, and the limit check runs on the YES scale with a NO buy as a SELL.
+  - A synchronously filled NO books the NO cost, and the step-1 instrument reads `sent` on our side's scale.
+  - No balance-gate change: the venue reserves (1 - YES price) x qty = NO cost x qty, which `check_order` already charges.
+  - User decisions: "Build the NO fix now", then "Deploy now".
+- **Ride-along** (`4bd5ece9..1efdea18`, runtime): none beyond this commit. The ledger commits between them are not runtime.
+- **Locks:**
+  - Claim acquired ~17:18Z (token `86c1460e…`, holder polymarket-no-price-convention).
+  - Preflight with a stated expectation: `no_order_wire_price no_price -> one_minus_no_price` and `no_fill_booked_at limit_proximity_rule -> one_minus_avgPx`. Baseline: 0 NO submits since 17:14:47Z, re-read each try.
+  - CLEAR 17:19:27Z. Live **17:26:07Z** (`update_in_progress` 17:24Z). Claim released ~17:30Z.
+- **verify: OWED**, all on the first live NO order after 17:26:07Z:
+  - (1) `SUBMIT ... side=OUTCOME_SIDE_NO price={'value': X}` with X = 1 minus our NO limit (compare with `POLYMARKET_ARTIFACT_PRICE price=`);
+  - (2) its `FILL_PRICE ... recorded=` equals 1 - avgPx and is at or below our NO limit, with no `FILL_ABOVE_LIMIT`;
+  - (3) Polymarket buying power falls by recorded x contracts + fee.
+  - Watcher `b1p6x1kee` reads (1)-(2) for 90 min. At 17:26Z there were 0 Polymarket submits on the new process.
+- **Known consequence:** a historical row re-reconciled now books the other reading (e.g. `C65VD0R72KDG` 0.765 vs the recorded 0.235). Settled rows are not re-read automatically. That order's recorded cost is owed a balance-ledger check (lane `polymarket-no-price-convention` (iv)).
+- Rollback: redeploy `4bd5ece9` to live-odds-worker.
