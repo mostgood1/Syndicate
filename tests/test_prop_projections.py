@@ -293,3 +293,29 @@ def test_a_segment_that_is_almost_never_decided_is_left_alone():
     out = _project("h2h", "first1", payloads=payloads)
     assert out["model_prob_over"] == 0.05
     assert out["basis"] == "first1/win_prob"
+
+
+def test_projections_carry_the_player_id_the_sim_used():
+    """`layer2-row-parity`: the board's headshot is the player the sim PROJECTED,
+    so the id comes from the artifact's own join, not a second name match."""
+    pitcher = _index_with_pitcher().project(player_name="Paul Skenes", market="outs", line=18.5)
+    assert pitcher["player_id"] == "111", "pitcher ids are the pitcher_props key"
+    index = PropProjectionIndex()
+    index.ingest_game({"hitter_props_likelihood_topn": {"total_bases_2plus": [
+        {"name": "Seiya Suzuki", "batter_id": 673548, "p_tb_2plus": 0.51, "tb_mean": 1.6}
+    ]}})
+    hitter = index.project(player_name="Seiya Suzuki", market="batter_total_bases", line=1.5)
+    assert hitter["player_id"] == "673548"
+
+
+def test_a_name_with_two_ids_gets_no_player_id():
+    """Two players sharing a name on one slate: no face rather than the wrong one."""
+    index = PropProjectionIndex()
+    index.ingest_game({"hitter_props_likelihood_topn": {"hits_1plus": [
+        {"name": "Will Smith", "batter_id": 669257, "p_h_1plus": 0.6, "h_mean": 1.0},
+    ]}})
+    index.ingest_game({"hitter_props_likelihood_topn": {"hits_1plus": [
+        {"name": "Will Smith", "batter_id": 519293, "p_h_1plus": 0.6, "h_mean": 1.0},
+    ]}})
+    assert index.player_id("Will Smith") is None
+    assert "player_id" not in (index.project(player_name="Will Smith", market="batter_hits", line=0.5) or {})

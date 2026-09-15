@@ -377,23 +377,16 @@ def test_a_scoreboard_failure_leaves_the_board_stale_not_empty(monkeypatch):
     assert cards[0]["lane"] == "pregame"
 
 
-def test_only_tracked_markets_are_joined_and_the_rest_are_labelled():
-    """`#368`. The odds tracker keeps history for h2h/totals/spreads only.
-    Measured on the served board: event+market overlap 11 of 73, so joining
-    everything would light up a fifth of the column and leave the rest
-    indistinguishable from a bug.
+def test_no_market_is_labelled_untracked_any_more():
+    """`#368` restricted movement to h2h/totals/spreads because the odds-history
+    shard it read had no prop series. `#372` moved movement onto the opening
+    ledger, which records EVERY published row, and the restriction stayed behind:
+    on 2026-09-15 it labelled 2,119 of 2,959 served rows "not tracked" whose
+    openings existed (lane `layer2-row-parity`). The gate is gone, not widened."""
+    import syndicate.features.shared.layer2_board as l2b
 
-    EXACT match, not prefix -- `totals_alt` and `spreads_alt` begin with a
-    tracked name and are not tracked. `startswith` here would relabel 95 of 200
-    rows as "has history" and put the column straight back to looking broken.
-    """
-    from syndicate.features.shared.layer2_board import _movement_is_tracked
-
-    for tracked in ("h2h", "totals", "spreads", "H2H", " totals "):
-        assert _movement_is_tracked(tracked) is True
-    for untracked in ("totals_alt", "spreads_alt", "h2h_lay", "h2h_3_way",
-                      "batter_hits", "player_points", "", None):
-        assert _movement_is_tracked(untracked) is False, f"{untracked!r} has no history series"
+    assert not hasattr(l2b, "_movement_is_tracked")
+    assert not hasattr(l2b, "_MOVEMENT_TRACKED_MARKETS")
 
 
 def test_movement_is_built_from_the_history_shard():
@@ -420,16 +413,17 @@ def test_movement_is_built_from_the_history_shard():
     assert _line_movement_for_row({"event_id": "abc", "market": "totals"}, None) is None
 
 
-def test_an_untracked_row_is_labelled_even_when_history_is_unreadable():
-    """The label comes from the market name, not from a successful load, so a
-    shard outage cannot turn "not tracked" back into an unexplained dash."""
+def test_a_row_without_openings_says_so_whatever_its_market():
+    """Absence stays REPORTED (`#368`): a prop with no opening reads `no_openings`,
+    never a blank and never the old market-name "not tracked" label."""
     from syndicate.features.shared.layer2_board import layer2_rows_to_board_cards
 
     row = {"event_id": "e", "sport": "mlb", "market": "batter_hits", "side": "over",
            "kind": "prop", "ev_pct": 1.0, "home_team": "H", "away_team": "A",
            "quote": {"price": -110}, "score": {"score": 0.4}}
     card = layer2_rows_to_board_cards([row])[0]
-    assert card["movement_not_tracked"] is True
+    assert card["movement_state"] == "no_openings"
+    assert "movement_not_tracked" not in card
     assert "line_odds_movement" not in card
 
 

@@ -346,10 +346,9 @@
   // The alternative would be comparing each row's line against the consensus
   // for its event+market and calling the outliers alt -- which invents a fact
   // the feed already states, and gets it wrong the moment two books disagree on
-  // the main number. `_movement_is_tracked` in `layer2_board.py` makes the same
-  // distinction from the other side and warns about the same trap: `totals_alt`
-  // and `spreads_alt` START WITH a tracked market name, so a prefix test would
-  // sweep the main markets in with them. Suffix, not prefix.
+  // the main number. And the name test has its own trap: `totals_alt` and
+  // `spreads_alt` START WITH a main market name, so a prefix test would sweep
+  // the main markets in with them. Suffix, not prefix.
   // BET TYPE — the specific market, not the game/prop family `MARKET_TABS`
   // already covers. Labels only where the raw token is not self-explanatory;
   // anything unmapped is title-cased rather than hidden, so a market the feed
@@ -1283,84 +1282,189 @@
     return `${label} ${hasRange ? `${opening} → ${latest} ` : ""}${deltaText}`;
   }
 
-  // Line/odds movement: prefers line_odds_movement (opening/latest line AND
-  // opening/latest price, computed server-side from the market-features
-  // pipeline's own per-market history -- see build_market_history_view in
-  // odds_lifecycle.py) so line moves and odds/price moves are reported as
-  // two separate, explicit direction+amount values instead of one combined
-  // number. Falls back to the older fuzzy-matched `movement` object (from
-  // _enrich_candidates_with_odds_history) for candidates not yet routed
-  // through that pipeline, e.g. game-type candidates.
-  // Line movement is the most decision-relevant thing on a card and was
-  // the least visual: renderMovement already computes opening/latest, real
-  // direction and a real move count, then flattens all of it into one
-  // string. This draws the series it already has.
+  // ---- THE MOVEMENT CELL: one meaning for colour --------------------------
   //
-  // Prefers the PRICE series over the line series -- price is what closing
-  // line value is measured against, and a market can hold its number while
-  // the juice walks (the same blind spot price CLV exists to cover). Falls
-  // back to the line series, then to a two-point opening->latest series.
-  // American odds are NOT safe to plot directly: they are discontinuous
-  // across the +/-100 boundary. -100 and +100 are the same price, yet sit
-  // 200 apart numerically, so a trivial -105 -> +105 move would draw as a
-  // 210-unit spike while a real -200 -> -150 move looks small. Decimal
-  // odds are continuous and monotonic in payout across that boundary
-  // (-100 and +100 both map to 2.0), so the shape reflects the actual
-  // move. Higher stays better for the bettor, which keeps "up" meaningful.
-  function _americanToDecimal(price) {
-    if (price === null || price === 0) return null;
-    return price > 0 ? 1 + price / 100 : 1 + 100 / Math.abs(price);
+  // GREEN MEANS THE MARKET MOVED TOWARD THE PICK `[user decision, 2026-09-15]`:
+  // the market now prices this side as MORE likely -- its price shortened
+  // (-117 -> -131, +150 -> +120) or its line moved the pick's way. RED is the
+  // opposite. The arrow, the label, the sparkline and the tooltip all follow
+  // that one convention.
+  //
+  // What it replaced: "toward" used to mean a price that PAYS MORE, the
+  // sparkline plotted decimal odds (which also rise as a price lengthens), and
+  // the label printed `movement_price_delta` -- a raw difference of American
+  // numbers, so a -104 -> +104 move that barely changed the price read
+  // "Odds +208". That delta is a scoring unit, not a price anyone was offered,
+  // and it is no longer typeset.
+  //
+  // Layer 2 rows (`movement_state` present) are drawn ENTIRELY from backend
+  // fields. `movement_vs_pick` is THE direction and is never re-derived here:
+  // resolving a move against the bettor's side is the defect this area has
+  // paid for most, and it belongs in one place. Legacy rows (no
+  // `movement_state`) keep their own fallback, converted to the same meaning.
+
+  // American odds the way the Odds column shows them: a leading + on positives.
+  function _signedAmerican(price) {
+    return price > 0 ? `+${price}` : `${price}`;
   }
 
+  // `displayLine`'s rule: whole numbers keep one decimal (8 -> "8.0"), anything
+  // else passes through rather than being rounded into a line no book offers.
+  function _movementLineText(line) {
+    return Number.isInteger(line) ? line.toFixed(1) : String(line);
+  }
+
+  // Implied probability of an American price, for the LEGACY sparkline.
+  //
+  // American odds are not safe to plot directly: they are discontinuous across
+  // the +/-100 boundary (-100 and +100 are the same price, 200 apart
+  // numerically), so a trivial -105 -> +105 move would draw as a spike while a
+  // real -200 -> -150 move looks small. Implied probability is continuous there
+  // (both map to 0.5) AND it rises as the price SHORTENS, which is what makes a
+  // legacy line draw green exactly when the market moved toward the side --
+  // the meaning `movement_series` already carries for Layer 2 rows. It replaces
+  // a decimal-odds helper that had the continuity right but the direction
+  // backwards: decimal odds rise as a price lengthens.
+  function _americanToImpliedProbability(price) {
+    if (typeof price !== "number" || !Number.isFinite(price) || price === 0) return null;
+    return price < 0 ? Math.abs(price) / (Math.abs(price) + 100) : 100 / (price + 100);
+  }
+
+  // Direction of a price move on the implied-probability scale: "up" when the
+  // price shortened (toward the side), "down" when it lengthened.
+  function _impliedDirection(fromPrice, toPrice) {
+    const from = _americanToImpliedProbability(fromPrice);
+    const to = _americanToImpliedProbability(toPrice);
+    if (from === null || to === null || from === to) return "flat";
+    return to > from ? "up" : "down";
+  }
+
+  // Neutral on purpose. The old tooltip gave a cause -- "the odds tracker keeps
+  // line history for h2h, totals and spreads only" -- that stopped being the
+  // cause once Layer 2 took over movement. A tooltip stating a stale reason is
+  // worse than one stating only the fact.
+  function _movementNotTrackedHtml() {
+    return '<span class="board-blotter__muted" title="No price history is recorded for this row">Not tracked</span>';
+  }
+
+  // Local clock time for the sparkline caption; the date is added only when
+  // the series did not start today.
+  function _movementClock(value) {
+    const text = String(value ?? "").trim();
+    if (!text) return null;
+    const date = new Date(text);
+    if (Number.isNaN(date.getTime())) return null;
+    const sameDay = date.toDateString() === new Date().toDateString();
+    const options = sameDay
+      ? { hour: "numeric", minute: "2-digit" }
+      : { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" };
+    return new Intl.DateTimeFormat(undefined, options).format(date);
+  }
+
+  // The sparkline's data: points of shape `{ t, v }` where a RISING v means
+  // the market moved toward the pick, plus `oriented` -- whether up/down can
+  // honestly be coloured green/red at all.
+  //
+  // LAYER 2 rows draw ONLY from `movement_series`: pairs of
+  // [minutes_since_start, prob_bp], t in minutes so the x axis is time-scaled.
+  // Nothing here synthesises a line from `movement_price_from`/`_to`. Two
+  // endpoints joined by a straight segment draw a path the market never took,
+  // and a row with no published series has, by contract, fewer than two
+  // distinct values to show.
+  //
+  // LEGACY rows keep the old preference -- the PRICE series over the line
+  // series, because price is what closing line value is measured against and a
+  // market can hold its number while the juice walks -- but plot implied
+  // probability (t is null, so x is index-spaced). A LINE-only series has no
+  // orientation this fallback can resolve: whether a total rising is good for
+  // the row depends on its side. It is drawn with `oriented: false`, which the
+  // sparkline renders without a colour claim.
   function _movementSeries(item) {
+    if (String(item.movement_state || "").trim()) {
+      const raw = Array.isArray(item.movement_series) ? item.movement_series : [];
+      const points = [];
+      raw.forEach((pair) => {
+        if (!Array.isArray(pair)) return;
+        const t = numericValue(pair[0]);
+        const v = numericValue(pair[1]);
+        if (t !== null && v !== null) points.push({ t, v });
+      });
+      // The contract says time-ordered; first-versus-last decides the colour,
+      // so an out-of-order payload must not be able to flip it. Stable sort.
+      points.sort((a, b) => a.t - b.t);
+      return { points, oriented: true };
+    }
+    const indexed = (values, oriented) => ({ points: values.map((v) => ({ t: null, v })), oriented });
     const movement = item.movement && typeof item.movement === "object" ? item.movement : {};
     const history = Array.isArray(movement.history) ? movement.history : [];
     if (history.length > 1) {
-      const prices = history.map((entry) => numericValue(entry.odds ?? entry.last_odds)).filter((value) => value !== null);
-      if (prices.length > 1 && new Set(prices).size > 1) {
-        const decimals = prices.map(_americanToDecimal).filter((value) => value !== null);
-        if (decimals.length > 1 && new Set(decimals).size > 1) return decimals;
-      }
+      const probs = history
+        .map((entry) => _americanToImpliedProbability(numericValue(entry.odds ?? entry.last_odds)))
+        .filter((value) => value !== null);
+      if (probs.length > 1 && new Set(probs).size > 1) return indexed(probs, true);
       const lines = history.map((entry) => numericValue(entry.current_line)).filter((value) => value !== null);
-      if (lines.length > 1 && new Set(lines).size > 1) return lines;
+      if (lines.length > 1 && new Set(lines).size > 1) return indexed(lines, false);
     }
     const structured = item.line_odds_movement && typeof item.line_odds_movement === "object" ? item.line_odds_movement : null;
     if (structured) {
-      const openPrice = _americanToDecimal(numericValue(structured.opening_price));
-      const latestPrice = _americanToDecimal(numericValue(structured.latest_price));
-      if (openPrice !== null && latestPrice !== null && openPrice !== latestPrice) return [openPrice, latestPrice];
+      const openProb = _americanToImpliedProbability(numericValue(structured.opening_price));
+      const latestProb = _americanToImpliedProbability(numericValue(structured.latest_price));
+      if (openProb !== null && latestProb !== null && openProb !== latestProb) return indexed([openProb, latestProb], true);
       const openLine = numericValue(structured.opening_line);
       const latestLine = numericValue(structured.latest_line);
-      if (openLine !== null && latestLine !== null && openLine !== latestLine) return [openLine, latestLine];
+      if (openLine !== null && latestLine !== null && openLine !== latestLine) return indexed([openLine, latestLine], false);
     }
-    return [];
+    return { points: [], oriented: false };
+  }
+
+  // What the Layer 2 sparkline shows, in words -- the probability window it
+  // spans and on what basis. Empty for legacy rows, which carry no window.
+  function _movementSeriesCaption(item, values) {
+    if (!String(item.movement_state || "").trim() || values.length < 2) return "";
+    const first = (values[0] / 100).toFixed(1);
+    const last = (values[values.length - 1] / 100).toFixed(1);
+    const basis = String(item.movement_series_basis || "").trim().toLowerCase();
+    const basisText = basis === "fair" ? "no-vig fair" : basis === "price" ? "implied from one book's price" : "";
+    const since = _movementClock(item.movement_series_start);
+    return `Market probability for this pick${since ? ` since ${since}` : ""}: ${first}% → ${last}%${basisText ? ` (${basisText})` : ""}`;
   }
 
   function _movementSparkline(item) {
-    const series = _movementSeries(item);
+    const { points, oriented } = _movementSeries(item);
+    const values = points.map((point) => point.v);
     // A flat or single-point series has nothing to show; drawing a
     // straight line would imply movement that did not happen, which is the
     // exact mistake the "20 unchanged snapshots = 20 moves" bug made.
-    // _movementSeries already rejects flat series, but this is the function
-    // that decides to DRAW, so it re-checks rather than trusting its input.
-    if (series.length < 2 || new Set(series).size < 2) return "";
+    // _movementSeries does not guarantee distinct values, and this is the
+    // function that decides to DRAW, so it checks rather than trusting input.
+    if (values.length < 2 || new Set(values).size < 2) return "";
     const width = 58;
     const height = 16;
     const pad = 2;
-    const min = Math.min(...series);
-    const max = Math.max(...series);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
     const span = max - min || 1;
-    const stepX = (width - pad * 2) / (series.length - 1);
-    const points = series.map((value, index) => {
-      const x = pad + index * stepX;
+    // TIME-SCALED x when every point carries a time: a burst of quotes in the
+    // first ten minutes followed by hours of quiet must not draw as an even
+    // staircase. Index spacing is the fallback when there are no times (legacy)
+    // or every point shares one minute, where a time axis has zero width.
+    const timed = points.every((point) => point.t !== null);
+    const tMin = timed ? Math.min(...points.map((point) => point.t)) : 0;
+    const tSpan = timed ? Math.max(...points.map((point) => point.t)) - tMin : 0;
+    const innerWidth = width - pad * 2;
+    const coords = points.map((point, index) => {
+      const fraction = tSpan > 0 ? (point.t - tMin) / tSpan : index / (points.length - 1);
+      const x = pad + innerWidth * fraction;
       // Invert: SVG y grows downward, and a rising number should rise.
-      const y = pad + (height - pad * 2) * (1 - (value - min) / span);
+      const y = pad + (height - pad * 2) * (1 - (point.v - min) / span);
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     });
-    const rising = series[series.length - 1] > series[0];
-    const klass = rising ? "up" : "down";
-    const last = points[points.length - 1].split(",");
-    return `<svg class="board-sparkline board-sparkline--${klass}" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" aria-hidden="true" focusable="false"><polyline points="${points.join(" ")}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" /><circle cx="${last[0]}" cy="${last[1]}" r="1.9" fill="currentColor" /></svg>`;
+    const rising = values[values.length - 1] > values[0];
+    const klass = oriented ? (rising ? "up" : "down") : "flat";
+    const last = coords[coords.length - 1].split(",");
+    const caption = _movementSeriesCaption(item, values);
+    const titleTag = caption ? `<title>${escapeHtml(caption)}</title>` : "";
+    return `<svg class="board-sparkline board-sparkline--${klass}" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" aria-hidden="true" focusable="false">${titleTag}<polyline points="${coords.join(" ")}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" /><circle cx="${last[0]}" cy="${last[1]}" r="1.9" fill="currentColor" /></svg>`;
   }
 
   function renderMovement(item) {
@@ -1379,7 +1483,8 @@
     // a fallback for any row not yet routed through that function.
     const state = String(item.movement_state || "").trim().toLowerCase();
     if (state === "not_tracked") {
-      return '<span class="board-blotter__muted" title="The odds tracker keeps line history for h2h, totals and spreads only — this market has no series to move">Not tracked</span>';
+      // Layer 2 no longer emits this state; rows from other pipelines still can.
+      return _movementNotTrackedHtml();
     }
     if (state === "no_opening_for_row" || state === "no_openings" || state === "unkeyable") {
       return '<span class="board-blotter__muted" title="This row has no matching opening price recorded yet — check back after the next capture cycle">No opening recorded</span>';
@@ -1388,32 +1493,49 @@
       return '<span class="board-blotter__muted" title="The line moved since we published this row, so the price at open and now are not the same bet">No comparable price</span>';
     }
     if (state === "tracked" || state === "flat") {
-      const priceDelta = numericValue(item.movement_price_delta);
-      const lineDelta = numericValue(item.movement_line_delta);
+      // THE LABEL IS THE TWO PRICES (and/or the two lines) the move was
+      // measured on -- never `movement_price_delta`, which is a scoring unit
+      // (see the block comment above `_signedAmerican`).
+      const priceFrom = numericValue(item.movement_price_from);
+      const priceTo = numericValue(item.movement_price_to);
+      const lineFrom = numericValue(item.movement_line_from);
+      const lineTo = numericValue(item.movement_line_to);
       const parts = [];
-      if (priceDelta !== null && priceDelta !== 0) {
-        parts.push(`Odds ${priceDelta > 0 ? "+" : ""}${priceDelta}`);
+      if (priceFrom !== null && priceTo !== null && priceFrom !== priceTo) {
+        parts.push(`Odds ${_signedAmerican(priceFrom)} → ${_signedAmerican(priceTo)}`);
       }
-      if (lineDelta !== null && lineDelta !== 0) {
-        parts.push(`Line ${lineDelta > 0 ? "+" : ""}${lineDelta}`);
+      if (lineFrom !== null && lineTo !== null && lineFrom !== lineTo) {
+        parts.push(`Line ${_movementLineText(lineFrom)} → ${_movementLineText(lineTo)}`);
       }
       const label = parts.length ? parts.join(" · ") : "Flat";
-      // `movement_direction` covers price; `movement_line_direction` is the
-      // fallback for a line-only move (spreads/totals with no comparable
-      // price -- see `movement_basis === "line_moved"`). "toward"/"against"
-      // are already resolved against the BETTOR's side server-side (that
-      // resolution, done wrong once, is the single defect this repo has
-      // paid for the most in this area -- see `_movement_from_opening`'s
-      // own comment) -- map straight to the existing up/down arrow classes
-      // rather than re-deriving anything client-side.
-      const direction = item.movement_direction || item.movement_line_direction || "flat";
-      const arrowDir = direction === "toward" ? "up" : direction === "against" ? "down" : "flat";
+      // `movement_vs_pick` is resolved server-side against the pick's side and
+      // mapped straight onto the arrow classes. A "Flat" label always gets the
+      // flat arrow: a green ▲ beside the word Flat would be the cell
+      // contradicting itself, whatever the backend's verdict field says.
+      const vsPick = String(item.movement_vs_pick || "").trim().toLowerCase();
+      const arrowDir = !parts.length ? "flat" : vsPick === "toward" ? "up" : vsPick === "away" ? "down" : "flat";
       const sinceAgo = formatRelativeTime(item.movement_opened_at);
       const agoText = sinceAgo ? ` · ${sinceAgo}` : "";
+      // Tooltip only: the backend's working, which the visible label keeps out
+      // of the way.
+      const tip = [];
+      if (vsPick === "toward") tip.push("Market moved toward the pick (it now prices this side as more likely)");
+      else if (vsPick === "away") tip.push("Market moved away from the pick");
+      else if (vsPick === "flat") tip.push("No net move for the pick");
+      else tip.push("Direction versus the pick is unknown");
+      const probDelta = numericValue(item.movement_prob_delta_pp);
+      if (probDelta !== null) tip.push(`${probDelta > 0 ? "+" : ""}${probDelta.toFixed(1)} pts implied`);
+      const basis = String(item.movement_basis || "").trim().toLowerCase();
+      const book = String(item.movement_book || "").trim();
+      if (basis === "same_book") tip.push(book ? `Same book: ${book}` : "Same book");
+      else if (basis === "best_of_n") tip.push("Best price across books (the quoting book can change)");
+      else if (basis === "line_moved") tip.push("Line moved, so the prices are not the same bet");
+      const caption = _movementSeriesCaption(item, _movementSeries(item).points.map((point) => point.v));
+      if (caption && sparkline) tip.push(caption);
       // The steam BADGE (renderCard's own badges row, "⚡ Steam") already
       // covers `item.steam` once isSteamCandidate() reads it -- see below.
       // No second indicator here; this line stays the plain movement fact.
-      return `<span class="board-card__movement-arrow--${arrowDir}">${_movementArrow(arrowDir)}</span> ${escapeHtml(label)}${escapeHtml(agoText)}${sparkline}`;
+      return `<span class="board-card__movement-arrow--${arrowDir}">${_movementArrow(arrowDir)}</span> <span title="${escapeHtml(tip.join(" · "))}">${escapeHtml(label)}${escapeHtml(agoText)}</span>${sparkline}`;
     }
 
     // Fallback below: legacy shapes, for any row this session's audit did
@@ -1422,21 +1544,29 @@
     // #368: "we do not measure this" is a different answer from "it has not
     // moved", and both used to render an identical bare dash -- which is why
     // the whole Movement column read as broken rather than as partly unmeasured.
-    // The odds tracker keeps history for h2h/totals/spreads only; alt lines,
-    // lay markets and every prop family have no series at all. Checked BEFORE
-    // `structured`, so a row can never be labelled untracked while holding real
-    // movement.
+    // Checked BEFORE `structured`, so a row can never be labelled untracked
+    // while holding real movement.
     if (!structured && item.movement_not_tracked) {
-      return '<span class="board-blotter__muted" title="The odds tracker keeps line history for h2h, totals and spreads only — this market has no series to move">Not tracked</span>';
+      return _movementNotTrackedHtml();
     }
     if (structured) {
       const lineDelta = numericValue(structured.line_delta);
-      const priceDelta = numericValue(structured.price_delta);
       const lineText = _formatMovementSegment("Line", numericValue(structured.opening_line), numericValue(structured.latest_line), lineDelta);
-      const priceText = _formatMovementSegment("Odds", numericValue(structured.opening_price), numericValue(structured.latest_price), priceDelta);
+      // Odds as the two prices, never `price_delta`: the same scoring-unit
+      // trap as the Layer 2 branch (-104 -> +104 is "208" wide).
+      const openPrice = numericValue(structured.opening_price);
+      const latestPrice = numericValue(structured.latest_price);
+      const priceText = openPrice !== null && latestPrice !== null && openPrice !== latestPrice
+        ? `Odds ${_signedAmerican(openPrice)} → ${_signedAmerican(latestPrice)}`
+        : null;
       const segments = [lineText, priceText].filter(Boolean);
       if (segments.length) {
-        const primaryDirection = lineText ? structured.line_direction : structured.price_direction;
+        // A line move keeps the server's `line_direction`. With the line
+        // unchanged the arrow follows the PRICE on the implied-probability
+        // scale the sparkline draws. NOT `price_direction`: that is the sign of
+        // latest - opening in American odds, which calls a shortening
+        // -117 -> -131 "negative" -- red beside a green line.
+        const primaryDirection = lineText ? structured.line_direction : _impliedDirection(openPrice, latestPrice);
         return `<span class="board-card__movement-arrow--${_movementArrowClass(primaryDirection)}">${_movementArrow(primaryDirection)}</span> ${escapeHtml(segments.join(" · "))}${sparkline}`;
       }
     }
@@ -1444,7 +1574,10 @@
     const trend = String(movement.trend || "flat").toLowerCase();
     const delta = numericValue(movement.delta);
     const history = Array.isArray(movement.history) ? movement.history : [];
-    const arrow = trend === "up" ? "▲" : trend === "down" ? "▼" : "→";
+    // `trend` is the LINE's trend. When the line did not move, the arrow is
+    // re-pointed below at the price's implied-probability direction, so a
+    // price-only move is not a flat → beside a coloured sparkline.
+    let arrowDir = trend === "up" ? "up" : trend === "down" ? "down" : "flat";
     const parts = [];
     if (delta !== null && delta !== 0) {
       parts.push(`${delta > 0 ? "+" : ""}${delta.toFixed(2)}`);
@@ -1467,8 +1600,9 @@
       const firstOdds = numericValue(firstEntry.odds ?? firstEntry.last_odds);
       const lastOdds = numericValue(lastEntry.odds ?? lastEntry.last_odds);
       if (firstOdds !== null && lastOdds !== null && firstOdds !== lastOdds && !parts.some((part) => part.startsWith("Odds"))) {
-        parts.push(`Odds ${firstOdds > 0 ? "+" : ""}${firstOdds} → ${lastOdds > 0 ? "+" : ""}${lastOdds}`);
+        parts.push(`Odds ${_signedAmerican(firstOdds)} → ${_signedAmerican(lastOdds)}`);
       }
+      if (arrowDir === "flat") arrowDir = _impliedDirection(firstOdds, lastOdds);
       let realMoveCount = 0;
       for (let i = 1; i < history.length; i += 1) {
         const prevEntry = history[i - 1] || {};
@@ -1490,7 +1624,7 @@
     if (!parts.length) {
       return null;
     }
-    return `<span class="board-card__movement-arrow--${trend === "up" ? "up" : trend === "down" ? "down" : "flat"}">${arrow}</span> ${escapeHtml(parts.join(" · "))}${sparkline}`;
+    return `<span class="board-card__movement-arrow--${arrowDir}">${_movementArrow(arrowDir)}</span> ${escapeHtml(parts.join(" · "))}${sparkline}`;
   }
 
   function edgeValue(item) {

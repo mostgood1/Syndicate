@@ -205,9 +205,9 @@ const isAltLine = (item) => altApi.isAltLine(item);
 console.log('\n--- an alt line is named by its MARKET, not guessed from its number ---');
 eq('totals_alt is alt', isAltLine({ market: 'totals_alt' }), true);
 eq('spreads_alt is alt', isAltLine({ market: 'spreads_alt' }), true);
-// The trap `layer2_board._movement_is_tracked` documents from the other side:
-// `totals_alt` STARTS WITH `totals`, so a prefix test sweeps the main market in
-// with the alts and "Main lines only" would show nothing at all.
+// The trap every market-name test shares: `totals_alt` STARTS WITH `totals`, so
+// a prefix test sweeps the main market in with the alts and "Main lines only"
+// would show nothing at all.
 eq('totals is NOT alt (a prefix test would get this wrong)', isAltLine({ market: 'totals' }), false);
 eq('spreads is NOT alt', isAltLine({ market: 'spreads' }), false);
 eq('h2h is NOT alt', isAltLine({ market: 'h2h' }), false);

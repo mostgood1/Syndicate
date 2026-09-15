@@ -85,7 +85,9 @@ from syndicate.features.shared.opportunity_signals import (
     devig,
     expected_value_pct,
     hold_pct,
+    implied_probability,
 )
+from syndicate.features.shared.clv_price_trail import price_trail_series, row_trail_point
 from syndicate.features.shared.probability_refusal import refuse_published_certainty
 from syndicate.features.shared.sharp_books import EXCHANGE_ANCHOR_PRIORITY, SHARP_ANCHOR_PRIORITY
 
@@ -3378,6 +3380,8 @@ def _segment_label(segment: Any, sport: Any = None) -> str | None:
 def layer2_rows_to_board_cards(
     rows: Iterable[Mapping[str, Any]],
     openings: Mapping[str, Mapping[str, Any]] | None = None,
+    price_trail: Mapping[str, Any] | None = None,
+    row_context: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Translate L2-A rows into the shape the board card normaliser expects.
 
@@ -3403,13 +3407,16 @@ def layer2_rows_to_board_cards(
     (ev, sim, book confidence, freshness, price reliability) rather than being
     asked to trust one opaque number.
     """
+    # `price_trail` and `row_context` (lane `layer2-row-parity`) are loaded once
+    # per build by the caller, like `openings`: the trail draws the sparkline, the
+    # context carries the MLB write-ups and NFL ids behind `headshot_url` and
+    # `detail`. Both optional -- a caller passing neither gets the card it always did.
+    #
+    # Imported here, not at module top: `layer2_row_context` imports helpers FROM
+    # this module, so a top-level import would be circular.
+    from syndicate.features.shared.layer2_row_context import row_explainer, row_identity
+
     cards: list[dict[str, Any]] = []
-    # `#368`: one odds-history shard per (sport, date), loaded lazily and only
-    # for rows whose market is actually tracked. The MLB shard is ~20MB, so
-    # loading it per row -- or for a board of nothing but props -- would be a
-    # real cost for no data. This runs worker-side inside the shortlist build,
-    # never in a request path.
-    history_cache: dict[tuple[str, str], Any] = {}
     for row in rows or ():
         if not isinstance(row, Mapping):
             continue
@@ -3509,7 +3516,12 @@ def layer2_rows_to_board_cards(
                 "segment_label": _segment_label(row.get("segment"), sport),
                 **_layer2_board_columns(row, quote, score),
                 **(row.get("movement") if isinstance(row.get("movement"), Mapping) else _movement_from_opening(row, openings)),
+                **_movement_series_columns(row, price_trail),
                 **_live_projection_columns(row),
+                # `layer2-row-parity`: the face and the sentence the legacy rows
+                # had, built from THIS row's own numbers.
+                **row_identity(row, row_context),
+                "detail": row_explainer(row, quote, row_context),
             }
         )
     return cards
@@ -3517,6 +3529,92 @@ def layer2_rows_to_board_cards(
 
 _STEAM_PRICE_POINTS = 15.0    # American-odds move that counts as sharp
 _STEAM_WINDOW_SECONDS = 3 * 3600
+
+
+def _american_cents(price: Any) -> float | None:
+    """American odds on a CONTINUOUS scale, where -100 and +100 are both 0.
+
+    Raw American odds jump by 200 at even money: -100 and +100 are the SAME
+    price, so differencing the raw numbers turns -104 -> +104, an 8-cent move,
+    into "+208". Measured on the served board 2026-09-15 15:25Z: 59 of 651
+    priced Layer 2 rows straddled even money, every one scored at the movement
+    cap, and the board's only Layer 2 steam flag was one of them.
+
+    Shifting each sign toward zero by 100 makes the scale continuous without
+    changing it anywhere else: -125 -> -105 is still 20 and +150 -> +170 is still
+    20, so `_SCORE_MOVEMENT_WEIGHT` and `_STEAM_PRICE_POINTS`, both tuned in
+    American points, keep their meaning. A price strictly between -100 and +100
+    is not a valid American price and returns None.
+    """
+    value = _as_float(price)
+    if value is None:
+        return None
+    if value >= 100.0:
+        return value - 100.0
+    if value <= -100.0:
+        return value + 100.0
+    return None
+
+
+def _american_cents_delta(price_from: Any, price_to: Any) -> float | None:
+    start = _american_cents(price_from)
+    end = _american_cents(price_to)
+    if start is None or end is None:
+        return None
+    return round(end - start, 2)
+
+
+def _signed_american(price: Any) -> str:
+    value = _as_float(price)
+    if value is None:
+        return "?"
+    rounded = int(round(value))
+    return f"+{rounded}" if rounded > 0 else str(rounded)
+
+
+def _line_move_vs_pick(side: str, line_delta: Any) -> str:
+    """Did a LINE move go the pick's way? The market's view, not the bettor's.
+
+    A total rising means the market expects more (toward an over). A handicap
+    falling (home -1.5 -> -2.5, away +3.5 -> +2.5) means the market likes that
+    side more. A row's `line` is always its OWN side's number, which is what
+    makes one rule per side enough.
+    """
+    delta = _as_float(line_delta)
+    if not delta:
+        return "flat"
+    if side == "over":
+        return "toward" if delta > 0 else "away"
+    if side == "under":
+        return "toward" if delta < 0 else "away"
+    if side in {"home", "away"}:
+        return "toward" if delta < 0 else "away"
+    return "unknown"
+
+
+def _movement_series_columns(row: Mapping[str, Any], price_trail: Mapping[str, Any] | None) -> dict[str, Any]:
+    """The card's sparkline, from the price trail loaded once per build. No IO.
+
+    Built here and NOT inside `_movement_from_opening`, deliberately: that
+    function's output is stamped on the shortlist ROWS as well as the cards, and
+    both are persisted under the keyvalue ceiling (`[layer2-board-keyvalue-ceiling]`).
+    The series is display-only, so it rides the card alone instead of being
+    stored twice.
+    """
+    if not price_trail:
+        return {}
+    key = movement_join_key(row)
+    if not key:
+        return {}
+    quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
+    epoch = int(datetime.now(timezone.utc).timestamp())
+    series = price_trail_series(
+        price_trail.get(key) or (),
+        line=row.get("line"),
+        book=quote.get("bookmaker"),
+        current=row_trail_point(row, epoch=epoch),
+    )
+    return series or {}
 
 
 def movement_join_key(row: Mapping[str, Any]) -> str | None:
@@ -3626,9 +3724,15 @@ def _movement_from_opening(
     "no opening recorded" (this row is new, or the ledger was off) from
     "flat" (recorded and unchanged). `#368` exists because those two rendered
     identically as a bare dash and the whole column read as broken.
+
+    EVERY MARKET, NOT THREE (lane `layer2-row-parity`, 2026-09-15). This used to
+    return `not_tracked` for anything but h2h/totals/spreads -- a rule carried
+    over from the odds-history shard `#368` read, whose props had no series.
+    THIS function reads the opening ledger, which records every row the board
+    publishes, props included (9,643 openings on 2026-09-15; MLB batter_hits 906,
+    strikeouts 203). The gate had put "Not tracked" on 2,119 of 2,959 served rows
+    that had an opening all along.
     """
-    if not _movement_is_tracked(row.get("market")):
-        return {"movement_not_tracked": True, "movement_state": "not_tracked"}
     if not openings:
         return {"movement_state": "no_openings"}
     key = movement_join_key(row)
@@ -3687,6 +3791,7 @@ def _movement_from_opening(
     book = str(quote.get("bookmaker") or "").strip().lower()
     same_book_open = _as_float((open_books or {}).get(book))
     same_book_now = _as_float((now_books or {}).get(book)) if now_books else now_price
+    price_from = price_to = None
     if not lines_comparable:
         # Deliberately no `movement_price_delta` at all, rather than a value
         # with a caveat attached. A number in that field feeds the score and
@@ -3694,15 +3799,34 @@ def _movement_from_opening(
         # either of them reading it.
         out["movement_basis"] = "line_moved"
     elif same_book_open is not None and same_book_now is not None:
-        out["movement_price_delta"] = round(same_book_now - same_book_open, 2)
+        price_from, price_to = same_book_open, same_book_now
         out["movement_basis"] = "same_book"
         out["movement_book"] = book
     elif open_price is not None and now_price is not None:
-        out["movement_price_delta"] = round(now_price - open_price, 2)
+        price_from, price_to = open_price, now_price
         out["movement_basis"] = "best_of_n"
+
+    # THE DELTA IS IN CENTS, NOT RAW AMERICAN POINTS (lane `layer2-row-parity`).
+    # See `_american_cents`: -104 -> +104 was published as "+208", scored at the
+    # movement cap and fired the board's only Layer 2 steam flag, for an 8-cent
+    # move. Within one sign nothing changes (-125 -> -105 is still 20), which is
+    # what keeps the score's movement weight and the steam threshold meaning
+    # what they were tuned to mean.
+    cents_delta = _american_cents_delta(price_from, price_to)
+    if cents_delta is not None:
+        out["movement_price_delta"] = cents_delta
+        out["movement_price_from"] = price_from
+        out["movement_price_to"] = price_to
+        prob_from = implied_probability(price_from)
+        prob_to = implied_probability(price_to)
+        if prob_from is not None and prob_to is not None:
+            out["movement_prob_delta_pp"] = round((prob_to - prob_from) * 100.0, 2)
 
     if open_line is not None and now_line is not None:
         out["movement_line_delta"] = round(now_line - open_line, 2)
+        if abs(now_line - open_line) >= 1e-9:
+            out["movement_line_from"] = open_line
+            out["movement_line_to"] = now_line
 
     delta = out.get("movement_price_delta")
     line_delta = out.get("movement_line_delta")
@@ -3710,41 +3834,33 @@ def _movement_from_opening(
         out["movement_state"] = "no_comparable_price"
         return out
 
-    # DIRECTION IS ABOUT THE BETTOR, AND THE TWO INPUTS DISAGREE ABOUT HOW.
+    # TOWARD THE PICK OR AWAY FROM IT: ONE VERDICT, AND IT IS THE MARKET'S
+    # (user decision 2026-09-15 -- green on the board means the market moved
+    # toward the pick). "Toward" means the market now rates this side MORE
+    # likely: its price shortened, or its line moved the pick's way.
     #
-    # PRICE is unambiguous: a larger American number always pays more, in both
-    # signs. -125 -> -105 is +20 and is better; that needs no knowledge of the
-    # side.
-    #
-    # LINE IS SIDE-DEPENDENT AND GETTING IT WRONG IS THE DEFECT THIS REPO HAS
-    # PAID FOR MOST. A total moving 9.0 -> 8.5 is FAVOURABLE to an over and
-    # hostile to an under; the first version of this function called it
-    # "against" for both, because it compared the raw delta and never read
-    # `side`. Same family as the spread-sign lane, whose whole finding was a
-    # sign attached to the wrong perspective.
-    #
-    # So the two are reported SEPARATELY rather than reduced to one verdict,
-    # and the line verdict is only emitted for sides whose preference is known.
+    # This REPLACES `movement_direction` / `movement_line_direction`, which took
+    # the BETTOR's view (a longer price was "toward") and disagreed with each
+    # other: the line half called home -1.5 -> -2.5 favourable, a worse number
+    # for anyone holding home -1.5. Price and line cannot both speak on one row
+    # -- a moved line withholds the price delta above -- so one field suffices
+    # and cannot contradict itself.
     side = str(row.get("side") or "").strip().lower()
-    if delta:
-        out["movement_direction"] = "toward" if delta > 0 else "against"
-    if line_delta:
-        prefers_lower = side in {"over", "home", "away"}
-        prefers_higher = side == "under"
-        if prefers_lower or prefers_higher:
-            favourable = (line_delta < 0) if prefers_lower else (line_delta > 0)
-            out["movement_line_direction"] = "toward" if favourable else "against"
-        else:
-            # h2h and anything else has no line to have a direction about.
-            out["movement_line_direction"] = "unknown_side"
     if not delta and not line_delta:
         out["movement_state"] = "flat"
-        out["movement_direction"] = "flat"
-    moved = bool(delta or line_delta)
+        out["movement_vs_pick"] = "flat"
+    elif not lines_comparable:
+        out["movement_vs_pick"] = _line_move_vs_pick(side, line_delta)
+    else:
+        prob_delta = out.get("movement_prob_delta_pp") or 0.0
+        out["movement_vs_pick"] = "toward" if prob_delta > 0 else ("away" if prob_delta < 0 else "flat")
 
-    # STEAM: a sharp move in a short window. Both halves are required -- a 30
-    # point drift over eight hours is not steam, and this is the distinction
-    # the old implementation never made because it had no clock.
+    # STEAM: a sharp move in a short window, AT ONE BOOK. Both clock halves are
+    # required -- a 30 point drift over eight hours is not steam, and this is
+    # the distinction the old implementation never made because it had no
+    # clock. And the move must be SAME-BOOK: a best-of-N delta can be a change
+    # of hands rather than of price. The only Layer 2 steam flag on 2026-09-15
+    # was -102 at betmgm against +113 at kalshi.
     age = None
     opened_at = str(opened.get("captured_at") or "")
     if opened_at:
@@ -3761,10 +3877,11 @@ def _movement_from_opening(
         and abs(delta) >= _STEAM_PRICE_POINTS
         and age is not None
         and age <= _STEAM_WINDOW_SECONDS
+        and out.get("movement_basis") == "same_book"
     ):
         out["steam"] = True
         out["steam_reason"] = (
-            f"{'+' if delta > 0 else ''}{delta:.0f} at {book or 'best book'} "
+            f"{_signed_american(price_from)} → {_signed_american(price_to)} at {book} "
             f"in {age / 60:.0f} min since we published it"
         )
     return out
@@ -3793,35 +3910,16 @@ def _layer2_movement_columns(row: Mapping[str, Any], cache: dict[tuple[str, str]
     lazy load is still a 20MB synchronous read the first time a tracked market
     appears, which is every MLB slate.
 
-    The "Not tracked" labelling in `_layer2_board_columns` is KEPT: it is a
-    string derived from the market name, does no IO, and is most of what made
-    the column legible (179 of 200 rows).
+    The "Not tracked" label this docstring once kept (a market-name rule, h2h /
+    totals / spreads only) is GONE as of lane `layer2-row-parity`, 2026-09-15:
+    movement now reads the opening ledger, which records props too, and the rule
+    had put "Not tracked" on 2,119 of 2,959 served rows that had openings.
 
     Re-landing this belongs where the odds tracker already holds the data, not
     in a per-build read of a multi-megabyte artifact.
     """
     return {}
     return {"line_odds_movement": movement} if movement else {}
-
-
-# The markets `odds_control_plane` actually tracks history for. Measured against
-# the live MLB shard 2026-08-11: 3,634 market keys covering 16 events, and only
-# these three carry a per-event series (15 events each). The board's other eleven
-# market types -- `h2h_lay`, `totals_alt`, `spreads_alt` and the prop families --
-# have NO history rows at all.
-#
-# Overlap on the served board: event 10 of 19, event+market **11 of 73**. So a
-# join that simply tried every row would light up about a fifth of the column and
-# leave the rest indistinguishable from a bug. Restricting it, and SAYING SO on
-# the rows outside it, is the difference between "no data" and "not measured".
-_MOVEMENT_TRACKED_MARKETS = ("h2h", "totals", "spreads")
-
-
-def _movement_is_tracked(market: Any) -> bool:
-    # Exact match, not prefix: `totals_alt` and `spreads_alt` start with a tracked
-    # name and are NOT tracked, so `startswith` here would relabel eleven of them
-    # as "has history" and put the column straight back to looking broken.
-    return str(market or "").strip().lower() in _MOVEMENT_TRACKED_MARKETS
 
 
 def _movement_shard_keys(commence_time: Any) -> tuple[str, ...]:
@@ -4231,12 +4329,11 @@ def _layer2_board_columns(
     if book_age is not None:
         columns["book_age_seconds"] = book_age
 
-    # `#368`: say WHICH kind of empty this is. A market with no history and a
-    # market whose history simply has not moved both rendered a bare dash, and
-    # the first is "we do not measure this" while the second is "it is flat".
-    # Conflating them is what made the whole column read as broken.
-    if not _movement_is_tracked(row.get("market")):
-        columns["movement_not_tracked"] = True
+    # `#368`'s "which kind of empty" is now said by `movement_state` alone
+    # (`no_openings` / `no_opening_for_row` / `flat`). The market-name
+    # `movement_not_tracked` flag set here was removed with the tracked-market gate
+    # (lane `layer2-row-parity`): it labelled props "not tracked" while the opening
+    # ledger held their openings.
     return columns
 
 

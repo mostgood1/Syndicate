@@ -338,6 +338,11 @@ class PropProjectionIndex:
         self._hitter_names_at: int = -1
         # (away_tri, home_tri) -> {segment_payload_name: payload}
         self._games: dict[tuple[str, str], dict[str, Any]] = {}
+        # normalised name -> MLBAM id, for the board's headshots (lane
+        # `layer2-row-parity`). Pitchers from the `pitcher_props` KEY, hitters
+        # from the row's own `batter_id` -- both already in the artifact, so this
+        # is the join the sim already made, not a second name match.
+        self._player_ids: dict[str, str] = {}
         self.games = 0
 
     # -- build ----------------------------------------------------------
@@ -376,6 +381,7 @@ class PropProjectionIndex:
             if not name:
                 continue
             self._pitchers[name] = dict(payload)
+            self._remember_player_id(name, pitcher_id)
 
         for bucket_name, rows in (game.get("hitter_props_likelihood_topn") or {}).items():
             if not isinstance(rows, list):
@@ -387,6 +393,7 @@ class PropProjectionIndex:
                 if not name:
                     continue
                 self._hitters[(name, str(bucket_name))] = dict(row)
+                self._remember_player_id(name, row.get("batter_id"))
                 means = self._hitter_means.setdefault(name, {})
                 for key, value in row.items():
                     if isinstance(key, str) and key.endswith("_mean"):
@@ -402,6 +409,24 @@ class PropProjectionIndex:
             name = _norm_name(row.get("name"))
             if name:
                 self._hitters[(name, "hr_1plus")] = dict(row)
+                self._remember_player_id(name, row.get("batter_id"))
+
+    def _remember_player_id(self, name: str, player_id: Any) -> None:
+        # First id wins. A name the sim saw twice with DIFFERENT ids (two players
+        # sharing a name on one slate) keeps the first rather than flipping per
+        # game, and is dropped entirely below -- a wrong face is worse than none.
+        text = str(player_id or "").strip()
+        if not text or not text.isdigit():
+            return
+        known = self._player_ids.get(name)
+        if known is None:
+            self._player_ids[name] = text
+        elif known != text:
+            self._player_ids[name] = ""
+
+    def player_id(self, player_name: Any) -> str | None:
+        """MLBAM id for a name the sim projected, or None when absent or ambiguous."""
+        return self._player_ids.get(_norm_name(player_name)) or None
 
     def _derived_hrr_mean(self, name: str) -> float | None:
         """Hits + Runs + RBIs, summed from the components the sim DOES write.
@@ -510,9 +535,16 @@ class PropProjectionIndex:
         rather than in each producer** because there are four of them and a
         refusal in one caught 1 of 17 certainties on a real board.
         """
-        return _refuse_published_certainty(
+        result = _refuse_published_certainty(
             self._project_uncensored(player_name=player_name, market=market, line=line)
         )
+        if isinstance(result, dict):
+            # Carried on the projection so the board card can show a headshot
+            # for exactly the player the sim projected (lane `layer2-row-parity`).
+            player_id = self.player_id(player_name)
+            if player_id:
+                result = {**result, "player_id": player_id}
+        return result
 
     def _project_uncensored(self, *, player_name: Any, market: Any, line: Any) -> dict[str, Any] | None:
         """Projection + modelled P(over) for one market line, or None.

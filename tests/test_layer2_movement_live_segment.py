@@ -137,37 +137,55 @@ def test_movement_does_no_io(monkeypatch):
 def test_absence_is_reported_never_blank():
     """`#368` exists because 'we do not track this' and 'it has not moved'
     rendered identically as a dash and the column read as broken."""
-    assert _movement_from_opening({"market": "batter_rbis"}, {})["movement_state"] == "not_tracked"
     assert _movement_from_opening({"market": "totals"}, None)["movement_state"] == "no_openings"
     row = _row()
     assert _movement_from_opening(row, {"other": {}})["movement_state"] == "no_opening_for_row"
     assert _movement_from_opening(row, _openings(row))["movement_state"] == "flat"
 
 
+def test_props_are_measured_not_labelled_untracked():
+    """`layer2-row-parity`: the h2h/totals/spreads-only gate put "Not tracked" on
+    2,119 of 2,959 served rows (2026-09-15) whose openings the ledger already held."""
+    row = _row(market="strikeouts", player_name="Sean Manaea", line=6.5)
+    got = _movement_from_opening(row, _openings(row, price=-120, line=6.5, books={"draftkings": -120}))
+    assert got["movement_state"] == "tracked"
+    assert "movement_not_tracked" not in got
+
+
 # --------------------------------------------------------------------------
-# Direction. The line half is SIDE-DEPENDENT and the first version got it wrong.
+# Direction is TOWARD or AWAY FROM THE PICK (user decision 2026-09-15: green on
+# the board means the market moved toward the pick).
 # --------------------------------------------------------------------------
 
 
-def test_price_direction_is_side_independent():
-    """A larger American number always pays more, in both signs."""
-    row = _row(market="h2h", side="home", line=None)
-    got = _movement_from_opening(row, _openings(row, price=-125, line=None, books={"draftkings": -125}))
-    assert got["movement_price_delta"] == 20.0
-    assert got["movement_direction"] == "toward"
+def test_a_shortening_price_is_toward_the_pick_whatever_its_sign():
+    row = _row(market="h2h", side="home", line=None)  # published now at -105
+    longer = _movement_from_opening(row, _openings(row, price=-125, line=None, books={"draftkings": -125}))
+    assert longer["movement_price_delta"] == 20.0
+    assert longer["movement_vs_pick"] == "away", "-125 -> -105: the market likes this side LESS"
+    assert longer["movement_prob_delta_pp"] < 0
+    assert (longer["movement_price_from"], longer["movement_price_to"]) == (-125.0, -105.0)
+    shorter = _movement_from_opening(row, _openings(row, price=105, line=None, books={"draftkings": 105}))
+    assert shorter["movement_vs_pick"] == "toward", "+105 -> -105 shortened across even money"
+    assert "movement_direction" not in longer and "movement_line_direction" not in longer
 
 
-def test_line_direction_is_side_aware():
-    """9.0 -> 8.5 is FAVOURABLE to an over and hostile to an under. The first
-    version compared the raw delta and called both 'against'."""
-    over = _row(side="over", line=8.5)
-    under = _row(side="under", line=8.5)
-    assert _movement_from_opening(over, _openings(over, line=9.0))["movement_line_direction"] == "toward"
-    assert _movement_from_opening(under, _openings(under, line=9.0))["movement_line_direction"] == "against"
-    over_up = _row(side="over", line=9.0)
-    under_up = _row(side="under", line=9.0)
-    assert _movement_from_opening(over_up, _openings(over_up, line=8.5))["movement_line_direction"] == "against"
-    assert _movement_from_opening(under_up, _openings(under_up, line=8.5))["movement_line_direction"] == "toward"
+def test_a_line_move_is_judged_from_the_pick_side():
+    """A total rising is the market leaning OVER; a handicap falling is the market
+    leaning to that side. The old bettor-view field called home -1.5 -> -2.5
+    favourable, which is a WORSE number for anyone holding -1.5."""
+    over = _row(side="over", line=9.0)
+    under = _row(side="under", line=9.0)
+    assert _movement_from_opening(over, _openings(over, line=8.5))["movement_vs_pick"] == "toward"
+    assert _movement_from_opening(under, _openings(under, line=8.5))["movement_vs_pick"] == "away"
+    over_down = _row(side="over", line=8.5)
+    moved = _movement_from_opening(over_down, _openings(over_down, line=9.0))
+    assert moved["movement_vs_pick"] == "away"
+    assert (moved["movement_line_from"], moved["movement_line_to"]) == (9.0, 8.5)
+    home = _row(market="spreads", side="home", line=-2.5)
+    assert _movement_from_opening(home, _openings(home, line=-1.5))["movement_vs_pick"] == "toward"
+    away = _row(market="spreads", side="away", line=3.5)
+    assert _movement_from_opening(away, _openings(away, line=2.5))["movement_vs_pick"] == "away"
 
 
 def test_price_delta_prefers_same_book_and_says_which():
@@ -193,6 +211,28 @@ def test_steam_requires_a_sharp_move_in_a_short_window():
     assert "steam" not in slow, "a 20-point drift over five hours is not steam"
     small = _movement_from_opening(row, _openings(row, price=-108, minutes=10, books={"draftkings": -108}))
     assert "steam" not in small
+
+
+def test_even_money_is_continuous_for_the_delta_and_for_steam():
+    """-104 -> +104 is 8 cents. Raw subtraction called it +208: 59 of 651 priced
+    Layer 2 rows on 2026-09-15, every one scored at the movement cap."""
+    row = _row(quote={"price": 104, "bookmaker": "draftkings", "book_prices": {"draftkings": 104}})
+    got = _movement_from_opening(row, _openings(row, price=-104, minutes=10, books={"draftkings": -104}))
+    assert got["movement_price_delta"] == 8.0
+    assert got["movement_vs_pick"] == "away"
+    assert "steam" not in got, "an 8-cent move is not steam"
+    within_sign = _movement_from_opening(_row(), _openings(_row(), price=-125, books={"draftkings": -125}))
+    assert within_sign["movement_price_delta"] == 20.0, "unchanged away from even money"
+
+
+def test_a_best_book_switch_cannot_fire_steam():
+    """The only Layer 2 steam flag on 2026-09-15 was -102 at betmgm against +113
+    at kalshi: a change of hands, not of price."""
+    row = _row(quote={"price": 113, "bookmaker": "kalshi", "book_prices": {"kalshi": 113}})
+    got = _movement_from_opening(row, _openings(row, price=-140, minutes=10, books={"betmgm": -140}))
+    assert got["movement_basis"] == "best_of_n"
+    assert abs(got["movement_price_delta"]) >= 15
+    assert "steam" not in got
 
 
 # --------------------------------------------------------------------------

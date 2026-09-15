@@ -1342,7 +1342,10 @@ table.board-blotter tbody tr:last-child td {
 }
 
 /* Line/odds movement sparkline. Colour carries direction, matching the
-   arrow that precedes it, so the shape and the text agree at a glance. */
+   arrow that precedes it, so the shape and the text agree at a glance.
+   GREEN = the market moved TOWARD the pick (it now prices this side as more
+   likely); RED = away. --flat is a series with no known orientation against
+   the pick (a legacy line-only history), drawn without a colour claim. */
 .board-sparkline {
   display: inline-block;
   vertical-align: middle;
@@ -1356,6 +1359,10 @@ table.board-blotter tbody tr:last-child td {
 
 .board-sparkline--down {
   color: #f87171;
+}
+
+.board-sparkline--flat {
+  color: var(--cards-text-dim);
 }
 
 .board-action-button--slip {

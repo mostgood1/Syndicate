@@ -741,6 +741,28 @@ def build_layer2_shortlist(
     except Exception as exc:
         openings_error = f"{type(exc).__name__}: {exc}"
 
+    # THE PRICE TRAIL AND THE ROW CONTEXT, LOADED ONCE HERE FOR THE SAME REASON
+    # AS THE OPENINGS (lane `layer2-row-parity`): the card builder does no IO.
+    # The trail draws each card's sparkline; the context carries the MLB write-ups
+    # and the player ids the headshots need. The trail is read BEFORE
+    # `record_price_trail` appends this build's points, exactly as the openings are.
+    price_trail_index: dict[str, Any] | None = None
+    price_trail_error: str | None = None
+    try:
+        from syndicate.features.shared.clv_price_trail import load_price_trail, price_trail_enabled
+
+        if price_trail_enabled():
+            price_trail_index = load_price_trail(str(selected_date or ""))
+    except Exception as exc:
+        price_trail_error = f"{type(exc).__name__}: {exc}"
+    row_context: dict[str, Any] = {}
+    try:
+        from syndicate.features.shared.layer2_row_context import load_layer2_row_context
+
+        row_context = load_layer2_row_context(selected_date)
+    except Exception as exc:
+        row_context = {"errors": {"import": f"{type(exc).__name__}: {exc}"}}
+
     # `#563`. PUBLISH THE CHIPS FIRST, BEFORE ANY SPORT IS INGESTED.
     #
     # This block used to sit at the BOTTOM of this function, beside the
@@ -1748,11 +1770,20 @@ def build_layer2_shortlist(
 
         rows_for_cards = shortlist.get("rows") or []
         try:
-            accepts = "openings" in inspect.signature(layer2_rows_to_board_cards).parameters
+            card_params = inspect.signature(layer2_rows_to_board_cards).parameters
         except (TypeError, ValueError):
-            accepts = False
+            card_params = {}
+        accepts = "openings" in card_params
+        # `layer2-row-parity`: the price trail and row context ride the same
+        # probe. An older `layer2_board.py` without them still builds cards, just
+        # without sparklines, headshots and explainers.
+        card_extras: dict[str, Any] = {}
+        if "price_trail" in card_params:
+            card_extras["price_trail"] = price_trail_index
+        if "row_context" in card_params:
+            card_extras["row_context"] = row_context
         if accepts:
-            shortlist["cards"] = layer2_rows_to_board_cards(rows_for_cards, openings=openings_index)
+            shortlist["cards"] = layer2_rows_to_board_cards(rows_for_cards, openings=openings_index, **card_extras)
         else:
             # Older `layer2_board.py` on this worker. Build the board it CAN
             # build rather than no board at all, and say so -- an unexplained
@@ -1910,13 +1941,12 @@ def build_layer2_shortlist(
         # bound inside a `try` that can fail, and a NameError raised while
         # computing an instrument would take the build down for the sake of a
         # counter.
-        from syndicate.features.shared.layer2_board import (
-            _movement_is_tracked,
-            movement_join_key as _movement_key,
-        )
+        from syndicate.features.shared.layer2_board import movement_join_key as _movement_key
 
         published = shortlist.get("rows") or []
-        eligible = [r for r in published if _movement_is_tracked(r.get("market"))]
+        # EVERY KEYABLE ROW IS ELIGIBLE (lane `layer2-row-parity`): movement no
+        # longer excludes props, so neither does its coverage number.
+        eligible = [r for r in published if _movement_key(r)]
         matched = sum(1 for r in eligible if _movement_key(r) in openings_index)
         shortlist["movement_eligible_rows"] = len(eligible)
         shortlist["movement_rows_matched"] = matched
@@ -2055,6 +2085,27 @@ def build_layer2_shortlist(
             )
     except Exception as exc:
         shortlist["clv_openings_error"] = f"{type(exc).__name__}: {exc}"
+    # `layer2-row-parity`: what the cards were drawn from, and this build's price
+    # points, appended AFTER the cards read the trail as it stood -- the same
+    # before/after order as the openings. Never raises into the shortlist.
+    shortlist["price_trail_keys"] = len(price_trail_index) if price_trail_index is not None else None
+    if price_trail_error:
+        shortlist["price_trail_error"] = price_trail_error
+    context_errors = row_context.get("errors") if isinstance(row_context, Mapping) else None
+    shortlist["row_context"] = {
+        "mlb_narratives": len(row_context.get("narratives") or {}) if isinstance(row_context, Mapping) else 0,
+        "nfl_espn_ids": len(row_context.get("nfl_espn_ids") or {}) if isinstance(row_context, Mapping) else 0,
+        "errors": dict(context_errors) if isinstance(context_errors, Mapping) else {},
+    }
+    try:
+        from syndicate.features.shared.clv_price_trail import price_trail_enabled, record_price_trail
+
+        if price_trail_enabled():
+            shortlist["clv_price_trail"] = record_price_trail(
+                shortlist.get("rows") or [], date=str(selected_date or ""), trail=price_trail_index
+            )
+    except Exception as exc:
+        shortlist["clv_price_trail_error"] = f"{type(exc).__name__}: {exc}"
     return shortlist
 
 
