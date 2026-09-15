@@ -694,6 +694,23 @@ death, never life — do not invert it.
     - 312 passed across the orders, ledger and execute_portfolio files (clean origin/main baseline: 224 in ledger+portfolio, now 229).
     - NOT run: the unwired check against HEAD's module.
   - (3), charging NO orders `(1-price) x qty`, waits on the NO-convention reading.
+  - **NO CONVENTION SETTLED 2026-09-15 ~12:50 CDT (read-only agent; docs + logs + balances): Polymarket US `price` IS ALWAYS THE YES PRICE. H2' CONFIRMED.**
+    - **Docs.** The partner order data model: "`price` is always the YES price; there is no separate NO book"; buying 10 NO at $0.20 is `SIDE_SELL ... price = 80`. The orders concepts page: "buy NO at $0.40 ... selling YES at $0.60". Collateral: a NO buy posts $1 margin less the sale proceeds, so it holds (1 - YES price). Open orders consume buying power at submit.
+    - **Balances, to the cent:**
+      - YES `CDYRSDTS4SJR` (cin-mil) 23.97 @ avgPx 0.365 + $0.33 commission = $9.08, and the balance went 100.60 -> 91.52.
+      - NO `CDZ89ZCJ8SJR` (dal-nyg) sent `price 0.4`, filled `avgPx 0.6050`, fee 0.19. The balance went 91.52 -> 85.97 = $5.55 = 13.57 x 0.395 + 0.19. Charging at X = 0.40 would have been $5.62.
+      - `C65VD0R72KDG`: `price 0.22`, `avgPx 0.235`, `ORDER_SIDE_SELL` / `BUY_SHORT` fits only a YES sell with price improvement.
+    - **phi-ten explained.** Sent NO @ 0.245 means SELL YES at 0.245 or better, worst case (1-0.245) x 6.53 = $4.93 against $2.84 buying power, so it was rejected instantly. The book (YES bid 0.76) means it would have cost 0.24 x 6.53 = $1.57 if sent correctly.
+    - **Consequences, inferred from the rule, not measured per order:**
+      - Every live Polymarket NO order has sent p_NO as the price, i.e. a YES floor, so its effective NO ceiling was 1 - p_NO (no price protection). Near-even markets hid it.
+      - `C65VD0R72KDG` is probably mis-booked: NO cost 1 - 0.235 = 0.765 (~$10.04 + 0.14), recorded as 0.235 / $3.09. `_fill_price`'s closest-to-limit rule (`polymarket_us_orders.py:~2038-2053`) chose the wrong reading. Unconfirmed by a balance read.
+    - **Required changes, NOT started, user decision:**
+      - (i) `order_body` sends `price = 1 - p_NO` for NO, snapped DOWN on the YES grid (a sell stays marketable); step 2 keeps the NO cost for EV and quantity and sends the YES bid.
+      - (ii) `check_order` charges a NO order `(1 - price_sent) x qty` + fee (equal to the stake once (i) ships), plus open orders on the instrument.
+      - (iii) `_fill_price`: NO fill = 1 - avgPx, always.
+      - (iv) re-check `C65VD0R72KDG` against the balance ledger endpoint.
+      - Until (i) ships, NO orders keep sending an unprotected price. Pausing Polymarket NO orders is the user's call; no side-level pause exists today.
+    - The step-1 table's NO rows in `[polymarket-ask-at-build-step1]` inherit this; the YES rows do not.
 - **DIAGNOSIS 2026-09-15 ~11:45 CDT (read-only agent for session 0f5b256e; logs + code; extracts in the session scratchpad). No code changed.**
   - **(R) CONFIRMED: why it re-submits.**
     - A venue `ORDER_STATE_REJECTED` is mapped into the dead group (`venue_order_states.py:58`). Reconcile then writes OUR `rejected` status (`execution_ledger.py:2602-2615`).
