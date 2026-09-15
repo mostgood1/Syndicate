@@ -32995,3 +32995,26 @@ Each line is copied verbatim, indented 4 spaces inside the fence so that no `###
 
 - best match on main: L647 ratio 0.725 at `.syndicate/lanes.md`:1916; L649 ratio 0.426 at `.syndicate/lanes_history.md`:31405
 
+
+### superseded status — `layer2-row-parity` (moved at its close, 2026-09-15)
+
+```text
+- Status `[2026-09-15 ~19:30Z (14:30 CT)]`:
+  - **ALL FIVE LIVE.**
+    - web `7ed1a18a`: live 19:06:27Z.
+    - refresh-worker `5686a555`: live 19:19:27Z (the score-sign change and the sparkline redesign bundled, user decision "Bundle into one deploy").
+  - Sparklines redesigned to plot the label's own price from our publish (user decision). Served board 19:29:06Z, 09-15 rows: 0 contradict their arrow, 0 old sign, 0 old basis. Rendered page 19:30:06Z: 519 of 519 arrow/sparkline pairs agree; 571 consensus tooltips.
+  - Leftovers are on the 09-16 shard, built pre-deploy: 2 disagreements, 3 old basis, 30 old sign. They clear on its next rebuild; that reading is owed.
+  - `deploys.md` 19:13:36Z entry.
+- Status `[2026-09-15 ~18:00Z (13:00 CT)]` (superseded above):
+  - **LIVE.** refresh-worker `87558f2f` (deploy `dep-dako25vqj5pc73d8anog`, live 17:38:11Z). Web carries the same code from ANOTHER session's 17:29Z deploy; see `deploys.md` 17:32:07Z.
+  - Readings: 17:47:09Z (`deploys.md`), then 17:59:17Z on the served payload: `not_tracked` 0, explainers 2,660 / 2,660, steam 0, crossing-not-cents 0, legacy prop/game rows 0. MLB headshots 491 / 501 and NFL 77 / 89 at 17:47Z.
+  - **Sparklines OWED:** 0 series so far. The trail's first 09-15 points were written 17:45:02Z and a series needs a second 09-15 build with changed prices; a session waiter measures it.
+  - Score-sign change (user decision "Toward the pick") committed locally as `11e24313`, 77 tests pass. It lands and deploys as its own deploy after the sparkline follow-up is recorded. Estimate on the served board: 1,146 of 2,664 rows carry a movement term (945 currently positive); top-50 overlap after the flip 39 / 50.
+  - Earlier: code on main `f808186c`, `8e00941c`, `87558f2f`. Tests: 118 lane + 193 neighbouring + 41 combined-board Python, 3 JS harnesses, all pass.
+  - `pipeline/intelligence_state.py` handed over by `heavy-build-memory-refusal` (its ledger, ~11:30 CDT); user confirmed "Take the claim".
+  - Pre-deploy baseline (verify script, served 17:10:28Z): Layer 2 2,678 rows, `not_tracked` 1,877, explainers 0, MLB headshots 0 of 511 player rows (503 with a projection), NFL 0 of 89, series 0, steam 1 (not same-book), legacy prop/game rows 74. The script's ±100 counter reads 0 pre-deploy only because the from/to fields do not exist yet; the reconstructed pre-deploy figure is 59 of 651 (15:25Z).
+  - Keyvalue check before deploy: newest soccer cards shard ~3.5 MB (worst recent 5.0 MB) of the 8 MB per-key ceiling, 0 `LAYER2_KEY_LARGE` in 6 h; store 236 MB of 256 MB, dated keys carry a TTL. Estimated worst-case card growth +14-20% per sport.
+  - refresh-worker preflight 17:11:25Z: HOLD, 4 jobs (MLB daily sim `ui-daily`, NCAAF smartsim). Claim held (token bd13561a). Deploy order: refresh-worker, then web once the first new build has published cards.
+  - PENDING, user decision "Toward the pick": flip the score's movement term sign (it rewards a lengthening price, contrary to its own "CLV in miniature" rationale). Its own deploy AFTER this one is measured; not written yet so it cannot ride along.
+```

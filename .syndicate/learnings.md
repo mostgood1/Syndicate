@@ -6183,3 +6183,21 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - Put the real files in the allow tests (copied, resolved, run), not synthetic stand-ins, so a false positive is a red test rather than a user report.
 - **Cost:** one false positive shipped to main, and it was live in the primary tree's guard for about an hour. Caught before any read-only script was actually blocked.
 - *(evidence: `log/2026-09-15.md` session 3a65723e, the `deploy-guard-file-scripts` entry; commits `11167fdf`, `af7c895c`)*
+
+## 2026-09-15 — OVERTURNED: "a sparkline of the pick's market probability tells the same story as the movement arrow beside it" — the line plotted the no-vig CONSENSUS, the arrow read the shown PRICE, and they disagreed on 132 of 294 rows `[lane layer2-row-parity]`
+
+- **What was believed:** a time series of the pick's no-vig ("fair") probability is the natural picture of "did the market move toward the pick", so it would agree with the arrow that reads the label's odds.
+- **What happened:**
+  - The first design shipped in `87558f2f`. At 18:08:02Z, 45 of 94 series sloped against their own arrow; at 19:11:17Z, 132 of 294 did.
+  - They are different quantities:
+    - The arrow compares the label's own price pair: one book, or the best price across books.
+    - The line was the de-vigged consensus across every book.
+    - The best price can lengthen while the consensus shortens: one book hangs a stale number, the vig moves, or the best-price book changes.
+  - Every series was well-formed and every test passed, because the tests checked each visual on its own, never the line against the arrow on the same card.
+  - The redesign (`5686a555`, user decision "Plot the label's price from our open") makes the line's ends the label's price pair, so line and arrow cannot disagree. The consensus move went to the tooltip.
+  - After it: 0 disagreements on every date (19:56Z), and 519 of 519 on the rendered page.
+- **How to apply:**
+  - Two visuals side by side on one row must be computed from the same quantity, or labelled as different ones. Test the PAIR, not each one: a "line vs arrow disagree" count would have caught this before the deploy.
+  - Name the quantity in the caption ("Implied probability of this pick's price … (best price across books)").
+  - A verify script's allow-lists are part of the design. After the redesign the script read "malformed 867" because it still named the old bases. Change the instrument in the same commit as the code it measures.
+- *(evidence: `deploys.md` 2026-09-15 18:08:02Z FOLLOW-UP (1), the 19:13:36Z entry and its 19:57:56Z FOLLOW-UP; commits `87558f2f`, `5686a555`, `4ccbea86`)*

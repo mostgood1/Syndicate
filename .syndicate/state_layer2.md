@@ -408,12 +408,20 @@ Full briefs: `.syndicate/brief_2026-08-16_layer1_board.md`,
 `layer1-board-coverage` / `layer2-board-quality` are RESERVED BY BRIEF and
 deliberately NOT opened in `lanes.md` — no session holds them yet.
 
-- **L2 movement/steam is DISABLED IN CODE, not decayed by data.**
-  `layer2_board.py:1152` is `return {}` with an unreachable body. `#372` turned
-  it off because the in-builder ~20MB odds-history load **stalled the shortlist
-  build for 70 minutes with no exception**. Naive re-enable re-stalls the board.
-  Only `h2h`/`totals`/`spreads` have history at all (`:1244`); served overlap was
-  event+market 11 of 73.
+- **L2 MOVEMENT IS LIVE ON EVERY ROW WITH AN OPENING `[verified in production 2026-09-15 19:57Z, refresh-worker `5686a555` / web `7ed1a18a`, lane `layer2-row-parity`]`.** It supersedes the 08-16 "disabled in code" note.
+  - Source: the CLV opening ledger (`reports/intelligence/clv_openings/<date>.jsonl`), joined on `movement_join_key` = event, market, player, segment, side, with no line and no book.
+    - Props are included.
+    - It does not load the ~20MB odds history that stalled the build in `#372`.
+  - Movement fields:
+    - `movement_price_delta` is on the continuous cents scale (±100 both map to 0).
+    - `movement_vs_pick` is the one direction verdict.
+    - Steam needs `movement_basis=same_book`.
+  - Sparklines: `clv_price_trail.py` records a change-only price trail each build (`SYNDICATE_CLV_PRICE_TRAIL`, absent = ON).
+    - `movement_series` plots the implied probability of the label's own price from our publish to now, so a line cannot contradict its arrow.
+    - The no-vig consensus move is `movement_fair_delta_pp`, shown in the tooltip only.
+  - The score's movement term is POSITIVE when the market moved toward the pick.
+  - Reading on 2,153 rows: `not_tracked` 0; 0 of 1,369 series against their arrow; movement component wrong sign 0 of 1,360.
+  - When the L2-A fallback has cards, `read_combined_intelligence_response` withholds legacy prop/game rows: 0 on the board at 19:29:06Z.
 - **The L2 scoring model EXISTS** — `blended_score()`,
   `opportunity_signals.py:497-575`, `min(value, value*reliability)`. Auditing it
   is the work; rebuilding it is not. The `min()` is load-bearing (it corrects a

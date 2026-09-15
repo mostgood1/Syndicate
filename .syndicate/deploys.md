@@ -35840,3 +35840,16 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Every match in that artifact carries `squad_audit`, and no side has 0 listed players.
   - Refresh-worker (the weekly autorun builds) gets the same commit in a separate deploy, so the reading must say which service wrote the artifact it read.
 - Rollback: `c725cc29`. It would also revert `867f1481`.
+
+## 2026-09-15 19:57:56Z (14:57 CT) — FOLLOW-UP to the 2026-09-15 19:13:36Z refresh-worker `55fee786` -> `5686a555` / web `8b563ca9` -> `7ed1a18a` entry — lane layer2-row-parity — **OWED reading DISCHARGED: the 09-16 pre-deploy residue is gone; 0 wrong on every date**
+- **Reading, served payload** (the board page's request, `slim_aliases` + `drop_row_diagnostics`): 2,153 Layer 2 rows over `game_date` 09-15..09-20.
+  - 19:56:26Z, series:
+    - `movement_series` on 1,369 rows. Basis `best_price` 739, `same_book` 630, `fair`/`price` 0.
+    - Series sloping against `movement_vs_pick`: 0 on every date.
+    - 09-16: 12 rows, 10 series, all `best_price`.
+  - 19:57:56Z, `board_score_components.movement_component` (a float on 1,746 rows, None on 407):
+    - Away-from-pick rows negative 980, toward-pick rows positive 380; away positive 0, toward negative 0.
+    - 09-16: away negative 9, toward positive 1.
+- At 19:29:06Z the 09-16 shard carried 2 disagreements, 3 `fair`-basis rows and 30 old-sign rows. It has been rebuilt since.
+- **Instrument note:** the first sign read matched the first component key containing "movement". That is the boolean `movement_capped`, and it reported 12 "away positive". Discarded; the numbers above read `movement_component` by name.
+- Verify: MET in full. This lane owes no further reading.
