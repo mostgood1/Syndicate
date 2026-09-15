@@ -38,9 +38,57 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+import pytest  # noqa: E402
+
 from pipeline import intelligence_state as st  # noqa: E402
+from syndicate.features.ncaaf import oddsapi_lines  # noqa: E402
+from syndicate.features.shared.team_aliases import chip_join_key  # noqa: E402
+from tests.test_ncaaf_chip_join_key import (  # noqa: E402
+    _REGISTRY_HEADER,
+    _clear_ncaaf_registry_caches,
+)
 
 MODULE = "syndicate.features.shared.game_chip_scoreboard.build_game_chips"
+
+# (team_id, canonical, abbr, mascot) -- real CFBD names for the clubs used below.
+_STUB_TEAMS = (
+    ("38", "Colorado", "COLO", "Buffaloes"),
+    ("59", "Georgia Tech", "GT", "Yellow Jackets"),
+    ("2006", "Akron", "AKR", "Zips"),
+    ("154", "Wake Forest", "WAKE", "Demon Deacons"),
+)
+
+
+@pytest.fixture(autouse=True)
+def _data_free(tmp_path, monkeypatch):
+    """DATA-FREE ON PURPOSE (lane layer2-chip-join-test-data, 2026-09-14).
+
+    With no published key, the join falls back to `chip_join_key`, which for
+    NCAAF reads `ncaaf_team_registry_snapshot.csv` under `data/`. Session
+    worktrees exclude `data/`, so there every name resolved to None and the two
+    no-key tests failed 0 == 1 -- while passing 6/6 with the real registry.
+    This writes a registry stub (plus the resolver supplement's targets, which
+    `_alias_map` refuses to lose) and keeps the on-disk chip artifact out too.
+    """
+    rows = list(_STUB_TEAMS)
+    known = {canonical for _, canonical, _, _ in rows}
+    for i, canonical in enumerate(sorted(set(oddsapi_lines._ODDSAPI_NAME_SUPPLEMENT.values()) - known)):
+        rows.append((f"90{i:03d}", canonical, f"Z{i:03d}", f"Mascot{i:03d}"))
+    path = tmp_path / "ncaaf_team_registry_snapshot.csv"
+    path.write_text(_REGISTRY_HEADER + "".join(
+        f'{tid},"{name}",{abbr},TestConf,FBS,"{name.lower()}|{abbr.lower()}",'
+        f'"{name}",,"{name}","{mascot}",cfbd,2026-07-21\n'
+        for tid, name, abbr, mascot in rows
+    ), encoding="utf-8")
+    monkeypatch.setattr(oddsapi_lines, "team_registry_snapshot_path", lambda: path)
+    monkeypatch.setattr(st, "read_game_chips", lambda _date: None)
+    _clear_ncaaf_registry_caches()
+    # Guards the no-key tests against passing, or failing, on a dead stub.
+    assert chip_join_key("ncaaf", "Colorado Buffaloes") == chip_join_key("ncaaf", "Colorado") is not None
+    try:
+        yield
+    finally:
+        _clear_ncaaf_registry_caches()
 
 
 def _chip(sport, away, home, state, away_key=None, home_key=None):
