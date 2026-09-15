@@ -6305,3 +6305,16 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - State the window's age when reporting a log-based reading, so its expiry is visible.
 - **Same session, different instrument:** releasing a file claim was checked by the full path only. A bare basename in another Files-labelled bullet of the same block kept the claim (`lane_claims.matches` uses endswith), and a peer lane caught it. Diff the claim SET for every token that `matches()` the path, not the path string.
 - *(evidence: `lanes.md` execution-ledger-live-trim RESTORE MANIFEST; the lane soccer-live-scoreboard-range-stale message recorded in its block; `deploys.md` 2026-09-15 20:52:30Z)*
+
+## 2026-09-15 — OVERTURNED: "main can't ship, steps A/B are not approved" — the status came from ANOTHER lane's citation, and the owning lane had already recorded the approval `[lane anytime-td-quote-side-yes]`
+
+- **What I believed.** At 21:00Z, `f833f7ec..6d526851` carried soccer-player-role-allocation steps A/B "not approved for deploy". I read that from lane `book-quotes-splice-repair`'s block, which cited it. So I put "off-main" to the user as the recommended path, built `1d78d38b` (live SHA + the fix), took the claim and looped preflight.
+- **What was true.** soccer-player-role-allocation's OWN block, in its 20:45Z VERDICT, already read "User decision: deploy main's tip to live-odds-worker, then refresh-worker, AFTER 21:25Z".
+  - An off-main deploy after that tip deploy would have reverted A/B and `070a05bf` on refresh-worker. One before it would have cost an extra reboot and 25 min of spacing.
+  - A peer's message caught it before any deploy. The fix then shipped as a ride-along in the tip deploy (`2d579fd1`, reading 256/256).
+- **Why.** A citation is a copy with its own timestamp. A deploy blocker's status moves within the hour on a day like this, and the lane that CITES it has no reason to update the copy.
+- **How to apply.**
+  - Before calling a commit on main a deploy blocker, read the OWNING lane's block on `origin/main` at that moment: its VERDICT or STATUS lines, and any "User decision" line.
+  - Then read the service's claim status. A claim held for a main tip is the other half of the same answer.
+  - Put the read time in the question to the user. An option built on a status that is 15 minutes old or older should say so.
+- *(evidence: `lanes.md` book-quotes-splice-repair line 437 vs soccer-player-role-allocation VERDICT 2026-09-15 20:45Z; `deploys.md` 2026-09-15 22:15:53Z READING; log 2026-09-15 anytime-td-quote-side-yes stand-down entry)*

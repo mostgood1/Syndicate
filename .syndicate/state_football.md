@@ -2567,7 +2567,10 @@ starters.
 - 102 of 102 rows choose their own market, side and line (101 Anytime TD / yes, 1 Receiving Yards / over / 34.5).
 - Shard `market` is the DISPLAY string ("Anytime TD"), so the row's display market narrows by exact match despite `missing_market_key`.
 - An identity-only control picks the wrong market on 1 row, so the filter is doing work. 23 of 102 players have more than 1 market.
-- Side: no Anytime TD "No" side exists in the shards, and the row's display pick never narrowed the side. **Fixed on main, NOT DEPLOYED** (lane `anytime-td-quote-side-yes`): `enrich_prop_rows` and `enrich_candidate_rows` now pass "yes" for Anytime TD unless the pick names a side. Until deployed, a captured No side with more books would still win on production.
+- Side: no Anytime TD "No" side exists in the shards, and the row's display pick never narrowed the side. **Fixed, LIVE on refresh-worker `2d579fd1`** (`6d526851`, ridden along in `dep-daks2irm8hqs73efhhh0`, finished 22:12:03Z; lane `anytime-td-quote-side-yes`): `enrich_prop_rows` and `enrich_candidate_rows` pass "yes" for Anytime TD unless the pick names a side.
+  - Post-deploy `ncaaf intelligence_prop with_quote` 256/256 in the new process (`deploys.md` 22:15:53Z).
+  - The side choice itself cannot be exercised in production until a No side is captured. It rests on `tests/test_quote_enrichment_anytime_td_side.py` and the production-shard replay.
+  - Web's live commit was NOT read for this fix.
 
 **NOT measured:** whether web runs `3157bb7b`.
 
