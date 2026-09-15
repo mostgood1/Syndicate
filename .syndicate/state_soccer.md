@@ -5,6 +5,42 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
+## [soccer-season-market-audit] SEASON TO DATE NO SOCCER MARKET BEATS THE CLOSE, AND THE PROP MODEL IS PRICING LAST SEASON'S SQUADS `[measured 2026-09-15, lane soccer-season-market-audit]`
+
+**Where everything lives:**
+- evidence: `.syndicate/findings_2026-09-15_soccer_season_market_audit.md`;
+- numbers: `reports/soccer_backtest/season_market_audit_2026-09-15.json`;
+- harness: `scripts/soccer_season_audit/`.
+
+Window 07-22..09-14, 584 completed matches, 10 leagues. Prices:
+- football-data 2026-27 CLOSING average for 1X2, O/U 2.5 and AH;
+- production pre-kickoff `game_markets` for BTTS and corners;
+- production `props/<date>.csv` for props (one-sided overs).
+
+CIs are bootstraps over matches; betting thresholds were chosen leave-one-date-out.
+
+- **1X2 LOSES +0.0276 [+0.0147, +0.0409]** (543 matches).
+  - Significant in Championship, Belgian, Primeira and MLS; parity in EPL, Serie A and Bundesliga.
+  - Favourites: model 0.626 / market 0.710 / actual 0.737.
+  - Builds after 09-07 score +0.048.
+- **Other game markets:**
+  - O/U 2.5 **+0.0081 [+0.0005, +0.0151] LOSES** (394, Europe). The model trails this season's scoring: Championship +0.57 and Eredivisie +0.52 goals/match.
+  - AH **+0.0178 LOSES**. BTTS parity (+0.0039). Team goals log loss **+0.0447 LOSES**.
+- **CORNERS: the model's match total is uninformative.** r = 0.02, and its MAE is worse than last season's league mean. MLS is over-predicted by 1.39, EPL by 1.27.
+- **BETTING: no pre-registered rule in any market has a held-out ROI whose CI clears zero.** 1X2 −12.5% [−24.0, −0.1], O/U 2.5 −18.4% [−31.7, −4.0], shots props (raw edge) −31.9% [−46.1, −15.1].
+- **PROPS: the predicted squads are stale.**
+  - Share of real shots taken by a player the model lists: Championship 36%, Primeira 53%, Belgian 56%, EPL 81%, MLS 87%.
+  - Appeared players' shots are UNDER-predicted: 0.87 held-out (starters 0.68, fringe 1.08).
+  - Anytime scorer: two full deciles sit at exactly 0.000 and 3–5% of them score; the top decile is 1.39× over.
+- **H7: the post-kickoff rebuild is not a material leak.** Pre-kickoff Brier 0.6273 vs final 0.6259 on 163 matches. "Parity" verdicts on these artifacts are real parity.
+- **GAME SHAPE** (FotMob, 6,008 matches):
+  - Next-goal momentum AUC is league-specific: MLS 0.521 [0.469, 0.569] (none) vs Primeira 0.679.
+  - Late-goal share is uniform at 19–23%.
+  - Momentum is not a pregame input.
+  - In-match intensity terciles move goals −0.19..+0.43 and corners −1.61..+0.63 against the model.
+- **DEFECT: `fotmob_match_id.py` pins 2025-26 FotMob ids** for eredivisie, championship and belgian_pro_league. The resolver matched 0 of 9 fixtures in those leagues vs 9 of 9 controls (2026-09-12), so live momentum is dark there. Fix handed to a separate session.
+- **Follow-ups: `todo.md #664` is RESERVED on origin/main, but its entry is NOT written.** `docs/ai_context/todo.md` is claimed by the OPEN lane `kalshi-shard-balance-gate` (for `#573`), and lane-guard refused the edit. The ranked list (8 items) lives in the findings file's "Learnings to implement" until that claim frees; whoever writes `#664` should copy it from there.
+
 ## [soccer-prop-book-coverage] WIDENING SOCCER PROP REGIONS BUYS ONE SOFT BOOK FOR ~1M CREDITS/MONTH — **KNOB SHIPPED, DELIBERATELY LEFT OFF** `[measured 2026-09-06, lane prop-region-knob]`
 
 Soccer player props are the platform's thinnest book coverage: **164 of 174
@@ -635,6 +671,13 @@ Do not change it without a larger sample.
 ---
 
 ## [soccer-shots-prop-skill] SOCCER SHOTS PROPS â€” THE POISSON SHAPE IS RIGHT AND THE MEAN IS INFLATED `[measured 2026-08-31, lane layer1-model-edge-join]`
+
+> **CORRECTED 2026-09-15 by `[soccer-season-market-audit]` — DO NOT SHIP THE 1.33 DIVISOR.**
+> Season to date, on ESPN box scores with one-to-one name binding, players who appear are
+> UNDER-predicted: 0.87 held-out, regular starters 0.68, fringe players 1.08. This section's
+> 1.40 came from unconditional means over every predicted row, with unmatched players scored
+> as zero, so it read a stale-squad defect as a level error. Its own method gives 1.09–1.13
+> on the new data. The Poisson-form exoneration below is unaffected.
 
 **Asked to measure model skill on the props carrying the board's largest model
 edges. Two things are now measured and they point in opposite directions, which
