@@ -2107,6 +2107,49 @@ death, never life — do not invert it.
 - Hypothesis: FotMob's league `id` is SEASON-SCOPED for 4 of the 10 leagues (Eredivisie, Championship, Belgian Pro League, MLS) while the league's `primaryId` is stable. Read from FotMob `/api/data/matches` on 2024-10-19, 2025-03-01, 2025-10-18, 2026-09-13 and 2026-09-15: primaryId 57/48/40/130 every season, ids 892939/893033/892857/889747 -> 900368/900638/900433/896669 -> 937276/938218/937988/913550. The other six have id == primaryId, which is why only these broke. Belgian's NAME was `First Division A` in 2024-25, so an exact-name key alone would also have broken.
 - Falsification test: after deploy, a LIVE Championship/Eredivisie match whose live_state row shows `momentum.supported == false` with reason `fotmob match id unresolved` means league matching was not the (only) cause -- look at team-name normalisation next.
 - Verification: `soccer_source/<league>/api/live_state/live_state_2026-09-15.json` on production shows `games[].momentum.supported == true` and `source == 'fotmob'` for an in-play Eredivisie (Ajax v Willem II, 18:00Z) or Championship (Bristol City v Lincoln City / Middlesbrough v Millwall, 18:45Z) match; reading recorded in `deploys.md`. A finished date's file carries only `match_box` and proves nothing.
+### quote-shard-date-fallback-prod — OPEN — opened 2026-09-15 — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
+- **STATUS 2026-09-15 ~13:30 CT — GOAL: NOT MET.** H0 CONFIRMED. H1 has no USER-VISIBLE effect, and the legacy NCAAF case is unattributed. H2 is code-certain, with its production reading owed.
+  - **H1, served rows:** a sport-scoped `/api/intelligence/query` read (18:24Z, 23.4 MB) gave 101 ncaaf prop rows.
+    - All 101 are Layer 2 rows (no `candidate_type`/`context_label`) with `game_date` and `commence_time` (09-17 to 09-19), and 101/101 are quoted.
+    - Probe caveat: its soccer control returned 0 rows (a filter mismatch), so it is validated only for these rows.
+  - **H1, legacy candidates:** worker counters (18:16:31Z, same process, a TODAY build) read `ncaaf intelligence_prop` rows=104, with_quote=0, missing_market_key=104; soccer 11/14 quoted, mlb 36/36.
+    - `quote-feed-age`: ncaaf shard 2026-09-15 is ABSENT; 09-19 is ok (16:43Z) and 09-20 is stale.
+    - Consistent with the fallback-date join (label "2026 Week 3", no ISO row date on the intelligence path), but NOT attributed: missing_market_key 104/104 is a confounder, and those rows' date fields were not sampled.
+  - **H2:** owed a same-process reading after a real 09-16 build (watcher 2 polling from 13:20 CT). The 18:15Z payload was confounded by `[refresh_worker] BOOTED` 18:14:03Z.
+  - **H0** (refresh-worker `CANDIDATE_POOL_READY`, 09-12 05:00Z..09-15 18:08Z, 206 builds): non-today pools with candidates exist.
+    - On 09-12 the 09-13 pool had 151 (x2).
+    - On 09-14 the 09-15 pool had 14 (x24).
+    - At 00:04 CT 09-15 the pool for 09-14 had 5.
+    - Today's 09-16 pools read `count=0` (x12), but the build still ENRICHES props: the 17:57:57Z build kept mlb,wnba,nfl,ncaaf,soccer, with `ENRICH_PROPS_ENTER ncaaf rows=104` and `soccer rows=14`.
+  - **H1:**
+    - Inert for ISO-labelled sports. Soccer `context_label` read `2026-09-15`/`2026-09-16` in those builds, and daily-sport artifact paths are dated to the pool date.
+    - LIVE ONLY where the label is not a date: NFL "2026 Week 1", NCAAF "2026 Week 3".
+    - Those rows fall back to `requested_date` (the worker's today) unless they carry `commence_time` (`home.py:1566/3181`), and that applies in EVERY pool, not just non-today ones.
+    - Row-level `commence_time` coverage is not yet measured.
+  - **H2:** by code, the flush sits inside `collect_candidates` (`intelligence.py:10078`) and `reset()` has no production caller, so counters are cumulative per process.
+    - The 18:15:08Z payload (`service_role=refresh-worker-4tx2`) had only 2026-09-15 keys and NO ncaaf/soccer.
+    - That is explained by `[refresh_worker] BOOTED` at 18:14:03Z (no deploy, no RECYCLE line), which cleared the counters after the 17:57Z build.
+    - Not evidence either way. Next reading: the watcher's endpoint read after the next 09-16 build, with no BOOTED in between.
+- Goal: measure in production whether candidate pools built for a non-today board date (a) price prop rows from TODAY's quote shard and (b) file opportunity-contract counts under today, and record a verdict per half. Diagnostic and read-only; any fix gets its own lane.
+- Files: .syndicate/leads.md (promoting the lead only)
+- Hypothesis (written before any production read):
+  - **H0, precondition:** refresh-worker builds pools for non-today dates, i.e. `CANDIDATE_POOL_READY date=<today+1 or today+2>` appears in its logs.
+  - **H1, quote join, expected INERT for daily sports:**
+    - `enrich_prop_rows` joins on `_row_slate_date(row)` first (`quote_enrichment.py:620`).
+    - Daily-sport prop rows carry an ISO `context_label` (`intelligence.py:5054`).
+    - The today fallback applies only to rows with no ISO date (NFL/NCAAF week labels), which the daily board window does not build.
+  - **H2, metrics filing, expected LIVE:**
+    - `collect_candidates` calls `record_rows(..., date_str=_quote_date_for_sport(sport, preferences))` (`intelligence.py:7998/8027`) with `requested_date` = today, because `_build_candidate_pool` uses the literal "top edges today" (`intelligence_state.py:6171`).
+    - So `intelligence_prop`/`intelligence_game` counts appear under today only, even for pools built at today+1/+2.
+- Falsification test:
+  - H0 is false if no non-today `CANDIDATE_POOL_READY` appears in the stated window; then both halves are moot.
+  - H1 is false if daily-sport prop rows from a non-today pool lack an ISO date, or resolve to today's shard.
+  - H2 is false if a worker-sourced opportunity-contract payload shows `intelligence_prop`/`intelligence_game` buckets under a non-today date while such pools were built.
+- Verification:
+  - refresh-worker `CANDIDATE_POOL_READY date=` lines over a stated UTC window, with counts per date.
+  - `/api/ops/opportunity-contract/status`: read `source` and `service_role` FIRST. That endpoint serves web's in-process counters whenever web built a dashboard, and those can never show the worker's lanes.
+  - Then read its per-date lane keys and `generated_at` against the pool-build times.
+  - Instrument limits stated with each reading.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
