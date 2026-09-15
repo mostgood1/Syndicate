@@ -35572,3 +35572,51 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
 - **Watch:** refresh-worker container at 99.9% (headroom 3.7 MB) at 17:45:04Z, right after the build. Accounted RSS was 1,467 MB, so most of that is page cache. Samples during the pre-deploy MLB sim were 93-99%.
 - **OWED:** the sparkline reading after the next build that records changed points. A session waiter measures it, and it is appended here as FOLLOW-UP (1).
 - Rollback: redeploy `d4c8814f` to refresh-worker. Web's template and filter shipped in another session's deploy, so a web rollback would also revert that session's change: coordinate first.
+
+## 2026-09-15 17:29:18Z (12:29 CT) — web `da268e07` -> `9ed5c5ad` — deploy `dep-dako0rlbvr0c73ear280` — lane book-quotes-splice-repair — **P0 + P1; verify OWED (first fragment offered to web)**
+- **What:** `904d95a2`, landed as `9ed5c5ad`.
+  - **P1:** web's append-only merge refuses a `book_quotes/*.jsonl` line that is not a JSON object, logged as `MERGE_REFUSED_BAD_LINES`.
+  - **P0:** both book-quotes readers print `BOOK_QUOTES_BAD_LINES` when a shard's unreadable-line count changes.
+  - User decisions: "Approve all phases (Recommended)", then "Deploy to web now (Recommended)".
+- **Ride-along** to web (`da268e07..9ed5c5ad`, runtime), all already on main:
+  - **CORRECTION (read 17:55Z):** this deploy also carried lane `layer2-row-parity`'s `f808186c`, `8e00941c` (legacy prop/game rows leave the board once Layer 2 has rows) and `87558f2f`. That lane's own entry (17:32:07Z) records the consequence and verified it on this web process.
+  - `9b214a33`, `d4c8814f` (probe, refresh-worker only), `a7a40471`/`1f9c9c62`/`83996893` (Polymarket order code; web places no orders), `f808186c` (layer2-row-parity UI).
+  - No `render.yaml` or `requirements*` change. `da268e07` is an ancestor.
+- **Locks:**
+  - Claim acquired 17:28:36Z (token `66c0e6bb…`).
+  - Preflight with a stated expectation: both new lines `0_lines -> yes`, baseline 0/0 since 15:36:46Z, read 17:28:40Z. CLEAR 17:28:58Z (gunicorn only, 2 defunct).
+  - Live **17:35:11Z** (`update_in_progress` 17:33Z). Claim released ~17:42Z.
+- **First reading, 17:39Z:** 13 book_quotes merges, 0 `MERGE_REFUSED_BAD_LINES`, 0 `BOOK_QUOTES_BAD_LINES`, 0 `Traceback`. Fragments arrive occasionally (mlb 09-15 gained ~1 per 15 min before the deploy), so 4 minutes is too short to read a zero as a pass.
+- **verify: OWED.**
+  - (1) A `MERGE_REFUSED_BAD_LINES` with a headless sample, while the merges keep adding real rows.
+  - (2) A web-side re-read of today's mlb shard shows no new fragment after 17:35:11Z; the stream route with bounded GETs; the last bad line's offset stays below the post-deploy size.
+  - Watcher `bl4vu6wq5` reads (1) for 60 min.
+- Rollback: redeploy `da268e07` to web.
+
+## 2026-09-15 17:36:46-17:44:18Z (12:37-12:44 CT) — READING — live-odds-worker `1efdea18` (NO price convention) and `4bd5ece9` (resend fix) — **verify MET for the NO fix on n=1; resend fix (1) MET, (2) still owed**
+**The first live Polymarket NO order after the NO fix:** `aec-nfl-sea-ari-2026-09-20`, Cardinals (NO), order `CGVRPD7SWVB8`.
+- **(1) Wire price = 1 - our NO limit: MET.**
+  - `POLYMARKET_CROSS quote=0.335 crossed=0.34`, `POLYMARKET_ARTIFACT_PRICE price=0.34`.
+  - `SUBMIT side=OUTCOME_SIDE_NO qty=7.94 price={'value': '0.66'}` at 17:36:46Z. The book at build had a YES bid of 0.665 and an offer of 0.67, so the YES sell at 0.66 was marketable.
+- **(2) Fill booked at 1 - avgPx and at or below our NO limit: MET.**
+  - `ORDER_STATE ... ORDER_STATE_FILLED price 0.66 cum=4.07 leaves=0 avgPx 0.6650`, then `FILL_PRICE ... recorded=0.335`.
+  - `RECONCILED ... submitted->filled contracts=4.07 fill_price=0.335 fees=0.05` at 17:44:04Z.
+  - 0.335 <= 0.34, and there was no `FILL_ABOVE_LIMIT`.
+- **(3) Buying-power drop = NO cost x contracts + fee: MET.**
+  - `VENUE_BALANCES polymarket=ok:2.84` (17:35:23Z) -> `ok:1.42` (17:43:45Z), a drop of $1.42.
+  - 4.07 x 0.335 + 0.05 = $1.4135, within rounding.
+  - Under the old convention the venue would have held 0.66 x 7.94 = $5.24 against $2.84.
+- **Noted, not explained:** it filled 4.07 of 7.94 with `leaves=0`, and the remainder is not resting. The venue may have capped the size on buying power including fees. Not investigated.
+- **Resend fix (1): MET.** `SUBMIT_RESPONSE ... keys=['executions', 'id'] id=CGVRPD7SWVB8 status=None executions=0`. This is the venue's create response shape. It carries no status or reason, as the docs said.
+- **Resend fix (2): OWED.** No venue `ORDER_STATE_REJECTED` has occurred since the deploy.
+- Earlier NO fills re-read under the new rule: `CDZ89ZCJ8SJR` (dal-nyg) `avgPx 0.6050 recorded=0.395`, which matches its 08-26 balance move; `CE7V6BXQETMQ` `avgPx 0.4900 recorded=0.51`.
+
+## 2026-09-15 17:40:00-17:47:37Z (12:40-12:48 CT) - READING - web `9ed5c5ad` - lane book-quotes-splice-repair - **P1 verify (1) MET**
+- `MERGE_REFUSED_BAD_LINES` fired on 4 merges within 12 min of go-live (17:35:11Z), refusing 5 lines in total. Every sample is a headless record tail:
+  - 17:40:00Z `2026-09-15.jsonl refused=1 added=63` sample `","market":"totals","segment":"full","selection":"over",...,"league":"la_liga"}` (soccer);
+  - 17:45:04Z `refused=2 added=41` (same soccer tail);
+  - 17:46:35Z `refused=1 added=276` and 17:47:37Z `refused=1 added=118`, sample `er","player_name":"Tommy Edman","line":1.5,"price":122,"source":"venue_direct"}` (mlb venue_direct).
+- Real rows kept merging on the same calls (63 / 41 / 276 / 118 added); 25 book_quotes merges, 0 `Traceback`.
+- The fragments are still being produced upstream (refresh-worker's tail pull, P2 not built yet); web now refuses them.
+- `BOOK_QUOTES_BAD_LINES` on web: 0 lines in the window (web read no damaged shard through the readers yet).
+- **verify (2) still OWED:** a bounded re-read of today's web mlb/soccer shards showing no fragment appended after 17:35:11Z.
