@@ -54,3 +54,28 @@ were read on production on 09-15.
 - Step 0 checks that the live commit still contains `fotmob_league_slug` and `unicodedata.normalize`.
 - The same MET / NOT MET / NOT READ rules apply, with a control read before NOT MET. The run may wait up to 2 h for kickoff.
 - Recording: a `deploys.md` READING. On MET it also replaces IN PLACE the `Belgian Pro League is UNREAD on production` sentence in `state_soccer.md` and the matching bullet part in the archived lane block in `lanes_closed.md`.
+
+## Friday 2026-09-18 -- `fotmob-alias-verify-0918-bayern` (13:50 CT / 18:50Z, one-time)
+
+Added on the user's request ("pick up the Bayern Munich strict-match miss"). The
+Bayern miss is NOT a production miss. The STRICT pass cannot match ESPN "Bayern
+Munich" to FotMob "Bayern München", and the LOOSE pass (`867f1481`) resolves every
+Bayern fixture. Read 2026-09-15 22:01Z with the resolver loaded from live
+commit `8c089e8c` (resolver blob `7bb75289`, identical to `867f1481`), ESPN ger.1
+day by day 08-15..10-10, against FotMob's listings:
+
+| date | ESPN fixture | fotmob_match_id | pass |
+|---|---|---|---|
+| 2026-08-28 | Bayern Munich v VfB Stuttgart | 5881143 | loose |
+| 2026-09-05 | Schalke 04 v Bayern Munich | 5881158 | loose |
+| 2026-09-13 | SV Elversberg v Bayern Munich | 5881163 | loose |
+| **2026-09-18 18:30Z** | **Bayern Munich v 1. FC Union Berlin** | **5881171** | loose |
+| 2026-10-10 | FC Augsburg v Bayern Munich | 5881179 | loose |
+
+So no strict alias was added. Fri 09-18 is the EARLIEST fixture only the loose pass
+resolves, a day before Saturday's targets, so this run reads it. Same MET / NOT MET
+/ NOT READ rules as the Saturday runs. On MET it closes lane `fotmob-team-name-aliases`
+in place, replacing its checkpoint VERDICT bullet, and replaces the "NOT YET READ on
+production" sentence in `state_soccer.md`. The Saturday runs then only append
+readings. It fires 15 min before `fotmob-belgian-verify-0918` (a different lane),
+and both may write the ledger close together.
