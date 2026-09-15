@@ -428,6 +428,20 @@ death, never life — do not invert it.
 - Falsification test: a fragment appears in a shard written after both guards are live, OR a dropped "fragment" turns out not to be a suffix of any intact line (that would be data loss, not repair).
 - Verification: per the Goal, recorded in `deploys.md`.
 - Blocked by: the user's approval of the plan.
+- **P5 PRE-REGISTRATION 2026-09-15 ~15:55 CDT (user: "do 1-3", then "All three, staggered (Recommended)" and "Its own deploy, after BQ (Recommended)" for price-at-ask). Code `070a05bf` on main; 207 tests pass on main and on the off-main deploy commits.**
+  - **Files, scope widened (no other OPEN lane claims these):**
+    - `odds_book_quotes.py`: `sanitize_book_quotes_shard`, and a newline written in `append_book_quotes` before rows when the last byte is not one.
+    - `artifact_publisher.py`: the sanitize call in `publish_hot_artifact` for append-only paths, plus the `.pending` sidecar in `_apply_synced_tail`/`_resync_append_only_whole`. The retry wrapper and pattern entries are untouched.
+    - `book_quotes_repair.py`: split glued lines.
+    - Tests: `test_artifact_publisher.py`, `test_book_quotes_bad_lines.py`, `test_book_quotes_repair.py`.
+  - **OFF-MAIN deploys, by necessity.** Main carries `soccer-player-role-allocation` steps A `e53274f2` and B `b33ef901`, which that lane's peer records as not approved for deploy. Each deploy is `<service live SHA> + cherry-pick 070a05bf`, `--allow-off-main`, the precedent of lane `soccer-live-scoreboard-range-stale` (`18be9107`). Both owner sessions were messaged 20:5xZ.
+  - **Deploy 1, live-odds-worker `18be9107 + 070a05bf` = `991a94d5`.**
+    - Baseline read 20:47:42Z: web `MERGE_REFUSED_BAD_LINES` 11 since 20:00Z; live-odds-worker book_quotes `ARTIFACT_MERGE_DEFERRED` 19; `BOOK_QUOTES_LOCAL_BAD_DROPPED` 0; `BOOK_QUOTES_TORN_TAIL_TERMINATED` 0. Re-read inside 15 min of preflight.
+    - Expect: `BOOK_QUOTES_LOCAL_BAD_DROPPED` once per stale shard it publishes (mlb 09-15 `dropped` about 10, soccer 09-15 about 43), then 0 web refusals on merges from `publisher=live-odds-worker`.
+    - Falsified if web still refuses a `publisher=live-odds-worker` merge 30 min after the first drop line, or a drop line reports `kept` far below the shard's row count.
+  - **Deploy 2, refresh-worker `<live> + 070a05bf`.** Expect `STREAM_TAIL_SYNC_OK` to continue with 0 `STREAM_TAIL_SYNC_FAILED`, no `.pending` left after a successful sync, and `BOOK_QUOTES_LOCAL_BAD_DROPPED` only where its copy holds bad lines. Waits on preflight HOLD for an MLB sim.
+  - **Deploy 3, web `<live> + 070a05bf`.** Then a repair dry run (`glued_lines`/`salvaged_rows` expected on the soccer 09-13/09-18/09-20 orphans) and the apply only on the user's OK.
+  - **Then price-at-ask:** its own live-odds-worker env set (single-key PUT `SYNDICATE_POLYMARKET_PRICE_AT_ASK=1`) plus a deploy, after Deploy 1 reads clean. Verification as pre-registered in lane `polymarket-ask-pricing`.
 - **P4 READING 2026-09-15 19:28-19:50Z (after the P3 apply). Check (1) MET; check (2) NOT MET, and the cause is outside P2's scope.**
   - (1) The post-apply dry run found 20 bad lines, all of them the orphans, and 0 fragments.
   - (3) refresh-worker resynced each touched shard with `STREAM_SYNC_WHOLE reason=overlap_mismatch`, dropping exactly web's refused counts (mlb 09-15 17, soccer 09-15 43, 09-17 14, 09-18 35, 09-19 53, 09-20 20), then went back to `STREAM_TAIL_SYNC_OK`.
