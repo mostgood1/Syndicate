@@ -5,6 +5,115 @@
 
 ---
 
+## 2026-09-15 10:25 AM CT — reading only, no deploy — refresh-worker `9b214a33` (scheduled task `nfl-prop-settled-grade`, the NFL prop grade owed by the 2026-09-11 08:50 CT row) — **HEADLINE: PRODUCTION HAS GRADED 0 OF 107 WEEK-1 NFL ORDERS. All 16 games are FINAL on ESPN, yet every order reads `not_decided_yet`, game totals on final scores included. The staking decision has no production measurement behind it. This task's own ESPN grade: props +23.2% ROI over 85 rows, 95% CI [-13.7%, +64.3%] over 14 games. That spans zero, so no exclusion is recommended.**
+
+All times Central; Render stamps are UTC (+5h). No code, settings or deploy were touched.
+
+### 1. Is the grader live? YES, and it is not what is failing.
+
+- The `origin/main` copy of `bet_status_nfl.py` carries `resolve_prop` (:418) and `order_capture_dates` (:335).
+- refresh-worker's live commit is `9b214a33` (Render deploys API, live 09:37 AM CT today), and it is on `origin/main`.
+- `git merge-base --is-ancestor` exits 0 for both `2259edf8` and `0ceb9636`.
+
+### 2. Production settlement: every NFL order is ungraded, and no NFL refusal is named
+
+These are the latest `SETTLED` lines, at 10:01:54 AM CT (15:01:54Z).
+
+| plan date | orders | already_graded | ungraded |
+|---|--:|--:|---|
+| 09-10 | 618 | 541 | `not_decided_yet` 57, `order_not_filled` 13, soccer 7 |
+| 09-11 | 609 | 520 | `not_decided_yet` 57, soccer 25, `order_not_filled` 6, `ncaaf_props_not_gradeable_from_scoreboard` 1 |
+| 09-12 | 473 | 395 | `not_decided_yet` 50, soccer 15, `order_not_filled` 7, `ncaaf_team_not_in_registry_or_ambiguous` 6 |
+| 09-13 | 291 | 129 | `not_decided_yet` 129, soccer 24, `order_not_filled` 6, `game_not_in_ncaaf_live_state` 3 |
+| 09-14 | 324 | 63 | `not_decided_yet` 222, soccer 23, NCAAF 10, `awaiting_venue` 4, `order_not_filled` 2 |
+
+- **Every NFL-named reason is ABSENT on every date:** `nfl_props_not_gradeable_from_scoreboard`, `game_not_in_nfl_live_state`, `nfl_player_not_in_final_box` and the other five `nfl_*` prop refusals.
+- A search for `nfl_player` over 09-13T16:00Z..now matched nothing.
+- `BET_STATUS` carries no NFL reason either.
+
+**The per-order read.** `/api/portfolio/paper` for plan dates 09-08..09-15 was fetched at ~10:10 AM CT. Its orders are read LIVE from the ledger (`intelligence.py:4258`); only `generated_at` belongs to the plan.
+
+- 107 distinct NFL orders kick off 09-10..09-15. All are `filled`, and **107 of 107 carry `outcome=None` and `graded_at=None`**.
+  - By plan date: 09-10 14, 09-11 24, 09-12 25, 09-13 34, 09-14 10.
+  - 85 props, 22 game lines; $427.32 filled.
+- `/api/ops/execution/ledger-summary?days=10&mode=paper` agrees: `nfl | player_prop | agrees` orders 48, settled 0; `nfl | game_line | agrees` 6, settled 0.
+- SF @ LAR carried no orders, so this is the whole week-1 book: 14 games.
+
+### 3. Why: the NFL live-state capture is stale (reproduced, not directly read)
+
+- **Nothing refreshes the capture.** `poll_nfl_live_state` has no scheduled caller: grep finds only `bet_status_nfl._load_games`. That function re-polls ESPN only when the stored record is absent or has no games (`bet_status_nfl.py:246`), and refresh-worker logged 0 `NFL_LIVE_STATE` lines since Sunday 11 AM.
+- **So a pregame record is read forever.** `resolve` and `resolve_prop` return `started=False`, and `paper_settlement` files that as `not_decided_yet`. The kickoff-date lookup (`0ceb9636`) was already finding the Sunday games on 09-10 at 09:59 CT, before any had started.
+- **The replay.** This task ran the production resolver locally: `nfl_status_resolver` then `paper_settlement._our_verdict`. The box came from cached ESPN summaries, and nothing was persisted.
+  - **Arm A**, fresh scoreboard capture (`poll_nfl_live_state(persist=False)`: 09-13 13 of 13 final, 09-14 1 of 1): graded **107 of 107** (47 won, 60 lost), 0 refusals.
+  - **Arm B**, the same records forced pregame: **107 of 107 `not_decided_yet`**, exactly production's reading.
+- **NOT READ:** the stored keyvalue record itself. No ops route reads `nfl_source/api/live_state_*`.
+- NCAAF does not share the gap: it has a worker poller (`NCAAF_LIVE_STATE` lines), and it graded FAMU @ MIA.
+- **Consequence:** until the capture refreshes, every NFL order grades never. That includes game lines, not only props: ATL @ PIT over 41.5 is ungraded on a 33-point final.
+- Noted, not investigated: the ledger stamps `last_blind_write` at 2026-09-14 5:04 PM CT (`cas_retries_exhausted`, 5,000 orders written). It cannot explain this, because the NFL orders are still `not_decided_yet` on today's passes.
+
+### 4. The grade. EVERY NUMBER HERE IS THIS TASK'S, not production's
+
+- **Source:** ESPN `summary?event=` for all 15 stakeable games, all `STATUS_FINAL`, parsed with `live_player_box.player_stat_rows_from_summary`.
+- **Cross-check:** the grade matches replay arm A (the production code) on 107 of 107 orders: outcome, settled value and P&L, **0 mismatches**. Production has no grades, so it cannot be cross-checked against itself.
+- **Samples:**
+  - Chase Receptions over 7.5: 2, LOST.
+  - Bo Nix Passing TDs over 1.5: 1, LOST.
+  - Olave Anytime TD: 0, LOST.
+  - Bryce Young Interceptions over 0.5: 1, WON.
+  - ATL @ PIT total over 41.5: 33, LOST.
+- **Voids (`nfl_player_not_in_final_box`): 0.** Every staked player appears in his final box.
+- **P&L basis:** flat American-price P&L at `fill_price`. Kalshi fees are `null` on these orders and are not charged.
+
+| population | n | W-L-P | hit | staked | P&L | ROI |
+|---|--:|---|--:|--:|--:|--:|
+| **NFL props, all venues** | 85 | 41-44-0 | 48.2% | $319.87 | +$74.06 | **+23.2%** |
+| props, portfolio book (`paper`) | 47 | 22-25-0 | 46.8% | $191.45 | +$41.08 | +21.5% |
+| props, `paper:kalshi` comparison | 38 | 19-19-0 | 50.0% | $128.42 | +$32.98 | +25.7% |
+| over / yes | 84 | 40-44-0 | 47.6% | $314.05 | +$67.48 | +21.5% |
+| under | 1 | 1-0-0 | | $5.82 | +$6.58 | |
+| Receptions | 40 | 15-25-0 | 37.5% | $147.65 | +$9.06 | +6.1% |
+| Passing TDs | 24 | 14-10-0 | 58.3% | $86.16 | +$23.54 | +27.3% |
+| Anytime TD | 13 | 5-8-0 | 38.5% | $42.01 | -$2.76 | -6.6% |
+| Interceptions | 8 | 7-1-0 | 87.5% | $44.05 | +$44.23 | +100.4% |
+| **Game lines (control)** | 22 | 6-16-0 | 27.3% | $107.45 | -$47.02 | **-43.8%** |
+| totals | 16 | 4-12-0 | | $80.12 | -$55.40 | -69.1% |
+| h2h | 6 | 2-4-0 | | $27.33 | +$8.38 | +30.7% |
+
+- **What is in the book.** No receiving, rushing or passing yards prop was staked this week. The book is Receptions, Passing TDs, Anytime TD and Interceptions only, which are the markets Kalshi quotes.
+- **Rows are not independent.** The `paper:kalshi` rows are the venue-comparison book and repeat decisions the portfolio book also made.
+- **95% CI**, bootstrapped over GAMES (20,000 reps):
+  - props, all rows: [-13.7%, +64.3%] (14 games)
+  - props, portfolio book: [-27.0%, +67.3%] (13 games)
+  - game lines: [-88.0%, +16.6%] (9 games)
+
+**Calibration by `model_edge_pct`** (props):
+
+| bucket | rows | hit | ROI |
+|---|--:|--:|--:|
+| [0, 2) | 11 | 9.1% | -84.4% |
+| [2, 5) | 16 | 25.0% | -40.8% |
+| [5, 10) | 28 | 64.3% | +38.8% |
+| >= 10 | 29 | 58.6% | +36.9% |
+
+- One row sits below 0: Tremble Receptions, -1.38, won.
+- **`#651`'s prediction that the top buckets underperform was NOT observed this week.** They carried the profit.
+- Split at the `market_fair` switch (09-10 ~22:20 CT): before, 9 rows at +9.9%; after, 76 rows at +24.5%. Every row carries `sim_view=agrees` except one `disagrees`.
+- **Mean P(over).** Orders carry no raw model probability. The STAKED probability, `(1 + ev_pct) x implied(fill)`, averages **0.442** against a realised over/yes rate of **0.476** (84 rows; mean fill-implied 0.426). The opener's +0.151 over-lean did not recur on this book.
+
+**Role changes.** The ESPN boxes show one starter change: MIN, where Wentz threw 19 attempts and Murray 5. **0 staked props were on MIN.** No staked QB prop was on a player who was not his team's leading passer. Receiver role changes cannot be read from a box and were not measured.
+
+**Caps**, from `/api/portfolio/limits` with every `sources` entry `stored` (updated 09-11 5:01 PM CT): account $251.01/day and 25 orders; Kalshi and Polymarket $150.01 and 15 each; $35.01 per order.
+
+### VERDICT
+
+1. **Production grading of NFL is broken, and that is the headline.** 0 of 107 week-1 orders graded, game lines included. The cause is reproduced (a pregame live-state capture that is never re-polled) but the stored record was not read directly. Until it is fixed, `SETTLED_SAMPLE` for NFL cannot grow, and neither can any NFL ROI on `/portfolio/paper`.
+2. **Staking: do NOT add `nfl:player_prop` to `SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES` on this evidence.** Week 1 made money on props (+23.2%; portfolio book +21.5%, +$41.08, which an exclusion would have forgone), but the game-bootstrapped CI spans zero.
+   - Scaling the CI half-width (~39 ROI points at 14 games) by the square root of n: ~40 games (~3 more weeks at this rate) to exclude zero if +23% held, and ~200 games (most of the season) for ±10 points.
+   - The game-line control lost (-43.8%), and its CI also spans zero.
+3. `#651` stays OPEN. This book avoided the yardage markets its bias was measured on, so this grade does not test that bias.
+
+verify: MEASURED by this task. Its ESPN grade matched the production grader's own code on 107 of 107 orders, 0 mismatches. **Production grade: NOT MET** (0 of 107). Owed: a live-state capture that refreshes during and after games, then the same `SETTLED` lines showing NFL `outcomes` non-empty for plan dates 09-10..09-14.
+
 ## 2026-09-14 5:34 PM CT — web `70f44f05` -> `ff7ec8be` (lane `brand-logo-v3`, user decisions "go with your recommendation" then "Deploy web now") — **MET: THE SILVER SYNDICATE LETTERING SHOWS BESIDE THE HEADER LOGO WHERE THE MENU ROW HAS ROOM AND IS HIDDEN WHERE IT DOES NOT. 0 partial states in 8 production readings, pill rows identical to the slot force-hidden in every one, no overflow.**
 
 **Deploy.** `dep-dak7b8u1egvs739d5o7g`, triggered 22:30:59Z. `/versionz` returned 502 from 22:33:06Z to 22:34:27Z and served `ff7ec8be` from 22:34:48Z (5:34 PM CT). Claim held by `brand-logo-v3` from 22:29:24Z. Preflight CLEAR at 22:30:34Z for `ff7ec8be` (infrastructure processes only, plus 2 defunct children).

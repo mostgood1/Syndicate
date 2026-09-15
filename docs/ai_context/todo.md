@@ -224,6 +224,11 @@ excluded for receiving_yards) and is structurally blind to the exact defect it
 would need to referee. Validating it needs a population the harness does not
 currently produce.
 
+- **2026-09-15, week-1 settled grade (scheduled task `nfl-prop-settled-grade`; `deploys.md` 2026-09-15 10:25 AM CT).**
+  - **Production graded 0 of 107 week-1 NFL orders**, all `not_decided_yet`. The NFL live-state capture is never re-polled once it holds games, so it stays pregame. Reproduced by replaying the grader; the stored record was not read.
+  - This task's own ESPN grade, which matches the production code on 107 of 107 orders: props +23.2% ROI (85 rows; portfolio book 47 rows +21.5%), CI over 14 games [-13.7%, +64.3%]. Edge >= 5 carried the profit (57 rows, about +37%) and edge < 5 lost (27 rows).
+  - No yardage prop was staked (Receptions, Passing TDs, Anytime TD and Interceptions only), so this does NOT test the high-bias claim above. No exclusion is recommended yet; about 40 games are needed to exclude zero.
+
 ---
 
 ### `#652` — **CLOSED 2026-09-08: the NFL board was mispriced on 56% of rows, invisible on every card, and destroyable by any worker boot. All fixed and verified on production.** — lane `nfl-props-autorun-e2e`
