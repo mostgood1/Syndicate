@@ -2544,3 +2544,29 @@ starters.
 - The readings are `deploys.md` 2026-09-11 11:20 CT and 11:52 CT.
 
 **Still true, from code and NOT measured:** the NCAAF CARDS pages and other kickoff labels (`cards.py` `kickoff_label` via `_format_kickoff_label(start_date)`, and `betting_card.py`) still format the placeholder as a time. Only the day selection and the chips changed.
+
+## [ncaaf-prop-quote-join-date] NCAAF LEGACY PROP ROWS JOIN THE KICKOFF-DATE QUOTE SHARD — fixed `3157bb7b`, LIVE on refresh-worker `f833f7ec`, verified 104/104 quoted `[2026-09-15, lane ncaaf-prop-kickoff-slate-date, CLOSED GOAL MET]`
+
+**The defect:**
+- NCAAF prop rows built by `home._compact_prop_rows` carried no date.
+- `_finalize_home_prop_rows` filled a date only from `scheduled_start_utc`.
+- So `quote_enrichment._row_slate_date` returned None, and `enrich_prop_rows` joined the worker's TODAY shard. `book_quotes` shards are keyed by Central kickoff date, and there is no NCAAF shard on a weekday.
+- Production replay: 102/102 rows had no date.
+
+**The fix (`syndicate/blueprints/home.py`):**
+- For `slug == "ncaaf"`, when `slate_date` is absent, set it to `kickoff_shard_date` of the matched game's kickoff. It reads `startTime`, then `kickoff`, then `scoreboard.kickoff`, then `ncaaf_card.scoreboard.kickoff` / `scoreboard_header.kickoff`.
+- `_build_prop_dashboard_row` passes `slate_date` through.
+- Other sports are unchanged. Tests: `tests/test_home_ncaaf_prop_kickoff_date.py` (10, on the production game shape).
+
+**Measured on production** (`/api/ops/opportunity-contract/status`, `service_role` refresh-worker-4tx2, same process):
+- `ncaaf intelligence_prop rows=104 with_quote=104`, flushed 20:19:01Z (15:19 CT).
+- The previous process read rows=416, with_quote=0.
+- Reading: `deploys.md` 2026-09-15 20:22:24Z.
+
+**NOT measured:**
+- That each attached quote is the right market (`missing_market_key=104`; the join matches on the player first).
+- Whether web runs `3157bb7b`.
+
+**Still true, from code:**
+- `_row_slate_date` slices `commence_time[:10]` (the UTC date) for rows WITHOUT `slate_date`, so other sports' evening kickoffs can join the next day's shard (a lead in `leads.md`).
+- Opportunity-contract counters file non-today builds under today's key.
