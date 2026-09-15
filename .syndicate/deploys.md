@@ -35663,3 +35663,13 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Arrow, label, colour and line then agree by construction. 839 rows carried a price move since open at ~18:10Z.
   - The no-vig consensus move moves to the tooltip.
 - **Same window, not this lane:** book-quotes-splice-repair deployed refresh-worker `55fee786` at 18:06:44Z, carrying this lane's commits, and holds the claim. The score-sign change `11e24313` is not on main and waits for that claim.
+
+## 2026-09-15 18:51:17Z (13:51 CT) — READING — live-odds-worker `c725cc29` — lane fotmob-season-scoped-league-ids — **Championship verify MET; Belgian still unread**
+- Follow-up to the 2026-09-15 18:08:50Z live-odds-worker `1efdea18` -> `c725cc29` entry, whose verify named Championship and Belgian Pro League as NOT read on production. Read-only: no deploy, no env or flag change.
+- Instrument: `/api/ops/artifacts/export` for `soccer_source/<league>/api/live_state/live_state_2026-09-15.json`, read 18:51:17Z. ESPN's eng.2 scoreboard at 18:51:13Z had both 18:45Z kickoffs `in` at 6'.
+- **championship** (file generated 18:50:02Z, after the 18:15:16Z go-live): 2 games in play, and both read `momentum.supported True`, `source fotmob`:
+  - `401880274` Bristol City v Lincoln City -> `fotmob_match_id 5836816`
+  - `401880280` Middlesbrough v Millwall -> `fotmob_match_id 5836818`
+  - Both ids equal FotMob's own on its 09-15 listing. `events 2` each, at 1' in the artifact.
+- **eredivisie** (file generated 18:48:56Z): Ajax v Willem II at 45'+2' HT still `supported True`, `source fotmob`, `5781718`. `events 46`, up from 16 at 18:17Z, so the series keeps growing rather than freezing after the first tick.
+- **belgian_pro_league**: 0 in play, and ESPN's bel.1 scoreboard lists no 09-15 fixture. **STILL UNREAD on production**; next bel.1 fixture 2026-09-18 18:45Z (13:45 CT), Standard Liege at KAA Gent, which is also the accent-fold case. Evidence so far is the vendor run only: 2/4 on 09-12, both misses team-name aliases (`leads.md`).

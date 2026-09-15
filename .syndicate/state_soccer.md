@@ -452,7 +452,10 @@ leagues have `id == primaryId`). The exact-name allowlist is a fallback only.
 Commit `c725cc29`, lane `fotmob-season-scoped-league-ids`. live-odds-worker went
 live at 18:15:16Z. The first post-live eredivisie `live_state_2026-09-15.json`
 (generated 18:17:24Z) shows Ajax v Willem II at 16' with `supported True`,
-`source fotmob`, `fotmob_match_id 5781718` and 16 events. Known misses left are
+`source fotmob`, `fotmob_match_id 5781718` and 16 events. Championship read
+the same at 18:51:17Z: both in-play matches `supported True`, `source fotmob`
+(`5836816`, `5836818`). Belgian Pro League is UNREAD on production (no fixture
+on 09-15; next 2026-09-18 18:45Z (13:45 CT), Standard Liege at KAA Gent, which is also the accent-fold case). Known misses left are
 TEAM-NAME aliases (Waasland-Beveren/SK Beveren, Sint-Truidense/St.Truiden,
 LAFC/Los Angeles FC: 3 of 44 fixtures), in `leads.md`. Detail: `.syndicate/deploys.md`
 2026-09-15 18:08:50Z entry.
