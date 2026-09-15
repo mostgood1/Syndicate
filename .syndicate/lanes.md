@@ -407,6 +407,20 @@ death, never life — do not invert it.
 - Falsification test: every NO fill found reads `recorded == 1 - avgPx`, and no WON row fits (b).
 - Verification: the table and totals, recorded in `state_polymarket.md` with the orders each discriminator could and could not see.
 
+### execution-ledger-live-trim — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: [user 2026-09-15 ~16:05 CDT: "Lane: never trim live rows (Recommended)"] the execution ledger's record cap never drops a live row. Over the cap it drops the oldest PAPER rows only; if non-paper rows alone exceed the cap it keeps every one and logs a tripwire. Read on production after both workers run it: every `TRIMMED` line carries `live_dropped=0` across a full day, and the served live book's row count never falls between reads without an operator action.
+- Origin: lane `polymarket-no-fill-booking-audit`'s lead.
+  - `_MAX_RECORDS = 5000` drops oldest-first ACROSS modes (`execution_ledger.py:971-976`). The ledger sits at the cap: `TRIMMED dropped=1 kept=5000` logged 167 times on refresh-worker and 6 on live-odds-worker 09-15 12:00-20:50Z.
+  - 20 live Polymarket orders with venue `FILL_PRICE` readings 09-01..09-04 are absent from `/api/portfolio/live?on=all&venue=polymarket&show=all` (49 rows).
+- Files: `syndicate/features/shared/execution_ledger.py` (the trim in `_persist` and its log line only), `tests/test_execution_ledger.py` (trim tests only). HANDED from this session's lane `polymarket-rejected-resubmit-loop`.
+- Hypothesis: paper volume (about 230 orders/day) keeps the ledger at the cap, and live rows are dropped only for being oldest; no rule targets them.
+- Falsification: after deploy, any `TRIMMED` line with `live_dropped>0`, or a live book row count that falls between two reads with no operator action.
+- Size: live rows are a few per day and about 1,094 B each, so protecting them cannot approach the store's 8 MB refusal ceiling within any horizon that matters. The tripwire covers the case anyway.
+- **Lost live Polymarket fills (not in the served book 2026-09-15 ~20:40Z), by venue order id:** `C4N3GPYA4GNQ`, `C5Z80VJKYKDK`, `C7A2NRX2EKDF`, `C7CEAC90MKDD`, `C7CEAP1SRKDM`, `C7CG2G8CCKDK`, `C7CGCT7PTKDN`, `C7CNYDJV4KDH`, `C7CX3YKB4KDN`, `C7G9F92G8KDD`, `C7GA29PGCKDD`, `C7WAS5YB4MCS`, `C7V7H872JMA6`, `C7YJT13SEM9F`, `C8292W0ATMA3`, `C84V9M1Z6MCK`, `C8GBQRTHMMW0`, `C8ZAFJ9S6MW0`, `C9B0G201JMVG`, `C9CHPYTAJMVG`.
+  - Restorable later from the venue's per-order read by id. Not in scope here.
+  - Kalshi losses are uncounted.
+- Blocked by: none for code. Deploys to live-odds-worker and refresh-worker are the user's call, sequenced after lane `soccer-player-role-allocation`'s ~21:25Z tip deploys.
+
 ### book-quotes-splice-repair — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **P3 APPLIED 19:28:33Z; P4 (1) and (3) MET, (2) NOT MET: live-odds-worker republishes stale copies**
 - **VERDICT (checkpoint 2026-09-15 ~15:10 CDT).** Goal: "[user 2026-09-15: "open the lane and bring me the plan"] no `book_quotes` shard gains a headless fragment line, and the shards already damaged are repaired. Read on production after the fix: 0 lines failing `json.loads` in newly written shards on web and refresh-worker across a full capture day; the refresh-worker byte-offset tail pull never appends into a file that is not a byte prefix of web's copy (the mismatch case is logged by name); and the affected historical shards read clean or are listed with their bad-line counts." — **GOAL: NOT MET.**
   - Done:
@@ -528,7 +542,7 @@ death, never life — do not invert it.
 
 ### polymarket-rejected-resubmit-loop — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - Goal: [user 2026-09-15: "open a lane for the rejection loop"] a Polymarket order the venue REJECTS is not re-submitted unchanged on every pass, and its reject reason is logged. Read on production: after the fix, a venue rejection produces ONE `submitted->rejected` per (ticker, price, qty), a named reason on the log line, and no further `SUBMIT` for that ticker until something about the order changes. Accepted orders are unaffected (fills, rests and expiries continue).
-- Files: `syndicate/features/shared/execution_ledger.py` (a venue-rejected-unchanged refusal in `place_order` only), `tests/test_execution_ledger.py` (those tests only). DECLARED 2026-09-15 ~11:55 CDT before any edit, on user decision "do all 3". Claims checked with lane-guard's own `_claims()`: none held. NOT `pipeline/execute_portfolio.py`, which OPEN lane `kalshi-shard-balance-gate` claims; the fix is built to need no change there. The submit-response log goes in the Polymarket orders module under lane polymarket-ask-pricing (same session).
+- Files: RETURNED 2026-09-15 ~16:05 CDT -- the execution ledger module and its test file are HANDED to lane execution-ledger-live-trim (same session); the resend refusal already landed (1f9c9c62). Originally DECLARED 2026-09-15 ~11:55 CDT before any edit, on user decision "do all 3". Claims checked with lane-guard's own `_claims()`: none held. NOT `pipeline/execute_portfolio.py`, which OPEN lane `kalshi-shard-balance-gate` claims; the fix is built to need no change there. The submit-response log goes in the Polymarket orders module under lane polymarket-ask-pricing (same session).
 - Origin: found while reading step 1 of `polymarket-ask-pricing` (`deploys.md` 2026-09-15 ~15:55Z).
 - **MEASURED 2026-09-15 before any code, live-odds-worker `54f3d662`:**
   - `aec-nfl-phi-ten-2026-09-20`, `OUTCOME_SIDE_NO`, qty 6.53 @ 0.245 ($1.60), GTD to kickoff 09-20 17:00Z.
