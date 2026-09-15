@@ -1446,6 +1446,52 @@ def _unrecorded_refusal(request: OrderRequest, token: str, message: str) -> dict
     }
 
 
+# The `error` reconciliation stamps when the VENUE refused an order it received
+# (`venue_{venue_status}` in the dead branch of `reconcile_live_orders`).
+_VENUE_REJECTED_ERROR = "venue_order_state_rejected"
+
+
+def _same_amount(a: Any, b: Any) -> bool:
+    try:
+        return abs(float(a) - float(b)) < 1e-9
+    except (TypeError, ValueError):
+        return False
+
+
+def _venue_rejected_unchanged(request: OrderRequest) -> str | None:
+    """Why this order must not be sent again, or None when a send may proceed.
+
+    `rejected` means "never reached the venue" everywhere it is written by US
+    (a 410 route, a 503, a build refusal), and those are rightly retried. A
+    VENUE `ORDER_STATE_REJECTED` is different: the venue received this exact
+    body and refused it, and nothing about sending it again changes that.
+    Measured 2026-09-15 on live-odds-worker: `aec-nfl-phi-ten-2026-09-20` NO
+    6.53 @ 0.245 was re-submitted on every pass from 05:18Z and rejected
+    instantly 34 times, holding $1.60 of buying power as `submitted` for part
+    of every pass.
+
+    ONLY WHILE UNCHANGED. The idempotency key excludes price and stake, so a
+    re-priced or re-sized position under the same key is a different order and
+    is sent. A row missing either figure is treated as changed -- the old
+    behaviour -- rather than blocking on an unknown.
+    """
+    order = find_order(idempotency_key(request))
+    if order is None or order.get("status") != STATUS_REJECTED:
+        return None
+    if str(order.get("error") or "").strip().lower() != _VENUE_REJECTED_ERROR:
+        return None
+    if not (
+        _same_amount(order.get("requested_price"), request.requested_price)
+        and _same_amount(order.get("requested_stake_dollars"), request.requested_stake_dollars)
+    ):
+        return None
+    return (
+        f"the venue rejected this exact order (venue_order_id={order.get('venue_order_id')!r}"
+        f" price={request.requested_price} stake={request.requested_stake_dollars});"
+        " not re-sent until its price or stake changes"
+    )
+
+
 def place_order(
     request: OrderRequest,
     *,
@@ -1508,6 +1554,13 @@ def place_order(
     existing = _blocking_record_for(request)
     if existing is not None:
         return existing
+
+    # NOT RE-SENT UNCHANGED AFTER THE VENUE SAID NO  [2026-09-15, lane
+    # polymarket-rejected-resubmit-loop, user decision "do all 3"]. Before the
+    # build, so a refused order pays no market or book read either.
+    venue_said_no = _venue_rejected_unchanged(request)
+    if venue_said_no is not None:
+        return _unrecorded_refusal(request, "venue_rejected_unchanged", venue_said_no)
 
     send, refusal = _build_before_record(request, submit)
     if refusal is not None:

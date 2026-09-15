@@ -647,7 +647,7 @@ death, never life — do not invert it.
 
 ### polymarket-rejected-resubmit-loop — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - Goal: [user 2026-09-15: "open a lane for the rejection loop"] a Polymarket order the venue REJECTS is not re-submitted unchanged on every pass, and its reject reason is logged. Read on production: after the fix, a venue rejection produces ONE `submitted->rejected` per (ticker, price, qty), a named reason on the log line, and no further `SUBMIT` for that ticker until something about the order changes. Accepted orders are unaffected (fills, rests and expiries continue).
-- Files: none yet. Diagnostic first; files are declared before any edit. (The Polymarket orders module is held by lane polymarket-ask-pricing, owned by the same session; any edit there is coordinated in both blocks.)
+- Files: `syndicate/features/shared/execution_ledger.py` (a venue-rejected-unchanged refusal in `place_order` only), `tests/test_execution_ledger.py` (those tests only). DECLARED 2026-09-15 ~11:55 CDT before any edit, on user decision "do all 3". Claims checked with lane-guard's own `_claims()`: none held. NOT `pipeline/execute_portfolio.py`, which OPEN lane `kalshi-shard-balance-gate` claims; the fix is built to need no change there. The submit-response log goes in the Polymarket orders module under lane polymarket-ask-pricing (same session).
 - Origin: found while reading step 1 of `polymarket-ask-pricing` (`deploys.md` 2026-09-15 ~15:55Z).
 - **MEASURED 2026-09-15 before any code, live-odds-worker `54f3d662`:**
   - `aec-nfl-phi-ten-2026-09-20`, `OUTCOME_SIDE_NO`, qty 6.53 @ 0.245 ($1.60), GTD to kickoff 09-20 17:00Z.
@@ -668,6 +668,18 @@ death, never life — do not invert it.
   - R dies if the re-submits come from a new plan row each pass, not from retry of the rejected row.
 - Verification: in `deploys.md` after the fix deploy, one rejection per (ticker, price, qty) with its reason logged, 0 re-submits of it on later passes, and fills/rests/expiries continuing at their prior rate.
 - Blocked by: none. A change to live order flow needs the user's go before deploy; live-odds-worker places real orders.
+- **STATUS 2026-09-15 ~12:10 CDT: fixes (1) and (2) BUILT, NOT DEPLOYED. GOAL: NOT MET until a live-odds-worker deploy shows it.**
+  - **(1) `execution_ledger.place_order`**, LIVE, after the duplicate check and BEFORE the build: `_venue_rejected_unchanged(request)`.
+    - When the key's row is `rejected` with `error == venue_order_state_rejected` and the same `requested_price` and `requested_stake_dollars`, it refuses `venue_rejected_unchanged` via `_unrecorded_refusal`.
+    - Nothing is built, sent or written, and `execute_portfolio`'s existing refused-at-build branch counts it by name (no change to that file).
+    - A re-sized or re-priced order under the same key is sent. Venue cancels and expiries, and our own pre-send rejects, keep today's retry. A row missing either figure is treated as changed.
+  - **(2) `polymarket_us_orders.submit_order`** logs `SUBMIT_RESPONSE` (keys, order keys, id, status, executions count) before reducing the response. It never raises.
+  - **Tests:**
+    - 5 in `test_execution_ledger.py`: unchanged not sent and no write; re-sized sent; cancel, expiry and pre-send reject still retried.
+    - 2 in `test_polymarket_us_orders.py`: shape logged; unloggable response never fails the send.
+    - 312 passed across the orders, ledger and execute_portfolio files (clean origin/main baseline: 224 in ledger+portfolio, now 229).
+    - NOT run: the unwired check against HEAD's module.
+  - (3), charging NO orders `(1-price) x qty`, waits on the NO-convention reading.
 - **DIAGNOSIS 2026-09-15 ~11:45 CDT (read-only agent for session 0f5b256e; logs + code; extracts in the session scratchpad). No code changed.**
   - **(R) CONFIRMED: why it re-submits.**
     - A venue `ORDER_STATE_REJECTED` is mapped into the dead group (`venue_order_states.py:58`). Reconcile then writes OUR `rejected` status (`execution_ledger.py:2602-2615`).

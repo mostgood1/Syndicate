@@ -285,6 +285,38 @@ def test_an_unrecognised_status_is_not_a_fill(monkeypatch):
     )["status"] == "submitted"
 
 
+def test_the_submit_response_shape_is_logged(monkeypatch, capsys):
+    """Lane polymarket-rejected-resubmit-loop: the venue rejected one order 34
+    times and nothing we kept said why. The response's shape is now visible."""
+    from syndicate.features.shared import polymarket_us_orders as mod
+
+    monkeypatch.setattr(
+        "syndicate.features.shared.polymarket_us_auth.signed_request",
+        lambda *a, **k: {"id": "ord-4", "executions": [{"px": "0.55"}], "extra": 1},
+    )
+    mod.submit_order(_Request(), price_dollars=0.55, market_slug="s", tick_size=0.01, minimum_trade_qty=1)
+    out = capsys.readouterr().out
+    assert "SUBMIT_RESPONSE slug=s" in out
+    assert "keys=['executions', 'extra', 'id']" in out
+    assert "id=ord-4" in out and "executions=1" in out
+
+
+def test_an_unloggable_response_never_fails_the_send(monkeypatch, capsys):
+    from syndicate.features.shared import polymarket_us_orders as mod
+
+    class _Weird(dict):
+        def keys(self):
+            raise RuntimeError("no keys for you")
+
+    monkeypatch.setattr(
+        "syndicate.features.shared.polymarket_us_auth.signed_request",
+        lambda *a, **k: _Weird(id="ord-5"),
+    )
+    result = mod.submit_order(_Request(), price_dollars=0.55, market_slug="s", tick_size=0.01, minimum_trade_qty=1)
+    assert result["venue_order_id"] == "ord-5"
+    assert "SUBMIT_RESPONSE_UNLOGGABLE" in capsys.readouterr().out
+
+
 def test_the_order_route_can_be_overridden_without_a_deploy(monkeypatch):
     """Kalshi's create route MOVED and cost an http_410 to discover. This one
     is documented -- but "documented" was also true of the route that moved."""

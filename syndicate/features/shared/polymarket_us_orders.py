@@ -860,6 +860,28 @@ def submit_order(
     )
     response = signed_request("POST", url, body=body)
 
+    # THE RESPONSE, BEFORE WE REDUCE IT  [2026-09-15, lane
+    # polymarket-rejected-resubmit-loop]. The venue rejected one order 34 times
+    # in a day and no reason was ever visible: the order object carries none,
+    # and everything here but the id and status was discarded. So log the
+    # response's SHAPE -- its keys, the id, the status, how many executions --
+    # never its values beyond those, so the next rejection shows what the venue
+    # actually returned.
+    try:
+        _order_view = response.get("order") if isinstance(response.get("order"), Mapping) else response
+        _executions = response.get("executions")
+        print(
+            f"[polymarket_us_orders] SUBMIT_RESPONSE slug={body.get('marketSlug')}"
+            f" keys={sorted(response.keys()) if isinstance(response, Mapping) else type(response).__name__}"
+            f" order_keys={sorted(_order_view.keys()) if isinstance(_order_view, Mapping) else None}"
+            f" id={_order_view.get('id') or _order_view.get('orderId') if isinstance(_order_view, Mapping) else None}"
+            f" status={_order_view.get('status') if isinstance(_order_view, Mapping) else None}"
+            f" executions={len(_executions) if isinstance(_executions, list) else None}",
+            flush=True,
+        )
+    except Exception as exc:  # noqa: BLE001 -- a log line must never fail a send
+        print(f"[polymarket_us_orders] SUBMIT_RESPONSE_UNLOGGABLE {type(exc).__name__}", flush=True)
+
     # WHAT THE VENUE ACTUALLY SAYS, never a default of `filled`. The documented
     # 200 carries only an `id` -- creation, NOT execution. Kalshi's phantom
     # fill came from exactly this: an accepted order booked as a traded one.

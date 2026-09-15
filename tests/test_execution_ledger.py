@@ -2799,6 +2799,59 @@ def test_a_duplicate_is_answered_WITHOUT_building(monkeypatch):
     assert "recorded" not in again
 
 
+# --------------------------------------------------------------------------
+# A VENUE REJECTION IS NOT RE-SENT UNCHANGED  [2026-09-15, lane
+# polymarket-rejected-resubmit-loop]. Measured: one $1.60 Polymarket NO order
+# re-submitted and rejected by the venue 34 times in one day.
+# --------------------------------------------------------------------------
+
+
+def _venue_rejected(monkeypatch, request, *, error="venue_order_state_rejected"):
+    _armed(monkeypatch)
+    first = place_order(request, submit=_TwoPhase(), mode=LIVE)
+    complete_order(first["idempotency_key"], status=STATUS_REJECTED, error=error)
+    return ledger.find_order(first["idempotency_key"])
+
+
+def test_a_venue_rejected_order_is_not_sent_again_unchanged(monkeypatch):
+    request = _request(venue="polymarket", position_key="phi-ten-no")
+    before = _venue_rejected(monkeypatch, request)
+    assert before["error"] == "venue_order_state_rejected"
+
+    writes = _ledger_writes(monkeypatch)
+    adapter = _TwoPhase()
+    again = place_order(request, submit=adapter, mode=LIVE)
+
+    assert adapter.built == [] and adapter.sent == []
+    assert again["recorded"] is False
+    assert again["refusal"] == "venue_rejected_unchanged"
+    assert writes == []
+    assert ledger.find_order(before["idempotency_key"]) == before
+
+
+def test_a_re_sized_order_under_the_same_key_is_sent(monkeypatch):
+    """The key excludes price and stake: a changed order is a different order."""
+    request = _request(venue="polymarket", position_key="phi-ten-no")
+    _venue_rejected(monkeypatch, request)
+    resized = _request(venue="polymarket", position_key="phi-ten-no", requested_stake_dollars=4.0)
+    assert idempotency_key(resized) == idempotency_key(request)
+
+    adapter = _TwoPhase()
+    again = place_order(resized, submit=adapter, mode=LIVE)
+    assert len(adapter.built) == 1 and len(adapter.sent) == 1
+    assert "recorded" not in again
+
+
+@pytest.mark.parametrize("error", ["venue_order_state_cancelled", "venue_order_state_expired", "dead route"])
+def test_other_rejections_are_still_retried(monkeypatch, error):
+    """A venue cancel/expiry and a pre-send reject keep today's retry."""
+    request = _request(venue="polymarket", position_key=f"retry-{error}")
+    _venue_rejected(monkeypatch, request, error=error)
+    adapter = _TwoPhase()
+    place_order(request, submit=adapter, mode=LIVE)
+    assert len(adapter.sent) == 1
+
+
 def test_a_disarmed_live_order_writes_nothing(monkeypatch):
     """Disarmed is a refusal made without a venue call, like a refused build. It
     wrote a row per position per pass, each one strandable -- and a stranded row
