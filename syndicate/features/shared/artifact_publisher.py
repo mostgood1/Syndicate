@@ -3179,32 +3179,23 @@ def pull_streamed_artifact(relative_path: str, *, timeout_seconds: int = 120) ->
         local_size = 0
 
     headers = {"Authorization": f"Bearer {token}"}
-    # #248: APPEND-ONLY families are fetched by their TAIL, not whole.
+    # APPEND-ONLY FAMILIES WITH A LOCAL COPY ARE SYNCED BY OFFSET, never by a
+    # blind tail append.  [2026-09-15, lane book-quotes-splice-repair, P2]
     #
-    # `book_quotes/<date>.jsonl` only ever grows -- the capture appends, it never
-    # rewrites -- so re-fetching 74MB to learn about the last few KB is pure
-    # waste, and on this worker it is not merely wasteful: refresh-worker
-    # plateaus at 2.65-2.70GB of 4GB (handoff_refresh_worker_oom.md) leaving
-    # ~1.4GB headroom, and #241's 120s whole-shard re-stream put it into a
-    # ~3-minute restart loop within the hour.
-    #
-    # The server needs no change: /api/ops/artifacts/stream serves via
-    # send_file(conditional=True), which honours HTTP Range already.
-    tail_from = local_size if (local_size > 0 and _is_append_only(normalized)) else 0
-    # NO `since=` ON A TAIL (2026-09-13). The stream route answers 304 on
-    # `st_mtime <= since` BEFORE it looks at Range (`ops.py`), and a 304 is a
-    # silent success below. So any local mtime at or past web's -- a torn append
-    # on a full disk, a local write, or this very tail's `open("ab")` stamping
-    # now() -- froze the copy until web's next write. Measured: refresh-worker's
-    # NFL 09-13 shard sat at 19,914,752 B with sportsbook prices from 09-12
-    # 08:02Z while web held 28,757,424 B captured 13:40Z, and the board served 0
-    # NFL rows for the Sunday slate. For an append-only file the byte offset IS
-    # the watermark: 206 carries the new tail, 416 means we hold everything.
-    url = _stream_url(normalized, since_epoch=None if tail_from else local_mtime)
+    # #248 fetched them by `Range: bytes=<local size>-` (a whole re-stream of a
+    # ~100MB shard had put refresh-worker into #241's restart loop), and
+    # 2026-09-13 dropped `since=` from that tail. Both assumed the local file is
+    # a byte prefix of web's. On refresh-worker it is not: this worker ALSO
+    # appends its own venue rows to the same shard, so a tail after a local
+    # append started mid-line and spliced a headless fragment in -- 29 in web's
+    # mlb 09-03, 190 in soccer 09-13 -- and the whole-file publish carried each
+    # one back to web. `_pull_append_only_synced` tracks how much of the local
+    # file is web's and verifies an overlap before writing anything.
+    if local_size > 0 and _is_append_only(normalized):
+        return _pull_append_only_synced(normalized, target_path, headers, timeout_seconds)
+    url = _stream_url(normalized, since_epoch=local_mtime)
     if not url:
         return False, 0
-    if tail_from:
-        headers["Range"] = f"bytes={tail_from}-"
     request_obj = urllib_request.Request(url, method="GET", headers=headers)
 
     temp_path: Path | None = None
@@ -3212,41 +3203,15 @@ def pull_streamed_artifact(relative_path: str, *, timeout_seconds: int = 120) ->
         with urllib_request.urlopen(request_obj, timeout=timeout_seconds) as response:
             remote_mtime_raw = response.headers.get("X-Artifact-Mtime")
             target_path.parent.mkdir(parents=True, exist_ok=True)
-            # A 206 means the server honoured the Range and this body is only
-            # the new tail -- append it in place. Anything else is a whole file
-            # and replaces the local copy, which is also the correct behaviour
-            # when the shard was rotated or rewritten and our offset is stale.
-            appended = tail_from > 0 and getattr(response, "status", None) == 206
-            if appended:
-                total = 0
-                with open(target_path, "ab") as handle:
-                    while True:
-                        chunk = response.read(_STREAM_CHUNK_BYTES)
-                        if not chunk:
-                            break
-                        handle.write(chunk)
-                        total += len(chunk)
-            else:
-                # uuid4-suffixed for the same concurrency reason the bulk pull's
-                # temp names are (see _pull_hot_artifacts_request).
-                temp_path = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.stream.tmp"
-                total = 0
-                with open(temp_path, "wb") as handle:
-                    while True:
-                        chunk = response.read(_STREAM_CHUNK_BYTES)
-                        if not chunk:
-                            break
-                        handle.write(chunk)
-                        total += len(chunk)
-        if temp_path is not None:
-            os.replace(temp_path, target_path)
-            temp_path = None
-        if appended:
-            print(
-                f"[artifact_publisher] STREAM_TAIL_OK path={normalized} appended_bytes={total} from_offset={tail_from}",
-                flush=True,
-            )
-            return True, (1 if total else 0)
+            # uuid4-suffixed for the same concurrency reason the bulk pull's
+            # temp names are (see _pull_hot_artifacts_request).
+            temp_path = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.stream.tmp"
+            total = _stream_response_to(response, temp_path)
+        os.replace(temp_path, target_path)
+        temp_path = None
+        if _is_append_only(normalized):
+            # A whole copy of web's file: every byte of it is web's.
+            _write_webpos(target_path, total)
         # Stamp the copy with web's mtime, not now(): the next cycle sends
         # this back as since=, and a local mtime later than the source would
         # make an updated shard look already-current forever.
@@ -3259,11 +3224,6 @@ def pull_streamed_artifact(relative_path: str, *, timeout_seconds: int = 120) ->
         print(f"[artifact_publisher] STREAM_PULL_OK path={normalized} bytes={total}", flush=True)
         return True, 1
     except urllib_error.HTTPError as exc:
-        if exc.code == 416:
-            # Range Not Satisfiable: our offset is at or past the remote size,
-            # i.e. we already hold everything. A success that writes nothing --
-            # the same steady state a 304 represents.
-            return True, 0
         if exc.code == 304:
             # Already current. The steady state, and the reason this is cheap
             # enough to call every cycle.
@@ -3288,6 +3248,282 @@ def pull_streamed_artifact(relative_path: str, *, timeout_seconds: int = 120) ->
                 temp_path.unlink()
         except Exception:
             pass
+
+
+# ---------------------------------------------------------------------------
+# APPEND-ONLY SYNC  [2026-09-15, lane book-quotes-splice-repair, P2]
+# ---------------------------------------------------------------------------
+#
+# `.<shard>.webpos` beside the shard records how many LEADING bytes of the local
+# file are web's bytes. Everything after it is rows this service appended itself
+# that web may not have merged yet.
+#
+#   * TAIL (the normal case): ask web for `bytes=<webpos - overlap>-`, check the
+#     overlap is byte-identical to our own bytes there, and only then -- under
+#     the lock `append_book_quotes` also takes -- cut the file at `webpos`,
+#     write web's new bytes, and re-append our local rows web's tail does not
+#     already contain. Cheap: the transfer is the new tail plus 4KB.
+#   * WHOLE (overlap mismatch, 416, or a non-206 answer): one full pull, plus our
+#     local rows web lacks. Fragments on our side are dropped (not JSON objects);
+#     web's bytes are kept exactly, so the next cycle's overlap matches again.
+
+_SYNC_OVERLAP_BYTES = 4096
+
+
+def _webpos_path(target_path: Path) -> Path:
+    return target_path.with_name(f".{target_path.name}.webpos")
+
+
+def _read_webpos(target_path: Path) -> int | None:
+    try:
+        return int(_webpos_path(target_path).read_text(encoding="utf-8").strip())
+    except Exception:
+        return None
+
+
+def _write_webpos(target_path: Path, value: int) -> None:
+    try:
+        sidecar = _webpos_path(target_path)
+        temp = sidecar.with_name(f"{sidecar.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
+        temp.write_text(str(int(value)), encoding="utf-8")
+        os.replace(temp, sidecar)
+    except Exception:
+        pass
+
+
+def _stream_response_to(response: Any, path: Path) -> int:
+    total = 0
+    with open(path, "wb") as handle:
+        while True:
+            chunk = response.read(_STREAM_CHUNK_BYTES)
+            if not chunk:
+                break
+            handle.write(chunk)
+            total += len(chunk)
+    return total
+
+
+def _line_digest(line: bytes) -> bytes:
+    return hashlib.blake2b(line, digest_size=16).digest()
+
+
+def _is_json_object_line(line: bytes) -> bool:
+    try:
+        return isinstance(json.loads(line), dict)
+    except Exception:
+        return False
+
+
+def _ends_with_newline(path: Path) -> bool:
+    try:
+        with open(path, "rb") as handle:
+            handle.seek(-1, os.SEEK_END)
+            return handle.read(1) == b"\n"
+    except OSError:
+        return True
+
+
+def _pull_append_only_synced(
+    normalized: str, target_path: Path, headers: dict[str, str], timeout_seconds: int
+) -> tuple[bool, int]:
+    try:
+        size = int(target_path.stat().st_size)
+    except OSError:
+        size = 0
+    webpos = _read_webpos(target_path)
+    if webpos is None or webpos <= 0 or webpos > size:
+        # No record yet (the first sync after this shipped) or the file shrank:
+        # assume all of it is web's. If that is wrong the overlap says so.
+        webpos = size
+    start = max(0, webpos - _SYNC_OVERLAP_BYTES)
+    try:
+        with open(target_path, "rb") as handle:
+            handle.seek(start)
+            overlap = handle.read(webpos - start)
+    except OSError as exc:
+        print(f"[artifact_publisher] STREAM_PULL_FAILED path={normalized} error={exc}", flush=True)
+        return False, 0
+    url = _stream_url(normalized, since_epoch=None)
+    if not url:
+        return False, 0
+    tail_headers = dict(headers)
+    tail_headers["Range"] = f"bytes={start}-"
+    temp = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.tail.tmp"
+    reason = ""
+    try:
+        try:
+            request_obj = urllib_request.Request(url, method="GET", headers=tail_headers)
+            with urllib_request.urlopen(request_obj, timeout=timeout_seconds) as response:
+                status = getattr(response, "status", None)
+                received = _stream_response_to(response, temp)
+        except urllib_error.HTTPError as exc:
+            if exc.code == 404:
+                print(f"[artifact_publisher] STREAM_PULL_ABSENT path={normalized}", flush=True)
+                return False, 0
+            if exc.code != 416:
+                print(f"[artifact_publisher] STREAM_PULL_FAILED path={normalized} status={exc.code}", flush=True)
+                return False, 0
+            status, received = 416, 0
+        if status == 206:
+            with open(temp, "rb") as handle:
+                head = handle.read(len(overlap))
+            if head == overlap:
+                new_bytes = received - len(overlap)
+                if new_bytes <= 0:
+                    return True, 0
+                return _apply_synced_tail(normalized, target_path, temp, len(overlap), webpos, new_bytes)
+            reason = "overlap_mismatch"
+        else:
+            reason = f"status_{status}"
+    except (urllib_error.URLError, TimeoutError, OSError) as exc:
+        print(f"[artifact_publisher] STREAM_PULL_FAILED path={normalized} error={exc}", flush=True)
+        return False, 0
+    except Exception as exc:  # pragma: no cover - defensive, must never raise
+        print(f"[artifact_publisher] STREAM_PULL_UNEXPECTED_ERROR path={normalized} error={exc}", flush=True)
+        return False, 0
+    finally:
+        try:
+            temp.unlink(missing_ok=True)
+        except Exception:
+            pass
+    return _resync_append_only_whole(
+        normalized, target_path, headers, timeout_seconds, reason, local_size=size, webpos=webpos
+    )
+
+
+def _apply_synced_tail(
+    normalized: str, target_path: Path, temp: Path, skip: int, webpos: int, new_bytes: int
+) -> tuple[bool, int]:
+    from syndicate.features.shared.odds_book_quotes import shard_append_lock
+
+    try:
+        web_digests: set[bytes] = set()
+        with open(temp, "rb") as handle:
+            handle.seek(skip)
+            for raw in handle:
+                line = raw.rstrip(b"\r\n")
+                if line:
+                    web_digests.add(_line_digest(line))
+        merged = dropped_bad = 0
+        keep: list[bytes] = []
+        with shard_append_lock(target_path):
+            with open(target_path, "r+b") as handle:
+                handle.seek(webpos)
+                for raw in handle.read().split(b"\n"):
+                    line = raw.rstrip(b"\r")
+                    if not line:
+                        continue
+                    if _line_digest(line) in web_digests:
+                        merged += 1
+                        continue
+                    if not _is_json_object_line(line):
+                        dropped_bad += 1
+                        continue
+                    keep.append(line)
+                handle.seek(webpos)
+                handle.truncate()
+                with open(temp, "rb") as source:
+                    source.seek(skip)
+                    while True:
+                        chunk = source.read(_STREAM_CHUNK_BYTES)
+                        if not chunk:
+                            break
+                        handle.write(chunk)
+                if keep:
+                    handle.flush()
+                    handle.seek(-1, os.SEEK_END)
+                    if handle.read(1) != b"\n":
+                        handle.write(b"\n")
+                    for line in keep:
+                        handle.write(line + b"\n")
+            _write_webpos(target_path, webpos + new_bytes)
+    except Exception as exc:
+        print(f"[artifact_publisher] STREAM_TAIL_SYNC_FAILED path={normalized} error={type(exc).__name__}: {exc}", flush=True)
+        return False, 0
+    print(
+        f"[artifact_publisher] STREAM_TAIL_SYNC_OK path={normalized} from_offset={webpos} web_bytes={new_bytes}"
+        f" local_rows_kept={len(keep)} local_rows_now_on_web={merged} local_bad_dropped={dropped_bad}",
+        flush=True,
+    )
+    return True, 1
+
+
+def _resync_append_only_whole(
+    normalized: str,
+    target_path: Path,
+    headers: dict[str, str],
+    timeout_seconds: int,
+    reason: str,
+    *,
+    local_size: int,
+    webpos: int,
+) -> tuple[bool, int]:
+    from syndicate.features.shared.odds_book_quotes import shard_append_lock
+
+    url = _stream_url(normalized, since_epoch=None)
+    if not url:
+        return False, 0
+    temp = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.whole.tmp"
+    try:
+        try:
+            request_obj = urllib_request.Request(url, method="GET", headers=dict(headers))
+            with urllib_request.urlopen(request_obj, timeout=timeout_seconds) as response:
+                total = _stream_response_to(response, temp)
+        except urllib_error.HTTPError as exc:
+            if exc.code == 404:
+                print(f"[artifact_publisher] STREAM_PULL_ABSENT path={normalized}", flush=True)
+            else:
+                print(f"[artifact_publisher] STREAM_PULL_FAILED path={normalized} status={exc.code}", flush=True)
+            return False, 0
+        web_digests: set[bytes] = set()
+        with open(temp, "rb") as handle:
+            for raw in handle:
+                line = raw.rstrip(b"\r\n")
+                if line:
+                    web_digests.add(_line_digest(line))
+        dropped_bad = 0
+        keep: list[bytes] = []
+        with shard_append_lock(target_path):
+            if target_path.is_file():
+                with open(target_path, "rb") as handle:
+                    for raw in handle:
+                        line = raw.rstrip(b"\r\n")
+                        if not line:
+                            continue
+                        digest = _line_digest(line)
+                        if digest in web_digests:
+                            continue
+                        if not _is_json_object_line(line):
+                            dropped_bad += 1
+                            continue
+                        web_digests.add(digest)
+                        keep.append(line)
+            if keep:
+                needs_newline = bool(total) and not _ends_with_newline(temp)
+                with open(temp, "ab") as out:
+                    if needs_newline:
+                        out.write(b"\n")
+                    for line in keep:
+                        out.write(line + b"\n")
+            os.replace(temp, target_path)
+            _write_webpos(target_path, total)
+    except (urllib_error.URLError, TimeoutError, OSError) as exc:
+        print(f"[artifact_publisher] STREAM_PULL_FAILED path={normalized} error={exc}", flush=True)
+        return False, 0
+    except Exception as exc:  # pragma: no cover - defensive, must never raise
+        print(f"[artifact_publisher] STREAM_PULL_UNEXPECTED_ERROR path={normalized} error={exc}", flush=True)
+        return False, 0
+    finally:
+        try:
+            temp.unlink(missing_ok=True)
+        except Exception:
+            pass
+    print(
+        f"[artifact_publisher] STREAM_SYNC_WHOLE path={normalized} reason={reason} local_size={local_size}"
+        f" webpos={webpos} web_bytes={total} local_rows_kept={len(keep)} local_bad_dropped={dropped_bad}",
+        flush=True,
+    )
+    return True, 1
 
 
 # Season-scoped sim inputs. **These are the files `pull_hot_artifacts` cannot

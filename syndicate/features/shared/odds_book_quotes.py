@@ -54,6 +54,7 @@ import gzip
 import json
 import os
 from collections import OrderedDict
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Mapping
@@ -631,6 +632,48 @@ def read_quote_last_seen(sport: str, date_str: str) -> dict[str, str]:
     return out
 
 
+@contextmanager
+def shard_append_lock(path: Path):
+    """An exclusive, cross-process lock on ONE shard, held around every write.
+
+    [2026-09-15, lane book-quotes-splice-repair, P2] refresh-worker both appends
+    its own venue rows to a shard AND syncs web's copy into it
+    (`artifact_publisher._pull_append_only_synced`), which rewrites the part of
+    the file after the last synced offset. Without a shared lock an append
+    landing between that read and its truncate would be lost. `flock` on a
+    dotfile beside the shard: released by the kernel if the holder dies, and a
+    no-op where `fcntl` does not exist (a Windows dev box). A lock that cannot
+    be taken never stops the write -- losing the capture is worse.
+    """
+    target = Path(path)
+    handle = None
+    try:
+        lock_path = target.with_name(f".{target.name}.lock")
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        handle = open(lock_path, "a+b")
+        try:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        except ImportError:
+            pass
+    except OSError:
+        if handle is not None:
+            handle.close()
+        handle = None
+    try:
+        yield
+    finally:
+        if handle is not None:
+            try:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            except Exception:
+                pass
+            handle.close()
+
+
 def append_book_quotes(
     *,
     sport: str,
@@ -700,7 +743,7 @@ def append_book_quotes(
             appended.append(normalized)
 
         if appended:
-            with path.open("a", encoding="utf-8") as handle:
+            with shard_append_lock(path), path.open("a", encoding="utf-8") as handle:
                 for row in appended:
                     handle.write(json.dumps(row, separators=(",", ":")) + "\n")
         # Written whenever anything was OBSERVED, not only when something

@@ -1481,11 +1481,15 @@ class OddsHistoryStreamedPullTests(unittest.TestCase):
 
     def test_append_only_tail_sends_range_without_since(self) -> None:
         """2026-09-13: `since=` made web answer 304 before honouring Range, so a
-        book_quotes copy whose mtime was at or past web's never tailed again."""
+        book_quotes copy whose mtime was at or past web's never tailed again.
+
+        UPDATED 2026-09-15 (P2): the Range now starts up to 4KB BEFORE our end,
+        and the body's first bytes must match ours before anything is written.
+        This 8-byte shard asks from 0 and the body repeats `{"k":1}`."""
         mocked_response = MagicMock()
         mocked_response.__enter__.return_value = mocked_response
         mocked_response.status = 206
-        mocked_response.read.side_effect = [b'{"k":2}\n', b""]
+        mocked_response.read.side_effect = [b'{"k":1}\n{"k":2}\n', b""]
         mocked_response.headers = {}
 
         with TemporaryDirectory() as tmp_dir:
@@ -1500,7 +1504,7 @@ class OddsHistoryStreamedPullTests(unittest.TestCase):
             request = mocked_urlopen.call_args.args[0]
             content = target.read_bytes()
         self.assertNotIn("since=", request.full_url)
-        self.assertEqual(request.get_header("Range"), "bytes=8-")
+        self.assertEqual(request.get_header("Range"), "bytes=0-")
         self.assertTrue(ok)
         self.assertEqual(written, 1)
         self.assertEqual(content, b'{"k":1}\n{"k":2}\n')
@@ -1553,6 +1557,115 @@ class OddsHistoryStreamedPullTests(unittest.TestCase):
         self.assertFalse(ok)
         self.assertEqual(written, 0)
         mocked_urlopen.assert_not_called()
+
+
+class AppendOnlySyncedPullTests(unittest.TestCase):
+    """P2, lane book-quotes-splice-repair. refresh-worker appends its own rows to
+    a book_quotes shard AND tail-pulls web's copy; a blind tail after a local
+    append spliced headless fragments in. The sync must never write web bytes
+    over a mismatch, must keep local rows web has not merged, and must not
+    duplicate rows web has merged."""
+
+    SHARD = "mlb_source/tracking/book_quotes/2026-09-15.jsonl"
+
+    @staticmethod
+    def _env(tmp_dir: str) -> dict[str, str]:
+        return {
+            "SYNDICATE_DATA_ROOT": tmp_dir,
+            "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports_root"),
+            "ADMIN_TOKEN": "secret-token",
+            "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+        }
+
+    @staticmethod
+    def _resp(body: bytes, status: int = 206) -> MagicMock:
+        mocked = MagicMock()
+        mocked.__enter__.return_value = mocked
+        mocked.status = status
+        mocked.read.side_effect = [body, b""]
+        mocked.headers = {}
+        return mocked
+
+    @staticmethod
+    def _rows(*names: str) -> bytes:
+        return b"".join(json.dumps({"row": n}, separators=(",", ":")).encode("utf-8") + b"\n" for n in names)
+
+    def _shard(self, tmp_dir: str, content: bytes, webpos: int | None = None) -> Path:
+        target = Path(tmp_dir) / self.SHARD
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+        if webpos is not None:
+            (target.parent / f".{target.name}.webpos").write_text(str(webpos), encoding="utf-8")
+        return target
+
+    def _pull(self, tmp_dir: str, responses: list):
+        with patch.dict(os.environ, self._env(tmp_dir), clear=False):
+            with patch("urllib.request.urlopen", side_effect=responses) as mocked:
+                result = pull_streamed_artifact(self.SHARD)
+        return result, mocked
+
+    @staticmethod
+    def _webpos(target: Path) -> int:
+        return int((target.parent / f".{target.name}.webpos").read_text(encoding="utf-8"))
+
+    def test_a_matching_tail_keeps_a_local_row_web_has_not_merged(self) -> None:
+        a, local, web_new = self._rows("a", "b"), self._rows("local"), self._rows("web")
+        with TemporaryDirectory() as tmp_dir:
+            target = self._shard(tmp_dir, a + local, webpos=len(a))
+            result, mocked = self._pull(tmp_dir, [self._resp(a + web_new)])
+            self.assertEqual(result, (True, 1))
+            self.assertEqual(mocked.call_args.args[0].get_header("Range"), "bytes=0-")
+            self.assertEqual(target.read_bytes(), a + web_new + local)
+            self.assertEqual(self._webpos(target), len(a + web_new))
+
+    def test_a_local_row_web_has_merged_is_not_duplicated(self) -> None:
+        a, local, web_new = self._rows("a", "b"), self._rows("local"), self._rows("web")
+        with TemporaryDirectory() as tmp_dir:
+            target = self._shard(tmp_dir, a + local, webpos=len(a))
+            self._pull(tmp_dir, [self._resp(a + local + web_new)])
+            self.assertEqual(target.read_bytes(), a + local + web_new)
+            self.assertEqual(self._webpos(target), len(a + local + web_new))
+
+    def test_a_spliced_copy_resyncs_whole_and_drops_the_fragment(self) -> None:
+        """No sidecar (first sync after deploy) and a copy that is NOT web's
+        prefix: the overlap mismatches, so nothing is appended blind."""
+        a, local, web_new = self._rows("a", "b"), self._rows("local"), self._rows("web")
+        fragment = b'","price":340}\n'
+        with TemporaryDirectory() as tmp_dir:
+            target = self._shard(tmp_dir, a + fragment + local)
+            result, mocked = self._pull(tmp_dir, [self._resp(a + web_new), self._resp(a + web_new, status=200)])
+            self.assertEqual(result, (True, 1))
+            self.assertIsNone(mocked.call_args_list[1].args[0].get_header("Range"))
+            self.assertEqual(target.read_bytes(), a + web_new + local)
+            self.assertNotIn(fragment, target.read_bytes())
+            self.assertEqual(self._webpos(target), len(a + web_new))
+
+    def test_range_not_satisfiable_resyncs_whole(self) -> None:
+        a, local = self._rows("a"), self._rows("local")
+        error = HTTPError("https://x/api/ops/artifacts/stream", 416, "Range Not Satisfiable", {}, None)
+        with TemporaryDirectory() as tmp_dir:
+            target = self._shard(tmp_dir, a + local, webpos=len(a))
+            result, _ = self._pull(tmp_dir, [error, self._resp(a, status=200)])
+            self.assertEqual(result, (True, 1))
+            self.assertEqual(target.read_bytes(), a + local)
+            self.assertEqual(self._webpos(target), len(a))
+
+    def test_nothing_new_on_web_writes_nothing(self) -> None:
+        a, local = self._rows("a", "b"), self._rows("local")
+        with TemporaryDirectory() as tmp_dir:
+            target = self._shard(tmp_dir, a + local, webpos=len(a))
+            result, _ = self._pull(tmp_dir, [self._resp(a)])
+            self.assertEqual(result, (True, 0))
+            self.assertEqual(target.read_bytes(), a + local)
+
+    def test_a_missing_local_copy_is_a_whole_pull_that_records_webpos(self) -> None:
+        a = self._rows("a", "b")
+        with TemporaryDirectory() as tmp_dir:
+            result, mocked = self._pull(tmp_dir, [self._resp(a, status=200)])
+            target = Path(tmp_dir) / self.SHARD
+            self.assertEqual(result, (True, 1))
+            self.assertIsNone(mocked.call_args.args[0].get_header("Range"))
+            self.assertEqual(self._webpos(target), len(a))
 
 
 class ArtifactStreamEndpointTests(unittest.TestCase):
