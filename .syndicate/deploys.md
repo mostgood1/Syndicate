@@ -35395,3 +35395,26 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
 - **Side effect:** this restarted refresh-worker ~12 h before scheduled task `full-slate-memory-reading-0915` (21:30 CDT). That reading is on a process booted 14:37Z.
 - Rollback: redeploy `c4f45fee` to refresh-worker.
 - Claim released 14:38Z.
+
+## 2026-09-15 ~15:05-15:20Z (10:05-10:20 CT) — READINGS (no deploy) — lanes live-odds-worker-oom, mlb-live-lens-payload-dup, book-quotes-prefer-fuller-copy — session 0f5b256e — **RECONCILED: 2 MET, 1 still unexercised**
+
+**live-odds-worker-oom — verify MET.** Render events API, `srv-d91dpertqb8s73co8lt0`, `startTime` 2026-09-13T23:00Z. Window: since the `54f3d662` deploy ended at 23:24:15Z, 39.6 h, spanning the 09-13 SNF + MLB and 09-14 MLB + MNF slates.
+- **0 `oomKilled`.** 6 `server_failed`, each `earlyExit: true, evicted: false`, plus 1 user `server_restarted` at 17:23:36Z 09-14.
+- Each exit is preceded by `LIVE_ODDS_WORKER_MEMORY stage=loop_recycle_for_uptime` then `loop_finally recycled_for_uptime: true`. That is the designed uptime recycle (`run_live_odds_refresh_worker.py:2451`, default 21600 s).
+- The pairs, logged against the event:
+  - 05:06:38 / 05:07:39Z
+  - 11:01:33 / 11:02:54Z
+  - 16:35:35 / 16:36:12Z
+  - 22:56:19 / 22:56:22Z
+  - 05:09:25 / 05:09:30Z
+  - 10:49:04 / 10:49:05Z
+- `container_memory_unreclaimable_mb` over the window (18,967 `ALL_PROCESS_MEMORY` samples): p50 723, **p95 1,082**, max 1,498 of 2,048 MB.
+- Credited to the combination on main (`58736a69` + `e332b531` + `77199c48` + later), not to any single fix.
+
+**mlb-live-lens-payload-dup — verify MET.**
+- `live_lens_tick_after_mlb` 09-13 16:00Z to 09-15 15:00Z: **1,316 / 1,316 `ok: true`**.
+- `KeyValuePayloadTooLarge` 0 and `KEYVALUE_WRITE_REJECTED` 0 since `77199c48` went live at 04:43:50Z 09-13.
+- A live population: 138 `KEYVALUE_WRITE_LARGE` for `mlb_live_lens.json`, 23:30Z 09-14 to 04:30Z 09-15, growing 1,117,841 -> 3,968,488 B through play. The ceiling is 8,388,608; pre-fix it was 10.8 MB.
+- Served `/mlb/api/live-lens?date=2026-09-14`: 15 games, 749,835 B (final slate; bytes not comparable to a live one).
+
+**book-quotes-prefer-fuller-copy — verify still UNEXERCISED.** refresh-worker `LATEST_CACHE_EVICT` 21:44:09Z 09-14 to 14:56:53Z 09-15: 464 evictions, all plain `.jsonl`, 0 for an affected date (mlb 09-03..09-09, ncaaf 09-05, soccer 08-22..09-09). No consumer reads those dates on demand. The reading needs a deliberate one-shot read, which is a separate decision.
