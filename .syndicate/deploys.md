@@ -36185,3 +36185,30 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
 - **Verdict: prediction MET for the first pull.**
 - **Owed:** refresh-worker's next today-pull (watcher waiting) carries `since=` = **22:12:51Z**, its own previous start. A refresh-worker redeploy in between does not disturb this: the key lives in the keyvalue store.
 - **Also live on refresh-worker now:** `e115cd6b` (goal count). Its reading is owed on a live match (22:04:17Z entry).
+
+## 2026-09-15 22:23:25Z (17:23 CT) — web `dd014d14` -> `c35284dc` (main tip: MLB market board `odds_delta` on the cents scale) — deploy `dep-daksan7f3r2c738gefsg` — lane legacy-steam-crossing-delta — **verify MET**
+- **What:** `ca80edf0`.
+  - `mlb/cards.py` `_mlb_hydrate_market_board_prop_movement` sizes `odds_delta` with `odds_refresh_tracking.american_cents_delta` (±100 both map to 0; a value that is not a valid American price keeps the plain difference).
+  - That path runs at request time in `/mlb/api/market-board` (`blueprints/mlb.py:329-332` -> `build_mlb_market_board`), so web is where it takes effect.
+  - The same commit's steam-detector change takes effect on the WORKERS: live-odds-worker is this lane's queued deploy; refresh-worker rides lane `execution-ledger-live-trim`'s main-tip deploy.
+- **Ride-alongs in `dd014d14..c35284dc`** (re-listed 22:21Z; runtime paths only; `render.yaml` unchanged):
+  - `a2a1fa32` (`execution_ledger` record cap drops only paper rows): user-approved per lane `book-quotes-splice-repair`; verify owned by lane `execution-ledger-live-trim`, no web-side reading expected.
+  - `e115cd6b` (soccer goal count incl. penalties/own goals): already live on both workers in `2d579fd1`; lane `soccer-live-scoreboard-range-stale` said a later deploy of main carrying it is fine.
+- **Why web now, before live-odds-worker:** the web claim was free and web's last deploy (`dd014d14`, 21:40:47Z) was 40+ min back. live-odds-worker is queued behind lane `polymarket-ask-pricing`'s own deploy (release expected ~22:55-23:05Z). The MLB board reading does not share an instrument with the soccer steam reading, so the order costs no attribution.
+- **Locks:** web claim 22:21:49Z (token `c0864edb415a2433`); preflight 22:23:02Z CLEAR for `c35284dc` (on main; no off-main waiver).
+- **Baseline** (22:22:30Z, `/mlb/api/market-board?date=2026-09-15`, 11.7 s):
+  - 769 rows carry `odds_delta` (766 with both odds). 44 rows crossed ±100 between `odds_previous` and `odds_last`; ALL 44 carried the raw difference (`mlb_board_crossing_rows_inflated=44`), 0 on the cents scale.
+  - Examples: Yoshinobu Yamamoto Pitcher Hits Allowed +101 -> -101 shown -202 (really -2); Mookie Betts Hitter Hits -335 -> +173 shown +508 (really +308); Jack Perkins Pitcher Earned Runs +106 -> -102 shown -208 (really -8).
+  - `steam_route_http=200`.
+- **Prediction:** `mlb_board_crossing_rows_inflated=0` (every crossing row's `odds_delta` equals its cents move); `steam_route_http=200`.
+- **Result:**
+  - POST 22:23:25Z. `build_in_progress` 22:23:39Z, `update_in_progress` 22:27:42Z.
+  - `live`, `finishedAt` 22:30:16.965Z (background watcher, 20 s cadence).
+- **Reading** (22:30:55Z, same request as the baseline):
+  - 769 rows carry `odds_delta`. 44 crossed ±100: `mlb_board_crossing_rows_inflated` **0**, on the cents scale **44**. Baseline was 44 inflated, 0 on the scale.
+  - Same three rows as the baseline: Yamamoto Pitcher Hits Allowed +101 -> -101 now **-2** (was -202); Mookie Betts Hitter Hits -335 -> +173 now **308** (was 508); Jack Perkins Pitcher Earned Runs +106 -> -102 now **-8** (was -208).
+  - `steam_route_http` 200 with the admin token, 401 without.
+  - Verify: MET on both predicted fields.
+  - NOT exercised here: the same commit's steam-detector change. It runs on the workers, whose deploys are pending (live-odds-worker queued behind lane `polymarket-ask-pricing`; refresh-worker rides lane `execution-ledger-live-trim`).
+- **Web claim:** released after this entry.
+- Rollback: web `dd014d14`.

@@ -1661,8 +1661,9 @@ death, never life — do not invert it.
     - Lane `book-quotes-splice-repair` (as `execution-ledger-live-trim`) deploys main's tip there at least 25 min after that goes live. `ca80edf0` rides as THIS lane's verify. This lane does NOT deploy refresh-worker.
     - After-reading on refresh-worker: `/api/ops/steam/events?sport=mlb` once MLB steam fires.
   - web ALSO needs a deploy for the MLB half: `build_mlb_market_board` (which calls `_mlb_hydrate_market_board_prop_movement`) runs in the web route `/mlb/api/market-board` (`blueprints/mlb.py:330-332`). Web runs `dd014d14`, which does not contain `ca80edf0`.
-    - `[~22:15Z]` THIS lane deploys web from main AFTER its live-odds-worker deploy and reading, under its own locks. Lane `book-quotes-splice-repair` has no further web deploy and confirmed the web claim free on its side.
-    - Ride-along: `a2a1fa32` (`execution_ledger` trim, user-approved), verify owned by lane `execution-ledger-live-trim`; no web-side reading expected. Re-list `<live>..tip` at preflight and stop for anything unapproved.
+    - `[22:30:16Z]` **DONE.** web runs `c35284dc`, which contains `ca80edf0`. Deployed BEFORE live-odds-worker: the web claim was free, and the board reading shares no instrument with the soccer steam reading.
+    - Reading 22:30:55Z: 769 board rows carry `odds_delta`; 44 crossed ±100; inflated **0**, on the cents scale **44** (baseline 22:22:30Z: 44 inflated, 0 on the scale). Yamamoto +101 -> -101 now -2 (was -202). The steam route answers 200 with the token, 401 without. `deploys.md` 22:23:25Z entry.
+    - Ride-alongs `a2a1fa32` (verify: lane `execution-ledger-live-trim`) and `e115cd6b` (already live on both workers).
     - After-reading: the market board's `odds_delta` on a row whose odds crossed ±100.
 
 ### ncaaf-prop-quote-market-check — CLOSED — opened 2026-09-15 — closed 2026-09-15 ~15:45 CT — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
