@@ -36169,3 +36169,19 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
 - **Not shown by this reading:** the side choice itself. No Anytime TD "No" side exists in the NCAAF/NFL shards (0 on the 09-17..09-19 exports), so production cannot yet exercise it. It rests on `tests/test_quote_enrichment_anytime_td_side.py` (`off != on`: 4 of 6 fail with the helper off) and the production-shard replay through the real `enrich_prop_rows` (101 rows pass "yes", 102/102 right).
 - **Not explained:** 256 rows in the first ~3 min against 104 per build earlier. The counters add up per process, and builds in the window were not counted.
 - Rollback: as in the entry above.
+
+## 2026-09-15 22:14Z (17:14 CT) — READING — refresh-worker `2d579fd1` (deployed by lane soccer-player-role-allocation, live 22:12:03Z) — lane soccer-live-scoreboard-range-stale — **`082da3e3` VERIFIED ON THE FIRST PULL: refresh-worker read its OWN, new watermark key (2 h clamp), not the shared one; the second pull (own previous start) is OWED**
+- No deploy by this lane. Source: `render_logs.py`, the `export?pattern=%2A2026` request lines on both workers since each go-live, with the `since=` epochs converted.
+- **Prediction** (lane block, written before the deploy): refresh-worker's first `pull_hot_artifacts` after go-live carries `since=` = its own previous pull start, or the 2 h clamp on its first; never a live-odds-worker pull start.
+- **refresh-worker** (live 22:12:03Z):
+  - 22:12:52Z `pattern=*2026-09-15*&since=1789503171.435754` -> **20:12:51Z**, exactly its pull start (22:12:51Z) minus the 7200 s clamp. `artifacts_received=8 written=8`, no timeout.
+  - 22:13:17Z `pattern=*2026_09_15*`, same `since`. `artifacts_received=9 written=9`.
+  - Both sub-requests succeeded, so `refresh-worker/2026-09-15` now records 22:12:51Z.
+- **live-odds-worker** (live on the fix since 21:38:19Z), same minutes: 22:13:39Z and 22:13:53Z requests carried `since=1789510245.306728` -> **22:10:45Z**, its own floor.
+- **Why the clamp is decisive, with no timing assumption:**
+  - The clamp is returned only when the key read holds nothing.
+  - The old shared key was NOT empty: refresh-worker's own old code recorded it on its successful 21:02:50Z pull (`deploys.md` / lane record), less than 2 h earlier.
+  - A read of that key would have produced `since` >= ~21:02Z. 20:12:51Z therefore means refresh-worker read a different, new key: the per-(service, date) path.
+- **Verdict: prediction MET for the first pull.**
+- **Owed:** refresh-worker's next today-pull (watcher waiting) carries `since=` = **22:12:51Z**, its own previous start. A refresh-worker redeploy in between does not disturb this: the key lives in the keyvalue store.
+- **Also live on refresh-worker now:** `e115cd6b` (goal count). Its reading is owed on a live match (22:04:17Z entry).
