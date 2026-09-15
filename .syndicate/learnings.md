@@ -6340,3 +6340,14 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - Verify a land by the COMMIT, not by the push line: `git merge-base --is-ancestor <your sha> origin/main`. A subject grep also fails when the push succeeded but pushed someone else's commit.
   - After an accidental land, measure the exposure window against every service that can ship main — the long-running services AND the crons, which build the branch tip when they fire — before saying nothing shipped.
 - *(evidence: `log/2026-09-15.md` 18:05 CT entry; `04b907a0` and its revert `d2d7b398`; the Render deploys read at 23:02Z)*
+## 2026-09-15 — OVERTURNED: "adding a sport to `SYNDICATE_ACTIVE_SPORTS` is a config change" — on WEB it is a REQUEST-PATH code-path flip, and this exact one has an outage on record `[lane web-dashboard-prop-dates-quotes]`
+
+- **What I was asked, and nearly did.** "add ncaaf to web's active sports" — a one-key env write plus a deploy. The key is not declared in `render.yaml`, no lane claimed it, and the blast-radius question I started with was the usual one (would `blueprint_sync` revert it, does it move worker sweep ownership). Both answers were reassuring.
+- **What the list actually gates on web.** `build_home_overview` filters to `_active_sport_slugs()` and then BUILDS each surviving sport inside the request (`home.py:8305`). For NCAAF that is `_NCAAFDataProvider.games(...)` without `include_upcoming` — `build_smartsim_cards_page_context(week)` **plus** `build_ncaaf_market_board(week)` (`home.py:6709-6713`), measured at 6.4 s warm for 51 games on a 2 GB display-only service.
+- **It has happened.** `deploys.md` 2026-08-29 12:18 CT: when a resolver fix made that path reachable, `/` went **3.5 s -> 37.9 s**, `/ncaaf/cards` 502'd and `/api/ops/memory` 502'd; revert `0163f904` restored it. The repair that followed (`fccd923d`) made only the CHIPS path light (`build_ncaaf_chip_games`, 0.23 s warm), so the home path is still the heavy one today.
+- **And the payoff was nil:** nothing under `syndicate/` fetches `/api/home` (only `tests/` and the run-syndicate skill), and `/` renders the Layer 2 board. The NCAAF surfaces users see do not read this key.
+- **How to apply.**
+  - Before flipping any list-shaped env var, find what the list GATES. A membership test in front of a builder is a code path, not configuration.
+  - Grep the ledger for the last time that value changed on that service. An outage with a revert is usually already written down.
+  - Ask what would become observable. If no served surface reads the thing the flip enables, the change is cost with no reading to verify it by.
+- *(evidence: `home.py:691/8305/6709-6713`, `deploys.md` 2026-08-29 12:18 CT and 12:46 CT; `/api/home` read 2026-09-15 22:31:13Z; user decision "Don't add it")*
