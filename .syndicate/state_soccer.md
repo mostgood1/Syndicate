@@ -28,7 +28,7 @@ CIs are bootstraps over matches; betting thresholds were chosen leave-one-date-o
   - AH **+0.0178 LOSES**. BTTS parity (+0.0039). Team goals log loss **+0.0447 LOSES**.
 - **CORNERS: the model's match total is uninformative.** r = 0.02, and its MAE is worse than last season's league mean. MLS is over-predicted by 1.39, EPL by 1.27.
 - **BETTING: no pre-registered rule in any market has a held-out ROI whose CI clears zero.** 1X2 −12.5% [−24.0, −0.1], O/U 2.5 −18.4% [−31.7, −4.0], shots props (raw edge) −31.9% [−46.1, −15.1].
-- **PROPS: the predicted squads are stale.**
+- **PROPS: the predicted squads were stale** (measurements below). **Fix #1 DEPLOYED 2026-09-15:** `f833f7ec` is live on live-odds-worker (19:37:29Z) and refresh-worker (20:15:58Z), per the Render deploys API. Production effect so far: the export at 20:03Z shows `players_2026.csv` NEW for championship and eredivisie and la_liga re-written; no recommendations artifact carrying `player_substrate` has been read yet (lane `soccer-player-substrate`). Shot prices at 20:37:17Z are still Poisson ladders over the divided unconditional mean (`unconditional_ladder_share` 1.000, 2,024 rows, 10 leagues). Fix #2 (`e53274f2` divisor retired, `b33ef901` conditional-on-appearing ladder) is on main, NOT deployed (lane `soccer-player-role-allocation`).
   - Share of real shots taken by a player the model lists: Championship 36%, Primeira 53%, Belgian 56%, EPL 81%, MLS 87%.
   - Appeared players' shots are UNDER-predicted: 0.87 held-out (starters 0.68, fringe 1.08).
   - Anytime scorer: two full deciles sit at exactly 0.000 and 3–5% of them score; the top decile is 1.39× over.

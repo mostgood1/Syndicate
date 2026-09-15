@@ -1279,6 +1279,12 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### soccer-player-substrate — OPEN — opened 2026-09-15 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- **VERDICT 2026-09-15 20:45Z.** Goal (verbatim): "the soccer prop sim lists the players who actually play. The test is a replay of squad selection over production player files and ESPN box scores for the 2026-09-01..09-14 fixtures: real shots attributable to a listed player reach >= 85% in every league (36-87% on 2026-09-15), phantom rows fall, and every recommendations artifact publishes a per-side squad-coverage field a gate can use. Code lands on origin/main with tests. A refresh-worker deploy and a production reading happen only on the user's go." — **GOAL: MET** on the lane's own Verification.
+  - The replay recorded in `log/2026-09-15.md` reaches 85-99% in every league (primeira 85, belgian 92, mls 95, epl 99), with phantoms about halved.
+  - `squad_audit` / `player_substrate` are written by the builder, with a reachability test reading them back from disk. Landed `f833f7ec`.
+  - The user's go came, and both workers are live: live-odds-worker 19:37:29Z, refresh-worker 20:15:58Z.
+  - KEPT OPEN for the owed production `verify:` in both deploy entries. As of 20:35Z: `players_2026.csv` post-deploy 3/10; recommendations artifacts carrying `player_substrate` 0/10, and none written since 20:09Z.
+  - Follow-up: a stale-200 ESPN range can pass `espn_lineups` (reported by lane `soccer-live-scoreboard-range-stale`, not re-derived).
 - Goal: the soccer prop sim lists the players who actually play. The test is a replay of squad selection over production player files and ESPN box scores for the 2026-09-01..09-14 fixtures: real shots attributable to a listed player reach >= 85% in every league (36-87% on 2026-09-15), phantom rows fall, and every recommendations artifact publishes a per-side squad-coverage field a gate can use. Code lands on origin/main with tests. A refresh-worker deploy and a production reading happen only on the user's go.
 - Files: `scripts/refresh_odds_sources.py` (`_SOCCER_PLAYER_FETCH_LEAGUES` and `_soccer_players_step` only), `scripts/build_soccer_artifacts.py` (player loading, departed filter, squad audit field), `syndicate/features/soccer/ingestion/espn_lineups.py` (scoreboard range fallback only), `syndicate/features/soccer/features/team_names.py` (six `_ALIASES` entries only), `tests/test_soccer_player_producer_step.py`, `tests/test_build_soccer_artifacts.py`, `tests/test_soccer_player_substrate.py` (NEW), `tests/test_soccer_espn_scoreboard_fallback.py` (NEW), `scripts/soccer_season_audit/decompose_squads.py` (NEW), `scripts/soccer_season_audit/squad_empty_sides.py` (NEW), `scripts/soccer_season_audit/squad_listing_lag.py` (NEW), `scripts/soccer_season_audit/replay_squads.py` (NEW)
 - Hypotheses (PRE-REGISTERED 2026-09-15, before the decomposition ran):
@@ -1293,11 +1299,6 @@ death, never life — do not invert it.
   - H4 is false if any league stays under 85% on replay.
 - Verification: the decomposition and replay tables are recorded in the log, with a reachability test (`off != on`) per change, landed on origin/main.
 - Blocked by: none
-- **STATUS 2026-09-15 20:25Z — GOAL: NOT MET (deployed on both workers; verify owed).**
-  - Landed `f833f7ec`. A/B test failure sets are identical (37 = 37).
-  - live-odds-worker live 19:37:29Z, refresh-worker live 20:15:58Z (`deploys.md`).
-  - First reading: `players_2026.csv` is new for championship and eredivisie, and la_liga was re-written. No recommendations artifact carrying `player_substrate` has been seen yet. An EPL one generated at 20:02:04Z lacks it: BELIEVED to be refresh-worker's pre-deploy build.
-  - Owed: the `verify:` in both deploy entries. Close the lane on it.
 
 ### fotmob-season-scoped-league-ids — CLOSED 2026-09-15 — opened 2026-09-15 — session da346015-cd58-450a-a9e0-bba6bdb00403 — **GOAL: MET: FotMob league matching is season-proof (primaryId + country), deployed to live-odds-worker `c725cc29`, verified on a LIVE Eredivisie match 18:18:47Z**
 - **VERDICT.** Goal (verbatim): "FotMob league matching is season-proof. `resolve_fotmob_match_id` resolves Championship, Eredivisie and Belgian Pro League fixtures in 2026-27 (it returned None for 9 of 9 on 2026-09-12), and the 2y harvest script classifies leagues the same way. Deployed to live-odds-worker and verified on a LIVE match." — **GOAL: MET.** Reading: eredivisie `live_state_2026-09-15.json` generated 18:17:24Z (after the 18:15:16Z go-live), Ajax v Willem II 16' `momentum.supported True`, `source fotmob`, `fotmob_match_id 5781718`.
@@ -1424,6 +1425,17 @@ death, never life — do not invert it.
 - **STATUS 2026-09-15 19:3xZ: BUILT + LANDED `867f1481`, NOT DEPLOYED.** Tests: 78 passed; the new alias cases fail on the previous resolver (12 failed / 3 passed). Measured with production's arguments against live ESPN + FotMob: 230 fixtures over 7 tuning dates, strict 212 -> 230; 159 fixtures over 9 HELD-OUT dates, strict 141 -> 159; loose-vs-strict disagreement 0; true FotMob row removed, wrong ids 0 of 389. **User decision: "After tonight's matches (Recommended)"**: deploy main to live-odds-worker once no tracked league is in play (La Liga Real Madrid at Elche ends ~21:25Z). Ride-along `8b563ca9` `4a1ca2c4` `5686a555` `af7c895c` are live on web only. Production verify owed Sat 2026-09-19 18:45Z (13:45 CT), Zulte-Waregem at Anderlecht, which only the loose pass resolves.
 
 ### soccer-player-role-allocation — OPEN — opened 2026-09-15 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- **VERDICT 2026-09-15 20:45Z.** Goal (verbatim): "soccer shot and shots-on-target props are priced on a ladder CONDITIONAL ON THE PLAYER APPEARING (start/sub mixture, substitute intensity fitted held-out), and the 1.393 shot divisor is retired with its re-fit machinery. On held-out dates, that ladder beats the post-divisor unconditional ladder on log loss at lines 0.5 and 1.5, pooled and in >= 8 of 10 leagues, on production-shaped inputs. Landed on main with reachability tests; deploy per user." — **GOAL: NOT MET.**
+  - Met so far:
+    - Step A `e53274f2` (divisor, loader, fitter and checks removed; the refit task disabled).
+    - Step B `b33ef901`.
+    - H13 / H14: the shipped engine reproduces the model held out, shots 0.6107 / 0.4690 against 0.6414 / 0.5169 and SOT 0.4931 / 0.1988 against 0.5122 / 0.2154, in 9/10 leagues.
+    - Mutation checks red; 108 targeted tests pass.
+  - LEFT: the Verification's post-deploy reading.
+    - User decision: deploy main's tip to live-odds-worker, then refresh-worker, AFTER 21:25Z.
+    - Pre-deploy baseline 20:37:17Z: `unconditional_ladder_share=1.000` over 2,024 rows, 10 leagues.
+    - Predicted after deploy: about 0.0 on artifacts generated after the deploy, read with `ladder_basis_reading.py <live_utc>`.
+  - Blocking: the time window only.
 - Goal: soccer shot and shots-on-target props are priced on a ladder CONDITIONAL ON THE PLAYER APPEARING (start/sub mixture, substitute intensity fitted held-out), and the 1.393 shot divisor is retired with its re-fit machinery. On held-out dates, that ladder beats the post-divisor unconditional ladder on log loss at lines 0.5 and 1.5, pooled and in >= 8 of 10 leagues, on production-shaped inputs. Landed on main with reachability tests; deploy per user.
 - Files:
   - `syndicate/features/soccer/sim_engine/soccersim/player_props.py`
@@ -1459,18 +1471,6 @@ death, never life — do not invert it.
   - Tests A/B against a baseline.
   - After deploy, the first artifacts carry the conditional ladder, and `soccer_projections` prices from it.
 - Blocked by: none. Step A (divisor retirement) needs nothing from step B.
-- **STATUS 2026-09-15 20:25Z — GOAL: NOT MET (landed on main, NOT deployed).**
-  - Step A `e53274f2`: divisor retired, `refit-soccer-shot-shrinkage` task disabled.
-  - Step B `b33ef901`: conditional-on-appearing shot/SOT ladder.
-  - Later hypotheses:
-    - H10, SOT: SUPPORTED.
-    - H11, production-shaped inputs: FALSIFIED (6/10 leagues).
-    - H12: FALSIFIED (+0.031).
-    - H13, season-scoped match count: SUPPORTED.
-    - H14: SUPPORTED. The shipped engine reproduces the model within 0.0001 held out: shots 0.6107 / 0.4690 against 0.6414 / 0.5169, SOT 0.4931 / 0.1988 against 0.5122 / 0.2154, 9/10 leagues.
-  - Mutation checks are red for each guarded mechanism; 108 targeted tests pass.
-  - Files added beyond the list: `scripts/soccer_season_audit/calibration_role_mixture4.py`, `5.py`, `6.py`, `calibration_engine_replay.py`.
-  - Owed: the deploy (user decision), then the reading that the first post-deploy artifacts carry the conditional ladder and `soccer_projections` prices from it.
 
 ### soccer-live-scoreboard-range-stale — OPEN — opened 2026-09-15 — session a1e40980-cceb-493f-adf9-5a5ca879acf6
 - Goal: The soccer live poller reads ESPN's single-date scoreboard, so soccer live state, the live lens and the Layer 2 compact chips track ESPN within one poll tick: on a live match after the live-odds-worker deploy, the served live_state clock is within 5 match-minutes of ESPN's live clock (it was ~65 behind on 2026-09-15).
