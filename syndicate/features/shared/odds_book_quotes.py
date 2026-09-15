@@ -1348,6 +1348,32 @@ def _book_quotes_cache_key(path: Path) -> tuple[str, int, int] | None:
     return (str(path), stat.st_mtime_ns, book_quotes_logical_bytes(path))
 
 
+# UNREADABLE LINES, COUNTED  [2026-09-15, lane book-quotes-splice-repair, P0].
+# Both readers skipped a line that fails `json.loads` with a bare `continue`, so
+# the headless fragments a byte-offset tail pull splices into these shards (29 in
+# web's mlb 09-03, 190 in soccer 09-13) were invisible to every reader and every
+# instrument. One line per shard when its bad count CHANGES in this process --
+# the baseline and the verify instrument for the repair, without a line per read.
+_BAD_LINES_REPORTED: dict[str, int] = {}
+
+
+def _report_bad_lines(path: Path, bad: int, lines: int) -> None:
+    if bad <= 0:
+        return
+    key = str(path)
+    if _BAD_LINES_REPORTED.get(key) == bad:
+        return
+    _BAD_LINES_REPORTED[key] = bad
+    if len(_BAD_LINES_REPORTED) > 512:
+        _BAD_LINES_REPORTED.clear()
+        _BAD_LINES_REPORTED[key] = bad
+    print(
+        f"[odds_book_quotes] BOOK_QUOTES_BAD_LINES sport={path.parent.parent.parent.name.removesuffix('_source')}"
+        f" shard={path.name} bad={bad} lines={lines}",
+        flush=True,
+    )
+
+
 def iter_book_quotes(sport: str, date_str: str) -> Iterator[dict[str, Any]]:
     """Stream a shard's rows one at a time. NOT cached, by design (`#331`).
 
@@ -1370,17 +1396,23 @@ def iter_book_quotes(sport: str, date_str: str) -> Iterator[dict[str, Any]]:
     path = resolve_book_quotes_path(sport, date_str)
     if not path.is_file():
         return
+    lines = bad = 0
     with _open_book_quotes_text(path) as handle:
         for line in handle:
             line = line.strip()
             if not line:
                 continue
+            lines += 1
             try:
                 parsed = json.loads(line)
             except Exception:
+                bad += 1
                 continue
             if isinstance(parsed, dict):
                 yield parsed
+            else:
+                bad += 1
+    _report_bad_lines(path, bad, lines)
 
 
 def read_book_quotes(sport: str, date_str: str) -> list[dict[str, Any]]:
@@ -1404,17 +1436,23 @@ def read_book_quotes(sport: str, date_str: str) -> list[dict[str, Any]]:
     try:
         if not path.is_file():
             return rows
+        lines = bad = 0
         with _open_book_quotes_text(path) as handle:
             for line in handle:
                 line = line.strip()
                 if not line:
                     continue
+                lines += 1
                 try:
                     parsed = json.loads(line)
                 except Exception:
+                    bad += 1
                     continue
                 if isinstance(parsed, dict):
                     rows.append(parsed)
+                else:
+                    bad += 1
+        _report_bad_lines(path, bad, lines)
     except Exception:
         # Deliberately NOT cached: a partial read from a transient IO error must
         # not become the answer every subsequent caller gets until the file

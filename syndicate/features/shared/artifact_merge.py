@@ -173,12 +173,38 @@ def merge_append_only(target_path: Path, incoming_path: Path,
             pass
 
 
+def _requires_json_lines(target_path: Path) -> bool:
+    """`book_quotes/<date>.jsonl`: every row is a JSON object, so a line that is
+    not one is damage, never data."""
+    return "book_quotes" in target_path.parts and target_path.suffix == ".jsonl"
+
+
+def _is_json_object_line(line: bytes) -> bool:
+    try:
+        return isinstance(json.loads(line), dict)
+    except Exception:
+        return False
+
+
 def _merge_append_only_locked(target_path: Path, incoming_path: Path) -> dict:
     digests: set[bytes] = set()
     existing_lines = 0
     for line in iter_lines(target_path):
         digests.add(hashlib.blake2b(line, digest_size=16).digest())
         existing_lines += 1
+
+    # NO FRAGMENTS ONTO WEB  [2026-09-15, lane book-quotes-splice-repair, P1].
+    # refresh-worker appends venue rows into a shard AND tail-pulls web's copy by
+    # byte offset, so a pull after a local append starts mid-line and leaves a
+    # headless fragment (`Z","sport":"mlb",...,"price":340}`). Publishing its
+    # whole file then offered that fragment here as a "new" line, and this merge
+    # -- whole-line identity, no parse -- kept it: 29 in web's mlb 09-03, 190 in
+    # soccer 09-13, and growing. A book_quotes line that is not a JSON object is
+    # refused. Existing bytes are still copied untouched (the byte-prefix
+    # invariant); repairing what is already on disk is P3, not this.
+    require_json = _requires_json_lines(target_path)
+    refused_bad_lines = 0
+    refused_sample: bytes | None = None
 
     merged_path = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.merge"
     added = 0
@@ -194,6 +220,11 @@ def _merge_append_only_locked(target_path: Path, incoming_path: Path) -> dict:
                 if digest in digests:
                     duplicates += 1
                     continue
+                if require_json and not _is_json_object_line(line):
+                    refused_bad_lines += 1
+                    if refused_sample is None:
+                        refused_sample = line[:120]
+                    continue
                 digests.add(digest)
                 out.write(line + b"\n")
                 added += 1
@@ -204,8 +235,16 @@ def _merge_append_only_locked(target_path: Path, incoming_path: Path) -> dict:
         except Exception:
             pass
         return {"merged": False, "error": f"{type(exc).__name__}: {exc}"}
+    if refused_bad_lines:
+        print(
+            f"[artifact_merge] MERGE_REFUSED_BAD_LINES path={target_path.name}"
+            f" dir={target_path.parent.parent.name} refused={refused_bad_lines}"
+            f" added={added} sample={refused_sample!r}",
+            flush=True,
+        )
     return {"merged": True, "existing_lines": existing_lines,
-            "added": added, "duplicates": duplicates}
+            "added": added, "duplicates": duplicates,
+            "refused_bad_lines": refused_bad_lines}
 
 
 # ---------------------------------------------------------------------------

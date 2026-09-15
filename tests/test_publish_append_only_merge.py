@@ -131,6 +131,52 @@ class MergeHelperTests(unittest.TestCase):
         self.assertEqual([p.name for p in self.root.glob("*.merge")], [])
 
 
+class BookQuotesFragmentRefusalTests(unittest.TestCase):
+    """P1, lane book-quotes-splice-repair: a book_quotes line that is not a JSON
+    object is refused by the merge, so a publisher's spliced copy cannot put a
+    headless fragment onto web. Other append-only families are unchanged."""
+
+    FRAGMENT = 'Z","sport":"mlb","market":"h2h","price":340}'
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        shard_dir = Path(self._tmp.name) / "mlb_source" / "tracking" / "book_quotes"
+        shard_dir.mkdir(parents=True)
+        self.target = shard_dir / "2026-09-03.jsonl"
+        self.incoming = shard_dir / "incoming.jsonl"
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_a_fragment_is_refused_and_a_real_row_is_added(self) -> None:
+        before = (_row("dk", "a", "t1") + "\n").encode("utf-8")
+        self.target.write_bytes(before)
+        self.incoming.write_text(
+            _row("dk", "a", "t1") + "\n" + self.FRAGMENT + "\n" + _row("fd", "b", "t2") + "\n",
+            encoding="utf-8",
+        )
+        result = am.merge_append_only(self.target, self.incoming)
+        self.assertTrue(result["merged"])
+        self.assertEqual((result["added"], result["duplicates"], result["refused_bad_lines"]), (1, 1, 1))
+        after = self.target.read_bytes()
+        self.assertTrue(after.startswith(before), "existing bytes stay a prefix")
+        self.assertNotIn(self.FRAGMENT.encode("utf-8"), after)
+
+    def test_a_non_object_json_line_is_refused_too(self) -> None:
+        self.target.write_text(_row("dk", "a", "t1") + "\n", encoding="utf-8")
+        self.incoming.write_text("[1, 2]\n", encoding="utf-8")
+        result = am.merge_append_only(self.target, self.incoming)
+        self.assertEqual((result["added"], result["refused_bad_lines"]), (0, 1))
+
+    def test_another_append_only_family_still_takes_any_line(self) -> None:
+        other = Path(self._tmp.name) / "target.jsonl"
+        other.write_text("a\n", encoding="utf-8")
+        incoming = Path(self._tmp.name) / "in.jsonl"
+        incoming.write_text(self.FRAGMENT + "\n", encoding="utf-8")
+        result = am.merge_append_only(other, incoming)
+        self.assertEqual((result["added"], result["refused_bad_lines"]), (1, 0))
+
+
 class PublishEndpointMergeTests(unittest.TestCase):
     """Both receive forms must merge. live-odds-worker is PINNED to an older
     commit and sends the ENVELOPE form, so fixing only the streamed path would
@@ -209,33 +255,41 @@ class PublishEndpointMergeTests(unittest.TestCase):
         # asserted on the file after waiting for the child.
         self.assertEqual(response.get_json()["merge"], "deferred")
 
+    # Rows are JSON objects, as every real book_quotes row is. Since 2026-09-15
+    # (lane book-quotes-splice-repair, P1) the merge refuses a book_quotes line
+    # that is not one, so bare-text fixtures like "a" would be refused as damage.
+    @staticmethod
+    def _j(*names: str) -> str:
+        return "".join(json.dumps({"row": name}) + "\n" for name in names)
+
     def test_publishing_is_commutative(self) -> None:
         """Order stops mattering — which is the whole point. Whoever publishes
         last, the result is the same union."""
-        a, b = "a\nb\n", "c\nd\n"
+        a, b = self._j("a", "b"), self._j("c", "d")
         self._publish_streamed(a, "worker-a")
         self._publish_streamed(b, "worker-b")
         self._await_merges()
-        one = sorted(self._target().read_text(encoding="utf-8").split())
+        one = sorted(self._target().read_text(encoding="utf-8").splitlines())
 
         self._target().unlink()
         self._publish_streamed(b, "worker-b")
         self._publish_streamed(a, "worker-a")
         self._await_merges()
-        two = sorted(self._target().read_text(encoding="utf-8").split())
+        two = sorted(self._target().read_text(encoding="utf-8").splitlines())
         self.assertEqual(one, two)
+        self.assertEqual(len(one), 4)
 
     def test_the_envelope_form_merges_too(self) -> None:
-        self._publish_envelope("a\nb\n")
-        self._publish_envelope("c\n")
+        self._publish_envelope(self._j("a", "b"))
+        self._publish_envelope(self._j("c"))
         self._await_merges()
-        self.assertEqual(self._target().read_text(encoding="utf-8"), "a\nb\nc\n")
+        self.assertEqual(self._target().read_text(encoding="utf-8"), self._j("a", "b", "c"))
 
     def test_the_two_forms_interoperate(self) -> None:
         """One writer pinned to the envelope form, one on the streamed form —
         which is the actual production arrangement."""
-        self._publish_envelope("envelope-row\n")
-        self._publish_streamed("streamed-row\n", "refresh-worker")
+        self._publish_envelope(self._j("envelope-row"))
+        self._publish_streamed(self._j("streamed-row"), "refresh-worker")
         self._await_merges()
         stored = self._target().read_text(encoding="utf-8")
         self.assertIn("envelope-row", stored)
@@ -251,8 +305,8 @@ class PublishEndpointMergeTests(unittest.TestCase):
         """The `#488` shrink guard would reject this. Under merge it must not:
         refusing would reject the publish carrying the other service's rows,
         which turns the fix off."""
-        self._publish_streamed("\n".join(f"row{i}" for i in range(400)) + "\n", "worker-a")
-        response = self._publish_streamed("tiny\n", "worker-b")
+        self._publish_streamed(self._j(*(f"row{i}" for i in range(400))), "worker-a")
+        response = self._publish_streamed(self._j("tiny"), "worker-b")
         self.assertEqual(response.status_code, 200)
         self._await_merges()
         stored = self._target().read_text(encoding="utf-8")

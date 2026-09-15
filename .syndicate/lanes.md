@@ -704,6 +704,16 @@ death, never life — do not invert it.
   - **P3, repair (one-shot, web first, then refresh-worker).** Per shard, drop only lines that fail `json.loads` AND are a byte suffix of an intact line in the same shard, with an atomic rewrite. Any other bad line is kept and counted (`REPAIR_ORPHAN_BAD_LINE`), never deleted blind. Refresh-worker's local plain and `.gz` copies are then replaced by web's repaired copy.
   - **P4, verify:** a full capture day with `BOOK_QUOTES_BAD_LINES = 0` on new shards on web and refresh-worker, 0 fragments merged, and every `STREAM_TAIL_PREFIX_MISMATCH` resolved by a whole pull.
   - **Order:** P0+P1 (web) -> P0+P2 (refresh-worker) -> P3 -> P4. Each is a separate deploy, measured before the next.
+- **STATUS 2026-09-15 ~13:55 CDT: P0 + P1 BUILT, NOT DEPLOYED. GOAL: NOT MET.**
+  - **P1** `artifact_merge._merge_append_only_locked`: for a target under `book_quotes/` ending `.jsonl`, an incoming line that is not a JSON object is refused (not added, not digested), counted as `refused_bad_lines` in the result, and logged once per merge as `MERGE_REFUSED_BAD_LINES` with a 120-byte sample. Existing bytes are still copied untouched. Other append-only families are unchanged.
+  - **P0** `odds_book_quotes.iter_book_quotes` / `read_book_quotes` count lines that fail `json.loads` or are not objects, and print `BOOK_QUOTES_BAD_LINES sport= shard= bad= lines=` when a shard's bad count changes in the process.
+  - **Tests:**
+    - 4 new in `test_book_quotes_bad_lines.py` (counted once, never yielded; cached reader counts; clean shard silent; growth re-reported).
+    - 3 new in `test_publish_append_only_merge.py` (fragment refused with the prefix kept; non-object JSON refused; another family still takes any line).
+    - 4 endpoint tests' bare-text fixtures became JSON rows, since the guard refuses bare text by design.
+    - 196 passed across the merge, book-quotes and publisher files.
+    - Book-quotes readers elsewhere: 173 passed. The 2 failures in `test_data_mirror_write_guard.py` are this worktree having no `data/` (by design of `session_worktree.py`), unrelated.
+  - **Deploy target:** web carries P1 and the P0 counter (web reads shards for exports and boards); refresh-worker carries P0 later with P2. Each deploy goes to the user first.
 
 ### polymarket-rejected-resubmit-loop — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - Goal: [user 2026-09-15: "open a lane for the rejection loop"] a Polymarket order the venue REJECTS is not re-submitted unchanged on every pass, and its reject reason is logged. Read on production: after the fix, a venue rejection produces ONE `submitted->rejected` per (ticker, price, qty), a named reason on the log line, and no further `SUBMIT` for that ticker until something about the order changes. Accepted orders are unaffected (fills, rests and expiries continue).
