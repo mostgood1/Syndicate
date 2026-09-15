@@ -2111,8 +2111,18 @@ death, never life — do not invert it.
 - Hypothesis: FotMob's league `id` is SEASON-SCOPED for 4 of the 10 leagues (Eredivisie, Championship, Belgian Pro League, MLS) while the league's `primaryId` is stable. Read from FotMob `/api/data/matches` on 2024-10-19, 2025-03-01, 2025-10-18, 2026-09-13 and 2026-09-15: primaryId 57/48/40/130 every season, ids 892939/893033/892857/889747 -> 900368/900638/900433/896669 -> 937276/938218/937988/913550. The other six have id == primaryId, which is why only these broke. Belgian's NAME was `First Division A` in 2024-25, so an exact-name key alone would also have broken.
 - Falsification test: after deploy, a LIVE Championship/Eredivisie match whose live_state row shows `momentum.supported == false` with reason `fotmob match id unresolved` means league matching was not the (only) cause -- look at team-name normalisation next.
 - Verification: `soccer_source/<league>/api/live_state/live_state_2026-09-15.json` on production shows `games[].momentum.supported == true` and `source == 'fotmob'` for an in-play Eredivisie (Ajax v Willem II, 18:00Z) or Championship (Bristol City v Lincoln City / Middlesbrough v Millwall, 18:45Z) match; reading recorded in `deploys.md`. A finished date's file carries only `match_box` and proves nothing.
-### quote-shard-date-fallback-prod — OPEN — opened 2026-09-15 — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
-- **STATUS 2026-09-15 ~13:30 CT — GOAL: NOT MET.** H0 CONFIRMED. H1 has no USER-VISIBLE effect, and the legacy NCAAF case is unattributed. H2 is code-certain, with its production reading owed.
+### quote-shard-date-fallback-prod — CLOSED 2026-09-15 — opened 2026-09-15 — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
+- **VERDICT.** Goal (verbatim): "measure in production whether candidate pools built for a non-today board date (a) price prop rows from TODAY's quote shard and (b) file opportunity-contract counts under today, and record a verdict per half. Diagnostic and read-only; any fix gets its own lane." — **GOAL: MET.**
+  - **(a) YES, but only for rows with no ISO date, and in EVERY pool (today's too). Not user-visible.**
+    - Replay of the real `_compact_prop_rows` -> `_finalize_home_prop_rows` -> `_prop_candidate_from_item` -> `_row_slate_date` over production `/ncaaf/api/cards?week=3` (18:54Z) gave 102 candidates (the worker counted 104).
+    - Their only date key is `context_label` "2026 Week 3" (the 57 games carry no kickoff value). `_row_slate_date` returned None for 102/102, so all fall back to `requested_date` = worker today.
+    - The 2026-09-15 NCAAF shard is ABSENT (`quote-feed-age`), which fully explains `with_quote=0`.
+    - The rows are "Anytime TD" with line "-" and `market_key` 0/102. Capture requests `player_anytime_td` (`fetch_ncaaf_oddsapi_props_local.py:86`), so an identity block after a date fix is unproven and less likely.
+    - ISO-dated sports are unaffected, and the served NCAAF props are 101 Layer 2 rows, dated and 101/101 quoted.
+    - These legacy rows do not reach the pool (`count=74` < 104).
+  - **(b) YES, CONFIRMED in production:** a same-process 09-16 build filed `intelligence_prop`/`intelligence_game` under 2026-09-15 (ncaaf 104 -> 208, soccer 14 -> 28; no 2026-09-16 key). Impact is limited to the ops coverage metric.
+  - No fix was made; any fix gets its own lane.
+- **Superseded status, 2026-09-15 ~13:30 CT (before sampling):** H0 CONFIRMED; H1 not user-visible, legacy NCAAF unattributed; H2 code-certain with its reading owed.
   - **H1, served rows:** a sport-scoped `/api/intelligence/query` read (18:24Z, 23.4 MB) gave 101 ncaaf prop rows.
     - All 101 are Layer 2 rows (no `candidate_type`/`context_label`) with `game_date` and `commence_time` (09-17 to 09-19), and 101/101 are quoted.
     - Probe caveat: its soccer control returned 0 rows (a filter mismatch), so it is validated only for these rows.
@@ -2127,7 +2137,10 @@ death, never life — do not invert it.
     - Payload flushed at 18:29:47Z (inside B), `service_role=refresh-worker-4tx2`: `ncaaf 2026-09-15 intelligence_prop=208 intelligence_game=564` and `soccer 2026-09-15 intelligence_prop=28 intelligence_game=156` (= A + B).
     - There is NO `2026-09-16` intelligence lane, while the same build's context_label-keyed lane landed at `soccer 2026-09-16 prop_source_in=180`.
     - Impact: the ops coverage metric double-counts today and never shows a non-today pool. The board is unaffected.
-  - **Open, user decision:** whether to sample the 104 legacy NCAAF rows' date fields and market keys to attribute H1.
+  - **H1 attribution: sampling the 104 legacy NCAAF rows (user: "sample the 104 NCAAF rows").** Written before sampling:
+    - **H1a, fallback date:** the rows carry no ISO date in `_row_slate_date`'s keys, so the join read `requested_date` = worker today (2026-09-15), a shard that is ABSENT, which gives with_quote=0.
+    - **H1b, identity:** the rows carry an ISO kickoff date (or would join the existing 09-17..09-19 shards) but still find no quote because of the missing `market_key` (104/104) or player-name mismatch.
+    - **Discriminator:** the rows' actual date fields and market keys. If they have no ISO date, replay the real `quote_ref_for_bet` for a sample with the kickoff date against the existing shard. Quotes found means H1a; none means H1b is also in play.
   - **H0** (refresh-worker `CANDIDATE_POOL_READY`, 09-12 05:00Z..09-15 18:08Z, 206 builds): non-today pools with candidates exist.
     - On 09-12 the 09-13 pool had 151 (x2).
     - On 09-14 the 09-15 pool had 14 (x24).
