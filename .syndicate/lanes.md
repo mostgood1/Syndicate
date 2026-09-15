@@ -1526,7 +1526,27 @@ death, never life — do not invert it.
     - A moneyline pair -194 → -186 does not fire on the line threshold.
     - The MLB board's -105 → +105 reads 10.
   - (3) After the owning worker's deploy: 0 new steam events with a crossing-inflated `odds_delta`; 0 moneyline events firing only through `line_hit`; and served legacy steam rows' `odds_delta` equal to their cents move.
-- Blocked by: none. First step: find which service runs `_steam_signal` (its steam log line on Render), then read today's steam events and split them.
+- Status `[2026-09-15 ~20:52Z (first step)]`: **BLOCKED on a read path for the raw steam events. H1/H2 are not yet tested on production.**
+  - Writer, STRONGLY INDICATED, not verified:
+    - Chain: `scripts/refresh_odds_sources.py:2580` -> `sync_sport_post_refresh_tracking` -> `_sync_odds_history_for_refresh` (`:1805`) -> `_steam_signal`, then `_record_steam_events`.
+    - It runs in `refresh_odds_sources.py` child processes on live-odds-worker: `ALL_PROCESS_MEMORY` names them, 173 matches 19:32-20:43Z.
+    - Child output never reaches Render logs: 0 `STEAM_DETECTED` on all 7 services since 12:00Z, and 0 `reports/steam` lines on web/refresh-worker/live-odds-worker since 18:00Z. The controls matched: `PUBLISH_OK` 414, `LAYER2_CARD_SHARDS_WRITTEN` 8.
+  - Reader: refresh-worker logs `steam_candidate_creation after=` 16-24 for 09-15 and 153 for 09-16 on every build today.
+  - Thresholds, VERIFIED: no `SYNDICATE_STEAM_*` key on any of the 7 services, so the defaults apply (15 points, 10 in ramp/closing, 0.5 lines, 45 min).
+  - The raw events are unreadable from outside:
+    - They are key-value only (`write_json_file`).
+    - Web's disk has no `reports/steam/*` for any date: export allows the path and returns count 0; the control `clv_openings/2026-09-15.jsonl` returns count 1.
+    - No ops route reads them, and there are no key-value credentials locally.
+    - The odds-lifecycle JSONL is on the writer's own disk and deliberately not exportable (`artifact_publisher.py:732`).
+    - `odds-refresh/logs` points at a 2026-08-07 manifest that does not exist.
+  - Served steam cards cannot stand in for the pair (7 of 7 at 20:48:37Z):
+    - `line_odds_movement` is rewritten after the builder: opening == latest, `price_delta` null.
+    - `score` is 0.0.
+    - Only `steam.odds_delta` and the writeup survive (e.g. "price moved -220").
+    - A 200+ `odds_delta` is CONSISTENT with H1 but not proof: in-play prices move that far without crossing (RMA @ ELC h2h -10000 -> -13000).
+  - H2 is supported on the board: the 2 h2h cards have `line` == price and `line_delta` == `odds_delta` (-49, -3000).
+  - RETRACTED (said in chat 20:3xZ): "the inflation also affects ranking" came from the builder's score formula (`intelligence.py:5656`). The served `score` is 0.0, so a ranking effect is not established.
+- Blocked by: user decision on how to read today's raw steam events (`reports/steam/steam_events_<sport>_2026-09-15.json` in the key-value store).
 
 ### ncaaf-prop-quote-market-check — CLOSED — opened 2026-09-15 — closed 2026-09-15 ~15:45 CT — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
 - **VERDICT.** Goal (verbatim): "for the 104 NCAAF legacy prop rows refresh-worker quoted after `f833f7ec` (`intelligence_prop with_quote=104`), state how many carry a quote from the row's OWN market, measured with the real `quote_ref_for_bet` over production quote shards. If they are wrong, describe the production impact and stop before changing behaviour. Read-only diagnostic; no code change without the user's go." — **GOAL: MET. Hypothesis FALSIFIED: 102 of 102 replayed rows get their own market, side and line.**
