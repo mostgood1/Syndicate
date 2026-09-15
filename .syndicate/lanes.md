@@ -1760,6 +1760,35 @@ death, never life — do not invert it.
 - Verification: on the served payload after the web + refresh-worker deploys — Layer 2 `not_tracked` rows 0 wherever an opening exists; no shown delta whose open/now straddle ±100 exceeds its cents move; every `steam` row is `movement_basis=same_book`; `movement_series` present and line-consistent on rows with 2+ distinct points; MLB prop headshot coverage against rows with a projection; explainer coverage against rows with a model; legacy prop/game rows on the board 0; one screenshot of the rendered board.
 - Blocked by: none (legacy-row step waits on the `intelligence_state.py` release).
 
+### test-wall-clock-timebombs — CLOSED 2026-09-15 — opened 2026-09-15 — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
+- **VERDICT.** Goal (verbatim): "two confirmed test time bombs pass on any date, test-only, no behaviour change." — **GOAL: MET.**
+  - Shortlist:
+    - The whole file passes 14/14 at the real clock.
+    - The forward test passes frozen at real now and at 2026-12-24T01Z, and FAILS frozen at kickoff day (now+120d), so the assertion is live.
+    - The kickoff is now `now + 120 days`.
+  - Soccer:
+    - The whole file passes 4/4 with `SYNDICATE_DATA_ROOT` set, unfrozen and frozen at 2027-07-02 and 2031-03-01.
+    - `schedule.central_today` is monkeypatched to 2026-08-20. The week clock `central_today_iso` is left real, so the regression guard is kept (reasoned, not run).
+  - Not changed (code): the soccer provider takes the SEASON from the wall clock and the WEEK from the requested date. It only diverges for a requested date across Jul 1 (Jan 1 for MLS), which is off-season, so the production impact is about nil. Detail: `log/2026-09-15.md`.
+- Goal: two confirmed test time bombs pass on any date, test-only, no behaviour change.
+  - `tests/test_layer2_shortlist_wiring.py::test_forward_view_is_reachable` fails from 2026-12-24T00:00Z.
+  - `tests/test_soccer_provider_date_scope.py::test_the_fan_out_uses_the_context_date_not_today` fails from 2027-07-01.
+- Files: tests/test_layer2_shortlist_wiring.py, tests/test_soccer_provider_date_scope.py
+- Hypothesis (CONFIRMED by frozen-clock runs before any edit, on `1f9c9c62`):
+  - **(1) Shortlist.** `build_layer2_shortlist` calls `select_shortlist` without `now`, so `_within_horizon` compares the fixed `commence_time` 2026-12-25T23:05Z against `datetime.now()` with MLB horizon `max(1, 1-1)=1`.
+    - Readings with `layer2_board.datetime.now` frozen: 2026-12-23T23:00Z 1 passed; 2026-12-24T01:00Z 1 failed on `scoped["rows"] == []`.
+  - **(2) Soccer.** `default_season` reads `schedule.central_today()`. From 2027-07-01 every league resolves season 2027, and both reference dates (08-16, 08-22) sit before week 1, so `moved` is empty.
+    - Readings with `SYNDICATE_DATA_ROOT` = the primary checkout's data (10 `schedule_2026.json`): unfrozen 1 passed; 2027-06-30 1 passed; 2027-07-02 1 failed on `assert moved`.
+    - Without `data/` it already fails in a worktree, a pre-existing mirror dependency.
+- Falsification test: either fixed test still fails under the same frozen clock that broke it (for the shortlist, a relative kickoff under an unfrozen run; for soccer, `central_today` pinned via monkeypatch overriding a frozen 2027-07-02), or the pin makes the regression guard vacuous.
+- Verification:
+  - Both tests pass unfrozen.
+  - Soccer passes under `FREEZE_DATE=2027-07-02` (the monkeypatch wins).
+  - Shortlist: still passes at real now, and fails when `layer2_board`'s clock is pulled to kickoff day, which proves the horizon assertion is live.
+  - Both whole files pass. Soccer runs with `SYNDICATE_DATA_ROOT` set.
+- Source: 5-agent audit of ~40 `now=`/`today=` functions' tests, 2026-09-15. The other flagged tests are 2099-nominal or were only broken BEFORE 2026-08-01, so no action.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

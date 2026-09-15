@@ -51,10 +51,12 @@ def _quote(**overrides):
     have left a fifth constant to discover next time.
 
     A relative timestamp removes the dependency at its source: no age ceiling,
-    present or future, can age these rows out. `commence_time` stays pinned
-    because the horizon test asserts against a fixed far date, and the
-    stale-kickoff and unknown-game-state env pins in `_no_quality_floor` already
-    neutralise that side.
+    present or future, can age these rows out. The default `commence_time` stays
+    a fixed PAST date: a past kickoff always passes the horizon, and the
+    stale-kickoff and unknown-game-state env pins in `_no_quality_floor`
+    neutralise the rest. `test_forward_view_is_reachable` overrides it with a
+    kickoff relative to now, for the same reason as `snapshot_ts`: its old fixed
+    far date walked into the 1-day horizon on 2026-12-24.
     """
     row = {
         "sport": "mlb",
@@ -278,7 +280,11 @@ def test_shortlist_policy_is_layer2_boards_not_redefined_here(shard):
 def test_forward_view_is_reachable(monkeypatch):
     """horizon_days=None is the Forward view. None is a MEANINGFUL value, so a
     plain None default would have made it unreachable while looking default."""
-    far = _quote(commence_time="2026-12-25T23:05:00Z")
+    # Relative to NOW, like `snapshot_ts`: `select_shortlist` measures the horizon
+    # against the wall clock, not the "2026-08-08" argument. The fixed
+    # "2026-12-25T23:05:00Z" this used to carry entered the 1-day horizon on
+    # 2026-12-24 and failed from then on.
+    far = _quote(commence_time=(datetime.now(timezone.utc) + timedelta(days=120)).isoformat().replace("+00:00", "Z"))
     rows = []
     for book, hp, ap in (("draftkings", -120, 105), ("fanduel", -115, 100)):
         rows.append({**far, "bookmaker": book, "selection": "home", "price": hp})
@@ -288,7 +294,7 @@ def test_forward_view_is_reachable(monkeypatch):
     scoped = build_layer2_shortlist("2026-08-08", ["mlb"])
     forward = build_layer2_shortlist("2026-08-08", ["mlb"], horizon_days=None)
 
-    assert scoped["rows"] == [], "a December game should be outside a 1-day horizon"
+    assert scoped["rows"] == [], "a game 120 days out should be outside a 1-day horizon"
     assert scoped["rows_beyond_horizon"] > 0, "dropped rows must be counted, not silently lost"
     assert len(forward["rows"]) == 2, "Forward view unreachable"
 

@@ -75,7 +75,17 @@ def test_the_fan_out_uses_the_context_date_not_today(monkeypatch):
     requests. Before the fix both produced the same set, because `games()`
     re-derived the date from the wall clock.
     """
+    from datetime import date
+
+    import syndicate.features.soccer.features.schedule as schedule
     from syndicate.features.soccer.sources import default_season, default_week
+
+    # Pin the SEASON clock to the dates under test. `default_season` reads
+    # `central_today()`, so from 2027-07-01 every league resolved season 2027,
+    # both dates sat before its week 1, and `moved` came back empty. The WEEK
+    # clock (`central_today_iso`) is deliberately left real: resolving the week
+    # from it is the regression this test exists to catch.
+    monkeypatch.setattr(schedule, "central_today", lambda: date(2026, 8, 20))
 
     provider = _provider()
 
