@@ -1861,9 +1861,17 @@ death, never life — do not invert it.
 - Method rules: score per MATCH, never per row. Pick thresholds only leave-one-date-out. Compare against the market's own lean. Print per-family date coverage and the intersection. Validate outcome capture per league (Belgian shot capture was 0.13 on 2026-08-31).
 - Verification: the findings file is on origin/main with per-market and per-league tables carrying n, dates and CIs, plus the coverage/intersection table; the harness re-runs from its cache.
 - Blocked by: none
-### deploy-guard-python-post — OPEN — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add
+### deploy-guard-python-post — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: the guard blocks a Python/JS POST to the deploys endpoint, in the worktree (133 passed; unwired check fails exactly the 4 Python block tests) and in the PRIMARY tree, where the urllib shape that passed with exit 0 this morning now returns exit 2.**
+- **VERDICT.** Goal (verbatim): "`.claude/hooks/deploy-guard.py` classifies a Python/JS POST to `/v1/services/<id>/deploys` as a deploy and applies the claim + CLEAR-preflight gate to it (today it returns exit 0 unchecked), while Python READS of that endpoint, and scripts that GET the deploy list beside a POST to another URL, stay allowed. A literal `"commitId"` in the body binds the receipt SHA like `--commit`. Promoted from the 2026-09-15 lead in `leads.md`." — **GOAL: MET.**
+  - Primary-tree reading, after writing main's `11167fdf` guard into its working tree (matches `origin/main`, 0 staged):
+    - The urllib deploy shape gives **exit 2** ("a Python/JS POST to the deploys endpoint").
+    - `render_deploy.py` gives exit 2.
+    - GET `/deploys?limit=3` + POST `/api/intelligence/query` gives exit 0.
+    - A plain command gives exit 0.
+  - The receipt binding is proven by `test_a_python_deploys_commit_id_is_bound_to_the_receipt`.
+  - Known limit remains: a deploy script run from a FILE is invisible to a text guard.
 - Goal: `.claude/hooks/deploy-guard.py` classifies a Python/JS POST to `/v1/services/<id>/deploys` as a deploy and applies the claim + CLEAR-preflight gate to it (today it returns exit 0 unchecked), while Python READS of that endpoint, and scripts that GET the deploy list beside a POST to another URL, stay allowed. A literal `"commitId"` in the body binds the receipt SHA like `--commit`. Promoted from the 2026-09-15 lead in `leads.md`.
-- Files: `.claude/hooks/deploy-guard.py`, `tests/test_deploy_guard.py`, `.syndicate/leads.md` (marking the lead promoted). No open lane claims any of them (checked on origin/main 2026-09-15); user decision "close the gap, take the claim".
+- Files: released: (a RECORD since the 2026-09-15 close; nothing is held) `.claude/hooks/deploy-guard.py`, `tests/test_deploy_guard.py`, `.syndicate/leads.md` (lead marked promoted). No open lane claimed them when taken; user decision "close the gap, take the claim".
 - Hypothesis: n/a (a guard fix). Root cause already measured: `POST_INTENT` is curl/PowerShell-only (`-X POST`, `--request POST`, `-Method Post`, `--data`, `-d`), so `DEPLOYS_ENDPOINT AND POST_INTENT` fails for `urllib.request.Request(..., method="POST")`.
 - Falsification test, both directions:
   - BLOCK without locks: a command shaped exactly like this session's two web deploys; `requests.post`; a urllib Request with only a body.
@@ -1889,7 +1897,7 @@ death, never life — do not invert it.
     - The urllib deploy shape actually run twice this session gives exit 2 BLOCK ("a Python/JS POST to the deploys endpoint").
     - This session's measurement heredoc (GET `/deploys?limit=3` + POST `/api/intelligence/query`) gives exit 0.
     - The deploy-status poller (GET `/deploys/dep-...`) gives exit 0.
-  - Owed for GOAL: land; write main's guard into the PRIMARY working tree (index untouched); re-run there the urllib-shaped command that returned exit 0 earlier today, which must now BLOCK.
+  - Owed for GOAL (DONE): landed as `11167fdf`. Main's guard was written into the PRIMARY working tree (index untouched), and there the urllib-shaped command that returned exit 0 earlier today returns exit 2. See the VERDICT at the top of this block.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
