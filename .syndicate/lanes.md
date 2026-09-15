@@ -968,6 +968,10 @@ death, never life — do not invert it.
     - (2) A user decision: `SYNDICATE_ENABLE_LIVE_LENS_LOOP` off refresh-worker vs off live-odds-worker. It is true on both.
     - (3) Re-scope or re-title this lane after that decision; the child-process design may no longer be the right fix.
   - **Blocking:** live games (from 22:40Z), then the user's decision.
+  - **USER DECISION 2026-09-15 ~01:30Z (20:30 CT 09-14): "Off on refresh-worker (Recommended)".** Evidence: `deploys.md` 2026-09-14 23:25Z. Two writers for MLB were measured. The MLB build costs per tick were median +51 MB refresh-worker / +78 MB live-odds-worker. live-odds-worker's unreclaimable headroom min was 887 MB in live play.
+    - Plan: set `SYNDICATE_ENABLE_LIVE_LENS_LOOP=false` on refresh-worker (single-key PUT), then redeploy its live commit `6438830d` with `--reinject-env` (no collateral) at the first free claim plus preflight CLEAR.
+    - **Verify:** 0 `live_lens_tick_*` stages on refresh-worker after boot; `LIVE_LENS_LOOP_START_RESULT started=False`; live-odds-worker still writes `live/mlb_live_lens.json` during games, with no `server_failed` from memory on the next slate; refresh-worker pid 39 per-build growth vs the 19:07Z boot curve.
+    - Rollback: set it back to `true` and redeploy.
 - Goal: stop refresh-worker's main process from keeping ~2.2 GB of live data after a full board build, by running `_compute_board_publication_response` in a child process whose memory is released on exit (the pattern `overview_subprocess.py` uses for the MLB overview). Then show heavy-build refusals staying at ~0 over a full slate day with no recycle restarts. No deploy without the user's OK.
 - Origin: user decision 2026-09-14 ~15:10Z (10:10 CT), "Restart at 1 + build isolation lane (Recommended)". The user's prompt was "why do we need 15? if we know its a problem we should fix it". The restart setting (lane heavy-build-memory-refusal) is the stopgap; this lane is the root-cause fix.
 - Measured before design (refresh-worker logs, 09-12 18:00Z..09-14 15:05Z):
@@ -1097,6 +1101,11 @@ death, never life — do not invert it.
   - The replay's gain is ~40% (N=1 ~612 vs N=15 ~1,044 blocked minutes, recycle's child-job hold included), not the ~3x first shown.
   - **Left:** `RECYCLE_EXIT` on a real refusal, then a Render restart, then `PORTFOLIO_COMMIT` resuming. Session Monitor `b1k43gk33` watches it and dies with the session.
   - **Blocking:** a refusal must actually occur. Today's boots were short and did not refuse.
+  - **LIVE-SLATE READING 2026-09-14 23:52Z-2026-09-15 01:25Z, refresh-worker `6438830d` (boot 21:03:51Z): recycle REACHABLE but HELD every time.**
+    - `RECYCLE_CHECK held=children_running` at 23:52:45Z (refusals 1, children 1, uptime 10,124 s), 00:46:45Z (1, 2), 00:51:48Z (2, 2) and 01:24:53Z (1, 2). 0 `RECYCLE_EXIT`, 0 `RECYCLE_CHECK_FAILED`.
+    - The refusal at 23:52:40Z had headroom 1,895.8 vs the 1,900 floor. Admitted builds between refusals reset the counter.
+    - **Structural finding:** during a live slate, child jobs (MLB sim and friends) are almost always running, so the recycle cannot fire exactly when refusals happen. Threshold 1 does not help there.
+    - This matches the replay's child-hold share (55-68% of samples). The live-lens flag change (lane heavy-build-child-process) is now the lever for refusals.
 - DECISION 2026-09-14 ~15:10Z (10:10 CT): user chose "Restart at 1 + build isolation lane (Recommended)".
   - Why not 15: a replay of 23 closed refusal streaks (09-12 18Z..09-14 15Z) counted minutes with no full build. No policy 2,144 (worst 969). N=15 987 / 8 restarts / worst 92. N=5 647 / 17 / 59. N=2 405 / 21 / 26. **N=1 300 / 23 / worst 13.**
   - Boot to first admitted build: median 13.1 min (6 boots, 9.6-24.8). Self-clearing streaks took 10-80 min.
