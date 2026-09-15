@@ -36219,3 +36219,15 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - NOT exercised here: the same commit's steam-detector change. It runs on the workers, whose deploys are pending (live-odds-worker queued behind lane `polymarket-ask-pricing`; refresh-worker rides lane `execution-ledger-live-trim`).
 - **Web claim:** released after this entry.
 - Rollback: web `dd014d14`.
+
+## 2026-09-15 22:39Z (17:39 CT) — READING — refresh-worker `2d579fd1` — lane soccer-live-scoreboard-range-stale — **`082da3e3` FULLY VERIFIED: refresh-worker's second today-pull carried ITS OWN previous start (22:12:51Z) while live-odds-worker pulled ~13 times on its own floors**
+- No deploy. Source: `render_logs.py` over both workers' `export?pattern=%2A2026-09-15%2A` request lines, with the `since=` epochs converted.
+- **Prediction** (lane block, written before the deploy): refresh-worker's next today-pull carries `since=` = its own previous pull start, never a live-odds-worker pull start.
+- **refresh-worker** (live on `2d579fd1` 22:12:03Z):
+  - 22:12:52Z `since=` **20:12:51Z** -- the 2 h clamp, its first pull with no key yet. `artifacts_received=8 written=8`.
+  - 22:39:32Z `since=` **22:12:51.435Z** -- exactly its own 22:12:51Z pull start, a 26.7-minute window. `artifacts_received=4 written=4`. **MET.**
+- **live-odds-worker pulled ~13 times in that same window, each on its own floor:** 22:19:06Z (`since` 22:16:58Z), 22:21:05Z (22:18:48Z), 22:23:19Z (22:20:48Z), 22:25:00Z (22:23:06Z), 22:26:45Z (22:24:44Z), 22:33:01Z (22:26:31Z), 22:35:10Z (22:32:43Z), 22:37:23Z (22:34:42Z).
+- **The counterfactual, stated exactly:** under the single shared key, refresh-worker's 22:39:32Z request would have carried live-odds-worker's last successful pull start (~22:34:42Z), a ~5-minute window instead of 26.7 minutes. That narrowing is the mechanism that starved the Layer 2 chips (`state_layer2.md [chip-refresh-worker-pull-hop]`).
+- **A FAILED pull still does not advance the floor, as designed:** live-odds-worker repeated `since=22:26:31Z` across two DNS failures (22:28:29Z, 22:29:39Z, `Name or service not known`) and one `timed out` (22:31:20Z), then succeeded at 22:33:01Z.
+- **Leads, untouched by this fix:** web `/export?pattern=*<today>*` still times out (live-odds-worker 22:31:20Z and 22:39:54Z), and live-odds-worker hit two DNS resolution errors reaching web at 22:28-22:29Z.
+- Rollback: n/a, reading only.

@@ -1544,7 +1544,7 @@ death, never life — do not invert it.
   - After deploy, the first artifacts carry the conditional ladder, and `soccer_projections` prices from it.
 - Blocked by: none. Step A (divisor retirement) needs nothing from step B.
 
-### soccer-live-scoreboard-range-stale — OPEN — opened 2026-09-15 — session a1e40980-cceb-493f-adf9-5a5ca879acf6 — **GOAL: NOT MET: live-state MET; `082da3e3` + `e115cd6b` LIVE on both workers (`2d579fd1`); pull-floor fix MET on the first pull; chips-within-one-tick and goal-count readings owed on a live match**
+### soccer-live-scoreboard-range-stale — OPEN — opened 2026-09-15 — session a1e40980-cceb-493f-adf9-5a5ca879acf6 — **GOAL: NOT MET: live-state MET; `082da3e3` pull-floor fix FULLY VERIFIED (both pulls, `deploys.md` 22:39Z); `e115cd6b` LIVE on both workers; chips-within-one-tick and goal-count readings owed on a live match**
 - **VERDICT 2026-09-15 ~21:40Z, updated ~22:20Z.** Goal (verbatim): "The soccer live poller reads ESPN's single-date scoreboard, so soccer live state, the live lens and the Layer 2 compact chips track ESPN within one poll tick: on a live match after the live-odds-worker deploy, the served live_state clock is within 5 match-minutes of ESPN's live clock (it was ~65 behind on 2026-09-15)." — **GOAL: NOT MET.**
   - MET, the reading: live-odds-worker `18be9107` live 20:34:57Z. The first post-deploy la_liga `live_state_2026-09-15.json` (generated 20:36:43Z, read from web's disk) had RMA @ ELC at 45'+3' against ESPN 47' at 20:38:22Z; ESP-RAY and VAL-ALA moved to final. `deploys.md` 2026-09-15 20:29:23Z.
   - NOT MET: the Layer 2 chips did not track within one poll tick. They served pre-deploy state for 11 publishes (20:38:19-21:01:41Z) and were fresh at 21:04:02Z, the first publish after refresh-worker's first successful today-pull (21:02:50Z). Cause traced: ONE keyvalue pull watermark shared by both workers, plus web `/export?pattern=*<today>*` timeouts.
@@ -1563,7 +1563,7 @@ death, never life — do not invert it.
 - Verification: offline, a test that fails with the range window and passes with the single date, and reaches BOTH call sites. Production: la_liga `live_state_2026-09-15.json` (RMA @ ELC, second half) read via web export after the deploy, `status_display_clock` within 5 match-minutes of ESPN's live clock read the same minute, and `/api/board/game-chips?sports=soccer` agreeing. Reading in `deploys.md`.
 - Blocked by: none. Waiting on live soccer: La Liga 2026-09-16 from 17:00Z.
 - **Owed, in order:**
-  1. refresh-worker's NEXT today-pull carries `since=` = **22:12:51Z**, its own previous start. The FIRST pull is MET (2 h clamp, `deploys.md` 2026-09-15 22:14Z).
+  1. **MET ~22:41Z** (`deploys.md` 2026-09-15 22:39Z): refresh-worker's second today-pull (22:39:32Z) carried `since=` **22:12:51.435Z**, its own previous start, a 26.7-minute window, while live-odds-worker pulled ~13 times on its own floors (22:16:58Z..22:37:20Z). The first pull was the 2 h clamp (22:14Z entry).
   2. DEPLOYED (`2d579fd1` on both workers). Owed: on a live match with a penalty or own goal (next: La Liga 2026-09-16 17:00Z), the served `live_state` `games` score equals ESPN's.
   3. `/api/board/game-chips?sports=soccer` agrees with ESPN within one publish on a live match.
   4. Lead: web export timeouts (~1 in 6 of refresh-worker's today-pulls on 09-15), cause unread.
