@@ -378,21 +378,21 @@ death, never life — do not invert it.
     - How: read `/api/ops/execution/ledger-summary?days=14` with the ops token, and sum `by_status.submitted` over the `paper:*` buckets of each date.
 - Blocked by: live-odds-worker's OOM loop (47 kills in 25.6 h, 2Gi). Scheduled task `execution-ledger-cas-close-reading` RAN on 2026-09-12 and did NOT close the lane; see the second-window block above and `deploys.md` 2026-09-12 16:37Z. `todo.md #656` stays OPEN.
 
-### polymarket-no-fill-booking-audit — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **IN PROGRESS: 2 misbooked NO fills found; log scan 09-01..09-15 running**
-- **VERDICT (checkpoint 2026-09-15 ~15:10 CDT).** Goal: "[user 2026-09-15 ~14:45 CT: "start no fills audit"] list every live Polymarket NO fill booked before `1efdea18` (live-odds-worker, live 17:26:07Z) whose `fill_price` is avgPx rather than the true NO cost 1 - avgPx. For each: the booked and true cost, and the stake, P&L and ROI error it carries. Report the total. READ-ONLY; correcting rows is a separate decision." — **GOAL: NOT MET** (in progress).
-  - **Misbooked so far, both before the served book starts (09-02), so no row to correct:**
-    - `C65VD0R72KDG` 08-30: 13.13 @ avgPx 0.235, booked 0.235 / $3.09, true 0.765 / $10.04, error +$6.96.
-    - `tsc-mlb-bos-mia-2026-08-26-8pt5`: 7.11 @ avgPx 0.43, booked 0.43 / $3.06, true 0.57 / $4.05, error +$1.00.
+### polymarket-no-fill-booking-audit — CLOSED 2026-09-15 — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **GOAL: MET within stated coverage: 2 misbooked NO fills, both before 09-01; 0 since**
+- **VERDICT 2026-09-15 ~16:00 CDT.** Goal: "[user 2026-09-15 ~14:45 CT: "start no fills audit"] list every live Polymarket NO fill booked before `1efdea18` (live-odds-worker, live 17:26:07Z) whose `fill_price` is avgPx rather than the true NO cost 1 - avgPx. For each: the booked and true cost, and the stake, P&L and ROI error it carries. Report the total. READ-ONLY; correcting rows is a separate decision." — **GOAL: MET** (within the coverage stated below).
+  - **Misbooked (fill_price = avgPx, true cost 1 - avgPx):**
+    - `tsc-mlb-bos-mia-2026-08-26-8pt5`: 7.11 @ avgPx 0.43. Booked 0.43 / $3.06, true 0.57 / $4.05. Stake error +$1.00; P&L error -$1.00 if graded; ROI understated by the stake ratio (3.06 vs 4.05).
+    - `C65VD0R72KDG` 08-30: 13.13 @ avgPx 0.235. Booked 0.235 / $3.09, true 0.765 / $10.04 (+$0.14 fee). Stake error +$6.96; P&L error -$6.96 if graded.
+    - **Total: +$7.96 of stake not on the record.** Neither order has a row in the served book (earliest fill 09-02), so no stored ROI shows the error today.
   - **Booked right:**
-    - The 3 NO fills in the served book (`CDZ89ZCJ8SJR` dal-nyg 0.395, `CE7V6BXQETMQ` nyj-ten 0.51, `CGVRPD7SWVB8` sea-ari 0.335; FILL_PRICE `recorded = 1 - avgPx`).
-    - 08-26 `C3GHTNSE0FSM` 0.435, `C3FPKCFNPFSN` 0.455, `C3E1TJPV4FSM` 0.49 (deploys.md 2026-08-26 00:37Z).
-    - 08-27 `C4N3GPYA4GNQ` lar-lac 0.51.
-    - (b) bal-col 09-02 WON: `pnl 6.7024` = n(1 - 0.515) - fee.
-  - **Served book** (`/api/portfolio/live?on=all&venue=polymarket&show=all`): 49 rows, 27 live filled from 09-02 plus 22 rejected. No hidden row carries a fill.
-  - **Left:**
-    - Discriminator (a): background scan `fill_price_scan.py` into scratchpad `fp_all.json`, one process with retries. Three parallel scans were stopped after log-API 503s left most windows empty.
-    - Discriminator (c): the `IMPOSSIBLE_PNL_CORRECTED` read failed on a 503 twice; still owed.
-    - Coverage limit: NO fills before 09-01 that no ledger entry names cannot be seen. Logs start 09-01 and the book 09-02.
+    - (a) Every live NO fill since logs start: 6 filled of 7 NO orders across 60 of 60 six-hour windows 09-01..09-15. All read `recorded = 1 - avgPx`: `C4N3GPYA4GNQ` 0.51, `C81RVJGZAM99` bal-col 0.515, `C8292W0ATMA3` 0.35, `CDZ89ZCJ8SJR` dal-nyg 0.395, `CE7V6BXQETMQ` nyj-ten 0.51, `CGVRPD7SWVB8` sea-ari 0.335. `C7CNYDJV4KDH` never filled.
+    - Ledger-named August NO fills: `C3GHTNSE0FSM` 0.435, `C3FPKCFNPFSN` 0.455, `C3E1TJPV4FSM` 0.49 (08-26).
+    - (b) bal-col WON, `pnl 6.7024` = n(1-0.515) - fee.
+    - (c) `IMPOSSIBLE_PNL_CORRECTED` 0 lines 09-01T12Z..now. The emitter exists (`venue_settlement.py:1131`) but has no live population: no NO fill since 09-01 has settled LOST. So (c) is a null without a population, and (a) is the evidence.
+  - **Hypothesis held:** the proximity rule misbooked only fills near the sent price. Since 09-01 no NO fill landed there.
+  - **Coverage limit:** NO fills before 09-01 that no ledger entry names cannot be seen (logs start 09-01, the book 09-02). The two misbooks were found only because the ledger named them.
+  - **Found, not followed (lead):** `C8292W0ATMA3` (NO, filled 09-02 @ 0.35) and `C7CNYDJV4KDH` are referenced by NO row in the served book (`show=all`, 49 rows), not even as `prior_attempts`.
+  - Correcting rows: not applicable to the two misbooks (no rows). No decision owed.
 - Goal: [user 2026-09-15 ~14:45 CT: "start no fills audit"] list every live Polymarket NO fill booked before `1efdea18` (live-odds-worker, live 17:26:07Z) whose `fill_price` is avgPx rather than the true NO cost 1 - avgPx. For each: the booked and true cost, and the stake, P&L and ROI error it carries. Report the total. READ-ONLY; correcting rows is a separate decision.
 - Origin: lane `polymarket-no-price-convention` (CLOSED, GOAL MET) and `C65VD0R72KDG`, settled by rule at 0.765 against a booked 0.235 (user decision, lane `polymarket-ask-pricing`).
 - Files: none (read-only). No claim taken.
