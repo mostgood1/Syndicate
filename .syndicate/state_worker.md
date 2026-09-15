@@ -2175,7 +2175,10 @@ outlier cold reading. Three paired replications erased it: **cold 31.32s vs warm
   - 3,303 of 7,159 refused-level samples had `process_count` 2, i.e. no children.
   - Heavy builds resumed within minutes of the 13:42Z, 16:23Z and 18:31Z boots.
 - **The floor is roughly right.** Steady-state builds peak +296 / 719 / 1,416 MB above start (2 s `MEMORY_WATCHDOG`, n=12), minimum headroom at peak 633 MB, at parent stages (`board_contract_end`, `build_live_state_payload_fallback`). The MLB hydrated overview runs in a capped child (`[overview_isolation] OK` 33/33, 0 `MEMORY_CAP_HIT`), so the floor's 08-07 sizing comment describes a stage no longer in pid 39.
-- **Fix LIVE, NEVER exercised `[verified 2026-09-14 through 21:27Z]`:** `339dc6e9` `worker_recycle` has been on refresh-worker since `fb0c91cf` (13:39:49Z); refresh-worker was on `6438830d` from 21:03:17Z.
+- **Fix LIVE and EXERCISED ONCE `[verified 2026-09-15 01:34:39Z, refresh-worker logs + Render events]`:** `RECYCLE_EXIT` after 2 refusals with 0 children; Render `server_failed earlyExit` (not evicted) then `server_available` 1 s later; boot 32 s after the exit.
+  - During the live slate before it, 5 checks held on `children_running`: the recycle cannot fire while slate jobs run.
+  - Heavy builds resuming after the exit: OWED at the time of writing.
+  - Earlier history, kept: `339dc6e9` `worker_recycle` has been on refresh-worker since `fb0c91cf` (13:39:49Z); refresh-worker was on `6438830d` from 21:03:17Z.
   - The worker exits (Render restarts it) after >= N consecutive refusals (env, now 1; 0 disables), uptime >= 30 min, no live child, no drain.
   - On `fb0c91cf`, refusals came back 50m45s after live (14:30:34Z). They were then reset by an admitted build at 15:22Z before any recycle.
   - The later boots (15:38Z, 17:29Z, 19:07Z, 21:03Z) logged 0 refusals before the next deploy. No `RECYCLE_EXIT` has ever been observed.

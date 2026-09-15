@@ -35164,3 +35164,11 @@ User decision in chat: "Deploy #3 after their reading is done".
   - Longest MLB message: **887** chars. Longest across all sports: also 887.
   - 0 lines lacked a closing `}`, and 0 carried `clipped=`.
 - Numbers only. No model quality or accuracy is inferred.
+
+## 2026-09-15 01:34:39Z (20:34 CT 09-14) — reading only, no deploy — refresh-worker `6438830d` — self-restart `339dc6e9` EXERCISED [lane heavy-build-memory-refusal]
+- **Holds first:** from 23:52:45Z to 01:31:09Z, 5 `RECYCLE_CHECK held=children_running` (refusals 1-2, children 1-2, env threshold 1). Admitted builds between refusals reset the counter.
+- **Exit:** `2026-09-15T01:34:39.390809567Z [worker_recycle] RECYCLE_EXIT reason=heavy_build_refused {'consecutive_refusals': 2, 'threshold': 1, 'uptime_s': 16238, 'min_uptime_s': 1800, 'children': 0}`.
+- **Render events:** `server_failed {"reason": {"earlyExit": true, "evicted": false}}` 01:34:43.44Z, then `server_available` 01:34:44.36Z. Planned exit, not an OOM.
+- **Boot:** `MALLOC_ARENA_INIT` pid 39 at 01:35:11Z; 0 `Traceback` through 01:38:55Z. `LIVE_LENS_LOOP_START_RESULT started=True`: the restart kept the old env, which is expected, so `SYNDICATE_ENABLE_LIVE_LENS_LOOP=false` (set ~01:35Z) still needs a deploy.
+- **verify MET for the exit leg:** one exit, 0 children, no restart loop. **OWED:** heavy builds resuming, i.e. the first `PORTFOLIO_COMMIT date=` after 01:35:11Z.
+- Preflight 01:39:27Z: HOLD, 3 jobs (MLB daily sim relaunched at boot).

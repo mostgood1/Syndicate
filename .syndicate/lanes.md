@@ -1106,6 +1106,14 @@ death, never life — do not invert it.
     - The refusal at 23:52:40Z had headroom 1,895.8 vs the 1,900 floor. Admitted builds between refusals reset the counter.
     - **Structural finding:** during a live slate, child jobs (MLB sim and friends) are almost always running, so the recycle cannot fire exactly when refusals happen. Threshold 1 does not help there.
     - This matches the replay's child-hold share (55-68% of samples). The live-lens flag change (lane heavy-build-child-process) is now the lever for refusals.
+  - **RECYCLE EXERCISED 2026-09-15 01:34:39Z (20:34 CT 09-14), first time in production:**
+    - After holds at 01:24:53Z and 01:31:09Z, `RECYCLE_EXIT reason=heavy_build_refused {'consecutive_refusals': 2, 'threshold': 1, 'uptime_s': 16238, 'children': 0}`.
+    - Render events: `server_failed` 01:34:43Z with `earlyExit: true, evicted: false` (a planned exit, not an OOM), then `server_available` 01:34:44Z.
+    - New boot `MALLOC_ARENA_INIT` pid 39 at 01:35:11Z (32 s after the exit); 0 Traceback.
+    - As expected, `LIVE_LENS_LOOP_START_RESULT started=True`: a restart does not re-inject the `false` env set ~01:35Z. That needs the pending deploy.
+    - **Still owed:** the first `PORTFOLIO_COMMIT date=` after 01:35:11Z (heavy builds resume). Session Monitor `b1k43gk33` exits on it.
+    - Red flags: none (1 exit; 0 children at exit; 0 `RECYCLE_CHECK_FAILED`).
+    - The MLB daily sim restarted at boot (preflight HOLD 01:39:27Z, 3 jobs).
 - DECISION 2026-09-14 ~15:10Z (10:10 CT): user chose "Restart at 1 + build isolation lane (Recommended)".
   - Why not 15: a replay of 23 closed refusal streaks (09-12 18Z..09-14 15Z) counted minutes with no full build. No policy 2,144 (worst 969). N=15 987 / 8 restarts / worst 92. N=5 647 / 17 / 59. N=2 405 / 21 / 26. **N=1 300 / 23 / worst 13.**
   - Boot to first admitted build: median 13.1 min (6 boots, 9.6-24.8). Self-clearing streaks took 10-80 min.
