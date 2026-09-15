@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1031 rules `[generated]`
+## Index — 1038 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 403**
+**FORBIDDEN — 405**
 
 - [2026-09-06 — FORBIDDEN: instrumenting join A, reading it, and concluding about a value…](#2026-09-06-forbidden-instrumenting-join-a-reading-it-and-concluding-about-a-value-written-by-join-b-name-the-writer-of-the-field-in-the-falsification-test-itself-lane-mlb-first5-kalshi-fanin-mismatch-vs-15410ca7)
 - [2026-09-06 — FORBIDDEN: concluding a guard covers a symptom because the guard is deploy…](#2026-09-06-forbidden-concluding-a-guard-covers-a-symptom-because-the-guard-is-deployed-firing-and-named-after-it-find-the-code-that-wrote-the-field-you-are-looking-at-lane-mlb-first5-kalshi-fanin-mismatch)
@@ -223,6 +223,8 @@
 - [2026-09-15 — FORBIDDEN: carrying a deploy's predicted effect on a time-varying field fr…](#2026-09-15-forbidden-carrying-a-deploys-predicted-effect-on-a-time-varying-field-from-a-reading-taken-hours-earlier-re-derive-it-at-preflight-and-baseline-every-field-it-names-plus-the-served-row-count-lane-combined-board-state-rows-lost)
 - [2026-09-15 — FORBIDDEN: caching a verdict whose validity depends on the date's relation…](#2026-09-15-forbidden-caching-a-verdict-whose-validity-depends-on-the-dates-relation-to-today-under-a-key-that-is-only-the-date-at-midnight-tomorrow-becomes-today-and-the-verdict-outlives-its-premise-lane-wnba-future-date-cache-carry)
 - [2026-09-15 — FORBIDDEN: reading ESPN's soccer scoreboard with a `dates=YYYYMMDD-YYYYMMD…](#2026-09-15-forbidden-reading-espns-soccer-scoreboard-with-a-datesyyyymmdd-yyyymmdd-range-for-live-state-ask-for-the-single-date-and-judge-freshness-by-a-content-field-lane-soccer-live-scoreboard-range-stale)
+- [2026-09-15 — FORBIDDEN: running `session_worktree.py land --lane <slug>` with any slug…](#2026-09-15-forbidden-running-session_worktreepy-land---lane-slug-with-any-slug-other-than-the-one-whose-branch-this-worktree-is-on-it-lands-that-lanes-branch-not-the-commit-in-front-of-you-session-abacd435-lanes-soccer-player-role-allocation-soccer-anytime-scorer)
+- [2026-09-15 — FORBIDDEN: gating a ledger commit on a SHELL `grep` filter over diff lines…](#2026-09-15-forbidden-gating-a-ledger-commit-on-a-shell-grep-filter-over-diff-lines-and-reading-a-dot-prefixed-revpath-answer-from-git-bash-as-fact-lane-fotmob-join-coverage-check)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -423,7 +425,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](learnings_evidence.md#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated) `[evidence]`
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 
-**Rules and corrections — 622**
+**Rules and corrections — 627**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -585,6 +587,11 @@
 - [2026-09-15 — OVERTURNED: "`pull_hot_artifacts`' `since=` floor is the calling service's…](#2026-09-15-overturned-pull_hot_artifacts-since-floor-is-the-calling-services-last-successful-pull-it-was-one-keyvalue-key-across-workers-so-live-odds-workers-pulls-set-refresh-workers-floor-lane-soccer-live-scoreboard-range-stale)
 - [2026-09-15 — OVERTURNED: "own-goal is correctly excluded" from the soccer TEAM score. C…](#2026-09-15-overturned-own-goal-is-correctly-excluded-from-the-soccer-team-score-count-by-the-feeds-own-scoringplay-not-by-a-type-key-prefix-lane-soccer-live-scoreboard-range-stale)
 - [2026-09-15 — OVERTURNED: "the fix is on main but its deploy is still my lane's to sched…](#2026-09-15-overturned-the-fix-is-on-main-but-its-deploy-is-still-my-lanes-to-schedule-once-a-commit-is-on-main-the-next-deploy-of-main-by-any-lane-ships-it-and-a-users-timing-decision-cannot-hold-lane-fotmob-team-name-aliases)
+- [2026-09-15 — OVERTURNED: "log lines found by a scan can be re-read later" — Render's ~1…](#2026-09-15-overturned-log-lines-found-by-a-scan-can-be-re-read-later-renders-14-day-retention-is-rolling-and-12-of-20-order-records-expired-between-the-scan-and-the-re-read-75-minutes-apart-lanes-polymarket-no-fill-booking-audit-execution-ledger-live-trim)
+- [2026-09-15 — OVERTURNED: "main can't ship, steps A/B are not approved" — the status cam…](#2026-09-15-overturned-main-cant-ship-steps-ab-are-not-approved-the-status-came-from-another-lanes-citation-and-the-owning-lane-had-already-recorded-the-approval-lane-anytime-td-quote-side-yes)
+- [2026-09-15 — OVERTURNED: "re-running another run's script on unchanged inputs reproduce…](#2026-09-15-overturned-re-running-another-runs-script-on-unchanged-inputs-reproduces-its-numbers-syndicate_repo_root-decides-which-checkouts-team_namespy-is-imported-and-that-alias-set-changes-the-market-join-session-abacd435-fix-5a-measurement-no-lane)
+- [2026-09-15 — OVERTURNED: "adding a sport to `SYNDICATE_ACTIVE_SPORTS` is a config chang…](#2026-09-15-overturned-adding-a-sport-to-syndicate_active_sports-is-a-config-change-on-web-it-is-a-request-path-code-path-flip-and-this-exact-one-has-an-outage-on-record-lane-web-dashboard-prop-dates-quotes)
+- [2026-09-15 — OVERTURNED: "`git diff | grep '^-[^-]'` lists the lines a change removes".…](#2026-09-15-overturned-git-diff-grep----lists-the-lines-a-change-removes-it-skips-every-removed-line-that-itself-starts-with---which-on-a-bulleted-ledger-is-most-of-them-lane-soccer-live-scoreboard-range-stale)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

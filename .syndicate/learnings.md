@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1031 rules `[generated]`
+## Index — 1038 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -6358,3 +6358,35 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
 - **Why it matters here:** the standing rule on a shared ledger is "0 deletions, and every deletion is mine". A grep that under-counts deletions makes that check pass while another lane's lines are being dropped.
 - **The rule:** count deletions with `--numstat`, and list them with `grep -E '^-' | grep -v '^---'`. Reconcile the two numbers before staging; if they disagree, the listing is wrong, not the count.
   - *(evidence: this session's 22:4xZ re-sync; `git diff --cached --numstat` 2/2 on `lanes.md` after the reconciliation)*
+
+## 2026-09-15 — FORBIDDEN: gating a ledger commit on a SHELL `grep` filter over diff lines, and reading a dot-prefixed `rev:path` answer from Git Bash as fact `[lane fotmob-join-coverage-check]`
+
+Three instrument failures in one session, two of them inside the guard that was
+supposed to protect a ledger commit.
+
+- **A `grep -v "^[-+][-+]"` filter meant to drop diff headers also dropped `+- `
+  and `-- ` lines** — markdown bullets, which is what `leads.md` and `lanes.md`
+  are made of. The gate printed a single blank `+` and was blind to the very
+  lines it existed to check.
+- **A deletion guard reported 2 "unexpected" deletions in `state_ledger.md`**
+  that were a blank line and an em-dash line the shell could not match. The
+  staged content was correct. Re-checking the SAME staged diff in Python passed,
+  and the commit went through.
+- **`git cat-file -e origin/main:.github/...` and `git show
+  origin/main:.syndicate/...` from Git Bash said two landed files were ABSENT
+  from `origin/main`.** MSYS rewrites `origin/main:.syndicate/x` into
+  `origin\main;.syndicate\x`. Only DOT-PREFIXED paths were affected, so
+  `scripts/...` in the same loop answered correctly — a partially working
+  instrument is the convincing kind, and it briefly read as "the land lied".
+
+**How to apply.**
+- Verify a staged diff in PYTHON, comparing against the exact expected line set.
+  A `grep -v` chain over `git diff` output is not a gate; it is a filter whose
+  failure mode is silence.
+- Read any `rev:path` through `subprocess` from Python (or PowerShell). Never
+  from Git Bash. This is the same rule as `feedback_git_bash_mangles_rev_path_args`,
+  now with a second shape: a false ABSENT rather than a false empty.
+- When a check answers ABSENT or none for SOME paths and correctly for others,
+  suspect the instrument before the repository, and re-read with a different one.
+- *(evidence: this session's `state_ledger.md` guard output and the `origin/main`
+  re-read in `.syndicate/log/2026-09-15.md`)*
