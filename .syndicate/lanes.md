@@ -2025,9 +2025,17 @@ death, never life — do not invert it.
   - The fixed test still passes with `central_today_iso` frozen at 2030-01-01 by the scratch plugin, so its own pin wins.
 - Blocked by: none
 
-### deploy-guard-file-scripts — OPEN — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add
+### deploy-guard-file-scripts — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: `af7c895c` classifies a deploy made by a script FILE; in the PRIMARY tree a `py -3 <file>` deploy returns exit 2, while the graft builder's dry-run and a GET + `data =` assignment return exit 0.**
+- **VERDICT.** Goal (verbatim): "`.claude/hooks/deploy-guard.py` also classifies a deploy made by a SCRIPT FILE the command runs (`py`/`python <file>.py`, `bash`/`sh <file>.sh` or `./<file>.sh`, PowerShell `-File <file>.ps1`) by reading that file and applying the same attached-POST (`.py`) or same-line curl/PowerShell intent (`.sh`/`.ps1`) checks, with service and `commitId` extraction from its contents. The repo's own read-only scripts stay allowed, and a file that cannot be found or read is allowed (the guard's fail-open rule). Also fixes a false positive in the landed Python check: `data = ...` as an ASSIGNMENT after a deploys GET (`scripts/build_consolidated_graft.py:93-96`) read as a POST body." — **GOAL: MET.**
+  - Worktree: 150 passed; the unwired check fails exactly the 8 script-file block tests; the repo rescan finds only `render_deploy.py` classifying as a deploy (of 22 files naming a deploys endpoint).
+  - PRIMARY tree, after writing main's `af7c895c` guard into its working tree (matches `origin/main`, 0 staged; refused unless the prior copy was the `11167fdf` version):
+    - `py -3 <file>` whose file POSTs to the deploys endpoint gives **exit 2** ("a script file that POSTs to the deploys endpoint").
+    - `py -3 scripts/build_consolidated_graft.py --service web --dry-run` gives exit 0.
+    - An inline GET + `data =` assignment gives exit 0.
+    - `render_deploy.py` gives exit 2.
+  - Still not followed, as stated in the Goal's limit: `python -m <module>`, runtime-built paths, and deploy helpers imported from another module.
 - Goal: `.claude/hooks/deploy-guard.py` also classifies a deploy made by a SCRIPT FILE the command runs (`py`/`python <file>.py`, `bash`/`sh <file>.sh` or `./<file>.sh`, PowerShell `-File <file>.ps1`) by reading that file and applying the same attached-POST (`.py`) or same-line curl/PowerShell intent (`.sh`/`.ps1`) checks, with service and `commitId` extraction from its contents. The repo's own read-only scripts stay allowed, and a file that cannot be found or read is allowed (the guard's fail-open rule). Also fixes a false positive in the landed Python check: `data = ...` as an ASSIGNMENT after a deploys GET (`scripts/build_consolidated_graft.py:93-96`) read as a POST body.
-- Files: `.claude/hooks/deploy-guard.py`, `tests/test_deploy_guard.py`. No open lane claims either (checked on origin/main 2026-09-15); user decision "proceed next action", continuing the blind spot recorded by `deploy-guard-python-post`.
+- Files: released: (a RECORD since the 2026-09-15 close; nothing is held) `.claude/hooks/deploy-guard.py`, `tests/test_deploy_guard.py`. No open lane claimed either when taken; user decision "proceed next action", continuing the blind spot recorded by `deploy-guard-python-post`.
 - Hypothesis: n/a (guard extension). Measured before design: 22 repo files mention a deploys endpoint. Under main's classifiers, 20 read as reads, `scripts/render_deploy.py` as a deploy (correct), and `scripts/build_consolidated_graft.py` as a deploy (WRONG: a GET followed by a `data =` assignment).
 - Falsification test:
   - BLOCK without locks: a `.py` file that POSTs to the deploys endpoint run by `py -3 <file>`, `python <file>` and an absolute Git Bash path; a `.sh` file with `curl -X POST .../deploys`.
@@ -2054,7 +2062,7 @@ death, never life — do not invert it.
   - Suites: guard + preflight + cron + worktree lock tests, **150 passed**.
   - **Unwired check** (full copy, lookup replaced by `None, ""`): **exactly the 8 script-file block tests FAIL** (8 failed, 55 passed).
   - **Repo rescan with the patched classifier:** 22 files mention a deploys endpoint; run as files, **only `scripts/render_deploy.py` classifies as a deploy** (before the `data=` fix, `build_consolidated_graft.py` did too).
-  - Owed for GOAL: land; write main's guard into the PRIMARY working tree (only if it is still the `11167fdf` version and the index is empty); probe there a `py -3 <file>` deploy (exit 2), `py -3 scripts/build_consolidated_graft.py --service web --dry-run` (exit 0) and the inline `data =` assignment (exit 0).
+  - Owed for GOAL (DONE): landed as `af7c895c`; main's guard is written into the PRIMARY working tree, and every probe matched (see the VERDICT at the top of this block).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
