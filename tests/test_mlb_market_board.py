@@ -1111,6 +1111,15 @@ class MlbHydrateMarketBoardPropMovementTests(unittest.TestCase):
         self.assertIsNone(row["odds_delta"])
         self.assertEqual(row["odds_trend"], "flat")
 
+    def test_odds_delta_across_even_money_is_the_real_move(self) -> None:
+        # -105 and +105 are ten cents apart. A raw difference read it as +210
+        # (lane `legacy-steam-crossing-delta`).
+        row: dict[str, object] = {"side": "over"}
+        entries = [{"_side": "over", "last_line": 5.5, "previous_line": 5.5, "last_odds": 105, "history": [{"last_odds": -105}, {"last_odds": 105}]}]
+        _mlb_hydrate_market_board_prop_movement(row, entries)
+        self.assertAlmostEqual(row["odds_delta"], 10.0)
+        self.assertEqual(row["odds_trend"], "up")
+
 
 class BuildMlbMarketBoardLineMovementWiringTests(unittest.TestCase):
     def test_game_market_row_is_hydrated_with_line_movement(self) -> None:

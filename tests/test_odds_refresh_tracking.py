@@ -1395,6 +1395,48 @@ class SteamDetectorTests(unittest.TestCase):
         self.assertIsNone(self._signal(current_line=8.0 + 0.5, previous_line=8.25))
         self.assertIsNone(self._signal(current_odds=-115.0))
 
+    # Lane `legacy-steam-crossing-delta`. American odds jump by 200 at even money
+    # (-100 and +100 are the same price), so a raw difference sized -105 -> +100
+    # as 205. Read on production 2026-09-15 21:23Z through /api/ops/steam/events:
+    # 4 of 400 soccer steam events fired ONLY through a crossing, and 116 of 400
+    # real ones carried a size inflated by 200.
+    def test_a_move_across_even_money_is_sized_by_its_real_distance(self) -> None:
+        steam = self._signal(previous_odds=-110.0, current_odds=105.0)
+        self.assertIsNotNone(steam)
+        self.assertEqual(steam["odds_delta"], 15.0)
+        steam = self._signal(previous_odds=105.0, current_odds=-110.0)
+        self.assertIsNotNone(steam)
+        self.assertEqual(steam["odds_delta"], -15.0)
+
+    def test_a_crossing_alone_is_not_steam(self) -> None:
+        # ADO Den Haag spreads, 2026-09-15: -105 -> +100 is five cents.
+        self.assertIsNone(self._signal(previous_odds=-105.0, current_odds=100.0))
+
+    def test_a_real_crossing_move_keeps_its_real_size(self) -> None:
+        steam = self._signal(previous_odds=-105.0, current_odds=240.0)
+        self.assertEqual(steam["odds_delta"], 145.0)
+        steam = self._signal(previous_odds=115.0, current_odds=-115.0)
+        self.assertEqual(steam["odds_delta"], -30.0)
+
+    def test_moves_that_do_not_cross_even_money_are_unchanged(self) -> None:
+        self.assertEqual(self._signal(previous_odds=-120.0, current_odds=-135.0)["odds_delta"], -15.0)
+        self.assertEqual(self._signal(previous_odds=150.0, current_odds=170.0)["odds_delta"], 20.0)
+
+    # A row with no line of its own (h2h, a goalscorer prop) has its PRICE
+    # standing in as the line: `_primary_line_value` falls back to price/odds.
+    # The 0.5-line bar then fired on any half-point price change -- 27 of 400
+    # soccer steam events on 2026-09-15 (Stoke City h2h +240 -> +230).
+    def test_a_price_standing_in_for_the_line_does_not_trip_the_line_bar(self) -> None:
+        self.assertIsNone(
+            self._signal(previous_line=240.0, current_line=230.0, previous_odds=240.0, current_odds=230.0)
+        )
+
+    def test_a_row_whose_line_is_its_price_still_fires_on_a_real_price_move(self) -> None:
+        steam = self._signal(previous_line=-194.0, current_line=-169.0, previous_odds=-194.0, current_odds=-169.0)
+        self.assertIsNotNone(steam)
+        self.assertEqual(steam["odds_delta"], 25.0)
+        self.assertIsNone(steam["line_delta"])
+
     def test_no_prior_observation_fails_open_to_none(self) -> None:
         self.assertIsNone(self._signal(previous_ts=None, current_line=12.0))
         self.assertIsNone(self._signal(previous_ts="garbage", current_line=12.0))

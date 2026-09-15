@@ -6902,10 +6902,17 @@ def _mlb_hydrate_market_board_prop_movement(row: dict[str, Any], entries: list[d
     row["odds_previous"] = previous_odds
     odds_delta = None
     if last_odds is not None and previous_odds is not None:
-        try:
-            odds_delta = float(last_odds) - float(previous_odds)
-        except (TypeError, ValueError):
-            odds_delta = None
+        # On the continuous "cents" scale: -105 -> +105 is ten cents, and a raw
+        # difference read it as +210 (lane `legacy-steam-crossing-delta`). A value
+        # that is not a valid American price keeps the plain difference.
+        from syndicate.features.shared.odds_refresh_tracking import american_cents_delta
+
+        odds_delta = american_cents_delta(previous_odds, last_odds)
+        if odds_delta is None:
+            try:
+                odds_delta = float(last_odds) - float(previous_odds)
+            except (TypeError, ValueError):
+                odds_delta = None
     row["odds_delta"] = odds_delta
     row["odds_trend"] = "flat" if odds_delta in (None, 0) else ("up" if odds_delta > 0 else "down")
     # See _mlb_hydrate_market_board_line_movement's matching comment --

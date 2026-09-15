@@ -243,6 +243,37 @@ def _implied_probability_from_american(value: Any) -> float | None:
     return abs(odds) / (abs(odds) + 100.0)
 
 
+def american_cents(value: Any) -> float | None:
+    """American odds on a CONTINUOUS scale, where -100 and +100 are both 0.
+
+    Raw American odds jump by 200 at even money: -100 and +100 are the SAME
+    price, so a raw difference sizes -105 -> +100, a five-cent move, as 205.
+    Shifting each sign toward zero by 100 makes the scale continuous without
+    changing it anywhere else (-125 -> -105 is still 20, +150 -> +170 is still
+    20), so SYNDICATE_STEAM_ODDS_MOVE, tuned in American points, keeps its
+    meaning. A value strictly between -100 and +100 is not a valid American
+    price and returns None. Twin of `layer2_board._american_cents`.
+    """
+    try:
+        odds = float(value)
+    except (TypeError, ValueError):
+        return None
+    if odds >= 100.0:
+        return odds - 100.0
+    if odds <= -100.0:
+        return odds + 100.0
+    return None
+
+
+def american_cents_delta(previous: Any, current: Any) -> float | None:
+    """`current - previous` in cents, or None when either is not a valid American price."""
+    start = american_cents(previous)
+    end = american_cents(current)
+    if start is None or end is None:
+        return None
+    return end - start
+
+
 def _steam_thresholds(capture_phase: str | None) -> tuple[float, float, float]:
     def _env_float(name: str, fallback: float) -> float:
         raw = str(os.environ.get(name) or "").strip()
@@ -311,12 +342,33 @@ def _steam_signal(
     line_move, odds_move, window_seconds = _steam_thresholds(capture_phase)
     if gap_seconds <= 0 or gap_seconds > window_seconds:
         return None
+    # A row with no line of its own (h2h, a goalscorer prop) has its PRICE
+    # standing in as the line: `_primary_line_value` falls back to price/odds.
+    # Its "line_delta" was the price move a second time, and the 0.5-line bar
+    # fired on any half-point price change: 27 of 400 soccer steam events read
+    # on production 2026-09-15 fired only that way (Stoke City h2h +240 -> +230).
+    # Such a row has no line to move, so it gets no line_delta.
+    line_is_price = (
+        previous_line is not None
+        and current_line is not None
+        and previous_odds is not None
+        and current_odds is not None
+        and previous_line == previous_odds
+        and current_line == current_odds
+    )
     line_delta = None
-    if previous_line is not None and current_line is not None:
+    if previous_line is not None and current_line is not None and not line_is_price:
         line_delta = current_line - previous_line
+    # Sized on the continuous "cents" scale (see `american_cents`): a raw
+    # difference added 200 to every move across even money. 4 of 400 soccer
+    # steam events on 2026-09-15 fired only through that, and 116 of 400 real
+    # ones carried a size 200 too big. A value that is not a valid American
+    # price keeps the plain difference.
     odds_delta = None
     if previous_odds is not None and current_odds is not None:
-        odds_delta = current_odds - previous_odds
+        odds_delta = american_cents_delta(previous_odds, current_odds)
+        if odds_delta is None:
+            odds_delta = current_odds - previous_odds
     line_hit = line_delta is not None and abs(line_delta) >= line_move
     odds_hit = odds_delta is not None and abs(odds_delta) >= odds_move
     if not (line_hit or odds_hit):
