@@ -1635,7 +1635,8 @@ death, never life — do not invert it.
     - Lane `book-quotes-splice-repair` (as `execution-ledger-live-trim`) deploys main's tip there at least 25 min after that goes live. `ca80edf0` rides as THIS lane's verify. This lane does NOT deploy refresh-worker.
     - After-reading on refresh-worker: `/api/ops/steam/events?sport=mlb` once MLB steam fires.
   - web ALSO needs a deploy for the MLB half: `build_mlb_market_board` (which calls `_mlb_hydrate_market_board_prop_movement`) runs in the web route `/mlb/api/market-board` (`blueprints/mlb.py:330-332`). Web runs `dd014d14`, which does not contain `ca80edf0`.
-    - Take the next main-based web deploy (any lane's, carrying `ca80edf0`), or deploy web after live-odds-worker.
+    - `[~22:15Z]` THIS lane deploys web from main AFTER its live-odds-worker deploy and reading, under its own locks. Lane `book-quotes-splice-repair` has no further web deploy and confirmed the web claim free on its side.
+    - Ride-along: `a2a1fa32` (`execution_ledger` trim, user-approved), verify owned by lane `execution-ledger-live-trim`; no web-side reading expected. Re-list `<live>..tip` at preflight and stop for anything unapproved.
     - After-reading: the market board's `odds_delta` on a row whose odds crossed ±100.
 
 ### ncaaf-prop-quote-market-check — CLOSED — opened 2026-09-15 — closed 2026-09-15 ~15:45 CT — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
