@@ -35927,3 +35927,13 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
 - **Correction to this lane's first reading.** The range form's HTTP 400s (31 of 60 league-dates, dev-machine probe) did not affect production today. Today's date answered 200 for all 10 leagues, and live-odds-worker logged 1 `LEAGUE_POLL_FAILED` 00:00-20:29Z (mls, `ReadTimeout`). The production cause was the stale copy alone.
 - **Secondary, not investigated:** RMA @ ELC's `games` entry read 1-0 while ESPN and the file's own `match_box` read 2-0 (score derived from summary keyEvents vs the scoreboard score).
 - Rollback: deploy `f833f7ec` to live-odds-worker.
+
+## 2026-09-15 20:50:55Z (15:50 CT) — FOLLOW-UP to the 2026-09-15 19:13:36Z refresh-worker `55fee786` -> `5686a555` entry — lane layer2-row-parity (closed) — **steam's same-book rule read on a REAL Layer 2 steam row: MET (n=1)**
+- **Why:** every earlier reading had 0 Layer 2 steam rows, so "steam only on same-book moves" had been tested only (`log/2026-09-15.md`, BELIEVED list).
+- **Instrument:** a background poll of the served board every 4 min from 20:26:12Z (`/api/intelligence/query`, the board page's request). It stopped at the first Layer 2 row with `steam === true`, the template's badge condition. Polls 1-6 read `layer2_steam=0`.
+- **Reading, poll 7 at 20:50:55Z:** 1 Layer 2 steam row of 2,178. Soccer, Fortuna Sittard @ Willem II, h2h away, game 2026-09-19.
+  - `movement_basis=same_book`, `movement_book=betrivers`.
+  - `movement_price_from` +140 -> `movement_price_to` +165. `movement_price_delta` 25.0 (cents +40 -> +65 = 25, no ±100 crossing).
+  - `movement_opened_at` 18:36:03Z, `movement_vs_pick` away.
+- Verify: MET for n=1. The rule's negative half (a cross-book move must NOT fire) is still tested only.
+- The 7 legacy steam rows on the board at every poll (`candidate_type=steam`, from the odds tracker) are lane `legacy-steam-crossing-delta`'s subject, not this rule's.
