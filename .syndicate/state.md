@@ -523,6 +523,8 @@ once this index exists: re-splitting would orphan the parts.
 | [layer1-board-date-scoping] | THE BOARD WAS DROPPING GAMES TWO WAYS — both FIXED AND VERIFIED `[verified 2026-08-30 05:0x-05:5xZ, web+refres | `state_layer2.md` |
 | [board-chip-coverage] | Layer 2 compact game cards — FULL chip coverage, verified 2026-08-26 | `state_layer2.md` |
 | [chip-artifact-content-age] | A chip artifact's TIMESTAMP and its CONTENT age are different numbers — verified 2026-08-27 (lane `mlb-chip-li | `state_layer2.md` |
+| [chip-refresh-worker-pull-hop] | REFRESH-WORKER'S HOT-ARTIFACT PULL FLOOR WAS SET BY LIVE-ODDS-WORKER — one shared keyvalue watermark; fix `082da3e3` | `state_layer2.md` |
+| [soccer-live-espn-inputs] | SOCCER LIVE STATE: ESPN's RANGE scoreboard is stale (fixed, LIVE); the live score dropped penalties and own goals | `state_soccer.md` |
 | [kalshi-prop-quote-identity] | KALSHI PROP QUOTES WERE FILED UNDER THE CANONICAL KEY WITH NO GAME, AND REFRESH-WORKER'S NFL PROP ARTIFACT WAS | `state_layer2.md` |
 | [layer2-live-quote-age] | LIVE LAYER 2 ROWS ARE AGED ON THE MOVEMENT CLOCK — NCAAF live quotes reach the board minutes to hours old; fix | `state_layer2.md` |
 | [layer2-prior-date-carryover] | A GAME STILL LIVE AT MIDNIGHT CT LOST ITS LAYER 2 BOARD — the carryover and the stale-live label are LIVE; the midnigh | `state_layer2.md` |

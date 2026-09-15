@@ -529,6 +529,16 @@ deployed three times on the evening of 2026-08-26. Same family as
 
 **Open as `todo.md #585`, not fixed.**
 
+## [chip-refresh-worker-pull-hop] REFRESH-WORKER'S HOT-ARTIFACT PULL FLOOR WAS SET BY LIVE-ODDS-WORKER — one shared keyvalue watermark; fix `082da3e3` on main, deploying, production reading OWED `[verified 2026-09-15 20:38-21:04Z, lane soccer-live-scoreboard-range-stale]`
+
+- **Where the soccer chips' live state comes from:** refresh-worker builds `/api/board/game-chips` every ~120 s from ITS OWN disk copy of `soccer_source/<league>/api/live_state/live_state_<date>.json`. That copy arrives only through `pull_hot_artifacts` inside the heavy board build, one date per build, alternating today and tomorrow. Nothing writes a keyvalue copy of that path.
+- **The floor was one key:** `reports_root()/refresh_status/latest/hot_artifact_pull_watermark.json`, keyvalue-backed, with the same `SYNDICATE_REPORTS_ROOT` on both workers. refresh-worker's requests carried live-odds-worker's pull start as `since=` (20:41:05Z -> 20:39:04Z; 21:02:50Z -> 20:58:06Z).
+- **Web's `/api/ops/artifacts/export?pattern=*<today>*` timed out** on ~1 in 6 of refresh-worker's today-pull requests on 09-15 (10 of 60 lines, 08:57-20:41Z), and on both workers in the same seconds (20:17Z, 20:41Z).
+- **Measured effect:** the chips served pre-deploy soccer state for 11 publishes (20:38:19-21:01:41Z) while web held the fresh file. They were fresh on the first publish after refresh-worker's first successful today-pull (21:02:50Z -> 21:04:02Z).
+- **Exonerated:** the card builder (web's own cards from the fresh copy were correct), the source roots (`/opt/render/project/data/soccer_source` on both workers), and a stale keyvalue copy.
+- **Fix `082da3e3` (on main):** the key is `.../hot_artifact_pull_watermark/<service>/<date|all>.json`. A new scope starts at the 2 h clamp; export size measured flat (15.5 MB JSON at 30 min and at 2 h). It rides `8c089e8c` (live-odds-worker build in progress 21:33Z). **Production reading OWED:** refresh-worker's first pull after go-live must carry its own floor.
+- **Not fixed:** the web export timeouts.
+
 ## [kalshi-prop-quote-identity] KALSHI PROP QUOTES WERE FILED UNDER THE CANONICAL KEY WITH NO GAME, AND REFRESH-WORKER'S NFL PROP ARTIFACT WAS FROZEN FOR TWO DAYS — both fixed; the artifact half MEASURED, the quote half owes a production reading `[2026-09-10/11, refresh-worker 5767e3ac, lane nfl-layer2-kalshi-identity]`
 
 **What the user saw on the NFL board:** a "Matchup" game card holding 65 opportunities from eight games. Every row read NO SIM VIEW at -0.9% EV, the "fair" price was the row's own price +2, and the labels were raw `player_pass_tds`.

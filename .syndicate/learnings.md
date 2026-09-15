@@ -6250,3 +6250,32 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - A pass on outcome-derived features is a pass for the mechanism, not for the build.
 - **Cost:** none shipped. The failure surfaced before code.
   - *(evidence: `log/2026-09-15.md` session abacd435; `scripts/soccer_season_audit/calibration_role_mixture5.py`, `calibration_role_mixture6.py`, `calibration_engine_replay.py`; commit `b33ef901`)*
+
+## 2026-09-15 — FORBIDDEN: reading ESPN's soccer scoreboard with a `dates=YYYYMMDD-YYYYMMDD` RANGE for live state. Ask for the single date, and judge freshness by a content field `[lane soccer-live-scoreboard-range-stale]`
+
+- **What happened:** the live poller asked `dates=20260915-20260915`. ESPN answered that query from a copy about an hour old, on both hosts, while `dates=20260915`, the undated scoreboard and the summary were live in the same second. Soccer live state, the live lens and the Layer 2 chips ran ~65 match-minutes behind.
+- **Why nothing flagged it:** every timestamp on the way was one this platform wrote -- the file's `generated_at`, `PUBLISH_OK`, the chip `published_at` (79 s old). Only the match CLOCK, compared against ESPN, showed the age.
+- **Also:** the range form returned HTTP 400 on 31 of 60 league-dates probed; the single-date form 200 on 60/60 with identical events.
+- **The rule:**
+  - Any live ESPN read uses the single-date form.
+  - A freshness check compares a content field (clock, score, state) against the source. A timestamp written by our own pipeline proves the pipeline ran, not that the data is current.
+  - *(evidence: `deploys.md` 2026-09-15 20:29:23Z; commit `20568eff`)*
+
+## 2026-09-15 — OVERTURNED: "`pull_hot_artifacts`' `since=` floor is the calling service's last successful pull". It was ONE keyvalue key across workers, so live-odds-worker's pulls set refresh-worker's floor `[lane soccer-live-scoreboard-range-stale]`
+
+- **What was believed:** the docstring's "floor = the start of the last successful pull".
+- **What was true:** the watermark path was keyvalue-backed and identical on both workers. refresh-worker, pulling each board date every ~15-30 min, asked for files changed since live-odds-worker's last pull ~2 min earlier, and never re-fetched an older change it already held. Measured twice from the request URLs: 20:41:05Z -> 20:39:04Z and 21:02:50Z -> 20:58:06Z. The Layer 2 soccer chips stayed stale for 26 minutes while web held the fresh file.
+- **Second instance of the shape** after `disk_maintenance._status_path` (2026-08-12), and the one `live_lens_loop.py`'s own comment names for the publish watermark.
+- **The rule:**
+  - A keyvalue-backed "last run / last seen" stamp carries the SERVICE (`disk_maintenance._service_slug`) and the SCOPE it tracks (date, league) in its path.
+  - When a floor looks wrong, read the `since=` value off the request and convert it. Does it equal THIS service's previous start?
+  - *(evidence: `lanes_history.md` lane soccer-live-scoreboard-range-stale; commit `082da3e3`)*
+
+## 2026-09-15 — OVERTURNED: "own-goal is correctly excluded" from the soccer TEAM score. Count by the feed's own `scoringPlay`, not by a type-key prefix `[lane soccer-live-scoreboard-range-stale]`
+
+- **What was believed:** `espn_live_state.py`'s comment. Goal variants share the `goal` prefix, and "own-goal ... is correctly excluded here".
+- **What was true:** that rule reproduced ESPN's final score on 68 of 95 finished matches. It dropped all 23 `penalty---scored` and all 7 `own-goal` events. Counting every non-shootout `scoringPlay` for the team ESPN tags: 95/95. Excluding an own goal is right for a player's tally and wrong for the scoreboard.
+- **The rule:**
+  - When a feed publishes its own verdict (`scoringPlay`, `shootout`), carry it through normalization and count by it.
+  - Before trusting a hand-listed type vocabulary, replay it against the feed's own final score over a real sample.
+  - *(evidence: commit `e115cd6b`; `tests/test_soccer_scoring_events.py`)*
