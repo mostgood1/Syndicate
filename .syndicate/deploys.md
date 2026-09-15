@@ -35895,3 +35895,35 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Whether web's live commit carries `3157bb7b` was not read.
   - Counts from non-today builds are still filed under today's key (a separate, known defect with no lane). So "2026-09-15" here is the counter key, not the shard date the rows joined.
 - Rollback: as in the entry above.
+
+## 2026-09-15 20:29:23Z (15:29 CT) — live-odds-worker `f833f7ec` -> `18be9107` (OFF-MAIN: `f833f7ec` + `c120ec34`; the fix is on main as `20568eff`) — deploy `dep-dakql8u1egvs73assqs0` — lane soccer-live-scoreboard-range-stale — **LIVE 20:34:57Z. Verify MET at the live-state layer (RMA @ ELC in play, lag within one tick). Board chips NOT caught up: a second, pre-existing hop on refresh-worker.**
+
+- **Why off-main (`--allow-off-main`).** Main also carries `e53274f2` (soccer-player-role-allocation step A, shot divisor retired), which is not approved for deploy. The poller's live props import `soccersim.player_props`, so it would have reached production, and the rule is one change per deploy while diagnosing.
+  - `18be9107` against live is exactly `scripts/poll_soccer_live_state.py` (+24/-4) and `tests/test_poll_soccer_live_state.py` (+30).
+  - Main's copies of both files are byte-identical to `18be9107`'s, so a later main deploy reverts nothing.
+  - That lane's session was messaged. It plans a main-tip deploy to live-odds-worker and refresh-worker at ~21:25Z.
+- `867f1481` (fotmob-team-name-aliases) was already inside live `f833f7ec`, so nothing shipped ahead of that lane's user decision.
+- Preflight CLEAR (sample 20:28:36Z: 3 processes, infrastructure only; claim held by this lane). User decision 20:18Z: "Now, verify on RMA–ELC (Recommended)".
+- **Baseline** (read 20:27:41Z; substrate render = web disk via `/api/ops/artifacts/export` plus served `/api/board/game-chips`; ESPN single-date scoreboard in the same instant):
+  - la_liga `live_state_2026-09-15.json`, generated 20:24:31Z: 2 live games, ESP-RAY 88' and VAL-ALA 45'+1' (both FT on ESPN), no RMA-ELC (ESPN had it at 45'+3').
+  - Chips: ESP-RAY live 88', VAL-ALA live 45'+1', RMA-ELC pregame.
+- **Predictions:** `la_liga_live_state_games` 2 -> 1; `rma_elc_in_live_state` false -> true; `rma_elc_chip_state` pregame -> live.
+- **Reading** (20:38:22Z and 20:38:30Z, gated on the first post-deploy file, generated 20:36:43Z; live-lens loop restarted 20:35:58Z):
+  - `la_liga_live_state_games` = **1**. MET.
+  - `rma_elc_in_live_state` = **true**, clock 45'+3' at 20:36:43Z against ESPN 47' at 20:38:22Z, i.e. one tick. MET (goal: within 5 match-minutes).
+  - ESP-RAY and VAL-ALA now sit in `match_box` as `post` (90'+9', 90'+5'). Correct.
+  - `rma_elc_chip_state` = **pregame**. NOT MET. Chip publishes at 20:38:19Z, 20:40:20Z and 20:42:21Z all still read ESP-RAY live 88', VAL-ALA live 45'+1', RMA-ELC pregame.
+- **Why the chips did not follow: a second hop on refresh-worker, CAUSE NOT YET FOUND.**
+  - refresh-worker publishes chips every ~120 s (`CHIP_PUBLISH_TICK`) and builds them from its own view of the per-league soccer live_state. That view still holds the pre-deploy content (ESP-RAY 88' is the old file's exact value).
+  - The chip builds at 20:40:20Z and 20:42:21Z took 975 ms and 892 ms: the soccer cards context cache hitting on an unchanged `_live_vintage`, i.e. refresh-worker's copy had not changed.
+  - **Hypothesis 1, FALSIFIED:** "refresh-worker's copy is refreshed only by `pull_hot_artifacts` inside the heavy board build (one date per build, alternating: `BUILD_SPAN_ENTER stage=pull_hot_artifacts` 20:16:48Z for 09-15, 20:27:48Z for 09-16, 20:40:35Z for 09-15), so the chips lag by ~20-25 min." The 09-15 pull EXITED at 20:42:53Z (138 s), and the next chip publish, 20:44:32Z, was STILL ESP-RAY live 88', VAL-ALA live 45'+1', RMA-ELC pregame. Pull cadence may still be real, but it is not the whole story.
+  - Before this deploy the file itself was frozen, so chips that matched it never tested this hop. Same family as `[chip-artifact-content-age]`.
+- **Chip reading after the 20:42:53Z pull:** 20:44:32Z publish, still stale (above). A 7-minute watcher (20:39-20:46Z, 4 publishes) ended NOT CAUGHT UP.
+  - **Untested candidates, for whoever takes the chip hop:**
+    - (a) refresh-worker rewrites its OWN copy with pre-fix code. `refresh_odds_sources.py` queues a live-phase step `soccer_{league}_live_state` that runs `scripts/poll_soccer_live_state.py` into the running service's `soccer_root`, and refresh-worker is on `f833f7ec`, which still asks for the range form. No log line names that step on either worker since 20:10Z, so this is neither shown nor excluded (an absent line is about the emitter).
+    - (b) a keyvalue copy of the per-league path. `read_json_file` routes it to the store first and falls back to disk only on a miss, so a stale stored copy would beat any pulled file. `/api/ops/keyvalue/usage` (read 20:47:14Z) mentions no soccer live_state key, but it returns only size buckets and `largest_keys`, so that is NOT evidence of absence.
+  - Natural experiment, CONFOUNDED: lane soccer-player-role-allocation deploys main (carrying this fix) to refresh-worker at ~21:25Z. Chips catching up after it would fit (a), but a restart also clears every in-process cache, so it would not prove it.
+  - refresh-worker's container read 99.8% of 4096 MB (6 MB headroom) at 20:28:34Z (`ALL_PROCESS_MEMORY`). Not this lane's; recorded because it was in the same log window.
+- **Correction to this lane's first reading.** The range form's HTTP 400s (31 of 60 league-dates, dev-machine probe) did not affect production today. Today's date answered 200 for all 10 leagues, and live-odds-worker logged 1 `LEAGUE_POLL_FAILED` 00:00-20:29Z (mls, `ReadTimeout`). The production cause was the stale copy alone.
+- **Secondary, not investigated:** RMA @ ELC's `games` entry read 1-0 while ESPN and the file's own `match_box` read 2-0 (score derived from summary keyEvents vs the scoreboard score).
+- Rollback: deploy `f833f7ec` to live-odds-worker.
