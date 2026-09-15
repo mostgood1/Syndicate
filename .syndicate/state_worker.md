@@ -2162,7 +2162,10 @@ outlier cold reading. Three paired replications erased it: **cold 31.32s vs warm
   - The root-cause work is lane `heavy-build-child-process`.
 - **Where pid 39's growth comes from `[verified 2026-09-14, one boot of 0a18557a, 504 staged ALL_PROCESS_MEMORY samples; shares are rough because threads interleave]`:** +1,516 MB in 109 min.
   - Live-lens loop builds +883 (soccer +414, mlb +388); heavy build +497; startup +390 (before any build); MLB sim tick +149 net; live-lens pulls -426 net (the spike is trimmed right after).
-  - The live-lens loop runs on BOTH workers: `SYNDICATE_ENABLE_LIVE_LENS_LOOP=true` on refresh-worker and live-odds-worker, same 4 sports. It was left undecided since 2026-08-17.
+  - **The live-lens loop is OFF on refresh-worker `[verified 2026-09-15 02:33Z]`:** by user decision `SYNDICATE_ENABLE_LIVE_LENS_LOOP=false`, deployed in `c4f45fee`, with `LIVE_LENS_LOOP_START_RESULT started=False` and 0 live-lens ticks.
+    - live-odds-worker is the sole writer of `live/mlb_live_lens.json` (3.48 MB writes, 02:33Z / 02:35Z).
+    - Before that, both workers built and wrote it (two MLB writers measured 22:40-23:17Z 09-14).
+    - Owed: live-odds-worker memory with the loop alone on a full slate, and refresh-worker per-build growth without the live-lens builds.
 - **Candidate-pool cache `[verified 2026-09-14]`:** one 09-14 pool is 19.7-28.2 MB of JSON; a 09-15 pool is 6.2-7.2 MB.
   - `SYNDICATE_CANDIDATE_POOL_CACHE_MAX=2` (code `0a18557a`, log field `d4deb502`) holds `entries` at 2.
   - Over builds 1-4 pid 39 grew ~164 MB less than on an uncapped boot, but kept growing (+291 MB over builds 3-6). The cache is part of the tail, not all of it.

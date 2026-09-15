@@ -605,6 +605,10 @@ deployed three times on the evening of 2026-08-26. Same family as
   - The ceiling defaults to 1800 s (absent = 1800); 0 disables.
   - Top-level fields: `build_age_seconds`, `live_state_max_build_age_seconds`, `rows_live_state_stale`.
   - It relabels rows only. The combined board's cards are restated separately, by `_refresh_layer2_live_state`.
+  - **`_refresh_layer2_live_state` reads the worker-published chips `[verified 2026-09-15 02:34Z, web c4f45fee]`.** It reads `read_game_chips`, the artifact `/api/board/game-chips` serves (fresh <= 600 s wins over the in-process build), not only `build_game_chips`.
+    - The in-process build on web yields no live NFL chips. Before the fix every live NFL L2-A card stayed unrestated and was re-gated watchlist / `no_game_state`: DEN @ KC 72 props, NFL live cards 0.
+    - After it: 72 props `opportunity` / `live`, NFL live cards 87, `LAYER2_LIVE_RESTATED` 932 of 2718.
+    - The combined board also restates per-date state rows before its first contract build (`dedfede6`); that path had no rows in production.
 
 **Readings:**
 - W1 MET, 15:08:17Z: the 09-12 NCAAF board went 28 -> 0 `game_state=live`, with `rows_live_state_stale` 28. The 09-13 board (build 746 s old) kept its 10 live rows, 0 relabelled.

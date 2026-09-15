@@ -1005,7 +1005,7 @@ death, never life — do not invert it.
   - **Done:** pool-cache cap live at env 2 (`0a18557a`; log field `d4deb502` verified 21:16:30Z `limit=2`). Over builds 1-4 it grew ~164 MB less than uncapped; H-cache PARTIAL.
   - **Left:**
     - (1) The live-slate reading, now OWNED BY SCHEDULED TASK `live-lens-dual-loop-reading-0914` (one-time, 2026-09-14 18:15 CDT / 23:15Z, read-only, records to deploys.md, this block and the log; it also checks refresh-worker recycle). It survives this session's close but only runs while the Claude app is open.: which worker publishes `live/<sport>_live_lens.json`, and what MLB's live-lens build costs each worker.
-    - (2) A user decision: `SYNDICATE_ENABLE_LIVE_LENS_LOOP` off refresh-worker vs off live-odds-worker. It is true on both.
+    - (2) ~~A user decision: `SYNDICATE_ENABLE_LIVE_LENS_LOOP` off refresh-worker vs off live-odds-worker.~~ **DONE 2026-09-15:** the user chose "off on refresh-worker", deployed in `c4f45fee` and verified `started=False` at 02:33Z. Owed now: live-odds-worker memory with the loop alone on a full slate, and refresh-worker per-build growth without live-lens builds, which decides (3).
     - (3) Re-scope or re-title this lane after that decision; the child-process design may no longer be the right fix.
   - **Blocking:** live games (from 22:40Z), then the user's decision.
   - **USER DECISION 2026-09-15 ~01:30Z (20:30 CT 09-14): "Off on refresh-worker (Recommended)".** Evidence: `deploys.md` 2026-09-14 23:25Z. Two writers for MLB were measured. The MLB build costs per tick were median +51 MB refresh-worker / +78 MB live-odds-worker. live-odds-worker's unreclaimable headroom min was 887 MB in live play.
@@ -1139,10 +1139,14 @@ death, never life — do not invert it.
   - No refusal, so no recycle was owed and there is no red flag.
 - CHECKPOINT 2026-09-14 ~21:30Z (16:30 CT), session 0f5b256e — Goal: explain why refresh-worker's heavy board build (candidate pool, board publication, portfolio commit / paper orders) was refused by `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` for ~16 h (2026-09-12 21:34Z .. 2026-09-13 13Z) with unreclaimable headroom ~1,810 MB. Measure what the build actually needs against that floor and what holds ~2.3 GB unreclaimable. Then bring the user options with numbers (retarget/lower the check, cut the build's cost, or add memory). Read-only on production; no code or deploy without the user's OK.
   - **GOAL: MET (diagnosis, unchanged).** The lane stays OPEN only for the user-chosen stopgap's reading.
-  - Recycle `339dc6e9` has been live with env threshold 1 since `6fe6c6e9` (15:37:05Z). **It has never been exercised.** 0 `pre_source_state_fingerprint` refusals and 0 `[worker_recycle]` lines on the boots of 15:38Z (111 min), 17:29Z (~49 min), 19:07Z (~116 min) and 21:03Z (to 21:27Z). Every boot was ended by another deploy before a refusal came.
+  - Recycle `339dc6e9` has been live with env threshold 1 since `6fe6c6e9` (15:37:05Z). ~~It has never been exercised.~~ **Corrected ~02:50Z 09-15: EXERCISED ONCE.**
+    - After 5 `held=children_running` checks during the live slate: `RECYCLE_EXIT` at 01:34:39Z (refusals 2, children 0).
+    - Render `server_failed earlyExit` (not evicted) 01:34:43Z, then `server_available` 01:34:44Z; boot 01:35:11Z.
+    - Heavy builds resumed (`portfolio_commit` span 01:53:02Z, `PORTFOLIO_COMMIT` 01:53:54Z, `STATE_PERSIST_BEGIN candidate_count=374` 01:56:23Z). No restart loop.
+    - The boots of 15:38Z, 17:29Z and 19:07Z had 0 refusals.
   - The replay's gain is ~40% (N=1 ~612 vs N=15 ~1,044 blocked minutes, recycle's child-job hold included), not the ~3x first shown.
   - **Left:** `RECYCLE_EXIT` on a real refusal, then a Render restart, then `PORTFOLIO_COMMIT` resuming. Session Monitor `b1k43gk33` watches it and dies with the session.
-  - **Blocking:** a refusal must actually occur. Today's boots were short and did not refuse.
+  - **Blocking (updated 02:50Z 09-15):** nothing blocks the stopgap. It fired and recovered. What is left is structural: during slates the recycle holds on child jobs (5 holds before the one exit). The lever there is the live-lens change (lane heavy-build-child-process), whose per-build reading is owed. The lane can close once that reading shows whether refusals persist.
   - **LIVE-SLATE READING 2026-09-14 23:52Z-2026-09-15 01:25Z, refresh-worker `6438830d` (boot 21:03:51Z): recycle REACHABLE but HELD every time.**
     - `RECYCLE_CHECK held=children_running` at 23:52:45Z (refusals 1, children 1, uptime 10,124 s), 00:46:45Z (1, 2), 00:51:48Z (2, 2) and 01:24:53Z (1, 2). 0 `RECYCLE_EXIT`, 0 `RECYCLE_CHECK_FAILED`.
     - The refusal at 23:52:40Z had headroom 1,895.8 vs the 1,900 floor. Admitted builds between refusals reset the counter.
