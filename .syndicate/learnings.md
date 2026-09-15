@@ -6390,3 +6390,12 @@ supposed to protect a ledger commit.
   suspect the instrument before the repository, and re-read with a different one.
 - *(evidence: this session's `state_ledger.md` guard output and the `origin/main`
   re-read in `.syndicate/log/2026-09-15.md`)*
+
+### REFINEMENT (same session, 23:43Z): verifying a land by the ancestry of the sha you held BEFORE landing gives a FALSE NEGATIVE
+
+The rule above says to verify a land by the commit rather than the push line, and `git merge-base --is-ancestor <sha> origin/main` is how I implemented it. That check is correct only when `land` fast-forwards.
+
+- Measured 23:42Z: the checkpoint commit pushed successfully (`64496c36..585106a7`), and my check reported NOT LANDED three times, because `session_worktree.py land` REBASES onto the fetched tip first. The rebased commit has a different sha, and the sha I was holding no longer exists on any branch.
+- The retries then printed `nothing to land -- no commits beyond origin/main`, which was the true state and the signal I should have read.
+- **How to apply:** verify a land by CONTENT or by the commit SUBJECT on `origin/main` (`git show origin/main:<path>` and look for your marker; or `git log origin/main --grep`), and treat `rev-list --count origin/main..HEAD == 0` as corroboration. Keep the sha check only for the fast-forward case, and never report NOT LANDED on its evidence alone.
+- This is the mirror of the mid-rebase FALSE POSITIVE recorded earlier today: one check lies while a rebase is in progress, the other lies after a rebase completes. Both are fixed by asking about the content, not the identity.
