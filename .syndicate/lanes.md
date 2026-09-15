@@ -1275,7 +1275,7 @@ death, never life — do not invert it.
     - `CANDIDATE_POOL` / `PORTFOLIO_COMMIT` resuming after boot;
     - no restart loop (min uptime holds).
 - Goal: explain why refresh-worker's heavy board build (candidate pool, board publication, portfolio commit / paper orders) was refused by `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` for ~16 h (2026-09-12 21:34Z .. 2026-09-13 13Z) with unreclaimable headroom ~1,810 MB. Measure what the build actually needs against that floor and what holds ~2.3 GB unreclaimable. Then bring the user options with numbers (retarget/lower the check, cut the build's cost, or add memory). Read-only on production; no code or deploy without the user's OK.
-- Files: `syndicate/features/shared/worker_recycle.py` (NEW), `tests/test_worker_recycle.py` (NEW), `scripts/run_refresh_worker.py` (main-loop recycle check), `pipeline/intelligence_state.py` (RETURNED 2026-09-15 by lane `state-read-expand-choke-point` at its close, which had taken it for the `_read_state_payload` choke-point refactor. Before that, RETURNED 2026-09-15 ~14:30Z by lane `combined-board-state-rows-lost` at its close. That lane held it ~04:40Z-14:30Z on user decision "proceed next steps" while this session was not running, and landed a one-line reader fix in `_read_single_date_response_for_combining` (web `b6a0e346`). Held here for: refusal-counter hook in `_compute_board_publication_response`; also holds the `_refresh_layer2_shortlist_only` Kalshi capture moved from `kalshi-nfl-quote-gap`), (main-loop recycle check; TAKEN 2026-09-14 ~00:45Z from UNOWNED `ncaaf-fcs-market-implied-rating`). User decision 2026-09-13 ~19:40 CT: "Approve, default ON at 15 (Recommended)".
+- Files: `syndicate/features/shared/worker_recycle.py` (NEW), `tests/test_worker_recycle.py` (NEW), `scripts/run_refresh_worker.py` (main-loop recycle check). Released 2026-09-15 to lane `combined-board-rows-unreadable-tripwire` (session 3a65723e; user decision "build check 2, take the claim"; mirrored into the primary checkout): `pipeline/intelligence_state.py` (RETURNED 2026-09-15 by lane `state-read-expand-choke-point` at its close, which had taken it for the `_read_state_payload` choke-point refactor. Before that, RETURNED 2026-09-15 ~14:30Z by lane `combined-board-state-rows-lost` at its close. That lane held it ~04:40Z-14:30Z on user decision "proceed next steps" while this session was not running, and landed a one-line reader fix in `_read_single_date_response_for_combining` (web `b6a0e346`). Held here for: refusal-counter hook in `_compute_board_publication_response`; also holds the `_refresh_layer2_shortlist_only` Kalshi capture moved from `kalshi-nfl-quote-gap`), (main-loop recycle check; TAKEN 2026-09-14 ~00:45Z from UNOWNED `ncaaf-fcs-market-implied-rating`). User decision 2026-09-13 ~19:40 CT: "Approve, default ON at 15 (Recommended)".
 - Origin: finding in lane `kalshi-nfl-quote-gap` (above). User decision 2026-09-13 ~17:55 CT: "Open a diagnostic lane (Recommended)".
 - Measured so far (refresh-worker logs):
   - 403 `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` 09-12 21:34Z..09-13 16:14Z. 21:34Z snapshot: current 3,531.7 MB, unreclaimable 2,288.7 MB (anon 2,281.2), reclaimable file 1,243.0, headroom 1,807.3.
@@ -1534,6 +1534,33 @@ death, never life — do not invert it.
 - Verification: new tests pass with the change and the unwired check fails without it. The combined-board and state suites stay green. No deploy unless the user asks: it changes no production behaviour.
 - Blocked by: none.
 - Out of scope, surfaced to the user: `read_latest_intelligence_board_snapshot_response` and `_latest_non_empty_intelligence_board_snapshot_response` expand, but read via `read_json_file` only, while their writer (`_write_state_payload`) can divert an oversized snapshot to the artifact transport. Routing them through `_read_state_payload` would change what web serves when keyvalue holds no copy, so it is a separate decision. The empty-over-good guard (`_empty_write_would_clobber_good_board`) reads a raw state for top-level scalars only, which compaction never touches. It runs on the worker about once a minute during refusals, so it is allowlisted in the static test rather than given a decompress.
+
+### combined-board-rows-unreadable-tripwire — OPEN — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add
+- Goal: the combined board's served payload carries, for every date, the WRITER's stored `candidate_count` beside the rows the READER got (`by_date[date].stored_candidate_count`; `None` when no payload was read), and web logs `COMBINED_BOARD_STATE_ROWS_UNREADABLE date= stored= rows=0 stamp= by_sport_shape=` whenever a payload that stores candidates yields none. This is postmortem check (2) from lane `combined-board-state-rows-lost`.
+- Files: `pipeline/intelligence_state.py` (`read_combined_intelligence_response`'s per-date loop plus two small helpers only; TAKEN 2026-09-15 from `heavy-build-memory-refusal` on user decision "build check 2, take the claim", mirrored into the primary checkout's lanes file), `tests/test_combined_board_rows_unreadable.py` (NEW).
+- Hypothesis: n/a (instrument, not diagnostic). Adds one key per `by_date` entry and one log line; it changes no rows, ranking or `state_meta`.
+- Falsification test: the tripwire test must FIRE on the historical defect, produced as a real write read back WITHOUT expansion. It must stay SILENT on a readable state and on a date with no payload. An instrument that cannot fire, or fires on healthy input, fails.
+- Verification: the new tests pass. With the new log line removed from a scratch copy, the tripwire test FAILS (unwired check). The combined-board and state suites stay green. Production needs a web deploy, which goes only on the user's approval; after it, the reading is `by_date[09-xx].stored_candidate_count` equal to `candidate_count` on the served board, and 0 `COMBINED_BOARD_STATE_ROWS_UNREADABLE` lines on web.
+- Blocked by: none for the code; the production reading waits on a web deploy the user has not yet approved.
+- **RESULTS 2026-09-15 (code on main, NOT deployed).**
+  - Change:
+    - Each `by_date` entry gains `stored_candidate_count` (`_optional_int(payload["candidate_count"])`; `None` on `DATE_MISS`).
+    - A `COMBINED_BOARD_STATE_ROWS_UNREADABLE date= stored= rows=0 stamp= by_sport_shape=` print fires when rows are 0 and stored is above 0.
+    - Two helpers: `_optional_int`, and `_by_sport_shape`, which returns absent/empty/compressed/aliased/lists/mixed or a type name.
+  - Tests, `tests/test_combined_board_rows_unreadable.py` (9 tests):
+    - A real write reads stored == rows == 40, silent.
+    - The same write read back WITHOUT expansion (the pre-`b6a0e346` reader) reads rows 0, stored 40, and the line fires with `by_sport_shape=aliased`; the aliased shape is asserted as a precondition.
+    - A date with no payload reports `None`, silent.
+    - Six shape cases.
+  - **Unwired check** (scratch copy, only the 7-line tripwire block removed): the historical-defect test FAILS (1 failed, 8 passed).
+  - Suites:
+    - This file + `test_state_read_choke_point` + `test_combined_board_persisted_state_rows` + 6 board/state files: 74 passed.
+    - `test_intelligence_state.py` + `test_ask_the_syndicate.py` subset: 77 passed, 1 ERROR, the pre-existing `data/`-mirror guard in `test_compute_response_recomputes_when_cached_snapshot_is_stale` (identical on a HEAD copy, measured earlier on 09-15).
+  - Consumers checked:
+    - `intelligence/opportunity_board.html:141` renders `js.by_date` from a different endpoint, as an array of bucket rows, so it is not this payload.
+    - `ask_the_syndicate_data.py:1248` is an MLB pitcher map.
+    - No test asserts a combined `by_date` entry by exact dict.
+  - **GOAL: NOT MET** until the web reading. Left: a user-approved web deploy, then read `by_date[*].stored_candidate_count` against `candidate_count` on the served board, and count `COMBINED_BOARD_STATE_ROWS_UNREADABLE` on web. The expectation is 0 lines, since `b6a0e346` expands.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

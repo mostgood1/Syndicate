@@ -9043,6 +9043,46 @@ def _combined_board_stale_after_seconds() -> float:
     return max(1.0, float(_env_int("SYNDICATE_INTELLIGENCE_BOARD_STALE_AFTER_SECONDS", 900)))
 
 
+def _optional_int(value: Any) -> int | None:
+    """An int when the value is one, else None -- never 0 for "unreadable".
+
+    Lane `combined-board-rows-unreadable-tripwire`: `stored_candidate_count`
+    distinguishes "the payload stored zero" from "nothing could be read", so a
+    missing or malformed field must not collapse to 0.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    try:
+        return int(str(value).strip()) if value is not None and str(value).strip() else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _by_sport_shape(value: Any) -> str:
+    """Name the shape a persisted `by_sport` arrived in, for one log line.
+
+    `compressed` (a `_compress_oversized_values` envelope), `aliased` (any
+    member list replaced by a `_compact_member_lists` marker), `lists` (plain,
+    readable), `empty`, `absent`, or the type name. Lane
+    `combined-board-rows-unreadable-tripwire`.
+    """
+    if value is None:
+        return "absent"
+    if not isinstance(value, Mapping):
+        return type(value).__name__
+    if not value:
+        return "empty"
+    if _COMPRESSED_VALUE_KEY in value:
+        return "compressed"
+    if any(isinstance(item, Mapping) and _MEMBER_ALIAS_KEY in item for item in value.values()):
+        return "aliased"
+    if all(isinstance(item, list) for item in value.values()):
+        return "lists"
+    return "mixed"
+
+
 def _read_single_date_response_for_combining(selected_date: str) -> dict[str, Any] | None:
     """One date's already-computed response, read-only. Consults both the
     in-memory snapshot the background loop already holds (cheapest -- exactly
@@ -9190,7 +9230,9 @@ def read_combined_intelligence_response(
     for requested_date in requested_dates:
         date_response = _read_single_date_response_for_combining(requested_date)
         if date_response is None:
-            by_date_summary[requested_date] = {"candidate_count": 0, "covered_sports": []}
+            # `stored_candidate_count` None, not 0: nothing was read, which is a
+            # different fact from a payload that stored zero.
+            by_date_summary[requested_date] = {"candidate_count": 0, "stored_candidate_count": None, "covered_sports": []}
             print(f"[intelligence_state] COMBINED_BOARD_STATE_DATE_MISS date={requested_date}", flush=True)
             continue
         # `#603` DEFERRED: a date sets the board's age only if it PUT ROWS ON IT.
@@ -9213,7 +9255,36 @@ def read_combined_intelligence_response(
                 date_candidate_count += 1
                 date_covered_sports.add(str(sport_key))
                 covered_sports.add(str(sport_key))
-        by_date_summary[requested_date] = {"candidate_count": date_candidate_count, "covered_sports": sorted(date_covered_sports)}
+        # THE STORED COUNT BESIDE THE ROWS READ (lane
+        # `combined-board-rows-unreadable-tripwire`, 2026-09-15).
+        #
+        # `candidate_count` above counts the rows THIS READER got out of
+        # `by_sport`. `stored_candidate_count` is the scalar the WRITER stored in
+        # the same payload. They are two instruments on one object, and a
+        # payload that says "I have candidates" while yielding no rows is a
+        # READER defect by construction -- the gate in
+        # `_read_single_date_response_for_combining` has already required a
+        # positive count to get here.
+        #
+        # That exact contradiction hid the combined board's missing state rows
+        # for weeks: `by_date` read 0 while refresh-worker persisted 374, and a
+        # session recorded "production has no state rows" from the served
+        # payload, which carried only the reader's number. The log line below
+        # names the shape `by_sport` actually arrived in, so the next occurrence
+        # is diagnosed from one line instead of a day.
+        stored_candidate_count = _optional_int(date_response.get("candidate_count"))
+        by_date_summary[requested_date] = {
+            "candidate_count": date_candidate_count,
+            "stored_candidate_count": stored_candidate_count,
+            "covered_sports": sorted(date_covered_sports),
+        }
+        if date_candidate_count == 0 and (stored_candidate_count or 0) > 0:
+            print(
+                f"[intelligence_state] COMBINED_BOARD_STATE_ROWS_UNREADABLE date={requested_date} "
+                f"stored={stored_candidate_count} rows=0 stamp={date_stamp or 'none'} "
+                f"by_sport_shape={_by_sport_shape(date_response.get('by_sport'))}",
+                flush=True,
+            )
         # `#603`. THE BOARD'S AGE IS THE AGE OF THE DATA IT IS ACTUALLY SHOWING.
         #
         # THE BUG THIS FIXES, measured 2026-08-29. `computed_at` is the OLDEST
