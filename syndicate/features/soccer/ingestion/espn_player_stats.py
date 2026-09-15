@@ -203,7 +203,86 @@ def aggregate_season_player_stats(
                 "source": "espn_true_per90",
             }
         )
+    _shrink_goal_rates_toward_position(rows_out)
     return rows_out
+
+
+#: Minutes at which a player's own goal/assist rate carries HALF the weight of the
+#: positional prior. It is the curve `player_history._shrink_toward_prior` uses for
+#: Understat and ASA rows, re-fitted for these: 180 beat 450, 900 and 1800 on
+#: training log loss (lane soccer-anytime-scorer, 2026-09-15).
+_RATE_STABILISATION_MINUTES = 180.0
+_SHRUNK_GOAL_FIELDS = ("xg_per90", "xa_per90")
+
+
+def _position_bucket(position: Any) -> str:
+    """D / M / F / GK, BY KEYWORD.
+
+    ESPN writes lineup SLOTS ("Center Left Defender", "Attacking Midfielder
+    Right"), and "Substitute" for 460 of ~1,240 rows (2026-09-15). The
+    first-token bucketing `player_history` uses on Understat's letter codes would
+    split one position into "Center"/"Left"/"Attacking", and give a third of the
+    rows a prior named after the bench. Anything unrecognised returns "?" and
+    takes the league's outfield prior.
+    """
+    text = str(position or "").lower()
+    if "goalkeeper" in text:
+        return "GK"
+    if "defender" in text or "back" in text or "sweeper" in text:
+        return "D"
+    if "midfielder" in text:
+        return "M"
+    if "forward" in text or "striker" in text or "wing" in text:
+        return "F"
+    return "?"
+
+
+def _shrink_goal_rates_toward_position(rows: list[dict[str, Any]]) -> None:
+    """Pull `xg_per90`/`xa_per90` toward the (league, position) minutes-weighted mean.
+
+    The weight is `minutes_played / (minutes_played + 180)`. Mutates in place.
+
+    THESE ROWS CARRY REALISED GOALS, so an unshrunk rate is exactly 0 for every
+    player who has not scored yet. Measured 2026-09-15 on appeared players, 53%
+    of the ESPN leagues' anytime-scorer prices were 0.000 (0.2% in the other six
+    leagues, whose rates are already shrunk). Held out, shrinking cut the ESPN
+    leagues' anytime log loss from 0.3551 to 0.2666.
+
+    SHOTS ARE NOT SHRUNK. The conditional shot ladder was validated on these
+    rows' raw shot rates. Goalkeepers are neither shrunk nor counted in a prior.
+    """
+    outfield = [row for row in rows if _position_bucket(row.get("position")) != "GK"]
+    if not outfield:
+        return
+
+    def _minutes(row: dict[str, Any]) -> float:
+        try:
+            return max(0.0, float(row.get("minutes_played") or 0.0))
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _prior(group: list[dict[str, Any]]) -> dict[str, float] | None:
+        total = sum(_minutes(row) for row in group)
+        if total <= 0:
+            return None
+        return {
+            field: sum(float(row.get(field) or 0.0) * _minutes(row) for row in group) / total
+            for field in _SHRUNK_GOAL_FIELDS
+        }
+
+    league_prior = _prior(outfield) or {field: 0.0 for field in _SHRUNK_GOAL_FIELDS}
+    buckets: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in outfield:
+        buckets[_position_bucket(row.get("position"))].append(row)
+    for key, group in buckets.items():
+        prior = (_prior(group) if key != "?" else None) or league_prior
+        for row in group:
+            minutes = _minutes(row)
+            weight = minutes / (minutes + _RATE_STABILISATION_MINUTES)
+            for field in _SHRUNK_GOAL_FIELDS:
+                own = float(row.get(field) or 0.0)
+                row[field] = round(weight * own + (1.0 - weight) * prior[field], 4)
+            row["rate_own_weight"] = round(weight, 4)
 
 
 __all__ = ["aggregate_season_player_stats", "season_date_windows"]
