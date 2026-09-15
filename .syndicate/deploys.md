@@ -36151,3 +36151,21 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
 - **What this proves and what it does not:** `build_live_state`, `extract_goals` and `extract_shot_events` import and run inside the production poller (reachability). It does NOT show a corrected score: no match was in play. **Still OWED:** on the first live match with a penalty or own goal, the served `games` score equals ESPN's.
 - **Claim released** 22:13:09Z (status `free`). `book-quotes-splice-repair` (env + same `2d579fd1`) and then `legacy-steam-crossing-delta` (main tip) were told.
 - **refresh-worker** went live on `2d579fd1` at 22:12:03Z (entry above, lane `soccer-player-role-allocation`), so `082da3e3` is now live there. This lane's option-1 reading, refresh-worker's first `pull_hot_artifacts` `since=` equals its own previous pull start, is being read and follows separately.
+
+## 2026-09-15 22:15:53Z (17:15 CT) — READING on the 2026-09-15 22:06:03Z refresh-worker `f833f7ec` -> `2d579fd1` entry — lane anytime-td-quote-side-yes — **ride-along `6d526851` (Anytime TD quote side) LIVE; expectation MET: ncaaf `intelligence_prop` with_quote/rows 256/256 in the new process**
+- **No deploy by this lane.** `6d526851` rode along in lane soccer-player-role-allocation's deploy `dep-daks2irm8hqs73efhhh0` of origin/main `2d579fd1`.
+  - This lane's off-main `1d78d38b` (branch `deploy/refresh-worker-anytime-td-side`) was built and preflighted (HOLD, MLB daily sim), then cancelled before any deploy once the tip deploy was agreed. Its claim was released 16:09:28 CT.
+- **Checked here, not taken from the peer's message:**
+  - The deploys API reads refresh-worker live on `2d579fd1`, finished 22:12:03Z.
+  - `git merge-base --is-ancestor 6d526851 2d579fd1` is true.
+  - The render logs show `[refresh_worker] BOOTED` at 22:12:37Z.
+- **Expectation** (stated on this lane's own preflight 21:02:10Z): `ncaaf_intelligence_prop_with_quote_rate` 1.0 -> 1.0.
+  - Baseline read 21:02:07Z: `ncaaf 2026-09-15 intelligence_prop rows=416 with_quote=416`, previous process, generated 15:54:45 CT.
+- **Reading** (`/api/ops/opportunity-contract/status`, read 22:15:53Z):
+  - `generated_at` 2026-09-15T17:15:06-05:00 (22:15:06Z, after the boot), `service_role` refresh-worker-4tx2, source persisted.
+  - `ncaaf 2026-09-15 intelligence_prop rows=256 with_quote=256 missing_market_key=256`, **rate 1.0**.
+  - The previous read, generated 22:13:36Z, had no ncaaf intelligence_prop yet (no NCAAF build since boot) and is not counted.
+- **Verify: MET.** The prop join still quotes every NCAAF prop row in the new process.
+- **Not shown by this reading:** the side choice itself. No Anytime TD "No" side exists in the NCAAF/NFL shards (0 on the 09-17..09-19 exports), so production cannot yet exercise it. It rests on `tests/test_quote_enrichment_anytime_td_side.py` (`off != on`: 4 of 6 fail with the helper off) and the production-shard replay through the real `enrich_prop_rows` (101 rows pass "yes", 102/102 right).
+- **Not explained:** 256 rows in the first ~3 min against 104 per build earlier. The counters add up per process, and builds in the window were not counted.
+- Rollback: as in the entry above.
