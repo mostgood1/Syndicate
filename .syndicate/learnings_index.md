@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1022 rules `[generated]`
+## Index — 1031 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 402**
+**FORBIDDEN — 403**
 
 - [2026-09-06 — FORBIDDEN: instrumenting join A, reading it, and concluding about a value…](#2026-09-06-forbidden-instrumenting-join-a-reading-it-and-concluding-about-a-value-written-by-join-b-name-the-writer-of-the-field-in-the-falsification-test-itself-lane-mlb-first5-kalshi-fanin-mismatch-vs-15410ca7)
 - [2026-09-06 — FORBIDDEN: concluding a guard covers a symptom because the guard is deploy…](#2026-09-06-forbidden-concluding-a-guard-covers-a-symptom-because-the-guard-is-deployed-firing-and-named-after-it-find-the-code-that-wrote-the-field-you-are-looking-at-lane-mlb-first5-kalshi-fanin-mismatch)
@@ -222,6 +222,7 @@
 - [2026-09-15 — FORBIDDEN: reading a READER's zero as the WRITER's absence — `by_date` 0 w…](#2026-09-15-forbidden-reading-a-readers-zero-as-the-writers-absence-by_date-0-was-a-dated-state-the-reader-could-not-parse-and-the-line-quoted-as-proof-said-so-lane-combined-board-state-rows-lost)
 - [2026-09-15 — FORBIDDEN: carrying a deploy's predicted effect on a time-varying field fr…](#2026-09-15-forbidden-carrying-a-deploys-predicted-effect-on-a-time-varying-field-from-a-reading-taken-hours-earlier-re-derive-it-at-preflight-and-baseline-every-field-it-names-plus-the-served-row-count-lane-combined-board-state-rows-lost)
 - [2026-09-15 — FORBIDDEN: caching a verdict whose validity depends on the date's relation…](#2026-09-15-forbidden-caching-a-verdict-whose-validity-depends-on-the-dates-relation-to-today-under-a-key-that-is-only-the-date-at-midnight-tomorrow-becomes-today-and-the-verdict-outlives-its-premise-lane-wnba-future-date-cache-carry)
+- [2026-09-15 — FORBIDDEN: reading ESPN's soccer scoreboard with a `dates=YYYYMMDD-YYYYMMD…](#2026-09-15-forbidden-reading-espns-soccer-scoreboard-with-a-datesyyyymmdd-yyyymmdd-range-for-live-state-ask-for-the-single-date-and-judge-freshness-by-a-content-field-lane-soccer-live-scoreboard-range-stale)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -422,7 +423,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](learnings_evidence.md#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated) `[evidence]`
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 
-**Rules and corrections — 614**
+**Rules and corrections — 622**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -576,6 +577,14 @@
 - [2026-09-15 — OVERTURNED: "a deploy the guard let through was a deploy the guard checked…](#2026-09-15-overturned-a-deploy-the-guard-let-through-was-a-deploy-the-guard-checked-two-web-deploys-passed-deploy-guardpy-because-it-never-classified-them-as-deploys-lane-deploy-guard-python-post)
 - [2026-09-15 — OVERTURNED: "soccer shots props over-predict by 40%; ship a 1.33 divisor".…](#2026-09-15-overturned-soccer-shots-props-over-predict-by-40-ship-a-133-divisor-a-per-row-skill-score-keyed-on-a-prediction-list-cannot-see-what-the-list-is-missing-and-it-read-a-stale-squad-as-a-level-error-lane-soccer-season-market-audit)
 - [2026-09-15 — OVERTURNED: "a FotMob league id verified against name AND country is a sta…](#2026-09-15-overturned-a-fotmob-league-id-verified-against-name-and-country-is-a-stable-join-key-it-identified-one-season-of-the-competition-and-a-same-day-decoy-check-cannot-see-that-lane-fotmob-season-scoped-league-ids)
+- [2026-09-15 — OVERTURNED: "the attached-POST classifier leaves reads alone" — it shipped…](#2026-09-15-overturned-the-attached-post-classifier-leaves-reads-alone-it-shipped-tested-only-on-hand-written-commands-and-the-repos-own-read-only-graft-builder-classified-as-a-deploy-lanes-deploy-guard-python-post-deploy-guard-file-scripts)
+- [2026-09-15 — OVERTURNED: "a sparkline of the pick's market probability tells the same s…](#2026-09-15-overturned-a-sparkline-of-the-picks-market-probability-tells-the-same-story-as-the-movement-arrow-beside-it-the-line-plotted-the-no-vig-consensus-the-arrow-read-the-shown-price-and-they-disagreed-on-132-of-294-rows-lane-layer2-row-parity)
+- [2026-09-15 — OVERTURNED: "fix the puller that spliced, repair web's copy, and web's mer…](#2026-09-15-overturned-fix-the-puller-that-spliced-repair-webs-copy-and-webs-merge-refusals-go-to-0-a-second-publisher-kept-republishing-its-own-stale-copy-and-the-merge-log-had-named-it-all-along-lane-book-quotes-splice-repair)
+- [2026-09-15 — OVERTURNED: "a lane whose header reads CLOSED on origin/main is safe to ar…](#2026-09-15-overturned-a-lane-whose-header-reads-closed-on-originmain-is-safe-to-archive-its-live-owner-was-reopening-it-in-an-uncommitted-worktree-edit-session-3a65723e-ledger-archive-no-lane)
+- [2026-09-15 — OVERTURNED: "a mechanism that passed a held-out test is ready to build". T…](#2026-09-15-overturned-a-mechanism-that-passed-a-held-out-test-is-ready-to-build-the-test-fed-it-an-input-production-does-not-have-and-on-productions-own-inputs-it-failed-until-a-join-defect-was-fixed-lane-soccer-player-role-allocation)
+- [2026-09-15 — OVERTURNED: "`pull_hot_artifacts`' `since=` floor is the calling service's…](#2026-09-15-overturned-pull_hot_artifacts-since-floor-is-the-calling-services-last-successful-pull-it-was-one-keyvalue-key-across-workers-so-live-odds-workers-pulls-set-refresh-workers-floor-lane-soccer-live-scoreboard-range-stale)
+- [2026-09-15 — OVERTURNED: "own-goal is correctly excluded" from the soccer TEAM score. C…](#2026-09-15-overturned-own-goal-is-correctly-excluded-from-the-soccer-team-score-count-by-the-feeds-own-scoringplay-not-by-a-type-key-prefix-lane-soccer-live-scoreboard-range-stale)
+- [2026-09-15 — OVERTURNED: "the fix is on main but its deploy is still my lane's to sched…](#2026-09-15-overturned-the-fix-is-on-main-but-its-deploy-is-still-my-lanes-to-schedule-once-a-commit-is-on-main-the-next-deploy-of-main-by-any-lane-ships-it-and-a-users-timing-decision-cannot-hold-lane-fotmob-team-name-aliases)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

@@ -463,9 +463,14 @@ live at 18:15:16Z. The first post-live eredivisie `live_state_2026-09-15.json`
 `source fotmob`, `fotmob_match_id 5781718` and 16 events. Championship read
 the same at 18:51:17Z: both in-play matches `supported True`, `source fotmob`
 (`5836816`, `5836818`). Belgian Pro League is UNREAD on production (no fixture
-on 09-15; next 2026-09-18 18:45Z (13:45 CT), Standard Liege at KAA Gent, which is also the accent-fold case). Known misses left are
-TEAM-NAME aliases (Waasland-Beveren/SK Beveren, Sint-Truidense/St.Truiden,
-LAFC/Los Angeles FC: 3 of 44 fixtures), in `leads.md`. Detail: `.syndicate/deploys.md`
+on 09-15; next 2026-09-18 18:45Z (13:45 CT), Standard Liege at KAA Gent, which is also the accent-fold case). TEAM-NAME aliases (Waasland-Beveren/SK Beveren,
+Sint-Truidense/St.Truiden, LAFC/Los Angeles FC, Bayern Munich/Bayern München, Stade
+Rennais/Rennes, FC Cologne/1. FC Köln) are bridged by a guarded LOOSE pass (`867f1481`,
+lane `fotmob-team-name-aliases`). It has been live on live-odds-worker since 2026-09-15
+19:37:29Z, verified by content (resolver blob `7bb75289` in the deployed commits). Offline
+code evidence: 389/389 ESPN fixtures resolve, and 0 wrong ids when the true FotMob row is
+removed. It is NOT YET READ on production: no alias-only fixture has been in play; reading
+scheduled 2026-09-19 (`.syndicate/scheduled_task_fotmob_alias_verify.md`). Detail: `.syndicate/deploys.md`
 2026-09-15 18:08:50Z entry.
 
 **THE DATASET ABOVE IS NOT TWO SEASONS FOR ALL TEN LEAGUES.** The harvest

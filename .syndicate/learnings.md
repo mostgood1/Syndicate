@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1022 rules `[generated]`
+## Index — 1031 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -6279,3 +6279,17 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - When a feed publishes its own verdict (`scoringPlay`, `shootout`), carry it through normalization and count by it.
   - Before trusting a hand-listed type vocabulary, replay it against the feed's own final score over a real sample.
   - *(evidence: commit `e115cd6b`; `tests/test_soccer_scoring_events.py`)*
+
+## 2026-09-15 — OVERTURNED: "the fix is on main but its deploy is still my lane's to schedule" — once a commit is on main, the NEXT deploy of main by ANY lane ships it, and a user's timing decision cannot hold `[lane fotmob-team-name-aliases]`
+
+- **What I believed.** Pushing `.py` to main ships nothing, so I could land `867f1481` and then ask the user WHEN to deploy. The user chose "After tonight's matches", and I built a slate-end watcher around that answer.
+- **What happened.**
+  - `867f1481` landed on main around 19:20Z. The user's decision came around 19:27Z.
+  - At 19:31:33Z lane `soccer-player-substrate` deployed main (`f833f7ec`) to the same service, mid-slate, for its own fix. The ride-along included `867f1481`, live at 19:37:29Z.
+  - Two more deploys of main by other lanes followed. By the time the slate ended, the "deploy step" had been done three times over, and not on the schedule the user picked.
+  - That lane recorded the conflict honestly. Nothing broke. But the user's decision was never enforceable, and my question implied it was.
+- **Why.** "Deploy only commits on `origin/main`" makes landing the same as queuing: every deploy is cumulative by design. `autoDeploy = no` bounds WHEN someone deploys, not WHAT their deploy carries.
+- **How to apply.**
+  - When a user wants to control when a change reaches a service, decide that BEFORE landing it. Either keep it off main (branch) until the window opens, or say in the question that the next deploy of main by any lane will carry it.
+  - When a lane's deploy is pending, read the service's deploys API before building any schedule around it. Check by CONTENT whether an earlier deploy already carries the commit.
+- *(evidence: `deploys.md` 2026-09-15 19:31:33Z `soccer-player-substrate` entry, its "CONFLICT" bullet, and the 21:3xZ `fotmob-team-name-aliases` READING)*
