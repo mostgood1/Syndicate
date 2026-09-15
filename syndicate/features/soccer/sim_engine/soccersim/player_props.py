@@ -59,6 +59,36 @@ def _over_probabilities(mean: float, lines: tuple[float, ...]) -> dict[str, floa
     return {f"{line:g}": round(poisson_at_least(mean, int(line + 0.5)), 4) for line in lines}
 
 
+# CONDITIONAL-ON-APPEARING shot ladder (lane soccer-player-role-allocation).
+# Books void a shot prop on a DNP, so the price is P(over | the player appears):
+# a START/SUB MIXTURE, not a Poisson over the unconditional mean, which carries
+# the DNP mass and under-states every player who does appear.
+#
+# Minutes per start and per sub appearance: least squares over 1,240 ESPN-league
+# outfield players (2026 files). Substitute intensity: fitted on dates before
+# 2026-08-26 and scored after. Held out, on production's own inputs, the mixture
+# beat the unconditional ladder in 9/10 leagues:
+#   shots log loss at P(>=1) / P(>=2): 0.611 / 0.469, against 0.641 / 0.517
+#   shots on target:                   0.493 / 0.199, against 0.512 / 0.215
+_MINUTES_PER_START = 83.1
+_MINUTES_PER_SUB_APPEARANCE = 15.6
+_SUB_SHOT_INTENSITY = 1.8
+_START_PRIOR_WEIGHT = 2.0
+
+
+def _mixture_over_probabilities(
+    components: tuple[tuple[float, float], ...], lines: tuple[float, ...]
+) -> dict[str, float]:
+    """P(X > line) for X a weighted mixture of Poissons, given ((weight, mean), ...)."""
+    return {
+        f"{line:g}": round(
+            _clamp(sum(weight * poisson_at_least(mean, int(line + 0.5)) for weight, mean in components), 0.0, 1.0),
+            4,
+        )
+        for line in lines
+    }
+
+
 @dataclass(frozen=True)
 class PlayerUsageProfile:
     player_id: str
@@ -74,6 +104,13 @@ class PlayerUsageProfile:
     penalty_taker: bool = False
     set_piece_taker: bool = False
     is_goalkeeper: bool = False
+    # Conditional-on-appearing inputs, both set by `build_usage_profiles`.
+    # `start_probability` is P(start | appears). `on_pitch_shot_share` is the
+    # player's share of team shots PER FULL MATCH ON THE PITCH: his rate over the
+    # side's minutes-weighted rate, with minutes scoped to one season. If either
+    # is None, `project_player_props` prices the unconditional ladder.
+    start_probability: float | None = None
+    on_pitch_shot_share: float | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -91,6 +128,8 @@ class PlayerUsageProfile:
             "penalty_taker": self.penalty_taker,
             "set_piece_taker": self.set_piece_taker,
             "is_goalkeeper": self.is_goalkeeper,
+            "start_probability": self.start_probability,
+            "on_pitch_shot_share": self.on_pitch_shot_share,
             "metadata": dict(self.metadata),
         }
 
@@ -115,10 +154,12 @@ class PlayerPropProjection:
     assists_over_probabilities: dict[str, float]
     expected_saves: float | None = None
     saves_over_probabilities: dict[str, float] = field(default_factory=dict)
-    # Conditional-on-appearing means: unconditional allocation divided by the
-    # player's expected minutes share. Books void player props on DNP, so
-    # market prices are conditional on the player playing — these are the
-    # values to compare against posted lines.
+    # Conditional-on-appearing means. Books void player props on a DNP, so
+    # market prices are conditional on the player playing. When the profile
+    # carries role inputs, shots and shots on target are the start/sub mixture's
+    # mean; `shots_over_probabilities` and `shots_on_target_over_probabilities`
+    # above are then P(over | appears) as well. Goals and assists are the
+    # unconditional allocation divided by the player's expected minutes share.
     expected_shots_if_playing: float = 0.0
     expected_shots_on_target_if_playing: float = 0.0
     expected_goals_if_playing: float = 0.0
@@ -231,15 +272,36 @@ def project_player_props(
     # union bound is close enough at these magnitudes for a projection seam.
     goal_or_assist = _clamp(1.0 - (1.0 - anytime) * (1.0 - poisson_at_least(expected_assists, 1)), 0.0, 1.0)
 
-    # Conditional-on-appearing rescale. Shares already embed expected
-    # minutes, so dividing by the minutes share recovers the full-match
-    # allocation books price against. Floored to avoid inflating fringe
-    # players whose tiny samples make the division meaningless.
+    # Conditional-on-appearing rescale for goals and assists. Shares already
+    # embed expected minutes, so dividing by the minutes share recovers the
+    # full-match allocation. Floored to avoid inflating fringe players whose
+    # tiny samples make the division meaningless.
     conditioning = max(minutes, 0.25)
-    expected_shots_if_playing = expected_shots / conditioning
-    expected_shots_on_target_if_playing = expected_shots_on_target / conditioning
     expected_goals_if_playing = expected_goals / conditioning
     expected_assists_if_playing = expected_assists / conditioning
+
+    # SHOTS AND SHOTS ON TARGET are priced CONDITIONAL ON APPEARING whenever
+    # `build_usage_profiles` supplied the role inputs: a start/sub mixture at the
+    # player's on-pitch rate. So `shots_over_probabilities` is P(over | appears),
+    # the quantity a book settles. A profile built without role inputs keeps the
+    # unconditional ladder and the old `/ max(minutes, 0.25)` mean.
+    if usage_profile.start_probability is not None and usage_profile.on_pitch_shot_share is not None:
+        full_match_shots = team_shots * _clamp(float(usage_profile.on_pitch_shot_share), 0.0, 1.0)
+        p_start = _clamp(float(usage_profile.start_probability), 0.0, 1.0)
+        shot_components = (
+            (p_start, full_match_shots * _MINUTES_PER_START / 90.0),
+            (1.0 - p_start, _SUB_SHOT_INTENSITY * full_match_shots * _MINUTES_PER_SUB_APPEARANCE / 90.0),
+        )
+        sot_components = tuple((weight, mean * on_target_rate) for weight, mean in shot_components)
+        expected_shots_if_playing = sum(weight * mean for weight, mean in shot_components)
+        expected_shots_on_target_if_playing = expected_shots_if_playing * on_target_rate
+        shots_ladder = _mixture_over_probabilities(shot_components, _SHOT_LINES)
+        shots_on_target_ladder = _mixture_over_probabilities(sot_components, _SOT_LINES)
+    else:
+        expected_shots_if_playing = expected_shots / conditioning
+        expected_shots_on_target_if_playing = expected_shots_on_target / conditioning
+        shots_ladder = _over_probabilities(expected_shots, _SHOT_LINES)
+        shots_on_target_ladder = _over_probabilities(expected_shots_on_target, _SOT_LINES)
 
     return PlayerPropProjection(
         player_id=usage_profile.player_id,
@@ -255,8 +317,8 @@ def project_player_props(
         anytime_scorer_probability=round(anytime, 4),
         two_or_more_scorer_probability=round(two_plus, 4),
         goal_or_assist_probability=round(goal_or_assist, 4),
-        shots_over_probabilities=_over_probabilities(expected_shots, _SHOT_LINES),
-        shots_on_target_over_probabilities=_over_probabilities(expected_shots_on_target, _SOT_LINES),
+        shots_over_probabilities=shots_ladder,
+        shots_on_target_over_probabilities=shots_on_target_ladder,
         assists_over_probabilities=_over_probabilities(expected_assists, _ASSIST_LINES),
         expected_shots_if_playing=round(expected_shots_if_playing, 4),
         expected_shots_on_target_if_playing=round(expected_shots_on_target_if_playing, 4),
@@ -367,6 +429,60 @@ def build_usage_profiles(
     goal_total = sum(weighted_goals) or 1.0
     assist_total = sum(weighted_assists) or 1.0
 
+    # ROLE INPUTS FOR THE CONDITIONAL SHOT LADDER, kept OFF the shares above.
+    # Team-minutes weights made the UNCONDITIONAL ladder worse (big five 0.644 ->
+    # 0.664). The shares above also allocate goals and assists, which were not
+    # re-measured.
+    #
+    # On-pitch minutes share: a row with `games` and `minutes` (Understat) is
+    # measured against its SIDE'S match count IN ITS OWN SEASON. A side mixes a
+    # current row with prior-season rows. Taking one match count across all of
+    # them (a 38-game season against a 4-game player) pushed the big five's shot
+    # means to 1.15-1.67x actual; scoped per season they read 0.75-0.93x. Other
+    # rows' `expected_minutes_share` is already a team share (ESPN, ASA).
+    def _number(value: Any) -> float | None:
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return None
+        return number if number == number else None
+
+    season_match_count: dict[str, float] = {}
+    for row in players:
+        games = _number(row.get("games"))
+        if games:
+            season_key = str(row.get("season"))
+            season_match_count[season_key] = max(season_match_count.get(season_key, 0.0), games)
+
+    on_pitch_minutes: list[float] = []
+    for row in players:
+        games, played = _number(row.get("games")), _number(row.get("minutes"))
+        matches = season_match_count.get(str(row.get("season")), 0.0)
+        if games and played is not None and matches > 0:
+            on_pitch_minutes.append(_minutes({"expected_minutes_share": played / (matches * 90.0)}))
+        else:
+            on_pitch_minutes.append(_minutes(row))
+    on_pitch_total = sum(
+        _rate(row, ("shots_per90", "shots")) * share for row, share in zip(players, on_pitch_minutes)
+    )
+
+    def _start_probability(row: dict[str, Any], key: str, on_pitch_share: float) -> float:
+        """P(start | appears). A confirmed lineup decides it outright."""
+        if starter_set is not None:
+            return 1.0 if key in starter_set else 0.0
+        prior = _clamp(on_pitch_share / (_MINUTES_PER_START / 90.0), 0.05, 0.95)
+        appearances, starts = _number(row.get("appearances")), _number(row.get("starts"))
+        if appearances and starts is not None:
+            return (starts + _START_PRIOR_WEIGHT * prior) / (appearances + _START_PRIOR_WEIGHT)
+        games, played = _number(row.get("games")), _number(row.get("minutes"))
+        if games and played is not None:
+            return _clamp(
+                (played / games - _MINUTES_PER_SUB_APPEARANCE) / (_MINUTES_PER_START - _MINUTES_PER_SUB_APPEARANCE),
+                0.02,
+                0.98,
+            )
+        return prior
+
     profiles: list[PlayerUsageProfile] = []
     for index, row in enumerate(players):
         on_target = row.get("shot_on_target_rate")
@@ -389,6 +505,10 @@ def build_usage_profiles(
                 penalty_taker=bool(row.get("penalty_taker")),
                 set_piece_taker=bool(row.get("set_piece_taker")),
                 is_goalkeeper=bool(row.get("is_goalkeeper")) or str(row.get("position") or "").upper() == "GK",
+                start_probability=_start_probability(row, row_keys[index], on_pitch_minutes[index]),
+                on_pitch_shot_share=(
+                    _rate(row, ("shots_per90", "shots")) / on_pitch_total if on_pitch_total > 0 else 0.0
+                ),
                 metadata={key: value for key, value in row.items() if key not in {"player_id", "player_name"}},
             )
         )

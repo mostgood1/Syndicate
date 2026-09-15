@@ -699,6 +699,12 @@ def build_soccer_player_features(
                 "expected_minutes_share",
                 "minutes",
                 "games",
+                # Role inputs for the conditional-on-appearing shot ladder
+                # (`build_usage_profiles`): `season` scopes a side's match count
+                # to one season, and ESPN rows carry `appearances`/`starts`.
+                "season",
+                "appearances",
+                "starts",
                 "is_goalkeeper",
                 "penalty_taker",
                 "set_piece_taker",
