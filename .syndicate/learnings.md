@@ -6217,3 +6217,21 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - Read the emitter's format string before interpreting a log field (`dir=` was not what its name suggests).
   - A log-API scan runs as ONE process with retry and backoff, and it records which windows actually returned. An empty window is not an empty log.
 - *(evidence: `deploys.md` 2026-09-15 19:27:29Z follow-up; `lanes.md` book-quotes-splice-repair P4 READING; `state_worker.md` `[streamed-pull-append-only-tail]`)*
+
+## 2026-09-15 — OVERTURNED: "a lane whose header reads CLOSED on origin/main is safe to archive" — its live owner was reopening it in an uncommitted worktree edit `[session 3a65723e, ledger archive; no lane]`
+
+- **What was believed:** `scripts/trim_lane_blocks.py` proposed 39 closed or orphaned blocks for removal. All 39 read CLOSED on origin/main, held 0 claims and had no OPEN header, so moving any of them to `lanes_closed.md` looked like pure bookkeeping.
+- **What happened:**
+  - Before touching the 12 closed TODAY, a liveness read found all 4 owning sessions had written their transcripts within minutes. One of them, `3421d2c5`, had an UNCOMMITTED `lanes.md` edit in worktree `disk-inventory-test-clock` flipping `ncaaf-prop-kickoff-slate-date` from CLOSED back to OPEN for a refresh-worker deploy.
+  - origin/main cannot show that edit, and the header, claims check and invariants all read origin/main. Archiving the block would have deleted the text the owner's rebase was about to modify.
+  - The user's choice ("older lanes only", leaving today's closures to possibly-running owners) avoided the collision; the header alone would not have.
+  - A 09-14 closure whose owner was idle for 21h (`brand-logo-v3`) was archived. A 09-10 lane with a stale marker (`wnba-schedule-guard-fix`) was NOT: a live session had closed it today with a handoff to its own OPEN lane.
+- **How to apply:**
+  - A CLOSED header is the owner's LAST PUSHED state, not their current intent. Before moving or rewriting another session's block, read owner liveness:
+    - the session transcript mtime (`~/.claude/projects/*/<sid>.jsonl`)
+    - its `.current-lane.<sid>` marker
+    - OPEN lanes naming the session
+    - `git status` of any worktree named for the lane
+  - Treat "live, or has an uncommitted ledger edit" as "do not touch".
+  - The lane's CLOSER can differ from its OWNER: check the liveness of both.
+- *(evidence: `log/2026-09-15.md` addenda "archived 26 lanes closed before 2026-09-15" and "owner liveness of the 13 closed lanes"; commits `7e721cfa`, `d1d74ce9`)*
