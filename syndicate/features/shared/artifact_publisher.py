@@ -1525,10 +1525,46 @@ def _admin_token() -> str:
     return _env("ADMIN_TOKEN") or _env("SYNDICATE_ADMIN_TOKEN")
 
 
-def _hot_artifact_pull_watermark_path() -> Path:
+def _hot_artifact_pull_watermark_path(date_str: str | None = None) -> Path:
+    """Where ONE puller's floor lives: per SERVICE and per DATE SCOPE.
+
+    THIS WAS ONE SHARED KEY, AND IT SKIPPED FILES. [2026-09-15, lane
+    soccer-live-scoreboard-range-stale] The path was
+    `.../latest/hot_artifact_pull_watermark.json`, written through
+    `write_json_file` -- keyvalue-backed, and every worker points at the same
+    store with the same `SYNDICATE_REPORTS_ROOT`. live-odds-worker pulls today
+    every ~2-3 min; refresh-worker pulls each board date every ~15-30 min. So
+    refresh-worker's floor was whatever live-odds-worker last recorded:
+    MEASURED, its 20:41:05Z pull asked `since=20:39:04Z`, the start of
+    live-odds-worker's own pull. It could only receive files changed in the
+    last two minutes and never re-fetched an older change it already held;
+    the Layer 2 soccer chips served a pre-deploy live state for 26 minutes
+    while web held the fresh file.
+
+    PER DATE as well as per service: refresh-worker alternates today and
+    tomorrow through this same function, so a service-only key would still let
+    tomorrow's pull advance today's floor -- the same skip inside one service.
+
+    `disk_maintenance._service_slug` is the identity because it fixed this
+    exact shape (a keyvalue stamp shared across workers) on 2026-08-12, and
+    `SYNDICATE_REFRESH_LANE` reads `web` / `refresh-worker` / `live-odds-worker`
+    on the three services. The old shared key is left in the store untouched;
+    a scope with no key yet starts from `_MAX_PULL_WINDOW_SECONDS`, measured not
+    to grow the response (15.5 MB at 30 min and at 2 h, 2026-09-15 21:00Z).
+    """
+    from syndicate.features.shared.disk_maintenance import _service_slug
     from syndicate.features.shared.refresh_state_store import reports_root
 
-    return reports_root() / "refresh_status" / "latest" / "hot_artifact_pull_watermark.json"
+    scope = str(date_str or "").strip() or "all"
+    scope = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in scope)
+    return (
+        reports_root()
+        / "refresh_status"
+        / "latest"
+        / "hot_artifact_pull_watermark"
+        / _service_slug()
+        / f"{scope}.json"
+    )
 
 
 # Hard ceiling on how far back a pull will ever reach.
@@ -1555,16 +1591,19 @@ def _hot_artifact_pull_watermark_path() -> Path:
 _MAX_PULL_WINDOW_SECONDS = 2 * 3600
 
 
-def _hot_artifact_pull_since_epoch(*, pull_started_epoch: float) -> float | None:
+def _hot_artifact_pull_since_epoch(*, pull_started_epoch: float, date_str: str | None = None) -> float | None:
     # Mirrors live_refresh_loop.py's _hot_artifact_publish_since_epoch on the
     # push side: floor = the start of the last successful pull, not each
     # call's own start time, so a slow or delayed cycle still catches
     # everything written since the last time this actually completed --
     # clamped to _MAX_PULL_WINDOW_SECONDS so neither a missing watermark nor
     # a stalled one can turn this into an unbounded fetch.
+    #
+    # "The last successful pull" means THIS service's, for THIS date scope --
+    # see `_hot_artifact_pull_watermark_path`.
     from syndicate.features.shared.refresh_state_store import read_json_file
 
-    payload = read_json_file(_hot_artifact_pull_watermark_path())
+    payload = read_json_file(_hot_artifact_pull_watermark_path(date_str))
     try:
         stored = float(payload.get("epoch")) if isinstance(payload, dict) and payload.get("epoch") is not None else None
     except (TypeError, ValueError):
@@ -1575,11 +1614,11 @@ def _hot_artifact_pull_since_epoch(*, pull_started_epoch: float) -> float | None
     return max(stored, window_floor)
 
 
-def _record_hot_artifact_pull_watermark(epoch: float) -> None:
+def _record_hot_artifact_pull_watermark(epoch: float, date_str: str | None = None) -> None:
     from syndicate.features.shared.refresh_state_store import write_json_file
 
     try:
-        write_json_file(_hot_artifact_pull_watermark_path(), {"epoch": epoch})
+        write_json_file(_hot_artifact_pull_watermark_path(date_str), {"epoch": epoch})
     except Exception:
         # Must never raise (module-wide constraint) -- worst case, the next
         # pull just doesn't advance the watermark and re-fetches everything.
@@ -2747,11 +2786,13 @@ def pull_hot_artifacts(*, date_str: str | None = None, timeout_seconds: int = 30
         print(f"[artifact_publisher] PULL_SKIP_NOT_CONFIGURED url_set={bool(_env('SYNDICATE_WEB_PUBLISH_URL'))} token_set={bool(token)}", flush=True)
         return 0
     pull_started_epoch = time.time()
-    since_epoch = _hot_artifact_pull_since_epoch(pull_started_epoch=pull_started_epoch)
+    # The floor is this service's, for this date scope -- never another
+    # worker's or another date's. See `_hot_artifact_pull_watermark_path`.
+    since_epoch = _hot_artifact_pull_since_epoch(pull_started_epoch=pull_started_epoch, date_str=date_str)
     if not date_str:
         succeeded, written = _pull_hot_artifacts_request(_export_url(None, since_epoch=since_epoch), token, timeout_seconds=timeout_seconds)
         if succeeded:
-            _record_hot_artifact_pull_watermark(pull_started_epoch)
+            _record_hot_artifact_pull_watermark(pull_started_epoch, date_str=None)
         return written
     written = 0
     all_succeeded = True
@@ -2760,7 +2801,7 @@ def pull_hot_artifacts(*, date_str: str | None = None, timeout_seconds: int = 30
         written += sub_written
         all_succeeded = all_succeeded and succeeded
     if all_succeeded:
-        _record_hot_artifact_pull_watermark(pull_started_epoch)
+        _record_hot_artifact_pull_watermark(pull_started_epoch, date_str=date_str)
     # Repair pass, AFTER the watermark is recorded and deliberately not part of
     # all_succeeded. It fetches only artifacts this worker is missing outright,
     # one exact ?path= request each and no since= filter, so it is the one
