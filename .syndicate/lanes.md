@@ -950,6 +950,25 @@ death, never life — do not invert it.
     - no rise in `LAYER2_GUARD_SKIP` or restarts.
 - Blocked by: none.
 
+### nfl-live-props-board-lane — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: live NFL props that the Layer 2 shortlist serves as live (`/api/board/layer2-shortlist?sport=nfl`, `market_state live`, lane `opportunity`) must also be served live on the main board (`POST /api/intelligence/query`, the page's default Opportunity lane). Prove it with a failing test first, then a production reading on the next live NFL game.
+- Origin: user report 2026-09-15 ~01:45Z (20:45 CT 09-14), "why are there no props for the live nfl game right now"; user decision ~02:00Z: "fix it open the lane".
+- **Measured before hypotheses (DEN @ KC live, 00:15Z kickoff):**
+  - Layer 2 API 01:48:28Z: 124 live rows (113 props), all `market_state live`, lane `opportunity`, `gate.reasons []`. At 01:50:22Z (new build): 49 live, 37 props.
+  - The page's query 01:52-01:57Z: state `computed_at 2026-09-15T00:49:16Z` (stale), source `combined_board_window+layer2_fallback`, `layer2_fallback_rows 2178`. There are 50 DEN @ KC rows (25 game, 25 prop), ALL `board_lane watchlist`, `market_state unknown`, `is_live None`, `lane pregame`, gate reason `no_game_state`, `source layer2_shortlist`, `source_board_date` 09-14 x37 / 09-15 x13.
+  - Cards restated live on the page: mlb 209, **nfl 0**.
+  - Web logged `LAYER2_LIVE_RESTATED cards=812 of 2737` (01:49Z) and `397 of 2248` (01:52Z).
+  - The chip join is NOT the miss: `/api/board/game-chips?sports=mlb,ncaaf,nfl,soccer&date=2026-09-14` holds DEN @ KC `state live` with keys `denver broncos`/`kansas city chiefs`, identical to the cards' `away_key`/`home_key`. `dates_covered` = 09-14/15/16.
+  - The page's default lane is `opportunity` (`intelligence.html:653-655`), so watchlist rows are hidden.
+- **H1 (written BEFORE any test):** legacy per-date state rows are appended to `merged_recommendations` FIRST (`intelligence_state.py:9091-9116`), and the restated L2-A fallback cards AFTER (`:9230`).
+  - The DEN @ KC legacy rows (state computed 00:49Z, not live-stamped) and the restated cards share a dedupe identity in `build_intelligence_board_contract`, which keeps the first copy. The live restate is discarded, and the serve-time re-gate (`blueprints/intelligence.py:1269-1302`, `has_game_state` false) demotes the survivor to watchlist.
+  - **Falsified if** the dedupe keeps the later or the richer copy, or if the two copies do not share an identity key.
+- **H2 (alternative):** a step after the merge strips `is_live`/`lane`/`market_state` from NFL cards specifically. Falsified if a unit test of the merge path keeps a restated NFL card live.
+- Verification:
+  - (1) A unit test through the real `combined_board_window` merge, with a legacy non-live row plus a restated live L2-A card for the same NFL prop, asserts the served card is `is_live True`, `market_state live`, lane opportunity after `annotate`. It fails on HEAD and passes with the fix.
+  - (2) Production, next live NFL game: page query DEN-style rows `is_live True` / `board_lane opportunity` count > 0 while the Layer 2 API shows live props.
+- Files: tests/test_board_live_restate_merge.py (NEW). The intelligence-state module edits run under lane heavy-build-memory-refusal's existing claim (same session). If the fix lands in the board dedupe module instead, that claim is taken here first.
+
 ### heavy-build-child-process — OPEN — opened 2026-09-14 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - STATUS 2026-09-14 23:25Z (18:25 CT), scheduled reading `live-lens-dual-loop-reading-0914`, live MLB 22:40Z..~23:17Z (`deploys.md` 23:25Z):
   - **Writers: TWO for MLB, measured.** Both workers write the same keyvalue key `live/mlb_live_lens.json` from `live_lens_loop.py:719`: refresh-worker 3 logged writes (1.26-1.51 MB), live-odds-worker 8 (1.05-1.52 MB). web `[ops.publish]` has 0 live-lens lines (keyvalue path). wnba/soccer/nfl: two writers INFERRED (both build every tick; writes under 1 MiB are unlogged). ncaaf: 0 builds on both.
