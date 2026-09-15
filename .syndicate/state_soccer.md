@@ -32,6 +32,8 @@ CIs are bootstraps over matches; betting thresholds were chosen leave-one-date-o
   - Share of real shots taken by a player the model lists: Championship 36%, Primeira 53%, Belgian 56%, EPL 81%, MLS 87%.
   - Appeared players' shots are UNDER-predicted: 0.87 held-out (starters 0.68, fringe 1.08).
   - Anytime scorer: two full deciles sit at exactly 0.000 and 3–5% of them score; the top decile is 1.39× over.
+    - **FIX #3 LANDED 2026-09-15, NOT DEPLOYED** (`ef9f18fc` load-time ESPN goal-rate shrink, `88df44cd` goals on the start/sub mixture; lane `soccer-anytime-scorer`). Replayed through the shipped engine on held-out dates: the ESPN-league zero deciles are the four ESPN leagues, where 53.6% of APPEARED outfield rows priced exactly 0.0 and now price none -- log loss 0.3551 -> 0.2666 -- and the conditional field's level moves 1.16 -> 0.96 with log loss 0.2716 -> 0.2673 (better in 9 of 10 leagues). Both reproduce pre-registered measurements to four decimals.
+    - Two decisions are OPEN with the user: which anytime field the board prices (unconditional 0.2733 vs conditional 0.2673 on the same rows), and the deploy itself. Main's tip carries both commits, so any lane's main-tip deploy ships them -- see the 23:48Z NOTICE in `deploys.md`.
 - **H7: the post-kickoff rebuild is not a material leak.** Pre-kickoff Brier 0.6273 vs final 0.6259 on 163 matches. "Parity" verdicts on these artifacts are real parity.
 - **GAME SHAPE** (FotMob, 6,008 matches):
   - Next-goal momentum AUC is league-specific: MLS 0.521 [0.469, 0.569] (none) vs Primeira 0.679.
