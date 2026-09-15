@@ -36041,3 +36041,31 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Until refresh-worker also runs the new code, an artifact written by its OLD build (refresh-worker `f833f7ec`) still reads 1.000. The reading must therefore split by `generated_at` against refresh-worker's live time and say which worker plausibly wrote each artifact.
 - Rollback: `991a94d5`, which restores the divisor and the unconditional ladder.
 - Claim released 21:38Z with its token.
+## 2026-09-15 21:34:51Z (16:34 CT) — web `f09601a0` -> `dd014d14` (origin/main) — deploy `dep-dakrjuqfngtc73e09q70` — lane book-quotes-splice-repair — **LIVE 21:40:47Z; steam route kept (401/200); repair dry run: 7 glued lines hold 7 salvageable rows, 0 errors**
+- **What:** P5's web piece, `book_quotes_repair.py` splits glued lines (in `070a05bf`).
+- **Ride-along** (`f09601a0..dd014d14`, runtime), no `render.yaml` or requirements change:
+  - `e53274f2`/`b33ef901` soccer-player-role-allocation A/B (approved by that lane's user);
+  - `6d526851` Anytime TD quote side;
+  - `082da3e3` per-(service, date) pull watermark: inert on web, whose `SYNDICATE_WEB_PUBLISH_URL` is absent (single-key GET 404) so `pull_hot_artifacts` no-ops; owner informed;
+  - `f833f7ec`, `3157bb7b`, `867f1481` (already live on the workers);
+  - the rest of `070a05bf` (worker paths).
+- **`--allow-rollback`, and why it is not one:** web ran OFF-MAIN `f09601a0` (lane legacy-steam-crossing-delta: `7ed1a18a` + steam-events route), which `dd014d14` does not descend from.
+  - Checked before passing the flag: the parent `7ed1a18a` IS an ancestor of `dd014d14`.
+  - All three files `f09601a0` changed (`syndicate/app.py`, `syndicate/blueprints/ops_steam.py`, `tests/test_ops_steam_events.py`) are byte-identical in `dd014d14`, where the route is `b2a9a4bb`. No content reverted.
+- **Locks:**
+  - Web claim `667fb7b7…` taken after lane legacy-steam-crossing-delta released web at 21:26:38Z; released ~21:44Z.
+  - Baseline 21:27:21Z: web `salvaged_rows` lines 0 since 19:00Z, `REPAIR_DONE` 3 (last 19:29:48Z).
+  - Preflight CLEAR ~21:27Z (expect: glued fields present on the next dry run). The first `render_deploy` call at 21:33:43Z was refused as a rollback; the deploy went at 21:34:51Z with the flag, inside the preflight window.
+- **Reading:**
+  - `/api/ops/steam/events?sport=mlb&date=2026-09-15` answered 401 without the admin token and 200 with it (21:42:09Z).
+  - Dry run `POST /api/ops/book-quotes/repair` 21:42:10Z (`pid 148`, apply false), `REPAIR_DONE` 21:42:49Z:
+
+      shards 86  shards_with_bad 11  bad_lines 20  orphan_bad_lines 20  verified_fragments 0  glued_lines 7  salvaged_rows 7  removed 0  errors 0
+
+  - Glued lines with a complete salvageable row: mlb 09-13 x1, soccer 09-13 x2, soccer 09-18 x1, 09-19 x1, 09-20 x1, nfl 09-14 x1.
+  - The other 13 orphans (torn heads and 09-01 headless tails) hold no complete row.
+- **verify:**
+  - Expectation (glued fields present): **MET**.
+  - Route unaffected: **MET**.
+  - Apply owed on the user's decision.
+- Rollback: redeploy `f09601a0` (keeps the route); nothing written by the dry run.
