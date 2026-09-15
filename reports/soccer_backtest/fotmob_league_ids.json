@@ -1,12 +1,12 @@
 {
- "epl": 47,
- "bundesliga": 54,
- "la_liga": 87,
- "ligue_1": 53,
- "serie_a": 55,
- "belgian_pro_league": 900433,
- "championship": 900638,
- "eredivisie": 900368,
- "primeira_liga": 61,
- "mls": 913550
+ "epl": {"primary_id": 47, "ccode": "ENG", "names": ["Premier League"]},
+ "la_liga": {"primary_id": 87, "ccode": "ESP", "names": ["LaLiga"]},
+ "bundesliga": {"primary_id": 54, "ccode": "GER", "names": ["Bundesliga"]},
+ "serie_a": {"primary_id": 55, "ccode": "ITA", "names": ["Serie A"]},
+ "ligue_1": {"primary_id": 53, "ccode": "FRA", "names": ["Ligue 1"]},
+ "mls": {"primary_id": 130, "ccode": "USA", "names": ["Major League Soccer"]},
+ "eredivisie": {"primary_id": 57, "ccode": "NED", "names": ["Eredivisie"]},
+ "primeira_liga": {"primary_id": 61, "ccode": "POR", "names": ["Liga Portugal"]},
+ "championship": {"primary_id": 48, "ccode": "ENG", "names": ["Championship"]},
+ "belgian_pro_league": {"primary_id": 40, "ccode": "BEL", "names": ["Belgian Pro League", "First Division A"]}
 }

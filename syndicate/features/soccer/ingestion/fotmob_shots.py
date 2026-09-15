@@ -49,7 +49,12 @@ def matches_for_date(date_yyyymmdd: str) -> list[dict[str, Any]]:
         for match in league.get("matches") or []:
             out.append({
                 "match_id": match.get("id"),
+                # `id` is SEASON-SCOPED for some competitions (Championship was
+                # 900638 in 2025-26 and 938218 in 2026-27); `primaryId` is the
+                # competition's own, stable id. Match leagues on the latter --
+                # `fotmob_match_id.fotmob_league_slug`.
                 "league_id": league.get("id"),
+                "league_primary_id": league.get("primaryId"),
                 "league": league.get("name"),
                 "ccode": league.get("ccode"),
                 "home": (match.get("home") or {}).get("longName") or (match.get("home") or {}).get("name"),

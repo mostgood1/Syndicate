@@ -7,14 +7,19 @@ failed to replicate. At n~90 per time-bucket-decile the standard error is ~0.05,
 so a +0.10 "effect" is one standard error of noise. No modelling change fixes
 that -- only sample size does.
 
-LEAGUE IDS ARE PINNED BY (NAME **AND** COUNTRY), and that is not pedantry.
-Matching on name alone returned `Premier League` = 9986 (CANADA) and `Serie A`
-= 268 (BRAZIL). Both would have harvested silently and been analysed as English
-and Italian top-flight football. The ids below were verified against ccode:
+LEAGUES ARE MATCHED BY (COUNTRY **AND** FOTMOB'S STABLE `primaryId`), and that
+is not pedantry. Matching on name alone returned `Premier League` = 9986
+(CANADA) and `Serie A` = 268 (BRAZIL). Both would have harvested silently and
+been analysed as English and Italian top-flight football.
 
-    epl 47/ENG   la_liga 87/ESP   bundesliga 54/GER   serie_a 55/ITA
-    ligue_1 53/FRA   mls 913550/USA   eredivisie 900368/NED
-    primeira_liga 61/POR   championship 900638/ENG   belgian_pro_league 900433/BEL
+Matching on FotMob's league `id` failed the other way. That id is SEASON-SCOPED
+for Eredivisie, Championship, Belgian Pro League and MLS. This script's first
+run pinned the 2025-26 ids (900368/900638/900433, MLS 913550) and walked
+2024-08..2026-08, so `fotmob_2y.json.gz` holds ONE season for those four
+leagues and two for the other six. A 2026-27 harvest returned 7 of 10 leagues.
+Classification is now `fotmob_match_id.fotmob_league_slug`, the resolver's own
+predicate. `fotmob_league_ids.json` is its record, and the run refuses to start
+if the two disagree.
 
 RESUMABLE ON PURPOSE. A 750-day walk is ~8k HTTP calls; losing it to one
 transient failure at hour two is not acceptable. Already-harvested match ids are
@@ -36,6 +41,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from syndicate.features.soccer.ingestion.fotmob_match_id import fotmob_league_slug, fotmob_leagues_record
 from syndicate.features.soccer.ingestion.fotmob_shots import matches_for_date, shots_for_match
 
 _IDS = Path("reports/soccer_backtest/fotmob_league_ids.json")
@@ -58,7 +64,10 @@ def main() -> int:
     args = ap.parse_args()
 
     league_ids = json.loads(_IDS.read_text(encoding="utf-8"))
-    id_to_slug = {int(v): k for k, v in league_ids.items()}
+    if league_ids != fotmob_leagues_record():
+        print(f"REFUSED: {_IDS} disagrees with fotmob_match_id.FOTMOB_LEAGUES -- "
+              "update one to match the other before harvesting", flush=True)
+        return 2
     out = Path(args.out)
 
     got: list[dict] = []
@@ -74,7 +83,7 @@ def main() -> int:
     start = dt.date.fromisoformat(args.start)
     end = dt.date.fromisoformat(args.end)
     days = (end - start).days + 1
-    print(f"walking {days} dates, {len(id_to_slug)} leagues -> {out}", flush=True)
+    print(f"walking {days} dates, {len(league_ids)} leagues -> {out}", flush=True)
 
     def flush() -> None:
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -94,16 +103,16 @@ def main() -> int:
         except Exception as exc:
             print(f"  {key} LIST FAILED {type(exc).__name__} -- not marking done", flush=True)
             continue
-        mine = [f for f in fixtures
-                if f.get("finished") and f.get("league_id") in id_to_slug
-                and str(f.get("match_id")) not in have]
+        mine = [(slug, f) for f in fixtures
+                if f.get("finished") and str(f.get("match_id")) not in have
+                and (slug := fotmob_league_slug(f))]
         kept = 0
         if mine:
             with ThreadPoolExecutor(max_workers=max(1, args.workers)) as pool:
-                fetched = list(pool.map(lambda f: (f, shots_for_match(f["match_id"])), mine))
-            for f, row in fetched:
+                fetched = list(pool.map(lambda sf: (sf[0], sf[1], shots_for_match(sf[1]["match_id"])), mine))
+            for slug, f, row in fetched:
                 if row and row["shots"]:
-                    row["league"] = id_to_slug[f["league_id"]]
+                    row["league"] = slug
                     row["league_name"] = f.get("league")
                     row["date"] = d.isoformat()
                     got.append(row)
