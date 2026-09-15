@@ -35193,3 +35193,17 @@ User decision in chat: "Deploy #3 after their reading is done".
   - NFL `is_live True` cards **87** (was 0). `LAYER2_LIVE_RESTATED cards=932 of 2718` (was 798 of 2718, MLB only).
 - Board state `computed_at` still 00:49:16Z (the stale combined-board vintage is a separate matter, unchanged by this fix).
 - Claim released after this entry is pushed.
+
+## 2026-09-15 02:29:49Z (21:29 CT 09-14) — refresh-worker `6438830d` -> `c4f45fee` — deploy `dep-dakar795efls73dbe010` — lane heavy-build-child-process (claim holder heavy-build-memory-refusal, same session) — live-lens loop OFF on refresh-worker — **verify MET**
+- **What:** carry env `SYNDICATE_ENABLE_LIVE_LENS_LOOP=false` (single-key PUT ~01:35Z, read back false; the parser treats anything but 1/true/yes/on as off, `live_lens_loop.py:242-246`). User decision ~01:30Z: "Off on refresh-worker (Recommended)", on `deploys.md` 2026-09-14 23:25Z evidence (two MLB live-lens writers; MLB build per tick +51 MB refresh-worker / +78 MB live-odds-worker; live-odds-worker unreclaimable headroom min 887 MB).
+- **Why this commit:** preflight refused a same-commit reinject of live `6438830d` (`HOLD ... ALREADY LIVE -- redundant`), so the env rides the main tip. Code delta `6438830d..c4f45fee`: the board restate fixes (`pipeline/intelligence_state.py`, web-side read path) plus brand/template commits `d126eeb4`..`c9cc175b`, already live on web; no `render.yaml`.
+- **Locks:** claim acquired 02:24:53Z (token `62aecfb9e98f2706`). Preflight `--target-commit c4f45fee` CLEAR at 02:29:36Z (infra only, so no job killed). Lane marker set to heavy-build-memory-refusal for deploy-guard.
+- **Result:** POST 02:29:49Z, `deploy_ended status 2` 02:32:47Z; boot `MALLOC_ARENA_INIT` pid 39 02:33:25Z; 0 `Traceback`, 0 `[worker_recycle]` through ~02:36Z.
+- **verify MET:**
+  - `LIVE_LENS_LOOP_START_RESULT started=False` (02:33:36Z); 0 `live_lens_tick_after_build*` lines after boot.
+  - refresh-worker wrote `live/mlb_live_lens.json` 0 times, while live-odds-worker kept writing it (`KEYVALUE_WRITE_LARGE ... size_bytes=3484756` 02:33:30Z, `3483834` 02:35:32Z). One writer again, during live MLB play.
+- **Still owed (not in this reading):**
+  - (a) live-odds-worker memory with the loop alone on the next full live slate (no `server_failed` from OOM; unreclaimable headroom);
+  - (b) refresh-worker pid 39 per-build growth vs the 19:07Z boot curve now that the live-lens builds are gone.
+- Rollback: set the env back to `true` and deploy.
+- Claim released after this entry is pushed.

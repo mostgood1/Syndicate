@@ -6017,3 +6017,16 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - Any size-sensitive layout claim ("shows from N px", "fits at N px") is read on PRODUCTION after the deploy, at the edge widths. A local reading is a prediction, not the result.
   - Prefer a content-driven fit over a breakpoint tuned on one environment's metrics.
   - *(evidence: `lanes_history.md` brand-logo-v3 local reading; `deploys.md` 2026-09-14 5:34 PM CT)*
+
+## 2026-09-15 — OVERTURNED: "H1 test-confirmed" — the test stubbed the one input production lacked, so it confirmed a mechanism that was not the cause `[lane nfl-live-props-board-lane]`
+
+- **What was believed:** live NFL props were demoted on the main board because pre-kickoff state rows won a first-wins dedupe over restated L2-A cards. A new test through the real `read_combined_intelligence_response` failed on HEAD and passed with a fix, and the fix was deployed to web as `dedfede6`.
+- **What falsified it:** after the deploy the page still served all 72 DEN @ KC props as watchlist / `no_game_state`.
+  - Every `by_date` candidate_count was 0: there were NO state rows in production, so the fix's own log line never printed.
+  - The real cause was upstream of the merge. The live restate built chips in-process (`build_game_chips`), which on web had no live NFL chip, while `/api/board/game-chips` served the worker-published artifact that did.
+  - The test had patched `build_game_chips` to return the live chip, the exact thing production was missing. Fix 2 (`c4f45fee`) read the published chips, and props went live on the next read.
+- **How to apply:**
+  - Before building a test on a hypothesis, confirm its PRECONDITION exists in production. H1 needed state rows, and `by_date.candidate_count` in the same payload already said 0.
+  - A test may only stub an input after it has been shown to carry, in production, the value the stub returns. Stubbing an upstream source proves the code downstream of it and nothing about whether that source delivers.
+  - After a fix deploys, read the fix's OWN log line (`COMBINED_STATE_LIVE_RESTATED` here) before reading the outcome. Its absence named the wrong mechanism in one query.
+  - *(evidence: `deploys.md` 2026-09-15 02:15:21Z and 02:29:09Z; lane nfl-live-props-board-lane)*
