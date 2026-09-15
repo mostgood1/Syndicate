@@ -1620,8 +1620,11 @@ death, never life — do not invert it.
     - Main's A/B commits are that lane's own approved deploy, so a main-tip deploy after it carries no unapproved ride-along. Re-check the range at preflight.
 - Blocked by: the live-odds-worker deploy queue `[2026-09-15 ~21:55Z]`:
   - 1. Lane `soccer-live-scoreboard-range-stale` holds the claim for `2d579fd1` (on main, predates `ca80edf0`). Its preflight is HOLD on an in-flight `refresh_odds_sources` job; it retries until 22:25Z. Its functional verify needs a live match, and a later deploy of main carries its `e115cd6b`, so it does not block us after it is live.
-  - 2. Lane `book-quotes-splice-repair` is queued to set `SYNDICATE_POLYMARKET_PRICE_AT_ASK=1` and redeploy `2d579fd1` as its own deploy (its user's decision). Proposed to it: it goes first, then this lane deploys main tip; the env var persists on the service. Answer pending.
-  - 3. This lane: deploy main tip (at or after `ca80edf0`) to live-odds-worker, then read `/api/ops/steam/events` after the next soccer refresh.
+  - 2. Lane `book-quotes-splice-repair` sets `SYNDICATE_POLYMARKET_PRICE_AT_ASK=1` and redeploys `2d579fd1` as its own deploy (its user's decision), takes its reading, releases the claim and messages this session. AGREED ~22:00Z; the env var persists on the service.
+  - 3. This lane: deploy a PINNED `ca80edf0` (AGREED ~22:00Z), not main's tip, to live-odds-worker, then read `/api/ops/steam/events` after the next soccer refresh.
+    - Why pinned: main's tip (`0ee8cb3c` at ~22:00Z) carries `a2a1fa32` (`execution_ledger` record cap, lane `book-quotes-splice-repair`), which is not approved for deploy.
+    - Checked here: `2d579fd1`, `8c089e8c`, `070a05bf` and `e115cd6b` are ancestors of `ca80edf0`; `ca80edf0` is on origin/main; `a2a1fa32` is the only runtime commit in `ca80edf0..origin/main`.
+    - If that lane reports `a2a1fa32` approved before this lane's turn, main's tip is acceptable instead.
   - HAZARD: any redeploy of `2d579fd1` (or anything before `ca80edf0`) AFTER this lane's deploy rolls the fix back. Check the live commit contains `ca80edf0` before taking the after-reading, and again before closing.
   - refresh-worker (MLB steam + board) follows, after lane `soccer-player-role-allocation` releases its claim (held since ~21:22Z, target `8c089e8c`).
 
