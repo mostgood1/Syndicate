@@ -1,0 +1,36 @@
+{
+  "app": {
+    "hour_served_bytes": 318425374,
+    "ours_bytes": 0,
+    "ours_count": 2596
+  },
+  "bucket": "2026-09-15T17:00:00Z",
+  "bucket_age_minutes": 182.6,
+  "edge": {
+    "background_bytes": 290658750,
+    "background_count": 3244,
+    "hour_total_bytes": 436908084,
+    "ours_bytes": 146249334,
+    "ours_count": 2414
+  },
+  "known_body_bytes": 157225860,
+  "known_edge_basis_bytes": 158149680,
+  "labelling": "bandwidth bucket labelled by its hour's START (corrected 2026-09-10)",
+  "metered_mb": 1131.2318,
+  "neighbour_buckets": {
+    "2026-09-15T14:00:00Z": 300.0281,
+    "2026-09-15T15:00:00Z": 280.8976,
+    "2026-09-15T16:00:00Z": 188.13887,
+    "2026-09-15T17:00:00Z": 1131.2318,
+    "2026-09-15T18:00:00Z": 286.08362,
+    "2026-09-15T19:00:00Z": 366.19153,
+    "2026-09-15T20:00:00Z": 5.882079
+  },
+  "sent_200": 2595,
+  "settled": true,
+  "transfer": "reports/bandwidth_spikes/controlled_transfer_20260915T171430Z.json",
+  "window": {
+    "end": "2026-09-15T18:00:00Z",
+    "start": "2026-09-15T17:00:00Z"
+  }
+}
