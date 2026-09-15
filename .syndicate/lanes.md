@@ -2011,6 +2011,37 @@ death, never life — do not invert it.
   - Instrument limits stated with each reading.
 - Blocked by: none
 
+### ncaaf-prop-kickoff-slate-date — CLOSED 2026-09-15 — opened 2026-09-15 — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
+- **VERDICT.** Goal (verbatim): "NCAAF legacy prop rows carry their game's CENTRAL kickoff date as `slate_date`, so `enrich_prop_rows` joins the kickoff-date quote shard instead of falling back to the worker's today. Shown by a test through the real path and a replay over the production week 3 cards payload. No other sport's behaviour changes. Code landed on main; deploy only on the user's go." — **GOAL: MET** (code, tests, production replay). **NOT DEPLOYED**; the post-deploy reading is owed if the user approves a deploy.
+  - Readings:
+    - `tests/test_home_ncaaf_prop_kickoff_date.py` 10 passed, on the production game shape, including a match precondition and an `off != on` join-date test (`quote_ref_for_bet` gets 2026-09-18 vs fallback 2026-09-15).
+    - Existing prop tests (`test_game_board_contract_prop_team.py` + `test_home.py -k prop`) 37 passed.
+    - Diagnostic over production `/ncaaf/api/cards?week=3`: 102/102 rows matched, 102/102 with a kickoff date.
+    - Replay: `slate_date` on 102/102 candidates; `_row_slate_date` returns 09-17 x8, 09-18 x16, 09-19 x78 (Central), where it was None x102 before.
+  - **A first version was INERT on production data:** it read top-level `kickoff`/`scoreboard.kickoff` and dated 0 of 102 rows, while its fixture-shaped tests passed 8/8. The prop games keep kickoff at `startTime` and `ncaaf_card.scoreboard.kickoff`. The tests were rebuilt on the production shape.
+- Goal: NCAAF legacy prop rows carry their game's CENTRAL kickoff date as `slate_date`, so `enrich_prop_rows` joins the kickoff-date quote shard instead of falling back to the worker's today. Shown by a test through the real path and a replay over the production week 3 cards payload. No other sport's behaviour changes. Code landed on main; deploy only on the user's go.
+- Files: syndicate/blueprints/home.py, tests/test_home_ncaaf_prop_kickoff_date.py (NEW)
+- Hypothesis / design (from lane `quote-shard-date-fallback-prod`, closed):
+  - **The defect:** NCAAF prop rows come from `_compact_prop_rows` (no date field) and pass through `_finalize_home_prop_rows`, whose date fill reads only `scheduled_start_utc` (NCAAF games carry `kickoff`). `_build_prop_dashboard_row` then rebuilds the dict, keeping only `commence_time`.
+  - **The result:** `_row_slate_date` is None for 102/102 rows (production replay), so the join reads today's shard, and the 2026-09-15 NCAAF shard is ABSENT.
+  - **The fix:**
+    - For `slug == "ncaaf"`, set `slate_date = kickoff_shard_date({"commence_time": kickoff})` from the matched game (top-level `kickoff`, else `scoreboard.kickoff`), only when absent.
+    - Pass `slate_date` through `_build_prop_dashboard_row`.
+    - `slate_date` is a key no other producer sets, and `_row_slate_date` reads it before `commence_time`.
+  - **Rejected alternatives:**
+    - Setting `commence_time`: `_row_slate_date` takes `[:10]` = the UTC date, wrong for evening kickoffs. `learnings.md` 2026-09-10 forbids UTC slicing for NCAAF/NFL dates.
+    - Passing `game_date` through: soccer items carry `game_date` = the board date, which would then override their real kickoff.
+- Falsification test:
+  - A Fri 19:00 CT (00:00Z Sat) NCAAF row gets `slate_date` 2026-09-19 (UTC) instead of 2026-09-18, or none.
+  - A non-NCAAF row or a placeholder kickoff gets a `slate_date`.
+  - `quote_ref_for_bet` still receives the fallback date for a dated NCAAF row.
+- Verification:
+  - The new test file passes, including an `off != on` reachability test: with the fix the `quote_ref_for_bet` `date_str` equals the Central kickoff date; without it, the fallback.
+  - Existing tests touching `_finalize_home_prop_rows`/`_build_prop_dashboard_row` pass.
+  - A replay over the production `/ncaaf/api/cards?week=3` payload shows `_row_slate_date` ISO for matched rows (was None for 102/102).
+  - Post-deploy (if approved): refresh-worker `ncaaf intelligence_prop with_quote` > 0 in a same-process build.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

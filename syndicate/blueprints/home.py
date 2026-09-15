@@ -1499,6 +1499,44 @@ def _home_prop_display_pills(item: dict[str, Any], *, live_total: str | None) ->
     return values
 
 
+def _ncaaf_game_kickoff_slate_date(game: dict[str, Any]) -> str | None:
+    """The CENTRAL calendar day an NCAAF game kicks off, or None when unknown.
+
+    Read through `kickoff_shard_date`, the function the NCAAF quote writer files
+    its shards with, so a prop row's date and its shard's date cannot diverge.
+    Placeholder text ("Kickoff unavailable") parses to None and is NOT defaulted.
+
+    THE BOARD GAMES KEEP IT NESTED. The games `_compact_prop_rows` reads (the ones
+    carrying `shared_prop_rows`) are game-board dicts: the kickoff is top-level
+    `startTime` and `ncaaf_card.scoreboard.kickoff`, NOT a top-level `kickoff`.
+    Measured on production `/ncaaf/api/cards?week=3` 2026-09-15: 13 of 13 prop
+    games, and a first version that read only `kickoff`/`scoreboard.kickoff` dated
+    0 of 102 matched rows. The raw card shape (`ncaaf/cards.py` top-level
+    `kickoff`) is kept as a fallback.
+    """
+    from syndicate.features.shared.odds_book_quotes import kickoff_shard_date
+
+    def _nested(*keys: str) -> Any:
+        node: Any = game
+        for key in keys:
+            if not isinstance(node, dict):
+                return None
+            node = node.get(key)
+        return node
+
+    for value in (
+        game.get("startTime"),
+        game.get("kickoff"),
+        _nested("scoreboard", "kickoff"),
+        _nested("ncaaf_card", "scoreboard", "kickoff"),
+        _nested("ncaaf_card", "scoreboard_header", "kickoff"),
+    ):
+        resolved = kickoff_shard_date({"commence_time": value})
+        if resolved:
+            return resolved
+    return None
+
+
 def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str, context_label: str | None = None, home_games: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     # #222 step 2: measure the identity gap BEFORE this function coerces it away.
     # Recorded on the way IN, so the numbers describe what producers actually
@@ -1565,6 +1603,20 @@ def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str, context_l
             # that already carries its own accurate date is left alone.
             if not item.get("commence_time") and matched_game.get("scheduled_start_utc"):
                 item["commence_time"] = matched_game.get("scheduled_start_utc")
+            # NCAAF props carry no date of their own (`_compact_prop_rows` sets
+            # none) and NCAAF game dicts hold their start under `kickoff`, not
+            # `scheduled_start_utc`, so the fill above never fires for them and
+            # `quote_enrichment._row_slate_date` fell back to the WORKER'S today.
+            # Measured 2026-09-15: 102/102 replayed rows, a shard that did not
+            # exist, `with_quote=0` on all 104 production rows (lane
+            # quote-shard-date-fallback-prod). `slate_date`, not `commence_time`:
+            # `_row_slate_date` slices `commence_time[:10]`, the UTC date, while the
+            # quote shard is keyed by CENTRAL kickoff date, so every evening kickoff
+            # would join the next day's shard. Same setdefault rule as above.
+            if slug == "ncaaf" and not item.get("slate_date"):
+                kickoff_slate_date = _ncaaf_game_kickoff_slate_date(matched_game)
+                if kickoff_slate_date:
+                    item["slate_date"] = kickoff_slate_date
         away_logo = str(item.get("away_logo") or item.get("team_logo_url") or "").strip() or None
         home_logo = str(item.get("home_logo") or item.get("opponent_logo_url") or "").strip() or None
         if isinstance(matched_game, dict):
@@ -3179,6 +3231,11 @@ def _build_prop_dashboard_row(sport: dict[str, Any], item: dict[str, Any], *, de
         # through to the fallback. The upstream fix was correct and
         # necessary but not sufficient without this.
         "commence_time": item.get("commence_time"),
+        # The Central slate date where the producer set one (NCAAF props, from the
+        # game's kickoff in `_finalize_home_prop_rows`). Dropped by this rebuild it
+        # would never reach `quote_enrichment._row_slate_date`, which reads it
+        # before `commence_time`. `or None`: absent stays absent.
+        "slate_date": _safe_text(item.get("slate_date"), "") or None,
         "sport": _safe_text(sport.get("name"), str(sport.get("slug") or "").upper()),
         "sport_slug": _safe_text(sport.get("slug"), "sport").lower(),
         "surface": heading,
