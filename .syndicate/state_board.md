@@ -923,13 +923,20 @@ and adds risk:
   `STATE_ARTIFACT_FALLBACK_REFUSED` on refresh-worker or web over the 24 h to
   14:41Z 2026-09-15. Snapshots fit keyvalue since compression (`/api/ops/board-snapshot/inspect`
   14:40:39Z: 09-15, 98 recommendations, generated 14:37:55Z).
-- **Web's disk holds STALE state files:** `reports/intelligence/intelligence_state.json`,
-  25,784,744 bytes, stamped 2026-08-10T01:38:16Z (for 08-09), read via
-  `/api/ops/artifacts/export` 14:39:50Z. Nothing reads it today
-  (`read_intelligence_state()` has no callers; 0 `STATE_READ_FROM_ARTIFACT` on web
-  12:00-14:40Z). But `_read_state_payload` returns a disk copy whenever keyvalue has
-  none, and the snapshot fallback loop globs disk, so routing would have let a
-  month-old file be served.
+- **Web's disk HELD a stale state file, now renamed out of the read path.**
+  - `reports/intelligence/intelligence_state.json`, 25,784,744 bytes, stamped
+    2026-08-10T01:38:16Z (for 08-09); last read via `/api/ops/artifacts/export`
+    17:18:50Z 2026-09-15.
+  - Nothing read it (`read_intelligence_state()` has no callers; 0 disk-copy state
+    reads on web 12:00-17:18Z). But `_read_state_payload` returns a disk copy
+    whenever keyvalue has none, and the snapshot fallback loop globs disk, so
+    routing the snapshot readers would have let a month-old file be served.
+  - **The user renamed it in the Render web Shell to
+    `intelligence_state.json.stale-2026-08-10`** (a rename, not a delete, so it can
+    be put back).
+  - Verified 17:23:13Z: the export reads the original path as absent (count 0). The
+    renamed name is not exportable (HTTP 403), so its presence rests on the
+    user's `mv`.
 - **If an oversized snapshot ever returns, the fix is allowlist + disk-aware read +
   a max-age refusal on disk copies, TOGETHER**, and it needs a web + refresh-worker
   deploy. Not before.
