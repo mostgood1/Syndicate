@@ -967,6 +967,14 @@ death, never life — do not invert it.
 - Verification:
   - (1) A unit test through the real `combined_board_window` merge, with a legacy non-live row plus a restated live L2-A card for the same NFL prop, asserts the served card is `is_live True`, `market_state live`, lane opportunity after `annotate`. It fails on HEAD and passes with the fix.
   - (2) Production, next live NFL game: page query DEN-style rows `is_live True` / `board_lane opportunity` count > 0 while the Layer 2 API shows live props.
+- **RESULT ~02:08Z: H1 CONFIRMED offline, fix written, NOT deployed (web serves `/api/intelligence/query`).**
+  - `tests/test_board_live_restate_merge.py` drives the REAL `read_combined_intelligence_response`: a pre-kickoff state row, the same prop as an L2-A card read through the real `_layer2_fallback_recommendations`, and a live chip. On HEAD it reproduced production exactly: served `is_live None`, and after `annotate` `watchlist / unknown / no_game_state`.
+  - Fix in `pipeline/intelligence_state.py`:
+    - (a) `read_combined_intelligence_response` restates the per-date STATE rows against the same scoreboard before the first contract build (`attach_actual=False`; logs `COMBINED_STATE_LIVE_RESTATED` / `_FAILED`).
+    - (b) `_refresh_layer2_live_state` gains `attach_actual` (default True, unchanged) and fills `status_context` = `live`/`final` only when a matched row has NO state text. That is needed because `game_state_of` resolves empty text to `pregame` before `is_live`: the restated row passed `no_game_state` but was still gated on pregame rules and labelled `market_state: pregame`.
+  - Tests: new 3/3 pass on the edit, and the 2 live tests FAIL on HEAD. The related suites (chip join, L2-A fallback, vintage gating, freshness, pool-cache log, opportunity gate) pass 67.
+  - 2 chip-join failures (`test_it_still_joins_when_NEITHER_side_publishes_a_key`, `test_a_final_chip_still_reaches_final`, `assert 0 == 1`) fail identically on HEAD. Pre-existing, not this change, not taken here.
+  - Owed: a web deploy (user decision), then verify (2) on the next live NFL game.
 - Files: tests/test_board_live_restate_merge.py (NEW). The intelligence-state module edits run under lane heavy-build-memory-refusal's existing claim (same session). If the fix lands in the board dedupe module instead, that claim is taken here first.
 
 ### heavy-build-child-process — OPEN — opened 2026-09-14 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8

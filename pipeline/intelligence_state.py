@@ -1787,7 +1787,12 @@ def _layer2_fallback_recommendations(
     return cards
 
 
-def _refresh_layer2_live_state(cards: list[dict[str, Any]], requested_dates: Sequence[str]) -> int:
+def _refresh_layer2_live_state(
+    cards: list[dict[str, Any]],
+    requested_dates: Sequence[str],
+    *,
+    attach_actual: bool = True,
+) -> int:
     """Re-state L2-A cards against the CURRENT scoreboard (`#367`).
 
     `is_live`, `lane` and `market_state` are stamped when the worker writes the
@@ -1913,17 +1918,33 @@ def _refresh_layer2_live_state(cards: list[dict[str, Any]], requested_dates: Seq
         if not chip:
             continue
         state = str(chip.get("state") or "").strip().lower()
+        # The re-gate (`opportunity_gate.annotate`) reads state TEXT before
+        # `is_live`, and `game_state_of` resolves empty text to `pregame`, so a
+        # restated row with no text was gated on pregame rules and labelled
+        # `market_state: pregame` (nfl-live-props-board-lane). Fill the text only
+        # when the row carries none; richer text a sport already set is kept.
+        has_state_text = bool(
+            str(card.get("game_state") or card.get("status_display") or card.get("status_context") or "").strip()
+        )
         if state == "live":
             card["is_live"] = True
             card["lane"] = "live"
             card["market_state"] = "live"
+            if not has_state_text:
+                card["status_context"] = "live"
             restated += 1
         elif state in {"final", "post", "completed"}:
             card["is_live"] = False
             card["lane"] = "final"
             card["market_state"] = "final"
+            if not has_state_text:
+                card["status_context"] = "final"
             restated += 1
-        _attach_layer2_live_actual(card, chip)
+        # `attach_actual=False` is the combined board restating its STATE rows
+        # (nfl-live-props-board-lane): state fields only. Deriving `actual` marks
+        # rows `decided`, and pruning decided rows stays the L2-A fallback path's job.
+        if attach_actual:
+            _attach_layer2_live_actual(card, chip)
     return restated
 
 
@@ -9170,6 +9191,37 @@ def read_combined_intelligence_response(
     # normaliser owns ranking, dedupe and the card contract, so L2-A rows are
     # translated to fit the board rather than the board rewritten to fit L2-A.
     # That is what preserves the existing formatting.
+    # nfl-live-props-board-lane (2026-09-15). RESTATE THE STATE ROWS TOO, BEFORE
+    # THE FIRST CONTRACT BUILD.
+    #
+    # State rows are appended above and the L2-A fallback cards below them, and
+    # `dedupe_recommendation_items` keeps the FIRST copy of a pick. So a state
+    # row written before kickoff -- never restated, because only the fallback
+    # cards ran through `_refresh_layer2_live_state` -- shadowed the
+    # live-restated card for the same prop, and the serve-time re-gate demoted
+    # the survivor (`no_game_state` -> watchlist), which the page's default
+    # Opportunity lane hides.
+    #
+    # Measured 2026-09-15 ~01:50Z with DEN @ KC live: the Layer 2 API served 113
+    # live NFL props; this board served the game's 25 props as watchlist /
+    # unknown, and restated 0 NFL cards live (MLB 209, whose state rows already
+    # carried live state).
+    #
+    # Same scoreboard, same join; state fields only (`attach_actual=False`).
+    # Never raises: a scoreboard blip must leave the board stale, not empty.
+    if merged_recommendations:
+        try:
+            _state_rows_restated = _refresh_layer2_live_state(
+                merged_recommendations, requested_dates, attach_actual=False
+            )
+            if _state_rows_restated:
+                print(
+                    f"[intelligence_state] COMBINED_STATE_LIVE_RESTATED rows={_state_rows_restated} "
+                    f"of {len(merged_recommendations)}",
+                    flush=True,
+                )
+        except Exception as exc:  # noqa: BLE001
+            print(f"[intelligence_state] COMBINED_STATE_LIVE_RESTATE_FAILED {type(exc).__name__}: {exc}", flush=True)
     layer2_fallback_used = 0
     contract_input = {"recommendations": merged_recommendations}
     board_contract = build_intelligence_board_contract(contract_input)
