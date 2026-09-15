@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 998 rules `[generated]`
+## Index — 1022 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -6151,3 +6151,24 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - A held-out fit validates a correction only for the population and method it was fitted on. Re-measure when the season, and the squads, turn over.
 - **Cost:** a standing shipping recommendation that would have cut starters' shot probabilities further. Caught before any engine change.
   - *(evidence: `findings_2026-09-15_soccer_season_market_audit.md` "Player props"; `state_soccer.md [soccer-season-market-audit]`; `log/2026-09-15.md` session abacd435)*
+
+## 2026-09-15 — OVERTURNED: "a FotMob league id verified against name AND country is a stable join key" — it identified ONE SEASON of the competition, and a same-day decoy check cannot see that `[lane fotmob-season-scoped-league-ids]`
+
+- **What was believed (2026-08-22):** the league ids in `fotmob_match_id.py` and `soccer_fotmob_harvest_2y.py` were "verified against ccode", so they were safe to pin as the join key.
+- **What happened:**
+  - FotMob's league `id` is SEASON-SCOPED for 4 of the 10 leagues:
+    - Eredivisie 892939 -> 900368 -> 937276
+    - Championship 893033 -> 900638 -> 938218
+    - Belgian 892857 -> 900433 -> 937988
+    - MLS 889747 -> 896669 -> 913550
+  - The competition itself is `primaryId` (57/48/40/130).
+  - From the 2026-27 season on, every live Championship, Eredivisie and Belgian match hid its momentum panel (9 of 9 None on 09-12). Nothing errored.
+  - The 2y harvest walked 2024-08..2026-08 with the 2025-26 ids, so it kept ONE season for those four leagues. It was described as two seasons across ten leagues.
+- **Why the check missed it:**
+  - The verification was a same-day decoy test (Canada 9986, Brazil 268). That proves a key is unambiguous on the day it is read. It says nothing about whether the key is the same next season.
+  - The six leagues that never broke have `id == primaryId`, so most of the population looked healthy.
+- **How to apply:**
+  - A pinned external id needs a CROSS-TIME check as well as a same-day one. Read the vendor's listing on a date from a previous season and confirm the id resolves there too.
+  - Prefer the vendor's canonical id (`primaryId`, `parentLeagueId`) when the payload carries one.
+  - A dataset described as "N seasons over K groups" must print its coverage per (group, season). A narrow key truncates it silently.
+- *(evidence: `deploys.md` 2026-09-15 18:08:50Z entry; commit `c725cc29`; `state_soccer.md` `[soccer-live-momentum]`)*

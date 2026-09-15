@@ -2094,7 +2094,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### fotmob-season-scoped-league-ids — CLOSED 2026-09-15 — opened 2026-09-15 — session da346015-cd58-450a-a9e0-bba6bdb00403 — **GOAL: MET: FotMob league matching is season-proof (primaryId + country), deployed to live-odds-worker `c725cc29`, verified on a LIVE Eredivisie match 18:18:47Z**
-- **VERDICT.** Goal: Championship/Eredivisie/Belgian fixtures resolve in 2026-27, the harvest classifies the same way, deployed and verified on a LIVE match. — **GOAL: MET.**
+- **VERDICT.** Goal (verbatim): "FotMob league matching is season-proof. `resolve_fotmob_match_id` resolves Championship, Eredivisie and Belgian Pro League fixtures in 2026-27 (it returned None for 9 of 9 on 2026-09-12), and the 2y harvest script classifies leagues the same way. Deployed to live-odds-worker and verified on a LIVE match." — **GOAL: MET.** Reading: eredivisie `live_state_2026-09-15.json` generated 18:17:24Z (after the 18:15:16Z go-live), Ajax v Willem II 16' `momentum.supported True`, `source fotmob`, `fotmob_match_id 5781718`.
   - Code: `c725cc29` on main. Resolver matches country AND FotMob `primaryId` (exact-name allowlist only for a row without one). `_norm` folds accents. Harvest script + `fotmob_league_ids.json` use the same predicate, and the script refuses to run on drift.
   - Tests: the recorded-listing (09-13) resolve cases gave 5 failed / 21 passed on the old ids. After the change, 59 passed across the fotmob + soccer live-state suites.
   - Vendor, real code, ESPN names (09-12 + 09-15): Championship 12/12 and Eredivisie 5/5 (both 0 before), Belgian 2/4, EPL 7/7, LaLiga 7/7, MLS 11/12. Harvest smoke for 09-13: 35/35 matches, 10 of 10 leagues.

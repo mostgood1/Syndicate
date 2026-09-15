@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 998 rules `[generated]`
+## Index — 1022 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 399**
+**FORBIDDEN — 402**
 
 - [2026-09-06 — FORBIDDEN: instrumenting join A, reading it, and concluding about a value…](#2026-09-06-forbidden-instrumenting-join-a-reading-it-and-concluding-about-a-value-written-by-join-b-name-the-writer-of-the-field-in-the-falsification-test-itself-lane-mlb-first5-kalshi-fanin-mismatch-vs-15410ca7)
 - [2026-09-06 — FORBIDDEN: concluding a guard covers a symptom because the guard is deploy…](#2026-09-06-forbidden-concluding-a-guard-covers-a-symptom-because-the-guard-is-deployed-firing-and-named-after-it-find-the-code-that-wrote-the-field-you-are-looking-at-lane-mlb-first5-kalshi-fanin-mismatch)
@@ -219,6 +219,9 @@
 - [2026-09-13 FORBIDDEN: using the wall time between two log lines as the COST of the code…](#2026-09-13-forbidden-using-the-wall-time-between-two-log-lines-as-the-cost-of-the-code-between-them-when-another-thread-shares-the-gil-and-a-preflight-clear-on-a-slate-night-may-be-a-post-kill-restart-not-a-quiet-worker-lane-live-odds-worker-oom-loop)
 - [2026-09-13 FORBIDDEN: grading "still there N minutes later" from a poller without check…](#2026-09-13-forbidden-grading-still-there-n-minutes-later-from-a-poller-without-checking-that-the-later-poll-read-a-newer-build-lane-layer2-live-scorecard-gate)
 - [2026-09-13 FORBIDDEN: gating a ledger commit on a PowerShell function's return value wi…](#2026-09-13-forbidden-gating-a-ledger-commit-on-a-powershell-functions-return-value-without-at-the-call-site-a-single-match-unrolls-to-a-bare-string-so-count-reads-1-and-0-is-its-first-character-lane-live-odds-worker-oom-loop)
+- [2026-09-15 — FORBIDDEN: reading a READER's zero as the WRITER's absence — `by_date` 0 w…](#2026-09-15-forbidden-reading-a-readers-zero-as-the-writers-absence-by_date-0-was-a-dated-state-the-reader-could-not-parse-and-the-line-quoted-as-proof-said-so-lane-combined-board-state-rows-lost)
+- [2026-09-15 — FORBIDDEN: carrying a deploy's predicted effect on a time-varying field fr…](#2026-09-15-forbidden-carrying-a-deploys-predicted-effect-on-a-time-varying-field-from-a-reading-taken-hours-earlier-re-derive-it-at-preflight-and-baseline-every-field-it-names-plus-the-served-row-count-lane-combined-board-state-rows-lost)
+- [2026-09-15 — FORBIDDEN: caching a verdict whose validity depends on the date's relation…](#2026-09-15-forbidden-caching-a-verdict-whose-validity-depends-on-the-dates-relation-to-today-under-a-key-that-is-only-the-date-at-midnight-tomorrow-becomes-today-and-the-verdict-outlives-its-premise-lane-wnba-future-date-cache-carry)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -419,7 +422,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](learnings_evidence.md#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated) `[evidence]`
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 
-**Rules and corrections — 593**
+**Rules and corrections — 614**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -552,6 +555,27 @@
 - [2026-09-13 An approval covers a SHIP LIST, not "main": when main moves between the answ…](#2026-09-13-an-approval-covers-a-ship-list-not-main-when-main-moves-between-the-answer-and-the-deploy-re-ask-or-deploy-the-approved-sha-lane-layer2-live-scorecard-gate)
 - [2026-09-13 — RECURRENCE (the 2026-09-11 REQUIRED rule that a claim transfer is not in f…](#2026-09-13-recurrence-the-2026-09-11-required-rule-that-a-claim-transfer-is-not-in-force-until-the-primary-lanesmd-says-so-i-released-a-claim-in-my-worktree-read-it-back-as-free-and-both-code-edits-were-blocked-lane-layer2-prior-date-live-carryover)
 - [2026-09-13 — OVERTURNED: the Layer 2 fast path is NOT a 14-27 s stage. It measured 133-…](#2026-09-13-overturned-the-layer-2-fast-path-is-not-a-14-27-s-stage-it-measured-133-182-s-per-build-on-refresh-worker-and-the-docstring-figure-had-sized-my-plan-lane-layer2-prior-date-live-carryover)
+- [2026-09-13 — OVERTURNED: "a 304 from /api/ops/artifacts/stream means refresh-worker's c…](#2026-09-13-overturned-a-304-from-apiopsartifactsstream-means-refresh-workers-copy-is-current-is-false-for-append-only-tails-and-odds_sweep_launched-means-the-sweep-ran-is-false-together-they-took-nfl-off-the-sunday-board-lane-refresh-worker-disk-inventory)
+- [2026-09-13 — OVERTURNED: "gzip magic + a trailer ISIZE bigger than the compressed size…](#2026-09-13-overturned-gzip-magic-a-trailer-isize-bigger-than-the-compressed-size-proves-a-gz-is-complete-is-false-lane-book-quotes-prefer-fuller-copy)
+- [2026-09-13 — OVERTURNED: "the OddsAPI live endpoint can only ever serve upcoming events…](#2026-09-13-overturned-the-oddsapi-live-endpoint-can-only-ever-serve-upcoming-events-is-false-and-a-fetcher-filtered-on-it-for-a-whole-season-lane-nfl-live-props-missing)
+- [2026-09-13 — OVERTURNED: "the fast path keeps the board fresh, so nothing is lost when…](#2026-09-13-overturned-the-fast-path-keeps-the-board-fresh-so-nothing-is-lost-when-the-heavy-build-is-refused-lane-kalshi-nfl-quote-gap)
+- [2026-09-13 — OVERTURNED: "a served board showing the rows = the fix is verified" — ONE…](#2026-09-13-overturned-a-served-board-showing-the-rows-the-fix-is-verified-one-build-is-a-sample-of-a-process-that-flaps-lanes-nfl-live-props-missing-quote-state-publish-retry)
+- [2026-09-14 — OVERTURNED: "the 1,900 MB heavy-build floor is stale" AND "refresh-worker'…](#2026-09-14-overturned-the-1900-mb-heavy-build-floor-is-stale-and-refresh-workers-memory-ratchets-slowly-until-the-build-is-refused-both-are-false-the-main-process-steps-up-once-after-its-first-full-build-and-holds-it-lane-heavy-build-memory-refusal)
+- [2026-09-14 — OVERTURNED: "a capped `games_with_outcome` is a finals-side loss" — and, t…](#2026-09-14-overturned-a-capped-games_with_outcome-is-a-finals-side-loss-and-twice-in-the-same-diagnosis-the-producer-failed-no-lane)
+- [2026-09-14 — OVERTURNED: "PUBLISH_FAILED rose 0 -> 9 after the refresh-worker deploy" —…](#2026-09-14-overturned-publish_failed-rose-0---9-after-the-refresh-worker-deploy-the-baseline-hour-sat-inside-the-defect-window-lane-heavy-build-memory-refusal)
+- [2026-09-14 — OVERTURNED: "my commit gate checked the deleted lines". It passed on an EM…](#2026-09-14-overturned-my-commit-gate-checked-the-deleted-lines-it-passed-on-an-empty-set-and-a--nonewline-patch-export-then-destroyed-the-edits-it-was-protecting-lane-book-grid-gameline-ledger-log)
+- [2026-09-14 — OVERTURNED: "only a restart clears a heavy-build refusal stretch" — and a…](#2026-09-14-overturned-only-a-restart-clears-a-heavy-build-refusal-stretch-and-a-safety-threshold-chosen-without-that-data-cost-11-h-of-builds-in-45-h-lane-heavy-build-memory-refusal)
+- [2026-09-14 — OVERTURNED: "CANDIDATE_POOL_CACHE limit= reports the real cap" — the test…](#2026-09-14-overturned-candidate_pool_cache-limit-reports-the-real-cap-the-test-pinning-it-compared-two-values-that-are-equal-by-default-lane-heavy-build-child-process)
+- [2026-09-14 — OVERTURNED: "the 09-15 board is a post-deploy population because its date…](#2026-09-14-overturned-the-09-15-board-is-a-post-deploy-population-because-its-date-begins-after-the-deploy-a-per-day-first-sighting-ledger-is-written-by-builds-that-ran-before-its-date-lane-accuracy-assessment-0914)
+- [2026-09-14 — OVERTURNED: "I can write the time from how long things usually take" — two…](#2026-09-14-overturned-i-can-write-the-time-from-how-long-things-usually-take-two-ledger-times-this-session-were-written-from-expectation-and-both-were-wrong-lane-accuracy-assessment-0914)
+- [2026-09-14 — OVERTURNED: "a layout fit measured on the worktree app predicts production…](#2026-09-14-overturned-a-layout-fit-measured-on-the-worktree-app-predicts-production-the-same-commit-at-the-same-viewport-put-the-header-lettering-on-screen-locally-and-off-screen-in-production-lane-brand-logo-v3)
+- [2026-09-15 — OVERTURNED: "H1 test-confirmed" — the test stubbed the one input productio…](#2026-09-15-overturned-h1-test-confirmed-the-test-stubbed-the-one-input-production-lacked-so-it-confirmed-a-mechanism-that-was-not-the-cause-lane-nfl-live-props-board-lane)
+- [2026-09-15 — OVERTURNED: "the board-snapshot readers miss the writer's disk fallback, s…](#2026-09-15-overturned-the-board-snapshot-readers-miss-the-writers-disk-fallback-so-route-them-through-_read_state_payload-the-fallback-cannot-reach-web-at-all-and-routing-would-have-handed-them-month-old-disk-files-lane-state-read-expand-choke-point)
+- [2026-09-15 — OVERTURNED: "the stored count will equal the rows read" — the writer caps…](#2026-09-15-overturned-the-stored-count-will-equal-the-rows-read-the-writer-caps-each-by_sport-list-per-sport-so-an-instrument-pairing-two-counts-differed-by-design-on-its-first-reading-lane-combined-board-rows-unreadable-tripwire)
+- [2026-09-15 — OVERTURNED: "a `cd` at the top of a Bash call scopes that call" — parallel…](#2026-09-15-overturned-a-cd-at-the-top-of-a-bash-call-scopes-that-call-parallel-bash-calls-share-one-shell-and-a-siblings-cd-ran-git-rebase-in-the-primary-tree-twice-lanes-state-read-expand-choke-point-combined-board-rows-unreadable-tripwire)
+- [2026-09-15 — OVERTURNED: "a deploy the guard let through was a deploy the guard checked…](#2026-09-15-overturned-a-deploy-the-guard-let-through-was-a-deploy-the-guard-checked-two-web-deploys-passed-deploy-guardpy-because-it-never-classified-them-as-deploys-lane-deploy-guard-python-post)
+- [2026-09-15 — OVERTURNED: "soccer shots props over-predict by 40%; ship a 1.33 divisor".…](#2026-09-15-overturned-soccer-shots-props-over-predict-by-40-ship-a-133-divisor-a-per-row-skill-score-keyed-on-a-prediction-list-cannot-see-what-the-list-is-missing-and-it-read-a-stale-squad-as-a-level-error-lane-soccer-season-market-audit)
+- [2026-09-15 — OVERTURNED: "a FotMob league id verified against name AND country is a sta…](#2026-09-15-overturned-a-fotmob-league-id-verified-against-name-and-country-is-a-stable-join-key-it-identified-one-season-of-the-competition-and-a-same-day-decoy-check-cannot-see-that-lane-fotmob-season-scoped-league-ids)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
