@@ -22,6 +22,7 @@ from __future__ import annotations
 from typing import Any
 
 from syndicate.features.soccer.ingestion.espn_lineups import extract_match_player_rows
+from syndicate.features.soccer.ingestion.espn_match_events import counts_toward_score
 from syndicate.features.soccer.ingestion.espn_match_events import extract_key_events
 from syndicate.features.soccer.ingestion.espn_shot_events import extract_shot_events
 
@@ -120,12 +121,17 @@ def build_live_state(
     else:
         cutoff = 2.0 * half_seconds
 
-    # ESPN uses distinct type keys for goal variants ("goal", "goal---volley",
-    # "goal---header", ...) -- match the prefix, not an exact string, or
-    # non-plain goals silently drop from the count. "own-goal" doesn't share
-    # this prefix, so it's correctly excluded here.
-    home_goals = sum(1 for e in key_events if e["type"].startswith("goal") and e["team"] == home_team)
-    away_goals = sum(1 for e in key_events if e["type"].startswith("goal") and e["team"] == away_team)
+    # THE TEAM SCORE IS EVERY NON-SHOOTOUT SCORING PLAY, for the team ESPN tags.
+    #
+    # This counted `type.startswith("goal")` and its comment said "own-goal ...
+    # is correctly excluded here". That is right for a PLAYER's tally and wrong
+    # for the scoreboard, and the prefix also missed every `penalty---scored`.
+    # Measured 2026-09-15 over 95 finished matches: that rule reproduced ESPN's
+    # final score on 68, `counts_toward_score` on 95. Live the same evening,
+    # Real Madrid at Elche read 1-0 against ESPN's 2-0 (a 25' own goal), and the
+    # live projection resumes from this number.
+    home_goals = sum(1 for e in key_events if counts_toward_score(e) and e["team"] == home_team)
+    away_goals = sum(1 for e in key_events if counts_toward_score(e) and e["team"] == away_team)
     home_red_cards = sum(1 for e in key_events if "red" in e["type"] and e["team"] == home_team)
     away_red_cards = sum(1 for e in key_events if "red" in e["type"] and e["team"] == away_team)
 

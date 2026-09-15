@@ -37,6 +37,7 @@ from typing import Any
 from syndicate.features.soccer.ingestion.espn_lineups import extract_match_player_rows
 from syndicate.features.soccer.ingestion.espn_match_events import (
     compute_minutes_played,
+    counts_toward_score,
     extract_key_events,
 )
 
@@ -130,18 +131,19 @@ def extract_team_box(summary: dict[str, Any]) -> dict[str, Any]:
 def extract_goals(summary: dict[str, Any]) -> list[dict[str, Any]]:
     """Goals in chronological order, with scorer and minute.
 
-    Matches ``build_live_state``'s own goal rule -- ESPN uses distinct type
-    keys per goal variant (``goal``, ``goal---header``, ``goal---volley``),
-    so this matches the PREFIX. ``own-goal`` does not share that prefix and
-    is picked up separately, because a card that silently drops an own goal
-    disagrees with its own scoreline.
+    The SAME rule as ``build_live_state``'s score: ``counts_toward_score``,
+    every non-shootout scoring play for the team ESPN tags. This kept own
+    goals already ("a card that silently drops an own goal disagrees with its
+    own scoreline") but matched the ``goal`` prefix for the rest, so every
+    ``penalty---scored`` -- 23 of 293 scoring plays over 95 finished matches,
+    measured 2026-09-15 -- was missing from the list its own score counted.
     """
     goals: list[dict[str, Any]] = []
     for event in extract_key_events(summary):
         event_type = str(event.get("type") or "")
-        is_own_goal = event_type.startswith("own-goal")
-        if not event_type.startswith("goal") and not is_own_goal:
+        if not counts_toward_score(event):
             continue
+        is_own_goal = event_type.startswith("own-goal")
         participants = event.get("participants") or []
         scorer = next(
             (str(p.get("athlete_name")) for p in participants if p.get("athlete_name")),
@@ -156,6 +158,7 @@ def extract_goals(summary: dict[str, Any]) -> list[dict[str, Any]]:
                 "clock": event.get("clock_display"),
                 "clock_seconds": event.get("clock_seconds"),
                 "own_goal": is_own_goal,
+                "penalty": event_type.startswith("penalty"),
             }
         )
     goals.sort(key=lambda goal: goal.get("clock_seconds") or 0.0)

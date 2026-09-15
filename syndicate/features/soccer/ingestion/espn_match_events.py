@@ -41,6 +41,7 @@ def extract_key_events(summary: dict[str, Any]) -> list[dict[str, Any]]:
             }
             for p in raw.get("participants") or []
         ]
+        scoring_play = raw.get("scoringPlay")
         events.append(
             {
                 "type": str(event_type.get("type") or "").lower(),
@@ -50,9 +51,46 @@ def extract_key_events(summary: dict[str, Any]) -> list[dict[str, Any]]:
                 "clock_display": clock.get("displayValue"),
                 "team": (raw.get("team") or {}).get("displayName"),
                 "participants": participants,
+                # ESPN's own verdicts, carried rather than re-derived from the
+                # type key -- see `counts_toward_score`. `None` when the feed
+                # omits the flag, so a consumer can tell "not scoring" from
+                # "not stated".
+                "scoring_play": bool(scoring_play) if scoring_play is not None else None,
+                "shootout": bool(raw.get("shootout")),
             }
         )
     return events
+
+
+# Every type ESPN flagged `scoringPlay` over 95 finished matches (ten leagues,
+# 2026-09-12..14). Only the fallback when a feed omits the flag.
+_SCORING_TYPE_PREFIXES = ("goal", "penalty---scored", "own-goal")
+
+
+def counts_toward_score(event: dict[str, Any]) -> bool:
+    """Whether a normalized key event moves the SCORE, for the team ESPN tags.
+
+    THE RULE THIS REPLACES DROPPED ONE GOAL IN EVERY FOUR MATCHES. Callers
+    counted `type.startswith("goal")`, which misses every `penalty---scored`
+    and every `own-goal`. Measured 2026-09-15 over every finished match in the
+    ten tracked leagues on 09-12/13/14 (n=95): that rule reproduced ESPN's final
+    score on 68; "every non-shootout `scoringPlay` for the tagged team" on 95.
+
+    THE TAGGED TEAM IS RIGHT FOR AN OWN GOAL. ESPN files it under the team it
+    counts FOR (crediting the tagged team matched the final in 6 of 7 own-goal
+    matches, the other team in 0; the 7th failed only on its dropped penalty).
+
+    A SHOOTOUT KICK IS A SCORING PLAY AND NEVER MOVES THE SCORE.
+
+    This is the TEAM score. A player's goal or shot tally is a different
+    question -- an own goal is nobody's shot -- and `espn_shot_events` answers it.
+    """
+    if event.get("shootout"):
+        return False
+    flag = event.get("scoring_play")
+    if flag is not None:
+        return bool(flag)
+    return str(event.get("type") or "").startswith(_SCORING_TYPE_PREFIXES)
 
 
 def compute_minutes_played(

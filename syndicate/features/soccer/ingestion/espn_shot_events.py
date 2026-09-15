@@ -55,12 +55,23 @@ def _classify_location(text: str) -> str:
     return "unknown"
 
 
-def _classify_outcome(type_key: str) -> str:
+def _is_goal_by_the_shooter(type_key: str) -> bool:
     # ESPN uses distinct type keys for goal variants ("goal", "goal---volley",
     # "goal---header", ...) -- match the prefix, or non-plain goals silently
     # fall through to "unknown" and vanish from conversion-rate measurement.
-    # "own-goal" doesn't share this prefix, so it's correctly excluded.
-    if type_key.startswith("goal"):
+    # "own-goal" doesn't share this prefix, so it's correctly excluded: it is
+    # nobody's shot.
+    #
+    # A CONVERTED PENALTY IS THE TAKER'S GOAL, and its key is NOT goal-prefixed.
+    # Commentary files it as `penalty---scored` ("Goal! ... converts the
+    # penalty"), measured on por.1 401885443 2026-09-15; it made up 23 of 293
+    # scoring plays over 95 finished matches. Without this, every penalty
+    # taker's live shots and goals came up one short.
+    return type_key.startswith("goal") or type_key.startswith("penalty---scored")
+
+
+def _classify_outcome(type_key: str) -> str:
+    if _is_goal_by_the_shooter(type_key):
         return "goal"
     return {
         "shot-on-target": "saved",
@@ -76,7 +87,7 @@ def extract_shot_events(summary: dict[str, Any], *, event_id: str) -> list[dict[
     for entry in commentary:
         play = entry.get("play") or {}
         type_key = str((play.get("type") or {}).get("type") or "").lower()
-        if type_key not in _NON_GOAL_SHOT_TYPES and not type_key.startswith("goal"):
+        if type_key not in _NON_GOAL_SHOT_TYPES and not _is_goal_by_the_shooter(type_key):
             continue
         text = str(play.get("text") or "")
         clock = play.get("clock") or {}
