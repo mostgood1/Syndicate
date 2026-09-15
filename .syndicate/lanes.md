@@ -1610,7 +1610,12 @@ death, never life — do not invert it.
   - Deploy plan: live-odds-worker (the soccer/wnba/nba steam writer, in `refresh_odds_sources` children), then refresh-worker (MLB refresh + board).
     - Sequenced AFTER lane `soccer-player-role-allocation`'s main-tip deploys and post-deploy reading. live-odds-worker `8c089e8c` was building at 21:33Z without this fix.
     - Main's A/B commits are that lane's own approved deploy, so a main-tip deploy after it carries no unapproved ride-along. Re-check the range at preflight.
-- Blocked by: sequencing only. Wait for `soccer-player-role-allocation` to finish its worker deploys and reading, then deploy main to live-odds-worker and read `/api/ops/steam/events` after the next soccer refresh.
+- Blocked by: the live-odds-worker deploy queue `[2026-09-15 ~21:55Z]`:
+  - 1. Lane `soccer-live-scoreboard-range-stale` holds the claim for `2d579fd1` (on main, predates `ca80edf0`). Its preflight is HOLD on an in-flight `refresh_odds_sources` job; it retries until 22:25Z. Its functional verify needs a live match, and a later deploy of main carries its `e115cd6b`, so it does not block us after it is live.
+  - 2. Lane `book-quotes-splice-repair` is queued to set `SYNDICATE_POLYMARKET_PRICE_AT_ASK=1` and redeploy `2d579fd1` as its own deploy (its user's decision). Proposed to it: it goes first, then this lane deploys main tip; the env var persists on the service. Answer pending.
+  - 3. This lane: deploy main tip (at or after `ca80edf0`) to live-odds-worker, then read `/api/ops/steam/events` after the next soccer refresh.
+  - HAZARD: any redeploy of `2d579fd1` (or anything before `ca80edf0`) AFTER this lane's deploy rolls the fix back. Check the live commit contains `ca80edf0` before taking the after-reading, and again before closing.
+  - refresh-worker (MLB steam + board) follows, after lane `soccer-player-role-allocation` releases its claim (held since ~21:22Z, target `8c089e8c`).
 
 ### ncaaf-prop-quote-market-check — CLOSED — opened 2026-09-15 — closed 2026-09-15 ~15:45 CT — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
 - **VERDICT.** Goal (verbatim): "for the 104 NCAAF legacy prop rows refresh-worker quoted after `f833f7ec` (`intelligence_prop with_quote=104`), state how many carry a quote from the row's OWN market, measured with the real `quote_ref_for_bet` over production quote shards. If they are wrong, describe the production impact and stop before changing behaviour. Read-only diagnostic; no code change without the user's go." — **GOAL: MET. Hypothesis FALSIFIED: 102 of 102 replayed rows get their own market, side and line.**
