@@ -73,6 +73,11 @@ def _over_probabilities(mean: float, lines: tuple[float, ...]) -> dict[str, floa
 _MINUTES_PER_START = 83.1
 _MINUTES_PER_SUB_APPEARANCE = 15.6
 _SUB_SHOT_INTENSITY = 1.8
+#: Substitute scoring intensity per minute, relative to a starter's. Fitted for
+#: GOALS by H17 and separate from the shot constant on purpose: they happen to
+#: share a value today, and tying them would silently move one when the other is
+#: re-fitted.
+_SUB_GOAL_INTENSITY = 1.8
 _START_PRIOR_WEIGHT = 2.0
 
 
@@ -111,6 +116,12 @@ class PlayerUsageProfile:
     # is None, `project_player_props` prices the unconditional ladder.
     start_probability: float | None = None
     on_pitch_shot_share: float | None = None
+    # `on_pitch_goal_share` is the same quantity for GOALS, and it exists for the
+    # same reason: dividing by the minutes share recovers a full-match allocation
+    # only if the player plays full matches. H17 measured the mixture against that
+    # division on held-out dates: pooled log loss 0.2716 -> 0.2673 and the level
+    # 1.14 -> 0.96 (MLS 1.36 -> 1.04), in 9 of 10 leagues.
+    on_pitch_goal_share: float | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -130,6 +141,7 @@ class PlayerUsageProfile:
             "is_goalkeeper": self.is_goalkeeper,
             "start_probability": self.start_probability,
             "on_pitch_shot_share": self.on_pitch_shot_share,
+            "on_pitch_goal_share": self.on_pitch_goal_share,
             "metadata": dict(self.metadata),
         }
 
@@ -277,8 +289,35 @@ def project_player_props(
     # full-match allocation. Floored to avoid inflating fringe players whose
     # tiny samples make the division meaningless.
     conditioning = max(minutes, 0.25)
-    expected_goals_if_playing = expected_goals / conditioning
     expected_assists_if_playing = expected_assists / conditioning
+
+    # GOALS ARE PRICED ON THE SAME START/SUB MIXTURE AS SHOTS whenever the role
+    # inputs exist. The division below cannot be right for a substitute: it asks
+    # what a player would score in a FULL match and then prices it as though he is
+    # certain to play one. H17, held out: pooled log loss 0.2716 -> 0.2673 in 9 of
+    # 10 leagues, and the level 1.14 -> 0.96 -- the over-prediction was the
+    # conditioning, not a scale, which is why H18 (a fitted level constant) was
+    # FALSIFIED at c = 1.05 and no constant ships.
+    #
+    # TWO DELIBERATE DIFFERENCES from the unconditional path, both stated because
+    # they are the kind of thing that otherwise looks like a bug later:
+    #   * the penalty taker's +0.03 stays on the unconditional mean only. The arm
+    #     H17 measured built the mixture from rates alone.
+    #   * ASSISTS keep the old division. H17 measured goals; assists were not
+    #     re-measured, and shipping an unmeasured change beside a measured one is
+    #     how a negative interaction gets attributed to the wrong half.
+    if usage_profile.start_probability is not None and usage_profile.on_pitch_goal_share is not None:
+        full_match_goals = team_goals * _clamp(float(usage_profile.on_pitch_goal_share), 0.0, 1.0)
+        goal_p_start = _clamp(float(usage_profile.start_probability), 0.0, 1.0)
+        goal_components = (
+            (goal_p_start, full_match_goals * _MINUTES_PER_START / 90.0),
+            (1.0 - goal_p_start, _SUB_GOAL_INTENSITY * full_match_goals * _MINUTES_PER_SUB_APPEARANCE / 90.0),
+        )
+        expected_goals_if_playing = sum(weight * mean for weight, mean in goal_components)
+        anytime_if_playing = sum(weight * poisson_at_least(mean, 1) for weight, mean in goal_components)
+    else:
+        expected_goals_if_playing = expected_goals / conditioning
+        anytime_if_playing = poisson_at_least(expected_goals_if_playing, 1)
 
     # SHOTS AND SHOTS ON TARGET are priced CONDITIONAL ON APPEARING whenever
     # `build_usage_profiles` supplied the role inputs: a start/sub mixture at the
@@ -324,7 +363,7 @@ def project_player_props(
         expected_shots_on_target_if_playing=round(expected_shots_on_target_if_playing, 4),
         expected_goals_if_playing=round(expected_goals_if_playing, 4),
         expected_assists_if_playing=round(expected_assists_if_playing, 4),
-        anytime_scorer_probability_if_playing=round(poisson_at_least(expected_goals_if_playing, 1), 4),
+        anytime_scorer_probability_if_playing=round(anytime_if_playing, 4),
     )
 
 
@@ -465,6 +504,12 @@ def build_usage_profiles(
     on_pitch_total = sum(
         _rate(row, ("shots_per90", "shots")) * share for row, share in zip(players, on_pitch_minutes)
     )
+    # The goal equivalent, over the SAME season-scoped on-pitch minutes. Kept off
+    # `goal_share` above, which still allocates the unconditional mean.
+    on_pitch_goal_total = sum(
+        _rate(row, ("xg_per90", "goals_per90", "xg", "goals")) * share
+        for row, share in zip(players, on_pitch_minutes)
+    )
 
     def _start_probability(row: dict[str, Any], key: str, on_pitch_share: float) -> float:
         """P(start | appears). A confirmed lineup decides it outright."""
@@ -508,6 +553,11 @@ def build_usage_profiles(
                 start_probability=_start_probability(row, row_keys[index], on_pitch_minutes[index]),
                 on_pitch_shot_share=(
                     _rate(row, ("shots_per90", "shots")) / on_pitch_total if on_pitch_total > 0 else 0.0
+                ),
+                on_pitch_goal_share=(
+                    _rate(row, ("xg_per90", "goals_per90", "xg", "goals")) / on_pitch_goal_total
+                    if on_pitch_goal_total > 0
+                    else 0.0
                 ),
                 metadata={key: value for key, value in row.items() if key not in {"player_id", "player_name"}},
             )

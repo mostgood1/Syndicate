@@ -226,5 +226,105 @@ class EspnGoalShrinkMechanicsTests(unittest.TestCase):
         self.assertEqual(self.module._PLAYER_LOAD_AUDIT.get("espn_goal_shrink", {}).get("state"), "disabled")
 
 
+class GoalRoleMixtureTests(unittest.TestCase):
+    """H17: goals price on the same start/sub mixture as shots.
+
+    The old path asked what a player would score in a FULL match and then priced it
+    as though he were certain to play one. Held out, the mixture moved pooled log
+    loss 0.2716 -> 0.2673 in 9 of 10 leagues and the level 1.14 -> 0.96.
+    """
+
+    def _distribution(self):
+        from syndicate.features.soccer.sim_engine.soccersim.distribution import MatchDistributionSummary
+
+        return MatchDistributionSummary(
+            simulations=1, home_win_probability=0.4, draw_probability=0.3,
+            away_win_probability=0.3, mean_home_goals=1.4, mean_away_goals=1.1,
+            mean_total=2.5, mean_margin=0.3, over_2_5_probability=0.5,
+            both_teams_scored_probability=0.5, scoreline_probabilities={},
+            mean_home_shots=12.0, mean_away_shots=10.0,
+            mean_home_shots_on_target=4.0, mean_away_shots_on_target=3.0,
+        )
+
+    def _profile(self, **overrides):
+        from syndicate.features.soccer.sim_engine.soccersim.player_props import PlayerUsageProfile
+
+        base = dict(
+            player_id="p1", player_name="Sub Striker", side="home", position="F", team="Wolves",
+            expected_minutes_share=0.35, shot_share=0.12, goal_share=0.15, assist_share=0.05,
+            start_probability=0.6, on_pitch_shot_share=0.14, on_pitch_goal_share=0.25,
+        )
+        base.update(overrides)
+        return PlayerUsageProfile(**base)
+
+    def _project(self, profile):
+        from syndicate.features.soccer.sim_engine.soccersim.player_props import project_player_props
+
+        return project_player_props(self._distribution(), profile)
+
+    def test_role_inputs_change_the_conditional_price(self) -> None:
+        """Reachability: the mixture must actually replace the division."""
+        with_role = self._project(self._profile())
+        without_role = self._project(self._profile(on_pitch_goal_share=None))
+        self.assertNotEqual(
+            with_role.anytime_scorer_probability_if_playing,
+            without_role.anytime_scorer_probability_if_playing,
+            "off == on: the goal mixture is not reached",
+        )
+        self.assertNotEqual(with_role.expected_goals_if_playing, without_role.expected_goals_if_playing)
+
+    def test_mixture_matches_hand_computation(self) -> None:
+        import math
+
+        projection = self._project(self._profile())
+        full = 1.4 * 0.25
+        start_mean = full * 83.1 / 90.0
+        sub_mean = 1.8 * full * 15.6 / 90.0
+        expected_mean = 0.6 * start_mean + 0.4 * sub_mean
+        expected_anytime = 0.6 * (1 - math.exp(-start_mean)) + 0.4 * (1 - math.exp(-sub_mean))
+        self.assertAlmostEqual(projection.expected_goals_if_playing, round(expected_mean, 4), places=4)
+        self.assertAlmostEqual(projection.anytime_scorer_probability_if_playing, round(expected_anytime, 4), places=4)
+
+    def test_unconditional_fields_are_untouched(self) -> None:
+        with_role = self._project(self._profile())
+        without_role = self._project(self._profile(on_pitch_goal_share=None))
+        self.assertEqual(with_role.expected_goals, without_role.expected_goals)
+        self.assertEqual(with_role.anytime_scorer_probability, without_role.anytime_scorer_probability)
+        self.assertEqual(with_role.two_or_more_scorer_probability, without_role.two_or_more_scorer_probability)
+
+    def test_assists_keep_the_old_conditioning(self) -> None:
+        """H17 measured GOALS. Shipping an unmeasured assist change beside it is how
+        a negative interaction gets attributed to the wrong half."""
+        with_role = self._project(self._profile())
+        without_role = self._project(self._profile(on_pitch_goal_share=None))
+        self.assertEqual(with_role.expected_assists_if_playing, without_role.expected_assists_if_playing)
+        self.assertAlmostEqual(
+            with_role.expected_assists_if_playing,
+            round(with_role.expected_assists / max(0.35, 0.25), 4),
+            places=4,
+        )
+
+    def test_penalty_nudge_stays_on_the_unconditional_mean(self) -> None:
+        plain = self._project(self._profile())
+        taker = self._project(self._profile(penalty_taker=True))
+        self.assertGreater(taker.expected_goals, plain.expected_goals)
+        self.assertEqual(taker.expected_goals_if_playing, plain.expected_goals_if_playing)
+
+    def test_build_usage_profiles_populates_on_pitch_goal_share(self) -> None:
+        from syndicate.features.soccer.sim_engine.soccersim.player_props import build_usage_profiles
+
+        rows = [
+            {"player_id": "a", "player_name": "Scorer", "position": "F", "team": "Wolves",
+             "season": "2026", "games": 6, "minutes": 540.0, "shots_per90": 3.0, "xg_per90": 0.8},
+            {"player_id": "b", "player_name": "Defender", "position": "D", "team": "Wolves",
+             "season": "2026", "games": 6, "minutes": 540.0, "shots_per90": 0.4, "xg_per90": 0.05},
+        ]
+        profiles = build_usage_profiles(rows, side="home", team="Wolves")
+        shares = {p.player_id: p.on_pitch_goal_share for p in profiles}
+        self.assertIsNotNone(shares["a"])
+        self.assertIsNotNone(shares["b"])
+        self.assertGreater(shares["a"], shares["b"])
+
+
 if __name__ == "__main__":
     unittest.main()
