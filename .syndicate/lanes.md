@@ -65,6 +65,28 @@ id resolves to an ARCHIVED session is hard evidence the lane is orphaned. The
 markers for running sessions did NOT match any roster id, so the mapping proves
 death, never life — do not invert it.
 
+### wnba-future-date-cache-carry — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: [user 2026-09-15: "stale WNBA compact game chips have returned to the layer 2 main page"] on a WNBA no-game day, refresh-worker seeds NO prior-slate games under that day's `live_state` key. Read on 2026-09-16 (no WNBA game; ESPN lists the next on 09-17): 0 WNBA chips in `/api/board/game-chips?date=2026-09-16`, `per_sport_ingest.wnba.sweep_state = no_slate` on Layer 2, and no `WNBA overview source missing for 2026-09-16 ... dashboard_games=4` line on refresh-worker. Then on 09-17 the real slate still shows (no false negative).
+- Files: `syndicate/features/wnba/sources.py` (`has_games_for_date` only), `tests/test_wnba_future_date_cache_carry.py` (NEW). No OPEN lane claims these (checked on origin/main 2026-09-15 ~14:30Z; `wnba-schedule-guard-fix` released both).
+- Origin: regression of lane `wnba-schedule-guard-fix`. Its 09-11 reading left the seed unnamed ("What SEEDS it is the open question") and proposed a carrier across midnight.
+- **MEASURED 2026-09-15 14:17-14:35Z, before any code:**
+  - Chips `worker_artifact` `published_at 14:17:51Z`: 4 WNBA chips, CON@DAL MIN@ATL LAS@SEA GSV@POR, all `final`, no start. Layer 2 `written_at 14:18:14Z`: `sweep_state pending`, `scheduled_games 4`. `/wnba/api/live_state?date=2026-09-15`: ESPN `401857186..189`, `source syndicate_cards_fallback`, `generated_at 07:56:57 CDT`. ESPN `?dates=20260915` returns 0 events.
+  - Writer: refresh-worker `OVERVIEW_SPORT_BEGIN sport=wnba force_refresh=True` 12:56:56Z, then `WNBA overview source missing for 2026-09-15: games=0 ... dashboard_games=4`, 1 s before the key's `generated_at`.
+  - That line by date since 09-12: 09-14 (14 lines, first 05:04Z = 00:04 CDT) and 09-15 (19 lines, first 05:06Z = 00:06 CDT). None for 09-12 or 09-13.
+  - Empty slates (94 B, 0 games) exist for 09-12..09-16. First publish: 09-12 06:25Z and 09-13 06:43Z (live-odds-worker, AFTER CT midnight); 09-14 03:39Z and 09-15 07:06Z on 09-14, 09-16 10:09Z on 09-14 (refresh-worker, BEFORE the date's CT midnight).
+  - The refresh-worker process that seeded 09-15 booted ~02:34Z 09-15 (`RECYCLE_EXIT` 01:34:39Z; `uptime_s 7685` at 04:41:42Z), i.e. before CT midnight.
+  - Live: web `b6a0e346`, refresh-worker `c4f45fee`, live-odds-worker `54f3d662`.
+- Hypothesis: `has_games_for_date` (sources.py) caches True for a NON-today date because a slate FILE exists (`available_dates()` counts empty slates), and checks that cache BEFORE the "today always asks ESPN" rule. A process that asked about tomorrow before midnight therefore reads today as schedule-confirmed after midnight, `_stored_date_substitution_allowed` passes, and the writer saves the 08-30 slate under today's `live_state` key. The chips and Layer 2 read that key.
+- Falsification test:
+  - (1) A unit test that primes tomorrow from an artifact, rolls the clock, and asks again is GREEN on origin/main: then the cache does not carry and the seed is elsewhere.
+  - (2) After the fix is live on refresh-worker (and live-odds-worker), the 09-16 `dashboard_games=4` line appears: another seed path exists.
+- Verification:
+  - (1) off != on: the new tests red on origin/main, green on the fix, INCLUDING a writer-level test through `_build_cards_page_context_uncached` with the real `has_games_for_date`.
+  - (2) the live SHAs carry the fix by content.
+  - (3) the 09-16 reading in the Goal, then 09-17's real slate.
+- Not in scope, stated: today's (09-15) key reads itself back through `_games_from_live_state_fallback` (cards.py :4061) until the date rolls. Guarding that on an ESPN `False` would reopen the 2026-07-22 false-negative, so it is left alone.
+- Blocked by: none.
+
 ### football-layer2-live-parity — OPEN — opened 2026-09-10 — session 2edf8b82-9f8a-4d32-bf26-ca43ecd1ea5a (archived 2026-09-11, so UNOWNED)
 - VERDICT 2026-09-12 13:25 CT — Goal: make NFL and NCAAF pregame sim and live projection data reach the Layer 2 board the way MLB and soccer do, before Saturday (NCAAF) and Sunday (NFL). — **GOAL: NOT MET.** NCAAF in-play: **PASS**. On refresh-worker `9d580145`, all four 11:00 CT FBS-vs-FCS games (Howard @ Indiana, ETSU @ North Carolina, Wofford @ Kent State, Gardner-Webb @ Liberty) were in progress at 18:24Z. They served 21 rows, all `game_state=live`, in a build written 18:23:08Z (past kickoff + 2 h), with `rows_stale_kickoff=0`. State came from the chip (`48621d65`); the lens overlay (`42d49364`) ran with `corrected=0`. `live_gameline`: 14 of 21 rows carry a block, 0 priceable (13 `live_resim_published_no_distribution_for_this_market`, 1 `no_two_sided_market_price`); Liberty's 7 rows carry none. See deploys.md 2026-09-12 13:25 CT. NFL: live game lines and projections are still BLOCKED on a user decision (the `nfl_live_lens.json` two-writer conflict, `SYNDICATE_NFL_LIVE_RESIM`, `LIVE_LENS_SOURCES_BY_SPORT['nfl']`, and `nfl` in `_LIVE_GAMELINE_SPORTS`). (written by scheduled task ncaaf-saturday-live-rows-reading on behalf of session 2edf8b82)
 - Goal: make NFL and NCAAF pregame sim and live projection data reach the Layer 2 board the way MLB and soccer do, before Saturday (NCAAF) and Sunday (NFL).

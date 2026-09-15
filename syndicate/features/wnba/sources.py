@@ -120,8 +120,17 @@ def has_games_for_date(date_str: str) -> bool | None:
     # cause of a board that kept showing a stale slate under today's date
     # no matter how thoroughly the game_cards artifact itself got fixed.
     # Always fall through to a real ESPN check for today specifically.
+    #
+    # NOT CACHED (2026-09-15, lane `wnba-future-date-cache-carry`). This used to
+    # add the date to `_HAS_GAMES_CONFIRMED_TRUE_CACHE`, which is checked ABOVE
+    # the today rule -- so a verdict earned while the date was still TOMORROW
+    # survived midnight and answered for TODAY. refresh-worker writes an empty
+    # recommendations_slate for tomorrow before midnight CT, so on 09-14 and
+    # 09-15 the process that asked the evening before read the no-game day as
+    # confirmed and saved the 2026-08-30 slate under today's live_state key.
+    # Only an ESPN-confirmed True (below) is safe to remember; this shortcut is
+    # already cheap, since available_dates() is cached on the directory mtime.
     if selected_date != central_today_iso() and selected_date in available_dates():
-        _HAS_GAMES_CONFIRMED_TRUE_CACHE.add(selected_date)
         return True
 
     # No lru_cache here: a False/None verdict is only ever a snapshot of one
