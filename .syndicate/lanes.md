@@ -419,6 +419,34 @@ death, never life — do not invert it.
 - **Lost live Polymarket fills (not in the served book 2026-09-15 ~20:40Z), by venue order id:** `C4N3GPYA4GNQ`, `C5Z80VJKYKDK`, `C7A2NRX2EKDF`, `C7CEAC90MKDD`, `C7CEAP1SRKDM`, `C7CG2G8CCKDK`, `C7CGCT7PTKDN`, `C7CNYDJV4KDH`, `C7CX3YKB4KDN`, `C7G9F92G8KDD`, `C7GA29PGCKDD`, `C7WAS5YB4MCS`, `C7V7H872JMA6`, `C7YJT13SEM9F`, `C8292W0ATMA3`, `C84V9M1Z6MCK`, `C8GBQRTHMMW0`, `C8ZAFJ9S6MW0`, `C9B0G201JMVG`, `C9CHPYTAJMVG`.
   - Restorable later from the venue's per-order read by id. Not in scope here.
   - Kalshi losses are uncounted.
+- **RESTORE MANIFEST 2026-09-15 ~21:20Z (read-only; scratchpad `trimmed_fills_manifest.json`).**
+  - 8 full records from venue `ORDER_STATE`/`FILL_PRICE`/`COMMISSION` log lines (7 with a `LIVE_ORDER` submit line). Their cost incl. fees: $17.30.
+  - 12 SCAN-ONLY: side, avgPx and booked price as the 09-01..09-15 FILL_PRICE scan saved them.
+    - **Their log lines EXPIRED during this investigation.** Render keeps about 14 days on a rolling basis: every line at 09-01T19:25:55Z was readable around 20:00Z and returned 0 at 21:15Z.
+    - Several were reconciled until 09-13/09-14, so they left the ledger in the last one to two days.
+    - Contracts, market and stake for these now exist only at the venue, via the per-order read by id from live-odds-worker.
+  - **Restoring is gated on:** (a) this lane's trim fix being live on both workers, or the next trim drops the restored rows again; (b) a user decision on a one-shot restore on live-odds-worker, since only that process holds the venue credentials.
+  - Rows:
+    - `C4N3GPYA4GNQ` NO avgPx 0.4900 booked 0.51; SCAN ONLY (reconciled 2026-09-01..2026-09-11T03:51Z)
+    - `C5Z80VJKYKDK` YES avgPx 0.2100 booked 0.21; SCAN ONLY (reconciled 2026-09-01..2026-09-11T18:44Z)
+    - `C7A2NRX2EKDF` YES avgPx 0.3800 booked 0.38; SCAN ONLY (reconciled 2026-09-01..2026-09-13T16:52Z)
+    - `C7CEAC90MKDD` YES avgPx 0.2700 booked 0.27; SCAN ONLY (reconciled 2026-09-01..2026-09-14T00:00Z)
+    - `C7CEAP1SRKDM` YES avgPx 0.3400 booked 0.34; SCAN ONLY (reconciled 2026-09-01..2026-09-02T21:04Z)
+    - `C7CG2G8CCKDK` YES avgPx 0.2500 booked 0.25; SCAN ONLY (reconciled 2026-09-01..2026-09-12T21:20Z)
+    - `C7CGCT7PTKDN` YES avgPx 0.2900 booked 0.29; SCAN ONLY (reconciled 2026-09-01..2026-09-14T00:00Z)
+    - `C7CNYDJV4KDH` NO avgPx 0.5000 booked 0.5; tsc-mlb-bal-col-2026-08-31-10pt5 x 5.04, fee 0.08, cost $2.60, created 2026-09-01T00:44Z
+    - `C7CX3YKB4KDN` YES avgPx 0.4600 booked 0.46; SCAN ONLY (reconciled 2026-09-01..2026-09-02T01:01Z)
+    - `C7G9F92G8KDD` YES avgPx 0.2500 booked 0.25; SCAN ONLY (reconciled 2026-09-01..2026-09-02T05:02Z)
+    - `C7GA29PGCKDD` YES avgPx 0.3800 booked 0.38; SCAN ONLY (reconciled 2026-09-01..2026-09-14T04:17Z)
+    - `C7WAS5YB4MCS` YES avgPx 0.2100 booked 0.21; SCAN ONLY (reconciled 2026-09-01..2026-09-14T04:17Z)
+    - `C7V7H872JMA6` YES avgPx 0.2700 booked 0.27; SCAN ONLY (reconciled 2026-09-01..2026-09-02T17:47Z)
+    - `C7YJT13SEM9F` YES avgPx 0.3350 booked 0.335; aec-mlb-ath-tex-2026-09-01 x 5.35, fee 0.07, cost $1.86, created 2026-09-01T21:28Z, mlb h2h line None stake 1.82
+    - `C8292W0ATMA3` NO avgPx 0.6500 booked 0.35; tsc-mlb-phi-az-2026-09-01-7pt5 x 4.11, fee 0.06, cost $1.50, created 2026-09-02T01:51Z, mlb totals line 7.5 stake 1.46
+    - `C84V9M1Z6MCK` YES avgPx 0.3700 booked 0.37; tsc-lal-ala-osa-2026-09-06-2pt5 x 15.76, fee 0.22, cost $6.05, created 2026-09-02T05:02Z, soccer totals line 2.5 stake 5.99
+    - `C8GBQRTHMMW0` YES avgPx 0.3100 booked 0.31; atc-eflch-bur-mid-2026-09-02-bur x 3.53, fee 0.05, cost $1.14, created 2026-09-02T18:08Z, soccer h2h line None stake 1.13
+    - `C8ZAFJ9S6MW0` YES avgPx 0.2200 booked 0.22; atc-lal-rso-cel-2026-09-03-cel x 4.86, fee 0.05, cost $1.12, created 2026-09-03T11:38Z, soccer h2h line None stake 1.12
+    - `C9B0G201JMVG` YES avgPx 0.2800 booked 0.28; aec-mlb-stl-lad-2026-09-03 x 5.26, fee 0.06, cost $1.53, created 2026-09-04T01:07Z, mlb h2h line None stake 1.5
+    - `C9CHPYTAJMVG` YES avgPx 0.2450 booked 0.245; aec-mlb-ath-sea-2026-09-03 x 5.84, fee 0.06, cost $1.49, created 2026-09-04T02:57Z, mlb h2h line None stake 1.55
 - Blocked by: none for code. Deploys to live-odds-worker and refresh-worker are the user's call, sequenced after lane `soccer-player-role-allocation`'s ~21:25Z tip deploys.
 
 ### book-quotes-splice-repair — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **P3 APPLIED 19:28:33Z; P4 (1) and (3) MET, (2) NOT MET: live-odds-worker republishes stale copies**
