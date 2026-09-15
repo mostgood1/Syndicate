@@ -6097,3 +6097,29 @@ It was meant to confirm that a commit removed exactly the one line I had edited.
   - A reader and its transport are one change. Neither half is a fix alone, and the reader half is the dangerous one.
   - A gap stated from code alone is a hypothesis. It was surfaced to the user as a finding, which is how it became an instruction.
   - *(evidence: `state_board.md` `[combined-board-state-rows-lost]`; `log/2026-09-15.md` session 3a65723e)*
+
+## 2026-09-15 — OVERTURNED: "the stored count will equal the rows read" — the writer caps each `by_sport` list per sport, so an instrument pairing two counts differed by design on its first reading `[lane combined-board-rows-unreadable-tripwire]`
+
+- **What was believed:** after web `da268e07`, `by_date[date].stored_candidate_count` would equal `candidate_count` for every readable date. That was written into the lane's Verification and the deploy's prediction.
+- **What falsified it:**
+  - The first reading (15:37:01Z): 09-15 stored **113**, rows **111**.
+  - refresh-worker saved the full pool (`CANDIDATE_POOL_READY count=113`). The writer builds `by_sport` with `_default_unbounded_by_sport_cap()` = 60 per sport, and La Liga was served at exactly 60.
+  - The cap and its "true counts stay available via `candidate_count`" comment sat at the call site the whole time.
+- **Why it cost nothing:** the tripwire fires only at `rows == 0`, a rule chosen for the defect, not for equality. Had it fired on `stored != rows`, it would have alarmed on every busy slate from the first minute.
+- **How to apply:**
+  - Before predicting that two numbers from one payload agree, enumerate every TRANSFORM the writer applies between them: caps, dedupe, filters, pruning. Read the builder, not only the field names.
+  - Gate an instrument on the defect's own signature (`rows 0 / stored > 0`), never on equality of two counts that pass through different transforms.
+  - *(evidence: `deploys.md` 2026-09-15 15:30:14Z; `state_board.md` `[combined-board-state-rows-lost]`)*
+
+## 2026-09-15 — OVERTURNED: "a `cd` at the top of a Bash call scopes that call" — parallel Bash calls share ONE shell, and a sibling's `cd` ran `git rebase` in the primary tree twice `[lanes state-read-expand-choke-point, combined-board-rows-unreadable-tripwire]`
+
+- **What was believed:** `cd /c/tmp/syndicate-sessions/<lane> && git rebase ...` operates on that worktree, whatever other Bash calls run beside it.
+- **What falsified it:**
+  - Twice, a call issued in parallel with one that ran `cd /c/Users/tempadmin/OneDrive/Coding/Syndicate` printed `cannot rebase: You have unstaged changes`. The worktree was clean, so the rebase had run in the PRIMARY checkout.
+  - A survey `grep` in the same batch returned line numbers ~400 lower: the primary tree's stale copy of `pipeline/intelligence_state.py`.
+  - Git refused both rebases, and the primary tree was verified untouched (HEAD `e88447a2`, no rebase in progress). A clean primary tree would not have refused.
+- **How to apply:**
+  - In any Bash call issued in PARALLEL with another, never use a bare `cd`. Use `git -C <path>` and absolute paths, or confine it to a subshell: `( cd <path> && ... )`.
+  - A result whose line numbers, HEAD or `git status` do not match the worktree you meant is the signal. Stop and re-read the tree before running a mutating command.
+  - A mutating git command (`rebase`, `reset`, `add`, `commit`) never shares a batch with a call that changes directory.
+  - *(evidence: `log/2026-09-15.md` session 3a65723e, dead ends)*
