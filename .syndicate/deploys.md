@@ -36105,3 +36105,40 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
   - Both carry `e115cd6b`, so neither disturbs the owed reading.
 - **refresh-worker is NOT deployed by this entry.** Lane `soccer-player-role-allocation` holds its claim, pinned to `2d579fd1`, and is waiting on the MLB daily sim. The option-1 reading for `082da3e3` stays this lane's: refresh-worker's first `pull_hot_artifacts` request carries `since=` = its own previous pull start, never a live-odds-worker pull start.
 - Rollback: deploy `8c089e8c` to live-odds-worker.
+
+## 2026-09-15 22:06:03Z (17:06 CT) — refresh-worker `f833f7ec` -> `2d579fd1` (soccer fix #2 + agreed ride-alongs) — deploy `dep-daks2irm8hqs73efhhh0` — lane soccer-player-role-allocation — **LIVE 22:12:03Z; verify OWED** — plus the live-odds-worker `8c089e8c` verify reading
+- **What:** the same fix #2 as the live-odds-worker 21:33:10Z entry above.
+  - `e53274f2`: shot divisor retired.
+  - `b33ef901`: shot/SOT props P(over | appears).
+  - User decisions: "After 21:25Z quiet window", then "go ahead with the 21:25Z deploy when it's clear".
+- **Target `2d579fd1`** (full `2d579fd1e3909b54b8db0180f6977aa1f57591dd`) = origin/main at ~21:31Z, PINNED, not the tip.
+  - Verified: on origin/main, a descendant of `8c089e8c`, contains every commit listed here. The only code between `8c089e8c` and `2d579fd1` is `e115cd6b`.
+  - Tip `ca80edf0` (steam, lane `legacy-steam-crossing-delta`) does NOT ride.
+  - Lane `book-quotes-splice-repair`'s unpushed execution_ledger change cannot ride.
+- **Ride-alongs, code only, each by agreement with its lane; each lane owns its verify reading:**
+  - `20568eff` soccer live poller single-date scoreboard (`soccer-live-scoreboard-range-stale`).
+  - `070a05bf` book_quotes write faults (`book-quotes-splice-repair`, which skipped its own refresh-worker deploy for this).
+  - `6d526851` quote_enrichment Anytime TD joins the YES side (`anytime-td-quote-side-yes`, which cancelled its off-main `1d78d38b` loop). Reading: `/api/ops/opportunity-contract/status` ncaaf `intelligence_prop` with_quote/rows.
+  - `082da3e3` hot-artifact pull watermark per (service, date) (`soccer-live-scoreboard-range-stale`). Reading: refresh-worker's next `pull_hot_artifacts` `since=` is its OWN previous pull start (2 h clamp on the first), never live-odds-worker's.
+  - `e115cd6b` soccer goal count includes penalties and own goals (`soccer-live-scoreboard-range-stale`). Reading: soccer `live_state` scores match ESPN on the next live match with a penalty or own goal.
+- **Gates:**
+  - Claim 21:22:44Z; RENEWED 21:53:53Z (released with its token and re-acquired, target `2d579fd1`) while the MLB daily sim held.
+  - Preflight:
+    - 21:24:33Z CLEAR (dry run on `8c089e8c`)
+    - 21:30:01Z HOLD (5 jobs: MLB `ui-daily`, NFL fantasy projections, refresh odds)
+    - HOLD 7-10 jobs through 21:50Z, then 3 jobs through 22:04Z
+    - 22:05:22Z CLEAR (watcher on `2d579fd1`)
+    - 22:06:02Z CLEAR
+  - POST 22:06:03Z; live 22:12:03Z. No rollback flag: the live `f833f7ec` is an ancestor.
+  - Expectation `--expect unconditional_ladder_share=0.0 --baseline unconditional_ladder_share=0.650 --baseline-read-at 2026-09-15T22:05:14Z`.
+- **THE BASELINE IS NOT A PURE PRE-STATE, stated so it is not over-read.** 0.650 at 22:05:14Z already includes artifacts built by live-odds-worker's new code (see the reading below). The pre-state for both workers is the 21:23:24Z read, 1.000 over 931 rows.
+- **Prediction:** artifacts generated after 22:12:03Z by either worker price every non-zero-mean shot row on the conditional ladder. `unconditional_ladder_share`, restricted to rows with `expected_shots > 0`, reads 0.
+- **verify (OWED for refresh-worker):** `ladder_basis_reading.py` over artifacts generated after 22:12:03Z. Rows with `expected_shots == 0` are excluded: both ladders are 0.0 there, so they cannot discriminate.
+- Rollback: refresh-worker `f833f7ec`.
+- **live-odds-worker `8c089e8c` verify reading** (entry above; ladder watcher read at 22:05:00Z, artifacts generated after its 21:38:19Z live time, refresh-worker still on OLD code):
+  - la_liga `recommendations_2026-09-16.json`, gen 21:59:30Z: 185 of 185 non-zero-mean rows conditional. The 2 matching rows have `expected_shots` 0.0.
+  - championship `recommendations_2026-09-15.json`, gen 22:01:36Z: 73 of 73 conditional; 5 zero-mean rows.
+  - eredivisie `recommendations_2026-09-15.json`, gen 22:00:17Z: 35 of 35 conditional; 4 zero-mean rows.
+  - Pooled over those plus one old artifact: share 0.156, `shot_mean_vs_ladder_ratio` 1.241 (> 1, as predicted).
+  - epl `recommendations_2026-09-18.json`, gen 21:45:50Z: 43/43 unconditional. An OLD-code writer: its `expected_shots_if_playing` equals `expected_shots / 0.25`, the pre-step-B floor that `build_usage_profiles` at `b33ef901` can no longer produce. Most likely refresh-worker (`f833f7ec`, odds refresh job in flight); not proven from logs.
+  - **Verdict for live-odds-worker: prediction MET** on 3 leagues' post-deploy artifacts, restricted to rows that can discriminate. The other 7 leagues had no artifact built by it yet at 22:05Z; the watcher continues.
