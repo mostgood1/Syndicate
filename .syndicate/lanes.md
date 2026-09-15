@@ -1543,7 +1543,7 @@ death, never life — do not invert it.
   - 5 carry an `odds_delta` whose size only a crossing explains: +229, +224, -207, -222, +227.
   - 2 are moneyline rows whose `line` equals the price: MIL @ MID `line_delta` 8.0 = `odds_delta` 8.0; RMA @ ELC 25.0 = 25.0.
   - Not yet split into crossing vs real moves. That split is the first step.
-- Files: `syndicate/features/shared/odds_refresh_tracking.py` (`_steam_signal`'s deltas and hits only, not the `implied_prob_delta` threshold re-base its own comment defers), `tests/test_odds_refresh_tracking.py`, `syndicate/features/mlb/cards.py` (the market board's `odds_delta` / `odds_trend`, ~`:6903-6910`, only), `tests/test_mlb_market_board.py`, `tests/test_intelligence_steam_candidates.py`.
+- Files: `syndicate/features/shared/odds_refresh_tracking.py` (`_steam_signal`'s deltas and hits only, not the `implied_prob_delta` threshold re-base its own comment defers), `tests/test_odds_refresh_tracking.py`, `syndicate/features/mlb/cards.py` (the market board's `odds_delta` / `odds_trend`, ~`:6903-6910`, only), `tests/test_mlb_market_board.py`, `tests/test_intelligence_steam_candidates.py`, `syndicate/blueprints/ops_steam.py` (NEW: the read-only steam-events admin route, a separate blueprint by user decision 2026-09-15 ~21:00Z; it imports the admin gate from the ops blueprint), `syndicate/app.py` (that blueprint import and registration only), `tests/test_ops_steam_events.py` (NEW).
 - Hypotheses (written BEFORE any production reading):
   - **H1.** `_steam_signal` (`odds_refresh_tracking.py:317-321`) takes `current_odds - previous_odds` on raw American odds. It fires on `abs(odds_delta) >= SYNDICATE_STEAM_ODDS_MOVE` (default 15, late phase 10, window 45 min).
     - Any observation pair straddling ±100 adds 200 to the size, so it clears the threshold whatever the real move was.
@@ -1584,7 +1584,7 @@ death, never life — do not invert it.
     - A 200+ `odds_delta` is CONSISTENT with H1 but not proof: in-play prices move that far without crossing (RMA @ ELC h2h -10000 -> -13000).
   - H2 is supported on the board: the 2 h2h cards have `line` == price and `line_delta` == `odds_delta` (-49, -3000).
   - RETRACTED (said in chat 20:3xZ): "the inflation also affects ranking" came from the builder's score formula (`intelligence.py:5656`). The served `score` is 0.0, so a ranking effect is not established.
-- Blocked by: user decision on how to read today's raw steam events (`reports/steam/steam_events_<sport>_2026-09-15.json` in the key-value store).
+- Blocked by: none. User decisions 2026-09-15: ~20:55Z admin read route, then ~21:00Z a separate blueprint without waiting for the owner of the ops blueprint. Next: build the steam-events route, deploy web, take the baseline reading through it.
 
 ### ncaaf-prop-quote-market-check — CLOSED — opened 2026-09-15 — closed 2026-09-15 ~15:45 CT — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
 - **VERDICT.** Goal (verbatim): "for the 104 NCAAF legacy prop rows refresh-worker quoted after `f833f7ec` (`intelligence_prop with_quote=104`), state how many carry a quote from the row's OWN market, measured with the real `quote_ref_for_bet` over production quote shards. If they are wrong, describe the production impact and stop before changing behaviour. Read-only diagnostic; no code change without the user's go." — **GOAL: MET. Hypothesis FALSIFIED: 102 of 102 replayed rows get their own market, side and line.**
