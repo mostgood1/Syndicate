@@ -2563,9 +2563,13 @@ starters.
 - The previous process read rows=416, with_quote=0.
 - Reading: `deploys.md` 2026-09-15 20:22:24Z.
 
-**NOT measured:**
-- That each attached quote is the right market (`missing_market_key=104`; the join matches on the player first).
-- Whether web runs `3157bb7b`.
+**Quotes are the row's own market** `[2026-09-15 ~15:45 CT, substrate: real quote_ref_for_bet replay over web's exported 09-17..09-19 NCAAF shards (mtime 19:28Z) and the production week-3 cards payload (13:54 CT), not refresh-worker's disk]`:
+- 102 of 102 rows choose their own market, side and line (101 Anytime TD / yes, 1 Receiving Yards / over / 34.5).
+- Shard `market` is the DISPLAY string ("Anytime TD"), so the row's display market narrows by exact match despite `missing_market_key`.
+- An identity-only control picks the wrong market on 1 row, so the filter is doing work. 23 of 102 players have more than 1 market.
+- Latent: no Anytime TD "No" side exists in the shards, and the row's pick does not narrow the side (lead in `leads.md`).
+
+**NOT measured:** whether web runs `3157bb7b`.
 
 **Still true, from code:**
 - `_row_slate_date` slices `commence_time[:10]` (the UTC date) for rows WITHOUT `slate_date`, so other sports' evening kickoffs can join the next day's shard (a lead in `leads.md`).

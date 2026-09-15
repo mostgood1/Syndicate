@@ -1514,6 +1514,29 @@ death, never life — do not invert it.
   - (3) After the owning worker's deploy: 0 new steam events with a crossing-inflated `odds_delta`; 0 moneyline events firing only through `line_hit`; and served legacy steam rows' `odds_delta` equal to their cents move.
 - Blocked by: none. First step: find which service runs `_steam_signal` (its steam log line on Render), then read today's steam events and split them.
 
+### ncaaf-prop-quote-market-check — CLOSED — opened 2026-09-15 — closed 2026-09-15 ~15:45 CT — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
+- **VERDICT.** Goal (verbatim): "for the 104 NCAAF legacy prop rows refresh-worker quoted after `f833f7ec` (`intelligence_prop with_quote=104`), state how many carry a quote from the row's OWN market, measured with the real `quote_ref_for_bet` over production quote shards. If they are wrong, describe the production impact and stop before changing behaviour. Read-only diagnostic; no code change without the user's go." — **GOAL: MET. Hypothesis FALSIFIED: 102 of 102 replayed rows get their own market, side and line.**
+  - **Reading:** the replay used the real `quote_ref_for_bet` with `enrich_prop_rows`' arguments, with `quote_ref` wrapped to capture the chosen group.
+    - Right: 102 of 102 (101 Anytime TD / yes; 1 Receiving Yards / over / 34.5).
+    - Price: 94 of 102 row odds equal a quoted book price. The other 8 differ by a few cents, because the card was read at 13:54 CT and the shard copy is from 19:28Z.
+  - **Why the premise was wrong:** production shards store `market` as the DISPLAY string ("Anytime TD"), not OddsAPI's `player_anytime_td`. The row's "Anytime TD" therefore narrows by exact match, and `missing_market_key` does not stop the join.
+  - **The frame could have been wrong:**
+    - 23 of 102 players have more than 1 market in the shard.
+    - An identity-only control (no market, selection or line) picks the WRONG market on 1 row, so the market filter is doing work.
+  - **Untested:** no NCAAF Anytime TD "No" side exists in the shards (0 of 101). The side filter never narrows for these rows (pick "Anytime TD - 3 books" matches no selection), so a future No side could be chosen. Recorded in `leads.md`.
+  - **Substrate:** rows from the real legacy path over production `/ncaaf/api/cards?week=3` (13:54 CT, 102 rows against the worker's 104). Shards are web's copies via `/api/ops/artifacts/export` (09-17/18/19, mtime 19:28Z), not refresh-worker's disk at its 20:18Z build.
+  - **Instrument error, corrected:** the first classifier compared against OddsAPI keys and reported 102 WRONG_MARKET. The chosen-group field I had already captured read "Anytime TD / yes".
+- Goal: for the 104 NCAAF legacy prop rows refresh-worker quoted after `f833f7ec` (`intelligence_prop with_quote=104`), state how many carry a quote from the row's OWN market, measured with the real `quote_ref_for_bet` over production quote shards. If they are wrong, describe the production impact and stop before changing behaviour. Read-only diagnostic; no code change without the user's go.
+- Files: none (read-only diagnostic; probes in the session scratchpad)
+- Hypothesis:
+  - `enrich_prop_rows` identifies by player only. Market, selection and line are SOFT (`narrowed or candidates`, `odds_book_quotes.py:2287-2301`).
+  - The legacy rows carry `market` "Anytime TD" (101 of 102 on the week-3 cards payload) and no `market_key`. `_normalize_token` gives "anytime td", while shard rows say `player_anytime_td` ("player anytime td"), and `_MARKET_ALIASES` has only game markets.
+  - So narrowing falls through to ALL of the player's quote rows, and `max(grouped, key=len)` picks the market with the MOST BOOKS. That may be receiving/rushing yards rather than Anytime TD.
+  - The 104/104 therefore measures "some quote for this player", not "this bet's price".
+- Falsification test: in a replay over the production 09-17..09-19 NCAAF shards, the market `quote_ref_for_bet` chooses equals `player_anytime_td` (or the row's own market) on every quoted row. The hypothesis is then wrong, and the rows are right by construction or by luck. Report which.
+- Verification: per quoted row, the chosen market key against the row's market, counted (right / wrong / no own-market quote in the shard). Substrate stated: web's synced shard copy read via `/api/ops/artifacts/export`, not refresh-worker's disk.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
