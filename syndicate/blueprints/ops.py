@@ -2821,8 +2821,12 @@ def api_ops_artifacts_export() -> Any:
     # watermark on a complete response, so a caller that cannot see it was
     # truncated would skip the remainder forever.
     budget_bytes = _artifact_export_budget_bytes()
+    max_file_bytes = _artifact_export_max_file_bytes()
     total_bytes = 0
     truncated = False
+    oversize: list[dict[str, Any]] = []
+    oversize_skipped = 0
+    oversize_bytes = 0
     # THE BODY-CARRYING LOOP WIDENS ONLY FOR AN EXPLICIT `pattern=`.
     #
     # With no pattern this walk is what the backup workflow calls, and it stops
@@ -2848,6 +2852,17 @@ def api_ops_artifacts_export() -> Any:
             stat = path.stat()
             if since_epoch is not None and stat.st_mtime < since_epoch:
                 continue
+            # BEFORE the budget test, deliberately. A file over the cap must not
+            # consume budget, must not trip `truncated`, and above all must not
+            # be inlined by the `and artifacts` clause below purely for being
+            # first. Named in the response instead, so it is shed VISIBLY and the
+            # caller can stream it.
+            if stat.st_size > max_file_bytes:
+                oversize_skipped += 1
+                oversize_bytes += stat.st_size
+                if len(oversize) < _OVERSIZE_REPORT_LIMIT:
+                    oversize.append({"path": relative_path, "bytes": stat.st_size})
+                continue
             if total_bytes + stat.st_size > budget_bytes and artifacts:
                 # Stop before reading, not after -- reading it is the
                 # memory we are trying not to spend.
@@ -2862,6 +2877,14 @@ def api_ops_artifacts_export() -> Any:
         "count": len(artifacts),
         "truncated": truncated,
         "bytes": total_bytes,
+        # Shed load, reported rather than implied. `oversize_skipped` and
+        # `oversize_bytes` are the whole truth; `oversize` names the first
+        # `_OVERSIZE_REPORT_LIMIT` of them so a caller can act without a second
+        # request. A client that ignores these is in the same position it was in
+        # when it ignored `truncated` -- so the pull logs them.
+        "oversize_skipped": oversize_skipped,
+        "oversize_bytes": oversize_bytes,
+        "oversize": oversize,
         "artifacts": artifacts,
     })
 
@@ -2943,6 +2966,54 @@ def api_ops_artifacts_stream() -> Any:
     response.headers["X-Artifact-Mtime"] = str(stat.st_mtime)
     response.headers["X-Artifact-Size"] = str(stat.st_size)
     return response
+
+
+# Reported per response, and capped so the envelope cannot itself become the
+# payload: 20 names is enough to act on, and the counters carry the whole truth.
+_OVERSIZE_REPORT_LIMIT = 20
+
+
+def _artifact_export_max_file_bytes() -> int:
+    """The largest single file the BULK (pattern) export will inline.
+
+    MEASURED 2026-09-16 03:40Z, lane `web-export-timeout`, a 30-minute window on
+    `pattern=*2026-09-15*`: **133 files, 312.4 MB — 13x the 24 MB budget — and the
+    top 12 files were 96% of it.** The other 121 files came to 11.1 MB, which fits
+    inside the budget with room to spare.
+
+        126.53 MB  mlb_source/tracking/book_quotes/2026-09-15.jsonl
+         56.59 MB  mlb_source/tracking/odds_history/2026-09-15.json
+         56.57 MB  mlb_source/artifacts/mlb/odds_history/2026-09-15.json
+         15.59 MB  soccer_source/tracking/book_quotes/2026-09-15.jsonl
+
+    These are append-only accumulators, re-sent WHOLE whenever one line is
+    appended. Without a cap they are met in arbitrary walk order, consume the
+    entire budget, and the loop `break`s — so a pull asking for 133 changed files
+    received FOUR, and the 121 small board artifacts it actually needed (soccer
+    `live_state` among them) were the ones dropped. The caller could not tell:
+    `truncated` is reported and nothing reads it.
+
+    THE CAP ALSO CLOSES A MEMORY HAZARD, which is the reason it is a per-FILE
+    rule rather than a reordering. The budget check below is
+    `total_bytes + size > budget and artifacts` — the `and artifacts` clause
+    admits the FIRST file whatever its size, so a walk that happened to reach the
+    126 MB accumulator first would `read_text` it into a str, put it in a dict and
+    `jsonify` it: several hundred MB transient on a 2 GB instance that is also
+    serving the board.
+
+    A capped file is NOT lost — it is named in `oversize` so the caller can fetch
+    it deliberately through `?path=` or `/api/ops/artifacts/stream`, which is the
+    right transport for it and always was. Tunable without a deploy, like the
+    budget it complements.
+    """
+    raw = str(os.environ.get("SYNDICATE_ARTIFACT_EXPORT_MAX_FILE_BYTES") or "").strip()
+    try:
+        value = int(raw or 8 * 1024 * 1024)
+    except ValueError:
+        value = 8 * 1024 * 1024
+    # Never below 1 MB: a cap under the size of ordinary board artifacts would
+    # skip the very files this endpoint exists to move.
+    return max(1024 * 1024, value)
 
 
 def _artifact_export_budget_bytes() -> int:

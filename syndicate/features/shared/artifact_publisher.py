@@ -2719,7 +2719,42 @@ def _pull_hot_artifacts_request(url: str, token: str, *, timeout_seconds: int) -
                 pass
             continue
 
-    print(f"[artifact_publisher] PULL_OK url={url} artifacts_received={len(artifacts)} written={written}", flush=True)
+    # WHAT THE SERVER SHED, SAID OUT LOUD. `#632`/lane `web-export-timeout`,
+    # 2026-09-16: the export has always reported `truncated`, and NOTHING here
+    # read it -- so a response carrying 4 of 133 changed files was logged
+    # `PULL_OK` and the watermark advanced past the other 129, which are then
+    # below the floor and never re-requested. The measurement that found it: a
+    # 30-minute window was 312.4 MB against a 24 MB budget, 96% of it in twelve
+    # append-only accumulators.
+    #
+    # THIS IS DELIBERATELY LOGGING ONLY. The watermark semantics are NOT changed
+    # here: refusing to advance re-fetches the same first budget-worth forever
+    # and never reaches the tail, so making the loss visible comes first and the
+    # bookkeeping is a separate decision. `oversize_skipped` is the server's
+    # per-file cap doing its job, not an error -- those files travel by
+    # `?path=` / `/api/ops/artifacts/stream`.
+    truncated = bool(payload.get("truncated"))
+    oversize_skipped = int(payload.get("oversize_skipped") or 0)
+    oversize_bytes = int(payload.get("oversize_bytes") or 0)
+    print(
+        f"[artifact_publisher] PULL_OK url={url} artifacts_received={len(artifacts)} "
+        f"written={written} truncated={truncated} oversize_skipped={oversize_skipped}",
+        flush=True,
+    )
+    if truncated or oversize_skipped:
+        largest = ""
+        named = payload.get("oversize")
+        if isinstance(named, list):
+            entries = [n for n in named if isinstance(n, dict) and n.get("path")]
+            if entries:
+                biggest = max(entries, key=lambda n: int(n.get("bytes") or 0))
+                largest = f" largest_skipped={biggest.get('path')} largest_bytes={int(biggest.get('bytes') or 0)}"
+        print(
+            f"[artifact_publisher] PULL_INCOMPLETE url={url} truncated={truncated} "
+            f"oversize_skipped={oversize_skipped} oversize_bytes={oversize_bytes}{largest} "
+            f"received={len(artifacts)} written={written}",
+            flush=True,
+        )
     return True, written
 
 
