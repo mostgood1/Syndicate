@@ -33,12 +33,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from syndicate.features.bankroll_manager import compute_board_stake  # noqa: E402
 from syndicate.features.shared.portfolio_commit import (  # noqa: E402
     SizingInputs,
+    _market_fair_sports,
     apply_price_reliability,
     commit_portfolio,
     sizing_candidate,
     sizing_input_field_names,
     sizing_inputs_from_row,
 )
+
+# A sport string no allowlist can contain, so the `no_model_edge_pct` refusal stays probed even
+# when every real sport sizes on market fair.
+_NEVER_ALLOWLISTED_SPORT = "__checklist_probe_not_allowlisted__"
 from syndicate.features.shared.portfolio_settings import PortfolioSettings  # noqa: E402
 
 # A row shaped exactly like one `layer2_board.build_layer2_rows` emits: the
@@ -179,6 +184,16 @@ def run_checklist() -> tuple[bool, list[str]]:
     # Refusals are part of the contract: a row missing an input must be turned
     # away by NAME, never sized on a default. Checked here so the guarantee is
     # gated rather than merely documented.
+    #
+    # `model_edge_pct` IS THE ONE INPUT WHOSE CONTRACT DEPENDS ON CONFIG. A sport on
+    # `SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS` is DEFINED to size a row with no sim edge on
+    # market fair; every other sport must refuse it. Measured 2026-09-16: this loop required the
+    # refusal unconditionally, the user put every sport on the list, and every portfolio commit was
+    # skipped until the env was reverted (`deploys.md` 17:28:19Z). So the canonical row is checked
+    # against the LIVE allowlist, and the refusal half is always probed with a sport that can never
+    # be allowlisted -- the gate keeps catching a row sized on a default whatever the env says
+    # (`tests/test_portfolio_commit_input_checklist_allowlist.py`).
+    allowlisted = str(CANONICAL_ROW.get("sport") or "").strip().lower() in _market_fair_sports()
     for field_name, reason_expected in (
         ("quote", "no_quote_price"),
         ("ev_pct", "no_ev_pct"),
@@ -187,6 +202,21 @@ def run_checklist() -> tuple[bool, list[str]]:
     ):
         stripped = {key: value for key, value in CANONICAL_ROW.items() if key != field_name}
         got_inputs, got_reason = sizing_inputs_from_row(stripped)
+        if field_name == "model_edge_pct" and allowlisted:
+            ok = got_inputs is not None and got_reason is None
+            got = "sized" if got_inputs is not None else repr(got_reason)
+            emit(f"{'ok  ' if ok else 'FAIL'}  missing {field_name:18s} -> {got} "
+                 f"(want sized on market fair: {CANONICAL_ROW['sport']} is allowlisted)")
+            if not ok:
+                failures += 1
+            probe = dict(stripped, sport=_NEVER_ALLOWLISTED_SPORT)
+            got_inputs, got_reason = sizing_inputs_from_row(probe)
+            ok = got_inputs is None and got_reason == reason_expected
+            emit(f"{'ok  ' if ok else 'FAIL'}  missing {field_name:18s} -> {got_reason!r} (want {reason_expected!r}; "
+                 f"probe sport {_NEVER_ALLOWLISTED_SPORT!r})")
+            if not ok:
+                failures += 1
+            continue
         ok = got_inputs is None and got_reason == reason_expected
         emit(f"{'ok  ' if ok else 'FAIL'}  missing {field_name:18s} -> {got_reason!r} (want {reason_expected!r})")
         if not ok:
