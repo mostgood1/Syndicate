@@ -10,6 +10,13 @@ server time had never been read. Four hypotheses were registered before measurin
 
 ## H2 CONFIRMED — the cost is the WALK, and its upper tail crosses the client's timeout
 
+**THIS IS NOT NEW, and the credit matters for what to do next.** `#632` already found it and
+already fixed it once: *"`/api/ops/artifacts/export` had a 26 s median and an 87 s max, and
+`?names_only=1` -- which reads no file bodies -- timed out after 180 s. The cost is the directory
+walk: 176 patterns collapsing onto 95 parents"* (`tests/test_artifact_walk.py`). The numbers below
+are the POST-optimisation state -- 26 s median improved to 15.21 s -- so the contribution here is
+the residual distribution against the client's timeout, and the truncation defect beside it.
+
 `names_only=1` runs the SAME `iter_pattern_matches` walk and the same `since` filter and
 returns a few bytes per file instead of the file, so it isolates the walk. Seven samples
 of the production-shaped query (`pattern=*2026-09-15*`, `since=now-30min`), identical work
