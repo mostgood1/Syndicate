@@ -36507,3 +36507,20 @@ Scheduled task `full-slate-memory-reading-0915`. Read-only on production: no dep
 - All four ESPN leagues now read `applied` on their newest artifact: championship (gen 03:38:00Z) 78 rows, eredivisie (03:36:51Z) 39, primeira_liga (03:08:58Z) 154, belgian_pro_league (02:07:55Z) 52. **Pooled 323 non-GK rows, 0 priced at exactly 0.0, against a predicted 0.**
 - Understat leagues unchanged and not staked, as the corrected scope says: epl 4, la_liga 2, ligue_1 2, serie_a 1. `no_espn_rows` on every non-ESPN league built by the new code.
 - **Both `verify:` obligations on the 03:04:56Z entry are now discharged**, and the lane closes on this reading.
+
+## 2026-09-16 03:50Z (2026-09-15 22:50 CT) — READING, no deploy, no env change — lane heavy-build-child-process — **THE CANDIDATE POOL'S JSON->RSS MULTIPLIER IS ~3x, MEASURED. It was the number every proposed fix was missing.**
+- **Why it was needed:** every option on the table (cap by bytes, `limit=1`) is sized in JSON megabytes while the problem is stated in resident memory. The lane recorded the multiplier as unmeasured, so no option had a predicted saving. `[user decision 2026-09-16: "Measure the multiplier first"]`
+- **Method:** paired `[intelligence_state] CANDIDATE_POOL_CACHE` (20 samples, `cache_json_bytes`) with `PROCESS_TREE_MEMORY` (`self_rss_mb`, 468 samples) on refresh-worker, 21:01:18Z..03:26:27Z, nearest sample within 180 s. Read-only, from logs already emitted.
+- **(1) THE NATURAL EXPERIMENT — a full cache flush, which is the strongest single reading:**
+
+        00:13:27  cache 183.2 MB   rss 2060.2 MB
+        01:03:03  cache   0.0 MB   rss 1534.7 MB      -183.2 MB cache  ->  -525.5 MB RSS   (ratio 2.87)
+
+  **525 MB of resident memory came back when the pool cache emptied.** So the pool is not merely large, it is RECLAIMED — which is the half that could not be assumed (Python does not always return freed arenas to the OS).
+- **4 of 6 cache DROPS show RSS falling with the cache:** ratios 7.31 (22:07->22:24, -24.6 MB cache / -179.6 MB RSS), 5.60 (23:29->23:57), 2.87 (the flush above), 0.63 (02:40->03:26). The 2 that do not are -7.7 and -8.6 MB drops at 21:01 and 21:23, swamped by concurrent build growth — **small-delta intervals are where this estimator is useless**, not where it disagrees.
+- **(2) REGRESSION, an UPPER bound:** `self_rss_mb` on `cache_json_mb` across all 20 paired samples gives **slope 3.33 MB RSS per MB of cache JSON, r = 0.78**, cache range 0.0-203.2 MB, RSS range 1259.6-2060.2 MB. Upper bound because the build grows for reasons unrelated to the pool.
+- **WHAT IT MEANS FOR THE LEVER:** at the observed peak (`cache_json_bytes` 203.2 MB, `limit=2`, 02:40:43Z) the pool's implied resident share is **~590-680 MB**. **Dropping `limit` 2 -> 1 should free ~300 MB.** For scale, the heavy build this lane was founded to move into a child process accounts for ~+497 MB of pid 39's +1,516 MB.
+  - **So the candidate pool at `limit=2` is comparable to, and plausibly larger than, the heavy build.** The lane's original premise is not just weak, it is out-prioritised by a one-line env change.
+- **THE POOL IS NOT THE ONLY TERM, and the same data says so:** at 01:03:03Z and 01:29:34Z the cache was EMPTY (`entries=0`) and RSS still read 1534.7 then 1808.6 MB — **+274 MB with no pool cached at all**. Anything claiming the pool explains the ceiling is refuted by those two samples.
+- **Not measured:** which of `pool_json_bytes` vs the live objects behind it dominates, and whether the ~3x holds below ~20 MB of cache (every clean interval here is a drop of 24 MB or more).
+- **Env state, read by single-key GET 03:32Z:** `SYNDICATE_CANDIDATE_POOL_CACHE_MAX` = 2 on refresh-worker, ABSENT on web and live-odds-worker. `limit=1` is a single-key PUT plus a deploy to inject it.
