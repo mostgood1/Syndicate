@@ -6572,3 +6572,11 @@ interval; the two other intervals showing RSS falling with the cache also each c
   because it gets acted on.
 - *(evidence: refresh-worker deploys finishedAt 22:12:03Z / 23:33:30Z / 00:36:13Z / 04:17:12Z / 05:06:56Z; `deploys.md` 2026-09-16 03:50Z and
   its retraction 14:10Z)*
+
+## 2026-09-16 — FORBIDDEN: treating a clean `land` or a silent lane-guard as proof that a SCRIPT write respected another lane's file claim
+
+Measured 2026-09-16 ~05:30Z, session abacd435. `docs/ai_context/todo.md` is claimed by OPEN, owned lane `kalshi-shard-balance-gate`. On 2026-09-15 lane-guard correctly REFUSED my `#664` entry for exactly that reason. On 2026-09-16 I wrote `#665` into the same file through a Python script: **lane-guard did not see it, and `session_worktree.py land` printed `ledger/lanes clean` and `ledger/todo ids clean` and pushed it.** Neither check compares the committed diff against other lanes' `Files:` claims. I found the claim only afterwards, by running the `#71` check.
+
+This is the lane-claim twin of the deploy guard missing Python deploys: **a guard that hooks a TOOL is blind to the same effect produced by a script**, and a later check that reports "clean" was never looking at claims. The breach was small (8 added lines, 0 deletions), which is why it matters as a rule: small, additive, conflict-free writes are exactly the ones nobody re-examines.
+
+**How to apply.** Before any script write to a path outside `.syndicate/` — and `todo.md` counts, it is claimed often — run `py -3 scripts/check_lane_claims.py` or grep `lanes.md` on `origin/main` for the path and read the holder's status. If an OPEN lane claims it, stop and surface, as the protocol says; the absence of a refusal is not permission.
