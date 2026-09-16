@@ -772,6 +772,11 @@ death, never life — do not invert it.
 - Blocked by: none. Deploys to this service need the user's explicit OK (real-money orders; a restart mid-placement strands orders) and must avoid lane `layer2-live-scorecard-gate`'s 2026-09-13 06:30-08:00Z scorecard window without asking.
 
 ### heavy-build-child-process — OPEN — opened 2026-09-14 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- **DEPLOYED 2026-09-16 04:10:56Z, session 0f5b256e — `SYNDICATE_CANDIDATE_POOL_CACHE_MAX` 2 -> 1 on refresh-worker `[user: "Set limit=1 and deploy it"]`. (A) INJECTION VERIFIED; (B) the saving is UNMEASURED.**
+  - Deploy `dep-dal1djoae00c73f7ajug`, main tip `0d3cea8f`, **zero code ride-alongs** (the whole range is ledger commits) — an env injection and nothing else.
+  - **Verified:** every post-deploy pool-cache line reads `limit=1`, and `cache_json_bytes` now EQUALS `pool_json_bytes` (22.6/22.6, 24.0/24.0), against ~3x at `limit=2` last night.
+  - **NOT verified, and the tempting number is a trap:** RSS reads 1344-1419 MB vs a 1893 MB baseline, but the deploy restarted the worker, and `learnings.md` records that every fix looks good for 5 minutes after a reboot. The pools seen since are 22.6-24.0 MB, ~1/8 of the 108 MB live-slate peak the prediction was about.
+  - **The real test is the next live MLB slate:** at `pool_json_bytes` ~100 MB, cache must be ~100 MB not ~200 MB, and RSS must sit ~300 MB below the 09-15 trace at a SAME-UPTIME point.
 - **MEASURED 2026-09-16 03:50Z (2026-09-15 22:50 CT), session 0f5b256e — THE MULTIPLIER IS ~3x, so the pool lever now has a NUMBER:** `cache_json_bytes` -> `self_rss_mb` is **2.87** on the one full-flush interval (183.2 MB cache -> 0, RSS 2060.2 -> 1534.7, **-525.5 MB**) and **3.33** by regression over 20 paired samples (r = 0.78). Method and caveats in `deploys.md` 2026-09-16 03:50Z.
   - **`limit` 2 -> 1 should free ~300 MB**; the peak cache (203.2 MB at `limit=2`) implies ~590-680 MB resident. The heavy build this lane was founded to relocate is ~+497 MB, so **the pool is the larger lever and needs only an env change.**
   - **But the pool does not explain the ceiling:** RSS rose +274 MB between two samples with an EMPTY cache (01:03:03Z 1534.7, 01:29:34Z 1808.6).
