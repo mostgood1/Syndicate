@@ -36920,3 +36920,44 @@ Scheduled task `full-slate-memory-reading-0915`. Read-only on production: no dep
 - `[portfolio_commit] KALSHI_SOCCER_RESOLVERS armed=True soccer_matches=95 withheld=0` at 19:04:24Z and 19:27:35Z (env `SYNDICATE_KALSHI_SOCCER_RESOLVERS=1`, injected 18:13:18Z). Before: `armed=False` with `withheld` 78-101 all day.
 - End to end: `/api/portfolio/paper?date=2026-09-16` (admin token, counts only) at ~19:35Z, venue `kalshi`: 45 positions, **1 soccer `game_total`**; `LIVE_PLAN_WRITTEN venue=kalshi rows_in=1071 positions=42 staked=$221.33` at 19:27:35Z. The same read shows MLB `player_prop` positions on Kalshi (10) and Polymarket (6), consistent with the family exclusion removal.
 - Leg (a) (no `no_model_edge_pct`) is still owed: it needs the all-sports allowlist, which is the D2 redo.
+
+## 2026-09-16 20:19Z (15:19 CT) — MEASUREMENT, no deploy — lane soccer-live-scoreboard-range-stale — **SECOND, INDEPENDENT reading CONFIRMS the chips track a live match (clock 1-5 match-minutes behind ESPN on 22 of 22 same-instant reads), and `e115cd6b` IS NOW EXERCISED LIVE: Barcelona's 25' `penalty---scored` is counted on the chip (0-2, then 1-2, 1-3). Scores reach the chip one aggregate tick plus one publish after ESPN (2m45s-4m06s); one goal missed a publish. Found in passing: a POSTPONED match is served as `0-0 FINAL`**
+
+- **Case:** the 17:44Z entry had already recorded the chips clause MET, so this is CONFIRMATION, not first evidence. Scheduled task `laliga-chip-freshness-check-1430`.
+- **Code read:** Render deploys API at 19:56Z. web `e0aee286` (live 18:50:02Z), refresh-worker `793b621b` (live 19:33:20Z), live-odds-worker `09c3e44a` (live 14:45:18Z). These are NOT the commits the task named (`4f65f2b2` / `1175e0ef`), so the question was checked by ancestry: `git merge-base --is-ancestor` `4f65f2b2` in `e0aee286`, `1175e0ef` in `793b621b`, `e115cd6b` in `793b621b` and in `09c3e44a`: all true.
+- **Instruments:** ESPN `esp.1/scoreboard?dates=20260916` (SINGLE date only) plus `summary?event=401882871` for `keyEvents`; `GET /api/board/game-chips?sports=soccer` and `GET /api/ops/live-lens/snapshot-index?sport=soccer` (admin token). Each ESPN read and chips read were taken inside the same second.
+- **Fixtures:** RAC @ BAR (`401882871`), live from about 19:34Z. **ATH @ LEV (`401882870`) never kicked off:** `STATUS_SCHEDULED` through 20:14Z, then `STATUS_POSTPONED` ("Postponed") from 20:15:28Z.
+- **RAC @ BAR, 22 reads 19:57:26-20:18:15Z (23'..44'):**
+
+| read (Z) | ESPN | chip | published_at | clock gap |
+|---|---|---|---|---|
+| 19:57:26 | 0-1 23' | 0-1 18' | 19:56:41 | 5 |
+| 19:57:53 | 0-1 24' | 0-1 22' | 19:57:50 | 2 |
+| 19:58:50 | 0-1 25' | 0-1 22' | 19:57:50 | 3 |
+| 19:59:45 | **0-2** 26' | 0-1 22' | 19:57:50 | 4 |
+| 20:00:41 | 0-2 26' | 0-1 25' | 20:00:09 | 1 |
+| 20:01:37 | 0-2 27' | 0-1 25' | 20:00:09 | 2 |
+| 20:02:33 | 0-2 28' | **0-2** 27' | 20:02:28 | 1 |
+| 20:03:29 | 0-2 29' | 0-2 27' | 20:02:28 | 2 |
+| 20:04:24 | 0-2 30' | 0-2 27' | 20:02:28 | 3 |
+| 20:05:20 | **1-2** 31' | 0-2 30' | 20:04:30 | 1 |
+| 20:06:15 | 1-2 32' | 0-2 30' | 20:04:30 | 2 |
+| 20:08:00 | 1-2 34' | 0-2 30' | 20:06:43 | 4 |
+| 20:08:25 | 1-2 34' | 0-2 30' | 20:06:43 | 4 |
+| 20:09:26 | 1-2 35' | **1-2** 32' | 20:08:55 | 3 |
+| 20:10:26 | 1-2 36' | 1-2 32' | 20:08:55 | 4 |
+| 20:11:27 | **1-3** 37' | 1-2 35' | 20:11:11 | 2 |
+| 20:12:28 | 1-3 38' | 1-2 35' | 20:11:11 | 3 |
+| 20:12:56 | 1-3 38' | 1-2 35' | 20:11:11 | 3 |
+| 20:14:12 | 1-3 40' | **1-3** 37' | 20:11:11 | 3 |
+| 20:15:28 | 1-3 41' | 1-3 40' | 20:11:11 | 1 |
+| 20:16:59 | **1-4** 43' | 1-3 40' | 20:16:19 | 3 |
+| 20:18:15 | 1-4 44' | 1-3 40' | 20:16:19 | 4 |
+
+- **Clock:** 1-5 match-minutes behind on 22 of 22 reads (max 5, on the first read, off a chip built before the 19:56:42Z aggregate). That is the same band as 17:44Z (0-4 once the aggregate held the match).
+- **Score, per goal, from the first ESPN read showing it to the first chip read showing it:** 25' penalty 19:59:45Z -> 20:02:33Z (**2m48s**); 30' goal 20:05:20Z -> 20:09:26Z (**4m06s**; it MISSED the 20:06:43Z publish although ESPN had it at least 83 s earlier); 36' goal 20:11:27Z -> 20:14:12Z (**2m45s**); ~42' goal first on ESPN 20:16:59Z, not yet on the chip at 20:18:15Z (window closed). 12 of 22 reads had the score equal to ESPN's; the other 10 were each one goal behind.
+- **Why the 30' goal missed a publish, from the readings:** aggregate `snapshot_generated_at` (CENTRAL, compared as instants) was 19:56:42, 19:59:18, 20:01:43, 20:04:14, **20:07:00**, 20:09:31, 20:11:47, 20:14:43 and 20:17:01Z, so the aggregate ticked every **136-176 s** while live (`snapshot_game_count` 1 at every read). The goal came after the 20:04:14Z tick; the 20:06:43Z publish predates the 20:07:00Z tick. The chip's bound is one aggregate tick plus one publish (~120-140 s), the same mechanism as the ATM 24' goal at 17:44Z. It is NOT the pull hop.
+- **`e115cd6b` (penalties and own goals), EXERCISED on a live match for the first time.** ESPN `keyEvents` scoring plays for `401882871`: `goal` 8' Barcelona, **`penalty---scored` 25' Barcelona**, `goal` 30' Racing Santander, `goal` 36' Barcelona; `shootout` false on all. The chip showed 0-2 from the 20:02:28Z publish, then 1-2 and 1-3. The pre-fix count (`type.startswith("goal")`) cannot produce 2 for Barcelona there. Path traced: `scripts/poll_soccer_live_state.py:302` `build_live_state` -> `espn_live_state.py:133` `counts_toward_score` -> per-league live_state `games` -> `live/soccer_live_lens.json` -> `cards.py` overlay -> chip. No own goal occurred, so the own-goal branch is still unobserved live (it was replayed 95/95).
+- **FINAL chips:** OSA @ ATM `0-4 FINAL` and SEV @ DEP `1-0 FINAL` on every read, matching ESPN's `STATUS_FULL_TIME` scores. Which input filled them (the aggregate's `finals` or the per-league file) was NOT isolated.
+- **NOT READ:** the served per-league `live_state_2026-09-16.json`. `/api/ops/artifacts/export?path=` returned 403 for both path spellings tried, so the lane's owed item 2 is confirmed on the chip, which carries that score, and not on the file itself.
+- **Found in passing, NOT this goal (lead filed):** (1) ATH @ LEV, ESPN `STATUS_POSTPONED`, is served as `state: final`, `status_token: FINAL`, scores `"0"`-`"0"`, on 3 consecutive reads (20:15:28, 20:16:59, 20:18:15Z; top-level `published_at` 20:18:33Z on a separate read). It showed `pregame` while ESPN said SCHEDULED. (2) The chip content moved (1-2 35' -> 1-3 37' -> 1-3 40') across reads at 20:12:56, 20:14:12 and 20:15:28Z while `published_at` stayed at 20:11:11Z. So `published_at` does not stamp the served content; cause unread.
