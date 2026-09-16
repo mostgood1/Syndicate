@@ -1,5 +1,13 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#665` — **Grade H24 (fix #5b): does the prior xG environment improve soccer totals? Due 2026-10-15, or earlier at n >= 150** — pre-registered 2026-09-15 by session abacd435 (no lane: the measurement is not due yet)
+
+- **Why.** Season to date the model's total goals trail actual in 7 of 10 leagues, and FotMob puts the league-wide environment at 3.07 goals/match against 2.79 over the prior two seasons. H24 asks whether scaling the published goal means by a trailing-365-day xG-environment factor improves O/U 2.5.
+- **The pre-registration is binding and lives in `.syndicate/log/2026-09-15.md`**, section *PRE-REGISTRATION (forward test, fix #5b)*: the predictor `factor_L(d)`, the arms `P0` vs `XE`, the falsification rule, and the data list. Grade ONLY matches kicking off on or after 2026-09-16 00:00Z that have a production recommendations artifact built BEFORE kickoff. Do not re-derive the predictor or change the arms after seeing outcomes.
+- **When.** At n >= 150 qualifying matches or on 2026-10-15, whichever comes first. Fewer than 150 by then: grade what exists and state n.
+- **Data trap, named now.** The FotMob season harvests used to fix the predictor (`fotmob_season*.json`, ending 2026-09-14) sit in session abacd435's scratchpad and will not survive that session: re-harvest through the grading window. The pre-registration names `reports/soccer_backtest/fotmob_2y.json.gz` for the base seasons; confirm it is present before relying on it. Pre-kickoff artifacts come from Render, not the git mirror; print per-family date coverage and the intersection before grading.
+- **Done when.** H24 is recorded MET or FALSIFIED in the ledger with n, the per-league sign test, and the Brier gap to the closing O/U 2.5. Shipping a totals input is a SEPARATE item, through the model-engine standard, and only if H24 holds.
+
 ### `#663` — **The Kalshi per-series cap keeps the board's own rungs, so NCAAF Saturday rows get a venue contract** — lane `kalshi-precap-board-lines` (`#661`'s residual), 2026-09-11 — **CLOSED 2026-09-11: NCAAF 09-12 Kalshi rows 1/13 -> 20/20 contracted; live placed 6 NCAAF Saturday orders**
 
 - **Why.** `MAX_MARKETS_PER_SERIES=400` kept the nearest date first, then that day's ladder in arrival order. On 09-11 the Kalshi plan's 16 NCAAF Saturday rows were all `price_source=aggregator` with no ticker (`placeable_committed=0/16`), so live could not place them.
