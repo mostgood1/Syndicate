@@ -2721,7 +2721,7 @@ def api_ops_artifacts_export() -> Any:
         if not target.is_file():
             return jsonify({"ok": True, "count": 0, "artifacts": {}})
         try:
-            if since_epoch is not None and target.stat().st_mtime < since_epoch:
+            if _older_than_since(target.stat().st_mtime, since_epoch):
                 return jsonify({"ok": True, "count": 0, "artifacts": {}})
             return jsonify({"ok": True, "count": 1, "artifacts": {exact_path: target.read_text(encoding="utf-8")}})
         except UnicodeDecodeError:
@@ -2792,7 +2792,7 @@ def api_ops_artifacts_export() -> Any:
                 continue
             try:
                 stat = path.stat()
-                if since_epoch is not None and stat.st_mtime < since_epoch:
+                if _older_than_since(stat.st_mtime, since_epoch):
                     continue
                 listing[relative_path] = {"bytes": stat.st_size, "mtime": stat.st_mtime}
             except Exception:
@@ -2863,7 +2863,7 @@ def api_ops_artifacts_export() -> Any:
             continue
         try:
             stat = path.stat()
-            if since_epoch is not None and stat.st_mtime < since_epoch:
+            if _older_than_since(stat.st_mtime, since_epoch):
                 continue
             # BEFORE the budget test, deliberately. A file over the cap must not
             # consume budget, must not trip `truncated`, and above all must not
@@ -3032,6 +3032,29 @@ def api_ops_artifacts_stream() -> Any:
     response.headers["X-Artifact-Mtime"] = str(stat.st_mtime)
     response.headers["X-Artifact-Size"] = str(stat.st_size)
     return response
+
+
+# A `since` that a caller has ROUNDED must not skip the file it points at.
+#
+# MEASURED 2026-09-16 14:36Z, on production, by this route's own verification: a
+# cursor chain that formatted `next_since` with `:.6f` lost 2 of 6 files. The
+# filter was a strict `mtime < since`, and two of the four cursors rounded UP past
+# their file's true mtime (`1789565893.2385237 -> .238524`,
+# `1789568946.8659189 -> .865919`); those two, and only those two, were skipped.
+# The production pull writes the exact float repr and was never affected, but a
+# resume cursor that silently drops a file for any caller who rounds is the very
+# defect it was built to end.
+#
+# One millisecond covers rounding to 3 or 6 decimals. The cost is a file modified
+# in the millisecond before `since` being SENT AGAIN -- bytes, never a file. It
+# applies to every `since` read here, so an inventory and a body read of the same
+# window can never disagree about which files are in it.
+_SINCE_TOLERANCE_SECONDS = 1e-3
+
+
+def _older_than_since(mtime: float, since_epoch: float | None) -> bool:
+    """True when a file is too old for this `since` read, allowing for a rounded cursor."""
+    return since_epoch is not None and float(mtime) < float(since_epoch) - _SINCE_TOLERANCE_SECONDS
 
 
 # Reported per response, and capped so the envelope cannot itself become the

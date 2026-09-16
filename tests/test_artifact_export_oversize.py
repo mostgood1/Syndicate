@@ -308,3 +308,46 @@ class ArtifactExportResumeCursorTests(TestCase):
             body = self._read(tmp_dir, since=_BASE_MTIME)
         self.assertTrue(body["truncated"])
         self.assertIsNone(body["next_since"])
+
+
+class ArtifactExportRoundedCursorTests(TestCase):
+    """A caller that ROUNDS `since` must not skip the file the cursor points at.
+
+    Reproduced on production 2026-09-16 14:36Z: a chain that formatted the cursor
+    with `:.6f` lost exactly the two files whose cursors rounded UP past their true
+    mtime (`...893.2385237 -> .238524`, `...946.8659189 -> .865919`).
+    """
+
+    TRUE_MTIME = 1789568946.8659189
+
+    def setUp(self) -> None:
+        app = create_app()
+        app.testing = True
+        self.client = app.test_client()
+
+    def _read(self, since: str) -> dict:
+        with TemporaryDirectory() as tmp_dir:
+            relative = _league_path(0)
+            _write(tmp_dir, relative, "r" * 1024)
+            os.utime(os.path.join(tmp_dir, *relative.split("/")), (self.TRUE_MTIME, self.TRUE_MTIME))
+            env = {"ADMIN_TOKEN": TOKEN, "SYNDICATE_DATA_ROOT": tmp_dir}
+            with patch.dict(os.environ, env, clear=False):
+                response = self.client.get(
+                    f"/api/ops/artifacts/export?pattern=*2026-09-15*&since={since}",
+                    headers={"Authorization": f"Bearer {TOKEN}"},
+                )
+            return json.loads(response.data.decode("utf-8"))
+
+    def test_a_cursor_rounded_UP_to_six_decimals_still_includes_its_file(self) -> None:
+        rounded = f"{self.TRUE_MTIME:.6f}"
+        self.assertGreater(float(rounded), self.TRUE_MTIME, "fixture no longer rounds up -- it tests nothing")
+        self.assertEqual(list(self._read(rounded)["artifacts"]), [_league_path(0)], "a rounded cursor skipped its file")
+
+    def test_a_cursor_rounded_UP_to_milliseconds_still_includes_its_file(self) -> None:
+        rounded = f"{self.TRUE_MTIME:.3f}"
+        self.assertGreater(float(rounded), self.TRUE_MTIME)
+        self.assertEqual(list(self._read(rounded)["artifacts"]), [_league_path(0)])
+
+    def test_the_tolerance_is_BOUNDED_and_a_genuinely_later_since_still_excludes(self) -> None:
+        """One millisecond of slack, not an open door: two ms later, the file is out."""
+        self.assertEqual(self._read(repr(self.TRUE_MTIME + 0.002))["artifacts"], {})
