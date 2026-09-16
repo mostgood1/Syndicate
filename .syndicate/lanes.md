@@ -119,6 +119,21 @@ death, never life — do not invert it.
 - Files: NONE. Code landed (`2259edf8`, `0ceb9636`); its claims on `bet_status_nfl.py`, `bet_status_ncaaf.py` and their tests were HANDED OVER to lane `football-settlement-gaps` on 2026-09-10. The first-grade reading is TAKEN (2026-09-11 08:50 CT). Owed: the first NFL prop grade (scheduled task `nfl-prop-settled-grade`, 09-15).
 
 ## OPEN
+
+### soccer-espn-window-validation — OPEN — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Goal: `fetch_events` cannot return an event outside the window it was asked for, so a stale or wrong-date ESPN 200 can no longer become a fixture for the requested date. Measured against the live endpoint on both request shapes, with a reachability test (`off != on`) and a regression test that an off-window payload yields no fixture. Landed on main with tests; deploy per user.
+- Files:
+  - `syndicate/features/soccer/ingestion/espn_lineups.py`
+  - `tests/test_soccer_espn_lineups.py`
+- Why this lane exists: lane `soccer-live-scoreboard-range-stale` reported that a stale-200 ESPN range can pass `espn_lineups`, and lane `soccer-player-substrate` recorded it as a follow-up NOT re-derived. It matters more than a data-freshness nit because `build_soccer_artifacts._fetch_fixtures` sends the one-day range form, its fixtures feed `_attach_confirmed_starters`, and confirmed starters set `start_probability` -- the input both deployed fixes (#2 shot ladder, #3 goal mixture) key off.
+- Hypotheses (PRE-REGISTERED 2026-09-16 03:48Z, before any probe ran):
+  - **H26 (code):** `fetch_events` performs NO window validation. It filters only on ESPN status state, stores `event["date"]`, and never compares it to the requested window. FALSIFIED if any date check exists in the path from `_scoreboard_payloads` to the returned rows.
+  - **H27 (live):** on at least one of 10 league-date probes using the one-day range form `YYYYMMDD-YYYYMMDD` that `_fetch_fixtures` sends, ESPN answers 200 with at least one event whose own `date` falls OUTSIDE the requested window. FALSIFIED if every returned event on every probe is inside its window.
+  - **H28 (shape):** the bare single-date form `dates=YYYYMMDD` and the one-day range form return the SAME event id set for the same date. FALSIFIED if they differ on any probe, and a difference is the defect fingerprint rather than a curiosity.
+- Falsification test: as stated per hypothesis, on a probe of 10 league-dates spanning today, a near future date and a settled past date. If H26 holds but H27 and H28 both come back clean, the window filter still ships as a guard with its own test, and the lane records that the exposure was NOT demonstrated live rather than implying it was.
+- Verification: a test in which a payload carrying an off-window event yields no fixture for the requested date, red against the current code and green after; plus the probe table recorded in `log/2026-09-16.md`.
+- Blocked by: none
+
 ## OPEN
 
 ### accuracy-ledger-budget-raise — OPEN — **EXERCISED 2026-09-11 (autorun 12:48-12:52Z on refresh-worker `1e1285a4`, both changes content-verified): COVERAGE HALF MET (one `LEDGER_CHUNKS_ACCEPTED count=39 dates=39 skipped_budget=0 truncated=0`), MEMORY HALF NOT MET AS WRITTEN (in-run peak anon 3,179.0 MiB; the peak sample is `board_contract_end` and the pre-run ambient was higher, 3,540.0) -- revert line crossed, NOT recommended on this evidence, user decides; needs an attributable memory reading or a restated criterion** — opened 2026-09-04 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885 (adopted 2026-09-10 by session 218b778c-1a91-4ff0-b90d-55d1133b09eb)
