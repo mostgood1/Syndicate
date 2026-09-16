@@ -6554,3 +6554,21 @@ I predicted `truncated: false` after deploying an 8 MB per-file cap, reasoning t
 - The prediction was registered at preflight and graded wrong, which is the protocol working. What it cost was one confident sentence to the user ("truncation becomes rare") that the measurement then contradicted.
 - **How to apply:** before predicting a threshold change, compute the population at the threshold the change actually uses — `sum(size for size in sizes if size <= CAP)` — not at whatever boundary an earlier report printed. If the only number to hand is bucketed elsewhere, say the prediction is unbounded rather than borrowing it.
 - *(evidence: `deploys.md` 2026-09-16 04:01:38Z and 05:01:10Z)*
+
+## 2026-09-16 -- A "NATURAL EXPERIMENT" IN WORKER MEMORY MUST BE CHECKED AGAINST THE DEPLOY TIMELINE FIRST
+
+I reported a ~3x candidate-pool JSON->RSS multiplier, headlined by a "full cache flush" of 183.2 -> 0 MB that returned 525.5 MB of RSS, and
+the user approved a production deploy sized on it. **The flush was a restart.** refresh-worker redeployed at 00:36:13Z, inside that
+interval; the two other intervals showing RSS falling with the cache also each contained a deploy. The one restart-free drop gave 0.63.
+
+- **STANDING RULE: before reading any interval of a worker's memory as cause and effect, list that service's deploys AND events for the
+  window** (`/v1/services/<id>/deploys`, `/events`) and discard every interval that contains one. A restart moves the cache and RSS together,
+  which is precisely the signature of the effect being hunted.
+- **I applied `worker memory is boot-confounded` correctly to the AFTER reading and missed it in the BEFORE measurement the same night.** The
+  rule is not "distrust post-deploy numbers"; it is "no interval containing a boot is evidence", wherever the interval sits.
+- **Several busy lanes deploy one worker in an evening** (five refresh-worker deploys in 7 h here). On such a night the restart-free
+  population is small; say so and report n, rather than widening the window until a pattern appears.
+- Same family as *retraction is not innocence* and *gate on the output*: a clean-looking ratio from a confounded interval is worse than none,
+  because it gets acted on.
+- *(evidence: refresh-worker deploys finishedAt 22:12:03Z / 23:33:30Z / 00:36:13Z / 04:17:12Z / 05:06:56Z; `deploys.md` 2026-09-16 03:50Z and
+  its retraction 14:10Z)*

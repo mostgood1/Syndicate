@@ -36617,3 +36617,17 @@ Scheduled task `full-slate-memory-reading-0915`. Read-only on production: no dep
 - Since each worker's deploy: **live-odds-worker 29 `TRIMMED`, `dropped_by_mode` {'paper': 36}**; **refresh-worker 377 `TRIMMED`, {'paper': 386}, `LEDGER_OVER_CAP_PROTECTED` 0.** Not one non-paper row dropped on either service in ~14 h.
 - This closes the gap recorded at 00:06Z ("live-odds-worker has NO population"). What remains is the goal's "across a full day", which completes ~23:33Z tonight on refresh-worker.
 - Also read in the same pass: web `MERGE_REFUSED_BAD_LINES` **0** since 22:05:52Z (~16 h, lane book-quotes-splice-repair; full day completes ~22:06Z); Polymarket balance still **$0.96** (13:45:51Z); post-deploy pool peak **30.7 MB** on refresh-worker, so the pool-cap saving test still needs tonight's live MLB slate.
+
+## 2026-09-16 14:10Z (09:10 CT) — RETRACTION, no deploy — lane heavy-build-child-process — **the ~3x pool JSON->RSS multiplier (entry 03:50Z) is WITHDRAWN: every interval that supported it spans a refresh-worker restart**
+- **Read from the Render deploys and events APIs:** refresh-worker deploys finished 22:12:03Z (`2d579fd1`), 23:33:30Z (`61ac543a`), 00:36:13Z (`1175e0ef`), 04:17:12Z (`0d3cea8f`), 05:06:56Z (`5abc20f3`). Three of these fall INSIDE the 21:01..03:26Z measurement window.
+- **Each supporting interval contains one:**
+
+        22:07:30 -> 22:24:54   cache -24.6  rss -179.6   ratio 7.31   spans restart 22:12:03Z
+        23:29:03 -> 23:57:00   cache -28.8  rss -161.1   ratio 5.60   spans restart 23:33:30Z
+        00:13:27 -> 01:03:03   cache -183.2 rss -525.5   ratio 2.87   spans restart 00:36:13Z   <- the "natural experiment"
+        02:40:43 -> 03:26:27   cache -47.4  rss  -30.0   ratio 0.63   NO restart
+
+- **A restart empties the cache and resets RSS in the same instant**, so those ratios measured reboots, not the pool. The two other restart-free intervals (21:01->21:12, 21:23->21:33) show RSS RISING while the cache fell. The 3.33 regression pooled samples from three boots and inherits the same confound.
+- **What survives:** the pool and cache SIZES (a 108.0 MB pool; a 203.2 MB cache at `limit=2`), and the `limit=1` injection (cache == pool on every post-deploy line). **What does not:** the multiplier, "the pool is the larger lever than the heavy build", and the ~300 MB prediction the 04:10Z deploy was sized on.
+- **The 04:10Z deploy stays harmless** — env-only, zero code ride-alongs, reversible by one single-key PUT — but it was APPROVED on this withdrawn number. Keep or revert is put back to the user; nothing reverted unilaterally.
+- **This is `learnings.md`'s own "worker memory is boot-confounded" rule, missed inside the measurement while it was applied correctly to the post-deploy reading four hours later.** The check that caught it: list the service's deploys/events for the window BEFORE reading any interval as a natural experiment.
