@@ -36740,3 +36740,21 @@ Scheduled task `full-slate-memory-reading-0915`. Read-only on production: no dep
 - **Baseline is a FLAP, which is why the drop fields are maxima over 4 builds:** 16:04:47Z the soccer drop was in a keep phase (15:51Z soccer=12, 16:02Z soccer=18; 09-16 shortlist soccer 1,050) while 16:02:26Z dropped mlb=1,009; at 15:40:26Z it was soccer=753, mlb=68.
 - **First build after go-live, 16:19:41Z (today, of 4,831):** 13 `MARKET_GONE_REFERENCE` lines -- branch REACHED, one per soccer commence date 09-16..09-20. MLB `newest_age_s=913 reference_age_s=3251` (a partial pass no longer sets the clock). `MARKET_GONE_DROPPED mlb=84 ncaaf=4 nfl=49 soccer=5 total=142`. No `MARKET_GONE_DROP_FAILED`.
 - `verify:` **OWED -- builds 2-4 and the first plan generated after 16:11:39Z** (the 16:21:16Z plan read still carried `generated_at` 11:03:33 CT, pre go-live). Watcher armed on refresh-worker logs.
+
+## 2026-09-16 16:22:45Z (11:22 CT) — READING — refresh-worker `03851b5a` — lane portfolio-no-family-exclusion — **D1 MET: the committed plan refuses no row by sport:family; MLB player props now reach the per-play gates and take 12 of 25 positions**
+
+- **Deploy is the peer's**, recorded above at "2026-09-16 16:05:22Z" (lane `soccer-board-tomorrow-shortlist-collapse`, `dep-dalbsgp42hec73buchj0`, live **16:11:39Z**). It carries this lane's `4484cae1`: `git merge-base --is-ancestor 4484cae1 03851b5a` true, and BY CONTENT live `03851b5a:syndicate/features/shared/portfolio_commit.py` has no `resolve_excluded_families` and no `refuse("market_family_excluded"`. This lane released its own claim at 15:49:50Z for that deploy.
+- `verify:` **MET, read by this lane at 16:22:45Z** on `/api/portfolio/plan?date=2026-09-16` (admin token; counts only), plan **generated 11:21:19 CT** (16:21:19Z), the first plan after go-live:
+
+      refusals  below_min_ev_pct 2774, beyond_max_positions 79, no_model_edge_pct 1764, zero_kelly_stake 47
+                NO market_family_excluded key
+      accounting  sum(refusals) 4664 + positions 25 = 4689 = rows_in
+      positions by sport x family  mlb player_prop 12, ncaaf game_line 6, mlb game_total 2, soccer game_total 2,
+                                   ncaaf game_total 1, mlb game_line 1, nfl player_prop 1
+
+- **Baseline** (pre-registered prediction 824/1724 -> absent): the last plans before go-live carried `market_family_excluded` 1,724 (10:42:00 CT, read 15:48:37Z) and 847 (11:03:33 CT, per the peer's read), all MLB player props. The same reader graded the 10:42 plan **NOT MET**, so it can read unhealthy.
+- **The peer's independent read of the same plan agrees on every count** (taken by that session at 16:22:20Z; re-derived here, not carried).
+- **Where MLB props went, reported, not predicted:** MLB `player_prop` positions 0 -> **12 of 25**; MLB rows now refused on their own numbers: `below_min_ev_pct` 1,494, `no_model_edge_pct` 318 (was 25 while the family rule ran first), `zero_kelly_stake` 46, `beyond_max_positions` 30.
+- **Consequence the user should see:** positions are capped (sized 25, `beyond_max_positions` 79). With MLB props admitted they compete for those slots: NCAAF `game_line` positions were 12 on the 10:42 CT plan and **6** on this one. Per-play ranking, not a defect, but a real shift in what is staked.
+- **Confounds named:** `rows_in` (3,938 -> 4,689) also moved because the peer's fix stopped the market-gone drop deleting live rows; this lane attributes no `rows_in` change. `sim_coverage` on this plan (`rows_with_sim_edge` 2,925) is still the OLD refusal-derived number; the on-rows count is D2's `9c98fd8f`, not yet deployed.
+- **D2 baselines already read:** `no_model_edge_pct` mlb 318 / nfl 612 / soccer 834 (this plan); `[portfolio_commit] KALSHI_SOCCER_RESOLVERS armed=False soccer_matches=101 withheld=101` at 16:22:04Z. D2 target `9c98fd8f` is a descendant of live `03851b5a` with no other code commit between them; earliest slot 16:36:39Z.
