@@ -36397,3 +36397,74 @@ Told directly: lane `legacy-steam-crossing-delta` / Layer 2 board styling (sessi
   - Reading: `anytime_verify.py 2026-09-16T03:10:22Z`, newest artifact per league, watcher on a 5-minute cadence.
   - The reading will confirm each service's live commit at read time, because an artifact cannot say which worker wrote it and both workers now run fix #3.
 - Rollback: live-odds-worker `cc141267`.
+
+## 2026-09-16 03:20Z (2026-09-15 22:20 CT) — reading only, no deploy — full-slate memory after live-lens loop off on refresh-worker [lanes heavy-build-child-process, heavy-build-memory-refusal]
+
+Scheduled task `full-slate-memory-reading-0915`. Read-only on production: no deploy, no env or flag change, no code edit. Window **W = 2026-09-15T22:30:00Z .. 2026-09-16T03:1xZ** (17:30 .. 22:1x CT).
+
+**W IS EXERCISED.** 113 `live_lens_tick_after_build_mlb` lines on live-odds-worker (covered 22:31:38Z..03:05:03Z). MLB was live throughout.
+
+**BOTH SERVICES DEPLOYED INSIDE W, so every reading below is split.** All are `trigger=api`, user `mostgood@gmail.com`, and none is this reading's.
+- refresh-worker: `2d579fd1` (live 22:12:03Z, before W) -> **`61ac543a` live 23:33:30Z** -> **`1175e0ef` live 00:36:13Z**. Two boots inside W (`MALLOC_ARENA_INIT` 23:34:00Z, 00:36:48Z), both deploys, neither a kill.
+- live-odds-worker: `2d579fd1` (live 22:09:41Z) -> **`cc141267` live 23:27:50Z**. A further deploy `88df44cd` (`dep-dal0em67bikc73du4u5g`) **started 03:04:56Z and was still `build_in_progress` at read time** — its behaviour is NOT in this reading.
+
+### (A) live-odds-worker with the live-lens loop alone — **HELD. No kill, no planned recycle, and not close to OOM.**
+
+`ALL_PROCESS_MEMORY --json`, 1,880 samples, **covered 2026-09-15T22:30:50Z .. 2026-09-16T03:16:14Z** in four contiguous chunks (452 / 481 / 480 / 467; a single-call pull returned HTTP 429).
+
+- **Min unreclaimable headroom (`container_memory_max_mb - container_memory_unreclaimable_mb`) 649.0 MB** at **02:30:39Z**, stage `live_lens_tick_after_wnba` (max 2,048.0, unreclaimable 1,399.0). Baseline 09-14: 887 MB. **Down 238 MB, and 3.2x the ~200 MB revert line.**
+- Min `container_memory_headroom_mb` **0.0 MB** at 00:29:13Z, stage `live_lens_tick_after_build_nfl`. **That field is page cache and is not a memory reading** — the same instrument read 0.0 twice in the 09-14 baseline window. Unreclaimable headroom at that same sample is not the minimum.
+- **No ratchet.** Hourly min unreclaimable headroom: 22Z 747.6 / 23Z 810.6 / 00Z 692.0 / 01Z 801.1 / 02Z 649.0 / 03Z 764.9 MB. Hourly median 1,057.6 -> 1,149.6 -> 1,162.9 -> 1,124.1 -> 1,103.1 -> 1,071.0. It oscillates; it does not climb.
+- **MLB live-lens build cost per tick** (`live_lens_tick_before_mlb` paired with the next `live_lens_tick_after_build_mlb`, main process pid 39, pairs more than 300 s apart dropped): **n=117, min +6.3, median +94.4, max +191.2 MB.** Baseline 09-14: median +78.4, max +130.7, n=15. **Median up ~20%, max up ~46%** — but n went 15 -> 117, so the baseline max was a thin tail. Unchanged across the 23:27:50Z deploy: pre n=22 median +93.7 max +124.7; post n=95 median +95.1 max +191.2.
+- Main-process pid 39 RSS hourly median **858 -> 901 -> 910 -> 936 -> 972 -> 998 MB** (~+28 MB/h drift, and the 23:27:50Z deploy did not reset it); max in W 1,078.2 MB.
+- **Kills: 0.** Render events cover 2026-09-12T19:57:48Z..2026-09-16T03:04:56Z (100 rows). No `server_failed` inside W. The most recent was **09-15 17:08:22Z, `earlyExit: true, evicted: false`** — a planned exit, BEFORE W. 23 `server_failed` in the whole 3.3-day list, every one `earlyExit`, none `evicted`, none `oomKilled`.
+- **0 `LIVE ODDS REFRESH WORKER RECYCLING` lines in W** (covered: nothing matched). The ~5.5 h uptime recycle did not fire; the 23:27:50Z deploy reset its clock.
+
+### (B) refresh-worker without the live-lens builds — **precondition HOLDS, but growth did NOT drop and refusals ROSE.**
+
+**Precondition confirmed, three ways.**
+- **0 `live_lens_tick_*` stages in W** (`--text live_lens_tick`: nothing matched).
+- `LIVE_LENS_LOOP_START_RESULT started=False` at **23:34:16Z and 00:37:04Z** — the flag survived BOTH deploys in W.
+- All 63 `mlb_live_lens` lines are READS or a consumer, never a write: 28 `[artifact_publisher] PULL_LIVE_LENS_SNAPSHOT`, 27 `PULL_OK`, 1 `PULL_FAILED`, and 12 `[intelligence] CANDIDATE_STAGE ... stage=mlb_live_lens_prop_backfill before=0 after=28..1,170`.
+
+**Per-build pid 39 RSS** — minimum in the 5 min after each `CANDIDATE_POOL_CACHE` line. **Windows crossing a boot are EXCLUDED, not reported as a drop** (the 23:29:03Z build's window contains the 23:34:00Z boot and would otherwise read as -1,548 MB).
+
+| boot | builds, min pid 39 RSS (MB) and step |
+|---|---|
+| 22:12Z `2d579fd1` (started before W) | 1,209 / +222 / +208 |
+| 23:34:00Z `61ac543a` | 1,429 / +432 |
+| 00:36:48Z `1175e0ef` | 1,480 / +296 / +34 / **-225** / +325 |
+| **09-14 baseline `0a18557a`** | **1,223 / +55 / +163 / +10 / +36 / +82** |
+
+- **The first build lands in the same place** (1,209-1,480 vs 1,223). **Every later step is 2-8x the baseline's.** The longest boot in W (00:36:48Z) grew **+430 MB over 5 builds**; the baseline grew +346 MB over 6.
+- **No boot in W ran 6 builds** — two deploys cut them to 4 / 2 / 5. The 6-build baseline curve is not matched build-for-build.
+- Max pid 39 RSS in W **2,158 MB at 02:54:08Z**; hourly median 1,329 -> 1,583 -> 1,851 -> 1,777 -> 1,880 -> 1,950 MB. Min unreclaimable headroom (4,096 container) **1,459.0 MB at 02:35:36Z** vs 1,755 MB on 09-14.
+
+**THE COMPARISON IS CONFOUNDED, AND THE CONFOUND IS THE ANSWER.** The 09-14 baseline boot `0a18557a` ran 19:07-20:56Z **with no live games**; W is a live slate. What replaced the live-lens builds is measurable in the same log:
+
+- `CANDIDATE_POOL_CACHE` `pool_json_bytes` for the LIVE date climbs **45.9 -> 68.4 -> 85.5 -> 97.8 -> 95.2 -> 108.0 MB** of JSON across W. On 09-14 one pool was **19.7 MB**. `cache_json_bytes` reaches **203.2 MB** at 02:40:43Z with `limit=2`.
+- The consumer feeding it grows in step: `mlb_live_lens_prop_backfill` `after=` 28 -> 1,170 over the evening.
+- So on a live date the pool is **~5.5x** its 09-14 size, and the cap of 2 entries holds ~203 MB of JSON. **The live-lens loop was not the thing that grows on a live slate; the candidate pool is.**
+
+**Counts in W.**
+- **`MEMORY_GUARD_ABORT`: 17 total**, covered 00:16:11Z..03:11:58Z (**0 in the 22Z and 23Z hours**).
+  - **13 at `stage=pre_source_state_fingerprint`** — per hour: 22Z 0, 23Z 0, **00Z 3, 01Z 2, 02Z 3, 03Z 5** (03Z partial, to 03:11:58Z). Baseline 09-14 22:30-02:30Z: at least 5. **It is rising, and the 03Z hour is the worst.**
+  - **4 at stages the baseline never tracked:** 3 `post_collect_candidates_with_fallback_merge` (00:48:25Z, 01:18:21Z, 02:52:51Z) and 1 `post_build_overview` (01:35:10Z). These are MID-BUILD aborts against the same `floor_mb=1900`, not the pre-build gate.
+- **`[worker_recycle]`: 13 lines, ALL `RECYCLE_CHECK held=children_running`. 0 `RECYCLE_EXIT`, 0 `RECYCLE_CHECK_FAILED`.** Baseline: 5 holds, 1 exit. `consecutive_refusals` climbed 1..7 in one unbroken streak from 02:54:40Z to 03:12:59Z, `children` 1-2 at every check, `uptime_s` 8,256-9,355 against `min_uptime_s` 1800. **The 30-minute uptime floor was never the blocker; child jobs were, every single time.** This re-confirms the 09-14 structural finding on a second slate.
+- **`PORTFOLIO_COMMIT date=`: 11** — per hour 22Z 2, 23Z 3, 00Z 1, 01Z 3, 02Z 2, **03Z 0**. The last is **02:39:37Z**, so **~33 minutes with no commit at read time**, coincident with the open 7-refusal streak. That is the cost, in the money path, of the refusals this reading found.
+
+### (3) Kills
+
+- **refresh-worker: 0 `server_failed` in W.** Events cover 2026-09-11T16:13:00Z..2026-09-16T00:36:13Z. Two in the whole list, both before W: 09-15 01:34:43Z `earlyExit: true, evicted: false` (the first-ever `RECYCLE_EXIT`) and 09-12 12:10:48Z `oomKilled {memoryLimit: 4Gi}`.
+- **live-odds-worker: 0 `server_failed` in W** (see A).
+- **Neither service was killed, and neither was evicted, anywhere in W.**
+
+### Verdict and what remains unknown
+
+- **(A) YES — live-odds-worker holds the loop alone through a full live MLB slate.** 649 MB minimum unreclaimable headroom, no kill, no recycle, no ratchet. **Reverting the flag is NOT indicated by these numbers.**
+- **(B) NO — refresh-worker did not get cheaper per build, and refusals roughly doubled.** Per-build steps rose from +10..+163 MB to +34..+432 MB, `pre_source_state_fingerprint` refusals from at least 5 to 13 (plus 4 mid-build refusals at stages not previously seen), recycle holds from 5 to 13 with 0 exits, and the money path has been stalled since 02:39:37Z.
+- **UNKNOWN, and stated rather than papered over:**
+  - **There is no control.** The 09-14 baseline boot had no live games and this one is a live slate, so **the flag's own effect is not isolated by this reading.** What is established is that removing the live-lens builds did not make the live-slate refusal problem go away — not that the flag made it worse.
+  - No boot in W ran 6 builds (two deploys), so the baseline curve is matched at 5 builds, not 6.
+  - live-odds-worker's `88df44cd` deploy was still building at 03:04:56Z; its post-deploy memory is unread.
+  - The JSON-to-live-memory multiplier for the candidate pool is still unmeasured, so 108 MB of pool JSON cannot be converted to the MB of pid 39 it accounts for.
