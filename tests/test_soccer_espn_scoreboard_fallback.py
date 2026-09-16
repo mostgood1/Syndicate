@@ -64,7 +64,11 @@ def test_a_REFUSED_range_is_retried_one_date_at_a_time():
     assert sorted(event["event_id"] for event in events) == ["e20260814", "e20260815", "e20260816"]
 
 
-def test_the_ONE_DAY_range_the_artifact_builder_sends_costs_one_retry():
+# RENAMED 2026-09-16: the artifact builder no longer sends a one-day range -- it
+# sends the bare date, because ESPN now 400s every range (lane
+# `soccer-espn-window-validation`). The BEHAVIOUR under test is unchanged and still
+# matters: any caller that does send a one-day range pays exactly one retry.
+def test_a_ONE_DAY_range_costs_one_retry():
     """`build_soccer_artifacts._fetch_fixtures` sends `YYYYMMDD-YYYYMMDD` for a
     single day. That exact shape returned 400 on 2026-08-15 for all four slugs
     tried, and a refusal was a failed build."""

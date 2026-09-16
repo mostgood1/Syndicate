@@ -721,7 +721,12 @@ def _fill_promoted(ratings: dict[str, dict[str, float]], team_names: list[str]) 
 
 def _fetch_fixtures(league: str, iso_date: str) -> list[dict[str, Any]]:
     compact = iso_date.replace("-", "")
-    window = f"{compact}-{compact}"
+    # THE BARE DATE, NOT A ONE-DAY RANGE. Measured 2026-09-16 03:51Z: ESPN returns
+    # 400 to every `dates=` range, including ranges it answered 200 the day before,
+    # while the bare `YYYYMMDD` returns 200. The range form therefore bought a
+    # guaranteed 400 plus a retry on every build, for a request the fallback then
+    # issued in this exact shape anyway (lane `soccer-espn-window-validation`).
+    window = compact
     events = fetch_events(league, date_windows=[window], statuses={"pre", "in", "post"})
     fixtures: list[dict[str, Any]] = []
     for event in events:
@@ -966,7 +971,8 @@ def _attach_confirmed_starters(league: str, iso_date: str, fixtures: list[dict[s
     if not player_rows_by_team:
         return fixtures
     compact = iso_date.replace("-", "")
-    window = f"{compact}-{compact}"
+    # Bare date, same reason as `_fetch_fixtures`: every range 400s as of 2026-09-16.
+    window = compact
     try:
         updated = attach_confirmed_starters(
             fixtures,

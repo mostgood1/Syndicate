@@ -123,6 +123,16 @@ def _scoreboard_payloads(league: str, window: str, timeout: int) -> list[dict[st
       - Every bare ``YYYYMMDD`` request returned 200, including 2026-08-15 with
         8 events on eng.2.
 
+    RE-MEASURED 2026-09-16 03:51Z (lane `soccer-espn-window-validation`) AND THE
+    ANSWER CHANGED OVERNIGHT: **every range form now returns 400**, including the
+    two windows recorded above as returning 200 the day before --
+    ``20260915-20260915`` and ``20260901-20260915`` on eng.2 -- plus
+    ``20260901-20260915`` on ned.1. The bare form still returns 200 (eng.2
+    ``20260901``: 8 events). So this fallback is no longer the exception: on
+    2026-09-16 it fires for EVERY range caller, one wasted 400 each. Callers that
+    want a single date should send the bare ``YYYYMMDD`` and skip the 400 entirely
+    -- `build_soccer_artifacts` and `poll_soccer_live_state` now do.
+
     So the range form still exists but fails on some dates, and a refusal used
     to raise straight out of every caller. `aggregate_season_player_stats` walks
     the season in ranges from 1 August and died on its first window. That made
@@ -149,6 +159,55 @@ def _scoreboard_payloads(league: str, window: str, timeout: int) -> list[dict[st
     return [fetch_espn_scoreboard(league, date_range=day, timeout=timeout) for day in days]
 
 
+def _window_day_set(windows: list[str]) -> set[str] | None:
+    """Every ``YYYYMMDD`` the requested windows cover, PLUS ONE DAY EITHER SIDE.
+
+    ``None`` when any window is unparseable, which means "do not filter" -- a guard
+    that silently drops everything because it could not read its own input is worse
+    than no guard.
+
+    WHY A ONE-DAY SKIRT RATHER THAN AN EXACT MATCH. ESPN keys ``dates`` to US
+    EASTERN while ``event["date"]`` comes back in UTC, so a 19:30 ET kickoff on the
+    15th is ``2026-09-16T23:30Z`` and an exact UTC-day match would drop a legitimate
+    fixture. `zoneinfo` would answer this precisely but needs `tzdata`, which is
+    routinely absent on Windows, so the skirt is deliberate: it cannot over-filter a
+    real kickoff, and it still catches the failure this guard exists for -- a payload
+    for a different WEEK, which is what a stale 200 returns.
+    """
+    from datetime import datetime, timedelta
+
+    days: set[str] = set()
+    for window in windows or []:
+        start_text, sep, end_text = str(window or "").strip().partition("-")
+        try:
+            start = datetime.strptime(start_text, "%Y%m%d").date()
+            end = datetime.strptime(end_text, "%Y%m%d").date() if sep else start
+        except ValueError:
+            return None
+        if (end - start).days < 0:
+            return None
+        cursor = start - timedelta(days=1)
+        last = end + timedelta(days=1)
+        while cursor <= last:
+            days.add(cursor.strftime("%Y%m%d"))
+            cursor += timedelta(days=1)
+    return days or None
+
+
+def _event_utc_day(event: dict[str, Any]) -> str | None:
+    """``YYYYMMDD`` of the event in UTC, or ``None`` if it has no readable date --
+    in which case the caller KEEPS it, because an unreadable date is not evidence
+    that the event is off-window."""
+    from datetime import datetime, timezone
+
+    raw = str(event.get("date") or "")
+    try:
+        when = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return when.astimezone(timezone.utc).strftime("%Y%m%d")
+
+
 def fetch_events(
     league: str,
     *,
@@ -164,6 +223,19 @@ def fetch_events(
     (see ``_scoreboard_payloads``)."""
     found: dict[str, dict[str, Any]] = {}
     payloads = [payload for window in date_windows for payload in _scoreboard_payloads(league, window, timeout)]
+    # THE WINDOW IS NOT SELF-ENFORCING. Nothing in this function used to compare a
+    # returned event against the dates it asked for: a 200 carrying another period's
+    # events became fixtures for the requested date, and `_fetch_fixtures` handed
+    # them to the builder, whose `_attach_confirmed_starters` then set
+    # `start_probability` from the wrong lineup -- the input both the conditional
+    # shot ladder and the goal mixture key off.
+    #
+    # NOT DEMONSTRATED LIVE, and recorded that way: on 2026-09-16 every range
+    # request returned 400, so ESPN offered no range 200 to catch (lane
+    # `soccer-espn-window-validation`, 10 probes). This is a guard against a shape
+    # the endpoint has produced before, not a fix for a measured failure.
+    allowed_days = _window_day_set(date_windows)
+    dropped_off_window = 0
     for payload in payloads:
         for event in payload.get("events") or []:
             competition = (event.get("competitions") or [{}])[0]
@@ -180,6 +252,11 @@ def fetch_events(
             state = str(status.get("state") or "").lower()
             if statuses is not None and state not in statuses:
                 continue
+            if allowed_days is not None:
+                event_day = _event_utc_day(event)
+                if event_day is not None and event_day not in allowed_days:
+                    dropped_off_window += 1
+                    continue
             event_id = str(event.get("id") or "")
             if not event_id:
                 continue
@@ -218,6 +295,12 @@ def fetch_events(
                 "status_detail": status.get("detail") or status.get("shortDetail"),
                 "status_description": status.get("description"),
             }
+    if dropped_off_window:
+        print(
+            f"[espn_lineups] ESPN_OFF_WINDOW_EVENTS_DROPPED league={league} "
+            f"windows={date_windows} dropped={dropped_off_window} kept={len(found)}",
+            flush=True,
+        )
     return list(found.values())
 
 
