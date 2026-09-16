@@ -767,7 +767,13 @@ death, never life — do not invert it.
   - **Writers: TWO for MLB, measured.** Both workers write the same keyvalue key `live/mlb_live_lens.json` from `live_lens_loop.py:719`: refresh-worker 3 logged writes (1.26-1.51 MB), live-odds-worker 8 (1.05-1.52 MB). web `[ops.publish]` has 0 live-lens lines (keyvalue path). wnba/soccer/nfl: two writers INFERRED (both build every tick; writes under 1 MiB are unlogged). ncaaf: 0 builds on both.
   - **MLB live-lens build cost per tick:** refresh-worker pid 39 RSS median +51 MB (min +0.3, max +101, n=10), container median +18; live-odds-worker main RSS median +78 MB (min +6, max +131, n=15), container median +78. Nothing near 08-08's +1,445 MB.
   - Kills: none on refresh-worker. The live-odds-worker `server_failed` at 22:56:22Z was its planned uptime recycle (19,871 s), not an OOM.
-  - DECISION OWED TO USER: flag off refresh-worker (a) vs off live-odds-worker (b).
+  - **DECISION SETTLED 2026-09-14 ~01:30Z -- (a), by the user: "Off on refresh-worker (Recommended)". SHIPPED. This line said OWED until 2026-09-16 03:30Z, and on 09-16 it caused the same question to be put to the user a second time.**
+    - Carried as `SYNDICATE_ENABLE_LIVE_LENS_LOOP=false` on refresh-worker by single-key PUT ~01:35Z, then a deploy to take effect (`deploys.md`: "the restart kept the old env, which is expected").
+    - **Verified by single-key GET 2026-09-16 03:28Z, not from this file:** refresh-worker key PRESENT and not truthy -> loop OFF; live-odds-worker -> loop ON; web key ABSENT -> OFF by the code's default (`_is_live_lens_loop_enabled`, default False).
+    - The 2026-09-16 03:20Z reading in this same block is the MEASUREMENT of the post-(a) world: "(A) live-odds-worker HELD the loop alone" and "(B) refresh-worker did NOT get cheaper". So (a) is not only shipped, it is already graded -- and it did not achieve its aim.
+    - Superseded text, kept for the record: "DECISION OWED TO USER: flag off refresh-worker (a) vs off live-odds-worker (b)."
+    - **THE DECISION THAT IS ACTUALLY OWED** is the one in the 03:20Z status: cap the candidate pool cache by BYTES (or `limit=1` on live dates) VS re-scope this lane off the child process and onto the pool.
+
     - **(a)** removes refresh-worker's per-tick MLB build (median +51 / max +101 MB) and the loop's +883 MB whole-boot retained share (afternoon, no live games; not re-measured live). Unreclaimable headroom in W was min 1,755 MB. live-odds-worker ALREADY builds every sport every tick (15 vs 10 ticks), so it takes on no new build, only sole-writer status. Its W minimum was 887 MB unreclaimable headroom, with the headroom field at 0.0 twice (page cache).
     - **(b)** removes live-odds-worker's median +78 / max +131 MB per tick and leaves refresh-worker's retained share in place. That is what the code comment intends.
     - Either way the double write to one key ends.

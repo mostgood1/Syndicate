@@ -6501,3 +6501,28 @@ for what to do next surfaces the imperative and buries the correction.
   is not the world.
 - *(evidence: `57b67127` an ancestor of web `4f65f2b2`, refresh-worker `1175e0ef`, live-odds-worker `88df44cd`, read 2026-09-16 03:20Z; the
   contradicting verdict is in the same lane block, dated 2026-09-15 ~11:25 CDT)*
+
+## 2026-09-16 -- `lanes.md` ACCRUES IMPERATIVES THAT NOBODY RETIRES, and re-offering one costs the USER, not just me
+
+In one session I surfaced an "open work" list built from `lanes.md` prose and got **three items wrong in the same way** -- each was an
+imperative that had been satisfied elsewhere and never struck:
+
+1. `book-quotes-prefer-fuller-copy`: "LANDED on main, NOT DEPLOYED" -- already live on all three services; the correcting verdict was in the
+   SAME block. The user APPROVED a redundant deploy before an ancestry check caught it.
+2. `heavy-build-child-process`: "DECISION OWED TO USER: flag off refresh-worker (a) vs off live-odds-worker (b)" -- **the user had already
+   decided exactly that on 2026-09-14 ("Off on refresh-worker (Recommended)"), it shipped, and the same lane block already held the reading
+   that GRADED it.** I asked them to decide it again, and they answered again.
+3. Same lane: I reported (a) as available work while the block's newest status named a DIFFERENT owed decision.
+
+The common shape: a lane block is APPEND-ONLY in practice. "OWED", "NOT DEPLOYED", "DECISION OWED" are written once and outlive their truth,
+while the thing that retires them lands in `deploys.md`, in an env var, or in a later paragraph of the same block.
+
+- **STANDING RULE: never offer an owed item without verifying it against the source that RETIRES it** -- deploy state from the service's live
+  commit, env state from a single-key GET, a user decision from `deploys.md`. `lanes.md` proposes; it never confirms.
+- **A settled item must be struck IN PLACE, not answered further down.** Appending the answer below the question leaves both true-looking, and
+  the imperative is the half that reads like work.
+- **Re-asking a decided question is not a cheap error.** It spends the user's attention on a choice they already made, and it invites them to
+  contradict their own earlier reasoning without knowing they are doing so.
+- Same family as the `state.md` rule "overwrite the stale line; do not stack contradictory lines" -- this is that failure in `lanes.md`.
+- *(evidence: `SYNDICATE_ENABLE_LIVE_LENS_LOOP` single-key GET 2026-09-16 03:28Z -- refresh-worker OFF, live-odds-worker ON, web absent;
+  `deploys.md` "User decision ~01:30Z"; `57b67127` an ancestor of all three live SHAs)*
