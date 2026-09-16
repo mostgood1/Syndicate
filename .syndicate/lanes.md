@@ -1511,6 +1511,19 @@ death, never life — do not invert it.
 - Verification: the 09-17 shortlist's soccer counts (selected, candidates, total_rows after gates, cards_present) and `written_at`, read against the served board's per-`source_board_date` soccer count at the same instant; then the named stage's own log lines or artifact on refresh-worker. Written to this lane and `state_layer2.md`.
 - Blocked by: none (web is mid-deploy for lane `web-export-timeout`; reads wait for it)
 
+### soccer-model-edge-exposure — OPEN — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Goal: establish from production whether the soccer 1X2 (h2h) and totals MODEL edges the board serves become portfolio orders — paper and live money, counted and settled — and put the posture decision (keep sizing them, or exclude them until they beat the close, per audit fixes #4/#5) to the user with the evidence. No gating code ships without that decision.
+- Files: none (measurement only). The instrument already exists: `/api/ops/execution/ledger-summary`'s `sim_view_roi` cut (`paper_settlement.sim_view_roi_summary`), portfolio-book orders bucketed `sport | market_family | sim_view`, where h2h and Asian handicap map to `game_line` and totals to `game_total` (`_market_family`).
+- Why: read 2026-09-16 14:17:06Z (lane `soccer-corners-posture`), the board served soccer h2h model edges (43 positive of 156) and totals (73 positive of 137), and a row with a numeric `model_edge_pct` passes `portfolio_commit`'s `no_model_edge_pct` gate. The season audit found 1X2 loses to the close (+0.0276 Brier) and O/U 2.5 loses (+0.0081), with held-out rule ROI 1X2 -12.5% and O/U 2.5 -18.4%.
+- Hypotheses (PRE-REGISTERED 2026-09-16 before the ledger-summary read; the commit time is authoritative):
+  - **H32 (orders exist):** the portfolio book holds at least one SOCCER order in `game_line` or `game_total` within the endpoint's 60-ledger-date window.
+  - **H33 (real money):** at least one of those soccer orders has `mode = live`.
+  - **H34 (they lose; REPORTED, graded only with enough n):** settled portfolio ROI is negative for soccer `game_line` and for soccer `game_total`. Graded per family only at >= 30 settled orders; below that it is reported with n and NOT graded.
+- Falsification test: H32 is falsified by a zero ONLY if the same read shows at least one portfolio order in `game_line`/`game_total` for ANOTHER sport (the reader sees the population). H33 is falsified by zero live orders only if soccer has at least one paper order in those families; if soccer has none of either mode, H33 is UNTESTED. H34 as stated above.
+- Decision rule, fixed now: **H33 holds** -> bring the user a gating decision immediately (live money on markets that lose to the close). **H32 holds, H33 falsified** -> report and recommend, not urgent. **H32 falsified** -> close the lead with no action.
+- Verification: one ledger-summary read per mode (`mode=live`, `mode=paper`) with `days=60`, soccer buckets printed beside the other-sport control, with `dates_in_ledger` and the covered dates stated. Verdicts recorded in `log/2026-09-16.md` before any recommendation.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
