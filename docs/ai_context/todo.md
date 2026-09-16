@@ -1,5 +1,23 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#664` — **Soccer season-to-date audit: the ranked follow-ups, with today's status on each** — lane `soccer-season-market-audit` (reserved 2026-09-15; written 2026-09-16 by session abacd435 as a USER-APPROVED cross-lane write into `kalshi-shard-balance-gate`'s claim)
+
+- **Source:** `.syndicate/findings_2026-09-15_soccer_season_market_audit.md`, "Learnings to implement, ranked by what they unblock". Season to date no soccer market beats the close; props priced last season's squads.
+- **Done or decided (for the record, not open work):**
+  - #1 player substrate from current-season data — LIVE and verified 2026-09-15.
+  - #2 minutes/role allocation, shots divisor retired — LIVE and verified.
+  - #3 anytime scorer (load-time ESPN goal shrink + start/sub mixture) — LIVE on all services, verified 2026-09-16 (323 rows, 0 zeros).
+  - #4 1X2 favourite dispersion (H20) — INVALID and falsified; no change.
+  - #5a in-season league scoring (H25) — FALSIFIED; no change. #5b prior xG environment as a totals input (H24) — owned by `#665` (grade by 2026-10-15).
+  - #8 FotMob season-scoped league ids — FIXED 2026-09-15; Belgian Pro League's in-play read is scheduled Fri 09-18 (`fotmob-belgian-verify-0918`).
+  - Posture: by USER DECISION 2026-09-16 nothing is blocked by sport or market family; each play is judged on its own sim edge and EV (`learnings.md`).
+- **OPEN, in the audit's order:**
+  - **#6 corners model rebuild.** The match-total corners model is uninformative (r = 0.02; MLS over-predicted by 1.39, EPL by 1.27). Rebuild from team corner rates plus a pressure term; fix the MLS level. Interim posture already holds: no corners MODEL edge reaches the board (0 of 641 rows, 2026-09-16; corners rows are price-shopping only). A model-engine-standard lane (reachability, engine replay, held-out re-fit).
+  - **#7 live model.** A per-league momentum weight (next-goal AUC: MLS 0.52, none; Primeira 0.68); condition live totals and corners on running intensity (terciles move corners -1.61..+0.63); keep the global second-half multiplier (late-goal share uniform 19-23%).
+  - **#9 capture.** Pull BTTS and corners nearer kickoff (median capture 13.8 h before); capture team totals and team corners if they are ever to be priced; prop UNDERs do not exist in the current feed.
+  - **#10 betting watch-list.** No soccer market has a demonstrated edge; the only non-negative held-out cells (corners >= 8 pp, 93 bets; SOT raw >= 15 pp, 47; anytime raw >= 15 pp, 46) are to be PRE-REGISTERED and graded forward, not staked on the audit's evidence.
+- **Done when:** each open item is either shipped with a production measurement, or closed with its evidence, in its own lane.
+
 ### `#666` — **Read the board ranker's 14-day history reader (#44) on refresh-worker: it must attach all 14 days without breaching the revert ceilings** — lane `board-eval-reader-chunk-ceiling`, 2026-09-16 — **OPEN; code on main, deploy user-approved and queued for 2026-09-16 ~19:58Z**
 
 - **Why.** The ranker's `load_recent_evaluation_records(days=14)` skipped 12 of 14 days in production (636 `SKIP_OVERSIZED_LEDGER_CHUNK ceiling=64000000` lines, 2026-09-16 00:07-15:05Z; chunks 117-417 MB), so the board ranked on 2 days of history. `ranking_records.load_recent_ranking_records` (`be530506`, `549c10ec`, `48a677eb`) streams every chunk and keeps only settled records' ranking fields.
