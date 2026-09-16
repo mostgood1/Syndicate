@@ -1,0 +1,360 @@
+{
+  "app": {
+    "access_lines": 6955,
+    "instrument_blind": false,
+    "instrument_partial": false,
+    "log_lines": 16941,
+    "note": "served_bytes is RESPONSE size only; a POST body (e.g. artifacts/publish) is NOT counted here",
+    "served_bytes": 508686218,
+    "served_mb": 485.12,
+    "top_clients": [
+      {
+        "bytes": 96832895,
+        "count": 548,
+        "key": "10.195.62.134"
+      },
+      {
+        "bytes": 86474358,
+        "count": 513,
+        "key": "10.192.43.134"
+      },
+      {
+        "bytes": 73422062,
+        "count": 576,
+        "key": "10.199.245.5"
+      },
+      {
+        "bytes": 70507050,
+        "count": 725,
+        "key": "10.193.4.133"
+      },
+      {
+        "bytes": 59290475,
+        "count": 622,
+        "key": "10.199.195.4"
+      },
+      {
+        "bytes": 58177146,
+        "count": 562,
+        "key": "10.195.241.15"
+      },
+      {
+        "bytes": 30552047,
+        "count": 925,
+        "key": "10.195.110.136"
+      },
+      {
+        "bytes": 21190656,
+        "count": 623,
+        "key": "10.195.110.244"
+      },
+      {
+        "bytes": 10634811,
+        "count": 1059,
+        "key": "10.197.59.232"
+      },
+      {
+        "bytes": 1577960,
+        "count": 2,
+        "key": "10.195.110.139"
+      },
+      {
+        "bytes": 26758,
+        "count": 787,
+        "key": "10.228.19.94"
+      },
+      {
+        "bytes": 0,
+        "count": 13,
+        "key": "127.0.0.1"
+      }
+    ],
+    "top_paths": [
+      {
+        "bytes": 401567992,
+        "count": 167,
+        "key": "/api/intelligence/query"
+      },
+      {
+        "bytes": 68108426,
+        "count": 362,
+        "key": "/api/ops/artifacts/export"
+      },
+      {
+        "bytes": 33662215,
+        "count": 27,
+        "key": "/"
+      },
+      {
+        "bytes": 2172014,
+        "count": 187,
+        "key": "/api/board/game-chips"
+      },
+      {
+        "bytes": 878511,
+        "count": 1,
+        "key": "/api/board/layer1"
+      },
+      {
+        "bytes": 685724,
+        "count": 2717,
+        "key": "/wnba/api/final_player_boxscore"
+      },
+      {
+        "bytes": 641775,
+        "count": 651,
+        "key": "/api/ops/artifacts/stream"
+      },
+      {
+        "bytes": 230685,
+        "count": 1703,
+        "key": "/api/ops/artifacts/publish"
+      },
+      {
+        "bytes": 167224,
+        "count": 4,
+        "key": "/api/portfolio/live"
+      },
+      {
+        "bytes": 138827,
+        "count": 1,
+        "key": "/ncaaf"
+      },
+      {
+        "bytes": 91813,
+        "count": 145,
+        "key": "/wnba/api/live_player_boxscore"
+      },
+      {
+        "bytes": 72071,
+        "count": 1,
+        "key": "/nhl"
+      }
+    ]
+  },
+  "bucket": "2026-09-15T21:00:00Z",
+  "captured_at": "2026-09-16T03:23:15Z",
+  "deploys_in_window": [
+    {
+      "commit": "dd014d1420",
+      "createdAt": "2026-09-15T21:34:51.584388Z",
+      "finishedAt": "2026-09-15T21:40:47.53342Z",
+      "status": "deactivated"
+    },
+    {
+      "commit": "f09601a042",
+      "createdAt": "2026-09-15T21:12:18.129754Z",
+      "finishedAt": "2026-09-15T21:22:57.320576Z",
+      "status": "deactivated"
+    }
+  ],
+  "edge": {
+    "bytes": 478193479,
+    "mb": 456.04,
+    "requests": 3753,
+    "top_clients": [
+      {
+        "bytes": 429369312,
+        "count": 675,
+        "key": "73.75.177.190"
+      },
+      {
+        "bytes": 7166952,
+        "count": 92,
+        "key": "135.232.232.34"
+      },
+      {
+        "bytes": 6726130,
+        "count": 93,
+        "key": "52.234.2.54"
+      },
+      {
+        "bytes": 5829806,
+        "count": 92,
+        "key": "64.236.131.243"
+      },
+      {
+        "bytes": 4051295,
+        "count": 93,
+        "key": "20.168.103.4"
+      },
+      {
+        "bytes": 3827029,
+        "count": 93,
+        "key": "128.203.190.87"
+      },
+      {
+        "bytes": 2716508,
+        "count": 95,
+        "key": "172.215.217.96"
+      },
+      {
+        "bytes": 2162347,
+        "count": 6,
+        "key": "66.249.83.64"
+      },
+      {
+        "bytes": 2089137,
+        "count": 4,
+        "key": "66.249.83.65"
+      },
+      {
+        "bytes": 2079078,
+        "count": 4,
+        "key": "66.249.83.69"
+      },
+      {
+        "bytes": 2072938,
+        "count": 2,
+        "key": "66.249.83.78"
+      },
+      {
+        "bytes": 2048423,
+        "count": 94,
+        "key": "74.235.134.166"
+      }
+    ],
+    "top_paths": [
+      {
+        "bytes": 397591652,
+        "count": 178,
+        "key": "/api/intelligence/query"
+      },
+      {
+        "bytes": 34514452,
+        "count": 2887,
+        "key": "/wnba/api/final_player_boxscore"
+      },
+      {
+        "bytes": 30548452,
+        "count": 16,
+        "key": "/"
+      },
+      {
+        "bytes": 5659771,
+        "count": 107,
+        "key": "/api/ops/artifacts/export"
+      },
+      {
+        "bytes": 4882309,
+        "count": 197,
+        "key": "/api/board/game-chips"
+      },
+      {
+        "bytes": 2316300,
+        "count": 156,
+        "key": "/wnba/api/live_player_boxscore"
+      },
+      {
+        "bytes": 878814,
+        "count": 1,
+        "key": "/api/board/layer1"
+      },
+      {
+        "bytes": 511628,
+        "count": 53,
+        "key": "/api/ops/steam/events"
+      },
+      {
+        "bytes": 168360,
+        "count": 4,
+        "key": "/api/portfolio/live"
+      },
+      {
+        "bytes": 139056,
+        "count": 1,
+        "key": "/ncaaf"
+      },
+      {
+        "bytes": 138880,
+        "count": 8,
+        "key": "/static/shared/syndicate-brand-header.jpg"
+      },
+      {
+        "bytes": 91375,
+        "count": 11,
+        "key": "/static/shared/board_cards.css"
+      }
+    ],
+    "top_user_agents": [
+      {
+        "bytes": 200596189,
+        "count": 213,
+        "key": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, l"
+      },
+      {
+        "bytes": 134282309,
+        "count": 117,
+        "key": "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, lik"
+      },
+      {
+        "bytes": 85717252,
+        "count": 145,
+        "key": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+      },
+      {
+        "bytes": 34514452,
+        "count": 2887,
+        "key": "Mozilla/5.0"
+      },
+      {
+        "bytes": 10840772,
+        "count": 350,
+        "key": "Python-urllib/3.11"
+      },
+      {
+        "bytes": 8484230,
+        "count": 18,
+        "key": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML"
+      },
+      {
+        "bytes": 1888067,
+        "count": 2,
+        "key": "DuckDuckBot/1.1; (+http://duckduckgo.com/duckduckbot.html)"
+      },
+      {
+        "bytes": 1251106,
+        "count": 13,
+        "key": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatibl"
+      },
+      {
+        "bytes": 446316,
+        "count": 2,
+        "key": "Go-http-client/2.0"
+      },
+      {
+        "bytes": 168360,
+        "count": 4,
+        "key": "curl/8.21.0"
+      },
+      {
+        "bytes": 4426,
+        "count": 2,
+        "key": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/"
+      }
+    ]
+  },
+  "metered_mb": 452.21582,
+  "note": "bucket is labelled by its hour's START: window_covered is label..label+1h (changed 2026-09-10; captures before then read the hour BEFORE the label -- see `rederived.prior` where present). edge_* is public traffic only; app_* includes internal service-to-service.",
+  "other_services_same_hour": {
+    "live-odds-worker": 20.6,
+    "refresh-worker": 17.3
+  },
+  "publish_into_web": {
+    "live-odds-worker": {
+      "bytes": 208379142,
+      "mb": 198.73,
+      "publishes": 595
+    },
+    "refresh-worker": {
+      "bytes": 64165262,
+      "mb": 61.19,
+      "publishes": 47
+    }
+  },
+  "service": "web",
+  "window_covered": {
+    "end": "2026-09-15T22:00:00Z",
+    "start": "2026-09-15T21:00:00Z"
+  }
+}
