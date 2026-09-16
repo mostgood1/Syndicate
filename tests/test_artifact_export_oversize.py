@@ -270,6 +270,13 @@ class ArtifactExportResumeCursorTests(TestCase):
                 since = body["next_since"]
                 self.assertLess(reads, 20, "the cursor never reached the end")
         self.assertEqual(delivered, everything, f"files skipped: {sorted(everything - delivered)}")
+        # ASSERT THE BRANCH RAN, NOT ONLY THE OUTCOME. The first version of this
+        # test ended at the line above and PASSED ON THE PRE-CHANGE CODE: without
+        # the `budget_bytes` override the budget stayed 48 MB, all five 700 KB
+        # files fit one read, the loop exited at once, and "every file arrived"
+        # held without a cursor ever being issued. At a 1 MB budget each read can
+        # carry exactly one 700 KB file, so the chain must take exactly five reads.
+        self.assertEqual(reads, 5, f"the cursor path did not run as designed ({reads} reads)")
 
     def test_a_read_WITHOUT_since_keeps_its_old_behaviour_and_no_cursor(self) -> None:
         """The no-`since` caller is the backup workflow, which never asked for a
