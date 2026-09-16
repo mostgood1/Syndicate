@@ -6452,3 +6452,21 @@ instance, in the old format. A post-deploy window that starts at `finishedAt` th
   - State a detector's false-positive rate when you record a reading that uses it, so the next person does not have to rediscover it from one alarming row.
   - Keep the denominator honest too: this one counted rows that CANNOT discriminate (zero-mean rows price 0.0 either way), which inflated the raw share to 15% in one league while the discriminating share was 0.
 - *(evidence: `deploys.md` 2026-09-16 01:23Z sentinel sweep; bundesliga `recommendations_2026-09-18.json` gen 00:21:57Z)*
+
+## 2026-09-16 — OVERTURNED: "the pre-registered criterion is the safe part, the risk is in the mechanism" — two hypotheses in one night died on the CRITERION `[session abacd435, fixes #4 and #5a; no lane]`
+
+- **H20 condition (c)** compared the model's favourite price to **the market's**. On TEST, favourites the market priced at 70.7% actually won **78.5%** (n=158), so the arm that best matched OUTCOMES (k=2.0, at 0.801) is the one the criterion penalised hardest. It silently assumed the benchmark was calibrated on that sample.
+- **H25 condition (b)** used the **pooled signed** bias. Per league, |bias| shrank in 8 of 10 and worsened in none, yet the pooled figure moved +0.106 -> +0.111: MLS (n=134, the largest league, over-predicting) improved from -0.41 to -0.19 and pushed the signed mean UP. H22 had already written that cancellation down -- the pooled bias barely moves because MLS runs the other way -- and I still wrote the criterion on the pooled number.
+- Both verdicts stand as recorded (H20 INVALID and falsified; H25 FALSIFIED). Neither was re-interpreted after it failed, which is the point of writing them first.
+- **How to apply.**
+  - After drafting a criterion, ask what ELSE could move it. A pooled signed mean over heterogeneous groups is almost never the quantity a decision needs; a per-group magnitude plus a sign test usually is.
+  - When the comparator is a market, say whether it is assumed calibrated on that sample. If it is not, closer-to-the-market is not better.
+  - A criterion defect is free to fix before the run and total afterwards: each of these cost a compute run of about 2.5 h that no amount of re-reading can rescue.
+- *(evidence: `log/2026-09-15.md` H20 entry `7171760b` and the H25 analysis; the analyzer's own degenerate `improved 0/9, p=0.004` line, which compares k*=1.0 against itself)*
+
+## 2026-09-16 — FORBIDDEN: gating a backtest on a `matches_scored` baseline produced by a DIFFERENT code state. Pin a fresh reference at the commit the run uses `[session abacd435, fix #4]`
+
+- H20's sanity gate compared per-league match counts to `reports/soccer_backtest/h2h_calibration_2026-08-15_limit120_n1112.json` and failed on four leagues: bundesliga 126 -> **71**, la_liga 123 -> 120, ligue_1 126 -> 120, serie_a 120 -> 121.
+- **The run was right and the baseline was stale.** `skipped_thin_ratings` rose 3-5x in exactly the five Understat leagues (epl 202 -> 699, la_liga 202 -> 873, bundesliga 180 -> 847, serie_a 200 -> 613, ligue_1 180 -> 528) and is byte-identical in the four goals-based ones. The harness was corrected after that baseline to read ratings the way production does, branch for branch: the big five use Understat xG+ppda with `window=45` where the baseline used goals-as-xG with `window=90`, and a 45-day window admits far fewer teams to the 20-prior-matches test.
+- **How to apply.** A stored baseline measures a CODE STATE, not a league. Record the commit beside any baseline a gate reads; when the harness has changed, generate a fresh reference arm at the running commit and say so BEFORE the run. Do not swap the gate after seeing it fail.
+- *(evidence: `log/2026-09-15.md` H20 entry; `summary_k1.0.json` coverage against the baseline, compared per league at 00:48:51Z)*
