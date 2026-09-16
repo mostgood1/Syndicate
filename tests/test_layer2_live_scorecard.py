@@ -84,6 +84,43 @@ def test_grade(over, away, home, expected):
     assert mod.grade(_rec(**over), away, home) == expected
 
 
+@pytest.mark.parametrize(
+    "side, away, home, expected",
+    [
+        # A draw is a result in a 3-way moneyline: the draw side wins, both team sides lose.
+        ("draw", 1, 1, "win"),
+        ("home", 1, 1, "loss"),
+        ("away", 1, 1, "loss"),
+        # A decisive score settles every side.
+        ("draw", 0, 2, "loss"),
+        ("home", 0, 2, "win"),
+        ("away", 0, 2, "loss"),
+        ("away", 3, 1, "win"),
+        ("home", 3, 1, "loss"),
+    ],
+)
+def test_soccer_h2h_is_three_way(side, away, home, expected):
+    assert mod.grade(_rec(sport="soccer", market="h2h", side=side, line=None), away, home) == expected
+
+
+def test_two_way_sports_still_push_on_a_tie_and_have_no_draw_side():
+    assert mod.grade(_rec(sport="nfl", market="h2h", side="home", line=None), 17, 17) == "push"
+    assert mod.grade(_rec(sport="nfl", market="h2h", side="draw", line=None), 17, 17) is None
+
+
+def test_soccer_h2h_agrees_with_bucket_search_on_every_side_and_outcome():
+    # bucket_search.settle_from_score applied the 3-way rule as a workaround; both must agree.
+    spec = importlib.util.spec_from_file_location(
+        "bucket_search_for_parity", pathlib.Path(__file__).resolve().parents[1] / "scripts" / "bucket_search.py"
+    )
+    bucket = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(bucket)
+    for side in ("home", "draw", "away"):
+        for away, home in ((1, 1), (0, 2), (3, 1)):
+            rec = _rec(sport="soccer", market="h2h", side=side, line=None)
+            assert mod.grade(rec, away, home) == bucket.settle_from_score(rec, away, home), (side, away, home)
+
+
 def test_phase_prefers_the_recorded_state_and_labels_the_clock_fallback():
     assert mod.phase_of(_rec(game_state="live")) == "in_play"
     assert mod.phase_of(_rec(game_state="pregame")) == "pregame"

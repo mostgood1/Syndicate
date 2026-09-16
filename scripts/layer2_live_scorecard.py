@@ -290,11 +290,28 @@ def look_after(
     return state
 
 
+# Sports whose moneyline is 3-way (home / draw / away). There a draw is a RESULT, not a
+# void: the draw side wins and both team sides lose. Everywhere else a tie is a push.
+THREE_WAY_H2H_SPORTS = frozenset({"soccer"})
+
+
 def grade(record: Mapping[str, Any], away_score: int, home_score: int) -> str | None:
     """'win' | 'loss' | 'push', or None when a final score cannot settle it."""
     market = str(record.get("market") or "").strip().lower()
     side = str(record.get("side") or "").strip().lower()
     line = _as_float(record.get("line"))
+    sport = str(record.get("sport") or "").strip().lower()
+    if market == "h2h" and sport in THREE_WAY_H2H_SPORTS:
+        # Lead #53 (2026-09-16): this used to fall through to the 2-way rule, grading a
+        # drawn home/away pick as a push and leaving the draw side ungraded, which dropped
+        # every drawn soccer game from the measurement.
+        if side == "draw":
+            return "win" if away_score == home_score else "loss"
+        if side in {"away", "home"}:
+            if away_score == home_score:
+                return "loss"
+            return "win" if (side == "away") == (away_score > home_score) else "loss"
+        return None
     if market == "h2h" and side in {"away", "home"}:
         if away_score == home_score:
             return "push"
