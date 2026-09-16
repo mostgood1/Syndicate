@@ -771,6 +771,9 @@ def commit_portfolio(
     # quotes. Without this the gap is unattributable and stays a guess.
     refusals_by_sport: dict[str, dict[str, int]] = {}
     rows_in = 0
+    # Counted ON THE ROWS (see `sim_coverage` below), never derived from a
+    # refusal counter: EV-only rows can be sized or refused for other reasons.
+    rows_with_sim_edge = 0
 
     def refuse(reason: str, row: Any = None) -> None:
         refusals[reason] = refusals.get(reason, 0) + 1
@@ -797,6 +800,8 @@ def commit_portfolio(
     priced: list[dict[str, Any]] = []
     for row in rows or ():
         rows_in += 1
+        if isinstance(row, Mapping) and _as_float(row.get("model_edge_pct")) is not None:
+            rows_with_sim_edge += 1
         if not isinstance(row, Mapping):
             refuse("row_not_a_mapping", None)
             continue
@@ -1146,12 +1151,19 @@ def commit_portfolio(
         # `rows_with_sim_edge` is the honest version: how many rows carried a
         # probability-space `model_edge_pct` at all. Measured on the served
         # shortlist 2026-08-16, that was 65 of 108. This counts it every run.
+        #
+        # COUNTED ON THE ROWS, NOT FROM `refusals["no_model_edge_pct"]`. That
+        # derivation was exact only while every row without a sim edge was
+        # refused for that reason. From 2026-09-16 (user decision, EV-only
+        # staking in every sport) such a row can be SIZED or refused for another
+        # reason, and the old number would have called that book 100% covered
+        # (`tests/test_portfolio_commit_sim_coverage.py`).
         "sim_coverage": {
             "rows_in": rows_in,
-            "rows_with_sim_edge": rows_in - refusals.get("no_model_edge_pct", 0),
-            "rows_without_sim_edge": refusals.get("no_model_edge_pct", 0),
+            "rows_with_sim_edge": rows_with_sim_edge,
+            "rows_without_sim_edge": rows_in - rows_with_sim_edge,
             "share_with_sim_edge": (
-                round((rows_in - refusals.get("no_model_edge_pct", 0)) / rows_in, 4)
+                round(rows_with_sim_edge / rows_in, 4)
                 if rows_in
                 else None
             ),
