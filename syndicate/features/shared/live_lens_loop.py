@@ -935,7 +935,12 @@ def _live_lens_background_loop() -> None:
 			# records, so these stages are visible from web.
 			log_and_persist_process_memory("live_lens_pull_before", append_to_ring=False, date=cycle_date)
 			try:
-				pulled_count = pull_hot_artifacts(date_str=central_today_iso())
+				# 30 s, EXPLICITLY, while the board build's default is 90 s. This pull runs
+				# inline before the tick below; a slow web walk at 90 s per date pattern
+				# could delay the ~60 s tick by minutes and stale the soccer live
+				# aggregate the Layer 2 chips read. A timed-out pull here costs one tick
+				# of artifact freshness and does not advance the watermark.
+				pulled_count = pull_hot_artifacts(date_str=central_today_iso(), timeout_seconds=30)
 				if pulled_count:
 					print(f"[live_lens_loop] pulled_hot_artifacts count={pulled_count}", flush=True)
 			except Exception as exc:
