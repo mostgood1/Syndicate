@@ -215,6 +215,22 @@ on a quiet log.
 so adding a sport to the board without a resolver now FAILS instead of quietly
 demonstrating the bug. Pinned is not fixed.
 
+## [execution-ledger-lost-live-rows] 30 LIVE FILLS PLACED 2026-09-01..09-04 ARE MISSING FROM THE EXECUTION LEDGER, BY DESIGN NOT RESTORED — correct any ROI, settlement or CLV analysis over those dates by hand `[recorded 2026-09-16, user decision "Record the gap, don't restore"; lane execution-ledger-live-trim]`
+
+**What happened.** Before `a2a1fa32` the ledger's 5,000-record cap dropped the OLDEST rows regardless of mode, so live fills were evicted along with paper. The fix (only `paper` rows are ever dropped) is live on every service and verified: refresh-worker 377 `TRIMMED` lines and live-odds-worker 29, all `dropped_by_mode={'paper': N}`, 0 live rows dropped (to 2026-09-16 13:58Z).
+
+**The money is not lost; the RECORD is.** The fills happened at the venues and the venue balances already reflect them. What is missing is their ledger rows, so anything computed from the ledger or the served live book over 09-01..09-04 undercounts these orders.
+
+**Why not restored `[user 2026-09-16]`:** nothing can write ledger rows (the reconciler's orphan scan is report-only by deliberate design), 12 of the 20 Polymarket rows have no contracts/market/stake left in logs, and Polymarket's reconciler reads per order (`coverage=per_order`), so its orphan scan cannot see them at all. Restoring would need new code and two deploys to the live-order worker for analytics only.
+
+**Kalshi, 10 fills, $55.73 incl. fees** (idempotency key, ticker, contracts @ price, stake, date): `e8f428191e6e7fe4619b6fb7` KXMLBTOTAL-26SEP011840TORCLE-7 over 6.5 8 @ 0.51 stake 4.55 (09-01); `5588591618c12ce924e460c0` KXMLBSPREAD-26SEP021940DETMIN-MIN2 home -1.5 3 @ 0.35 stake 1.31 (09-02); `4b7f70492ec2b49efd1da77c` KXMLBTOTAL-26SEP021540PHIAZ-6 over 5.5 10 @ 0.35 stake 3.88 (09-02); `0ddcbeb1087243302e6af69b` KXMLBTOTAL-26SEP021940MIAKC-9 under 8.5 19 @ 0.46 stake 9.03 (09-02); `b5c619d43febeecc16993e8d` KXMLBTOTAL-26SEP021940MILCHC-9 under 8.5 11 @ 0.49 stake 5.57 (09-02); `7a751f80634b54e1c51cc0fc` KXMLBTOTAL-26SEP022210STLLAD-8 under 7.5 12 @ 0.46 stake 5.78 (09-03); `7cd3ecdf3875c6838165c40d` KXMLBTOTAL-26SEP022138NYYLAA-5 over 4.5 19 @ 0.5 stake 10.12 (09-03); `ffd3ed75e9e0b14d6e30be8e` KXMLBTOTAL-26SEP031235SFPIT-9 under 8.5 19 @ 0.45 stake 8.71 (09-03); `92860aac7abf94b13ab6704f` KXMLBTOTAL-26SEP042210ATHSEA-8 over 7.5 12 @ 0.46 stake 5.96 (09-04); `ff62fde8eb851cfcf65bc57d` KXMLBTOTAL-26SEP042005TBTEX-9 under 8.5 5 @ 0.51 stake 2.59 (09-04).
+
+**Polymarket, 20 fills.** Full detail for 8: `C7CNYDJV4KDH` tsc-mlb-bal-col-2026-08-31-10pt5 NO 5.04 @ avgPx 0.5000; `C7YJT13SEM9F` aec-mlb-ath-tex-2026-09-01 YES 5.35 @ avgPx 0.3350; `C8292W0ATMA3` tsc-mlb-phi-az-2026-09-01-7pt5 NO 4.11 @ avgPx 0.6500; `C84V9M1Z6MCK` tsc-lal-ala-osa-2026-09-06-2pt5 YES 15.76 @ avgPx 0.3700; `C8GBQRTHMMW0` atc-eflch-bur-mid-2026-09-02-bur YES 3.53 @ avgPx 0.3100; `C8ZAFJ9S6MW0` atc-lal-rso-cel-2026-09-03-cel YES 4.86 @ avgPx 0.2200; `C9B0G201JMVG` aec-mlb-stl-lad-2026-09-03 YES 5.26 @ avgPx 0.2800; `C9CHPYTAJMVG` aec-mlb-ath-sea-2026-09-03 YES 5.84 @ avgPx 0.2450. Id, side and fill price only for 12 (logs expired): `C4N3GPYA4GNQ`, `C5Z80VJKYKDK`, `C7A2NRX2EKDF`, `C7CEAC90MKDD`, `C7CEAP1SRKDM`, `C7CG2G8CCKDK`, `C7CGCT7PTKDN`, `C7CX3YKB4KDN`, `C7G9F92G8KDD`, `C7GA29PGCKDD`, `C7WAS5YB4MCS`, `C7V7H872JMA6`. Stake for the thin rows is unknown; read it from the venue by order id if an analysis needs it.
+
+**Correction recorded with this:** `C7CNYDJV4KDH` was called "never filled" in lane `polymarket-no-fill-booking-audit` (2026-09-15). The venue ORDER_STATE read the same day says `ORDER_STATE_FILLED`, 5.04 contracts at avgPx 0.50, `tsc-mlb-bal-col-2026-08-31-10pt5` Under. It filled; its row was trimmed like the others.
+
+**How to use this:** before trusting a ledger-derived number that includes 2026-09-01..09-04, add these 30 orders back or state the undercount.
+
 ## [execution-ledger-cross-service-race] THE MONEY LEDGER IS WRITTEN BY THREE SERVICES, AND SINCE 2026-09-11 EVERY WRITE IS ONE COMPARE-AND-SWAP (#656); the lost-update history is below `[CAS verified on production 2026-09-11T03:36Z, lane execution-ledger-cas; history verified 2026-08-28, lane portfolio-venue-and-side-integrity]`
 
 `execution_ledger._persist` does a blind whole-document `write_json_file` — no
