@@ -138,3 +138,60 @@ class ArtifactExportOversizeTests(TestCase):
             body = json.loads(response.data.decode("utf-8"))
 
         self.assertIn(HUGE, body["artifacts"], "the cap hid the file from the inventory too")
+
+
+# ---------------------------------------------------------------------------
+# The BUDGET, raised 24 MB -> 48 MB (2026-09-16, user decision).
+#
+# After the per-file cap shipped, refresh-worker's `*2026-09-16*` pull still
+# reported `truncated=True` at 77 files with ZERO oversize skips: ordinary
+# artifacts under the cap filling 24 MB on their own. Measured at the cap's own
+# boundary, a 30-minute window carried 36.65 MB and the 2-hour clamp 37.30 MB.
+# ---------------------------------------------------------------------------
+
+# Four real hot-artifact paths, each a separate league, so the export admits all
+# of them and the test is about the budget rather than the allowlist.
+_UNDER_CAP_PATHS = [
+    f"soccer_source/{league}/api/live_state/live_state_2026-09-15.json"
+    for league in ("epl", "la_liga", "serie_a", "bundesliga")
+]
+
+
+class ArtifactExportBudgetTests(TestCase):
+    def setUp(self) -> None:
+        app = create_app()
+        app.testing = True
+        self.client = app.test_client()
+
+    def test_the_default_budget_is_48_MB(self) -> None:
+        """Pinned directly, with the override ABSENT -- which is how all three
+        services run (checked 2026-09-16 on the single-key endpoint)."""
+        from syndicate.blueprints.ops import _artifact_export_budget_bytes
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("SYNDICATE_ARTIFACT_EXPORT_MAX_BYTES", None)
+            self.assertEqual(_artifact_export_budget_bytes(), 48 * 1024 * 1024)
+
+    def test_a_set_between_24_and_48_MB_is_delivered_WHOLE(self) -> None:
+        """The behaviour the raise is for: 28 MB of under-cap files, which the
+        old budget truncated, now arrives complete with `truncated` false.
+
+        Each file is 7 MB -- under the 8 MB per-file cap, so this cannot pass by
+        way of the cap skipping them."""
+        seven_mb = "z" * (7 * 1024 * 1024)
+        with TemporaryDirectory() as tmp_dir:
+            for relative in _UNDER_CAP_PATHS:
+                _write(tmp_dir, relative, seven_mb)
+            env = {"ADMIN_TOKEN": TOKEN, "SYNDICATE_DATA_ROOT": tmp_dir}
+            with patch.dict(os.environ, env, clear=False):
+                os.environ.pop("SYNDICATE_ARTIFACT_EXPORT_MAX_BYTES", None)
+                os.environ.pop("SYNDICATE_ARTIFACT_EXPORT_MAX_FILE_BYTES", None)
+                response = self.client.get(
+                    "/api/ops/artifacts/export?pattern=*2026-09-15*",
+                    headers={"Authorization": f"Bearer {TOKEN}"},
+                )
+            body = json.loads(response.data.decode("utf-8"))
+
+        self.assertFalse(body["truncated"], "28 MB of under-cap files was still truncated")
+        self.assertEqual(sorted(body["artifacts"]), sorted(_UNDER_CAP_PATHS))
+        self.assertEqual(body["oversize_skipped"], 0, "the cap, not the budget, decided this")

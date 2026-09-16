@@ -3016,15 +3016,48 @@ def _artifact_export_max_file_bytes() -> int:
     return max(1024 * 1024, value)
 
 
+# 48 MB. See `_artifact_export_budget_bytes` for the measurement it rests on.
+_ARTIFACT_EXPORT_DEFAULT_BUDGET_BYTES = 48 * 1024 * 1024
+
+
 def _artifact_export_budget_bytes() -> int:
-    # 24MB default: comfortably above a normal incremental pull (the
-    # watermark keeps those small) and far below what put a 2GB instance
-    # near its ceiling. Tunable without a deploy during an incident.
+    """The most file-body bytes one bulk (pattern) export will carry.
+
+    RAISED 24 MB -> 48 MB on 2026-09-16 (lane `web-export-timeout`, user decision),
+    because 24 MB was truncating the pulls of the service that builds the board.
+
+    MEASURED at the per-file cap's OWN boundary, i.e. only files <= 8 MB, which is
+    everything this budget can ever be asked to carry -- `*2026-09-16*` at 14:00Z:
+
+        pull window   eligible bytes   fits 24 MB   fits 48 MB
+        150 s           5.75 MB          yes          yes
+        15 min         11.64 MB          yes          yes
+        30 min         36.65 MB          NO           yes
+        2 h            37.30 MB          NO           yes   (the first-boot clamp)
+
+    live-odds-worker pulls every ~2-3 minutes and always fit. refresh-worker pulls a
+    date every ~15-30 minutes and did NOT: after the per-file cap shipped, its
+    `*2026-09-16*` pull still reported `truncated=True` at 77 files with ZERO
+    oversize skips (`deploys.md` 2026-09-16 05:01:10Z) -- ordinary artifacts, not
+    accumulators, filling the budget -- and every file it did not receive fell below
+    a watermark that advanced anyway.
+
+    WHAT IT COSTS, stated rather than implied: the bodies are held as `str` in a
+    dict and then serialized by `jsonify`, so a full 48 MB response is roughly 3x
+    that transient -- ~150 MB -- per concurrent export on a 2 GB instance that is
+    also serving the board. Headroom at the 2 h window is ~22% (37.3 of 48 MB) and
+    was measured on an ordinary slate, not a busy one.
+
+    NOT TUNABLE "WITHOUT A DEPLOY". This used to say it was. It is read from
+    `os.environ` in-process, and a Render env change does not reach a running
+    process until the service is deployed -- the env var is an override that needs
+    a deploy like any other.
+    """
     raw = str(os.environ.get("SYNDICATE_ARTIFACT_EXPORT_MAX_BYTES") or "").strip()
     try:
-        value = int(raw or 24 * 1024 * 1024)
+        value = int(raw or _ARTIFACT_EXPORT_DEFAULT_BUDGET_BYTES)
     except ValueError:
-        value = 24 * 1024 * 1024
+        value = _ARTIFACT_EXPORT_DEFAULT_BUDGET_BYTES
     return max(1024 * 1024, value)
 
 
