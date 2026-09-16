@@ -151,6 +151,18 @@ body.syndicate-body .cards-shell {
   cursor: help;
 }
 
+/* THE TWO HORIZONTAL STRIPS SCROLL ON A DARK BOARD, and without a colour
+   they take the browser's LIGHT native scrollbar. Reported 2026-09-16 (lane
+   `layer2-chip-rail-duplicate`): a bright white bar under the Games rail.
+   Measured on the served page: `scrollbar-color: auto` and root
+   `color-scheme: normal` on both strips. The thumb reuses the board's own
+   strong line colour; the track stays transparent. */
+.board-strip,
+.game-card-strip {
+  scrollbar-color: var(--cards-line-strong) transparent;
+  scrollbar-width: thin;
+}
+
 .board-strip {
   display: flex;
   gap: 10px;
@@ -182,6 +194,17 @@ body.syndicate-body .cards-shell {
   margin-top: 2px;
   font-size: 10px;
   color: var(--cards-text-dim);
+}
+
+/* The Games section spans the full page width ABOVE `.board-layout`, whose
+   second column is the bet-slip rail. Both are plain blocks, so the rail's
+   handle started on the exact pixel the strip ended -- measured 2026-09-16 at
+   1600px, handle top 745.40 == strip bottom 745.40 -- and the expanded
+   "Hide bet slip & more" box sat glued to the strip's scrollbar, reading as a
+   button floating over the board. Scoped to the Layer 2 page's own section;
+   the other boards sharing this sheet are untouched. */
+.board-games-section {
+  margin-bottom: 16px;
 }
 
 .game-card-strip {
