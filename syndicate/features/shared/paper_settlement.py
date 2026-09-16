@@ -1313,18 +1313,28 @@ def settled_decisions_by_sport(
 # parentheses guarantee no collision: every real verdict is a bare identifier.
 SIM_VIEW_UNRECORDED = "(unrecorded)"
 
-# WHICH VERDICTS CAN REACH AN ORDER AT ALL. Measured 2026-09-03 by running
-# `commit_portfolio` over one row per verdict at ev_pct 1/5/20/100 (lane
-# `order-sim-view`). This is a property of the COMMIT GATE, not of this module,
-# and it is published in the response because a reader who does not know it will
-# read four permanently-absent buckets as a broken join.
-#
+# VERDICTS WHOSE ORDERS WERE ALL SIZED ON MARKET FAIR, NOT ON THE SIM.
 # These four are exactly the verdicts computed in the branch where
-# `model_edge_pct is None`, and `sizing_inputs_from_row` refuses that row by name
-# (`no_model_edge_pct`) before anything is sized, at every EV. So the
-# `contradicts`-vs-`agrees` split that `layer2-sim-disagrees` pre-registered has
-# a denominator that is structurally zero and stays zero however long this runs.
-SIM_VIEW_UNREACHABLE = ("contradicts", "live_contradicts", "unpriced", "none")
+# `model_edge_pct is None` (`layer2_board._layer2_board_columns`), and
+# `sizing_inputs_from_row` reads that same field on that same row. So a row with
+# one of them is either refused `no_model_edge_pct`, or -- for a sport named in
+# `SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS`, which the commit reads on
+# refresh-worker -- sized on market fair, i.e. on the best price against the
+# no-vig consensus. In play, `in_play_market_fair` refuses it unless allowed.
+#
+# THIS USED TO SAY THE FOUR BUCKETS WERE "STRUCTURALLY EMPTY AND STAY EMPTY",
+# measured 2026-09-03 with no sport allowlisted. The allowlist named `ncaaf` on
+# 2026-09-04 and all eight sports on 2026-09-16, and on 2026-09-16 22:28Z the
+# paper ledger held 37 `contradicts`, 157 `none` and 130 `unpriced` orders for
+# 09-16..09-17 while the payload still called them empty. The tests pinning the
+# old sentence read the env implicitly and CI leaves it absent, so nothing
+# turned red. A statement whose truth depends on another service's env is not
+# a structural fact -- this one depends only on the row, so it cannot go stale.
+#
+# What it means for the read: `contradicts` vs `agrees` compares the SIZING
+# BASIS as well as the verdict. An `agrees` order bet the sim's edge; a
+# `contradicts` order bet price dispersion while the sim pointed the other way.
+SIM_VIEW_MARKET_FAIR_ONLY = ("contradicts", "live_contradicts", "unpriced", "none")
 
 # Placeable, but ONLY when the EV outruns the disagreement: the stake gates
 # refuse `below_min_stake` and then `zero_kelly_stake` as the sim's probability
@@ -1395,6 +1405,9 @@ def sim_view_roi_summary(
     buckets = _grouped(rows, _key)
     for bucket in buckets:
         bucket.update(labels.get(bucket["key"], {}))
+        # On the cross as well as the pooled index: the cross is the cut that
+        # gets quoted, and a caveat that is not on the quoted number is not read.
+        bucket["market_fair_only"] = bucket.get("sim_view") in SIM_VIEW_MARKET_FAIR_ONLY
 
     # THE SAME ROWS POOLED BY VERDICT ALONE. Offered BESIDE the cross and never
     # instead of it: pooling across sports and families is exactly the confound
@@ -1409,6 +1422,7 @@ def sim_view_roi_summary(
         rolled = _aggregate(by_verdict[verdict])
         rolled["sim_view"] = verdict
         rolled["ev_conditioned"] = verdict in SIM_VIEW_EV_CONDITIONED
+        rolled["market_fair_only"] = verdict in SIM_VIEW_MARKET_FAIR_ONLY
         pooled.append(rolled)
 
     return {
@@ -1417,17 +1431,18 @@ def sim_view_roi_summary(
         # An index across them. Read the cross before quoting this.
         "by_verdict": pooled,
         # WHAT THE BUCKETS CANNOT SAY ABOUT THEMSELVES, and would be misread
-        # without. Four verdicts are absent BY CONSTRUCTION rather than for want
-        # of data, and one pair is present but selected on EV. A permanently
-        # empty bucket and a not-yet-populated one look identical.
+        # without. Four verdicts hold only market-fair-sized orders, one pair is
+        # selected on EV, and pre-`cb223b62` orders carry no verdict at all.
         "verdict_reachability": {
-            "unreachable": list(SIM_VIEW_UNREACHABLE),
-            "unreachable_reason": (
-                "computed where model_edge_pct is None, which "
-                "portfolio_commit.sizing_inputs_from_row refuses by name "
-                "(no_model_edge_pct) before sizing, at every ev_pct. These "
-                "buckets are structurally empty and stay empty; the "
-                "contradicts-vs-agrees ROI split cannot be taken from this book."
+            "market_fair_only": list(SIM_VIEW_MARKET_FAIR_ONLY),
+            "market_fair_only_reason": (
+                "computed where model_edge_pct is None, so every order in these "
+                "buckets was sized on MARKET FAIR (best price against the no-vig "
+                "consensus), never on the sim's edge: only sports named in "
+                "SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS reach them, and in play "
+                "in_play_market_fair refuses them unless allowed. Comparing them "
+                "with agrees/disagrees compares the sizing basis as well as the "
+                "verdict."
             ),
             "ev_conditioned": list(SIM_VIEW_EV_CONDITIONED),
             "ev_conditioned_reason": (

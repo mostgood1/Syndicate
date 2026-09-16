@@ -173,9 +173,11 @@ def test_the_sim_view_roi_cut_is_served_and_carries_its_caveats(client, monkeypa
 
     # The caveats travel with the numbers, not only in the docs.
     reach = cut["verdict_reachability"]
-    assert "contradicts" in reach["unreachable"]
-    assert "no_model_edge_pct" in reach["unreachable_reason"]
+    assert "unreachable" not in reach
+    assert "contradicts" in reach["market_fair_only"]
+    assert "SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS" in reach["market_fair_only_reason"]
     assert "disagrees" in reach["ev_conditioned"]
+    assert all(b["market_fair_only"] is False for b in cut["by_sport_family_verdict"])
 
 
 def test_the_roi_cut_answers_the_SAME_WINDOW_as_the_counts(client, monkeypatch):

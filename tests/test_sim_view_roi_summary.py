@@ -14,8 +14,8 @@ Four groups of tests:
      the same rows, because a cut that cannot be compared to the cuts beside it
      is worth less than no cut
   4. THE REACHABILITY CLAIM IS TRUE -- the published constants are checked
-     against the real commit gate, so the payload cannot keep asserting a
-     structural fact after the structure changes
+     against the real commit gate, with the allowlist env SET EXPLICITLY in
+     each state, so the payload cannot assert something only CI's env makes true
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ import pytest
 
 from syndicate.features.shared.paper_settlement import (
     SIM_VIEW_EV_CONDITIONED,
-    SIM_VIEW_UNREACHABLE,
+    SIM_VIEW_MARKET_FAIR_ONLY,
     SIM_VIEW_UNRECORDED,
     settlement_summary,
     sim_view_roi_summary,
@@ -272,46 +272,69 @@ def _board_row(edge, side="over", projected=51.0, mpo=0.60, basis=None, ev=5.0):
     }
 
 
-UNREACHABLE_FIXTURES = {
+MARKET_FAIR_ONLY_FIXTURES = {
     "contradicts": _board_row(None, side="under", projected=67.8),
     "live_contradicts": _board_row(None, side="under", projected=67.8, basis="live_resim"),
     "unpriced": _board_row(None),
     "none": _board_row(None, projected=None, mpo=None),
 }
 
+_ALLOWLIST = "SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS"
+_IN_PLAY = "SYNDICATE_PORTFOLIO_IN_PLAY_MARKET_FAIR"
 
-def test_the_published_unreachable_set_is_exactly_what_the_gate_refuses():
-    """THE PAYLOAD ASSERTS A STRUCTURAL FACT; this keeps it a fact.
 
-    `verdict_reachability.unreachable` tells a reader that four buckets are
-    empty BY CONSTRUCTION rather than for want of data. That claim is about the
-    COMMIT GATE, which lives in another module and can change without this one
-    noticing -- at which point the endpoint would be publishing a confident
-    falsehood, and the empty buckets it explains would be quietly wrong.
+def test_the_market_fair_only_set_is_exactly_the_rows_with_no_sim_edge(monkeypatch):
+    """THE PAYLOAD ASSERTS A FACT ABOUT FOUR BUCKETS; this keeps it one.
 
-    So the constant is checked against the gate itself, at several EVs, because
-    the refusal must hold at ALL of them and not merely at the one I picked.
+    `verdict_reachability.market_fair_only` tells a reader that every order in
+    those buckets was sized on market fair, never on the sim's edge. Checked
+    against the commit gate itself, IN BOTH ALLOWLIST STATES, SET EXPLICITLY.
+
+    The sentence this replaced said the buckets were "structurally empty and
+    stay empty", and its test read the allowlist env implicitly. CI leaves that
+    env absent, so the test stayed green while production (every sport
+    allowlisted, 2026-09-16) held 324 orders in the buckets it called empty.
+    A test of a claim that depends on configuration must set the configuration.
     """
     from syndicate.features.shared.portfolio_commit import (
         _sim_view_of,
         commit_portfolio,
+        sizing_basis_of,
         sizing_inputs_from_row,
     )
 
-    assert set(SIM_VIEW_UNREACHABLE) == set(UNREACHABLE_FIXTURES), (
-        "the published unreachable set and this test's fixtures disagree -- "
+    assert set(SIM_VIEW_MARKET_FAIR_ONLY) == set(MARKET_FAIR_ONLY_FIXTURES), (
+        "the published market_fair_only set and this test's fixtures disagree -- "
         "one of them is stale"
     )
-    for verdict, row in UNREACHABLE_FIXTURES.items():
+    monkeypatch.delenv(_IN_PLAY, raising=False)
+    for verdict, row in MARKET_FAIR_ONLY_FIXTURES.items():
         assert _sim_view_of(row)["sim_view"] == verdict, f"fixture no longer produces {verdict}"
-        # Refused by NAME, and at every EV -- an unreachable verdict that became
-        # reachable at a high enough EV would be `ev_conditioned`, not unreachable.
+        assert sizing_basis_of(row) == "market_fair", verdict
+
+        # Sport NOT allowlisted: refused by name, at every EV.
+        monkeypatch.delenv(_ALLOWLIST, raising=False)
         for ev in (1.0, 5.0, 20.0):
             priced = dict(row, ev_pct=ev)
             inputs, reason = sizing_inputs_from_row(priced)
-            assert inputs is None, f"{verdict} became sizable at ev_pct={ev}"
+            assert inputs is None, f"{verdict} became sizable at ev_pct={ev} with no allowlist"
             assert reason == "no_model_edge_pct", f"{verdict} refused as {reason} at ev_pct={ev}"
             assert not commit_portfolio([priced], selected_date="2026-09-03")["positions"]
+
+        # Sport allowlisted, pregame: it REACHES AN ORDER, and on market fair.
+        monkeypatch.setenv(_ALLOWLIST, row["sport"])
+        inputs, reason = sizing_inputs_from_row(row)
+        assert inputs is not None and reason is None, f"{verdict} refused as {reason} when allowlisted"
+        positions = commit_portfolio([row], selected_date="2026-09-03")["positions"]
+        assert positions, f"{verdict} did not place when allowlisted"
+        assert positions[0]["sizing"]["basis"] == "market_fair"
+        assert positions[0]["sim_view"] == verdict
+
+        # Sport allowlisted, in play: refused unless in-play market fair is allowed.
+        live = dict(row, market_state="live", is_live=True)
+        out = commit_portfolio([live], selected_date="2026-09-03")
+        assert not out["positions"], f"{verdict} placed in play"
+        assert out["refusals"].get("in_play_market_fair") == 1, out["refusals"]
 
 
 def test_the_ev_conditioned_set_really_is_ev_conditioned():
@@ -334,12 +357,16 @@ def test_the_ev_conditioned_set_really_is_ev_conditioned():
 
 
 def test_the_reachability_block_is_carried_in_the_payload():
-    """A permanently-empty bucket and a not-yet-populated one look identical.
-    The response has to say which it is, or the first reader concludes the join
-    is broken -- the same instrument-blindness this repo keeps paying for."""
+    """The buckets cannot say what they hold about themselves: a
+    `contradicts` bucket and an `agrees` bucket read alike, and were sized on
+    different things. The response has to say so beside the numbers."""
     block = sim_view_roi_summary(orders=[_order()])["verdict_reachability"]
-    assert set(block["unreachable"]) == set(SIM_VIEW_UNREACHABLE)
-    assert "no_model_edge_pct" in block["unreachable_reason"]
+    # The false sentence is gone, not kept alongside the true one.
+    assert "unreachable" not in block
+    assert "unreachable_reason" not in block
+    assert set(block["market_fair_only"]) == set(SIM_VIEW_MARKET_FAIR_ONLY)
+    assert "SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS" in block["market_fair_only_reason"]
+    assert "in_play_market_fair" in block["market_fair_only_reason"]
     assert set(block["ev_conditioned"]) == set(SIM_VIEW_EV_CONDITIONED)
     assert "ev_pct" in block["ev_conditioned_reason"]
     assert block["unrecorded_bucket"] == SIM_VIEW_UNRECORDED
@@ -356,3 +383,24 @@ def test_the_ev_conditioned_flag_travels_with_the_pooled_bucket():
     pooled = {b["sim_view"]: b for b in sim_view_roi_summary(orders=rows)["by_verdict"]}
     assert pooled["disagrees"]["ev_conditioned"] is True
     assert pooled["agrees"]["ev_conditioned"] is False
+
+
+def test_the_market_fair_only_flag_is_on_the_cross_and_the_pooled_buckets():
+    """On the CROSS too, because the cross is the cut that gets quoted."""
+    rows = [
+        _order(sim_view="contradicts", market="totals", outcome="won", pnl_dollars=9.09),
+        _order(sim_view="agrees", market="totals", outcome="lost", pnl_dollars=-10.0),
+        _order(sim_view="none", outcome="won", pnl_dollars=9.09),
+        _order(sim_view=None, outcome="won", pnl_dollars=9.09),
+    ]
+    out = sim_view_roi_summary(orders=rows)
+    assert _bucket(out, "mlb | game_total | contradicts")["market_fair_only"] is True
+    assert _bucket(out, "mlb | game_line | none")["market_fair_only"] is True
+    assert _bucket(out, "mlb | game_total | agrees")["market_fair_only"] is False
+    # Never recorded is not a verdict, so it is not claimed to be market fair.
+    assert _bucket(out, f"mlb | game_line | {SIM_VIEW_UNRECORDED}")["market_fair_only"] is False
+    pooled = {b["sim_view"]: b for b in out["by_verdict"]}
+    assert pooled["contradicts"]["market_fair_only"] is True
+    assert pooled["none"]["market_fair_only"] is True
+    assert pooled["agrees"]["market_fair_only"] is False
+    assert pooled[SIM_VIEW_UNRECORDED]["market_fair_only"] is False

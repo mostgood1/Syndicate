@@ -710,20 +710,17 @@ def _sim_view_of(row: Mapping[str, Any]) -> dict[str, Any]:
         return {field: None for field in _SIM_VIEW_FIELDS}
     return {
         "sim_view": str(view),
-        # SET ONLY ON A `contradicts` ROW, AND THOSE CANNOT REACH AN ORDER
-        # TODAY. A contradiction is computed in exactly the branch where
-        # `model_edge_pct` is None, and `sizing_inputs_from_row` refuses that
-        # row by name (`no_model_edge_pct`) before anything is sized -- so this
-        # column is expected to be null on 100% of orders, and that null is the
-        # CONTRACT rather than a bug. The same gate makes `unpriced` and
-        # `none` unreachable too, which is why a STORED `sim_view` only ever
-        # reads `agrees`, `disagrees`, `neutral` or a `live_` form.
+        # SET ONLY ON A `contradicts` ROW. A contradiction is computed in
+        # exactly the branch where `model_edge_pct` is None, so such a row
+        # reaches an order only when it is sized on MARKET FAIR -- its sport is
+        # named in `_market_fair_sports()` and it is not in play. The same holds
+        # for `unpriced` and `none` (`paper_settlement.SIM_VIEW_MARKET_FAIR_ONLY`).
         #
-        # Carried anyway because the gate is a POLICY the
-        # `layer2-sim-disagrees` lane has open, and a field added after the
-        # gate changes records nothing about the bets placed before it. Its
-        # nullness is also the cheapest available proof the gate is still
-        # standing.
+        # THIS COMMENT USED TO SAY those rows could not reach an order and this
+        # column would be null on 100% of orders. True with no sport
+        # allowlisted; false from 2026-09-04 (`ncaaf`), and on 2026-09-16 (all
+        # eight sports) the paper ledger held 37 `contradicts` orders for
+        # 09-16..09-17. Its nullness is no longer evidence of anything.
         "sim_line_gap": _as_float(columns.get("sim_line_gap")),
         "sim_probability_railed": bool(columns.get("sim_probability_railed")),
     }

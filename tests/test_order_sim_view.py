@@ -14,14 +14,14 @@ The suite is in four parts:
   1. the verdict is computed by the BOARD'S OWN function, not a copy of its rule
   2. it survives the position -> OrderRequest -> ledger record chain
   3. absence survives as absence, and `"none"` never collapses into `None`
-  4. WHAT IS STILL UNREACHABLE -- the commit gate refuses the exact rows a
-     contradiction lives on, so FOUR of the nine verdicts can never appear on a
-     stored order and the `contradicts` arm of the pre-registered measurement
-     has a structurally empty denominator. Pinned here so that a change to that
-     gate turns this file red rather than silently changing what the
-     measurement means. The set itself lives in
-     `paper_settlement.SIM_VIEW_UNREACHABLE` -- the endpoint publishes it, so
-     there must not be a second copy of it here.
+  4. WHAT CAN ONLY BE BET ON THE PRICE -- a contradiction lives on a row with
+     no model edge, so FOUR of the nine verdicts reach a stored order only when
+     the row is sized on MARKET FAIR (its sport allowlisted, not in play). The
+     `contradicts` arm of the pre-registered measurement therefore differs from
+     `agrees` in sizing basis as well as verdict. Pinned in both allowlist
+     states so that a change to that gate turns this file red. The set itself
+     lives in `paper_settlement.SIM_VIEW_MARKET_FAIR_ONLY` -- the endpoint
+     publishes it, so there must not be a second copy of it here.
 """
 
 from __future__ import annotations
@@ -47,8 +47,8 @@ KNOWN_VERDICTS = {
     "contradicts", "live_contradicts",
     # `36161e83`: "the sim has a view it could not PRICE" (typically a
     # one-sided market, so there is no two-sided fair) split away from "the sim
-    # has no view at all". Both reach the unreachability test below, because
-    # both live in the branch the commit gate refuses.
+    # has no view at all". Both reach the market-fair-only test below, because
+    # both live in the branch with no model edge.
     "unpriced",
     "none",
 }
@@ -367,28 +367,28 @@ def test_the_verdict_is_not_part_of_a_bets_identity():
     assert idempotency_key(absent) == idempotency_key(present) == idempotency_key(different)
 
 
-def test_a_contradicted_row_still_cannot_become_an_order():
-    """FOUR OF THE NINE VERDICTS HAVE A STRUCTURALLY EMPTY DENOMINATOR.
+def test_a_contradicted_row_becomes_an_order_only_on_market_fair(monkeypatch):
+    """FOUR OF THE NINE VERDICTS CAN ONLY BE BET ON THE PRICE, NEVER ON THE SIM.
 
     They are computed in exactly the branch where `model_edge_pct` is None, and
-    `sizing_inputs_from_row` refuses that row BY NAME (`no_model_edge_pct`)
-    before anything is sized. So persisting the verdict is NECESSARY and NOT
-    SUFFICIENT: `contradicts`-vs-`agrees` settled ROI cannot accumulate at all
-    while this gate stands, no matter how long the ledger runs. Only `agrees`,
-    `neutral` and (EV-permitting) `disagrees`, with their `live_` forms, can
-    ever appear on a stored order.
+    `sizing_inputs_from_row` reads that same field on that same row. So such a
+    row is refused BY NAME (`no_model_edge_pct`) unless its sport is on the
+    market-fair allowlist, and then it is sized on market fair -- and
+    `contradicts`-vs-`agrees` settled ROI compares sizing bases as well as
+    verdicts.
+
+    THIS TEST USED TO BE `test_a_contradicted_row_still_cannot_become_an_order`
+    and asserted the refusal with the allowlist env read implicitly. CI leaves
+    it absent, so it stayed green while production (all eight sports allowlisted,
+    2026-09-16) held 37 `contradicts` orders. Both states are set here.
 
     THE SET IS IMPORTED, NOT RESTATED. `/api/ops/execution/ledger-summary`
-    publishes `SIM_VIEW_UNREACHABLE` to explain four permanently-empty buckets,
-    so a second copy here could drift out of agreement with the one users read.
-    An earlier version of this test listed THREE and omitted `live_contradicts`
-    -- which is that drift, caught late.
-
-    Asserted rather than written down, so that changing the gate turns this red
-    and whoever changes it reads the note instead of quietly redefining what the
-    measurement is measuring.
+    publishes `SIM_VIEW_MARKET_FAIR_ONLY`, so a second copy here could drift out
+    of agreement with the one users read. An earlier version of this test listed
+    THREE and omitted `live_contradicts` -- which is that drift, caught late.
     """
-    from syndicate.features.shared.paper_settlement import SIM_VIEW_UNREACHABLE
+    from syndicate.features.shared.paper_settlement import SIM_VIEW_MARKET_FAIR_ONLY
+    from syndicate.features.shared.portfolio_commit import sizing_basis_of
 
     fixtures = {
         "contradicts": _row(model_edge_pct=None, side="under", projection={"projected": 67.8}),
@@ -397,15 +397,23 @@ def test_a_contradicted_row_still_cannot_become_an_order():
         "unpriced": _row(model_edge_pct=None, projection={"projected": None}),
         "none": _row(model_edge_pct=None, projection={"projected": None, "model_prob_over": None}),
     }
-    assert set(fixtures) == set(SIM_VIEW_UNREACHABLE), (
+    assert set(fixtures) == set(SIM_VIEW_MARKET_FAIR_ONLY), (
         "this test and the published set disagree about which verdicts are "
-        "unreachable -- one of them is stale"
+        "market-fair-only -- one of them is stale"
     )
     for verdict, row in fixtures.items():
         assert _sim_view_of(row)["sim_view"] == verdict
+        assert sizing_basis_of(row) == "market_fair"
+
+        monkeypatch.delenv("SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS", raising=False)
         inputs, reason = sizing_inputs_from_row(row)
         assert inputs is None
         assert reason == "no_model_edge_pct"
+
+        monkeypatch.setenv("SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS", row["sport"])
+        inputs, reason = sizing_inputs_from_row(row)
+        assert inputs is not None, f"{verdict} refused as {reason} when allowlisted"
+        assert reason is None
 
 
 def test_the_disagrees_arm_is_conditioned_on_ev_not_merely_present():
