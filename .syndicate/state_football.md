@@ -45,7 +45,7 @@ for a rebuild before reading. Tells that the request path did not run: no
 - **They GRADE end-to-end.** On 2026-09-10, `paper_settlement` graded 20 FAMU @ MIA orders (plans 09-08 to 09-10) in its 21:55 and 22:37 CT runs. Every outcome is consistent with its `settled_value`.
 - **What let them past the two gates below:**
   - `e6d5ab29` (2026-09-04, an operator decision) lets a NAMED sport size on market fair through the allowlist `SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS`.
-  - That key reads `'ncaaf'` on refresh-worker (single-key read, 2026-09-11).
+  - That key reads `mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,soccer` on refresh-worker since 2026-09-16 20:58:44Z (USER DECISION: EV-only staking in every sport; it read `'ncaaf'` from 2026-09-04 to 2026-09-16). The in-play refusal of market-fair-only rows is KEPT by user decision.
   - `pick_gate`'s model denial is unchanged; sizing no longer needs the model edge.
   - This is the "explicit choice to size on market basis" that `#627`'s LIFT_CONDITION named.
 - Read the analysis below as the 2026-09-01 state, not the current one.
