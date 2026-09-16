@@ -33102,3 +33102,477 @@ Each line is copied verbatim, indented 4 spaces inside the fence so that no `###
   - No other reader of the old path (grep across syndicate/pipeline/scripts/tests); the old shared key is left in the store.
   - Deploy: refresh-worker is what benefits (its floor stops being live-odds-worker's). Lane `soccer-player-role-allocation` planned a main-tip deploy to both workers ~21:25Z and was asked to start after this lands, so it rides along; otherwise this lane deploys refresh-worker behind claim + preflight.
   - Verification owed: refresh-worker's next `pull_hot_artifacts` request after go-live carries `since=` = ITS OWN previous 09-15 pull start (or the 2 h clamp on its first), never a live-odds-worker pull start. Read from both workers' `PULL_OK`/`PULL_FAILED` lines.
+
+
+## SUPERSEDED LANE BLOCKS MOVED FROM `lanes.md` — 2026-09-15
+
+Moved verbatim by `scripts/trim_lane_blocks.py`; nothing summarised or
+deleted. Every block here was NEITHER claim-bearing NOR reading OPEN at move
+time, verified against `lane-guard.py`'s own `_claims()` — so `lane-guard`
+lost no protection and no open lane left the session-start digest.
+
+### wnba-schedule-guard-fix — CLOSED 2026-09-15 (SUPERSEDED by lane `wnba-future-date-cache-carry`) — opened 2026-09-10 — session 8c631ba2-16bd-41a6-a384-d655570b10ba (desktop `local_f4eeac0a-49e0-49f6-8320-610fd1ae3d14`) — **DEPLOYED: live-odds-worker `6ebec70e` (21:19:20Z), refresh-worker `c29a7d4e` (21:50:27Z). Same-day chips 4 -> 0 and Layer 2 `no_slate` READ. 09-11 READING: GOAL NOT MET — falsification (2) FIRED, `live_state_2026-09-11` holds the four 08-30 games while the chips (0) and Layer 2 (`no_slate`) pass**
+- **CLOSED 2026-09-15 by session 0f5b256e (owner 8c631ba2 archived; this block's handoff note lets any session take it).** Goal (verbatim): "on a WNBA no-game day, production serves ZERO WNBA chips and writes ZERO games under that day's `live_state` key. Read on 2026-09-11: 0 WNBA chips in `/api/board/game-chips?date=2026-09-11`, 0 games in `/wnba/api/live_state?date=2026-09-11`, and `per_sport_ingest.wnba.sweep_state = no_slate` on the Layer 2 board." — **GOAL: NOT MET, carried forward.** The chips regressed on 09-14 and 09-15: 4 FINAL 08-30 chips, Layer 2 `scheduled_games 4`. The seed this block left unnamed ("What SEEDS it is the open question") is named. `has_games_for_date` cached an artifact-existence True for a future date, and it survived midnight CT. Fix `9b214a33` has been live on refresh-worker since 14:37:12Z 09-15. The same outcome, restated for 09-16/09-17, is the Goal of lane `wnba-future-date-cache-carry`, whose scheduled readings close it. Nothing is left in this block.
+- **GOAL VERDICT — Goal (verbatim): "on a WNBA no-game day, production serves ZERO WNBA chips and writes ZERO games under that day's `live_state` key. Read on 2026-09-11: 0 WNBA chips in `/api/board/game-chips?date=2026-09-11`, 0 games in `/wnba/api/live_state?date=2026-09-11`, and `per_sport_ingest.wnba.sweep_state = no_slate` on the Layer 2 board." → GOAL: NOT MET — READ 2026-09-11 10:17-10:21 CDT: chips 0 and Layer 2 `no_slate` PASS, but `/wnba/api/live_state?date=2026-09-11` serves the four 08-30 games. Falsification (2) fired; see the 09-11 READING bullet.** Verification (1) ran: 5 of 10 new tests fail on the old code exactly as predicted, and each part is mutation-checked. Undoing the page-builder guard alone turns the page-builder cases red, which is what proves the scope correction. (2) ran: both live SHAs carry both fixes by content. (3) same-day ran: chips 4 -> 0 (21:51:21Z) and Layer 2 `no_slate`/0 (21:59:19Z); falsification (1) did not fire, so (a) reaches ESPN from Render. Left: the Goal's own 09-11 reading, which tests the writer and (b). Today's `live_state_2026-09-10` key stays frozen until the date roll, as `deploys.md` explains. Landed `8e132558` (lane) and `6ebec70e` (fix). Deploys are in `deploys.md`, 2026-09-10 21:12:58Z and 21:44:08Z.
+- Goal: on a WNBA no-game day, production serves ZERO WNBA chips and writes ZERO games under that day's `live_state` key. Read on 2026-09-11: 0 WNBA chips in `/api/board/game-chips?date=2026-09-11`, 0 games in `/wnba/api/live_state?date=2026-09-11`, and `per_sport_ingest.wnba.sweep_state = no_slate` on the Layer 2 board.
+- Files: released: (a RECORD since the 2026-09-10 deploys; nothing is held) `syndicate/features/wnba/sources.py` (`has_games_for_date`), `syndicate/features/wnba/cards.py` (`_stored_date_substitution_allowed` and its two call sites), `tests/test_wnba_schedule_guard.py` (NEW).
+- Hypothesis: n/a — the fixes named by lane `wnba-chip-frozen-trace`. User decision 2026-09-10: "apply (a) and (b) and deploy before 09-17".
+  - **SCOPE CORRECTION, stated before the code:** (b) as first written covered `cards.py:607` only. `_build_cards_page_context_uncached` substitutes today a SECOND time at `:4042` without consulting the schedule, and the writer reaches it. So (b) is applied at both sites, or it is inert on the writer.
+- Falsification test:
+  - (1) If refresh-worker runs the fix and today's (09-10) WNBA chips still read the 08-30 games, then (a) does not reach ESPN from Render: the reader's no-games gate never fired.
+  - (2) If `live_state_2026-09-11` holds any 08-30 game on 09-11, a third substitution path exists. **FIRED 2026-09-11: 4 of 4 games are 08-30's (see the 09-11 READING below).**
+- Verification:
+  - (1) off != on unit tests, mutation-checked. They INCLUDE a page-builder-level test, because that is the writer's actual call; a resolver-only test would not do.
+  - (2) the refresh-worker and live-odds-worker live SHAs carry both fixes BY CONTENT.
+  - (3) the same-day 09-10 chip reading, then the 09-11 reading in the Goal.
+- **09-11 READING — GOAL NOT MET; falsification (2) FIRED** `[2026-09-11 15:17-15:21Z, scheduled task wnba-0911-no-game-chips-reading, session fbc82f9f]`. The measurement is `deploys.md`, 2026-09-11 15:17Z.
+  - **Live code, by content.** Web `4c373107`, refresh-worker `1e1285a4`, live-odds-worker `f8b67afa`.
+    - Also checked: `3bafdd2b` (live-odds-worker 03:44Z-14:22Z) and `78e4623f` (14:22Z-15:06Z, and refresh-worker's build in progress at 15:15Z).
+    - Every one has 1 `site.web.api.espn.com` line in `sources.py`, 3 `_stored_date_substitution_allowed` lines in `cards.py`, and `6ebec70e` as an ancestor.
+    - So whichever worker wrote at 13:24Z ran both fixes.
+  - **Layer 2 — PASS.** Board `written_at 15:11:58Z`: `wnba_chips []`, no `FROZEN?`, `per_sport_ingest.wnba` = `no_slate`, `scheduled_games 0`. The script exits 3 (UNREADABLE, "no WNBA slate in the build window"); on a no-game day that label means there is nothing to check.
+  - **Chips — PASS.** `worker_artifact`, `published_at 15:17:07Z`: 263 chips, **wnba 0**.
+  - **`/wnba/api/live_state?date=2026-09-11` — FAIL.** Read at 15:17:02Z and 15:19:03Z: **4 games, ESPN `401857186..189`, all `Final`. That is the 08-30 slate.** `source syndicate_cards_fallback`, `generated_at 08:24:04 CDT` (13:24:04Z), identical on both reads.
+  - **A WORKER wrote it.**
+    - `syndicate_cards_fallback` comes only from the non-web branch (`cards.py:6698`).
+    - Web's branch emits `wnba_artifacts`, and returns a stored key before building anything (`:6463`).
+    - The persist step does nothing on web (`:240`).
+  - **A second web surface serves the same games.** Web `/wnba/api/cards?date=2026-09-11` = 0 games, but `/wnba/api/source/cards?date=2026-09-11` = the same 4 ids.
+  - **The chips are clean while live_state is poisoned.** The chip path's no-games gate fires first, so the chips no longer read this key.
+  - **The third path is NOT named.** Ruled out:
+    - The ESPN scoreboard. `site.web.api` with `?dates=20260911` returns 0 events; undated, it returns 09-17's `401857190..194`.
+    - Both guarded sites (`:651`, `:4068`). They pass only on a CONFIRMED slate, and ESPN reports none.
+    - The date-keyed readers: `_local_live_state_payload` (`:4245`) and the game_cards keyvalue reader (`:420`).
+  - **Once seeded, the key reads itself back.** `_artifact_bundle`'s worker-only live-state fallback (`:1726`) and `:4061` return it as today's rows, so it survives until the date roll. What SEEDS it is the open question.
+  - **Untested candidate.**
+    - `_stored_date_substitution_allowed` returns True for ANY non-today date, FUTURE dates included (`:623`). Its docstring says "past".
+    - So a 09-10 build of 09-11 may substitute.
+    - Persisting happens only for today (`:238`), so this path would need a carrier across midnight, such as a context cache.
+  - **Impact:** no-game days only. Web serves 4 phantom FINAL games at `/wnba/api/live_state` and `/wnba/api/source/cards`. The chips and Layer 2 are clean.
+  - **Next:** read the Render logs for refresh-worker and live-odds-worker around 13:24:04Z to learn which service and caller wrote `live_state_2026-09-11`, then name the seed. No code change or deploy was made by this reading.
+- Blocked by: none.
+- **OWNER SESSION 8c631ba2 DELIBERATELY ARCHIVED 2026-09-10 [user: "checkpoint and archive if complete"] — NOT ABANDONED, HANDED OFF.** The Goal's 2026-09-11 reading is all that remains. Scheduled task `wnba-0911-no-game-chips-reading` (one-time, 2026-09-11 10:00 CT) takes it and closes this lane on a pass. If it does not fire (tasks run only while the desktop app is open), any session can take the reading: `py -3 scripts/verify_wnba_slate_hygiene.py --date 2026-09-11 --check layer2`, plus `/wnba/api/live_state?date=2026-09-11` (0 games). Then close per this block's Verification. The lane holds no files and no deploy claim. At archive every service ran both fixes: web `4c373107`, refresh-worker `c29a7d4e`, live-odds-worker `e4410f37`, all checked by ancestry and content.
+
+### polymarket-no-fill-booking-audit — CLOSED 2026-09-15 — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **GOAL: MET within stated coverage: 2 misbooked NO fills, both before 09-01; 0 since**
+- **VERDICT 2026-09-15 ~16:00 CDT.** Goal: "[user 2026-09-15 ~14:45 CT: "start no fills audit"] list every live Polymarket NO fill booked before `1efdea18` (live-odds-worker, live 17:26:07Z) whose `fill_price` is avgPx rather than the true NO cost 1 - avgPx. For each: the booked and true cost, and the stake, P&L and ROI error it carries. Report the total. READ-ONLY; correcting rows is a separate decision." — **GOAL: MET** (within the coverage stated below).
+  - **Misbooked (fill_price = avgPx, true cost 1 - avgPx):**
+    - `tsc-mlb-bos-mia-2026-08-26-8pt5`: 7.11 @ avgPx 0.43. Booked 0.43 / $3.06, true 0.57 / $4.05. Stake error +$1.00; P&L error -$1.00 if graded; ROI understated by the stake ratio (3.06 vs 4.05).
+    - `C65VD0R72KDG` 08-30: 13.13 @ avgPx 0.235. Booked 0.235 / $3.09, true 0.765 / $10.04 (+$0.14 fee). Stake error +$6.96; P&L error -$6.96 if graded.
+    - **Total: +$7.96 of stake not on the record.** Neither order has a row in the served book (earliest fill 09-02), so no stored ROI shows the error today.
+  - **Booked right:**
+    - (a) Every live NO fill since logs start: 6 filled of 7 NO orders across 60 of 60 six-hour windows 09-01..09-15. All read `recorded = 1 - avgPx`: `C4N3GPYA4GNQ` 0.51, `C81RVJGZAM99` bal-col 0.515, `C8292W0ATMA3` 0.35, `CDZ89ZCJ8SJR` dal-nyg 0.395, `CE7V6BXQETMQ` nyj-ten 0.51, `CGVRPD7SWVB8` sea-ari 0.335. `C7CNYDJV4KDH` never filled.
+    - Ledger-named August NO fills: `C3GHTNSE0FSM` 0.435, `C3FPKCFNPFSN` 0.455, `C3E1TJPV4FSM` 0.49 (08-26).
+    - (b) bal-col WON, `pnl 6.7024` = n(1-0.515) - fee.
+    - (c) `IMPOSSIBLE_PNL_CORRECTED` 0 lines 09-01T12Z..now. The emitter exists (`venue_settlement.py:1131`) but has no live population: no NO fill since 09-01 has settled LOST. So (c) is a null without a population, and (a) is the evidence.
+  - **Hypothesis held:** the proximity rule misbooked only fills near the sent price. Since 09-01 no NO fill landed there.
+  - **Coverage limit:** NO fills before 09-01 that no ledger entry names cannot be seen (logs start 09-01, the book 09-02). The two misbooks were found only because the ledger named them.
+  - **Found, not followed (lead):** `C8292W0ATMA3` (NO, filled 09-02 @ 0.35) and `C7CNYDJV4KDH` are referenced by NO row in the served book (`show=all`, 49 rows), not even as `prior_attempts`.
+  - Correcting rows: not applicable to the two misbooks (no rows). No decision owed.
+- Goal: [user 2026-09-15 ~14:45 CT: "start no fills audit"] list every live Polymarket NO fill booked before `1efdea18` (live-odds-worker, live 17:26:07Z) whose `fill_price` is avgPx rather than the true NO cost 1 - avgPx. For each: the booked and true cost, and the stake, P&L and ROI error it carries. Report the total. READ-ONLY; correcting rows is a separate decision.
+- Origin: lane `polymarket-no-price-convention` (CLOSED, GOAL MET) and `C65VD0R72KDG`, settled by rule at 0.765 against a booked 0.235 (user decision, lane `polymarket-ask-pricing`).
+- Files: none (read-only). No claim taken.
+- Hypothesis (to test, not believed): before `1efdea18`, a NO order sent p_NO as a YES floor, and `_fill_price` booked whichever of {avgPx, 1-avgPx} was closer to the sent limit.
+  - So a NO fill is MISBOOKED exactly when the venue sold YES near our floor (avgPx near p_NO, i.e. we paid about 1 - p_NO).
+  - It is booked RIGHT when the book was near our intended price (avgPx near 1 - p_NO): dal-nyg sent 0.40, avgPx 0.605, booked 0.395, and the balance confirmed it.
+  - The misbooked rows therefore look normal on the record (fill_price about equal to the requested probability) and hide the largest real overpays.
+- Discriminators, none of which needs the side label:
+  - (a) A retained `FILL_PRICE` log line with `outcome_side=NO` and `recorded == avgPx` (avgPx != 0.5). Logs reach back to about 09-05.
+  - (b) A venue-settled WON row whose `pnl_dollars` is about n x fill_price rather than n x (1 - fill_price).
+  - (c) A LOST row carrying `IMPOSSIBLE_PNL_CORRECTED`, where the venue loss exceeded the booked fill because the true cost was higher.
+- Falsification test: every NO fill found reads `recorded == 1 - avgPx`, and no WON row fits (b).
+- Verification: the table and totals, recorded in `state_polymarket.md` with the orders each discriminator could and could not see.
+
+### disk-inventory-test-clock — CLOSED 2026-09-15 — opened 2026-09-15 — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
+- **VERDICT.** Goal (verbatim): "`tests/test_disk_inventory.py::test_compactable_families_are_dated_uncompressed_and_old` passes on any wall-clock date. It fails on clean origin/main since 2026-09-15; first measured on `8ac6513d`, reproduced on `8bae6851`: 1 failed, 46 passed across the inventory, compaction and maintenance test files." — **GOAL: MET.**
+  - Readings:
+    - The targeted files give 48 passed.
+    - The fixed tests pass under a `time.time` shift of +1500, -2 and -400 days.
+    - Control: the origin/main file passes at -2d and fails at 0d.
+  - The hypothesis was CONFIRMED: the test was wrong and the classifier is correct. Test-only change, no deploy, landed as `71780264`. Detail: `log/2026-09-15.md`.
+- Goal: `tests/test_disk_inventory.py::test_compactable_families_are_dated_uncompressed_and_old` passes on any wall-clock date. It fails on clean origin/main since 2026-09-15; first measured on `8ac6513d`, reproduced on `8bae6851`: 1 failed, 46 passed across the inventory, compaction and maintenance test files.
+- Files: tests/test_disk_inventory.py
+- Hypothesis: the test is date-dependent, and the classifier is correct.
+  - `disk_inventory.py:228` ages a text file by the DATE IN ITS NAME (`_file_date_age_days`), with `now` defaulting to `time.time()`.
+  - The fixture `reports/intelligence/clv_openings/2026-09-13.jsonl` is commented "today". It turned exactly 2.0 days old at 2026-09-15 00:00Z, which meets `compactable_min_age_days=2.0` (`>=`).
+  - Neither file changed after `92a271b8` (09-13, the only commit on either). Sibling `test_disk_compaction.py` already pins `TODAY = date(2026, 9, 13)`, and this test never did.
+- Falsification test: under an injected `now` of 2026-09-13 12:00Z the test still reports a `clv_openings` family. Or a commit after `92a271b8` changed the classifier or the fixture naming.
+- Verification:
+  - The three targeted test files pass.
+  - The compactable test passes with `now` pinned.
+  - A new assertion shows the SAME fixture becomes compactable at now+2d, so the date rule is reachable, not vacuous.
+  - A run with `time.time` forced to 2030 still passes.
+- Blocked by: none
+
+### layer2-row-parity — CLOSED 2026-09-15 — opened 2026-09-15 — session a0a81858-49f8-4085-a858-d4781b1dbce4 — **GOAL: MET**
+- **VERDICT.** Goal (verbatim): "every Layer 2 board row carries (1) real movement, props included, with deltas correct across ±100 and steam on same-book moves only; (2) a time-scaled sparkline of the pick's market probability, where green = the market moved TOWARD the pick (user decision 2026-09-15); (3) a headshot wherever a player-id source exists; (4) a plain-language explainer; and (5) the 58 legacy candidate rows leave the board, server-side (user decision 2026-09-15). Measured on the served `/api/intelligence/query` payload." — **GOAL: MET.**
+  - (1) Served 19:29:06Z: `not_tracked` 0, and 0 deltas across ±100 off the cents scale. There were 0 steam rows, so none is cross-book; the same-book path is tested only.
+  - (2) Served 19:56:26Z: 0 of 1,369 series slope against their arrow on any date, and the only bases are `best_price` / `same_book`. Rendered page 19:30:06Z: 519 of 519 pairs agree.
+    - The line plots the implied probability of the label's own price from our publish (user decision "Plot the label's price from our open").
+    - It replaced the first design, a fair-probability line, which read 132 of 294 against its arrow (19:11:17Z).
+  - (3) Headshots 17:47Z: MLB 491 of 501 player rows (every row with a projection); NFL 77 of 89.
+  - (4) Explainers 1,444 of 1,444 (19:29:06Z).
+  - (5) Legacy prop/game rows 0 (19:29:06Z; 74 at 17:10:28Z).
+  - Screenshot ~19:35Z: the Yandy Diaz card with headshot, a red ▼ "Odds +101 → +133" and a red falling line.
+  - Also shipped (user decision "Toward the pick"): the score's movement term. Wrong sign 0 of 1,360 (19:57:56Z).
+  - Ledger:
+    - `deploys.md` entries 17:32:07Z, 18:08:02Z, 19:13:36Z and 19:57:56Z.
+    - Narrative: `log/2026-09-15.md`.
+    - Superseded status blocks: `lanes_history.md`.
+  - `pipeline/intelligence_state.py` RETURNED to `heavy-build-memory-refusal` at close.
+- Goal: every Layer 2 board row carries (1) real movement, props included, with deltas correct across ±100 and steam on same-book moves only; (2) a time-scaled sparkline of the pick's market probability, where green = the market moved TOWARD the pick (user decision 2026-09-15); (3) a headshot wherever a player-id source exists; (4) a plain-language explainer; and (5) the 58 legacy candidate rows leave the board, server-side (user decision 2026-09-15). Measured on the served `/api/intelligence/query` payload.
+- Baseline `[served payload 2026-09-15 15:25Z, 3,070 rows]`: 2,959 Layer 2 rows, of which 2,119 `movement_state=not_tracked`; 59 of 651 priced rows show a raw-American delta across ±100 (e.g. "Odds +208" for -104 -> +104), and the only Layer 2 steam flag is one of them (Brest @ Auxerre U2.5, cross-book); Layer 2 headshots 0, explainers 0 (`rationale` is machine text, not rendered); 58 legacy rows (44 MLB, 14 soccer), 16 of 39 MLB props duplicating a Layer 2 row with contradictory numbers; legacy sparklines wrong-side on MLB unders, wrong-game on 6 of 14 soccer rows. The production opening ledger already records props (9,643 openings on 09-15, incl. MLB batter_hits 906, strikeouts 203).
+- Files: `syndicate/features/shared/layer2_board.py` and `pipeline/layer2_shortlist.py` (TAKEN 2026-09-15 from `accuracy-assessment-0914`, owner session archived, its code shipped 09-14 and only scheduled readings remain; user decision "Take them"; movement, card fields and the openings/trail load only, not its measured-skill code), `syndicate/templates/intelligence.html`, `syndicate/static/shared/board_cards.css`, `syndicate/features/shared/clv_price_trail.py` (NEW), `syndicate/features/shared/prop_projections.py` (player ids only), `tests/test_layer2_movement_live_segment.py`, `tests/test_layer2_score_flatten.py`, `tests/test_prop_projections.py`, `tests/test_clv_price_trail.py` (NEW), `tests/test_layer2_row_parity.py` (NEW), `tests/js/board_movement_display.test.mjs` (NEW), `tests/js/board_sim_view_display.test.mjs`, `scripts/verify_layer2_row_parity.py` (NEW), `syndicate/features/shared/layer2_row_context.py` (NEW), `tests/test_layer2_row_context.py` (NEW), `tests/test_layer2_legacy_rows_withheld.py` (NEW), `pipeline/intelligence_state.py` (handed over 2026-09-15 ~11:30 CDT by `heavy-build-memory-refusal` on request, and confirmed by user decision "Take the claim"; the legacy-row filter in `read_combined_intelligence_response` only), `syndicate/features/shared/opportunity_signals.py` and `tests/test_score_reliability_resolution.py` (unclaimed when taken 2026-09-15; the movement term's SIGN only, user decision "Toward the pick", shipped as its own deploy).
+- Hypothesis: n/a (build). Design choice stated so it can be checked: `movement_price_delta` keeps its American-points unit but is computed on the continuous "cents" scale (±100 both map to 0), so the score's movement weight and the steam threshold, both tuned in points, stay valid; implied probability drives the display and the toward/away verdict.
+- Falsification test: reachability, `off != on` per feature: a prop row that returned `not_tracked` now returns tracked/flat against an opening; -104 -> +104 yields 8, not 208; a best-of-N book switch cannot fire steam; a row whose trail spans a line change draws only the current line's points; an Under row's series rises when the Under shortens.
+- Verification: on the served payload after the web + refresh-worker deploys — Layer 2 `not_tracked` rows 0 wherever an opening exists; no shown delta whose open/now straddle ±100 exceeds its cents move; every `steam` row is `movement_basis=same_book`; `movement_series` present and line-consistent on rows with 2+ distinct points; MLB prop headshot coverage against rows with a projection; explainer coverage against rows with a model; legacy prop/game rows on the board 0; one screenshot of the rendered board.
+- Blocked by: none
+
+### test-wall-clock-timebombs — CLOSED 2026-09-15 — opened 2026-09-15 — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
+- **VERDICT.** Goal (verbatim): "two confirmed test time bombs pass on any date, test-only, no behaviour change." — **GOAL: MET.**
+  - Shortlist:
+    - The whole file passes 14/14 at the real clock.
+    - The forward test passes frozen at real now and at 2026-12-24T01Z, and FAILS frozen at kickoff day (now+120d), so the assertion is live.
+    - The kickoff is now `now + 120 days`.
+  - Soccer:
+    - The whole file passes 4/4 with `SYNDICATE_DATA_ROOT` set, unfrozen and frozen at 2027-07-02 and 2031-03-01.
+    - `schedule.central_today` is monkeypatched to 2026-08-20. The week clock `central_today_iso` is left real, so the regression guard is kept (reasoned, not run).
+  - Not changed (code): the soccer provider takes the SEASON from the wall clock and the WEEK from the requested date. It only diverges for a requested date across Jul 1 (Jan 1 for MLS), which is off-season, so the production impact is about nil. Detail: `log/2026-09-15.md`.
+- Goal: two confirmed test time bombs pass on any date, test-only, no behaviour change.
+  - `tests/test_layer2_shortlist_wiring.py::test_forward_view_is_reachable` fails from 2026-12-24T00:00Z.
+  - `tests/test_soccer_provider_date_scope.py::test_the_fan_out_uses_the_context_date_not_today` fails from 2027-07-01.
+- Files: tests/test_layer2_shortlist_wiring.py, tests/test_soccer_provider_date_scope.py
+- Hypothesis (CONFIRMED by frozen-clock runs before any edit, on `1f9c9c62`):
+  - **(1) Shortlist.** `build_layer2_shortlist` calls `select_shortlist` without `now`, so `_within_horizon` compares the fixed `commence_time` 2026-12-25T23:05Z against `datetime.now()` with MLB horizon `max(1, 1-1)=1`.
+    - Readings with `layer2_board.datetime.now` frozen: 2026-12-23T23:00Z 1 passed; 2026-12-24T01:00Z 1 failed on `scoped["rows"] == []`.
+  - **(2) Soccer.** `default_season` reads `schedule.central_today()`. From 2027-07-01 every league resolves season 2027, and both reference dates (08-16, 08-22) sit before week 1, so `moved` is empty.
+    - Readings with `SYNDICATE_DATA_ROOT` = the primary checkout's data (10 `schedule_2026.json`): unfrozen 1 passed; 2027-06-30 1 passed; 2027-07-02 1 failed on `assert moved`.
+    - Without `data/` it already fails in a worktree, a pre-existing mirror dependency.
+- Falsification test: either fixed test still fails under the same frozen clock that broke it (for the shortlist, a relative kickoff under an unfrozen run; for soccer, `central_today` pinned via monkeypatch overriding a frozen 2027-07-02), or the pin makes the regression guard vacuous.
+- Verification:
+  - Both tests pass unfrozen.
+  - Soccer passes under `FREEZE_DATE=2027-07-02` (the monkeypatch wins).
+  - Shortlist: still passes at real now, and fails when `layer2_board`'s clock is pulled to kickoff day, which proves the horizon assertion is live.
+  - Both whole files pass. Soccer runs with `SYNDICATE_DATA_ROOT` set.
+- Source: 5-agent audit of ~40 `now=`/`today=` functions' tests, 2026-09-15. The other flagged tests are 2099-nominal or were only broken BEFORE 2026-08-01, so no action.
+- Blocked by: none
+
+### soccer-season-market-audit — CLOSED 2026-09-15 — opened 2026-09-15 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77 — **GOAL: MET: season-to-date audit of every soccer market, overall and per league, landed (`e1afe4ac`). No market beats the close; no betting rule survives held out; prop squads are stale; fotmob ids are stale for 3 leagues (task chip)**
+- Goal: one findings file covering soccer 2026-07-20..2026-09-14, for every market (1X2, totals, Asian handicap, BTTS, team goals, corners, team corners, player shots, shots on target, anytime scorer), overall and per league. It gives model vs de-vigged market vs outcome (n, dates, Brier / log-loss or MAE, calibration, CI over matches); the ROI of pre-registered edge rules at available prices, validated leave-one-date-out; and FotMob momentum game shape by league, tied to model residuals. Each learning names the change it implies. ANALYSIS ONLY: no engine, board or deploy change. — **GOAL: MET** — reading (2026-09-15, read back from `origin/main` after `e1afe4ac`):
+  - the findings file has 17 sections, with per-market and per-league tables carrying n, dates and CIs, plus the coverage table;
+  - `[soccer-season-market-audit]` has 1 state section and 1 index row;
+  - 10 harness modules;
+  - the results JSON is 97,035 B.
+  - Residual: `todo.md #664` is reserved but its entry is unwritten, because lane `kalshi-shard-balance-gate` claims `todo.md`.
+- Files: `scripts/soccer_season_audit/common.py`, `scripts/soccer_season_audit/prodfetch.py`, `scripts/soccer_season_audit/outcomes.py`, `scripts/soccer_season_audit/shape.py`, `scripts/soccer_season_audit/shape_join.py`, `scripts/soccer_season_audit/audit_games.py`, `scripts/soccer_season_audit/audit_props.py`, `scripts/soccer_season_audit/namejoin_diag.py`, `scripts/soccer_season_audit/leak.py`, `scripts/soccer_season_audit/pullchain.py` (all NEW), `.syndicate/findings_2026-09-15_soccer_season_market_audit.md` (NEW), `reports/soccer_backtest/season_market_audit_2026-09-15.json` (NEW)
+- Ledger (not a claim): one new soccer state section plus its index row, written at the end.
+- Hypotheses (PRE-REGISTERED before any number was read):
+  - H1: 1X2 loses to the market season-to-date, concentrated on favourites (replicating 2026-09-14), and no league shows a model win whose CI excludes zero.
+  - H2: totals, BTTS and team goals are parity with the market.
+  - H3: corner and team-corner means are biased (sign unknown), with no measurable edge.
+  - H4: shots and SOT means over-predict (ratio > 1.2) in every league with usable capture, and anytime-scorer probabilities over-predict for the top shooters.
+  - H5: no pre-registered edge rule (2/4/6/8 pp vs the de-vigged close, flat 1u at the available price) shows ROI with a match-clustered CI excluding zero on held-out dates.
+  - H6: momentum game shape (dominance, volatility, late pressure) differs by league beyond bootstrap noise, and team-level shape explains part of the totals/corners residuals.
+  - H7 (data): the final `recommendations_*.json` are rebuilt after kickoff. The 2026-09-02 cache holds true pre-kickoff snapshots for 09-02..09-09, and the difference bounds the leak.
+- Falsification test: per hypothesis, the opposite reading. A market where the model's Brier/MAE beats the close with a CI excluding 0 (H1/H2). A league with n >= 500 and shots ratio <= 1.1 (H4). A held-out ROI CI excluding 0 (H5). League shape differences inside bootstrap noise (H6). Snapshot vs final identical (H7).
+- Method rules: score per MATCH, never per row. Pick thresholds only leave-one-date-out. Compare against the market's own lean. Print per-family date coverage and the intersection. Validate outcome capture per league (Belgian shot capture was 0.13 on 2026-08-31).
+- Verification: the findings file is on origin/main with per-market and per-league tables carrying n, dates and CIs, plus the coverage/intersection table; the harness re-runs from its cache.
+- Blocked by: none
+
+### preview-date-pin-inert — CLOSED 2026-09-15 — opened 2026-09-15 — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
+- **VERDICT.** Goal (verbatim): "`tests/test_intelligence.py::IntelligenceBlueprintTests::test_intelligence_query_api_resolves_preview_date_and_preserves_contract` pins the date the endpoint actually uses and asserts `selected_date == "2026-06-07"`. Test-only, no behaviour change." — **GOAL: MET.**
+  - Readings:
+    - HEAD as-is: 1 passed.
+    - Control (HEAD plus the new assertion, router pin only): FAILED `'2026-09-15' != '2026-06-07'`, which proves the old pin inert and the assertion live.
+    - Fixed test: 1 passed unfrozen and 1 passed with `central_today_iso` frozen at 2030-01-01; the response date is 2026-06-07 in both.
+    - Worktree clean, no `data/`.
+  - One extra patch was needed. The first fix (blueprint pin only) gave 1 passed, **1 error**: the conftest data-mirror guard.
+    - The pool build settles `selected_date` and the day before (`pipeline/intelligence_state.py:7057-7061`), and `_refresh_wnba_boxscores` (:7106) then fetched and wrote real 2026-06-06/07 boxscores under `data/`.
+    - The test now also patches `pipeline.intelligence_state._refresh_wnba_boxscores`.
+- Goal: `tests/test_intelligence.py::IntelligenceBlueprintTests::test_intelligence_query_api_resolves_preview_date_and_preserves_contract` pins the date the endpoint actually uses and asserts `selected_date == "2026-06-07"`. Test-only, no behaviour change.
+- Files: tests/test_intelligence.py
+- Hypothesis (from the `/api/intelligence/query` clock trace, log 2026-09-15): the test's only pin, `router.query_router.central_today_iso`, is never read.
+  - With no date in the body, `_compute_intelligence_response` stamps the date from the blueprint's own module-level `central_today_iso` (`syndicate/blueprints/intelligence.py:51` import, `:1172`), so the router sees an explicit date.
+  - The test asserts only `assertTrue(selected_date)`, so it passes on any date with the real clock.
+- Falsification test: with the router pin alone, `selected_date == "2026-06-07"` already holds (then the pin was not inert).
+- Verification:
+  - The fixed test passes.
+  - A scratch copy with ONLY the router pin plus the new equality assertion fails, which proves the old pin inert and the new assertion live.
+  - The fixed test still passes with `central_today_iso` frozen at 2030-01-01 by the scratch plugin, so its own pin wins.
+- Blocked by: none
+
+### soccer-player-substrate — CLOSED 2026-09-15 — opened 2026-09-15 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Outcome: the prop sim lists the players who actually play. Landed `f833f7ec`, deployed to both workers, and confirmed in production: 10/10 leagues rebuilt `players_2026.csv` and 8/10 leagues' recommendations carry `player_substrate` with `squad_audit` on every match and no empty side.
+- **VERDICT 2026-09-15 20:45Z.** Goal (verbatim): "the soccer prop sim lists the players who actually play. The test is a replay of squad selection over production player files and ESPN box scores for the 2026-09-01..09-14 fixtures: real shots attributable to a listed player reach >= 85% in every league (36-87% on 2026-09-15), phantom rows fall, and every recommendations artifact publishes a per-side squad-coverage field a gate can use. Code lands on origin/main with tests. A refresh-worker deploy and a production reading happen only on the user's go." — **GOAL: MET** on the lane's own Verification.
+  - The replay recorded in `log/2026-09-15.md` reaches 85-99% in every league (primeira 85, belgian 92, mls 95, epl 99), with phantoms about halved.
+  - `squad_audit` / `player_substrate` are written by the builder, with a reachability test reading them back from disk. Landed `f833f7ec`.
+  - The user's go came, and both workers are live: live-odds-worker 19:37:29Z, refresh-worker 20:15:58Z.
+  - The owed production `verify:` is now RECORDED in `deploys.md` as the 23:08:18Z READING: `players_2026.csv` post-deploy 10/10; recommendations carrying `player_substrate` 8/10, each with `departed_filter` in {per_club, single_season}, `squad_audit` on every match and no side at `listed: 0`. belgian_pro_league and primeira_liga have no post-deploy recommendations artifact yet (newest 19:08:40Z and 18:51:37Z) — coverage owed, not doubt; a read-only watcher continues.
+  - `scripts/build_soccer_artifacts.py` is RELEASED to lane `soccer-anytime-scorer`, which needs it to move the goal-rate shrink to load time (`_load_player_rows`, after the dedupe) where H19 must be re-registered.
+  - Follow-up: a stale-200 ESPN range can pass `espn_lineups` (reported by lane `soccer-live-scoreboard-range-stale`, not re-derived).
+- Goal: the soccer prop sim lists the players who actually play. The test is a replay of squad selection over production player files and ESPN box scores for the 2026-09-01..09-14 fixtures: real shots attributable to a listed player reach >= 85% in every league (36-87% on 2026-09-15), phantom rows fall, and every recommendations artifact publishes a per-side squad-coverage field a gate can use. Code lands on origin/main with tests. A refresh-worker deploy and a production reading happen only on the user's go.
+- Files: `scripts/refresh_odds_sources.py` (`_SOCCER_PLAYER_FETCH_LEAGUES` and `_soccer_players_step` only), `scripts/build_soccer_artifacts.py` (player loading, departed filter, squad audit field), `syndicate/features/soccer/ingestion/espn_lineups.py` (scoreboard range fallback only), `syndicate/features/soccer/features/team_names.py` (six `_ALIASES` entries only), `tests/test_soccer_player_producer_step.py`, `tests/test_build_soccer_artifacts.py`, `tests/test_soccer_player_substrate.py` (NEW), `tests/test_soccer_espn_scoreboard_fallback.py` (NEW), `scripts/soccer_season_audit/decompose_squads.py` (NEW), `scripts/soccer_season_audit/squad_empty_sides.py` (NEW), `scripts/soccer_season_audit/squad_listing_lag.py` (NEW), `scripts/soccer_season_audit/replay_squads.py` (NEW)
+- Hypotheses (PRE-REGISTERED 2026-09-15, before the decomposition ran):
+  - H1: in the four ESPN leagues, which have no current-season file in production, most unattributed shots come from players in NO production player file. The missing producer is the fix.
+  - H2: in the big five, the departed filter is OFF (the busiest current-season player is under 450 min), so phantom rows are mostly prior-season-only players.
+  - H3: intra-league transfers kept at their old club are under 10% of unattributed shots. (Dedupe keeps the max-minutes row, which carries last season's team.)
+  - H4: fixing those three raises replayed coverage to >= 85% in every league.
+- Falsification test:
+  - H1 is false if "absent" is under 50% of unattributed shots in the ESPN leagues.
+  - H2 is false if prior-only rows are under half of the big-five phantoms.
+  - H3 is false if other-club classes reach >= 10%.
+  - H4 is false if any league stays under 85% on replay.
+- Verification: the decomposition and replay tables are recorded in the log, with a reachability test (`off != on`) per change, landed on origin/main.
+- Blocked by: none
+
+### quote-shard-date-fallback-prod — CLOSED 2026-09-15 — opened 2026-09-15 — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
+- **VERDICT.** Goal (verbatim): "measure in production whether candidate pools built for a non-today board date (a) price prop rows from TODAY's quote shard and (b) file opportunity-contract counts under today, and record a verdict per half. Diagnostic and read-only; any fix gets its own lane." — **GOAL: MET.**
+  - **(a) YES, but only for rows with no ISO date, and in EVERY pool (today's too). Not user-visible.**
+    - Replay of the real `_compact_prop_rows` -> `_finalize_home_prop_rows` -> `_prop_candidate_from_item` -> `_row_slate_date` over production `/ncaaf/api/cards?week=3` (18:54Z) gave 102 candidates (the worker counted 104).
+    - Their only date key is `context_label` "2026 Week 3" (the 57 games carry no kickoff value). `_row_slate_date` returned None for 102/102, so all fall back to `requested_date` = worker today.
+    - The 2026-09-15 NCAAF shard is ABSENT (`quote-feed-age`), which fully explains `with_quote=0`.
+    - The rows are "Anytime TD" with line "-" and `market_key` 0/102. Capture requests `player_anytime_td` (`fetch_ncaaf_oddsapi_props_local.py:86`), so an identity block after a date fix is unproven and less likely.
+    - ISO-dated sports are unaffected, and the served NCAAF props are 101 Layer 2 rows, dated and 101/101 quoted.
+    - These legacy rows do not reach the pool (`count=74` < 104).
+  - **(b) YES, CONFIRMED in production:** a same-process 09-16 build filed `intelligence_prop`/`intelligence_game` under 2026-09-15 (ncaaf 104 -> 208, soccer 14 -> 28; no 2026-09-16 key). Impact is limited to the ops coverage metric.
+  - No fix was made; any fix gets its own lane.
+- **Superseded status, 2026-09-15 ~13:30 CT (before sampling):** H0 CONFIRMED; H1 not user-visible, legacy NCAAF unattributed; H2 code-certain with its reading owed.
+  - **H1, served rows:** a sport-scoped `/api/intelligence/query` read (18:24Z, 23.4 MB) gave 101 ncaaf prop rows.
+    - All 101 are Layer 2 rows (no `candidate_type`/`context_label`) with `game_date` and `commence_time` (09-17 to 09-19), and 101/101 are quoted.
+    - Probe caveat: its soccer control returned 0 rows (a filter mismatch), so it is validated only for these rows.
+  - **H1, legacy candidates:** worker counters (18:16:31Z, same process, a TODAY build) read `ncaaf intelligence_prop` rows=104, with_quote=0, missing_market_key=104; soccer 11/14 quoted, mlb 36/36.
+    - `quote-feed-age`: ncaaf shard 2026-09-15 is ABSENT; 09-19 is ok (16:43Z) and 09-20 is stale.
+    - Consistent with the fallback-date join (label "2026 Week 3", no ISO row date on the intelligence path), but NOT attributed: missing_market_key 104/104 is a confounder, and those rows' date fields were not sampled.
+  - **H2 CONFIRMED in production (13:40 CT reading):** a same-process 09-16 build filed its intelligence counts under TODAY.
+    - Build order after the 18:14:03Z boot:
+      - A (today): enrich mlb 36 / ncaaf 104 / soccer 14 at 18:15-18:16Z, `CANDIDATE_POOL_READY date=2026-09-15 count=74` at 18:25:08Z.
+      - B (09-16): enrich ncaaf 104 / soccer 14 at 18:28:52-57Z, 09-16 gate at 18:34:35Z, `date=2026-09-16 count=0` at 18:39:53Z.
+      - No other pool-ready line in between, no BOOTED since 18:14:03Z.
+    - Payload flushed at 18:29:47Z (inside B), `service_role=refresh-worker-4tx2`: `ncaaf 2026-09-15 intelligence_prop=208 intelligence_game=564` and `soccer 2026-09-15 intelligence_prop=28 intelligence_game=156` (= A + B).
+    - There is NO `2026-09-16` intelligence lane, while the same build's context_label-keyed lane landed at `soccer 2026-09-16 prop_source_in=180`.
+    - Impact: the ops coverage metric double-counts today and never shows a non-today pool. The board is unaffected.
+  - **H1 attribution: sampling the 104 legacy NCAAF rows (user: "sample the 104 NCAAF rows").** Written before sampling:
+    - **H1a, fallback date:** the rows carry no ISO date in `_row_slate_date`'s keys, so the join read `requested_date` = worker today (2026-09-15), a shard that is ABSENT, which gives with_quote=0.
+    - **H1b, identity:** the rows carry an ISO kickoff date (or would join the existing 09-17..09-19 shards) but still find no quote because of the missing `market_key` (104/104) or player-name mismatch.
+    - **Discriminator:** the rows' actual date fields and market keys. If they have no ISO date, replay the real `quote_ref_for_bet` for a sample with the kickoff date against the existing shard. Quotes found means H1a; none means H1b is also in play.
+  - **H0** (refresh-worker `CANDIDATE_POOL_READY`, 09-12 05:00Z..09-15 18:08Z, 206 builds): non-today pools with candidates exist.
+    - On 09-12 the 09-13 pool had 151 (x2).
+    - On 09-14 the 09-15 pool had 14 (x24).
+    - At 00:04 CT 09-15 the pool for 09-14 had 5.
+    - Today's 09-16 pools read `count=0` (x12), but the build still ENRICHES props: the 17:57:57Z build kept mlb,wnba,nfl,ncaaf,soccer, with `ENRICH_PROPS_ENTER ncaaf rows=104` and `soccer rows=14`.
+  - **H1:**
+    - Inert for ISO-labelled sports. Soccer `context_label` read `2026-09-15`/`2026-09-16` in those builds, and daily-sport artifact paths are dated to the pool date.
+    - LIVE ONLY where the label is not a date: NFL "2026 Week 1", NCAAF "2026 Week 3".
+    - Those rows fall back to `requested_date` (the worker's today) unless they carry `commence_time` (`home.py:1566/3181`), and that applies in EVERY pool, not just non-today ones.
+    - Row-level `commence_time` coverage is not yet measured.
+  - **H2:** by code, the flush sits inside `collect_candidates` (`intelligence.py:10078`) and `reset()` has no production caller, so counters are cumulative per process.
+    - The 18:15:08Z payload (`service_role=refresh-worker-4tx2`) had only 2026-09-15 keys and NO ncaaf/soccer.
+    - That is explained by `[refresh_worker] BOOTED` at 18:14:03Z (no deploy, no RECYCLE line), which cleared the counters after the 17:57Z build.
+    - Not evidence either way. Next reading: the watcher's endpoint read after the next 09-16 build, with no BOOTED in between.
+- Goal: measure in production whether candidate pools built for a non-today board date (a) price prop rows from TODAY's quote shard and (b) file opportunity-contract counts under today, and record a verdict per half. Diagnostic and read-only; any fix gets its own lane.
+- Files: .syndicate/leads.md (promoting the lead only)
+- Hypothesis (written before any production read):
+  - **H0, precondition:** refresh-worker builds pools for non-today dates, i.e. `CANDIDATE_POOL_READY date=<today+1 or today+2>` appears in its logs.
+  - **H1, quote join, expected INERT for daily sports:**
+    - `enrich_prop_rows` joins on `_row_slate_date(row)` first (`quote_enrichment.py:620`).
+    - Daily-sport prop rows carry an ISO `context_label` (`intelligence.py:5054`).
+    - The today fallback applies only to rows with no ISO date (NFL/NCAAF week labels), which the daily board window does not build.
+  - **H2, metrics filing, expected LIVE:**
+    - `collect_candidates` calls `record_rows(..., date_str=_quote_date_for_sport(sport, preferences))` (`intelligence.py:7998/8027`) with `requested_date` = today, because `_build_candidate_pool` uses the literal "top edges today" (`intelligence_state.py:6171`).
+    - So `intelligence_prop`/`intelligence_game` counts appear under today only, even for pools built at today+1/+2.
+- Falsification test:
+  - H0 is false if no non-today `CANDIDATE_POOL_READY` appears in the stated window; then both halves are moot.
+  - H1 is false if daily-sport prop rows from a non-today pool lack an ISO date, or resolve to today's shard.
+  - H2 is false if a worker-sourced opportunity-contract payload shows `intelligence_prop`/`intelligence_game` buckets under a non-today date while such pools were built.
+- Verification:
+  - refresh-worker `CANDIDATE_POOL_READY date=` lines over a stated UTC window, with counts per date.
+  - `/api/ops/opportunity-contract/status`: read `source` and `service_role` FIRST. That endpoint serves web's in-process counters whenever web built a dashboard, and those can never show the worker's lanes.
+  - Then read its per-date lane keys and `generated_at` against the pool-build times.
+  - Instrument limits stated with each reading.
+- Blocked by: none
+
+### ncaaf-prop-kickoff-slate-date — CLOSED — opened 2026-09-15 — closed 2026-09-15 ~15:25 CT — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
+- **VERDICT.** Goal (verbatim): "NCAAF legacy prop rows carry their game's CENTRAL kickoff date as `slate_date`, so `enrich_prop_rows` joins the kickoff-date quote shard instead of falling back to the worker's today. Shown by a test through the real path and a replay over the production week 3 cards payload. No other sport's behaviour changes. Code landed on main; deploy only on the user's go." — **GOAL: MET, and LIVE on refresh-worker.**
+  - **Deploy:** `3157bb7b` rode along in `soccer-player-substrate`'s refresh-worker deploy `dep-dakqc6h5efls73d8r3og` (`f833f7ec`, live 20:15:58Z). This lane waited for that claim and did not deploy.
+  - **Post-deploy reading** (`deploys.md` 2026-09-15 20:22:24Z): `ncaaf 2026-09-15 intelligence_prop rows=104 with_quote=104`, in a same-process build flushed 20:19:01Z. The baseline, read 20:00:31Z in the previous process, was rows=416, with_quote=0.
+  - **Not verified:** that each quote is the right market (`missing_market_key=104`), and web's live commit.
+  - **Lead correction:** the 18:14:03Z refresh-worker BOOTED was deploy `dep-dakoid2fngtc73ev1rjg` (`55fee786`, finished 18:13:26Z), read from the deploys API; I had checked only `deploys.md`. The lead was deleted from `leads.md`.
+  - Readings before the deploy:
+    - `tests/test_home_ncaaf_prop_kickoff_date.py` 10 passed, on the production game shape, including a match precondition and an `off != on` join-date test (`quote_ref_for_bet` gets 2026-09-18 vs fallback 2026-09-15).
+    - Existing prop tests (`test_game_board_contract_prop_team.py` + `test_home.py -k prop`) 37 passed.
+    - Diagnostic over production `/ncaaf/api/cards?week=3`: 102/102 rows matched, 102/102 with a kickoff date.
+    - Replay: `slate_date` on 102/102 candidates; `_row_slate_date` returns 09-17 x8, 09-18 x16, 09-19 x78 (Central), where it was None x102 before.
+  - **A first version was INERT on production data:** it read top-level `kickoff`/`scoreboard.kickoff` and dated 0 of 102 rows, while its fixture-shaped tests passed 8/8. The prop games keep kickoff at `startTime` and `ncaaf_card.scoreboard.kickoff`. The tests were rebuilt on the production shape.
+- Goal: NCAAF legacy prop rows carry their game's CENTRAL kickoff date as `slate_date`, so `enrich_prop_rows` joins the kickoff-date quote shard instead of falling back to the worker's today. Shown by a test through the real path and a replay over the production week 3 cards payload. No other sport's behaviour changes. Code landed on main; deploy only on the user's go.
+- Files: syndicate/blueprints/home.py, tests/test_home_ncaaf_prop_kickoff_date.py (NEW)
+- Hypothesis / design (from lane `quote-shard-date-fallback-prod`, closed):
+  - **The defect:** NCAAF prop rows come from `_compact_prop_rows` (no date field) and pass through `_finalize_home_prop_rows`, whose date fill reads only `scheduled_start_utc` (NCAAF games carry `kickoff`). `_build_prop_dashboard_row` then rebuilds the dict, keeping only `commence_time`.
+  - **The result:** `_row_slate_date` is None for 102/102 rows (production replay), so the join reads today's shard, and the 2026-09-15 NCAAF shard is ABSENT.
+  - **The fix:**
+    - For `slug == "ncaaf"`, set `slate_date = kickoff_shard_date({"commence_time": kickoff})` from the matched game (top-level `kickoff`, else `scoreboard.kickoff`), only when absent.
+    - Pass `slate_date` through `_build_prop_dashboard_row`.
+    - `slate_date` is a key no other producer sets, and `_row_slate_date` reads it before `commence_time`.
+  - **Rejected alternatives:**
+    - Setting `commence_time`: `_row_slate_date` takes `[:10]` = the UTC date, wrong for evening kickoffs. `learnings.md` 2026-09-10 forbids UTC slicing for NCAAF/NFL dates.
+    - Passing `game_date` through: soccer items carry `game_date` = the board date, which would then override their real kickoff.
+- Falsification test:
+  - A Fri 19:00 CT (00:00Z Sat) NCAAF row gets `slate_date` 2026-09-19 (UTC) instead of 2026-09-18, or none.
+  - A non-NCAAF row or a placeholder kickoff gets a `slate_date`.
+  - `quote_ref_for_bet` still receives the fallback date for a dated NCAAF row.
+- Verification:
+  - The new test file passes, including an `off != on` reachability test: with the fix the `quote_ref_for_bet` `date_str` equals the Central kickoff date; without it, the fallback.
+  - Existing tests touching `_finalize_home_prop_rows`/`_build_prop_dashboard_row` pass.
+  - A replay over the production `/ncaaf/api/cards?week=3` payload shows `_row_slate_date` ISO for matched rows (was None for 102/102).
+  - Post-deploy (if approved): refresh-worker `ncaaf intelligence_prop with_quote` > 0 in a same-process build.
+- Blocked by: none
+
+### soccer-player-role-allocation — CLOSED 2026-09-15 — opened 2026-09-15 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Outcome: shot/SOT props ship conditional on appearing, the 1.393 divisor and its re-fit machinery are gone, and both workers serve it with the reading to prove it.
+- **VERDICT 2026-09-15 22:20Z.** Goal (verbatim): "soccer shot and shots-on-target props are priced on a ladder CONDITIONAL ON THE PLAYER APPEARING (start/sub mixture, substitute intensity fitted held-out), and the 1.393 shot divisor is retired with its re-fit machinery. On held-out dates, that ladder beats the post-divisor unconditional ladder on log loss at lines 0.5 and 1.5, pooled and in >= 8 of 10 leagues, on production-shaped inputs. Landed on main with reachability tests; deploy per user." — **GOAL: MET.**
+  - Met so far:
+    - Step A `e53274f2` (divisor, loader, fitter and checks removed; the refit task disabled).
+    - Step B `b33ef901`.
+    - H13 / H14: the shipped engine reproduces the model held out, shots 0.6107 / 0.4690 against 0.6414 / 0.5169 and SOT 0.4931 / 0.1988 against 0.5122 / 0.2154, in 9/10 leagues.
+    - Mutation checks red; 108 targeted tests pass.
+    - DEPLOYED to both workers after the 21:25Z window, per the user's decision. live-odds-worker `8c089e8c` went live 21:38:19Z; refresh-worker `2d579fd1` went live 22:12:03Z. Both are recorded in `deploys.md`.
+    - live-odds-worker verify MET. In artifacts it generated after 21:38:19Z, every shot row with `expected_shots > 0` is priced on the conditional ladder: la_liga 185/185, championship 73/73, eredivisie 35/35. `shot_mean_vs_ladder_ratio` is 1.241.
+  - refresh-worker verify MET, read 22:38:58Z: 693 rows with `expected_shots > 0` across epl, la_liga, championship and bundesliga artifacts generated after 22:12:03Z, 0 unconditional, ratio 1.287. Baseline was 1.000 over 2,024 rows at 20:37:17Z. Recorded in `deploys.md` (`4d7c228a`).
+  - `player_props.py` passed to `soccer-anytime-scorer` on close.
+- Goal: soccer shot and shots-on-target props are priced on a ladder CONDITIONAL ON THE PLAYER APPEARING (start/sub mixture, substitute intensity fitted held-out), and the 1.393 shot divisor is retired with its re-fit machinery. On held-out dates, that ladder beats the post-divisor unconditional ladder on log loss at lines 0.5 and 1.5, pooled and in >= 8 of 10 leagues, on production-shaped inputs. Landed on main with reachability tests; deploy per user.
+- Files:
+  - `syndicate/features/soccer/sim_engine/soccersim/player_props.py` (RELEASED 2026-09-15 to `soccer-anytime-scorer`)
+  - `syndicate/features/soccer/sim_engine/soccersim/shot_calibration.py` (DELETE)
+  - `tests/test_soccer_shot_shrinkage.py` (DELETE)
+  - `tests/test_soccersim_player_props.py`
+  - `scripts/fit_soccer_shot_shrinkage.py`, `scripts/check_soccer_divisor_reached_engine.py`, `scripts/check_soccer_shot_divisor_vs_season_rate.py` (DELETE)
+  - `syndicate/features/shared/soccer_projections.py` (`_PLAYER_PROB_BY_LINE` only)
+  - `syndicate/features/soccer/features/loaders.py` (`usage_metrics` role fields only)
+  - `tests/test_soccer_player_role_ladder.py` (NEW)
+  - `scripts/soccer_season_audit/calibration_role_mixture.py`, `calibration_role_mixture2.py`, `calibration_role_mixture3.py` (NEW)
+  - NOT here: `scripts/build_soccer_artifacts.py` and `scripts/refresh_odds_sources.py` stay with `soccer-player-substrate` (same session) until that lane closes.
+- Hypotheses. Each run's hypotheses were written into the script docstring BEFORE that run.
+  - Population: 16,377 appeared outfield (player, match) rows, 07-22..09-14, fix #1 squads, ESPN box scores. Log loss is P(shots >= 1) / P(shots >= 2).
+  - Run 1:
+    - H1, retire the divisor. **SUPPORTED.** Board ladder today 0.690 / 0.570; at 1.5 that is WORSE than a constant (0.553). Without the divisor, 0.632 / 0.498: better in both halves and in 10/10 leagues.
+    - H2, Understat share is per APPEARANCE, not per team minute. **SUPPORTED for starters**: big-five mixture starters 0.57 -> 0.67.
+    - H3, a start/sub mixture beats the better of the unconditional and `/max(share, 0.25)` ladders. **FALSIFIED as registered.** It passed pooled and on both halves, but won only 5/10 leagues against >= 7.
+    - H4, the confirmed-lineup ceiling is 0.020 / 0.013.
+  - Run 2:
+    - H5, team-minutes shares improve the UNCONDITIONAL ladder. **FALSIFIED**: big five 0.644 -> 0.664. So T ships only inside the conditional ladder, and never replaces `expected_minutes_share`, which the live and unconditional paths read.
+    - H6, roles are under-separated. **SUPPORTED**: P(start | appear) averages 0.751 for actual starters and 0.409 for actual subs.
+    - H7, substitute per-minute intensity > 1.5. **SUPPORTED**: 1.87.
+  - Run 3, fitted on dates < 08-26 and scored on >= 08-26:
+    - H8, the refitted mixture beats both the run-1 mixture and the post-divisor ladder. **SUPPORTED**: test 0.611 / 0.469 against 0.621 / 0.474 and 0.641 / 0.517; 9/10 leagues at 0.5, 10/10 at 1.5.
+    - H9, fitted k is in [1.5, 2.2]. **SUPPORTED**: k = 1.8, c = 2.
+  - Residual: level 0.88 (starters 0.75, subs 1.57); Serie A 0.72. That is the next re-fit, not this lane's goal.
+- Falsification test (production-shaped): the shipped ladder, fed production's own inputs (role counts from the ESPN producer, not outcomes.json), fails H8's held-out test. Or SOT, pre-registered separately before any board switch, fails the same test.
+- Verification:
+  - `off != on` reachability: the shot divisor artifact on disk no longer moves `expected_shots`; the board reads the conditional ladder when present and the unconditional one when absent.
+  - A held-out replay over production-shaped inputs.
+  - Tests A/B against a baseline.
+  - After deploy, the first artifacts carry the conditional ladder, and `soccer_projections` prices from it.
+- Blocked by: none. Step A (divisor retirement) needs nothing from step B.
+
+### ncaaf-prop-quote-market-check — CLOSED — opened 2026-09-15 — closed 2026-09-15 ~15:45 CT — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
+- **VERDICT.** Goal (verbatim): "for the 104 NCAAF legacy prop rows refresh-worker quoted after `f833f7ec` (`intelligence_prop with_quote=104`), state how many carry a quote from the row's OWN market, measured with the real `quote_ref_for_bet` over production quote shards. If they are wrong, describe the production impact and stop before changing behaviour. Read-only diagnostic; no code change without the user's go." — **GOAL: MET. Hypothesis FALSIFIED: 102 of 102 replayed rows get their own market, side and line.**
+  - **Reading:** the replay used the real `quote_ref_for_bet` with `enrich_prop_rows`' arguments, with `quote_ref` wrapped to capture the chosen group.
+    - Right: 102 of 102 (101 Anytime TD / yes; 1 Receiving Yards / over / 34.5).
+    - Price: 94 of 102 row odds equal a quoted book price. The other 8 differ by a few cents, because the card was read at 13:54 CT and the shard copy is from 19:28Z.
+  - **Why the premise was wrong:** production shards store `market` as the DISPLAY string ("Anytime TD"), not OddsAPI's `player_anytime_td`. The row's "Anytime TD" therefore narrows by exact match, and `missing_market_key` does not stop the join.
+  - **The frame could have been wrong:**
+    - 23 of 102 players have more than 1 market in the shard.
+    - An identity-only control (no market, selection or line) picks the WRONG market on 1 row, so the market filter is doing work.
+  - **Untested:** no NCAAF Anytime TD "No" side exists in the shards (0 of 101). The side filter never narrows for these rows (pick "Anytime TD - 3 books" matches no selection), so a future No side could be chosen. Recorded in `leads.md`.
+  - **Substrate:** rows from the real legacy path over production `/ncaaf/api/cards?week=3` (13:54 CT, 102 rows against the worker's 104). Shards are web's copies via `/api/ops/artifacts/export` (09-17/18/19, mtime 19:28Z), not refresh-worker's disk at its 20:18Z build.
+  - **Instrument error, corrected:** the first classifier compared against OddsAPI keys and reported 102 WRONG_MARKET. The chosen-group field I had already captured read "Anytime TD / yes".
+- Goal: for the 104 NCAAF legacy prop rows refresh-worker quoted after `f833f7ec` (`intelligence_prop with_quote=104`), state how many carry a quote from the row's OWN market, measured with the real `quote_ref_for_bet` over production quote shards. If they are wrong, describe the production impact and stop before changing behaviour. Read-only diagnostic; no code change without the user's go.
+- Files: none (read-only diagnostic; probes in the session scratchpad)
+- Hypothesis:
+  - `enrich_prop_rows` identifies by player only. Market, selection and line are SOFT (`narrowed or candidates`, `odds_book_quotes.py:2287-2301`).
+  - The legacy rows carry `market` "Anytime TD" (101 of 102 on the week-3 cards payload) and no `market_key`. `_normalize_token` gives "anytime td", while shard rows say `player_anytime_td` ("player anytime td"), and `_MARKET_ALIASES` has only game markets.
+  - So narrowing falls through to ALL of the player's quote rows, and `max(grouped, key=len)` picks the market with the MOST BOOKS. That may be receiving/rushing yards rather than Anytime TD.
+  - The 104/104 therefore measures "some quote for this player", not "this bet's price".
+- Falsification test: in a replay over the production 09-17..09-19 NCAAF shards, the market `quote_ref_for_bet` chooses equals `player_anytime_td` (or the row's own market) on every quoted row. The hypothesis is then wrong, and the rows are right by construction or by luck. Report which.
+- Verification: per quoted row, the chosen market key against the row's market, counted (right / wrong / no own-market quote in the shard). Substrate stated: web's synced shard copy read via `/api/ops/artifacts/export`, not refresh-worker's disk.
+- Blocked by: none
+
+### anytime-td-quote-side-yes — CLOSED — opened 2026-09-15 — closed ~15:55 CT, reopened ~16:00 CT for the deploy, CLOSED ~17:17 CT — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
+- **DEPLOY VERDICT.** Goal (verbatim, as widened): "prop rows whose market is Anytime TD pass `selection="yes"` to `quote_ref_for_bet` from `enrich_prop_rows` and from `enrich_candidate_rows` (the two joins that pass a display pick as the selection hint), unless their pick/selection already names a side, so a "No" side quoted by more books cannot be chosen. Shown by an `off != on` test on a shard holding yes and no, where No has more books: before the fix the row prices the No, after it the Yes. Other markets' join arguments unchanged. Landed on main; deploy only on the user's go." — **GOAL: MET, and LIVE on refresh-worker.**
+  - **Deploy:** `6d526851` rode along in lane soccer-player-role-allocation's refresh-worker deploy of origin/main `2d579fd1` (`dep-daks2irm8hqs73efhhh0`, finished 22:12:03Z; `[refresh_worker] BOOTED` 22:12:37Z). Checked here against the deploys API, the render logs and git ancestry, not taken from the peer message. This lane's off-main `1d78d38b` was never deployed.
+  - **Post-deploy reading** (`deploys.md` 2026-09-15 22:15:53Z): `/api/ops/opportunity-contract/status`, `generated_at` 22:15:06Z (after the boot), `service_role` refresh-worker-4tx2: `ncaaf 2026-09-15 intelligence_prop rows=256 with_quote=256`. Rate 1.0 against the expected 1.0; the baseline was 416/416, read 21:02:07Z in the previous process.
+  - **What that reading shows:** the join still quotes every NCAAF prop row after the change. It cannot show the side choice itself, because no Anytime TD "No" side exists in the shards. The side fix rests on the `off != on` tests and on the production-shard replay (101 rows pass "yes", 102/102 right).
+- **STATUS 2026-09-15 ~16:00 CT — REOPENED for the refresh-worker deploy** (user: "deploy the Anytime TD fix to refresh-worker"). refresh-worker live is `f833f7ec` (`dep-dakqc6h5efls73d8r3og`). `f833f7ec..6d526851` carries soccer-player-role-allocation steps A `e53274f2` and B `b33ef901`, which are not approved for deploy, so main cannot ship. **User decision ~16:02 CT: "Off-main now".** The target is `f833f7ec` plus the fix's two files (blobs identical to `6d526851`), `--allow-off-main`, precedent `18be9107`. Book-quotes-splice-repair's Deploy 2 (`<live> + 070a05bf`) must build on this SHA.
+  - **Built:** `1d78d38b` (branch `deploy/refresh-worker-anytime-td-side`, pushed). 62 passed on its own tree.
+  - **Claim:** acquired 21:00:31Z.
+  - **Preflight 21:02:10Z: HOLD.** 5 jobs, the MLB daily sim (`run_mlb_daily_sim_job`, `daily_update.py --workflow ui-daily`). The claim, off-main, spacing (46 min) and expectation all passed.
+  - **Baseline** (read 21:02:07Z, flushed 15:54:45 CT, `service_role` refresh-worker-4tx2): `ncaaf 2026-09-15 intelligence_prop rows=416 with_quote=416`, rate 1.0.
+  - **Expect:** rate 1.0 in the new process.
+  - **Waiting:** a background loop re-reads the baseline and re-runs preflight every 60 s, stopping at 21:40Z. Deploy on the first CLEAR.
+  - **Messaging the book-quotes session:** the claim breadcrumb id did not resolve ("session not found"). A transcript search for its pushed branch `deploy/live-odds-worker-bq-write-faults` mapped it to CCD session `local_d77a58da-70a0-4822-93eb-d6b7310f216a`. The message "build your Deploy 2 on 1d78d38b" was QUEUED there ~16:05 CT.
+  - **~16:09 CT: STOOD DOWN, and `1d78d38b` is NOT deployed.** Book-quotes-splice-repair replied that it had dropped its refresh-worker deploy, and that lane soccer-player-role-allocation will deploy origin/main's TIP (steps A/B approved) to refresh-worker after 21:25Z.
+    - **Verified on origin/main `b2a9a4bb`:** that lane's block records "User decision: deploy main's tip to live-odds-worker, then refresh-worker, AFTER 21:25Z", and the tip contains `6d526851`.
+    - **Why stand down:** an off-main deploy of mine AFTER their tip would revert steps A/B and `070a05bf` (`render_deploy.py`'s rollback guard would also refuse it). One BEFORE would cost an extra reboot and push their deploy back by the 25-min spacing.
+    - **Done:** loop stopped (6 passes, all HOLD on the MLB daily sim, 5-10 jobs), claim released, both sessions messaged. The soccer lane was asked to name `6d526851` as a ride-along. Branch `deploy/refresh-worker-anytime-td-side` is unused.
+    - **Owed after their refresh-worker deploy:** `ncaaf intelligence_prop with_quote/rows` = 1.0 in the new process (baseline 416/416 read 21:02:07Z). The fix's own effect stays unobservable until a No side is captured.
+    - **~16:12 CT:** the soccer lane confirmed that the pinned origin/main tip goes to live-odds-worker then refresh-worker (~21:25Z, MLB sim permitting), with `6d526851` listed as a ride-along. The user said: "wait for the deploy and take the with_quote reading".
+    - **Watcher running:** it polls the Render deploys API every 2 min until refresh-worker is live on a commit containing `6d526851`. It then polls `/api/ops/opportunity-contract/status` until `generated_at` is after that deploy's `finishedAt` and the ncaaf intelligence_prop rows are above 0. Deadline 3 h.
+    - **17:13 CT, deploy confirmed independently (not from the peer message):** the deploys API shows refresh-worker live on `2d579fd1` (`dep-daks2irm8hqs73efhhh0`, finished 22:12:03Z). It contains `6d526851` and is on origin/main. The render logs show `[refresh_worker] BOOTED` at 22:12:37Z.
+    - **First new-process counter read** (generated 22:13:36Z, read 22:13:57Z): ncaaf 2026-09-15 intelligence_prop rows=0. No NCAAF build has run since boot, so this is not a reading. The watcher keeps polling for rows above 0.
+- **VERDICT.** Goal (verbatim): "prop rows whose market is Anytime TD pass `selection="yes"` to `quote_ref_for_bet` from `enrich_prop_rows` and from `enrich_candidate_rows` (the two joins that pass a display pick as the selection hint), unless their pick/selection already names a side, so a "No" side quoted by more books cannot be chosen. Shown by an `off != on` test on a shard holding yes and no, where No has more books: before the fix the row prices the No, after it the Yes. Other markets' join arguments unchanged. Landed on main; deploy only on the user's go." — **GOAL: MET. NOT DEPLOYED.**
+  - **Code:** `quote_enrichment._anytime_td_side_hint` is used at both joins. It returns "yes" when `canonical_market_key(sport, market_key, market)` is `player_anytime_td` and the hint's first word is not yes/no/over/under. Otherwise it returns the hint unchanged, including on any exception.
+  - **Tests:** `tests/test_quote_enrichment_anytime_td_side.py`, 6 tests.
+    - Fixed code: 62 passed across it plus the 6 existing quote suites. Baseline before the edit: 56 passed.
+    - Fix switched off (a scratch plugin makes the helper return the hint): 4 failed. They are the two prop Yes-side tests, the candidate Yes-side test and the join-arguments test. 2 passed: the precondition (the display pick alone prices the No, 3 books at -190) and the explicit-No test.
+  - **Production replay** through the real `enrich_prop_rows` over web's exported 09-17..09-19 NCAAF shards: the selection passed is "yes" on 101 rows (the Receiving Yards row unchanged), 102 of 102 are quoted, and 102 of 102 are right on market, side and line.
+  - **Shard vocabulary:** Anytime TD quotes read `yes`, line None, on NFL 09-17 (950 rows) and NCAAF 09-19 (706). No "no" rows.
+  - **Owed if deployed** (refresh-worker runs both joins; web runs `enrich_prop_rows` in `home.py`): nothing measurable changes until a No side is captured. The instrument is a replay against a shard holding one, not a production counter.
+- Goal: prop rows whose market is Anytime TD pass `selection="yes"` to `quote_ref_for_bet` from `enrich_prop_rows` and from `enrich_candidate_rows` (the two joins that pass a display pick as the selection hint), unless their pick/selection already names a side, so a "No" side quoted by more books cannot be chosen. Shown by an `off != on` test on a shard holding yes and no, where No has more books: before the fix the row prices the No, after it the Yes. Other markets' join arguments unchanged. Landed on main; deploy only on the user's go.
+- Files: `syndicate/features/shared/quote_enrichment.py`, `tests/test_quote_enrichment_anytime_td_side.py` (NEW)
+- Hypothesis / design (from lane `ncaaf-prop-quote-market-check`, closed):
+  - **The defect:** NCAAF legacy rows pass pick "Anytime TD - N books" as the selection hint, which `_selection_matches` never matches. The side filter falls through, and `max(grouped, key=len)` picks the group with the most books.
+  - **Today:** 102/102 are right only because the shards hold no "no" side (0 of 101).
+  - **Fix at the shared entry:**
+    - In `enrich_prop_rows`, when `canonical_market_key(sport, market_key, market)` is `player_anytime_td` and the hint is not a side word (yes/no/over/under), pass "yes".
+    - An explicit "No" pick stays No.
+    - This covers NFL rows too, because they share the `_FOOTBALL` map.
+- Falsification test:
+  - With the fix, the test row still prices the No side.
+  - A non-Anytime-TD row's `quote_ref_for_bet` arguments change.
+  - An explicit "No"/"Under" pick is rewritten.
+- Verification:
+  - The new test file passes, including the `off != on` side test with the real `quote_ref_for_bet` over a temp shard.
+  - Existing quote-enrichment and NCAAF prop tests pass.
+  - The replay over web's exported 09-17..09-19 NCAAF shards still reads 102/102 right.
+- Blocked by: none
+
+### fotmob-join-coverage-check — CLOSED 2026-09-15 — opened 2026-09-15 — session da346015-cd58-450a-a9e0-bba6bdb00403 — **GOAL: MET: the checker is built, tested, landed `60e695c0` and CI-VERIFIED (dispatched run 35032523439, 114/114 fixtures), and the user chose its schedule**
+- **VERDICT.** Goal (verbatim): "a checker resolves every upcoming ESPN fixture in the 10 tracked leagues through production's `resolve_fotmob_match_id`, with production's inputs (`espn_lineups.fetch_events` names, league slug, ESPN date). It exits non-zero on any unresolved fixture, or on any fetch it could not complete, and lists ESPN's names beside FotMob's unmatched fixtures. An ESPN respelling, or a new alias gap, is then caught days before kickoff instead of as a hidden momentum panel. Built, tested, run once over the next 7 days and landed on main; how it runs on a schedule is the user's call." — **GOAL: MET.** Readings: 63 tests (the "1. FC Cologne" respelling exits 1 and names FotMob's unclaimed `1. FC Köln` fixture; both fetch failures exit 2); local run today(Central)+6 days, all 10 leagues, 114/114 resolved, exit 0; CI run `35032523439` on main success in 83 s with the same 114/114 and the exit-0 branch taken. Schedule: the user chose a daily 12:00Z workflow, a LOGGED OVERRIDE of `#486` (`1bb29d14`). **The cron itself has not fired yet** — first scheduled run 2026-09-16 12:00Z, lead in `leads.md`.
+- Goal: a checker resolves every upcoming ESPN fixture in the 10 tracked leagues through production's `resolve_fotmob_match_id`, with production's inputs (`espn_lineups.fetch_events` names, league slug, ESPN date). It exits non-zero on any unresolved fixture, or on any fetch it could not complete, and lists ESPN's names beside FotMob's unmatched fixtures. An ESPN respelling, or a new alias gap, is then caught days before kickoff instead of as a hidden momentum panel. Built, tested, run once over the next 7 days and landed on main; how it runs on a schedule is the user's call.
+- Files: `scripts/check_fotmob_join_coverage.py` (NEW), `tests/test_check_fotmob_join_coverage.py` (NEW), `.github/workflows/fotmob-join-coverage.yml` (NEW), `.syndicate/scheduled_task_fotmob_join_coverage.md` (NEW)
+- Hypothesis: n/a (a detector). Why detection and not more aliases: an alias for a spelling nobody has seen is a guess (`learnings.md` 2026-09-06 FORBIDDEN: a refusal keyed to one spelling of a value with synonyms), while ESPN and FotMob both publish fixtures days ahead.
+- Falsification test: an injected respelling (ESPN "Stade Rennais FC" on a recorded fixture) does NOT make the checker exit non-zero, OR an ESPN or FotMob fetch failure exits 0.
+- Verification: tests (a respelling exits 1 with both vendors' names listed; a fetch failure exits 2; all resolved exits 0), and one real run over today..+7 days across all 10 leagues, reporting resolved/total and any misses.
+- Blocked by: none
+- **STATUS 2026-09-15 22:3xZ: BUILT + LANDED `60e695c0`, SCHEDULED.** Tests 63 passed: a "1. FC Cologne" respelling exits 1 against the recorded 09-12 listing and prints FotMob's unclaimed `1. FC Köln` fixture; an ESPN or FotMob fetch failure exits 2 (not read as a respelling); a resolved fixture is never offered as a candidate; the poller's single-date window is asserted. Real run 22:2xZ, today (Central) + 6 days, all 10 leagues: **114/114 fixtures resolved, 0 unresolved, 0 unknown, exit 0** — no respelling or alias gap is pending this week, and that covers the weekend's Bayern, Rennes, Köln, Belgian and Championship fixtures. Nothing runs it on a schedule yet; the user is choosing between a local daily task, a GitHub Actions cron and on demand. **SCHEDULED 2026-09-15 `[user decision, OVERRIDE of #486]`:** asked with `#486` (2026-08-20, "we no longer use that daily update feature, everything runs on render"), the 2026-09-07 re-removal of `vendor-sync.yml`'s cron and the `learnings.md` rule quoted, and with a local task offered as the recommendation, the user answered "Add the cron anyway (override #486)". `.github/workflows/fotmob-join-coverage.yml` runs it daily at 12:00Z, READ-ONLY (no secrets, no push, no deploy): exit 1 fails the run with the names in the job summary, exit 2 only warns. `state_ledger.md`'s Actions capability table and its "no `schedule:` in any workflow" line are corrected in the same commit; doc `.syndicate/scheduled_task_fotmob_join_coverage.md`. **CI VERIFIED 2026-09-15 22:46:59Z:** a dispatched run of the workflow on main, `35032523439`, finished **success** in 83 s: `FOTMOB_JOIN_COVERAGE resolved=114/114 unresolved=0 unknown=0 exit=0`, and the policy step took the exit-0 branch ("every upcoming fixture joins"). GitHub has the workflow registered and active (id 359151897), `requirements.txt` installs, and the checker runs on Linux/Python 3.11 -- no billing lock, so presence is reachability here. Landed as `1bb29d14` (rebased from local `53900680`). First scheduled run 2026-09-16 12:00Z. Only annotation: GitHub's Node.js 20 deprecation for `actions/checkout@v4` and `actions/setup-python@v5`, which every workflow in this repo shares.
+
+### web-dashboard-prop-dates-quotes — CLOSED — opened 2026-09-15 — closed 2026-09-15 ~17:35 CT — session 3421d2c5-eb3b-413c-91ff-9d5d64d25884
+- **VERDICT.** Goal (verbatim): "state, from web's own served payload, how many dashboard prop rows carry a row date and a quote, per sport, with NCAAF split out — the surface `home.py`'s `enrich_prop_rows` feeds (`home.py:3461`), on web live `c35284dc`, which carries `3157bb7b` and `6d526851`. Read-only; no code change without the user's go." — **GOAL: MET. The answer is that NCAAF is ZERO on this surface, by configuration.**
+  - **Served payload** `/api/home` (read 22:31:13Z, `selected_date` 2026-09-15): `sports` entries 1 (mlb). `dashboard.top_props` 14 rows, all mlb, 14 quoted, 0 with a row date — MLB rows fall back to `date_str` (`selected_date`), which is their own slate, so they still join.
+  - **Web's own counters**, same process (`source in_process`, `service_role syndicate-an21`, generated 22:32:25Z): `mlb 2026-09-15 prop_dashboard_row rows=46 with_quote=45` (0.978). **No ncaaf lane, no other sport.**
+  - **Why:** `_build_light_home_sports` (`home.py:8404`) keeps only `_active_sport_slugs()`, and web's `SYNDICATE_ACTIVE_SPORTS` reads `mlb,wnba,soccer,nfl` — **no ncaaf** (single-key env read 22:34Z; refresh-worker's reads `mlb,wnba,soccer,ncaaf,nfl`). So NCAAF prop rows never reach web's `enrich_prop_rows`, and `3157bb7b`/`6d526851` are inert on THIS surface while live in the code.
+  - **Other dates return nothing at all:** `?date=` is accepted (`home.py:8477`), but 2026-09-13, 2026-09-17 and 2026-09-19 each served `sports` 0 / `top_props` 0. From code: `home.py`'s `_allow_stored_date_fallback()` returns False and each sport's `is_active` requires the label to equal today.
+  - **Unexplained, not chased:** soccer and nfl are in web's active list yet absent from today's payload.
+  - **Lead filed** for the ncaaf-on-web gap.
+  - **DECISION 2026-09-15 ~17:45 CT (user: "add ncaaf to web's active sports", then "Don't add it" once the cost was shown): web's `SYNDICATE_ACTIVE_SPORTS` is LEFT AS IS. Nothing was changed, no claim taken, no deploy.**
+    - **Why:** `build_home_overview` calls `_NCAAFDataProvider.games(context, is_active_today=...)` WITHOUT `include_upcoming`, which is the heavy branch (`build_smartsim_cards_page_context(week)` + `build_ncaaf_market_board(week)`, `home.py:6709-6713`). `fccd923d` (2026-08-29) made only the CHIPS path light via `build_ncaaf_chip_games`.
+    - **Measured precedent** (`deploys.md` 2026-08-29 12:18 CT, revert `0163f904`): with NCAAF reachable on that path, `/` went 3.5s -> 37.9s and `/ncaaf/cards` 502'd; the revert restored 200s.
+    - **Payoff would be nil:** no template or JS under `syndicate/` fetches `/api/home` (only `tests/` and the run-syndicate skill), and `/` renders the Layer 2 board (`home.py:8407`). NCAAF's user-visible surfaces (`/ncaaf/*`, the Layer 2 board, chips) do not read this key.
+    - **`render.yaml` does not declare the key**, and a `blueprint_sync` upserts declared keys while leaving live-only ones alone, so no drift risk either way.
+    - **If it is ever wanted:** give the home overview a light NCAAF build first (the `build_ncaaf_chip_games` pattern), prove equivalence and cost offline, then flip the key with a deploy.
+- Goal: state, from web's own served payload, how many dashboard prop rows carry a row date and a quote, per sport, with NCAAF split out — the surface `home.py`'s `enrich_prop_rows` feeds (`home.py:3461`), on web live `c35284dc`, which carries `3157bb7b` and `6d526851`. Read-only; no code change without the user's go.
+- Files: none (read-only sampling; probes in the session scratchpad)
+- Hypothesis:
+  - Web builds these rows from each sport's `prop_opportunities`/`home_rails`/`props_bar` items, not from the worker's candidate pool, so its coverage is its own number and need not match refresh-worker's 256/256.
+  - With `3157bb7b` live, NCAAF rows should carry a `slate_date` from the game's Central kickoff, and so join a real shard rather than today's absent one.
+- Falsification test: NCAAF dashboard rows carry no row date, or carry one and still no quote, on web's served payload.
+- Verification: counts from the served payload only, with the read time and the payload's own date fields stated. `dashboard.top_props` is capped at 14 rows (`home.py:3545`), so the served list is a shortlist; say so with any count.
+- Blocked by: none
