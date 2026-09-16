@@ -272,3 +272,257 @@ def test_a_zero_cap_does_not_mean_scan_nothing(tmp_path, monkeypatch):
     the default, never to a degenerate branch."""
     monkeypatch.setenv("SYNDICATE_RETENTION_MAX_FILES_PER_PASS", "0")
     assert ar._env_int("SYNDICATE_RETENTION_MAX_FILES_PER_PASS", ar._MAX_FILES_PER_PASS) == ar._MAX_FILES_PER_PASS
+
+
+# ---------------------------------------------------------------------------
+# Lane `worker-disk-auto-retention` (2026-09-16): the rule table, its reader
+# lookback guard, directory dates, the sorted cursor, dedupe_twin, and a dry run
+# that is proven to touch nothing.
+# ---------------------------------------------------------------------------
+
+import hashlib
+import json
+import math
+import os
+import random
+
+
+def test_a_rule_inside_its_readers_lookback_is_refused_at_construction():
+    with pytest.raises(ar.RetentionRuleError):
+        ar.Rule("too_short", "x/*", "derived", days=7, min_reader_lookback_days=1)
+    with pytest.raises(ar.RetentionRuleError):
+        ar.Rule("way_too_short", "x/*", "ops", days=10, min_reader_lookback_days=30)
+    # Exactly lookback + 7 is allowed.
+    ar.Rule("just_enough", "x/*", "derived", days=8, min_reader_lookback_days=1)
+
+
+def test_every_shipped_rule_passes_the_guard_and_names_its_reader():
+    for rule in ar.RULES:
+        assert rule.days >= rule.min_reader_lookback_days + ar.LOOKBACK_MARGIN_DAYS, rule.name
+        assert rule.reader, f"{rule.name} does not say where its lookback came from"
+    assert len({rule.name for rule in ar.RULES}) == len(ar.RULES)
+
+
+def test_an_env_override_that_crosses_a_readers_window_refuses_that_rule(tmp_path, monkeypatch):
+    """SYNDICATE_RETENTION_DERIVED_DAYS=10 is fine for book_grid (lookback 0) and
+    must NOT shorten live_lens (lookback 30) to 10 days."""
+    monkeypatch.setenv("SYNDICATE_ARTIFACT_RETENTION_ENABLED", "true")
+    monkeypatch.setenv("SYNDICATE_RETENTION_DERIVED_DAYS", "10")
+    grid = _touch(tmp_path, "mlb_source/data/book_grid/book_grid_2026-07-30.json")
+    signals = _touch(tmp_path, "nba_source/data/live_lens/live_lens_signals_2026-07-20.jsonl")
+    out = ar.sweep_expired_artifacts(today=TODAY, root=tmp_path)
+    assert not grid.exists()
+    assert signals.exists(), "an env override shortened a rule past its reader's window"
+    assert out.by_rule["live_lens_data"].refused_lookback is True
+
+
+def test_live_lens_signals_inside_the_30_day_accuracy_window_are_kept(tmp_path, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_ARTIFACT_RETENTION_ENABLED", "true")
+    inside = _touch(tmp_path, "nba_source/data/live_lens/live_lens_signals_%s.jsonl" % (TODAY - timedelta(days=25)).isoformat())
+    outside = _touch(tmp_path, "nba_source/data/live_lens/live_lens_signals_%s.jsonl" % (TODAY - timedelta(days=60)).isoformat())
+    ar.sweep_expired_artifacts(today=TODAY, root=tmp_path)
+    assert inside.exists()
+    assert not outside.exists()
+
+
+@pytest.mark.parametrize("root_part", ["source_artifacts/data", "data"])
+def test_live_prop_observations_survive_past_the_derived_7_days(tmp_path, monkeypatch, root_part):
+    """Captures, and read by a 60-day accuracy window -- not derived."""
+    monkeypatch.setenv("SYNDICATE_ARTIFACT_RETENTION_ENABLED", "true")
+    base = f"mlb_source/{root_part}/live_lens/prop_registry"
+    d30 = (TODAY - timedelta(days=30)).strftime("%Y_%m_%d")
+    d100 = (TODAY - timedelta(days=100)).strftime("%Y_%m_%d")
+    d130 = (TODAY - timedelta(days=130)).strftime("%Y_%m_%d")
+    obs30 = _touch(tmp_path, f"{base}/live_prop_observations_{d30}.jsonl")
+    obs100 = _touch(tmp_path, f"{base}/live_prop_observations_{d100}.jsonl")
+    reg100 = _touch(tmp_path, f"{base}/live_prop_registry_{d100}.json")
+    obs130 = _touch(tmp_path, f"{base}/live_prop_observations_{d130}.jsonl")
+    ar.sweep_expired_artifacts(today=TODAY, root=tmp_path)
+    assert obs30.exists() and obs100.exists() and reg100.exists()
+    assert not obs130.exists(), "the source window still applies at 120 days"
+
+
+def test_directory_dated_paths_are_matched_by_dirname(tmp_path, monkeypatch):
+    monkeypatch.delenv("SYNDICATE_ARTIFACT_RETENTION_ENABLED", raising=False)
+    old = _touch(tmp_path, "reports/migration_runs/2026-07-01/odds_refresh_20260701T120000Z/odds_refresh.json")
+    recent = _touch(tmp_path, "reports/migration_runs/2026-08-05/odds_refresh_20260805T120000Z/odds_refresh.json")
+    out = ar.sweep_expired_artifacts(today=TODAY, root=tmp_path)
+    stats = out.by_rule["migration_runs"]
+    assert stats.files == 1
+    assert stats.oldest == date(2026, 7, 1)
+    assert old.exists() and recent.exists()
+    assert ar._dirname_date("reports/migration_runs/2026-07-01/odds_refresh_x/f.json") == date(2026, 7, 1)
+    # A stamp that merely CONTAINS digits is not a date directory.
+    assert ar._dirname_date("reports/migration_runs/odds_refresh_20260701T1200/f.json") is None
+
+
+def test_new_rules_never_act_on_the_legacy_enable_flag_alone(tmp_path, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_ARTIFACT_RETENTION_ENABLED", "true")
+    monkeypatch.delenv("SYNDICATE_DISK_RETENTION_NEW_RULES_APPLY", raising=False)
+    events = _touch(tmp_path, "odds_events/2026-07-01.jsonl")
+    out = ar.sweep_expired_artifacts(today=TODAY, root=tmp_path)
+    assert events.exists()
+    assert out.by_rule["odds_events"].files == 1
+    assert out.rule_acts["odds_events"] is False
+
+
+def test_new_delete_rules_act_only_with_both_flags(tmp_path, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_ARTIFACT_RETENTION_ENABLED", "true")
+    monkeypatch.setenv("SYNDICATE_DISK_RETENTION_NEW_RULES_APPLY", "true")
+    old = _touch(tmp_path, "odds_events/2026-07-01.jsonl")
+    inside = _touch(tmp_path, "odds_events/%s.jsonl" % (TODAY - timedelta(days=7)).isoformat())
+    ar.sweep_expired_artifacts(today=TODAY, root=tmp_path)
+    assert not old.exists()
+    assert inside.exists(), "inside the 7-day load_recent_odds_events window"
+
+
+def _shard(root, rel, size):
+    p = root / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_bytes(b"{" + b"x" * (size - 2) + b"}")
+    return p
+
+
+def test_dedupe_twin_refuses_when_tracking_copy_missing_or_smaller(tmp_path, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_ARTIFACT_RETENTION_ENABLED", "true")
+    monkeypatch.setenv("SYNDICATE_DISK_RETENTION_NEW_RULES_APPLY", "true")
+    no_twin = _shard(tmp_path, "reports/odds_control_plane/odds_history/nba/2026-07-01.json", 500)
+    smaller = _shard(tmp_path, "reports/odds_control_plane/odds_history/mlb/2026-07-01.json", 500)
+    _shard(tmp_path, "mlb_source/tracking/odds_history/2026-07-01.json", 499)
+    ok = _shard(tmp_path, "reports/odds_control_plane/odds_history/mlb/2026-07-02.json", 500)
+    _shard(tmp_path, "mlb_source/tracking/odds_history/2026-07-02.json", 500)
+
+    out = ar.sweep_expired_artifacts(today=TODAY, root=tmp_path)
+    stats = out.by_rule["odds_control_plane_history_twin"]
+    assert stats.refused_twin == 2
+    assert stats.files == 1 and stats.bytes == 500
+    # dedupe_twin has no acting path, even with both flags set.
+    assert out.rule_acts["odds_control_plane_history_twin"] is False
+    assert no_twin.exists() and smaller.exists() and ok.exists()
+
+
+def test_cursor_covers_every_file_across_capped_passes_with_an_unsorted_listing(tmp_path, monkeypatch):
+    """THE CURSOR BUG: the cursor is 'last path examined' and later passes skip
+    everything <= it, which is only a seek if the walk is in string order. With
+    `rglob` it was not, so capped passes silently skipped paths."""
+    disk = tmp_path / "disk"
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path / "state"))
+    cap = 7
+    monkeypatch.setenv("SYNDICATE_RETENTION_MAX_FILES_PER_PASS", str(cap))
+    expected = set()
+    rels = [
+        "a.txt",
+        "a/b.json",
+        "a-b/c.json",
+        "a/z/deep_2020-01-01.json",
+        "mlb_source/data/book_grid/book_grid_2020-01-01.json",
+        "mlb_source/data/book_grid/book_grid_2020-01-02.json",
+        "odds_events/2020-01-01.jsonl",
+        "zz/last.json",
+        "reports/migration_runs/2020-01-01/odds_refresh_1/odds_refresh.json",
+        "b/c/d/e/f.json",
+    ] + ["mlb_source/tracking/book_quotes/2020-02-%02d.jsonl" % i for i in range(1, 21)]
+    for rel in rels:
+        _touch(disk, rel, size=8)
+        expected.add(rel)
+
+    real_scandir = os.scandir
+    rng = random.Random(1234)
+
+    class _Shuffled:
+        def __init__(self, path):
+            self._inner = real_scandir(path)
+            self._entries = list(self._inner)
+            rng.shuffle(self._entries)
+
+        def __enter__(self):
+            return iter(self._entries)
+
+        def __exit__(self, *exc):
+            self._inner.close()
+            return False
+
+    monkeypatch.setattr(ar.os, "scandir", _Shuffled)
+    seen = []
+    real_rule_for = ar._rule_for
+
+    def _recording(rel):
+        seen.append(rel)
+        return real_rule_for(rel)
+
+    monkeypatch.setattr(ar, "_rule_for", _recording)
+
+    passes = 0
+    max_passes = math.ceil(len(expected) / cap) + 1
+    out = None
+    while passes < max_passes:
+        passes += 1
+        out = ar.sweep_expired_artifacts(today=TODAY, root=disk)
+        if not out.hit_pass_limit:
+            break
+    assert out is not None and not out.hit_pass_limit, "never completed a cycle"
+    assert set(seen) == expected, sorted(expected - set(seen))
+    assert len(seen) == len(expected), "a file was examined twice in one cycle"
+    assert seen == sorted(seen)
+
+
+def _hash(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+@pytest.mark.parametrize("enabled_env", [None, "true"])
+def test_dry_run_deletes_nothing_byte_identical_and_logs_path_and_summary(tmp_path, monkeypatch, capsys, enabled_env):
+    """Default env: dry run. ENABLED=true plus force_dry_run: still dry run."""
+    disk = tmp_path / "disk"
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path / "state"))
+    monkeypatch.setenv("SYNDICATE_DISK_RETENTION_NEW_RULES_APPLY", "true")
+    if enabled_env:
+        monkeypatch.setenv("SYNDICATE_ARTIFACT_RETENTION_ENABLED", enabled_env)
+    else:
+        monkeypatch.delenv("SYNDICATE_ARTIFACT_RETENTION_ENABLED", raising=False)
+    rels = [
+        "mlb_source/data/book_grid/book_grid_2020-01-01.json",
+        "mlb_source/tracking/book_quotes/2020-01-01.jsonl",
+        "mlb_source/source_artifacts/data/eval/batches/x/sim_vs_actual_2020-01-01.json",
+        "reports/intelligence/intelligence_state_2020_01_01.json",
+        "odds_events/2020-01-01.jsonl",
+        "reports/migration_runs/2020-01-01/odds_refresh_1/odds_refresh.json",
+        "reports/intelligence/venue_odds/kalshi__mlb__2020_01_01.json",
+        "reports/odds_control_plane/odds_history/mlb/2020-01-01.json",
+        "mlb_source/tracking/odds_history/2020-01-01.json",
+        "settlement_inputs/finals_2020-01-01.json",
+    ]
+    for rel in rels:
+        _touch(disk, rel, size=64)
+    _closing(disk, "2020-01-01", graded=True)
+    before = {p: _hash(p) for p in disk.rglob("*") if p.is_file()}
+
+    out = ar.run_retention_sweep(today=TODAY, root=disk, force_dry_run=bool(enabled_env))
+
+    after = {p: _hash(p) for p in disk.rglob("*") if p.is_file()}
+    assert after == before, "a dry run changed the disk"
+    assert out.deleted == 0 and out.matched >= len(rels)
+    assert not any(out.rule_acts.values())
+
+    lines = capsys.readouterr().out.splitlines()
+    path_lines = [line for line in lines if "DISK_RETENTION_PATH " in line]
+    summary_lines = [line for line in lines if "DISK_RETENTION_SUMMARY " in line]
+    assert len(path_lines) == len(ar.RULES)
+    assert len(summary_lines) == 1
+    row = json.loads(path_lines[0].split("DISK_RETENTION_PATH ", 1)[1])
+    assert {"rule", "action", "files", "bytes", "oldest", "newest_affected", "dry_run"} <= set(row)
+    summary = json.loads(summary_lines[0].split("DISK_RETENTION_SUMMARY ", 1)[1])
+    assert summary["dry_run"] is True
+    assert summary["cursor_complete"] is True
+    assert "elapsed_s" in summary
+    assert summary["per_action"]["delete"]["files"] >= 1
+    assert summary["per_action"]["dedupe_twin"]["files"] == 1
+
+
+def test_yesterday_is_never_touched_by_any_rule(tmp_path, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_ARTIFACT_RETENTION_ENABLED", "true")
+    monkeypatch.setattr(ar, "check_lookback", lambda *a, **k: None)
+    monkeypatch.setenv("SYNDICATE_RETENTION_DERIVED_DAYS", "1")
+    y = _touch(tmp_path, "mlb_source/data/book_grid/book_grid_%s.json" % (TODAY - timedelta(days=1)).isoformat())
+    ar.sweep_expired_artifacts(today=TODAY, root=tmp_path)
+    assert y.exists()

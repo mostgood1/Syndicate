@@ -19,6 +19,11 @@ a time and each rung is observable before the next:
     SYNDICATE_BOOK_QUOTES_COMPACTION_ENABLED compaction ACTS (default off, dry run)
     SYNDICATE_ARTIFACT_RETENTION_ENABLED     retention DELETES (default off, dry run)
 
+plus `SYNDICATE_DISK_RETENTION_DRY_RUN` (default off), which runs the retention
+sweep FORCED to dry run -- even with the runner itself disabled -- so production
+can report what it would delete without anything else being switched on.
+Retention always runs in a daemon thread, never on the worker's main loop.
+
 Turning the first on with the other two off is the useful state and the one to
 start in: it produces the production numbers nobody has, on the disks that
 actually matter, while deleting nothing. Every number in the reports so far comes
@@ -40,6 +45,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -164,6 +170,145 @@ def _container_limit_bytes() -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# Retention runs OFF the main loop (lane `worker-disk-auto-retention`, 2026-09-16)
+#
+# The August observation pass ran `run_retention_sweep()` inline here and
+# blocked refresh-worker's main poll loop for 10-18 minutes; bounding the walk
+# made it shorter, not free. So the sweep runs in its own daemon thread, the way
+# `disk_compaction.start_disk_compaction_once` does, and single-flight: a second
+# request while one sweep is running is refused rather than stacked.
+# ---------------------------------------------------------------------------
+
+# "What would you delete?" -- runs the sweep with `force_dry_run=True` even when
+# nothing else is enabled. Default OFF. It can never delete: the sweep's own
+# `force_dry_run` overrides SYNDICATE_ARTIFACT_RETENTION_ENABLED.
+_DRY_RUN_FLAG = "SYNDICATE_DISK_RETENTION_DRY_RUN"
+
+_RETENTION_LOCK = threading.Lock()
+_RETENTION_STATE: dict[str, Any] = {"thread": None, "last": None}
+
+
+def retention_in_flight() -> bool:
+    thread = _RETENTION_STATE.get("thread")
+    return bool(thread is not None and thread.is_alive())
+
+
+def _retention_summary(retention: Any) -> dict[str, Any]:
+    return {
+        "dry_run": retention.dry_run,
+        "scanned": retention.scanned,
+        "matched": retention.matched,
+        "deleted": retention.deleted,
+        "reclaimable_mb": round(retention.bytes_reclaimable / 1024 / 1024, 1),
+        "freed_mb": round(retention.bytes_deleted / 1024 / 1024, 1),
+        "by_tier": retention.by_tier,
+        "unsettled_kept": retention.unsettled_kept,
+        "unknown_settlement": retention.unknown_settlement,
+        "cursor_complete": not retention.hit_pass_limit,
+    }
+
+
+def _start_retention_thread(*, force_dry_run: bool, on_done: Any = None) -> bool:
+    """Start one retention sweep in a daemon thread. False if one is running.
+
+    Never raises. `on_done` receives the summary dict (or an error string) and
+    runs IN the thread, after the sweep.
+    """
+    try:
+        with _RETENTION_LOCK:
+            if retention_in_flight():
+                return False
+
+            def _run() -> None:
+                try:
+                    from syndicate.features.shared import artifact_retention
+
+                    retention = artifact_retention.run_retention_sweep(force_dry_run=force_dry_run)
+                    outcome: Any = _retention_summary(retention)
+                except Exception as exc:
+                    outcome = f"error {type(exc).__name__}: {exc}"
+                    print(f"[disk_maintenance] RETENTION_FAILED {outcome}", flush=True)
+                _RETENTION_STATE["last"] = outcome
+                if on_done is not None:
+                    try:
+                        on_done(outcome)
+                    except Exception as exc:  # pragma: no cover - defensive
+                        print(f"[disk_maintenance] RETENTION_ON_DONE_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+            thread = threading.Thread(target=_run, name="artifact-retention", daemon=True)
+            _RETENTION_STATE["thread"] = thread
+            thread.start()
+            return True
+    except Exception as exc:  # pragma: no cover - must never take a worker down
+        print(f"[disk_maintenance] RETENTION_START_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return False
+
+
+def wait_for_retention(summary: dict[str, Any] | None = None, timeout: float = 60.0) -> dict[str, Any] | None:
+    """Join the running retention thread (if any) and return `summary`.
+
+    For tests and operator scripts. The worker loop never calls this -- joining
+    is exactly the main-loop stall the thread exists to avoid.
+    """
+    thread = _RETENTION_STATE.get("thread")
+    if thread is not None:
+        thread.join(timeout)
+    return summary
+
+
+def _dry_run_status_path() -> Path:
+    from syndicate.features.shared.refresh_state_store import reports_root
+
+    return reports_root() / "refresh_status" / "latest" / f"disk_retention_dry_run_status_{_service_slug()}.json"
+
+
+def _dry_run_due() -> bool:
+    from syndicate.features.shared.refresh_state_store import read_json_file
+
+    payload = read_json_file(_dry_run_status_path()) or {}
+    try:
+        last = float(payload.get("epoch") or 0.0)
+    except (TypeError, ValueError):
+        last = 0.0
+    return last <= 0.0 or (time.time() - last) >= float(_interval_seconds())
+
+
+def _run_dry_run_only() -> dict[str, Any]:
+    """The `SYNDICATE_DISK_RETENTION_DRY_RUN` path with maintenance disabled.
+
+    Same cost controls as the full runner -- single-flight, once per interval on
+    its own per-service stamp, skipped under memory pressure -- and nothing else:
+    no inventory, no compaction, no probe.
+    """
+    if retention_in_flight():
+        return {"started": False, "reason": "retention_in_flight"}
+    if not _dry_run_due():
+        return {"started": False, "reason": "not_due"}
+    blocked, memory_facts = _memory_pressure_blocks()
+    if blocked:
+        print(
+            f"[disk_maintenance] RETENTION_DRY_RUN_SKIPPED_MEMORY_PRESSURE {json.dumps(memory_facts, sort_keys=True)}",
+            flush=True,
+        )
+        return {"started": False, "reason": "memory_pressure", "memory": memory_facts}
+
+    def _finish(outcome: Any) -> None:
+        try:
+            from syndicate.features.shared.refresh_state_store import write_json_file
+
+            write_json_file(_dry_run_status_path(), {"epoch": time.time(), "retention": outcome})
+        except Exception:
+            pass
+        print(
+            f"[disk_maintenance] DISK_RETENTION_DRY_RUN {json.dumps(outcome, sort_keys=True, default=str)}",
+            flush=True,
+        )
+
+    started = _start_retention_thread(force_dry_run=True, on_done=_finish)
+    return {"started": started, "force_dry_run": True}
+
+
 def run_disk_maintenance(*, sports: tuple[str, ...] = ("mlb", "wnba", "nba", "nhl", "nfl", "ncaaf", "ncaab", "soccer")) -> dict[str, Any]:
     """One daily pass: compact closed book_quotes shards, then sweep retention.
 
@@ -173,6 +318,11 @@ def run_disk_maintenance(*, sports: tuple[str, ...] = ("mlb", "wnba", "nba", "nh
     summary: dict[str, Any] = {"ran": False}
     try:
         if not _flag("SYNDICATE_DISK_MAINTENANCE_ENABLED"):
+            if _flag(_DRY_RUN_FLAG):
+                # "What would you delete?" with NOTHING else enabled: no
+                # inventory, no compaction, no probe, and a sweep that is forced
+                # to dry run whatever SYNDICATE_ARTIFACT_RETENTION_ENABLED says.
+                return {"ran": False, "reason": "disabled", "retention_dry_run": _run_dry_run_only()}
             return {"ran": False, "reason": "disabled"}
 
         # Lane `refresh-worker-disk-inventory` (2026-09-13). BEFORE the daily
@@ -216,6 +366,12 @@ def run_disk_maintenance(*, sports: tuple[str, ...] = ("mlb", "wnba", "nba", "nh
                 start_resolve_probe_once(600.0)
             except Exception as exc:
                 print(f"[disk_maintenance] RESOLVE_PROBE_START_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+        # Single-flight, and BEFORE the daily gate: the stamp is written when the
+        # retention thread finishes, so until then `_due()` still reads True and
+        # every tick would otherwise re-run compaction under a running sweep.
+        if retention_in_flight():
+            return {"ran": False, "reason": "retention_in_flight"}
 
         if not _due():
             return {"ran": False, "reason": "not_due"}
@@ -283,8 +439,16 @@ def run_disk_maintenance(*, sports: tuple[str, ...] = ("mlb", "wnba", "nba", "nh
         # So the observation pass now needs an explicit opt-in of its own.
         # Compaction is unaffected -- it is bounded by shard count, finished in
         # 5 seconds, and is the job actually wanted here.
-        retention_wanted = _flag("SYNDICATE_ARTIFACT_RETENTION_ENABLED") or _flag(
-            "SYNDICATE_ARTIFACT_RETENTION_OBSERVE"
+        #
+        # 2026-09-16 (lane `worker-disk-auto-retention`): when asked for, the
+        # sweep runs in ITS OWN DAEMON THREAD, never on the main loop, and
+        # single-flight -- see `_start_retention_thread`. The daily stamp and the
+        # DISK_MAINTENANCE line are written by that thread when it finishes.
+        dry_run_only = _flag(_DRY_RUN_FLAG)
+        retention_wanted = (
+            _flag("SYNDICATE_ARTIFACT_RETENTION_ENABLED")
+            or _flag("SYNDICATE_ARTIFACT_RETENTION_OBSERVE")
+            or dry_run_only
         )
         if not retention_wanted:
             summary["retention"] = {"skipped": "not_enabled_and_not_observing"}
@@ -302,37 +466,27 @@ def run_disk_maintenance(*, sports: tuple[str, ...] = ("mlb", "wnba", "nba", "nh
             )
             return summary
 
-        try:
-            from syndicate.features.shared.artifact_retention import run_retention_sweep
-
-            retention = run_retention_sweep()
-            summary["retention"] = {
-                "dry_run": retention.dry_run,
-                "scanned": retention.scanned,
-                "matched": retention.matched,
-                "deleted": retention.deleted,
-                "reclaimable_mb": round(retention.bytes_reclaimable / 1024 / 1024, 1),
-                "freed_mb": round(retention.bytes_deleted / 1024 / 1024, 1),
-                "by_tier": retention.by_tier,
-                "unsettled_kept": retention.unsettled_kept,
-                "unknown_settlement": retention.unknown_settlement,
-            }
-        except Exception as exc:
-            summary["retention"] = f"error {type(exc).__name__}: {exc}"
-
-        summary["seconds"] = round(time.time() - started, 1)
         summary["compaction_applied"] = compaction_applies
+        summary["retention"] = {"started_in_thread": True, "force_dry_run": dry_run_only}
 
-        # Stamped only after a completed pass, so a crash mid-sweep retries
-        # tomorrow rather than being recorded as done.
-        try:
-            from syndicate.features.shared.refresh_state_store import write_json_file
+        def _finish(retention_summary: Any) -> None:
+            summary["retention"] = retention_summary
+            summary["seconds"] = round(time.time() - started, 1)
+            # Stamped only after a completed pass, so a crash mid-sweep retries
+            # tomorrow rather than being recorded as done.
+            try:
+                from syndicate.features.shared.refresh_state_store import write_json_file
 
-            write_json_file(_status_path(), {"epoch": time.time(), "summary": summary})
-        except Exception:
-            pass
+                write_json_file(_status_path(), {"epoch": time.time(), "summary": summary})
+            except Exception:
+                pass
+            print(
+                f"[disk_maintenance] DISK_MAINTENANCE {json.dumps(summary, sort_keys=True, default=str)}",
+                flush=True,
+            )
 
-        print(f"[disk_maintenance] DISK_MAINTENANCE {json.dumps(summary, sort_keys=True, default=str)}", flush=True)
+        if not _start_retention_thread(force_dry_run=dry_run_only, on_done=_finish):
+            summary["retention"] = {"skipped": "already_running"}
         return summary
     except Exception as exc:  # pragma: no cover - must never take a worker down
         print(f"[disk_maintenance] FAILED {type(exc).__name__}: {exc}", flush=True)

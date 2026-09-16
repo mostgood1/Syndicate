@@ -11,6 +11,8 @@ service that is the source of truth. Every default here is off.
 
 from __future__ import annotations
 
+import threading
+
 import pytest
 
 from syndicate.features.shared import disk_maintenance as dm
@@ -26,9 +28,19 @@ def _clean(tmp_path, monkeypatch):
         "SYNDICATE_ARTIFACT_RETENTION_ENABLED",
         "SYNDICATE_ARTIFACT_RETENTION_OBSERVE",
         "SYNDICATE_DISK_MAINTENANCE_INTERVAL_SECONDS",
+        "SYNDICATE_DISK_RETENTION_DRY_RUN",
+        "SYNDICATE_DISK_RETENTION_NEW_RULES_APPLY",
     ):
         monkeypatch.delenv(key, raising=False)
-    return tmp_path
+    yield tmp_path
+    # Retention runs in a daemon thread; never let one outlive its test's env.
+    dm.wait_for_retention(timeout=30)
+
+
+def _run(**kwargs):
+    """Run maintenance and JOIN the retention thread, so the summary it fills in
+    is readable. The worker never does this -- that is the point of the thread."""
+    return dm.wait_for_retention(dm.run_disk_maintenance(**kwargs), timeout=30)
 
 
 def test_it_does_nothing_at_all_by_default(_clean):
@@ -50,7 +62,7 @@ def test_enabling_the_runner_alone_deletes_nothing(_clean, monkeypatch):
     old.parent.mkdir(parents=True, exist_ok=True)
     old.write_text("x" * 2048, encoding="utf-8")
 
-    out = dm.run_disk_maintenance(sports=("mlb",))
+    out = _run(sports=("mlb",))
     assert out["ran"] is True
     assert out["retention"]["dry_run"] is True
     assert out["retention"]["deleted"] == 0
@@ -66,7 +78,7 @@ def test_retention_deletes_only_when_its_own_flag_is_set(_clean, monkeypatch):
     old.parent.mkdir(parents=True, exist_ok=True)
     old.write_text("x" * 2048, encoding="utf-8")
 
-    out = dm.run_disk_maintenance(sports=("mlb",))
+    out = _run(sports=("mlb",))
     assert out["retention"]["dry_run"] is False
     assert out["retention"]["deleted"] >= 1
     assert not old.exists()
@@ -80,7 +92,7 @@ def test_the_two_apply_switches_are_independent(_clean, monkeypatch):
     shard.parent.mkdir(parents=True, exist_ok=True)
     shard.write_text('{"a":1}\n' * 50, encoding="utf-8")
 
-    out = dm.run_disk_maintenance(sports=("mlb",))
+    out = _run(sports=("mlb",))
     assert out["compaction_applied"] is False
     assert not shard.with_name(shard.name + ".gz").exists(), "compaction acted without its flag"
 
@@ -127,13 +139,13 @@ def test_a_failing_job_never_takes_the_worker_down(_clean, monkeypatch):
     monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")
     monkeypatch.setenv("SYNDICATE_ARTIFACT_RETENTION_OBSERVE", "true")
 
-    def _boom():
+    def _boom(*args, **kwargs):
         raise RuntimeError("retention exploded")
 
     import syndicate.features.shared.artifact_retention as ar
 
     monkeypatch.setattr(ar, "run_retention_sweep", _boom)
-    out = dm.run_disk_maintenance(sports=("mlb",))
+    out = _run(sports=("mlb",))
     assert out["ran"] is True
     assert "error" in str(out["retention"])
 
@@ -176,7 +188,7 @@ def test_observe_flag_runs_the_sweep_without_deleting(_clean, monkeypatch):
     old.parent.mkdir(parents=True, exist_ok=True)
     old.write_text("x" * 2048, encoding="utf-8")
 
-    out = dm.run_disk_maintenance(sports=("mlb",))
+    out = _run(sports=("mlb",))
     assert out["retention"]["dry_run"] is True
     assert out["retention"]["deleted"] == 0
     assert old.exists()
@@ -192,7 +204,7 @@ def test_enabling_deletion_still_implies_running_the_sweep(_clean, monkeypatch):
     old.parent.mkdir(parents=True, exist_ok=True)
     old.write_text("x" * 2048, encoding="utf-8")
 
-    out = dm.run_disk_maintenance(sports=("mlb",))
+    out = _run(sports=("mlb",))
     assert out["retention"]["deleted"] >= 1
     assert not old.exists()
 
@@ -246,3 +258,102 @@ def test_an_unidentifiable_service_still_gets_a_stamp(_clean, monkeypatch):
         monkeypatch.delenv(key, raising=False)
     assert dm._service_slug() == "local"
     assert dm._status_path().name.endswith("_local.json")
+
+
+# ---------------------------------------------------------------------------
+# Lane `worker-disk-auto-retention` (2026-09-16): retention off the main loop,
+# single-flight, and a dry-run-only switch that cannot delete.
+# ---------------------------------------------------------------------------
+
+def test_retention_runs_off_the_main_thread_not_inside_run_disk_maintenance(_clean, monkeypatch):
+    """The August pass ran inline and stalled the poll loop 10-18 minutes. The
+    sweep is held open here: if it ran synchronously, run_disk_maintenance could
+    not return before the release."""
+    monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")
+    monkeypatch.setenv("SYNDICATE_ARTIFACT_RETENTION_OBSERVE", "true")
+    import syndicate.features.shared.artifact_retention as ar
+
+    release = threading.Event()
+    seen = {}
+
+    def _held(*args, **kwargs):
+        seen["thread"] = threading.current_thread()
+        assert release.wait(10), "test never released the sweep"
+        raise RuntimeError("stop here")
+
+    monkeypatch.setattr(ar, "run_retention_sweep", _held)
+    out = dm.run_disk_maintenance(sports=("mlb",))
+    try:
+        assert out["ran"] is True
+        assert out["retention"].get("started_in_thread") is True
+        assert dm.retention_in_flight() is True
+        # Single-flight: a second tick while the sweep runs neither re-runs
+        # compaction nor starts a second sweep.
+        again = dm.run_disk_maintenance(sports=("mlb",))
+        assert again == {"ran": False, "reason": "retention_in_flight"}
+    finally:
+        release.set()
+        dm.wait_for_retention(timeout=10)
+    assert seen["thread"] is not threading.main_thread()
+    assert seen["thread"].daemon is True
+    assert dm.retention_in_flight() is False
+
+
+def test_the_daily_stamp_waits_for_the_retention_thread(_clean, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")
+    monkeypatch.setenv("SYNDICATE_ARTIFACT_RETENTION_OBSERVE", "true")
+    _run(sports=("mlb",))
+    assert dm._due() is False
+
+
+def test_dry_run_flag_is_off_by_default_and_runs_nothing(_clean, monkeypatch):
+    import syndicate.features.shared.artifact_retention as ar
+
+    monkeypatch.setattr(ar, "run_retention_sweep", lambda *a, **k: (_ for _ in ()).throw(AssertionError("swept")))
+    out = dm.run_disk_maintenance()
+    assert out == {"ran": False, "reason": "disabled"}
+    assert dm.retention_in_flight() is False
+
+
+def test_dry_run_flag_alone_reports_and_deletes_nothing_even_with_retention_enabled(_clean, monkeypatch, capsys):
+    """"What would you delete?" with the runner OFF, and ENABLED deliberately set
+    to prove the forced dry run wins."""
+    monkeypatch.setenv("SYNDICATE_DISK_RETENTION_DRY_RUN", "1")
+    monkeypatch.setenv("SYNDICATE_ARTIFACT_RETENTION_ENABLED", "true")
+    monkeypatch.setenv("SYNDICATE_DISK_RETENTION_NEW_RULES_APPLY", "true")
+    old = _clean / "mlb_source" / "data" / "book_grid" / "book_grid_2020-01-01.json"
+    old.parent.mkdir(parents=True, exist_ok=True)
+    old.write_text("x" * 2048, encoding="utf-8")
+
+    out = dm.wait_for_retention(dm.run_disk_maintenance(sports=("mlb",)), timeout=30)
+    assert out["ran"] is False and out["reason"] == "disabled"
+    assert out["retention_dry_run"]["started"] is True
+    assert old.exists(), "the dry-run flag deleted a file"
+    last = dm._RETENTION_STATE["last"]
+    assert last["dry_run"] is True and last["deleted"] == 0 and last["matched"] >= 1
+    printed = capsys.readouterr().out
+    assert "DISK_RETENTION_SUMMARY" in printed and "DISK_RETENTION_PATH" in printed
+    # And not again until the interval passes.
+    again = dm.run_disk_maintenance(sports=("mlb",))
+    assert again["retention_dry_run"] == {"started": False, "reason": "not_due"}
+
+
+def test_dry_run_flag_with_maintenance_enabled_forces_dry_run(_clean, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")
+    monkeypatch.setenv("SYNDICATE_DISK_RETENTION_DRY_RUN", "true")
+    monkeypatch.setenv("SYNDICATE_ARTIFACT_RETENTION_ENABLED", "true")
+    old = _clean / "mlb_source" / "data" / "book_grid" / "book_grid_2020-01-01.json"
+    old.parent.mkdir(parents=True, exist_ok=True)
+    old.write_text("x" * 2048, encoding="utf-8")
+    out = _run(sports=("mlb",))
+    assert out["retention"]["dry_run"] is True
+    assert out["retention"]["deleted"] == 0
+    assert old.exists()
+
+
+def test_dry_run_only_path_respects_memory_pressure(_clean, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_DISK_RETENTION_DRY_RUN", "1")
+    monkeypatch.setattr(dm, "_memory_pressure_blocks", lambda: (True, {"rss_bytes": 9, "limit_bytes": 10}))
+    out = dm.run_disk_maintenance()
+    assert out["retention_dry_run"]["reason"] == "memory_pressure"
+    assert dm.retention_in_flight() is False
