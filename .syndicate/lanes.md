@@ -1518,8 +1518,9 @@ death, never life — do not invert it.
 - Verification: the 09-17 shortlist's soccer counts (selected, candidates, total_rows after gates, cards_present) and `written_at`, read against the served board's per-`source_board_date` soccer count at the same instant; then the named stage's own log lines or artifact on refresh-worker. Written to this lane and `state_layer2.md`.
 - Blocked by: none (web is mid-deploy for lane `web-export-timeout`; reads wait for it)
 
-### soccer-model-edge-exposure — OPEN — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+### soccer-model-edge-exposure — CLOSED 2026-09-16 — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
 - Goal: establish from production whether the soccer 1X2 (h2h) and totals MODEL edges the board serves become portfolio orders — paper and live money, counted and settled — and put the posture decision (keep sizing them, or exclude them until they beat the close, per audit fixes #4/#5) to the user with the evidence. No gating code ships without that decision.
+- **GOAL: MET.** The evidence was read (H32 HOLDS, H33 HOLDS for soccer `game_line`: 14 live positions, 0-7 settled, -$29.03; H34 NOT GRADED, n < 30) and the posture decision was put to the user, who DECIDED: no category block of any kind, including the existing `mlb:player_prop` default. Nothing soccer-specific ships. The removal is lane `portfolio-no-family-exclusion`. The STATUS line below is superseded.
 - **STATUS 2026-09-16 ~10:10 CT: GOAL NOT MET YET, by design** — the evidence half is done and the decision half is with the user. H32 HOLDS, H33 HOLDS for soccer `game_line` (14 live positions, 0-7 settled, -$29.03) and not for `game_total` (no live position), H34 NOT GRADED (n < 30; 84 paper orders pending would carry both paper families past it). Mechanism found: `SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES` (unset everywhere; setting it replaces the `mlb:player_prop` default; stops paper AND live). Nothing changed in production. Detail: `log/2026-09-16.md` ~10:10 CT.
 - Files: none (measurement only). The instrument already exists: `/api/ops/execution/ledger-summary`'s `sim_view_roi` cut (`paper_settlement.sim_view_roi_summary`), portfolio-book orders bucketed `sport | market_family | sim_view`, where h2h and Asian handicap map to `game_line` and totals to `game_total` (`_market_family`).
 - Why: read 2026-09-16 14:17:06Z (lane `soccer-corners-posture`), the board served soccer h2h model edges (43 positive of 156) and totals (73 positive of 137), and a row with a numeric `model_edge_pct` passes `portfolio_commit`'s `no_model_edge_pct` gate. The season audit found 1X2 loses to the close (+0.0276 Brier) and O/U 2.5 loses (+0.0081), with held-out rule ROI 1X2 -12.5% and O/U 2.5 -18.4%.
@@ -1565,6 +1566,22 @@ death, never life — do not invert it.
 - Retention windows per path are user decisions (a window shorter than a reader's lookback is data loss).
 - Files: none yet; declared here before the first edit.
 - Blocked by: none. No deploy without the user's go.
+### portfolio-no-family-exclusion — OPEN — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Goal: the portfolio commit refuses no row for its sport or market family: the `sport:family` exclusion (`resolve_excluded_families`, default `mlb:player_prop`, env `SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES`) is REMOVED, so every row, MLB player props included, is judged only by its own per-play gates (sim edge, EV, stake, caps), and production's committed plan carries no `market_family_excluded` refusal.
+- Files:
+  - `syndicate/features/shared/portfolio_commit.py` (the exclusion function, its default, and the branch in the commit loop only)
+  - `pipeline/portfolio_commit.py` (one comment naming `DEFAULT_EXCLUDED_FAMILIES`)
+  - `scripts/verify_mlb_prop_exclusion.py` (DELETED: a one-off verify whose PASS requires the exclusion; referenced nowhere)
+  - `tests/test_portfolio_commit_excluded_families.py` (DELETED, replaced by the next file)
+  - `tests/test_portfolio_commit_no_family_exclusion.py` (NEW)
+  - `tests/test_portfolio_commit.py`, `tests/test_clv_position_join.py`, `tests/test_kalshi_soccer_forward_date.py` (stale `setenv(EXCLUDED_FAMILIES, "")` lines and comments only)
+- Why: USER DECISION 2026-09-16 ~10:25 CT, verbatim: "we shouldnt block anything globally - that includes MLB player props.  every prop and game line is its own entity in the scheme of things - we optimize overall but there's ALWAYS a chance an individual play is viable based on EV, sim edge, etc". Lane `soccer-model-edge-exposure` had proposed ADDING `soccer:game_line`/`soccer:game_total`; the user rejected category blocks outright, including the existing MLB one.
+- What the removed rule stood on, kept here so it is not lost with the code: MLB player props settled 145 rows at -19.27% ROI on $561.23 (portfolio book, 08-22..08-31), with no model view on the rows (`model_edge_pct` numeric on 0 of 103 then).
+- Baseline, read 15:17:55Z from `/api/portfolio/plan?date=2026-09-16` (plan generated 10:07:38 CT): `refusals.market_family_excluded = 1795`, all `mlb`, all player-prop markets; `refusals_by_sport.no_model_edge_pct = mlb 25, nfl 620, soccer 869`; rows_in 4751, sized 25, positions 21.
+- Hypothesis / deploy prediction (PRE-REGISTERED before any code): on the first committed plan GENERATED after refresh-worker goes live with the removal, `refusals` has NO `market_family_excluded` key, and its refusal reasons plus positions still account for every row (the existing rows_in invariant). NOT predicted, reported: where the former 1,795 MLB prop rows land (`no_model_edge_pct` if they carry no sim edge, `below_min_ev_pct`, or sized).
+- Falsification test: `market_family_excluded` present on a plan whose `generated_at` post-dates go-live, or the reasons no longer sum to the rows.
+- Verification: reachability test first (a row the old default refused is now evaluated: an MLB player prop with a numeric model edge and enough EV is SIZED; setting the old env var no longer refuses anything), mutation check (restore the branch, the test goes red), targeted portfolio tests green, then the production plan read above after the deploy, recorded in `deploys.md`.
+- Blocked by: the deploy needs the user's go-ahead (live-money behaviour change).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
