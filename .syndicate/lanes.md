@@ -1435,6 +1435,19 @@ death, never life — do not invert it.
   - **Superseded: OWED: deploy + verify.** The cap is SERVER-side, so web is the deploy that delivers it; the workers gain only logging. Verification: after a web deploy, a `pattern=*<today>*` export returns `oversize_skipped > 0` with the accumulators NAMED, `count` in the ~100s rather than single digits, and the workers log `PULL_INCOMPLETE`. Until that is read, this fix is believed, not verified.
 - Blocked by: none. **Bandwidth discipline:** a full export is 15-25 MB per call, and this repo has an open lane measuring egress. Prefer `names_only=1`, keep full-body samples few, and state the bytes spent.
 
+### closed-lane-archive-0916 — CLOSED 2026-09-16 — opened 2026-09-16 — session 5ed7cd5e-d23f-46c9-81c8-6611a2c2b340 (scheduled task archive-closed-lanes-0916) — GOAL MET (null pass: 0 SAFE, 0 moved)
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none claimed (ledger-only: moves CLOSED blocks from .syndicate/lanes.md to .syndicate/lanes_closed.md with one pointer each; appends .syndicate/log/2026-09-16.md)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: on origin/main each moved slug has 0 headers in lanes.md, 1 pointer, 1 body in lanes_closed.md; check_lane_invariants shows no FAIL beyond the pre-apply baseline
+- Blocked by: none
+- Pre-registered reading (`owner_liveness.py --worktree <wt> --idle-min 240`, origin/main `a54852be`, 08:43 CDT):
+  - `soccer-espn-window-validation            sessions[abacd435=1m] -> WAIT: abacd435 idle 1m < 240m`
+  - `soccer-anytime-scorer                    sessions[abacd435=1m] -> WAIT: abacd435 idle 1m < 240m`
+  - `SAFE_SLUGS=` (empty)
+- **Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only — GOAL: MET** (null pass). Reading: `owner_liveness.py` ran on origin/main `a54852be` at 08:43 CDT and returned `SAFE_SLUGS=` empty. Both CLOSED blocks were deferred because owner `abacd435` had been idle 1m. Nothing moved. The digest's "15 owed" came from the primary tree, which is 210 commits behind. Details in `log/2026-09-16.md`.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
