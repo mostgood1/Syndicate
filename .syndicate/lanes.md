@@ -1121,7 +1121,15 @@ death, never life — do not invert it.
   - **Measured offline 2026-09-13 ~19:35Z** (dev machine, `scratchpad/bench_fuller_copy.py`): plain 157,286,185 B / 469,511 rows with a `.gz` 12 rows fuller.
     - Cold resolve (inflate) 0.444 s, tracemalloc peak 23.2 MiB. Warm (cached) 0.001 s. Re-inflate after an mtime change 0.400 s.
     - **Caveat:** the synthetic shard compresses 229x against production's ~39x, so real inflate is likely slower. It is still seconds per process across ~18 shards, paid only when those dates are read. Not measured on refresh-worker.
-- **STATUS 2026-09-13 ~19:25Z: LANDED `57b67127` on main, NOT DEPLOYED.**
+- **STATUS CORRECTED 2026-09-16 03:25Z (2026-09-15 22:25 CT), session 0f5b256e: `57b67127` IS DEPLOYED and has been since 09-15. The line below said "NOT DEPLOYED" for three days after it stopped being true, and it caused a redundant deploy to be proposed and approved tonight before an ancestry check caught it.**
+  - **Verified by ancestry against the LIVE commit on each service**, not from this file: `57b67127` is an ancestor of web `4f65f2b2`, refresh-worker `1175e0ef` and live-odds-worker `88df44cd` (read from the Render deploys API 03:20Z). The lane's own VERDICT of 2026-09-15 ~11:25 CDT already recorded the reading taken on refresh-worker `d4c8814f` -- the two statements sat in the same block contradicting each other.
+  - **The deploy was NOT run.** Nothing was needed.
+  - **And the lane's "Fix direction, NOT started" list has since SHIPPED, by sibling lane `book-quotes-splice-repair`** -- also verified by ancestry, live on all three services:
+    - "web's merge should refuse lines that are not valid JSON" -> `9ed5c5ad` (P1), live on web, refresh-worker and live-odds-worker.
+    - "refresh-worker must not both append locally and byte-offset tail-pull the same file" -> `070a05bf` (P5 write faults: torn-tail termination, shard sanitize before publish, pending-rows sidecar), live on all three.
+    - So the root cause this lane DIAGNOSED is fixed; what remains unfixed is this lane's OWN resolver goal, which its verdict already calls NOT MET and falsified for 16 of 18 shards.
+  - **Superseded, kept for the record:** STATUS 2026-09-13 ~19:25Z said `57b67127` was landed on main and not deployed. True when written.
+
   - Tests: book_quotes, book grid, layer1, cross-book and last-seen suites, 219 passed. The 1 error, `test_odds_book_quotes.py::MlbEndToEndQuoteLogTests`, errors identically on HEAD's module (conftest mkdir guard), so it is pre-existing.
   - Unwired check: `test_a_fuller_gz_wins_over_a_shorter_plain_copy` fails on HEAD's resolver and passes with the change.
   - refresh-worker preflight at 19:20Z was HOLD (10 jobs: MLB daily sim + soccer odds refresh). Collateral vs live `cae4713e`: `odds_book_quotes.py` only.

@@ -6479,3 +6479,25 @@ Nearly shipped as an addition. The plan was to make the soccer poller ALSO write
 - Worse in the failure mode: keyvalue writes are REFUSED above 8 MB and can fail transiently. A failed write leaves the PREVIOUS value in the store, and the reader prefers the store -- so a stale copy would silently SHADOW a correct disk file, with a 10-day TTL. That is strictly worse than the hop it was meant to fix. `delete_text_file`'s own docstring records the same shape from 2026-07-23.
 - **How to apply:** before adding a `write_json_file` for an artifact anything reads from disk -- a publish sweep, a directory walk, a `Path.exists()` -- check `_keyvalue_backed(path)` for that path and read the BRANCH, not the function name. If it must live in both places that is two writes and a rule for which wins, not one call. Prefer an artifact ALREADY crossing services (here `live/soccer_live_lens.json`) over converting one that is not.
 - *(evidence: `refresh_state_store.py:697` and `:868-898`; the abandoned design and its replacement, `.syndicate/log/2026-09-15.md` and commit `08f4c4a2`)*
+
+## 2026-09-15 -- A LANE BLOCK CAN CONTRADICT ITSELF, and the STALE half is the one that reads like an instruction
+
+I recommended deploying `57b67127` because lane `book-quotes-prefer-fuller-copy` said **"STATUS 2026-09-13 ~19:25Z: LANDED on main, NOT
+DEPLOYED."** The user approved it. It was already live on all three services, and had been for a day -- the SAME BLOCK, further down,
+carried a 2026-09-15 verdict describing the production reading taken after that deploy.
+
+The stale line won because of its SHAPE: "landed, not deployed" is an action item, and a verdict paragraph is prose. Scanning a 16 KB block
+for what to do next surfaces the imperative and buries the correction.
+
+- **STANDING RULE: `deploy state` is never read from `lanes.md`. Read it from the SERVICE.** Before proposing or running any deploy, test
+  ancestry of the commit against the LIVE commit on each target service (`git merge-base --is-ancestor <sha> <live-sha>`, live SHA from the
+  Render deploys API). It is two commands and it is the only source that cannot be stale.
+- **A deploy that would be a no-op must be caught BEFORE approval is sought**, not after it is granted. Approval spends the user's trust on
+  a decision that was never real, and an approved-but-pointless deploy still restarts a service and kills in-flight work.
+- When a block holds two statements about the same fact, the NEWER one wins and the older must be rewritten in place -- not left below it.
+  This is the same failure `learnings.md` records for `state.md` ("overwrite the stale line; do not stack contradictory lines"), appearing
+  in `lanes.md` instead.
+- Same family as *primary tree is not deployed code* and *test the fix's predicate, not its deploy state*: the ledger describes the world, it
+  is not the world.
+- *(evidence: `57b67127` an ancestor of web `4f65f2b2`, refresh-worker `1175e0ef`, live-odds-worker `88df44cd`, read 2026-09-16 03:20Z; the
+  contradicting verdict is in the same lane block, dated 2026-09-15 ~11:25 CDT)*
