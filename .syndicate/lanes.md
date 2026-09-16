@@ -1454,6 +1454,15 @@ death, never life — do not invert it.
   - `SAFE_SLUGS=` (empty)
 - **Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only — GOAL: MET** (null pass). Reading: `owner_liveness.py` ran on origin/main `a54852be` at 08:43 CDT and returned `SAFE_SLUGS=` empty. Both CLOSED blocks were deferred because owner `abacd435` had been idle 1m. Nothing moved. The digest's "15 owed" came from the primary tree, which is 210 commits behind. Details in `log/2026-09-16.md`.
 
+### layer2-chip-rail-duplicate — OPEN — opened 2026-09-16 — session 94c55714-2ce4-43cd-ab1d-135ebfd77909
+- Goal: The Layer 2 Games rail seats ONE card per game: replayed over the production payload pair of 2026-09-16 (`/api/board/game-chips` published 14:02:01Z + `/api/intelligence/query`), SEV @ DEP (`e8d1b34c...` / ESPN `401882873`) resolves its chip and renders once, instead of a chip-less `WED SEP 16 / 23 opportunities` card beside a count-0 `SEV / Deportiv` chip card; and no other game on that payload gains or loses a card except by joining its own chip.
+- Files: `syndicate/templates/intelligence.html` (`deriveGameCards` group join keys only), `tests/js/game_rail_derive.test.mjs`
+- Hypothesis: `deriveGameCards` fills a group's join fields (`matchup`, `awayKey`, `homeKey`) from the FIRST row only. For SEV @ DEP the first row is a steam/prop row (`sport: "la liga"`, `matchup: "SEV @ DEP"`, no `away_key`/`home_key`); 20 later rows in the same group (same `event_id`) carry `away_key: sevilla`, `home_key: deportivo la coruña`, which equal the chip's `away.key`/`home.key`. So `chipForGame` misses on all four indexes, and the unclaimed chip seats a second card. Measured 14:03Z: 3 rows of the first family, 20 of the second, 1 chip.
+- Falsification test: backfilling the group's keys from any row does NOT make `chipForGame` return chip `401882873` for that group in the replay (e.g. the keys differ by a Unicode normal form), or the rail still seats two cards for it.
+- Verification: `node tests/js/game_rail_production_replay.mjs` over the saved payload pair, pre-change vs post-change template: SEV @ DEP cards 2 -> 1, total card delta explained game by game. A new `game_rail_derive.test.mjs` case built from the PRODUCTION row shapes (not one name set for both sides) fails on the old template and passes on the new. After a user-approved web deploy: the same replay with `SYNDICATE_TEMPLATE_HTML` pointed at the served page. Reading in `deploys.md`.
+- Blocked by: none
+- NOT in Files, surfaced to the user as a COLLISION: the `Deportiv` abbreviation. `soccer/cards.py:_abbr` mints `longest[:8].title()` when `soccer/sources.py:team_by_name('la_liga', 'Deportivo')` misses; the branding CSV has `DEP` under `Deportivo La Coruña`, and `canonical_team` already resolves the short name (the chip key is `deportivo la coruña`). Both files are claimed by OPEN lane `soccer-live-scoreboard-range-stale` (other functions).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
