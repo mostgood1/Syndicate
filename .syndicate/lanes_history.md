@@ -33644,3 +33644,7 @@ evidence that the verdicts were written before the probes ran, which a summary c
     - **LANDED `02684624` on origin/main. NOT DEPLOYED (2026-09-16 15:24Z / 10:24 CDT).** Claim acquired 14:41:35Z. Waited for the 25-min spacing after `layer2-chip-rail-duplicate`'s `1923d677`, then for in-flight jobs. Preflight returned CLEAR at 15:23:47Z for `--target-commit 02684624` with expect `future_date_rule_lines_in_live_cards_py` 0->1 and `wnba_live_state_2026-09-17_games` 5->5 (baseline read 15:21:56Z). The `render_deploy.py` call was then DENIED by the auto-mode classifier (`Production Deploy`). No POST was made. Claim released 15:24Z. **OWED: an explicit user go-ahead for the refresh-worker deploy**, then a fresh preflight, because the CLEAR above has expired. Ride-alongs on that deploy: `cb72764c`, `a0f85482` (lane `web-export-timeout`, `artifact_publisher.pull_hot_artifacts`, worker-side), `2d9b57aa`, `9dceb84a`. The live `1923d677` is an ancestor, so nothing reverts.
 - Blocked by: none.
 
+
+## 2026-09-16 — portfolio-no-family-exclusion, superseded status line moved VERBATIM at the ~10:55 CT checkpoint
+
+- **STATUS 2026-09-16 ~10:45 CT: GOAL NOT MET YET** — code landed `4484cae1` (5 new tests RED on old code, GREEN after; 619 passed), NOT deployed; the refresh-worker deploy awaits the user. Baseline to re-read within 15 min of preflight: `market_family_excluded` 1,795 on the 10:07 CT plan. Premise of the removed rule is gone: MLB prop cards with a numeric sim edge 455 of 521 (298 positive) at 14:17Z.
