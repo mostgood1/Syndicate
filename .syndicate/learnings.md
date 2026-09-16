@@ -6660,3 +6660,11 @@ The change had tests, all green: the code tests pinned the allowlist's behaviour
 - A watermark "advanced" prediction must name the value only the fix can write (a successful pull's own start, a returned cursor), not a direction. Check for `PULL_WINDOW_CLAMPED` in the same window before crediting any advance.
 - A time-window clamp's exposure is the longest GAP between successful pulls of a scope, not the truncation rate. Read that gap before calling it harmless.
 - *(evidence: `deploys.md` 2026-09-16 20:47Z, 20:58Z, 21:28Z)*
+
+## 2026-09-16 — FORBIDDEN: pinning a PUBLISHED claim with a test that reads the configuration it depends on implicitly
+
+Measured 2026-09-16, session abacd435, lane `sim-view-reachability-caveat`. `/api/ops/execution/ledger-summary` told readers that four sim-verdict buckets are "structurally empty and stay empty". Production's paper ledger held 324 orders in them. The sentence had been false since 2026-09-04, when `SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS` first named a sport. Two tests existed specifically to keep it true ("so the payload cannot keep asserting a structural fact after the structure changes"). Both called the commit gate with the env read implicitly. CI leaves it absent, so they stayed green for 12 days. With production's value, both failed.
+
+Same root as the rule above (an env value is a code path), in a different place: there it broke a gate, here it let an instrument lie.
+
+**How to apply.** A test whose assertion depends on a setting must set that setting explicitly with `monkeypatch`, in every state production can hold, and assert the outcome in each. If a claim is true only under one configuration, it is not structural. Publish what holds in any configuration (here: "no model edge, so sized on market fair") instead of what holds in CI.
