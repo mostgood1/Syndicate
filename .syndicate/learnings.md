@@ -6619,3 +6619,11 @@ The 09-16 reading passed all three criteria the Goal named (0 WNBA chips, Layer 
 - The named readings were CONSUMERS that filter (the chips reader drops the rows) and ONE emitter of ONE seed path. The key itself, the only reading that discriminates between seeds, was not in the list; the scheduled task read it only as an extra step.
 - **How to apply:** when a Goal says "X is not written", its verification must read X (the stored artifact or key) directly, alongside any downstream surface. A clean consumer or a silent log line from a known writer does not exclude an unknown writer.
 - *(evidence: `deploys.md` 2026-09-16 14:14Z; the seed was a future-date build at 04:31:02Z, fixed in `02684624`)*
+
+## 2026-09-16 — FORBIDDEN: gating anything on a substring of `render_logs.py` output without `--width`
+
+`scripts/render_logs.py` truncates every message to 200 characters by default (`--width 200`). A worker's `ALL_PROCESS_MEMORY` line is ~3,900 characters and its process list sits past character 200. Measured 2026-09-16 16:47Z, session abacd435: a watcher waiting for refresh-worker's MLB daily sim to finish (so a deploy would not kill it) read the 16:44:35Z sample, found neither `run_mlb_daily_sim_job` nor `daily_update.py`, and exited "done" — on the SAME sample `deploy_preflight.py` had just used to return `HOLD: 5 job(s) in flight`. Re-read with `--width 200000`: 3,895 chars, both tokens present. Nothing was deployed on the false signal, only because the watcher's output was checked before acting.
+
+This is the second instrument defect in this one tool today (see the header-echo rule above): **one inflates every count by 1, the other hides every token past column 200.** Both make a watcher report the state you are waiting for.
+
+**How to apply.** Pass `--width 200000` whenever a decision depends on WHAT a line contains, and prove the watcher reads the unhealthy state on a sample known to be unhealthy before trusting its all-clear. `deploy_preflight.py` itself reads the Render logs API untruncated, so it remains the authority on in-flight jobs.
