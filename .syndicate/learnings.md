@@ -6647,3 +6647,16 @@ Measured 2026-09-16, session abacd435, lane `portfolio-no-family-exclusion`. Set
 The change had tests, all green: the code tests pinned the allowlist's behaviour, and the checklist test covered the feature OFF only. **An env value is a code path.** The deploy's pre-registered legs were about the effect of the change; none was about whether the commit still RAN.
 
 **How to apply.** (1) Before any env change that alters what the commit accepts, run the gating checklist in-process with that env set (`SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS=<value> py -3 scripts/portfolio_commit_input_checklist.py`, or the pytest that drives it) and require exit 0. (2) Every portfolio deploy's verify must include a liveness leg: a commit after go-live that is NOT `PORTFOLIO_COMMIT_SKIPPED`. (3) A verifier waiting for a post-deploy artifact must also watch for the SKIP/FAIL line that means the artifact will never come; "no population yet" for 2x the usual cadence is itself a reading.
+
+### 2026-09-16 (session a1e40980, lane `web-export-timeout`) — FORBIDDEN: grading a watermark-ADVANCED prediction on the next request's `since` when a window clamp can produce the same advance
+
+**What I believed.** Twice today the lane recorded that the 2 h pull-window clamp "should never bite" at a 48 MB budget. And I pre-registered a deploy prediction, "tomorrow's floor advances past 17:48:19Z", to be read from the `since=` of the next tomorrow request.
+
+**What was true.**
+- The clamp BIT on the very first tomorrow pull after the deploy: `20:35:20Z PULL_WINDOW_CLAMPED scope=2026-09-17 skipped_seconds=2821.9`. Timeouts had frozen the floor, and tomorrow pulls are rare (none 18:33Z -> 20:35Z). "Truncation is rare" never bounded it: the gap between pulls does, and a failing pull freezes the floor meanwhile.
+- That request's `since=18:35:20Z` was PAST 17:48:19Z, so the prediction read MET. The clamp did it, and a 30 s client would have produced the identical advance. The discriminating reading came 43 min later: the NEXT tomorrow request carried `since` = the prior successful pull's own start (`1789590920.878161`), with no clamp line.
+
+**How to apply.**
+- A watermark "advanced" prediction must name the value only the fix can write (a successful pull's own start, a returned cursor), not a direction. Check for `PULL_WINDOW_CLAMPED` in the same window before crediting any advance.
+- A time-window clamp's exposure is the longest GAP between successful pulls of a scope, not the truncation rate. Read that gap before calling it harmless.
+- *(evidence: `deploys.md` 2026-09-16 20:47Z, 20:58Z, 21:28Z)*
