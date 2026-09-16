@@ -619,8 +619,22 @@ def _stored_date_substitution_allowed(requested_date: str, schedule_verdict: boo
     left the writer substituting anyway -- a correct `False` verdict included.
     Past dates keep the stored-date fallback unchanged: that is the standalone
     cards page recovering a missing artifact, not a day presenting as live.
+
+    A FUTURE DATE NEVER (2026-09-16, lane `wnba-future-date-cache-carry`). This
+    used to answer True for every non-today date. The look-ahead warmer runs
+    `refresh_wnba_oddsapi_props.py --date <tomorrow>`, whose live-snapshot export
+    saves `build_live_state_payload(tomorrow, allow_stored_date_fallback=True)`,
+    so the evening before a no-game day it saved the 2026-08-30 slate under
+    tomorrow's live_state key (refresh-worker built 09-16 with 4 games at 23:31
+    CDT on 09-15). After midnight that key reads itself back through
+    `_games_from_live_state_fallback`. There is no artifact to recover for a day
+    that has not happened, and no schedule verdict makes an old slate tomorrow's.
     """
-    if str(requested_date or "").strip() != central_today_iso():
+    requested = str(requested_date or "").strip()
+    today = central_today_iso()
+    if requested > today:
+        return False
+    if requested != today:
         return True
     return schedule_verdict is True
 
