@@ -270,6 +270,79 @@ def _classify_stale_row(
     return "orphaned_line" if (float(seen) - sib_age) > 900 else "market_gone"
 
 
+# The share of recently-seen keys a pass must have re-observed to count as "the
+# sweep" a row is compared with. See `_sweep_reference_age`.
+_MARKET_GONE_REFERENCE_COVERAGE = 0.5
+
+
+def _sweep_reference_age(last_seen: Mapping[str, str], now: Any) -> tuple[float, float]:
+    """`(newest_age, reference_age)` in seconds for one state file.
+
+    **THE NEWEST STAMP IS NOT "THE SWEEP", and treating it as one deleted live
+    markets.** Captures are PARTIAL: soccer is swept per league on different
+    cadences, and MLB runs small prop passes between its full ones. Measured
+    2026-09-16 (lane `soccer-board-tomorrow-shortlist-collapse`):
+    `soccer_source/.../2026-09-19.state.json` had 67 events in 9 leagues last
+    seen 14:11-14:12Z and 4 La Liga events at 15:09Z. Against the 15:09 stamp,
+    every other league's row read as older than the sweep, found no fresher
+    sibling, and was dropped as `market_gone` -- served soccer went 1,089 -> 186,
+    flapping build to build (`MARKET_GONE_DROPPED soccer=` 9 / 828 / 883 / 20).
+    MLB flapped the same way (1,098 / 5) whenever a partial prop pass followed a
+    full one.
+
+    The reference is instead the most recent pass that re-observed at least
+    `_MARKET_GONE_REFERENCE_COVERAGE` of the keys seen within the board's own
+    quote-age ceiling. Replayed with the real classifier on those files: soccer
+    false `market_gone` 2,971 -> 0 with rows last seen 90+ min before the pass
+    still dropped (79 of 106); MLB with a partial pass 20 min after the full
+    one, 14,113 -> 0, 554 older rows still dropped.
+
+    When no key falls inside the ceiling the reference IS the newest stamp,
+    which is exactly the old behaviour -- a sidecar that has not advanced at all
+    still protects its rows (the slow-sweep case).
+
+    Raises ValueError when no stamp parses; the caller keeps the rows.
+    """
+    import math
+    from datetime import datetime, timezone
+
+    try:
+        from syndicate.features.shared.layer2_board import SHORTLIST_MAX_QUOTE_AGE_SECONDS as window
+    except Exception:  # noqa: BLE001
+        window = 14 * 3600
+    ages: list[float] = []
+    for stamp in last_seen.values():
+        try:
+            parsed = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+        except Exception:  # noqa: BLE001
+            continue
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        ages.append(max(0.0, (now - parsed).total_seconds()))
+    if not ages:
+        raise ValueError("no parseable last-seen stamp")
+    ages.sort()
+    newest_age = ages[0]
+    recent = [age for age in ages if age <= float(window)]
+    if not recent:
+        return newest_age, newest_age
+    need = max(1, math.ceil(len(recent) * _MARKET_GONE_REFERENCE_COVERAGE))
+    return newest_age, recent[need - 1]
+
+
+def _row_commence_date(row: Mapping[str, Any]) -> str:
+    """The row's UTC commence date (`YYYY-MM-DD`), or '' when it has none."""
+    text = str(row.get("commence_time") or "").strip()[:10]
+    return text if len(text) == 10 and text[4] == "-" and text[7] == "-" else ""
+
+
+def _row_quote_group(row: Mapping[str, Any]) -> tuple[str, ...]:
+    """The row's `_index_last_seen` group key -- built exactly as
+    `_classify_stale_row` builds its lookup, so "this file holds the group" and
+    "the classifier finds the group" cannot disagree."""
+    return tuple(_fold_group_term(f, row.get(f)) for f in _QUOTE_GROUP_FIELDS)
+
+
 def _drop_market_gone_rows(rows: Any, selected_date: Any, shortlist: Any = None) -> Any:
     """Remove rows the FEED HAS STOPPED QUOTING. `[user 2026-08-30: "Drop them"]`
 
@@ -317,7 +390,9 @@ def _drop_market_gone_rows(rows: Any, selected_date: Any, shortlist: Any = None)
 
         from syndicate.features.shared.odds_book_quotes import read_quote_last_seen
 
-        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        now = datetime.now(timezone.utc)
+        now_iso = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+        selected = str(selected_date or "")
         by_sport: dict[str, list] = {}
         for row in rows:
             if isinstance(row, Mapping):
@@ -326,52 +401,93 @@ def _drop_market_gone_rows(rows: Any, selected_date: Any, shortlist: Any = None)
         kept: list = []
         dropped: dict[str, int] = {}
         for slug, sport_rows in by_sport.items():
-            try:
-                last_seen = read_quote_last_seen(slug, str(selected_date or ""))
-            except Exception:
-                kept.extend(sport_rows)
-                continue
-            if not last_seen:
-                # No state file is NOT evidence a market is gone. Keep everything.
-                kept.extend(sport_rows)
-                continue
-            try:
-                newest = max(last_seen.values())
-                parsed = datetime.fromisoformat(str(newest).replace("Z", "+00:00"))
-                if parsed.tzinfo is None:
-                    parsed = parsed.replace(tzinfo=timezone.utc)
-                sidecar_age = max(0.0, (datetime.now(timezone.utc) - parsed).total_seconds())
-            except Exception:
-                kept.extend(sport_rows)
-                continue
+            # One view per state FILE, built only when a row needs it:
+            # (last_seen, reference_age, group_index), None for "no evidence",
+            # or "unreadable".
+            views: dict[str, Any] = {}
 
-            group_index = _index_last_seen(last_seen)
-            if not group_index:
-                # A state file with entries but NO PARSEABLE KEYS is a broken
-                # file, not a dead market -- and it would classify every row as
-                # `market_gone`, because "no sibling was seen" is exactly what an
-                # empty index says. Found by a test whose premise was that this
-                # produced an `unknown_*` label; it does not, it produces a
-                # confident mass drop. Keep everything and say why.
+            def _view(date: str, slug: str = slug, views: dict[str, Any] = views) -> Any:
+                if date in views:
+                    return views[date]
+                try:
+                    last_seen = read_quote_last_seen(slug, date)
+                except Exception:  # noqa: BLE001
+                    views[date] = "unreadable"
+                    return views[date]
+                if not last_seen:
+                    # No state file is NOT evidence a market is gone.
+                    views[date] = None
+                    return None
+                try:
+                    newest_age, reference_age = _sweep_reference_age(last_seen, now)
+                except Exception:  # noqa: BLE001
+                    views[date] = "unreadable"
+                    return views[date]
+                group_index = _index_last_seen(last_seen)
+                if not group_index:
+                    # A state file with entries but NO PARSEABLE KEYS is a broken
+                    # file, not a dead market -- and it would classify every row as
+                    # `market_gone`, because "no sibling was seen" is exactly what an
+                    # empty index says. Found by a test whose premise was that this
+                    # produced an `unknown_*` label; it does not, it produces a
+                    # confident mass drop. Keep everything and say why.
+                    print(
+                        f"[layer2_shortlist] MARKET_GONE_DROP_SKIPPED sport={slug} "
+                        f"reason=state_file_has_no_parseable_keys entries={len(last_seen)} date={date}",
+                        flush=True,
+                    )
+                    views[date] = None
+                    return None
+                # The branch-ran instrument: `reference_age_s` above `newest_age_s`
+                # means a partial pass no longer decides what counts as stale.
                 print(
-                    f"[layer2_shortlist] MARKET_GONE_DROP_SKIPPED sport={slug} "
-                    f"reason=state_file_has_no_parseable_keys entries={len(last_seen)}",
+                    f"[layer2_shortlist] MARKET_GONE_REFERENCE sport={slug} date={date} "
+                    f"keys={len(last_seen)} newest_age_s={int(newest_age)} "
+                    f"reference_age_s={int(reference_age)} coverage={_MARKET_GONE_REFERENCE_COVERAGE}",
                     flush=True,
                 )
-                kept.extend(sport_rows)
-                continue
+                views[date] = (last_seen, reference_age, group_index)
+                return views[date]
+
             for row in sport_rows:
                 quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
                 seen = quote.get("quote_seen_age_seconds") if isinstance(quote, Mapping) else None
                 if not isinstance(seen, (int, float)) or isinstance(seen, bool) or float(seen) < 900:
                     kept.append(row)
                     continue
-                label = _classify_stale_row(row, last_seen, now_iso, sidecar_age, group_index)
-                # ONLY `market_gone`. Every other label -- including every
-                # `unknown_*` -- keeps the row. An unclassifiable row is not
-                # evidence of a dead market, and defaulting the unknown case to
-                # DROP is how a diagnostic gap becomes silent data loss.
-                if label == "market_gone":
+                # WHICH FILE JUDGES THE ROW. Game markets are FILED BY COMMENCE
+                # DATE (`fetch_soccer_oddsapi_props_local.py` groups by
+                # `commence_time`); player props by capture date. Measured
+                # 2026-09-16: the 09-16 soccer file held corners/btts/h2h keys for
+                # the 4 fixtures commencing 09-16 and none for the 90 weekend
+                # fixtures on the same shortlist. A file is only a judge if it
+                # HOLDS the row's group -- each with its own sweep reference, so
+                # today's fresh pass cannot age a weekend market (merging the two
+                # files did exactly that when today's cohort was the larger half).
+                # If no file holds the group, the commence-date file judges (the
+                # selected date's when the row has none), which is the old "no
+                # sibling was seen" case.
+                commence = _row_commence_date(row)
+                dates = [commence, selected] if commence and commence != selected else [selected]
+                candidate_views = [_view(date) for date in dates]
+                if any(view == "unreadable" for view in candidate_views):
+                    kept.append(row)
+                    continue
+                present = [view for view in candidate_views if view is not None]
+                if not present:
+                    kept.append(row)
+                    continue
+                group = _row_quote_group(row)
+                judges = [view for view in present if group in view[2]] or present[:1]
+                labels = [
+                    _classify_stale_row(row, view[0], now_iso, view[1], view[2]) for view in judges
+                ]
+                # ONLY `market_gone`, and only when EVERY judge says so. Every
+                # other label -- including every `unknown_*` -- keeps the row. An
+                # unclassifiable row is not evidence of a dead market, and
+                # defaulting the unknown case to DROP is how a diagnostic gap
+                # becomes silent data loss.
+                if all(label == "market_gone" for label in labels):
                     dropped[slug] = dropped.get(slug, 0) + 1
                     continue
                 kept.append(row)
