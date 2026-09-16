@@ -1,5 +1,25 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#666` — **Read the board ranker's 14-day history reader (#44) on refresh-worker: it must attach all 14 days without breaching the revert ceilings** — lane `board-eval-reader-chunk-ceiling`, 2026-09-16 — **OPEN; code on main, deploy user-approved and queued for 2026-09-16 ~19:58Z**
+
+- **Why.** The ranker's `load_recent_evaluation_records(days=14)` skipped 12 of 14 days in production (636 `SKIP_OVERSIZED_LEDGER_CHUNK ceiling=64000000` lines, 2026-09-16 00:07-15:05Z; chunks 117-417 MB), so the board ranked on 2 days of history. `ranking_records.load_recent_ranking_records` (`be530506`, `549c10ec`, `48a677eb`) streams every chunk and keeps only settled records' ranking fields.
+- **Reading that closes it.** On the first board build after the deploy: `SKIP_OVERSIZED_LEDGER_CHUNK` 0 (was 64 per build), `[ranking_records] RANKING_RECORDS_LOADED` naming ~15 chunks, peak `self_rss_mb` <= the pre-deploy boot's peak + 400 MiB, `elapsed_s` <= 120. **Revert** on peak > +600 MiB, `elapsed_s` > 180, or any `oomKilled` (this path once OOM'd on the whole-record load). Tooling: scratchpad `eval44_deploy_loop.py` / `eval44_watch.py` (session 0f5b256e).
+- **Worker memory is boot-confounded:** judge the peak against the same-boot-age baseline, never against a reading from before a restart.
+- **Done when.** The measurement is in `.syndicate/deploys.md` and the verdict is on the lane.
+
+### `#667` — **Verify NHL runs on real inputs and reaches the served board at its 2026-09-19 preseason start** — lane `nhl-season-readiness`, 2026-09-16 — **OPEN; code landed, web allowlist live, live-odds-worker env flip + deploy approved for 2026-09-17**
+
+- **Why.** NHL generation runs only in live-odds-worker's refresh loop, and `SYNDICATE_ACTIVE_SPORTS` there is `mlb,wnba,soccer,ncaaf,nfl`. `e1398936` (calendar admits NHL from 09-19; the runner pulls its five `_latest` season inputs from web) and `ade2a6ba` (allowlist for `predictions_*`, `predictions_sim_*`, `lineups_*`) are on main; web runs `ade2a6ba` since 2026-09-16 18:50:02Z (`e0aee286`).
+- **Owed, in order.** (1) 2026-09-17 quiet window: add `nhl` to live-odds-worker's `SYNDICATE_ACTIVE_SPORTS` (single-key PUT), then deploy main's tip there under the locks. Rehearsed 2026-09-16 read-only: the only behavioural ride-along is `6ac08075`. (2) 2026-09-19 readings, scheduled 10:00 and 19:15 CDT: `=== NHL RUNNER HIT ===` and `[nhl_runner] NHL_SEASON_INPUTS` all present on live-odds-worker; no `SWEEP_OWNERSHIP_EXCLUDED` naming nhl; `predictions_2026-09-19.csv` exportable from web; `/nhl/api/cards?date=2026-09-19` serves 7 games carrying model output.
+- **Model-engine standard applies:** the NHL sim input checklist must pass on production inputs (Elo and the other team features populated, not defaulted) before the board output is trusted.
+- **Done when.** The 09-19 reading is in `.syndicate/deploys.md` and the lane's verdict is MET.
+
+### `#668` — **Turn on disk retention's dry run on refresh-worker and set per-path windows from its report** — lane `worker-disk-auto-retention`, 2026-09-16 — **OPEN; code landed inert (`4481cb6c`); waits on `#666` reading clean (user decision)**
+
+- **Why.** refresh-worker's disk went 36.19 GB (09-13) -> 37.62 GB (09-16), ~+0.49 GB/day with 14.88 GB free (~a month to full); growers `evaluation_ledger_chunks` ~+190 MB/day, `mlb_source/source_artifacts/data` ~+142 MB/day, `venue_odds` ~+34 MB/day. `SYNDICATE_ARTIFACT_RETENTION_ENABLED`, `SYNDICATE_DISK_RETENTION_DRY_RUN` and `SYNDICATE_DISK_RETENTION_NEW_RULES_APPLY` are ABSENT on both workers, so retention has never run. live-odds-worker's disk is unread (it emits no `DISK_INVENTORY`).
+- **Owed, in order.** (1) After `#666` reads clean: set `SYNDICATE_DISK_RETENTION_DRY_RUN=1` on refresh-worker (single-key PUT) and deploy under the locks; read `RETENTION_DRY_RUN` and the `DISK_RETENTION_SUMMARY` for would-delete bytes per rule. (2) Replace the lookbacks marked 'guess' in `artifact_retention.py` with per-path windows justified by each reader's lookback. (3) Enable deletes, then a 7-day flat-disk reading.
+- **Done when.** Disk used is flat or falling across 7 days with retention enabled, recorded in `.syndicate/deploys.md`.
+
 ### `#665` — **Grade H24 (fix #5b): does the prior xG environment improve soccer totals? Due 2026-10-15, or earlier at n >= 150** — pre-registered 2026-09-15 by session abacd435 (no lane: the measurement is not due yet)
 
 - **Why.** Season to date the model's total goals trail actual in 7 of 10 leagues, and FotMob puts the league-wide environment at 3.07 goals/match against 2.79 over the prior two seasons. H24 asks whether scaling the published goal means by a trailing-365-day xG-environment factor improves O/U 2.5.
