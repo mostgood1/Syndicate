@@ -557,6 +557,75 @@ def _source_cli_generation_enabled() -> bool:
     return value in {"1", "true", "yes", "on"}
 
 
+# The hockeysim inputs the owned producer reads from `<artifact_root>/data/processed`.
+# Only the `_latest` names: the loaders key season files off the date's season code, and
+# a new season has no season file until its producers run, so `_latest` is what resolves.
+_NHL_SEASON_INPUT_FILES = (
+    "team_elo_latest.csv",
+    "team_xg_latest.csv",
+    "team_special_teams_latest.csv",
+    "team_rates_latest.csv",
+    "player_rates_latest.csv",
+)
+
+
+def _ensure_season_inputs(artifact_root: Path) -> dict[str, list[str]]:
+    """Pull any missing season input from web before generation. Never raises.
+
+    WHY THIS EXISTS (lane nhl-season-readiness, 2026-09-16). Generation reads these
+    from THIS worker's own disk (`root=artifact_root`), and nothing else copies them
+    there: `pull_hot_artifacts` is date-scoped and `_SEASON_ARTIFACT_PATTERNS` lists
+    MLB inputs only. Without them every feature silently takes its neutral default.
+
+    Only pulls when `artifact_root` sits where the pull writes (`<data_root>/nhl_source`);
+    anywhere else the pulled file would land beside the root, not in it, so that case
+    is reported rather than attempted.
+    """
+    processed = artifact_root / "data" / "processed"
+
+    def _present(name: str) -> bool:
+        path = processed / name
+        try:
+            return path.is_file() and path.stat().st_size > 0
+        except OSError:
+            return False
+
+    missing = [name for name in _NHL_SEASON_INPUT_FILES if not _present(name)]
+    pulled: list[str] = []
+    skipped = ""
+    if missing:
+        try:
+            from syndicate.features.shared import artifact_publisher as publisher
+
+            data_root = Path(publisher._data_root()).resolve()
+            token = publisher._admin_token()
+            if artifact_root.resolve() != (data_root / "nhl_source"):
+                skipped = f"root_mismatch data_root={data_root}"
+            elif not token:
+                skipped = "no_token"
+            else:
+                for name in missing:
+                    url = publisher._export_url(exact_path=f"nhl_source/data/processed/{name}")
+                    if not url:
+                        skipped = "not_configured"
+                        break
+                    ok, written = publisher._pull_hot_artifacts_request(url, token, timeout_seconds=60)
+                    pulled.append(f"{name}:ok={ok},written={written}")
+        except Exception as exc:  # noqa: BLE001 - generation must still run, degraded
+            skipped = f"error={type(exc).__name__}: {exc}"
+    result = {
+        "present": [name for name in _NHL_SEASON_INPUT_FILES if _present(name)],
+        "missing": [name for name in _NHL_SEASON_INPUT_FILES if not _present(name)],
+        "pulled": pulled,
+    }
+    print(
+        f"[nhl_runner] NHL_SEASON_INPUTS root={artifact_root} present={len(result['present'])}"
+        f" missing={result['missing']} pulled={pulled}{(' skipped=' + skipped) if skipped else ''}",
+        flush=True,
+    )
+    return result
+
+
 def _run_owned_generation(*, artifact_root: Path, target_dates: list[str], props_n_sims: int, warnings: list[str]) -> None:
     """Syndicate-owned NHL generation (Phase 5 cutover) — replaces the vendor CLI subprocess.
 
@@ -576,6 +645,10 @@ def _run_owned_generation(*, artifact_root: Path, target_dates: list[str], props
     # Render's collector (CLAUDE.md).
     anchor_weight, anchor_source = resolve_anchor_weight()
     print(f"nhl owned generation: market anchor weight={anchor_weight} (source={anchor_source}, env={ENV_ANCHOR_WEIGHT})", flush=True)
+
+    inputs = _ensure_season_inputs(artifact_root)
+    if inputs["missing"]:
+        warnings.append(f"nhl season inputs missing after pull: {inputs['missing']}")
 
     for target_date in target_dates:
         try:

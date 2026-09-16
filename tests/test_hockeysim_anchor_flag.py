@@ -206,6 +206,9 @@ def test_refresh_entrypoint_threads_one_resolved_weight(tmp_path, monkeypatch):
     monkeypatch.setitem(sys.modules, "build_nhl_artifacts", fake_producer)
     import syndicate.features.nhl.sim_engine.hockeysim.ingestion as ingestion
     monkeypatch.setattr(ingestion, "collect_slate_inputs", lambda date, root=None: None)
+    # This test is about the anchor weight. The season-input pull (tests/test_nhl_input_pull.py)
+    # warns when inputs are absent, which they are under tmp_path, so report them present here.
+    monkeypatch.setattr(module, "_ensure_season_inputs", lambda root: {"present": list(module._NHL_SEASON_INPUT_FILES), "missing": [], "pulled": []})
 
     monkeypatch.setenv(ENV_ANCHOR_WEIGHT, "0.2")
     warnings: list = []

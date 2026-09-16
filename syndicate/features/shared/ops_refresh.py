@@ -1137,8 +1137,10 @@ def _active_sports_for_date(date_str: str) -> str:
     # NBA: October – June
     if month >= 10 or month <= 6:
         active.append("nba")
-    # NHL: October – June
-    if month >= 10 or month <= 6:
+    # NHL: preseason from September 19, then the regular season October – June.
+    # The preseason start is a user decision (2026-09-16, lane nhl-season-readiness);
+    # before it, the October-only window excluded 09-19..09-30 whatever the env said.
+    if month >= 10 or month <= 6 or (month == 9 and day >= 19):
         active.append("nhl")
     # WNBA: May – October
     if 5 <= month <= 10:
