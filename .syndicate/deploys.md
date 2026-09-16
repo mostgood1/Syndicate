@@ -36485,3 +36485,19 @@ Scheduled task `full-slate-memory-reading-0915`. Read-only on production: no dep
 - **Two instrument defects found and fixed during this reading, recorded because both would have produced a false pass:**
   - the first watcher pointed at `C:\tmp\anytime_verify.py` while the reader lived in Git Bash's `/tmp`; it failed every cycle and took no readings at all until checked.
   - the reader printed `share 0.0000 (predicted 0.0)` computed over ZERO rows, which is indistinguishable from the prediction being met. It now refuses to report a share over an empty population.
+
+## 2026-09-16 03:33:27Z (22:33 CT) — READING (addendum) on the fix #3 entries — lane soccer-anytime-scorer — **VINTAGE SPLIT: 64.7% of rows priced at exactly 0.0 before, 0 after — and why the SERVED BOARD still shows zeros**
+
+- **Every recommendations file on web's disk, per league, split by whether its own `player_substrate.espn_goal_shrink` audit says `applied`:**
+
+| league | files | new-code rows | new-code zeros | old-code rows | old-code zeros |
+| --- | --- | --- | --- | --- | --- |
+| primeira_liga | 26 | 154 | **0** | 1,928 | 1,159 (60.11%) |
+| championship | 21 | 113 | **0** | 2,296 | 1,576 (68.64%) |
+
+  Pooled: **4,224 old-code rows at 64.7% zero, 267 new-code rows at 0.0%.** Same leagues, same reader, same instant — the only variable is which code built the file. This is the before/after the H19-b replay predicted (53.6% -> 0 on appeared rows), now measured on published production artifacts.
+- **THE SERVED BOARD STILL SHOWS MANY ZEROS, AND THAT IS NOT A REGRESSION.** `/soccer/<league>/api/props` read at 03:32:05Z: championship 240 of 449 cards at `0.0%`, eredivisie 164 of 441, primeira_liga 135 of 366, belgian 141 of 372; Understat leagues 39-69 each.
+  - `source_path` is a DIRECTORY (`data/soccer_source/<league>/api/recommendations/`), so the rank board unions the season's files. Only the near dates have been rebuilt by the new code: championship `2026-09-15` (gen 02:25:21Z) and `2026-09-18` (01:28:55Z); primeira_liga `2026-09-19` (03:08:58Z). The zeros come from the older files, which no deploy rewrites.
+  - **So the board cleans up per DATE as each artifact rebuilds, not at the deploy.** A future reader who counts board zeros and calls the fix inert would be wrong in exactly the way this note exists to prevent; count by file, and read each file's audit state first.
+  - Worth noting for the same reason: championship's `2026-09-19` file (gen 2026-09-15T19:05:19Z, 260 rows, 181 zeros) and `2026-09-20` (gen 23:54:22Z, 69 rows, 43 zeros) are still old-vintage even though the second was written AFTER `ef9f18fc` landed on main -- it was built by live-odds-worker, which did not carry the code until 03:10:22Z.
+- **The board prices the field the user chose, confirmed end to end:** the rank card `badge` is `anytime_scorer_probability` (unconditional) -- e.g. primeira_liga 42.7%, championship 59.9% -- while `anytime_scorer_probability_if_playing` appears only as a secondary list item (`Anytime scorer if playing: 54.7%`). `using_sample_data: false`, no warning panel, 366 and 449 cards served.
