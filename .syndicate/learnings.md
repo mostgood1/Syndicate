@@ -6633,3 +6633,9 @@ This is the second instrument defect in this one tool today (see the header-echo
 A splice script did `open(p,'wb').write(nl.join(lines))`. `nl` was bytes and `lines` str, so `join` raised, but only AFTER `open` had truncated `pipeline/layer2_shortlist.py`: 2,363 lines to 0. The traceback named the type error, not the file. It was caught only because the next command printed `git diff --numstat` (`0 2363`). Had the next step been a test run, it would have failed on an import and looked like a code bug.
 
 **How to apply.** Build the bytes first, then open: `data = ...; with open(p, 'wb') as f: f.write(data)`. For code, prefer the Edit tool, which never truncates on failure. After any scripted write to a tracked file, read `git diff --numstat` before doing anything else, and treat a deletion count near the file's length as an emptied file.
+
+## 2026-09-16 — FORBIDDEN: attributing a portfolio plan's output change to a deploy without reading the plan's own `settings` block. Settings are written through an API with no deploy, and they bind before code does. `[lane soccer-board-tomorrow-shortlist-collapse]`
+
+I recorded the plan's `sized` 25 -> 99 as "the portfolio change plus the recovered rows" because a deploy carrying both had just gone live. The cause was a `POST /portfolio/settings` 16 minutes earlier (`max_positions` 25 -> 150, exposure 0.251 -> 0.35). The evidence was in the payload I had already fetched: `settings.max_positions` with `sources: stored`, and the earlier post-deploy plan still sizing exactly 25 with `beyond_max_positions` 79 -- a cap binding, not rows missing. Corrected by the owning lane, re-derived, `deploys.md` 17:06Z.
+
+**How to apply.** Before attributing any plan change, read `settings` (values AND sources) and the binding refusal (`beyond_max_positions`, the exposure scale) on the plans either side. If a cap was the binding refusal before, a settings change is the first suspect, not the deploy.
