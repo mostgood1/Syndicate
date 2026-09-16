@@ -403,6 +403,8 @@ still genuinely absent — `conditional_mix` etc. return `count: 0` and `POST
   `ncaaf/game_projections.py` nulls `edge_vs_market_pct` by design.
 - **The `sport:family` staking exclusion is REMOVED** (`4484cae1`, live on refresh-worker 16:11:39Z 2026-09-16, user
   decision; `SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES` no longer exists; first plan after it held 12 MLB prop positions of 25) and **`SYNDICATE_PORTFOLIO_MIN_EV_PCT=0`**. Neither is a hidden throttle.
+- **EV-only (market-fair) staking is allowed in EVERY sport** (2026-09-16, user decision): `SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS` reads `mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,soccer` on refresh-worker, live 20:58:44Z (`deploys.md` 20:53:17Z: plan 21:10:26Z `rows_in` 4117, 77 positions, 0 `no_model_edge_pct`, 0 skipped commits). A row with no sim edge is still REFUSED IN-PLAY (`in_play_market_fair`, 36 on that plan; user decision to keep). Any change to that env must run `scripts/portfolio_commit_input_checklist.py` with the env first: the 17:28Z attempt failed it and SKIPPED every commit.
+- **Stored portfolio settings** (`POST /portfolio/settings` 16:29:39Z, read back `stored`): `max_positions` 150, `max_slate_exposure_fraction` 0.35, bankroll 1000, `min_ev_pct` 2.0. On the first plan after, the exposure ceiling ($350) bound and the position count did not (`deploys.md` 16:46:12Z).
 
 ### Order attribution is COMPLETE, and the dataset is EMPTY — 2026-09-04 02:2xZ `[lane prop-join-yield]`
 
