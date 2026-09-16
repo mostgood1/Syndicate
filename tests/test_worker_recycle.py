@@ -18,9 +18,9 @@ from unittest.mock import patch
 from syndicate.features.shared import worker_recycle as wr
 
 
-def _refuse(n: int) -> None:
+def _refuse(n: int, stage: str = "pre_source_state_fingerprint") -> None:
     for _ in range(n):
-        wr.note_heavy_build_guard(True)
+        wr.note_heavy_build_refused(stage)
 
 
 class RecycleDecisionTests(unittest.TestCase):
@@ -57,12 +57,21 @@ class RecycleDecisionTests(unittest.TestCase):
         _refuse(14)
         self.assertEqual(self._decide()[:2], (False, "below_threshold"))
 
-    def test_an_admitted_build_resets_the_count(self) -> None:
+    def test_a_completed_build_resets_the_count(self) -> None:
         _refuse(14)
-        wr.note_heavy_build_guard(False)
+        wr.note_heavy_build_completed()
         _refuse(14)
         self.assertEqual(wr.consecutive_refusals(), 14)
         self.assertEqual(self._decide()[:2], (False, "below_threshold"))
+
+    def test_mid_build_refusals_reach_the_recycle(self) -> None:
+        # 2026-09-16 22:23-22:55Z: every refusal was mid-build. Off != on: these
+        # must be able to fire a recycle, and the detail must name the stage.
+        _refuse(14, stage="post_pull_hot_artifacts")
+        _refuse(1, stage="post_collect_candidates_with_fallback_merge")
+        recycle, reason, detail = self._decide()
+        self.assertEqual((recycle, reason), (True, "recycle"))
+        self.assertEqual(detail["last_refusal_stage"], "post_collect_candidates_with_fallback_merge")
 
     def test_zero_disables(self) -> None:
         _refuse(100)
@@ -162,7 +171,9 @@ class HookWiringTests(unittest.TestCase):
 
         service = IntelligenceStateService()
         patches = [
-            patch.object(ism, "_abort_build_candidate_pool_if_memory_critical", return_value=refused),
+            # The LOWER seam, so the real `_abort_build_candidate_pool_if_memory_critical`
+            # (which now feeds the counter) runs.
+            patch.object(ism, "_abort_if_memory_critical", return_value=refused),
             patch.object(ism, "_diag_log_all_process_memory", return_value=None),
             patch.object(IntelligenceStateService, "_refresh_layer2_shortlist_only", return_value=None),
             # Past the guard the build would do real work: stop it at the first call.
@@ -178,15 +189,54 @@ class HookWiringTests(unittest.TestCase):
             if str(exc) != "stop-here":
                 raise
 
-    def test_refused_guard_increments_the_counter(self) -> None:
+    def test_refused_start_guard_increments_the_counter_once_per_cycle(self) -> None:
         self._publication(refused=True)
         self._publication(refused=True)
         self.assertEqual(wr.consecutive_refusals(), 2)
 
-    def test_admitted_guard_resets_the_counter(self) -> None:
+    def test_passing_the_start_guard_does_not_reset_the_counter(self) -> None:
+        # 2026-09-16: builds passed this guard, then were refused mid-build; the old
+        # reset-on-pass zeroed the count every cycle, so no recycle could fire.
         self._publication(refused=True)
         self._publication(refused=False)
-        self.assertEqual(wr.consecutive_refusals(), 0)
+        self.assertEqual(wr.consecutive_refusals(), 1)
+
+    def test_every_heavy_build_guard_stage_feeds_the_counter(self) -> None:
+        import pipeline.intelligence_state as ism
+
+        stages = ("build_candidate_pool_start", "post_pull_hot_artifacts", "post_build_overview",
+                  "post_collect_candidates_with_fallback_merge", "post_candidate_building", "manifest_loop_sport=mlb")
+        with patch.object(ism, "_abort_if_memory_critical", return_value=True):
+            for stage in stages:
+                self.assertTrue(ism._abort_build_candidate_pool_if_memory_critical(stage))
+        self.assertEqual(wr.consecutive_refusals(), len(stages))
+        self.assertEqual(wr._last_refusal_stage(), "manifest_loop_sport=mlb")
+        with patch.object(ism, "_abort_if_memory_critical", return_value=False):
+            self.assertFalse(ism._abort_build_candidate_pool_if_memory_critical("post_pull_hot_artifacts"))
+        self.assertEqual(wr.consecutive_refusals(), len(stages), "a passing guard must not reset or count")
+
+    def test_every_guard_in_the_pool_build_goes_through_the_counting_wrapper(self) -> None:
+        # A new guard written against `_abort_if_memory_critical` directly with the
+        # 1,900 MB floor would be invisible to the recycle again.
+        import inspect
+        import pipeline.intelligence_state as ism
+
+        body = inspect.getsource(ism.IntelligenceStateService._build_candidate_pool)
+        self.assertNotIn("_abort_if_memory_critical(", body.replace("_abort_build_candidate_pool_if_memory_critical(", ""))
+        self.assertGreaterEqual(body.count("_abort_build_candidate_pool_if_memory_critical("), 6)
+
+    def test_the_reset_sits_at_the_pool_builds_normal_completion_only(self) -> None:
+        import inspect
+        import pipeline.intelligence_state as ism
+
+        source = inspect.getsource(ism)
+        self.assertEqual(source.count("note_heavy_build_completed()"), 1, "exactly one reset site")
+        body = inspect.getsource(ism.IntelligenceStateService._build_candidate_pool)
+        reset_at = body.find("note_heavy_build_completed()")
+        self.assertGreater(reset_at, body.rfind("_abort_build_candidate_pool_if_memory_critical("))
+        self.assertGreater(reset_at, body.rfind("_log_candidate_pool_cache("))
+        self.assertIn("return json.loads(serialized_pool)", body[reset_at:])
+        self.assertNotIn("note_heavy_build_guard", source, "the reset-on-pass hook must be gone")
 
     def test_main_loop_asks_maybe_recycle_before_sleeping(self) -> None:
         source = (Path(__file__).resolve().parents[1] / "scripts" / "run_refresh_worker.py").read_text(encoding="utf-8")

@@ -4737,7 +4737,23 @@ def _abort_if_memory_critical(stage: str, floor_bytes: int, *, token: str = "MEM
 
 
 def _abort_build_candidate_pool_if_memory_critical(stage: str) -> bool:
-    return _abort_if_memory_critical(stage, _MIN_SAFE_MEMORY_HEADROOM_BYTES)
+    refused = _abort_if_memory_critical(stage, _MIN_SAFE_MEMORY_HEADROOM_BYTES)
+    if refused:
+        # Lane `heavy-build-memory-refusal`: EVERY heavy-build guard feeds the
+        # self-restart count, not only `pre_source_state_fingerprint`. On
+        # 2026-09-16 22:08-23:06Z builds passed that first guard and were refused
+        # mid-build (`post_pull_hot_artifacts`, `post_collect_candidates_with_
+        # fallback_merge`), which the count never saw, so the board stayed 60+
+        # minutes stale with no recycle. The reset is `note_heavy_build_completed`
+        # at the end of `_build_candidate_pool`. Recording must never change the
+        # build's own path.
+        try:
+            from syndicate.features.shared.worker_recycle import note_heavy_build_refused
+
+            note_heavy_build_refused(stage)
+        except Exception:
+            pass
+    return refused
 
 
 
@@ -7188,6 +7204,14 @@ class IntelligenceStateService:
             self._cache_candidate_pool(cache_key, pool)
         serialized_pool = json.dumps(pool, default=str)
         self._log_candidate_pool_cache(selected_date, cache_key, serialized_pool, cached=pool["candidate_count"] > 0)
+        # Every guard in this build passed: the only reset of the self-restart
+        # count (lane `heavy-build-memory-refusal`).
+        try:
+            from syndicate.features.shared.worker_recycle import note_heavy_build_completed
+
+            note_heavy_build_completed()
+        except Exception:
+            pass
         return json.loads(serialized_pool)
 
     def _cache_candidate_pool(self, cache_key: str, pool: dict[str, Any]) -> None:
@@ -8005,17 +8029,10 @@ class IntelligenceStateService:
             log_heap_census("pre_source_state_fingerprint", min_container_mb=1200.0)
         except Exception:
             pass
+        # A refusal here feeds the self-restart count inside the guard itself
+        # (lane `heavy-build-memory-refusal`); a pass here resets nothing, because
+        # the build can still be refused further in.
         _heavy_build_refused = _abort_build_candidate_pool_if_memory_critical("pre_source_state_fingerprint")
-        # Lane `heavy-build-memory-refusal`: count consecutive refusals so the
-        # worker's main loop can restart a process stuck above this floor (the
-        # 2026-09-12/13 16-hour refusal cleared only on restarts). Recording is
-        # instrumentation and must never change the build's own path.
-        try:
-            from syndicate.features.shared.worker_recycle import note_heavy_build_guard
-
-            note_heavy_build_guard(bool(_heavy_build_refused))
-        except Exception:
-            pass
         if _heavy_build_refused:
             # THE REFUSAL IS SPLIT HERE, and this is the whole change.
             #

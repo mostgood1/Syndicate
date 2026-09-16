@@ -17,7 +17,8 @@ added is the restart the deploys were doing by accident, under conditions that
 make it harmless:
 
 - the heavy build has been refused `N` times IN A ROW (default 15, ~30-45 min);
-  any admitted build resets the count, so a single low-headroom cycle never counts;
+  only a COMPLETED candidate-pool build resets the count, so a single
+  low-headroom cycle never counts;
 - the process has been up at least `min_uptime` (default 30 min), so a worker that
   boots straight into refusal cannot restart-loop;
 - NO child process of the worker is alive -- sims, odds jobs, soccer builds, the
@@ -28,6 +29,18 @@ make it harmless:
 
 User decision 2026-09-13 ~19:40 CT: "Approve, default ON at 15 (Recommended)".
 `SYNDICATE_REFRESH_WORKER_RECYCLE_AFTER_REFUSALS=0` turns it off.
+
+A REFUSAL AT ANY GUARD COUNTS, AND PASSING THE FIRST GUARD RESETS NOTHING
+(2026-09-16). The count used to be fed only by `pre_source_state_fingerprint`,
+and a pass there reset it. On 2026-09-16 22:08Z-23:06Z refresh-worker's builds
+passed that first guard and were then refused mid-build -- at
+`post_pull_hot_artifacts` (22:23:04Z) and `post_collect_candidates_with_fallback_merge`
+(22:48:30Z, 22:55:37Z), unreclaimable 2,258-2,375 MB against the 2,196 MB line --
+so each cycle reset the count to 0, no recycle could fire, and the served board
+stayed 60+ minutes stale. So every `_abort_build_candidate_pool_if_memory_critical`
+refusal reports here (`note_heavy_build_refused`), and the reset moved to the
+end of a candidate-pool build that ran every guard (`note_heavy_build_completed`).
+User decision 2026-09-16: "do 1".
 
 This module decides; it never exits the process itself. The caller (the worker's
 main loop) returns from `main()`, and Render restarts the service, as
@@ -44,7 +57,8 @@ from typing import Any, Callable
 __all__ = [
     "recycle_after_refusals",
     "recycle_min_uptime_seconds",
-    "note_heavy_build_guard",
+    "note_heavy_build_refused",
+    "note_heavy_build_completed",
     "consecutive_refusals",
     "child_process_pids",
     "recycle_decision",
@@ -54,7 +68,7 @@ _DEFAULT_AFTER_REFUSALS = 15
 _DEFAULT_MIN_UPTIME_SECONDS = 1800
 
 _lock = threading.Lock()
-_state = {"consecutive_refusals": 0, "total_refusals": 0, "total_admitted": 0}
+_state: dict[str, Any] = {"consecutive_refusals": 0, "total_refusals": 0, "total_completed": 0, "last_refusal_stage": None}
 
 
 def recycle_after_refusals() -> int:
@@ -77,19 +91,26 @@ def recycle_min_uptime_seconds() -> int:
     return max(0, value)
 
 
-def note_heavy_build_guard(refused: bool) -> int:
-    """Record one heavy-build guard outcome. Returns the consecutive-refusal count. Never raises."""
+def note_heavy_build_refused(stage: str) -> int:
+    """Record one heavy-build refusal at any guard. Returns the consecutive-refusal count. Never raises."""
     try:
         with _lock:
-            if refused:
-                _state["consecutive_refusals"] += 1
-                _state["total_refusals"] += 1
-            else:
-                _state["consecutive_refusals"] = 0
-                _state["total_admitted"] += 1
+            _state["consecutive_refusals"] += 1
+            _state["total_refusals"] += 1
+            _state["last_refusal_stage"] = str(stage)
             return int(_state["consecutive_refusals"])
     except Exception:  # pragma: no cover - defensive
         return 0
+
+
+def note_heavy_build_completed() -> None:
+    """Record a candidate-pool build that ran every guard. The only reset. Never raises."""
+    try:
+        with _lock:
+            _state["consecutive_refusals"] = 0
+            _state["total_completed"] += 1
+    except Exception:  # pragma: no cover - defensive
+        pass
 
 
 def consecutive_refusals() -> int:
@@ -97,9 +118,14 @@ def consecutive_refusals() -> int:
         return int(_state["consecutive_refusals"])
 
 
+def _last_refusal_stage() -> str | None:
+    with _lock:
+        return _state["last_refusal_stage"]
+
+
 def _reset_for_tests() -> None:
     with _lock:
-        _state.update({"consecutive_refusals": 0, "total_refusals": 0, "total_admitted": 0})
+        _state.update({"consecutive_refusals": 0, "total_refusals": 0, "total_completed": 0, "last_refusal_stage": None})
 
 
 def child_process_pids(parent_pid: int, *, proc_root: Path = Path("/proc")) -> list[int] | None:
@@ -147,6 +173,7 @@ def recycle_decision(
     refusals = consecutive_refusals()
     detail: dict[str, Any] = {
         "consecutive_refusals": refusals,
+        "last_refusal_stage": _last_refusal_stage(),
         "threshold": threshold,
         "uptime_s": int(uptime_seconds),
         "min_uptime_s": recycle_min_uptime_seconds(),
