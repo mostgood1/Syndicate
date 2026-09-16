@@ -36826,3 +36826,22 @@ Scheduled task `full-slate-memory-reading-0915`. Read-only on production: no dep
 - **Aggregate NOT empty:** `snapshot_game_count` **2** on every read from 17:32:10Z (1 at 17:31:16Z, generated 17:30:02Z), matching the 2 matches ESPN had in play. Separate observation, not a chip defect: the snapshot-index reports both games with null `home_name`/`away_name` (`skipped_no_team_names`, `index_size` 0). The ops index cannot key soccer rows; the chips carry correct teams.
 - **Fix `e115cd6b` (penalties + own goals) was NOT exercised:** the only goal (ATM, 24') had `penaltyKick` false and `ownGoal` false. **Still OWED**, not passed.
 - Next window: RAC @ BAR and ATH @ LEV at 19:30Z (14:30 CT), task `laliga-chip-freshness-check-1430`.
+
+## 2026-09-16 17:28:19Z (12:28 CT) — refresh-worker `03851b5a` -> `9c98fd8f` + env (D2) — lane portfolio-no-family-exclusion — **INCIDENT: every portfolio commit SKIPPED after go-live; the env half of D2 was reverted**
+
+- **Live 17:34:34Z**, `dep-dald3cp42hec73c2nemg`, trigger=api, exactly `9c98fd8f` (sim_coverage counted on rows; the only code commit over live `03851b5a`). Env set BEFORE the deploy while holding the claim (16:37:4xZ): `SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS` `ncaaf` -> `mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,soccer`, `SYNDICATE_KALSHI_SOCCER_RESOLVERS` unset -> `1`. User decision 2026-09-16 ~10:50 CT (EV-only staking all sports; soccer on Kalshi).
+- **Locks:** claim held throughout (renewed back to back 17:17Z and 18:06Z, TTL 3600). Preflight HOLD on in-flight `run_mlb_daily_sim_job` from 16:46Z to 17:26Z, and the sim relaunched within ~1 min of finishing at 17:02Z; CLEAR at 17:28:08Z with baselines re-read at 17:27:45Z (`no_model_edge_pct` 1812, `sim_coverage.rows_without_sim_edge` 1812, `KALSHI_SOCCER_RESOLVERS withheld=90`). Expectations: 1812 -> 0; 1812 -> >0 counted on rows; 90 -> 0.
+- `verify:` **NOT MET, and it broke production.** refresh-worker logged, at 17:45:07Z and again at 17:58:42Z:
+
+      [portfolio_commit] CHECKLIST_FAIL FAIL  missing model_edge_pct     -> None (want 'no_model_edge_pct')
+      [intelligence_state] PORTFOLIO_COMMIT_SKIPPED status=error reason=input_checklist_failed
+
+  **No portfolio plan was generated after go-live** (newest plan stayed 11:45:45 CT), so nothing new was staked, for any sport, paper or live, from the first post-boot commit (~17:45Z) until the revert. No `KALSHI_SOCCER_RESOLVERS` line was printed either, because the commit stopped before the venue resolvers.
+- **Cause, read in code:** `scripts/portfolio_commit_input_checklist.py` gates every commit; it strips `model_edge_pct` from `CANONICAL_ROW` (`sport: "mlb"`) and REQUIRES the refusal `no_model_edge_pct` ("a row missing an input must be turned away by NAME, never sized on a default"). With `mlb` on the market-fair allowlist the stripped row is sized on market fair instead -> reason None -> FAIL -> the whole commit is skipped. `tests/test_market_fair_sizing.py::test_the_gating_checklist_still_passes_with_the_feature_off` covers only the feature OFF. **The code commit `9c98fd8f` is not implicated**; only the env value is.
+- **How it was found:** not by the D2 verifier (which was still waiting for a post-go-live plan that could never come) but at the 18:03Z checkpoint, by reading refresh-worker's `PORTFOLIO_COMMIT` log lines after noticing 28 minutes with no plan against ~10 minutes after D1.
+
+## 2026-09-16 18:07:11Z (13:07 CT) — refresh-worker `9c98fd8f` -> `9c98fd8f` --reinject-env — lane portfolio-no-family-exclusion — **INCIDENT REVERT: market-fair allowlist back to `ncaaf`**
+
+- `SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS` set back to `ncaaf` at 18:06Z (single-key PUT, read back `ncaaf`). `SYNDICATE_KALSHI_SOCCER_RESOLVERS=1` KEPT: the only checklist failure is the model_edge_pct refusal, so it is not implicated.
+- Preflight CLEAR 18:06:5xZ with `--reinject-env` and `--no-expectation` (incident revert), no jobs in flight. Deploy `dep-daldljrm8hqs73977o6g` created 18:07:11Z, zero code delta.
+- `verify:` OWED — the first `PORTFOLIO_COMMIT` after go-live must NOT be SKIPPED and a plan must be generated after go-live. A watcher is following it in session abacd435.
