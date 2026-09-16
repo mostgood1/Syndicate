@@ -1503,6 +1503,14 @@ death, never life — do not invert it.
 - Verification: one same-instant read per surface, per-market counts for soccer with the control population printed beside the corners count, the consumer field named, and the verdict per hypothesis recorded in `log/2026-09-16.md` before any change is proposed.
 - Blocked by: none
 
+### soccer-board-tomorrow-shortlist-collapse — OPEN — opened 2026-09-16 — session 94c55714-2ce4-43cd-ab1d-135ebfd77909
+- Goal: Name, with a production reading that discriminates, why the served board's soccer rows from the 2026-09-17 Layer 2 shortlist fell 844 -> 3 between board states 13:57:06Z and 14:20:15Z (then 1 at 14:44:40Z), while that shortlist's WNBA/NFL/NCAAF rows held or grew. A fix is in scope only once the cause is named and the user decides.
+- Files: none claimed yet (diagnostic, read-only); any file is named here before an edit.
+- Hypothesis: H1: the 09-17 shortlist was REBUILT between 13:57Z and 14:20Z from a soccer candidate pool missing its weekend inputs (per-league odds/props artifacts for 09-17..09-20 not on refresh-worker's disk, e.g. a truncated or failed `*2026-09-17*` hot-artifact pull), so soccer `per_sport.selected`/ingest `candidates` for 09-17 fell with it. H2: the pool is intact and a serve-time gate or the cards shard dropped soccer (`cards_present` < rows, or `rows_beyond_quote_age`/value-floor counts jump for soccer). H3: the rows are intact in the 09-17 shortlist and are lost in the web merge (`_layer2_fallback_recommendations` -> `dedupe_recommendation_items`), e.g. a key change that collapses them into 09-16 copies.
+- Falsification test: H1 is false if `/api/board/layer2-shortlist?date=2026-09-17` shows soccer `per_sport.selected` and ingest `candidates` near the ~1,000 level with a `written_at` after 13:57Z. H2 is false if that shortlist's soccer rows after gates (`sport=soccer&limit=2000` `total_rows`) are still in the hundreds. H3 is false if the 09-17 shortlist itself serves only a handful of soccer rows.
+- Verification: the 09-17 shortlist's soccer counts (selected, candidates, total_rows after gates, cards_present) and `written_at`, read against the served board's per-`source_board_date` soccer count at the same instant; then the named stage's own log lines or artifact on refresh-worker. Written to this lane and `state_layer2.md`.
+- Blocked by: none (web is mid-deploy for lane `web-export-timeout`; reads wait for it)
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
