@@ -6005,9 +6005,14 @@ class IntelligenceStateService:
         in this codebase."""
         try:
             from syndicate.features.intelligence import rank_candidates
-            from syndicate.features.shared.intelligence_evaluation import load_recent_evaluation_records
+            # The ranker's 14-day history. `load_recent_evaluation_records` skipped
+            # every daily chunk over 64 MB and kept whole records, so on
+            # 2026-09-16 it read 2 of 14 days (lane board-eval-reader-chunk-ceiling).
+            # This reader streams every day and keeps only the settled records'
+            # ranking fields, which bounds memory by record count, not file size.
+            from syndicate.features.shared.ranking_records import load_recent_ranking_records
 
-            evaluation_records = load_recent_evaluation_records(days=14)
+            evaluation_records = load_recent_ranking_records(days=14)
             rejected_sink: list[dict[str, Any]] = []
             ranked_rows = rank_candidates(global_pool, evaluation_records=evaluation_records, rejected_sink=rejected_sink)
             if rejected_sink:

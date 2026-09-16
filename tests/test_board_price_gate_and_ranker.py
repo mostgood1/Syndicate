@@ -101,7 +101,7 @@ class AttachAdjustedScoresTests(unittest.TestCase):
             # "c" dropped by the internal filter -- must stay un-annotated.
         ]
         with patch("syndicate.features.intelligence.rank_candidates", return_value=ranked_rows), patch(
-            "syndicate.features.shared.intelligence_evaluation.load_recent_evaluation_records", return_value=[]
+            "syndicate.features.shared.ranking_records.load_recent_ranking_records", return_value=[]
         ):
             IntelligenceStateService._attach_adjusted_scores(pool)
         self.assertEqual(pool[0]["adjusted_score"], 12.5)
@@ -116,7 +116,7 @@ class AttachAdjustedScoresTests(unittest.TestCase):
         with patch(
             "syndicate.features.intelligence.rank_candidates", side_effect=RuntimeError("boom")
         ), patch(
-            "syndicate.features.shared.intelligence_evaluation.load_recent_evaluation_records", return_value=[]
+            "syndicate.features.shared.ranking_records.load_recent_ranking_records", return_value=[]
         ):
             IntelligenceStateService._attach_adjusted_scores(pool)
         self.assertNotIn("adjusted_score", pool[0])
@@ -134,7 +134,7 @@ class AttachAdjustedScoresTests(unittest.TestCase):
             return []
 
         with patch("syndicate.features.intelligence.rank_candidates", side_effect=fake_rank_candidates), patch(
-            "syndicate.features.shared.intelligence_evaluation.load_recent_evaluation_records", return_value=[]
+            "syndicate.features.shared.ranking_records.load_recent_ranking_records", return_value=[]
         ), patch("syndicate.features.shared.shadow_candidate_ledger.record_shadow_candidates") as mocked_record:
             mocked_record.return_value = {"ok": True, "skipped": False, "sampled": 1}
             IntelligenceStateService._attach_adjusted_scores(pool, "2026-08-04")
@@ -149,7 +149,7 @@ class AttachAdjustedScoresTests(unittest.TestCase):
         with patch(
             "syndicate.features.intelligence.rank_candidates", return_value=[]
         ), patch(
-            "syndicate.features.shared.intelligence_evaluation.load_recent_evaluation_records", return_value=[]
+            "syndicate.features.shared.ranking_records.load_recent_ranking_records", return_value=[]
         ), patch("syndicate.features.shared.shadow_candidate_ledger.record_shadow_candidates") as mocked_record:
             IntelligenceStateService._attach_adjusted_scores(pool, "2026-08-04")
         mocked_record.assert_not_called()
@@ -163,7 +163,7 @@ class AttachAdjustedScoresTests(unittest.TestCase):
             return [{"candidate_id": "a", "adjusted_score": 9.0}]
 
         with patch("syndicate.features.intelligence.rank_candidates", side_effect=fake_rank_candidates), patch(
-            "syndicate.features.shared.intelligence_evaluation.load_recent_evaluation_records", return_value=[]
+            "syndicate.features.shared.ranking_records.load_recent_ranking_records", return_value=[]
         ), patch(
             "syndicate.features.shared.shadow_candidate_ledger.record_shadow_candidates",
             side_effect=RuntimeError("boom"),

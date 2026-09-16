@@ -243,14 +243,6 @@ def test_chunk_over_the_old_64mb_ceiling_is_read_by_the_new_reader_only(ledger, 
     assert "SKIP_OVERSIZED_LEDGER_CHUNK" not in capsys.readouterr().out
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "call site not yet switched: the edit to pipeline/intelligence_state.py was "
-        "BLOCKED by lane-guard (file claimed by open lane 'heavy-build-memory-refusal'). "
-        "strict=True makes this XPASS -> FAIL once it is wired, so remove the mark then."
-    ),
-)
 def test_call_site_uses_the_new_reader():
     import inspect
 
