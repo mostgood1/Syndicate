@@ -249,7 +249,11 @@ def load_recent_ranking_records(
         for chunk_path, byte_limit in plan:
             consumed = 0
             try:
-                with chunk_path.open("r", encoding="utf-8") as handle:
+                # errors="replace": one invalid byte (a torn write can split a
+                # multibyte character) must cost one unparseable LINE, not raise
+                # UnicodeDecodeError -- which is not an OSError -- out of the whole
+                # ranking attach.
+                with chunk_path.open("r", encoding="utf-8", errors="replace") as handle:
                     counters["chunks_read"] += 1
                     counters["dates_read"].append(chunk_path.stem)
                     for line in handle:

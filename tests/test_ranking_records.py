@@ -334,6 +334,19 @@ def test_parity_rank_recommendations_end_to_end(ledger, monkeypatch):
 
 # --- filter, backstop, log line -----------------------------------------------
 
+def test_an_invalid_utf8_byte_costs_one_line_not_the_whole_read(ledger):
+    # A torn write can split a multibyte character. Under strict decoding that raises
+    # UnicodeDecodeError (not an OSError) and would fail the entire ranking attach.
+    chunk = _write_chunk(ledger, _today(), [{"recommendation_id": "a", "result": "win"}])
+    with chunk.open("ab") as handle:
+        handle.write(b'{"recommendation_id": "torn", "result": "win", "note": "\xe2\x82"}\n')
+        handle.write(json.dumps({"recommendation_id": "b", "result": "loss"}).encode("utf-8") + b"\n")
+    stats: dict = {}
+    kept = rr.load_recent_ranking_records(days=14, ledger_path=ledger, stats=stats)
+    assert [r["recommendation_id"] for r in kept if r["recommendation_id"] != "torn"] == ["a", "b"]
+    assert stats["lines_seen"] == 3
+
+
 def test_only_settled_records_are_kept(ledger):
     rows = [
         {"recommendation_id": "w", "result": "win"},
