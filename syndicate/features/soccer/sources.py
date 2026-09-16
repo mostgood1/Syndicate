@@ -967,6 +967,29 @@ def team_by_name(league: str, team_name: str) -> dict[str, Any] | None:
         team = index.get(variant)
         if team is not None:
             return team
+    # A SHORT NAME THE BRANDING CSV DOES NOT CARRY, which the shared alias map
+    # already resolves. Measured 2026-09-16 on the production chip feed: ESPN
+    # sends Deportivo La Coruna as `Deportivo`; the la_liga CSV lists only
+    # `Deportivo La Coruña` (`DEP`), so this lookup missed and `cards._abbr`
+    # minted `Deportiv` -- served on the Layer 2 chip beside `SEV`, and the
+    # reason the rail's abbr matchup (`SEV @ Deportiv`) could not meet the
+    # board's (`SEV @ DEP`). The chip's own `key` was right all along
+    # (`deportivo la coruña`): `game_chip_scoreboard` asks `canonical_team`,
+    # and this directory never did.
+    #
+    # LAST, and INSIDE THE LEAGUE. Every spelling above still wins, so no
+    # existing hit can change. The alias map is sport-wide -- `Athletic`
+    # resolves to Charlton Athletic -- so its answer is only accepted when this
+    # league's own index holds that club; a name that resolves to another
+    # league's club still returns None.
+    from syndicate.features.shared.team_aliases import canonical_team
+
+    canonical = canonical_team("soccer", team_name)
+    if canonical:
+        for variant in _team_key_variants(canonical, loose=False):
+            team = index.get(variant)
+            if team is not None:
+                return team
     return None
 
 
