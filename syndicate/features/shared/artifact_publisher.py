@@ -2843,7 +2843,30 @@ def _pull_watermark_after(
     return resume
 
 
-def pull_hot_artifacts(*, date_str: str | None = None, timeout_seconds: int = 30) -> int:
+# 90 s, raised from 30 s on 2026-09-16 (lane `web-export-timeout`, user decision).
+#
+# MEASURED on production that afternoon: refresh-worker's dated pulls timed out
+# 10 of 12 between 15:46Z and 16:27Z, leaving tomorrow's board artifacts stuck at a
+# 15:11:37Z floor. On the exact failing request, web's directory WALK ALONE
+# (`names_only=1`, no bodies) took 54.20 s and 78.86 s; with the walk fast, the
+# whole export took 16.33-16.56 s at either budget. So the cost is the walk, and
+# its distribution now straddles 30 s far more often than it did at 03:40Z
+# (13.10-38.13 s). The slowest single request measured was 91.51 s.
+#
+# SAFE WITH RESPECT TO SKIPPING, which it was not before: a longer timeout lets
+# more large windows complete, and a large window can truncate -- but the pull
+# now records the server's `next_since` cursor instead of its start time, so a
+# truncation re-reads the tail rather than losing it.
+#
+# NOT for the live-lens loop. `live_lens_loop._live_lens_background_loop` calls
+# this INLINE before each ~60 s tick, and passes `timeout_seconds=30` explicitly:
+# at 90 s two slow date patterns could hold the tick back three minutes and stale
+# the soccer live aggregate the Layer 2 chips read. refresh-worker's board build
+# takes the default; `tests/test_pull_timeout_scope.py` pins both.
+_BOARD_PULL_TIMEOUT_SECONDS = 90
+
+
+def pull_hot_artifacts(*, date_str: str | None = None, timeout_seconds: int = _BOARD_PULL_TIMEOUT_SECONDS) -> int:
     """Best-effort pull of hot artifacts from the web service's disk onto
     this process's own disk.
 
