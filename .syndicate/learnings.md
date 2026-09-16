@@ -6410,3 +6410,34 @@ The rule above says to verify a land by the commit rather than the push line, an
 - **How to apply:** a test whose fixture is hand-written asserts that the CODE agrees with the FIXTURE. To make it assert anything about production, the fixture's field names must come from the writer — cite the writing line — or the test must run the writer. When a suite declares a test load-bearing, check what its fixture is made of before trusting the claim; and when you fix a name like this, do NOT keep the old one as a fallback, because a reader that accepts both preserves exactly the ambiguity that hid it.
 - Same family as *a fixture can pick a cheaper path than production* and *presence is not reachability*: the instrument was measuring itself.
 - *(evidence: `test_a_live_score_change_invalidates` FAILS with the fingerprint reverted to `home_score` against the corrected fixture, passes with `score_home`; `.syndicate/log/2026-09-15.md`, commit `116690a8`)*
+
+## 2026-09-15 -- A FALSIFIER IN THE WRONG UNIT KILLS A LIVE HYPOTHESIS, and the retraction looks rigorous while it happens
+
+Lane `polymarket-rejected-resubmit-loop` wrote: "H2 (insufficient buying power) dies if the account's available balance covered $1.60 at a
+rejected submit." It did -- flat at $2.84 across all 34 rejections -- so I recorded H2 as DEAD BY ITS OWN FALSIFIER, which is the strongest
+form of retraction this ledger has.
+
+**H2 was right.** The venue checks a NO order against $1.00 per contract, so the number that had to be covered was $6.53, not $1.60. The
+falsifier was written in NET dollars against a venue that checks GROSS. Everything downstream was correct reasoning on the wrong unit, and
+the error was invisible precisely BECAUSE the falsifier fired cleanly.
+
+- **STANDING RULE: a falsifier must name its UNIT, not just its threshold.** "balance covered the stake" is not a test until "stake" is
+  pinned to cost, notional, payout or margin. Where a venue or API could plausibly mean a different one, write the falsifier for EACH and
+  say which reading kills the hypothesis.
+- A hypothesis killed by its own falsifier deserves the same scepticism as one confirmed by its own prediction. Both are self-graded.
+- Same family as *read the field you already have* and *a rate, not a count*: the arithmetic was never wrong, the denominator was.
+- *(evidence: `.syndicate/state_polymarket.md [polymarket-no-fill-size-is-gross-capped]`; commits `ce64e639` -> `16c7d919` -> `a8668557`,
+  which are the overclaim, the over-retraction, and the table that settled it)*
+
+## 2026-09-15 -- `finishedAt` IS NOT WHEN THE OLD INSTANCE STOPS WRITING
+
+Lane `legacy-steam-crossing-delta` measured soccer steam events **38 s AFTER its deploy went live** that were still written by the OUTGOING
+instance, in the old format. A post-deploy window that starts at `finishedAt` therefore contains old-code output at its head.
+
+- **STANDING RULE: when a reading starts at `finishedAt`, discard or separately label the first minute** -- an old-format line there is
+  evidence of an overlap, not of a failed fix. Gate the verdict on lines comfortably after the boundary.
+- The inverse error is worse: crediting the NEW code with output the OLD instance produced. That lane retracted an attribution for exactly
+  this reason -- its 200 events were stamped 66 s after a second service's deploy, so they could not identify which service wrote them.
+- Extends *gate verification on artifact mtime*: deploy live is not code live, and code live is not old code STOPPED.
+- *(evidence: cross-session reports from lane `legacy-steam-crossing-delta`, 2026-09-15 ~23:35Z and its retraction ~23:55Z;
+  `.syndicate/log/2026-09-15.md`)*
