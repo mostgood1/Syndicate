@@ -1298,8 +1298,9 @@ death, never life — do not invert it.
 - Files: `tests/_artifact_isolation.py`, `tests/test_archives.py` (an import at the top only). Declared 2026-09-16 ~19:35Z before any edit; unclaimed on origin/main and in the primary tree.
 - Blocked by: none. Tests only; no deploy.
 
-### chip-key-test-no-data-blind — OPEN — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+### chip-key-test-no-data-blind — CLOSED 2026-09-16 — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
 - Goal: `tests/test_chip_canonical_join_key.py` can no longer PASS when the soccer team artifacts are absent: with no alias map it SKIPS with a stated reason, and with the map present it asserts a real, non-None canonical club for both spellings.
+- **GOAL: MET** (`f9040bb3`). Data-less worktree: 4 passed, 2 SKIPPED with the stated reason; with the primary tree's `data/`: 6 passed; mutation (map present, `canonical_team` -> None): both data tests FAIL.
 - Files:
   - `tests/test_chip_canonical_join_key.py`
 - Why: measured 2026-09-16 (`log/2026-09-16.md` ~14:40 CT): in a session worktree (no `data/`), `canonical_team("soccer", ...)` is None for every club, so `test_the_two_spellings_that_broke_the_cards_resolve_to_one_name` passes on `None == None` and `test_the_chip_side_and_the_row_side_agree` fails. With the primary tree's data both resolve (`athletic club`), and production keys 203 of 203 soccer chips. Test hygiene only; no runtime change.
