@@ -6603,3 +6603,19 @@ A float timestamp formatted to six decimals looks precise enough for a `>=` boun
 - **It read as the fix failing.** The skip was produced by my PROBE, while the production client — which writes the exact repr — was fine. A verification instrument that rounds can manufacture the very defect it is checking for.
 - **How to apply:** carry epoch floats as `repr()` / `str()`, never `:.Nf`, whenever they cross a boundary comparison. On the receiving side, compare with a tolerance sized to the coarsest rounding a caller might apply (`12cbe434` uses 1 ms), so a rounded cursor RE-SENDS rather than SKIPS. When a boundary read comes back short, check each boundary value's rounding direction before concluding the code is wrong.
 - *(evidence: `deploys.md` 2026-09-16 14:32:33Z and 14:56:00Z; `tests/test_artifact_export_oversize.py::ArtifactExportRoundedCursorTests`)*
+
+### 2026-09-16 (session 30234b9d, lane `wnba-future-date-cache-carry`) — FORBIDDEN: running reproduction variants in one process through a builder with a process-local cache
+
+A reproduction script ran three data-root variants back to back through `build_live_state_payload`. All three read 0 games, which would have FALSIFIED a true hypothesis.
+
+- The builder wraps `_build_cards_page_context_uncached` in `_BUILD_CARDS_PAGE_CONTEXT_CACHE` (12 s TTL, keyed on date and flags, not on the data). The first variant's empty context answered the next two. The tell was in hand: the uncached builder was never entered for variants 2 and 3.
+- With the cache cleared per run, the only-real-slates variant returned the four phantom games. The same call made directly on `_build_cards_page_context_uncached` had shown 4 all along.
+- **How to apply:** before comparing variants in one interpreter, list every module-level cache on the path (`*_CACHE`, `lru_cache`, `.cache_clear`) and clear each per run. Confirm the branch ran for EVERY variant (a stage marker or a call log), not only the first. A null from a cached path is instrument silence, and `learnings.md` already requires a live population behind a null.
+
+### 2026-09-16 (session 30234b9d, lane `wnba-future-date-cache-carry`) — OVERTURNED: "the Goal's named readings cover the seed"
+
+The 09-16 reading passed all three criteria the Goal named (0 WNBA chips, Layer 2 `no_slate`, no `dashboard_games=4` line), while the Goal's own core clause, "seeds NO prior-slate games under that day's `live_state` key", FAILED: the key held 4 phantom FINALs.
+
+- The named readings were CONSUMERS that filter (the chips reader drops the rows) and ONE emitter of ONE seed path. The key itself, the only reading that discriminates between seeds, was not in the list; the scheduled task read it only as an extra step.
+- **How to apply:** when a Goal says "X is not written", its verification must read X (the stored artifact or key) directly, alongside any downstream surface. A clean consumer or a silent log line from a known writer does not exclude an unknown writer.
+- *(evidence: `deploys.md` 2026-09-16 14:14Z; the seed was a future-date build at 04:31:02Z, fixed in `02684624`)*
