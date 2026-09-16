@@ -139,7 +139,7 @@ class TestTheResolverGate:
 
     Measured precondition that forced this: `no_model_edge_pct` does NOT keep
     soccer out of positions -- 4 soccer positions in the 7 days to 2026-09-01,
-    soccer absent from `DEFAULT_EXCLUDED_FAMILIES`, `SYNDICATE_EXECUTION_ENABLED=1`.
+    soccer absent from `DEFAULT_EXCLUDED_FAMILIES` (since removed), `SYNDICATE_EXECUTION_ENABLED=1`.
     """
 
     @staticmethod

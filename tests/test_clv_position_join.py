@@ -249,13 +249,6 @@ def test_report_line_names_every_counter_that_would_trigger_action():
 
 def test_commit_portfolio_stamps_a_key_that_matches_the_ledgers_own(monkeypatch):
     """The stamp and the ledger must agree on the SAME row, or Stage C is dead."""
-    # POLICY-INDEPENDENT ON PURPOSE. This test NEEDS a prop row -- the player
-    # component of the opening key is precisely what it checks -- and `#615`
-    # added a sport-scoped family exclusion defaulting to `mlb:player_prop`,
-    # which refuses the fixture before it can be sized. Pinning the knob keeps
-    # the prop fixture and the subject both intact; swapping in a game line
-    # would leave the player component untested.
-    monkeypatch.setenv("SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES", "")
     from syndicate.features.shared.portfolio_commit import commit_portfolio
 
     row = _row(
@@ -279,13 +272,6 @@ def test_a_committed_plan_joins_to_the_openings_recorded_from_the_same_rows(monk
     that a plan committed from a board and the openings recorded from that same
     board actually meet.
     """
-    # POLICY-INDEPENDENT ON PURPOSE. This test NEEDS a prop row -- the player
-    # component of the opening key is precisely what it checks -- and `#615`
-    # added a sport-scoped family exclusion defaulting to `mlb:player_prop`,
-    # which refuses the fixture before it can be sized. Pinning the knob keeps
-    # the prop fixture and the subject both intact; swapping in a game line
-    # would leave the player component untested.
-    monkeypatch.setenv("SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES", "")
     from syndicate.features.shared.portfolio_commit import commit_portfolio
 
     rows = [

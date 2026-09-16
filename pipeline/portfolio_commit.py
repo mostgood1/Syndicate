@@ -1110,8 +1110,8 @@ def _resolvers_from_markets(markets, selected_date: str | None = None):
     # prediction rather than a precaution. I expected `no_model_edge_pct` to
     # keep soccer out of positions on its own. **It does not:** `/api/portfolio
     # /paper` shows **4 soccer positions in the 7 days to 2026-09-01**
-    # (08-26/28/29/30), soccer is NOT in `DEFAULT_EXCLUDED_FAMILIES`
-    # (`mlb:player_prop` only), `SYNDICATE_EXECUTION_ENABLED=1` and soccer is in
+    # (08-26/28/29/30), soccer was NOT in `DEFAULT_EXCLUDED_FAMILIES`
+    # (`mlb:player_prop` only; removed 2026-09-16), `SYNDICATE_EXECUTION_ENABLED=1` and soccer is in
     # `SYNDICATE_ACTIVE_SPORTS`. So widening the join without this would have
     # added 918 markets of a sport whose model is recorded as NOT beating the
     # market (`soccer-model-dispersion`: worse than market in 8 of 9 leagues) to
