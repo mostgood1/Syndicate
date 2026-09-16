@@ -4294,6 +4294,18 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         # separately, so it can never disagree with them.
         considered = scoped_in + sum(int(v or 0) for v in scope_refusals.values())
         no_view = int(venue_refusals.get("no_model_edge_pct", 0) or 0)
+        # "THE MODEL HAS A VIEW ON N" IS COUNTED ON THE ROWS, NOT INFERRED FROM A REFUSAL.
+        # rows_in minus `no_model_edge_pct` was exact only while every row with no sim edge
+        # was refused for that reason. EV-only staking (user decision 2026-09-16) sizes such
+        # rows, so the inference would call them viewed. The plan's own `sim_coverage` is
+        # counted row by row (`portfolio_commit`, 2026-09-16); an older plan without it keeps
+        # the old derivation.
+        rows_with_sim_edge = ((venue_plan or {}).get("sim_coverage") or {}).get("rows_with_sim_edge")
+        sim_view_on = (
+            int(rows_with_sim_edge)
+            if isinstance(rows_with_sim_edge, int) and not isinstance(rows_with_sim_edge, bool)
+            else max(scoped_in - no_view, 0)
+        )
         paper2.append(
             {
                 "venue": venue,
@@ -4308,7 +4320,7 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
                 # constraint -- Kalshi quoted 47 rows and the model had a view on
                 # 12 of them. A venue that quotes plenty of markets the sim has
                 # no opinion about is not a venue this system can trade.
-                "sim_view_on": max(scoped_in - no_view, 0),
+                "sim_view_on": sim_view_on,
                 "scope_refusals": scope_refusals,
                 "refusals": venue_refusals,
                 "rows": (venue_plan or {}).get("positions") or [],

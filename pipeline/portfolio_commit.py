@@ -1605,7 +1605,9 @@ def run_portfolio_commit(
                 # THE NUMBER THAT DECIDES STAGE D, on the line rather than
                 # inferred: how many of the venue's own quoted rows the model
                 # has any view on at all. Kalshi measured 12 of 47.
-                f"sim_view_on={len(scoped) - int(venue_refusals.get('no_model_edge_pct', 0) or 0)}"
+                # Counted on the rows (`sim_coverage`), not inferred from the refusal: EV-only
+                # staking sizes rows with no sim edge (2026-09-16). Same rule as the paper page.
+                f"sim_view_on={(venue_plan.get('sim_coverage') or {}).get('rows_with_sim_edge', len(scoped) - int(venue_refusals.get('no_model_edge_pct', 0) or 0))}"
                 f"/{len(scoped)} "
                 # How many rows were priced from the VENUE rather than the
                 # aggregator -- the difference between a real coverage number

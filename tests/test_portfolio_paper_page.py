@@ -391,6 +391,26 @@ def test_paper2_coverage_is_derived_from_the_refusals(paper2_env):
     assert p2["venue_not_quoting"] == 1460
 
 
+def test_paper2_sim_view_on_reads_the_plans_on_row_count_not_the_refusal(paper2_env):
+    """EV-only staking (user decision 2026-09-16) sizes rows that have no sim edge, so they
+    are no longer refused `no_model_edge_pct`. Deriving "the model has a view on N" as
+    rows_in minus that refusal then counts every such row as viewed. The plan's own
+    `sim_coverage` is counted ON THE ROWS (`portfolio_commit`, 2026-09-16) and is the
+    number this cell means."""
+    paper2_env["plan"] = _venue_plan(
+        sim_coverage={"rows_in": 40, "rows_with_sim_edge": 12, "rows_without_sim_edge": 28,
+                      "share_with_sim_edge": 0.3},
+    )
+    p2 = _payload(paper2_env)["paper2"][0]
+    assert p2["sim_view_on"] == 12
+
+
+def test_paper2_sim_view_on_falls_back_for_a_plan_written_before_sim_coverage(paper2_env):
+    paper2_env["plan"] = _venue_plan(refusals={"no_model_edge_pct": 30, "below_min_ev_pct": 6})
+    p2 = _payload(paper2_env)["paper2"][0]
+    assert p2["sim_view_on"] == 10
+
+
 def test_paper2_absent_degrades_to_not_running(paper2_env):
     p2 = _payload(paper2_env)["paper2"][0]
     assert p2["plan_present"] is False
