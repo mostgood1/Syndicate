@@ -239,35 +239,35 @@ is IMPORTED from the board's own `_layer2_board_columns`, never recopied — the
 board attaches the verdict to `shortlist["cards"]` while the commit path prices
 `shortlist["rows"]`, so there is nothing to read it off.
 
-**THE LOAD-BEARING FACT, and it is about the GATE rather than the field.**
-`contradicts`, **`live_contradicts`**, `unpriced` and `none` — **FOUR of the
-nine verdicts, not three** `[count corrected 2026-09-03 in the same lane; the
-first record missed `live_contradicts`, which sits in the same branch]` — are
-all computed where `model_edge_pct is None`, and `sizing_inputs_from_row`
-refuses that row by name (`no_model_edge_pct`) before anything is sized, **at
-every ev_pct**. Measured by running the real `commit_portfolio` over one row per
-verdict class:
-
-    agrees     PLACED     contradicts  REFUSED  no_model_edge_pct
-    neutral    PLACED     unpriced     REFUSED  no_model_edge_pct
-    disagrees  PLACED*    none         REFUSED  no_model_edge_pct
-
-The nine verdicts fall into three classes, and the middle one is the
-dangerous one because its buckets FILL UP and look like a fair sample:
+**THE LOAD-BEARING FACT, and it is about the ROW rather than the field** `[rewritten 2026-09-16, lane sim-view-reachability-caveat]`.
+`contradicts`, `live_contradicts`, `unpriced` and `none` (FOUR of the nine
+verdicts) are all computed where `model_edge_pct is None`. So an order carrying
+one of them was sized on MARKET FAIR, never on the sim's edge. The row is
+refused `no_model_edge_pct` unless its sport is on
+`SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS`, and refused `in_play_market_fair` in
+play:
 
     ALWAYS REACHABLE (3)      agrees, live_agrees, neutral
     EV-CONDITIONED   (2)      disagrees, live_disagrees  -- placeable only when
                               the EV outruns the disagreement
-    UNREACHABLE      (4)      contradicts, live_contradicts, unpriced, none
+    MARKET-FAIR ONLY (4)      contradicts, live_contradicts, unpriced, none
 
-**So a STORED order can only ever carry `agrees`, `disagrees`, `neutral` or a
-`live_` form — and the `contradicts`-vs-`agrees` ROI split that
-`layer2-sim-disagrees` pre-registered has a denominator that is structurally
-zero and stays zero however long the ledger runs.** Persisting the field was
-NECESSARY AND IS NOT SUFFICIENT. Corroborated on production the same day:
-`/api/portfolio/paper` served 41 orders — mlb 29, soccer 12, **no NCAAF**, which
-is where the contradictions live. Pinned by
-`test_a_contradicted_row_still_cannot_become_an_order`.
+**These buckets FILL.** Paper ledger for 2026-09-16..17, read 22:46:11Z:
+contradicts 38, none 159, unpriced 131, against agrees 130 and disagrees 4.
+`contradicts`-vs-`agrees` settled ROI can therefore be taken, but it compares
+SIZING BASIS as well as verdict: one bets price dispersion while the sim points
+the other way, the other bets the sim's edge. Each bucket on
+`/api/ops/execution/ledger-summary` carries `market_fair_only` (web
+`c49ecd3d`). Pinned in BOTH allowlist states by
+`test_a_contradicted_row_becomes_an_order_only_on_market_fair` and
+`test_the_market_fair_only_set_is_exactly_the_rows_with_no_sim_edge`.
+
+HISTORY, superseded: on 2026-09-03, with no sport allowlisted, all four were
+refused at every ev_pct and the payload called the buckets "structurally empty
+and stay empty". That became false when the allowlist named `ncaaf`
+(2026-09-04) and all eight sports (2026-09-16). The tests pinning it read the
+env implicitly and CI leaves it absent, so they stayed green; with production's
+value they failed.
 
 **\* `disagrees` IS REACHABLE BUT CENSORED, and the censoring is not random.**
 The stake gates admit a disagreement only when the EV outruns it. Measured
@@ -303,10 +303,12 @@ emits counters, money sums and three label strings, and reads only `sport`,
 serialised response — no ticker, key, price, position key, event id or player
 name survives.
 
-`verdict_reachability` travels IN the payload, because four buckets are empty by
-construction and two more are EV-selected, and a reader without that reads the
-gap as a broken join. **That claim is re-derived from the live commit gate at
-three EVs by a test**, so it cannot go stale silently.
+`verdict_reachability` travels IN the payload: four verdicts hold only
+market-fair-sized orders (`market_fair_only`, flagged on every bucket since web
+`c49ecd3d`), two more are EV-selected, and pre-`cb223b62` orders are
+`(unrecorded)`. The market-fair claim is re-derived from the commit gate with
+the allowlist env SET in both states. The earlier test that read the env
+implicitly is how "empty by construction" outlived its truth by 12 days.
 
 Size cost, since `_LEAN_FIELDS` bounds a document two services
 read-modify-write: +74 B/record, **+361 KB at the 5,000-record ceiling**, where
