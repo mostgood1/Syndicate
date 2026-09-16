@@ -36854,3 +36854,29 @@ Scheduled task `full-slate-memory-reading-0915`. Read-only on production: no dep
 - **D2 leg (b) MET, and discriminating:** `sim_coverage.rows_without_sim_edge` **2323** against `refusals.no_model_edge_pct` **1831** on the same plan. The old refusal-derived count would have read 1831; the extra 492 are rows with no sim edge that were sized on market fair (NCAAF) or refused for another reason, which only the on-rows count (`9c98fd8f`) can see.
 - D2 leg (a) not gradable while the market-fair allowlist is `ncaaf` (by revert). Leg (c): no `KALSHI_SOCCER_RESOLVERS` line yet since 18:13:18Z, still owed.
 - **Fix forward landed, not deployed:** `14beb848` (checklist refusal contract follows the allowlist; 4 of 6 new tests RED on the old checklist; in-process run WITH the all-sports env exits 0). Per the agreed refresh-worker queue it deploys LAST, cumulative on main's tip: D3 first, then lanes `web-export-timeout` and `board-eval-reader-chunk-ceiling`, then the D2 redo.
+
+## 2026-09-16 18:37:13Z (13:37 CT) — READING — live-odds-worker `cc141267` — lane legacy-steam-crossing-delta — **soccer steam PASS: 154 crossing rows written after the fix, 154 record the cents move, 0 the raw difference; 0 rows with `line_delta` where the line is the price**
+- **Instrument:** `GET /api/ops/steam/events?sport=<slug>&date=<d>` with the admin token (401 without it, read at the same time), 8 sports × 2026-09-16 and 2026-09-17. Filter: event `timestamp` at or after 2026-09-15T23:27:50Z (when `cc141267` went live). Scheduled task `soccer-steam-cents-reading-0916`, running for session a0a81858's lane.
+- **Writer, read before judging (Render deploys API, ~18:38Z):** live-odds-worker's live commit is now `09c3e44a` (finishedAt 14:45:18Z, no newer deploy), which succeeds `cc141267`. Web is `e6b4bb94`, refresh-worker `9c98fd8f`. `git merge-base --is-ancestor ca80edf0` is true for all three. Both soccer windows below were written after 14:45Z, so the code that wrote them is `09c3e44a`, not `cc141267`. Both contain the fix.
+- **Window:** each record holds the writer's newest 200 events, all stamped with one batch time. That makes this a window of two batches, not a day.
+  - soccer 09-16: 200 events at 2026-09-16T13:36:47-05:00 (18:36:47Z).
+  - soccer 09-17: 200 events at 2026-09-16T11:04:06-05:00 (16:04:06Z).
+  - All 400 are after the cutoff. That clears the 20-event floor.
+- **Counts, soccer (400):**
+
+  | window | crossing ±100 | cents move recorded | RAW recorded | other | non-crossing (recorded == price - prev) | `line_delta` None |
+  |---|---|---|---|---|---|---|
+  | 09-16 | 69 | **69** | **0** | 0 | 131 | 41 |
+  | 09-17 | 85 | **85** | **0** | 0 | 115 | 0 |
+
+  - The 41 rows with `line_delta` None are exactly the 24 Last Goalscorer + 17 First Goalscorer rows. These markets have no line, and they are the ones H2 used to fire on.
+  - 0 rows carry a `line_delta` whose line equals the price (checked on both `previous_line` vs `previous_odds` and `line` vs `price`).
+  - Every classified event is `real` under the script's cents-scale split: 0 `only_crossing`, 0 `only_price_as_line`, 0 `real_display_inflated`.
+- **Example crossing rows (prev -> price: recorded / cents / raw):**
+  - Shots, Agustín Ojeda: +260 -> -800: -860 / -860 / -1060
+  - Shots, Alonso Martínez: -200 -> +105: +105 / +105 / +305
+  - Shots, Paulo Dybala: -185 -> +135: +120 / +120 / +320
+  - Shots, Petar Sucic: +700 -> -260: -760 / -760 / -960
+- **Control, same read:** mlb 09-16, 200 events at 18:35:32Z. 24 crossing rows, all 24 record the cents move (-105 -> +175 recorded +80, raw +280), and 0 rows have line == price. Every other sport on both dates: 0 events.
+- **Verdict:** the soccer half of the lane's verification is MET. With the 2026-09-15 readings (web board 44/44 crossings on the cents scale at 22:30:55Z, and 66/66 MLB steam crossings at 23:35:40Z), all three verify legs are met. The lane is CLOSED.
+- **Not measured:** whether steam is predictive. The implied-probability threshold re-base is still deferred, per the lane's scope boundary. The per-book duplicate events also remain unexplained.
