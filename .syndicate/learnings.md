@@ -6545,3 +6545,12 @@ I told the user, and wrote into commit `259691fc`'s message, that lane `book-quo
 The tell is cheap and should be habit: print the matched line's timestamp next to the count. The phantom's timestamp rendered as `#`.
 
 **How to apply.** Filter to lines that ARE log lines — a `^\d{4}-\d{2}-\d{2}T` match — not merely lines containing the pattern. This generalises past this one tool: any wrapper that echoes its own query (grep with a banner, a paging tool that prints the window it covered) puts its parameters into the output stream it is filtering. Related: [[feedback_instrument_blindness]] — a healthy reading is evidence only once you know what makes it read unhealthy; here the unhealthy reading was unreachable, because the count could not go below 1.
+
+### 2026-09-16 (session a1e40980, lane `web-export-timeout`) — FORBIDDEN: predicting a fix's effect from an inventory bucketed at a DIFFERENT boundary than the fix uses
+
+I predicted `truncated: false` after deploying an 8 MB per-file cap, reasoning that the files which were not giant accumulators came to 11.1 MB against a 24 MB budget. Web answered `truncated: true` at 22.35 MB, and refresh-worker truncated at 77 files with **zero** files over the cap.
+
+- The 11.1 MB was **files under 1 MB** — the bucket my inventory script happened to print. The fix's boundary was **8 MB**. Everything between 1 and 8 MB was in neither number, and it was enough to fill the budget on its own.
+- The prediction was registered at preflight and graded wrong, which is the protocol working. What it cost was one confident sentence to the user ("truncation becomes rare") that the measurement then contradicted.
+- **How to apply:** before predicting a threshold change, compute the population at the threshold the change actually uses — `sum(size for size in sizes if size <= CAP)` — not at whatever boundary an earlier report printed. If the only number to hand is bucketed elsewhere, say the prediction is unbounded rather than borrowing it.
+- *(evidence: `deploys.md` 2026-09-16 04:01:38Z and 05:01:10Z)*
