@@ -36326,3 +36326,15 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0915`, ta
 - **If you take the tip and carry them, tell me and I will own the verify reading** and record them as ride-alongs in this lane's entry, as the other soccer lanes did for me tonight. The reading: appeared non-GK rows in the four ESPN leagues' recommendations artifacts generated after your live time, share priced exactly 0.0 goes to 0.
 
 Told directly: lane `legacy-steam-crossing-delta` / Layer 2 board styling (session a0a81858), 23:47Z. NOT told directly: `book-quotes-splice-repair` / `execution-ledger-live-trim` (local_d77a58da) — the cross-session message was refused by the anti-loop guard after 10 messages, which is why this notice exists here.
+
+## 2026-09-16 00:06:42Z (2026-09-15 19:06 CT) — READING on the 23:27:31Z refresh-worker `61ac543a` deploy — lane execution-ledger-live-trim — **THE MECHANISM IS CONFIRMED ON PRODUCTION: 21 trims, 21 paper rows, 0 live rows dropped. The GOAL is still NOT MET, because it asks for a full day.**
+- **THE READING.** `trim_watch.py refresh-worker dep-dakt8olbedkc73d1n9c0`, rounds from 23:35:40Z:
+  - 23:35:40Z .. 00:01:0xZ: `TRIMMED` **0** — no new order row had been added yet (see the note in the deploy entry: both counters fire only when a write pushes the count above the cap).
+  - **00:06:42Z: `TRIMMED` 21, `dropped_by_mode={'paper': 21}`, `LEDGER_OVER_CAP_PROTECTED` 0, served live rows 177.**
+  - **Every dropped row was paper. Not one live row was dropped.** On the old code those same 21 trims took the oldest rows regardless of mode, which is exactly how 20 Polymarket and 10 Kalshi live fills were lost.
+  - The served live-row count was **177 on all six reads** across both workers, never once below the 177 baseline.
+  - Cross-check that makes 177 more than a stable number: the LEDGER's own live count is **128 Kalshi + 49 Polymarket = 177**, equal to what the book serves. The two agree, so nothing live is being dropped and hidden by a reader.
+- **The prediction in the preflight was `trimmed_lines_carry_dropped_by_mode=paper_only` and `served_live_rows=never_below_177`. Both hold.**
+- **WHY THIS IS NOT `GOAL: MET`.** The lane's goal says `every TRIMMED line carries live_dropped=0 ACROSS A FULL DAY`. This is 31 minutes and one burst of 21. What is left is DURATION, not doubt — and one real coverage gap:
+  - **live-odds-worker has NO population.** 9 rounds, 23:29:56Z to 00:10:30Z, `TRIMMED` 0 every time, so its trim path is UNMEASURED there. It runs the identical commit (`cc141267` contains `a2a1fa32`) and its live-row guard held, but the code has not been SEEN to trim on that service. A null with no population is not a pass — `learnings.md` has this rule twice.
+- **Left owed:** a full-day read on refresh-worker, and one `TRIMMED` line on live-odds-worker. Neither blocks anything; both are reads.
