@@ -6526,3 +6526,14 @@ while the thing that retires them lands in `deploys.md`, in an env var, or in a 
 - Same family as the `state.md` rule "overwrite the stale line; do not stack contradictory lines" -- this is that failure in `lanes.md`.
 - *(evidence: `SYNDICATE_ENABLE_LIVE_LENS_LOOP` single-key GET 2026-09-16 03:28Z -- refresh-worker OFF, live-odds-worker ON, web absent;
   `deploys.md` "User decision ~01:30Z"; `57b67127` an ancestor of all three live SHAs)*
+
+### 2026-09-16 (session a1e40980, lane `web-export-timeout`) — FORBIDDEN: reporting a lane UNPROTECTED from a checking loop that re-queries a GENERATOR
+
+I told the user, and wrote into commit `259691fc`'s message, that lane `book-quotes-splice-repair` was unprotected on three files because the claim parser read them as UNCLAIMED. **All three were claimed, before and after. The defect was in my check.**
+
+- `lane_claims._claims(text)` returns a **generator**. My loop did `for f in files: holders = {lane for lane, path in claims if path == f}` against one `claims` object. The FIRST iteration drained it; every file after the first saw an empty iterable and reported `UNCLAIMED`.
+- It was self-consistently wrong, which is why it passed review: ops.py (queried first) came back with a real holder, so the output looked like a working instrument that had found three genuinely unprotected files. The one true row made the three false ones credible.
+- It survived a BEFORE/AFTER comparison too — I ran it against `origin/main` and against my edit and got the same three UNCLAIMED, and read that stability as confirmation. Both runs shared the bug, so the comparison could only ever agree with itself. A diff between two readings of the same broken instrument is not a control.
+- **How to apply:** materialise before querying — `claims = list(_claims(text))` — and whenever a check reports something ABSENT, re-read one known-present case LAST rather than first. The ordering matters: a drained iterator always makes the earliest query look healthy. Before publishing "lane X is unprotected", "artifact Y is missing" or "nobody reads Z", re-run the check with the order reversed; if the answer moves, the instrument is the finding.
+- Same family as *a rate, not a count* and *instrument blindness*: the reading was about my probe, not the population. The cost here was a false public statement about another session's lane, which is the kind of thing that gets someone's files taken out from under them.
+- *(evidence: `list(_claims(...))` at `3169bdeb` returns `book-quotes-splice-repair` for all three files; the retraction is in `lanes.md` under lane `web-export-timeout`)*

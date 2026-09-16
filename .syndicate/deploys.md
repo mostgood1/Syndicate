@@ -36561,3 +36561,23 @@ Scheduled task `full-slate-memory-reading-0915`. Read-only on production: no dep
 - **What that line is worth:** the SAME pull, before today, logged `PULL_OK artifacts_received=20` and nothing else — while **265.1 MB across 4 files was being skipped**, invisibly. The largest is `book_quotes` at **133.7 MB**, which has grown 7.2 MB since the 03:40Z inventory measured it at 126.5 MB. That is the defect this lane opened for, now readable in one line.
 - **`truncated=False` on this service, and that is the cap working rather than a weaker reading.** live-odds-worker pulls every ~2-3 minutes, so its window is small; with the four accumulators deferred to the stream transport the remainder fits inside the 24 MB budget and nothing is dropped at all. Web's own 30-minute-window probe still truncates (`deploys.md` 04:01:38Z) — the budget binds on the LONGER window, which is refresh-worker's.
 - **refresh-worker is NOT deployed in this entry.** Its claim is held by lane `heavy-build-child-process` (session 0f5b256e), and preflight showed an MLB daily sim with two children in flight. Not forced: the preflight's own evidence test for a live holder — a RUNNING CHILD under the service — was positive. Waiting on the TTL and a quiet window; its entry follows.
+
+## 2026-09-16 05:01:10Z (00:01 CT) — refresh-worker `0d3cea8f` -> `5abc20f3` (main tip) — lane web-export-timeout — **the pull logging on the service where the budget actually binds**
+
+- **Live 05:06:56Z**, `dep-dal255mk1f9s73de6c9g`, trigger=api. Locks: claim acquired 05:00:5xZ after the previous holder's TTL lapsed; preflight **CLEAR at 05:01:0xZ** for this exact SHA (worker plus multiprocessing infra, no JOB). Claim released 05:07Z.
+- **Carries** (`0d3cea8f..5abc20f3`, code only): `a347c4ea` (this fix), plus ride-alongs `1ddb5854` and `5abc20f3` (lane `soccer-espn-window`: ESPN window validation, and normalising a one-day range at the choke point — refresh-worker DOES run `build_soccer_artifacts.py`, so these are live code here, not inert as on live-odds-worker).
+- **ANCESTRY CHECKED BEFORE DEPLOYING, because another session had moved this service under me.** It was on `1175e0ef` when I started and on `0d3cea8f` by the time I got the claim. `0d3cea8f` is a ledger commit ON main dated 03:47Z — it simply predates `a347c4ea` — so the tip deploy was a fast-forward and reverted nothing. Had it been off-main, this would have silently reverted that session's work.
+- `verify:` **MET.** Baseline 04:56:54Z: 15 `PULL_OK` matches in 04:45-04:57Z, **none carrying a `truncated=` field, no `PULL_INCOMPLETE` anywhere**. After go-live, its first two pattern pulls:
+
+      05:08:03Z  pattern=*2026-09-15*  truncated=True  oversize_skipped=5
+                 oversize_bytes=238287619
+                 largest_skipped=mlb_source/tracking/book_quotes/2026-09-15.jsonl
+                 largest_bytes=134227492   received=95 written=95
+
+      05:10:24Z  pattern=*2026-09-16*  truncated=True  oversize_skipped=0
+                 oversize_bytes=0          received=77 written=77
+
+- **The effect is the point: `received=95` and `received=77`.** Web's own pre-fix probe of the same 30-minute window returned **4**. This service's pulls were previously logged `artifacts_received=21` / `=31` with no indication anything was missing.
+- **THE SECOND LINE IS THE MORE IMPORTANT READING, and it changes the diagnosis.** The `*2026-09-16*` pull carries `oversize_skipped=0` — not one file over the 8 MB cap, because the new date's accumulators have barely grown — and it **still truncated at 77 files**. So truncation is NOT only the accumulators crowding the budget: **77 ordinary artifacts exceed 24 MB on their own.** The cap fixed the crowding; the budget is now the binding constraint by itself, which the web entry (04:01:38Z) predicted from `truncated: true` at 22.35 MB and this confirms independently on a clean file set.
+- **Files are therefore STILL being silently skipped on this service**, fewer than before and now logged, but the watermark still advances past them (deliberately unchanged — refusing to advance re-fetches the same budget-worth forever). That residual is the open question, and it is a BUDGET decision, not a cap decision: ~32 MB of capped-eligible files against a 24 MB ceiling, and raising it costs roughly 3x that in transient memory on a 2 GB instance once `jsonify`'s copy is counted.
+- **Incidental, and it is why this file is on the list at all:** `book_quotes` measured 126.53 MB at 03:40Z, 133.75 MB at 04:18Z and **134.23 MB at 05:08Z** — it grows by megabytes per hour and is re-sent WHOLE on every change. It reaches the workers by `STREAM_PULL_OK` already (59 MB seen at 04:08Z), which is the transport the cap defers it to.
