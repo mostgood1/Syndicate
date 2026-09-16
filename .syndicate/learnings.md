@@ -6441,3 +6441,14 @@ instance, in the old format. A post-deploy window that starts at `finishedAt` th
 - Extends *gate verification on artifact mtime*: deploy live is not code live, and code live is not old code STOPPED.
 - *(evidence: cross-session reports from lane `legacy-steam-crossing-delta`, 2026-09-15 ~23:35Z and its retraction ~23:55Z;
   `.syndicate/log/2026-09-15.md`)*
+
+## 2026-09-16 — a detector that matches a FORMULA at published precision has a FALSE-POSITIVE RATE, and mine fired at about 1 row per 1,200 `[session abacd435, lane soccer-anytime-scorer]`
+
+- **The instrument.** `unconditional_ladder_share` decided whether a soccer shot row was priced on the OLD unconditional ladder by testing `ladder["0.5"] == round(1 - exp(-expected_shots), 4)`. It verified fix #2 on both workers.
+- **What happened.** A 3-hour sentinel over 28 artifacts flagged one row with `expected_shots` > 0: Serge Gnabry, bundesliga, ladder 0.8653 against 1 - exp(-2.0046) = 0.8653. Read naively that is a deployed fix not applying to a row.
+- **What was true.** He was on the new mixture path. His conditional mean was 2.5541, not the fallback's 2.9601, and no row in that artifact matched the fallback. A mixture's P(>= 1) is below the Poisson value at its own mean, so it can coincide with the Poisson value at a DIFFERENT (lower) mean. At 4 published decimals such a collision is expected roughly once per thousand rows.
+- **How to apply.**
+  - A formula-equality detector tests a VALUE, and values collide. Before reading a small nonzero share as a failure, check the mechanism's own signature instead — here, whether the conditional mean equals the fallback's `x / max(minutes, 0.25)`.
+  - State a detector's false-positive rate when you record a reading that uses it, so the next person does not have to rediscover it from one alarming row.
+  - Keep the denominator honest too: this one counted rows that CANNOT discriminate (zero-mean rows price 0.0 either way), which inflated the raw share to 15% in one league while the discriminating share was 0.
+- *(evidence: `deploys.md` 2026-09-16 01:23Z sentinel sweep; bundesliga `recommendations_2026-09-18.json` gen 00:21:57Z)*
