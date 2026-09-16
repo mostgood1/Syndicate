@@ -290,4 +290,40 @@ console.log(`normalized team pairs seating MORE THAN ONE card: ${pairDupes.lengt
 for (const [k, l] of pairDupes) {
   console.log(`   ${k} -> ` + l.map((c) => `[${c.sport} "${c.matchup}" n=${c.count}]`).join(' + '));
 }
-process.exitCode = (chipDupes.length || pairDupes.length) ? 1 : 0;
+// Third detector, for the shape BOTH of the above miss (lane
+// `layer2-chip-rail-duplicate`, 2026-09-16): a game whose rows carry its chip's
+// canonical keys, but not on the row that SEATED the group. The group then
+// takes a keyless matchup (`SEV @ DEP`), resolves no chip, and the unclaimed
+// chip seeds a SECOND card under a different abbr (`SEV @ Deportiv`). Neither
+// card resolves the chip twice, and the two matchups do not normalise alike, so
+// detectors 1 and 2 both read 0 on exactly this defect -- measured on the
+// 14:0xZ payload against the pre-change template.
+//
+// Anchored on the ROWS, never on `group.awayKey`/`homeKey`, because those are
+// what the defect gets wrong: a chip-SEEDED card (`chip|...`) whose chip's
+// `away.key @ home.key` is carried by some board row of the same sport means a
+// row family for that game exists and failed to claim its chip.
+const rowPairs = new Map();
+for (const it of items) {
+  const ak = String(it.away_key || '').trim().toLowerCase();
+  const hk = String(it.home_key || '').trim().toLowerCase();
+  if (!ak || !hk) continue;
+  const k = `${String((it.sport_slug || it.sport) || '').trim().toLowerCase()}|${ak} @ ${hk}`;
+  rowPairs.set(k, (rowPairs.get(k) || 0) + 1);
+}
+const orphanSeeds = [];
+for (const c of cards) {
+  if (!String(c.key || '').startsWith('chip|')) continue;
+  const chip = resolveChip(c);
+  if (!chip) continue;
+  const ak = String((chip.away || {}).key || '').trim().toLowerCase();
+  const hk = String((chip.home || {}).key || '').trim().toLowerCase();
+  if (!ak || !hk) continue;
+  const n = rowPairs.get(`${slugOfCard(c)}|${ak} @ ${hk}`) || 0;
+  if (n) orphanSeeds.push([c, chip, n]);
+}
+console.log(`chip-SEEDED cards whose game HAS keyed board rows: ${orphanSeeds.length}`);
+for (const [c, chip, n] of orphanSeeds) {
+  console.log(`   ${chip.sport} ${chip.matchup} (${chip.game_key}) seeded "${c.matchup}" n=${c.count}, while ${n} row(s) carry its keys`);
+}
+process.exitCode = (chipDupes.length || pairDupes.length || orphanSeeds.length) ? 1 : 0;

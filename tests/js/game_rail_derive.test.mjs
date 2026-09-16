@@ -562,3 +562,82 @@ console.log('ASSERT an unjoinable row keeps its sport :',
 // NARROWNESS 3: a row with no id AND no matchup has no key at all.
 console.log('ASSERT a keyless row does not throw      :',
   rowSportLabel({sport:'nfl', sport_slug:'nfl'}) === 'NFL' ? 'PASS' : 'FAIL');
+
+// --------------------------------------------------------------------------
+// THE GROUP'S JOIN KEYS COME FROM ANY ROW, NOT ONLY THE FIRST.
+//
+// USER-REPORTED 2026-09-16 (lane `layer2-chip-rail-duplicate`): the rail showed
+// SEV @ DEP twice -- a chip-less `LA LIGA · WED SEP 16 / 23 opportunities` card
+// and, beside it, a dimmed count-0 `SEV / Deportiv` card seeded from the chip.
+//
+// Every value below is copied from the PRODUCTION payload pair, not invented:
+// the chip from `/api/board/game-chips` (published 14:02:01Z), each row family
+// from `/api/intelligence/query` (14:0xZ). The two sides are copied from their
+// OWN payloads (`learnings.md` 2026-09-05 forbids a join fixture built from one
+// set of names); that the keys agree byte-for-byte (NFC `\u00f1` on both) was
+// checked on the payload itself, not assumed here.
+//
+// The shape of the defect: 3 steam/prop rows ranked 8, 13, 15 carry no keys and
+// an abbr matchup the chip does not share (`SEV @ DEP` vs the chip's
+// `SEV @ Deportiv`); 20 shortlist rows from rank 32 carry the keys. The group
+// took its keys from the first row, so the canonical join never ran.
+//
+// THIS SECTION DISCRIMINATES: the first three fail against the pre-change
+// template. The last two are narrowness guards and pass in both states.
+// --------------------------------------------------------------------------
+resetChips();
+state.date = '2026-09-16';
+state.sport = 'all';
+const depChip = {"away":{"abbr":"SEV","key":"sevilla","name":"Sevilla","score":null},
+  "game_key":"401882873",
+  "home":{"abbr":"Deportiv","key":"deportivo la coru\u00f1a","name":"Deportivo","score":null},
+  "leader":null,"league":"la_liga","league_display":"La Liga","matchup":"SEV @ Deportiv",
+  "score_suppressed":null,"sport":"soccer","start_time_utc":"2026-09-16T17:00:00+00:00",
+  "state":"pregame","status_token":"12:00P CT"};
+seatSoccerChip(depChip, depChip.away.name, depChip.home.name, depChip.away.key, depChip.home.key);
+const DEP_EVENT = 'e8d1b34cb3e1f52f67538ad554811b56';
+const DEP_STEAM_ROW = {sport:'la liga', sport_slug:'soccer', event_id:DEP_EVENT, game_id:DEP_EVENT,
+                       matchup:'SEV @ DEP', away_key:null, home_key:null,
+                       game_date:'2026-09-16', source_board_date:'2026-09-16', market_state:'pregame'};
+const DEP_SHORTLIST_ROW = {sport:'soccer', sport_slug:'soccer', event_id:DEP_EVENT, game_id:null,
+                           matchup:'Sevilla @ Deportivo La Coru\u00f1a',
+                           away_key:'sevilla', home_key:'deportivo la coru\u00f1a',
+                           game_date:'2026-09-16', source_board_date:'2026-09-16', market_state:'pregame'};
+const depRows = [DEP_STEAM_ROW, DEP_STEAM_ROW, DEP_STEAM_ROW,
+                 ...Array.from({length: 20}, () => DEP_SHORTLIST_ROW)];
+const outDep = deriveGameCards(depRows);
+console.log();
+console.log('SEV @ DEP rail ->', outDep.map((g) => `${g.matchup}(count=${g.count}, chip=${chipForGame(g) ? chipForGame(g).game_key : 'none'})`).join(' | '));
+console.log('ASSERT one game seats ONE card           :', outDep.length === 1 ? 'PASS' : 'FAIL');
+console.log('ASSERT that card resolves the chip       :', outDep.length && chipForGame(outDep[0]) === depChip ? 'PASS' : 'FAIL');
+console.log('ASSERT ...and carries all 23 rows        :', outDep.length === 1 && outDep[0].count === 23 ? 'PASS' : 'FAIL');
+
+// NARROWNESS 1: keys already on the group are never overwritten by a later
+// row. A second chip is seated under the LATER row's keys; the card must stay
+// on the chip its first row named.
+resetChips();
+const sevChip = {...depChip};
+const otherChip = {...depChip, game_key:'999', matchup:'BAR @ SEV',
+                   away:{abbr:'BAR', key:'barcelona', name:'Barcelona'},
+                   home:{abbr:'SEV', key:'sevilla', name:'Sevilla'}};
+seatSoccerChip(sevChip, sevChip.away.name, sevChip.home.name, sevChip.away.key, sevChip.home.key);
+seatSoccerChip(otherChip, otherChip.away.name, otherChip.home.name, otherChip.away.key, otherChip.home.key);
+const outKeep = deriveGameCards([
+  {...DEP_SHORTLIST_ROW, matchup:'nomatch @ nomatch'},
+  {...DEP_SHORTLIST_ROW, matchup:'nomatch @ nomatch', away_key:'barcelona', home_key:'sevilla'},
+]);
+console.log('ASSERT first row\'s keys are not replaced :',
+  outKeep.length && outKeep[0].awayKey === 'sevilla' && chipForGame(outKeep[0]) === sevChip ? 'PASS' : 'FAIL');
+
+// NARROWNESS 2: an away key from one row is never paired with a home key from
+// another. Neither row carries a PAIR, so the group must not end up holding one
+// (it keeps the first row's lone away key, as it always has) and must not join.
+resetChips();
+seatSoccerChip(depChip, depChip.away.name, depChip.home.name, depChip.away.key, depChip.home.key);
+const outHalf = deriveGameCards([
+  {...DEP_STEAM_ROW, away_key:'sevilla'},
+  {...DEP_STEAM_ROW, home_key:'deportivo la coru\u00f1a'},
+]);
+const halfGroup = outHalf.find((g) => g.key === `soccer|${DEP_EVENT}`);
+console.log('ASSERT half keys from two rows not paired:',
+  halfGroup && !(halfGroup.awayKey && halfGroup.homeKey) && chipForGame(halfGroup) === null ? 'PASS' : 'FAIL');

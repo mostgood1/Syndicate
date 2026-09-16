@@ -2573,6 +2573,29 @@
         });
       }
       const group = groups.get(key);
+      // THE JOIN KEYS ARE A FACT ABOUT THE GAME, NOT ABOUT WHICHEVER ROW WAS
+      // SEATED FIRST. The group above is built from its first row only, and
+      // the two soccer row families disagree on what they carry: the steam /
+      // prop rows (`sport: "la liga"`, `matchup: "SEV @ DEP"`) have no
+      // `away_key`/`home_key`, the `layer2_shortlist` rows for the SAME event
+      // id do. Measured on production 2026-09-16 14:0xZ: SEV @ DEP had 3 rows of
+      // the first family ranked ahead of 20 of the second, so the group took
+      // the keyless shape, `chipForGame` missed on all four indexes (the chip's
+      // abbr matchup is `SEV @ Deportiv`), and the rail seated the game TWICE --
+      // a chip-less `WED SEP 16 / 23 opportunities` card beside the unclaimed
+      // chip's count-0 card.
+      //
+      // Backfilled only while the group has NO pair, and only as a PAIR from
+      // one row: keys already present are never overwritten, and an away key
+      // from one row is never matched with a home key from another.
+      if (!group.awayKey || !group.homeKey) {
+        const awayKey = String(item.away_key || "").trim().toLowerCase();
+        const homeKey = String(item.home_key || "").trim().toLowerCase();
+        if (awayKey && homeKey) {
+          group.awayKey = awayKey;
+          group.homeKey = homeKey;
+        }
+      }
       group.count += 1;
       const itemState = recommendationState(item);
       if (itemState === "live") group.hasLive = true;
