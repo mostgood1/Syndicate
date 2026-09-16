@@ -1569,6 +1569,7 @@ death, never life — do not invert it.
 - Blocked by: none. No deploy without the user's go.
 ### portfolio-no-family-exclusion — OPEN — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
 - Goal: the portfolio commit refuses no row for its sport or market family: the `sport:family` exclusion (`resolve_excluded_families`, default `mlb:player_prop`, env `SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES`) is REMOVED, so every row, MLB player props included, is judged only by its own per-play gates (sim edge, EV, stake, caps), and production's committed plan carries no `market_family_excluded` refusal.
+- **STATUS 2026-09-16 ~10:45 CT: GOAL NOT MET YET** — code landed `4484cae1` (5 new tests RED on old code, GREEN after; 619 passed), NOT deployed; the refresh-worker deploy awaits the user. Baseline to re-read within 15 min of preflight: `market_family_excluded` 1,795 on the 10:07 CT plan. Premise of the removed rule is gone: MLB prop cards with a numeric sim edge 455 of 521 (298 positive) at 14:17Z.
 - Files:
   - `syndicate/features/shared/portfolio_commit.py` (the exclusion function, its default, and the branch in the commit loop only)
   - `pipeline/portfolio_commit.py` (one comment naming `DEFAULT_EXCLUDED_FAMILIES`)
