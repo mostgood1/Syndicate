@@ -42,6 +42,7 @@ from syndicate.features.soccer.features.live_lens import project_live_player_pro
 from syndicate.features.soccer.features.team_names import match_team_name
 from syndicate.features.soccer.ingestion.espn_lineups import LEAGUE_ESPN_SLUGS
 from syndicate.features.soccer.ingestion.espn_lineups import fetch_events
+from syndicate.features.soccer.ingestion.espn_lineups import record_is_unplayed
 from syndicate.features.soccer.ingestion.espn_lineups import fetch_match_summary
 from syndicate.features.soccer.ingestion.espn_live_state import build_live_state
 from syndicate.features.soccer.ingestion.espn_match_box import build_match_box
@@ -556,6 +557,13 @@ def _finished_matches(leagues, iso_date, *, source_root) -> list[dict[str, Any]]
             # fields is absent.
             state = str(record.get("status_state") or "").strip().lower()
             if state != "post" and not bool(record.get("final")):
+                continue
+            # A POSTPONED MATCH IS NOT A RESULT. ESPN files it under `post` and
+            # a box written before `espn_lineups.UNPLAYED_STATE` existed carries
+            # `final: true` with a placeholder 0-0 -- measured 2026-09-16, ATH @
+            # LEV `401882870`, detail "Postponed". This list is what settlement
+            # grades from, so that record would have settled as a draw.
+            if record_is_unplayed(record):
                 continue
             out.append({
                 "league": league,

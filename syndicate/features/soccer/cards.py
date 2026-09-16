@@ -9,6 +9,8 @@ from typing import Any
 
 from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
 from syndicate.features.shared.timezone import central_today_iso
+from syndicate.features.soccer.ingestion.espn_lineups import UNPLAYED_STATE
+from syndicate.features.soccer.ingestion.espn_lineups import record_is_unplayed
 from syndicate.features.soccer.sources import available_weeks
 from syndicate.features.soccer.sources import build_module_links
 from syndicate.features.soccer.sources import default_season
@@ -2176,6 +2178,15 @@ def _effective_state_with_box(status_state: Any, kickoff: Any, match_box: dict[s
     purpose: it is a production string, and every correction it reports is
     still a stale artifact being overtaken by a fresher reading.
     """
+    # A MATCH ESPN SAYS WAS NOT PLAYED IS NEVER FINAL, whichever source claimed
+    # it. Checked before the terminal rule below on purpose: ESPN files a
+    # postponement under `post`, so the artifact and a box written before
+    # `espn_lineups.UNPLAYED_STATE` existed both say `post` for it. Measured
+    # 2026-09-16: ATH @ LEV `401882870` served as `0-0 FINAL` on the chip after
+    # ESPN moved it to STATUS_POSTPONED. This is a refusal, not a new result --
+    # `"void"` is neither `in` nor `post`, so no score or final head renders.
+    if str(status_state or "").strip().lower() == UNPLAYED_STATE or record_is_unplayed(match_box):
+        return UNPLAYED_STATE
     state = _effective_status_state(status_state, kickoff)
     # FINAL IS TERMINAL. A match the artifact already calls finished is never
     # moved back to live, whatever any other source says -- the same rule

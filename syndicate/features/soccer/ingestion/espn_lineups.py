@@ -23,6 +23,53 @@ from typing import Any
 import requests
 
 _ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer"
+
+# A FIXTURE THAT ENDED WITHOUT BEING PLAYED. ESPN puts a postponed, canceled or
+# abandoned match in `state: "post"` -- the same state as a finished one -- and
+# tells them apart only by `completed: false` and the status name. Measured
+# 2026-09-16 on La Liga ATH @ LEV (`401882870`):
+# `{"name": "STATUS_POSTPONED", "state": "post", "completed": false}` beside
+# `{"name": "STATUS_FULL_TIME", "state": "post", "completed": true}`. Copying
+# `state` verbatim made every `== "post"` reader take the postponement as a
+# finished 0-0: the chip served `0-0 FINAL` and the poller put it in the
+# aggregate's `finals`, which settlement grades from.
+#
+# `"void"` is its own state rather than `"pre"`: the match is not upcoming at
+# its listed kickoff either, and a reader that filters on `pre` (lineups, the
+# fixture builder) should not pick it up as a match to project or price.
+UNPLAYED_STATE = "void"
+_UNPLAYED_STATUS_NAMES = frozenset({"STATUS_POSTPONED", "STATUS_CANCELED", "STATUS_ABANDONED"})
+# ESPN's own `detail` text for those names. Only for records written BEFORE
+# this rule existed, which carry `status_state: "post"` and the detail but no
+# name or `completed` flag -- exact match, never a substring search.
+_UNPLAYED_STATUS_DETAILS = frozenset({"postponed", "canceled", "cancelled", "abandoned"})
+
+
+def unplayed_post_status(status_type: dict[str, Any] | None) -> bool:
+    """True when ESPN's `competition.status.type` says `post` but the match was
+    not played. Absent `completed` is NOT read as unplayed: a final whose payload
+    lacks the flag must stay final."""
+    if not isinstance(status_type, dict):
+        return False
+    if str(status_type.get("state") or "").strip().lower() != "post":
+        return False
+    if status_type.get("completed") is False:
+        return True
+    return str(status_type.get("name") or "").strip().upper() in _UNPLAYED_STATUS_NAMES
+
+
+def record_is_unplayed(record: dict[str, Any] | None) -> bool:
+    """The same judgement over a STORED record (a `match_box` entry, a finals
+    row or a `fetch_events` row), including one written before `"void"` existed."""
+    if not isinstance(record, dict):
+        return False
+    if str(record.get("status_state") or "").strip().lower() == UNPLAYED_STATE:
+        return True
+    if record.get("status_completed") is False:
+        return True
+    if str(record.get("status_name") or "").strip().upper() in _UNPLAYED_STATUS_NAMES:
+        return True
+    return str(record.get("status_detail") or "").strip().lower() in _UNPLAYED_STATUS_DETAILS
 # Was {"User-Agent": "Mozilla/5.0 (SyndicateSoccerSim)", "Accept":
 # "application/json,text/plain,*/*"}. A prior session's temporary probe
 # (81f091b7, 2026-08-04) tested this exact string against usa.1's bare
@@ -253,8 +300,9 @@ def fetch_events(
     timeout: int = 20,
 ) -> list[dict[str, Any]]:
     """Events across a list of ``YYYYMMDD-YYYYMMDD`` windows, optionally
-    filtered by ESPN status state (``"pre"``, ``"in"``, ``"post"``; default
-    None keeps all). Callers should keep each window to a few weeks --
+    filtered by ESPN status state (``"pre"``, ``"in"``, ``"post"``, or
+    ``"void"`` for a postponed/canceled/abandoned match ESPN files under
+    ``post`` -- see ``UNPLAYED_STATE``; default None keeps all). Callers should keep each window to a few weeks --
     ESPN's scoreboard endpoint silently truncates around ~100 events per
     call. A window ESPN refuses with a 400 is retried one date at a time
     (see ``_scoreboard_payloads``)."""
@@ -273,6 +321,7 @@ def fetch_events(
     # the endpoint has produced before, not a fix for a measured failure.
     allowed_days = _window_day_set(date_windows)
     dropped_off_window = 0
+    unplayed = 0
     for payload in payloads:
         for event in payload.get("events") or []:
             competition = (event.get("competitions") or [{}])[0]
@@ -287,6 +336,9 @@ def fetch_events(
             status_block = competition.get("status") or {}
             status = status_block.get("type") or {}
             state = str(status.get("state") or "").lower()
+            if unplayed_post_status(status):
+                state = UNPLAYED_STATE
+                unplayed += 1
             if statuses is not None and state not in statuses:
                 continue
             if allowed_days is not None:
@@ -331,11 +383,21 @@ def fetch_events(
                 "status_period": status_block.get("period"),
                 "status_detail": status.get("detail") or status.get("shortDetail"),
                 "status_description": status.get("description"),
+                "status_name": status.get("name"),
+                "status_completed": status.get("completed"),
             }
     if dropped_off_window:
         print(
             f"[espn_lineups] ESPN_OFF_WINDOW_EVENTS_DROPPED league={league} "
             f"windows={date_windows} dropped={dropped_off_window} kept={len(found)}",
+            flush=True,
+        )
+    if unplayed:
+        # Counted per call, before the `statuses` filter: a postponement is
+        # otherwise invisible to a caller asking for `in`/`post`.
+        print(
+            f"[espn_lineups] ESPN_UNPLAYED_POST_EVENTS league={league} "
+            f"windows={date_windows} unplayed={unplayed}",
             flush=True,
         )
     return list(found.values())
