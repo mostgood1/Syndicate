@@ -123,6 +123,13 @@ class HotArtifactPullWatermarkScopeTests(unittest.TestCase):
             with patch.object(artifact_publisher, "_admin_token", return_value="t"), patch.dict(
                 "os.environ", {"SYNDICATE_WEB_PUBLISH_URL": "http://web/api/ops/artifacts/publish"}
             ), patch.object(artifact_publisher, "_export_url", side_effect=_fake_export_url), patch.object(
+                # The dated pull calls the OUTCOME function (it needs `truncated`
+                # and `next_since`); the tuple wrapper is kept for exact-path
+                # callers. A complete, untruncated response records the pull's
+                # start time exactly as before -- which is what this asserts.
+                artifact_publisher, "_pull_hot_artifacts_request_outcome",
+                return_value=artifact_publisher._PullOutcome(True, 0, False, None),
+            ), patch.object(
                 artifact_publisher, "_pull_hot_artifacts_request", return_value=(True, 0)
             ), patch.object(
                 artifact_publisher, "_missing_required_artifact_relative_paths", return_value=[]

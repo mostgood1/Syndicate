@@ -1611,6 +1611,17 @@ def _hot_artifact_pull_since_epoch(*, pull_started_epoch: float, date_str: str |
     window_floor = float(pull_started_epoch) - _MAX_PULL_WINDOW_SECONDS
     if stored is None or stored <= 0.0:
         return window_floor
+    if stored < window_floor:
+        # A SECOND, time-based skip, and the one the resume cursor cannot fix:
+        # the clamp bounds a request's size by jumping the floor forward, and
+        # anything changed between `stored` and the new floor is never pulled.
+        # With truncation rare at a 48 MB budget a resume point should never
+        # fall this far behind -- which is exactly why it must be LOUD if it does.
+        print(
+            f"[artifact_publisher] PULL_WINDOW_CLAMPED scope={date_str or 'all'} stored={stored} "
+            f"floor={window_floor} skipped_seconds={window_floor - stored:.1f}",
+            flush=True,
+        )
     return max(stored, window_floor)
 
 
@@ -2618,7 +2629,21 @@ def _read_possibly_gzipped(response: Any) -> bytes:
     return _gzip.decompress(raw)
 
 
-def _pull_hot_artifacts_request(url: str, token: str, *, timeout_seconds: int) -> tuple[bool, int]:
+class _PullOutcome(NamedTuple):
+    """One export request's result, including whether it was COMPLETE.
+
+    `succeeded` is transport success and nothing else: a truncated 200 is a
+    success. That conflation is the defect this type exists to end -- see
+    `pull_hot_artifacts`.
+    """
+
+    succeeded: bool
+    written: int
+    truncated: bool
+    next_since: float | None
+
+
+def _pull_hot_artifacts_request_outcome(url: str, token: str, *, timeout_seconds: int) -> "_PullOutcome":
     """Returns (succeeded, files_written). succeeded distinguishes a genuine
     request failure from a successful-but-empty response (e.g. nothing
     changed since the caller's own watermark) -- pull_hot_artifacts only
@@ -2670,15 +2695,15 @@ def _pull_hot_artifacts_request(url: str, token: str, *, timeout_seconds: int) -
             payload = json.loads(_read_possibly_gzipped(response).decode("utf-8"))
     except (urllib_error.URLError, TimeoutError, OSError) as exc:
         print(f"[artifact_publisher] PULL_FAILED url={url} error={exc}", flush=True)
-        return False, 0
+        return _PullOutcome(False, 0, False, None)
     except Exception as exc:  # pragma: no cover - defensive, must never raise
         print(f"[artifact_publisher] PULL_UNEXPECTED_ERROR url={url} error={exc}", flush=True)
-        return False, 0
+        return _PullOutcome(False, 0, False, None)
 
     artifacts = payload.get("artifacts") if isinstance(payload, dict) else None
     if not isinstance(artifacts, dict):
         print(f"[artifact_publisher] PULL_EMPTY_RESPONSE url={url}", flush=True)
-        return False, 0
+        return _PullOutcome(False, 0, False, None)
 
     root = _data_root()
     written = 0
@@ -2734,6 +2759,13 @@ def _pull_hot_artifacts_request(url: str, token: str, *, timeout_seconds: int) -
     # per-file cap doing its job, not an error -- those files travel by
     # `?path=` / `/api/ops/artifacts/stream`.
     truncated = bool(payload.get("truncated"))
+    # The server's resume cursor for a truncated `since` read. Absent from an
+    # older web, and null when resuming could not make progress -- both mean
+    # the caller must HOLD its watermark, never record its own start time.
+    try:
+        next_since = float(payload["next_since"]) if payload.get("next_since") is not None else None
+    except (TypeError, ValueError):
+        next_since = None
     oversize_skipped = int(payload.get("oversize_skipped") or 0)
     oversize_bytes = int(payload.get("oversize_bytes") or 0)
     print(
@@ -2755,7 +2787,60 @@ def _pull_hot_artifacts_request(url: str, token: str, *, timeout_seconds: int) -
             f"received={len(artifacts)} written={written}",
             flush=True,
         )
-    return True, written
+    return _PullOutcome(True, written, truncated, next_since)
+
+
+def _pull_hot_artifacts_request(url: str, token: str, *, timeout_seconds: int) -> tuple[bool, int]:
+    """Returns (succeeded, files_written) -- the contract six callers unpack.
+
+    Kept exactly, because exact-path callers (the repair pass, the live-lens
+    snapshot fetch, `publish_sim_input_reports`) cannot be truncated and have
+    no use for a cursor. The dated pattern pull, which can, calls
+    `_pull_hot_artifacts_request_outcome` directly.
+    """
+    outcome = _pull_hot_artifacts_request_outcome(url, token, timeout_seconds=timeout_seconds)
+    return outcome.succeeded, outcome.written
+
+
+def _pull_watermark_after(
+    outcomes: list["_PullOutcome"], *, pull_started_epoch: float, since_epoch: float | None, scope: str
+) -> float | None:
+    """The floor a SUCCESSFUL pull may record, or None to hold the current one.
+
+    THE DEFECT THIS ENDS (lane `web-export-timeout`, 2026-09-16). This used to
+    be unconditionally `pull_started_epoch`. A truncated export is an HTTP 200,
+    so a pull that received 4 of 133 changed files recorded its START time and
+    the other 129 were below the floor forever -- the repair pass only fetches
+    files missing OUTRIGHT, never ones present and stale. The docstring above
+    promised "a partial failure re-fetches that same window"; truncation is not
+    a failure, so it walked straight through that promise.
+
+    - Nothing truncated: `pull_started_epoch`, exactly as before.
+    - Something truncated WITH a cursor: the EARLIEST `next_since` across the
+      date's patterns. Two patterns share one floor, so a complete pattern
+      re-sends files at or after that point -- bytes, never a skipped file.
+    - Something truncated WITHOUT a cursor (an older web, or a resume the server
+      judged could not progress): None. Hold the floor and re-read the window.
+      Re-fetching is recoverable; skipping is not.
+    """
+    cut = [o for o in outcomes if o.truncated]
+    if not cut:
+        return pull_started_epoch
+    cursors = [o.next_since for o in cut]
+    if any(c is None for c in cursors):
+        print(
+            f"[artifact_publisher] PULL_WATERMARK_HELD scope={scope} truncated={len(cut)} "
+            f"reason=no_resume_cursor floor={since_epoch}",
+            flush=True,
+        )
+        return None
+    resume = min(float(c) for c in cursors)  # type: ignore[arg-type]
+    print(
+        f"[artifact_publisher] PULL_WATERMARK_RESUME scope={scope} truncated={len(cut)} "
+        f"resume_at={resume} instead_of={pull_started_epoch} held_back_seconds={pull_started_epoch - resume:.1f}",
+        flush=True,
+    )
+    return resume
 
 
 def pull_hot_artifacts(*, date_str: str | None = None, timeout_seconds: int = 30) -> int:
@@ -2825,18 +2910,24 @@ def pull_hot_artifacts(*, date_str: str | None = None, timeout_seconds: int = 30
     # worker's or another date's. See `_hot_artifact_pull_watermark_path`.
     since_epoch = _hot_artifact_pull_since_epoch(pull_started_epoch=pull_started_epoch, date_str=date_str)
     if not date_str:
-        succeeded, written = _pull_hot_artifacts_request(_export_url(None, since_epoch=since_epoch), token, timeout_seconds=timeout_seconds)
-        if succeeded:
-            _record_hot_artifact_pull_watermark(pull_started_epoch, date_str=None)
-        return written
+        outcome = _pull_hot_artifacts_request_outcome(_export_url(None, since_epoch=since_epoch), token, timeout_seconds=timeout_seconds)
+        if outcome.succeeded:
+            floor = _pull_watermark_after([outcome], pull_started_epoch=pull_started_epoch, since_epoch=since_epoch, scope="all")
+            if floor is not None:
+                _record_hot_artifact_pull_watermark(floor, date_str=None)
+        return outcome.written
     written = 0
     all_succeeded = True
+    outcomes: list[_PullOutcome] = []
     for pattern in _date_glob_patterns(date_str):
-        succeeded, sub_written = _pull_hot_artifacts_request(_export_url(pattern, since_epoch=since_epoch), token, timeout_seconds=timeout_seconds)
-        written += sub_written
-        all_succeeded = all_succeeded and succeeded
+        outcome = _pull_hot_artifacts_request_outcome(_export_url(pattern, since_epoch=since_epoch), token, timeout_seconds=timeout_seconds)
+        outcomes.append(outcome)
+        written += outcome.written
+        all_succeeded = all_succeeded and outcome.succeeded
     if all_succeeded:
-        _record_hot_artifact_pull_watermark(pull_started_epoch, date_str=date_str)
+        floor = _pull_watermark_after(outcomes, pull_started_epoch=pull_started_epoch, since_epoch=since_epoch, scope=date_str)
+        if floor is not None:
+            _record_hot_artifact_pull_watermark(floor, date_str=date_str)
     # Repair pass, AFTER the watermark is recorded and deliberately not part of
     # all_succeeded. It fetches only artifacts this worker is missing outright,
     # one exact ?path= request each and no since= filter, so it is the one

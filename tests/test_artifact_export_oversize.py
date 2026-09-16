@@ -195,3 +195,109 @@ class ArtifactExportBudgetTests(TestCase):
         self.assertFalse(body["truncated"], "28 MB of under-cap files was still truncated")
         self.assertEqual(sorted(body["artifacts"]), sorted(_UNDER_CAP_PATHS))
         self.assertEqual(body["oversize_skipped"], 0, "the cap, not the budget, decided this")
+
+
+# ---------------------------------------------------------------------------
+# The RESUME CURSOR (2026-09-16, "fix the watermark so it stops skipping
+# truncated files"). A `since` read is filled oldest-first and reports
+# `next_since`, the mtime of the first file that did not fit. The pull records
+# that instead of its own start time. The property that matters is the last
+# one below: chaining the cursor delivers EVERY file, with no gap.
+# ---------------------------------------------------------------------------
+
+_BASE_MTIME = 1_700_000_000.0
+
+
+def _league_path(i: int) -> str:
+    # One real hot-artifact family, a distinct league directory per file, so every
+    # path is admitted by the allowlist and the test is about ORDER and CURSOR.
+    return f"soccer_source/league{i}/api/live_state/live_state_2026-09-15.json"
+
+
+class ArtifactExportResumeCursorTests(TestCase):
+    def setUp(self) -> None:
+        app = create_app()
+        app.testing = True
+        self.client = app.test_client()
+
+    def _tree(self, tmp_dir: str, count: int, *, same_mtime: bool = False) -> list[str]:
+        paths = []
+        for i in range(count):
+            relative = _league_path(i)
+            _write(tmp_dir, relative, "q" * (700 * 1024))
+            mtime = _BASE_MTIME if same_mtime else _BASE_MTIME + (count - i) * 10.0
+            os.utime(os.path.join(tmp_dir, *relative.split("/")), (mtime, mtime))
+            paths.append(relative)
+        return paths
+
+    def _read(self, tmp_dir: str, since: float, budget: int | None = 1024 * 1024) -> dict:
+        query = f"/api/ops/artifacts/export?pattern=*2026-09-15*&since={since}"
+        if budget is not None:
+            query += f"&budget_bytes={budget}"
+        env = {"ADMIN_TOKEN": TOKEN, "SYNDICATE_DATA_ROOT": tmp_dir}
+        with patch.dict(os.environ, env, clear=False):
+            os.environ.pop("SYNDICATE_ARTIFACT_EXPORT_MAX_BYTES", None)
+            response = self.client.get(query, headers={"Authorization": f"Bearer {TOKEN}"})
+        self.assertEqual(response.status_code, 200)
+        return json.loads(response.data.decode("utf-8"))
+
+    def test_a_since_read_is_filled_OLDEST_FIRST_and_names_where_to_resume(self) -> None:
+        """Files are written newest-first on purpose, so walk order and mtime order
+        disagree and the test cannot pass by accident of directory listing."""
+        with TemporaryDirectory() as tmp_dir:
+            self._tree(tmp_dir, 3)
+            body = self._read(tmp_dir, since=_BASE_MTIME - 1.0)
+        oldest = _league_path(2)
+        self.assertTrue(body["truncated"])
+        self.assertEqual(list(body["artifacts"]), [oldest], "the budget was not spent on the OLDEST file")
+        self.assertEqual(body["next_since"], _BASE_MTIME + 20.0, "the cursor is not the first undelivered mtime")
+
+    def test_chaining_next_since_delivers_EVERY_file_with_no_gap(self) -> None:
+        """THE PROPERTY. Pre-fix, a pull recorded its start time after the first
+        truncated read and the other four files were never requested again."""
+        with TemporaryDirectory() as tmp_dir:
+            everything = set(self._tree(tmp_dir, 5))
+            delivered: set[str] = set()
+            since, reads = _BASE_MTIME - 1.0, 0
+            while True:
+                body = self._read(tmp_dir, since=since)
+                delivered.update(body["artifacts"])
+                reads += 1
+                if not body["truncated"]:
+                    break
+                self.assertIsNotNone(body["next_since"], "a truncated since-read gave no cursor")
+                self.assertGreater(body["next_since"], since, "the cursor did not advance")
+                since = body["next_since"]
+                self.assertLess(reads, 20, "the cursor never reached the end")
+        self.assertEqual(delivered, everything, f"files skipped: {sorted(everything - delivered)}")
+
+    def test_a_read_WITHOUT_since_keeps_its_old_behaviour_and_no_cursor(self) -> None:
+        """The no-`since` caller is the backup workflow, which never asked for a
+        cursor and must not have its file selection silently reordered."""
+        with TemporaryDirectory() as tmp_dir:
+            self._tree(tmp_dir, 3)
+            env = {"ADMIN_TOKEN": TOKEN, "SYNDICATE_DATA_ROOT": tmp_dir}
+            with patch.dict(os.environ, env, clear=False):
+                response = self.client.get(
+                    "/api/ops/artifacts/export?pattern=*2026-09-15*&budget_bytes=1048576",
+                    headers={"Authorization": f"Bearer {TOKEN}"},
+                )
+            body = json.loads(response.data.decode("utf-8"))
+        self.assertTrue(body["truncated"])
+        self.assertIsNone(body["next_since"])
+
+    def test_the_budget_override_can_only_LOWER_the_budget(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            self._tree(tmp_dir, 1)
+            body = self._read(tmp_dir, since=_BASE_MTIME - 1.0, budget=10 * 1024 * 1024 * 1024)
+        self.assertEqual(body["budget_bytes"], 48 * 1024 * 1024, "a request raised the memory ceiling")
+
+    def test_a_resume_that_cannot_progress_WITHHOLDS_the_cursor(self) -> None:
+        """Every file at exactly the request's own `since`: resuming would return the
+        identical response forever. The cursor is withheld so the pull HOLDS -- a
+        stall that is logged, never a skip."""
+        with TemporaryDirectory() as tmp_dir:
+            self._tree(tmp_dir, 3, same_mtime=True)
+            body = self._read(tmp_dir, since=_BASE_MTIME)
+        self.assertTrue(body["truncated"])
+        self.assertIsNone(body["next_since"])

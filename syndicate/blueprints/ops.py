@@ -2821,9 +2821,22 @@ def api_ops_artifacts_export() -> Any:
     # watermark on a complete response, so a caller that cannot see it was
     # truncated would skip the remainder forever.
     budget_bytes = _artifact_export_budget_bytes()
+    # LOWER-ONLY probe override. Exists so the resume contract below can be
+    # exercised against production on demand: at the 48 MB default a real pull
+    # almost never truncates, which would leave the `next_since` path verifiable
+    # only in tests. It can never RAISE the budget -- the memory ceiling stays
+    # the configured one -- and it is admin-gated with the rest of this route.
+    requested_budget = str(request.args.get("budget_bytes") or "").strip()
+    if requested_budget:
+        try:
+            budget_bytes = min(budget_bytes, max(1024 * 1024, int(requested_budget)))
+        except ValueError:
+            pass
     max_file_bytes = _artifact_export_max_file_bytes()
     total_bytes = 0
     truncated = False
+    next_since: float | None = None
+    resume_candidates: list[tuple[float, str, int, Path]] = []
     oversize: list[dict[str, Any]] = []
     oversize_skipped = 0
     oversize_bytes = 0
@@ -2863,6 +2876,11 @@ def api_ops_artifacts_export() -> Any:
                 if len(oversize) < _OVERSIZE_REPORT_LIMIT:
                     oversize.append({"path": relative_path, "bytes": stat.st_size})
                 continue
+            if since_epoch is not None:
+                # A `since`-bearing request is a CURSOR read, so it is filled in
+                # mtime order below rather than streamed here. See that block.
+                resume_candidates.append((float(stat.st_mtime), relative_path, int(stat.st_size), path))
+                continue
             if total_bytes + stat.st_size > budget_bytes and artifacts:
                 # Stop before reading, not after -- reading it is the
                 # memory we are trying not to spend.
@@ -2872,10 +2890,58 @@ def api_ops_artifacts_export() -> Any:
             total_bytes += stat.st_size
         except Exception:
             continue
+
+    # A RESUMABLE FILL, for requests that carry `since` -- which is every hot
+    # artifact PULL, and never the no-`since` backup call above, whose streamed
+    # walk-order behaviour is left byte-for-byte as it was.
+    #
+    # THE DEFECT (lane `web-export-timeout`, 2026-09-16): a truncated response
+    # was a 200, the pull recorded its watermark at its own START time, and every
+    # file the budget cut was then below the floor and never asked for again.
+    # Truncation used to break out of the walk in arbitrary order, so there was
+    # no point the caller could safely resume from -- refusing to advance would
+    # only have re-fetched the same first budget-worth forever.
+    #
+    # Filling OLDEST-FIRST gives that point. Every file older than the first one
+    # that did not fit has been delivered, so `next_since` = that file's mtime is
+    # a floor that skips nothing: the next request includes it, and the pull
+    # records `next_since` instead of its start time. Files that share the
+    # boundary mtime may be sent twice; that costs bytes, never a file.
+    #
+    # Each truncated response delivers at least one file (the per-file cap keeps
+    # every candidate under the budget floor), so the cursor advances -- except
+    # when every delivered file sits at exactly the request's own `since`. Then
+    # resuming would return the identical response forever, so `next_since` is
+    # withheld and the client holds its watermark: a stall, logged, never a skip.
+    if since_epoch is not None and resume_candidates:
+        resume_candidates.sort(key=lambda item: (item[0], item[1]))
+        for mtime, relative_path, size, path in resume_candidates:
+            if total_bytes + size > budget_bytes and artifacts:
+                truncated = True
+                next_since = mtime
+                break
+            try:
+                artifacts[relative_path] = path.read_text(encoding="utf-8")
+            except Exception:
+                continue
+            total_bytes += size
+        if next_since is not None and next_since <= since_epoch:
+            print(
+                f"[ops] ARTIFACT_EXPORT_RESUME_STALLED pattern={subset_pattern!r} since={since_epoch} "
+                f"boundary_mtime={next_since} delivered={len(artifacts)} budget_bytes={budget_bytes}",
+                flush=True,
+            )
+            next_since = None
     return jsonify({
         "ok": True,
         "count": len(artifacts),
         "truncated": truncated,
+        # Where a truncated `since` read must resume. null when nothing was cut,
+        # when the request carried no `since`, or when resuming could not make
+        # progress -- and a pull that sees `truncated` with no `next_since` must
+        # HOLD its watermark rather than skip.
+        "next_since": next_since,
+        "budget_bytes": budget_bytes,
         "bytes": total_bytes,
         # Shed load, reported rather than implied. `oversize_skipped` and
         # `oversize_bytes` are the whole truth; `oversize` names the first
