@@ -36797,3 +36797,9 @@ Scheduled task `full-slate-memory-reading-0915`. Read-only on production: no dep
 - **User-visible, 17:02:32Z same instant:** served state 16:36:10Z soccer **1,160** (09-16 1,112, 09-17 48), mlb 1,222; shortlists 09-16 soccer 1,053 (16:44:34Z) and 09-17 988 (17:00:41Z) -- both high at once, where before one of them was always cut.
 - **Side effect to watch, NOT this lane's to judge:** the 11:45:45 CT plan `sized` **99** (was 25 on every earlier plan today), rows_in 4,547. That is the portfolio change plus the recovered rows; relayed to portfolio-no-family-exclusion.
 - `PULL_WATERMARK_HELD` / `PULL_WATERMARK_RESUME` on refresh-worker since 16:11:39Z: none (requested by lane web-export-timeout).
+
+## 2026-09-16 17:06Z (12:06 CT) — CORRECTION, no deploy — to the entry `2026-09-16 17:02Z` (lane soccer-board-tomorrow-shortlist-collapse) — **the plan's `sized` 25 -> 99 was a portfolio SETTINGS change, not either deploy**
+
+- That entry attributed `sized` 99 (11:45:45 CT plan) to "the portfolio change plus the recovered rows". **Wrong.** Lane portfolio-no-family-exclusion wrote `max_positions` 25 -> 150 and `max_slate_exposure_fraction` 0.251 -> 0.35 via `POST /portfolio/settings` at 16:29:39Z (user decision; entries `2026-09-16 16:30Z` and `16:46:12Z`).
+- Re-derived here, not taken on trust (plan read 17:05:57Z): `settings.max_positions` 150 and `max_slate_exposure_fraction` 0.35, both `stored`; staked $343.88; no `beyond_max_positions`. The 11:21:19 CT plan, which already ran on `03851b5a` with the exclusion removed, sized 25 with `beyond_max_positions` 79 (this lane's own 16:22:20Z read): the cap, not the rows, bound it. No deploy between those two plans.
+- Nothing else in the 17:02Z entry changes.
