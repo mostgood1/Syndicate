@@ -6627,3 +6627,9 @@ The 09-16 reading passed all three criteria the Goal named (0 WNBA chips, Layer 
 This is the second instrument defect in this one tool today (see the header-echo rule above): **one inflates every count by 1, the other hides every token past column 200.** Both make a watcher report the state you are waiting for.
 
 **How to apply.** Pass `--width 200000` whenever a decision depends on WHAT a line contains, and prove the watcher reads the unhealthy state on a sample known to be unhealthy before trusting its all-clear. `deploy_preflight.py` itself reads the Render logs API untruncated, so it remains the authority on in-flight jobs.
+
+## 2026-09-16 — FORBIDDEN: opening a source file for write before its new content is fully built. A raise between `open(p, 'wb')` and `write` leaves the file EMPTY, with no error pointing at the file. `[lane soccer-board-tomorrow-shortlist-collapse]`
+
+A splice script did `open(p,'wb').write(nl.join(lines))`. `nl` was bytes and `lines` str, so `join` raised, but only AFTER `open` had truncated `pipeline/layer2_shortlist.py`: 2,363 lines to 0. The traceback named the type error, not the file. It was caught only because the next command printed `git diff --numstat` (`0 2363`). Had the next step been a test run, it would have failed on an import and looked like a code bug.
+
+**How to apply.** Build the bytes first, then open: `data = ...; with open(p, 'wb') as f: f.write(data)`. For code, prefer the Edit tool, which never truncates on failure. After any scripted write to a tracked file, read `git diff --numstat` before doing anything else, and treat a deletion count near the file's length as an emptied file.
