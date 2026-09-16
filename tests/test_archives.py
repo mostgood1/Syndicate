@@ -25,6 +25,9 @@ def _paths_match(expected: Path | str, actual: Path | str) -> bool:
     actual_norm = os.path.normcase(os.path.normpath(str(actual_path.resolve(strict=False))))
     return expected_norm == actual_norm
 
+# Imported BEFORE the app, for its side effect: under `python -m unittest` (CI) this is
+# the only thing that redirects SYNDICATE_REPORTS_ROOT out of the repo (lead #26).
+import tests._artifact_isolation  # noqa: F401,E402
 from syndicate.app import create_app
 # The slate date is US CENTRAL everywhere in the app (central_today_iso,
 # syndicate/features/shared/timezone.py). `date.today()` is the RUNNER's

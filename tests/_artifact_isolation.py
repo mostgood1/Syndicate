@@ -32,10 +32,26 @@ data out from under all of them.
 from __future__ import annotations
 
 import contextlib
+import os
+import tempfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Iterator
 from unittest.mock import patch
+
+# THE REPORTS ROOT, for BOTH runners (lead #26, lane archive-test-reports-redirect).
+# `tests/conftest.py` redirects `SYNDICATE_REPORTS_ROOT` at import, but CI runs
+# `python -m unittest tests.test_archives`, which never imports conftest -- so under CI
+# the app wrote `reports/intelligence/coverage_report.json` and
+# `game_chips_<date>.json` INTO THE REPO (reproduced 2026-09-16). Same `setdefault` and
+# same prefix as conftest's, so whichever module imports first wins, a deliberately set
+# variable still wins, and pytest's behaviour is unchanged (conftest has already set it).
+# At IMPORT, not in a fixture: `reports_root()` reads the variable at call time, and a
+# test can write before any fixture here runs.
+os.environ.setdefault(
+    "SYNDICATE_REPORTS_ROOT",
+    tempfile.mkdtemp(prefix="syndicate_session_reports_root_"),
+)
 
 
 def _scratch_wnba_cards_context_path(scratch: Path):
