@@ -31,6 +31,21 @@ LEAGUE = "epl"
 EVENT = "401879301"
 
 
+@pytest.fixture(autouse=True)
+def no_aggregate_memo(monkeypatch):
+    """The aggregate read carries a 15s cross-scope memo (see `sources.py`).
+
+    Every test here rewrites the snapshot and reads again, which is exactly what
+    that memo is built to collapse. Disabling it keeps these tests about the
+    OVERLAY and off the clock -- `learnings.md` forbids a test that depends on
+    wall time passing. The memo has its own tests below, with an injected clock.
+    """
+    monkeypatch.setenv("SYNDICATE_SOCCER_LIVE_AGGREGATE_MEMO_SECONDS", "0")
+    S.clear_live_aggregate_memo()
+    yield
+    S.clear_live_aggregate_memo()
+
+
 @pytest.fixture
 def root(tmp_path, monkeypatch):
     """`data_root()` is what BOTH reads derive their path (and keyvalue key) from."""
@@ -358,3 +373,77 @@ def test_no_aggregate_at_all_is_exactly_the_old_behaviour(root):
     assert payload is not None
     assert payload["games"][EVENT]["score_home"] == 1
     assert "source" not in payload, "an absent aggregate still claimed to be one"
+
+
+# ---------------------------------------------------------------------------
+# The memo. `cards._live_vintage` runs BEFORE the builder opens its read scope,
+# so it is a scope miss by construction -- 20 per board build, every ~120s.
+# ---------------------------------------------------------------------------
+
+
+def _count_reads(monkeypatch):
+    calls = {"n": 0}
+    real = S._live_aggregate_snapshot_uncached
+
+    def counted(date):
+        calls["n"] += 1
+        return real(date)
+
+    monkeypatch.setattr(S, "_live_aggregate_snapshot_uncached", counted)
+    return calls
+
+
+def test_the_aggregate_is_read_ONCE_across_many_vintage_calls(root, monkeypatch):
+    """The regression this exists to prevent, in one assertion."""
+    monkeypatch.setenv("SYNDICATE_SOCCER_LIVE_AGGREGATE_MEMO_SECONDS", "15")
+    S.clear_live_aggregate_memo()
+    monkeypatch.setattr(S, "_monotonic", lambda: 1000.0)
+    _write_per_league(root, generated_at="2026-09-15T20:07:50+00:00",
+                      games={EVENT: _live_row(score_home=0, score_away=0, clock="1'")})
+    _write_aggregate(root, generated_at="2026-09-15T21:04:02+00:00",
+                     games=[_live_row(score_home=2, score_away=0, clock="67'")])
+    calls = _count_reads(monkeypatch)
+    for _ in range(20):
+        cards._live_vintage(LEAGUE)
+    assert calls["n"] == 1, f"{calls['n']} store reads for 20 vintage calls"
+
+    # BOTH DIRECTIONS, so this cannot pass vacuously: with the memo disabled the
+    # same twenty calls pay twenty round trips, which is the cost being avoided.
+    monkeypatch.setenv("SYNDICATE_SOCCER_LIVE_AGGREGATE_MEMO_SECONDS", "0")
+    S.clear_live_aggregate_memo()
+    calls["n"] = 0
+    for _ in range(20):
+        cards._live_vintage(LEAGUE)
+    assert calls["n"] == 20, f"the counter is not measuring the read ({calls['n']})"
+
+
+def test_the_memo_EXPIRES_rather_than_pinning_the_vintage(root, monkeypatch):
+    """A memo that never expires is the freeze `_live_vintage` exists to prevent."""
+    monkeypatch.setenv("SYNDICATE_SOCCER_LIVE_AGGREGATE_MEMO_SECONDS", "15")
+    S.clear_live_aggregate_memo()
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(S, "_monotonic", lambda: clock["t"])
+    _write_per_league(root, generated_at="2026-09-15T20:07:50+00:00",
+                      games={EVENT: _live_row(score_home=0, score_away=0, clock="1'")})
+    _write_aggregate(root, generated_at="2026-09-15T21:04:02+00:00",
+                     games=[_live_row(score_home=1, score_away=0, clock="45'")])
+    first = cards._live_vintage(LEAGUE)
+
+    _write_aggregate(root, generated_at="2026-09-15T21:06:02+00:00",
+                     games=[_live_row(score_home=2, score_away=0, clock="67'")])
+    assert cards._live_vintage(LEAGUE) == first, "the memo did not hold inside its TTL"
+
+    clock["t"] += 15.001
+    assert cards._live_vintage(LEAGUE) != first, "the memo outlived its TTL"
+
+
+def test_the_memo_is_per_date(root, monkeypatch):
+    """Today and tomorrow are both asked for in one build; one must not answer
+    for the other."""
+    monkeypatch.setenv("SYNDICATE_SOCCER_LIVE_AGGREGATE_MEMO_SECONDS", "15")
+    S.clear_live_aggregate_memo()
+    monkeypatch.setattr(S, "_monotonic", lambda: 1000.0)
+    _write_aggregate(root, generated_at="2026-09-15T21:04:02+00:00",
+                     games=[_live_row(score_home=2, score_away=0, clock="67'")])
+    assert S.live_aggregate_snapshot(_today()) is not None
+    assert S.live_aggregate_snapshot("1999-01-01") is None

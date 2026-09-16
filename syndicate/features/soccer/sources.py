@@ -10,7 +10,10 @@ from datetime import timezone as timezone_cls
 from functools import lru_cache
 import io
 import json
+import os
 from pathlib import Path
+import threading
+import time
 from typing import Any
 from typing import Iterator
 
@@ -411,15 +414,78 @@ def _live_aggregate_snapshot_uncached(selected_date: str) -> dict[str, Any] | No
     return payload
 
 
-def live_aggregate_snapshot(selected_date: str) -> dict[str, Any] | None:
-    """Memoized per `soccer_read_scope()`, like the per-league read.
+# A SECOND, SHORTER MEMO, AND IT IS NOT REDUNDANT WITH THE SCOPE ONE.
+#
+# `cards._live_vintage` is called by `build_cards_page_context` to compute the
+# CACHE KEY, which necessarily happens BEFORE the builder opens its
+# `soccer_read_scope()` -- so every vintage read is a scope miss by construction.
+# `_SoccerDataProvider.games()` calls that 10 leagues x 2 matchdays = 20 times
+# per board build, every ~120 s.
+#
+# The per-league file made that cheap-ish. The aggregate does not: it carries
+# every in-play match with its projection and up to twelve live props, plus every
+# finished match, and `poll_soccer_live_state`'s own comment records that it
+# "already trips `KEYVALUE_WRITE_LARGE` at 1MB". Twenty ~1 MB keyvalue GETs per
+# build is ~600 MB/hour of store reads from this path alone -- a cost this repo
+# has an open lane measuring elsewhere, and one I would be introducing.
+#
+# The TTL is a QUARTER of the 60 s producer tick, so it cannot make the vintage
+# more than a fraction of one tick stale, against a chip publish cadence of
+# ~120 s. `0` disables it, which is what the tests use so none of them depends on
+# a wall clock.
+_AGGREGATE_MEMO: dict[str, tuple[float, dict[str, Any] | None]] = {}
+_AGGREGATE_MEMO_LOCK = threading.Lock()
 
-    ONE store round trip per build rather than one per league: a card build
-    walks every league and this is a single shared document.
+# Injected rather than called directly so a test can advance it. A test that
+# waits for a real clock to pass is the flake `learnings.md` forbids.
+_monotonic = time.monotonic
+
+
+def _live_aggregate_memo_ttl_seconds() -> float:
+    raw = str(os.environ.get("SYNDICATE_SOCCER_LIVE_AGGREGATE_MEMO_SECONDS") or "").strip()
+    if not raw:
+        return 15.0
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return 15.0
+
+
+def clear_live_aggregate_memo() -> None:
+    """Drop every entry. For tests, and for a caller that must not reuse one."""
+    with _AGGREGATE_MEMO_LOCK:
+        _AGGREGATE_MEMO.clear()
+
+
+def _live_aggregate_snapshot_memoized(selected_date: str) -> dict[str, Any] | None:
+    ttl = _live_aggregate_memo_ttl_seconds()
+    if ttl <= 0:
+        return _live_aggregate_snapshot_uncached(selected_date)
+    now = _monotonic()
+    with _AGGREGATE_MEMO_LOCK:
+        hit = _AGGREGATE_MEMO.get(selected_date)
+        if hit is not None and (now - hit[0]) < ttl:
+            return hit[1]
+    payload = _live_aggregate_snapshot_uncached(selected_date)
+    with _AGGREGATE_MEMO_LOCK:
+        _AGGREGATE_MEMO[selected_date] = (_monotonic(), payload)
+        # Bounded: a board build asks about today and tomorrow, and a long-lived
+        # worker must not accumulate an entry per date it has ever seen.
+        if len(_AGGREGATE_MEMO) > 8:
+            oldest = min(_AGGREGATE_MEMO, key=lambda key: _AGGREGATE_MEMO[key][0])
+            _AGGREGATE_MEMO.pop(oldest, None)
+    return payload
+
+
+def live_aggregate_snapshot(selected_date: str) -> dict[str, Any] | None:
+    """Memoized per `soccer_read_scope()`, and briefly across scopes.
+
+    ONE store round trip per build rather than one per league: a card build walks
+    every league and this is a single shared document.
     """
     return _scoped_read(
         ("live_aggregate", selected_date),
-        lambda: _live_aggregate_snapshot_uncached(selected_date),
+        lambda: _live_aggregate_snapshot_memoized(selected_date),
     )
 
 
