@@ -68,15 +68,38 @@ def test_a_REFUSED_range_is_retried_one_date_at_a_time():
 # sends the bare date, because ESPN now 400s every range (lane
 # `soccer-espn-window-validation`). The BEHAVIOUR under test is unchanged and still
 # matters: any caller that does send a one-day range pays exactly one retry.
-def test_a_ONE_DAY_range_costs_one_retry():
-    """`build_soccer_artifacts._fetch_fixtures` sends `YYYYMMDD-YYYYMMDD` for a
-    single day. That exact shape returned 400 on 2026-08-15 for all four slugs
-    tried, and a refusal was a failed build."""
+def test_a_ONE_DAY_range_is_normalised_to_a_bare_date_and_costs_NO_retry():
+    """A one-day range carries exactly the information of a bare date, and the bare
+    form is the one ESPN answers.
+
+    WHY THIS ASSERTION CHANGED. It used to expect two calls -- the range, a 400, then
+    the retry -- and that was the measured behaviour. On 2026-09-16 every range began
+    returning 400, so the retry stopped being an edge case: live-odds-worker logged
+    72 one-day refusals in 30 minutes. Fixing two call sites was not enough, because
+    `shared/schedule_adapter.py` builds the same shape, so the normalisation moved to
+    `_scoreboard_payloads` where every caller crosses. One call, no 400.
+    """
     calls: list[str] = []
     with patch.object(el, "fetch_espn_scoreboard", side_effect=_refuse_ranges(calls)):
         events = el.fetch_events("epl", date_windows=["20260815-20260815"])
-    assert calls == ["20260815-20260815", "20260815"]
+    assert calls == ["20260815"], "a one-day range must go out as a bare date, with no refusal first"
     assert [event["event_id"] for event in events] == ["e20260815"]
+
+
+def test_a_bare_date_is_passed_through_unchanged():
+    calls: list[str] = []
+    with patch.object(el, "fetch_espn_scoreboard", side_effect=_refuse_ranges(calls)):
+        el.fetch_events("epl", date_windows=["20260815"])
+    assert calls == ["20260815"]
+
+
+def test_a_MULTI_day_range_is_still_sent_as_a_range_and_still_falls_back():
+    """The normalisation must not swallow the real fallback: a genuine range still
+    goes out as one, and a 400 still expands it one date at a time."""
+    calls: list[str] = []
+    with patch.object(el, "fetch_espn_scoreboard", side_effect=_refuse_ranges(calls)):
+        el.fetch_events("epl", date_windows=["20260814-20260815"])
+    assert calls == ["20260814-20260815", "20260814", "20260815"]
 
 
 def test_REACHABILITY_an_accepted_range_is_NOT_split():

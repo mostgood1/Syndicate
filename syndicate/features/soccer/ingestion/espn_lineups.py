@@ -107,6 +107,28 @@ def _window_days(window: str) -> list[str]:
     return [(start + timedelta(days=offset)).strftime("%Y%m%d") for offset in range(span + 1)]
 
 
+def _single_day_of(window: str) -> str | None:
+    """``YYYYMMDD`` when ``window`` is a one-day range or already a bare date, else
+    ``None``. Anything unparseable returns ``None`` so the caller sends it untouched
+    and ESPN, not this function, decides what it means."""
+    from datetime import datetime
+
+    text = str(window or "").strip()
+    start_text, sep, end_text = text.partition("-")
+    if not sep:
+        try:
+            datetime.strptime(text, "%Y%m%d")
+        except ValueError:
+            return None
+        return text
+    try:
+        start = datetime.strptime(start_text, "%Y%m%d").date()
+        end = datetime.strptime(end_text, "%Y%m%d").date()
+    except ValueError:
+        return None
+    return start.strftime("%Y%m%d") if start == end else None
+
+
 def _scoreboard_payloads(league: str, window: str, timeout: int) -> list[dict[str, Any]]:
     """The scoreboard for one window, retried ONE DATE AT A TIME when ESPN
     refuses the range.
@@ -144,6 +166,21 @@ def _scoreboard_payloads(league: str, window: str, timeout: int) -> list[dict[st
     something that is not a range, still raises: a 5xx is not this failure, and
     splitting an unknown window would be guessing.
     """
+    # A ONE-DAY RANGE IS SENT AS A BARE DATE, AT THE CHOKE POINT.
+    #
+    # Measured 2026-09-16 04:46Z, and it is why this lives here rather than in the
+    # callers: the same change was first made in `build_soccer_artifacts`, and
+    # live-odds-worker still logged 72 one-day-range refusals in the next 30 minutes,
+    # because `shared/schedule_adapter.py` builds `f"{compact}-{compact}"` as well.
+    # Two call sites were fixed and a third kept paying. Every caller that wants one
+    # date now gets the form ESPN answers, including callers not yet written.
+    #
+    # `YYYYMMDD-YYYYMMDD` with equal ends carries exactly the information of
+    # `YYYYMMDD`, so this is a request-shape normalisation and not a semantic change:
+    # the fallback below already reissued precisely this request after eating a 400.
+    single = _single_day_of(window)
+    if single is not None:
+        window = single
     try:
         return [fetch_espn_scoreboard(league, date_range=window, timeout=timeout)]
     except requests.HTTPError as error:
