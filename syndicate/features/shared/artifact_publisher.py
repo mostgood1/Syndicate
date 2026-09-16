@@ -959,9 +959,12 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # (`load_team_xg_map`, `load_team_elo_map`) but no allowlist entry -- per
     # `model_engine_standard.md` §3, unallowlisted means unauditable via
     # `/api/ops/artifacts/*` and, for any engine that DOES rely on the
-    # worker-writes/web-reads push (unlike `predictions_*.csv`, which this
-    # module self-generates per-service -- see the reference doc's pipeline
-    # trace), unreachable regardless of what produces it. `team_xg_*.csv` has no
+    # worker-writes/web-reads push, unreachable regardless of what produces it.
+    # (This comment once said `predictions_*.csv` is "self-generated per-service".
+    # That stopped being true: generation now runs only inside live-odds-worker's
+    # refresh loop -- SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP is false on web and
+    # refresh-worker, read 2026-09-16 -- so the NHL board files are allowlisted
+    # below, lane nhl-season-readiness.) `team_xg_*.csv` has no
     # producer yet (genuinely absent, not merely unfed -- same doc). `team_elo_*.csv`
     # is produced by `scripts/build_nhl_elo_artifact.py`; per-season single
     # document, same bounded shape as the MLB `#440` entries above.
@@ -987,6 +990,23 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # genuinely-absent inputs `hockeysim_engine_reference.md` §5 tracked.
     "nhl_source/source_artifacts/data/processed/player_rates_*.csv",
     "nhl_source/data/processed/player_rates_*.csv",
+    # THE NHL BOARD FILES, lane nhl-season-readiness (2026-09-16). Web's
+    # `/nhl/api/cards` builds games from `predictions_{date}.csv` /
+    # `predictions_sim_{date}.csv`, falling back to the scoreboard snapshot, and
+    # reads player positions from `lineups_{date}.csv` (`nhl/cards.py:350-361`,
+    # `:639-668`, `:877`) -- all from web's OWN disk. They are generated only on
+    # live-odds-worker (`scripts/refresh_nhl_oddsapi.py` -> `build_nhl_artifacts.py`,
+    # root `<data_root>/nhl_source`), so without these entries the worker cannot
+    # publish them and web serves an empty NHL board. Small per-date CSVs in the
+    # one `processed/` directory the dated-pull walk already lists. The scoreboard
+    # fallback (`odds/games/date=*/scoreboard.csv`) is deliberately NOT here: a
+    # `date=*` directory pattern makes every dated pull list every historical
+    # game-date folder, and web's export walk already runs past the pull timeout
+    # (lane web-export-timeout, deploys.md 2026-09-16 16:52Z). Predictions are the
+    # primary source; the scoreboard only matters when they are missing.
+    "nhl_source/data/processed/predictions_*.csv",
+    "nhl_source/data/processed/predictions_sim_*.csv",
+    "nhl_source/data/processed/lineups_*.csv",
     # #163's MLB player game-log index (last-N starts/games, history vs
     # opponent -- syndicate/features/mlb/player_game_log.py, read by
     # ask_the_syndicate_data.py's _mlb_player_history_evidence) is the same
