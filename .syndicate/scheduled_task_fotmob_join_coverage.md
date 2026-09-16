@@ -90,3 +90,9 @@ run would not prove the schedule.
 It writes the verdict to `.syndicate/log/2026-09-16.md`, adds a "First scheduled
 run" section here, and resolves the `leads.md` lead that records the cron has
 never fired.
+
+## First scheduled run -- FIRED, GREEN (2026-09-16)
+
+The cron has fired. Run `35093757133`, `event: schedule`, `conclusion: success`; created 07:04:30 CT (12:04:30Z) -- 4 min 30 s after the 12:00Z cron -- completed 07:06:01 CT (12:06:01Z); checker at 12:05:57Z: `FOTMOB_JOIN_COVERAGE resolved=108/108 unresolved=0 unknown=0 exit=0`.
+
+Read by the one-time task `fotmob-cron-fired-0916` at 08:58 CT (13:58Z). The earlier `workflow_dispatch` run `35032523439` is the only other run; this one is the first with `event: schedule`. Fixture count moved 114 -> 108 because the 7-day window rolled, not because anything stopped resolving (`unresolved=0 unknown=0`).
