@@ -125,6 +125,8 @@ death, never life — do not invert it.
 - Files:
   - `syndicate/features/soccer/ingestion/espn_lineups.py`
   - `tests/test_soccer_espn_lineups.py`
+  - `scripts/build_soccer_artifacts.py` (the two one-day-range call sites only; unclaimed since lane `soccer-anytime-scorer` closed 2026-09-16)
+  - `tests/test_soccer_espn_scoreboard_fallback.py` (one test name asserts the builder sends a one-day range, which this change makes untrue)
 - Why this lane exists: lane `soccer-live-scoreboard-range-stale` reported that a stale-200 ESPN range can pass `espn_lineups`, and lane `soccer-player-substrate` recorded it as a follow-up NOT re-derived. It matters more than a data-freshness nit because `build_soccer_artifacts._fetch_fixtures` sends the one-day range form, its fixtures feed `_attach_confirmed_starters`, and confirmed starters set `start_probability` -- the input both deployed fixes (#2 shot ladder, #3 goal mixture) key off.
 - Hypotheses (PRE-REGISTERED 2026-09-16 03:48Z, before any probe ran):
   - **H26 (code):** `fetch_events` performs NO window validation. It filters only on ESPN status state, stores `event["date"]`, and never compares it to the requested window. FALSIFIED if any date check exists in the path from `_scoreboard_payloads` to the returned rows.
