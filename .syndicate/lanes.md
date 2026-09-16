@@ -1549,7 +1549,8 @@ death, never life — do not invert it.
 - Files: none yet; declared here before the first edit.
 - Blocked by: none. No deploy or `render.yaml` change without the user's go.
 
-### correlation-arm-value-land — OPEN — opened 2026-09-16 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+### correlation-arm-value-land — CLOSED 2026-09-16 — opened 2026-09-16 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **GOAL: MET**
+- **VERDICT 2026-09-16 ~16:05Z (11:05 CDT), session 0f5b256e.** Goal (verbatim): "[user 2026-09-16: "Land #38"] the rescued `scripts/measure_correlation_arm_value.py` and `tests/test_correlation_arm_value.py` (local-only branch `session/measured-correlation-pays-off` @ `ab83a66b`) are on `origin/main` with their tests passing, so that branch is no longer the only copy." — **GOAL: MET.** Reading: landed as `16368c42`, an ancestor of `origin/main`, and both files read back from `origin/main`; `tests/test_correlation_arm_value.py` 24 passed in this worktree on current main. The four lazily imported repo names (`JointCorrelationIndex`, `compute_correlation`, `register_measured_correlation_resolver`, `_correlation_adjusted_probability`) import, and the tests call `build_joint_index` and `score_arms`, which execute them. Content byte-identical to `ab83a66b`. The local branch `session/measured-correlation-pays-off` is no longer the only copy and was left in place (deleting it was not asked). Not run against production; running the measurement is a separate decision.
 - Goal: [user 2026-09-16: "Land #38"] the rescued `scripts/measure_correlation_arm_value.py` and `tests/test_correlation_arm_value.py` (local-only branch `session/measured-correlation-pays-off` @ `ab83a66b`) are on `origin/main` with their tests passing, so that branch is no longer the only copy.
 - Origin: lead #38 in `leads.md`.
 - Verification: the tests pass in this lane's worktree on current `origin/main`; both files present at `origin/main` by ancestry.
