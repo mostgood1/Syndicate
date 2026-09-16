@@ -6594,3 +6594,12 @@ The Games rail seated SEV @ DEP twice because `deriveGameCards` took each game's
 It came up when a session proposed adding `soccer:game_line,soccer:game_total` to `SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES` after measuring live soccer 1X2 at 0-7 (-$29.03) and an audit showing soccer 1X2 and O/U 2.5 losing to the close. The user rejected the category block AND the existing `mlb:player_prop` default it would have extended (lane `portfolio-no-family-exclusion` removes that mechanism).
 
 **How to apply.** A measured loss in a market family is evidence for a PER-PLAY criterion (a stricter EV or sim-edge bar, a precision gate, a calibration fix), not for switching the family off. Do not propose, add, or re-enable a `sport:family` or sport-wide staking exclusion. Where an existing gate is category-shaped (for example a sport allowlist), surface it to the user as a decision; do not remove or extend it on inference.
+
+### 2026-09-16 (session a1e40980, lane `web-export-timeout`) — FORBIDDEN: passing an epoch-float boundary through fixed-precision formatting into a STRICT comparison
+
+A float timestamp formatted to six decimals looks precise enough for a `>=` boundary. It is not: rounding moves the value up as often as down, and a strict `mtime < since` then excludes exactly the file the boundary names.
+
+- Measured on production 2026-09-16 14:36Z. A verification chain followed the export's `next_since` cursor with `f"{since:.6f}"` and LOST 2 OF 6 FILES. The two cursors that rounded UP past their file's true mtime (`1789565893.2385237 -> .238524`, `1789568946.8659189 -> .865919`) were exactly the two skipped; the two that rounded down were not. Re-run with `str(float)`: 6 of 6.
+- **It read as the fix failing.** The skip was produced by my PROBE, while the production client — which writes the exact repr — was fine. A verification instrument that rounds can manufacture the very defect it is checking for.
+- **How to apply:** carry epoch floats as `repr()` / `str()`, never `:.Nf`, whenever they cross a boundary comparison. On the receiving side, compare with a tolerance sized to the coarsest rounding a caller might apply (`12cbe434` uses 1 ms), so a rounded cursor RE-SENDS rather than SKIPS. When a boundary read comes back short, check each boundary value's rounding direction before concluding the code is wrong.
+- *(evidence: `deploys.md` 2026-09-16 14:32:33Z and 14:56:00Z; `tests/test_artifact_export_oversize.py::ArtifactExportRoundedCursorTests`)*
