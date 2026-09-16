@@ -121,7 +121,7 @@ claim-before-work record distinguishes a refused gate from a death mid-pass.
 refresh-worker has **153** keys; a single page read as a total is how I briefly
 cited 100.
 
-**MLB PLAYER PROPS ARE EXCLUDED FROM STAKING** — `commit_portfolio`, env
+**MLB PLAYER PROPS ARE NO LONGER EXCLUDED FROM STAKING (2026-09-16, user decision; `4484cae1` live 16:11:39Z; `deploys.md` 16:22:45Z: 12 of 25 positions were MLB props). HISTORY BELOW, superseded:** — `commit_portfolio`, env
 `SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES`, default `mlb:player_prop`, refusal
 `market_family_excluded`. **VERIFIED IN PRODUCTION 2026-09-01T12:46Z: 1,860
 refused against 1,876 MLB prop rows (99.1%), top market `batter_rbis:379`**;
