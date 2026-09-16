@@ -1475,6 +1475,18 @@ death, never life — do not invert it.
 - Blocked by: none
 - NOT in Files, surfaced to the user as a COLLISION: the `Deportiv` abbreviation. `soccer/cards.py:_abbr` mints `longest[:8].title()` when `soccer/sources.py:team_by_name('la_liga', 'Deportivo')` misses; the branding CSV has `DEP` under `Deportivo La Coruña`, and `canonical_team` already resolves the short name (the chip key is `deportivo la coruña`). Both files are claimed by OPEN lane `soccer-live-scoreboard-range-stale` (other functions).
 
+### soccer-corners-posture — OPEN — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Goal: from production's SERVED payloads, establish whether soccer corners edges reach a user today (board rows, recommendations, or portfolio orders); if they do, put the audit's interim posture ("publish no corners edge") to the user as a decision with the exact change it implies. The corners MODEL rebuild (audit fix #6: team corner rates + pressure term, MLS level -1.39) is NOT this lane.
+- Files: none (measurement only). Any gating change widens this list with a collision check first.
+- Why: `findings_2026-09-15_soccer_season_market_audit.md` ranked fix 6 says the model prices the match total and misses the MLS level by -1.39, and "Publish no corners edge meanwhile". Nobody has checked whether corners edges are published now.
+- Hypotheses (PRE-REGISTERED 2026-09-16 ~14:25Z, before any corners field was read):
+  - **H29 (board):** the served Layer 2 board carries at least one SOCCER CORNERS row (match-total or team corners) with a model edge a user can act on. The edge is the field the board CONSUMER reads to show or rank an edge, named from the payload at read time, not a projection or a probability alone.
+  - **H30 (recommendations):** at least one published soccer `recommendations_<date>.json` for 2026-09-16 or 2026-09-17 lists a corners pick.
+  - **H31 (money):** at least one paper or live portfolio order on a soccer corners market was placed on or after 2026-09-01.
+- Falsification test: each is FALSIFIED by a zero count, and a zero counts ONLY with a live population beside it: the same payload must carry soccer rows with an edge in some other market (for H29/H30) or soccer orders in some other market (for H31). A zero over an empty soccer population is recorded UNTESTED, not falsified.
+- Verification: one same-instant read per surface, per-market counts for soccer with the control population printed beside the corners count, the consumer field named, and the verdict per hypothesis recorded in `log/2026-09-16.md` before any change is proposed.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
