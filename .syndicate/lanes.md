@@ -1532,6 +1532,40 @@ death, never life — do not invert it.
 - Verification: one ledger-summary read per mode (`mode=live`, `mode=paper`) with `days=60`, soccer buckets printed beside the other-sport control, with `dates_in_ledger` and the covered dates stated. Verdicts recorded in `log/2026-09-16.md` before any recommendation.
 - Blocked by: none
 
+### board-eval-reader-chunk-ceiling — OPEN — opened 2026-09-16 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: [user 2026-09-16: "open a lane for #44"] the board's scoring/ranking pass reads every day of its 14-day evaluation window that exists on refresh-worker's disk, with no day dropped by `SKIP_OVERSIZED_LEDGER_CHUNK ... ceiling=64000000`, and without making refresh-worker's memory worse. Read on production after the deploy: 0 such lines over a full day, and `MEMORY_GUARD_ABORT` count and peak `self_rss_mb` no worse than the pre-deploy baseline at a same-uptime point within a restart-free boot.
+- Origin: lead #44 in `leads.md`, confirmed in production 2026-09-16.
+- Baseline `[refresh-worker logs, 2026-09-16 00:07-15:05Z]`: 636 `SKIP_OVERSIZED_LEDGER_CHUNK ceiling=64000000` lines, 12 of 14 window days skipped (117-417 MB each). Caller `pipeline/intelligence_state.py:6010` -> `load_recent_evaluation_records(days=14)`, fixed default `max_chunk_bytes=64_000_000` at `syndicate/features/shared/intelligence_evaluation.py:2511`, skip at `:2538`.
+- Hypothesis (to test, not believed): the 64 MB default predates chunks growing past it, and the read is already streamed (`#254`), so the ceiling guards a per-chunk cost that no longer exists.
+- Falsification test: if the reader RETAINS every parsed record rather than only streaming, memory scales with bytes read; then raising the ceiling is unsafe (12 skipped days ~3.4 GB of JSON) and the fix must keep only the fields the ranking pass uses. Measured before any code change.
+- Files: none yet; declared here before the first edit.
+- Blocked by: none. No deploy without the user's go.
+
+### nhl-season-readiness — OPEN — opened 2026-09-16 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: [user 2026-09-16: "we need to get NHL up and running"] NHL runs on real inputs for its 2026-09-19 preseason start: the NHL sim input checklist passes on production inputs (Elo and the other required team features populated, not defaulted), and NHL games reach the served board with model output. The exact verification reading is pinned in this block AFTER the survey and BEFORE any code or production change.
+- Origin: lead #16 in `leads.md`, read 2026-09-16: the Elo producer `scripts/build_nhl_elo_artifact.py` exists but nothing schedules it; web's `nhl_source/**` holds 96 files and 0 elo/xg/team-stat/goalie inputs; refresh-worker's whole `nhl_source` is 51 KB / 9 files (`DISK_INVENTORY` 14:40Z).
+- Hypothesis: none yet. Survey first: what an NHL board needs end to end, what exists, what is missing.
+- Files: none yet; declared here before the first edit.
+- Blocked by: none. No deploy or `render.yaml` change without the user's go.
+
+### correlation-arm-value-land — OPEN — opened 2026-09-16 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: [user 2026-09-16: "Land #38"] the rescued `scripts/measure_correlation_arm_value.py` and `tests/test_correlation_arm_value.py` (local-only branch `session/measured-correlation-pays-off` @ `ab83a66b`) are on `origin/main` with their tests passing, so that branch is no longer the only copy.
+- Origin: lead #38 in `leads.md`.
+- Verification: the tests pass in this lane's worktree on current `origin/main`; both files present at `origin/main` by ancestry.
+- Not in scope: running the measurement or acting on its result.
+- Files: `scripts/measure_correlation_arm_value.py` (NEW), `tests/test_correlation_arm_value.py` (NEW).
+- Blocked by: none. Scripts and tests only, inert on every service, so no deploy.
+
+### worker-disk-auto-retention — OPEN — opened 2026-09-16 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: [user 2026-09-16: "figure out how to auto-manage this disk space"] the workers' data disks stop growing without bound: an automatic retention and compaction policy holds refresh-worker's `DISK_INVENTORY` `used_bytes` flat (within 1 GB) over 7 days after it is deployed, with no manual clearance, and with every deleted path named alongside the reader that no longer needs it. live-odds-worker's disk is measured first and included if it grows.
+- Origin: lead #22 in `leads.md`, read 2026-09-16.
+- Baseline `[refresh-worker DISK_INVENTORY]`: FULL at 2026-09-13 13:44Z (52.50 GB used, 0 free), relieved by a ~16 GB manual clearance; then 36.19 GB (09-13 16:32Z) -> 37.62 GB (09-16 14:40Z), ~+0.49 GB/day, 14.88 GB free. Growth over that interval: `reports/intelligence/evaluation_ledger_chunks` 8.63 -> 9.18 GB (~+190 MB/day), `reports/intelligence/venue_odds` 430 -> 528 MB (~+34 MB/day). 14.6 GB of the disk is older than 30 days. live-odds-worker: UNREAD (log read failed).
+- Existing machinery to read first, not rebuild: `syndicate/features/shared/disk_maintenance.py`, `syndicate/features/shared/artifact_retention.py`, `syndicate/features/shared/disk_inventory.py`.
+- Hypothesis: none yet. Survey first: what retention already runs, where, and why the growers are outside it.
+- Retention windows per path are user decisions (a window shorter than a reader's lookback is data loss).
+- Files: none yet; declared here before the first edit.
+- Blocked by: none. No deploy without the user's go.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
