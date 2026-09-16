@@ -849,6 +849,8 @@ Full working: `findings_2026-09-04_web_sigkill_137_cohort.md`.
 
 ## [refresh-worker-memory] MEMORY — refresh-worker: THE OOM IS FIXED; A SLOW RATCHET REMAINS `[verified 2026-08-17, superseding four earlier sections]`
 
+- **2026-09-16 pointer, not yet a production fact:** the 64 MB ceiling below still guards `build_intelligence_evaluation_bundle`, but the BOARD RANKER's `load_recent_evaluation_records(days=14)` call skipped 12 of 14 days in production (636 `SKIP_OVERSIZED_LEDGER_CHUNK ceiling=64000000` lines, 00:07-15:05Z; chunks 117-417 MB). Lane `board-eval-reader-chunk-ceiling` replaces ONLY the ranker's call with `ranking_records.load_recent_ranking_records` (streams all days, keeps settled records' ranking fields; `48a677eb` on main, NOT deployed). Because this path once OOM'd on the whole-record load, its deploy carries revert ceilings: peak `self_rss_mb` > prior boot peak +600 MiB, `elapsed_s` > 180, any oomKilled.
+
 **This section replaces the 08-16 "allocator still unnamed" narrative entirely.
 That story ended; do not re-open it from the archive.**
 
@@ -2129,6 +2131,8 @@ outlier cold reading. Three paired replications erased it: **cold 31.32s vs warm
 31.45s**. The rule is in `learnings.md` 2026-09-03.
 
 ## [refresh-worker-disk-2026-09-13] refresh-worker's 48.9 GB disk: FULL 09-12 23:39Z -> 09-13 14:15Z, COMPACTED to 16.3 GB free `[verified 2026-09-13, lane refresh-worker-disk-inventory]`
+
+- **UPDATE `[verified 2026-09-16, refresh-worker DISK_INVENTORY + single-key env reads]`:** used 36.19 GB (09-13 16:32Z) -> 37.62 GB (09-16 14:40Z), ~+0.49 GB/day, 14.88 GB free (~a month to full). Growers: `evaluation_ledger_chunks` 8.63 -> 9.18 GB (~+190 MB/day), `mlb_source/source_artifacts/data` ~+142 MB/day, `venue_odds` 430 -> 528 MB (~+34 MB/day). **Retention has never run:** `SYNDICATE_ARTIFACT_RETENTION_ENABLED`, `_OBSERVE`, `SYNDICATE_DISK_RETENTION_DRY_RUN`, `_NEW_RULES_APPLY` all ABSENT on refresh-worker AND live-odds-worker (`SYNDICATE_DISK_MAINTENANCE_ENABLED=true` on both). Dry-run rule-table retention landed inert as `4481cb6c` (lane worker-disk-auto-retention). live-odds-worker's disk: UNREAD (it emits no DISK_INVENTORY).
 
 - **Inventory, 13:44Z, 0.0 MB free.**
   - `soccer_source/tracking` 13.32 GB: daily `odds_*_history_<date>.csv`, export-only, no reader in code.

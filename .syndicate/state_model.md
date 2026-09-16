@@ -538,6 +538,8 @@ map with the tool, not the prose.
 
 ## [nhl-sim-engine] NHL SIM (hockeysim) — `nhl_sim_input_checklist.py` PASSES, exit 0 `[measured 2026-08-20, lane nhl-model-owner]`
 
+- **PRODUCTION WIRING `[verified 2026-09-16, single-key env reads + code; lane nhl-season-readiness]`:** NHL generation runs ONLY inside live-odds-worker's refresh loop (`SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP` true there, false on web and refresh-worker); a launched refresh job always runs on refresh-worker. The runner reads inputs from its OWN disk (`root=artifact_root` = `<data_root>/nhl_source`). `SYNDICATE_ACTIVE_SPORTS` lacks `nhl` on all three services. The five `_latest` inputs were published to web and sha-verified. Landed, inert until `nhl` is in `SYNDICATE_ACTIVE_SPORTS`: `e1398936` (calendar admits NHL from 09-19; runner pulls missing inputs from web) and `ade2a6ba` (allowlists `predictions_*`, `predictions_sim_*`, `lineups_*`; the `date=*` scoreboard deliberately excluded for walk cost). NHL 2026-27 (NHL API): preseason 2026-09-19, regular season 2026-09-29.
+
 - **Started this session at 16 alarms, now 0.** Full pipeline trace + gating
   checklist: `docs/ai_context/hockeysim_engine_reference.md`
   (§1–§2zzz, §8/§8b), `docs/ai_context/nhl_model_inventory.md`, `todo.md`
