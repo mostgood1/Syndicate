@@ -366,7 +366,12 @@ SHORTLIST_ROWS_PER_GAME = 6
 # `#391` caps any one GAME at 6 rows. Nothing capped a market FAMILY, which is
 # how one prop type took half the board. Substring match, so `first`, `last` and
 # `anytime` variants are all covered by one rule.
-SHORTLIST_EXCLUDED_MARKETS = "goal_scorer"
+#
+# **DEFAULT EMPTY FROM 2026-09-16, BY USER DECISION** (`learnings.md`, lane
+# `board-category-gates`): no market family is kept off the board by name;
+# every row is judged on its own EV, sim edge, value floor and the per-game cap.
+# The reasons above are why `goal_scorer` WAS the default, kept as history.
+SHORTLIST_EXCLUDED_MARKETS = ""
 
 
 # Minimum value% a row must carry to be shown. Env:

@@ -35,31 +35,46 @@ def _row(*, market, sport="soccer", ev=2.0, event_id="e1"):
 
 
 class ExcludedMarketTests(unittest.TestCase):
-    def test_goalscorer_props_are_excluded_and_counted(self) -> None:
+    """DEFAULT EMPTY since 2026-09-16 (user decision): no family is excluded by name.
+    The env knob still works when someone sets it explicitly, and is tested as such."""
+
+    def test_by_default_goalscorer_props_are_KEPT_and_nothing_is_excluded(self) -> None:
         rows = [
             _row(market="player_first_goal_scorer"),
             _row(market="player_last_goal_scorer"),
             _row(market="h2h"),
         ]
         out = select_shortlist(rows, now=_NOW)
-        kept = [r["market"] for r in out["rows"]]
-        self.assertEqual(kept, ["h2h"])
-        self.assertEqual(out["rows_excluded_market"], 2)
+        kept = sorted(r["market"] for r in out["rows"])
+        self.assertEqual(kept, ["h2h", "player_first_goal_scorer", "player_last_goal_scorer"])
+        self.assertEqual(out["rows_excluded_market"], 0)
+        self.assertEqual(out["excluded_markets"], [])
+
+    def test_by_default_the_anytime_variant_is_kept_too(self) -> None:
+        out = select_shortlist([_row(market="player_anytime_goal_scorer")], now=_NOW)
+        self.assertEqual(len(out["rows"]), 1)
+        self.assertEqual(out["rows_excluded_market"], 0)
+
+    def test_an_explicit_env_exclusion_is_a_substring_rule_and_counted(self) -> None:
+        import os
+        from unittest.mock import patch
+
+        with patch.dict(os.environ, {"SYNDICATE_SHORTLIST_EXCLUDED_MARKETS": "goal_scorer"}, clear=False):
+            out = select_shortlist([_row(market="player_anytime_goal_scorer"), _row(market="h2h")], now=_NOW)
+        self.assertEqual([r["market"] for r in out["rows"]], ["h2h"])
+        self.assertEqual(out["rows_excluded_market"], 1)
         self.assertEqual(out["excluded_markets"], ["goal_scorer"])
 
-    def test_the_anytime_variant_is_covered_by_the_same_substring(self) -> None:
-        """Substring match on purpose -- first/last/anytime are one family and a
-        literal list would silently miss whichever variant a book adds next."""
-        out = select_shortlist([_row(market="player_anytime_goal_scorer")], now=_NOW)
-        self.assertEqual(out["rows"], [])
-        self.assertEqual(out["rows_excluded_market"], 1)
-
-    def test_exclusion_beats_the_kind_floor(self) -> None:
+    def test_an_explicit_exclusion_beats_the_kind_floor(self) -> None:
         """kind_floor guarantees 30 prop slots. If exclusion ran after bucketing
-        the guarantee would drag these back -- the same ordering bug the value
-        floor and the game cap each had to avoid."""
+        the guarantee would drag these back -- the ordering still matters when
+        someone sets the knob."""
+        import os
+        from unittest.mock import patch
+
         rows = [_row(market="player_first_goal_scorer", event_id=f"g{i}") for i in range(40)]
-        out = select_shortlist(rows, now=_NOW, kind_floor=30)
+        with patch.dict(os.environ, {"SYNDICATE_SHORTLIST_EXCLUDED_MARKETS": "goal_scorer"}, clear=False):
+            out = select_shortlist(rows, now=_NOW, kind_floor=30)
         self.assertEqual(out["rows"], [])
         self.assertEqual(out["rows_excluded_market"], 40)
 
@@ -68,13 +83,13 @@ class ExcludedMarketTests(unittest.TestCase):
         self.assertEqual(len(out["rows"]), 1)
         self.assertEqual(out["rows_excluded_market"], 0)
 
-    def test_env_can_widen_or_disable_the_rule(self) -> None:
+    def test_env_can_disable_or_replace_the_list(self) -> None:
         import os
         from unittest.mock import patch
 
         with patch.dict(os.environ, {"SYNDICATE_SHORTLIST_EXCLUDED_MARKETS": ""}, clear=False):
             out = select_shortlist([_row(market="player_first_goal_scorer")], now=_NOW)
-        self.assertEqual(len(out["rows"]), 1, "empty env must DISABLE the rule, not keep the default")
+        self.assertEqual(len(out["rows"]), 1)
         self.assertEqual(out["excluded_markets"], [])
 
         with patch.dict(os.environ, {"SYNDICATE_SHORTLIST_EXCLUDED_MARKETS": "shots_on_target"}, clear=False):
