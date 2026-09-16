@@ -613,7 +613,8 @@ death, never life — do not invert it.
   - Population: 44 distinct NO orders in 09-11..09-15 -- 5 filled, 34 rejected (all one ticker), 5 resting. Table in `state_polymarket.md [polymarket-no-fill-size-is-gross-capped]`.
   - **Cheap next step for whoever picks this up:** size a NO order so that `1.00 x qty <= buying power` and see whether it is accepted. That tests H2-gross directly and costs one order.
 - Goal: [user 2026-09-15: "open a lane for the rejection loop"] a Polymarket order the venue REJECTS is not re-submitted unchanged on every pass, and its reject reason is logged. Read on production: after the fix, a venue rejection produces ONE `submitted->rejected` per (ticker, price, qty), a named reason on the log line, and no further `SUBMIT` for that ticker until something about the order changes. Accepted orders are unaffected (fills, rests and expiries continue).
-- Files: RETURNED 2026-09-15 ~16:05 CDT -- the execution ledger module and its test file are HANDED to lane execution-ledger-live-trim (same session); the resend refusal already landed (1f9c9c62). Originally DECLARED 2026-09-15 ~11:55 CDT before any edit, on user decision "do all 3". Claims checked with lane-guard's own `_claims()`: none held. NOT `pipeline/execute_portfolio.py`, which OPEN lane `kalshi-shard-balance-gate` claims; the fix is built to need no change there. The submit-response log goes in the Polymarket orders module under lane polymarket-ask-pricing (same session).
+- Files: RETURNED 2026-09-15 ~16:05 CDT -- the execution ledger module and its test file are HANDED to lane execution-ledger-live-trim (same session); the resend refusal already landed (1f9c9c62). Originally DECLARED 2026-09-15 ~11:55 CDT before any edit, on user decision "do all 3". Claims checked with lane-guard's own `_claims()`: none held. The submit-response log goes in the Polymarket orders module under lane polymarket-ask-pricing (same session).
+- **Deliberately NOT claimed** (kept off the `Files:` line, because a disclaimer there is parsed as a CLAIM and shows up as a contested file): `pipeline/execute_portfolio.py` is held by OPEN lane `kalshi-shard-balance-gate`. This lane's fix is built to need no change there.
 - Origin: found while reading step 1 of `polymarket-ask-pricing` (`deploys.md` 2026-09-15 ~15:55Z).
 - **MEASURED 2026-09-15 before any code, live-odds-worker `54f3d662`:**
   - `aec-nfl-phi-ten-2026-09-20`, `OUTCOME_SIDE_NO`, qty 6.53 @ 0.245 ($1.60), GTD to kickoff 09-20 17:00Z.
@@ -747,7 +748,7 @@ death, never life — do not invert it.
     - A balance read on the order itself is no longer possible:
       - Render logs for live-odds-worker start after 08-30. Probe 19:10Z: `VENUE_BALANCES` 0 lines on 08-30, 50 on 09-05.
       - `venue_balance_history.json` keeps 128 readings, about half a day.
-      - `/api/portfolio/live?on=all&venue=polymarket` holds 27 orders, none of them this one.
+      - The live portfolio endpoint (admin, `on=all` and `venue=polymarket`) holds 27 orders, none of them this one. Written without a path so it is not read as a file claim.
       - The ledger ops endpoint is aggregate-only by design.
     - The rule rests on the same mechanism (NO buy = YES sell, cost 1 - avgPx) measured on the balance twice: dal-nyg 91.52 -> 85.97 = 13.57 x 0.395 + 0.19, and sea-ari 2.84 -> 1.42 = 4.07 x 0.335 + 0.05.
     - Correcting the stored row is NOT done and needs its own lane.
