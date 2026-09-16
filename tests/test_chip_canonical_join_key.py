@@ -25,11 +25,31 @@ ODDS_FEED_SPELLING = "Athletic Bilbao"
 ARTIFACT_SPELLING = "Athletic Club"
 
 
+def _require_soccer_alias_map():
+    """Skip, loudly, when the soccer team artifacts are not on disk at all.
+
+    The soccer map is DERIVED from the per-league team artifacts under `data/`
+    (`team_aliases._soccer_alias_to_name`), and session worktrees exclude `data/`
+    by default. Measured 2026-09-16: without them every `canonical_team("soccer",
+    ...)` is None, so the equality below PASSED on `None == None` while the join it
+    guards could not work. An absent map is an environment fact, reported as a skip;
+    a PRESENT map that fails to resolve these clubs is a real failure and still fails.
+    """
+    import pytest
+
+    from syndicate.features.shared.team_aliases import _soccer_alias_to_name
+
+    if not _soccer_alias_to_name():
+        pytest.skip("soccer team artifacts absent (no data/ in this checkout): the alias map is empty")
+
+
 def test_the_two_spellings_that_broke_the_cards_resolve_to_one_name():
-    assert canonical_team("soccer", ODDS_FEED_SPELLING) == canonical_team("soccer", ARTIFACT_SPELLING)
-    assert canonical_team("soccer", "Real Racing Club de Santander") == canonical_team(
-        "soccer", "Racing Santander"
-    )
+    _require_soccer_alias_map()
+    athletic = canonical_team("soccer", ARTIFACT_SPELLING)
+    racing = canonical_team("soccer", "Racing Santander")
+    assert athletic is not None and racing is not None, "a present alias map must resolve both clubs, not agree on None"
+    assert canonical_team("soccer", ODDS_FEED_SPELLING) == athletic
+    assert canonical_team("soccer", "Real Racing Club de Santander") == racing
 
 
 def test_the_chip_side_and_the_row_side_agree():
@@ -39,6 +59,7 @@ def test_the_chip_side_and_the_row_side_agree():
     canonical string itself is the alias map's business and may change; what
     must never change is that both sides land on the same value.
     """
+    _require_soccer_alias_map()
     chip_key = _side_key("soccer", {"home": {"name": ARTIFACT_SPELLING}}, "home")
     row_key = _canonical_team_key("soccer", ODDS_FEED_SPELLING)
     assert chip_key is not None
