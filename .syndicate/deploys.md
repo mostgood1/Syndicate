@@ -36468,3 +36468,20 @@ Scheduled task `full-slate-memory-reading-0915`. Read-only on production: no dep
   - No boot in W ran 6 builds (two deploys), so the baseline curve is matched at 5 builds, not 6.
   - live-odds-worker's `88df44cd` deploy was still building at 03:04:56Z; its post-deploy memory is unread.
   - The JSON-to-live-memory multiplier for the candidate pool is still unmeasured, so 108 MB of pool JSON cannot be converted to the MB of pid 39 it accounts for.
+
+## 2026-09-16 03:18:33Z (22:18 CT) — READING on the 03:04:56Z live-odds-worker `88df44cd` entry — lane soccer-anytime-scorer — **fix #3 verify MET on every ESPN league the new code has rebuilt (3 of 4); eredivisie unexercised**
+
+- **The instrument is the artifact's OWN audit, not a timestamp cutoff.** `ef9f18fc` publishes `player_substrate.espn_goal_shrink`, so each artifact states whether the load-time shrink ran inside it. That selects new-code artifacts regardless of which worker wrote them, and it dissolves the writer-attribution caveat every fix #2 reading had to carry.
+- Newest artifact per league, read 03:18:33Z:
+  - championship, gen 02:25:21Z, `applied` (566 ESPN rows, `xg_zero_rows` 367 -> 0): 78 non-GK rows, **0** priced at exactly 0.0.
+  - primeira_liga, gen 03:08:58Z, `applied` (391 rows, 254 -> 0): 154 non-GK rows, **0**.
+  - belgian_pro_league, gen 02:07:55Z, `applied` (424 rows, 205 -> 0): 52 non-GK rows, **0**.
+  - **Pooled: 284 non-GK rows built by the new code, 0 at exactly 0.0, against a predicted 0. verify MET on these three leagues.**
+  - eredivisie, gen 02:02:36Z, audit **ABSENT** (old code): 39 rows, 17 zeros. **UNEXERCISED, not failing** — its newest artifact predates the new code on either worker. A watcher polls on the audit criterion and will catch its next rebuild.
+- **The sharpest single comparison, same league, two artifacts:** primeira_liga priced **113 of 190** non-GK rows at exactly 0.0 on its old-code artifact (gen 2026-09-15T23:51:29Z) and **0 of 154** on its new-code artifact (gen 03:08:58Z).
+- **Understat leagues keep a few zeros, exactly as predicted and NOT staked:** epl 4, la_liga 2, ligue_1 2, serie_a 1. The shrink is scoped to `source=espn_true_per90` and those are genuinely zero-rate players. The `no_espn_rows` audit state on non-ESPN leagues built by the new code is itself a reachability confirmation: the filter ran and correctly found nothing to touch.
+- **A production fact worth keeping, and it cost a wrong first instinct to learn:** `build_soccer_artifacts.py` log lines are UNREACHABLE. `SOCCER_ESPN_GOAL_SHRINK` returned 0 matches on live-odds-worker since 03:10Z and on refresh-worker since 00:36Z — 2 h 40 m of the code running and demonstrably applying, per the audit. `ops_refresh.py` launches refresh units with `stdout=DEVNULL` (the same reason `_apply_market_anchor` publishes an audit field instead of trusting its prints). For anything this script does, the published audit IS the only observable.
+- **Live commits at read time, checked rather than assumed:** live-odds-worker `88df44cd` (live 03:10:22Z), refresh-worker `1175e0ef` (00:36:13Z), web `4f65f2b2` (00:21:07Z). All three carry fix #3.
+- **Two instrument defects found and fixed during this reading, recorded because both would have produced a false pass:**
+  - the first watcher pointed at `C:\tmp\anytime_verify.py` while the reader lived in Git Bash's `/tmp`; it failed every cycle and took no readings at all until checked.
+  - the reader printed `share 0.0000 (predicted 0.0)` computed over ZERO rows, which is indistinguishable from the prediction being met. It now refuses to report a share over an empty population.
