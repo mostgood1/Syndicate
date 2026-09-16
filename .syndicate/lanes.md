@@ -1287,6 +1287,13 @@ death, never life — do not invert it.
 - Verification: the readings above, recorded in `deploys.md`.
 - Blocked by: `portfolio-no-family-exclusion` D1 and D2 (refresh-worker's 25-min deploy spacing serialises them).
 
+### archive-test-reports-redirect — OPEN — opened 2026-09-16 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: [user 2026-09-16: "do 1 then 2" -- 2 = lead #26] CI's `python -m unittest tests.test_archives` leaves NO files in the repo, by redirecting `SYNDICATE_REPORTS_ROOT` for unittest runs the way `tests/conftest.py` already does for pytest, without changing the suite's pass/fail outcome.
+- Baseline `[reproduced 2026-09-16 ~19:30Z, clean detached worktree at origin/main, no data/]`: `py -3 -m unittest tests.test_archives` -> Ran 386, FAILED (failures=31, skipped=2), and left `reports/intelligence/coverage_report.json` and `reports/intelligence/game_chips_2026_09_16.json` untracked in the repo. Cause: the reports-root redirect lives only in `tests/conftest.py` (~:47, `setdefault` at import), which unittest never imports; `tests/_artifact_isolation.py` exists to be shared by both runners but has no reports-root redirect, and `test_archives.py` imports it only lazily (~:136) after `from syndicate.app import create_app` (:28).
+- Verification: the same command in the same kind of worktree leaves 0 new files and still reports 386 run / 31 failures / 2 skipped (the failures are the no-`data/` environment, unchanged by this lane).
+- Files: `tests/_artifact_isolation.py`, `tests/test_archives.py` (an import at the top only). Declared 2026-09-16 ~19:35Z before any edit; unclaimed on origin/main and in the primary tree.
+- Blocked by: none. Tests only; no deploy.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
