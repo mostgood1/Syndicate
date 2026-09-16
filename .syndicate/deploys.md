@@ -36524,3 +36524,25 @@ Scheduled task `full-slate-memory-reading-0915`. Read-only on production: no dep
 - **THE POOL IS NOT THE ONLY TERM, and the same data says so:** at 01:03:03Z and 01:29:34Z the cache was EMPTY (`entries=0`) and RSS still read 1534.7 then 1808.6 MB — **+274 MB with no pool cached at all**. Anything claiming the pool explains the ceiling is refuted by those two samples.
 - **Not measured:** which of `pool_json_bytes` vs the live objects behind it dominates, and whether the ~3x holds below ~20 MB of cache (every clean interval here is a drop of 24 MB or more).
 - **Env state, read by single-key GET 03:32Z:** `SYNDICATE_CANDIDATE_POOL_CACHE_MAX` = 2 on refresh-worker, ABSENT on web and live-odds-worker. `limit=1` is a single-key PUT plus a deploy to inject it.
+
+## 2026-09-16 04:01:38Z (2026-09-15 23:01 CT) — web `4f65f2b2` -> `1ddb5854` (main tip) — lane web-export-timeout — **artifact export: per-file size cap**
+
+- **Live 04:04:57Z**, `dep-dal198n40ujc7396g4hg`, trigger=api. Locks: claim held by this lane from 04:00:4xZ; preflight **CLEAR at 04:01:10Z** for this exact SHA (gunicorn infra plus 2 already-dead defunct children). Claim released 04:06Z.
+- **Carries** (`4f65f2b2..1ddb5854`, code only, 4 commits): `a347c4ea` this fix; `1175e0ef` the soccer aggregate read memo (web did not have it); **ride-alongs** `1ddb5854` (lane `soccer-espn-window` — `build_soccer_artifacts.py` + `espn_lineups.py` validation, not on web's request path) and `d990c9c7` (two bandwidth report JSONs, inert).
+- `verify:` **PARTIALLY MET — 2 of 3 predictions, and the third was WRONG.** Prediction registered at preflight against a baseline read 04:00:52Z, 18 s earlier. Same request both times (`pattern=*2026-09-15*&since=now-30min`):
+
+| field | baseline 04:00:52Z | post-deploy 04:05:39Z | predicted | |
+|---|---|---|---|---|
+| `count` | 4 | **127** | at_least_50 | **MET** |
+| `oversize_skipped` | FIELD ABSENT | **5** | at_least_1 | **MET** |
+| `truncated` | True | **True** | False | **NOT MET** |
+| `bytes` | 17,668,098 | 22,353,459 | — | |
+| `oversize_bytes` | — | **280,442,901** | — | |
+| duration | 3.10 s | 14.24 s | — | |
+
+- **The fix works and the effect is large:** a pull that received **4** files now receives **127**, a 31.75x increase, and the five accumulators are named rather than silently eating the budget — `mlb_source/tracking/book_quotes`, both `odds_history`, `clv_openings`, `book_grid`. 280.4 MB shed VISIBLY, which was the entire point.
+- **WHERE I WAS WRONG, and it matters:** I predicted `truncated: false`, reasoning from the earlier inventory that the non-giant files came to 11.1 MB against a 24 MB budget. That figure was *files under 1 MB*. The set between 1 MB and the 8 MB cap is not small: the response carried 22.35 MB and **still truncated**. So the cap moved the binding constraint from "five accumulators" to "the 24 MB budget itself", and files are still being dropped silently — fewer of them, and now with the client logging it, but the silent-skip defect is NOT closed.
+- **Estimated remainder:** total matched 312.4 MB minus 280.4 MB oversize leaves ~32 MB of capped-eligible files against a 24 MB budget. A budget near 48 MB would cover it, at roughly 150 MB transient on a 2 GB instance once `jsonify`'s copy is counted — a decision, not an obvious win, and NOT taken here.
+- **A second-order effect, as predicted in the findings:** the request got SLOWER, 3.10 s -> 14.24 s, because it is no longer cut short by meeting a 126 MB file early. That is the interaction recorded before the change ("fixing the timeout alone makes truncation more frequent" — the converse also holds). 14.24 s is inside the client's 30 s timeout, but the walk's measured tail reaches 38 s, so this deploy plausibly RAISES the timeout rate. Unmeasured; watch `PULL_FAILED`.
+- **`SYNDICATE_ARTIFACT_EXPORT_MAX_BYTES` is documented "tunable without a deploy during an incident". That is wrong** and should not be relied on in one: the value is read from `os.environ` in-process, and a Render env change does not reach a running process — a restart does not re-inject env vars, a deploy does.
+- **Not verified here:** the client-side `PULL_INCOMPLETE` logging. It ships in the same commit but runs on the WORKERS, which were not deployed (refresh-worker `1175e0ef`, live-odds-worker `88df44cd`). Nothing has read that line in production.
