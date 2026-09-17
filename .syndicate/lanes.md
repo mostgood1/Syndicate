@@ -1338,6 +1338,16 @@ death, never life — do not invert it.
 - Verification: after the web deploy, the same read has no `unreachable` key; `verdict_reachability.market_fair_only` lists the four verdicts; every bucket with one of them carries `market_fair_only: true` and every other bucket `false`; order counts per verdict match the pre-deploy read taken in the same window.
 - Blocked by: none. The web deploy must not carry another lane's undeployed web-affecting commit without that lane's say.
 
+### sim-view-roi-decision-count — OPEN — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Goal: every bucket of `/api/ops/execution/ledger-summary` `sim_view_roi` (cross and pooled) reports `decisions` and `settled_decisions`: distinct bets, keyed the way `settled_decisions_by_sport` already keys them. The payload also reports how many decisions sit in more than one verdict. The settled sim-verdict ROI read can then state its real sample size instead of an order-row count.
+- Files:
+  - `syndicate/features/shared/paper_settlement.py` (`settled_decisions_by_sport`'s decision key lifted to module level unchanged, and the counts added in `sim_view_roi_summary` only)
+  - `tests/test_sim_view_roi_summary.py`
+- Hypothesis: sim-verdict buckets overstate independent trials because an order's idempotency key includes `selected_date` and venue, so one bet planned on several slate dates is several rows. Read 2026-09-17 00:5xZ on production's final plans: 40 of 77 distinct NCAAF bets appear on 2 or 3 slate dates (09-15..17). The paper ledger holds 458 NCAAF rows for 09-15..17, on 39 games in the 09-17 plan. 96% of the market-fair-only rows are NCAAF and grade on Sat 09-19.
+- Falsification test: `decisions == orders` in every NCAAF bucket after deploy would mean rows are already distinct bets and the change adds nothing.
+- Verification: after the web deploy, `ledger-summary?days=3&mode=paper` carries `decisions` and `settled_decisions` on 100% of cross and pooled buckets, with `decisions <= orders` everywhere and `settled_decisions <= settled`; the NCAAF buckets' decisions/orders ratio is recorded; ROI and order counts equal a same-window read taken just before.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
