@@ -709,9 +709,16 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # The daily MODEL SCORECARD (lane `model-scorecard-cron`, 2026-09-17): the Render cron
     # `model-scorecard` publishes its dated scorecard (JSON + markdown, no ISO date in the name
     # so the date-scoped worker pulls skip it), its incremental grading state, and the
-    # validated-bucket overlay the Layer 2 scorer reads (`skill_overlay`). Bounded by the cron:
-    # one run a day, ~5 files, the state pruned to 35 days of per-game sums.
-    "reports/model_scorecard/*",
+    # validated-bucket overlay the Layer 2 scorer reads (`skill_overlay`). EXPLICIT names, not
+    # an open `reports/model_scorecard/*`: `artifact_walk.iter_pattern_matches` lists each
+    # pattern's parent on EVERY export walk and stats each match, so an open family that
+    # accumulates costs every request (review by session 0f5b256e, 2026-09-17). Growth is two
+    # dated files a day plus one weekly report; the state is one file pruned to 35 days.
+    "reports/model_scorecard/model_scorecard_*.json",
+    "reports/model_scorecard/model_scorecard_*.md",
+    "reports/model_scorecard/measured_bucket_skill_overlay.json",
+    "reports/model_scorecard/state/scorecard_state.json",
+    "reports/model_scorecard/weekly/weekly_backtests_*",
     # The PROJECTED evaluation ledger (`evaluation_ledger_projection.py`). This
     # is the only form of the ledger that can cross to web at all: the RAW
     # chunks are 95-332 MB/day against the 12 MiB `_PUBLISH_MAX_BYTES` below,

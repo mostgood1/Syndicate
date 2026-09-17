@@ -256,3 +256,12 @@ def test_every_published_path_is_allowlisted():
     for relative in (msc.scorecard_path("2026-09-17"), msc.markdown_path("2026-09-17"), msc.STATE_PATH,
                      msc.OVERLAY_PATH, msc.LATEST_PATH, f"{msc.REPORT_DIR}/weekly/weekly_backtests_20260921.json"):
         assert ap.is_hot_artifact_relative_path(relative), relative
+
+
+def test_the_allowlist_names_the_family_explicitly_not_an_open_directory():
+    """An open `reports/model_scorecard/*` would list-and-stat an accumulating directory on every export walk."""
+    from syndicate.features.shared import artifact_publisher as ap
+
+    patterns = [p for p in ap.HOT_ARTIFACT_PATTERNS if p.startswith("reports/model_scorecard/")]
+    assert patterns and "reports/model_scorecard/*" not in patterns
+    assert not ap.is_hot_artifact_relative_path("reports/model_scorecard/anything_else.json")
