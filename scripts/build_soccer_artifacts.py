@@ -1186,7 +1186,137 @@ def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: 
     rec_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     _update_date_index(api_root, iso_date)
     print(f"wrote {rec_path}")
+    # AFTER the artifact is written, and unable to fail it: the freeze is an
+    # evaluation record, and no evaluation record is worth a missing board.
+    try:
+        counts = freeze_prekickoff(rec_path.parent, iso_date, payload)
+        print(
+            f"SOCCER_PREKICKOFF_FREEZE league={league} date={iso_date} "
+            + " ".join(f"{key}={value}" for key, value in counts.items()),
+            flush=True,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"SOCCER_PREKICKOFF_FREEZE_FAILED league={league} date={iso_date} error={type(exc).__name__}: {exc}", flush=True)
     return payload
+
+
+# ---------------------------------------------------------------------------
+# PRE-KICKOFF FREEZE
+# ---------------------------------------------------------------------------
+#
+# WHY. `recommendations_{date}.json` is ONE file per league-date, rewritten on
+# every build as its matches go pre -> in -> post, so after kickoff nothing
+# production holds says what the model published beforehand. Read 2026-09-17
+# 01:21:48Z over 09-13..09-16: 43 of 43 matches sat in an artifact generated
+# AFTER their kickoff. Every forward test that needs "the model before the
+# game" -- H24 (todo #665) and the soccer watch-list (#664 item 10) -- had a
+# qualifying population of zero, and a props grade on a post-match rebuild
+# would read a squad that already knows who played.
+#
+# THE RULE. A match's entry is (re)written only by a build generated BEFORE
+# its kickoff while its state is still `pre`; once a build runs at or after
+# kickoff, the entry is never touched again. So each entry is the LAST
+# pre-kickoff output. A match with no kickoff is never frozen: nothing could
+# prove its entry pre-dates the game.
+#
+# ONE FILE PER SERVICE. live-odds-worker and refresh-worker both build and
+# publish soccer recommendations. One shared path would be a whole-file replace
+# from two writers on web (#630). The service name goes in the file name, and
+# a grader merges the services' files, taking each match's latest `frozen_at`
+# that precedes the real kickoff.
+#
+# PUBLISHED WITHOUT A PUBLISHER CHANGE. The name matches the existing hot
+# pattern `soccer_source/*/api/recommendations/recommendations_*.json`, and
+# `sweep_changed_hot_artifacts` globs hot patterns. No production code lists
+# this directory (2026-09-17), so the extra name cannot be read as a date.
+
+PREKICKOFF_FREEZE_SCHEMA = "soccer_prekickoff_freeze_v1"
+
+
+def _prekickoff_service_tag() -> str:
+    raw = str(os.environ.get("RENDER_SERVICE_NAME") or "").strip().lower()
+    tag = "".join(ch if ch.isalnum() or ch == "-" else "-" for ch in raw).strip("-")
+    return tag or "local"
+
+
+def prekickoff_freeze_path(rec_dir: Path, iso_date: str, service: str | None = None) -> Path:
+    return rec_dir / f"recommendations_prekickoff_{iso_date}.{service or _prekickoff_service_tag()}.json"
+
+
+def _utc_timestamp(value: Any) -> pd.Timestamp | None:
+    if value in (None, ""):
+        return None
+    try:
+        stamp = pd.Timestamp(value)
+    except (TypeError, ValueError):
+        return None
+    if pd.isna(stamp):
+        return None
+    return stamp.tz_localize("UTC") if stamp.tzinfo is None else stamp.tz_convert("UTC")
+
+
+def freeze_prekickoff(rec_dir: Path, iso_date: str, payload: dict[str, Any], *, service: str | None = None) -> dict[str, int]:
+    """Fold one build's matches into the pre-kickoff freeze. Returns this build's counts."""
+    service = service or _prekickoff_service_tag()
+    path = prekickoff_freeze_path(rec_dir, iso_date, service)
+    existing: dict[str, Any] = {}
+    if path.exists():
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001 -- a corrupt freeze restarts; it must not stop the build
+            loaded = None
+        if isinstance(loaded, dict) and isinstance(loaded.get("matches"), dict):
+            existing = loaded["matches"]
+
+    generated_at = _utc_timestamp(payload.get("generated_at"))
+    props_by_match: dict[str, list[dict[str, Any]]] = {}
+    for row in payload.get("player_props") or []:
+        props_by_match.setdefault(str(row.get("match_id")), []).append(row)
+
+    frozen = dict(existing)
+    counts = {"frozen_this_build": 0, "kept_after_kickoff": 0, "started_unfrozen": 0, "not_pre": 0, "no_kickoff": 0}
+    for match in payload.get("matches") or []:
+        match_id = str(match.get("match_id") or "")
+        if not match_id:
+            continue
+        kickoff = _utc_timestamp(match.get("kickoff"))
+        if kickoff is None or generated_at is None:
+            counts["no_kickoff"] += 1
+            continue
+        if generated_at >= kickoff:
+            counts["kept_after_kickoff" if match_id in existing else "started_unfrozen"] += 1
+            continue
+        if str(match.get("status_state") or "pre") != "pre":
+            counts["not_pre"] += 1
+            continue
+        frozen[match_id] = {
+            "frozen_at": generated_at.isoformat(),
+            "kickoff": kickoff.isoformat(),
+            "match": match,
+            "player_props": props_by_match.get(match_id, []),
+        }
+        counts["frozen_this_build"] += 1
+
+    body = {
+        "schema": PREKICKOFF_FREEZE_SCHEMA,
+        "league": payload.get("league"),
+        "date": iso_date,
+        "service": service,
+        "updated_at": generated_at.isoformat() if generated_at is not None else None,
+        "rule": "an entry is the last build generated before its kickoff while status_state was pre; builds at or after kickoff never touch it",
+        "last_build": counts,
+        "matches": frozen,
+    }
+    # Built in full before any file is opened, then swapped in: a failure part
+    # way through leaves the previous freeze intact, never an empty file. The
+    # temp name carries the pid so two builds of one league-date on one service
+    # cannot write the same temp file; the later replace wins, and a match that
+    # build dropped is re-frozen by the next pre-kickoff build.
+    text = json.dumps(body, indent=2)
+    tmp_path = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    tmp_path.write_text(text, encoding="utf-8")
+    os.replace(tmp_path, path)
+    return counts
 
 
 def _update_date_index(api_root: Path, iso_date: str) -> None:
