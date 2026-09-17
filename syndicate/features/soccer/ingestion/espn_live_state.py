@@ -28,6 +28,28 @@ from syndicate.features.soccer.ingestion.espn_shot_events import extract_shot_ev
 
 _HALF_SECONDS = 2700.0
 _MATCH_SECONDS = 5400.0
+# THIS IS THE BEST AVAILABLE RULE, NOT THE RIGHT ANSWER, AND THE DIFFERENCE IS
+# MEASURED (lane `soccer-shot-on-target-definition`, 2026-09-17, 48 team-matches
+# across epl/la_liga/serie_a/bundesliga 09-01..09-17, ESPN's public feeds).
+#
+# Against ESPN's OWN per-team `shotsOnTarget`: this rule is exact for 39 of 48
+# teams and SHORT for 9 (seven by 1, one by 2, one by 3) -- never over. Total
+# shortfall 12 shots, 0.25 per team per match.
+#
+# IT IS NOT A MISSING TYPE, so do not "fix" it by widening this set. Every one
+# of those 9 teams has an EXACT total-shot count (48/48 per team), so the events
+# are all present and ESPN's boxscore simply classifies some of them as on
+# target while its own commentary types them `shot-off-target` / `shot-blocked`.
+# No subset of commentary type keys reconciles: a search over every combination
+# scored 39/48 at best, and adding `shot-hit-woodwork` makes it WORSE -- 10
+# teams that are exact today each had 1-3 woodwork shots, so ESPN does not count
+# those as on target either.
+#
+# So `shots_on_target_so_far` is a commentary-derived LOWER BOUND on ESPN's
+# figure. That matters beyond display: `soccer_live_gameline_source.py` banks
+# this field under the live `player_shots_on_target` market, so the banked count
+# can sit ~0.25/team/match low and understate an over. Widening the set to close
+# the gap would overshoot 39 teams to rescue 9.
 _ON_TARGET_OUTCOMES = {"goal", "saved"}
 
 
