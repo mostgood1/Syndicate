@@ -1489,6 +1489,16 @@ death, never life — do not invert it.
   ```
 - Blocked by: owners active (a1e40980, abacd435, 0f5b256e).
 
+### lane-guard-main-claims — OPEN — opened 2026-09-17 — session a1e40980-cceb-493f-adf9-5a5ca879acf6
+- Goal: `lane-guard.py` blocks an edit only for a claim that is on origin/main's `lanes.md` OR was added in the primary tree since it forked from origin/main. A claim released on main no longer blocks just because the stale primary copy still carries it. When git cannot give main's copy, it falls back to today's primary-copy behaviour. Every block names the claim's source. Proven by tests that fail on the current guard, and live after the hook files are synced into the primary tree.
+- Why: USER DECISION 2026-09-17 ("go ahead", then "Main + local claims (Recommended)"). Measured today, session a1e40980: the guard, which reads the PRIMARY tree's `lanes.md` (400+ commits behind origin/main, with large uncommitted edits by other sessions), blocked `syndicate/blueprints/ops.py` (claim released on main 2026-09-16) and `tests/test_artifact_publisher.py` (transfer recorded on main). One block persisted after a one-line mirror, while a manual replay of the hook with the same payload exited 0. The block message did not say which copy it read, so that one stayed unexplained, and the edit was written by script with the user's OK.
+- Files: `.claude/hooks/lane-guard.py` (the claim-matching loop and the block message only), `.claude/hooks/lane_claims_source.py` (NEW), `tests/test_lane_guard_claim_source.py` (NEW). All unclaimed at 2026-09-17 ~16:10Z (`claims_by_path`).
+- Hypothesis: the false blocks are claims present in the primary tree's committed history, and so in its fork point with main, that main has since released. Claims = claims(origin/main) ∪ (claims(primary working copy) − claims(fork point)) removes exactly those, keeps every claim on main, and keeps every claim a session wrote in the primary tree and has not landed.
+- Falsification test: in a temp repo mirroring that shape, a claim released on main still blocks; a local, not-yet-landed claim does not block; or a git failure makes the guard LESS strict than today.
+- Verification (PRE-REGISTERED): (1) tests: released-on-main does not block; claim on main blocks; claim added locally since the fork point blocks; no origin/main or a git error falls back to the primary copy; the block message names its source; the released-on-main test fails on the current guard. (2) existing guard suites stay green. (3) live, after the files are copied into the primary tree's `.claude/hooks/`: a session edit of a file claimed only in the stale primary copy is allowed, and a hook run against a real OPEN lane's file still blocks, naming source `main@<sha>`.
+- Rollout: land on origin/main, then copy ONLY `lane-guard.py` and `lane_claims_source.py` into `C:/Users/tempadmin/OneDrive/Coding/Syndicate/.claude/hooks/` (both have no uncommitted edits there; `deploy-guard.py` does, and is not touched).
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
