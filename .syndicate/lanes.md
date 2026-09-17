@@ -1464,6 +1464,24 @@ death, never life — do not invert it.
 - Verification: the study script's printed verdict per registration, recorded in the log and in `state_soccer.md`.
 - Blocked by: none
 
+### prop-evidence-parity — OPEN — opened 2026-09-17 — session 4a583d41-5e1a-477f-82f6-04aaabbf368c
+- Goal: [user 2026-09-17: "lets go - get this FULLY implemented", on the plan "Ask the Syndicate player-prop evidence at MLB depth for every sport"] a board-row PLAYER PROP Ask returns evidence organised into the seven `prop_evidence_v1` layers (player_sim, recent_form, matchup, advanced, game_sim, environment, track_record) for NBA, WNBA, NHL, NFL, NCAAF and soccer, each layer either filled or carrying a named absent reason; MLB's reference answer unchanged; the heavy MLB batter-vs-pitcher aggregation moved off web to a worker-built slate artifact.
+- Files:
+  - `syndicate/features/shared/prop_evidence/` (NEW package: contract, common, per-sport providers, track_record)
+  - `syndicate/blueprints/ask_the_syndicate_data.py`
+  - `syndicate/blueprints/ask_the_syndicate.py`
+  - `tests/test_ask_the_syndicate.py`
+  - `tests/test_prop_evidence_contract.py` (NEW), `tests/test_prop_evidence_providers.py` (NEW), `tests/test_mlb_bvp_slate.py` (NEW)
+  - `scripts/prop_evidence_checklist.py` (NEW), `scripts/build_mlb_bvp_slate.py` (NEW)
+  - `scripts/run_mlb_daily_sim_job.py` (the BvP slate build before its publish only)
+  - `syndicate/features/nfl/props.py` (carry the computed stdev and sample size on artifact rows; display only, pricing unchanged)
+  - `docs/ai_context/prop_evidence_reference.md` (NEW: pipeline trace per sport, model_engine_standard format)
+- Shared, declared not claimed: `syndicate/features/shared/artifact_publisher.py` gets additive `HOT_ARTIFACT_PATTERNS` entries only (pattern list held by `nhl-season-readiness` by agreement; `pull-window-dated-scope` holds the pull-window functions) -- owners messaged before the edit. Grading is NOT built here: lane `model-scorecard-cron` owns prop settlement (NHL settler, non-MLB props); this lane only READS `reports/model_scorecard/*`.
+- Hypothesis: n/a (build lane). Recon (code on origin/main `bac96455` + ledger, NOT production reads): soccer `players_by_match` is loaded by `_soccer_match_evidence` and discarded; WNBA Ask reads `minutes` where the production sim writes `min_mean` (`state_basketball.md` measured Bueckers `min_mean 38.37`); NFL prop index falls back to the newest week and only records it in `index.resolution`; `_mlb_bvp_evidence` aggregates ~70MB of JSON per pitcher on web.
+- Falsification test: on production after deploy, for a sport with prop rows on the served board, a layer its provider declares FILLABLE reads 0% filled over >= 8 sampled board prop rows (the provider does not reach the data), OR an MLB prop Ask's table titles/rows differ from the same-row pre-deploy capture.
+- Verification: (1) offline: provider tests over production-shaped fixtures; each fixture test fails with the provider's reader removed; checklist exits non-zero on an unfed declared layer. (2) production: `scripts/prop_evidence_checklist.py --base-url` per-layer fill rates per sport over sampled board prop rows, recorded in `deploys.md`; MLB same-row before/after diff empty. Sports with no slate in the window (NBA, NCAAB) are recorded as UNVERIFIED-NO-SLATE, not passed.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
