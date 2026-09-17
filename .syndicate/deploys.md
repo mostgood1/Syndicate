@@ -37151,3 +37151,17 @@ Scheduled task `full-slate-memory-reading-0915`. Read-only on production: no dep
 - **Refusal 2:** `MEMORY_GUARD_ABORT stage=post_collect_candidates_with_fallback_merge` 04:32:52Z (headroom 1,647.6 MB) -> `RECYCLE_CHECK held=children_running consecutive_refusals=1` 04:33:20Z -> `LAYER2_FAST_REFRESH date=2026-09-16 rows=3379 live_rows=6 kalshi_capture=joined:16113:108.7s elapsed_s=318.7` 04:38:14Z -> `LAYER2_REFRESH_AFTER_BUILD_ABORT ... ran=yes` 04:38:17Z; today's shortlist `written_at` 04:36:23Z (3 min 31 s after the refusal).
 - **Flags, deduplicated:** MISSED x2 distinct (02:55:33Z, 04:32:52Z) -- both are the same timing miss (fast path 291-319 s vs the 3-min window), not absent refreshes; STALE x2 (35 and 40 min, 02:53-02:58Z) -- the next-day-build queue wait already in leads.md; 0 NOT_RUN; 0 LOOP.
 - **Verdict for the pre-registered clauses:** refresh on every mid-build refusal MET (2/2); 3-min timing NOT MET (the window was set from a 14-27 s figure that is stale); today's write gap <= 25 min NOT MET only during the next-day build wait. Lane stays open for the recycle-threshold decision.
+
+## 2026-09-17 03:51:59Z (2026-09-16 22:51 CT) — live-odds-worker `f56f08dd` -> `05b808cc` (origin/main tip) — lane soccer-corners-model-rebuild — **MET (reachability): published soccer corners now come from the estimator, with the sim's values kept beside them**
+
+- **Live 03:54:49Z**, `dep-dalm7njl550s73boqn10`. Preflight CLEAR 03:51:5xZ (infrastructure only). Expectation: `soccer_recs_matches_with_corners_basis_estimator` 0 -> at least 1 after the first pregame build, against the 03:51:37Z read (104 upcoming matches in 30 artifacts, 0 with `corners_basis`).
+- **Carried:**
+  - `bea2a355` (lane `soccer-postponed-served-final`: schedule reader follows the file; unplayed fixture never FINAL). The owner cleared its ride-along by message and takes its own verify.
+  - `4515ae77` (export-walk prefilter; `artifact_walk` is imported only by `blueprints/ops.py`, web's route): inert here.
+- **Why 90 min with nothing:** soccer pregame builds are cadence-gated (see this service's 01:34:07Z entry); no league was due until ~05:1xZ.
+- `verify:` **MET** at 05:25:40Z. Published recommendations for 09-17..09-21: 6 matches carry `corners_basis=team_rates_pressure_v1`, in 5 artifacts whose `corners_estimator.state` is `on`; all 6 had `pressure_applied`. Sim -> published (home/away):
+  - Bayern Munich v Union Berlin 7.12/3.43 -> 8.02/2.50
+  - Brentford v Chelsea 5.54/5.21 -> 4.64/5.48
+  - Real Betis v Getafe 5.78/3.54 -> 5.65/3.68
+  - Monza v Sassuolo 4.15/5.22 -> 5.00/4.08
+- **The accuracy claim is NOT made here.** It is H27's forward grade on frozen post-deploy matches (`log/2026-09-16.md` ~22:45 CT).
