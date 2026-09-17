@@ -6834,3 +6834,22 @@ Seven worktrees, all clean, every commit's content on `origin/main`. `close` acc
 - **The refusal text is right to be loud and wrong about the world**: read it as "I cannot see these upstream", not "these are unlanded" — the same shape as `learnings.md` 2026-09-12's *remote-absent is not content-absent*, and the reason that rule exists.
 - **Belt and braces for a `--force` you are about to run on someone's only copy:** `git cat-file -e origin/main:<path>` for every file the branch introduced, and count the fixtures too. Cheap, and it converts "the patch-ids match" into "the files are there".
 - Two operational notes from the same pass: the tool clears OneDrive's READONLY bit on the worktree admin dir before deleting it (git alone cannot), and it reports stale admin dirs it could not remove — `session_worktree.py prune` owns those, `close` does not.
+
+## 2026-09-17 — OVERTURNED: "refresh-worker publishes NO soccer recommendations, so its pre-kickoff freeze is not observable from web" `[lane soccer-live-corners-stage2]`
+
+- **What was believed** (`deploys.md` 2026-09-17 05:42:11Z, my own verify): 0 `.refresh-worker.json` freeze files on web by 11:48:31Z and 0 publisher lines for `soccer_source/*/api/recommendations/*` in 169 log lines, therefore refresh-worker's freeze and its estimator corners are local-only and the forward grades merge over ONE visible service.
+- **What is true** (read 16:45Z): web holds **18** `recommendations_prekickoff_<date>.refresh-worker-4tx2.json` files, **50 entries, 50/50** carrying `corners_basis=team_rates_pressure_v1`, with web mtimes from **07:58:26Z** — before the reading that found none.
+- **The rule:** the service TAG in a filename is not the service NAME. `RENDER_SERVICE_NAME` is `refresh-worker-4tx2` here, so a check for `.refresh-worker.json` matches nothing while the files sit there. When a name-shaped check returns zero, PRINT THE NAMES THAT DO EXIST before concluding absence. This is 2026-09-15's "a reader's zero is not the writer's absence" one layer down: the reader was looking for the wrong string.
+
+## 2026-09-17 — FORBIDDEN: reading "which service runs the LOOP" as "which service runs the CODE" `[lane soccer-live-corners-stage2]`
+
+- **Measured:** `SYNDICATE_ENABLE_LIVE_LENS_LOOP` true on live-odds-worker, false on refresh-worker. I wrote from that: this change "needs live-odds-worker only".
+- **Why that was too strong** (peer a1e40980): `live_lens_loop.py:58` imports `poll_active_leagues_for_tick` FROM `scripts/poll_soccer_live_state`, and refresh-worker reaches the same `poll_league` through `SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN`, which is true there. Their log count: 62 `[soccer_live_state]` lines on live-odds-worker against 1 on refresh-worker in 6 h — a RARE SECOND WRITER, not a non-writer.
+- **The rule:** an env flag says which ENTRY POINT is enabled, not which code runs. Trace the importers before scoping a deploy to one service. (Their counts are quoted and owed a re-measurement by this lane before being cited as fact.)
+
+## 2026-09-17 — FORBIDDEN: verifying a new ARTIFACT field on a served UI route `[lane soccer-live-corners-stage2]`
+
+- **What happened:** after the live-corners deploy, `/soccer/<lg>/api/game/<event>` carries none of `corners_basis`, `live_corners`, `sim_projected_total_corners`, nor even `projected_total_corners` (checked directly 21:19Z). A verification taken there scores the change a NO-OP.
+- **What is true:** the fields are in the artifact the worker writes — `soccer_source/<lg>/api/live_state/live_state_<date>.json`, `games[].projection` — where the 21:15:11.797Z snapshot carried all three.
+- **The rule:** a served page is a fixed contract exposing a chosen subset. Verify a new field on the surface that WRITES it; if a UI route is meant to carry it, that contract change is a second piece of work.
+- **Corollary, found in the same minute and worth as much as the deploy:** run the CONSUMER CENSUS. The only reader of `projected_total_corners` is `syndicate/features/soccer/live_lens.py:109`, so a better live corners number currently feeds one displayed metric and no money path (`leads.md` 2026-09-17).
