@@ -344,3 +344,113 @@ def test_no_PRODUCTION_pattern_is_dropped_for_a_subset_it_can_still_match():
         f"d5e4cc51. First 3 of {len(unsound)}:\n" + "\n".join(
             f"  subset={s!r} dropped={p!r} witness={w!r}" for s, p, w in unsound[:3])
     )
+
+
+# --- the date prefilter (lane `web-export-walk-prefilter`) ---------------------
+#
+# MEASURED on production 2026-09-17 03:21-03:25Z: a `names_only` export of
+# `*2026_09_17*` returned 9 files in 28-81 s. The date subset keeps 165 of 184
+# patterns, so every dated request stat-ed and resolved every pattern-matched
+# file across all history before the caller's `fnmatch` threw nearly all of them
+# away. The prefilter moves that test in front of the stat. It must return
+# EXACTLY the caller's post-filtered set, and it must actually skip the stat.
+
+import fnmatch as _fnmatch
+from pathlib import Path as _Path
+
+from syndicate.features.shared.artifact_walk import WalkCounters
+
+DATED_PATTERNS = PATTERNS + ["*_source/data/snapshots/*/schedule_raw.json"]
+
+
+@pytest.fixture
+def dated_tree(tree):
+    """`tree`, plus other dates and a DATE-NAMED DIRECTORY, where the date is in
+    the path but not in the file name."""
+    for sport in ("mlb", "nba", "wnba"):
+        processed = tree / f"{sport}_source" / "source_artifacts" / "data" / "processed"
+        for name in ("alpha_2026_09_08.json", "beta_2026_08_30.json"):
+            (processed / name).write_text("{}", encoding="utf-8")
+        for day in ("2026-09-07", "2026-09-08"):
+            snap = tree / f"{sport}_source" / "data" / "snapshots" / day
+            snap.mkdir(parents=True)
+            (snap / "schedule_raw.json").write_text("{}", encoding="utf-8")
+    return tree
+
+
+def _rel(root, path):
+    return _Path(path).relative_to(root).as_posix()
+
+
+def _reference_subset(root, patterns, subset):
+    """What the export keeps today: the full walk, THEN the caller's fnmatch."""
+    return sorted(p for p in _naive(root, patterns) if _fnmatch.fnmatch(_rel(root, p), subset))
+
+
+@pytest.mark.parametrize("subset", ["*2026_09_07*", "*2026_09_08*", "*2026-09-07*", "*2026-09-08*", "mlb_source/*", "*nothing*"])
+def test_the_prefilter_returns_exactly_the_callers_subset(dated_tree, subset):
+    got = sorted(str(p) for p in iter_pattern_matches(
+        dated_tree, DATED_PATTERNS, accept_relative=lambda rel: _fnmatch.fnmatch(rel, subset)))
+    assert got == _reference_subset(dated_tree, DATED_PATTERNS, subset)
+
+
+def test_a_date_in_the_DIRECTORY_name_still_matches(dated_tree):
+    got = [_rel(dated_tree, p) for p in iter_pattern_matches(
+        dated_tree, DATED_PATTERNS, accept_relative=lambda rel: _fnmatch.fnmatch(rel, "*2026-09-08*"))]
+    assert sorted(got) == sorted(f"{s}_source/data/snapshots/2026-09-08/schedule_raw.json" for s in ("mlb", "nba", "wnba"))
+
+
+def test_the_prefilter_skips_the_stat_for_every_path_the_subset_rejects(dated_tree, monkeypatch):
+    """THE POINT. Without it `is_file()` runs once per pattern-matched file across
+    history; with it, once per file the date can match."""
+    calls = {"n": 0}
+    real = _Path.is_file
+
+    def counting(self, *a, **k):
+        calls["n"] += 1
+        return real(self, *a, **k)
+
+    monkeypatch.setattr(_Path, "is_file", counting)
+    unfiltered = list(iter_pattern_matches(dated_tree, DATED_PATTERNS))
+    unfiltered_calls = calls["n"]
+    calls["n"] = 0
+    subset = "*2026_09_07*"
+    kept = list(iter_pattern_matches(dated_tree, DATED_PATTERNS, accept_relative=lambda rel: _fnmatch.fnmatch(rel, subset)))
+
+    # 21 = 3 sports x (processed alpha 2 + beta 2 + live_lens alpha 1 + snapshots 2).
+    # 9 = 3 sports x the three `_2026_09_07` names; the snapshots are hyphen-dated.
+    assert unfiltered_calls == len(unfiltered) == 21
+    assert calls["n"] == len(kept) == 9, f"stat-ed {calls['n']} paths to return {len(kept)}"
+
+
+def test_the_counters_account_for_every_pattern_match(dated_tree):
+    counters = WalkCounters()
+    kept = list(iter_pattern_matches(dated_tree, DATED_PATTERNS,
+                                     accept_relative=lambda rel: _fnmatch.fnmatch(rel, "*2026_09_07*"),
+                                     counters=counters))
+    assert counters.glob_hits == 21
+    assert counters.prefiltered == 12
+    assert counters.stats == 9 == counters.yielded == len(kept)
+    assert counters.prefilter_disabled_dirs == 0
+
+
+def test_without_a_prefilter_the_walk_is_unchanged(dated_tree):
+    counters = WalkCounters()
+    got = sorted(str(p) for p in iter_pattern_matches(dated_tree, DATED_PATTERNS, counters=counters))
+    assert got == _naive(dated_tree, DATED_PATTERNS)
+    assert counters.prefiltered == 0 and counters.stats == counters.glob_hits == 21
+
+
+def test_the_prefilter_is_OFF_inside_a_symlinked_directory(dated_tree):
+    """The caller's subset test runs on the RESOLVED path. A symlinked directory
+    whose name lacks the date but whose target has it must not be dropped."""
+    snaps = dated_tree / "mlb_source" / "data" / "snapshots"
+    try:
+        os.symlink(snaps / "2026-09-07", snaps / "latest", target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("this platform cannot create a directory symlink here")
+    counters = WalkCounters()
+    got = [_rel(dated_tree, p) for p in iter_pattern_matches(
+        dated_tree, DATED_PATTERNS, accept_relative=lambda rel: _fnmatch.fnmatch(rel, "*2026-09-07*"), counters=counters)]
+    assert "mlb_source/data/snapshots/latest/schedule_raw.json" in got
+    assert counters.prefilter_disabled_dirs >= 1

@@ -34,7 +34,9 @@ from __future__ import annotations
 import fnmatch
 import os
 import posixpath
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 from typing import Iterator
 
 
@@ -51,7 +53,49 @@ def group_patterns_by_parent(patterns: list[str]) -> dict[str, list[str]]:
     return grouped
 
 
-def iter_pattern_matches(root: Path, patterns: list[str]) -> Iterator[Path]:
+@dataclass
+class WalkCounters:
+    """What one walk touched. Counts, not durations: a count is a property only
+    the walk can change, so it verifies the prefilter where wall time -- shared
+    with every other gunicorn thread -- cannot."""
+
+    parents: int = 0
+    listed: int = 0
+    glob_hits: int = 0
+    prefiltered: int = 0
+    prefilter_disabled_dirs: int = 0
+    stats: int = 0
+    yielded: int = 0
+
+
+def _relative_dir(directory: Path, root: Path, resolved_root: Path | None) -> str | None:
+    """`directory` relative to `root` as posix, or None when the prefilter must
+    NOT be trusted inside it.
+
+    The caller's own subset test runs on `relative_to_data_root`, which RESOLVES
+    the path. The prefilter tests the unresolved path so it can skip that cost,
+    and the two agree unless a symlink sits between `root` and the file. So a
+    directory whose resolved form differs is walked the old way: one resolve per
+    DIRECTORY here instead of one per file.
+    """
+    try:
+        unresolved = directory.relative_to(root).as_posix()
+        if resolved_root is None:
+            return unresolved
+        if directory.resolve().relative_to(resolved_root).as_posix() != unresolved:
+            return None
+        return unresolved
+    except Exception:
+        return None
+
+
+def iter_pattern_matches(
+    root: Path,
+    patterns: list[str],
+    *,
+    accept_relative: Callable[[str], bool] | None = None,
+    counters: WalkCounters | None = None,
+) -> Iterator[Path]:
     """Yield files under `root` matching any pattern, listing each dir once.
 
     Equivalent to `for p in patterns: yield from root.glob(p)` over FILES, minus
@@ -62,7 +106,25 @@ def iter_pattern_matches(root: Path, patterns: list[str]) -> Iterator[Path]:
     A directory that cannot be listed is skipped rather than raised: this serves
     a read-only export whose whole job is to return what it can see, and one
     unreadable directory must not fail the request.
+
+    `accept_relative` -- lane `web-export-walk-prefilter`, 2026-09-17. A caller
+    that will drop any path its own predicate rejects can pass that predicate,
+    and it is applied to the entry's path relative to `root` BEFORE the
+    `is_file()` stat. MEASURED on production 2026-09-17 03:21-03:25Z: a
+    `names_only` export of `*2026_09_17*` returned 9 files and took 28-81 s,
+    because the date subset keeps 165 of 184 patterns, so every dated request
+    stat-ed (and the export then resolved) every pattern-matched file across
+    ALL history. The prefilter cannot ADD a file, only skip a stat for a path
+    the caller would have discarded, and it is off inside any directory reached
+    through a symlink (`_relative_dir`).
     """
+    counters = counters if counters is not None else WalkCounters()
+    resolved_root: Path | None = None
+    if accept_relative is not None:
+        try:
+            resolved_root = root.resolve()
+        except Exception:
+            accept_relative = None
     seen: set[str] = set()
     for parent_glob, names in group_patterns_by_parent(list(patterns)).items():
         # One expansion of the wildcard segment, however many patterns share it.
@@ -75,15 +137,30 @@ def iter_pattern_matches(root: Path, patterns: list[str]) -> Iterator[Path]:
                 entries = os.listdir(directory)
             except Exception:
                 continue
+            counters.parents += 1
+            counters.listed += len(entries)
+            relative_dir: str | None = None
+            if accept_relative is not None:
+                relative_dir = _relative_dir(directory, root, resolved_root)
+                if relative_dir is None:
+                    counters.prefilter_disabled_dirs += 1
             for entry in entries:
                 if not any(fnmatch.fnmatch(entry, name) for name in names):
                     continue
+                counters.glob_hits += 1
                 candidate = directory / entry
                 key = str(candidate)
                 if key in seen:
                     continue
                 seen.add(key)
+                if relative_dir is not None:
+                    relative = entry if relative_dir in {"", "."} else f"{relative_dir}/{entry}"
+                    if not accept_relative(relative):
+                        counters.prefiltered += 1
+                        continue
+                counters.stats += 1
                 if candidate.is_file():
+                    counters.yielded += 1
                     yield candidate
 
 

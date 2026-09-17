@@ -29,6 +29,7 @@ from syndicate.features.shared.artifact_publisher import is_hot_artifact_relativ
 from syndicate.features.shared.artifact_publisher import EXPORT_ONLY_ARTIFACT_PATTERNS
 from syndicate.features.shared.artifact_publisher import is_exportable_artifact_relative_path
 from syndicate.features.shared.artifact_publisher import relative_to_data_root
+from syndicate.features.shared.artifact_walk import WalkCounters
 from syndicate.features.shared.artifact_walk import iter_pattern_matches
 from syndicate.features.shared.artifact_walk import patterns_that_can_match
 # Private on purpose, and imported rather than re-stated. It is the SAME
@@ -2770,6 +2771,17 @@ def api_ops_artifacts_export() -> Any:
     # bigger, separate behaviour change across every ops route.
     names_only = _coerce_bool(request.args.get("names_only"))
     artifacts: dict[str, str] = {}
+    # THE SUBSET, APPLIED DURING THE WALK (lane `web-export-walk-prefilter`).
+    # Both walks below drop every path `fnmatch(relative_path, subset_pattern)`
+    # rejects -- but only AFTER an `is_file()` stat and a `relative_to_data_root`
+    # resolve for it. A dated subset keeps 165 of 184 patterns, so a request that
+    # returns 9 files paid for every pattern-matched file across all history:
+    # 28-81 s on production 2026-09-17 03:21Z. Passing the same predicate into the
+    # walk skips those files before either cost. The post-walk test stays: it is
+    # the authority, and the prefilter is off wherever it could disagree.
+    walk_counters = WalkCounters()
+    walk_started = time.monotonic()
+    walk_accept = (lambda rel: fnmatch.fnmatch(rel, subset_pattern)) if subset_pattern else None
     if names_only:
         listing: dict[str, dict[str, Any]] = {}
         # The inventory walk carries the export-only set too. It reads no file
@@ -2784,7 +2796,7 @@ def api_ops_artifacts_export() -> Any:
         # still TIMED OUT after 180 s.
         _inventory = patterns_that_can_match(
             HOT_ARTIFACT_PATTERNS + EXPORT_ONLY_ARTIFACT_PATTERNS, subset_pattern)
-        for path in iter_pattern_matches(root, _inventory):
+        for path in iter_pattern_matches(root, _inventory, accept_relative=walk_accept, counters=walk_counters):
             relative_path = relative_to_data_root(path)
             if not relative_path or not is_exportable_artifact_relative_path(relative_path):
                 continue
@@ -2801,6 +2813,8 @@ def api_ops_artifacts_export() -> Any:
         # is no budget to exceed and nothing to truncate. Reporting a field that
         # is structurally always False would invite a caller to trust it on the
         # body-carrying path too.
+        _log_artifact_export_walk(subset_pattern, names_only=True, since_epoch=since_epoch,
+                                  counters=walk_counters, started=walk_started, returned=len(listing))
         return jsonify(
             {
                 "ok": True,
@@ -2855,7 +2869,8 @@ def api_ops_artifacts_export() -> Any:
     # now exits ONE loop instead of two, which is the same behaviour -- the old
     # inner `break` set `truncated` and the outer loop tested it immediately.
     for path in iter_pattern_matches(
-            root, patterns_that_can_match(_body_patterns, subset_pattern)):
+            root, patterns_that_can_match(_body_patterns, subset_pattern),
+            accept_relative=walk_accept, counters=walk_counters):
         relative_path = relative_to_data_root(path)
         if not relative_path or not is_exportable_artifact_relative_path(relative_path):
             continue
@@ -2932,6 +2947,8 @@ def api_ops_artifacts_export() -> Any:
                 flush=True,
             )
             next_since = None
+    _log_artifact_export_walk(subset_pattern, names_only=False, since_epoch=since_epoch,
+                              counters=walk_counters, started=walk_started, returned=len(artifacts))
     return jsonify({
         "ok": True,
         "count": len(artifacts),
@@ -3055,6 +3072,34 @@ _SINCE_TOLERANCE_SECONDS = 1e-3
 def _older_than_since(mtime: float, since_epoch: float | None) -> bool:
     """True when a file is too old for this `since` read, allowing for a rounded cursor."""
     return since_epoch is not None and float(mtime) < float(since_epoch) - _SINCE_TOLERANCE_SECONDS
+
+
+def _log_artifact_export_walk(
+    subset_pattern: str,
+    *,
+    names_only: bool,
+    since_epoch: float | None,
+    counters: WalkCounters,
+    started: float,
+    returned: int,
+) -> None:
+    """One line per pattern export: what the walk touched, and what came back.
+
+    The COUNTS are the verification instrument (lane `web-export-walk-prefilter`):
+    `glob_hits` is what the walk used to stat, `stats` is what it stats now, and
+    `prefiltered` is the difference. `elapsed_ms` is indicative only -- it shares
+    the interpreter with every other gunicorn thread, and on the body path it
+    includes reading the files.
+    """
+    print(
+        f"[ops] ARTIFACT_EXPORT_WALK pattern={subset_pattern or '-'!r} names_only={int(bool(names_only))} "
+        f"since={'yes' if since_epoch is not None else 'no'} parents={counters.parents} listed={counters.listed} "
+        f"glob_hits={counters.glob_hits} prefiltered={counters.prefiltered} "
+        f"prefilter_off_dirs={counters.prefilter_disabled_dirs} stats={counters.stats} "
+        f"yielded={counters.yielded} returned={returned} "
+        f"elapsed_ms={int((time.monotonic() - started) * 1000)}",
+        flush=True,
+    )
 
 
 # Reported per response, and capped so the envelope cannot itself become the

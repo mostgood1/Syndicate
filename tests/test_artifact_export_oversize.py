@@ -351,3 +351,53 @@ class ArtifactExportRoundedCursorTests(TestCase):
     def test_the_tolerance_is_BOUNDED_and_a_genuinely_later_since_still_excludes(self) -> None:
         """One millisecond of slack, not an open door: two ms later, the file is out."""
         self.assertEqual(self._read(repr(self.TRUE_MTIME + 0.002))["artifacts"], {})
+
+
+# ---------------------------------------------------------------------------
+# The walk PREFILTER (lane `web-export-walk-prefilter`, 2026-09-17). The export's
+# answer must not change; what changes is how many files the walk touches, and
+# that is logged per request as the verification instrument.
+# ---------------------------------------------------------------------------
+
+_OTHER_DAY = "soccer_source/epl/api/live_state/live_state_2026-09-14.json"
+
+
+class ArtifactExportWalkPrefilterTests(TestCase):
+    def setUp(self) -> None:
+        app = create_app()
+        app.testing = True
+        self.client = app.test_client()
+
+    def _get(self, tmp_dir: str, query: str) -> tuple[dict, str]:
+        import contextlib
+        import io
+
+        buffer = io.StringIO()
+        with patch.dict(os.environ, {"ADMIN_TOKEN": TOKEN, "SYNDICATE_DATA_ROOT": tmp_dir}, clear=False), \
+                contextlib.redirect_stdout(buffer):
+            response = self.client.get(query, headers={"Authorization": f"Bearer {TOKEN}"})
+        self.assertEqual(response.status_code, 200)
+        return json.loads(response.data.decode("utf-8")), buffer.getvalue()
+
+    def test_a_dated_inventory_skips_other_days_and_says_so(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            _write(tmp_dir, SMALL, "{}")
+            _write(tmp_dir, _OTHER_DAY, "{}")
+            body, logged = self._get(tmp_dir, "/api/ops/artifacts/export?pattern=*2026-09-15*&names_only=1")
+
+        self.assertEqual(sorted(body["artifacts"]), [SMALL])
+        line = next((l for l in logged.splitlines() if "ARTIFACT_EXPORT_WALK" in l), "")
+        self.assertTrue(line, "no ARTIFACT_EXPORT_WALK line: the walk is not instrumented")
+        self.assertIn("names_only=1", line)
+        self.assertRegex(line, r"prefiltered=[1-9]\d*", "the other day's file was stat-ed, not prefiltered")
+        self.assertIn("returned=1", line)
+
+    def test_a_dated_body_export_returns_the_same_file_set(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            _write(tmp_dir, SMALL, json.dumps({"league": "epl"}))
+            _write(tmp_dir, _OTHER_DAY, json.dumps({"league": "epl"}))
+            body, logged = self._get(tmp_dir, "/api/ops/artifacts/export?pattern=*2026-09-15*")
+
+        self.assertEqual(sorted(body["artifacts"]), [SMALL])
+        line = next((l for l in logged.splitlines() if "ARTIFACT_EXPORT_WALK" in l), "")
+        self.assertIn("names_only=0", line)
