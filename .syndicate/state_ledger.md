@@ -729,6 +729,7 @@ unbounded.
 - **`state.md` sections carry a subject key** `## [subject-slug] TITLE`. One
   subject, one section; a shared slug IS the stacking failure. Added because "no
   duplicate titles" was trivially true while sections were titled by date.
+- **`lane-guard.py` enforces origin/main's claims plus claims added locally since the fork point, and names each block's source** `[verified 2026-09-17, lane lane-guard-main-claims, 3d3587f7, installed in the primary tree's .claude/hooks]`. Claims released on main no longer block because the stale primary `lanes.md` still carries them. If git cannot read origin/main, the old primary-copy set is enforced. Live: 165 main + 12 local claims enforced, 4 stale dropped; harness-level Edit probes blocked with `Claim source: origin/main@...` and allowed a stale-only claim.
 - **`lane-guard.py` reads BOTH Files forms and wrapped continuation lines**
   `[verified 2026-08-18: file-like claims 52 -> 80]`. It previously matched only
   `- Files:`, so 5 lanes using `- **Files (...):**` declared paths NO HOOK COULD

@@ -6713,3 +6713,15 @@ A registration is a promise about a measurement that will exist; check that it c
 Measured 2026-09-17 ~11:4xZ, session abacd435. While removing its own temporary worktree, it ran `git worktree prune`. prune is REPO-GLOBAL: it tried to delete 8 other sessions' worktree records (`.git/worktrees/*`). Every attempt failed with "Permission denied", so nothing was lost. It still acted on work this session did not own.
 
 **How to apply.** Remove only your own worktree (`git worktree remove <path>`). If a directory is left behind, delete that directory and check `git worktree list` for your path alone. Never prune.
+
+### 2026-09-17 (session a1e40980) — FORBIDDEN: running a ledger-wide cleanup tool without first reading the rules of the lane that owns that cleanup
+
+**What happened.** The user approved "Apply all 15" after a dry run of `scripts/archive_released_lanes.py` showed 15 claim-free CLOSED lane blocks, "claims unchanged". Applied (`bac96455`). But a scheduled lane that owns archiving (`closed-lane-archive-0917b`, earlier the same day) had documented three rules the tool does not enforce: move a closed lane only when its owner session has been idle >= 240 min; never move five named lanes (including `heavy-build-child-process`, which was moved); and put bodies in `lanes_closed.md` with a one-line pointer (the tool wrote `lanes_history.md`, no pointer). 11 of the 15 belonged to sessions active at that moment.
+
+**The dry run was not the check.** It verified what the TOOL verifies -- claims and OPEN headers -- and was silent on policy that lived only in another lane's verdict and today's log. The user's approval was given on that incomplete picture, because I presented it that way.
+
+**How to apply.**
+- Before any bulk ledger move, grep today's and yesterday's log and `lanes_history.md` for a lane that owns that kind of cleanup (`archive`, `trim`, `never-archive`) and read its rules; put them in the approval question.
+- Owner-idle is not optional: an owner editing its own block during a move either fails to find it or re-creates it.
+- Undoing a landed archive trips `ledger-commit-guard` (restored blocks read as un-archiving); the override needs the user's explicit approval for that commit.
+- *(evidence: `bac96455`, revert `1a309584`, `4ef3bff8`; `log/2026-09-17.md` ~11:02 CDT and this session's entry)*
