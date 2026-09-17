@@ -5947,6 +5947,52 @@ class IntelligenceStateService:
             "layer2_shortlist": {"rows": []},
         }
 
+    @classmethod
+    def _memory_guard_aborted_pool(cls, selected_date: str | None, source_fingerprint: str, stage: str) -> dict[str, Any]:
+        """The empty pool, marked with the guard stage that refused this build.
+
+        The mark is what lets the caller tell a REFUSED build from an honestly
+        empty one, and run the cheap Layer 2 refresh after a refusal (see
+        `_refresh_layer2_after_build_abort`). An honestly empty pool carries no
+        mark, so it never triggers that refresh.
+        """
+        pool = cls._empty_candidate_pool(selected_date, source_fingerprint)
+        pool["memory_guard_abort_stage"] = str(stage)
+        return pool
+
+    def _refresh_layer2_after_build_abort(self, selected_date: str | None, candidate_pool: dict[str, Any]) -> None:
+        """Run the cheap Layer 2 shortlist refresh when the heavy build was refused MID-BUILD.
+
+        WHY (lane `heavy-build-memory-refusal`, measured on refresh-worker
+        2026-09-16). `_refresh_layer2_shortlist_only` exists so a memory-guard
+        refusal does not take the served shortlist down with the heavy build,
+        but it was only called from the `pre_source_state_fingerprint` refusal.
+        A build that passes that first guard and is refused further in returned
+        an empty pool and skipped the shortlist entirely. Today's shortlist
+        `LAYER2_SHORTLIST date=2026-09-16` was written at 22:03Z and not again
+        until a first-guard refusal ran the fast path at 23:12Z -- 69 minutes --
+        while three builds in between were refused at `post_pull_hot_artifacts`
+        (22:23:04Z) and `post_collect_candidates_with_fallback_merge` (22:48:30Z,
+        22:55:37Z). The combined board's age is that shortlist's age.
+
+        The fast path keeps its own floor (`LAYER2_GUARD_SKIP`) and its own
+        minimum interval, so this cannot run it more often or under less memory
+        than the first-guard branch already does. Never raises.
+        """
+        stage = candidate_pool.get("memory_guard_abort_stage") if isinstance(candidate_pool, dict) else None
+        if not stage:
+            return
+        try:
+            shortlist = self._refresh_layer2_shortlist_only(selected_date)
+        except Exception as exc:  # pragma: no cover - the fast path never raises; defensive
+            shortlist = None
+            print(f"[intelligence_state] LAYER2_REFRESH_AFTER_BUILD_ABORT_FAILED error={type(exc).__name__}", flush=True)
+        print(
+            f"[intelligence_state] LAYER2_REFRESH_AFTER_BUILD_ABORT date={selected_date} stage={stage} "
+            f"ran={'yes' if shortlist is not None else 'no'}",
+            flush=True,
+        )
+
     @staticmethod
     def _attach_board_stakes(global_pool: list[dict[str, Any]]) -> None:
         """Attach a fractional-Kelly suggested stake to each candidate.
@@ -6114,7 +6160,7 @@ class IntelligenceStateService:
         # the shape a high-water mark has and a leak does not.
         _release_freed_memory_to_os("pre_build_candidate_pool_start_guard")
         if _abort_build_candidate_pool_if_memory_critical("build_candidate_pool_start"):
-            return self._empty_candidate_pool(selected_date, source_fingerprint)
+            return self._memory_guard_aborted_pool(selected_date, source_fingerprint, "build_candidate_pool_start")
         try:
             from syndicate.features.shared.artifact_publisher import pull_hot_artifacts
 
@@ -6169,7 +6215,7 @@ class IntelligenceStateService:
         # 590 candidates and 1493.9MB on the plateau that builds none. 465MB.
         _release_freed_memory_to_os("pre_overview_headroom_guard")
         if _abort_build_candidate_pool_if_memory_critical("post_pull_hot_artifacts"):
-            return self._empty_candidate_pool(selected_date, source_fingerprint)
+            return self._memory_guard_aborted_pool(selected_date, source_fingerprint, "post_pull_hot_artifacts")
 
         # `#387` CUTOVER: PEAK IS NOW MAX-OF-ONE-SPORT, NOT SUM-OF-EIGHT.
         #
@@ -6403,7 +6449,7 @@ class IntelligenceStateService:
         # fit underneath it. That window is where the OOM kills happened.
         _release_freed_memory_to_os("post_build_overview_guard")
         if _abort_build_candidate_pool_if_memory_critical("post_build_overview"):
-            return self._empty_candidate_pool(selected_date, source_fingerprint)
+            return self._memory_guard_aborted_pool(selected_date, source_fingerprint, "post_build_overview")
         # `#376`: THE ONLY UNOBSERVED SPAN IN THIS FUNCTION, and the build has
         # been dying inside it since 2026-08-12 01:39:38Z.
         #
@@ -6505,7 +6551,7 @@ class IntelligenceStateService:
                 )
         _diag_log_all_process_memory("post_collect_candidates_with_fallback_merge")
         if _abort_build_candidate_pool_if_memory_critical("post_collect_candidates_with_fallback_merge"):
-            return self._empty_candidate_pool(selected_date, source_fingerprint)
+            return self._memory_guard_aborted_pool(selected_date, source_fingerprint, "post_collect_candidates_with_fallback_merge")
 
         # `#336`, second half of the split. With BOARD_OVERVIEW_READY above,
         # these two numbers localise the zero to one of three places:
@@ -6608,7 +6654,7 @@ class IntelligenceStateService:
         _build_span_exit("candidate_building", _candidate_build_mark)
         _diag_log_all_process_memory("post_candidate_building")
         if _abort_build_candidate_pool_if_memory_critical("post_candidate_building"):
-            return self._empty_candidate_pool(selected_date, source_fingerprint)
+            return self._memory_guard_aborted_pool(selected_date, source_fingerprint, "post_candidate_building")
 
         # `#567`, the other half of the unattributed 181s. This loop reloads a
         # per-sport odds-history payload and joins it against every candidate.
@@ -6625,7 +6671,7 @@ class IntelligenceStateService:
         manifest_shard_keys = {sport_slug: resolve_current_shard_key(sport_slug, selected_date) for sport_slug in manifests}
         for sport_slug, manifest in manifests.items():
             if _abort_build_candidate_pool_if_memory_critical(f"manifest_loop_sport={sport_slug}"):
-                return self._empty_candidate_pool(selected_date, source_fingerprint)
+                return self._memory_guard_aborted_pool(selected_date, source_fingerprint, f"manifest_loop_sport={sport_slug}")
             try:
                 _history_mark: float | None = time.monotonic()
             except Exception:
@@ -8082,6 +8128,7 @@ class IntelligenceStateService:
         logger.info("BETTING_BOARD_PUBLISH_START", extra={"selected_date": selected_date, "question": question})
 
         candidate_pool = _timed_candidate_pool(self._build_candidate_pool, selected_date, source_fingerprint)
+        self._refresh_layer2_after_build_abort(selected_date, candidate_pool)
         candidate_pool_count = int(candidate_pool.get("candidate_count") or 0)
         # 2026-07-25: everything below this point (through the final return)
         # was only ever traced via logger.info/_log_stage_timing -- confirmed
@@ -8448,6 +8495,7 @@ class IntelligenceStateService:
                 self._last_run_started_at = time.time()
 
             candidate_pool = _timed_candidate_pool(self._build_candidate_pool, selected_date, source_fingerprint)
+            self._refresh_layer2_after_build_abort(selected_date, candidate_pool)
             candidate_pool_count = int(candidate_pool.get("candidate_count") or 0)
             if candidate_pool_count <= 0 and selected_date == central_today_iso() and not payload_had_explicit_date:
                 rollover_date = _next_supported_intelligence_date(selected_date)
