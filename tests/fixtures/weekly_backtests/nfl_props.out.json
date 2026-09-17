@@ -1,0 +1,948 @@
+{
+  "sport": "nfl",
+  "scope": "player props (rate model)",
+  "generated_at": "2026-09-17T15:06:18.904072+00:00",
+  "seasons": [
+    2025,
+    2026
+  ],
+  "coverage": {
+    "player_ids": 919,
+    "player_game_weeks": 5691,
+    "player_stat_weeks_no_rate": 13014
+  },
+  "section_1_point_accuracy": {
+    "passing_yards": {
+      "n": 554,
+      "excluded_zero_engagement": 3691,
+      "correlation": 0.6364,
+      "mae_model": 60.8021,
+      "mae_constant_baseline": 84.9832,
+      "mae_debiased": 60.8782,
+      "mean_bias": -1.6669,
+      "baseline_value": 183.0054,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "verdict": "beats baseline by 24.1811",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": false,
+        "reason": "needs >= 20 distinct (season,week) pairs, have 16"
+      }
+    },
+    "passing_attempts": {
+      "n": 637,
+      "excluded_zero_engagement": 3608,
+      "correlation": 0.7624,
+      "mae_model": 7.1644,
+      "mae_constant_baseline": 14.0522,
+      "mae_debiased": 7.1892,
+      "mean_bias": -0.1163,
+      "baseline_value": 24.3061,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "verdict": "beats baseline by 6.8878",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": false,
+        "reason": "needs >= 20 distinct (season,week) pairs, have 16"
+      }
+    },
+    "passing_tds": {
+      "n": 502,
+      "excluded_zero_engagement": 3743,
+      "correlation": 0.2967,
+      "mae_model": 0.9425,
+      "mae_constant_baseline": 1.0002,
+      "mae_debiased": 0.9375,
+      "mean_bias": 0.0463,
+      "baseline_value": 1.3147,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "verdict": "beats baseline by 0.0577",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": false,
+        "reason": "needs >= 20 distinct (season,week) pairs, have 16"
+      }
+    },
+    "rushing_yards": {
+      "n": 2366,
+      "excluded_zero_engagement": 1879,
+      "correlation": 0.7058,
+      "mae_model": 13.7511,
+      "mae_constant_baseline": 24.0391,
+      "mae_debiased": 14.0046,
+      "mean_bias": -0.7993,
+      "baseline_value": 22.6589,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "verdict": "beats baseline by 10.288",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": false,
+        "reason": "needs >= 20 distinct (season,week) pairs, have 16"
+      }
+    },
+    "rushing_attempts": {
+      "n": 2505,
+      "excluded_zero_engagement": 1740,
+      "correlation": 0.826,
+      "mae_model": 2.1698,
+      "mae_constant_baseline": 4.9076,
+      "mae_debiased": 2.2196,
+      "mean_bias": -0.1899,
+      "baseline_value": 4.9042,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "verdict": "beats baseline by 2.7378",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": false,
+        "reason": "needs >= 20 distinct (season,week) pairs, have 16"
+      }
+    },
+    "receptions": {
+      "n": 3711,
+      "excluded_zero_engagement": 534,
+      "correlation": 0.596,
+      "mae_model": 1.3648,
+      "mae_constant_baseline": 1.7457,
+      "mae_debiased": 1.363,
+      "mean_bias": 0.0307,
+      "baseline_value": 2.5101,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "verdict": "beats baseline by 0.3809",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": false,
+        "reason": "needs >= 20 distinct (season,week) pairs, have 16"
+      }
+    },
+    "receiving_yards": {
+      "n": 3667,
+      "excluded_zero_engagement": 578,
+      "correlation": 0.559,
+      "mae_model": 18.4039,
+      "mae_constant_baseline": 23.152,
+      "mae_debiased": 18.4457,
+      "mean_bias": -0.2666,
+      "baseline_value": 27.9419,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "verdict": "beats baseline by 4.7481",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": false,
+        "reason": "needs >= 20 distinct (season,week) pairs, have 16"
+      }
+    },
+    "interceptions": {
+      "n": 460,
+      "excluded_zero_engagement": 3785,
+      "correlation": 0.0887,
+      "mae_model": 0.6664,
+      "mae_constant_baseline": 0.6604,
+      "mae_debiased": 0.6559,
+      "mean_bias": 0.0534,
+      "baseline_value": 0.5957,
+      "beats_constant_baseline": false,
+      "debiased_beats_baseline": true,
+      "verdict": "BIASED, NOT BLIND -- de-biased beats by 0.0045",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": false,
+        "reason": "needs >= 20 distinct (season,week) pairs, have 16"
+      }
+    },
+    "anytime_td": {
+      "n": 4245,
+      "excluded_zero_engagement": 0,
+      "correlation": 0.2407,
+      "mae_model": 0.3991,
+      "mae_constant_baseline": 0.4201,
+      "mae_debiased": 0.4024,
+      "mean_bias": -0.0061,
+      "baseline_value": 0.2702,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "verdict": "beats baseline by 0.021",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": false,
+        "reason": "needs >= 20 distinct (season,week) pairs, have 16"
+      }
+    }
+  },
+  "section_2_ladder_calibration": {
+    "markets": {
+      "passing_yards": {
+        "n": 2770,
+        "brier_score": 0.2111,
+        "buckets": [
+          {
+            "bucket": 1,
+            "n": 277,
+            "avg_predicted": 0.1297,
+            "actual_hit_rate": 0.1877,
+            "gap": -0.058
+          },
+          {
+            "bucket": 2,
+            "n": 277,
+            "avg_predicted": 0.1546,
+            "actual_hit_rate": 0.2383,
+            "gap": -0.0836
+          },
+          {
+            "bucket": 3,
+            "n": 277,
+            "avg_predicted": 0.2389,
+            "actual_hit_rate": 0.3357,
+            "gap": -0.0969
+          },
+          {
+            "bucket": 4,
+            "n": 277,
+            "avg_predicted": 0.2891,
+            "actual_hit_rate": 0.343,
+            "gap": -0.0538
+          },
+          {
+            "bucket": 5,
+            "n": 277,
+            "avg_predicted": 0.4089,
+            "actual_hit_rate": 0.4765,
+            "gap": -0.0676
+          },
+          {
+            "bucket": 6,
+            "n": 277,
+            "avg_predicted": 0.473,
+            "actual_hit_rate": 0.509,
+            "gap": -0.0361
+          },
+          {
+            "bucket": 7,
+            "n": 277,
+            "avg_predicted": 0.6648,
+            "actual_hit_rate": 0.6823,
+            "gap": -0.0175
+          },
+          {
+            "bucket": 8,
+            "n": 277,
+            "avg_predicted": 0.6828,
+            "actual_hit_rate": 0.6606,
+            "gap": 0.0221
+          },
+          {
+            "bucket": 9,
+            "n": 277,
+            "avg_predicted": 0.8439,
+            "actual_hit_rate": 0.7365,
+            "gap": 0.1074
+          },
+          {
+            "bucket": 10,
+            "n": 277,
+            "avg_predicted": 0.8692,
+            "actual_hit_rate": 0.8087,
+            "gap": 0.0605
+          }
+        ]
+      },
+      "passing_attempts": {
+        "n": 3160,
+        "brier_score": 0.189,
+        "buckets": [
+          {
+            "bucket": 1,
+            "n": 316,
+            "avg_predicted": 0.0778,
+            "actual_hit_rate": 0.1108,
+            "gap": -0.033
+          },
+          {
+            "bucket": 2,
+            "n": 316,
+            "avg_predicted": 0.1498,
+            "actual_hit_rate": 0.1962,
+            "gap": -0.0464
+          },
+          {
+            "bucket": 3,
+            "n": 316,
+            "avg_predicted": 0.1893,
+            "actual_hit_rate": 0.2468,
+            "gap": -0.0575
+          },
+          {
+            "bucket": 4,
+            "n": 316,
+            "avg_predicted": 0.2717,
+            "actual_hit_rate": 0.2753,
+            "gap": -0.0036
+          },
+          {
+            "bucket": 5,
+            "n": 316,
+            "avg_predicted": 0.357,
+            "actual_hit_rate": 0.4462,
+            "gap": -0.0892
+          },
+          {
+            "bucket": 6,
+            "n": 316,
+            "avg_predicted": 0.4644,
+            "actual_hit_rate": 0.4462,
+            "gap": 0.0182
+          },
+          {
+            "bucket": 7,
+            "n": 316,
+            "avg_predicted": 0.6581,
+            "actual_hit_rate": 0.6456,
+            "gap": 0.0125
+          },
+          {
+            "bucket": 8,
+            "n": 316,
+            "avg_predicted": 0.6862,
+            "actual_hit_rate": 0.7342,
+            "gap": -0.048
+          },
+          {
+            "bucket": 9,
+            "n": 316,
+            "avg_predicted": 0.843,
+            "actual_hit_rate": 0.8101,
+            "gap": 0.0329
+          },
+          {
+            "bucket": 10,
+            "n": 316,
+            "avg_predicted": 0.87,
+            "actual_hit_rate": 0.8006,
+            "gap": 0.0693
+          }
+        ]
+      },
+      "passing_tds": {
+        "n": 2460,
+        "brier_score": 0.2143,
+        "buckets": [
+          {
+            "bucket": 1,
+            "n": 246,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.1667,
+            "gap": -0.008
+          },
+          {
+            "bucket": 2,
+            "n": 246,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.2236,
+            "gap": -0.0649
+          },
+          {
+            "bucket": 3,
+            "n": 246,
+            "avg_predicted": 0.3085,
+            "actual_hit_rate": 0.3171,
+            "gap": -0.0085
+          },
+          {
+            "bucket": 4,
+            "n": 246,
+            "avg_predicted": 0.3085,
+            "actual_hit_rate": 0.3008,
+            "gap": 0.0077
+          },
+          {
+            "bucket": 5,
+            "n": 246,
+            "avg_predicted": 0.5,
+            "actual_hit_rate": 0.3577,
+            "gap": 0.1423
+          },
+          {
+            "bucket": 6,
+            "n": 246,
+            "avg_predicted": 0.5,
+            "actual_hit_rate": 0.4593,
+            "gap": 0.0407
+          },
+          {
+            "bucket": 7,
+            "n": 246,
+            "avg_predicted": 0.6915,
+            "actual_hit_rate": 0.6016,
+            "gap": 0.0898
+          },
+          {
+            "bucket": 8,
+            "n": 246,
+            "avg_predicted": 0.6915,
+            "actual_hit_rate": 0.6057,
+            "gap": 0.0858
+          },
+          {
+            "bucket": 9,
+            "n": 246,
+            "avg_predicted": 0.8413,
+            "actual_hit_rate": 0.7439,
+            "gap": 0.0974
+          },
+          {
+            "bucket": 10,
+            "n": 246,
+            "avg_predicted": 0.8413,
+            "actual_hit_rate": 0.7358,
+            "gap": 0.1056
+          }
+        ]
+      },
+      "rushing_yards": {
+        "n": 12325,
+        "brier_score": 0.1926,
+        "buckets": [
+          {
+            "bucket": 1,
+            "n": 1232,
+            "avg_predicted": 0.1128,
+            "actual_hit_rate": 0.1583,
+            "gap": -0.0455
+          },
+          {
+            "bucket": 2,
+            "n": 1232,
+            "avg_predicted": 0.1448,
+            "actual_hit_rate": 0.2175,
+            "gap": -0.0727
+          },
+          {
+            "bucket": 3,
+            "n": 1232,
+            "avg_predicted": 0.211,
+            "actual_hit_rate": 0.2062,
+            "gap": 0.0048
+          },
+          {
+            "bucket": 4,
+            "n": 1232,
+            "avg_predicted": 0.2686,
+            "actual_hit_rate": 0.3141,
+            "gap": -0.0455
+          },
+          {
+            "bucket": 5,
+            "n": 1232,
+            "avg_predicted": 0.3769,
+            "actual_hit_rate": 0.2768,
+            "gap": 0.1001
+          },
+          {
+            "bucket": 6,
+            "n": 1232,
+            "avg_predicted": 0.4472,
+            "actual_hit_rate": 0.4667,
+            "gap": -0.0195
+          },
+          {
+            "bucket": 7,
+            "n": 1232,
+            "avg_predicted": 0.6666,
+            "actual_hit_rate": 0.5771,
+            "gap": 0.0895
+          },
+          {
+            "bucket": 8,
+            "n": 1232,
+            "avg_predicted": 0.7087,
+            "actual_hit_rate": 0.6502,
+            "gap": 0.0585
+          },
+          {
+            "bucket": 9,
+            "n": 1232,
+            "avg_predicted": 0.8413,
+            "actual_hit_rate": 0.9383,
+            "gap": -0.097
+          },
+          {
+            "bucket": 10,
+            "n": 1237,
+            "avg_predicted": 0.8854,
+            "actual_hit_rate": 0.7203,
+            "gap": 0.1652
+          }
+        ]
+      },
+      "rushing_attempts": {
+        "n": 12335,
+        "brier_score": 0.2054,
+        "buckets": [
+          {
+            "bucket": 1,
+            "n": 1233,
+            "avg_predicted": 0.12,
+            "actual_hit_rate": 0.18,
+            "gap": -0.0601
+          },
+          {
+            "bucket": 2,
+            "n": 1233,
+            "avg_predicted": 0.1495,
+            "actual_hit_rate": 0.2271,
+            "gap": -0.0776
+          },
+          {
+            "bucket": 3,
+            "n": 1233,
+            "avg_predicted": 0.2237,
+            "actual_hit_rate": 0.2474,
+            "gap": -0.0237
+          },
+          {
+            "bucket": 4,
+            "n": 1233,
+            "avg_predicted": 0.2775,
+            "actual_hit_rate": 0.3228,
+            "gap": -0.0453
+          },
+          {
+            "bucket": 5,
+            "n": 1233,
+            "avg_predicted": 0.3924,
+            "actual_hit_rate": 0.3131,
+            "gap": 0.0793
+          },
+          {
+            "bucket": 6,
+            "n": 1233,
+            "avg_predicted": 0.4578,
+            "actual_hit_rate": 0.4307,
+            "gap": 0.0271
+          },
+          {
+            "bucket": 7,
+            "n": 1233,
+            "avg_predicted": 0.6672,
+            "actual_hit_rate": 0.6083,
+            "gap": 0.0589
+          },
+          {
+            "bucket": 8,
+            "n": 1233,
+            "avg_predicted": 0.7004,
+            "actual_hit_rate": 0.5588,
+            "gap": 0.1416
+          },
+          {
+            "bucket": 9,
+            "n": 1233,
+            "avg_predicted": 0.8426,
+            "actual_hit_rate": 0.8597,
+            "gap": -0.0171
+          },
+          {
+            "bucket": 10,
+            "n": 1238,
+            "avg_predicted": 0.8825,
+            "actual_hit_rate": 0.7383,
+            "gap": 0.1442
+          }
+        ]
+      },
+      "receptions": {
+        "n": 17985,
+        "brier_score": 0.2153,
+        "buckets": [
+          {
+            "bucket": 1,
+            "n": 1798,
+            "avg_predicted": 0.1524,
+            "actual_hit_rate": 0.2024,
+            "gap": -0.0501
+          },
+          {
+            "bucket": 2,
+            "n": 1798,
+            "avg_predicted": 0.1564,
+            "actual_hit_rate": 0.2097,
+            "gap": -0.0533
+          },
+          {
+            "bucket": 3,
+            "n": 1798,
+            "avg_predicted": 0.293,
+            "actual_hit_rate": 0.3309,
+            "gap": -0.0379
+          },
+          {
+            "bucket": 4,
+            "n": 1798,
+            "avg_predicted": 0.3007,
+            "actual_hit_rate": 0.3037,
+            "gap": -0.003
+          },
+          {
+            "bucket": 5,
+            "n": 1798,
+            "avg_predicted": 0.4798,
+            "actual_hit_rate": 0.4533,
+            "gap": 0.0265
+          },
+          {
+            "bucket": 6,
+            "n": 1798,
+            "avg_predicted": 0.4893,
+            "actual_hit_rate": 0.4055,
+            "gap": 0.0838
+          },
+          {
+            "bucket": 7,
+            "n": 1798,
+            "avg_predicted": 0.6847,
+            "actual_hit_rate": 0.6112,
+            "gap": 0.0734
+          },
+          {
+            "bucket": 8,
+            "n": 1798,
+            "avg_predicted": 0.6882,
+            "actual_hit_rate": 0.5779,
+            "gap": 0.1103
+          },
+          {
+            "bucket": 9,
+            "n": 1798,
+            "avg_predicted": 0.8436,
+            "actual_hit_rate": 0.718,
+            "gap": 0.1256
+          },
+          {
+            "bucket": 10,
+            "n": 1803,
+            "avg_predicted": 0.8546,
+            "actual_hit_rate": 0.7876,
+            "gap": 0.067
+          }
+        ]
+      },
+      "receiving_yards": {
+        "n": 18460,
+        "brier_score": 0.2146,
+        "buckets": [
+          {
+            "bucket": 1,
+            "n": 1846,
+            "avg_predicted": 0.1461,
+            "actual_hit_rate": 0.2281,
+            "gap": -0.0819
+          },
+          {
+            "bucket": 2,
+            "n": 1846,
+            "avg_predicted": 0.1538,
+            "actual_hit_rate": 0.2324,
+            "gap": -0.0786
+          },
+          {
+            "bucket": 3,
+            "n": 1846,
+            "avg_predicted": 0.2796,
+            "actual_hit_rate": 0.3169,
+            "gap": -0.0373
+          },
+          {
+            "bucket": 4,
+            "n": 1846,
+            "avg_predicted": 0.2937,
+            "actual_hit_rate": 0.3142,
+            "gap": -0.0204
+          },
+          {
+            "bucket": 5,
+            "n": 1846,
+            "avg_predicted": 0.463,
+            "actual_hit_rate": 0.4355,
+            "gap": 0.0275
+          },
+          {
+            "bucket": 6,
+            "n": 1846,
+            "avg_predicted": 0.4802,
+            "actual_hit_rate": 0.4182,
+            "gap": 0.062
+          },
+          {
+            "bucket": 7,
+            "n": 1846,
+            "avg_predicted": 0.6814,
+            "actual_hit_rate": 0.5672,
+            "gap": 0.1142
+          },
+          {
+            "bucket": 8,
+            "n": 1846,
+            "avg_predicted": 0.6909,
+            "actual_hit_rate": 0.6013,
+            "gap": 0.0896
+          },
+          {
+            "bucket": 9,
+            "n": 1846,
+            "avg_predicted": 0.8439,
+            "actual_hit_rate": 0.8077,
+            "gap": 0.0362
+          },
+          {
+            "bucket": 10,
+            "n": 1846,
+            "avg_predicted": 0.8652,
+            "actual_hit_rate": 0.7665,
+            "gap": 0.0987
+          }
+        ]
+      },
+      "interceptions": {
+        "n": 2280,
+        "brier_score": 0.2104,
+        "buckets": [
+          {
+            "bucket": 1,
+            "n": 228,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.2149,
+            "gap": -0.0563
+          },
+          {
+            "bucket": 2,
+            "n": 228,
+            "avg_predicted": 0.1587,
+            "actual_hit_rate": 0.1272,
+            "gap": 0.0315
+          },
+          {
+            "bucket": 3,
+            "n": 228,
+            "avg_predicted": 0.3085,
+            "actual_hit_rate": 0.2895,
+            "gap": 0.0191
+          },
+          {
+            "bucket": 4,
+            "n": 228,
+            "avg_predicted": 0.3085,
+            "actual_hit_rate": 0.2895,
+            "gap": 0.0191
+          },
+          {
+            "bucket": 5,
+            "n": 228,
+            "avg_predicted": 0.5,
+            "actual_hit_rate": 0.386,
+            "gap": 0.114
+          },
+          {
+            "bucket": 6,
+            "n": 228,
+            "avg_predicted": 0.5,
+            "actual_hit_rate": 0.386,
+            "gap": 0.114
+          },
+          {
+            "bucket": 7,
+            "n": 228,
+            "avg_predicted": 0.6915,
+            "actual_hit_rate": 0.5088,
+            "gap": 0.1827
+          },
+          {
+            "bucket": 8,
+            "n": 228,
+            "avg_predicted": 0.6915,
+            "actual_hit_rate": 0.4912,
+            "gap": 0.2002
+          },
+          {
+            "bucket": 9,
+            "n": 228,
+            "avg_predicted": 0.8413,
+            "actual_hit_rate": 0.8377,
+            "gap": 0.0036
+          },
+          {
+            "bucket": 10,
+            "n": 228,
+            "avg_predicted": 0.8413,
+            "actual_hit_rate": 0.7456,
+            "gap": 0.0957
+          }
+        ]
+      },
+      "anytime_td": {
+        "n": 4245,
+        "brier_score": 0.1672,
+        "buckets": [
+          {
+            "bucket": 1,
+            "n": 424,
+            "avg_predicted": 0.1494,
+            "actual_hit_rate": 0.1462,
+            "gap": 0.0032
+          },
+          {
+            "bucket": 2,
+            "n": 424,
+            "avg_predicted": 0.18,
+            "actual_hit_rate": 0.1274,
+            "gap": 0.0526
+          },
+          {
+            "bucket": 3,
+            "n": 424,
+            "avg_predicted": 0.1965,
+            "actual_hit_rate": 0.1722,
+            "gap": 0.0243
+          },
+          {
+            "bucket": 4,
+            "n": 424,
+            "avg_predicted": 0.2091,
+            "actual_hit_rate": 0.1344,
+            "gap": 0.0747
+          },
+          {
+            "bucket": 5,
+            "n": 424,
+            "avg_predicted": 0.2225,
+            "actual_hit_rate": 0.1604,
+            "gap": 0.0622
+          },
+          {
+            "bucket": 6,
+            "n": 424,
+            "avg_predicted": 0.2484,
+            "actual_hit_rate": 0.1981,
+            "gap": 0.0503
+          },
+          {
+            "bucket": 7,
+            "n": 424,
+            "avg_predicted": 0.2747,
+            "actual_hit_rate": 0.2547,
+            "gap": 0.02
+          },
+          {
+            "bucket": 8,
+            "n": 424,
+            "avg_predicted": 0.3103,
+            "actual_hit_rate": 0.2877,
+            "gap": 0.0226
+          },
+          {
+            "bucket": 9,
+            "n": 424,
+            "avg_predicted": 0.3616,
+            "actual_hit_rate": 0.3255,
+            "gap": 0.0361
+          },
+          {
+            "bucket": 10,
+            "n": 429,
+            "avg_predicted": 0.4861,
+            "actual_hit_rate": 0.4172,
+            "gap": 0.0689
+          }
+        ]
+      }
+    },
+    "pooled_all_markets_informational_only": {
+      "n": 76020,
+      "brier_score": 0.2057,
+      "buckets": [
+        {
+          "bucket": 1,
+          "n": 7602,
+          "avg_predicted": 0.1325,
+          "actual_hit_rate": 0.1989,
+          "gap": -0.0664
+        },
+        {
+          "bucket": 2,
+          "n": 7602,
+          "avg_predicted": 0.156,
+          "actual_hit_rate": 0.2076,
+          "gap": -0.0515
+        },
+        {
+          "bucket": 3,
+          "n": 7602,
+          "avg_predicted": 0.2369,
+          "actual_hit_rate": 0.2406,
+          "gap": -0.0037
+        },
+        {
+          "bucket": 4,
+          "n": 7602,
+          "avg_predicted": 0.2921,
+          "actual_hit_rate": 0.3136,
+          "gap": -0.0215
+        },
+        {
+          "bucket": 5,
+          "n": 7602,
+          "avg_predicted": 0.3848,
+          "actual_hit_rate": 0.3587,
+          "gap": 0.0261
+        },
+        {
+          "bucket": 6,
+          "n": 7602,
+          "avg_predicted": 0.4776,
+          "actual_hit_rate": 0.4303,
+          "gap": 0.0473
+        },
+        {
+          "bucket": 7,
+          "n": 7602,
+          "avg_predicted": 0.6351,
+          "actual_hit_rate": 0.556,
+          "gap": 0.079
+        },
+        {
+          "bucket": 8,
+          "n": 7602,
+          "avg_predicted": 0.6883,
+          "actual_hit_rate": 0.6269,
+          "gap": 0.0613
+        },
+        {
+          "bucket": 9,
+          "n": 7602,
+          "avg_predicted": 0.8321,
+          "actual_hit_rate": 0.7748,
+          "gap": 0.0573
+        },
+        {
+          "bucket": 10,
+          "n": 7602,
+          "avg_predicted": 0.8673,
+          "actual_hit_rate": 0.7573,
+          "gap": 0.11
+        }
+      ]
+    }
+  },
+  "section_3_real_market_hit_rate": {
+    "no_resolvable_player": 0,
+    "no_resolvable_rate": 0,
+    "pushes_excluded": 0,
+    "markets": {}
+  }
+}

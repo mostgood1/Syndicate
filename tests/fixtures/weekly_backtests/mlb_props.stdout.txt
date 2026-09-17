@@ -1,0 +1,186 @@
+  ...1/2 dates, 218 player-games
+  ...2/2 dates, 478 player-games
+
+COVERAGE
+  dates sampled                 : 2
+  dates with no projection      : 0
+  dates with no box score       : 0
+  player-games joined           : 478
+  excluded, did not bat (0 PA)  : 25
+
+PER-MARKET (a market whose mean was never written is NOT measurable,
+no matter how many player-games joined -- see #429's hrr_mean)
+  market         n     corr  MAE model  MAE base MAE debias     bias    infl verdict
+  ----------------------------------------------------------------------------------
+  h            478   0.2688     0.6662    0.6863     0.6570  +0.0946   11.5% beats baseline by 0.0201
+                                                                             out-of-sample NOT COMPUTED: needs >= 6 distinct dates, have 2
+  tb           478   0.2763     1.3050    1.3265     1.2504  +0.1559   11.5% beats baseline by 0.0215
+                                                                             out-of-sample NOT COMPUTED: needs >= 6 distinct dates, have 2
+  rbi          478   0.2075     0.6171    0.5868     0.5617  +0.1273   31.0% BIASED, NOT BLIND -- de-biased beats baseline by 0.0251 (bias +0.1273)
+                                                                             out-of-sample NOT COMPUTED: needs >= 6 distinct dates, have 2
+  r            478   0.2323     0.5479    0.5455     0.5127  +0.1204   28.3% BIASED, NOT BLIND -- de-biased beats baseline by 0.0328 (bias +0.1204)
+                                                                             out-of-sample NOT COMPUTED: needs >= 6 distinct dates, have 2
+  2b           478    0.127     0.2365    0.2311     0.2263  +0.0136   10.3% BIASED, NOT BLIND -- de-biased beats baseline by 0.0048 (bias +0.0136)
+                                                                             out-of-sample NOT COMPUTED: needs >= 6 distinct dates, have 2
+  3b           478   0.1546     0.0296    0.0329     0.0323  -0.0029  -17.2% beats baseline by 0.0033
+                                                                             out-of-sample NOT COMPUTED: needs >= 6 distinct dates, have 2
+  sb           478   0.2912     0.1170    0.1467     0.1391  -0.0261  -32.9% beats baseline by 0.0297
+                                                                             out-of-sample NOT COMPUTED: needs >= 6 distinct dates, have 2
+  hrr          478   0.2728     1.4368    1.4195     1.3478  +0.3423   20.6% BIASED, NOT BLIND -- de-biased beats baseline by 0.0717 (bias +0.3423)
+                                                                             out-of-sample NOT COMPUTED: needs >= 6 distinct dates, have 2
+
+========================================================================
+MEASURED_SKILL block:
+{
+  "sport": "mlb",
+  "scope": "hitter props",
+  "generated_at": "2026-09-17T15:03:35.658344+00:00",
+  "dates": "2026-09-15..2026-09-16",
+  "player_games": 478,
+  "markets": {
+    "h": {
+      "n": 478,
+      "correlation": 0.2688,
+      "mae_model": 0.6662,
+      "mae_constant_baseline": 0.6863,
+      "mae_debiased": 0.657,
+      "mean_bias": 0.0946,
+      "baseline_value": 0.8243,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "inflation_pct_of_baseline": 11.5,
+      "verdict": "beats baseline by 0.0201",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": false,
+        "reason": "needs >= 6 distinct dates, have 2"
+      }
+    },
+    "tb": {
+      "n": 478,
+      "correlation": 0.2763,
+      "mae_model": 1.305,
+      "mae_constant_baseline": 1.3265,
+      "mae_debiased": 1.2504,
+      "mean_bias": 0.1559,
+      "baseline_value": 1.3598,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "inflation_pct_of_baseline": 11.5,
+      "verdict": "beats baseline by 0.0215",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": false,
+        "reason": "needs >= 6 distinct dates, have 2"
+      }
+    },
+    "rbi": {
+      "n": 478,
+      "correlation": 0.2075,
+      "mae_model": 0.6171,
+      "mae_constant_baseline": 0.5868,
+      "mae_debiased": 0.5617,
+      "mean_bias": 0.1273,
+      "baseline_value": 0.41,
+      "beats_constant_baseline": false,
+      "debiased_beats_baseline": true,
+      "inflation_pct_of_baseline": 31.0,
+      "verdict": "BIASED, NOT BLIND -- de-biased beats baseline by 0.0251 (bias +0.1273)",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": false,
+        "reason": "needs >= 6 distinct dates, have 2"
+      }
+    },
+    "r": {
+      "n": 478,
+      "correlation": 0.2323,
+      "mae_model": 0.5479,
+      "mae_constant_baseline": 0.5455,
+      "mae_debiased": 0.5127,
+      "mean_bias": 0.1204,
+      "baseline_value": 0.4247,
+      "beats_constant_baseline": false,
+      "debiased_beats_baseline": true,
+      "inflation_pct_of_baseline": 28.3,
+      "verdict": "BIASED, NOT BLIND -- de-biased beats baseline by 0.0328 (bias +0.1204)",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": false,
+        "reason": "needs >= 6 distinct dates, have 2"
+      }
+    },
+    "2b": {
+      "n": 478,
+      "correlation": 0.127,
+      "mae_model": 0.2365,
+      "mae_constant_baseline": 0.2311,
+      "mae_debiased": 0.2263,
+      "mean_bias": 0.0136,
+      "baseline_value": 0.1318,
+      "beats_constant_baseline": false,
+      "debiased_beats_baseline": true,
+      "inflation_pct_of_baseline": 10.3,
+      "verdict": "BIASED, NOT BLIND -- de-biased beats baseline by 0.0048 (bias +0.0136)",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": false,
+        "reason": "needs >= 6 distinct dates, have 2"
+      }
+    },
+    "3b": {
+      "n": 478,
+      "correlation": 0.1546,
+      "mae_model": 0.0296,
+      "mae_constant_baseline": 0.0329,
+      "mae_debiased": 0.0323,
+      "mean_bias": -0.0029,
+      "baseline_value": 0.0167,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "inflation_pct_of_baseline": -17.2,
+      "verdict": "beats baseline by 0.0033",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": false,
+        "reason": "needs >= 6 distinct dates, have 2"
+      }
+    },
+    "sb": {
+      "n": 478,
+      "correlation": 0.2912,
+      "mae_model": 0.117,
+      "mae_constant_baseline": 0.1467,
+      "mae_debiased": 0.1391,
+      "mean_bias": -0.0261,
+      "baseline_value": 0.0795,
+      "beats_constant_baseline": true,
+      "debiased_beats_baseline": true,
+      "inflation_pct_of_baseline": -32.9,
+      "verdict": "beats baseline by 0.0297",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": false,
+        "reason": "needs >= 6 distinct dates, have 2"
+      }
+    },
+    "hrr": {
+      "n": 478,
+      "correlation": 0.2728,
+      "mae_model": 1.4368,
+      "mae_constant_baseline": 1.4195,
+      "mae_debiased": 1.3478,
+      "mean_bias": 0.3423,
+      "baseline_value": 1.659,
+      "beats_constant_baseline": false,
+      "debiased_beats_baseline": true,
+      "inflation_pct_of_baseline": 20.6,
+      "verdict": "BIASED, NOT BLIND -- de-biased beats baseline by 0.0717 (bias +0.3423)",
+      "validation": "in_sample",
+      "out_of_sample": {
+        "available": false,
+        "reason": "needs >= 6 distinct dates, have 2"
+      }
+    }
+  }
+}

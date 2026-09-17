@@ -1,0 +1,28 @@
+{
+ "files": [
+  {
+   "source": "reports/intelligence/clv_openings/2026-09-16.jsonl",
+   "dest": "<work>/layer2/2026-09-16/openings.jsonl",
+   "required": true,
+   "status": "fetched",
+   "bytes": 19128712,
+   "seconds": 0.9
+  },
+  {
+   "source": "reports/intelligence/clv_departures/2026-09-16.jsonl",
+   "dest": "<work>/layer2/2026-09-16/departures.jsonl",
+   "required": false,
+   "status": "fetched",
+   "bytes": 2569202,
+   "seconds": 0.5
+  },
+  {
+   "source": "game-chips:2026-09-16",
+   "dest": "<work>/layer2/2026-09-16/chips.json",
+   "required": true,
+   "status": "fetched",
+   "bytes": 87134,
+   "seconds": 1.1
+  }
+ ]
+}

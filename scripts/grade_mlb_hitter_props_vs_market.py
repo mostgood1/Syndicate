@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import re
 import statistics
 import sys
@@ -82,11 +83,16 @@ BUCKET_RE = re.compile(r"^(?P<fam>[a-z_]+?)_(?P<k>\d+)plus$")
 
 def _env() -> dict:
     out = {}
-    for line in (REPO_ROOT / ".env").read_text(encoding="utf-8").splitlines():
+    env_file = REPO_ROOT / ".env"
+    lines = env_file.read_text(encoding="utf-8").splitlines() if env_file.is_file() else []
+    for line in lines:
         line = line.strip()
         if line and not line.startswith("#") and "=" in line:
             k, v = line.split("=", 1)
             out[k.strip()] = v.strip().strip('"').strip("'")
+    # A fresh clone (the `model-scorecard` cron) has no .env; the token arrives in the environment.
+    if not out.get("ADMIN_TOKEN") and os.environ.get("ADMIN_TOKEN"):
+        out["ADMIN_TOKEN"] = os.environ["ADMIN_TOKEN"].strip()
     return out
 
 
@@ -141,8 +147,8 @@ def fetch_projections(date: str, token: str, cache: Path) -> list[dict]:
     return rows
 
 
-def load_odds(date: str) -> dict[tuple[str, str], dict]:
-    path = SNAPSHOTS / date / f"oddsapi_hitter_props_{date.replace('-', '_')}.json"
+def load_odds(date: str, snapshots: Path = SNAPSHOTS) -> dict[tuple[str, str], dict]:
+    path = snapshots / date / f"oddsapi_hitter_props_{date.replace('-', '_')}.json"
     if not path.is_file():
         return {}
     try:
@@ -160,8 +166,7 @@ def load_odds(date: str) -> dict[tuple[str, str], dict]:
     return out
 
 
-def load_actuals() -> dict[tuple[str, str], dict]:
-    path = DATA / "processed/mlb_batter_game_log.csv"
+def load_actuals(path: Path = DATA / "processed/mlb_batter_game_log.csv") -> dict[tuple[str, str], dict]:
     out: dict[tuple[str, str], dict] = {}
     if not path.is_file():
         return out
@@ -201,6 +206,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dates", default="2026-06-15..2026-06-27")
     parser.add_argument("--json", type=Path, default=None)
+    # A fresh clone has no data/ inputs; the weekly runner pulls web's copies
+    # (odds from daily/snapshots, allowlisted) into a temp root and points here.
+    parser.add_argument("--snapshots-dir", type=Path, default=SNAPSHOTS,
+                        help="dir holding <date>/oddsapi_hitter_props_<date>.json")
+    parser.add_argument("--batter-log", type=Path, default=DATA / "processed/mlb_batter_game_log.csv")
     args = parser.parse_args()
 
     lo, _, hi = args.dates.partition("..")
@@ -210,7 +220,7 @@ def main() -> int:
     env = _env()
     token = env.get("ADMIN_TOKEN", "")
     cache = Path(env.get("TEMP", "/tmp")) / "mlb_prop_market_cache"
-    actuals = load_actuals()
+    actuals = load_actuals(args.batter_log)
 
     counters = Counter()
     scored: dict[str, dict[str, list]] = defaultdict(lambda: defaultdict(list))
@@ -222,7 +232,7 @@ def main() -> int:
 
     for date in dates:
         projections = fetch_projections(date, token, cache)
-        odds = load_odds(date)
+        odds = load_odds(date, args.snapshots_dir)
         if not projections or not odds:
             print(f"  {date}: projections={len(projections)} odds={len(odds)} -> SKIPPED")
             counters["dates_skipped"] += 1

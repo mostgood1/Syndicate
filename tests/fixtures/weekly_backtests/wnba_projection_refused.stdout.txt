@@ -1,0 +1,18 @@
+stored WNBA dates in production: 2 (limited to 2)
+
+COVERAGE (the intersection is what every number below rests on)
+  dates considered                  : 2
+  dates with no projection artifact : 0
+  dates with no ESPN final          : 2
+  games joined to a final           : 0
+  ...of those, WITH pred_margin     : 0   (0.0%)
+  ...of those, WITH pred_total      : 0   (0.0%)
+
+REFUSING TO EMIT A SKILL CONSTANT: only 0 games carry a projection (< --min-games 30).
+0 games joined to a final, but a joined game the model never
+scored says nothing about the model. Gating on the join instead of on
+the projection is how a 9-game sample gets reported as 361.
+
+THE FINDING IS THE COVERAGE, NOT THE SKILL: production game_cards carry
+a projection on 0 of 0 completed games. Fix that
+before measuring skill -- a correlation here would be #377 again.

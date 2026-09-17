@@ -73,10 +73,16 @@ MARKETS: dict[str, str] = {
 
 
 def _admin_token() -> str:
-    for line in (REPO_ROOT / ".env").read_text(encoding="utf-8").splitlines():
-        if line.strip().startswith("ADMIN_TOKEN="):
-            return line.split("=", 1)[1].strip().strip('"').strip("'")
-    raise SystemExit("ADMIN_TOKEN not found in .env")
+    env_file = REPO_ROOT / ".env"
+    if env_file.is_file():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith("ADMIN_TOKEN="):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    # A fresh clone (the `model-scorecard` cron) has no .env; the token arrives in the environment.
+    token = str(os.environ.get("ADMIN_TOKEN") or "").strip()
+    if token:
+        return token
+    raise SystemExit("ADMIN_TOKEN not found in .env or the environment")
 
 
 def _get(url: str, headers: dict | None = None, timeout: int = 120) -> bytes:

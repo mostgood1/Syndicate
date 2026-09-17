@@ -1,0 +1,45 @@
+{
+  "weeks_graded": [],
+  "anytime_td": {
+    "n": 0,
+    "refused_min_games": 0,
+    "brier_model": NaN,
+    "brier_player_mean": NaN,
+    "brier_base_rate": NaN
+  },
+  "yardage": {
+    "Receiving Yards": {
+      "n": 0,
+      "mae_model": NaN,
+      "mae_player_mean": NaN,
+      "mae_base_rate": NaN
+    },
+    "Rushing Yards": {
+      "n": 0,
+      "mae_model": NaN,
+      "mae_player_mean": NaN,
+      "mae_base_rate": NaN
+    },
+    "Passing Yards": {
+      "n": 0,
+      "mae_model": NaN,
+      "mae_player_mean": NaN,
+      "mae_base_rate": NaN
+    },
+    "Receptions": {
+      "n": 0,
+      "mae_model": NaN,
+      "mae_player_mean": NaN,
+      "mae_base_rate": NaN
+    },
+    "Passing TDs": {
+      "n": 0,
+      "mae_model": NaN,
+      "mae_player_mean": NaN,
+      "mae_base_rate": NaN
+    }
+  },
+  "season": 2026,
+  "rows": 8115,
+  "players": 4731
+}

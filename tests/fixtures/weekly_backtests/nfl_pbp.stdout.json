@@ -1,0 +1,22 @@
+{
+ "fetched_at": "2026-09-17T15:05:57+00:00",
+ "artifact_root": "<work>/nfl_data/nfl_source/source_artifacts",
+ "results": [
+  {
+   "season": 2026,
+   "path": "<work>/nfl_data/nfl_source/source_artifacts/tracking/nflverse/pbp/pbp_2026.csv",
+   "existed": false,
+   "bytes": 5537943,
+   "reg_plays": 2756,
+   "status": "written"
+  },
+  {
+   "season": 2025,
+   "path": "<work>/nfl_data/nfl_source/source_artifacts/tracking/nflverse/pbp/pbp_2025.csv",
+   "existed": false,
+   "bytes": 97951481,
+   "reg_plays": 46452,
+   "status": "written"
+  }
+ ]
+}
