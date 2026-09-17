@@ -1395,6 +1395,14 @@ death, never life — do not invert it.
   SAFE_SLUGS=
   ```
 
+### soccer-capture-staleness — OPEN — opened 2026-09-17 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Goal: `#664` item 9, measured before changed. Establish whether stale soccer BTTS / corners captures (audit: median 13.8 h before kickoff) become paper-portfolio positions sized on price alone. If they do, bring those markets' capture close enough to kickoff that a staked row's quote is no older than the h2h/totals quotes staked beside it, within the OddsAPI budget. If they do not, record the reading and close without a capture change.
+- Files: none yet (diagnostic). Capture code is claimed only if the reading licenses a change.
+- Hypothesis (H28): since EV-only staking opened to every sport (2026-09-16), soccer `btts` and `alternate_totals_corners` rows sized on market fair reach the paper plan and ledger, and the quotes behind them are materially older at plan time than h2h/totals quotes. A stale best price against a stale consensus can read +EV after the market has moved.
+- Falsification test: (a) 0 soccer btts/corners positions across 09-16..09-17 plans and paper ledger; or (b) their quote age at plan time is not materially older (median within 2 h) than the soccer h2h/totals positions in the same plans.
+- Verification: a production read naming counts of soccer positions by market, the quote age at plan time per market (median, p90), and the capture schedule for those markets. Only if H28 holds: a capture change with a budget estimate, deployed, then the same read showing the age gap closed.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
