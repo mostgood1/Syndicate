@@ -36,6 +36,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from syndicate.features.soccer.adapters import build_soccer_simulation_adapter
+from syndicate.features.soccer.features.corners_estimator import CORNERS_BASIS
+from syndicate.features.soccer.features.corners_estimator import apply_corners_estimator
 from syndicate.features.soccer.features.lineups import attach_confirmed_starters
 from syndicate.features.soccer.features.loaders import build_soccer_simulation_input
 from syndicate.features.soccer.features.loaders import compute_team_ratings
@@ -1126,11 +1128,18 @@ def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: 
             }
         )
 
+    # THE PUBLISHED CORNERS COME FROM THE CORNERS ESTIMATOR, not the possession sim
+    # (lane `soccer-corners-model-rebuild`, H27). The sim's own values stay beside
+    # them on each match; see `features/corners_estimator.py` for why and how.
+    corners_audit = _apply_corners_estimator(league, source_root, iso_date, matches)
+
     payload = {
         "league": league,
         "date": iso_date,
         "generated_at": pd.Timestamp.now("UTC").isoformat(),
         "simulations": simulations,
+        # Published for the same reason as `anchor`: the builder's stdout is discarded.
+        "corners_estimator": corners_audit,
         "promoted_prior_teams": promoted,
         # PUBLISHED BECAUSE THE LOGS CANNOT BE READ. See `_apply_market_anchor`.
         "anchor": anchor_audit,
@@ -1198,6 +1207,14 @@ def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: 
     except Exception as exc:  # noqa: BLE001
         print(f"SOCCER_PREKICKOFF_FREEZE_FAILED league={league} date={iso_date} error={type(exc).__name__}: {exc}", flush=True)
     return payload
+
+
+def _apply_corners_estimator(league: str, source_root: Path, iso_date: str, matches: list[dict[str, Any]]) -> dict[str, Any]:
+    """The estimator never costs the board: a failure leaves the sim's corners and says so."""
+    try:
+        return apply_corners_estimator(league, source_root, iso_date, matches)
+    except Exception as exc:  # noqa: BLE001
+        return {"basis": CORNERS_BASIS, "state": f"failed:{type(exc).__name__}", "error": str(exc)[:300]}
 
 
 # ---------------------------------------------------------------------------
