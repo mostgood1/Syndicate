@@ -6838,3 +6838,125 @@ carried-forward work in `docs/ai_context/todo.md` `#650`/`#651`/`#652`.
   SAFE_SLUGS=
   ```
 - Blocked by: owners active (a1e40980, abacd435, 0f5b256e).
+
+### execution-ledger-live-trim — CLOSED 2026-09-17 — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **DEPLOYED TO BOTH WORKERS AND CONFIRMED ON PRODUCTION (21 trims, 21 paper, 0 live dropped); GOAL NOT MET — the goal asks for a FULL DAY**
+- **VERDICT 2026-09-17 12:15Z (07:15 CDT), scheduled reading `midnight-reading-trim-bookquotes-poolcap-0916`.** Goal (verbatim): "[user 2026-09-15 ~16:05 CDT: "Lane: never trim live rows (Recommended)"] the execution ledger's record cap never drops a live row. Over the cap it drops the oldest PAPER rows only; if non-paper rows alone exceed the cap it keeps every one and logs a tripwire. Read on production after both workers run it: every `TRIMMED` line carries `live_dropped=0` across a full day, and the served live book's row count never falls between reads without an operator action." — **GOAL: MET.**
+  - (a) Duration: 36 h 42 m since refresh-worker `61ac543a` went live at 2026-09-15T23:33:30Z. Every commit live since then contains `a2a1fa32` by `git merge-base --is-ancestor`: 16 refresh-worker deploys (through `05b808cc`, live 2026-09-17T05:47:43Z) and 8 live-odds-worker deploys (through `05b808cc`, live 03:54:49Z). refresh-worker was down after `server_failed` 09-16 12:32:21Z until the 14:37:10Z deploy. No instance ran without the fix.
+  - (b) Every `[execution_ledger] TRIMMED` line reads paper only. refresh-worker: **1,545 lines, keys `{'paper'}` only, 1,584 rows dropped**, covered 09-15T23:54:34Z..09-17T11:07:06Z. live-odds-worker: **103 lines, `{'paper'}` only, 139 rows dropped**, covered 09-16T01:57:26Z..09-17T09:15:41Z. 0 lines lacked `dropped_by_mode`, so there are no outgoing-instance exceptions. The goal's `live_dropped=0` is the pre-registered `dropped_by_mode` with no `live` key.
+  - (c) Both workers have a population: 1,545 and 103 lines. `LEDGER_OVER_CAP_PROTECTED`: 0 on both.
+  - (d) Served live rows at 12:11:48Z: `/api/portfolio/live?on=all&show=all` `orders` **233**; `ledger-summary?days=60` `live:*` orders **233** (kalshi 184, polymarket 49). Baseline was 177, so the count never fell below it. Between reads the only evidence is the trim lines above, which dropped no live row.
+  - The 30 previously lost live rows stay RECORDED, NOT RESTORED (user decision 09-16). This verdict does not touch that.
+- **USER DECISION 2026-09-16 ~16:30Z: the 30 lost live rows are RECORDED, NOT RESTORED.** Full list and how to correct analyses: `state_model.md [execution-ledger-lost-live-rows]`. Restoring would need new code (the orphan scan is report-only; Polymarket is per-order and invisible to it) and two worker deploys, for analytics only. This does not change the goal verdict, which waits on tonight's full-day reading.
+- **VERDICT 2026-09-16 00:10Z (2026-09-15 19:10 CT), session 0f5b256e.** Goal (verbatim): "[user 2026-09-15 ~16:05 CDT: "Lane: never trim live rows (Recommended)"] the execution ledger's record cap never drops a live row. Over the cap it drops the oldest PAPER rows only; if non-paper rows alone exceed the cap it keeps every one and logs a tripwire. Read on production after both workers run it: every `TRIMMED` line carries `live_dropped=0` across a full day, and the served live book's row count never falls between reads without an operator action." — **GOAL: NOT MET**, and the gap is DURATION, not doubt.
+  - **Deployed to both workers on 2026-09-15:** live-odds-worker `cc141267` live 23:27:50Z (lane `legacy-steam-crossing-delta`'s deploy); refresh-worker `61ac543a` live 23:33:30Z (this lane's own, user-approved).
+  - **CONFIRMED ON PRODUCTION at 00:06:42Z: `TRIMMED` 21, `dropped_by_mode={'paper': 21}`, protected 0, served live rows 177.** Every dropped row paper; no live row dropped.
+  - Served live rows **177 on all six reads**, never below baseline. The ledger's own live count (128 Kalshi + 49 Polymarket = 177) equals the served count, so the guard is not reading past a loss.
+  - **What blocks MET:** (a) the goal's "across a full day" — this is 31 minutes; (b) **live-odds-worker has no population** (9 rounds, `TRIMMED` 0), so its trim path is unmeasured there even though it runs the same commit.
+  - Restoring the 20 Polymarket + 10 Kalshi rows already lost remains a SEPARATE user decision; the manifest is built.
+- **VERDICT (checkpoint 2026-09-15 ~16:55 CDT).** Goal: "[user 2026-09-15 ~16:05 CDT: "Lane: never trim live rows (Recommended)"] the execution ledger's record cap never drops a live row. Over the cap it drops the oldest PAPER rows only; if non-paper rows alone exceed the cap it keeps every one and logs a tripwire. Read on production after both workers run it: every `TRIMMED` line carries `live_dropped=0` across a full day, and the served live book's row count never falls between reads without an operator action." — **GOAL: NOT MET.**
+  - `_trim_to_cap` drops only rows whose mode is exactly paper; unknown and live rows are kept, with `LEDGER_OVER_CAP_PROTECTED`, and `TRIMMED` reports `dropped_by_mode`. 197 passed across `tests/test_execution_ledger*.py`.
+  - Held unpushed until lane soccer-player-role-allocation pinned refresh-worker to `2d579fd1`, so it rides nothing unapproved.
+  - **Left:** the user's OK for a deploy to both workers (after the queued `2d579fd1` deploys), then the production reading in the Goal. Restoring the 20 lost fills is a separate user decision after that.
+  - **DEPLOY APPROVED `[user 2026-09-15 ~17:00 CDT: "approve the ledger trim deploy"]`.** `a2a1fa32` reaches the workers inside other lanes' main deploys rather than its own:
+    - live-odds-worker: lane legacy-steam-crossing-delta's main-tip deploy, third in line after the goal-count `2d579fd1` and this session's price-at-ask redeploy.
+    - refresh-worker: asked lane soccer-player-role-allocation to move its pending pin `2d579fd1` to main's tip. Otherwise this lane deploys main there itself, 25 min after theirs.
+  - **Expectation, pre-registered:** after each worker boots on a commit containing `a2a1fa32`, every `[execution_ledger] TRIMMED` line carries `dropped_by_mode={'paper': N}` and never a `live` key, and `LEDGER_OVER_CAP_PROTECTED` stays absent. The served live row count never falls between reads without an operator action.
+  - **Baseline:** today's `TRIMMED` lines carry no `dropped_by_mode` field (167 on refresh-worker and 6 on live-odds-worker, 12:00-20:50Z). Served live rows `[/api/portfolio/live?on=all&show=all, read 2026-09-15 22:01:14Z]`: **177** (polymarket filled 27 / rejected 22; kalshi filled 101 / rejected 17 / failed 10). The earliest is 2026-08-26T01:53Z, while Polymarket fills from 09-01 are gone: the trim cuts by list position, not by date.
+- Goal: [user 2026-09-15 ~16:05 CDT: "Lane: never trim live rows (Recommended)"] the execution ledger's record cap never drops a live row. Over the cap it drops the oldest PAPER rows only; if non-paper rows alone exceed the cap it keeps every one and logs a tripwire. Read on production after both workers run it: every `TRIMMED` line carries `live_dropped=0` across a full day, and the served live book's row count never falls between reads without an operator action.
+- Origin: lane `polymarket-no-fill-booking-audit`'s lead.
+  - `_MAX_RECORDS = 5000` drops oldest-first ACROSS modes (`execution_ledger.py:971-976`). The ledger sits at the cap: `TRIMMED dropped=1 kept=5000` logged 167 times on refresh-worker and 6 on live-odds-worker 09-15 12:00-20:50Z.
+  - 20 live Polymarket orders with venue `FILL_PRICE` readings 09-01..09-04 are absent from `/api/portfolio/live?on=all&venue=polymarket&show=all` (49 rows).
+- Files: `syndicate/features/shared/execution_ledger.py` (the trim in `_persist` and its log line only), `tests/test_execution_ledger.py` (trim tests only). HANDED from this session's lane `polymarket-rejected-resubmit-loop`.
+- Hypothesis: paper volume (about 230 orders/day) keeps the ledger at the cap, and live rows are dropped only for being oldest; no rule targets them.
+- Falsification: after deploy, any `TRIMMED` line with `live_dropped>0`, or a live book row count that falls between two reads with no operator action.
+- Size: live rows are a few per day and about 1,094 B each, so protecting them cannot approach the store's 8 MB refusal ceiling within any horizon that matters. The tripwire covers the case anyway.
+- **Lost live Polymarket fills (not in the served book 2026-09-15 ~20:40Z), by venue order id:** `C4N3GPYA4GNQ`, `C5Z80VJKYKDK`, `C7A2NRX2EKDF`, `C7CEAC90MKDD`, `C7CEAP1SRKDM`, `C7CG2G8CCKDK`, `C7CGCT7PTKDN`, `C7CNYDJV4KDH`, `C7CX3YKB4KDN`, `C7G9F92G8KDD`, `C7GA29PGCKDD`, `C7WAS5YB4MCS`, `C7V7H872JMA6`, `C7YJT13SEM9F`, `C8292W0ATMA3`, `C84V9M1Z6MCK`, `C8GBQRTHMMW0`, `C8ZAFJ9S6MW0`, `C9B0G201JMVG`, `C9CHPYTAJMVG`.
+  - Restorable later from the venue's per-order read by id. Not in scope here.
+  - Kalshi losses are uncounted.
+- **RESTORE MANIFEST 2026-09-15 ~21:20Z (read-only; scratchpad `trimmed_fills_manifest.json`).**
+  - 8 full records from venue `ORDER_STATE`/`FILL_PRICE`/`COMMISSION` log lines (7 with a `LIVE_ORDER` submit line). Their cost incl. fees: $17.30.
+  - 12 SCAN-ONLY: side, avgPx and booked price as the 09-01..09-15 FILL_PRICE scan saved them.
+    - **Their log lines EXPIRED during this investigation.** Render keeps about 14 days on a rolling basis: every line at 09-01T19:25:55Z was readable around 20:00Z and returned 0 at 21:15Z.
+    - Several were reconciled until 09-13/09-14, so they left the ledger in the last one to two days.
+    - Contracts, market and stake for these now exist only at the venue, via the per-order read by id from live-odds-worker.
+  - **Restoring is gated on:** (a) this lane's trim fix being live on both workers, or the next trim drops the restored rows again; (b) a user decision on a one-shot restore on live-odds-worker, since only that process holds the venue credentials.
+  - Rows:
+    - `C4N3GPYA4GNQ` NO avgPx 0.4900 booked 0.51; SCAN ONLY (reconciled 2026-09-01..2026-09-11T03:51Z)
+    - `C5Z80VJKYKDK` YES avgPx 0.2100 booked 0.21; SCAN ONLY (reconciled 2026-09-01..2026-09-11T18:44Z)
+    - `C7A2NRX2EKDF` YES avgPx 0.3800 booked 0.38; SCAN ONLY (reconciled 2026-09-01..2026-09-13T16:52Z)
+    - `C7CEAC90MKDD` YES avgPx 0.2700 booked 0.27; SCAN ONLY (reconciled 2026-09-01..2026-09-14T00:00Z)
+    - `C7CEAP1SRKDM` YES avgPx 0.3400 booked 0.34; SCAN ONLY (reconciled 2026-09-01..2026-09-02T21:04Z)
+    - `C7CG2G8CCKDK` YES avgPx 0.2500 booked 0.25; SCAN ONLY (reconciled 2026-09-01..2026-09-12T21:20Z)
+    - `C7CGCT7PTKDN` YES avgPx 0.2900 booked 0.29; SCAN ONLY (reconciled 2026-09-01..2026-09-14T00:00Z)
+    - `C7CNYDJV4KDH` NO avgPx 0.5000 booked 0.5; tsc-mlb-bal-col-2026-08-31-10pt5 x 5.04, fee 0.08, cost $2.60, created 2026-09-01T00:44Z
+    - `C7CX3YKB4KDN` YES avgPx 0.4600 booked 0.46; SCAN ONLY (reconciled 2026-09-01..2026-09-02T01:01Z)
+    - `C7G9F92G8KDD` YES avgPx 0.2500 booked 0.25; SCAN ONLY (reconciled 2026-09-01..2026-09-02T05:02Z)
+    - `C7GA29PGCKDD` YES avgPx 0.3800 booked 0.38; SCAN ONLY (reconciled 2026-09-01..2026-09-14T04:17Z)
+    - `C7WAS5YB4MCS` YES avgPx 0.2100 booked 0.21; SCAN ONLY (reconciled 2026-09-01..2026-09-14T04:17Z)
+    - `C7V7H872JMA6` YES avgPx 0.2700 booked 0.27; SCAN ONLY (reconciled 2026-09-01..2026-09-02T17:47Z)
+    - `C7YJT13SEM9F` YES avgPx 0.3350 booked 0.335; aec-mlb-ath-tex-2026-09-01 x 5.35, fee 0.07, cost $1.86, created 2026-09-01T21:28Z, mlb h2h line None stake 1.82
+    - `C8292W0ATMA3` NO avgPx 0.6500 booked 0.35; tsc-mlb-phi-az-2026-09-01-7pt5 x 4.11, fee 0.06, cost $1.50, created 2026-09-02T01:51Z, mlb totals line 7.5 stake 1.46
+    - `C84V9M1Z6MCK` YES avgPx 0.3700 booked 0.37; tsc-lal-ala-osa-2026-09-06-2pt5 x 15.76, fee 0.22, cost $6.05, created 2026-09-02T05:02Z, soccer totals line 2.5 stake 5.99
+    - `C8GBQRTHMMW0` YES avgPx 0.3100 booked 0.31; atc-eflch-bur-mid-2026-09-02-bur x 3.53, fee 0.05, cost $1.14, created 2026-09-02T18:08Z, soccer h2h line None stake 1.13
+    - `C8ZAFJ9S6MW0` YES avgPx 0.2200 booked 0.22; atc-lal-rso-cel-2026-09-03-cel x 4.86, fee 0.05, cost $1.12, created 2026-09-03T11:38Z, soccer h2h line None stake 1.12
+    - `C9B0G201JMVG` YES avgPx 0.2800 booked 0.28; aec-mlb-stl-lad-2026-09-03 x 5.26, fee 0.06, cost $1.53, created 2026-09-04T01:07Z, mlb h2h line None stake 1.5
+    - `C9CHPYTAJMVG` YES avgPx 0.2450 booked 0.245; aec-mlb-ath-sea-2026-09-03 x 5.84, fee 0.06, cost $1.49, created 2026-09-04T02:57Z, mlb h2h line None stake 1.55
+- **KALSHI LOSSES COUNTED 2026-09-15 ~22:20Z (read-only; scratchpad `kalshi_trim_scan.py`, raw lines `live_order_raw_lines.jsonl`, report `trim_scan_report.json`).**
+  - Window 2026-09-01T22:15Z..22:06Z today, 0 gaps. live-odds-worker `LIVE_ORDER` placements (149) and `RECONCILED` transitions (159) were checked against the served book (177 rows read 22:05:42Z).
+  - Positive control: the 09-10 18:00-18:10Z window returned 10 Kalshi `LIVE_ORDER` lines matching the book's rows within 2 s. The windows with no lines (09-04T22Z..09-10T10Z) are a real no-live-Kalshi stretch, which matches the book's 09-05..09-09 gap.
+  - **10 live Kalshi fills are missing from the book, $55.73 incl. fees, all placed 09-01..09-04.** Each has a `submitted->filled` reconcile and a `LIVE_ORDER status=submitted` placement for the same ticker, so 10 orders, not 20.
+  - Method check: the same scan finds 12 of the 20 known lost Polymarket fills. The other 8 predate the window.
+  - Rows:
+    - `e8f428191e6e7fe4619b6fb7` KXMLBTOTAL-26SEP011840TORCLE-7 over 6.5: 8 @ 0.51 fee 0.14, stake 4.55, submitted 2026-09-01T23:02:35Z, reconciled 2026-09-01T23:02:37Z
+    - `5588591618c12ce924e460c0` KXMLBSPREAD-26SEP021940DETMIN-MIN2 home -1.5: 3 @ 0.35 fee 0.0239, stake 1.31, submitted 2026-09-02T09:37:53Z, reconciled 2026-09-02T09:37:55Z
+    - `4b7f70492ec2b49efd1da77c` KXMLBTOTAL-26SEP021540PHIAZ-6 over 5.5: 10 @ 0.35 fee 0.1593, stake 3.88, submitted 2026-09-02T20:40:03Z, reconciled 2026-09-02T20:40:06Z
+    - `0ddcbeb1087243302e6af69b` KXMLBTOTAL-26SEP021940MIAKC-9 under 8.5: 19 @ 0.46 fee 0.1652, stake 9.03, submitted 2026-09-02T20:58:23Z, reconciled 2026-09-02T20:58:26Z
+    - `b5c619d43febeecc16993e8d` KXMLBTOTAL-26SEP021940MILCHC-9 under 8.5: 11 @ 0.49 fee 0.0963, stake 5.57, submitted 2026-09-02T21:45:13Z, reconciled 2026-09-02T21:45:16Z
+    - `7a751f80634b54e1c51cc0fc` KXMLBTOTAL-26SEP022210STLLAD-8 under 7.5: 12 @ 0.46 fee 0.1044, stake 5.78, submitted 2026-09-03T01:33:24Z, reconciled 2026-09-03T01:33:26Z
+    - `7cd3ecdf3875c6838165c40d` KXMLBTOTAL-26SEP022138NYYLAA-5 over 4.5: 19 @ 0.5 fee 0.3325, stake 10.12, submitted 2026-09-03T02:14:56Z, reconciled 2026-09-03T02:14:57Z
+    - `ffd3ed75e9e0b14d6e30be8e` KXMLBTOTAL-26SEP031235SFPIT-9 under 8.5: 19 @ 0.45 fee 0.1646, stake 8.71, submitted 2026-09-03T15:27:35Z, reconciled 2026-09-03T15:27:37Z
+    - `92860aac7abf94b13ab6704f` KXMLBTOTAL-26SEP042210ATHSEA-8 over 7.5: 12 @ 0.46 fee 0.1044, stake 5.96, submitted 2026-09-04T07:31:42Z, reconciled 2026-09-04T07:31:49Z
+    - `ff62fde8eb851cfcf65bc57d` KXMLBTOTAL-26SEP042005TBTEX-9 under 8.5: 5 @ 0.51 fee 0.0438, stake 2.59, submitted 2026-09-04T14:41:46Z, reconciled 2026-09-04T14:41:50Z
+- Blocked by: none for code. Deploys to live-odds-worker and refresh-worker are the user's call, sequenced after lane `soccer-player-role-allocation`'s ~21:25Z tip deploys.
+
+### archive-test-reports-redirect — CLOSED 2026-09-16 — opened 2026-09-16 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **GOAL: MET**
+- **VERDICT 2026-09-16 ~19:55Z (14:55 CDT), session 0f5b256e.** Goal (verbatim): "[user 2026-09-16: "do 1 then 2" -- 2 = lead #26] CI's `python -m unittest tests.test_archives` leaves NO files in the repo, by redirecting `SYNDICATE_REPORTS_ROOT` for unittest runs the way `tests/conftest.py` already does for pytest, without changing the suite's pass/fail outcome." — **GOAL: MET.** Landed `07dab32f`. Its own verification ran: `py -3 -m unittest tests.test_archives` in the lane worktree -> Ran 386, failures=31, skipped=2 (identical to the baseline) and ZERO new files in `git status`, where the baseline left 2 report files. Pytest side unchanged: `tests/test_reports_root_isolation.py` 2 passed.
+- Goal: [user 2026-09-16: "do 1 then 2" -- 2 = lead #26] CI's `python -m unittest tests.test_archives` leaves NO files in the repo, by redirecting `SYNDICATE_REPORTS_ROOT` for unittest runs the way `tests/conftest.py` already does for pytest, without changing the suite's pass/fail outcome.
+- Baseline `[reproduced 2026-09-16 ~19:30Z, clean detached worktree at origin/main, no data/]`: `py -3 -m unittest tests.test_archives` -> Ran 386, FAILED (failures=31, skipped=2), and left `reports/intelligence/coverage_report.json` and `reports/intelligence/game_chips_2026_09_16.json` untracked in the repo. Cause: the reports-root redirect lives only in `tests/conftest.py` (~:47, `setdefault` at import), which unittest never imports; `tests/_artifact_isolation.py` exists to be shared by both runners but has no reports-root redirect, and `test_archives.py` imports it only lazily (~:136) after `from syndicate.app import create_app` (:28).
+- Verification: the same command in the same kind of worktree leaves 0 new files and still reports 386 run / 31 failures / 2 skipped (the failures are the no-`data/` environment, unchanged by this lane).
+- Files: `tests/_artifact_isolation.py`, `tests/test_archives.py` (an import at the top only). Declared 2026-09-16 ~19:35Z before any edit; unclaimed on origin/main and in the primary tree.
+- Blocked by: none. Tests only; no deploy.
+
+### closed-lane-archive-0917 — CLOSED 2026-09-16 — opened 2026-09-16 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **GOAL: NOT MET (deferred, nothing eligible)**
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- **GOAL: NOT MET** (2026-09-16 ~22:40 CT). Goal restated: "archive CLOSED lane blocks whose owners are idle, verified, ledger-only". 0 of 8 CLOSED blocks on origin/main were SAFE: every owner (a1e40980, abacd435, 0f5b256e) had a transcript write within 2 minutes, against a 240-minute bar. Nothing moved; lanes.md and lanes_closed.md bodies untouched; `check_lane_invariants.py` INVARIANTS HOLD after adding this block. Re-run the same recipe once those three sessions have been idle >= 240 min. Log: `log/2026-09-16.md` ~22:40 CT.
+- Files: none (ledger-only)
+- Why: USER DECISION 2026-09-16 ~22:35 CT ("archive the closed lanes"). Recipe: the 09-16 archive task (`owner_liveness.py` -> `archive_closed_lanes_before.py --only <SAFE> --owner-idle-verified`), `--idle-min 240`.
+- Pre-registered reading (2026-09-16 22:37 CT, `owner_liveness.py --idle-min 240` over origin/main `e5e519ae`, 8 CLOSED blocks):
+
+  ```
+  soccer-live-scoreboard-range-stale       sessions[a1e40980=2m] -> WAIT: a1e40980 idle 2m < 240m
+  web-export-timeout                       sessions[a1e40980=2m] -> WAIT: a1e40980 idle 2m < 240m
+  portfolio-no-family-exclusion            sessions[abacd435=1m] -> WAIT: abacd435 idle 1m < 240m
+  board-category-gates                     sessions[abacd435=1m] -> WAIT: abacd435 idle 1m < 240m
+  archive-test-reports-redirect            sessions[0f5b256e=0m] -> WAIT: 0f5b256e idle 0m < 240m
+  chip-key-test-no-data-blind              sessions[abacd435=1m] -> WAIT: abacd435 idle 1m < 240m
+  sim-view-reachability-caveat             sessions[abacd435=1m] -> WAIT: abacd435 idle 1m < 240m
+  sim-view-roi-decision-count              sessions[abacd435=1m] -> WAIT: abacd435 idle 1m < 240m
+  SAFE_SLUGS=
+  ```
+
+### closed-lane-archive-20260917-1442 — CLOSED 2026-09-17 — opened 2026-09-17 — session 15b0e4b6-80f1-4491-acfb-c4895a53452b (scheduled task archive-closed-lanes-0917)
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- **GOAL VERDICT: GOAL MET for 1 of 14 CLOSED blocks — `closed-lane-archive-0917b` archived; the other 13 WAIT on live owners and were not touched.**
+- **USER OVERRIDE, logged:** the idle threshold was lowered **240m -> 120m** on explicit user instruction (2026-09-17 ~14:45 CDT / 19:45Z), relaxing the bar this task adopted from `learnings.md` 2026-09-15 *"a lane whose header reads CLOSED on origin/main is safe to archive"*. Every STRUCTURAL check was left at full strength — no claims, no OPEN header, no uncommitted `lanes.md` edit naming the slug in any of the 112 registered worktrees, no lane-named worktree (none exists for the target). Only the transcript-idle bar moved, and the one block it admitted is **this task's OWN prior run**, owned by a session idle 210m. Three earlier clock-timed runs moved nothing (09-16 22:37 CDT, 09-17 11:01 CDT, 09-17 14:38 CDT).
+- READING (pre-registered, `owner_liveness.py --worktree <this> --idle-min 120`, 2026-09-17 ~19:52Z / 14:52 CDT, on origin/main `680e12db`) — grouped by owner; the full per-slug table is in `log/2026-09-17.md`, which is not on the session-start read path:
+
+      abacd435 idle    1m -> WAIT: portfolio-no-family-exclusion, board-category-gates, chip-key-test-no-data-blind, sim-view-reachability-caveat, sim-view-roi-decision-count, soccer-capture-staleness, soccer-forward-graders
+      0f5b256e idle   20m -> WAIT: execution-ledger-live-trim, heavy-build-child-process, heavy-build-memory-refusal, archive-test-reports-redirect, closed-lane-archive-0917
+      5d8da952 idle  218m -> SAFE: closed-lane-archive-0917b
+      a1e40980 idle    1m -> WAIT: board-today-freshness
+      SAFE_SLUGS=closed-lane-archive-0917b
+
+- MEASURED: `lanes.md` **543,942 -> 544,184 B (net +242)**; `lanes_closed.md` **748,406 -> 751,081 B**. The archived block removed 2,457 B and THIS block costs most of it back — a one-block run barely pays for its own ledger entry, which is the honest read on the size goal. `lanes_closed.md` took **+24/-0**, append-only, zero deletions. Claims **169 unchanged**, OPEN headers unchanged; `check_lane_invariants.py` reads `INVARIANTS HOLD` identical to the origin/main baseline taken in a scratch tree (49 headings, 27 claim-holding OPEN lanes, 169 claims). `lanes.md` stays far over its 234 KB cap: **13 of 14 CLOSED blocks still WAIT on live owners**, and they hold the bulk of what is reclaimable.
