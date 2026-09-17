@@ -1,0 +1,626 @@
+{
+ "teams": {
+  "away": {
+   "team": {
+    "name": "New York Yankees"
+   },
+   "players": {
+    "ID621112": {
+     "person": {
+      "id": 621112,
+      "fullName": "Paul Blackburn"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "1.0",
+       "outs": 3,
+       "battersFaced": 3,
+       "strikeOuts": 0
+      }
+     }
+    },
+    "ID645305": {
+     "person": {
+      "id": 645305,
+      "fullName": "Ali Sánchez"
+     },
+     "battingOrder": "401",
+     "stats": {
+      "batting": {
+       "plateAppearances": 2,
+       "atBats": 2,
+       "hits": 1,
+       "strikeOuts": 1
+      },
+      "pitching": {}
+     }
+    },
+    "ID671218": {
+     "person": {
+      "id": 671218,
+      "fullName": "Heliot Ramos"
+     },
+     "battingOrder": "301",
+     "stats": {
+      "batting": {
+       "plateAppearances": 4,
+       "atBats": 3,
+       "hits": 0,
+       "strikeOuts": 1
+      },
+      "pitching": {}
+     }
+    },
+    "ID676609": {
+     "person": {
+      "id": 676609,
+      "fullName": "José Caballero"
+     },
+     "battingOrder": "802",
+     "stats": {
+      "batting": {
+       "plateAppearances": 1,
+       "atBats": 0,
+       "hits": 0,
+       "strikeOuts": 0
+      },
+      "pitching": {}
+     }
+    },
+    "ID607074": {
+     "person": {
+      "id": 607074,
+      "fullName": "Carlos Rodón"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "6.0",
+       "outs": 18,
+       "battersFaced": 25,
+       "strikeOuts": 5
+      }
+     }
+    },
+    "ID682987": {
+     "person": {
+      "id": 682987,
+      "fullName": "Spencer Jones"
+     },
+     "battingOrder": "500",
+     "stats": {
+      "batting": {
+       "plateAppearances": 6,
+       "atBats": 6,
+       "hits": 0,
+       "strikeOuts": 5
+      },
+      "pitching": {}
+     }
+    },
+    "ID657376": {
+     "person": {
+      "id": 657376,
+      "fullName": "Clarke Schmidt"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "0.2",
+       "outs": 2,
+       "battersFaced": 4,
+       "strikeOuts": 2
+      }
+     }
+    },
+    "ID592450": {
+     "person": {
+      "id": 592450,
+      "fullName": "Aaron Judge"
+     },
+     "battingOrder": "300",
+     "stats": {
+      "batting": {
+       "plateAppearances": 2,
+       "atBats": 2,
+       "hits": 0,
+       "strikeOuts": 2
+      },
+      "pitching": {}
+     }
+    },
+    "ID641857": {
+     "person": {
+      "id": 641857,
+      "fullName": "Ryan McMahon"
+     },
+     "battingOrder": "700",
+     "stats": {
+      "batting": {
+       "plateAppearances": 6,
+       "atBats": 6,
+       "hits": 0,
+       "strikeOuts": 4
+      },
+      "pitching": {}
+     }
+    },
+    "ID502671": {
+     "person": {
+      "id": 502671,
+      "fullName": "Paul Goldschmidt"
+     },
+     "battingOrder": "801",
+     "stats": {
+      "batting": {
+       "plateAppearances": 2,
+       "atBats": 2,
+       "hits": 1,
+       "strikeOuts": 0
+      },
+      "pitching": {}
+     }
+    },
+    "ID669224": {
+     "person": {
+      "id": 669224,
+      "fullName": "Austin Wells"
+     },
+     "battingOrder": "800",
+     "stats": {
+      "batting": {
+       "plateAppearances": 2,
+       "atBats": 2,
+       "hits": 0,
+       "strikeOuts": 0
+      },
+      "pitching": {}
+     }
+    },
+    "ID700250": {
+     "person": {
+      "id": 700250,
+      "fullName": "Ben Rice"
+     },
+     "battingOrder": "100",
+     "stats": {
+      "batting": {
+       "plateAppearances": 6,
+       "atBats": 3,
+       "hits": 1,
+       "strikeOuts": 1
+      },
+      "pitching": {}
+     }
+    },
+    "ID687396": {
+     "person": {
+      "id": 687396,
+      "fullName": "Brent Headrick"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "1.1",
+       "outs": 4,
+       "battersFaced": 4,
+       "strikeOuts": 2
+      }
+     }
+    },
+    "ID683011": {
+     "person": {
+      "id": 683011,
+      "fullName": "Anthony Volpe"
+     },
+     "battingOrder": "900",
+     "stats": {
+      "batting": {
+       "plateAppearances": 5,
+       "atBats": 5,
+       "hits": 2,
+       "strikeOuts": 0
+      },
+      "pitching": {}
+     }
+    },
+    "ID641355": {
+     "person": {
+      "id": 641355,
+      "fullName": "Cody Bellinger"
+     },
+     "battingOrder": "200",
+     "stats": {
+      "batting": {
+       "plateAppearances": 6,
+       "atBats": 5,
+       "hits": 3,
+       "strikeOuts": 0
+      },
+      "pitching": {}
+     }
+    },
+    "ID670280": {
+     "person": {
+      "id": 670280,
+      "fullName": "David Bednar"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "2.0",
+       "outs": 6,
+       "battersFaced": 8,
+       "strikeOuts": 2
+      }
+     }
+    },
+    "ID806146": {
+     "person": {
+      "id": 806146,
+      "fullName": "George Lombard Jr."
+     },
+     "battingOrder": "600",
+     "stats": {
+      "batting": {
+       "plateAppearances": 6,
+       "atBats": 6,
+       "hits": 1,
+       "strikeOuts": 0
+      },
+      "pitching": {}
+     }
+    },
+    "ID671277": {
+     "person": {
+      "id": 671277,
+      "fullName": "Luis García Jr."
+     },
+     "battingOrder": "400",
+     "stats": {
+      "batting": {
+       "plateAppearances": 4,
+       "atBats": 4,
+       "hits": 0,
+       "strikeOuts": 3
+      },
+      "pitching": {}
+     }
+    },
+    "ID670167": {
+     "person": {
+      "id": 670167,
+      "fullName": "John Schreiber"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "1.0",
+       "outs": 3,
+       "battersFaced": 3,
+       "strikeOuts": 0
+      }
+     }
+    }
+   }
+  },
+  "home": {
+   "team": {
+    "name": "Minnesota Twins"
+   },
+   "players": {
+    "ID667297": {
+     "person": {
+      "id": 667297,
+      "fullName": "Tommy Nance"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "1.0",
+       "outs": 3,
+       "battersFaced": 3,
+       "strikeOuts": 2
+      }
+     }
+    },
+    "ID605170": {
+     "person": {
+      "id": 605170,
+      "fullName": "Victor Caratini"
+     },
+     "battingOrder": "201",
+     "stats": {
+      "batting": {
+       "plateAppearances": 1,
+       "atBats": 1,
+       "hits": 1,
+       "strikeOuts": 0
+      },
+      "pitching": {}
+     }
+    },
+    "ID691181": {
+     "person": {
+      "id": 691181,
+      "fullName": "Emmanuel Rodriguez"
+     },
+     "battingOrder": "700",
+     "stats": {
+      "batting": {
+       "plateAppearances": 5,
+       "atBats": 4,
+       "hits": 0,
+       "strikeOuts": 1
+      },
+      "pitching": {}
+     }
+    },
+    "ID665019": {
+     "person": {
+      "id": 665019,
+      "fullName": "Kody Clemens"
+     },
+     "battingOrder": "500",
+     "stats": {
+      "batting": {
+       "plateAppearances": 5,
+       "atBats": 4,
+       "hits": 1,
+       "strikeOuts": 2
+      },
+      "pitching": {}
+     }
+    },
+    "ID686797": {
+     "person": {
+      "id": 686797,
+      "fullName": "Brooks Lee"
+     },
+     "battingOrder": "901",
+     "stats": {
+      "batting": {
+       "plateAppearances": 3,
+       "atBats": 2,
+       "hits": 1,
+       "strikeOuts": 0
+      },
+      "pitching": {}
+     }
+    },
+    "ID668885": {
+     "person": {
+      "id": 668885,
+      "fullName": "Austin Martin"
+     },
+     "battingOrder": "200",
+     "stats": {
+      "batting": {
+       "plateAppearances": 5,
+       "atBats": 5,
+       "hits": 1,
+       "strikeOuts": 1
+      },
+      "pitching": {}
+     }
+    },
+    "ID805805": {
+     "person": {
+      "id": 805805,
+      "fullName": "Walker Jenkins"
+     },
+     "battingOrder": "401",
+     "stats": {
+      "batting": {
+       "plateAppearances": 0,
+       "atBats": 0,
+       "hits": 0,
+       "strikeOuts": 0
+      },
+      "pitching": {}
+     }
+    },
+    "ID605137": {
+     "person": {
+      "id": 605137,
+      "fullName": "Josh Bell"
+     },
+     "battingOrder": "400",
+     "stats": {
+      "batting": {
+       "plateAppearances": 5,
+       "atBats": 5,
+       "hits": 1,
+       "strikeOuts": 1
+      },
+      "pitching": {}
+     }
+    },
+    "ID805346": {
+     "person": {
+      "id": 805346,
+      "fullName": "Ben Ross"
+     },
+     "battingOrder": "900",
+     "stats": {
+      "batting": {
+       "plateAppearances": 2,
+       "atBats": 2,
+       "hits": 1,
+       "strikeOuts": 0
+      },
+      "pitching": {}
+     }
+    },
+    "ID656546": {
+     "person": {
+      "id": 656546,
+      "fullName": "Jeff Hoffman"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "1.0",
+       "outs": 3,
+       "battersFaced": 3,
+       "strikeOuts": 2
+      }
+     }
+    },
+    "ID621345": {
+     "person": {
+      "id": 621345,
+      "fullName": "A.J. Minter"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "1.0",
+       "outs": 3,
+       "battersFaced": 6,
+       "strikeOuts": 2
+      }
+     }
+    },
+    "ID680777": {
+     "person": {
+      "id": 680777,
+      "fullName": "Ryan Jeffers"
+     },
+     "battingOrder": "300",
+     "stats": {
+      "batting": {
+       "plateAppearances": 5,
+       "atBats": 4,
+       "hits": 0,
+       "strikeOuts": 3
+      },
+      "pitching": {}
+     }
+    },
+    "ID668952": {
+     "person": {
+      "id": 668952,
+      "fullName": "Ryan Kreidler"
+     },
+     "battingOrder": "800",
+     "stats": {
+      "batting": {
+       "plateAppearances": 5,
+       "atBats": 4,
+       "hits": 1,
+       "strikeOuts": 2
+      },
+      "pitching": {}
+     }
+    },
+    "ID681892": {
+     "person": {
+      "id": 681892,
+      "fullName": "Kody Funderburk"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "0.1",
+       "outs": 1,
+       "battersFaced": 1,
+       "strikeOuts": 0
+      }
+     }
+    },
+    "ID701519": {
+     "person": {
+      "id": 701519,
+      "fullName": "Travis Adams"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "3.0",
+       "outs": 9,
+       "battersFaced": 11,
+       "strikeOuts": 1
+      }
+     }
+    },
+    "ID668904": {
+     "person": {
+      "id": 668904,
+      "fullName": "Royce Lewis"
+     },
+     "battingOrder": "600",
+     "stats": {
+      "batting": {
+       "plateAppearances": 5,
+       "atBats": 4,
+       "hits": 0,
+       "strikeOuts": 1
+      },
+      "pitching": {}
+     }
+    },
+    "ID672782": {
+     "person": {
+      "id": 672782,
+      "fullName": "Yoendrys Gómez"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "0.2",
+       "outs": 2,
+       "battersFaced": 6,
+       "strikeOuts": 2
+      }
+     }
+    },
+    "ID805673": {
+     "person": {
+      "id": 805673,
+      "fullName": "Zebby Matthews"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "6.0",
+       "outs": 18,
+       "battersFaced": 22,
+       "strikeOuts": 8
+      }
+     }
+    },
+    "ID807712": {
+     "person": {
+      "id": 807712,
+      "fullName": "Luke Keaschall"
+     },
+     "battingOrder": "100",
+     "stats": {
+      "batting": {
+       "plateAppearances": 6,
+       "atBats": 5,
+       "hits": 3,
+       "strikeOuts": 0
+      },
+      "pitching": {}
+     }
+    }
+   }
+  }
+ }
+}

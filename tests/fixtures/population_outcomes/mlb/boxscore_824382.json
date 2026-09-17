@@ -1,0 +1,498 @@
+{
+ "teams": {
+  "away": {
+   "team": {
+    "name": "Chicago White Sox"
+   },
+   "players": {
+    "ID671976": {
+     "person": {
+      "id": 671976,
+      "fullName": "Tristan Peters"
+     },
+     "battingOrder": "900",
+     "stats": {
+      "batting": {
+       "plateAppearances": 4,
+       "atBats": 4,
+       "hits": 0,
+       "strikeOuts": 1
+      },
+      "pitching": {}
+     }
+    },
+    "ID641743": {
+     "person": {
+      "id": 641743,
+      "fullName": "Anthony Kay"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "4.0",
+       "outs": 12,
+       "battersFaced": 17,
+       "strikeOuts": 3
+      }
+     }
+    },
+    "ID682668": {
+     "person": {
+      "id": 682668,
+      "fullName": "Luisangel Acuña"
+     },
+     "battingOrder": "800",
+     "stats": {
+      "batting": {
+       "plateAppearances": 3,
+       "atBats": 3,
+       "hits": 0,
+       "strikeOuts": 1
+      },
+      "pitching": {}
+     }
+    },
+    "ID545341": {
+     "person": {
+      "id": 545341,
+      "fullName": "Randal Grichuk"
+     },
+     "battingOrder": "200",
+     "stats": {
+      "batting": {
+       "plateAppearances": 5,
+       "atBats": 5,
+       "hits": 2,
+       "strikeOuts": 1
+      },
+      "pitching": {}
+     }
+    },
+    "ID808959": {
+     "person": {
+      "id": 808959,
+      "fullName": "Munetaka Murakami"
+     },
+     "battingOrder": "701",
+     "stats": {
+      "batting": {
+       "plateAppearances": 2,
+       "atBats": 1,
+       "hits": 0,
+       "strikeOuts": 0
+      },
+      "pitching": {}
+     }
+    },
+    "ID805367": {
+     "person": {
+      "id": 805367,
+      "fullName": "Chase Meidroth"
+     },
+     "battingOrder": "100",
+     "stats": {
+      "batting": {
+       "plateAppearances": 5,
+       "atBats": 5,
+       "hits": 3,
+       "strikeOuts": 0
+      },
+      "pitching": {}
+     }
+    },
+    "ID691019": {
+     "person": {
+      "id": 691019,
+      "fullName": "Kyle Teel"
+     },
+     "battingOrder": "500",
+     "stats": {
+      "batting": {
+       "plateAppearances": 4,
+       "atBats": 3,
+       "hits": 0,
+       "strikeOuts": 2
+      },
+      "pitching": {}
+     }
+    },
+    "ID502054": {
+     "person": {
+      "id": 502054,
+      "fullName": "Tommy Pham"
+     },
+     "battingOrder": "400",
+     "stats": {
+      "batting": {
+       "plateAppearances": 4,
+       "atBats": 4,
+       "hits": 1,
+       "strikeOuts": 1
+      },
+      "pitching": {}
+     }
+    },
+    "ID695657": {
+     "person": {
+      "id": 695657,
+      "fullName": "Colson Montgomery"
+     },
+     "battingOrder": "700",
+     "stats": {
+      "batting": {
+       "plateAppearances": 2,
+       "atBats": 1,
+       "hits": 0,
+       "strikeOuts": 1
+      },
+      "pitching": {}
+     }
+    },
+    "ID702273": {
+     "person": {
+      "id": 702273,
+      "fullName": "Noah Schultz"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "2.0",
+       "outs": 6,
+       "battersFaced": 6,
+       "strikeOuts": 0
+      }
+     }
+    },
+    "ID696146": {
+     "person": {
+      "id": 696146,
+      "fullName": "Hagen Smith"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "1.2",
+       "outs": 5,
+       "battersFaced": 8,
+       "strikeOuts": 2
+      }
+     }
+    },
+    "ID686668": {
+     "person": {
+      "id": 686668,
+      "fullName": "Brenton Doyle"
+     },
+     "battingOrder": "600",
+     "stats": {
+      "batting": {
+       "plateAppearances": 4,
+       "atBats": 4,
+       "hits": 1,
+       "strikeOuts": 2
+      },
+      "pitching": {}
+     }
+    },
+    "ID656794": {
+     "person": {
+      "id": 656794,
+      "fullName": "Sean Newcomb"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "0.0",
+       "outs": 0,
+       "battersFaced": 4,
+       "strikeOuts": 0
+      }
+     }
+    },
+    "ID663855": {
+     "person": {
+      "id": 663855,
+      "fullName": "Jordan Hicks"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "0.1",
+       "outs": 1,
+       "battersFaced": 1,
+       "strikeOuts": 1
+      }
+     }
+    },
+    "ID803011": {
+     "person": {
+      "id": 803011,
+      "fullName": "Sam Antonacci"
+     },
+     "battingOrder": "801",
+     "stats": {
+      "batting": {
+       "plateAppearances": 1,
+       "atBats": 1,
+       "hits": 0,
+       "strikeOuts": 0
+      },
+      "pitching": {}
+     }
+    },
+    "ID678246": {
+     "person": {
+      "id": 678246,
+      "fullName": "Miguel Vargas"
+     },
+     "battingOrder": "300",
+     "stats": {
+      "batting": {
+       "plateAppearances": 4,
+       "atBats": 4,
+       "hits": 1,
+       "strikeOuts": 1
+      },
+      "pitching": {}
+     }
+    }
+   }
+  },
+  "home": {
+   "team": {
+    "name": "Cleveland Guardians"
+   },
+   "players": {
+    "ID694197": {
+     "person": {
+      "id": 694197,
+      "fullName": "Angel Genao"
+     },
+     "battingOrder": "600",
+     "stats": {
+      "batting": {
+       "plateAppearances": 4,
+       "atBats": 3,
+       "hits": 0,
+       "strikeOuts": 1
+      },
+      "pitching": {}
+     }
+    },
+    "ID595978": {
+     "person": {
+      "id": 595978,
+      "fullName": "Austin Hedges"
+     },
+     "battingOrder": "700",
+     "stats": {
+      "batting": {
+       "plateAppearances": 4,
+       "atBats": 3,
+       "hits": 0,
+       "strikeOuts": 1
+      },
+      "pitching": {}
+     }
+    },
+    "ID663993": {
+     "person": {
+      "id": 663993,
+      "fullName": "Nathaniel Lowe"
+     },
+     "battingOrder": "501",
+     "stats": {
+      "batting": {
+       "plateAppearances": 0,
+       "atBats": 0,
+       "hits": 0,
+       "strikeOuts": 0
+      },
+      "pitching": {}
+     }
+    },
+    "ID683953": {
+     "person": {
+      "id": 683953,
+      "fullName": "Travis Bazzana"
+     },
+     "battingOrder": "400",
+     "stats": {
+      "batting": {
+       "plateAppearances": 4,
+       "atBats": 4,
+       "hits": 0,
+       "strikeOuts": 0
+      },
+      "pitching": {}
+     }
+    },
+    "ID677587": {
+     "person": {
+      "id": 677587,
+      "fullName": "Brayan Rocchio"
+     },
+     "battingOrder": "900",
+     "stats": {
+      "batting": {
+       "plateAppearances": 4,
+       "atBats": 3,
+       "hits": 0,
+       "strikeOuts": 1
+      },
+      "pitching": {}
+     }
+    },
+    "ID690984": {
+     "person": {
+      "id": 690984,
+      "fullName": "Petey Halpin"
+     },
+     "battingOrder": "800",
+     "stats": {
+      "batting": {
+       "plateAppearances": 4,
+       "atBats": 4,
+       "hits": 2,
+       "strikeOuts": 0
+      },
+      "pitching": {}
+     }
+    },
+    "ID666176": {
+     "person": {
+      "id": 666176,
+      "fullName": "Jo Adell"
+     },
+     "battingOrder": "300",
+     "stats": {
+      "batting": {
+       "plateAppearances": 4,
+       "atBats": 3,
+       "hits": 1,
+       "strikeOuts": 2
+      },
+      "pitching": {}
+     }
+    },
+    "ID681807": {
+     "person": {
+      "id": 681807,
+      "fullName": "David Fry"
+     },
+     "battingOrder": "500",
+     "stats": {
+      "batting": {
+       "plateAppearances": 4,
+       "atBats": 3,
+       "hits": 0,
+       "strikeOuts": 1
+      },
+      "pitching": {}
+     }
+    },
+    "ID671922": {
+     "person": {
+      "id": 671922,
+      "fullName": "Cade Smith"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "1.1",
+       "outs": 4,
+       "battersFaced": 4,
+       "strikeOuts": 2
+      }
+     }
+    },
+    "ID608070": {
+     "person": {
+      "id": 608070,
+      "fullName": "José Ramírez"
+     },
+     "battingOrder": "200",
+     "stats": {
+      "batting": {
+       "plateAppearances": 4,
+       "atBats": 4,
+       "hits": 2,
+       "strikeOuts": 0
+      },
+      "pitching": {}
+     }
+    },
+    "ID680757": {
+     "person": {
+      "id": 680757,
+      "fullName": "Steven Kwan"
+     },
+     "battingOrder": "100",
+     "stats": {
+      "batting": {
+       "plateAppearances": 4,
+       "atBats": 3,
+       "hits": 0,
+       "strikeOuts": 0
+      },
+      "pitching": {}
+     }
+    },
+    "ID800048": {
+     "person": {
+      "id": 800048,
+      "fullName": "Parker Messick"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "6.0",
+       "outs": 18,
+       "battersFaced": 26,
+       "strikeOuts": 8
+      }
+     }
+    },
+    "ID681870": {
+     "person": {
+      "id": 681870,
+      "fullName": "Erik Sabrowski"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "0.2",
+       "outs": 2,
+       "battersFaced": 4,
+       "strikeOuts": 0
+      }
+     }
+    },
+    "ID683769": {
+     "person": {
+      "id": 683769,
+      "fullName": "Hunter Gaddis"
+     },
+     "battingOrder": null,
+     "stats": {
+      "batting": {},
+      "pitching": {
+       "inningsPitched": "1.0",
+       "outs": 3,
+       "battersFaced": 4,
+       "strikeOuts": 0
+      }
+     }
+    }
+   }
+  }
+ }
+}

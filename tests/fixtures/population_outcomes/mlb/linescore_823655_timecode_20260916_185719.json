@@ -1,0 +1,51 @@
+{
+ "currentInning": 5,
+ "inningState": "Middle",
+ "isTopInning": true,
+ "scheduledInnings": 9,
+ "innings": [
+  {
+   "num": 1,
+   "away": {
+    "runs": 0
+   },
+   "home": {
+    "runs": 1
+   }
+  },
+  {
+   "num": 2,
+   "away": {
+    "runs": 0
+   },
+   "home": {
+    "runs": 0
+   }
+  },
+  {
+   "num": 3,
+   "away": {
+    "runs": 0
+   },
+   "home": {
+    "runs": 0
+   }
+  },
+  {
+   "num": 4,
+   "away": {
+    "runs": 0
+   },
+   "home": {
+    "runs": 0
+   }
+  },
+  {
+   "num": 5,
+   "away": {
+    "runs": 0
+   },
+   "home": {}
+  }
+ ]
+}
