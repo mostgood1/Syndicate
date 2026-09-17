@@ -43,6 +43,11 @@ for p in (str(HERE), str(CHECKOUT)):
         sys.path.insert(0, p)
 
 LIVE_BASIS = "prekickoff_pace_v1"
+# AMENDED 2026-09-17 ~19:00 CT, before any qualifying snapshot existed (`log/2026-09-17.md`): Belgian Pro League's
+# ESPN commentary carries NO corner events (0 of 554 box corners, measured before H29, which excluded it for the same
+# reason), so `corners_so_far` is structurally 0 there and BOTH arms undercount the final total by the corners already
+# taken. Grading it would compare two wrong numbers on a defect neither arm owns.
+EXCLUDED_LEAGUES = frozenset({"belgian_pro_league"})
 BUCKETS = ((20.0, 40.0), (40.0, 60.0), (60.0, 80.0))
 HALF_SECONDS = 45.0 * 60.0
 GRADE_MATCHES = 100
@@ -102,6 +107,9 @@ def pick_snapshots(rows: list[dict]) -> tuple[dict, collections.Counter]:
         if bucket is None:
             continue
         funnel["in_a_bucket"] += 1
+        if str(row.get("league")) in EXCLUDED_LEAGUES:
+            funnel["excluded_league"] += 1
+            continue
         state = audit_state(row)
         if state is not None and state != "applied":
             funnel[f"audit_{state}"] += 1

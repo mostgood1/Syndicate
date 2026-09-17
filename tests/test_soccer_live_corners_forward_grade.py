@@ -136,3 +136,12 @@ def test_verdict(n, hi, today, expected):
 def test_the_bootstrap_clusters_by_match():
     point, (lo, hi) = g.paired_boot([[-1.0, -1.0, -1.0]] * 10)
     assert point == pytest.approx(-1.0) and lo == pytest.approx(-1.0) and hi == pytest.approx(-1.0)
+
+
+def test_belgian_pro_league_is_excluded_because_its_feed_has_no_corner_events():
+    """Amended before any qualifying snapshot: corners_so_far is structurally 0 there (0 of 554 box corners in
+    commentary), so both arms undercount and grading them would score a feed defect, not the estimate."""
+    rows = [_row("b", 30, 4.0, 5.0, "t1", league="belgian_pro_league"), _row("e", 30, 10.0, 12.0, "t1")]
+    chosen, funnel = g.pick_snapshots(rows)
+    assert list(chosen) == [("epl", "e")]
+    assert funnel["excluded_league"] == 1
