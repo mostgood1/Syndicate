@@ -1465,6 +1465,30 @@ death, never life — do not invert it.
 - STATUS `[2026-09-17 ~16:00Z (11:00 CT)]`: code on main (`89d43bfb` grader + single pass + batch rewrite, `050204cd` tail re-copy until stable); LIVE on refresh-worker `f3748922` since 15:50:52Z; `EVALUATION_SETTLEMENT_SPORTS` still `mlb,wnba`. OWED: task `settlement-and-scorecard-morning-reading-0918` (08:15 CT) grades the first autorun (MLB >= 60%, path=batch, no oomKilled) and ONLY on MET adds nfl + deploys under the locks (user: one sport per daily run); then ncaaf, then soccer.
 - Blocked by: none.
 
+### closed-lane-archive-0917b — CLOSED 2026-09-17 — opened 2026-09-17 — session 5d8da952-8b7e-4069-aa67-ef92b64684d3 (scheduled task archive-closed-lanes-0917) — **GOAL: NOT MET (deferred, nothing eligible)**
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- **GOAL: NOT MET** (2026-09-17 16:02Z / 11:02 CDT). Goal restated: "archive CLOSED lane blocks whose owners are idle, verified, ledger-only". 0 of 13 CLOSED blocks on origin/main `699f34f7` were SAFE: all three owners were still active (transcript mtimes 15:59:42Z abacd435, 16:00:49Z 0f5b256e, 16:01:20Z a1e40980, read 16:01:48Z) against a 240-minute bar, so the late-morning slot did not find them idle. Nothing moved; `archive_closed_lanes_before.py` was not run; lanes.md and lanes_closed.md bodies untouched. Re-run only after those three sessions have been idle >= 240 min. The NEVER-archive list (board-eval-reader-chunk-ceiling, heavy-build-memory-refusal, nhl-season-readiness, worker-disk-auto-retention, heavy-build-child-process) was not reached. Log: `log/2026-09-17.md` ~11:02 CDT.
+- Files: none (ledger-only)
+- Pre-registered reading (2026-09-17 16:01Z / 11:01 CDT, `owner_liveness.py --worktree <this worktree> --idle-min 240` over origin/main `699f34f7`, 13 CLOSED blocks):
+
+  ```
+  execution-ledger-live-trim               sessions[0f5b256e=1m] -> WAIT: 0f5b256e idle 1m < 240m
+  heavy-build-child-process                sessions[0f5b256e=1m] -> WAIT: 0f5b256e idle 1m < 240m
+  soccer-live-scoreboard-range-stale       sessions[a1e40980=0m] -> WAIT: a1e40980 idle 0m < 240m
+  web-export-timeout                       sessions[a1e40980=0m] -> WAIT: a1e40980 idle 0m < 240m
+  portfolio-no-family-exclusion            sessions[abacd435=2m] -> WAIT: abacd435 idle 2m < 240m
+  board-category-gates                     sessions[abacd435=2m] -> WAIT: abacd435 idle 2m < 240m
+  archive-test-reports-redirect            sessions[0f5b256e=1m] -> WAIT: 0f5b256e idle 1m < 240m
+  chip-key-test-no-data-blind              sessions[abacd435=2m] -> WAIT: abacd435 idle 2m < 240m
+  sim-view-reachability-caveat             sessions[abacd435=2m] -> WAIT: abacd435 idle 2m < 240m
+  sim-view-roi-decision-count              sessions[abacd435=2m] -> WAIT: abacd435 idle 2m < 240m
+  web-export-walk-prefilter                sessions[a1e40980=0m] -> WAIT: a1e40980 idle 0m < 240m
+  closed-lane-archive-0917                 sessions[0f5b256e=1m] -> WAIT: 0f5b256e idle 1m < 240m
+  soccer-capture-staleness                 sessions[abacd435=2m] -> WAIT: abacd435 idle 2m < 240m
+  SAFE_SLUGS=
+  ```
+- Blocked by: owners active (a1e40980, abacd435, 0f5b256e).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
