@@ -37165,3 +37165,18 @@ Scheduled task `full-slate-memory-reading-0915`. Read-only on production: no dep
   - Real Betis v Getafe 5.78/3.54 -> 5.65/3.68
   - Monza v Sassuolo 4.15/5.22 -> 5.00/4.08
 - **The accuracy claim is NOT made here.** It is H27's forward grade on frozen post-deploy matches (`log/2026-09-16.md` ~22:45 CT).
+
+## 2026-09-17 05:42:11Z (00:42 CT) — refresh-worker `f7ae4ce3` -> `05b808cc` (origin/main tip) — lanes soccer-prekickoff-freeze + soccer-corners-model-rebuild — **LIVE; reachability NOT observable from web: refresh-worker never publishes soccer recommendations**
+
+- **Live 05:47:43Z**, `dep-dalnrcqd0e5s73821ip0`. Consolidated into one deploy because each refresh-worker restart costs a ~25 min first board build (lane `heavy-build-memory-refusal`'s warning).
+  - Waited for that lane's post-boot build to save (`BOARD_BUILD_TIMING` 03:38:45Z).
+  - Preflight HOLD for 2 h 27 min (1 to 10 jobs incl. `run_mlb_daily_sim_job`) until CLEAR at 05:42:10Z.
+  - Fired 1 s later from a loop that checked the claim (HELD by this lane, unexpired) in the same instant: deploy-guard cannot see a script-launched deploy, so the loop enforced both locks itself.
+  - Expectations (baselines read 05:4xZ): refresh-worker freeze files on web 0 -> at least 1; matches with estimator corners 11 -> grows.
+- **Carried:** `fc61882d` + `05b808cc` (this entry's lanes); `bea2a355` (owner cleared it by message); `4515ae77` (inert: `artifact_walk` is imported only by web's `ops.py`); `f7ae4ce3` stays.
+- `verify:` **the web-side expectation was WRONG, and the reason is a fact about refresh-worker:**
+  - 0 `.refresh-worker.json` freeze files on web by 11:48:31Z (6 h).
+  - Yet refresh-worker DID run soccer builds on the new code: `SOCCER_UNIT_OUTCOME unit=la_liga|2026-09-18 ... wrote_since_launch=True` at 10:57Z; 144 unit outcomes since go-live.
+  - It has **zero `artifact_publisher` lines for `soccer_source/*/api/recommendations/*` across 169 log lines 2026-09-16..17.** refresh-worker writes soccer recommendations to its own disk for its own board and never publishes them, so its freeze file is local-only by design, and neither its freeze nor its estimator corners are observable from web.
+- **Consequence for the forward grades (no amendment needed):** the watch-list, H24 and H27 read `recommendations_prekickoff_<date>.live-odds-worker.json`. Their "merge services" rule merges over one visible service. The values refresh-worker's own board and portfolio use are not frozen anywhere readable.
+- **Not verified:** that refresh-worker's local freeze file and estimator corners exist on its disk. There is no reader.
