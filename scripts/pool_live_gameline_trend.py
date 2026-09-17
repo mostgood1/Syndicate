@@ -53,6 +53,18 @@ measurement-validity one -- the per-record ledger for 09-11 has 13,187 records,
 (09-09, before the switch: 41 priceable, that reason absent). The forecasts were
 still recorded; only publication stopped.
 
+PUBLICATION WAS SWITCHED BACK ON 2026-09-16, so `priceable_only` is populated
+again -- as a SECOND series, not a continuation of the first. By user decision,
+lane `board-category-gates` deleted `SYNDICATE_LIVE_GAMELINE_PUBLISH_DISABLED_SPORTS=mlb`
+from refresh-worker, live with deploy `b59887db` at 18:50:42Z (`deploys.md`
+18:45:03Z). On the 09-16 per-record ledger (1,805 records) the last
+`model_edge_publishing_disabled_for_sport` row is 18:42:37Z and the first
+`priceable=True` row is 19:16:11Z; no build mixes the two. So 09-16 is a SPLIT
+date, and 09-11..09-15 are a gap in that cut. This tool does not know about the
+gap: pooling `priceable_only` across it splices two publication regimes into one
+number. Pool it only from 2026-09-16 on. `fresh_quotes_only` has no such gap,
+which is one more reason it stays the headline.
+
 So `coverage_gap()` below names every date that HAS outcomes and contributes
 nothing to the requested cut, and `main` exits non-zero when the newest such
 date is the most recent in the history. A frozen headline must announce itself.
