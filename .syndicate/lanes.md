@@ -1343,6 +1343,16 @@ death, never life — do not invert it.
 - Verification: offline, tests show entries are frozen before kickoff and kept unchanged after kickoff, an entry without a kickoff is never frozen, a corrupt or absent freeze file never breaks the artifact build, and the file name matches the existing publish pattern. In production after the live-odds-worker and refresh-worker deploys: `/api/ops/artifacts/export` returns `recommendations_prekickoff_<date>.<service>.json` for a date with matches, with 100% of post-go-live kickoffs frozen at `frozen_at < kickoff`.
 - Blocked by: none. Design constraint: two services build and publish soccer recommendations, so each writes its OWN freeze file (service name in the file name). One shared path would be a whole-file-replace race on web (#630).
 
+### soccer-corners-model-rebuild — OPEN — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Goal: the soccer engine's published match and team corners carry information: on held-out current-season matches, the rebuilt projection beats last season's league mean on total-corners MAE and correlates with actual total corners at r >= 0.20 (was 0.02), with no league biased by more than 0.5 corners (MLS was -1.39). Shipped through the model-engine standard (reachability test, engine replay, refit, production measurement), with goals calibration unchanged within tolerance.
+- Files:
+  - `scripts/soccer_season_audit/corners_estimators.py` (NEW: offline estimator study; stage 1)
+  - Engine files are claimed only when stage 2 begins, after stage 1 picks an estimator: `syndicate/features/soccer/sim_engine/soccersim/possession_priors.py`, `.../event_simulator.py`, `.../league_profiles.py`, `syndicate/features/soccer/features/loaders.py`.
+- Hypothesis (H26): corners are uninformative because the sim's per-possession corner chance ignores each team's measured corner rates. `possession_priors.py:368` builds it from generic attack/defense indices; a team's `corners_per_match` moves only `_set_piece_index`, by 0.03 per corner. A projection from team corners-for x opponent corners-against, shrunk and league-normalised, and possibly a pregame pressure proxy, will beat the league mean held out.
+- Falsification test: on held-out current-season matches the team-rate estimator fails to beat last season's league mean on total-corners MAE, or its r(total) is < 0.20. Then team rates are not the missing information, and the rebuild does not go into the engine.
+- Verification: stage 1 prints per-family date coverage and the intersection, then held-out MAE, r and per-league bias for E0 (production model), E1 (league mean), E2 (team rates), E3 (team rates + pressure proxy); the fit uses only data before each match. Stage 2: engine replay reproduces the stage-1 estimator within tolerance, a reachability test (off != on), goals per match within +-0.05 of the pre-change engine on the same inputs, a deploy, and the #664 item-6 production reading on matches after go-live.
+- Blocked by: none. Interaction: a stage-2 deploy ENDS watch-list cell W1 (`log/2026-09-16.md` pre-registration).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
