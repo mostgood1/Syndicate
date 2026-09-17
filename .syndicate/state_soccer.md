@@ -667,10 +667,27 @@ on live-odds-worker (single-key endpoint, booleans only). **But
 `live_lens_loop.py:58` imports `poll_active_leagues_for_tick` FROM
 `scripts/poll_soccer_live_state`, so refresh-worker reaches the same
 `poll_league` through the autorun.** Measured on the logs API over the 6 h to
-21:0xZ: `[soccer_live_state]` lines = **62 on live-odds-worker, 1 on
+21:0xZ: `[soccer_live_state]` lines = **61 on live-odds-worker, ZERO on
 refresh-worker** (a `SOCCER_LIVE_STATE` text search is misleading — it also hits
 `match_not_in_soccer_live_state` inside paper-settlement lines; match the
 bracketed prefix).
+
+**CORRECTED 2026-09-17 23:1xZ — I FIRST PUBLISHED THIS AS "62 vs 1", AND THE 1
+WAS MY OWN QUERY.** `render_logs.py` prints a header line `# refresh-worker
+text='[soccer_live_state]'`, and my count grepped the tool's output without
+dropping headers, so the search string echoed back as a hit. Lane
+`soccer-live-corners-stage2` re-measured over 47 h (2026-09-16T00:00Z ->
+2026-09-17T23:00Z): **live-odds-worker 1,381 lines, refresh-worker 0** — and
+validated the zero against the same reader and service (1,260
+`SOCCER_UNIT_OUTCOME`, 166 `BOARD_BUILD_TIMING` on refresh-worker in the same
+window), so it is a real absence, not a dead instrument.
+
+**So refresh-worker is NOT OBSERVED to be a soccer live writer at all.** It
+CAN be, by code path (`live_lens_loop` imports the poller; the autorun reaches
+`poll_league`), and that is what makes the whole-file-replace hazard real in
+code — but "rare second writer" overstated it, and no occurrence has been
+observed in 47 h. Treat the code path as the risk and the rate as zero until
+someone measures otherwise.
 
 So the accurate statement is: **live-odds-worker is the LIVE writer;
 refresh-worker is a RARE second writer.** A partial deploy will not flicker
