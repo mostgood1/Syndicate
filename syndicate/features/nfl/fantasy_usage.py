@@ -652,17 +652,53 @@ def usage_substrate(season: int) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def usage_artifact_path(season: int) -> Path:
-    """Where the built usage document lives.
+    """Where the usage document must be WRITTEN. `#671`, and it is `#389` again.
 
-    Under the NFL source root's ``fantasy/`` tree so it publishes and reads
-    through the same ``SYNDICATE_NFL_SOURCE_ROOT`` / mounted-disk mechanism as
-    every other NFL artifact. ONE DOCUMENT PER SEASON, not per week --
-    ``model_engine_standard.md`` s3 asks for bounded artifacts because the
-    allowlist drives publishing as well as reading.
+    ONE DOCUMENT PER SEASON, not per week -- ``model_engine_standard.md`` s3 asks
+    for bounded artifacts because the allowlist drives publishing as well as
+    reading.
+
+    **THIS USED TO CALL ``default_nfl_source_root()``, WHICH IS A READ
+    SELECTOR**, and that is why no `nfl_fantasy_usage_*.json` has ever existed on
+    web. ``_first_existing_root`` picks a root by probing for
+    ``upcoming_recs_*.csv`` -- an unrelated family the repo mirror ships and the
+    mounted disk does not -- so on refresh-worker this resolved to
+    ``/opt/render/project/src/data/nfl_source``, the EPHEMERAL CHECKOUT. Three
+    consequences, all measured 2026-09-17: every deploy erased the artifact; the
+    "already built" check in ``build_nfl_fantasy_projection_artifact.prepare``
+    therefore rebuilt it on every run; and it could never be published, because
+    ``publish_hot_artifact`` addresses files by their path relative to
+    ``SYNDICATE_DATA_ROOT`` and the checkout is not under it. `#389` fixed
+    exactly this for the SmartSim2 writers and `#441` for the pbp read path;
+    this family was left on the old selector.
+
+    Reads go through ``existing_usage_artifact_path`` so a document already
+    sitting in either root is still found.
     """
-    from syndicate.features.nfl.sources import default_nfl_source_root
+    from syndicate.features.nfl.sources import nfl_artifact_output_root
 
-    return default_nfl_source_root() / "fantasy" / f"nfl_fantasy_usage_{season}.json"
+    return nfl_artifact_output_root() / "fantasy" / f"nfl_fantasy_usage_{season}.json"
+
+
+def existing_usage_artifact_path(season: int) -> Path | None:
+    """The usage document that actually EXISTS for *season*, across every root.
+
+    The read twin of ``usage_artifact_path``, resolved PER FILE rather than by
+    probing for an unrelated artifact -- the rule ``preferred_artifact_roots``
+    states in its own comment and ``nfl_pbp_path`` already follows.
+    """
+    from syndicate.features.nfl.sources import _source_roots, nfl_artifact_output_root
+
+    name = f"nfl_fantasy_usage_{season}.json"
+    candidates = [nfl_artifact_output_root() / "fantasy" / name]
+    candidates += [root / "fantasy" / name for root in _source_roots()]
+    for candidate in candidates:
+        try:
+            if candidate.is_file():
+                return candidate
+        except OSError:
+            continue
+    return None
 
 
 def _strip(entry: Any, game_id: str | None = None) -> dict[str, Any]:
@@ -726,8 +762,8 @@ def _load_usage_payload(season: int) -> dict[str, Any] | None:
     turns the pbp fallback off so that violation fails loudly instead of just
     running slowly.
     """
-    path = usage_artifact_path(season)
-    if not path.is_file():
+    path = existing_usage_artifact_path(season)
+    if path is None:
         return None
     try:
         return json.loads(path.read_text(encoding="utf-8"))

@@ -118,19 +118,51 @@ def _prepare_inputs(season: int, history: tuple) -> None:
         ],
     )
 
-    missing = [value for value in history if not usage_artifact_path(value).is_file()]
-    if missing:
+    # `#671`: the CURRENT season belongs in this set too, and on a different
+    # rule than history. History is immutable, so "absent" is the only reason to
+    # build it. The current season's pbp GROWS EVERY WEEK, so its artifact is
+    # rebuilt whenever the play-by-play is newer than the document -- gated on
+    # the files themselves, not on a timer, so a week with no new pbp costs
+    # nothing. Without this, `nfl_fantasy_usage_<current>.json` never existed at
+    # all and every NFL prop answer's recent-form layer was empty.
+    wanted = list(dict.fromkeys([*history, season]))
+    build: list[int] = []
+    for value in wanted:
+        target = usage_artifact_path(value)
+        if not target.is_file():
+            build.append(value)
+            continue
+        if value != season:
+            continue
+        pbp = usage_substrate(value)
+        if pbp["exists"] and Path(pbp["path"]).stat().st_mtime > target.stat().st_mtime:
+            print(f"[fantasy_artifact] PREPARE_STEP usage {value} STALE -- pbp is newer than the artifact", flush=True)
+            build.append(value)
+    if build:
         _run(
             "usage",
             [
                 sys.executable,
                 str(scripts / "build_nfl_fantasy_usage.py"),
                 "--seasons",
-                ",".join(str(value) for value in missing),
+                ",".join(str(value) for value in build),
+                "--force",
             ],
         )
     else:
-        print("[fantasy_artifact] PREPARE_STEP usage skipped -- all artifacts present", flush=True)
+        # Publishing is NOT conditional on building: the steady state is
+        # "already built", and the artifact's absence from web is exactly the
+        # defect `#671` records. The builder decides per season whether the push
+        # is needed; it is a few hundred KB.
+        _run(
+            "usage_publish",
+            [
+                sys.executable,
+                str(scripts / "build_nfl_fantasy_usage.py"),
+                "--seasons",
+                ",".join(str(value) for value in wanted),
+            ],
+        )
 
 
 
