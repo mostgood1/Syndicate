@@ -37418,3 +37418,25 @@ false is claimed about coverage, but the date is meaningless there. Follow-up, n
 
 **Owed next:** after refresh-worker deploys, confirm 64 `bvp_pairs_*.json` shards on web and
 re-read the MLB median; then this lane's Verification is complete.
+
+## 2026-09-17 21:10:33Z (16:10 CT) — live-odds-worker `7f7f2084` -> `20d589ed` (origin/main tip) — lane soccer-live-corners-stage2 — **verify: MET. The served live projection's corners now come from the PRE-KICKOFF estimate over the clock, with the sim's values kept beside them**
+
+- **User decision** (AskUserQuestion, ~16:15 CT... recorded at 21:15Z; the ask itself was ~21:0xZ): "Deploy once the call site lands". The call site landed as `fd59d32a` at ~21:00Z; this deploy is the tip that carries it.
+- **Live 21:13:48.730Z**, `dep-dam5eidbedkc73aoqa30`, 3m15s. Claim acquired 21:10:28Z (the peer lane's claim had lapsed at 21:08Z; **not forced**), preflight CLEAR 21:10:32Z, deploy fired 21:10:33Z — one second apart, from a loop that re-checks the claim in the same instant, because deploy-guard cannot see a script-launched deploy. **A job-free window on this service lasts 60-90 s while soccer is live** (peer measurement, confirmed by my own CLEAR: only infrastructure processes, 2 already-dead children awaiting reap), which is shorter than claim + preflight + deploy run by hand.
+- **Expectations, baseline read 21:10:29Z** (served soccer `live_state` 2026-09-17: 10 files, 1 live game, all three fields at 0):
+  - `live_state_games_with_prekickoff_pace_basis` 0 -> **1**
+  - `sim_projected_total_corners_nonnull` 0 -> **1**
+  - `live_corners_audits` 0 -> **1**, state `applied`
+- **verify: MET, read 21:15:49Z and detailed 21:16:12Z.** la_liga `401882869` Malaga v Villarreal at 84', snapshot `generated_at` **21:15:11.797Z**, i.e. 1m23s AFTER the deploy went live, so the NEW code wrote it (the artifact's existence would not have shown that; the basis field does):
+  - `projection.corners_basis` = `prekickoff_pace_v1`; published total **11.4025** (home 4.7614, away 6.6411)
+  - `sim_projected_total_corners` = **10.975** kept beside it (home 4.55, away 6.425)
+  - audit: `state=applied`, `elapsed_seconds=5040` (84'), `share_remaining=0.1404` (the fitted table interpolated between 80' 0.182 and 85' 0.130), `pregame_total=9.9888` from the freeze, `remaining=1.4024`, `so_far=10`
+  - the goals path is untouched, as intended: `projected_final_total` 4.375 at 80 sims.
+- **The flag was never set: `SYNDICATE_SOCCER_LIVE_CORNERS_ESTIMATOR` is ABSENT on both workers and the code treats absent as ENABLED**, so this deploy turned the behaviour on with no env change. Said out loud because "absent" reads as "off" to anyone who does not check the default.
+- **What is NOT verified by this:** that the new corners are BETTER on production. H32 (registration `log/2026-09-17.md` ~15:05 CT) grades published against the kept `sim_` values on live snapshots, 100 matches or 2026-11-15. Offline evidence only so far (H29: MAE 1.951 -> 1.876, bias +0.46 -> +0.07, paired -0.0742 [-0.1235, -0.0235]).
+- **OWED:** (a) the daily `live_state` harvest for H32, because that family is deleted after 8 days; (b) refresh-worker, which reaches the same `poll_league` through the soccer autorun and logged `[soccer_live_state]` once in 6 h against live-odds-worker's 62 (peer measurement, to be re-measured by this lane before it is treated as fact) — so this change is live-odds-worker-critical and refresh-worker-eventual.
+- **Ride-along `5a8ff498`** (lane soccer-shot-woodwork-undercount, session a1e40980), UNAVOIDABLE: it is an ancestor of `fd59d32a`, so no deploy of this change could exclude it. Its owner was told before firing and agreed. Their expectation, in their wording:
+  > `extract_shot_events` counts `shot-hit-woodwork` and the penalty variants. EXPECT: on a live soccer match whose ESPN commentary carries at least one such event, ESPN's per-match `totalShots` MINUS the served live box's shots total reads 0, where it read the event count before. MEASURED PRE-DEPLOY on la_liga 401882869, three same-instant reads: 20:54:47Z 13 vs 13, gap 0, zero such events; 21:03:04Z 14 vs 15, gap +1, exactly one `shot-hit-woodwork`; 21:1xZ 17 vs 18, gap +1, same one event. Offline, ESPN's own per-match totals reconcile 24/24 matches after the fix against 9/24 before (`scripts/check_soccer_shot_reconciliation.py`, `--baseline` reproduces 9/24). CAVEAT ON THE INSTRUMENT: an IN-PLAY gap is not clean — our snapshot refreshes every ~2 min while ESPN's boxscore moves continuously, so a live gap mixes the defect with poll lag (observed 1 -> 2 -> 1 in seven minutes). The sound reading is after full time, when both sides freeze and the gap must equal the count of such events in the final commentary.
+
+  That lane takes its own reading and writes its own entry; the 21:15:11Z snapshot being new-code is the which-code answer it needed.
+- **Claim released** 21:14:3xZ, immediately after the deploy went live.
