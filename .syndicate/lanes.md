@@ -1099,6 +1099,7 @@ death, never life — do not invert it.
   - `syndicate/features/soccer/features/live_lens.py` (the three `sim_*` corner fields and `corners_basis` on `LiveMatchProjection` + `to_dict`)
   - `tests/test_soccer_live_corners.py` (NEW)
   - `scripts/soccer_season_audit/harvest_live_projections.py` + `tests/test_soccer_live_projection_harvest.py` (NEW: H32's evidence capture)
+  - `scripts/soccer_season_audit/live_corners_forward_grade.py` + `tests/test_soccer_live_corners_forward_grade.py` (NEW: H32's grader)
   - **NOT CLAIMED HERE, and the reason this lane cannot finish alone:** the call site is `scripts/poll_soccer_live_state.py`, held by OPEN lane `soccer-postponed-served-final` (session a1e40980). The patch is prepared and offered to that lane; until it is applied the feature is PRESENT AND INERT in production.
 - Hypothesis: H29's offline result (`log/2026-09-17.md` ~13:55 CT) carries to production: the pregame estimator x S(t) beats the live re-sim's remaining corners, paired, on live matches.
 - Falsification test: H32 (registration owed before the first graded match) — on production live snapshots, MAE of the published corners is not below the kept `sim_` corners with a paired CI excluding zero.
