@@ -1,0 +1,90 @@
+{
+ "events": [
+  {
+   "id": "401872931",
+   "date": "2026-09-15T00:15Z",
+   "name": "Denver Broncos at Kansas City Chiefs",
+   "status": {
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final"
+    },
+    "period": 4
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "31",
+       "team": {
+        "id": "12",
+        "displayName": "Kansas City Chiefs",
+        "shortDisplayName": "Chiefs",
+        "location": "Kansas City",
+        "abbreviation": "KC"
+       },
+       "linescores": [
+        {
+         "value": 7.0,
+         "displayValue": "7",
+         "period": 1
+        },
+        {
+         "value": 7.0,
+         "displayValue": "7",
+         "period": 2
+        },
+        {
+         "value": 10.0,
+         "displayValue": "10",
+         "period": 3
+        },
+        {
+         "value": 7.0,
+         "displayValue": "7",
+         "period": 4
+        }
+       ]
+      },
+      {
+       "homeAway": "away",
+       "score": "10",
+       "team": {
+        "id": "7",
+        "displayName": "Denver Broncos",
+        "shortDisplayName": "Broncos",
+        "location": "Denver",
+        "abbreviation": "DEN"
+       },
+       "linescores": [
+        {
+         "value": 7.0,
+         "displayValue": "7",
+         "period": 1
+        },
+        {
+         "value": 0.0,
+         "displayValue": "0",
+         "period": 2
+        },
+        {
+         "value": 3.0,
+         "displayValue": "3",
+         "period": 3
+        },
+        {
+         "value": 0.0,
+         "displayValue": "0",
+         "period": 4
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

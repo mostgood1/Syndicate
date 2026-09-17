@@ -1,0 +1,262 @@
+{
+ "events": [
+  {
+   "id": "401856782",
+   "date": "2026-09-12T17:30Z",
+   "name": "Oregon Ducks at Oklahoma State Cowboys",
+   "status": {
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final"
+    },
+    "period": 4
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "39",
+       "team": {
+        "id": "197",
+        "displayName": "Oklahoma State Cowboys",
+        "shortDisplayName": "Oklahoma St",
+        "location": "Oklahoma State",
+        "abbreviation": "OKST"
+       },
+       "linescores": [
+        {
+         "value": 3.0,
+         "displayValue": "3",
+         "period": 1
+        },
+        {
+         "value": 21.0,
+         "displayValue": "21",
+         "period": 2
+        },
+        {
+         "value": 6.0,
+         "displayValue": "6",
+         "period": 3
+        },
+        {
+         "value": 9.0,
+         "displayValue": "9",
+         "period": 4
+        }
+       ]
+      },
+      {
+       "homeAway": "away",
+       "score": "31",
+       "team": {
+        "id": "2483",
+        "displayName": "Oregon Ducks",
+        "shortDisplayName": "Oregon",
+        "location": "Oregon",
+        "abbreviation": "ORE"
+       },
+       "linescores": [
+        {
+         "value": 7.0,
+         "displayValue": "7",
+         "period": 1
+        },
+        {
+         "value": 10.0,
+         "displayValue": "10",
+         "period": 2
+        },
+        {
+         "value": 7.0,
+         "displayValue": "7",
+         "period": 3
+        },
+        {
+         "value": 7.0,
+         "displayValue": "7",
+         "period": 4
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401856679",
+   "date": "2026-09-12T16:00Z",
+   "name": "Oklahoma Sooners at Michigan Wolverines",
+   "status": {
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final"
+    },
+    "period": 4
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "17",
+       "team": {
+        "id": "130",
+        "displayName": "Michigan Wolverines",
+        "shortDisplayName": "Michigan",
+        "location": "Michigan",
+        "abbreviation": "MICH"
+       },
+       "linescores": [
+        {
+         "value": 7.0,
+         "displayValue": "7",
+         "period": 1
+        },
+        {
+         "value": 3.0,
+         "displayValue": "3",
+         "period": 2
+        },
+        {
+         "value": 0.0,
+         "displayValue": "0",
+         "period": 3
+        },
+        {
+         "value": 7.0,
+         "displayValue": "7",
+         "period": 4
+        }
+       ]
+      },
+      {
+       "homeAway": "away",
+       "score": "10",
+       "team": {
+        "id": "201",
+        "displayName": "Oklahoma Sooners",
+        "shortDisplayName": "Oklahoma",
+        "location": "Oklahoma",
+        "abbreviation": "OU"
+       },
+       "linescores": [
+        {
+         "value": 0.0,
+         "displayValue": "0",
+         "period": 1
+        },
+        {
+         "value": 0.0,
+         "displayValue": "0",
+         "period": 2
+        },
+        {
+         "value": 7.0,
+         "displayValue": "7",
+         "period": 3
+        },
+        {
+         "value": 3.0,
+         "displayValue": "3",
+         "period": 4
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401858440",
+   "date": "2026-09-12T19:30Z",
+   "name": "Eastern Michigan Eagles at Michigan State Spartans",
+   "status": {
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final"
+    },
+    "period": 4
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "35",
+       "team": {
+        "id": "127",
+        "displayName": "Michigan State Spartans",
+        "shortDisplayName": "Michigan St",
+        "location": "Michigan State",
+        "abbreviation": "MSU"
+       },
+       "linescores": [
+        {
+         "value": 7.0,
+         "displayValue": "7",
+         "period": 1
+        },
+        {
+         "value": 7.0,
+         "displayValue": "7",
+         "period": 2
+        },
+        {
+         "value": 14.0,
+         "displayValue": "14",
+         "period": 3
+        },
+        {
+         "value": 7.0,
+         "displayValue": "7",
+         "period": 4
+        }
+       ]
+      },
+      {
+       "homeAway": "away",
+       "score": "7",
+       "team": {
+        "id": "2199",
+        "displayName": "Eastern Michigan Eagles",
+        "shortDisplayName": "E Michigan",
+        "location": "Eastern Michigan",
+        "abbreviation": "EMU"
+       },
+       "linescores": [
+        {
+         "value": 0.0,
+         "displayValue": "0",
+         "period": 1
+        },
+        {
+         "value": 7.0,
+         "displayValue": "7",
+         "period": 2
+        },
+        {
+         "value": 0.0,
+         "displayValue": "0",
+         "period": 3
+        },
+        {
+         "value": 0.0,
+         "displayValue": "0",
+         "period": 4
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

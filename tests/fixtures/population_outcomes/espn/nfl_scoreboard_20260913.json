@@ -1,0 +1,100 @@
+{
+ "events": [
+  {
+   "id": "401872923",
+   "date": "2026-09-13T17:00Z",
+   "name": "New Orleans Saints at Detroit Lions",
+   "status": {
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final/OT"
+    },
+    "period": 5
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "31",
+       "team": {
+        "id": "8",
+        "displayName": "Detroit Lions",
+        "shortDisplayName": "Lions",
+        "location": "Detroit",
+        "abbreviation": "DET"
+       },
+       "linescores": [
+        {
+         "value": 7.0,
+         "displayValue": "7",
+         "period": 1
+        },
+        {
+         "value": 0.0,
+         "displayValue": "0",
+         "period": 2
+        },
+        {
+         "value": 14.0,
+         "displayValue": "14",
+         "period": 3
+        },
+        {
+         "value": 3.0,
+         "displayValue": "3",
+         "period": 4
+        },
+        {
+         "value": 7.0,
+         "displayValue": "7",
+         "period": 5
+        }
+       ]
+      },
+      {
+       "homeAway": "away",
+       "score": "30",
+       "team": {
+        "id": "18",
+        "displayName": "New Orleans Saints",
+        "shortDisplayName": "Saints",
+        "location": "New Orleans",
+        "abbreviation": "NO"
+       },
+       "linescores": [
+        {
+         "value": 0.0,
+         "displayValue": "0",
+         "period": 1
+        },
+        {
+         "value": 0.0,
+         "displayValue": "0",
+         "period": 2
+        },
+        {
+         "value": 14.0,
+         "displayValue": "14",
+         "period": 3
+        },
+        {
+         "value": 10.0,
+         "displayValue": "10",
+         "period": 4
+        },
+        {
+         "value": 6.0,
+         "displayValue": "6",
+         "period": 5
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,7 @@
+team_id,canonical_team_name,abbreviation,conference,subdivision,aliases,display_name,conference_short_name,school_name,mascot_name,source_system,source_snapshot_date
+2199,Eastern Michigan,EMU,Mid-American,FBS,eagles|eastern michigan|emu,Eastern Michigan,,Eastern Michigan,Eagles,cfbd,2026-07-21
+130,Michigan,MICH,Big Ten,FBS,mich|michigan|wolverines,Michigan,,Michigan,Wolverines,cfbd,2026-07-21
+127,Michigan State,MSU,Big Ten,FBS,michigan state|msu|spartans,Michigan State,,Michigan State,Spartans,cfbd,2026-07-21
+201,Oklahoma,OU,SEC,FBS,oklahoma|ou|sooners,Oklahoma,,Oklahoma,Sooners,cfbd,2026-07-21
+197,Oklahoma State,OKST,Big 12,FBS,cowboys|oklahoma state|okst,Oklahoma State,,Oklahoma State,Cowboys,cfbd,2026-07-21
+2483,Oregon,ORE,Big Ten,FBS,ducks|ore|oregon,Oregon,,Oregon,Ducks,cfbd,2026-07-21

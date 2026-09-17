@@ -1,0 +1,214 @@
+{
+ "events": [
+  {
+   "id": "401857190",
+   "date": "2026-09-17T23:30Z",
+   "name": "Connecticut Sun at Atlanta Dream",
+   "status": {
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "shortDetail": "9/17 - 7:30 PM EDT"
+    },
+    "period": 0
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "team": {
+        "id": "20",
+        "displayName": "Atlanta Dream",
+        "shortDisplayName": "Dream",
+        "location": "Atlanta",
+        "abbreviation": "ATL"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "team": {
+        "id": "18",
+        "displayName": "Connecticut Sun",
+        "shortDisplayName": "Sun",
+        "location": "Connecticut",
+        "abbreviation": "CON"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401857191",
+   "date": "2026-09-18T00:00Z",
+   "name": "Washington Mystics at Chicago Sky",
+   "status": {
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "shortDetail": "9/17 - 8:00 PM EDT"
+    },
+    "period": 0
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "team": {
+        "id": "19",
+        "displayName": "Chicago Sky",
+        "shortDisplayName": "Sky",
+        "location": "Chicago",
+        "abbreviation": "CHI"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "team": {
+        "id": "16",
+        "displayName": "Washington Mystics",
+        "shortDisplayName": "Mystics",
+        "location": "Washington",
+        "abbreviation": "WSH"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401857192",
+   "date": "2026-09-18T00:00Z",
+   "name": "Los Angeles Sparks at Dallas Wings",
+   "status": {
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "shortDetail": "9/17 - 8:00 PM EDT"
+    },
+    "period": 0
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "team": {
+        "id": "3",
+        "displayName": "Dallas Wings",
+        "shortDisplayName": "Wings",
+        "location": "Dallas",
+        "abbreviation": "DAL"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "team": {
+        "id": "6",
+        "displayName": "Los Angeles Sparks",
+        "shortDisplayName": "Sparks",
+        "location": "Los Angeles",
+        "abbreviation": "LA"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401857193",
+   "date": "2026-09-18T02:00Z",
+   "name": "Phoenix Mercury at Portland Fire",
+   "status": {
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "shortDetail": "9/17 - 10:00 PM EDT"
+    },
+    "period": 0
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "team": {
+        "id": "132052",
+        "displayName": "Portland Fire",
+        "shortDisplayName": "Fire",
+        "location": "Portland",
+        "abbreviation": "POR"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "team": {
+        "id": "11",
+        "displayName": "Phoenix Mercury",
+        "shortDisplayName": "Mercury",
+        "location": "Phoenix",
+        "abbreviation": "PHX"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401857194",
+   "date": "2026-09-18T02:00Z",
+   "name": "Las Vegas Aces at Seattle Storm",
+   "status": {
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "shortDetail": "9/17 - 10:00 PM EDT"
+    },
+    "period": 0
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "0",
+       "team": {
+        "id": "14",
+        "displayName": "Seattle Storm",
+        "shortDisplayName": "Storm",
+        "location": "Seattle",
+        "abbreviation": "SEA"
+       }
+      },
+      {
+       "homeAway": "away",
+       "score": "0",
+       "team": {
+        "id": "17",
+        "displayName": "Las Vegas Aces",
+        "shortDisplayName": "Aces",
+        "location": "Las Vegas",
+        "abbreviation": "LV"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

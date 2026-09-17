@@ -1,0 +1,348 @@
+{
+ "events": [
+  {
+   "id": "401857186",
+   "date": "2026-08-30T19:00Z",
+   "name": "Minnesota Lynx at Atlanta Dream",
+   "status": {
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final"
+    },
+    "period": 4
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "89",
+       "team": {
+        "id": "20",
+        "displayName": "Atlanta Dream",
+        "shortDisplayName": "Dream",
+        "location": "Atlanta",
+        "abbreviation": "ATL"
+       },
+       "linescores": [
+        {
+         "value": 26.0,
+         "displayValue": "26",
+         "period": 1
+        },
+        {
+         "value": 26.0,
+         "displayValue": "26",
+         "period": 2
+        },
+        {
+         "value": 19.0,
+         "displayValue": "19",
+         "period": 3
+        },
+        {
+         "value": 18.0,
+         "displayValue": "18",
+         "period": 4
+        }
+       ]
+      },
+      {
+       "homeAway": "away",
+       "score": "81",
+       "team": {
+        "id": "8",
+        "displayName": "Minnesota Lynx",
+        "shortDisplayName": "Lynx",
+        "location": "Minnesota",
+        "abbreviation": "MIN"
+       },
+       "linescores": [
+        {
+         "value": 21.0,
+         "displayValue": "21",
+         "period": 1
+        },
+        {
+         "value": 20.0,
+         "displayValue": "20",
+         "period": 2
+        },
+        {
+         "value": 21.0,
+         "displayValue": "21",
+         "period": 3
+        },
+        {
+         "value": 19.0,
+         "displayValue": "19",
+         "period": 4
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401857187",
+   "date": "2026-08-30T21:00Z",
+   "name": "Los Angeles Sparks at Seattle Storm",
+   "status": {
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final"
+    },
+    "period": 4
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "74",
+       "team": {
+        "id": "14",
+        "displayName": "Seattle Storm",
+        "shortDisplayName": "Storm",
+        "location": "Seattle",
+        "abbreviation": "SEA"
+       },
+       "linescores": [
+        {
+         "value": 11.0,
+         "displayValue": "11",
+         "period": 1
+        },
+        {
+         "value": 22.0,
+         "displayValue": "22",
+         "period": 2
+        },
+        {
+         "value": 19.0,
+         "displayValue": "19",
+         "period": 3
+        },
+        {
+         "value": 22.0,
+         "displayValue": "22",
+         "period": 4
+        }
+       ]
+      },
+      {
+       "homeAway": "away",
+       "score": "90",
+       "team": {
+        "id": "6",
+        "displayName": "Los Angeles Sparks",
+        "shortDisplayName": "Sparks",
+        "location": "Los Angeles",
+        "abbreviation": "LA"
+       },
+       "linescores": [
+        {
+         "value": 25.0,
+         "displayValue": "25",
+         "period": 1
+        },
+        {
+         "value": 27.0,
+         "displayValue": "27",
+         "period": 2
+        },
+        {
+         "value": 18.0,
+         "displayValue": "18",
+         "period": 3
+        },
+        {
+         "value": 20.0,
+         "displayValue": "20",
+         "period": 4
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401857188",
+   "date": "2026-08-30T23:00Z",
+   "name": "Golden State Valkyries at Portland Fire",
+   "status": {
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final"
+    },
+    "period": 4
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "69",
+       "team": {
+        "id": "132052",
+        "displayName": "Portland Fire",
+        "shortDisplayName": "Fire",
+        "location": "Portland",
+        "abbreviation": "POR"
+       },
+       "linescores": [
+        {
+         "value": 14.0,
+         "displayValue": "14",
+         "period": 1
+        },
+        {
+         "value": 11.0,
+         "displayValue": "11",
+         "period": 2
+        },
+        {
+         "value": 26.0,
+         "displayValue": "26",
+         "period": 3
+        },
+        {
+         "value": 18.0,
+         "displayValue": "18",
+         "period": 4
+        }
+       ]
+      },
+      {
+       "homeAway": "away",
+       "score": "86",
+       "team": {
+        "id": "129689",
+        "displayName": "Golden State Valkyries",
+        "shortDisplayName": "Valkyries",
+        "location": "Golden State",
+        "abbreviation": "GS"
+       },
+       "linescores": [
+        {
+         "value": 28.0,
+         "displayValue": "28",
+         "period": 1
+        },
+        {
+         "value": 19.0,
+         "displayValue": "19",
+         "period": 2
+        },
+        {
+         "value": 23.0,
+         "displayValue": "23",
+         "period": 3
+        },
+        {
+         "value": 16.0,
+         "displayValue": "16",
+         "period": 4
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401857189",
+   "date": "2026-08-31T00:30Z",
+   "name": "Connecticut Sun at Dallas Wings",
+   "status": {
+    "type": {
+     "name": "STATUS_FINAL",
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final"
+    },
+    "period": 4
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "score": "97",
+       "team": {
+        "id": "3",
+        "displayName": "Dallas Wings",
+        "shortDisplayName": "Wings",
+        "location": "Dallas",
+        "abbreviation": "DAL"
+       },
+       "linescores": [
+        {
+         "value": 32.0,
+         "displayValue": "32",
+         "period": 1
+        },
+        {
+         "value": 28.0,
+         "displayValue": "28",
+         "period": 2
+        },
+        {
+         "value": 23.0,
+         "displayValue": "23",
+         "period": 3
+        },
+        {
+         "value": 14.0,
+         "displayValue": "14",
+         "period": 4
+        }
+       ]
+      },
+      {
+       "homeAway": "away",
+       "score": "71",
+       "team": {
+        "id": "18",
+        "displayName": "Connecticut Sun",
+        "shortDisplayName": "Sun",
+        "location": "Connecticut",
+        "abbreviation": "CON"
+       },
+       "linescores": [
+        {
+         "value": 18.0,
+         "displayValue": "18",
+         "period": 1
+        },
+        {
+         "value": 29.0,
+         "displayValue": "29",
+         "period": 2
+        },
+        {
+         "value": 12.0,
+         "displayValue": "12",
+         "period": 3
+        },
+        {
+         "value": 12.0,
+         "displayValue": "12",
+         "period": 4
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

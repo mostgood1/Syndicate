@@ -1,0 +1,668 @@
+{
+ "header": {
+  "id": "401857186",
+  "competitions": [
+   {
+    "status": {
+     "type": {
+      "name": "STATUS_FINAL",
+      "state": "post",
+      "completed": true,
+      "shortDetail": "Final"
+     }
+    },
+    "competitors": [
+     {
+      "homeAway": "home",
+      "score": "89",
+      "team": {
+       "id": "20",
+       "displayName": "Atlanta Dream",
+       "location": "Atlanta",
+       "abbreviation": "ATL"
+      },
+      "linescores": [
+       {
+        "displayValue": "26"
+       },
+       {
+        "displayValue": "26"
+       },
+       {
+        "displayValue": "19"
+       },
+       {
+        "displayValue": "18"
+       }
+      ]
+     },
+     {
+      "homeAway": "away",
+      "score": "81",
+      "team": {
+       "id": "8",
+       "displayName": "Minnesota Lynx",
+       "location": "Minnesota",
+       "abbreviation": "MIN"
+      },
+      "linescores": [
+       {
+        "displayValue": "21"
+       },
+       {
+        "displayValue": "20"
+       },
+       {
+        "displayValue": "21"
+       },
+       {
+        "displayValue": "19"
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "boxscore": {
+  "players": [
+   {
+    "team": {
+     "id": "8",
+     "abbreviation": "MIN",
+     "displayName": "Minnesota Lynx"
+    },
+    "statistics": [
+     {
+      "name": null,
+      "keys": [
+       "minutes",
+       "points",
+       "fieldGoalsMade-fieldGoalsAttempted",
+       "threePointFieldGoalsMade-threePointFieldGoalsAttempted",
+       "freeThrowsMade-freeThrowsAttempted",
+       "rebounds",
+       "assists",
+       "turnovers",
+       "steals",
+       "blocks",
+       "offensiveRebounds",
+       "defensiveRebounds",
+       "fouls",
+       "plusMinus"
+      ],
+      "athletes": [
+       {
+        "athlete": {
+         "id": "2529130",
+         "displayName": "Natasha Howard"
+        },
+        "stats": [
+         "31",
+         "9",
+         "3-6",
+         "0-1",
+         "3-4",
+         "7",
+         "7",
+         "4",
+         "4",
+         "2",
+         "3",
+         "4",
+         "2",
+         "-9"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "3917450",
+         "displayName": "Napheesa Collier"
+        },
+        "stats": [
+         "35",
+         "17",
+         "5-15",
+         "2-5",
+         "5-6",
+         "7",
+         "2",
+         "1",
+         "2",
+         "1",
+         "2",
+         "5",
+         "2",
+         "-16"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "2529205",
+         "displayName": "Kayla McBride"
+        },
+        "stats": [
+         "37",
+         "17",
+         "7-16",
+         "2-6",
+         "1-2",
+         "3",
+         "3",
+         "0",
+         "3",
+         "0",
+         "1",
+         "2",
+         "2",
+         "-4"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "2987891",
+         "displayName": "Courtney Williams"
+        },
+        "stats": [
+         "31",
+         "11",
+         "5-12",
+         "1-1",
+         "0-0",
+         "3",
+         "4",
+         "3",
+         "3",
+         "0",
+         "0",
+         "3",
+         "4",
+         "-4"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "4433791",
+         "displayName": "Olivia Miles"
+        },
+        "stats": [
+         "30",
+         "21",
+         "7-14",
+         "1-3",
+         "6-7",
+         "5",
+         "0",
+         "2",
+         "1",
+         "0",
+         "0",
+         "5",
+         "3",
+         "-19"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "3054590",
+         "displayName": "Nia Brodie"
+        },
+        "stats": [
+         "18",
+         "0",
+         "0-0",
+         "0-0",
+         "0-0",
+         "4",
+         "1",
+         "0",
+         "1",
+         "0",
+         "0",
+         "4",
+         "1",
+         "+3"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "4280877",
+         "displayName": "Chloe Bibby"
+        },
+        "stats": [
+         "6",
+         "2",
+         "1-2",
+         "0-1",
+         "0-0",
+         "1",
+         "0",
+         "1",
+         "0",
+         "1",
+         "0",
+         "1",
+         "0",
+         "-1"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "4596309",
+         "displayName": "Liatu King"
+        },
+        "stats": [
+         "1",
+         "2",
+         "1-1",
+         "0-0",
+         "0-0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "+2"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "5278237",
+         "displayName": "Anastasiia Olairi Kosu"
+        },
+        "stats": [
+         "1",
+         "0",
+         "0-0",
+         "0-0",
+         "0-0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "+2"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "4280850",
+         "displayName": "Maya Caldwell"
+        },
+        "stats": [
+         "10",
+         "2",
+         "1-4",
+         "0-2",
+         "0-0",
+         "2",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "2",
+         "0",
+         "+4"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "5345478",
+         "displayName": "Eliska Joklova"
+        },
+        "stats": [
+         "1",
+         "0",
+         "0-0",
+         "0-0",
+         "0-0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "+2"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "team": {
+     "id": "20",
+     "abbreviation": "ATL",
+     "displayName": "Atlanta Dream"
+    },
+    "statistics": [
+     {
+      "name": null,
+      "keys": [
+       "minutes",
+       "points",
+       "fieldGoalsMade-fieldGoalsAttempted",
+       "threePointFieldGoalsMade-threePointFieldGoalsAttempted",
+       "freeThrowsMade-freeThrowsAttempted",
+       "rebounds",
+       "assists",
+       "turnovers",
+       "steals",
+       "blocks",
+       "offensiveRebounds",
+       "defensiveRebounds",
+       "fouls",
+       "plusMinus"
+      ],
+      "athletes": [
+       {
+        "athlete": {
+         "id": "4398915",
+         "displayName": "Naz Hillmon"
+        },
+        "stats": [
+         "30",
+         "7",
+         "3-9",
+         "1-5",
+         "0-0",
+         "3",
+         "1",
+         "4",
+         "0",
+         "0",
+         "1",
+         "2",
+         "0",
+         "+21"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "4433402",
+         "displayName": "Angel Reese"
+        },
+        "stats": [
+         "33",
+         "15",
+         "5-9",
+         "0-0",
+         "5-8",
+         "11",
+         "2",
+         "5",
+         "2",
+         "1",
+         "3",
+         "8",
+         "5",
+         "+15"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "3058901",
+         "displayName": "Allisha Gray"
+        },
+        "stats": [
+         "35",
+         "23",
+         "8-16",
+         "6-11",
+         "1-1",
+         "11",
+         "2",
+         "2",
+         "3",
+         "0",
+         "1",
+         "10",
+         "2",
+         "+17"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "3142250",
+         "displayName": "Jordin Canada"
+        },
+        "stats": [
+         "36",
+         "16",
+         "6-12",
+         "2-6",
+         "2-3",
+         "4",
+         "10",
+         "2",
+         "0",
+         "1",
+         "0",
+         "4",
+         "2",
+         "+5"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "4398674",
+         "displayName": "Rhyne Howard"
+        },
+        "stats": [
+         "35",
+         "16",
+         "6-16",
+         "2-9",
+         "2-2",
+         "1",
+         "3",
+         "0",
+         "2",
+         "1",
+         "0",
+         "1",
+         "3",
+         "+5"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "869",
+         "displayName": "DeWanna Bonner"
+        },
+        "stats": [
+         "17",
+         "7",
+         "3-5",
+         "1-3",
+         "0-0",
+         "4",
+         "2",
+         "2",
+         "1",
+         "0",
+         "2",
+         "2",
+         "1",
+         "-14"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "5017721",
+         "displayName": "Sika Kone"
+        },
+        "stats": [
+         "1",
+         "0",
+         "0-1",
+         "0-0",
+         "0-0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "-2"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "5108587",
+         "displayName": "Madina Okot"
+        },
+        "stats": [
+         "1",
+         "0",
+         "0-0",
+         "0-0",
+         "0-0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "-2"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "3058893",
+         "displayName": "Shatori Walker-Kimbrough"
+        },
+        "stats": [
+         "1",
+         "0",
+         "0-0",
+         "0-0",
+         "0-0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "-2"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "4433431",
+         "displayName": "Te-Hina Paopao"
+        },
+        "stats": [
+         "4",
+         "0",
+         "0-1",
+         "0-1",
+         "0-0",
+         "0",
+         "1",
+         "0",
+         "0",
+         "0",
+         "0",
+         "0",
+         "1",
+         "+3"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "5208983",
+         "displayName": "Isobel Borlase"
+        },
+        "stats": [
+         "8",
+         "5",
+         "2-2",
+         "1-1",
+         "0-0",
+         "3",
+         "0",
+         "3",
+         "0",
+         "0",
+         "1",
+         "2",
+         "0",
+         "-6"
+        ],
+        "didNotPlay": false,
+        "reason": "COACH'S DECISION"
+       },
+       {
+        "athlete": {
+         "id": "5105740",
+         "displayName": "Indya Nivar"
+        },
+        "stats": [],
+        "didNotPlay": true,
+        "reason": "COACH'S DECISION"
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}
