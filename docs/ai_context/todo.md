@@ -1,5 +1,38 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#671` — **NFL per-game player stats never reach web, so every NFL prop answer has an empty recent-form layer** — FOUND 2026-09-17, lane `prop-evidence-parity`, NOT STARTED, no owner
+
+- **Measured.** `nfl_source/fantasy/nfl_fantasy_usage_*.json` IS allowlisted in `HOT_ARTIFACT_PATTERNS`, and the production export listing returns **0 files**; `nfl_source/tracking/nflverse/` on web holds only `injuries_2026.csv`, `roster_2026.csv`, `schedules_games.csv` — no pbp, no player_stats. So over the 40 real NFL board prop rows sampled 2026-09-17, `recent_form` is `artifact_missing` on 40/40, while the other six layers fill.
+- **Why it matters.** Recent form plus the hit rate against the row's own line is the layer a human checks first. NFL is the only sport with a live slate that cannot show it.
+- **The fix is one worker run, not new code.** `scripts/build_nfl_fantasy_usage.py --seasons 2025,2026` produces the file (`fantasy_usage.py:680-706` writes per-game targets, receptions, rec/air yards, carries, rush/pass yards, red-zone and goal-line use). Verified locally: with that file readable, NFL `recent_form` goes 40/40 filled. It needs play-by-play on the worker's disk and it has no publish call today — both are the work.
+- **Done when** a production NFL prop Ask shows a last-N table with a hit rate, and `scripts/prop_evidence_checklist.py --base-url ... --sports nfl` reports `recent_form` filled > 0.
+
+### `#672` — **The NFL prop model artifact stops at week 1, and the board prices every later week from it** — FOUND 2026-09-17, lane `prop-evidence-parity`, NOT STARTED, no owner
+
+- **Measured 2026-09-17.** `ls nfl_source/nfl_prop_projections_*` → one file, `_2026_wk1.json` (476,295 B, 09-10 00:09). All 40 sampled week-2 board rows are priced from it; 26 of them under week 1's `game_id` (Gibbs receptions carries `New Orleans Saints|Detroit Lions`). All 1,140 rows are `rate_source=prior_season_fallback`, i.e. 2025 rates. `smartsim2_projections_2026_wk2.csv` is also stale (generated 2026-08-01, 47-50 days before kickoff) and `smartsim2_segment_distributions_*` exists for week 1 only.
+- **Ask now says so** (every NFL prop table carries a STALE WEEK row, and `nfl_prop_projections.py`'s week fallback is surfaced instead of living only in `index.resolution`), but the BOARD still prices and stakes off it silently.
+- **Done when** the week's own prop artifact is rebuilt on a service before that week's slate, or the board withholds a projection whose artifact week is not the game's week.
+
+### `#673` — **Soccer: the board prices `player_assists` off an UNCONDITIONAL ladder while shots/SOT ladders are conditional on playing** — FOUND 2026-09-17, lane `prop-evidence-parity`, NOT STARTED, no owner
+
+- **Measured over 212 ladder-bearing rows** (Serie A 2026-09-19 production file, plus 43 Eredivisie rows as a check): shots ladders match `1 − e^(−expected_shots_if_playing)` on 207/212 and SOT on 210/212, while assists match the UNCONDITIONAL mean on 212/212 (0 conditional) and `anytime_scorer_probability` equals `1 − e^(−expected_goals)` on 230/230.
+- **Why it matters.** A book voids a prop when the player does not appear, so a conditional probability is the right one to price shots/SOT — and pricing assists unconditionally mixes two different questions in one market family. A bench player's conditional shots line reads as a 88% over (Nils Eggens, minutes share 5.9%).
+- **Two smaller findings in the same read.** (a) 4 of 12 sampled fixtures never join the sim by name — "Inter Milan"/"Internazionale", "FC Zwolle"/"PEC Zwolle", "SC Telstar"/"Telstar", "FC Twente Enschede"/"FC Twente" — so neither the board nor Ask has a projection for them. (b) `SoccerProjectionIndex.generated_at_by_league` is keyed by league only, so in a multi-date slate window the last date loaded overwrites the others' as-of, and the board's freshness stamp inherits it (`soccer_projections.py:1290`).
+- **Done when** each soccer prop family states which probability it prices and the two are not mixed; the four name joins land; the as-of is per match.
+
+### `#674` — **NHL `raw/player_game_stats.csv` has no scheduled producer, and the season starts 2026-09-19** — FOUND 2026-09-17, lane `prop-evidence-parity`, NOT STARTED, no owner
+
+- **Measured.** The file is on web (202,067 B, modified 2026-06-19) and covers 2026-05-01..06-15 — playoffs only. Its only writer is the vendor CLI `collect_player_game_stats` (`vendor/nhl_betting_repo/nhl_betting/data/collect.py:165`), and no caller exists in `scripts/`, `.github/` or `render.yaml`.
+- **Consequence.** NHL prop evidence fills recent form from last season today; once games start it is stale-by-design, and the staleness row will say so on every answer.
+- **Also.** A blank `shots` cell means zero (the vendor parser's `or` chain, `collect.py:114`): 411 of 1,476 skater rows are blank and no row holds `0.0`.
+- **Done when** a scheduled job refreshes that file for the 2026-27 season and the NHL recent-form table's newest game is within days of the slate.
+
+### `#675` — **WNBA `boxscores_history.csv` is frozen at 2026-06-30 while the dated per-day files reach 2026-08-25** — FOUND 2026-09-17, lane `prop-evidence-parity`, NOT STARTED, no owner
+
+- **Measured on web 2026-09-17:** `wnba_source/data/processed/boxscores_history.csv` newest game 2026-06-30; `boxscores_2026-08-25.csv` and its siblings exist and are current to 08-25; no September file of either kind, during the playoffs.
+- **This is `#469`'s bootstrap stall, still live.** Ask's prop evidence now reads the history file PLUS the dated files and states the remaining staleness on the table, so a September prop no longer shows June form as if it were current — but nothing is refreshing either family now.
+- **Done when** a WNBA slate date's box scores appear within a day of the game, and the prop evidence table stops printing its STALE row.
+
 ### `#669` — **Scheduled model evaluation for the active sports: daily scorecard + weekly backtests + auto-updated scoring overlay (Render cron `model-scorecard`)** — lane `model-scorecard-cron`, 2026-09-17 — **OPEN; code on the lane branch, dry run against production PASSED (exit 0), web deploy + cron creation next**
 
 - **Why.** User 2026-09-17: "do we have anything scheduled to backtest models on active sports daily/weekly for game lines and props, pregame and live?" -- measured NO: the only GHA schedule is fotmob join coverage, the three Render crons evaluate no model, and the 09-14 assessment table and `bucket_search.py` only ever ran by hand. User: "lets get a plan together and execute it ASAP".
