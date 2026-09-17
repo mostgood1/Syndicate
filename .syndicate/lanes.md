@@ -1439,6 +1439,7 @@ death, never life — do not invert it.
 - Blocked by: none
 ### soccer-live-model-study — OPEN — opened 2026-09-17 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
 - Goal: `#664` item 7, stage 1 (offline, no engine change). Each live-model hypothesis gets a pre-registered held-out verdict before any engine work: H29 live corners (running corner rate + pregame estimator vs the production live re-sim), then H30 live goals (running shot quality) and H31 per-league momentum direction weight, each registered before its own run.
+- **H30 FALSIFIED 2026-09-17** (`log/2026-09-17.md` ~15:20 CT): on 259 held-out TEST matches, a running-xG update did not beat the live re-sim (-0.0134 [-0.0403, +0.0125]) nor the pregame market pace (+0.0037); `a` = 8.0 (heaviest shrink) on TRAIN. And the pregame pace did NOT beat the live re-sim either (-0.0171 [-0.0440, +0.0081]), so the sim's GOALS stand. No engine change. H31 still owed.
 - **H29 FALSIFIED 2026-09-17** (`log/2026-09-17.md` ~13:55 CT): on 320 held-out TEST matches the running-rate arm beat production's live re-sim (mean |err| -0.0714 [-0.1251, -0.0166]) but not the pregame-estimator pace (+0.0028), so corners-so-far adds nothing. **Reported, not graded:** the pregame estimator x time share beats the live re-sim by -0.0742 [-0.1235, -0.0235] corners MAE and cuts bias +0.46 -> +0.07. A stage-2 swap is a user decision, not taken. H30/H31 still owed.
 - Files:
   - `scripts/soccer_season_audit/live_corners_study.py` (NEW, H29)
