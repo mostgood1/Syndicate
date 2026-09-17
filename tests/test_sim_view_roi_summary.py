@@ -404,3 +404,98 @@ def test_the_market_fair_only_flag_is_on_the_cross_and_the_pooled_buckets():
     assert pooled["none"]["market_fair_only"] is True
     assert pooled["agrees"]["market_fair_only"] is False
     assert pooled[SIM_VIEW_UNRECORDED]["market_fair_only"] is False
+
+
+# ---------------------------------------------------------------------------
+# 5. THE SAMPLE IS DECISIONS, NOT ROWS
+# ---------------------------------------------------------------------------
+
+
+def _bet(event_id="evt-sat", side="over", line=53.5, selected_date="2026-09-16", **kw):
+    """A keyable NCAAF order: the same bet on another slate date is another ROW."""
+    base = dict(
+        sport="ncaaf", market="totals", segment="full_game", event_id=event_id,
+        side=side, line=line, book="draftkings", selected_date=selected_date,
+        sim_view="none", outcome="won", pnl_dollars=9.09,
+        idempotency_key=f"{event_id}|{side}|{line}|{selected_date}",
+    )
+    base.update(kw)
+    return _order(**base)
+
+
+def test_one_bet_on_three_slate_dates_is_three_rows_and_one_decision():
+    """Measured 2026-09-17: 40 of 77 NCAAF bets sat on 2-3 slate dates' plans.
+    Rows share one outcome, so they are one trial."""
+    rows = [_bet(selected_date=d) for d in ("2026-09-15", "2026-09-16", "2026-09-17")]
+    out = sim_view_roi_summary(orders=rows)
+    bucket = _bucket(out, "ncaaf | game_total | none")
+    assert (bucket["orders"], bucket["settled"]) == (3, 3)
+    assert (bucket["decisions"], bucket["settled_decisions"]) == (1, 1)
+    pooled = {b["sim_view"]: b for b in out["by_verdict"]}
+    assert (pooled["none"]["decisions"], pooled["none"]["settled_decisions"]) == (1, 1)
+    assert out["sample"]["decisions"] == 1
+
+
+def test_a_different_line_or_side_is_a_different_decision():
+    rows = [_bet(), _bet(line=54.5), _bet(side="under"), _bet(event_id="evt-other")]
+    bucket = _bucket(sim_view_roi_summary(orders=rows), "ncaaf | game_total | none")
+    assert (bucket["orders"], bucket["decisions"]) == (4, 4)
+
+
+def test_settled_decisions_uses_the_same_settled_rule_as_the_row_counts():
+    """A bet with one graded row and one pending row is settled once, and the
+    pending-only bet is not settled at all -- `_grouped`'s rule, not a second one."""
+    rows = [
+        _bet(selected_date="2026-09-16"),
+        _bet(selected_date="2026-09-17", outcome=None, status="filled", pnl_dollars=None),
+        _bet(event_id="evt-pending", outcome=None, status="filled", pnl_dollars=None),
+    ]
+    bucket = _bucket(sim_view_roi_summary(orders=rows), "ncaaf | game_total | none")
+    assert (bucket["orders"], bucket["settled"], bucket["pending"]) == (3, 1, 2)
+    assert (bucket["decisions"], bucket["settled_decisions"]) == (2, 1)
+
+
+def test_the_decision_counts_do_not_change_roi_or_row_counts():
+    """Added BESIDE the row-based money, never instead of it: the same bet at two
+    prices on two slate dates is still two stakes and two P&Ls."""
+    rows = [_bet(selected_date="2026-09-15", pnl_dollars=9.09),
+            _bet(selected_date="2026-09-16", pnl_dollars=8.33)]
+    bucket = sim_view_roi_summary(orders=rows)["by_verdict"][0]
+    theirs = settlement_summary(orders=rows)["total"]
+    for field in ("settled", "won", "lost", "push", "pending",
+                  "staked_dollars", "pnl_dollars", "roi_pct", "win_pct"):
+        assert bucket[field] == theirs[field], f"{field} disagrees with settlement_summary"
+    assert (bucket["settled"], bucket["settled_decisions"]) == (2, 1)
+
+
+def test_a_bet_whose_verdict_changed_between_slate_dates_is_counted_and_named():
+    """`sim_view` is recomputed per slate date, so one bet can be `unpriced` on
+    Wednesday and `contradicts` on Thursday. It sits in both buckets; the payload
+    says how many bets do, so the buckets are not read as independent."""
+    rows = [_bet(sim_view="unpriced", selected_date="2026-09-16"),
+            _bet(sim_view="contradicts", selected_date="2026-09-17"),
+            _bet(event_id="evt-steady", sim_view="unpriced")]
+    out = sim_view_roi_summary(orders=rows)
+    assert _bucket(out, "ncaaf | game_total | unpriced")["decisions"] == 2
+    assert _bucket(out, "ncaaf | game_total | contradicts")["decisions"] == 1
+    assert out["sample"]["decisions"] == 2
+    assert out["sample"]["decisions_in_more_than_one_verdict"] == 1
+    assert "selected_date" in out["sample"]["reason"]
+
+
+def test_an_unkeyable_row_is_its_own_decision_and_never_merged():
+    """No event_id: the key falls back to the row's own identity, as
+    `settled_decisions_by_sport` does -- dropping it would UNDERSTATE the sample."""
+    rows = [_order(idempotency_key="a"), _order(idempotency_key="b")]
+    bucket = _bucket(sim_view_roi_summary(orders=rows), "mlb | game_line | agrees")
+    assert (bucket["orders"], bucket["decisions"]) == (2, 2)
+
+
+def test_the_cut_uses_the_credibility_samples_decision_key():
+    """One identity, not two: the same settled rows give the same distinct count
+    through `settled_decisions_by_sport`."""
+    from syndicate.features.shared.paper_settlement import settled_decisions_by_sport
+
+    rows = [_bet(selected_date=d) for d in ("2026-09-15", "2026-09-16")] + [_bet(line=54.5)]
+    out = sim_view_roi_summary(orders=rows)
+    assert out["sample"]["decisions"] == settled_decisions_by_sport(rows)["ncaaf"] == 2

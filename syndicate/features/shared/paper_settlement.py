@@ -1265,27 +1265,9 @@ def settled_decisions_by_sport(
     `unknown` is excluded: it is a failed sport join, not a sport, and letting
     it collect rows would credential nothing at all.
     """
-    from syndicate.features.shared.clv_position_join import (
-        market_key,
-        opening_key_for_position,
-    )
     from syndicate.features.shared.execution_ledger import _load
 
     rows = list(orders) if orders is not None else (_load().get("orders") or [])
-
-    def _decision(order: Mapping[str, Any]) -> str:
-        raw = order.get("opening_key")
-        if not (isinstance(raw, str) and raw.strip()):
-            try:
-                raw = opening_key_for_position(order)
-            except Exception:  # noqa: BLE001
-                raw = None
-        key = market_key(raw) if raw else None
-        if key:
-            return key
-        # Unkeyable. Its own identity, so it counts once and is never merged
-        # with an unrelated row that is also unkeyable.
-        return "idempotency_key=%s" % str(order.get("idempotency_key") or id(order))
 
     seen: dict[str, set[str]] = {}
     for order in rows:
@@ -1298,8 +1280,36 @@ def settled_decisions_by_sport(
         sport = str(order.get("sport") or "").strip().lower()
         if not sport or sport == "unknown":
             continue
-        seen.setdefault(sport, set()).add(_decision(order))
+        seen.setdefault(sport, set()).add(_decision_key(order))
     return {sport: len(keys) for sport, keys in seen.items() if keys}
+
+
+def _decision_key(order: Mapping[str, Any]) -> str:
+    """One BET's identity: `event_id|market|player|segment|side|line`.
+
+    The identity `settled_decisions_by_sport` documents above, lifted out of it
+    unchanged so the sim-verdict cut counts decisions by the SAME rule rather
+    than a second one. It carries no slate date and no venue, which is the
+    point: an order's idempotency key includes both, so one bet planned on
+    three slate dates is three order rows and one decision.
+    """
+    from syndicate.features.shared.clv_position_join import (
+        market_key,
+        opening_key_for_position,
+    )
+
+    raw = order.get("opening_key")
+    if not (isinstance(raw, str) and raw.strip()):
+        try:
+            raw = opening_key_for_position(order)
+        except Exception:  # noqa: BLE001
+            raw = None
+    key = market_key(raw) if raw else None
+    if key:
+        return key
+    # Unkeyable. Its own identity, so it counts once and is never merged
+    # with an unrelated row that is also unkeyable.
+    return "idempotency_key=%s" % str(order.get("idempotency_key") or id(order))
 
 
 # ---------------------------------------------------------------------------
@@ -1409,6 +1419,33 @@ def sim_view_roi_summary(
         # gets quoted, and a caveat that is not on the quoted number is not read.
         bucket["market_fair_only"] = bucket.get("sim_view") in SIM_VIEW_MARKET_FAIR_ONLY
 
+    # DISTINCT BETS, BESIDE THE ROW COUNTS. An order's idempotency key includes
+    # `selected_date` and venue, so a bet planned on several slate dates is
+    # several rows with ONE outcome. Measured 2026-09-17 00:5xZ on production's
+    # final plans for 09-15..09-17: 40 of 77 distinct NCAAF bets sat on 2 or 3
+    # slate dates. A settled ROI quoted with a row count claims that many
+    # independent trials. Keyed by `_decision_key`, the rule
+    # `settled_decisions_by_sport` already uses; `settled` is `_grouped`'s own
+    # test (a non-empty `outcome`), so `settled_decisions <= settled` holds.
+    decisions: dict[str, set[str]] = {}
+    settled_decisions: dict[str, set[str]] = {}
+    verdicts_by_decision: dict[str, set[str]] = {}
+    for order in rows:
+        try:
+            key = str(_key(order) or "unknown")
+        except Exception:  # noqa: BLE001 -- `_grouped`'s own fallback
+            key = "unknown"
+        decision = _decision_key(order)
+        decisions.setdefault(key, set()).add(decision)
+        if str(order.get("outcome") or ""):
+            settled_decisions.setdefault(key, set()).add(decision)
+        verdicts_by_decision.setdefault(decision, set()).add(
+            (labels.get(key) or {}).get("sim_view") or "unknown"
+        )
+    for bucket in buckets:
+        bucket["decisions"] = len(decisions.get(bucket["key"], ()))
+        bucket["settled_decisions"] = len(settled_decisions.get(bucket["key"], ()))
+
     # THE SAME ROWS POOLED BY VERDICT ALONE. Offered BESIDE the cross and never
     # instead of it: pooling across sports and families is exactly the confound
     # the pre-registered measurement says to hold fixed, so this is an index,
@@ -1423,6 +1460,11 @@ def sim_view_roi_summary(
         rolled["sim_view"] = verdict
         rolled["ev_conditioned"] = verdict in SIM_VIEW_EV_CONDITIONED
         rolled["market_fair_only"] = verdict in SIM_VIEW_MARKET_FAIR_ONLY
+        # A union rather than a sum of the buckets' counts, so this number can
+        # never exceed the distinct bets it covers.
+        keys = [b["key"] for b in by_verdict[verdict]]
+        rolled["decisions"] = len(set().union(*(decisions.get(k, set()) for k in keys)))
+        rolled["settled_decisions"] = len(set().union(*(settled_decisions.get(k, set()) for k in keys)))
         pooled.append(rolled)
 
     return {
@@ -1430,6 +1472,24 @@ def sim_view_roi_summary(
         "by_sport_family_verdict": buckets,
         # An index across them. Read the cross before quoting this.
         "by_verdict": pooled,
+        # THE SAMPLE SIZE IS DECISIONS, NOT ROWS.
+        "sample": {
+            "decisions": len(verdicts_by_decision),
+            "decisions_in_more_than_one_verdict": sum(
+                1 for verdicts in verdicts_by_decision.values() if len(verdicts) > 1
+            ),
+            "reason": (
+                "orders/settled count ROWS. An order's identity includes "
+                "selected_date and venue, so one bet planned on several slate "
+                "dates is several rows with one outcome. decisions and "
+                "settled_decisions count distinct bets (game, market, "
+                "selection, segment, side and line, the rule "
+                "settled_decisions_by_sport uses). The sim_view is recomputed "
+                "per slate date, so one bet can carry different verdicts; it is "
+                "counted in each verdict's bucket, and "
+                "decisions_in_more_than_one_verdict says how many."
+            ),
+        },
         # WHAT THE BUCKETS CANNOT SAY ABOUT THEMSELVES, and would be misread
         # without. Four verdicts hold only market-fair-sized orders, one pair is
         # selected on EV, and pre-`cb223b62` orders carry no verdict at all.
