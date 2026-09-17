@@ -37180,3 +37180,24 @@ Scheduled task `full-slate-memory-reading-0915`. Read-only on production: no dep
   - It has **zero `artifact_publisher` lines for `soccer_source/*/api/recommendations/*` across 169 log lines 2026-09-16..17.** refresh-worker writes soccer recommendations to its own disk for its own board and never publishes them, so its freeze file is local-only by design, and neither its freeze nor its estimator corners are observable from web.
 - **Consequence for the forward grades (no amendment needed):** the watch-list, H24 and H27 read `recommendations_prekickoff_<date>.live-odds-worker.json`. Their "merge services" rule merges over one visible service. The values refresh-worker's own board and portfolio use are not frozen anywhere readable.
 - **Not verified:** that refresh-worker's local freeze file and estimator corners exist on its disk. There is no reader.
+
+## 2026-09-17 12:15Z (07:15 CDT) — READING, no deploy — lanes execution-ledger-live-trim, book-quotes-splice-repair, heavy-build-child-process — **ledger trim GOAL MET (1,648 TRIMMED lines, all paper-only; 233 live rows); book_quotes NOT MET (0 refusals over ~38 h, shard-content clause OWED); pool cap descriptive only, uptime-confounded**
+- Scheduled task `midnight-reading-trim-bookquotes-poolcap-0916`, which ran late at 12:02Z. READ-ONLY: no deploy, no env write, no claim. The raw log JSON is in the session scratchpad.
+- **Step 0, restarts.**
+  - refresh-worker deploys finished since 09-15T23:00Z: 23:33:30Z `61ac543a`; 09-16 00:36:13Z `1175e0ef`, 04:17:12Z `0d3cea8f`, 05:06:56Z `5abc20f3`, 14:37:10Z `1923d677`, 15:32:57Z `e6b4bb94`, 16:11:39Z `03851b5a`, 17:34:34Z and 18:13:18Z `9c98fd8f`, 18:50:42Z `b59887db`, 19:33:20Z `793b621b` (off-main), 20:15:12Z and 20:58:44Z `a1047e60`; 09-17 00:04:19Z `1011bfef`, 01:44:39Z `f7ae4ce3`, 05:47:43Z `05b808cc` (live).
+  - refresh-worker `server_failed` (earlyExit, not evicted): 09-16 12:32:21Z (no `server_available` until the 14:37 deploy); 09-17 01:07:49Z, 03:09:38Z, 05:24:07Z, 06:50:11Z and 12:01:14Z (in progress at read time).
+  - live-odds-worker deploys finished: 09-15 23:27:50Z `cc141267`; 09-16 03:10:22Z `88df44cd`, 04:16:44Z `b0363cb3`, 04:53:48Z `5abc20f3`, 14:45:18Z `09c3e44a`, 21:43:25Z `bf1785bf`; 09-17 01:36:46Z `f56f08dd`, 03:54:49Z `05b808cc` (live). `server_failed`: 09-16 20:18:15Z (next available 21:43:25Z, the deploy) and 09-17 10:07:06Z.
+  - Event lists reach back to 09-15 14:37Z (refresh-worker) and 09-13 (live-odds-worker), so the window is fully covered.
+- **A, execution-ledger-live-trim: GOAL MET.**
+  - `a2a1fa32` is an ancestor of all 24 commits live since the fix times (16 refresh-worker, 8 live-odds-worker).
+  - `TRIMMED`: refresh-worker 1,545 lines and 1,584 rows; live-odds-worker 103 lines and 139 rows. `dropped_by_mode` keys are `paper` only on every line, and no line lacks the field.
+  - `LEDGER_OVER_CAP_PROTECTED` 0/0. Served live orders 233 on both `/api/portfolio/live?on=all&show=all` and `ledger-summary?days=60` (`live:kalshi` 184, `live:polymarket` 49) at 12:11:48Z, against a baseline of 177.
+- **B, book-quotes-splice-repair: GOAL NOT MET.**
+  - web `MERGE_REFUSED_BAD_LINES` **0** from 09-15T22:05:53Z to 09-17T12:05Z.
+  - Control: 3,660 book_quotes `.jsonl` `ARTIFACT_MERGE_DEFERRED` lines out of 8,065 total: refresh-worker 999, live-odds-worker 1,366, and 1,295 `transport=envelope` with no publisher field.
+  - OWED: the goal's `json.loads` check over newly written shards on web and refresh-worker, which needs a read of shard contents.
+- **C, heavy-build-child-process pool cap: DESCRIPTIVE, no saving graded.**
+  - 20 refresh-worker boots since 04:17:12Z; `limit=1` on 106 of 106 lines; cache == pool on all 103 `cached=True` lines; 83 `MEMORY_GUARD_ABORT` lines.
+  - Busiest pool: 111.3 MB, boot 09-17 00:04:19Z, peak RSS 2172.2 MB at 45 m of uptime. Reference `limit=2` boot: RSS 2006.3 MB at ~2 h 04 m, so the comparison is **uptime-confounded**.
+  - Highest RSS: 2765.5 MB at 4 h 25 m on the 06:50:11Z boot (pool 39.3 MB, 25 aborts), which ended in `server_failed` at 12:01:14Z. The 05:06:56Z boot reached 2394.5 MB at 7 h 18 m (33 aborts), which ended in `server_failed` at 12:32:21Z.
+- `verify:` this is a reading. The numbers above are the measurement.
