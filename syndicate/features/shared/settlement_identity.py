@@ -46,8 +46,21 @@ one way a record could settle against another game, and it is what the
 doubleheader / cross-game test pins.
 
 Every miss is classified (`team_unresolved`, `selection_unmapped`,
-`game_not_graded`, `game_id_absent`, `unclassified`) because the autorun's
-counters are the ONLY production instrument for this join.
+`game_absent`, `market_not_graded`, `game_id_absent`, `unclassified`) because
+the autorun's counters are the ONLY production instrument for this join.
+
+SCORE ROWS (2026-09-17). A grader may emit one `game_score` row per game and
+segment instead of pre-graded rows (`graded_outcomes.SCORE_ROW_MARKET`). Such a
+row is reachable ONLY through the game-id phase, and only after every ordinary
+row for that game has failed, and it settles a record through
+`graded_outcomes.grade_score_bet` -- for any line and either side -- or refuses
+with a named `detail`.
+
+SEGMENTS. A record's segment (explicit `segment`, a suffixed market key, or a
+label such as "First 5 Total") must equal the row's (absent = `full`). Before
+this, "First 5 Moneyline" fell through `_markets_compatible`'s keyword family to
+`moneyline` and settled against the card's FULL-GAME `ml` row. An unrecognised
+segment word matches nothing.
 """
 
 from __future__ import annotations
@@ -56,6 +69,11 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
+from syndicate.features.shared.graded_outcomes import SCORE_BET_MONEYLINE
+from syndicate.features.shared.graded_outcomes import SCORE_BET_SPREAD
+from syndicate.features.shared.graded_outcomes import SCORE_BET_TOTAL
+from syndicate.features.shared.graded_outcomes import grade_score_bet
+from syndicate.features.shared.graded_outcomes import is_score_row
 from syndicate.features.shared.team_aliases import _alias_map
 from syndicate.features.shared.team_aliases import chip_join_key
 from syndicate.features.shared.team_aliases import fold_accents
@@ -95,20 +113,57 @@ _PLACEHOLDERS = frozenset({"", "-", "?", "n/a", "none", "null", "nan"})
 
 # Reason tokens, in the order they are reported when several apply. The most
 # ACTIONABLE first: an unresolved club or an unmapped selection is a vocabulary
-# gap this module can close; a graded-side gap ("game_not_graded") is the
-# grader's; an absent id is the producer's.
+# gap this module can close; a graded-side gap is the grader's; an absent id is
+# the producer's.
+#
+# `game_not_graded` was SPLIT 2026-09-17 into the two graded-side gaps it hid.
+# Production 09-17 reported 6,815 `game_not_graded` while every sample named a
+# game the index DID hold -- a totals record on a game graded only for props.
+#   game_absent        no graded row carries this game id at all
+#   market_not_graded  the game is indexed; no row settles this market/line/side
+#                      (the finer cause is `MatchOutcome.detail`)
+# The old key is gone rather than kept as an alias: summing the reason dict must
+# still equal the parent counter, and nothing in code reads the old key.
 REASON_TEAM_UNRESOLVED = "team_unresolved"
 REASON_SELECTION_UNMAPPED = "selection_unmapped"
-REASON_GAME_NOT_GRADED = "game_not_graded"
+REASON_GAME_ABSENT = "game_absent"
+REASON_MARKET_NOT_GRADED = "market_not_graded"
 REASON_GAME_ID_ABSENT = "game_id_absent"
 REASON_UNCLASSIFIED = "unclassified"
 NO_KEY_MATCH_REASONS: tuple[str, ...] = (
     REASON_TEAM_UNRESOLVED,
     REASON_SELECTION_UNMAPPED,
-    REASON_GAME_NOT_GRADED,
+    REASON_GAME_ABSENT,
+    REASON_MARKET_NOT_GRADED,
     REASON_GAME_ID_ABSENT,
     REASON_UNCLASSIFIED,
 )
+
+SEGMENT_FULL = "full"
+SEGMENT_UNRECOGNIZED = "unrecognized"
+
+# Segment phrases in a market label or key, most specific first. The sport's
+# own vocabulary (`market_segments.SPORT_SEGMENTS`) is the target namespace.
+_SEGMENT_PATTERNS: tuple[tuple["re.Pattern[str]", str], ...] = (
+    (re.compile(r"\b(?:first|1st)\s*(?:5|five)(?:\s*innings?)?\b|\bf5\b"), "first5"),
+    (re.compile(r"\b(?:first|1st)\s*(?:3|three)(?:\s*innings?)?\b|\bf3\b"), "first3"),
+    (re.compile(r"\b(?:first|1st)\s*(?:1|one)(?:\s*innings?)?\b|\b(?:first|1st)\s+inning\b|\bf1\b"), "first1"),
+    (re.compile(r"\b(?:first|1st)\s+half\b|\b1h\b|\bh1\b"), "h1"),
+    (re.compile(r"\b(?:second|2nd)\s+half\b|\b2h\b|\bh2\b"), "h2"),
+    (re.compile(r"\b(?:first|1st)\s+quarter\b|\b1q\b|\bq1\b"), "q1"),
+    (re.compile(r"\b(?:second|2nd)\s+quarter\b|\b2q\b|\bq2\b"), "q2"),
+    (re.compile(r"\b(?:third|3rd)\s+quarter\b|\b3q\b|\bq3\b"), "q3"),
+    (re.compile(r"\b(?:fourth|4th)\s+quarter\b|\b4q\b|\bq4\b"), "q4"),
+    (re.compile(r"\b(?:first|1st)\s+period\b|\b1p\b|\bp1\b"), "p1"),
+    (re.compile(r"\b(?:second|2nd)\s+period\b|\b2p\b|\bp2\b"), "p2"),
+    (re.compile(r"\b(?:third|3rd)\s+period\b|\b3p\b|\bp3\b"), "p3"),
+)
+_FULL_GAME_PATTERN = re.compile(r"\bfull\s*game\b")
+# A segment-shaped word none of the patterns above consumed ("2nd inning",
+# "half time"). Refused as unrecognised rather than read as the full game.
+_UNMAPPED_SEGMENT_WORDS = re.compile(r"\b(?:innings?|half|halves|halftime|quarters?|periods?|segment)\b")
+_KNOWN_SEGMENTS = frozenset(name for pattern, name in _SEGMENT_PATTERNS)
+_FULL_SEGMENT_WORDS = frozenset({"full", "fg", "game", "full game", "full_game", "match"})
 
 
 def _text(value: Any) -> str:
@@ -477,6 +532,272 @@ def _same_fixture(sport: str | None, record: SettlementIdentity, row: Settlement
 MarketsCompatible = Callable[[Any, Any, Any], bool]
 
 
+# ---------------------------------------------------------------------------
+# Segments
+# ---------------------------------------------------------------------------
+
+
+def _label_text(value: Any) -> str:
+    return " ".join(re.sub(r"[_\-/+]+", " ", str(value if value is not None else "").strip().lower()).split())
+
+
+def _segments_in_label(value: Any) -> tuple[set[str], str]:
+    """(segments named, remaining text) for a market label or key."""
+    text = _label_text(value)
+    found: set[str] = set()
+    if not text:
+        return found, text
+    for pattern, name in _SEGMENT_PATTERNS:
+        if pattern.search(text):
+            found.add(name)
+            text = pattern.sub(" ", text)
+    if _FULL_GAME_PATTERN.search(text):
+        found.add(SEGMENT_FULL)
+        text = _FULL_GAME_PATTERN.sub(" ", text)
+    if _UNMAPPED_SEGMENT_WORDS.search(text):
+        found.add(SEGMENT_UNRECOGNIZED)
+    return found, " ".join(text.split())
+
+
+def _explicit_segment(value: Any) -> str | None:
+    text = _label_text(value)
+    if not text:
+        return None
+    if text in _FULL_SEGMENT_WORDS:
+        return SEGMENT_FULL
+    if text.replace(" ", "") in _KNOWN_SEGMENTS:
+        return text.replace(" ", "")
+    found, _rest = _segments_in_label(text)
+    return next(iter(found)) if len(found) == 1 else SEGMENT_UNRECOGNIZED
+
+
+def _resolve_segments(found: set[str]) -> str:
+    if not found:
+        return SEGMENT_FULL
+    if len(found) == 1:
+        return next(iter(found))
+    return SEGMENT_UNRECOGNIZED
+
+
+def record_segment(record: Mapping[str, Any]) -> str:
+    """The segment a ledger record is on: `full`, a sport segment, or
+    `unrecognized` (a segment word nothing maps, or two sources that disagree)."""
+    recommendation = record.get("recommendation") if isinstance(record.get("recommendation"), Mapping) else record
+    found: set[str] = set()
+    explicit = _explicit_segment(recommendation.get("segment") or recommendation.get("market_segment"))
+    if explicit:
+        found.add(explicit)
+    for key in ("market_key", "market", "market_label", "market_family"):
+        segments, _rest = _segments_in_label(recommendation.get(key))
+        found |= segments
+    # Two different answers ("full" beside "first5") is a record that says two
+    # things, and resolves to `unrecognized`.
+    return _resolve_segments(found)
+
+
+def graded_row_segment(row: Mapping[str, Any]) -> str:
+    found: set[str] = set()
+    explicit = _explicit_segment(row.get("segment"))
+    if explicit:
+        found.add(explicit)
+    segments, _rest = _segments_in_label(row.get("market"))
+    found |= segments
+    return _resolve_segments(found)
+
+
+# ---------------------------------------------------------------------------
+# Score rows: turn a record into a bet `grade_score_bet` can decide
+# ---------------------------------------------------------------------------
+
+_SCORE_KIND_BY_MARKET_KEY: dict[str, tuple[str, bool | None]] = {
+    "totals": (SCORE_BET_TOTAL, None),
+    "totals_alt": (SCORE_BET_TOTAL, None),
+    "spreads": (SCORE_BET_SPREAD, None),
+    "spreads_alt": (SCORE_BET_SPREAD, None),
+    "h2h": (SCORE_BET_MONEYLINE, None),
+    "h2h_3_way": (SCORE_BET_MONEYLINE, True),
+}
+_MACHINE_MARKET_KEYS = frozenset(_SCORE_KIND_BY_MARKET_KEY)
+# Words that say which FEED or WHEN, not which bet: an alternate total is the
+# same wager at a non-main line (`market_segments.base_market_for_alternate`),
+# and a live total settles on the same final score as a pregame one.
+_MARKET_NOISE = re.compile(r"\b(?:alt|alternate|alternative|live|in play|game)\b")
+_THREE_WAY = re.compile(r"\b(?:3|three)\s*way\b")
+_TWO_WAY = re.compile(r"\b(?:2|two)\s*way\b")
+
+
+def score_market_kind(sport: str | None, record: Mapping[str, Any]) -> tuple[str | None, bool | None]:
+    """(`total`|`spread`|`moneyline`|None, three_way) for a record's market.
+
+    The FIRST non-empty market field decides, so a prop key cannot be rescued
+    into a game market by a looser label further down. `three_way` is True for
+    an explicit 3-way market, False for the machine key `h2h` (OddsAPI's two-way
+    moneyline, whose segment tie refunds), None when only a display label
+    ("Moneyline") says it -- `grade_score_bet` refuses a segment tie then.
+    """
+    from syndicate.features.shared.market_keys import canonical_market_key
+    from syndicate.features.shared.market_segments import split_segment_market_key
+
+    recommendation = record.get("recommendation") if isinstance(record.get("recommendation"), Mapping) else record
+    for key in ("market_key", "market", "market_label", "market_family"):
+        raw = str(recommendation.get(key) or "").strip().lower()
+        if not raw:
+            continue
+        machine = False
+        base: str | None = None
+        split = None
+        try:
+            split = split_segment_market_key(sport or "", raw)
+        except Exception:
+            split = None
+        if split:
+            base, machine = split[1], True
+        elif raw in _MACHINE_MARKET_KEYS:
+            base, machine = raw, True
+        three_way: bool | None = None
+        if base is None:
+            _segments, rest = _segments_in_label(raw)
+            if _THREE_WAY.search(rest):
+                three_way = True
+                rest = _THREE_WAY.sub(" ", rest)
+            elif _TWO_WAY.search(rest):
+                three_way = False
+                rest = _TWO_WAY.sub(" ", rest)
+            rest = " ".join(_MARKET_NOISE.sub(" ", rest).split())
+            try:
+                base = canonical_market_key(sport, raw) or (canonical_market_key(sport, rest) if rest else None)
+            except Exception:
+                base = None
+        if base not in _SCORE_KIND_BY_MARKET_KEY:
+            return None, None
+        kind, key_three_way = _SCORE_KIND_BY_MARKET_KEY[base]
+        if key_three_way is not None:
+            three_way = key_three_way
+        elif kind == SCORE_BET_MONEYLINE and machine and base == "h2h":
+            three_way = False
+        return kind, three_way
+    return None, None
+
+
+def _club_is(sport: str | None, token: str | None, *names: Any) -> bool:
+    return bool(token) and any(same_club(sport, token, name) for name in names if _text(name))
+
+
+def _score_side_and_line(
+    sport: str | None,
+    record: Mapping[str, Any],
+    record_id: SettlementIdentity,
+    kind: str,
+    row: Mapping[str, Any],
+) -> tuple[str | None, float | None, str | None]:
+    """(side, line, refusal) for one record against one score row's fixture."""
+    recommendation = record.get("recommendation") if isinstance(record.get("recommendation"), Mapping) else {}
+    row_home = (row.get("home"), row.get("home_name"))
+    row_away = (row.get("away"), row.get("away_name"))
+
+    # The fixture must be the same way round. The record's clubs came from the
+    # board's matchup; the scores come from the feed. Pairing a score with a
+    # name from a different source is how a game gets graded backwards.
+    if record_id.home and record_id.away:
+        home_ok = _club_is(sport, record_id.home, *row_home)
+        away_ok = _club_is(sport, record_id.away, *row_away)
+        if not (home_ok and away_ok):
+            swapped = _club_is(sport, record_id.home, *row_away) and _club_is(sport, record_id.away, *row_home)
+            return None, None, "fixture_orientation_disagrees" if swapped else "fixture_clubs_disagree"
+
+    # The MARKET line only: the explicit `line`, or the number in the pick
+    # text. Never `projected` -- `record_identity` falls back to it, and a
+    # model projection is not a line anyone bet. Two present and different is
+    # a record that says two things (a lens row stores its projection in
+    # `line` beside "Over 4.5" in the pick), so it refuses.
+    explicit_line = _coerce_float(recommendation.get("line"))
+    text_line = resolve_selection(sport, recommendation.get("selection") or recommendation.get("pick") or recommendation.get("name")).line
+    if explicit_line is not None and text_line is not None and abs(explicit_line - text_line) > 1e-9:
+        return None, None, "line_disagrees_with_selection"
+    line = explicit_line if explicit_line is not None else text_line
+
+    side = record_id.side
+    if kind == SCORE_BET_TOTAL:
+        return side, line, None
+
+    team = record_id.team
+    if side in {"home", "away"}:
+        side_names = row_home if side == "home" else row_away
+        if team and not _club_is(sport, team, *side_names):
+            return None, None, "team_side_disagrees"
+        return side, line, None
+    if side is None and team:
+        if _club_is(sport, team, *row_home):
+            return "home", line, None
+        if _club_is(sport, team, *row_away):
+            return "away", line, None
+        return None, None, "team_not_in_fixture"
+    return side, line, None
+
+
+def grade_record_on_score_rows(
+    record: Mapping[str, Any],
+    record_id: SettlementIdentity,
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    sport: str | None,
+    segment: str,
+) -> tuple[dict[str, Any] | None, str]:
+    """(graded row, detail). The graded row has the ordinary shape
+    (`GRADED_OUTCOME_FIELDS`), with `odds`/`pnl` left None so settlement prices
+    the record at ITS OWN odds and never stamps its own price as the close."""
+    if segment == SEGMENT_UNRECOGNIZED:
+        return None, "segment_unrecognized"
+    if record_id.player:
+        return None, "prop_not_graded"
+    kind, three_way = score_market_kind(sport, record)
+    if kind is None:
+        return None, "not_a_score_market"
+    segment_rows = [row for row in rows if str(row.get("segment") or SEGMENT_FULL) == segment]
+    if not segment_rows:
+        return None, "segment_score_unavailable"
+    if len(segment_rows) > 1:
+        return None, "score_rows_ambiguous"
+    row = segment_rows[0]
+    side, line, refusal = _score_side_and_line(sport, record, record_id, kind, row)
+    if refusal:
+        return None, refusal
+    result, actual, refusal = grade_score_bet(
+        kind=kind,
+        segment=segment,
+        side=side,
+        line=line,
+        three_way=three_way,
+        home_score=row.get("home_score"),
+        away_score=row.get("away_score"),
+    )
+    if result is None:
+        return None, refusal or "score_bet_refused"
+    market_key = {SCORE_BET_TOTAL: "totals", SCORE_BET_SPREAD: "spreads"}.get(kind) or ("h2h_3_way" if three_way else "h2h")
+    graded = {
+        "sport": row.get("sport") or sport,
+        "game_id": row.get("game_id"),
+        "game_pk": row.get("game_pk"),
+        "market": market_key,
+        "segment": segment,
+        "selection": side,
+        "player": None,
+        "team": (row.get("home") if side == "home" else row.get("away") if side == "away" else None),
+        "home": row.get("home"),
+        "away": row.get("away"),
+        "title": row.get("title"),
+        "line": line if kind != SCORE_BET_MONEYLINE else None,
+        "actual": actual,
+        "odds": None,
+        "result": result,
+        "pnl": None,
+        "home_score": row.get("home_score"),
+        "away_score": row.get("away_score"),
+        "graded_from": "final_score",
+    }
+    return graded, "graded"
+
+
 class GradedRowIndex:
     """Graded rows with their identities computed ONCE per settlement pass.
 
@@ -490,7 +811,13 @@ class GradedRowIndex:
     def __init__(self, rows: Iterable[Mapping[str, Any]]):
         self.rows: list[Mapping[str, Any]] = []
         self.identities: list[SettlementIdentity] = []
+        self.segments: list[str] = []
+        self.score_row: list[bool] = []
         self.by_game_id: dict[str, list[int]] = {}
+        # Rows, not games: `by_game_id` has one key per GAME, and reading its
+        # length as a row count is what made `graded_rows_with_game_id` report
+        # 15 on a date with 980 rows.
+        self.rows_with_game_id = 0
         for row in rows:
             if not isinstance(row, Mapping):
                 continue
@@ -498,6 +825,10 @@ class GradedRowIndex:
             index = len(self.rows)
             self.rows.append(row)
             self.identities.append(identity)
+            self.segments.append(graded_row_segment(row))
+            self.score_row.append(is_score_row(row))
+            if identity.game_ids:
+                self.rows_with_game_id += 1
             for game_id in identity.game_ids:
                 self.by_game_id.setdefault(game_id, []).append(index)
 
@@ -508,12 +839,19 @@ class GradedRowIndex:
     def carries_game_ids(self) -> bool:
         return bool(self.by_game_id)
 
+    @property
+    def games_indexed(self) -> int:
+        return len(self.by_game_id)
+
 
 @dataclass(frozen=True)
 class MatchOutcome:
     row: Mapping[str, Any] | None
-    phase: str | None  # "game_id" | "club" | "loose" | None
+    phase: str | None  # "game_id" | "game_score" | "club" | "loose" | None
     reason: str | None  # one of NO_KEY_MATCH_REASONS when row is None
+    # The finer cause behind `market_not_graded` (e.g. `prop_not_graded`,
+    # `line_disagrees_with_selection`, `no_score_rows_for_game`). None otherwise.
+    detail: str | None = None
 
 
 def _loose_record_keys(record: Mapping[str, Any]) -> set[str]:
@@ -547,6 +885,8 @@ def find_graded_row(
     def _market_ok(row: Mapping[str, Any]) -> bool:
         return markets_compatible(record_market, row.get("market"), sport_slug)
 
+    segment = record_segment(record)
+
     # Phase 1: the same game, by id. Only rows that share an id are eligible,
     # and if the index carries ids at all, a record that shares NONE stops
     # here -- it names a game the grader did not grade (or a different one),
@@ -555,8 +895,16 @@ def find_graded_row(
         candidates: list[int] = []
         for game_id in record_id.game_ids:
             candidates.extend(index.by_game_id.get(game_id, ()))
+        if not candidates:
+            return MatchOutcome(row=None, phase=None, reason=_classify_miss(record_id, game_reason=REASON_GAME_ABSENT))
+        score_rows: list[Mapping[str, Any]] = []
         for position in sorted(set(candidates)):
             row = index.rows[position]
+            if index.score_row[position]:
+                score_rows.append(row)
+                continue
+            if index.segments[position] != segment:
+                continue
             row_id = index.identities[position]
             if not _market_ok(row):
                 continue
@@ -564,10 +912,27 @@ def find_graded_row(
                 continue
             if _selection_agrees(sport_slug, record_id, row_id):
                 return MatchOutcome(row=row, phase="game_id", reason=None)
-        return MatchOutcome(row=None, phase=None, reason=_classify_miss(record_id, game_not_graded=True))
+        # Every ordinary row for the game failed; only now may its final score
+        # decide. Ordinary rows first keeps every pre-existing settlement (and
+        # its card pnl) exactly as it was.
+        if score_rows:
+            graded, detail = grade_record_on_score_rows(record, record_id, score_rows, sport=sport_slug, segment=segment)
+            if graded is not None:
+                return MatchOutcome(row=graded, phase="game_score", reason=None)
+        else:
+            detail = "prop_not_graded" if record_id.player else "no_score_rows_for_game"
+        return MatchOutcome(
+            row=None,
+            phase=None,
+            reason=_classify_miss(record_id, game_reason=REASON_MARKET_NOT_GRADED),
+            detail=detail,
+        )
 
-    # Phase 2: canonical club + side, bounded to the same fixture.
+    # Phase 2: canonical club + side, bounded to the same fixture. Score rows
+    # are reachable only by game id (doubleheaders share both clubs).
     for position, row in enumerate(index.rows):
+        if index.score_row[position] or index.segments[position] != segment:
+            continue
         row_id = index.identities[position]
         if not _market_ok(row):
             continue
@@ -582,6 +947,8 @@ def find_graded_row(
     # normalised tokens overlap, whose market agrees, and whose line agrees.
     record_keys = _loose_record_keys(record)
     for position, row in enumerate(index.rows):
+        if index.score_row[position] or index.segments[position] != segment:
+            continue
         row_id = index.identities[position]
         row_keys = _loose_row_keys(row)
         if record_keys and row_keys and record_keys.isdisjoint(row_keys):
@@ -592,16 +959,16 @@ def find_graded_row(
             continue
         return MatchOutcome(row=row, phase="loose", reason=None)
 
-    return MatchOutcome(row=None, phase=None, reason=_classify_miss(record_id, game_not_graded=False))
+    return MatchOutcome(row=None, phase=None, reason=_classify_miss(record_id, game_reason=None))
 
 
-def _classify_miss(record_id: SettlementIdentity, *, game_not_graded: bool) -> str:
+def _classify_miss(record_id: SettlementIdentity, *, game_reason: str | None) -> str:
     if record_id.team_unresolved:
         return REASON_TEAM_UNRESOLVED
     if record_id.selection_unmapped:
         return REASON_SELECTION_UNMAPPED
-    if game_not_graded:
-        return REASON_GAME_NOT_GRADED
+    if game_reason:
+        return game_reason
     if not record_id.game_ids:
         return REASON_GAME_ID_ABSENT
     return REASON_UNCLASSIFIED
@@ -611,11 +978,19 @@ __all__ = [
     "GradedRowIndex",
     "MatchOutcome",
     "NO_KEY_MATCH_REASONS",
+    "REASON_GAME_ABSENT",
+    "REASON_MARKET_NOT_GRADED",
+    "SEGMENT_FULL",
+    "SEGMENT_UNRECOGNIZED",
     "SettlementIdentity",
     "club_key",
     "find_graded_row",
+    "grade_record_on_score_rows",
     "graded_row_identity",
+    "graded_row_segment",
     "record_identity",
+    "record_segment",
     "resolve_selection",
     "same_club",
+    "score_market_kind",
 ]

@@ -1,0 +1,148 @@
+{
+ "_provenance": {
+  "fetched_at_utc": "2026-09-17T15:10:39+00:00",
+  "source": "https://statsapi.mlb.com/api/v1.1/game/824954/feed/live",
+  "trimmed_to": "gameData.game/datetime/status/teams + liveData.linescore innings runs and team totals"
+ },
+ "gameData": {
+  "datetime": {
+   "dateTime": "2026-09-12T01:40:00Z",
+   "officialDate": "2026-09-11"
+  },
+  "game": {
+   "pk": 824954
+  },
+  "status": {
+   "abstractGameCode": "F",
+   "abstractGameState": "Final",
+   "codedGameState": "F",
+   "detailedState": "Final",
+   "startTimeTBD": false,
+   "statusCode": "F"
+  },
+  "teams": {
+   "away": {
+    "abbreviation": "SEA",
+    "id": 136,
+    "name": "Seattle Mariners"
+   },
+   "home": {
+    "abbreviation": "ATH",
+    "id": 133,
+    "name": "Athletics"
+   }
+  }
+ },
+ "liveData": {
+  "linescore": {
+   "currentInning": 10,
+   "inningState": "Bottom",
+   "innings": [
+    {
+     "away": {
+      "runs": 1
+     },
+     "home": {
+      "runs": 2
+     },
+     "num": 1
+    },
+    {
+     "away": {
+      "runs": 1
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 2
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 2
+     },
+     "num": 3
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 4
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 5
+    },
+    {
+     "away": {
+      "runs": 2
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 6
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 7
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 8
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 9
+    },
+    {
+     "away": {
+      "runs": 1
+     },
+     "home": {
+      "runs": 2
+     },
+     "num": 10
+    }
+   ],
+   "isTopInning": false,
+   "scheduledInnings": 9,
+   "teams": {
+    "away": {
+     "errors": 1,
+     "hits": 10,
+     "runs": 5
+    },
+    "home": {
+     "errors": 1,
+     "hits": 14,
+     "runs": 6
+    }
+   }
+  }
+ }
+}

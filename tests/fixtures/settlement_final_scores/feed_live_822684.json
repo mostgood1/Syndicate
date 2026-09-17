@@ -1,0 +1,137 @@
+{
+ "_provenance": {
+  "fetched_at_utc": "2026-09-17T15:10:39+00:00",
+  "source": "https://statsapi.mlb.com/api/v1.1/game/822684/feed/live",
+  "trimmed_to": "gameData.game/datetime/status/teams + liveData.linescore innings runs and team totals"
+ },
+ "gameData": {
+  "datetime": {
+   "dateTime": "2026-09-11T22:45:00Z",
+   "officialDate": "2026-09-11"
+  },
+  "game": {
+   "pk": 822684
+  },
+  "status": {
+   "abstractGameCode": "F",
+   "abstractGameState": "Final",
+   "codedGameState": "F",
+   "detailedState": "Final",
+   "startTimeTBD": false,
+   "statusCode": "F"
+  },
+  "teams": {
+   "away": {
+    "abbreviation": "LAA",
+    "id": 108,
+    "name": "Los Angeles Angels"
+   },
+   "home": {
+    "abbreviation": "WSH",
+    "id": 120,
+    "name": "Washington Nationals"
+   }
+  }
+ },
+ "liveData": {
+  "linescore": {
+   "currentInning": 9,
+   "inningState": "Top",
+   "innings": [
+    {
+     "away": {
+      "runs": 1
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 1
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 2
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 3
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 1
+     },
+     "num": 4
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 5
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 6
+    },
+    {
+     "away": {
+      "runs": 1
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 7
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 3
+     },
+     "num": 8
+    },
+    {
+     "away": {
+      "runs": 1
+     },
+     "home": {},
+     "num": 9
+    }
+   ],
+   "isTopInning": true,
+   "scheduledInnings": 9,
+   "teams": {
+    "away": {
+     "errors": 1,
+     "hits": 4,
+     "runs": 3
+    },
+    "home": {
+     "errors": 0,
+     "hits": 6,
+     "runs": 4
+    }
+   }
+  }
+ }
+}

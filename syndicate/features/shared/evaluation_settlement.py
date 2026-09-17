@@ -21,16 +21,28 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import time
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Iterable, Iterator, Mapping, Sequence
 
 from syndicate.features.shared.graded_outcomes import GRADED_OUTCOME_GRADERS
+from syndicate.features.shared.graded_outcomes import SCORE_ROW_MARKET
 from syndicate.features.shared.graded_outcomes import graded_rows_for_date
+from syndicate.features.shared.graded_outcomes import is_score_row
+from syndicate.features.shared.graded_outcomes import score_row_diagnostics
 from syndicate.features.shared.intelligence_evaluation import DEFAULT_LEDGER_PATH
+from syndicate.features.shared.intelligence_evaluation import _canonical_payload
 from syndicate.features.shared.intelligence_evaluation import _is_chunked_ledger_path
 from syndicate.features.shared.intelligence_evaluation import _ledger_chunk_path
 from syndicate.features.shared.intelligence_evaluation import _ledger_record_chunk_name
+from syndicate.features.shared.intelligence_evaluation import _ledger_record_identity
+from syndicate.features.shared.intelligence_evaluation import _load_chunk_index
 from syndicate.features.shared.intelligence_evaluation import _record_sport
+from syndicate.features.shared.intelligence_evaluation import _slim_record_response_for_persist
+from syndicate.features.shared.intelligence_evaluation import _update_evaluation_ledger_record
+from syndicate.features.shared.intelligence_evaluation import _utc_now
+from syndicate.features.shared.intelligence_evaluation import _write_chunk_index
 from syndicate.features.shared.intelligence_evaluation import settle_result
 import functools
 from syndicate.features.shared.intelligence_evaluation import ledger_index_session
@@ -38,6 +50,7 @@ from syndicate.features.shared.settlement_identity import GradedRowIndex
 from syndicate.features.shared.settlement_identity import NO_KEY_MATCH_REASONS
 from syndicate.features.shared.settlement_identity import find_graded_row
 from syndicate.features.shared.settlement_identity import record_identity
+from syndicate.features.shared.settlement_identity import record_segment
 
 
 # "Supported" now means "has a registered grader in graded_outcomes.py",
@@ -216,11 +229,18 @@ def _read_chunk_records(chunk_path: Path) -> list[dict[str, Any]]:
 
     Still returns a full list, because callers index and filter it. The caller
     that mattered (`run_refresh_worker`'s ledger bridge) has been changed to
-    hold one date at a time rather than accumulating all 21.
+    hold one date at a time rather than accumulating all 21. Settlement itself
+    no longer calls this: it streams `_iter_chunk_records` and keeps only the
+    pending recommendations.
     """
+    return list(_iter_chunk_records(chunk_path))
+
+
+def _iter_chunk_records(chunk_path: Path) -> Iterator[dict[str, Any]]:
+    """Every record in a ledger chunk, one at a time. A read error ends the
+    stream with what was read so far, as `_read_chunk_records` always did."""
     if not chunk_path.exists():
-        return []
-    records: list[dict[str, Any]] = []
+        return
     try:
         with chunk_path.open("r", encoding="utf-8") as handle:
             for line in handle:
@@ -232,10 +252,9 @@ def _read_chunk_records(chunk_path: Path) -> list[dict[str, Any]]:
                 except Exception:
                     continue
                 if isinstance(payload, dict):
-                    records.append(payload)
+                    yield payload
     except Exception:
-        return records
-    return records
+        return
 
 
 def _read_ledger_records_for_date(target_ledger_path: Path, date_token: str) -> list[dict[str, Any]]:
@@ -390,7 +409,14 @@ def _american_profit(odds: Any, stake: float = 1.0) -> float | None:
     return round(stake * (100.0 / abs(value)), 4)
 
 
-def _pnl_for_settlement(row: Mapping[str, Any], result: str) -> float:
+def _pnl_for_settlement(row: Mapping[str, Any], result: str, recommendation: Mapping[str, Any] | None = None) -> float:
+    """The row's own pnl, else its odds, else the RECORD's odds.
+
+    The last fallback exists for rows graded from a final score: they carry no
+    price of their own, deliberately -- a price on the row would also become the
+    record's `closing_price` and zero its CLV. The record's odds are the price it
+    was recorded at, which is exactly what the stake returns.
+    """
     if row.get("pnl") is not None:
         try:
             return round(float(row.get("pnl")), 4)
@@ -398,7 +424,10 @@ def _pnl_for_settlement(row: Mapping[str, Any], result: str) -> float:
             pass
     if result in {"push", "void"}:
         return 0.0
-    profit = _american_profit(row.get("odds"))
+    odds = row.get("odds")
+    if odds is None and isinstance(recommendation, Mapping):
+        odds = recommendation.get("odds") if recommendation.get("odds") is not None else recommendation.get("price")
+    profit = _american_profit(odds)
     if profit is None:
         return 1.0 if result == "win" else -1.0
     return profit if result == "win" else -1.0
@@ -439,6 +468,26 @@ def _with_ledger_index_session(fn):
     return wrapper
 
 
+def _date_token(date_value: str) -> str:
+    date_token = str(date_value or "").strip()[:10]
+    if len(date_token) != 10 or date_token[4] != "-" or date_token[7] != "-":
+        raise ValueError("date_value must be an ISO date like YYYY-MM-DD")
+    return date_token
+
+
+def _unsupported_sport_result(date_token: str, sport_slug: str) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "date": date_token,
+        "sport": sport_slug,
+        "pending": 0,
+        "matched": 0,
+        "settled": 0,
+        "unmatched": 0,
+        "note": f"sport '{sport_slug}' is not yet supported by evaluation_settlement",
+    }
+
+
 @_with_ledger_index_session
 def settle_ledger_for_date(
     date_value: str,
@@ -447,52 +496,181 @@ def settle_ledger_for_date(
     ledger_path: Path | str | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    date_token = str(date_value or "").strip()[:10]
-    if len(date_token) != 10 or date_token[4] != "-" or date_token[7] != "-":
-        raise ValueError("date_value must be an ISO date like YYYY-MM-DD")
+    return _settle_date_for_sports(date_value, sports=[sport], ledger_path=ledger_path, dry_run=dry_run)[0]
 
-    sport_slug = str(sport or "").strip().lower() or None
-    if sport_slug and sport_slug not in _SUPPORTED_SPORTS:
-        return {
-            "ok": True,
-            "date": date_token,
-            "sport": sport_slug,
-            "pending": 0,
-            "matched": 0,
-            "settled": 0,
-            "unmatched": 0,
-            "note": f"sport '{sport_slug}' is not yet supported by evaluation_settlement",
-        }
+
+class _ScopeRecords:
+    """One sport scope's view of a date chunk: counts, and the pending records
+    themselves (the only records settlement holds)."""
+
+    __slots__ = ("recommendations", "already_resolved", "pending")
+
+    def __init__(self) -> None:
+        self.recommendations = 0
+        self.already_resolved = 0
+        self.pending: list[dict[str, Any]] = []
+
+
+def _read_date_for_scopes(
+    target_ledger_path: Path, date_token: str, scopes: Sequence[str | None]
+) -> tuple[int, dict[str | None, _ScopeRecords]]:
+    """ONE streamed read of a date's records for every sport scope at once.
+
+    Replaces a whole-chunk read PER SPORT. Measured 2026-09-17: chunks run
+    45-258 MB, materialise at ~4x file bytes, and the autorun read each date
+    once for mlb and again for wnba -- 14 full reads for a 7-day, 2-sport pass,
+    multiplying with every sport added. Only PENDING recommendations are kept;
+    every other record is counted and dropped as it streams past, so the peak is
+    the pending set rather than the chunk.
+
+    Chunked-vs-flat is decided exactly as `_read_ledger_records_for_date`
+    decides it, including the flat ledger's per-record date filter.
+    """
+    chunked = _is_chunked_ledger_path(target_ledger_path)
+    source = _ledger_chunk_path(target_ledger_path, date_token) if chunked else target_ledger_path
+    views: dict[str | None, _ScopeRecords] = {scope: _ScopeRecords() for scope in scopes}
+    total = 0
+    for record in _iter_chunk_records(source):
+        if not chunked and _ledger_record_chunk_name(record) != date_token:
+            continue
+        total += 1
+        if str(record.get("record_type") or "").strip().lower() != "recommendation":
+            continue
+        record_sport = _record_sport(record)
+        is_pending = str(record.get("result") or "pending").strip().lower() == "pending"
+        for scope, view in views.items():
+            if scope is not None and record_sport != scope:
+                continue
+            view.recommendations += 1
+            if is_pending:
+                view.pending.append(record)
+            else:
+                view.already_resolved += 1
+    return total, views
+
+
+class _GradedCache:
+    """Graded rows and their index, built once per sport for the whole date
+    pass and shared by every scope that needs that sport."""
+
+    def __init__(self, date_token: str) -> None:
+        self.date_token = date_token
+        self.rows: dict[str, list[dict[str, Any]]] = {}
+        self.index: dict[str, GradedRowIndex] = {}
+        self.family_counts: dict[str, dict[str, int]] = {}
+
+    def rows_for(self, sport: str) -> list[dict[str, Any]]:
+        if sport not in self.rows:
+            self.rows[sport] = _graded_rows_for_date(sport, self.date_token)
+        return self.rows[sport]
+
+    def index_for(self, sport: str) -> GradedRowIndex:
+        if sport not in self.index:
+            self.index[sport] = GradedRowIndex(self.rows_for(sport))
+        return self.index[sport]
+
+    def families_for(self, sport: str) -> dict[str, int]:
+        if sport not in self.family_counts:
+            self.family_counts[sport] = _graded_row_family_counts(self.rows_for(sport))
+        return self.family_counts[sport]
+
+
+def _graded_row_family_counts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    """What the graded rows actually cover, counted over EVERY row.
+
+    Replaces a sample of the first 25 rows, which were sorted by market and so
+    always read `["props"]` -- on a date whose score rows covered every game.
+    """
+    counts: dict[str, int] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        if is_score_row(row):
+            family = f"{SCORE_ROW_MARKET}:{row.get('segment') or 'full'}"
+        else:
+            family = _market_family(row.get("market")) or "unknown"
+        counts[family] = counts.get(family, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+@_with_ledger_index_session
+def _settle_date_for_sports(
+    date_value: str,
+    *,
+    sports: Sequence[str | None],
+    ledger_path: Path | str | None = None,
+    dry_run: bool = False,
+) -> list[dict[str, Any]]:
+    """Settle one date for every sport scope from ONE read of its chunk, and
+    persist every settlement with ONE rewrite per chunk file.
+
+    Results are one dict per entry of `sports`, in order, each identical in
+    shape and value to what a separate `settle_ledger_for_date` call per sport
+    returned. Scopes are processed in order, and a record an earlier scope
+    settled is counted as already resolved by a later overlapping scope --
+    exactly what the old re-read would have seen.
+    """
+    date_token = _date_token(date_value)
+    scopes = [str(sport or "").strip().lower() or None for sport in sports]
+    results: list[dict[str, Any] | None] = [None] * len(scopes)
+    active: list[int] = []
+    for position, scope in enumerate(scopes):
+        if scope and scope not in _SUPPORTED_SPORTS:
+            results[position] = _unsupported_sport_result(date_token, scope)
+        else:
+            active.append(position)
+    if not active:
+        return [result for result in results if result is not None]
 
     target_ledger_path = Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH
-    records = _read_ledger_records_for_date(target_ledger_path, date_token)
+    total_ledger_records, views = _read_date_for_scopes(
+        target_ledger_path, date_token, list(dict.fromkeys(scopes[position] for position in active))
+    )
+    graded = _GradedCache(date_token)
+    writes: list[dict[str, Any]] = []
+    settled_record_ids: set[int] = set()
+    for position in active:
+        results[position] = _settle_scope(
+            date_token=date_token,
+            sport_slug=scopes[position],
+            view=views[scopes[position]],
+            total_ledger_records=total_ledger_records,
+            target_ledger_path=target_ledger_path,
+            dry_run=dry_run,
+            graded=graded,
+            writes=writes,
+            settled_record_ids=settled_record_ids,
+        )
+    if writes and not dry_run:
+        _persist_settled_records(target_ledger_path, writes, date_token=date_token)
+    return [result for result in results if result is not None]
 
+
+def _settle_scope(
+    *,
+    date_token: str,
+    sport_slug: str | None,
+    view: _ScopeRecords,
+    total_ledger_records: int,
+    target_ledger_path: Path,
+    dry_run: bool,
+    graded: _GradedCache,
+    writes: list[dict[str, Any]],
+    settled_record_ids: set[int],
+) -> dict[str, Any]:
     # Visibility-only counters (2026-08-03): "pending" below is necessarily
     # zero on a day this function has already fully settled, which reads
     # identically to "nothing was ever recorded here" from the autorun
     # status file alone -- these disambiguate the two from the web service,
     # which has no other way to see this worker-local ledger chunk.
-    recommendation_records = [
-        record
-        for record in records
-        if str(record.get("record_type") or "").strip().lower() == "recommendation"
-        and (sport_slug is None or _record_sport(record) == sport_slug)
-    ]
-    already_resolved_records = [
-        record for record in recommendation_records if str(record.get("result") or "pending").strip().lower() != "pending"
-    ]
+    #
+    # A record an earlier scope in this pass settled is RESOLVED for this one,
+    # as a fresh read after that scope's writes would have reported it.
+    pending_records = [record for record in view.pending if id(record) not in settled_record_ids]
+    already_resolved_count = view.already_resolved + (len(view.pending) - len(pending_records))
 
-    pending_records = [
-        record
-        for record in records
-        if str(record.get("record_type") or "").strip().lower() == "recommendation"
-        and str(record.get("result") or "pending").strip().lower() == "pending"
-        and (sport_slug is None or _record_sport(record) == sport_slug)
-    ]
-
-    graded_rows_by_sport: dict[str, list[dict[str, Any]]] = {}
-    # WP8: identities computed once per sport, not once per record x row.
-    graded_index_by_sport: dict[str, GradedRowIndex] = {}
+    # Sports this scope asked a grader about, in first-use order.
+    graded_sports: list[str] = []
     matched = 0
     settled = 0
     unmatched = 0
@@ -510,11 +688,18 @@ def settle_ledger_for_date(
     # WP8: WHY a key match failed, because the counters are the only
     # production instrument for this join. `team_unresolved` -- the record's
     # club token is not in the sport's alias map; `selection_unmapped` -- its
-    # selection text names neither a side nor a club; `game_not_graded` -- the
-    # record and the graded rows both carry game ids and none agree;
+    # selection text names neither a side nor a club; `game_absent` -- no
+    # graded row carries the record's game id; `market_not_graded` -- the game
+    # IS graded but no row settles this market/segment/line/side (these two
+    # replaced `game_not_graded` 2026-09-17, which counted both);
     # `game_id_absent` -- the record carries no game id and the club path
     # found nothing either. The parent counter is unchanged and is the sum.
     unmatched_no_key_match_reasons: dict[str, int] = {reason: 0 for reason in NO_KEY_MATCH_REASONS}
+    # Why `market_not_graded` fired (`MatchOutcome.detail`): a prop the card
+    # did not grade, a game with no final score on disk, a refused line, ...
+    unmatched_market_not_graded_detail: dict[str, int] = {}
+    # Which join phase settled each record; `game_score` = from the final score.
+    matched_by_phase: dict[str, int] = {}
     unmatched_bad_result = 0
     # #260: records that CANNOT settle because their market identity was
     # malformed at write time. Counted separately so `settled` is measured
@@ -554,40 +739,50 @@ def settle_ledger_for_date(
             unmatched += 1
             unmatched_unsupported_sport += 1
             continue
-        if record_sport not in graded_rows_by_sport:
-            graded_rows_by_sport[record_sport] = _graded_rows_for_date(record_sport, date_token)
-        candidate_rows = graded_rows_by_sport[record_sport]
+        if record_sport not in graded_sports:
+            graded_sports.append(record_sport)
+        candidate_rows = graded.rows_for(record_sport)
         if not candidate_rows:
             unmatched += 1
             unmatched_no_graded_rows += 1
             continue
-        if record_sport not in graded_index_by_sport:
-            graded_index_by_sport[record_sport] = GradedRowIndex(candidate_rows)
-        outcome = find_graded_row(
-            record, graded_index_by_sport[record_sport], sport=record_sport, markets_compatible=_markets_compatible
-        )
+        sport_index = graded.index_for(record_sport)
+        outcome = find_graded_row(record, sport_index, sport=record_sport, markets_compatible=_markets_compatible)
         row = outcome.row
         if row is None:
             unmatched += 1
             unmatched_no_key_match += 1
             reason_token = str(outcome.reason or NO_KEY_MATCH_REASONS[-1])
             unmatched_no_key_match_reasons[reason_token] = unmatched_no_key_match_reasons.get(reason_token, 0) + 1
+            if outcome.detail:
+                unmatched_market_not_graded_detail[outcome.detail] = unmatched_market_not_graded_detail.get(outcome.detail, 0) + 1
             if len(unmatched_samples) < _MAX_SAMPLES:
                 recommendation = record.get("recommendation") if isinstance(record.get("recommendation"), Mapping) else {}
+                family_counts = graded.families_for(record_sport)
                 unmatched_samples.append(
                     {
                         "sport": record_sport,
                         "reason": f"no_key_match:{reason_token}",
+                        "detail": outcome.detail,
                         "record_keys": sorted(_evaluation_record_keys(record)),
                         "record_identity": record_identity(record, sport=record_sport).summary(),
                         "record_market_family": _market_family(recommendation.get("market") or recommendation.get("market_family")),
+                        "record_segment": record_segment(record),
                         "record_line": _record_line(record),
                         "graded_rows_available": len(candidate_rows),
-                        "graded_rows_with_game_id": len(graded_index_by_sport[record_sport].by_game_id),
-                        "graded_row_market_families_sample": sorted({_market_family(row.get("market")) for row in candidate_rows[:25] if _market_family(row.get("market"))}),
+                        # DEPRECATED name, kept one release: this has always
+                        # counted GAMES (`len(by_game_id)`), never rows.
+                        "graded_rows_with_game_id": sport_index.games_indexed,
+                        "graded_games_indexed": sport_index.games_indexed,
+                        "graded_rows_carrying_game_id": sport_index.rows_with_game_id,
+                        # Every family present across ALL rows (was: the first
+                        # 25 rows sorted by market, which always read ["props"]).
+                        "graded_row_market_families_sample": sorted(family_counts),
+                        "graded_row_market_family_counts": family_counts,
                     }
                 )
             continue
+        matched_by_phase[str(outcome.phase)] = matched_by_phase.get(str(outcome.phase), 0) + 1
         matched += 1
         result = str(row.get("result") or "").strip().lower()
         if result not in {"win", "loss", "push", "void"}:
@@ -626,16 +821,24 @@ def settle_ledger_for_date(
                     closing_line = stamped_closing_line
         except Exception:
             pass
-        settle_result(
-            record=record,
-            result=result,
-            pnl=_pnl_for_settlement(row, result),
-            closing_line=closing_line,
-            closing_price=closing_price,
-            implied_probability=recommendation.get("model_probability") or record.get("implied_probability"),
-            persist=True,
-            ledger_path=target_ledger_path,
+        # NOT persisted here. Persisting one record rewrote its whole chunk
+        # (`_replace_ledger_line` streams every line to a temp file), so a
+        # 258 MB chunk was rewritten once PER SETTLED RECORD -- the refresh
+        # worker's stack dumps during the 09-17 run sat on exactly this call.
+        # `_persist_settled_records` applies the whole date in one rewrite.
+        writes.append(
+            settle_result(
+                record=record,
+                result=result,
+                pnl=_pnl_for_settlement(row, result, recommendation),
+                closing_line=closing_line,
+                closing_price=closing_price,
+                implied_probability=recommendation.get("model_probability") or record.get("implied_probability"),
+                persist=False,
+                ledger_path=target_ledger_path,
+            )
         )
+        settled_record_ids.add(id(record))
         settled += 1
 
     # #260: the achievable denominator. `pending` counts everything in the
@@ -664,15 +867,197 @@ def settle_ledger_for_date(
         "unmatched_no_graded_rows": unmatched_no_graded_rows,
         "unmatched_no_key_match": unmatched_no_key_match,
         "unmatched_no_key_match_reasons": unmatched_no_key_match_reasons,
+        "unmatched_market_not_graded_detail": dict(sorted(unmatched_market_not_graded_detail.items())),
+        "matched_by_phase": dict(sorted(matched_by_phase.items())),
         "unmatched_bad_result": unmatched_bad_result,
         "unmatched_samples": unmatched_samples,
-        "graded_rows_available": {sport_key: len(rows) for sport_key, rows in graded_rows_by_sport.items()},
-        "graded_rows_with_game_id": {sport_key: len(index.by_game_id) for sport_key, index in graded_index_by_sport.items()},
+        "graded_rows_available": {sport_key: len(graded.rows_for(sport_key)) for sport_key in graded_sports},
+        # DEPRECATED name, kept one release for readers of the status file: it
+        # counts GAMES with a graded row, not rows. Read the two below instead.
+        "graded_rows_with_game_id": {
+            sport_key: graded.index_for(sport_key).games_indexed for sport_key in graded_sports if graded.rows_for(sport_key)
+        },
+        "graded_games_indexed": {
+            sport_key: graded.index_for(sport_key).games_indexed for sport_key in graded_sports if graded.rows_for(sport_key)
+        },
+        "graded_rows_carrying_game_id": {
+            sport_key: graded.index_for(sport_key).rows_with_game_id for sport_key in graded_sports if graded.rows_for(sport_key)
+        },
+        "graded_row_market_family_counts": {
+            sport_key: graded.families_for(sport_key) for sport_key in graded_sports if graded.rows_for(sport_key)
+        },
+        "score_row_diagnostics": {
+            sport_key: diagnostics
+            for sport_key in graded_sports
+            for diagnostics in (score_row_diagnostics(sport_key, date_token),)
+            if diagnostics
+        },
         "dry_run": dry_run,
-        "total_ledger_records": len(records),
-        "total_recommendation_records": len(recommendation_records),
-        "already_resolved_records": len(already_resolved_records),
+        "total_ledger_records": total_ledger_records,
+        "total_recommendation_records": view.recommendations,
+        "already_resolved_records": already_resolved_count,
     }
+
+
+# ---------------------------------------------------------------------------
+# Persisting a date's settlements: ONE rewrite per chunk file
+# ---------------------------------------------------------------------------
+
+
+def _replace_ledger_lines(file_path: Path, updates: Mapping[str, Mapping[str, Any]]) -> set[str]:
+    """Rewrite every record in `updates` (identity -> settled payload) in ONE
+    streamed pass; returns the identities replaced.
+
+    The batch form of `intelligence_evaluation._replace_ledger_line`, with the
+    same semantics per identity -- the FIRST line carrying it is replaced, the
+    record is slimmed and written canonically, and a file with nothing to
+    replace is left byte-for-byte untouched. Differences, all for safety:
+
+    * CRASH-SAFE: written to a sibling temp file in the SAME directory, flushed
+      and fsynced, then `os.replace`d over the original. A deploy that kills the
+      worker mid-rewrite leaves the original chunk intact and a stale temp file
+      the next run truncates -- never a half-written chunk.
+    * Byte-stream, one line in memory at a time; nothing holds the chunk.
+    * APPENDS DURING THE PASS ARE KEPT. The recorder appends to today's chunk
+      while settlement runs. Bytes past the offset this pass consumed are copied
+      onto the temp file before the replace (a trailing line with no newline yet
+      is treated as unconsumed), which the per-record path never did.
+    """
+    wanted = {identity: payload for identity, payload in updates.items() if str(identity or "").strip()}
+    if not wanted or not file_path.exists():
+        return set()
+    tmp_path = file_path.with_name(file_path.name + ".settle-batch.tmp")
+    replaced: set[str] = set()
+    try:
+        with file_path.open("rb") as source, tmp_path.open("wb") as sink:
+            consumed = 0
+            for raw in source:
+                if not raw.endswith(b"\n"):
+                    # A line still being appended. Leave it to the tail copy.
+                    break
+                consumed += len(raw)
+                stripped = raw.strip()
+                if not stripped:
+                    continue
+                if len(replaced) < len(wanted):
+                    try:
+                        existing = json.loads(stripped)
+                    except Exception:
+                        existing = None
+                    identity = _ledger_record_identity(existing) if isinstance(existing, dict) else None
+                    if identity and identity in wanted and identity not in replaced:
+                        record = _slim_record_response_for_persist(wanted[identity])
+                        sink.write(_canonical_payload(dict(record)).encode("utf-8"))
+                        sink.write(b"\n")
+                        replaced.add(identity)
+                        continue
+                sink.write(stripped)
+                sink.write(b"\n")
+            if replaced:
+                current_size = os.path.getsize(file_path)
+                if current_size > consumed:
+                    source.seek(consumed)
+                    while True:
+                        block = source.read(1024 * 1024)
+                        if not block:
+                            break
+                        sink.write(block)
+            sink.flush()
+            os.fsync(sink.fileno())
+    except Exception:
+        try:
+            tmp_path.unlink()
+        except OSError:
+            pass
+        raise
+    if not replaced:
+        try:
+            tmp_path.unlink()
+        except OSError:
+            pass
+        return set()
+    os.replace(tmp_path, file_path)
+    return replaced
+
+
+def _persist_settled_records(target_ledger_path: Path, settled_records: Sequence[Mapping[str, Any]], *, date_token: str) -> dict[str, Any]:
+    """Write a date's settlements: one rewrite per chunk file, then the index
+    once (inside the caller's `ledger_index_session`).
+
+    Each record goes where `_update_evaluation_ledger_record` would have put it:
+    the index entry's path for a chunked ledger, the ledger file itself for a
+    flat one. A record the batch cannot place -- no identity, not in the index,
+    or not found in its file -- takes that per-record path, including its
+    append-if-missing safety net. If the batch RAISES, every record it had not
+    already written falls back to the per-record path. Both are logged with
+    which path ran, because a silent fallback is a 4-5x runtime regression that
+    nothing else would show.
+    """
+    started = time.monotonic()
+    chunked = _is_chunked_ledger_path(target_ledger_path)
+    written: set[str] = set()
+    per_record: list[Mapping[str, Any]] = []
+    files_rewritten = 0
+    error_text: str | None = None
+    try:
+        index = _load_chunk_index(target_ledger_path) if chunked else None
+        by_path: dict[Path, dict[str, Mapping[str, Any]]] = {}
+        chunk_by_identity: dict[str, str] = {}
+        for payload in settled_records:
+            identity = _ledger_record_identity(payload)
+            if not identity:
+                per_record.append(payload)
+                continue
+            if chunked:
+                existing = index.get(identity) if isinstance(index, dict) else None
+                if not isinstance(existing, dict):
+                    per_record.append(payload)
+                    continue
+                chunk_name = str(existing.get("chunk") or "") or _ledger_record_chunk_name(payload)
+                path_value = existing.get("path")
+                path = Path(str(path_value)) if path_value else _ledger_chunk_path(target_ledger_path, chunk_name)
+                chunk_by_identity[identity] = chunk_name
+            else:
+                path = target_ledger_path
+            # Later settlements of the same identity win, as sequential
+            # per-record writes would have left it.
+            by_path.setdefault(path, {})[identity] = payload
+        for path, updates in by_path.items():
+            replaced = _replace_ledger_lines(path, updates)
+            if replaced:
+                files_rewritten += 1
+            now = _utc_now()
+            for identity, payload in updates.items():
+                if identity in replaced:
+                    written.add(identity)
+                    if chunked and isinstance(index, dict):
+                        index[identity] = {"chunk": chunk_by_identity[identity], "path": str(path), "updated_at": now}
+                else:
+                    per_record.append(payload)
+        if chunked and written and isinstance(index, dict):
+            _write_chunk_index(target_ledger_path, index)
+    except Exception as exc:  # noqa: BLE001
+        error_text = f"{type(exc).__name__}: {exc}"
+        per_record = [payload for payload in settled_records if _ledger_record_identity(payload) not in written]
+    for payload in per_record:
+        _update_evaluation_ledger_record(target_ledger_path, payload)
+    summary = {
+        "path": "per_record_fallback" if error_text else "batch",
+        "records": len(settled_records),
+        "batch_written": len(written),
+        "per_record_written": len(per_record),
+        "files_rewritten": files_rewritten,
+        "elapsed_s": round(time.monotonic() - started, 2),
+        "error": error_text,
+    }
+    print(
+        f"[evaluation_settlement] SETTLE_PERSIST date={date_token} path={summary['path']} "
+        f"records={summary['records']} batch_written={summary['batch_written']} "
+        f"per_record_written={summary['per_record_written']} files_rewritten={files_rewritten} "
+        f"elapsed_s={summary['elapsed_s']}" + (f" error={error_text}" if error_text else ""),
+        flush=True,
+    )
+    return summary
 
 
 def settle_ledger_for_dates(
@@ -685,10 +1070,8 @@ def settle_ledger_for_dates(
     sport_list = list(sports) if sports else [None]
     results: list[dict[str, Any]] = []
     for date_value in dates:
-        for sport in sport_list:
-            results.append(
-                settle_ledger_for_date(date_value, sport=sport, ledger_path=ledger_path, dry_run=dry_run)
-            )
+        # ONE read of the date's chunk for every sport (was one per sport).
+        results.extend(_settle_date_for_sports(date_value, sports=sport_list, ledger_path=ledger_path, dry_run=dry_run))
     return {
         "ok": True,
         "results": results,
@@ -746,13 +1129,49 @@ def settle_ledger_for_dates(
                 for r in results
                 if r.get("graded_rows_available")
             },
+            # DEPRECATED name (counts games); kept one release.
             "graded_rows_with_game_id": {
                 f"{r.get('sport')}:{r.get('date')}": r.get("graded_rows_with_game_id")
                 for r in results
                 if r.get("graded_rows_with_game_id")
             },
+            "graded_games_indexed": {
+                f"{r.get('sport')}:{r.get('date')}": r.get("graded_games_indexed")
+                for r in results
+                if r.get("graded_games_indexed")
+            },
+            "graded_rows_carrying_game_id": {
+                f"{r.get('sport')}:{r.get('date')}": r.get("graded_rows_carrying_game_id")
+                for r in results
+                if r.get("graded_rows_carrying_game_id")
+            },
+            "graded_row_market_family_counts": {
+                f"{r.get('sport')}:{r.get('date')}": r.get("graded_row_market_family_counts")
+                for r in results
+                if r.get("graded_row_market_family_counts")
+            },
+            "score_row_diagnostics": {
+                f"{r.get('sport')}:{r.get('date')}": r.get("score_row_diagnostics")
+                for r in results
+                if r.get("score_row_diagnostics")
+            },
+            "unmatched_market_not_graded_detail": _sum_counter_maps(r.get("unmatched_market_not_graded_detail") for r in results),
+            "matched_by_phase": _sum_counter_maps(r.get("matched_by_phase") for r in results),
         },
     }
+
+
+def _sum_counter_maps(maps: Iterable[Any]) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for item in maps:
+        if not isinstance(item, Mapping):
+            continue
+        for key, value in item.items():
+            try:
+                out[str(key)] = out.get(str(key), 0) + int(value or 0)
+            except (TypeError, ValueError):
+                continue
+    return dict(sorted(out.items()))
 
 
 def main(argv: Sequence[str] | None = None) -> int:

@@ -186,7 +186,7 @@ def test_same_club_on_different_sides_of_two_games_does_not_cross_match():
     ungraded = _board_record(sport="mlb", game_id=823999, pick="Away ML", team="LAA", market="Moneyline", matchup="LAA @ TEX")
     outcome = find_graded_row(ungraded, rows, sport="mlb", markets_compatible=_markets_compatible)
     assert outcome.row is None
-    assert outcome.reason == "game_not_graded"
+    assert outcome.reason == "game_absent"
 
 
 def test_wrong_side_of_the_right_game_does_not_match():
@@ -222,14 +222,18 @@ def test_reason_game_id_absent():
     assert _reason(record, rows) == "game_id_absent"
 
 
-def test_reason_game_not_graded():
+def test_reason_game_absent():
+    # Was `game_not_graded`, split 2026-09-17 into `game_absent` (this case: the
+    # id is in no graded row) and `market_not_graded` (the game is indexed).
     rows = _mlb_graded_rows([_mlb_day_row(823983, "SEA @ LAA", "ml", "home", "win")])
     record = _board_record(sport="mlb", game_id=823999, pick="Home ML", team="NYY", market="Moneyline", matchup="BOS @ NYY")
-    assert _reason(record, rows) == "game_not_graded"
+    assert _reason(record, rows) == "game_absent"
 
 
 def test_every_reason_token_is_reported_by_the_counters():
-    assert set(NO_KEY_MATCH_REASONS) == {"team_unresolved", "selection_unmapped", "game_not_graded", "game_id_absent", "unclassified"}
+    assert set(NO_KEY_MATCH_REASONS) == {
+        "team_unresolved", "selection_unmapped", "game_absent", "market_not_graded", "game_id_absent", "unclassified",
+    }
 
 
 # --------------------------------------------------------------------------
@@ -343,16 +347,16 @@ def test_settlement_reports_reason_split_and_pending_by_sport():
                 summary = settle_ledger_for_date("2026-09-05", sport="mlb", ledger_path=ledger_path)
             assert summary["matched"] == 1 and summary["settled"] == 1
             assert summary["unmatched_no_key_match"] == 2
-            assert summary["unmatched_no_key_match_reasons"]["game_not_graded"] == 1
+            assert summary["unmatched_no_key_match_reasons"]["game_absent"] == 1
             assert summary["unmatched_no_key_match_reasons"]["selection_unmapped"] == 1
             assert summary["graded_rows_with_game_id"] == {"mlb": 1}
             reasons = {sample["reason"] for sample in summary["unmatched_samples"]}
-            assert reasons == {"no_key_match:game_not_graded", "no_key_match:selection_unmapped"}
+            assert reasons == {"no_key_match:game_absent", "no_key_match:selection_unmapped"}
             assert all("record_identity" in sample for sample in summary["unmatched_samples"])
 
             with patch.object(evaluation_settlement, "_graded_rows_for_date", return_value=rows):
                 totals = settle_ledger_for_dates(["2026-09-05"], sports=["mlb", "wnba"], ledger_path=ledger_path)["totals"]
-            assert totals["unmatched_no_key_match_reasons"]["game_not_graded"] == 1
+            assert totals["unmatched_no_key_match_reasons"]["game_absent"] == 1
             assert totals["pending_by_sport"] == {"mlb:2026-09-05": 2, "wnba:2026-09-05": 0}
             assert "wnba:2026-09-05" not in totals["graded_rows_available"]
             assert hit["recommendation_id"]

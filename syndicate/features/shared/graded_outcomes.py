@@ -64,6 +64,29 @@ def _unavailable_graded_rows_for_date(_date_str: str) -> list[dict[str, Any]]:
 
 
 def _mlb_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
+    """The season card's graded rows (PROPS, plus its one `ml` pick per game)
+    followed by one SCORE ROW per finished game and segment.
+
+    Two sources because they answer different questions. The card is the only
+    prop source this grader has, but it grades only what the card itself picked:
+    measured over 2026-09-11..09-16 it held 4,642 rows, hitter/pitcher props plus
+    ONE moneyline side per game, and zero totals, run lines or segment rows. The
+    evaluation ledger records every board side at every line, so 6,815 of 7,013
+    unmatched MLB records were reported `game_not_graded` on games the card DID
+    grade -- all 5 production samples were full-game totals overs. The final
+    score answers those for any line and either side; see
+    `_mlb_final_score_rows_for_date`.
+
+    Card rows come FIRST, and the matcher tries every non-score row before any
+    score row, so every record that settled before settles the same way.
+    """
+    rows = _mlb_card_graded_rows_for_date(date_str)
+    card_game_pks = {row.get("game_pk") for row in rows if row.get("game_pk") is not None}
+    rows.extend(_mlb_final_score_rows_for_date(date_str, extra_game_pks=card_game_pks))
+    return rows
+
+
+def _mlb_card_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
     from syndicate.features.mlb.market_accuracy import build_market_accuracy_payload
 
     try:
@@ -135,6 +158,301 @@ def _mlb_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
                 }
             )
     return rows
+
+
+# ---------------------------------------------------------------------------
+# MLB game markets from FINAL SCORES -- one "score row" per game per segment.
+#
+# WHY A SCORE ROW AND NOT A LADDER OF GRADED ROWS. A ledger total can sit at any
+# line (8.0, 8.5 and 10.0 were the production samples), a run line at any alt
+# handicap for either club, a moneyline on either side, and each of those again
+# for first1/first3/first5. Enumerating win/loss rows for every line would put
+# ~500 rows per game into the index -- every one walked per record by
+# `find_graded_row`'s game-id phase -- and still miss the first line nobody
+# enumerated. The score is the fact; the verdict for one (market, segment, side,
+# line) is arithmetic on it. So this grader emits scores, and
+# `settlement_identity.find_graded_row` asks `grade_score_bet` for the verdict of
+# THIS record, returning a graded row in the usual shape.
+#
+# A score row carries no `result`, on purpose: nothing can settle against it
+# without going through `grade_score_bet`. The club and loose match phases skip
+# it, and `emit_settlement_inputs._graded_index` ignores it (no actual/result/pnl).
+# ---------------------------------------------------------------------------
+
+SCORE_ROW_MARKET = "game_score"
+
+# The partial segments a score row is emitted for, and the innings each needs.
+# `full` is gated on a regulation-length game instead (see below).
+_MLB_SCORE_SEGMENT_INNINGS: tuple[tuple[str, int], ...] = (("first1", 1), ("first3", 3), ("first5", 5))
+
+# StatsAPI marks a POSTPONED game `abstractGameState: Final` with a 0-0 linescore,
+# so `_game_is_final` alone would read it as a 0-0 final: every under wins, every
+# moneyline pushes. A game is complete only when BOTH the coded state and the
+# detailed state affirmatively say so -- an allowlist, the same rule as
+# `_NFL_PLAYED_STATUSES`: an unrecognised state costs a missed settlement, never
+# an invented one. `completed early` is an OFFICIAL shortened game; it still
+# settles its completed segments, and gets no full-game row (under 9 innings).
+_MLB_COMPLETED_CODES = frozenset({"F", "O"})
+_MLB_COMPLETED_DETAIL_PREFIXES = ("final", "game over", "completed early")
+_MLB_NOT_PLAYED_WORDS = ("postpon", "cancel", "suspend")
+
+# Bounded diagnostics per (sport, date), copied into the autorun status by
+# evaluation_settlement. Without them "no feed on disk" and "no game finished"
+# both read as zero score rows.
+_SCORE_ROW_DIAGNOSTICS: dict[tuple[str, str], dict[str, Any]] = {}
+_SCORE_ROW_DIAGNOSTICS_MAX = 64
+
+
+def is_score_row(row: Any) -> bool:
+    return isinstance(row, Mapping) and str(row.get("market") or "") == SCORE_ROW_MARKET
+
+
+def score_row_diagnostics(sport: str, date_str: str) -> dict[str, Any] | None:
+    found = _SCORE_ROW_DIAGNOSTICS.get((str(sport or "").strip().lower(), str(date_str or "").strip()))
+    return dict(found) if isinstance(found, dict) else None
+
+
+def _record_score_row_diagnostics(sport: str, date_str: str, payload: dict[str, Any]) -> None:
+    key = (sport, date_str)
+    if key not in _SCORE_ROW_DIAGNOSTICS and len(_SCORE_ROW_DIAGNOSTICS) >= _SCORE_ROW_DIAGNOSTICS_MAX:
+        _SCORE_ROW_DIAGNOSTICS.pop(next(iter(_SCORE_ROW_DIAGNOSTICS)))
+    _SCORE_ROW_DIAGNOSTICS[key] = payload
+
+
+def _int_or_none(value: Any) -> int | None:
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _mlb_feed_completed(feed: Mapping[str, Any]) -> bool:
+    from syndicate.features.shared.bet_status_mlb import _game_is_final
+
+    if not _game_is_final(feed):
+        return False
+    game_data = feed.get("gameData") if isinstance(feed.get("gameData"), Mapping) else {}
+    status = game_data.get("status") if isinstance(game_data.get("status"), Mapping) else {}
+    detailed = str(status.get("detailedState") or "").strip().lower()
+    if any(word in detailed for word in _MLB_NOT_PLAYED_WORDS):
+        return False
+    if not detailed.startswith(_MLB_COMPLETED_DETAIL_PREFIXES):
+        return False
+    coded = str(status.get("codedGameState") or status.get("statusCode") or "").strip().upper()
+    return coded in _MLB_COMPLETED_CODES
+
+
+def mlb_score_rows_from_feed(feed: Any) -> list[dict[str, Any]]:
+    """Score rows for one `feed/live` payload; [] unless the game is complete.
+
+    Reads the payload through the paper resolver's own functions
+    (`bet_status_mlb._team_runs` / `_segment_runs` / `_game_is_final`), so the
+    two graders cannot disagree about what the score was.
+
+    `full` needs a REGULATION-LENGTH game: 9+ linescore entries (a home side
+    leading after the top of the 9th has 9, with no bottom-half runs). A game
+    called earlier is official for a moneyline but VOID for totals and run lines
+    at the books, and this row cannot tell those apart, so no full-game row is
+    emitted and those records stay pending. Its first1/3/5 rows still emit when
+    those innings completed (`_segment_runs` refuses an inning never finished).
+    """
+    if not isinstance(feed, Mapping) or not _mlb_feed_completed(feed):
+        return []
+    from syndicate.features.shared.bet_status_mlb import _segment_runs, _team_runs
+
+    game_data = feed.get("gameData") if isinstance(feed.get("gameData"), Mapping) else {}
+    game = game_data.get("game") if isinstance(game_data.get("game"), Mapping) else {}
+    game_id = _game_id_text(game.get("pk"))
+    if not game_id:
+        return []
+    teams = game_data.get("teams") if isinstance(game_data.get("teams"), Mapping) else {}
+    home_team = teams.get("home") if isinstance(teams.get("home"), Mapping) else {}
+    away_team = teams.get("away") if isinstance(teams.get("away"), Mapping) else {}
+    home_abbr = str(home_team.get("abbreviation") or "").strip() or None
+    away_abbr = str(away_team.get("abbreviation") or "").strip() or None
+    base = {
+        "sport": "mlb",
+        "game_id": game_id,
+        "game_pk": _int_or_none(game.get("pk")),
+        "market": SCORE_ROW_MARKET,
+        "home": home_abbr,
+        "away": away_abbr,
+        "home_name": str(home_team.get("name") or "").strip() or None,
+        "away_name": str(away_team.get("name") or "").strip() or None,
+        "title": f"{away_abbr} @ {home_abbr}" if home_abbr and away_abbr else None,
+        "source": "feed_live_linescore",
+    }
+    live_data = feed.get("liveData") if isinstance(feed.get("liveData"), Mapping) else {}
+    linescore = live_data.get("linescore") if isinstance(live_data.get("linescore"), Mapping) else {}
+    innings = linescore.get("innings") if isinstance(linescore.get("innings"), list) else []
+
+    rows: list[dict[str, Any]] = []
+    runs = _team_runs(feed)
+    if runs is not None and len(innings) >= 9:
+        rows.append({**base, "segment": "full", "home_score": runs[0], "away_score": runs[1], "innings": len(innings)})
+    for segment, innings_needed in _MLB_SCORE_SEGMENT_INNINGS:
+        segment_runs = _segment_runs(feed, innings_needed)
+        if segment_runs is None or not segment_runs[2]:
+            continue
+        rows.append({**base, "segment": segment, "home_score": segment_runs[0], "away_score": segment_runs[1], "innings": innings_needed})
+    return rows
+
+
+def _mlb_slate_game_pks(date_str: str) -> set[int]:
+    """Every gamePk StatsAPI lists for the slate, from the refresh's own
+    `schedule_raw.json` -- the same read `bet_status_mlb._schedule_index` uses."""
+    try:
+        from syndicate.features.mlb.cards import _schedule_raw_games
+
+        games = _schedule_raw_games(date_str)
+    except Exception:
+        return set()
+    pks: set[int] = set()
+    for game in games or []:
+        if isinstance(game, Mapping):
+            pk = _int_or_none(game.get("gamePk"))
+            if pk:
+                pks.add(pk)
+    return pks
+
+
+def _load_cached_mlb_feed(date_str: str, game_pk: int) -> Mapping[str, Any] | None:
+    """CACHE ONLY, as in `bet_status_mlb`: refresh-worker captures `feed_live`
+    itself, and a grader that quietly fetched from statsapi would hide exactly
+    the capture gap it depends on."""
+    from syndicate.features.mlb.box_score_stats import load_final_feed
+
+    try:
+        feed = load_final_feed(date_str, game_pk, fetch_if_missing=False)
+    except Exception:
+        return None
+    return feed if isinstance(feed, Mapping) and feed else None
+
+
+def _mlb_final_score_rows_for_date(date_str: str, *, extra_game_pks: Any = ()) -> list[dict[str, Any]]:
+    """Score rows for every completed game on the slate.
+
+    A game with no cached feed emits nothing -- its records stay pending -- and
+    is COUNTED in `score_row_diagnostics` so the gap reads as a capture gap, not
+    as "not final". One feed is parsed at a time and dropped once its scalars
+    are taken, so the peak is one payload (~0.8 MB of JSON), not the slate.
+    """
+    game_pks = _mlb_slate_game_pks(date_str)
+    for value in extra_game_pks or ():
+        pk = _int_or_none(value)
+        if pk:
+            game_pks.add(pk)
+    rows: list[dict[str, Any]] = []
+    feeds_missing: list[int] = []
+    games_not_complete = 0
+    games_graded = 0
+    for game_pk in sorted(game_pks):
+        feed = _load_cached_mlb_feed(date_str, game_pk)
+        if feed is None:
+            feeds_missing.append(game_pk)
+            continue
+        game_rows = mlb_score_rows_from_feed(feed)
+        del feed
+        if game_rows:
+            games_graded += 1
+            rows.extend(game_rows)
+        else:
+            games_not_complete += 1
+    _record_score_row_diagnostics(
+        "mlb",
+        date_str,
+        {
+            "games_on_slate": len(game_pks),
+            "games_graded": games_graded,
+            "games_not_complete": games_not_complete,
+            "feeds_not_cached": len(feeds_missing),
+            "feeds_not_cached_sample": feeds_missing[:10],
+            "score_rows": len(rows),
+            "score_rows_by_segment": {
+                segment: sum(1 for row in rows if row.get("segment") == segment)
+                for segment in ("full", *(name for name, _ in _MLB_SCORE_SEGMENT_INNINGS))
+            },
+        },
+    )
+    return rows
+
+
+SCORE_BET_TOTAL = "total"
+SCORE_BET_SPREAD = "spread"
+SCORE_BET_MONEYLINE = "moneyline"
+
+
+def grade_score_bet(
+    *,
+    kind: str,
+    segment: str,
+    side: str | None,
+    line: float | None,
+    three_way: bool | None,
+    home_score: Any,
+    away_score: Any,
+) -> tuple[str | None, float | None, str | None]:
+    """`(result, actual, refusal)` for one bet on two scores. Pure.
+
+    Conventions are `game_line_bet.game_line_view`'s, restated rather than
+    re-derived: a spread `line` is a handicap ADDED to the backed side's score
+    (home -1.5 covers when home wins by 2+); a moneyline is two-way unless
+    `three_way`. `actual` is what the market is about -- the run total for a
+    total, the backed side's margin for a spread or moneyline.
+
+    Refused, never guessed:
+      * a SEGMENT moneyline that ends LEVEL when the record does not say whether
+        it was two-way (tie = push) or three-way (tie = loss). Every non-level
+        result grades the same under both, so only the tie refuses.
+      * a draw side on a full-game MLB moneyline (baseball has no draw market).
+    """
+    try:
+        home = float(home_score)
+        away = float(away_score)
+    except (TypeError, ValueError):
+        return None, None, "no_scores"
+
+    if kind == SCORE_BET_TOTAL:
+        if side not in {"over", "under"}:
+            return None, None, "total_side_unmapped"
+        if line is None:
+            return None, None, "total_line_missing"
+        actual = home + away
+        if actual == line:
+            return "push", actual, None
+        return ("win" if (actual > line) == (side == "over") else "loss"), actual, None
+
+    if kind == SCORE_BET_SPREAD:
+        if side not in {"home", "away"}:
+            return None, None, "spread_side_unmapped"
+        if line is None:
+            return None, None, "spread_line_missing"
+        margin = home - away if side == "home" else away - home
+        covered = margin + line
+        if covered == 0:
+            return "push", margin, None
+        return ("win" if covered > 0 else "loss"), margin, None
+
+    if kind == SCORE_BET_MONEYLINE:
+        level = home == away
+        if side == "draw":
+            if segment == "full":
+                return None, None, "draw_side_on_full_game_moneyline"
+            return ("win" if level else "loss"), abs(home - away), None
+        if side not in {"home", "away"}:
+            return None, None, "moneyline_side_unmapped"
+        margin = home - away if side == "home" else away - home
+        if not level:
+            return ("win" if margin > 0 else "loss"), margin, None
+        if three_way is True:
+            return "loss", margin, None
+        if three_way is False or segment == "full":
+            # Full-game baseball is two-way (`bet_status_mlb` passes
+            # `draw_possible=False`): a level final is a push.
+            return "push", margin, None
+        return None, None, "segment_moneyline_tie_way_unknown"
+
+    return None, None, "not_a_score_market"
 
 
 def _game_id_text(value: Any) -> str | None:
@@ -663,5 +981,10 @@ def graded_rows_for_date(sport: str, date_str: str) -> list[dict[str, Any]]:
 __all__ = [
     "GRADED_OUTCOME_FIELDS",
     "GRADED_OUTCOME_GRADERS",
+    "SCORE_ROW_MARKET",
+    "grade_score_bet",
     "graded_rows_for_date",
+    "is_score_row",
+    "mlb_score_rows_from_feed",
+    "score_row_diagnostics",
 ]

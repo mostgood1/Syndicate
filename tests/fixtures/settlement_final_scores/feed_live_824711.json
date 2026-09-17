@@ -1,0 +1,139 @@
+{
+ "_provenance": {
+  "fetched_at_utc": "2026-09-17T15:10:39+00:00",
+  "source": "https://statsapi.mlb.com/api/v1.1/game/824711/feed/live",
+  "trimmed_to": "gameData.game/datetime/status/teams + liveData.linescore innings runs and team totals"
+ },
+ "gameData": {
+  "datetime": {
+   "dateTime": "2026-09-11T23:10:00Z",
+   "officialDate": "2026-09-11"
+  },
+  "game": {
+   "pk": 824711
+  },
+  "status": {
+   "abstractGameCode": "F",
+   "abstractGameState": "Final",
+   "codedGameState": "F",
+   "detailedState": "Final",
+   "startTimeTBD": false,
+   "statusCode": "F"
+  },
+  "teams": {
+   "away": {
+    "abbreviation": "KC",
+    "id": 118,
+    "name": "Kansas City Royals"
+   },
+   "home": {
+    "abbreviation": "BOS",
+    "id": 111,
+    "name": "Boston Red Sox"
+   }
+  }
+ },
+ "liveData": {
+  "linescore": {
+   "currentInning": 9,
+   "inningState": "Bottom",
+   "innings": [
+    {
+     "away": {
+      "runs": 1
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 1
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 2
+    },
+    {
+     "away": {
+      "runs": 2
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 3
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 4
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 2
+     },
+     "num": 5
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 6
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 7
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 8
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 9
+    }
+   ],
+   "isTopInning": false,
+   "scheduledInnings": 9,
+   "teams": {
+    "away": {
+     "errors": 0,
+     "hits": 10,
+     "runs": 3
+    },
+    "home": {
+     "errors": 0,
+     "hits": 8,
+     "runs": 2
+    }
+   }
+  }
+ }
+}

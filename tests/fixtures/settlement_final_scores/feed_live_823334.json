@@ -1,0 +1,63 @@
+{
+ "_provenance": {
+  "fetched_at_utc": "2026-09-17T15:10:39+00:00",
+  "source": "https://statsapi.mlb.com/api/v1.1/game/823334/feed/live",
+  "trimmed_to": "gameData.game/datetime/status/teams + liveData.linescore innings runs and team totals"
+ },
+ "gameData": {
+  "datetime": {
+   "dateTime": "2026-09-17T16:35:00Z",
+   "officialDate": "2026-09-17"
+  },
+  "game": {
+   "pk": 823334
+  },
+  "status": {
+   "abstractGameCode": "P",
+   "abstractGameState": "Preview",
+   "codedGameState": "P",
+   "detailedState": "Pre-Game",
+   "startTimeTBD": false,
+   "statusCode": "P"
+  },
+  "teams": {
+   "away": {
+    "abbreviation": "MIL",
+    "id": 158,
+    "name": "Milwaukee Brewers"
+   },
+   "home": {
+    "abbreviation": "PIT",
+    "id": 134,
+    "name": "Pittsburgh Pirates"
+   }
+  }
+ },
+ "liveData": {
+  "linescore": {
+   "currentInning": 1,
+   "inningState": "Top",
+   "innings": [
+    {
+     "away": {},
+     "home": {},
+     "num": 1
+    }
+   ],
+   "isTopInning": true,
+   "scheduledInnings": 9,
+   "teams": {
+    "away": {
+     "errors": 0,
+     "hits": 0,
+     "runs": 0
+    },
+    "home": {
+     "errors": 0,
+     "hits": 0,
+     "runs": 0
+    }
+   }
+  }
+ }
+}
