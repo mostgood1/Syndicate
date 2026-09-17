@@ -37269,3 +37269,16 @@ Scheduled task `full-slate-memory-reading-0915`. Read-only on production: no dep
 - **Baseline** (read 16:33Z): queue lines `floor_s=1200`; next-day queues in the last 3 h: 7.
 - **Pre-registered:** every `BOARD_WINDOW_QUEUED` / `BOARD_WINDOW_QUEUE_GATED` line after go-live reads `floor_s=3600`; next-day queues <= 3 per 3 h; over a full day, >25-min gaps in today's shortlist writes that contain a next-day build <= 3 (was 18). Watcher: scratchpad `window_floor_watch.py` (FLOOR / NEXTDAY / GAP / PULL flags).
 - **verify:** OWED.
+
+## 2026-09-17 16:45Z (11:45 CT) — READING, no deploy — refresh-worker `05b808cc`+ (live `f3748922` since 15:50:52Z) — lanes soccer-prekickoff-freeze + soccer-corners-model-rebuild + soccer-forward-graders — **CORRECTION of the 05:42:11Z verify: refresh-worker's freeze files and estimator corners ARE on web**
+
+- **Reading** (`/api/ops/artifacts/export`, `names_only` then bodies, 16:39-16:45Z): web holds **18 `recommendations_prekickoff_<date>.refresh-worker-4tx2.json` files** (9 leagues, dates 09-17..09-20) beside 11 live-odds-worker files.
+  - 50 entries, **50/50 with `volume_projection.corners_basis=team_rates_pressure_v1`** and player props.
+  - Web mtimes 07:58:26Z..15:37:11Z. live-odds-worker's run 04:44:28Z..16:37:12Z.
+- **So the 05:42:11Z verify ("0 `.refresh-worker.json` freeze files on web by 11:48:31Z"; "neither its freeze nor its estimator corners are observable from web") is WRONG.** The service tag is `refresh-worker-4tx2`, not `refresh-worker`, and the earliest such file on web carries mtime 07:58:26Z, before that reading.
+  - **Believed, NOT verified:** the 11:48Z check matched the exact suffix `.refresh-worker.json` and so missed files that existed. This is the 2026-09-15 FORBIDDEN rule (a reader's zero read as the writer's absence) again.
+  - **Also not verified:** whether web's mtime is its arrival time or a preserved source time. How the files reach web is not established either; the "0 publisher lines" log count stands as read, and does not explain their presence.
+- **Consequences:**
+  - (a) Refresh-worker estimator reachability is MET on web: 50 entries.
+  - (b) The forward grades' "services merged by latest `frozen_at`" rule merges TWO visible services, not one. `forward_grade.py` reads both.
+  - (c) The freeze leg-2 watcher now reads both services (restarted 16:41Z; first poll 29 files, 61 entries, 0 qualifying).
