@@ -6800,3 +6800,28 @@ Web workers had never had `#285`'s arena cap (`configure_malloc_arenas` is calle
 - **Size the limit for the largest single unit of work, not for the ceiling you want.** 2 x (650 + ~100) fits 2,048 MB with the master and two merge children; 2 x 700 plus a 72 MB overshoot does not leave that room.
 - **Checking more often is the tempting fix and it is the wrong one** — it would have bought ~7 MB of the 45.
 - Corollary for the instrument: `growth_episodes` in `/api/ops/memory` RE-BASELINES ON EVERY READ (`baseline_age_s` ~6 s), so `episodes_captured=0` and `max_anon_rise_seen_mb=0.0` are what it prints while a worker grows 500 MB between two reads. A zero from an instrument that resets itself is not a measurement of zero.
+
+### 2026-09-17 (session 4a583d41, lane prop-evidence-parity) â FORBIDDEN: treating your own commit on `main` as inert because YOU have not deployed it
+
+**What happened.** Two web commits sat on `origin/main` while this lane waited for deploy
+approval, and I described them to the user as "landed, not deployed" as though that were a
+stable state. A peer lane (`a1e40980`) pointed out what it actually is: **the next web deploy
+by ANY lane ships them.** That queue was three lanes deep at the time â my two plus
+web-memory-guard's per-worker memory limit change â and no lane's expectation covered another
+lane's change.
+
+**Why `autoDeploy = no` does not save you.** It stops a PUSH from deploying. It does nothing
+about the next deploy someone else triggers, which carries every commit merged since the live
+SHA. "Nothing is deployed" is true of the service, never of your code's future.
+
+**How to apply.**
+- The moment code lands unshipped, write a RIDE-ALONG VERDICT in the lane block: is it safe
+  for someone else's deploy to carry this unmeasured, and what is the blast radius if it does.
+  Back it with a measurement, not a feeling (here: 0.14-0.27 s per answer, <16 MB transient,
+  ~6 KB payload, one visible behaviour change).
+- The verification is still OWED BY YOUR LANE when a ride-along ships it. A ride-along moves
+  code; it does not take the reading, and a deploy receipt written by another lane will not
+  mention your predicate.
+- Before deploying, re-read what has accumulated: `origin/main` moved 18 commits under this
+  lane in about two hours.
+- *(evidence: `log/2026-09-17.md` ~20:55Z; verdict landed in `46e86b03`)*

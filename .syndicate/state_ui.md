@@ -255,6 +255,12 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
   whose game had already started returned **3 tables**; WNBA **1**, NFL **3**, NCAAF **0**.
   `MAX_TABLES = 8` was also TRUNCATING MLB's own answer (McLean built 9, served 8, and said
   nothing); the cap is now 12.
+- **WHAT THE NEW PROP PATH COSTS, measured on production files 2026-09-17 (NOT on a
+  deployed service): 0.14-0.27 s per answer** (median of 3; WNBA 0.27, NFL 0.14, NCAAF
+  0.14), peak traced allocation 2.4-15.9 MB, retained 0.6-1.6 MB, ~6 KB added to a
+  payload already ~8 MB. Against a 15-26 s Ask and web's 650 MB per-worker anon recycle
+  that is noise â which is why this lane told the web deploy queue its two commits are
+  safe to ride along with someone else's deploy.
 - **THE MLB BvP TABLE WAS 4 MONTHS STALE AND SAID 'THROUGH TODAY'.** The git-tracked cache
   web reads covers 2021-03-15..**2026-05-11** (47 files, 1,158 dates, 384,382 pairs); the
   title now prints the data's own horizon. The daily sim carries NO BvP fields at all
