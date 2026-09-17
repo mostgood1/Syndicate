@@ -6725,3 +6725,52 @@ Measured 2026-09-17 ~11:4xZ, session abacd435. While removing its own temporary 
 - Owner-idle is not optional: an owner editing its own block during a move either fails to find it or re-creates it.
 - Undoing a landed archive trips `ledger-commit-guard` (restored blocks read as un-archiving); the override needs the user's explicit approval for that commit.
 - *(evidence: `bac96455`, revert `1a309584`, `4ef3bff8`; `log/2026-09-17.md` ~11:02 CDT and this session's entry)*
+
+### 2026-09-17 (session 4a583d41, lane prop-evidence-parity) — FORBIDDEN: a cap, filter or truncation that drops output without saying what it dropped
+
+**What happened.** `MAX_TABLES = 8` in Ask's evidence merge. A production MLB
+prop answer (Nolan McLean, earned runs, read 18:0xZ) BUILT nine tables and
+SERVED eight — the park/weather table fell off the end, and nothing in the
+payload, the panel or the logs said a table had been dropped. The ledger's own
+record of that surface ("MLB prop unchanged at 8 + 3") had been reading the CAP
+as if it were the answer's natural size for a month.
+
+**Why it survived.** A truncation looks exactly like an absence from outside:
+both render as "that table is not here". The cap was set when the answer had
+fewer sections, and every later section quietly competed for the same eight
+slots. Nothing failed, so nothing was investigated.
+
+**How to apply.**
+- A cap must report its own bite: carry the built and served counts on the
+  payload (`prop_evidence.tables_built` / `tables_served` is the instance), or
+  log when they differ. "Fits in the budget" is not the same claim as "is all
+  there was".
+- When you raise a cap, re-read what appears — the newly visible item is
+  evidence about what the cap was hiding, and it may be the most useful one.
+- The same shape applies to any `[:N]`, `head`, `LIMIT` or sample in a path
+  whose output someone reads as a complete set.
+- *(evidence: production Ask captures 2026-09-17 18:0x-18:2xZ, `log/2026-09-17.md`; fix in `fdea0a2e`)*
+
+### 2026-09-17 (session 4a583d41, lane prop-evidence-parity) — FORBIDDEN: reading a field name out of a TEST FIXTURE and calling it the producer's contract
+
+**What happened.** Ask read `player["minutes"]` from the basketball sim's
+`cards_sim_detail`. The production engine writes **`min_mean`**; `minutes`
+exists only on a fallback stub. So the player Minutes row never rendered on real
+data and the team table printed `0` minutes for every player — for months, with
+a green test, because `tests/test_ask_the_syndicate.py`'s fixture was written
+with the reader's key rather than the writer's.
+
+**The tell nobody looked at.** `or 0` in the formatter turned a missing key into
+a plausible number. A neutral default makes an unfed field indistinguishable
+from a working one — `model_engine_standard.md` says exactly this about sim
+inputs, and it applies to READERS as well as engines.
+
+**How to apply.**
+- Verify a key against the WRITER (the producer's `player_dict[...] = ...`), or
+  against a real artifact, never against a fixture you or a peer wrote.
+- Slice test fixtures out of production files. The fixtures for this work are
+  cut from the real `cards_sim_detail`, `smart_sim_*`, `props_recommendations`
+  and box-score files, and the WNBA test asserts `"minutes" not in player` so
+  the stub key cannot come back.
+- Never let a formatter substitute `0` for absent. `—` is the honest cell.
+- *(evidence: `state_basketball.md` measured `min_mean 38.37` for Bueckers; fix + test in `fdea0a2e`)*

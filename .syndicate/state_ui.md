@@ -242,6 +242,27 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
 
 ## [ask-the-syndicate] ASK THE SYNDICATE
 
+- **`prop_evidence_v1` IS ON `origin/main` AND NOT DEPLOYED `[2026-09-17 18:3xZ, lane prop-evidence-parity]`.**
+  `fdea0a2e` + `bff99ffe`: a board-row PLAYER PROP is answered by a per-sport provider
+  (`syndicate/features/shared/prop_evidence/`) that fills seven layers -- player_sim,
+  recent_form, matchup, advanced, game_sim, environment, track_record -- or names why
+  each one is empty, and the named absences reach the user as a last table. MLB keeps its
+  reference fetchers (tables unchanged, tagged by layer) plus the shared track record.
+  Web deploy was REFUSED by the auto-mode permission classifier, not by a guard.
+- **PRODUCTION ANSWER SHAPES, read 2026-09-17 18:0x-18:2xZ on web `efd24273`, BEFORE any
+  deploy** -- this is the before-baseline, and it CORRECTS the '8 + 3' line below:
+  MLB **8 tables / 2-3 charts on 4 of 5 rows** (16.8s / 17.1s / 26.0s / 3.8s), but a row
+  whose game had already started returned **3 tables**; WNBA **1**, NFL **3**, NCAAF **0**.
+  `MAX_TABLES = 8` was also TRUNCATING MLB's own answer (McLean built 9, served 8, and said
+  nothing); the cap is now 12.
+- **THE MLB BvP TABLE WAS 4 MONTHS STALE AND SAID 'THROUGH TODAY'.** The git-tracked cache
+  web reads covers 2021-03-15..**2026-05-11** (47 files, 1,158 dates, 384,382 pairs); the
+  title now prints the data's own horizon. The daily sim carries NO BvP fields at all
+  (`daily_summary_2026_09_17*`: 0 matches), so the weekly Statcast job builds 64 shards
+  (`scripts/build_mlb_bvp_index.py`, allowlisted) from refresh-worker's raw pitches.
+  Measured: counts IDENTICAL to the web aggregation for 3 real pitchers, and the 7-pitcher
+  read a batter prop triggers goes **20.25s -> 1.07s**.
+
 **The LLM is off by decision. The deterministic snapshot path is the product.**
 
 - **ASK ANSWERS ABOUT THE EXACT BOARD ROW, IN EVERY SPORT ON THE BOARD `[verified 2026-09-11, lane ask-sport-parity, web `1421ee3c`]`.**
@@ -255,10 +276,12 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
   production board: NCAAF prop 0 -> 3 tables + 1 chart, NCAAF total (no bet named)
   -> named bet + 2 tables, NFL prop 0 -> 1 table, soccer total (no bet named) ->
   named bet + 3 tables + chart, MLB prop unchanged at 8 + 3.
-  - **NOT covered, with the reason:** NBA/WNBA (`smart_sim_*.json` has per-player
-    mean/sd only, no Ask reader, no slate); NHL (projections are not allowlisted and
-    are generated per service); NCAAB (no fetcher); NCAAF player projections (none
-    published, and web must not model).
+  - **SUPERSEDED 2026-09-17 by `prop_evidence_v1` (lane `prop-evidence-parity`), and
+    two of its three reasons were STALE:** NBA/WNBA `cards_sim_detail` carries a
+    100-draw `prop_distributions` histogram and a hit-probability ladder per stat,
+    not mean/sd (measured on production 2026-09-17), and NHL's props ARE allowlisted.
+    NCAAB stands (no player model, no prop capture) and NCAAF player projections stand
+    (none published; web must not model). See below.
   - **Cost:** an Ask from a board row now reads the shortlist artifact — 1.6s -> 2.6s
     warm, 14.2s on the first cold read, measured on production.
 - **THE ASK RAIL RENDERS EVERY EVIDENCE TABLE AND CHART `[verified 2026-09-11, lane ask-rail-evidence, web 422698e0]`.**
