@@ -172,19 +172,40 @@ def main():
             "printed and ignored while the count grew to five.\n")
         return 2
 
-    conflict = None
+    # WHICH CLAIMS COUNT (lane `lane-guard-main-claims`, 2026-09-17). This used
+    # to be `_claims(text)` over the primary tree's `lanes.md` alone -- a shared
+    # copy routinely hundreds of commits behind origin/main, so a claim main had
+    # already RELEASED kept blocking (measured that day on `ops.py` and
+    # `tests/test_artifact_publisher.py`). `lane_claims_source` enforces
+    # origin/main's claims plus any claim added in the primary tree since it
+    # forked, and falls back to exactly the old set when git cannot answer.
+    # If the helper itself fails, the old set is used too: never less strict.
     try:
-        for slug, f in _claims(text):
+        from lane_claims_source import effective_claims
+
+        entries, _source_info = effective_claims(root, text)
+    except Exception as exc:
+        entries = [
+            (slug, f, f"primary tree lanes.md (claim-source helper failed: {type(exc).__name__})")
+            for slug, f in _claims(text)
+        ]
+
+    conflict = None
+    conflict_source = None
+    try:
+        for slug, f, source in entries:
             if slug == current:
                 continue
             if matches(rel, f):
                 conflict = slug
+                conflict_source = source
     except Exception:
         return 0
 
     if conflict:
         sys.stderr.write(
             f"BLOCKED: {rel} is claimed by OPEN lane '{conflict}'.\n"
+            f"Claim source: {conflict_source}.\n"
             f"Current lane: '{current or 'none'}'"
             f"{' (per-session marker)' if session_marker_used else ' (global marker)'}.\n"
             "Close or reassign that lane, or work a different file. "
