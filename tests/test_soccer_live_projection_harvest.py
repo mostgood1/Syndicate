@@ -75,3 +75,28 @@ def test_a_half_written_last_line_does_not_lose_the_file(tmp_path):
 def test_default_dates_cover_the_utc_rollover():
     dates = h.default_dates()
     assert len(dates) == 2 and dates[0] < dates[1]
+
+
+def test_the_artifacts_own_history_is_harvested_and_dedupes_against_the_live_block(tmp_path):
+    """Since 2026-09-17 the poller carries every tick inside the artifact; a weekly pull must read it."""
+    payload = _payload()
+    payload["projection_history"] = {"401999001": [
+        {"generated_at": "2026-09-18T18:15:00+00:00", "corners_basis": "prekickoff_pace_v1",
+         "projected_total_corners": 11.1, "sim_projected_total_corners": 12.0, "live_corners_state": "applied"},
+        {"generated_at": "2026-09-18T18:30:00+00:00", "corners_basis": "prekickoff_pace_v1",
+         "projected_total_corners": 10.8, "sim_projected_total_corners": 11.9, "live_corners_state": "applied"},
+    ]}
+    from_history = h.history_rows(payload)
+    assert [r["projected_total_corners"] for r in from_history] == [11.1, 10.8]
+    assert {r["league"] for r in from_history} == {"epl"}
+
+    path = tmp_path / "live_projections_2026-09-18.jsonl"
+    # the 18:30 tick appears in BOTH the live block and the history: one row, not two
+    assert h.append_rows(path, h.snapshot_rows(payload) + from_history) == 2
+    keys = {h.snapshot_key(r) for r in h.snapshot_rows(payload) + from_history}
+    assert len(keys) == 2
+
+
+def test_history_rows_ignore_junk(tmp_path):
+    assert h.history_rows({"league": "epl", "projection_history": {"m": "not a list"}}) == []
+    assert h.history_rows({"league": "epl", "projection_history": {"m": [1, {"generated_at": "t"}]}})[0]["generated_at"] == "t"

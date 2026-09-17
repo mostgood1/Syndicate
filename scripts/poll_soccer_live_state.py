@@ -40,6 +40,9 @@ from syndicate.features.soccer.features.live_lens import goal_in_window_probabil
 from syndicate.features.soccer.features.live_lens import project_live_match
 from syndicate.features.soccer.features.live_lens import project_live_player_props
 from syndicate.features.soccer.features.live_corners import apply_live_corners
+from syndicate.features.soccer.features.live_projection_history import HISTORY_KEY
+from syndicate.features.soccer.features.live_projection_history import history_from_payload
+from syndicate.features.soccer.features.live_projection_history import merge_history
 from syndicate.features.soccer.features.live_corners import load_pregame_payload
 from syndicate.features.soccer.features.live_corners import pregame_corners_from_payload
 from syndicate.features.soccer.features.team_names import match_team_name
@@ -396,10 +399,26 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
 
     match_box = _build_match_boxes(league, iso_date, out_path=out_path, summaries=summaries)
 
+    # THE PROJECTION HISTORY, carried forward from the file this tick is about to replace.
+    # `games` holds only matches in play, so a finished match left no trace of the live numbers it
+    # was serving minutes earlier -- measured 2026-09-17 22:01:52Z, `games: []` with two completed
+    # matches. H32 grades a LIVE number, so the evidence has to survive the whistle. A read of the
+    # existing artifact is cheap (this tick already read it for `match_box` reuse) and a corrupt or
+    # missing file simply starts the history again.
+    previous_payload: dict[str, Any] | None = None
+    if out_path.exists():
+        try:
+            previous_payload = json.loads(out_path.read_text(encoding="utf-8"))
+        except Exception as error:  # noqa: BLE001 -- history is evidence, never a reason to fail a tick
+            print(f"[soccer_live_state] HISTORY_READ_FAILED league={league} date={iso_date} "
+                  f"error={type(error).__name__}", flush=True)
+    generated_at = pd.Timestamp.now("UTC").isoformat()
+    projection_history = merge_history(history_from_payload(previous_payload), games, generated_at)
+
     payload = {
         "league": league,
         "date": iso_date,
-        "generated_at": pd.Timestamp.now("UTC").isoformat(),
+        "generated_at": generated_at,
         "count": len(games),
         "games": games,
         # A SEPARATE KEY FROM `games`, deliberately. `games` means "matches in
@@ -416,10 +435,15 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
         # and an unallowlisted artifact cannot reach web at all.
         "match_box": match_box,
         "match_box_count": len(match_box),
+        # Per-tick rows for every match this date has seen, capped per match. See
+        # `features/live_projection_history.py` for why it lives in THIS artifact.
+        HISTORY_KEY: projection_history,
     }
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    print(f"wrote {out_path} ({len(games)} live games, {len(match_box)} box scores)", flush=True)
+    print(f"wrote {out_path} ({len(games)} live games, {len(match_box)} box scores, "
+          f"{sum(len(v) for v in projection_history.values())} history rows across "
+          f"{len(projection_history)} matches)", flush=True)
     return payload
 
 

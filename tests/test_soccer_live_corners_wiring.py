@@ -97,3 +97,33 @@ def test_a_match_with_no_pregame_estimate_serves_the_sim_and_says_so(monkeypatch
     game = poller.poll_league(LEAGUE, DATE, source_root=source_root, out_root=out_root, simulations=10)["games"][EVENT_ID]
     assert game["live_corners"]["state"] == "no_pregame_estimate"
     assert game["projection"]["projected_total_corners"] == 14.0
+
+
+def test_the_history_accumulates_across_ticks_and_survives_the_match_leaving_games(monkeypatch, wired):
+    """The durable capture: rows written by one tick are still in the artifact after the match ends."""
+    source_root, out_root = wired
+    monkeypatch.delenv("SYNDICATE_SOCCER_LIVE_CORNERS_ESTIMATOR", raising=False)
+    first = poller.poll_league(LEAGUE, DATE, source_root=source_root, out_root=out_root, simulations=10)
+    assert len(first["projection_history"][EVENT_ID]) == 1
+    row = first["projection_history"][EVENT_ID][0]
+    assert row["corners_basis"] == lc.LIVE_CORNERS_BASIS
+    assert row["sim_projected_total_corners"] == 14.0 and row["live_corners_state"] == "applied"
+
+    second = poller.poll_league(LEAGUE, DATE, source_root=source_root, out_root=out_root, simulations=10)
+    assert len(second["projection_history"][EVENT_ID]) == 2, "the second tick must append, not replace"
+
+    # the match ends: no in-play events at all, and the rows must still be there
+    monkeypatch.setattr(poller, "fetch_events", lambda *a, **k: [])
+    after = poller.poll_league(LEAGUE, DATE, source_root=source_root, out_root=out_root, simulations=10)
+    assert after["games"] == {}
+    assert len(after["projection_history"][EVENT_ID]) == 2
+
+
+def test_a_corrupt_previous_artifact_starts_the_history_again_without_failing_the_tick(monkeypatch, wired):
+    source_root, out_root = wired
+    monkeypatch.delenv("SYNDICATE_SOCCER_LIVE_CORNERS_ESTIMATOR", raising=False)
+    poller.poll_league(LEAGUE, DATE, source_root=source_root, out_root=out_root, simulations=10)
+    path = out_root / LEAGUE / "api" / "live_state" / f"live_state_{DATE}.json"
+    path.write_text("{ this is not json", encoding="utf-8")
+    result = poller.poll_league(LEAGUE, DATE, source_root=source_root, out_root=out_root, simulations=10)
+    assert len(result["projection_history"][EVENT_ID]) == 1

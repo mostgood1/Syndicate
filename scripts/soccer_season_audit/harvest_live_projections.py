@@ -39,6 +39,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 CHECKOUT = HERE.parents[1]
 
+# Mirrors `syndicate/features/soccer/features/live_projection_history.HISTORY_KEY`. Spelled out rather than
+# imported so this script runs from a bare checkout of `scripts/` with no package import path.
+HISTORY_KEY = "projection_history"
+
 FIELDS_FROM_GAME = ("home_team", "away_team", "status_display_clock", "half", "clock_remaining",
                     "score_home", "score_away", "home_corners_so_far", "away_corners_so_far")
 FIELDS_FROM_PROJECTION = ("corners_basis", "projected_total_corners", "projected_home_corners",
@@ -63,6 +67,28 @@ def snapshot_rows(payload: dict) -> list[dict]:
     return rows
 
 
+def history_rows(payload: dict) -> list[dict]:
+    """Rows from the artifact's OWN per-tick history (`projection_history`), which the poller has carried
+    since 2026-09-17. This is why the harvest no longer has to arrive within the hour: every tick is kept
+    inside the artifact, so a puller only has to beat the family's 8-day retention.
+
+    A history row is a snapshot row minus the team names, and its key is built the same way, so a date
+    pulled both ways de-duplicates instead of double-counting the tick that is in both.
+    """
+    league = payload.get("league")
+    rows = []
+    for event_id, entries in (payload.get(HISTORY_KEY) or {}).items():
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            row = {"league": league, "event_id": str(event_id), "source": HISTORY_KEY}
+            row.update(entry)
+            rows.append(row)
+    return rows
+
+
 def snapshot_key(row: dict) -> str:
     return f"{row.get('league')}|{row.get('event_id')}|{row.get('generated_at')}"
 
@@ -81,9 +107,20 @@ def existing_keys(path: Path) -> set[str]:
 
 
 def append_rows(path: Path, rows: list[dict]) -> int:
-    """Append only rows whose (league, event, generated_at) is new. Returns how many were written."""
+    """Append only rows whose (league, event, generated_at) is new. Returns how many were written.
+
+    De-duplicates WITHIN the batch as well as against the file: one tick appears in both the live `games`
+    block and the artifact's own `projection_history`, so a batch carrying both would otherwise store it
+    twice and inflate every count H32 reads off this cache.
+    """
     known = existing_keys(path)
-    fresh = [r for r in rows if snapshot_key(r) not in known]
+    fresh = []
+    for row in rows:
+        key = snapshot_key(row)
+        if key in known:
+            continue
+        known.add(key)
+        fresh.append(row)
     if not fresh:
         return 0
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -111,13 +148,18 @@ def harvest(out_dir: Path, dates: list[str], env_root: Path | None = None) -> di
         arts = prod.export(prod.DEFAULT_BASE, token,
                            {"pattern": f"soccer_source/*/api/live_state/live_state_{date}.json"}, 900).get("artifacts") or {}
         rows: list[dict] = []
+        history_seen = 0
         for body in arts.values():
             payload = body if isinstance(body, dict) else json.loads(body)
             rows.extend(snapshot_rows(payload))
+            from_history = history_rows(payload)
+            history_seen += len(from_history)
+            rows.extend(from_history)
         written = append_rows(out_dir / f"live_projections_{date}.jsonl", rows)
         bases = collections.Counter(str(r.get("corners_basis")) for r in rows)
-        tally["dates"][date] = {"files": len(arts), "in_play_games": len(rows), "appended": written,
-                               "corners_basis": dict(bases)}
+        tally["dates"][date] = {"files": len(arts), "in_play_games": len(rows) - history_seen,
+                                "history_rows_seen": history_seen, "appended": written,
+                                "corners_basis": dict(bases)}
     return tally
 
 
