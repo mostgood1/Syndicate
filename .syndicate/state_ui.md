@@ -254,14 +254,15 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
   intact, gaining the track record and McLean's park/weather table that the 8-cap had been
   truncating. **It reached production as a RIDE-ALONG on another lane's deploy**, not by this
   lane's hand -- the deploy call was refused by a session permission classifier.
-- **THE BvP INDEX BUILDER IS DEPLOYED, THE INDEX IS NOT BUILT YET `[2026-09-17 21:47:49Z]`.**
-  refresh-worker `5cf06987` -> `b90d1e47` (`dep-dam5tcvqj5pc73bv6i1g`, deployed by lane
-  `prop-evidence-parity`). **0 shards on web at 21:47Z**, so an MLB prop Ask is still on the
-  legacy ~70 MB-per-pitcher scan (18.25 s median, 40.02 s cold on a starter with no cached
-  entry). The build runs when the weekly Statcast job next launches -- a missing index now
-  makes `is_stale()` true -- and that launch can still refuse with a NAMED reason
-  (`sim_active`, `low_memory_headroom`): refresh-worker sat at 1,895-2,014 MB resident before
-  sim children tonight. Do not read "deployed" as "built"; count the shards.
+- **THE BvP INDEX IS LIVE, AND ITS DATA IS 4 MONTHS FRESHER `[2026-09-17 21:49:37Z, verified]`.**
+  refresh-worker `b90d1e47` (live 21:47:49Z) built and published 64 shards ~110 s later:
+  `pairs 421,656`, `first_date 2021-03-15`, **`through 2026-09-16`** (29 raw Statcast chunks
+  already on the worker's disk covered 2026-03-15..09-16; the git cache supplied only
+  2021..2025-11-01). Web IS serving it, isolated from the fallback by the only field that
+  separates them â the table title prints the SOURCE's horizon: `career, through 2026-09-16`
+  where the legacy scan printed `2026-05-09`. **MLB prop Ask median 18.25 s -> 11.62 s**, and
+  one identical board row 16.79 s -> 3.57 s. The launch gate did not refuse; Render's logs API
+  was erroring throughout, so this rests on the artifact's own `built_at` and mtimes.
 - **PRODUCTION ANSWER SHAPES, read 2026-09-17 18:0x-18:2xZ on web `efd24273`, BEFORE any
   deploy** -- this is the before-baseline, and it CORRECTS the '8 + 3' line below:
   MLB **8 tables / 2-3 charts on 4 of 5 rows** (16.8s / 17.1s / 26.0s / 3.8s), but a row

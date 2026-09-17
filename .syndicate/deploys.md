@@ -37479,3 +37479,44 @@ Scheduled reading `board-eval-reader-fullday-reading-0917` (due 09-17 16:30 CT /
 - **NOT CLAIMED:** that the ranker's OUTPUT improved. This reading measures skip lines, chunk coverage, load time and memory only — nothing here says the 14 days now reaching the ranker produce better rankings, prices or ROI. Also not claimed: that the memory delta is CAUSED by this change (see confounds), and nothing at all about 6-24 h uptime, which was never reachable in this window.
 - **DECISION FOR THE USER, not taken here** (this reading reverts nothing): either (i) accept +111/+211 MB at 1-3 h/3-6 h as the price of reading all 14 days, given guard aborts and OOM are no worse and NO-SIM load time is inside the bar, and close `#666` on that basis; or (ii) hold `#666` open for a boot that survives 6+ hours so the untested buckets can be read; or (iii) treat the 2b build-cost rise (NO-SIM median 61 s -> 170 s, `wall_s` 613 -> 724 s) as the thing worth acting on, which belongs to lead #44's own follow-up rather than to this goal.
 
+
+## 2026-09-17 21:42:11Z → live 21:47:49Z (4:47 PM CT) — refresh-worker `5cf06987` -> `b90d1e47` (`dep-dam5tcvqj5pc73bv6i1g`) — lane `prop-evidence-parity` — **verify: MET, on all three predicted fields**
+
+Pre-registered expectation (preflight receipt, baseline re-read at the firing cycle):
+`refresh_worker_live_commit 5cf06987 -> b90d1e47` and `bvp_pairs_shards_on_web 0 -> 64`.
+
+**verify (1) — the artifact exists and is FRESHER than the defect it replaces.** 64
+`bvp_pairs_*.json` on web, 122-265 KB each, all mtime 21:49. Shard 07's own meta:
+`built_at 2026-09-17T21:49:37Z`, `pairs 421,656`, `first_date 2021-03-15`,
+**`through 2026-09-16`**, `sources.raw_chunks 29` covering `2026-03-15..2026-09-16` and
+`sources.legacy_files 47` covering `2021-03-15..2025-11-01`. The build needed no new fetch:
+refresh-worker already had this season's raw Statcast chunks on its mounted disk, so the
+season came from raw and only prior seasons from the git-tracked cache. **The BvP horizon
+moved 2026-05-11 -> 2026-09-16** — the four-month staleness this lane found is closed, not
+merely relabelled.
+
+**verify (2) — web is SERVING the shard, isolated from the fallback.** The discriminating
+field is the table title, which prints the source's own horizon: `BvP — Brett Baty vs Aaron
+Nola (career, through 2026-09-16)` and `BvP — today's lineup vs Nolan McLean (career, through
+2026-09-16)`. The legacy scan cannot produce that date — it printed `2026-05-09` / `2026-05-08`
+for the same two rows 40 minutes earlier. This is the check that separates "deployed" from
+"reached": the counts alone would have looked identical either way.
+
+**verify (3) — the latency the shard was built for.** MLB prop Ask median over 5 pregame board
+rows: **18.25 s -> 11.62 s** (`reports/prop_evidence/2026-09-17_post_bvp_index.json`; the
+residual is the shortlist read and the ~8 MB board payload, not BvP). Single-row, same board
+row before and after: **Brett Baty 16.79 s -> 3.57 s**. Locally the isolated 7-pitcher read a
+batter prop triggers measured 20.25 s -> 1.07 s with identical counts.
+
+**The launch gate did NOT refuse.** Lane `soccer-shot-woodwork-undercount` flagged
+`low_memory_headroom` as the plausible silent failure (refresh-worker at 1,895-2,014 MB
+resident before sim children). The job ran ~110 s after the service went live and published
+the same minute. Render's logs API returned HTTP errors throughout, so this is established
+from the ARTIFACT (`built_at`, mtimes, meta) rather than from a log line — which is the
+stronger evidence anyway.
+
+**Not changed by this deploy, still true:** MLB `environment` fills only on hr_targets batters
+(0/5 on this sample, 1/5 earlier — park/weather rows are not on every row); NFL recent form
+still has no published per-game file (`#671`); NCAAF still publishes no player projection.
+
+**Claim:** held by this lane from 21:38Z, released after this reading.

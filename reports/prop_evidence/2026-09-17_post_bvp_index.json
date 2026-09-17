@@ -1,0 +1,202 @@
+{
+ "offline": {
+  "title_map_failures": [],
+  "providers": {
+   "ncaaf": {
+    "player_sim": "no_producer:no NCAAF player projection artifact is published; web does not model (ncaaf/prop_model.py is not called)",
+    "recent_form": "filled",
+    "matchup": "filled",
+    "advanced": "filled",
+    "game_sim": "filled",
+    "environment": "filled",
+    "track_record": "insufficient_sample:no_graded_cell_for_market"
+   },
+   "nfl": {
+    "player_sim": "filled",
+    "recent_form": "artifact_missing:nfl_fantasy_usage_2026.json / nfl_fantasy_usage_2025.json not on this disk -- no per-game NFL player stat artifact is published to web",
+    "matchup": "filled",
+    "advanced": "filled",
+    "game_sim": "filled",
+    "environment": "filled",
+    "track_record": "filled"
+   },
+   "nhl": {
+    "player_sim": "filled",
+    "recent_form": "filled",
+    "matchup": "filled",
+    "advanced": "filled",
+    "game_sim": "filled",
+    "environment": "filled",
+    "track_record": "insufficient_sample:no_graded_cell_for_market"
+   },
+   "soccer": {
+    "player_sim": "filled",
+    "recent_form": "filled",
+    "matchup": "filled",
+    "advanced": "filled",
+    "game_sim": "filled",
+    "environment": "filled",
+    "track_record": "filled"
+   },
+   "wnba": {
+    "player_sim": "filled",
+    "recent_form": "filled",
+    "matchup": "filled",
+    "advanced": "filled",
+    "game_sim": "filled",
+    "environment": "filled",
+    "track_record": "insufficient_sample:no_graded_cell_for_market"
+   }
+  }
+ },
+ "production": {
+  "mlb": {
+   "board_prop_rows_pregame": 703,
+   "sampled": 5,
+   "answered_with_coverage": 5,
+   "filled_rate": {
+    "player_sim": 1.0,
+    "recent_form": 1.0,
+    "matchup": 1.0,
+    "advanced": 1.0,
+    "game_sim": 1.0,
+    "environment": 0.0,
+    "track_record": 1.0
+   },
+   "absent_reasons": {
+    "environment": {
+     "not_shown": 5
+    }
+   },
+   "median_seconds": 11.62,
+   "details": [
+    {
+     "row": {
+      "sport": "mlb",
+      "market": "batter_hits",
+      "player_name": "Brandon Nimmo",
+      "event_id": "04a2f236dde09215a7d5033c63178a44",
+      "side": "under",
+      "line": "0.5",
+      "segment": "full",
+      "name": "Brandon Nimmo"
+     },
+     "seconds": 12.69,
+     "bytes": 3902804,
+     "provider": "mlb:reference_fetchers",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "not_shown:reference fetchers built no table for it",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "filled",
+      "recent_form": "filled",
+      "track_record": "filled"
+     },
+     "tables_served": 10
+    },
+    {
+     "row": {
+      "sport": "mlb",
+      "market": "batter_hits_runs_rbis",
+      "player_name": "Jeremy Pena",
+      "event_id": "b9c3b50472005c67c30de323cd8a5396",
+      "side": "over",
+      "line": "2.5",
+      "segment": "full",
+      "name": "Jeremy Pena"
+     },
+     "seconds": 2.69,
+     "bytes": 3902510,
+     "provider": "mlb:reference_fetchers",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "not_shown:reference fetchers built no table for it",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "filled",
+      "recent_form": "filled",
+      "track_record": "filled"
+     },
+     "tables_served": 10
+    },
+    {
+     "row": {
+      "sport": "mlb",
+      "market": "batter_rbis",
+      "player_name": "Isaac Paredes",
+      "event_id": "b9c3b50472005c67c30de323cd8a5396",
+      "side": "over",
+      "line": "0.5",
+      "segment": "full",
+      "name": "Isaac Paredes"
+     },
+     "seconds": 1.54,
+     "bytes": 3902338,
+     "provider": "mlb:reference_fetchers",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "not_shown:reference fetchers built no table for it",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "filled",
+      "recent_form": "filled",
+      "track_record": "filled"
+     },
+     "tables_served": 10
+    },
+    {
+     "row": {
+      "sport": "mlb",
+      "market": "batter_runs_scored",
+      "player_name": "Jeremy Pena",
+      "event_id": "b9c3b50472005c67c30de323cd8a5396",
+      "side": "over",
+      "line": "0.5",
+      "segment": "full",
+      "name": "Jeremy Pena"
+     },
+     "seconds": 18.77,
+     "bytes": 3901857,
+     "provider": "mlb:reference_fetchers",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "not_shown:reference fetchers built no table for it",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "filled",
+      "recent_form": "filled",
+      "track_record": "filled"
+     },
+     "tables_served": 10
+    },
+    {
+     "row": {
+      "sport": "mlb",
+      "market": "batter_total_bases",
+      "player_name": "A.J. Ewing",
+      "event_id": "86a852d517d266c4d6c74e570caffa06",
+      "side": "over",
+      "line": "1.5",
+      "segment": "full",
+      "name": "A.J. Ewing"
+     },
+     "seconds": 11.62,
+     "bytes": 3902297,
+     "provider": "mlb:reference_fetchers",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "not_shown:reference fetchers built no table for it",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "filled",
+      "recent_form": "filled",
+      "track_record": "filled"
+     },
+     "tables_served": 10
+    }
+   ],
+   "verdict": "PASS"
+  }
+ }
+}
