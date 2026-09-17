@@ -37520,3 +37520,35 @@ stronger evidence anyway.
 still has no published per-game file (`#671`); NCAAF still publishes no player projection.
 
 **Claim:** held by this lane from 21:38Z, released after this reading.
+
+## 2026-09-17 22:28:46Z → live 22:34:51Z (5:34 PM CT) — refresh-worker `b90d1e47` -> `7ef0431b` (`dep-dam6j7jm8hqs73cm7plg`) — lane `nfl-usage-publish` — **verify: OWED, and datable — the code is live, its first RUN is ~21:30Z on 2026-09-18**
+
+Carries `#671` (`e2104fcd`): the NFL usage artifact is written to the mounted disk instead of
+the ephemeral checkout, reads resolve per file across the real candidate roots, the builder
+publishes what it BUILDS and what it KEEPS, and `_prepare_inputs` builds the CURRENT season,
+rebuilding it when the pbp file is newer than the document.
+
+**verify (1), now:** live commit is `7ef0431b` and it contains `e2104fcd`.
+
+**verify (2), OWED and NOT guessable from the deploy.** The producer is the daily fantasy
+autorun (`NFL_FANTASY_ARTIFACT_INTERVAL_SECONDS`, default 86400, floor 3600), and it ran at
+**2026-09-17T21:31:49Z** — 57 minutes before this deploy, so the state file gates it until
+~21:30Z on 09-18. Until then `nfl_fantasy_usage_*.json` stays at **0 files on web** and NFL
+`recent_form` stays `artifact_missing`. Nothing about this deploy changes that today, and a
+reading taken tonight would measure the schedule, not the fix. Then:
+`nfl_fantasy_usage_2026.json` in the export listing, and
+`scripts/prop_evidence_checklist.py --base-url <web> --sports nfl` with `recent_form` > 0
+(0 of 5 today). Falsifier already written into the lane: if the build reports `no_substrate`
+for 2026, `pbp_2026.csv` is missing on the worker and `#671` is an INGESTION problem, not a
+publish one.
+
+**MY OWN INSTRUMENT FAILED FIRST, and it cost a usable window.** I adapted the deploy-when-
+clear loop with `sed`, renaming the `--expect` field but NOT the matching `--baseline` flag.
+Preflight then answered `NO_EXPECTATION` on every cycle — correctly; it refuses a prediction
+with no baseline — and I had backgrounded it, so it burned **24 cycles / ~14 minutes** unable
+to act, through at least one CLEAR window (the jobs did drain: try 7 and 8 showed 3 jobs, and
+the rerun found CLEAR on cycle 1). The first run of that script had shown only `HOLD`, which
+masked the defect, because preflight reports the job check before it validates expectations.
+Fixed, verified on ONE cycle, and it fired immediately.
+
+**Claim:** held by `nfl-usage-publish` from 22:12Z, released after this entry.

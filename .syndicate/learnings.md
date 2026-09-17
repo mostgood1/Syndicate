@@ -6886,3 +6886,47 @@ nothing and is the only thing that makes the poll meaningful.
   - Absence on a display surface is evidence about the display surface. Say which surface every production reading came from, in the entry.
   - A live instrument has a WINDOW, and it can close in a way that looks like nothing happened. Ask "when does this surface stop reporting?" before deferring a reading to a more convenient moment.
 - **Related, measured the same hour:** an IN-PLAY gap between our snapshot and a vendor's live box mixes the defect with poll lag (our artifact refreshes every ~2 min while ESPN's boxscore moves continuously; observed 1 -> 2 -> 1 in seven minutes). Lag can only make our count LOWER, so only a gap of 0 — or a gap equal to the known event count on a caught-up read — carries information.
+
+### 2026-09-17 (session 4a583d41, lane nfl-usage-publish) — FORBIDDEN: writing UTF-8 punctuation as a `\xNN` escape inside a Python `str` and then `.encode()`-ing it
+
+**What happened.** I built ledger blocks in a heredoc'd Python script from a `str` containing
+the three escapes for an em-dash and encoded it UTF-8. Those escapes are three CHARACTERS, so
+the encode emitted SIX bytes and the em-dash landed as mojibake. In `lanes.md` it hit the lane
+HEADER, and `lane_claims` parses on the em-dash — so the new lane's `Files:` claims parsed as
+EMPTY and nothing was enforcing them. Six occurrences in `lanes.md`, then one more in
+`todo.md` an hour later, after I had already been bitten once.
+
+**Why it is dangerous rather than cosmetic.** The file still opens, still renders, and still
+passes `check_lane_invariants`, which reads headers rather than claims. The only symptom was a
+`scope-guard` warning that is easy to read as noise. A third instance appeared while writing
+THIS entry: the escape examples inside the text were themselves parsed by Python.
+
+**How to apply.**
+- Write ledger bytes with BYTE literals, or the real character in UTF-8 source. Never `\xNN`
+  escapes in a `str` you later encode. When the TEXT must show such escapes, write the file
+  with an editor tool rather than a heredoc'd string.
+- After any scripted ledger write: the file must `.decode('utf-8')` without raising, and a
+  scan for the double-encoded em-dash byte sequence must return 0.
+- Then re-run the PARSER, not the linter: `lane_claims._claims(text)` must list your files.
+- *(evidence: `log/2026-09-17.md`; 6 + 4 + 1 occurrences repaired in-session)*
+
+### 2026-09-17 (session 4a583d41, lane nfl-usage-publish) — FORBIDDEN: backgrounding an instrument you adapted but never watched complete ONE cycle
+
+**What happened.** I `sed`-adapted a deploy-when-clear loop for a second service and renamed
+the `--expect` field without renaming its paired `--baseline` flag. `deploy_preflight` answered
+`NO_EXPECTATION` every cycle — correctly, it refuses a prediction with no baseline — and
+because the loop was backgrounded it burned 24 cycles over ~14 minutes unable to act, through a
+CLEAR window that did open (job counts fell to 3; the fixed rerun found CLEAR on its first
+cycle and deployed instantly).
+
+**Why the first run did not reveal it.** Preflight reports the JOB check before it validates
+expectations, so while jobs were in flight every cycle printed `HOLD` — the same line a healthy
+run prints. The defect was only observable in the state I had not yet reached.
+
+**How to apply.**
+- Run an adapted instrument for exactly ONE cycle in the foreground and read it before
+  backgrounding. One cycle costs seconds; a blind loop costs the window.
+- Renaming one half of a paired flag set (`--expect` / `--baseline`) is a silent break: grep
+  for both halves.
+- A verdict identical in the healthy and broken cases is not evidence the instrument works.
+- *(evidence: `deploys.md` 2026-09-17 22:28:46Z entry)*
