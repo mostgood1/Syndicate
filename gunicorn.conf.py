@@ -29,7 +29,7 @@ TWO LEVERS, each with a proof line and an env switch.
    it waits -- unless it is over the HARD limit (limit + `SYNDICATE_WEB_WORKER_HARD_MARGIN_MB`),
    where the kernel is closer than a cold worker. Proof lines: `WEB_MEMORY_GUARD_ARMED` per
    worker, `WEB_WORKER_MEMORY_RECYCLE` per recycle, `WEB_WORKER_MEMORY_RECYCLE_DEFERRED` when
-   the stagger holds one back. Switch: `SYNDICATE_WEB_WORKER_ANON_LIMIT_MB` (default 700;
+   the stagger holds one back. Switch: `SYNDICATE_WEB_WORKER_ANON_LIMIT_MB` (default 650, sized for overshoot;
    <= 0 disables).
 
 Hooks never raise: a broken guard must not take a worker down.
@@ -62,7 +62,17 @@ def arena_max() -> int:
 
 
 def anon_limit_mb() -> int:
-    return _env_int("SYNDICATE_WEB_WORKER_ANON_LIMIT_MB", 700)
+    """Default 650 MB, sized for OVERSHOOT, not for the limit.
+
+    MEASURED 2026-09-17 on the first two recycles (18:01:54Z, 18:04:08Z): pid 41 crossed at
+    666.7 MB against a 666.0 limit, but pid 40 crossed at 723.2 against 678.4 -- **44.8 MB
+    above it**. At the ~1.3 MB/request growth of that window, a 5-request check interval
+    explains ~7 MB, so the rest is ONE request allocating tens of MB (a board build or a
+    multi-MB publish). Checking more often would not have caught it; leaving room would.
+    Worst case then is 2 x (650 + ~100) = ~1,500 MB against the 2,048 MB limit, plus the
+    master (~30 MB) and up to two merge children (~100-200 MB each).
+    """
+    return _env_int("SYNDICATE_WEB_WORKER_ANON_LIMIT_MB", 650)
 
 
 def hard_margin_mb() -> int:

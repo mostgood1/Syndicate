@@ -21,7 +21,7 @@ conf = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(conf)
 
 
-def _worker(limit=700.0, born=0.0, requests=4):
+def _worker(limit=650.0, born=0.0, requests=4):
     return types.SimpleNamespace(alive=True, _syndicate_limit_mb=limit, _syndicate_born=born,
                                  _syndicate_requests=requests)
 
@@ -34,10 +34,10 @@ def _lines(capsys, event):
 def test_a_worker_over_its_limit_recycles_and_says_so(tmp_path, capsys):
     worker = _worker()
     stamp = tmp_path / "stamp"
-    assert conf.decide_recycle(worker, now=1000.0, anon_mb_reader=lambda: 720.0, stamp_path=str(stamp)) == "recycled"
+    assert conf.decide_recycle(worker, now=1000.0, anon_mb_reader=lambda: 670.0, stamp_path=str(stamp)) == "recycled"
     assert worker.alive is False and stamp.exists()
     [line] = _lines(capsys, "WEB_WORKER_MEMORY_RECYCLE")
-    assert line["anon_mb"] == 720.0 and line["requests"] == 5 and line["hard"] is False
+    assert line["anon_mb"] == 670.0 and line["requests"] == 5 and line["hard"] is False
 
 
 def test_off_is_not_on_the_switch_disables_the_guard(tmp_path):
@@ -48,7 +48,7 @@ def test_off_is_not_on_the_switch_disables_the_guard(tmp_path):
 
 def test_under_the_limit_or_between_checks_nothing_happens(tmp_path):
     under = _worker()
-    assert conf.decide_recycle(under, now=1000.0, anon_mb_reader=lambda: 699.0, stamp_path=str(tmp_path / "s")) == "below_limit"
+    assert conf.decide_recycle(under, now=1000.0, anon_mb_reader=lambda: 649.0, stamp_path=str(tmp_path / "s")) == "below_limit"
     between = _worker(requests=0)
     assert conf.decide_recycle(between, now=1000.0, anon_mb_reader=lambda: 9999.0, stamp_path=str(tmp_path / "s")) == "skipped"
     assert under.alive and between.alive
@@ -63,10 +63,10 @@ def test_a_young_worker_is_never_recycled(tmp_path):
 def test_two_workers_crossing_together_are_staggered_unless_one_is_over_the_hard_limit(tmp_path, capsys):
     stamp = str(tmp_path / "stamp")
     first, second, hard = _worker(), _worker(), _worker()
-    assert conf.decide_recycle(first, now=1000.0, anon_mb_reader=lambda: 710.0, stamp_path=stamp) == "recycled"
-    assert conf.decide_recycle(second, now=1001.0, anon_mb_reader=lambda: 710.0, stamp_path=stamp) == "deferred"
+    assert conf.decide_recycle(first, now=1000.0, anon_mb_reader=lambda: 660.0, stamp_path=stamp) == "recycled"
+    assert conf.decide_recycle(second, now=1001.0, anon_mb_reader=lambda: 660.0, stamp_path=stamp) == "deferred"
     assert second.alive, "a soft crossing waits for the other worker's replacement"
-    assert conf.decide_recycle(hard, now=1002.0, anon_mb_reader=lambda: 700.0 + conf.hard_margin_mb() + 1,
+    assert conf.decide_recycle(hard, now=1002.0, anon_mb_reader=lambda: 650.0 + conf.hard_margin_mb() + 1,
                                stamp_path=stamp) == "recycled"
     assert len(_lines(capsys, "WEB_WORKER_MEMORY_RECYCLE_DEFERRED")) == 1
 
@@ -91,7 +91,7 @@ def test_post_fork_applies_the_arena_cap_and_arms_the_guard(monkeypatch, capsys)
     conf.post_fork(None, worker)
     assert calls == [2]
     [armed] = _lines(capsys, "WEB_MEMORY_GUARD_ARMED")
-    assert armed["arena_cap_applied"] is True and 665 <= armed["anon_limit_mb"] <= 700
+    assert armed["arena_cap_applied"] is True and 617 <= armed["anon_limit_mb"] <= 650
     assert worker._syndicate_requests == 0
 
 
@@ -109,7 +109,7 @@ def test_post_fork_respects_both_switches(monkeypatch, capsys):
     assert armed["arena_cap_applied"] is None
 
 
-@pytest.mark.parametrize("raw, expected", [("", 700), ("650", 650), ("garbage", 700), ("0", 0)])
+@pytest.mark.parametrize("raw, expected", [("", 650), ("700", 700), ("garbage", 650), ("0", 0)])
 def test_a_typo_in_the_limit_never_disables_the_guard(monkeypatch, raw, expected):
     monkeypatch.setenv("SYNDICATE_WEB_WORKER_ANON_LIMIT_MB", raw)
     assert conf.anon_limit_mb() == expected
