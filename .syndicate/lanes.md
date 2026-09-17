@@ -1443,6 +1443,9 @@ death, never life — do not invert it.
 - **H29 FALSIFIED 2026-09-17** (`log/2026-09-17.md` ~13:55 CT): on 320 held-out TEST matches the running-rate arm beat production's live re-sim (mean |err| -0.0714 [-0.1251, -0.0166]) but not the pregame-estimator pace (+0.0028), so corners-so-far adds nothing. **Reported, not graded:** the pregame estimator x time share beats the live re-sim by -0.0742 [-0.1235, -0.0235] corners MAE and cuts bias +0.46 -> +0.07. A stage-2 swap is a user decision, not taken. H30/H31 still owed.
 - Files:
   - `scripts/soccer_season_audit/live_corners_study.py` (NEW, H29)
+  - `scripts/soccer_season_audit/live_goals_study.py` (NEW, H30)
+  - `scripts/soccer_season_audit/live_direction_study.py` (NEW, H31)
+  - `tests/test_soccer_live_corners_study.py`, `tests/test_soccer_live_goals_study.py`, `tests/test_soccer_live_direction_study.py` (NEW)
 - Hypothesis: H29 (`log/2026-09-17.md` ~11:50 CT, commit 16:51:51Z): the live re-sim's remaining corners come from the possession sim, whose pregame corners carry almost no information (H26 stage 1: r 0.046), and it never updates on the corner rate observed so far.
 - Falsification test: on held-out matches, the running-rate arm's remaining-corners MAE is not lower than the production live re-sim's, with a paired CI excluding zero.
 - Verification: the study script's printed verdict per registration, recorded in the log and in `state_soccer.md`.
