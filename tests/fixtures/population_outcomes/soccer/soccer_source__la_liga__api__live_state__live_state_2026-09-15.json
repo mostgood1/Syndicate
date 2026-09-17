@@ -1,0 +1,641 @@
+{
+ "league": "la_liga",
+ "date": "2026-09-15",
+ "generated_at": "2026-09-16T04:59:44.301526+00:00",
+ "count": 0,
+ "games": {},
+ "match_box": {
+  "401882876": {
+   "event_id": "401882876",
+   "teams": {
+    "home": {
+     "team": "Alavés",
+     "stats": {
+      "Possession": "43.3%",
+      "Shots": "15",
+      "On target": "3",
+      "Corners": "2",
+      "Saves": "2",
+      "Fouls": "7",
+      "Yellow": "1",
+      "Red": "0",
+      "Offsides": "3",
+      "Passes": "344",
+      "Pass %": "80%",
+      "Tackles": "19"
+     }
+    },
+    "away": {
+     "team": "Valencia",
+     "stats": {
+      "Possession": "56.7%",
+      "Shots": "10",
+      "On target": "3",
+      "Corners": "5",
+      "Saves": "3",
+      "Fouls": "14",
+      "Yellow": "4",
+      "Red": "0",
+      "Offsides": "4",
+      "Passes": "475",
+      "Pass %": "80%",
+      "Tackles": "15"
+     }
+    }
+   },
+   "goals": [
+    {
+     "team": "Valencia",
+     "scorer": "Luis Rioja",
+     "clock": "78'",
+     "clock_seconds": 4669.0,
+     "own_goal": false,
+     "penalty": false
+    }
+   ],
+   "players": {
+    "home": {
+     "team": "Alavés",
+     "players": [
+      {
+       "player_id": "200910",
+       "player_name": "Antonio Sivera",
+       "position": "Goalkeeper",
+       "starter": true,
+       "appeared": true,
+       "minutes": 90.0,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "149306",
+       "player_name": "Ville Koski",
+       "position": "Center Defender",
+       "starter": true,
+       "appeared": true,
+       "minutes": 90.0,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 1.0,
+       "shots_on_target": 1.0
+      },
+      {
+       "player_id": "318084",
+       "player_name": "Nicolás Valentini",
+       "position": "Center Left Defender",
+       "starter": true,
+       "appeared": true,
+       "minutes": 90.0,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "262491",
+       "player_name": "Nahuel Tenaglia",
+       "position": "Center Right Defender",
+       "starter": true,
+       "appeared": true,
+       "minutes": 90.0,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "163068",
+       "player_name": "Denis Suárez",
+       "position": "Center Left Midfielder",
+       "starter": true,
+       "appeared": true,
+       "minutes": 66.05,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "106326",
+       "player_name": "Pablo Ibáñez",
+       "position": "Center Right Midfielder",
+       "starter": true,
+       "appeared": true,
+       "minutes": 90.0,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 3.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "265997",
+       "player_name": "Antonio Blanco",
+       "position": "Attacking Midfielder",
+       "starter": true,
+       "appeared": true,
+       "minutes": 84.13,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "345991",
+       "player_name": "Abde Rebbach",
+       "position": "Left Midfielder",
+       "starter": true,
+       "appeared": true,
+       "minutes": 84.25,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 1.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "374621",
+       "player_name": "Ángel Pérez",
+       "position": "Right Midfielder",
+       "starter": true,
+       "appeared": true,
+       "minutes": 84.1,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 2.0,
+       "shots_on_target": 1.0
+      },
+      {
+       "player_id": "207236",
+       "player_name": "Lucas Boyé",
+       "position": "Center Left Forward",
+       "starter": true,
+       "appeared": true,
+       "minutes": 90.0,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 4.0,
+       "shots_on_target": 1.0
+      },
+      {
+       "player_id": "181757",
+       "player_name": "Toni Martínez",
+       "position": "Center Right Forward",
+       "starter": true,
+       "appeared": true,
+       "minutes": 66.02,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 3.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "176312",
+       "player_name": "Jonny",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": false,
+       "minutes": null,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "253754",
+       "player_name": "Carlos Protesoni",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": false,
+       "minutes": null,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "382532",
+       "player_name": "Youssef Lekhedim",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": true,
+       "minutes": 23.95,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 1.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "260256",
+       "player_name": "Ander Guevara",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": true,
+       "minutes": 5.87,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "233802",
+       "player_name": "Carles Aleñá",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": true,
+       "minutes": 5.9,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "198832",
+       "player_name": "Mariano Díaz",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": true,
+       "minutes": 23.98,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "83494",
+       "player_name": "Miguel Rodríguez",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": true,
+       "minutes": 5.75,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "305608",
+       "player_name": "Hugo Novoa",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": false,
+       "minutes": null,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "150374",
+       "player_name": "Adrián Rodríguez",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": false,
+       "minutes": null,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "415206",
+       "player_name": "Izei Hernandez",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": false,
+       "minutes": null,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "415276",
+       "player_name": "Xanet Oláiz",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": false,
+       "minutes": null,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "367996",
+       "player_name": "Selu Diallo",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": false,
+       "minutes": null,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      }
+     ]
+    },
+    "away": {
+     "team": "Valencia",
+     "players": [
+      {
+       "player_id": "165334",
+       "player_name": "Stole Dimitrievski",
+       "position": "Goalkeeper",
+       "starter": true,
+       "appeared": true,
+       "minutes": 90.0,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "282086",
+       "player_name": "Justin de Haas",
+       "position": "Center Left Defender",
+       "starter": true,
+       "appeared": true,
+       "minutes": 81.32,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "231603",
+       "player_name": "Pepelu",
+       "position": "Center Right Defender",
+       "starter": true,
+       "appeared": true,
+       "minutes": 90.0,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "178747",
+       "player_name": "José Gayà",
+       "position": "Left Back",
+       "starter": true,
+       "appeared": true,
+       "minutes": 90.0,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "222661",
+       "player_name": "Pablo Maffeo",
+       "position": "Right Back",
+       "starter": true,
+       "appeared": true,
+       "minutes": 81.55,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 1.0,
+       "shots_on_target": 1.0
+      },
+      {
+       "player_id": "16340",
+       "player_name": "Javi Guerra",
+       "position": "Attacking Midfielder",
+       "starter": true,
+       "appeared": true,
+       "minutes": 90.0,
+       "goals": 0.0,
+       "assists": 1.0,
+       "shots": 2.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "212185",
+       "player_name": "Guido Rodríguez",
+       "position": "Left Midfielder",
+       "starter": true,
+       "appeared": true,
+       "minutes": 69.48,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 1.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "419048",
+       "player_name": "Aaron Mayol",
+       "position": "Right Midfielder",
+       "starter": true,
+       "appeared": true,
+       "minutes": 90.0,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "267477",
+       "player_name": "Hugo Duro",
+       "position": "Forward",
+       "starter": true,
+       "appeared": true,
+       "minutes": 62.57,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 2.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "231618",
+       "player_name": "Arnaut Danjuma",
+       "position": "Attacking Midfielder Left",
+       "starter": true,
+       "appeared": true,
+       "minutes": 90.0,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 2.0,
+       "shots_on_target": 1.0
+      },
+      {
+       "player_id": "248681",
+       "player_name": "Filip Ugrinic",
+       "position": "Attacking Midfielder Right",
+       "starter": true,
+       "appeared": true,
+       "minutes": 90.0,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "308728",
+       "player_name": "Arnau Martínez",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": true,
+       "minutes": 8.45,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "264177",
+       "player_name": "Luis Rioja",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": true,
+       "minutes": 18.58,
+       "goals": 1.0,
+       "assists": 0.0,
+       "shots": 1.0,
+       "shots_on_target": 1.0
+      },
+      {
+       "player_id": "253763",
+       "player_name": "Dani Raba",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": false,
+       "minutes": null,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "324582",
+       "player_name": "Kayne Van Oevelen",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": false,
+       "minutes": null,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "232803",
+       "player_name": "Aliou Dieng",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": false,
+       "minutes": null,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "388076",
+       "player_name": "Iker Córdoba",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": true,
+       "minutes": 8.68,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "377768",
+       "player_name": "David Otorbi",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": true,
+       "minutes": 20.52,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 1.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "413671",
+       "player_name": "Alex Panach",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": false,
+       "minutes": null,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "360096",
+       "player_name": "Ryunosuke Sato",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": false,
+       "minutes": null,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "189804",
+       "player_name": "Jesús Vázquez",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": true,
+       "minutes": 8.85,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "409380",
+       "player_name": "Aimar Blázquez",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": false,
+       "minutes": null,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      },
+      {
+       "player_id": "280806",
+       "player_name": "Harvey Elliott",
+       "position": "Substitute",
+       "starter": false,
+       "appeared": false,
+       "minutes": null,
+       "goals": 0.0,
+       "assists": 0.0,
+       "shots": 0.0,
+       "shots_on_target": 0.0
+      }
+     ]
+    }
+   },
+   "clock_seconds": null,
+   "home_linescores": [
+    0,
+    0
+   ],
+   "away_linescores": [
+    0,
+    1
+   ],
+   "final": true,
+   "status_state": "post",
+   "status_detail": "FT",
+   "status_display_clock": "90'+5'",
+   "status_period": 2,
+   "score_home": "0",
+   "score_away": "1",
+   "home_team": "Alavés",
+   "away_team": "Valencia"
+  }
+ },
+ "match_box_count": 1
+}
