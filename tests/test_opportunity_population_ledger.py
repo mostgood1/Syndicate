@@ -229,3 +229,40 @@ def test_a_sink_that_raises_cannot_take_the_board_down():
 
     rows = build_layer2_rows([_grid_row(projection={"edge_vs_market_pct": 6.0})], population_sink=boom)
     assert rows["candidates"] == 2
+
+
+# --------------------------------------------------------------------------
+# one sighting per PHASE  [2026-09-17, lane model-scorecard-cron, "Recorder live coverage"]
+# --------------------------------------------------------------------------
+
+LIVE_NOW = datetime(2026, 9, 15, 0, 30, tzinfo=timezone.utc)  # after the 23:05Z first pitch
+
+
+def test_a_side_first_priced_pregame_is_recorded_again_when_live_at_the_same_line(tmp_path):
+    """Off != on: before the change the second call wrote 0 (same identity, same line)."""
+    pregame = pop.record_population([_row(side="home", market="h2h", line=None)], sport="mlb",
+                                    date="2026-09-14", now=NOW, root=tmp_path)
+    live = pop.record_population([_row(side="home", market="h2h", line=None, game_state="live")], sport="mlb",
+                                 date="2026-09-14", now=LIVE_NOW, root=tmp_path)
+    again = pop.record_population([_row(side="home", market="h2h", line=None, game_state="live")], sport="mlb",
+                                  date="2026-09-14", now=LIVE_NOW, root=tmp_path)
+    assert pregame["written"] == 1 and pregame["live_pending"] == 0
+    assert live["written"] == 1 and live["live_pending"] == 1
+    assert again["written"] == 0 and again["duplicate"] == 1
+    records = [json.loads(line) for line in
+               pop.part_path("2026-09-14", "mlb", 0, root=tmp_path).read_text(encoding="utf-8").splitlines()]
+    assert [r["gs"] for r in records] == ["pregame", "live"]
+    assert records[0]["k"] == records[1]["k"], "the identity key on the record is unchanged"
+
+
+def test_an_absent_game_state_falls_back_to_the_sighting_clock(tmp_path):
+    before = pop.record_population([_row(game_state=None)], sport="mlb", date="2026-09-14", now=NOW, root=tmp_path)
+    after = pop.record_population([_row(game_state=None)], sport="mlb", date="2026-09-14", now=LIVE_NOW,
+                                  root=tmp_path)
+    assert before["written"] == 1 and after["written"] == 1 and after["live_pending"] == 1
+
+
+def test_the_sidecar_distinguishes_the_live_sighting(tmp_path):
+    pop.record_population([_row(game_state="live")], sport="mlb", date="2026-09-14", now=LIVE_NOW, root=tmp_path)
+    keys = pop.keys_path("2026-09-14", "mlb", root=tmp_path).read_text(encoding="utf-8").split()
+    assert keys == [pop.population_key(_row()) + pop.LIVE_KEY_SUFFIX]

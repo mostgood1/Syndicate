@@ -533,3 +533,50 @@ def test_the_board_build_passes_the_row_to_the_scorer(monkeypatch):
     monkeypatch.setattr(mbs, "MEASURED_BUCKET_SKILL", bucket_table)
     moved = {r["side"]: r["score"]["score"] for r in l2.build_layer2_rows([dict(grid_row)])["opportunities"]}
     assert all(moved[side] < baseline[side] for side in baseline)
+
+
+# --------------------------------------------------------------------------
+# the extra settler and one sighting per phase  [2026-09-17, lane model-scorecard-cron]
+# --------------------------------------------------------------------------
+
+
+def test_an_extra_settler_grades_what_the_skips_would_drop_and_none_passes_through():
+    segment = _record_from(_candidate(segment="first5"))
+    prop = _record_from(_candidate(sport="soccer", market="player_goal_scorer_anytime",
+                                   player_name="A Striker", side="yes", line=None))
+    full = _record_from(_candidate())
+    chips = {"2026-09-01": [_chip("Home Team", "Away Team", away_score=4, home_score=6)]}
+    seen = []
+
+    def settler(shaped, view):
+        seen.append((shaped["segment"], shaped["market"]))
+        if shaped["segment"] == "first5":
+            return "win", None
+        if shaped["player_name"]:
+            return None, "dnp_void"
+        return None
+
+    without, ungraded_without = bs.grade_population([segment, prop, full], chips)
+    graded, ungraded = bs.grade_population([segment, prop, full], chips, extra_settler=settler)
+    assert ungraded_without == {"segment_not_full_game": 1, "player_prop": 1}
+    assert len(without) == 1
+    assert len(graded) == 2 and ungraded == {"extra_dnp_void": 1}
+    assert any(r["y"] == 1.0 and "|first5|" in r["buckets"][0] for r in graded)
+    assert ("full", "totals") in seen, "the settler is asked about every record"
+
+
+def test_an_extra_settler_does_not_grade_a_game_that_has_not_started():
+    segment = _record_from(_candidate(segment="first5", commence_time="2099-01-01T23:00:00Z"))
+    graded, ungraded = bs.grade_population([segment], {}, today="2026-09-17",
+                                           extra_settler=lambda shaped, view: ("win", None))
+    assert graded == [] and ungraded == {"not_started": 1}
+
+
+def test_a_side_sighted_pregame_and_live_grades_once_per_phase():
+    """Off != on: keyed on (sport, k) the live sighting of an unmoved h2h side was dropped."""
+    pregame = _record_from(_candidate(market="h2h", side="home", line=None))
+    live = dict(pregame, t="2026-09-02T00:30:00Z", gs="live")
+    chips = {"2026-09-01": [_chip("Home Team", "Away Team", away_score=4, home_score=6)]}
+    graded, _ = bs.grade_population([pregame, live], chips)
+    phases = sorted(r["buckets"][0].split("|")[3] for r in graded)
+    assert phases == ["live", "pregame"]

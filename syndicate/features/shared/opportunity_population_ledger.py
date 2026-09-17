@@ -213,6 +213,26 @@ def _existing_parts(date: Any, sport: Any, root: Path | str | None) -> list[tupl
     return sorted(found)
 
 
+LIVE_KEY_SUFFIX = "#live"
+
+
+def seen_key(row: Mapping[str, Any], key: str, *, now: datetime) -> str:
+    """The DEDUP key: the identity, plus `#live` when the side is priced in play.
+
+    `[2026-09-17, lane model-scorecard-cron, user decision "Recorder live coverage"]`. The
+    dedup used the identity alone, so a side first priced pregame was never recorded again
+    once its game went live unless its LINE moved. Measured on the 2026-09-15/16 production
+    records: 5,406 of 8,685 (62%) MLB pregame sides in games that went live had no live row,
+    and h2h (no line) could never produce one. A side is now recorded once per phase. The
+    record's `k` is unchanged; only the sidecar distinguishes the two sightings, and `gs`
+    / `t` on the record say which one it is.
+    """
+    from syndicate.features.shared.measured_bucket_skill import _phase
+
+    phase = _phase(row.get("game_state"), sighted_at=now, commence_time=row.get("commence_time"))
+    return key + LIVE_KEY_SUFFIX if phase == "live" else key
+
+
 def _load_keys(path: Path) -> set[str]:
     seen: set[str] = set()
     if not path.exists():
@@ -247,7 +267,7 @@ def record_population(
     seen = _load_keys(sidecar)
     already = len(seen)
 
-    rows_in = unkeyable = duplicate = 0
+    rows_in = unkeyable = duplicate = live_written = 0
     pending: list[tuple[str, dict[str, Any]]] = []
     for row in rows or ():
         rows_in += 1
@@ -258,11 +278,14 @@ def record_population(
         if key is None:
             unkeyable += 1
             continue
-        if key in seen:
+        dedup = seen_key(row, key, now=stamp)
+        if dedup in seen:
             duplicate += 1
             continue
-        seen.add(key)
-        pending.append((key, population_record(row, key, captured_at, sport=sport)))
+        seen.add(dedup)
+        if dedup != key:
+            live_written += 1
+        pending.append((dedup, population_record(row, key, captured_at, sport=sport)))
 
     written = 0
     truncated = False
@@ -326,14 +349,16 @@ def record_population(
         "already_recorded": already,
         "duplicate": duplicate,
         "unkeyable": unkeyable,
+        "live_pending": live_written,
         "truncated_at_day_ceiling": truncated,
         "parts_touched": len(touched),
         "parts_published": published,
     }
     print(
         "[opportunity_population] POPULATION sport=%s date=%s rows_in=%d written=%d already=%d "
-        "duplicate=%d unkeyable=%d parts_touched=%d published=%d truncated=%s"
-        % (sport, date, rows_in, written, already, duplicate, unkeyable, len(touched), published, truncated),
+        "duplicate=%d unkeyable=%d live_pending=%d parts_touched=%d published=%d truncated=%s"
+        % (sport, date, rows_in, written, already, duplicate, unkeyable, live_written, len(touched), published,
+           truncated),
         flush=True,
     )
     return report

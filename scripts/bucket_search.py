@@ -445,6 +445,7 @@ def grade_population(
     prop_settler: Any = None,
     ungraded_by_sport: dict[str, dict[str, int]] | None = None,
     score_source: Any = None,
+    extra_settler: Any = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """One graded row per priced side, plus the count of what could not be graded and why.
 
@@ -455,13 +456,24 @@ def grade_population(
     settled by it (MLB: `prop_outcomes.MlbPropGrader.settle`, from box scores) and graded like
     game lines, with their reasons prefixed `prop_`. Without it, and for every other sport, a
     prop is counted `player_prop`.
+
+    With `extra_settler(shaped, view) -> None | (result, reason)` [lane `model-scorecard-cron`,
+    2026-09-17], every record the settler HANDLES is settled by it before any of the skips
+    below (props of other sports, segments, alternate / 3-way markets): `None` means "not
+    mine" and the record takes the existing path unchanged, so passing no settler grades
+    exactly what this function graded before. Its reasons are prefixed `extra_`.
+
+    ONE SIGHTING PER PHASE. The earliest sighting is kept per (sport, key, phase), not per
+    (sport, key): the recorder writes a side once pregame AND once live, and keeping only
+    the earliest would silently drop every live row whose line never moved.
     """
-    chosen: dict[tuple[str, str], Mapping[str, Any]] = {}
+    chosen: dict[tuple[str, str, str], Mapping[str, Any]] = {}
     # The EARLIEST sighting is the one graded, and it can predate the recorder carrying team
     # names while a later sighting of the same event carries them: lend them across.
     named: dict[tuple[str, str], tuple[str, str]] = {}
     for record in records:
-        key = (str(record.get("sport") or "").strip().lower(), str(record.get("k") or ""))
+        key = (str(record.get("sport") or "").strip().lower(), str(record.get("k") or ""),
+               mbs._phase(record.get("gs"), sighted_at=record.get("t"), commence_time=record.get("ct")))
         if not key[1]:
             continue
         if record.get("ht") and record.get("at"):
@@ -482,63 +494,74 @@ def grade_population(
         ungraded[reason] += 1
         by_sport[sport_name][reason] += 1
 
-    for (sport, _key), record in chosen.items():
+    for (sport, _key, _phase), record in chosen.items():
         view = mbs.view_from_record(record)
         shaped, reason = scorecard_record(record, event_teams)
         if shaped is None:
             skip(sport, reason or "unparseable_key")
             continue
         is_prop = bool(shaped["player_name"])
-        if is_prop and (prop_settler is None or sport not in PROP_GRADED_SPORTS):
-            skip(sport, "player_prop")
-            continue
-        if not is_prop and view["market"] not in mbs.GRADABLE_MARKETS:
-            skip(sport, "market_not_gradeable_from_score")
-            continue
-        if view["segment"] not in ("full", "full_game"):
-            skip(sport, "segment_not_full_game")
-            continue
-        day = SCORECARD.central_date(shaped["commence_time"])
-        if day and today is not None and day > today:
-            skip(sport, "not_started")
-            continue
-        if is_prop:
-            if not day:
-                skip(sport, "prop_no_commence_time")
+        handled = extra_settler(shaped, view) if extra_settler is not None else None
+        if handled is not None:
+            day = SCORECARD.central_date(shaped["commence_time"])
+            if day and today is not None and day > today:
+                skip(sport, "not_started")
                 continue
-            result, why = prop_settler(shaped)
+            result, why = handled
             if result is None:
-                skip(sport, f"prop_{why}" if why else "prop_unsettled")
+                skip(sport, f"extra_{why}" if why else "extra_unsettled")
                 continue
         else:
-            if not (shaped["home_team"] and shaped["away_team"]):
-                skip(sport, "no_team_names")
+            if is_prop and (prop_settler is None or sport not in PROP_GRADED_SPORTS):
+                skip(sport, "player_prop")
                 continue
-            if day and day in indexed:
-                chip, why = SCORECARD.match_chip(shaped, indexed[day].get(sport, []))
-            else:
-                chip, why = None, "no_chips_for_kickoff_date"
-            if chip is not None and chip["state"] != "final":
-                skip(sport, "game_not_final")
+            if not is_prop and view["market"] not in mbs.GRADABLE_MARKETS:
+                skip(sport, "market_not_gradeable_from_score")
                 continue
-            scores = chip["scores"] if chip is not None else None
-            if scores is None and score_source is not None and sport in PROP_GRADED_SPORTS:
-                # The scoreboard served past MLB finals with null scores (2026-09-02: 15 of 15);
-                # the schedule's official final settles them, matched the way the prop grader matches.
-                scores, source_why = score_source(shaped)
-                if scores is None:
-                    skip(sport, f"final_{source_why}" if source_why else "final_unavailable")
+            if view["segment"] not in ("full", "full_game"):
+                skip(sport, "segment_not_full_game")
+                continue
+            day = SCORECARD.central_date(shaped["commence_time"])
+            if day and today is not None and day > today:
+                skip(sport, "not_started")
+                continue
+            if is_prop:
+                if not day:
+                    skip(sport, "prop_no_commence_time")
                     continue
-            elif chip is None:
-                skip(sport, why or "no_chip_match")
-                continue
-            elif scores is None:
-                skip(sport, "final_score_unparseable")
-                continue
-            result = settle_from_score(shaped, *scores)
-            if result is None:
-                skip(sport, "unsettleable_side_or_line")
-                continue
+                result, why = prop_settler(shaped)
+                if result is None:
+                    skip(sport, f"prop_{why}" if why else "prop_unsettled")
+                    continue
+            else:
+                if not (shaped["home_team"] and shaped["away_team"]):
+                    skip(sport, "no_team_names")
+                    continue
+                if day and day in indexed:
+                    chip, why = SCORECARD.match_chip(shaped, indexed[day].get(sport, []))
+                else:
+                    chip, why = None, "no_chips_for_kickoff_date"
+                if chip is not None and chip["state"] != "final":
+                    skip(sport, "game_not_final")
+                    continue
+                scores = chip["scores"] if chip is not None else None
+                if scores is None and score_source is not None and sport in PROP_GRADED_SPORTS:
+                    # The scoreboard served past MLB finals with null scores (2026-09-02: 15 of 15);
+                    # the schedule's official final settles them, matched the way the prop grader matches.
+                    scores, source_why = score_source(shaped)
+                    if scores is None:
+                        skip(sport, f"final_{source_why}" if source_why else "final_unavailable")
+                        continue
+                elif chip is None:
+                    skip(sport, why or "no_chip_match")
+                    continue
+                elif scores is None:
+                    skip(sport, "final_score_unparseable")
+                    continue
+                result = settle_from_score(shaped, *scores)
+                if result is None:
+                    skip(sport, "unsettleable_side_or_line")
+                    continue
         if result == "push":
             skip(sport, "push")
             continue
