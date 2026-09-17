@@ -1370,6 +1370,24 @@ death, never life — do not invert it.
 - Safety: the prefilter is disabled for any directory whose resolved path differs from its unresolved path (a symlink inside the data root), so a symlinked tree keeps today's behaviour. ops.py's own subset filter stays in place after the walk.
 - Blocked by: none.
 
+### closed-lane-archive-0917 — OPEN — opened 2026-09-16 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Why: USER DECISION 2026-09-16 ~22:35 CT ("archive the closed lanes"). Recipe: the 09-16 archive task (`owner_liveness.py` -> `archive_closed_lanes_before.py --only <SAFE> --owner-idle-verified`), `--idle-min 240`.
+- Pre-registered reading (2026-09-16 22:37 CT, `owner_liveness.py --idle-min 240` over origin/main `e5e519ae`, 8 CLOSED blocks):
+
+  ```
+  soccer-live-scoreboard-range-stale       sessions[a1e40980=2m] -> WAIT: a1e40980 idle 2m < 240m
+  web-export-timeout                       sessions[a1e40980=2m] -> WAIT: a1e40980 idle 2m < 240m
+  portfolio-no-family-exclusion            sessions[abacd435=1m] -> WAIT: abacd435 idle 1m < 240m
+  board-category-gates                     sessions[abacd435=1m] -> WAIT: abacd435 idle 1m < 240m
+  archive-test-reports-redirect            sessions[0f5b256e=0m] -> WAIT: 0f5b256e idle 0m < 240m
+  chip-key-test-no-data-blind              sessions[abacd435=1m] -> WAIT: abacd435 idle 1m < 240m
+  sim-view-reachability-caveat             sessions[abacd435=1m] -> WAIT: abacd435 idle 1m < 240m
+  sim-view-roi-decision-count              sessions[abacd435=1m] -> WAIT: abacd435 idle 1m < 240m
+  SAFE_SLUGS=
+  ```
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
