@@ -6668,3 +6668,8 @@ Measured 2026-09-16, session abacd435, lane `sim-view-reachability-caveat`. `/ap
 Same root as the rule above (an env value is a code path), in a different place: there it broke a gate, here it let an instrument lie.
 
 **How to apply.** A test whose assertion depends on a setting must set that setting explicitly with `monkeypatch`, in every state production can hold, and assert the outcome in each. If a claim is true only under one configuration, it is not structural. Publish what holds in any configuration (here: "no model edge, so sized on market fair") instead of what holds in CI.
+## 2026-09-17 - FORBIDDEN: predicting which DEPLOY will fix a served value before tracing which DATA COPY the serving service builds it from `[lane soccer-postponed-served-final]`
+
+**What happened.** The postponed ATH @ LEV chip read `0-0 FINAL`. I recommended deploying refresh-worker "to fix the chip", then said the fix was waiting on a live-odds-worker rebuild. Both predictions were about code. Data decided it: a 21:37Z artifact built by old code and copied to refresh-worker. The chip cleared when the corrected artifact reached refresh-worker (23:00Z, still on OLD code), and it came BACK after refresh-worker restarted onto the FIXED code (00:05Z), while web on the same fixed code served it correctly. The rebuild-cadence prediction (4 h, so ~01:37Z) was also wrong: it ran at 22:43Z.
+
+**Rule.** Before naming a deploy as the fix for a served value, read the value's input on the service that builds it and compare it with the same input on another service. Identical code with divergent output (here web vs refresh-worker) puts the defect in the data copy. Do not predict a periodic job's next run from its configured interval; read its last run.
