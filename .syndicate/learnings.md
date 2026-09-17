@@ -6930,3 +6930,12 @@ run prints. The defect was only observable in the state I had not yet reached.
   for both halves.
 - A verdict identical in the healthy and broken cases is not evidence the instrument works.
 - *(evidence: `deploys.md` 2026-09-17 22:28:46Z entry)*
+
+## 2026-09-17 — RECONCILE AT THE FINEST UNIT THE DATA OFFERS. A per-match residual hid a one-sided structure that per-team showed immediately. `[lane soccer-shot-on-target-definition]`
+- **The belief overturned:** that "our on-target count disagrees with ESPN's in BOTH directions" — measured per MATCH the day before (exact in 15/24 with woodwork off target, 10/24 with it on) and used to conclude only that the stat was not derivable. Per TEAM, over the same fixtures, the residual is **strictly one-sided**: 39/48 exact, 9 short by 1-3, **never over**. Match totals let the two teams' errors cancel and destroyed the sign.
+- **What was actually true:** ESPN's `shotsOnTarget` is not a function of the commentary type keys at all. Every subset of them peaks at 39/48, and all 9 short teams have EXACT total shots (48/48 per team) — so the events are present and the vendor's BOXSCORE classifies some of them differently from the vendor's own COMMENTARY. Adding `shot-hit-woodwork` makes the fit worse (10 exact teams each had 1-3 of them), which settles a second question the same measurement was not designed to answer.
+- **How we found out:** the same census re-run per team instead of per match. Nothing else changed.
+- **The rule going forward:**
+  - **Reconcile at the smallest unit that carries the field** — per team before per match, per player before per team. An aggregate residual can be zero while both components are wrong; its SIGN is the first casualty.
+  - **Two surfaces from one vendor are two sources.** "Derive X from feed Y" is a hypothesis to falsify, not a contract, even when both come from the same API response.
+  - When a rule cannot be made exact, record what the field IS (here: a lower bound, 0.25/team/match low) next to the code, and name any priced consumer — otherwise the next reader "fixes" it by widening and overshoots the 39 cases that were already right to rescue the 9 that were not.
