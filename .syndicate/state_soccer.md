@@ -657,6 +657,38 @@ live-odds-worker and false on refresh-worker**, so the soccer live tick runs on 
 service and a partial deploy cannot flicker the soccer aggregate today. Treat the
 "BOTH workers" sentence as history, not as production.
 
+**NARROWED THE SAME HOUR — THE LOOP IS NOT THE ONLY ROUTE INTO THE POLLER**
+(lane `soccer-shot-woodwork-undercount`, session a1e40980, measured 2026-09-17
+21:0x-21:1xZ; the lane above agrees and asked for this line). The env reading is
+confirmed independently: `SYNDICATE_ENABLE_LIVE_LENS_LOOP` true on
+live-odds-worker / false on refresh-worker, and
+`SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN` true on refresh-worker / absent
+on live-odds-worker (single-key endpoint, booleans only). **But
+`live_lens_loop.py:58` imports `poll_active_leagues_for_tick` FROM
+`scripts/poll_soccer_live_state`, so refresh-worker reaches the same
+`poll_league` through the autorun.** Measured on the logs API over the 6 h to
+21:0xZ: `[soccer_live_state]` lines = **62 on live-odds-worker, 1 on
+refresh-worker** (a `SOCCER_LIVE_STATE` text search is misleading — it also hits
+`match_not_in_soccer_live_state` inside paper-settlement lines; match the
+bracketed prefix).
+
+So the accurate statement is: **live-odds-worker is the LIVE writer;
+refresh-worker is a RARE second writer.** A partial deploy will not flicker
+minute to minute, because one writer dominates during a slate — but the two
+services can still disagree whenever refresh-worker does write, so a change to
+this code path is **live-odds-worker-CRITICAL and refresh-worker-EVENTUAL**, not
+live-odds-worker-only. All three facts are env-flag-dependent and move with no
+diff (`feedback_which_service_runs_the_code`), so re-read the keys before acting
+on any of them.
+
+**OPERATIONAL, measured the same evening:** while a soccer slate is in play the
+poller re-spawns as a child job every ~90 s on live-odds-worker, and a job-free
+window seen at T is gone by T+70 s. Three preflights in a row HELD on jobs that
+started after the previous check (CLEAR 21:05:45Z -> HOLD 21:07; CLEAR 21:07:24Z
+-> HOLD 21:08:37). **Do not run preflight and deploy as two hand-typed steps
+there** -- automate "preflight, and fire in the same breath on CLEAR", or wait
+for the slate to end.
+
 **RETRACTED: "soccer box sections render 0 rows".** That 08-21 UI-audit finding
 was a MEASUREMENT ERROR — table sections carry `table_rows` and set
 `"rows": []` by design. Verified on production 2026-08-21 23:29Z: Goals 3/2/3/1
