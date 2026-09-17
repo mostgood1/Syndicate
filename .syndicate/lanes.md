@@ -1337,8 +1337,8 @@ death, never life — do not invert it.
 
 ### soccer-prekickoff-freeze — OPEN — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
 - Goal: every soccer match production simulates before kickoff has its last pre-kickoff model output (match projections and player props) frozen in a published artifact that no later rebuild overwrites, so the #664 item-10 watch-list and #665 (H24) forward grades have a qualifying population. Verified on production after deploy: a match that kicked off after go-live has a frozen entry whose `frozen_at` is earlier than its kickoff, exportable from web.
+- **Claim on `scripts/build_soccer_artifacts.py` moved 2026-09-16 ~22:50 CT to lane `soccer-corners-model-rebuild` (same session).** The freeze code is landed (`fc61882d`); this lane owes only its production verify. The next edit to that file is the corners estimator call.
 - Files:
-  - `scripts/build_soccer_artifacts.py` (a pre-kickoff freeze helper and its one call in `build_artifacts` only)
   - `tests/test_soccer_prekickoff_freeze.py` (NEW)
 - Hypothesis: production retains no pre-kickoff soccer model values. Read 2026-09-17 01:21:48Z over `recommendations_2026-09-13..16.json`: 43 of 43 matches sit in an artifact generated AFTER their kickoff, because `build_artifacts` rewrites one file per league-date as matches go pre -> in -> post. H24's rule "an artifact built BEFORE kickoff" therefore qualifies 0 matches, and so would a props watch-list grade.
 - Falsification test: after deploy, if a match that kicked off after go-live has no frozen entry, or its entry's `frozen_at` is later than its kickoff, the freeze does not do its job.
