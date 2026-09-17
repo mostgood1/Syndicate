@@ -37337,3 +37337,9 @@ Scheduled task `full-slate-memory-reading-0915`. Read-only on production: no dep
 - **NOT OBSERVED: a read with today under 900 s while the window is stale.** Today's oldest source was over 900 s on all three reads (the 17:25:57Z shortlist, then the 17:31:25Z state payload). That case needs BOTH of today's sources fresh, so it depends on build timing, not on this code.
 - **Tests.** `tests/test_board_today_freshness.py` 19 pass, all fail on the pre-change module; `tests/js/board_today_freshness_chip.test.mjs` 7 pass, 4 fail on the pre-change template.
 - **Web health in this window:** see web-memory-guard's entry above (3 unhealthy instance restarts 17:51-17:53Z, not attributed). My reads added load: the 69.5 s cold combined query at 17:48:46Z, and one page load at ~17:50:40Z that got a 502.
+
+## 2026-09-17 18:35Z (13:35 CT) — READING, no deploy — refresh-worker — lane heavy-build-memory-refusal — **recycle threshold 3 VERIFIED DIRECTLY in the running process**
+
+- **verify (the reading):** `[worker_recycle] RECYCLE_CHECK held=children_running {'consecutive_refusals': 3, 'last_refusal_stage': 'pre_source_state_fingerprint', 'threshold': 3, 'uptime_s': 4698, 'min_uptime_s': 1800, 'children': 2}` at 18:29:12Z -- the process reads `threshold: 3`, the line fired only at the THIRD consecutive refusal, and the recycle was correctly held by child jobs. Earlier indirect evidence held too: 4 refusals 13:01:53Z-15:49Z produced 0 recycle lines (silent below threshold).
+- Env `SYNDICATE_REFRESH_WORKER_RECYCLE_AFTER_REFUSALS=3` injected by `dep-dalu6pf40ujc73f9eggg` (live 13:01:53Z, `deploys.md` 2026-09-17 12:56:05Z) and carried by the two later refresh-worker deploys (`5cf06987` live 17:10:04Z among them).
+- **Not claimed:** that a recycle now fires only when the worker is genuinely stuck over a full day; that the threshold is the right number (3 was chosen from 09-16/09-17 counts: 3 of 6 exits in 24 h had < 3 refusals).
