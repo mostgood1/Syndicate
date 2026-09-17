@@ -137,10 +137,11 @@ def _is_not_final(reason: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def empty_state(grader_signature: str) -> dict[str, Any]:
+def empty_state(grader_signature: str, sport_versions: Mapping[str, str] | None = None) -> dict[str, Any]:
     return {
         "version": SCORECARD_VERSION,
         "grader_signature": grader_signature,
+        "sport_versions": dict(sport_versions or {}),
         "board_dates": {},
         "pending": {},
         "games": {},
@@ -150,26 +151,57 @@ def empty_state(grader_signature: str) -> dict[str, Any]:
     }
 
 
-def load_state(payload: Any, grader_signature: str, *, now: datetime) -> tuple[dict[str, Any], str | None]:
-    """The saved state, or a fresh one. Returns (state, reset_reason or None)."""
+def load_state(payload: Any, grader_signature: str, *, now: datetime,
+               sport_versions: Mapping[str, str] | None = None) -> tuple[dict[str, Any], str | None]:
+    """The saved state, or a fresh one. Returns (state, reset_reason or None).
+
+    TWO LEVELS OF RESET, so a new settler does not erase every sport's history.
+    - `grader_signature` is the code EVERY sport grades through (`grade_population` and the
+      rules it imports). When it changes, all history resets.
+    - `sport_versions` maps each sport to the settler that owns it. When only those change, the
+      games and ungraded counts of the CHANGED sports are dropped and every retained board date
+      is marked incomplete, so the next runs refetch the recorder and regrade exactly those
+      sports; games of the other sports are kept (their re-fetched records count as `late`).
+    """
+    sport_versions = dict(sport_versions or {})
+    stamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     if not isinstance(payload, Mapping) or payload.get("version") != SCORECARD_VERSION:
         reason = None if payload is None else "state_version_changed"
-        return empty_state(grader_signature), reason
+        return empty_state(grader_signature, sport_versions), reason
     if payload.get("grader_signature") != grader_signature:
-        state = empty_state(grader_signature)
+        state = empty_state(grader_signature, sport_versions)
         state["resets"] = list(payload.get("resets") or [])[-9:] + [{
-            "at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "at": stamp,
             "from": payload.get("grader_signature"),
             "to": grader_signature,
         }]
         return state, "grader_signature_changed"
-    state = empty_state(grader_signature)
+    state = empty_state(grader_signature, sport_versions)
     for field in ("board_dates", "pending", "games", "ungraded"):
         if isinstance(payload.get(field), Mapping):
             state[field] = {key: value for key, value in payload[field].items()}
     state["late_records"] = int(payload.get("late_records") or 0)
     state["resets"] = list(payload.get("resets") or [])
-    return state, None
+    saved_versions = dict(payload.get("sport_versions") or {})
+    changed = sorted(sport for sport in set(saved_versions) | set(sport_versions)
+                     if saved_versions.get(sport) != sport_versions.get(sport))
+    if not changed:
+        return state, None
+    dropped = [key for key, game in state["games"].items() if str(game.get("sport")) in changed]
+    for key in dropped:
+        del state["games"][key]
+    for day, sports in list(state["ungraded"].items()):
+        state["ungraded"][day] = {sport: reasons for sport, reasons in sports.items() if sport not in changed}
+    for entry in state["board_dates"].values():
+        entry["complete"] = False
+    state["resets"] = state["resets"][-9:] + [{
+        "at": stamp,
+        "sports": changed,
+        "from": {sport: saved_versions.get(sport) for sport in changed},
+        "to": {sport: sport_versions.get(sport) for sport in changed},
+        "games_dropped": len(dropped),
+    }]
+    return state, "sport_versions_changed:" + ",".join(changed)
 
 
 def board_dates_to_fetch(state: Mapping[str, Any], today: str, *, limit: int) -> list[str]:

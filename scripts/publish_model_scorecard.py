@@ -168,17 +168,27 @@ def fetch_chips_with_retry(bs: Any, day: str, *, attempts: int = 4) -> list[Any]
     raise last if last is not None else RuntimeError("unreachable")
 
 
-def grader_signature(bs: Any, settler: Any) -> tuple[str, dict[str, Any]]:
-    """A hash of the grading CODE plus each settler's declared version. Changes reset history."""
+def grader_signature(bs: Any, settler: Any) -> tuple[str, dict[str, str], dict[str, Any]]:
+    """(core signature, per-sport versions, report block).
+
+    The CORE is the code every sport grades through; a change there resets all history. Each
+    sport's version is its settler's declared version -- plus, for MLB, a hash of the prop grader
+    that only MLB uses -- so changing or adding one sport's settler resets only that sport.
+    """
     from syndicate.features.mlb import prop_outcomes
 
-    sources = [inspect.getsource(obj) for obj in (
-        bs.grade_population, bs.settle_from_score, bs.scorecard_record, bs.SCORECARD.grade, bs.SCORECARD.match_chip,
-        prop_outcomes.MlbPropGrader.settle, prop_outcomes.MlbPropGrader.final_score)]
-    digest = hashlib.sha256("\n".join(sources).encode("utf-8")).hexdigest()[:12]
-    grader = {"scorecard": msc.SCORECARD_VERSION, "core_code": digest, "settlers": settler.versions,
-              "settlers_unavailable": sorted(settler.unavailable)}
-    return json.dumps(grader, sort_keys=True), grader
+    def digest(objects: tuple[Any, ...]) -> str:
+        return hashlib.sha256("\n".join(inspect.getsource(obj) for obj in objects).encode("utf-8")).hexdigest()[:12]
+
+    core = digest((bs.grade_population, bs.settle_from_score, bs.scorecard_record, bs.SCORECARD.grade,
+                   bs.SCORECARD.match_chip))
+    sport_versions = dict(settler.sport_versions)
+    sport_versions["mlb"] = (f"{sport_versions.get('mlb', 'unavailable:mlb')}+props:"
+                             f"{digest((prop_outcomes.MlbPropGrader.settle, prop_outcomes.MlbPropGrader.final_score))}")
+    signature = json.dumps({"scorecard": msc.SCORECARD_VERSION, "core_code": core}, sort_keys=True)
+    grader = {"scorecard": msc.SCORECARD_VERSION, "core_code": core, "sport_versions": sport_versions,
+              "settlers": settler.versions, "settlers_unavailable": sorted(settler.unavailable)}
+    return signature, sport_versions, grader
 
 
 def write(relative: str, content: str) -> Path:
@@ -255,8 +265,8 @@ def main(argv: list[str] | None = None) -> int:
 
     mlb = MlbPropGrader(cache_dir=cache / "statsapi")
     settler = build_extra_settler(cache_dir=cache / "settlers", fetch_export=reader.text)
-    signature, grader = grader_signature(bs, settler)
-    log(f"GRADER {signature}")
+    signature, sport_versions, grader = grader_signature(bs, settler)
+    log(f"GRADER {json.dumps(grader, sort_keys=True)}")
 
     try:
         saved_state = reader.json(msc.STATE_PATH)
@@ -264,7 +274,7 @@ def main(argv: list[str] | None = None) -> int:
     except FetchError as exc:
         log(f"REFUSING: could not read the saved state ({exc}). Publishing a fresh state would erase history.")
         return 4
-    state, reset = msc.load_state(saved_state, signature, now=now)
+    state, reset = msc.load_state(saved_state, signature, now=now, sport_versions=sport_versions)
     log(f"STATE loaded={'yes' if saved_state is not None else 'no (first run)'} reset={reset} "
         f"games={len(state['games'])} pending={len(state['pending'])}")
 

@@ -265,3 +265,45 @@ def test_the_allowlist_names_the_family_explicitly_not_an_open_directory():
     patterns = [p for p in ap.HOT_ARTIFACT_PATTERNS if p.startswith("reports/model_scorecard/")]
     assert patterns and "reports/model_scorecard/*" not in patterns
     assert not ap.is_hot_artifact_relative_path("reports/model_scorecard/anything_else.json")
+
+
+def test_a_changed_sport_settler_resets_only_that_sport():
+    saved = msc.empty_state("core", {"mlb": "mlb/1", "nfl": "espn/1", "nhl": "unavailable:nhl"})
+    saved["games"] = {"mlb|a": {"date": "2026-09-16", "sport": "mlb"}, "nfl|b": {"date": "2026-09-15", "sport": "nfl"}}
+    saved["ungraded"] = {"2026-09-16": {"mlb": {"push": 1}, "nfl": {"push": 2}}}
+    saved["board_dates"] = {"2026-09-15": {"complete": True}}
+    saved["pending"] = {"nfl|c": [{"k": "c|h2h||full|home|"}]}
+    state, reason = msc.load_state(saved, "core", now=NOW, sport_versions={"mlb": "mlb/1", "nfl": "espn/2", "nhl": "nhl/1"})
+    assert reason == "sport_versions_changed:nfl,nhl"
+    assert set(state["games"]) == {"mlb|a"}, "only the changed sport's graded games are dropped"
+    assert state["ungraded"]["2026-09-16"] == {"mlb": {"push": 1}}
+    assert state["board_dates"]["2026-09-15"]["complete"] is False, "board dates are refetched to regrade nfl"
+    assert state["pending"] == saved["pending"], "pending records survive"
+    assert state["resets"][-1]["sports"] == ["nfl", "nhl"] and state["resets"][-1]["games_dropped"] == 1
+    assert state["sport_versions"]["nhl"] == "nhl/1"
+
+
+def test_a_core_change_still_resets_every_sport():
+    saved = msc.empty_state("core-old", {"mlb": "mlb/1"})
+    saved["games"] = {"mlb|a": {"date": "2026-09-16", "sport": "mlb"}}
+    state, reason = msc.load_state(saved, "core-new", now=NOW, sport_versions={"mlb": "mlb/1"})
+    assert reason == "grader_signature_changed" and state["games"] == {}
+
+
+def test_unchanged_versions_keep_everything():
+    saved = msc.empty_state("core", {"mlb": "mlb/1"})
+    saved["games"] = {"mlb|a": {"date": "2026-09-16", "sport": "mlb"}}
+    saved["board_dates"] = {"2026-09-15": {"complete": True}}
+    state, reason = msc.load_state(saved, "core", now=NOW, sport_versions={"mlb": "mlb/1"})
+    assert reason is None and state["games"] == saved["games"] and state["board_dates"]["2026-09-15"]["complete"] is True
+
+
+def test_every_settler_module_declares_the_sports_it_owns():
+    from syndicate.features.shared import population_outcomes as po
+
+    owned = [sport for *_rest, sports in po.SETTLER_MODULES for sport in sports]
+    assert len(owned) == len(set(owned)), "a sport must have exactly one owning settler"
+    assert {"mlb", "soccer", "nfl", "ncaaf", "wnba", "nhl"} <= set(owned)
+    composite = po.CompositeSettler([("mlb", lambda s, v: None, "mlb/1")], {"nhl": "ModuleNotFoundError"},
+                                    {"mlb": ("mlb",), "nhl": ("nhl",)})
+    assert composite.sport_versions == {"mlb": "mlb/1", "nhl": "unavailable:nhl"}

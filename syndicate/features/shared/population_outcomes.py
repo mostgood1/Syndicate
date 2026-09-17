@@ -12,6 +12,7 @@ markets. Each sport's settler lives in its own module:
     population_outcomes_mlb      segments first1/3/5, alt and 3-way markets (statsapi)
     population_outcomes_soccer   scorer / shots / assists props, h1, corners (live_state)
     population_outcomes_espn     NFL, NCAAF, WNBA props and period segments (ESPN)
+    population_outcomes_nhl      NHL game lines incl. OT/shootout, periods, player props (api-web.nhle.com)
 
 `build_extra_settler` composes whichever are importable into ONE `extra_settler(shaped,
 view)` for `grade_population`: the first settler that HANDLES a record decides it, and a
@@ -31,19 +32,24 @@ import inspect
 from collections.abc import Callable, Mapping
 from typing import Any
 
-SETTLER_MODULES: tuple[tuple[str, str, str], ...] = (
-    ("mlb", "syndicate.features.shared.population_outcomes_mlb", "MlbPopulationSettler"),
-    ("soccer", "syndicate.features.shared.population_outcomes_soccer", "SoccerPopulationSettler"),
-    ("espn", "syndicate.features.shared.population_outcomes_espn", "EspnPopulationSettler"),
+# (name, module, class, sports it settles). The SPORTS column is what lets the scorecard reset
+# ONE sport's history when that sport's settler changes, instead of every sport's.
+SETTLER_MODULES: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
+    ("mlb", "syndicate.features.shared.population_outcomes_mlb", "MlbPopulationSettler", ("mlb",)),
+    ("soccer", "syndicate.features.shared.population_outcomes_soccer", "SoccerPopulationSettler", ("soccer",)),
+    ("espn", "syndicate.features.shared.population_outcomes_espn", "EspnPopulationSettler", ("nfl", "ncaaf", "wnba")),
+    ("nhl", "syndicate.features.shared.population_outcomes_nhl", "NhlPopulationSettler", ("nhl",)),
 )
 
 
 class CompositeSettler:
     """First settler that handles a record decides it. Counts what each one did."""
 
-    def __init__(self, settlers: list[tuple[str, Callable[..., Any], str]], unavailable: Mapping[str, str] | None = None):
+    def __init__(self, settlers: list[tuple[str, Callable[..., Any], str]], unavailable: Mapping[str, str] | None = None,
+                 sports: Mapping[str, tuple[str, ...]] | None = None):
         self.settlers = list(settlers)
         self.unavailable = dict(unavailable or {})
+        self.sports = {name: tuple(values) for name, values in (sports or {}).items()}
         self.handled: collections.Counter[str] = collections.Counter()
         self.errors: collections.Counter[str] = collections.Counter()
         self.first_error: dict[str, str] = {}
@@ -51,6 +57,17 @@ class CompositeSettler:
     @property
     def versions(self) -> dict[str, str]:
         return {name: version for name, _settler, version in self.settlers}
+
+    @property
+    def sport_versions(self) -> dict[str, str]:
+        """sport -> the version of the settler that owns it, or `unavailable:<name>`."""
+        out: dict[str, str] = {}
+        available = self.versions
+        for name, sports in self.sports.items():
+            version = available.get(name, f"unavailable:{name}")
+            for sport in sports:
+                out[sport] = version
+        return out
 
     def __call__(self, shaped: Mapping[str, Any], view: Mapping[str, Any]) -> tuple[str | None, str | None] | None:
         for name, settler, _version in self.settlers:
@@ -83,7 +100,7 @@ def build_extra_settler(**resources: Any) -> CompositeSettler:
     """
     settlers: list[tuple[str, Callable[..., Any], str]] = []
     unavailable: dict[str, str] = {}
-    for name, module_name, class_name in SETTLER_MODULES:
+    for name, module_name, class_name, _sports in SETTLER_MODULES:
         try:
             module = importlib.import_module(module_name)
             cls = getattr(module, class_name)
@@ -98,4 +115,4 @@ def build_extra_settler(**resources: Any) -> CompositeSettler:
             unavailable[name] = f"init {type(exc).__name__}: {exc}"[:200]
             continue
         settlers.append((name, instance, str(getattr(module, "GRADER_VERSION", "unversioned"))))
-    return CompositeSettler(settlers, unavailable)
+    return CompositeSettler(settlers, unavailable, {name: sports for name, _m, _c, sports in SETTLER_MODULES})
