@@ -540,10 +540,14 @@ def print_report(report: dict) -> None:
 
 # ============================================================================ pull (network)
 
-def _prod():
+def _prod(env_root: Path | None = None):
+    """`fetch_prod_artifacts_paced`'s own token convention (the gitignored `.env`, never argv). A session
+    worktree has no `.env`, so `--env-root` names the checkout that holds it."""
     sys.path.insert(0, str(CHECKOUT / "scripts"))
-    from fetch_prod_artifacts_paced import DEFAULT_BASE, admin_token, export  # noqa: E402
-    return DEFAULT_BASE, admin_token(), export
+    import fetch_prod_artifacts_paced as prod  # noqa: E402
+    if env_root is not None:
+        prod.REPO_ROOT = Path(env_root)
+    return prod.DEFAULT_BASE, prod.admin_token(), prod.export
 
 
 def _stream(base: str, token: str, rel_path: str, dest: Path) -> int:
@@ -562,12 +566,12 @@ def _stream(base: str, token: str, rel_path: str, dest: Path) -> int:
     return dest.stat().st_size
 
 
-def pull(cache: Path, with_book_quotes: bool = False, pause: float = 2.0) -> dict:
+def pull(cache: Path, with_book_quotes: bool = False, pause: float = 2.0, env_root: Path | None = None) -> dict:
     from syndicate.features.soccer.ingestion.espn_lineups import fetch_match_summary  # noqa: E402
     cache = Path(cache)
     for sub in ("freeze", "espn", "prod/game_markets", "prod/props", "book_quotes"):
         (cache / sub).mkdir(parents=True, exist_ok=True)
-    base, token, export = _prod()
+    base, token, export = _prod(env_root)
     now = dt.datetime.now(dt.timezone.utc)
     tally = collections.Counter()
 
@@ -637,13 +641,15 @@ def main(argv=None) -> int:
     p = sub.add_parser("pull")
     p.add_argument("--cache", required=True)
     p.add_argument("--with-book-quotes", action="store_true")
+    p.add_argument("--env-root", help="checkout holding the gitignored .env (a session worktree has none)")
     g = sub.add_parser("grade")
     g.add_argument("--cache", required=True)
     g.add_argument("--history-root", required=True, help="a checkout WITH data/soccer_source/*/history")
     g.add_argument("--today", help="YYYY-MM-DD (CT); default today")
     args = ap.parse_args(argv)
     if args.cmd == "pull":
-        print(json.dumps(pull(Path(args.cache), args.with_book_quotes), indent=1))
+        env_root = Path(args.env_root) if args.env_root else None
+        print(json.dumps(pull(Path(args.cache), args.with_book_quotes, env_root=env_root), indent=1))
         return 0
     today = dt.date.fromisoformat(args.today) if args.today else None
     report = grade(Path(args.cache), Path(args.history_root), today)
