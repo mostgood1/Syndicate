@@ -4528,6 +4528,8 @@ the measurement to repeat on this sprint.
 > **ARMED:** the scheduled task `wnba-0917-slate-rebuild-reading`, one-time 2026-09-17 17:15 CT. It runs readings 1–3 and opens the lane below.
 > - Scheduled tasks run only while the app is open, and this machine sleeps. If the task does not fire, any session can take readings 1–2 with those two commands.
 >
+> **READINGS 1–3 TAKEN 2026-09-17 22:31Z (scheduled task `wnba-0917-slate-rebuild-reading`, session 565ee1fa) — ALL PASS.** `verify_wnba_slate_hygiene.py --date 2026-09-17 --check all` exit 0: slate **20 picks / 5 games**, `prop_ev_over_100 0`, `game_ev_over_100 0`, `certainty_claims 0`, `p_win_outside_clamp 0`, `total_picks 0`, `max_abs_ev_pct 45.38`; Layer 2 has **wnba in `active_sports`**, selected 1200 (game 915, prop 285), and the **09-10 `FROZEN?` risk did NOT materialise** — `frozen_chips None`, the 5 chips are the real 09-17 slate. Layer 2's verdict is PRE-TIP (first tip 23:30Z), so the post-tip demotion question is still open, and the EV gate passed on a slate whose `max_abs_ev_pct` is 45.38 — it was not exercised in the red direction. Lane `wnba-sprint-0917` is OPEN; lane `wnba-slate-prop-ev-refusal` is CLOSED, GOAL: MET. Working in `deploys.md`, 2026-09-17 22:35Z. Readings 4–6 are owed.
+>
 > **PRE-REGISTERED LANE BLOCK — copy verbatim to the end of `## OPEN` on 09-17 (EM DASH separators):**
 >
 >     ### wnba-sprint-0917 — OPEN — opened 2026-09-17 — session <id>

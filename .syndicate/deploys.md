@@ -37552,3 +37552,41 @@ masked the defect, because preflight reports the job check before it validates e
 Fixed, verified on ONE cycle, and it fired immediately.
 
 **Claim:** held by `nfl-usage-publish` from 22:12Z, released after this entry.
+
+
+## 2026-09-17 22:31–22:35Z — READING, NO DEPLOY — the first post-break WNBA slate (2026-09-17) is CLEAN, and WNBA reached Layer 2 — lanes `wnba-sprint-0917` (opened by this reading) and `wnba-slate-prop-ev-refusal` (CLOSED by it)
+
+Taken by scheduled task `wnba-0917-slate-rebuild-reading`, session 565ee1fa, from worktree
+`C:\tmp\syndicate-sessions\wnba-sprint-0917` at origin/main. **No deploy, no env change, no
+`render.yaml` touch, no code change.** Substrate: the served artifact + the served board
+(`verify_wnba_slate_hygiene.py` reads production, not the checkout's `data/**`).
+
+Command, once, both checks: `py -3 scripts/verify_wnba_slate_hygiene.py --date 2026-09-17 --check all --json`
+— **OVERALL PASS, exit 0.**
+
+| # | what was read | reading | verdict |
+|---|---|---|---|
+| 1 | slate hygiene — `wnba_source/data/processed/recommendations_slate_2026-09-17.json`, 13,790 B | **20 picks over 5 games** (ATS 5, Threes 4, Pa 3, Reb 2, Pr 2, Ast 2, Ra 2); `certainty_claims 0`; `p_win_outside_clamp 0`, n=20, range **0.4608..0.7562**; `total_picks 0`; `game_ev_over_100 0`; **`prop_ev_over_100 0`**; `max_abs_ev_pct 45.38` | **PASS** |
+| 2 | Layer 2 — board written_at **2026-09-17T21:59:51Z** | `active_sports` = mlb, ncaaf, nfl, soccer, **wnba**; `per_sport.wnba` selected **1200** (game 915, prop 285), available 1427, available_today 300, selected_today 243, imminence_seated 25; `per_sport_ingest.wnba` sweep_state **swept**, scheduled_games 8, quote_rows 11,547, grid_rows 1,405, opportunities 2,564, candidates 2,588, by_lane `{dead 20, opportunity 2568}`, window_dates `[2026-09-17]`, error null | **PASS** |
+| 3 | the chip source (the 09-10 `FROZEN?` risk) | `frozen_chips None`, no `FROZEN?` token; the 5 chips are the real 09-17 slate — CON @ ATL 23:30Z, LAS @ DAL 00:00Z, WSH @ CHI 00:00Z, PHX @ POR 02:00Z, LVA @ SEA 02:00Z, all `pregame` | **PASS** |
+
+**What this establishes.** All five 2026-09-01 producer fixes plus the 2026-09-10 prop-EV
+refusal (`5bb0158a`) are IN FORCE on the first slate that could exercise them. The check is
+proven able to read red on real data (2026-08-30 gave FAIL: a `p_win` 1.0 certainty claim and
+1 TOTAL pick), and this run is not vacuous — 20 picks, n=20 on the `p_win` clamp.
+
+**What it does NOT establish.** Nothing here exercised the EV refusal's red direction on live
+data: the 09-17 `max_abs_ev_pct` is 45.38, well inside the 100 threshold, exactly as on 08-30
+(57.8), so a PASS is what an engine with NO refusal would also have produced on this slate.
+The refusal's red direction remains proven by unit test only. Layer 2's verdict is PRE-TIP:
+first tip is 23:30Z, so **no WNBA row has game state yet** and the post-tip demotion question
+(`#614`, `_LIVE_GAME_STATE_SPORTS` = {mlb, soccer}) is UNMEASURED here. Nothing about
+`#616`, the postgame producer cost, or `book_quotes` during live play was read.
+`scheduled_games 8` against 5 chips is the ingest's own wider window, not a discrepancy this
+reading resolved.
+
+**Lane consequences.** `wnba-slate-prop-ev-refusal` → **CLOSED 2026-09-17, GOAL: MET** (its
+falsification test did not fire). `wnba-sprint-0917` → **OPENED** on the pre-registered block
+in `todo.md #623`, carrying reading 1 of 6.
+
+**No claim was taken and none was owed:** read-only, no deploy.
