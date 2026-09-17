@@ -1,0 +1,574 @@
+{
+ "id": 2025020549,
+ "season": 20252026,
+ "gameType": 2,
+ "limitedScoring": false,
+ "gameDate": "2025-12-20",
+ "startTimeUTC": "2025-12-20T17:30:00Z",
+ "gameState": "OFF",
+ "gameScheduleState": "OK",
+ "periodDescriptor": {
+  "number": 5,
+  "periodType": "SO",
+  "maxRegulationPeriods": 3
+ },
+ "gameOutcome": {
+  "lastPeriodType": "SO"
+ },
+ "awayTeam": {
+  "id": 4,
+  "commonName": {
+   "default": "Flyers"
+  },
+  "abbrev": "PHI",
+  "score": 4
+ },
+ "homeTeam": {
+  "id": 3,
+  "commonName": {
+   "default": "Rangers"
+  },
+  "abbrev": "NYR",
+  "score": 5
+ },
+ "playerByGameStats": {
+  "awayTeam": {
+   "forwards": [
+    {
+     "playerId": 8481553,
+     "name": {
+      "default": "B. Brink"
+     },
+     "position": "R",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 2,
+     "toi": "15:14"
+    },
+    {
+     "playerId": 8478439,
+     "name": {
+      "default": "T. Konecny"
+     },
+     "position": "R",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 3,
+     "blockedShots": 0,
+     "toi": "23:31"
+    },
+    {
+     "playerId": 8476461,
+     "name": {
+      "default": "S. Couturier"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 3,
+     "blockedShots": 1,
+     "toi": "19:58"
+    },
+    {
+     "playerId": 8479022,
+     "name": {
+      "default": "R. Abols"
+     },
+     "position": "C",
+     "goals": 1,
+     "assists": 0,
+     "points": 1,
+     "sog": 2,
+     "blockedShots": 1,
+     "toi": "11:57"
+    },
+    {
+     "playerId": 8480220,
+     "name": {
+      "default": "N. Cates"
+     },
+     "position": "L",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 1,
+     "blockedShots": 1,
+     "toi": "17:19"
+    },
+    {
+     "playerId": 8483733,
+     "name": {
+      "default": "N. Grebenkin"
+     },
+     "position": "R",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 2,
+     "blockedShots": 0,
+     "toi": "11:27"
+    },
+    {
+     "playerId": 8484387,
+     "name": {
+      "default": "M. Michkov",
+      "cs": "M. Mičkov",
+      "fi": "M. Mitshkov",
+      "sk": "M. Mičkov"
+     },
+     "position": "R",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 2,
+     "blockedShots": 1,
+     "toi": "15:04"
+    },
+    {
+     "playerId": 8475235,
+     "name": {
+      "default": "N. Deslauriers"
+     },
+     "position": "L",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 0,
+     "blockedShots": 0,
+     "toi": "06:08"
+    },
+    {
+     "playerId": 8481533,
+     "name": {
+      "default": "T. Zegras"
+     },
+     "position": "C",
+     "goals": 1,
+     "assists": 0,
+     "points": 1,
+     "sog": 2,
+     "blockedShots": 1,
+     "toi": "22:58"
+    },
+    {
+     "playerId": 8484142,
+     "name": {
+      "default": "D. Barkey"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 2,
+     "points": 2,
+     "sog": 2,
+     "blockedShots": 2,
+     "toi": "15:18"
+    },
+    {
+     "playerId": 8480015,
+     "name": {
+      "default": "O. Tippett"
+     },
+     "position": "R",
+     "goals": 1,
+     "assists": 0,
+     "points": 1,
+     "sog": 2,
+     "blockedShots": 0,
+     "toi": "17:01"
+    },
+    {
+     "playerId": 8479336,
+     "name": {
+      "default": "C. Grundstrom",
+      "cs": "C. Grundström",
+      "fi": "C. Grundström",
+      "sk": "C. Grundström",
+      "sv": "C. Grundström"
+     },
+     "position": "R",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 1,
+     "toi": "12:29"
+    }
+   ],
+   "defense": [
+    {
+     "playerId": 8477948,
+     "name": {
+      "default": "T. Sanheim"
+     },
+     "position": "D",
+     "goals": 1,
+     "assists": 1,
+     "points": 2,
+     "sog": 2,
+     "blockedShots": 1,
+     "toi": "20:56"
+    },
+    {
+     "playerId": 8481546,
+     "name": {
+      "default": "C. York"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 2,
+     "blockedShots": 3,
+     "toi": "22:57"
+    },
+    {
+     "playerId": 8482142,
+     "name": {
+      "default": "J. Drysdale"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 1,
+     "blockedShots": 0,
+     "toi": "21:40"
+    },
+    {
+     "playerId": 8476372,
+     "name": {
+      "default": "N. Seeler"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 2,
+     "blockedShots": 4,
+     "toi": "17:15"
+    },
+    {
+     "playerId": 8482126,
+     "name": {
+      "default": "E. Andrae"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 0,
+     "toi": "19:09"
+    },
+    {
+     "playerId": 8477499,
+     "name": {
+      "default": "R. Ristolainen"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 3,
+     "blockedShots": 3,
+     "toi": "23:05"
+    }
+   ],
+   "goalies": [
+    {
+     "playerId": 8481035,
+     "name": {
+      "default": "S. Ersson"
+     },
+     "position": "G",
+     "saves": 23,
+     "shotsAgainst": 27,
+     "toi": "65:00",
+     "starter": true
+    },
+    {
+     "playerId": 8482783,
+     "name": {
+      "default": "A. Kolosov"
+     },
+     "position": "G",
+     "saves": 0,
+     "shotsAgainst": 0,
+     "toi": "00:00",
+     "starter": false
+    }
+   ]
+  },
+  "homeTeam": {
+   "forwards": [
+    {
+     "playerId": 8476468,
+     "name": {
+      "default": "J. Miller"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 0,
+     "blockedShots": 0,
+     "toi": "18:44"
+    },
+    {
+     "playerId": 8478550,
+     "name": {
+      "default": "A. Panarin"
+     },
+     "position": "L",
+     "goals": 2,
+     "assists": 0,
+     "points": 2,
+     "sog": 7,
+     "blockedShots": 0,
+     "toi": "22:31"
+    },
+    {
+     "playerId": 8482109,
+     "name": {
+      "default": "A. Lafrenière"
+     },
+     "position": "L",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 0,
+     "blockedShots": 0,
+     "toi": "18:24"
+    },
+    {
+     "playerId": 8476389,
+     "name": {
+      "default": "V. Trocheck"
+     },
+     "position": "C",
+     "goals": 1,
+     "assists": 0,
+     "points": 1,
+     "sog": 4,
+     "blockedShots": 0,
+     "toi": "25:38"
+    },
+    {
+     "playerId": 8475842,
+     "name": {
+      "default": "S. Carrick"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 3,
+     "blockedShots": 0,
+     "toi": "08:28"
+    },
+    {
+     "playerId": 8483690,
+     "name": {
+      "default": "N. Laba"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 2,
+     "blockedShots": 0,
+     "toi": "16:03"
+    },
+    {
+     "playerId": 8477839,
+     "name": {
+      "default": "C. Sheary"
+     },
+     "position": "L",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 0,
+     "toi": "15:26"
+    },
+    {
+     "playerId": 8482157,
+     "name": {
+      "default": "W. Cuylle"
+     },
+     "position": "L",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 1,
+     "blockedShots": 0,
+     "toi": "16:46"
+    },
+    {
+     "playerId": 8482460,
+     "name": {
+      "default": "M. Rempe"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 0,
+     "blockedShots": 0,
+     "toi": "04:56"
+    },
+    {
+     "playerId": 8482747,
+     "name": {
+      "default": "B. Othmann"
+     },
+     "position": "L",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 0,
+     "blockedShots": 0,
+     "toi": "04:51"
+    },
+    {
+     "playerId": 8476459,
+     "name": {
+      "default": "M. Zibanejad"
+     },
+     "position": "C",
+     "goals": 1,
+     "assists": 1,
+     "points": 2,
+     "sog": 3,
+     "blockedShots": 0,
+     "toi": "22:50"
+    },
+    {
+     "playerId": 8484210,
+     "name": {
+      "default": "G. Perreault"
+     },
+     "position": "R",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 0,
+     "blockedShots": 0,
+     "toi": "15:31"
+    }
+   ],
+   "defense": [
+    {
+     "playerId": 8482073,
+     "name": {
+      "default": "B. Schneider"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 0,
+     "blockedShots": 0,
+     "toi": "25:12"
+    },
+    {
+     "playerId": 8478840,
+     "name": {
+      "default": "W. Borgen"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 0,
+     "blockedShots": 0,
+     "toi": "16:01"
+    },
+    {
+     "playerId": 8477369,
+     "name": {
+      "default": "C. Soucy"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 2,
+     "blockedShots": 1,
+     "toi": "15:37"
+    },
+    {
+     "playerId": 8481525,
+     "name": {
+      "default": "M. Robertson"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 0,
+     "blockedShots": 0,
+     "toi": "17:28"
+    },
+    {
+     "playerId": 8478882,
+     "name": {
+      "default": "V. Gavrikov"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 0,
+     "blockedShots": 2,
+     "toi": "28:56"
+    },
+    {
+     "playerId": 8482666,
+     "name": {
+      "default": "S. Morrow"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 4,
+     "blockedShots": 1,
+     "toi": "20:12"
+    }
+   ],
+   "goalies": [
+    {
+     "playerId": 8478048,
+     "name": {
+      "default": "I. Shesterkin",
+      "cs": "I. Šesťorkin",
+      "fi": "I. Shestjorkin",
+      "sk": "I. Šesťorkin"
+     },
+     "position": "G",
+     "saves": 28,
+     "shotsAgainst": 32,
+     "toi": "64:59",
+     "starter": true
+    },
+    {
+     "playerId": 8471734,
+     "name": {
+      "default": "J. Quick"
+     },
+     "position": "G",
+     "saves": 0,
+     "shotsAgainst": 0,
+     "toi": "00:00",
+     "starter": false
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,569 @@
+{
+ "id": 2025010008,
+ "season": 20252026,
+ "gameType": 1,
+ "limitedScoring": false,
+ "gameDate": "2025-09-21",
+ "startTimeUTC": "2025-09-21T23:00:00Z",
+ "gameState": "FINAL",
+ "gameScheduleState": "OK",
+ "periodDescriptor": {
+  "number": 5,
+  "periodType": "SO",
+  "maxRegulationPeriods": 3
+ },
+ "gameOutcome": {
+  "lastPeriodType": "SO"
+ },
+ "awayTeam": {
+  "id": 4,
+  "commonName": {
+   "default": "Flyers"
+  },
+  "abbrev": "PHI",
+  "score": 3
+ },
+ "homeTeam": {
+  "id": 2,
+  "commonName": {
+   "default": "Islanders"
+  },
+  "abbrev": "NYI",
+  "score": 2
+ },
+ "playerByGameStats": {
+  "awayTeam": {
+   "forwards": [
+    {
+     "playerId": 8483461,
+     "name": {
+      "default": "D. Kaplan"
+     },
+     "position": "R",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 0,
+     "blockedShots": 0,
+     "toi": "11:13"
+    },
+    {
+     "playerId": 8479022,
+     "name": {
+      "default": "R. Abols"
+     },
+     "position": "C",
+     "goals": 1,
+     "assists": 0,
+     "points": 1,
+     "sog": 2,
+     "blockedShots": 0,
+     "toi": "13:54"
+    },
+    {
+     "playerId": 8477903,
+     "name": {
+      "default": "G. Hathaway"
+     },
+     "position": "R",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 1,
+     "toi": "13:16"
+    },
+    {
+     "playerId": 8478967,
+     "name": {
+      "default": "L. Pederson"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 0,
+     "toi": "03:12"
+    },
+    {
+     "playerId": 8480220,
+     "name": {
+      "default": "N. Cates"
+     },
+     "position": "L",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 2,
+     "blockedShots": 0,
+     "toi": "19:42"
+    },
+    {
+     "playerId": 8483733,
+     "name": {
+      "default": "N. Grebenkin"
+     },
+     "position": "R",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 0,
+     "toi": "20:10"
+    },
+    {
+     "playerId": 8484387,
+     "name": {
+      "default": "M. Michkov",
+      "cs": "M. Mičkov",
+      "fi": "M. Mitshkov",
+      "sk": "M. Mičkov"
+     },
+     "position": "R",
+     "goals": 1,
+     "assists": 0,
+     "points": 1,
+     "sog": 6,
+     "blockedShots": 0,
+     "toi": "23:41"
+    },
+    {
+     "playerId": 8481533,
+     "name": {
+      "default": "T. Zegras"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 4,
+     "blockedShots": 0,
+     "toi": "23:09"
+    },
+    {
+     "playerId": 8484142,
+     "name": {
+      "default": "D. Barkey"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 4,
+     "blockedShots": 0,
+     "toi": "18:08"
+    },
+    {
+     "playerId": 8482727,
+     "name": {
+      "default": "S. Tuomaala"
+     },
+     "position": "R",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 2,
+     "toi": "13:33"
+    },
+    {
+     "playerId": 8485409,
+     "name": {
+      "default": "J. Nesbitt"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 0,
+     "blockedShots": 1,
+     "toi": "16:05"
+    },
+    {
+     "playerId": 8483697,
+     "name": {
+      "default": "A. Gendron"
+     },
+     "position": "R",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 1,
+     "toi": "11:26"
+    }
+   ],
+   "defense": [
+    {
+     "playerId": 8481178,
+     "name": {
+      "default": "E. Zamula",
+      "cs": "J. Zamula",
+      "de": "Y. Zamula",
+      "es": "Y. Zamula",
+      "fi": "J. Zamula",
+      "sk": "J. Zamula",
+      "sv": "Y. Zamula"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 0,
+     "blockedShots": 5,
+     "toi": "25:29"
+    },
+    {
+     "playerId": 8482142,
+     "name": {
+      "default": "J. Drysdale"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 3,
+     "blockedShots": 6,
+     "toi": "24:22"
+    },
+    {
+     "playerId": 8480874,
+     "name": {
+      "default": "A. Ginning"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 3,
+     "blockedShots": 2,
+     "toi": "19:49"
+    },
+    {
+     "playerId": 8482126,
+     "name": {
+      "default": "E. Andrae"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 0,
+     "blockedShots": 0,
+     "toi": "18:29"
+    },
+    {
+     "playerId": 8484804,
+     "name": {
+      "default": "S. Gill"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 0,
+     "blockedShots": 1,
+     "toi": "18:10"
+    },
+    {
+     "playerId": 8478454,
+     "name": {
+      "default": "N. Juulsen"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 2,
+     "toi": "16:10"
+    }
+   ],
+   "goalies": [
+    {
+     "playerId": 8482783,
+     "name": {
+      "default": "A. Kolosov"
+     },
+     "position": "G",
+     "saves": 15,
+     "shotsAgainst": 17,
+     "toi": "39:56"
+    },
+    {
+     "playerId": 8484147,
+     "name": {
+      "default": "C. Bjarnason"
+     },
+     "position": "G",
+     "saves": 17,
+     "shotsAgainst": 17,
+     "toi": "24:06"
+    }
+   ]
+  },
+  "homeTeam": {
+   "forwards": [
+    {
+     "playerId": 8478445,
+     "name": {
+      "default": "M. Barzal"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 4,
+     "blockedShots": 0,
+     "toi": "22:20"
+    },
+    {
+     "playerId": 8477500,
+     "name": {
+      "default": "B. Horvat"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 5,
+     "blockedShots": 0,
+     "toi": "22:41"
+    },
+    {
+     "playerId": 8478146,
+     "name": {
+      "default": "M. Highmore"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 0,
+     "blockedShots": 1,
+     "toi": "14:59"
+    },
+    {
+     "playerId": 8475151,
+     "name": {
+      "default": "K. Palmieri"
+     },
+     "position": "C",
+     "goals": 1,
+     "assists": 1,
+     "points": 2,
+     "sog": 1,
+     "blockedShots": 0,
+     "toi": "19:38"
+    },
+    {
+     "playerId": 8475314,
+     "name": {
+      "default": "A. Lee"
+     },
+     "position": "L",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 0,
+     "blockedShots": 0,
+     "toi": "16:03"
+    },
+    {
+     "playerId": 8477494,
+     "name": {
+      "default": "J. Drouin"
+     },
+     "position": "L",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 2,
+     "blockedShots": 0,
+     "toi": "19:01"
+    },
+    {
+     "playerId": 8482154,
+     "name": {
+      "default": "A. Jefferies"
+     },
+     "position": "L",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 0,
+     "toi": "13:09"
+    },
+    {
+     "playerId": 8485702,
+     "name": {
+      "default": "M. Shabanov"
+     },
+     "position": "R",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 2,
+     "blockedShots": 1,
+     "toi": "16:48"
+    },
+    {
+     "playerId": 8485462,
+     "name": {
+      "default": "G. Veremyev"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 0,
+     "blockedShots": 0,
+     "toi": "09:25"
+    },
+    {
+     "playerId": 8485378,
+     "name": {
+      "default": "T. Poletin"
+     },
+     "position": "L",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 3,
+     "toi": "11:50"
+    },
+    {
+     "playerId": 8481003,
+     "name": {
+      "default": "H. Drew"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 2,
+     "blockedShots": 0,
+     "toi": "09:09"
+    },
+    {
+     "playerId": 8485370,
+     "name": {
+      "default": "L. Romano"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 0,
+     "toi": "08:03"
+    }
+   ],
+   "defense": [
+    {
+     "playerId": 8484287,
+     "name": {
+      "default": "C. McWard"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 4,
+     "blockedShots": 3,
+     "toi": "18:03"
+    },
+    {
+     "playerId": 8476429,
+     "name": {
+      "default": "S. Mayfield"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 0,
+     "blockedShots": 1,
+     "toi": "20:57"
+    },
+    {
+     "playerId": 8485352,
+     "name": {
+      "default": "K. Aitcheson"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 4,
+     "blockedShots": 0,
+     "toi": "18:09"
+    },
+    {
+     "playerId": 8481569,
+     "name": {
+      "default": "M. Warren"
+     },
+     "position": "D",
+     "goals": 1,
+     "assists": 0,
+     "points": 1,
+     "sog": 2,
+     "blockedShots": 0,
+     "toi": "16:45"
+    },
+    {
+     "playerId": 8485366,
+     "name": {
+      "default": "M. Schaefer"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 5,
+     "blockedShots": 0,
+     "toi": "24:39"
+    },
+    {
+     "playerId": 8477950,
+     "name": {
+      "default": "T. DeAngelo"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 0,
+     "blockedShots": 0,
+     "toi": "25:21"
+    }
+   ],
+   "goalies": [
+    {
+     "playerId": 8479496,
+     "name": {
+      "default": "D. Rittich"
+     },
+     "position": "G",
+     "saves": 13,
+     "shotsAgainst": 14,
+     "toi": "33:21"
+    },
+    {
+     "playerId": 8480481,
+     "name": {
+      "default": "P. Gahagen"
+     },
+     "position": "G",
+     "saves": 15,
+     "shotsAgainst": 16,
+     "toi": "31:39"
+    }
+   ]
+  }
+ }
+}

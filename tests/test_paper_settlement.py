@@ -361,7 +361,7 @@ def test_the_traded_sports_WITHOUT_a_resolver_are_pinned_so_a_new_gap_cannot_pas
         if resolve({"sport": sport}).get("unavailable_reason") == f"no_resolver_for_{sport}"
     }
 
-    assert missing == {"nba", "nhl", "ncaab"}, (
+    assert missing == {"nba", "ncaab"}, (
         "settlement resolver coverage changed -- if a sport gained one, shrink this set; "
         "if a sport was added to the board without one, its bets cannot be graded"
     )

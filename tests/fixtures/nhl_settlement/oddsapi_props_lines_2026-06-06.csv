@@ -1,0 +1,11 @@
+date,player_id,player_name,team,market,line,over_price,under_price,book,first_seen_at,last_seen_at,is_current,_merge_key
+2026-06-06,,Jack Eichel,,ASSISTS,0.5,-135,105,draftkings,2026-06-06T16:02:44Z,2026-06-06T16:02:44Z,True,name::jack eichel
+2026-06-06,,Jack Eichel,,GOALS,0.5,195,-270,fanduel,2026-06-06T16:02:44Z,2026-06-06T16:02:44Z,True,name::jack eichel
+2026-06-06,,Jack Eichel,,SOG,2.5,-120,-110,draftkings,2026-06-06T16:02:44Z,2026-06-06T16:02:44Z,True,name::jack eichel
+2026-06-06,,Jalen Chatfield,,SOG,1.5,140,-180,draftkings,2026-06-06T16:02:44Z,2026-06-06T16:02:44Z,True,name::jalen chatfield
+2026-06-06,,Jordan Staal,,POINTS,0.5,154,-200,draftkings,2026-06-06T16:02:44Z,2026-06-06T16:02:44Z,True,name::jordan staal
+2026-06-06,,Jordan Staal,,SOG,1.5,130,-166,draftkings,2026-06-06T16:02:44Z,2026-06-06T16:02:44Z,True,name::jordan staal
+2026-06-06,,Mitch Marner,,GOALS,0.5,210,-300,fanduel,2026-06-06T16:02:44Z,2026-06-06T16:02:44Z,True,name::mitch marner
+2026-06-06,,Mitch Marner,,POINTS,1.5,170,-220,draftkings,2026-06-06T16:02:44Z,2026-06-06T16:02:44Z,True,name::mitch marner
+2026-06-06,,Mitch Marner,,SOG,1.5,-195,150,draftkings,2026-06-06T16:02:44Z,2026-06-06T16:02:44Z,True,name::mitch marner
+2026-06-06,,Shea Theodore,,ASSISTS,0.5,140,-180,draftkings,2026-06-06T16:02:44Z,2026-06-06T16:02:44Z,True,name::shea theodore

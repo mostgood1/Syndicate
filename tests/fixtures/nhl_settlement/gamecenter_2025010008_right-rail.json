@@ -1,0 +1,63 @@
+{
+ "linescore": {
+  "byPeriod": [
+   {
+    "periodDescriptor": {
+     "number": 1,
+     "periodType": "REG",
+     "maxRegulationPeriods": 3
+    },
+    "away": 1,
+    "home": 0
+   },
+   {
+    "periodDescriptor": {
+     "number": 2,
+     "periodType": "REG",
+     "maxRegulationPeriods": 3
+    },
+    "away": 0,
+    "home": 2
+   },
+   {
+    "periodDescriptor": {
+     "number": 3,
+     "periodType": "REG",
+     "maxRegulationPeriods": 3
+    },
+    "away": 1,
+    "home": 0
+   },
+   {
+    "periodDescriptor": {
+     "number": 4,
+     "periodType": "OT",
+     "maxRegulationPeriods": 3
+    },
+    "away": 0,
+    "home": 0
+   },
+   {
+    "periodDescriptor": {
+     "number": 5,
+     "periodType": "SO",
+     "maxRegulationPeriods": 3
+    },
+    "away": 1,
+    "home": 0
+   }
+  ],
+  "shootout": {
+   "awayDecidingGoal": 1,
+   "awayConversions": 4,
+   "awayAttempts": 11,
+   "homeDecidingGoal": 0,
+   "homeConversions": 3,
+   "homeAttempts": 11
+  },
+  "totals": {
+   "away": 3,
+   "home": 2
+  }
+ }
+}

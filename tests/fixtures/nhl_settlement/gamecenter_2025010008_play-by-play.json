@@ -1,0 +1,456 @@
+{
+ "id": 2025010008,
+ "gameType": 1,
+ "gameState": "FINAL",
+ "gameScheduleState": "OK",
+ "awayTeam": {
+  "id": 4,
+  "abbrev": "PHI"
+ },
+ "homeTeam": {
+  "id": 2,
+  "abbrev": "NYI"
+ },
+ "rosterSpots": [
+  {
+   "teamId": 2,
+   "playerId": 8475151,
+   "firstName": {
+    "default": "Kyle"
+   },
+   "lastName": {
+    "default": "Palmieri"
+   },
+   "positionCode": "C"
+  },
+  {
+   "teamId": 2,
+   "playerId": 8475314,
+   "firstName": {
+    "default": "Anders"
+   },
+   "lastName": {
+    "default": "Lee"
+   },
+   "positionCode": "L"
+  },
+  {
+   "teamId": 2,
+   "playerId": 8476429,
+   "firstName": {
+    "default": "Scott"
+   },
+   "lastName": {
+    "default": "Mayfield"
+   },
+   "positionCode": "D"
+  },
+  {
+   "teamId": 2,
+   "playerId": 8477494,
+   "firstName": {
+    "default": "Jonathan"
+   },
+   "lastName": {
+    "default": "Drouin"
+   },
+   "positionCode": "L"
+  },
+  {
+   "teamId": 2,
+   "playerId": 8477500,
+   "firstName": {
+    "default": "Bo"
+   },
+   "lastName": {
+    "default": "Horvat"
+   },
+   "positionCode": "C"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8477903,
+   "firstName": {
+    "default": "Garnet"
+   },
+   "lastName": {
+    "default": "Hathaway"
+   },
+   "positionCode": "R"
+  },
+  {
+   "teamId": 2,
+   "playerId": 8477950,
+   "firstName": {
+    "default": "Tony"
+   },
+   "lastName": {
+    "default": "DeAngelo"
+   },
+   "positionCode": "D"
+  },
+  {
+   "teamId": 2,
+   "playerId": 8478146,
+   "firstName": {
+    "default": "Matthew"
+   },
+   "lastName": {
+    "default": "Highmore"
+   },
+   "positionCode": "C"
+  },
+  {
+   "teamId": 2,
+   "playerId": 8478445,
+   "firstName": {
+    "default": "Mathew"
+   },
+   "lastName": {
+    "default": "Barzal"
+   },
+   "positionCode": "C"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8478454,
+   "firstName": {
+    "default": "Noah"
+   },
+   "lastName": {
+    "default": "Juulsen"
+   },
+   "positionCode": "D"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8478967,
+   "firstName": {
+    "default": "Lane"
+   },
+   "lastName": {
+    "default": "Pederson"
+   },
+   "positionCode": "C"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8479022,
+   "firstName": {
+    "default": "Rodrigo"
+   },
+   "lastName": {
+    "default": "Abols"
+   },
+   "positionCode": "C"
+  },
+  {
+   "teamId": 2,
+   "playerId": 8479496,
+   "firstName": {
+    "default": "David"
+   },
+   "lastName": {
+    "default": "Rittich"
+   },
+   "positionCode": "G"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8480220,
+   "firstName": {
+    "default": "Noah"
+   },
+   "lastName": {
+    "default": "Cates"
+   },
+   "positionCode": "L"
+  },
+  {
+   "teamId": 2,
+   "playerId": 8480481,
+   "firstName": {
+    "default": "Parker"
+   },
+   "lastName": {
+    "default": "Gahagen"
+   },
+   "positionCode": "G"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8480874,
+   "firstName": {
+    "default": "Adam"
+   },
+   "lastName": {
+    "default": "Ginning"
+   },
+   "positionCode": "D"
+  },
+  {
+   "teamId": 2,
+   "playerId": 8481003,
+   "firstName": {
+    "default": "Hunter"
+   },
+   "lastName": {
+    "default": "Drew"
+   },
+   "positionCode": "C"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8481178,
+   "firstName": {
+    "default": "Egor"
+   },
+   "lastName": {
+    "default": "Zamula"
+   },
+   "positionCode": "D"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8481533,
+   "firstName": {
+    "default": "Trevor"
+   },
+   "lastName": {
+    "default": "Zegras"
+   },
+   "positionCode": "C"
+  },
+  {
+   "teamId": 2,
+   "playerId": 8481569,
+   "firstName": {
+    "default": "Marshall"
+   },
+   "lastName": {
+    "default": "Warren"
+   },
+   "positionCode": "D"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8482126,
+   "firstName": {
+    "default": "Emil"
+   },
+   "lastName": {
+    "default": "Andrae"
+   },
+   "positionCode": "D"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8482142,
+   "firstName": {
+    "default": "Jamie"
+   },
+   "lastName": {
+    "default": "Drysdale"
+   },
+   "positionCode": "D"
+  },
+  {
+   "teamId": 2,
+   "playerId": 8482154,
+   "firstName": {
+    "default": "Alex"
+   },
+   "lastName": {
+    "default": "Jefferies"
+   },
+   "positionCode": "L"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8482727,
+   "firstName": {
+    "default": "Samu"
+   },
+   "lastName": {
+    "default": "Tuomaala"
+   },
+   "positionCode": "R"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8482783,
+   "firstName": {
+    "default": "Aleksei"
+   },
+   "lastName": {
+    "default": "Kolosov"
+   },
+   "positionCode": "G"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8483461,
+   "firstName": {
+    "default": "Devin"
+   },
+   "lastName": {
+    "default": "Kaplan"
+   },
+   "positionCode": "R"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8483697,
+   "firstName": {
+    "default": "Alexis"
+   },
+   "lastName": {
+    "default": "Gendron"
+   },
+   "positionCode": "R"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8483733,
+   "firstName": {
+    "default": "Nikita"
+   },
+   "lastName": {
+    "default": "Grebenkin"
+   },
+   "positionCode": "R"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8484142,
+   "firstName": {
+    "default": "Denver"
+   },
+   "lastName": {
+    "default": "Barkey"
+   },
+   "positionCode": "C"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8484147,
+   "firstName": {
+    "default": "Carson"
+   },
+   "lastName": {
+    "default": "Bjarnason"
+   },
+   "positionCode": "G"
+  },
+  {
+   "teamId": 2,
+   "playerId": 8484287,
+   "firstName": {
+    "default": "Cole"
+   },
+   "lastName": {
+    "default": "McWard"
+   },
+   "positionCode": "D"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8484387,
+   "firstName": {
+    "default": "Matvei"
+   },
+   "lastName": {
+    "default": "Michkov"
+   },
+   "positionCode": "R"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8484804,
+   "firstName": {
+    "default": "Spencer"
+   },
+   "lastName": {
+    "default": "Gill"
+   },
+   "positionCode": "D"
+  },
+  {
+   "teamId": 2,
+   "playerId": 8485352,
+   "firstName": {
+    "default": "Kashawn"
+   },
+   "lastName": {
+    "default": "Aitcheson"
+   },
+   "positionCode": "D"
+  },
+  {
+   "teamId": 2,
+   "playerId": 8485366,
+   "firstName": {
+    "default": "Matthew"
+   },
+   "lastName": {
+    "default": "Schaefer"
+   },
+   "positionCode": "D"
+  },
+  {
+   "teamId": 2,
+   "playerId": 8485370,
+   "firstName": {
+    "default": "Luca"
+   },
+   "lastName": {
+    "default": "Romano"
+   },
+   "positionCode": "C"
+  },
+  {
+   "teamId": 2,
+   "playerId": 8485378,
+   "firstName": {
+    "default": "Tomas"
+   },
+   "lastName": {
+    "default": "Poletin"
+   },
+   "positionCode": "L"
+  },
+  {
+   "teamId": 4,
+   "playerId": 8485409,
+   "firstName": {
+    "default": "Jack"
+   },
+   "lastName": {
+    "default": "Nesbitt"
+   },
+   "positionCode": "C"
+  },
+  {
+   "teamId": 2,
+   "playerId": 8485462,
+   "firstName": {
+    "default": "Gleb"
+   },
+   "lastName": {
+    "default": "Veremyev"
+   },
+   "positionCode": "C"
+  },
+  {
+   "teamId": 2,
+   "playerId": 8485702,
+   "firstName": {
+    "default": "Maxim"
+   },
+   "lastName": {
+    "default": "Shabanov"
+   },
+   "positionCode": "R"
+  }
+ ]
+}

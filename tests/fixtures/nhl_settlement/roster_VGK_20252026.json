@@ -1,0 +1,224 @@
+{
+ "players": [
+  {
+   "id": 8477964,
+   "firstName": {
+    "default": "Ivan"
+   },
+   "lastName": {
+    "default": "Barbashev"
+   },
+   "positionCode": "L"
+  },
+  {
+   "id": 8483890,
+   "firstName": {
+    "default": "Braeden"
+   },
+   "lastName": {
+    "default": "Bowman"
+   },
+   "positionCode": "R"
+  },
+  {
+   "id": 8484803,
+   "firstName": {
+    "default": "Trevor"
+   },
+   "lastName": {
+    "default": "Connelly"
+   },
+   "positionCode": "L"
+  },
+  {
+   "id": 8475343,
+   "firstName": {
+    "default": "Nic"
+   },
+   "lastName": {
+    "default": "Dowd"
+   },
+   "positionCode": "C"
+  },
+  {
+   "id": 8478403,
+   "firstName": {
+    "default": "Jack"
+   },
+   "lastName": {
+    "default": "Eichel"
+   },
+   "positionCode": "C"
+  },
+  {
+   "id": 8476881,
+   "firstName": {
+    "default": "Tomas"
+   },
+   "lastName": {
+    "default": "Hertl"
+   },
+   "positionCode": "C"
+  },
+  {
+   "id": 8482125,
+   "firstName": {
+    "default": "Alexander"
+   },
+   "lastName": {
+    "default": "Holtz"
+   },
+   "positionCode": "R"
+  },
+  {
+   "id": 8479353,
+   "firstName": {
+    "default": "Brett"
+   },
+   "lastName": {
+    "default": "Howden"
+   },
+   "positionCode": "C"
+  },
+  {
+   "id": 8476448,
+   "firstName": {
+    "default": "William"
+   },
+   "lastName": {
+    "default": "Karlsson"
+   },
+   "positionCode": "C"
+  },
+  {
+   "id": 8478434,
+   "firstName": {
+    "default": "Keegan"
+   },
+   "lastName": {
+    "default": "Kolesar"
+   },
+   "positionCode": "R"
+  },
+  {
+   "id": 8478483,
+   "firstName": {
+    "default": "Mitch"
+   },
+   "lastName": {
+    "default": "Marner"
+   },
+   "positionCode": "R"
+  },
+  {
+   "id": 8475913,
+   "firstName": {
+    "default": "Mark"
+   },
+   "lastName": {
+    "default": "Stone"
+   },
+   "positionCode": "R"
+  },
+  {
+   "id": 8485251,
+   "firstName": {
+    "default": "Kai"
+   },
+   "lastName": {
+    "default": "Uchacz"
+   },
+   "positionCode": "C"
+  },
+  {
+   "id": 8479602,
+   "firstName": {
+    "default": "Jeremy"
+   },
+   "lastName": {
+    "default": "Davies"
+   },
+   "positionCode": "D"
+  },
+  {
+   "id": 8478396,
+   "firstName": {
+    "default": "Noah"
+   },
+   "lastName": {
+    "default": "Hanifin"
+   },
+   "positionCode": "D"
+  },
+  {
+   "id": 8475188,
+   "firstName": {
+    "default": "Brayden"
+   },
+   "lastName": {
+    "default": "McNabb"
+   },
+   "positionCode": "D"
+  },
+  {
+   "id": 8477034,
+   "firstName": {
+    "default": "Jaycob"
+   },
+   "lastName": {
+    "default": "Megna"
+   },
+   "positionCode": "D"
+  },
+  {
+   "id": 8477447,
+   "firstName": {
+    "default": "Shea"
+   },
+   "lastName": {
+    "default": "Theodore"
+   },
+   "positionCode": "D"
+  },
+  {
+   "id": 8478450,
+   "firstName": {
+    "default": "Parker"
+   },
+   "lastName": {
+    "default": "Wotherspoon"
+   },
+   "positionCode": "D"
+  },
+  {
+   "id": 8479394,
+   "firstName": {
+    "default": "Carter"
+   },
+   "lastName": {
+    "default": "Hart"
+   },
+   "positionCode": "G"
+  },
+  {
+   "id": 8478499,
+   "firstName": {
+    "default": "Adin"
+   },
+   "lastName": {
+    "default": "Hill"
+   },
+   "positionCode": "G"
+  },
+  {
+   "id": 8482761,
+   "firstName": {
+    "default": "Carl"
+   },
+   "lastName": {
+    "default": "Lindbom"
+   },
+   "positionCode": "G"
+  }
+ ]
+}

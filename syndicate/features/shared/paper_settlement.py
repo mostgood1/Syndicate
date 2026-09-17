@@ -910,6 +910,12 @@ def _default_resolver(selected_date: str):
         # NOT `teams_match`: see `bet_status_ncaaf` on why a prefix rule
         # turns "Michigan" into "Michigan State".
         "ncaaf": lambda: _build("syndicate.features.shared.bet_status_ncaaf", "ncaaf_status_resolver", selected_date),
+        # Wired 2026-09-17, BEFORE the first NHL order -- the preseason starts 09-19 and
+        # every NHL order would otherwise read `no_resolver_for_nhl` forever. Reads the NHL's
+        # own API (api-web.nhle.com) at call time, sequentially, memoised per resolver, and
+        # degrades to a named reason; see `bet_status_nhl` for the measured feed facts
+        # (shootout credit in the final, full names only in play-by-play, split squads).
+        "nhl": lambda: _build("syndicate.features.shared.bet_status_nhl", "nhl_status_resolver", selected_date),
     }
     cache: dict[str, Any] = {}
 

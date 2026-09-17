@@ -1,0 +1,575 @@
+{
+ "id": 2025030413,
+ "season": 20252026,
+ "gameType": 3,
+ "limitedScoring": false,
+ "gameDate": "2026-06-06",
+ "startTimeUTC": "2026-06-07T00:00:00Z",
+ "gameState": "OFF",
+ "gameScheduleState": "OK",
+ "periodDescriptor": {
+  "number": 5,
+  "periodType": "OT",
+  "otPeriods": 2,
+  "maxRegulationPeriods": 3
+ },
+ "gameOutcome": {
+  "lastPeriodType": "OT",
+  "otPeriods": 2
+ },
+ "awayTeam": {
+  "id": 12,
+  "commonName": {
+   "default": "Hurricanes"
+  },
+  "abbrev": "CAR",
+  "score": 4
+ },
+ "homeTeam": {
+  "id": 54,
+  "commonName": {
+   "default": "Golden Knights"
+  },
+  "abbrev": "VGK",
+  "score": 5
+ },
+ "playerByGameStats": {
+  "awayTeam": {
+   "forwards": [
+    {
+     "playerId": 8473533,
+     "name": {
+      "default": "J. Staal"
+     },
+     "position": "C",
+     "goals": 1,
+     "assists": 1,
+     "points": 2,
+     "sog": 5,
+     "blockedShots": 0,
+     "toi": "23:16"
+    },
+    {
+     "playerId": 8478427,
+     "name": {
+      "default": "S. Aho"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 2,
+     "points": 2,
+     "sog": 0,
+     "blockedShots": 1,
+     "toi": "24:51"
+    },
+    {
+     "playerId": 8482702,
+     "name": {
+      "default": "L. Stankoven"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 0,
+     "blockedShots": 0,
+     "toi": "23:50"
+    },
+    {
+     "playerId": 8482093,
+     "name": {
+      "default": "S. Jarvis"
+     },
+     "position": "R",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 1,
+     "blockedShots": 0,
+     "toi": "27:22"
+    },
+    {
+     "playerId": 8477940,
+     "name": {
+      "default": "N. Ehlers"
+     },
+     "position": "L",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 2,
+     "blockedShots": 0,
+     "toi": "24:36"
+    },
+    {
+     "playerId": 8477478,
+     "name": {
+      "default": "W. Carrier"
+     },
+     "position": "L",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 0,
+     "blockedShots": 0,
+     "toi": "06:51"
+    },
+    {
+     "playerId": 8480830,
+     "name": {
+      "default": "A. Svechnikov",
+      "cs": "A. Svečnikov",
+      "fi": "A. Svetshnikov",
+      "sk": "A. Svečnikov"
+     },
+     "position": "R",
+     "goals": 1,
+     "assists": 0,
+     "points": 1,
+     "sog": 3,
+     "blockedShots": 1,
+     "toi": "25:49"
+    },
+    {
+     "playerId": 8476921,
+     "name": {
+      "default": "J. Martinook"
+     },
+     "position": "L",
+     "goals": 1,
+     "assists": 0,
+     "points": 1,
+     "sog": 3,
+     "blockedShots": 1,
+     "toi": "20:41"
+    },
+    {
+     "playerId": 8480762,
+     "name": {
+      "default": "E. Robinson"
+     },
+     "position": "L",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 1,
+     "blockedShots": 1,
+     "toi": "18:44"
+    },
+    {
+     "playerId": 8482809,
+     "name": {
+      "default": "J. Blake"
+     },
+     "position": "R",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 2,
+     "blockedShots": 1,
+     "toi": "24:10"
+    },
+    {
+     "playerId": 8475791,
+     "name": {
+      "default": "T. Hall"
+     },
+     "position": "L",
+     "goals": 1,
+     "assists": 0,
+     "points": 1,
+     "sog": 3,
+     "blockedShots": 1,
+     "toi": "22:57"
+    },
+    {
+     "playerId": 8476873,
+     "name": {
+      "default": "M. Jankowski"
+     },
+     "position": "L",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 2,
+     "blockedShots": 0,
+     "toi": "15:10"
+    }
+   ],
+   "defense": [
+    {
+     "playerId": 8476906,
+     "name": {
+      "default": "S. Gostisbehere"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 1,
+     "toi": "22:43"
+    },
+    {
+     "playerId": 8478970,
+     "name": {
+      "default": "J. Chatfield"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 3,
+     "blockedShots": 4,
+     "toi": "28:15"
+    },
+    {
+     "playerId": 8480817,
+     "name": {
+      "default": "K. Miller"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 1,
+     "toi": "33:25"
+    },
+    {
+     "playerId": 8482100,
+     "name": {
+      "default": "A. Nikishin"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 3,
+     "blockedShots": 0,
+     "toi": "19:16"
+    },
+    {
+     "playerId": 8480336,
+     "name": {
+      "default": "S. Walker"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 3,
+     "blockedShots": 1,
+     "toi": "34:20"
+    },
+    {
+     "playerId": 8476958,
+     "name": {
+      "default": "J. Slavin"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 0,
+     "blockedShots": 1,
+     "toi": "29:56"
+    }
+   ],
+   "goalies": [
+    {
+     "playerId": 8475883,
+     "name": {
+      "default": "F. Andersen"
+     },
+     "position": "G",
+     "saves": 12,
+     "shotsAgainst": 16,
+     "toi": "40:00",
+     "starter": true
+    },
+    {
+     "playerId": 8483548,
+     "name": {
+      "default": "B. Bussi"
+     },
+     "position": "G",
+     "saves": 18,
+     "shotsAgainst": 19,
+     "toi": "45:26",
+     "starter": false
+    }
+   ]
+  },
+  "homeTeam": {
+   "forwards": [
+    {
+     "playerId": 8478403,
+     "name": {
+      "default": "J. Eichel"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 1,
+     "blockedShots": 4,
+     "toi": "26:43"
+    },
+    {
+     "playerId": 8476925,
+     "name": {
+      "default": "C. Sissons"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 1,
+     "toi": "17:47"
+    },
+    {
+     "playerId": 8481604,
+     "name": {
+      "default": "P. Dorofeyev",
+      "cs": "P. Dorofejev",
+      "fi": "P. Dorofejev",
+      "sk": "P. Dorofejev"
+     },
+     "position": "R",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 1,
+     "toi": "17:40"
+    },
+    {
+     "playerId": 8479353,
+     "name": {
+      "default": "B. Howden"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 3,
+     "blockedShots": 1,
+     "toi": "21:31"
+    },
+    {
+     "playerId": 8482062,
+     "name": {
+      "default": "C. Smith"
+     },
+     "position": "R",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 1,
+     "toi": "19:19"
+    },
+    {
+     "playerId": 8475343,
+     "name": {
+      "default": "N. Dowd"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 2,
+     "toi": "19:40"
+    },
+    {
+     "playerId": 8476881,
+     "name": {
+      "default": "T. Hertl"
+     },
+     "position": "C",
+     "goals": 1,
+     "assists": 1,
+     "points": 2,
+     "sog": 2,
+     "blockedShots": 1,
+     "toi": "15:20"
+    },
+    {
+     "playerId": 8477964,
+     "name": {
+      "default": "I. Barbashev",
+      "cs": "I. Barbašev",
+      "fi": "I. Barbashov",
+      "sk": "I. Barbašev"
+     },
+     "position": "L",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 0,
+     "toi": "23:25"
+    },
+    {
+     "playerId": 8478434,
+     "name": {
+      "default": "K. Kolesar"
+     },
+     "position": "R",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 0,
+     "blockedShots": 0,
+     "toi": "15:49"
+    },
+    {
+     "playerId": 8475913,
+     "name": {
+      "default": "M. Stone"
+     },
+     "position": "R",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 3,
+     "blockedShots": 4,
+     "toi": "27:03"
+    },
+    {
+     "playerId": 8476448,
+     "name": {
+      "default": "W. Karlsson"
+     },
+     "position": "C",
+     "goals": 0,
+     "assists": 1,
+     "points": 1,
+     "sog": 2,
+     "blockedShots": 1,
+     "toi": "24:09"
+    },
+    {
+     "playerId": 8478483,
+     "name": {
+      "default": "M. Marner"
+     },
+     "position": "R",
+     "goals": 3,
+     "assists": 1,
+     "points": 4,
+     "sog": 10,
+     "blockedShots": 0,
+     "toi": "27:00"
+    }
+   ],
+   "defense": [
+    {
+     "playerId": 8475188,
+     "name": {
+      "default": "B. McNabb"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 2,
+     "points": 2,
+     "sog": 1,
+     "blockedShots": 0,
+     "toi": "35:47"
+    },
+    {
+     "playerId": 8478397,
+     "name": {
+      "default": "R. Andersson"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 4,
+     "blockedShots": 2,
+     "toi": "30:56"
+    },
+    {
+     "playerId": 8478468,
+     "name": {
+      "default": "J. Lauzon"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 0,
+     "blockedShots": 6,
+     "toi": "25:08"
+    },
+    {
+     "playerId": 8478396,
+     "name": {
+      "default": "N. Hanifin"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 0,
+     "blockedShots": 2,
+     "toi": "20:53"
+    },
+    {
+     "playerId": 8477447,
+     "name": {
+      "default": "S. Theodore"
+     },
+     "position": "D",
+     "goals": 1,
+     "assists": 1,
+     "points": 2,
+     "sog": 3,
+     "blockedShots": 3,
+     "toi": "39:09"
+    },
+    {
+     "playerId": 8479639,
+     "name": {
+      "default": "D. Coghlan"
+     },
+     "position": "D",
+     "goals": 0,
+     "assists": 0,
+     "points": 0,
+     "sog": 1,
+     "blockedShots": 1,
+     "toi": "17:38"
+    }
+   ],
+   "goalies": [
+    {
+     "playerId": 8478499,
+     "name": {
+      "default": "A. Hill"
+     },
+     "position": "G",
+     "saves": 0,
+     "shotsAgainst": 0,
+     "toi": "00:00",
+     "starter": false
+    },
+    {
+     "playerId": 8479394,
+     "name": {
+      "default": "C. Hart"
+     },
+     "position": "G",
+     "saves": 29,
+     "shotsAgainst": 33,
+     "toi": "85:38",
+     "starter": true
+    }
+   ]
+  }
+ }
+}

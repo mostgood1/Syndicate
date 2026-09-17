@@ -1,0 +1,83 @@
+{
+ "currentDate": "2025-12-20",
+ "games": [
+  {
+   "id": 2025020549,
+   "season": 20252026,
+   "gameType": 2,
+   "gameDate": "2025-12-20",
+   "startTimeUTC": "2025-12-20T17:30:00Z",
+   "gameState": "OFF",
+   "gameScheduleState": "OK",
+   "periodDescriptor": {
+    "number": 5,
+    "periodType": "SO",
+    "maxRegulationPeriods": 3
+   },
+   "clock": {
+    "timeRemaining": "00:00",
+    "secondsRemaining": 0,
+    "running": false,
+    "inIntermission": false
+   },
+   "gameOutcome": {
+    "lastPeriodType": "SO"
+   },
+   "awayTeam": {
+    "id": 4,
+    "name": {
+     "default": "Flyers"
+    },
+    "abbrev": "PHI",
+    "score": 4
+   },
+   "homeTeam": {
+    "id": 3,
+    "name": {
+     "default": "Rangers"
+    },
+    "abbrev": "NYR",
+    "score": 5
+   }
+  },
+  {
+   "id": 2025020550,
+   "season": 20252026,
+   "gameType": 2,
+   "gameDate": "2025-12-20",
+   "startTimeUTC": "2025-12-20T17:30:00Z",
+   "gameState": "OFF",
+   "gameScheduleState": "OK",
+   "periodDescriptor": {
+    "number": 3,
+    "periodType": "REG",
+    "maxRegulationPeriods": 3
+   },
+   "clock": {
+    "timeRemaining": "00:00",
+    "secondsRemaining": 0,
+    "running": false,
+    "inIntermission": false
+   },
+   "gameOutcome": {
+    "lastPeriodType": "REG"
+   },
+   "awayTeam": {
+    "id": 17,
+    "name": {
+     "default": "Red Wings"
+    },
+    "abbrev": "DET",
+    "score": 5
+   },
+   "homeTeam": {
+    "id": 15,
+    "name": {
+     "default": "Capitals"
+    },
+    "abbrev": "WSH",
+    "score": 2
+   }
+  }
+ ]
+}

@@ -1,0 +1,74 @@
+{
+ "currentDate": "2026-09-19",
+ "games": [
+  {
+   "id": 2026010001,
+   "season": 20262027,
+   "gameType": 1,
+   "gameDate": "2026-09-19",
+   "startTimeUTC": "2026-09-19T23:00:00Z",
+   "gameState": "FUT",
+   "gameScheduleState": "OK",
+   "awayTeam": {
+    "id": 25,
+    "name": {
+     "default": "Stars"
+    },
+    "abbrev": "DAL"
+   },
+   "homeTeam": {
+    "id": 19,
+    "name": {
+     "default": "Blues"
+    },
+    "abbrev": "STL"
+   }
+  },
+  {
+   "id": 2026010006,
+   "season": 20262027,
+   "gameType": 1,
+   "gameDate": "2026-09-19",
+   "startTimeUTC": "2026-09-19T23:00:00Z",
+   "gameState": "FUT",
+   "gameScheduleState": "OK",
+   "awayTeam": {
+    "id": 8,
+    "name": {
+     "default": "Canadiens"
+    },
+    "abbrev": "MTL"
+   },
+   "homeTeam": {
+    "id": 10,
+    "name": {
+     "default": "Maple Leafs"
+    },
+    "abbrev": "TOR"
+   }
+  },
+  {
+   "id": 2026010007,
+   "season": 20262027,
+   "gameType": 1,
+   "gameDate": "2026-09-19",
+   "startTimeUTC": "2026-09-19T23:00:00Z",
+   "gameState": "FUT",
+   "gameScheduleState": "OK",
+   "awayTeam": {
+    "id": 10,
+    "name": {
+     "default": "Maple Leafs"
+    },
+    "abbrev": "TOR"
+   },
+   "homeTeam": {
+    "id": 8,
+    "name": {
+     "default": "Canadiens"
+    },
+    "abbrev": "MTL"
+   }
+  }
+ ]
+}

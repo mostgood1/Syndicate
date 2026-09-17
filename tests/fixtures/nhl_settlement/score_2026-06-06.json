@@ -1,0 +1,46 @@
+{
+ "currentDate": "2026-06-06",
+ "games": [
+  {
+   "id": 2025030413,
+   "season": 20252026,
+   "gameType": 3,
+   "gameDate": "2026-06-06",
+   "startTimeUTC": "2026-06-07T00:00:00Z",
+   "gameState": "OFF",
+   "gameScheduleState": "OK",
+   "periodDescriptor": {
+    "number": 5,
+    "periodType": "OT",
+    "otPeriods": 2,
+    "maxRegulationPeriods": 3
+   },
+   "clock": {
+    "timeRemaining": "14:22",
+    "secondsRemaining": 862,
+    "running": false,
+    "inIntermission": false
+   },
+   "gameOutcome": {
+    "lastPeriodType": "OT",
+    "otPeriods": 2
+   },
+   "awayTeam": {
+    "id": 12,
+    "name": {
+     "default": "Hurricanes"
+    },
+    "abbrev": "CAR",
+    "score": 4
+   },
+   "homeTeam": {
+    "id": 54,
+    "name": {
+     "default": "Golden Knights"
+    },
+    "abbrev": "VGK",
+    "score": 5
+   }
+  }
+ ]
+}
