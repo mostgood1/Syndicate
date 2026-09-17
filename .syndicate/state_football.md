@@ -2477,14 +2477,21 @@ columns. The worker's own first autorun, 120 ms after its launch line:
                   odds_rows=2463 sim_rows=0 refused_wrong_team=0 refused_unknown_team=0
 
 **refresh-worker had 2,463 odds rows -- more than web's 2,455 -- and still built
-zero.** NEITHER SERVICE HAS THE PLAYER-LEVEL pbp, and it cannot be shipped to
-either: `_pbp_path` reads `nfl_source/tracking/nflverse/pbp/pbp_<season>.csv`,
-that path is **not in `HOT_ARTIFACT_PATTERNS` at all** (so it can neither publish
-nor stream), and `pbp_2025.csv` is **97.9 MB** against a 12 MiB
-`_PUBLISH_MAX_BYTES`. `load_player_plays` returns `()` for a missing file, so the
-failure is silent everywhere except the row count.
+zero.** ~~NEITHER SERVICE HAS THE PLAYER-LEVEL pbp~~ — **SUPERSEDED 2026-09-17 (lane
+`nfl-prop-week-substrate`, `#672`): refresh-worker DOES have it; the reader looked in
+the wrong place.** Measured: `pbp_2025.csv` is on refresh-worker's MOUNTED disk at
+`/opt/render/project/data/nfl_source/tracking/nflverse/pbp/` (97,951,481 B,
+`exists: true` in the basis block of `nfl_fantasy_projections_2026.json`, which the
+worker itself built). `_pbp_path` read it through `default_nfl_source_root()`, which
+probes for the git-tracked `upcoming_recs_*.csv` and so resolved to the EPHEMERAL
+CHECKOUT, where `tracking/` is gitignored. `load_player_plays` returned `()` for that
+missing path, silently. The same selector made `nfl_target_week` read git's
+`schedule_2026.csv` (272 of 272 rows with blank scores), which is why every launch
+was `week=1`. Fixed in `4d221768` (`data_path` resolves per file; `_pbp_path` uses
+`nfl_pbp_path`), **NOT YET DEPLOYED** as of 23:40Z. The 97.9 MB / 12 MiB publish point
+above is still true and is why the build must run ON the worker, not be shipped.
 
-**CONSEQUENCE: refresh-worker can never build this artifact.** The producer is an
+~~**CONSEQUENCE: refresh-worker can never build this artifact.**~~ **SUPERSEDED 2026-09-17: false, see the correction above — it could not FIND the pbp it has.** The producer is an
 offline run on a machine that has the pbp, which `CLAUDE.md` permits (artifact
 generation happens in background workers "or offline scripts"). The autorun's
 remaining job on the worker is to fail without damage.

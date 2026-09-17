@@ -6948,3 +6948,28 @@ run prints. The defect was only observable in the state I had not yet reached.
   - **Strip a tool's own headers before counting its output** (`grep -v '^#'`, or use the tool's `--json`/structured mode). A count that includes the query text is measuring the question, not the answer.
   - **A count of 1 deserves the same scepticism as a count of 0** — print the matching line before believing it. One line is cheap to eyeball and is exactly where an echo, a substring hit or a header hides. (The sibling trap the same evening: a plain `SOCCER_LIVE_STATE` search also matches `match_not_in_soccer_live_state` inside settlement lines.)
   - **When a published number is corrected, correct it everywhere it was published** — ledger subject, lane verdict and deploy entry — and name who re-measured it. A stale number in one file outlives the retraction in another.
+
+### 2026-09-17 (session 4a583d41, lane nfl-prop-week-substrate) — FORBIDDEN: recording "this service CANNOT do X" when the evidence is only that a READER did not find X
+
+**What happened.** A builder docstring and `state_football.md` both said "NEITHER SERVICE HAS THE
+PLAYER-LEVEL pbp" and "refresh-worker can never build this artifact", and the NFL prop autorun
+was left refusing `zero_sim_rows` hourly for over a week on that basis. The evidence was a row
+count of zero. The pbp was on the worker's mounted disk the whole time (97,951,481 B, recorded
+as `exists: true` in an artifact that worker itself built); the reader looked for it in the
+ephemeral checkout. The same wrong root made the week resolver read git's unplayed schedule,
+so every launch was week 1. This is the standing 2026-09-15 rule ("reading a READER's zero as
+the WRITER's absence") meeting its most expensive form: the zero was written down as a
+capability limit, so nobody re-checked the path.
+
+**How to apply.**
+- Before recording that a service lacks an input, find the input BY A PATH THAT DOES NOT RUN
+  THROUGH THE READER UNDER SUSPICION — here, any artifact whose basis names the file and its size.
+- A "cannot succeed here" note is a claim about the world; check it like one. If the reader
+  resolves its root by probing for a DIFFERENT file, the note is about the probe.
+- In this codebase specifically: any NFL read built on `default_nfl_source_root()` is suspect on
+  a Render service. `#389`, `#441`, `#671` and `#672` are the same defect four times.
+
+**Addendum to the double-encoding rule above (same session).** It recurred a THIRD time, in
+`state_football.md`, minutes after the rule was written. The rule did not stop it; the byte check
+inside the write path did. Put the check in the script that writes, not only in the ledger.
+- *(evidence: `log/2026-09-17.md` ~23:45Z; `4d221768`)*
