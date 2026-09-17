@@ -34,6 +34,7 @@ from syndicate.blueprints.ncaab import ncaab_bp
 from syndicate.blueprints.ncaaf import ncaaf_bp
 from syndicate.blueprints.nba import nba_bp
 from syndicate.blueprints.mlb import mlb_bp
+from syndicate.blueprints.model_scorecard import model_scorecard_bp
 from syndicate.blueprints.opportunity_board import opportunity_board_bp
 from syndicate.blueprints.portfolio_books import portfolio_books_bp
 from syndicate.blueprints.soccer import soccer_bp
@@ -452,6 +453,7 @@ def create_app() -> Flask:
     app.register_blueprint(ncaab_bp)
     app.register_blueprint(soccer_bp)
     app.register_blueprint(sports_bp)
+    app.register_blueprint(model_scorecard_bp)
 
     
     @app.route("/")

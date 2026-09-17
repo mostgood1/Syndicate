@@ -231,8 +231,18 @@ def bucket_factor(
     gain: float = SKILL_GAIN,
     floor: float = SKILL_FLOOR,
 ) -> float | None:
-    """The score factor a validated bucket assigns, or None to leave the category factor."""
-    source = MEASURED_BUCKET_SKILL if table is None else table
+    """The score factor a validated bucket assigns, or None to leave the category factor.
+
+    With no `table`, the source is the daily scorecard's validated overlay when it is enabled,
+    present and unexpired, else the shipped static table (`skill_overlay.active_table`; USER
+    DECISION 2026-09-17 "Auto-update measured skill", kill switch `SYNDICATE_SKILL_OVERLAY=off`).
+    """
+    if table is None:
+        from syndicate.features.shared.skill_overlay import active_table
+
+        source = active_table(MEASURED_BUCKET_SKILL)
+    else:
+        source = table
     if not source:
         return None
     matched = [source[bucket_id] for bucket_id in bucket_ids(view) if bucket_id in source]
