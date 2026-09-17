@@ -1500,6 +1500,18 @@ death, never life — do not invert it.
 - Blocked by: none.
 - **Reading 1 of the sprint TAKEN 2026-09-17 22:31Z (scheduled task `wnba-0917-slate-rebuild-reading`, this session).** `verify_wnba_slate_hygiene.py --date 2026-09-17 --check all` → **OVERALL PASS (exit 0)**. Slate PASS: 20 picks / 5 games, `certainty_claims 0`, `p_win_outside_clamp 0` (range 0.4608..0.7562), `total_picks 0`, `game_ev_over_100 0`, `prop_ev_over_100 0`, `max_abs_ev_pct 45.38`. Layer 2 PASS: WNBA in `active_sports`, selected 1200 (game 915, prop 285), 5 real 09-17 chips, `frozen_chips None`, no `FROZEN?`. Full working in `deploys.md`, 2026-09-17 22:35Z. Readings 4–6 of `#623` are still owed.
 
+### nfl-prop-week-substrate — OPEN — opened 2026-09-17 — session 4a583d41-5e1a-477f-82f6-04aaabbf368c
+- Goal: [user 2026-09-17: "do #672"] refresh-worker's NFL prop autorun builds THE WEEK THE BOARD IS PLAYING with real rows: the worker log shows `NFL_PROP_PROJECTION_LAUNCHING season=2026 week=<current>` and a published `nfl_prop_projections_2026_wk<current>.json` with row_count > 0, instead of `week=1` + `REFUSED reason=zero_sim_rows` every hour.
+- Files:
+  - `syndicate/features/nfl/sources.py` (`data_path` resolves per requested file across candidate roots; nothing else)
+  - `syndicate/features/nfl/player_stats.py` (`_pbp_path` uses `nfl_pbp_path`)
+  - `tests/test_nfl_sources_data_path.py` (NEW)
+- Hypothesis (written BEFORE the fix): ONE cause produces BOTH symptoms — `default_nfl_source_root()` is a READ selector that probes for `upcoming_recs_*.csv`, a git-tracked file, so on refresh-worker it resolves to the EPHEMERAL CHECKOUT. (a) `nfl_target_week` reads `schedule_2026.csv` through it and the checkout copy has **272 of 272 rows with blank scores**, so "lowest unplayed week" is 1 forever; (b) `player_stats._pbp_path` reads the pbp through it and `tracking/` is gitignored, so `load_player_plays` returns `()` and every run refuses `zero_sim_rows`. Same family as `#671`, `#389`, `#441`.
+- Measured BEFORE (production, refresh-worker logs, 24 h to 2026-09-17 22:3xZ): 64 `NFL_PROP_PROJECTION` lines, **every launch `season=2026 week=1`**, every build `REFUSED ... reason=zero_sim_rows odds_rows=2296`, artifact age 684,010 s (7.9 d), relaunch held on a 3600 s cooldown. Web holds only `nfl_prop_projections_2026_wk1.json` (09-10 00:09). The mounted disk's own `schedule_2026.csv` IS current (web copy, 21,369 B, 16:56Z today) and `pbp_2025.csv` IS on the worker (97,951,481 B, `exists: true` in the fantasy artifact's basis).
+- Falsification test: after the fix the autorun still launches `week=1`, or still refuses `zero_sim_rows` — then the root selector was not the cause and the substrate is genuinely absent on the worker.
+- Verification: (1) offline: a test where a probe-file-bearing checkout root and a mounted root both exist proves `data_path` returns the MOUNTED file and `nfl_target_week` returns the played week, and the test fails on the pre-change code; (2) production: the launch line names the current week and the build writes row_count > 0, published and visible in the export listing; (3) the child's peak RSS is read from the run, because this builder loads a 97.9 MB pbp on a worker that plateaus at 2.65-2.70 GB of 4 GB (`#241`).
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

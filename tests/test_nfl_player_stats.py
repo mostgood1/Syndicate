@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from syndicate.features.nfl import player_stats
+from syndicate.features.nfl import sources as nfl_sources
 
 
 def _play(**overrides) -> dict:
@@ -31,12 +32,21 @@ class NflPlayerStatsTests(unittest.TestCase):
         self.nfl_root = os.path.join(self._tmp.name, "nfl_source")
         self.pbp_dir = os.path.join(self.nfl_root, "tracking", "nflverse", "pbp")
         os.makedirs(self.pbp_dir, exist_ok=True)
-        # Patch the resolved root directly rather than the env var --
+        # Patch the resolved root rather than the env var --
         # default_nfl_source_root()'s own resolution logic requires a real
         # upcoming_recs_*.csv to prefer an env-provided root over the repo's
         # real data/nfl_source (a fixture dir with only pbp files would be
         # silently skipped in favor of real production data otherwise).
-        self._root_patch = patch.object(player_stats, "default_nfl_source_root", return_value=Path(self.nfl_root))
+        #
+        # PATCHED ON `sources`, NOT ON `player_stats` (`#672`). `_pbp_path` now
+        # resolves through `nfl_pbp_path`, which searches each candidate root
+        # for THE REQUESTED FILE and falls back to `default_nfl_source_root()`.
+        # Patching the name player_stats imported stopped redirecting anything,
+        # and the fixture dir -- which is the only place these pbp files exist --
+        # was no longer searched. The production bug this fixes is the same
+        # shape: the reader looked in the ephemeral checkout, found nothing, and
+        # `load_player_plays` returned `()` silently.
+        self._root_patch = patch.object(nfl_sources, "default_nfl_source_root", return_value=Path(self.nfl_root))
         self._root_patch.start()
         self.addCleanup(self._root_patch.stop)
         player_stats.load_player_plays.cache_clear()

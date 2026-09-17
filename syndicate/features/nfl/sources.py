@@ -322,7 +322,53 @@ def nfl_artifact_output_root() -> Path:
 
 
 def data_path(*parts: str) -> Path:
-    return default_nfl_source_root().joinpath(*parts)
+    """The NFL data file *parts*, resolved PER REQUESTED FILE across the roots.
+
+    `#672`, and it is `#389`/`#441`/`#671` a fourth time. This used to be
+    `default_nfl_source_root().joinpath(...)`, and `_first_existing_root` picks a
+    root by probing for `upcoming_recs_*.csv` -- a git-tracked file the repo
+    checkout has and the mounted disk does not. So on refresh-worker every
+    caller of this function was pointed at `/opt/render/project/src/data/
+    nfl_source`, the EPHEMERAL CHECKOUT, and got whatever git shipped instead of
+    what the pipeline produced. Measured 2026-09-17, both symptoms from this one
+    line:
+
+      * `nfl_target_week` reads `schedule_{season}.csv` here. The CHECKOUT copy
+        has 272 of 272 rows with blank scores -- the season as it looked when it
+        was committed -- so "the lowest week with an unplayed game" was **1**,
+        forever. The worker relaunched the NFL prop build for week 1 sixty-four
+        times in 24 h while the board played week 3.
+      * `player_stats._pbp_path` read the play-by-play here, and `tracking/` is
+        gitignored, so `load_player_plays` returned `()` and every one of those
+        builds refused with `zero_sim_rows` against 2,296 real odds rows.
+
+    Resolving per file is the rule `preferred_artifact_roots` states in its own
+    comment and that `nfl_pbp_path` already follows. A file that exists nowhere
+    falls back to the WRITE root, so a new artifact is created on the mounted
+    disk rather than in the checkout that the next deploy erases.
+
+    ORDER IS THE WHOLE FIX. The configured roots are tried FIRST, so the
+    mounted disk's copy wins; `default_nfl_source_root()` is kept as the LAST
+    candidate rather than dropped, because it is how callers and tests redirect
+    NFL reads, and removing it would silently stop that redirection working.
+    It can now only supply a file that exists nowhere better.
+    """
+    relative = Path(*parts)
+    candidates = list(_source_roots())
+    try:
+        probe_root = default_nfl_source_root()
+        if probe_root not in candidates:
+            candidates.append(probe_root)
+    except Exception:  # noqa: BLE001 -- a root resolver must never break a read
+        pass
+    for root in candidates:
+        try:
+            candidate = root / relative
+            if candidate.exists():
+                return candidate
+        except OSError:
+            continue
+    return nfl_artifact_output_root() / relative
 
 
 def _count_csv_rows(path: Path) -> int:

@@ -63,7 +63,17 @@ _PLAY_COLUMNS = (
 
 
 def _pbp_path(season: int) -> Path:
-    return default_nfl_source_root() / "tracking" / "nflverse" / "pbp" / f"pbp_{season}.csv"
+    """`#672`: resolve the pbp PER FILE, the way `#441` already fixed it elsewhere.
+
+    This read used `default_nfl_source_root()`, whose probe file is git-tracked,
+    so on refresh-worker it pointed into the ephemeral checkout -- where
+    `tracking/` is gitignored and the file can never be. `load_player_plays`
+    returns `()` for a missing file, so the failure was silent at every level
+    except the row count: 2,296 odds rows in, zero sim rows out, hourly.
+    """
+    from syndicate.features.nfl.sources import nfl_pbp_path
+
+    return nfl_pbp_path(season)
 
 
 @lru_cache(maxsize=8)
