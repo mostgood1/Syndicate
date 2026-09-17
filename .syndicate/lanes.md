@@ -1370,8 +1370,9 @@ death, never life — do not invert it.
 - Safety: the prefilter is disabled for any directory whose resolved path differs from its unresolved path (a symlink inside the data root), so a symlinked tree keeps today's behaviour. ops.py's own subset filter stays in place after the walk.
 - Blocked by: none.
 
-### closed-lane-archive-0917 — OPEN — opened 2026-09-16 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+### closed-lane-archive-0917 — CLOSED 2026-09-16 — opened 2026-09-16 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **GOAL: NOT MET (deferred, nothing eligible)**
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- **GOAL: NOT MET** (2026-09-16 ~22:40 CT). Goal restated: "archive CLOSED lane blocks whose owners are idle, verified, ledger-only". 0 of 8 CLOSED blocks on origin/main were SAFE: every owner (a1e40980, abacd435, 0f5b256e) had a transcript write within 2 minutes, against a 240-minute bar. Nothing moved; lanes.md and lanes_closed.md bodies untouched; `check_lane_invariants.py` INVARIANTS HOLD after adding this block. Re-run the same recipe once those three sessions have been idle >= 240 min. Log: `log/2026-09-16.md` ~22:40 CT.
 - Files: none (ledger-only)
 - Why: USER DECISION 2026-09-16 ~22:35 CT ("archive the closed lanes"). Recipe: the 09-16 archive task (`owner_liveness.py` -> `archive_closed_lanes_before.py --only <SAFE> --owner-idle-verified`), `--idle-min 240`.
 - Pre-registered reading (2026-09-16 22:37 CT, `owner_liveness.py --idle-min 240` over origin/main `e5e519ae`, 8 CLOSED blocks):
