@@ -1,0 +1,579 @@
+{
+  "fired": null,
+  "gate": "metered/app-served (edge ratio recorded, not gating) [switched 2026-09-10]",
+  "polls": [
+    {
+      "arm_a": "arm A: 168.0 MB < 1e+09 MB bar",
+      "at": "2026-09-16T15:35:23Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T15:00:00Z",
+      "latest_bucket_mb": 168.0,
+      "seconds_left_in_hour": 1476,
+      "why": "arm A: 168.0 MB < 1e+09 MB bar | arm B: hour 15Z outside 05:00-11:00; last bucket 168.0 MB > 20.0; 1476s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 202.9 MB < 1e+09 MB bar",
+      "at": "2026-09-16T15:39:23Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T15:00:00Z",
+      "latest_bucket_mb": 202.86,
+      "seconds_left_in_hour": 1236,
+      "why": "arm A: 202.9 MB < 1e+09 MB bar | arm B: hour 15Z outside 05:00-11:00; last bucket 202.9 MB > 20.0; 1236s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 235.7 MB < 1e+09 MB bar",
+      "at": "2026-09-16T15:43:24Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T15:00:00Z",
+      "latest_bucket_mb": 235.73,
+      "seconds_left_in_hour": 996,
+      "why": "arm A: 235.7 MB < 1e+09 MB bar | arm B: hour 15Z outside 05:00-11:00; last bucket 235.7 MB > 20.0; 996s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 286.6 MB < 1e+09 MB bar",
+      "at": "2026-09-16T15:47:24Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T15:00:00Z",
+      "latest_bucket_mb": 286.57,
+      "seconds_left_in_hour": 756,
+      "why": "arm A: 286.6 MB < 1e+09 MB bar | arm B: hour 15Z outside 05:00-11:00; last bucket 286.6 MB > 20.0; 756s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 317.6 MB < 1e+09 MB bar",
+      "at": "2026-09-16T15:51:24Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T15:00:00Z",
+      "latest_bucket_mb": 317.62,
+      "seconds_left_in_hour": 515,
+      "why": "arm A: 317.6 MB < 1e+09 MB bar | arm B: hour 15Z outside 05:00-11:00; last bucket 317.6 MB > 20.0; 515s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 344.2 MB < 1e+09 MB bar",
+      "at": "2026-09-16T15:55:25Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T15:00:00Z",
+      "latest_bucket_mb": 344.15,
+      "seconds_left_in_hour": 275,
+      "why": "arm A: 344.2 MB < 1e+09 MB bar | arm B: hour 15Z outside 05:00-11:00; last bucket 344.2 MB > 20.0; 275s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 401.1 MB < 1e+09 MB bar",
+      "at": "2026-09-16T15:59:25Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T15:00:00Z",
+      "latest_bucket_mb": 401.12,
+      "seconds_left_in_hour": 35,
+      "why": "arm A: 401.1 MB < 1e+09 MB bar | arm B: hour 15Z outside 05:00-11:00; last bucket 401.1 MB > 20.0; 35s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 4.4 MB < 1e+09 MB bar",
+      "at": "2026-09-16T16:03:25Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T16:00:00Z",
+      "latest_bucket_mb": 4.39,
+      "seconds_left_in_hour": 3394,
+      "why": "arm A: 4.4 MB < 1e+09 MB bar | arm B: hour 16Z outside 05:00-11:00"
+    },
+    {
+      "arm_a": "arm A: 54.4 MB < 1e+09 MB bar",
+      "at": "2026-09-16T16:07:25Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T16:00:00Z",
+      "latest_bucket_mb": 54.4,
+      "seconds_left_in_hour": 3154,
+      "why": "arm A: 54.4 MB < 1e+09 MB bar | arm B: hour 16Z outside 05:00-11:00; last bucket 54.4 MB > 20.0"
+    },
+    {
+      "arm_a": "arm A: 71.9 MB < 1e+09 MB bar",
+      "at": "2026-09-16T16:11:26Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T16:00:00Z",
+      "latest_bucket_mb": 71.93,
+      "seconds_left_in_hour": 2914,
+      "why": "arm A: 71.9 MB < 1e+09 MB bar | arm B: hour 16Z outside 05:00-11:00; last bucket 71.9 MB > 20.0"
+    },
+    {
+      "arm_a": "arm A: 79.4 MB < 1e+09 MB bar",
+      "at": "2026-09-16T16:15:26Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T16:00:00Z",
+      "latest_bucket_mb": 79.44,
+      "seconds_left_in_hour": 2673,
+      "why": "arm A: 79.4 MB < 1e+09 MB bar | arm B: hour 16Z outside 05:00-11:00; last bucket 79.4 MB > 20.0"
+    },
+    {
+      "arm_a": "arm A: 94.7 MB < 1e+09 MB bar",
+      "at": "2026-09-16T16:19:26Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T16:00:00Z",
+      "latest_bucket_mb": 94.73,
+      "seconds_left_in_hour": 2433,
+      "why": "arm A: 94.7 MB < 1e+09 MB bar | arm B: hour 16Z outside 05:00-11:00; last bucket 94.7 MB > 20.0; 2433s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 113.6 MB < 1e+09 MB bar",
+      "at": "2026-09-16T16:23:27Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T16:00:00Z",
+      "latest_bucket_mb": 113.61,
+      "seconds_left_in_hour": 2193,
+      "why": "arm A: 113.6 MB < 1e+09 MB bar | arm B: hour 16Z outside 05:00-11:00; last bucket 113.6 MB > 20.0; 2193s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 132.6 MB < 1e+09 MB bar",
+      "at": "2026-09-16T16:27:27Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T16:00:00Z",
+      "latest_bucket_mb": 132.57,
+      "seconds_left_in_hour": 1953,
+      "why": "arm A: 132.6 MB < 1e+09 MB bar | arm B: hour 16Z outside 05:00-11:00; last bucket 132.6 MB > 20.0; 1953s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 147.2 MB < 1e+09 MB bar",
+      "at": "2026-09-16T16:31:27Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T16:00:00Z",
+      "latest_bucket_mb": 147.18,
+      "seconds_left_in_hour": 1712,
+      "why": "arm A: 147.2 MB < 1e+09 MB bar | arm B: hour 16Z outside 05:00-11:00; last bucket 147.2 MB > 20.0; 1712s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 195.9 MB < 1e+09 MB bar",
+      "at": "2026-09-16T16:35:27Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T16:00:00Z",
+      "latest_bucket_mb": 195.85,
+      "seconds_left_in_hour": 1472,
+      "why": "arm A: 195.9 MB < 1e+09 MB bar | arm B: hour 16Z outside 05:00-11:00; last bucket 195.9 MB > 20.0; 1472s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 233.5 MB < 1e+09 MB bar",
+      "at": "2026-09-16T16:39:28Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T16:00:00Z",
+      "latest_bucket_mb": 233.53,
+      "seconds_left_in_hour": 1232,
+      "why": "arm A: 233.5 MB < 1e+09 MB bar | arm B: hour 16Z outside 05:00-11:00; last bucket 233.5 MB > 20.0; 1232s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 280.5 MB < 1e+09 MB bar",
+      "at": "2026-09-16T16:43:28Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T16:00:00Z",
+      "latest_bucket_mb": 280.51,
+      "seconds_left_in_hour": 992,
+      "why": "arm A: 280.5 MB < 1e+09 MB bar | arm B: hour 16Z outside 05:00-11:00; last bucket 280.5 MB > 20.0; 992s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 318.1 MB < 1e+09 MB bar",
+      "at": "2026-09-16T16:47:28Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T16:00:00Z",
+      "latest_bucket_mb": 318.09,
+      "seconds_left_in_hour": 751,
+      "why": "arm A: 318.1 MB < 1e+09 MB bar | arm B: hour 16Z outside 05:00-11:00; last bucket 318.1 MB > 20.0; 751s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 355.4 MB < 1e+09 MB bar",
+      "at": "2026-09-16T16:51:28Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T16:00:00Z",
+      "latest_bucket_mb": 355.41,
+      "seconds_left_in_hour": 511,
+      "why": "arm A: 355.4 MB < 1e+09 MB bar | arm B: hour 16Z outside 05:00-11:00; last bucket 355.4 MB > 20.0; 511s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 387.0 MB < 1e+09 MB bar",
+      "at": "2026-09-16T16:55:29Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T16:00:00Z",
+      "latest_bucket_mb": 387.02,
+      "seconds_left_in_hour": 271,
+      "why": "arm A: 387.0 MB < 1e+09 MB bar | arm B: hour 16Z outside 05:00-11:00; last bucket 387.0 MB > 20.0; 271s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 520.4 MB < 1e+09 MB bar",
+      "at": "2026-09-16T16:59:29Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T16:00:00Z",
+      "latest_bucket_mb": 520.36,
+      "seconds_left_in_hour": 30,
+      "why": "arm A: 520.4 MB < 1e+09 MB bar | arm B: hour 16Z outside 05:00-11:00; last bucket 520.4 MB > 20.0; 30s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 9.0 MB < 1e+09 MB bar",
+      "at": "2026-09-16T17:03:29Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T17:00:00Z",
+      "latest_bucket_mb": 9.0,
+      "seconds_left_in_hour": 3390,
+      "why": "arm A: 9.0 MB < 1e+09 MB bar | arm B: hour 17Z outside 05:00-11:00"
+    },
+    {
+      "arm_a": "arm A: 59.6 MB < 1e+09 MB bar",
+      "at": "2026-09-16T17:07:30Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T17:00:00Z",
+      "latest_bucket_mb": 59.59,
+      "seconds_left_in_hour": 3150,
+      "why": "arm A: 59.6 MB < 1e+09 MB bar | arm B: hour 17Z outside 05:00-11:00; last bucket 59.6 MB > 20.0"
+    },
+    {
+      "arm_a": "arm A: 87.5 MB < 1e+09 MB bar",
+      "at": "2026-09-16T17:12:01Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T17:00:00Z",
+      "latest_bucket_mb": 87.47,
+      "seconds_left_in_hour": 2878,
+      "why": "arm A: 87.5 MB < 1e+09 MB bar | arm B: hour 17Z outside 05:00-11:00; last bucket 87.5 MB > 20.0"
+    },
+    {
+      "arm_a": "arm A: 101.7 MB < 1e+09 MB bar",
+      "at": "2026-09-16T17:16:01Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T17:00:00Z",
+      "latest_bucket_mb": 101.75,
+      "seconds_left_in_hour": 2638,
+      "why": "arm A: 101.7 MB < 1e+09 MB bar | arm B: hour 17Z outside 05:00-11:00; last bucket 101.7 MB > 20.0"
+    },
+    {
+      "arm_a": "arm A: 129.4 MB < 1e+09 MB bar",
+      "at": "2026-09-16T17:20:02Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T17:00:00Z",
+      "latest_bucket_mb": 129.43,
+      "seconds_left_in_hour": 2398,
+      "why": "arm A: 129.4 MB < 1e+09 MB bar | arm B: hour 17Z outside 05:00-11:00; last bucket 129.4 MB > 20.0; 2398s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 150.4 MB < 1e+09 MB bar",
+      "at": "2026-09-16T17:24:02Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T17:00:00Z",
+      "latest_bucket_mb": 150.41,
+      "seconds_left_in_hour": 2157,
+      "why": "arm A: 150.4 MB < 1e+09 MB bar | arm B: hour 17Z outside 05:00-11:00; last bucket 150.4 MB > 20.0; 2157s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 172.0 MB < 1e+09 MB bar",
+      "at": "2026-09-16T17:28:02Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T17:00:00Z",
+      "latest_bucket_mb": 172.03,
+      "seconds_left_in_hour": 1917,
+      "why": "arm A: 172.0 MB < 1e+09 MB bar | arm B: hour 17Z outside 05:00-11:00; last bucket 172.0 MB > 20.0; 1917s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 190.1 MB < 1e+09 MB bar",
+      "at": "2026-09-16T17:32:03Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T17:00:00Z",
+      "latest_bucket_mb": 190.15,
+      "seconds_left_in_hour": 1677,
+      "why": "arm A: 190.1 MB < 1e+09 MB bar | arm B: hour 17Z outside 05:00-11:00; last bucket 190.1 MB > 20.0; 1677s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 212.0 MB < 1e+09 MB bar",
+      "at": "2026-09-16T17:36:03Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T17:00:00Z",
+      "latest_bucket_mb": 212.0,
+      "seconds_left_in_hour": 1437,
+      "why": "arm A: 212.0 MB < 1e+09 MB bar | arm B: hour 17Z outside 05:00-11:00; last bucket 212.0 MB > 20.0; 1437s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 231.5 MB < 1e+09 MB bar",
+      "at": "2026-09-16T17:40:03Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T17:00:00Z",
+      "latest_bucket_mb": 231.54,
+      "seconds_left_in_hour": 1196,
+      "why": "arm A: 231.5 MB < 1e+09 MB bar | arm B: hour 17Z outside 05:00-11:00; last bucket 231.5 MB > 20.0; 1196s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 250.0 MB < 1e+09 MB bar",
+      "at": "2026-09-16T17:44:04Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T17:00:00Z",
+      "latest_bucket_mb": 250.02,
+      "seconds_left_in_hour": 956,
+      "why": "arm A: 250.0 MB < 1e+09 MB bar | arm B: hour 17Z outside 05:00-11:00; last bucket 250.0 MB > 20.0; 956s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 272.7 MB < 1e+09 MB bar",
+      "at": "2026-09-16T17:48:04Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T17:00:00Z",
+      "latest_bucket_mb": 272.67,
+      "seconds_left_in_hour": 715,
+      "why": "arm A: 272.7 MB < 1e+09 MB bar | arm B: hour 17Z outside 05:00-11:00; last bucket 272.7 MB > 20.0; 715s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 289.7 MB < 1e+09 MB bar",
+      "at": "2026-09-16T17:52:04Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T17:00:00Z",
+      "latest_bucket_mb": 289.67,
+      "seconds_left_in_hour": 475,
+      "why": "arm A: 289.7 MB < 1e+09 MB bar | arm B: hour 17Z outside 05:00-11:00; last bucket 289.7 MB > 20.0; 475s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 312.1 MB < 1e+09 MB bar",
+      "at": "2026-09-16T17:56:05Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T17:00:00Z",
+      "latest_bucket_mb": 312.08,
+      "seconds_left_in_hour": 235,
+      "why": "arm A: 312.1 MB < 1e+09 MB bar | arm B: hour 17Z outside 05:00-11:00; last bucket 312.1 MB > 20.0; 235s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 328.8 MB < 1e+09 MB bar",
+      "at": "2026-09-16T18:00:05Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T17:00:00Z",
+      "latest_bucket_mb": 328.84,
+      "seconds_left_in_hour": 3594,
+      "why": "arm A: 328.8 MB < 1e+09 MB bar | arm B: hour 18Z outside 05:00-11:00; last bucket 328.8 MB > 20.0"
+    },
+    {
+      "arm_a": "arm A: 16.4 MB < 1e+09 MB bar",
+      "at": "2026-09-16T18:04:05Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T18:00:00Z",
+      "latest_bucket_mb": 16.4,
+      "seconds_left_in_hour": 3354,
+      "why": "arm A: 16.4 MB < 1e+09 MB bar | arm B: hour 18Z outside 05:00-11:00"
+    },
+    {
+      "arm_a": "arm A: 33.2 MB < 1e+09 MB bar",
+      "at": "2026-09-16T18:08:06Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T18:00:00Z",
+      "latest_bucket_mb": 33.21,
+      "seconds_left_in_hour": 3114,
+      "why": "arm A: 33.2 MB < 1e+09 MB bar | arm B: hour 18Z outside 05:00-11:00; last bucket 33.2 MB > 20.0"
+    },
+    {
+      "arm_a": "arm A: 54.3 MB < 1e+09 MB bar",
+      "at": "2026-09-16T18:12:06Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T18:00:00Z",
+      "latest_bucket_mb": 54.3,
+      "seconds_left_in_hour": 2874,
+      "why": "arm A: 54.3 MB < 1e+09 MB bar | arm B: hour 18Z outside 05:00-11:00; last bucket 54.3 MB > 20.0"
+    },
+    {
+      "arm_a": "arm A: 54.6 MB < 1e+09 MB bar",
+      "at": "2026-09-16T18:16:06Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T18:00:00Z",
+      "latest_bucket_mb": 54.65,
+      "seconds_left_in_hour": 2633,
+      "why": "arm A: 54.6 MB < 1e+09 MB bar | arm B: hour 18Z outside 05:00-11:00; last bucket 54.6 MB > 20.0"
+    },
+    {
+      "arm_a": "arm A: 65.8 MB < 1e+09 MB bar",
+      "at": "2026-09-16T18:20:07Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T18:00:00Z",
+      "latest_bucket_mb": 65.81,
+      "seconds_left_in_hour": 2393,
+      "why": "arm A: 65.8 MB < 1e+09 MB bar | arm B: hour 18Z outside 05:00-11:00; last bucket 65.8 MB > 20.0; 2393s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 67.1 MB < 1e+09 MB bar",
+      "at": "2026-09-16T18:24:07Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T18:00:00Z",
+      "latest_bucket_mb": 67.08,
+      "seconds_left_in_hour": 2153,
+      "why": "arm A: 67.1 MB < 1e+09 MB bar | arm B: hour 18Z outside 05:00-11:00; last bucket 67.1 MB > 20.0; 2153s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 68.2 MB < 1e+09 MB bar",
+      "at": "2026-09-16T18:28:07Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T18:00:00Z",
+      "latest_bucket_mb": 68.23,
+      "seconds_left_in_hour": 1912,
+      "why": "arm A: 68.2 MB < 1e+09 MB bar | arm B: hour 18Z outside 05:00-11:00; last bucket 68.2 MB > 20.0; 1912s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 68.5 MB < 1e+09 MB bar",
+      "at": "2026-09-16T18:32:07Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T18:00:00Z",
+      "latest_bucket_mb": 68.51,
+      "seconds_left_in_hour": 1672,
+      "why": "arm A: 68.5 MB < 1e+09 MB bar | arm B: hour 18Z outside 05:00-11:00; last bucket 68.5 MB > 20.0; 1672s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 68.6 MB < 1e+09 MB bar",
+      "at": "2026-09-16T18:36:08Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T18:00:00Z",
+      "latest_bucket_mb": 68.55,
+      "seconds_left_in_hour": 1432,
+      "why": "arm A: 68.6 MB < 1e+09 MB bar | arm B: hour 18Z outside 05:00-11:00; last bucket 68.6 MB > 20.0; 1432s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 83.9 MB < 1e+09 MB bar",
+      "at": "2026-09-16T18:40:08Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T18:00:00Z",
+      "latest_bucket_mb": 83.93,
+      "seconds_left_in_hour": 1191,
+      "why": "arm A: 83.9 MB < 1e+09 MB bar | arm B: hour 18Z outside 05:00-11:00; last bucket 83.9 MB > 20.0; 1191s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 100.6 MB < 1e+09 MB bar",
+      "at": "2026-09-16T18:44:08Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T18:00:00Z",
+      "latest_bucket_mb": 100.6,
+      "seconds_left_in_hour": 951,
+      "why": "arm A: 100.6 MB < 1e+09 MB bar | arm B: hour 18Z outside 05:00-11:00; last bucket 100.6 MB > 20.0; 951s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 103.0 MB < 1e+09 MB bar",
+      "at": "2026-09-16T18:48:09Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T18:00:00Z",
+      "latest_bucket_mb": 102.99,
+      "seconds_left_in_hour": 711,
+      "why": "arm A: 103.0 MB < 1e+09 MB bar | arm B: hour 18Z outside 05:00-11:00; last bucket 103.0 MB > 20.0; 711s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 103.1 MB < 1e+09 MB bar",
+      "at": "2026-09-16T18:52:09Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T18:00:00Z",
+      "latest_bucket_mb": 103.14,
+      "seconds_left_in_hour": 471,
+      "why": "arm A: 103.1 MB < 1e+09 MB bar | arm B: hour 18Z outside 05:00-11:00; last bucket 103.1 MB > 20.0; 471s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 138.0 MB < 1e+09 MB bar",
+      "at": "2026-09-16T18:56:09Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T18:00:00Z",
+      "latest_bucket_mb": 137.98,
+      "seconds_left_in_hour": 230,
+      "why": "arm A: 138.0 MB < 1e+09 MB bar | arm B: hour 18Z outside 05:00-11:00; last bucket 138.0 MB > 20.0; 230s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 139.9 MB < 1e+09 MB bar",
+      "at": "2026-09-16T19:00:09Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T18:00:00Z",
+      "latest_bucket_mb": 139.87,
+      "seconds_left_in_hour": 3590,
+      "why": "arm A: 139.9 MB < 1e+09 MB bar | arm B: hour 19Z outside 05:00-11:00; last bucket 139.9 MB > 20.0"
+    },
+    {
+      "arm_a": "arm A: 1.1 MB < 1e+09 MB bar",
+      "at": "2026-09-16T19:04:10Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T19:00:00Z",
+      "latest_bucket_mb": 1.07,
+      "seconds_left_in_hour": 3350,
+      "why": "arm A: 1.1 MB < 1e+09 MB bar | arm B: hour 19Z outside 05:00-11:00"
+    },
+    {
+      "arm_a": "arm A: 2.6 MB < 1e+09 MB bar",
+      "at": "2026-09-16T19:08:10Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T19:00:00Z",
+      "latest_bucket_mb": 2.64,
+      "seconds_left_in_hour": 3109,
+      "why": "arm A: 2.6 MB < 1e+09 MB bar | arm B: hour 19Z outside 05:00-11:00"
+    },
+    {
+      "arm_a": "arm A: 4.1 MB < 1e+09 MB bar",
+      "at": "2026-09-16T19:12:10Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T19:00:00Z",
+      "latest_bucket_mb": 4.14,
+      "seconds_left_in_hour": 2869,
+      "why": "arm A: 4.1 MB < 1e+09 MB bar | arm B: hour 19Z outside 05:00-11:00"
+    },
+    {
+      "arm_a": "arm A: 5.4 MB < 1e+09 MB bar",
+      "at": "2026-09-16T19:16:11Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T19:00:00Z",
+      "latest_bucket_mb": 5.36,
+      "seconds_left_in_hour": 2629,
+      "why": "arm A: 5.4 MB < 1e+09 MB bar | arm B: hour 19Z outside 05:00-11:00"
+    },
+    {
+      "arm_a": "arm A: 5.9 MB < 1e+09 MB bar",
+      "at": "2026-09-16T19:20:11Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T19:00:00Z",
+      "latest_bucket_mb": 5.86,
+      "seconds_left_in_hour": 2389,
+      "why": "arm A: 5.9 MB < 1e+09 MB bar | arm B: hour 19Z outside 05:00-11:00; 2389s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 6.9 MB < 1e+09 MB bar",
+      "at": "2026-09-16T19:24:11Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T19:00:00Z",
+      "latest_bucket_mb": 6.92,
+      "seconds_left_in_hour": 2148,
+      "why": "arm A: 6.9 MB < 1e+09 MB bar | arm B: hour 19Z outside 05:00-11:00; 2148s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 8.1 MB < 1e+09 MB bar",
+      "at": "2026-09-16T19:28:11Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T19:00:00Z",
+      "latest_bucket_mb": 8.09,
+      "seconds_left_in_hour": 1908,
+      "why": "arm A: 8.1 MB < 1e+09 MB bar | arm B: hour 19Z outside 05:00-11:00; 1908s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 9.0 MB < 1e+09 MB bar",
+      "at": "2026-09-16T19:32:12Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T19:00:00Z",
+      "latest_bucket_mb": 8.99,
+      "seconds_left_in_hour": 1668,
+      "why": "arm A: 9.0 MB < 1e+09 MB bar | arm B: hour 19Z outside 05:00-11:00; 1668s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 10.9 MB < 1e+09 MB bar",
+      "at": "2026-09-16T19:36:12Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T19:00:00Z",
+      "latest_bucket_mb": 10.87,
+      "seconds_left_in_hour": 1428,
+      "why": "arm A: 10.9 MB < 1e+09 MB bar | arm B: hour 19Z outside 05:00-11:00; 1428s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 11.0 MB < 1e+09 MB bar",
+      "at": "2026-09-16T19:40:12Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T19:00:00Z",
+      "latest_bucket_mb": 11.05,
+      "seconds_left_in_hour": 1187,
+      "why": "arm A: 11.0 MB < 1e+09 MB bar | arm B: hour 19Z outside 05:00-11:00; 1187s left < 2600"
+    },
+    {
+      "arm_a": "arm A: 11.1 MB < 1e+09 MB bar",
+      "at": "2026-09-16T19:44:13Z",
+      "decision": "wait",
+      "latest_bucket": "2026-09-16T19:00:00Z",
+      "latest_bucket_mb": 11.13,
+      "seconds_left_in_hour": 947,
+      "why": "arm A: 11.1 MB < 1e+09 MB bar | arm B: hour 19Z outside 05:00-11:00; 947s left < 2600"
+    }
+  ],
+  "quiet_band_utc": "05:00-11:00",
+  "spike_app_ratio": 5.0,
+  "spike_mb": 1000000000.0,
+  "spike_ratio": 6.0,
+  "watch_started_at": "2026-09-16T15:35:23Z",
+  "watch_until": "2026-09-17T11:00:00Z"
+}
