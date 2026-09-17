@@ -37590,3 +37590,18 @@ falsification test did not fire). `wnba-sprint-0917` → **OPENED** on the pre-r
 in `todo.md #623`, carrying reading 1 of 6.
 
 **No claim was taken and none was owed:** read-only, no deploy.
+
+## 2026-09-17 22:44:03Z (17:44 CT) — live-odds-worker `20d589ed` -> `35920359` (origin/main tip) — lane soccer-live-corners-stage2 — **verify: MET on reachability. Every served soccer `live_state` file now carries `projection_history`, so a finished match's live numbers survive the whistle**
+
+- **User decision:** "ship it" (~17:40 CT), for the durable H32 capture built and landed as `63c6d5b1`.
+- **Live 22:46:55.380Z**, `dep-dam6qcv40ujc73a7jh90`, 2m52s. Claim 22:38:53Z; first preflight **HOLD** at 22:38:57Z (3 jobs in flight), CLEAR at 22:44:02Z, fired 22:44:03Z — one second later, from a loop that re-checked the claim in the same instant. Claim released 22:5xZ.
+- **Expectations, baseline read 22:38:53Z** (served soccer `live_state` 2026-09-17: 10 files, **0** carrying `projection_history`, 0 history rows):
+  - `live_state_files_with_projection_history_key` 0 -> **10** — **MET, read 22:49:57Z**, 3m02s after go-live.
+  - `projection_history_rows_on_an_in_play_match` 0 -> >= 1 — **OWED**: there is no soccer in play tonight; first chance is Friday 2026-09-18 18:00Z.
+- **Why the empty key still proves the code ran:** the previous code has no such key at all, so its presence on all 10 league files can only have been written by `63c6d5b1`. `history_matches 0` is CORRECT with no match in play — the block is created empty and fills per tick once a match is live.
+- **What it changes:** `games` holds only matches IN PLAY, so before this a match's live projections were gone ~45 minutes after full time (measured 22:01:52Z: `games: []` on a date with two completed matches). Each tick now appends a compact row per match — both corners arms, `corners_basis`, audit state, `share_remaining`, `pregame_total`, clock, corners so far, score, goals arm — and carries earlier rows forward, capped at 240 per match. **H32's evidence window goes from under an hour to the family's 8-day retention.**
+- **Ride-alongs, none of them mine, all landed before my commit and each already live on refresh-worker:**
+  - `7ef0431b` (lane `soccer-shot-on-target-definition`, session a1e40980): ESPN's `shotsOnTarget` is not derivable from commentary types; goal+saved is exact. Their lane's reading; this deploy is the vehicle on live-odds-worker.
+  - `e2104fcd` (`#671`, lane `nfl-usage-publish`): the NFL usage artifact was written to the ephemeral checkout. Its reading is on refresh-worker, where it is already live, so this deploy does not affect that grade.
+- **Still owed by this lane:** the Friday rows reading; H32 itself (100 matches or 2026-11-15); refresh-worker, deliberately deferred behind lane `soccer-shot-woodwork-undercount`'s scheduled 09:30 CT run; and the `tracking/live_projections/` family if the history should outlive retention without a copier (needs four claim holders plus a retention rule).
+- **Unchanged and deliberate:** the 15-minute harvest task keeps running. It is now a copier with a week of slack rather than the only thing between H32 and no data.
