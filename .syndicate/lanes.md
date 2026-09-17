@@ -1332,6 +1332,16 @@ death, never life — do not invert it.
 - Verification: after the web deploy, `ledger-summary?days=3&mode=paper` carries `decisions` and `settled_decisions` on 100% of cross and pooled buckets, with `decisions <= orders` everywhere and `settled_decisions <= settled`; the NCAAF buckets' decisions/orders ratio is recorded; ROI and order counts equal a same-window read taken just before.
 - Blocked by: none.
 
+### soccer-prekickoff-freeze — OPEN — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Goal: every soccer match production simulates before kickoff has its last pre-kickoff model output (match projections and player props) frozen in a published artifact that no later rebuild overwrites, so the #664 item-10 watch-list and #665 (H24) forward grades have a qualifying population. Verified on production after deploy: a match that kicked off after go-live has a frozen entry whose `frozen_at` is earlier than its kickoff, exportable from web.
+- Files:
+  - `scripts/build_soccer_artifacts.py` (a pre-kickoff freeze helper and its one call in `build_artifacts` only)
+  - `tests/test_soccer_prekickoff_freeze.py` (NEW)
+- Hypothesis: production retains no pre-kickoff soccer model values. Read 2026-09-17 01:21:48Z over `recommendations_2026-09-13..16.json`: 43 of 43 matches sit in an artifact generated AFTER their kickoff, because `build_artifacts` rewrites one file per league-date as matches go pre -> in -> post. H24's rule "an artifact built BEFORE kickoff" therefore qualifies 0 matches, and so would a props watch-list grade.
+- Falsification test: after deploy, if a match that kicked off after go-live has no frozen entry, or its entry's `frozen_at` is later than its kickoff, the freeze does not do its job.
+- Verification: offline, tests show entries are frozen before kickoff and kept unchanged after kickoff, an entry without a kickoff is never frozen, a corrupt or absent freeze file never breaks the artifact build, and the file name matches the existing publish pattern. In production after the live-odds-worker and refresh-worker deploys: `/api/ops/artifacts/export` returns `recommendations_prekickoff_<date>.<service>.json` for a date with matches, with 100% of post-go-live kickoffs frozen at `frozen_at < kickoff`.
+- Blocked by: none. Design constraint: two services build and publish soccer recommendations, so each writes its OWN freeze file (service name in the file name). One shared path would be a whole-file-replace race on web (#630).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
