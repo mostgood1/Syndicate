@@ -6696,3 +6696,20 @@ Same root as the rule above (an env value is a code path), in a different place:
 - Discriminate unreadable worker disks with what crosses the boundary: web's `[ops.publish] ACCEPTED ... publisher= bytes= delta=` log gave each service's copy size and build time.
 - An artifact with no date in its name is outside the dated pull. A service that built it on old code keeps that copy until it rebuilds it.
 - *(evidence: `deploys.md` 2026-09-17 00:39Z and 01:25Z; commit `bea2a355`)*
+
+## 2026-09-17 — FORBIDDEN: pre-registering a forward test without measuring that its qualifying population can exist, or a threshold without measuring its ceiling
+
+Measured 2026-09-17, session abacd435. Two registrations were written as binding and would have graded nothing:
+- **H24 (`#665`)** required "a production recommendations artifact built BEFORE kickoff". 43 of 43 matches sat in artifacts generated AFTER kickoff, because the builder rewrites one file per league-date through the match. The population was zero forever. Nobody could have found out before grading day (2026-10-15).
+- **H26 (corners)** set r(total) >= 0.20. The corners market's own implied mean reaches r 0.155 on the same matches, so the bar sat above what any pregame number can know, and a market-parity estimator (r 0.182) "failed".
+
+**How to apply.** Before a forward registration is binding:
+1. Read production for the qualifying artifact AS THE RULE WORDS IT (here: `generated_at` vs `kickoff` per match) and count how many recent units would have qualified. Zero means the rule is broken, not the model.
+2. Put the best available reference (the market's own accuracy on the same units) beside any absolute threshold, and set the bar relative to it.
+A registration is a promise about a measurement that will exist; check that it can.
+
+## 2026-09-17 — FORBIDDEN: running `git worktree prune` from a session
+
+Measured 2026-09-17 ~11:4xZ, session abacd435. While removing its own temporary worktree, it ran `git worktree prune`. prune is REPO-GLOBAL: it tried to delete 8 other sessions' worktree records (`.git/worktrees/*`). Every attempt failed with "Permission denied", so nothing was lost. It still acted on work this session did not own.
+
+**How to apply.** Remove only your own worktree (`git worktree remove <path>`). If a directory is left behind, delete that directory and check `git worktree list` for your path alone. Never prune.
