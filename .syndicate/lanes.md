@@ -1437,30 +1437,6 @@ death, never life — do not invert it.
 - Falsification test: a finished frozen match that meets a cell's population rule but the grader joins no price or no outcome for it; or an input family with a deletion rule inside the grading window.
 - Verification: first run after the 2026-09-17 La Liga matches finish. Per cell, frozen -> finished -> priced -> bet counts, with the joins non-zero where a population exists. Retention read from `artifact_retention.py` rules.
 - Blocked by: none
-### closed-lane-archive-0917b — CLOSED 2026-09-17 — opened 2026-09-17 — session 5d8da952-8b7e-4069-aa67-ef92b64684d3 (scheduled task archive-closed-lanes-0917) — **GOAL: NOT MET (deferred, nothing eligible)**
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- **GOAL: NOT MET** (2026-09-17 16:02Z / 11:02 CDT). Goal restated: "archive CLOSED lane blocks whose owners are idle, verified, ledger-only". 0 of 13 CLOSED blocks on origin/main `699f34f7` were SAFE: all three owners were still active (transcript mtimes 15:59:42Z abacd435, 16:00:49Z 0f5b256e, 16:01:20Z a1e40980, read 16:01:48Z) against a 240-minute bar, so the late-morning slot did not find them idle. Nothing moved; `archive_closed_lanes_before.py` was not run; lanes.md and lanes_closed.md bodies untouched. Re-run only after those three sessions have been idle >= 240 min. The NEVER-archive list (board-eval-reader-chunk-ceiling, heavy-build-memory-refusal, nhl-season-readiness, worker-disk-auto-retention, heavy-build-child-process) was not reached. Log: `log/2026-09-17.md` ~11:02 CDT.
-- Files: none (ledger-only)
-- Pre-registered reading (2026-09-17 16:01Z / 11:01 CDT, `owner_liveness.py --worktree <this worktree> --idle-min 240` over origin/main `699f34f7`, 13 CLOSED blocks):
-
-  ```
-  execution-ledger-live-trim               sessions[0f5b256e=1m] -> WAIT: 0f5b256e idle 1m < 240m
-  heavy-build-child-process                sessions[0f5b256e=1m] -> WAIT: 0f5b256e idle 1m < 240m
-  soccer-live-scoreboard-range-stale       sessions[a1e40980=0m] -> WAIT: a1e40980 idle 0m < 240m
-  web-export-timeout                       sessions[a1e40980=0m] -> WAIT: a1e40980 idle 0m < 240m
-  portfolio-no-family-exclusion            sessions[abacd435=2m] -> WAIT: abacd435 idle 2m < 240m
-  board-category-gates                     sessions[abacd435=2m] -> WAIT: abacd435 idle 2m < 240m
-  archive-test-reports-redirect            sessions[0f5b256e=1m] -> WAIT: 0f5b256e idle 1m < 240m
-  chip-key-test-no-data-blind              sessions[abacd435=2m] -> WAIT: abacd435 idle 2m < 240m
-  sim-view-reachability-caveat             sessions[abacd435=2m] -> WAIT: abacd435 idle 2m < 240m
-  sim-view-roi-decision-count              sessions[abacd435=2m] -> WAIT: abacd435 idle 2m < 240m
-  web-export-walk-prefilter                sessions[a1e40980=0m] -> WAIT: a1e40980 idle 0m < 240m
-  closed-lane-archive-0917                 sessions[0f5b256e=1m] -> WAIT: 0f5b256e idle 1m < 240m
-  soccer-capture-staleness                 sessions[abacd435=2m] -> WAIT: abacd435 idle 2m < 240m
-  SAFE_SLUGS=
-  ```
-- Blocked by: owners active (a1e40980, abacd435, 0f5b256e).
-
 ### soccer-live-model-study — OPEN — opened 2026-09-17 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
 - Goal: `#664` item 7, stage 1 (offline, no engine change). Each live-model hypothesis gets a pre-registered held-out verdict before any engine work: H29 live corners (running corner rate + pregame estimator vs the production live re-sim), then H30 live goals (running shot quality) and H31 per-league momentum direction weight, each registered before its own run.
 - **H29 FALSIFIED 2026-09-17** (`log/2026-09-17.md` ~13:55 CT): on 320 held-out TEST matches the running-rate arm beat production's live re-sim (mean |err| -0.0714 [-0.1251, -0.0166]) but not the pregame-estimator pace (+0.0028), so corners-so-far adds nothing. **Reported, not graded:** the pregame estimator x time share beats the live re-sim by -0.0742 [-0.1235, -0.0235] corners MAE and cuts bias +0.46 -> +0.07. A stage-2 swap is a user decision, not taken. H30/H31 still owed.
@@ -1536,6 +1512,21 @@ death, never life — do not invert it.
 - Verification: (a) offline, `off != on` through the call path with tests that fail on the pre-change code; (b) production, a served `live_state` snapshot carrying `corners_basis=prekickoff_pace_v1` with `sim_*` beside it; (c) H32 forward.
 - Blocked by: the call-site edit (lane `soccer-postponed-served-final`) and a user deploy decision.
 
+### closed-lane-archive-20260917-1442 — CLOSED 2026-09-17 — opened 2026-09-17 — session 15b0e4b6-80f1-4491-acfb-c4895a53452b (scheduled task archive-closed-lanes-0917)
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- **GOAL VERDICT: GOAL MET for 1 of 14 CLOSED blocks — `closed-lane-archive-0917b` archived; the other 13 WAIT on live owners and were not touched.**
+- **USER OVERRIDE, logged:** the idle threshold was lowered **240m -> 120m** on explicit user instruction (2026-09-17 ~14:45 CDT / 19:45Z), relaxing the bar this task adopted from `learnings.md` 2026-09-15 *"a lane whose header reads CLOSED on origin/main is safe to archive"*. Every STRUCTURAL check was left at full strength — no claims, no OPEN header, no uncommitted `lanes.md` edit naming the slug in any of the 112 registered worktrees, no lane-named worktree (none exists for the target). Only the transcript-idle bar moved, and the one block it admitted is **this task's OWN prior run**, owned by a session idle 210m. Three earlier clock-timed runs moved nothing (09-16 22:37 CDT, 09-17 11:01 CDT, 09-17 14:38 CDT).
+- READING (pre-registered, `owner_liveness.py --worktree <this> --idle-min 120`, 2026-09-17 ~19:52Z / 14:52 CDT, on origin/main `680e12db`) — grouped by owner; the full per-slug table is in `log/2026-09-17.md`, which is not on the session-start read path:
+
+      abacd435 idle    1m -> WAIT: portfolio-no-family-exclusion, board-category-gates, chip-key-test-no-data-blind, sim-view-reachability-caveat, sim-view-roi-decision-count, soccer-capture-staleness, soccer-forward-graders
+      0f5b256e idle   20m -> WAIT: execution-ledger-live-trim, heavy-build-child-process, heavy-build-memory-refusal, archive-test-reports-redirect, closed-lane-archive-0917
+      5d8da952 idle  218m -> SAFE: closed-lane-archive-0917b
+      a1e40980 idle    1m -> WAIT: board-today-freshness
+      SAFE_SLUGS=closed-lane-archive-0917b
+
+- MEASURED: `lanes.md` **543,942 -> 544,184 B (net +242)**; `lanes_closed.md` **748,406 -> 751,081 B**. The archived block removed 2,457 B and THIS block costs most of it back — a one-block run barely pays for its own ledger entry, which is the honest read on the size goal. `lanes_closed.md` took **+24/-0**, append-only, zero deletions. Claims **169 unchanged**, OPEN headers unchanged; `check_lane_invariants.py` reads `INVARIANTS HOLD` identical to the origin/main baseline taken in a scratch tree (49 headings, 27 claim-holding OPEN lanes, 169 claims). `lanes.md` stays far over its 234 KB cap: **13 of 14 CLOSED blocks still WAIT on live owners**, and they hold the bulk of what is reclaimable.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
@@ -1549,6 +1540,7 @@ death, never life — do not invert it.
 - `brand-logo-v3` — CLOSED — opened 2026-09-14, closed 2026-09-14 — session 08fb3eec-6daf-4680-a64d-bd7f914ad2e7
 - `census-rescue-0910` — CLOSED 2026-09-10 — opened 2026-09-10 — session 78cad512 — **GOAL: MET: census rescue landed (`ab43454d`), three shipped lanes closed, unmeasured-deploy count 3 -> 1**
 - `chunk-assignment-stable` — CLOSED-REVERTED 2026-09-09 — opened 2026-09-08 — session e371dfde — **the fix worked and was unaffordable: it OOM'd the suite twice and is reverted**
+- `closed-lane-archive-0917b` — CLOSED 2026-09-17 — opened 2026-09-17 — session 5d8da952-8b7e-4069-aa67-ef92b64684d3 (scheduled task archive-closed-lanes-0917) — **GOAL: NOT MET (deferred, nothing eligible)**
 - `combined-board-rows-unreadable-tripwire` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: live on web `da268e07` (15:36:46Z); the field is served on every date, 0 `ROWS_UNREADABLE` lines; stored 113 vs rows 111 is the per-sport `by_sport` cap, not a defect.**
 - `combined-board-state-rows-lost` — CLOSED 2026-09-15 — opened 2026-09-14 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: Q1-Q3 answered with production readings. The reader fix is live on web `b6a0e346` (14:10:07Z): `by_date` 09-15 106 (was 0), 0 `VINTAGE_IGNORED`. One prediction was WRONG (`computed_at` moved to the refused heavy build's state stamp). User decision 2026-09-15: keep the `stale` label, it is true. Postmortem in `learnings.md`.**
 - `convergence-phase7-crps` — ORPHANED, **UNOWNED** `[session abf487e4 ARCHIVED 2026-08-20T21:1xZ]` — — **FIVE FINDINGS: FOUR DEFECTS FIXED AND MEASURED, ONE NOT A DEFECT.** Ladder
