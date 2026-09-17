@@ -98,6 +98,8 @@ import collections
 import hashlib
 import json
 import os
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -420,17 +422,33 @@ def parse_roster_spots(payload: Any) -> dict[str, Any] | None:
 # ---------------------------------------------------------------------------
 
 
+# PROCESS-WIDE CACHE for the paper-settlement resolver. `portfolio_commit` builds a NEW
+# resolver (and so a new feed) on every cycle, so a per-instance memo alone re-reads the score,
+# box, roster and linescore of every NHL game with an order on EVERY cycle -- ~4 requests per
+# game per cycle, measured from the endpoints this module reads. Reduced payloads that can no
+# longer change are kept for the process; anything else for `LIVE_TTL_SECONDS`. Failures are
+# never cached. Bounded by `SHARED_CACHE_MAX` entries, oldest evicted first.
+LIVE_TTL_SECONDS = 60.0
+SHARED_CACHE_MAX = 512
+_SHARED_CACHE: dict[str, tuple[float | None, Any]] = {}
+_SHARED_LOCK = threading.Lock()
+
+
 class NhlFeed:
     """Sequential reads of api-web.nhle.com, one per path per instance.
 
     `fetch_json(url) -> payload | None`; None means "use the module default", resolved at call
     time so a test can substitute it. `cache_dir` keeps the REDUCED form of a payload that can
     no longer change (a final game, a date whose every game is final) between runs.
+    `shared_cache` (a dict, e.g. `_SHARED_CACHE`) keeps reduced payloads across feeds in one
+    process: immutable ones indefinitely, live ones for `LIVE_TTL_SECONDS`.
     """
 
-    def __init__(self, *, fetch_json: Callable[[str], Any] | None = None, cache_dir: Path | str | None = None) -> None:
+    def __init__(self, *, fetch_json: Callable[[str], Any] | None = None, cache_dir: Path | str | None = None,
+                 shared_cache: dict[str, tuple[float | None, Any]] | None = None) -> None:
         self._fetch_json = fetch_json
         self._cache_dir = Path(cache_dir) if cache_dir else None
+        self._shared = shared_cache
         self._memo: dict[str, Any] = {}
         self.counters: collections.Counter[str] = collections.Counter()
 
@@ -479,6 +497,13 @@ class NhlFeed:
     def _get(self, path: str, *, reduce: Callable[[Any], Any], immutable: Callable[[Any], bool]) -> Any:
         if path in self._memo:
             return self._memo[path]
+        if self._shared is not None:
+            with _SHARED_LOCK:
+                hit = self._shared.get(path)
+            if hit is not None and (hit[0] is None or time.monotonic() < hit[0]):
+                self.counters["nhle_shared_cache_hits"] += 1
+                self._memo[path] = hit[1]
+                return hit[1]
         cached = self._cache_path(path)
         if cached is not None and cached.is_file():
             try:
@@ -503,6 +528,15 @@ class NhlFeed:
         if value is None:
             self.counters["nhle_failures"] += 1
         self._memo[path] = value
+        if value is not None and self._shared is not None:
+            try:
+                final = bool(immutable(value))
+            except Exception:
+                final = False
+            with _SHARED_LOCK:
+                self._shared[path] = (None if final else time.monotonic() + LIVE_TTL_SECONDS, value)
+                while len(self._shared) > SHARED_CACHE_MAX:
+                    self._shared.pop(next(iter(self._shared)))
         if value is not None and cached is not None:
             try:
                 keep = bool(immutable(value))
@@ -909,7 +943,7 @@ def nhl_status_resolver(selected_date: str):
     Constructing it reads nothing. One feed per resolver, so a slate of forty orders on one
     game is one schedule read, one box, one roster and one linescore -- not forty of each.
     """
-    feed = NhlFeed()
+    feed = NhlFeed(shared_cache=_SHARED_CACHE)
 
     def resolve(order: Mapping[str, Any]) -> dict[str, Any]:
         try:

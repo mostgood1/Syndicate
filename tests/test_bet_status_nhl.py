@@ -529,3 +529,57 @@ def test_an_nhl_bet_now_grades_end_to_end(monkeypatch, isolated_ledger):
     assert result["outcomes"] == {"won": 2, "lost": 1}, result
     assert result["ungraded"] == {}
     assert any("/v1/gamecenter/2025030413/boxscore" in url for url in fake.urls)
+
+
+# ---------------------------------------------------------------------------
+# the process-wide cache: portfolio_commit builds a new resolver every cycle
+# ---------------------------------------------------------------------------
+
+
+def test_a_final_date_is_read_once_across_feeds_that_share_the_cache():
+    fake, shared = FakeNhle(), {}
+    first = nhl.NhlFeed(fetch_json=fake, shared_cache=shared).games_on("2025-12-20")
+    second = nhl.NhlFeed(fetch_json=fake, shared_cache=shared).games_on("2025-12-20")
+    assert first and second == first
+    assert len(fake.urls) == 1, "off != on: without the shared cache the second feed reads again"
+    assert len(nhl.NhlFeed(fetch_json=fake).games_on("2025-12-20")) == len(first) and len(fake.urls) == 2
+
+
+def test_a_not_final_date_is_reused_only_within_the_live_ttl(monkeypatch):
+    fake, shared, clock = FakeNhle(), {}, [1000.0]
+    monkeypatch.setattr(nhl.time, "monotonic", lambda: clock[0])
+    nhl.NhlFeed(fetch_json=fake, shared_cache=shared).games_on("2026-09-19")
+    nhl.NhlFeed(fetch_json=fake, shared_cache=shared).games_on("2026-09-19")
+    assert len(fake.urls) == 1
+    clock[0] += nhl.LIVE_TTL_SECONDS + 1
+    nhl.NhlFeed(fetch_json=fake, shared_cache=shared).games_on("2026-09-19")
+    assert len(fake.urls) == 2
+
+
+def test_a_failed_read_is_never_cached():
+    fake, shared = FakeNhle(), {}
+    assert nhl.NhlFeed(fetch_json=fake, shared_cache=shared).games_on("1999-01-01") is None
+    nhl.NhlFeed(fetch_json=fake, shared_cache=shared).games_on("1999-01-01")
+    assert len(fake.urls) == 2 and shared == {}
+
+
+def test_the_shared_cache_is_bounded(monkeypatch):
+    monkeypatch.setattr(nhl, "SHARED_CACHE_MAX", 2)
+    fake, shared = FakeNhle(), {}
+    for day in ("2025-09-21", "2025-12-20", "2026-06-06"):
+        nhl.NhlFeed(fetch_json=fake, shared_cache=shared).games_on(day)
+    assert list(shared) == ["/score/2025-12-20", "/score/2026-06-06"]
+
+
+def test_the_paper_settlement_resolver_uses_the_process_cache(monkeypatch):
+    built = []
+    real = nhl.NhlFeed
+
+    def spy(**kwargs):
+        built.append(kwargs)
+        return real(**kwargs)
+
+    monkeypatch.setattr(nhl, "NhlFeed", spy)
+    nhl.nhl_status_resolver("2026-09-19")
+    assert built and built[0].get("shared_cache") is nhl._SHARED_CACHE
+
