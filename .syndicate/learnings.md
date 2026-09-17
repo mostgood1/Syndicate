@@ -6825,3 +6825,12 @@ SHA. "Nothing is deployed" is true of the service, never of your code's future.
 - Before deploying, re-read what has accumulated: `origin/main` moved 18 commits under this
   lane in about two hours.
 - *(evidence: `log/2026-09-17.md` ~20:55Z; verdict landed in `46e86b03`)*
+
+## 2026-09-17 (session 1628e558, lanes model-scorecard-cron / web-memory-guard) — `session_worktree.py close` REFUSES A CHERRY-PICKED BRANCH FOREVER, AND ITS "N commit(s) not on origin/main" IS AN ANCESTRY CLAIM, NOT A CONTENT ONE
+
+Seven worktrees, all clean, every commit's content on `origin/main`. `close` accepted two (the lane branches, which had been rebased by `land`) and refused five with *"1 commit(s) not on origin/main -- Land them, or pass --force to discard. Nothing here is recoverable from another session"*. Those five were BUILDER branches whose commits I cherry-picked onto the lane branch: cherry-picking rewrites the SHA, so the original commit is not an ancestor of main and never will be, however many times it lands.
+
+- **`git cherry -v origin/main <branch>` is the check that settles it.** A `-` prefix means git found a patch-identical commit upstream; a `+` means it did not. All five printed `-`, so `--force` discarded nothing. The same relation is invisible to `merge-base --is-ancestor`, which is what the tool (and my instinct) reached for.
+- **The refusal text is right to be loud and wrong about the world**: read it as "I cannot see these upstream", not "these are unlanded" — the same shape as `learnings.md` 2026-09-12's *remote-absent is not content-absent*, and the reason that rule exists.
+- **Belt and braces for a `--force` you are about to run on someone's only copy:** `git cat-file -e origin/main:<path>` for every file the branch introduced, and count the fixtures too. Cheap, and it converts "the patch-ids match" into "the files are there".
+- Two operational notes from the same pass: the tool clears OneDrive's READONLY bit on the worktree admin dir before deleting it (git alone cannot), and it reports stale admin dirs it could not remove — `session_worktree.py prune` owns those, `close` does not.
