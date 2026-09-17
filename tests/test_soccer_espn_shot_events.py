@@ -85,6 +85,106 @@ class ExtractShotEventsTests(unittest.TestCase):
         self.assertEqual(extract_shot_events({}, event_id="e1"), [])
 
 
+class WoodworkAndPenaltyShotsAreCountedTests(unittest.TestCase):
+    """A shot off the post was not off target, not blocked -- it was ABSENT.
+
+    MEASURED 2026-09-17 on ESPN's public feeds, 24 finished matches across
+    epl/la_liga/serie_a/bundesliga (09-01..09-17): the old three-type allowlist
+    reproduced ESPN's own per-match `totalShots` in 9 of 24 matches, and each
+    shortfall equalled that match's count of dropped `shot-hit-woodwork` /
+    `penalty---saved` entries -- 23 and 1 in the sample, 1.42 shots/match, 5.0
+    per 100 kept. With them counted: 24 of 24, no residual gap.
+
+    Restoring the old `_NON_GOAL_SHOT_TYPES` turns every test here red.
+    """
+
+    def test_a_shot_off_the_woodwork_is_a_shot(self) -> None:
+        summary = {
+            "commentary": [
+                {"play": _play("shot-hit-woodwork", "Hit Woodwork",
+                               "Justin Kluivert (Bournemouth) hits the left post with a right footed shot from outside the box.")}
+            ]
+        }
+        rows = extract_shot_events(summary, event_id="e1")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["location"], "outside_box")
+
+    def test_woodwork_has_its_own_outcome_and_is_NOT_on_target(self) -> None:
+        # The on/off-target question is UNRESOLVED against ESPN's own
+        # `shotsOnTarget` (off: 15/24 matches, on: 10/24, residuals both ways),
+        # so this pins that the code does not pretend to have answered it. The
+        # live-state reader keys off `_ON_TARGET_OUTCOMES = {goal, saved}`, and
+        # `woodwork` must stay out of that set rather than being folded into
+        # either side here.
+        from syndicate.features.soccer.ingestion.espn_live_state import _ON_TARGET_OUTCOMES
+
+        summary = {"commentary": [{"play": _play("shot-hit-woodwork", "Hit Woodwork", "hits the bar with a shot from the box.")}]}
+        outcome = extract_shot_events(summary, event_id="e1")[0]["outcome"]
+        self.assertEqual(outcome, "woodwork")
+        self.assertNotIn(outcome, _ON_TARGET_OUTCOMES)
+
+    def test_penalty_variants_are_shots_with_the_right_outcome(self) -> None:
+        # `penalty---scored` was already handled as the taker's goal; the other
+        # three are the same shot with a different ending.
+        cases = [
+            ("penalty---saved", "saved", "Penalty saved. Kylian Mbappe (Real Madrid) right footed shot saved in the bottom left corner."),
+            ("penalty---missed", "off_target", "Penalty missed! Bad penalty by Someone (Team), right footed shot is too high."),
+            ("penalty---post", "woodwork", "Penalty missed! Someone (Team) hits the right post with a right footed shot."),
+        ]
+        for type_key, expected, text in cases:
+            with self.subTest(type_key):
+                summary = {"commentary": [{"play": _play(type_key, "Penalty", text)}]}
+                rows = extract_shot_events(summary, event_id="e1")
+                self.assertEqual(len(rows), 1, "a penalty is a shot by the taker")
+                self.assertEqual(rows[0]["outcome"], expected)
+
+    def test_an_unknown_shot_like_type_is_LOGGED_not_silently_dropped(self) -> None:
+        # THE REASON THIS DEFECT SURVIVED: the old code dropped it wordlessly.
+        # ESPN renames these keys with no notice, so the next one must announce
+        # itself even though it is still (correctly) not counted.
+        summary = {
+            "commentary": [
+                {"play": _play("shot-deflected-wide", "New Thing", "Attempt blocked. Someone (Team) right footed shot from the box.")},
+                {"play": _play("shot-deflected-wide", "New Thing", "Attempt saved. Another (Team) header from the six yard box.")},
+                {"play": _play("foul", "Foul", "Foul by Someone.")},
+            ]
+        }
+        with patch("builtins.print") as printed:
+            rows = extract_shot_events(summary, event_id="e9")
+        self.assertEqual(rows, [], "an unknown type is still not counted -- only announced")
+        lines = [str(call.args[0]) for call in printed.call_args_list]
+        self.assertEqual(len(lines), 1, f"one line per unknown type per match, got {lines}")
+        self.assertIn("SHOT_EVENT_TYPE_UNMAPPED", lines[0])
+        self.assertIn("type=shot-deflected-wide", lines[0])
+        self.assertIn("event_id=e9", lines[0])
+
+    def test_a_dropped_NON_shot_entry_stays_quiet(self) -> None:
+        # The tripwire must not fire on the ordinary contents of this feed --
+        # fouls, cards, subs and corners are most of it. A tripwire that fires
+        # on everything is read as noise and then not read at all.
+        summary = {
+            "commentary": [
+                {"play": _play("foul", "Foul", "Foul by Someone (Team).")},
+                {"play": _play("corner-awarded", "Corner", "Corner, Home FC. Conceded by Someone.")},
+                {"play": _play("yellow-card", "Yellow", "Someone (Team) is shown the yellow card for a bad foul.")},
+                {"play": _play("substitution", "Sub", "Substitution, Home FC. A replaces B.")},
+            ]
+        }
+        with patch("builtins.print") as printed:
+            self.assertEqual(extract_shot_events(summary, event_id="e1"), [])
+        self.assertEqual(printed.call_args_list, [])
+
+    def test_own_goal_is_still_nobody_s_shot(self) -> None:
+        # Guard against the widened allowlist swallowing the one case the
+        # module already got right on purpose.
+        summary = {"commentary": [{"play": _play("own-goal", "Own Goal", "Own Goal by Someone (Team), header from the six yard box.")}]}
+        with patch("builtins.print") as printed:
+            self.assertEqual(extract_shot_events(summary, event_id="e1"), [])
+        lines = [str(call.args[0]) for call in printed.call_args_list]
+        self.assertEqual(len(lines), 1, "it is not a shot, but a header in the text must still be announced, not hidden")
+        self.assertIn("type=own-goal", lines[0])
+
+
 class AggregateSeasonShotEventsTests(unittest.TestCase):
     def test_aggregates_across_matches_and_skips_fetch_failures(self) -> None:
         events = [{"event_id": "e1"}, {"event_id": "e2"}]

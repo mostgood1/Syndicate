@@ -3,6 +3,15 @@
 
 A league whose capture is far below the ~23.4 shots/match benchmark has MISSING
 outcomes, not zero shots. Including such a league inflates the fitted divisor.
+
+THIS IS A SCREEN, NOT A RECONCILIATION. It compares a league's rate against an
+external benchmark over whatever matches the local cache holds, so it can say
+"this league looks short" and never which shots are missing. For the exact
+question -- our count vs ESPN's OWN `totalShots`, per match, same payload, no
+tolerance, non-zero exit on any gap -- use `check_soccer_shot_reconciliation.py`.
+That one caught `shot-hit-woodwork` being dropped (2026-09-17): 1.42 shots/match
+missing, which is 6% of the benchmark and well inside this script's 0.75 floor,
+i.e. invisible here by construction.
 """
 import collections, datetime, glob, io, json, os, sys
 sys.path.insert(0, os.getcwd())

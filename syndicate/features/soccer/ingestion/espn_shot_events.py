@@ -3,7 +3,8 @@
 ESPN's match summary carries two event feeds: the sparse ``keyEvents``
 timeline (goals/cards/subs, used by ``espn_match_events.py`` for minutes)
 and a much richer ``commentary`` feed -- roughly 5x the entries -- covering
-every shot (on/off target, blocked), corner, foul, and offside, each with
+every shot (on/off target, blocked, off the woodwork, and the penalty
+variants), corner, foul, and offside, each with
 a clock, team, participants, and (unreliable, unreverse-engineered)
 field-position coordinates.
 
@@ -32,8 +33,36 @@ from typing import Any
 from syndicate.features.soccer.ingestion.espn_lineups import fetch_completed_events
 from syndicate.features.soccer.ingestion.espn_lineups import fetch_match_summary
 
-_NON_GOAL_SHOT_TYPES = {"shot-on-target", "shot-off-target", "shot-blocked"}
+# EVERY non-goal commentary type that IS a shot. Measured 2026-09-17 over 24
+# finished matches (epl/la_liga/serie_a/bundesliga, 09-01..09-17): with only the
+# first three, extracted totals matched ESPN's own `totalShots` in 9 of 24
+# matches; with `shot-hit-woodwork` and the penalty variants, 24 of 24, and each
+# match's shortfall equalled its dropped-event count exactly. 23 woodwork events
+# and 1 `penalty---saved` in that sample = 1.42 shots/match, 5.0 per 100 kept --
+# shots that were not off target, not blocked, but ABSENT.
+#
+# `penalty---missed` and `penalty---post` did not occur in the sample and are
+# included from the naming pattern of the two that did. A wrong guess costs an
+# unused entry; omitting a real one costs a silent drop, which is the defect
+# this lane exists to fix -- and `_UNMAPPED_SHOT_TEXT` below makes the next
+# unknown key loud either way.
+_NON_GOAL_SHOT_TYPES = {
+    "shot-on-target",
+    "shot-off-target",
+    "shot-blocked",
+    "shot-hit-woodwork",
+    "penalty---saved",
+    "penalty---missed",
+    "penalty---post",
+}
 _CORNER_MARKER = "following a corner"
+
+# A commentary entry whose TEXT describes a shot while its type key is not one
+# this module knows. ESPN adds and renames these keys with no notice and the
+# failure mode is SILENT -- the shot stops existing, and every total downstream
+# is quietly short. Across those 24 matches this matched exactly the types added
+# above and nothing else, so it is a tripwire, not a source of noise.
+_UNMAPPED_SHOT_TEXT = ("shot", "attempt", "header", "effort", "strike")
 
 # Checked in order -- "outside the box" must win before the generic "box"
 # markers below it, since it contains the substring "box".
@@ -77,6 +106,19 @@ def _classify_outcome(type_key: str) -> str:
         "shot-on-target": "saved",
         "shot-off-target": "off_target",
         "shot-blocked": "blocked",
+        # ITS OWN VALUE, NOT FOLDED INTO on/off TARGET, and that is a measurement
+        # rather than caution. Against ESPN's own `shotsOnTarget` over the same
+        # 24 matches, counting woodwork as OFF target reconciles 15 of 24 and as
+        # ON target 10 of 24, with residuals in BOTH directions -- so ESPN's
+        # on-target figure is not a function of these keys and either choice
+        # would be a guess wearing a fix's clothes. `woodwork` counts as a SHOT
+        # (which is exact, 24/24) and is absent from `espn_live_state`'s
+        # `_ON_TARGET_OUTCOMES`, so it lands off target there while the open
+        # question stays visible instead of being silently decided here.
+        "shot-hit-woodwork": "woodwork",
+        "penalty---saved": "saved",
+        "penalty---missed": "off_target",
+        "penalty---post": "woodwork",
     }.get(type_key, "unknown")
 
 
@@ -84,10 +126,25 @@ def extract_shot_events(summary: dict[str, Any], *, event_id: str) -> list[dict[
     """One row per shot (incl. goals) from a match's commentary feed."""
     commentary = summary.get("commentary") or []
     rows: list[dict[str, Any]] = []
+    unmapped: set[str] = set()
     for entry in commentary:
         play = entry.get("play") or {}
         type_key = str((play.get("type") or {}).get("type") or "").lower()
         if type_key not in _NON_GOAL_SHOT_TYPES and not _is_goal_by_the_shooter(type_key):
+            # THE TRIPWIRE. Dropping an entry is normal -- fouls, cards, subs and
+            # substitutions are most of this feed. Dropping one whose TEXT calls
+            # it a shot is the defect that hid `shot-hit-woodwork` for the life
+            # of this module, and it hid because nothing said a word. One line
+            # per unknown type per match, not per entry: enough to name the key
+            # and read the sentence, bounded when a whole feed changes shape.
+            text_lower = str(play.get("text") or "").lower()
+            if type_key not in unmapped and any(word in text_lower for word in _UNMAPPED_SHOT_TEXT):
+                unmapped.add(type_key)
+                print(
+                    f"[espn_shot_events] SHOT_EVENT_TYPE_UNMAPPED event_id={event_id} "
+                    f"type={type_key or '(empty)'} text={text_lower[:120]!r}",
+                    flush=True,
+                )
             continue
         text = str(play.get("text") or "")
         clock = play.get("clock") or {}
