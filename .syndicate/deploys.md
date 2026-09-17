@@ -37144,3 +37144,10 @@ Scheduled task `full-slate-memory-reading-0915`. Read-only on production: no dep
   - live-odds-worker (live-lens pull at an explicit 30 s): **67 pulls, 0 timed out** (03:46-04:34Z), against 12% (8 of 67) at 19:33-20:56Z and 16% (19 of 122) at 16:38-19:12Z.
   - refresh-worker: **6 pulls, 0 timed out** (04:02-04:33Z); its floor advanced on each (03:09:12 -> 04:02:11 -> 04:23:42Z).
 - **The 03:43Z cold outliers did not recur:** the slowest warm body pull was 18.3 s.
+
+## 2026-09-17 04:50Z (2026-09-16 23:50 CT) — READING, no deploy — refresh-worker `f7ae4ce3` — lane heavy-build-memory-refusal — **watch window closed: 2 of 2 mid-build refusals refreshed today's Layer 2 shortlist (~5 min each); no LOOP, no NOT_RUN**
+
+- **Window** 01:46:46Z-04:45:18Z, 36 readings (`shortlist_fix_watch.py`), 8 board builds saved, 1 recycle (03:09:35Z).
+- **Refusal 2:** `MEMORY_GUARD_ABORT stage=post_collect_candidates_with_fallback_merge` 04:32:52Z (headroom 1,647.6 MB) -> `RECYCLE_CHECK held=children_running consecutive_refusals=1` 04:33:20Z -> `LAYER2_FAST_REFRESH date=2026-09-16 rows=3379 live_rows=6 kalshi_capture=joined:16113:108.7s elapsed_s=318.7` 04:38:14Z -> `LAYER2_REFRESH_AFTER_BUILD_ABORT ... ran=yes` 04:38:17Z; today's shortlist `written_at` 04:36:23Z (3 min 31 s after the refusal).
+- **Flags, deduplicated:** MISSED x2 distinct (02:55:33Z, 04:32:52Z) -- both are the same timing miss (fast path 291-319 s vs the 3-min window), not absent refreshes; STALE x2 (35 and 40 min, 02:53-02:58Z) -- the next-day-build queue wait already in leads.md; 0 NOT_RUN; 0 LOOP.
+- **Verdict for the pre-registered clauses:** refresh on every mid-build refusal MET (2/2); 3-min timing NOT MET (the window was set from a 14-27 s figure that is stale); today's write gap <= 25 min NOT MET only during the next-day build wait. Lane stays open for the recycle-threshold decision.
