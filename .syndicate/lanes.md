@@ -1318,8 +1318,9 @@ death, never life — do not invert it.
 - Verification: after the web deploy, the same read has no `unreachable` key; `verdict_reachability.market_fair_only` lists the four verdicts; every bucket with one of them carries `market_fair_only: true` and every other bucket `false`; order counts per verdict match the pre-deploy read taken in the same window.
 - Blocked by: none. The web deploy must not carry another lane's undeployed web-affecting commit without that lane's say.
 
-### sim-view-roi-decision-count — OPEN — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+### sim-view-roi-decision-count — CLOSED 2026-09-17 — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
 - Goal: every bucket of `/api/ops/execution/ledger-summary` `sim_view_roi` (cross and pooled) reports `decisions` and `settled_decisions`: distinct bets, keyed the way `settled_decisions_by_sport` already keys them. The payload also reports how many decisions sit in more than one verdict. The settled sim-verdict ROI read can then state its real sample size instead of an order-row count.
+- **GOAL: MET** (2026-09-17 01:15Z). Web `6b26e0c1` has been live since 01:10:24Z. The read at 01:11:16Z has `decisions` and `settled_decisions` on 20/20 cross and 5/5 pooled buckets and 0 bucket violations; `sample` shows 373 decisions, 2 in more than one verdict; orders and ROI are unchanged against the 01:07:00Z baseline (`deploys.md` 01:07:10Z). NCAAF: 458 rows are 198 decisions.
 - Files:
   - `syndicate/features/shared/paper_settlement.py` (`settled_decisions_by_sport`'s decision key lifted to module level unchanged, and the counts added in `sim_view_roi_summary` only)
   - `tests/test_sim_view_roi_summary.py`

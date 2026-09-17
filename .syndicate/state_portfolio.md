@@ -310,6 +310,17 @@ market-fair-sized orders (`market_fair_only`, flagged on every bucket since web
 the allowlist env SET in both states. The earlier test that read the env
 implicitly is how "empty by construction" outlived its truth by 12 days.
 
+**THE SAMPLE IS DECISIONS, NOT ROWS** `[2026-09-17, lane sim-view-roi-decision-count; web 6b26e0c1]`.
+An order's identity includes `selected_date` and venue, so a bet planned on
+several slate dates is several rows with one outcome. Every `sim_view_roi`
+bucket now carries `decisions` and `settled_decisions`, keyed by
+`_decision_key`, the same key `settled_decisions_by_sport` uses. A top-level
+`sample` block counts bets that carry different verdicts on different slate
+dates. Read 01:11:16Z (paper, 09-15..17): NCAAF 458 rows = 198 decisions; the
+sample holds 373 decisions, 2 of them in two verdicts. **Quote
+`settled_decisions` as n; ROI stays row-weighted** (each row is its own stake at
+its own price).
+
 Size cost, since `_LEAN_FIELDS` bounds a document two services
 read-modify-write: +74 B/record, **+361 KB at the 5,000-record ceiling**, where
 the whole ledger is ~4.40 MB against an 8 MB refusal — already 220% of its own
