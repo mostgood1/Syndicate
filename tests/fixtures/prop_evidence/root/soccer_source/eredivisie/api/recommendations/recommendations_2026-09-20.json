@@ -1,0 +1,63 @@
+{
+ "league": "eredivisie",
+ "date": "2026-09-20",
+ "generated_at": "2026-09-16T03:47:03.523140+00:00",
+ "simulations": 400,
+ "promoted_prior_teams": [],
+ "anchor": {
+  "state": "disabled",
+  "weight": 0.0,
+  "odds_path": "/opt/render/project/data/soccer_source/eredivisie/api/odds/game_odds_current.csv",
+  "fixtures": 4,
+  "market_features": {
+   "fixtures": 4,
+   "attached": 1,
+   "with_total": 1,
+   "with_spread": 1,
+   "skipped": 3,
+   "priced_events": 9,
+   "armed": false
+  },
+  "attached": 4,
+  "skipped": 0,
+  "priced_events": 9,
+  "by_stage": {
+   "event_id": 0,
+   "exact_pair": 1,
+   "fuzzy": 3
+  },
+  "skipped_reasons": {},
+  "skipped_examples": []
+ },
+ "player_substrate": {
+  "league": "eredivisie",
+  "files": [
+   "players_2025.csv",
+   "players_2026.csv"
+  ],
+  "rows": 557,
+  "club_from_newest_season": 33,
+  "latest_file_rows": 299,
+  "previous_file_rows": 459,
+  "latest_max_minutes": 540.0,
+  "clubs_ready": 18,
+  "clubs_seen": 18,
+  "departed_filter": "per_club",
+  "dropped": 71,
+  "espn_goal_shrink": {
+   "state": "applied",
+   "stabilizer": 180.0,
+   "rows": 454,
+   "buckets": {
+    "?": 218,
+    "D": 97,
+    "F": 34,
+    "M": 105
+   },
+   "xg_zero_rows_before": 189,
+   "xg_zero_rows_after": 0
+  }
+ },
+ "matches": [],
+ "player_props": []
+}

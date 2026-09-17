@@ -1044,6 +1044,15 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # a growing/unbounded tree like data/cache or data/raw/statcast).
     "mlb_source/source_artifacts/data/statcast/features/player_features_latest.json",
     "mlb_source/data/statcast/features/player_features_latest.json",
+    # `prop-evidence-parity` (2026-09-17): Ask's MLB batter-vs-pitcher index --
+    # 64 shards keyed by pitcher_id % 64, built weekly on refresh-worker from its
+    # own raw Statcast chunks by `scripts/build_mlb_bvp_index.py`. Measured over
+    # the 384,382 pairs the legacy cache holds: 91-269 KB per shard, 10.45 MB in
+    # total. It replaces web aggregating ~70 MB of git-tracked cache (newest date
+    # 2026-05-11) per pitcher per Ask. Narrow on purpose (agreed with
+    # `nhl-season-readiness`, which holds this list): one directory, one name
+    # shape, a fixed shard count.
+    "mlb_source/source_artifacts/data/statcast/bvp/bvp_pairs_*.json",
     # Soccer has no source_artifacts/data/processed nesting -- build_soccer_artifacts.py,
     # poll_soccer_live_state.py, build_soccer_schedule.py, fetch_soccer_oddsapi_odds_local.py,
     # fetch_soccer_oddsapi_props_local.py, and build_soccer_picks.py all write directly

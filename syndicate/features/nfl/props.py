@@ -644,6 +644,11 @@ def nfl_props_rows_for_week(
             "game_id": game_id, "market": join_market, "period": "full_game", "entity": player_name,
             "sim_projection": model_prob, "projected_value": mean,
             "sim_source": "nfl_season_rate" if rate_source == "current_season_rolling" else f"nfl_{rate_source}",
+            # DISPLAY ONLY (lane `prop-evidence-parity`): the spread and sample the
+            # probability above was priced from, so Ask can show a mean WITH its
+            # uncertainty and its game count. `model_prob` is unchanged by these.
+            "projected_sd": round(float(stdev), 4) if stdev is not None else None,
+            "sample_games": int(n) if isinstance(n, (int, float)) and not isinstance(n, bool) else None,
             "rate_source": rate_source,
             "player_id_source": id_source,
             "player_team": player_team,

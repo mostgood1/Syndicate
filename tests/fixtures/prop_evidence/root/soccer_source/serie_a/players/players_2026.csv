@@ -1,0 +1,47 @@
+league,season,player_id,player_name,team,position,minutes,games,shots_per90,xg_per90,xa_per90,goals_per90,assists_per90,key_passes_per90,expected_minutes_share,is_goalkeeper,source,rate_own_weight
+serie_a,2026,understat_7700,Che Adams,Torino,F S,196.0,3,1.9713,0.3945,0.1193,0.6362,0.0591,1.1119,0.7259,False,understat,0.5213
+serie_a,2026,understat_7375,Roberto Piccoli,Bologna,F,276.0,4,2.4149,0.4602,0.0769,0.3272,0.0487,0.7195,0.7667,False,understat,0.6053
+serie_a,2026,understat_11736,Artem Dovbyk,Bologna,S,76.0,3,3.2172,0.5672,0.2756,0.4973,0.0833,1.5797,0.2815,False,understat,0.2969
+serie_a,2026,understat_11902,Pietro Comuzzo,Torino,D,339.0,4,0.5926,0.1377,0.0463,0.1942,0.0317,0.6213,0.9417,False,understat,0.6532
+serie_a,2026,understat_308,Ricardo Rodríguez,Torino,S,16.0,1,2.3654,0.2677,0.1788,0.1903,0.1088,1.6041,0.1778,False,understat,0.0816
+serie_a,2026,understat_1102,Giovanni Simeone,Torino,F S,252.0,4,2.3408,0.3445,0.0886,0.1371,0.0514,0.7594,0.7,False,understat,0.5833
+serie_a,2026,understat_1148,Duván Zapata,Torino,S,10.0,2,2.4401,0.2762,0.1844,0.1963,0.1122,1.6548,0.0556,False,understat,0.0526
+serie_a,2026,understat_1305,Lukasz Skorupski,Bologna,GK,270.0,3,0.0,0.0,0.0018,0.0,0.0,0.02,1.0,True,understat,0.6
+serie_a,2026,understat_1424,Federico Bernardeschi,Bologna,M S,290.0,4,2.1605,0.179,0.3501,0.0623,0.0538,1.677,0.8056,False,understat,0.617
+serie_a,2026,understat_6160,Riccardo Orsolini,Bologna,M S,84.0,2,1.119,0.1026,0.1562,0.1109,0.0958,1.6219,0.4667,False,understat,0.3182
+serie_a,2026,understat_6276,Nikola Vlasic,Torino,F M,360.0,4,1.7059,0.1793,0.1041,0.1096,0.0411,0.7742,1.0,False,understat,0.6667
+serie_a,2026,understat_7005,Jens Odgaard,Bologna,M S,229.0,4,2.0426,0.2423,0.0985,0.0716,0.0618,1.0469,0.6361,False,understat,0.5599
+serie_a,2026,understat_7286,Juan Miranda,Bologna,D S,221.0,3,0.3181,0.0363,0.2153,0.0269,0.2655,1.4775,0.8185,False,understat,0.5511
+serie_a,2026,understat_7576,Nicolò Cambiaghi,Bologna,M,308.0,4,2.0808,0.1324,0.0999,0.06,0.0518,1.2462,0.8556,False,understat,0.6311
+serie_a,2026,understat_8626,Nikola Moro,Bologna,S,71.0,3,1.8471,0.2091,0.1396,0.1486,0.0849,1.2526,0.263,False,understat,0.2829
+serie_a,2026,understat_8912,Tommaso Pobega,Bologna,M,183.0,3,1.8055,0.0952,0.0895,0.0806,0.0697,1.1795,0.6778,False,understat,0.5041
+serie_a,2026,understat_9090,Ardian Ismajli,Torino,D S,161.0,3,0.374,0.0427,0.0501,0.0317,0.0483,0.4178,0.5963,False,understat,0.4721
+serie_a,2026,understat_9866,Nadir Zortea,Bologna,D S,90.0,2,0.8057,0.0657,0.0632,0.04,0.061,0.5276,0.5,False,understat,0.3333
+serie_a,2026,understat_9999,Arthur Theate,Bologna,D,180.0,2,0.8543,0.0626,0.0474,0.03,0.0457,0.3957,1.0,False,understat,0.5
+serie_a,2026,understat_10292,Nathan Patterson,Torino,S,30.0,1,2.2077,0.2499,0.1669,0.1776,0.1015,1.4972,0.3333,False,understat,0.1429
+serie_a,2026,understat_10382,Eray Cömert,Torino,D,250.0,3,0.5059,0.0388,0.0446,0.0251,0.2476,0.5406,0.9259,False,understat,0.5814
+serie_a,2026,understat_10433,Cesare Casadei,Torino,M,70.0,1,1.1817,0.1083,0.1076,0.1171,0.1011,0.9927,0.7778,False,understat,0.28
+serie_a,2026,understat_10796,Zakaria Aboukhlal,Torino,S,23.0,2,3.1705,0.4018,0.1726,0.1838,0.105,1.5488,0.1278,False,understat,0.1133
+serie_a,2026,understat_10899,Emirhan Ilkhan,Torino,S,50.0,2,2.0157,0.2281,0.2673,0.1622,0.0927,1.7583,0.2778,False,understat,0.2174
+serie_a,2026,understat_10956,Emil Holm,Bologna,D S,270.0,4,0.8834,0.0649,0.0435,0.024,0.0366,0.5166,0.75,False,understat,0.6
+serie_a,2026,understat_11039,Lewis Ferguson,Bologna,M,360.0,4,1.0471,0.1266,0.2147,0.0542,0.0468,1.2929,1.0,False,understat,0.6667
+serie_a,2026,understat_11278,Gvidas Gineitis,Torino,M,281.0,4,0.8361,0.08,0.0688,0.0635,0.2501,0.7336,0.7806,False,understat,0.6095
+serie_a,2026,understat_11741,Saúl Coco,Torino,D,309.0,4,0.6289,0.1039,0.0383,0.0221,0.0337,0.4754,0.8583,False,understat,0.6319
+serie_a,2026,understat_11962,Oussama El Azzouzi,Bologna,M,83.0,1,1.1233,0.103,0.1208,0.1113,0.0961,1.2858,0.9222,False,understat,0.3156
+serie_a,2026,understat_12012,Marcus Pedersen,Torino,D,70.0,1,0.5102,0.0582,0.1042,0.0432,0.0658,0.9298,0.7778,False,understat,0.28
+serie_a,2026,understat_12369,Lucas Perri,Torino,GK,180.0,2,0.0,0.0,0.0023,0.0,0.0,0.025,1.0,True,understat,0.5
+serie_a,2026,understat_12609,Niccolò Fortini,Torino,D M S,230.0,4,0.5306,0.0474,0.0614,0.0263,0.0401,0.567,0.6389,False,understat,0.561
+serie_a,2026,understat_12904,Samuel Mbangula,Bologna,S,6.0,2,2.9764,0.3225,0.1884,0.2006,0.1146,1.6904,0.0333,False,understat,0.0323
+serie_a,2026,understat_13237,Massimo Pessina,Bologna,GK,90.0,1,0.0,0.0,0.003,0.0,0.0,0.0333,1.0,True,understat,0.3333
+serie_a,2026,understat_13599,Alessio Cacciamani,Torino,D M S,274.0,4,0.4792,0.0581,0.1181,0.0238,0.2345,0.7102,0.7611,False,understat,0.6035
+serie_a,2026,understat_13698,Rahim Alhassane,Bologna,D,139.0,2,0.9641,0.1467,0.0785,0.0339,0.0516,1.293,0.7722,False,understat,0.4357
+serie_a,2026,understat_13894,Torbjørn Heggem,Bologna,D,360.0,4,0.4029,0.0421,0.0611,0.02,0.0305,0.7638,1.0,False,understat,0.6667
+serie_a,2026,understat_13962,Rafik Belghali,Torino,D S,77.0,2,0.4963,0.0566,0.2556,0.042,0.4142,0.9045,0.4278,False,understat,0.2996
+serie_a,2026,understat_14382,Eivind Helland,Bologna,D,180.0,2,0.8543,0.0807,0.0474,0.03,0.0457,0.3957,1.0,False,understat,0.5
+serie_a,2026,understat_14403,Sandro Kulenovic,Torino,S,19.0,2,2.3297,0.2637,0.1761,0.1875,0.1071,1.5799,0.1056,False,understat,0.0955
+serie_a,2026,understat_14897,Diego Mascardi,Torino,GK,180.0,2,0.0,0.0,0.0023,0.0,0.0,0.025,1.0,True,understat,0.5
+serie_a,2026,understat_14898,Kian Fitz-Jim,Torino,M,330.0,4,0.9322,0.0577,0.2291,0.0574,0.0496,1.5455,0.9167,False,understat,0.6471
+serie_a,2026,understat_14910,Mikel Amondarain,Bologna,M S,93.0,3,1.4118,0.119,0.1021,0.1072,0.0926,1.2387,0.3444,False,understat,0.3407
+serie_a,2026,understat_14911,Marco Libra,Bologna,S,70.0,2,2.2145,0.2311,0.1673,0.1492,0.0853,1.6176,0.3889,False,understat,0.28
+serie_a,2026,understat_15039,Daniel Bragança,Torino,S,59.0,2,1.9398,0.2196,0.2498,0.1561,0.0892,1.6921,0.3278,False,understat,0.2469
+serie_a,2026,understat_15060,Jay Enem,Bologna,S,5.0,1,2.9925,0.2975,0.2301,0.2016,0.1152,2.186,0.0556,False,understat,0.027

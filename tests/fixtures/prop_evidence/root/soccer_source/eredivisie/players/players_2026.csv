@@ -1,0 +1,36 @@
+league,player_id,player_name,team,position,is_goalkeeper,appearances,starts,minutes_played,shots_per90,xg_per90,xa_per90,shot_on_target_rate,expected_minutes_share,source
+eredivisie,196688,Stijn van Gassel,Excelsior,Goalkeeper,True,6,6,540.0,0.0,0.0,0.1667,,1.0,espn_true_per90
+eredivisie,386880,Jan Plug,Excelsior,Center Left Defender,False,6,6,540.0,0.5,0.0,0.0,0.3333,1.0,espn_true_per90
+eredivisie,305597,Rick Meissen,Excelsior,Center Right Defender,False,6,6,540.0,0.5,0.1667,0.0,0.6667,1.0,espn_true_per90
+eredivisie,278383,Simon Janssen,Excelsior,Left Back,False,6,5,400.2,0.6747,0.0,0.6747,0.0,0.7411,espn_true_per90
+eredivisie,321080,Lennard Hartjes,Excelsior,Left Midfielder,False,6,6,517.5,0.6957,0.0,0.0,0.5,0.9583,espn_true_per90
+eredivisie,328957,Daniel Van Vianen,Excelsior,Right Midfielder,False,4,3,254.2,0.7082,0.0,0.0,0.0,0.4707,espn_true_per90
+eredivisie,328982,David Garden,Excelsior,Forward,False,6,6,425.4,1.9041,0.6347,0.0,0.4444,0.7878,espn_true_per90
+eredivisie,343207,Irakli Yegoian,Excelsior,Right Forward,False,6,6,524.2,2.5752,0.3434,0.6867,0.4667,0.9708,espn_true_per90
+eredivisie,344197,Nesto Groen,Excelsior,Substitute,False,5,0,105.5,3.4123,0.8531,0.0,0.5,0.1954,espn_true_per90
+eredivisie,388327,Aymen Sliti,Excelsior,Substitute,False,6,4,296.5,3.6426,0.6071,0.3036,0.4167,0.5491,espn_true_per90
+eredivisie,387986,Ilano Silva Timas,Excelsior,Substitute,False,5,2,179.9,0.0,0.0,0.5002,,0.3332,espn_true_per90
+eredivisie,303840,Casper Widell,Excelsior,Substitute,False,6,5,466.0,0.5794,0.1931,0.0,0.3333,0.863,espn_true_per90
+eredivisie,140740,Marc-André ter Stegen,Ajax Amsterdam,Goalkeeper,True,5,5,450.0,0.0,0.0,0.0,,0.8333,espn_true_per90
+eredivisie,305590,Youri Baas,Ajax Amsterdam,Center Left Defender,False,6,5,474.6,1.1379,0.1896,0.0,0.1667,0.8788,espn_true_per90
+eredivisie,384127,Aaron Bouwman,Ajax Amsterdam,Center Right Defender,False,4,4,354.0,0.2542,0.0,0.0,1.0,0.6556,espn_true_per90
+eredivisie,240353,Caio Henrique,Ajax Amsterdam,Left Back,False,6,5,465.2,0.3869,0.0,0.1935,0.0,0.8615,espn_true_per90
+eredivisie,351281,Lucas Rosa,Ajax Amsterdam,Right Back,False,3,3,270.0,1.6667,0.0,0.3333,0.2,0.5,espn_true_per90
+eredivisie,325609,Oscar Gloukh,Ajax Amsterdam,Left Midfielder,False,6,5,357.6,4.5303,0.2517,0.7551,0.3889,0.6622,espn_true_per90
+eredivisie,168993,Davy Klaassen,Ajax Amsterdam,Right Midfielder,False,6,5,370.7,1.9423,0.7284,0.0,0.5,0.6865,espn_true_per90
+eredivisie,219284,Kasper Dolberg,Ajax Amsterdam,Forward,False,5,3,267.0,4.7191,0.6742,0.6742,0.2143,0.4944,espn_true_per90
+eredivisie,403927,Abdellah Ouazane,Ajax Amsterdam,Left Forward,False,6,2,258.0,4.883,0.3488,0.0,0.2143,0.4779,espn_true_per90
+eredivisie,149577,Steven Berghuis,Ajax Amsterdam,Right Forward,False,6,6,402.8,3.5747,0.2234,0.4468,0.375,0.746,espn_true_per90
+eredivisie,305372,Tolu Arokodare,Ajax Amsterdam,Substitute,False,5,3,245.4,4.0346,0.7336,0.3668,0.2727,0.4544,espn_true_per90
+eredivisie,381074,Jorthy Mokio,Ajax Amsterdam,Substitute,False,6,4,356.5,2.2721,0.2525,0.0,0.3333,0.6602,espn_true_per90
+eredivisie,304571,Marcos Leonardo,Ajax Amsterdam,Substitute,False,4,0,102.5,3.5125,0.8781,0.0,0.5,0.1898,espn_true_per90
+eredivisie,197628,Julian Brandt,Ajax Amsterdam,Substitute,False,6,4,351.4,2.8175,0.7684,0.0,0.6364,0.6507,espn_true_per90
+eredivisie,188055,Alireza Jahanbakhsh,Excelsior,Substitute,False,4,0,68.8,2.6182,0.0,0.0,0.5,0.1273,espn_true_per90
+eredivisie,295861,Oliver Edvardsen,Ajax Amsterdam,Substitute,False,3,1,78.0,1.1537,0.0,0.0,0.0,0.1445,espn_true_per90
+eredivisie,321905,Ágúst Þorsteinsson,Excelsior,Left Forward,False,4,4,282.4,1.275,0.0,0.3187,0.25,0.5229,espn_true_per90
+eredivisie,366388,Kasey Bos,Excelsior,Substitute,False,3,1,119.9,0.0,0.0,0.0,,0.222,espn_true_per90
+eredivisie,372025,Eric Da Silva Moreira,Excelsior,Substitute,False,4,3,235.3,0.3825,0.0,0.0,0.0,0.4357,espn_true_per90
+eredivisie,333312,Anton Gaaei,Ajax Amsterdam,Right Back,False,3,3,270.0,1.3333,0.0,0.0,0.25,0.5,espn_true_per90
+eredivisie,214401,Thilo Kehrer,Ajax Amsterdam,Substitute,False,3,2,172.7,2.0845,0.5211,0.5211,0.5,0.3198,espn_true_per90
+eredivisie,212231,Viktor Tsygankov,Ajax Amsterdam,Substitute,False,3,0,85.9,3.1421,1.0474,1.0474,0.6667,0.1591,espn_true_per90
+eredivisie,195226,Sofyan Amrabat,Ajax Amsterdam,Substitute,False,3,1,159.6,1.128,0.0,0.0,0.5,0.2955,espn_true_per90

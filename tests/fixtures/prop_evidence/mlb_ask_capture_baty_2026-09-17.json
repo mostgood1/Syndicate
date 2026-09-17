@@ -1,0 +1,443 @@
+{
+ "row": {
+  "sport": "mlb",
+  "event_id": "86a852d517d266c4d6c74e570caffa06",
+  "market": "batter_total_bases",
+  "player_name": "Brett Baty",
+  "line": 1.5,
+  "side": "over"
+ },
+ "tables": [
+  {
+   "title": "SmartSim game outlook — Philadelphia Phillies @ New York Mets (2026-09-17)",
+   "columns": [
+    "Metric",
+    "Philadelphia Phillies",
+    "New York Mets"
+   ],
+   "rows": [
+    [
+     "Win probability",
+     "41.2%",
+     "58.8%"
+    ],
+    [
+     "Mean runs",
+     "5.30",
+     "6.06"
+    ]
+   ],
+   "layer": null
+  },
+  {
+   "title": "Last 10 games — Brett Baty (through 2026-09-16)",
+   "columns": [
+    "Date",
+    "Opponent",
+    "AB",
+    "H",
+    "HR",
+    "RBI",
+    "BB",
+    "SO"
+   ],
+   "rows": [
+    [
+     "2026-09-16",
+     "BAL",
+     "4",
+     "1",
+     "0",
+     "0",
+     "0",
+     "1"
+    ],
+    [
+     "2026-09-15",
+     "BAL",
+     "2",
+     "1",
+     "0",
+     "0",
+     "0",
+     "0"
+    ],
+    [
+     "2026-09-14",
+     "BAL",
+     "3",
+     "0",
+     "0",
+     "0",
+     "1",
+     "1"
+    ],
+    [
+     "2026-09-13",
+     "NYY",
+     "3",
+     "1",
+     "0",
+     "0",
+     "0",
+     "0"
+    ],
+    [
+     "2026-09-09",
+     "MIA",
+     "1",
+     "1",
+     "0",
+     "1",
+     "0",
+     "0"
+    ],
+    [
+     "2026-09-08",
+     "MIA",
+     "3",
+     "1",
+     "1",
+     "2",
+     "0",
+     "0"
+    ],
+    [
+     "2026-09-07",
+     "MIA",
+     "4",
+     "1",
+     "0",
+     "0",
+     "1",
+     "1"
+    ],
+    [
+     "2026-09-06",
+     "SF",
+     "1",
+     "1",
+     "1",
+     "1",
+     "0",
+     "0"
+    ],
+    [
+     "2026-09-05",
+     "SF",
+     "3",
+     "1",
+     "0",
+     "3",
+     "1",
+     "0"
+    ],
+    [
+     "2026-09-02",
+     "TB",
+     "2",
+     "1",
+     "0",
+     "3",
+     "0",
+     "0"
+    ],
+    [
+     "L10 avg",
+     "",
+     "2.6",
+     "0.9",
+     "0.20",
+     "1.0",
+     "0.3",
+     "0.3"
+    ]
+   ],
+   "layer": null
+  },
+  {
+   "title": "Advanced Statcast profile — Brett Baty (Statcast sample as of 2026-09-07)",
+   "columns": [
+    "Factor",
+    "Value"
+   ],
+   "rows": [
+    [
+     "Exit velocity",
+     "90.2 mph"
+    ],
+    [
+     "Barrel%",
+     "10.5%"
+    ],
+    [
+     "HardHit%",
+     "42.6%"
+    ],
+    [
+     "xwOBA",
+     "0.384"
+    ],
+    [
+     "Pulled-air rate",
+     "15.2%"
+    ],
+    [
+     "HR mult",
+     "1.06"
+    ],
+    [
+     "K mult",
+     "1.11"
+    ]
+   ],
+   "layer": null
+  },
+  {
+   "title": "BvP — Brett Baty vs Aaron Nola (career, through 2026-09-17)",
+   "columns": [
+    "Matchup",
+    "PA",
+    "H",
+    "HR",
+    "BB",
+    "SO",
+    "AVG"
+   ],
+   "rows": [
+    [
+     "Brett Baty vs Aaron Nola",
+     13,
+     1,
+     0,
+     3,
+     3,
+     "0.100"
+    ]
+   ],
+   "layer": null
+  },
+  {
+   "title": "Matchup profile — Brett Baty (2026-09-17)",
+   "columns": [
+    "Factor",
+    "Value"
+   ],
+   "rows": [
+    [
+     "K rate",
+     "28.0%"
+    ],
+    [
+     "BB rate",
+     "8.7%"
+    ],
+    [
+     "HR rate",
+     "2.7%"
+    ],
+    [
+     "In-play hit rate",
+     "29.9%"
+    ]
+   ],
+   "layer": null
+  },
+  {
+   "title": "Today's simulated matchup probabilities — Brett Baty (2026-09-17)",
+   "columns": [
+    "Market",
+    "Probability"
+   ],
+   "rows": [
+    [
+     "Hits 1+",
+     "56.5%"
+    ],
+    [
+     "Total Bases 1+",
+     "56.5%"
+    ],
+    [
+     "Hits+Runs+RBIs 2+",
+     "50.2%"
+    ],
+    [
+     "Runs Scored 1+",
+     "38.2%"
+    ],
+    [
+     "Hits+Runs+RBIs 3+",
+     "33.0%"
+    ],
+    [
+     "Total Bases 2+",
+     "31.5%"
+    ],
+    [
+     "RBIs 1+",
+     "25.0%"
+    ],
+    [
+     "Hits+Runs+RBIs 4+",
+     "19.4%"
+    ],
+    [
+     "Total Bases 3+",
+     "18.9%"
+    ],
+    [
+     "Hits 2+",
+     "18.0%"
+    ],
+    [
+     "Total Bases 4+",
+     "13.9%"
+    ],
+    [
+     "Doubles 1+",
+     "13.1%"
+    ],
+    [
+     "Hits+Runs+RBIs 5+",
+     "11.1%"
+    ],
+    [
+     "RBIs 2+",
+     "10.0%"
+    ],
+    [
+     "Stolen Bases 1+",
+     "7.1%"
+    ],
+    [
+     "Runs Scored 2+",
+     "6.2%"
+    ],
+    [
+     "Total Bases 5+",
+     "6.1%"
+    ],
+    [
+     "Hits 3+",
+     "3.8%"
+    ],
+    [
+     "RBIs 3+",
+     "3.5%"
+    ],
+    [
+     "Triples 1+",
+     "1.4%"
+    ],
+    [
+     "RBIs 4+",
+     "1.2%"
+    ],
+    [
+     "Runs Scored 3+",
+     "0.8%"
+    ]
+   ],
+   "layer": null
+  },
+  {
+   "title": "Season tendencies (own rates, not matchup-blended) — Brett Baty vs Aaron Nola",
+   "columns": [
+    "Outcome",
+    "Brett Baty",
+    "Aaron Nola"
+   ],
+   "rows": [
+    [
+     "Strikeout rate",
+     "28.0%",
+     "25.3%"
+    ],
+    [
+     "Walk rate",
+     "8.7%",
+     "8.1%"
+    ],
+    [
+     "Home run rate",
+     "2.7%",
+     "5.2%"
+    ],
+    [
+     "In-play hit rate",
+     "29.9%",
+     "34.8%"
+    ]
+   ],
+   "layer": null
+  },
+  {
+   "title": "Opposing bullpen — vs Brett Baty (2026-09-17)",
+   "columns": [
+    "Reliever (role)",
+    "K rate",
+    "BB rate",
+    "HR rate",
+    "Career vs batter"
+   ],
+   "rows": [
+    [
+     "Jhoan Duran (CL)",
+     "40.6%",
+     "3.4%",
+     "1.3%",
+     "2 PA, 1 H, 0 HR"
+    ],
+    [
+     "Chase Shugart (SU)",
+     "26.1%",
+     "8.4%",
+     "5.2%",
+     "1 PA, 0 H, 0 HR"
+    ],
+    [
+     "Jonathan Bowlan (SU)",
+     "35.9%",
+     "5.3%",
+     "4.3%",
+     "1 PA, 0 H, 0 HR"
+    ],
+    [
+     "Alex McFarlane (MR)",
+     "21.5%",
+     "7.2%",
+     "2.1%",
+     "no recorded history"
+    ],
+    [
+     "Brooks Raley (MR)",
+     "21.8%",
+     "8.4%",
+     "3.6%",
+     "no recorded history"
+    ],
+    [
+     "Kyle Backhus (MR)",
+     "21.4%",
+     "7.3%",
+     "2.7%",
+     "no recorded history"
+    ]
+   ],
+   "layer": null
+  }
+ ],
+ "charts": [
+  {
+   "title": "Simulated total runs — Philadelphia Phillies @ New York Mets (2026-09-17)",
+   "n": 30,
+   "layer": null
+  },
+  {
+   "title": "Actual hits — last 10 games — Brett Baty",
+   "n": 10,
+   "layer": null
+  }
+ ]
+}

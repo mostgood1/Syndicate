@@ -107,6 +107,12 @@ def is_stale(max_age_days: int, *, season: int | None = None) -> bool:
     because it has its own season-match guard. Age and correctness are
     different questions and this now asks both.
     """
+    # `prop-evidence-parity`: the BvP index is built by this job (see
+    # `build_bvp_index`). A missing index is stale even when the feature file
+    # is current, or the first build would wait up to a week for the features
+    # to age out while Ask keeps scanning ~70 MB per pitcher on web.
+    if _bvp_index_missing():
+        return True
     path = _latest_json_path()
     if not path.exists():
         return True
@@ -162,6 +168,45 @@ def refresh(*, season: int, start_date: str, end_date: str) -> None:
             print(f"copied {name} -> {dest_root}", flush=True)
 
 
+def _bvp_index_missing() -> bool:
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    try:
+        from scripts.build_mlb_bvp_index import index_is_missing
+    except Exception:
+        return False  # an unimportable builder must not make the scrape loop forever
+    return index_is_missing(_data_root())
+
+
+def build_bvp_index(*, publish: bool = True) -> int:
+    """Rebuild and publish Ask's batter-vs-pitcher shards from this disk's raw pitches.
+
+    RUNS HERE BECAUSE THIS IS THE ONLY PLACE THE DATA IS. The raw Statcast
+    chunks this job fetches live on refresh-worker's mounted disk
+    (`_raw_pitch_root`); the daily sim carries no BvP fields (production
+    `daily_summary_2026_09_17*`, 0 matches). Before this step, web aggregated a
+    git-tracked cache ending 2026-05-11 at request time, several seconds per
+    pitcher. Returns the builder's exit code; never raises.
+    """
+    # `python scripts/refresh_mlb_statcast_features.py` puts scripts/ on sys.path,
+    # not the repo root; the package import below needs the root.
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    try:
+        from scripts import build_mlb_bvp_index
+    except Exception as exc:
+        print(f"[statcast_refresh] BVP_INDEX import failed: {type(exc).__name__}", flush=True)
+        return 2
+    args = ["--raw-root", str(_raw_pitch_root())]
+    if not publish:
+        args.append("--no-publish")
+    try:
+        return int(build_mlb_bvp_index.main(args))
+    except Exception as exc:
+        print(f"[statcast_refresh] BVP_INDEX FAILED: {type(exc).__name__}: {exc}", flush=True)
+        return 2
+
+
 def publish_latest(*, timeout_seconds: int = 180) -> bool | None:
     """Push `player_features_latest.json` to web. None when not configured.
 
@@ -210,11 +255,16 @@ def main() -> int:
     ap.add_argument("--end-date", default=date.today().isoformat())
     ap.add_argument("--max-age-days", type=int, default=7)
     ap.add_argument("--force", action="store_true", help="Skip the staleness check and refresh anyway")
+    ap.add_argument("--bvp-only", action="store_true",
+                    help="Only rebuild and publish the BvP index from the raw pitches already on disk")
     args = ap.parse_args()
 
     print(f"[statcast_refresh] data_root {_data_root()}", flush=True)
     print(f"[statcast_refresh] raw_root  {_raw_pitch_root()}", flush=True)
     print(f"[statcast_refresh] features  {_feature_dirs()[0]}", flush=True)
+
+    if args.bvp_only:
+        return build_bvp_index()
 
     # `season=` is passed now, so a fresh file for the WRONG season no longer
     # reads as current. That is the actual production state: season 2025.
@@ -225,6 +275,9 @@ def main() -> int:
 
     refresh(season=args.season, start_date=args.start_date, end_date=args.end_date)
     publish_latest()
+    # After the feature publish, so a BvP failure can never cost the features.
+    bvp_code = build_bvp_index()
+    print(f"[statcast_refresh] BVP_INDEX exit={bvp_code}", flush=True)
 
     # VERIFY, rather than trust the copy. `refresh()` prints "copied" for each
     # destination, but that is the writer's account of itself -- the same class

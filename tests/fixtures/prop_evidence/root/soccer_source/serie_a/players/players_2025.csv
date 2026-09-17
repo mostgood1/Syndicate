@@ -1,0 +1,52 @@
+league,season,player_id,player_name,team,position,minutes,games,shots_per90,xg_per90,xa_per90,goals_per90,assists_per90,key_passes_per90,expected_minutes_share,is_goalkeeper,source
+serie_a,2025,understat_1102,Giovanni Simeone,Torino,F M S,2273.0,32,3.0884,0.4427,0.0736,0.4355,0.0,0.9107,0.7892,False,understat
+serie_a,2025,understat_6160,Riccardo Orsolini,Bologna,F M S,2146.0,35,3.439,0.4567,0.0717,0.4194,0.0419,1.0904,0.6813,False,understat
+serie_a,2025,understat_6276,Nikola Vlasic,Torino,F M S,3079.0,37,1.4323,0.2165,0.1368,0.2338,0.0877,1.5784,0.9246,False,understat
+serie_a,2025,understat_12528,Santiago Castro,Bologna,F S,2381.0,35,2.3814,0.3137,0.1033,0.2646,0.0756,1.0584,0.7559,False,understat
+serie_a,2025,understat_7700,Che Adams,Torino,F M S,1899.0,33,2.5118,0.3133,0.1521,0.2844,0.0948,1.1848,0.6394,False,understat
+serie_a,2025,understat_10433,Cesare Casadei,Torino,M S,1971.0,33,1.5982,0.2124,0.0827,0.274,0.0,0.7763,0.6636,False,understat
+serie_a,2025,understat_7005,Jens Odgaard,Bologna,F M S,1391.0,26,2.2646,0.1766,0.0606,0.3235,0.0647,0.9058,0.5944,False,understat
+serie_a,2025,understat_1424,Federico Bernardeschi,Bologna,F M S,1198.0,29,2.9299,0.2388,0.2682,0.3005,0.1503,2.1786,0.459,False,understat
+serie_a,2025,understat_1148,Duván Zapata,Torino,F S,1088.0,28,2.8125,0.3642,0.2217,0.2482,0.0827,0.8272,0.4317,False,understat
+serie_a,2025,understat_7576,Nicolò Cambiaghi,Bologna,F M S,1510.0,28,1.4305,0.1738,0.1806,0.1788,0.2384,1.0728,0.5992,False,understat
+serie_a,2025,understat_8912,Tommaso Pobega,Bologna,M S,1446.0,26,1.556,0.1146,0.0343,0.1867,0.0622,0.3734,0.6179,False,understat
+serie_a,2025,understat_10172,Jonathan Rowe,Bologna,F M S,1612.0,28,2.6799,0.2779,0.1507,0.1675,0.1117,1.1725,0.6397,False,understat
+serie_a,2025,understat_6073,Guillermo Maripán,Torino,D S,2151.0,27,0.7531,0.1019,0.0144,0.0837,0.0,0.3347,0.8852,False,understat
+serie_a,2025,understat_10794,Thijs Dallinga,Bologna,F S,785.0,23,2.7516,0.4455,0.0825,0.2293,0.2293,1.1465,0.3792,False,understat
+serie_a,2025,understat_1488,Remo Freuler,Bologna,M S,2236.0,29,0.322,0.0677,0.054,0.0403,0.0805,0.8855,0.8567,False,understat
+serie_a,2025,understat_7286,Juan Miranda,Bologna,D S,2576.0,32,0.4542,0.0181,0.1574,0.0349,0.1048,2.236,0.8944,False,understat
+serie_a,2025,understat_8554,Rafael Obrador,Torino,D M S,1135.0,16,0.5551,0.0137,0.0838,0.0793,0.2379,0.8722,0.7882,False,understat
+serie_a,2025,understat_8626,Nikola Moro,Bologna,M S,1784.0,30,1.0594,0.047,0.1035,0.0504,0.0,1.3117,0.6607,False,understat
+serie_a,2025,understat_10899,Emirhan Ilkhan,Torino,M S,1028.0,19,1.1381,0.2068,0.1071,0.0875,0.1751,1.0506,0.6012,False,understat
+serie_a,2025,understat_11038,Jhon Lucumí,Bologna,D S,2282.0,29,0.3155,0.0544,0.0311,0.0394,0.0,0.2761,0.8743,False,understat
+serie_a,2025,understat_11039,Lewis Ferguson,Bologna,M S,1576.0,27,0.7424,0.0372,0.0894,0.0571,0.0,0.9137,0.6486,False,understat
+serie_a,2025,understat_11306,Cyril Ngonge,Torino,F S,987.0,20,2.1884,0.2519,0.0513,0.0912,0.0912,1.0942,0.5483,False,understat
+serie_a,2025,understat_11741,Saúl Coco,Torino,D,3093.0,35,0.4365,0.0337,0.0221,0.0291,0.0291,0.3201,0.9819,False,understat
+serie_a,2025,understat_12012,Marcus Pedersen,Torino,D M S,2148.0,29,0.6285,0.0681,0.121,0.0419,0.0838,0.838,0.823,False,understat
+serie_a,2025,understat_12365,Alieu Njie,Torino,F M S,266.0,15,1.6917,0.4099,0.0545,0.3383,0.3383,1.015,0.197,False,understat
+serie_a,2025,understat_1164,Cristiano Biraghi,Torino,D M S,497.0,14,0.3622,0.0112,0.066,0.0,0.0,1.2676,0.3944,False,understat
+serie_a,2025,understat_1193,Lorenzo De Silvestri,Bologna,D S,499.0,12,0.0,0.0,0.0286,0.0,0.0,0.9018,0.462,False,understat
+serie_a,2025,understat_1209,Ciro Immobile,Bologna,F S,185.0,6,0.973,0.0306,0.0308,0.0,0.0,0.4865,0.3426,False,understat
+serie_a,2025,understat_1305,Lukasz Skorupski,Bologna,GK,1594.0,19,0.0,0.0,0.0,0.0,0.0,0.0,0.9322,True,understat
+serie_a,2025,understat_1441,Adam Masina,Torino,D S,224.0,5,0.0,0.0,0.1654,0.0,0.4018,0.8036,0.4978,False,understat
+serie_a,2025,understat_1544,Federico Ravaglia,Bologna,GK S,1468.0,17,0.0,0.0,0.0,0.0,0.0,0.0,0.9595,True,understat
+serie_a,2025,understat_5996,Adrien Tameze,Torino,D M S,1110.0,24,0.4054,0.018,0.0215,0.0,0.0,0.6486,0.5139,False,understat
+serie_a,2025,understat_6352,Valentino Lazaro,Torino,D M S,2273.0,31,0.3168,0.0168,0.1466,0.0,0.0792,1.2275,0.8147,False,understat
+serie_a,2025,understat_6517,Charalampos Lykogiannis,Bologna,D S,627.0,10,1.0048,0.032,0.2148,0.0,0.1435,1.866,0.6967,False,understat
+serie_a,2025,understat_8109,Niels Nkounkou,Torino,D S,340.0,11,1.0588,0.0576,0.2346,0.0,0.2647,1.8529,0.3434,False,understat
+serie_a,2025,understat_8383,Faustino Anjorin,Torino,M S,258.0,15,1.3953,0.2106,0.0414,0.0,0.0,1.0465,0.1911,False,understat
+serie_a,2025,understat_8828,Ivan Ilic,Torino,M S,414.0,8,0.0,0.0,0.156,0.0,0.0,1.7391,0.575,False,understat
+serie_a,2025,understat_8829,Nicolò Casale,Bologna,D S,672.0,12,0.6696,0.1,0.0274,0.0,0.0,0.5357,0.6222,False,understat
+serie_a,2025,understat_9044,Alberto Paleari,Torino,GK,2610.0,29,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2025,understat_9090,Ardian Ismajli,Torino,D S,1907.0,25,0.2832,0.0353,0.0254,0.0,0.0472,0.1888,0.8476,False,understat
+serie_a,2025,understat_9179,Franco Israel,Torino,GK,810.0,9,0.0,0.0,0.0,0.0,0.0,0.0,1.0,True,understat
+serie_a,2025,understat_9854,Kristjan Asllani,Torino,M S,1145.0,15,1.5721,0.0913,0.0888,0.0,0.0,1.2576,0.8481,False,understat
+serie_a,2025,understat_9866,Nadir Zortea,Bologna,D S,1776.0,32,0.5574,0.0214,0.1448,0.0,0.1014,1.3176,0.6167,False,understat
+serie_a,2025,understat_10796,Zakaria Aboukhlal,Torino,D M S,500.0,15,1.26,0.0742,0.1076,0.0,0.0,0.54,0.3704,False,understat
+serie_a,2025,understat_11278,Gvidas Gineitis,Torino,M S,1778.0,29,1.3667,0.0474,0.1354,0.0,0.0506,1.3161,0.6812,False,understat
+serie_a,2025,understat_13061,Benjamín Domínguez,Bologna,M S,553.0,15,1.953,0.1053,0.0429,0.0,0.4882,1.1392,0.4096,False,understat
+serie_a,2025,understat_13237,Massimo Pessina,Bologna,GK S,353.0,4,0.0,0.0,0.0,0.0,0.0,0.0,0.9806,True,understat
+serie_a,2025,understat_13893,Martin Vitík,Bologna,D S,1320.0,19,0.5455,0.0503,0.0117,0.0,0.0,0.2045,0.7719,False,understat
+serie_a,2025,understat_13894,Torbjørn Heggem,Bologna,D S,2109.0,27,0.4694,0.0433,0.0022,0.0,0.0,0.0853,0.8679,False,understat
+serie_a,2025,understat_14382,Eivind Helland,Bologna,D,497.0,6,0.1811,0.0181,0.0271,0.0,0.0,0.5433,0.9204,False,understat
+serie_a,2025,understat_14403,Sandro Kulenovic,Torino,F S,284.0,13,1.5845,0.2699,0.1082,0.0,0.3169,1.5845,0.2427,False,understat

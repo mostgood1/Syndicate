@@ -747,6 +747,11 @@ def ask_the_syndicate_query_api():
         "sport": _evidence.get("sport") or _routed_sport,
     }
     response["as_of"] = response["visuals"]["as_of"]
+    # `prop_evidence_v1` coverage for a board-row player prop: which of the seven
+    # layers this answer filled, and for each one it did not, the named reason.
+    # None on every other answer. `scripts/prop_evidence_checklist.py --base-url`
+    # reads exactly this key to measure production fill rates per sport.
+    response["prop_evidence"] = _evidence.get("prop_evidence")
 
     if has_snapshot:
         briefing_payload = generate_briefing(

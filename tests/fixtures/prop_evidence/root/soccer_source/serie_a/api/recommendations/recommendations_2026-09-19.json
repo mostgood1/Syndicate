@@ -1,0 +1,2477 @@
+{
+ "league": "serie_a",
+ "date": "2026-09-19",
+ "generated_at": "2026-09-17T14:47:14.864510+00:00",
+ "simulations": 400,
+ "corners_estimator": {
+  "basis": "team_rates_pressure_v1",
+  "state": "on",
+  "estimated": 4,
+  "declined": 0,
+  "pressure_applied": 4,
+  "league_rows": 1180
+ },
+ "promoted_prior_teams": [],
+ "anchor": {
+  "state": "disabled",
+  "weight": 0.0,
+  "odds_path": "/opt/render/project/data/soccer_source/serie_a/api/odds/game_odds_current.csv",
+  "fixtures": 4,
+  "market_features": {
+   "fixtures": 4,
+   "attached": 3,
+   "with_total": 3,
+   "with_spread": 3,
+   "skipped": 1,
+   "priced_events": 20,
+   "armed": false
+  },
+  "attached": 4,
+  "skipped": 0,
+  "priced_events": 20,
+  "by_stage": {
+   "event_id": 0,
+   "exact_pair": 3,
+   "fuzzy": 1
+  },
+  "skipped_reasons": {},
+  "skipped_examples": []
+ },
+ "player_substrate": {
+  "league": "serie_a",
+  "files": [
+   "players_2024.csv",
+   "players_2025.csv",
+   "players_2026.csv"
+  ],
+  "rows": 803,
+  "club_from_newest_season": 102,
+  "latest_file_rows": 437,
+  "previous_file_rows": 489,
+  "latest_max_minutes": 360.0,
+  "clubs_ready": 20,
+  "clubs_seen": 20,
+  "departed_filter": "per_club",
+  "dropped": 154,
+  "espn_goal_shrink": {
+   "state": "no_espn_rows"
+  }
+ },
+ "matches": [
+  {
+   "match_id": "401874767",
+   "league": "serie_a",
+   "date": "2026-09-19",
+   "index": 0,
+   "matchup": {
+    "home_team": "Bologna",
+    "away_team": "Torino"
+   },
+   "win_probability": {
+    "home": 0.4625,
+    "draw": 0.24,
+    "away": 0.2975
+   },
+   "team_projection": {
+    "home_mean": 1.5325,
+    "away_mean": 1.165,
+    "total_mean": 2.6975,
+    "margin_mean": 0.3675
+   },
+   "spread_distribution": {
+    "home": 0.3675,
+    "away": -0.3675
+   },
+   "total_distribution": {
+    "mean": 2.6975,
+    "over_2_5_probability": 0.5125,
+    "both_teams_scored_probability": 0.5575
+   },
+   "volume_projection": {
+    "home_shots": 13.5825,
+    "away_shots": 10.3625,
+    "home_shots_on_target": 4.805,
+    "away_shots_on_target": 3.5375,
+    "home_corners": 5.3842,
+    "away_corners": 3.3632,
+    "sim_home_corners": 5.1225,
+    "sim_away_corners": 4.3325,
+    "corners_basis": "team_rates_pressure_v1",
+    "corners_estimator": {
+     "league_rows": 1180,
+     "home_team_weight": 23.511,
+     "away_team_weight": 23.395,
+     "pressure_applied": true
+    }
+   },
+   "periods": {
+    "h1": {
+     "home_mean": 0.85,
+     "away_mean": 0.5125
+    },
+    "h2": {
+     "home_mean": 0.6825,
+     "away_mean": 0.6525
+    }
+   },
+   "scoreline_probabilities": {
+    "1-1": 0.1225,
+    "1-0": 0.11,
+    "2-1": 0.0925,
+    "1-2": 0.0825,
+    "2-0": 0.08,
+    "0-1": 0.0775,
+    "0-0": 0.06,
+    "2-2": 0.05,
+    "3-2": 0.04,
+    "3-1": 0.0375,
+    "3-0": 0.0375,
+    "1-3": 0.0375,
+    "0-2": 0.0375,
+    "2-3": 0.035,
+    "4-1": 0.0175,
+    "4-0": 0.0175,
+    "0-4": 0.01,
+    "4-2": 0.01,
+    "3-3": 0.0075,
+    "5-0": 0.0075,
+    "5-3": 0.005,
+    "2-4": 0.005,
+    "1-4": 0.005,
+    "0-3": 0.005,
+    "4-3": 0.005,
+    "5-1": 0.0025,
+    "3-4": 0.0025
+   },
+   "simulations": 400,
+   "adapter_metadata": {
+    "home_rating_matched": true,
+    "away_rating_matched": true,
+    "home_rating_detail": {
+     "attack_rating": -0.0394,
+     "defense_rating": 0.0192,
+     "xg_for_per_match": 1.239,
+     "xg_against_per_match": 1.2878,
+     "ppda": 10.2981,
+     "matches": 45.0,
+     "goals_for_per_match": 1.2222,
+     "goals_against_per_match": 1.2889,
+     "points_per_match": 1.3556
+    },
+    "away_rating_detail": {
+     "attack_rating": -0.0136,
+     "defense_rating": -0.0998,
+     "xg_for_per_match": 1.3016,
+     "xg_against_per_match": 1.5767,
+     "ppda": 15.0529,
+     "matches": 45.0,
+     "goals_for_per_match": 1.0444,
+     "goals_against_per_match": 1.6,
+     "points_per_match": 1.0889
+    }
+   },
+   "event_id": "401874767",
+   "kickoff": "2026-09-19T13:00Z",
+   "status_state": "pre",
+   "live_home_score": "0",
+   "live_away_score": "0",
+   "top_props": [
+    {
+     "player_id": "understat_7375",
+     "player_name": "Roberto Piccoli",
+     "team": "Bologna",
+     "side": "home",
+     "position": "F",
+     "anytime_scorer_probability": 0.2176,
+     "expected_shots": 1.4205,
+     "expected_shots_on_target": 0.5025,
+     "expected_minutes_share": 0.955
+    },
+    {
+     "player_id": "understat_11736",
+     "player_name": "Artem Dovbyk",
+     "team": "Bologna",
+     "side": "home",
+     "position": "F S",
+     "anytime_scorer_probability": 0.2034,
+     "expected_shots": 1.0667,
+     "expected_shots_on_target": 0.3774,
+     "expected_minutes_share": 0.8521
+    },
+    {
+     "player_id": "understat_1102",
+     "player_name": "Giovanni Simeone",
+     "team": "Torino",
+     "side": "away",
+     "position": "F M S",
+     "anytime_scorer_probability": 0.1504,
+     "expected_shots": 1.0537,
+     "expected_shots_on_target": 0.3597,
+     "expected_minutes_share": 0.7892
+    },
+    {
+     "player_id": "understat_6160",
+     "player_name": "Riccardo Orsolini",
+     "team": "Bologna",
+     "side": "home",
+     "position": "F M S",
+     "anytime_scorer_probability": 0.1459,
+     "expected_shots": 1.2695,
+     "expected_shots_on_target": 0.4491,
+     "expected_minutes_share": 0.6813
+    },
+    {
+     "player_id": "understat_7700",
+     "player_name": "Che Adams",
+     "team": "Torino",
+     "side": "away",
+     "position": "F S",
+     "anytime_scorer_probability": 0.116,
+     "expected_shots": 0.7686,
+     "expected_shots_on_target": 0.2624,
+     "expected_minutes_share": 0.8179
+    },
+    {
+     "player_id": "understat_6276",
+     "player_name": "Nikola Vlasic",
+     "team": "Torino",
+     "side": "away",
+     "position": "F M S",
+     "anytime_scorer_probability": 0.0892,
+     "expected_shots": 0.5725,
+     "expected_shots_on_target": 0.1954,
+     "expected_minutes_share": 0.9246
+    },
+    {
+     "player_id": "understat_7005",
+     "player_name": "Jens Odgaard",
+     "team": "Bologna",
+     "side": "home",
+     "position": "F M S",
+     "anytime_scorer_probability": 0.0887,
+     "expected_shots": 0.9155,
+     "expected_shots_on_target": 0.3239,
+     "expected_minutes_share": 0.7613
+    },
+    {
+     "player_id": "understat_10794",
+     "player_name": "Thijs Dallinga",
+     "team": "Bologna",
+     "side": "home",
+     "position": "F S",
+     "anytime_scorer_probability": 0.0865,
+     "expected_shots": 0.5419,
+     "expected_shots_on_target": 0.1917,
+     "expected_minutes_share": 0.4029
+    }
+   ],
+   "squad_audit": {
+    "home": {
+     "listed": 31,
+     "current": 24,
+     "prior_only": 7,
+     "single_season": 0
+    },
+    "away": {
+     "listed": 34,
+     "current": 25,
+     "prior_only": 9,
+     "single_season": 0
+    }
+   }
+  }
+ ],
+ "player_props": [
+  {
+   "player_id": "understat_15060",
+   "player_name": "Jay Enem",
+   "team": "Bologna",
+   "side": "home",
+   "position": "S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0083,
+   "anytime_scorer_probability_if_playing": 0.0581,
+   "expected_shots": 0.0902,
+   "expected_shots_if_playing": 0.6654,
+   "expected_shots_on_target": 0.0319,
+   "expected_shots_on_target_if_playing": 0.2354,
+   "expected_minutes_share": 0.0556,
+   "shots_over_probabilities": {
+    "0.5": 0.4804,
+    "1.5": 0.1439,
+    "2.5": 0.0326,
+    "3.5": 0.0066
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.2084,
+    "1.5": 0.0246,
+    "2.5": 0.0022
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0086,
+    "1.5": 0.0
+   },
+   "expected_assists": 0.0087,
+   "expected_assists_if_playing": 0.0346,
+   "expected_goals": 0.0084,
+   "goal_or_assist_probability": 0.0169,
+   "two_or_more_scorer_probability": 0.0
+  },
+  {
+   "player_id": "understat_14911",
+   "player_name": "Marco Libra",
+   "team": "Bologna",
+   "side": "home",
+   "position": "S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0445,
+   "anytime_scorer_probability_if_playing": 0.0669,
+   "expected_shots": 0.4666,
+   "expected_shots_if_playing": 0.7407,
+   "expected_shots_on_target": 0.1651,
+   "expected_shots_on_target_if_playing": 0.262,
+   "expected_minutes_share": 0.3889,
+   "shots_over_probabilities": {
+    "0.5": 0.4856,
+    "1.5": 0.1762,
+    "2.5": 0.0569,
+    "3.5": 0.0165
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.2224,
+    "1.5": 0.0345,
+    "2.5": 0.0045
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0431,
+    "1.5": 0.0009
+   },
+   "expected_assists": 0.044,
+   "expected_assists_if_playing": 0.1132,
+   "expected_goals": 0.0456,
+   "goal_or_assist_probability": 0.0857,
+   "two_or_more_scorer_probability": 0.001
+  },
+  {
+   "player_id": "understat_11962",
+   "player_name": "Oussama El Azzouzi",
+   "team": "Bologna",
+   "side": "home",
+   "position": "M",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.047,
+   "anytime_scorer_probability_if_playing": 0.0566,
+   "expected_shots": 0.5613,
+   "expected_shots_if_playing": 0.7019,
+   "expected_shots_on_target": 0.1986,
+   "expected_shots_on_target_if_playing": 0.2483,
+   "expected_minutes_share": 0.9222,
+   "shots_over_probabilities": {
+    "0.5": 0.5031,
+    "1.5": 0.157,
+    "2.5": 0.0349,
+    "3.5": 0.006
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.2197,
+    "1.5": 0.0264,
+    "2.5": 0.0022
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0726,
+    "1.5": 0.0027
+   },
+   "expected_assists": 0.0753,
+   "expected_assists_if_playing": 0.0817,
+   "expected_goals": 0.0481,
+   "goal_or_assist_probability": 0.1162,
+   "two_or_more_scorer_probability": 0.0011
+  },
+  {
+   "player_id": "understat_14910",
+   "player_name": "Mikel Amondarain",
+   "team": "Bologna",
+   "side": "home",
+   "position": "M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0206,
+   "anytime_scorer_probability_if_playing": 0.0327,
+   "expected_shots": 0.2634,
+   "expected_shots_if_playing": 0.4371,
+   "expected_shots_on_target": 0.0932,
+   "expected_shots_on_target_if_playing": 0.1546,
+   "expected_minutes_share": 0.3444,
+   "shots_over_probabilities": {
+    "0.5": 0.3361,
+    "1.5": 0.0803,
+    "2.5": 0.0169,
+    "3.5": 0.0032
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.1401,
+    "1.5": 0.0134,
+    "2.5": 0.0011
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0235,
+    "1.5": 0.0003
+   },
+   "expected_assists": 0.0238,
+   "expected_assists_if_playing": 0.0691,
+   "expected_goals": 0.0208,
+   "goal_or_assist_probability": 0.0436,
+   "two_or_more_scorer_probability": 0.0002
+  },
+  {
+   "player_id": "understat_13698",
+   "player_name": "Rahim Alhassane",
+   "team": "Bologna",
+   "side": "home",
+   "position": "D",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0558,
+   "anytime_scorer_probability_if_playing": 0.0701,
+   "expected_shots": 0.4034,
+   "expected_shots_if_playing": 0.5291,
+   "expected_shots_on_target": 0.1427,
+   "expected_shots_on_target_if_playing": 0.1872,
+   "expected_minutes_share": 0.7722,
+   "shots_over_probabilities": {
+    "0.5": 0.4024,
+    "1.5": 0.1039,
+    "2.5": 0.0195,
+    "3.5": 0.0029
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.1693,
+    "1.5": 0.0167,
+    "2.5": 0.0012
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0402,
+    "1.5": 0.0008
+   },
+   "expected_assists": 0.041,
+   "expected_assists_if_playing": 0.0531,
+   "expected_goals": 0.0574,
+   "goal_or_assist_probability": 0.0937,
+   "two_or_more_scorer_probability": 0.0016
+  },
+  {
+   "player_id": "understat_9999",
+   "player_name": "Arthur Theate",
+   "team": "Bologna",
+   "side": "home",
+   "position": "D",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0312,
+   "anytime_scorer_probability_if_playing": 0.0348,
+   "expected_shots": 0.4629,
+   "expected_shots_if_playing": 0.5338,
+   "expected_shots_on_target": 0.1638,
+   "expected_shots_on_target_if_playing": 0.1888,
+   "expected_minutes_share": 1.0,
+   "shots_over_probabilities": {
+    "0.5": 0.4128,
+    "1.5": 0.1011,
+    "2.5": 0.0173,
+    "3.5": 0.0023
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.1719,
+    "1.5": 0.0159,
+    "2.5": 0.001
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0316,
+    "1.5": 0.0005
+   },
+   "expected_assists": 0.0321,
+   "expected_assists_if_playing": 0.0321,
+   "expected_goals": 0.0317,
+   "goal_or_assist_probability": 0.0618,
+   "two_or_more_scorer_probability": 0.0005
+  },
+  {
+   "player_id": "understat_13237",
+   "player_name": "Massimo Pessina",
+   "team": "Bologna",
+   "side": "home",
+   "position": "GK S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0,
+   "anytime_scorer_probability_if_playing": 0.0,
+   "expected_shots": 0.0,
+   "expected_shots_if_playing": 0.0,
+   "expected_shots_on_target": 0.0,
+   "expected_shots_on_target_if_playing": 0.0,
+   "expected_minutes_share": 0.9806,
+   "shots_over_probabilities": {},
+   "shots_on_target_over_probabilities": {},
+   "assists_over_probabilities": {},
+   "expected_assists": 0.0,
+   "expected_assists_if_playing": 0.0,
+   "expected_goals": 0.0,
+   "goal_or_assist_probability": 0.0,
+   "two_or_more_scorer_probability": 0.0
+  },
+  {
+   "player_id": "understat_14382",
+   "player_name": "Eivind Helland",
+   "team": "Bologna",
+   "side": "home",
+   "position": "D",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0084,
+   "anytime_scorer_probability_if_playing": 0.0102,
+   "expected_shots": 0.0903,
+   "expected_shots_if_playing": 0.1132,
+   "expected_shots_on_target": 0.0319,
+   "expected_shots_on_target_if_playing": 0.04,
+   "expected_minutes_share": 0.9204,
+   "shots_over_probabilities": {
+    "0.5": 0.1069,
+    "1.5": 0.006,
+    "2.5": 0.0002,
+    "3.5": 0.0
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.0392,
+    "1.5": 0.0008,
+    "2.5": 0.0
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0167,
+    "1.5": 0.0001
+   },
+   "expected_assists": 0.0169,
+   "expected_assists_if_playing": 0.0183,
+   "expected_goals": 0.0084,
+   "goal_or_assist_probability": 0.025,
+   "two_or_more_scorer_probability": 0.0
+  },
+  {
+   "player_id": "understat_12904",
+   "player_name": "Samuel Mbangula",
+   "team": "Bologna",
+   "side": "home",
+   "position": "M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.01,
+   "anytime_scorer_probability_if_playing": 0.0162,
+   "expected_shots": 0.212,
+   "expected_shots_if_playing": 0.3568,
+   "expected_shots_on_target": 0.075,
+   "expected_shots_on_target_if_playing": 0.1262,
+   "expected_minutes_share": 0.3319,
+   "shots_over_probabilities": {
+    "0.5": 0.287,
+    "1.5": 0.0576,
+    "2.5": 0.0102,
+    "3.5": 0.0016
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.1164,
+    "1.5": 0.0092,
+    "2.5": 0.0006
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0503,
+    "1.5": 0.0013
+   },
+   "expected_assists": 0.0516,
+   "expected_assists_if_playing": 0.1554,
+   "expected_goals": 0.0101,
+   "goal_or_assist_probability": 0.0598,
+   "two_or_more_scorer_probability": 0.0001
+  },
+  {
+   "player_id": "understat_12006",
+   "player_name": "Jesper Karlsson",
+   "team": "Bologna",
+   "side": "home",
+   "position": "F M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0578,
+   "anytime_scorer_probability_if_playing": 0.0827,
+   "expected_shots": 0.4335,
+   "expected_shots_if_playing": 0.6574,
+   "expected_shots_on_target": 0.1534,
+   "expected_shots_on_target_if_playing": 0.2326,
+   "expected_minutes_share": 0.4456,
+   "shots_over_probabilities": {
+    "0.5": 0.4497,
+    "1.5": 0.1507,
+    "2.5": 0.0434,
+    "3.5": 0.0108
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.2012,
+    "1.5": 0.0279,
+    "2.5": 0.0032
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0269,
+    "1.5": 0.0004
+   },
+   "expected_assists": 0.0273,
+   "expected_assists_if_playing": 0.0612,
+   "expected_goals": 0.0595,
+   "goal_or_assist_probability": 0.0831,
+   "two_or_more_scorer_probability": 0.0017
+  },
+  {
+   "player_id": "understat_8829",
+   "player_name": "Nicolò Casale",
+   "team": "Bologna",
+   "side": "home",
+   "position": "D S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0082,
+   "anytime_scorer_probability_if_playing": 0.0107,
+   "expected_shots": 0.1594,
+   "expected_shots_if_playing": 0.2153,
+   "expected_shots_on_target": 0.0564,
+   "expected_shots_on_target_if_playing": 0.0762,
+   "expected_minutes_share": 0.6771,
+   "shots_over_probabilities": {
+    "0.5": 0.1907,
+    "1.5": 0.0225,
+    "2.5": 0.0019,
+    "3.5": 0.0001
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.0729,
+    "1.5": 0.0032,
+    "2.5": 0.0001
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.017,
+    "1.5": 0.0001
+   },
+   "expected_assists": 0.0171,
+   "expected_assists_if_playing": 0.0253,
+   "expected_goals": 0.0082,
+   "goal_or_assist_probability": 0.025,
+   "two_or_more_scorer_probability": 0.0
+  },
+  {
+   "player_id": "understat_1193",
+   "player_name": "Lorenzo De Silvestri",
+   "team": "Bologna",
+   "side": "home",
+   "position": "D S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0301,
+   "anytime_scorer_probability_if_playing": 0.0393,
+   "expected_shots": 0.2709,
+   "expected_shots_if_playing": 0.3678,
+   "expected_shots_on_target": 0.0958,
+   "expected_shots_on_target_if_playing": 0.1301,
+   "expected_minutes_share": 0.663,
+   "shots_over_probabilities": {
+    "0.5": 0.2996,
+    "1.5": 0.0586,
+    "2.5": 0.0085,
+    "3.5": 0.001
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.1207,
+    "1.5": 0.0089,
+    "2.5": 0.0005
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0115,
+    "1.5": 0.0001
+   },
+   "expected_assists": 0.0116,
+   "expected_assists_if_playing": 0.0174,
+   "expected_goals": 0.0306,
+   "goal_or_assist_probability": 0.0413,
+   "two_or_more_scorer_probability": 0.0005
+  },
+  {
+   "player_id": "understat_10794",
+   "player_name": "Thijs Dallinga",
+   "team": "Bologna",
+   "side": "home",
+   "position": "F S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0865,
+   "anytime_scorer_probability_if_playing": 0.1259,
+   "expected_shots": 0.5419,
+   "expected_shots_if_playing": 0.8496,
+   "expected_shots_on_target": 0.1917,
+   "expected_shots_on_target_if_playing": 0.3006,
+   "expected_minutes_share": 0.4029,
+   "shots_over_probabilities": {
+    "0.5": 0.5284,
+    "1.5": 0.2118,
+    "2.5": 0.0758,
+    "3.5": 0.0245
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.2494,
+    "1.5": 0.0438,
+    "2.5": 0.0065
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0117,
+    "1.5": 0.0001
+   },
+   "expected_assists": 0.0118,
+   "expected_assists_if_playing": 0.0292,
+   "expected_goals": 0.0905,
+   "goal_or_assist_probability": 0.0972,
+   "two_or_more_scorer_probability": 0.0039
+  },
+  {
+   "player_id": "understat_10956",
+   "player_name": "Emil Holm",
+   "team": "Bologna",
+   "side": "home",
+   "position": "D S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0175,
+   "anytime_scorer_probability_if_playing": 0.0234,
+   "expected_shots": 0.258,
+   "expected_shots_if_playing": 0.3595,
+   "expected_shots_on_target": 0.0913,
+   "expected_shots_on_target_if_playing": 0.1272,
+   "expected_minutes_share": 0.5974,
+   "shots_over_probabilities": {
+    "0.5": 0.2923,
+    "1.5": 0.0575,
+    "2.5": 0.0087,
+    "3.5": 0.001
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.1179,
+    "1.5": 0.0088,
+    "2.5": 0.0005
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.032,
+    "1.5": 0.0005
+   },
+   "expected_assists": 0.0325,
+   "expected_assists_if_playing": 0.0544,
+   "expected_goals": 0.0176,
+   "goal_or_assist_probability": 0.0489,
+   "two_or_more_scorer_probability": 0.0002
+  },
+  {
+   "player_id": "understat_1424",
+   "player_name": "Federico Bernardeschi",
+   "team": "Bologna",
+   "side": "home",
+   "position": "F M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.054,
+   "anytime_scorer_probability_if_playing": 0.0768,
+   "expected_shots": 0.7287,
+   "expected_shots_if_playing": 1.0948,
+   "expected_shots_on_target": 0.2578,
+   "expected_shots_on_target_if_playing": 0.3873,
+   "expected_minutes_share": 0.459,
+   "shots_over_probabilities": {
+    "0.5": 0.6097,
+    "1.5": 0.2918,
+    "2.5": 0.1243,
+    "3.5": 0.0473
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.3065,
+    "1.5": 0.0668,
+    "2.5": 0.012
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0799,
+    "1.5": 0.0033
+   },
+   "expected_assists": 0.0833,
+   "expected_assists_if_playing": 0.1814,
+   "expected_goals": 0.0556,
+   "goal_or_assist_probability": 0.1296,
+   "two_or_more_scorer_probability": 0.0015
+  },
+  {
+   "player_id": "understat_13893",
+   "player_name": "Martin Vitík",
+   "team": "Bologna",
+   "side": "home",
+   "position": "D S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0195,
+   "anytime_scorer_probability_if_playing": 0.0247,
+   "expected_shots": 0.2281,
+   "expected_shots_if_playing": 0.2993,
+   "expected_shots_on_target": 0.0807,
+   "expected_shots_on_target_if_playing": 0.1059,
+   "expected_minutes_share": 0.7719,
+   "shots_over_probabilities": {
+    "0.5": 0.2554,
+    "1.5": 0.0392,
+    "2.5": 0.0043,
+    "3.5": 0.0004
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.1,
+    "1.5": 0.0057,
+    "2.5": 0.0002
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0061,
+    "1.5": 0.0
+   },
+   "expected_assists": 0.0061,
+   "expected_assists_if_playing": 0.0079,
+   "expected_goals": 0.0197,
+   "goal_or_assist_probability": 0.0255,
+   "two_or_more_scorer_probability": 0.0002
+  },
+  {
+   "player_id": "understat_8912",
+   "player_name": "Tommaso Pobega",
+   "team": "Bologna",
+   "side": "home",
+   "position": "M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0353,
+   "anytime_scorer_probability_if_playing": 0.0467,
+   "expected_shots": 0.5209,
+   "expected_shots_if_playing": 0.7197,
+   "expected_shots_on_target": 0.1843,
+   "expected_shots_on_target_if_playing": 0.2546,
+   "expected_minutes_share": 0.6179,
+   "shots_over_probabilities": {
+    "0.5": 0.4868,
+    "1.5": 0.1716,
+    "2.5": 0.048,
+    "3.5": 0.0109
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.2197,
+    "1.5": 0.0313,
+    "2.5": 0.0033
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0142,
+    "1.5": 0.0001
+   },
+   "expected_assists": 0.0143,
+   "expected_assists_if_playing": 0.0232,
+   "expected_goals": 0.0359,
+   "goal_or_assist_probability": 0.049,
+   "two_or_more_scorer_probability": 0.0006
+  },
+  {
+   "player_id": "understat_1544",
+   "player_name": "Federico Ravaglia",
+   "team": "Bologna",
+   "side": "home",
+   "position": "GK S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0,
+   "anytime_scorer_probability_if_playing": 0.0,
+   "expected_shots": 0.0,
+   "expected_shots_if_playing": 0.0,
+   "expected_shots_on_target": 0.0,
+   "expected_shots_on_target_if_playing": 0.0,
+   "expected_minutes_share": 0.9595,
+   "shots_over_probabilities": {},
+   "shots_on_target_over_probabilities": {},
+   "assists_over_probabilities": {},
+   "expected_assists": 0.0,
+   "expected_assists_if_playing": 0.0,
+   "expected_goals": 0.0,
+   "goal_or_assist_probability": 0.0,
+   "two_or_more_scorer_probability": 0.0
+  },
+  {
+   "player_id": "understat_7576",
+   "player_name": "Nicolò Cambiaghi",
+   "team": "Bologna",
+   "side": "home",
+   "position": "F M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0514,
+   "anytime_scorer_probability_if_playing": 0.0682,
+   "expected_shots": 0.4644,
+   "expected_shots_if_playing": 0.6466,
+   "expected_shots_on_target": 0.1643,
+   "expected_shots_on_target_if_playing": 0.2288,
+   "expected_minutes_share": 0.5992,
+   "shots_over_probabilities": {
+    "0.5": 0.4523,
+    "1.5": 0.147,
+    "2.5": 0.0379,
+    "3.5": 0.0079
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.2,
+    "1.5": 0.026,
+    "2.5": 0.0025
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0706,
+    "1.5": 0.0026
+   },
+   "expected_assists": 0.0732,
+   "expected_assists_if_playing": 0.1221,
+   "expected_goals": 0.0528,
+   "goal_or_assist_probability": 0.1184,
+   "two_or_more_scorer_probability": 0.0013
+  },
+  {
+   "player_id": "understat_11039",
+   "player_name": "Lewis Ferguson",
+   "team": "Bologna",
+   "side": "home",
+   "position": "M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0122,
+   "anytime_scorer_probability_if_playing": 0.016,
+   "expected_shots": 0.2609,
+   "expected_shots_if_playing": 0.3561,
+   "expected_shots_on_target": 0.0923,
+   "expected_shots_on_target_if_playing": 0.126,
+   "expected_minutes_share": 0.6486,
+   "shots_over_probabilities": {
+    "0.5": 0.2915,
+    "1.5": 0.0557,
+    "2.5": 0.008,
+    "3.5": 0.0009
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.1171,
+    "1.5": 0.0084,
+    "2.5": 0.0004
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0385,
+    "1.5": 0.0007
+   },
+   "expected_assists": 0.0392,
+   "expected_assists_if_playing": 0.0605,
+   "expected_goals": 0.0122,
+   "goal_or_assist_probability": 0.0501,
+   "two_or_more_scorer_probability": 0.0001
+  },
+  {
+   "player_id": "understat_10172",
+   "player_name": "Jonathan Rowe",
+   "team": "Bologna",
+   "side": "home",
+   "position": "F M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0862,
+   "anytime_scorer_probability_if_playing": 0.1115,
+   "expected_shots": 0.9289,
+   "expected_shots_if_playing": 1.2721,
+   "expected_shots_on_target": 0.3286,
+   "expected_shots_on_target_if_playing": 0.45,
+   "expected_minutes_share": 0.6397,
+   "shots_over_probabilities": {
+    "0.5": 0.6729,
+    "1.5": 0.3573,
+    "2.5": 0.1582,
+    "3.5": 0.0587
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.3501,
+    "1.5": 0.0827,
+    "2.5": 0.0148
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0631,
+    "1.5": 0.002
+   },
+   "expected_assists": 0.0652,
+   "expected_assists_if_playing": 0.1019,
+   "expected_goals": 0.0901,
+   "goal_or_assist_probability": 0.1438,
+   "two_or_more_scorer_probability": 0.0038
+  },
+  {
+   "player_id": "understat_8626",
+   "player_name": "Nikola Moro",
+   "team": "Bologna",
+   "side": "home",
+   "position": "M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0156,
+   "anytime_scorer_probability_if_playing": 0.0205,
+   "expected_shots": 0.3792,
+   "expected_shots_if_playing": 0.5153,
+   "expected_shots_on_target": 0.1342,
+   "expected_shots_on_target_if_playing": 0.1823,
+   "expected_minutes_share": 0.6607,
+   "shots_over_probabilities": {
+    "0.5": 0.3886,
+    "1.5": 0.1025,
+    "2.5": 0.0205,
+    "3.5": 0.0033
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.1643,
+    "1.5": 0.0167,
+    "2.5": 0.0012
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0452,
+    "1.5": 0.001
+   },
+   "expected_assists": 0.0463,
+   "expected_assists_if_playing": 0.07,
+   "expected_goals": 0.0157,
+   "goal_or_assist_probability": 0.0601,
+   "two_or_more_scorer_probability": 0.0001
+  },
+  {
+   "player_id": "understat_7005",
+   "player_name": "Jens Odgaard",
+   "team": "Bologna",
+   "side": "home",
+   "position": "F M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0887,
+   "anytime_scorer_probability_if_playing": 0.1109,
+   "expected_shots": 0.9155,
+   "expected_shots_if_playing": 1.2044,
+   "expected_shots_on_target": 0.3239,
+   "expected_shots_on_target_if_playing": 0.4261,
+   "expected_minutes_share": 0.7613,
+   "shots_over_probabilities": {
+    "0.5": 0.6733,
+    "1.5": 0.3393,
+    "2.5": 0.1343,
+    "3.5": 0.0429
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.3405,
+    "1.5": 0.0728,
+    "2.5": 0.0113
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0583,
+    "1.5": 0.0017
+   },
+   "expected_assists": 0.06,
+   "expected_assists_if_playing": 0.0789,
+   "expected_goals": 0.0928,
+   "goal_or_assist_probability": 0.1418,
+   "two_or_more_scorer_probability": 0.0041
+  },
+  {
+   "player_id": "understat_13894",
+   "player_name": "Torbjørn Heggem",
+   "team": "Bologna",
+   "side": "home",
+   "position": "D S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0189,
+   "anytime_scorer_probability_if_playing": 0.0233,
+   "expected_shots": 0.2207,
+   "expected_shots_if_playing": 0.2827,
+   "expected_shots_on_target": 0.0781,
+   "expected_shots_on_target_if_playing": 0.1,
+   "expected_minutes_share": 0.8679,
+   "shots_over_probabilities": {
+    "0.5": 0.2452,
+    "1.5": 0.034,
+    "2.5": 0.0033,
+    "3.5": 0.0002
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.095,
+    "1.5": 0.0048,
+    "2.5": 0.0002
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0013,
+    "1.5": 0.0
+   },
+   "expected_assists": 0.0013,
+   "expected_assists_if_playing": 0.0015,
+   "expected_goals": 0.019,
+   "goal_or_assist_probability": 0.0201,
+   "two_or_more_scorer_probability": 0.0002
+  },
+  {
+   "player_id": "understat_6160",
+   "player_name": "Riccardo Orsolini",
+   "team": "Bologna",
+   "side": "home",
+   "position": "F M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.1459,
+   "anytime_scorer_probability_if_playing": 0.1835,
+   "expected_shots": 1.2695,
+   "expected_shots_if_playing": 1.7123,
+   "expected_shots_on_target": 0.4491,
+   "expected_shots_on_target_if_playing": 0.6058,
+   "expected_minutes_share": 0.6813,
+   "shots_over_probabilities": {
+    "0.5": 0.7686,
+    "1.5": 0.4877,
+    "2.5": 0.2639,
+    "3.5": 0.1216
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.4378,
+    "1.5": 0.1315,
+    "2.5": 0.0301
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0325,
+    "1.5": 0.0005
+   },
+   "expected_assists": 0.033,
+   "expected_assists_if_playing": 0.0485,
+   "expected_goals": 0.1577,
+   "goal_or_assist_probability": 0.1737,
+   "two_or_more_scorer_probability": 0.0112
+  },
+  {
+   "player_id": "understat_1305",
+   "player_name": "Lukasz Skorupski",
+   "team": "Bologna",
+   "side": "home",
+   "position": "GK",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0,
+   "anytime_scorer_probability_if_playing": 0.0,
+   "expected_shots": 0.0,
+   "expected_shots_if_playing": 0.0,
+   "expected_shots_on_target": 0.0,
+   "expected_shots_on_target_if_playing": 0.0,
+   "expected_minutes_share": 0.9728,
+   "shots_over_probabilities": {},
+   "shots_on_target_over_probabilities": {},
+   "assists_over_probabilities": {},
+   "expected_assists": 0.0,
+   "expected_assists_if_playing": 0.0,
+   "expected_goals": 0.0,
+   "goal_or_assist_probability": 0.0,
+   "two_or_more_scorer_probability": 0.0
+  },
+  {
+   "player_id": "understat_11736",
+   "player_name": "Artem Dovbyk",
+   "team": "Bologna",
+   "side": "home",
+   "position": "F S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.2034,
+   "anytime_scorer_probability_if_playing": 0.2452,
+   "expected_shots": 1.0667,
+   "expected_shots_if_playing": 1.371,
+   "expected_shots_on_target": 0.3774,
+   "expected_shots_on_target_if_playing": 0.485,
+   "expected_minutes_share": 0.8521,
+   "shots_over_probabilities": {
+    "0.5": 0.7325,
+    "1.5": 0.3973,
+    "2.5": 0.166,
+    "3.5": 0.0554
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.3809,
+    "1.5": 0.0878,
+    "2.5": 0.0143
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0599,
+    "1.5": 0.0018
+   },
+   "expected_assists": 0.0617,
+   "expected_assists_if_playing": 0.0724,
+   "expected_goals": 0.2274,
+   "goal_or_assist_probability": 0.2511,
+   "two_or_more_scorer_probability": 0.0222
+  },
+  {
+   "player_id": "understat_7286",
+   "player_name": "Juan Miranda",
+   "team": "Bologna",
+   "side": "home",
+   "position": "D S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0082,
+   "anytime_scorer_probability_if_playing": 0.0101,
+   "expected_shots": 0.2201,
+   "expected_shots_if_playing": 0.2803,
+   "expected_shots_on_target": 0.0779,
+   "expected_shots_on_target_if_playing": 0.0992,
+   "expected_minutes_share": 0.8944,
+   "shots_over_probabilities": {
+    "0.5": 0.2439,
+    "1.5": 0.0331,
+    "2.5": 0.0031,
+    "3.5": 0.0002
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.0943,
+    "1.5": 0.0047,
+    "2.5": 0.0002
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0908,
+    "1.5": 0.0043
+   },
+   "expected_assists": 0.0952,
+   "expected_assists_if_playing": 0.1065,
+   "expected_goals": 0.0082,
+   "goal_or_assist_probability": 0.0983,
+   "two_or_more_scorer_probability": 0.0
+  },
+  {
+   "player_id": "understat_9866",
+   "player_name": "Nadir Zortea",
+   "team": "Bologna",
+   "side": "home",
+   "position": "D M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0416,
+   "anytime_scorer_probability_if_playing": 0.0512,
+   "expected_shots": 0.4954,
+   "expected_shots_if_playing": 0.6338,
+   "expected_shots_on_target": 0.1753,
+   "expected_shots_on_target_if_playing": 0.2242,
+   "expected_minutes_share": 0.8727,
+   "shots_over_probabilities": {
+    "0.5": 0.4657,
+    "1.5": 0.135,
+    "2.5": 0.0279,
+    "3.5": 0.0045
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.2002,
+    "1.5": 0.0222,
+    "2.5": 0.0017
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0716,
+    "1.5": 0.0026
+   },
+   "expected_assists": 0.0743,
+   "expected_assists_if_playing": 0.0851,
+   "expected_goals": 0.0425,
+   "goal_or_assist_probability": 0.1102,
+   "two_or_more_scorer_probability": 0.0009
+  },
+  {
+   "player_id": "understat_7375",
+   "player_name": "Roberto Piccoli",
+   "team": "Bologna",
+   "side": "home",
+   "position": "F",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.2176,
+   "anytime_scorer_probability_if_playing": 0.2493,
+   "expected_shots": 1.4205,
+   "expected_shots_if_playing": 1.7154,
+   "expected_shots_on_target": 0.5025,
+   "expected_shots_on_target_if_playing": 0.6068,
+   "expected_minutes_share": 0.955,
+   "shots_over_probabilities": {
+    "0.5": 0.8166,
+    "1.5": 0.5106,
+    "2.5": 0.2483,
+    "3.5": 0.0971
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.4539,
+    "1.5": 0.1247,
+    "2.5": 0.0242
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0207,
+    "1.5": 0.0002
+   },
+   "expected_assists": 0.0209,
+   "expected_assists_if_playing": 0.0219,
+   "expected_goals": 0.2454,
+   "goal_or_assist_probability": 0.2338,
+   "two_or_more_scorer_probability": 0.0256
+  },
+  {
+   "player_id": "understat_1488",
+   "player_name": "Remo Freuler",
+   "team": "Bologna",
+   "side": "home",
+   "position": "M",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0203,
+   "anytime_scorer_probability_if_playing": 0.0233,
+   "expected_shots": 0.249,
+   "expected_shots_if_playing": 0.296,
+   "expected_shots_on_target": 0.0881,
+   "expected_shots_on_target_if_playing": 0.1047,
+   "expected_minutes_share": 0.97,
+   "shots_over_probabilities": {
+    "0.5": 0.2559,
+    "1.5": 0.0363,
+    "2.5": 0.0035,
+    "3.5": 0.0003
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.0994,
+    "1.5": 0.0052,
+    "2.5": 0.0002
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0352,
+    "1.5": 0.0006
+   },
+   "expected_assists": 0.0358,
+   "expected_assists_if_playing": 0.0369,
+   "expected_goals": 0.0205,
+   "goal_or_assist_probability": 0.0548,
+   "two_or_more_scorer_probability": 0.0002
+  },
+  {
+   "player_id": "understat_308",
+   "player_name": "Ricardo Rodríguez",
+   "team": "Torino",
+   "side": "away",
+   "position": "S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.022,
+   "anytime_scorer_probability_if_playing": 0.0532,
+   "expected_shots": 0.1818,
+   "expected_shots_if_playing": 0.4614,
+   "expected_shots_on_target": 0.0621,
+   "expected_shots_on_target_if_playing": 0.1575,
+   "expected_minutes_share": 0.1778,
+   "shots_over_probabilities": {
+    "0.5": 0.366,
+    "1.5": 0.0798,
+    "2.5": 0.0132,
+    "3.5": 0.002
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.1451,
+    "1.5": 0.0117,
+    "2.5": 0.0007
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0141,
+    "1.5": 0.0001
+   },
+   "expected_assists": 0.0142,
+   "expected_assists_if_playing": 0.0568,
+   "expected_goals": 0.0222,
+   "goal_or_assist_probability": 0.0358,
+   "two_or_more_scorer_probability": 0.0002
+  },
+  {
+   "player_id": "understat_10292",
+   "player_name": "Nathan Patterson",
+   "team": "Torino",
+   "side": "away",
+   "position": "S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0381,
+   "anytime_scorer_probability_if_playing": 0.0666,
+   "expected_shots": 0.3181,
+   "expected_shots_if_playing": 0.5877,
+   "expected_shots_on_target": 0.1086,
+   "expected_shots_on_target_if_playing": 0.2006,
+   "expected_minutes_share": 0.3333,
+   "shots_over_probabilities": {
+    "0.5": 0.4177,
+    "1.5": 0.1255,
+    "2.5": 0.0338,
+    "3.5": 0.0084
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.1768,
+    "1.5": 0.0214,
+    "2.5": 0.0022
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0246,
+    "1.5": 0.0003
+   },
+   "expected_assists": 0.0249,
+   "expected_assists_if_playing": 0.0746,
+   "expected_goals": 0.0389,
+   "goal_or_assist_probability": 0.0617,
+   "two_or_more_scorer_probability": 0.0007
+  },
+  {
+   "player_id": "understat_15039",
+   "player_name": "Daniel Bragança",
+   "team": "Torino",
+   "side": "away",
+   "position": "S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.033,
+   "anytime_scorer_probability_if_playing": 0.0583,
+   "expected_shots": 0.2749,
+   "expected_shots_if_playing": 0.5111,
+   "expected_shots_on_target": 0.0938,
+   "expected_shots_on_target_if_playing": 0.1745,
+   "expected_minutes_share": 0.3278,
+   "shots_over_probabilities": {
+    "0.5": 0.3782,
+    "1.5": 0.1017,
+    "2.5": 0.0245,
+    "3.5": 0.0054
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.1562,
+    "1.5": 0.0166,
+    "2.5": 0.0015
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0359,
+    "1.5": 0.0007
+   },
+   "expected_assists": 0.0366,
+   "expected_assists_if_playing": 0.1117,
+   "expected_goals": 0.0336,
+   "goal_or_assist_probability": 0.0678,
+   "two_or_more_scorer_probability": 0.0006
+  },
+  {
+   "player_id": "understat_12369",
+   "player_name": "Lucas Perri",
+   "team": "Torino",
+   "side": "away",
+   "position": "GK",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0,
+   "anytime_scorer_probability_if_playing": 0.0,
+   "expected_shots": 0.0,
+   "expected_shots_if_playing": 0.0,
+   "expected_shots_on_target": 0.0,
+   "expected_shots_on_target_if_playing": 0.0,
+   "expected_minutes_share": 1.0,
+   "shots_over_probabilities": {},
+   "shots_on_target_over_probabilities": {},
+   "assists_over_probabilities": {},
+   "expected_assists": 0.0,
+   "expected_assists_if_playing": 0.0,
+   "expected_goals": 0.0,
+   "goal_or_assist_probability": 0.0,
+   "two_or_more_scorer_probability": 0.0
+  },
+  {
+   "player_id": "understat_14897",
+   "player_name": "Diego Mascardi",
+   "team": "Torino",
+   "side": "away",
+   "position": "GK",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0,
+   "anytime_scorer_probability_if_playing": 0.0,
+   "expected_shots": 0.0,
+   "expected_shots_if_playing": 0.0,
+   "expected_shots_on_target": 0.0,
+   "expected_shots_on_target_if_playing": 0.0,
+   "expected_minutes_share": 1.0,
+   "shots_over_probabilities": {},
+   "shots_on_target_over_probabilities": {},
+   "assists_over_probabilities": {},
+   "expected_assists": 0.0,
+   "expected_assists_if_playing": 0.0,
+   "expected_goals": 0.0,
+   "goal_or_assist_probability": 0.0,
+   "two_or_more_scorer_probability": 0.0
+  },
+  {
+   "player_id": "understat_10382",
+   "player_name": "Eray Cömert",
+   "team": "Torino",
+   "side": "away",
+   "position": "D",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0166,
+   "anytime_scorer_probability_if_playing": 0.022,
+   "expected_shots": 0.2025,
+   "expected_shots_if_playing": 0.2773,
+   "expected_shots_on_target": 0.0691,
+   "expected_shots_on_target_if_playing": 0.0947,
+   "expected_minutes_share": 0.9259,
+   "shots_over_probabilities": {
+    "0.5": 0.2419,
+    "1.5": 0.0322,
+    "2.5": 0.0029,
+    "3.5": 0.0002
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.0903,
+    "1.5": 0.0042,
+    "2.5": 0.0001
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0183,
+    "1.5": 0.0002
+   },
+   "expected_assists": 0.0185,
+   "expected_assists_if_playing": 0.0199,
+   "expected_goals": 0.0168,
+   "goal_or_assist_probability": 0.0346,
+   "two_or_more_scorer_probability": 0.0001
+  },
+  {
+   "player_id": "understat_13599",
+   "player_name": "Alessio Cacciamani",
+   "team": "Torino",
+   "side": "away",
+   "position": "D M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0204,
+   "anytime_scorer_probability_if_playing": 0.0285,
+   "expected_shots": 0.1577,
+   "expected_shots_if_playing": 0.2281,
+   "expected_shots_on_target": 0.0538,
+   "expected_shots_on_target_if_playing": 0.0779,
+   "expected_minutes_share": 0.7611,
+   "shots_over_probabilities": {
+    "0.5": 0.2018,
+    "1.5": 0.0241,
+    "2.5": 0.002,
+    "3.5": 0.0001
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.0746,
+    "1.5": 0.0031,
+    "2.5": 0.0001
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0394,
+    "1.5": 0.0008
+   },
+   "expected_assists": 0.0402,
+   "expected_assists_if_playing": 0.0528,
+   "expected_goals": 0.0206,
+   "goal_or_assist_probability": 0.059,
+   "two_or_more_scorer_probability": 0.0002
+  },
+  {
+   "player_id": "understat_14403",
+   "player_name": "Sandro Kulenovic",
+   "team": "Torino",
+   "side": "away",
+   "position": "F S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0301,
+   "anytime_scorer_probability_if_playing": 0.0604,
+   "expected_shots": 0.1663,
+   "expected_shots_if_playing": 0.3514,
+   "expected_shots_on_target": 0.0568,
+   "expected_shots_on_target_if_playing": 0.1199,
+   "expected_minutes_share": 0.2427,
+   "shots_over_probabilities": {
+    "0.5": 0.2876,
+    "1.5": 0.0534,
+    "2.5": 0.0087,
+    "3.5": 0.0014
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.1116,
+    "1.5": 0.0078,
+    "2.5": 0.0005
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0117,
+    "1.5": 0.0001
+   },
+   "expected_assists": 0.0117,
+   "expected_assists_if_playing": 0.047,
+   "expected_goals": 0.0306,
+   "goal_or_assist_probability": 0.0414,
+   "two_or_more_scorer_probability": 0.0005
+  },
+  {
+   "player_id": "understat_14898",
+   "player_name": "Kian Fitz-Jim",
+   "team": "Torino",
+   "side": "away",
+   "position": "M",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0244,
+   "anytime_scorer_probability_if_playing": 0.0326,
+   "expected_shots": 0.3694,
+   "expected_shots_if_playing": 0.511,
+   "expected_shots_on_target": 0.1261,
+   "expected_shots_on_target_if_playing": 0.1744,
+   "expected_minutes_share": 0.9167,
+   "shots_over_probabilities": {
+    "0.5": 0.3993,
+    "1.5": 0.094,
+    "2.5": 0.0155,
+    "3.5": 0.0019
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.16,
+    "1.5": 0.0137,
+    "2.5": 0.0008
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0896,
+    "1.5": 0.0041
+   },
+   "expected_assists": 0.0939,
+   "expected_assists_if_playing": 0.1024,
+   "expected_goals": 0.0247,
+   "goal_or_assist_probability": 0.1118,
+   "two_or_more_scorer_probability": 0.0003
+  },
+  {
+   "player_id": "understat_12365",
+   "player_name": "Alieu Njie",
+   "team": "Torino",
+   "side": "away",
+   "position": "S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0354,
+   "anytime_scorer_probability_if_playing": 0.0697,
+   "expected_shots": 0.2432,
+   "expected_shots_if_playing": 0.5063,
+   "expected_shots_on_target": 0.083,
+   "expected_shots_on_target_if_playing": 0.1728,
+   "expected_minutes_share": 0.2507,
+   "shots_over_probabilities": {
+    "0.5": 0.3818,
+    "1.5": 0.0969,
+    "2.5": 0.0217,
+    "3.5": 0.0048
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.1559,
+    "1.5": 0.0155,
+    "2.5": 0.0014
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0155,
+    "1.5": 0.0001
+   },
+   "expected_assists": 0.0157,
+   "expected_assists_if_playing": 0.0625,
+   "expected_goals": 0.036,
+   "goal_or_assist_probability": 0.0504,
+   "two_or_more_scorer_probability": 0.0006
+  },
+  {
+   "player_id": "understat_11279",
+   "player_name": "Ali Dembélé",
+   "team": "Torino",
+   "side": "away",
+   "position": "D S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0117,
+   "anytime_scorer_probability_if_playing": 0.0226,
+   "expected_shots": 0.1441,
+   "expected_shots_if_playing": 0.2887,
+   "expected_shots_on_target": 0.0492,
+   "expected_shots_on_target_if_playing": 0.0986,
+   "expected_minutes_share": 0.2733,
+   "shots_over_probabilities": {
+    "0.5": 0.2429,
+    "1.5": 0.0393,
+    "2.5": 0.0057,
+    "3.5": 0.0008
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.0927,
+    "1.5": 0.0056,
+    "2.5": 0.0003
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0032,
+    "1.5": 0.0
+   },
+   "expected_assists": 0.0032,
+   "expected_assists_if_playing": 0.0118,
+   "expected_goals": 0.0118,
+   "goal_or_assist_probability": 0.0149,
+   "two_or_more_scorer_probability": 0.0001
+  },
+  {
+   "player_id": "understat_12609",
+   "player_name": "Niccolò Fortini",
+   "team": "Torino",
+   "side": "away",
+   "position": "D S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0067,
+   "anytime_scorer_probability_if_playing": 0.0118,
+   "expected_shots": 0.2162,
+   "expected_shots_if_playing": 0.3967,
+   "expected_shots_on_target": 0.0738,
+   "expected_shots_on_target_if_playing": 0.1354,
+   "expected_minutes_share": 0.3389,
+   "shots_over_probabilities": {
+    "0.5": 0.312,
+    "1.5": 0.0687,
+    "2.5": 0.0133,
+    "3.5": 0.0023
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.1242,
+    "1.5": 0.0105,
+    "2.5": 0.0008
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0129,
+    "1.5": 0.0001
+   },
+   "expected_assists": 0.0129,
+   "expected_assists_if_playing": 0.0382,
+   "expected_goals": 0.0067,
+   "goal_or_assist_probability": 0.0194,
+   "two_or_more_scorer_probability": 0.0
+  },
+  {
+   "player_id": "understat_10796",
+   "player_name": "Zakaria Aboukhlal",
+   "team": "Torino",
+   "side": "away",
+   "position": "D M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0127,
+   "anytime_scorer_probability_if_playing": 0.0218,
+   "expected_shots": 0.2018,
+   "expected_shots_if_playing": 0.3583,
+   "expected_shots_on_target": 0.0689,
+   "expected_shots_on_target_if_playing": 0.1223,
+   "expected_minutes_share": 0.3704,
+   "shots_over_probabilities": {
+    "0.5": 0.2875,
+    "1.5": 0.0586,
+    "2.5": 0.0103,
+    "3.5": 0.0016
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.113,
+    "1.5": 0.0087,
+    "2.5": 0.0006
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0177,
+    "1.5": 0.0002
+   },
+   "expected_assists": 0.0178,
+   "expected_assists_if_playing": 0.0481,
+   "expected_goals": 0.0128,
+   "goal_or_assist_probability": 0.0302,
+   "two_or_more_scorer_probability": 0.0001
+  },
+  {
+   "player_id": "understat_9179",
+   "player_name": "Franco Israel",
+   "team": "Torino",
+   "side": "away",
+   "position": "GK",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0,
+   "anytime_scorer_probability_if_playing": 0.0,
+   "expected_shots": 0.0,
+   "expected_shots_if_playing": 0.0,
+   "expected_shots_on_target": 0.0,
+   "expected_shots_on_target_if_playing": 0.0,
+   "expected_minutes_share": 1.0,
+   "shots_over_probabilities": {},
+   "shots_on_target_over_probabilities": {},
+   "assists_over_probabilities": {},
+   "expected_assists": 0.0,
+   "expected_assists_if_playing": 0.0,
+   "expected_goals": 0.0,
+   "goal_or_assist_probability": 0.0,
+   "two_or_more_scorer_probability": 0.0
+  },
+  {
+   "player_id": "understat_11306",
+   "player_name": "Cyril Ngonge",
+   "team": "Torino",
+   "side": "away",
+   "position": "F S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0624,
+   "anytime_scorer_probability_if_playing": 0.0924,
+   "expected_shots": 0.5187,
+   "expected_shots_if_playing": 0.8133,
+   "expected_shots_on_target": 0.1771,
+   "expected_shots_on_target_if_playing": 0.2776,
+   "expected_minutes_share": 0.5483,
+   "shots_over_probabilities": {
+    "0.5": 0.5202,
+    "1.5": 0.2038,
+    "2.5": 0.0662,
+    "3.5": 0.018
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.2353,
+    "1.5": 0.0373,
+    "2.5": 0.0046
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0125,
+    "1.5": 0.0001
+   },
+   "expected_assists": 0.0126,
+   "expected_assists_if_playing": 0.0229,
+   "expected_goals": 0.0645,
+   "goal_or_assist_probability": 0.0741,
+   "two_or_more_scorer_probability": 0.002
+  },
+  {
+   "player_id": "understat_10899",
+   "player_name": "Emirhan Ilkhan",
+   "team": "Torino",
+   "side": "away",
+   "position": "M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0564,
+   "anytime_scorer_probability_if_playing": 0.0819,
+   "expected_shots": 0.2958,
+   "expected_shots_if_playing": 0.4524,
+   "expected_shots_on_target": 0.101,
+   "expected_shots_on_target_if_playing": 0.1544,
+   "expected_minutes_share": 0.6012,
+   "shots_over_probabilities": {
+    "0.5": 0.3499,
+    "1.5": 0.0842,
+    "2.5": 0.0157,
+    "3.5": 0.0023
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.141,
+    "1.5": 0.0126,
+    "2.5": 0.0008
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0284,
+    "1.5": 0.0004
+   },
+   "expected_assists": 0.0288,
+   "expected_assists_if_playing": 0.0479,
+   "expected_goals": 0.058,
+   "goal_or_assist_probability": 0.0831,
+   "two_or_more_scorer_probability": 0.0016
+  },
+  {
+   "player_id": "understat_11876",
+   "player_name": "Luca Marianucci",
+   "team": "Torino",
+   "side": "away",
+   "position": "D M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0161,
+   "anytime_scorer_probability_if_playing": 0.0233,
+   "expected_shots": 0.1921,
+   "expected_shots_if_playing": 0.2878,
+   "expected_shots_on_target": 0.0656,
+   "expected_shots_on_target_if_playing": 0.0983,
+   "expected_minutes_share": 0.6531,
+   "shots_over_probabilities": {
+    "0.5": 0.2446,
+    "1.5": 0.0384,
+    "2.5": 0.0045,
+    "3.5": 0.0004
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.0928,
+    "1.5": 0.0052,
+    "2.5": 0.0002
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0038,
+    "1.5": 0.0
+   },
+   "expected_assists": 0.0038,
+   "expected_assists_if_playing": 0.0059,
+   "expected_goals": 0.0162,
+   "goal_or_assist_probability": 0.0199,
+   "two_or_more_scorer_probability": 0.0001
+  },
+  {
+   "player_id": "understat_1148",
+   "player_name": "Duván Zapata",
+   "team": "Torino",
+   "side": "away",
+   "position": "F S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0707,
+   "anytime_scorer_probability_if_playing": 0.1112,
+   "expected_shots": 0.5249,
+   "expected_shots_if_playing": 0.8844,
+   "expected_shots_on_target": 0.1792,
+   "expected_shots_on_target_if_playing": 0.3019,
+   "expected_minutes_share": 0.4317,
+   "shots_over_probabilities": {
+    "0.5": 0.5412,
+    "1.5": 0.2242,
+    "2.5": 0.0822,
+    "3.5": 0.0268
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.2505,
+    "1.5": 0.0441,
+    "2.5": 0.0064
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0419,
+    "1.5": 0.0009
+   },
+   "expected_assists": 0.0428,
+   "expected_assists_if_playing": 0.0991,
+   "expected_goals": 0.0734,
+   "goal_or_assist_probability": 0.1097,
+   "two_or_more_scorer_probability": 0.0026
+  },
+  {
+   "player_id": "understat_5996",
+   "player_name": "Adrien Tameze",
+   "team": "Torino",
+   "side": "away",
+   "position": "D M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0043,
+   "anytime_scorer_probability_if_playing": 0.0067,
+   "expected_shots": 0.0901,
+   "expected_shots_if_playing": 0.1438,
+   "expected_shots_on_target": 0.0307,
+   "expected_shots_on_target_if_playing": 0.0491,
+   "expected_minutes_share": 0.5139,
+   "shots_over_probabilities": {
+    "0.5": 0.1316,
+    "1.5": 0.0114,
+    "2.5": 0.0008,
+    "3.5": 0.0
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.0476,
+    "1.5": 0.0015,
+    "2.5": 0.0
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0049,
+    "1.5": 0.0
+   },
+   "expected_assists": 0.0049,
+   "expected_assists_if_playing": 0.0096,
+   "expected_goals": 0.0043,
+   "goal_or_assist_probability": 0.0092,
+   "two_or_more_scorer_probability": 0.0
+  },
+  {
+   "player_id": "understat_8383",
+   "player_name": "Faustino Anjorin",
+   "team": "Torino",
+   "side": "away",
+   "position": "M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0166,
+   "anytime_scorer_probability_if_playing": 0.0248,
+   "expected_shots": 0.452,
+   "expected_shots_if_playing": 0.7013,
+   "expected_shots_on_target": 0.1543,
+   "expected_shots_on_target_if_playing": 0.2394,
+   "expected_minutes_share": 0.5692,
+   "shots_over_probabilities": {
+    "0.5": 0.4753,
+    "1.5": 0.1658,
+    "2.5": 0.0469,
+    "3.5": 0.0109
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.2077,
+    "1.5": 0.0285,
+    "2.5": 0.003
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0454,
+    "1.5": 0.001
+   },
+   "expected_assists": 0.0464,
+   "expected_assists_if_playing": 0.0816,
+   "expected_goals": 0.0167,
+   "goal_or_assist_probability": 0.0612,
+   "two_or_more_scorer_probability": 0.0001
+  },
+  {
+   "player_id": "understat_9854",
+   "player_name": "Kristjan Asllani",
+   "team": "Torino",
+   "side": "away",
+   "position": "M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0355,
+   "anytime_scorer_probability_if_playing": 0.0484,
+   "expected_shots": 0.5764,
+   "expected_shots_if_playing": 0.8154,
+   "expected_shots_on_target": 0.1968,
+   "expected_shots_on_target_if_playing": 0.2783,
+   "expected_minutes_share": 0.8481,
+   "shots_over_probabilities": {
+    "0.5": 0.5497,
+    "1.5": 0.1995,
+    "2.5": 0.053,
+    "3.5": 0.011
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.2416,
+    "1.5": 0.0333,
+    "2.5": 0.0032
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0331,
+    "1.5": 0.0006
+   },
+   "expected_assists": 0.0337,
+   "expected_assists_if_playing": 0.0397,
+   "expected_goals": 0.0361,
+   "goal_or_assist_probability": 0.0674,
+   "two_or_more_scorer_probability": 0.0006
+  },
+  {
+   "player_id": "understat_1164",
+   "player_name": "Cristiano Biraghi",
+   "team": "Torino",
+   "side": "away",
+   "position": "D S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0128,
+   "anytime_scorer_probability_if_playing": 0.0179,
+   "expected_shots": 0.2819,
+   "expected_shots_if_playing": 0.4073,
+   "expected_shots_on_target": 0.0962,
+   "expected_shots_on_target_if_playing": 0.139,
+   "expected_minutes_share": 0.7657,
+   "shots_over_probabilities": {
+    "0.5": 0.3288,
+    "1.5": 0.0673,
+    "2.5": 0.0099,
+    "3.5": 0.0011
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.129,
+    "1.5": 0.0096,
+    "2.5": 0.0005
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0613,
+    "1.5": 0.0019
+   },
+   "expected_assists": 0.0632,
+   "expected_assists_if_playing": 0.0826,
+   "expected_goals": 0.0129,
+   "goal_or_assist_probability": 0.0733,
+   "two_or_more_scorer_probability": 0.0001
+  },
+  {
+   "player_id": "understat_11278",
+   "player_name": "Gvidas Gineitis",
+   "team": "Torino",
+   "side": "away",
+   "position": "M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.015,
+   "anytime_scorer_probability_if_playing": 0.0214,
+   "expected_shots": 0.4025,
+   "expected_shots_if_playing": 0.597,
+   "expected_shots_on_target": 0.1374,
+   "expected_shots_on_target_if_playing": 0.2038,
+   "expected_minutes_share": 0.6812,
+   "shots_over_probabilities": {
+    "0.5": 0.4333,
+    "1.5": 0.1286,
+    "2.5": 0.029,
+    "3.5": 0.0052
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.1817,
+    "1.5": 0.0203,
+    "2.5": 0.0017
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0404,
+    "1.5": 0.0008
+   },
+   "expected_assists": 0.0412,
+   "expected_assists_if_playing": 0.0605,
+   "expected_goals": 0.0151,
+   "goal_or_assist_probability": 0.0547,
+   "two_or_more_scorer_probability": 0.0001
+  },
+  {
+   "player_id": "understat_13962",
+   "player_name": "Rafik Belghali",
+   "team": "Torino",
+   "side": "away",
+   "position": "D M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0456,
+   "anytime_scorer_probability_if_playing": 0.0623,
+   "expected_shots": 0.3492,
+   "expected_shots_if_playing": 0.4964,
+   "expected_shots_on_target": 0.1192,
+   "expected_shots_on_target_if_playing": 0.1695,
+   "expected_minutes_share": 0.8269,
+   "shots_over_probabilities": {
+    "0.5": 0.3865,
+    "1.5": 0.092,
+    "2.5": 0.0156,
+    "3.5": 0.0021
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.1551,
+    "1.5": 0.0135,
+    "2.5": 0.0008
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0373,
+    "1.5": 0.0007
+   },
+   "expected_assists": 0.038,
+   "expected_assists_if_playing": 0.046,
+   "expected_goals": 0.0467,
+   "goal_or_assist_probability": 0.0812,
+   "two_or_more_scorer_probability": 0.0011
+  },
+  {
+   "player_id": "understat_10433",
+   "player_name": "Cesare Casadei",
+   "team": "Torino",
+   "side": "away",
+   "position": "M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0637,
+   "anytime_scorer_probability_if_playing": 0.0902,
+   "expected_shots": 0.4585,
+   "expected_shots_if_playing": 0.6843,
+   "expected_shots_on_target": 0.1565,
+   "expected_shots_on_target_if_playing": 0.2336,
+   "expected_minutes_share": 0.6636,
+   "shots_over_probabilities": {
+    "0.5": 0.4744,
+    "1.5": 0.1586,
+    "2.5": 0.041,
+    "3.5": 0.0085
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.2046,
+    "1.5": 0.0263,
+    "2.5": 0.0025
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0242,
+    "1.5": 0.0003
+   },
+   "expected_assists": 0.0245,
+   "expected_assists_if_playing": 0.037,
+   "expected_goals": 0.0658,
+   "goal_or_assist_probability": 0.0863,
+   "two_or_more_scorer_probability": 0.0021
+  },
+  {
+   "player_id": "understat_12012",
+   "player_name": "Marcus Pedersen",
+   "team": "Torino",
+   "side": "away",
+   "position": "D M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0258,
+   "anytime_scorer_probability_if_playing": 0.0355,
+   "expected_shots": 0.2236,
+   "expected_shots_if_playing": 0.3182,
+   "expected_shots_on_target": 0.0763,
+   "expected_shots_on_target_if_playing": 0.1086,
+   "expected_minutes_share": 0.823,
+   "shots_over_probabilities": {
+    "0.5": 0.2702,
+    "1.5": 0.0428,
+    "2.5": 0.0048,
+    "3.5": 0.0004
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.1026,
+    "1.5": 0.0058,
+    "2.5": 0.0002
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0435,
+    "1.5": 0.001
+   },
+   "expected_assists": 0.0445,
+   "expected_assists_if_playing": 0.0541,
+   "expected_goals": 0.0262,
+   "goal_or_assist_probability": 0.0682,
+   "two_or_more_scorer_probability": 0.0003
+  },
+  {
+   "player_id": "understat_11902",
+   "player_name": "Pietro Comuzzo",
+   "team": "Torino",
+   "side": "away",
+   "position": "D S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0067,
+   "anytime_scorer_probability_if_playing": 0.0094,
+   "expected_shots": 0.0524,
+   "expected_shots_if_playing": 0.0763,
+   "expected_shots_on_target": 0.0179,
+   "expected_shots_on_target_if_playing": 0.026,
+   "expected_minutes_share": 0.738,
+   "shots_over_probabilities": {
+    "0.5": 0.0731,
+    "1.5": 0.0031,
+    "2.5": 0.0001,
+    "3.5": 0.0
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.0257,
+    "1.5": 0.0004,
+    "2.5": 0.0
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0049,
+    "1.5": 0.0
+   },
+   "expected_assists": 0.0049,
+   "expected_assists_if_playing": 0.0067,
+   "expected_goals": 0.0067,
+   "goal_or_assist_probability": 0.0115,
+   "two_or_more_scorer_probability": 0.0
+  },
+  {
+   "player_id": "understat_1102",
+   "player_name": "Giovanni Simeone",
+   "team": "Torino",
+   "side": "away",
+   "position": "F M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.1504,
+   "anytime_scorer_probability_if_playing": 0.2015,
+   "expected_shots": 1.0537,
+   "expected_shots_if_playing": 1.5126,
+   "expected_shots_on_target": 0.3597,
+   "expected_shots_on_target_if_playing": 0.5164,
+   "expected_minutes_share": 0.7892,
+   "shots_over_probabilities": {
+    "0.5": 0.7522,
+    "1.5": 0.4407,
+    "2.5": 0.2066,
+    "3.5": 0.079
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.3961,
+    "1.5": 0.0993,
+    "2.5": 0.018
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0256,
+    "1.5": 0.0003
+   },
+   "expected_assists": 0.026,
+   "expected_assists_if_playing": 0.0329,
+   "expected_goals": 0.163,
+   "goal_or_assist_probability": 0.1722,
+   "two_or_more_scorer_probability": 0.0119
+  },
+  {
+   "player_id": "understat_3821",
+   "player_name": "Rolando Mandragora",
+   "team": "Torino",
+   "side": "away",
+   "position": "M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0624,
+   "anytime_scorer_probability_if_playing": 0.0853,
+   "expected_shots": 0.8138,
+   "expected_shots_if_playing": 1.1627,
+   "expected_shots_on_target": 0.2778,
+   "expected_shots_on_target_if_playing": 0.3969,
+   "expected_minutes_share": 0.8072,
+   "shots_over_probabilities": {
+    "0.5": 0.6687,
+    "1.5": 0.3252,
+    "2.5": 0.1214,
+    "3.5": 0.0362
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.3236,
+    "1.5": 0.0635,
+    "2.5": 0.0089
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0372,
+    "1.5": 0.0007
+   },
+   "expected_assists": 0.0379,
+   "expected_assists_if_playing": 0.0469,
+   "expected_goals": 0.0644,
+   "goal_or_assist_probability": 0.0973,
+   "two_or_more_scorer_probability": 0.002
+  },
+  {
+   "player_id": "understat_9090",
+   "player_name": "Ardian Ismajli",
+   "team": "Torino",
+   "side": "away",
+   "position": "D",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0082,
+   "anytime_scorer_probability_if_playing": 0.0105,
+   "expected_shots": 0.0745,
+   "expected_shots_if_playing": 0.0983,
+   "expected_shots_on_target": 0.0254,
+   "expected_shots_on_target_if_playing": 0.0336,
+   "expected_minutes_share": 0.9617,
+   "shots_over_probabilities": {
+    "0.5": 0.0936,
+    "1.5": 0.0046,
+    "2.5": 0.0001,
+    "3.5": 0.0
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.033,
+    "1.5": 0.0006,
+    "2.5": 0.0
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0005,
+    "1.5": 0.0
+   },
+   "expected_assists": 0.0005,
+   "expected_assists_if_playing": 0.0005,
+   "expected_goals": 0.0082,
+   "goal_or_assist_probability": 0.0086,
+   "two_or_more_scorer_probability": 0.0
+  },
+  {
+   "player_id": "understat_9044",
+   "player_name": "Alberto Paleari",
+   "team": "Torino",
+   "side": "away",
+   "position": "GK",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0,
+   "anytime_scorer_probability_if_playing": 0.0,
+   "expected_shots": 0.0,
+   "expected_shots_if_playing": 0.0,
+   "expected_shots_on_target": 0.0,
+   "expected_shots_on_target_if_playing": 0.0,
+   "expected_minutes_share": 1.0,
+   "shots_over_probabilities": {},
+   "shots_on_target_over_probabilities": {},
+   "assists_over_probabilities": {},
+   "expected_assists": 0.0,
+   "expected_assists_if_playing": 0.0,
+   "expected_goals": 0.0,
+   "goal_or_assist_probability": 0.0,
+   "two_or_more_scorer_probability": 0.0
+  },
+  {
+   "player_id": "understat_7700",
+   "player_name": "Che Adams",
+   "team": "Torino",
+   "side": "away",
+   "position": "F S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.116,
+   "anytime_scorer_probability_if_playing": 0.1561,
+   "expected_shots": 0.7686,
+   "expected_shots_if_playing": 1.0951,
+   "expected_shots_on_target": 0.2624,
+   "expected_shots_on_target_if_playing": 0.3738,
+   "expected_minutes_share": 0.8179,
+   "shots_over_probabilities": {
+    "0.5": 0.6496,
+    "1.5": 0.3012,
+    "2.5": 0.1061,
+    "3.5": 0.0297
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.3086,
+    "1.5": 0.057,
+    "2.5": 0.0074
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0267,
+    "1.5": 0.0004
+   },
+   "expected_assists": 0.0271,
+   "expected_assists_if_playing": 0.0331,
+   "expected_goals": 0.1233,
+   "goal_or_assist_probability": 0.1396,
+   "two_or_more_scorer_probability": 0.007
+  },
+  {
+   "player_id": "understat_6276",
+   "player_name": "Nikola Vlasic",
+   "team": "Torino",
+   "side": "away",
+   "position": "F M S",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0892,
+   "anytime_scorer_probability_if_playing": 0.1169,
+   "expected_shots": 0.5725,
+   "expected_shots_if_playing": 0.7851,
+   "expected_shots_on_target": 0.1954,
+   "expected_shots_on_target_if_playing": 0.268,
+   "expected_minutes_share": 0.9246,
+   "shots_over_probabilities": {
+    "0.5": 0.5425,
+    "1.5": 0.1865,
+    "2.5": 0.0459,
+    "3.5": 0.0087
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.2349,
+    "1.5": 0.0303,
+    "2.5": 0.0027
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.055,
+    "1.5": 0.0015
+   },
+   "expected_assists": 0.0565,
+   "expected_assists_if_playing": 0.0612,
+   "expected_goals": 0.0934,
+   "goal_or_assist_probability": 0.1393,
+   "two_or_more_scorer_probability": 0.0041
+  },
+  {
+   "player_id": "understat_11741",
+   "player_name": "Saúl Coco",
+   "team": "Torino",
+   "side": "away",
+   "position": "D",
+   "match_id": "401874767",
+   "anytime_scorer_probability": 0.0153,
+   "anytime_scorer_probability_if_playing": 0.0192,
+   "expected_shots": 0.1853,
+   "expected_shots_if_playing": 0.2393,
+   "expected_shots_on_target": 0.0633,
+   "expected_shots_on_target_if_playing": 0.0817,
+   "expected_minutes_share": 0.9819,
+   "shots_over_probabilities": {
+    "0.5": 0.2126,
+    "1.5": 0.0246,
+    "2.5": 0.0019,
+    "3.5": 0.0001
+   },
+   "shots_on_target_over_probabilities": {
+    "0.5": 0.0784,
+    "1.5": 0.0032,
+    "2.5": 0.0001
+   },
+   "assists_over_probabilities": {
+    "0.5": 0.0097,
+    "1.5": 0.0
+   },
+   "expected_assists": 0.0097,
+   "expected_assists_if_playing": 0.0099,
+   "expected_goals": 0.0154,
+   "goal_or_assist_probability": 0.0248,
+   "two_or_more_scorer_probability": 0.0001
+  }
+ ]
+}

@@ -33,7 +33,14 @@ logger = logging.getLogger(__name__)
 MAX_CHART_POINTS = 30
 MAX_LOOKBACK_FILES = 10
 LAST_N_GAMES = 10
-MAX_TABLES = 8
+# 12, not 8. At 8 the cap was silently TRUNCATING MLB's own reference answer:
+# measured on production 2026-09-17, Nolan McLean's earned-runs Ask built nine
+# tables and served eight -- the park/weather table fell off the end with
+# nothing saying so. A board-row prop now also carries the `track_record`
+# layer and, when layers are missing, the coverage table. `ask_bar.js` renders
+# every table collapsible with only the first two open, so the cost of a
+# higher cap is scroll, not payload (each table is a few hundred bytes).
+MAX_TABLES = 12
 MAX_CHARTS = 5
 
 _WNBA_TEAM_NAMES: dict[str, str] = {
@@ -565,6 +572,15 @@ def _wnba_latest(pattern_name: str, selected_date: str | None) -> tuple[Any, str
     return _load_json(path), iso
 
 
+def _sim_minutes(player: dict[str, Any]) -> float | None:
+    """Expected minutes off a basketball sim player row: `min_mean`, else the stub's `minutes`.
+
+    The team table used to print `or 0`, i.e. "0" minutes for every real player.
+    """
+    value = _to_float(player.get("min_mean"))
+    return value if value is not None else _to_float(player.get("minutes"))
+
+
 def _wnba_team_label(tri: str) -> str:
     return _WNBA_TEAM_NAMES.get(str(tri or "").upper(), str(tri or ""))
 
@@ -793,7 +809,11 @@ def _wnba_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, 
             rows.append([label, f"{mean:.1f}", f"±{sd:.1f}" if sd is not None else "—"])
             chart_points.append({"x": label, "y": round(mean, 2)})
             evidence_stats[label.lower()] = {"mean": round(mean, 2), "sd": round(sd, 2) if sd is not None else None}
-        minutes = _to_float(matched_player.get("minutes"))
+        # `min_mean` is the key the production sim writes (`cards_sim_detail`,
+        # Paige Bueckers `min_mean 38.37`, `state_basketball.md`); `minutes`
+        # exists only on the fallback stub, so this row never rendered on real
+        # sim output. Lane `prop-evidence-parity`.
+        minutes = _sim_minutes(matched_player)
         if minutes is not None:
             rows.append(["Minutes", f"{minutes:.1f}", "—"])
 
@@ -912,7 +932,7 @@ def _wnba_focused_evidence(question: str, context: dict[str, Any]) -> dict[str, 
                 f"{_to_float(p.get('reb_mean')) or 0:.1f}",
                 f"{_to_float(p.get('ast_mean')) or 0:.1f}",
                 f"{_to_float(p.get('pra_mean')) or 0:.1f}",
-                f"{_to_float(p.get('minutes')) or 0:.0f}",
+                f"{_sim_minutes(p):.0f}" if _sim_minutes(p) is not None else "—",
             ]
             for p in top
         ]
@@ -1225,15 +1245,64 @@ _BVP_CACHE_MAX_PITCHERS = 8
 _BVP_COUNT_FIELDS = ("pa", "hits", "hr", "so", "bb", "hbp", "inplay_pa", "inplay_hits")
 
 
-def _bvp_counts_for_pitcher(pitcher_id: int) -> dict[int, dict[str, int]]:
-    """Aggregate career BvP counts for one pitcher from the daily index files.
+_BVP_INDEX_SHARDS = 64
+_BVP_INDEX_SCHEMA = "mlb_bvp_pairs_v1"
+# pitcher_id -> the last date the counts cover. The title used to print the
+# ANSWER's date ("career, through 2026-09-17") over index files whose newest
+# date is 2026-05-11 (measured over all 47 files, lane `prop-evidence-parity`).
+_BVP_THROUGH: dict[int, str] = {}
 
-    The 47 index files total ~70MB, so results are cached per pitcher and the
-    cache is kept small; a cold lookup is a few seconds, warm ones are free.
+
+def _bvp_index_shard(pitcher_id: int) -> dict[str, Any] | None:
+    """The worker-built shard holding this pitcher (`scripts/build_mlb_bvp_index.py`), or None."""
+    name = f"bvp_pairs_{int(pitcher_id) % _BVP_INDEX_SHARDS:02d}.json"
+    for base in (_mlb_data_root(), os.path.join(_syndicate_data_root(), "mlb_source", "data")):
+        path = os.path.join(base, "statcast", "bvp", name)
+        if not os.path.exists(path):
+            continue
+        try:
+            payload = _load_json(path)
+        except Exception:
+            continue
+        if isinstance(payload, dict) and payload.get("schema") == _BVP_INDEX_SCHEMA:
+            return payload
+    return None
+
+
+def _bvp_through_label(pitcher_id: int, fallback: str) -> str:
+    return _BVP_THROUGH.get(int(pitcher_id)) or fallback
+
+
+def _bvp_counts_for_pitcher(pitcher_id: int) -> dict[int, dict[str, int]]:
+    """Career BvP counts for one pitcher: the worker-built shard, else the daily index files.
+
+    THE SHARD IS THE PRODUCTION PATH. Aggregating the 47 legacy index files
+    (~70 MB) on web took several seconds PER PITCHER, and a batter prop asks for
+    the starter plus six bullpen arms -- measured production MLB prop Asks of
+    16.8 s, 17.1 s and 26.0 s on 2026-09-17. The shard is one ~150 KB read. The
+    legacy scan stays only as the fallback for a disk the worker has not
+    published to yet, and records its own newest date either way.
     """
     with _BVP_CACHE_LOCK:
         if pitcher_id in _BVP_CACHE:
             return _BVP_CACHE[pitcher_id]
+
+    shard = _bvp_index_shard(pitcher_id)
+    if shard is not None:
+        fields = [str(field) for field in shard.get("fields") or []]
+        indexed: dict[int, dict[str, int]] = {}
+        for batter_key, values in ((shard.get("pitchers") or {}).get(str(int(pitcher_id))) or {}).items():
+            try:
+                row = dict(zip(fields, (int(v) for v in values)))
+                indexed[int(batter_key)] = {field: int(row.get(field) or 0) for field in _BVP_COUNT_FIELDS}
+            except (TypeError, ValueError):
+                continue
+        with _BVP_CACHE_LOCK:
+            if len(_BVP_CACHE) >= _BVP_CACHE_MAX_PITCHERS:
+                _BVP_CACHE.pop(next(iter(_BVP_CACHE)), None)
+            _BVP_CACHE[pitcher_id] = indexed
+            _BVP_THROUGH[int(pitcher_id)] = str(shard.get("through") or "")
+        return indexed
 
     directory = os.path.join(_mlb_data_root(), "cache", "statcast", "bvp", "statcast_bvp_file_daily")
     pitcher_key = str(pitcher_id)
@@ -1275,6 +1344,7 @@ def _bvp_counts_for_pitcher(pitcher_id: int) -> dict[int, dict[str, int]]:
         if len(_BVP_CACHE) >= _BVP_CACHE_MAX_PITCHERS:
             _BVP_CACHE.pop(next(iter(_BVP_CACHE)), None)
         _BVP_CACHE[pitcher_id] = totals
+        _BVP_THROUGH[int(pitcher_id)] = max(per_date) if per_date else ""
     return totals
 
 
@@ -1653,7 +1723,7 @@ def _mlb_bvp_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] 
         except (TypeError, ValueError):
             return None
         counts = _bvp_counts_for_pitcher(pitcher_id).get(batter_id)
-        title = f"BvP — {batter_name} vs {pitcher_name} (career, through {iso_date})"
+        title = f"BvP — {batter_name} vs {pitcher_name} (career, through {_bvp_through_label(pitcher_id, iso_date)})"
         if counts and (counts.get("pa") or 0) > 0:
             tables = [{
                 "title": title,
@@ -1878,7 +1948,7 @@ def _mlb_bvp_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] 
 
     if lineup:
         tables = [{
-            "title": f"BvP — today's lineup vs {pitcher_name} (career, through {iso_date})",
+            "title": f"BvP — today's lineup vs {pitcher_name} (career, through {_bvp_through_label(pitcher_id, iso_date)})",
             "columns": ["Batter", "PA", "H", "HR", "BB", "SO", "AVG"],
             "rows": [_bvp_rate_row(name, counts) for name, counts in lineup[:10]],
         }]
@@ -1886,7 +1956,7 @@ def _mlb_bvp_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] 
         # Sparse/no career history (common for young pitchers) isn't the
         # same as "nothing to show" -- say so instead of silently vanishing.
         tables = [{
-            "title": f"BvP — today's lineup vs {pitcher_name} (career, through {iso_date})",
+            "title": f"BvP — today's lineup vs {pitcher_name} (career, through {_bvp_through_label(pitcher_id, iso_date)})",
             "columns": ["Note"],
             "rows": [[f"No recorded plate appearances vs today's lineup yet — {pitcher_name}'s career BvP sample here is limited."]],
         }]
@@ -4175,6 +4245,126 @@ def _nfl_player_projection_evidence(question: str, context: dict[str, Any]) -> d
     return {"evidence": evidence, "tables": [table], "charts": [], "as_of": "", "sport": "nfl"}
 
 
+# ---------------------------------------------------------------------------
+# prop_evidence_v1 -- every board-row PLAYER PROP answer names its seven layers
+# (lane `prop-evidence-parity`, 2026-09-17). See
+# `syndicate/features/shared/prop_evidence/contract.py` for the contract and
+# `docs/ai_context/prop_evidence_reference.md` for the per-sport pipeline trace.
+# ---------------------------------------------------------------------------
+
+# Tables and charts built by the fetchers above predate the contract, so their
+# layer is read off the TITLE. The titles are pinned by
+# `tests/test_ask_the_syndicate.py`; a title that stops matching shows up as a
+# layer going unshown in the coverage block, not as a silently wrong answer.
+_LEGACY_TITLE_LAYERS: tuple[tuple[str, str, str], ...] = (
+    ("prefix", "SmartSim game outlook", "game_sim"),
+    ("prefix", "Simulated total runs", "game_sim"),
+    ("prefix", "Starter sim projections", "player_sim"),
+    ("prefix", "Simulated strikeouts", "player_sim"),
+    ("prefix", "Today's simulated matchup probabilities", "player_sim"),
+    ("prefix", "SmartSim projection", "player_sim"),
+    ("prefix", "Projected stat line", "player_sim"),
+    ("prefix", "Market lines & model edges", "player_sim"),
+    ("prefix", "Prop model projections", "player_sim"),
+    ("prefix", "Last ", "recent_form"),
+    ("prefix", "Actual ", "recent_form"),
+    ("contains", " by game — ", "recent_form"),
+    ("prefix", "History vs ", "matchup"),
+    ("prefix", "BvP", "matchup"),
+    ("prefix", "Matchup profile", "matchup"),
+    ("prefix", "Opposing bullpen", "matchup"),
+    ("prefix", "Opposing lineup Statcast", "matchup"),
+    ("prefix", "Today's opposing lineup", "matchup"),
+    ("prefix", "Team pace & defense", "matchup"),
+    ("prefix", "Team ratings the sim used", "matchup"),
+    ("contains", " this season", "matchup"),
+    ("contains", " team profile (", "matchup"),
+    ("prefix", "Advanced Statcast profile", "advanced"),
+    ("prefix", "Season tendencies", "advanced"),
+    ("prefix", "Park/weather", "environment"),
+    ("prefix", "SmartSim top projections", "game_sim"),
+    ("prefix", "Projected points leaders", "game_sim"),
+    ("prefix", "Match sim ", "game_sim"),
+    ("prefix", "Simulated total goals", "game_sim"),
+    ("contains", " projection", "game_sim"),
+    ("prefix", "SmartSim vs actual", "track_record"),
+    ("prefix", "Moneyline accuracy by day", "track_record"),
+)
+_ENVIRONMENT_ROW_LABELS = {"Park HR mult", "Weather HR mult"}
+
+_LAYER_ORDER = ("player_sim", "recent_form", "matchup", "advanced", "game_sim", "environment", "track_record")
+_LAYER_LABELS = {
+    "player_sim": "Player sim",
+    "recent_form": "Recent form",
+    "matchup": "Matchup",
+    "advanced": "Usage and advanced",
+    "game_sim": "Game sim",
+    "environment": "Environment",
+    "track_record": "Track record",
+}
+_ABSENT_TEXT = {
+    "no_producer": "Nothing in the platform produces this yet",
+    "not_published": "Computed on a worker but not published to the web service",
+    "artifact_missing": "Today's file is not on disk",
+    "player_not_found": "This player or game is not in the published file",
+    "not_applicable": "Not meaningful for this market",
+    "insufficient_sample": "Not enough graded games yet",
+    "provider_error": "The reader failed (logged)",
+    "not_shown": "No table for this layer on this answer",
+}
+
+
+def _tag_legacy_layers(items: list[dict[str, Any]]) -> None:
+    for item in items:
+        if not isinstance(item, dict) or item.get("layer"):
+            continue
+        title = str(item.get("title") or "")
+        for kind, needle, layer in _LEGACY_TITLE_LAYERS:
+            if (kind == "prefix" and title.startswith(needle)) or (kind == "contains" and needle in title):
+                item["layer"] = layer
+                break
+        if item.get("layer") == "matchup" and title.startswith("Matchup profile"):
+            if any(isinstance(row, list) and row and row[0] in _ENVIRONMENT_ROW_LABELS for row in item.get("rows") or []):
+                item["also_layers"] = ["environment"]
+
+
+def _layers_shown(tables: list[dict[str, Any]], charts: list[dict[str, Any]]) -> set[str]:
+    shown: set[str] = set()
+    for item in list(tables) + list(charts):
+        if isinstance(item, dict):
+            if item.get("layer"):
+                shown.add(str(item["layer"]))
+            shown.update(str(layer) for layer in item.get("also_layers") or [])
+    return shown
+
+
+def _coverage_table(coverage: dict[str, str]) -> dict[str, Any] | None:
+    rows = []
+    for layer in _LAYER_ORDER:
+        status = str(coverage.get(layer) or "")
+        if not status or status == "filled":
+            continue
+        prefix, _, detail = status.partition(":")
+        text = _ABSENT_TEXT.get(prefix, prefix)
+        rows.append([_LAYER_LABELS.get(layer, layer), text + (f" ({detail})" if detail else "")])
+    if not rows:
+        return None
+    return {"title": "What this answer could not show", "columns": ["Layer", "Why"], "rows": rows, "layer": "coverage"}
+
+
+def _is_player_prop_row(row: Any) -> bool:
+    return isinstance(row, dict) and bool(str(row.get("player_name") or "").strip()) and bool(str(row.get("market") or "").strip())
+
+
+def _prop_selected_date(context: dict[str, Any]) -> str:
+    selected = str(context.get("selected_date") or "").strip()
+    if selected:
+        return selected
+    from syndicate.features.shared.timezone import central_today_iso
+
+    return central_today_iso()
+
+
 def collect_focused_evidence(
     question: str, context: dict[str, Any], *, board_row: dict[str, Any] | None = None
 ) -> dict[str, Any] | None:
@@ -4184,6 +4374,13 @@ def collect_focused_evidence(
     `resolve_board_row`). With it, the fetchers are pointed at that row's game
     and player, not only at whatever the question's words happen to name, and
     the row itself travels in the context for the fetchers that need it.
+
+    A PLAYER PROP row is answered through `prop_evidence_v1`: the sport's
+    provider builds all seven layers from published artifacts (NBA, WNBA, NHL,
+    NFL, NCAAF, soccer); MLB keeps its reference fetchers, with their tables
+    tagged by layer, plus the shared `track_record` layer. Either way the answer
+    carries `prop_evidence.coverage` -- which layers it filled and, for each one
+    it did not, why -- and the missing ones are listed in a last table.
     """
     sport = str(context.get("sport_slug") or context.get("sport") or "").strip().lower()
     if isinstance(board_row, dict):
@@ -4196,15 +4393,60 @@ def collect_focused_evidence(
             "board_home_team": str(board_row.get("home_team") or "").strip(),
         }
     sections: list[dict[str, Any]] = []
-    for fetcher in _fetchers_for_sport(sport, question):
+    prop_block: dict[str, Any] | None = None
+    prop_row = board_row if _is_player_prop_row(board_row) else None
+    run_legacy_fetchers = True
+
+    if prop_row is not None and sport != "mlb":
         try:
-            result = fetcher(question, context)
+            from syndicate.features.shared import prop_evidence
+
+            if sport in prop_evidence.PROVIDERS:
+                built = prop_evidence.build_prop_evidence(
+                    {**prop_row, "sport": sport}, selected_date=_prop_selected_date(context)
+                )
+                if built is not None:
+                    section = built.to_section()
+                    prop_block = section.get("prop_evidence")
+                    sections.append(section)
+                    # The provider owns every layer for this row. Only when it
+                    # found NOTHING but the track record do the old fetchers
+                    # run, so a join miss never answers with less than before.
+                    run_legacy_fetchers = not [layer for layer in built.filled_layers() if layer != "track_record"]
         except Exception:
-            name = getattr(fetcher, "__name__", "<lambda>")
-            logger.exception("Ask focused-evidence fetcher %s failed", name)
-            continue
-        if isinstance(result, dict):
-            sections.append(result)
+            logger.exception("Ask prop_evidence provider failed for sport %s", sport)
+
+    if run_legacy_fetchers:
+        for fetcher in _fetchers_for_sport(sport, question):
+            try:
+                result = fetcher(question, context)
+            except Exception:
+                name = getattr(fetcher, "__name__", "<lambda>")
+                logger.exception("Ask focused-evidence fetcher %s failed", name)
+                continue
+            if isinstance(result, dict):
+                sections.append(result)
+
+    if prop_row is not None and sport == "mlb":
+        try:
+            from syndicate.features.shared.prop_evidence.contract import PropSubject
+            from syndicate.features.shared.prop_evidence.track_record import build_track_record
+
+            subject = PropSubject.from_board_row({**prop_row, "sport": sport}, selected_date=_prop_selected_date(context))
+            if subject is not None:
+                record = build_track_record(subject)
+                if record.filled:
+                    sections.append({
+                        "evidence": {"source": "prop_evidence:track_record", **record.facts},
+                        "tables": record.tables,
+                        "charts": record.charts,
+                        "as_of": record.as_of or "",
+                        "sport": "mlb",
+                    })
+                prop_block = {"schema": "prop_evidence_v1", "provider": "mlb:reference_fetchers",
+                              "coverage": {"track_record": record.status()}}
+        except Exception:
+            logger.exception("Ask MLB track record failed")
 
     if not sections:
         return None
@@ -4216,10 +4458,28 @@ def collect_focused_evidence(
         charts.extend(section.get("charts") or [])
         if isinstance(section.get("evidence"), dict):
             evidence_sections.append(section["evidence"])
-    return {
+    _tag_legacy_layers(tables)
+    _tag_legacy_layers(charts)
+
+    if prop_block is not None and prop_block.get("provider") == "mlb:reference_fetchers":
+        shown = _layers_shown(tables, charts)
+        coverage = {layer: ("filled" if layer in shown else "not_shown:reference fetchers built no table for it")
+                    for layer in _LAYER_ORDER}
+        track_status = prop_block["coverage"].get("track_record", "filled")
+        if track_status != "filled":
+            coverage["track_record"] = track_status
+        prop_block = {**prop_block, "coverage": coverage}
+
+    coverage_table = _coverage_table(prop_block.get("coverage") or {}) if prop_block else None
+    limit = MAX_TABLES - (1 if coverage_table else 0)
+    served_tables = tables[:limit] + ([coverage_table] if coverage_table else [])
+    out: dict[str, Any] = {
         "evidence": evidence_sections,
-        "tables": tables[:MAX_TABLES],
+        "tables": served_tables,
         "charts": charts[:MAX_CHARTS],
         "as_of": max(str(s.get("as_of") or "") for s in sections),
-        "sport": sections[0].get("sport"),
+        "sport": sections[0].get("sport") or sport or None,
     }
+    if prop_block is not None:
+        out["prop_evidence"] = {**prop_block, "tables_built": len(tables), "tables_served": len(served_tables)}
+    return out
