@@ -242,13 +242,21 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
 
 ## [ask-the-syndicate] ASK THE SYNDICATE
 
-- **`prop_evidence_v1` IS ON `origin/main` AND NOT DEPLOYED `[2026-09-17 18:3xZ, lane prop-evidence-parity]`.**
-  `fdea0a2e` + `bff99ffe`: a board-row PLAYER PROP is answered by a per-sport provider
-  (`syndicate/features/shared/prop_evidence/`) that fills seven layers -- player_sim,
-  recent_form, matchup, advanced, game_sim, environment, track_record -- or names why
-  each one is empty, and the named absences reach the user as a last table. MLB keeps its
-  reference fetchers (tables unchanged, tagged by layer) plus the shared track record.
-  Web deploy was REFUSED by the auto-mode permission classifier, not by a guard.
+- **`prop_evidence_v1` IS LIVE ON WEB AND VERIFIED `[2026-09-17 21:0xZ, lane prop-evidence-parity, web `90888a55` live 19:46:04Z]`.**
+  A board-row PLAYER PROP is answered by a per-sport provider
+  (`syndicate/features/shared/prop_evidence/`) filling seven layers -- player_sim,
+  recent_form, matchup, advanced, game_sim, environment, track_record -- or naming why each
+  is empty, with the named absences shown to the user as a last table. MLB keeps its
+  reference fetchers plus the shared track record. **Measured on production, 5 pregame board
+  prop rows per sport: mlb / wnba / nfl / ncaaf ALL PASS** (`reports/prop_evidence/2026-09-17_post_ridealong.json`;
+  medians 18.25 / 5.20 / 2.02 / 4.05 s; tables served MLB 9-10, NFL 8, WNBA 7, NCAAF 6).
+  MLB's own answer on three identical rows went **8 tables -> 10** with every reference table
+  intact, gaining the track record and McLean's park/weather table that the 8-cap had been
+  truncating. **It reached production as a RIDE-ALONG on another lane's deploy**, not by this
+  lane's hand -- the deploy call was refused by a session permission classifier.
+- **STILL ON THE LEGACY BvP PATH:** refresh-worker is on `5cf06987`, so no shards exist and an
+  MLB prop Ask still scans ~70 MB per pitcher (18.25 s median, 40.02 s cold on a starter with
+  no cached entry). The shard path measures 20.25 s -> 1.07 s locally for the same 7-pitcher read.
 - **PRODUCTION ANSWER SHAPES, read 2026-09-17 18:0x-18:2xZ on web `efd24273`, BEFORE any
   deploy** -- this is the before-baseline, and it CORRECTS the '8 + 3' line below:
   MLB **8 tables / 2-3 charts on 4 of 5 rows** (16.8s / 17.1s / 26.0s / 3.8s), but a row
