@@ -14,6 +14,8 @@ def _game(total=10.8, sim=11.9, clock="60'", state="applied"):
     return {
         "status_display_clock": clock, "half": 2, "clock_remaining": 1800.0,
         "score_home": 1, "score_away": 1, "home_corners_so_far": 4, "away_corners_so_far": 3,
+        "home_shots_so_far": 11, "away_shots_so_far": 6,
+        "home_shots_on_target_so_far": 5, "away_shots_on_target_so_far": 2,
         "live_corners": {"state": state, "share_remaining": 0.373, "pregame_total": 10.2},
         "projection": {"corners_basis": "prekickoff_pace_v1", "projected_total_corners": total,
                        "projected_home_corners": 5.9, "projected_away_corners": 4.9,
@@ -75,3 +77,18 @@ def test_prior_rows_survive_a_cap_change_and_junk_is_dropped():
 ])
 def test_history_from_payload_is_defensive(payload, expected):
     assert hist.history_from_payload(payload) == expected
+
+
+def test_a_row_carries_the_shot_counts_for_the_lane_that_asked_for_them():
+    """`soccer-shot-on-target-definition` needs these per tick: at full time the served box drops to rows: []
+    (measured 21:28:49Z), so the counts are unreadable within the hour. On-target is a LOWER BOUND on ESPN's
+    figure (exact on 39 of 48 team-matches, short on 9, never over) and must not be read as the box score."""
+    row = hist.history_row(_game(), "2026-09-18T18:30:00+00:00")
+    assert row["home_shots_so_far"] == 11 and row["away_shots_so_far"] == 6
+    assert row["home_shots_on_target_so_far"] == 5 and row["away_shots_on_target_so_far"] == 2
+
+
+def test_a_game_missing_the_shot_fields_still_produces_a_row():
+    sparse = {"status_display_clock": "45'", "projection": {"corners_basis": "sim"}}
+    row = hist.history_row(sparse, "2026-09-18T18:30:00+00:00")
+    assert row["home_shots_so_far"] is None and row["corners_basis"] == "sim"

@@ -44,7 +44,12 @@ CHECKOUT = HERE.parents[1]
 HISTORY_KEY = "projection_history"
 
 FIELDS_FROM_GAME = ("home_team", "away_team", "status_display_clock", "half", "clock_remaining",
-                    "score_home", "score_away", "home_corners_so_far", "away_corners_so_far")
+                    "score_home", "score_away", "home_corners_so_far", "away_corners_so_far",
+                    # Shots as well, matching the artifact's own history rows. `*_shots_on_target_so_far` is a
+                    # commentary-derived LOWER BOUND on ESPN's figure (exact on 39 of 48 team-matches, short on
+                    # 9, never over), not the box score's number.
+                    "home_shots_so_far", "away_shots_so_far",
+                    "home_shots_on_target_so_far", "away_shots_on_target_so_far")
 FIELDS_FROM_PROJECTION = ("corners_basis", "projected_total_corners", "projected_home_corners",
                           "projected_away_corners", "sim_projected_total_corners",
                           "sim_projected_home_corners", "sim_projected_away_corners", "projected_final_total")

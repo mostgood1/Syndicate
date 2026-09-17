@@ -33,7 +33,20 @@ HISTORY_KEY = "projection_history"
 MAX_ROWS_PER_MATCH = 240
 
 _GAME_FIELDS = ("status_display_clock", "half", "clock_remaining", "score_home", "score_away",
-                "home_corners_so_far", "away_corners_so_far")
+                "home_corners_so_far", "away_corners_so_far",
+                # SHOTS AND ON-TARGET, added 2026-09-17 at lane `soccer-shot-on-target-definition`'s request
+                # (session a1e40980). Its production evidence existed ONLY while the match was in play: at
+                # full time the served game page drops the live box entirely (`rows: []`, measured 21:28:49Z),
+                # so the counts became unreadable within the hour -- the same disappearance this block exists
+                # to stop. Per-tick rows turn that class of verification from "be watching at the right
+                # minute" into "read the artifact tomorrow".
+                #
+                # `*_shots_on_target_so_far` IS A COMMENTARY-DERIVED LOWER BOUND ON ESPN'S OWN FIGURE, not
+                # ESPN's stat: measured per team over 48 team-matches, exact on 39, short on 9, never over,
+                # 0.25 per team per match (that lane, 2026-09-17). Anyone reading this column later must not
+                # treat it as the box score's number.
+                "home_shots_so_far", "away_shots_so_far",
+                "home_shots_on_target_so_far", "away_shots_on_target_so_far")
 _PROJECTION_FIELDS = ("corners_basis", "projected_total_corners", "projected_home_corners",
                       "projected_away_corners", "sim_projected_total_corners",
                       "sim_projected_home_corners", "sim_projected_away_corners", "projected_final_total")
