@@ -140,8 +140,20 @@ class PullHotArtifactsReachabilityTests(unittest.TestCase):
 
 
 class PullWindowClampTests(unittest.TestCase):
-    """The 2 h clamp is a SECOND, time-based skip the cursor cannot fix. It stays --
-    it bounds a request's size -- but it must say so when it jumps a stored floor."""
+    """The window clamp, per scope (lane `pull-window-dated-scope`, 2026-09-17).
+
+    MEASURED on production over the 24 h to 2026-09-17 12:13Z: refresh-worker's 2 h
+    clamp fired 3 times on `scope=2026-09-17`, skipping 3.9, 36.7 and 47.0 minutes
+    of tomorrow's changes; and the first request of every NEW date scope looked
+    back exactly 2.00 h, so anything written for that date earlier was never
+    asked for. The clamp exists for the 2026-07-25 OOM (an unbounded response
+    held in memory on two services). A DATED request is now bounded without it:
+    the date prefilter, the 48 MB budget, the 8 MB per-file cap and the
+    `next_since` resume. So a dated scope reaches back 24 h, and an undated one
+    keeps 2 h.
+    """
+
+    DAY = 24 * 3600.0
 
     def setUp(self) -> None:
         self.store = _Store()
@@ -157,21 +169,50 @@ class PullWindowClampTests(unittest.TestCase):
         for p in reversed(self._patches):
             p.stop()
 
-    def test_the_clamp_is_LOUD_when_it_jumps_a_stored_floor(self) -> None:
-        stale = NOW - 3 * 3600.0
-        artifact_publisher._record_hot_artifact_pull_watermark(stale, date_str="2026-09-16")
+    def _since(self, date_str, printed=None):
+        return artifact_publisher._hot_artifact_pull_since_epoch(pull_started_epoch=NOW, date_str=date_str)
+
+    @staticmethod
+    def _clamped(printed) -> bool:
+        return any("PULL_WINDOW_CLAMPED" in str(c.args[0]) for c in printed.call_args_list if c.args)
+
+    def test_the_dated_cap_is_24_hours(self) -> None:
+        self.assertEqual(getattr(artifact_publisher, "_MAX_DATED_PULL_WINDOW_SECONDS", None), self.DAY)
+
+    def test_a_dated_floor_3_hours_old_is_NOT_jumped(self) -> None:
+        """THE DEFECT: this returned NOW - 2 h, and the hour before it was never pulled."""
+        artifact_publisher._record_hot_artifact_pull_watermark(NOW - 3 * 3600.0, date_str="2026-09-16")
         with patch("builtins.print") as printed:
-            since = artifact_publisher._hot_artifact_pull_since_epoch(pull_started_epoch=NOW, date_str="2026-09-16")
+            since = self._since("2026-09-16")
+        self.assertEqual(since, NOW - 3 * 3600.0)
+        self.assertFalse(self._clamped(printed))
+
+    def test_a_NEW_dated_scope_looks_back_24_hours(self) -> None:
+        """No watermark yet for this date: the first pull used to see only 2 h."""
+        self.assertEqual(self._since("2026-09-18"), NOW - self.DAY)
+
+    def test_a_dated_floor_older_than_24_hours_is_clamped_and_LOUD(self) -> None:
+        artifact_publisher._record_hot_artifact_pull_watermark(NOW - 30 * 3600.0, date_str="2026-09-16")
+        with patch("builtins.print") as printed:
+            since = self._since("2026-09-16")
+        self.assertEqual(since, NOW - self.DAY)
+        self.assertTrue(self._clamped(printed), "a clamp that skips changes must say so")
+
+    def test_an_UNDATED_scope_keeps_the_2_hour_clamp(self) -> None:
+        """No date filter bounds an undated request, so the 07-25 guard stays."""
+        self.assertEqual(self._since(None), NOW - 2 * 3600.0)
+        artifact_publisher._record_hot_artifact_pull_watermark(NOW - 3 * 3600.0, date_str=None)
+        with patch("builtins.print") as printed:
+            since = self._since(None)
         self.assertEqual(since, NOW - 2 * 3600.0)
-        lines = " ".join(str(call.args[0]) for call in printed.call_args_list if call.args)
-        self.assertIn("PULL_WINDOW_CLAMPED", lines, "the clamp skipped an hour of changes silently")
+        self.assertTrue(self._clamped(printed))
 
     def test_the_clamp_is_quiet_when_it_changes_nothing(self) -> None:
         artifact_publisher._record_hot_artifact_pull_watermark(NOW - 600.0, date_str="2026-09-16")
         with patch("builtins.print") as printed:
-            since = artifact_publisher._hot_artifact_pull_since_epoch(pull_started_epoch=NOW, date_str="2026-09-16")
+            since = self._since("2026-09-16")
         self.assertEqual(since, NOW - 600.0)
-        self.assertFalse(any("PULL_WINDOW_CLAMPED" in str(c.args[0]) for c in printed.call_args_list if c.args))
+        self.assertFalse(self._clamped(printed))
 
 
 if __name__ == "__main__":

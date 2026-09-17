@@ -692,13 +692,15 @@ class PullHotArtifactClientTests(unittest.TestCase):
                         call.args[0].full_url for call in reversed(mocked_urlopen.call_args_list) if "pattern=" in call.args[0].full_url
                     )
                     self.assertIn("since=", retry_url)
-                    from syndicate.features.shared.artifact_publisher import _MAX_PULL_WINDOW_SECONDS
+                    # A DATED pull's bound is the dated cap (lane `pull-window-dated-scope`,
+                    # 2026-09-17): still a hard bound a failing pull cannot widen past.
+                    from syndicate.features.shared.artifact_publisher import _MAX_DATED_PULL_WINDOW_SECONDS
                     import time as _time
 
                     retry_since = float(retry_url.split("since=")[1])
                     self.assertLessEqual(
                         _time.time() - retry_since,
-                        _MAX_PULL_WINDOW_SECONDS + 60,
+                        _MAX_DATED_PULL_WINDOW_SECONDS + 60,
                         "a failing pull must not be able to widen its own window without bound",
                     )
 

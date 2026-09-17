@@ -1610,6 +1610,21 @@ def _hot_artifact_pull_watermark_path(date_str: str | None = None) -> Path:
 # above pulls nothing at all and takes the worker down with it.
 _MAX_PULL_WINDOW_SECONDS = 2 * 3600
 
+# A DATED scope reaches back further (lane `pull-window-dated-scope`, 2026-09-17).
+#
+# The 2 h ceiling above is right for an UNDATED pull, where nothing but time
+# bounds the request. A dated pull is bounded three other ways that did not
+# exist on 2026-07-25: the export filters by `*<date>*` BEFORE touching a file
+# (`artifact_walk` prefilter), fills at most a 48 MB body with an 8 MB per-file
+# cap, and returns `next_since` so a cut-off read resumes rather than skips. So
+# for a dated scope the 2 h clamp no longer bought safety -- it only skipped.
+# MEASURED on production over the 24 h to 2026-09-17 12:13Z: refresh-worker
+# clamped `scope=2026-09-17` 3 times, skipping 3.9, 36.7 and 47.0 minutes of
+# tomorrow's changes, and every NEW date scope's first request looked back
+# exactly 2.00 h, never asking for anything written for that date earlier.
+# 24 h still bounds a floor frozen for days; hitting it is logged.
+_MAX_DATED_PULL_WINDOW_SECONDS = 24 * 3600
+
 
 def _hot_artifact_pull_since_epoch(*, pull_started_epoch: float, date_str: str | None = None) -> float | None:
     # Mirrors live_refresh_loop.py's _hot_artifact_publish_since_epoch on the
@@ -1628,15 +1643,16 @@ def _hot_artifact_pull_since_epoch(*, pull_started_epoch: float, date_str: str |
         stored = float(payload.get("epoch")) if isinstance(payload, dict) and payload.get("epoch") is not None else None
     except (TypeError, ValueError):
         stored = None
-    window_floor = float(pull_started_epoch) - _MAX_PULL_WINDOW_SECONDS
+    max_window = _MAX_DATED_PULL_WINDOW_SECONDS if str(date_str or "").strip() else _MAX_PULL_WINDOW_SECONDS
+    window_floor = float(pull_started_epoch) - max_window
     if stored is None or stored <= 0.0:
         return window_floor
     if stored < window_floor:
         # A SECOND, time-based skip, and the one the resume cursor cannot fix:
         # the clamp bounds a request's size by jumping the floor forward, and
         # anything changed between `stored` and the new floor is never pulled.
-        # With truncation rare at a 48 MB budget a resume point should never
-        # fall this far behind -- which is exactly why it must be LOUD if it does.
+        # For a dated scope that now needs a floor frozen for over 24 h, and
+        # it must be LOUD when it happens.
         print(
             f"[artifact_publisher] PULL_WINDOW_CLAMPED scope={date_str or 'all'} stored={stored} "
             f"floor={window_floor} skipped_seconds={window_floor - stored:.1f}",

@@ -86,9 +86,11 @@ class HotArtifactPullWatermarkScopeTests(unittest.TestCase):
         with self._as_service("live-odds-worker"):
             self._record(self.OTHER_START, "2026-09-15")
         with self._as_service("refresh-worker"):
+            # A DATED scope's first pull reaches back 24 h (lane `pull-window-dated-scope`):
+            # other services' floors still never leak in; the bound is now the dated cap.
             self.assertEqual(
                 self.NOW - self._since("2026-09-15"),
-                artifact_publisher._MAX_PULL_WINDOW_SECONDS,
+                getattr(artifact_publisher, "_MAX_DATED_PULL_WINDOW_SECONDS", None),
             )
 
     def test_scopes_are_distinct_paths_and_not_the_legacy_shared_key(self) -> None:
