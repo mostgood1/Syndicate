@@ -651,6 +651,12 @@ live-lens loop runs on BOTH workers writing the same aggregate, so a partial
 deploy makes momentum **flicker** rather than be absent: whichever ticks last
 wins. Publisher is on `06babca2`; refresh-worker is not.
 
+**SUPERSEDED on the loop, measured 2026-09-17 21:0xZ** (single-key env read, lane
+`soccer-live-corners-stage2`): `SYNDICATE_ENABLE_LIVE_LENS_LOOP` is **true on
+live-odds-worker and false on refresh-worker**, so the soccer live tick runs on ONE
+service and a partial deploy cannot flicker the soccer aggregate today. Treat the
+"BOTH workers" sentence as history, not as production.
+
 **RETRACTED: "soccer box sections render 0 rows".** That 08-21 UI-audit finding
 was a MEASUREMENT ERROR — table sections carry `table_rows` and set
 `"rows": []` by design. Verified on production 2026-08-21 23:29Z: Goals 3/2/3/1
