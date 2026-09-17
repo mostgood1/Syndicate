@@ -202,6 +202,15 @@ class LiveMatchProjection:
     # at 3.5/4.5), so a single-threshold answer is least useful exactly when the
     # live tier matters most.
     scoreline_probabilities: dict[str, float] = field(default_factory=dict)
+    # THE SIM'S OWN CORNERS, KEPT. `features/live_corners.py` may replace the three published corner
+    # numbers above with the pre-kickoff estimator spread over the clock (H29: the sim's live corners
+    # carry MAE 1.951 and +0.46 bias against 1.876 and +0.07). These stay None until it does, so an
+    # artifact always says which arm produced what it published -- and a forward grade (H32) can score
+    # both from the same snapshot instead of needing a replay.
+    sim_projected_home_corners: float | None = None
+    sim_projected_away_corners: float | None = None
+    sim_projected_total_corners: float | None = None
+    corners_basis: str = "sim"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -220,6 +229,10 @@ class LiveMatchProjection:
             "home_red_card_applied": self.home_red_card_applied,
             "away_red_card_applied": self.away_red_card_applied,
             "scoreline_probabilities": dict(self.scoreline_probabilities),
+            "sim_projected_home_corners": self.sim_projected_home_corners,
+            "sim_projected_away_corners": self.sim_projected_away_corners,
+            "sim_projected_total_corners": self.sim_projected_total_corners,
+            "corners_basis": self.corners_basis,
         }
 
 
