@@ -111,7 +111,12 @@ class WebReader:
         self.seconds = 0.0
 
     def text(self, relative: str) -> str | None:
-        """File content, None for a clean not-found, FetchError for anything else."""
+        """File content as text, None for a clean not-found, FetchError for anything else."""
+        blob = self.bytes(relative)
+        return None if blob is None else blob.decode("utf-8")
+
+    def bytes(self, relative: str) -> bytes | None:
+        """File content as bytes, None for a clean not-found, FetchError for anything else."""
         url = f"{self.base}/api/ops/artifacts/stream?path={urllib.parse.quote(relative, safe='')}"
         last: Exception | None = None
         for attempt in range(self.attempts):
@@ -124,7 +129,7 @@ class WebReader:
                 with self.opener(request, timeout=240) as response:
                     body = response.read()
                 self.seconds += time.monotonic() - started
-                return body.decode("utf-8")
+                return body
             except urllib.error.HTTPError as exc:
                 self.seconds += time.monotonic() - started
                 if exc.code in (403, 404):
@@ -191,10 +196,13 @@ def grader_signature(bs: Any, settler: Any) -> tuple[str, dict[str, str], dict[s
     return signature, sport_versions, grader
 
 
-def write(relative: str, content: str) -> Path:
+def write(relative: str, content: str | bytes) -> Path:
     path = data_root() / relative
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    if isinstance(content, bytes):
+        path.write_bytes(content)
+    else:
+        path.write_text(content, encoding="utf-8")
     return path
 
 
@@ -269,7 +277,7 @@ def main(argv: list[str] | None = None) -> int:
     log(f"GRADER {json.dumps(grader, sort_keys=True)}")
 
     try:
-        saved_state = reader.json(msc.STATE_PATH)
+        saved_state = msc.decode_state(reader.bytes(msc.STATE_PATH))
         previous = reader.json(msc.LATEST_PATH)
     except FetchError as exc:
         log(f"REFUSING: could not read the saved state ({exc}). Publishing a fresh state would erase history.")
@@ -319,7 +327,7 @@ def main(argv: list[str] | None = None) -> int:
         scorecard["weekly_backtests"] = weekly
 
     outputs = {
-        msc.STATE_PATH: msc.dumps(state),
+        msc.STATE_PATH: msc.encode_state(state),
         msc.OVERLAY_PATH: json.dumps(overlay, indent=1, sort_keys=True),
         msc.scorecard_path(today): json.dumps(scorecard, indent=1, sort_keys=True, default=str),
         msc.markdown_path(today): msc.markdown(scorecard),

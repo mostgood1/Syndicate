@@ -717,7 +717,7 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "reports/model_scorecard/model_scorecard_*.json",
     "reports/model_scorecard/model_scorecard_*.md",
     "reports/model_scorecard/measured_bucket_skill_overlay.json",
-    "reports/model_scorecard/state/scorecard_state.json",
+    "reports/model_scorecard/state/scorecard_state.json.gz",
     "reports/model_scorecard/weekly/weekly_backtests_*",
     # The PROJECTED evaluation ledger (`evaluation_ledger_projection.py`). This
     # is the only form of the ledger that can cross to web at all: the RAW

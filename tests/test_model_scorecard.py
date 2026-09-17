@@ -13,6 +13,7 @@ Lane `model-scorecard-cron` `[2026-09-17]`. The load-bearing tests:
 
 from __future__ import annotations
 
+import json
 import random
 from datetime import datetime, timezone
 
@@ -307,3 +308,15 @@ def test_every_settler_module_declares_the_sports_it_owns():
     composite = po.CompositeSettler([("mlb", lambda s, v: None, "mlb/1")], {"nhl": "ModuleNotFoundError"},
                                     {"mlb": ("mlb",), "nhl": ("nhl",)})
     assert composite.sport_versions == {"mlb": "mlb/1", "nhl": "unavailable:nhl"}
+
+
+def test_the_state_is_stored_gzipped_and_reads_back_either_way():
+    state = msc.empty_state("core", {"mlb": "mlb/1"})
+    state["pending"] = {"mlb|x": [{"k": f"x|totals||full|over|{i}.5", "t": "2026-09-17T15:00:00Z"} for i in range(2000)]}
+    blob = msc.encode_state(state)
+    assert blob[:2] == b"\x1f\x8b" and len(blob) * 5 < len(msc.dumps(state).encode("utf-8"))
+    assert msc.decode_state(blob) == json.loads(msc.dumps(state)), "gzipped bytes as stored on web"
+    assert msc.decode_state(msc.dumps(state).encode("utf-8")) == json.loads(msc.dumps(state)), "a transport that un-gzipped"
+    assert msc.decode_state(None) is None
+    assert msc.STATE_PATH.endswith(".json.gz")
+

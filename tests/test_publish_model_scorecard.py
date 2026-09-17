@@ -114,6 +114,7 @@ def test_an_unreadable_state_refuses_before_anything_is_written(monkeypatch, tmp
         raise pms.FetchError(f"{relative}: 502")
 
     monkeypatch.setattr(pms.WebReader, "json", failing_json)
+    monkeypatch.setattr(pms.WebReader, "bytes", failing_json)
     assert pms.main(["--weekly", "off"]) == 4
     assert not any(tmp_path.rglob("*")), "nothing may be written when the saved state could not be read"
 
@@ -122,6 +123,7 @@ def test_no_recorder_data_at_all_refuses_to_publish(monkeypatch, tmp_path):
     monkeypatch.setattr(pms, "admin_token", lambda: "t")
     monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
     monkeypatch.setattr(pms.WebReader, "json", lambda self, relative: None)
+    monkeypatch.setattr(pms.WebReader, "bytes", lambda self, relative: None)
 
     def failing_fetch(reader, bs, day, sports):
         raise pms.FetchError("export down")

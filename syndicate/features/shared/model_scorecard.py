@@ -40,6 +40,7 @@ TWO THRESHOLDS, ON PURPOSE.
 from __future__ import annotations
 
 import collections
+import gzip
 import importlib.util
 import json
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -53,7 +54,10 @@ from syndicate.features.shared.opportunity_population_ledger import parse_popula
 
 SCORECARD_VERSION = "model_scorecard/1"
 REPORT_DIR = "reports/model_scorecard"
-STATE_PATH = f"{REPORT_DIR}/state/scorecard_state.json"
+# GZIPPED. Measured 2026-09-17: the plain state was 33.9 MB, and web (which sits at 1.6-1.9 GB of its
+# 2 GiB limit) was OOM-killed at 16:36:52Z seconds into a cron run that streamed it back. gzip took the
+# same state to ~2.5 MB on the wire; this keeps it that size on web's disk and in every read.
+STATE_PATH = f"{REPORT_DIR}/state/scorecard_state.json.gz"
 LATEST_PATH = f"{REPORT_DIR}/model_scorecard_latest.json"
 OVERLAY_PATH = skill_overlay.OVERLAY_PATH
 RECORDER_START = "2026-09-14"
@@ -626,3 +630,16 @@ def markdown(scorecard: Mapping[str, Any]) -> str:
 
 def dumps(payload: Any) -> str:
     return json.dumps(payload, separators=(",", ":"), sort_keys=True, default=str)
+
+
+def encode_state(state: Mapping[str, Any]) -> bytes:
+    return gzip.compress(dumps(state).encode("utf-8"), compresslevel=6, mtime=0)
+
+
+def decode_state(blob: bytes | None) -> Any:
+    """The saved state from web, whether the transport already un-gzipped it or not. None when absent."""
+    if blob is None:
+        return None
+    if blob[:2] == b"\x1f\x8b":
+        blob = gzip.decompress(blob)
+    return json.loads(blob.decode("utf-8"))
