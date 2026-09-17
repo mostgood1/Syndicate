@@ -135,6 +135,37 @@ def append_rows(path: Path, rows: list[dict]) -> int:
     return len(fresh)
 
 
+def truncation_alarm(out_dir: Path, date: str, history_counts: dict[str, int]) -> list[str]:
+    """Name a history block that SHRANK since the last harvest, instead of losing rows silently.
+
+    `live_state_<date>.json` is replaced WHOLE by whichever service ticks, so a writer running code without
+    `projection_history` drops the block and the next tick starts it again from empty. Suggested by lane
+    `soccer-shot-on-target-definition` (2026-09-17): the signature is a per-league row count that falls while
+    a match is in play, and this harvest already reads that number every 15 minutes. A fall is reported, not
+    corrected -- the cache keeps every row it has already stored, so the alarm says what was lost from the
+    ARTIFACT, and the rows themselves survive here.
+
+    State lives beside the cache in `history_counts_<date>.json`. A first run has nothing to compare and
+    reports nothing.
+    """
+    path = out_dir / f"history_counts_{date}.json"
+    previous: dict[str, int] = {}
+    if path.exists():
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+            previous = {str(k): int(v) for k, v in loaded.items()} if isinstance(loaded, dict) else {}
+        except Exception:  # noqa: BLE001 -- a corrupt state file must not stop the harvest
+            previous = {}
+    alarms = [
+        f"HISTORY_TRUNCATED league={league} date={date} rows {previous[league]} -> {count}"
+        for league, count in history_counts.items()
+        if league in previous and count < previous[league]
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(history_counts, sort_keys=True), encoding="utf-8")
+    return alarms
+
+
 def default_dates() -> list[str]:
     """Today and yesterday in UTC: a late kickoff's date rolls over mid-match."""
     now = datetime.now(timezone.utc)
@@ -154,17 +185,22 @@ def harvest(out_dir: Path, dates: list[str], env_root: Path | None = None) -> di
                            {"pattern": f"soccer_source/*/api/live_state/live_state_{date}.json"}, 900).get("artifacts") or {}
         rows: list[dict] = []
         history_seen = 0
+        history_counts: dict[str, int] = {}
         for body in arts.values():
             payload = body if isinstance(body, dict) else json.loads(body)
             rows.extend(snapshot_rows(payload))
             from_history = history_rows(payload)
             history_seen += len(from_history)
+            history_counts[str(payload.get("league"))] = len(from_history)
             rows.extend(from_history)
         written = append_rows(out_dir / f"live_projections_{date}.jsonl", rows)
         bases = collections.Counter(str(r.get("corners_basis")) for r in rows)
+        alarms = truncation_alarm(out_dir, date, history_counts)
+        for alarm in alarms:
+            print(alarm, flush=True)
         tally["dates"][date] = {"files": len(arts), "in_play_games": len(rows) - history_seen,
                                 "history_rows_seen": history_seen, "appended": written,
-                                "corners_basis": dict(bases)}
+                                "corners_basis": dict(bases), "truncations": alarms}
     return tally
 
 

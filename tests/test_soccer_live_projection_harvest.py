@@ -100,3 +100,29 @@ def test_the_artifacts_own_history_is_harvested_and_dedupes_against_the_live_blo
 def test_history_rows_ignore_junk(tmp_path):
     assert h.history_rows({"league": "epl", "projection_history": {"m": "not a list"}}) == []
     assert h.history_rows({"league": "epl", "projection_history": {"m": [1, {"generated_at": "t"}]}})[0]["generated_at"] == "t"
+
+
+# ---------------------------------------------------------------------------- the truncation detector
+
+def test_a_shrinking_history_block_is_named_not_lost_silently(tmp_path):
+    """A writer without the history code replaces the file whole and drops the block. The signature is a row
+    count that FALLS; this turns "H32 has thin evidence" into "H32 lost 40 rows at 19:12Z"."""
+    assert h.truncation_alarm(tmp_path, "2026-09-18", {"epl": 40}) == []          # first run: nothing to compare
+    assert h.truncation_alarm(tmp_path, "2026-09-18", {"epl": 45}) == []          # growing is normal
+    alarms = h.truncation_alarm(tmp_path, "2026-09-18", {"epl": 0})
+    assert alarms == ["HISTORY_TRUNCATED league=epl date=2026-09-18 rows 45 -> 0"]
+    # after the fall, the new floor is what the next run compares against
+    assert h.truncation_alarm(tmp_path, "2026-09-18", {"epl": 3}) == []
+
+
+def test_the_detector_is_per_league_and_per_date(tmp_path):
+    h.truncation_alarm(tmp_path, "2026-09-18", {"epl": 10, "mls": 4})
+    alarms = h.truncation_alarm(tmp_path, "2026-09-18", {"epl": 12, "mls": 1})
+    assert alarms == ["HISTORY_TRUNCATED league=mls date=2026-09-18 rows 4 -> 1"]
+    assert h.truncation_alarm(tmp_path, "2026-09-19", {"epl": 1}) == []            # a different date is separate
+
+
+def test_a_corrupt_state_file_does_not_stop_the_harvest(tmp_path):
+    (tmp_path / "history_counts_2026-09-18.json").write_text("{not json", encoding="utf-8")
+    assert h.truncation_alarm(tmp_path, "2026-09-18", {"epl": 5}) == []
+    assert h.truncation_alarm(tmp_path, "2026-09-18", {"epl": 2})[0].endswith("rows 5 -> 2")
