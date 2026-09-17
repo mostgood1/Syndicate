@@ -1212,3 +1212,13 @@ test" caveat. `suspect = 0` across 29 candidate rows: every served null was
 re-priced against its own bar and refused correctly. Agresti-Coull confirmed in
 the served data — `p` reconstructs to `(k+2)/404` exactly on all six.
 `sims_run: 400` and `point_estimator: "agresti_coull"` on every projection.
+
+## [soccer-shot-woodwork-undercount] EVERY SHOT OFF THE WOODWORK WAS MISSING FROM SHOT TOTALS — FIXED, LIVE ON live-odds-worker `20d589ed` 2026-09-17
+
+Lane `soccer-shot-woodwork-undercount` (readings in `deploys.md` 2026-09-17 21:16-21:17Z).
+
+- `extract_shot_events` kept three commentary types, so `shot-hit-woodwork` and the penalty variants were not off target, not blocked — **absent**. Measured over 24 finished matches (epl/la_liga/serie_a/bundesliga, 09-01..09-17): ESPN's own per-match `totalShots` reconciled in **9/24** before and **24/24** after, each shortfall equal to that match's dropped count. Rate: **1.42 shots/match, 5.0 per 100 kept**.
+- Verified live 2026-09-17: same-instant served-vs-ESPN gap was +1 with one woodwork event, then **0 twice after the deploy with the event still in the feed**. A `[soccer_live_state]` tick 83 s after `finishedAt` proves the new code wrote that snapshot.
+- **It is a PRICED path, not a display one:** `soccer_live_gameline_source.py:337` banks `shots_so_far` under the live `player_shots` market and `live_lens.py` derives the over-probabilities. A shooter whose woodwork strike vanished was banked one shot low.
+- **STILL OPEN:** (1) refresh-worker — the rare second writer — runs the OLD code until the 2026-09-18 09:30 CT scheduled deploy; (2) the on/off-target split does NOT reconcile with ESPN's `shotsOnTarget` (woodwork as OFF target exact in 15/24 matches, as ON target 10/24, residuals both ways), so `woodwork` is its own outcome and the question is unanswered; (3) `league_profiles`' conversion bases were fitted with the undercounted shots as denominator, so the same data now implies bases ~4.8% lower — refit is a user decision, not done.
+- Instrument: `py -3 scripts/check_soccer_shot_reconciliation.py` (non-zero exit on any gap; `--baseline` reproduces 9/24). `check_soccer_shot_capture.py` is a league-level SCREEN and cannot see this — 1.42 shots/match is inside its 0.75-of-benchmark floor.

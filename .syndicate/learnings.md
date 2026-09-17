@@ -6876,3 +6876,13 @@ nothing and is the only thing that makes the poll meaningful.
   process. Pass `--token <token printed by acquire>`; `--force` is for a holder that is GONE,
   and reaching for it here would have been a false claim about another session.
 - *(evidence: `log/2026-09-17.md` ~21:50Z; deploy `dep-dam5tcvqj5pc73bv6i1g`)*
+
+## 2026-09-17 — FORBIDDEN: verifying a change on a UI CONTRACT route. A served page selects fields; absence there is a fact about the contract, never about the writer. `[lanes soccer-shot-woodwork-undercount, soccer-live-corners-stage2]`
+- **The belief overturned:** that `/soccer/<league>/api/game/<event_id>` shows what the live-state writer wrote. It does not. Measured 2026-09-17 21:16Z: that route carries NONE of `corners_basis`, `live_corners`, `sim_projected_total_corners` — nor even `projected_total_corners` — while the same fields were live in the `live_state` ARTIFACT written 83 s earlier. A parallel lane had planned to grade its own deploy on that route and would have scored a shipped, working change as INERT.
+- **A second face of the same defect, same evening:** at FULL TIME that route stops rendering the live box entirely (`rows: []`, read 21:28:49Z), so a plan to "take the clean reading after the whistle" measures nothing at all. The in-play window was the only one that existed, and it was nearly missed by waiting for a cleaner one.
+- **How we found out:** one lane read the artifact, the other read the route, and the two disagreed about whether the same deploy had done anything.
+- **The rule going forward:**
+  - **Verify on the surface the WRITER wrote** — the artifact, the keyvalue payload, the log line — not on a display contract that chooses a subset for the UI. If the reading must come from a served route, first prove that route carries the field when the field is known to exist.
+  - Absence on a display surface is evidence about the display surface. Say which surface every production reading came from, in the entry.
+  - A live instrument has a WINDOW, and it can close in a way that looks like nothing happened. Ask "when does this surface stop reporting?" before deferring a reading to a more convenient moment.
+- **Related, measured the same hour:** an IN-PLAY gap between our snapshot and a vendor's live box mixes the defect with poll lag (our artifact refreshes every ~2 min while ESPN's boxscore moves continuously; observed 1 -> 2 -> 1 in seven minutes). Lag can only make our count LOWER, so only a gap of 0 — or a gap equal to the known event count on a caught-up read — carries information.
