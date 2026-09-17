@@ -116,6 +116,7 @@ CRON_SERVICE_IDS = {
     "sim-input-reports": "crn-dafj4ie7bikc738q9ol0",
     "ci-suite": "crn-dafg4h0u01pc73aavs6g",
     "mlb-season-artifacts": "crn-dafffnn40ujc73b349pg",
+    "model-scorecard": "crn-dam0ao942hec73cge0rg",  # lane model-scorecard-cron, created 2026-09-17
 }
 
 SERVICE_IDS = {

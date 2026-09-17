@@ -47,7 +47,7 @@ ALLOW, BLOCK = 0, 2
 SESSION = "test-session-cron-0001"
 LANE = "test-lane-cron"
 
-CRON_NAMES = ("sim-input-reports", "ci-suite", "mlb-season-artifacts")
+CRON_NAMES = ("sim-input-reports", "ci-suite", "mlb-season-artifacts", "model-scorecard")
 CI_SUITE_ID = "crn-dafg4h0u01pc73aavs6g"
 
 

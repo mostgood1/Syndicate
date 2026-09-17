@@ -176,8 +176,9 @@ SERVICE_BY_ID = {
     "crn-dafj4ie7bikc738q9ol0": "sim-input-reports",
     "crn-dafg4h0u01pc73aavs6g": "ci-suite",
     "crn-dafffnn40ujc73b349pg": "mlb-season-artifacts",
+    "crn-dam0ao942hec73cge0rg": "model-scorecard",
 }
-CRON_SERVICES = ("sim-input-reports", "ci-suite", "mlb-season-artifacts")
+CRON_SERVICES = ("sim-input-reports", "ci-suite", "mlb-season-artifacts", "model-scorecard")
 # `ALL_SERVICES` is what a `render.yaml` push expands to, and crons are NOT in
 # `render.yaml` -- `blueprint_sync` cannot reach them. They are guarded when
 # named directly, and must not be dragged into a blueprint push's blast radius,

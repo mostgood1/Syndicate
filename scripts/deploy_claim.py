@@ -117,7 +117,7 @@ CLAIM_DIR = _main_worktree_root() / ".syndicate" / "deploy_claims"
 # ci-suite` was rejected by `choices`, so a cron deploy could not be serialised
 # at all -- while `deploy-guard.py` matched the cron deploy endpoint, resolved
 # no service from a `crn-` id, and printed advice to take this very lock.
-CRON_SERVICES = ("sim-input-reports", "ci-suite", "mlb-season-artifacts")
+CRON_SERVICES = ("sim-input-reports", "ci-suite", "mlb-season-artifacts", "model-scorecard")
 SERVICES = ("web", "syndicate", "refresh-worker", "live-odds-worker") + CRON_SERVICES
 DEFAULT_TTL_SECONDS = 45 * 60
 
