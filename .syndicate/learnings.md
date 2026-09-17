@@ -6774,3 +6774,13 @@ inputs, and it applies to READERS as well as engines.
   the stub key cannot come back.
 - Never let a formatter substitute `0` for absent. `—` is the honest cell.
 - *(evidence: `state_basketball.md` measured `min_mean 38.37` for Bueckers; fix + test in `fdea0a2e`)*
+
+## 2026-09-17 — A CACHE TTL READ FROM THE CODE IS NOT THE LIVE TTL, and the live one decides how long a served timestamp may lag. `[lane board-today-freshness]`
+- **The belief overturned:** `read_combined_intelligence_response`'s own comments discuss the combined-board cache as the 15 s default (`SYNDICATE_INTELLIGENCE_COMBINED_BOARD_CACHE_SECONDS`, `max(1.0, ...15)`), and `#632`'s comment reasons from "the TTL defaults to 15 s while the rebuild costs 5-18 s". I designed against that number.
+- **What was actually true:** web sets the key to **180 s** (single-key env read, 2026-09-17 ~17:59Z), and `_COMBINED_BOARD_STALE_TTL_MULTIPLE` serves a stale entry for up to 10x that during a rebuild. So a stamp in the served payload can be up to 180 s behind the artifact route, and up to 1,800 s in the worst case.
+- **How we found out:** a post-deploy reading. At 17:57:42Z `/api/board/layer2-shortlist?date=2026-09-17` said `written_at` 17:56:42Z while the combined board served 17:25:57Z for the same date — which formally triggered that lane's falsification test. The payload named its own cause: `age_seconds` and `newest_age_seconds` both back-computed to a build at 17:56:37Z, 5 s BEFORE the newer shortlist existed. A read after expiry agreed exactly.
+- **The rule going forward:**
+  - Before designing or verifying anything whose correctness depends on a cache window, READ THE KEY ON THE SERVICE. A code default is the value for a service that does not set it, which is not evidence about the one you are measuring. Same discipline as `feedback_which_service_runs_the_code`: config moves with no diff.
+  - **A caching layer is a second clock.** Any "the payload disagrees with the artifact" verdict must first ask how old the payload's own build is, from a field the payload already carries. This one was answerable with no extra request.
+  - The cache is PER WORKER (module-level dict, `WEB_CONCURRENCY=2`), so same-instant reads can land on entries of different ages, and a recycle forces a cold rebuild. State the worker, or the comparison is unattributable.
+- **Cost:** none to the fix (the design had already refused to serve any cached clock-relative verdict, which is why the mismatch was a stamp lag and not a wrong freshness verdict). Cost was one confusing reading and the work to attribute it.
