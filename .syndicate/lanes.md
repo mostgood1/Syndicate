@@ -1062,6 +1062,16 @@ death, never life — do not invert it.
 - STATUS `[2026-09-17 ~16:00Z (11:00 CT)]`: code on main (`89d43bfb` grader + single pass + batch rewrite, `050204cd` tail re-copy until stable); LIVE on refresh-worker `f3748922` since 15:50:52Z; `EVALUATION_SETTLEMENT_SPORTS` still `mlb,wnba`. OWED: task `settlement-and-scorecard-morning-reading-0918` (08:15 CT) grades the first autorun (MLB >= 60%, path=batch, no oomKilled) and ONLY on MET adds nfl + deploys under the locks (user: one sport per daily run); then ncaaf, then soccer.
 - Blocked by: none.
 
+### soccer-forward-graders — OPEN — opened 2026-09-17 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Goal: one committed grader computes H27 (corners estimator vs market) and watch-list cells W1r/W2/W3 over the pre-kickoff freeze exactly as registered (`log/2026-09-16.md` ~20:50 and ~22:45 CT, `log/2026-09-17.md` ~07:20 CT), and its first production run joins at least one frozen, finished match to its outcome and price for every cell whose population can exist that day.
+- Files:
+  - `scripts/soccer_season_audit/forward_grade.py` (NEW)
+  - `tests/test_soccer_forward_grade.py` (NEW)
+- Hypothesis: n/a (tooling). Risk named first: every input the grades need survives on production until 2026-12-15.
+- Falsification test: a finished frozen match that meets a cell's population rule but the grader joins no price or no outcome for it; or an input family with a deletion rule inside the grading window.
+- Verification: first run after the 2026-09-17 La Liga matches finish. Per cell, frozen -> finished -> priced -> bet counts, with the joins non-zero where a population exists. Retention read from `artifact_retention.py` rules.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
