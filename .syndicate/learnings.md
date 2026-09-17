@@ -6681,3 +6681,18 @@ Same root as the rule above (an env value is a code path), in a different place:
 **Rule.** Before diagnosing from a timestamp served by an aggregate (combined board, window, multi-date or multi-sport payload), read its definition AND the per-input stamps in the same read, and name which input sets it. A correction is a claim: it needs its own measurement at the same bar, not just a reason the first claim might be wrong.
 
 **Evidence.** `pipeline/intelligence_state.py` combined-window freshness block (`computed_at` = oldest dated input); reads of `/api/intelligence/query` `state_meta` and `/api/board/layer2-shortlist?date=` at 00:45Z and 00:58Z 2026-09-17; ledger commits 7dda4e0a (over-correction), 1b58575e (refined); `deploys.md` 2026-09-17 00:00:56Z entry.
+
+### 2026-09-17 (session a1e40980, lane `soccer-postponed-served-final`) — FORBIDDEN: blaming a stale DATA COPY for a value that flips exactly at a RESTART without first looking for a process-lifetime cache on its reader
+
+**What was believed.** refresh-worker's chip for postponed ATH @ LEV went `pregame` -> `final 0-0` on the first publish after a restart. The lane recorded "the defect is refresh-worker's DATA COPY", named the recommendations file as the likely stale input, and predicted which file it was.
+
+**What was true.**
+- The recommendations copy was clean before AND after the restart: refresh-worker re-published its own at the clean 171,140 B (the old-code build was 234,306 B) at 00:29:40Z, and the chip stayed `final` even after refresh-worker rebuilt it at 01:06Z.
+- The match had left recommendations, so it was carded from the SCHEDULE artifact through a second path (`_unsimulated_game`) with no unplayed guard. refresh-worker's schedule was an old-code build (21:51Z) that is never re-pulled (no date in its name). `schedule_payload` was `@lru_cache` for the process's life, so the OLD process kept serving a pre-postponement read, and the restart is what surfaced the stale disk copy.
+- **A restart is not a neutral event for a reader with a process-lifetime cache.** It changes the answer without any file changing, so "it flipped at the deploy" pointed at the cache, not at the deploy's code or at a data copy being written.
+
+**How to apply.**
+- When a served value changes exactly at a restart, grep the read path for `@lru_cache` / module-level memos BEFORE naming a stale file, and list every card path that can build the value (here two: recommendations and schedule).
+- Discriminate unreadable worker disks with what crosses the boundary: web's `[ops.publish] ACCEPTED ... publisher= bytes= delta=` log gave each service's copy size and build time.
+- An artifact with no date in its name is outside the dated pull. A service that built it on old code keeps that copy until it rebuilds it.
+- *(evidence: `deploys.md` 2026-09-17 00:39Z and 01:25Z; commit `bea2a355`)*
