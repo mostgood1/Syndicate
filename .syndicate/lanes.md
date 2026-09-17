@@ -1428,8 +1428,9 @@ death, never life — do not invert it.
 - STATUS `[2026-09-17 ~16:00Z (11:00 CT)]`: code on main (`89d43bfb` grader + single pass + batch rewrite, `050204cd` tail re-copy until stable); LIVE on refresh-worker `f3748922` since 15:50:52Z; `EVALUATION_SETTLEMENT_SPORTS` still `mlb,wnba`. OWED: task `settlement-and-scorecard-morning-reading-0918` (08:15 CT) grades the first autorun (MLB >= 60%, path=batch, no oomKilled) and ONLY on MET adds nfl + deploys under the locks (user: one sport per daily run); then ncaaf, then soccer.
 - Blocked by: none.
 
-### soccer-forward-graders — OPEN — opened 2026-09-17 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+### soccer-forward-graders — CLOSED 2026-09-17 — opened 2026-09-17 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
 - Goal: one committed grader computes H27 (corners estimator vs market) and watch-list cells W1r/W2/W3 over the pre-kickoff freeze exactly as registered (`log/2026-09-16.md` ~20:50 and ~22:45 CT, `log/2026-09-17.md` ~07:20 CT), and its first production run joins at least one frozen, finished match to its outcome and price for every cell whose population can exist that day.
+- **GOAL: MET** (2026-09-17 19:05Z / 14:05 CT, first run after the 17:00Z La Liga match): every cell joins end to end on production data. H27 frozen 1 -> finished 1 -> in window 1 -> outcome 1 -> priced with a K 1 (MAE M 2.446 vs K 2.507 at n=1, not a reading about accuracy). W1r the same funnel, 0 bets (no leg reached 8 pp). W2 67 priced lines -> 44 graded (19 void, 4 no model player), 0 bets. W3 39 -> 24, 0 bets. The book_quotes sensitivity ran beside it (W2 48 graded, W3 24). Every grade reads WATCHING, which is the registered state before its trigger.
 - Files:
   - `scripts/soccer_season_audit/forward_grade.py` (NEW)
   - `tests/test_soccer_forward_grade.py` (NEW)
