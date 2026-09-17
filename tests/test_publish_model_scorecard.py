@@ -37,7 +37,7 @@ def _opener(script):
         step = script[min(len(calls), len(script)) - 1]
         if isinstance(step, Exception):
             raise step
-        return _Response(json.dumps(step).encode("utf-8"))
+        return _Response(step.encode("utf-8"))
 
     opener.calls = calls
     return opener
@@ -53,22 +53,50 @@ def _http(code):
 
 
 def test_reader_returns_content_none_for_not_found_and_raises_for_anything_else():
-    ok = pms.WebReader("https://web", "t", opener=_opener([{"ok": True, "artifacts": {"p": "hello"}}]))
-    assert ok.text("p") == "hello"
+    ok = pms.WebReader("https://web", "t", opener=_opener(['{"k": 1}']))
+    assert ok.text("p") == '{"k": 1}'
     missing = pms.WebReader("https://web", "t", opener=_opener([_http(404)]))
     assert missing.text("p") is None
-    empty = pms.WebReader("https://web", "t", opener=_opener([{"ok": True, "artifacts": {}}]))
-    assert empty.text("p") is None
+    refused = pms.WebReader("https://web", "t", opener=_opener([_http(403)]))
+    assert refused.text("p") is None
     broken = pms.WebReader("https://web", "t", opener=_opener([_http(502), _http(502), _http(502)]))
     with pytest.raises(pms.FetchError):
         broken.text("p")
     assert broken.calls == 3
-    recovers = pms.WebReader("https://web", "t", opener=_opener([TimeoutError("slow"), {"artifacts": {"p": "x"}}]))
+    recovers = pms.WebReader("https://web", "t", opener=_opener([TimeoutError("slow"), "x"]))
     assert recovers.text("p") == "x"
 
 
+def test_reads_go_through_stream_never_export():
+    """The first production run read through `export` and web answered the scoreboard with 502."""
+    opener = _opener(["x"])
+    pms.WebReader("https://web", "t", opener=opener).text("reports/a.json")
+    assert "/api/ops/artifacts/stream?path=" in opener.calls[0] and "/export" not in opener.calls[0]
+
+
+def test_scoreboard_fetch_retries_a_transient_502_then_raises(monkeypatch):
+    attempts = []
+
+    class _Scorecard:
+        @staticmethod
+        def fetch_chips(base, day, sport):
+            attempts.append(day)
+            if len(attempts) < 3:
+                raise _http(502)
+            return [{"sport": "mlb"}]
+
+    class _Bs:
+        SCORECARD = _Scorecard
+
+    assert pms.fetch_chips_with_retry(_Bs, "2026-09-16") == [{"sport": "mlb"}] and len(attempts) == 3
+    attempts.clear()
+    _Scorecard.fetch_chips = staticmethod(lambda base, day, sport: (_ for _ in ()).throw(_http(502)))
+    with pytest.raises(urllib.error.HTTPError):
+        pms.fetch_chips_with_retry(_Bs, "2026-09-16", attempts=2)
+
+
 def test_the_token_goes_in_a_header_never_the_url():
-    opener = _opener([{"artifacts": {"p": "x"}}])
+    opener = _opener(["x"])
     pms.WebReader("https://web", "SECRET", opener=opener).text("reports/a b.json")
     assert "SECRET" not in opener.calls[0] and "reports%2Fa%20b.json" in opener.calls[0]
 

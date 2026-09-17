@@ -12,8 +12,8 @@ WHAT A RUN DOES, IN ORDER
    FAILS (anything but a clean 404) stops the run: starting from an empty state and
    publishing it would erase a month of graded history and read as a quiet first run.
 2. Fetches the recorder parts (`opportunity_population_ledger`) for the board dates that can
-   still change -- today, yesterday, and any date in the window not yet complete. One export
-   at a time: web has OOM'd on export bursts, and each one takes 15-38 s.
+   still change -- today, yesterday, and any date in the window not yet complete. One read at
+   a time through `/api/ops/artifacts/stream` (see `WebReader`), never `export`.
 3. Grades every game whose kickoff date has passed with `bucket_search.grade_population`,
    MLB props through `MlbPropGrader`, and everything else through `population_outcomes`.
 4. Builds the scorecard (7d / 28d) and the validated-bucket overlay, writes them under the
@@ -53,8 +53,10 @@ if str(REPO_ROOT) not in sys.path:
 
 from syndicate.features.shared import model_scorecard as msc  # noqa: E402
 
-DEFAULT_SPORTS = ("mlb", "nfl", "ncaaf", "soccer", "wnba", "nhl", "nba", "ncaab")
-EXPORT_PAUSE_SECONDS = 1.0
+# Sports with recorder parts to read. NBA and NCAAB are off-season: every board date would spend one
+# not-found read each on them. Add them back when their seasons open.
+DEFAULT_SPORTS = ("mlb", "nfl", "ncaaf", "soccer", "wnba", "nhl")
+EXPORT_PAUSE_SECONDS = 2.0
 TOOL = "publish_model_scorecard"
 
 
@@ -92,7 +94,14 @@ def admin_token() -> str:
 
 
 class WebReader:
-    """Sequential, paced, retried reads of web's disk through the admin export."""
+    """Sequential, paced, retried reads of web's disk.
+
+    THROUGH `/api/ops/artifacts/stream`, NOT `/export`. The first production run (2026-09-17
+    15:26-15:33Z) read recorder parts through `export`: 58 calls took 290 s, one board date took
+    2 m 19 s, and web answered the scoreboard with 502 right after -- the run graded nothing
+    (`chips_unavailable` 61). `stream` is a `send_file` from disk with the same admin gate and
+    allowlist (the weekly runner measured a 19.1 MB file in 0.9 s), so it is the one to lean on.
+    """
 
     def __init__(self, base: str, token: str, *, attempts: int = 3, pause: float = EXPORT_PAUSE_SECONDS,
                  opener: Any = None) -> None:
@@ -103,7 +112,7 @@ class WebReader:
 
     def text(self, relative: str) -> str | None:
         """File content, None for a clean not-found, FetchError for anything else."""
-        url = f"{self.base}/api/ops/artifacts/export?path={urllib.parse.quote(relative, safe='')}"
+        url = f"{self.base}/api/ops/artifacts/stream?path={urllib.parse.quote(relative, safe='')}"
         last: Exception | None = None
         for attempt in range(self.attempts):
             if self.calls:
@@ -111,21 +120,17 @@ class WebReader:
             self.calls += 1
             started = time.monotonic()
             try:
-                request = urllib.request.Request(url, headers={"X-Admin-Token": self.token, "Accept": "application/json"})
+                request = urllib.request.Request(url, headers={"X-Admin-Token": self.token})
                 with self.opener(request, timeout=240) as response:
-                    payload = json.loads(response.read())
+                    body = response.read()
                 self.seconds += time.monotonic() - started
-                artifacts = payload.get("artifacts") if isinstance(payload, dict) else None
-                if not isinstance(artifacts, dict) or not artifacts:
-                    return None
-                value = next(iter(artifacts.values()))
-                return value if isinstance(value, str) else json.dumps(value)
+                return body.decode("utf-8")
             except urllib.error.HTTPError as exc:
                 self.seconds += time.monotonic() - started
                 if exc.code in (403, 404):
                     return None
                 last = exc
-            except Exception as exc:  # network, timeout, bad JSON
+            except Exception as exc:  # network, timeout, undecodable body
                 self.seconds += time.monotonic() - started
                 last = exc
             time.sleep(min(30.0, 10.0 * (attempt + 1)))
@@ -148,6 +153,19 @@ def fetch_board_date(reader: WebReader, bs: Any, day: str, sports: list[str]) ->
             records.extend(bs.parse_records_text(text))
             parts[sport] = part + 1
     return records, parts
+
+
+def fetch_chips_with_retry(bs: Any, day: str, *, attempts: int = 4) -> list[Any]:
+    """The public scoreboard, retried: a 502 from a busy web is transient, a missing scoreboard is not."""
+    last: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            return bs.SCORECARD.fetch_chips(base_url(), day, None)
+        except Exception as exc:
+            last = exc
+            log(f"CHIPS_RETRY {day} attempt={attempt + 1} {type(exc).__name__}: {exc}")
+            time.sleep(min(60.0, 15.0 * (attempt + 1)))
+    raise last if last is not None else RuntimeError("unreachable")
 
 
 def grader_signature(bs: Any, settler: Any) -> tuple[str, dict[str, Any]]:
@@ -270,7 +288,7 @@ def main(argv: list[str] | None = None) -> int:
     grade = functools.partial(bs.grade_population, prop_settler=mlb.settle, score_source=mlb.final_score,
                               extra_settler=settler)
     grading = msc.grade_pending(state, today=today, grade=grade,
-                                chips_for=lambda day: bs.SCORECARD.fetch_chips(base_url(), day, None),
+                                chips_for=functools.partial(fetch_chips_with_retry, bs),
                                 central_date=bs.SCORECARD.central_date)
     msc.prune(state, today)
     log(f"GRADED {grading} settlers={settler.report()}")
