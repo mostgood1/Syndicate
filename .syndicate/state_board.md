@@ -954,3 +954,12 @@ the two numbers correctly:**
 - `stored None` means no payload was read for that date.
 - 0 unreadable lines since go-live. The firing branch is proven by
   `tests/test_combined_board_rows_unreadable.py`, not yet by production.
+
+## [board-per-date-freshness] THE COMBINED BOARD DATES EACH WINDOW DATE ON ITS OWN; THE CHIP SHOWS TODAY APART FROM TOMORROW — LIVE ON WEB `efd24273` 2026-09-17
+
+Lane `board-today-freshness` (CLOSED; readings in `deploys.md` 2026-09-17 18:00:10Z).
+
+- `state_meta.computed_at` is still the WINDOW's oldest input. Beside it, `state_meta.dates{<date>: {written_at, written_at_source, sources{state?, layer2_shortlist?}}}` and `window_oldest_date`. A date's `written_at` is the oldest source that put rows on the board, so `computed_at == dates[window_oldest_date].written_at`. Verified same-instant on web 17:48:46Z and 18:00:10Z: `sources.layer2_shortlist` == `/api/board/layer2-shortlist?date=` `written_at` for today and tomorrow.
+- **No `today_*` key, on purpose:** the combined response is cached, so "which date is today" and any age would be frozen in it. The chip (`boardDateFreshnessParts` in `intelligence.html`) takes today from the browser's Central clock. Served 17:56:47Z: "Today as of Sep 17, 12:25 PM · Fri as of Sep 17, 12:39 PM".
+- **Web's combined cache is 180 s, not the code's 15 s default** (`SYNDICATE_INTELLIGENCE_COMBINED_BOARD_CACHE_SECONDS=180`, read 2026-09-17 ~17:59Z), and stale entries serve up to 10x that during a rebuild. The board's stamps therefore trail the shortlist route by up to 180 s (up to 1,800 s in the worst case). Measured 17:57:42Z: route 17:56:42Z vs board 17:25:57Z, from an entry built at 17:56:37Z.
+- A date's `written_at` can come from the legacy STATE payload even with Layer 2 primary, because non-prop/game legacy rows (`steam`) stay on the board. 18:00:10Z: 78 of them dated 09-17, so today read 17:31:25Z (`state`) while its shortlist was 17:56:42Z.
