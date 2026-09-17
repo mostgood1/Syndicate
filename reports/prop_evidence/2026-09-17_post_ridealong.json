@@ -1,0 +1,666 @@
+{
+ "offline": {
+  "title_map_failures": [],
+  "providers": {
+   "ncaaf": {
+    "player_sim": "no_producer:no NCAAF player projection artifact is published; web does not model (ncaaf/prop_model.py is not called)",
+    "recent_form": "filled",
+    "matchup": "filled",
+    "advanced": "filled",
+    "game_sim": "filled",
+    "environment": "filled",
+    "track_record": "insufficient_sample:no_graded_cell_for_market"
+   },
+   "nfl": {
+    "player_sim": "filled",
+    "recent_form": "artifact_missing:nfl_fantasy_usage_2026.json / nfl_fantasy_usage_2025.json not on this disk -- no per-game NFL player stat artifact is published to web",
+    "matchup": "filled",
+    "advanced": "filled",
+    "game_sim": "filled",
+    "environment": "filled",
+    "track_record": "filled"
+   },
+   "nhl": {
+    "player_sim": "filled",
+    "recent_form": "filled",
+    "matchup": "filled",
+    "advanced": "filled",
+    "game_sim": "filled",
+    "environment": "filled",
+    "track_record": "insufficient_sample:no_graded_cell_for_market"
+   },
+   "soccer": {
+    "player_sim": "filled",
+    "recent_form": "filled",
+    "matchup": "filled",
+    "advanced": "filled",
+    "game_sim": "filled",
+    "environment": "filled",
+    "track_record": "filled"
+   },
+   "wnba": {
+    "player_sim": "filled",
+    "recent_form": "filled",
+    "matchup": "filled",
+    "advanced": "filled",
+    "game_sim": "filled",
+    "environment": "filled",
+    "track_record": "insufficient_sample:no_graded_cell_for_market"
+   }
+  }
+ },
+ "production": {
+  "mlb": {
+   "board_prop_rows_pregame": 694,
+   "sampled": 5,
+   "answered_with_coverage": 5,
+   "filled_rate": {
+    "player_sim": 1.0,
+    "recent_form": 1.0,
+    "matchup": 1.0,
+    "advanced": 1.0,
+    "game_sim": 1.0,
+    "environment": 0.2,
+    "track_record": 1.0
+   },
+   "absent_reasons": {
+    "environment": {
+     "not_shown": 4
+    }
+   },
+   "median_seconds": 18.25,
+   "details": [
+    {
+     "row": {
+      "sport": "mlb",
+      "market": "batter_hits",
+      "player_name": "Caleb Durbin",
+      "event_id": "04a2f236dde09215a7d5033c63178a44",
+      "side": "under",
+      "line": "0.5",
+      "segment": "full",
+      "name": "Caleb Durbin"
+     },
+     "seconds": 22.33,
+     "bytes": 6618165,
+     "provider": "mlb:reference_fetchers",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "not_shown:reference fetchers built no table for it",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "filled",
+      "recent_form": "filled",
+      "track_record": "filled"
+     },
+     "tables_served": 10
+    },
+    {
+     "row": {
+      "sport": "mlb",
+      "market": "batter_hits_runs_rbis",
+      "player_name": "Caleb Durbin",
+      "event_id": "04a2f236dde09215a7d5033c63178a44",
+      "side": "under",
+      "line": "1.5",
+      "segment": "full",
+      "name": "Caleb Durbin"
+     },
+     "seconds": 40.91,
+     "bytes": 6618353,
+     "provider": "mlb:reference_fetchers",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "not_shown:reference fetchers built no table for it",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "filled",
+      "recent_form": "filled",
+      "track_record": "filled"
+     },
+     "tables_served": 10
+    },
+    {
+     "row": {
+      "sport": "mlb",
+      "market": "batter_rbis",
+      "player_name": "Kyle Schwarber",
+      "event_id": "86a852d517d266c4d6c74e570caffa06",
+      "side": "over",
+      "line": "0.5",
+      "segment": "full",
+      "name": "Kyle Schwarber"
+     },
+     "seconds": 18.25,
+     "bytes": 6618065,
+     "provider": "mlb:reference_fetchers",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "filled",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "filled",
+      "recent_form": "filled",
+      "track_record": "filled"
+     },
+     "tables_served": 9
+    },
+    {
+     "row": {
+      "sport": "mlb",
+      "market": "batter_runs_scored",
+      "player_name": "Jeremy Pena",
+      "event_id": "b9c3b50472005c67c30de323cd8a5396",
+      "side": "over",
+      "line": "0.5",
+      "segment": "full",
+      "name": "Jeremy Pena"
+     },
+     "seconds": 16.72,
+     "bytes": 6617796,
+     "provider": "mlb:reference_fetchers",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "not_shown:reference fetchers built no table for it",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "filled",
+      "recent_form": "filled",
+      "track_record": "filled"
+     },
+     "tables_served": 10
+    },
+    {
+     "row": {
+      "sport": "mlb",
+      "market": "batter_total_bases",
+      "player_name": "Ryan Jeffers",
+      "event_id": "7147180b37c36caf2b4003b82c2d1afa",
+      "side": "over",
+      "line": "1.5",
+      "segment": "full",
+      "name": "Ryan Jeffers"
+     },
+     "seconds": 14.49,
+     "bytes": 6617611,
+     "provider": "mlb:reference_fetchers",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "not_shown:reference fetchers built no table for it",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "filled",
+      "recent_form": "filled",
+      "track_record": "filled"
+     },
+     "tables_served": 10
+    }
+   ],
+   "verdict": "PASS"
+  },
+  "wnba": {
+   "board_prop_rows_pregame": 322,
+   "sampled": 5,
+   "answered_with_coverage": 5,
+   "filled_rate": {
+    "player_sim": 0.8,
+    "recent_form": 0.8,
+    "matchup": 0.4,
+    "advanced": 1.0,
+    "game_sim": 1.0,
+    "environment": 1.0,
+    "track_record": 0.8
+   },
+   "absent_reasons": {
+    "player_sim": {
+     "no_producer": 1
+    },
+    "recent_form": {
+     "not_applicable": 1
+    },
+    "matchup": {
+     "player_not_found": 3
+    },
+    "track_record": {
+     "insufficient_sample": 1
+    }
+   },
+   "median_seconds": 5.2,
+   "details": [
+    {
+     "row": {
+      "sport": "wnba",
+      "market": "player_assists",
+      "player_name": "Erica Wheeler",
+      "event_id": "61b156ccbfae6cde6e02dfc0684905de",
+      "side": "under",
+      "line": "3.5",
+      "segment": "full",
+      "name": "Erica Wheeler"
+     },
+     "seconds": 12.11,
+     "bytes": 10457387,
+     "provider": "basketball:wnba",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "filled",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "filled",
+      "recent_form": "filled",
+      "track_record": "filled"
+     },
+     "tables_served": 7
+    },
+    {
+     "row": {
+      "sport": "wnba",
+      "market": "player_double_double",
+      "player_name": "Kamilla Cardoso",
+      "event_id": "e1345bc3242e9236f8524205bb759ad3",
+      "side": "Yes",
+      "segment": "full",
+      "name": "Kamilla Cardoso"
+     },
+     "seconds": 18.0,
+     "bytes": 10454875,
+     "provider": "basketball:wnba",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "filled",
+      "game_sim": "filled",
+      "matchup": "player_not_found:no meetings with WSH and no team advanced stats row",
+      "player_sim": "no_producer:sim publishes per-stat marginals, not the joint distribution a player_double_double needs",
+      "recent_form": "not_applicable:player_double_double is a joint event; per-stat logs shown elsewhere",
+      "track_record": "insufficient_sample:no_graded_cell_for_market"
+     },
+     "tables_served": 4
+    },
+    {
+     "row": {
+      "sport": "wnba",
+      "market": "player_points",
+      "player_name": "Arike Ogunbowale",
+      "event_id": "61b156ccbfae6cde6e02dfc0684905de",
+      "side": "over",
+      "line": "17.5",
+      "segment": "full",
+      "name": "Arike Ogunbowale"
+     },
+     "seconds": 4.58,
+     "bytes": 10458828,
+     "provider": "basketball:wnba",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "filled",
+      "game_sim": "filled",
+      "matchup": "player_not_found:no meetings with LAS and no team advanced stats row",
+      "player_sim": "filled",
+      "recent_form": "filled",
+      "track_record": "filled"
+     },
+     "tables_served": 7
+    },
+    {
+     "row": {
+      "sport": "wnba",
+      "market": "player_points_assists",
+      "player_name": "Paige Bueckers",
+      "event_id": "61b156ccbfae6cde6e02dfc0684905de",
+      "side": "over",
+      "line": "28.5",
+      "segment": "full",
+      "name": "Paige Bueckers"
+     },
+     "seconds": 5.2,
+     "bytes": 10457495,
+     "provider": "basketball:wnba",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "filled",
+      "game_sim": "filled",
+      "matchup": "player_not_found:no meetings with LAS and no team advanced stats row",
+      "player_sim": "filled",
+      "recent_form": "filled",
+      "track_record": "filled"
+     },
+     "tables_served": 7
+    },
+    {
+     "row": {
+      "sport": "wnba",
+      "market": "player_points_rebounds",
+      "player_name": "Chelsea Gray",
+      "event_id": "b9b0b24665156d1d63dfbe7e8d13682b",
+      "side": "under",
+      "line": "14.5",
+      "segment": "full",
+      "name": "Chelsea Gray"
+     },
+     "seconds": 3.55,
+     "bytes": 10457577,
+     "provider": "basketball:wnba",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "filled",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "filled",
+      "recent_form": "filled",
+      "track_record": "filled"
+     },
+     "tables_served": 7
+    }
+   ],
+   "verdict": "PASS"
+  },
+  "nfl": {
+   "board_prop_rows_pregame": 1126,
+   "sampled": 5,
+   "answered_with_coverage": 5,
+   "filled_rate": {
+    "player_sim": 1.0,
+    "recent_form": 0.0,
+    "matchup": 1.0,
+    "advanced": 1.0,
+    "game_sim": 1.0,
+    "environment": 1.0,
+    "track_record": 1.0
+   },
+   "absent_reasons": {
+    "recent_form": {
+     "artifact_missing": 5
+    }
+   },
+   "median_seconds": 2.02,
+   "details": [
+    {
+     "row": {
+      "sport": "nfl",
+      "market": "Interceptions",
+      "player_name": "Drake Maye",
+      "event_id": "9d14f87600f6edc74dbcb5c74edf6246",
+      "side": "under",
+      "line": "0.5",
+      "segment": "full",
+      "name": "Drake Maye"
+     },
+     "seconds": 19.88,
+     "bytes": 6027468,
+     "provider": "football:nfl",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "filled",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "filled",
+      "recent_form": "artifact_missing:nfl_fantasy_usage_2026.json / nfl_fantasy_usage_2025.json not on this disk -- no per-game NFL player stat artifact is published to web",
+      "track_record": "filled"
+     },
+     "tables_served": 8
+    },
+    {
+     "row": {
+      "sport": "nfl",
+      "market": "Passing Attempts",
+      "player_name": "Aaron Rodgers",
+      "event_id": "9d14f87600f6edc74dbcb5c74edf6246",
+      "side": "under",
+      "line": "34.5",
+      "segment": "full",
+      "name": "Aaron Rodgers"
+     },
+     "seconds": 2.02,
+     "bytes": 6025879,
+     "provider": "football:nfl",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "filled",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "filled",
+      "recent_form": "artifact_missing:nfl_fantasy_usage_2026.json / nfl_fantasy_usage_2025.json not on this disk -- no per-game NFL player stat artifact is published to web",
+      "track_record": "filled"
+     },
+     "tables_served": 8
+    },
+    {
+     "row": {
+      "sport": "nfl",
+      "market": "Passing TDs",
+      "player_name": "Lamar Jackson",
+      "event_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "side": "over",
+      "line": "1.5",
+      "segment": "full",
+      "name": "Lamar Jackson"
+     },
+     "seconds": 10.62,
+     "bytes": 6027172,
+     "provider": "football:nfl",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "filled",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "filled",
+      "recent_form": "artifact_missing:nfl_fantasy_usage_2026.json / nfl_fantasy_usage_2025.json not on this disk -- no per-game NFL player stat artifact is published to web",
+      "track_record": "filled"
+     },
+     "tables_served": 8
+    },
+    {
+     "row": {
+      "sport": "nfl",
+      "market": "Passing Yards",
+      "player_name": "Jared Goff",
+      "event_id": "56e8897681915f7ec92baeee952bb1ae",
+      "side": "over",
+      "line": "267.5",
+      "segment": "full",
+      "name": "Jared Goff"
+     },
+     "seconds": 1.74,
+     "bytes": 6025716,
+     "provider": "football:nfl",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "filled",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "filled",
+      "recent_form": "artifact_missing:nfl_fantasy_usage_2026.json / nfl_fantasy_usage_2025.json not on this disk -- no per-game NFL player stat artifact is published to web",
+      "track_record": "filled"
+     },
+     "tables_served": 8
+    },
+    {
+     "row": {
+      "sport": "nfl",
+      "market": "Receiving Yards",
+      "player_name": "DJ Moore",
+      "event_id": "56e8897681915f7ec92baeee952bb1ae",
+      "side": "under",
+      "line": "60.5",
+      "segment": "full",
+      "name": "DJ Moore"
+     },
+     "seconds": 1.56,
+     "bytes": 6025191,
+     "provider": "football:nfl",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "filled",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "filled",
+      "recent_form": "artifact_missing:nfl_fantasy_usage_2026.json / nfl_fantasy_usage_2025.json not on this disk -- no per-game NFL player stat artifact is published to web",
+      "track_record": "filled"
+     },
+     "tables_served": 8
+    }
+   ],
+   "verdict": "PASS"
+  },
+  "ncaaf": {
+   "board_prop_rows_pregame": 637,
+   "sampled": 5,
+   "answered_with_coverage": 5,
+   "filled_rate": {
+    "player_sim": 0.0,
+    "recent_form": 0.8,
+    "matchup": 0.8,
+    "advanced": 0.8,
+    "game_sim": 1.0,
+    "environment": 1.0,
+    "track_record": 0.0
+   },
+   "absent_reasons": {
+    "player_sim": {
+     "no_producer": 5
+    },
+    "recent_form": {
+     "player_not_found": 1
+    },
+    "matchup": {
+     "player_not_found": 1
+    },
+    "advanced": {
+     "player_not_found": 1
+    },
+    "track_record": {
+     "insufficient_sample": 5
+    }
+   },
+   "median_seconds": 4.05,
+   "details": [
+    {
+     "row": {
+      "sport": "ncaaf",
+      "market": "Passing TDs",
+      "player_name": "Tait Reynolds",
+      "event_id": "3fe3d77e009a7f205cce737523609a86",
+      "side": "over",
+      "line": "1.5",
+      "segment": "full",
+      "name": "Tait Reynolds"
+     },
+     "seconds": 7.32,
+     "bytes": 6915463,
+     "provider": "football:ncaaf",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "filled",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "no_producer:no NCAAF player projection artifact is published; web does not model (ncaaf/prop_model.py is not called)",
+      "recent_form": "filled",
+      "track_record": "insufficient_sample:no_graded_cell_for_market"
+     },
+     "tables_served": 6
+    },
+    {
+     "row": {
+      "sport": "ncaaf",
+      "market": "Passing Yards",
+      "player_name": "Steve Angeli",
+      "event_id": "f06e90b4212fb514f3564ded9f190107",
+      "side": "under",
+      "line": "257.5",
+      "segment": "full",
+      "name": "Steve Angeli"
+     },
+     "seconds": 1.94,
+     "bytes": 6914640,
+     "provider": "football:ncaaf",
+     "coverage": {
+      "advanced": "player_not_found:Steve Angeli has no Syracuse/Pittsburgh lines in ncaaf_player_game_stats_snapshot.csv",
+      "environment": "filled",
+      "game_sim": "filled",
+      "matchup": "player_not_found:Steve Angeli has no Syracuse/Pittsburgh lines in ncaaf_player_game_stats_snapshot.csv",
+      "player_sim": "no_producer:no NCAAF player projection artifact is published; web does not model (ncaaf/prop_model.py is not called)",
+      "recent_form": "player_not_found:Steve Angeli has no Syracuse/Pittsburgh lines in ncaaf_player_game_stats_snapshot.csv",
+      "track_record": "insufficient_sample:no_graded_cell_for_market"
+     },
+     "tables_served": 3
+    },
+    {
+     "row": {
+      "sport": "ncaaf",
+      "market": "Receiving Yards",
+      "player_name": "Trey'Dez Green",
+      "event_id": "65571f1cab1a260aae4a220e38dbbc1d",
+      "side": "under",
+      "line": "60.5",
+      "segment": "full",
+      "name": "Trey'Dez Green"
+     },
+     "seconds": 4.05,
+     "bytes": 6915391,
+     "provider": "football:ncaaf",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "filled",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "no_producer:no NCAAF player projection artifact is published; web does not model (ncaaf/prop_model.py is not called)",
+      "recent_form": "filled",
+      "track_record": "insufficient_sample:no_graded_cell_for_market"
+     },
+     "tables_served": 6
+    },
+    {
+     "row": {
+      "sport": "ncaaf",
+      "market": "Receptions",
+      "player_name": "Joseph Williams",
+      "event_id": "03297aa8a399c223aa1cc6aa923d9bc6",
+      "side": "over",
+      "line": "4.5",
+      "segment": "full",
+      "name": "Joseph Williams"
+     },
+     "seconds": 4.15,
+     "bytes": 6915547,
+     "provider": "football:ncaaf",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "filled",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "no_producer:no NCAAF player projection artifact is published; web does not model (ncaaf/prop_model.py is not called)",
+      "recent_form": "filled",
+      "track_record": "insufficient_sample:no_graded_cell_for_market"
+     },
+     "tables_served": 6
+    },
+    {
+     "row": {
+      "sport": "ncaaf",
+      "market": "Rushing Yards",
+      "player_name": "Kewan Lacy",
+      "event_id": "65571f1cab1a260aae4a220e38dbbc1d",
+      "side": "under",
+      "line": "84.5",
+      "segment": "full",
+      "name": "Kewan Lacy"
+     },
+     "seconds": 2.8,
+     "bytes": 6915225,
+     "provider": "football:ncaaf",
+     "coverage": {
+      "advanced": "filled",
+      "environment": "filled",
+      "game_sim": "filled",
+      "matchup": "filled",
+      "player_sim": "no_producer:no NCAAF player projection artifact is published; web does not model (ncaaf/prop_model.py is not called)",
+      "recent_form": "filled",
+      "track_record": "insufficient_sample:no_graded_cell_for_market"
+     },
+     "tables_served": 6
+    }
+   ],
+   "verdict": "PASS"
+  }
+ }
+}

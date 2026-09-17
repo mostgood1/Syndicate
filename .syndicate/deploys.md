@@ -37364,3 +37364,57 @@ Scheduled task `full-slate-memory-reading-0915`. Read-only on production: no dep
 - **Known limit, recorded in the lane:** the per-date last-queued time is in-process, so every restart lets the next-day date queue immediately; next-day builds ran 34 min apart (16:59:38Z, 17:33:15Z) around that deploy.
 - **Side effects:** 8 `MEMORY_GUARD_ABORT` in the window, none at `post_pull_hot_artifacts` (so no sign yet that the 24 h dated pull window costs memory there); 0 `LAYER2_REFRESH_AFTER_BUILD_ABORT ran=no`; 0 Tracebacks.
 - **verify:** OWED -- the goal is a full day (scheduled `layer2-next-day-floor-fullday-reading-0918`, 09-18 12:00 CDT) against the 18-gap baseline.
+
+## 2026-09-17 21:0x-21:1xZ (4:0x PM CT) — READING, no deploy of my own — web `90888a55` (live 19:46:04Z, deployed by lane `web-memory-guard`) — lane `prop-evidence-parity`
+
+**MY CODE WENT LIVE AS A RIDE-ALONG, AND THE READING IS STILL MINE.** `fdea0a2e` +
+`bff99ffe` (Ask `prop_evidence_v1`) sat on `main` undeployed; the 19:46:04Z web deploy
+carried them. My own `render_deploy.py` call had been refused by the session's permission
+classifier, so nothing here was triggered by this lane — which changes who pressed the
+button, not who owes the measurement.
+
+**verify (1): production coverage, `scripts/prop_evidence_checklist.py --base-url ... --sample 5`, 21:0xZ, 5 pregame board prop rows per sport, all four sports PASS.**
+`reports/prop_evidence/2026-09-17_post_ridealong.json`.
+
+| sport | answered | median s | player_sim | recent_form | matchup | advanced | game_sim | environment | track_record |
+|---|---|---|---|---|---|---|---|---|---|
+| mlb | 5/5 | 18.25 | 100% | 100% | 100% | 100% | 100% | 20% | 100% |
+| wnba | 5/5 | 5.20 | 80% | 80% | 40% | 100% | 100% | 100% | 80% |
+| nfl | 5/5 | 2.02 | 100% | 0% | 100% | 100% | 100% | 100% | 100% |
+| ncaaf | 5/5 | 4.05 | 0% | 80% | 80% | 80% | 100% | 100% | 0% |
+
+Every empty cell is a NAMED reason, not a blank: MLB `environment not_shown` x4 (park/weather
+rows exist only on hr_targets batters); WNBA `matchup player_not_found` x3, and one
+double-double row `no_producer` + `not_applicable` (the sim ships per-stat marginals, not the
+joint); NFL `recent_form artifact_missing` x5 (`#671` — the usage file is allowlisted and
+production holds none); NCAAF `player_sim no_producer` x5 (nothing published, web must not
+model) and `track_record insufficient_sample` x5 (no NCAAF prop cell in the scorecard yet).
+Tables served: MLB 9-10, NFL 8, WNBA 7, NCAAF 6.
+
+**verify (2): MLB's reference answer, same three rows before and after, board identity matched exactly.**
+Baty `batter_total_bases 1.5` 8t/2c -> **10t/2c**; Perez `batter_hits 0.5` 8t -> **10t**;
+McLean `earned_runs 2.5` 8t/3c -> **10t/3c**. Every reference table is still there by title and
+columns. Row VALUES moved on the sim-backed tables because the daily sim re-ran between the two
+reads, and Perez's opposing starter changed on the board itself (Peter Lambert -> Miguel
+Ullola) — neither is this change. What is new: the `Track record` table on all three, the
+coverage table, and **McLean's `Park/weather` table, which the old `MAX_TABLES = 8` had been
+silently truncating**. BvP titles now read `career, through 2026-05-09` / `2026-05-08` instead
+of claiming today's date.
+
+**NOT yet true, and it is the other half of this lane.** refresh-worker is still on `5cf06987`,
+so no BvP shards exist and MLB Asks remain on the legacy ~70 MB-per-pitcher scan: 18.25 s median
+here, and a cold 40.02 s on Perez once his opposing starter changed to a pitcher with no cached
+entry. The shard path is measured locally at 20.25 s -> 1.07 s for the 7-pitcher read a batter
+prop triggers. refresh-worker's claim is held by lane `soccer-shot-woodwork-undercount`
+(session a1e40980) as of 21:06Z; that lane has been told what rides along, including the one
+live side effect — `refresh_mlb_statcast_features.is_stale()` now also fires on a missing BvP
+index, so the weekly Statcast job launches on the first hourly check after ANY refresh-worker
+deploy (it self-gates on an in-flight sim and on memory headroom).
+
+**Small defect found in my own change, named not hidden:** a pitcher with NO BvP history at all
+still prints `career, through <today>` (the horizon falls back to the answer's date when the
+source carried no dates for him). The table's own row says "no recorded history", so nothing
+false is claimed about coverage, but the date is meaningless there. Follow-up, not a blocker.
+
+**Owed next:** after refresh-worker deploys, confirm 64 `bvp_pairs_*.json` shards on web and
+re-read the MLB median; then this lane's Verification is complete.
