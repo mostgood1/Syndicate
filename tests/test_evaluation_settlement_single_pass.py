@@ -233,11 +233,15 @@ def test_a_line_appended_during_the_rewrite_is_kept(two_ledgers):
     appended = json.dumps({"record_type": "prediction", "prediction_id": "pred_appended_mid_pass"}) + "\n"
     real_getsize = os.path.getsize
 
+    calls = []
+
     def append_then_measure(path):
         # The recorder appends to today's chunk AFTER the stream reached its
         # end and before the replace -- the window the tail copy exists for.
-        with open(chunk, "a", encoding="utf-8") as handle:
-            handle.write(appended)
+        if not calls:
+            with open(chunk, "a", encoding="utf-8") as handle:
+                handle.write(appended)
+        calls.append(path)
         return real_getsize(path)
 
     with patch.object(intelligence_evaluation, "DEFAULT_LEDGER_PATH", ledger_path), \
@@ -248,3 +252,28 @@ def test_a_line_appended_during_the_rewrite_is_kept(two_ledgers):
     assert len(lines) == len(stored) + 1
     assert lines[-1]["prediction_id"] == "pred_appended_mid_pass"
     assert next(line for line in lines if line.get("recommendation_id") == target["recommendation_id"])["result"] == "loss"
+
+
+def test_a_line_appended_while_the_temp_file_is_fsynced_is_kept(two_ledgers):
+    """The second window: an append after the tail copy, during fsync, before the replace."""
+    mlb_rows, ledger_path, _other = two_ledgers
+    chunk = _ledger_chunk_path(ledger_path, DATE)
+    stored = [json.loads(line) for line in chunk.read_text(encoding="utf-8").splitlines() if line.strip()]
+    target = next(record for record in stored if record.get("record_type") == "recommendation")
+    appended = json.dumps({"record_type": "prediction", "prediction_id": "pred_appended_during_fsync"}) + "\n"
+    real_fsync = os.fsync
+    calls = []
+
+    def append_during_fsync(fd):
+        if not calls:
+            with open(chunk, "a", encoding="utf-8") as handle:
+                handle.write(appended)
+        calls.append(fd)
+        return real_fsync(fd)
+
+    with patch.object(intelligence_evaluation, "DEFAULT_LEDGER_PATH", ledger_path), \
+         patch.object(os, "fsync", side_effect=append_during_fsync):
+        evaluation_settlement._replace_ledger_lines(chunk, {target["recommendation_id"]: dict(target, result="win")})
+    lines = [json.loads(line) for line in chunk.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert len(lines) == len(stored) + 1
+    assert lines[-1]["prediction_id"] == "pred_appended_during_fsync"

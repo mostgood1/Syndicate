@@ -953,6 +953,7 @@ def _replace_ledger_lines(file_path: Path, updates: Mapping[str, Mapping[str, An
                         continue
                 sink.write(stripped)
                 sink.write(b"\n")
+            copied_to = consumed
             if replaced:
                 current_size = os.path.getsize(file_path)
                 if current_size > consumed:
@@ -962,8 +963,25 @@ def _replace_ledger_lines(file_path: Path, updates: Mapping[str, Mapping[str, An
                         if not block:
                             break
                         sink.write(block)
+                        copied_to += len(block)
             sink.flush()
             os.fsync(sink.fileno())
+            # An append can land while the fsync above runs. Re-copy the tail until the
+            # source stops growing, so the replace below never drops a line appended
+            # after the first tail copy (bounded: a writer that never pauses keeps the
+            # last few bytes for the next run's rewrite, which re-reads the file).
+            for _ in range(5):
+                if not replaced or os.path.getsize(file_path) <= copied_to:
+                    break
+                source.seek(copied_to)
+                while True:
+                    block = source.read(1024 * 1024)
+                    if not block:
+                        break
+                    sink.write(block)
+                    copied_to += len(block)
+                sink.flush()
+                os.fsync(sink.fileno())
     except Exception:
         try:
             tmp_path.unlink()
