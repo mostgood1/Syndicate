@@ -39,6 +39,9 @@ from syndicate.features.soccer.ingestion.fotmob_momentum import fotmob_momentum_
 from syndicate.features.soccer.features.live_lens import goal_in_window_probability
 from syndicate.features.soccer.features.live_lens import project_live_match
 from syndicate.features.soccer.features.live_lens import project_live_player_props
+from syndicate.features.soccer.features.live_corners import apply_live_corners
+from syndicate.features.soccer.features.live_corners import load_pregame_payload
+from syndicate.features.soccer.features.live_corners import pregame_corners_from_payload
 from syndicate.features.soccer.features.team_names import match_team_name
 from syndicate.features.soccer.ingestion.espn_lineups import LEAGUE_ESPN_SLUGS
 from syndicate.features.soccer.ingestion.espn_lineups import fetch_events
@@ -268,6 +271,10 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
         team_names = [event["home_team"] for event in live_events] + [event["away_team"] for event in live_events]
         _fill_promoted(ratings, team_names)
         player_rows = _load_player_rows(league, source_root)
+        # The PRE-KICKOFF corners estimate, read once per league tick. `recommendations_<date>.json` is
+        # rewritten as matches go pre -> in -> post, so the freeze is what still holds a pregame number
+        # for a match that has already started.
+        pregame_payload = load_pregame_payload(source_root, league, iso_date)
 
         for event in live_events:
             event_id = str(event.get("event_id") or "")
@@ -314,6 +321,11 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
             home_rating = _rating_for(ratings, live_state["home_team"])
             away_rating = _rating_for(ratings, live_state["away_team"])
             projection = project_live_match(live_state, home_rating=home_rating, away_rating=away_rating, simulations=simulations)
+            # H29 (log/2026-09-17.md ~13:55 CT): the sim's remaining corners carry MAE 1.951 and a +0.46
+            # bias on 320 held-out matches against 1.876 and +0.07 for the pregame estimate over the clock.
+            # The sim's own values are kept on the returned projection as `sim_*`, and H32 grades the pair.
+            projection, corners_audit = apply_live_corners(
+                projection, live_state, pregame_corners_from_payload(pregame_payload, event_id))
             goal_windows = {
                 label: goal_in_window_probability(live_state, home_rating=home_rating, away_rating=away_rating, window_seconds=seconds, simulations=simulations)
                 for label, seconds in _GOAL_WINDOWS_SECONDS.items()
@@ -330,6 +342,7 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
             )
             games[event_id] = {
                 "event_id": event_id,
+                "live_corners": corners_audit,
                 "home_team": live_state["home_team"],
                 "away_team": live_state["away_team"],
                 "half": live_state["half"],
