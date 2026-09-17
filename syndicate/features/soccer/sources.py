@@ -1062,9 +1062,51 @@ def schedule_path(league: str, season: int) -> Path:
     return _api_read_path(league, "schedule", f"schedule_{season}.json")
 
 
-@lru_cache(maxsize=32)
+# A MEMO THAT FOLLOWS THE FILE, not `@lru_cache`.
+#
+# This was `@lru_cache(maxsize=32)` from `570ba09f` (2026-07-20), which kept the
+# FIRST schedule a process ever read for the life of the process. The schedule is
+# not static: builders rewrite `status_state` and scores during the day, and
+# `recommendations_payload` above dropped the same cache on 2026-07-24 for the
+# same reason. MEASURED on production 2026-09-17 (`deploys.md` 01:25Z): postponed
+# ATH @ LEV was carded from the schedule once it left recommendations. The old
+# refresh-worker process served a cached pre-postponement read (`pregame`), and
+# the next restart surfaced the stale on-disk copy as `final 0-0`, while web's
+# `void` copy was right.
+#
+# Keyed on (path, mtime_ns, size), so an unchanged file still answers from memory
+# -- the schedule is read many times per board build -- and a rewritten one is
+# re-read on the next call instead of at the next restart.
+_SCHEDULE_MEMO: dict[tuple[str, int], tuple[tuple[str, int | None, int | None], dict[str, Any] | None]] = {}
+_SCHEDULE_MEMO_LOCK = threading.Lock()
+
+
 def schedule_payload(league: str, season: int) -> dict[str, Any] | None:
-    return load_json(schedule_path(league, season))
+    path = schedule_path(league, season)
+    try:
+        stat = path.stat()
+        stamp: tuple[str, int | None, int | None] = (str(path), int(stat.st_mtime_ns), int(stat.st_size))
+    except OSError:
+        stamp = (str(path), None, None)
+    key = (normalize_league(league), int(season))
+    with _SCHEDULE_MEMO_LOCK:
+        hit = _SCHEDULE_MEMO.get(key)
+    if hit is not None and hit[0] == stamp and stamp[1] is not None:
+        return hit[1]
+    payload = load_json(path)
+    with _SCHEDULE_MEMO_LOCK:
+        _SCHEDULE_MEMO[key] = (stamp, payload)
+    return payload
+
+
+def _clear_schedule_memo() -> None:
+    with _SCHEDULE_MEMO_LOCK:
+        _SCHEDULE_MEMO.clear()
+
+
+# Kept callable: `tests/test_soccer_sources.py` resets the old `@lru_cache` with
+# `schedule_payload.cache_clear()`, and that contract should survive the change.
+schedule_payload.cache_clear = _clear_schedule_memo  # type: ignore[attr-defined]
 
 
 def available_weeks(league: str, season: int) -> list[int]:

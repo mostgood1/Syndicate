@@ -488,7 +488,16 @@ def _unsimulated_game(fixture: dict[str, Any], *, league: str, week: int, season
     home_team = str(fixture.get("home_team") or "Home").strip() or "Home"
     away_team = str(fixture.get("away_team") or "Away").strip() or "Away"
     event_id = str(fixture.get("event_id") or "").strip()
-    status_state = _effective_status_state(fixture.get("status_state") or "pre", fixture.get("date"))
+    # The same refusal `_effective_state_with_box` makes, on the OTHER card path: a
+    # fixture absent from recommendations is carded here from the schedule, and a
+    # match ESPN says was not played must not read as FINAL on either path
+    # (2026-09-17, postponed ATH @ LEV; `deploys.md` 01:25Z). `void` already maps
+    # to not-final below; this also refuses a row that carries ESPN's unplayed
+    # signals under `post`.
+    if record_is_unplayed(fixture):
+        status_state = UNPLAYED_STATE
+    else:
+        status_state = _effective_status_state(fixture.get("status_state") or "pre", fixture.get("date"))
     date_str = str(fixture.get("date") or "")[:10]
     return {
         "gamePk": event_id or f"{league}_{date_str}_{home_team}_{away_team}".replace(" ", "_"),

@@ -150,3 +150,79 @@ def test_the_chip_for_a_void_match_is_not_final():
     })
     assert chip["state"] != "final"
     assert chip["status_token"] != "FINAL"
+
+
+# --- the SCHEDULE path: a fixture absent from recommendations ---------------------
+#
+# MEASURED ON PRODUCTION 2026-09-17 00:05-01:10Z (`deploys.md` 01:25Z): once the
+# rebuilt recommendations dropped ATH @ LEV, the chip was built by
+# `_unsimulated_game` from the SCHEDULE artifact. refresh-worker's copy was an
+# old-code build (`post`, 0-0), and `schedule_payload`'s `@lru_cache` had frozen a
+# pre-postponement read in the old process -- so the chip went `pregame` and then
+# back to `final 0-0` at the next restart, while web (schedule `void`) was right.
+
+
+def _write_schedule(root, rows, mtime_ns):
+    import os
+
+    path = root / "la_liga" / "api" / "schedule" / "schedule_2026.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"league": "la_liga", "season": 2026, "matches": rows}), encoding="utf-8")
+    os.utime(path, ns=(mtime_ns, mtime_ns))
+    return path
+
+
+def _schedule_row(status_state):
+    return {"event_id": "401882870", "date": "2026-09-16T19:30Z", "week": 5, "status_state": status_state,
+            "home_team": "Levante", "away_team": "Athletic Club", "home_score": "0", "away_score": "0"}
+
+
+def test_the_schedule_read_follows_the_file_not_the_first_read(tmp_path, monkeypatch):
+    """THE DEFECT: a process kept the first schedule it ever read, so a rebuilt
+    schedule was invisible until the process restarted -- and a restart then
+    surfaced whatever stale copy sat on disk."""
+    from syndicate.features.soccer import sources
+
+    root = tmp_path / "soccer_source"
+    monkeypatch.setenv("SYNDICATE_SOCCER_SOURCE_ROOT", str(root))
+    _write_schedule(root, [_schedule_row("pre")], 1_000_000_000_000_000_000)
+    first = sources.schedule_payload("la_liga", 2026)
+    _write_schedule(root, [_schedule_row(VOID)], 1_000_000_060_000_000_000)
+    second = sources.schedule_payload("la_liga", 2026)
+
+    assert first["matches"][0]["status_state"] == "pre"
+    assert second["matches"][0]["status_state"] == VOID, "the schedule read is still the first one this process made"
+
+
+def test_an_unchanged_schedule_is_not_re_parsed(tmp_path, monkeypatch):
+    """The cache existed for a reason: the schedule is read many times per build.
+    It must still answer from memory while the file is unchanged."""
+    from syndicate.features.soccer import sources
+
+    root = tmp_path / "soccer_source"
+    monkeypatch.setenv("SYNDICATE_SOCCER_SOURCE_ROOT", str(root))
+    _write_schedule(root, [_schedule_row("pre")], 1_000_000_000_000_000_000)
+    calls = []
+    real = sources.load_json
+    monkeypatch.setattr(sources, "load_json", lambda path: calls.append(path) or real(path))
+    sources.schedule_payload("la_liga", 2026)
+    sources.schedule_payload("la_liga", 2026)
+    assert len(calls) == 1
+
+
+def test_a_schedule_only_fixture_marked_unplayed_is_not_final():
+    from syndicate.features.soccer.cards import _unsimulated_game
+
+    fixture = dict(_schedule_row("post"), date=_kicked_off(), status_completed=False)
+    game = _unsimulated_game(fixture, league="la_liga", week=5, season=2026)
+    assert game["live_state"]["final"] is False
+
+
+def test_the_chip_for_a_void_schedule_fixture_is_not_final():
+    from syndicate.features.shared.game_chip_scoreboard import build_game_chip
+    from syndicate.features.soccer.cards import _unsimulated_game
+
+    game = _unsimulated_game(dict(_schedule_row(VOID), date=_kicked_off()), league="la_liga", week=5, season=2026)
+    chip = build_game_chip("soccer", {**game, "away_team": "Athletic Club", "home_team": "Levante",
+                                      "scheduled_start_utc": game.get("scheduled_start_utc")})
+    assert chip["state"] != "final"
