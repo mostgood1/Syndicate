@@ -627,6 +627,15 @@ to a complete log scan.**
     /api/intelligence/query   131.1 MB   59 calls   MEDIAN 2.53 MB EACH   = 81%
     client 73.75.177.190      159.3 MB  497 calls                        = 98%
     user agents               Chrome/Linux 48 calls, iPad 11 calls
+**THAT ATTRIBUTION IS NOW MEASURED, NOT INFERRED FROM THE UA `[2026-09-17, scheduled task `bandwidth-spike-tripwire`, session 60d6432d]`.** `api.ipify.org` returns
+**`73.75.177.190`** for the dev workstation — an exact match. Across all 46 committed
+`reports/bandwidth_spikes/web_*.json` captures that client is **8,543.4 MB / 19,691
+requests in 45 of the 46 buckets** (2026-09-01T22:00Z .. 2026-09-17T19:00Z), ~50x the
+next client (174.253.98.187, 159.6 MB). **Limit: the match proves the household NAT,
+not the specific machine.** It does NOT re-open the eliminated "public edge traffic"
+mechanism for the 09-01..04 / 09-08 spikes — this client is present in those hours too
+and is orders too small there (the 4,050 MB hour carried 178 MB of edge in total).
+
 
 **That 2.53 MB is ALREADY GZIPPED** — `install_response_compression` is registered
 `after_request` unconditionally, the type is `application/json` and the floor is
