@@ -3714,6 +3714,35 @@
     restoreBoardUiState(uiState);
   }
 
+  // PER-DATE "AS OF" (lane `board-today-freshness`, 2026-09-17). The single
+  // stamp below is `state_last_updated`, the OLDEST input across the board
+  // window. Measured that day: it read 16:17Z (tomorrow's shortlist) while
+  // today's had been rebuilt at 16:52Z, and with tomorrow now refreshed about
+  // hourly the chip would show tomorrow's age nearly all the time. When the
+  // combined read supplies `state_meta.dates`, each date is shown with its own
+  // stamp, today first. An older payload without it keeps the old single stamp.
+  function boardDateFreshnessParts(response) {
+    const nested = response && typeof response.response === "object" && response.response ? response.response : null;
+    const meta = (nested && nested.state_meta) || (response && response.state_meta) || null;
+    const dates = meta && typeof meta.dates === "object" && meta.dates ? meta.dates : null;
+    if (!dates) return [];
+    const today = String(meta.today_date || "").trim();
+    const keys = Object.keys(dates).filter((key) => dates[key] && dates[key].written_at).sort();
+    keys.sort((a, b) => (a === today ? -1 : b === today ? 1 : a.localeCompare(b)));
+    return keys.map((key) => {
+      const stamp = formatTimestamp(dates[key].written_at);
+      if (!stamp) return "";
+      let label = key;
+      if (key === today) {
+        label = "Today";
+      } else {
+        const parsed = new Date(`${key}T12:00:00`);
+        if (!Number.isNaN(parsed.getTime())) label = new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(parsed);
+      }
+      return `${label} as of ${stamp}`;
+    }).filter(Boolean);
+  }
+
   function renderFreshnessChip(response) {
     const el = document.getElementById("board-freshness-chip");
     if (!el) return;
@@ -3723,8 +3752,10 @@
     const count = numericValue(response && response.candidate_count);
     const parts = [];
     if (sourceLabel) parts.push(sourceLabel);
+    const dateParts = boardDateFreshnessParts(response);
     const formattedUpdate = formatTimestamp(stateUpdated);
-    if (formattedUpdate) parts.push(`as of ${formattedUpdate}`);
+    if (dateParts.length) parts.push(...dateParts);
+    else if (formattedUpdate) parts.push(`as of ${formattedUpdate}`);
     if (count !== null) parts.push(`${count} candidates`);
     if (!parts.length) {
       el.hidden = true;
