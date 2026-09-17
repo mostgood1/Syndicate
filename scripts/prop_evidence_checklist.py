@@ -51,8 +51,12 @@ EXPECTED: dict[str, set[str]] = {
     "nba": {"player_sim", "matchup", "advanced", "game_sim", "environment"},
     "nhl": {"player_sim", "recent_form", "matchup", "advanced", "game_sim", "environment"},
     "soccer": {"player_sim", "matchup", "advanced", "game_sim", "environment"},
+    # NFL recent form is NOT expected: `nfl_fantasy_usage_*.json` is allowlisted
+    # but production web holds zero of them (export listing, 2026-09-17), so no
+    # per-game NFL player stats reach this service. NCAAF has no published player
+    # projection and web must not model, so player_sim is not expected either.
     "nfl": {"player_sim", "matchup", "advanced", "game_sim", "environment"},
-    "ncaaf": {"recent_form", "matchup", "game_sim"},
+    "ncaaf": {"recent_form", "matchup", "advanced", "game_sim", "environment"},
 }
 
 # One real board row per provider sport, the same rows the provider tests use.
@@ -65,6 +69,15 @@ FIXTURE_ROWS: dict[str, tuple[str, dict[str, Any]]] = {
         "sport": "nhl", "event_id": "nhl-2025030414", "market": "SOG", "player_name": "Jack Eichel", "line": 2.5,
         "side": "under", "segment": "full", "home_team": "Vegas Golden Knights", "away_team": "Carolina Hurricanes",
         "commence_time": "2026-06-10T00:00:00Z", "kind": "prop"}),
+    "nfl": ("2026-09-17", {
+        "sport": "nfl", "event_id": "56e8897681915f7ec92baeee952bb1ae", "market": "Receptions",
+        "player_name": "Jahmyr Gibbs", "line": 4.5, "side": "over", "segment": "full",
+        "home_team": "Buffalo Bills", "away_team": "Detroit Lions", "commence_time": "2026-09-18T00:15:00Z", "kind": "prop"}),
+    "ncaaf": ("2026-09-17", {
+        "sport": "ncaaf", "event_id": "03297aa8a399c223aa1cc6aa923d9bc6", "market": "Receptions",
+        "player_name": "Joseph Williams", "line": 4.5, "side": "over", "segment": "full",
+        "home_team": "Northwestern Wildcats", "away_team": "Colorado Buffaloes",
+        "commence_time": "2026-09-19T23:30:00Z", "kind": "prop"}),
     "soccer": ("2026-09-17", {
         "sport": "soccer", "event_id": "c7b8233ea02650f1055ae086b169b7a1", "market": "player_shots",
         "player_name": "Roberto Piccoli", "line": 2.5, "side": "over", "segment": "full",

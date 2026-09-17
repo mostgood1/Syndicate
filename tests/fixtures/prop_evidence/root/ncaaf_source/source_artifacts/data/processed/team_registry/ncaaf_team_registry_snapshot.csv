@@ -1,0 +1,685 @@
+team_id,canonical_team_name,abbreviation,conference,subdivision,aliases,display_name,conference_short_name,school_name,mascot_name,source_system,source_snapshot_date
+2000,Abilene Christian,ACU,UAC,FCS,abilene christian|acu|wildcats,Abilene Christian,,Abilene Christian,Wildcats,cfbd,2026-07-21
+2001,Adams State,ADST,Rocky Mountain,II,adams state|adst|grizzlies,Adams State,,Adams State,Grizzlies,cfbd,2026-07-21
+2003,Adrian,ADR,Michigan,III,adr|adrian|bulldogs,Adrian,,Adrian,Bulldogs,cfbd,2026-07-21
+2005,Air Force,AF,Mountain West,FBS,af|air force|falcons,Air Force,,Air Force,Falcons,cfbd,2026-07-21
+2006,Akron,AKR,Mid-American,FBS,akr|akron|zips,Akron,,Akron,Zips,cfbd,2026-07-21
+333,Alabama,ALA,SEC,FBS,ala|alabama|crimson tide,Alabama,,Alabama,Crimson Tide,cfbd,2026-07-21
+2010,Alabama A&M,AAMU,SWAC,FCS,aamu|alabama a and m|bulldogs,Alabama A&M,,Alabama A&M,Bulldogs,cfbd,2026-07-21
+2011,Alabama State,ALST,SWAC,FCS,alabama state|alst|hornets,Alabama State,,Alabama State,Hornets,cfbd,2026-07-21
+2013,Albany State GA,ALBS,SIAC,II,albany state ga|albs|golden rams,Albany State GA,,Albany State GA,Golden Rams,cfbd,2026-07-21
+2790,Albion,ALBI,Michigan,III,albi|albion|britons,Albion,,Albion,Britons,cfbd,2026-07-21
+2015,Albright,ALB,Mid Atlantic,III,alb|albright|lions,Albright,,Albright,Lions,cfbd,2026-07-21
+2016,Alcorn State,ALCN,SWAC,FCS,alcn|alcorn state|braves,Alcorn State,,Alcorn State,Braves,cfbd,2026-07-21
+2017,Alderson-Broaddus,ABC,Mountain East,II,abc|alderson-broaddus|battlers,Alderson-Broaddus,,Alderson-Broaddus,Battlers,cfbd,2026-07-21
+3162,Alfred State,ALFS,Empire 8,III,alfred state|alfs|pioneers,Alfred State,,Alfred State,Pioneers,cfbd,2026-07-21
+365,Alfred University,ALF,Empire 8,III,alf|alfred university|saxons,Alfred University,,Alfred University,Saxons,cfbd,2026-07-21
+2018,Allegheny,ALL,Presidents',III,all|allegheny|gators,Allegheny,,Allegheny,Gators,cfbd,2026-07-21
+2019,Allen,ALL,SIAC,II,all|allen|yellow jackets,Allen,,Allen,Yellow Jackets,cfbd,2026-07-21
+2800,Alma,ALM,Michigan,III,alm|alma|scots,Alma,,Alma,Scots,cfbd,2026-07-21
+2022,American International,AIC,Northeast 10,II,aic|american international|yellow jackets,American International,,American International,Yellow Jackets,cfbd,2026-07-21
+7,Amherst,AMH,NESCAC,III,amh|amherst|mammoths,Amherst,,Amherst,Mammoths,cfbd,2026-07-21
+2023,Anderson (IN),AND,Heartland,III,and|anderson in|ravens,Anderson (IN),,Anderson (IN),Ravens,cfbd,2026-07-21
+129469,Anderson (Sc),AND,South Atlantic,II,and|anderson sc|trojans,Anderson (Sc),,Anderson (Sc),Trojans,cfbd,2026-07-21
+2025,Angelo State,ANG,Lone Star,II,ang|angelo state|rams,Angelo State,,Angelo State,Rams,cfbd,2026-07-21
+2026,App State,APP,Sun Belt,FBS,app|app state|mountaineers,App State,,App State,Mountaineers,cfbd,2026-07-21
+3111,Apprentice School,APPRE,Independent DIII,III,appre|apprentice school|builders,Apprentice School,,Apprentice School,Builders,cfbd,2026-07-21
+12,Arizona,ARIZ,Big 12,FBS,ariz|arizona|wildcats,Arizona,,Arizona,Wildcats,cfbd,2026-07-21
+9,Arizona State,ASU,Big 12,FBS,arizona state|asu|sun devils,Arizona State,,Arizona State,Sun Devils,cfbd,2026-07-21
+8,Arkansas,ARK,SEC,FBS,ark|arkansas|razorbacks,Arkansas,,Arkansas,Razorbacks,cfbd,2026-07-21
+2032,Arkansas State,ARST,Sun Belt,FBS,arkansas state|arst|red wolves,Arkansas State,,Arkansas State,Red Wolves,cfbd,2026-07-21
+2033,Arkansas Tech,ARKTECH,Great American,II,arkansas tech|arktech|wonder boys,Arkansas Tech,,Arkansas Tech,Wonder Boys,cfbd,2026-07-21
+2028,Arkansas-Monticello,ARKMONT,Great American,II,arkansas-monticello|arkmont|boll weevils,Arkansas-Monticello,,Arkansas-Monticello,Boll Weevils,cfbd,2026-07-21
+2029,Arkansas-Pine Bluff,UAPB,SWAC,FCS,arkansas-pine bluff|golden lions|uapb,Arkansas-Pine Bluff,,Arkansas-Pine Bluff,Golden Lions,cfbd,2026-07-21
+349,Army,ARMY,American Athletic,FBS,army|black knights,Army,,Army,Black Knights,cfbd,2026-07-21
+308,Ashland,ASH,Great Midwest Athletic,II,ash|ashland|eagles,Ashland,,Ashland,Eagles,cfbd,2026-07-21
+2038,Assumption,ASP,Northeast 10,II,asp|assumption|greyhounds,Assumption,,Assumption,Greyhounds,cfbd,2026-07-21
+2,Auburn,AUB,SEC,FBS,aub|auburn|tigers,Auburn,,Auburn,Tigers,cfbd,2026-07-21
+124,Augsburg,AUG,Minnesota,III,aug|auggies|augsburg,Augsburg,,Augsburg,Auggies,cfbd,2026-07-21
+2042,Augustana (IL),AUGIL,CCIW,III,augil|augustana il|vikings,Augustana (IL),,Augustana (IL),Vikings,cfbd,2026-07-21
+2043,Augustana University (SD),AUSD,Northern Sun,II,augustana university sd|ausd|vikings,Augustana University (SD),,Augustana University (SD),Vikings,cfbd,2026-07-21
+2044,Aurora,AUR,NACC,III,aur|aurora|spartans,Aurora,,Aurora,Spartans,cfbd,2026-07-21
+2045,Austin,AUS,Southern Collegiate Athletic,III,'roos|aus|austin,Austin,,Austin,'Roos,cfbd,2026-07-21
+2046,Austin Peay,APSU,UAC,FCS,apsu|austin peay|governors,Austin Peay,,Austin Peay,Governors,cfbd,2026-07-21
+2047,Averett,AVE,Old Dominion,III,ave|averett|cougars,Averett,,Averett,Cougars,cfbd,2026-07-21
+2049,Azusa Pacific,AZU,So. Cal.,III,azu|azusa pacific|cougars,Azusa Pacific,,Azusa Pacific,Cougars,cfbd,2026-07-21
+252,BYU,BYU,Big 12,FBS,byu|cougars,BYU,,BYU,Cougars,cfbd,2026-07-21
+188,Baldwin Wallace,BAL,Ohio,III,bal|baldwin wallace|yellow jackets,Baldwin Wallace,,Baldwin Wallace,Yellow Jackets,cfbd,2026-07-21
+2050,Ball State,BALL,Mid-American,FBS,ball|ball state|cardinals,Ball State,,Ball State,Cardinals,cfbd,2026-07-21
+121,Bates,BAT,NESCAC,III,bat|bates|bobcats,Bates,,Bates,Bobcats,cfbd,2026-07-21
+239,Baylor,BAY,Big 12,FBS,bay|baylor|bears,Baylor,,Baylor,Bears,cfbd,2026-07-21
+2056,Belhaven,BELHA,USA South,III,belha|belhaven|blazers,Belhaven,,Belhaven,Blazers,cfbd,2026-07-21
+266,Beloit,BEL,Midwest,III,bel|beloit|buccaneers,Beloit,,Beloit,Buccaneers,cfbd,2026-07-21
+132,Bemidji State,BST,Northern Sun,II,beavers|bemidji state|bst,Bemidji State,,Bemidji State,Beavers,cfbd,2026-07-21
+490,Benedict College,BEN,SIAC,II,ben|benedict college|tigers,Benedict College,,Benedict College,Tigers,cfbd,2026-07-21
+2283,Benedictine University,BENILL,NACC,III,benedictine university|benill|eagles,Benedictine University,,Benedictine University,Eagles,cfbd,2026-07-21
+2060,Bentley,BENT,Northeast 10,II,bent|bentley|falcons,Bentley,,Bentley,Falcons,cfbd,2026-07-21
+2757,Berry College,BER,Southern Athletic,III,ber|berry college|vikings,Berry College,,Berry College,Vikings,cfbd,2026-07-21
+2062,Bethany (WV),BETHWV,Presidents',III,bethany wv|bethwv|bison,Bethany (WV),,Bethany (WV),Bison,cfbd,2026-07-21
+2802,Bethel (MN),BET,Minnesota,III,bet|bethel mn|royals,Bethel (MN),,Bethel (MN),Royals,cfbd,2026-07-21
+2065,Bethune-Cookman,BCU,SWAC,FCS,bcu|bethune-cookman|wildcats,Bethune-Cookman,,Bethune-Cookman,Wildcats,cfbd,2026-07-21
+111675,Biddeford,NWENG,Commonwealth Coast,III,biddeford|nor'easters|nweng,Biddeford,,Biddeford,Nor'easters,cfbd,2026-07-21
+3,Birmingham-Southern,BIR,Southern Athletic,III,bir|birmingham-southern|panthers,Birmingham-Southern,,Birmingham-Southern,Panthers,cfbd,2026-07-21
+2069,Black Hills State,BHST,Rocky Mountain,II,bhst|black hills state|yellow jackets,Black Hills State,,Black Hills State,Yellow Jackets,cfbd,2026-07-21
+2071,Bloomsburg,BLMSB,Pennsylvania State Athletic,II,blmsb|bloomsburg|huskies,Bloomsburg,,Bloomsburg,Huskies,cfbd,2026-07-21
+124180,Bluefield State,BLU,CIAA,II,big blue|blu|bluefield state,Bluefield State,,Bluefield State,Big Blue,cfbd,2026-07-21
+2074,Bluffton,BLUFFTON,Heartland,III,beavers|bluffton,Bluffton,,Bluffton,Beavers,cfbd,2026-07-21
+68,Boise State,BOIS,Pac-12,FBS,bois|boise state|broncos,Boise State,,Boise State,Broncos,cfbd,2026-07-21
+103,Boston College,BC,ACC,FBS,bc|boston college|eagles,Boston College,,Boston College,Eagles,cfbd,2026-07-21
+340,Bowdoin,BOW,NESCAC,III,bow|bowdoin|polar bears,Bowdoin,,Bowdoin,Polar Bears,cfbd,2026-07-21
+2075,Bowie State,BSU,CIAA,II,bowie state|bsu|bulldogs,Bowie State,,Bowie State,Bulldogs,cfbd,2026-07-21
+189,Bowling Green,BGSU,Mid-American,FBS,bgsu|bowling green|falcons,Bowling Green,,Bowling Green,Falcons,cfbd,2026-07-21
+2913,Brevard College,BRE,USA South,III,bre|brevard college|tornados,Brevard College,,Brevard College,Tornados,cfbd,2026-07-21
+2079,Bridgewater (VA),BRVA,Old Dominion,III,bridgewater va|brva|eagles,Bridgewater (VA),,Bridgewater (VA),Eagles,cfbd,2026-07-21
+18,Bridgewater State,BRST,MSCAC,III,bears|bridgewater state|brst,Bridgewater State,,Bridgewater State,Bears,cfbd,2026-07-21
+2781,Brockport,BRO,Empire 8,III,bro|brockport|golden eagles,Brockport,,Brockport,Golden Eagles,cfbd,2026-07-21
+225,Brown,BRWN,Ivy,FCS,bears|brown|brwn,Brown,,Brown,Bears,cfbd,2026-07-21
+2803,Bryant,BRY,CAA,FCS,bry|bryant|bulldogs,Bryant,,Bryant,Bulldogs,cfbd,2026-07-21
+2083,Bucknell,BUCK,Patriot,FCS,bison|buck|bucknell,Bucknell,,Bucknell,Bison,cfbd,2026-07-21
+63,Buena Vista,BUENA,American Rivers,III,beavers|buena|buena vista,Buena Vista,,Buena Vista,Beavers,cfbd,2026-07-21
+2084,Buffalo,BUF,Mid-American,FBS,buf|buffalo|bulls,Buffalo,,Buffalo,Bulls,cfbd,2026-07-21
+2085,Buffalo State,BUF,Liberty League,III,bengals|buf|buffalo state,Buffalo State,,Buffalo State,Bengals,cfbd,2026-07-21
+2086,Butler,BUT,Pioneer,FCS,bulldogs|but|butler,Butler,,Butler,Bulldogs,cfbd,2026-07-21
+101442,CENTENARY,CEN,Southern Collegiate Athletic,III,cen|centenary|gentlemen,CENTENARY,,CENTENARY,Gentlemen,cfbd,2026-07-21
+2570,CSU Pueblo,CSTP,Rocky Mountain,II,cstp|csu pueblo|thunderwolves,CSU Pueblo,,CSU Pueblo,Thunderwolves,cfbd,2026-07-21
+13,Cal Poly,CP,Big Sky,FCS,cal poly|cp|mustangs,Cal Poly,,Cal Poly,Mustangs,cfbd,2026-07-21
+25,California,CAL,ACC,FBS,cal|california|golden bears,California,,California,Golden Bears,cfbd,2026-07-21
+2094,California Lutheran University,CALLUTH,So. Cal.,III,california lutheran university|calluth|kingsmen,California Lutheran University,,California Lutheran University,Kingsmen,cfbd,2026-07-21
+129738,Calvin University,CAL,Michigan,III,cal|calvin university|knights,Calvin University,,Calvin University,Knights,cfbd,2026-07-21
+2097,Campbell,CAM,CAA,FCS,cam|campbell|fighting camels,Campbell,,Campbell,Fighting Camels,cfbd,2026-07-21
+424,Capital,CAPITAL,Ohio,III,capital|comets,Capital,,Capital,Comets,cfbd,2026-07-21
+2101,Carleton,CARLETON,Minnesota,III,carleton|knights,Carleton,,Carleton,Knights,cfbd,2026-07-21
+2102,Carnegie Mellon,CARM,Presidents',III,carm|carnegie mellon|tartans,Carnegie Mellon,,Carnegie Mellon,Tartans,cfbd,2026-07-21
+32,Carroll University (WI),CAR,CCIW,III,car|carroll university wi|pioneers,Carroll University (WI),,Carroll University (WI),Pioneers,cfbd,2026-07-21
+2105,Carson-Newman College,CAR,South Atlantic,II,car|carson-newman college|eagles,Carson-Newman College,,Carson-Newman College,Eagles,cfbd,2026-07-21
+2106,Carthage,CARCWI,CCIW,III,carcwi|carthage|firebirds,Carthage,,Carthage,Firebirds,cfbd,2026-07-21
+2963,Case Western Reserve,CSR,Presidents',III,case western reserve|csr|spartans,Case Western Reserve,,Case Western Reserve,Spartans,cfbd,2026-07-21
+293,Castleton,CAS,New Jersey,III,cas|castleton|spartans,Castleton,,Castleton,Spartans,cfbd,2026-07-21
+2107,Catawba,CAT,South Atlantic,II,cat|catawba|indians,Catawba,,Catawba,Indians,cfbd,2026-07-21
+2108,Catholic,CATH,Landmark Conference,III,cardinals|cath|catholic,Catholic,,Catholic,Cardinals,cfbd,2026-07-21
+2110,Central Arkansas,CARK,UAC,FCS,bears|cark|central arkansas,Central Arkansas,,Central Arkansas,Bears,cfbd,2026-07-21
+2964,Central College,CNTCIA,American Rivers,III,central college|cntcia|dutch,Central College,,Central College,Dutch,cfbd,2026-07-21
+2115,Central Connecticut,CCSU,NEC,FCS,blue devils|ccsu|central connecticut,Central Connecticut,,Central Connecticut,Blue Devils,cfbd,2026-07-21
+2117,Central Michigan,CMU,Mid-American,FBS,central michigan|chippewas|cmu,Central Michigan,,Central Michigan,Chippewas,cfbd,2026-07-21
+2118,Central Missouri,CENM,Mid America,II,cenm|central missouri|mules,Central Missouri,,Central Missouri,Mules,cfbd,2026-07-21
+2122,Central Oklahoma,CENO,Mid America,II,bronchos|ceno|central oklahoma,Central Oklahoma,,Central Oklahoma,Bronchos,cfbd,2026-07-21
+2119,Central State (OH),CEN,SIAC,II,cen|central state oh|marauders,Central State (OH),,Central State (OH),Marauders,cfbd,2026-07-21
+2120,Central Washington,CENTWASH,Lone Star,II,central washington|centwash|wildcats,Central Washington,,Central Washington,Wildcats,cfbd,2026-07-21
+2121,Centre College Kentucky,CENTRE,Southern Athletic,III,centre|centre college kentucky|colonels,Centre College Kentucky,,Centre College Kentucky,Colonels,cfbd,2026-07-21
+2123,Chadron St,CHADRONST,Rocky Mountain,II,chadron st|chadronst|eagles,Chadron St,,Chadron St,Eagles,cfbd,2026-07-21
+411,Chapman,CHA,So. Cal.,III,cha|chapman|panthers,Chapman,,Chapman,Panthers,cfbd,2026-07-21
+2127,Charleston Southern,CHSO,Big South-OVC,FCS,buccaneers|charleston southern|chso,Charleston Southern,,Charleston Southern,Buccaneers,cfbd,2026-07-21
+2429,Charlotte,CLT,American Athletic,FBS,49ers|charlotte|clt,Charlotte,,Charlotte,49ers,cfbd,2026-07-21
+236,Chattanooga,UTC,Southern,FCS,chattanooga|mocs|utc,Chattanooga,,Chattanooga,Mocs,cfbd,2026-07-21
+2129,Cheyney,CHE,Pennsylvania State Athletic,II,che|cheyney|wolves,Cheyney,,Cheyney,Wolves,cfbd,2026-07-21
+80,Chicago,CHI,Midwest,III,chi|chicago|maroons,Chicago,,Chicago,Maroons,cfbd,2026-07-21
+2130,Chicago State,Chicago State,FCS Independents,FCS,chicago state|cougars,Chicago State,,Chicago State,Cougars,cfbd,2026-07-21
+2804,Chowan,CHOWA,Carolinas,II,chowa|chowan|hawks,Chowan,,Chowan,Hawks,cfbd,2026-07-21
+3112,Christopher Newport,CHR,New Jersey,III,captains|chr|christopher newport,Christopher Newport,,Christopher Newport,Captains,cfbd,2026-07-21
+2132,Cincinnati,CIN,Big 12,FBS,bearcats|cin|cincinnati,Cincinnati,,Cincinnati,Bearcats,cfbd,2026-07-21
+17,Claremont-Mudd-Scripps College,CLA,So. Cal.,III,cla|claremont-mudd-scripps college|stags,Claremont-Mudd-Scripps College,,Claremont-Mudd-Scripps College,Stags,cfbd,2026-07-21
+2134,Clarion,CLARION,Pennsylvania State Athletic,II,clarion|golden eagles,Clarion,,Clarion,Golden Eagles,cfbd,2026-07-21
+2805,Clark Atlanta,CLA,SIAC,II,cla|clark atlanta|panthers,Clark Atlanta,,Clark Atlanta,Panthers,cfbd,2026-07-21
+228,Clemson,CLEM,ACC,FBS,clem|clemson|tigers,Clemson,,Clemson,Tigers,cfbd,2026-07-21
+2557,Coast Guard,USCGA,NEWMAC,III,bears|coast guard|uscga,Coast Guard,,Coast Guard,Bears,cfbd,2026-07-21
+324,Coastal Carolina,CCU,Sun Belt,FBS,ccu|chanticleers|coastal carolina,Coastal Carolina,,Coastal Carolina,Chanticleers,cfbd,2026-07-21
+2141,Coe College,COE,American Rivers,III,coe|coe college|kohawks,Coe College,,Coe College,Kohawks,cfbd,2026-07-21
+33,Colby College,COLBY,NESCAC,III,colby|colby college|white mules,Colby College,,Colby College,White Mules,cfbd,2026-07-21
+2142,Colgate,COLG,Patriot,FCS,colg|colgate|raiders,Colgate,,Colgate,Raiders,cfbd,2026-07-21
+2442,College Of New Jersey,COL,New Jersey,III,col|college of new jersey|lions,College Of New Jersey,,College Of New Jersey,Lions,cfbd,2026-07-21
+38,Colorado,COLO,Big 12,FBS,buffaloes|colo|colorado,Colorado,,Colorado,Buffaloes,cfbd,2026-07-21
+11,Colorado Mesa,MESA,Rocky Mountain,II,colorado mesa|mavericks|mesa,Colorado Mesa,,Colorado Mesa,Mavericks,cfbd,2026-07-21
+2146,Colorado School Of Mines,COLOMINES,Rocky Mountain,II,colomines|colorado school of mines|orediggers,Colorado School Of Mines,,Colorado School Of Mines,Orediggers,cfbd,2026-07-21
+36,Colorado State,CSU,Pac-12,FBS,colorado state|csu|rams,Colorado State,,Colorado State,Rams,cfbd,2026-07-21
+171,Columbia,COLU,Ivy,FCS,colu|columbia|lions,Columbia,,Columbia,Lions,cfbd,2026-07-21
+2148,Concord University,CON,Mountain East,II,con|concord university|mountain lions,Concord University,,Concord University,Mountain Lions,cfbd,2026-07-21
+2152,Concordia Moorhead,CONCOMN,Minnesota,III,cobbers|concomn|concordia moorhead,Concordia Moorhead,,Concordia Moorhead,Cobbers,cfbd,2026-07-21
+2151,Concordia University Chicago,CONCOIL,NACC,III,concoil|concordia university chicago|cougars,Concordia University Chicago,,Concordia University Chicago,Cougars,cfbd,2026-07-21
+3066,Concordia University St Paul,CON,Northern Sun,II,con|concordia university st paul|golden bears,Concordia University St Paul,,Concordia University St Paul,Golden Bears,cfbd,2026-07-21
+409,Concordia-Wisconsin,CONW,NACC,III,concordia-wisconsin|conw|falcons,Concordia-Wisconsin,,Concordia-Wisconsin,Falcons,cfbd,2026-07-21
+172,Cornell,COR,Ivy,FCS,big red|cor|cornell,Cornell,,Cornell,Big Red,cfbd,2026-07-21
+2155,Cornell College (IA),CORNELLIA,Midwest,III,cornell college ia|cornellia|rams,Cornell College (IA),,Cornell College (IA),Rams,cfbd,2026-07-21
+2782,Cortland,CORTLAND,Empire 8,III,cortland|red dragons,Cortland,,Cortland,Red Dragons,cfbd,2026-07-21
+509,Crown College,CROWN,Upper Midwest,III,crown|crown college|polars,Crown College,,Crown College,Polars,cfbd,2026-07-21
+40,Curry College,CUR,Commonwealth Coast,III,colonels|cur|curry college,Curry College,,Curry College,Colonels,cfbd,2026-07-21
+159,Dartmouth,DART,Ivy,FCS,big green|dart|dartmouth,Dartmouth,,Dartmouth,Big Green,cfbd,2026-07-21
+110254,Davenport,DU,GLIAC,II,davenport|du|panthers,Davenport,,Davenport,Panthers,cfbd,2026-07-21
+2166,Davidson,DAV,Pioneer,FCS,dav|davidson|wildcats,Davidson,,Davidson,Wildcats,cfbd,2026-07-21
+2168,Dayton,DAY,Pioneer,FCS,day|dayton|flyers,Dayton,,Dayton,Flyers,cfbd,2026-07-21
+110438,Dean College,DEA,MSCAC,III,bulldogs|dea|dean college,Dean College,,Dean College,Bulldogs,cfbd,2026-07-21
+48,Delaware,DEL,Conference USA,FBS,blue hens|del|delaware,Delaware,,Delaware,Blue Hens,cfbd,2026-07-21
+2169,Delaware State,DSU,MEAC,FCS,delaware state|dsu|hornets,Delaware State,,Delaware State,Hornets,cfbd,2026-07-21
+2808,Delaware Valley,DV,Mid Atlantic,III,aggies|delaware valley|dv,Delaware Valley,,Delaware Valley,Aggies,cfbd,2026-07-21
+2170,Delta State,DELTAST,Gulf South,II,delta state|deltast|statesmen,Delta State,,Delta State,Statesmen,cfbd,2026-07-21
+2171,Denison University,DEN,North Coast,III,big red|den|denison university,Denison University,,Denison University,Big Red,cfbd,2026-07-21
+83,Depauw,DEP,North Coast,III,dep|depauw|tigers,Depauw,,Depauw,Tigers,cfbd,2026-07-21
+2175,Dickinson (PA),DIC,Centennial,III,dic|dickinson pa|red devils,Dickinson (PA),,Dickinson (PA),Red Devils,cfbd,2026-07-21
+2181,Drake,DRKE,Pioneer,FCS,bulldogs|drake|drke,Drake,,Drake,Bulldogs,cfbd,2026-07-21
+49,Dubuque,DUB,American Rivers,III,dub|dubuque|spartans,Dubuque,,Dubuque,Spartans,cfbd,2026-07-21
+150,Duke,DUKE,ACC,FBS,blue devils|duke,Duke,,Duke,Blue Devils,cfbd,2026-07-21
+2184,Duquesne,DUQ,NEC,FCS,dukes|duq|duquesne,Duquesne,,Duquesne,Dukes,cfbd,2026-07-21
+101784,ERSKINE,ERSKINE,Carolinas,II,erskine|flying fleet,ERSKINE,,ERSKINE,Flying Fleet,cfbd,2026-07-21
+151,East Carolina,ECU,American Athletic,FBS,east carolina|ecu|pirates,East Carolina,,East Carolina,Pirates,cfbd,2026-07-21
+2191,East Central (OK),EAS,Great American,II,eas|east central ok|tigers,East Central (OK),,East Central (OK),Tigers,cfbd,2026-07-21
+2188,East Stroudsburg University,ESTROUD,Pennsylvania State Athletic,II,east stroudsburg university|estroud|warriors,East Stroudsburg University,,East Stroudsburg University,Warriors,cfbd,2026-07-21
+2193,East Tennessee State,ETSU,Southern,FCS,buccaneers|east tennessee state|etsu,East Tennessee State,,East Tennessee State,Buccaneers,cfbd,2026-07-21
+2837,East Texas A&M,ETAM,Southland,FCS,east texas a and m|etam|lions,East Texas A&M,,East Texas A&M,Lions,cfbd,2026-07-21
+2194,East Texas Baptist University,EAS,American Southwest,III,eas|east texas baptist university|tigers,East Texas Baptist University,,East Texas Baptist University,Tigers,cfbd,2026-07-21
+2197,Eastern Illinois,EIU,Big South-OVC,FCS,eastern illinois|eiu|panthers,Eastern Illinois,,Eastern Illinois,Panthers,cfbd,2026-07-21
+2198,Eastern Kentucky,EKU,UAC,FCS,colonels|eastern kentucky|eku,Eastern Kentucky,,Eastern Kentucky,Colonels,cfbd,2026-07-21
+2199,Eastern Michigan,EMU,Mid-American,FBS,eagles|eastern michigan|emu,Eastern Michigan,,Eastern Michigan,Eagles,cfbd,2026-07-21
+2201,Eastern New Mexico,EASTERNNM,Lone Star,II,eastern new mexico|easternnm|greyhounds,Eastern New Mexico,,Eastern New Mexico,Greyhounds,cfbd,2026-07-21
+127954,Eastern University,EAS,Mid Atlantic,III,eagles|eas|eastern university,Eastern University,,Eastern University,Eagles,cfbd,2026-07-21
+331,Eastern Washington,EWU,Big Sky,FCS,eagles|eastern washington|ewu,Eastern Washington,,Eastern Washington,Eagles,cfbd,2026-07-21
+2205,Edinboro University,EDI,Pennsylvania State Athletic,II,edi|edinboro university|fighting scots,Edinboro University,,Edinboro University,Fighting Scots,cfbd,2026-07-21
+2206,Edward Waters,EDW,SIAC,II,edw|edward waters|tigers,Edward Waters,,Edward Waters,Tigers,cfbd,2026-07-21
+2207,Elizabeth City State,ELI,CIAA,II,eli|elizabeth city state|vikings,Elizabeth City State,,Elizabeth City State,Vikings,cfbd,2026-07-21
+72,Elmhurst,ELM,CCIW,III,bluejays|elm|elmhurst,Elmhurst,,Elmhurst,Bluejays,cfbd,2026-07-21
+2210,Elon,ELON,CAA,FCS,elon|phoenix,Elon,,Elon,Phoenix,cfbd,2026-07-21
+2213,Emory & Henry College,EMHEN,South Atlantic,II,emhen|emory and henry college|wasps,Emory & Henry College,,Emory & Henry College,Wasps,cfbd,2026-07-21
+2214,Emporia State University,EMP,Mid America,II,emp|emporia state university|hornets,Emporia State University,,Emporia State University,Hornets,cfbd,2026-07-21
+452,Endicott College,END,Commonwealth Coast,III,end|endicott college|gulls,Endicott College,,Endicott College,Gulls,cfbd,2026-07-21
+101,Eureka College,EUR,NACC,III,eur|eureka college|red devils,Eureka College,,Eureka College,Red Devils,cfbd,2026-07-21
+2221,FDU-Florham,FDUFLOR,Mid Atlantic,III,devils|fdu-florham|fduflor,FDU-Florham,,FDU-Florham,Devils,cfbd,2026-07-21
+2986,Fairmont State,FAIRST,Mountain East,II,fairmont state|fairst|falcons,Fairmont State,,Fairmont State,Falcons,cfbd,2026-07-21
+2220,Fayetteville State,FAY,CIAA,II,broncos|fay|fayetteville state,Fayetteville State,,Fayetteville State,Broncos,cfbd,2026-07-21
+2222,Ferris State,FRST,GLIAC,II,bulldogs|ferris state|frst,Ferris State,,Ferris State,Bulldogs,cfbd,2026-07-21
+366,Ferrum,FER,Carolinas,II,fer|ferrum|panthers,Ferrum,,Ferrum,Panthers,cfbd,2026-07-21
+2224,Findlay,FINDLAY,Great Midwest Athletic,II,findlay|oilers,Findlay,,Findlay,Oilers,cfbd,2026-07-21
+109418,Finlandia University,FINL,Upper Midwest,III,finl|finlandia university|lions,Finlandia University,,Finlandia University,Lions,cfbd,2026-07-21
+114,Fitchburg State,FITCH,MSCAC,III,falcons|fitch|fitchburg state,Fitchburg State,,Fitchburg State,Falcons,cfbd,2026-07-21
+57,Florida,FLA,SEC,FBS,fla|florida|gators,Florida,,Florida,Gators,cfbd,2026-07-21
+50,Florida A&M,FAMU,SWAC,FCS,famu|florida a and m|rattlers,Florida A&M,,Florida A&M,Rattlers,cfbd,2026-07-21
+2226,Florida Atlantic,FAU,American Athletic,FBS,fau|florida atlantic|owls,Florida Atlantic,,Florida Atlantic,Owls,cfbd,2026-07-21
+2229,Florida International,FIU,Conference USA,FBS,fiu|florida international|panthers,Florida International,,Florida International,Panthers,cfbd,2026-07-21
+52,Florida State,FSU,ACC,FBS,florida state|fsu|seminoles,Florida State,,Florida State,Seminoles,cfbd,2026-07-21
+2230,Fordham,FOR,Patriot,FCS,for|fordham|rams,Fordham,,Fordham,Rams,cfbd,2026-07-21
+2231,Fort Hays State,FTHAYST,Mid America,II,fort hays state|fthayst|tigers,Fort Hays State,,Fort Hays State,Tigers,cfbd,2026-07-21
+2237,Fort Lewis,FORTLEW,Rocky Mountain,II,fort lewis|fortlew|skyhawks,Fort Lewis,,Fort Lewis,Skyhawks,cfbd,2026-07-21
+2232,Fort Valley State,FOR,SIAC,II,for|fort valley state|wildcats,Fort Valley State,,Fort Valley State,Wildcats,cfbd,2026-07-21
+2967,Framingham State,FRA,MSCAC,III,fra|framingham state|rams,Framingham State,,Framingham State,Rams,cfbd,2026-07-21
+2233,Franklin,FRANKLIN,Heartland,III,franklin|grizzlies,Franklin,,Franklin,Grizzlies,cfbd,2026-07-21
+2234,Franklin & Marshall,FRKLNMAR,Centennial,III,diplomats|franklin and marshall|frklnmar,Franklin & Marshall,,Franklin & Marshall,Diplomats,cfbd,2026-07-21
+112334,Franklin Pierce,FRANK,Northeast 10,II,frank|franklin pierce|ravens,Franklin Pierce,,Franklin Pierce,Ravens,cfbd,2026-07-21
+278,Fresno State,FRES,Pac-12,FBS,bulldogs|fres|fresno state,Fresno State,,Fresno State,Bulldogs,cfbd,2026-07-21
+341,Frostburg State,FRO,Mountain East,II,bobcats|fro|frostburg state,Frostburg State,,Frostburg State,Bobcats,cfbd,2026-07-21
+231,Furman,FUR,Southern,FCS,fur|furman|paladins,Furman,,Furman,Paladins,cfbd,2026-07-21
+417,Gallaudet,GAL,Southern Collegiate Athletic,III,bison|gal|gallaudet,Gallaudet,,Gallaudet,Bison,cfbd,2026-07-21
+367,Gannon,GAN,Pennsylvania State Athletic,II,gan|gannon|golden knights,Gannon,,Gannon,Golden Knights,cfbd,2026-07-21
+2241,Gardner-Webb,GWEB,Big South-OVC,FCS,gardner-webb|gweb|runnin' bulldogs,Gardner-Webb,,Gardner-Webb,Runnin' Bulldogs,cfbd,2026-07-21
+2242,Geneva,GENEVA,Presidents',III,geneva|golden tornadoes,Geneva,,Geneva,Golden Tornadoes,cfbd,2026-07-21
+46,Georgetown,GTWN,Patriot,FCS,georgetown|gtwn|hoyas,Georgetown,,Georgetown,Hoyas,cfbd,2026-07-21
+61,Georgia,UGA,SEC,FBS,bulldogs|georgia|uga,Georgia,,Georgia,Bulldogs,cfbd,2026-07-21
+290,Georgia Southern,GASO,Sun Belt,FBS,eagles|gaso|georgia southern,Georgia Southern,,Georgia Southern,Eagles,cfbd,2026-07-21
+2247,Georgia State,GAST,Sun Belt,FBS,gast|georgia state|panthers,Georgia State,,Georgia State,Panthers,cfbd,2026-07-21
+59,Georgia Tech,GT,ACC,FBS,georgia tech|gt|yellow jackets,Georgia Tech,,Georgia Tech,Yellow Jackets,cfbd,2026-07-21
+2248,Gettysburg,GETTY,Centennial,III,bullets|getty|gettysburg,Gettysburg,,Gettysburg,Bullets,cfbd,2026-07-21
+2249,Glenville State,GLENVILLE,Mountain East,II,glenville|glenville state|pioneers,Glenville State,,Glenville State,Pioneers,cfbd,2026-07-21
+2755,Grambling,GRAM,SWAC,FCS,gram|grambling|tigers,Grambling,,Grambling,Tigers,cfbd,2026-07-21
+125,Grand Valley State University,GVSU,GLIAC,II,grand valley state university|gvsu|lakers,Grand Valley State University,,Grand Valley State University,Lakers,cfbd,2026-07-21
+2839,Greeneville,TUS,South Atlantic,II,greeneville|pioneers|tus,Greeneville,,Greeneville,Pioneers,cfbd,2026-07-21
+2256,Greensboro College,GRNSBORO,USA South,III,greensboro college|grnsboro|pride,Greensboro College,,Greensboro College,Pride,cfbd,2026-07-21
+2257,Greenville,GRNVIL,Upper Midwest,III,greenville|grnvil|panthers,Greenville,,Greenville,Panthers,cfbd,2026-07-21
+65,Grinnell,GRI,Midwest,III,gri|grinnell|pioneers,Grinnell,,Grinnell,Pioneers,cfbd,2026-07-21
+146,Grove City College,GRO,Presidents',III,gro|grove city college|wolverines,Grove City College,,Grove City College,Wolverines,cfbd,2026-07-21
+2258,Guilford College,GUI,Old Dominion,III,gui|guilford college|quakers,Guilford College,,Guilford College,Quakers,cfbd,2026-07-21
+2968,Gustavus Adolphus,GUSADOL,Minnesota,III,golden gusties|gusadol|gustavus adolphus,Gustavus Adolphus,,Gustavus Adolphus,Golden Gusties,cfbd,2026-07-21
+348,Hamilton,HAM,NESCAC,III,continentals|ham|hamilton,Hamilton,,Hamilton,Continentals,cfbd,2026-07-21
+162,Hamline University,HAM,Minnesota,III,ham|hamline university|pipers,Hamline University,,Hamline University,Pipers,cfbd,2026-07-21
+297,Hampden-Sydney,HAM,Old Dominion,III,ham|hampden-sydney|tigers,Hampden-Sydney,,Hampden-Sydney,Tigers,cfbd,2026-07-21
+2261,Hampton,HAMP,CAA,FCS,hamp|hampton|pirates,Hampton,,Hampton,Pirates,cfbd,2026-07-21
+2262,Hanover College,HAN,Heartland,III,han|hanover college|panthers,Hanover College,,Hanover College,Panthers,cfbd,2026-07-21
+2810,Hardin-Simmons,HARDSIM,American Southwest,III,cowboys|hardin-simmons|hardsim,Hardin-Simmons,,Hardin-Simmons,Cowboys,cfbd,2026-07-21
+2264,Harding University,HARDING,Great American,II,bisons|harding|harding university,Harding University,,Harding University,Bisons,cfbd,2026-07-21
+173,Hartwick,HAR,Empire 8,III,har|hartwick|hawks,Hartwick,,Hartwick,Hawks,cfbd,2026-07-21
+108,Harvard,HARV,Ivy,FCS,crimson|harv|harvard,Harvard,,Harvard,Crimson,cfbd,2026-07-21
+62,Hawai'i,HAW,Mountain West,FBS,haw|hawaii|rainbow warriors,Hawai'i,,Hawai'i,Rainbow Warriors,cfbd,2026-07-21
+191,Heidelberg,HEI,Ohio,III,hei|heidelberg|student princes,Heidelberg,,Heidelberg,Student Princes,cfbd,2026-07-21
+2271,Henderson State,HENDERSON,Great American,II,henderson|henderson state|reddies,Henderson State,,Henderson State,Reddies,cfbd,2026-07-21
+418,Hendrix College,HENDRIX,Southern Athletic,III,hendrix|hendrix college|warriors,Hendrix College,,Hendrix College,Warriors,cfbd,2026-07-21
+125974,Hilbert College,HIL,Empire 8,III,hawks|hil|hilbert college,Hilbert College,,Hilbert College,Hawks,cfbd,2026-07-21
+2273,Hillsdale,HILLSDALE,Great Midwest Athletic,II,chargers|hillsdale,Hillsdale,,Hillsdale,Chargers,cfbd,2026-07-21
+2274,Hiram College,HIR,Presidents',III,hir|hiram college|terriers,Hiram College,,Hiram College,Terriers,cfbd,2026-07-21
+174,Hobart College,HBRT,Liberty League,III,hbrt|hobart college|statesmen,Hobart College,,Hobart College,Statesmen,cfbd,2026-07-21
+107,Holy Cross,HC,Patriot,FCS,crusaders|hc|holy cross,Holy Cross,,Holy Cross,Crusaders,cfbd,2026-07-21
+2812,Hope College,HOP,Michigan,III,flying dutchmen|hop|hope college,Hope College,,Hope College,Flying Dutchmen,cfbd,2026-07-21
+248,Houston,HOU,Big 12,FBS,cougars|hou|houston,Houston,,Houston,Cougars,cfbd,2026-07-21
+2277,Houston Christian,HCU,Southland,FCS,hcu|houston christian|huskies,Houston Christian,,Houston Christian,Huskies,cfbd,2026-07-21
+47,Howard,HOW,MEAC,FCS,bison|how|howard,Howard,,Howard,Bison,cfbd,2026-07-21
+2758,Howard Payne,HOWPAY,American Southwest,III,howard payne|howpay|yellow jackets,Howard Payne,,Howard Payne,Yellow Jackets,cfbd,2026-07-21
+2938,Huntingdon College (AL),HNTNGDN,USA South,III,hawks|hntngdn|huntingdon college al,Huntingdon College (AL),,Huntingdon College (AL),Hawks,cfbd,2026-07-21
+2280,Husson,HUSSON,Commonwealth Coast,III,eagles|husson,Husson,,Husson,Eagles,cfbd,2026-07-21
+70,Idaho,IDHO,Big Sky,FCS,idaho|idho|vandals,Idaho,,Idaho,Vandals,cfbd,2026-07-21
+304,Idaho State,IDST,Big Sky,FCS,bengals|idaho state|idst,Idaho State,,Idaho State,Bengals,cfbd,2026-07-21
+356,Illinois,ILL,Big Ten,FBS,fighting illini|ill|illinois,Illinois,,Illinois,Fighting Illini,cfbd,2026-07-21
+2286,Illinois College,ILLCOLL,Midwest,III,blueboys|illcoll|illinois college,Illinois College,,Illinois College,Blueboys,cfbd,2026-07-21
+2287,Illinois State,ILST,MVFC,FCS,illinois state|ilst|redbirds,Illinois State,,Illinois State,Redbirds,cfbd,2026-07-21
+306,Illinois Wesleyan,ILLWES,CCIW,III,illinois wesleyan|illwes|titans,Illinois Wesleyan,,Illinois Wesleyan,Titans,cfbd,2026-07-21
+2916,Incarnate Word,UIW,Southland,FCS,cardinals|incarnate word|uiw,Incarnate Word,,Incarnate Word,Cardinals,cfbd,2026-07-21
+84,Indiana,IU,Big Ten,FBS,hoosiers|indiana|iu,Indiana,,Indiana,Hoosiers,cfbd,2026-07-21
+282,Indiana State,INST,MVFC,FCS,indiana state|inst|sycamores,Indiana State,,Indiana State,Sycamores,cfbd,2026-07-21
+2291,Indiana-Pennsylvania,INDIANAPA,Pennsylvania State Athletic,II,crimson hawks|indiana-pennsylvania|indianapa,Indiana-Pennsylvania,,Indiana-Pennsylvania,Crimson Hawks,cfbd,2026-07-21
+2292,Indianapolis,INDY,Great Lakes,II,greyhounds|indianapolis|indy,Indianapolis,,Indianapolis,Greyhounds,cfbd,2026-07-21
+2294,Iowa,IOWA,Big Ten,FBS,hawkeyes|iowa,Iowa,,Iowa,Hawkeyes,cfbd,2026-07-21
+66,Iowa State,ISU,Big 12,FBS,cyclones|iowa state|isu,Iowa State,,Iowa State,Cyclones,cfbd,2026-07-21
+175,Ithaca College,ITH,Liberty League,III,bombers|ith|ithaca college,Ithaca College,,Ithaca College,Bombers,cfbd,2026-07-21
+2296,Jackson State,JKST,SWAC,FCS,jackson state|jkst|tigers,Jackson State,,Jackson State,Tigers,cfbd,2026-07-21
+55,Jacksonville State,JXST,Conference USA,FBS,gamecocks|jacksonville state|jxst,Jacksonville State,,Jacksonville State,Gamecocks,cfbd,2026-07-21
+256,James Madison,JMU,Sun Belt,FBS,dukes|james madison|jmu,James Madison,,James Madison,Dukes,cfbd,2026-07-21
+2939,Jamestown College,JAM,Northern Sun,II,jam|jamestown college|jimmies,Jamestown College,,Jamestown College,Jimmies,cfbd,2026-07-21
+2302,John Carroll University,JOH,Ohio,III,blue streaks|joh|john carroll university,John Carroll University,,John Carroll University,Blue Streaks,cfbd,2026-07-21
+118,Johns Hopkins University,JHU,Centennial,III,blue jays|jhu|johns hopkins university,Johns Hopkins University,,Johns Hopkins University,Blue Jays,cfbd,2026-07-21
+2304,Johnson C Smith,JOH,CIAA,II,golden bulls|joh|johnson c smith,Johnson C Smith,,Johnson C Smith,Golden Bulls,cfbd,2026-07-21
+246,Juniata College,JUN,Landmark Conference,III,eagles|jun|juniata college,Juniata College,,Juniata College,Eagles,cfbd,2026-07-21
+126,Kalamazoo,KAL,Michigan,III,hornets|kal|kalamazoo,Kalamazoo,,Kalamazoo,Hornets,cfbd,2026-07-21
+2305,Kansas,KU,Big 12,FBS,jayhawks|kansas|ku,Kansas,,Kansas,Jayhawks,cfbd,2026-07-21
+2306,Kansas State,KSU,Big 12,FBS,kansas state|ksu|wildcats,Kansas State,,Kansas State,Wildcats,cfbd,2026-07-21
+2871,Kean,KEAN,New Jersey,III,cougars|kean,Kean,,Kean,Cougars,cfbd,2026-07-21
+338,Kennesaw State,KENN,Conference USA,FBS,kenn|kennesaw state|owls,Kennesaw State,,Kennesaw State,Owls,cfbd,2026-07-21
+2309,Kent State,KENT,Mid-American,FBS,golden flashes|kent|kent state,Kent State,,Kent State,Golden Flashes,cfbd,2026-07-21
+96,Kentucky,UK,SEC,FBS,kentucky|uk|wildcats,Kentucky,,Kentucky,Wildcats,cfbd,2026-07-21
+2310,Kentucky State,KYST,SIAC,II,kentucky state|kyst|thorobreds,Kentucky State,,Kentucky State,Thorobreds,cfbd,2026-07-21
+2316,Kentucky Wesleyan,KYWESL,Great Midwest Athletic,II,kentucky wesleyan|kywesl|panthers,Kentucky Wesleyan,,Kentucky Wesleyan,Panthers,cfbd,2026-07-21
+352,Kenyon,KEN,North Coast,III,ken|kenyon|owls,Kenyon,,Kenyon,Owls,cfbd,2026-07-21
+122774,Keystone,KEY,Independent DIII,III,giants|key|keystone,Keystone,,Keystone,Giants,cfbd,2026-07-21
+247,Kings College (PA),KIN,Mid Atlantic,III,kin|kings college pa|monarchs,Kings College (PA),,Kings College (PA),Monarchs,cfbd,2026-07-21
+255,Knox College,KNO,Midwest,III,kno|knox college|prairie fire,Knox College,,Knox College,Prairie Fire,cfbd,2026-07-21
+2315,Kutztown University,KUTZTOWN,Pennsylvania State Athletic,II,golden bears|kutztown|kutztown university,Kutztown University,,Kutztown University,Golden Bears,cfbd,2026-07-21
+99,LSU,LSU,SEC,FBS,lsu|tigers,LSU,,LSU,Tigers,cfbd,2026-07-21
+101161,LYONCOLL,LYON,Southern Collegiate Athletic,III,lyon|lyoncoll|scots,LYONCOLL,,LYONCOLL,Scots,cfbd,2026-07-21
+2318,La Verne,LAVERNE,So. Cal.,III,la verne|laverne|leopards,La Verne,,La Verne,Leopards,cfbd,2026-07-21
+322,Lafayette,LAF,Patriot,FCS,laf|lafayette|leopards,Lafayette,,Lafayette,Leopards,cfbd,2026-07-21
+548,Lagrange College,LAG,USA South,III,lag|lagrange college|panthers,Lagrange College,,Lagrange College,Panthers,cfbd,2026-07-21
+437,Lake Erie,LAKEERIE,Great Midwest Athletic,II,lake erie|lakeerie|storm,Lake Erie,,Lake Erie,Storm,cfbd,2026-07-21
+262,Lake Forest College,LAK,Midwest,III,foresters|lak|lake forest college,Lake Forest College,,Lake Forest College,Foresters,cfbd,2026-07-21
+6353,Lakeland,LAKEL,NACC,III,lakel|lakeland|muskies,Lakeland,,Lakeland,Muskies,cfbd,2026-07-21
+2320,Lamar,LAM,Southland,FCS,cardinals|lam|lamar,Lamar,,Lamar,Cardinals,cfbd,2026-07-21
+2323,Lane College,LAC,SIAC,II,dragons|lac|lane college,Lane College,,Lane College,Dragons,cfbd,2026-07-21
+268,Lawrence University,LAW,Midwest,III,law|lawrence university|vikings,Lawrence University,,Lawrence University,Vikings,cfbd,2026-07-21
+388,Lebanon Valley,LEB,Mid Atlantic,III,flying dutchmen|leb|lebanon valley,Lebanon Valley,,Lebanon Valley,Flying Dutchmen,cfbd,2026-07-21
+2329,Lehigh,LEH,Patriot,FCS,leh|lehigh|mountain hawks,Lehigh,,Lehigh,Mountain Hawks,cfbd,2026-07-21
+2331,Lenoir-Rhyne,LENRHYNE,South Atlantic,II,bears|lenoir-rhyne|lenrhyne,Lenoir-Rhyne,,Lenoir-Rhyne,Bears,cfbd,2026-07-21
+2333,Lewis & Clark College,LEW,Northwest,III,lew|lewis and clark college|pioneers,Lewis & Clark College,,Lewis & Clark College,Pioneers,cfbd,2026-07-21
+2335,Liberty,LIB,Conference USA,FBS,flames|lib|liberty,Liberty,,Liberty,Flames,cfbd,2026-07-21
+2336,Limestone,LIMESTONE,South Atlantic,II,limestone|saints,Limestone,,Limestone,Saints,cfbd,2026-07-21
+124179,Lincoln (CA),LIN,Independent DII,II,lin|lincoln ca|oaklanders,Lincoln (CA),,Lincoln (CA),Oaklanders,cfbd,2026-07-21
+2876,Lincoln (MO),LIN,Great Lakes,II,blue tigers|lin|lincoln mo,Lincoln (MO),,Lincoln (MO),Blue Tigers,cfbd,2026-07-21
+2339,Lincoln (PA),LINP,CIAA,II,lincoln pa|linp|lions,Lincoln (PA),,Lincoln (PA),Lions,cfbd,2026-07-21
+2815,Lindenwood,LIN,Big South-OVC,FCS,lin|lindenwood|lions,Lindenwood,,Lindenwood,Lions,cfbd,2026-07-21
+203,Linfield College,LIN,Northwest,III,lin|linfield college|wildcats,Linfield College,,Linfield College,Wildcats,cfbd,2026-07-21
+2940,Livingstone,LIV,CIAA,II,blue bears|liv|livingstone,Livingstone,,Livingstone,Blue Bears,cfbd,2026-07-21
+209,Lock Haven University,LHU,Pennsylvania State Athletic,II,bald eagles|lhu|lock haven university,Lock Haven University,,Lock Haven University,Bald Eagles,cfbd,2026-07-21
+2341,Long Island University,LIU,NEC,FCS,liu|long island university|sharks,Long Island University,,Long Island University,Sharks,cfbd,2026-07-21
+263,Loras College,LOR,American Rivers,III,duhawks|lor|loras college,Loras College,,Loras College,Duhawks,cfbd,2026-07-21
+309,Louisiana,UL,Sun Belt,FBS,louisiana|ragin' cajuns|ul,Louisiana,,Louisiana,Ragin' Cajuns,cfbd,2026-07-21
+2348,Louisiana Tech,LT,Sun Belt,FBS,bulldogs|louisiana tech|lt,Louisiana Tech,,Louisiana Tech,Bulldogs,cfbd,2026-07-21
+97,Louisville,LOU,ACC,FBS,cardinals|lou|louisville,Louisville,,Louisville,Cardinals,cfbd,2026-07-21
+67,Luther,LUT,Midwest,III,lut|luther|norse,Luther,,Luther,Norse,cfbd,2026-07-21
+2354,Lycoming,LYCOMING,Landmark Conference,III,lycoming|warriors,Lycoming,,Lycoming,Warriors,cfbd,2026-07-21
+109,MIT,MIT,NEWMAC,III,engineers|mit,MIT,,MIT,Engineers,cfbd,2026-07-21
+2359,Macalester,MACALES,Minnesota,III,macales|macalester|scots,Macalester,,Macalester,Scots,cfbd,2026-07-21
+311,Maine,ME,CAA,FCS,black bears|maine|me,Maine,,Maine,Black Bears,cfbd,2026-07-21
+274,Maine Maritime,MAI,Commonwealth Coast,III,mai|maine maritime|mariners,Maine Maritime,,Maine Maritime,Mariners,cfbd,2026-07-21
+2362,Manchester,MNCHSTR,Heartland,III,manchester|mnchstr|spartans,Manchester,,Manchester,Spartans,cfbd,2026-07-21
+317,Marietta,MAR,Ohio,III,mar|marietta|pioneers,Marietta,,Marietta,Pioneers,cfbd,2026-07-21
+2368,Marist,MRST,Pioneer,FCS,marist|mrst|red foxes,Marist,,Marist,Red Foxes,cfbd,2026-07-21
+2369,Mars Hill,MH,South Atlantic,II,lions|mars hill|mh,Mars Hill,,Mars Hill,Lions,cfbd,2026-07-21
+276,Marshall,MRSH,Sun Belt,FBS,marshall|mrsh|thundering herd,Marshall,,Marshall,Thundering Herd,cfbd,2026-07-21
+446,Martin Luther,MAR,Upper Midwest,III,knights|mar|martin luther,Martin Luther,,Martin Luther,Knights,cfbd,2026-07-21
+2371,Mary Hardin-Baylor,MRYHRBAY,American Southwest,III,crusaders|mary hardin-baylor|mryhrbay,Mary Hardin-Baylor,,Mary Hardin-Baylor,Crusaders,cfbd,2026-07-21
+120,Maryland,MD,Big Ten,FBS,maryland|md|terrapins,Maryland,,Maryland,Terrapins,cfbd,2026-07-21
+2373,Maryville College (TN),MRYVILTN,USA South,III,maryville college tn|mryviltn|scots,Maryville College (TN),,Maryville College (TN),Scots,cfbd,2026-07-21
+110,Mass Maritime,MAMARI,MSCAC,III,buccaneers|mamari|mass maritime,Mass Maritime,,Mass Maritime,Buccaneers,cfbd,2026-07-21
+113,Massachusetts,MASS,Mid-American,FBS,mass|massachusetts|minutemen,Massachusetts,,Massachusetts,Minutemen,cfbd,2026-07-21
+2700,McDaniel College,MCD,Centennial,III,green terror|mcd|mcdaniel college,McDaniel College,,McDaniel College,Green Terror,cfbd,2026-07-21
+2816,McKendree,MAN,Great Lakes,II,bearcats|man|mckendree,McKendree,,McKendree,Bearcats,cfbd,2026-07-21
+241,McMurry,MCM,American Southwest,III,mcm|mcmurry|war hawks,McMurry,,McMurry,War Hawks,cfbd,2026-07-21
+2377,McNeese,MCN,Southland,FCS,cowboys|mcn|mcneese,McNeese,,McNeese,Cowboys,cfbd,2026-07-21
+235,Memphis,MEM,American Athletic,FBS,mem|memphis|tigers,Memphis,,Memphis,Tigers,cfbd,2026-07-21
+2382,Mercer,MER,Southern,FCS,bears|mer|mercer,Mercer,,Mercer,Bears,cfbd,2026-07-21
+2383,Merchant Marine Academy,MER,NEWMAC,III,mariners|mer|merchant marine academy,Merchant Marine Academy,,Merchant Marine Academy,Mariners,cfbd,2026-07-21
+2385,Mercyhurst,MERC,NEC,FCS,lakers|merc|mercyhurst,Mercyhurst,,Mercyhurst,Lakers,cfbd,2026-07-21
+2771,Merrimack,MRMK,FCS Independents,FCS,merrimack|mrmk|warriors,Merrimack,,Merrimack,Warriors,cfbd,2026-07-21
+291,Methodist,MTH,USA South,III,methodist|monarchs|mth,Methodist,,Methodist,Monarchs,cfbd,2026-07-21
+2390,Miami,MIA,ACC,FBS,hurricanes|mia|miami,Miami,,Miami,Hurricanes,cfbd,2026-07-21
+193,Miami (OH),M-OH,Mid-American,FBS,m-oh|miami oh|redhawks,Miami (OH),,Miami (OH),RedHawks,cfbd,2026-07-21
+130,Michigan,MICH,Big Ten,FBS,mich|michigan|wolverines,Michigan,,Michigan,Wolverines,cfbd,2026-07-21
+127,Michigan State,MSU,Big Ten,FBS,michigan state|msu|spartans,Michigan State,,Michigan State,Spartans,cfbd,2026-07-21
+2392,Michigan Tech,MTU,GLIAC,II,huskies|michigan tech|mtu,Michigan Tech,,Michigan Tech,Huskies,cfbd,2026-07-21
+2393,Middle Tennessee,MTSU,Conference USA,FBS,blue raiders|middle tennessee|mtsu,Middle Tennessee,,Middle Tennessee,Blue Raiders,cfbd,2026-07-21
+2394,Middlebury,MIDLBRY,NESCAC,III,middlebury|midlbry|panthers,Middlebury,,Middlebury,Panthers,cfbd,2026-07-21
+2395,Midwestern State,MID,Lone Star,II,mid|midwestern state|mustangs,Midwestern State,,Midwestern State,Mustangs,cfbd,2026-07-21
+2396,Miles College,MIL,SIAC,II,golden bears|mil|miles college,Miles College,,Miles College,Golden Bears,cfbd,2026-07-21
+210,Millersville,MIL,Pennsylvania State Athletic,II,marauders|mil|millersville,Millersville,,Millersville,Marauders,cfbd,2026-07-21
+74,Millikin,MIL,CCIW,III,big blue|mil|millikin,Millikin,,Millikin,Big Blue,cfbd,2026-07-21
+2398,Millsaps,MIL,Southern Athletic,III,majors|mil|millsaps,Millsaps,,Millsaps,Majors,cfbd,2026-07-21
+135,Minnesota,MINN,Big Ten,FBS,golden gophers|minn|minnesota,Minnesota,,Minnesota,Golden Gophers,cfbd,2026-07-21
+134,Minnesota Duluth,UMD,Northern Sun,II,bulldogs|minnesota duluth|umd,Minnesota Duluth,,Minnesota Duluth,Bulldogs,cfbd,2026-07-21
+2399,Minnesota Morris,MNMOR,Upper Midwest,III,cougars|minnesota morris|mnmor,Minnesota Morris,,Minnesota Morris,Cougars,cfbd,2026-07-21
+2364,Minnesota State Mankato,MNST,Northern Sun,II,mavericks|minnesota state mankato|mnst,Minnesota State Mankato,,Minnesota State Mankato,Mavericks,cfbd,2026-07-21
+2817,Minnesota State Moorhead,MIN,Northern Sun,II,dragons|min|minnesota state moorhead,Minnesota State Moorhead,,Minnesota State Moorhead,Dragons,cfbd,2026-07-21
+568,Minot State,MIN,Northern Sun,II,beavers|min|minot state,Minot State,,Minot State,Beavers,cfbd,2026-07-21
+2969,Misericordia,MISC,Mid Atlantic,III,cougars|misc|misericordia,Misericordia,,Misericordia,Cougars,cfbd,2026-07-21
+2401,Mississippi College,MIS,Gulf South,II,choctaws|mis|mississippi college,Mississippi College,,Mississippi College,Choctaws,cfbd,2026-07-21
+344,Mississippi State,MSST,SEC,FBS,bulldogs|mississippi state|msst,Mississippi State,,Mississippi State,Bulldogs,cfbd,2026-07-21
+2400,Mississippi Valley State,MVSU,SWAC,FCS,delta devils|mississippi valley state|mvsu,Mississippi Valley State,,Mississippi Valley State,Delta Devils,cfbd,2026-07-21
+142,Missouri,MIZ,SEC,FBS,missouri|miz|tigers,Missouri,,Missouri,Tigers,cfbd,2026-07-21
+2402,Missouri S&T,MISSO,Great Lakes,II,miners|misso|missouri s and t,Missouri S&T,,Missouri S&T,Miners,cfbd,2026-07-21
+2403,Missouri Southern State,MOSSTC,Mid America,II,lions|missouri southern state|mosstc,Missouri Southern State,,Missouri Southern State,Lions,cfbd,2026-07-21
+2623,Missouri State,MOST,Conference USA,FBS,bears|missouri state|most,Missouri State,,Missouri State,Bears,cfbd,2026-07-21
+137,Missouri Western,MOW,Mid America,II,griffons|missouri western|mow,Missouri Western,,Missouri Western,Griffons,cfbd,2026-07-21
+2405,Monmouth,MONM,CAA,FCS,hawks|monm|monmouth,Monmouth,,Monmouth,Hawks,cfbd,2026-07-21
+2919,Monmouth (IL),MONMIL,Midwest,III,fighting scots|monmil|monmouth il,Monmouth (IL),,Monmouth (IL),Fighting Scots,cfbd,2026-07-21
+149,Montana,MONT,Big Sky,FCS,grizzlies|mont|montana,Montana,,Montana,Grizzlies,cfbd,2026-07-21
+147,Montana State,MTST,Big Sky,FCS,bobcats|montana state|mtst,Montana State,,Montana State,Bobcats,cfbd,2026-07-21
+2818,Montclair State,MON,New Jersey,III,mon|montclair state|red hawks,Montclair State,,Montclair State,Red Hawks,cfbd,2026-07-21
+323,Moravian,MOR,Landmark Conference,III,greyhounds|mor|moravian,Moravian,,Moravian,Greyhounds,cfbd,2026-07-21
+2413,Morehead State,MORE,Pioneer,FCS,eagles|more|morehead state,Morehead State,,Morehead State,Eagles,cfbd,2026-07-21
+60,Morehouse College,MOR,SIAC,II,maroon tigers|mor|morehouse college,Morehouse College,,Morehouse College,Maroon Tigers,cfbd,2026-07-21
+2415,Morgan State,MORG,MEAC,FCS,bears|morg|morgan state,Morgan State,,Morgan State,Bears,cfbd,2026-07-21
+481,Mount Ida College,MOU,ECFC,III,mou|mount ida college|mustangs,Mount Ida College,,Mount Ida College,Mustangs,cfbd,2026-07-21
+2419,Mount St. Joseph,MTS,Heartland,III,lions|mount st joseph|mts,Mount St. Joseph,,Mount St. Joseph,Lions,cfbd,2026-07-21
+2422,Muhlenberg,MHLBRG,Centennial,III,mhlbrg|muhlenberg|mules,Muhlenberg,,Muhlenberg,Mules,cfbd,2026-07-21
+93,Murray State,MUR,MVFC,FCS,mur|murray state|racers,Murray State,,Murray State,Racers,cfbd,2026-07-21
+332,Muskingum University,MUS,Ohio,III,fighting muskies|mus|muskingum university,Muskingum University,,Muskingum University,Fighting Muskies,cfbd,2026-07-21
+152,NC State,NCSU,ACC,FBS,nc state|ncsu|wolfpack,NC State,,NC State,Wolfpack,cfbd,2026-07-21
+415,NEWBERG,GFU,Northwest,III,bruins|gfu|newberg,NEWBERG,,NEWBERG,Bruins,cfbd,2026-07-21
+2426,Navy,NAVY,American Athletic,FBS,midshipmen|navy,Navy,,Navy,Midshipmen,cfbd,2026-07-21
+158,Nebraska,NEB,Big Ten,FBS,cornhuskers|neb|nebraska,Nebraska,,Nebraska,Cornhuskers,cfbd,2026-07-21
+6845,Nebraska Wesleyan,NEBWS,American Rivers,III,nebraska wesleyan|nebws|prairie wolves,Nebraska Wesleyan,,Nebraska Wesleyan,Prairie Wolves,cfbd,2026-07-21
+2438,Nebraska-Kearney,NEKR,Mid America,II,lopers|nebraska-kearney|nekr,Nebraska-Kearney,,Nebraska-Kearney,Lopers,cfbd,2026-07-21
+2440,Nevada,NEV,Mountain West,FBS,nev|nevada|wolf pack,Nevada,,Nevada,Wolf Pack,cfbd,2026-07-21
+160,New Hampshire,UNH,CAA,FCS,new hampshire|unh|wildcats,New Hampshire,,New Hampshire,Wildcats,cfbd,2026-07-21
+2441,New Haven,NHVN,NEC,FCS,chargers|new haven|nhvn,New Haven,,New Haven,Chargers,cfbd,2026-07-21
+167,New Mexico,UNM,Mountain West,FBS,lobos|new mexico|unm,New Mexico,,New Mexico,Lobos,cfbd,2026-07-21
+2424,New Mexico Highlands,NMH,Rocky Mountain,II,cowboys|new mexico highlands|nmh,New Mexico Highlands,,New Mexico Highlands,Cowboys,cfbd,2026-07-21
+166,New Mexico State,NMSU,Conference USA,FBS,aggies|new mexico state|nmsu,New Mexico State,,New Mexico State,Aggies,cfbd,2026-07-21
+2444,Newberry,NBY,South Atlantic,II,nby|newberry|wolves,Newberry,,Newberry,Wolves,cfbd,2026-07-21
+2447,Nicholls,NICH,Southland,FCS,colonels|nich|nicholls,Nicholls,,Nicholls,Colonels,cfbd,2026-07-21
+2884,Nichols College,NICHOLS,Commonwealth Coast,III,bison|nichols|nichols college,Nichols College,,Nichols College,Bison,cfbd,2026-07-21
+2450,Norfolk State,NORF,MEAC,FCS,norf|norfolk state|spartans,Norfolk State,,Norfolk State,Spartans,cfbd,2026-07-21
+2453,North Alabama,UNA,UAC,FCS,lions|north alabama|una,North Alabama,,North Alabama,Lions,cfbd,2026-07-21
+153,North Carolina,UNC,ACC,FBS,north carolina|tar heels|unc,North Carolina,,North Carolina,Tar Heels,cfbd,2026-07-21
+2448,North Carolina A&T,NCAT,CAA,FCS,aggies|ncat|north carolina a and t,North Carolina A&T,,North Carolina A&T,Aggies,cfbd,2026-07-21
+2428,North Carolina Central,NCCU,MEAC,FCS,eagles|nccu|north carolina central,North Carolina Central,,North Carolina Central,Eagles,cfbd,2026-07-21
+286,North Carolina Wesleyan,NORTH,USA South,III,battling bishops|north|north carolina wesleyan,North Carolina Wesleyan,,North Carolina Wesleyan,Battling Bishops,cfbd,2026-07-21
+3071,North Central College,NCC,CCIW,III,cardinals|ncc|north central college,North Central College,,North Central College,Cardinals,cfbd,2026-07-21
+155,North Dakota,UND,MVFC,FCS,fighting hawks|north dakota|und,North Dakota,,North Dakota,Fighting Hawks,cfbd,2026-07-21
+2449,North Dakota State,NDSU,Mountain West,FBS,bison|ndsu|north dakota state,North Dakota State,,North Dakota State,Bison,cfbd,2026-07-21
+2822,North Greenville,NG,Carolinas,II,crusaders|ng|north greenville,North Greenville,,North Greenville,Crusaders,cfbd,2026-07-21
+75,North Park,NOR,CCIW,III,nor|north park|vikings,North Park,,North Park,Vikings,cfbd,2026-07-21
+249,North Texas,UNT,American Athletic,FBS,mean green|north texas|unt,North Texas,,North Texas,Mean Green,cfbd,2026-07-21
+196,Northeastern State,NOR,Independent DII,II,nor|northeastern state|riverhawks,Northeastern State,,Northeastern State,RiverHawks,cfbd,2026-07-21
+2464,Northern Arizona,NAU,Big Sky,FCS,lumberjacks|nau|northern arizona,Northern Arizona,,Northern Arizona,Lumberjacks,cfbd,2026-07-21
+2458,Northern Colorado,UNCO,Big Sky,FCS,bears|northern colorado|unco,Northern Colorado,,Northern Colorado,Bears,cfbd,2026-07-21
+2459,Northern Illinois,NIU,Mountain West,FBS,huskies|niu|northern illinois,Northern Illinois,,Northern Illinois,Huskies,cfbd,2026-07-21
+2460,Northern Iowa,UNI,MVFC,FCS,northern iowa|panthers|uni,Northern Iowa,,Northern Iowa,Panthers,cfbd,2026-07-21
+128,Northern Michigan,NMI,GLIAC,II,nmi|northern michigan|wildcats,Northern Michigan,,Northern Michigan,Wildcats,cfbd,2026-07-21
+425,Northern State,NOR,Northern Sun,II,nor|northern state|wolves,Northern State,,Northern State,Wolves,cfbd,2026-07-21
+138,Northwest Missouri St,NWMS,Mid America,II,bearcats|northwest missouri st|nwms,Northwest Missouri St,,Northwest Missouri St,Bearcats,cfbd,2026-07-21
+77,Northwestern,NU,Big Ten,FBS,northwestern|nu|wildcats,Northwestern,,Northwestern,Wildcats,cfbd,2026-07-21
+583,Northwestern (MN),NWMN,Upper Midwest,III,eagles|northwestern mn|nwmn,Northwestern (MN),,Northwestern (MN),Eagles,cfbd,2026-07-21
+2823,Northwestern Oklahoma State,NWO,Great American,II,northwestern oklahoma state|nwo|rangers,Northwestern Oklahoma State,,Northwestern Oklahoma State,Rangers,cfbd,2026-07-21
+2466,Northwestern State,NWST,Southland,FCS,demons|northwestern state|nwst,Northwestern State,,Northwestern State,Demons,cfbd,2026-07-21
+2886,Northwood (MI),NAR,Great Midwest Athletic,II,nar|northwood mi|timberwolves,Northwood (MI),,Northwood (MI),Timberwolves,cfbd,2026-07-21
+2467,Norwich,NOR,NEWMAC,III,cadets|nor|norwich,Norwich,,Norwich,Cadets,cfbd,2026-07-21
+87,Notre Dame,ND,FBS Independents,FBS,fighting irish|nd|notre dame,Notre Dame,,Notre Dame,Fighting Irish,cfbd,2026-07-21
+587,Notre Dame College,NOT,Mountain East,II,blue falcons|not|notre dame college,Notre Dame College,,Notre Dame College,Blue Falcons,cfbd,2026-07-21
+391,Oberlin,OBERLIN,North Coast,III,oberlin|yeomen,Oberlin,,Oberlin,Yeomen,cfbd,2026-07-21
+2475,Occidental,OCC,So. Cal.,III,occ|occidental|tigers,Occidental,,Occidental,Tigers,cfbd,2026-07-21
+195,Ohio,OHIO,Mid-American,FBS,bobcats|ohio,Ohio,,Ohio,Bobcats,cfbd,2026-07-21
+2477,Ohio Dominican,Ohio Dominican,Great Midwest Athletic,II,ohio dominican|panthers,Ohio Dominican,,Ohio Dominican,Panthers,cfbd,2026-07-21
+427,Ohio Northern,OHNRTH,Ohio,III,ohio northern|ohnrth|polar bears,Ohio Northern,,Ohio Northern,Polar Bears,cfbd,2026-07-21
+194,Ohio State,OSU,Big Ten,FBS,buckeyes|ohio state|osu,Ohio State,,Ohio State,Buckeyes,cfbd,2026-07-21
+2980,Ohio Wesleyan,OHWESL,North Coast,III,battling bishops|ohio wesleyan|ohwesl,Ohio Wesleyan,,Ohio Wesleyan,Battling Bishops,cfbd,2026-07-21
+201,Oklahoma,OU,SEC,FBS,oklahoma|ou|sooners,Oklahoma,,Oklahoma,Sooners,cfbd,2026-07-21
+319,Oklahoma Baptist,OB,Great American,II,bison|ob|oklahoma baptist,Oklahoma Baptist,,Oklahoma Baptist,Bison,cfbd,2026-07-21
+2824,Oklahoma Panhandle St,OKLAH,Independent DII,II,ok panhandle st|oklah|oklahoma panhandle st,Oklahoma Panhandle St,,Oklahoma Panhandle St,Ok Panhandle St,cfbd,2026-07-21
+197,Oklahoma State,OKST,Big 12,FBS,cowboys|oklahoma state|okst,Oklahoma State,,Oklahoma State,Cowboys,cfbd,2026-07-21
+295,Old Dominion,ODU,Sun Belt,FBS,monarchs|odu|old dominion,Old Dominion,,Old Dominion,Monarchs,cfbd,2026-07-21
+145,Ole Miss,MISS,SEC,FBS,miss|ole miss|rebels,Ole Miss,,Ole Miss,Rebels,cfbd,2026-07-21
+354,Olivet College,OLI,Michigan,III,comets|oli|olivet college,Olivet College,,Olivet College,Comets,cfbd,2026-07-21
+2483,Oregon,ORE,Big Ten,FBS,ducks|ore|oregon,Oregon,,Oregon,Ducks,cfbd,2026-07-21
+204,Oregon State,ORST,Pac-12,FBS,beavers|oregon state|orst,Oregon State,,Oregon State,Beavers,cfbd,2026-07-21
+359,Otterbein,OTT,Ohio,III,cardinals|ott|otterbein,Otterbein,,Otterbein,Cardinals,cfbd,2026-07-21
+2888,Ouachita Baptist,OUA,Great American,II,oua|ouachita baptist|tigers,Ouachita Baptist,,Ouachita Baptist,Tigers,cfbd,2026-07-21
+2487,Pace,PAC,Northeast 10,II,pac|pace|setters,Pace,,Pace,Setters,cfbd,2026-07-21
+205,Pacific (OR),PAC,Northwest,III,boxers|pac|pacific or,Pacific (OR),,Pacific (OR),Boxers,cfbd,2026-07-21
+2486,Pacific Lutheran,PACLTH,Northwest,III,lutes|pacific lutheran|paclth,Pacific Lutheran,,Pacific Lutheran,Lutes,cfbd,2026-07-21
+213,Penn State,PSU,Big Ten,FBS,nittany lions|penn state|psu,Penn State,,Penn State,Nittany Lions,cfbd,2026-07-21
+2858,PennWest California,PWC,Pennsylvania State Athletic,II,pennwest california|pwc|vulcans,PennWest California,,PennWest California,Vulcans,cfbd,2026-07-21
+219,Pennsylvania,PENN,Ivy,FCS,penn|pennsylvania|quakers,Pennsylvania,,Pennsylvania,Quakers,cfbd,2026-07-21
+90,Pittsburg St,PIT,Mid America,II,gorillas|pit|pittsburg st,Pittsburg St,,Pittsburg St,Gorillas,cfbd,2026-07-21
+221,Pittsburgh,PITT,ACC,FBS,panthers|pitt|pittsburgh,Pittsburgh,,Pittsburgh,Panthers,cfbd,2026-07-21
+2972,Plymouth State,PLYST,MSCAC,III,panthers|plymouth state|plyst,Plymouth State,,Plymouth State,Panthers,cfbd,2026-07-21
+2923,Pomona Pitzer,POM,So. Cal.,III,pom|pomona pitzer|sagehens,Pomona Pitzer,,Pomona Pitzer,Sagehens,cfbd,2026-07-21
+2502,Portland State,PRST,Big Sky,FCS,portland state|prst|vikings,Portland State,,Portland State,Vikings,cfbd,2026-07-21
+126086,Post University,POS,Northeast 10,II,eagles|pos|post university,Post University,,Post University,Eagles,cfbd,2026-07-21
+2504,Prairie View A&M,PV,SWAC,FCS,panthers|prairie view a and m|pv,Prairie View A&M,,Prairie View A&M,Panthers,cfbd,2026-07-21
+2506,Presbyterian,PRES,Pioneer,FCS,blue hose|pres|presbyterian,Presbyterian,,Presbyterian,Blue Hose,cfbd,2026-07-21
+163,Princeton,PRIN,Ivy,FCS,prin|princeton|tigers,Princeton,,Princeton,Tigers,cfbd,2026-07-21
+2508,Puget Sound,PUGET,Northwest,III,loggers|puget|puget sound,Puget Sound,,Puget Sound,Loggers,cfbd,2026-07-21
+2509,Purdue,PUR,Big Ten,FBS,boilermakers|pur|purdue,Purdue,,Purdue,Boilermakers,cfbd,2026-07-21
+2825,Quincy,QUI,Great Lakes,II,hawks|qui|quincy,Quincy,,Quincy,Hawks,cfbd,2026-07-21
+2516,Randolph-Macon,RAN,Old Dominion,III,ran|randolph-macon|yellow jackets,Randolph-Macon,,Randolph-Macon,Yellow Jackets,cfbd,2026-07-21
+111674,Reading,ALVERNIA,Mid Atlantic,III,alvernia|golden wolves|reading,Reading,,Reading,Golden Wolves,cfbd,2026-07-21
+29,Redlands,RED,So. Cal.,III,bulldogs|red|redlands,Redlands,,Redlands,Bulldogs,cfbd,2026-07-21
+2528,Rensselaer,RPI,Liberty League,III,engineers|rensselaer|rpi,Rensselaer,,Rensselaer,Engineers,cfbd,2026-07-21
+227,Rhode Island,URI,CAA,FCS,rams|rhode island|uri,Rhode Island,,Rhode Island,Rams,cfbd,2026-07-21
+2519,Rhodes College,RHO,Southern Athletic,III,lynx|rho|rhodes college,Rhodes College,,Rhodes College,Lynx,cfbd,2026-07-21
+242,Rice,RICE,American Athletic,FBS,owls|rice,Rice,,Rice,Owls,cfbd,2026-07-21
+257,Richmond,RICH,Patriot,FCS,rich|richmond|spiders,Richmond,,Richmond,Spiders,cfbd,2026-07-21
+2891,Ripon,RIP,Midwest,III,red hawks|rip|ripon,Ripon,,Ripon,Red Hawks,cfbd,2026-07-21
+2523,Robert Morris,RMU,NEC,FCS,colonials|rmu|robert morris,Robert Morris,,Robert Morris,Colonials,cfbd,2026-07-21
+2524,Rockford,ROCKF,NACC,III,regents|rockf|rockford,Rockford,,Rockford,Regents,cfbd,2026-07-21
+127991,Roosevelt,ROO,GLIAC,II,lakers|roo|roosevelt,Roosevelt,,Roosevelt,Lakers,cfbd,2026-07-21
+86,Rose-Hulman,ROSEHUL,Heartland,III,fightin' engineers|rose-hulman|rosehul,Rose-Hulman,,Rose-Hulman,Fightin' Engineers,cfbd,2026-07-21
+2827,Rowan,ROW,New Jersey,III,profs|row|rowan,Rowan,,Rowan,Profs,cfbd,2026-07-21
+164,Rutgers,RUTG,Big Ten,FBS,rutg|rutgers|scarlet knights,Rutgers,,Rutgers,Scarlet Knights,cfbd,2026-07-21
+2545,SE Louisiana,SELA,Southland,FCS,lions|se louisiana|sela,SE Louisiana,,SE Louisiana,Lions,cfbd,2026-07-21
+2567,SMU,SMU,ACC,FBS,mustangs|smu,SMU,,SMU,Mustangs,cfbd,2026-07-21
+2951,SUNY Maritime,SUNYMAR,NEWMAC,III,privateers|suny maritime|sunymar,SUNY Maritime,,SUNY Maritime,Privateers,cfbd,2026-07-21
+3110,SUNY Morrisville,MOR,Empire 8,III,mor|mustangs|suny morrisville,SUNY Morrisville,,SUNY Morrisville,Mustangs,cfbd,2026-07-21
+16,Sacramento State,SAC,Mid-American,FBS,hornets|sac|sacramento state,Sacramento State,,Sacramento State,Hornets,cfbd,2026-07-21
+2529,Sacred Heart,SHU,CAA,FCS,pioneers|sacred heart|shu,Sacred Heart,,Sacred Heart,Pioneers,cfbd,2026-07-21
+129,Saginaw Valley State,SAGI,GLIAC,II,cardinals|sagi|saginaw valley state,Saginaw Valley State,,Saginaw Valley State,Cardinals,cfbd,2026-07-21
+2600,Saint John's (MN),ST. J,Minnesota,III,johnnies|saint john's mn|st j,Saint John's (MN),,Saint John's (MN),Johnnies,cfbd,2026-07-21
+2614,Saint Vincent,STV,Presidents',III,bearcats|saint vincent|stv,Saint Vincent,,Saint Vincent,Bearcats,cfbd,2026-07-21
+2532,Salisbury,SALIS,New Jersey,III,salis|salisbury|sea gulls,Salisbury,,Salisbury,Sea Gulls,cfbd,2026-07-21
+2776,Salve Regina,SALVE,NEWMAC,III,salve|salve regina|seahawks,Salve Regina,,Salve Regina,Seahawks,cfbd,2026-07-21
+2534,Sam Houston,SHSU,Conference USA,FBS,bearkats|sam houston|shsu,Sam Houston,,Sam Houston,Bearkats,cfbd,2026-07-21
+2535,Samford,SAM,Southern,FCS,bulldogs|sam|samford,Samford,,Samford,Bulldogs,cfbd,2026-07-21
+301,San Diego,USD,Pioneer,FCS,san diego|toreros|usd,San Diego,,San Diego,Toreros,cfbd,2026-07-21
+21,San Diego State,SDSU,Pac-12,FBS,aztecs|san diego state|sdsu,San Diego State,,San Diego State,Aztecs,cfbd,2026-07-21
+23,San José State,SJSU,Mountain West,FBS,san jos state|sjsu|spartans,San José State,,San José State,Spartans,cfbd,2026-07-21
+2542,Savannah St,SAV,SIAC,II,sav|savannah st|tigers,Savannah St,,Savannah St,Tigers,cfbd,2026-07-21
+1001088,Schreiner,Schreiner,American Southwest,III,mountaineers|schreiner,Schreiner,,Schreiner,Mountaineers,cfbd,2026-07-21
+611,Seton Hill,SETONHILL,Pennsylvania State Athletic,II,griffins|seton hill|setonhill,Seton Hill,,Seton Hill,Griffins,cfbd,2026-07-21
+2553,Sewanee,SEWAN,Southern Athletic,III,sewan|sewanee|tigers,Sewanee,,Sewanee,Tigers,cfbd,2026-07-21
+2551,Shaw,SHAW,CIAA,II,bears|shaw,Shaw,,Shaw,Bears,cfbd,2026-07-21
+2828,Shenandoah,SHENAN,Old Dominion,III,hornets|shenan|shenandoah,Shenandoah,,Shenandoah,Hornets,cfbd,2026-07-21
+2974,Shepherd,SHE,Pennsylvania State Athletic,II,rams|she|shepherd,Shepherd,,Shepherd,Rams,cfbd,2026-07-21
+2559,Shippensburg,SHPSBRG,Pennsylvania State Athletic,II,raiders|shippensburg|shpsbrg,Shippensburg,,Shippensburg,Raiders,cfbd,2026-07-21
+2560,Shorter,SHOR,Carolinas,II,hawks|shor|shorter,Shorter,,Shorter,Hawks,cfbd,2026-07-21
+2829,Simon Fraser,SIM,Lone Star,II,clansmen|sim|simon fraser,Simon Fraser,,Simon Fraser,Clansmen,cfbd,2026-07-21
+2564,Simpson College (IA),SIMPS,American Rivers,III,simps|simpson college ia|storm,Simpson College (IA),,Simpson College (IA),Storm,cfbd,2026-07-21
+2894,Sioux Falls,SIO,Northern Sun,II,cougars|sio|sioux falls,Sioux Falls,,Sioux Falls,Cougars,cfbd,2026-07-21
+215,Slippery Rock,SRU,Pennsylvania State Athletic,II,slippery rock|sru|the rock,Slippery Rock,,Slippery Rock,The Rock,cfbd,2026-07-21
+6,South Alabama,USA,Sun Belt,FBS,jaguars|south alabama|usa,South Alabama,,South Alabama,Jaguars,cfbd,2026-07-21
+2579,South Carolina,SC,SEC,FBS,gamecocks|sc|south carolina,South Carolina,,South Carolina,Gamecocks,cfbd,2026-07-21
+2569,South Carolina State,SCST,MEAC,FCS,bulldogs|scst|south carolina state,South Carolina State,,South Carolina State,Bulldogs,cfbd,2026-07-21
+233,South Dakota,SDAK,MVFC,FCS,coyotes|sdak|south dakota,South Dakota,,South Dakota,Coyotes,cfbd,2026-07-21
+613,South Dakota Mines,SDMT,Rocky Mountain,II,hardrockers|sdmt|south dakota mines,South Dakota Mines,,South Dakota Mines,Hardrockers,cfbd,2026-07-21
+2571,South Dakota State,SDST,MVFC,FCS,jackrabbits|sdst|south dakota state,South Dakota State,,South Dakota State,Jackrabbits,cfbd,2026-07-21
+58,South Florida,USF,American Athletic,FBS,bulls|south florida|usf,South Florida,,South Florida,Bulls,cfbd,2026-07-21
+2546,Southeast Missouri State,SEMO,Big South-OVC,FCS,redhawks|semo|southeast missouri state,Southeast Missouri State,,Southeast Missouri State,Redhawks,cfbd,2026-07-21
+199,Southeastern Oklahoma State,SEOS,Great American,II,savage storm|seos|southeastern oklahoma state,Southeastern Oklahoma State,,Southeastern Oklahoma State,Savage Storm,cfbd,2026-07-21
+2582,Southern,SOU,SWAC,FCS,jaguars|sou|southern,Southern,,Southern,Jaguars,cfbd,2026-07-21
+2568,Southern Arkansas,SOU,Great American,II,muleriders|sou|southern arkansas,Southern Arkansas,,Southern Arkansas,Muleriders,cfbd,2026-07-21
+2583,Southern Connecticut State,SOU,Northeast 10,II,owls|sou|southern connecticut state,Southern Connecticut State,,Southern Connecticut State,Owls,cfbd,2026-07-21
+79,Southern Illinois,SIU,MVFC,FCS,salukis|siu|southern illinois,Southern Illinois,,Southern Illinois,Salukis,cfbd,2026-07-21
+2572,Southern Miss,USM,Sun Belt,FBS,golden eagles|southern miss|usm,Southern Miss,,Southern Miss,Golden Eagles,cfbd,2026-07-21
+200,Southern Nazarene,STN,Great American,II,crimson storm|southern nazarene|stn,Southern Nazarene,,Southern Nazarene,Crimson Storm,cfbd,2026-07-21
+253,Southern Utah,SUU,Big Sky,FCS,southern utah|suu|thunderbirds,Southern Utah,,Southern Utah,Thunderbirds,cfbd,2026-07-21
+2896,Southern Virginia,SVA,USA South,III,knights|southern virginia|sva,Southern Virginia,,Southern Virginia,Knights,cfbd,2026-07-21
+2586,Southwest Baptist,SWB,Great Lakes,II,bearcats|southwest baptist|swb,Southwest Baptist,,Southwest Baptist,Bearcats,cfbd,2026-07-21
+2587,Southwest Minnesota State,SWMN,Northern Sun,II,mustangs|southwest minnesota state|swmn,Southwest Minnesota State,,Southwest Minnesota State,Mustangs,cfbd,2026-07-21
+2927,Southwestern Oklahoma State,SWO,Great American,II,bulldogs|southwestern oklahoma state|swo,Southwestern Oklahoma State,,Southwestern Oklahoma State,Bulldogs,cfbd,2026-07-21
+2588,Southwestern University,SW,Southern Athletic,III,pirates|southwestern university|sw,Southwestern University,,Southwestern University,Pirates,cfbd,2026-07-21
+81,Springfield,SPR,NEWMAC,III,pride|spr|springfield,Springfield,,Springfield,Pride,cfbd,2026-07-21
+374,St John Fisher University,SJFISH,Empire 8,III,cardinals|sjfish|st john fisher university,St John Fisher University,,St John Fisher University,Cardinals,cfbd,2026-07-21
+2830,St. Anselm,STA,Northeast 10,II,hawks|st anselm|sta,St. Anselm,,St. Anselm,Hawks,cfbd,2026-07-21
+395,St. Augustine's,STA,CIAA,II,falcons|st augustine's|sta,St. Augustine's,,St. Augustine's,Falcons,cfbd,2026-07-21
+2598,St. Francis (PA),SFPA,Presidents',III,red flash|sfpa|st francis pa,St. Francis (PA),,St. Francis (PA),Red Flash,cfbd,2026-07-21
+2601,St. Joseph's (IN),ST,Great Lakes,II,pumas|st|st joseph's in,St. Joseph's (IN),,St. Joseph's (IN),Pumas,cfbd,2026-07-21
+2779,St. Lawrence,USL,Liberty League,III,saints|st lawrence|usl,St. Lawrence,,St. Lawrence,Saints,cfbd,2026-07-21
+2832,St. Norbert,STN,NACC,III,green knights|st norbert|stn,St. Norbert,,St. Norbert,Green Knights,cfbd,2026-07-21
+133,St. Olaf,STO,Minnesota,III,oles|st olaf|sto,St. Olaf,,St. Olaf,Oles,cfbd,2026-07-21
+375,St. Scholastica,SCHOLA,Minnesota,III,saints|schola|st scholastica,St. Scholastica,,St. Scholastica,Saints,cfbd,2026-07-21
+2900,St. Thomas (MN),STMN,Pioneer,FCS,st thomas mn|stmn|tommies,St. Thomas (MN),,St. Thomas (MN),Tommies,cfbd,2026-07-21
+24,Stanford,STAN,ACC,FBS,cardinal|stan|stanford,Stanford,,Stanford,Cardinal,cfbd,2026-07-21
+2617,Stephen F. Austin,SFA,Southland,FCS,lumberjacks|sfa|stephen f austin,Stephen F. Austin,,Stephen F. Austin,Lumberjacks,cfbd,2026-07-21
+56,Stetson,STET,Pioneer,FCS,hatters|stet|stetson,Stetson,,Stetson,Hatters,cfbd,2026-07-21
+471,Stevenson,STU,Mid Atlantic,III,mustangs|stevenson|stu,Stevenson,,Stevenson,Mustangs,cfbd,2026-07-21
+284,Stonehill,STO,NEC,FCS,skyhawks|sto|stonehill,Stonehill,,Stonehill,Skyhawks,cfbd,2026-07-21
+2619,Stony Brook,STBK,CAA,FCS,seawolves|stbk|stony brook,Stony Brook,,Stony Brook,Seawolves,cfbd,2026-07-21
+2834,Sul Ross State,SROS,Lone Star,II,lobos|sros|sul ross state,Sul Ross State,,Sul Ross State,Lobos,cfbd,2026-07-21
+216,Susquehanna,SUS,Landmark Conference,III,river hawks|sus|susquehanna,Susquehanna,,Susquehanna,River Hawks,cfbd,2026-07-21
+183,Syracuse,SYR,ACC,FBS,orange|syr|syracuse,Syracuse,,Syracuse,Orange,cfbd,2026-07-21
+2628,TCU,TCU,Big 12,FBS,horned frogs|tcu,TCU,,TCU,Horned Frogs,cfbd,2026-07-21
+2627,Tarleton State,TAR,UAC,FCS,tar|tarleton state|texans,Tarleton State,,Tarleton State,Texans,cfbd,2026-07-21
+218,Temple,TEM,American Athletic,FBS,owls|tem|temple,Temple,,Temple,Owls,cfbd,2026-07-21
+2633,Tennessee,TENN,SEC,FBS,tenn|tennessee|volunteers,Tennessee,,Tennessee,Volunteers,cfbd,2026-07-21
+2634,Tennessee State,TNST,Big South-OVC,FCS,tennessee state|tigers|tnst,Tennessee State,,Tennessee State,Tigers,cfbd,2026-07-21
+2635,Tennessee Tech,TNTC,Southern,FCS,golden eagles|tennessee tech|tntc,Tennessee Tech,,Tennessee Tech,Golden Eagles,cfbd,2026-07-21
+251,Texas,TEX,SEC,FBS,longhorns|tex|texas,Texas,,Texas,Longhorns,cfbd,2026-07-21
+245,Texas A&M,TA&M,SEC,FBS,aggies|ta and m|texas a and m,Texas A&M,,Texas A&M,Aggies,cfbd,2026-07-21
+2658,Texas A&M-Kingsville,TXA,Lone Star,II,javelinas|texas a and m-kingsville|txa,Texas A&M-Kingsville,,Texas A&M-Kingsville,Javelinas,cfbd,2026-07-21
+2639,Texas Lutheran,TL,Southern Collegiate Athletic,III,bulldogs|texas lutheran|tl,Texas Lutheran,,Texas Lutheran,Bulldogs,cfbd,2026-07-21
+2640,Texas Southern,TXSO,SWAC,FCS,texas southern|tigers|txso,Texas Southern,,Texas Southern,Tigers,cfbd,2026-07-21
+326,Texas State,TXST,Pac-12,FBS,bobcats|texas state|txst,Texas State,,Texas State,Bobcats,cfbd,2026-07-21
+2641,Texas Tech,TTU,Big 12,FBS,red raiders|texas tech|ttu,Texas Tech,,Texas Tech,Red Raiders,cfbd,2026-07-21
+2643,The Citadel,CIT,Southern,FCS,bulldogs|cit|the citadel,The Citadel,,The Citadel,Bulldogs,cfbd,2026-07-21
+2644,Thiel,THIEL,Presidents',III,thiel|tomcats,Thiel,,Thiel,Tomcats,cfbd,2026-07-21
+2646,Thomas More College,THMORE,Great Midwest Athletic,II,saints|thmore|thomas more college,Thomas More College,,Thomas More College,Saints,cfbd,2026-07-21
+2838,Tiffin,TIF,Great Midwest Athletic,II,dragons|tif|tiffin,Tiffin,,Tiffin,Dragons,cfbd,2026-07-21
+625,Tiffin University,TIF,Great Midwest Athletic,II,dragons|tif|tiffin university,Tiffin University,,Tiffin University,Dragons,cfbd,2026-07-21
+2649,Toledo,TOL,Mid-American,FBS,rockets|tol|toledo,Toledo,,Toledo,Rockets,cfbd,2026-07-21
+119,Towson,TOW,CAA,FCS,tigers|tow|towson,Towson,,Towson,Tigers,cfbd,2026-07-21
+2651,Trine University,TRI,Michigan,III,thunder|tri|trine university,Trine University,,Trine University,Thunder,cfbd,2026-07-21
+2977,Trinity (CT),TRI,NESCAC,III,bantams|tri|trinity ct,Trinity (CT),,Trinity (CT),Bantams,cfbd,2026-07-21
+386,Trinity University TX,TRTX,Southern Athletic,III,tigers|trinity university tx|trtx,Trinity University TX,,Trinity University TX,Tigers,cfbd,2026-07-21
+2653,Troy,TROY,Sun Belt,FBS,trojans|troy,Troy,,Troy,Trojans,cfbd,2026-07-21
+2654,Truman State,TRU,Great Lakes,II,bulldogs|tru|truman state,Truman State,,Truman State,Bulldogs,cfbd,2026-07-21
+112,Tufts,TUF,NESCAC,III,jumbos|tuf|tufts,Tufts,,Tufts,Jumbos,cfbd,2026-07-21
+2655,Tulane,TULN,American Athletic,FBS,green wave|tulane|tuln,Tulane,,Tulane,Green Wave,cfbd,2026-07-21
+202,Tulsa,TLSA,American Athletic,FBS,golden hurricane|tlsa|tulsa,Tulsa,,Tulsa,Golden Hurricane,cfbd,2026-07-21
+2657,Tuskegee,TUS,SIAC,II,golden tigers|tus|tuskegee,Tuskegee,,Tuskegee,Golden Tigers,cfbd,2026-07-21
+5,UAB,UAB,American Athletic,FBS,blazers|uab,UAB,,UAB,Blazers,cfbd,2026-07-21
+399,UAlbany,UALB,CAA,FCS,great danes|ualb|ualbany,UAlbany,,UAlbany,Great Danes,cfbd,2026-07-21
+302,UC Davis,UCD,Big Sky,FCS,aggies|uc davis|ucd,UC Davis,,UC Davis,Aggies,cfbd,2026-07-21
+2116,UCF,UCF,Big 12,FBS,knights|ucf,UCF,,UCF,Knights,cfbd,2026-07-21
+26,UCLA,UCLA,Big Ten,FBS,bruins|ucla,UCLA,,UCLA,Bruins,cfbd,2026-07-21
+41,UConn,CONN,FBS Independents,FBS,conn|huskies|uconn,UConn,,UConn,Huskies,cfbd,2026-07-21
+2433,UL Monroe,ULM,Sun Belt,FBS,ul monroe|ulm|warhawks,UL Monroe,,UL Monroe,Warhawks,cfbd,2026-07-21
+379,UMass Dartmouth,MAS,MSCAC,III,corsairs|mas|umass dartmouth,UMass Dartmouth,,UMass Dartmouth,Corsairs,cfbd,2026-07-21
+2882,UNC Pembroke,NCPEMB,Carolinas,II,braves|ncpemb|unc pembroke,UNC Pembroke,,UNC Pembroke,Braves,cfbd,2026-07-21
+2439,UNLV,UNLV,Mountain West,FBS,rebels|unlv,UNLV,,UNLV,Rebels,cfbd,2026-07-21
+30,USC,USC,Big Ten,FBS,trojans|usc,USC,,USC,Trojans,cfbd,2026-07-21
+2630,UT Martin,UTM,Big South-OVC,FCS,skyhawks|ut martin|utm,UT Martin,,UT Martin,Skyhawks,cfbd,2026-07-21
+110243,UT Permian Basin,TXPBAS,Lone Star,II,falcons|txpbas|ut permian basin,UT Permian Basin,,UT Permian Basin,Falcons,cfbd,2026-07-21
+292,UT Rio Grande Valley,RGV,Southland,FCS,rgv|ut rio grande valley|vaqueros,UT Rio Grande Valley,,UT Rio Grande Valley,Vaqueros,cfbd,2026-07-21
+2638,UTEP,UTEP,Mountain West,FBS,miners|utep,UTEP,,UTEP,Miners,cfbd,2026-07-21
+2636,UTSA,UTSA,American Athletic,FBS,roadrunners|utsa,UTSA,,UTSA,Roadrunners,cfbd,2026-07-21
+2842,UVA Wise,VIRWISE,South Atlantic,II,cavaliers|uva wise|virwise,UVA Wise,,UVA Wise,Cavaliers,cfbd,2026-07-21
+237,Union (NY),UNNY,Liberty League,III,garnet chargers|union ny|unny,Union (NY),,Union (NY),Garnet Chargers,cfbd,2026-07-21
+2128,University Of Charleston (WV),CHWV,Mountain East,II,chwv|golden eagles|university of charleston wv,University Of Charleston (WV),,University Of Charleston (WV),Golden Eagles,cfbd,2026-07-21
+559,University of Mary,MARY,Northern Sun,II,marauders|mary|university of mary,University of Mary,,University of Mary,Marauders,cfbd,2026-07-21
+426,University of Mount Union,MTU,Ohio,III,mtu|raiders|university of mount union,University of Mount Union,,University of Mount Union,Raiders,cfbd,2026-07-21
+184,University of Rochester (NY),ROC,Liberty League,III,roc|university of rochester ny|yellow jackets,University of Rochester (NY),,University of Rochester (NY),Yellow Jackets,cfbd,2026-07-21
+389,Upper Iowa University,UPPERIOWA,Great Lakes,II,peacocks|upper iowa university|upperiowa,Upper Iowa University,,Upper Iowa University,Peacocks,cfbd,2026-07-21
+2667,Ursinus,URS,Centennial,III,bears|urs|ursinus,Ursinus,,Ursinus,Bears,cfbd,2026-07-21
+254,Utah,UTAH,Big 12,FBS,utah|utes,Utah,,Utah,Utes,cfbd,2026-07-21
+328,Utah State,USU,Pac-12,FBS,aggies|usu|utah state,Utah State,,Utah State,Aggies,cfbd,2026-07-21
+3101,Utah Tech,UTU,Big Sky,FCS,trailblazers|utah tech|utu,Utah Tech,,Utah Tech,Trailblazers,cfbd,2026-07-21
+390,Utica,UTICA,Empire 8,III,pioneers|utica,Utica,,Utica,Pioneers,cfbd,2026-07-21
+2678,VMI,VMI,Southern,FCS,keydets|vmi,VMI,,VMI,Keydets,cfbd,2026-07-21
+2673,Valdosta State,VAL,Gulf South,II,blazers|val|valdosta state,Valdosta State,,Valdosta State,Blazers,cfbd,2026-07-21
+2674,Valparaiso,VAL,Pioneer,FCS,beacons|val|valparaiso,Valparaiso,,Valparaiso,Beacons,cfbd,2026-07-21
+238,Vanderbilt,VAN,SEC,FBS,commodores|van|vanderbilt,Vanderbilt,,Vanderbilt,Commodores,cfbd,2026-07-21
+222,Villanova,VILL,Patriot,FCS,vill|villanova|wildcats,Villanova,,Villanova,Wildcats,cfbd,2026-07-21
+258,Virginia,UVA,ACC,FBS,cavaliers|uva|virginia,Virginia,,Virginia,Cavaliers,cfbd,2026-07-21
+330,Virginia St,VIR,CIAA,II,trojans|vir|virginia st,Virginia St,,Virginia St,Trojans,cfbd,2026-07-21
+259,Virginia Tech,VT,ACC,FBS,hokies|virginia tech|vt,Virginia Tech,,Virginia Tech,Hokies,cfbd,2026-07-21
+2676,Virginia Union,VU,CIAA,II,panthers|virginia union|vu,Virginia Union,,Virginia Union,Panthers,cfbd,2026-07-21
+89,Wabash College,WAB,North Coast,III,little giants|wab|wabash college,Wabash College,,Wabash College,Little Giants,cfbd,2026-07-21
+2681,Wagner,WAG,NEC,FCS,seahawks|wag|wagner,Wagner,,Wagner,Seahawks,cfbd,2026-07-21
+154,Wake Forest,WAKE,ACC,FBS,demon deacons|wake|wake forest,Wake Forest,,Wake Forest,Demon Deacons,cfbd,2026-07-21
+2682,Walsh,WAL,Great Midwest Athletic,II,cavaliers|wal|walsh,Walsh,,Walsh,Cavaliers,cfbd,2026-07-21
+2685,Wartburg,WAR,American Rivers,III,knights|war|wartburg,Wartburg,,Wartburg,Knights,cfbd,2026-07-21
+2687,Washburn,WAS,Mid America,II,ichabods|was|washburn,Washburn,,Washburn,Ichabods,cfbd,2026-07-21
+264,Washington,WASH,Big Ten,FBS,huskies|wash|washington,Washington,,Washington,Huskies,cfbd,2026-07-21
+2686,Washington & Jefferson,WAS,Presidents',III,presidents|was|washington and jefferson,Washington & Jefferson,,Washington & Jefferson,Presidents,cfbd,2026-07-21
+265,Washington State,WSU,Pac-12,FBS,cougars|washington state|wsu,Washington State,,Washington State,Cougars,cfbd,2026-07-21
+143,Washington University (St. Louis),WSTL,North Coast,III,bears|washington university st louis|wstl,Washington University (St. Louis),,Washington University (St. Louis),Bears,cfbd,2026-07-21
+2688,Washington and Lee,UWL,Old Dominion,III,generals|uwl|washington and lee,Washington and Lee,,Washington and Lee,Generals,cfbd,2026-07-21
+131,Wayne State (MI),WAY,GLIAC,II,warriors|way|wayne state mi,Wayne State (MI),,Wayne State (MI),Warriors,cfbd,2026-07-21
+2844,Wayne State (NE),WNST,Northern Sun,II,wayne state ne|wildcats|wnst,Wayne State (NE),,Wayne State (NE),Wildcats,cfbd,2026-07-21
+2845,Waynesburg,WAYNEB,Presidents',III,wayneb|waynesburg|yellow jackets,Waynesburg,,Waynesburg,Yellow Jackets,cfbd,2026-07-21
+2692,Weber State,WEB,Big Sky,FCS,web|weber state|wildcats,Weber State,,Weber State,Wildcats,cfbd,2026-07-21
+336,Wesleyan University (CT),WES,NESCAC,III,cardinals|wes|wesleyan university ct,Wesleyan University (CT),,Wesleyan University (CT),Cardinals,cfbd,2026-07-21
+2695,West Alabama,WES,Gulf South,II,tigers|wes|west alabama,West Alabama,,West Alabama,Tigers,cfbd,2026-07-21
+223,West Chester,WES,Pennsylvania State Athletic,II,golden rams|wes|west chester,West Chester,,West Chester,Golden Rams,cfbd,2026-07-21
+110242,West Florida,WES,UAC,FCS,argonauts|wes|west florida,West Florida,,West Florida,Argonauts,cfbd,2026-07-21
+2698,West Georgia,WGA,UAC,FCS,west georgia|wga|wolves,West Georgia,,West Georgia,Wolves,cfbd,2026-07-21
+2699,West Liberty,WLIBST,Mountain East,II,hilltoppers|west liberty|wlibst,West Liberty,,West Liberty,Hilltoppers,cfbd,2026-07-21
+2704,West Texas A&M,WES,Lone Star,II,buffaloes|wes|west texas a and m,West Texas A&M,,West Texas A&M,Buffaloes,cfbd,2026-07-21
+277,West Virginia,WVU,Big 12,FBS,mountaineers|west virginia|wvu,West Virginia,,West Virginia,Mountaineers,cfbd,2026-07-21
+2707,West Virginia State,WEST,Mountain East,II,west|west virginia state|yellow jackets,West Virginia State,,West Virginia State,Yellow Jackets,cfbd,2026-07-21
+455,West Virginia Wesleyan,WEST,Mountain East,II,bobcats|west|west virginia wesleyan,West Virginia Wesleyan,,West Virginia Wesleyan,Bobcats,cfbd,2026-07-21
+2717,Western Carolina,WCU,Southern,FCS,catamounts|wcu|western carolina,Western Carolina,,Western Carolina,Catamounts,cfbd,2026-07-21
+2714,Western Colorado,WSCO,Rocky Mountain,II,mountaineers|western colorado|wsco,Western Colorado,,Western Colorado,Mountaineers,cfbd,2026-07-21
+2843,Western Connecticut St,WES,Landmark Conference,III,wes|western connecticut st|wolves,Western Connecticut St,,Western Connecticut St,Wolves,cfbd,2026-07-21
+2710,Western Illinois,WIU,Big South-OVC,FCS,leathernecks|western illinois|wiu,Western Illinois,,Western Illinois,Leathernecks,cfbd,2026-07-21
+98,Western Kentucky,WKU,Conference USA,FBS,hilltoppers|western kentucky|wku,Western Kentucky,,Western Kentucky,Hilltoppers,cfbd,2026-07-21
+2711,Western Michigan,WMU,Mid-American,FBS,broncos|western michigan|wmu,Western Michigan,,Western Michigan,Broncos,cfbd,2026-07-21
+2702,Western New England,WNWENG,Commonwealth Coast,III,golden bears|western new england|wnweng,Western New England,,Western New England,Golden Bears,cfbd,2026-07-21
+2703,Western New Mexico,WNMEX,Lone Star,II,mustangs|western new mexico|wnmex,Western New Mexico,,Western New Mexico,Mustangs,cfbd,2026-07-21
+2848,Western Oregon,WORE,Lone Star,II,western oregon|wolves|wore,Western Oregon,,Western Oregon,Wolves,cfbd,2026-07-21
+2909,Westfield State,WES,MSCAC,III,owls|wes|westfield state,Westfield State,,Westfield State,Owls,cfbd,2026-07-21
+2849,Westminster (PA),WMNPA,Presidents',III,titans|westminster pa|wmnpa,Westminster (PA),,Westminster (PA),Titans,cfbd,2026-07-21
+433,Westminster College (MO),WMN,Upper Midwest,III,blue jays|westminster college mo|wmn,Westminster College (MO),,Westminster College (MO),Blue Jays,cfbd,2026-07-21
+396,Wheaton,WHEATON,CCIW,III,thunder|wheaton,Wheaton,,Wheaton,Thunder,cfbd,2026-07-21
+112335,Wheeling,WHEEL,Mountain East,II,cardinals|wheel|wheeling,Wheeling,,Wheeling,Cardinals,cfbd,2026-07-21
+2850,Whittier,WHI,So. Cal.,III,poets|whi|whittier,Whittier,,Whittier,Poets,cfbd,2026-07-21
+2721,Whitworth,WHI,Northwest,III,pirates|whi|whitworth,Whitworth,,Whitworth,Pirates,cfbd,2026-07-21
+2725,Widener,WID,Mid Atlantic,III,pride|wid|widener,Widener,,Widener,Pride,cfbd,2026-07-21
+398,Wilkes,WILKES,Landmark Conference,III,colonels|wilkes,Wilkes,,Wilkes,Colonels,cfbd,2026-07-21
+2930,Willamette,WLLMTT,Northwest,III,bearcats|willamette|wllmtt,Willamette,,Willamette,Bearcats,cfbd,2026-07-21
+2729,William & Mary,W&M,Patriot,FCS,tribe|w and m|william and mary,William & Mary,,William & Mary,Tribe,cfbd,2026-07-21
+2911,William Jewell,WILLI,Great Lakes,II,cardinals|willi|william jewell,William Jewell,,William Jewell,Cardinals,cfbd,2026-07-21
+2970,William Paterson,WILLPAT,New Jersey,III,pioneers|william paterson|willpat,William Paterson,,William Paterson,Pioneers,cfbd,2026-07-21
+2731,Williams,WIL,NESCAC,III,ephs|wil|williams,Williams,,Williams,Ephs,cfbd,2026-07-21
+2733,Wilmington (OH),WILMOH,Ohio,III,fightin' quakers|wilmington oh|wilmoh,Wilmington (OH),,Wilmington (OH),Fightin' Quakers,cfbd,2026-07-21
+122666,Wilson,BARTON,Carolinas,II,barton|bulldogs|wilson,Wilson,,Wilson,Bulldogs,cfbd,2026-07-21
+351,Wingate,WIN,South Atlantic,II,bulldogs|win|wingate,Wingate,,Wingate,Bulldogs,cfbd,2026-07-21
+2851,Winona State,WIN,Northern Sun,II,warriors|win|winona state,Winona State,,Winona State,Warriors,cfbd,2026-07-21
+2736,Winston-Salem,WNSL,CIAA,II,rams|winston-salem|wnsl,Winston-Salem,,Winston-Salem,Rams,cfbd,2026-07-21
+275,Wisconsin,WIS,Big Ten,FBS,badgers|wis|wisconsin,Wisconsin,,Wisconsin,Badgers,cfbd,2026-07-21
+2738,Wisconsin-Eau Claire,WISE,Wisconsin,III,blugolds|wisconsin-eau claire|wise,Wisconsin-Eau Claire,,Wisconsin-Eau Claire,Blugolds,cfbd,2026-07-21
+2740,Wisconsin-Lacrosse,WISL,Wisconsin,III,eagles|wisconsin-lacrosse|wisl,Wisconsin-Lacrosse,,Wisconsin-Lacrosse,Eagles,cfbd,2026-07-21
+2741,Wisconsin-Lutheran,WILU,NACC,III,warriors|wilu|wisconsin-lutheran,Wisconsin-Lutheran,,Wisconsin-Lutheran,Warriors,cfbd,2026-07-21
+271,Wisconsin-Oshkosh,WISO,Wisconsin,III,titans|wisconsin-oshkosh|wiso,Wisconsin-Oshkosh,,Wisconsin-Oshkosh,Titans,cfbd,2026-07-21
+272,Wisconsin-Platteville,WIPL,Wisconsin,III,pioneers|wipl|wisconsin-platteville,Wisconsin-Platteville,,Wisconsin-Platteville,Pioneers,cfbd,2026-07-21
+2723,Wisconsin-River Falls,WIRF,Wisconsin,III,falcons|wirf|wisconsin-river falls,Wisconsin-River Falls,,Wisconsin-River Falls,Falcons,cfbd,2026-07-21
+2743,Wisconsin-Stevens Pt,WISP,Wisconsin,III,pointers|wisconsin-stevens pt|wisp,Wisconsin-Stevens Pt,,Wisconsin-Stevens Pt,Pointers,cfbd,2026-07-21
+2744,Wisconsin-Stout,WISS,Wisconsin,III,blue devils|wisconsin-stout|wiss,Wisconsin-Stout,,Wisconsin-Stout,Blue Devils,cfbd,2026-07-21
+2745,Wisconsin-Whitewater,WISW,Wisconsin,III,warhawks|wisconsin-whitewater|wisw,Wisconsin-Whitewater,,Wisconsin-Whitewater,Warhawks,cfbd,2026-07-21
+2746,Wittenberg,WITTEN,North Coast,III,tigers|witten|wittenberg,Wittenberg,,Wittenberg,Tigers,cfbd,2026-07-21
+2747,Wofford,WOF,Southern,FCS,terriers|wof|wofford,Wofford,,Wofford,Terriers,cfbd,2026-07-21
+2748,Wooster,WOO,North Coast,III,fighting scots|woo|wooster,Wooster,,Wooster,Fighting Scots,cfbd,2026-07-21
+2749,Worcester Polytechnic Institute,WORCE,NEWMAC,III,engineers|worce|worcester polytechnic institute,Worcester Polytechnic Institute,,Worcester Polytechnic Institute,Engineers,cfbd,2026-07-21
+402,Worcester St,WORST,MSCAC,III,lancers|worcester st|worst,Worcester St,,Worcester St,Lancers,cfbd,2026-07-21
+2751,Wyoming,WYO,Mountain West,FBS,cowboys|wyo|wyoming,Wyoming,,Wyoming,Cowboys,cfbd,2026-07-21
+43,Yale,YALE,Ivy,FCS,bulldogs|yale,Yale,,Yale,Bulldogs,cfbd,2026-07-21
+2754,Youngstown State,YSU,MVFC,FCS,penguins|youngstown state|ysu,Youngstown State,,Youngstown State,Penguins,cfbd,2026-07-21

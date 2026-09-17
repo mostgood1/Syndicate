@@ -175,11 +175,31 @@ def initial_key(value: Any) -> str:
     return f"{parts[0][0]} {parts[-1]}"
 
 
+def name_keys(value: Any) -> set[str]:
+    """Every spelling of one name a feed might use.
+
+    `name_key` turns "D.J. Moore" into "d j moore" and the board writes "DJ
+    Moore" -- a real NFL row, and they never met. The collapsed form joins them
+    by gluing single-letter runs back together.
+    """
+    keys = {name_key(value), name_key_loose(value)}
+    parts = name_key_loose(value).split()
+    if any(len(part) == 1 for part in parts):
+        collapsed: list[str] = []
+        for part in parts:
+            if len(part) == 1 and collapsed and len(collapsed[-1]) <= 2 and collapsed[-1].isalpha() and len(collapsed[-1]) < 3:
+                collapsed[-1] += part
+            else:
+                collapsed.append(part)
+        keys.add(" ".join(collapsed))
+    return {key for key in keys if key}
+
+
 def names_match(a: Any, b: Any) -> bool:
-    ka, kb = name_key(a), name_key(b)
-    if not ka or not kb:
+    keys_a, keys_b = name_keys(a), name_keys(b)
+    if not keys_a or not keys_b:
         return False
-    return ka == kb or name_key_loose(a) == name_key_loose(b)
+    return bool(keys_a & keys_b)
 
 
 def fmt_pct(value: Any, digits: int = 1) -> str:

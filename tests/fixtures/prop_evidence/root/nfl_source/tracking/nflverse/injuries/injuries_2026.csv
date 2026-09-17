@@ -1,0 +1,33 @@
+season,season_type,game_type,team,week,gsis_id,position,full_name,first_name,last_name,report_primary_injury,report_secondary_injury,report_status,practice_primary_injury,practice_secondary_injury,practice_status
+2026,REG,REG,BUF,1,00-0035537,RB,Ty Johnson,Ty,Johnson,Hamstring,,Questionable,Hamstring,,Limited Participation in Practice
+2026,REG,REG,BUF,1,00-0040192,CB,Jordan Hancock,Jordan,Hancock,Quadricep,,Questionable,Quadricep,,Full Participation in Practice
+2026,REG,REG,BUF,1,00-0040724,DE,T.J. Sanders,Tanaeri,Sanders,Knee,,Questionable,Knee,,Limited Participation in Practice
+2026,REG,REG,DET,1,00-0038660,LB,Trevor Nowaske,Trevor,Nowaske,,,,Knee,,Full Participation in Practice
+2026,REG,REG,DET,1,00-0038820,S,Christian Izien,Christian,Izien,Groin,,Questionable,Groin,,Limited Participation in Practice
+2026,REG,REG,DET,1,00-0039396,DT,Mekhi Wingo,Mekhi,Wingo,,,,Groin,,Full Participation in Practice
+2026,REG,REG,DET,1,00-0039660,S,Thomas Harper,Thomas,Harper,,,,Ankle,,Full Participation in Practice
+2026,REG,REG,DET,1,00-0039862,CB,Ennis Rakestraw Jr.,Ennis,Rakestraw,,,,Ankle,,Full Participation in Practice
+2026,REG,REG,DET,1,00-0041441,DE,Derrick Moore,Derrick,Moore,,,,Hamstring,,Full Participation in Practice
+2026,REG,REG,DET,1,00-0041442,LB,Jimmy Rolder,James,Rolder,,,,Hamstring,,Full Participation in Practice
+2026,REG,REG,DET,1,00-0041445,CB,Keith Abney II,Keith,Abney,,,,Hand,,Full Participation in Practice
+2026,REG,REG,NO,1,00-0027962,LB,Cameron Jordan,Cameron,Jordan,Hamstring,,Out,Hamstring,,Limited Participation in Practice
+2026,REG,REG,NO,1,00-0033860,DT,Davon Godchaux,Davon,Godchaux,,,,Not injury related - resting player,,Full Participation in Practice
+2026,REG,REG,NO,1,00-0033906,RB,Alvin Kamara,Alvin,Kamara,Knee,,Questionable,Knee,,Full Participation in Practice
+2026,REG,REG,NO,1,00-0039373,RB,Audric Estimé,Audric,Estime,Thigh,,Out,Thigh,,Did Not Participate In Practice
+2026,REG,REG,NO,1,00-0041041,TE,Oscar Delp,Oscar,Delp,Hamstring,,Out,Hamstring,,Did Not Participate In Practice
+2026,REG,REG,BUF,2,00-0034832,LB,Bradley Chubb,Bradley,Chubb,,,,Thumb,,Full Participation in Practice
+2026,REG,REG,BUF,2,00-0035537,RB,Ty Johnson,Ty,Johnson,Hamstring,,Questionable,Hamstring,,Limited Participation in Practice
+2026,REG,REG,BUF,2,00-0037254,LB,Terrel Bernard,Terrel,Bernard,,,,Calf,,Limited Participation in Practice
+2026,REG,REG,BUF,2,00-0039872,S,Cole Bishop,Cole,Bishop,Knee,Groin,Questionable,Knee,Groin,Limited Participation in Practice
+2026,REG,REG,BUF,2,00-0040192,CB,Jordan Hancock,Jordan,Hancock,,,,Quadricep,,Full Participation in Practice
+2026,REG,REG,BUF,2,00-0040724,DE,T.J. Sanders,Tanaeri,Sanders,Knee,Illness,Questionable,Knee,Illness,Limited Participation in Practice
+2026,REG,REG,DET,2,00-0034384,CB,D.J. Reed,Dennis,Reed,Foot,,Questionable,Foot,,Limited Participation in Practice
+2026,REG,REG,DET,2,00-0038820,S,Christian Izien,Christian,Izien,,,,Groin,,Full Participation in Practice
+2026,REG,REG,DET,2,00-0038936,G,Juice Scruggs,Frederick,Scruggs,,,,Knee,,Full Participation in Practice
+2026,REG,REG,DET,2,00-0039408,G,Christian Mahogany,Christian,Mahogany,Hip,,Out,Hip,,Did Not Participate In Practice
+2026,REG,REG,DET,2,00-0041439,T,Blake Miller,Blake,Miller,Knee,,Out,Knee,,Did Not Participate In Practice
+2026,REG,REG,NO,2,00-0027962,LB,Cameron Jordan,Cameron,Jordan,,,,Hamstring,,Limited Participation in Practice
+2026,REG,REG,NO,2,00-0033906,RB,Alvin Kamara,Alvin,Kamara,,,,Knee,,Full Participation in Practice
+2026,REG,REG,NO,2,00-0036040,TE,Juwan Johnson,Juwan,Johnson,,,,Illness,,Did Not Participate In Practice
+2026,REG,REG,NO,2,00-0039622,LB,Isaiah Stalbird,Isaiah,Stalbird,,,,Shoulder,,Did Not Participate In Practice
+2026,REG,REG,NO,2,00-0041041,TE,Oscar Delp,Oscar,Delp,,,,Hamstring,,Limited Participation in Practice

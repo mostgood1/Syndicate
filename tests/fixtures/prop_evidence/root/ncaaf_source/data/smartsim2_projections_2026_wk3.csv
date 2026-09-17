@@ -1,0 +1,4 @@
+game_id,season,week,home_team,away_team,home_score_mean,away_score_mean,margin_mean,total_mean,margin_stdev,total_stdev,home_win_rate,seeds_used,profile_name,rating_source,generated_at,profile_source,profile_version
+401858225,2026,3,Pittsburgh,Syracuse,35.077,21.193,13.883,56.27,14.661,13.346,0.84,300,ncaaf_v2,cfbd_sp_plus_2026[scale=10]+cfbd_ppa_asof_2026_through_wk2,2026-09-16T17:18:20.043805+00:00,artifact,ncaaf-goal-line-refit-1
+401856802,2026,3,Virginia,West Virginia,26.89,16.05,10.84,42.94,13.991,12.763,0.7633,300,ncaaf_v2,cfbd_sp_plus_2026[scale=10]+cfbd_ppa_asof_2026_through_wk2,2026-09-16T17:26:17.715880+00:00,artifact,ncaaf-goal-line-refit-1
+401856796,2026,3,Northwestern,Colorado,22.07,16.423,5.647,38.493,13.578,12.699,0.6367,300,ncaaf_v2,cfbd_sp_plus_2026[scale=10]+cfbd_ppa_asof_2026_through_wk2,2026-09-16T17:26:34.991514+00:00,artifact,ncaaf-goal-line-refit-1
