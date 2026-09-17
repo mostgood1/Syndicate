@@ -1709,6 +1709,7 @@ def _layer2_fallback_recommendations(
     requested_dates: Sequence[str],
     *,
     vintages: list[str] | None = None,
+    dated_vintages: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """Persisted L2-A cards for these dates, shaped like a merged candidate.
 
@@ -1731,6 +1732,13 @@ def _layer2_fallback_recommendations(
     per request to answer "how old is this" would cost more than the staleness
     it reports. The signature stays keyword-only and defaulted so every existing
     caller and test is untouched.
+
+    `dated_vintages`, when given, records the same stamp under its DATE, on the
+    same "this date put cards on the board" condition (lane
+    `board-today-freshness`). `vintages` alone cannot say which date is old:
+    measured 2026-09-17, the board read "stale" off tomorrow's 48-minute-old
+    shortlist while today's was 13 minutes old, and nothing in the response
+    could tell the two apart.
     """
     cards: list[dict[str, Any]] = []
     for requested_date in requested_dates or ():
@@ -1747,7 +1755,11 @@ def _layer2_fallback_recommendations(
         # building could pin `computed_at` exactly as the main path did. Fixing
         # only the main path would have moved the defect here and looked fixed.
         _cards_before = len(cards)
-        _stamp = str(shortlist.get("written_at") or "").strip() if vintages is not None else ""
+        _stamp = (
+            str(shortlist.get("written_at") or "").strip()
+            if vintages is not None or dated_vintages is not None
+            else ""
+        )
         for card in shortlist.get("cards") or []:
             if not isinstance(card, Mapping):
                 continue
@@ -1763,8 +1775,11 @@ def _layer2_fallback_recommendations(
         # whose every card is later pruned still counts here -- it did put rows
         # on the board, and they were removed for being DECIDED, not for being
         # absent.
-        if vintages is not None and _stamp and len(cards) > _cards_before:
-            vintages.append(_stamp)
+        if _stamp and len(cards) > _cards_before:
+            if vintages is not None:
+                vintages.append(_stamp)
+            if dated_vintages is not None:
+                dated_vintages[str(requested_date)] = _stamp
         elif vintages is not None and _stamp:
             print(
                 f"[intelligence_state] LAYER2_VINTAGE_IGNORED date={requested_date} "
@@ -9296,6 +9311,11 @@ def read_combined_intelligence_response(
     # `state_meta` block at the bottom of this function for why an ASSERTED
     # freshness was the defect.
     artifact_vintages: list[str] = []
+    # `board-today-freshness`: the same stamps, kept under their date. Two maps
+    # rather than one because a date can have both a state payload and a
+    # shortlist, and the served block names which one set the date's age.
+    state_vintages_by_date: dict[str, str] = {}
+    layer2_vintages_by_date: dict[str, str] = {}
 
     for requested_date in requested_dates:
         date_response = _read_single_date_response_for_combining(requested_date)
@@ -9393,6 +9413,7 @@ def read_combined_intelligence_response(
         # not a miss; it is the honest reading.
         if date_stamp and date_candidate_count > 0:
             artifact_vintages.append(date_stamp)
+            state_vintages_by_date[requested_date] = date_stamp
         elif date_stamp:
             print(
                 f"[intelligence_state] COMBINED_BOARD_VINTAGE_IGNORED date={requested_date} "
@@ -9499,7 +9520,9 @@ def read_combined_intelligence_response(
     legacy_candidate_count = len(merged_recommendations)
     legacy_rows_withheld = 0
     if board_l2a_fallback_enabled():
-        fallback_cards = _layer2_fallback_recommendations(requested_dates, vintages=artifact_vintages)
+        fallback_cards = _layer2_fallback_recommendations(
+            requested_dates, vintages=artifact_vintages, dated_vintages=layer2_vintages_by_date
+        )
         if fallback_cards:
             # LEGACY PROP AND GAME ROWS LEAVE THE BOARD ONCE LAYER 2 HAS ROWS (lane
             # `layer2-row-parity`, user decision 2026-09-15 "Server-side").
@@ -9594,6 +9617,43 @@ def read_combined_intelligence_response(
     oldest_age = max(age for _stamp, age in dated) if dated else None
     newest_age = min(age for _stamp, age in dated) if dated else None
     status = _freshness_status_from_age(oldest_age, stale_after)
+    # PER-DATE STAMPS (lane `board-today-freshness`). `computed_at` below is the
+    # WINDOW's oldest input, and since the next-day floor went to 3600 s
+    # (2026-09-17) that is usually TOMORROW -- so the chip said "as of" a stamp
+    # 48 minutes old while today's rows were 13 minutes old. This map keeps each
+    # date's own stamp, under the same rule as the window: a date's
+    # `written_at` is the OLDEST stamp that put rows on the board for it, so
+    # `computed_at` is always `dates[window_oldest_date].written_at`.
+    #
+    # STAMPS ONLY, NO AGES OR VERDICTS, ON PURPOSE. This payload is cached (up
+    # to 10x the TTL when served stale), and `_apply_freshness_recompute` only
+    # rebuilds the three top-level keys. A per-date `age_seconds` or a
+    # "today is fresh" verdict would be frozen at build time, and "which date is
+    # today" is itself clock-relative under a cache key that is only the dates
+    # (learnings 2026-09-15, FORBIDDEN). The reader derives ages from these
+    # stamps and today from its own Central clock.
+    dates_block: dict[str, dict[str, Any]] = {}
+    for requested_date in requested_dates:
+        sources = {
+            name: stamp
+            for name, stamp in (
+                ("state", state_vintages_by_date.get(requested_date)),
+                ("layer2_shortlist", layer2_vintages_by_date.get(requested_date)),
+            )
+            if stamp and _timestamp_age_seconds(stamp) is not None
+        }
+        if not sources:
+            continue
+        oldest_source = max(sources, key=lambda name: _timestamp_age_seconds(sources[name]) or 0.0)
+        dates_block[requested_date] = {
+            "written_at": sources[oldest_source],
+            "written_at_source": oldest_source,
+            "sources": sources,
+        }
+    window_oldest_date = next(
+        (day for day in sorted(dates_block) if oldest_stamp and dates_block[day]["written_at"] == oldest_stamp),
+        None,
+    )
     combined["state_meta"] = {
         "source": "combined_board_window",
         # `computed_at` IS THE OLDEST ARTIFACT'S STAMP, NOT THE MOMENT OF THE
@@ -9625,6 +9685,8 @@ def read_combined_intelligence_response(
         "is_fresh": None if oldest_age is None else status == "fresh",
         "newest_age_seconds": newest_age,
         "artifacts_dated": len(dated),
+        "dates": dates_block,
+        "window_oldest_date": window_oldest_date,
     }
     # `#363`: the legacy pool's own size, independent of what the board shows.
     # Always emitted, so "is `#308` still live" stays a one-field question now
