@@ -6853,3 +6853,26 @@ Seven worktrees, all clean, every commit's content on `origin/main`. `close` acc
 - **What is true:** the fields are in the artifact the worker writes — `soccer_source/<lg>/api/live_state/live_state_<date>.json`, `games[].projection` — where the 21:15:11.797Z snapshot carried all three.
 - **The rule:** a served page is a fixed contract exposing a chosen subset. Verify a new field on the surface that WRITES it; if a UI route is meant to carry it, that contract change is a second piece of work.
 - **Corollary, found in the same minute and worth as much as the deploy:** run the CONSUMER CENSUS. The only reader of `projected_total_corners` is `syndicate/features/soccer/live_lens.py:109`, so a better live corners number currently feeds one displayed metric and no money path (`leads.md` 2026-09-17).
+
+### 2026-09-17 (session 4a583d41, lane prop-evidence-parity) — FORBIDDEN: polling for a job-free deploy window without holding the claim first
+
+**What happened.** refresh-worker's preflight was HOLD (jobs in flight), so I polled it every
+50 s waiting for a gap — with the claim FREE, because I did not want to sit on a lock I could
+not yet use. Six polls in, lane `soccer-shot-woodwork-undercount` acquired refresh-worker, and
+this lane waited ~25 minutes for a claim it had been first in line for. The lock is not a
+courtesy to take at the last second; it is the queue.
+
+**Why the instinct is wrong.** "Do not hold a lock you cannot use yet" is right for locks that
+block work. A deploy claim blocks only OTHER DEPLOYS, has a 45-minute TTL, expires on its own
+(`EXPIRED (does not block)`), and is released with one command. Holding it during a poll costs
+nothing and is the only thing that makes the poll meaningful.
+
+**How to apply.**
+- `deploy_claim.py acquire` FIRST, then poll `deploy_preflight.py` for the window.
+- Fire the deploy in the SAME loop cycle as the CLEAR. Job-free windows on refresh-worker
+  measured ~70 s tonight (7 HOLDs then CLEAR on try 8, deploy fired 0 s later and landed).
+  A CLEAR you carry into a human-paced next command is a CLEAR you have already lost.
+- `release` refuses with "token does not match" when the acquiring shell was a different
+  process. Pass `--token <token printed by acquire>`; `--force` is for a holder that is GONE,
+  and reaching for it here would have been a false claim about another session.
+- *(evidence: `log/2026-09-17.md` ~21:50Z; deploy `dep-dam5tcvqj5pc73bv6i1g`)*

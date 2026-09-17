@@ -254,9 +254,14 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
   intact, gaining the track record and McLean's park/weather table that the 8-cap had been
   truncating. **It reached production as a RIDE-ALONG on another lane's deploy**, not by this
   lane's hand -- the deploy call was refused by a session permission classifier.
-- **STILL ON THE LEGACY BvP PATH:** refresh-worker is on `5cf06987`, so no shards exist and an
-  MLB prop Ask still scans ~70 MB per pitcher (18.25 s median, 40.02 s cold on a starter with
-  no cached entry). The shard path measures 20.25 s -> 1.07 s locally for the same 7-pitcher read.
+- **THE BvP INDEX BUILDER IS DEPLOYED, THE INDEX IS NOT BUILT YET `[2026-09-17 21:47:49Z]`.**
+  refresh-worker `5cf06987` -> `b90d1e47` (`dep-dam5tcvqj5pc73bv6i1g`, deployed by lane
+  `prop-evidence-parity`). **0 shards on web at 21:47Z**, so an MLB prop Ask is still on the
+  legacy ~70 MB-per-pitcher scan (18.25 s median, 40.02 s cold on a starter with no cached
+  entry). The build runs when the weekly Statcast job next launches -- a missing index now
+  makes `is_stale()` true -- and that launch can still refuse with a NAMED reason
+  (`sim_active`, `low_memory_headroom`): refresh-worker sat at 1,895-2,014 MB resident before
+  sim children tonight. Do not read "deployed" as "built"; count the shards.
 - **PRODUCTION ANSWER SHAPES, read 2026-09-17 18:0x-18:2xZ on web `efd24273`, BEFORE any
   deploy** -- this is the before-baseline, and it CORRECTS the '8 + 3' line below:
   MLB **8 tables / 2-3 charts on 4 of 5 rows** (16.8s / 17.1s / 26.0s / 3.8s), but a row
