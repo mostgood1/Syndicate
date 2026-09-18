@@ -159,20 +159,78 @@ def _histograms_from_scorelines(scorelines: Any) -> tuple[dict[float, float], di
     return totals, margins
 
 
+def _canonical_pair(away: Any, home: Any) -> tuple[str, str]:
+    # Imported here, like this module's other imports: the soccer features
+    # package costs ~2 s to import and most callers of this module never join.
+    from syndicate.features.soccer.features.team_names import canonical_team_name
+
+    return (canonical_team_name(str(away or "")), canonical_team_name(str(home or "")))
+
+
+class _CanonicalMatchIndex(dict):
+    """Stored under canonical team names, and ANSWERS BY THEM, whatever key it is asked with.
+
+    The shared join (`live_gameline_join.attach_live_gamelines`) looks a board
+    row up with its own `_norm_team` key -- case and spacing only -- and calls
+    nothing on the index except `get` and `len`. Canonicalising the question
+    here changes the soccer join without touching that file, which every sport
+    shares.
+
+    A canonical key two in-play matches collapse to answers NOTHING: a wrong
+    fixture priced is worse than a match left unpriced.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.ambiguous: set[tuple[str, str]] = set()
+
+    def _answer_key(self, key: Any) -> tuple[str, str] | None:
+        try:
+            away, home = key
+        except (TypeError, ValueError):
+            return None
+        pair = _canonical_pair(away, home)
+        return None if pair in self.ambiguous else pair
+
+    def get(self, key: Any, default: Any = None) -> Any:
+        pair = self._answer_key(key)
+        return default if pair is None else super().get(pair, default)
+
+    def __getitem__(self, key: Any) -> Any:
+        pair = self._answer_key(key)
+        if pair is None:
+            raise KeyError(key)
+        return super().__getitem__(pair)
+
+    def __contains__(self, key: object) -> bool:
+        pair = self._answer_key(key)
+        return pair is not None and super().__contains__(pair)
+
+
 def soccer_live_gameline_index(
     selected_date: str, *, data_root: Any = None
 ) -> dict[tuple[str, str], dict[str, Any]]:
     """(away_team, home_team) -> live moneyline projection, for in-play matches.
 
-    Keyed on FULL TEAM NAMES with no alias table, matching
-    `build_live_gameline_index`'s deliberate choice. Gate 1 measured that this
-    join is exact for soccer: the ESPN names in the live-state artifact matched
-    the OddsAPI grid on 286 rows for the 2026-08-20 la_liga fixture.
+    KEYED AND ANSWERED ON CANONICAL TEAM NAMES (`team_names.canonical_team_name`),
+    on both sides. It used to be keyed on full names with no alias table, on
+    Gate 1's measurement that the ESPN names in the live-state artifact matched
+    the OddsAPI grid on 286 rows -- of ONE La Liga fixture (2026-08-20). Read on
+    the served soccer book grid of 2026-09-18 (8 matches in play), that key
+    joined 3 of 8: Union Berlin / 1. FC Union Berlin, Elche CF / Elche, RC Lens /
+    Lens, Gent / KAA Gent and FC Zwolle / PEC Zwolle had no live line at all.
+    Canonical names join the first three. The last two differ by a club prefix
+    the canonicaliser keeps, and stay unjoined rather than hand-aliased (a
+    one-night alias is a guess about the feed's naming everywhere else); they
+    show up as `no_live_gameline_projection` in the join's coverage.
+
+    `team_names.py` is used as it is, not extended: it also feeds the pregame
+    corners estimator, whose published numbers are under forward tests.
 
     In-play only, by the producer's contract: a finished match leaves `games`
     and lives in `match_box`, so a settled market can never be priced from here.
     """
-    index: dict[tuple[str, str], dict[str, Any]] = {}
+    index = _CanonicalMatchIndex()
     for game in soccer_live_games(selected_date, data_root=data_root):
         projection = game.get("projection")
         if not isinstance(projection, Mapping):
@@ -180,8 +238,16 @@ def soccer_live_gameline_index(
         home_p = _f(projection.get("home_win_probability"))
         if home_p is None or not (0.0 <= home_p <= 1.0):
             continue
-        key = (_norm(game.get("away_team")), _norm(game.get("home_team")))
+        key = _canonical_pair(game.get("away_team"), game.get("home_team"))
         if not key[0] or not key[1]:
+            continue
+        if dict.__contains__(index, key):
+            index.ambiguous.add(key)
+            print(
+                f"[soccer_live_gameline] AMBIGUOUS_CANONICAL_KEY away={key[0]!r} home={key[1]!r} "
+                f"league={game.get('league')} event={game.get('event_id')} -- neither match is priced",
+                flush=True,
+            )
             continue
 
         home_goals = _f(projection.get("projected_final_home_goals"))

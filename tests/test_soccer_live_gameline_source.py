@@ -65,7 +65,9 @@ def test_in_play_match_is_indexed_on_full_names(root):
         }
     })
     idx = _index(root)
-    assert list(idx) == [("coventry city", "arsenal")]
+    # Stored under CANONICAL names since 2026-09-18 (lane soccer-live-gameline-name-join), and answered by
+    # them: the full-name key the shared join asks with still finds the match.
+    assert len(idx) == 1 and ("coventry city", "arsenal") in idx
     hit = idx[("coventry city", "arsenal")]
     assert hit["home_win_prob"] == 0.62
     assert hit["sims_run"] == 400

@@ -113,7 +113,8 @@ def test_aggregate_alone_feeds_the_games_loader(root):
 def test_gate3_index_builds_from_the_aggregate_alone(root):
     _write_aggregate(root, [_aggregate_game()])
     idx = src.soccer_live_gameline_index(_TODAY)
-    assert list(idx) == [("coventry city", "arsenal")]
+    # Canonical storage since 2026-09-18 (lane soccer-live-gameline-name-join); the full-name key still answers.
+    assert len(idx) == 1 and ("coventry city", "arsenal") in idx
     hit = idx[("coventry city", "arsenal")]
     assert hit["home_win_prob"] == 0.62
     assert hit["sims_run"] == 400
