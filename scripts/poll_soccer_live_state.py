@@ -373,6 +373,9 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
                 "away_shots_on_target_so_far": live_state["away_shots_on_target_so_far"],
                 "home_corners_so_far": live_state["home_corners_so_far"],
                 "away_corners_so_far": live_state["away_corners_so_far"],
+                # Which source filled the two counts above: `commentary`, `box_fallback` (an in-progress
+                # match whose commentary has no corner events, e.g. Belgian Pro League) or `commentary_empty`.
+                "corners_source": live_state.get("corners_source"),
                 "projection": projection.to_dict(),
                 "goal_windows": goal_windows,
                 # ATTACK MOMENTUM, from FotMob's own per-minute series

@@ -33,7 +33,7 @@ HISTORY_KEY = "projection_history"
 MAX_ROWS_PER_MATCH = 240
 
 _GAME_FIELDS = ("status_display_clock", "half", "clock_remaining", "score_home", "score_away",
-                "home_corners_so_far", "away_corners_so_far",
+                "home_corners_so_far", "away_corners_so_far", "corners_source",
                 # SHOTS AND ON-TARGET, added 2026-09-17 at lane `soccer-shot-on-target-definition`'s request
                 # (session a1e40980). Its production evidence existed ONLY while the match was in play: at
                 # full time the served game page drops the live box entirely (`rows: []`, measured 21:28:49Z),

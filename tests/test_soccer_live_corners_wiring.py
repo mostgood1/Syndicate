@@ -127,3 +127,13 @@ def test_a_corrupt_previous_artifact_starts_the_history_again_without_failing_th
     path.write_text("{ this is not json", encoding="utf-8")
     result = poller.poll_league(LEAGUE, DATE, source_root=source_root, out_root=out_root, simulations=10)
     assert len(result["projection_history"][EVENT_ID]) == 1
+
+
+def test_the_served_game_and_its_history_say_which_source_filled_corners_so_far(monkeypatch, wired):
+    """Without this a Belgian match's box-score fallback is invisible on production: the counts move, the reason does not."""
+    source_root, out_root = wired
+    monkeypatch.delenv("SYNDICATE_SOCCER_LIVE_CORNERS_ESTIMATOR", raising=False)
+    monkeypatch.setattr(poller, "build_live_state", lambda *a, **k: {**_live_state(), "corners_source": "box_fallback"})
+    result = poller.poll_league(LEAGUE, DATE, source_root=source_root, out_root=out_root, simulations=10)
+    assert result["games"][EVENT_ID]["corners_source"] == "box_fallback"
+    assert result["projection_history"][EVENT_ID][-1]["corners_source"] == "box_fallback"
