@@ -1338,6 +1338,22 @@ death, never life — do not invert it.
   - **Next (a user decision, because it is a production change):**
     - Turn on the existing env-gated cProfile hooks (`SYNDICATE_CANDIDATE_COLLECTION_PROFILE`, `SYNDICATE_CONSUME_SPORT_PROFILE`) for 1-2 builds, then turn them off. That takes an env re-inject deploy each way. L2 has no hook.
     - Or, as code: a per-build `BOOK_QUOTES_LATEST_STATS hits= misses= raw_rows= thread_s=` line, which tests the leading candidate directly.
+  - **USER 2026-09-18 ~16:20Z chose "Fix paper-execution writes"** → lane `paper-execution-ledger-batch` below. This lane stays OPEN for the per-candidate rise.
+
+### paper-execution-ledger-batch — OPEN — opened 2026-09-18 — session a1e40980-cceb-493f-adf9-5a5ca879acf6
+- Goal: cut the board thread's paper-execution wall on refresh-worker (BUILD_SPAN_EXIT portfolio_commit → last PORTFOLIO_EXECUTED/PAPER2_EXECUTED) from its 09-18 median of 189-304 s per build to <= 40 s, by reading the execution ledger once per paper run and writing it once, with the ledger's rows unchanged in content.
+- Why: USER 2026-09-18 ("Fix paper-execution writes"), out of lane `board-build-stage-slowdown`.
+  - MEASURED: each paper run pays a full `_load` of the 6.1 MB, 5,000-order `execution_ledger.json` per POSITION. `_status_of` → `find_order` is one; `place_order` → `record_order` is another, even for duplicates. Each NEW order adds `record_order` (`_persist` CAS) and `complete_order` (`_load` + `_persist` CAS).
+  - One build = 1 unrestricted plus 4 paper2 venue runs, about 238 positions and 17 placed for one date (09-18 15:41-15:44Z). Duplicate-only novig run: 17 positions in 7.9 s, about 0.45 s per position.
+- Files: `syndicate/features/shared/execution_ledger.py`, `pipeline/execute_portfolio.py`, `tests/test_paper_execution_batch.py` (NEW). Checked 2026-09-18 16:25Z: no OPEN lane's `Files:` names either module. `execution-ledger-cas` RELEASED them 09-11. `#657` (`_load` masking) is filed but not started, and this lane does NOT change `_load`.
+- Design:
+  - PAPER ONLY. `run_execution` opens a `PaperLedgerBatch` when mode != live. It does one `_load`, answers `status_of` and `place` against that in-memory state with the SAME per-order logic, then one `_persist` (merge inside the CAS, unchanged) in a `finally`, before `ledger_summary`.
+  - The logic is shared through `_record_into_state` and `_complete_in_state`, refactored out of `record_order` and `complete_order`. Live keeps `place_order` per order: write-ahead, then send, then complete.
+- Hypothesis: the paper wall is ledger I/O proportional to positions. Predicts about 5 loads and <= 1 SET per run after the fix, versus ~2×positions + 4×placed loads and 2×placed SETs before.
+- Verification (PRE-REGISTERED, on refresh-worker after deploy, over >= 10 builds):
+  - (1) Paper-execution wall per build <= 40 s median, from BUILD_SPAN_EXIT portfolio_commit to the last EXECUTED line.
+  - (2) `KEYVALUE_WRITE_LARGE ... execution_ledger.json` per build <= the number of runs that placed >= 1 order (was 2 × placed).
+  - (3) Unchanged ledger semantics: `EXECUTED` placed/duplicates behave as before (a re-run of the same plan places 0), 0 new `LEDGER_CAS_EXHAUSTED`, and paper orders per day in line with 09-17/09-18.
 
 ### ncaaf-board-sim-coverage — OPEN — opened 2026-09-18 — session 259d6003-bff3-416d-835f-12f4f7f584d8
 - Goal: on the served Layer 2 board (`/api/intelligence/query`), NCAAF FBS-vs-FBS game-line rows carry a sim view on EVERY market -- `projected` on spreads and totals, and a per-row `model_edge_pct` on two-sided pregame h2h/spreads/totals rows (weight left to the existing `_apply_skill_reliability` discount, no sport-wide suppression) -- neutral-site and moved-kickoff FBS games join, and `/ncaaf` with no `?week=` renders the schedule's target week. User decisions 2026-09-18: "they should be shown, period ... we shouldnt be hiding anything globally, every game/prop is its own entity"; "Publish, skill-discounted".
