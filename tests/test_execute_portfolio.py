@@ -1155,6 +1155,18 @@ def _record(status, **extra):
     return row
 
 
+def _placer_returns(monkeypatch, runner, row):
+    """Make the run's placer answer `row`, whichever placer the mode uses.
+
+    Paper runs place through `PaperLedgerBatch.place` since 2026-09-18 (lane
+    paper-execution-ledger-batch) and live runs through `place_order`, so a test
+    about the COUNTERS patches both. Patching only `place_order` would leave a
+    paper run placing for real, and the test would be about the ledger instead.
+    """
+    monkeypatch.setattr(runner, "place_order", lambda request, submit=None: row)
+    monkeypatch.setattr(runner.PaperLedgerBatch, "place", lambda self, request: row)
+
+
 def test_a_resting_order_counts_as_PLACED_not_as_nothing(monkeypatch):
     """MEASURED 2026-08-24T15:38:23Z. A real order went to Kalshi -- Sandy
     Alcantara over 4.5 Ks, 3 contracts at $0.50 -- and the run reported
@@ -1175,8 +1187,7 @@ def test_a_resting_order_counts_as_PLACED_not_as_nothing(monkeypatch):
     monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
     from pipeline import execute_portfolio as runner
 
-    monkeypatch.setattr(runner, "place_order",
-                        lambda request, submit=None: _record("submitted"))
+    _placer_returns(monkeypatch, runner, _record("submitted"))
     result = runner.run_execution("2026-08-22")
 
     assert result["placed"] == 1, result
@@ -1189,8 +1200,7 @@ def test_a_fill_counts_as_both_placed_and_filled(monkeypatch):
     monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
     from pipeline import execute_portfolio as runner
 
-    monkeypatch.setattr(runner, "place_order",
-                        lambda request, submit=None: _record("filled"))
+    _placer_returns(monkeypatch, runner, _record("filled"))
     result = runner.run_execution("2026-08-22")
     assert result["placed"] == 1
     assert result["filled"] == 1
@@ -1205,8 +1215,7 @@ def test_a_failed_order_is_neither_placed_nor_invisible(monkeypatch):
     monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
     from pipeline import execute_portfolio as runner
 
-    monkeypatch.setattr(runner, "place_order",
-                        lambda request, submit=None: _record("failed", error="boom"))
+    _placer_returns(monkeypatch, runner, _record("failed", error="boom"))
     result = runner.run_execution("2026-08-22")
     assert result["placed"] == 0
     assert result["failed"] == 1

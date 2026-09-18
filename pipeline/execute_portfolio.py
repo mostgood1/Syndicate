@@ -26,6 +26,7 @@ from syndicate.features.shared.execution_ledger import (
     STATUS_FILLED,
     STATUS_SUBMITTED,
     OrderRequest,
+    PaperLedgerBatch,
     execution_mode,
     ledger_summary,
     live_execution_armed,
@@ -285,6 +286,33 @@ def run_execution(
     because if it were false, paper2 would silently suppress the main book's
     orders rather than fail visibly.
     """
+    # A PAPER RUN'S NEW ROWS ARE HELD IN ONE LOADED LEDGER AND WRITTEN ONCE
+    # (`PaperLedgerBatch`, lane paper-execution-ledger-batch). The body flushes
+    # before its summary; this `finally` is the exception path, so a raise
+    # mid-slate still keeps what was placed before it, as the per-order writes
+    # did. A wrapper rather than a `try` around the loop, so the loop is not
+    # re-indented.
+    batches: list[PaperLedgerBatch] = []
+    try:
+        return _run_execution(
+            selected_date, force=force, inline=inline, venue_scope=venue_scope, batches=batches
+        )
+    finally:
+        for batch in batches:
+            try:
+                batch.flush()
+            except Exception as exc:  # noqa: BLE001 -- never mask the original raise
+                print(f"[execute_portfolio] PAPER_FLUSH_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+
+def _run_execution(
+    selected_date: str,
+    *,
+    force: bool,
+    inline: bool,
+    venue_scope: str | None,
+    batches: list[PaperLedgerBatch],
+) -> dict[str, Any]:
     normalized = str(selected_date or "").strip()
     if not normalized:
         return {"status": "skipped", "reason": "no_date"}
@@ -510,6 +538,16 @@ def run_execution(
         flush=True,
     )
 
+    # ONE LEDGER READ AND ONE WRITE PER PAPER RUN  [2026-09-18, lane
+    # paper-execution-ledger-batch]. This loop used to load the whole ledger
+    # once per position in `_status_of` and again in `place_order`, and write it
+    # twice per new order. At 6.1 MB that held refresh-worker's board thread for
+    # a median 189-304 s per build. Live keeps its per-order write-ahead through
+    # `place_order`: a live row must exist before its send does.
+    batch = PaperLedgerBatch(mode) if mode != LIVE else None
+    if batch is not None:
+        batches.append(batch)
+
     placed = 0
     filled = 0
     failed = 0
@@ -586,7 +624,7 @@ def run_execution(
         # not at all: `polymarket_us_orders._refuse_after_commence`. Evidence:
         # `state_polymarket.md` [polymarket-pregame-hold-premise-falsified].
 
-        before = _status_of(request)
+        before = batch.status_of(request) if batch is not None else _status_of(request)
         # A REJECTED order never reached the venue, so a fresh attempt is a
         # PLACEMENT, not a duplicate. Measured 2026-08-24T12:58Z: the retry
         # unblock worked and the order really was submitted -- and this branch
@@ -607,7 +645,7 @@ def run_execution(
                 skipped += 1
                 continue
 
-        record = place_order(request, submit=submitter)
+        record = batch.place(request) if batch is not None else place_order(request, submit=submitter)
         if record.get("recorded") is False:
             # REFUSED AT BUILD -- NOTHING WAS WRITTEN.  [2026-09-10, lane
             # write-ahead-build-refusal]
@@ -699,6 +737,9 @@ def run_execution(
                 "orders": int(used.get("orders") or 0) + 1,
             }
 
+    if batch is not None:
+        # Before the summary, so it counts this run's rows as it always has.
+        batch.flush()
     summary = ledger_summary(normalized)
     print(
         f"[execute_portfolio] EXECUTED date={normalized} mode={mode} venue={venue} "

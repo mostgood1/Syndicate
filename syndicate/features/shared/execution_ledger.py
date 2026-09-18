@@ -67,6 +67,7 @@ import hashlib
 import json
 import os
 import re
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -532,7 +533,35 @@ def _order_fingerprint(order: Mapping[str, Any]) -> str:
     return hashlib.sha1(blob.encode("utf-8", errors="replace")).hexdigest()
 
 
+# THE OPEN PAPER BATCH'S ROWS, visible to READERS ON ITS OWN THREAD ONLY.
+# [2026-09-18, lane paper-execution-ledger-batch] Before batching, each paper
+# order was persisted before the next position was checked, so every read in
+# between -- `execution_guard.check_order`'s account-wide `spent_today` above
+# all -- counted the orders this run had already placed. A batch holds them
+# unflushed, and a read of the STORE would undercount the run's own spend
+# against the all-venues cap. So while a batch is open, `_load` on that thread
+# answers from the batch. Every other thread, and `_read_for_merge` inside the
+# compare-and-swap, still reads the store.
+_BATCH_VIEW = threading.local()
+
+
+def _batch_view_copy(state: Mapping[str, Any]) -> dict[str, Any]:
+    """What `_load` returns while a batch is open: a copy, so a reader that
+    mutates what it loaded cannot change the batch underneath it."""
+    view = {
+        "orders": [dict(o) for o in state.get("orders") or []],
+        "created_at": state.get("created_at"),
+        "last_blind_write": state.get("last_blind_write"),
+    }
+    if _BASELINE_KEY in state:
+        view[_BASELINE_KEY] = dict(state[_BASELINE_KEY])
+    return view
+
+
 def _load() -> dict[str, Any]:
+    open_batch = getattr(_BATCH_VIEW, "state", None)
+    if open_batch is not None:
+        return _batch_view_copy(open_batch)
     try:
         payload = read_json_file(_ledger_path())
     except Exception as exc:
@@ -1254,6 +1283,25 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
     existed, in which case the EXISTING record comes back untouched -- a retry
     is a no-op by construction rather than by the caller remembering to check.
     """
+    state = _load()
+    record, created = _record_into_state(state, request, mode=mode)
+    if created:
+        _persist(state)
+    return record, created
+
+
+def _record_into_state(
+    state: dict[str, Any], request: OrderRequest, *, mode: str | None = None
+) -> tuple[dict[str, Any], bool]:
+    """`record_order` against a ledger ALREADY LOADED, writing nothing.
+
+    [2026-09-18, lane paper-execution-ledger-batch] Split out so that
+    `PaperLedgerBatch` places a whole paper run on ONE loaded state with the
+    same duplicate, legacy-key and rejected-retry rules a single order gets. Two
+    copies of those rules would drift, and a drifted duplicate rule is how one
+    bet becomes two. Mutates `state` in place; the caller decides when to
+    `_persist` it.
+    """
     key = idempotency_key(request)
     # BOTH SHAPES. A pre-fix row carries the legacy key and must still be
     # recognised as THIS bet -- see `_legacy_idempotency_key`. Matching either
@@ -1261,7 +1309,6 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
     # legacy shape ages out on its own rather than needing a migration.
     legacy_key = _legacy_idempotency_key(request)
     match_keys = {key} | ({legacy_key} if legacy_key else set())
-    state = _load()
     orders = state.get("orders") or []
     # WHAT THE ATTEMPT WE ARE REPLACING ACTUALLY DID. Empty unless a row is
     # popped below -- see `_prior_attempts_for_retry`.
@@ -1356,7 +1403,6 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
         "prior_attempts": prior_attempts,
     }
     state.setdefault("orders", []).append({k: record[k] for k in _LEAN_FIELDS})
-    _persist(state)
     return record, True
 
 
@@ -1371,6 +1417,35 @@ def complete_order(
 ) -> dict[str, Any] | None:
     """Close out a write-ahead record with what actually happened."""
     state = _load()
+    updated = _complete_in_state(
+        state,
+        key,
+        status=status,
+        fill_price=fill_price,
+        fill_stake_dollars=fill_stake_dollars,
+        venue_order_id=venue_order_id,
+        error=error,
+    )
+    if updated is not None:
+        _persist(state)
+    return updated
+
+
+def _complete_in_state(
+    state: dict[str, Any],
+    key: str,
+    *,
+    status: str,
+    fill_price: float | None = None,
+    fill_stake_dollars: float | None = None,
+    venue_order_id: str | None = None,
+    error: str | None = None,
+) -> dict[str, Any] | None:
+    """`complete_order` against a ledger ALREADY LOADED, writing nothing.
+
+    Split out with `_record_into_state` for the same reason: one copy of the
+    fields a completion sets. Mutates `state` in place.
+    """
     updated = None
     for order in state.get("orders") or []:
         if order.get("idempotency_key") != key:
@@ -1387,9 +1462,112 @@ def complete_order(
         order["settled_at"] = resolved_at
         updated = dict(order)
         break
-    if updated is not None:
-        _persist(state)
     return updated
+
+
+def _place_paper_into_state(
+    state: dict[str, Any], request: OrderRequest, *, mode: str
+) -> tuple[dict[str, Any], bool]:
+    """`place_order`'s PAPER branch against a ledger ALREADY LOADED.
+
+    Record, then fill at the requested price -- the same two steps
+    `place_order` takes, on one state instead of two load/persist round trips.
+    Returns `(row, created)`: the existing row for a duplicate, else the
+    completed row, which is what `place_order` returns.
+    """
+    record, created = _record_into_state(state, request, mode=mode)
+    if not created:
+        return record, False
+    completed = _complete_in_state(
+        state,
+        record["idempotency_key"],
+        status=STATUS_FILLED,
+        fill_price=request.requested_price,
+        fill_stake_dollars=request.requested_stake_dollars,
+        venue_order_id=None,
+    )
+    return (completed or record), True
+
+
+class PaperLedgerBatch:
+    """ONE ledger read and ONE write for a whole PAPER run.
+
+    [2026-09-18, lane paper-execution-ledger-batch] `run_execution` used to pay
+    a full `_load` of this ledger per POSITION (`_status_of`, then `place_order`
+    -> `record_order` again, duplicates included), plus two `_persist`
+    compare-and-swaps per new order. MEASURED on refresh-worker 2026-09-18, at
+    6.1 MB and 5,000 rows: a duplicate-only run took about 0.45 s per position
+    (novig, 17 positions, 7.9 s). One build places 1 unrestricted plus 4 paper2
+    books, about 238 positions, so paper execution held the board thread for a
+    median 189-304 s per build, against 45-67 s on 09-15.
+
+    Same rules, fewer round trips: `status_of` is `find_order` on the loaded
+    rows, and `place` is `place_order`'s paper branch through the shared
+    `_record_into_state` / `_complete_in_state`. Rows placed earlier in the run
+    are visible to later positions, exactly as they were after each write --
+    including to readers the loop calls between positions, because `_load` on
+    this thread answers from the open batch (`_BATCH_VIEW`). That is what keeps
+    `check_order`'s account-wide `spent_today` counting this run's own orders.
+
+    `flush` writes through the unchanged `_persist`, so the three-way merge
+    inside the compare-and-swap still keeps every row another writer touched.
+    Holding one read for the run widens the window between our read and our
+    write from one order to one run; that window is the case the merge exists
+    for, and the rows this batch changes are its own paper rows.
+
+    PAPER ONLY. A live order is recorded BEFORE it is sent, one at a time,
+    because the write-ahead row is what survives a crash mid-send. Batching
+    that would defer the record past the send, so the constructor refuses.
+    """
+
+    def __init__(self, mode: str) -> None:
+        if mode == LIVE:
+            raise ValueError(
+                "PaperLedgerBatch is paper-only: a live order must be recorded before it is sent"
+            )
+        self.mode = mode
+        self._state: dict[str, Any] | None = None
+        self._pending = 0
+        self._loaded()
+
+    def _loaded(self) -> dict[str, Any]:
+        if self._state is None:
+            # From the STORE, never from another batch's view left on this thread.
+            _BATCH_VIEW.state = None
+            self._state = _load()
+            # Readers on this thread now see this batch's rows, flushed or not.
+            _BATCH_VIEW.state = self._state
+        return self._state
+
+    def status_of(self, request: OrderRequest) -> str | None:
+        key = idempotency_key(request)
+        for order in self._loaded().get("orders") or []:
+            if order.get("idempotency_key") == key:
+                return str(order.get("status") or "")
+        return None
+
+    def place(self, request: OrderRequest) -> dict[str, Any]:
+        row, created = _place_paper_into_state(self._loaded(), request, mode=self.mode)
+        if created:
+            self._pending += 1
+        return row
+
+    def flush(self) -> int:
+        """Persist everything placed since the last flush in ONE write; returns how many.
+
+        Always closes the batch's view, written or not, so no reader on this
+        thread goes on seeing rows the store does not hold. A later `place`
+        re-reads the store: `_persist` consumed the load-time baseline.
+        """
+        pending, state = self._pending, self._state
+        self._state = None
+        self._pending = 0
+        if getattr(_BATCH_VIEW, "state", None) is state:
+            _BATCH_VIEW.state = None
+        if not pending or state is None:
+            return 0
+        _persist(state)
+        return pending
 
 
 def _blocks_a_new_attempt(order: Mapping[str, Any]) -> bool:
