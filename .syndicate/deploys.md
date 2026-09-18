@@ -37947,3 +37947,12 @@ never receives a soccer prop.
 - **verify (readings since 16:58:22Z, 3 builds, all NO-SIM):** 17:18:23Z ranker 199.3 s = load 177.5 (`cache=reused:0,extended:0,parsed:15`, cold) + rank 21.8; 17:42:21Z **34.8 s** (`reused:14,extended:1`); 18:00:19Z **19.8 s** (`reused:15`, load 0.1 s). `RANKING_DERIVED_CACHE` hit/miss 2/14, 7/3, 16/6. skip64=0, chunks=15 on every load, 0 Tracebacks, peak `self_rss_mb` 1,979, no `oomKilled`.
 - **The cold build is the open item.** Pre-change first-load-after-boot median 49.8 s (n=24 boots 09-17..09-18, range 33.7-147.8) vs later loads 43.5 s, so a restart alone does not explain 177.5 s. A local cold cached parse with production-length lines (18.3 KB/line, 220 MB) was FASTER than the old uncached read (2.97 s vs 5.4-8.6 s), so the code is not intrinsically slower. Boot jobs did not overlap the load window 17:15:26-17:18:23Z (disk inventory ended 17:13:42Z, compaction 17:07:31Z). n=1: unexplained, watch the next boot's first build.
 - **Not claimed:** the goal (a full-day NO-SIM median); memory at matched uptime beyond 1 h; that memo misses on warm builds (3 and 6) are only new markets / experiment keys (not read).
+
+## 2026-09-18 18:10Z (1:10 PM CT) — READING, no deploy — refresh-worker `19021fc5` (live 14:42:16Z) — lane mlb-sim-retrigger-churn — **verify: the 3 h window is MET**
+
+- **The window ran 14:42Z to 17:42Z**, read by `props_regen_reading.py` (session a1e40980's scratchpad) after it closed:
+  - `MLB_PROPS_REGEN_DUE` = **0** against a baseline of **3** per 3 h this morning (six in 06:05-13:01Z).
+  - `MLB_PROPS_REGEN_SKIPPED reason=top_props_present` = **6** against a baseline of 0.
+  - `MLB_DAILY_SIM_TRIGGERED` = **0**; `MEMORY_GUARD_ABORT` = 0.
+- **Confound:** refresh-worker restarted inside the window on another lane's deploy (`983c77e9`, live 16:58:22Z). A restart can only add a cold-start sim, and there were none, so it does not flatter the reading.
+- **Not measured here:** the day-slate effect on board refusals and refresh cadence, which is still owed to lane mlb-sim-retrigger-churn. Zero MLB sims in 3 h is also a reading to watch. The debounce allows one fingerprint launch an hour, so the MLB board may now refresh less often than lineups change during the evening slate.
