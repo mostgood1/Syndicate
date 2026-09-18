@@ -37821,3 +37821,13 @@ file's as-of. Ask uses the board's rule.
   That is stated, not claimed as verified.
 - **Web health after go-live:** `/api/board/layer1?sport=soccer` 200 (8.35 MB, 13.3 s) and
   `?sport=mlb` 200 at 14:5xZ.
+
+## 2026-09-18 14:59:22Z -> live 15:05:50Z (10:05 AM CT) — web `2fdb6cf3` -> `e4d2ac4a` (`dep-daml3imk1f9s739fa3g0`) — lane intelligence-idle-poll — **LIVE; idle gate served (content MET); verify: OWED (an untouched /intelligence tab stops POSTing /api/intelligence/query after 15 min)**
+
+- **What.** `65346f95`: `polling.js` gains an opt-in `idleTimeoutMs` (no pointer/key/wheel/touch/scroll/focus for that long -> stop ticking, `onIdle`; next interaction -> immediate tick and resume); `/intelligence` opts in at 15 min. Cause: a Claude desktop browser pane left open on `/intelligence` by lane `board-today-freshness` polled the ~5-6 MB query at 60/h from 2026-09-17T17:56:59Z to 2026-09-18T04:53:47Z despite `skipWhenHidden: true` (record: `state_worker.md` `[render-egress-spikes]`, 2026-09-17/18 entry).
+- **User decision:** "yes, deploy web" (2026-09-18).
+- **Sequencing.** Web was mid-deploy by lane `soccer-prop-conditioning` (`2fdb6cf3`, NOT containing `65346f95`) when first read at 14:48:13Z. I polled `deploy_claim.py status` only (no re-acquire) until the claim freed at 14:57:49Z, then confirmed via the deploys API that `dep-damktptbedkc73c5alfg` was live (finished 14:52:39Z) before acquiring 14:58:26Z.
+- **Ride-alongs (2fdb6cf3..e4d2ac4a, excluding ledger/reports/docs/data):** `scripts/soccer_season_audit/harvest_live_projections.py`, `scripts/soccer_season_audit/live_corners_forward_grade.py` (offline audit scripts, not on web's request path) + tests. No `render.yaml` change.
+- **Preflight** CLEAR 14:58:51Z (gunicorn infra only: workers 545 / 528 MB rss, 1 defunct child). Expectation `polling_js_idle_gate: absent -> present`, baseline read 14:58:31Z.
+- **Reading (content), 15:06:07Z:** served `/static/shared/polling.js` contains `idleTimeoutMs` (baseline absent); served `/intelligence` HTML contains `idleTimeoutMs: 15 * 60 * 1000`. **Predicate MET by content.**
+- **OWED (behavioural):** Render `type=request` log shows an `/intelligence` tab with no interaction issuing no `POST /api/intelligence/query` after its 15th minute (and resuming on interaction). Not observed yet; nothing has exercised it.
