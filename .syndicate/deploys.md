@@ -38066,3 +38066,17 @@ Closes the owed items of the 2026-09-18 14:27:33Z entry. Read from web's served 
 - **Which code wrote them:** live-odds-worker was on `3cc53826` during the slate (live 16:33:04Z, per this ledger), which contains `63c6d5b1` (`git merge-base --is-ancestor`). `35920359` itself was replaced at 01:16Z 09-18; this reading grades the capture code, which every later live-odds-worker commit carries.
 - **Downstream proof the rows are usable:** H32 graded 7 matches end to end, H32-BE 1, H36 scored 56 items on 5 matches (all WATCHING). Numbers in `log/2026-09-18.md` ~16:55 CT (21:55Z).
 - Scheduled check `soccer-live-corners-friday-check-0918`. No deploy, no env change, no code change.
+
+## 2026-09-18 21:59:40Z -> live 22:05:00Z (5:05 PM CT) — refresh-worker `541acddc` -> `3bd766e8` (`dep-damr8j0u01pc73esr5ig`) — lane market-history-index-memo — **verify: OWED (3 builds; watcher running)**
+
+- **What.** `42594360`: `odds_lifecycle._recent_market_history_index` builds the 7-day odds-events history index once per file version instead of once per candidate. It is the only code between `541acddc` and `3bd766e8`; the rest is ledger. USER 2026-09-18: "fix the market history index rebuild", then "Deploy after the matcher reading".
+- **Locks.** Claim 21:27:4xZ. Preflight read HOLD 21:37-21:53Z on 3-4 jobs (`run_refresh_odds_job.py` → `refresh_odds_sources.py` → `build_soccer_artifacts.py --league mls`). It read CLEAR at 21:59:38Z with 0 jobs (1 defunct child) and the deploy fired in the same breath.
+- **Expectation:** `candidate_collection_s_median` <= 120. **Baseline**, builds since the matcher fix went live at 20:49:04Z: 436.4 s (cold, first after restart), 179.3 s, 322.8 s; median 322.8 s (n=3).
+- **Matcher fix (`e639fc14`, live 20:49:04Z on lane layer2-today-next-day-starvation's deploy), first two builds:**
+  - Soccer `CONSUME_SPORT_SEGMENTS collect_s` 32.0 s → 11.0 s (n=1).
+  - Overview 269.6 s → 285.4 s (cold), then 132.7 s.
+  - Candidate collection 352.7 s → 436.4 s (cold), then 179.3 s.
+  - Build wall 1,402 s → 1,285 s (cold), then 752 s.
+  - L2 rows 5,443 → 5,387 / 5,344.
+  - `[profiler]` lines since go-live: 0, so the profilers are confirmed off.
+  - Two builds only, and the same deploy carried other lanes' changes (d05fe70f and others). Only the soccer `collect_s` number is specific to the fix.
