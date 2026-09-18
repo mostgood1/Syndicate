@@ -38125,3 +38125,14 @@ Closes the owed items of the 2026-09-18 14:27:33Z entry. Read from web's served 
 - The first build's 148.5 s ran on a cold process (restart at 22:05Z). Its whole build took 1,673.5 s because an MLB daily sim ran beside it, 22:17:51-22:48:10Z: every later stage slowed, including the CPU-bound control `kalshi_board_join` (68 s vs ~30). Candidate collection finished before the sim started. The second whole build took 1,058.7 s.
 - NCAAF live re-sims on the main thread in that window were no-ops (`elapsed_seconds` 0.0, 0 live games), so they are exonerated as the contention.
 - Lane `market-history-index-memo`: GOAL MET on this reading. The refresh-worker claim is free; the soccer lane's queued deploy was waiting on this entry.
+
+## 2026-09-18 23:48:51Z -> live 23:54:45Z (6:54 PM CT) — refresh-worker `3bd766e8` -> `008dcecab` (`dep-damsrov40ujc73csacq0`) — lane wnba-sim-distributions — **verify: OWED (after the first WNBA smart_sim publish carrying `score.dist`)**
+
+- **What.** `b7967c54`'s join half: `wnba_game_projections` prices any full-game WNBA spread/total and the half/quarter markets from `sim.score_dist`, and combo props price from the new `pr`/`pa`/`ra` ladders. The producer half went live on live-odds-worker at 23:00:55Z. USER 2026-09-18: "Both, live-odds-worker first".
+- **Ride-along:** `a2b1b466`, soccer live game-line pricer-only club-name table (lane soccer-live-gameline-name-join, session abacd435, user-approved; that session reads its own `LIVE_GAMELINE_BUILD` result).
+- **Target is `008dcecab`, not the tip.** Main's tip carried `0bbdbcf2` (NHL game-log writer, default-on in refresh-worker's NHL refresh job), which is another lane's release to make. `008dcecab` is its parent and on main.
+- **Locks.** Claim 23:47:xxZ. Preflight read CLEAR at 23:48:50Z; the memo READING had been recorded first (23:50Z entry). Baseline, served `/api/board/layer2-shortlist?sport=wnba`, read 23:48:44Z: `wnba_l2_model_edge_rows` = 28 of 221 (2026-09-18).
+- **Before-reading at go-live (23:55Z)**, from boards built before the deploy:
+  - 2026-09-18: 221 served, 28 with an edge, 0 priced from the sim's draws, combos with a probability 0/5, 154 carrying the alternate-line reason.
+  - 2026-09-19: 437 served, 15 edges, 0, 0/46, 301.
+- **Owed:** the same reading after a WNBA smart_sim publish carrying `score.dist` reaches a board build. Expect dist-priced rows > 0, combos with a probability > 0, the alternate-line reason falling, and edges rising. A watcher is polling every 10 min.
