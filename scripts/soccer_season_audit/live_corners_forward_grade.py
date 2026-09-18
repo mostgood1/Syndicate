@@ -19,6 +19,10 @@ every 15 minutes, because `live_state` keeps only in-play matches) and the durab
 Reported, never graded: per bucket, per league, each arm's bias, and the share of snapshots in the window
 whose audit state was not `applied` (the production reachability reading).
 
+H32-BE, amended 2026-09-18 before the first Belgian match on the fixed feed (`log/2026-09-18.md`): Belgian Pro
+League stays OUT of H32. Its snapshots written by the box-fallback code (non-null `corners_source`) are scored
+under H32's own rules as a separate stratum that is REPORTED ONLY: no verdict, and nothing in it touches H32's.
+
     py -3 scripts/soccer_season_audit/live_corners_forward_grade.py pull  --harvest <dir> --cache <dir>
     py -3 scripts/soccer_season_audit/live_corners_forward_grade.py grade --harvest <dir> --cache <dir>
 
@@ -48,6 +52,11 @@ LIVE_BASIS = "prekickoff_pace_v1"
 # reason), so `corners_so_far` is structurally 0 there and BOTH arms undercount the final total by the corners already
 # taken. Grading it would compare two wrong numbers on a defect neither arm owns.
 EXCLUDED_LEAGUES = frozenset({"belgian_pro_league"})
+# AMENDED 2026-09-18, before the first Belgian match played on the fixed feed (Gent v Standard Liege, 18:45Z): H32-BE.
+# Live-odds-worker `57a5920d` (live 14:30:30Z) reads corners-so-far from the box score when commentary has none, and
+# stamps every game with `corners_source`. A non-null `corners_source` therefore marks a row written by the fixed code;
+# rows without it (before the fix, or a writer on an older build) never qualify. Scored like H32, REPORTED ONLY.
+STRATUM_LEAGUE = "belgian_pro_league"
 BUCKETS = ((20.0, 40.0), (40.0, 60.0), (60.0, 80.0))
 HALF_SECONDS = 45.0 * 60.0
 GRADE_MATCHES = 100
@@ -113,15 +122,47 @@ def pick_snapshots(rows: list[dict]) -> tuple[dict, collections.Counter]:
         state = audit_state(row)
         if state is not None and state != "applied":
             funnel[f"audit_{state}"] += 1
-        if row.get("corners_basis") != LIVE_BASIS or row.get("sim_projected_total_corners") is None \
-                or row.get("projected_total_corners") is None:
+        if not _eligible(row):
             continue
         funnel["eligible"] += 1
-        key = (str(row.get("league")), str(row.get("event_id")))
-        held = chosen[key].get(bucket)
-        if held is None or str(row.get("generated_at") or "") > str(held.get("generated_at") or ""):
-            chosen[key][bucket] = row
+        _keep_last(chosen, row, bucket)
     return dict(chosen), funnel
+
+
+def pick_belgian_stratum(rows: list[dict]) -> tuple[dict, collections.Counter]:
+    """H32-BE: Belgian snapshots written by the fixed feed, under H32's own per-match rule. Reported only."""
+    funnel = collections.Counter()
+    chosen: dict = collections.defaultdict(dict)
+    for row in rows:
+        if str(row.get("league")) != STRATUM_LEAGUE:
+            continue
+        funnel["snapshots"] += 1
+        bucket = bucket_of(elapsed_minutes(row))
+        if bucket is None:
+            continue
+        funnel["in_a_bucket"] += 1
+        source = row.get("corners_source")
+        if source is None:
+            funnel["no_corners_source"] += 1
+            continue
+        funnel[f"source_{source}"] += 1
+        if not _eligible(row):
+            continue
+        funnel["eligible"] += 1
+        _keep_last(chosen, row, bucket)
+    return dict(chosen), funnel
+
+
+def _eligible(row: dict) -> bool:
+    return row.get("corners_basis") == LIVE_BASIS and row.get("sim_projected_total_corners") is not None \
+        and row.get("projected_total_corners") is not None
+
+
+def _keep_last(chosen: dict, row: dict, bucket: tuple[float, float]) -> None:
+    key = (str(row.get("league")), str(row.get("event_id")))
+    held = chosen[key].get(bucket)
+    if held is None or str(row.get("generated_at") or "") > str(held.get("generated_at") or ""):
+        chosen[key][bucket] = row
 
 
 # ---------------------------------------------------------------------------- statistics + verdict
@@ -172,6 +213,33 @@ def grade(harvest_dir: Path, cache: Path, today: dt.date | None = None) -> dict:
         if outcome.get("completed") and home.get("wonCorners") is not None and away.get("wonCorners") is not None:
             finals[(league, event)] = float(home["wonCorners"]) + float(away["wonCorners"])
 
+    units, per_bucket, per_league = _score(chosen, finals, funnel)
+    in_window = funnel["in_a_bucket"]
+    not_applied = sum(v for k, v in funnel.items() if k.startswith("audit_"))
+    summary = _summary(units, per_bucket)
+    hi = summary["ci"][1]
+    report = {
+        "today": today.isoformat(),
+        "funnel": dict(funnel),
+        **summary,
+        "per_bucket": {f"{int(b[0])}-{int(b[1])}": {"n": len(rs), "mae_published": _mean(abs(r["pub"]) for r in rs),
+                                                     "mae_sim": _mean(abs(r["sim"]) for r in rs)}
+                       for b, rs in sorted(per_bucket.items())},
+        "per_league": {lg: {"n": len(rs), "mae_published": _mean(abs(r["pub"]) for r in rs),
+                            "mae_sim": _mean(abs(r["sim"]) for r in rs)} for lg, rs in sorted(per_league.items())},
+        "share_not_applied_in_window": (not_applied / in_window) if in_window else float("nan"),
+    }
+    report["verdict"] = verdict(report["matches"], hi, today)
+
+    # H32-BE: scored AFTER the verdict is fixed, from its own picks, so nothing in it can reach H32's numbers.
+    b_chosen, b_funnel = pick_belgian_stratum(rows)
+    b_units, b_per_bucket, _ = _score(b_chosen, finals, b_funnel)
+    report["belgian_stratum"] = {"reported_only": True, "funnel": dict(b_funnel), **_summary(b_units, b_per_bucket)}
+    return report
+
+
+def _score(chosen: dict, finals: dict, funnel: collections.Counter):
+    """Per match: |error| of each arm against the final total, per bucket snapshot. Counts into `funnel`."""
     units, per_bucket, per_league = [], collections.defaultdict(list), collections.defaultdict(list)
     for key, buckets in chosen.items():
         funnel["matches_with_an_eligible_snapshot"] += 1
@@ -188,14 +256,13 @@ def grade(harvest_dir: Path, cache: Path, today: dt.date | None = None) -> dict:
             per_league[key[0]].append(record)
             diffs.append(abs(err_pub) - abs(err_sim))
         units.append(diffs)
+    return units, per_bucket, per_league
 
+
+def _summary(units: list, per_bucket: dict) -> dict:
     pooled = [r for rs in per_bucket.values() for r in rs]
     point, (lo, hi) = paired_boot(units)
-    in_window = funnel["in_a_bucket"]
-    not_applied = sum(v for k, v in funnel.items() if k.startswith("audit_"))
-    report = {
-        "today": today.isoformat(),
-        "funnel": dict(funnel),
+    return {
         "matches": len(units),
         "snapshots_graded": len(pooled),
         "mae_published": _mean(abs(r["pub"]) for r in pooled),
@@ -203,15 +270,7 @@ def grade(harvest_dir: Path, cache: Path, today: dt.date | None = None) -> dict:
         "bias_published": _mean(r["pub"] for r in pooled),
         "bias_sim": _mean(r["sim"] for r in pooled),
         "diff": point, "ci": (lo, hi),
-        "per_bucket": {f"{int(b[0])}-{int(b[1])}": {"n": len(rs), "mae_published": _mean(abs(r["pub"]) for r in rs),
-                                                     "mae_sim": _mean(abs(r["sim"]) for r in rs)}
-                       for b, rs in sorted(per_bucket.items())},
-        "per_league": {lg: {"n": len(rs), "mae_published": _mean(abs(r["pub"]) for r in rs),
-                            "mae_sim": _mean(abs(r["sim"]) for r in rs)} for lg, rs in sorted(per_league.items())},
-        "share_not_applied_in_window": (not_applied / in_window) if in_window else float("nan"),
     }
-    report["verdict"] = verdict(report["matches"], hi, today)
-    return report
 
 
 # ---------------------------------------------------------------------------- pull (network)
@@ -257,6 +316,12 @@ def print_report(r: dict) -> None:
     for lg, v in r["per_league"].items():
         print(f"    {lg:20s} n {v['n']:4d}  published {v['mae_published']:.3f}  sim {v['mae_sim']:.3f}")
     print("H32:", r["verdict"])
+    b = r.get("belgian_stratum")
+    if b:
+        print(f"H32-BE (Belgian on the fixed feed, REPORTED ONLY, no verdict): funnel {b['funnel']}")
+        print(f"  matches {b['matches']}, snapshots {b['snapshots_graded']}  |  MAE published {b['mae_published']:.3f} "
+              f"vs sim {b['mae_sim']:.3f}  |  bias {b['bias_published']:+.3f} vs {b['bias_sim']:+.3f}  |  "
+              f"diff {b['diff']:+.4f} [{b['ci'][0]:+.4f}, {b['ci'][1]:+.4f}]")
 
 
 def main(argv=None) -> int:

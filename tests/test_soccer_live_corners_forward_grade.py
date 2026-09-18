@@ -18,11 +18,14 @@ import live_corners_forward_grade as g  # noqa: E402
 TODAY = dt.date(2026, 9, 20)
 
 
-def _row(event, minute, published, sim, generated_at, basis=g.LIVE_BASIS, league="epl", state="applied", source="history"):
+def _row(event, minute, published, sim, generated_at, basis=g.LIVE_BASIS, league="epl", state="applied", source="history",
+         corners_source=None):
     half = 1 if minute < 45 else 2
     remaining = (45 - minute) * 60.0 if half == 1 else (90 - minute) * 60.0
     row = {"league": league, "event_id": event, "generated_at": generated_at, "half": half, "clock_remaining": remaining,
            "corners_basis": basis, "projected_total_corners": published, "sim_projected_total_corners": sim}
+    if corners_source is not None:
+        row["corners_source"] = corners_source
     if source == "history":
         row["live_corners_state"] = state
     else:
@@ -145,3 +148,44 @@ def test_belgian_pro_league_is_excluded_because_its_feed_has_no_corner_events():
     chosen, funnel = g.pick_snapshots(rows)
     assert list(chosen) == [("epl", "e")]
     assert funnel["excluded_league"] == 1
+
+
+# ---------------------------------------------------------------------------- H32-BE (amended 2026-09-18, reported only)
+
+BE = "belgian_pro_league"
+
+
+def test_h32_be_scores_the_fixed_feed_and_cannot_move_h32(tmp_path):
+    """Belgian rows written by the box-fallback code are scored in their own stratum; H32's own report is
+    IDENTICAL to a run with no Belgian rows at all, so the stratum cannot leak into the verdict."""
+    epl = [_row("m1", 30, 10.0, 12.0, "t1"), _row("m1", 50, 10.4, 12.0, "t2")]
+    belgian = [_row("b1", 30, 8.0, 9.5, "t1", league=BE, corners_source="box_fallback"),
+               _row("b1", 50, 8.4, 9.0, "t2", league=BE, corners_source="commentary_empty"),
+               _row("b2", 30, 7.0, 7.5, "t1", league=BE)]                     # older code: no corners_source
+    finals = {("epl", "m1"): (6, 4), (BE, "b1"): (5, 4), (BE, "b2"): (3, 3)}
+    (tmp_path / "with").mkdir()
+    (tmp_path / "alone").mkdir()
+    report = g.grade(*_write(tmp_path / "with", epl + belgian, finals), TODAY)
+    alone = g.grade(*_write(tmp_path / "alone", epl, finals), TODAY)
+
+    stratum = report["belgian_stratum"]
+    assert stratum["reported_only"] is True and "verdict" not in stratum
+    assert stratum["funnel"]["no_corners_source"] == 1
+    assert stratum["funnel"]["source_box_fallback"] == 1 and stratum["funnel"]["source_commentary_empty"] == 1
+    assert stratum["matches"] == 1 and stratum["snapshots_graded"] == 2          # b1 in two buckets; b2 never
+    assert stratum["mae_published"] == pytest.approx((1.0 + 0.6) / 2)             # final 9: |8-9|, |8.4-9|
+
+    assert report["funnel"]["excluded_league"] == 3                               # H32 still excludes Belgian
+    for key in ("matches", "snapshots_graded", "mae_published", "mae_sim", "diff", "verdict", "per_league"):
+        assert report[key] == alone[key], key
+
+
+def test_h32_be_takes_only_belgian_rows_from_the_fixed_code_and_keeps_the_last_per_bucket():
+    rows = [_row("e", 30, 10.0, 12.0, "t1", corners_source="commentary"),        # not Belgian
+            _row("b", 25, 1.0, 1.0, "t1", league=BE, corners_source="box_fallback"),
+            _row("b", 35, 2.0, 2.0, "t3", league=BE),                            # later, but no field: never picked
+            _row("b", 30, 3.0, 3.0, "t2", league=BE, corners_source="box_fallback")]
+    chosen, funnel = g.pick_belgian_stratum(rows)
+    assert list(chosen) == [(BE, "b")]
+    assert chosen[(BE, "b")][(20.0, 40.0)]["projected_total_corners"] == 3.0
+    assert funnel["snapshots"] == 3 and funnel["no_corners_source"] == 1 and funnel["eligible"] == 2

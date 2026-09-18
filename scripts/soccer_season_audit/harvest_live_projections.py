@@ -19,7 +19,7 @@ WHAT IT DOES. Pulls the served `live_state` for the given dates, and appends one
 
 Rows are JSONL under `<out>/live_projections_<date>.jsonl`, one per snapshot:
     league, event_id, generated_at, home_team, away_team, status_display_clock, half, clock_remaining,
-    home_corners_so_far, away_corners_so_far, score_home, score_away,
+    home_corners_so_far, away_corners_so_far, corners_source, score_home, score_away,
     corners_basis, projected_total_corners, sim_projected_total_corners, live_corners (the audit),
     projected_final_total (the goals arm, untouched by the corners change)
 
@@ -49,7 +49,13 @@ FIELDS_FROM_GAME = ("home_team", "away_team", "status_display_clock", "half", "c
                     # commentary-derived LOWER BOUND on ESPN's figure (exact on 39 of 48 team-matches, short on
                     # 9, never over), not the box score's number.
                     "home_shots_so_far", "away_shots_so_far",
-                    "home_shots_on_target_so_far", "away_shots_on_target_so_far")
+                    "home_shots_on_target_so_far", "away_shots_on_target_so_far",
+                    # Where corners-so-far came from (`commentary` / `commentary_empty` / `box_fallback`), carried
+                    # by the poller since live-odds-worker `57a5920d` (2026-09-18 14:30:30Z). H32-BE gates on it.
+                    # It MUST be here and not only in the history rows: `append_rows` keeps the FIRST row of a
+                    # tick, and `harvest` lists the live block first, so without it the newest tick of every
+                    # harvest would be stored without the field.
+                    "corners_source")
 FIELDS_FROM_PROJECTION = ("corners_basis", "projected_total_corners", "projected_home_corners",
                           "projected_away_corners", "sim_projected_total_corners",
                           "sim_projected_home_corners", "sim_projected_away_corners", "projected_final_total")

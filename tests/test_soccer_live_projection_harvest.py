@@ -126,3 +126,20 @@ def test_a_corrupt_state_file_does_not_stop_the_harvest(tmp_path):
     (tmp_path / "history_counts_2026-09-18.json").write_text("{not json", encoding="utf-8")
     assert h.truncation_alarm(tmp_path, "2026-09-18", {"epl": 5}) == []
     assert h.truncation_alarm(tmp_path, "2026-09-18", {"epl": 2})[0].endswith("rows 5 -> 2")
+
+
+def test_the_corners_source_survives_the_dedupe_whichever_block_the_tick_came_from(tmp_path):
+    """H32-BE gates on `corners_source`. The live block is listed first and the dedupe keeps a tick's FIRST row,
+    so the field must be copied from the live block too, or the newest tick of every harvest loses it."""
+    payload = _payload()
+    payload["games"]["401999001"]["corners_source"] = "box_fallback"
+    payload["projection_history"] = {"401999001": [
+        {"generated_at": "2026-09-18T18:15:00+00:00", "corners_source": "commentary_empty"},
+        {"generated_at": "2026-09-18T18:30:00+00:00", "corners_source": "box_fallback"},
+    ]}
+    assert h.snapshot_rows(payload)[0]["corners_source"] == "box_fallback"
+    path = tmp_path / "live_projections_2026-09-18.jsonl"
+    assert h.append_rows(path, h.snapshot_rows(payload) + h.history_rows(payload)) == 2
+    stored = {r["generated_at"]: r for r in map(json.loads, io.open(path, encoding="utf-8"))}
+    assert stored["2026-09-18T18:30:00+00:00"]["corners_source"] == "box_fallback"
+    assert stored["2026-09-18T18:15:00+00:00"]["corners_source"] == "commentary_empty"
