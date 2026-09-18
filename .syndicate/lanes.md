@@ -1376,6 +1376,14 @@ death, never life — do not invert it.
 - Verification: the grader's first production run joining at least one in-play capture to a projection-history row and an ESPN final, with the funnel printed; then H36 itself on its registered trigger.
 - Blocked by: none
 
+### polling-idle-pause-all — OPEN — opened 2026-09-18 — session f26bba3b-72ee-4f8c-9721-3f8c7e4678f1
+- Goal: every page that polls web pauses after 15 min with no interaction and resumes on the next one (user: "add the same idle pause to the other polling pages"), extending `intelligence-idle-poll` (CLOSED, `65346f95`).
+- Files: `syndicate/static/shared/polling.js`, `syndicate/static/shared/market_board.js`, `syndicate/templates/shared/layer1_board.html`, `syndicate/static/wnba/cards-parity.js`, `tests/js/polling_idle_pause.test.mjs`, `tests/test_market_board_ui.py`
+- Hypothesis: n/a (behaviour change). Shape: make the idle gate the shared poller's DEFAULT (opt-out `idleTimeoutMs: 0`) so all ~13 callers get it at one choke point; show a generic "paused" pill when the page has no `onIdle`; carry the last-activity time across `reloadCurrentPage` reloads (rank board live-lens) via sessionStorage, or a reload would reset the timer forever; move the two raw `setInterval` pollers (`market_board.js` chips, `layer1_board.html` board) onto the shared poller.
+- Falsification test: the extended node test fails against `65346f95`'s `polling.js` (default-on, reload persistence, pill) — `off != on`.
+- Verification: (1) node test passes and fails on the pre-change file; targeted pytest for the touched templates; (2) production after a user-approved web deploy: an untouched non-intelligence polling page (e.g. `/api/board/layer1` via `/…/market-board`) stops its fetches ~15 min after load in Render's `type=request` log.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
