@@ -7049,4 +7049,4 @@ but they came from an environment production never runs.
 - To add those CSVs temporarily, note that writing a file under a sparse-excluded path CLEARS its
   skip-worktree bit, so deleting it afterwards shows as a tracked DELETION. `git sparse-checkout
   reapply` restores the bit; check `git status` for ` D` before any commit.
-- *(evidence: `log/2026-09-18.md` ~16:30Z; lane `soccer-prop-conditioning`)*
+- *(evidence: `log/2026-09-18.md` ~14:40Z; lane `soccer-prop-conditioning`)*

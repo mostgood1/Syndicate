@@ -37781,3 +37781,43 @@ within ~3 min of go-live), not attributed to this change.
 - **What that number means:** 1,824 top-prop candidates were on refresh-worker's disk while the old code, reading Redis, treated top props as missing and re-simmed the full slate (19-37 min) at every cooldown — six times this morning.
 - Why there was no line until 14:56Z: the first post-restart tick (14:43:18Z) exited early with `intelligence_pipeline_busy` (from `MLB_SIM_TICK`), before the props check — not a failure of the fix.
 - **Still owed:** the 3 h window to 17:42Z (`MLB_PROPS_REGEN_DUE` expected 0 against a baseline of 3) and the day-slate effect on board refusals and refresh cadence; a watcher takes the 3 h reading.
+
+## 2026-09-18 14:46:19Z → 14:52:39Z (9:46-9:52 AM CT) — live-odds-worker `57a5920d` -> `2fdb6cf3` and web `d0686493` -> `2fdb6cf3` — lane soccer-prop-conditioning (`#673`, user decision "yes, deploy all three") — **verify: live-odds-worker OWED on its first soccer build after go-live; web LIVE, its change has no production reader today (stated below)**
+
+| service | from → to | fired | live | deploy |
+|---|---|---|---|---|
+| live-odds-worker | `57a5920d` → `2fdb6cf3` | 14:46:19Z | 14:52:07Z | `dep-damktetbedkc73c59bu0` |
+| web | `d0686493` → `2fdb6cf3` | 14:47:03Z | 14:52:39Z | `dep-damktptbedkc73c5alfg` |
+
+Each fired in the same cycle as its preflight CLEAR (`deploy673.py`, scratchpad of session 4a583d41), with
+the baseline read in that cycle. Both locks released after go-live (14:5xZ); refresh-worker is the third
+service and gets its own entry.
+
+**What `2fdb6cf3` carries for this lane:** `bdf98148`. The assists ladder moves to the start/sub mixture
+(H33). Every probability field is stamped `ladder_conditioning`. The board refuses a ladder whose
+question differs from its family's. The shots mean fallback reads `_if_playing`. Each row gets its own
+file's as-of. Ask uses the board's rule.
+
+**Ride-alongs, named:**
+- live-odds-worker: none. `bdf98148` is the only code commit in `57a5920d..2fdb6cf3`; the rest is ledger.
+- web: `84700b9b` (refresh-worker book-grid rebuild env; inert on web), `7156d2c6` (MLB prop settlement),
+  `f64c9109` (MLB past-date card score), `684c776d` + `fd022dcf` (soccer live corners, already live on
+  live-odds-worker since 14:30:30Z), `19021fc5` (MLB props-regen disk read), `3c63c909`, `faa826fc`.
+  No `render.yaml` change on either path.
+
+**Stated predictions and baselines (read in the firing cycle):**
+- live-odds-worker, `low_freeze_assists_unconditional`: baseline **1230/1230** unconditional over its
+  prekickoff freeze entries today/tomorrow (newest `frozen_at` 14:26:25Z). Predicted: **0 among entries
+  frozen after go-live**. Read again at 14:5xZ: 235/235, newest `frozen_at` 14:25:05Z, so NO soccer build
+  has run on the new code yet. That is expected: pregame builds there are cadence-gated after a restart.
+  **The reading is owed on its first post-go-live build.**
+- web, `ask_soccer_assists_label_agrees_with_board`: baseline read `unlabelled`. **That baseline is an
+  instrument miss, not a reading.** Ask resolves prop rows from the layer2 shortlist, and the soccer
+  shortlist carries **0 prop rows** (1,025 rows at 14:48Z, all game markets). So Ask never sees a
+  soccer prop row, and web's prop-label change has **no production reader today**. The soccer
+  game-evidence as-of line is also unread: two shortlisted MLS h2h rows asked 14:49-14:50Z both
+  routed to `out_of_scope` or returned no visuals. Web's changes are covered by tests only
+  (`tests/test_soccer_prop_conditioning.py::test_ask_labels_a_new_assists_ladder_if_playing_and_flags_a_legacy_one`).
+  That is stated, not claimed as verified.
+- **Web health after go-live:** `/api/board/layer1?sport=soccer` 200 (8.35 MB, 13.3 s) and
+  `?sport=mlb` 200 at 14:5xZ.
