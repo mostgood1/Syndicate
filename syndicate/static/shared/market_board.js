@@ -685,5 +685,14 @@
   void loadGameChips();
   // Same 60s cadence the Layer 2 board uses for its chips -- scores and
   // inning/clock tokens go stale much faster than the odds rows themselves.
-  setInterval(() => { if (!document.hidden) void loadGameChips(); }, 60000);
+  // Through the shared poller so it also pauses on an untouched tab (lane
+  // polling-idle-pause-all); the bare timer is only a fallback.
+  if (window.SyndicatePolling && typeof window.SyndicatePolling.start === 'function') {
+    window.SyndicatePolling.start({
+      intervalMs: 60000, skipWhenHidden: true, refreshOnVisible: false, refreshOnFocus: false,
+      onTick: () => loadGameChips(),
+    });
+  } else {
+    setInterval(() => { if (!document.hidden) void loadGameChips(); }, 60000);
+  }
 })();

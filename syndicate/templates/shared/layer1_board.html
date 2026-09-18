@@ -367,7 +367,8 @@
     if (!state.board) {
       q("l1-body").innerHTML = '<div class="l1-empty">Loading…</div>';
     }
-    fetch(url, { headers: { "Accept": "application/json" } })
+    // Returned so the shared poller's preventOverlap can see a fetch in flight.
+    return fetch(url, { headers: { "Accept": "application/json" } })
       .then(function (r) { return r.json(); })
       .then(function (b) {
         var first = !state.board;
@@ -1387,13 +1388,26 @@
   //
   // State (view, market, segment, league) survives a refresh because render()
   // reads it back out of `state` -- the tabs do not reset under the user.
+  //
+  // Through the shared poller, which also PAUSES after 15 min with no
+  // interaction -- a tab that reports itself visible with nobody looking polled
+  // all night on 2026-09-17 (lane polling-idle-pause-all). Its refreshOnVisible
+  // refetches the moment the tab is looked at again. The bare timer below is a
+  // fallback for a page where polling.js failed to load.
   var REFRESH_MS = 60000;
-  setInterval(function () { if (!document.hidden) { fetchBoard(); } }, REFRESH_MS);
-  // And refetch the moment the tab is looked at again, rather than making the
-  // user wait out the remainder of an interval that ran while they were away.
-  document.addEventListener("visibilitychange", function () {
-    if (!document.hidden) { fetchBoard(); }
-  });
+  if (window.SyndicatePolling && typeof window.SyndicatePolling.start === "function") {
+    window.SyndicatePolling.start({
+      intervalMs: REFRESH_MS, skipWhenHidden: true, refreshOnVisible: true, refreshOnFocus: false,
+      onTick: function () { return fetchBoard(); },
+    });
+  } else {
+    setInterval(function () { if (!document.hidden) { fetchBoard(); } }, REFRESH_MS);
+    // And refetch the moment the tab is looked at again, rather than making the
+    // user wait out the remainder of an interval that ran while they were away.
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) { fetchBoard(); }
+    });
+  }
 
   if (window.SyndicateBetSlip) { window.SyndicateBetSlip.init(); }
   if (window.SyndicateAskBar) { window.SyndicateAskBar.init(); }
