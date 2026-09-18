@@ -72,6 +72,32 @@ def _extract_corner_events(summary: dict[str, Any]) -> list[dict[str, Any]]:
     return corners
 
 
+def _summary_state(summary: dict[str, Any]) -> str:
+    """ESPN's own match state for this summary: ``pre`` / ``in`` / ``post`` (empty when absent)."""
+    competition = ((summary.get("header") or {}).get("competitions") or [{}])[0]
+    return str((((competition.get("status") or {}).get("type") or {}).get("state")) or "").strip().lower()
+
+
+def _box_corners(summary: dict[str, Any]) -> tuple[int, int] | None:
+    """(home, away) ``wonCorners`` from the summary's box score, sides keyed off ESPN's ``homeAway``."""
+    found: dict[str, int] = {}
+    for team_block in ((summary.get("boxscore") or {}).get("teams") or []):
+        side = str(team_block.get("homeAway") or "").strip().lower()
+        if side not in {"home", "away"}:
+            continue
+        for stat in team_block.get("statistics") or []:
+            if stat.get("name") != "wonCorners":
+                continue
+            raw = stat.get("value", stat.get("displayValue"))
+            try:
+                found[side] = int(float(raw))
+            except (TypeError, ValueError):
+                pass
+    if "home" in found and "away" in found:
+        return found["home"], found["away"]
+    return None
+
+
 def _current_half_and_clock_remaining(as_of_seconds: float, *, half_seconds: float = _HALF_SECONDS) -> tuple[int, float]:
     """(half, clock_remaining_in_that_half) for a continuous match-clock
     value. Stoppage time is folded into the current half (a cutoff at
@@ -134,6 +160,7 @@ def build_live_state(
     key_events = extract_key_events(summary)
     shot_events = extract_shot_events(summary, event_id=event_id)
     corner_events = _extract_corner_events(summary)
+    commentary_has_corners = bool(corner_events)
 
     if as_of_seconds is not None:
         key_events = [e for e in key_events if e["clock_seconds"] <= as_of_seconds]
@@ -161,6 +188,26 @@ def build_live_state(
     away_shots = [s for s in shot_events if s["team"] == away_team]
 
     half, clock_remaining = _current_half_and_clock_remaining(cutoff, half_seconds=half_seconds)
+
+    # CORNERS SO FAR: commentary first, the box score only as a LIVE fallback.
+    #
+    # Commentary `corner-awarded` events reconcile exactly with ESPN's box `wonCorners` in nine leagues
+    # (530 of 530 completed matches within +-1, measured 2026-09-17), and they carry a clock, so a replay at
+    # any cutoff is exact. Belgian Pro League's commentary carries NONE (0 of 554 box corners), so there the
+    # count was structurally 0 and every live corners projection added nothing for the corners already taken.
+    #
+    # The box score fills that gap, but ONLY for a match ESPN reports as in progress, and only when the
+    # commentary has no corner events at all. A completed match's box is its FINAL total, so reading it for a
+    # replay at a cutoff would leak the future into every backtest; there the commentary count (0) stands and
+    # `corners_source` says why. Commentary with any corner events is never mixed with the box.
+    home_corners = sum(1 for e in corner_events if e["team"] == home_team)
+    away_corners = sum(1 for e in corner_events if e["team"] == away_team)
+    corners_source = "commentary" if commentary_has_corners else "commentary_empty"
+    if not commentary_has_corners and _summary_state(summary) == "in":
+        box = _box_corners(summary)
+        if box is not None and sum(box) > 0:
+            home_corners, away_corners = box
+            corners_source = "box_fallback"
 
     player_stats: dict[str, dict[str, Any]] = {}
     for row in roster_rows:
@@ -207,8 +254,9 @@ def build_live_state(
         "away_shots_so_far": len(away_shots),
         "home_shots_on_target_so_far": sum(1 for s in home_shots if s["outcome"] in _ON_TARGET_OUTCOMES),
         "away_shots_on_target_so_far": sum(1 for s in away_shots if s["outcome"] in _ON_TARGET_OUTCOMES),
-        "home_corners_so_far": sum(1 for e in corner_events if e["team"] == home_team),
-        "away_corners_so_far": sum(1 for e in corner_events if e["team"] == away_team),
+        "home_corners_so_far": home_corners,
+        "away_corners_so_far": away_corners,
+        "corners_source": corners_source,
         "player_stats": player_stats,
     }
     # GAME SHAPE -- the state a live projection is computed FROM, kept rather
