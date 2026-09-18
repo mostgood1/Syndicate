@@ -356,14 +356,66 @@ def build_recent_market_history_index(events: Sequence[Mapping[str, Any]]) -> di
     return index
 
 
-# #75: caching this index was tried and reverted. It looked like the twin of
-# _JSONL_ROWS_CACHE -- build_recent_market_history_index runs once per game,
-# copies every event under up to nine aliases and sorts each bucket -- but
-# measured against production artifacts it bought nothing (identical peak) and
-# cost ~7MB of retained memory holding the index. _MAX_JSONL_ROWS_PER_FILE caps
-# this path at 2000 rows/day, so the whole 7-day set is ~14k events and
-# rebuilding it 15 times is noise. The uncapped path was the odds-history
-# shards; see the payload_cache threading in simulation_adapter.py.
+# MEMOISED  [2026-09-18, lane market-history-index-memo]. This REVERSES #75,
+# on a new measurement of a different quantity.
+#
+# #75 tried a cache here and reverted it: "it bought nothing (identical peak)
+# and cost ~7MB of retained memory", on the premise that the index "runs once
+# per game" -- ~15 rebuilds of ~14k events, which is noise. That measured PEAK
+# MEMORY, and a rebuild does not move the peak.
+#
+# What it costs is CPU, and it no longer runs once per game. cProfile of
+# `candidate_collection_with_fallback` on refresh-worker `ef3fb857`,
+# 2026-09-18 20:09-20:19Z: 610.8 of 641.0 s was `build_market_features` ->
+# `build_market_history_view` -> here, and `build_recent_market_history_index`
+# ran **1,311 times -- once per CANDIDATE** -- for 517.5 s, with 18.35M
+# `_event_aliases` (= 1,311 x ~14k events) and 9.6M sorts.
+#
+# So ONE index is kept, for the latest version of the day files it was built
+# from. The key is each file's (path, mtime), read BEFORE loading: a file
+# appended mid-read gets a newer mtime than the key, so the next call rebuilds
+# rather than serving stale rows. The index is read only by
+# `_recent_history_rows`, which returns copies, so a caller cannot mutate it.
+# The ~7MB #75 measured is the price, and it is one index, never a growing set.
+_RECENT_INDEX_MEMO: tuple[Any, dict[str, list[dict[str, Any]]]] | None = None
+
+
+def _recent_odds_files_fingerprint(*, days_back: int, end_date: str | None, root: Path | None) -> tuple[Any, ...]:
+    """The files `load_recent_odds_events` would read, with their mtimes. Mirrors its path logic."""
+    lookback = max(int(days_back or 0), 1)
+    end_token = _parse_date_token(end_date) or central_today()
+    odds_root = root or odds_lifecycle_root()
+    files = []
+    for offset in range(lookback):
+        path = odds_root / f"{(end_token - timedelta(days=offset)).isoformat()}.jsonl"
+        try:
+            stat = path.stat()
+            files.append((str(path), stat.st_mtime_ns, stat.st_size))
+        except OSError:
+            files.append((str(path), None, None))
+    return (lookback, end_token.isoformat(), str(odds_root), tuple(files))
+
+
+def _recent_market_history_index(*, days_back: int = 7, end_date: str | None = None, root: Path | None = None) -> dict[str, list[dict[str, Any]]]:
+    """`build_recent_market_history_index(load_recent_odds_events(...))`, built once per file version."""
+    global _RECENT_INDEX_MEMO
+    # The compaction hook `load_recent_odds_events` runs first, so a compaction
+    # it triggers is already in the mtimes below. It is rate-limited to once
+    # per 30 minutes, so calling it on a memo hit costs a clock read.
+    _maybe_compact_stale_odds_lifecycle_files()
+    # The LOADER is part of the key as well as the files. A caller that swaps it
+    # (every test that patches `load_recent_odds_events`) gets its own build
+    # instead of an index built from someone else's events. The memo holds the
+    # loader object itself, so a later replacement cannot reuse its identity.
+    loader = load_recent_odds_events
+    key = (_recent_odds_files_fingerprint(days_back=days_back, end_date=end_date, root=root), loader)
+    memo = _RECENT_INDEX_MEMO
+    if memo is not None and memo[0] == key:
+        return memo[1]
+    events = loader(days_back=days_back, end_date=end_date, root=root)
+    index = build_recent_market_history_index(events) if events else {}
+    _RECENT_INDEX_MEMO = (key, index)
+    return index
 _SELECTION_SUBJECT_RE = re.compile(r"^(.*?)\s+(?:OVER|UNDER)\b", re.IGNORECASE)
 
 
@@ -420,10 +472,9 @@ def _stat_text_for_filtering(row: Mapping[str, Any]) -> str:
 
 
 def _recent_history_rows(candidate: Mapping[str, Any], *, sport: str | None = None, lookback_days: int = 7, end_date: str | None = None) -> list[dict[str, Any]]:
-    recent_events = load_recent_odds_events(days_back=lookback_days, end_date=end_date)
-    if not recent_events:
+    index = _recent_market_history_index(days_back=lookback_days, end_date=end_date)
+    if not index:
         return []
-    index = build_recent_market_history_index(recent_events)
     candidate_row = dict(candidate)
     candidate_market_id = _candidate_market_id(candidate_row, sport=sport)
     market_level_aliases = {candidate_market_id, str(candidate_row.get("market_id") or "").strip(), str(candidate_row.get("player_id") or candidate_row.get("athlete_id") or "").strip()}
