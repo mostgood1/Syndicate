@@ -47,14 +47,17 @@ collected book line (`build_props_for_date`), and the OddsAPI prop capture reque
 (`syndicate/local_nhl_odds.py:545`). A Kalshi `player_saves` board row therefore has
 no `player_sim` source; that is a named `no_producer`, not a missing file.
 
-**THE GAME LOG IS FROZEN.** `nhl_source/source_artifacts/data/raw/player_game_stats.csv`
-covers 2026-05-01..2026-06-15 (playoffs only, mtime 2026-06-19). Its only writer is
-the vendor CLI `collect_player_game_stats`
-(`vendor/nhl_betting_repo/nhl_betting/data/collect.py:165`); no Syndicate job runs
-it. Recent form is read from it and its staleness stated. **A blank `shots` cell on a
-skater row is ZERO shots**: the parser's `stats.get("shots") or stats.get("sog") or
-... or p.get("shots")` (`collect.py:114`) turns `sog: 0` into None. Measured: 411 of
-1,476 skater rows blank, and not one row carries `0.0` while 1.0..10.0 all occur.
+**THE GAME LOG HAS A SCHEDULED WRITER SINCE `#674`.**
+`nhl_source/source_artifacts/data/raw/player_game_stats.csv` was frozen at
+2026-05-01..2026-06-15 (playoffs only, mtime 2026-06-19), written only by the vendor CLI
+`collect_player_game_stats`. Now `syndicate/features/nhl/boxscore_log.py` adds every
+finished game on each NHL refresh (`scripts/refresh_nhl_oddsapi.py`) and publishes the file.
+Staleness is still stated from the newest game, not assumed. **A blank `shots` cell on a
+skater row is ZERO shots**: the vendor parser's `stats.get("shots") or stats.get("sog")
+or ... or p.get("shots")` (`collect.py:114`) turned `sog: 0` into None. Measured: 411 of
+1,476 skater rows blank, and not one row carries `0.0` while 1.0..10.0 all occur. The new
+writer writes 0 and repairs those blanks; the reader keeps treating a blank as 0 for any
+copy written before that.
 
 NOT PUBLISHED / NO PRODUCER (stated on the tables): `starting_goalies_<date>.csv`
 (worker-side, not allowlisted), pregame goalie save % (only in-game,
@@ -576,7 +579,7 @@ def _recent_form(subject: PropSubject, market: NhlMarket | None, line: float | N
     if log.path is None:
         return absent(Layer.RECENT_FORM, (
             f"{ABSENT_NO_ARTIFACT}:nhl_source {GAME_LOG_RELATIVE} not on this disk "
-            "(its only writer is the vendor CLI collect_player_game_stats)"))
+            "(written by the NHL refresh on refresh-worker, syndicate/features/nhl/boxscore_log.py)"))
     window = f"{log.window[0]}..{log.window[1]}" if log.window else "empty"
     if log.ambiguous:
         return absent(Layer.RECENT_FORM, f"{ABSENT_NO_MATCH}:{subject.player_name} is ambiguous in player_game_stats.csv (initial + surname) and no lineups row fixes the id")

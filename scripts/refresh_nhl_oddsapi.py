@@ -665,6 +665,20 @@ def _run_owned_generation(*, artifact_root: Path, target_dates: list[str], props
         except Exception as exc:
             warnings.append(f"owned props generation failed {target_date}: {exc}")
 
+    # `#674`: the per-game player log NHL prop evidence reads for RECENT FORM. It had no
+    # scheduled writer, so web's copy stopped at the 2025-26 playoffs. Once per run, after
+    # generation so a slow feed cannot delay predictions. It acts only on the hosted root
+    # (`<data_root>/nhl_source`) and says why when it does not, so a local or test root is
+    # a printed skip, not a warning.
+    try:
+        from syndicate.features.nhl.boxscore_log import refresh_hosted_game_log
+
+        game_log = refresh_hosted_game_log(artifact_root)
+        if game_log.get("error"):
+            warnings.append(f"nhl game log refresh failed: {game_log['error']}")
+    except Exception as exc:
+        warnings.append(f"nhl game log refresh failed: {exc}")
+
 
 def main() -> int:
     print("=== NHL RUNNER HIT ===", flush=True)
