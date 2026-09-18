@@ -37619,3 +37619,58 @@ in `todo.md #623`, carrying reading 1 of 6.
 - **Baseline (read 01:13:08Z, window 22:13-01:13Z):** `reason=fingerprint_change` **7**, `MLB_SIM_FINGERPRINT_DEBOUNCED` **0**. (Earlier 3 h reads: 10 at 00:37Z, 9 at 00:55Z, 8 at 01:04Z — the window was sliding off the densest stretch.) 12 h context: 19 fingerprint launches, 31 board refusals.
 - **EXPECT:** over a 3 h window after go-live, fingerprint launches **<= 4** (a 3600 s gap allows at most 3, plus any that ride a repair trigger) and debounced **>= 1**; over a full day slate, fewer `MEMORY_GUARD_ABORT` refusals of the board and today's board re-completing more often than the ~20 min median measured 16:40-23:10Z on 09-17.
 - **verify: OWED.** (1) PREDICATE: an `MLB_SIM_FINGERPRINT_LAUNCH` line after 01:20:00Z, then an `MLB_SIM_FINGERPRINT_DEBOUNCED` within the hour after it — proof the branch runs, not just that the code shipped. (2) The 3 h counts above. (3) The day-slate board refusal count and today's re-completion interval on 2026-09-18. Tonight's MLB slate is winding down, so (3) is the real test.
+
+## 2026-09-18 00:33:04Z → 01:29:09Z (7:33-8:29 PM CT 09-17) — THREE deploys for `#672`, all to commits carrying `4d221768` — lane `nfl-prop-week-substrate` — **verify: MET on two of the goal's three readings; the third is scheduled, not failed**
+
+| service | from → to | fired | live | deploy |
+|---|---|---|---|---|
+| refresh-worker | `7ef0431b` → `c05918c8` | 00:33:04Z | 00:39:36Z | `dep-dam8dg61egvs738hdp1g` |
+| live-odds-worker | `35920359` → `d0686493` | 01:16:04Z | ~01:22Z | `dep-dam91l61egvs738jhevg` |
+| web | `90888a55` → `d0686493` | 01:22:28Z | 01:29:09Z | `dep-dam94l5bedkc73ahc550` |
+
+Each fired in the same loop cycle as its preflight CLEAR (refresh-worker when the MLB daily sim
+finished; live-odds-worker on try 3; web on try 1). All three locks held throughout and released
+after each reading.
+
+**verify (1), MET — the week is no longer pinned.** Before: 64 `NFL_PROP_PROJECTION_LAUNCHING`
+lines in 24 h, EVERY one `season=2026 week=1`. First launch on `c05918c8`, 00:54:00Z:
+`season=2026 week=2 reason=artifact_missing_no_prior_launch`. Week 2 IS the current week:
+production's `schedule_2026.csv` has week 1 at 16/16 scored and week 2 at 0/16 (it opens
+tonight, DET @ BUF). **Correction to this lane's own earlier notes and commit message:** I wrote
+"the board played week 3"; that was inferred from game dates without reading the schedule, and
+was wrong. Fixed in the code comments by this entry's commit.
+
+**verify (2), MET — the odds capture files the right week.** That first launch refused
+`zero_sim_rows odds_rows=0`, and the reason was upstream: live-odds-worker writes the NFL prop
+capture and was still on `35920359` (committed 10 min BEFORE `4d221768`), so it filed week-2
+props as `oddsapi_player_props_2026_wk1.csv` (rewritten 00:53Z, 866,144 B). After its deploy:
+**`oddsapi_player_props_2026_wk2.csv` on web at 01:29:50Z (861,814 B)**. Web's
+`/nfl/api/props` moved `control_value 1 -> 2` and `source_path ..._wk1.csv -> ..._wk2.csv`.
+Cards stayed **0 -> 0**; believed (NOT verified) to be because no week-2 projection artifact
+exists yet for the page to join.
+
+**verify (3), NOT YET READ, and why it is a schedule rather than a failure.** The build that
+proves the play-by-play half has not re-run. After the 00:54Z launch produced nothing, the
+autorun took `SEASON_PROJECTION_ARTIFACT_MISSING ... artifact_missing_after_launch
+interval_seconds=86400` — `#389`'s anti-busy-loop guard waits the full DAILY interval after a
+launch that left no artifact, logged every ~12 min through 02:46Z. The input it lacked arrived at
+01:29Z, 35 min after that launch, so the next week-2 build is due ~00:54Z on 2026-09-19. The
+pbp half — does the builder now FIND `pbp_2025.csv` and produce rows — is unmeasured until
+then. No build child ran tonight, so the memory question on a 97.9 MB pbp is unmeasured too.
+
+**Ride-alongs, named so nobody guesses:**
+- `c6a91b90` (MLB fingerprint debounce, lane `mlb-sim-retrigger-churn`) rode live-odds-worker
+  and web — **INERT on both**: its branch sits below `_mlb_daily_sim_enabled()`, and
+  `SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER` is FALSE on live-odds-worker and absent (= False) on
+  web (that lane's single-key reads, 2026-09-18 ~01:1xZ). No expectation attached.
+- The soccer corners/shots lanes' `63c6d5b1`, `063ca373`, `5f46bd22`, `90f0ff8f`, `f37fc667`
+  rode refresh-worker; `63c6d5b1` closes that lane's documented whole-file-replace truncation
+  hazard, which it had marked "insurance, not urgency".
+- Web additionally carried `7ef0431b`, `e2104fcd` (`#671`, inert on web), `05195909`,
+  `fd59d32a`, `d8a15f79`, `d0c25f1e`, `5a8ff498`, `0b04ecac`.
+- **The 00:39Z refresh-worker restart resets the MLB sim cadence**, so any before/after count of
+  fingerprint re-sims across this window measures the restart, not code.
+
+**Web health:** the watcher saw 502s 01:26:55-01:28:27Z (the deploy's own restart) and again
+01:33:04-01:33:50Z — web's post-deploy shape, per `web-memory-guard`'s note (2-3 unhealthy events
+within ~3 min of go-live), not attributed to this change.

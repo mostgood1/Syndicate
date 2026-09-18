@@ -74,7 +74,7 @@ def test_the_target_week_follows_the_played_schedule_not_gits_copy(two_roots):
     assert sources.nfl_target_week(2026) == 3          # weeks 1 and 2 are played
     # Pre-change behaviour, asserted directly so the regression is visible: the
     # checkout's copy would have answered 1 -- which is what production did, 64
-    # launches in 24 h while the board played week 3.
+    # launches in 24 h after week 1 had finished (the real current week was 2).
     monkey = two_roots["checkout"] / "schedule_2026.csv"
     assert "2026_01_NE_SEA,2026,REG,1,2026-09-09,20:20,NE,SEA,,\n" in monkey.read_text(encoding="utf-8")
 

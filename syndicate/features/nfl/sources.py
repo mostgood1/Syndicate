@@ -337,7 +337,11 @@ def data_path(*parts: str) -> Path:
         has 272 of 272 rows with blank scores -- the season as it looked when it
         was committed -- so "the lowest week with an unplayed game" was **1**,
         forever. The worker relaunched the NFL prop build for week 1 sixty-four
-        times in 24 h while the board played week 3.
+        times in 24 h after week 1 had FINISHED (16 of 16 games scored on the
+        mounted disk's copy; week 2 began 2026-09-17). Corrected 2026-09-18: this
+        line first said "while the board played week 3", inferred from game dates
+        without reading the schedule. The deployed fix launched `week=2`, which is
+        right.
       * `player_stats._pbp_path` read the play-by-play here, and `tracking/` is
         gitignored, so `load_player_plays` returned `()` and every one of those
         builds refused with `zero_sim_rows` against 2,296 real odds rows.
