@@ -313,6 +313,7 @@ def test_no_target_week_skips_the_build_by_name(root, monkeypatch):
     from syndicate.features.ncaaf import player_stats_refresh as refresh
     from syndicate.features.ncaaf import sources
 
+    monkeypatch.setattr(pp, "current_week_from_state", lambda season, **kw: None)
     monkeypatch.setattr(sources, "ncaaf_target_week", lambda season: None)
     summary = refresh.build_prop_projections_after_refresh(season=2026, snapshot_path=_snapshot(root))
     assert summary["status"] == "skipped" and summary["reason"] == "no_target_week"

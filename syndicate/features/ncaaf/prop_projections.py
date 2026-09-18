@@ -36,6 +36,24 @@ with one game is ~1/3 his own line and ~2/3 prior; with six games ~3/4 his own.
 `scripts/build_ncaaf_prop_projections.py --backtest` scores this against real
 OUTCOMES; nothing here has been scored against a PRICE.
 
+MEASURED 2026-09-18, substrate `checkout` (the git-tracked 2025 snapshot,
+35,829 rows, weeks 1-16, NO 2024 -- so the prior-season path is not exercised
+and this is evidence about the CODE, not about production). MAE of the shrunk
+mean vs the raw season-to-date mean on every projected player's next game:
+
+    weeks 2-8            model    raw mean      weeks 9-16 (held out)
+    passing yards        62.24    64.06           54.31 vs 54.54
+    passing TDs          0.826    0.868           0.684 vs 0.694
+    rushing yards        23.05    24.13           19.77 vs 19.73
+    receiving yards      21.21    22.11           19.74 vs 19.79
+    receptions           1.457    1.450           1.343 vs 1.329
+
+Better early (when shrinkage matters) on 4 of 5, a wash late; receptions never
+beat the raw mean. K_ROLE=2 was chosen before the run and weeks 2-8 did not
+prefer 1 or 3. P(over) at a proxy line (floor of the raw mean + 0.5) is still
+over-confident in its upper bins (receiving yards 0.65-0.80: 0.71 predicted,
+0.54 observed) -- so a board edge from this model is a lead, not a price.
+
 THE DISTRIBUTION, so P(over line) exists:
 
     yards  gamma (support >= 0, right-skewed), falling back to a normal only

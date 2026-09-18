@@ -341,9 +341,15 @@ def build_prop_projections_after_refresh(
     summary: dict[str, Any] = {"season": int(season), "week": week}
     try:
         if week is None:
-            from syndicate.features.ncaaf.sources import ncaaf_target_week
+            # The published week_state first; `ncaaf_target_week`'s games-cache
+            # fallback (17.9 s / 41 MB on a dev machine) only when it is absent.
+            from syndicate.features.ncaaf.prop_projections import current_week_from_state
 
-            week = ncaaf_target_week(int(season))
+            week = current_week_from_state(int(season))
+            if week is None:
+                from syndicate.features.ncaaf.sources import ncaaf_target_week
+
+                week = ncaaf_target_week(int(season))
             summary["week"] = week
         if not week:
             summary.update(status="skipped", reason="no_target_week")
