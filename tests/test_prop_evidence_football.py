@@ -252,20 +252,125 @@ def test_names_join_through_initials_without_loosening_the_surname():
 # ---------------------------------------------------------------------------
 
 
-def test_ncaaf_player_sim_is_declared_no_producer_and_the_prop_model_is_never_called(monkeypatch):
+def test_ncaaf_player_sim_reads_the_worker_artifact_and_web_never_models(monkeypatch):
+    """`ncaaf_prop_projections_2026_wk3.json` in the fixture root is the REAL
+    builder's output (`scripts/build_ncaaf_prop_projections.py --season 2026
+    --week 3`) over the production-sliced snapshot beside it -- not typed."""
     from syndicate.features.ncaaf import prop_model
+    from syndicate.features.ncaaf import prop_projections as pp
 
     def forbidden(*args, **kwargs):
         raise AssertionError("web must not model NCAAF props")
 
     for name in ("_read_rows", "_rates", "anytime_td_probability"):
         monkeypatch.setattr(prop_model, name, forbidden)
+    for name in ("build_payload", "payload_from_players", "build_prop_projections"):
+        monkeypatch.setattr(pp, name, forbidden)
     evidence = _build(JOSEPH_WILLIAMS_RECEPTIONS)
     coverage = evidence.coverage()
     assert list(coverage) == [layer.value for layer in LAYER_ORDER]
-    assert coverage["player_sim"].startswith("no_producer:")
     assert coverage["track_record"] == "insufficient_sample:no_graded_cell_for_market"
-    assert all(coverage[k] == "filled" for k in ("recent_form", "matchup", "advanced", "game_sim", "environment")), coverage
+    assert all(coverage[k] == "filled" for k in ("player_sim", "recent_form", "matchup", "advanced", "game_sim", "environment")), coverage
+
+    artifact = json.loads((NCAAF / "data/ncaaf_prop_projections_2026_wk3.json").read_text(encoding="utf-8"))
+    colorado = next(p for p in artifact["players"] if p["name"] == "Joseph Williams" and p["team"] == "Colorado")
+    entry = colorado["markets"]["receptions"]
+    facts = evidence.layers[Layer.PLAYER_SIM].facts
+    assert facts["player_team"] == "Colorado"  # never the Holy Cross namesake the artifact also carries
+    assert facts["mean"] == pytest.approx(entry["mean"])
+    assert facts["prob_over"] == pytest.approx(pp.prob_over(entry, 4.5))
+    assert (facts["artifact_week"], facts["game_week"], facts["stale_week"]) == (3, 3, False)
+    rows = _rows(evidence, Layer.PLAYER_SIM)
+    assert any(r[0] == "Model skill" and "unmeasured" in r[1] for r in rows)
+
+
+def test_ncaaf_player_sim_is_a_named_absence_without_the_artifact(monkeypatch):
+    """Reachability: the layer is filled BY the artifact reader and nothing else."""
+    from syndicate.features.ncaaf import prop_projections as pp
+
+    monkeypatch.setattr(pp, "newest_index_at_or_before", lambda season, week: None)
+    coverage = _build(JOSEPH_WILLIAMS_RECEPTIONS).coverage()
+    assert coverage["player_sim"].startswith("artifact_missing:ncaaf_prop_projections_2026_wk3.json"), coverage
+
+
+def test_ncaaf_player_sim_names_a_market_the_model_does_not_price():
+    row = {**JOSEPH_WILLIAMS_RECEPTIONS, "market": "Rushing Attempts", "line": 2.5}
+    assert _build(row).coverage()["player_sim"].startswith("no_producer:the NCAAF prop model does not price Rushing Attempts")
+
+
+def test_ncaaf_recent_form_carries_a_season_to_date_row():
+    snapshot = _csv(NCAAF / "source_artifacts/data/processed/player_game_stats/ncaaf_player_game_stats_snapshot.csv")
+    colorado = [r for r in snapshot if r["player_name"] == "Joseph Williams" and r["team"] == "Colorado" and r["season"] == "2026"]
+    evidence = _build(JOSEPH_WILLIAMS_RECEPTIONS)
+    season = evidence.layers[Layer.RECENT_FORM].facts["season_to_date"]
+    total = sum(float(r["receptions"]) for r in colorado)
+    assert season["season"] == 2026 and season["games"] == len(colorado)
+    assert season["total"] == pytest.approx(total) and season["per_game"] == pytest.approx(total / len(colorado))
+    labels = [r[0] for r in _rows(evidence, Layer.RECENT_FORM)]
+    assert f"2026 season to date — total ({len(colorado)} games)" in labels
+    assert "2026 season to date — per game" in labels
+
+
+_BOX_COLUMNS = ("season", "week", "game_id", "player_id", "player_name", "team", "passing_attempts", "passing_yards",
+                "passing_tds", "interceptions", "rushing_attempts", "rushing_yards", "receptions", "receiving_yards",
+                "anytime_td", "source_snapshot_date")
+
+
+def _box_for(tmp_path, monkeypatch, rows, subject_row):
+    path = tmp_path / "snapshot.csv"
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=_BOX_COLUMNS, restval="0")
+        writer.writeheader()
+        writer.writerows(rows)
+    monkeypatch.setattr(C, "first_existing", lambda *a, **k: path)
+    from syndicate.features.shared.prop_evidence.contract import PropSubject
+
+    subject = PropSubject.from_board_row(subject_row, selected_date="2026-09-19")
+    return subject, football._ncaaf_box(subject, "Colorado", "Northwestern")
+
+
+def _line(season, week, gid, pid, name, team, rec):
+    return {"season": season, "week": week, "game_id": gid, "player_id": pid, "player_name": name, "team": team,
+            "receptions": rec, "receiving_yards": rec * 10, "source_snapshot_date": "2026-09-14"}
+
+
+def test_ncaaf_recent_form_keeps_a_transfers_old_school_games_by_player_id(tmp_path, monkeypatch):
+    rows = [
+        _line("2025", 5, "O1", "777", "Joseph Williams", "Old School", 6),
+        _line("2025", 6, "O2", "777", "Joseph Williams", "Old School", 7),
+        _line("2026", 1, "C1", "777", "Joseph Williams", "Colorado", 3),
+        _line("2026", 1, "H1", "888", "Joseph Williams", "Holy Cross", 9),  # a namesake: never joined
+        _line("2026", 1, "C1", "1", "Somebody Else", "Opponent U", 1),
+        _line("2025", 5, "O1", "2", "Somebody Else", "Rival", 1),
+    ]
+    subject, box = _box_for(tmp_path, monkeypatch, rows, JOSEPH_WILLIAMS_RECEPTIONS)
+    assert box.team == "Colorado" and [g["game_id"] for g in box.games] == ["C1"]
+    assert [g["game_id"] for g in box.other_school_games] == ["O2", "O1"]
+    assert box.elsewhere == ["Holy Cross"]
+    layer = football._ncaaf_recent_form(subject, "receptions", "Receptions", box, "Colorado", "Northwestern")
+    assert layer.facts["values"] == [3.0, 7.0, 6.0]
+    assert layer.facts["other_schools"] == ["Old School"]
+    assert layer.facts["season_to_date"]["games"] == 1  # 2026 only; the old-school games are 2025
+    assert any("(Old School)" in r[0] for r in layer.tables[0]["rows"])
+
+
+def test_ncaaf_a_transfer_facing_his_old_school_is_one_person_not_ambiguous(tmp_path, monkeypatch):
+    rows = [
+        _line("2025", 5, "N1", "777", "Joseph Williams", "Northwestern", 6),
+        _line("2026", 1, "C1", "777", "Joseph Williams", "Colorado", 3),
+    ]
+    _, box = _box_for(tmp_path, monkeypatch, rows, JOSEPH_WILLIAMS_RECEPTIONS)
+    assert not box.ambiguous and box.team == "Colorado"
+    assert [g["game_id"] for g in box.other_school_games] == ["N1"]
+
+
+def test_ncaaf_two_people_of_one_name_in_this_game_are_still_refused(tmp_path, monkeypatch):
+    rows = [
+        _line("2026", 1, "N1", "555", "Joseph Williams", "Northwestern", 6),
+        _line("2026", 1, "C1", "777", "Joseph Williams", "Colorado", 3),
+    ]
+    _, box = _box_for(tmp_path, monkeypatch, rows, JOSEPH_WILLIAMS_RECEPTIONS)
+    assert box.ambiguous == ["Colorado", "Northwestern"] and not box.games and not box.other_school_games
 
 
 def test_ncaaf_recent_form_joins_the_board_team_not_a_same_named_player():

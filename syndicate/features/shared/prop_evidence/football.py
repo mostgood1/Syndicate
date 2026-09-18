@@ -50,10 +50,16 @@ NCAAF SOURCES (all allowlisted; measured 2026-09-17):
     week_state/ncaaf_week_state_<season>.json
                                    unplayed_kickoffs[week].last -- places a kickoff in a week
     smartsim2_projections_<season>_wk<week>.csv / smartsim2_segment_distributions_...json
+    ncaaf_prop_projections_<season>_wk<week>.json
+                                   players[] {player_id, name, team, markets{stat: {mean, dist,
+                                   sd | dispersion, season_mean, season_games, prior_*}}} --
+                                   built on refresh-worker from games BEFORE the week
+                                   (`ncaaf/prop_projections.py`, lane ncaaf-player-data)
 
-NO NCAAF PLAYER PROJECTION IS PUBLISHED, and web does not model:
-`syndicate/features/ncaaf/prop_model.py` exists and is deliberately NOT called
-here, so `player_sim` is a named `no_producer` absence. Team names resolve
+WEB DOES NOT MODEL: `player_sim` READS the worker-built prop projection and
+evaluates its published distribution at the row's line; `ncaaf/prop_model.py`
+is still not called here. Recent form joins a transfer's other-school games
+through his CFBD player_id (never his name). Team names resolve
 through `ncaaf.oddsapi_lines.resolve_team` -- the validated resolver the board
 join uses -- never a mascot match (~680 schools share mascots).
 
@@ -1117,6 +1123,11 @@ class NcaafBox:
     snapshot_dates: list[str]
     #: Both clubs in THIS game field a player of this name: refused, never guessed.
     ambiguous: list[str] = field(default_factory=list)
+    #: The SAME player's games for another school (a transfer's old team), joined
+    #: through his CFBD player_id -- never through the name, which a namesake
+    #: shares. Recent form reads these; share-of-team layers do not, because the
+    #: team denominators belong to a different offense.
+    other_school_games: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _ncaaf_box(subject: PropSubject, home: str | None, away: str | None) -> NcaafBox | None:
@@ -1127,7 +1138,7 @@ def _ncaaf_box(subject: PropSubject, home: str | None, away: str | None) -> Ncaa
     wanted = {_fold(t): t for t in (home, away) if t}
     matcher = NameMatcher(subject.player_name)
     mine: dict[str, dict[str, Any]] = {}
-    elsewhere: set[str] = set()
+    other: list[dict[str, Any]] = []
     team_game: dict[tuple[str, str], dict[str, float]] = {}
     game_meta: dict[str, dict[str, Any]] = {}
     dates: set[str] = set()
@@ -1161,28 +1172,45 @@ def _ncaaf_box(subject: PropSubject, home: str | None, away: str | None) -> Ncaa
             if row.get("source_snapshot_date"):
                 dates.add(str(row.get("source_snapshot_date")))
             if matcher(row.get("player_name")):
+                entry.update({"game_id": gid, "team": team, "season": row.get("season"), "week": row.get("week"),
+                              "player_id": str(row.get("player_id") or "").strip()})
                 if _fold(team) in wanted:
-                    entry.update({"game_id": gid, "team": team, "season": row.get("season"), "week": row.get("week")})
                     mine.setdefault(gid, entry)
                 else:
-                    elsewhere.add(team)
+                    other.append(entry)
     except Exception:
         logger.exception("prop_evidence football: unreadable %s", path)
         return None
-    teams = {g["team"] for g in mine.values()}
+
+    def _order(g: dict[str, Any]) -> tuple[int, int, str]:
+        return int(C.to_float(g.get("season")) or 0), int(C.to_float(g.get("week")) or 0), str(g.get("game_id") or "")
+
+    # AMBIGUITY IS DECIDED BY PERSON (player_id), NOT BY SCHOOL. Two ids on this
+    # game's two schools are two people of one name: refused, never guessed.
+    # One id on both schools is ONE person -- a transfer facing his old team --
+    # which the old by-school rule refused as "on both rosters".
+    ids = {g.get("player_id") for g in mine.values()}
     ambiguous: list[str] = []
-    if len(teams) > 1:
-        # One name on BOTH rosters of this game: refuse rather than guess.
+    if len(ids) > 1:
+        teams = {g["team"] for g in mine.values()}
         logger.warning("prop_evidence football: %r matches players on %s", subject.player_name, sorted(teams))
         ambiguous = sorted(teams)
-        mine, teams = {}, set()
-    games = list(mine.values())
-    for g in games:
+        mine, ids = {}, set()
+    current_team = max(mine.values(), key=_order)["team"] if mine else None
+    games = [g for g in mine.values() if g["team"] == current_team]
+    # The same person's lines for any other school (his old team, including one
+    # of this game's two) travel with him; a namesake's never do.
+    moved = [g for g in mine.values() if g["team"] != current_team]
+    moved += [g for g in other if ids and g.get("player_id") in ids]
+    elsewhere = sorted({g["team"] for g in other if not (ids and g.get("player_id") in ids)})
+    for g in games + moved:
         others = game_meta.get(g["game_id"], {}).get("teams", set()) - {g["team"]}
         g["opponent"] = next(iter(sorted(others)), "")
-    games.sort(key=lambda g: (int(C.to_float(g.get("season")) or 0), int(C.to_float(g.get("week")) or 0), g["game_id"]), reverse=True)
-    return NcaafBox(path=path, games=games, team=next(iter(teams), None), elsewhere=sorted(elsewhere),
-                    team_game=team_game, game_meta=game_meta, snapshot_dates=sorted(dates), ambiguous=ambiguous)
+    games.sort(key=_order, reverse=True)
+    moved.sort(key=_order, reverse=True)
+    return NcaafBox(path=path, games=games, team=current_team, elsewhere=elsewhere,
+                    team_game=team_game, game_meta=game_meta, snapshot_dates=sorted(dates), ambiguous=ambiguous,
+                    other_school_games=moved)
 
 
 # ---------------------------------------------------------------------------
@@ -1210,17 +1238,56 @@ def _ncaaf_recent_form(subject: PropSubject, stat: str | None, label: str, box: 
     if reason:
         return absent(Layer.RECENT_FORM, reason)
     assert box is not None
-    last = box.games[:C.LAST_N_GAMES]
+
+    def _order(g: dict[str, Any]) -> tuple[int, int, str]:
+        return int(C.to_float(g.get("season")) or 0), int(C.to_float(g.get("week")) or 0), str(g.get("game_id") or "")
+
+    # HIS games, wherever he played them. A transfer's old-school lines used to
+    # be dropped here as "same name found elsewhere"; they are joined by CFBD
+    # player_id in `_ncaaf_box`, so a namesake still never gets in.
+    history = sorted(box.games + box.other_school_games, key=_order, reverse=True)
+    last = history[:C.LAST_N_GAMES]
     volume_col, volume_label = NCAAF_VOLUME[stat]
     event = stat == "anytime_td"
     line = _line_for(subject, stat)
-    values = [None if g.get(stat) is None else ((1.0 if (g.get(stat) or 0) > 0 else 0.0) if event else g.get(stat)) for g in last]
-    rows = [[_week_label(g.get("season"), g.get("week")), g.get("opponent") or "", C.fmt_num(g.get(volume_col), 0),
+
+    def _value(g: dict[str, Any]) -> float | None:
+        if g.get(stat) is None:
+            return None
+        return (1.0 if (g.get(stat) or 0) > 0 else 0.0) if event else g.get(stat)
+
+    def _game_label(g: dict[str, Any]) -> str:
+        text = _week_label(g.get("season"), g.get("week"))
+        return text if g.get("team") == box.team else f"{text} ({g.get('team')})"
+
+    values = [_value(g) for g in last]
+    rows = [[_game_label(g), g.get("opponent") or "", C.fmt_num(g.get(volume_col), 0),
              C.fmt_num(v, 0) if v is not None else "—"] for g, v in zip(last, values)]
     clean = [v for v in values if v is not None]
     vol = [C.to_float(g.get(volume_col)) for g in last]
     vol = [v for v in vol if v is not None]
     rows.append([f"L{len(last)} avg", "", C.fmt_num(sum(vol) / len(vol), 1) if vol else "—", C.fmt_num(sum(clean) / len(clean), 2) if clean else "—"])
+
+    # THE SEASON-TO-DATE ROW. "Last 10" crosses seasons, so on its own it cannot
+    # say what he has done THIS year -- the number a line is set against.
+    season = _season(subject)
+    this_season = [g for g in history if season is not None and int(C.to_float(g.get("season")) or 0) == season]
+    season_values = [v for v in (_value(g) for g in this_season) if v is not None]
+    season_volume = [v for v in (C.to_float(g.get(volume_col)) for g in this_season) if v is not None]
+    season_fact: dict[str, Any] = {"season": season, "games": len(this_season)}
+    if this_season:
+        total, n = sum(season_values), len(this_season)
+        season_fact.update(total=total, per_game=total / n if season_values else None,
+                           volume_total=sum(season_volume), volume_per_game=sum(season_volume) / n if season_volume else None)
+        noun = "TD games" if event else "total"
+        rows.append([f"{season} season to date — {noun} ({n} game{'s' if n != 1 else ''})", "",
+                     C.fmt_num(sum(season_volume), 0), C.fmt_num(total, 0)])
+        rows.append([f"{season} season to date — per game", "",
+                     C.fmt_num(sum(season_volume) / n, 1) if season_volume else "—",
+                     C.fmt_num(total / n, 2) if season_values else "—"])
+    else:
+        rows.append([f"{season} season to date: no {season} games in the snapshot", "", "", ""])
+
     rate = C.hit_rate(values, line, _norm_side(subject.side))
     if rate:
         rows.append([f"Hit rate vs {C.fmt_line(line)}", "", "", C.hit_rate_text(rate)])
@@ -1229,12 +1296,90 @@ def _ncaaf_recent_form(subject: PropSubject, stat: str | None, label: str, box: 
     series = list(reversed([(_week_label(g.get("season"), g.get("week")), v) for g, v in zip(last, values)]))
     charts = [c for c in [_form_chart(series, label=label, player=subject.player_name, line=line)] if c]
     through = box.snapshot_dates[-1] if box.snapshot_dates else "—"
+    other_schools = sorted({g["team"] for g in last if g.get("team") != box.team})
     return LayerEvidence(
         Layer.RECENT_FORM,
         tables=[table(f"Last {len(last)} games — {subject.player_name}, {box.team} (CFBD box scores through {through})", ["Game", "Opp", volume_label, label], rows, Layer.RECENT_FORM)],
         charts=charts,
-        facts={"games": len(last), "hit_rate": rate, "values": values, "team": box.team, "snapshot_through": through},
+        facts={"games": len(last), "hit_rate": rate, "values": values, "team": box.team, "snapshot_through": through,
+               "season_to_date": season_fact, "other_school_games": sum(1 for g in last if g.get("team") != box.team),
+               "other_schools": other_schools},
         source="ncaaf:player_game_stats_snapshot", as_of=through if through != "—" else C.mtime_iso(box.path))
+
+
+def _ncaaf_player_sim(subject: PropSubject, stat: str | None, label: str, season: int | None,
+                      game: NcaafGame | str, home: str | None, away: str | None) -> LayerEvidence:
+    """The worker-built prop projection for this player and market -- READ from
+    `ncaaf_prop_projections_<season>_wk<week>.json`, never computed here.
+
+    The week is the GAME's (the projection row's week, else `week_state`), and
+    only that week's file or an EARLIER one is read: a later week's build
+    contains this game's own line.
+    """
+    if stat is None:
+        return absent(Layer.PLAYER_SIM, f"{ABSENT_NOT_APPLICABLE}:market {subject.market} has no football stat mapping")
+    from syndicate.features.ncaaf import prop_projections as pp
+
+    if stat not in pp.MARKETS:
+        priced = ", ".join(spec["label"] for spec in pp.MARKETS.values())
+        return absent(Layer.PLAYER_SIM, f"{ABSENT_NO_PRODUCER}:the NCAAF prop model does not price {subject.market} (it prices {priced})")
+    if season is None:
+        return absent(Layer.PLAYER_SIM, f"{ABSENT_NO_MATCH}:no season for {subject.selected_date}")
+    if not home or not away:
+        return absent(Layer.PLAYER_SIM, f"{ABSENT_NO_MATCH}:board teams do not resolve to CFBD schools ({subject.away_team} @ {subject.home_team})")
+    if isinstance(game, NcaafGame):
+        game_week, week_basis = game.week, "projection_row"
+    else:
+        game_week, week_basis = pp.week_for_kickoff(season, subject.commence_time)
+    if game_week is None:
+        return absent(Layer.PLAYER_SIM, f"{ABSENT_NO_MATCH}:no week for kickoff {subject.commence_time or subject.selected_date}")
+    index = pp.newest_index_at_or_before(season, game_week)
+    if index is None:
+        return absent(Layer.PLAYER_SIM, f"{ABSENT_NO_ARTIFACT}:{pp.artifact_name(season, game_week)} (or an earlier week) not on this disk")
+    name = pp.artifact_name(index.season, index.week)
+    player, reason = pp.find_player(index, subject.player_name, (home, away))
+    if player is None:
+        why = {"player_not_in_artifact": "has no projection (no game before this week, or a spot role only)",
+               "player_not_on_either_team": f"is projected only for another school, not {away}/{home}",
+               "ambiguous_player": f"matches two projected players on {away}/{home} -- refused rather than guessed"}.get(reason, reason)
+        return absent(Layer.PLAYER_SIM, f"{ABSENT_NO_MATCH}:{subject.player_name} {why} in {name}")
+    entry = (player.get("markets") or {}).get(stat)
+    if not isinstance(entry, dict):
+        return absent(Layer.PLAYER_SIM, f"{ABSENT_NO_MATCH}:{subject.player_name} has no {label.lower()} projection in {name} (no {label.lower()} opportunity logged this season)")
+
+    line = _line_for(subject, stat)
+    p_over = pp.prob_over(entry, line) if line is not None else None
+    mean = C.to_float(entry.get("mean"))
+    dist = str(entry.get("dist") or "")
+    spread = (f"var/mean {C.fmt_num(entry.get('dispersion'), 2)}" if dist in pp.COUNT_DISTRIBUTIONS
+              else f"sd {C.fmt_num(entry.get('sd'), 1)}")
+    rows: list[list[Any]] = [["Projected mean", C.fmt_num(mean, 2)]]
+    if line is not None:
+        rows.append([f"Model P(over {C.fmt_line(line)})", C.fmt_pct(p_over)])
+        rows.append([f"Model P(under {C.fmt_line(line)})", C.fmt_pct(1.0 - p_over) if p_over is not None else "—"])
+    rows.append(["Distribution", f"{dist} ({spread}; widened for the uncertainty in the mean)"])
+    interval = pp.central_range(entry)
+    if interval:
+        rows.append(["Approx. 80% range", f"{C.fmt_num(interval[0], 1)} – {C.fmt_num(interval[1], 1)}"])
+    n = entry.get("season_games")
+    rows.append([f"{season} season to date", f"{C.fmt_num(entry.get('season_mean'), 2)} per game over {n} game{'s' if n != 1 else ''} before week {index.week}"])
+    rows.append(["Shrunk toward", f"{C.fmt_num(entry.get('prior_mean'), 2)} ({entry.get('prior_source')}), weight {C.fmt_num(entry.get('prior_weight_games'), 0)} games; role {entry.get('role')}"])
+    rows.append(["Projection file", f"{name} (games before week {index.week}; generated {str(index.generated_at or '—')[:16].replace('T', ' ')})"])
+    stale = index.week != game_week
+    if stale:
+        rows.append([f"STALE WEEK: priced for week {index.week}", f"this game is week {game_week}; no week-{game_week} projection file is published, so week {index.week}..{game_week - 1} games are missing from it"])
+    rows.append(["Model skill", "unmeasured against prices -- a baseline projection, not a pick"])
+    board_prob = C.to_float(subject.projection.get("model_prob_over"))
+    market_prob = C.to_float(subject.projection.get("market_fair_prob_over"))
+    if board_prob is not None or market_prob is not None:
+        rows.append(["Board model P(over) vs market fair", f"{C.fmt_pct(board_prob)} vs {C.fmt_pct(market_prob)}"])
+    facts = {"stat": stat, "mean": mean, "prob_over": p_over, "dist": dist, "artifact_week": index.week,
+             "game_week": game_week, "week_basis": week_basis, "stale_week": stale, "season_games": n,
+             "prior_source": entry.get("prior_source"), "player_team": player.get("team"),
+             "player_id": player.get("player_id")}
+    title = f"Player sim — {subject.player_name} {label} {C.fmt_line(line)} ({player.get('team')}, NCAAF {season} wk{game_week})"
+    return LayerEvidence(Layer.PLAYER_SIM, tables=[table(title, ["Measure", "Value"], rows, Layer.PLAYER_SIM)],
+                         facts=facts, source="ncaaf:ncaaf_prop_projections", as_of=index.generated_at)
 
 
 def _ncaaf_allowed_by_team(box: NcaafBox, stat: str) -> dict[str, list[tuple[int, int, str, float]]]:
@@ -1441,9 +1586,9 @@ def build_ncaaf(subject: PropSubject) -> PropEvidence:
     game = _ncaaf_find_game(subject, season, home, away)
     box = _ncaaf_box(subject, home, away)
 
-    # NOTHING IS PUBLISHED, AND WEB DOES NOT MODEL. `ncaaf/prop_model.py` is not
-    # called here on purpose (worker split); the absence is the fact.
-    evidence.set(absent(Layer.PLAYER_SIM, f"{ABSENT_NO_PRODUCER}:no NCAAF player projection artifact is published; web does not model (ncaaf/prop_model.py is not called)"))
+    # READ FROM THE WORKER-BUILT ARTIFACT (`ncaaf/prop_projections.py`); web
+    # still does not model, and `ncaaf/prop_model.py` is still not called here.
+    evidence.set(_ncaaf_player_sim(subject, stat, label, season, game, home, away))
     evidence.set(_ncaaf_recent_form(subject, stat, label, box, home, away))
     evidence.set(_ncaaf_matchup(subject, stat, label, box, home, away))
     evidence.set(_ncaaf_advanced(subject, stat, label, box, home, away))

@@ -53,10 +53,14 @@ EXPECTED: dict[str, set[str]] = {
     "soccer": {"player_sim", "matchup", "advanced", "game_sim", "environment"},
     # NFL recent form is NOT expected: `nfl_fantasy_usage_*.json` is allowlisted
     # but production web holds zero of them (export listing, 2026-09-17), so no
-    # per-game NFL player stats reach this service. NCAAF has no published player
-    # projection and web must not model, so player_sim is not expected either.
+    # per-game NFL player stats reach this service.
     "nfl": {"player_sim", "matchup", "advanced", "game_sim", "environment"},
-    "ncaaf": {"recent_form", "matchup", "advanced", "game_sim", "environment"},
+    # NCAAF player_sim IS expected from 2026-09-18 (lane `ncaaf-player-data`):
+    # refresh-worker builds `ncaaf_prop_projections_<season>_wk<week>.json` and
+    # web only reads it. The fixture copy is that builder's output over the
+    # fixture snapshot. In PRODUCTION this fails until the artifact is on web's
+    # disk -- which is exactly what it should report.
+    "ncaaf": {"player_sim", "recent_form", "matchup", "advanced", "game_sim", "environment"},
 }
 
 # One real board row per provider sport, the same rows the provider tests use.
