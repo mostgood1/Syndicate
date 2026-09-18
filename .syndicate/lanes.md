@@ -442,7 +442,7 @@ death, never life — do not invert it.
     - On a match, under a per-shard lock shared with `append_book_quotes`, it reads the local-only rows after `webpos`, truncates at `webpos`, appends web's new tail, re-appends the local-only valid JSON rows web's tail does not already contain, and advances `webpos`.
     - On a mismatch, or a missing or implausible `webpos`, it does ONE whole pull plus the local-only valid rows, and resets `webpos`. It is logged by name.
   - **Files amended:**
-    - `odds_book_quotes.py` scope widens to the append lock in `append_book_quotes`.
+    - Released 2026-09-18 ~19:45Z (file scoped out to board-build-stage-slowdown; see the Files note above) -- was: the scope widening to the append lock in `append_book_quotes` in `odds_book_quotes.py`.
     - RELEASED 2026-09-15 ~21:20Z to lane `soccer-live-scoreboard-range-stale` (see this block's Files line); the amendment as written: `artifact_publisher.py` stays `pull_streamed_artifact` only, plus a private helper.
 - **STATUS 2026-09-15 ~13:25 CT: P2 BUILT, NOT DEPLOYED.**
   - `odds_book_quotes.shard_append_lock` (flock on `.<shard>.lock`; a no-op without fcntl; never blocks a write) wraps the append in `append_book_quotes`.
