@@ -38016,3 +38016,11 @@ never receives a soccer prop.
 - **Production file:** `soccer_source/belgian_pro_league/api/live_state/live_state_2026-09-18.json` via `/api/ops/artifacts/export`, `generated_at 2026-09-18T19:09:14Z` (after kickoff). `games` holds `401878987` only; `status_display_clock 21'`; `momentum.supported True`, `source fotmob`, `fotmob_match_id 5811764` (= expected), `events` 21, `reason None`.
 - **Verdict: MET** on the first read, so no control read was needed. This is also the accent-fold case (FotMob "Standard Liège" vs ESPN "Standard Liege"). All three leagues of the lane (Championship, Eredivisie, Belgian Pro League) are now verified in play on production.
 - **verify:** MET — the reading above. Nothing owed.
+
+## 2026-09-18 19:18:41Z -> live 19:24:24Z (14:24 CT) — refresh-worker `ef3fb857` same-commit env re-inject (`dep-damot4ff3r2c73apr9f0`) — lane worker-disk-auto-retention — **`SYNDICATE_RETENTION_MAX_FILES_PER_PASS` absent (8000) -> 130000; deletes stay OFF; reading is the next daily sweep (~00:49Z 09-19)**
+
+- **Decision:** user 2026-09-18 ~11:25 CDT ("yes, raise the cap after the ranker deploy") and ~13:10 CDT ("yes, start the retention cap deploy").
+- **Order kept (learning 2026-09-18):** claim acquired 19:11Z as worker-disk-auto-retention FIRST, then the single-key PUT (read `None` -> `130000`, read back), then preflight. First preflight 19:12:17Z refused TOO_SOON (25-min spacing after `ef3fb857` 18:52:47Z, another lane's deploy); retried 19:18:39Z: CLEAR (only infrastructure processes; redundancy waived by `--reinject-env`).
+- **Prediction / baseline (preflight receipt):** `retention_sweep_scanned` 8000 -> all files (~125,000; 124,941 at 15:32Z); `cursor_complete` false -> true; `elapsed_s` 6.07 -> <= 900 (own thread); `SKIPPED_MEMORY_PRESSURE` 0 -> 0.
+- **verify (the reading, OWED):** the first `DISK_RETENTION_SUMMARY` after 19:24:24Z (daily stamp, due ~00:49Z) reads `scanned` >= ~120,000 and `cursor_complete=true`; plus its `DISK_RETENTION_PATH` per-rule totals for the whole disk. Watcher `retention_cap_rollout.py watch dep-damot4ff3r2c73apr9f0` running.
+- **Also restarted by this deploy:** the ranker cache (lane ranking-records-build-cost) -- the next build is a cold parse, expected ~60 s load.
