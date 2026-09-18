@@ -37723,3 +37723,34 @@ within ~3 min of go-live), not attributed to this change.
 - **(d) dated `PULL_FAILED ... timed out` — MET:** live-odds-worker **12 of 1,732 dated pulls (0.69%)**, 30 `PULL_FAILED` in total; refresh-worker **0 of 174 (0%)**.
 - **Ledger agreement:** the 2026-09-17 17:10Z entry (session a1e40980, n=5, p90 19.9, max 21.8, 0 aborts, 0 clamps) agrees with this read for 15:50-17:08Z; its narrow p90 margin did not hold on the longer window.
 - **verify:** (a)/(b)/(d) MET; (c) NOT MET. Lane stays OPEN; no code changed.
+
+## 2026-09-18 14:19Z (09:19 CT) — reading: one combined-board rebuild's anon cost on web (lane web-memory-guard) — **UNATTRIBUTED (null result, not an exoneration). A cold rebuild IS proven (`board_read` 10,040 ms), but the counter cannot say which worker served it, and the likely worker was a 15 s-old replacement whose warm-up is mixed into the rise**
+
+- **Scope.** Scheduled task `web-board-rebuild-memory-cost-0918`, no deploy, no env change. Web runs `d0686493` (live 01:28:49Z 09-18, `dep-dam94l5bedkc73ahc550`); this is the first reading of this route since `efd24273` / `90888a55`.
+- **Gates (14:17:44Z / 09:17 CT), all passed on the first try:** `/healthz` 200 x3 at 0.24 / 0.18 / 0.17 s. Events (limit 30): the latest `server_failed` was 01:34:01Z (a health-check timeout, 12.7 h earlier). There was no `oomKilled` since 09-17 16:36:52Z, and the latest `deploy_ended` was 01:28:49Z. `/api/ops/memory`: unreclaimable 776.6 MB, sampled pid 5345 anon 145.2 MB. Game chips 09-18: 15 MLB games, all `pregame`.
+- **Request.** `POST /api/intelligence/query` with the board's own body (`intelligence.html` `intelligenceQueryPayload`, initial load): `{"question":"top edges today","mode":"recommendation","timing":"all","background":false,"force_refresh":false,"slim_aliases":true,"drop_row_diagnostics":true}`. Sent 14:19:03Z, **200 in 15.97 s wall (client), 39,784,407 bytes**, `debug_source=combined_board_window`. This was the only heavy request of the run.
+- **Proof the rebuild ran: HALF of the required proof.** (a) PRESENT. `[intelligence] QUERY_STAGE_MS` at 14:19:17.13Z (instance `-lz4gm`) reads `board_read` **10,040.4 ms**, `hydrate_and_mirror` 672.3, `slim` 131.7, `drop_row_diagnostics` 289.2, `version_and_debug` 1,933.8, **total 13,067.4 ms**, rows **4,679**. It is the only `QUERY_STAGE_MS` line in 14:17:30-14:20:06Z, so it is this request. A single-flight stale serve returns at once, so a 10 s `board_read` is not `COMBINED_BOARD_SERVED_STALE`. (b) NOT READ. The logs API returned HTTP 429 on calls 2 through 5, which exhausted the 5-call budget. The access-log line, and a direct grep for `COMBINED_BOARD_SERVED_STALE` / `WEB_WORKER_MEMORY_RECYCLE` / `Booting worker` in the window, are both **unread**. The 15.97 s client wall time is the only duration on the response side. For comparison, the next two queries were WARM (`board_read` 0.1 ms): 14:20:06Z total 3,084.6 ms and 14:20:58Z total 4,598.4 ms, from another caller on the board's 60 s poll. Even warm, `version_and_debug` costs 1.8-2.3 s.
+- **pid map** (`/api/ops/memory`, `glibc_arena_detail` / `growth_episodes`; `arena_count` 2 on every read):
+
+  | read (Z) | pid | anon MB | secondary arena MB | age s | requests_total | unreclaimable MB |
+  |---|---|---|---|---|---|---|
+  | 14:17:44 | 5345 | 145.2 | 16.6 | 286 | 292 | 776.6 (pid 5224 still alive, rss 625.5) |
+  | 14:18:18 | 5345 | 156.0 | 24.4 | 319 | 311 | 260.7 (5224 gone) |
+  | 14:18:33 | **5396** | **87.8** | 0.1 | **0.0** | 4 | 261.0 |
+  | 14:18:48 | 5396 | 87.8 | 0.1 | 15 | 13 | 272.4 |
+  | *query 14:19:03-14:19:20* | | | | | | |
+  | 14:19:14 | 5345 | 155.2 | 24.4 | 374 | 335 | 480.9 |
+  | 14:19:24 | 5396 | **405.3** | 154.7 | 51 | 34 | 578.6 |
+  | 14:19:55 | 5396 | 318.6 | 68.0 | 82 | 61 | 491.9 |
+  | 14:20:26 | 5396 | 379.7 | 127.9 | 113 | 78 | 552.6 |
+  | 14:21:07-14:22:19 | 5396 | 406.1-407.1 | 127.9 | 154-226 | 102-171 | 570-574 |
+  | 14:19:44-14:22:29 | 5345 | 155.3 -> 149.5 | 24.4-25.0 | 405-570 | 348-466 | — |
+
+- **Why UNATTRIBUTED, three independent reasons:**
+  1. **The counter cannot find the serving worker.** Both pids gained 20-40 requests per 25-36 s from other traffic (5345: 311 -> 466 in 4 min; 5396: 13 -> 34 across the query). My own polling explains at most ~4 of the 21. No pid's counter moved in a way only my query could cause.
+  2. **A recycle fired 30 s before the query.** pid 5224 (rss 625.5 MB at 14:17:44Z) was replaced by pid 5396, which read `age_s 0.0` at 14:18:33Z. If 5396 served the query, and its anon is the only one that moved (5345 held 145-156 MB across all 22 reads), then **+317.5 MB (87.8 -> 405.3)** combines the rebuild, a fresh worker's first-request warm-up, and 21 other requests. It is an UPPER BOUND on the rebuild's cost, never its value.
+  3. Proof item (b), the access-log line, was not read (429).
+  Criterion 1 does hold: pid continuity (5345 and 5396 on every read 14:18:33-14:22:29Z) shows no recycle DURING or AFTER the query.
+- **What the reading still establishes (facts, not a verdict):** a cold `board_read` costs **10.0 s** on a fresh worker, not the 69.5 s cold figure handed over. 4,679 rows are served, against 5,013 expected. After the response, 5396 settled at **~380-407 MB** and stayed there through two warm serves. It shed ~87 MB within 31 s of the response (405.3 -> 318.6), which fits a large TRANSIENT held only during the request: the 39.8 MB body plus its intermediates. That transient is exactly what `post_request` cannot see.
+- **Verdict: UNATTRIBUTED.** The ≥40 MB hypothesis is UNTESTED. It is neither supported nor falsified.
+- **Next.** Don't re-run this black-box probe. Put the attribution in-process: add `os.getpid()` and `memory_observability._process_anon_mb()` before and after `board_read` (and at the stage line's end) to the existing `QUERY_STAGE_MS` line in `syndicate/blueprints/intelligence.py`. That turns every production board query into an attributed measurement with no second heavy request, and it removes all three reasons above. Check `lanes.md` for a claim on that file first. The rebuild internals (`pipeline/intelligence_state.py`, the L2-A reader) remain claimed by lane `board-eval-reader-chunk-ceiling` (session 0f5b256e).
