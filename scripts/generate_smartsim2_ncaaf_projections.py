@@ -381,7 +381,20 @@ def load_ppa_ratings(season: int) -> dict[str, dict]:
 _MIN_ASOF_GAMES = 3
 
 
+# (season, week) -> rows. `load_ppa_ratings_asof` and the in-season blend read
+# the SAME weeks in one run; without this the blend would double the run's
+# `/ppa/games` calls. Process-local: every run starts empty.
+_PPA_GAMES_WEEK_MEMO: dict[tuple[int, int], list[dict]] = {}
+
+
 def load_ppa_games_week(season: int, week: int) -> list[dict]:
+    key = (int(season), int(week))
+    if key not in _PPA_GAMES_WEEK_MEMO:
+        _PPA_GAMES_WEEK_MEMO[key] = _load_ppa_games_week_uncached(season, week)
+    return _PPA_GAMES_WEEK_MEMO[key]
+
+
+def _load_ppa_games_week_uncached(season: int, week: int) -> list[dict]:
     """Per-GAME PPA for one REGULAR-SEASON week.
 
     `seasonType=regular` IS LOAD-BEARING AND ITS ABSENCE IS A WORSE LEAK THAN
@@ -1013,6 +1026,242 @@ def resolve_sp_ratings(
     return index, result
 
 
+# ---------------------------------------------------------------------------
+# SEASON-TO-DATE BLEND. Lane `ncaaf-sim-inseason-ratings`, 2026-09-18.
+# ---------------------------------------------------------------------------
+#
+# WHAT SHIPPED AND WHY: `scripts/backtest_ncaaf_inseason_blend.py`. Leak-free
+# as-of backtest, tuned on 2023+2024 (1,288 games), graded ONCE on held-out
+# 2025 weeks 3-15 (644 FBS-vs-FBS games, every one with a close) through this
+# generator's own `build_projection`, 300 seeds, common random numbers:
+#
+#                     margin MAE   dMAE vs static prior [95% bootstrap CI]
+#   static prior SP+    16.334     --
+#   this blend          12.830     -3.504 [-4.33, -2.68]    <- rule met
+#     weeks 3-5 -2.28 [-3.85, -0.77] | 6-9 -3.79 [-5.21, -2.32] | 10-15 -3.91 [-5.20, -2.61]
+#   closing line        11.900     the blend is still +0.93 [+0.55, +1.32] behind it,
+#                                  w (model - market) = +0.04 [-0.18, +0.25]
+#
+# So it is a large gain over what the generator did, and NOT a market edge:
+# picks stay suppressed (`football/pick_gate.py`). Part of the gain is
+# dispersion -- the static prior's margin SD is 18.0 against a close of 12.8,
+# this blend's 13.5 -- but it also beat the best pure RESCALE of the static
+# prior (`SP_RATING_SCALE = 10/0.35`) by -1.37 [-2.10, -0.64] on the engine
+# surrogate, i.e. the in-season information is real, not just a scale fix.
+#
+# THE CONSTRUCTION, exactly as measured (`blend_ppa[k=2]`):
+#   prior      SP+ of season S-1 (FINAL), the backtest's leak-free baseline;
+#   current    a ridge SRS on `/ppa/games` offense PPA for weeks < N, each row
+#              `beta * ppa` points, y = mu + h*home + o[team] - d[opponent],
+#              lambda 1 toward league average, every unrated team pooled;
+#   blend      per team, current weight n/(n+k), n = its games so far.
+# `tests/test_generate_smartsim2_ncaaf_projections.py` pins this function
+# equal to the backtest's `ratings_asof(Setting("blend_ppa", 2))` on the same
+# rows, so the code that ships is the code that was graded.
+#
+# WHAT WAS NOT MEASURED, stated so nobody reads more into it: the baseline was
+# STATIC prior-season SP+, and production's current rating is CFBD's in-season
+# SP+ refreshed by `refresh_sp_ratings_cache`. SP+ in-season is itself a
+# prior/current blend, and no historical weekly snapshots of it exist to
+# grade. Weeks 1-2 are outside the graded range and keep the current-season
+# SP+ path (`INSEASON_BLEND_MIN_WEEK`).
+
+INSEASON_BLEND_ENV = "SYNDICATE_NCAAF_INSEASON_BLEND"
+INSEASON_BLEND_K = 2.0
+INSEASON_BLEND_MIN_WEEK = 3
+_INSEASON_CURRENT_LAMBDA = 1.0
+_INSEASON_OTHER_LAMBDA = 0.01
+# CFBD per-game PPA -> SP+ points, fitted on 2025 (2025 FINAL SP+ regressed on
+# full-season opponent-adjusted `/ppa/games` offense PPA, both sides stacked,
+# through the origin). The same fit read 47.07 on 2023 and 44.66 on 2024; the
+# 2025 held-out grade used 44.66, i.e. only data older than what it graded.
+INSEASON_PPA_POINTS_SCALE = 44.497
+_INSEASON_OTHER = "__other__"
+
+
+def inseason_blend_enabled() -> bool:
+    """ON unless `SYNDICATE_NCAAF_INSEASON_BLEND` says off. ABSENT MEANS ON."""
+    raw = str(os.environ.get(INSEASON_BLEND_ENV) or "").strip().lower()
+    return raw not in {"0", "false", "off", "no"}
+
+
+def inseason_blend_index(
+    prior: dict[str, tuple[float, float]],
+    ppa_rows: list[dict],
+    games_by_id: dict[int, dict],
+    *,
+    k: float = INSEASON_BLEND_K,
+    beta: float = INSEASON_PPA_POINTS_SCALE,
+) -> tuple[dict[str, tuple[float, float]], dict[str, int]]:
+    """`(SP+-shaped index, games per team)` for the prior's teams.
+
+    `ppa_rows` are `/ppa/games` rows for weeks < N; `games_by_id` the COMPLETED
+    regular-season games of those weeks (home/away/neutral come from here, and a
+    row whose game is not in it is dropped -- the backtest's own rule).
+    """
+    import numpy as np
+
+    if not prior:
+        return {}, {}
+    teams = sorted(prior)
+    ids = {team: i for i, team in enumerate(teams)}
+    ids[_INSEASON_OTHER] = len(teams)
+    n_teams = len(ids)
+    n_params = 2 * n_teams + 2
+    rows: list[tuple[int, int, float, float]] = []
+    counts: dict[str, int] = {}
+    for row in ppa_rows or []:
+        try:
+            game = games_by_id.get(int(row.get("gameId")))
+            value = (row.get("offense") or {}).get("overall")
+        except (TypeError, ValueError):
+            continue
+        if game is None or value is None:
+            continue
+        team = norm(row.get("team") or "")
+        home, away = norm(game.get("homeTeam") or ""), norm(game.get("awayTeam") or "")
+        if team not in (home, away):
+            continue
+        opponent = away if team == home else home
+        home_flag = 1.0 if (team == home and not game.get("neutralSite")) else 0.0
+        rows.append((ids.get(team, ids[_INSEASON_OTHER]), n_teams + ids.get(opponent, ids[_INSEASON_OTHER]),
+                     home_flag, beta * float(value)))
+        counts[team] = counts.get(team, 0) + 1
+    x = np.zeros((len(rows), n_params))
+    y = np.zeros(len(rows))
+    for r, (i_o, i_d, home_flag, value) in enumerate(rows):
+        x[r, i_o] += 1.0
+        x[r, i_d] -= 1.0
+        x[r, 2 * n_teams] = 1.0
+        x[r, 2 * n_teams + 1] = home_flag
+        y[r] = value
+    penalty = np.full(n_params, 1e-6)
+    penalty[: 2 * n_teams] = _INSEASON_CURRENT_LAMBDA
+    penalty[ids[_INSEASON_OTHER]] = penalty[n_teams + ids[_INSEASON_OTHER]] = _INSEASON_OTHER_LAMBDA
+    solution = np.linalg.solve(x.T @ x + np.diag(penalty), x.T @ y)
+
+    mean_o = statistics.fmean(v[0] for v in prior.values())
+    mean_d = statistics.fmean(v[1] for v in prior.values())
+    out: dict[str, tuple[float, float]] = {}
+    for team in teams:
+        i = ids[team]
+        n = counts.get(team, 0)
+        w = n / (n + k) if n > 0 else 0.0
+        p_o, p_d = prior[team][0] - mean_o, mean_d - prior[team][1]
+        o = (1 - w) * p_o + w * float(solution[i])
+        d = (1 - w) * p_d + w * float(solution[n_teams + i])
+        out[team] = (mean_o + o, mean_d - d)
+    return out, counts
+
+
+def inseason_blend_artifact_path(season: int) -> Path:
+    """Beside the SP+ mirror, so `ncaaf_source/historical_truth/sp_ratings_*.json`
+    (already in `HOT_ARTIFACT_PATTERNS`) admits it: the rating the engine was
+    actually handed is then auditable on Render (model_engine_standard §3)."""
+    return sp_ratings_durable_path(season).with_name(f"sp_ratings_inseason_blend_{season}.json")
+
+
+def _write_inseason_blend_artifact(season: int, week: int, index: dict, counts: dict, meta: dict) -> Path | None:
+    """One document per season, one entry per target week. Never raises."""
+    path = inseason_blend_artifact_path(season)
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    except Exception:  # noqa: BLE001 - a corrupt document is rebuilt, not trusted
+        doc = {}
+    if not isinstance(doc, dict) or not isinstance(doc.get("weeks"), dict):
+        doc = {"season": season, "weeks": {}}
+    doc["weeks"][str(week)] = {
+        **meta,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "teams": {team: [round(o, 4), round(d, 4), int(counts.get(team, 0))] for team, (o, d) in sorted(index.items())},
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(path.name + ".part")
+        tmp.write_text(json.dumps(doc, indent=1, sort_keys=True), encoding="utf-8")
+        tmp.replace(path)
+        return path
+    except Exception as exc:  # noqa: BLE001
+        print(f"[inseason_blend] artifact write failed ({type(exc).__name__}) -- continuing", flush=True)
+        return None
+
+
+def resolve_inseason_blend(
+    season: int,
+    week: int,
+    current_sp: dict[str, tuple[float, float]],
+    *,
+    games: list[dict] | None = None,
+    ppa_week_loader=None,
+    publish=None,
+) -> tuple[dict[str, tuple[float, float]] | None, str]:
+    """`(blended index, reason)`; the index is None when the blend does not apply.
+
+    Never raises -- a blend failure falls back to the SP+ path, with the reason
+    printed on the `INSEASON_BLEND` line, never silently.
+    """
+    if not inseason_blend_enabled():
+        return None, "disabled_by_env"
+    if int(week) < INSEASON_BLEND_MIN_WEEK:
+        return None, f"week_below_{INSEASON_BLEND_MIN_WEEK}"
+    try:
+        prior = dict(load_sp_ratings(int(season) - 1))
+        if not prior:
+            return None, "no_prior_season_sp"
+        # A team new to FBS has no prior-season SP+; its current-season SP+ is
+        # the only rating it has, so it stands in as that team's prior (the
+        # backtest excluded such games -- unmeasured, and at most a handful).
+        for team, value in (current_sp or {}).items():
+            prior.setdefault(team, value)
+        if games is None:
+            from syndicate.features.football.sim_engine.smartsim2.historical_truth.ncaaf_historical_loader import (
+                load_games_season,
+            )
+
+            games = load_games_season(int(season))
+        games_by_id = {}
+        for game in games or []:
+            try:
+                wk = int(game.get("week") or 0)
+            except (TypeError, ValueError):
+                continue
+            if (str(game.get("seasonType") or "regular") == "regular" and wk < int(week)
+                    and game.get("homePoints") is not None and game.get("awayPoints") is not None):
+                games_by_id[int(game["id"])] = game
+        loader = ppa_week_loader or load_ppa_games_week
+        rows = [row for wk in range(1, int(week)) for row in loader(int(season), wk)]
+        index, counts = inseason_blend_index(prior, rows, games_by_id)
+    except Exception as exc:  # noqa: BLE001 - never fail generation over a blend
+        return None, f"error:{type(exc).__name__}"
+    if not counts:
+        return None, "no_season_to_date_ppa"
+    meta = {"k": INSEASON_BLEND_K, "beta": INSEASON_PPA_POINTS_SCALE, "prior_season": int(season) - 1,
+            "through_week": int(week) - 1, "ppa_rows": sum(counts.values()), "games": len(games_by_id)}
+    path = _write_inseason_blend_artifact(int(season), int(week), index, counts, meta)
+    published: object = False
+    if path is not None:
+        try:
+            if publish is None:
+                from syndicate.features.shared.artifact_publisher import publish_hot_artifact as publish
+            published = bool(publish(path))
+        except Exception as exc:  # noqa: BLE001
+            published = f"error:{type(exc).__name__}"
+    print(
+        f"INSEASON_BLEND season={season} week={week} status=applied k={INSEASON_BLEND_K:g} "
+        f"beta={INSEASON_PPA_POINTS_SCALE:g} prior_season={int(season) - 1} teams={len(index)} "
+        f"teams_with_games={len(counts)} ppa_rows={meta['ppa_rows']} artifact={path} published={published}",
+        flush=True,
+    )
+    return index, "applied"
+
+
+def inseason_blend_rating_source(season: int, week: int) -> str:
+    """Names the construction. `asof` keeps `pick_ledger.leak_status` at "clean":
+    every input is from weeks < N or from season S-1."""
+    return (f"inseason_blend_ppa[k={INSEASON_BLEND_K:g},beta={INSEASON_PPA_POINTS_SCALE:g}]"
+            f"_prior_cfbd_sp_plus_{int(season) - 1}_asof_{int(season)}_through_wk{int(week) - 1}")
+
+
 def sp_offense_defense_rating(team: str, sp_index: dict[str, tuple[float, float]],
                               means: tuple[float, float]) -> tuple[float, float] | None:
     """SP+ components -> engine ratings, centred on the league mean.
@@ -1367,8 +1616,24 @@ def main() -> None:
     ratings_season = args.ratings_season if args.ratings_season is not None else args.season
     sp_index, sp_refresh = resolve_sp_ratings(ratings_season)
     log(format_sp_refresh_line(sp_refresh))
+    # THE SEASON-TO-DATE BLEND replaces the SP+ index from week 3 on (see
+    # `resolve_inseason_blend`). It reads the `/ppa/games` weeks that
+    # `load_ppa_ratings_asof` above already fetched (memoised), so it adds no
+    # CFBD call. `--leaked-season-ppa` reproduces the pre-2026-08-19 generator
+    # and so never blends.
+    if args.leaked_season_ppa:
+        blend_index, blend_reason = None, "leaked_season_ppa_flag"
+    else:
+        blend_index, blend_reason = resolve_inseason_blend(args.season, args.week, sp_index)
+    if blend_index is not None:
+        sp_index = blend_index
+        rating_source = (f"{inseason_blend_rating_source(args.season, args.week)}"
+                         f"[scale={SP_RATING_SCALE:g}]+{rating_source}")
+    else:
+        print(f"INSEASON_BLEND season={args.season} week={args.week} status=skipped reason={blend_reason}", flush=True)
+    log(f"INSEASON_BLEND applied={blend_index is not None} reason={blend_reason}")
     sp_means = sp_league_means(sp_index)
-    if sp_index:
+    if sp_index and blend_index is None:
         rating_source = f"cfbd_sp_plus_{ratings_season}[scale={SP_RATING_SCALE:g}]+{rating_source}"
     if ratings_season != args.season:
         log(f"RATINGS_SEASON_OVERRIDE ratings={ratings_season} games={args.season} "

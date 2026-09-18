@@ -311,5 +311,170 @@ def test_REACHABILITY_refreshed_values_reach_build_projection(sp_dir, capsys):
     assert "SP_RATINGS_REFRESH season=2026 status=refreshed" in out
 
 
+# ---------------------------------------------------------------------------
+# SEASON-TO-DATE BLEND (lane `ncaaf-sim-inseason-ratings`, 2026-09-18).
+# ---------------------------------------------------------------------------
+
+import itertools
+import random
+
+BLEND_TEAMS = ["alabama", "auburn", "ohio st", "michigan", "texas", "oregon", "iowa", "utah"]
+BLEND_PRIOR = {t: (24.0 + 2.0 * i, 30.0 - 1.5 * i) for i, t in enumerate(BLEND_TEAMS)}
+
+
+def _blend_season(weeks: int = 6, seed: int = 11):
+    """CFBD-shaped `/games` and `/ppa/games` rows for a synthetic season."""
+    rng = random.Random(seed)
+    games, ppa_rows, gid = [], {}, 100
+    pairs = list(itertools.combinations(BLEND_TEAMS, 2))
+    for week in range(1, weeks + 1):
+        rng.shuffle(pairs)
+        used: set[str] = set()
+        for home, away in pairs:
+            if home in used or away in used:
+                continue
+            used |= {home, away}
+            neutral = rng.random() < 0.15
+            games.append({"id": gid, "week": week, "seasonType": "regular", "homeTeam": home, "awayTeam": away,
+                          "neutralSite": neutral, "homePoints": rng.randint(7, 45), "awayPoints": rng.randint(7, 45)})
+            for team, opp in ((home, away), (away, home)):
+                ppa_rows.setdefault(week, []).append({
+                    "gameId": gid, "week": week, "seasonType": "regular", "team": team, "opponent": opp,
+                    "offense": {"overall": round(rng.gauss(0.1, 0.2), 3)}, "defense": {"overall": 0.0},
+                })
+            gid += 1
+    return games, ppa_rows
+
+
+def test_the_shipped_blend_is_the_backtested_blend():
+    """The code that ships must be the code that was graded: identical output to
+    `backtest_ncaaf_inseason_blend.ratings_asof(Setting("blend_ppa", 2))`."""
+    import scripts.backtest_ncaaf_inseason_blend as bt
+
+    games, ppa_rows = _blend_season()
+    week = 5
+    rows = [r for wk in range(1, week) for r in ppa_rows[wk]]
+    games_by_id = {g["id"]: g for g in games if g["week"] < week}
+    shipped, counts = gen.inseason_blend_index(BLEND_PRIOR, rows, games_by_id, k=2.0, beta=45.0)
+
+    bt_games = [bt.Game(g["id"], 2030, g["week"], g["homeTeam"], g["awayTeam"], float(g["homePoints"]),
+                        float(g["awayPoints"]), bool(g["neutralSite"]), True, True) for g in games]
+    graded = bt.ratings_asof(bt.Setting("blend_ppa", 2.0), BLEND_PRIOR, bt_games,
+                             bt.game_ppa_from_cfbd_rows([r for rs in ppa_rows.values() for r in rs]), week, 45.0)
+    assert set(shipped) == set(graded)
+    for team in graded:
+        assert shipped[team] == pytest.approx(graded[team], abs=1e-9)
+    assert counts == {t: 4 for t in BLEND_TEAMS}
+
+
+@pytest.fixture()
+def blend_env(tmp_path, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_SP_RATINGS_CACHE_DIR", str(tmp_path))
+    monkeypatch.setattr(gen, "_SP_CACHE_REFRESH", False, raising=False)
+    monkeypatch.setattr(gen, "_cfbd_get", lambda *a, **k: (_ for _ in ()).throw(AssertionError("real CFBD call")))
+    from syndicate.features.football.sim_engine.smartsim2.historical_truth import ncaaf_historical_loader as loader
+
+    monkeypatch.setattr(loader, "load_cached_ratings", lambda season, **k: None)
+    _write_copy(tmp_path / "sp_ratings_2025.json", BLEND_PRIOR, fetched_at=_iso(300), season=2025)
+    gen._SP_PROVENANCE.clear()
+    games, ppa_rows = _blend_season()
+    calls: list[int] = []
+
+    def loader_fn(season, wk):
+        calls.append(wk)
+        return ppa_rows.get(wk, [])
+
+    yield {"games": games, "loader": loader_fn, "calls": calls, "dir": tmp_path}
+    gen._SP_PROVENANCE.clear()
+
+
+def _resolve(env, week=5, current=None):
+    return gen.resolve_inseason_blend(2026, week, current or {}, games=env["games"],
+                                      ppa_week_loader=env["loader"], publish=lambda p: False)
+
+
+def test_REACHABILITY_the_blend_changes_what_build_projection_prices(blend_env, monkeypatch):
+    """off != on, measured on the margin, not on the index."""
+    current_sp = {t: (v[0] + 3.0, v[1] - 1.0) for t, v in BLEND_PRIOR.items()}
+
+    def margin(index):
+        return gen.build_projection(season=2026, week=5, home_team="Auburn", away_team="Utah", game_id="g",
+                                    ppa_index={}, rating_source="t", seeds=4, sp_index=index,
+                                    sp_means=gen.sp_league_means(index)).margin_mean
+
+    monkeypatch.setenv(gen.INSEASON_BLEND_ENV, "off")
+    off_index, reason = _resolve(blend_env, current=current_sp)
+    assert off_index is None and reason == "disabled_by_env"
+
+    monkeypatch.delenv(gen.INSEASON_BLEND_ENV, raising=False)  # ABSENT MEANS ON
+    on_index, reason = _resolve(blend_env, current=current_sp)
+    assert reason == "applied"
+    assert margin(on_index) != margin(current_sp)
+
+
+def test_the_blend_reads_only_weeks_before_the_target(blend_env):
+    index, reason = _resolve(blend_env, week=5)
+    assert reason == "applied"
+    assert sorted(set(blend_env["calls"])) == [1, 2, 3, 4]
+    # Week-5+ RESULTS in the games list must not move it either.
+    later = [dict(g, homePoints=99) if g["week"] >= 5 else g for g in blend_env["games"]]
+    again, _ = gen.resolve_inseason_blend(2026, 5, {}, games=later, ppa_week_loader=blend_env["loader"],
+                                          publish=lambda p: False)
+    assert again == index
+
+
+@pytest.mark.parametrize("week", [1, 2])
+def test_weeks_outside_the_graded_range_keep_the_sp_path(blend_env, week):
+    assert _resolve(blend_env, week=week) == (None, f"week_below_{gen.INSEASON_BLEND_MIN_WEEK}")
+    assert blend_env["calls"] == []
+
+
+def test_a_blend_failure_falls_back_instead_of_failing_the_run(blend_env):
+    def boom(season, wk):
+        raise RuntimeError("HTTP 500")
+
+    index, reason = gen.resolve_inseason_blend(2026, 5, {}, games=blend_env["games"], ppa_week_loader=boom,
+                                               publish=lambda p: False)
+    assert index is None and reason == "error:RuntimeError"
+
+
+def test_the_blend_artifact_is_written_and_allowlisted(blend_env, tmp_path, monkeypatch):
+    index, _ = _resolve(blend_env)
+    doc = json.loads(gen.inseason_blend_artifact_path(2026).read_text(encoding="utf-8"))
+    assert doc["weeks"]["5"]["through_week"] == 4 and doc["weeks"]["5"]["prior_season"] == 2025
+    assert doc["weeks"]["5"]["teams"]["auburn"][:2] == [round(v, 4) for v in index["auburn"]]
+
+    from syndicate.features.shared.artifact_publisher import is_hot_artifact_relative_path
+
+    monkeypatch.delenv("SYNDICATE_SP_RATINGS_CACHE_DIR", raising=False)
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    monkeypatch.setenv("SYNDICATE_NCAAF_SOURCE_ROOT", str(tmp_path / "ncaaf_source"))
+    relative = gen.inseason_blend_artifact_path(2026).relative_to(tmp_path).as_posix()
+    assert relative == "ncaaf_source/historical_truth/sp_ratings_inseason_blend_2026.json"
+    assert is_hot_artifact_relative_path(relative) is True
+
+
+def test_the_blend_rating_source_grades_clean():
+    from syndicate.features.football.pick_ledger import leak_status
+
+    source = gen.inseason_blend_rating_source(2026, 5)
+    assert source.startswith("inseason_blend_ppa[k=2,")
+    assert "through_wk4" in source
+    assert leak_status(source, 2026) == "clean"
+
+
+def test_ppa_week_rows_are_fetched_once_per_run(monkeypatch):
+    """The blend and `load_ppa_ratings_asof` read the same weeks; the memo keeps
+    the blend from doubling the run's CFBD calls."""
+    calls = []
+    monkeypatch.setattr(gen, "_load_ppa_games_week_uncached", lambda s, w: calls.append((s, w)) or [{"w": w}])
+    gen._PPA_GAMES_WEEK_MEMO.clear()
+    try:
+        assert gen.load_ppa_games_week(2026, 3) == gen.load_ppa_games_week(2026, 3) == [{"w": 3}]
+        assert calls == [(2026, 3)]
+    finally:
+        gen._PPA_GAMES_WEEK_MEMO.clear()
+
+
 if __name__ == "__main__":
     unittest.main()
