@@ -977,6 +977,40 @@ def _mlb_sim_check_interval_seconds() -> int:
 	return max(60, value)
 
 
+def _mlb_sim_fingerprint_min_gap_seconds() -> int:
+	"""Minimum gap between FINGERPRINT-triggered MLB re-sims. 0 disables.
+
+	Lane `mlb-sim-retrigger-churn`, 2026-09-17. The check interval above paces
+	how often we LOOK; it cannot pace how often we LAUNCH, because a run takes
+	~15 min and the first check after it always finds some change somewhere
+	across a 15-game slate. Measured on refresh-worker over 12 h: 19
+	`fingerprint_change` runs, back to back from 20:10Z to 23:04Z, 44% of the
+	worker's wall time -- and the memory guard refused the board 31 times while
+	they ran.
+
+	A run's cost does not scale with its scope, which is why a gap is the right
+	lever and a narrower fingerprint is not: re-simming ONE game took 14.9 min,
+	five games 15.8 (read from the runs' own `--only-game-pks`). Changes that
+	arrive inside the gap are not lost -- the decision keeps the old stored
+	fingerprints, so they accumulate and fire together once it expires, at no
+	extra cost per game.
+
+	Deliberately a NEW knob with a code default rather than a larger
+	SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS: that one is pinned in render.yaml,
+	so changing it durably means a render.yaml push and a blueprint sync across
+	all three services, and it would also throttle the join-mismatch and
+	board-missing triggers, which repair a broken board and should stay prompt.
+	The tip-off-window re-sim is unaffected either way: it returns before any of
+	this is consulted.
+	"""
+	raw = str(os.environ.get("SYNDICATE_MLB_SIM_FINGERPRINT_MIN_GAP_SECONDS") or "").strip()
+	try:
+		value = int(raw) if raw else 3600
+	except Exception:
+		value = 3600
+	return max(0, value)
+
+
 # SYNDICATE_MLB_SIM_TIMEOUT_SECONDS is read where it is actually enforced --
 # scripts/run_mlb_daily_sim_job.py's _timeout_seconds(), which passes it to
 # subprocess.run() and kills a hung sim. A duplicate reader used to live here
@@ -1726,6 +1760,43 @@ def _record_mlb_props_regen_attempt(*, now_epoch: float, date_str: str) -> None:
 	)
 
 
+def _mlb_fingerprint_launch_path() -> Path:
+	return _meta_dir() / "mlb_fingerprint_launch.json"
+
+
+def _read_last_mlb_fingerprint_launch_epoch(date_str: str) -> float:
+	"""When a fingerprint-triggered re-sim last launched for *date_str*, or 0.0.
+
+	Its own file, NOT a field on last_mlb_sim_check.json, for the reason
+	`_read_mlb_tip_off_simmed` gives: that record is rewritten on every check,
+	and a field lost to an unrelated rewrite would silently turn the debounce
+	off. Date-scoped, so a new day's first change launches at once.
+
+	Fails OPEN (0.0, i.e. "no recent launch") on any read problem: the cost of
+	that is exactly today's behaviour, one extra re-sim. The opposite failure --
+	believing a launch happened when none did -- would hold a real change back
+	for a whole gap with nothing to show for it.
+	"""
+	try:
+		payload = read_json_file(_mlb_fingerprint_launch_path())
+		if not isinstance(payload, dict) or str(payload.get("date") or "") != str(date_str):
+			return 0.0
+		return float(payload.get("epoch") or 0.0)
+	except Exception:
+		return 0.0
+
+
+def _record_mlb_fingerprint_launch(*, now_epoch: float, date_str: str, game_pks: Any) -> None:
+	"""Start the gap. Call ONLY once a fingerprint launch is committed. Never raises."""
+	try:
+		write_json_file(
+			_mlb_fingerprint_launch_path(),
+			{"epoch": now_epoch, "date": date_str, "game_pks": sorted(str(pk) for pk in (game_pks or []))},
+		)
+	except Exception as exc:
+		print(f"[live_refresh_loop] MLB_FINGERPRINT_LAUNCH_MARK_FAILED date={date_str} {type(exc).__name__}: {exc}", flush=True)
+
+
 def _intelligence_pipeline_busy() -> bool:
 	# #55, sim side. The pipeline yielding to a resident sim is only half the
 	# bound: at boot the pipeline starts FIRST and this gate fires ~5s later,
@@ -2101,7 +2172,55 @@ def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any
 	if _mlb_props_now_available_needs_regen(now_epoch=now_epoch, date_str=date_str):
 		props_regen_game_pks = sorted(current_fingerprints.keys())
 
+	# FINGERPRINT DEBOUNCE (lane `mlb-sim-retrigger-churn`, user decision
+	# 2026-09-17). See `_mlb_sim_fingerprint_min_gap_seconds` for the
+	# measurement. Applies ONLY when fingerprint change is the whole reason to
+	# launch: join-mismatch, board-missing and props-regen repair a board that is
+	# visibly wrong, so any of them launches at once and takes the changed games
+	# along with it.
+	#
+	# THE ONE THING THIS MUST NOT DO IS ABSORB THE CHANGE. Recording the CURRENT
+	# fingerprints here would mark these games as seen, and they would never
+	# re-sim at all. Recording nothing is wrong the other way: `last_epoch` would
+	# stay at the launch, the interval gate above would pass on every tick, and
+	# every tick would repeat the injury fetch, the lineup fetch and the
+	# join-mismatch market-board build -- the build this file already records as
+	# having OOM-killed a worker. So record the CHECK (the interval keeps pacing
+	# it) with the OLD stored fingerprints: the changed games stay changed,
+	# later changes accumulate beside them, and all of them launch together when
+	# the gap expires.
+	if changed_game_pks and not (join_mismatch_game_pks or board_missing_game_pks or props_regen_game_pks):
+		gap = _mlb_sim_fingerprint_min_gap_seconds()
+		last_launch = _read_last_mlb_fingerprint_launch_epoch(date_str)
+		if gap > 0 and last_launch > 0.0 and (now_epoch - last_launch) < gap:
+			kept = stored_fingerprints if isinstance(stored_fingerprints, dict) else {}
+			_record_mlb_sim_check(now_epoch, date_str, kept, launched=False)
+			next_in_s = int(gap - (now_epoch - last_launch))
+			print(
+				f"[live_refresh_loop] MLB_SIM_FINGERPRINT_DEBOUNCED date={date_str} "
+				f"changed_games={len(changed_game_pks)} game_pks={','.join(changed_game_pks)} "
+				f"since_last_launch_s={int(now_epoch - last_launch)} gap_s={gap} next_in_s={next_in_s}",
+				flush=True,
+			)
+			return {
+				"force": False,
+				"reason": "fingerprint_debounced",
+				"changed_game_pks": changed_game_pks,
+				"next_in_s": next_in_s,
+			}
+
 	if changed_game_pks or join_mismatch_game_pks or board_missing_game_pks or props_regen_game_pks:
+		if changed_game_pks:
+			# Starts the gap even when another trigger rode along: these games
+			# are being re-simmed now either way. Also the first time production
+			# can say WHICH games a fingerprint change was about -- before this,
+			# `changed_game_pks` was computed and never printed.
+			_record_mlb_fingerprint_launch(now_epoch=now_epoch, date_str=date_str, game_pks=changed_game_pks)
+			print(
+				f"[live_refresh_loop] MLB_SIM_FINGERPRINT_LAUNCH date={date_str} "
+				f"changed_games={len(changed_game_pks)} game_pks={','.join(changed_game_pks)}",
+				flush=True,
+			)
 		_record_mlb_sim_check(now_epoch, date_str, current_fingerprints, launched=True)
 		merged_game_pks = sorted(
 			set(changed_game_pks) | set(join_mismatch_game_pks) | set(board_missing_game_pks) | set(props_regen_game_pks)
