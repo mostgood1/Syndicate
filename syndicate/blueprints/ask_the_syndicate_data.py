@@ -3802,10 +3802,11 @@ def _entity_fetchers_for_sport(sport: str, question: str) -> list:
         # branch is written out so the absence is visibly intentional.
         return []
     if sport == "ncaaf":
-        # Player first, as MLB leads with the player's own log; the player
-        # fetcher answers only a prop row, and the team fetchers every row.
-        return [_ncaaf_player_log_evidence, _ncaaf_matchup_projection_evidence, _ncaaf_team_profile_evidence,
-                _ncaaf_ats_evidence]
+        # Player first, as MLB leads with the player's own log; the player-log
+        # fetcher answers only a prop row, the typed-question fetcher only a
+        # question that NAMES a player, and the team fetchers every row.
+        return [_ncaaf_player_log_evidence, _ncaaf_player_question_evidence, _ncaaf_matchup_projection_evidence,
+                _ncaaf_team_profile_evidence, _ncaaf_ats_evidence]
     if sport == "nfl":
         return [_nfl_player_projection_evidence, _nfl_matchup_evidence, _nfl_preseason_matchup_evidence,
                 _nfl_team_profile_evidence, _nfl_ats_evidence]
@@ -3836,6 +3837,7 @@ def _entity_fetchers_for_sport(sport: str, question: str) -> list:
             _wnba_focused_evidence,
             lambda q, c: _basketball_last10_evidence(q, c, "nba"),
             _nhl_last10_evidence,
+            _ncaaf_player_question_evidence,
             _ncaaf_matchup_projection_evidence,
             _ncaaf_team_profile_evidence,
             _ncaaf_ats_evidence,
@@ -4203,6 +4205,28 @@ def _ncaaf_player_log_evidence(question: str, context: dict[str, Any]) -> dict[s
         })
     evidence = {"source": "ncaaf_player_game_stats", "player": player, "games": count}
     return {"evidence": evidence, "tables": [table], "charts": charts, "as_of": "", "sport": "ncaaf"}
+
+
+def _ncaaf_player_question_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
+    """A TYPED question naming a college player ("how has Arch Manning played
+    this season"): last-N games, a season-to-date row and his published prop
+    projection, via `ncaaf.player_stats.question_player_section` (full-name
+    match only; a shared name is refused unless the school is named). Also in
+    the no-sport branch: a player name carries no sport hint. Reads only.
+    """
+    row = context.get("board_row")
+    if isinstance(row, dict) and str(row.get("player_name") or "").strip():
+        return None  # a board-row prop is answered by the prop_evidence provider
+    from syndicate.features.ncaaf.player_stats import question_player_section
+
+    def _schools() -> list[str]:
+        # Only evaluated when a name is ambiguous: the registry scan is not free
+        # and this runs on every unrouted typed question.
+        return [str(team.get("school_name") or "") for team in _ncaaf_teams_in_question(question)]
+
+    return question_player_section(
+        question, selected_date=str(context.get("selected_date") or "").strip() or None, question_teams=_schools
+    )
 
 
 def _nfl_player_projection_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:

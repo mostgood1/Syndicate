@@ -507,6 +507,16 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # repair-on-failure. Stated here so a future stale-snapshot complaint starts
     # in the right place.
     "ncaaf_source/source_artifacts/data/processed/player_game_stats/ncaaf_player_game_stats_snapshot.csv",
+    # NCAAF PLAYER-PROP PROJECTIONS (lane `ncaaf-player-data`, 2026-09-18).
+    # Built on refresh-worker by `ncaaf/prop_projections.py` at the end of the
+    # player-stats refresh above, which publishes it itself (`#208`: this entry
+    # only PERMITS the transfer). Read by web's NCAAF prop board join and Ask's
+    # player_sim layer. The producer never writes an empty file; readers only
+    # read the game's own week or an earlier one, so HOT, not export-only.
+    # Checked with the real matcher: no existing entry matched it, and it
+    # matches no smartsim2/week_state/oddsapi path. 1.15-2.12 MB per week
+    # (2025 checkout, weeks 2-16).
+    "ncaaf_source/data/ncaaf_prop_projections_*_wk*.json",
     # THE NCAAF GAME CARD'S PER-SIDE SIM PLAYER PROJECTIONS.
     # `lane ncaaf-roster-snapshot-publish`, 2026-09-09.
     #
