@@ -38080,3 +38080,20 @@ Closes the owed items of the 2026-09-18 14:27:33Z entry. Read from web's served 
   - L2 rows 5,443 → 5,387 / 5,344.
   - `[profiler]` lines since go-live: 0, so the profilers are confirmed off.
   - Two builds only, and the same deploy carried other lanes' changes (d05fe70f and others). Only the soccer `collect_s` number is specific to the fix.
+
+## 2026-09-18 22:30:21Z (5:30 PM CT) — READING for `#671` (refresh-worker `7ef0431b`, live 2026-09-17 22:34:51Z; every refresh-worker deploy since contains `e2104fcd`) — lane nfl-usage-publish — **verify: MET**
+
+- **The producer ran for the first time with the fix and published to web.** Refresh-worker log:
+  `[built] 2025: 648 players, 32 teams, 4.7 MB` and `[built] 2026: 346 players, 32 teams, 0.5 MB`, then
+  `PUBLISH_OK path=nfl_source/fantasy/nfl_fantasy_usage_2025.json` (22:30:20Z) and
+  `..._2026.json` (22:30:21Z), with `[usage] publish ... -> True` for both. Web's export lists both
+  files (mtimes 22:30:20Z and 22:30:21Z). Before: no `nfl_fantasy_usage_*.json` on web at all.
+- **Goal reading:** `scripts/prop_evidence_checklist.py --base-url https://syndicate-an21.onrender.com
+  --sports nfl --sample 8`, run 22:4xZ: **PASS**. 1,110 pregame NFL board props; 8 sampled, 8 answered;
+  **`recent_form` filled 8/8** (was 0 of 5 on 2026-09-17). Every other layer was filled 8/8 as well. Median
+  8.71 s. Rows: Stroud INTs, Rodgers attempts, Mayfield TDs, Daniels yards, M. Washington rec yds,
+  McCaffrey receptions, B. Hall rush att, C. Brown rush yds.
+- **Why it landed at 22:30Z and not at the predicted 21:30:40Z.** The daily marker WAS eligible at
+  21:30:40Z. But the autorun sits in refresh-worker's exclusive autorun chain, behind the inline daily
+  reconciliation, and 7 other-lane refresh-worker deploys (16:52-21:59Z) killed and restarted that job,
+  so the chain was blocked 17:45-~21:27Z and job-capped after it. Recorded in `leads.md`, not followed.

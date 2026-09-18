@@ -254,6 +254,7 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
   intact, gaining the track record and McLean's park/weather table that the 8-cap had been
   truncating. **It reached production as a RIDE-ALONG on another lane's deploy**, not by this
   lane's hand -- the deploy call was refused by a session permission classifier.
+  - **NFL `recent_form` IS NOW FILLED ON PRODUCTION `[2026-09-18 22:4xZ, lane nfl-usage-publish CLOSED, `#671`]`.** The 09-17 NFL "PASS" above had `recent_form` empty on 0 of 5 rows, because `nfl_fantasy_usage_<season>.json` never reached web. Since `e2104fcd` the refresh-worker fantasy autorun publishes it. The first run was 22:30:21Z (2025: 648 players; 2026: 346 players), and the production checklist then read NFL `recent_form` **8/8**, every layer 8/8, on 1,110 pregame props.
 - **THE BvP INDEX IS LIVE, AND ITS DATA IS 4 MONTHS FRESHER `[2026-09-17 21:49:37Z, verified]`.**
   refresh-worker `b90d1e47` (live 21:47:49Z) built and published 64 shards ~110 s later:
   `pairs 421,656`, `first_date 2021-03-15`, **`through 2026-09-16`** (29 raw Statcast chunks
