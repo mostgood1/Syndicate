@@ -38034,3 +38034,18 @@ Closes the owed items of the 2026-09-18 14:27:33Z entry. Read from web's served 
 - **Against ESPN's own box:** the 19:09:14Z tick read 2-1 while ESPN's summary at 19:09:45Z (same 21') read 2-4; ESPN's away count moved in a burst between our tick and that read. The next tick, 19:13:54Z (25'), read **2-4 on `box_fallback`**, equal to ESPN's box at 19:16:07Z, home and away the right way round. So a lag of one tick, not a disagreement.
 - **Live commit:** the reading ran on live-odds-worker `3cc53826` (deployed 16:26-16:33Z by another lane); `git merge-base --is-ancestor` confirms it contains `684c776d` and `fd022dcf`.
 - **Seen on the way, not caused by this deploy:** the live loop's tick spacing grows with matches in play (116 s with 1 at 18:00Z, 215-245 s with 7, up to 373 s), so served states were 3-5 min old at 19:12Z. Lead filed (`leads.md`).
+
+## 2026-09-18 19:55:27Z -> live 20:00:55Z (3:00 PM CT) — refresh-worker `ef3fb857` -> `ef3fb857`, ENV RE-INJECT (`dep-dampebrm8hqs739k3blg`) — lane board-build-stage-slowdown — **verify: MET (both profilers reported); profilers env back to `off` 20:24Z, applied by lane layer2-today-next-day-starvation's next deploy**
+
+- **What.** `SYNDICATE_CANDIDATE_COLLECTION_PROFILE` and `SYNDICATE_CONSUME_SPORT_PROFILE` were changed `off` -> `all` on the single-key endpoint, which printed only the enum. This was a same-commit re-inject, so no code changed.
+  - USER 2026-09-18: "Turn on profilers for 1-2 builds", then "Yes, change them and deploy".
+  - The first env write was refused by auto mode's permission classifier. The claim was released and the user was asked; the write went through after the explicit yes.
+- **Locks.** Claim 19:41:00Z. Preflight read TOO_SOON until the 25 min spacing (after `ef3fb857` live 19:24:24Z) cleared, then CLEAR at 19:55:26Z with `--reinject-env`. Expectation: `candidate_collection_profile_reports_per_build` 0 -> >=1 and `consume_sport_profile_reports_per_build` 0 -> >=1.
+  - **Tooling note:** the first CLEAR fired `render_deploy.py` WITHOUT `--reinject-env`. It refused the same-commit deploy on stderr, which the runner did not capture, so nothing deployed. Pass `--reinject-env` to BOTH preflight and `render_deploy.py`, and capture stderr.
+- **Reading:**
+  - `[profiler] consume_sport` reported for 8 sports, 20:02-20:09Z: soccer 133.6 s, mlb 18.9, ncaaf 4.7, wnba 3.1, nfl 2.1, the rest under 0.4.
+  - `[profiler] candidate_collection` reported at 20:19:39Z: 641.0 s. Both figures carry cProfile's 1.3-2x overhead.
+- **What it named:**
+  - **Overview, soccer:** 114.0 of 133.6 s is `_enrich_candidates_with_odds_history` → `_candidate_odds_history_state` → `_best_of`. `_candidate_odds_history_match_score` ran 1,190,510 times for 260 candidates, re-parsing each entry's key per pair. Fix: lane odds-history-match-precompute.
+  - **Candidate collection:** 610.8 of 641.0 s is `odds_lifecycle.build_market_features` → `build_market_history_view`. `build_recent_market_history_index` ran **1,311 times, about once per candidate**, for 517.5 s cumulative, with 18.35M `_event_aliases`, 36.7M `_event_timestamp` and 9.6M sorts. A shared index is rebuilt per candidate. Not fixed yet.
+- **Off:** at 20:24Z both env vars were set back to `off` (PUT response enum `off`) and the claim was released. Lane layer2-today-next-day-starvation's main-tip deploy (~20:45Z, user-approved) re-injects them; its script aborts unless both read `off`. The reading that the profilers are off owes to this lane.
