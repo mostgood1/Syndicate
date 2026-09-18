@@ -1370,6 +1370,19 @@ death, never life — do not invert it.
   - (2) `KEYVALUE_WRITE_LARGE ... execution_ledger.json` per build <= the number of runs that placed >= 1 order (was 2 × placed).
   - (3) Unchanged ledger semantics: `EXECUTED` placed/duplicates behave as before (a re-run of the same plan places 0), 0 new `LEDGER_CAS_EXHAUSTED`, and paper orders per day in line with 09-17/09-18.
 
+### market-history-index-memo — OPEN — opened 2026-09-18 — session a1e40980-cceb-493f-adf9-5a5ca879acf6
+- Goal: stop refresh-worker's candidate collection rebuilding `odds_lifecycle.build_recent_market_history_index` once per candidate. Build it once per version of the 7-day odds-events files and reuse it, with every candidate's recent-history rows unchanged. Verified by a test that counts builds and compares rows, then by candidate collection's time on production.
+- Why: USER 2026-09-18 ~15:55 CDT, "fix the market history index rebuild".
+  - MEASURED, cProfile of `candidate_collection_with_fallback` on refresh-worker `ef3fb857`, 20:09-20:19Z: 610.8 of 641.0 s in `build_market_features` → `build_market_history_view` → `_recent_history_rows`.
+  - `build_recent_market_history_index` ran **1,311 times** (about once per candidate), for 517.5 s cumulative, with 18.35M `_event_aliases` = 1,311 × ~14k events.
+  - The `#75` note in `odds_lifecycle.py` records a cache as tried and reverted on the premise of ~15 rebuilds per build, and it measured PEAK MEMORY, not CPU. That premise no longer holds. Nothing in `learnings.md` marks it forbidden.
+- Files: `syndicate/features/shared/odds_lifecycle.py` (a memo around `build_recent_market_history_index` at its one call site in `_recent_history_rows`, plus the `#75` note only), `tests/test_market_history_index_memo.py` (NEW). Checked 2026-09-18 ~20:55Z: no OPEN lane claims `odds_lifecycle.py`.
+- Design: ONE memo entry, keyed by (lookback, end date, root, then each day file's path and mtime). The key is read BEFORE loading, so a file appended mid-read makes the next call rebuild rather than serve stale rows. The index is only read through `_recent_history_rows`, which returns copies. Retained memory is one index (~7 MB per `#75`).
+- Verification (PRE-REGISTERED):
+  - (1) Test: N calls over unchanged files build the index once (the pre-change code builds N times), and rows are equal to a fresh build for every candidate shape.
+  - (2) Test: an append (mtime change) or a new date rebuilds it.
+  - (3) Production after deploy: `candidate_collection_with_fallback` span median well below today's, with candidate and LAYER2_SHORTLIST counts unchanged in distribution.
+
 ### odds-history-match-precompute — OPEN — opened 2026-09-18 — session a1e40980-cceb-493f-adf9-5a5ca879acf6
 - Goal: cut the odds-history matching cost inside refresh-worker's board build, with every candidate's chosen odds-history entry unchanged. The per-(candidate, entry) scoring re-derives the same per-entry and per-candidate normalised fields; derive them once per entry per enrichment pass, and once per candidate. Verified by an exact-equality test against the pre-change scorer, then by soccer's `_consume_sport` time on production.
 - Why: USER 2026-09-18 ~15:25 CDT, "fix the odds history matching", after the profiler this session armed named it.
