@@ -1276,7 +1276,7 @@ death, never life — do not invert it.
 - Verification: (1) `off != on` test: the new test fails on origin/main and passes with the change; (2) production, after a refresh-worker deploy the user approves: a rebuild of the 09-15 MLB board reads `games_with_outcome` > 0 on the served book-grid (it rests on the date still being rebuilt — if nothing rebuilds a past date, that is a finding, not a pass).
 - Blocked by: none
 
-### intelligence-idle-poll — OPEN — opened 2026-09-18 — session f26bba3b-72ee-4f8c-9721-3f8c7e4678f1
+### intelligence-idle-poll — CLOSED 2026-09-18 (GOAL MET: an untouched post-deploy /intelligence tab stopped POSTing at minute 14; resume unit-tested only) — opened 2026-09-18 — session f26bba3b-72ee-4f8c-9721-3f8c7e4678f1
 - Goal: `/intelligence` stops re-sending its ~5-6 MB `/api/intelligence/query` every 60 s from a tab nobody is interacting with, and resumes on the next interaction; the 09-17 attribution is recorded under `[render-egress-spikes]`.
 - Files: `syndicate/static/shared/polling.js`, `syndicate/templates/intelligence.html`, `tests/js/polling_idle_pause.test.mjs` (NEW), `.syndicate/state_worker.md`
 - Hypothesis: the page already passes `skipWhenHidden: true`, yet a Claude desktop browser pane (UA `Claude/2.110.0 ... MSIX`) polled at exactly 60/h from 2026-09-17T17:56:59Z to 2026-09-18T04:53:47Z, so that pane reports `document.hidden === false` while nobody looks at it. A visibility gate cannot stop it; an interaction-idle gate can.
