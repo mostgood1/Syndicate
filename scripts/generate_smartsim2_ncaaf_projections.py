@@ -529,17 +529,342 @@ def _read_sp_cache(path: Path) -> dict[str, tuple[float, float]]:
     return out
 
 
-def _write_sp_cache(path: Path, season: int, index: dict[str, tuple[float, float]]) -> None:
+# ---------------------------------------------------------------------------
+# SP+ IN-SEASON REFRESH. Lane `ncaaf-sim-inseason-ratings`, 2026-09-18.
+# ---------------------------------------------------------------------------
+#
+# THE DEFECT. The cache above is keyed by SEASON and nothing re-fetched it:
+# `--refresh-sp-cache` is the only way in and the refresh-worker never passes
+# it. Measured 2026-09-18: the git-tracked `sp_ratings_2026.json` carried
+# `fetched_at 2026-09-05T21:43Z`, and a live `/ratings/sp?year=2026` the same
+# day had moved EVERY one of the 105 name-matched teams (max 4.5 pts on a
+# component). Week 3 was priced on a two-week-old rating of a season whose
+# whole point, in-season, is that the rating moves.
+#
+# THE SECOND DEFECT, which would have made a naive fix inert. The live re-sim
+# (`run_refresh_worker._ncaaf_sp_ratings_index`) mirrors whatever
+# `load_sp_ratings` returned through `_write_sp_cache`, and `_write_sp_cache`
+# stamped `fetched_at = now`. So a stale copy was RE-STAMPED AS NEW once a day,
+# and an age rule reading `fetched_at` would have called a two-week-old rating
+# "fresh" forever. `fetched_at` now means "when CFBD answered", carried through
+# a rewrite by `_SP_PROVENANCE`; a copy that cannot vouch for that meaning
+# (`fetched_at_source` absent -- every file written before this change) is
+# treated as UNKNOWN AGE, which is STALE: unknown must not default permissive.
+
+# How old the best cached copy of the CURRENT season may be before a re-fetch.
+# SP+ is republished weekly; six days keeps each slate at most one update
+# behind, for one CFBD call a week.
+SP_RATINGS_MAX_AGE_SECONDS = 6 * 86400.0
+
+# A failed or refused refresh is not retried inside this window. Same number,
+# same reason as `ncaaf_historical_loader._GAMES_REFRESH_RETRY_SECONDS`: the
+# generator relaunches hourly while its artifact is stale, and a non-quota
+# failure (500, DNS) never trips `cfbd_quota_latch`, so without a throttle this
+# path would be the per-tick hammer the latch exists to stop.
+SP_RATINGS_REFRESH_RETRY_SECONDS = 6 * 3600.0
+
+# The value of `fetched_at_source` that makes `fetched_at` trustworthy as the
+# moment CFBD answered. Anything else is a legacy or re-stamped copy.
+_SP_FETCHED_AT_VERIFIED = "cfbd_fetch"
+
+# season -> (index, fetched_at, verified) for the copy `load_sp_ratings` last
+# returned. Read by `_write_sp_cache` so a caller that mirrors that index (the
+# live re-sim) writes the ORIGINAL fetch time, not the time of the copy.
+_SP_PROVENANCE: dict[int, tuple[dict[str, tuple[float, float]], str | None, bool]] = {}
+
+
+def _utc_iso(epoch: float) -> str:
+    return datetime.fromtimestamp(float(epoch), tz=timezone.utc).isoformat()
+
+
+def _parse_fetched_at(value: object) -> float | None:
+    """Epoch seconds for an ISO timestamp, or None. A naive value is UTC."""
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        moment = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.timestamp()
+
+
+def current_ncaaf_season(now: float) -> int:
+    """The season a moment belongs to: August-December is that year's season,
+    January-July the previous one's (bowls, then the offseason)."""
+    moment = datetime.fromtimestamp(float(now), tz=timezone.utc)
+    return moment.year if moment.month >= 8 else moment.year - 1
+
+
+def sp_ratings_durable_path(season: int) -> Path:
+    """Where a REFRESHED copy is written: the mounted disk, when there is one.
+
+    The SAME path `run_refresh_worker._ncaaf_sp_ratings_durable_path` reads for
+    the live re-sim -- `default_ncaaf_source_root()` is
+    `$SYNDICATE_NCAAF_SOURCE_ROOT`, else `$SYNDICATE_DATA_ROOT/ncaaf_source`,
+    else the checkout -- and the path `HOT_ARTIFACT_PATTERNS` allowlists
+    (`ncaaf_source/historical_truth/sp_ratings_*.json`). `sp_ratings_cache_path`
+    resolves off `__file__`, i.e. Render's EPHEMERAL checkout, which every
+    deploy resets to the git copy; a refresh written there would be undone
+    several times a day.
+
+    `SYNDICATE_SP_RATINGS_CACHE_DIR`, when set, pins every SP+ read and write to
+    that one directory. It is the tests' isolation knob, and an override that
+    left a second, real directory in play would not isolate anything.
+    """
+    if str(os.environ.get("SYNDICATE_SP_RATINGS_CACHE_DIR") or "").strip():
+        return sp_ratings_cache_path(season)
+    try:
+        return default_ncaaf_source_root() / "historical_truth" / f"sp_ratings_{season}.json"
+    except Exception:  # noqa: BLE001 - a misconfigured root must not stop a run
+        return sp_ratings_cache_path(season)
+
+
+def _sp_cache_candidates(season: int) -> list[Path]:
+    """Every place a JSON copy of this season's SP+ may live, durable first."""
+    out: list[Path] = []
+    seen: set[str] = set()
+    for path in (sp_ratings_durable_path(season), sp_ratings_cache_path(season)):
+        try:
+            key = str(path.resolve())
+        except Exception:  # noqa: BLE001
+            key = str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(path)
+    return out
+
+
+def _read_sp_cache_record(path: Path) -> dict | None:
+    """`{index, fetched_at, fetched_epoch, verified, path}`, or None. Never raises."""
+    index = _read_sp_cache(path)
+    if not index:
+        return None
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        raw = {}
+    fetched_at = raw.get("fetched_at") if isinstance(raw, dict) else None
+    verified = isinstance(raw, dict) and raw.get("fetched_at_source") == _SP_FETCHED_AT_VERIFIED
+    return {
+        "index": index,
+        "fetched_at": str(fetched_at) if fetched_at else None,
+        "fetched_epoch": _parse_fetched_at(fetched_at),
+        "verified": bool(verified),
+        "path": path,
+    }
+
+
+def _best_sp_cache(season: int) -> dict | None:
+    """The copy with the NEWEST `fetched_at`; a copy with none ranks last.
+
+    Ties go to the earlier candidate, i.e. the durable copy. On Render two
+    copies exist by construction -- the git copy in the checkout and the
+    refreshed one on the mounted disk -- and a fixed order would keep serving
+    whichever it names first, so the order is by what each copy says of itself.
+    """
+    best: dict | None = None
+    for path in _sp_cache_candidates(season):
+        record = _read_sp_cache_record(path)
+        if record is None:
+            continue
+        if best is None:
+            best = record
+            continue
+        mine, theirs = record["fetched_epoch"], best["fetched_epoch"]
+        if mine is not None and (theirs is None or mine > theirs):
+            best = record
+    return best
+
+
+def _sp_index_from_payload(payload: object) -> dict[str, tuple[float, float]]:
+    """`/ratings/sp` rows -> `{norm(team): (offense, defense)}`; sentinel dropped."""
+    index: dict[str, tuple[float, float]] = {}
+    if isinstance(payload, list):
+        for row in payload:
+            if not isinstance(row, dict):
+                continue
+            team = row.get("team")
+            if not team or team == "nationalAverages":
+                continue
+            off = (row.get("offense") or {}).get("rating")
+            dfn = (row.get("defense") or {}).get("rating")
+            if off is None or dfn is None:
+                continue
+            index[norm(team)] = (float(off), float(dfn))
+    return index
+
+
+def _write_sp_cache(
+    path: Path,
+    season: int,
+    index: dict[str, tuple[float, float]],
+    *,
+    fetched_at: str | None = None,
+) -> bool:
+    """Atomic write; True on success. Never raises.
+
+    `fetched_at` given -> the caller holds a fresh CFBD answer and says when.
+    Omitted -> this is a COPY of something already loaded (the live re-sim's
+    mirror is the caller that matters), so the loaded copy's own `fetched_at`
+    and verification are carried across unchanged. Only an index nobody loaded
+    here falls back to `now`, and that stamp is written UNVERIFIED.
+    """
+    if fetched_at is not None:
+        stamp: str | None = fetched_at
+        verified = True
+    else:
+        provenance = _SP_PROVENANCE.get(int(season))
+        if provenance is not None and provenance[0] == index:
+            stamp, verified = provenance[1], provenance[2]
+        else:
+            stamp, verified = datetime.now(timezone.utc).isoformat(), False
+    document: dict[str, object] = {
+        "season": season,
+        "fetched_at": stamp,
+        "source": "cfbd /ratings/sp",
+        "teams": {k: [v[0], v[1]] for k, v in sorted(index.items())},
+    }
+    if verified:
+        document["fetched_at_source"] = _SP_FETCHED_AT_VERIFIED
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({
-            "season": season,
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
-            "source": "cfbd /ratings/sp",
-            "teams": {k: [v[0], v[1]] for k, v in sorted(index.items())},
-        }, indent=1, sort_keys=True), encoding="utf-8")
+        tmp = path.with_name(path.name + ".part")
+        tmp.write_text(json.dumps(document, indent=1, sort_keys=True), encoding="utf-8")
+        # `replace`, not a direct write: the live re-sim reads this file from
+        # the same service, and a half-written JSON reads as ABSENT there
+        # (`_read_sp_cache` never raises) for no reason at all.
+        tmp.replace(path)
+        return True
     except Exception as exc:
         print(f"[sp_ratings] cache write failed ({type(exc).__name__}) -- continuing without it", flush=True)
+        return False
+
+
+def _sp_refresh_marker_path(season: int) -> Path:
+    return sp_ratings_durable_path(season).with_name(f"sp_ratings_{season}.refresh_attempt")
+
+
+def _fetch_sp_payload(season: int) -> object:
+    """The one CFBD call, through the latch and the retry ladder (`_cfbd_get`)."""
+    return _cfbd_get("/ratings/sp", {"year": season})
+
+
+def refresh_sp_ratings_cache(
+    season: int,
+    *,
+    now: float | None = None,
+    fetch=None,
+    publish=None,
+) -> dict[str, object]:
+    """Re-fetch the CURRENT season's SP+ when the best cached copy is > 6 days old.
+
+    Never raises; returns a status dict whose `status` is one of:
+
+      fresh                  best copy is verified and younger than 6 days
+      not_current_season     never re-fetched: a past season's SP+ is FINAL
+                             (and leaky -- `[ncaaf-ratings-leak]`), a future
+                             one's does not exist yet
+      throttled              an attempt was made < 6 h ago
+      fetch_failed           any exception, including `QuotaExhausted`
+      short_payload_refused  fewer teams than the copy already held (or none)
+      write_failed           the fetch was good and the disk refused it
+      refreshed              written to `sp_ratings_durable_path` and published
+
+    The four rules of `ncaaf_historical_loader.refresh_games_cache`, each a
+    failure worse than the staleness it replaces: through the quota latch (the
+    default `fetch` is `_cfbd_get`); never clobber a good copy with a short one;
+    stale beats blank (every failure leaves the existing copies in place and
+    `load_sp_ratings` keeps serving them); throttled on failure, the marker
+    stamped BEFORE the call so a run killed mid-fetch still counts.
+    """
+    now = time.time() if now is None else float(now)
+    fetch = fetch or _fetch_sp_payload
+    best = _best_sp_cache(season)
+    held = len(best["index"]) if best else 0
+    status: dict[str, object] = {
+        "season": season,
+        "fetched_at": best["fetched_at"] if best else None,
+        "teams": held,
+    }
+
+    if int(season) != current_ncaaf_season(now):
+        return {"status": "not_current_season", **status}
+
+    age = None
+    if best and best["verified"] and best["fetched_epoch"] is not None:
+        age = now - float(best["fetched_epoch"])
+    if age is not None and age < SP_RATINGS_MAX_AGE_SECONDS:
+        return {"status": "fresh", **status, "age_hours": round(age / 3600.0, 1)}
+    status["age_hours"] = round(age / 3600.0, 1) if age is not None else "unverified"
+
+    marker = _sp_refresh_marker_path(season)
+    try:
+        last_attempt = float(marker.read_text(encoding="utf-8").strip())
+    except Exception:  # noqa: BLE001 - absent or unparseable means "never attempted"
+        last_attempt = None
+    if last_attempt is not None and 0 <= (now - last_attempt) < SP_RATINGS_REFRESH_RETRY_SECONDS:
+        return {
+            "status": "throttled",
+            **status,
+            "retry_in_seconds": int(SP_RATINGS_REFRESH_RETRY_SECONDS - (now - last_attempt)),
+        }
+    try:
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(str(now), encoding="utf-8")
+    except Exception:  # noqa: BLE001 - an unwritable marker must not block the refresh
+        pass
+
+    try:
+        payload = fetch(season)
+    except Exception as exc:  # noqa: BLE001 - includes QuotaExhausted; stale beats blank
+        return {"status": "fetch_failed", **status, "error": f"{type(exc).__name__}: {exc}"[:200]}
+
+    index = _sp_index_from_payload(payload)
+    if not index or len(index) < held:
+        # SP+ rates every FBS team every week; it does not shrink. Fewer teams
+        # than we hold is a partial or filtered answer, and writing it would
+        # drop teams to the PPA fallback with no error anywhere.
+        return {"status": "short_payload_refused", **status, "incoming_teams": len(index)}
+
+    fetched_at = _utc_iso(now)
+    path = sp_ratings_durable_path(season)
+    if not _write_sp_cache(path, season, index, fetched_at=fetched_at):
+        return {"status": "write_failed", **status, "path": str(path)}
+
+    # Published like every other worker-built input (model_engine_standard
+    # section 3), so web can audit which snapshot priced the week. Best effort:
+    # `publish_hot_artifact` never raises and returns False on every local run.
+    published: object = False
+    try:
+        if publish is None:
+            from syndicate.features.shared.artifact_publisher import publish_hot_artifact as publish
+        published = bool(publish(path))
+    except Exception as exc:  # noqa: BLE001 - transfer must never fail generation
+        published = f"error:{type(exc).__name__}"
+    return {
+        "status": "refreshed",
+        "season": season,
+        "fetched_at": fetched_at,
+        "teams": len(index),
+        "previous_fetched_at": status["fetched_at"],
+        "previous_teams": held,
+        "path": str(path),
+        "published": published,
+    }
+
+
+def format_sp_refresh_line(result: dict[str, object]) -> str:
+    """`SP_RATINGS_REFRESH season=.. status=.. fetched_at=.. teams=.. <rest>`"""
+    head = ("season", "status", "fetched_at", "teams")
+    parts = [f"{key}={result.get(key)}" for key in head]
+    parts += [f"{key}={value}" for key, value in result.items() if key not in head]
+    return "SP_RATINGS_REFRESH " + " ".join(parts)
 
 
 def load_sp_ratings(season: int) -> dict[str, tuple[float, float]]:
@@ -589,58 +914,103 @@ def load_sp_ratings(season: int) -> dict[str, tuple[float, float]]:
     # belongs -- one owner, one refresh path. This script's own JSON cache stays
     # as the second lookup so an existing one keeps working, but the loader's is
     # authoritative and is what a scheduled refresh will populate.
+    #
+    # 2026-09-18 (`ncaaf-sim-inseason-ratings`): "authoritative" now yields to a
+    # JSON copy that is PROVABLY NEWER. Nothing refreshes the loader's gzip (it
+    # is write-once, `ensure_ratings_cached`), so for the current season a
+    # refreshed JSON copy is newer by construction; letting the gzip win
+    # unconditionally would make `refresh_sp_ratings_cache` inert wherever one
+    # exists. The gzip carries no `fetched_at`, so its file mtime stands in --
+    # it is not git-tracked, so that mtime is its write time. An unknown mtime
+    # keeps the old precedence.
+    best = None if _SP_CACHE_REFRESH else _best_sp_cache(season)
     if not _SP_CACHE_REFRESH:
+        loader_mtime = None
         try:
-            from syndicate.features.football.sim_engine.smartsim2.historical_truth.ncaaf_historical_loader import (
-                load_cached_ratings,
-            )
-            raw = load_cached_ratings(season)
+            from syndicate.features.football.sim_engine.smartsim2.historical_truth import ncaaf_historical_loader as _loader
+
+            raw = _loader.load_cached_ratings(season)
+            try:
+                loader_mtime = _loader._ratings_cache_path(season, _loader.DEFAULT_CACHE_DIR).stat().st_mtime
+            except Exception:  # noqa: BLE001 - absent file, or a patched loader
+                loader_mtime = None
         except Exception:
             raw = None
-        if raw:
-            index: dict[str, tuple[float, float]] = {}
-            for row in raw:
-                team = row.get("team") if isinstance(row, dict) else None
-                if not team or team == "nationalAverages":
-                    continue
-                off = (row.get("offense") or {}).get("rating")
-                dfn = (row.get("defense") or {}).get("rating")
-                if off is None or dfn is None:
-                    continue
-                index[norm(team)] = (float(off), float(dfn))
-            if index:
-                print(f"[sp_ratings] season={season} source=loader_cache teams={len(index)}", flush=True)
-                return index
+        index = _sp_index_from_payload(raw) if raw else {}
+        newer_json = (
+            best is not None
+            and best["fetched_epoch"] is not None
+            and loader_mtime is not None
+            and best["fetched_epoch"] > loader_mtime
+        )
+        if index and not newer_json:
+            print(f"[sp_ratings] season={season} source=loader_cache teams={len(index)}", flush=True)
+            _SP_PROVENANCE[int(season)] = (
+                dict(index),
+                _utc_iso(loader_mtime) if loader_mtime is not None else None,
+                False,
+            )
+            return index
 
-    cache_path = sp_ratings_cache_path(season)
-    cached = {} if _SP_CACHE_REFRESH else _read_sp_cache(cache_path)
-    if cached:
+    if best is not None:
         # `log` is defined INSIDE main(); this runs at module scope, so print.
         # `flush=True` because todo.md records logger.info never reaching
         # Render's log collector.
-        print(f"[sp_ratings] season={season} source=cache teams={len(cached)} path={cache_path}", flush=True)
-        return cached
+        print(
+            f"[sp_ratings] season={season} source=cache teams={len(best['index'])} "
+            f"fetched_at={best['fetched_at']} verified={best['verified']} path={best['path']}",
+            flush=True,
+        )
+        _SP_PROVENANCE[int(season)] = (dict(best["index"]), best["fetched_at"], bool(best["verified"]))
+        return best["index"]
 
+    cache_path = sp_ratings_durable_path(season)
     payload = _cfbd_get("/ratings/sp", {"year": season})
-    index: dict[str, tuple[float, float]] = {}
-    if isinstance(payload, list):
-        for row in payload:
-            team = row.get("team")
-            if not team or team == "nationalAverages":
-                continue
-            off = (row.get("offense") or {}).get("rating")
-            dfn = (row.get("defense") or {}).get("rating")
-            if off is None or dfn is None:
-                continue
-            index[norm(team)] = (float(off), float(dfn))
+    index = _sp_index_from_payload(payload)
     if index:
-        _write_sp_cache(cache_path, season, index)
+        fetched_at = datetime.now(timezone.utc).isoformat()
+        _write_sp_cache(cache_path, season, index, fetched_at=fetched_at)
+        _SP_PROVENANCE[int(season)] = (dict(index), fetched_at, True)
         print(f"[sp_ratings] season={season} source=api teams={len(index)} cached={cache_path}", flush=True)
     else:
         # NEVER cache an empty index. A rate-limited or malformed response would
         # otherwise be written once and served forever as though it were real.
         print(f"[sp_ratings] season={season} source=api teams=0 NOT CACHED (empty)", flush=True)
     return index
+
+
+def resolve_sp_ratings(
+    season: int,
+    *,
+    now: float | None = None,
+    fetch=None,
+    publish=None,
+) -> tuple[dict[str, tuple[float, float]], dict[str, object]]:
+    """The run's SP+ index, refreshed first when the current season's is stale.
+
+    The ONE hop `main` takes, so a test of this function is a test of what the
+    generator prices with -- not merely of what landed on disk. Exactly one
+    `SP_RATINGS_REFRESH` line per run, printed (not logged): `logger.info`
+    never reaches Render's log collector, and this line is the verification
+    for the lane that added it.
+
+    `--refresh-sp-cache` keeps its meaning (ignore every cache and fetch), so
+    the age-gated refresh is skipped under it rather than spending a second call.
+    """
+    if _SP_CACHE_REFRESH:
+        result: dict[str, object] = {"status": "forced_by_flag", "season": season, "fetched_at": None, "teams": None}
+    else:
+        try:
+            result = refresh_sp_ratings_cache(season, now=now, fetch=fetch, publish=publish)
+        except Exception as exc:  # noqa: BLE001 - it never raises; belt and braces
+            result = {"status": "raised", "season": season, "fetched_at": None, "teams": None,
+                      "error": f"{type(exc).__name__}: {exc}"[:200]}
+    index = load_sp_ratings(season)
+    provenance = _SP_PROVENANCE.get(int(season))
+    result["served_teams"] = len(index)
+    result["served_fetched_at"] = provenance[1] if provenance else None
+    print(format_sp_refresh_line(result), flush=True)
+    return index, result
 
 
 def sp_offense_defense_rating(team: str, sp_index: dict[str, tuple[float, float]],
@@ -995,7 +1365,8 @@ def main() -> None:
 
     # SP+ is the primary rating source; PPA above stays as the per-team fallback.
     ratings_season = args.ratings_season if args.ratings_season is not None else args.season
-    sp_index = load_sp_ratings(ratings_season)
+    sp_index, sp_refresh = resolve_sp_ratings(ratings_season)
+    log(format_sp_refresh_line(sp_refresh))
     sp_means = sp_league_means(sp_index)
     if sp_index:
         rating_source = f"cfbd_sp_plus_{ratings_season}[scale={SP_RATING_SCALE:g}]+{rating_source}"
