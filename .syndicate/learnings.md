@@ -7024,3 +7024,29 @@ chose week 2, and for a while I read that as a partial failure.
 **Rule.** A production env value is part of the next deploy of that service, whoever runs it. Write it only while holding the service's claim, immediately before your own deploy; never set it early to 'save time'. If another lane takes the claim first, either revert the PUT or tell that lane its deploy will carry your change and agree who reads it.
 
 **Evidence.** `deploys.md` 2026-09-18 13:45Z; refresh-worker deploys `7ef0431b` (22:34:51Z), `c05918c8` (00:39:36Z), `c6a91b90` (01:20:00Z); `DISK_RETENTION_SUMMARY` 2026-09-18 00:48:54Z.
+
+### 2026-09-18 (session 4a583d41, lane soccer-prop-conditioning) — FORBIDDEN: measuring a soccer name join, or anything that resolves team names, in a session worktree without `data/`
+
+**What happened.** While closing `prop-evidence-parity` I measured the soccer fixture join with
+`SoccerProjectionIndex.match_for` over production recommendation files, found 4 of 12 fixtures
+"never join" ("Inter Milan"/"Internazionale", "FC Zwolle"/"PEC Zwolle", "SC Telstar"/"Telstar",
+"FC Twente Enschede"/"FC Twente"), and filed it into `#673` as a defect. It was false. The soccer
+alias map (`team_aliases._soccer_alias_to_name`) is DERIVED from the git-tracked team-branding
+CSVs under `data/soccer_source/<league>/source_artifacts/`, and a session worktree excludes `data/`
+by design. In that checkout the map was empty, `canonical_team` returned None for every club, and
+`teams_match` fell back to heuristics. On production all four fixtures join (123/124, 267/275,
+13/14, 13/14 rows projected on the served board). The code read fine and the numbers were real,
+but they came from an environment production never runs.
+
+**How to apply.**
+- A join, alias, branding or roster measurement comes from the SERVED payload (`/api/board/layer1`
+  rows with a projection), or from code run beside the data it reads. A session worktree has
+  neither; the tool says so when it opens ("92 tests fail in this tree for that absence alone").
+- Before filing "X never joins" from a local replay, run the same pair through the served board.
+  A null there needs a live population (the fixture's rows must be on the board).
+- The same absence explains most red soccer tests in a worktree: 21 of 26 failures in this
+  session's sweep passed once git's own ten branding CSVs were present.
+- To add those CSVs temporarily, note that writing a file under a sparse-excluded path CLEARS its
+  skip-worktree bit, so deleting it afterwards shows as a tracked DELETION. `git sparse-checkout
+  reapply` restores the bit; check `git status` for ` D` before any commit.
+- *(evidence: `log/2026-09-18.md` ~16:30Z; lane `soccer-prop-conditioning`)*
