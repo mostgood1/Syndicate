@@ -425,6 +425,19 @@ def test_only_an_earlier_week_is_ever_used_and_it_is_labelled_stale(root, monkey
     assert coverage["stale_week_rows"] == 1
 
 
+def test_the_board_join_never_falls_back_to_the_games_cache(root, monkeypatch):
+    """`sources.ncaaf_target_week` falls back to the raw CFBD games cache when
+    week_state is absent (17.9 s, 41 MB retained, measured). A row whose week
+    cannot be placed from week_state is counted, never resolved that way."""
+    from syndicate.features.ncaaf import oddsapi_lines, sources
+
+    monkeypatch.setattr(oddsapi_lines, "resolve_team", lambda name: _TEAMS.get(str(name)))
+    monkeypatch.setattr(sources, "ncaaf_target_week", lambda season: (_ for _ in ()).throw(AssertionError("games cache")))
+    _write_artifact(root, week=3)  # artifact present, week_state absent
+    coverage = pp.attach_ncaaf_prop_projections([_prop_row()], selected_date="2026-09-19")
+    assert coverage["no_week_rows"] == 1 and coverage["rows_with_projection"] == 0
+
+
 def test_the_board_wrapper_attaches_props_with_no_game_projections_and_declares_skill(root, monkeypatch):
     """The old NCAAF branch returned early when `not index.games`, which would
     have blanked every prop row on a date with no game projection."""

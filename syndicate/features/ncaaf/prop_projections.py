@@ -928,7 +928,13 @@ def week_for_kickoff(
 ) -> tuple[int | None, str]:
     """(week, how) for a kickoff: the lowest week whose LAST unplayed kickoff
     is not before it (`week_state`, the resolver Ask's game-sim layer uses),
-    else the schedule's target week, else (None, "unresolved")."""
+    else week_state's target week, else (None, "unresolved").
+
+    READS THE PUBLISHED week_state ONLY. `sources.ncaaf_target_week` falls back
+    to the raw CFBD games cache when the artifact is absent, and that fallback
+    measured 17.9 s and 41 MB retained on a dev machine -- a price a board join
+    or an Ask answer must never pay. Unresolved is counted, not guessed.
+    """
     kickoff = _parse_ts(commence_time)
     state = week_state
     if state is None:
@@ -944,13 +950,20 @@ def week_for_kickoff(
             last = _parse_ts((unplayed.get(str(week)) or {}).get("last"))
             if last is not None and last >= kickoff:
                 return week, "week_state"
-    try:
-        from syndicate.features.ncaaf.sources import ncaaf_target_week
+    target = current_week_from_state(season, week_state=state)
+    return (target, "week_state_target") if target else (None, "unresolved")
 
-        target = ncaaf_target_week(int(season))
+
+def current_week_from_state(season: int, *, week_state: Mapping[str, Any] | None = None) -> int | None:
+    """The week in progress per the PUBLISHED week_state, never the games cache."""
+    try:
+        from syndicate.features.ncaaf.week_state import read_week_state, target_week_from_state
+
+        state = week_state if week_state is not None else read_week_state(int(season))
+        target = target_week_from_state(state)
     except Exception:  # noqa: BLE001
-        target = None
-    return (int(target), "target_week") if target else (None, "unresolved")
+        return None
+    return int(target) if target else None
 
 
 # ---------------------------------------------------------------------------
