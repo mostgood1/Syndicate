@@ -1686,12 +1686,48 @@ def _mlb_props_now_available_needs_regen(*, now_epoch: float, date_str: str) -> 
 		from syndicate.features.mlb.sources import daily_top_props_path
 		from syndicate.features.mlb.sources import daily_snapshot_oddsapi_hitter_props_path
 		from syndicate.features.mlb.sources import daily_snapshot_oddsapi_pitcher_props_path
+		from syndicate.features.mlb.sources import load_json_or_gz_file
 	except Exception:
 		return False
 
-	top_props = read_json_file(daily_top_props_path(date_str))
+	# DISK FIRST, THEN THE STATE STORE -- the same order, for the same reason, as
+	# `_mlb_oddsapi_props_snapshot_has_entries` above. Lane
+	# `mlb-sim-retrigger-churn`, 2026-09-18.
+	#
+	# This used `read_json_file` alone. On refresh-worker the state backend is
+	# keyvalue and this path is not excluded from it, so that read went to REDIS
+	# -- while the file is written to DISK by the vendored MLB app
+	# (`flask_frontend._write_json_file`), and every other top-props reader
+	# (`home.py`, `intelligence.py`, `mlb/hub.py`) reads disk. The predicate
+	# therefore NEVER saw top props, fell through to "daily summary exists but top
+	# props doesn't", and re-simmed the whole slate every time its cooldown
+	# expired. Measured 2026-09-18: `MLB_PROPS_REGEN_DUE` six times 06:05-13:01Z,
+	# all PREGAME, 19-37 min a run, while web served that day's top props from
+	# disk with 12 real candidates. The regen was succeeding; only this check was
+	# blind to it.
+	top_props_path = daily_top_props_path(date_str)
+	top_props = load_json_or_gz_file(top_props_path)
+	if not isinstance(top_props, dict):
+		top_props = read_json_file(top_props_path)
+		if isinstance(top_props, dict) and _mlb_top_props_candidate_total(top_props) > 0:
+			# Worth knowing about: it would mean top props started being written
+			# through the state store, and the disk read is no longer the
+			# authoritative one.
+			print(
+				f"[live_refresh_loop] MLB_TOP_PROPS_KEYVALUE_ONLY date={date_str} "
+				f"candidates={_mlb_top_props_candidate_total(top_props)}",
+				flush=True,
+			)
 	if isinstance(top_props, dict):
-		if _mlb_top_props_candidate_total(top_props) > 0:
+		candidates = _mlb_top_props_candidate_total(top_props)
+		if candidates > 0:
+			# The branch this fix makes reachable, named so production can show it
+			# ran: before it, a day with real top props still read as "missing".
+			print(
+				f"[live_refresh_loop] MLB_PROPS_REGEN_SKIPPED date={date_str} "
+				f"reason=top_props_present candidates={candidates}",
+				flush=True,
+			)
 			return False
 	elif not _mlb_daily_summary_path(date_str).exists():
 		# Genuine coldstart -- first_appearance above already covers a slate
