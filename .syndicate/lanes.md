@@ -1231,6 +1231,16 @@ death, never life — do not invert it.
 - Falsification test: attribute every trigger over a full day to (game, input, started-or-not). H1 is falsified if started games' line changes cause none; H3 if every change is a real content change; H4 if re-sim duration scales with the number of games re-simmed.
 - Verification (PRE-REGISTERED): (1) attribution — a per-trigger log naming changed game_pks and, per game, which of the five inputs moved and whether the game had started, over >= 12 h of a live slate; (2) for any cut: `fingerprint_change` triggers per 12 h and the board's refusal count (`MEMORY_GUARD_ABORT` at `pre_source_state_fingerprint`) both fall, with the MLB board's sim output unchanged for the games it did re-sim, and today's board re-completing more often than the ~20-min median measured 16:40-23:10Z.
 
+### soccer-h24-grader — OPEN — opened 2026-09-17 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Goal: `#665`'s H24 has a committed grader that computes exactly the registered predictor `factor_L(d)` and arms `P0`/`XE` over the pre-kickoff freeze, on FotMob xG data that actually covers the registered base seasons and the trailing-365-day window for all ten leagues, and prints per-family coverage and their intersection; its first production run joins at least one finished frozen match through outcome, factor and both arms.
+- Files:
+  - `scripts/soccer_season_audit/h24_forward_grade.py` (NEW)
+  - `tests/test_soccer_h24_forward_grade.py` (NEW)
+- Hypothesis: n/a (tooling). The data risk, named first: the committed 2-year FotMob cache holds ONE season for Eredivisie, Championship and Belgian Pro League, and only 2026 for MLS, while the registered base is 2024-25 + 2025-26 (MLS 2024 + 2025).
+- Falsification test: a finished frozen match in the window that the grader cannot join to an outcome or a factor, or a league whose base season the harvest cannot fill.
+- Verification: first run prints each family's date coverage per league and the intersection, and grades >= 1 match with both arms; per-league base-season match counts printed.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
