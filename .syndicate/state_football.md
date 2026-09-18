@@ -2488,7 +2488,7 @@ CHECKOUT, where `tracking/` is gitignored. `load_player_plays` returned `()` for
 missing path, silently. The same selector made `nfl_target_week` read git's
 `schedule_2026.csv` (272 of 272 rows with blank scores), which is why every launch
 was `week=1`. Fixed in `4d221768` (`data_path` resolves per file; `_pbp_path` uses
-`nfl_pbp_path`), **NOT YET DEPLOYED** as of 23:40Z. The 97.9 MB / 12 MiB publish point
+`nfl_pbp_path`). **DEPLOYED to all three services and VERIFIED 2026-09-18** (`deploys.md` 00:33:04Z entry): the autorun now launches `week=2`, the correct current week (was `week=1` x64), and live-odds-worker files the capture as `..._wk2.csv`. The BUILD-WITH-ROWS reading is still owed: due ~00:54Z 2026-09-19 (`artifact_missing_after_launch` waits 86,400 s). The 97.9 MB / 12 MiB publish point
 above is still true and is why the build must run ON the worker, not be shipped.
 
 ~~**CONSEQUENCE: refresh-worker can never build this artifact.**~~ **SUPERSEDED 2026-09-17: false, see the correction above — it could not FIND the pbp it has.** The producer is an

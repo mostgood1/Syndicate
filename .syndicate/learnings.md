@@ -6989,3 +6989,24 @@ inside the write path did. Put the check in the script that writes, not only in 
   - **Count the event line, not a token.** One line type per event (`MLB_DAILY_SIM_TRIGGERED`), and check how many line types carry the token before using it as a counter.
   - **A reason label records the first matching branch, not the cause.** Where several triggers can merge, log each trigger's contribution separately, and grade a fix on the trigger it changed.
   - **Re-derive a baseline with the SAME counter you will grade with, before pre-registering the prediction** — a prediction set against a miscounted baseline can pass while proving nothing.
+
+### 2026-09-18 (session 4a583d41, lane nfl-prop-week-substrate) — FORBIDDEN: predicting when a gated job runs next from a timer you saw in a log line, without reading which branch the job is on
+
+**What happened.** After deploying the `#672` fix I told the user the NFL prop autorun would
+relaunch "within the hour", because its logs had shown `cooldown_seconds=3600`. That number
+belonged to `artifact_stale_relaunched_recently`. The first post-deploy launch left no artifact,
+which puts the job on a DIFFERENT branch, `artifact_missing_after_launch`, gated on the full
+`interval_seconds=86400`. The next build was ~24 h away, and a watcher sat out its 95-minute
+window waiting for a launch the code would never make that night.
+
+**The sibling error, same lane.** I recorded "the board was playing week 3" from game DATES,
+without reading the schedule the code reads. Production's own schedule said week 2. The fix
+chose week 2, and for a while I read that as a partial failure.
+
+**How to apply.**
+- Before predicting a re-run, name the guard's BRANCH from its latest log line and read that
+  branch's timer in code. The same job can wait 1 h or 24 h depending on how its last run ended.
+- A fact the code derives from a file (the current week, the active slate) is read FROM THAT
+  FILE, not inferred from calendar arithmetic. The whole bug was a reader looking at the wrong
+  copy of the schedule; the diagnosis should not repeat it by looking at no copy.
+- *(evidence: `log/2026-09-18.md`; `deploys.md` 2026-09-18 00:33:04Z entry)*
