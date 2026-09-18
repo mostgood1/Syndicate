@@ -7057,3 +7057,15 @@ but they came from an environment production never runs.
 - **What was measured** (2026-09-18, the 38 in-play `alternate_totals_corners` events of 09-12..09-17, OddsAPI names vs ESPN summary names, same league, kickoff within 30 min): that key joined **21**. The platform's own `team_names.canonical_team_name` joined **34, with 0 wrong fixtures**. The misses are systematic, not noise: FC Augsburg / Augsburg, Osasuna / CA Osasuna, Atalanta / Atalanta BC, Le Havre AC / Le Havre, Paris Saint-Germain / Paris Saint Germain, the accent in CF Montreal, Houston Dynamo FC / Houston Dynamo. 286 rows were one fixture of one league: a row count is not coverage.
 - **The rule:** a name join between two sources is certified per league, over the population it will serve, with the unmatched count printed as a funnel stage. One fixture proves only that fixture. A join that drops a row must count it, because a silent miss looks like "no price", which reads as a normal state.
 - *(evidence: `log/2026-09-18.md` ~11:22 CT; lead in `leads.md`; not yet read on the pricer's own run)*
+### 2026-09-18 (session 4a583d41, lane soccer-prop-conditioning) — a background watcher piped through `grep` writes NOTHING until it exits
+
+**What happened.** I backgrounded a deploy watcher as `py -3 watch.py 2>&1 | grep -v http_compression`. Its
+output file stayed empty through two reads. Nothing was wrong with the watcher: `grep` writing to a file
+(not a terminal) block-buffers, so lines arrive only when the buffer fills or the process ends. An empty
+output file looks exactly like a hung or dead watcher. The session rule "read the first cycle before
+trusting a watcher" caught it, and the empty read was then misleading in the other direction.
+
+**How to apply.** For any backgrounded watcher: `py -3 -u` (or `PYTHONUNBUFFERED=1`), and
+`grep --line-buffered` on every filter in the pipe. Read the output file once before trusting it; if it is
+empty, suspect buffering before suspecting the watcher.
+- *(evidence: `log/2026-09-18.md` ~16:40Z checkpoint)*
