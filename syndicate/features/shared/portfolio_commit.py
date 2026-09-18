@@ -248,6 +248,45 @@ def _net_profit_per_unit(american: float) -> float | None:
 
 
 
+# SPORTS WHOSE STAKES ARE SIZED ON PRICE EVEN WHEN THE ROW CARRIES A SIM EDGE.
+# `[2026-09-18, user decision "Show edges, size on price", lane ncaaf-board-sim-coverage]`
+#
+# A SIZING BASIS, NOT AN EXCLUSION. Every NCAAF row is still judged and sized
+# (the 2026-09-16 no-family-exclusion rule below is untouched); what changes is
+# only WHICH probability the stake is bet on. Until 2026-09-18 NCAAF published
+# no `model_edge_pct` at all, so every NCAAF stake was already market-fair.
+# That day the user made NCAAF sim edges visible and rankable ("they should be
+# shown, period"), and asked separately that the money keep following price
+# until an in-season NCAAF model beats the close -- the current one loses to it
+# by +1.75 margin MAE this season (`ncaaf/game_projections.NCAAF_MEASURED_SKILL`).
+#
+# Without this, publishing the edge would silently switch NCAAF paper AND live
+# stakes to `fair + model_edge_pct/100` Kelly. With it, NCAAF sizing is
+# byte-identical to the day before the edges appeared. The row's real
+# `model_edge_pct` is still RECORDED on the position, so the settled book can be
+# split by what the sim thought.
+#
+# `SYNDICATE_PORTFOLIO_PRICE_BASIS_SPORTS`: absent or blank keeps this default;
+# `none` clears it; otherwise a comma list.
+_PRICE_BASIS_SPORTS_DEFAULT = frozenset({"ncaaf"})
+
+
+def _price_basis_sports() -> frozenset[str]:
+    raw = str(os.environ.get("SYNDICATE_PORTFOLIO_PRICE_BASIS_SPORTS") or "").strip().lower()
+    if not raw:
+        return _PRICE_BASIS_SPORTS_DEFAULT
+    if raw == "none":
+        return frozenset()
+    return frozenset(part.strip() for part in raw.split(",") if part.strip())
+
+
+def _sizing_model_edge(row: Mapping[str, Any]) -> float | None:
+    """The model edge the STAKE may use: None for a price-basis sport."""
+    if str(row.get("sport") or "").strip().lower() in _price_basis_sports():
+        return None
+    return _as_float(row.get("model_edge_pct"))
+
+
 def _market_fair_sports() -> frozenset[str]:
     """Sports allowed to size on MARKET FAIR when they carry no model edge.
 
@@ -310,7 +349,7 @@ def _refuses_in_play_market_fair(row: Mapping[str, Any]) -> bool:
     `_market_fair_sports()` is already refused `no_model_edge_pct`, and moving it
     to this counter would change a refusal count other readings depend on.
     """
-    if _as_float(row.get("model_edge_pct")) is not None:
+    if _sizing_model_edge(row) is not None:
         return False
     if str(row.get("sport") or "").strip().lower() not in _market_fair_sports():
         return False
@@ -337,7 +376,7 @@ def sizing_basis_of(row: Mapping[str, Any]) -> str:
     about the price. Recording only the total would make the next accuracy read
     uninterpretable in exactly the way `#624` step 6 had to unpick.
     """
-    return "model_edge" if _as_float(row.get("model_edge_pct")) is not None else "market_fair"
+    return "model_edge" if _sizing_model_edge(row) is not None else "market_fair"
 
 
 PREGAME_INTERVAL_GATE_ENV = "SYNDICATE_PREGAME_INTERVAL_GATE"
@@ -497,7 +536,9 @@ def sizing_inputs_with_provenance(
     if not (0.0 < fair < 1.0):
         return None, "derived_fair_probability_out_of_range", provenance
 
-    model_edge_pct = _as_float(row.get("model_edge_pct"))
+    # `_sizing_model_edge`, not the raw field: a price-basis sport's sim edge is
+    # shown and ranked, never staked on. See `_PRICE_BASIS_SPORTS_DEFAULT`.
+    model_edge_pct = _sizing_model_edge(row)
     has_model_view = model_edge_pct is not None
     if model_edge_pct is None:
         # Roughly 40% of the served board ranks on market EV and price shopping

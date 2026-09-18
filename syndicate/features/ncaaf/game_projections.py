@@ -24,17 +24,24 @@ from `prop_projections` exactly as the NFL module imports it.
 THE CAVEAT IS THE POINT, NOT A DISCLAIMER. `football/pick_gate.py` is explicit
 that suppressing PICKS "does NOT stop projections being generated, published, or
 displayed -- the board still shows what the model thinks", because a gate that
-blinds its own exit criterion never opens. So displaying is correct. But the
-model is MEASURED as losing to the closing line, and a bare number in a column
-headed PROJECTED has nowhere to say so. Same resolution NFL reached for its own
-skill-less markets: keep the probability, blank the bare numeric, and travel with
-the measurement.
+blinds its own exit criterion never opens. So displaying is correct. The model
+is MEASURED as losing to the closing line, and that measurement travels on every
+projection as `model_skill`.
+
+UNTIL 2026-09-18 THIS MODULE ALSO BLANKED: spreads published `projected: None`
+and all three markets published no edge. The user reversed that ("they should be
+shown, period ... every game/prop is its own entity"; "Publish,
+skill-discounted"), so every market now carries its projection, probability and
+edge, and the measured loss acts through `layer2_board._apply_skill_reliability`
+(ranking) while `portfolio_commit` keeps NCAAF stakes on the market-fair basis.
+See the block above `_normal_prob_above`.
 """
 
 from __future__ import annotations
 
 import csv
 import logging
+import math
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping
 
@@ -204,18 +211,87 @@ def _unratable_reason(game: Mapping[str, Any]) -> str | None:
     )
 
 
+# HOW FAR A KICKOFF DATE MAY DRIFT BETWEEN THE SCHEDULE AND THE BOARD. One day.
+#
+# The date on the index comes from the CFBD schedule; the date on the row comes
+# from OddsAPI's `commence_time`. They disagree for ordinary reasons, and the
+# join used to demand byte-equality anyway. Measured 2026-09-18 on the served
+# board: North Texas @ Texas State sat at `2026-09-20T02:00Z` in the schedule
+# copy the join reads (git-tracked, written 2026-08-01, and reset to that copy by
+# every deploy) while the board had `2026-09-19T16:00Z` -- the kickoff was set
+# after the copy was taken, and the game carried no model.
+#
+# ONE day and not "any day of the week", because a week spans ten days and a
+# projection must not leak onto a different day's row -- `test_lookup_is_date_scoped`
+# pins a 7-day gap as a miss, and that still holds. A team pair plays once per
+# regular-season week, so +/-1 day cannot confuse two different games.
+_KICKOFF_DATE_TOLERANCE_DAYS = 1
+
+
+def _shift_date(date_key: str, days: int) -> str | None:
+    from datetime import date, timedelta
+
+    try:
+        return (date.fromisoformat(date_key) + timedelta(days=days)).isoformat()
+    except ValueError:
+        return None
+
+
+def _date_window(date_key: str) -> list[str]:
+    """`date_key` first, then each neighbour within the tolerance."""
+    out = [date_key]
+    for offset in range(1, _KICKOFF_DATE_TOLERANCE_DAYS + 1):
+        for signed in (-offset, offset):
+            shifted = _shift_date(date_key, signed)
+            if shifted:
+                out.append(shifted)
+    return out
+
+
+def _oriented(entry: Mapping[str, Any], *, flipped: bool, date_shifted: bool) -> dict[str, Any]:
+    """The entry restated in the BOARD ROW's home/away frame.
+
+    NEUTRAL-SITE GAMES HAVE A NOMINAL HOME, AND THE TWO FEEDS PICK DIFFERENTLY.
+    Measured 2026-09-18: CFBD lists `Arizona State @ Kansas` (Wembley Stadium,
+    `neutralSite: true`) and `West Virginia @ Virginia` (Bank of America Stadium,
+    `neutralSite: true`); OddsAPI lists both the other way round. The lookup was
+    keyed on the exact (home, away) order, so both FBS games carried no model.
+
+    Every home-relative number flips; the total does not. The projection's own
+    HFA stays whatever the generator applied for CFBD's reading of the venue --
+    that is the model's statement, and restating its frame does not change it.
+    """
+    out = dict(entry)
+    if flipped:
+        margin = _as_float(entry.get("margin_mean"))
+        win = _as_float(entry.get("home_win_rate"))
+        out["margin_mean"] = -margin if margin is not None else None
+        out["home_win_rate"] = (1.0 - win) if win is not None else None
+        out["home_team"], out["away_team"] = entry.get("away_team"), entry.get("home_team")
+    out["orientation_flipped"] = bool(flipped)
+    out["kickoff_date_shifted"] = bool(date_shifted)
+    return out
+
+
 @dataclass
 class NcaafGameProjectionIndex:
-    """(kickoff date, home, away) -> one projection row.
+    """(schedule kickoff date, home, away) -> one projection row.
 
-    Keyed on CFBD canonical names; `lookup` resolves the board's names -- which
-    come from OddsAPI and carry mascots ("TCU Horned Frogs") -- through the same
-    validated resolver the line capture uses. Ambiguity yields a miss, never a
-    guess: ~680 schools share mascots, so a wrong join puts another game's model
-    on this card.
+    Keyed on CFBD canonical names in CFBD's orientation; `lookup` resolves the
+    board's names -- which come from OddsAPI and carry mascots ("TCU Horned
+    Frogs") -- through the same validated resolver the line capture uses, and
+    returns the entry restated in the BOARD's frame. Ambiguity yields a miss,
+    never a guess: ~680 schools share mascots, so a wrong join puts another
+    game's model on this card.
+
+    `undated` holds projections for games the schedule copy does not contain at
+    all (added after the copy was taken). Keyed on the pair alone and consulted
+    last: the generator on refresh-worker refreshes its schedule before it
+    writes the CSV, while this join reads whatever copy this service holds.
     """
 
     by_date_teams: dict[tuple[str, str, str], dict[str, Any]] = field(default_factory=dict)
+    undated: dict[tuple[str, str], dict[str, Any]] = field(default_factory=dict)
     games: int = 0
     sources: list[str] = field(default_factory=list)
     rows_unresolved_team: int = 0
@@ -226,11 +302,26 @@ class NcaafGameProjectionIndex:
     unratable: dict[tuple[str, str, str], str] = field(default_factory=dict)
     unratable_games: int = 0
 
+    @staticmethod
+    def _find(table: Mapping[tuple[str, str, str], Any], date_key: str, home: str, away: str):
+        """(value, flipped, date_shifted) for the first key in the window, or None.
+
+        Exact date and orientation first, so a normal game can never be answered
+        by a neighbour.
+        """
+        for position, candidate in enumerate(_date_window(date_key)):
+            for key_home, key_away, flipped in ((home, away, False), (away, home, True)):
+                value = table.get((candidate, key_home, key_away))
+                if value is not None:
+                    return value, flipped, position > 0
+        return None
+
     def unratable_reason(self, game_date: str, home: Any, away: Any) -> str | None:
         """Why this fixture has no projection, or None if it is not that case.
 
-        Resolved through the SAME `resolve_team` path as `lookup`, so a fixture
-        cannot be called unratable on a name the lookup would have matched.
+        Resolved through the SAME `resolve_team` path and the same date and
+        orientation tolerance as `lookup`, so a fixture cannot be called
+        unratable on a name or date the lookup would have matched.
         """
         date_key = str(game_date or "")[:10]
         if not date_key or not self.unratable:
@@ -239,7 +330,8 @@ class NcaafGameProjectionIndex:
         away_canonical = resolve_team(away)
         if not (home_canonical and away_canonical):
             return None
-        return self.unratable.get((date_key, _norm(home_canonical), _norm(away_canonical)))
+        found = self._find(self.unratable, date_key, _norm(home_canonical), _norm(away_canonical))
+        return found[0] if found else None
 
     def lookup(self, game_date: str, home: Any, away: Any) -> dict[str, Any] | None:
         date_key = str(game_date or "")[:10]
@@ -249,7 +341,16 @@ class NcaafGameProjectionIndex:
         away_canonical = resolve_team(away)
         if not (home_canonical and away_canonical):
             return None
-        return self.by_date_teams.get((date_key, _norm(home_canonical), _norm(away_canonical)))
+        home_key, away_key = _norm(home_canonical), _norm(away_canonical)
+        found = self._find(self.by_date_teams, date_key, home_key, away_key)
+        if found is not None:
+            entry, flipped, shifted = found
+            return _oriented(entry, flipped=flipped, date_shifted=shifted)
+        for key_home, key_away, flipped in ((home_key, away_key, False), (away_key, home_key, True)):
+            entry = self.undated.get((key_home, key_away))
+            if entry is not None:
+                return _oriented(entry, flipped=flipped, date_shifted=False)
+        return None
 
 
 def _season_for_date(date_str: str) -> int | None:
@@ -293,26 +394,38 @@ def load_ncaaf_game_projections(selected_date: str) -> NcaafGameProjectionIndex:
         _LOGGER.exception("NCAAF_PROJECTION_SCHEDULE_FAILURE season=%s", season)
         return index
 
-    # date -> the weeks that have a game on it, and (home, away) -> date.
+    # The weeks with a game on this date or a neighbour within the tolerance,
+    # and (home, away) -> its OWN schedule date for every game in that window.
+    # Keyed on the schedule's date rather than this one so `lookup` can prefer
+    # an exact-date match and only then fall back to a neighbour.
+    window = set(_date_window(date_key))
     weeks: set[int] = set()
     kickoff: dict[tuple[str, str], str] = {}
+    # Every scheduled pair in the season, either orientation. A CSV row whose
+    # pair is scheduled OUTSIDE this window is another date's game; one whose
+    # pair is not scheduled at all is a game this copy of the schedule predates.
+    scheduled_pairs: set[frozenset[str]] = set()
     for game in schedule:
         if not isinstance(game, dict):
             continue
+        home = str(game.get("homeTeam") or "").strip()
+        away = str(game.get("awayTeam") or "").strip()
+        if home and away:
+            scheduled_pairs.add(frozenset((_norm(home), _norm(away))))
         game_date = str(game.get("startDate") or "").split("T")[0]
-        if game_date != date_key:
+        if game_date not in window:
             continue
         week = game.get("week")
         if isinstance(week, int):
             weeks.add(week)
-        home = str(game.get("homeTeam") or "").strip()
-        away = str(game.get("awayTeam") or "").strip()
         if home and away:
             kickoff[(_norm(home), _norm(away))] = game_date
             reason = _unratable_reason(game)
             if reason:
                 index.unratable[(game_date, _norm(home), _norm(away))] = reason
-    index.unratable_games = len(index.unratable)
+    # A RATE, so it stays scoped to THIS date: the window's neighbours are here
+    # only so a moved kickoff can still be explained.
+    index.unratable_games = sum(1 for key in index.unratable if key[0] == date_key)
     if not weeks:
         return index
 
@@ -335,12 +448,7 @@ def load_ncaaf_game_projections(selected_date: str) -> NcaafGameProjectionIndex:
             away = str(row.get("away_team") or "").strip()
             if not (home and away):
                 continue
-            game_date = kickoff.get((_norm(home), _norm(away)))
-            if game_date is None:
-                # The projection is for a game that does not kick off on this
-                # date. Not an error -- a week spans many days.
-                continue
-            index.by_date_teams[(game_date, _norm(home), _norm(away))] = {
+            entry = {
                 "home_team": home,
                 "away_team": away,
                 "margin_mean": _as_float(row.get("margin_mean")),
@@ -351,8 +459,178 @@ def load_ncaaf_game_projections(selected_date: str) -> NcaafGameProjectionIndex:
                 "profile": row.get("profile_name"),
                 "generated_at": row.get("generated_at"),
             }
-    index.games = len(index.by_date_teams)
+            home_key, away_key = _norm(home), _norm(away)
+            game_date = kickoff.get((home_key, away_key))
+            if game_date is None:
+                # The CSV and the schedule can disagree on orientation for the
+                # same neutral-site reason `_oriented` documents; store the
+                # entry in the CSV's own frame under the schedule's date.
+                game_date = kickoff.get((away_key, home_key))
+            if game_date is not None:
+                index.by_date_teams[(game_date, home_key, away_key)] = entry
+            elif frozenset((home_key, away_key)) not in scheduled_pairs:
+                # Not in this copy of the schedule AT ALL. The CSV is week-scoped
+                # and a pair plays once a week, so the pair alone identifies it.
+                index.undated[(home_key, away_key)] = entry
+            # else: scheduled on another date outside the window. Not an error --
+            # a week spans many days.
+    # Scoped to THIS date, as before, so `games_indexed` beside
+    # `games_unratable_opponent` still reads as a per-date rate. Undated entries
+    # count because they may be on this date and nothing says otherwise.
+    index.games = sum(1 for key in index.by_date_teams if key[0] == date_key) + len(index.undated)
     return index
+
+
+
+# ---------------------------------------------------------------------------
+# PER-ROW PROJECTION AND PRICE, EVERY MARKET. `[2026-09-18, user decisions]`
+#
+# "they should be shown, period ... we shouldnt be hiding anything globally,
+# every game/prop is its own entity" and "Publish, skill-discounted". Until this
+# date every NCAAF spread row published `projected: None`, and every NCAAF row
+# of all three markets published `edge_vs_market_pct: None`, because the model
+# is MEASURED as losing to the close. That was a sport-wide suppression: on the
+# served board 2026-09-18 14:55Z, 0 of 938 NCAAF rows carried `model_edge_pct`
+# and 154 FBS spread rows read "no sim view" while the sim held a margin.
+#
+# THE MEASUREMENT STILL TRAVELS, AND IT STILL BITES -- where the user put it.
+# Every projection carries `model_skill` (the loss to the close, with its CI).
+# `layer2_board._apply_skill_reliability` reads that note's
+# `established_loss_rel` and demotes the row's SCORE by it, so a losing model
+# ranks lower rather than being hidden. STAKE SIZE is a separate decision:
+# `portfolio_commit` keeps sizing NCAAF on the market-fair basis ("Show edges,
+# size on price", 2026-09-18), so publishing an edge here does not put money
+# behind a model that loses to the close.
+#
+# PROBABILITIES ARE NORMAL, off the sim's own mean and SD. Both are the
+# generator's outputs (`margin_stdev`, `total_stdev`); the dispersion ratios in
+# `NCAAF_MEASURED_SKILL` (margins 1.28x, totals 2.48x the close's) say those SDs
+# are too wide, which pulls probabilities TOWARD 0.5 -- the conservative
+# direction for an edge. Not corrected here: that is engine work under
+# `model_engine_standard.md`, not a join.
+# ---------------------------------------------------------------------------
+
+
+def _normal_prob_above(threshold: float | None, mean: float | None, stdev: float | None) -> float | None:
+    """P(X > threshold) for X ~ Normal(mean, stdev), or None without a usable SD."""
+    if threshold is None or mean is None or stdev is None or not stdev > 0:
+        return None
+    return 0.5 * math.erfc(((threshold - mean) / stdev) / math.sqrt(2.0))
+
+
+def _game_projection(row: Mapping[str, Any], market: str, entry: Mapping[str, Any]) -> dict[str, Any] | None:
+    """The sim's view of one full-game row, in the ROW's home/away frame.
+
+    `entry` has already been restated in the board's frame by `lookup`
+    (`_oriented`), so `home_win_rate` and `margin_mean` are the board home
+    team's. `model_prob_over` follows the grid convention every game producer
+    uses (`prop_projections.attach_projections`): the HOME side for h2h and
+    spreads, the OVER for totals.
+    """
+    line = _as_float(row.get("line"))
+    home_name = str(row.get("home_team") or "").strip()
+    common: dict[str, Any] = {
+        "source": SOURCE,
+        "generated_at": entry.get("generated_at"),
+    }
+    if entry.get("orientation_flipped"):
+        # Said on the row, so a reader auditing a neutral-site game can see the
+        # model's home was the other team and every number was restated.
+        common["orientation_flipped"] = True
+    if entry.get("kickoff_date_shifted"):
+        common["kickoff_date_shifted"] = True
+
+    if market == "h2h":
+        prob = _as_float(entry.get("home_win_rate"))
+        if prob is None:
+            return None
+        return {
+            **common,
+            "model_prob_over": round(prob, 4),
+            "side": home_name,
+            # A win probability is not a projected STAT; the board shows it in
+            # its Win% column from `model_prob_over`.
+            "projected": None,
+            "basis": "smartsim2_home_win_rate",
+            "model_skill": skill_note("margins"),
+        }
+
+    if market == "totals":
+        mean = _as_float(entry.get("total_mean"))
+        if mean is None:
+            return None
+        prob = _normal_prob_above(line, mean, _as_float(entry.get("total_stdev")))
+        projection = {
+            **common,
+            "projected": round(mean, 3),
+            "side": "over",
+            "basis": "smartsim2_total_normal",
+            "model_prob_over": round(prob, 4) if prob is not None else None,
+            "model_skill": skill_note("totals"),
+        }
+        if line is not None:
+            projection["edge_vs_line"] = round(mean - line, 3)
+        if prob is None:
+            projection["probability_unavailable_reason"] = (
+                "no over probability: the sim reported no usable total_stdev"
+                if line is not None
+                else "no over probability: the row carries no line to price against"
+            )
+        return projection
+
+    # spreads
+    mean = _as_float(entry.get("margin_mean"))
+    if mean is None:
+        return None
+    # THE LINE ARRIVES IN THE AWAY FRAME (`book_grid._canonical_line`, `#262`).
+    # With L the away team's line, home covers when (home - away) > L -- the
+    # same algebra `prop_projections.project_game_market` states for MLB's
+    # spreads, where negating it once inverted every home probability.
+    prob = _normal_prob_above(line, mean, _as_float(entry.get("margin_stdev")))
+    projection = {
+        **common,
+        # HOME MINUS AWAY, the frame MLB's and NFL's spread rows already publish.
+        "projected": round(mean, 3),
+        "side": home_name,
+        "basis": "smartsim2_margin_normal",
+        "model_prob_over": round(prob, 4) if prob is not None else None,
+        "model_skill": skill_note("margins"),
+    }
+    if line is not None:
+        projection["edge_vs_line"] = round(mean - line, 3)
+    if prob is None:
+        projection["probability_unavailable_reason"] = (
+            "no cover probability: the sim reported no usable margin_stdev"
+            if line is not None
+            else "no cover probability: the row carries no line to price against"
+        )
+    return projection
+
+
+def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any], no_vig_over) -> None:
+    """Stamp the market fair and the edge -- or the NAMED reason there is none.
+
+    Same three outcomes as `prop_projections.attach_projections`, including its
+    live rule: a PREGAME projection priced against a market that has watched
+    the game is not an edge, it is the score (`live_edge_policy`, `#340`).
+    """
+    from syndicate.features.shared.live_edge_policy import live_edge_unavailable_reason
+
+    fair = no_vig_over(row)
+    projection["market_fair_prob_over"] = round(float(fair), 4) if fair is not None else None
+    prob = projection.get("model_prob_over")
+    live_reason = live_edge_unavailable_reason(row)
+    if live_reason:
+        projection["edge_vs_market_pct"] = None
+        projection["edge_unavailable_reason"] = live_reason
+    elif prob is not None and fair is not None:
+        projection["edge_vs_market_pct"] = round((float(prob) - float(fair)) * 100.0, 2)
+    elif prob is None:
+        projection["edge_vs_market_pct"] = None
+        projection["edge_unavailable_reason"] = projection.get("probability_unavailable_reason") or "no model probability"
+    else:
+        projection["edge_vs_market_pct"] = None
+        projection["edge_unavailable_reason"] = "no no-vig fair: the market is not quoted on both sides"
 
 
 def attach_ncaaf_game_projections(
@@ -435,115 +713,9 @@ def attach_ncaaf_game_projections(
                 unmatched += 1
             continue
 
-        projection: dict[str, Any] | None = None
-
-        if market == "h2h":
-            prob = entry.get("home_win_rate")
-            if prob is not None:
-                note = skill_note("margins")
-                projection = {
-                    # The probability STAYS. It has somewhere to carry its
-                    # caveat, and `pick_gate.py` needs the model visible for the
-                    # measurement that would lift the gate.
-                    "model_prob_over": round(float(prob), 4),
-                    "side": str(row.get("home_team") or "").strip(),
-                    # Blanked for the same reason NFL blanks it: the home win
-                    # rate derives from the margin model this note condemns, and
-                    # `projected` lands in a bare numeric column.
-                    "projected": None,
-                    "basis": "smartsim2_home_win_rate",
-                    "source": SOURCE,
-                    "generated_at": entry.get("generated_at"),
-                    "model_skill": note,
-                    "projection_unavailable_reason": _skill_reason(note),
-                    # THE ONLY CHANNEL A HUMAN CAN ACTUALLY READ, and picking the
-                    # right field name is the whole difference between a stated
-                    # caveat and a silent one. `layer1_board.html` renders the
-                    # EDGE cell as "·*" with a hover title when
-                    # `edge_unavailable_reason` is set; the PROJ cell (line
-                    # ~1012) has no tooltip channel at all, and `model_skill` is
-                    # rendered nowhere. So a reason placed anywhere else is
-                    # payload-only -- the same "stated refusal that nobody could
-                    # read" `state.md` records for the frozen-chip corrector.
-                    "edge_unavailable_reason": _skill_reason(note),
-                }
-        elif market == "totals":
-            mean = entry.get("total_mean")
-            stdev = entry.get("total_stdev")
-            line = _as_float(row.get("line"))
-            if mean is not None:
-                note = skill_note("totals")
-                projection = {
-                    # The MEAN is kept: it is the model's own statement about the
-                    # game and is not itself inflated. What is inflated is the
-                    # EDGE derived from it, which is why the dispersion ratio
-                    # travels alongside and the edge is suppressed below.
-                    "projected": round(float(mean), 3),
-                    "side": "over",
-                    "basis": "smartsim2_total_mean",
-                    "source": SOURCE,
-                    "generated_at": entry.get("generated_at"),
-                    "model_prob_over": None,
-                    "model_skill": note,
-                }
-                if stdev is None or stdev <= 0 or line is None:
-                    projection["edge_vs_market_pct"] = None
-                    projection["edge_unavailable_reason"] = (
-                        "no over probability: the sim reported no usable total_stdev"
-                        if line is not None
-                        else "no over probability: the row carries no line to price against"
-                    )
-                else:
-                    # NO EDGE PERCENTAGE ON TOTALS, DELIBERATELY.
-                    #
-                    # The model's total SD is 5.77 against the market's 3.46
-                    # (1.67x). Pricing a line against an over-dispersed
-                    # distribution is exactly what `state.md` calls manufacturing
-                    # an edge: the wider the model's spread, the further past
-                    # each line it lands, and the more confident the number
-                    # looks. Publishing that percentage would be selling
-                    # dispersion as insight.
-                    #
-                    # `edge_vs_line` below is still computed -- a derived
-                    # diagnostic that travels with `model_skill`, so anyone
-                    # auditing this can see the input.
-                    projection["edge_vs_market_pct"] = None
-                    projection["edge_unavailable_reason"] = (
-                        f"totals lose to the closing line by {note.get('delta_mae')} points of "
-                        f"MAE over {note.get('sample_games')} games and are "
-                        f"{note.get('dispersion_ratio')}x over-dispersed against the market"
-                    )
-                    market_fair = _no_vig_over_probability(row)
-                    if market_fair is not None:
-                        projection["market_fair_prob_over"] = round(float(market_fair), 4)
-                if line is not None:
-                    projection["edge_vs_line"] = round(float(mean) - line, 3)
-        else:  # spreads
-            mean = entry.get("margin_mean")
-            line = _as_float(row.get("line"))
-            if mean is not None:
-                note = skill_note("margins")
-                projection = {
-                    "projected": None,
-                    "side": str(row.get("home_team") or "").strip(),
-                    "basis": "smartsim2_margin_mean",
-                    "source": SOURCE,
-                    "generated_at": entry.get("generated_at"),
-                    "model_prob_over": None,
-                    "edge_vs_market_pct": None,
-                    "model_skill": note,
-                    "projection_unavailable_reason": _skill_reason(note),
-                    # See the h2h branch: this is the field the board can show.
-                    "edge_unavailable_reason": _skill_reason(note),
-                    # Inherited verbatim from the NFL module's finding: the row's
-                    # `line` does not state which side it belongs to, and a
-                    # guessed sign inverts the edge while looking plausible.
-                    "probability_unavailable_reason": "spread row does not state which side its line belongs to",
-                }
-                if line is not None:
-                    projection["edge_vs_line"] = round(float(mean) - line, 3)
-
+        projection = _game_projection(row, market, entry)
         if projection is not None:
+            _price_against_market(row, projection, _no_vig_over_probability)
             row["projection"] = refuse_published_certainty(projection)  # type: ignore[index]
             attached += 1
 

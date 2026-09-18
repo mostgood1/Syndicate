@@ -149,51 +149,215 @@ def test_every_projection_carries_its_measurement():
     assert coverage["model_skill"]["margins"]["delta_mae"] == 3.563
 
 
-def test_margin_backed_markets_publish_no_bare_projection():
-    """A bare number in a column headed PROJECTED has nowhere to carry a caveat,
-    so where the model has no measured skill the honest value is none. Same
-    resolution `#377` reached for NFL."""
-    grid = _grid()
+def _two_sided_grid():
+    """Grid rows as `book_grid` builds them: canonical AWAY/OVER line, both
+    sides quoted in `consensus`. TCU (home) -15 is away +15."""
+    base = {
+        "kind": "game",
+        "segment": "full",
+        "commence_time": "2026-08-29T16:00:00Z",
+        "home_team": "TCU Horned Frogs",
+        "away_team": "North Carolina Tar Heels",
+        "sides": ["away", "home"],
+    }
+    return [
+        {**base, "market": "h2h", "consensus": {"away": 260, "home": -320}},
+        {**base, "market": "spreads", "line": 15.0, "consensus": {"away": -110, "home": -110}},
+        {**base, "market": "totals", "line": 43.0, "sides": ["over", "under"], "consensus": {"over": -110, "under": -110}},
+    ]
+
+
+def test_every_market_publishes_its_projection_2026_09_18():
+    """USER DECISION 2026-09-18: "they should be shown, period ... we shouldnt be
+    hiding anything globally". Spreads used to publish `projected: None` while
+    the sim held a margin -- 154 FBS spread rows read "no sim view" that day."""
+    grid = _two_sided_grid()
     gp.attach_ncaaf_game_projections(grid, _index())
     by_market = {r["market"]: r["projection"] for r in grid}
-    assert by_market["h2h"]["projected"] is None
-    assert by_market["spreads"]["projected"] is None
-    # The PROBABILITY survives -- it has somewhere to carry the caveat, and
-    # pick_gate.py needs the model visible for the measurement that lifts it.
+    # Home minus away, the frame MLB and NFL spread rows already publish.
+    assert by_market["spreads"]["projected"] == pytest.approx(10.263)
+    assert by_market["totals"]["projected"] == pytest.approx(50.337)
     assert by_market["h2h"]["model_prob_over"] == pytest.approx(0.80)
+    for projection in by_market.values():
+        # The measurement still travels on every row -- it is what
+        # `_apply_skill_reliability` demotes the score by.
+        assert projection["model_skill"]
+        assert projection.get("probability_unavailable_reason") is None
 
 
-def test_the_caveat_rides_on_the_field_the_board_can_show():
-    """THE FIELD NAME IS THE WHOLE FIX.
+def test_spread_probability_is_home_covering_the_AWAY_FRAME_line():
+    """`book_grid._canonical_line` states the away line. Away +15 means home
+    -15, and home covers when margin > +15 -- NOT margin > -15, which is the
+    inversion that once put 0.74 on MLB underdogs."""
+    import math
 
-    `layer1_board.html` renders the EDGE cell with a hover title when
-    `edge_unavailable_reason` is set. The PROJ cell has no tooltip channel and
-    `model_skill` is rendered nowhere, so a reason placed anywhere else is
-    payload-only -- a stated refusal nobody can read. Verified against the real
-    board: 12 elements carried the tooltip.
-    """
-    grid = _grid()
+    grid = _two_sided_grid()
+    gp.attach_ncaaf_game_projections(grid, _index())
+    spread = next(r["projection"] for r in grid if r["market"] == "spreads")
+    expected = 0.5 * math.erfc(((15.0 - 10.263) / 13.291) / math.sqrt(2.0))
+    assert spread["model_prob_over"] == pytest.approx(expected, abs=1e-4)
+    assert spread["model_prob_over"] < 0.5, "a 10-point favourite does not cover 15 more often than not"
+    assert spread["side"] == "TCU Horned Frogs"
+
+
+def test_every_two_sided_pregame_row_carries_an_edge():
+    """"Publish, skill-discounted" (2026-09-18). 0 of 938 NCAAF rows carried
+    `model_edge_pct` on the served board that morning."""
+    grid = _two_sided_grid()
     gp.attach_ncaaf_game_projections(grid, _index())
     for row in grid:
-        reason = row["projection"].get("edge_unavailable_reason")
-        assert reason, row["market"]
-        assert "closing line" in reason or "over-dispersed" in reason
+        projection = row["projection"]
+        fair = projection["market_fair_prob_over"]
+        assert fair is not None, row["market"]
+        assert projection["edge_vs_market_pct"] == pytest.approx(
+            (projection["model_prob_over"] - fair) * 100.0, abs=0.02
+        )
 
 
-def test_totals_keep_the_mean_but_publish_no_percentage_edge():
-    """The mean is the model's own statement. The EDGE derived from it is not:
-    pricing a line against a distribution 2.48x as spread as the close
-    manufactures conviction, and the totals model loses to that close."""
-    grid = _grid()
+def test_a_one_sided_row_names_why_it_has_no_edge():
+    grid = _grid()  # no `sides`/`consensus`: nothing to de-vig
+    gp.attach_ncaaf_game_projections(grid, _index())
+    for row in grid:
+        assert row["projection"]["edge_vs_market_pct"] is None
+        assert "both sides" in row["projection"]["edge_unavailable_reason"]
+
+
+def test_a_live_row_gets_no_pregame_edge():
+    """`live_edge_policy`: a pregame projection priced against a market that has
+    watched the game is the score, not an edge."""
+    # `live_edge_policy.game_state_of` reads the chip block grid rows carry.
+    grid = [dict(row, game={"state": "live"}) for row in _two_sided_grid()]
+    gp.attach_ncaaf_game_projections(grid, _index())
+    for row in grid:
+        assert row["projection"]["edge_vs_market_pct"] is None
+        assert row["projection"]["edge_unavailable_reason"]
+        # The projection itself is still shown.
+        assert row["projection"]["model_prob_over"] is not None
+
+
+def test_totals_keep_the_line_diagnostic():
+    grid = _two_sided_grid()
     gp.attach_ncaaf_game_projections(grid, _index())
     totals = next(r["projection"] for r in grid if r["market"] == "totals")
-    assert totals["projected"] == pytest.approx(50.337)
-    assert totals["edge_vs_market_pct"] is None
-    assert "over-dispersed" in totals["edge_unavailable_reason"]
-    assert "lose to the closing line" in totals["edge_unavailable_reason"]
-    assert "never scored" not in totals["edge_unavailable_reason"]
-    # The raw diagnostic survives so an auditor can still see the input.
     assert totals["edge_vs_line"] == pytest.approx(7.337)
+    assert totals["model_skill"]["verdict"].startswith("loses to the closing line")
+
+
+# --------------------------------------------------------------------------
+# the join -- neutral sites, moved kickoffs, games the schedule copy predates
+# --------------------------------------------------------------------------
+
+def test_a_neutral_site_game_listed_the_other_way_round_joins_FLIPPED():
+    """MEASURED 2026-09-18: CFBD `Arizona State @ Kansas` (Wembley) and
+    `West Virginia @ Virginia` (Charlotte), both `neutralSite: true`; OddsAPI
+    lists both reversed, and both FBS games carried no model."""
+    idx = _index()  # CFBD frame: TCU home, North Carolina away
+    entry = idx.lookup("2026-08-29", "North Carolina Tar Heels", "TCU Horned Frogs")
+    assert entry is not None
+    assert entry["orientation_flipped"] is True
+    assert entry["margin_mean"] == pytest.approx(-10.263)
+    assert entry["home_win_rate"] == pytest.approx(0.20)
+
+    grid = [
+        {
+            "kind": "game", "segment": "full", "market": "h2h",
+            "commence_time": "2026-08-29T16:00:00Z",
+            "home_team": "North Carolina Tar Heels", "away_team": "TCU Horned Frogs",
+            "sides": ["away", "home"], "consensus": {"away": -320, "home": 260},
+        }
+    ]
+    gp.attach_ncaaf_game_projections(grid, idx)
+    projection = grid[0]["projection"]
+    assert projection["model_prob_over"] == pytest.approx(0.20)
+    assert projection["side"] == "North Carolina Tar Heels"
+    assert projection["orientation_flipped"] is True
+
+
+def test_a_kickoff_moved_by_a_day_still_joins_and_says_so():
+    """North Texas @ Texas State: `2026-09-20T02:00Z` in the schedule copy the
+    join reads, `2026-09-19T16:00Z` on the board."""
+    idx = _index()
+    entry = idx.lookup("2026-08-30", "TCU Horned Frogs", "North Carolina Tar Heels")
+    assert entry is not None
+    assert entry["kickoff_date_shifted"] is True
+    exact = idx.lookup("2026-08-29", "TCU Horned Frogs", "North Carolina Tar Heels")
+    assert exact["kickoff_date_shifted"] is False
+
+
+def test_an_undated_projection_joins_on_the_pair():
+    idx = gp.NcaafGameProjectionIndex()
+    idx.undated[("tcu", "north carolina")] = {"margin_mean": 3.0, "home_win_rate": 0.6, "total_mean": 50.0}
+    entry = idx.lookup("2026-08-29", "North Carolina Tar Heels", "TCU Horned Frogs")
+    assert entry is not None and entry["margin_mean"] == pytest.approx(-3.0)
+
+
+def _fake_schedule_and_csv(monkeypatch, tmp_path, schedule, csv_rows):
+    import shutil
+
+    from syndicate.features.football.sim_engine.smartsim2.historical_truth import ncaaf_historical_loader
+    from syndicate.features.ncaaf import oddsapi_lines, sources
+
+    # The team resolver reads its registry from the SAME source root, so the
+    # fake root carries a copy of the real one -- and the resolver's caches are
+    # cleared first, or this test would pass or fail on whichever test happened
+    # to warm them (measured: it passed in the file and failed alone). What
+    # they then cache is the same registry's content, so nothing leaks.
+    registry = sources.team_registry_snapshot_path()
+    fake_registry = tmp_path / registry.relative_to(sources.default_ncaaf_source_root())
+    fake_registry.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy(registry, fake_registry)
+    for cached in (oddsapi_lines.fbs_canonical_names, oddsapi_lines._alias_map, oddsapi_lines._mascot_tails):
+        cached.cache_clear()
+    monkeypatch.setattr(ncaaf_historical_loader, "load_games_season", lambda season: schedule)
+    monkeypatch.setattr(sources, "default_ncaaf_source_root", lambda: tmp_path)
+    (tmp_path / "data").mkdir(parents=True, exist_ok=True)
+    header = "game_id,season,week,home_team,away_team,margin_mean,total_mean,margin_stdev,total_stdev,home_win_rate,profile_name,generated_at"
+    lines = [header] + [
+        f"{i},2026,3,{home},{away},{m},50.0,13.0,11.0,{w},ncaaf_v2,2026-09-18T00:00:00Z"
+        for i, (home, away, m, w) in enumerate(csv_rows)
+    ]
+    (tmp_path / "data" / "smartsim2_projections_2026_wk3.csv").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _game(home, away, start, week=3, home_class="fbs", away_class="fbs"):
+    return {
+        "homeTeam": home, "awayTeam": away, "startDate": start, "week": week,
+        "homeClassification": home_class, "awayClassification": away_class,
+    }
+
+
+def test_load_indexes_moved_swapped_and_unscheduled_games(monkeypatch, tmp_path):
+    """The three shapes of 2026-09-18's 27 unjoined FBS rows, end to end
+    through `load_ncaaf_game_projections`."""
+    schedule = [
+        _game("TCU", "Baylor", "2026-09-19T16:00:00.000Z"),           # anchors the week on the date
+        _game("Texas State", "North Texas", "2026-09-20T02:00:00.000Z"),  # moved kickoff (stale copy)
+        _game("Kansas", "Arizona State", "2026-09-19T16:00:00.000Z"),     # neutral site, CFBD frame
+        _game("Oregon", "Portland State", "2026-09-19T20:00:00.000Z", away_class="fcs"),
+    ]
+    csv_rows = [
+        ("TCU", "Baylor", 7.0, 0.7),
+        ("Texas State", "North Texas", 2.0, 0.55),
+        ("Kansas", "Arizona State", -4.0, 0.38),
+        ("Fresno State", "San José State", 1.5, 0.52),  # absent from the stale schedule
+    ]
+    _fake_schedule_and_csv(monkeypatch, tmp_path, schedule, csv_rows)
+    idx = gp.load_ncaaf_game_projections("2026-09-19")
+
+    moved = idx.lookup("2026-09-19", "Texas State Bobcats", "North Texas Mean Green")
+    assert moved is not None and moved["kickoff_date_shifted"] is True
+
+    swapped = idx.lookup("2026-09-19", "Arizona State Sun Devils", "Kansas Jayhawks")
+    assert swapped is not None and swapped["margin_mean"] == pytest.approx(4.0)
+
+    unscheduled = idx.lookup("2026-09-19", "Fresno State Bulldogs", "San Jose State Spartans")
+    assert unscheduled is not None and unscheduled["margin_mean"] == pytest.approx(1.5)
+
+    # The FCS boundary is untouched, and explained in either orientation.
+    assert idx.lookup("2026-09-19", "Portland State Vikings", "Oregon Ducks") is None
+    assert "FCS" in (idx.unratable_reason("2026-09-19", "Portland State Vikings", "Oregon Ducks") or "")
+    # Still a per-date rate: the moved game is keyed on the 20th.
+    assert idx.unratable_games == 1
 
 
 def test_non_full_segments_are_skipped():

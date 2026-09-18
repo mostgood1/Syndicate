@@ -203,16 +203,24 @@ def available_weeks() -> list[int]:
 
 
 def default_week() -> int:
-    weeks = available_weeks()
-    # Mirror cards.py's _ncaaf_default_active_week: available_weeks() comes
-    # from the legacy recommendations_summary index, which can be empty for
-    # a season that has real SmartSim2 projections (confirmed live: an empty
+    # The real schedule-driven target week outranks the legacy index whenever
+    # the schedule can answer. available_weeks() comes from the legacy
+    # recommendations_summary index, which can be empty for a season that has
+    # real SmartSim2 projections (confirmed live: an empty
     # recommendations_summary/ directory pinned the Layer 2 NCAAF context to
-    # week 1 via the bare fallback below). The real schedule-driven target
-    # week outranks it whenever the schedule is loadable.
+    # week 1 via the bare fallback below).
+    #
+    # IT CAN ALSO BE NON-EMPTY AND WRONG, and that is the case the old
+    # `target in weeks` condition got backwards. Measured 2026-09-18 on
+    # production: web's legacy index tracks 6 weeks with only week 1 populated
+    # (`/ncaaf/hub`: "Tracked weeks 6"), week_state targets week 3, and `/ncaaf`
+    # rendered "2026 week 1" -- the stale index vetoed the target because 3
+    # was not in [1]. A legacy index says what an old pipeline produced, not
+    # what week it is.
     target = ncaaf_target_week(default_season())
-    if target is not None and (not weeks or target in weeks):
+    if target is not None:
         return target
+    weeks = available_weeks()
     return weeks[-1] if weeks else 1
 
 

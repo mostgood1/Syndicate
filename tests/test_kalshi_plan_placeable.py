@@ -22,6 +22,17 @@ import pytest
 
 from syndicate.features.shared.portfolio_settings import PortfolioSettings
 
+
+# THESE TESTS USE NCAAF AS A SAMPLE SPORT FOR A ROW THAT CARRIES A MODEL EDGE.
+# Since 2026-09-18 NCAAF sizes on price even with a sim edge
+# (`portfolio_commit._PRICE_BASIS_SPORTS_DEFAULT`, user decision "Show edges,
+# size on price"); that rule has its own tests in
+# `test_portfolio_price_basis_sports.py`. Cleared here so these keep testing
+# the model-edge mechanics they were written for.
+@pytest.fixture(autouse=True)
+def _model_edge_sizing_for_sample_sport(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_PORTFOLIO_PRICE_BASIS_SPORTS", "none")
+
 _DATE = "2026-08-22"
 _TICKER = "KXNCAAFSPREAD-26AUG22AWAYHOME-HOME4"
 

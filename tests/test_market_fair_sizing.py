@@ -24,6 +24,8 @@ unreviewed step, so a sport opts in by name.
 from __future__ import annotations
 
 import sys
+
+import pytest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -38,6 +40,17 @@ from syndicate.features.shared.portfolio_commit import (  # noqa: E402
 )
 
 ENV = "SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS"
+
+
+# THESE TESTS USE NCAAF AS A SAMPLE SPORT FOR A ROW THAT CARRIES A MODEL EDGE.
+# Since 2026-09-18 NCAAF sizes on price even with a sim edge
+# (`portfolio_commit._PRICE_BASIS_SPORTS_DEFAULT`, user decision "Show edges,
+# size on price"); that rule has its own tests in
+# `test_portfolio_price_basis_sports.py`. Cleared here so these keep testing
+# the model-edge mechanics they were written for.
+@pytest.fixture(autouse=True)
+def _model_edge_sizing_for_sample_sport(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_PORTFOLIO_PRICE_BASIS_SPORTS", "none")
 
 
 def _row(sport="ncaaf", **kw):
