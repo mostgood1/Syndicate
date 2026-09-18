@@ -7075,3 +7075,9 @@ empty, suspect buffering before suspecting the watcher.
 
 **The rule.** Before attributing a post-deploy symptom to your change, read the service's events for the last several deploys and state the baseline rate (failures per deploy, minutes after go-live). A symptom inside a window that has one on every deploy is not evidence about your change. The control that settles it is cheap: leave the service alone for the window and watch -- that is what turned this. And a timing taken inside the cold window measures the window, not the code: re-time warm (>= 10 min after go-live) before calling anything slow.
 - *(evidence: `deploys.md` 2026-09-18 18:09:25Z entry; `leads.md` 2026-09-18 post-deploy health-check lead)*
+
+## 2026-09-18 — OVERTURNED: "a CLOSED block whose HEADER sessions are all idle is safe to archive" — a session the header never names had closed it 3 minutes earlier `[lane lane-archive-tool-checks, session 4991d2ec]`
+
+- **What was believed:** the 09-15 rule above made the archive tools read owner liveness, taking "owner" to be the session ids in the block's first 3 lines. `owner_liveness.py` printed SAFE for `fotmob-team-name-aliases` because da346015 had been idle 3,910m.
+- **What happened:** scheduled task session 96d06e18 had CLOSED the block at 19:08Z (commit 1e064aa3) and was active 3m before the read. Scheduled tasks, archivers and handoff sessions edit blocks they do not own, and none of them is added to the header.
+- **How to apply:** judge a block's liveness by WHO LAST TOUCHED IT as well as by who owns it. `git blame` over the block's own lines on origin/main gives the newest touching commit; if that is younger than the idle threshold, WAIT. Both lane-archive tools now do this (`C:\tmp\lane-archive-tools\`, 2026-09-18). An identity you cannot see is a reason to wait, never a reason to proceed.

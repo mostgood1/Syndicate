@@ -1440,6 +1440,11 @@ death, never life — do not invert it.
 - Verification: (a) tests on real names from BOTH producers, including pairs that must not join, failing on the pre-change code; (b) production after a user-approved deploy of the service that builds the soccer book grid: on a live slate, in-play board matches with a live verdict / in-play matches, against 3 of 8 on 2026-09-18, with the residual misses named.
 - Blocked by: none (the deploy is a user decision)
 
+### lane-archive-tool-checks — CLOSED 2026-09-18 — opened 2026-09-18 — session 4991d2ec-b2c2-4040-9042-d98867b768ab — **GOAL MET: both tools WAIT `fotmob-team-name-aliases` (last modified by a non-header session)**
+- **VERDICT 2026-09-18 ~20:00Z (15:00 CDT).** Goal (verbatim): "the lane-archive tools refuse a CLOSED block that a session NOT named in its header touched recently, and the watcher applies every check the gate applies". GOAL: MET. Reading: `owner_liveness.py` at ~19:30Z printed `fotmob-team-name-aliases ... lastmod[1e064aa3=21m] -> WAIT: block last modified 21m ago` (it read SAFE on the same block at 19:11Z before the change); the watcher's test poll at 19:53Z printed SAFE [] with `mlb-stop-publishing-edges ... UNCOMMITTED-EDIT-IN[bandwidth-controlled-transfer]`, agreeing with the gate. Claim-state checks proven reachable on synthetic text (claimed ['bar-lane'], open ['bar-lane']; control empty). Detail: `.syndicate/log/2026-09-18.md`.
+- Goal: the lane-archive tools refuse a CLOSED block that a session NOT named in its header touched recently, and the watcher applies every check the gate applies
+- Files: none in git (ledger-only). The tools changed are outside git: `C:\tmp\lane-archive-tools\` (outside git) sha256 after the change: `wait_owner_idle.py` 3f6fb0ed80c98005 (7,230 B), `owner_liveness.py` fac620921fa566cd (6,498 B), `archive_closed_lanes_before.py` 97139e8e94fd1b5f (unchanged). Pre-edit backups: session 4991d2ec scratchpad.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
