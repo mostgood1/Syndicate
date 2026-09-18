@@ -38008,3 +38008,11 @@ never receives a soccer prop.
 - **OWED, refresh-worker, lane B:** the next NCAAF generator run on `ef3fb857` logs `SP_RATINGS_REFRESH season=2026 status=refreshed` and `INSEASON_BLEND season=2026 week=3 status=applied`, and web's wk3 CSV `rating_source` names `inseason_blend_ppa`. At 19:07Z no `SEASON_PROJECTION*` line had printed since the 18:52:47Z boot (the branch had not had its turn); a watcher is polling. Listed in the lane block pending the user's approval to write `todo.md`.
 - **OWED, refresh-worker, lane C:** the next daily player-stats run (~22:48Z) logs `[ncaaf_prop_projections] WRITTEN`, web holds >= 1 `ncaaf_prop_projections_2026_wk*.json`, and on the first board after it >= 50% of NCAAF prop rows carry `projected`. Listed in the lane block pending the user's approval to write `todo.md`.
 - **verify:** web Ask MET; lane B first-run reading OWED; lane C prop-projection reading OWED after ~22:48Z.
+
+## 2026-09-18 19:11:50Z (14:11 CT) — READING — live-odds-worker `3cc53826` — lane fotmob-season-scoped-league-ids (follow-up) — **Belgian Pro League verify MET**
+
+- **Step 0 (fix still live):** live-odds-worker's `live` deploy is `3cc53826` (finished 16:33:04Z, trigger `api`). That commit's `syndicate/features/soccer/ingestion/fotmob_match_id.py` contains `fotmob_league_slug` PRESENT and `unicodedata.normalize` PRESENT — not rolled back.
+- **ESPN:** bel.1 event `401878987`, Standard Liege at KAA Gent, `status.type.state = in`, clock 23' at 19:11:50Z (kickoff 18:45Z).
+- **Production file:** `soccer_source/belgian_pro_league/api/live_state/live_state_2026-09-18.json` via `/api/ops/artifacts/export`, `generated_at 2026-09-18T19:09:14Z` (after kickoff). `games` holds `401878987` only; `status_display_clock 21'`; `momentum.supported True`, `source fotmob`, `fotmob_match_id 5811764` (= expected), `events` 21, `reason None`.
+- **Verdict: MET** on the first read, so no control read was needed. This is also the accent-fold case (FotMob "Standard Liège" vs ESPN "Standard Liege"). All three leagues of the lane (Championship, Eredivisie, Belgian Pro League) are now verified in play on production.
+- **verify:** MET — the reading above. Nothing owed.
