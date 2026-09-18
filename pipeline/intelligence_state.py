@@ -5179,6 +5179,73 @@ class IntelligenceStateService:
         )
         return shortlist
 
+    def _refresh_today_layer2_around_next_day_build(self, build_date: str | None, phase: str) -> str:
+        """Write TODAY's Layer 2 shortlist right before and right after a NEXT-DAY board build.
+
+        Lane `layer2-today-next-day-starvation`, option A (user 2026-09-18).
+
+        WHY. This loop builds one board date per pass, and today's shortlist is
+        normally written at the END of a today build. A next-day build that lands
+        in that interval stretches the gap by its whole duration. Measured on
+        refresh-worker: 18 of 23 gaps over 25 min between today's writes had a
+        next-day build inside (floor 1200 s, 09-16/17), and a floor of 3600 s
+        left 17 (09-17/18, `deploys.md` 2026-09-18 18:12Z) because each next-day
+        build got longer (median 10 -> 19 min, up to 39). Throttling next-day
+        builds does not help; writing today's shortlist around them does.
+
+        HOW. `before`: only if today's shortlist (heavy or fast, per
+        `_layer2_fast_refresh_seen`) is at least
+        SYNDICATE_LAYER2_AROUND_NEXT_DAY_MIN_AGE_SECONDS old (default 600) -- a
+        today build that just finished needs no second write. `after`:
+        unconditional; the fast path's own minimum interval and its
+        `LAYER2_GUARD_SKIP` memory floor still decide. Both yield to a deploy
+        drain. The caller holds the execution guard, so the MLB sim launcher sees
+        the pipeline busy, exactly as for the build itself.
+
+        Returns "yes" / "no" (the fast path declined or failed) / "skipped" /
+        "not_next_day". Never raises. One `LAYER2_AROUND_NEXT_DAY` line per
+        next-day phase. Off: SYNDICATE_LAYER2_AROUND_NEXT_DAY_ENABLED=0.
+        """
+        try:
+            today = central_today_iso()
+            build = str(build_date or "").strip()
+            # ISO dates compare as strings; only a date AFTER today is a next-day build.
+            if not build or build <= today:
+                return "not_next_day"
+            seen = self._layer2_fast_refresh_seen(today)
+            age = (time.time() - seen) if seen else None
+            reason = ""
+            if not _env_bool("SYNDICATE_LAYER2_AROUND_NEXT_DAY_ENABLED", default=True):
+                reason = "disabled"
+            elif phase == "before" and age is not None and age < max(
+                0, _env_int("SYNDICATE_LAYER2_AROUND_NEXT_DAY_MIN_AGE_SECONDS", 600)
+            ):
+                reason = "fresh"
+            else:
+                try:
+                    from syndicate.features.shared.deploy_drain import drain_hold_reason
+
+                    hold = drain_hold_reason() or None
+                except Exception:
+                    hold = None
+                if hold:
+                    reason = f"drain:{hold}"
+            if reason:
+                ran = "skipped"
+            else:
+                shortlist = self._refresh_layer2_shortlist_only(today)
+                ran = "yes" if shortlist is not None else "no"
+            print(
+                f"[intelligence_state] LAYER2_AROUND_NEXT_DAY phase={phase} today={today} build_date={build} "
+                f"age_s={'none' if age is None else format(age, '.0f')} ran={ran}"
+                + (f" reason={reason}" if reason else ""),
+                flush=True,
+            )
+            return ran
+        except Exception as exc:  # pragma: no cover - must never take the loop down
+            print(f"[intelligence_state] LAYER2_AROUND_NEXT_DAY_FAILED phase={phase} error={type(exc).__name__}: {exc}", flush=True)
+            return "no"
+
     def _refresh_layer2_shortlist_only(self, selected_date: str | None) -> dict[str, Any] | None:
         """Rebuild and persist JUST the Layer 2 shortlist, off the heavy path.
 
@@ -7851,6 +7918,7 @@ class IntelligenceStateService:
                         continue
                     logger.info("WORKER RUN", extra={"payload_key": _payload_key(payload_to_process)})
                     logger.info("BACKGROUND_LOOP_PRE_BOARD_PUBLISH", extra={"elapsed_ms": round((time.time() - iteration_started_at) * 1000.0, 3)})
+                    self._refresh_today_layer2_around_next_day_build(str(payload_to_process.get("date") or payload_to_process.get("selected_date") or ""), "before")
                     print("[intelligence_state] CALLING_COMPUTE_BOARD_PUBLICATION_RESPONSE", flush=True)
                     state = self._compute_board_publication_response(payload_to_process)
                     print("[intelligence_state] RETURNED_FROM_COMPUTE_BOARD_PUBLICATION_RESPONSE", flush=True)
@@ -7925,6 +7993,9 @@ class IntelligenceStateService:
                 # (still stored, under tomorrow's real key, and still
                 # eligible to become self._latest_key below) without ever
                 # overwriting a different date's slot.
+                # Success or failure: a next-day build just held the loop, so
+                # today's shortlist is written again before anything else runs.
+                self._refresh_today_layer2_around_next_day_build(str(payload_to_process.get("date") or payload_to_process.get("selected_date") or ""), "after")
                 response_date = str(response.get("selected_date") or "").strip() if isinstance(response, dict) else ""
                 request_date = str(payload_to_process.get("date") or payload_to_process.get("selected_date") or "").strip()
                 effective_payload = dict(payload_to_process)
