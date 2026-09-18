@@ -37858,3 +37858,58 @@ file's as-of. Ask uses the board's rule.
 - **Setup (user: "run the test yourself in the built-in browser").** Loaded `/intelligence` in the Claude desktop browser pane (UA `... Claude/2.110.0 ... MSIX`) at 15:41:45Z; in-page `SyndicatePolling.start` contained `idleTimeoutMs` (new code). The pane was not on screen, so the page read `document.hidden === true`, which the OLD `skipWhenHidden` gate would already stop. At 15:42:13Z I overrode `document.hidden`/`visibilityState` to report visible (last night's pane state), via a script that dispatches no interaction events. No other action on the tab until the read.
 - **Reading, Render `type=request` log 15:41:00Z..16:03:31Z, that UA only:** 15 `POST /api/intelligence/query` (82.5 MB), first 15:41:57Z, **last 15:55:53Z**, gaps <= 1.3 min throughout, then **none for 7.6 min** where the old code would have made ~7 more (~40 MB). In-page status at 16:03:44Z: "Auto-refresh paused while idle. Move the mouse or press a key to resume." Tab closed 16:03:5xZ.
 - **Not measured in production:** resume-on-interaction (covered by `tests/js/polling_idle_pause.test.mjs` only). A tab loaded BEFORE 15:05:50Z keeps the old code until reloaded — the user's Edge tab polled 15:42-15:47Z under it.
+
+## 2026-09-18 16:10:59Z → 16:17:17Z (11:10-11:17 AM CT) — refresh-worker `84700b9b` -> `dbeab1cf` — lane soccer-prop-conditioning (`#673`, user decision "yes, deploy all three") — **verify: MET. Also the owed live-odds-worker reading from the 14:46:19Z entry: MET.**
+
+| service | from → to | fired | live | deploy |
+|---|---|---|---|---|
+| refresh-worker | `84700b9b` → `dbeab1cf` | 16:10:59Z | 16:17:17Z | `dep-damm54p42hec739lcm70` |
+
+**Target chosen to carry `bdf98148` and nothing else.** `dbeab1cf` is on main, and `84700b9b..dbeab1cf`
+holds exactly one code commit, `bdf98148`. Main's tip (`84ca68f4`) would also have carried `e6478363`, the
+ranker cache of OPEN lane `ranking-records-build-cost`, which is "LANDED, NOT DEPLOYED" with its own
+pre-deploy baseline (15:20Z). Carrying its behaviour change here would have mixed two changes in one deploy.
+It stays for that lane to ship. `84700b9b` is an ancestor of `dbeab1cf`, so nothing live was reverted.
+No `render.yaml` change.
+
+**How the window opened.** The lock was held by `mlb-past-date-chip-score` until it expired at ~15:29Z; that
+lane deployed `84700b9b` at 15:18:03Z. My loop then read `TOO_SOON` (25-min spacing) until 15:42Z, and then
+`HOLD` for 28 min. The job in flight was one full pregame refresh for 2026-09-19 across all sports
+(`refresh_odds_sources.py --date 2026-09-19 ... --mode full`, started 15:38:02Z). It cleared at 16:10:57Z and
+the loop fired in the same cycle. My first claim expired mid-deploy (16:15Z); I re-acquired it at 16:16Z,
+when it read free, and released it after the reading.
+
+**verify, refresh-worker: MET on the first post-deploy soccer board build (layer1 `generated_at`
+16:22:02Z).** Baseline in the firing cycle (16:10:40Z) → reading:
+- `soccer_board_prop_projections_labelled`: **0/2154 → 2120/2120**. Every priced player-prop projection
+  carries `conditioning`: shots 831 `appearing`, SOT 432 `appearing`, assists 158 `appearing`, anytime 242
+  / first 242 / last 215 `unconditional`.
+- `soccer_board_assists_priced_off_unconditional`: **181 → 0**. 158 assists rows are priced, all
+  `appearing`. The board's own coverage report (`/api/board/book-grid?sport=soccer`) reads
+  `conditioning_mismatch_by_market {"player_assists": 23}`, exactly the 181 → 158 gap: 23 rows whose
+  files were not yet rebuilt by the new engine, refused rather than priced on the other question.
+- `soccer_board_shots_mean_on_unconditional`: **163 → 0**. Mean-fallback rows now read
+  `expected_shots_if_playing` (149) and `expected_shots_on_target_if_playing` (6).
+- **Per-match as-of.** Before (13:49Z build), every row carried an overnight stamp that was not its own
+  file's: Groningen v FC Zwolle showed 09:23:53Z while eredivisie's 09-18 file had been rebuilt at 13:03Z.
+  After, today's rows in 5 of 9 leagues (bundesliga, ligue_1, serie_a, epl, mls) carry **exactly** web's
+  copy of their own 09-18 file's `generated_at`. The other 4 differ from web's copy because the board reads
+  refresh-worker's own disk. For la_liga the row (16:11:30Z) is NEWER than web's copy (16:06:35Z), a
+  direction the old last-date stamp could not explain. `generated_at_by_league` in the report now holds
+  each league's oldest file (`oldest_sim_age_hours` 5.3).
+
+**verify, live-odds-worker (owed from the 14:46:19Z entry): MET on its first post-go-live soccer builds.**
+Assists ladders in its prekickoff freeze (`recommendations_prekickoff_<date>.live-odds-worker.json`),
+split at go-live 14:52:07Z:
+- entries frozen AFTER: **220 `appearing`, 1 `unconditional`** (bundesliga 38, epl 42+1, la_liga 43,
+  ligue_1 42, serie_a 55).
+- entries frozen BEFORE: 1,009 unconditional, 0 `appearing`.
+- The 1 is the measured coincidence class, not the old code path. Nathan Collins is a confirmed full-time
+  starter (minutes share 1.0), with ladder 0.0343 vs Poisson 0.0341 and mean 0.0349 vs 0.0347/1.0. The
+  board refuses that row; it cannot misprice it. H33's replay measured 15/16,377 of these.
+- The stamp is absent from the artifact, as expected, because `build_soccer_artifacts.py`'s allowlist
+  drops it; the board reads the fingerprints.
+
+**Web (`2fdb6cf3` 14:52:39Z, then another lane's `e4d2ac4a` 15:05:50Z, both carrying `bdf98148`):** no
+production reader, as recorded in the 14:46:19Z entry. The soccer shortlist carries 0 prop rows, so Ask
+never receives a soccer prop.
