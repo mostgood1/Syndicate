@@ -36,6 +36,8 @@ _SAVE_LINES = (0.5, 1.5, 2.5, 3.5, 4.5)
 # Share of goals that are assisted (league-typical), used to convert team
 # goals into an assistable pool.
 _ASSISTED_GOAL_SHARE = 0.72
+#: The rate keys `assist_share` and `on_pitch_assist_share` both read, in order.
+_ASSIST_RATE_KEYS = ("xa_per90", "assists_per90", "xa", "assists")
 
 
 def _clamp(value: float, low: float, high: float) -> float:
@@ -78,7 +80,18 @@ _SUB_SHOT_INTENSITY = 1.8
 #: share a value today, and tying them would silently move one when the other is
 #: re-fitted.
 _SUB_GOAL_INTENSITY = 1.8
+#: Substitute ASSIST intensity per minute, relative to a starter's. H33 reused the
+#: goals value rather than fitting one, and a TRAIN-fitted level scale on top of it
+#: landed on exactly 1.00. Its own constant for the reason the goal one is.
+_SUB_ASSIST_INTENSITY = 1.8
 _START_PRIOR_WEIGHT = 2.0
+
+#: WHICH QUESTION A PROBABILITY ANSWERS (`#673`). A book voids a player prop on a
+#: DNP, so the settled quantity is P(over | the player appears). Every probability
+#: field is stamped with one of these in `PlayerPropProjection.ladder_conditioning`,
+#: so a reader never has to infer it from the numbers.
+CONDITIONAL_ON_APPEARING = "appearing"
+UNCONDITIONAL = "unconditional"
 
 
 def _mixture_over_probabilities(
@@ -122,6 +135,9 @@ class PlayerUsageProfile:
     # division on held-out dates: pooled log loss 0.2716 -> 0.2673 and the level
     # 1.14 -> 0.96 (MLS 1.36 -> 1.04), in 9 of 10 leagues.
     on_pitch_goal_share: float | None = None
+    # And for ASSISTS (`#673`, H33): the assists ladder is priced on the same
+    # mixture, over the same season-scoped on-pitch minutes.
+    on_pitch_assist_share: float | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -142,6 +158,7 @@ class PlayerUsageProfile:
             "start_probability": self.start_probability,
             "on_pitch_shot_share": self.on_pitch_shot_share,
             "on_pitch_goal_share": self.on_pitch_goal_share,
+            "on_pitch_assist_share": self.on_pitch_assist_share,
             "metadata": dict(self.metadata),
         }
 
@@ -168,15 +185,19 @@ class PlayerPropProjection:
     saves_over_probabilities: dict[str, float] = field(default_factory=dict)
     # Conditional-on-appearing means. Books void player props on a DNP, so
     # market prices are conditional on the player playing. When the profile
-    # carries role inputs, shots and shots on target are the start/sub mixture's
-    # mean; `shots_over_probabilities` and `shots_on_target_over_probabilities`
-    # above are then P(over | appears) as well. Goals and assists are the
+    # carries role inputs, shots, shots on target, goals and assists are the
+    # start/sub mixture's mean, and the shots, shots-on-target and assists ladders
+    # above are P(over | appears) as well. Without role inputs each is the
     # unconditional allocation divided by the player's expected minutes share.
     expected_shots_if_playing: float = 0.0
     expected_shots_on_target_if_playing: float = 0.0
     expected_goals_if_playing: float = 0.0
     expected_assists_if_playing: float = 0.0
     anytime_scorer_probability_if_playing: float = 0.0
+    # `#673`: probability field -> CONDITIONAL_ON_APPEARING or UNCONDITIONAL, as
+    # computed for THIS row. The two answer different questions, and the
+    # artifact never said which it held.
+    ladder_conditioning: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -203,6 +224,7 @@ class PlayerPropProjection:
             "expected_goals_if_playing": self.expected_goals_if_playing,
             "expected_assists_if_playing": self.expected_assists_if_playing,
             "anytime_scorer_probability_if_playing": self.anytime_scorer_probability_if_playing,
+            "ladder_conditioning": dict(self.ladder_conditioning),
         }
 
 
@@ -247,6 +269,8 @@ def project_player_props(
             assists_over_probabilities={},
             expected_saves=round(expected_saves, 4),
             saves_over_probabilities=_over_probabilities(expected_saves, _SAVE_LINES),
+            # Opponent shots on target scaled by the keeper's minutes share.
+            ladder_conditioning={"saves_over_probabilities": UNCONDITIONAL},
         )
 
     # THE SINGLE CHOKE POINT FOR THE SHOT MEAN. Everything shot-derived below
@@ -289,7 +313,33 @@ def project_player_props(
     # full-match allocation. Floored to avoid inflating fringe players whose
     # tiny samples make the division meaningless.
     conditioning = max(minutes, 0.25)
-    expected_assists_if_playing = expected_assists / conditioning
+
+    # ASSISTS ARE PRICED ON THE SAME START/SUB MIXTURE AS GOALS (`#673`, H33).
+    # They were the one count ladder still priced on the UNCONDITIONAL mean, so
+    # the board priced shots "if he plays" and assists "whether or not he plays"
+    # beside each other, for markets a book settles the same way (void on a DNP).
+    # H33, pre-registered and held out (dates >= 2026-08-26, 9,810 appeared
+    # outfield rows, `scripts/soccer_season_audit/assists_conditioning.py`):
+    # P(assists >= 1) log loss 0.2366 unconditional -> 0.2309 mixture, 0.2331 for
+    # the division below; better in 9 of 10 leagues (EPL the loss); level
+    # 0.74 -> 0.93; line 1.5 0.0313 -> 0.0293. The substitute intensity is the
+    # GOALS constant reused, not re-fitted: the TRAIN fit of a level scale landed
+    # on exactly 1.00. The set-piece bonus stays on the unconditional mean only,
+    # as the penalty bonus does for goals.
+    if usage_profile.start_probability is not None and usage_profile.on_pitch_assist_share is not None:
+        full_match_assists = team_goals * _ASSISTED_GOAL_SHARE * _clamp(float(usage_profile.on_pitch_assist_share), 0.0, 1.0)
+        assist_p_start = _clamp(float(usage_profile.start_probability), 0.0, 1.0)
+        assist_components = (
+            (assist_p_start, full_match_assists * _MINUTES_PER_START / 90.0),
+            (1.0 - assist_p_start, _SUB_ASSIST_INTENSITY * full_match_assists * _MINUTES_PER_SUB_APPEARANCE / 90.0),
+        )
+        expected_assists_if_playing = sum(weight * mean for weight, mean in assist_components)
+        assists_ladder = _mixture_over_probabilities(assist_components, _ASSIST_LINES)
+        assists_conditioning = CONDITIONAL_ON_APPEARING
+    else:
+        expected_assists_if_playing = expected_assists / conditioning
+        assists_ladder = _over_probabilities(expected_assists, _ASSIST_LINES)
+        assists_conditioning = UNCONDITIONAL
 
     # GOALS ARE PRICED ON THE SAME START/SUB MIXTURE AS SHOTS whenever the role
     # inputs exist. The division below cannot be right for a substitute: it asks
@@ -303,9 +353,9 @@ def project_player_props(
     # they are the kind of thing that otherwise looks like a bug later:
     #   * the penalty taker's +0.03 stays on the unconditional mean only. The arm
     #     H17 measured built the mixture from rates alone.
-    #   * ASSISTS keep the old division. H17 measured goals; assists were not
-    #     re-measured, and shipping an unmeasured change beside a measured one is
-    #     how a negative interaction gets attributed to the wrong half.
+    #   * assists were deliberately left on the old division by this change, because
+    #     H17 measured goals only. They moved to the mixture later, on their own
+    #     measurement (H33, `#673`; the assists block above).
     if usage_profile.start_probability is not None and usage_profile.on_pitch_goal_share is not None:
         full_match_goals = team_goals * _clamp(float(usage_profile.on_pitch_goal_share), 0.0, 1.0)
         goal_p_start = _clamp(float(usage_profile.start_probability), 0.0, 1.0)
@@ -336,11 +386,13 @@ def project_player_props(
         expected_shots_on_target_if_playing = expected_shots_if_playing * on_target_rate
         shots_ladder = _mixture_over_probabilities(shot_components, _SHOT_LINES)
         shots_on_target_ladder = _mixture_over_probabilities(sot_components, _SOT_LINES)
+        shots_conditioning = CONDITIONAL_ON_APPEARING
     else:
         expected_shots_if_playing = expected_shots / conditioning
         expected_shots_on_target_if_playing = expected_shots_on_target / conditioning
         shots_ladder = _over_probabilities(expected_shots, _SHOT_LINES)
         shots_on_target_ladder = _over_probabilities(expected_shots_on_target, _SOT_LINES)
+        shots_conditioning = UNCONDITIONAL
 
     return PlayerPropProjection(
         player_id=usage_profile.player_id,
@@ -358,12 +410,23 @@ def project_player_props(
         goal_or_assist_probability=round(goal_or_assist, 4),
         shots_over_probabilities=shots_ladder,
         shots_on_target_over_probabilities=shots_on_target_ladder,
-        assists_over_probabilities=_over_probabilities(expected_assists, _ASSIST_LINES),
+        assists_over_probabilities=assists_ladder,
         expected_shots_if_playing=round(expected_shots_if_playing, 4),
         expected_shots_on_target_if_playing=round(expected_shots_on_target_if_playing, 4),
         expected_goals_if_playing=round(expected_goals_if_playing, 4),
         expected_assists_if_playing=round(expected_assists_if_playing, 4),
         anytime_scorer_probability_if_playing=round(anytime_if_playing, 4),
+        ladder_conditioning={
+            "shots_over_probabilities": shots_conditioning,
+            "shots_on_target_over_probabilities": shots_conditioning,
+            "assists_over_probabilities": assists_conditioning,
+            # Poisson on the unconditional goal mean, always. The board prices this
+            # field by user decision (2026-09-15/16); `_if_playing` is the other one.
+            "anytime_scorer_probability": UNCONDITIONAL,
+            "anytime_scorer_probability_if_playing": CONDITIONAL_ON_APPEARING,
+            "two_or_more_scorer_probability": UNCONDITIONAL,
+            "goal_or_assist_probability": UNCONDITIONAL,
+        },
     )
 
 
@@ -463,7 +526,7 @@ def build_usage_profiles(
         minutes = _lineup_adjusted_minutes(row, key)
         weighted_shots.append(_rate(row, ("shots_per90", "shots")) * minutes)
         weighted_goals.append(_rate(row, ("xg_per90", "goals_per90", "xg", "goals")) * minutes)
-        weighted_assists.append(_rate(row, ("xa_per90", "assists_per90", "xa", "assists")) * minutes)
+        weighted_assists.append(_rate(row, _ASSIST_RATE_KEYS) * minutes)
     shot_total = sum(weighted_shots) or 1.0
     goal_total = sum(weighted_goals) or 1.0
     assist_total = sum(weighted_assists) or 1.0
@@ -509,6 +572,10 @@ def build_usage_profiles(
     on_pitch_goal_total = sum(
         _rate(row, ("xg_per90", "goals_per90", "xg", "goals")) * share
         for row, share in zip(players, on_pitch_minutes)
+    )
+    # And for assists, with the same keys `assist_share` reads (`#673`, H33).
+    on_pitch_assist_total = sum(
+        _rate(row, _ASSIST_RATE_KEYS) * share for row, share in zip(players, on_pitch_minutes)
     )
 
     def _start_probability(row: dict[str, Any], key: str, on_pitch_share: float) -> float:
@@ -558,6 +625,9 @@ def build_usage_profiles(
                     _rate(row, ("xg_per90", "goals_per90", "xg", "goals")) / on_pitch_goal_total
                     if on_pitch_goal_total > 0
                     else 0.0
+                ),
+                on_pitch_assist_share=(
+                    _rate(row, _ASSIST_RATE_KEYS) / on_pitch_assist_total if on_pitch_assist_total > 0 else 0.0
                 ),
                 metadata={key: value for key, value in row.items() if key not in {"player_id", "player_name"}},
             )

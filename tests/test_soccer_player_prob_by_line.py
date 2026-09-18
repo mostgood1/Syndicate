@@ -34,6 +34,9 @@ FULL = {
     "expected_shots": 1.9,
     "expected_shots_on_target": 0.7,
     "expected_assists": 0.21,
+    "expected_shots_if_playing": 2.3,
+    "expected_shots_on_target_if_playing": 0.85,
+    "expected_assists_if_playing": 0.24,
     "shots_over_probabilities": {"0.5": 0.82, "1.5": 0.55, "2.5": 0.28},
     "shots_on_target_over_probabilities": {"0.5": 0.51, "1.5": 0.19},
     "assists_over_probabilities": {"0.5": 0.19, "1.5": 0.03},
@@ -67,7 +70,10 @@ def test_a_line_the_sim_did_not_price_falls_back_to_the_mean_not_a_neighbour():
     row = _row("player_shots", 3.5)          # not in the dict
     sp.attach_soccer_projections([row], _index(FULL))
     proj = row["projection"]
-    assert proj["basis"] == "expected_shots"          # fell back to the mean
+    # Fell back to the mean -- the CONDITIONAL one, the question the shots
+    # ladder answers (`#673`), not the unconditional `expected_shots`.
+    assert proj["basis"] == "expected_shots_if_playing"
+    assert proj["projected"] == 2.3
     assert proj["model_prob_over"] is None
 
 
@@ -81,14 +87,14 @@ def test_assists_at_an_unpriced_line_is_refused_not_guessed():
 
 def test_an_artifact_without_the_dicts_degrades_to_the_old_behaviour():
     """Rebuild lag is the norm here; an older artifact must not break."""
-    old = {"expected_shots": 1.9, "expected_shots_on_target": 0.7}
+    old = {"expected_shots": 1.9, "expected_shots_if_playing": 2.3, "expected_shots_on_target": 0.7}
     row = _row("player_shots", 2.5)
     sp.attach_soccer_projections([row], _index(old))
-    assert row["projection"]["basis"] == "expected_shots"
+    assert row["projection"]["basis"] == "expected_shots_if_playing"
 
 
 def test_an_out_of_range_probability_is_rejected():
     bad = dict(FULL, shots_over_probabilities={"2.5": 1.4})
     row = _row("player_shots", 2.5)
     sp.attach_soccer_projections([row], _index(bad))
-    assert row["projection"]["basis"] == "expected_shots"   # fell back
+    assert row["projection"]["basis"] == "expected_shots_if_playing"   # fell back

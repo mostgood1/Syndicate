@@ -47,10 +47,13 @@ misreadable number on a soccer prop. Measured over the production
                                                212/212 and 43/43 rows: UNCONDITIONAL
     anytime_scorer_probability                 == 1-exp(-expected_goals): UNCONDITIONAL
 
-which is what `player_props.project_player_props` writes: shots and shots on
-target are a start/sub mixture "P(over | appears)" whenever the profile carries
-role inputs; assists and the anytime field are Poisson on the unconditional
-mean. So a bench player (Nils Eggens, minutes share 0.059) reads
+which is what `player_props.project_player_props` wrote then: shots and shots
+on target a start/sub mixture "P(over | appears)"; assists and the anytime field
+Poisson on the unconditional mean. Since `#673` (2026-09-18, H33) the ASSISTS
+ladder is the mixture too, and every probability field is stamped in
+`ladder_conditioning`; the anytime field stays unconditional by user decision.
+`ladder_basis` reads the stamp, and for a file built before it the exact test in
+`soccer_projections.ladder_conditioning`, so this and the board cannot disagree. So a bench player (Nils Eggens, minutes share 0.059) reads
 "P(over 0.5 shots) 88%" -- IF HE PLAYS. Every probability row below says which
 it is, beside the minutes share, and `ladder_basis` checks it per row rather
 than per market, because artifacts built before `b33ef901` (2026-09-15) carry an
@@ -107,22 +110,19 @@ class MarketSpec:
     ladder: str | None
     mean: str | None
     mean_if_playing: str | None
-    # Whether `project_player_props` CAN price this ladder conditional on
-    # appearing (start/sub mixture). Assists cannot: `_over_probabilities(expected_assists)`.
-    producer_conditional: bool
     kind: str  # count | anytime | first | last
 
 
 MARKETS: dict[str, MarketSpec] = {
     "player_shots": MarketSpec("Shots", "shots", "shots_over_probabilities", "expected_shots",
-                               "expected_shots_if_playing", True, "count"),
+                               "expected_shots_if_playing", "count"),
     "player_shots_on_target": MarketSpec("Shots on target", "shots_on_target", "shots_on_target_over_probabilities",
-                                         "expected_shots_on_target", "expected_shots_on_target_if_playing", True, "count"),
+                                         "expected_shots_on_target", "expected_shots_on_target_if_playing", "count"),
     "player_assists": MarketSpec("Assists", "assists", "assists_over_probabilities", "expected_assists",
-                                 "expected_assists_if_playing", False, "count"),
-    "player_goal_scorer_anytime": MarketSpec("Goals", "goals", None, "expected_goals", None, False, "anytime"),
-    "player_first_goal_scorer": MarketSpec("Goals", "goals", None, "expected_goals", None, False, "first"),
-    "player_last_goal_scorer": MarketSpec("Goals", "goals", None, "expected_goals", None, False, "last"),
+                                 "expected_assists_if_playing", "count"),
+    "player_goal_scorer_anytime": MarketSpec("Goals", "goals", None, "expected_goals", None, "anytime"),
+    "player_first_goal_scorer": MarketSpec("Goals", "goals", None, "expected_goals", None, "first"),
+    "player_last_goal_scorer": MarketSpec("Goals", "goals", None, "expected_goals", None, "last"),
 }
 
 # Board markets the soccer platform captures odds for but has no model or box stat for.
@@ -172,9 +172,8 @@ class Resolved:
     side: str = ""
     team: str = ""
     opponent: str = ""
-    # From the ONE file holding this match. `index.generated_at_by_league` is a
-    # plain per-league write across the whole window, so it holds whichever
-    # date loaded LAST, not this match's build (see `generated_at_for`).
+    # From the ONE file holding this match. `index.generated_at_by_league` holds
+    # the league's OLDEST file in the window (`#673`), not this match's build.
     generated_at: str = ""
 
     def generated_at_for(self) -> str:
@@ -324,25 +323,30 @@ def ladder_points(entry: Mapping[str, Any], field_name: str | None) -> list[tupl
 
 
 def ladder_basis(entry: Mapping[str, Any], spec: MarketSpec) -> str:
-    """Which quantity THIS row's ladder is: `if_playing`, `unconditional`, `zero`, `none`, `unverified`.
+    """Which quantity THIS row's ladder is: `if_playing`, `unconditional`, `zero` or `none`.
 
-    `unconditional` means P(over 0.5) is exactly Poisson on the unconditional
-    mean -- the non-role path of `project_player_props`, and every assists
-    ladder. A start/sub mixture cannot land on that value to 4 dp unless the
-    mean is zero.
+    The BOARD's rule, not a second copy of it: `soccer_projections.ladder_conditioning`
+    reads the producer's `ladder_conditioning` stamp, and for a file built before
+    the stamp the exact test (a ladder equal to Poisson on the unconditional mean
+    at 0.5 IS that; any other value is the start/sub mixture).
     """
-    points = dict(ladder_points(entry, spec.ladder))
-    first = points.get(0.5)
-    mean = C.to_float(entry.get(spec.mean)) if spec.mean else None
-    if first is None or mean is None:
+    from syndicate.features.shared import soccer_projections
+
+    if not spec.ladder:
         return "none"
-    if mean == 0.0 and all(value == 0.0 for value in points.values()):
-        return "zero"
-    if abs(first - (1.0 - math.exp(-mean))) <= _POISSON_TOLERANCE:
-        return "unconditional"
-    if spec.producer_conditional and C.to_float(entry.get(spec.mean_if_playing)) is not None:
-        return "if_playing"
-    return "unverified"
+    state = soccer_projections.ladder_conditioning(entry, spec.ladder)
+    return {soccer_projections.CONDITIONAL_ON_APPEARING: "if_playing",
+            soccer_projections.UNCONDITIONAL: "unconditional", "zero": "zero"}.get(state, "none")
+
+
+def board_prices_ladder(market: str, basis: str) -> bool:
+    """Whether the board prices a ladder of this basis for this market (`#673`)."""
+    from syndicate.features.shared import soccer_projections
+
+    family = soccer_projections._FAMILY_CONDITIONING.get(market)
+    wanted = {soccer_projections.CONDITIONAL_ON_APPEARING: "if_playing",
+              soccer_projections.UNCONDITIONAL: "unconditional"}.get(family or "")
+    return basis == "zero" or basis == wanted
 
 
 _BASIS_TEXT = {
@@ -635,9 +639,10 @@ def _player_sim(subject: PropSubject, ctx: Resolved, spec: MarketSpec | None) ->
         if points:
             rows.append(["How the ladder is priced", "Poisson on the match sim's team volume x his share "
                                                      "(a start/sub mixture when conditional), not simulation draws"])
-        if spec.box_stat == "assists":
-            rows.append(["Note", "the assists ladder is Poisson on the UNCONDITIONAL mean; the if-plays mean "
-                                 "is the sim's rescale by minutes share (floor 25%), not a ladder"])
+        if basis != "none" and not board_prices_ladder(subject.market, basis):
+            rows.append(["Board", "does NOT price this row from the ladder above: it answers a different question "
+                                  "from the one the board prices for this market (books void on a DNP, `#673`); "
+                                  "a rebuild of this match's artifact replaces it"])
         facts.update({"stat": spec.box_stat, "prob_over": prob, "ladder_basis": basis, "ladder": dict(points),
                       "mean": mean, "mean_if_playing": mean_playing})
         if points:

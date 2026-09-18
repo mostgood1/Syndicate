@@ -3,7 +3,7 @@
 
 Keyed by ESPN match id -- the same id space the predictions carry, so the join
 is direct. Extracts the final score, team corners/shots/SOT, and per-player
-shots/SOT/goals from `rosters[].roster[].stats` (the box score, not the
+shots/SOT/goals/assists from `rosters[].roster[].stats` (the box score, not the
 commentary: commentary shot capture was 0.13 in belgian_pro_league on
 2026-08-31). A summary that is not FULL TIME is never used and is re-fetched.
 """
@@ -92,6 +92,9 @@ def extract(s):
                 "starter": bool(p.get("starter")), "subbed_in": bool(sub),
                 "appearances": _num(st2.get("appearances")), "shots": _num(st2.get("totalShots")),
                 "sot": _num(st2.get("shotsOnTarget")), "goals": _num(st2.get("totalGoals")),
+                # `#673` H33 scores the assists ladder. Additive: every reader of
+                # the fields above is unchanged.
+                "assists": _num(st2.get("goalAssists")),
             })
     return res
 

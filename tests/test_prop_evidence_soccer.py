@@ -289,7 +289,10 @@ def test_ladder_basis_catches_an_unconditional_shots_ladder_under_the_same_key()
     sim = dict(_sim_player(SERIE_A, "Ricardo Rodríguez"))
     spec = soccer.MARKETS["player_shots"]
     assert soccer.ladder_basis(sim, spec) == "if_playing"
+    # The whole legacy shape: that path ALSO published `_if_playing` as the
+    # unconditional mean / max(minutes share, 0.25) (`#673`'s second fingerprint).
     sim["shots_over_probabilities"] = {"0.5": round(1 - math.exp(-sim["expected_shots"]), 4)}
+    sim["expected_shots_if_playing"] = round(sim["expected_shots"] / max(sim["expected_minutes_share"], 0.25), 4)
     assert soccer.ladder_basis(sim, spec) == "unconditional"
 
 

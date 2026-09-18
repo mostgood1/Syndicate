@@ -119,10 +119,16 @@ player projection is published and web must not model.
 ### Soccer — `prop_evidence/soccer.py`
 
 `<league>/api/recommendations/<date>.json` `player_props[]` — the projections
-Ask used to load and discard. **Shots and shots-on-target ladders are
-conditional on playing** (measured: 207/212 and 210/212 rows match
-`1 − e^(−mean_if_playing)`), assists and anytime scorer are unconditional
-(0/212 and 230/230); each row is labelled, with the minutes share beside it.
+Ask used to load and discard. **Shots, shots-on-target and (since `#673`,
+2026-09-18) assists ladders are conditional on playing**; the anytime scorer
+field is unconditional by user decision. Each probability field is stamped in
+`ladder_conditioning` by `player_props.project_player_props`, and a file built
+before the stamp is read by the exact test in
+`soccer_projections.ladder_conditioning` (a ladder equal to Poisson on the
+unconditional mean at 0.5 IS that; anything else is the start/sub mixture). Ask
+and the board share that one function, so they cannot disagree; a row whose
+ladder answers the other question from its market's is labelled, and the board
+does not price it. The minutes share sits beside every row.
 Form from `<league>/api/live_state/live_state_<date>.json` boxes (only since
 2026-09-09, so samples are 1–2 matches). Season rates from
 `<league>/players/<season>.csv`, with ESPN-league `xg_per90`/`xa_per90`
@@ -156,9 +162,10 @@ player_sim are absent from it for the reasons above.
 * NFL prop artifact stops at week 1 and every row is `prior_season_fallback`.
 * NHL `raw/player_game_stats.csv` has no scheduled producer.
 * WNBA `boxscores_history.csv` bootstrap stalls (`#469`), newest game 2026-06-30.
-* Soccer: the board prices `player_assists` off the UNCONDITIONAL ladder while
-  shots/SOT are conditional; 4 of 12 sampled fixtures never join the sim by name;
-  `SoccerProjectionIndex.generated_at_by_league` is keyed by league so a slate
-  window's last date overwrites the others' as-of.
+* Soccer (`#673`, lane `soccer-prop-conditioning`): assists now price conditional
+  on playing, like shots/SOT (H33, held out); each projection's as-of is its own
+  match's file. The "4 of 12 fixtures never join" finding was RETRACTED: it was
+  read in a worktree without `data/`, where the team-branding CSVs the soccer
+  alias map is built from are absent; all four join on production.
 * WNBA/NBA/NCAAF/NHL have no graded prop cells in the model scorecard yet
   (lane `model-scorecard-cron` owns that).

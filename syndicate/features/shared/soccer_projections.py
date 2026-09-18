@@ -32,6 +32,7 @@ inferred from a mean are not the same claim.
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -46,11 +47,116 @@ from syndicate.features.shared.book_margin_model import (
 # Player-prop market -> field on the player_props entry, and whether that field
 # is a PROBABILITY or a MEAN. Getting this wrong in either direction is the
 # whole risk: a mean presented as a probability is a fabricated edge.
+#
+# The shot means are the `_if_playing` ones (`#673`). The shot LADDERS price
+# P(over | the player appears), so falling back to the UNCONDITIONAL mean for a
+# line the ladder does not carry answered a different question inside the same
+# market family -- measured 2026-09-18, 148 `player_shots` and 11 SOT rows on the
+# served board were projected from `expected_shots` beside 684 and 423 priced off
+# the conditional ladder.
 _PLAYER_FIELDS: dict[str, tuple[str, str]] = {
     "player_goal_scorer_anytime": ("anytime_scorer_probability", "probability"),
-    "player_shots": ("expected_shots", "mean"),
-    "player_shots_on_target": ("expected_shots_on_target", "mean"),
+    "player_shots": ("expected_shots_if_playing", "mean"),
+    "player_shots_on_target": ("expected_shots_on_target_if_playing", "mean"),
 }
+
+# WHICH QUESTION EACH SOCCER PLAYER-PROP FAMILY IS PRICED ON (`#673`).
+#
+# A book voids a player prop when the player does not appear, so what it settles
+# is P(over | he appears). The sim publishes both kinds of number under similar
+# names, and until 2026-09-18 the board priced shots and shots on target on the
+# conditional ladder and ASSISTS on the unconditional one, side by side, with
+# nothing on the row saying which. An unconditional ladder carries the DNP mass
+# and reads low for everyone who does play: held out, assists level 0.74 against
+# the mixture's 0.93 (H33, `scripts/soccer_season_audit/assists_conditioning.py`).
+#
+# The scorer markets are UNCONDITIONAL BY USER DECISION (2026-09-15/16,
+# `state_soccer.md`): the board prices `anytime_scorer_probability`, and
+# `anytime_scorer_probability_if_playing` is shown beside it on the props page.
+# Stated here so the row says so, not changed.
+#
+# A row whose ladder answers the OTHER question from its family's is not priced
+# from that ladder: see `ladder_conditioning` and `conditioning_mismatch_by_market`.
+CONDITIONAL_ON_APPEARING = "appearing"
+UNCONDITIONAL = "unconditional"
+_FAMILY_CONDITIONING: dict[str, str] = {
+    "player_shots": CONDITIONAL_ON_APPEARING,
+    "player_shots_on_target": CONDITIONAL_ON_APPEARING,
+    "player_assists": CONDITIONAL_ON_APPEARING,
+    "player_goal_scorer_anytime": UNCONDITIONAL,
+    "player_first_goal_scorer": UNCONDITIONAL,
+    "player_last_goal_scorer": UNCONDITIONAL,
+}
+
+# The UNCONDITIONAL mean each ladder would be a Poisson over, if it were one,
+# and the `_if_playing` mean published beside it.
+_LADDER_UNCONDITIONAL_MEAN: dict[str, str] = {
+    "shots_over_probabilities": "expected_shots",
+    "shots_on_target_over_probabilities": "expected_shots_on_target",
+    "assists_over_probabilities": "expected_assists",
+}
+_LADDER_IF_PLAYING_MEAN: dict[str, str] = {
+    "shots_over_probabilities": "expected_shots_if_playing",
+    "shots_on_target_over_probabilities": "expected_shots_on_target_if_playing",
+    "assists_over_probabilities": "expected_assists_if_playing",
+}
+# Ladders are rounded to 4 dp from an unrounded mean, and the mean itself is
+# published to 4 dp; 2e-4 covers both roundings and nothing else.
+_POISSON_TOLERANCE = 2e-4
+
+
+def ladder_conditioning(entry: Mapping[str, Any], prob_field: str) -> str:
+    """Which question `entry[prob_field]` answers: `appearing`, `unconditional`, `zero` or `unstated`.
+
+    THE PRODUCER'S STAMP FIRST. `player_props.project_player_props` writes
+    `ladder_conditioning` per probability field (`#673`), computed from the branch
+    it actually took for this row.
+
+    WITHOUT A STAMP, TWO EXACT FINGERPRINTS, NOT A GUESS. The engine has exactly
+    two ways to price a count ladder: Poisson over the unconditional mean, or the
+    start/sub mixture. The first lands on `1 - e^(-mean)` at 0.5 to 4 dp AND
+    publishes its `_if_playing` mean as mean / max(minutes share, 0.25). A ladder
+    off the Poisson value is the mixture; one on it is unconditional only if the
+    division holds too. Measured 2026-09-18: 1,573 of 1,573 old-code assists
+    ladders on production read unconditional and 1,549 of 1,549 shots ladders
+    conditional; on H33's replay of the NEW engine with the stamp stripped, 15 of
+    16,377 assists ladders misread as unconditional (refused, never mispriced).
+    This is what makes the change safe before every file in the slate window has
+    been rebuilt, and safe if an allowlist drops the stamp.
+
+    `zero` is a zero-volume row, which prices 0.0 on either basis.
+    """
+    stamp = (entry.get("ladder_conditioning") or {}) if isinstance(entry.get("ladder_conditioning"), Mapping) else {}
+    stated = str(stamp.get(prob_field) or "").strip()
+    if stated in (CONDITIONAL_ON_APPEARING, UNCONDITIONAL):
+        return stated
+    table = entry.get(prob_field)
+    mean = _as_float(entry.get(_LADDER_UNCONDITIONAL_MEAN.get(prob_field, "")))
+    if not isinstance(table, Mapping) or not table or mean is None:
+        return "unstated"
+    first = None
+    for key, value in table.items():
+        if _as_float(key) == 0.5:
+            first = _as_float(value)
+    if first is None:
+        return "unstated"
+    if mean == 0.0 and all((_as_float(v) or 0.0) == 0.0 for v in table.values()):
+        return "zero"
+    if abs(first - (1.0 - math.exp(-mean))) > _POISSON_TOLERANCE:
+        return CONDITIONAL_ON_APPEARING
+    # A MIXTURE CAN LAND ON THE POISSON VALUE for a regular starter: 255 of 16,377
+    # new assists ladders did (H33's replay, 2026-09-18). The unconditional path
+    # left a SECOND fingerprint: it published its `_if_playing` mean as the
+    # unconditional mean / max(minutes share, 0.25), which a mixture's mean does
+    # not reproduce. The tolerance is the 4 dp rounding of all three numbers.
+    if_playing = _as_float(entry.get(_LADDER_IF_PLAYING_MEAN.get(prob_field, "")))
+    minutes = _as_float(entry.get("expected_minutes_share"))
+    if if_playing is None or minutes is None:
+        return UNCONDITIONAL
+    divisor = max(minutes, 0.25)
+    if abs(if_playing * divisor - mean) <= 1e-4 * (1.0 + divisor + if_playing):
+        return UNCONDITIONAL
+    return CONDITIONAL_ON_APPEARING
 
 # PER-LINE PROBABILITY DICTS, PREFERRED OVER THE MEAN ABOVE WHERE PRESENT.
 #
@@ -145,6 +251,10 @@ class SoccerProjectionIndex:
     # board was pairing a 22-DAY-OLD sim with odds quoted minutes earlier and
     # rendering it identically to a fresh one. Prices carry `age_seconds`;
     # projections carried nothing.
+    #
+    # `#673`: the OLDEST file of each league in the window. A row's own as-of is
+    # its match's `source_generated_at`; this map answers "how stale is the
+    # stalest thing this league is showing", which is `oldest_sim_age_hours`.
     generated_at_by_league: dict[str, str] = field(default_factory=dict)
     # Which dates were actually read, so a zero is attributable to the slate
     # rather than to a one-date read. Same reason `per_sport_ingest` carries
@@ -298,11 +408,16 @@ def _load_one(path: Path, index: SoccerProjectionIndex) -> bool:
     if not isinstance(payload, Mapping):
         return False
     league = str(payload.get("league") or "")
+    generated_at = str(payload.get("generated_at") or "").strip()
     if league:
         index.leagues.append(league)
-        generated_at = str(payload.get("generated_at") or "").strip()
         if generated_at:
-            index.generated_at_by_league[league] = generated_at
+            # The OLDEST file of the league, not the last one read (`#673`). This
+            # map feeds `oldest_sim_age_hours` and only that; a row's own as-of is
+            # its match's `source_generated_at`, below.
+            held = index.generated_at_by_league.get(league)
+            if held is None or _older_timestamp(generated_at, held):
+                index.generated_at_by_league[league] = generated_at
     index.source_paths.append(str(path))
 
     for match in payload.get("matches") or []:
@@ -312,8 +427,16 @@ def _load_one(path: Path, index: SoccerProjectionIndex) -> bool:
         home = _norm_team(matchup.get("home_team"))
         away = _norm_team(matchup.get("away_team"))
         event_id = str(match.get("event_id") or "").strip()
+        stored = dict(match)
+        if generated_at:
+            # THE AS-OF OF THE FILE THAT HOLDS THIS MATCH (`#673`). The board
+            # stamped every row from `generated_at_by_league`, one plain write per
+            # FILE, so across a 7-date window a row carried whichever date of its
+            # league loaded LAST -- mls 09-19 (built 13:02Z) would have read as
+            # the 09-20 file's 04:16Z, nine hours older than its own sim.
+            stored["source_generated_at"] = generated_at
         if event_id:
-            index.by_event[event_id] = dict(match)
+            index.by_event[event_id] = stored
         if home and away:
             key = (home, away)
             existing = index.by_teams.get(key)
@@ -326,7 +449,7 @@ def _load_one(path: Path, index: SoccerProjectionIndex) -> bool:
                 index.ambiguous_team_keys.add(key)
                 index.by_teams.pop(key, None)
             elif key not in index.ambiguous_team_keys:
-                index.by_teams[key] = dict(match)
+                index.by_teams[key] = stored
         index.matches += 1
 
     # Player props are keyed by match_id, so a name collision across two matches
@@ -863,6 +986,28 @@ def _stamp_precision(projection: dict[str, Any], verdict: Mapping[str, Any]) -> 
             projection[key] = value
 
 
+def _parse_timestamp(raw: Any):
+    from datetime import datetime, timezone
+
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
+
+
+def _older_timestamp(candidate: str, held: str) -> bool:
+    """Whether `candidate` is older than `held`. An unparseable `held` loses to a
+    parseable candidate; an unparseable candidate never replaces anything."""
+    new, old = _parse_timestamp(candidate), _parse_timestamp(held)
+    if new is None:
+        return False
+    return old is None or new < old
+
+
 def _age_hours(generated_at: str) -> float | None:
     """Hours since a simulation was produced, or None if unparseable.
 
@@ -871,15 +1016,9 @@ def _age_hours(generated_at: str) -> float | None:
     """
     from datetime import datetime, timezone
 
-    raw = str(generated_at or "").strip()
-    if not raw:
+    parsed = _parse_timestamp(generated_at)
+    if parsed is None:
         return None
-    try:
-        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
     return round((datetime.now(timezone.utc) - parsed).total_seconds() / 3600.0, 1)
 
 
@@ -986,6 +1125,10 @@ def attach_soccer_projections(
     player_alias_ambiguous = 0
     unprojected_no_field = 0
     unprojected_by_market: dict[str, int] = {}
+    # `#673`: rows NOT priced because their ladder answers the other question
+    # from their family's, and what every priced player-prop row was priced on.
+    conditioning_mismatch_by_market: dict[str, int] = {}
+    conditioning_by_market: dict[str, dict[str, int]] = {}
     unmatched_players: dict[str, str] = {}
     roster_sample_by_match: dict[str, list[str]] = {}
 
@@ -1223,6 +1366,8 @@ def attach_soccer_projections(
                 projection["low_coverage"] = True
             if market == "player_last_goal_scorer":
                 projection["assumption"] = "last scorer equals first scorer under time-reversal symmetry"
+            # Built from the unconditional goal means, like the anytime field.
+            projection["conditioning"] = _FAMILY_CONDITIONING.get(market)
         elif market in _PLAYER_FIELDS or market in _PLAYER_PROB_BY_LINE:
             players = index.players_by_match.get(str(match.get("match_id") or "").strip()) or {}
             entry, player_state = _lookup_player(players, row.get("player_name"))
@@ -1241,8 +1386,18 @@ def attach_soccer_projections(
             # that tail is exactly how this file's rules have rotted before.
             prob_field = _PLAYER_PROB_BY_LINE.get(market)
             exact = _prob_at_line(entry, prob_field, row.get("line")) if prob_field else None
+            family = _FAMILY_CONDITIONING.get(market)
+            if exact is not None and prob_field and ladder_conditioning(entry, prob_field) not in ("zero", family):
+                # `#673`: THIS ROW'S LADDER ANSWERS THE OTHER QUESTION. Not priced
+                # from it, and not silently: counted by market, because a family
+                # priced half on one basis and half on the other is the defect.
+                conditioning_mismatch_by_market[market] = conditioning_mismatch_by_market.get(market, 0) + 1
+                if market not in _PLAYER_FIELDS:
+                    continue
+                exact = None
             if exact is not None:
                 projection = _probability_projection(exact, basis=prob_field)
+                projection["conditioning"] = family
             elif market not in _PLAYER_FIELDS:
                 # An assists row whose exact line the sim did not price. Named
                 # rather than counted as a player miss: the player matched, the
@@ -1258,6 +1413,7 @@ def attach_soccer_projections(
                         if kind == "probability"
                         else _mean_projection(value, row.get("line"), basis=field_name)
                     )
+                    projection["conditioning"] = family
         else:
             unsupported_market += 1
             continue
@@ -1287,7 +1443,9 @@ def attach_soccer_projections(
         # leagues simulate on their own units, so one stale league must not make
         # the others look stale, or the reverse.
         source_league = str(match.get("league") or "").strip()
-        generated_at = index.generated_at_by_league.get(source_league)
+        # Its OWN file's as-of (`#673`); the league map only for a match indexed
+        # without one, which no longer happens for a file that states it.
+        generated_at = str(match.get("source_generated_at") or "").strip() or index.generated_at_by_league.get(source_league)
         if generated_at:
             projection["generated_at"] = generated_at
             age = _age_hours(generated_at)
@@ -1296,6 +1454,9 @@ def attach_soccer_projections(
         projected += 1
         if projection.get("model_prob_over") is not None:
             with_probability += 1
+        if projection.get("conditioning"):
+            by_basis = conditioning_by_market.setdefault(market, {})
+            by_basis[projection["conditioning"]] = by_basis.get(projection["conditioning"], 0) + 1
 
     # THE INDEX SIDE OF THE SAME PAIRING. Without it the unmatched samples say
     # what the BOARD calls a fixture and nothing about what the SIM calls it,
@@ -1357,6 +1518,10 @@ def attach_soccer_projections(
         "unprojected_by_market": dict(
             sorted(unprojected_by_market.items(), key=lambda kv: -kv[1])[:12]
         ),
+        # `#673`. Reported even when empty, so "nothing mismatched" and "this
+        # counter was never wired" cannot share a reading.
+        "conditioning_by_market": {k: dict(v) for k, v in sorted(conditioning_by_market.items())},
+        "conditioning_mismatch_by_market": dict(sorted(conditioning_mismatch_by_market.items())),
         "unmatched_player_sample": sorted(unmatched_players),
         "sim_roster_sample": sorted(
             name for names in roster_sample_by_match.values() for name in names

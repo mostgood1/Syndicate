@@ -297,6 +297,7 @@ def _write_with_players(root: Path, league: str, date: str, home: str, away: str
                         "match_id": f"{league}-0",
                         "player_name": name,
                         "expected_shots": 2.1,
+                        "expected_shots_if_playing": 2.1,
                     }
                     for name in players
                 ],

@@ -33,6 +33,9 @@ _PLAYERS = [
         "anytime_scorer_probability": 0.2893,
         "expected_shots": 1.5985,
         "expected_shots_on_target": 0.6045,
+        # The shot means the board prices are the `_if_playing` ones (`#673`).
+        "expected_shots_if_playing": 1.8412,
+        "expected_shots_on_target_if_playing": 0.6963,
     }
 ]
 
@@ -122,9 +125,11 @@ def test_shots_markets_are_means(tmp_path):
         _row("player_shots_on_target", 0.5, player_name="Nicolo Tresoldi"),
     ]
     attach_soccer_projections(grid, _index(tmp_path))
-    assert grid[0]["projection"]["projected"] == 1.599
+    # The CONDITIONAL means (`#673`): the family's ladders price "if he plays".
+    assert grid[0]["projection"]["projected"] == 1.841
     assert grid[0]["projection"]["model_prob_over"] is None
-    assert grid[1]["projection"]["projected"] == 0.605
+    assert grid[0]["projection"]["conditioning"] == "appearing"
+    assert grid[1]["projection"]["projected"] == 0.696
 
 
 def test_first_goal_scorer_is_never_filled_from_anytime(tmp_path):

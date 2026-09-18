@@ -4114,7 +4114,8 @@ def _soccer_match_evidence(question: str, context: dict[str, Any]) -> dict[str, 
         charts.append(goals_chart)
     if not tables and not charts:
         return None
-    as_of = index.generated_at_by_league.get(league) or kickoff or selected_date
+    # This match's OWN file (`#673`); the league map holds the oldest file of the window.
+    as_of = match.get("source_generated_at") or index.generated_at_by_league.get(league) or kickoff or selected_date
     evidence = {"source": "soccer_recommendations", "as_of": as_of, "matchup": label, "league": league}
     return {"evidence": evidence, "tables": tables, "charts": charts, "as_of": str(as_of)[:10], "sport": "soccer"}
 
