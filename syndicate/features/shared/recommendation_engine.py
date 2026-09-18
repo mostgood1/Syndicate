@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import logging
 import hashlib
+import copy
 import json
 import math
 import os
+import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -95,6 +97,65 @@ _NEUTRAL_RELIABILITY_FIELDS: dict[str, float] = {
     "roi_adjustment": 0.0,
     "reliability_multiplier": 1.0,
 }
+
+
+# ---------------------------------------------------------------------------
+# Derived-aggregate memo. Lane `ranking-records-build-cost` (2026-09-18).
+#
+# WHY. Once #44 fed the ranker all 15 days of settled records (~17k), the
+# stretch from `RANKING_RECORDS_LOADED` to `ADJUSTED_SCORES_ATTACHED` went from
+# ~61 s to a ~170 s median on builds with no MLB sim running (`deploys.md`
+# 2026-09-17 21:50Z). Everything recomputed here is a pure function of the
+# records: the selected policy, the gated sport profile, one gated profile
+# per market, and the policy comparison -- and `rank_recommendations` rebuilt
+# the comparison ONCE PER SCORED CANDIDATE, over every record.
+#
+# HOW. `ranking_records.load_recent_ranking_records` returns a list carrying
+# `.fingerprint`, a digest of the kept records' content. While it is
+# unchanged, the aggregates are reused across calls and across builds. The
+# memo holds ONE fingerprint's entries and is dropped when it changes, so it
+# retains a handful of small profiles, never records. Callers get deep
+# copies: the rows embed these profiles, and nothing a caller does to its
+# copy can reach the next build. Records WITHOUT a fingerprint (every other
+# caller, every existing test) take exactly the old path.
+# ---------------------------------------------------------------------------
+_DERIVED_MEMO_LOCK = threading.Lock()
+_DERIVED_MEMO: dict[str, Any] = {"fingerprint": None, "entries": {}}
+_MEMO_MISS = object()
+
+
+def _records_fingerprint(records: Any) -> str | None:
+    fingerprint = getattr(records, "fingerprint", None)
+    return fingerprint if isinstance(fingerprint, str) and fingerprint else None
+
+
+def _memoized_derived(fingerprint: str | None, key: tuple[Any, ...], compute: Any, counts: dict[str, int] | None = None) -> Any:
+    if fingerprint is None:
+        return compute()
+    # The profiles are gated on `feedback_min_sample()`, an env read, so the
+    # memo is scoped to (records, gate) -- never records alone.
+    scope = (fingerprint, feedback_min_sample())
+    with _DERIVED_MEMO_LOCK:
+        if _DERIVED_MEMO["fingerprint"] != scope:
+            _DERIVED_MEMO["fingerprint"] = scope
+            _DERIVED_MEMO["entries"] = {}
+        value = _DERIVED_MEMO["entries"].get(key, _MEMO_MISS)
+    if value is _MEMO_MISS:
+        value = compute()
+        with _DERIVED_MEMO_LOCK:
+            if _DERIVED_MEMO["fingerprint"] == scope:
+                _DERIVED_MEMO["entries"][key] = value
+        if counts is not None:
+            counts["miss"] = counts.get("miss", 0) + 1
+    elif counts is not None:
+        counts["hit"] = counts.get("hit", 0) + 1
+    return copy.deepcopy(value)
+
+
+def reset_derived_memo() -> None:
+    with _DERIVED_MEMO_LOCK:
+        _DERIVED_MEMO["fingerprint"] = None
+        _DERIVED_MEMO["entries"] = {}
 
 
 def _gated_reliability_profile(
@@ -1371,12 +1432,22 @@ def filter_candidates(
     # them and there is no cache behind them -- so copying them protects
     # nobody. Truthiness is preserved exactly: an EMPTY `evaluation_records`
     # still falls through to the ledger, as before.
-    if evaluation_records:
+    # A fingerprinted record list is read-only by contract (its records are
+    # cached across builds by `ranking_records`), so it is not copied either.
+    fingerprint = _records_fingerprint(evaluation_records) if evaluation_records else None
+    memo_counts: dict[str, int] = {}
+    if fingerprint is not None:
+        history_rows = [record for record in evaluation_records if isinstance(record, Mapping)]
+    elif evaluation_records:
         history_rows = [dict(record) for record in evaluation_records if isinstance(record, Mapping)]
     else:
         history_rows = [record for record in _load_records_from_ledger(ledger_path) if isinstance(record, Mapping)]
-    sport_profile = _gated_reliability_profile(records=history_rows, sport=sport)
-    policy_spec = _policy_spec(policy or select_policy(history_rows, sport=sport))
+    sport_profile = _memoized_derived(
+        fingerprint, ("sport_profile", sport), lambda: _gated_reliability_profile(records=history_rows, sport=sport), memo_counts
+    )
+    policy_spec = _policy_spec(
+        policy or _memoized_derived(fingerprint, ("policy", sport, None), lambda: select_policy(history_rows, sport=sport), memo_counts)
+    )
     filtered: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
     # _market_profile rescans history_rows and recomputes build_reliability_profile
@@ -1457,7 +1528,12 @@ def filter_candidates(
         market = _market(candidate)
         market_profile = market_profile_cache.get(market)
         if market_profile is None:
-            market_profile = _market_profile(history_rows, sport=sport, market=market)
+            market_profile = _memoized_derived(
+                fingerprint,
+                ("market_profile", sport, market),
+                lambda: _market_profile(history_rows, sport=sport, market=market),
+                memo_counts,
+            )
             market_profile_cache[market] = market_profile
         market_features = build_market_features(candidate, sport=sport, payload_cache=odds_payload_cache)
         live_pricing = _repriced_probabilities(candidate)
@@ -1676,7 +1752,17 @@ def rank_recommendations(
         _owned_records = True
     if experiment_key is None:
         experiment_key = _candidate_policy_key(candidate_rows, sport=sport)
-    selected_policy = _normalize_policy_name(policy or select_policy(evaluation_records, sport=sport, experiment_key=experiment_key))
+    fingerprint = _records_fingerprint(evaluation_records)
+    memo_counts: dict[str, int] = {}
+    selected_policy = _normalize_policy_name(
+        policy
+        or _memoized_derived(
+            fingerprint,
+            ("policy", sport, experiment_key),
+            lambda: select_policy(evaluation_records, sport=sport, experiment_key=experiment_key),
+            memo_counts,
+        )
+    )
     policy_spec = _policy_spec(selected_policy)
     performance_summary = _load_performance_summary(ledger_path=ledger_path)
     filtered_candidates = filter_candidates(
@@ -1689,11 +1775,30 @@ def rank_recommendations(
     )
     # Reuses the single load above. `_owned_records` means we read them on this
     # call, so nothing else holds a reference and the defensive copy is waste.
-    if _owned_records:
+    if _owned_records or fingerprint is not None:
         history_rows = [record for record in evaluation_records if isinstance(record, Mapping)]
     else:
         history_rows = [dict(record) for record in evaluation_records if isinstance(record, Mapping)]
-    sport_profile = _gated_reliability_profile(records=history_rows, sport=sport)
+    sport_profile = _memoized_derived(
+        fingerprint, ("sport_profile", sport), lambda: _gated_reliability_profile(records=history_rows, sport=sport), memo_counts
+    )
+    # The policy comparison each row carries is a function of (records, sport,
+    # experiment_key) only, and was rebuilt for EVERY scored candidate. Built
+    # at most once per call now, lazily (a call that scores nothing never
+    # builds it, as before); each row still gets its own copy.
+    policy_comparison_holder: list[list[Any]] = []
+
+    def _policy_comparison() -> list[Any]:
+        if not policy_comparison_holder:
+            policy_comparison_holder.append(
+                _memoized_derived(
+                    fingerprint,
+                    ("policy_comparison", sport, experiment_key),
+                    lambda: build_policy_optimization_summary(history_rows, sport=sport, experiment_key=experiment_key).get("policy_comparison", []),
+                    memo_counts,
+                )
+            )
+        return copy.deepcopy(policy_comparison_holder[0])
     scored: list[dict[str, Any]] = []
     rank_rejected_counts: dict[str, int] = {}
     # Same per-market memoization as filter_candidates above -- avoids
@@ -1708,7 +1813,12 @@ def rank_recommendations(
         market = str(candidate.get("market") or "market").strip().lower() or "market"
         market_profile = market_profile_cache.get(market)
         if market_profile is None:
-            market_profile = _market_profile(history_rows, sport=sport, market=market)
+            market_profile = _memoized_derived(
+                fingerprint,
+                ("market_profile", sport, market),
+                lambda: _market_profile(history_rows, sport=sport, market=market),
+                memo_counts,
+            )
             market_profile_cache[market] = market_profile
         market_features = _copy_mapping(candidate.get("market_features"))
         if not market_features:
@@ -1851,7 +1961,7 @@ def rank_recommendations(
                 "historical_profile": {
                     "sport": sport_profile,
                     "market": market_profile,
-                    "policy_comparison": build_policy_optimization_summary(history_rows, sport=sport, experiment_key=experiment_key).get("policy_comparison", []),
+                    "policy_comparison": _policy_comparison(),
                 },
                 "decision_strategy": selected_policy,
                 "adjusted_score": round(adjusted_score, 3),
@@ -1871,6 +1981,13 @@ def rank_recommendations(
         f"in={len(filtered_candidates)} out={len(scored)} "
         f"rejected={json.dumps(rank_rejected_counts, sort_keys=True)} "
         f"feedback_gated={json.dumps({'sport': sport_profile.get('feedback_gated'), 'sample_size': sport_profile.get('sample_size'), 'min_sample': sport_profile.get('min_sample')}, sort_keys=True)}",
+        flush=True,
+    )
+    # One line per call. `fingerprint=none` says the memo was not in play (a
+    # plain record list); hit/miss count this rank pass's own lookups.
+    print(
+        "[recommendation_engine] RANKING_DERIVED_CACHE "
+        f"fingerprint={(fingerprint or 'none')[:16]} hit={memo_counts.get('hit', 0)} miss={memo_counts.get('miss', 0)}",
         flush=True,
     )
 
