@@ -19,8 +19,11 @@ TWO PASSES, because fixing this service's copy does not fix web's.
    are checked against ONE StatsAPI schedule call per date. A game StatsAPI
    calls final gets its status written into its row, the report's `counts` are
    recounted, a `finalPass` entry records what changed and from where, and the
-   file is replaced atomically. No other field is touched and no report is
-   rebuilt.
+   file is replaced atomically. The ONE other field written is `score`, on a
+   final row that has none (lane `mlb-lens-final-pass-scores`, 2026-09-18): the
+   served web form is SLIM (`gamePk`/`startTime`/`status`), so a status-only
+   pass left every final-passed date with no score on web, and web's past-date
+   chips served finals with nothing to show. No report is rebuilt.
 
 2. WEB. The first version stopped at 1 and said the publish sweep would carry
    the rewrite to web the same cycle. IT DOES NOT, measured 2026-09-10 after
@@ -86,7 +89,7 @@ WEB_TARGET_FORM = "mlb_source/source_artifacts/data/live_lens/{name}"
 WEB_SLIM_FORM = "mlb_source/data/live_lens/{name}"
 
 _LOCAL_NOTE = (
-    "status only -- the live-lens loop writes today's report only, so this date's rows froze at the "
+    "status and final score -- the live-lens loop writes today's report only, so this date's rows froze at the "
     "midnight-Central roll"
 )
 
@@ -128,15 +131,17 @@ def final_pass_lookback_days() -> int:
         return DEFAULT_LOOKBACK_DAYS
 
 
-def fetch_schedule_statuses(date_str: str, *, timeout: float = 15.0) -> dict[int, dict[str, str]] | None:
-    """`{gamePk: {"abstract", "detailed"}}` for one date; None when StatsAPI could not be read.
+def fetch_schedule_statuses(date_str: str, *, timeout: float = 15.0) -> dict[int, dict[str, Any]] | None:
+    """`{gamePk: {"abstract", "detailed", "away_score", "home_score"}}` for one date.
 
-    `fields=` keeps the response to the two strings the pass reads, so a slate
-    costs a few KB rather than the full schedule document.
+    None when StatsAPI could not be read. `fields=` keeps the response to the
+    strings and two runs totals the pass reads, so a slate costs a few KB
+    rather than the full schedule document. A score is None when StatsAPI
+    reports none for that side.
     """
     url = (
         f"{STATSAPI_SCHEDULE}?sportId=1&date={date_str}"
-        "&fields=dates,games,gamePk,status,abstractGameState,detailedState"
+        "&fields=dates,games,gamePk,status,abstractGameState,detailedState,teams,away,home,score"
     )
     try:
         request = urllib.request.Request(url, headers={"User-Agent": "syndicate-live-lens-final-pass"})
@@ -144,7 +149,7 @@ def fetch_schedule_statuses(date_str: str, *, timeout: float = 15.0) -> dict[int
             payload = json.loads(response.read().decode("utf-8"))
     except Exception:
         return None
-    statuses: dict[int, dict[str, str]] = {}
+    statuses: dict[int, dict[str, Any]] = {}
     for day in payload.get("dates") or []:
         for game in (day or {}).get("games") or []:
             try:
@@ -152,11 +157,30 @@ def fetch_schedule_statuses(date_str: str, *, timeout: float = 15.0) -> dict[int
             except (TypeError, ValueError):
                 continue
             status = game.get("status") or {}
+            teams = game.get("teams") if isinstance(game.get("teams"), dict) else {}
             statuses[game_pk] = {
                 "abstract": str(status.get("abstractGameState") or ""),
                 "detailed": str(status.get("detailedState") or ""),
+                "away_score": _runs((teams.get("away") or {}).get("score") if isinstance(teams.get("away"), dict) else None),
+                "home_score": _runs((teams.get("home") or {}).get("score") if isinstance(teams.get("home"), dict) else None),
             }
     return statuses
+
+
+def _runs(value: Any) -> int | None:
+    """A whole, non-negative runs total, or None. Never a guess."""
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return int(number) if number.is_integer() and number >= 0 else None
+
+
+def _row_has_score(row: dict[str, Any]) -> bool:
+    score = row.get("score")
+    return isinstance(score, dict) and _runs(score.get("away")) is not None and _runs(score.get("home")) is not None
 
 
 def _row_status(row: dict[str, Any]) -> tuple[str, str]:
@@ -184,17 +208,37 @@ def _recount(report: dict[str, Any]) -> None:
 
 
 def _open_rows(report: Any) -> list[dict[str, Any]] | None:
-    """The rows not yet final; None when there is no report to judge."""
+    """The rows this pass still owes work; None when there is no report to judge.
+
+    Not final, OR final with no score. The second clause is lane
+    `mlb-lens-final-pass-scores` (2026-09-18): the pass used to be status-only,
+    and on web it republishes the SLIM served form (`gamePk`/`startTime`/
+    `status`), so every final-passed date lost its scores there -- 09-15 and
+    09-16 carried 0 scores in 15 rows each, and web's past-date MLB chips
+    served 15 finals with no score. A row already Final when the date rolled
+    was never visited at all, so the gap could not heal.
+    """
     games = report.get("games") if isinstance(report, dict) else None
     if not isinstance(games, list) or not games:
         return None
-    return [row for row in games if isinstance(row, dict) and not mlb_status_is_final(*_row_status(row))]
+    return [
+        row
+        for row in games
+        if isinstance(row, dict) and (not mlb_status_is_final(*_row_status(row)) or not _row_has_score(row))
+    ]
+
+
+def _still_open(rows: list[dict[str, Any]]) -> int:
+    """Rows still NOT FINAL. A Final row StatsAPI has no score for is not open:
+    counting it would re-check that date on every pass, forever."""
+    return sum(1 for row in rows if not mlb_status_is_final(*_row_status(row)))
 
 
 def _finalize_open_rows(
-    open_rows: list[dict[str, Any]], statuses: dict[int, dict[str, str]]
+    open_rows: list[dict[str, Any]], statuses: dict[int, dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    """Write StatsAPI's final status into each open row it calls final. Status only."""
+    """For each row StatsAPI calls final: write its final status, and its score
+    when the row has none and StatsAPI reports BOTH sides."""
     finalized: list[dict[str, Any]] = []
     for row in open_rows:
         try:
@@ -205,16 +249,22 @@ def _finalize_open_rows(
         if not fresh or not mlb_status_is_final(fresh.get("abstract"), fresh.get("detailed")):
             continue
         old_abstract, old_detailed = _row_status(row)
-        status = dict(row["status"]) if isinstance(row.get("status"), dict) else {}
-        status["abstract"] = fresh["abstract"]
-        status["detailed"] = fresh["detailed"]
-        row["status"] = status
+        item: dict[str, Any] = {"gamePk": game_pk}
+        if not mlb_status_is_final(old_abstract, old_detailed):
+            status = dict(row["status"]) if isinstance(row.get("status"), dict) else {}
+            status["abstract"] = fresh["abstract"]
+            status["detailed"] = fresh["detailed"]
+            row["status"] = status
+            item["from"] = {"abstract": old_abstract, "detailed": old_detailed}
+            item["to"] = {"abstract": fresh["abstract"], "detailed": fresh["detailed"]}
+        away, home = _runs(fresh.get("away_score")), _runs(fresh.get("home_score"))
+        if not _row_has_score(row) and away is not None and home is not None:
+            row["score"] = {"away": away, "home": home}
+            item["score"] = {"away": away, "home": home}
+        if len(item) == 1:
+            continue
         row["finalizedBy"] = "live_lens_final_pass"
-        finalized.append({
-            "gamePk": game_pk,
-            "from": {"abstract": old_abstract, "detailed": old_detailed},
-            "to": {"abstract": fresh["abstract"], "detailed": fresh["detailed"]},
-        })
+        finalized.append(item)
     return finalized
 
 
@@ -377,6 +427,7 @@ def _finalize_web_copies(
         "too_large": 0,
         "open_rows": 0,
         "finalized": 0,
+        "scored": 0,
         "still_open": 0,
         "published": 0,
         "publish_failed": 0,
@@ -434,14 +485,17 @@ def _finalize_web_copies(
             web["fetch_failed"] += 1
             continue
         finalized = _finalize_open_rows(open_rows, statuses)
-        still_open = len(open_rows) - len(finalized)
+        still_open = _still_open(open_rows)
         web["still_open"] += still_open
+        web["scored"] += sum(1 for item in finalized if "score" in item)
         if not finalized:
+            if still_open == 0:
+                _WEB_VERIFIED_FINAL[date_str] = local_key
             continue
         _stamp_final_pass(
             report,
             finalized,
-            note=f"status only, applied to web's own {served_rel} -- the form web serves; {_LOCAL_NOTE}",
+            note=f"status and final score, applied to web's own {served_rel} -- the form web serves; {_LOCAL_NOTE}",
         )
         if not publish_web_copy(served_rel, _dumps_like(served.text, report)):
             web["publish_failed"] += 1
@@ -474,6 +528,7 @@ def finalize_recent_mlb_live_lens_reports(
         "dates_without_report": 0,
         "open_rows": 0,
         "finalized": 0,
+        "scored": 0,
         "still_open": 0,
         "fetch_failed": 0,
         "write_failed": 0,
@@ -525,9 +580,12 @@ def finalize_recent_mlb_live_lens_reports(
             continue
 
         finalized = _finalize_open_rows(open_rows, statuses)
-        still_open = len(open_rows) - len(finalized)
+        still_open = _still_open(open_rows)
         stats["still_open"] += still_open
+        stats["scored"] += sum(1 for item in finalized if "score" in item)
         if not finalized:
+            if still_open == 0:
+                _VERIFIED_FINAL[date_str] = mtime_ns
             continue
 
         _stamp_final_pass(report, finalized, note=_LOCAL_NOTE)
@@ -549,7 +607,7 @@ def finalize_recent_mlb_live_lens_reports(
         f"[live_lens_final_pass] MLB_LIVE_LENS_FINAL_PASS today={today_iso} lookback={days} "
         f"dates_checked={stats['dates_checked']} skipped_verified={stats['dates_skipped_verified']} "
         f"no_report={stats['dates_without_report']} open_rows={stats['open_rows']} "
-        f"finalized={stats['finalized']} still_open={stats['still_open']} "
+        f"finalized={stats['finalized']} scored={stats['scored']} still_open={stats['still_open']} "
         f"fetch_failed={stats['fetch_failed']} write_failed={stats['write_failed']} "
         f"games={stats['finalized_games']}",
         flush=True,
@@ -571,7 +629,7 @@ def finalize_recent_mlb_live_lens_reports(
             f"[live_lens_final_pass] MLB_LIVE_LENS_FINAL_PASS_WEB today={today_iso} lookback={days} "
             f"dates_checked={web['dates_checked']} skipped_verified={web['skipped_verified']} "
             f"served_slim={web['served_slim']} absent={web['absent']} read_failed={web['read_failed']} "
-            f"too_large={web['too_large']} open_rows={web['open_rows']} finalized={web['finalized']} "
+            f"too_large={web['too_large']} open_rows={web['open_rows']} finalized={web['finalized']} scored={web['scored']} "
             f"still_open={web['still_open']} published={web['published']} "
             f"publish_failed={web['publish_failed']} fetch_failed={web['fetch_failed']} "
             f"deferred={web['deferred']} games={web['finalized_games']}",

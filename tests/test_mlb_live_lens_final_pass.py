@@ -49,7 +49,10 @@ FROZEN_0903 = [
      "props": [{"id": "p1"}], "liveProps": [{"id": "lp1"}]},
     {"gamePk": 823907, "startTime": "9:10 PM", "status": {"abstract": "Live", "detailed": "In Progress"}},
 ]
-FINAL_0909 = [{"gamePk": 823901, "startTime": "7:05 PM", "status": {"abstract": "Final", "detailed": "Final"}}]
+# Final AND scored: nothing left for the pass to do (a scoreless final is work
+# since lane `mlb-lens-final-pass-scores`).
+FINAL_0909 = [{"gamePk": 823901, "startTime": "7:05 PM", "status": {"abstract": "Final", "detailed": "Final"},
+               "score": {"away": 2, "home": 5}}]
 OLD_0820 = [{"gamePk": 800001, "startTime": "7:05 PM", "status": {"abstract": "Live", "detailed": "In Progress"}}]
 
 
@@ -412,3 +415,96 @@ def test_publish_web_copy_streams_a_temp_file_under_the_real_path(monkeypatch):
     assert sent["rel"] == rel and sent["body"] == '{"games": []}'
     assert sent["url"].endswith("/api/ops/artifacts/publish")
     assert not sent["path"].exists(), "the temp file is removed"
+
+
+# ---------------------------------------------------------------------------
+# Lane `mlb-lens-final-pass-scores` (2026-09-18): the pass writes StatsAPI's
+# FINAL SCORE into a final row that has none. Web serves the SLIM form, so a
+# status-only pass left every final-passed date scoreless there (09-15, 09-16:
+# 0 scores in 15 rows), and a row already Final at the roll was never visited.
+# ---------------------------------------------------------------------------
+
+def _final_scored(away, home, detailed="Final"):
+    return {"abstract": "Final", "detailed": detailed, "away_score": away, "home_score": home}
+
+
+def test_a_final_scoreless_row_gains_statsapis_score_and_a_frozen_row_is_finalized_and_scored(reports):
+    fetch = _Fetch({"2026-09-03": {823337: _final_scored(1, 3), 823095: _final_scored(4, 5), 823907: _final_scored(0, 2)}})
+    stats = fp.finalize_recent_mlb_live_lens_reports(TODAY, now_epoch=1_000, fetch=fetch)
+    rows = {row["gamePk"]: row for row in _load(reports("2026-09-03"))["games"]}
+    assert rows[823337]["score"] == {"away": 1, "home": 3}, "already Final at the roll, repaired anyway"
+    assert rows[823337]["status"] == FINAL, "an already-final status is not rewritten"
+    assert rows[823095]["status"] == FINAL and rows[823095]["score"] == {"away": 4, "home": 5}
+    assert rows[823907]["score"] == {"away": 0, "home": 2}, "a shutout keeps its zero"
+    assert rows[823095]["liveProps"] == [{"id": "lp1"}], "status and score only"
+    assert stats["scored"] == 3 and stats["finalized"] == 3 and stats["still_open"] == 0
+
+
+def test_a_one_sided_score_is_not_written_and_the_date_is_not_retried_forever(reports):
+    fetch = _Fetch({"2026-09-03": {823337: _final_scored(1, None), 823095: FINAL, 823907: _final_scored(0, 2)}})
+    stats = fp.finalize_recent_mlb_live_lens_reports(TODAY, now_epoch=1_000, fetch=fetch)
+    rows = {row["gamePk"]: row for row in _load(reports("2026-09-03"))["games"]}
+    assert "score" not in rows[823337] and "score" not in rows[823095]
+    assert stats["still_open"] == 0, "a final row StatsAPI has no score for is not 'open'"
+    calls = list(fetch.calls)
+    fp.finalize_recent_mlb_live_lens_reports(TODAY, now_epoch=10_000, fetch=fetch)
+    assert fetch.calls == calls, "verified: the next pass does not ask StatsAPI again"
+
+
+def test_web_scores_the_slim_form_it_serves_when_every_row_was_already_final(web):
+    """09-15 as measured: web serves the SLIM form, every row Final, none scored."""
+    slim = _rel(fp.WEB_SLIM_FORM, "2026-09-08")
+    web.copies[slim] = (json.dumps(_slim_report("2026-09-08", [
+        {"gamePk": 824466, "startTime": "5:40 PM", "status": FINAL},
+        {"gamePk": 822925, "startTime": "6:10 PM", "status": FINAL},
+    ])), 300.0)
+    fetch = _Fetch({**WEB_FETCH, "2026-09-08": {824466: _final_scored(4, 0), 822925: _final_scored(3, 6)}})
+    stats = fp.finalize_recent_mlb_live_lens_reports(TODAY, now_epoch=1_000, fetch=fetch)
+    assert slim in web.published
+    rows = web.rows(slim)
+    assert rows[824466]["score"] == {"away": 4, "home": 0} and rows[822925]["score"] == {"away": 3, "home": 6}
+    assert stats["web"]["scored"] == 2
+
+
+def test_a_scored_lens_row_reaches_webs_past_date_chip():
+    """The consumer, not the file: a slim Final row with the pass's score gives the chip a score."""
+    from syndicate.features.mlb import cards
+    from syndicate.features.shared.game_chip_scoreboard import build_game_chip
+
+    summary = {"date": "2026-09-15", "outputs": [{"game_pk": 824466, "away": "LAD", "home": "CIN"}]}
+    game = cards._games_from_daily_summary(summary, actual_games={})[0]  # web: no feed_live
+    row = {"gamePk": 824466, "startTime": "5:40 PM", "status": FINAL}
+    fp._finalize_open_rows([row], {824466: _final_scored(4, 0)})
+    chip = build_game_chip("mlb", cards._merge_live_lens_row_into_game(game, row))
+    assert (chip["state"], chip["away"]["score"], chip["home"]["score"]) == ("final", "4", "0")
+
+
+def test_fetch_schedule_statuses_reads_both_scores(monkeypatch):
+    body = json.dumps({"dates": [{"games": [
+        {"gamePk": 1, "status": {"abstractGameState": "Final", "detailedState": "Final"},
+         "teams": {"away": {"score": 4}, "home": {"score": 0}}},
+        {"gamePk": 2, "status": {"abstractGameState": "Preview", "detailedState": "Scheduled"},
+         "teams": {"away": {}, "home": {}}},
+    ]}]}).encode("utf-8")
+
+    class _Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return body
+
+    seen = {}
+
+    def _urlopen(request, timeout=None):
+        seen["url"] = request.full_url
+        return _Resp()
+
+    monkeypatch.setattr(fp.urllib.request, "urlopen", _urlopen)
+    out = fp.fetch_schedule_statuses("2026-09-15")
+    assert "teams,away,home,score" in seen["url"]
+    assert out[1] == {"abstract": "Final", "detailed": "Final", "away_score": 4, "home_score": 0}
+    assert out[2]["away_score"] is None and out[2]["home_score"] is None
