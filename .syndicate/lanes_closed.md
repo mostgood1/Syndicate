@@ -7362,3 +7362,16 @@ carried-forward work in `docs/ai_context/todo.md` `#650`/`#651`/`#652`.
       board-today-freshness                    sessions[a1e40980=0m] -> SAFE
       soccer-shot-on-target-definition         sessions[a1e40980=0m] -> SAFE
       closed-lane-archive-20260917-1708        sessions[6627d075=0m] -> SAFE
+
+### closed-lane-archive-20260918-0837 — CLOSED 2026-09-18 — opened 2026-09-18 — session b0d770fe-e2f6-4691-83ce-2186e7baecb5 (scheduled task archive-closed-lanes-0917) — **GOAL: MET (2 of 16 archived; 14 deferred, owners active)**
+- **GOAL VERDICT: MET.** Goal restated verbatim: "archive CLOSED lane blocks whose owners are idle, verified, ledger-only". Archived only the 2 blocks the authoritative gate read SAFE at --idle-min 240; no idle override, NEVER list honoured, no code, no deploy, no claim touched.
+- MEASUREMENT: `archive_closed_lanes_before.py --only closed-lane-archive-20260917-1708,closed-lane-archive-20260917-1733 --owner-idle-verified --apply` moved 2 blocks / 63 lines. `git diff --numstat`: lanes.md 13+/63- (this block + 2 pointers), lanes_closed.md 63+/0-. Tool self-checks passed (claims 163 as a set, OPEN headers 34 unchanged, lines conserved, 1 pointer per slug). `check_lane_invariants.py` INVARIANTS HOLD, identical to the origin/main baseline (0 contested). On disk lanes.md 501,320 -> 490,904 B.
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Pre-registered reading (owner_liveness.py --idle-min 240, 13:38Z / 08:38 CDT, worktree at origin/main c9479bcc; 16 CLOSED blocks, NEVER-list excluded):
+  - portfolio-no-family-exclusion, board-category-gates, chip-key-test-no-data-blind, sim-view-reachability-caveat, sim-view-roi-decision-count, soccer-prekickoff-freeze, soccer-capture-staleness, soccer-forward-graders, soccer-live-model-study, soccer-h24-grader -> WAIT: abacd435 idle 0m < 240m
+  - prop-evidence-parity -> WAIT: 4a583d41 idle 1m < 240m
+  - board-today-freshness, soccer-shot-woodwork-undercount, soccer-shot-on-target-definition -> WAIT: a1e40980 idle 0m < 240m
+  - closed-lane-archive-20260917-1708, closed-lane-archive-20260917-1733 -> SAFE (6627d075 idle 832m)
+- Note: the watcher's poll at 13:37Z had read 4a583d41=621m and a1e40980=538m (SAFE); ~1 min later both transcripts were 0-1m idle, so those 4 slugs are deferred per the gate.
+- Step 4: no worktree under C:	mp\syndicate-sessions holds uncommitted `.syndicate/` edits mentioning 6627d075 or either slug (5 dirty worktrees checked, 0 mentions).
