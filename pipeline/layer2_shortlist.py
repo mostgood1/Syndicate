@@ -28,6 +28,7 @@ not have been safe as a separate sweep over sports nobody had read.
 
 from __future__ import annotations
 
+import functools
 from typing import Any, Iterable, Mapping
 
 
@@ -756,6 +757,36 @@ def _live_chip_count(chips: Any) -> int | None:
     )
 
 
+def _profiled_by_date(env_var: str, *, label: str):
+    """Profile the decorated build iff `env_var` names its date (or `all`).
+
+    [2026-09-18, lane board-build-stage-slowdown] `branch_profiler.profile_branch`
+    around the whole call. It is the instrument `SYNDICATE_CANDIDATE_COLLECTION_PROFILE`
+    and `SYNDICATE_CONSUME_SPORT_PROFILE` already give the stages before Layer 2.
+    A DECORATOR rather than a `with` or a renamed body, so the body is not
+    re-indented and keeps its name. `functools.wraps` keeps `__wrapped__`, so
+    `inspect.getsource`, and the AST and source wiring tests that read this
+    function by name, still see the real body. OFF by default, since cProfile
+    costs 1.3-2x.
+    """
+
+    def decorate(build):
+        @functools.wraps(build)
+        def profiled(selected_date, *args, **kwargs):
+            from syndicate.features.shared.branch_profiler import profile_branch
+
+            with profile_branch(env_var, str(selected_date or "all"), label=label):
+                return build(selected_date, *args, **kwargs)
+
+        return profiled
+
+    return decorate
+
+
+# `SYNDICATE_LAYER2_SHORTLIST_PROFILE=all` (or a date) profiles a real build. The
+# stage's cost per 1k candidates about doubled on uncontended builds 2026-09-17..18
+# (2.3-3.4 s to 5.4 s), and logs cannot name the leaf.
+@_profiled_by_date("SYNDICATE_LAYER2_SHORTLIST_PROFILE", label="layer2_shortlist")
 def build_layer2_shortlist(
     selected_date: str,
     sport_slugs: Iterable[str],
