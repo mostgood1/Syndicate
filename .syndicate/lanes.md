@@ -1276,8 +1276,9 @@ death, never life — do not invert it.
 - Verification: (1) `node tests/js/polling_idle_pause.test.mjs` passes and fails against the pre-change `polling.js`; (2) production, after a web deploy the user approves: an open `/intelligence` tab left untouched stops issuing `POST /api/intelligence/query` after the idle timeout (read in Render's `type=request` log by user agent).
 - Blocked by: none
 
-### soccer-live-corners-dispersion — OPEN — opened 2026-09-18 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+### soccer-live-corners-dispersion — CLOSED 2026-09-18 — opened 2026-09-18 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
 - Goal: H35 (offline): which count distribution around the PUBLISHED live remaining-corners mean (`prekickoff_pace_v1` = pregame E3 x production `SHARE_TABLE`) prices over/under half-lines best -- Poisson, NB1 (variance a fixed multiple of the mean, the platform's pregame corners convention in `common.nb_sf`) or NB2 (a gamma-mixed rate: variance mu + mu^2/k) -- registered before any dispersion is computed, graded on TEST, and written to the ledger. No engine change; pricing live corners stays parked behind H32.
+- **GOAL: MET 2026-09-18 ~10:13 CT (15:13Z)** (`log/2026-09-18.md`): the TEST run happened on the registered rules, and its numbers and verdict are in the log. **H35 FALSIFIED:** NB1 (phi 1.10, chosen on TRAIN) - Poisson half-line log-loss -0.00054 [-0.00135, +0.00023] over 397 TEST matches; the variance ratio is ~1.15 at every cutoff; Poisson around the published mean is calibrated at the main line (0.45 / 0.45). Pricing stays parked behind H32. Code `13f2386b`, 20 tests.
 - Files:
   - `scripts/soccer_season_audit/live_corners_dispersion_study.py` (NEW)
   - `tests/test_soccer_live_corners_dispersion_study.py` (NEW)
