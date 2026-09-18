@@ -1371,6 +1371,26 @@ death, never life — do not invert it.
   - (2) `KEYVALUE_WRITE_LARGE ... execution_ledger.json` per build <= the number of runs that placed >= 1 order (was 2 × placed).
   - (3) Unchanged ledger semantics: `EXECUTED` placed/duplicates behave as before (a re-run of the same plan places 0), 0 new `LEDGER_CAS_EXHAUSTED`, and paper orders per day in line with 09-17/09-18.
 
+### wnba-sim-distributions — OPEN — opened 2026-09-18 — session a1e40980-cceb-493f-adf9-5a5ca879acf6
+- Goal: give Layer 2 a WNBA sim probability for every line the sim can honestly answer, from distributions the WNBA smart sim already draws but never publishes.
+  - Game total and margin histograms price any full-game spread or total line, alternate lines included.
+  - Per-period histograms price half and quarter markets.
+  - points+rebounds, points+assists and rebounds+assists ladders price combo props.
+  - Captured in Syndicate's own per-draw helper, at today's 100 draws. Verified by the WNBA model-edge coverage on the served Layer 2 board.
+- Why: USER 2026-09-18 ("why WNBA sim stats aren't being found by the layer 2 board"), then fixes chosen ("Price alternate lines", "Combo prop distributions", plus the trace and the calibration); "Syndicate-side capture"; "Build at 100, measure memory".
+  - MEASURED on `/api/board/layer2-shortlist?date=2026-09-18&sport=wnba` (21:55Z): projection on 731/859 rows, model edge on 91.
+  - 437 game rows: "sim priced only its own market line; 3-point quantile summary cannot answer". 101 period rows are unprojected (the sim is full-game only). 58 combo props: "model ships means".
+  - `leads.md` 2026-09-18 WNBA entry.
+- Files: `syndicate/features/shared/basketball_props_smart_sim.py` (a draw recorder around `_simulate_pbp_game_boxscore_local` and a post-sim enrichment of the result, only), `syndicate/features/shared/wnba_game_projections.py` (pricing from distributions, only), `syndicate/features/shared/wnba_projections.py` (combo ladder lookup, only), `scripts/refresh_wnba_oddsapi_props.py` (threading the new fields to the board, only), `tests/test_wnba_sim_distributions.py` (NEW). Checked 2026-09-18 ~22:10Z: no OPEN lane claims these.
+- Constraints:
+  - NO vendor edit, so a re-pull cannot revert it.
+  - NO `render.yaml` change. `REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS=100` stays on live-odds-worker, where 250 filled the 2 GB container (render.yaml:1005-1018).
+  - Distributions are shifted by the same market-anchor delta the sim applies to its published means, so the board's numbers agree with the sim's own summary.
+  - The sim runs on live-odds-worker, so shipping needs a live-odds-worker deploy (a user decision).
+- Verification (PRE-REGISTERED):
+  - (1) Tests: the recorder captures every draw, is a no-op when not enabled, and changes nothing the sim returns. Histograms reproduce the sim's own `p_total_over` / `p_home_cover` at its line. Combo ladders equal sums of draws. The board prices an alternate line from the histogram, and refuses an exact 0/1.
+  - (2) Production: WNBA served rows with `model_edge_pct` rise from 91/859. Game rows with "3-point quantile summary cannot answer" fall from 437 to ~0 on dates the new artifact covers. live-odds-worker peak RSS during the WNBA refresh is measured before and after, with no increase over ~50 MB.
+
 ### market-history-index-memo — OPEN — opened 2026-09-18 — session a1e40980-cceb-493f-adf9-5a5ca879acf6
 - Goal: stop refresh-worker's candidate collection rebuilding `odds_lifecycle.build_recent_market_history_index` once per candidate. Build it once per version of the 7-day odds-events files and reuse it, with every candidate's recent-history rows unchanged. Verified by a test that counts builds and compares rows, then by candidate collection's time on production.
 - Why: USER 2026-09-18 ~15:55 CDT, "fix the market history index rebuild".
