@@ -37990,3 +37990,9 @@ never receives a soccer prop.
   - One build is not the pre-registered verification, which needs >= 10 builds.
   - This first build was cold after the restart: overview 299 s, candidate collection 387 s. That does not touch this span.
   - The deploy also carried lane ncaaf-board-sim-coverage's NCAAF prop projections, so whole-build wall is not attributable to this lane. The span measured here runs only this lane's code.
+
+## 2026-09-18 19:06:39Z (14:06 CT) — READING — live-odds-worker `3cc53826` — lane fotmob-team-name-aliases — **MET**
+- Step 0: live deploy `3cc53826` (finished 16:33:04Z, trigger api). Its `syndicate/features/soccer/ingestion/fotmob_match_id.py` contains `_loose_match_ids`; blob `7bb75289`, identical to `867f1481`'s. Fix still live.
+- ESPN `ger.1` scoreboard 20260918, read 19:06:39Z: 1. FC Union Berlin at Bayern Munich, kickoff 18:30Z, `state` **in**, clock 37'.
+- Production `soccer_source/bundesliga/api/live_state/live_state_2026-09-18.json` (web export): `generated_at` 2026-09-18T19:03:00.866849Z (after kickoff), 1 game. Bayern game: `status_display_clock` 33', `momentum.supported` **True**, `source` **fotmob**, `fotmob_match_id` **5881171** (expected 5881171), `events` 32, `reason` None.
+- Verdict **MET**: first production read of a fixture only the LOOSE pass resolves (strict returns None for Bayern Munich/Bayern München, per the 2026-09-15 22:01Z offline read). One read, no control needed for MET. Lane `fotmob-team-name-aliases` CLOSED. Nothing owed; the Saturday tasks (`fotmob-alias-verify-0919-am`/`-pm`) only append readings.

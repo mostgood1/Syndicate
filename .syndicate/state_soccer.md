@@ -479,8 +479,8 @@ Rennais/Rennes, FC Cologne/1. FC Köln) are bridged by a guarded LOOSE pass (`86
 lane `fotmob-team-name-aliases`). It has been live on live-odds-worker since 2026-09-15
 19:37:29Z, verified by content (resolver blob `7bb75289` in the deployed commits). Offline
 code evidence: 389/389 ESPN fixtures resolve, and 0 wrong ids when the true FotMob row is
-removed. It is NOT YET READ on production: no alias-only fixture has been in play; reading
-scheduled 2026-09-19 (`.syndicate/scheduled_task_fotmob_alias_verify.md`). Detail: `.syndicate/deploys.md`
+removed. READ on production 2026-09-18 19:06:39Z: Bayern Munich v 1. FC Union Berlin (alias-only,
+loose pass), ESPN `in` 37', `live_state_2026-09-18.json` `generated_at` 19:03:00Z, `momentum` supported/fotmob/`5881171`. Detail: `.syndicate/deploys.md`
 2026-09-15 18:08:50Z entry.
 
 **THE DATASET ABOVE IS NOT TWO SEASONS FOR ALL TEN LEAGUES.** The harvest
