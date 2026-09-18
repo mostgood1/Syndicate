@@ -1198,6 +1198,17 @@ death, never life — do not invert it.
 - Note: the watcher's poll at 13:37Z had read 4a583d41=621m and a1e40980=538m (SAFE); ~1 min later both transcripts were 0-1m idle, so those 4 slugs are deferred per the gate.
 - Step 4: no worktree under C:	mp\syndicate-sessions holds uncommitted `.syndicate/` edits mentioning 6627d075 or either slug (5 dirty worktrees checked, 0 mentions).
 
+### soccer-live-corners-box-fallback — OPEN — opened 2026-09-18 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Goal: a live soccer match whose ESPN commentary carries no corner events (Belgian Pro League today) gets its corners-so-far from the same summary's box score while in progress, so the live corners projection stops undercounting; a completed match replayed at a cutoff never reads the box (that would be hindsight).
+- Files:
+  - `syndicate/features/soccer/ingestion/espn_live_state.py` (the corner count and a `corners_source` field)
+  - `tests/test_soccer_live_state_corner_fallback.py` (NEW)
+- Hypothesis: `build_live_state` counts corners only from commentary `corner-awarded` events; Belgian commentary has none (0 of 554 box corners, measured 2026-09-17), so corners-so-far is structurally 0 there, and both live corners arms undercount by every corner already taken.
+- Falsification test: on an in-progress Belgian summary the box carries no `wonCorners` either, or the fallback fires on a completed-match replay (leak).
+- Verification: offline, tests that fail on the pre-change code (in-progress Belgian-shaped summary -> box counts, source `box_fallback`; completed replay -> commentary only). Production after a user-approved deploy: a served Belgian live_state game with `corners_source=box_fallback` and a non-zero corners-so-far.
+- Blocked by: none
+- Note: H32 keeps Belgian Pro League EXCLUDED as registered; this fix changes the feed going forward, not the grade's population.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
