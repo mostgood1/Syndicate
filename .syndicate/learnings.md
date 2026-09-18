@@ -7010,3 +7010,10 @@ chose week 2, and for a while I read that as a partial failure.
   FILE, not inferred from calendar arithmetic. The whole bug was a reader looking at the wrong
   copy of the schedule; the diagnosis should not repeat it by looking at no copy.
 - *(evidence: `log/2026-09-18.md`; `deploys.md` 2026-09-18 00:33:04Z entry)*
+
+## 2026-09-18 — FORBIDDEN: treating a named data file's PRESENCE as proof that it COVERS what a rule needs `[lane soccer-h24-grader]`
+
+- **What the plan said** (`todo.md #665`, written by this session on 2026-09-15): "The pre-registration names `reports/soccer_backtest/fotmob_2y.json.gz` for the base seasons; confirm it is present before relying on it."
+- **What was true** (2026-09-17 ~20:10 CT, from the file itself and its harvester's docstring): the file was present, committed and loadable. It held ONE season for Eredivisie, Championship and Belgian Pro League, and **only the current 2026 season for MLS**, while the registration defines the base as 2024-25 + 2025-26 (MLS 2024 + 2025). A presence check passes; the grade would then have computed MLS's "base" from the very season under test.
+- **The rule:** a check on a data dependency must ask the question the rule asks, not whether the file exists. Print its per-group date coverage against the exact ranges the rule names, which is what `CLAUDE.md`'s "print the per-family coverage and the intersection" already demands of backtests. "Present" is a weaker claim than "covers", and a plan that asks only for the weaker one hands the next session a false all-clear.
+- *(evidence: `log/2026-09-17.md` ~20:10 CT and ~20:40 CT; base matches after the fix MLS 1,062, Championship 1,114, Belgian 626, Eredivisie 618)*
