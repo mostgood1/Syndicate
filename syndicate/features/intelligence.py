@@ -3464,14 +3464,51 @@ def _expand_mlb_team_abbreviations(text: str) -> list[str]:
     return [index[token] for token in tokens if token and token in index]
 
 
-def _candidate_odds_history_match_score(candidate: dict[str, Any], market_key: Any, state: Mapping[str, Any]) -> float:
+# FEATURES DERIVED ONCE, NOT ONCE PER PAIR  [2026-09-18, lane odds-history-match-precompute].
+#
+# MEASURED, cProfile over `_consume_sport` on refresh-worker `ef3fb857`,
+# 20:02-20:09Z, soccer: 133.6 s, of which 114.0 s was `_best_of` ->
+# `_candidate_odds_history_match_score`, called **1,190,510 times for 260
+# candidates** (~4,600 entries each, via the full-scan fallback). Every call
+# re-parsed the entry's market key (1.2M `_parse_odds_history_market_key`) and
+# re-normalised ~15 candidate fields (41M `_safe_text`), although both sides are
+# fixed for the whole pass. `#601` memoised the normaliser itself (902 s ->
+# ~134 s); this removes the re-derivation around it.
+#
+# SAME FORMULA, SAME INPUTS, SAME ORDER OF ADDITION: the score is computed from
+# exactly the strings the old body computed, so every score and every chosen
+# entry is unchanged. `tests/test_odds_history_match_precompute.py` pins that
+# against the pre-change scorer. `_candidate_odds_history_match_score` keeps its
+# signature for its callers and tests.
+_ODDS_HISTORY_EVENT_FIELDS = (
+    "event_key", "event_id", "matchup", "home_team", "away_team", "player_name", "player_key", "team", "team_key",
+)
+
+
+def _odds_history_entry_match_features(market_key: Any, state: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Everything the scorer reads from ONE odds-history entry. None = unparseable key (scores 0)."""
     parsed_key = _parse_odds_history_market_key(market_key)
     if not parsed_key:
-        return 0.0
+        return None
+    entry_market = _safe_text(parsed_key.get("market"), "")
+    entry_team_names = [
+        _normalized_market_text(_safe_text(parsed_key.get(field), ""))
+        for field in ("home_team", "away_team", "team", "team_key")
+    ]
+    return {
+        "event": " ".join(_safe_text(parsed_key.get(field), "") for field in _ODDS_HISTORY_EVENT_FIELDS).strip(),
+        "market": entry_market,
+        "market_type": entry_market.strip().lower(),
+        "selection": _safe_text(parsed_key.get("selection"), ""),
+        "book": _safe_text(parsed_key.get("bookmaker") or parsed_key.get("book"), ""),
+        "team_names": [name for name in entry_team_names if name],
+        "state_line": _numeric_hint(state.get("last_line")),
+    }
 
-    score = 0.0
+
+def _candidate_odds_history_match_features(candidate: dict[str, Any]) -> dict[str, Any]:
+    """Everything the scorer reads from ONE candidate, derived once per candidate."""
     candidate_matchup = _normalized_market_text(_safe_text(candidate.get("matchup"), ""))
-    candidate_market = _normalized_market_text(_safe_text(candidate.get("market"), ""))
     # _candidate_subject_key() only ever returns non-None for candidate_type
     # == "prop" (by its own explicit design, since its other callers --
     # dedup, correlated-parlay-leg matching -- are prop-specific too; not
@@ -3481,7 +3518,6 @@ def _candidate_odds_history_match_score(candidate: dict[str, Any], market_key: A
     # cross-market guard below has real identity text to check for BOTH
     # candidate types, not just props.
     subject_source = _candidate_subject_key(candidate) or candidate.get("subject_key") or candidate.get("player_name") or candidate.get("entity")
-    candidate_subject = _normalized_market_text(_safe_text(subject_source, ""))
     candidate_team = _normalized_market_text(_safe_text(_candidate_team_key(candidate), ""))
     expanded_team_names: list[str] = []
     if _normalized_market_text(_safe_text(candidate.get("sport_slug"), candidate.get("sport"))) == "mlb":
@@ -3494,14 +3530,28 @@ def _candidate_odds_history_match_score(candidate: dict[str, Any], market_key: A
         ]
     candidate_selection = _candidate_selection_text(candidate)
     candidate_selection_direction = _candidate_selection_direction(candidate)
-    candidate_selection_hint = "over" if candidate_selection_direction > 0 else "under" if candidate_selection_direction < 0 else ""
-    entry_event = " ".join(
-        _safe_text(parsed_key.get(field), "")
-        for field in ("event_key", "event_id", "matchup", "home_team", "away_team", "player_name", "player_key", "team", "team_key")
-    ).strip()
-    entry_market = _safe_text(parsed_key.get("market"), "")
-    entry_selection = _safe_text(parsed_key.get("selection"), "")
-    entry_book = _safe_text(parsed_key.get("bookmaker") or parsed_key.get("book"), "")
+    candidate_subject = _normalized_market_text(_safe_text(subject_source, ""))
+    return {
+        "type": _safe_text(candidate.get("candidate_type"), ""),
+        "market_key": _normalized_market_text(_safe_text(candidate.get("market_key"), "")),
+        "subject": candidate_subject,
+        "event_values": (candidate_matchup, candidate_subject, candidate_team, candidate_selection, *expanded_team_names),
+        "market": _normalized_market_text(_safe_text(candidate.get("market"), "")),
+        "selection": candidate_selection,
+        "selection_hint": "over" if candidate_selection_direction > 0 else "under" if candidate_selection_direction < 0 else "",
+        "book": _normalized_market_text(_safe_text(candidate.get("book"), _safe_text(candidate.get("bookmaker"), ""))),
+        "line": _numeric_hint(candidate.get("line")),
+    }
+
+
+def _odds_history_match_score_from_features(c: Mapping[str, Any], e: Mapping[str, Any] | None) -> float:
+    """The (candidate, entry) score, from precomputed features. Every rule's WHY is below."""
+    if e is None:
+        return 0.0
+    score = 0.0
+    entry_event = e["event"]
+    entry_market_type = e["market_type"]
+    candidate_subject = c["subject"]
 
     # A player-prop candidate must never adopt a GAME-level market's odds
     # history (h2h/spreads/totals) just because it happens to share the same
@@ -3548,49 +3598,75 @@ def _candidate_odds_history_match_score(candidate: dict[str, Any], market_key: A
     # gate exists to prevent, just within game markets instead of across
     # prop/game ones. player_name is already None for these by construction
     # (market_key in _GAME_SIDE_MARKETS), so player-level steam is untouched.
-    candidate_type_text = _safe_text(candidate.get("candidate_type"), "")
-    if candidate_type_text in ("prop", "steam") and entry_market.strip().lower() in _GAME_ONLY_ODDS_HISTORY_MARKET_TYPES:
-        candidate_market_key = _normalized_market_text(_safe_text(candidate.get("market_key"), ""))
-        if candidate_type_text == "steam" and candidate_market_key in _GAME_SIDE_MARKETS:
-            entry_team_names = [
-                _normalized_market_text(_safe_text(parsed_key.get(field), ""))
-                for field in ("home_team", "away_team", "team", "team_key")
-            ]
-            entry_team_names = [name for name in entry_team_names if name]
-            if not candidate_subject or not any(name in candidate_subject for name in entry_team_names):
+    if c["type"] in ("prop", "steam") and entry_market_type in _GAME_ONLY_ODDS_HISTORY_MARKET_TYPES:
+        candidate_market_key = c["market_key"]
+        if c["type"] == "steam" and candidate_market_key in _GAME_SIDE_MARKETS:
+            if not candidate_subject or not any(name in candidate_subject for name in e["team_names"]):
                 return 0.0
-            if entry_market.strip().lower() not in _ODDS_HISTORY_MARKET_TYPES_BY_GAME_SIDE.get(candidate_market_key, set()):
+            if entry_market_type not in _ODDS_HISTORY_MARKET_TYPES_BY_GAME_SIDE.get(candidate_market_key, set()):
                 return 0.0
         elif not candidate_subject or candidate_subject not in entry_event:
             return 0.0
 
-    for value in (candidate_matchup, candidate_subject, candidate_team, candidate_selection, *expanded_team_names):
+    for value in c["event_values"]:
         if not value or not entry_event:
             continue
         if value == entry_event or value in entry_event or entry_event in value:
             score += 2.0
 
+    candidate_market, entry_market = c["market"], e["market"]
     if candidate_market and entry_market:
         if candidate_market == entry_market or candidate_market in entry_market or entry_market in candidate_market:
             score += 3.0
 
+    candidate_selection, entry_selection = c["selection"], e["selection"]
     if candidate_selection and entry_selection:
         if candidate_selection == entry_selection or candidate_selection in entry_selection or entry_selection in candidate_selection:
             score += 2.5
-    if candidate_selection_hint and entry_selection and candidate_selection_hint in entry_selection:
+    if c["selection_hint"] and entry_selection and c["selection_hint"] in entry_selection:
         score += 1.0
 
-    if entry_book and _normalized_market_text(_safe_text(candidate.get("book"), _safe_text(candidate.get("bookmaker"), ""))):
-        candidate_book = _normalized_market_text(_safe_text(candidate.get("book"), _safe_text(candidate.get("bookmaker"), "")))
+    entry_book, candidate_book = e["book"], c["book"]
+    if entry_book and candidate_book:
         if candidate_book == entry_book or candidate_book in entry_book or entry_book in candidate_book:
             score += 0.5
 
-    candidate_line = _numeric_hint(candidate.get("line"))
-    state_line = _numeric_hint(state.get("last_line"))
+    candidate_line, state_line = c["line"], e["state_line"]
     if candidate_line is not None and state_line is not None:
         score += max(0.0, 1.5 - min(abs(candidate_line - state_line), 1.5))
 
     return score
+
+
+# Entry features for the enrichment pass in progress, keyed by market key and
+# validated by the IDENTITY of the entry's state dict, so a key reused with
+# another state is recomputed rather than served stale. Cleared at the start and
+# end of `_enrich_candidates_with_odds_history`, so no payload outlives its
+# pass, and bounded in case a caller outside that pass fills it.
+_ODDS_HISTORY_ENTRY_FEATURES: dict[str, tuple[Any, dict[str, Any] | None]] = {}
+_ODDS_HISTORY_ENTRY_FEATURES_MAX = 200_000
+
+
+def _odds_history_entry_match_features_cached(market_key: Any, state: Mapping[str, Any]) -> dict[str, Any] | None:
+    key = str(market_key)
+    hit = _ODDS_HISTORY_ENTRY_FEATURES.get(key)
+    if hit is not None and hit[0] is state:
+        return hit[1]
+    features = _odds_history_entry_match_features(market_key, state)
+    if len(_ODDS_HISTORY_ENTRY_FEATURES) >= _ODDS_HISTORY_ENTRY_FEATURES_MAX:
+        _ODDS_HISTORY_ENTRY_FEATURES.clear()
+    _ODDS_HISTORY_ENTRY_FEATURES[key] = (state, features)
+    return features
+
+
+def _candidate_odds_history_match_score(candidate: dict[str, Any], market_key: Any, state: Mapping[str, Any]) -> float:
+    """One (candidate, entry) score, for callers and tests. The hot path in
+    `_candidate_odds_history_state` derives each side once and calls
+    `_odds_history_match_score_from_features` directly."""
+    return _odds_history_match_score_from_features(
+        _candidate_odds_history_match_features(candidate),
+        _odds_history_entry_match_features(market_key, state),
+    )
 
 
 # `#414`. The event identity a game-level entry and a candidate can BOTH
@@ -3685,10 +3761,17 @@ def _candidate_odds_history_state(
         _safe_text(_candidate_subject_key(candidate), "")
     )
 
+    # Derived ONCE per candidate, and each entry's side once per pass
+    # (`_odds_history_entry_match_features_cached`), rather than both once per
+    # pair -- lane odds-history-match-precompute. Same scores, same choice.
+    candidate_features = _candidate_odds_history_match_features(candidate)
+
     def _best_of(pool: list[tuple[str, dict[str, Any]]]) -> tuple[str, dict[str, Any] | None, float]:
         best_key, best_state, best_score = "", None, 0.0
         for market_key, state in pool:
-            score = _candidate_odds_history_match_score(candidate, market_key, state)
+            score = _odds_history_match_score_from_features(
+                candidate_features, _odds_history_entry_match_features_cached(market_key, state)
+            )
             if score > best_score:
                 best_key, best_score, best_state = market_key, score, state
         return best_key, best_state, best_score
@@ -4291,6 +4374,16 @@ def _supplement_odds_history_from_candidate_dates(
 
 
 def _enrich_candidates_with_odds_history(candidates: list[dict[str, Any]], odds_history_by_sport: dict[str, dict[str, Any]] | None) -> list[dict[str, Any]]:
+    # The per-entry match features live for THIS pass only: cleared on the way
+    # in and on the way out, so no odds-history payload is held past it.
+    _ODDS_HISTORY_ENTRY_FEATURES.clear()
+    try:
+        return _enrich_candidates_with_odds_history_pass(candidates, odds_history_by_sport)
+    finally:
+        _ODDS_HISTORY_ENTRY_FEATURES.clear()
+
+
+def _enrich_candidates_with_odds_history_pass(candidates: list[dict[str, Any]], odds_history_by_sport: dict[str, dict[str, Any]] | None) -> list[dict[str, Any]]:
     _reset_odds_history_index_stats()
     odds_history_by_sport = _supplement_odds_history_from_candidate_dates(candidates, odds_history_by_sport)
     enriched: list[dict[str, Any]] = []
