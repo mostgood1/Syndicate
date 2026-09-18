@@ -29,6 +29,7 @@ not have been safe as a separate sweep over sports nobody had read.
 from __future__ import annotations
 
 import functools
+import json
 from typing import Any, Iterable, Mapping
 
 
@@ -783,9 +784,47 @@ def _profiled_by_date(env_var: str, *, label: str):
     return decorate
 
 
+def _reports_book_quote_cache_stats(build):
+    """After each Layer 2 build, print what the book-quote LATEST cache cost.
+
+    [2026-09-18, lane board-build-stage-slowdown] `BOOK_QUOTES_LATEST_STATS` covers
+    everything since the previous line: hits, misses, raw rows streamed on a
+    miss, and the thread CPU they took. One Layer 2 build per board cycle makes
+    that about one line per cycle, and it covers the candidate collection and
+    overview readers too, which share the cache. Here rather than in the
+    board loop because this function already runs once per build on every
+    path (the full build and both fast paths). Never raises.
+    """
+
+    @functools.wraps(build)
+    def reported(*args, **kwargs):
+        try:
+            return build(*args, **kwargs)
+        finally:
+            try:
+                from syndicate.features.shared.odds_book_quotes import take_latest_cache_stats
+
+                stats = take_latest_cache_stats()
+                calls = int(stats.get("hits") or 0) + int(stats.get("misses") or 0)
+                print(
+                    "[layer2_shortlist] BOOK_QUOTES_LATEST_STATS "
+                    f"date={args[0] if args else kwargs.get('selected_date')} since_s={stats.get('since_s')} "
+                    f"calls={calls} hits={stats.get('hits')} misses={stats.get('misses')} "
+                    f"raw_rows={stats.get('raw_rows')} reduced_rows={stats.get('reduced_rows')} "
+                    f"miss_cpu_s={stats.get('miss_cpu_s')} miss_wall_s={stats.get('miss_wall_s')} "
+                    f"by_sport={json.dumps(stats.get('by_sport') or {}, sort_keys=True)}",
+                    flush=True,
+                )
+            except Exception as exc:  # noqa: BLE001 -- an instrument must not cost the build
+                print(f"[layer2_shortlist] BOOK_QUOTES_LATEST_STATS_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+    return reported
+
+
 # `SYNDICATE_LAYER2_SHORTLIST_PROFILE=all` (or a date) profiles a real build. The
 # stage's cost per 1k candidates about doubled on uncontended builds 2026-09-17..18
 # (2.3-3.4 s to 5.4 s), and logs cannot name the leaf.
+@_reports_book_quote_cache_stats
 @_profiled_by_date("SYNDICATE_LAYER2_SHORTLIST_PROFILE", label="layer2_shortlist")
 def build_layer2_shortlist(
     selected_date: str,

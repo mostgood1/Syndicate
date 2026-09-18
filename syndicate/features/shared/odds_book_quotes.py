@@ -53,6 +53,7 @@ from __future__ import annotations
 import gzip
 import json
 import os
+import time
 from collections import OrderedDict
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -1720,6 +1721,46 @@ def reduce_to_latest_per_key(rows: Iterable[Mapping[str, Any]]) -> list[dict[str
     return list(freshest.values())
 
 
+# WHAT THE LATEST CACHE COSTS, counted  [2026-09-18, lane board-build-stage-slowdown].
+# `LATEST_CACHE_EVICT` per board build rose from ~5 to ~20 between 09-15 and
+# 09-18. The budget holds ~9 reduced shards, 15-20 are in play, and each MISS
+# re-streams the WHOLE append-only shard (60-70 MB for soccer 09-19 and 09-20),
+# not the ~25k reduced rows the eviction line reports. A shard that is
+# tail-synced mid-build also misses, because the key carries its mtime. So an
+# eviction count says nothing about what the misses cost. These counters do,
+# per process, until `take_latest_cache_stats` reads and resets them.
+# Instrument only: no read, cache or eviction decision changes.
+_LATEST_CACHE_STATS: dict[str, Any] = {}
+
+
+def _latest_stats_reset() -> None:
+    _LATEST_CACHE_STATS.clear()
+    _LATEST_CACHE_STATS.update(
+        hits=0, misses=0, raw_rows=0, reduced_rows=0, miss_cpu_s=0.0, miss_wall_s=0.0,
+        by_sport={}, since=time.monotonic(),
+    )
+
+
+_latest_stats_reset()
+
+
+def take_latest_cache_stats() -> dict[str, Any]:
+    """The LATEST-cache counters since the last call, then reset.
+
+    `miss_cpu_s` is the calling thread's CPU (`time.thread_time`) spent
+    streaming and reducing on a miss, so other threads sharing the GIL do not
+    inflate it. `miss_wall_s` is the wall time of the same reads. `since_s` is
+    the window the counts cover. `by_sport` splits misses and raw rows.
+    """
+    snapshot = dict(_LATEST_CACHE_STATS)
+    snapshot["by_sport"] = {k: dict(v) for k, v in (_LATEST_CACHE_STATS.get("by_sport") or {}).items()}
+    snapshot["since_s"] = round(time.monotonic() - float(snapshot.pop("since", time.monotonic())), 1)
+    snapshot["miss_cpu_s"] = round(float(snapshot.get("miss_cpu_s") or 0.0), 2)
+    snapshot["miss_wall_s"] = round(float(snapshot.get("miss_wall_s") or 0.0), 2)
+    _latest_stats_reset()
+    return snapshot
+
+
 def read_book_quotes_latest(sport: str, date_str: str) -> list[dict[str, Any]]:
     """Latest-per-key rows for a sport/date shard, STREAMED then cached.
 
@@ -1737,14 +1778,32 @@ def read_book_quotes_latest(sport: str, date_str: str) -> list[dict[str, Any]]:
         cached = _BOOK_QUOTES_LATEST_CACHE.get(cache_key)
         if cached is not None:
             _BOOK_QUOTES_LATEST_CACHE.move_to_end(cache_key)
+            _LATEST_CACHE_STATS["hits"] += 1
             return cached
 
+    streamed = [0]
+
+    def _counted(rows_in: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]]:
+        for row in rows_in:
+            streamed[0] += 1
+            yield row
+
+    cpu_started, wall_started = time.thread_time(), time.monotonic()
     try:
-        rows = reduce_to_latest_per_key(iter_book_quotes(sport, date_str))
+        rows = reduce_to_latest_per_key(_counted(iter_book_quotes(sport, date_str)))
     except Exception:
         # Same rule as `read_book_quotes`: a partial read from a transient IO
         # error must never be cached and served as complete.
         return []
+    finally:
+        _LATEST_CACHE_STATS["misses"] += 1
+        _LATEST_CACHE_STATS["raw_rows"] += streamed[0]
+        _LATEST_CACHE_STATS["miss_cpu_s"] += time.thread_time() - cpu_started
+        _LATEST_CACHE_STATS["miss_wall_s"] += time.monotonic() - wall_started
+        per_sport = _LATEST_CACHE_STATS["by_sport"].setdefault(str(sport or ""), {"misses": 0, "raw_rows": 0})
+        per_sport["misses"] += 1
+        per_sport["raw_rows"] += streamed[0]
+    _LATEST_CACHE_STATS["reduced_rows"] += len(rows)
 
     if cache_key is not None and _book_quotes_cache_key(path) == cache_key:
         _BOOK_QUOTES_LATEST_CACHE[cache_key] = rows
