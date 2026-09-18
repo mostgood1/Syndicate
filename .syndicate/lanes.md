@@ -1136,39 +1136,6 @@ death, never life — do not invert it.
 - Not in scope: the `league_profiles` conversion-base refit (separate user decision), and the refresh-worker deploy owed by `soccer-shot-woodwork-undercount`.
 
 - Consequence recorded, not fixed: `shots_on_target_so_far` is a commentary-derived LOWER BOUND on ESPN's figure, and `soccer_live_gameline_source.py` banks it under the live `player_shots_on_target` market — so the banked count can sit ~0.25/team/match low and understate an over. Quantified but NOT priced: what that does to a live over/under price is unmeasured.
-### closed-lane-archive-20260917-1708 — CLOSED 2026-09-17 — opened 2026-09-17 — session 6627d075-cad9-42fd-9339-040aaba5ce76 (scheduled task archive-closed-lanes-0917) — **GOAL: MET (4 blocks archived; 3 NEVER-listed held back)**
-- **GOAL VERDICT: MET.** Goal restated verbatim: "archive CLOSED lane blocks whose owners are idle, verified, ledger-only". **The word *idle* was overridden by the user** (see USER OVERRIDE above) — the owners were 3m and 64m idle, not 120m or 240m — so this lane met the goal as REDEFINED by that instruction, not as originally written. Everything else held.
-- MEASUREMENT (worktree `closed-lane-archive-20260917-1708`, over origin/main `bee57380` + this lane block): `archive_closed_lanes_before.py --only <4 slugs> --owner-idle-verified --apply` moved **4 blocks / 122 lines**. `git diff --numstat`: `lanes.md 32+/122-`, `lanes_closed.md 122+/0-` — deletions equal the moved block lines exactly (no boundary-blank drift), insertions are this 28-line block plus 4 pointers, and lanes_closed.md lost nothing. Tool self-checks: claim set identical AS A SET (161), OPEN header count unchanged (34), every moved non-blank line present in lanes_closed.md, exactly 1 pointer per slug, 0 headers left behind.
-- `check_lane_invariants.py` BEFORE (origin/main copy in a scratch dir, `CLAUDE_PROJECT_DIR` set there): INVARIANTS HOLD, 1 `[hint]` (a disclaimed `- Files:` prose path). AFTER, in this worktree: INVARIANTS HOLD, the SAME single hint. No new FAIL.
-- lanes.md **574,013 —> 556,133 B** in-worktree (-17,880 B, -3.1%). Still ~2.3x the 234 KB cap: the remaining 13 CLOSED blocks are the bulk, and 11 of them belong to two owners (`abacd435`, `a1e40980`) who were writing continuously throughout.
-- Deferred, with reason: `heavy-build-child-process`, `heavy-build-memory-refusal`, `board-eval-reader-chunk-ceiling` — SAFE on every check, held back by the standing NEVER-archive list (owner keeps readings on them). `prop-evidence-parity` — the gate's own WAIT: an uncommitted `lanes.md` edit naming it in worktree `nfl-usage-publish` (owner 4a583d41 may be reopening it). The other 9 CLOSED blocks were out of the scope the user named.
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- **USER OVERRIDE, logged (2026-09-17 ~17:20 CDT / 22:20Z):** the user directed "just archive 15b0e4b6 and 0f5b256e's lanes now", dropping the transcript-idle bar ENTIRELY for those two owners (240m —> 120m —> 0m across three instructions this session). This relaxes `learnings.md` 2026-09-15 *"a lane whose header reads CLOSED on origin/main is safe to archive"*. Every STRUCTURAL check was left at full strength and re-run at `--idle-min 0`: no claims, no OPEN header, no uncommitted `lanes.md` edit naming the slug in any registered worktree, no dirty lane-named worktree. Additionally every worktree belonging to those two sessions was read with `git status --porcelain` (17 owned blocks, 7 worktrees on disk): **0 uncommitted `.syndicate/` edits**. Owners were NOT idle at archive time: 0f5b256e 6m, 15b0e4b6 75m.
-- **NEVER-archive list honoured:** `heavy-build-child-process`, `heavy-build-memory-refusal`, `board-eval-reader-chunk-ceiling` — all 0f5b256e's, all read SAFE — were held back, because their owning session keeps readings on them.
-- Scope: 4 slugs. 0f5b256e: `execution-ledger-live-trim`, `archive-test-reports-redirect`, `closed-lane-archive-0917`. 15b0e4b6: `closed-lane-archive-20260917-1442`.
-- Pre-registered reading (`owner_liveness.py --worktree <this worktree> --idle-min 0`, 2026-09-17 22:20:35Z / 17:20:35 CDT, origin/main `bee57380`, 17 CLOSED blocks; the single WAIT is another owner's lane and is untouched):
-
-      execution-ledger-live-trim               sessions[0f5b256e=6m] -> SAFE
-      heavy-build-child-process                sessions[0f5b256e=6m] -> SAFE
-      heavy-build-memory-refusal               sessions[0f5b256e=6m] -> SAFE
-      board-eval-reader-chunk-ceiling          sessions[0f5b256e=6m] -> SAFE
-      portfolio-no-family-exclusion            sessions[abacd435=5m] -> SAFE
-      board-category-gates                     sessions[abacd435=5m] -> SAFE
-      archive-test-reports-redirect            sessions[0f5b256e=6m] -> SAFE
-      chip-key-test-no-data-blind              sessions[abacd435=5m] -> SAFE
-      sim-view-reachability-caveat             sessions[abacd435=5m] -> SAFE
-      sim-view-roi-decision-count              sessions[abacd435=5m] -> SAFE
-      closed-lane-archive-0917                 sessions[0f5b256e=6m] -> SAFE
-      soccer-capture-staleness                 sessions[abacd435=5m] -> SAFE
-      soccer-forward-graders                   sessions[abacd435=5m] -> SAFE
-      soccer-live-model-study                  sessions[abacd435=5m] -> SAFE
-      prop-evidence-parity                     sessions[4a583d41=3m] -> SAFE
-      board-today-freshness                    sessions[a1e40980=8m] -> SAFE
-      closed-lane-archive-20260917-1442        sessions[15b0e4b6=75m] -> SAFE
-      soccer-shot-on-target-definition         sessions[a1e40980=8m] -> SAFE
-      SAFE_SLUGS=execution-ledger-live-trim,heavy-build-child-process,heavy-build-memory-refusal,board-eval-reader-chunk-ceiling,portfolio-no-family-exclusion,board-category-gates,archive-test-reports-redirect,chip-key-test-no-data-blind,sim-view-reachability-caveat,sim-view-roi-decision-count,closed-lane-archive-0917,soccer-capture-staleness,soccer-forward-graders,soccer-live-model-study,prop-evidence-parity,board-today-freshness,closed-lane-archive-20260917-1442,soccer-shot-on-target-definition
-
 ### wnba-sprint-0917 — OPEN — opened 2026-09-17 — session 565ee1fa-6fc2-41cb-8931-5e448aff111c
 - Goal: run `#623` as a test over 2026-09-17..09-25: a PASS / FAIL / UNREADABLE verdict, with n and window, for each of the 8 gates in `findings_2026-08-31_wnba_accuracy_assessment.md` ("What to measure over 2026-09-17 .. 2026-09-25"), for `prereg_wnba_favourite_lean.py`, and for `verify_wnba_slate_hygiene.py --check slate`.
 - Files: none at open (readings only). Claim a path before editing it.
@@ -1191,36 +1158,6 @@ death, never life — do not invert it.
 - Falsification test: after the fix the autorun still launches `week=1`, or still refuses `zero_sim_rows` — then the root selector was not the cause and the substrate is genuinely absent on the worker.
 - Verification: (1) offline: a test where a probe-file-bearing checkout root and a mounted root both exist proves `data_path` returns the MOUNTED file and `nfl_target_week` returns the played week, and the test fails on the pre-change code; (2) production: the launch line names the current week and the build writes row_count > 0, published and visible in the export listing; (3) the child's peak RSS is read from the run, because this builder loads a 97.9 MB pbp on a worker that plateaus at 2.65-2.70 GB of 4 GB (`#241`).
 - Blocked by: none.
-### closed-lane-archive-20260917-1733 — CLOSED 2026-09-17 — opened 2026-09-17 — session 6627d075-cad9-42fd-9339-040aaba5ce76 (scheduled task archive-closed-lanes-0917) — **GOAL: MET (3 NEVER-listed blocks archived on explicit user override)**
-- **GOAL VERDICT: MET.** Goal restated verbatim: "archive CLOSED lane blocks whose owners are idle, verified, ledger-only". As in the sibling lane, *idle* was overridden by the user (0f5b256e was 4m idle). **Additionally the task's NEVER-archive list was overridden** — see USER OVERRIDE #2 above. Ledger-only holds: no code, no deploy, no claim touched.
-- MEASUREMENT (worktree `closed-lane-archive-20260917-1733`, over origin/main `cd2bd646` + this lane block): `archive_closed_lanes_before.py --only heavy-build-child-process,heavy-build-memory-refusal,board-eval-reader-chunk-ceiling --owner-idle-verified --apply` moved **3 blocks / 330 lines**. `git diff --numstat`: `lanes.md 28+/330-`, `lanes_closed.md 330+/0-` — deletions equal the moved block lines exactly, insertions are this 25-line block plus 3 pointers, lanes_closed.md lost nothing. Tool self-checks: claim set identical AS A SET (160), OPEN header count unchanged (33), every moved non-blank line present in lanes_closed.md, exactly 1 pointer per slug, 0 headers left behind. 0 duplicate slugs in the result.
-- `check_lane_invariants.py` BEFORE (origin/main copy in a scratch dir): INVARIANTS HOLD, 51 headings / 160 claims, 1 `[hint]`. AFTER, in this worktree: INVARIANTS HOLD, **49 headings** (51 + 1 this lane — 3 moved) / **160 claims**, the SAME single hint. No new FAIL.
-- lanes.md **562,777 —> 480,259 B** on disk (-82,518 B, **-14.7%**) — by far the largest single reduction of the four archive passes, because these three blocks are long (330 lines for 3, vs 122 lines for the 4 in `closed-lane-archive-20260917-1708`). Note on-disk bytes exceed `git show` bytes by exactly the CRLF count: the blob stores LF, the working tree is CRLF.
-- Still OPEN after this pass: the remaining CLOSED blocks belong to `abacd435` (8), `a1e40980` (2), `4a583d41` (1) and this session (1), plus the two still-protected NEVER-list slugs `nhl-season-readiness` and `worker-disk-auto-retention`.
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- **USER OVERRIDE #2, logged (2026-09-17 ~17:35 CDT / 22:35Z) — THE NEVER-ARCHIVE LIST WAS OVERRIDDEN.** The scheduled task `archive-closed-lanes-0917` names five slugs to NEVER archive "even if CLOSED and SAFE", because their owning session keeps readings on them. Three of those five are 0f5b256e's and were archived by this lane on the user's explicit instruction ("archive the other three too"), after the exclusion was put to them and reaffirmed: `heavy-build-child-process`, `heavy-build-memory-refusal`, `board-eval-reader-chunk-ceiling`. **The remaining two are UNTOUCHED and still protected: `nhl-season-readiness`, `worker-disk-auto-retention`.**
-- **What this costs, stated plainly:** each of the three still has a LIVE WORKTREE on disk under `C:\tmp\syndicate-sessions\` (all three clean, 0 uncommitted files). If 0f5b256e resumes one, its block is no longer in `lanes.md` — the body is in `lanes_closed.md` behind a pointer, reachable but off the session-start read path. Nothing was deleted.
-- The transcript-idle bar was ALSO still overridden (as in `closed-lane-archive-20260917-1708`): owner 0f5b256e was **4m** idle, not 120m or 240m. Every STRUCTURAL check was left at full strength and run at `--idle-min 0`: no claims, no OPEN header, no uncommitted `lanes.md` edit naming the slug in any registered worktree, no dirty lane-named worktree. Plus `git status --porcelain` over all 6 on-disk worktrees of 0f5b256e's 13 blocks: **0 uncommitted `.syndicate/` edits**.
-- Pre-registered reading (`owner_liveness.py --worktree <this worktree> --idle-min 0`, 2026-09-17 22:37:05Z / 17:37:05 CDT, origin/main `cd2bd646`, 16 CLOSED blocks):
-
-      heavy-build-child-process                sessions[0f5b256e=4m] -> SAFE
-      heavy-build-memory-refusal               sessions[0f5b256e=4m] -> SAFE
-      board-eval-reader-chunk-ceiling          sessions[0f5b256e=4m] -> SAFE
-      portfolio-no-family-exclusion            sessions[abacd435=0m] -> SAFE
-      board-category-gates                     sessions[abacd435=0m] -> SAFE
-      chip-key-test-no-data-blind              sessions[abacd435=0m] -> SAFE
-      sim-view-reachability-caveat             sessions[abacd435=0m] -> SAFE
-      sim-view-roi-decision-count              sessions[abacd435=0m] -> SAFE
-      soccer-prekickoff-freeze                 sessions[abacd435=0m] -> SAFE
-      soccer-capture-staleness                 sessions[abacd435=0m] -> SAFE
-      soccer-forward-graders                   sessions[abacd435=0m] -> SAFE
-      soccer-live-model-study                  sessions[abacd435=0m] -> SAFE
-      prop-evidence-parity                     sessions[4a583d41=0m] -> SAFE
-      board-today-freshness                    sessions[a1e40980=0m] -> SAFE
-      soccer-shot-on-target-definition         sessions[a1e40980=0m] -> SAFE
-      closed-lane-archive-20260917-1708        sessions[6627d075=0m] -> SAFE
-
 ### mlb-sim-retrigger-churn — OPEN — opened 2026-09-17 — session a1e40980-cceb-493f-adf9-5a5ca879acf6
 - **GOAL VERDICT 2026-09-18 04:30Z.** Goal (verbatim): "name, with evidence, what moves the MLB daily sim's per-game input fingerprint, so that each `MLB_DAILY_SIM_TRIGGERED reason=fingerprint_change` is attributable to a game and an input; then cut the re-sims that change no simulation output, so the board stops being locked out of refresh-worker by sims that did not need to run." — **GOAL: NOT MET.** Done: each fingerprint launch is now attributable to its GAMES (`MLB_SIM_FINGERPRINT_LAUNCH` / `_DEBOUNCED` name them), and the debounce is live on refresh-worker and executing (7 fingerprint-only changes held back 01:20-04:20Z, predicate MET). Left, and why it is not met: (1) launches are NOT yet attributable to an INPUT — which of the five fingerprint inputs moved is still unlogged; (2) re-sims are not yet cut in total: fingerprint-labelled launches read 4 before and 4 after, because `MLB_PROPS_REGEN_DUE` now drives 3 of 4 — it re-fires hourly since top props stays at 0 candidates after each full-slate regen, and its launches carry the fingerprint label; (3) the day-slate reading (board refusals, today's re-completion interval) is owed 2026-09-18. Next: find out whether zero top props late in the day is correct or a failing stage, then cap or fix the props-regen loop.
 - Goal: name, with evidence, what moves the MLB daily sim's per-game input fingerprint, so that each `MLB_DAILY_SIM_TRIGGERED reason=fingerprint_change` is attributable to a game and an input; then cut the re-sims that change no simulation output, so the board stops being locked out of refresh-worker by sims that did not need to run.
@@ -1244,6 +1181,19 @@ death, never life — do not invert it.
 - Verification: first run prints each family's date coverage per league and the intersection, and grades >= 1 match with both arms; per-league base-season match counts printed.
 - Blocked by: none
 
+### closed-lane-archive-20260918-0837 — CLOSED 2026-09-18 — opened 2026-09-18 — session b0d770fe-e2f6-4691-83ce-2186e7baecb5 (scheduled task archive-closed-lanes-0917) — **GOAL: MET (2 of 16 archived; 14 deferred, owners active)**
+- **GOAL VERDICT: MET.** Goal restated verbatim: "archive CLOSED lane blocks whose owners are idle, verified, ledger-only". Archived only the 2 blocks the authoritative gate read SAFE at --idle-min 240; no idle override, NEVER list honoured, no code, no deploy, no claim touched.
+- MEASUREMENT: `archive_closed_lanes_before.py --only closed-lane-archive-20260917-1708,closed-lane-archive-20260917-1733 --owner-idle-verified --apply` moved 2 blocks / 63 lines. `git diff --numstat`: lanes.md 13+/63- (this block + 2 pointers), lanes_closed.md 63+/0-. Tool self-checks passed (claims 163 as a set, OPEN headers 34 unchanged, lines conserved, 1 pointer per slug). `check_lane_invariants.py` INVARIANTS HOLD, identical to the origin/main baseline (0 contested). On disk lanes.md 501,320 -> 490,904 B.
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Pre-registered reading (owner_liveness.py --idle-min 240, 13:38Z / 08:38 CDT, worktree at origin/main c9479bcc; 16 CLOSED blocks, NEVER-list excluded):
+  - portfolio-no-family-exclusion, board-category-gates, chip-key-test-no-data-blind, sim-view-reachability-caveat, sim-view-roi-decision-count, soccer-prekickoff-freeze, soccer-capture-staleness, soccer-forward-graders, soccer-live-model-study, soccer-h24-grader -> WAIT: abacd435 idle 0m < 240m
+  - prop-evidence-parity -> WAIT: 4a583d41 idle 1m < 240m
+  - board-today-freshness, soccer-shot-woodwork-undercount, soccer-shot-on-target-definition -> WAIT: a1e40980 idle 0m < 240m
+  - closed-lane-archive-20260917-1708, closed-lane-archive-20260917-1733 -> SAFE (6627d075 idle 832m)
+- Note: the watcher's poll at 13:37Z had read 4a583d41=621m and a1e40980=538m (SAFE); ~1 min later both transcripts were 0-1m idle, so those 4 slugs are deferred per the gate.
+- Step 4: no worktree under C:	mp\syndicate-sessions holds uncommitted `.syndicate/` edits mentioning 6627d075 or either slug (5 dirty worktrees checked, 0 mentions).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
@@ -1262,6 +1212,8 @@ death, never life — do not invert it.
 - `closed-lane-archive-0917` — CLOSED 2026-09-16 — opened 2026-09-16 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **GOAL: NOT MET (deferred, nothing eligible)**
 - `closed-lane-archive-0917b` — CLOSED 2026-09-17 — opened 2026-09-17 — session 5d8da952-8b7e-4069-aa67-ef92b64684d3 (scheduled task archive-closed-lanes-0917) — **GOAL: NOT MET (deferred, nothing eligible)**
 - `closed-lane-archive-20260917-1442` — CLOSED 2026-09-17 — opened 2026-09-17 — session 15b0e4b6-80f1-4491-acfb-c4895a53452b (scheduled task archive-closed-lanes-0917)
+- `closed-lane-archive-20260917-1708` — CLOSED 2026-09-17 — opened 2026-09-17 — session 6627d075-cad9-42fd-9339-040aaba5ce76 (scheduled task archive-closed-lanes-0917) — **GOAL: MET (4 blocks archived; 3 NEVER-listed held back)**
+- `closed-lane-archive-20260917-1733` — CLOSED 2026-09-17 — opened 2026-09-17 — session 6627d075-cad9-42fd-9339-040aaba5ce76 (scheduled task archive-closed-lanes-0917) — **GOAL: MET (3 NEVER-listed blocks archived on explicit user override)**
 - `combined-board-rows-unreadable-tripwire` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: live on web `da268e07` (15:36:46Z); the field is served on every date, 0 `ROWS_UNREADABLE` lines; stored 113 vs rows 111 is the per-sport `by_sport` cap, not a defect.**
 - `combined-board-state-rows-lost` — CLOSED 2026-09-15 — opened 2026-09-14 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: Q1-Q3 answered with production readings. The reader fix is live on web `b6a0e346` (14:10:07Z): `by_date` 09-15 106 (was 0), 0 `VINTAGE_IGNORED`. One prediction was WRONG (`computed_at` moved to the refused heavy build's state stamp). User decision 2026-09-15: keep the `stale` label, it is true. Postmortem in `learnings.md`.**
 - `convergence-phase7-crps` — ORPHANED, **UNOWNED** `[session abf487e4 ARCHIVED 2026-08-20T21:1xZ]` — — **FIVE FINDINGS: FOUR DEFECTS FIXED AND MEASURED, ONE NOT A DEFECT.** Ladder
