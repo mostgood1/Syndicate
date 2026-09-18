@@ -5,6 +5,16 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
+## [ncaaf-sim-view-coverage] NCAAF GAME LINES CARRY A SIM VIEW ON EVERY MARKET; EDGES ARE BOUNDED BY THE 15-POINT CAP; STAKES STAY ON PRICE `[measured 2026-09-18 on the served board, web + refresh-worker `983c77e9`, lane ncaaf-board-sim-coverage]`
+
+- **Coverage, first build after the deploy (17:22:07Z):** FBS spreads with `projected` **186/186** (was 0 -- the margin had been blanked by design until the user reversed it: "they should be shown, period"); FBS game-line rows with a sim view **443/444**; games with any sim **56/74**, the 18 without all FCS opponents (SP+ is FBS-only -- no pregame model by construction).
+- **Join:** tolerant of a neutral site listed the other way round (CFBD `Arizona State @ Kansas` at Wembley vs OddsAPI the reverse -- numbers restated in the board's frame, `orientation_flipped`), a kickoff drifting +/-1 day from the schedule copy (`kickoff_date_shifted`; the join reads the git 08-01 `games_2026.json.gz` after every deploy), and games absent from that copy (`undated`). Replay on production inputs: 53/18/3 unmatched -> 56/18/0.
+- **Edges:** every two-sided pregame NCAAF game row now carries `edge_vs_market_pct`; **196/444** FBS rows keep a `model_edge_pct` on the Layer 2 row. **244 of the 248** without one have a sim-vs-market gap > 15 points, which `layer2_board._MODEL_EDGE_MAX_POINTS = 15.0` drops (platform-wide; user 2026-09-18: keep the cap). The rows still show the projection and probability. Ranking weight is further cut by `_apply_skill_reliability` off `NCAAF_MEASURED_SKILL`.
+- **Sizing:** `portfolio_commit._PRICE_BASIS_SPORTS_DEFAULT = {"ncaaf"}` -- NCAAF stakes are sized market-fair even with a sim edge (user: "Show edges, size on price"). First plan after the deploy: **40/40** NCAAF positions `market_fair`, 0 with model probability != fair; the sim edge is RECORDED on the position.
+- **`/ncaaf`** opens on the week_state target (week 3 on 2026-09-18); web's legacy recommendations_summary index (6 weeks tracked, only week 1 populated) no longer vetoes it.
+- **Ratings:** until lane `ncaaf-sim-inseason-ratings` (`ef3fb857`, live on refresh-worker 18:52:47Z, first run OWED) the generator priced 2026 on the SP+ snapshot fetched 2026-09-05; CFBD's live 2026 SP+ had moved on every one of 105 name-matched teams by 09-18 (max 4.5 pts).
+- **Player data:** Ask answers a typed NCAAF player question with last-N games + a 2026 season-to-date row (web `b7faeb34`, verified 19:05Z). `NCAAF_PLAYER_STATS_ENABLE_REFRESH_WORKER_AUTORUN` is `true` on refresh-worker and the refresh runs daily ~22:48Z; production's snapshot held 8,115 rows (2026 weeks 1-2, no 2025) on 09-18. NCAAF player prop projections are wired (chained after that refresh, allowlisted) but had NOT yet been produced on 09-18.
+
 ## [nfl-board-projection-coverage] NFL BOARD PROJECTION COVERAGE IS 100% `[measured 2026-09-04T23:19:34Z on the served payload, lanes nfl-projection-et-datekey + nfl-la-rams-alias]`
 
 `/api/board/book-grid?sport=nfl` reads **`unmatched_game_rows` 0** of 1,251 game rows;

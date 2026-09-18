@@ -7069,3 +7069,9 @@ trusting a watcher" caught it, and the empty read was then misleading in the oth
 `grep --line-buffered` on every filter in the pipe. Read the output file once before trusting it; if it is
 empty, suspect buffering before suspecting the watcher.
 - *(evidence: `log/2026-09-18.md` ~16:40Z checkpoint)*
+## 2026-09-18 — FORBIDDEN: attributing a web health-check failure to your change without the day's post-deploy baseline `[lane ncaaf-player-data, session 259d6003]`
+
+**What happened.** Minutes after web went live on `1c5caea6`, my typed Ask question took 25.6 s and then 59.8 s (both 502), and web failed health checks at 18:14:20Z (with a restart) and 18:20:05Z -- each inside one of my calls. I pulled the new fetcher (`e67c8b8a`) and redeployed. On that build -- fetcher unregistered, and **no requests from this session** -- web failed again at 18:29:21Z, 18:31:43Z and 18:33:48Z. The events API showed the same shape after EVERY web deploy that day and the day before (1-4 `server_failed reason.unhealthy` within ~10 min, then quiet). The fetcher measured 0.152 s cold on production's own snapshot. It was restored 30 minutes after it was pulled, at the cost of two extra web deploys, each with its own cold window.
+
+**The rule.** Before attributing a post-deploy symptom to your change, read the service's events for the last several deploys and state the baseline rate (failures per deploy, minutes after go-live). A symptom inside a window that has one on every deploy is not evidence about your change. The control that settles it is cheap: leave the service alone for the window and watch -- that is what turned this. And a timing taken inside the cold window measures the window, not the code: re-time warm (>= 10 min after go-live) before calling anything slow.
+- *(evidence: `deploys.md` 2026-09-18 18:09:25Z entry; `leads.md` 2026-09-18 post-deploy health-check lead)*
