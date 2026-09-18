@@ -1303,6 +1303,40 @@ death, never life — do not invert it.
 - Hypotheses, told apart by evidence: (H1) A STEP from a deploy — a commit changed the work inside one or both spans; predicts a change point at a deploy time that survives splitting by time of day. (H2) A GROWN INPUT the spans read that the output row count does not show (quote store, candidate pool, live state, book quotes) — predicts duration tracking that input's size, gradually or by slate. (H3) PROCESS STATE — the same work slower in a bigger or more fragmented process (RSS, arena caps, cache misses after restarts) — predicts duration tracking RSS or uptime rather than any input. (H4) DIURNAL — 09-17 morning was pregame-light and 09-18's window holds more live games; predicts the gap closing when like hours are compared.
 - Falsification test: each hypothesis names a variable; it is falsified if span duration does not move with that variable across >= 40 builds.
 - Verification (PRE-REGISTERED): (1) the diagnosis names one variable that span time tracks, with the others ruled out by the same data; (2) after any fix, both spans' NO-SIM medians over a full day return toward the 09-17 morning level (L2 <= 80 s, overview <= 120 s), with LAYER2_SHORTLIST row counts unchanged.
+- **STATUS 2026-09-18 ~16:15Z.** The goal, verbatim: "name, with evidence, why refresh-worker's `layer2_shortlist_build` and `build_intelligence_overview` spans roughly doubled on flat row counts between the mornings of 2026-09-17 and 2026-09-18 — as a commit, an input that grew, or process state — and then cut that cost, verified by both spans' NO-SIM medians over a day." **GOAL: NOT MET.** H2 (the stages do more work) is supported, and H1, H3, H4 and contention are ruled out. The leaf behind Layer 2's per-candidate rise is NOT named yet, because logs cannot name it and it needs a profiler (a user decision). Readings are in `.syndicate/log/2026-09-18.md` under `[board-build-stage-slowdown]`.
+  - **H4 diurnal: FALSIFIED.** Like-hour comparison, 06-12Z: L2 46 s (09-16) → 163 s (09-18); overview 92 → 249 s.
+  - **H1 deploy step: NOT SUPPORTED.** The rise creeps from 09-17 18Z and survives both restarts (01:20Z and 14:42Z), with no step at any deploy.
+  - **H3 process state: FALSIFIED for memory and uptime.**
+    - Share of time at the cgroup ceiling (at or above 99% of max): 32% at 09-17 08Z (fast) vs 12% at 09-18 08Z (slow).
+    - A fresh process is still slow: the 14:59Z L2 took 166 s, 2.26× the volume model.
+  - **In-process GIL contention: NOT SUPPORTED.** `kalshi_board_join` is CPU-bound, on the same thread, in the same builds, and went 26.6 → 30.1 s while L2 grew 3.4× and overview 2.7×.
+  - **MLB-sim contention: excluded by the split.** L2 spans with no sim overlap still run 1.8-3.6× a volume-only fit of 19.3 s + 1.66 s per 1k considered (n=126 uncontended spans before 09-17 18Z).
+  - **H2 grown work: SUPPORTED.**
+    - `BOARD_BUILD_TIMING` cpu_s went 454 → 1220 per build and off_cpu from ~15% to ~8% (06-12Z medians, 09-16 vs 09-18).
+    - Volume, `considered` 12.0k → 32.5k over four days, explains about 1/3 of L2's growth. Per-candidate cost roughly doubling covers the rest.
+  - **Where the +712 s per build went** (per-build sums, 06-12Z on 09-16 vs 09-18):
+
+    | Part | Change |
+    |---|---|
+    | candidate_collection | +158 |
+    | overview | +138 |
+    | L2 | +112 |
+    | portfolio_commit | +47 |
+    | pull_hot_artifacts | −28 |
+    | **UNSPANNED** | **+282** |
+
+    Paper execution is +126 of the unspanned time: board-thread wall 63 → 189 s, placed orders 4 → 20 per build. Every order makes two full CAS rewrites of the 6.1 MB, 5,000-order `execution_ledger.json`, seen as `KEYVALUE_WRITE_LARGE` from `execution_ledger.py:1017`. That cost is separable; it is lead material and not this lane's code.
+  - **Leading candidate for the per-candidate rise: book-quote LATEST-cache thrash. UNCONFIRMED.**
+    - Evidence for it:
+      - The 250 MB budget holds about 9 reduced shards; 15-20 are in play.
+      - `LATEST_CACHE_EVICT` per build went from about 5 to about 20.
+      - Every miss re-streams the whole append-only raw shard. soccer 09-19 and 09-20 are about 60-70 MB each.
+      - Shards are tail-synced during builds, and sometimes whole-re-downloaded (`STREAM_SYNC_WHOLE reason=overlap_mismatch`, 22-85 per 6h). Either one invalidates the (path, mtime, size) key. That contradicts the premise in `odds_book_quotes.py`'s `_BOOK_QUOTES_CACHE` comment that a shard "is stable for the whole build".
+      - `quote_ref_for_bet` → `read_book_quotes_latest` runs once per candidate, inside the enrichment loops.
+    - Against it: bytes in play grew only 1.25× from 09-17 to 09-18 morning while L2 grew 3×. A back-of-envelope estimate puts it at about 60-100 s per build, a contributor that is not shown to be the whole rise.
+  - **Next (a user decision, because it is a production change):**
+    - Turn on the existing env-gated cProfile hooks (`SYNDICATE_CANDIDATE_COLLECTION_PROFILE`, `SYNDICATE_CONSUME_SPORT_PROFILE`) for 1-2 builds, then turn them off. That takes an env re-inject deploy each way. L2 has no hook.
+    - Or, as code: a per-build `BOOK_QUOTES_LATEST_STATS hits= misses= raw_rows= thread_s=` line, which tests the leading candidate directly.
 
 ### ncaaf-board-sim-coverage — OPEN — opened 2026-09-18 — session 259d6003-bff3-416d-835f-12f4f7f584d8
 - Goal: on the served Layer 2 board (`/api/intelligence/query`), NCAAF FBS-vs-FBS game-line rows carry a sim view on EVERY market -- `projected` on spreads and totals, and a per-row `model_edge_pct` on two-sided pregame h2h/spreads/totals rows (weight left to the existing `_apply_skill_reliability` discount, no sport-wide suppression) -- neutral-site and moved-kickoff FBS games join, and `/ncaaf` with no `?week=` renders the schedule's target week. User decisions 2026-09-18: "they should be shown, period ... we shouldnt be hiding anything globally, every game/prop is its own entity"; "Publish, skill-discounted".
