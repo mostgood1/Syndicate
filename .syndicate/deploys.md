@@ -38118,3 +38118,10 @@ Closes the owed items of the 2026-09-18 14:27:33Z entry. Read from web's served 
 - **Paper-execution wall per build** (BUILD_SPAN_EXIT portfolio_commit -> last EXECUTED): median **11 s** over 9 builds, 18:41-23:14Z, placed median 32. Baseline 292 s median (n=10, 12:00-18:07Z); expectation <= 40 s.
 - `LEDGER_CAS_EXHAUSTED` 0, `PAPER_FLUSH_FAILED` 0 since go-live.
 - `KEYVALUE_WRITE_LARGE ... execution_ledger.json` 42 over the 9 builds, about 4.7 per build, i.e. one per run that placed (5 runs per build). Predicted <= 1 per placing run; before, it was 2 per placed order (~174/h).
+
+## 2026-09-18 23:50Z (6:50 PM CT) — READING, no deploy — refresh-worker `3bd766e8` (live 22:05:00Z) — lane market-history-index-memo — **verify: MET**
+
+- **`candidate_collection_with_fallback` since go-live: 148.5 s (22:12:58Z), 24.95 s (23:02:20Z), 47.73 s (23:38:28Z); median 47.7 s.** Baseline median 322.8 s (n=3 since the matcher fix at 20:49Z); 352.7 s over 12:00-19:55Z. Expectation <= 120 s: met on all three.
+- The first build's 148.5 s ran on a cold process (restart at 22:05Z). Its whole build took 1,673.5 s because an MLB daily sim ran beside it, 22:17:51-22:48:10Z: every later stage slowed, including the CPU-bound control `kalshi_board_join` (68 s vs ~30). Candidate collection finished before the sim started. The second whole build took 1,058.7 s.
+- NCAAF live re-sims on the main thread in that window were no-ops (`elapsed_seconds` 0.0, 0 live games), so they are exonerated as the contention.
+- Lane `market-history-index-memo`: GOAL MET on this reading. The refresh-worker claim is free; the soccer lane's queued deploy was waiting on this entry.
