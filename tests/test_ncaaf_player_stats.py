@@ -167,6 +167,71 @@ class NcaafPlayerStatsTests(unittest.TestCase):
         self.assertEqual(len(rows_2025), 1)
         self.assertEqual(rows_2025[0]["passing_yards"], 200.0)
 
+    # -- the cache is keyed by the FILE (mtime/size), not the season ---------
+
+    def _rewrite_without_cache_clear(self, rows: list[dict]) -> None:
+        """A publish landing on disk: the file changes, nobody clears a cache."""
+        with self.snapshot_path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=_COLUMNS)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow(row)
+        # Force a distinct mtime even on a coarse-clock filesystem.
+        stat = self.snapshot_path.stat()
+        os.utime(self.snapshot_path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 5_000_000_000))
+
+    def test_a_republished_snapshot_is_read_without_a_restart(self) -> None:
+        """The old season-keyed lru_cache served the boot-time reading until a
+        deploy. A new week landing on disk must reach every reader on the next
+        call -- rows, the name index and the per-player log alike."""
+        self._write_snapshot([_row(season="2026", week="1", game_id="G1", player_id="QB1",
+                                   player_name="Arch Manning", passing_yards="200")])
+        self.assertEqual(len(player_stats.load_player_game_rows(2026)), 1)
+        self.assertEqual(len(player_stats.player_game_log(2026, "QB1")), 1)
+        self.assertIsNone(player_stats.resolve_player_id(2026, "New Guy"))
+
+        self._rewrite_without_cache_clear([
+            _row(season="2026", week="1", game_id="G1", player_id="QB1", player_name="Arch Manning", passing_yards="200"),
+            _row(season="2026", week="2", game_id="G2", player_id="QB1", player_name="Arch Manning", passing_yards="310"),
+            _row(season="2026", week="2", game_id="G2", player_id="WR9", player_name="New Guy", receptions="5"),
+        ])
+        self.assertEqual(len(player_stats.load_player_game_rows(2026)), 3)
+        self.assertEqual([g["passing_yards"] for g in player_stats.player_game_log(2026, "QB1")], [200.0, 310.0])
+        self.assertEqual(player_stats.resolve_player_id(2026, "New Guy"), "WR9")
+
+    def test_an_unchanged_file_is_parsed_once(self) -> None:
+        self._write_snapshot([_row(season="2026", week="1", game_id="G1", player_id="QB1")])
+        first = player_stats.load_player_game_rows(2026)
+        self.assertIs(player_stats.load_player_game_rows(2026), first)
+
+    def test_a_snapshot_that_disappears_reads_empty_not_stale(self) -> None:
+        self._write_snapshot([_row(season="2026", week="1", game_id="G1", player_id="QB1")])
+        self.assertEqual(len(player_stats.load_player_game_rows(2026)), 1)
+        self.snapshot_path.unlink()
+        self.assertEqual(player_stats.load_player_game_rows(2026), ())
+
+    def test_player_ids_by_name_keeps_every_namesake(self) -> None:
+        """`player_name_index` collapses namesakes to one id; the ambiguity-aware
+        index must not, or a question about one would answer with the other."""
+        self._write_snapshot([
+            _row(season="2026", week="1", game_id="G1", player_id="111", player_name="Joseph Williams", team="Colorado"),
+            _row(season="2026", week="1", game_id="G2", player_id="222", player_name="Joseph Williams", team="Holy Cross"),
+            _row(season="2026", week="1", game_id="G3", player_id="333", player_name="Kenneth Walker III", team="X"),
+        ])
+        index = player_stats.player_ids_by_name(2026)
+        self.assertEqual(set(index["joseph williams"]), {"111", "222"})
+        self.assertEqual(index["kenneth walker"], ("333",))
+        self.assertEqual(player_stats.normalize_name("Ja'Kobi Lane"), "jakobi lane")
+        self.assertEqual(player_stats.normalize_name("José Pérez Jr."), "jose perez")
+
+    def test_opponent_for_reads_the_other_school_in_the_game(self) -> None:
+        self._write_snapshot([
+            _row(season="2026", week="1", game_id="G1", player_id="1", team="Texas"),
+            _row(season="2026", week="1", game_id="G1", player_id="2", team="Ohio State"),
+        ])
+        self.assertEqual(player_stats.opponent_for(2026, "G1", "Texas"), "Ohio State")
+        self.assertEqual(player_stats.opponent_for(2026, "G9", "Texas"), "")
+
 
 if __name__ == "__main__":
     unittest.main()
