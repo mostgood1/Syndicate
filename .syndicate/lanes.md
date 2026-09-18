@@ -1274,6 +1274,16 @@ death, never life — do not invert it.
 - Verification: (1) `node tests/js/polling_idle_pause.test.mjs` passes and fails against the pre-change `polling.js`; (2) production, after a web deploy the user approves: an open `/intelligence` tab left untouched stops issuing `POST /api/intelligence/query` after the idle timeout (read in Render's `type=request` log by user agent).
 - Blocked by: none
 
+### soccer-live-corners-dispersion — OPEN — opened 2026-09-18 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Goal: H35 (offline): which count distribution around the PUBLISHED live remaining-corners mean (`prekickoff_pace_v1` = pregame E3 x production `SHARE_TABLE`) prices over/under half-lines best -- Poisson, NB1 (variance a fixed multiple of the mean, the platform's pregame corners convention in `common.nb_sf`) or NB2 (a gamma-mixed rate: variance mu + mu^2/k) -- registered before any dispersion is computed, graded on TEST, and written to the ledger. No engine change; pricing live corners stays parked behind H32.
+- Files:
+  - `scripts/soccer_season_audit/live_corners_dispersion_study.py` (NEW)
+  - `tests/test_soccer_live_corners_dispersion_study.py` (NEW)
+- Hypothesis: remaining corners given the published mean are over-dispersed relative to Poisson by enough to change a half-line price (match-level rate uncertainty in E3, and corners arriving in bunches).
+- Falsification test: H35 as registered in `log/2026-09-18.md` ~09:59 CT (14:59Z): the TRAIN-selected over-dispersed law does not beat Poisson on TEST half-line log-loss with a match-clustered CI entirely below 0.
+- Verification: the study's TEST run, its numbers and verdict written to the log, and this block's goal verdict.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
