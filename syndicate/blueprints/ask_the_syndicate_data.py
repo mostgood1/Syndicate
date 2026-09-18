@@ -3802,11 +3802,19 @@ def _entity_fetchers_for_sport(sport: str, question: str) -> list:
         # branch is written out so the absence is visibly intentional.
         return []
     if sport == "ncaaf":
-        # Player first, as MLB leads with the player's own log; the player-log
-        # fetcher answers only a prop row, the typed-question fetcher only a
-        # question that NAMES a player, and the team fetchers every row.
-        return [_ncaaf_player_log_evidence, _ncaaf_player_question_evidence, _ncaaf_matchup_projection_evidence,
-                _ncaaf_team_profile_evidence, _ncaaf_ats_evidence]
+        # Player first, as MLB leads with the player's own log; the player
+        # fetcher answers only a prop row, and the team fetchers every row.
+        #
+        # `_ncaaf_player_question_evidence` (typed questions) is UNREGISTERED
+        # here and in the no-sport branch below `[2026-09-18, lane
+        # ncaaf-board-sim-coverage]`. Live on web 18:12:43Z, the typed question
+        # "How has Arch Manning played this season in college football?" went
+        # from 5.0 s (baseline 18:07Z) to a 502 at 59.8 s, and both web
+        # health-check failures that followed (18:14:20Z with a restart,
+        # 18:20:05Z) fell inside those calls. The function stays; it comes back
+        # once its cold cost is measured on production's snapshot.
+        return [_ncaaf_player_log_evidence, _ncaaf_matchup_projection_evidence, _ncaaf_team_profile_evidence,
+                _ncaaf_ats_evidence]
     if sport == "nfl":
         return [_nfl_player_projection_evidence, _nfl_matchup_evidence, _nfl_preseason_matchup_evidence,
                 _nfl_team_profile_evidence, _nfl_ats_evidence]
@@ -3837,7 +3845,6 @@ def _entity_fetchers_for_sport(sport: str, question: str) -> list:
             _wnba_focused_evidence,
             lambda q, c: _basketball_last10_evidence(q, c, "nba"),
             _nhl_last10_evidence,
-            _ncaaf_player_question_evidence,
             _ncaaf_matchup_projection_evidence,
             _ncaaf_team_profile_evidence,
             _ncaaf_ats_evidence,
