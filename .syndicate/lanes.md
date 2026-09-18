@@ -1331,6 +1331,16 @@ death, never life — do not invert it.
 - Verification: production -- the NCAAF prop projection artifact exists on web's disk; served NCAAF prop rows with `projected` >= 80% of rows whose player has a 2026 game; a typed NCAAF player question to Ask returns a last-N table and a season-to-date row.
 - Blocked by: none.
 
+### soccer-live-corners-book-test — OPEN — opened 2026-09-18 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Goal: H36 (forward, paper): the published live corners number, priced as so_far + Poisson(remaining) per H35, is scored against the in-play books' de-vigged `alternate_totals_corners` probabilities on the same line at the same moment -- registered before any qualifying capture, with a grader that joins production `book_quotes` to the live projection history and runs on production data. No engine change and no bet placed.
+- Files:
+  - `scripts/soccer_season_audit/live_corners_book_grade.py` (NEW)
+  - `tests/test_soccer_live_corners_book_grade.py` (NEW)
+- Hypothesis: the pregame-pace live corners price is better calibrated than US books' in-play corners lines, because those books price corners off a slower model (their quotes lag our capture by 66-135 s median) and H29 showed the pregame pace beats a live re-sim.
+- Falsification test: H36 as registered in `log/2026-09-18.md` ~10:54 CT (15:54Z): at >= 150 matches (or 2026-11-15), the match-clustered CI of mean log-loss (ours - book) is not entirely below 0.
+- Verification: the grader's first production run joining at least one in-play capture to a projection-history row and an ESPN final, with the funnel printed; then H36 itself on its registered trigger.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
