@@ -1,0 +1,1006 @@
+{
+ "_source": "https://statsapi.mlb.com/api/v1.1/game/823819/feed/live",
+ "gameData": {
+  "datetime": {
+   "officialDate": "2026-09-12"
+  },
+  "game": {
+   "pk": 823819
+  },
+  "status": {
+   "abstractGameState": "Final",
+   "codedGameState": "F",
+   "detailedState": "Final",
+   "statusCode": "F"
+  },
+  "teams": {
+   "away": {
+    "abbreviation": "LAD",
+    "id": 119,
+    "name": "Los Angeles Dodgers"
+   },
+   "home": {
+    "abbreviation": "MIA",
+    "id": 146,
+    "name": "Miami Marlins"
+   }
+  }
+ },
+ "liveData": {
+  "boxscore": {
+   "teams": {
+    "away": {
+     "players": {
+      "ID500743": {
+       "person": {
+        "fullName": "Miguel Rojas",
+        "id": 500743
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID518692": {
+       "person": {
+        "fullName": "Freddie Freeman",
+        "id": 518692
+       },
+       "stats": {
+        "batting": {
+         "atBats": 4,
+         "baseOnBalls": 0,
+         "hits": 0,
+         "homeRuns": 0,
+         "plateAppearances": 4,
+         "rbi": 0,
+         "runs": 0,
+         "strikeOuts": 0,
+         "totalBases": 0
+        },
+        "pitching": {}
+       }
+      },
+      "ID571771": {
+       "person": {
+        "fullName": "Enrique Hernández",
+        "id": 571771
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID571970": {
+       "person": {
+        "fullName": "Max Muncy",
+        "id": 571970
+       },
+       "stats": {
+        "batting": {
+         "atBats": 4,
+         "baseOnBalls": 0,
+         "hits": 1,
+         "homeRuns": 1,
+         "plateAppearances": 4,
+         "rbi": 1,
+         "runs": 1,
+         "strikeOuts": 1,
+         "totalBases": 4
+        },
+        "pitching": {}
+       }
+      },
+      "ID592779": {
+       "person": {
+        "fullName": "Brock Stewart",
+        "id": 592779
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID595014": {
+       "person": {
+        "fullName": "Blake Treinen",
+        "id": 595014
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID605141": {
+       "person": {
+        "fullName": "Mookie Betts",
+        "id": 605141
+       },
+       "stats": {
+        "batting": {
+         "atBats": 3,
+         "baseOnBalls": 1,
+         "hits": 1,
+         "homeRuns": 1,
+         "plateAppearances": 4,
+         "rbi": 1,
+         "runs": 1,
+         "strikeOuts": 1,
+         "totalBases": 4
+        },
+        "pitching": {}
+       }
+      },
+      "ID605483": {
+       "person": {
+        "fullName": "Blake Snell",
+        "id": 605483
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID606192": {
+       "person": {
+        "fullName": "Teoscar Hernández",
+        "id": 606192
+       },
+       "stats": {
+        "batting": {
+         "atBats": 3,
+         "baseOnBalls": 1,
+         "hits": 0,
+         "homeRuns": 0,
+         "plateAppearances": 4,
+         "rbi": 0,
+         "runs": 0,
+         "strikeOuts": 1,
+         "totalBases": 0
+        },
+        "pitching": {}
+       }
+      },
+      "ID607192": {
+       "person": {
+        "fullName": "Tyler Glasnow",
+        "id": 607192
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {
+         "baseOnBalls": 4,
+         "battersFaced": 22,
+         "earnedRuns": 4,
+         "hits": 5,
+         "inningsPitched": "4.0",
+         "outs": 12,
+         "strikeOuts": 7
+        }
+       }
+      },
+      "ID623465": {
+       "person": {
+        "fullName": "Evan Phillips",
+        "id": 623465
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID656945": {
+       "person": {
+        "fullName": "Tanner Scott",
+        "id": 656945
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID663656": {
+       "person": {
+        "fullName": "Kyle Tucker",
+        "id": 663656
+       },
+       "stats": {
+        "batting": {
+         "atBats": 4,
+         "baseOnBalls": 0,
+         "hits": 0,
+         "homeRuns": 0,
+         "plateAppearances": 4,
+         "rbi": 0,
+         "runs": 0,
+         "strikeOuts": 1,
+         "totalBases": 0
+        },
+        "pitching": {}
+       }
+      },
+      "ID669242": {
+       "person": {
+        "fullName": "Tommy Edman",
+        "id": 669242
+       },
+       "stats": {
+        "batting": {
+         "atBats": 4,
+         "baseOnBalls": 0,
+         "hits": 0,
+         "homeRuns": 0,
+         "plateAppearances": 4,
+         "rbi": 0,
+         "runs": 0,
+         "strikeOuts": 1,
+         "totalBases": 0
+        },
+        "pitching": {}
+       }
+      },
+      "ID669257": {
+       "person": {
+        "fullName": "Will Smith",
+        "id": 669257
+       },
+       "stats": {
+        "batting": {
+         "atBats": 1,
+         "baseOnBalls": 0,
+         "hits": 0,
+         "homeRuns": 0,
+         "plateAppearances": 1,
+         "rbi": 0,
+         "runs": 0,
+         "strikeOuts": 0,
+         "totalBases": 0
+        },
+        "pitching": {}
+       }
+      },
+      "ID669373": {
+       "person": {
+        "fullName": "Tarik Skubal",
+        "id": 669373
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID669743": {
+       "person": {
+        "fullName": "Alex Call",
+        "id": 669743
+       },
+       "stats": {
+        "batting": {
+         "atBats": 0,
+         "baseOnBalls": 0,
+         "hits": 0,
+         "homeRuns": 0,
+         "plateAppearances": 0,
+         "rbi": 0,
+         "runs": 0,
+         "strikeOuts": 0,
+         "totalBases": 0
+        },
+        "pitching": {}
+       }
+      },
+      "ID672613": {
+       "person": {
+        "fullName": "Eliezer Alfonzo",
+        "id": 672613
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID676263": {
+       "person": {
+        "fullName": "Jack Dreyer",
+        "id": 676263
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {
+         "baseOnBalls": 0,
+         "battersFaced": 4,
+         "earnedRuns": 0,
+         "hits": 0,
+         "inningsPitched": "1.0",
+         "outs": 3,
+         "strikeOuts": 0
+        }
+       }
+      },
+      "ID676439": {
+       "person": {
+        "fullName": "Hunter Feduccia",
+        "id": 676439
+       },
+       "stats": {
+        "batting": {
+         "atBats": 3,
+         "baseOnBalls": 1,
+         "hits": 1,
+         "homeRuns": 0,
+         "plateAppearances": 4,
+         "rbi": 1,
+         "runs": 0,
+         "strikeOuts": 0,
+         "totalBases": 1
+        },
+        "pitching": {}
+       }
+      },
+      "ID678020": {
+       "person": {
+        "fullName": "Seth Halvorsen",
+        "id": 678020
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {
+         "baseOnBalls": 0,
+         "battersFaced": 3,
+         "earnedRuns": 0,
+         "hits": 0,
+         "inningsPitched": "1.0",
+         "outs": 3,
+         "strikeOuts": 1
+        }
+       }
+      },
+      "ID680736": {
+       "person": {
+        "fullName": "Justin Wrobleski",
+        "id": 680736
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {
+         "baseOnBalls": 1,
+         "battersFaced": 9,
+         "earnedRuns": 0,
+         "hits": 2,
+         "inningsPitched": "2.0",
+         "outs": 6,
+         "strikeOuts": 1
+        }
+       }
+      },
+      "ID681911": {
+       "person": {
+        "fullName": "Alex Vesia",
+        "id": 681911
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID683618": {
+       "person": {
+        "fullName": "Edgardo Henriquez",
+        "id": 683618
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID686218": {
+       "person": {
+        "fullName": "Emmet Sheehan",
+        "id": 686218
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID690976": {
+       "person": {
+        "fullName": "Alex Freeland",
+        "id": 690976
+       },
+       "stats": {
+        "batting": {
+         "atBats": 3,
+         "baseOnBalls": 0,
+         "hits": 1,
+         "homeRuns": 0,
+         "plateAppearances": 3,
+         "rbi": 0,
+         "runs": 0,
+         "strikeOuts": 0,
+         "totalBases": 1
+        },
+        "pitching": {}
+       }
+      },
+      "ID800543": {
+       "person": {
+        "fullName": "Josue De Paula",
+        "id": 800543
+       },
+       "stats": {
+        "batting": {
+         "atBats": 2,
+         "baseOnBalls": 2,
+         "hits": 0,
+         "homeRuns": 0,
+         "plateAppearances": 4,
+         "rbi": 0,
+         "runs": 1,
+         "strikeOuts": 0,
+         "totalBases": 0
+        },
+        "pitching": {}
+       }
+      },
+      "ID808967": {
+       "person": {
+        "fullName": "Yoshinobu Yamamoto",
+        "id": 808967
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      }
+     }
+    },
+    "home": {
+     "players": {
+      "ID640459": {
+       "person": {
+        "fullName": "Brian Navarreto",
+        "id": 640459
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID645261": {
+       "person": {
+        "fullName": "Sandy Alcantara",
+        "id": 645261
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID656848": {
+       "person": {
+        "fullName": "Michael Petersen",
+        "id": 656848
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {
+         "baseOnBalls": 0,
+         "battersFaced": 3,
+         "earnedRuns": 0,
+         "hits": 0,
+         "inningsPitched": "1.0",
+         "outs": 3,
+         "strikeOuts": 1
+        }
+       }
+      },
+      "ID663969": {
+       "person": {
+        "fullName": "Tyler Phillips",
+        "id": 663969
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {
+         "baseOnBalls": 3,
+         "battersFaced": 16,
+         "earnedRuns": 2,
+         "hits": 2,
+         "inningsPitched": "3.2",
+         "outs": 11,
+         "strikeOuts": 3
+        }
+       }
+      },
+      "ID664126": {
+       "person": {
+        "fullName": "Pete Fairbanks",
+        "id": 664126
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {
+         "baseOnBalls": 1,
+         "battersFaced": 5,
+         "earnedRuns": 1,
+         "hits": 1,
+         "inningsPitched": "1.0",
+         "outs": 3,
+         "strikeOuts": 0
+        }
+       }
+      },
+      "ID665052": {
+       "person": {
+        "fullName": "Griffin Conine",
+        "id": 665052
+       },
+       "stats": {
+        "batting": {
+         "atBats": 3,
+         "baseOnBalls": 1,
+         "hits": 3,
+         "homeRuns": 0,
+         "plateAppearances": 4,
+         "rbi": 0,
+         "runs": 1,
+         "strikeOuts": 0,
+         "totalBases": 4
+        },
+        "pitching": {}
+       }
+      },
+      "ID665923": {
+       "person": {
+        "fullName": "Esteury Ruiz",
+        "id": 665923
+       },
+       "stats": {
+        "batting": {
+         "atBats": 3,
+         "baseOnBalls": 0,
+         "hits": 0,
+         "homeRuns": 0,
+         "plateAppearances": 3,
+         "rbi": 0,
+         "runs": 0,
+         "strikeOuts": 2,
+         "totalBases": 0
+        },
+        "pitching": {}
+       }
+      },
+      "ID667652": {
+       "person": {
+        "fullName": "Jack Ralston",
+        "id": 667652
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID669065": {
+       "person": {
+        "fullName": "Kyle Stowers",
+        "id": 669065
+       },
+       "stats": {
+        "batting": {
+         "atBats": 5,
+         "baseOnBalls": 0,
+         "hits": 0,
+         "homeRuns": 0,
+         "plateAppearances": 5,
+         "rbi": 0,
+         "runs": 0,
+         "strikeOuts": 2,
+         "totalBases": 0
+        },
+        "pitching": {}
+       }
+      },
+      "ID672640": {
+       "person": {
+        "fullName": "Otto Lopez",
+        "id": 672640
+       },
+       "stats": {
+        "batting": {
+         "atBats": 2,
+         "baseOnBalls": 1,
+         "hits": 2,
+         "homeRuns": 0,
+         "plateAppearances": 4,
+         "rbi": 1,
+         "runs": 0,
+         "strikeOuts": 0,
+         "totalBases": 2
+        },
+        "pitching": {}
+       }
+      },
+      "ID676083": {
+       "person": {
+        "fullName": "Janson Junk",
+        "id": 676083
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID676534": {
+       "person": {
+        "fullName": "Calvin Faucher",
+        "id": 676534
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {
+         "baseOnBalls": 0,
+         "battersFaced": 4,
+         "earnedRuns": 0,
+         "hits": 1,
+         "inningsPitched": "1.0",
+         "outs": 3,
+         "strikeOuts": 0
+        }
+       }
+      },
+      "ID676604": {
+       "person": {
+        "fullName": "Tyler Zuber",
+        "id": 676604
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {
+         "baseOnBalls": 1,
+         "battersFaced": 4,
+         "earnedRuns": 0,
+         "hits": 0,
+         "inningsPitched": "1.0",
+         "outs": 3,
+         "strikeOuts": 1
+        }
+       }
+      },
+      "ID680767": {
+       "person": {
+        "fullName": "Victor Vodnik",
+        "id": 680767
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID681715": {
+       "person": {
+        "fullName": "Heriberto Hernández",
+        "id": 681715
+       },
+       "stats": {
+        "batting": {
+         "atBats": 5,
+         "baseOnBalls": 0,
+         "hits": 1,
+         "homeRuns": 0,
+         "plateAppearances": 5,
+         "rbi": 0,
+         "runs": 1,
+         "strikeOuts": 2,
+         "totalBases": 1
+        },
+        "pitching": {}
+       }
+      },
+      "ID682663": {
+       "person": {
+        "fullName": "Agustín Ramírez",
+        "id": 682663
+       },
+       "stats": {
+        "batting": {
+         "atBats": 1,
+         "baseOnBalls": 0,
+         "hits": 0,
+         "homeRuns": 0,
+         "plateAppearances": 1,
+         "rbi": 0,
+         "runs": 0,
+         "strikeOuts": 0,
+         "totalBases": 0
+        },
+        "pitching": {}
+       }
+      },
+      "ID683357": {
+       "person": {
+        "fullName": "Owen Caissie",
+        "id": 683357
+       },
+       "stats": {
+        "batting": {
+         "atBats": 0,
+         "baseOnBalls": 1,
+         "hits": 0,
+         "homeRuns": 0,
+         "plateAppearances": 1,
+         "rbi": 0,
+         "runs": 1,
+         "strikeOuts": 0,
+         "totalBases": 0
+        },
+        "pitching": {}
+       }
+      },
+      "ID687473": {
+       "person": {
+        "fullName": "Ryan Gusto",
+        "id": 687473
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID688363": {
+       "person": {
+        "fullName": "Graham Pauley",
+        "id": 688363
+       },
+       "stats": {
+        "batting": {
+         "atBats": 2,
+         "baseOnBalls": 0,
+         "hits": 1,
+         "homeRuns": 1,
+         "plateAppearances": 2,
+         "rbi": 2,
+         "runs": 1,
+         "strikeOuts": 1,
+         "totalBases": 4
+        },
+        "pitching": {}
+       }
+      },
+      "ID690978": {
+       "person": {
+        "fullName": "Dax Fulton",
+        "id": 690978
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID691277": {
+       "person": {
+        "fullName": "Deyvison De Los Santos",
+        "id": 691277
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID691587": {
+       "person": {
+        "fullName": "Eury Pérez",
+        "id": 691587
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID691594": {
+       "person": {
+        "fullName": "Javier Sanoja",
+        "id": 691594
+       },
+       "stats": {
+        "batting": {
+         "atBats": 3,
+         "baseOnBalls": 1,
+         "hits": 0,
+         "homeRuns": 0,
+         "plateAppearances": 4,
+         "rbi": 1,
+         "runs": 0,
+         "strikeOuts": 0,
+         "totalBases": 0
+        },
+        "pitching": {}
+       }
+      },
+      "ID691788": {
+       "person": {
+        "fullName": "Joe Mack",
+        "id": 691788
+       },
+       "stats": {
+        "batting": {
+         "atBats": 4,
+         "baseOnBalls": 0,
+         "hits": 0,
+         "homeRuns": 0,
+         "plateAppearances": 4,
+         "rbi": 0,
+         "runs": 0,
+         "strikeOuts": 2,
+         "totalBases": 0
+        },
+        "pitching": {}
+       }
+      },
+      "ID691858": {
+       "person": {
+        "fullName": "Jared Serna",
+        "id": 691858
+       },
+       "stats": {
+        "batting": {
+         "atBats": 1,
+         "baseOnBalls": 0,
+         "hits": 0,
+         "homeRuns": 0,
+         "plateAppearances": 1,
+         "rbi": 0,
+         "runs": 0,
+         "strikeOuts": 0,
+         "totalBases": 0
+        },
+        "pitching": {}
+       }
+      },
+      "ID694795": {
+       "person": {
+        "fullName": "Josh Ekness",
+        "id": 694795
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {}
+       }
+      },
+      "ID805300": {
+       "person": {
+        "fullName": "Jakob Marsee",
+        "id": 805300
+       },
+       "stats": {
+        "batting": {
+         "atBats": 1,
+         "baseOnBalls": 1,
+         "hits": 0,
+         "homeRuns": 0,
+         "plateAppearances": 4,
+         "rbi": 0,
+         "runs": 0,
+         "strikeOuts": 0,
+         "totalBases": 0
+        },
+        "pitching": {}
+       }
+      },
+      "ID806188": {
+       "person": {
+        "fullName": "Cade Gibson",
+        "id": 806188
+       },
+       "stats": {
+        "batting": {},
+        "pitching": {
+         "baseOnBalls": 0,
+         "battersFaced": 4,
+         "earnedRuns": 0,
+         "hits": 0,
+         "inningsPitched": "1.1",
+         "outs": 4,
+         "strikeOuts": 0
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "linescore": {
+   "innings": [
+    {
+     "away": {
+      "runs": 2
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 1
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 3
+     },
+     "num": 2
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 3
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 4
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 1
+     },
+     "num": 5
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 6
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 7
+    },
+    {
+     "away": {
+      "runs": 0
+     },
+     "home": {
+      "runs": 0
+     },
+     "num": 8
+    },
+    {
+     "away": {
+      "runs": 1
+     },
+     "home": {
+      "runs": null
+     },
+     "num": 9
+    }
+   ],
+   "teams": {
+    "away": {
+     "runs": 3
+    },
+    "home": {
+     "runs": 4
+    }
+   }
+  }
+ }
+}

@@ -56,6 +56,14 @@ row for that game has failed, and it settles a record through
 `graded_outcomes.grade_score_bet` -- for any line and either side -- or refuses
 with a named `detail`.
 
+PLAYER BOX ROWS (2026-09-18). MLB also emits one `player_box` row per
+regulation final (`graded_outcomes.PLAYER_BOX_ROW_MARKET`): every player's
+box-score value for every stat the paper resolver grades. Reachable ONLY through
+the game-id phase, only for a record that names a player, and only after every
+ordinary row for the game has failed; it settles through
+`grade_record_on_player_box` at the record's own line and side, or refuses with
+a named `detail`.
+
 SEGMENTS. A record's segment (explicit `segment`, a suffixed market key, or a
 label such as "First 5 Total") must equal the row's (absent = `full`). Before
 this, "First 5 Moneyline" fell through `_markets_compatible`'s keyword family to
@@ -73,7 +81,9 @@ from syndicate.features.shared.graded_outcomes import SCORE_BET_MONEYLINE
 from syndicate.features.shared.graded_outcomes import SCORE_BET_SPREAD
 from syndicate.features.shared.graded_outcomes import SCORE_BET_TOTAL
 from syndicate.features.shared.graded_outcomes import grade_score_bet
+from syndicate.features.shared.graded_outcomes import is_player_box_row
 from syndicate.features.shared.graded_outcomes import is_score_row
+from syndicate.features.shared.graded_outcomes import player_name_key
 from syndicate.features.shared.team_aliases import _alias_map
 from syndicate.features.shared.team_aliases import chip_join_key
 from syndicate.features.shared.team_aliases import fold_accents
@@ -798,6 +808,188 @@ def grade_record_on_score_rows(
     return graded, "graded"
 
 
+# ---------------------------------------------------------------------------
+# Player box rows: grade a prop record at its own line from the box score
+# ---------------------------------------------------------------------------
+
+_PITCHER_PREFIX = re.compile(r"^pitcher(?:[\s_]|$)")
+_HITTER_PREFIX = re.compile(r"^(?:hitter|batter)(?:[\s_]|$)")
+_GROUP_PREFIX = re.compile(r"^(?:pitcher|hitter|batter)[\s_]+")
+_LADDER_LINE = re.compile(r"(\d+(?:\.\d+)?)\s*\+\s*$")
+_PROP_MARKET_FIELDS = ("market_key", "market", "market_label", "market_family")
+
+
+def _declared_prop_group(raw: str) -> str | None:
+    if _PITCHER_PREFIX.match(raw):
+        return "pitcher"
+    if _HITTER_PREFIX.match(raw):
+        return "hitter"
+    return None
+
+
+def prop_stat_for_record(sport: str | None, record: Mapping[str, Any]) -> tuple[tuple[str, str, str] | None, str | None]:
+    """((group, stat, market_key), refusal) for an MLB prop record.
+
+    The FIRST non-empty market field decides (as in `score_market_kind`), read
+    through the paper resolver's own table (`bet_status_mlb._stat_for_market`,
+    which accepts both the board key and the display label). A label's
+    hitter/batter/pitcher prefix is a CLAIM about the group and is checked:
+    `canonical_market_key` folds "Hitter Strikeouts" onto the PITCHER
+    `strikeouts` key, so without this a batter's strikeout prop would settle
+    against the pitcher's line. Two fields naming different groups refuse too.
+    """
+    if normalize(sport) != "mlb":
+        return None, "prop_sport_not_boxed"
+    from syndicate.features.shared.bet_status_mlb import _stat_for_market
+    from syndicate.features.shared.market_keys import canonical_market_key
+
+    recommendation = record.get("recommendation") if isinstance(record.get("recommendation"), Mapping) else record
+    raws = [str(recommendation.get(key) or "").strip().lower() for key in _PROP_MARKET_FIELDS]
+    raws = [raw for raw in raws if raw]
+    if not raws:
+        return None, "prop_market_unmapped"
+    declared = {group for group in (_declared_prop_group(raw) for raw in raws) if group}
+    if len(declared) > 1:
+        return None, "prop_market_group_disagrees"
+    raw = raws[0]
+    mapped = _stat_for_market(raw)
+    if mapped is None:
+        stripped = _GROUP_PREFIX.sub("", raw)
+        if stripped != raw:
+            mapped = _stat_for_market(stripped)
+    if mapped is None:
+        return None, "prop_market_unmapped"
+    group, stat = mapped
+    if declared and group not in declared:
+        return None, "prop_market_group_disagrees"
+    try:
+        market_key = canonical_market_key("mlb", raw) or raw
+    except Exception:
+        market_key = raw
+    return (group, stat, market_key), None
+
+
+def _prop_line(sport: str | None, recommendation: Mapping[str, Any]) -> tuple[float | None, str | None]:
+    """The prop's MARKET line: explicit `line`, else the pick text's number.
+    Never `projected`. "Over 16+" is the ladder form of over 15.5. Both present
+    and different refuses, as for score bets."""
+    explicit = _coerce_float(recommendation.get("line"))
+    text = _text(recommendation.get("selection") or recommendation.get("pick") or recommendation.get("name"))
+    ladder = _LADDER_LINE.search(text)
+    if ladder:
+        text_line: float | None = float(ladder.group(1)) - 0.5
+    else:
+        text_line = resolve_selection(sport, text).line
+    if explicit is not None and text_line is not None and abs(explicit - text_line) > 1e-9:
+        return None, "line_disagrees_with_selection"
+    line = explicit if explicit is not None else text_line
+    if line is None:
+        return None, "prop_line_missing"
+    return line, None
+
+
+def _record_player_ids(recommendation: Mapping[str, Any], group: str) -> list[int]:
+    keys = ["player_id", "pitcher_id" if group == "pitcher" else "batter_id"]
+    out: list[int] = []
+    for key in keys:
+        value = recommendation.get(key)
+        try:
+            number = int(str(value).strip())
+        except (TypeError, ValueError):
+            continue
+        if number > 0 and number not in out:
+            out.append(number)
+    return out
+
+
+def _find_box_player(players: Sequence[Mapping[str, Any]], *, ids: Sequence[int], name_key: str) -> tuple[Mapping[str, Any] | None, str | None]:
+    """(player, refusal). Id first; a name that names a DIFFERENT player than
+    the id refuses. Name alone must be unique within the game."""
+    by_name = [player for player in players if name_key and player.get("name_key") == name_key]
+    for player_id in ids:
+        for player in players:
+            if player.get("id") == player_id:
+                if by_name and all(other is not player for other in by_name):
+                    return None, "player_id_name_disagree"
+                return player, None
+    if len(by_name) > 1:
+        return None, "player_name_ambiguous"
+    if by_name:
+        return by_name[0], None
+    return None, "player_not_in_boxscore"
+
+
+def grade_record_on_player_box(
+    record: Mapping[str, Any],
+    record_id: SettlementIdentity,
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    sport: str | None,
+    segment: str,
+) -> tuple[dict[str, Any] | None, str]:
+    """(graded row, detail) for a prop record against its game's box row.
+
+    The graded row has the ordinary shape with `odds`/`pnl` None, so
+    settlement prices the record at ITS OWN odds (as for score rows). Nothing
+    defaults: a player not in the box, a stat not recorded, or a line the
+    record states two ways each refuses by name and the record stays pending.
+    """
+    if segment != SEGMENT_FULL:
+        return None, "prop_segment_not_graded"
+    if len(rows) > 1:
+        return None, "player_box_ambiguous"
+    mapped, refusal = prop_stat_for_record(sport, record)
+    if mapped is None:
+        return None, refusal or "prop_market_unmapped"
+    group, stat, market_key = mapped
+    if record_id.side not in {"over", "under"}:
+        return None, "prop_side_unmapped"
+    recommendation = record.get("recommendation") if isinstance(record.get("recommendation"), Mapping) else {}
+    line, refusal = _prop_line(sport, recommendation)
+    if line is None:
+        return None, refusal or "prop_line_missing"
+    row = rows[0]
+    players = [player for player in (row.get("players") or ()) if isinstance(player, Mapping)]
+    player, refusal = _find_box_player(
+        players,
+        ids=_record_player_ids(recommendation, group),
+        name_key=player_name_key(record_id.player),
+    )
+    if player is None:
+        return None, refusal or "player_not_in_boxscore"
+    group_stats = player.get(group)
+    if not isinstance(group_stats, Mapping):
+        return None, "player_group_absent"
+    actual = _coerce_float(group_stats.get(stat))
+    if actual is None:
+        return None, "player_stat_absent"
+    if actual == line:
+        result = "push"
+    else:
+        result = "win" if (actual > line) == (record_id.side == "over") else "loss"
+    graded = {
+        "sport": row.get("sport") or sport,
+        "game_id": row.get("game_id"),
+        "game_pk": row.get("game_pk"),
+        "market": market_key,
+        "segment": SEGMENT_FULL,
+        "selection": record_id.side,
+        "player": player.get("name"),
+        "player_id": player.get("id"),
+        "team": player.get("team"),
+        "home": row.get("home"),
+        "away": row.get("away"),
+        "title": row.get("title"),
+        "line": line,
+        "actual": actual,
+        "odds": None,
+        "result": result,
+        "pnl": None,
+        "graded_from": "box_score",
+    }
+    return graded, "graded"
+
+
 class GradedRowIndex:
     """Graded rows with their identities computed ONCE per settlement pass.
 
@@ -813,6 +1005,11 @@ class GradedRowIndex:
         self.identities: list[SettlementIdentity] = []
         self.segments: list[str] = []
         self.score_row: list[bool] = []
+        self.box_row: list[bool] = []
+        # Games with a player box row. Non-zero is what tells "this game has no
+        # box" (`no_player_box_for_game`) apart from "this sport has no box
+        # grader at all" (`prop_not_graded`).
+        self.box_rows_total = 0
         self.by_game_id: dict[str, list[int]] = {}
         # Rows, not games: `by_game_id` has one key per GAME, and reading its
         # length as a row count is what made `graded_rows_with_game_id` report
@@ -827,6 +1024,10 @@ class GradedRowIndex:
             self.identities.append(identity)
             self.segments.append(graded_row_segment(row))
             self.score_row.append(is_score_row(row))
+            box = is_player_box_row(row)
+            self.box_row.append(box)
+            if box:
+                self.box_rows_total += 1
             if identity.game_ids:
                 self.rows_with_game_id += 1
             for game_id in identity.game_ids:
@@ -898,10 +1099,14 @@ def find_graded_row(
         if not candidates:
             return MatchOutcome(row=None, phase=None, reason=_classify_miss(record_id, game_reason=REASON_GAME_ABSENT))
         score_rows: list[Mapping[str, Any]] = []
+        box_rows: list[Mapping[str, Any]] = []
         for position in sorted(set(candidates)):
             row = index.rows[position]
             if index.score_row[position]:
                 score_rows.append(row)
+                continue
+            if index.box_row[position]:
+                box_rows.append(row)
                 continue
             if index.segments[position] != segment:
                 continue
@@ -915,12 +1120,21 @@ def find_graded_row(
         # Every ordinary row for the game failed; only now may its final score
         # decide. Ordinary rows first keeps every pre-existing settlement (and
         # its card pnl) exactly as it was.
-        if score_rows:
+        if record_id.player:
+            # A PROP. The linescore has no player stats, so score rows never
+            # answer it; the box row does, or the miss is named.
+            if box_rows:
+                graded, detail = grade_record_on_player_box(record, record_id, box_rows, sport=sport_slug, segment=segment)
+                if graded is not None:
+                    return MatchOutcome(row=graded, phase="box_score", reason=None)
+            else:
+                detail = "no_player_box_for_game" if index.box_rows_total else "prop_not_graded"
+        elif score_rows:
             graded, detail = grade_record_on_score_rows(record, record_id, score_rows, sport=sport_slug, segment=segment)
             if graded is not None:
                 return MatchOutcome(row=graded, phase="game_score", reason=None)
         else:
-            detail = "prop_not_graded" if record_id.player else "no_score_rows_for_game"
+            detail = "no_score_rows_for_game"
         return MatchOutcome(
             row=None,
             phase=None,
@@ -931,7 +1145,7 @@ def find_graded_row(
     # Phase 2: canonical club + side, bounded to the same fixture. Score rows
     # are reachable only by game id (doubleheaders share both clubs).
     for position, row in enumerate(index.rows):
-        if index.score_row[position] or index.segments[position] != segment:
+        if index.score_row[position] or index.box_row[position] or index.segments[position] != segment:
             continue
         row_id = index.identities[position]
         if not _market_ok(row):
@@ -947,7 +1161,7 @@ def find_graded_row(
     # normalised tokens overlap, whose market agrees, and whose line agrees.
     record_keys = _loose_record_keys(record)
     for position, row in enumerate(index.rows):
-        if index.score_row[position] or index.segments[position] != segment:
+        if index.score_row[position] or index.box_row[position] or index.segments[position] != segment:
             continue
         row_id = index.identities[position]
         row_keys = _loose_row_keys(row)
@@ -985,6 +1199,7 @@ __all__ = [
     "SettlementIdentity",
     "club_key",
     "find_graded_row",
+    "grade_record_on_player_box",
     "grade_record_on_score_rows",
     "graded_row_identity",
     "graded_row_segment",

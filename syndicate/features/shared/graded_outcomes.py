@@ -65,7 +65,9 @@ def _unavailable_graded_rows_for_date(_date_str: str) -> list[dict[str, Any]]:
 
 def _mlb_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
     """The season card's graded rows (PROPS, plus its one `ml` pick per game)
-    followed by one SCORE ROW per finished game and segment.
+    followed by one SCORE ROW per finished game and segment, and one PLAYER BOX
+    ROW per regulation-length final (props at any line; see
+    `mlb_player_box_row_from_feed`).
 
     Two sources because they answer different questions. The card is the only
     prop source this grader has, but it grades only what the card itself picked:
@@ -298,6 +300,137 @@ def mlb_score_rows_from_feed(feed: Any) -> list[dict[str, Any]]:
     return rows
 
 
+# ---------------------------------------------------------------------------
+# MLB player props from the FINAL BOX SCORE -- one "player box row" per game.
+#
+# Measured on production 2026-09-18 (first autorun with score rows): MLB settled
+# 2,293 of 10,817 settleable (21.2%), and all 7,849 `market_not_graded` misses
+# were `prop_not_graded`. The season card grades only the props IT picked; the
+# ledger records every board prop at every line. Samples: pitcher strikeouts
+# over 3.5, pitcher outs over 13.5, hitter runs under 0.5, hitter hits over 0.5,
+# all on games whose feed WAS cached.
+#
+# Same reasoning as the score row: the box score is the fact, and the verdict
+# for one (player, stat, side, line) is arithmetic on it. One row per game
+# carries every player's value for every stat the paper resolver can grade
+# (`bet_status_mlb._MARKET_TO_STAT`, read through `box_score_stats`' own
+# readers), so the two graders cannot disagree about a player's line.
+#
+# Like a score row it carries no `result`/`actual`/`pnl`: nothing settles
+# against it except `settlement_identity.grade_record_on_player_box`, and
+# `emit_settlement_inputs._graded_index` skips it.
+# ---------------------------------------------------------------------------
+
+PLAYER_BOX_ROW_MARKET = "player_box"
+
+_NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
+
+
+def is_player_box_row(row: Any) -> bool:
+    return isinstance(row, Mapping) and str(row.get("market") or "") == PLAYER_BOX_ROW_MARKET
+
+
+def player_name_key(value: Any) -> str:
+    """A player's name as a join key: `cards._normalize_live_name` (case,
+    whitespace, accents), then periods/commas dropped and a trailing
+    generational suffix removed -- "Vladimir Guerrero Jr." == "vladimir guerrero"."""
+    from syndicate.features.mlb.cards import _normalize_live_name
+
+    text = _normalize_live_name(value).replace(".", " ").replace(",", " ")
+    tokens = text.split()
+    while len(tokens) > 2 and tokens[-1] in _NAME_SUFFIXES:
+        tokens.pop()
+    return " ".join(tokens)
+
+
+def _mlb_prop_stats_by_group() -> dict[str, tuple[str, ...]]:
+    from syndicate.features.shared.bet_status_mlb import _MARKET_TO_STAT
+
+    out: dict[str, list[str]] = {}
+    for group, stat in _MARKET_TO_STAT.values():
+        if stat not in out.setdefault(group, []):
+            out[group].append(stat)
+    return {group: tuple(stats) for group, stats in out.items()}
+
+
+def mlb_player_box_row_from_feed(feed: Any) -> dict[str, Any] | None:
+    """One player box row for a completed, REGULATION-LENGTH game; else None.
+
+    Regulation only (9+ linescore innings), the rule the full-game score row
+    uses: a called game's props are action at some books and void at others,
+    and this row cannot tell which, so its prop records stay pending.
+
+    A player appears in a group only with a NON-EMPTY stats block for it
+    (`box_score_stats._stat_indexes`' rule): a rostered player who did not bat
+    has no batting entry, so an unplayed prop reads `player_not_in_boxscore`,
+    never "0 hits".
+    """
+    if not isinstance(feed, Mapping) or not _mlb_feed_completed(feed):
+        return None
+    live_data = feed.get("liveData") if isinstance(feed.get("liveData"), Mapping) else {}
+    linescore = live_data.get("linescore") if isinstance(live_data.get("linescore"), Mapping) else {}
+    innings = linescore.get("innings") if isinstance(linescore.get("innings"), list) else []
+    if len(innings) < 9:
+        return None
+    game_data = feed.get("gameData") if isinstance(feed.get("gameData"), Mapping) else {}
+    game = game_data.get("game") if isinstance(game_data.get("game"), Mapping) else {}
+    game_id = _game_id_text(game.get("pk"))
+    if not game_id:
+        return None
+    teams = game_data.get("teams") if isinstance(game_data.get("teams"), Mapping) else {}
+    abbr: dict[str, str | None] = {}
+    for side in ("home", "away"):
+        team = teams.get(side) if isinstance(teams.get(side), Mapping) else {}
+        abbr[side] = str(team.get("abbreviation") or "").strip() or None
+
+    from syndicate.features.mlb.box_score_stats import _hitter_stat_value
+    from syndicate.features.mlb.cards import _actual_pitcher_stat_value, _iter_team_players
+
+    stats_by_group = _mlb_prop_stats_by_group()
+    players: list[dict[str, Any]] = []
+    for side in ("away", "home"):
+        for player_obj in _iter_team_players(dict(feed), side):
+            person = player_obj.get("person") if isinstance(player_obj.get("person"), Mapping) else {}
+            name = str(person.get("fullName") or "").strip()
+            player_id = _int_or_none(person.get("id"))
+            stats = player_obj.get("stats") if isinstance(player_obj.get("stats"), Mapping) else {}
+            entry: dict[str, Any] = {
+                "id": player_id if player_id and player_id > 0 else None,
+                "name": name,
+                "name_key": player_name_key(name),
+                "side": side,
+                "team": abbr.get(side),
+            }
+            present = False
+            for group, block_key, reader in (
+                ("hitter", "batting", _hitter_stat_value),
+                ("pitcher", "pitching", _actual_pitcher_stat_value),
+            ):
+                block = stats.get(block_key) if isinstance(stats.get(block_key), dict) else None
+                if not block:
+                    continue
+                values = {stat: reader(block, stat) for stat in stats_by_group.get(group, ())}
+                entry[group] = {stat: value for stat, value in values.items() if value is not None}
+                present = True
+            if present and (entry["name_key"] or entry["id"]):
+                players.append(entry)
+    if not players:
+        return None
+    return {
+        "sport": "mlb",
+        "game_id": game_id,
+        "game_pk": _int_or_none(game.get("pk")),
+        "market": PLAYER_BOX_ROW_MARKET,
+        "segment": "full",
+        "home": abbr.get("home"),
+        "away": abbr.get("away"),
+        "title": f"{abbr.get('away')} @ {abbr.get('home')}" if abbr.get("home") and abbr.get("away") else None,
+        "innings": len(innings),
+        "players": players,
+        "source": "feed_live_boxscore",
+    }
+
+
 def _mlb_slate_game_pks(date_str: str) -> set[int]:
     """Every gamePk StatsAPI lists for the slate, from the refresh's own
     `schedule_raw.json` -- the same read `bet_status_mlb._schedule_index` uses."""
@@ -346,18 +479,26 @@ def _mlb_final_score_rows_for_date(date_str: str, *, extra_game_pks: Any = ()) -
     feeds_missing: list[int] = []
     games_not_complete = 0
     games_graded = 0
+    player_box_rows = 0
+    players_boxed = 0
     for game_pk in sorted(game_pks):
         feed = _load_cached_mlb_feed(date_str, game_pk)
         if feed is None:
             feeds_missing.append(game_pk)
             continue
         game_rows = mlb_score_rows_from_feed(feed)
+        # The SAME parsed feed: props cost no extra read.
+        box_row = mlb_player_box_row_from_feed(feed)
         del feed
         if game_rows:
             games_graded += 1
             rows.extend(game_rows)
         else:
             games_not_complete += 1
+        if box_row is not None:
+            player_box_rows += 1
+            players_boxed += len(box_row.get("players") or ())
+            rows.append(box_row)
     _record_score_row_diagnostics(
         "mlb",
         date_str,
@@ -367,7 +508,9 @@ def _mlb_final_score_rows_for_date(date_str: str, *, extra_game_pks: Any = ()) -
             "games_not_complete": games_not_complete,
             "feeds_not_cached": len(feeds_missing),
             "feeds_not_cached_sample": feeds_missing[:10],
-            "score_rows": len(rows),
+            "score_rows": len(rows) - player_box_rows,
+            "player_box_rows": player_box_rows,
+            "players_boxed": players_boxed,
             "score_rows_by_segment": {
                 segment: sum(1 for row in rows if row.get("segment") == segment)
                 for segment in ("full", *(name for name, _ in _MLB_SCORE_SEGMENT_INNINGS))
@@ -981,10 +1124,14 @@ def graded_rows_for_date(sport: str, date_str: str) -> list[dict[str, Any]]:
 __all__ = [
     "GRADED_OUTCOME_FIELDS",
     "GRADED_OUTCOME_GRADERS",
+    "PLAYER_BOX_ROW_MARKET",
     "SCORE_ROW_MARKET",
     "grade_score_bet",
     "graded_rows_for_date",
+    "is_player_box_row",
     "is_score_row",
+    "mlb_player_box_row_from_feed",
     "mlb_score_rows_from_feed",
+    "player_name_key",
     "score_row_diagnostics",
 ]

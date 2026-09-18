@@ -27,8 +27,10 @@ from pathlib import Path
 from typing import Any, Iterable, Iterator, Mapping, Sequence
 
 from syndicate.features.shared.graded_outcomes import GRADED_OUTCOME_GRADERS
+from syndicate.features.shared.graded_outcomes import PLAYER_BOX_ROW_MARKET
 from syndicate.features.shared.graded_outcomes import SCORE_ROW_MARKET
 from syndicate.features.shared.graded_outcomes import graded_rows_for_date
+from syndicate.features.shared.graded_outcomes import is_player_box_row
 from syndicate.features.shared.graded_outcomes import is_score_row
 from syndicate.features.shared.graded_outcomes import score_row_diagnostics
 from syndicate.features.shared.intelligence_evaluation import DEFAULT_LEDGER_PATH
@@ -587,6 +589,8 @@ def _graded_row_family_counts(rows: Iterable[Mapping[str, Any]]) -> dict[str, in
             continue
         if is_score_row(row):
             family = f"{SCORE_ROW_MARKET}:{row.get('segment') or 'full'}"
+        elif is_player_box_row(row):
+            family = PLAYER_BOX_ROW_MARKET
         else:
             family = _market_family(row.get("market")) or "unknown"
         counts[family] = counts.get(family, 0) + 1

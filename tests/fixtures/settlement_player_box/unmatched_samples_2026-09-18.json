@@ -1,0 +1,140 @@
+{
+ "_source": "GET /api/ops/evaluation-settlement/status autorun_status.summary.unmatched_samples, autorun epoch 2026-09-18T11:27:37Z",
+ "unmatched_samples": [
+  {
+   "sport": "mlb",
+   "reason": "no_key_match:market_not_graded",
+   "detail": "prop_not_graded",
+   "record_keys": [
+    "823009",
+    "kyle leahy",
+    "over kyle leahy",
+    "pitcher strikeouts",
+    "stl"
+   ],
+   "record_identity": {
+    "away": "cws",
+    "game_ids": [
+     "823009"
+    ],
+    "home": "stl",
+    "line": 3.5,
+    "player": "kyle leahy",
+    "side": "over",
+    "team": "stl",
+    "team_resolved": "st. louis cardinals"
+   },
+   "record_market_family": "props",
+   "record_segment": "full",
+   "record_line": 3.5
+  },
+  {
+   "sport": "mlb",
+   "reason": "no_key_match:market_not_graded",
+   "detail": "prop_not_graded",
+   "record_keys": [
+    "823819",
+    "mia",
+    "over tyler phillips",
+    "pitcher outs",
+    "tyler phillips"
+   ],
+   "record_identity": {
+    "away": "lad",
+    "game_ids": [
+     "823819"
+    ],
+    "home": "mia",
+    "line": 13.5,
+    "player": "tyler phillips",
+    "side": "over",
+    "team": "mia",
+    "team_resolved": "miami marlins"
+   },
+   "record_market_family": "props",
+   "record_segment": "full",
+   "record_line": 13.5
+  },
+  {
+   "sport": "mlb",
+   "reason": "no_key_match:market_not_graded",
+   "detail": "prop_not_graded",
+   "record_keys": [
+    "823657",
+    "cle",
+    "hitter runs",
+    "josé ramírez",
+    "under josé ramírez"
+   ],
+   "record_identity": {
+    "away": "cle",
+    "game_ids": [
+     "823657"
+    ],
+    "home": "min",
+    "line": 0.5,
+    "player": "jose ramirez",
+    "side": "under",
+    "team": "cle",
+    "team_resolved": "cleveland guardians"
+   },
+   "record_market_family": "props",
+   "record_segment": "full",
+   "record_line": 0.5
+  },
+  {
+   "sport": "mlb",
+   "reason": "no_key_match:market_not_graded",
+   "detail": "prop_not_graded",
+   "record_keys": [
+    "825035",
+    "az",
+    "hitter runs",
+    "lars nootbaar",
+    "under lars nootbaar"
+   ],
+   "record_identity": {
+    "away": "tex",
+    "game_ids": [
+     "825035"
+    ],
+    "home": "az",
+    "line": 0.5,
+    "player": "lars nootbaar",
+    "side": "under",
+    "team": "az",
+    "team_resolved": "arizona diamondbacks"
+   },
+   "record_market_family": "props",
+   "record_segment": "full",
+   "record_line": 0.5
+  },
+  {
+   "sport": "mlb",
+   "reason": "no_key_match:market_not_graded",
+   "detail": "prop_not_graded",
+   "record_keys": [
+    "824630",
+    "esmerlyn valdez",
+    "hitter hits",
+    "over esmerlyn valdez",
+    "pit"
+   ],
+   "record_identity": {
+    "away": "pit",
+    "game_ids": [
+     "824630"
+    ],
+    "home": "chc",
+    "line": 0.5,
+    "player": "esmerlyn valdez",
+    "side": "over",
+    "team": "pit",
+    "team_resolved": "pittsburgh pirates"
+   },
+   "record_market_family": "props",
+   "record_segment": "full",
+   "record_line": 0.5
+  }
+ ]
+}
