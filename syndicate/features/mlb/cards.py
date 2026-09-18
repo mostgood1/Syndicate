@@ -1464,6 +1464,34 @@ def _source_status(actual_payload: dict[str, Any] | None) -> dict[str, str]:
     return {"abstract": abstract, "detailed": detailed}
 
 
+def _source_final_score(actual_payload: dict[str, Any] | None) -> dict[str, int] | None:
+    """The FINAL score off the same feed `_source_status` reads its Final from.
+
+    `_games_from_daily_summary` copied the feed's STATUS and never its SCORE, so
+    on a past date -- where `_apply_mlb_live_scores` is gated off by
+    `is_active_today` (`home.py`) -- the only score left was the live-lens row,
+    and a lens report with `score: null` produced chips that were `final` with
+    no score. Measured 2026-09-18 (lane `mlb-past-date-chip-score`): all 15
+    games of the 09-15 slate, feed `Final` on refresh-worker at every build
+    behind the served grid, reached `live_gameline_score` as
+    `finals_skipped_no_numeric_score_games: 15`, and the date scored nothing.
+
+    FINAL ONLY, and BOTH SIDES OR NOTHING. A live linescore is the lens's job
+    and is fresher there; and one side missing is exactly the case
+    `_apply_mlb_live_scores` refuses to read as 0-0 when neither is reported.
+    """
+    if not isinstance(actual_payload, dict) or not mlb_feed_payload_is_final(actual_payload):
+        return None
+    live_data = actual_payload.get("liveData") if isinstance(actual_payload.get("liveData"), dict) else {}
+    linescore = live_data.get("linescore") if isinstance(live_data.get("linescore"), dict) else {}
+    teams = linescore.get("teams") if isinstance(linescore.get("teams"), dict) else {}
+    away = _safe_int(((teams.get("away") or {}) if isinstance(teams.get("away"), dict) else {}).get("runs"))
+    home = _safe_int(((teams.get("home") or {}) if isinstance(teams.get("home"), dict) else {}).get("runs"))
+    if away is None or home is None:
+        return None
+    return {"away": away, "home": home}
+
+
 def _probability_rows(output: dict[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for key, label in (("first1", "First 1"), ("first3", "First 3"), ("first5", "First 5"), ("full", "Full game")):
@@ -3042,6 +3070,10 @@ def _merge_live_lens_row_into_game(game: dict[str, Any], live_lens_row: dict[str
     keep_final_status = _cards_status_is_final(game.get("status")) and not _cards_status_is_final(
         live_lens_row.get("status")
     )
+    # THE SAME RULE FOR THE SCORE. A frozen `Live` row carries the score it had
+    # when it froze, and a Final feed's linescore is terminal. Held back only
+    # when `_games_from_daily_summary` actually took a score off a Final feed.
+    keep_final_score = merged.get("score_source") == "statsapi_feed_final"
     for key in (
         "status",
         "score",
@@ -3068,6 +3100,8 @@ def _merge_live_lens_row_into_game(game: dict[str, Any], live_lens_row: dict[str
         "simContextAvailable",
     ):
         if key == "status" and keep_final_status:
+            continue
+        if key == "score" and keep_final_score:
             continue
         value = live_lens_row.get(key)
         if value is None:
@@ -5709,6 +5743,13 @@ def _games_from_daily_summary(summary: dict[str, Any], *, betting_games: dict[in
                 "segment_overview_cards": _segment_overview_cards(output, betting_game),
             }
         )
+        # Only when the feed is Final with both sides reported: an absent key is
+        # what lets `_merge_live_lens_row_into_game` fall back to the lens, so a
+        # pregame or live game keeps exactly the behaviour it had.
+        final_score = _source_final_score(actual_payload)
+        if final_score is not None:
+            games[-1]["score"] = final_score
+            games[-1]["score_source"] = "statsapi_feed_final"
     return games
 
 
