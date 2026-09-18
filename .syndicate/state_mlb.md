@@ -1303,3 +1303,13 @@ at `Live / In Progress`, and both ended 00:05/00:09 CT. **9 games on 7 of 9 date
 
 `FEED_LIVE_STATUS` prints only when `not _render_web_dyno()`: it is a
 refresh-worker instrument, and it says nothing about what web serves.
+
+## [mlb-sim-retrigger-churn] THE MLB DAILY SIM CROWDED THE BOARD OFF refresh-worker; A RE-SIM COSTS ~15 MIN WHATEVER ITS SCOPE — FINGERPRINT DEBOUNCE LIVE `c6a91b90`, PROPS-REGEN NOW THE DRIVER
+
+Lane `mlb-sim-retrigger-churn` (OPEN). Readings: `deploys.md` 2026-09-18 01:14:08Z and 04:20Z.
+
+- **Measured 12 h on refresh-worker to 2026-09-17 23:34Z:** 25 MLB daily sims (19 `fingerprint_change`) took 44% of wall time; board builds median 14.7 min; the memory guard refused the board 31 times (5 mid-build); from 20:10Z the sim ran back to back.
+- **A re-sim's cost is fixed, not per-game:** `--only-game-pks` 1 game 14.9 min, 5 games 15.8, 9 games 20.1. Scoping saves almost nothing, so the lever is how often a run STARTS.
+- **Only refresh-worker runs the sim decision:** `SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER` TRUE there, FALSE on live-odds-worker, absent (= False by code default) on web. `SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS=600` is pinned in render.yaml.
+- **Debounce live since 2026-09-18 01:20:00Z:** `SYNDICATE_MLB_SIM_FINGERPRINT_MIN_GAP_SECONDS` default 3600 holds fingerprint-only launches; tip-off, cold-start, join-mismatch, board-missing and props-regen stay immediate. Verified executing: 7 debounces 01:20-04:20Z.
+- **Props-regen is now the visible driver:** `MLB_PROPS_REGEN_DUE` fired at 01:58, 03:08 and 04:10Z, each time widening a launch to the full slate, because `daily_top_props` stayed at 0 candidates after each regen. Its launches carry the `fingerprint_change` LABEL (the reason string prefers it), so count `MLB_DAILY_SIM_TRIGGERED` lines by cause, not by label. Open: whether zero is correct late in the day.
