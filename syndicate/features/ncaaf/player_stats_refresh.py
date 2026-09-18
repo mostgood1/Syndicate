@@ -134,6 +134,9 @@ class RefreshReport:
     weeks: tuple[WeekRefreshResult, ...] = field(default_factory=tuple)
     total_rows_before: int = 0
     total_rows_after: int = 0
+    #: What the chained prop-projection build did (`build_prop_projections_after_refresh`),
+    #: or None when the chain did not run for this output path.
+    prop_projections: dict[str, Any] | None = None
 
     @property
     def rows_written(self) -> int:
@@ -167,6 +170,7 @@ class RefreshReport:
             "total_rows_after": self.total_rows_after,
             "ok": self.ok,
             "validation_issues": list(self.validation_issues),
+            "prop_projections": self.prop_projections,
         }
 
 
@@ -307,6 +311,64 @@ def refresh_week(
     )
 
 
+def _is_production_snapshot(path: Path) -> bool:
+    try:
+        return Path(path).resolve() == player_game_stats_snapshot_path().resolve()
+    except Exception:  # noqa: BLE001 - unknown must not default to building
+        return False
+
+
+def build_prop_projections_after_refresh(
+    *,
+    season: int,
+    snapshot_path: Path,
+    week: int | None = None,
+) -> dict[str, Any]:
+    """Rebuild and publish `ncaaf_prop_projections_{season}_wk{week}.json` from
+    the snapshot this refresh just wrote. BEST-EFFORT: every failure is
+    returned as a status, never raised -- a projection problem must not turn a
+    good refresh into a failed job, and the snapshot it read is already safe.
+
+    CHAINED HERE rather than given its own autorun branch, on purpose: the
+    projection's only input is this snapshot, so it is current exactly when the
+    snapshot is, and a second branch in `run_refresh_worker.py`'s `elif` chain
+    would be one more thing competing for a tick (`#341`).
+
+    The week is the schedule's target week (`sources.ncaaf_target_week`, the
+    week in progress), so the build uses every completed week before it and
+    never that week's own games.
+    """
+    summary: dict[str, Any] = {"season": int(season), "week": week}
+    try:
+        if week is None:
+            from syndicate.features.ncaaf.sources import ncaaf_target_week
+
+            week = ncaaf_target_week(int(season))
+            summary["week"] = week
+        if not week:
+            summary.update(status="skipped", reason="no_target_week")
+            print(f"[ncaaf_prop_projections] SKIPPED season={season} reason=no_target_week", flush=True)
+            return summary
+        from syndicate.features.ncaaf.prop_projections import build_prop_projections
+
+        result = build_prop_projections(season=int(season), week=int(week), snapshot_path=Path(snapshot_path))
+        print(result.summary_line(), flush=True)
+        summary.update(
+            status="written" if result.written else "not_written",
+            reason=result.reason or None,
+            players=result.players,
+            projections=result.projections,
+            bytes=result.bytes,
+            published=result.published,
+            path=str(result.path),
+            refusals=dict(result.refusals),
+        )
+    except Exception as exc:  # noqa: BLE001 - never fatal to the refresh
+        summary.update(status="error", error=f"{type(exc).__name__}: {exc}")
+        print(f"[ncaaf_prop_projections] ERROR season={season} week={week} {type(exc).__name__}: {exc}", flush=True)
+    return summary
+
+
 def refresh_player_game_stats(
     *,
     client: Any,
@@ -315,11 +377,19 @@ def refresh_player_game_stats(
     output_path: Path | None = None,
     season_type: str = "regular",
     source_snapshot_date: str | None = None,
+    build_prop_projections: bool | None = None,
+    projection_week: int | None = None,
 ) -> RefreshReport:
     """Refresh a window of weeks into the one snapshot CSV.
 
     Weeks are processed oldest-first so a partial failure leaves the newest
     weeks unwritten rather than a hole in the middle.
+
+    Then, when this wrote the PRODUCTION snapshot (or `build_prop_projections`
+    is True), the NCAAF prop-projection artifact is rebuilt from it and
+    published -- see `build_prop_projections_after_refresh`. None (the default)
+    means "only for the production path", so a test or a scratch refresh into a
+    temp file never writes a projection into the real data root.
     """
     path = output_path or player_game_stats_snapshot_path()
     total_before = sum(_row_counts_by_season_week(path).values())
@@ -336,12 +406,19 @@ def refresh_player_game_stats(
             )
         )
     total_after = sum(_row_counts_by_season_week(path).values())
+    chain = _is_production_snapshot(path) if build_prop_projections is None else bool(build_prop_projections)
+    projections = (
+        build_prop_projections_after_refresh(season=season, snapshot_path=path, week=projection_week)
+        if chain
+        else None
+    )
     return RefreshReport(
         season=season,
         output_path=path,
         weeks=tuple(results),
         total_rows_before=total_before,
         total_rows_after=total_after,
+        prop_projections=projections,
     )
 
 

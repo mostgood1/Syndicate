@@ -1558,6 +1558,14 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
         # PICKS and says in terms that it "does NOT stop projections being
         # generated, published, or displayed", because a gate that blinds its
         # own exit criterion never opens.
+        #
+        # GAME LINES AND PLAYER PROPS ARE TWO INDEPENDENT JOINS, exactly as NFL
+        # (above) and WNBA (`#364`). They read different artifacts
+        # (smartsim2_projections vs `ncaaf_prop_projections_*.json`), and the old
+        # `if not index.games: return` would have blanked props on every date
+        # with no game projection -- lane `ncaaf-player-data`, 2026-09-18: 430
+        # of 938 served NCAAF rows were props and 0 carried a sim view.
+        game_coverage: dict[str, Any] = {"supported": True, "rows_with_projection": 0}
         try:
             from syndicate.features.ncaaf.game_projections import (
                 attach_ncaaf_game_projections,
@@ -1566,15 +1574,31 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
 
             index = load_ncaaf_game_projections(selected_date)
             if not index.games:
-                return {
+                game_coverage = {
                     "supported": True,
                     "rows_with_projection": 0,
                     "reason": "no NCAAF SmartSim2 projections for this date",
                 }
-            return attach_ncaaf_game_projections(grid, index, selected_date=selected_date)
+            else:
+                game_coverage = attach_ncaaf_game_projections(grid, index, selected_date=selected_date)
         except Exception:
             _LOGGER.exception("BOOK_GRID_PROJECTION_FAILURE sport=ncaaf date=%s", selected_date)
-            return {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
+            game_coverage = {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
+
+        # READ ONLY. The artifact is built on refresh-worker at the end of the
+        # player-stats refresh and published; this evaluates its published
+        # distribution at each row's line and nothing else.
+        prop_coverage: dict[str, Any] = {"supported": True, "rows_with_projection": 0}
+        try:
+            from syndicate.features.ncaaf.prop_projections import attach_ncaaf_prop_projections
+
+            prop_coverage = attach_ncaaf_prop_projections(grid, selected_date=selected_date)
+        except Exception:
+            # Independent of the game join above, and never able to break it.
+            _LOGGER.exception("BOOK_GRID_PROP_PROJECTION_FAILURE sport=ncaaf date=%s", selected_date)
+            prop_coverage = {"supported": True, "error": "prop projection join failed", "rows_with_projection": 0}
+
+        return _merge_nfl_coverage(game_coverage, prop_coverage)
 
     if sport != "mlb":
         return {"supported": False, "reason": f"no projection source wired for {sport}"}
