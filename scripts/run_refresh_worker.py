@@ -6346,6 +6346,53 @@ def _book_grid_forward_days() -> int:
         return 0
 
 
+# Past (sport, date) pairs already rebuilt by `SYNDICATE_BOOK_GRID_REBUILD_DATES`
+# in THIS process. Once per process, so the cost is one build per boot per pair.
+_BOOK_GRID_REBUILT_ONCE: set[tuple[str, str]] = set()
+
+
+def _book_grid_rebuild_dates(selected_date: str) -> dict[str, set[str]]:
+    """`SYNDICATE_BOOK_GRID_REBUILD_DATES=mlb:2026-09-15,...` -> {date: {sport}}.
+
+    WHY IT EXISTS. The tick rebuilds today and yesterday and nothing older, so a
+    fix to how a board is BUILT never reaches a finished slate that is two or
+    more days back. Measured 2026-09-18 (lane `mlb-past-date-chip-score`): the
+    09-15 MLB board was last built 03:10Z 09-17, scored 0 of 15 games, and no
+    code path would ever rebuild it.
+
+    SCOPED BY SPORT, not a bare date: `_sport_covers_date` admits every past
+    date for every sport, so a date alone would pull and pivot eight shards to
+    repair one. Today and yesterday are refused -- the tick already owns them --
+    as are future dates and anything malformed, each with a printed reason.
+    """
+    raw = str(os.environ.get("SYNDICATE_BOOK_GRID_REBUILD_DATES") or "").strip()
+    out: dict[str, set[str]] = {}
+    if not raw:
+        return out
+    try:
+        today = date.fromisoformat(selected_date)
+    except Exception:
+        return out
+    for token in raw.split(","):
+        token = token.strip()
+        if not token:
+            continue
+        sport, _, day = token.partition(":")
+        sport, day = sport.strip().lower(), day.strip()
+        try:
+            offset = (today - date.fromisoformat(day)).days
+        except Exception:
+            print(f"[refresh_worker] BOOK_GRID_REBUILD_REFUSED token={token!r} reason=malformed", flush=True)
+            continue
+        if not sport or offset < 2:
+            print(f"[refresh_worker] BOOK_GRID_REBUILD_REFUSED token={token!r} reason=not_older_than_yesterday_or_no_sport", flush=True)
+            continue
+        if (sport, day) in _BOOK_GRID_REBUILT_ONCE:
+            continue
+        out.setdefault(day, set()).add(sport)
+    return out
+
+
 def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     """#322: pivot the book_quotes shard HERE so web never has to.
 
@@ -6393,6 +6440,10 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     previous_date = (date.fromisoformat(selected_date) - timedelta(days=1)).isoformat()
     rebuild_previous = _BOOK_GRID_LAST_RUN.get("previous_date") != previous_date
     dates = [selected_date] + ([previous_date] if rebuild_previous else [])
+    # Explicitly requested past dates, for the named sports only. See
+    # `_book_grid_rebuild_dates`.
+    rebuild_only = _book_grid_rebuild_dates(selected_date)
+    dates.extend(day for day in sorted(rebuild_only) if day not in dates)
 
     # FORWARD DATES, so a slate window has something to read (`#329`).
     #
@@ -6434,6 +6485,8 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     out_of_window = 0
     for build_date in dates:
         for sport in ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"):
+            if build_date in rebuild_only and sport not in rebuild_only[build_date]:
+                continue
             # `#565`. Skip the pairs no board will ever read, BEFORE the shard
             # reconcile below -- which is the expensive half (an HTTP Range pull
             # per sport per date, plus its `.state.json` sidecar).
@@ -6555,6 +6608,11 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     # rather than marking the day done and leaving it frozen for good.
     if rebuild_previous:
         _BOOK_GRID_LAST_RUN["previous_date"] = previous_date
+    for day, sports in rebuild_only.items():
+        for sport in sports:
+            _BOOK_GRID_REBUILT_ONCE.add((sport, day))
+            hit = next((w for w in written if w.startswith(f"{sport}:") and w.endswith(f"@{day}")), None)
+            print(f"[refresh_worker] BOOK_GRID_REBUILD_DONE sport={sport} date={day} written={hit}", flush=True)
 
     if not written and not skipped:
         return None
