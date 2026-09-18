@@ -37774,3 +37774,10 @@ within ~3 min of go-live), not attributed to this change.
 - **Baseline (read 14:32:16Z, window 11:32-14:32Z):** `MLB_PROPS_REGEN_DUE` **3**, `reason=top_props_present` **0**.
 - **EXPECT:** `MLB_PROPS_REGEN_DUE` **0** over the 3 h after go-live while today's top props exist on disk, and `MLB_PROPS_REGEN_SKIPPED reason=top_props_present` **>= 1** (the predicate proof). Counted from those exact line types only — last night's reading double-counted a token that appears on two line types.
 - **verify: OWED.** (1) the first `reason=top_props_present` line after 14:42:16Z — proof the fixed read is taken; (2) the 3 h counts; (3) over the day slate, MLB sims per hour and board `MEMORY_GUARD_ABORT` refusals, against 09-17's 25 sims / 31 refusals per 12 h.
+
+## 2026-09-18 14:57Z (9:57 AM CT) — READING, no deploy — refresh-worker `19021fc5` (live 14:42:16Z) — lane mlb-sim-retrigger-churn — **predicate MET; the 3 h window still owed**
+
+- **The fixed branch ran on production, at the first evaluation after go-live:** `14:56:07Z [live_refresh_loop] MLB_PROPS_REGEN_SKIPPED date=2026-09-18 reason=top_props_present candidates=1824`. The same tick's `MLB_SIM_TICK` reads `"mlbDailySim": {"launched": false, "reason": "no_change"}` — the decision reached its end and launched NOTHING. No `MLB_TOP_PROPS_KEYVALUE_ONLY` line, so DISK answered.
+- **What that number means:** 1,824 top-prop candidates were on refresh-worker's disk while the old code, reading Redis, treated top props as missing and re-simmed the full slate (19-37 min) at every cooldown — six times this morning.
+- Why there was no line until 14:56Z: the first post-restart tick (14:43:18Z) exited early with `intelligence_pipeline_busy` (from `MLB_SIM_TICK`), before the props check — not a failure of the fix.
+- **Still owed:** the 3 h window to 17:42Z (`MLB_PROPS_REGEN_DUE` expected 0 against a baseline of 3) and the day-slate effect on board refusals and refresh cadence; a watcher takes the 3 h reading.
