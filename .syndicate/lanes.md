@@ -1533,7 +1533,8 @@ death, never life — do not invert it.
 - Goal: the three ledger lines where a shell heredoc turned `C:\tmp` into `C:<TAB>mp` (and `\a` into BEL) read their original paths again, with no other byte changed
 - Files: none (ledger-only)
 
-### nhl-player-game-log — OPEN — opened 2026-09-18 — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **`#674`; build lane, nothing landed yet**
+### nhl-player-game-log — OPEN — opened 2026-09-18 — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **LANDED `0bbdbcf2`; NOT DEPLOYED (refresh-worker deploy awaits the user)**
+- **STATUS 2026-09-19 ~00:0xZ (7:0x PM CT 09-18). GOAL: NOT MET.** The producer, the runner call, a manual CLI and 12 tests are on main (`0bbdbcf2`); each test fails on the old code, and the reachability test fails against origin/main's runner. A live smoke run on a copy of web's file scanned 06-14..06-25 with every day readable, added no games (the season was over) and repaired 486 blank-zero cells. Left: a refresh-worker deploy (user). Predicted readings: (1) on the first NHL refresh after go-live, `NHL_GAME_LOG ... repaired=486 ... wrote=True published=True`, web's copy rewritten (mtime after go-live), blank skater `shots` 411 -> 0, rows 1,640 unchanged. (2) After 2026-09-19 preseason games finish (from ~23:00Z), `2026010xxx` rows on web and an NHL prop Ask's recent-form newest game dated 09-19 or later.
 
 - Goal: [user 2026-09-18: "do #674"] a scheduled job refreshes NHL's `player_game_stats.csv` for the 2026-27 season on production: the NHL refresh on refresh-worker updates `nhl_source/source_artifacts/data/raw/player_game_stats.csv` with every finished game since the file's newest, publishes it to web, and an NHL board-row prop Ask's recent-form table shows a newest game within days of its slate once games are being played (preseason from 2026-09-19).
 - Files:
