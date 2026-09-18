@@ -209,14 +209,10 @@ needs_wrapper = pytest.mark.skipif(
 
 
 @needs_wrapper
-def test_the_wrapper_is_UNREGISTERED_until_its_cold_cost_is_measured():
-    """Registered live on web 18:12:43Z 2026-09-18, the typed question went from
-    5.0 s to a 502 at 59.8 s and two web health-check failures fell inside those
-    calls, so the registration was pulled the same hour. The function stays and
-    is tested below; this pins the pull so it cannot come back by accident."""
+def test_the_wrapper_is_registered_for_ncaaf_and_for_an_unrouted_question():
     assert _ask._entity_fetchers_for_sport("ncaaf", "q")[0] is _ask._ncaaf_player_log_evidence
-    assert _WRAPPER not in _ask._entity_fetchers_for_sport("ncaaf", "how has arch manning played")
-    assert _WRAPPER not in _ask._entity_fetchers_for_sport("", "how has arch manning played")
+    assert _WRAPPER in _ask._entity_fetchers_for_sport("ncaaf", "how has arch manning played")
+    assert _WRAPPER in _ask._entity_fetchers_for_sport("", "how has arch manning played")
 
 
 @needs_wrapper
