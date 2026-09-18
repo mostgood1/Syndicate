@@ -1231,8 +1231,9 @@ death, never life — do not invert it.
 - Falsification test: attribute every trigger over a full day to (game, input, started-or-not). H1 is falsified if started games' line changes cause none; H3 if every change is a real content change; H4 if re-sim duration scales with the number of games re-simmed.
 - Verification (PRE-REGISTERED): (1) attribution — a per-trigger log naming changed game_pks and, per game, which of the five inputs moved and whether the game had started, over >= 12 h of a live slate; (2) for any cut: `fingerprint_change` triggers per 12 h and the board's refusal count (`MEMORY_GUARD_ABORT` at `pre_source_state_fingerprint`) both fall, with the MLB board's sim output unchanged for the games it did re-sim, and today's board re-completing more often than the ~20-min median measured 16:40-23:10Z.
 
-### soccer-h24-grader — OPEN — opened 2026-09-17 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+### soccer-h24-grader — CLOSED 2026-09-17 — opened 2026-09-17 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
 - Goal: `#665`'s H24 has a committed grader that computes exactly the registered predictor `factor_L(d)` and arms `P0`/`XE` over the pre-kickoff freeze, on FotMob xG data that actually covers the registered base seasons and the trailing-365-day window for all ten leagues, and prints per-family coverage and their intersection; its first production run joins at least one finished frozen match through outcome, factor and both arms.
+- **GOAL: MET 2026-09-17 ~20:40 CT** (`log/2026-09-17.md`): the first production grade joined 2 finished frozen La Liga matches through outcome, FotMob factor (full window), both arms and the football-data close. Coverage printed per family, and every registered base season is now filled (MLS 1,062 base matches, previously current season only; Eredivisie / Championship / Belgian 618 / 1,114 / 626, previously one season). Verdict WATCHING at n=2, which is not evidence. Grader `faa826fc`, 16 tests, 3 injected rule breaks caught.
 - Files:
   - `scripts/soccer_season_audit/h24_forward_grade.py` (NEW)
   - `tests/test_soccer_h24_forward_grade.py` (NEW)
