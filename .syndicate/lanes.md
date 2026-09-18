@@ -1382,6 +1382,11 @@ death, never life — do not invert it.
   - (1) Test: N calls over unchanged files build the index once (the pre-change code builds N times), and rows are equal to a fresh build for every candidate shape.
   - (2) Test: an append (mtime change) or a new date rebuilds it.
   - (3) Production after deploy: `candidate_collection_with_fallback` span median well below today's, with candidate and LAYER2_SHORTLIST counts unchanged in distribution.
+- **STATUS 2026-09-18 ~21:05Z — CODE ON MAIN, NOT DEPLOYED. GOAL: NOT MET** (needs a deploy, which is a user decision, then reading (3)).
+  - `_recent_history_rows` now reads `_recent_market_history_index`: one memo entry, keyed by (lookback, end date, root, each day file's path + mtime_ns + size) AND the loader object. The key is read before loading.
+  - **Verification (1) and (2) MET** in `tests/test_market_history_index_memo.py` (7 tests). The build count for 6 candidates × 5 passes is **30 on the pre-change module** (HEAD via a sys.modules plugin) and **1** now. Rows equal a fresh build. An append or a new date rebuilds. Copies go out.
+  - **Found by the suites:** a files-only key served tests that patch `load_recent_odds_events` an index built from the previous test's events. The loader is now in the key, so a swapped loader gets its own build (pinned by a test).
+  - Across the odds_lifecycle, compaction, retention, refresh-tracking, simulation_adapter and market_data suites, the failure set is IDENTICAL with and without the change: 24 pre-existing failures and errors, 0 new.
 
 ### odds-history-match-precompute — OPEN — opened 2026-09-18 — session a1e40980-cceb-493f-adf9-5a5ca879acf6
 - Goal: cut the odds-history matching cost inside refresh-worker's board build, with every candidate's chosen odds-history entry unchanged. The per-(candidate, entry) scoring re-derives the same per-entry and per-candidate normalised fields; derive them once per entry per enrichment pass, and once per candidate. Verified by an exact-equality test against the pre-change scorer, then by soccer's `_consume_sport` time on production.
