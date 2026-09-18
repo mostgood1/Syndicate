@@ -5913,6 +5913,14 @@ def _build_cards_sim_detail_from_local_smart_sim(*, processed_root: Path, date_s
                     "quarters": quarters,
                     # P3: carry the pre-sim market anchoring record into the served sim block.
                     "market_anchor": payload.get("market_anchor") if isinstance(payload.get("market_anchor"), dict) else None,
+                    # The sim's own total/margin histograms per segment (lane
+                    # wnba-sim-distributions), so Layer 2 can price any line and the
+                    # half/quarter markets. Absent on files written before it.
+                    "score_dist": (
+                        payload["score"].get("dist")
+                        if isinstance(payload.get("score"), dict) and isinstance(payload["score"].get("dist"), dict)
+                        else None
+                    ),
                     "players_summary": summary,
                     "players": {
                         "home": home_players,

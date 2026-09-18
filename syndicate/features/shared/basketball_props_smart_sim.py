@@ -4293,6 +4293,8 @@ def _team_players_from_props_local(*, props_df, team_tri: str, opp_tri: str, pro
 def _call_source_simulate_smart_game_local(*, smart_sim_module, processed_root: Path, league_code: str, kwargs: dict[str, Any]):
     original_values: dict[str, Any] = {}
     raw_root = processed_root.parent / "raw"
+    # One list per game call; see `_attach_sim_distributions_local`.
+    recorded_draws: list[dict[str, Any]] = []
     replacements = {
         "_period_lines_from_processed": lambda date_str, home_tri, away_tri: _period_lines_from_processed_local(
             processed_root=processed_root,
@@ -4407,7 +4409,13 @@ def _call_source_simulate_smart_game_local(*, smart_sim_module, processed_root: 
             date_str=date_str,
             lookback_days=lookback_days,
         ),
-        "simulate_pbp_game_boxscore": lambda **inner_kwargs: _simulate_pbp_game_boxscore_local(league_code=league_code, **inner_kwargs),
+        # Every draw is also RECORDED (lane wnba-sim-distributions), so the
+        # distributions the vendor sim draws but never publishes can be
+        # attached to its output below. The call itself is unchanged.
+        "simulate_pbp_game_boxscore": _recording_sim_draws_local(
+            lambda **inner_kwargs: _simulate_pbp_game_boxscore_local(league_code=league_code, **inner_kwargs),
+            recorded_draws,
+        ),
         "simulate_event_level_boxscore": lambda **inner_kwargs: _simulate_event_level_boxscore_local(league_code=league_code, **inner_kwargs),
         "_rotation_sim_minutes_for_team": lambda team_df, date_str, home_tri, away_tri, team_tri, side, game_id: _rotation_sim_minutes_for_team_local(
             smart_sim_module=smart_sim_module,
@@ -4465,13 +4473,154 @@ def _call_source_simulate_smart_game_local(*, smart_sim_module, processed_root: 
         params = inspect.signature(simulate_smart_game).parameters
         accepts_var_keyword = any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values())
         call_kwargs = kwargs if accepts_var_keyword else {k: v for k, v in kwargs.items() if k in params}
-        return simulate_smart_game(**call_kwargs)
+        out = simulate_smart_game(**call_kwargs)
+        _attach_sim_distributions_local(
+            out,
+            recorded_draws,
+            build_ladder=getattr(smart_sim_module, "build_exact_ladder_payload", None),
+        )
+        return out
     finally:
         for name, value in original_values.items():
             try:
                 setattr(smart_sim_module, name, value)
             except Exception:
                 pass
+
+
+# THE DRAWS THE SIM THROWS AWAY, PUBLISHED  [2026-09-18, lane wnba-sim-distributions].
+#
+# The vendored `simulate_smart_game` keeps every draw's team quarter scores and
+# player lines in local arrays, then publishes only p10/p50/p90 plus a
+# probability at ONE line (`score.p_total_over` at the market total), and
+# ladders for single stats plus `pra`. Measured on Layer 2, 2026-09-18 21:55Z,
+# WNBA:
+#   - 437 of 562 game rows could not be priced ("sim priced only its own market
+#     line; this is an alternate line the sim's 3-point quantile summary cannot
+#     answer");
+#   - 101 half/quarter rows had no projection at all;
+#   - 58 combo props shipped a mean only ("model ships means, not a
+#     distribution").
+#
+# The per-draw helper is already Syndicate's own (`_simulate_pbp_game_boxscore_local`,
+# swapped in above), so each draw can be recorded there and the distributions
+# rebuilt HERE from the same draws. No vendor file changes, so a re-pull
+# cannot revert this.
+#
+# Market anchoring is PRE-sim (`_apply_market_anchor_local` moves the team
+# means that drive every draw), so these distributions agree with the sim's own
+# `p_total_over` / `p_home_cover` with no further shift. `regulation` is what
+# the vendor's own score block uses (quarters only); `full` adds overtime,
+# which is what full-game totals and spreads settle on.
+_SIM_DIST_SEGMENTS_LOCAL: dict[str, tuple[int, ...]] = {
+    "q1": (0,), "q2": (1,), "q3": (2,), "q4": (3,),
+    "h1": (0, 1), "h2": (2, 3),
+    "regulation": (0, 1, 2, 3),
+}
+_SIM_COMBO_LADDERS_LOCAL: dict[str, tuple[str, ...]] = {
+    "pr": ("pts", "reb"), "pa": ("pts", "ast"), "ra": ("reb", "ast"),
+}
+
+
+def _recording_sim_draws_local(simulate_draw, recorded_draws: list[dict[str, Any]]):
+    """Wrap the per-draw boxscore helper: same call, same return, and a compact copy kept."""
+
+    def recording(**inner_kwargs):
+        result = simulate_draw(**inner_kwargs)
+        try:
+            h_box, a_box, hq_i, aq_i = result
+            recorded_draws.append({
+                "hq": [int(x or 0) for x in list(hq_i or [0, 0, 0, 0])[:4]],
+                "aq": [int(x or 0) for x in list(aq_i or [0, 0, 0, 0])[:4]],
+                "hot": [int(x or 0) for x in ((h_box or {}).get("ot_pts") or []) if x is not None],
+                "aot": [int(x or 0) for x in ((a_box or {}).get("ot_pts") or []) if x is not None],
+                "home": {
+                    str((p or {}).get("player_name") or "").strip(): tuple(int((p or {}).get(s) or 0) for s in ("pts", "reb", "ast"))
+                    for p in ((h_box or {}).get("players") or [])
+                },
+                "away": {
+                    str((p or {}).get("player_name") or "").strip(): tuple(int((p or {}).get(s) or 0) for s in ("pts", "reb", "ast"))
+                    for p in ((a_box or {}).get("players") or [])
+                },
+            })
+        except Exception:
+            # A draw whose shape this cannot read is simply not recorded. The
+            # sim's own result is returned untouched either way.
+            pass
+        return result
+
+    return recording
+
+
+def _histogram_local(values: list[int]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for value in values:
+        counts[str(int(value))] = counts.get(str(int(value)), 0) + 1
+    return dict(sorted(counts.items(), key=lambda kv: int(kv[0])))
+
+
+def _attach_sim_distributions_local(out: Any, recorded_draws: list[dict[str, Any]], *, build_ladder: Any = None) -> None:
+    """Add `score.dist` (total and margin histograms per segment) and the
+    `pr`/`pa`/`ra` ladders to a smart-sim result, from its own recorded draws.
+
+    Adds keys only; never changes one the sim wrote. Never raises. A result
+    with no recorded draws (the legacy non-PBP path) is left as it was.
+    """
+    try:
+        if not isinstance(out, dict) or not recorded_draws:
+            return
+        segments: dict[str, dict[str, Any]] = {}
+        for segment, quarters in _SIM_DIST_SEGMENTS_LOCAL.items():
+            home = [sum(d["hq"][q] for q in quarters) for d in recorded_draws]
+            away = [sum(d["aq"][q] for q in quarters) for d in recorded_draws]
+            segments[segment] = {
+                "total": _histogram_local([h + a for h, a in zip(home, away)]),
+                "margin": _histogram_local([h - a for h, a in zip(home, away)]),
+            }
+        full_home = [sum(d["hq"]) + sum(d["hot"]) for d in recorded_draws]
+        full_away = [sum(d["aq"]) + sum(d["aot"]) for d in recorded_draws]
+        segments["full"] = {
+            "total": _histogram_local([h + a for h, a in zip(full_home, full_away)]),
+            "margin": _histogram_local([h - a for h, a in zip(full_home, full_away)]),
+        }
+        score = out.get("score")
+        if isinstance(score, dict):
+            score["dist"] = {
+                "n": len(recorded_draws),
+                "margin_frame": "home_minus_away",
+                "segments": segments,
+                "source": "syndicate_recorded_draws",
+            }
+        if not callable(build_ladder):
+            return
+        players = out.get("players")
+        if not isinstance(players, dict):
+            return
+        for side in ("home", "away"):
+            by_name: dict[str, list[tuple[int, int, int]]] = {}
+            for draw in recorded_draws:
+                for name, line in (draw.get(side) or {}).items():
+                    if name:
+                        by_name.setdefault(name, []).append(line)
+            for row in players.get(side) or []:
+                if not isinstance(row, dict):
+                    continue
+                lines = by_name.get(str(row.get("player_name") or "").strip())
+                if not lines:
+                    continue
+                ladders = row.get("prop_ladders")
+                if not isinstance(ladders, dict):
+                    ladders = {}
+                    row["prop_ladders"] = ladders
+                stat_index = {"pts": 0, "reb": 1, "ast": 2}
+                for key, stats in _SIM_COMBO_LADDERS_LOCAL.items():
+                    if key in ladders:
+                        continue
+                    payload = build_ladder([sum(line[stat_index[s]] for s in stats) for line in lines])
+                    if payload:
+                        ladders[key] = payload
+    except Exception as exc:  # noqa: BLE001 -- enrichment must never cost the sim its result
+        print(f"[basketball_props_smart_sim] SIM_DISTRIBUTIONS_FAILED {type(exc).__name__}: {exc}", flush=True)
 
 
 def _prune_stale_smart_sim_outputs_local(*, processed_root: Path, date_str: str, expected_matchups: set[tuple[str, str]], out_prefix: str = "smart_sim", remove_all: bool = False) -> int:

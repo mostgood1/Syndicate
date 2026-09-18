@@ -71,6 +71,20 @@ ONE line it priced and not for an arbitrary alt line. A `spreads_alt`/
 projected-only, probability null, honestly labelled as an alternate line rather
 than reusing the "sim ships a mean, not a distribution" reason, which would be
 false for these rows now that the main line is priced.
+
+2026-09-18, lane wnba-sim-distributions: DECISIONS 3 AND 4 NOW HOLD ONLY
+WITHOUT A HISTOGRAM. The smart sim publishes the total and margin histograms of
+its own draws per segment (`score.dist`, carried into `cards_sim_detail` as
+`sim.score_dist`). Where a game has one:
+  - every full-game spread and total line is priced from the `full` histogram
+    (overtime included, as full-game markets settle), not only the sim's own line;
+  - a half or quarter row is priced from ITS OWN segment's histogram, so a
+    40-minute number is never stamped on a 10-minute market;
+  - a period moneyline gets P(home wins | no tie) with the edge withheld, the
+    same policy and reason the full-game h2h branch states.
+Measured before, 2026-09-18 21:55Z: 437 of 562 WNBA game rows carried the
+alternate-line reason and 101 period rows had no projection. A game without a
+histogram keeps every rule above exactly as written.
 """
 
 from __future__ import annotations
@@ -79,7 +93,13 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared.live_edge_policy import live_edge_unavailable_reason
-from syndicate.features.shared.prop_projections import _edge_unavailable_reason, _no_vig_over_probability
+from syndicate.features.shared.prop_projections import (
+    _dist_mean,
+    _dist_prob_below,
+    _dist_prob_over,
+    _edge_unavailable_reason,
+    _no_vig_over_probability,
+)
 from syndicate.features.shared.team_aliases import teams_match
 from syndicate.features.shared.probability_refusal import refuse_published_certainty
 
@@ -158,6 +178,8 @@ class WnbaGameProjectionIndex:
     by_tri: dict[tuple[str, str], dict[str, Any]] = field(default_factory=dict)
     games: int = 0
     source_path: str = ""
+    #: Games whose entry carries the sim's own histograms (`score.dist`).
+    games_with_dist: int = 0
 
     def lookup(self, home: Any, away: Any) -> dict[str, Any] | None:
         h, a = _norm_team(home), _norm_team(away)
@@ -233,7 +255,127 @@ def load_wnba_game_projections(selected_date: str) -> WnbaGameProjectionIndex:
         if ht and at:
             index.by_tri[(ht, at)] = entry
     index.games = len(index.by_teams) or len(index.by_tri)
+    _attach_sim_distributions(index, selected_date)
     return index
+
+
+def _attach_sim_distributions(index: WnbaGameProjectionIndex, selected_date: str) -> None:
+    """Join each game's `score.dist` from `cards_sim_detail_<date>.json` onto its entry.
+
+    [2026-09-18, lane wnba-sim-distributions] The smart sim now publishes the
+    total and margin histograms of its own draws, per segment
+    (`basketball_props_smart_sim._attach_sim_distributions_local`). Read through
+    the same `wnba.cards` parser and path resolver as
+    `wnba_projections.load_wnba_prop_distributions`, keyed by tri-code the way
+    that file names its games. An entry with no histogram keeps today's
+    behaviour exactly: the sim's own line priced, every other line a reason.
+    """
+    try:
+        from syndicate.features.wnba.cards import _artifact_games_index
+        from syndicate.features.wnba.sources import processed_path
+
+        path = processed_path(f"cards_sim_detail_{selected_date}.json")
+        games = _artifact_games_index(path) if path and path.exists() else {}
+    except Exception:
+        return
+    for game in (games or {}).values():
+        if not isinstance(game, Mapping):
+            continue
+        sim = game.get("sim") if isinstance(game.get("sim"), Mapping) else {}
+        dist = sim.get("score_dist")
+        if not isinstance(dist, Mapping) or not isinstance(dist.get("segments"), Mapping):
+            continue
+        entry = index.by_tri.get((_norm_team(game.get("home_tri")), _norm_team(game.get("away_tri"))))
+        if entry is not None:
+            entry["dist"] = dist
+            index.games_with_dist += 1
+
+
+def _dist_segment(entry: Mapping[str, Any] | None, segment: str) -> Mapping[str, Any] | None:
+    dist = entry.get("dist") if isinstance(entry, Mapping) else None
+    segments = dist.get("segments") if isinstance(dist, Mapping) else None
+    block = segments.get(segment) if isinstance(segments, Mapping) else None
+    return block if isinstance(block, Mapping) else None
+
+
+def _projection_from_dist(
+    row: Mapping[str, Any], market: str, block: Mapping[str, Any], *, segment: str, sims: Any
+) -> dict[str, Any] | None:
+    projection = _projection_from_dist_unchecked(row, market, block, segment=segment, sims=sims)
+    if projection is not None and projection.get("model_prob_over") is None and not projection.get("probability_unavailable_reason"):
+        projection["probability_unavailable_reason"] = (
+            f"every one of the sim's {sims} draws fell on one side of this line: "
+            "a bound on the probability from a finite sample, not a certainty, so none is published"
+        )
+    return projection
+
+
+def _projection_from_dist_unchecked(
+    row: Mapping[str, Any], market: str, block: Mapping[str, Any], *, segment: str, sims: Any
+) -> dict[str, Any] | None:
+    """A projection priced off the sim's own histogram, at ANY line.
+
+    Same conventions as MLB's `project_game_market`, through the same helpers:
+    a total is P(total > line); a spread is P(home covers) = P(margin > line)
+    in the grid's away frame, with margin = home minus away; a push is excluded
+    from both sides; an exact 0 or 1 is refused, not clamped.
+
+    A moneyline gets a probability with the edge WITHHELD, the same policy and
+    reason the full-game h2h branch below states for an unbacktested sim. A
+    2-way moneyline pushes a tie, so it is P(home wins | no tie).
+    """
+    basis_segment = "full" if segment == "full" else segment
+    if market == "totals":
+        dist = block.get("total")
+        line = _as_float(row.get("line"))
+        if not isinstance(dist, Mapping) or line is None:
+            return None
+        return {
+            "projected": _dist_mean(dist),
+            "side": "over",
+            "basis": f"sim_total_dist/{basis_segment}",
+            "source": "wnba_smart_sim_draws",
+            "sim_draws": sims,
+            "model_prob_over": _dist_prob_over(dist, line),
+        }
+    if market == "spreads":
+        dist = block.get("margin")
+        line = _as_float(row.get("line"))
+        if not isinstance(dist, Mapping) or line is None:
+            return None
+        return {
+            "projected": _dist_mean(dist),
+            "side": str(row.get("home_team") or "").strip(),
+            "basis": f"sim_margin_dist/{basis_segment}",
+            "source": "wnba_smart_sim_draws",
+            "sim_draws": sims,
+            "model_prob_over": _dist_prob_over(dist, line),
+        }
+    if market == "h2h":
+        dist = block.get("margin")
+        if not isinstance(dist, Mapping):
+            return None
+        win, loss = _dist_prob_over(dist, 0.0), _dist_prob_below(dist, 0.0)
+        prob = None
+        if win is not None and loss is not None and (win + loss) > 0:
+            prob = round(win / (win + loss), 4)
+            if prob in (0.0, 1.0):
+                prob = None
+        return {
+            "projected": _dist_mean(dist),
+            "side": str(row.get("home_team") or "").strip(),
+            "basis": f"sim_margin_dist/{basis_segment}/no_tie",
+            "source": "wnba_smart_sim_draws",
+            "sim_draws": sims,
+            "model_prob_over": prob,
+            "edge_vs_market_pct": None,
+            "edge_unavailable_reason": (
+                "this projection's producer does not compute a "
+                "probability-space edge, so none was priced"
+            ),
+            "market_fair_prob_over": _no_vig_over_probability(row),
+        }
+    return None
 
 
 def _home_win_prob(margin: float | None) -> float | None:
@@ -350,6 +492,8 @@ def attach_wnba_game_projections(
     alternate_rows = 0
     alternate_attached = 0
     at_sim_market_line = 0
+    dist_priced_rows = 0
+    period_rows_priced = 0
 
     for row in grid:
         if str(row.get("kind") or "") == "prop":
@@ -359,9 +503,21 @@ def attach_wnba_game_projections(
             continue
         considered += 1
         # Decision 4: a full-game mean must not be stamped on a period market.
-        if str(row.get("segment") or "full").strip().lower() not in {"", "full"}:
-            non_full_segment += 1
-            continue
+        # A period is priced only from ITS OWN histogram (lane
+        # wnba-sim-distributions); without one it is skipped, as before.
+        segment = str(row.get("segment") or "full").strip().lower() or "full"
+        dist_projection: dict[str, Any] | None = None
+        if segment != "full":
+            period_entry = index.lookup(row.get("home_team"), row.get("away_team"))
+            block = _dist_segment(period_entry, segment)
+            if block is not None:
+                dist_projection = _projection_from_dist(
+                    row, market, block, segment=segment, sims=(period_entry or {}).get("dist", {}).get("n")
+                )
+            if dist_projection is None:
+                non_full_segment += 1
+                continue
+            period_rows_priced += 1
         is_alternate = str(row.get("market") or "").strip().lower() not in {"h2h", "spreads", "totals"}
         if is_alternate:
             alternate_rows += 1
@@ -370,8 +526,21 @@ def attach_wnba_game_projections(
             unmatched_games += 1
             continue
 
+        if dist_projection is None and market in {"spreads", "totals"}:
+            full_block = _dist_segment(entry, "full")
+            if full_block is not None:
+                dist_projection = _projection_from_dist(
+                    row, market, full_block, segment="full", sims=(entry.get("dist") or {}).get("n")
+                )
         projection: dict[str, Any] | None = None
-        if market == "h2h":
+        if dist_projection is not None:
+            # ANY line, from the sim's own draws. The edge goes through the same
+            # shared computation as the sim's-own-line path below.
+            projection = dist_projection
+            dist_priced_rows += 1
+            if market != "h2h" and projection.get("model_prob_over") is not None:
+                _attach_sim_probability_edge(projection, row=row, model_prob=projection.get("model_prob_over"))
+        elif market == "h2h":
             # `#263`, 2026-08-19. `basketball-model-owner`'s call (their
             # smart-sim domain, not this lane's to make unilaterally --
             # `6933d263`): the sim's own `p_home_win` is a per-game empirical
@@ -602,5 +771,10 @@ def attach_wnba_game_projections(
         # the board said so -- the rows just looked like a model with no opinion.
         "rows_at_sim_market_line": at_sim_market_line,
         "games_in_index": index.games,
+        # Lane wnba-sim-distributions: rows priced off the sim's own histograms
+        # (any line, and period markets), and how many games carried them.
+        "games_with_sim_distribution": index.games_with_dist,
+        "rows_priced_from_sim_distribution": dist_priced_rows,
+        "period_rows_priced": period_rows_priced,
         "source_artifact": index.source_path,
     }
