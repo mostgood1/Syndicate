@@ -6973,3 +6973,11 @@ capability limit, so nobody re-checked the path.
 `state_football.md`, minutes after the rule was written. The rule did not stop it; the byte check
 inside the write path did. Put the check in the script that writes, not only in the ledger.
 - *(evidence: `log/2026-09-17.md` ~23:45Z; `4d221768`)*
+
+## 2026-09-17 — FORBIDDEN: reading an artifact FAMILY's retention as its CONTENTS' lifetime `[lane soccer-live-corners-stage2]`
+
+- **What I believed and registered:** H32's evidence lives in `soccer_source/<lg>/api/live_state/live_state_<date>.json`, whose retention rule is 8 days, so "a DAILY harvest into a cache" preserves it (written into H32's registration, `log/2026-09-17.md` ~15:05 CT).
+- **What was true** (22:01:52Z): the FILE lives 8 days, but its `games` block holds only the matches in play at the tick that wrote it. A date with two completed matches read `games: []`, so the projections were gone ~45 minutes after full time. A daily harvest would have captured nothing, every day, and the November grade would have had no evidence. It was caught only because the harvest was about to be built and I read one finished date first.
+- **The rule:** retention says how long a PATH survives. It says nothing about how long a VALUE inside a rewritten file survives. For any artifact rewritten per tick, measure the lifetime of the specific field on a date whose events have ENDED before designing anything that depends on it.
+- **Corollary, same evening:** a block added inside a whole-file-replaced artifact is only as durable as the least-updated service that writes that file. refresh-worker runs the corners swap but not the history code, so any tick of its would drop the block (`poll_soccer_live_state.py:443` write vs `:416` merge-forward). Measured rate: 0 in 47 h. `HISTORY_TRUNCATED` names it if that changes.
+- *(evidence: `deploys.md` 2026-09-17 22:44:03Z; `log/2026-09-17.md` ~17:10 and ~18:10 CT)*
