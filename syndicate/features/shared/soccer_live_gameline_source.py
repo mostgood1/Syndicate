@@ -159,12 +159,62 @@ def _histograms_from_scorelines(scorelines: Any) -> tuple[dict[float, float], di
     return totals, margins
 
 
+# PRICER-ONLY NAME TABLE: canonical OddsAPI form -> canonical ESPN form, for
+# clubs `canonical_team_name` leaves apart. Every entry was MEASURED, not
+# guessed: this weekend's 92 fixtures (2026-09-19/20, all ten leagues) paired
+# odds events to ESPN fixtures by league and kickoff, and these are the pairs
+# still unequal after canonicalisation (plus Gent and Zwolle, read on the live
+# board 2026-09-18). USER DECISION 2026-09-18: keep it HERE, not in
+# `team_names._ALIASES`, because that module also feeds the pregame corners
+# estimator, whose published numbers are under forward tests (H27, W1r) until
+# 2026-11-15. Fold these into `team_names.py` after those grades, and delete
+# this table then.
+#
+# Applied to BOTH sides after canonicalisation, so either spelling of a club
+# reaches the same key. Keys and values are written in canonical form, and no
+# value is itself a key (tests hold both).
+_PRICER_NAME_ALIASES: dict[str, str] = {
+    # belgian_pro_league
+    "leuven": "oh leuven",
+    "charleroi": "royal charleroi",
+    "union saint gilloise": "union st gilloise",
+    "royal antwerp": "antwerp",
+    "westerlo": "kvc westerlo",
+    "sint truiden": "sint truidense",
+    "genk": "racing genk",
+    "sk beveren": "waasland beveren",
+    "gent": "kaa gent",
+    # bundesliga
+    "fsv mainz 05": "mainz",
+    # eredivisie
+    "ajax": "ajax amsterdam",
+    "feyenoord": "feyenoord rotterdam",
+    "twente enschede": "twente",
+    "zwolle": "pec zwolle",
+    # la_liga
+    "ca osasuna": "osasuna",
+    "athletic bilbao": "athletic",
+    "real racing santander": "racing santander",
+    # primeira_liga
+    "nacional": "c d nacional",
+    "cs maritimo": "maritimo",
+    "sporting lisbon": "sporting cp",
+    "vitoria": "vitoria guimaraes",
+    # serie_a
+    "atalanta bc": "atalanta",
+}
+
+
 def _canonical_pair(away: Any, home: Any) -> tuple[str, str]:
     # Imported here, like this module's other imports: the soccer features
     # package costs ~2 s to import and most callers of this module never join.
     from syndicate.features.soccer.features.team_names import canonical_team_name
 
-    return (canonical_team_name(str(away or "")), canonical_team_name(str(home or "")))
+    def key(name: Any) -> str:
+        canonical = canonical_team_name(str(name or ""))
+        return _PRICER_NAME_ALIASES.get(canonical, canonical)
+
+    return (key(away), key(home))
 
 
 class _CanonicalMatchIndex(dict):
@@ -219,10 +269,11 @@ def soccer_live_gameline_index(
     the served soccer book grid of 2026-09-18 (8 matches in play), that key
     joined 3 of 8: Union Berlin / 1. FC Union Berlin, Elche CF / Elche, RC Lens /
     Lens, Gent / KAA Gent and FC Zwolle / PEC Zwolle had no live line at all.
-    Canonical names join the first three. The last two differ by a club prefix
-    the canonicaliser keeps, and stay unjoined rather than hand-aliased (a
-    one-night alias is a guess about the feed's naming everywhere else); they
-    show up as `no_live_gameline_projection` in the join's coverage.
+    Canonical names join the first three. Across the next weekend's 92 fixtures
+    the old key joined 52 and canonical names 74; the 18 left, plus Gent and
+    Zwolle, are club-name forms measured across every league, and
+    `_PRICER_NAME_ALIASES` joins them. Anything still unjoined shows up as
+    `no_live_gameline_projection` in the join's coverage.
 
     `team_names.py` is used as it is, not extended: it also feeds the pregame
     corners estimator, whose published numbers are under forward tests.
