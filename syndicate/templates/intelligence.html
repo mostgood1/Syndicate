@@ -4095,10 +4095,18 @@
     void loadIntelligence({});
   }
 
+  // Each tick re-sends the whole board query (~5-6 MB compressed), so an
+  // unattended tab is expensive: a Claude browser pane that reported itself
+  // visible polled this page every minute for 11 hours on 2026-09-17 (lane
+  // intelligence-idle-poll). After 15 minutes with no interaction the poller
+  // pauses; any mouse, key, scroll, touch or focus resumes it with a fresh fetch.
   window.SyndicatePolling.startFromPolicy(
     {},
-    { onTick: () => { void loadGameChips(); return loadIntelligence({ background: true }); } },
-    { enabled: true, intervalMs: 60000, refreshOnVisible: true, refreshOnFocus: true, skipWhenHidden: true, preventOverlap: true }
+    {
+      onTick: () => { void loadGameChips(); return loadIntelligence({ background: true }); },
+      onIdle: () => setRefreshStatus("Auto-refresh paused while idle. Move the mouse or press a key to resume.", "idle"),
+    },
+    { enabled: true, intervalMs: 60000, refreshOnVisible: true, refreshOnFocus: true, skipWhenHidden: true, preventOverlap: true, idleTimeoutMs: 15 * 60 * 1000 }
   );
 })();
 </script>

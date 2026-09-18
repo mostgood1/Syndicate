@@ -543,6 +543,14 @@ is read from the HOOK's environment, which an inline env prefix does not reach.
 
 ## [render-egress-spikes] WEB'S BILL IS ~10 ANOMALOUS HOUR-BUCKETS, NOT A LEAK — normal hours ARE explained, the spikes are NOT, and six mechanisms are eliminated by measurement `[2026-09-06, lane render-egress-transport]`
 
+**2026-09-17/18 — THE 18:00Z..01:00Z WEB SPIKE HOURS WERE A CLAUDE BROWSER PANE LEFT OPEN ON `/intelligence`.** `[2026-09-18, session f26bba3b (scheduled task bandwidth-spike-tripwire, then the user: "find which session hit intelligence/query last night"), lane intelligence-idle-poll]`
+
+- **Caller.** Render `type=request` log, user agent `Mozilla/5.0 (Windows NT 10.0) ... Claude/2.110.0 Chrome/152.0.7977.76 Safari/537.36 MSIX` (the Claude desktop app's built-in browser), client `73.75.177.190` (the user's home IP, checked 2026-09-18 ~14:10Z via two IP-echo services). Page `GET /intelligence` 502 at 17:50:34Z, reload 200 at 17:56:42Z, then `POST /api/intelligence/query` + `GET /api/board/game-chips` once a minute: 58-61 query calls in every hour 18Z..03Z, 108 in 04Z, last call **04:53:47Z**; none since (checked 13:42-14:22Z).
+- **Session.** Lane `board-today-freshness` (CLI session `a1e40980`, desktop title "Layer 2 compact card board staleness"). Its own `deploys.md` entry `2026-09-17 18:00:10Z` records "one page load at ~17:50:40Z that got a 502" and a chip read "served page DOM" at 17:56:47Z, matching the pane's requests to the second. It opened the pane to read the freshness chip and never closed it.
+- **Cost.** Each tick's query response is ~5-6 MB gzipped. In the captured 00:00Z hour this browser moved **370.9 MB of 626.8 MB edge** (most of the rest, 284.5 MB, was an `X11; Linux` Chrome also seen from Verizon `174.253.98.187` — most likely the user's phone in desktop mode; the user's Edge made 40 query calls over 23:00Z..00:30Z, 1 of them in this hour). ~11 h at ~350 MB/h ≈ **~4 GB**, an estimate from one measured hour. In the 00Z and 01Z captures metered ≈ edge (0.98 / 0.99), so these hours are NOT the unexplained meter gap.
+- **Scope.** It covers the captured web buckets `09-17T18:00Z..09-18T01:00Z`. It does NOT explain `09-17T16:00Z` or `17:00Z` (before 17:50Z), and it is no evidence about the 09-01..04 or 09-08 spikes.
+- **Why `skipWhenHidden` did not stop it.** The page already passed `skipWhenHidden: true`; the pane kept `document.hidden === false` with nobody looking. Fix: an interaction-idle gate in `polling.js` (`idleTimeoutMs`, opt-in), set to 15 min on `/intelligence` (lane `intelligence-idle-poll`).
+
 **Web is 20.55 GB of the workspace's 25.96 GB (79%), Sep 1-6.**
 
 **THE BASELINE IS NEAR ZERO.** Quiet hours meter **0.2-0.5 MB**, for many hours at a
