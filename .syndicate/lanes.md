@@ -645,7 +645,7 @@ death, never life — do not invert it.
   - (2) `check_order` refuses a live Kalshi order by name (`insufficient_shard_balance`) when the shard its market routes to cannot cover the stake.
   - It stays PERMISSIVE on every unknown, exactly like the account-level gate. The account-level `insufficient_venue_balance` check is unchanged.
 - Files: `syndicate/features/shared/venue_balances.py`, `syndicate/features/shared/execution_guard.py`, `tests/test_kalshi_shard_balance.py` (NEW), `docs/ai_context/todo.md` (`#573`).
-  - NOT `pipeline/execute_portfolio.py`, which `polymarket-e2e-review` holds: the gate lives in `check_order`, which the executor already calls before any ledger row.
+  - Never claimed by this lane: `pipeline/execute_portfolio.py`. The gate lives in `check_order`, which the executor already calls before any ledger row. (Reworded 2026-09-18 by session a1e40980 with the meaning unchanged. The old wording, "NOT `pipeline/execute_portfolio.py`, which `polymarket-e2e-review` holds", had the path before any disclaimer marker, so `lane_claims.py` parsed this prohibition as a CLAIM and the lane guard blocked edits to the file. `polymarket-e2e-review` has been CLOSED since 2026-09-11.)
   - NOT `pipeline/kalshi_odds_refresh.py`, which `kalshi-precap-board-lines` holds: each ticker's shard is read with `kalshi_client.fetch_market`, not from the stored markets.
 - Hypothesis, measured 2026-09-11 and read-only:
   - Kalshi keeps cash PER EXCHANGE SHARD. MLB, tennis and, from 2026-09-10, basketball are on shard 3; NFL, NCAAF and the rest are on shard 0.
