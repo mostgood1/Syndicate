@@ -7374,4 +7374,4 @@ carried-forward work in `docs/ai_context/todo.md` `#650`/`#651`/`#652`.
   - board-today-freshness, soccer-shot-woodwork-undercount, soccer-shot-on-target-definition -> WAIT: a1e40980 idle 0m < 240m
   - closed-lane-archive-20260917-1708, closed-lane-archive-20260917-1733 -> SAFE (6627d075 idle 832m)
 - Note: the watcher's poll at 13:37Z had read 4a583d41=621m and a1e40980=538m (SAFE); ~1 min later both transcripts were 0-1m idle, so those 4 slugs are deferred per the gate.
-- Step 4: no worktree under C:	mp\syndicate-sessions holds uncommitted `.syndicate/` edits mentioning 6627d075 or either slug (5 dirty worktrees checked, 0 mentions).
+- Step 4: no worktree under C:\tmp\syndicate-sessions holds uncommitted `.syndicate/` edits mentioning 6627d075 or either slug (5 dirty worktrees checked, 0 mentions).
