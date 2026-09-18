@@ -103,10 +103,19 @@ def test_the_row_is_the_last_at_or_before_the_books_update_and_never_after():
     assert g.pick_row(rows, t)["projected_total_corners"] == 2.0
 
 
-def test_a_row_more_than_180_seconds_old_is_not_used():
+def test_a_row_more_than_600_seconds_old_is_not_used():
     t = dt.datetime(2026, 9, 19, 14, 38, 30, tzinfo=dt.timezone.utc)
-    assert g.pick_row([_hist("2026-09-19T14:35:29+00:00", 1.0)], t) is None
-    assert g.pick_row([_hist("2026-09-19T14:35:30+00:00", 1.0)], t) is not None
+    assert g.pick_row([_hist("2026-09-19T14:28:29+00:00", 1.0)], t) is None
+    assert g.pick_row([_hist("2026-09-19T14:28:30+00:00", 1.0)], t) is not None
+
+
+@pytest.mark.parametrize("row_at,in_registered_subset", [("2026-09-19T14:37:00+00:00", 1),    # 90 s old
+                                                          ("2026-09-19T14:33:30+00:00", 0)])   # 300 s old
+def test_the_registered_180s_rule_is_kept_as_a_reported_subset(tmp_path, row_at, in_registered_subset):
+    harvest, cache = _write(tmp_path, [_hist(row_at, 9.0)], _two_sided(9.5, -110, -110), {("epl", "e1"): _espn()})
+    report = g.grade(harvest, cache, TODAY)
+    assert report["matches"] == 1                                     # scored under the amended 600 s window
+    assert report["sensitivity_registered_180s"]["matches"] == in_registered_subset
 
 
 def test_a_pair_is_valid_only_from_its_later_sides_update():

@@ -11,8 +11,11 @@ Lane `soccer-live-corners-book-test`. The rules are the registration, not this f
                 capture: registered as the live pricer's exact key (`soccer_live_gameline_source._norm`), which
                 joined 21 of 38 real in-play events against 34 for the canonical name (0 wrong fixtures). Whether
                 the pricer's key would ALSO have matched is kept per item and reported.
-    as-of       the LAST harvested row of that match at or before the book's `book_updated_at`, at most 180 s
-                before it, with `corners_basis=prekickoff_pace_v1`
+    as-of       the LAST harvested row of that match at or before the book's `book_updated_at`, at most 600 s
+                before it, with `corners_basis=prekickoff_pace_v1`. AMENDED 2026-09-18 before any outcome existed:
+                registered as 180 s on an assumed ~60 s tick, but the live loop's ticks run 2-6 min apart once
+                several matches are in play (measured from `projection_history`), so 180 s would drop a share of
+                the supply that has nothing to do with the match. The registered 180 s subset is reported beside.
     ours        P(so_far + R > line), R ~ Poisson(projected_total_corners - so_far)   (H35's law)
     book        that book's two-sided price, de-vigged proportionally
     filters     settled lines (so_far > line) out; book probability outside [0.05, 0.95] out; ESPN final required
@@ -46,7 +49,8 @@ for p in (str(HERE), str(CHECKOUT)):
 MARKET = "alternate_totals_corners"
 IN_PLAY_MINUTES = (0.0, 130.0)
 KICKOFF_TOLERANCE = dt.timedelta(minutes=30)
-ROW_WINDOW = dt.timedelta(seconds=180)
+ROW_WINDOW = dt.timedelta(seconds=600)
+REGISTERED_WINDOW_S = 180.0      # the original rule, kept as a reported sensitivity
 BOOK_P_RANGE = (0.05, 0.95)
 LIVE_BASIS = "prekickoff_pace_v1"
 CLIP = 1e-6
@@ -126,7 +130,7 @@ def quote_items(rows, funnel: collections.Counter) -> list[dict]:
 
 
 def pick_row(rows: list[dict], as_of: dt.datetime) -> dict | None:
-    """The LAST row at or before `as_of`, no more than 180 s before it. A row after `as_of` is never used."""
+    """The LAST row at or before `as_of`, no more than `ROW_WINDOW` before it. A row after `as_of` is never used."""
     from common import ts  # noqa: E402
 
     best = None
@@ -166,6 +170,7 @@ def score_items(items: list[dict], by_names: dict, finals: dict, history: dict, 
     from syndicate.features.shared.soccer_live_gameline_source import _norm  # noqa: E402
     from syndicate.features.soccer.features.team_names import canonical_team_name  # noqa: E402
     from live_corners_forward_grade import elapsed_minutes  # noqa: E402
+    from common import ts  # noqa: E402
 
     scored = []
     for it in items:
@@ -182,7 +187,7 @@ def score_items(items: list[dict], by_names: dict, finals: dict, history: dict, 
             continue
         row = pick_row(history.get(key, []), it["book_updated"])
         if row is None:
-            funnel["no_row_within_180s"] += 1
+            funnel["no_row_within_window"] += 1
             continue
         if row.get("corners_basis") != LIVE_BASIS or row.get("projected_total_corners") is None \
                 or row.get("home_corners_so_far") is None or row.get("away_corners_so_far") is None:
@@ -221,6 +226,7 @@ def score_items(items: list[dict], by_names: dict, finals: dict, history: dict, 
                        "ours": ours, "sim": sim, "book_p": p_book, "over": it["over"], "under": it["under"],
                        "minute": elapsed_minutes(row), "kickoff": it["commence"],
                        "lag_s": (it["captured"] - it["book_updated"]).total_seconds(),
+                       "row_age_s": (it["book_updated"] - ts(row.get("generated_at"))).total_seconds(),
                        "d_ours": log_loss(ours, happened) - log_loss(p_book, happened),
                        "d_sim": (log_loss(sim, happened) - log_loss(p_book, happened)) if sim is not None else None})
     return scored
@@ -281,11 +287,16 @@ def grade(harvest_dir: Path, cache: Path, today: dt.date | None = None) -> dict:
 
     (point, (lo, hi)), n_matches = _clustered(scored, "d_ours")
     (sim_point, sim_ci), _ = _clustered(scored, "d_sim")
+    (reg_point, reg_ci), reg_n = _clustered([s for s in scored if s["row_age_s"] <= REGISTERED_WINDOW_S], "d_ours")
+    ages = sorted(s["row_age_s"] for s in scored)
     weeks = collections.Counter(s["kickoff"].strftime("%G-W%V") for s in {s["match"]: s for s in scored}.values())
     report = {
         "today": today.isoformat(), "funnel": dict(funnel), "matches": n_matches, "items": len(scored),
         "diff_ours_minus_book": point, "ci": (lo, hi),
         "diff_sim_minus_book": sim_point, "ci_sim": sim_ci,
+        "sensitivity_registered_180s": {"matches": reg_n, "diff": reg_point, "ci": reg_ci},
+        "row_age_s": {"median": statistics.median(ages) if ages else float("nan"),
+                      "p90": ages[int(0.9 * (len(ages) - 1))] if ages else float("nan")},
         "roi": {str(e): paper_roi(scored, e) for e in EDGES},
         "per_league": {lg: {"items": len(v), "matches": len({s["match"] for s in v}), "diff": statistics.fmean(s["d_ours"] for s in v)}
                        for lg, v in sorted(_group(scored, lambda s: s["league"]).items(), key=lambda kv: str(kv[0]))},
@@ -347,6 +358,9 @@ def print_report(r: dict) -> None:
     print(f"H36 {r['today']}: funnel {r['funnel']}")
     print(f"  matches {r['matches']}, items {r['items']}  |  log-loss ours - book {r['diff_ours_minus_book']:+.4f} "
           f"[{r['ci'][0]:+.4f}, {r['ci'][1]:+.4f}]  |  sim - book {r['diff_sim_minus_book']:+.4f}  |  book lag median {r['book_lag_s_median']:.0f}s")
+    sens = r["sensitivity_registered_180s"]
+    print(f"  row age median {r['row_age_s']['median']:.0f}s p90 {r['row_age_s']['p90']:.0f}s  |  registered 180 s subset: "
+          f"{sens['matches']} matches, diff {sens['diff']:+.4f} [{sens['ci'][0]:+.4f}, {sens['ci'][1]:+.4f}]")
     for e, v in r["roi"].items():
         print(f"    paper edge >= {e}: {v['bets']} bets, profit {v['profit']:+.2f} u, ROI {v['roi']:+.3f}")
     for lg, v in r["per_league"].items():
