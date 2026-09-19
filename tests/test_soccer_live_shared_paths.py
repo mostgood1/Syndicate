@@ -119,3 +119,27 @@ def test_the_poller_simulates_each_match_once_for_both_consumers(monkeypatch, tm
     game = result["games"]["401900001"]
     assert game["projection"]["simulations"] == n and game["live_player_props"]
     assert len(calls) == 3 * n
+
+
+# ---------------------------------------------------------------------------- (B) the goal window's own length
+
+@pytest.mark.parametrize("half,remaining,window,simulated", [
+    (2, 1800.0, 300.0, 300),     # was 600: the 2nd-half stoppage base (300 s) doubled "next 5 min"
+    (2, 1800.0, 600.0, 600),     # was 900
+    (1, 1500.0, 600.0, 600),     # was 750 (1st-half base 150 s)
+    (2, 400.0, 600.0, 700),      # the window reaches the half's end: the stoppage IS still to be played
+    (2, 300.0, 300.0, 600),      # exactly to the end: same
+])
+def test_a_goal_window_simulates_its_own_length_and_stoppage_only_at_the_halfs_end(monkeypatch, half, remaining, window, simulated):
+    clocks = []
+    real = ll.simulate_match
+
+    def recording(*a, **k):
+        clocks.append(k["initial_state"].clock_remaining)
+        return real(*a, **k)
+
+    monkeypatch.setattr(ll, "simulate_match", recording)
+    state = {"home_team": "Home FC", "away_team": "Away FC", "half": half, "clock_remaining": remaining,
+             "score_home": 0, "score_away": 0}
+    p = ll.goal_in_window_probability(state, home_rating={}, away_rating={}, window_seconds=window, simulations=3)
+    assert set(clocks) == {simulated} and 0.0 <= p <= 1.0

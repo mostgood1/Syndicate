@@ -418,6 +418,12 @@ def goal_in_window_probability(
     home_rating = apply_red_card_penalty(home_rating, int(live_state.get("home_red_cards") or 0))
     away_rating = apply_red_card_penalty(away_rating, int(live_state.get("away_red_cards") or 0))
     truncated_clock = min(float(live_state["clock_remaining"]), max(0.0, window_seconds))
+    # STOPPAGE ONLY IF THE WINDOW REACHES THE END OF THE HALF. `build_resume_state` adds the half's stoppage base
+    # to whatever clock it is given, which is right for "the rest of the half" and wrong for a window that ends
+    # before it: measured 2026-09-19, a second-half "next 5 min" simulated 600 s and "next 10 min" 900 s (base
+    # 300 s), a first-half "next 10 min" 750 s (base 150 s), inflating both published windows. A window that
+    # does reach the half's end still gets the stoppage, because those minutes really are still to be played.
+    reaches_half_end = max(0.0, window_seconds) >= float(live_state["clock_remaining"])
     already_home = int(live_state["score_home"])
     already_away = int(live_state["score_away"])
 
@@ -426,7 +432,8 @@ def goal_in_window_probability(
     for offset in range(n):
         run_seed = seed + offset
         resume_state = build_resume_state(
-            {**live_state, "clock_remaining": truncated_clock}, possession_owner=possession_owner
+            {**live_state, "clock_remaining": truncated_clock}, possession_owner=possession_owner,
+            include_stoppage=reaches_half_end,
         )
         simulation_input = SoccerSimSimulationInput(
             home_team=live_state["home_team"],
