@@ -38382,3 +38382,21 @@ Scheduled task `fotmob-alias-verify-0919-am`, read-only. The lane was already CL
 - **Locks.** Claim `live-inplay-board-cadence`. Preflight CLEAR 16:53Z ("only infrastructure processes running"; 2 defunct children awaiting reap).
 - **Baseline** (16:53:21Z): `/intelligence` HTML has no "plays as of".
 - **Reading** (16:58:17Z): `/intelligence` HTML contains "plays as of". Harness `node tests/js/board_today_freshness_chip.test.mjs`: 9/9 pass.
+
+## 2026-09-19 17:12:47Z (12:12 CT) — DEPLOY (env re-inject, same commit) — live-odds-worker `7c5a1dad` (`dep-danc53p42hec73e0nhpg`) — lane live-inplay-board-cadence — **LIVE 17:18:33Z; verify: PENDING**
+
+- **Why.** USER 2026-09-19 ~11:45 CDT: "we need live interval odds for all sports to reach the board faster - not just NCAAF. And its ALL intervals not just Q1", plus "Capture Q1 + faster NCAAF lines". Measured the same morning:
+  - NCAAF captured `h1` only, so there were 0 q1 rows.
+  - NCAAF lines were captured every 7-11 min. At the 17:06Z grid build, the newest in-play NCAAF quote was 421 s old, past the board's 300 s live observation ceiling (`opportunity_gate.LIVE_QUOTE_MAX_OBSERVED_AGE_SECONDS`). So most live rows were "dead" before a board was built.
+- **What.** Single-key PUTs at 17:08:02Z, read back:
+  - `SYNDICATE_{NCAAF,NFL,SOCCER}_SEGMENT_MARKETS` `h1` → `all`.
+  - `SYNDICATE_{NCAAF,NFL,SOCCER}_SEGMENT_LIVE_WINDOW_SECONDS` absent (105 min) → 13500 / 12600 / 7200.
+  - `SYNDICATE_NCAAF_SEGMENT_MAX_EVENTS` absent (40) → 80.
+  - `SYNDICATE_NCAAF_LINES_REFRESH_INTERVAL_SECONDS` absent (300) → 150.
+  - Zero code delta.
+- **Credit estimate** (agent reading of `/api/ops/oddsapi/quota`): burn was ~61.8K/day, ~37% of the 5M plan. `all` for NCAAF/NFL/soccer is about +0.8M/30 days (to ~53%), and the NCAAF 150 s cadence about +7% more. Upper bounds: billing counts markets actually returned.
+- **UNVERIFIED RISK.** The q1-q4/h2 keys were not validated against the API: there is no `ODDS_API_KEY` in the local .env, and I would not read it from Render. An invalid key fails the WHOLE per-event request, which would also lose `h1`. The soccer `h1` keys work in production today. REVERT = PUT the three `_SEGMENT_MARKETS` back to `h1` + deploy.
+- **Locks.** Claim `live-inplay-board-cadence`. Preflight HOLD (5-6 jobs) until a CLEAR at 17:12:46Z; the deploy-on-clear runner fired on the notification. The claim was released after live.
+- **Baseline** (17:08:28Z, `/api/board/book-grid?sport=ncaaf`, default 300 rows): game rows q1 0, h1 13.
+- **Expectation.** After the first capture runs, NCAAF grid game rows include q1-q4/h2 (> 0), and h1 is still > 0. The newest in-play NCAAF quote age at grid build falls below 300 s more often.
+- **verify:** `segment_capture_reading.py` (scratchpad a1e40980), NCAAF + soccer grids every 3 min for 45 min.
