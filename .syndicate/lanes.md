@@ -1393,6 +1393,36 @@ death, never life — do not invert it.
   - (2) `KEYVALUE_WRITE_LARGE ... execution_ledger.json` per build <= the number of runs that placed >= 1 order (was 2 × placed).
   - (3) Unchanged ledger semantics: `EXECUTED` placed/duplicates behave as before (a re-run of the same plan places 0), 0 new `LEDGER_CAS_EXHAUSTED`, and paper orders per day in line with 09-17/09-18.
 
+### sim-sizing-skill-gate — OPEN — opened 2026-09-19 — session a1e40980-cceb-493f-adf9-5a5ca879acf6
+- Goal: no simulation sizes a stake, vetoes a price-shopping bet or orders the position cut unless its market is MEASURED as beating the market (`model_skill.status == measured` and `verdict_class == beats_market`). Every other sim edge stays on the board, shown and ranked, while the money follows price alone. Verified on the first refresh-worker plans after deploy: `sim_share_of_stake == 0` on every position without a beats_market note, with the paper and live books still placing price-shopping bets.
+- Why: USER 2026-09-19 ~09:40 CDT, "We need everything to be MEANINGFUL how do we get there", then "All sports (Recommended)" for "only measured skill moves money" and "Nightly skill scoreboard (Recommended)" next.
+  - MEASURED: all 31 `measured_market_skill` entries are `parity` (23) or `loses_to_market` (8); none beats the market.
+  - The WNBA backtest adds props, totals and spreads as losing (`leads.md` WNBA entry, item 5; log 2026-09-18).
+  - The sim still sizes money: `portfolio_commit.stake_attribution` measured the sim owning 57.6% of a representative stake. It also sized 1 of the 5 live WNBA overs on 09-18 at 89%.
+  - The only measured edge is price shopping.
+  - Served 09-19 14:35Z: 1,041 rows carry `model_edge_pct` (wnba 521 unmeasured, ncaaf 306 unmeasured + 214 measured, no `verdict_class`), and every one carries `projection.model_skill`, so the gate has its input.
+- Files: `syndicate/features/shared/portfolio_commit.py` (`_sizing_model_edge` and the position cut's rank key only, plus the gate helpers and their counters), `tests/test_portfolio_sim_skill_gate.py` (NEW). Existing portfolio tests that pin sim-sized math may set `SYNDICATE_PORTFOLIO_SIM_SIZING=legacy` in their own setup; each such edit is listed here when made. Checked 2026-09-19 on origin/main `94f77ced`: no OPEN lane claims `portfolio_commit.py` (`ncaaf-board-sim-coverage`'s scoped claim closed 09-18). NOT touched: `measured_market_skill.py` / `projection_skill.py` (held by `accuracy-assessment-0914`), `layer2_board.py`, `opportunity_signals.py`. The board's own ranking is unchanged; only money is gated.
+- Design:
+  - It generalises the NCAAF "Show edges, size on price" rule (`_PRICE_BASIS_SPORTS_DEFAULT`, user 2026-09-18) from one sport to "every row whose model is not measured to beat the market". `_sizing_model_edge` returns None for such a row, so it takes the existing price-basis path: market-fair sizing where the sport is allowlisted. Production allowlists all 8 sports (`SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS`, read 2026-09-19 via the single-key endpoint).
+  - Consequences, stated rather than discovered:
+    - (a) `zero_kelly_stake` refusals on sim-picked rows. The sim can no longer create a bet.
+    - (b) The sim can no longer veto or shrink a price bet.
+    - (c) The interval gate and the fitted blend do not run on gated rows.
+    - (d) In-play rows whose stake rested on the sim now meet `in_play_market_fair` (refused by default, for the 2026-09-12 stale-quote measurement).
+  - The position cut (`max_positions`) ranks a gated row on its Layer 2 score with the capped `sim_component` removed, recomputed from the score's own reliability terms.
+  - Off switch: only the exact word `legacy` in `SYNDICATE_PORTFOLIO_SIM_SIZING` restores sim sizing. Absent means gated.
+- Verification (PRE-REGISTERED):
+  - (1) Tests:
+    - An unmeasured, parity or losing note sizes exactly like the same row with no model edge. `beats_market` sizes like today.
+    - `legacy` restores today's stakes (reachability, off != on).
+    - A sim-only bet is refused. A price bet the sim would have vetoed is placed.
+    - The cut drops the sim term.
+  - (2) Production, first 3 refresh-worker plans after deploy:
+    - Every position's `sim_share_of_stake` is 0 (or None at zero stake), and `side_picked_by` is never `simulation`.
+    - The new `sim_sizing` counter shows the gated count ≈ rows with `model_edge_pct`.
+    - Paper plans still commit positions.
+  - (3) Live: the next live orders carry `sim_share_of_stake` 0.
+
 ### reconciliation-disk-walks — OPEN — opened 2026-09-19 — session a1e40980-cceb-493f-adf9-5a5ca879acf6
 - Goal: cut refresh-worker's daily prediction-reconciliation autorun, which runs INLINE in the main loop and blocks every book-grid tick while it runs, from ~23 min to <= 5 min, by walking the persistent disk once per date instead of twelve times, with every date's reconciliation result unchanged. Verified by a per-date timing line on the first autorun after deploy.
 - Why: USER 2026-09-18 ~19:05 CDT chose "Trace soccer live rebuilds", out of lane `board-build-stage-slowdown`.
