@@ -38194,3 +38194,58 @@ Closes the owed items of the 2026-09-18 14:27:33Z entry. Read from web's served 
   2026-09-18 22:02Z) IS read. The fallback is `rate_source`: `player_rate` returns None with fewer than 2 prior games
   (`player_stats.py:537`), and a week-2 build has only week 1. By design; current-season rates take over from week 3.
 - The goal verdict (week 2, row_count 1,614) is unaffected. The lead is deleted from `leads.md`.
+
+## 2026-09-19 14:52Z -- reading -- refresh-worker `c03351aa` -- lane `layer2-prior-date-live-carryover` -- R3 NOT EXERCISED 09-18 (no game crossed midnight CT), but the carryover RAN 6 h on a stale live label, and its stop condition (b)/(c) never fired
+
+Read-only reading by scheduled task `layer2-carryover-crossing-reading-0919`, taken 14:44-14:52Z (09:44-09:52 CDT). Nothing was deployed and no env var was changed. **No 09-18 event was really live after the 05:00Z roll. Even so, the carryover built the 09-18 shortlist 39 times, from 05:20Z to 11:03Z. It stopped only on `past_cap`, never on `nothing_live_at_last_build`. The live signal that kept it running was 10 WNBA rows for a game that went final at 04:02:19Z. R3 (a real crossing, then a stop on 0 live) is still owed; the lane stays OPEN. Next reading: task `layer2-carryover-crossing-reading-0920` (Sun 09-20 9:30 AM CT, Saturday night's NCAAF late kickoffs), left enabled.**
+
+**STEP 0: the code is on the loop path, checked by content.**
+- `fleet_live_commits` at ~14:45Z (09:45 CDT):
+  - web `b7faeb34`, live 2026-09-18 18:54:31Z.
+  - refresh-worker `c03351aa`, live 2026-09-19 00:45:38Z (19:45 CDT 09-18).
+  - live-odds-worker `7c5a1dad`, live 2026-09-18 23:00:55Z.
+- `git show c03351aa:pipeline/intelligence_state.py` has 2 matches for `_maybe_carry_over_prior_date_layer2`. `c03351aa` is an ancestor of origin/main. It was live across the whole roll, and no deploy happened in the window.
+
+**STEP 1: nothing was live across midnight CT.**
+- statsapi schedule for 09-18: 15 games, all `Final`. Four started at or after 00:30Z. Their last play's `about.endTime`:
+  - MIN @ LAA (823977), first pitch 01:38Z: **03:58:45Z** (22:58 CDT).
+  - MIA @ SD (823252), first pitch 01:40Z: **04:27:26Z** (23:27 CDT).
+  - NYY @ AZ (825032), first pitch 01:40Z: **04:31:22Z** (23:31 CDT).
+  - SF @ LAD (823898), first pitch 02:15Z: **04:53:43Z** (23:53 CDT). This was the last MLB final, 6.3 min before the roll.
+  - All 15 games' end times were checked. The latest was LAD.
+- WNBA, from ESPN `summary?event=401857197`: Portland Fire @ Golden State Valkyries, tip 02:00Z (21:00 CDT). `End of Game` wallclock **04:02:19Z** (23:02 CDT), STATUS_FINAL, GSV 82-66. The other two 09-18 WNBA games tipped at 23:30Z and are Final.
+- NCAAF: the 3 `ncaaf` chips on `game-chips?date=2026-09-18` read `final`.
+
+**STEP 2: the carryover RAN, on a false live signal.** `render_logs --text "LAYER2_CARRYOVER"` 04:50-12:00Z: covered 05:03:23..11:51:08Z, 44 matches over 2 pages.
+- 05:03:23Z (00:03 CDT) `decision=wait reason=rate_limited live_rows=3 chips_live=3`, then 05:09:22Z `wait reason=sim_subprocess_resident`.
+- **First `decision=built`: 05:20:24Z (00:20 CDT)**, `reason=live_at_last_build live_rows=3 chips_live=3 rows=4318 live_rows_now=2 chips_live_now=2`.
+- **39 `built` lines, 05:20:24Z-11:03:00Z (00:20-06:03 CDT)**, at a 5-12 min cadence.
+  - 07:01:43Z `wait reason=sim_subprocess_resident`.
+  - 3 builds carry `reason=unknown_since_restart`: 07:16:19Z, 09:00:31Z and 11:03:00Z (02:16, 04:00 and 06:03 CDT). The loop lost its in-memory last-build state three times in 6 h. The cause is not attributed: there was no deploy, and Render events were not read.
+- **Stop: 11:12:35Z (06:12 CDT) `decision=skip reason=past_cap hours_since_roll=6.21`**, then again at 11:51:08Z. There is **no `reason=nothing_live_at_last_build` anywhere in the window.**
+- `LAYER2_FAST_REFRESH date=2026-09-18`, 03:30-12:00Z: covered 03:36:12..11:02:59Z, 47 matches over 2 pages.
+  - Before the roll: 7 builds, 03:36-05:01Z. They ran with MLB live (`live_rows` 18-36, `chips_live` 6), and `mlb` dropped out of `sports` from 04:55:50Z.
+  - After the roll: 40 builds, 05:01:55Z-11:02:59Z. Sports ncaaf/nfl/soccer/wnba, rows 4,067-4,384.
+  - `live_rows` ran 2-3 (05:01-05:28Z), then 6, 4, and **8-10 from 07:16Z to the end**. `chips_live` ran 3 -> 2 (05:20Z) -> **1 from 05:59:01Z to the end**.
+  - Gaps over 15 min after the roll:
+    - 05:01:55 -> 05:20:23Z (18.5 min): the `rate_limited` and `sim_subprocess_resident` waits.
+    - 06:56:53 -> 07:16:19Z (19.4 min): the `sim_subprocess_resident` wait, then the restart.
+    - Every other gap was 12.0 min or less.
+- Failure markers, 04:50-12:00Z: `LAYER2_GUARD_SKIP`, `LAYER2_FAST_REFRESH_FAILED` and `LAYER2_CARRYOVER_FAILED` each matched nothing (1 page each).
+
+**Criteria, graded against a night with no real crossing:**
+- (a) `built` after 05:00Z: YES, 39 times. Gaps: 2 over 15 min, with their wait reasons quoted above. The mechanism fires, which is new evidence past R1/R2. But nothing real was live, so these are 39 unneeded fast builds of 130-213 s each, about 1.7 h of worker time.
+- (b) a `nothing_live_at_last_build` skip within about 20 min of the last final: **NO.** The last real final was 04:53:43Z (MLB) or 04:02:19Z (WNBA), both before the roll. The carryover ran to the 6 h cap.
+- (c) the last fast build before the stop shows 0 live: **NO.** At 11:02:59Z it was `live_rows=10 chips_live=1`.
+- (d) served artifact: MET as a label. `GET /api/board/layer2-shortlist?sport=all&date=2026-09-18&limit=2000` at 14:46:27Z (09:46 CDT):
+  - `written_at` 2026-09-19T11:01:51Z (06:01 CDT), after the roll. `build_age_seconds` 13,475.1.
+  - `total_rows` 4,067; `returned` 2,000 (nfl 1,851 + ncaaf 149 under `per_sport_limit` 2000).
+  - **0** `game_state=live`. `rows_live_state_stale` **10**.
+  - Per-sport reads, `limit=10000`, show 0 live rows everywhere: ncaaf 1,327, soccer 879, nfl 1,851 and wnba 10. The web-side stale label (W1) did its job.
+
+**What held the carryover open (a finding for this lane; nothing was fixed).**
+- The 10 stale rows are ALL WNBA POR @ GSV `totals` (8 with commence 02:07Z, 2 with 02:00Z). Each has `game_state_at_build=live`, `quote_source=kalshi` and `books_quoting=1`, and `quote_seen_age_seconds` was 63 s at the 11:01:51Z build.
+- A Kalshi WNBA total stays quoted after the game ends, until settlement. So these rows kept reading live for 7 h after the final, and `live_rows` fed `live_at_last_build` on every pass.
+- `game-chips?date=2026-09-18` at ~14:47Z shows all 3 WNBA chips as `pregame`, including POR @ GSV, which ESPN has as Final. The board has no WNBA final state for this game.
+- Which event was the single `chips_live=1` from 05:59Z on is **not identified.** The chip endpoint now mixes in 09-19 soccer games that are live today, so it cannot show the overnight state.
+- Consequence for R3: the stop condition assumes the live label clears at the final. For WNBA/Kalshi rows it does not, so on any night with such a game the carryover can only end at `past_cap`. A real crossing may still stop cleanly on 09-19/20 if no stale-live WNBA rows exist for that date. That makes the 0920 reading able to separate the two cases. No code change was made (read-only task).
