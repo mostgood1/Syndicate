@@ -16,6 +16,8 @@ import argparse
 import csv
 import json
 import logging
+import os
+import time
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -107,15 +109,74 @@ def _load_json_rows(path: Path) -> list[dict[str, Any]]:
     return []
 
 
+def _walk_for_names(root: Path, names: Sequence[str]) -> list[list[Path]]:
+    """ONE walk of `root`, returning every file named in `names`, per name.
+
+    This replaced one `root.rglob(name)` per name. On Render the root is the
+    whole persistent disk (48,816 directories on 2026-09-18), and each rglob is
+    a full walk plus a stat of every directory. Six patterns, called twice per
+    date across 14 dates, came to 168 walks and a ~23 min autorun that runs
+    INLINE in refresh-worker's main loop, so no book-grid tick happens while it
+    runs (lane `reconciliation-disk-walks`).
+
+    SAME PATHS, SAME ORDER as rglob on CPython 3.11 (`render.yaml` pins
+    3.11.9), because the first matching row wins in `_match_result_row`, so the
+    ORDER of files decides which of two conflicting rows settles a
+    prediction. rglob visits a directory before its children, and the children
+    in `os.scandir` order. It does not descend into symlinked directories. It
+    yields `<dir>/<name>` wherever that exists, and the caller then keeps
+    `is_file()`. This visits the same directories in the same pre-order and
+    checks every name against each directory's listing, so N names cost one
+    walk. `tests/test_reconciliation_disk_walks.py` holds a frozen copy of the
+    rglob version and compares the two.
+    """
+    hits: list[list[Path]] = [[] for _ in names]
+    wanted = {os.path.normcase(name): index for index, name in enumerate(names)}
+    stack: list[Path] = [root]
+    while stack:
+        directory = stack.pop()
+        try:
+            with os.scandir(directory) as iterator:
+                entries = list(iterator)
+        except PermissionError:
+            # rglob could still stat `<dir>/<name>` inside an unlistable
+            # directory; keep that answer rather than silently narrowing it.
+            for index, name in enumerate(names):
+                candidate = directory / name
+                if candidate.is_file():
+                    hits[index].append(candidate)
+            continue
+        subdirectories: list[Path] = []
+        for entry in entries:
+            index = wanted.get(os.path.normcase(entry.name))
+            if index is not None:
+                try:
+                    entry_is_file = entry.is_file()
+                except OSError:
+                    entry_is_file = False
+                if entry_is_file:
+                    # The pattern's own spelling, as rglob yields it.
+                    hits[index].append(directory / names[index])
+            try:
+                entry_is_dir = entry.is_dir()
+            except OSError:
+                entry_is_dir = False
+            if entry_is_dir and not entry.is_symlink():
+                subdirectories.append(directory / entry.name)
+        # Pushed reversed so they pop in scandir order: a pre-order walk.
+        stack.extend(reversed(subdirectories))
+    return hits
+
+
 def _candidate_result_paths(date_value: str, roots: Sequence[Path]) -> list[Path]:
+    names = [pattern.format(date=date_value) for pattern in RECONCILIATION_PATTERNS]
     paths: list[Path] = []
     for root in roots:
         if not root.exists():
             continue
-        for pattern in RECONCILIATION_PATTERNS:
-            for candidate in root.rglob(pattern.format(date=date_value)):
-                if candidate.is_file():
-                    paths.append(candidate)
+        # Pattern-major within a root, as the per-pattern rglob loop was.
+        for per_name in _walk_for_names(root, names):
+            paths.extend(per_name)
     unique: list[Path] = []
     seen: set[str] = set()
     for path in paths:
@@ -127,9 +188,14 @@ def _candidate_result_paths(date_value: str, roots: Sequence[Path]) -> list[Path
     return unique
 
 
-def _result_rows_for_date(date_value: str, roots: Sequence[Path]) -> list[dict[str, Any]]:
+def _result_rows_from_paths(paths: Iterable[Path]) -> list[dict[str, Any]]:
+    """Rows from `_candidate_result_paths`' files, in that order.
+
+    Takes the paths rather than re-deriving them: the caller also reports the
+    file list, and deriving it twice was a second full-disk walk per date.
+    """
     rows: list[dict[str, Any]] = []
-    for path in _candidate_result_paths(date_value, roots):
+    for path in paths:
         if path.suffix.lower() == ".csv":
             rows.extend(_load_csv_rows(path))
         elif path.suffix.lower() == ".json":
@@ -276,15 +342,33 @@ def _row_pnl(row: Mapping[str, Any], outcome: str | None, prediction: Mapping[st
     return profit if outcome == "win" else -round(stake, 4)
 
 
-def _match_result_row(prediction: Mapping[str, Any], rows: Iterable[Mapping[str, Any]]) -> Mapping[str, Any] | None:
-    prediction_keys = _prediction_keys(prediction)
+KeyedResultRow = tuple[Mapping[str, Any], set[str], str]
+
+
+def _keyed_result_rows(rows: Iterable[Any]) -> list[KeyedResultRow]:
+    """Each result row with its match keys and normalised market, computed ONCE per date.
+
+    `_match_result_row` used to recompute both for every (prediction, row)
+    pair: 11,201 closing-line rows on 2026-09-18, scanned once per unsettled
+    prediction. Non-mapping rows are dropped here, where the matcher used to
+    skip them.
+    """
+    keyed: list[KeyedResultRow] = []
     for row in rows:
         if not isinstance(row, Mapping):
             continue
-        row_keys = _row_keys(row)
+        keyed.append((row, _row_keys(row), _normalize_text(row.get("market"))))
+    return keyed
+
+
+def _match_result_row(prediction: Mapping[str, Any], keyed_rows: Iterable[KeyedResultRow]) -> Mapping[str, Any] | None:
+    """The FIRST row that shares a key with the prediction and does not name a different market."""
+    prediction_keys = _prediction_keys(prediction)
+    prediction_market = _normalize_text(prediction.get("market"))
+    for row, row_keys, row_market in keyed_rows:
         if prediction_keys and row_keys and prediction_keys.isdisjoint(row_keys):
             continue
-        if _normalize_text(row.get("market")) and _normalize_text(prediction.get("market")) and _normalize_text(row.get("market")) != _normalize_text(prediction.get("market")):
+        if row_market and prediction_market and row_market != prediction_market:
             continue
         return row
     return None
@@ -348,14 +432,28 @@ def reconcile_prediction_results_for_date(
     ledger_root = Path(ledger_path) if ledger_path is not None else None
     roots = [Path(root) for root in result_roots] if result_roots is not None else [_repo_root() / "data"]
 
+    started = time.perf_counter()
     predictions = load_all_predictions(ledger_path=ledger_root)
     scoped_predictions = [prediction for prediction in predictions if _prediction_date(prediction) == date_token]
-    result_rows = _result_rows_for_date(date_token, roots)
+    loaded_ledger = time.perf_counter()
+    # ONE walk per date, shared by the rows and the reported file list (it
+    # used to be two, each six rglobs of the whole disk).
+    result_paths = _candidate_result_paths(date_token, roots)
+    walked = time.perf_counter()
+    result_rows = _result_rows_from_paths(result_paths)
+    keyed_rows = _keyed_result_rows(result_rows)
+    read_rows = time.perf_counter()
 
     resolved = 0
     skipped = 0
-    result_files = [str(path) for path in _candidate_result_paths(date_token, roots)]
+    result_files = [str(path) for path in result_paths]
     reconciled_predictions: list[dict[str, Any]] = []
+    # Also INFO: the debug payload below serialises every result row, so it is
+    # built only when something will actually emit it. Render's collector does
+    # not see logger.info, and building it anyway cost one full dump of the
+    # date's rows per unmatched prediction.
+    debug_unmatched = logger.isEnabledFor(logging.INFO)
+    write_seconds = 0.0
 
     for prediction in scoped_predictions:
         result = prediction.get("result") if isinstance(prediction.get("result"), Mapping) else None
@@ -364,22 +462,23 @@ def reconcile_prediction_results_for_date(
             reconciled_predictions.append(dict(prediction))
             continue
 
-        matched_row = _match_result_row(prediction, result_rows)
+        matched_row = _match_result_row(prediction, keyed_rows)
         if matched_row is None:
-            logger.info(
-                json.dumps(
-                    {
-                        "prediction_id": prediction.get("id"),
-                        "sport": prediction.get("sport"),
-                        "selection": prediction.get("selection"),
-                        "market": prediction.get("market"),
-                        "reason": "no match found",
-                        "candidate_results_checked": _candidate_result_debug_rows(result_rows),
-                    },
-                    sort_keys=True,
-                    default=str,
+            if debug_unmatched:
+                logger.info(
+                    json.dumps(
+                        {
+                            "prediction_id": prediction.get("id"),
+                            "sport": prediction.get("sport"),
+                            "selection": prediction.get("selection"),
+                            "market": prediction.get("market"),
+                            "reason": "no match found",
+                            "candidate_results_checked": _candidate_result_debug_rows(result_rows),
+                        },
+                        sort_keys=True,
+                        default=str,
+                    )
                 )
-            )
             skipped += 1
             reconciled_predictions.append(dict(prediction))
             continue
@@ -393,6 +492,7 @@ def reconcile_prediction_results_for_date(
         original_line = _row_original_line(prediction, matched_row)
         closing_line = _row_closing_line(matched_row)
         pnl = _row_pnl(matched_row, outcome, prediction)
+        write_started = time.perf_counter()
         result_payload = record_result(
             prediction_id=prediction.get("id"),
             outcome=outcome,
@@ -403,8 +503,23 @@ def reconcile_prediction_results_for_date(
             closing_price=_row_closing_price(matched_row),
             ledger_path=ledger_root,
         )
+        write_seconds += time.perf_counter() - write_started
         resolved += 1
         reconciled_predictions.append({**dict(prediction), "result": result_payload})
+
+    finished = time.perf_counter()
+    # One line per date, so the autorun's time can be split by stage from the
+    # logs (lane `reconciliation-disk-walks`). print, not logger.info: only
+    # stdout reaches Render's collector.
+    print(
+        f"[prediction_reconciliation] RECONCILE_DATE_TIMING date={date_token} "
+        f"predictions={len(scoped_predictions)} resolved={resolved} skipped={skipped} "
+        f"result_files={len(result_paths)} result_rows={len(result_rows)} "
+        f"ledger_s={loaded_ledger - started:.2f} walk_s={walked - loaded_ledger:.2f} "
+        f"rows_s={read_rows - walked:.2f} match_s={finished - read_rows - write_seconds:.2f} "
+        f"write_s={write_seconds:.2f} total_s={finished - started:.2f}",
+        flush=True,
+    )
 
     summary = {
         "date": date_token,
