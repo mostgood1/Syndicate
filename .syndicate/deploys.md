@@ -38145,3 +38145,19 @@ Closes the owed items of the 2026-09-18 14:27:33Z entry. Read from web's served 
 - **EXPECT:** `sp_ratings_source inseason_blend_wk3`, 138 teams.
 - **MEASURED** (first tick after boot, 00:57:50Z -- the loop's usual ~12-min post-boot gap): `week 3`, `sp_ratings_teams 138`, **`sp_ratings_source inseason_blend_wk3`, `inseason_blend inseason_blend_wk3`**, `ratings_teams 150`, `written True`, `live_resimmed 2` of 75 (72 not in progress, 1 no live state) -- the two Friday-night games in play are now re-simmed on the same ratings as their pregame rows. Pre-deploy: production's blend document (web export) parsed through the new helper as `inseason_blend_wk3`, 138 teams, keys 138/138 with the SP+ index. Tests: `test_ncaaf_live_resim_blend` 9 passed incl. the real tick off != on (home win prob 0.8525 SP+ vs 0.0575 on a reversing blend); live re-sim/FCS/generator suites 79 passed.
 - **verify:** MET.
+
+## 2026-09-19 01:25:24Z (8:25 PM CT 09-18) — READING for `#672` (the 2026-09-18 00:33:04Z deploy entry; every refresh-worker deploy since contains `4d221768`) — lane nfl-prop-week-substrate — **verify: MET**
+
+- **The autorun built the week being played, with rows.** Refresh-worker logged `NFL_PROP_PROJECTION_LAUNCHING season=2026
+  week=2 reason=artifact_missing_retry since_launch_seconds=88246 interval_seconds=86400` at 01:24:46Z. Web holds
+  `nfl_source/nfl_prop_projections_2026_wk2.json` from 01:25:24Z: 725,256 B, `week` 2, **`row_count` 1,614** over 15
+  games and 9 markets (receiving yards 506, rushing yards 287, anytime TD 277, passing yards 248, ...). Before: 64
+  launches of `week=1` in 24 h, each refusing `zero_sim_rows`.
+- **Why 30 min after the 00:54:00Z due time.** The 86,400 s wait survived every restart (verified 18:07Z). But
+  refresh-worker was redeployed at 00:45:38Z (`c03351aa`, lane `ncaaf-live-resim-blend`), and its exclusive autorun
+  chain reached only reconciliation and accuracy on its 00:57Z and 01:05Z passes. Same starvation as `leads.md`
+  `c7545819`.
+- **NOT part of this goal, recorded as a lead:** all 1,614 rows carry `sim_source=nfl_prior_season_fallback`. By
+  `player_stats.resolve_player_id_with_prior` (`player_stats.py:285`) that means no player resolved in the 2026 index,
+  so the week-2 build uses 2025 rates and none of week 1's games. That is correct for week 1 and should not hold for
+  week 2.
