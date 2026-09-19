@@ -1718,7 +1718,11 @@ death, never life — do not invert it.
 - **GOAL VERDICT (checkpoint 2026-09-19 ~16:25Z / 11:25 CT): NOT MET.** Goal (verbatim): "name, each with a measurement, why (a) 5 of today's 13 MLS fixtures are absent from the soccer Layer 1 board and (b) 4 fixtures that ARE on it carry 0 projections, while web's `mls/.../recommendations_2026-09-19.json` (generated 13:44:16Z) has all 13 with props; then fix what is in scope, before the first kickoff at 23:30Z if the user approves a deploy."
   - (a) ANSWERED: its premise was my filter error. No fixture is absent (H1 exonerated).
   - (b) ANSWERED and WIDER: 9 fixtures, not 4 (H2). The cause is measured and the fix `6419eea5` is on main.
-  - Left: the deploy the user approved for ~16:45Z. Runner `deploy_mls.py` (scratchpad, background) waits until 16:45Z, then acquires the claim, re-reads the baseline, preflights and fires on CLEAR. It writes the claim token to `deploy_mls.token` for the release.
+  - Left: the deploy the user approved for ~16:45Z.
+    - **RE-TIMED 16:31Z on a peer's warning** (session a1e40980): `deploy_preflight.py` does not see the in-process board build. Their CLEAR re-inject at 16:04:54Z threw away a 09-19 board mid-build during live NCAAF.
+    - Runner `deploy_mls.py` (scratchpad, background) now waits for a `BOARD_BUILD_TIMING` after 16:30Z whose newest preceding `BUILD_SPAN_ENTER` is `date=2026-09-19`, i.e. TODAY's board just landed. It then acquires the claim, re-reads the baseline and preflights, firing only if CLEAR within 5 tries at 30 s. Otherwise it releases and does not deploy.
+    - It gives up WITHOUT firing at 17:50Z. The claim token goes to `deploy_mls.token`.
+    - Not the drain (it pauses builds during live NCAAF). The peer's profiler env vars stay as they are, and it owns turning them off.
   - Then the production reading: watcher `watch_mls.py` (scratchpad) waits for go-live, then reads the UTC-09-20 grid and the 9 evening fixtures every 3 min, for up to 3 h.
   - Owed after firing: the `deploys.md` entry (draft `deploys_mls.md` in scratchpad) and `deploy_claim.py release --service refresh-worker --token <deploy_mls.token>`.
 - Files:
