@@ -1695,6 +1695,14 @@ death, never life — do not invert it.
 - Verification: offline tests that fail on today's code (path routing under the keyvalue backend; publish ordering; the backfill rule and its retry cap), then production after a deploy the user approves: web's `boxscores_<yesterday>.csv` and `recon_*` present with fresh mtimes, the backlog draining, and a WNBA prop Ask whose recent form carries no STALE row.
 - Not this lane, recorded: `linescores_<date>.json` has the same keyvalue shape (`write_json_file`), but segment settlement may read it from keyvalue today, so moving it needs its own look. live-odds-worker's stale `boxscores_history.csv` (`#469`) is also left alone.
 
+### soccer-live-loop-cost — OPEN — opened 2026-09-19 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- Goal: attribute the soccer live loop's 3.5-7 minute cycle under load (lead in `leads.md`, 2026-09-18) to its stages -- ESPN scoreboard and summary fetches, per-league disk loads, and the four Monte Carlo passes per in-play match -- by timing the production poller locally against a live slate, and write the split and the fix it points to into the ledger. Diagnostic only: no code change and no deploy in this lane.
+- Files: none (diagnostic, read-only; the profiler lives in the session scratchpad). A fix would touch `scripts/poll_soccer_live_state.py` and needs its own lane.
+- Hypothesis: per league per tick the loop pays 2 ESPN scoreboard calls (live events, then box events) and 3 disk loads (ratings, player rows, pregame payload), sequentially across 10 leagues; per in-play match it pays 1 summary fetch and FOUR 80-sim Monte Carlo passes (`project_live_match`, `goal_in_window_probability` x2, `project_live_player_props`). With ~20 matches in play the per-match Monte Carlo passes dominate the cycle, not the network.
+- Falsification test: timed on a live slate, the ESPN fetches (or the per-league disk loads) take more of the cycle than the four simulation passes together.
+- Verification: a timed local run of `poll_active_leagues_for_tick` over the live slate, per stage and per league, with the local-vs-worker caveat stated, written to `log/2026-09-19.md`.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
