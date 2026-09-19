@@ -38374,3 +38374,11 @@ Scheduled task `fotmob-alias-verify-0919-am`, read-only. The lane was already CL
 - **Position labels** (`sizing.sim_sizing`, since `7301fe67` carried `45a15e34`): plan 2 had `gated_parity` 8, `gated_unmeasured` 6, `price_basis_sport` 22 and none 56; plan 3 had 8 / 6 / 25 / 57.
 - **Refusals, plan 3:** `in_play_market_fair` 21, `zero_kelly_stake` 1.
 - **Live (3): OWED.** The newest live orders (05:17-07:31Z) all predate the gate. Two of them carry sim shares, soccer totals 0.5 and mlb totals_alt 0.2843, as expected before the gate.
+
+## 2026-09-19 16:53:39Z (11:53 CT) — DEPLOY — web `08a537c5` -> `4043e136` (`dep-danbs4v40ujc73be2k5g`, main tip) — lane live-inplay-board-cadence — **LIVE 16:56:55Z; verify: MET**
+
+- **Why.** USER 2026-09-19 ~11:40 CDT chose "Honest freshness stamp". The chip showed only each date's OLDER source. It read "as of 10:49" while the plays had been rewritten at 11:05, because a refresh-worker restart discarded the full build that would have moved it.
+- **What.** `4043e136` changes `intelligence.html` `boardDateFreshnessParts`: "Today: plays as of <shortlist> · full board <state>" when the two stamps differ, otherwise unchanged. Display-only; the payload already carried `sources`. It also carries every main commit since `08a537c5`.
+- **Locks.** Claim `live-inplay-board-cadence`. Preflight CLEAR 16:53Z ("only infrastructure processes running"; 2 defunct children awaiting reap).
+- **Baseline** (16:53:21Z): `/intelligence` HTML has no "plays as of".
+- **Reading** (16:58:17Z): `/intelligence` HTML contains "plays as of". Harness `node tests/js/board_today_freshness_chip.test.mjs`: 9/9 pass.
