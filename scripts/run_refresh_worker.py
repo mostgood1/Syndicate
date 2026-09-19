@@ -1958,6 +1958,71 @@ def _ncaaf_sp_ratings_index(season: int) -> tuple[dict[str, tuple[float, float]]
     return index, source
 
 
+def _ncaaf_inseason_blend_index(season: int, week: int) -> tuple[dict[str, tuple[float, float]] | None, str]:
+    """The pregame generator's in-season blend for `week`, in the SP+ shape, or None.
+
+    `todo #678`, lane `ncaaf-live-resim-blend`. From week 3 the pregame
+    generator prices on `inseason_blend_ppa` (prior-season SP+ blended with
+    season-to-date per-game PPA; `findings_2026-09-18_ncaaf_inseason_blend.md`)
+    while this tick kept reading SP+, so one game's pregame and live numbers
+    rested on different team ratings. The generator hands the engine the blend
+    by replacing its SP+ index wholesale (`sp_index = blend_index`); this is the
+    same substitution, read from the document the generator writes beside the
+    SP+ mirror on the mounted disk -- no CFBD call, no recomputation here.
+
+    Same switch as the generator (`SYNDICATE_NCAAF_INSEASON_BLEND`, absent =
+    on), so `off` reverts pregame AND live together. A week with no entry falls
+    back to the newest EARLIER entry and says so (`stale_week`); nothing
+    usable returns None with the reason, and the caller keeps SP+.
+    """
+    try:
+        from scripts.generate_smartsim2_ncaaf_projections import (
+            INSEASON_BLEND_MIN_WEEK,
+            inseason_blend_artifact_path,
+            inseason_blend_enabled,
+        )
+    except Exception as exc:  # noqa: BLE001 -- a missing blend must never kill the tick
+        return None, f"blend_import_failed:{type(exc).__name__}"
+    if not inseason_blend_enabled():
+        return None, "blend_disabled"
+    if int(week) < int(INSEASON_BLEND_MIN_WEEK):
+        return None, f"week_below_{INSEASON_BLEND_MIN_WEEK}"
+    path = inseason_blend_artifact_path(season)
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None, "no_blend_artifact"
+    except Exception as exc:  # noqa: BLE001
+        return None, f"blend_artifact_unreadable:{type(exc).__name__}"
+    weeks = doc.get("weeks") if isinstance(doc, dict) else None
+    if not isinstance(weeks, dict):
+        return None, "blend_artifact_no_weeks"
+    usable: list[int] = []
+    for key in weeks:
+        try:
+            if int(key) <= int(week):
+                usable.append(int(key))
+        except (TypeError, ValueError):
+            continue
+    if not usable:
+        return None, f"no_blend_entry_at_or_before_wk{week}"
+    chosen = max(usable)
+    teams = (weeks.get(str(chosen)) or {}).get("teams")
+    index: dict[str, tuple[float, float]] = {}
+    if isinstance(teams, dict):
+        for team, value in teams.items():
+            try:
+                index[str(team)] = (float(value[0]), float(value[1]))
+            except (TypeError, ValueError, IndexError):
+                continue
+    if not index:
+        return None, f"blend_entry_wk{chosen}_empty"
+    source = f"inseason_blend_wk{chosen}"
+    if chosen != int(week):
+        source += f"_stale_week_for_wk{week}"
+    return index, source
+
+
 def _ncaaf_live_resim_espn_dates(now_utc: datetime) -> list[str]:
     """Which ESPN scoreboard dates can carry a game that is live RIGHT NOW.
 
@@ -2620,6 +2685,13 @@ def _run_ncaaf_live_resim_tick() -> dict[str, Any] | None:
     )
 
     sp_index, sp_source = _ncaaf_sp_ratings_index(season)
+    # THE PREGAME GENERATOR'S RATINGS, when it priced this week on the blend
+    # (`todo #678`). Replaced before anything below reads `sp_index` -- the
+    # per-team ratings, the league means and the FCS market-implied back-out --
+    # so every live lane rests on the same ratings as the game's pregame row.
+    blend_index, blend_reason = _ncaaf_inseason_blend_index(season, week)
+    if blend_index:
+        sp_index, sp_source = blend_index, blend_reason
     ratings: dict[str, tuple[float, float]] = {}
     if sp_index:
         from scripts.generate_smartsim2_ncaaf_projections import (
@@ -2757,6 +2829,8 @@ def _run_ncaaf_live_resim_tick() -> dict[str, Any] | None:
     snapshot["week"] = week
     snapshot["spRatingsSource"] = sp_source
     snapshot["spRatingsTeams"] = len(sp_index)
+    # Why the blend was or was not used, including when SP+ stayed in place.
+    snapshot["inseasonBlend"] = blend_reason
     snapshot["espnFetch"] = fetch_stats
 
     written = False
@@ -2772,6 +2846,7 @@ def _run_ncaaf_live_resim_tick() -> dict[str, Any] | None:
         "projections": len(projections),
         "sp_ratings_teams": len(sp_index),
         "sp_ratings_source": sp_source,
+        "inseason_blend": blend_reason,
         "ratings_teams": len(ratings),
         "espn": fetch_stats,
         "live_index": len(live_index),
