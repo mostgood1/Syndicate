@@ -7116,3 +7116,7 @@ and read one field of five.
 - Before calling a fallback a defect, read the fallback's own condition in code. "Falls back only when the current season
   cannot answer" plus an n >= 2 floor is expected behaviour in week 2, not a missing input.
 - *(evidence: `deploys.md` 2026-09-19 14:4xZ correction; `nfl_prop_projections_2026_wk2.json` rows)*
+
+## 2026-09-18 — RECURRENCE of 2026-09-17 "a cache TTL read from the code is not the live TTL": I told the user an autorun flag was OFF because the code's default is off; the service sets it `true` `[lane ncaaf-player-data, session 259d6003]`
+- **What happened.** A survey read `_..._autorun_enabled`'s absent-means-off default and I reported "the flag is off, a deploy alone won't run it". The refresh-worker env had the key set `true`; the autorun was already live. Corrected to the user in the same session.
+- **Rule.** A value the code DEFAULTS to answers "what happens on a service that does not set the key" -- nothing else. Before stating a flag's state on production, read that ONE key on that service (single-key env endpoint; never the list API, which dumps secret values), and say which you read: `code default` or `live key`.
