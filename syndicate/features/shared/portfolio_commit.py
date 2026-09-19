@@ -314,17 +314,8 @@ def _sim_sizing_mode() -> str:
     return SIM_SIZING_LEGACY if raw == SIM_SIZING_LEGACY else SIM_SIZING_GATED
 
 
-def _sim_sizing_gate_reason(row: Mapping[str, Any]) -> str | None:
-    """Why this row's model may NOT size, or None when it may.
-
-    It may size when the gate is off (`legacy`), or when the row's
-    `projection.model_skill` is `measured` with `verdict_class == beats_market`.
-    Anything else is gated and says which: `no_skill_note` (unknown must not
-    default permissive), `unmeasured`, `measured_no_verdict` (a producer note
-    that carries no class), `parity` or `loses_to_market`.
-    """
-    if _sim_sizing_mode() == SIM_SIZING_LEGACY:
-        return None
+def _note_gate_reason(row: Mapping[str, Any]) -> str | None:
+    """The row's own `projection.model_skill` verdict: None only for measured + beats_market."""
     from syndicate.features.shared.measured_market_skill import VERDICT_BEATS
     from syndicate.features.shared.projection_skill import STATUS_MEASURED
 
@@ -339,6 +330,46 @@ def _sim_sizing_gate_reason(row: Mapping[str, Any]) -> str | None:
     if verdict_class == VERDICT_BEATS:
         return None
     return verdict_class or "measured_no_verdict"
+
+
+def _in_validated_skill_pocket(row: Mapping[str, Any]) -> bool:
+    """True when the daily scorecard has VALIDATED this row's bucket as a skill pocket.
+
+    THE SELF-UPDATING HALF OF THE GATE. The `model-scorecard` cron grades the priced
+    population every day and publishes only buckets that pass `bucket_search`'s own
+    bar (>= 60 games over >= 5 dates, FDR, leave-one-date-out). The file expires in
+    72 h and has a kill switch (`skill_overlay`). A model that starts beating the
+    market in a bucket earns sizing there with no code change, and loses it when the
+    next run stops validating it.
+
+    `bucket_factor == 1.0` is exactly "a validated pocket and no conflicting loss"
+    (`measured_bucket_skill.bucket_factor`). Anything else, including a lookup that
+    raises, is not a pocket. Unknown must not default permissive.
+    """
+    try:
+        from syndicate.features.shared.measured_bucket_skill import bucket_factor, view_from_candidate
+
+        return bucket_factor(view_from_candidate(row)) == 1.0
+    except Exception:
+        return False
+
+
+def _sim_sizing_gate_reason(row: Mapping[str, Any]) -> str | None:
+    """Why this row's model may NOT size, or None when it may.
+
+    It may size when the gate is off (`legacy`), when the row's
+    `projection.model_skill` is `measured` with `verdict_class == beats_market`,
+    or when the daily scorecard validated the row's bucket as a skill pocket.
+    Anything else is gated and says which: `no_skill_note` (unknown must not
+    default permissive), `unmeasured`, `measured_no_verdict` (a producer note
+    that carries no class), `parity` or `loses_to_market`.
+    """
+    if _sim_sizing_mode() == SIM_SIZING_LEGACY:
+        return None
+    reason = _note_gate_reason(row)
+    if reason is not None and _in_validated_skill_pocket(row):
+        return None
+    return reason
 
 
 def _sizing_model_edge(row: Mapping[str, Any]) -> float | None:
@@ -361,9 +392,13 @@ def _sim_sizing_basis(row: Mapping[str, Any]) -> str | None:
         return None
     if str(row.get("sport") or "").strip().lower() in _price_basis_sports():
         return SIM_SIZING_PRICE_BASIS_SPORT
-    reason = _sim_sizing_gate_reason(row)
+    if _sim_sizing_mode() == SIM_SIZING_LEGACY:
+        return SIM_SIZING_LEGACY
+    reason = _note_gate_reason(row)
     if reason is None:
-        return SIM_SIZING_LEGACY if _sim_sizing_mode() == SIM_SIZING_LEGACY else "admitted_beats_market"
+        return "admitted_beats_market"
+    if _in_validated_skill_pocket(row):
+        return "admitted_validated_pocket"
     return f"gated_{reason}"
 
 

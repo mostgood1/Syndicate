@@ -44,6 +44,8 @@ def _env(monkeypatch):
     monkeypatch.setenv(FAIR_ENV, "mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,soccer")
     monkeypatch.delenv(PRICE_ENV, raising=False)
     monkeypatch.delenv(GATE_ENV, raising=False)
+    # The shipped static bucket table (empty), never a pulled overlay: deterministic.
+    monkeypatch.setenv("SYNDICATE_SKILL_OVERLAY", "off")
 
 
 def _row(skill=UNMEASURED, **over):
@@ -204,3 +206,36 @@ def test_an_admitted_model_keeps_its_published_score_in_the_cut():
     row = _scored(6.0, 1.5, line=170.5)
     row["projection"] = {"model_skill": dict(BEATS)}
     assert _cut_rank_score(row) == pytest.approx(6.75)
+
+
+# --- the self-updating half: the daily scorecard's validated pockets -------------
+
+
+def _bucket_factor_returns(monkeypatch, value):
+    from syndicate.features.shared import measured_bucket_skill
+
+    def fake(view, **_):
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+    monkeypatch.setattr(measured_bucket_skill, "bucket_factor", fake)
+
+
+def test_a_validated_skill_pocket_earns_sizing_without_a_code_change(monkeypatch):
+    gated, _ = sizing_inputs_from_row(_row())
+    assert gated.model_probability == gated.market_fair_probability
+    _bucket_factor_returns(monkeypatch, 1.0)
+    admitted, _ = sizing_inputs_from_row(_row())
+    assert admitted.model_probability == pytest.approx(admitted.market_fair_probability + 0.08)
+    plan = _commit([_row()])
+    assert plan["sim_sizing"]["by_basis"] == {"admitted_validated_pocket": 1}
+    assert plan["positions"][0]["attribution"]["sim_share_of_stake"] > 0.0
+
+
+@pytest.mark.parametrize("factor", [0.8, None, RuntimeError("overlay unreadable")], ids=["validated_loss", "no_bucket", "lookup_raises"])
+def test_anything_but_a_clean_pocket_stays_gated(monkeypatch, factor):
+    _bucket_factor_returns(monkeypatch, factor)
+    inputs, _ = sizing_inputs_from_row(_row())
+    assert inputs.model_probability == inputs.market_fair_probability
+    assert _commit([_row()])["sim_sizing"]["by_basis"] == {"gated_unmeasured": 1}
