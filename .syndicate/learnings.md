@@ -7088,3 +7088,15 @@ empty, suspect buffering before suspecting the watcher.
 - **What was measured** (2026-09-18, the served history rows, then live-odds-worker's own write lines): the soccer live loop's per-league gap grows with matches in play, 116-155 s with 1-2, ~220 s with 3-5, 267-397 s with 6-9, 432 s with 15+ (2026-09-12). The docstring's figure was an idle-load number. At 180 s the window would have dropped a large, match-independent share of every busy slate's captures, most of all on Saturdays. It was amended to 600 s before any outcome existed, with the 180 s subset reported beside it.
 - **The rule:** a window, timeout or tolerance that assumes how often something happens must be sized from that cadence MEASURED AT THE LOAD THE RULE WILL MEET. A cadence in a docstring or a config default is a belief about one load level. Measure it by load bucket before a registration or a guard depends on it.
 - *(evidence: `log/2026-09-18.md` ~14:25 CT and ~14:50 CT; lead in `leads.md`)*
+
+## 2026-09-18 A revert justified by ONE quantity does not cover another, and its call-count premise can go stale. `[lane market-history-index-memo]`
+
+**What I believed.** The `#75` note in `odds_lifecycle.py` said caching `build_recent_market_history_index` "was tried and reverted": it "bought nothing (identical peak)" and the index "runs once per game", ~15 rebuilds of ~14k events, "noise". I read that as settled, and the profile target went elsewhere at first.
+
+**What was true.** #75 measured PEAK MEMORY, which a rebuild never moves. The cost is CPU, and the premise had drifted: cProfile on refresh-worker 2026-09-18 showed **1,311 rebuilds per build, once per candidate**, for 517.5 of 641.0 s in candidate collection. Memoised per file version (`42594360`), candidate collection went 322.8 s → 47.7 s median.
+
+**How to apply.**
+- A recorded revert names the quantity it measured. Before trusting it for a DIFFERENT cost, re-measure that cost. "Identical peak" says nothing about CPU.
+- A "runs N times" premise is a call count, and call counts move when callers change. Re-derive it from a profile (`ncalls`) rather than from the note.
+- Profile before theorising: logs and wall spans pointed at book-quote cache thrash (real, ~8 s per cycle), while the profiler named two leaves worth ~90% of two stages.
+- *(evidence in `.syndicate/deploys.md` 2026-09-18 19:55:27Z and 23:50Z, and `log/2026-09-18.md` evening checkpoint)*
