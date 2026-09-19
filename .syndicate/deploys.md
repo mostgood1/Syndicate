@@ -38471,3 +38471,16 @@ Scheduled task `fotmob-alias-verify-0919-am`, read-only. The lane was already CL
   - Median served in-play quote age well under the baseline's 733 s. The 180 s web combined-board cache is a floor on that, so ~3 min is NOT expected from this deploy alone.
 - **First line:** 18:28:29Z `INPLAY_OVERLAY sport=soccer rows_inplay=1 opportunities=1 cards=0 published=True elapsed_ms=151`.
 - **verify:** `overlay_served_reading.py` (served board every 60 s, 50 min) + `overlay_reading.py` (log lines).
+
+## 2026-09-19 17:59:14Z (12:59 CT) — READING — refresh-worker `7301fe67` — lane wnba-postgame-to-disk — **verify: the Ask STALE clause MET; the backlog drains, including one publish failure and its retry**
+
+- **Backlog tick 2** (16:56:01Z): `date` 2026-09-17, `box_rebuild` true, box 105 rows, recon 5 games / 105 props. `published` was **false for all four**.
+  - Web was mid-deploy: `4043e136`, 16:53:39-16:56:55Z, another session's.
+  - As designed, the date was not marked published, so it stays in the backfill (attempt 1 of 3).
+- **Tick 3** (17:57:02Z): the retry of 09-17 published **true for all four**. Web then listed 110 dated box scores, including `boxscores_2026-09-17.csv` (17:58:39Z).
+- **Ask STALE clause: MET.** At 17:58:51-17:59:14Z the same four WNBA board-prop Asks no longer print a STALE row: Alyssa Thomas AST, Arike Ogunbowale 3PM, Kahleah Copper 3PM (PHX @ DAL), and Flau'jae Johnson 3PM (SEA @ GS).
+  - At 15:55-15:56Z all four printed `STALE: newest box score is 25` (27) `days before this game`.
+  - Their teams played 09-17; they did not play 09-18.
+- **Still owed:** the backlog 09-16 → 08-26 (~22 slates, one per hour), then web listing every dated file from 08-26.
+- **A cost this surfaced:** a web restart costs the worker→web publish that lands during it. The fix's retry absorbed it (1 of 3 attempts). Three web restarts, each landing on a tick, would exhaust a date's attempts.
+

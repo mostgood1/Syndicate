@@ -1664,15 +1664,15 @@ death, never life — do not invert it.
 ### wnba-postgame-to-disk — OPEN — opened 2026-09-19 — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **`#675`; LIVE on refresh-worker `7301fe67` since 15:39:17Z; readings owed**
 
 - Goal: [user 2026-09-19: "proceed next" on `#675`] a WNBA slate date's box scores appear on WEB within a day of the game (`wnba_source/data/processed/boxscores_<date>.csv`), its three recon files reach web too, the dates missing since 2026-08-25 are backfilled, and a WNBA board-row prop Ask's recent-form table stops printing its STALE row.
-- **GOAL VERDICT (2026-09-19 ~16:00Z / 11:00 CT): NOT MET. Two of four clauses are MET.** Goal (verbatim): "a WNBA slate date's box scores appear on WEB within a day of the game (`wnba_source/data/processed/boxscores_<date>.csv`), its three recon files reach web too, the dates missing since 2026-08-25 are backfilled, and a WNBA board-row prop Ask's recent-form table stops printing its STALE row."
+- **GOAL VERDICT (2026-09-19 ~18:35Z / 13:35 CT): NOT MET. Three of four clauses are MET; the backfill is draining.** Goal (verbatim): "a WNBA slate date's box scores appear on WEB within a day of the game (`wnba_source/data/processed/boxscores_<date>.csv`), its three recon files reach web too, the dates missing since 2026-08-25 are backfilled, and a WNBA board-row prop Ask's recent-form table stops printing its STALE row."
   - Deployed on the user's "Deploy now": refresh-worker `ef5ab75b` -> `7301fe67` (`dep-danammh42hec73drs0ig`), fired 15:33:46Z, live 15:39:17Z (`deploys.md` entry). Claim released ~15:43Z.
   - **MET, box scores and recon reach web** (`deploys.md` READING 15:55:52Z). The first tick on the new code (15:55:46Z) logged `date` 2026-09-18, `box_rebuild` true, and `published` true for the box score and all three recon files. At 15:55:52Z web listed 109 dated box scores, newest `2026-09-18` (baseline 08-25), plus `recon_{games,props,quarters}_2026-09-18.csv` (baseline 0).
   - The settlement pass wrote 09-18 and 09-17 to disk six minutes before that tick and published neither. That is the case the "published, not on disk" rule exists for.
-  - **OWED, the backfill:** 09-17 → 08-26, one per hour, newest first.
-  - **OWED, the Ask STALE row:** 4 board-prop Asks (3 on PHX @ DAL, 1 on SEA @ GS) still print `STALE ... 25/27 days`. None of those players played 09-18, and today's board has 0 props for anyone who did, so this tick could not clear it.
-  - Watcher `watch675b.py` (scratchpad) re-asks after every published tick until ~18:57Z.
-  - Checkpoint ~16:25Z: no second tick yet. Web still lists 109 dated box scores, newest 09-18 (16:21:48Z). The 09-17 tick is due ~16:55Z.
-  - The approved refresh-worker deploy for lane `mls-board-evening-gaps` (~16:45Z) restarts the worker. The producer's interval gate lives in keyvalue and survives it.
+  - **MET, the Ask STALE row** (`deploys.md` READING 17:59:14Z). After 09-17 published (the 17:57:02Z retry), the same 4 board-prop Asks (3 on PHX @ DAL, 1 on SEA @ GS) print no STALE row. They printed `STALE ... 25/27 days` at 15:55Z.
+  - **OWED, the backfill:** 2 of ~24 slates are on web (09-18, 09-17); next is 09-16 → 08-26, one per hour, newest first.
+    - The 09-17 tick at 16:56:01Z published false ×4 during another session's web deploy (`4043e136`). The retry an hour later published all four (attempt 2 of 3).
+    - Refresh-worker restarted at 18:26:24Z (`aebc040d`, not this lane's deploy). The producer's interval gate lives in keyvalue and survives it.
+  - Close when web lists every dated `boxscores_2026-*.csv` from 08-26 to yesterday.
 - Files:
   - `syndicate/features/shared/refresh_state_store.py` (the `_KEYVALUE_EXCLUDED_PATH_MARKERS` tuple ONLY: one marker for dated WNBA box scores)
   - `scripts/run_refresh_worker.py` (`_wnba_postgame_target_dates` and `_run_wnba_postgame_producer_tick` ONLY)
@@ -1717,23 +1717,18 @@ death, never life — do not invert it.
 - Verification: offline, tests failing on the pre-change code: shared == unshared (exact equality) for projection and props; the poller simulates each match's paths once for the two consumers (call count); a window short of the half's end simulates exactly the window, one that reaches it gets stoppage. Production, after a user-approved deploy: served `goal_windows` fall to the corrected values (read by recomputing one served state), and the tick's per-match cost drops (re-profile).
 - Blocked by: none (the deploy is a user decision)
 
-### mls-board-evening-gaps — OPEN — opened 2026-09-19 — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **H2 fix LANDED `6419eea5`; refresh-worker deploy APPROVED (user: "Deploy ~16:45Z"), GATED on today's board build landing, not yet fired (checkpoint 16:37Z)**
+### mls-board-evening-gaps — OPEN — opened 2026-09-19 — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **fix `6419eea5` LIVE on refresh-worker since 18:26:24Z via `aebc040d` (NOT this lane's deploy); production reading owed**
 
 - Goal: [user 2026-09-19 "proceed next steps", on the MLS lead this session filed in lane `soccer-prop-conditioning`] name, each with a measurement, why (a) 5 of today's 13 MLS fixtures are absent from the soccer Layer 1 board and (b) 4 fixtures that ARE on it carry 0 projections, while web's `mls/.../recommendations_2026-09-19.json` (generated 13:44:16Z) has all 13 with props; then fix what is in scope, before the first kickoff at 23:30Z if the user approves a deploy.
-- **GOAL VERDICT (checkpoint 2026-09-19 ~16:37Z / 11:37 CT): NOT MET.** At 16:36Z the gated runner was still waiting for a 09-19 build completion, and `watch_mls.py` read 0 of 9 evening fixtures projected (live `7301fe67`). Goal (verbatim): "name, each with a measurement, why (a) 5 of today's 13 MLS fixtures are absent from the soccer Layer 1 board and (b) 4 fixtures that ARE on it carry 0 projections, while web's `mls/.../recommendations_2026-09-19.json` (generated 13:44:16Z) has all 13 with props; then fix what is in scope, before the first kickoff at 23:30Z if the user approves a deploy."
+- **GOAL VERDICT (2026-09-19 ~18:35Z / 13:35 CT): NOT MET.** Goal (verbatim): "name, each with a measurement, why (a) 5 of today's 13 MLS fixtures are absent from the soccer Layer 1 board and (b) 4 fixtures that ARE on it carry 0 projections, while web's `mls/.../recommendations_2026-09-19.json` (generated 13:44:16Z) has all 13 with props; then fix what is in scope, before the first kickoff at 23:30Z if the user approves a deploy."
   - (a) ANSWERED: its premise was my filter error. No fixture is absent (H1 exonerated).
-  - (b) ANSWERED and WIDER: 9 fixtures, not 4 (H2). The cause is measured and the fix `6419eea5` is on main.
-  - Left: the deploy the user approved for ~16:45Z.
-    - **RE-TIMED 16:31Z on a peer's warning** (session a1e40980): `deploy_preflight.py` does not see the in-process board build. Their CLEAR re-inject at 16:04:54Z threw away a 09-19 board mid-build during live NCAAF.
-    - Runner `deploy_mls.py` (scratchpad, background) now waits for a `BOARD_BUILD_TIMING` after 16:30Z whose newest preceding `BUILD_SPAN_ENTER` is `date=2026-09-19`, i.e. TODAY's board just landed. It then acquires the claim, re-reads the baseline and preflights, firing only if CLEAR within 5 tries at 30 s. Otherwise it releases and does not deploy.
-    - It gives up WITHOUT firing at 17:50Z. The claim token goes to `deploy_mls.token`.
-    - Not the drain (it pauses builds during live NCAAF). The peer's profiler env vars stay as they are, and it owns turning them off.
-    - **HELD 16:39Z for a peer env write** (session a1e40980's request, agreed). It will PUT `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS` 1200→3600 and both profilers `all`→`off` to ride this deploy (one restart, not two).
-      - Before-values read at 16:40:15Z: `1200` / `all` / `all`.
-      - The runner fires nothing while `deploy_mls.hold` exists in this session's scratchpad. It also refuses a 09-19 completion older than 240 s.
-      - Clear the hold after the peer's "written" and a read-back showing `3600` / `off` / `off`.
-  - Then the production reading: watcher `watch_mls.py` (scratchpad) waits for go-live, then reads the UTC-09-20 grid and the 9 evening fixtures every 3 min, for up to 3 h.
-  - Owed after firing: the `deploys.md` entry (draft `deploys_mls.md` in scratchpad) and `deploy_claim.py release --service refresh-worker --token <deploy_mls.token>`.
+  - (b) ANSWERED and WIDER: 9 fixtures, not 4 (H2). The cause is measured.
+  - **The fix is LIVE, but not by this lane's deploy.** Refresh-worker went `7301fe67` → `aebc040d` (`dep-dand50jm8hqs73au6i90`, fired 18:20:50Z by lane `live-inplay-board-cadence` / session a1e40980 with preflight CLEAR and the board build idle, live 18:26:24Z; their `deploys.md` entry lists `6419eea5` as a rider). `aebc040d` contains `6419eea5`, session a1e40980's `c55644af`, and its env (slow refresh 3600, profilers off).
+  - This lane's approved deploy NEVER fired.
+    - It was gated on today's board build landing (peer a1e40980: preflight cannot see the in-process build). A hold for the peer's env write cost the 16:53Z window. The 17:49Z window was HOLD ×5 on the MLB daily sim (launched 17:47:22Z).
+    - USER then chose "Fire at next board landing" (kill the MLB sim if needed). The runner was re-armed at 18:27Z to override ONLY a jobs-in-flight HOLD.
+    - It was STOPPED at 18:28Z, unfired, on seeing `aebc040d` live: a second deploy would only have killed the sim. The claim is free.
+  - Left: the production reading on the first UTC-09-20 grid built after 18:26:24Z: `dates_read[0]` = 2026-09-19, `unmatched_by_league.mls` near 0 (from 3683), and 9 of 9 evening fixtures projected. Watcher `watch_mls.py` (scratchpad) is running.
 - Files:
   - `syndicate/features/shared/board_enrichment.py` (the soccer branch's projection-window lines in `_attach_projections_by_sport` ONLY). Checked 16:1xZ: no OPEN lane claims it; the last claim was released 2026-09-17 by the ownership sweep.
   - `tests/test_soccer_projection_previous_day.py` (NEW)
