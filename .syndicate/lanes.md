@@ -1694,7 +1694,7 @@ death, never life — do not invert it.
 - Verification: offline, tests failing on the pre-change code: shared == unshared (exact equality) for projection and props; the poller simulates each match's paths once for the two consumers (call count); a window short of the half's end simulates exactly the window, one that reaches it gets stoppage. Production, after a user-approved deploy: served `goal_windows` fall to the corrected values (read by recomputing one served state), and the tick's per-match cost drops (re-profile).
 - Blocked by: none (the deploy is a user decision)
 
-### mls-board-evening-gaps — OPEN — opened 2026-09-19 — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **H1 EXONERATED (my filter error), H2 CONFIRMED; fix in progress**
+### mls-board-evening-gaps — OPEN — opened 2026-09-19 — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **H2 fix LANDED `6419eea5`; refresh-worker deploy APPROVED for ~16:45Z (user: "Deploy ~16:45Z"), not yet fired**
 
 - Goal: [user 2026-09-19 "proceed next steps", on the MLS lead this session filed in lane `soccer-prop-conditioning`] name, each with a measurement, why (a) 5 of today's 13 MLS fixtures are absent from the soccer Layer 1 board and (b) 4 fixtures that ARE on it carry 0 projections, while web's `mls/.../recommendations_2026-09-19.json` (generated 13:44:16Z) has all 13 with props; then fix what is in scope, before the first kickoff at 23:30Z if the user approves a deploy.
 - Files:
