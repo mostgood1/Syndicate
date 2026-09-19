@@ -1673,6 +1673,9 @@ death, never life — do not invert it.
     - The 09-17 tick at 16:56:01Z published false ×4 during another session's web deploy (`4043e136`). The retry an hour later published all four (attempt 2 of 3).
     - Refresh-worker restarted at 18:26:24Z (`aebc040d`, not this lane's deploy). The producer's interval gate lives in keyvalue and survives it.
   - Close when web lists every dated `boxscores_2026-*.csv` from 08-26 to yesterday.
+    - A missing date is legitimate only if it had no games (recon `no_final`).
+    - The closing reading is SCHEDULED as task `wnba-675-backfill-reading-0920`, firing 2026-09-20 19:30Z / 14:30 CDT. It reads web's listing, explains each missing date from refresh-worker's `WNBA_POSTGAME_PRODUCER` lines, and closes the lane or records what is left.
+    - The drain estimate: 09-16 at ~18:57Z 09-19, then one per hour to 08-26, plus the 09-19 slate after midnight CT, so done ~17:00Z 09-20 with no failures.
 - Files:
   - `syndicate/features/shared/refresh_state_store.py` (the `_KEYVALUE_EXCLUDED_PATH_MARKERS` tuple ONLY: one marker for dated WNBA box scores)
   - `scripts/run_refresh_worker.py` (`_wnba_postgame_target_dates` and `_run_wnba_postgame_producer_tick` ONLY)
