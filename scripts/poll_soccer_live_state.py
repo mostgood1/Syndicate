@@ -39,6 +39,7 @@ from syndicate.features.soccer.ingestion.fotmob_momentum import fotmob_momentum_
 from syndicate.features.soccer.features.live_lens import goal_in_window_probability
 from syndicate.features.soccer.features.live_lens import project_live_match
 from syndicate.features.soccer.features.live_lens import project_live_player_props
+from syndicate.features.soccer.features.live_lens import simulate_live_paths
 from syndicate.features.soccer.features.live_corners import apply_live_corners
 from syndicate.features.soccer.features.live_projection_history import HISTORY_KEY
 from syndicate.features.soccer.features.live_projection_history import history_from_payload
@@ -323,7 +324,12 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
 
             home_rating = _rating_for(ratings, live_state["home_team"])
             away_rating = _rating_for(ratings, live_state["away_team"])
-            projection = project_live_match(live_state, home_rating=home_rating, away_rating=away_rating, simulations=simulations)
+            # ONE set of simulated paths for the projection AND the player props: both used to run the same
+            # `simulations` matches from the same state and seeds, one after the other (25% of a live tick, timed
+            # 2026-09-19). Each consumer checks the paths were built from its own inputs, so no number moves.
+            paths = simulate_live_paths(live_state, home_rating=home_rating, away_rating=away_rating, simulations=simulations)
+            projection = project_live_match(live_state, home_rating=home_rating, away_rating=away_rating,
+                                            simulations=simulations, paths=paths)
             # H29 (log/2026-09-17.md ~13:55 CT): the sim's remaining corners carry MAE 1.951 and a +0.46
             # bias on 320 held-out matches against 1.876 and +0.07 for the pregame estimate over the clock.
             # The sim's own values are kept on the returned projection as `sim_*`, and H32 grades the pair.
@@ -342,6 +348,7 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
                 home_player_rows=home_players,
                 away_player_rows=away_players,
                 simulations=simulations,
+                paths=paths,
             )
             games[event_id] = {
                 "event_id": event_id,

@@ -236,6 +236,93 @@ class LiveMatchProjection:
         }
 
 
+@dataclass(frozen=True)
+class LivePaths:
+    """One set of simulated rest-of-match outputs, and the exact inputs that produced them.
+
+    WHY IT EXISTS. `project_live_match` and `project_live_player_props` each ran their own loop over
+    `simulate_match`, and in production both loops received the SAME state, ratings, seeds, profile and stoppage
+    rule, so the second re-simulated the first's matches one for one. Timed on a live slate (2026-09-19, 15 matches,
+    80 sims), the player-props pass was 25% of a tick. The poller now simulates once and hands both consumers these
+    paths. The numbers cannot move: each consumer checks `key` against the inputs IT would have simulated with and,
+    on any difference, simulates for itself exactly as before.
+    """
+
+    key: tuple
+    outputs: tuple
+
+
+def _paths_key(live_state: dict[str, Any], home_rating: dict[str, float], away_rating: dict[str, float],
+               profile: CalibrationProfile, resume_profile: CalibrationProfile, simulations: int, seed: int,
+               possession_owner: str, include_stoppage: bool) -> tuple:
+    """Everything `simulate_live_paths` reads. RAW ratings plus the red-card counts, because the penalty is applied inside."""
+    return (
+        str(live_state["home_team"]), str(live_state["away_team"]), int(live_state["half"]),
+        float(live_state["clock_remaining"]), int(live_state["score_home"]), int(live_state["score_away"]),
+        int(live_state.get("home_red_cards") or 0), int(live_state.get("away_red_cards") or 0),
+        tuple(sorted((str(k), float(v)) for k, v in (home_rating or {}).items())),
+        tuple(sorted((str(k), float(v)) for k, v in (away_rating or {}).items())),
+        id(profile), id(resume_profile), max(1, int(simulations)), int(seed), str(possession_owner), bool(include_stoppage),
+    )
+
+
+def simulate_live_paths(
+    live_state: dict[str, Any],
+    *,
+    home_rating: dict[str, float],
+    away_rating: dict[str, float],
+    profile: CalibrationProfile = SOCCER_CALIBRATION_PROFILE,
+    resume_profile: CalibrationProfile | None = None,
+    simulations: int = 300,
+    seed: int = 1,
+    possession_owner: str = "home",
+    include_stoppage: bool = True,
+) -> LivePaths:
+    """The rest of the match from `live_state`, `simulations` times: seeds `seed .. seed + n - 1`, each on its own
+    `Random(run_seed)`, the loop both consumers used to run separately. `resume_profile` sets the stoppage base the
+    resumed clock is built with and defaults to `profile`."""
+    resume_profile = profile if resume_profile is None else resume_profile
+    key = _paths_key(live_state, home_rating, away_rating, profile, resume_profile, simulations, seed,
+                     possession_owner, include_stoppage)
+    home = apply_red_card_penalty(home_rating, int(live_state.get("home_red_cards") or 0))
+    away = apply_red_card_penalty(away_rating, int(live_state.get("away_red_cards") or 0))
+    outputs = []
+    for offset in range(max(1, simulations)):
+        run_seed = seed + offset
+        resume_state = build_resume_state(
+            live_state, possession_owner=possession_owner,
+            include_stoppage=include_stoppage, profile=resume_profile,
+        )
+        simulation_input = SoccerSimSimulationInput(
+            home_team=live_state["home_team"],
+            away_team=live_state["away_team"],
+            seed=run_seed,
+            home_attack_rating=home.get("attack_rating", 0.0),
+            home_defense_rating=home.get("defense_rating", 0.0),
+            away_attack_rating=away.get("attack_rating", 0.0),
+            away_defense_rating=away.get("defense_rating", 0.0),
+        )
+        outputs.append(simulate_match(simulation_input, rng=Random(run_seed), profile=profile, initial_state=resume_state))
+    return LivePaths(key=key, outputs=tuple(outputs))
+
+
+def _live_outputs(paths: LivePaths | None, consumer: str, live_state: dict[str, Any], **inputs: Any) -> tuple:
+    """`paths.outputs` when they were simulated from exactly `inputs`; otherwise this consumer's own simulation.
+
+    A mismatch is never used, because foreign paths would publish another state's numbers under this one, and
+    it is printed, because in production both consumers are called with the same inputs and a mismatch there
+    means a caller changed."""
+    resume_profile = inputs.get("resume_profile") or inputs["profile"]
+    expected = _paths_key(live_state, inputs["home_rating"], inputs["away_rating"], inputs["profile"], resume_profile,
+                          inputs["simulations"], inputs["seed"], inputs["possession_owner"], inputs["include_stoppage"])
+    if paths is not None and paths.key == expected:
+        return paths.outputs
+    if paths is not None:
+        print(f"[soccer_live_lens] SHARED_PATHS_MISMATCH consumer={consumer} "
+              f"match={live_state.get('home_team')} v {live_state.get('away_team')} -- simulating its own", flush=True)
+    return simulate_live_paths(live_state, **inputs).outputs
+
+
 def project_live_match(
     live_state: dict[str, Any],
     *,
@@ -246,9 +333,8 @@ def project_live_match(
     seed: int = 1,
     possession_owner: str = "home",
     include_stoppage: bool = True,
+    paths: LivePaths | None = None,
 ) -> LiveMatchProjection:
-    home_rating = apply_red_card_penalty(home_rating, int(live_state.get("home_red_cards") or 0))
-    away_rating = apply_red_card_penalty(away_rating, int(live_state.get("away_red_cards") or 0))
     already_home_corners = int(live_state.get("home_corners_so_far") or 0)
     already_away_corners = int(live_state.get("away_corners_so_far") or 0)
 
@@ -259,22 +345,10 @@ def project_live_match(
     final_home_corners: list[float] = []
     final_away_corners: list[float] = []
 
-    for offset in range(max(1, simulations)):
-        run_seed = seed + offset
-        resume_state = build_resume_state(
-            live_state, possession_owner=possession_owner,
-            include_stoppage=include_stoppage, profile=profile,
-        )
-        simulation_input = SoccerSimSimulationInput(
-            home_team=live_state["home_team"],
-            away_team=live_state["away_team"],
-            seed=run_seed,
-            home_attack_rating=home_rating.get("attack_rating", 0.0),
-            home_defense_rating=home_rating.get("defense_rating", 0.0),
-            away_attack_rating=away_rating.get("attack_rating", 0.0),
-            away_defense_rating=away_rating.get("defense_rating", 0.0),
-        )
-        output = simulate_match(simulation_input, rng=Random(run_seed), profile=profile, initial_state=resume_state)
+    outputs = _live_outputs(paths, "project_live_match", live_state, home_rating=home_rating, away_rating=away_rating,
+                            profile=profile, resume_profile=profile, simulations=simulations, seed=seed,
+                            possession_owner=possession_owner, include_stoppage=include_stoppage)
+    for output in outputs:
         final_home = int(output.final_score["home"])
         final_away = int(output.final_score["away"])
         final_home_goals.append(float(final_home))
@@ -432,6 +506,7 @@ def project_live_player_props(
     simulations: int = 300,
     seed: int = 1,
     possession_owner: str = "home",
+    paths: LivePaths | None = None,
 ) -> tuple[LivePlayerPropProjection, ...]:
     """Already-accumulated shots this match + a starter-aware allocation of
     the *projected remainder* team shot volume from a resumed Monte Carlo
@@ -439,9 +514,6 @@ def project_live_player_props(
     is no longer in question, so every player in ``*_player_rows`` who
     accumulated any minutes is treated as a starter for allocation
     purposes (pass only players who actually appeared)."""
-    home_rating = apply_red_card_penalty(home_rating, int(live_state.get("home_red_cards") or 0))
-    away_rating = apply_red_card_penalty(away_rating, int(live_state.get("away_red_cards") or 0))
-
     home_remainder_shots: list[float] = []
     away_remainder_shots: list[float] = []
     # Assists derive from GOALS, not shots -- pregame computes
@@ -453,19 +525,14 @@ def project_live_player_props(
     away_remainder_goals: list[float] = []
     score_home_now = int(live_state.get("score_home") or 0)
     score_away_now = int(live_state.get("score_away") or 0)
-    for offset in range(max(1, simulations)):
-        run_seed = seed + offset
-        resume_state = build_resume_state(live_state, possession_owner=possession_owner)
-        simulation_input = SoccerSimSimulationInput(
-            home_team=live_state["home_team"],
-            away_team=live_state["away_team"],
-            seed=run_seed,
-            home_attack_rating=home_rating.get("attack_rating", 0.0),
-            home_defense_rating=home_rating.get("defense_rating", 0.0),
-            away_attack_rating=away_rating.get("attack_rating", 0.0),
-            away_defense_rating=away_rating.get("defense_rating", 0.0),
-        )
-        output = simulate_match(simulation_input, rng=Random(run_seed), profile=profile, initial_state=resume_state)
+    # `resume_profile` is the DEFAULT profile, not `profile`: this function always built its resumed clock with
+    # `build_resume_state`'s defaults (stoppage base from SOCCER_CALIBRATION_PROFILE) whatever profile it simulated
+    # with, and keeping that is what keeps its numbers identical. In production `profile` is that default too, so
+    # its inputs equal `project_live_match`'s and the poller's shared paths are used.
+    outputs = _live_outputs(paths, "project_live_player_props", live_state, home_rating=home_rating,
+                            away_rating=away_rating, profile=profile, resume_profile=SOCCER_CALIBRATION_PROFILE,
+                            simulations=simulations, seed=seed, possession_owner=possession_owner, include_stoppage=True)
+    for output in outputs:
         home_shots = sum(
             1
             for p in output.possession_log
@@ -555,10 +622,12 @@ def project_live_player_props(
 
 __all__ = [
     "LiveMatchProjection",
+    "LivePaths",
     "LivePlayerPropProjection",
     "apply_red_card_penalty",
     "build_resume_state",
     "goal_in_window_probability",
     "project_live_match",
     "project_live_player_props",
+    "simulate_live_paths",
 ]

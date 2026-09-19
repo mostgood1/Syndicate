@@ -1683,6 +1683,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### soccer-live-shared-paths — OPEN — opened 2026-09-19 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- **STATUS 2026-09-19 ~11:10 CT (16:10Z):** (A) BUILT: shared paths, numbers identical to the pre-change code (golden test from origin/main's own module), 3n instead of 4n simulations per match at the call site, 5 breaks caught; benchmark -41..-48% of per-match Monte Carlo. (B) next. Nothing deployed.
 - Goal: (A) the soccer live tick simulates each in-play match's rest of play ONCE for both the live projection and the live player props, with every published number unchanged, and (B) a goal-in-window probability adds stoppage time only when the window reaches the end of the half; proven offline by equality, reachability and window-length tests, and on production after a user-approved live-odds-worker deploy by the served numbers and the tick's per-match cost.
 - Files:
   - `syndicate/features/soccer/features/live_lens.py` (a shared set of simulated paths; the goal window's stoppage rule). Claim moved here from `soccer-live-corners-stage2`, whose code there is done.
