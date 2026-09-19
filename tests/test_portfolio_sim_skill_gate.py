@@ -125,6 +125,12 @@ def test_positions_carry_no_sim_share_and_the_plan_counts_why(monkeypatch):
         assert positions[line]["attribution"]["side_picked_by"] == "price_shopping"
         assert positions[line]["sizing"]["basis"] == "market_fair"
     assert positions[172.5]["attribution"]["sim_share_of_stake"] > 0.0
+    # The label rides the POSITION, not only the plan counter: the first production plan
+    # (2026-09-19 15:16Z) served `sizing.sim_sizing` None on all 89 positions because the
+    # position's `sizing` block copies a fixed key list that did not include it.
+    assert positions[170.5]["sizing"]["sim_sizing"] == "gated_unmeasured"
+    assert positions[171.5]["sizing"]["sim_sizing"] == "gated_parity"
+    assert positions[172.5]["sizing"]["sim_sizing"] == "admitted_beats_market"
     assert plan["sim_sizing"] == {
         "mode": "measured_only",
         "by_basis": {"admitted_beats_market": 1, "gated_parity": 1, "gated_unmeasured": 1},

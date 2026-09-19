@@ -1287,6 +1287,10 @@ def commit_portfolio(
                     "blend_beta": stake.get("blend_beta"),
                     "model_probability_raw": stake.get("model_probability_raw"),
                     "interval_gate": stake.get("interval_gate"),
+                    # Lane `sim-sizing-skill-gate`: why the sim did or did not size
+                    # this stake. Stamped on the breadcrumb above, and it has to be
+                    # listed here too, or the position never carries it.
+                    "sim_sizing": stake.get("sim_sizing"),
                     "kelly_fraction": stake.get("kelly_fraction"),
                     "kelly_multiplier": stake.get("kelly_multiplier"),
                     "sample_credibility": stake.get("sample_credibility"),
