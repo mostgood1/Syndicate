@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1038 rules `[generated]`
+## Index — 1102 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -7133,3 +7133,7 @@ and read one field of five.
 ### 2026-09-19 (session a1e40980, lane board-build-stage-slowdown) — A cadence that tracks "live windows" can be RESTART churn: count the boots before attributing it to load
 - **What happened.** The soccer book grid rebuilt every 31-54 min "only when matches were live", and two sessions read it as live load. The cause was 5 refresh-worker SIGTERMs in that window (12 in 10 h, mostly deploys). Each boot empties the in-memory tick state (forcing the 18-grid tick). Each boot also re-ran the daily reconciliation INLINE from scratch, because it only stamps on completion; it ran ~23 min, and a deploy killed it every time. With no restart, live ticks came every 3-15 min.
 - **Rule.** Before attributing a slow cadence to load or live state, count `WORKER_SHUTDOWN`/`BOOTED` in the same window. Any daily job that runs inline and stamps only at completion turns deploy churn into a retry storm.
+### 2026-09-19 (session f26bba3b, lanes intelligence-idle-poll + polling-idle-pause-all) — OVERTURNED: "`skipWhenHidden` stops an unattended tab from polling." `document.hidden` answers whether the tab is ON SCREEN, not whether anyone is there; a verification tab left open in a Claude browser pane polled `/intelligence` (~6 MB) every minute for 11 h
+- **What happened.** `/intelligence` passed `skipWhenHidden: true`. A session opened it in the Claude desktop browser pane to read one chip (09-17 17:56Z) and never closed it; the pane stayed visible and the page polled at 60/h until 04:53:47Z, ~4 GB of web egress, the 18Z..01Z tripwire spikes. Found only by grouping the edge log by FULL user agent (`Claude/2.110.0 ... MSIX`) — the tripwire's 60-char truncation read it as a plain Windows browser.
+- **Rule.** Gate background polling on INTERACTION, not visibility (`polling.js` now pauses every poller after 15 idle min). And close any browser tab you opened for a verification when the reading is taken; a tab left open keeps polling after its session has moved on.
+- **Test trap.** An OFF-SCREEN Claude pane reports `document.hidden === true`, so the old visibility gate stops polling there on its own; a test of the idle gate in such a pane passes vacuously unless `document.hidden` is overridden (as in `deploys.md` 2026-09-18 16:03:31Z).
