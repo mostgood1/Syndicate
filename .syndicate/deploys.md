@@ -38260,3 +38260,20 @@ Scheduled task `fotmob-alias-verify-0919-am`, read-only. The lane was already CL
 - **Other targets were NOT READ, because they are still `pre` on ESPN at 14:49Z:** Charleroi v Cercle Brugge (16:15Z), Anderlecht v Zulte-Waregem (18:45Z), Lyon v Rennes (18:45Z) and San Jose v LAFC (23:30Z). `fotmob-alias-verify-0919-pm` covers the 18:45Z pair.
 - **Verdict: MET.** An ESPN-vs-FotMob name-shape fixture that only the loose pass resolves ("FC Cologne" / "1. FC Köln") carries FotMob momentum in production, in play, on the expected id.
 - **Side observation (not investigated):** at 14:49Z the file's `generated_at` was about 10 min old, and its clock (`47'`) trailed ESPN's (`60'`) by ~13 min. The poller is meant to tick every ~60s. This could be the export's read path or a stall in poller writes, and this run did not tell them apart.
+
+## 2026-09-19 15:02:35Z (10:02 CT) — DEPLOY — refresh-worker `c03351aa` -> `ef5ab75b` (`dep-dana82rtqb8s73b6ofpg`, origin/main) — lane sim-sizing-skill-gate — verify: PENDING
+
+- **Why.** USER 2026-09-19 ~09:40 CDT: "We need everything to be MEANINGFUL how do we get there", then "All sports (Recommended)". The option text named this refresh-worker deploy behind the usual locks.
+- **What.** `ef5ab75b`: only a row whose `projection.model_skill` is `measured` + `beats_market` may size a stake on its sim edge. Today that is none: 31/31 measured entries are parity or loses, and WNBA's props, totals and spreads lose in the 25-date backtest.
+  - Every other sim-edge row takes the NCAAF price-basis path. Its stake becomes the price-shopping stake (`stake_fraction_ev_only`). The sim cannot create, veto or shrink a bet.
+  - The `max_positions` cut ranks gated rows without the sim term.
+  - In-play rows whose stake rested on the sim now meet `in_play_market_fair`, which is refused by default.
+  - Off switch: `SYNDICATE_PORTFOLIO_SIM_SIZING=legacy` (exact word).
+  - Also carries `9df3f4bc` (reconciliation: one disk walk per date; lane `reconciliation-disk-walks`) and every main commit since `c03351aa`.
+- **Locks.** Claim `sim-sizing-skill-gate` (token acquired 15:02Z). Preflight CLEAR at 15:02:34Z ("only infrastructure processes running") for `ef5ab75b`, run by the deploy-on-clear runner in scratchpad a1e40980.
+- **Baseline** (read 15:02:29Z, `/api/portfolio/paper`, plan generated 09:43 CDT): 85 positions, $321.19 staked, `sim_share_of_staked` **0.2458** ($78.95 sim-attributed), `positions_where_sim_picked_the_side` 0.
+- **Expectation.**
+  - First 3 plans after go-live: `sim_share_of_staked` **0** and `staked_dollars_sim_attributed` $0. The new `sim_sizing.by_basis` shows gated counts about equal to rows with `model_edge_pct`. Paper plans still commit positions.
+  - Live: the next orders carry `sim_share_of_stake` 0.
+  - Reconciliation: the next autorun (due ~21:27Z) prints `RECONCILE_DATE_TIMING` lines summing to <= 300 s.
+- **verify:** the first 3 post-live paper plans' `totals.sim_share_of_staked` and `sim_sizing`. Watcher `gate_reading.py` (scratchpad a1e40980).
