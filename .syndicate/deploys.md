@@ -38451,3 +38451,23 @@ Scheduled task `fotmob-alias-verify-0919-am`, read-only. The lane was already CL
   - Soccer: 2. WNBA: 6 (all full). MLB: 0 (0 in-play rows within 300 s).
   - Every card carries `gate.fair_method=consensus`, `sim_view=none`, `model_edge_pct=null`: best book against the no-vig consensus of the other books. No sim picks a side.
 - **NOT claimed.** That in-play consensus edges are real. A stale book reads as value in-play. That question belongs to the nightly skill scoreboard, per segment, before any in-play interval moves money.
+
+## 2026-09-19 18:20:50Z (13:20 CT) — DEPLOY — refresh-worker `7301fe67` -> `aebc040d` (`dep-dand50jm8hqs73au6i90`, origin/main) — lane live-inplay-board-cadence — **LIVE 18:26:24Z; verify: PENDING**
+
+- **Why.** USER 2026-09-19 "Build it, deploy ASAP" (the in-play overlay). This is the overlay's WORKER half, `c55644af`: every book-grid write also writes `book_grid_inplay_<date>.json`. That file holds the grid's live rows seen within 300 s, run through the shortlist chain, and it reaches web about every grid tick instead of every 12-35 min.
+- **Riders (all on main, all un-deployed on refresh-worker until now):**
+  - `6419eea5` (session 4a583d41's MLS day-before projection read; their reading is theirs to record).
+  - `3bced149`, `ee05f778`, `588d5a26`, `08a537c5`, `4043e136`.
+  - The env written 17:18:15Z (lanes board-build-stage-slowdown / live-inplay-board-cadence): `SYNDICATE_SLOW_REFRESH` 3600, `LAYER2_SHORTLIST_PROFILE` off, `CONSUME_SPORT_PROFILE` off. The peer read it back at 17:18:40Z.
+- **Locks.** Claim `live-inplay-board-cadence`, acquired ~18:13Z.
+  - Runner `rw_overlay_deploy_on_clear.py` (scratchpad a1e40980) fired only when BOTH held: `check_deploy_safety.py` exit 0 with the board build idle (preflight cannot see the in-process build), AND preflight CLEAR.
+  - It held 18:13-18:20Z on one soccer odds-refresh chain (`run_refresh_odds_job` -> `refresh_odds_sources --sports soccer` -> `build_soccer_artifacts`). Such chains launch every 6-12 min and run 5-8 min, leaving 2-4 min gaps. Session 4a583d41's runner had lost the 17:49Z window, which held on the MLB daily sim.
+  - Preflight CLEAR at 18:20:49Z; board build last completed 18:19:28Z. The claim was released at ~18:27Z after live.
+- **Restart during a live slate: yes.** This one deploy restarts refresh-worker during live NCAAF/WNBA/soccer. The lane's goal ("without a restart") is about the steady state, where overlay cards change without one.
+- **Baseline** (served board, 18:20:07Z): 280 in-play cards, 0 overlay. Quote age at serve time (build age + `book_age_seconds`) was min/median/max **514 / 733 / 1351 s**; by 18:28:51Z it read 1037 / 1251 / 1875 s, from a shortlist written 18:11:43Z.
+- **Expectation:**
+  - refresh-worker `[book_grid] INPLAY_OVERLAY` on every grid write with in-play rows (dry run 18:09:55Z: NCAAF 90 cards).
+  - Web `INPLAY_OVERLAY_MERGED`, and served `source=layer2_inplay_overlay` cards.
+  - Median served in-play quote age well under the baseline's 733 s. The 180 s web combined-board cache is a floor on that, so ~3 min is NOT expected from this deploy alone.
+- **First line:** 18:28:29Z `INPLAY_OVERLAY sport=soccer rows_inplay=1 opportunities=1 cards=0 published=True elapsed_ms=151`.
+- **verify:** `overlay_served_reading.py` (served board every 60 s, 50 min) + `overlay_reading.py` (log lines).
