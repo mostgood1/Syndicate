@@ -229,6 +229,24 @@ _KEYVALUE_EXCLUDED_PATH_MARKERS = (
     #    these survive a deploy. This exclusion would be wrong for any path that
     #    resolves inside the ephemeral checkout.
     "/intelligence/venue_odds/",
+    # `#675`, 2026-09-19. DATED WNBA BOX SCORES ARE ARTIFACTS, NOT COORDINATION
+    # STATE. `build_wnba_boxscores.build_date` writes `boxscores_<date>.csv`
+    # through `write_text_file`, so under the keyvalue backend (refresh-worker)
+    # every slate since the backend reached this path went to Redis with the
+    # 10-day date TTL above and NEVER to disk. The producer could not publish
+    # it (its own result read `keyvalue_backed_not_a_file`), web's newest dated
+    # box score stayed `boxscores_2026-08-24.csv` while games were played
+    # daily, and anything older than ten days was simply gone.
+    #
+    # A marker, not a writer change, because the settler READS the same file
+    # through `read_text_file` (`bet_status_wnba._final_csv_rows`): this one
+    # predicate moves the writer and every state-store reader to disk
+    # together, on every service. The file then publishes like any artifact
+    # (it is allowlisted), and web's readers already read disk.
+    #
+    # `boxscores_20` and not `boxscores_`: the dated files only.
+    # `boxscores_history.csv` has its own writer and is deliberately unchanged.
+    "wnba_source/data/processed/boxscores_20",
 )
 
 

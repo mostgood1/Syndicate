@@ -1513,6 +1513,8 @@ def _mlb_betting_day_backfill_status_path() -> Path:
 #
 # Off switch: SYNDICATE_WNBA_POSTGAME_PRODUCER=off.
 _WNBA_POSTGAME_INTERVAL_DEFAULT_SECONDS = 3600.0
+#: `#675`: rebuilds of a DONE date whose box score is not on disk, per date.
+_WNBA_BOX_REBUILD_MAX_ATTEMPTS = 3
 
 
 def _wnba_postgame_producer_enabled() -> bool:
@@ -1534,11 +1536,14 @@ def _wnba_postgame_status_path() -> Path:
     return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "wnba_postgame_producer.json"
 
 
-def _wnba_postgame_target_dates(lookback_days: int = 21) -> list[str]:
+def _wnba_postgame_target_dates(lookback_days: int = 30) -> list[str]:
     """Completed Central dates, most recent first.
 
     Most recent first because a fresh slate is worth more than a three-week-old
     one, and because the backlog is drained one per tick.
+
+    30 days, not the original 21 (`#675`): the dated box scores lost to keyvalue
+    run from 2026-08-25, which is 26 days before the fix reached production.
     """
     from syndicate.features.shared.timezone import central_today
 
@@ -1565,17 +1570,43 @@ def _run_wnba_postgame_producer_tick() -> dict[str, Any] | None:
         return None
 
     done = last_status.get("done") if isinstance(last_status.get("done"), dict) else {}
-    target = next((date_str for date_str in _wnba_postgame_target_dates() if not done.get(date_str)), None)
+    box_rebuilds = last_status.get("box_rebuilds") if isinstance(last_status.get("box_rebuilds"), dict) else {}
+    box_published = last_status.get("box_published") if isinstance(last_status.get("box_published"), dict) else {}
+
+    # `#675` BACKFILL. A date is also outstanding when it is DONE with recon `ok`
+    # (so it had finished games) and its box score has never been PUBLISHED from
+    # here. Every slate from 2026-08-25 was "done" while its box score lived only
+    # in keyvalue, expiring after ten days; the marker in `refresh_state_store`
+    # moves new writes to disk, and this puts the lost dates on web. Capped per
+    # date, so a slate ESPN will not serve cannot pin the producer on one date.
+    #
+    # PUBLISHED, NOT "ON DISK". The settlement pass (`intelligence_state.
+    # _refresh_wnba_boxscores`, this same service, every ~3 min) also builds
+    # today's and yesterday's box score and does not publish it. Keyed on the
+    # file being on disk, this skipped exactly the dates that pass had already
+    # written, and 2026-09-18 would never have reached web.
+    rebuild = False
+    target = None
+    for date_str in _wnba_postgame_target_dates():
+        if not done.get(date_str):
+            target = date_str
+            break
+        if (done.get(date_str) == "ok" and not box_published.get(date_str)
+                and int(box_rebuilds.get(date_str) or 0) < _WNBA_BOX_REBUILD_MAX_ATTEMPTS):
+            target, rebuild = date_str, True
+            break
     if target is None:
         # Backlog drained. Stamp the run so the interval gate keeps this to one
         # dict lookup per hour rather than one per cycle.
         store["write_json_file"](status_path, {**last_status, "lastRunEpoch": now, "done": done})
         return None
+    if rebuild:
+        box_rebuilds = {**box_rebuilds, target: int(box_rebuilds.get(target) or 0) + 1}
 
     from scripts import build_wnba_boxscores, build_wnba_recon
 
-    data_root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() or None
-    result: dict[str, Any] = {"date": target}
+    data_root =str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() or None
+    result: dict[str, Any] = {"date": target, "box_rebuild": rebuild}
     recon_paths: dict[str, str] = {}
     try:
         recon = build_wnba_recon.build_date(target, data_root=Path(data_root) if data_root else None)
@@ -1624,26 +1655,33 @@ def _run_wnba_postgame_producer_tick() -> dict[str, Any] | None:
         from syndicate.features.shared.refresh_state_store import _keyvalue_backed
 
         for path in targets:
-            # A keyvalue-backed artifact is NOT a file and never will be:
-            # `write_text_file` returns after the `client.set` without touching
-            # disk. Publishing it is not "failing", it is asking the wrong
-            # question -- and reporting that as `missing` (which the first
-            # version did) invites someone to go looking for a lost file.
-            # Measured 2026-09-01: `boxscores_2026-08-29.csv` reported `missing`
-            # for exactly this reason while the producer had written it fine.
+            # A FILE ON DISK IS PUBLISHED, WHATEVER THE BACKEND (`#675`). This
+            # asked `_keyvalue_backed(path)` FIRST, and under the keyvalue backend
+            # that is true of every path not in `_KEYVALUE_EXCLUDED_PATH_MARKERS`
+            # -- including the three recon CSVs, which `build_wnba_recon` writes to
+            # disk with a plain `write_text`. So real files were refused as
+            # `keyvalue_backed_not_a_file` on every slate (2026-09-18's result read
+            # that for all four), and web never received a recon file.
+            #
+            # A path that is NOT on disk and IS keyvalue-backed is still named as
+            # such rather than `missing`: measured 2026-09-01,
+            # `boxscores_2026-08-29.csv` reported `missing` while the producer had
+            # written it fine, into keyvalue.
+            if path.is_file():
+                published[path.name] = bool(publish_hot_artifact(path, timeout_seconds=120))
+                continue
             try:
                 if _keyvalue_backed(path):
                     published[path.name] = "keyvalue_backed_not_a_file"
                     continue
             except Exception:
                 pass
-            if not path.is_file():
-                published[path.name] = "missing"
-                continue
-            published[path.name] = bool(publish_hot_artifact(path, timeout_seconds=120))
+            published[path.name] = "missing"
     except Exception as exc:
         published["error"] = f"{type(exc).__name__}: {exc}"
     result["published"] = published
+    if published.get(f"boxscores_{target}.csv") is True:
+        box_published = {**box_published, target: True}
 
     # `no_final` is DONE, not a failure: a date with no completed WNBA games
     # (an off day, or the World Cup break) will never produce rows and must not
@@ -1652,7 +1690,8 @@ def _run_wnba_postgame_producer_tick() -> dict[str, Any] | None:
     settled = recon_status in {"ok", "no_final"}
     if settled:
         done = {**done, target: recon_status}
-    store["write_json_file"](status_path, {"lastRunEpoch": now, "done": done, "last": result})
+    store["write_json_file"](status_path, {"lastRunEpoch": now, "done": done, "box_rebuilds": box_rebuilds,
+                                     "box_published": box_published, "last": result})
     result["marked_done"] = settled
     return result
 

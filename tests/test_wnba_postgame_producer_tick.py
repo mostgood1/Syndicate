@@ -35,6 +35,10 @@ def store(tmp_path, monkeypatch):
     })
     monkeypatch.delenv("SYNDICATE_WNBA_POSTGAME_PRODUCER", raising=False)
     monkeypatch.delenv("SYNDICATE_WNBA_POSTGAME_INTERVAL_SECONDS", raising=False)
+    # These tests drain NOT-YET-DONE dates, with a box builder that writes no file.
+    # `#675`'s rebuild of done dates missing a box score on disk is tested on its
+    # own in tests/test_wnba_postgame_publish_disk.py, so it is off here.
+    monkeypatch.setattr(worker, "_WNBA_BOX_REBUILD_MAX_ATTEMPTS", 0)
     return state
 
 
