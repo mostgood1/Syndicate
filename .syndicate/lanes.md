@@ -1355,6 +1355,13 @@ death, never life — do not invert it.
     - **Book-quote cache:** about 4 s inside `_consume_sport` for soccer (`reduce_to_latest_per_key`, 2 calls). Real but minor there. Its counter `bdf874bf` rides the next main-tip deploy.
     - Layer 2 was not profiled; the hook is `f9df40a9` (`SYNDICATE_LAYER2_SHORTLIST_PROFILE`, unset).
     - **Data point from session "Soccer props analysis" (2026-09-18 ~22:25Z):** the SOCCER book grid (`[book_grid] LIVE_GAMELINE_BUILD sport=soccer`) rebuilds every ~10-12 min with no match in play, but every 34-49 min with matches in play (18:25→18:59→19:29→20:06→20:55Z), while `BOOK_GRID_TICK` said `next_interval_seconds: 120`. So the served soccer live game-line verdicts were 30-50 min old during a live slate. Not yet attributed; this lane's stage.
+    - **ATTRIBUTED 2026-09-19 ~01:40Z: restarts, not live play.** Readings are in the log under `[board-build-stage-slowdown]`.
+      - Five refresh-worker SIGTERMs fell in that window (18:18, 18:51, 19:23, 19:59, 20:47Z), and 12 between 14:40Z and 00:44Z.
+      - After each boot, the tick state in `_BOOK_GRID_LAST_RUN` (in memory) is empty, so the first tick rebuilds yesterday plus the forward dates (18 grids).
+      - The daily reconciliation, due since 17:45Z and killed by every restart, re-ran INLINE for 17-32 min before the next pass could tick.
+      - The one-shot disk-inventory thread also walks the disk for 771.8 s after every boot.
+      - With no restart (22:20Z-00:57Z, games live), ticks came every 3-15 min.
+      - The fix for reconciliation's cost is lane `reconciliation-disk-walks`. Persisting the tick state across boots is a follow-up in the refresh-worker main loop script, which other lanes claim.
 
 ### paper-execution-ledger-batch — CLOSED 2026-09-18 (GOAL: MET) — opened 2026-09-18 — session a1e40980-cceb-493f-adf9-5a5ca879acf6
 - **CLOSED 2026-09-18 ~23:58Z — GOAL: MET.** The goal, verbatim: "cut the board thread's paper-execution wall on refresh-worker (BUILD_SPAN_EXIT portfolio_commit → last PORTFOLIO_EXECUTED/PAPER2_EXECUTED) from its 09-18 median of 189-304 s per build to <= 40 s, by reading the execution ledger once per paper run and writing it once, with the ledger's rows unchanged in content." Reading: median **11 s** over 9 builds (18:41-23:14Z; 10 were pre-registered, and deploys restarted the worker between). `LEDGER_CAS_EXHAUSTED` 0, `PAPER_FLUSH_FAILED` 0, about 4.7 ledger writes per build (`deploys.md` 23:46Z). Also live on live-odds-worker since 23:00:55Z: 0 CAS failures at 45 min, and no live orders attempted yet (owed on the wnba-sim-distributions deploy entry). Files released.
@@ -1384,6 +1391,29 @@ death, never life — do not invert it.
   - (1) Paper-execution wall per build <= 40 s median, from BUILD_SPAN_EXIT portfolio_commit to the last EXECUTED line.
   - (2) `KEYVALUE_WRITE_LARGE ... execution_ledger.json` per build <= the number of runs that placed >= 1 order (was 2 × placed).
   - (3) Unchanged ledger semantics: `EXECUTED` placed/duplicates behave as before (a re-run of the same plan places 0), 0 new `LEDGER_CAS_EXHAUSTED`, and paper orders per day in line with 09-17/09-18.
+
+### reconciliation-disk-walks — OPEN — opened 2026-09-19 — session a1e40980-cceb-493f-adf9-5a5ca879acf6
+- Goal: cut refresh-worker's daily prediction-reconciliation autorun, which runs INLINE in the main loop and blocks every book-grid tick while it runs, from ~23 min to <= 5 min, by walking the persistent disk once per date instead of twelve times, with every date's reconciliation result unchanged. Verified by a per-date timing line on the first autorun after deploy.
+- Why: USER 2026-09-18 ~19:05 CDT chose "Trace soccer live rebuilds", out of lane `board-build-stage-slowdown`.
+  - MEASURED (refresh-worker Render logs, 2026-09-18): the 31-54 min soccer book-grid tick gaps in 18:00-21:10Z were RESTARTS, not live play. There were 12 `WORKER_SHUTDOWN signal=SIGTERM` between 14:40Z and 00:44Z. With no restart (22:20Z-00:57Z, games live) ticks came every 3-15 min.
+  - Reconciliation came due at 17:45:37Z. It then logged `RECONCILIATION_AUTORUN_RUNNING` on five boots, with `last_epoch_age_sec` 86454 → 89378 → 91372 → 93238 → 95608 → 98348: never stamped, because each deploy's SIGTERM killed it mid-run. Its one clean run was 21:03:51Z → ~21:27:13Z, **~23.4 min** (stamp age 2083 s at 22:01:56Z).
+  - Cost hypothesis, NOT YET SPLIT by any timing line:
+    - `_candidate_result_paths` makes six `root.rglob` walks of `/opt/render/project/data`, and it is called twice per date. `DISK_INVENTORY_SUMMARY` 21:03:11Z counts 48,816 dirs and 125,197 files there.
+    - 12 walks × 14 dates is 168 walks, about 8 s each.
+    - Secondary: `_row_keys` is recomputed per prediction × row (11,201 closing rows on 09-18). A debug JSON of every result row is built per unmatched prediction for a `logger.info` that Render never collects.
+- Files: `syndicate/features/prediction_reconciliation.py` (`_candidate_result_paths`, its row loader, `_match_result_row`, `reconcile_prediction_results_for_date` only), `tests/test_reconciliation_disk_walks.py` (NEW). Checked 2026-09-19 ~01:40Z on origin/main `3f1a0fb6`: no OPEN lane claims `prediction_reconciliation.py`. The refresh-worker main loop script is NOT touched (other lanes claim it), so a cross-date index and persisting the book-grid tick state across restarts are follow-ups, not this lane.
+- Design:
+  - One `os.scandir` pre-order walk per (root, date) matches all six names. It visits directories in the order `Path.rglob` does on CPython 3.11.9 (what `render.yaml` pins): a directory before its children, children in scandir order, symlinked directories not followed.
+  - The path list is computed once per call. Row keys are computed once per date.
+  - The unmatched-prediction debug JSON is built only when INFO is enabled.
+  - `[prediction_reconciliation] RECONCILE_DATE_TIMING` prints once per date, with the walk, row-read, match and ledger-write seconds.
+- Verification (PRE-REGISTERED):
+  - (1) Tests:
+    - Path lists equal a frozen copy of the old `rglob` implementation's on a nested fixture tree, order included.
+    - Each call scans each directory once (six times before).
+    - `reconcile_prediction_results_for_date` returns the same payload and ledger results as the old code on the same inputs, including which of two conflicting result files wins.
+  - (2) Production, on the first autorun after a refresh-worker deploy carrying it: the `RECONCILE_DATE_TIMING` total_s summed over the run <= 300 s; `RECONCILIATION_AUTORUN_RUNNING` followed by a stamp (the next `GATED` line's age) within 5 min; resolved counts > 0 on dates with results, as before.
+  - Rides the next refresh-worker main-tip deploy. It does not need one of its own.
 
 ### wnba-sim-distributions — OPEN — opened 2026-09-18 — session a1e40980-cceb-493f-adf9-5a5ca879acf6
 - Goal: give Layer 2 a WNBA sim probability for every line the sim can honestly answer, from distributions the WNBA smart sim already draws but never publishes.
