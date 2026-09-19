@@ -1558,6 +1558,14 @@ death, never life — do not invert it.
 - Verification: (1) offline tests that fail on today's code (the call is reachable from `_run_owned_generation`; zeros stay zeros; merge keeps history and dedupes; seed-pull failure skips). (2) Production, after a refresh-worker deploy the user approves: the first NHL refresh after 2026-09-19 games finish rewrites web's copy, with 2026010xxx rows present, and a preseason NHL prop Ask's recent-form newest game dated within days of its slate.
 - Blocked by: none. Production reading needs a deploy (user) and finished preseason games (from 2026-09-19 evening ET).
 
+### ncaaf-live-resim-blend — OPEN — opened 2026-09-18 — session 259d6003-bff3-416d-835f-12f4f7f584d8
+- Goal: the NCAAF live re-sim prices from the SAME team ratings as the pregame projection (`todo #678`, user 2026-09-18: "fix the live re-sim to use the blend"): from week 3, with `SYNDICATE_NCAAF_INSEASON_BLEND` on, refresh-worker's `NCAAF_LIVE_RESIM` status reads `sp_ratings_source` = `inseason_blend_wk<W>` over the blend's 138 teams, the FCS market-implied path backs out the unrated side against those same ratings, and the flag set to `off` reverts both pregame and live to SP+.
+- Files: `scripts/run_refresh_worker.py` (the NCAAF live re-sim's rating index ONLY: a new `_ncaaf_inseason_blend_index` and its one substitution in `_run_ncaaf_live_resim_tick`), `tests/test_ncaaf_live_resim_blend.py` (NEW)
+- Hypothesis: n/a -- a wiring change; the estimator is the pregame one already backtested (`findings_2026-09-18_ncaaf_inseason_blend.md`).
+- Falsification test: with the flag off, or week < 3, or no blend entry, the tick's index and source are byte-identical to today's SP+ path; with it on and an entry for the target week, every rated team's (offense, defense) equals the artifact's, and a missing week falls back to the newest earlier entry by NAME (`stale_week`), never to a neutral default.
+- Verification: after a refresh-worker deploy, the first `NCAAF_LIVE_RESIM` line reads `"sp_ratings_source": "inseason_blend_wk3"` and `"sp_ratings_teams": 138` (baseline: SP+ `durable_mirror`/`loader`, 138); during Saturday 09-19 play, `live_resimmed` > 0 on that basis.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
