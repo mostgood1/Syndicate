@@ -324,6 +324,21 @@ equivalent endpoint does carry finals.
 
 ## [wnba-model-vs-board-mismatch] THE WNBA SIM'S ONE EDGE IS THE MONEYLINE, AND THE BOARD BET IT TWICE ALL SEASON `[verified 2026-08-31, lane wnba-accuracy-assessment]`
 
+**RE-MEASURED 2026-09-19 against the MARKET, not climatology** (lane
+`wnba-sim-distributions`; Render substrate, 25 dates 08-06..08-30,
+pregame `tracking/book_quotes` median-of-books no-vig, results from
+`recon_props`/`boxscores`):
+- **Props:** the served ladder P(over) (`wnba_projections._hit_prob_over`, 4,297
+  rows) has log-loss **0.858 vs market 0.682**, and the fitted weight on the model
+  is ~0. corr(sim-line, actual-line) is +0.03..+0.07 (threes +0.18). The sim's SD
+  is 1.27-1.41x too narrow.
+- **Game lines** (71 games): totals are worse than the market (+0.089 log-loss,
+  2.5 SE; the sim total sits +3.6 above the market total), spreads are worse, and
+  the moneyline is slightly better (-0.036, 1.1 SE).
+- So the moneyline asset below still reads, and every other WNBA sim probability
+  is noise against the market. Money no longer follows it
+  (`[portfolio-sim-sizing-gate]`).
+
 Measured on the **Syndicate root only** (see `[wnba-two-artifact-roots]`), graded
 against ESPN.
 

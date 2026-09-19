@@ -613,6 +613,7 @@ once this index exists: re-splitting would orphan the parts.
 | [portfolio-sign-in-and-books] | EVERY PORTFOLIO PAGE IS BEHIND A SIGN-IN, AND THERE IS MORE THAN ONE PORTFOLIO `[verified on production 2026-0 | `state_portfolio.md` |
 | [portfolio-live-surface] | `/portfolio` IS THE LIVE BUYING ENGINE, the venue caps BIND, and the VENUE now settles our bets `[verified 202 | `state_portfolio.md` |
 | [portfolio-settlement] | PORTFOLIO SETTLEMENT — the ledger crossed no service boundary, and the join keyed on a value that drifts `[ver | `state_portfolio.md` |
+| [portfolio-sim-sizing-gate] | ONLY A MODEL MEASURED TO BEAT THE MARKET SIZES MONEY; TODAY NONE IS, SO STAKES FOLLOW PRICE `[verified on prod | `state_portfolio.md` |
 | [order-model-attribution] | AN ORDER RECORDS THE SIM'S VERDICT — DEPLOYED AND VERIFIED ON PRODUCTION; THE COMMIT GATE MAKES FOUR OF THE NI | `state_portfolio.md` |
 | [soccer-season-market-audit] | SEASON TO DATE NO SOCCER MARKET BEATS THE CLOSE, AND THE PROP MODEL IS PRICING LAST SEASON'S SQUADS `[measured | `state_soccer.md` |
 | [soccer-prop-book-coverage] | WIDENING SOCCER PROP REGIONS BUYS ONE SOFT BOOK FOR ~1M CREDITS/MONTH — **KNOB SHIPPED, DELIBERATELY LEFT OFF* | `state_soccer.md` |

@@ -229,6 +229,32 @@ real evaluation records: the ledger is worker-local and not in
 `[ledger_bridge]` line carries the breakdown that falsifies it —
 `by_identity` large with `matched_by_identity: 0` means the mapping is wrong.
 
+## [portfolio-sim-sizing-gate] ONLY A MODEL MEASURED TO BEAT THE MARKET SIZES MONEY; TODAY NONE IS, SO STAKES FOLLOW PRICE `[verified on production 2026-09-19 15:17Z and 15:48Z, lane sim-sizing-skill-gate]`
+
+USER 2026-09-19: "All sports". `portfolio_commit._sizing_model_edge` returns None
+for a sim edge unless the row's `projection.model_skill` is `measured` +
+`beats_market`, or the daily scorecard validated its bucket as a skill pocket
+(`bucket_factor == 1.0`). Such a row takes the price-basis path: it is sized on
+market fair, the sim cannot create, veto or shrink a bet, and the
+`max_positions` cut ranks it without the sim term. The edge is still shown,
+ranked on the board and recorded on the position (`sizing.sim_sizing`,
+`sizing.basis = market_fair`).
+
+- **Measured:** `sim_share_of_staked` was 0.25-0.39 on 09-19 plans before the
+  deploy. After it (plans 10:16 and 10:47 CDT) it is **0.0**, with every
+  sim-edge position market_fair and labels `gated_parity` / `gated_unmeasured` /
+  `price_basis_sport`.
+- **Why none is admitted:** all 31 `measured_market_skill` entries are parity (23)
+  or loses (8). The `model-scorecard` cron's 146 cells carry 0 beats. WNBA's
+  props, totals and spreads lose in the 2026-09-18 backtest
+  (`[wnba-model-vs-board-mismatch]`).
+- **Consequences:** in-play rows whose stake rested on the sim are refused
+  `in_play_market_fair` (the default).
+- **The input checklist's canonical row carries a `beats_market` note.** Remove
+  it and the hard gate in `pipeline/portfolio_commit.py` stops every commit
+  wherever MLB is not market-fair-allowlisted.
+- **Off switch:** `SYNDICATE_PORTFOLIO_SIM_SIZING=legacy` (exact word).
+
 ## [order-model-attribution] AN ORDER RECORDS THE SIM'S VERDICT — DEPLOYED AND VERIFIED ON PRODUCTION; THE COMMIT GATE MAKES FOUR OF THE NINE VERDICTS UNREACHABLE `[verified on production 2026-09-04 00:03:26Z, lane order-sim-view]`
 
 `sim_view` / `sim_line_gap` / `sim_probability_railed` are stamped onto the
