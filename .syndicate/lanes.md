@@ -1739,7 +1739,22 @@ death, never life — do not invert it.
 - Verification: offline, tests failing on the pre-change code: shared == unshared (exact equality) for projection and props; the poller simulates each match's paths once for the two consumers (call count); a window short of the half's end simulates exactly the window, one that reaches it gets stoppage. Production, after a user-approved deploy: served `goal_windows` fall to the corrected values (read by recomputing one served state), and the tick's per-match cost drops (re-profile).
 - Blocked by: none (the deploy is a user decision)
 
-## Archived lanes (full bodies in `lanes_closed.md`)
+### mls-board-evening-gaps — OPEN — opened 2026-09-19 — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **diagnostic; hypotheses written, no code**
+
+- Goal: [user 2026-09-19 "proceed next steps", on the MLS lead this session filed in lane `soccer-prop-conditioning`] name, each with a measurement, why (a) 5 of today's 13 MLS fixtures are absent from the soccer Layer 1 board and (b) 4 fixtures that ARE on it carry 0 projections, while web's `mls/.../recommendations_2026-09-19.json` (generated 13:44:16Z) has all 13 with props; then fix what is in scope, before the first kickoff at 23:30Z if the user approves a deploy.
+- Files: none claimed (diagnostic). `syndicate/features/shared/book_grid_artifact.py` and the soccer projection attach are READ only until a hypothesis survives.
+- Recon, measured 2026-09-19 16:00-16:05Z:
+  - `/api/board/layer1?sport=soccer&date=2026-09-19` (built 16:01:31Z, America/Chicago date scope) lists 8 MLS games.
+  - The 4 kicking off at 23:30Z (CLB@MTL, CLT@DC, LAF@SJ, ORL@NE) are fully projected: 122-174 props each, stamped `13:44:16`.
+  - The 4 listed at 00:30-02:30Z on 09-20 (LA@MIN, TOR@STL, VAN@RSL, ATL@POR) have rows (145-183) and `rows_with_projection` 0.
+  - Absent from both the 09-19 and 09-20 boards: DAL, HOU, SKC (00:30Z) and NSH, COL (01:30Z).
+  - The artifact reports `rows_total` 11,673 and `rows_truncated` 5,673. The cap is `BOOK_GRID_ARTIFACT_MAX_ROWS` = 6000 (`book_grid_artifact.py:99`), applied as `grid[:6000]` AFTER `book_grid.py:875` sorts by `-books_quoting`.
+  - The "board read an OLDER copy" theory from the original lead is RETRACTED for today: projected rows carry `2026-09-19T08:44:16-05:00` = 13:44:16Z, the current file.
+  - Layer 2 shortlist carries 0 soccer player props (it did on 09-17 too, so that is not new).
+- **Hypotheses (not yet tested):**
+  - (H1) The 5 absent fixtures are cut by the 6000-row bound. On a Saturday with 57 soccer games, MLS markets have fewer books quoting than the European leagues, so every row of those fixtures sorts below row 6000. Falsified if any of their rows is in the served artifact, or if their `books_quoting` is not below the cut row's.
+  - (H2) The 4 present evening fixtures lose projections in the soccer projection join, and the join is date-keyed so that a UTC-09-20 kickoff misses the file dated 09-19. Falsified if the join does not key by date, or if another present 00:30Z+ fixture IS projected.
+- Verification: each hypothesis confirmed or exonerated by a production read plus the code path (file:line), recorded here before any fix.
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
 > full bodies are in `lanes_history.md`, INCLUDING each ORPHANED lane's `Files:`
