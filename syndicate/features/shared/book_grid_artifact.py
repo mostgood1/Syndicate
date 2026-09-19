@@ -548,6 +548,12 @@ def build_book_grid_artifact(
     # slice that happened to fit.
     summary = book_grid_summary(grid)
     total = len(grid)
+    # IN-PLAY ROWS ARE TAKEN BEFORE THE ROW CAP (lane `live-inplay-board-cadence`).
+    # Soccer's grid ran 11,677 rows against the 6,000 cap on 2026-09-19, so a
+    # live match could be cut from the artifact while it was the one thing a
+    # live bettor needed. Held aside for `write_book_grid_artifact`, never
+    # added to the payload, so the grid file itself is unchanged.
+    _remember_inplay_rows(sport, date_str, generated_at, grid)
     bounded = grid[: max(1, int(max_rows))]
 
     return {
@@ -603,6 +609,9 @@ def write_book_grid_artifact(sport: str, date_str: str, payload: dict[str, Any])
     with tmp.open("w", encoding="utf-8") as handle:
         json.dump(payload, handle, ensure_ascii=False, default=str)
     os.replace(tmp, path)
+    # Best effort and AFTER the grid is on disk: an overlay failure must never
+    # cost the grid, which is what every other reader depends on.
+    _write_inplay_overlay_best_effort(sport, date_str, payload)
     return path
 
 
@@ -621,3 +630,287 @@ def read_book_grid_artifact(sport: str, date_str: str) -> dict[str, Any] | None:
     except Exception:
         return None
     return payload if isinstance(payload, dict) else None
+
+
+# ---------------------------------------------------------------------------
+# IN-PLAY OVERLAY (lane `live-inplay-board-cadence`, user 2026-09-19: "we need
+# live interval odds for all sports to reach the board faster"; "Build it,
+# deploy ASAP").
+#
+# WHY. The served board's in-play rows come from the Layer 2 shortlist, which
+# refresh-worker rewrites about every ~12 min (and a restart discards a build).
+# Measured 2026-09-19: 15-25 min from a price move to the page, while this grid
+# rebuilt every ~2-3 min with NCAAF in-play prices a median 119 s old. The
+# overlay carries ONLY in-play rows whose price is fresh, turned into board
+# cards by the SAME chain the shortlist uses (`build_layer2_rows` ->
+# `select_shortlist` -> `layer2_rows_to_board_cards`), so line, side, best-book
+# re-pick and no-vig fair are the board's own and not a second contract. Web
+# merges it at serve time (`intelligence_state._layer2_fallback_recommendations`).
+#
+# PRICES ONLY. Every in-play row carried `model_edge_pct` None on 2026-09-19 and
+# in-play market-fair staking is refused by default, so these cards change what
+# a bettor SEES, not what the portfolio stakes: `portfolio_commit` reads
+# `read_layer2_shortlist` directly and never this file.
+#
+# Kill switch: `SYNDICATE_INPLAY_OVERLAY=off` on either service (worker stops
+# writing; web stops merging).
+# ---------------------------------------------------------------------------
+
+INPLAY_OVERLAY_VERSION = 1
+INPLAY_OVERLAY_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer")
+_INPLAY_OFF_VALUES = frozenset({"off", "0", "false", "no", "disabled"})
+# (sport, date) -> (generated_at, rows): the latest build's in-play rows, held
+# between `build_book_grid_artifact` and `write_book_grid_artifact`. One entry
+# per sport/date, replaced on every build, so it cannot grow.
+_INPLAY_ROWS: dict[tuple[str, str], tuple[Any, list[Mapping[str, Any]]]] = {}
+# Sport/dates whose last published overlay had cards: an empty overlay is
+# published only to CLEAR one of these, so a finished game leaves the board.
+_INPLAY_PUBLISHED_NONEMPTY: set[tuple[str, str]] = set()
+_INPLAY_READ_CACHE: dict[str, tuple[tuple[int, int], dict[str, Any]]] = {}
+
+
+def inplay_overlay_enabled() -> bool:
+    raw = str(os.environ.get("SYNDICATE_INPLAY_OVERLAY") or "").strip().lower()
+    return raw not in _INPLAY_OFF_VALUES
+
+
+def _env_seconds(name: str, default: int) -> int:
+    raw = str(os.environ.get(name) or "").strip()
+    try:
+        value = int(raw) if raw else default
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+def inplay_overlay_max_price_age_seconds() -> int:
+    """A row older than this at grid build is NOT in-play-fresh (default 300 s)."""
+    return _env_seconds("SYNDICATE_INPLAY_OVERLAY_MAX_PRICE_AGE_SECONDS", 300)
+
+
+def inplay_overlay_max_file_age_seconds() -> int:
+    """Web ignores an overlay written longer ago than this (default 360 s): a
+    dead tick must degrade to the shortlist, not freeze stale prices as live."""
+    return _env_seconds("SYNDICATE_INPLAY_OVERLAY_MAX_FILE_AGE_SECONDS", 360)
+
+
+def book_grid_inplay_artifact_path(sport: str, date_str: str) -> Path:
+    """Beside the grid, so the existing `book_grid_*.json` publish pattern and
+    the 7-day `book_grid` retention rule cover it with no allowlist edit
+    (`artifact_retention._artifact_date` reads its date the same way)."""
+    return book_grid_artifact_path(sport, date_str).with_name(f"book_grid_inplay_{str(date_str).strip()}.json")
+
+
+def _row_age_seconds(row: Mapping[str, Any]) -> float | None:
+    for key in ("seen_age_seconds", "age_seconds"):
+        value = row.get(key)
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            continue
+        if parsed == parsed and parsed >= 0:
+            return parsed
+    return None
+
+
+def is_inplay_fresh_row(row: Any, *, max_age_seconds: float) -> bool:
+    """A live game's row whose price was seen within `max_age_seconds` of the build."""
+    if not isinstance(row, Mapping):
+        return False
+    game = row.get("game")
+    if not isinstance(game, Mapping) or str(game.get("state") or "").strip().lower() != "live":
+        return False
+    age = _row_age_seconds(row)
+    return age is not None and age <= max_age_seconds
+
+
+def select_inplay_rows(grid: Any, *, max_age_seconds: float | None = None) -> list[Mapping[str, Any]]:
+    limit = float(max_age_seconds if max_age_seconds is not None else inplay_overlay_max_price_age_seconds())
+    return [row for row in (grid or []) if is_inplay_fresh_row(row, max_age_seconds=limit)]
+
+
+def _remember_inplay_rows(sport: Any, date_str: Any, generated_at: Any, grid: Any) -> None:
+    """Called by the builder BEFORE its row cap. Never raises."""
+    try:
+        if not inplay_overlay_enabled():
+            return
+        key = (str(sport or "").strip().lower(), str(date_str or "").strip())
+        _INPLAY_ROWS[key] = (generated_at, select_inplay_rows(grid))
+    except Exception:
+        pass
+
+
+def build_inplay_overlay(
+    sport: str, date_str: str, rows: list[Mapping[str, Any]], *, grid_generated_at: Any = None
+) -> dict[str, Any]:
+    """The overlay payload: board cards for these in-play rows, built by the
+    shortlist's own chain. Raises on a card-builder failure; the writer catches."""
+    from syndicate.features.shared.layer2_board import (
+        build_layer2_rows,
+        layer2_rows_to_board_cards,
+        select_shortlist,
+    )
+
+    slug = str(sport or "").strip().lower()
+    cards: list[dict[str, Any]] = []
+    opportunities: list[dict[str, Any]] = []
+    if rows:
+        result = build_layer2_rows(rows)
+        opportunities = [dict(item) for item in (result.get("opportunities") or []) if isinstance(item, Mapping)]
+        for item in opportunities:
+            if not str(item.get("sport") or "").strip():
+                item["sport"] = slug
+        chosen = ((select_shortlist(opportunities) or {}).get("rows") or []) if opportunities else []
+        for card in layer2_rows_to_board_cards(chosen):
+            if not isinstance(card, Mapping):
+                continue
+            tagged = dict(card)
+            tagged["source"] = "layer2_inplay_overlay"
+            tagged["inplay_overlay"] = True
+            tagged["price_grid_generated_at"] = grid_generated_at
+            cards.append(tagged)
+    return {
+        "version": INPLAY_OVERLAY_VERSION,
+        "sport": slug,
+        "date": str(date_str or "").strip(),
+        "grid_generated_at": grid_generated_at,
+        "written_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "max_price_age_seconds": inplay_overlay_max_price_age_seconds(),
+        "rows_inplay": len(rows or []),
+        "opportunities": len(opportunities),
+        "cards": cards,
+    }
+
+
+def write_book_grid_inplay_overlay(sport: str, date_str: str, overlay: Mapping[str, Any]) -> Path:
+    path = book_grid_inplay_artifact_path(sport, date_str)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".json.tmp")
+    with tmp.open("w", encoding="utf-8") as handle:
+        json.dump(overlay, handle, ensure_ascii=False, default=str)
+    os.replace(tmp, path)
+    return path
+
+
+def _publish_inplay_overlay(path: Path) -> bool:
+    try:
+        from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+        return bool(publish_hot_artifact(path, timeout_seconds=30))
+    except Exception:
+        return False
+
+
+def _write_inplay_overlay_best_effort(sport: str, date_str: str, payload: Mapping[str, Any]) -> None:
+    """Build, write and publish this sport/date's overlay. NEVER raises.
+
+    Rows come from the builder's pre-cap stash when it matches this payload's
+    build, else from the (capped) payload rows. An overlay with no cards is
+    written and published only when the previous one had cards, so a game that
+    ends leaves the board instead of lingering until the file ages out.
+    """
+    import time as _time
+
+    started = _time.monotonic()
+    key = (str(sport or "").strip().lower(), str(date_str or "").strip())
+    try:
+        if not inplay_overlay_enabled():
+            return
+        stashed = _INPLAY_ROWS.pop(key, None)
+        generated_at = payload.get("generated_at") if isinstance(payload, Mapping) else None
+        if stashed is not None and stashed[0] == generated_at:
+            rows = stashed[1]
+        else:
+            rows = select_inplay_rows((payload or {}).get("rows") if isinstance(payload, Mapping) else [])
+        if not rows and key not in _INPLAY_PUBLISHED_NONEMPTY:
+            return
+        overlay = build_inplay_overlay(key[0], key[1], rows, grid_generated_at=generated_at)
+        path = write_book_grid_inplay_overlay(key[0], key[1], overlay)
+        published = _publish_inplay_overlay(path)
+        if overlay["cards"]:
+            _INPLAY_PUBLISHED_NONEMPTY.add(key)
+        else:
+            _INPLAY_PUBLISHED_NONEMPTY.discard(key)
+        print(
+            f"[book_grid] INPLAY_OVERLAY sport={key[0]} date={key[1]} rows_inplay={overlay['rows_inplay']} "
+            f"opportunities={overlay['opportunities']} cards={len(overlay['cards'])} published={published} "
+            f"elapsed_ms={(_time.monotonic() - started) * 1000:.0f}",
+            flush=True,
+        )
+    except Exception as exc:  # noqa: BLE001 -- an overlay must never cost the grid
+        print(f"[book_grid] INPLAY_OVERLAY_FAILED sport={key[0]} date={key[1]} {type(exc).__name__}: {exc}", flush=True)
+
+
+def read_book_grid_inplay_overlay(sport: str, date_str: str) -> dict[str, Any] | None:
+    """WEB-SIDE. The overlay for one sport/date, cached per process by the file's
+    (mtime, size), so a board rebuild costs one stat per sport when nothing moved."""
+    path = book_grid_inplay_artifact_path(sport, date_str)
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    signature = (int(stat.st_mtime_ns), int(stat.st_size))
+    cached = _INPLAY_READ_CACHE.get(str(path))
+    if cached is not None and cached[0] == signature:
+        return cached[1]
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    _INPLAY_READ_CACHE[str(path)] = (signature, payload)
+    return payload
+
+
+def inplay_overlay_cards(date_str: str, *, now: datetime | None = None) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """WEB-SIDE. Every fresh overlay card for this date, plus what was skipped and why.
+
+    An overlay whose `written_at` is older than `inplay_overlay_max_file_age_seconds()`
+    is skipped: the tick that feeds it died or the worker restarted, and the board
+    must fall back to the shortlist rather than present stale prices as live.
+    """
+    report: dict[str, Any] = {"sports": {}, "newest_written_at": None}
+    if not inplay_overlay_enabled():
+        report["disabled"] = True
+        return [], report
+    moment = now or datetime.now(timezone.utc)
+    limit = inplay_overlay_max_file_age_seconds()
+    cards: list[dict[str, Any]] = []
+    for sport in INPLAY_OVERLAY_SPORTS:
+        overlay = read_book_grid_inplay_overlay(sport, date_str)
+        if not overlay:
+            continue
+        written = str(overlay.get("written_at") or "")
+        try:
+            written_dt = datetime.fromisoformat(written.replace("Z", "+00:00"))
+        except ValueError:
+            report["sports"][sport] = "unreadable_written_at"
+            continue
+        age = (moment - written_dt).total_seconds()
+        if age > limit:
+            report["sports"][sport] = f"stale_{int(age)}s"
+            continue
+        sport_cards = [dict(card) for card in (overlay.get("cards") or []) if isinstance(card, Mapping)]
+        report["sports"][sport] = len(sport_cards)
+        cards.extend(sport_cards)
+        if report["newest_written_at"] is None or written > report["newest_written_at"]:
+            report["newest_written_at"] = written
+    return cards, report
+
+
+def inplay_overlay_identity(card: Mapping[str, Any]) -> tuple[str, str, str, str, str]:
+    """What an overlay card REPLACES: the same game, market, segment and player.
+    Deliberately NOT the line or side, so a moved line replaces the old one."""
+
+    def norm(value: Any) -> str:
+        return str(value or "").strip().lower()
+
+    return (
+        norm(card.get("sport") or card.get("sport_slug")),
+        norm(card.get("event_id") or card.get("game_pk")),
+        norm(card.get("market") or card.get("market_key")),
+        norm(card.get("segment")) or "full",
+        norm(card.get("player_name")),
+    )

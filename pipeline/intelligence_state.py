@@ -1770,6 +1770,13 @@ def _layer2_fallback_recommendations(
             _normalize_card_edge_units(tagged)
             _backfill_layer2_board_columns(tagged)
             cards.append(tagged)
+        # IN-PLAY OVERLAY (lane `live-inplay-board-cadence`, user 2026-09-19 "Build
+        # it, deploy ASAP"). Never raises: a missing, stale or unreadable overlay
+        # leaves this date's shortlist cards exactly as they were.
+        try:
+            _merge_inplay_overlay(cards, requested_date, start=_cards_before)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[intelligence_state] INPLAY_OVERLAY_MERGE_FAILED date={requested_date} {type(exc).__name__}: {exc}", flush=True)
         # NOTE the granularity: this counts cards this DATE contributed, before
         # `_prune_decided_layer2_cards` below runs across the whole list. A date
         # whose every card is later pruned still counts here -- it did put rows
@@ -1800,6 +1807,49 @@ def _layer2_fallback_recommendations(
     except Exception as exc:  # noqa: BLE001
         print(f"[intelligence_state] LAYER2_LIVE_RESTATE_FAILED {type(exc).__name__}: {exc}", flush=True)
     return cards
+
+
+def _merge_inplay_overlay(cards: list[dict[str, Any]], requested_date: str, *, start: int = 0) -> dict[str, int]:
+    """Replace this date's in-play shortlist cards with the book-grid overlay's.
+
+    Lane `live-inplay-board-cadence`. The shortlist is rewritten about every ~12
+    min; the overlay (`book_grid_artifact.inplay_overlay_cards`) every grid tick
+    (~2-3 min), holding only in-play rows whose price passed the board's own live
+    observation ceiling (300 s). A card is REPLACED by an overlay card with the
+    same game, market, segment and player (`inplay_overlay_identity`), whatever
+    its line or side, so a moved line cannot leave its old price beside the new
+    one. Overlay cards with no shortlist counterpart are ADDED, which is how
+    interval rows reach the board between shortlist builds.
+
+    Only `cards[start:]` (this date's cards) is touched. Overlay cards get the
+    same per-card treatment as shortlist cards above, so the live restate and
+    decided-market pruning below see them the same way.
+    """
+    from syndicate.features.shared.book_grid_artifact import inplay_overlay_cards, inplay_overlay_identity
+
+    overlay, report = inplay_overlay_cards(requested_date)
+    if not overlay:
+        return {"replaced": 0, "added": 0}
+    keys = {inplay_overlay_identity(card) for card in overlay}
+    date_cards = cards[start:]
+    kept = [card for card in date_cards if inplay_overlay_identity(card) not in keys]
+    replaced = len(date_cards) - len(kept)
+    for card in overlay:
+        tagged = dict(card)
+        tagged["game_date"] = resolve_candidate_game_date(tagged, fallback=requested_date)
+        tagged["source_board_date"] = requested_date
+        tagged.setdefault("sport", tagged.get("sport_slug"))
+        _normalize_card_edge_units(tagged)
+        _backfill_layer2_board_columns(tagged)
+        kept.append(tagged)
+    cards[start:] = kept
+    print(
+        f"[intelligence_state] INPLAY_OVERLAY_MERGED date={requested_date} overlay_cards={len(overlay)} "
+        f"replaced={replaced} added={len(overlay) - replaced} newest_written_at={report.get('newest_written_at')} "
+        f"sports={report.get('sports')}",
+        flush=True,
+    )
+    return {"replaced": replaced, "added": len(overlay) - replaced}
 
 
 def _refresh_layer2_live_state(
