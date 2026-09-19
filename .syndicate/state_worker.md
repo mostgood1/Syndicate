@@ -977,6 +977,18 @@ That story ended; do not re-open it from the archive.**
 
 ## [deploy-discipline] DEPLOY DISCIPLINE — read before any deploy
 
+- **`deploy_preflight.py` CLEAR IS BLIND TO refresh-worker's BOARD BUILD.** It
+  HOLDs only on child jobs, cron runs and spacing; the intelligence-state build
+  thread is not a job. **A refresh-worker deploy therefore discards any board
+  build in flight.**
+  - Measured 2026-09-19: a CLEAR at 16:04:53Z restarted the worker after today's
+    L2 shortlist was written (16:05:23Z) but before it published. Today's board
+    froze 10:49 → 11:20 CDT during live NCAAF.
+  - The detector EXISTS: `scripts/check_deploy_safety.py` `board_build_state()`,
+    and its `--drain`, which the worker honours via `deploy_drain.drain_hold_reason()`.
+  - Until preflight calls it, fire a refresh-worker deploy right after a
+    `BOARD_BUILD_TIMING` line for TODAY's date, or drain first.
+  `[verified 2026-09-19, lane board-build-stage-slowdown]`
 - **`autoDeploy = no` on all three services, so pushing `.py` ships nothing.
   Pushing `render.yaml` DOES apply to production** via `blueprint_sync`, which
   bypasses it. A sync **upserts declared keys and leaves live-only keys alone**
