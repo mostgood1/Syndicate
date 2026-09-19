@@ -1645,6 +1645,26 @@ death, never life — do not invert it.
 - Verification: after a refresh-worker deploy, the first `NCAAF_LIVE_RESIM` line reads `"sp_ratings_source": "inseason_blend_wk3"` and `"sp_ratings_teams": 138` (baseline: SP+ `durable_mirror`/`loader`, 138); during Saturday 09-19 play, `live_resimmed` > 0 on that basis.
 - Blocked by: none.
 
+### wnba-postgame-to-disk — OPEN — opened 2026-09-19 — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **`#675`; hypothesis written, no code yet**
+
+- Goal: [user 2026-09-19: "proceed next" on `#675`] a WNBA slate date's box scores appear on WEB within a day of the game (`wnba_source/data/processed/boxscores_<date>.csv`), its three recon files reach web too, the dates missing since 2026-08-25 are backfilled, and a WNBA board-row prop Ask's recent-form table stops printing its STALE row.
+- Files:
+  - `syndicate/features/shared/refresh_state_store.py` (the `_KEYVALUE_EXCLUDED_PATH_MARKERS` tuple ONLY: one marker for dated WNBA box scores)
+  - `scripts/run_refresh_worker.py` (`_wnba_postgame_target_dates` and `_run_wnba_postgame_producer_tick` ONLY)
+  - `tests/test_wnba_postgame_publish_disk.py` (NEW)
+- Recon, measured 2026-09-19 14:5x-15:3xZ:
+  - WNBA games are being played daily; web's cards list 3-5 a day through 2026-09-20.
+  - Web's newest dated box score is `boxscores_2026-08-24.csv`: 108 files for 2026, all written in one batch on 08-26 20:23Z.
+  - Web's `boxscores_history.csv` is republished every few minutes by live-odds-worker (`PUBLISH_OK` / `PUBLISH_SKIPPED_UNCHANGED checksum=5db9fb6d1af9`), and its newest game is 2026-06-30. That is `#469`'s stale copy; this lane does not change it.
+  - refresh-worker's hourly WNBA postgame producer DOES build every slate. `[wnba_boxscores] WROTE date=2026-09-18 games=3 rows=59` at 04:10:45Z and 05:44:59Z, and recon `games 3 / props 59 / quarters 3 ok`. Its own publish result reads `keyvalue_backed_not_a_file` for all FOUR files, so none reaches web.
+- **Hypothesis (two defects, one producer):**
+  - (D1) The publish block (`run_refresh_worker.py` ~1627) asks `_keyvalue_backed(path)` BEFORE `path.is_file()`. Under `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` that predicate is true for every path not in `_KEYVALUE_EXCLUDED_PATH_MARKERS`, so the three recon CSVs are refused. `build_wnba_recon` writes them to disk with a plain `write_text`, so they are real files that are never published.
+  - (D2) `build_wnba_boxscores.build_date` writes through `refresh_state_store.write_text_file`, which under keyvalue puts `boxscores_<date>.csv` in Redis (10-day TTL) and never on disk. So it can never be published, and it is gone after 10 days.
+  - FIX: publish a file that is on disk, whatever the backend; and exclude `wnba_source/data/processed/boxscores_20` (dated files only; `boxscores_history.csv` is untouched) from keyvalue, so the WRITER (`write_text_file`) and the settler's READER (`bet_status_wnba._final_csv_rows`, `read_text_file`) both move to disk together. BACKFILL: the producer also rebuilds a date that is `done` with recon `ok` but has no box score on disk, at most 3 attempts per date, with the lookback widened from 21 to 30 days so 2026-08-25 is inside it.
+- Falsification: after refresh-worker runs the fix, (a) the next producer tick's `published` shows `true` for `boxscores_<date>.csv` and the recon files, and web lists that `boxscores_<date>.csv` with a fresh mtime; (b) over the following day, web gains the dated files for 2026-08-25 onward. If a tick publishes nothing, or web's newest dated file stays 08-24, the hypothesis is wrong.
+- Verification: offline tests that fail on today's code (path routing under the keyvalue backend; publish ordering; the backfill rule and its retry cap), then production after a deploy the user approves: web's `boxscores_<yesterday>.csv` and `recon_*` present with fresh mtimes, the backlog draining, and a WNBA prop Ask whose recent form carries no STALE row.
+- Not this lane, recorded: `linescores_<date>.json` has the same keyvalue shape (`write_json_file`), but segment settlement may read it from keyvalue today, so moving it needs its own look. live-odds-worker's stale `boxscores_history.csv` (`#469`) is also left alone.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
