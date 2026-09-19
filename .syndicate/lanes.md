@@ -1673,7 +1673,7 @@ death, never life — do not invert it.
   - `tests/test_wnba_postgame_producer_tick.py` (the `store` fixture ONLY: it sets the rebuild cap to 0, so those tests keep draining not-yet-done dates)
 - Recon, measured 2026-09-19 ~14:50-15:05Z (read off the session's message timestamps; the earlier "15:3xZ" upper bound was wrong):
   - WNBA games are being played daily; web's cards list 3-5 a day through 2026-09-20.
-  - Web's newest dated box score is `boxscores_2026-08-24.csv`: 108 files for 2026, all written in one batch on 08-26 20:23Z.
+  - Web's newest dated box score is `boxscores_2026-08-25.csv`: 108 files for 2026, all written in one batch on 08-26 20:23Z. **CORRECTED 15:18:49Z: this line and `0465103e`'s comments first said 08-24.** The web listing reads 108 files, newest 08-25. So the first lost slate is 08-26. The comments were fixed in `f6972a2b`.
   - Web's `boxscores_history.csv` is republished every few minutes by live-odds-worker (`PUBLISH_OK` / `PUBLISH_SKIPPED_UNCHANGED checksum=5db9fb6d1af9`), and its newest game is 2026-06-30. That is `#469`'s stale copy; this lane does not change it.
   - refresh-worker's hourly WNBA postgame producer DOES build every slate. `[wnba_boxscores] WROTE date=2026-09-18 games=3 rows=59` at 04:10:45Z and 05:44:59Z, and recon `games 3 / props 59 / quarters 3 ok`. Its own publish result reads `keyvalue_backed_not_a_file` for all FOUR files, so none reaches web.
 - **Hypothesis (two defects, one producer):**
