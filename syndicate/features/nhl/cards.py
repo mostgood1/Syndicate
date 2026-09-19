@@ -856,17 +856,24 @@ def _prediction_dates() -> list[str]:
     return [date_str for date_str in source_available_dates() if len(date_str) == 10]
 
 
-def _prediction_dates_with_rows() -> list[str]:
-    return [
-        date_str
-        for date_str in _prediction_dates()
-        if _load_csv_rows(processed_path(f"predictions_{date_str}.csv"))
+def _date_has_rows(date_str: str) -> bool:
+    return bool(
+        _load_csv_rows(processed_path(f"predictions_{date_str}.csv"))
         or _load_csv_rows(processed_path(f"predictions_sim_{date_str}.csv"))
         or _load_csv_rows(scoreboard_snapshot_path(date_str))
-    ]
+    )
+
+
+def _prediction_dates_with_rows() -> list[str]:
+    return [date_str for date_str in _prediction_dates() if _date_has_rows(date_str)]
 
 
 def _next_scheduled_game_date_after_empty_slate(selected_date: str) -> str | None:
+    # Only an EMPTY requested slate looks ahead. Without this check any later
+    # predictions file hijacked the board: on 2026-09-19 the requested date had
+    # 7 games on web's disk and the board served 2026-09-20's slate instead.
+    if _date_has_rows(selected_date):
+        return None
     selected = parse_iso_date(selected_date)
     for date_str in sorted(_prediction_dates_with_rows()):
         if parse_iso_date(date_str) > selected:
