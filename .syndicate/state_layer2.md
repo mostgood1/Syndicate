@@ -435,7 +435,7 @@ has no book allowlist" is a **negative from a grep over one file**. Layer 1's
 list IS confirmed (`DEFAULT_BOOKS`, `templates/shared/layer1_board.html:267`,
 client-side JS). Trace the served `book` field to its writer before acting.
 
-## [layer1-board-date-scoping] THE BOARD WAS DROPPING GAMES TWO WAYS — both FIXED AND VERIFIED; a THIRD (soccer projections, late kickoffs) found 2026-09-19, fix `6419eea5` not yet verified — `[verified 2026-08-30 05:0x-05:5xZ, web+refresh-worker `d7cda903`]`
+## [layer1-board-date-scoping] THE BOARD WAS DROPPING GAMES TWO WAYS — both FIXED AND VERIFIED; a THIRD (soccer projections, late kickoffs) found 2026-09-19, FIXED `6419eea5` and VERIFIED 18:36Z — `[verified 2026-08-30 05:0x-05:5xZ, web+refresh-worker `d7cda903`]`
 
 1. **A 9pm Central game was invisible.** The grid artifact is keyed by **UTC**
    date; the board scopes by **CENTRAL** game date; the read set was window+today.
@@ -452,8 +452,10 @@ client-side JS). Trace the served `book` field to its writer before acting.
    is UNCHANGED at 7** and `#565`'s per-sport cost pruning survives — three extra
    shard checks for NCAAF, none for any other sport.
 3. **THE PROJECTION SIDE OF (1) WAS STILL OPEN FOR SOCCER** `[defect verified
-   2026-09-19 16:06-16:10Z, lane mls-board-evening-gaps; the fix `6419eea5` is
-   NOT yet verified in production]`.
+   2026-09-19 16:06-16:10Z, lane mls-board-evening-gaps; FIXED by `6419eea5`,
+   VERIFIED 18:29-18:36Z on refresh-worker `aebc040d`: the UTC-09-20 grid reads
+   09-19..09-26, `unmatched_by_league` mls 3730 -> 0, and all 13 MLS 09-19 fixtures
+   are projected]`.
    - The grid build's soccer projection read (`board_enrichment._attach_projections_by_sport`
      → `resolve_window_dates(..., "slate")`, forward-only) is anchored on the
      artifact's UTC date. The sim files a fixture under its LOCAL date.

@@ -38484,3 +38484,17 @@ Scheduled task `fotmob-alias-verify-0919-am`, read-only. The lane was already CL
 - **Still owed:** the backlog 09-16 → 08-26 (~22 slates, one per hour), then web listing every dated file from 08-26.
 - **A cost this surfaced:** a web restart costs the worker→web publish that lands during it. The fix's retry absorbed it (1 of 3 attempts). Three web restarts, each landing on a tick, would exhaust a date's attempts.
 
+## 2026-09-19 18:36:18Z (13:36 CT) — READING — refresh-worker `aebc040d` (`dep-dand50jm8hqs73au6i90`, lane live-inplay-board-cadence's deploy; live 18:26:24Z) — lane mls-board-evening-gaps (rider `6419eea5`) — **verify: MET**
+
+- **First UTC-09-20 grid built after go-live** (`/api/board/book-grid?sport=soccer&date=2026-09-20`, generated 18:29:49Z):
+  - `projections.dates_read` = `2026-09-19 .. 2026-09-26`. Baseline 09-20..09-26; the previous day is now read first.
+  - `unmatched_by_league` = `{"?": 1}`. Baseline `{"mls": 3730}` at 16:06Z and 3,683 at 17:49Z.
+  - `rows_with_projection` 10,592 of 13,828.
+  - `oldest_sim_age_hours` 3.5, a metric only, as predicted.
+- **Layer 1, soccer, 09-19** (built 18:35:59Z): **all 13 MLS fixtures projected**.
+  - The nine kicking off after 00:00Z carry 130-157 projected rows each (DAL 140, HOU 133, MIN 149, SKC 145, STL 139, NSH 135, COL 130, RSL 157, POR 135). Baseline 0-1 each; the watcher read `9of9` at 18:32:45Z.
+  - The four 23:30Z fixtures are unchanged (164 / 161 / 133 / 186).
+  - Every stamp is `2026-09-19T16:20:02`, the newest mls 09-19 file (the sim re-ran at 16:20Z).
+  - Board-wide `rows_with_projection` 6,296 of 7,411 (baseline 5,044 of 7,408 at 16:01Z).
+- **This lane fired no deploy.** Its gated runner lost the 16:53Z window to a hold for session a1e40980's env write, and the 17:49Z window to the MLB daily sim (preflight HOLD ×5; no deploy, claim released). The user then chose "Fire at next board landing" (override a jobs-only HOLD). The runner was re-armed at 18:27Z and stopped unfired at 18:28Z on seeing `aebc040d` live, which already carried the fix; a second deploy would only have killed the MLB sim.
+
