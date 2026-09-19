@@ -38185,3 +38185,12 @@ Closes the owed items of the 2026-09-18 14:27:33Z entry. Read from web's served 
 - **Reading 4 — inventory.** Latest `DISK_INVENTORY_SUMMARY` 2026-09-19T14:19:50Z: 126,742 files, 39,719,006,037 B; filesystem available 12,305,002,496 B of 52,521,566,208 (used 40,199,786,496). Retention's scan saw 117,742 — ~9,000 fewer than the inventory (not established whether that is scope or growth since 01:07Z).
 - **Reading 5 — verdict for the cap deploy (`ef3fb857` re-inject, live 2026-09-18T19:24:24Z): NOT MET on one clause.** scanned 117,742 < 120,000 (FAIL, literal); cursor_complete=true (PASS); elapsed_s 526.96 <= 900 (PASS); memory skips 0 (PASS); deleted 0 (PASS). The failing clause is the pre-registered file-count estimate, not coverage: `hit_pass_limit=False` and `cursor_complete=true` say the pass walked the whole tree under the cap. Not re-graded as MET here.
 - **NOT claimed:** that any rule's window/lookback is correct (a dry run validates nothing about reader needs); that the 3.4 GiB is safe to delete; that the post-sweep RSS climb or the earlyExit restarts are unrelated to anything — only that they are outside the sweep window and not attributed. **Deletes stay OFF.** Lane goal stays NOT MET (deletes + a 7-day flat-disk reading remain).
+
+## 2026-09-19 14:4xZ (9:4x AM CT) — CORRECTION to the 2026-09-19 01:25:24Z `#672` reading — lane nfl-prop-week-substrate (CLOSED) — **the `prior_season_fallback` "lead" is RETRACTED; it is by design**
+
+- That entry said all 1,614 week-2 rows being `nfl_prior_season_fallback` meant "no player resolved in the 2026 index". **Wrong.**
+  The same artifact's own fields separate the two: `player_id_source=current_season` on **1,509**/1,614 rows and
+  `player_team_source=current_season` on 1,545, so the 2026 play-by-play (2,940 regular plays on refresh-worker, fetched
+  2026-09-18 22:02Z) IS read. The fallback is `rate_source`: `player_rate` returns None with fewer than 2 prior games
+  (`player_stats.py:537`), and a week-2 build has only week 1. By design; current-season rates take over from week 3.
+- The goal verdict (week 2, row_count 1,614) is unaffected. The lead is deleted from `leads.md`.

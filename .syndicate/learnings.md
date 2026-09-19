@@ -7100,3 +7100,19 @@ empty, suspect buffering before suspecting the watcher.
 - A "runs N times" premise is a call count, and call counts move when callers change. Re-derive it from a profile (`ncalls`) rather than from the note.
 - Profile before theorising: logs and wall spans pointed at book-quote cache thrash (real, ~8 s per cycle), while the profiler named two leaves worth ~90% of two stages.
 - *(evidence in `.syndicate/deploys.md` 2026-09-18 19:55:27Z and 23:50Z, and `log/2026-09-18.md` evening checkpoint)*
+
+### 2026-09-19 (session 4a583d41, lane nfl-prop-week-substrate) — FORBIDDEN: naming the cause of a fallback from its summary tag when the row carries the fields that split it
+
+**What happened.** The NFL week-2 prop artifact had `sim_source=nfl_prior_season_fallback` on all 1,614 rows. I wrote
+into `deploys.md`, `state_football.md`, a lane verdict and `leads.md` that "no player resolved in the 2026 index" and
+"probably no 2026 pbp on refresh-worker". Both were wrong. The same rows carry `player_id_source` (1,509/1,614
+`current_season`), `player_team_source` (1,545 `current_season`) and `rate_source` (the one field that fell back), and
+`player_stats.player_rate` has a documented >= 2-game floor that makes every week-2 rate fall back. I had the file on disk
+and read one field of five.
+
+**How to apply.**
+- `sim_source` is a SUMMARY of several joins. Before naming which join failed, count each per-join source field the row
+  carries (`player_id_source`, `player_team_source`, `rate_source`, ...). The failing one is the cause; the others clear it.
+- Before calling a fallback a defect, read the fallback's own condition in code. "Falls back only when the current season
+  cannot answer" plus an n >= 2 floor is expected behaviour in week 2, not a missing input.
+- *(evidence: `deploys.md` 2026-09-19 14:4xZ correction; `nfl_prop_projections_2026_wk2.json` rows)*
