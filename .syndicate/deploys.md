@@ -38299,3 +38299,12 @@ Scheduled task `fotmob-alias-verify-0919-am`, read-only. The lane was already CL
 - **Refusals:** `below_min_ev_pct` 4,683, `below_min_stake` 61, `beyond_max_positions` 81, `in_play_market_fair` 25. The last is consequence (d): in-play rows whose stake rested on the sim.
 - **NOT MET, the label clause:** every position served `sizing.sim_sizing` None. The breadcrumb key was never copied into the position's `sizing` block. Fixed and tested on main `45a15e34`, NOT deployed. The plan-level `sim_sizing` counter is also not surfaced by `/api/portfolio/paper`; it lives in the plan artifact only.
 - **Owed:** plans 2-3 (watcher `gate_reading.py` running), and the next live orders' `sim_share_of_stake`.
+
+## 2026-09-19 15:31Z (10:31 CT) — READING, no deploy — refresh-worker `a2b1b466` — lane soccer-live-gameline-name-join — **MET: weekend_fixtures_unjoined_by_deployed_key=0 on Saturday's served board (17/17 in-play matched, 0 defects, 0 residuals)**
+
+- `a2b1b466` live since `008dceca` (2026-09-18 23:54:45Z); now in refresh-worker `ef5ab75b` (live 2026-09-19 15:08:29Z), which also contains `a67eb26c` and `f80120f3` (Koln table entry).
+- Expectation `weekend_fixtures_unjoined_by_deployed_key=0`: **MET** on the reading. Served soccer book grid generated 15:27:39Z, 17 in-play matches: 16 JOINED, 1 STALE (Strasbourg @ Paris FC, keys equal, all 4 quotes past the ceiling), 0 DEFECT, 0 RESIDUAL. Share 17/17 = 1.000.
+- Earlier today (~09:50 CT early read, 20 in play at 14:49Z): 18 JOINED, 1 STALE, 1 RESIDUAL (board "1. FC Koln" @ "Hamburger SV" vs live "FC Cologne" @ "Hamburg SV"), 19/20 = 0.95. That residual is covered by `f80120f3`, live since 15:08:29Z but NOT yet read on a match (Koln not in play at 15:27Z).
+- Builds since 11:00Z: 88 with matches in play, `index` up to 20, last `index=17 full_games=16`.
+- verify: owed only for the Koln entry: Koln's next match JOINED on the served grid.
+
