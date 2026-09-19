@@ -1447,6 +1447,33 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
                 # Falling back to one date restores exactly the old behaviour,
                 # which is a degraded read rather than a broken one.
                 soccer_window = [selected_date]
+            # AND THE DAY BEFORE, because this `selected_date` is a UTC shard date
+            # and the sim files a fixture under its LOCAL date. An MLS kickoff at
+            # 7:30pm Central is 00:30Z the next day, so its rows sit in the NEXT
+            # day's grid while its projections sit in `recommendations_<local
+            # date>.json`, one date before this window starts. Measured
+            # 2026-09-19: the UTC-09-20 grid read 09-20..09-26, reported
+            # `unmatched_by_league: {"mls": 3730}`, and all nine MLS fixtures
+            # kicking off after 00:00Z went unprojected. Every one was in the
+            # 09-19 file, and it happens every night.
+            #
+            # The mirror image of `layer1_board.artifact_read_dates`, which fixed
+            # the QUOTE side of the same mismatch by reading date+1. It widens
+            # the read set only: a projection still attaches only to a row in
+            # this grid that matches the fixture. The previous day goes FIRST, so
+            # the anchor's own file (a plain write, loaded later) wins any
+            # fixture both files carry.
+            try:
+                from datetime import date as _date
+                from datetime import timedelta as _timedelta
+
+                previous_day = (
+                    _date.fromisoformat(str(selected_date).strip()) - _timedelta(days=1)
+                ).isoformat()
+                if previous_day not in soccer_window:
+                    soccer_window = [previous_day, *soccer_window]
+            except ValueError:
+                pass
             index = load_soccer_projections(roots, selected_date, window_dates=soccer_window)
             if not index.matches:
                 return {
