@@ -81,6 +81,23 @@ check('a date with no written_at is skipped',
   boardDateFreshnessParts({ state_meta: { dates: { [centralToday]: {}, [tomorrow]: { written_at: 'T2' } } } }),
   [`${weekday(tomorrow)} as of T2`]);
 
+// BOTH STAMPS WHEN THEY DIFFER (lane `live-inplay-board-cadence`, 2026-09-19).
+// Production that day: plays rewritten 11:05 CDT, full build still 10:49 (a
+// restart discarded the build that would have moved it), and the chip said only
+// "as of 10:49". The plays' stamp now leads; the full build stays beside it.
+const twoSources = {
+  dates: {
+    [centralToday]: { written_at: 'T-full', sources: { state: 'T-full', layer2_shortlist: 'T-plays' } },
+    [tomorrow]: { written_at: 'T-tom', sources: { state: 'T-tom', layer2_shortlist: 'T-tom' } },
+  },
+};
+check('differing sources show the plays stamp first and the full board beside it',
+  boardDateFreshnessParts({ state_meta: twoSources }),
+  ['Today: plays as of T-plays · full board T-full', `${weekday(tomorrow)} as of T-tom`]);
+check('a single source keeps the old form',
+  boardDateFreshnessParts({ state_meta: { dates: { [centralToday]: { written_at: 'T1', sources: { layer2_shortlist: 'T1' } } } } }),
+  ['Today as of T1']);
+
 // The chip itself: per-date parts replace the single oldest stamp.
 renderFreshnessChip({ execution_source: 'worker', state_last_updated: 'T-tomorrow', candidate_count: 12, state_meta: meta });
 check('chip text', chip.textContent, `Worker-refreshed · Today as of T-today · ${weekday(tomorrow)} as of T-tomorrow · 12 candidates`);

@@ -3746,6 +3746,19 @@
         const parsed = new Date(`${key}T12:00:00`);
         if (!Number.isNaN(parsed.getTime())) label = new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(parsed);
       }
+      // BOTH STAMPS WHEN THEY DIFFER (lane `live-inplay-board-cadence`, user
+      // 2026-09-19 "Honest freshness stamp"). `written_at` is the OLDER of the
+      // two sources, correctly, since the board shows rows from both. But
+      // printed alone it said "as of 10:49" while the plays had been rewritten
+      // at 11:05, because a restart had discarded the full build that would
+      // have moved it. The plays' own stamp is the one a live bettor acts on,
+      // so it leads, and the older full build stays visible beside it.
+      const sources = dates[key].sources && typeof dates[key].sources === "object" ? dates[key].sources : {};
+      const plays = formatTimestamp(sources.layer2_shortlist);
+      const full = formatTimestamp(sources.state);
+      if (plays && full && sources.layer2_shortlist !== sources.state) {
+        return `${label}: plays as of ${plays} · full board ${full}`;
+      }
       return `${label} as of ${stamp}`;
     }).filter(Boolean);
   }
