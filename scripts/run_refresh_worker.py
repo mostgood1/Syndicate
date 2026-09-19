@@ -1543,7 +1543,7 @@ def _wnba_postgame_target_dates(lookback_days: int = 30) -> list[str]:
     one, and because the backlog is drained one per tick.
 
     30 days, not the original 21 (`#675`): the dated box scores lost to keyvalue
-    run from 2026-08-25, which is 26 days before the fix reached production.
+    run from 2026-08-26 (web has 08-25), 24-25 days before the fix reaches production.
     """
     from syndicate.features.shared.timezone import central_today
 
@@ -1575,7 +1575,7 @@ def _run_wnba_postgame_producer_tick() -> dict[str, Any] | None:
 
     # `#675` BACKFILL. A date is also outstanding when it is DONE with recon `ok`
     # (so it had finished games) and its box score has never been PUBLISHED from
-    # here. Every slate from 2026-08-25 was "done" while its box score lived only
+    # here. Every slate from 2026-08-26 was "done" while its box score lived only
     # in keyvalue, expiring after ten days; the marker in `refresh_state_store`
     # moves new writes to disk, and this puts the lost dates on web. Capped per
     # date, so a slate ESPN will not serve cannot pin the producer on one date.

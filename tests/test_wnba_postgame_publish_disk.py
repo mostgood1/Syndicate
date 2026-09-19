@@ -4,7 +4,7 @@ Measured 2026-09-19 on refresh-worker: the hourly producer built every slate
 (`WROTE date=2026-09-18 games=3 rows=59`) and published NONE of it. Its own result
 read `keyvalue_backed_not_a_file` for all four files: the three recon CSVs (real files,
 refused by the publish block's ordering) and the box score (written into keyvalue, never
-to disk). Web's newest dated box score stayed `boxscores_2026-08-24.csv`.
+to disk). Web's newest dated box score stayed `boxscores_2026-08-25.csv`.
 
 Every test here fails on the pre-change code.
 """
@@ -181,9 +181,9 @@ def test_a_date_espn_will_not_serve_is_given_up_after_three_attempts(state, tmp_
 
 
 def test_the_lookback_reaches_the_first_lost_date():
-    """2026-08-25 was the first slate lost; the fix reached production on 2026-09-19/20."""
+    """2026-08-26 was the first slate lost (web has 08-25); the fix reached production on 2026-09-19/20."""
     from datetime import date, timedelta
 
     with patch("syndicate.features.shared.timezone.central_today", return_value=date(2026, 9, 20)):
         dates = worker._wnba_postgame_target_dates()
-    assert "2026-08-25" in dates and dates[0] == (date(2026, 9, 20) - timedelta(days=1)).isoformat()
+    assert "2026-08-26" in dates and dates[0] == (date(2026, 9, 20) - timedelta(days=1)).isoformat()

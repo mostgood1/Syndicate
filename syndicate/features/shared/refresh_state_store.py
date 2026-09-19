@@ -235,7 +235,7 @@ _KEYVALUE_EXCLUDED_PATH_MARKERS = (
     # every slate since the backend reached this path went to Redis with the
     # 10-day date TTL above and NEVER to disk. The producer could not publish
     # it (its own result read `keyvalue_backed_not_a_file`), web's newest dated
-    # box score stayed `boxscores_2026-08-24.csv` while games were played
+    # box score stayed `boxscores_2026-08-25.csv` while games were played
     # daily, and anything older than ten days was simply gone.
     #
     # A marker, not a writer change, because the settler READS the same file
