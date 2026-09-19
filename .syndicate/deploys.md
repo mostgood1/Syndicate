@@ -38161,3 +38161,17 @@ Closes the owed items of the 2026-09-18 14:27:33Z entry. Read from web's served 
   `player_stats.resolve_player_id_with_prior` (`player_stats.py:285`) that means no player resolved in the 2026 index,
   so the week-2 build uses 2025 rates and none of week 1's games. That is correct for week 1 and should not hold for
   week 2.
+
+## 2026-09-19 05:16:35Z (12:16 AM CT) — READING (1 of 2) for `#674` (`0bbdbcf2`, live on refresh-worker via `c03351aa` 2026-09-19 00:45:38Z) — lane nhl-player-game-log — **reading 1 MET; reading 2 (2026-27 game rows) owed after the 09-19 preseason games**
+
+- **The first NHL refresh on the new code rewrote and published the log.** Web's
+  `nhl_source/source_artifacts/data/raw/player_game_stats.csv` mtime went 2026-06-19T02:03:55Z → **2026-09-19T05:16:35Z**,
+  the same minute as that run's `predictions_2026-09-20.csv` / `props_recommendations_2026-09-20.csv` / `lineups_2026-09-20.csv`
+  (first NHL September outputs on web; the next run wrote the 09-19 files at 11:29Z).
+- **Predicted vs read (14:34Z):** rows 1,640 → **1,640**; blank skater `shots` 411 → **0**; blank goalie `shotsAgainst` 75 → **0**;
+  2026-27 games 0 → 0 (none played yet). **Integrity, row by row against the 2026-09-18 copy:** same 1,640 (gamePk, player_id,
+  role) keys, and exactly 486 changed cells, all `'' → '0'` in those two columns. Bytes 202,067 → 199,271 are line endings
+  (CRLF → LF) and CSV formatting, not rows.
+- **Reading 2, still owed:** the 7 preseason games of 2026-09-19 (first faceoff ~23:00Z) finishing, then the next NHL
+  refresh (the runs so far were 05:16Z and 11:29Z) adding `2026010xxx` rows, and an NHL prop Ask's recent-form newest game
+  dated 09-19 or later. Read it on WEB's file; the runner's stdout does not reach Render's logs (lane note, 2026-09-19 03:5xZ).
