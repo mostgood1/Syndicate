@@ -1425,6 +1425,14 @@ death, never life — do not invert it.
     - The new `sim_sizing` counter shows the gated count ≈ rows with `model_edge_pct`.
     - Paper plans still commit positions.
   - (3) Live: the next live orders carry `sim_share_of_stake` 0.
+- **STATUS 2026-09-19 ~15:25Z — LIVE `ef5ab75b` since 15:08:29Z. GOAL: NOT MET.** Goal, verbatim: "no simulation sizes a stake, vetoes a price-shopping bet or orders the position cut unless its market is MEASURED as beating the market (`model_skill.status == measured` and `verdict_class == beats_market`). Every other sim edge stays on the board, shown and ranked, while the money follows price alone."
+  - The stake half is MET on plan 1 of 3: `sim_share_of_staked` 0.0 (baseline 0.2458). All 35 sim-edge positions are sized `market_fair`, out of 2,095 sim-edge rows in (`deploys.md` 15:17:26Z).
+  - Left:
+    - Plans 2-3.
+    - Live orders' `sim_share_of_stake`.
+    - The `sizing.sim_sizing` label: it was None on all 89 positions because the breadcrumb key was not copied. The fix `45a15e34` is on main, not deployed.
+  - `8462481f` (on main, not deployed): the daily scorecard's validated skill pockets admit sim sizing, the self-updating half of the gate. It is inert until a pocket validates; the overlay's 4 buckets are all losses.
+  - Both ride the next refresh-worker main-tip deploy.
 - **STATUS 2026-09-19 ~15:10Z — CODE ON MAIN `ef5ab75b`, DEPLOY FIRED 15:02:35Z (`dep-dana82rtqb8s73b6ofpg`). GOAL: NOT MET** until reading (2).
   - Verification (1) MET: `tests/test_portfolio_sim_skill_gate.py` has 18 tests. Every change it asserts is also shown reverting under `legacy`.
   - The 79 pre-existing failures under the gate ALL pass under `legacy` (303/303), so they were the intended change and nothing else. Those 13 modules, plus 2 execution modules, now pin `legacy`.
