@@ -1414,6 +1414,10 @@ death, never life — do not invert it.
     - `reconcile_prediction_results_for_date` returns the same payload and ledger results as the old code on the same inputs, including which of two conflicting result files wins.
   - (2) Production, on the first autorun after a refresh-worker deploy carrying it: the `RECONCILE_DATE_TIMING` total_s summed over the run <= 300 s; `RECONCILIATION_AUTORUN_RUNNING` followed by a stamp (the next `GATED` line's age) within 5 min; resolved counts > 0 on dates with results, as before.
   - Rides the next refresh-worker main-tip deploy. It does not need one of its own.
+- **STATUS 2026-09-19 ~02:45Z — CODE ON MAIN `9df3f4bc`, NOT DEPLOYED. GOAL: NOT MET** until a refresh-worker deploy carries it and the first autorun after that is read (the next one is due ~21:27Z 09-19 by the stamp, sooner only if a run fails).
+  - Verification (1) MET: `tests/test_reconciliation_disk_walks.py` has 10 tests plus 1 skipped (symlinks on Windows). Against HEAD's module, 6 fail (the change tests) and 4 pass (the equivalence tests, which the old code IS the reference for).
+  - 104 passed / 1 skipped across the 10 reconciliation suites, plus 3/3 `test_refresh_worker -k reconcil`.
+  - Local timing on a 5,550-directory tree: 13.4 s → 0.82 s per date.
 
 ### wnba-sim-distributions — OPEN — opened 2026-09-18 — session a1e40980-cceb-493f-adf9-5a5ca879acf6
 - Goal: give Layer 2 a WNBA sim probability for every line the sim can honestly answer, from distributions the WNBA smart sim already draws but never publishes.
@@ -1438,6 +1442,10 @@ death, never life — do not invert it.
   - Deploys: live-odds-worker `7c5a1dad` live 23:00:55Z; refresh-worker `008dcecab` live 23:54:45Z (`deploys.md`).
   - WNBA sims publish once a day, ~05:00Z for that date's slate, so the first `score.dist` is expected ~05:00Z 09-19. Watcher: `wnba_midnight_reading.py` in scratchpad a1e40980.
   - Before-reading: 09-18 28/221 edges and 154 alt-line reasons; 09-19 15/437 and 301.
+  - **CAVEAT, 2026-09-19 ~02:45Z: coverage is not value.** The calibration backtest (`leads.md` WNBA entry, item 5) shows the served single-prop ladder P(over) has NO signal beyond the line over 25 dates (log-loss 0.858 vs market 0.682; the fitted weight on the model is ~0).
+    - The new combo ladders come from the same draws, so they very likely inherit that.
+    - The game-level distributions (`score.dist`) are UNTESTED.
+    - So reading (2) meeting its coverage numbers would NOT show the new edges are worth ranking. Before this lane can close MET, the game-level histograms need the same market-relative backtest, and the prop edges need a user decision: withhold, or calibrate to ~market.
 - **STATUS 2026-09-18 ~22:35Z — CODE ON MAIN, NOT DEPLOYED. GOAL: NOT MET** (needs a live-odds-worker deploy for the producer and a refresh-worker deploy for the join, both user decisions; then the next WNBA props refresh; then reading (2)).
   - **Producer:** `basketball_props_smart_sim._recording_sim_draws_local` wraps the already-swapped per-draw helper. `_attach_sim_distributions_local` adds `score.dist` (total and margin histograms for full [with OT], regulation, h1, h2, q1-q4) and the `pr`/`pa`/`ra` ladders from the same draws, via the vendor module's own `build_exact_ladder_payload`. `refresh_wnba_oddsapi_props` carries `score.dist` into `cards_sim_detail` as `sim.score_dist`.
   - **Join:** `wnba_game_projections` prices any full-game spread or total line off `full`, period spreads and totals off their own segment, and period h2h as P(home | no tie) with the edge withheld. It uses MLB's `_dist_prob_over` / `_dist_prob_below`: pushes excluded, certainty refused with a reason. A game without a histogram keeps today's behaviour exactly.
