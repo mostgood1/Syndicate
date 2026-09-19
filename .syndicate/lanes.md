@@ -1723,6 +1723,10 @@ death, never life — do not invert it.
     - Runner `deploy_mls.py` (scratchpad, background) now waits for a `BOARD_BUILD_TIMING` after 16:30Z whose newest preceding `BUILD_SPAN_ENTER` is `date=2026-09-19`, i.e. TODAY's board just landed. It then acquires the claim, re-reads the baseline and preflights, firing only if CLEAR within 5 tries at 30 s. Otherwise it releases and does not deploy.
     - It gives up WITHOUT firing at 17:50Z. The claim token goes to `deploy_mls.token`.
     - Not the drain (it pauses builds during live NCAAF). The peer's profiler env vars stay as they are, and it owns turning them off.
+    - **HELD 16:39Z for a peer env write** (session a1e40980's request, agreed). It will PUT `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS` 1200→3600 and both profilers `all`→`off` to ride this deploy (one restart, not two).
+      - Before-values read at 16:40:15Z: `1200` / `all` / `all`.
+      - The runner fires nothing while `deploy_mls.hold` exists in this session's scratchpad. It also refuses a 09-19 completion older than 240 s.
+      - Clear the hold after the peer's "written" and a read-back showing `3600` / `off` / `off`.
   - Then the production reading: watcher `watch_mls.py` (scratchpad) waits for go-live, then reads the UTC-09-20 grid and the 9 evening fixtures every 3 min, for up to 3 h.
   - Owed after firing: the `deploys.md` entry (draft `deploys_mls.md` in scratchpad) and `deploy_claim.py release --service refresh-worker --token <deploy_mls.token>`.
 - Files:
