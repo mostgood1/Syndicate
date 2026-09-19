@@ -1643,7 +1643,15 @@ death, never life — do not invert it.
   - Close when web lists every dated `boxscores_2026-*.csv` from 08-26 to yesterday.
     - A missing date is legitimate only if it had no games (recon `no_final`).
     - The closing reading is SCHEDULED as task `wnba-675-backfill-reading-0920`, firing 2026-09-20 19:30Z / 14:30 CDT. It reads web's listing, explains each missing date from refresh-worker's `WNBA_POSTGAME_PRODUCER` lines, and closes the lane or records what is left.
-    - The drain estimate: 09-16 at ~18:57Z 09-19, then one per hour to 08-26, plus the 09-19 slate after midnight CT, so done ~17:00Z 09-20 with no failures.
+    - **The drain estimate is CORRECTED (19:06Z): the backlog is small.**
+      - The first post-restart tick (19:00:55Z) took **08-30**, not 09-16.
+      - Web's `/wnba/api/cards` shows 0 games for 09-03..09-16 (each request falls back to an earlier empty date), and 08-31 falls back to 08-30. So there was a ~2-week no-game break, and those dates are rightly skipped (done `no_final`, BELIEVED; the closing reading verifies from recon status).
+      - Left: 08-30 (retry) → 08-26, then 08-25..08-21 re-published (web already has them), plus the 09-19 slate after midnight CT. That is ~10 ticks, done ~05:00Z 09-20 if nothing collides.
+    - **RISK, measured today: a publish failure costs one of a date's 3 attempts, and web restarts keep causing them.**
+      - 2 of the 5 ticks so far landed in a web deploy's switchover. 09-17 at 16:56:01Z hit `4043e136`. 08-30 at 19:00:55Z hit `bdc45c11` (live 18:58:36Z, then `server_failed` health checks at 19:02:08Z and 19:04:21Z): `Connection refused` / `Name or service not known` on every worker→web publish 18:57-19:03Z.
+      - A date whose 3 attempts all collide is dropped from the backfill.
+      - Fix if the closing reading finds one: count an attempt only when the BUILD fails, never a publish failure, with a separate bound so a permanently refused path cannot starve older dates.
+      - Not done now: it needs a refresh-worker deploy, and three were fought over today.
 - Files:
   - `syndicate/features/shared/refresh_state_store.py` (the `_KEYVALUE_EXCLUDED_PATH_MARKERS` tuple ONLY: one marker for dated WNBA box scores)
   - `scripts/run_refresh_worker.py` (`_wnba_postgame_target_dates` and `_run_wnba_postgame_producer_tick` ONLY)
