@@ -38351,3 +38351,15 @@ Scheduled task `fotmob-alias-verify-0919-am`, read-only. The lane was already CL
   - Owed: re-ask after each backlog tick. Watcher `watch675b.py` re-asks after every published tick, for up to 3 h.
 - **Owed:** the backlog draining (09-17 next, ~1/hour, newest first, to 08-26), and the four Asks losing the STALE row once their last game's box score is on web.
 
+## 2026-09-19 16:04:54Z (11:04 CT) — DEPLOY (env re-inject, same commit) — refresh-worker `7301fe67` (`dep-danb59jbc2fs73dq20d0`) — lane board-build-stage-slowdown — verify: PENDING
+
+- **Why.** USER 2026-09-19 ~10:30 CDT, "proceed": profile Layer 2 and the overview for 1-2 builds, then off.
+- **What.** Single-key PUTs at 15:44:02Z, read back `all`:
+  - `SYNDICATE_LAYER2_SHORTLIST_PROFILE` was absent and is now `all`.
+  - `SYNDICATE_CONSUME_SPORT_PROFILE` was `off` and is now `all`.
+  - `SYNDICATE_SPORT_OVERVIEW_PROFILE` was left `off`: its hook fires only on hydrated passes, which the board build does not run.
+  - Zero code delta: `--reinject-env` on the SHA refresh-worker already runs (lane `wnba-postgame-to-disk`'s `7301fe67`, live 15:39:17Z).
+- **Locks.** Claim `board-build-stage-slowdown`, taken 15:43Z after the peer's claim freed; the env was written only after their deploy was out. Preflight TOO_SOON until 16:04:19Z, then HOLD (3 jobs), then CLEAR 16:04:53Z.
+- **Baseline** (15:44:11Z, re-read 16:00:25Z): `[profiler] layer2_shortlist` lines 0, `[profiler] consume_sport` lines 0 over the preceding 3 h. Span medians 11:00-15:25Z: L2 65.4 s (n=24), overview 41.3 s (n=27).
+- **Expectation.** Each build after go-live prints >= 1 `layer2_shortlist` and >= 1 `consume_sport` profile. L2 and the overview run 1.3-2x slower while profiled.
+- **verify:** profiler lines for 2 builds (collector `collect_profiles2.py` -> `profiles2_raw.jsonl`, scratchpad a1e40980). **Then PUT both keys `off` and deploy**: this is not a standing config.
