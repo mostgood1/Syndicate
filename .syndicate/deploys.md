@@ -38429,3 +38429,25 @@ Scheduled task `fotmob-alias-verify-0919-am`, read-only. The lane was already CL
   - Ranked-output equality cached vs uncached is not re-measured in production; it rests on the lane's test.
   - The cause of the 8 `earlyExit` restarts is not attributed. Each one costs a ~50-85 s cold ranker build, which is the restart-frequency cost the user may want to weigh.
   - The per-uptime memory comparison against the baseline is not made (UNREAD).
+
+## 2026-09-19 17:17:43Z (12:17 CT) — DEPLOY — web `4043e136` -> `c55644af` (`dep-danc7dugekts738gcqjg`, origin/main) — lane live-inplay-board-cadence — **LIVE 17:20:58Z; verify: OWED (inert until refresh-worker writes overlay files)**
+
+- **Why.** USER 2026-09-19: "we need live interval odds for all sports to reach the board faster" and, for the overlay, "Build it, deploy ASAP". The board's in-play cards came from a Layer 2 shortlist rewritten roughly every 12-35 min, while the book grid rebuilds every ~2-3 min.
+- **What.** Web half of the in-play overlay: `pipeline/intelligence_state._merge_inplay_overlay`, called per date inside `_layer2_fallback_recommendations`. It merges `book_grid_inplay_<date>.json` cards at serve time: same identity replaces, new identity adds. Files older than 360 s are skipped. Kill switch `SYNDICATE_INPLAY_OVERLAY=off`.
+- **Display only.** The only callers of `read_combined_intelligence_response` are web routes (`blueprints/intelligence.py`, `ask_the_syndicate.py`). `portfolio_commit` does not read it, so no overlay card can reach an order.
+- **Locks.** Claim `live-inplay-board-cadence`. Preflight CLEAR at 17:17:42Z; the claim was released at 17:21:49Z after live.
+- **Baseline.** Overlay cards on the served board: 0 (no overlay file exists).
+- **verify:** web `INPLAY_OVERLAY_MERGED` lines plus `source=layer2_inplay_overlay` cards on `/api/intelligence/query`, after refresh-worker runs `c55644af`.
+
+## 2026-09-19 18:20Z (13:20 CT) — READING, no deploy — live-odds-worker `7c5a1dad` env (live 17:18:33Z) — lane live-inplay-board-cadence — **verify: MET on capture for NCAAF + soccer (every interval arrives, h1 survived); NFL UNMEASURED (no games until 09-20); pricing is the next limit**
+
+- **(1) Every interval is captured.** Production grid, per-market reads (`/api/board/book-grid?market=`), NCAAF grid 18:09:55Z. In-play game rows by segment: full 208, h1 93, q1 25, q2 66, q3 95, q4 74, h2 82. Soccer grid 18:07:16Z: in-play h1 8, h2 4. WNBA (not changed by this env) 18:11:44Z: every segment present.
+- **(2) h1 survived.** The served NCAAF grid's h1 rows went 114 -> 145. No per-event request failed wholesale, so REVERT was NOT needed.
+- **(3) Instrument limitation, named.** `segment_capture_reading.py` read the grid WITHOUT a market filter. That returns a capped 663-row subset, which showed only full/h1/q1 (q1 70 -> 91 from the 17:27:41Z build on). Its "no q2-q4/h2" was the capped read, not capture. Per-market reads found 2,065-2,110 rows.
+- **(4) Freshness is better, not solved.** After go-live, the newest in-play NCAAF quote at grid build was <=300 s in 6 of 12 reads (80, 221, 368, 290, 442, 198, 377, 544, 832, 300, 300, 508 s). At 18:09:55Z, 390 of 643 in-play rows (61%) were seen within 300 s. Whether the NCAAF lines loop actually runs every 150 s is NOT measured.
+- **(5) The next limit is pricing, not capture.** refresh-worker `LIVE_GAMELINE_JOIN sport=ncaaf` at 18:08:19Z: considered 612, **priceable 3**, withheld 609. Of those, 409 are `segment_is_not_full_game` (correct on principle: the live re-sim publishes full-game distributions only), 132 are `live_resim_published_no_distribution_for_this_market`, and 62 are `quote_older_than_live_pricing_ceiling`. The sim prices no in-play interval.
+- **(6) The consensus path does price them.** Overlay dry run over the same production grid (`overlay_dryrun_live.py`, scratchpad a1e40980), cards `build_inplay_overlay` would write:
+  - NCAAF 18:09:55Z: **90** = full 52, q3 15, q4 12, h1 4, q2 3, h2 3, q1 1.
+  - Soccer: 2. WNBA: 6 (all full). MLB: 0 (0 in-play rows within 300 s).
+  - Every card carries `gate.fair_method=consensus`, `sim_view=none`, `model_edge_pct=null`: best book against the no-vig consensus of the other books. No sim picks a side.
+- **NOT claimed.** That in-play consensus edges are real. A stale book reads as value in-play. That question belongs to the nightly skill scoreboard, per segment, before any in-play interval moves money.
