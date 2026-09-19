@@ -1669,10 +1669,10 @@ death, never life — do not invert it.
 - Verification: after a refresh-worker deploy, the first `NCAAF_LIVE_RESIM` line reads `"sp_ratings_source": "inseason_blend_wk3"` and `"sp_ratings_teams": 138` (baseline: SP+ `durable_mirror`/`loader`, 138); during Saturday 09-19 play, `live_resimmed` > 0 on that basis.
 - Blocked by: none.
 
-### wnba-postgame-to-disk — OPEN — opened 2026-09-19 — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **`#675`; LANDED `0465103e`, NOT DEPLOYED**
+### wnba-postgame-to-disk — OPEN — opened 2026-09-19 — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **`#675`; LIVE on refresh-worker `7301fe67` since 15:39:17Z; readings owed**
 
 - Goal: [user 2026-09-19: "proceed next" on `#675`] a WNBA slate date's box scores appear on WEB within a day of the game (`wnba_source/data/processed/boxscores_<date>.csv`), its three recon files reach web too, the dates missing since 2026-08-25 are backfilled, and a WNBA board-row prop Ask's recent-form table stops printing its STALE row.
-- **GOAL: NOT MET, as of 2026-09-19 ~15:17Z (10:17 CT).** The code is on `origin/main` (`0465103e`) and is not deployed. What is left: a refresh-worker deploy the user approves, then the production readings under Falsification.
+- **GOAL: NOT MET, as of 2026-09-19 ~15:45Z (10:45 CT).** Deployed on the user's "Deploy now": refresh-worker `ef5ab75b` -> `7301fe67` (`dep-danammh42hec73drs0ig`), fired 15:33:46Z, live 15:39:17Z (`deploys.md` entry). What is left: the production readings under Falsification. The first producer tick on the new code is due within ~1 h of go-live.
 - Files:
   - `syndicate/features/shared/refresh_state_store.py` (the `_KEYVALUE_EXCLUDED_PATH_MARKERS` tuple ONLY: one marker for dated WNBA box scores)
   - `scripts/run_refresh_worker.py` (`_wnba_postgame_target_dates` and `_run_wnba_postgame_producer_tick` ONLY)

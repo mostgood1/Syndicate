@@ -38308,3 +38308,26 @@ Scheduled task `fotmob-alias-verify-0919-am`, read-only. The lane was already CL
 - Builds since 11:00Z: 88 with matches in play, `index` up to 20, last `index=17 full_games=16`.
 - verify: owed only for the Koln entry: Koln's next match JOINED on the served grid.
 
+## 2026-09-19 15:33:46Z (10:33 CT) — DEPLOY — refresh-worker `ef5ab75b` -> `7301fe67` (`dep-danammh42hec73drs0ig`, origin/main, LIVE 15:39:17Z / 10:39 CT) — lane wnba-postgame-to-disk — verify: PENDING
+
+- **Why.** USER 2026-09-19: "proceed next" on `#675`, then "Deploy now" when asked when to deploy (options: after the sim-sizing lane's plans 2-3 / now / hold).
+- **What.** `0465103e` + `f6972a2b` (comments only). WNBA's hourly post-game producer now publishes its output to web.
+  - (D1) The publish step now checks `path.is_file()` BEFORE `_keyvalue_backed(path)`. So the three recon CSVs, real files that `build_wnba_recon` writes to disk, are no longer refused as `keyvalue_backed_not_a_file`.
+  - (D2) The marker `wnba_source/data/processed/boxscores_20` in `_KEYVALUE_EXCLUDED_PATH_MARKERS` sends dated box scores to disk, not into Redis (10-day TTL). It moves the writer, the settler's reader (`bet_status_wnba._final_csv_rows`) and the settlement-side producer (`intelligence_state._refresh_wnba_boxscores`) together.
+  - BACKFILL: a date that is done with recon `ok` and whose box score was never published from here is rebuilt and published, one per tick, newest first, at most 3 attempts per date. The lookback is 30 days.
+  - Off switch: `SYNDICATE_WNBA_POSTGAME_PRODUCER=off` (absent means on).
+- **Rides along:** `8462481f` + `45a15e34` (`portfolio_commit.py`, lane `sim-sizing-skill-gate`). Its status says both "ride the next refresh-worker main-tip deploy". Its plans 2-3 of `ef5ab75b` were still owed at fire time; the user chose not to wait. No `render.yaml` in the range.
+- **Web needs no deploy.** No web route calls the WNBA resolver. `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` was read live at 15:10:34Z (single-key reads): `true` on refresh-worker, `false` on web and live-odds-worker. `SYNDICATE_REFRESH_STATE_BACKEND` is `keyvalue` on all three. Web's readers of the published files read disk.
+- **Locks.** Claim `wnba-postgame-to-disk` (acquired 15:30:43Z). Preflight returned TOO_SOON ×4 (25-min spacing after `dep-dana82rtqb8s73b6ofpg`), then CLEAR at 15:33:45Z ("only infrastructure processes running") for `7301fe672e06`.
+- **Web was deployed by another session in the same window** (`08a537c5`, created 15:34:47Z, live 15:38:01Z). Web's export returned 502 from 15:36:40Z to at least 15:41:32Z, while `/healthz` read 200 at 15:38:40Z. Not this deploy.
+- **Baseline** (read 15:33:40Z, web `/api/ops/artifacts/export?names_only=1`):
+  - web lists 108 dated `boxscores_2026-*.csv`, newest `boxscores_2026-08-25.csv`;
+  - 0 `recon_{games,props,quarters}_2026-09-*.csv`;
+  - the producer's last printed tick (05:44:59Z) read `keyvalue_backed_not_a_file` for all four files of 2026-09-18.
+- **Expectation.**
+  - Within ~1 h of go-live, one `[refresh_worker] WNBA_POSTGAME_PRODUCER` line: `date` 2026-09-18, `box_rebuild` true, and `published` `true` for `boxscores_2026-09-18.csv` and the three recon files.
+  - Web then lists `boxscores_2026-09-18.csv` and three September recon files.
+  - After that, one date per hour, newest first (09-17 … 08-26), until the backlog is drained.
+  - The first new-date tick (09-19, after midnight CT) publishes with `box_rebuild` false.
+  - Transient: the settler cannot read slates 09-09..09-17 until each one is rebuilt onto disk.
+
