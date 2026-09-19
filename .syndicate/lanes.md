@@ -1651,6 +1651,8 @@ death, never life — do not invert it.
   - **OWED, the backfill:** 09-17 → 08-26, one per hour, newest first.
   - **OWED, the Ask STALE row:** 4 board-prop Asks (3 on PHX @ DAL, 1 on SEA @ GS) still print `STALE ... 25/27 days`. None of those players played 09-18, and today's board has 0 props for anyone who did, so this tick could not clear it.
   - Watcher `watch675b.py` (scratchpad) re-asks after every published tick until ~18:57Z.
+  - Checkpoint ~16:25Z: no second tick yet. Web still lists 109 dated box scores, newest 09-18 (16:21:48Z). The 09-17 tick is due ~16:55Z.
+  - The approved refresh-worker deploy for lane `mls-board-evening-gaps` (~16:45Z) restarts the worker. The producer's interval gate lives in keyvalue and survives it.
 - Files:
   - `syndicate/features/shared/refresh_state_store.py` (the `_KEYVALUE_EXCLUDED_PATH_MARKERS` tuple ONLY: one marker for dated WNBA box scores)
   - `scripts/run_refresh_worker.py` (`_wnba_postgame_target_dates` and `_run_wnba_postgame_producer_tick` ONLY)
@@ -1698,6 +1700,12 @@ death, never life — do not invert it.
 ### mls-board-evening-gaps — OPEN — opened 2026-09-19 — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **H2 fix LANDED `6419eea5`; refresh-worker deploy APPROVED for ~16:45Z (user: "Deploy ~16:45Z"), not yet fired**
 
 - Goal: [user 2026-09-19 "proceed next steps", on the MLS lead this session filed in lane `soccer-prop-conditioning`] name, each with a measurement, why (a) 5 of today's 13 MLS fixtures are absent from the soccer Layer 1 board and (b) 4 fixtures that ARE on it carry 0 projections, while web's `mls/.../recommendations_2026-09-19.json` (generated 13:44:16Z) has all 13 with props; then fix what is in scope, before the first kickoff at 23:30Z if the user approves a deploy.
+- **GOAL VERDICT (checkpoint 2026-09-19 ~16:25Z / 11:25 CT): NOT MET.** Goal (verbatim): "name, each with a measurement, why (a) 5 of today's 13 MLS fixtures are absent from the soccer Layer 1 board and (b) 4 fixtures that ARE on it carry 0 projections, while web's `mls/.../recommendations_2026-09-19.json` (generated 13:44:16Z) has all 13 with props; then fix what is in scope, before the first kickoff at 23:30Z if the user approves a deploy."
+  - (a) ANSWERED: its premise was my filter error. No fixture is absent (H1 exonerated).
+  - (b) ANSWERED and WIDER: 9 fixtures, not 4 (H2). The cause is measured and the fix `6419eea5` is on main.
+  - Left: the deploy the user approved for ~16:45Z. Runner `deploy_mls.py` (scratchpad, background) waits until 16:45Z, then acquires the claim, re-reads the baseline, preflights and fires on CLEAR. It writes the claim token to `deploy_mls.token` for the release.
+  - Then the production reading: watcher `watch_mls.py` (scratchpad) waits for go-live, then reads the UTC-09-20 grid and the 9 evening fixtures every 3 min, for up to 3 h.
+  - Owed after firing: the `deploys.md` entry (draft `deploys_mls.md` in scratchpad) and `deploy_claim.py release --service refresh-worker --token <deploy_mls.token>`.
 - Files:
   - `syndicate/features/shared/board_enrichment.py` (the soccer branch's projection-window lines in `_attach_projections_by_sport` ONLY). Checked 16:1xZ: no OPEN lane claims it; the last claim was released 2026-09-17 by the ownership sweep.
   - `tests/test_soccer_projection_previous_day.py` (NEW)

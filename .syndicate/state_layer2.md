@@ -435,7 +435,7 @@ has no book allowlist" is a **negative from a grep over one file**. Layer 1's
 list IS confirmed (`DEFAULT_BOOKS`, `templates/shared/layer1_board.html:267`,
 client-side JS). Trace the served `book` field to its writer before acting.
 
-## [layer1-board-date-scoping] THE BOARD WAS DROPPING GAMES TWO WAYS — both FIXED AND VERIFIED `[verified 2026-08-30 05:0x-05:5xZ, web+refresh-worker `d7cda903`]`
+## [layer1-board-date-scoping] THE BOARD WAS DROPPING GAMES TWO WAYS — both FIXED AND VERIFIED; a THIRD (soccer projections, late kickoffs) found 2026-09-19, fix `6419eea5` not yet verified — `[verified 2026-08-30 05:0x-05:5xZ, web+refresh-worker `d7cda903`]`
 
 1. **A 9pm Central game was invisible.** The grid artifact is keyed by **UTC**
    date; the board scopes by **CENTRAL** game date; the read set was window+today.
@@ -451,6 +451,23 @@ client-side JS). Trace the served `book` field to its writer before acting.
    `artifact_window_days` (never below the display window). **The display width
    is UNCHANGED at 7** and `#565`'s per-sport cost pruning survives — three extra
    shard checks for NCAAF, none for any other sport.
+3. **THE PROJECTION SIDE OF (1) WAS STILL OPEN FOR SOCCER** `[defect verified
+   2026-09-19 16:06-16:10Z, lane mls-board-evening-gaps; the fix `6419eea5` is
+   NOT yet verified in production]`.
+   - The grid build's soccer projection read (`board_enrichment._attach_projections_by_sport`
+     → `resolve_window_dates(..., "slate")`, forward-only) is anchored on the
+     artifact's UTC date. The sim files a fixture under its LOCAL date.
+   - The UTC-09-20 grid read `recommendations_2026-09-20..26` and reported
+     `unmatched_by_league {"mls": 3730}`.
+   - All nine MLS fixtures kicking off after 00:00Z carried 0-1 projected rows on
+     Layer 1 09-19, though every one was in `recommendations_2026-09-19.json`.
+     The four 23:30Z fixtures, in the 09-19 grid, were projected (133-185 rows).
+   - Nightly, for every late kickoff. The Ask and prop-evidence readers anchor on
+     the local date and are not affected.
+   - Also measured there, NOT this defect: the soccer 09-19 grid is `rows_total`
+     11,673, `rows_truncated` 5,673. The cap is 6000, applied after a
+     `-books_quoting, market` sort. That keeps all 5,143 multi-book rows and
+     single-book rows in MARKET-NAME order; 6,538 rows are single-book.
 
 ## [board-chip-coverage] Layer 2 compact game cards — FULL chip coverage, verified 2026-08-26
 
