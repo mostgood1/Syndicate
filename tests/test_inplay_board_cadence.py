@@ -173,3 +173,89 @@ def test_merge_is_inert_with_the_kill_switch(monkeypatch):
     off = [_card("live1")]
     assert st._merge_inplay_overlay(off, "2026-09-19") == {"replaced": 0, "added": 0}
     assert off[0]["source"] == "layer2_shortlist"
+
+
+# --- web cache expiry on a newer overlay ------------------------------------------
+
+
+def test_newest_overlay_mtime_is_the_max_over_sports_and_zero_when_none():
+    import os
+
+    assert bga.newest_inplay_overlay_mtime(["2026-09-19"]) == 0.0
+    _write_overlay("ncaaf", "2026-09-19", [], written_at="2026-09-19T17:00:00Z")
+    _write_overlay("wnba", "2026-09-19", [], written_at="2026-09-19T17:00:00Z")
+    os.utime(bga.book_grid_inplay_artifact_path("ncaaf", "2026-09-19"), (1000.0, 1000.0))
+    os.utime(bga.book_grid_inplay_artifact_path("wnba", "2026-09-19"), (2000.0, 2000.0))
+    assert bga.newest_inplay_overlay_mtime(["2026-09-19", "2026-09-20"]) == 2000.0
+
+
+@pytest.fixture()
+def combined(monkeypatch):
+    """read_combined_intelligence_response over one empty date; `builds` counts rebuilds."""
+    from pipeline import intelligence_state as st
+
+    monkeypatch.setenv("SYNDICATE_INTELLIGENCE_COMBINED_BOARD_CACHE_SECONDS", "180")
+    monkeypatch.delenv("SYNDICATE_INPLAY_OVERLAY_CACHE_EXPIRY", raising=False)
+    monkeypatch.delenv("SYNDICATE_INPLAY_OVERLAY_CACHE_MIN_AGE_SECONDS", raising=False)
+    st._COMBINED_INTELLIGENCE_RESPONSE_CACHE.clear()
+    st._COMBINED_OVERLAY_MTIME_BY_KEY.clear()
+    builds: list[str] = []
+    monkeypatch.setattr(st, "read_layer2_shortlist", lambda d: None)
+    monkeypatch.setattr(st, "_read_single_date_response_for_combining", lambda d: builds.append(d))
+    monkeypatch.setattr(st, "board_l2a_fallback_enabled", lambda: True)
+    key = (("2026-09-19",), "all", None)
+
+    def read():
+        st.read_combined_intelligence_response(dates=["2026-09-19"])
+        return len(builds)
+
+    def age_entry(seconds):
+        built_at, payload = st._COMBINED_INTELLIGENCE_RESPONSE_CACHE[key]
+        st._COMBINED_INTELLIGENCE_RESPONSE_CACHE[key] = (built_at - seconds, payload)
+
+    def land_overlay(mtime):
+        import os
+
+        _write_overlay("ncaaf", "2026-09-19", [], written_at="2026-09-19T17:00:00Z")
+        os.utime(bga.book_grid_inplay_artifact_path("ncaaf", "2026-09-19"), (mtime, mtime))
+
+    return read, age_entry, land_overlay
+
+
+def test_a_newer_overlay_expires_the_cached_board_only_past_the_floor(combined):
+    import time
+
+    read, age_entry, land_overlay = combined
+    land_overlay(time.time() - 100)
+    assert read() == 1
+    assert read() == 1  # same overlay: the TTL holds
+    land_overlay(time.time())
+    assert read() == 1  # newer overlay, but the entry is younger than the 45 s floor
+    age_entry(60)
+    assert read() == 2  # newer overlay and past the floor: rebuilt inside the 180 s TTL
+    age_entry(60)
+    assert read() == 2  # built against the newest overlay: the TTL holds again
+
+
+def test_no_newer_overlay_keeps_the_ttl(combined):
+    import time
+
+    read, age_entry, land_overlay = combined
+    land_overlay(time.time() - 100)
+    assert read() == 1
+    age_entry(120)
+    assert read() == 1
+
+
+def test_kill_switch_keeps_the_plain_ttl(combined, monkeypatch):
+    import time
+
+    read, age_entry, land_overlay = combined
+    monkeypatch.setenv("SYNDICATE_INPLAY_OVERLAY_CACHE_EXPIRY", "off")
+    land_overlay(time.time() - 100)
+    assert read() == 1
+    land_overlay(time.time())
+    age_entry(60)
+    assert read() == 1
+    monkeypatch.delenv("SYNDICATE_INPLAY_OVERLAY_CACHE_EXPIRY")
+    assert read() == 2  # off != on: the same state rebuilds with the switch removed

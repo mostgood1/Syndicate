@@ -49,7 +49,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -692,6 +692,34 @@ def inplay_overlay_max_file_age_seconds() -> int:
     """Web ignores an overlay written longer ago than this (default 360 s): a
     dead tick must degrade to the shortlist, not freeze stale prices as live."""
     return _env_seconds("SYNDICATE_INPLAY_OVERLAY_MAX_FILE_AGE_SECONDS", 360)
+
+
+def inplay_overlay_cache_expiry_enabled() -> bool:
+    """Web's combined-board cache is refused when a newer overlay landed.
+    `SYNDICATE_INPLAY_OVERLAY_CACHE_EXPIRY=off` keeps the plain TTL."""
+    raw = str(os.environ.get("SYNDICATE_INPLAY_OVERLAY_CACHE_EXPIRY") or "").strip().lower()
+    return inplay_overlay_enabled() and raw not in _INPLAY_OFF_VALUES
+
+
+def inplay_overlay_cache_min_age_seconds() -> int:
+    """A cached board younger than this is served even if an overlay landed
+    (default 45 s): one rebuild per 45 s per web worker at most."""
+    return _env_seconds("SYNDICATE_INPLAY_OVERLAY_CACHE_MIN_AGE_SECONDS", 45)
+
+
+def newest_inplay_overlay_mtime(dates: Iterable[str]) -> float:
+    """WEB-SIDE. The newest overlay file's mtime across every sport and date,
+    0.0 when there is none. One stat per (sport, date); nothing is read."""
+    newest = 0.0
+    for date_str in dates:
+        for sport in INPLAY_OVERLAY_SPORTS:
+            try:
+                mtime = book_grid_inplay_artifact_path(sport, str(date_str)).stat().st_mtime
+            except OSError:
+                continue
+            if mtime > newest:
+                newest = mtime
+    return newest
 
 
 def book_grid_inplay_artifact_path(sport: str, date_str: str) -> Path:

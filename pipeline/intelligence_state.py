@@ -9160,6 +9160,12 @@ def read_latest_intelligence_state_response(
 
 
 _COMBINED_INTELLIGENCE_RESPONSE_CACHE: dict[tuple[Any, ...], tuple[float, dict[str, Any]]] = {}
+# Lane `live-inplay-board-cadence`: the newest in-play overlay mtime each cached
+# board was built against. The overlay changes every grid tick (~2-3 min), but
+# the board above is cached for SYNDICATE_INTELLIGENCE_COMBINED_BOARD_CACHE_SECONDS
+# (180 s on web), which added up to 3 min to every in-play price. A newer overlay
+# file now refuses the cache hit, after `inplay_overlay_cache_min_age_seconds()`.
+_COMBINED_OVERLAY_MTIME_BY_KEY: dict[tuple[Any, ...], float] = {}
 # `#632`: one rebuild at a time for a given key. NOT a cache -- the store above
 # stays exactly as it is, because its bound is ROW COUNT and this cache measured
 # 37.50 MB while obeying its 32-entry cap. A generic entry-capped cache would
@@ -9227,6 +9233,37 @@ def _prune_combined_intelligence_response_cache() -> None:
             return
         oldest_key = min(cache, key=lambda key: cache[key][0])
         cache.pop(oldest_key, None)
+
+
+def _combined_board_overlay_state(
+    requested_dates: list[str],
+    cached: tuple[float, dict[str, Any]] | None,
+    cache_key: tuple[Any, ...],
+) -> tuple[float, bool]:
+    """(newest overlay mtime now, whether it expires `cached`).
+
+    Compares file mtimes with the mtime the entry was BUILT against, captured
+    before the build read any overlay, so an overlay landing mid-build still
+    expires the entry on the next request. Any failure keeps the plain TTL.
+    """
+    try:
+        from syndicate.features.shared.book_grid_artifact import (
+            inplay_overlay_cache_expiry_enabled,
+            inplay_overlay_cache_min_age_seconds,
+            newest_inplay_overlay_mtime,
+        )
+
+        if not inplay_overlay_cache_expiry_enabled():
+            return 0.0, False
+        newest = newest_inplay_overlay_mtime(requested_dates)
+        min_age = inplay_overlay_cache_min_age_seconds()
+    except Exception as exc:  # noqa: BLE001 -- a failed check must never cost the board
+        print(f"[intelligence_state] COMBINED_BOARD_OVERLAY_CHECK_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return 0.0, False
+    if cached is None:
+        return newest, False
+    expired = newest > _COMBINED_OVERLAY_MTIME_BY_KEY.get(cache_key, 0.0) and (time.time() - cached[0]) >= min_age
+    return newest, expired
 
 
 def _combined_board_response_cache_ttl_seconds() -> float:
@@ -9391,8 +9428,11 @@ def read_combined_intelligence_response(
     cache_key = (tuple(sorted(requested_dates)), str(sport or "all").strip().lower(), limit)
     ttl_seconds = _combined_board_response_cache_ttl_seconds()
     cached = _COMBINED_INTELLIGENCE_RESPONSE_CACHE.get(cache_key)
+    overlay_mtime, overlay_expired = _combined_board_overlay_state(requested_dates, cached, cache_key)
     if cached is not None and (time.time() - cached[0]) < ttl_seconds:
-        return dict(cached[1])
+        if not overlay_expired:
+            return dict(cached[1])
+        print(f"[intelligence_state] COMBINED_BOARD_OVERLAY_EXPIRED age_s={time.time() - cached[0]:.1f}", flush=True)
 
     # `#632`: the read above and the write at the bottom of this function had
     # NOTHING between them, so N concurrent misses each started their own 5-18
@@ -9837,7 +9877,10 @@ def read_combined_intelligence_response(
     sliced["board_contract"] = board_contract
 
     _COMBINED_INTELLIGENCE_RESPONSE_CACHE[cache_key] = (time.time(), sliced)
+    _COMBINED_OVERLAY_MTIME_BY_KEY[cache_key] = overlay_mtime
     _prune_combined_intelligence_response_cache()
+    for stale_key in [key for key in _COMBINED_OVERLAY_MTIME_BY_KEY if key not in _COMBINED_INTELLIGENCE_RESPONSE_CACHE]:
+        _COMBINED_OVERLAY_MTIME_BY_KEY.pop(stale_key, None)
     # `#632`: release AFTER the write, so every waiter wakes to a populated
     # cache. Unconditional on purpose -- in the rare fall-through above we may
     # not own the marker, and releasing another builder's lease early can only
