@@ -38400,3 +38400,32 @@ Scheduled task `fotmob-alias-verify-0919-am`, read-only. The lane was already CL
 - **Baseline** (17:08:28Z, `/api/board/book-grid?sport=ncaaf`, default 300 rows): game rows q1 0, h1 13.
 - **Expectation.** After the first capture runs, NCAAF grid game rows include q1-q4/h2 (> 0), and h1 is still > 0. The newest in-play NCAAF quote age at grid build falls below 300 s more often.
 - **verify:** `segment_capture_reading.py` (scratchpad a1e40980), NCAAF + soccer grids every 3 min for 45 min.
+
+## 2026-09-19 17:33:21Z (12:33 CT) — READING, no deploy — refresh-worker — lane ranking-records-build-cost — **GOAL: MET: NO-SIM ranker median 5.7 s (n=75) vs 125.2 s baseline; warm 3.0 s, cold 66.8 s**
+
+- **Window.** 2026-09-18T16:58:22Z (go-live of `e6478363` inside `983c77e9`) -> 2026-09-19T16:58:22Z, a full 24 h. The scheduled task ran late, starting 17:28Z (12:28 CDT). The 11 later refresh-worker deploys (`1c5caea6`, `ef3fb857`x3, `541acddc`, `3bd766e8`, `008dceca`, `c03351aa`, `ef5ab75b`, `7301fe67`x2) all contain `e6478363` (`git merge-base --is-ancestor`). Grader: `ranker_time_grade.py`, from scratchpad 0f5b256e.
+- **(1) Ranker time per build** (`RANKING_RECORDS_LOADED elapsed_s` + LOADED -> `ADJUSTED_SCORES_ATTACHED`), 77 loads:
+  - NO-SIM: n=75, median **5.7 s** [0.8-215.6]; load median 0.2 s, rank median 4.4 s. Baseline was 125.2 s = 44.9 + 72.3.
+  - SIM: n=2, median 172.2 s [95.8-248.5]; load median 161.9 s. Both were cold loads. Baseline was 281.7 s.
+  - UNKNOWN: 0.
+- **(2) COLD vs WARM**, by `cache=`: COLD means `parsed:15` / `reused:0`.
+  - NO-SIM COLD: n=18, median **66.8 s** [46.4-215.6]; the three near 200 s were at 17:18Z, 00:09Z and 01:00Z.
+  - NO-SIM WARM: n=57, median **3.0 s** [0.8-58.7].
+  - Restarts in the window: 19 = 11 deploys (finishedAt 18:19:56, 18:52:47, 19:24:24, 20:00:55, 20:49:04, 22:05:00, 23:54:45, 00:45:38, 15:08:29, 15:39:17, 16:10:03Z) + 8 `server_failed` (01:55, 04:02, 07:12, 08:57, 10:59, 11:51, 13:03, 14:17Z). With the go-live boot that makes 20 boots. There are 20 cold loads (18 NO-SIM + 2 SIM), so every cold load is a first-after-boot.
+- **(3) Profiler windows, stated, not dropped:**
+  - Lane board-build-stage-slowdown's profilers were live 2026-09-18 20:00:55Z -> 20:49:04Z. They were set `off` at 20:24Z, but that took effect only with the 20:49:04Z deploy.
+  - A second window opened 2026-09-19 16:10:03Z (`dep-danb59jbc2fs73dq20d0`, layer2 + consume_sport profilers) and was still open at window end.
+  - 5 NO-SIM builds fall inside them (66.6, 32.0, 84.2, 12.2, 3.3 s). The median **excluding** them is **5.0 s** (n=70; warm 2.9 s n=54, cold 65.8 s n=16). **Including** them it is 5.7 s.
+- **(4) Guards:**
+  - skip64 (`SKIP_OVERSIZED_LEDGER_CHUNK ceiling=64000000`): **0**. `chunks=15` on 77/77 loads; `excluded_by_backstop=0` on 77/77.
+  - `kept` grew from 19,627 to 29,653 over the day. Cold `bytes_parsed` grew from 3.25 to 3.62 GB.
+  - `Traceback` lines on refresh-worker in the window: **0**. That count covers every module, not only `ranking_records` / `recommendation_engine`.
+  - `RANKING_DERIVED_CACHE`: 77 lines, 715 hits and 507 misses.
+  - Peak `self_rss_mb` (`PROCESS_TREE_MEMORY`, 2,419 samples) by uptime: 0-1 h 2,314; 1-3 h **2,469**; 3-6 h 2,291. The all-window peak is 2,469, against a baseline all-window peak of 2,551. The baseline's per-uptime-bucket peaks are **UNREAD** (the baseline recorded only the overall peak).
+  - `oomKilled`: **0**. All 8 `server_failed` events carry `earlyExit: true, evicted: false`.
+- **(5) Verdict: GOAL: MET.** Full-window NO-SIM median 5.7 s <= 30 s, skip64 = 0, chunks = 15 on every load, and no oomKilled. The median holds with or without the profiler windows.
+- **Controls:** the grader's classification comes from `ALL_PROCESS_MEMORY` cmdlines (UNKNOWN 0). The cold/warm split follows the restart count exactly (20 = 20).
+- **NOT claimed:**
+  - Ranked-output equality cached vs uncached is not re-measured in production; it rests on the lane's test.
+  - The cause of the 8 `earlyExit` restarts is not attributed. Each one costs a ~50-85 s cold ranker build, which is the restart-frequency cost the user may want to weigh.
+  - The per-uptime memory comparison against the baseline is not made (UNREAD).
