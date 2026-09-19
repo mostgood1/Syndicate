@@ -1694,10 +1694,12 @@ death, never life — do not invert it.
 - Verification: offline, tests failing on the pre-change code: shared == unshared (exact equality) for projection and props; the poller simulates each match's paths once for the two consumers (call count); a window short of the half's end simulates exactly the window, one that reaches it gets stoppage. Production, after a user-approved deploy: served `goal_windows` fall to the corrected values (read by recomputing one served state), and the tick's per-match cost drops (re-profile).
 - Blocked by: none (the deploy is a user decision)
 
-### mls-board-evening-gaps — OPEN — opened 2026-09-19 — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **diagnostic; hypotheses written, no code**
+### mls-board-evening-gaps — OPEN — opened 2026-09-19 — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **H1 EXONERATED (my filter error), H2 CONFIRMED; fix in progress**
 
 - Goal: [user 2026-09-19 "proceed next steps", on the MLS lead this session filed in lane `soccer-prop-conditioning`] name, each with a measurement, why (a) 5 of today's 13 MLS fixtures are absent from the soccer Layer 1 board and (b) 4 fixtures that ARE on it carry 0 projections, while web's `mls/.../recommendations_2026-09-19.json` (generated 13:44:16Z) has all 13 with props; then fix what is in scope, before the first kickoff at 23:30Z if the user approves a deploy.
-- Files: none claimed (diagnostic). `syndicate/features/shared/book_grid_artifact.py` and the soccer projection attach are READ only until a hypothesis survives.
+- Files:
+  - `syndicate/features/shared/board_enrichment.py` (the soccer branch's projection-window lines in `_attach_projections_by_sport` ONLY). Checked 16:1xZ: no OPEN lane claims it; the last claim was released 2026-09-17 by the ownership sweep.
+  - `tests/test_soccer_projection_previous_day.py` (NEW)
 - Recon, measured 2026-09-19 16:00-16:05Z:
   - `/api/board/layer1?sport=soccer&date=2026-09-19` (built 16:01:31Z, America/Chicago date scope) lists 8 MLS games.
   - The 4 kicking off at 23:30Z (CLB@MTL, CLT@DC, LAF@SJ, ORL@NE) are fully projected: 122-174 props each, stamped `13:44:16`.
@@ -1709,7 +1711,26 @@ death, never life — do not invert it.
 - **Hypotheses (not yet tested):**
   - (H1) The 5 absent fixtures are cut by the 6000-row bound. On a Saturday with 57 soccer games, MLS markets have fewer books quoting than the European leagues, so every row of those fixtures sorts below row 6000. Falsified if any of their rows is in the served artifact, or if their `books_quoting` is not below the cut row's.
   - (H2) The 4 present evening fixtures lose projections in the soccer projection join, and the join is date-keyed so that a UTC-09-20 kickoff misses the file dated 09-19. Falsified if the join does not key by date, or if another present 00:30Z+ fixture IS projected.
-- Verification: each hypothesis confirmed or exonerated by a production read plus the code path (file:line), recorded here before any fix.
+- **RESULTS, 2026-09-19 16:06-16:10Z:**
+  - **(H1) EXONERATED; the "5 absent fixtures" was MY FILTER ERROR.**
+    - All 13 MLS fixtures ARE on the 09-19 Layer 1 board.
+    - DAL, HOU, SKC, NSH and COL carry game-level `league: None`, because each has one row with no league, beside 150-155 `mls` rows. I had filtered on the game's `league == "mls"`.
+    - Their Layer 2 rows include 3-5-book totals, and every multi-book row sorts above the cut: 5,143 multi-book rows against 6,000 kept. The cut itself is real. It keeps all multi-book rows plus 857 of 6,538 single-book rows, taken in MARKET-NAME order; that is a separate question for another lane.
+  - **(H2) CONFIRMED.** Measured on the 16:06:01Z build:
+    - All NINE MLS fixtures kicking off after 00:00Z on 09-20 carry 0-1 projected rows (the lead's "9 of 13", exactly). The 4 kicking off at 23:30Z on 09-19 are projected (133-185 rows).
+    - Their rows live in the UTC-09-20 grid artifact (`bookgrid` date 2026-09-20, built 15:55:41Z). It reads `projections.dates_read = [09-20 .. 09-26]` and reports `unmatched_by_league: {"mls": 3730}`. Its `unmatched_fixture_sample` names exactly those nine fixtures.
+    - The sim files them in `recommendations_2026-09-19.json`, under the LOCAL date. SD @ MIA, filed under 09-20, is projected in the same artifact.
+    - Code path: `board_enrichment.py` `_attach_projections_by_sport` soccer branch → `resolve_window_dates("soccer", selected_date, window="slate")` (`layer1_board.py:240`, "FORWARD ONLY, deliberately"), called with `selected_date` = the artifact's UTC date → `load_soccer_projections` reads `recommendations_<d>.json` for those dates only.
+    - This is the mirror image of `artifact_read_dates` (`layer1_board.py`), which fixed the quote side of the same UTC-vs-local mismatch by reading date+1. The Ask and prop-evidence callers anchor on the LOCAL date, so they already read 09-19 and are not affected.
+    - It recurs every day. The 09-19 artifact equally misses 09-18's evening fixtures.
+- **FIX:** the grid build's soccer projection window also reads the day BEFORE its UTC anchor, first in order so the anchor's own file wins any overlap.
+  - It widens the read set only: a projection attaches only to a row that is in the grid and matches the fixture.
+  - Cost: one more date of files per league (about 1/7 more than the current window). `oldest_sim_age_hours`, which is a metric only, will read one day older. Each row's `age_hours` comes from its own match's file.
+- Verification:
+  - Offline:
+    - the production caller's window starts at the day before (it fails on today's code);
+    - with that window, `load_soccer_projections` matches an evening fixture filed under the previous date, and without it, it does not.
+  - Production, after a refresh-worker deploy the user approves: the UTC-09-20 grid artifact's `dates_read` starts `2026-09-19`, `unmatched_by_league.mls` falls from 3,730 to near 0, and the nine evening fixtures on `/api/board/layer1?sport=soccer&date=2026-09-19` carry projections stamped `13:44:16`.
 ### closed-lane-archive-20260919-1100 — CLOSED 2026-09-19 — opened 2026-09-19 — session d8048c76-5a5e-49b2-a876-c74841de9549
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
