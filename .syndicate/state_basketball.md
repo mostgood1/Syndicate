@@ -141,14 +141,29 @@ siblings were present**, so once produced it would have sat on the worker disk
 and never reached web. Allowlisted with the producer, not after the first
 period-total reads zero.
 
-**NEITHER `build_wnba_recon.py` NOR `build_wnba_boxscores.py` IS SCHEDULED
-ANYWHERE.** That is the remaining half and it was deliberately not wired:
-periodic work on refresh-worker is what `#241` did when it caused a prod restart
-loop (~1.4GB headroom), so it needs its own decision and its own measurement.
-loop, so it needs its own decision and its own measurement. **The headroom
-figure that rule carried (~1.4GB) is STALE — see
-`[refresh-worker-headroom-2026-09-02]`; it is ~2.26GB of ANON, and the metric
-most people read says 29-99MB.**
+**BOTH ARE SCHEDULED NOW, and until `#675` NEITHER REACHED WEB** `[verified
+2026-09-19, refresh-worker Render logs + web export listing; overwrites "neither
+is scheduled anywhere"]`. refresh-worker's hourly WNBA post-game producer
+(`_run_wnba_postgame_producer_tick`, one date per tick) built every slate
+(`[wnba_boxscores] WROTE date=2026-09-18 games=3 rows=59`, 04:10:45Z and
+05:44:59Z). Its own result read `keyvalue_backed_not_a_file` for the box score
+AND all three recon files, so it published nothing. At 15:33:40Z web's newest
+dated WNBA box score was `boxscores_2026-08-25.csv`, and web listed 0 September
+recon files. There were two causes. The publish block asked `_keyvalue_backed`
+before `is_file`, which refused real recon files. And dated box scores went
+through `write_text_file` into keyvalue (10-day TTL), never onto disk.
+
+The fix is `0465103e` (lane `wnba-postgame-to-disk`). It publishes files on disk,
+excludes the dated box scores from keyvalue, and backfills slates never published
+from here. **Deployed to refresh-worker `7301fe67`, live 15:39:17Z. Web receiving
+the files is NOT yet verified.**
+
+Two things any reader of this family must know:
+
+- The settlement pass (`intelligence_state._refresh_wnba_boxscores`, refresh-worker
+  only) writes the same box-score file and does NOT publish it. On the new code it
+  wrote 09-18 and 09-17 at 15:49:30Z / 15:49:36Z.
+- Headroom for periodic work here: `[refresh-worker-headroom-2026-09-02]`.
 
 ## [wnba-consensus-price] BOOK PRICES WERE AVERAGED ON THE AMERICAN SCALE; 43% OF CARD PRICES WERE IMPOSSIBLE `[2026-08-31, lane wnba-accuracy-assessment, commit 697c41f0]`
 
