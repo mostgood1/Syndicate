@@ -38363,3 +38363,14 @@ Scheduled task `fotmob-alias-verify-0919-am`, read-only. The lane was already CL
 - **Baseline** (15:44:11Z, re-read 16:00:25Z): `[profiler] layer2_shortlist` lines 0, `[profiler] consume_sport` lines 0 over the preceding 3 h. Span medians 11:00-15:25Z: L2 65.4 s (n=24), overview 41.3 s (n=27).
 - **Expectation.** Each build after go-live prints >= 1 `layer2_shortlist` and >= 1 `consume_sport` profile. L2 and the overview run 1.3-2x slower while profiled.
 - **verify:** profiler lines for 2 builds (collector `collect_profiles2.py` -> `profiles2_raw.jsonl`, scratchpad a1e40980). **Then PUT both keys `off` and deploy**: this is not a standing config.
+
+## 2026-09-19 16:10:38Z (11:10 CT) — READING — refresh-worker `ef5ab75b` / `7301fe67` — lane sim-sizing-skill-gate — **verify (2) MET on 3 of 3 plans; (3) live owed**
+
+- **Plans after go-live** (`/api/portfolio/paper`), with `sim_share_of_staked` **0.0** and `staked_dollars_sim_attributed` $0 on every one:
+  - 10:16:31 CDT: 89 positions, $266.02.
+  - 10:47:46 CDT: 92 positions, $279.69.
+  - 11:07:04 CDT: 96 positions, $269.57.
+- **Rows with a nonzero sim share: 0 on all three.**
+- **Position labels** (`sizing.sim_sizing`, since `7301fe67` carried `45a15e34`): plan 2 had `gated_parity` 8, `gated_unmeasured` 6, `price_basis_sport` 22 and none 56; plan 3 had 8 / 6 / 25 / 57.
+- **Refusals, plan 3:** `in_play_market_fair` 21, `zero_kelly_stake` 1.
+- **Live (3): OWED.** The newest live orders (05:17-07:31Z) all predate the gate. Two of them carry sim shares, soccer totals 0.5 and mlb totals_alt 0.2843, as expected before the gate.
