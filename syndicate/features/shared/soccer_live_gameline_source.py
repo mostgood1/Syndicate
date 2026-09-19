@@ -186,6 +186,9 @@ _PRICER_NAME_ALIASES: dict[str, str] = {
     "gent": "kaa gent",
     # bundesliga
     "fsv mainz 05": "mainz",
+    # Read on the live board 2026-09-19 (1. FC Koln @ Hamburger SV, 13:30Z): the audit could not pair this fixture
+    # (four events shared its kickoff). "Hamburger SV" / "Hamburg SV" already canonicalise alike; only Koln differed.
+    "1 koln": "cologne",
     # eredivisie
     "ajax": "ajax amsterdam",
     "feyenoord": "feyenoord rotterdam",

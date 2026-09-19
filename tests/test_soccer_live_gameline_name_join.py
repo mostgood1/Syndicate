@@ -5,7 +5,8 @@ and the unmodified shared join.
 Every pair below is REAL. `REAL_PAIRS_2026_09_18` was read on production: the board's name (OddsAPI, on the served
 soccer book grid) against the live state's name (ESPN, on the served `live_state`), for the eight matches in play
 at 19:29Z; the exact key joined 3 of them. `WEEKEND_PAIRS_2026_09_19_20` are the 18 fixtures of that weekend whose
-production odds name and ESPN scoreboard name still differed after canonicalisation. `learnings.md` 2026-09-05 forbids a join test whose fixture builds both
+production odds name and ESPN scoreboard name still differed after canonicalisation, plus the one match read unjoined
+on the live board on 2026-09-19 (1. FC Koln / FC Cologne). `learnings.md` 2026-09-05 forbids a join test whose fixture builds both
 sides from one set of names, so the two sides here are never the same list, and pairs that must NOT join are
 asserted as well as pairs that must.
 """
@@ -53,6 +54,9 @@ WEEKEND_PAIRS_2026_09_19_20 = [
     ("primeira_liga", "Arouca", "Sporting Lisbon", "Arouca", "Sporting CP"),
     ("primeira_liga", "Moreirense FC", "Vit\u00f3ria SC", "Moreirense", "Vit\u00f3ria de Guimaraes"),
     ("serie_a", "Atalanta BC", "Juventus", "Atalanta", "Juventus"),
+    # Not in the audit (four events shared its kickoff, so it could not be paired); read unjoined on the live
+    # board 2026-09-19 14:49Z, the one residual that morning.
+    ("bundesliga", "1. FC Köln", "Hamburger SV", "FC Cologne", "Hamburg SV"),
 ]
 
 
