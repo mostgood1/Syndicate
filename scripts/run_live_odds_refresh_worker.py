@@ -921,22 +921,12 @@ def _run_tick() -> dict[str, object] | None:
         _launch_autorun_wnba_pregame_refresh()
     except Exception as exc:
         print(f"[live_odds_worker] WNBA_PREGAME_AUTORUN_ERROR {type(exc).__name__}: {exc}", flush=True)
-    # `wnba-live-odds-capture-gap`. Same independence as the two autoruns
-    # above: its own interval AND liveness gate make this a no-op except
-    # when a WNBA game is actually live and due, and its own try/except
-    # means a WNBA failure here can never take down the general tick.
-    try:
-        _launch_autorun_wnba_live_refresh()
-    except Exception as exc:
-        print(f"[live_odds_worker] WNBA_LIVE_AUTORUN_ERROR {type(exc).__name__}: {exc}", flush=True)
-    # `ncaaf-live-cadence`. Same independence as the three above: its enable
-    # flag, season gate, game-day gate and interval gate make this a no-op on
-    # almost every call, and its own try/except means an NCAAF failure can never
-    # take down the WNBA autoruns or the general tick that follows.
-    try:
-        _launch_autorun_ncaaf_lines_refresh()
-    except Exception as exc:
-        print(f"[live_odds_worker] NCAAF_LINES_AUTORUN_ERROR {type(exc).__name__}: {exc}", flush=True)
+    # `wnba-live-odds-capture-gap` and `ncaaf-live-cadence`: the two in-play
+    # autoruns, each a no-op unless enabled, live/game-day and due, each in its
+    # own try/except. Also called every ~30 s by the in-play capture thread
+    # (`start_inplay_capture_loop`), under the same lock -- this call is what
+    # keeps them running when that thread is switched off.
+    _launch_inplay_capture_autoruns("loop")
     try:
         _log_worker_memory("tick_start")
         meta = _run_live_refresh_tick()
@@ -2379,6 +2369,8 @@ def main() -> int:
                 f"[live_odds_worker] VENUE_POLL_STARTED interval_seconds={venue_poll_interval_seconds()}",
                 flush=True,
             )
+        # In-play capture on its own clock too -- see `start_inplay_capture_loop`.
+        start_inplay_capture_loop()
         # AFTER the writer, deliberately: the audit reads the slate artifact,
         # so running it before the refresh tick would measure the previous
         # cycle's book. Inert unless SYNDICATE_POLYMARKET_SPREAD_AUDIT_ON_BOOT
@@ -2599,6 +2591,91 @@ def start_venue_poll_loop() -> bool:
         daemon=True,
     )
     _VENUE_POLL_THREAD.start()
+    return True
+
+
+# ---------------------------------------------------------------------------
+# IN-PLAY CAPTURE ON ITS OWN CLOCK (lane `live-inplay-board-cadence`).
+#
+# MEASURED 2026-09-19: the NCAAF lines autorun launched once per main-loop pass,
+# and a pass took 2-10 min (18:02-18:31Z: 4.4, 2.1, 8.4, 10.4 min; the Polymarket
+# slate write and the execution tick fill most of it). The interval knob was a
+# lever that did nothing: the median gap between launches was 535 s at 300 s and
+# 532 s at 150 s. An in-play quote older than 300 s at grid build never reaches
+# the board, so the pass length decided which live rows existed.
+#
+# The venue poll above had the same defect and the same fix. The launchers
+# already self-pace (enable flag, liveness/game-day gate, interval gate, per-lane
+# mutex), so a 30 s tick costs a status-file read and returns unless a run is
+# due. ONE LOCK with the main loop's call, so the two can never both pass the
+# same interval gate and double-launch. DEFAULT ON for the venue poll's reason:
+# one process, and a thread shipped off is a thread that never runs.
+# `SYNDICATE_INPLAY_CAPTURE_THREAD=off` returns to once per pass.
+# ---------------------------------------------------------------------------
+_INPLAY_LAUNCH_LOCK = threading.Lock()
+_INPLAY_CAPTURE_STOP = threading.Event()
+_INPLAY_CAPTURE_THREAD = None
+DEFAULT_INPLAY_CAPTURE_TICK_SECONDS = 30
+MIN_INPLAY_CAPTURE_TICK_SECONDS = 10
+
+
+def inplay_capture_thread_enabled() -> bool:
+    raw = str(os.environ.get("SYNDICATE_INPLAY_CAPTURE_THREAD") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off", "disabled"}
+
+
+def inplay_capture_tick_seconds() -> int:
+    raw = str(os.environ.get("SYNDICATE_INPLAY_CAPTURE_TICK_SECONDS") or "").strip()
+    try:
+        parsed = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_INPLAY_CAPTURE_TICK_SECONDS
+    if parsed <= 0:
+        return DEFAULT_INPLAY_CAPTURE_TICK_SECONDS
+    return max(MIN_INPLAY_CAPTURE_TICK_SECONDS, parsed)
+
+
+def _launch_inplay_capture_autoruns(source: str) -> None:
+    """Both in-play autoruns, once, under the shared lock. Each is isolated:
+    a WNBA failure can never cost the NCAAF launch, or the reverse."""
+    with _INPLAY_LAUNCH_LOCK:
+        try:
+            _launch_autorun_wnba_live_refresh()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[live_odds_worker] WNBA_LIVE_AUTORUN_ERROR source={source} {type(exc).__name__}: {exc}", flush=True)
+        try:
+            _launch_autorun_ncaaf_lines_refresh()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[live_odds_worker] NCAAF_LINES_AUTORUN_ERROR source={source} {type(exc).__name__}: {exc}", flush=True)
+
+
+def _inplay_capture_background_loop() -> None:
+    print(f"[inplay_capture] STARTED tick_seconds={inplay_capture_tick_seconds()}", flush=True)
+    while not _INPLAY_CAPTURE_STOP.is_set() and not _LIVE_REFRESH_LOOP_STOP.is_set():
+        try:
+            _launch_inplay_capture_autoruns("thread")
+        except Exception as exc:  # noqa: BLE001 -- a tick must never kill the loop
+            print(f"[inplay_capture] TICK_FAILED {type(exc).__name__}: {exc}", flush=True)
+        # Re-read each pass, so the cadence can change without a restart.
+        _INPLAY_CAPTURE_STOP.wait(inplay_capture_tick_seconds())
+
+
+def start_inplay_capture_loop() -> bool:
+    """Start the in-play capture thread. Returns whether it started."""
+    global _INPLAY_CAPTURE_THREAD
+
+    if not inplay_capture_thread_enabled():
+        print("[inplay_capture] DISABLED by SYNDICATE_INPLAY_CAPTURE_THREAD", flush=True)
+        return False
+    if _INPLAY_CAPTURE_THREAD is not None and _INPLAY_CAPTURE_THREAD.is_alive():
+        return False
+    _INPLAY_CAPTURE_STOP.clear()
+    _INPLAY_CAPTURE_THREAD = threading.Thread(
+        target=_inplay_capture_background_loop,
+        name="syndicate-inplay-capture",
+        daemon=True,
+    )
+    _INPLAY_CAPTURE_THREAD.start()
     return True
 
 

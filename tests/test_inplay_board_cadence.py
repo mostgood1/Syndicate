@@ -259,3 +259,149 @@ def test_kill_switch_keeps_the_plain_ttl(combined, monkeypatch):
     assert read() == 1
     monkeypatch.delenv("SYNDICATE_INPLAY_OVERLAY_CACHE_EXPIRY")
     assert read() == 2  # off != on: the same state rebuilds with the switch removed
+
+
+# --- the credit cap: the pregame segment tier on its own cadence --------------------
+
+
+class _SegResponse:
+    def __init__(self, event_id, status_code=200):
+        self.status_code = status_code
+        self.headers = {}
+        self.url = "https://api.the-odds-api.com/v4/x"
+        self.text = ""
+        self._event_id = event_id
+
+    def json(self):
+        return {"id": self._event_id, "bookmakers": []}
+
+
+class _SegSession:
+    """Records every per-event call: the credit-spending thing is what is asserted."""
+
+    def __init__(self, status_code=200):
+        self.event_ids: list[str] = []
+        self.status_code = status_code
+
+    def get(self, url, params=None, timeout=None):
+        event_id = url.rstrip("/").split("/")[-2]
+        self.event_ids.append(event_id)
+        return _SegResponse(event_id, self.status_code)
+
+
+def _segments(session, now, env, state):
+    from syndicate.features.shared import segment_odds_fetch as sof
+
+    events = [
+        {"id": "pre", "commence_time": (now + timedelta(minutes=90)).isoformat().replace("+00:00", "Z")},
+        {"id": "live", "commence_time": (now - timedelta(minutes=30)).isoformat().replace("+00:00", "Z")},
+    ]
+    return sof.fetch_event_segments(api_key="k", sport="ncaaf", sport_key="americanfootball_ncaaf",
+                                    base_url="https://api.the-odds-api.com/v4", events=events, session=session,
+                                    now=now, env=env, pregame_state=state)
+
+
+NOW_SEG = datetime(2026, 9, 19, 18, 0, tzinfo=timezone.utc)
+
+
+def test_default_fetches_both_tiers_every_run(tmp_path):
+    session = _SegSession()
+    env = {"SYNDICATE_NCAAF_SEGMENT_MARKETS": "all"}
+    for minutes in (0, 3):
+        _, stats = _segments(session, NOW_SEG + timedelta(minutes=minutes), env, tmp_path / "s.json")
+        assert stats["pregame_included"] is True and stats["pregame_deferred"] == 0
+    assert sorted(session.event_ids) == ["live", "live", "pre", "pre"]
+    assert not (tmp_path / "s.json").exists()
+
+
+def test_pregame_tier_waits_for_its_interval_and_live_never_does(tmp_path):
+    session = _SegSession()
+    env = {"SYNDICATE_NCAAF_SEGMENT_MARKETS": "all", "SYNDICATE_NCAAF_SEGMENT_PREGAME_INTERVAL_SECONDS": "1800"}
+    state = tmp_path / "s.json"
+    _, first = _segments(session, NOW_SEG, env, state)
+    assert sorted(session.event_ids) == ["live", "pre"] and first["pregame_included"] is True
+    session.event_ids.clear()
+    _, second = _segments(session, NOW_SEG + timedelta(minutes=3), env, state)
+    assert session.event_ids == ["live"]
+    assert second["pregame_included"] is False and second["pregame_deferred"] == 1
+    session.event_ids.clear()
+    _segments(session, NOW_SEG + timedelta(minutes=31), env, state)
+    assert sorted(session.event_ids) == ["live", "pre"]
+
+
+def test_a_run_where_every_call_failed_does_not_stamp_the_pregame_tier(tmp_path):
+    env = {"SYNDICATE_NCAAF_SEGMENT_MARKETS": "all", "SYNDICATE_NCAAF_SEGMENT_PREGAME_INTERVAL_SECONDS": "1800"}
+    state = tmp_path / "s.json"
+    _segments(_SegSession(status_code=500), NOW_SEG, env, state)
+    assert not state.exists()
+    retry = _SegSession()
+    _segments(retry, NOW_SEG + timedelta(minutes=3), env, state)
+    assert sorted(retry.event_ids) == ["live", "pre"]
+
+
+# --- live-odds-worker: in-play capture on its own clock -------------------------------
+
+
+@pytest.fixture(scope="module")
+def worker():
+    import importlib.util
+    import pathlib
+
+    path = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "run_live_odds_refresh_worker.py"
+    spec = importlib.util.spec_from_file_location("test_inplay_capture_worker", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_both_inplay_launchers_run_and_one_failure_never_costs_the_other(worker, monkeypatch, capsys):
+    calls = []
+    monkeypatch.setattr(worker, "_launch_autorun_wnba_live_refresh", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(worker, "_launch_autorun_ncaaf_lines_refresh", lambda: calls.append("ncaaf"))
+    worker._launch_inplay_capture_autoruns("thread")
+    assert calls == ["ncaaf"]
+    assert "WNBA_LIVE_AUTORUN_ERROR source=thread RuntimeError: boom" in capsys.readouterr().out
+
+
+def test_the_main_loop_launches_through_the_same_locked_helper(worker, monkeypatch):
+    sources = []
+    monkeypatch.setattr(worker, "_launch_inplay_capture_autoruns", lambda source: sources.append(source))
+    monkeypatch.setattr(worker, "_launch_autorun_soccer_pregame_refresh", lambda: None)
+    monkeypatch.setattr(worker, "_launch_autorun_wnba_pregame_refresh", lambda: None)
+    monkeypatch.setattr(worker, "_run_live_refresh_tick", lambda: {"ok": True})
+    monkeypatch.setattr(worker, "_log_worker_memory", lambda *a, **k: None)
+    worker._run_tick()
+    assert sources == ["loop"]
+
+
+def test_the_helper_holds_the_shared_lock_while_launching(worker, monkeypatch):
+    held = []
+    monkeypatch.setattr(worker, "_launch_autorun_wnba_live_refresh", lambda: held.append(worker._INPLAY_LAUNCH_LOCK.locked()))
+    monkeypatch.setattr(worker, "_launch_autorun_ncaaf_lines_refresh", lambda: held.append(worker._INPLAY_LAUNCH_LOCK.locked()))
+    worker._launch_inplay_capture_autoruns("loop")
+    assert held == [True, True] and not worker._INPLAY_LAUNCH_LOCK.locked()
+
+
+def test_the_thread_ticks_the_launchers_and_stops_on_its_event(worker, monkeypatch):
+    ticks = []
+
+    def once(source):
+        ticks.append(source)
+        worker._INPLAY_CAPTURE_STOP.set()
+
+    monkeypatch.setattr(worker, "_launch_inplay_capture_autoruns", once)
+    worker._INPLAY_CAPTURE_STOP.clear()
+    worker._inplay_capture_background_loop()
+    assert ticks == ["thread"]
+
+
+def test_kill_switch_and_tick_floor(worker, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_INPLAY_CAPTURE_THREAD", "off")
+    assert worker.inplay_capture_thread_enabled() is False
+    assert worker.start_inplay_capture_loop() is False
+    monkeypatch.delenv("SYNDICATE_INPLAY_CAPTURE_THREAD")
+    assert worker.inplay_capture_thread_enabled() is True  # absent = ON, stated
+    monkeypatch.setenv("SYNDICATE_INPLAY_CAPTURE_TICK_SECONDS", "2")
+    assert worker.inplay_capture_tick_seconds() == 10
+    monkeypatch.setenv("SYNDICATE_INPLAY_CAPTURE_TICK_SECONDS", "junk")
+    assert worker.inplay_capture_tick_seconds() == 30

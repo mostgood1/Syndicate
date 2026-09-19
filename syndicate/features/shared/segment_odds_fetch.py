@@ -209,8 +209,13 @@ def events_in_window(
     sport: str,
     now: datetime | None = None,
     env: Mapping[str, str] | None = None,
+    include_pregame: bool = True,
 ) -> tuple[list[Mapping[str, Any]], dict[str, Any]]:
     """The events worth a per-event segment call right now, plus the counters.
+
+    `include_pregame=False` drops the pregame tier and counts it as
+    `pregame_deferred` (the tier's own cadence is not due -- see
+    `pregame_interval_seconds`); live events are never deferred.
 
     An event is in scope when it sits inside EITHER tier:
 
@@ -238,6 +243,7 @@ def events_in_window(
         "out_of_window": 0,
         "no_commence_time": 0,
         "capped": 0,
+        "pregame_deferred": 0,
         "pregame_window_seconds": pregame_window,
         "live_window_seconds": live_window,
         "max_events": max_events,
@@ -256,6 +262,9 @@ def events_in_window(
             stats["out_of_window"] += 1
             continue
         stats[tier] += 1
+        if tier == "pregame" and not include_pregame:
+            stats["pregame_deferred"] += 1
+            continue
         # Sorted by |until| so that if the cap trips, the events kept are the
         # ones closest to kickoff -- the ones whose prices are moving.
         scoped.append((abs(until), event, tier))
@@ -265,6 +274,52 @@ def events_in_window(
         stats["capped"] = len(scoped) - max_events
         scoped = scoped[:max_events]
     return [event for _, event, _ in scoped], stats
+
+
+def pregame_interval_seconds(sport: str, *, env: Mapping[str, str] | None = None) -> int:
+    """How often the PREGAME tier is fetched, in seconds. 0 (the default) = every run.
+
+    THE CREDIT CAP for a faster in-play cadence (lane `live-inplay-board-cadence`,
+    measured 2026-09-19): an NCAAF run with every interval cost ~2,100 credits
+    (MEASURED, quota by_sport delta over one run), across up to 80 events x 36
+    segment markets. At most ~16 games were in play at once (the grid's live
+    index), so most of that is the pregame tier -- INFERRED, no log line splits
+    it; `SEGMENT_PLAN`'s `pregame=`/`live=` counts are what will. A pregame
+    interval line moves slowly, so fetching that tier on its own slower cadence
+    is what lets the in-play tier run every ~150 s at about today's spend.
+    """
+    return _env_int(f"{env_prefix(sport)}_PREGAME_INTERVAL_SECONDS", 0, env)
+
+
+def pregame_state_path(sport: str) -> Any:
+    """When this sport's pregame tier was last fetched: a disk file, because every
+    fetch runs in its own subprocess."""
+    from syndicate.features.shared.refresh_state_store import data_root
+
+    return data_root() / f"{str(sport or '').strip().lower()}_source" / "tracking" / "segment_pregame_fetch.json"
+
+
+def _read_pregame_epoch(path: Any) -> float:
+    import json
+
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            return float((json.load(handle) or {}).get("epoch") or 0.0)
+    except Exception:  # noqa: BLE001 -- unreadable means "never fetched": fetch it
+        return 0.0
+
+
+def _write_pregame_epoch(path: Any, epoch: float) -> None:
+    import json
+
+    try:
+        os.makedirs(os.path.dirname(str(path)), exist_ok=True)
+        tmp = f"{path}.tmp"
+        with open(tmp, "w", encoding="utf-8") as handle:
+            json.dump({"epoch": epoch}, handle)
+        os.replace(tmp, str(path))
+    except Exception as exc:  # noqa: BLE001 -- a lost stamp costs one extra pregame fetch
+        print(f"[segment_odds_fetch] PREGAME_STAMP_WRITE_FAILED {type(exc).__name__}: {exc}", flush=True)
 
 
 def estimated_credits(n_events: int, n_markets: int, regions: str) -> int:
@@ -289,6 +344,7 @@ def fetch_event_segments(
     env: Mapping[str, str] | None = None,
     timeout: int = 20,
     log_prefix: str | None = None,
+    pregame_state: Any = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Per-event segment odds for the in-window events. Never raises.
 
@@ -319,8 +375,18 @@ def fetch_event_segments(
         print(f"{prefix} SEGMENT_CAPTURE disabled ({env_prefix(sport)}_MARKETS unset)", flush=True)
         return [], stats
 
-    scoped, window_stats = events_in_window(events, sport=sport, now=now, env=env)
+    moment = now or datetime.now(tz=timezone.utc)
+    pregame_every = pregame_interval_seconds(sport, env=env)
+    state_path = None
+    include_pregame = True
+    if pregame_every > 0:
+        state_path = pregame_state if pregame_state is not None else pregame_state_path(sport)
+        last_pregame = _read_pregame_epoch(state_path)
+        include_pregame = last_pregame <= 0.0 or (moment.timestamp() - last_pregame) >= pregame_every
+    scoped, window_stats = events_in_window(events, sport=sport, now=moment, env=env, include_pregame=include_pregame)
     stats.update(window_stats)
+    stats["pregame_interval_seconds"] = pregame_every
+    stats["pregame_included"] = include_pregame
     regions = segment_regions(sport, env=env)
     markets_csv = ",".join(sorted(market_map.keys()))
     stats["requested_events"] = len(scoped)
@@ -332,7 +398,8 @@ def fetch_event_segments(
         f"markets={len(market_map)} regions={regions} considered={window_stats['considered']} "
         f"pregame={window_stats['pregame']} live={window_stats['live']} "
         f"out_of_window={window_stats['out_of_window']} no_commence={window_stats['no_commence_time']} "
-        f"capped={window_stats['capped']} events={len(scoped)} "
+        f"capped={window_stats['capped']} pregame_every_s={pregame_every} "
+        f"pregame_deferred={window_stats['pregame_deferred']} events={len(scoped)} "
         f"est_credits={stats['estimated_credits']}",
         flush=True,
     )
@@ -379,6 +446,8 @@ def fetch_event_segments(
         else:
             stats["failed_events"] += 1
 
+    if state_path is not None and include_pregame and stats["ok_events"] > 0:
+        _write_pregame_epoch(state_path, moment.timestamp())
     print(
         f"{prefix} SEGMENT_FETCH ok={stats['ok_events']} failed={stats['failed_events']} "
         f"of={len(scoped)} est_credits={stats['estimated_credits']}"
