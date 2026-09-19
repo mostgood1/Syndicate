@@ -38498,3 +38498,23 @@ Scheduled task `fotmob-alias-verify-0919-am`, read-only. The lane was already CL
   - Board-wide `rows_with_projection` 6,296 of 7,411 (baseline 5,044 of 7,408 at 16:01Z).
 - **This lane fired no deploy.** Its gated runner lost the 16:53Z window to a hold for session a1e40980's env write, and the 17:49Z window to the MLB daily sim (preflight HOLD ×5; no deploy, claim released). The user then chose "Fire at next board landing" (override a jobs-only HOLD). The runner was re-armed at 18:27Z and stopped unfired at 18:28Z on seeing `aebc040d` live, which already carried the fix; a second deploy would only have killed the MLB sim.
 
+
+## 2026-09-19 18:55:14Z (13:55 CT) — DEPLOY — web `c55644af` -> `bdc45c11` (`dep-dandl4mgekts738kming`, origin/main) — lane live-inplay-board-cadence — **LIVE 18:58:36Z; verify: PARTIAL; three health-check failures after go-live, under watch; rollback to `c55644af` staged**
+
+- **Why.** USER 2026-09-19 ~13:45 CDT chose "Expire web cache on overlay". The combined-board cache (180 s on web) added up to 3 min to every in-play price the overlay delivers.
+- **What.** A cache hit is refused when the newest overlay file's mtime is newer than the one the cached entry was built against, and the entry is >= 45 s old (`SYNDICATE_INPLAY_OVERLAY_CACHE_MIN_AGE_SECONDS`). Kill switch `SYNDICATE_INPLAY_OVERLAY_CACHE_EXPIRY=off`. Riders: none (`c55644af..bdc45c11` touches only this).
+- **Locks.** Claim `live-inplay-board-cadence`. Preflight CLEAR at 18:55:13Z. Claim released at 18:58:38Z.
+- **Reading, (1) expiry fires:**
+  - `COMBINED_BOARD_OVERLAY_EXPIRED` from 19:00:04Z.
+  - 8 lines in 19:00:04-19:00:52Z, at entry ages 69-124 s. After the 19:04:51Z restart, about 1 a minute (19:06, 19:07, 19:08).
+  - Before, a key rebuilt about once per 180 s, so this is ~3x the rebuilds.
+- **Reading, (2) HEALTH: web `server_failed` "HTTP health check failed (timed out after 5 seconds)" at 19:02:08, 19:04:21 and 19:05:17Z.**
+  - The board 502'd around each one; probes at 19:04:32-19:04:43Z got 502.
+  - NOT attributed:
+    - The same post-deploy cluster happened today without this change: 15:39/15:41/15:43Z after the 15:34Z deploy, 17:02Z after 16:53Z, and 17:22Z after 17:17Z.
+    - The web log in 19:03:10-19:04:25Z is dominated by home-page MLB rows (120 lines), card reads and publishes, with almost no combined-board lines.
+  - NOT exonerated either: each rebuild holds the GIL 5-25 s, and the rebuild rate is ~3x.
+  - Probe latency 19:05:50-19:07:47Z: 7.7-24.8 s. The pre-change reading's own spacing implies ~8-21 s for the same query, so this is not clearly worse.
+- **Decision rule, stated in advance:**
+  - Another `server_failed` in steady state (after ~19:10Z) -> roll back to `c55644af` (`web_rollback.py`, scratchpad a1e40980). The diff is only this change, so the rollback needs no env write.
+  - None through 19:12:47Z.
