@@ -29,6 +29,8 @@ between them.
 """
 from __future__ import annotations
 
+import pytest
+
 import sys
 from pathlib import Path
 
@@ -135,6 +137,14 @@ from syndicate.features.shared.paper_settlement import (  # noqa: E402
     settled_decisions_by_sport,
     settlement_summary,
 )
+
+
+@pytest.fixture(autouse=True)
+def _sim_sizing_legacy(monkeypatch):
+    """These tests pin the sizing MECHANICS of a model that is allowed to size.
+    WHETHER a model may size (only one measured to beat the market) is
+    `test_portfolio_sim_skill_gate.py`'s business (lane `sim-sizing-skill-gate`)."""
+    monkeypatch.setenv("SYNDICATE_PORTFOLIO_SIM_SIZING", "legacy")
 
 
 def _order(

@@ -15,6 +15,14 @@ import pytest
 from syndicate.features.shared import execution_ledger
 from syndicate.features.shared.portfolio_settings import PortfolioSettings
 
+@pytest.fixture(autouse=True)
+def _sim_sizing_legacy(monkeypatch):
+    """These tests pin EXECUTION plumbing on plans built from sim-sized rows.
+    WHETHER a model may size (only one measured to beat the market) is
+    `test_portfolio_sim_skill_gate.py`'s business (lane `sim-sizing-skill-gate`)."""
+    monkeypatch.setenv("SYNDICATE_PORTFOLIO_SIM_SIZING", "legacy")
+
+
 DATE = "2026-08-22"
 _TIMESTAMPS = ("submitted_at", "venue_resolved_at", "settled_at")
 

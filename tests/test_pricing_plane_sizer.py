@@ -45,6 +45,14 @@ from syndicate.features.shared.staked_probability_profile import (
 
 
 @pytest.fixture(autouse=True)
+def _sim_sizing_legacy(monkeypatch):
+    """These tests pin the sizing MECHANICS of a model that is allowed to size.
+    WHETHER a model may size (only one measured to beat the market) is
+    `test_portfolio_sim_skill_gate.py`'s business (lane `sim-sizing-skill-gate`)."""
+    monkeypatch.setenv("SYNDICATE_PORTFOLIO_SIM_SIZING", "legacy")
+
+
+@pytest.fixture(autouse=True)
 def _inert(monkeypatch, tmp_path):
     """Every flag absent and the profile pointed at a file that does not exist,
     so a real artifact on the dev machine can never leak into a test."""

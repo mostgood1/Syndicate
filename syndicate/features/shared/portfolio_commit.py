@@ -280,11 +280,122 @@ def _price_basis_sports() -> frozenset[str]:
     return frozenset(part.strip() for part in raw.split(",") if part.strip())
 
 
+# ONLY A MODEL MEASURED TO BEAT THE MARKET MAY MOVE MONEY.
+# `[2026-09-19, user decision "All sports (Recommended)", after "We need
+# everything to be MEANINGFUL how do we get there"]`, lane `sim-sizing-skill-gate`.
+#
+# The NCAAF price-basis rule above, generalised from one sport to every row whose
+# model has not EARNED sizing. When measured, all 31 `measured_market_skill` entries were
+# `parity` (23) or `loses_to_market` (8). None beat the market. The WNBA
+# backtest over 25 dates (4,297 priced props) put the sim's log-loss at 0.858
+# against the market's 0.682, with the fitted weight on the model ~0. Yet
+# `stake_attribution` measured the sim OWNING 57.6% of a representative stake,
+# and it sized a live WNBA over at 89% on 2026-09-18. A number that loses to the
+# market was deciding how much money went in.
+#
+# A gated row takes the price-basis path: its sim edge is still shown, ranked
+# and RECORDED on the position, and its stake is the price-shopping stake that
+# `stake_attribution` already computes as `stake_fraction_ev_only`. So the sim
+# can no longer create a bet (a sim-only row sizes to zero), veto or shrink a
+# price bet, or run the interval gate and blend. An IN-PLAY row whose stake
+# rested on the sim now meets `in_play_market_fair`, refused by default for the
+# 2026-09-12 stale-quote measurement.
+#
+# `SYNDICATE_PORTFOLIO_SIM_SIZING`: only the exact word `legacy` restores sim
+# sizing; absent or anything else gates. An unrecognised value must not quietly
+# hand money back to an unmeasured model.
+SIM_SIZING_LEGACY = "legacy"
+SIM_SIZING_GATED = "measured_only"
+SIM_SIZING_PRICE_BASIS_SPORT = "price_basis_sport"
+
+
+def _sim_sizing_mode() -> str:
+    raw = str(os.environ.get("SYNDICATE_PORTFOLIO_SIM_SIZING") or "").strip().lower()
+    return SIM_SIZING_LEGACY if raw == SIM_SIZING_LEGACY else SIM_SIZING_GATED
+
+
+def _sim_sizing_gate_reason(row: Mapping[str, Any]) -> str | None:
+    """Why this row's model may NOT size, or None when it may.
+
+    It may size when the gate is off (`legacy`), or when the row's
+    `projection.model_skill` is `measured` with `verdict_class == beats_market`.
+    Anything else is gated and says which: `no_skill_note` (unknown must not
+    default permissive), `unmeasured`, `measured_no_verdict` (a producer note
+    that carries no class), `parity` or `loses_to_market`.
+    """
+    if _sim_sizing_mode() == SIM_SIZING_LEGACY:
+        return None
+    from syndicate.features.shared.measured_market_skill import VERDICT_BEATS
+    from syndicate.features.shared.projection_skill import STATUS_MEASURED
+
+    projection = row.get("projection")
+    skill = projection.get("model_skill") if isinstance(projection, Mapping) else None
+    if not isinstance(skill, Mapping):
+        return "no_skill_note"
+    status = str(skill.get("status") or "").strip().lower()
+    if status != STATUS_MEASURED:
+        return status or "no_skill_status"
+    verdict_class = str(skill.get("verdict_class") or "").strip().lower()
+    if verdict_class == VERDICT_BEATS:
+        return None
+    return verdict_class or "measured_no_verdict"
+
+
 def _sizing_model_edge(row: Mapping[str, Any]) -> float | None:
-    """The model edge the STAKE may use: None for a price-basis sport."""
+    """The model edge the STAKE may use.
+
+    None for a price-basis sport, and None for a model not measured to beat the
+    market (`_sim_sizing_gate_reason`). Both take the same price-basis path.
+    """
     if str(row.get("sport") or "").strip().lower() in _price_basis_sports():
         return None
-    return _as_float(row.get("model_edge_pct"))
+    edge = _as_float(row.get("model_edge_pct"))
+    if edge is None or _sim_sizing_gate_reason(row) is not None:
+        return None
+    return edge
+
+
+def _sim_sizing_basis(row: Mapping[str, Any]) -> str | None:
+    """What decided whether this row's sim edge sized: None when it has no edge."""
+    if _as_float(row.get("model_edge_pct")) is None:
+        return None
+    if str(row.get("sport") or "").strip().lower() in _price_basis_sports():
+        return SIM_SIZING_PRICE_BASIS_SPORT
+    reason = _sim_sizing_gate_reason(row)
+    if reason is None:
+        return SIM_SIZING_LEGACY if _sim_sizing_mode() == SIM_SIZING_LEGACY else "admitted_beats_market"
+    return f"gated_{reason}"
+
+
+def _cut_rank_score(row: Mapping[str, Any]) -> float | None:
+    """The score the `max_positions` cut orders by.
+
+    A row whose sim edge may not size must not win a slot on it either, so its
+    Layer 2 score is re-derived with the capped `sim_component` removed. The
+    re-derivation uses the score's own terms, the same algebra as
+    `blended_score` and `layer2_board._apply_skill_reliability`: value is
+    `value_pct - sim_component`, and the reliability discount applies only when
+    it lowers the value. A score without those terms, or a row whose sim may
+    size, keeps its published score unchanged.
+    """
+    base = _score_value(row)
+    score = row.get("score")
+    if base is None or not isinstance(score, Mapping):
+        return base
+    sim = _as_float(score.get("sim_component"))
+    if not sim or _as_float(row.get("model_edge_pct")) is None or _sizing_model_edge(row) is not None:
+        return base
+    value = _as_float(score.get("value_pct"))
+    terms = [_as_float(score.get(key)) for key in ("book_confidence", "freshness_factor", "price_reliability")]
+    if value is None or any(term is None for term in terms):
+        return base
+    reliability = terms[0] * terms[1] * terms[2]
+    price_only = value - sim
+    ranked = min(price_only, price_only * reliability)
+    skill_factor = _as_float(score.get("skill_reliability"))
+    if skill_factor is not None and skill_factor < 1.0:
+        ranked = min(ranked, ranked * skill_factor)
+    return round(ranked, 4)
 
 
 def _market_fair_sports() -> frozenset[str]:
@@ -835,11 +946,18 @@ def commit_portfolio(
     # `DEFAULT_PROFILE` == every beta 0.0 == the pre-P2 derivation, bit for bit.
     blend_profile, _blend_profile_meta = load_staked_probability_profile()
 
+    # WHAT DECIDED EACH SIM EDGE'S RIGHT TO SIZE, counted on the rows that carry
+    # one (lane `sim-sizing-skill-gate`). The production reading for the gate is
+    # this counter plus `sim_share_of_stake` on the positions.
+    sim_sizing: dict[str, int] = {}
+
     priced: list[dict[str, Any]] = []
     for row in rows or ():
         rows_in += 1
         if isinstance(row, Mapping) and _as_float(row.get("model_edge_pct")) is not None:
             rows_with_sim_edge += 1
+            basis = _sim_sizing_basis(row) or "unknown"
+            sim_sizing[basis] = sim_sizing.get(basis, 0) + 1
         if not isinstance(row, Mapping):
             refuse("row_not_a_mapping", None)
             continue
@@ -882,6 +1000,8 @@ def commit_portfolio(
                 "blend_beta": provenance["blend_beta"],
                 "model_probability_raw": provenance["model_probability_raw"],
                 "interval_gate": provenance["interval_gate"],
+                # Why the sim did or did not size this stake. None: no sim edge.
+                "sim_sizing": _sim_sizing_basis(row),
             }
         )
         if (_as_float(candidate["stake"].get("stake_fraction")) or 0.0) <= 0.0:
@@ -924,7 +1044,11 @@ def commit_portfolio(
     # `price_source` at all, and an implicit "is the field present" test would
     # make that guarantee depend on a field nobody set. The venue loop opts in.
     def _rank(item: Mapping[str, Any]) -> tuple[int, float]:
-        score = _score_value(item["row"]) or float("-inf")
+        # `_cut_rank_score`, not the raw score: a sim that may not size may not
+        # win a slot either (lane `sim-sizing-skill-gate`).
+        score = _cut_rank_score(item["row"])
+        if score is None:
+            score = float("-inf")
         if not prefer_placeable:
             return (0, score)
         placeable = str(item["row"].get("price_source") or "") == "venue_feed"
@@ -1205,6 +1329,12 @@ def commit_portfolio(
                 if rows_in
                 else None
             ),
+        },
+        # Per sim-edge row: `admitted_beats_market`, `gated_<reason>`,
+        # `price_basis_sport` or `legacy`. Sums to `rows_with_sim_edge`.
+        "sim_sizing": {
+            "mode": _sim_sizing_mode(),
+            "by_basis": dict(sorted(sim_sizing.items())),
         },
         "rows_in": rows_in,
         "sized": len(priced),

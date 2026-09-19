@@ -39,6 +39,14 @@ from syndicate.features.shared.portfolio_commit import (  # noqa: E402
     sizing_inputs_from_row,
 )
 
+@pytest.fixture(autouse=True)
+def _sim_sizing_legacy(monkeypatch):
+    """These tests pin the sizing MECHANICS of a model that is allowed to size.
+    WHETHER a model may size (only one measured to beat the market) is
+    `test_portfolio_sim_skill_gate.py`'s business (lane `sim-sizing-skill-gate`)."""
+    monkeypatch.setenv("SYNDICATE_PORTFOLIO_SIM_SIZING", "legacy")
+
+
 ENV = "SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS"
 
 

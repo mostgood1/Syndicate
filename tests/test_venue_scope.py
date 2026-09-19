@@ -18,6 +18,14 @@ from syndicate.features.shared.venue_scope import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _sim_sizing_legacy(monkeypatch):
+    """These tests pin the sizing MECHANICS of a model that is allowed to size.
+    WHETHER a model may size (only one measured to beat the market) is
+    `test_portfolio_sim_skill_gate.py`'s business (lane `sim-sizing-skill-gate`)."""
+    monkeypatch.setenv("SYNDICATE_PORTFOLIO_SIM_SIZING", "legacy")
+
+
 def _row(best=-110, book_prices=None, ev_pct=4.0, **overrides):
     row = {
         "sport": "mlb",

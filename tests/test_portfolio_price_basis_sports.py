@@ -12,6 +12,8 @@ exactly as the same row without one did the day before.
 """
 from __future__ import annotations
 
+import pytest
+
 import sys
 from pathlib import Path
 
@@ -24,6 +26,14 @@ from syndicate.features.shared.portfolio_commit import (  # noqa: E402
     sizing_basis_of,
     sizing_inputs_from_row,
 )
+
+@pytest.fixture(autouse=True)
+def _sim_sizing_legacy(monkeypatch):
+    """These tests pin the sizing MECHANICS of a model that is allowed to size.
+    WHETHER a model may size (only one measured to beat the market) is
+    `test_portfolio_sim_skill_gate.py`'s business (lane `sim-sizing-skill-gate`)."""
+    monkeypatch.setenv("SYNDICATE_PORTFOLIO_SIM_SIZING", "legacy")
+
 
 PRICE_ENV = "SYNDICATE_PORTFOLIO_PRICE_BASIS_SPORTS"
 FAIR_ENV = "SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS"
