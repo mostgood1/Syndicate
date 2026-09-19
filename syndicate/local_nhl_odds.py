@@ -249,6 +249,50 @@ class OddsApiClient:
         return {}, headers
 
 
+# TheOddsAPI lists NHL preseason games under their OWN sport key, and a request to
+# `icehockey_nhl` never returns them. Measured 2026-09-19: all 7 preseason games
+# generated `anchor_state=no_market` with every odds column blank. Both keys are
+# listed on every fetch; out of season the preseason key lists nothing. (The events
+# listing itself does not draw on the usage quota.)
+NHL_REGULAR_SPORT_KEY = "icehockey_nhl"
+NHL_PRESEASON_SPORT_KEY = "icehockey_nhl_preseason"
+NHL_SPORT_KEYS: Tuple[str, ...] = (NHL_REGULAR_SPORT_KEY, NHL_PRESEASON_SPORT_KEY)
+# Preseason markets are thinner. When a request for the full market list fails on a
+# preseason event, it is retried with the core three.
+NHL_CORE_TEAM_MARKETS: Tuple[str, ...] = ("h2h", "spreads", "totals")
+
+
+def _event_sport_key(event: Dict, default: str = NHL_REGULAR_SPORT_KEY) -> str:
+    return str(event.get("sport_key") or default).strip() or default
+
+
+def list_nhl_events(client: "OddsApiClient", *, commence_from_iso: str, commence_to_iso: str) -> List[Dict]:
+    """Events for the window across the regular AND preseason keys, each tagged with its own `sport_key`."""
+    events: List[Dict] = []
+    seen: set[str] = set()
+    for sport_key in NHL_SPORT_KEYS:
+        try:
+            listed, _ = client.list_events(sport_key, commence_from_iso=commence_from_iso, commence_to_iso=commence_to_iso)
+        except Exception as exc:
+            # The regular key is the season's backbone, so its failure still propagates.
+            # A failure on the preseason key must not cost the regular season its board.
+            if sport_key == NHL_REGULAR_SPORT_KEY:
+                raise
+            print(f"[local_nhl_odds] NHL_EVENTS_LIST_FAILED sport_key={sport_key} error={type(exc).__name__}: {exc}", flush=True)
+            continue
+        for event in listed or []:
+            event_id = str(event.get("id") or "")
+            if not event_id or event_id in seen:
+                continue
+            seen.add(event_id)
+            events.append({**event, "sport_key": _event_sport_key(event, sport_key)})
+    by_key: Dict[str, int] = {}
+    for event in events:
+        by_key[event["sport_key"]] = by_key.get(event["sport_key"], 0) + 1
+    print(f"[local_nhl_odds] NHL_EVENTS window={commence_from_iso}..{commence_to_iso} by_sport_key={by_key}", flush=True)
+    return events
+
+
 class NhlWebClient:
     def __init__(self, *, rate_limit_per_sec: float = 3.0, timeout: float = 30.0) -> None:
         self.sleep = 1.0 / max(rate_limit_per_sec, 0.1)
@@ -384,14 +428,26 @@ def collect_oddsapi_team_odds(date: str, *, markets: Optional[Iterable[str]] = N
         from syndicate.features.shared.market_segments import segment_market_keys
 
         market_list.extend(key for key in segment_market_keys("nhl") if key not in market_list)
-    events, _ = client.list_events(
-        "icehockey_nhl",
+    events = list_nhl_events(
+        client,
         commence_from_iso=start_utc.isoformat().replace("+00:00", "Z"),
         commence_to_iso=end_utc.isoformat().replace("+00:00", "Z"),
     )
     rows: List[dict] = []
+    core_markets = [key for key in market_list if key in NHL_CORE_TEAM_MARKETS]
     for event in events or []:
-        odds, _ = client.event_odds("icehockey_nhl", str(event.get("id")), markets=",".join(market_list))
+        sport_key = _event_sport_key(event)
+        try:
+            odds, _ = client.event_odds(sport_key, str(event.get("id")), markets=",".join(market_list))
+        except Exception as exc:
+            if sport_key != NHL_PRESEASON_SPORT_KEY or not core_markets or core_markets == market_list:
+                raise
+            print(
+                f"[local_nhl_odds] NHL_PRESEASON_MARKETS_RETRY event_id={event.get('id')} "
+                f"error={type(exc).__name__} retry_markets={','.join(core_markets)}",
+                flush=True,
+            )
+            odds, _ = client.event_odds(sport_key, str(event.get("id")), markets=",".join(core_markets))
         for bookmaker in odds.get("bookmakers", []) or []:
             for market in bookmaker.get("markets", []) or []:
                 rows.extend(_flatten_team_odds(event, bookmaker, market))
@@ -603,28 +659,30 @@ def collect_oddsapi_props(date: str) -> pd.DataFrame:
     start_et = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=ZoneInfo("America/New_York"))
     from_dt = start_et.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     to_dt = (start_et + timedelta(days=1)).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    events, _ = client.list_events("icehockey_nhl", commence_from_iso=from_dt, commence_to_iso=to_dt)
+    events = list_nhl_events(client, commence_from_iso=from_dt, commence_to_iso=to_dt)
     events = [event for event in (events or []) if _commence_date_et(event.get("commence_time")) == date]
+    sport_key_by_event = {str(event.get("id")): _event_sport_key(event) for event in events if event.get("id")}
 
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     def fetch_event(event_id: str) -> Optional[Dict]:
         use_keys = [key.strip() for key in markets.split(",") if key.strip()]
+        sport_key = sport_key_by_event.get(event_id, NHL_REGULAR_SPORT_KEY)
         try:
-            event_odds, _ = client.event_odds("icehockey_nhl", event_id, markets=",".join(use_keys), regions=regions, bookmakers=bookmakers)
+            event_odds, _ = client.event_odds(sport_key, event_id, markets=",".join(use_keys), regions=regions, bookmakers=bookmakers)
             if isinstance(event_odds, dict) and event_odds.get("bookmakers"):
                 return event_odds
         except Exception:
             pass
         try:
-            event_odds, _ = client.event_odds("icehockey_nhl", event_id, markets=",".join(use_keys), regions=regions, bookmakers=None)
+            event_odds, _ = client.event_odds(sport_key, event_id, markets=",".join(use_keys), regions=regions, bookmakers=None)
             if isinstance(event_odds, dict) and event_odds.get("bookmakers"):
                 return event_odds
         except Exception:
             pass
         for single_market in use_keys:
             try:
-                event_odds, _ = client.event_odds("icehockey_nhl", event_id, markets=single_market, regions=regions, bookmakers=None)
+                event_odds, _ = client.event_odds(sport_key, event_id, markets=single_market, regions=regions, bookmakers=None)
                 if isinstance(event_odds, dict) and event_odds.get("bookmakers"):
                     return event_odds
             except Exception:
@@ -643,7 +701,10 @@ def collect_oddsapi_props(date: str) -> pd.DataFrame:
 
     try:
         base_snapshot = f"{date}T17:00:00Z"
-        snapshot_events, _ = client.historical_list_events("icehockey_nhl", snapshot_iso=base_snapshot)
+        # Regular key only, deliberately: this fallback fires whenever live props come
+        # back empty, which is the normal state in preseason. Listing the preseason key
+        # here would add a paid historical odds pull to every preseason sweep.
+        snapshot_events, _ = client.historical_list_events(NHL_REGULAR_SPORT_KEY, snapshot_iso=base_snapshot)
         historical = snapshot_events.get("data", []) if isinstance(snapshot_events, dict) else []
         for event in [event for event in historical if _commence_date_et(event.get("commence_time")) == date]:
             if not event.get("id"):
@@ -651,7 +712,7 @@ def collect_oddsapi_props(date: str) -> pd.DataFrame:
             for snapshot_iso in [base_snapshot, f"{date}T19:00:00Z", f"{date}T22:00:00Z"]:
                 try:
                     event_odds, _ = client.historical_event_odds(
-                        "icehockey_nhl",
+                        NHL_REGULAR_SPORT_KEY,
                         str(event.get("id")),
                         markets=markets,
                         snapshot_iso=snapshot_iso,
