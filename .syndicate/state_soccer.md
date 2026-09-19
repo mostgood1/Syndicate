@@ -1230,6 +1230,7 @@ test" caveat. `suspect = 0` across 29 candidate rows: every served null was
 re-priced against its own bar and refused correctly. Agresti-Coull confirmed in
 the served data — `p` reconstructs to `(k+2)/404` exactly on all six.
 `sims_run: 400` and `point_estimator: "agresti_coull"` on every projection.
+- **THE JOIN THIS PRICE RIDES ON, 2026-09-18** `[lane soccer-live-gameline-name-join]`: `soccer_live_gameline_index` matched board rows to in-play matches on exact full names and joined **3 of 8** on the served grid (19:29:28Z); it now keys and answers on `team_names.canonical_team_name` plus a pricer-only table of 22 measured club-name pairs (`a67eb26c`, `a2b1b466`; live since refresh-worker `008dceca` 23:54:45Z). Read on production: the MLS pair New York Red Bulls / Red Bull New York joined (23:59:26Z build, 0 `no_live_gameline_projection`). A full slate's share is read 2026-09-19.
 
 ## [soccer-shot-woodwork-undercount] EVERY SHOT OFF THE WOODWORK WAS MISSING FROM SHOT TOTALS — FIXED, LIVE ON live-odds-worker `20d589ed` 2026-09-17
 
