@@ -1675,10 +1675,13 @@ death, never life — do not invert it.
 ### wnba-postgame-to-disk — OPEN — opened 2026-09-19 — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **`#675`; LIVE on refresh-worker `7301fe67` since 15:39:17Z; readings owed**
 
 - Goal: [user 2026-09-19: "proceed next" on `#675`] a WNBA slate date's box scores appear on WEB within a day of the game (`wnba_source/data/processed/boxscores_<date>.csv`), its three recon files reach web too, the dates missing since 2026-08-25 are backfilled, and a WNBA board-row prop Ask's recent-form table stops printing its STALE row.
-- **GOAL VERDICT (checkpoint 2026-09-19 ~15:55Z / 10:55 CT): NOT MET.** Goal (verbatim): "a WNBA slate date's box scores appear on WEB within a day of the game (`wnba_source/data/processed/boxscores_<date>.csv`), its three recon files reach web too, the dates missing since 2026-08-25 are backfilled, and a WNBA board-row prop Ask's recent-form table stops printing its STALE row."
+- **GOAL VERDICT (2026-09-19 ~16:00Z / 11:00 CT): NOT MET. Two of four clauses are MET.** Goal (verbatim): "a WNBA slate date's box scores appear on WEB within a day of the game (`wnba_source/data/processed/boxscores_<date>.csv`), its three recon files reach web too, the dates missing since 2026-08-25 are backfilled, and a WNBA board-row prop Ask's recent-form table stops printing its STALE row."
   - Deployed on the user's "Deploy now": refresh-worker `ef5ab75b` -> `7301fe67` (`dep-danammh42hec73drs0ig`), fired 15:33:46Z, live 15:39:17Z (`deploys.md` entry). Claim released ~15:43Z.
-  - Read so far: on the new code the settlement pass WROTE `boxscores_2026-09-18.csv` (15:49:30Z) and `boxscores_2026-09-17.csv` (15:49:36Z). That writer does not publish. Web still lists newest `08-25` and 0 September recon files (15:51:47Z).
-  - Left: the hourly producer's first tick on the new code (a `WNBA_POSTGAME_PRODUCER` line with `published` true), web listing the files, the backlog draining, and the Ask STALE row. Watcher `watch675.py` (scratchpad) polls every 2 min until ~18:04Z.
+  - **MET, box scores and recon reach web** (`deploys.md` READING 15:55:52Z). The first tick on the new code (15:55:46Z) logged `date` 2026-09-18, `box_rebuild` true, and `published` true for the box score and all three recon files. At 15:55:52Z web listed 109 dated box scores, newest `2026-09-18` (baseline 08-25), plus `recon_{games,props,quarters}_2026-09-18.csv` (baseline 0).
+  - The settlement pass wrote 09-18 and 09-17 to disk six minutes before that tick and published neither. That is the case the "published, not on disk" rule exists for.
+  - **OWED, the backfill:** 09-17 → 08-26, one per hour, newest first.
+  - **OWED, the Ask STALE row:** 4 board-prop Asks (3 on PHX @ DAL, 1 on SEA @ GS) still print `STALE ... 25/27 days`. None of those players played 09-18, and today's board has 0 props for anyone who did, so this tick could not clear it.
+  - Watcher `watch675b.py` (scratchpad) re-asks after every published tick until ~18:57Z.
 - Files:
   - `syndicate/features/shared/refresh_state_store.py` (the `_KEYVALUE_EXCLUDED_PATH_MARKERS` tuple ONLY: one marker for dated WNBA box scores)
   - `scripts/run_refresh_worker.py` (`_wnba_postgame_target_dates` and `_run_wnba_postgame_producer_tick` ONLY)
