@@ -1349,6 +1349,11 @@ death, never life — do not invert it.
   - **Next (a user decision, because it is a production change):**
     - Turn on the existing env-gated cProfile hooks (`SYNDICATE_CANDIDATE_COLLECTION_PROFILE`, `SYNDICATE_CONSUME_SPORT_PROFILE`) for 1-2 builds, then turn them off. That takes an env re-inject deploy each way. L2 has no hook.
     - Or, as code: a per-build `BOOK_QUOTES_LATEST_STATS hits= misses= raw_rows= thread_s=` line, which tests the leading candidate directly.
+  - **STATUS 2026-09-19 ~15:35Z — GOAL: NOT MET, but the spans are back inside the pre-registered targets this morning.**
+    - Medians over 11:00-15:25Z (BUILD_SPAN_EXIT): `layer2_shortlist_build` **65.4 s** (n=24) and `build_intelligence_overview` **41.3 s** (n=27). The targets are L2 <= 80 s and overview <= 120 s; last night's evening builds read 337 s and ~260 s.
+    - Not closing on a morning: the goal is a full day's NO-SIM medians, and the evening slate is the part that was slow.
+    - USER 2026-09-19 ~10:30 CDT "proceed": profile Layer 2 plus the overview for 1-2 builds (`SYNDICATE_LAYER2_SHORTLIST_PROFILE=all`, `SYNDICATE_CONSUME_SPORT_PROFILE=all`; the SPORT_OVERVIEW hook only fires on hydrated passes, which the build does not run), then off.
+    - Held behind lane `wnba-postgame-to-disk`'s refresh-worker claim (15:30Z). The env is NOT written until that deploy is out, so it does not ride someone else's deploy.
   - **STATUS 2026-09-19 ~00:35Z — GOAL: NOT MET.** The goal, verbatim: "name, with evidence, why refresh-worker's `layer2_shortlist_build` and `build_intelligence_overview` spans roughly doubled on flat row counts between the mornings of 2026-09-17 and 2026-09-18 — as a commit, an input that grew, or process state — and then cut that cost, verified by both spans' NO-SIM medians over a day."
     - The overview's leaf is named and fixed (matcher, `e639fc14`). So is candidate collection's (index memo, `42594360`). Paper execution is fixed too (`2890be5d`).
     - LEFT: Layer 2 itself. It is still unprofiled, and the evening builds read a 337 s median (186 before). The hook `f9df40a9` is deployed; profiling needs `SYNDICATE_LAYER2_SHORTLIST_PROFILE` set plus a re-inject deploy, which is a user decision. The soccer book-grid live cadence is also unattributed.
