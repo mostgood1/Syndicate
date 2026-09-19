@@ -1442,6 +1442,10 @@ death, never life — do not invert it.
 - Why: USER 2026-09-19 ~11:25 CDT chose "Block deploys mid-build", after "Its 11:19 and last board update for today was 10:49. Its impossible, with this timing, to get live NCAAF 1Q plays." MEASURED: my 16:04:54Z CLEAR restarted the worker between today's L2 write (16:05:23Z) and its publish (`state_worker.md [deploy-discipline]`).
 - Files: `scripts/check_deploy_safety.py` (read-only import; unclaimed); a NEW test `tests/test_preflight_board_build_hold.py`. The preflight script itself is held by lane `model-scorecard-cron` (owner session 1628e558 ARCHIVED 2026-09-17; its only edit there registered a cron id, `457d1260`). A scoped transfer is to be asked of the user before any edit.
 - Design risk (stated, unmeasured): builds run back to back, so HOLD-while-in-flight may leave few natural windows. The drain (`check_deploy_safety.py --drain`, which the worker honours) is the intended path, and it needs the keyvalue backend in the deploying shell.
+- Design inputs, 2026-09-19 ~16:35Z:
+  - (a) `board_build_state()` treats `LAYER2_SHORTLIST` as build-complete, but the build continues past it (kalshi join, `portfolio_commit` ~90 s, paper execution, publish). My kill landed in exactly that tail (L2 16:05:23Z, SIGTERM ~16:09Z). The completion marker must be `BOARD_BUILD_TIMING`.
+  - (b) Peer session 4a583d41 (lane `mls-board-evening-gaps`) measured the natural fire window as `BOARD_BUILD_TIMING` → the next build's first `BUILD_SPAN_ENTER` = 16:24:52 → 16:28:53Z (~4 min). It now gates its own deploy on a date=today `BOARD_BUILD_TIMING`.
+  - (c) The peer declines `--drain` during live slates because it pauses builds; so the drain is for quiet windows, and the fire-window gate is for live ones.
 
 ### live-inplay-board-cadence — OPEN — opened 2026-09-19 — session a1e40980-cceb-493f-adf9-5a5ca879acf6
 - Goal: live NCAAF in-play rows (first-quarter lines included) change on the served Layer 2 board within ~3 min of the price moving, without a full board build and without a restart during a live slate. Measured on a live NCAAF slate as the gap between an in-play quote change and the served row reflecting it.
