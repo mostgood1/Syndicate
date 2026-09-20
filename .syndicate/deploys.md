@@ -38882,3 +38882,14 @@ byte-identical 263-cell windows: the recorder started 2026-09-14.
   zero rows rather than vanishing) and deliberately absent from `HANDLED_SPORTS`.
 
 Claim released after this row.
+
+## 2026-09-20 17:47:30Z (12:47 CT) — READING — live-odds-worker `76a6f4a2` (live 16:06:32Z) — lane live-inplay-board-cadence — **verify: MET on all three registered clauses. The NFL in-play capture lane is done.**
+
+- **Window:** 100 min, 16:07-17:47Z, across kickoff (17:00Z), `nfl_capture_reading.py` reporting every 10 min. The deploy's `--expect` fields are answered one for one.
+- **(1) CADENCE — expected 150-200 s once games are in play: MET.** 38 `NFL_LINES_AUTORUN_LAUNCHED`, **median gap 154 s** in every single 10-minute report, full range 152-161 s. Baseline: the lane did not exist (0 launches), and the NCAAF launcher it is modelled on ran at a 532 s median with its interval knob set to 150.
+- **(2) FAILURES: 0** `NFL_LINES_AUTORUN_FAILED` across the whole window.
+- **(3) CREDITS — expected under ~600/run in-play: MET at ~24/run.** Per-10-min NFL deltas: **+243, +12, +12, +246, +12, +135, +678, +870, +587, +931** = **3,726 credits over 100 min (~2,236/h)** covering a full Sunday early slate at a 154 s cadence. For scale, ONE pre-cap NCAAF run cost ~2,100.
+- **(4) THE PREGAME CAP, verified rather than proxied — this was the clause last night could not test, because nothing sat inside the 6 h pregame window.** The first four reports are its signature exactly: **+243** (pregame tier fetched), **+12**, **+12** (deferred by the 1800 s stamp), **+246** (due again, ~30 min later). After kickoff the in-play tier takes over and the totals rise with the slate, as designed.
+- **(5) NCAAF: 0 launches all window** — correct, there is no college slate on a Sunday, and the game-day gate held it off rather than spending on an empty date.
+- **Board side, same window (separate reading, deploys.md 17:16Z and its 17:25Z correction):** NFL interval cards reached the served board — peak h1 66, q1 57, h2 29, q3 23, q4 22, q2 20.
+- **NOT claimed:** the WNBA half of the capture thread is still UNMEASURED (0 WNBA launches in any reading window to date, since `_launch_autorun_wnba_live_refresh` has its own liveness gate).
