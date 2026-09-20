@@ -38943,3 +38943,46 @@ the dominant risk, not the movement term.
 - **Against the two baselines:** the shortlist-only board this replaced read 733 s and rising on 09-19; the same board's shortlist rows in this window read 551-700 s while the overlay read ~298 s. So the overlay is consistently serving prices roughly half as old as the path it replaced — on a card population that peaked at 1,091.
 - **AND the metric still overstates the board's own lag**, per the 17:25Z correction: this figure is grid->serve + `book_age` (time since the price MOVED). The pipeline-only clock (`quote_seen_age`) measured **~362 s look-to-serve** at 17:22Z, which is the number to beat and is worse than this one, not better.
 - **VERDICT: GOAL NOT MET.** ~180 s target; 297-298 s measured; 10% of samples inside target. The work that remains is named in the lane and is split between capture (~202 s since we last looked) and the board (79-160 s grid->serve), with the freshness ceiling explicitly ruled out as the lever.
+
+## 2026-09-20 18:3xZ (13:3x CT) — MEASUREMENT for the 18:19Z deploy — refresh-worker + web `96e17478` — lane `layer2-line-movement-scoring` — **verify: 5 of 6 MET, 1 OWED ON A CLOCK (not failed)**
+
+Both live: refresh-worker 18:25:13Z, web 18:26:00Z. **Gated on the ARTIFACT, not
+the deploy:** read against board `written_at` **18:34:07Z**, which is after both
+deploys, so this is the new code's own output and not a stale artifact.
+
+    field                                          baseline -> measured        verdict
+    line_moved_rows_with_null_movement_component   1266     -> 160 of 1223     MET
+    rows_carrying_score_movement_kind              0        -> 1547            MET
+    rows_refused_by_movement                       null     -> 349             MET
+    rows_admitted_by_movement                      null     -> 167             MET
+    rows_admitted_by_blend  [NEGATIVE CONTROL]     225      -> 274             MET (in 150..400)
+    clv_price_trail_export_count                   0        -> 0               OWED, see below
+
+**THE HEADLINE: 1,063 rows now score on a line move that scored exactly 0.0
+before.** `movement_kind` splits **line 1,063 / price 484 / none 453**.
+
+**THE TERM IS NO LONGER A NET PENALTY.** Signed mean `movement_component` moves
+**-0.2545 -> +0.0170**, which is the balanced line signal entering the score —
+line-moved rows had split 59 away / 55 toward while price moves ran 60.5% away.
+And movement now **ADMITS 167 rows** where it had admitted **0**, while refusing
+349 — the direction that was structurally uncountable before this deploy is now
+the larger of the two and is finally visible.
+
+**THE CAP HELD:** max `|movement_component|` = 1.0000, unchanged bound.
+
+**THE 160 RESIDUAL NULLS ARE THE PREDICTED, CORRECT ABSENCE — checked, not
+assumed.** 128 have no opening fair (or a zero move), 32 have a side with no
+line-direction rule (`movement_vs_pick=None`). **UNEXPLAINED: 0.** And the
+sanity check that matters: rows carrying a `movement_line_prob_delta_pp` but NO
+`movement_component` = **0**, so nothing is computed and then dropped.
+
+**THE TRAIL EXPORT IS OWED ON A CLOCK, AND IS NOT EVIDENCE OF FAILURE.** Chunks
+publish when their HOUR SEALS. The deploy landed 18:25Z, so the 18:00-19:00
+chunk cannot seal before **19:00Z** and the first push can only happen on the
+first build after that. A `count=0` read at 18:3xZ is the design working, not a
+broken push — the condition that settles it is `count>=1` on
+`reports/intelligence/clv_price_trail/*` after 19:00Z. **Do not read this as
+verified until that reading exists.**
+
+Claims released after this reading.
+
