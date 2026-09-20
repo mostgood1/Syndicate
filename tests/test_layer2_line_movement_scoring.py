@@ -352,3 +352,67 @@ def test_harness_american_cents_matches_production():
     harness = importlib.import_module("scripts.decompose_movement_clv")
     for price in (-104, 104, -250, 250, -110, 110):
         assert harness.american_cents(price) == pytest.approx(layer2_board._american_cents(price))
+
+
+# ---------------------------------------------------------------------------
+# 9. THE TWO GAPS THE FIRST PRODUCTION READING EXPOSED (2026-09-20, post-deploy)
+# ---------------------------------------------------------------------------
+
+
+def test_a_moneyline_never_takes_the_line_gate():
+    """32 served rows scored NOTHING because the line gate fired on a market
+    with no handicap: 23 h2h, 8 h2h_3_way, all with a price at both ends.
+
+    Suppressing a PRICE comparison to guard against a handicap change is only
+    meaningful where a handicap exists. On a moneyline it is pure loss.
+    """
+    row = _row(side="home", line=None, price=-140, fair=0.57, market="h2h")
+    row["quote"]["book_prices"] = {"betmgm": -140}
+    key = layer2_board.movement_join_key(row)
+    opening = _opening(line=1.5, price=-120, fair=0.55, captured_at=_now_iso(30), key=key)
+    opening["book_prices"] = {"betmgm": -120}
+    out = layer2_board._movement_from_opening(row, {key: opening})
+
+    assert out.get("movement_line_gate_waived") == "moneyline_has_no_handicap"
+    assert out["movement_state"] != "no_comparable_price"
+    assert out.get("movement_price_delta") is not None, "the price comparison must survive"
+
+
+def test_a_prop_is_NOT_exempted_from_the_line_gate():
+    """The exemption must not reintroduce the +1.0 vs -1.5 false positive."""
+    row = _row(side="over", line=2.5, price=-110, fair=0.55, market="batter_hits")
+    key = layer2_board.movement_join_key(row)
+    opening = _opening(line=1.5, price=-110, fair=0.52, captured_at=_now_iso(30), key=key)
+    out = layer2_board._movement_from_opening(row, {key: opening})
+    assert out.get("movement_line_gate_waived") is None
+    assert out["movement_basis"] == "line_moved"
+    assert out.get("movement_price_delta") is None, "a price at a different handicap is not a price move"
+
+
+def test_a_missing_opening_fair_leaves_the_row_UNSCORED_on_purpose():
+    """An implied-from-price fallback was tried here and REVERTED.
+
+    On a line-moved row the two prices belong to DIFFERENT BETS, so their
+    difference measures the handicap change, not the market: home +1.0 @ -104
+    (p .5098) -> home -1.5 @ +122 (p .4505) makes the probability FALL 5.94 pp
+    while `_line_move_vs_pick` correctly calls the same move "toward". Sign and
+    magnitude disagreed, and it reached steam.
+
+    Better a row with no movement term than one with a confidently wrong one.
+    """
+    row = _row(side="over", line=9.5, price=-130, fair=0.58)
+    key = layer2_board.movement_join_key(row)
+    opening = _opening(line=8.5, price=110, fair=None, captured_at=_now_iso(30), key=key)
+    opening.pop("fair_probability")
+    out = layer2_board._movement_from_opening(row, {key: opening})
+    assert out.get("movement_line_prob_delta_pp") is None
+    assert out.get("steam") is not True
+
+
+def test_a_present_opening_fair_still_scores():
+    row = _row(side="over", line=9.5, price=-130, fair=0.58)
+    key = layer2_board.movement_join_key(row)
+    opening = _opening(line=8.5, price=110, fair=0.50, captured_at=_now_iso(30), key=key)
+    out = layer2_board._movement_from_opening(row, {key: opening})
+    assert out["movement_vs_pick"] == "toward"
+    assert out["movement_line_prob_delta_pp"] == pytest.approx(8.0, abs=1e-6)

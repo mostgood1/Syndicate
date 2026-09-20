@@ -3928,6 +3928,25 @@ def _movement_from_opening(
     lines_comparable = (open_line is None and now_line is None) or (
         open_line is not None and now_line is not None and abs(open_line - now_line) < 1e-9
     )
+    # A MARKET WITH NO HANDICAP CANNOT HAVE A LINE MOVE (2026-09-20).
+    #
+    # Measured on the served board after the movement term shipped: **32 rows
+    # reached `no_comparable_price` and scored NOTHING** — 23 `h2h`, 8
+    # `h2h_3_way`, 1 prop — every one of them with a price at BOTH ends. The
+    # line gate had fired on a moneyline, where there is no number to move; one
+    # end carried a stray line value and the other did not, so `lines_comparable`
+    # went False, the price delta was withheld as "a price at a different
+    # handicap", and no line delta could be computed either. The row then had
+    # neither term and fell out of the score entirely.
+    #
+    # Suppressing a PRICE comparison to protect against a handicap change is
+    # only meaningful where a handicap exists. For `moneyline` it is pure loss,
+    # and it is the strictly safe case to exempt: there is no second line for
+    # the price to belong to. Props and totals are NOT exempted — that is
+    # exactly where the +1.0/-1.5 spread false positive came from.
+    if not lines_comparable and _market_family(row.get("market")) == "moneyline":
+        lines_comparable = True
+        out["movement_line_gate_waived"] = "moneyline_has_no_handicap"
     if not lines_comparable:
         out["movement_price_not_comparable"] = "line_moved"
 
@@ -4047,6 +4066,29 @@ def _movement_from_opening(
     if not lines_comparable and out.get("movement_vs_pick") in {"toward", "away"}:
         line_fair_open = _as_float(opened.get("fair_probability"))
         line_fair_now = _as_float(quote.get("fair_probability"))
+        # NO IMPLIED-FROM-PRICE FALLBACK HERE, AND THE ATTEMPT IS WHY.
+        #
+        # 128 served rows had a current fair and were blocked solely on the
+        # OPENING's, so falling back to implied-from-price looked like free
+        # coverage. It is not: on a LINE-MOVED row the two prices belong to
+        # DIFFERENT BETS, so the difference measures the handicap change, not
+        # the market. `tests/test_layer2_movement_live_segment.py::
+        # test_a_moved_line_cannot_fire_steam` caught it immediately --
+        # home +1.0 @ -104 (p .5098) -> home -1.5 @ +122 (p .4505) made the
+        # probability FALL 5.94 pp while `_line_move_vs_pick` correctly called
+        # the same move "toward". Sign and magnitude disagreed.
+        #
+        # **THAT CONTRADICTION IS LATENT IN THE FAIR-BASED PATH TOO** and is a
+        # REAL LIMITATION of this term, recorded rather than papered over: a
+        # cross-handicap probability difference is not a clean measure of how
+        # far the market moved. The SIGN is sound (`movement_vs_pick` owns it);
+        # the MAGNITUDE is only approximate, and is bounded by the shared cap,
+        # which is what keeps it safe to rank on. The proper fix is a magnitude
+        # derived from the LINE delta normalised per market -- not from
+        # probabilities read at two different handicaps. NOT attempted here.
+        #
+        # Leaving these rows unscored is the correct trade: better a row with
+        # no movement term than one with a confidently wrong one.
         if (
             line_fair_open is not None
             and line_fair_now is not None
