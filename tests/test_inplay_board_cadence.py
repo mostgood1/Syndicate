@@ -405,3 +405,80 @@ def test_kill_switch_and_tick_floor(worker, monkeypatch):
     assert worker.inplay_capture_tick_seconds() == 10
     monkeypatch.setenv("SYNDICATE_INPLAY_CAPTURE_TICK_SECONDS", "junk")
     assert worker.inplay_capture_tick_seconds() == 30
+
+
+# --- NFL gets its own in-play capture lane -----------------------------------------
+
+
+def test_nfl_lines_autorun_is_off_when_the_flag_is_absent_and_launches_nothing(worker, monkeypatch):
+    launched = []
+    monkeypatch.delenv("SYNDICATE_ENABLE_NFL_LINES_REFRESH_AUTORUN", raising=False)
+    monkeypatch.setattr(worker, "launch_refresh_run", lambda **kw: launched.append(kw))
+    worker._launch_autorun_nfl_lines_refresh()
+    assert launched == [], "absent means OFF, and this one spends credits"
+    assert worker._nfl_lines_refresh_enabled() is False
+
+
+def test_nfl_lines_autorun_launches_fast_on_its_own_lane_when_enabled(worker, monkeypatch, tmp_path):
+    launched = []
+    monkeypatch.setenv("SYNDICATE_ENABLE_NFL_LINES_REFRESH_AUTORUN", "on")
+    monkeypatch.setenv("SYNDICATE_NFL_LINES_REFRESH_INTERVAL_SECONDS", "150")
+    monkeypatch.setattr(worker, "_nfl_lines_autorun_status_path", lambda: tmp_path / "nfl_status.json")
+    monkeypatch.setattr(worker, "_nfl_active_for_date", lambda d: True)
+    monkeypatch.setattr(worker, "_nfl_has_games_within_horizon", lambda d: True)
+    monkeypatch.setattr(worker, "launch_refresh_run", lambda **kw: launched.append(kw) or {"runStamp": "r1"})
+    worker._launch_autorun_nfl_lines_refresh()
+    assert len(launched) == 1
+    call = launched[0]
+    # mode=fast is what leaves player props -- the largest credit family -- to the full sweep.
+    assert call["sports"] == "nfl" and call["phase"] == "live" and call["mode"] == "fast"
+    assert call["lane"] == "live-odds-worker-nfl-lines", "must not contend with the combined sweep's lane"
+    assert call["skip_mirror"] is True and call["regions"] == "us"
+    # The interval gate holds the second call inside 150 s.
+    worker._launch_autorun_nfl_lines_refresh()
+    assert len(launched) == 1
+
+
+def test_the_capture_thread_launches_nfl_too(worker, monkeypatch):
+    calls = []
+    monkeypatch.setattr(worker, "_launch_autorun_wnba_live_refresh", lambda: calls.append("wnba"))
+    monkeypatch.setattr(worker, "_launch_autorun_ncaaf_lines_refresh", lambda: calls.append("ncaaf"))
+    monkeypatch.setattr(worker, "_launch_autorun_nfl_lines_refresh", lambda: calls.append("nfl"))
+    worker._launch_inplay_capture_autoruns("thread")
+    assert calls == ["wnba", "ncaaf", "nfl"]
+
+
+def test_an_nfl_failure_never_costs_the_ncaaf_launch(worker, monkeypatch, capsys):
+    calls = []
+    monkeypatch.setattr(worker, "_launch_autorun_wnba_live_refresh", lambda: None)
+    monkeypatch.setattr(worker, "_launch_autorun_ncaaf_lines_refresh", lambda: calls.append("ncaaf"))
+    monkeypatch.setattr(worker, "_launch_autorun_nfl_lines_refresh", lambda: (_ for _ in ()).throw(RuntimeError("nfl boom")))
+    worker._launch_inplay_capture_autoruns("loop")
+    assert calls == ["ncaaf"]
+    assert "NFL_LINES_AUTORUN_ERROR source=loop RuntimeError: nfl boom" in capsys.readouterr().out
+
+
+def test_the_nfl_odds_step_passes_the_refresh_mode_through(monkeypatch):
+    """`--mode fast` must reach refresh_nfl_oddsapi.py, or a fast run still fetches props."""
+    import argparse
+    import importlib.util
+    import pathlib
+
+    path = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "refresh_odds_sources.py"
+    import sys
+
+    spec = importlib.util.spec_from_file_location("test_refresh_odds_sources_nfl", path)
+    module = importlib.util.module_from_spec(spec)
+    # Registered BEFORE exec: the module defines dataclasses, and @dataclass
+    # resolves its own module out of sys.modules while the class body runs.
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    seen = {}
+    for mode in ("fast", "full"):
+        args = argparse.Namespace(date="2026-09-20", season=2026, week=3, mode=mode, phase="live")
+        steps = module._build_nfl_steps(args)
+        odds = next(s for s in steps if s.name == "nfl_oddsapi_refresh")
+        command = list(odds.command)
+        assert "--mode" in command, "the step drops --mode, so fast runs props anyway"
+        seen[mode] = command[command.index("--mode") + 1]
+    assert seen == {"fast": "fast", "full": "full"}

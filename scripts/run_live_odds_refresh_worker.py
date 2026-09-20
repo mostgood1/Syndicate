@@ -687,6 +687,140 @@ def _launch_autorun_ncaaf_lines_refresh() -> None:
     )
 
 
+def _nfl_lines_refresh_enabled() -> bool:
+    # DEFAULT OFF, this file's convention for new periodic work (`#241`).
+    raw_value = str(os.environ.get("SYNDICATE_ENABLE_NFL_LINES_REFRESH_AUTORUN") or "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
+def _nfl_lines_refresh_interval_seconds() -> int:
+    raw_value = str(os.environ.get("SYNDICATE_NFL_LINES_REFRESH_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = int(raw_value or 300)
+    except ValueError:
+        value = 300
+    return max(1, value)
+
+
+def _nfl_lines_refresh_horizon_days() -> int:
+    raw_value = str(os.environ.get("SYNDICATE_NFL_LINES_REFRESH_HORIZON_DAYS") or "").strip()
+    try:
+        return max(0, int(raw_value or 1))
+    except ValueError:
+        return 1
+
+
+def _nfl_lines_refresh_lane() -> str:
+    raw_value = str(os.environ.get("SYNDICATE_NFL_LINES_REFRESH_LANE") or "").strip()
+    return raw_value or "live-odds-worker-nfl-lines"
+
+
+def _nfl_lines_autorun_status_path() -> Path:
+    return reports_root() / "refresh_status" / "latest" / "nfl_lines_autorun_status.json"
+
+
+def _nfl_active_for_date(date_str: str) -> bool:
+    active = {item.strip().lower() for item in _active_sports_for_date(date_str).split(",") if item.strip()}
+    return "nfl" in active
+
+
+def _nfl_has_games_within_horizon(date_str: str) -> bool:
+    """Same predicate the ownership split uses; `unknown_means_yes` inherited."""
+    try:
+        from syndicate.features.shared.schedule_adapter import sport_has_games_within
+
+        return bool(sport_has_games_within("nfl", date_str, horizon_days=_nfl_lines_refresh_horizon_days()))
+    except Exception as exc:  # noqa: BLE001 -- an unreadable schedule over-captures rather than going dark
+        print(f"[live_odds_worker] NFL_LINES_SCHEDULE_UNREADABLE {type(exc).__name__}: {exc}", flush=True)
+        return True
+
+
+def _report_previous_nfl_lines_run(last_status: dict) -> None:
+    if not last_status:
+        return
+    err = last_status.get("error")
+    if err:
+        print(f"[live_odds_worker] NFL_LINES_AUTORUN_PREV date={last_status.get('date')} FAILED {err}", flush=True)
+        return
+    print(
+        f"[live_odds_worker] NFL_LINES_AUTORUN_PREV date={last_status.get('date')} launched=ok "
+        f"runStamp={last_status.get('runStamp')} artifactsDir={last_status.get('artifactsDir')}",
+        flush=True,
+    )
+
+
+def _launch_autorun_nfl_lines_refresh() -> None:
+    """NFL's twin of the NCAAF lines autorun (lane `live-inplay-board-cadence`).
+
+    WHY NFL NEEDED ITS OWN LANE. Its in-play odds came only from the combined
+    sweep, which runs `--sports mlb,wnba,ncaaf,soccer,...` `--mode full` and was
+    MEASURED on 2026-09-19 at about an hour per pass, two passes overlapping. An
+    in-play quote older than 300 s at grid build never reaches the board, so on
+    that cadence NFL interval rows were stale before they were written.
+
+    `mode="fast"` is what makes the cadence affordable, and it only became true
+    for NFL in this same change: the step now passes `--mode` through, so a fast
+    run fetches TEAM ODDS ONLY (plus this sport's configured segment markets,
+    which `fetch_nfl_team_odds_local` appends to the shared quote log) and leaves
+    player props -- the largest credit family on the platform -- to the full sweep.
+    """
+    if not _nfl_lines_refresh_enabled():
+        return
+    selected_date = central_today_iso()
+    if not _nfl_active_for_date(selected_date):
+        return
+    if not _nfl_has_games_within_horizon(selected_date):
+        return
+    status_path = _nfl_lines_autorun_status_path()
+    last_status = read_json_file(status_path) or {}
+    _report_previous_nfl_lines_run(last_status)
+    if last_status and not last_status.get("reported"):
+        try:
+            write_json_file(status_path, {**last_status, "reported": True})
+        except Exception:  # noqa: BLE001
+            pass
+    last_epoch = float((last_status or {}).get("epoch") or 0.0)
+    if last_epoch > 0.0 and (time.time() - last_epoch) < float(_nfl_lines_refresh_interval_seconds()):
+        return
+    try:
+        result = launch_refresh_run(
+            date=selected_date,
+            sports="nfl",
+            phase="live",
+            execution_mode="source",
+            regions="us",
+            skip_mirror=True,
+            mode="fast",
+            launch_mode="web_process",
+            lane=_nfl_lines_refresh_lane(),
+        )
+    except Exception as exc:
+        if _is_refresh_run_contention_error(exc):
+            # `#472`: preserve the ORIGINAL epoch on contention, so one lost
+            # mutex race costs a short retry rather than a full interval.
+            write_json_file(status_path, {**last_status, "sports": "nfl", "date": selected_date, "error": f"{type(exc).__name__}: {exc}", "reported": False})
+        else:
+            write_json_file(status_path, {"epoch": time.time(), "sports": "nfl", "date": selected_date, "error": f"{type(exc).__name__}: {exc}"})
+        print(f"[live_odds_worker] NFL_LINES_AUTORUN_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return
+    write_json_file(
+        status_path,
+        {
+            "epoch": time.time(),
+            "sports": "nfl",
+            "date": selected_date,
+            "artifactsDir": (result or {}).get("artifactsDir"),
+            "runStamp": (result or {}).get("runStamp"),
+            "reported": False,
+        },
+    )
+    print(
+        f"[live_odds_worker] NFL_LINES_AUTORUN_LAUNCHED date={selected_date} phase=live mode=fast "
+        f"lane={_nfl_lines_refresh_lane()} interval_s={_nfl_lines_refresh_interval_seconds()}",
+        flush=True,
+    )
+
+
 def _launch_autorun_soccer_pregame_refresh() -> None:
     if not _soccer_pregame_refresh_enabled():
         return
@@ -2647,6 +2781,10 @@ def _launch_inplay_capture_autoruns(source: str) -> None:
             _launch_autorun_ncaaf_lines_refresh()
         except Exception as exc:  # noqa: BLE001
             print(f"[live_odds_worker] NCAAF_LINES_AUTORUN_ERROR source={source} {type(exc).__name__}: {exc}", flush=True)
+        try:
+            _launch_autorun_nfl_lines_refresh()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[live_odds_worker] NFL_LINES_AUTORUN_ERROR source={source} {type(exc).__name__}: {exc}", flush=True)
 
 
 def _inplay_capture_background_loop() -> None:

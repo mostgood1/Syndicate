@@ -983,8 +983,26 @@ def _build_nfl_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 str(season),
                 "--week",
                 str(week),
+                # THE MODE WAS NEVER PASSED THROUGH, so `--mode fast` skipped
+                # NCAAF's props and ran NFL's anyway. `refresh_nfl_oddsapi.py`
+                # has implemented the split since it was written: `full` fetches
+                # team odds THEN player props and materialises the artifact
+                # bundle; `fast` runs team odds only. Team odds are the cheap
+                # half and the one the board's in-play rows come from --
+                # `fetch_nfl_team_odds_local` appends full-game AND segment rows
+                # to the shared quote log (`_append_nfl_team_book_quotes`, on
+                # `events + segment_payloads`), which is what `book_grid` reads.
+                # Props are the platform's largest credit family (1,470,478 of
+                # 5M this period), so a short in-play cadence is only affordable
+                # with them left to the full sweep.
+                #
+                # NOT A BEHAVIOUR CHANGE FOR EXISTING SWEEPS: production runs
+                # `SYNDICATE_LIVE_ODDS_REFRESH_MODE=full` on both workers, and
+                # `full` is this argument's default on both sides.
+                "--mode",
+                str(getattr(args, "mode", "full") or "full").strip().lower() or "full",
             ),
-            description="Refresh NFL team odds and player props into a Syndicate-owned artifact bundle.",
+            description="Refresh NFL team odds (fast) plus player props and the artifact bundle (full).",
         ),
     ]
     # Only shell fetch_nfl_preseason_odds.py while there's still an unplayed
