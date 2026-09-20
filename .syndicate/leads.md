@@ -195,3 +195,10 @@ because the work kept deviating:
 - **Why it is not obviously harmful:** in the 16:45:58Z sample the two sets are disjoint identities (overlay 7 soccer rows, shortlist 7 others), so nothing was displaced. Whether a same-identity displacement happens, and how often, is UNMEASURED.
 - **The fix, if it is real:** replace only when the overlay's quote is NEWER. The overlay card carries `price_grid_generated_at` + `book_age_seconds`; the shortlist side needs its `written_at` (available to `_layer2_fallback_recommendations`, which already reads the payload) minus the card's `book_age_seconds`. Same clock on both sides, so the comparison is well-defined.
 - **Measure first:** log, per merge, how many replacements made the served quote OLDER and by how much (`INPLAY_OVERLAY_MERGED` already prints `replaced`). If that count is ~0, leave the code alone and record that.
+
+## 2026-09-20 16:50Z — Layer 2's build time is dominated by uncached team-name normalisation `[lane board-build-stage-slowdown, session a1e40980]`
+
+- **Measured** (4 profiled builds, 09-19 16:10-16:36Z, 544.9M calls in 271.5 s): `team_aliases.normalize` 116.9 s internal, `canonical_team` 45.1 s, `teams_match` 17.0 s (cum 83.1 s), `_alias_map` 14.3 s. ~193 s of internal time in one path; `board_enrichment.attach_game_state` carries 76.3 s cumulative.
+- **Why it looks cheap to fix:** `normalize` is `" ".join(str(value or "").strip().lower().replace(...).split())` -- pure, tiny, and called with a SMALL set of distinct team strings over and over. `team_aliases.py` already imports `lru_cache` and uses it at `:73, :101, :444, :491`.
+- **Do not just add it:** bound the cache (distinct inputs include more than team names), and measure the span median before/after -- the lane's own pre-registered bar. A perf change to a shared hot module without a before/after is how the 150 s NCAAF knob happened (it changed nothing and read as a fix).
+- `team_aliases.py` was claimed by no OPEN lane at 16:49Z.
