@@ -291,3 +291,36 @@ def test_each_date_prints_its_timing_split(tree: Path, tmp_path: Path, capsys: p
     assert "result_files=10" in line
     for field in ("ledger_s=", "walk_s=", "rows_s=", "match_s=", "write_s=", "total_s="):
         assert field in line
+
+
+def test_the_timing_line_says_WHY_nothing_resolved(tree: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A 0-resolved date must explain itself.
+
+    MEASURED 2026-09-19, the first autorun after the walk fix: every one of 13
+    dates read `resolved=0`, including dates with plenty of result rows (07-05:
+    20 predictions against 906 rows). A single `skipped` counter cannot separate
+    "nothing was resolvable" from "the matcher stopped matching" -- and the
+    comparison that would have settled it does not exist retrospectively,
+    because this timing line is NEWER than the code it replaced. So the line
+    carries the breakdown.
+    """
+    ledger_path = tmp_path / "prediction_ledger.json"
+    _record(ledger_path, "matched", player="Jane Doe")          # resolves off the fixture tree
+    # Disjoint on BOTH key axes: the fixture rows are player "Jane Doe", market
+    # "points", and the matcher refuses a row that names a different market.
+    _record(ledger_path, "nobody", player="Nobody Here", market="assists")
+
+    recon.reconcile_prediction_results_for_date(DATE, ledger_path=ledger_path, result_roots=[tree])
+    line = next(l for l in capsys.readouterr().out.splitlines() if "RECONCILE_DATE_TIMING" in l)
+
+    assert "resolved=1" in line and "skipped=1" in line
+    assert '"no_result_row_matched":1' in line, line
+
+    # A SECOND run over the same ledger: the first prediction now carries a
+    # terminal outcome, so its skip is `already_resolved` -- a different fact
+    # from an unmatched row, and the reason a bare `skipped` count misleads.
+    recon.reconcile_prediction_results_for_date(DATE, ledger_path=ledger_path, result_roots=[tree])
+    line2 = next(l for l in capsys.readouterr().out.splitlines() if "RECONCILE_DATE_TIMING" in l)
+    assert '"already_resolved":1' in line2, line2
+    assert '"no_result_row_matched":1' in line2, line2
+    assert "resolved=0" in line2 and "skipped=2" in line2

@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import time
+from collections import Counter
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -446,6 +447,14 @@ def reconcile_prediction_results_for_date(
 
     resolved = 0
     skipped = 0
+    # WHY A BREAKDOWN. On 2026-09-19's first post-fix autorun every date read
+    # `resolved=0`, including dates with plenty of result rows (07-05: 20
+    # predictions against 906 rows). A single `skipped` counter cannot tell
+    # "nothing was resolvable" from "the matcher stopped matching", and the
+    # comparison that would have settled it does not exist retrospectively:
+    # this timing line is newer than the old code it replaced. So the line now
+    # carries its own explanation.
+    skip_reasons: Counter[str] = Counter()
     result_files = [str(path) for path in result_paths]
     reconciled_predictions: list[dict[str, Any]] = []
     # Also INFO: the debug payload below serialises every result row, so it is
@@ -459,6 +468,7 @@ def reconcile_prediction_results_for_date(
         result = prediction.get("result") if isinstance(prediction.get("result"), Mapping) else None
         if result and _normalize_text(result.get("outcome")) in {"win", "loss", "push", "void"}:
             skipped += 1
+            skip_reasons["already_resolved"] += 1
             reconciled_predictions.append(dict(prediction))
             continue
 
@@ -480,12 +490,14 @@ def reconcile_prediction_results_for_date(
                     )
                 )
             skipped += 1
+            skip_reasons["no_result_row_matched"] += 1
             reconciled_predictions.append(dict(prediction))
             continue
 
         outcome = _row_outcome(matched_row, prediction)
         if outcome is None:
             skipped += 1
+            skip_reasons["outcome_unreadable"] += 1
             reconciled_predictions.append(dict(prediction))
             continue
 
@@ -514,6 +526,7 @@ def reconcile_prediction_results_for_date(
     print(
         f"[prediction_reconciliation] RECONCILE_DATE_TIMING date={date_token} "
         f"predictions={len(scoped_predictions)} resolved={resolved} skipped={skipped} "
+        f"skipped_by={json.dumps(dict(sorted(skip_reasons.items())), separators=(',', ':'))} "
         f"result_files={len(result_paths)} result_rows={len(result_rows)} "
         f"ledger_s={loaded_ledger - started:.2f} walk_s={walked - loaded_ledger:.2f} "
         f"rows_s={read_rows - walked:.2f} match_s={finished - read_rows - write_seconds:.2f} "
