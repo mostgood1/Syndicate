@@ -38620,3 +38620,15 @@ Scheduled task `fotmob-alias-verify-0919-pm`, which fired ~7h late (21:16 CT, no
 - **Numbers unchanged for the projection and the props:** proven offline against origin/main's own pre-change module, field for field on two fixtures (`log/2026-09-19.md` ~11:10 CT). Nothing in this deploy could move them, and no production surface contradicts it.
 - **Cost, NOT isolated on production:** per-league tick gap since go-live 144 s with 1-2 matches in play (n 164) and **127 s with 3-5 (n 16), against 202 s on 09-12 and 220 s on 09-18** for that bucket. Faster, but the same deploy carried `bad3b94e` (in-play capture on its own 30 s clock) and an overnight slate runs fewer sports, so this is consistent with the change and does not attribute the gain to it. The isolated figure stays the controlled benchmark: **-41% / -48% of per-match Monte Carlo** (same states, old and new code alternated).
 - **Owed by this lane: nothing.** The verification the lane registered has run.
+
+## 2026-09-20 15:43:51Z (10:43 CT) — READING (2 of 2) for `#674` (`0bbdbcf2`, live on refresh-worker since 2026-09-19 00:45:38Z via `c03351aa`) — lane nhl-player-game-log — **producer half MET; the Ask half is NOT GRADEABLE (0 pregame NHL prop rows on the board), which is not a failure**
+
+- **Web's `nhl_source/source_artifacts/data/raw/player_game_stats.csv`**, read at 15:43:51Z:
+  - mtime **2026-09-20T07:57:21Z** — rewritten after the preseason games ended (~04:00Z), by a scheduled NHL refresh, with no hand intervention.
+  - **1,920 rows / 48 distinct gamePk**, against reading 1's 1,640 / 41. The older rows are all still there.
+  - The 7 new games are exactly the first 2026-27 preseason slate: `2026010001` .. `2026010007`.
+  - Newest `date` **2026-09-20T01:00:00Z** (reading 1: 2026-06-15).
+  - **0 blank skater `shots`, 0 blank goalie `shotsAgainst`** — the repair path held on new rows.
+- **The Ask half cannot be graded yet.** `scripts/prop_evidence_checklist.py --sports nhl --sample 6` against production: `nhl: UNVERIFIED: 0 answered rows < 8 pregame_props=0 answered=0/0`. The board carries no pregame NHL prop row to ask about, so there is nothing to sample. Offline, the same run reads `nhl: player_sim=ok, recent_form=ok, matchup=ok, advanced=ok, game_sim=ok, environment=ok`.
+- **This reading was taken by hand, not by its scheduled task.** Task `nhl-674-reading-0920` (fireAt 14:00Z / 09:00 CT) shows `totalRuns: 0` — it never fired, and the app was closed at that moment. The producer's own scheduling is what this lane tested, and that ran on time; only my reading of it was late.
+

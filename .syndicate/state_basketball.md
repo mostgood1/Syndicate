@@ -155,8 +155,14 @@ through `write_text_file` into keyvalue (10-day TTL), never onto disk.
 
 The fix is `0465103e` (lane `wnba-postgame-to-disk`). It publishes files on disk,
 excludes the dated box scores from keyvalue, and backfills slates never published
-from here. **Deployed to refresh-worker `7301fe67`, live 15:39:17Z. Web receiving
-the files is NOT yet verified.**
+from here. **Deployed to refresh-worker `7301fe67`, live 15:39:17Z, and VERIFIED
+2026-09-19/20 (`deploys.md` readings 15:55:52Z, 17:59:14Z, 03:12Z): the first tick
+published `boxscores_2026-09-18.csv` and its three recon files; web then listed every
+WNBA date with games 08-26..09-18 (115 dated files, baseline 108 ending 08-25), and the
+board-prop Asks stopped printing their STALE recent-form row. 2026-08-31..09-16 had no
+games. Four of eleven ticks published `false` because a web deploy was restarting web;
+each recovered on the next hourly attempt (a failed publish still costs one of the 3
+rebuild attempts -- `leads.md` 2026-09-20).**
 
 Two things any reader of this family must know:
 
