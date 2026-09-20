@@ -854,6 +854,8 @@ a schedule.**
 **Render labels a voluntary process exit `server_failed`.** That is a platform
 naming artifact. Any audit that counts the events without the reason inflates.
 
+**RE-CONFIRMED OVER A LONGER WINDOW `[2026-09-20, lane nhl-season-readiness, read-only]`.** live-odds-worker, 2026-09-17T12:40:35Z .. 2026-09-20T00:00:00Z, events API fully paged: 52 events, `oomKilled` **0**, `earlyExit` **8** -- and all **8 of 8** match 1:1 to a `LIVE ODDS REFRESH WORKER RECYCLING after <n>s uptime` line seconds earlier, uptimes 20,413-23,791 s (the 21,600 s +/-10% jitter). So on this service the earlyExit:recycle ratio is currently 1.00 -- an earlyExit with NO recycle line before it would be the anomaly worth chasing.
+
 **A THIRD meaning, and this one makes a census UNDERCOUNT rather than inflate
 `[2026-09-04, lane web-sigkill-137-cohort]`.** `reason.nonZeroExit` — the
 process returned a code — was unnamed by `classify()` until 2026-09-04 and fell
