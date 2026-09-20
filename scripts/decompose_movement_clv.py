@@ -72,9 +72,19 @@ WHAT THIS DOES NOT CLAIM
 ------------------------------------------------------------------------------
 GETTING THE TRAIL
 ------------------------------------------------------------------------------
-The trail is written on refresh-worker. As of 2026-09-20 it is NOT in
-`HOT_ARTIFACT_PATTERNS`, so `/api/ops/artifacts/export` returns `count=0` for it
--- verified, not assumed. Two routes, and `--trail-dir` accepts either:
+The trail is written on refresh-worker as HOURLY CHUNKS (`<date>T<hh>.jsonl`),
+each published to web exactly ONCE when its hour seals. Both shapes are read
+here: a date before 2026-09-20 is a single `<date>.jsonl`, after it a set of
+chunks, and a date spanning the change is both.
+
+It IS allowlisted in `HOT_ARTIFACT_PATTERNS` (2026-09-20) -- but the allowlist
+alone never moved this file, and that is worth knowing before trusting an empty
+result. Nothing in refresh-worker's MAIN LOOP sweeps (the generic sweep runs
+only from intermittently spawned jobs), and the old whole-day file exceeded the
+12 MiB `_PUBLISH_MAX_BYTES` silently, with no `_FAILED_DIRECT_PUBLISH` exemption
+because there was no direct call to fail. The publish-on-seal in
+`record_price_trail` is what actually pushes it. Two routes, and `--trail-dir`
+accepts either:
 
   1. Locally, against an exported or mirrored copy.
   2. On refresh-worker, against `$SYNDICATE_DATA_ROOT/intelligence/clv_price_trail/`.
@@ -403,13 +413,25 @@ def main() -> int:
         "no_forward_clv": 0,
     }
     for date in dates:
-        path = trail_dir / f"{date}.jsonl"
-        if not path.exists():
+        # EVERY file for the date: the legacy whole-day `<date>.jsonl` AND the
+        # hourly `<date>T<hh>.jsonl` chunks the writer produces since
+        # 2026-09-20. Reading only one shape would silently halve the
+        # population depending on which side of that change the date falls on.
+        paths = sorted(trail_dir.glob(f"{date}*.jsonl"))
+        if not paths:
             stats["trail_files_missing"] += 1
             continue
-        stats["trail_files_found"] += 1
-        trail = load_trail_file(path)
-        stats["trail_bad_lines"] += (trail.pop("__bad_lines__", [{"n": 0}]) or [{"n": 0}])[0]["n"]
+        stats["trail_files_found"] += len(paths)
+        trail = defaultdict(list)
+        for path in paths:
+            part = load_trail_file(path)
+            stats["trail_bad_lines"] += (part.pop("__bad_lines__", [{"n": 0}]) or [{"n": 0}])[0]["n"]
+            for key, points in part.items():
+                trail[key].extend(points)
+        # Chunks are individually ordered; merged they are not, and
+        # `observations()` treats the FIRST point as our open.
+        for points in trail.values():
+            points.sort(key=lambda r: r.get("t") or 0)
         for key, points in trail.items():
             stats["keys_in_trail"] += 1
             close_row = closes.get((date, key))
