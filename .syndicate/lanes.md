@@ -1689,6 +1689,23 @@ SAFE_SLUGS=ranking-records-build-cost,intelligence-idle-poll,closed-lane-archive
 - Step-4 cross-check: the 5 worktrees under `C:	mp\syndicate-sessions` holding uncommitted `.syndicate/` edits (bandwidth-controlled-transfer, layer2-sim-disagrees, live-gameline-accuracy-cut-repoint, mlb-ledger-segment-visibility, soccer-board-mlb-parity) mention none of the 4 SAFE slugs and none of their owner session ids.
 - Measurement: `lanes.md` 655,538 → 645,824 B in-worktree (CRLF); `lanes_closed.md` 904,315 → 918,655 B; 101 block lines moved, 3 pointers added. `check_lane_invariants.py` in-worktree: exit 0, all three invariants `[ok]` (baseline on origin/main in a scratch dir: 2 FAIL — contested `pipeline/execute_portfolio.py`, marker `ncaaf-live-moneyline-release` with no block). No new FAIL.
 
+### closed-lane-archive-20260919-2216 — CLOSED 2026-09-19 (GOAL NOT MET: 1 SAFE slug, 0 archivable — the shared tool rejects it) — opened 2026-09-19 — session 8eb963f9-1145-462a-ae71-d373a184d6ad
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Pre-registered reading, `owner_liveness.py --idle-min 240` at 2026-09-20T03:17:33Z (2026-09-19 22:17 CDT), worktree at `origin/main` `73fcd552`. 28 CLOSED blocks read, ONE SAFE:
+
+```
+ranking-records-build-cost               sessions[0f5b256e=1732m] lastmod[aebc040d=584m] -> SAFE
+SAFE_SLUGS=ranking-records-build-cost
+```
+
+  The 27 WAIT lines are recorded verbatim in `.syndicate/log/2026-09-19.md` rather than here, because this run moved nothing and `lanes.md` is 638 KB against a 234 KB cap. Grouped: owner `abacd435` (54m idle) holds 12; `a1e40980` (4m) holds 6; `4a583d41` (2m) holds 5; `nhl-season-readiness` and `closed-lane-archive-20260919-2116` were last modified 13m / 54m ago; `mlb-stop-publishing-edges` has an uncommitted `lanes.md` edit in worktree `bandwidth-controlled-transfer`.
+- Goal (restated verbatim): archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- **GOAL NOT MET — 0 blocks moved.** The one SAFE slug is the SAME one the 21:16 CDT run deferred. `archive_closed_lanes_before.py` needs a close date in the header both to select a block and to source its pointer, and `### ranking-records-build-cost — CLOSED — opened 2026-09-17 — session 0f5b256e…` has none. Measured, not assumed: the dry run raised `AssertionError: ('--only slug not eligible', ['ranking-records-build-cost'])`.
+- **This is a recurring defect now, not a one-off.** Two consecutive runs (21:16 and 22:17 CDT) found exactly one SAFE slug and archived nothing; a third will do the same. A PRIVATE patched copy of the tool was attempted and REFUSED by the auto-mode classifier (`[Modify Shared Resources]`); the shared tools in `C:\tmp\lane-archive-tools\` were NOT modified. The fix needs a human: in `archive_closed_lanes_before.py`, when a slug is named in `--only` together with `--owner-idle-verified`, let the `if not dated: continue` branch fall through with `pointer_src[slug] = headers[-1]` (and guard the `latest = max(…)` line in the summary print, which raises on an empty sequence). Cheaper alternative: owner `0f5b256e` adds a close date to that header.
+- Step-4 cross-check: owner `0f5b256e` is named by 11 lane blocks; its 4 worktrees that exist (`wnba-future-date-cache-carry`, `ranking-records-build-cost`, `nhl-season-readiness`, `worker-disk-auto-retention`) are all clean, 0 dirty paths each. The 5 worktrees holding uncommitted `.syndicate/` edits (bandwidth-controlled-transfer, layer2-sim-disagrees, live-gameline-accuracy-cut-repoint, mlb-ledger-segment-visibility, soccer-board-mlb-parity) mention neither the slug nor the owner id.
+- Measurement: `lanes.md` 638,121 B as the `origin/main` blob (LF) / 640,179 B in-worktree (CRLF) at 03:16Z; archiving changed it by 0 B, `lanes_closed.md` (911,093 B blob) untouched. **Note the perversity:** a zero-move run still adds its own lane block, so the hot file GROWS. The binding constraint is not the tool — it is that three long-running sessions (`abacd435`, `a1e40980`, `4a583d41`) own 23 of the 28 CLOSED blocks and are never idle 240m; at this rate the 240m gate can only ever collect stragglers.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
