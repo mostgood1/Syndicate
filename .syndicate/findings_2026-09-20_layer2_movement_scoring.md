@@ -99,8 +99,22 @@ holder session was not reachable in the CCD roster.
 `/api/ops/artifacts/export` refuses any single file over **8 MB**. Today's
 **already-allowlisted** `clv_openings/2026-09-20.jsonl` returns `count=0,
 oversize_skipped=1, oversize_bytes=15,691,334`. Every openings file since
-2026-09-01 is over the cap, up to **31.1 MB** on 09-19, against the allowlist
-comment's stated "~90 KB a day" — **174x stale**. The trail carries many points
+2026-09-01 is over the cap, up to **31,120,228 bytes on 09-19**, against the
+allowlist comment's stated "~90 KB a day" (`artifact_publisher.py:687`) —
+**345x stale at the 09-19 peak, 174x on 09-20**.
+
+> **Corrected 2026-09-20 after independent re-measurement by session a1e40980
+> (lane `pull-window-dated-scope`).** This sentence first read "up to 31.1 MB …
+> 174x stale", pairing the PEAK file with a multiplier computed from a
+> DIFFERENT day's file — the one defect this ledger has a standing rule about,
+> a number sitting next to a number it was not derived from. Both multipliers
+> are now stated with the day each belongs to. That session reproduced the
+> finding from its own session rather than banking mine: 09-20 `oversize_bytes`
+> **15,736,057** and 09-19 **31,120,228**. Its 09-20 reading is 44,723 bytes
+> larger than mine taken ~40 min earlier, which is the file still appending, not
+> a disagreement.
+
+The trail carries many points
 per key where openings carry one. Allowlisting it would have produced a pattern
 that *looks satisfied and transfers nothing*: `#208`'s lesson in its nastiest
 form. So `record_price_trail` now reports `bytes_on_disk`, and the harness
@@ -112,6 +126,24 @@ the worker->web sync. `decompose_sim_clv.py` is unaffected — it uses the
 server-side `/api/ops/clv/report` join, not a raw export. That is the pattern
 that scales, and the route a trail harness should copy if a worker-side run is
 not wanted.
+
+**THE SYNC PATH IS UNMEASURED AND IS NOT BEING ASSERTED BY ANYONE.** Session
+a1e40980 owns exactly that path (`pull_hot_artifacts`) and independently
+declined to claim it is fine: *"The files being present on web's disk is
+consistent with the sync working and only the CONTENT export refusing. I am not
+going to assert the sync is fine without measuring it, and I have not measured
+it today."* Two sessions now hold the same caveat from opposite directions,
+which is the correct state to leave it in — an open question with a named owner,
+not a null result. It has been flagged to the user as **unowned and larger than
+the one-line allowlist ask**.
+
+**The allowlist entry was NOT obtained, and correctly so.** Asked directly,
+a1e40980 refused to make the edit on a peer's request — *"Your lane guard
+refused you, and me doing it instead is the shape of thing I have to put to my
+user rather than decide between us"* — and surfaced it to the user with the
+reasoning intact. That refusal is right and is recorded here so nobody reads the
+missing entry as an oversight, or routes around a guard by asking a peer next
+time.
 
 ## Verification
 
