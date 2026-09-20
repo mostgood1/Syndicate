@@ -38986,3 +38986,42 @@ verified until that reading exists.**
 
 Claims released after this reading.
 
+
+## 2026-09-20 18:50Z (13:50 CT) — READING, no deploy — the OWED trail clause — lane `layer2-line-movement-scoring` — **MET EARLY, AND NOT BY THE MECHANISM I BUILT. Attribution corrected.**
+
+    reports/intelligence/clv_price_trail/2026-09-20T18.jsonl
+      196,841 bytes   mtime 18:46:53Z   export count 0 -> 1
+
+**THE PREDICTION IS MET — and crediting my fix for it would have been wrong.**
+`_publish_sealed_chunks` skips any chunk whose hour is `>= current_hour`. At
+18:46:53Z the current UTC hour WAS 18 and the chunk is `T18`, so my code
+provably did not push it, and could not have: no earlier chunk exists (the
+first write was after the 18:25Z deploy). **The SWEEP published it**, which is
+only possible because of the `HOT_ARTIFACT_PATTERNS` entry lane
+`pull-window-dated-scope` added in `2952bf2b`.
+
+**THIS IS THE CORRECTED STRUCTURAL CLAIM BEING CONFIRMED IN PRODUCTION.** My
+first version — *"the sweep does not run on refresh-worker"* — was retracted in
+`d3f8e7f4` as too strong; the corrected version was that a sweep reaches
+refresh-worker **intermittently, from spawned jobs**. That is exactly what
+happened, inside 25 minutes of the deploy. `[feedback_isolate_the_source_you_changed]`:
+a field with two possible producers verifies nothing until you know which one
+filled it.
+
+**WHAT THE TWO MECHANISMS EACH BUY, now that both are live.** The sweep gives
+EARLY but PARTIAL availability — this is a mid-hour snapshot of a chunk still
+being appended, and nothing guarantees another sweep before the hour ends.
+Publish-on-seal gives COMPLETENESS: the sealed `T18` is pushed once after
+19:00Z and never again. Neither alone is sufficient; the completeness half is
+still OWED a reading (`T18` growing past 196,841 bytes after 19:00Z).
+
+**AND IT SETTLES A QUESTION THAT WAS PREVIOUSLY UNMEASURABLE — the whole-day
+file WOULD have crossed the publish ceiling.** 196,841 bytes accumulated
+18:25:13Z -> 18:46:53Z is **8,988 bytes/min**, i.e. **~12.94 MB/day** against
+`_PUBLISH_MAX_BYTES` of 12,582,912 (12 MiB). Marginally OVER, on an evening
+sample — and this was listed as believed-not-verified until now. **CAVEAT,
+stated because it is a 22-minute extrapolation:** the rate is not flat across a
+day, so treat this as "the ceiling was genuinely in play", not as a day total.
+Each hourly chunk at ~560 KB is nowhere near the bound, which is the property
+the chunking was for.
+
