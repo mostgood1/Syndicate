@@ -979,6 +979,11 @@ That story ended; do not re-open it from the archive.**
 
 ## [deploy-discipline] DEPLOY DISCIPLINE — read before any deploy
 
+- **PREFLIGHT NOW HOLDS ON AN IN-FLIGHT BOARD BUILD `[2026-09-20, lane preflight-board-build-hold, `bafe9660`, tooling only]`.** The build is a THREAD inside `run_refresh_worker.py`, so it has no child process and the preflight — which reads the process table — was blind to it. `deploy_preflight.py` returns HOLD for refresh-worker while `check_deploy_safety.board_build_state()` says a build is in flight, UNKNOWN when unreadable, and `--allow-mid-build` is the escape (recorded on the receipt). A shell with no `RENDER_API_KEY` is "cannot ask", not "cannot tell" (it cannot deploy either), so that case is not applicable.
+  - **The completion marker moved from `LAYER2_SHORTLIST` to `BOARD_BUILD_TIMING`.** The shortlist write is MID-build: the kalshi join, `portfolio_commit` (~90 s), paper execution and the publish all follow it. The 2026-09-19 16:04:54Z kill landed in exactly that tail.
+  - **VERIFIED on production 2026-09-20 16:25:14Z:** `HOLD -- a board build is in flight started 16:24:54.488Z` (20 s old), previous completion 16:12:52.005Z.
+  - Windows DO exist: both deploys since fired on natural CLEARs with nothing killed (`bad3b94e` 03:30:11Z, `76a6f4a2` 16:00:21Z).
+
 - **`deploy_preflight.py` CLEAR IS BLIND TO refresh-worker's BOARD BUILD.** It
   HOLDs only on child jobs, cron runs and spacing; the intelligence-state build
   thread is not a job. **A refresh-worker deploy therefore discards any board
