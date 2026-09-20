@@ -38567,3 +38567,20 @@ Scheduled task `fotmob-alias-verify-0919-pm`, which fired ~7h late (21:16 CT, no
 - **All four goal clauses are now MET** (see the 15:55:52Z, 17:59:14Z and this reading): dated box scores reach web, the three recon files reach web, the dates missing since 08-25 are backfilled, and a WNBA board-prop Ask's recent-form table prints no STALE row.
 - **Steady state, already demonstrated:** 09-18 was published 15:55:46Z, the first tick after go-live, within a day of the games. 09-19's slate becomes due after 05:00Z 09-20 and needs no watching.
 
+
+## 2026-09-20 03:30:13Z (2026-09-19 22:30 CT) — DEPLOY — live-odds-worker `7c5a1dad` -> `bad3b94e` (`dep-danl6hajnfac7390i1eg`, origin/main) — lane live-inplay-board-cadence — **LIVE 03:36:09Z; verify: MET on (1)(2)(4); (3) unreadable, proxied**
+
+- **Why.** USER 2026-09-19 ~13:45 CDT chose "Decouple capture". MEASURED 17:24-18:31Z: the NCAAF lines autorun launched once per main-loop pass (passes 2.1-10.4 min), so its interval knob was inert -- launch-gap median **535 s at interval 300** and **532 s at 150**.
+- **What.** A thread calls the NCAAF-lines and WNBA-live launchers every 30 s under one lock shared with the loop's call (`SYNDICATE_INPLAY_CAPTURE_THREAD=off` returns to once per pass), plus the segment PREGAME tier on its own cadence. Env set 19:01:38Z, read back: `SYNDICATE_NCAAF_SEGMENT_PREGAME_INTERVAL_SECONDS` absent -> `1800`.
+- **Ride-alongs, owned by lane `soccer-live-shared-paths` (session abacd435), verified by that lane, not by mine** (their words):
+  - `ee05f778` -- one shared set of simulated paths for the live projection and the live player props: identical numbers, ~40% less per-match Monte Carlo.
+  - `3bced149` -- a goal-window fix: the window inherited `build_resume_state`'s stoppage default, so a 2nd-half "next 5 min" simulated 600 s; at 60' it published 0.195 where the model implies 0.100.
+  - Also riding: `c03351aa`, `9df3f4bc`, `f80120f3`, `0bbdbcf2`, `ef5ab75b`/`8462481f`/`45a15e34`, `0465103e`/`f6972a2b`, and the board commits. live-odds-worker had been on `7c5a1dad` since 17:18:33Z.
+- **Locks, and NO bypass was used.** Claim `live-inplay-board-cadence`. Preflight read HOLD (3-7 jobs) continuously from 19:12Z; the user authorized killing an in-flight sweep for this one deploy at ~21:1x CT, and it was NOT needed: at **03:30:11Z preflight returned CLEAR** ("only infrastructure processes running; 1 defunct child awaiting reap") once the slate wound down, and the runner fired on that. The claim released itself at 03:36:18Z.
+- **Reading (`capture_thread_reading.py`, `ncaaf_run_cost.py`, scratchpad a1e40980):**
+  - **(1) The thread runs:** `[inplay_capture] STARTED tick_seconds=30` at 03:40:51Z. Baseline 0 such lines.
+  - **(2) NCAAF capture cadence MET:** 7 `NCAAF_LINES_AUTORUN_LAUNCHED` by 03:56:26Z, gaps **153, 152, 154, 153, 152, 152 s**, median **152 s** against the 532 s baseline and the `--expect` of 150-200 s.
+  - **(3) `SEGMENT_PLAN`'s `pregame_deferred` is UNREADABLE** -- the fetch runs in a subprocess whose stdout never reaches Render's log collector (0 `SEGMENT_PLAN` matches all day, before and after). Proxied by (4).
+  - **(4) The credit cap holds:** NCAAF credits per capture run **229, 220, 115** (03:47-03:55Z, quota `by_sport` deltas at the 150 s cadence) against **~2,100 per run** measured 18:38-18:50Z with every interval on up to 80 events. Whole-service burn 3,969-4,116/h against ~14-20K/h on the afternoon slate.
+  - **(5) WNBA: 0 launches** -- no WNBA game was live in the window, so that half is UNMEASURED, not verified.
+- **NOT claimed.** That a full Saturday slate stays near today's spend: (4) was measured on a late-night slate with few games in play. The Sunday NFL slate is the next test, and NFL has no dedicated in-play lane yet -- its capture still rides the combined sweep.
