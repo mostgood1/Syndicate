@@ -38893,3 +38893,40 @@ Claim released after this row.
 - **(5) NCAAF: 0 launches all window** — correct, there is no college slate on a Sunday, and the game-day gate held it off rather than spending on an empty date.
 - **Board side, same window (separate reading, deploys.md 17:16Z and its 17:25Z correction):** NFL interval cards reached the served board — peak h1 66, q1 57, h2 29, q3 23, q4 22, q2 20.
 - **NOT claimed:** the WNBA half of the capture thread is still UNMEASURED (0 WNBA launches in any reading window to date, since `_launch_autorun_wnba_live_refresh` has its own liveness gate).
+
+## 2026-09-20 18:19Z (13:19 CT) — DEPLOY — refresh-worker `aebc040d` -> `96e17478` (`dep-dao27a2jnfac73aaehhg`) AND web `bdc45c11` -> `96e17478` (`dep-dao27gbtqb8s73dkfhkg`), both origin/main — lane `layer2-line-movement-scoring` — **verify: PENDING**
+
+**PREDICTIONS WRITTEN BEFORE THE RESULT WAS KNOWN.** Baseline read
+2026-09-20T18:16:38Z on `/api/board/layer2-shortlist?limit=2000`
+(`written_at` 18:08:39Z) and on the artifact export:
+
+    field                                          baseline -> expected
+    line_moved_rows_with_null_movement_component   1266     -> fewer than 1266
+    rows_carrying_score_movement_kind              0        -> more than 0
+    clv_price_trail_export_count                   0        -> at least 1
+    rows_refused_by_movement                       null     -> non-null integer
+    rows_admitted_by_movement                      null     -> non-null integer
+    rows_admitted_by_blend                         225      -> stays in 150..400   [NEGATIVE CONTROL]
+
+**WHY TWO SERVICES, IN THIS ORDER.** refresh-worker BUILDS the counters and
+writes/publishes the trail chunks; web's endpoint FORWARDS the counters. web
+alone leaves them null — the builder/endpoint split this lane already fixed
+once. `live-odds-worker` deliberately NOT in scope.
+
+**THE DEFECT IS MUCH BIGGER THAN THE MORNING READING SAID.** At 16:23:40Z,
+114 of 2,000 served rows were `line_moved` and scored exactly 0.0 on movement
+(5.7%). At the 18:16:38Z baseline it is **1,266 of 2,000 (63.3%), all 1,266
+with a null `movement_component`**. The 5.7% was a point-in-time reading, not a
+ceiling: the share grows through the day as lines move.
+
+**PREFLIGHT HELD FIRST, AND IT WAS RIGHT TO.** 18:16:42Z returned `HOLD: 9
+job(s) in flight` — including `run_mlb_daily_sim_job.py --reason tip_off_window
+--only-game-pks 823001,824139,824546` (1000 sims, 2 workers) with its vendor
+`daily_update.py` chain, plus a live soccer odds refresh. Waited; 18:18:42Z
+returned **CLEAR, jobs=0**, and both services were deployed inside that window.
+No in-flight sim was killed.
+
+**RISK ACCEPTED AND STATED:** the target is ~80 commits ahead of
+refresh-worker's live `aebc040d`, so this ships many other lanes' work. That is
+the dominant risk, not the movement term.
+
