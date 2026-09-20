@@ -80,6 +80,43 @@ once after being removed — a stale-read write on this shared file resurrected
 them alongside their own replacement. If they show up a third time, delete
 them again rather than assuming the merge was reverted: the merged rule and
 the evidence file are the source of truth.
+## 2026-09-20 FORBIDDEN: reading a comment REPEATED across files as corroboration `[lane layer2-line-movement-scoring]`
+
+A sentence copied into six places is **one claim with six copies**, not six
+independent confirmations. Copies do not age independently either: when the
+code moves, every copy is stale at once, and the count makes the stale claim
+look better established the more it has spread.
+
+I asserted *"`sweep_changed_hot_artifacts` does not run on refresh-worker"* on
+the strength of *"its only production caller is `live_lens_loop`, on another
+service"* appearing at `artifact_publisher.py:496` and `:561`,
+`run_refresh_worker.py:1631` and `:3049`, `build_ncaaf_roster_snapshot.py:81`
+and `refresh_ncaaf_player_game_stats.py:200`. Six sites. **The claim is stale:**
+`artifact_publisher.py:1490` says the sweep has **FOUR** paths into it, names
+them, and records an incident caused by believing otherwise -- *"a guard on one
+of them is bypassed by the other three -- which is exactly what happened"*.
+`run_refresh_worker.py:4380` spawns one of them.
+
+**THE AGGRAVATING DETAIL: the contradicting line was in my own grep output.** I
+ran `grep -rn sweep_changed_hot_artifacts`, `:1490` printed, and I read past it
+because six agreeing lines had already settled the question. Repetition did not
+just fail to help -- it actively suppressed the one line that mattered.
+
+**AND I COMPOUNDED IT** by taking a peer's 75-minute window of
+`publishedArtifacts 0` as "never", which is this file's own
+absence-in-a-window rule, cited by me at two other people the same day.
+
+**THE RULE.** A comment is a claim by one author at one time. Corroboration
+comes from a DIFFERENT KIND of evidence -- the call graph, a runtime counter, a
+log line -- never from the same sentence found again. Before resting a
+structural claim on a comment: grep for the SYMBOL and read every hit,
+especially the ones that disagree; prefer the site that ENUMERATES ("four paths
+into it") over the site that ASSERTS ("the only caller"), because the enumerator
+had to look.
+
+Retracted within the hour, before anyone built on it: `c99bc013` corrected in
+the lane.
+
 ## 2026-09-20 FORBIDDEN: quoting a RATIO next to an extreme value it was not computed from `[lane layer2-line-movement-scoring]`
 
 Caught by a PEER session re-measuring rather than banking my reading, which is
