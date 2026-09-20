@@ -80,6 +80,37 @@ once after being removed — a stale-read write on this shared file resurrected
 them alongside their own replacement. If they show up a third time, delete
 them again rather than assuming the merge was reverted: the merged rule and
 the evidence file are the source of truth.
+## 2026-09-20 FORBIDDEN: quoting a RATIO next to an extreme value it was not computed from `[lane layer2-line-movement-scoring]`
+
+Caught by a PEER session re-measuring rather than banking my reading, which is
+the only reason it was caught at all.
+
+I wrote: *"Every openings file since 2026-09-01 is over the cap, up to **31.1 MB**
+on 09-19, against the allowlist comment's stated '~90 KB a day' -- **174x stale**."*
+
+Both numbers are TRUE and they do not belong to each other. 174x is
+15,691,334 / 90,000, which is **09-20's** file. The 31.1 MB sitting beside it is
+**09-19's**, and its ratio is **345x**. A reader takes a multiplier as the
+multiplier OF THE NUMBER NEXT TO IT -- that is what adjacency means in prose --
+so the sentence asserts something false while containing no false number.
+
+**THE RULE.** When a ratio and an absolute sit in one sentence they must be the
+SAME OBSERVATION. If you want the peak's magnitude AND a typical ratio, that is
+two sentences or two labelled pairs, never one clause. State the denominator AND
+the date/row each figure came from.
+
+**WHY 'a rate, not a count' DOES NOT COVER THIS.** That rule is about a MISSING
+denominator. Here the denominator is present and correct; the defect is that the
+NUMERATOR silently changed between the two halves of the sentence, so a check for
+"did I divide by something" passes. The check that catches it: **point at the
+exact row each number came from, and if two figures in one clause point at
+different rows, split the clause.**
+
+Corrected in place in `findings_2026-09-20_layer2_movement_scoring.md` rather
+than silently patched, with the peer's independent reproduction beside it
+(09-19 31,120,228; 09-20 15,736,057 -- 44,723 bytes above mine 40 min earlier,
+which is the file still appending, not a disagreement). `c21312f7`.
+
 ## 2026-09-08 FORBIDDEN: a parity check that compares PRESENTATION and ignores CAPABILITY `[lane nfl-ncaaf-ui-parity]`
 
 **What we believed.** That moving NFL onto NCAAF's card partial was a strict
