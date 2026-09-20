@@ -726,6 +726,32 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # and on its owner's user decision -- the pattern list itself is unheld, and
     # this lane recorded "no objection" to the same shape for
     # `model-scorecard-cron` and `prop-evidence-parity` on 2026-09-17.
+    #
+    # THIS ENTRY IS NECESSARY AND NOT SUFFICIENT, and the shortfall is silent.
+    # `sweep_changed_hot_artifacts` is generic over this tuple, so the entry
+    # alone does make the trail eligible -- no call site needed. But the sweep
+    # obeys `_PUBLISH_MAX_BYTES` (12 MiB) and `_publish_skip_reason` returns
+    # `too_large:<size>` UNLESS the path sits in `_FAILED_DIRECT_PUBLISH`, which
+    # only a FAILED DIRECT publish ever populates. `clv_openings` clears the
+    # ceiling because it calls `publish_hot_artifact` itself
+    # (`clv_opening_ledger.py:369-371`); `clv_price_trail.py` has NO such call
+    # (verified 2026-09-20), so it can never enter that set and the ceiling has
+    # no fallback for it.
+    #
+    # The failure mode is therefore NOT a clean refusal: the trail publishes
+    # while under 12 MiB and is skipped above it, so web ends up with a copy
+    # TRUNCATED IN TIME -- the morning without the evening -- which reads as
+    # complete. For a forward-CLV harness that is the wrong half, since the
+    # observations nearest the close are the ones lost.
+    #
+    # NOT MEASURED: whether the trail crosses 12 MiB at all. `clv_openings` runs
+    # 15.7-31.1 MB at ~1,053 bytes/record; a trail record is ~150 bytes, so it
+    # may sit comfortably under. Two independent ways to settle it once anything
+    # deploys: `record_price_trail`'s `bytes_on_disk`, and this sweep's own
+    # `skipped` counter with reasons. Reported by lane
+    # `layer2-line-movement-scoring`, whose first read (that the trail could
+    # never publish at all) it then retracted; the ceiling is the real ceiling.
+    #
     # Allowlisting PERMITS the transfer; the producer still has to publish.
     "reports/intelligence/clv_price_trail/*.jsonl",
     # The PRE-PUBLICATION population (`opportunity_population_ledger`, lane
