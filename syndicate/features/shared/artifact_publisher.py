@@ -731,8 +731,18 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # MEASURED 2026-09-20 17:36Z, the positive/negative contrast rather than an
     # absence: on refresh-worker `PUBLISH_OK` 339 (its per-path direct
     # publishes) but `publishedArtifacts` **0** and `PUBLISH_SKIPPED_UNCHANGED`
-    # **0** since 16:30Z, while live-odds-worker emits both constantly. So the
-    # SWEEP DOES NOT RUN on refresh-worker -- and `pipeline/layer2_shortlist.py`
+    # **0** since 16:30Z, while live-odds-worker emits both constantly. So NO
+    # SWEEP RAN ON refresh-worker IN THAT 75-MINUTE WINDOW -- which is NOT the
+    # same as never, and the stronger claim was wrong when this lane first wrote
+    # it. The MAIN LOOP there does not sweep; a sweep reaches that service only
+    # from a SPAWNED JOB -- `publish_changed_hot_artifacts` at
+    # `run_queued_refresh_job.py:229/241` (spawned by `_spawn_pending_job`,
+    # `run_refresh_worker.py:4174`) and `run_mlb_daily_sim_job.py:666`. Those are
+    # rare: `run_refresh_worker.py:4183` measured the queued path at **0 samples
+    # >0 in 1.5 h** while the autorun path took 33. So the trail reaches web
+    # INTERMITTENTLY at best, and silently truncated above 12 MiB when it does --
+    # partial data that reads as data, which is worse than not arriving.
+    # `pipeline/layer2_shortlist.py`
     # writes the trail THERE (`[clv_price_trail] TRAIL date=2026-09-20
     # rows_in=4956 written=1182` at 17:14:36Z), with no `publish_hot_artifact`
     # call of its own. A file that is neither swept nor directly published does
