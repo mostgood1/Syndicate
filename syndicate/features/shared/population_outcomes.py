@@ -37,7 +37,9 @@ from typing import Any
 SETTLER_MODULES: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
     ("mlb", "syndicate.features.shared.population_outcomes_mlb", "MlbPopulationSettler", ("mlb",)),
     ("soccer", "syndicate.features.shared.population_outcomes_soccer", "SoccerPopulationSettler", ("soccer",)),
-    ("espn", "syndicate.features.shared.population_outcomes_espn", "EspnPopulationSettler", ("nfl", "ncaaf", "wnba")),
+    # `nba` added 2026-09-20 (lane `daily-accuracy-suite`). NCAAB is absent on purpose and
+    # for exactly one reason -- no team registry -- documented at `population_outcomes_espn.HANDLED_SPORTS`.
+    ("espn", "syndicate.features.shared.population_outcomes_espn", "EspnPopulationSettler", ("nfl", "ncaaf", "wnba", "nba")),
     ("nhl", "syndicate.features.shared.population_outcomes_nhl", "NhlPopulationSettler", ("nhl",)),
 )
 

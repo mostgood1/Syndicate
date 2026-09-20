@@ -320,3 +320,82 @@ def test_the_state_is_stored_gzipped_and_reads_back_either_way():
     assert msc.decode_state(None) is None
     assert msc.STATE_PATH.endswith(".json.gz")
 
+
+
+# ---------------------------------------------------------------------------------------
+# Coverage honesty (lane `daily-accuracy-suite`, 2026-09-20).
+#
+# Both of these are about the artifact DESCRIBING ITSELF. On 2026-09-20 production served
+# a `7d` and a `28d` window holding byte-identical cells -- 263 each -- because the
+# recorder had only run since 2026-09-14, and nothing in the payload said so. A reader had
+# no way to tell an under-backed window from a real one.
+# ---------------------------------------------------------------------------------------
+
+
+def test_a_window_reports_the_history_that_actually_backs_it():
+    """The production case, by its real numbers: recorder 2026-09-14, slate 2026-09-20."""
+    span = msc.window_span("2026-09-20", 28)
+    assert span["nominal_days"] == 28
+    assert span["effective_days"] == 6
+    assert span["degraded"] is True
+    assert "2026-09-14" in span["degraded_reason"]
+
+
+def test_a_fully_backed_window_is_not_degraded_and_carries_no_reason():
+    """off != on. Without this the field could be pinned True and look perceptive."""
+    span = msc.window_span("2026-10-20", 7)
+    assert span == {"nominal_days": 7, "effective_days": 7, "backed_from": "2026-10-13",
+                    "degraded": False, "degraded_reason": None}
+
+
+def test_both_windows_reporting_the_same_effective_days_is_what_explains_identical_cells():
+    """Not merely a flag -- the DIAGNOSIS. Two windows whose populations start on the same
+    day must produce the same cells, so `effective_days` being equal is the cause, and a
+    reader can say why rather than just that something is off."""
+    seven = msc.window_span("2026-09-20", 7)
+    twenty_eight = msc.window_span("2026-09-20", 28)
+    assert seven["effective_days"] == twenty_eight["effective_days"] == 6
+    assert seven["backed_from"] == twenty_eight["backed_from"] == msc.RECORDER_START
+
+
+def test_ungraded_is_published_as_a_rate_and_the_worst_count_is_not_the_worst_rate():
+    """mlb 2,866 of 60,464 is 4.7%; wnba 596 of 10,765 is 5.5%. A count-ordered report puts
+    mlb first and sends someone to the wrong sport."""
+    state = msc.empty_state("core", {})
+    state["ungraded"] = {"2026-09-19": {"mlb": {"prop_player_not_in_boxscore": 2866},
+                                        "wnba": {"game_not_final": 596}}}
+    games = [{"sport": "mlb", "date": "2026-09-19", "rows": 57598},
+             {"sport": "wnba", "date": "2026-09-19", "rows": 10169}]
+    rates = msc.coverage(state, games, "2026-09-20", 7)["ungraded_rate_by_sport"]
+
+    assert rates["mlb"]["considered_rows"] == 57598 + 2866
+    assert rates["mlb"]["ungraded_rate"] == pytest.approx(2866 / 60464, abs=1e-5)
+    assert rates["wnba"]["ungraded_rate"] == pytest.approx(596 / 10765, abs=1e-5)
+    assert rates["wnba"]["ungraded_rate"] > rates["mlb"]["ungraded_rate"]
+    assert rates["wnba"]["ungraded_rows"] < rates["mlb"]["ungraded_rows"]
+
+
+def test_a_sports_reason_rates_sum_to_its_overall_ungraded_rate():
+    state = msc.empty_state("core", {})
+    state["ungraded"] = {"2026-09-19": {"soccer": {"player_not_in_box": 30, "cards_not_gradeable": 20}}}
+    entry = msc.coverage(state, [{"sport": "soccer", "date": "2026-09-19", "rows": 50}],
+                         "2026-09-20", 7)["ungraded_rate_by_sport"]["soccer"]
+    assert sum(entry["by_reason"].values()) == pytest.approx(entry["ungraded_rate"], abs=1e-5)
+    assert entry["ungraded_rate"] == pytest.approx(0.5, abs=1e-5)
+
+
+def test_a_sport_with_no_considered_rows_is_absent_rather_than_a_divide_by_zero():
+    state = msc.empty_state("core", {})
+    state["ungraded"] = {"2026-09-19": {"nhl": {}}}
+    assert msc.coverage(state, [], "2026-09-20", 7)["ungraded_rate_by_sport"] == {}
+
+
+def test_the_markdown_says_degraded_out_loud_rather_than_only_in_the_json():
+    """The `/model-scorecard` page is what a person reads. A flag only a parser can see
+    does not stop anyone quoting a 28-day heading."""
+    state = _state_with(_graded_rows(dates=4, games_per_date=6))
+    card, _overlay = msc.build_scorecard(state, bs=bs, today="2026-09-20", now=NOW,
+                                         grader={"g": 1}, run={}, resamples=50)
+    body = msc.markdown(card)
+    assert "DEGRADED WINDOW" in body
+    assert "not 28d" in body

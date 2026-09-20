@@ -463,6 +463,34 @@ def window_games(state: Mapping[str, Any], today: str, days: int) -> list[Mappin
     return [game for game in state["games"].values() if first <= str(game.get("date") or "") < today]
 
 
+def window_span(today: str, days: int) -> dict[str, Any]:
+    """Whether a window's LABEL is backed by the history it claims.
+
+    A `28d` heading over 6 days of population is a claim the data does not support, and
+    until 2026-09-20 nothing said so: `7d` and `28d` were serving byte-identical cells
+    (263 each) because the recorder started 2026-09-14, and both were presented as if
+    they were two different measurements.
+
+    `effective_days` is what the recorder can actually back. `degraded` is a fact about
+    COVERAGE, not an error -- an under-backed window is still the best available reading,
+    it just must not be quoted as a 28-day result.
+    """
+    first = _shift(today, -days)
+    backed_from = max(first, RECORDER_START)
+    effective = max(0, (date_cls.fromisoformat(today) - date_cls.fromisoformat(backed_from)).days)
+    degraded = effective < days
+    return {
+        "nominal_days": days,
+        "effective_days": effective,
+        "backed_from": backed_from,
+        "degraded": degraded,
+        "degraded_reason": (
+            f"the recorder started {RECORDER_START}, so this window is backed by "
+            f"{effective}d of population, not {days}d"
+        ) if degraded else None,
+    }
+
+
 def coverage(state: Mapping[str, Any], games: Sequence[Mapping[str, Any]], today: str, days: int) -> dict[str, Any]:
     first = _shift(today, -days)
     by_sport: dict[str, dict[str, Any]] = {}
@@ -476,13 +504,35 @@ def coverage(state: Mapping[str, Any], games: Sequence[Mapping[str, Any]], today
         if first <= day < today:
             for sport, reasons in sports.items():
                 ungraded[sport].update({reason: int(n) for reason, n in reasons.items()})
+    # A RATE, not a count. `2,887 player_not_in_box` is unreadable until you know it sits
+    # against 14,319 graded rows (11.5%) -- and the worst COUNT is routinely not the worst
+    # RATE: on 2026-09-20 mlb's 2,866 was 4.6% while wnba's 596 was 5.4%. The denominator is
+    # every row the grader CONSIDERED for that sport, so a sport's reasons sum to its
+    # `ungraded_rate` and the number is comparable ACROSS sports of very different sizes.
+    rates: dict[str, dict[str, Any]] = {}
+    for sport, counter in sorted(ungraded.items()):
+        graded_rows = int((by_sport.get(sport) or {}).get("rows") or 0)
+        total_ungraded = int(sum(counter.values()))
+        considered = graded_rows + total_ungraded
+        if not considered:
+            continue
+        rates[sport] = {
+            "considered_rows": considered,
+            "graded_rows": graded_rows,
+            "ungraded_rows": total_ungraded,
+            "ungraded_rate": _round(total_ungraded / considered, 5),
+            "by_reason": {reason: _round(count / considered, 5) for reason, count in counter.most_common()},
+        }
+
     return {
         "kickoff_dates": [first, _shift(today, -1)],
         "recorder_start": RECORDER_START,
         "dates_with_graded_games": len({str(g.get("date")) for g in games}),
+        "window_span": window_span(today, days),
         "by_sport": {sport: {"games": v["games"], "graded_rows": v["rows"], "dates": len(v["dates"])}
                      for sport, v in sorted(by_sport.items())},
         "ungraded_by_sport": {sport: dict(counter.most_common()) for sport, counter in sorted(ungraded.items())},
+        "ungraded_rate_by_sport": rates,
     }
 
 
@@ -606,8 +656,17 @@ def markdown(scorecard: Mapping[str, Any]) -> str:
         lines.append(f"## {label}: kickoff {cov['kickoff_dates'][0]}..{cov['kickoff_dates'][1]} "
                      f"({cov['dates_with_graded_games']} dates with graded games)")
         lines.append("")
+        span = cov.get("window_span") or {}
+        if span.get("degraded"):
+            lines.append(f"> **DEGRADED WINDOW** -- {span.get('degraded_reason')}. Do not quote this as a "
+                         f"{span.get('nominal_days')}-day result.")
+            lines.append("")
         for sport, entry in cov["by_sport"].items():
-            lines.append(f"- {sport}: {entry['games']} games, {entry['graded_rows']} graded rows, {entry['dates']} dates")
+            rate = (cov.get("ungraded_rate_by_sport") or {}).get(sport) or {}
+            suffix = (f", {rate['ungraded_rate']:.1%} ungraded ({rate['ungraded_rows']} of "
+                      f"{rate['considered_rows']} considered)") if rate else ""
+            lines.append(f"- {sport}: {entry['games']} games, {entry['graded_rows']} graded rows, "
+                         f"{entry['dates']} dates{suffix}")
         lines.append("")
         lines.append("| sport | market | segment | phase | games | dates | model Brier | market Brier | diff [95% CI] | verdict |")
         lines.append("|---|---|---|---|---|---|---|---|---|---|")

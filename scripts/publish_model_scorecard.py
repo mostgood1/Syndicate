@@ -43,7 +43,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -53,8 +53,54 @@ if str(REPO_ROOT) not in sys.path:
 
 from syndicate.features.shared import model_scorecard as msc  # noqa: E402
 
-# Sports with recorder parts to read. NBA and NCAAB are off-season: every board date would spend one
-# not-found read each on them. Add them back when their seasons open.
+# Sports with recorder parts to read.
+#
+# THE OFF-SEASON EXCLUSION IS A COST DECISION AND IT STAYS -- every board date would spend one
+# not-found read per out-of-season sport. What changed 2026-09-20 (lane `daily-accuracy-suite`)
+# is that it is no longer a hand-maintained list whose note said "add them back when their
+# seasons open" and relied on somebody remembering. `SEASON_WINDOWS` decides it per run date,
+# so NBA turns itself on in late October and off again in late June.
+#
+# The windows are deliberately COARSE. The question they answer is "should anyone expect rows
+# for this sport today", not "is there a game tonight" -- a sport inside its window with no
+# slate simply reads zero, which is cheap and honest. Being WRONG in the generous direction
+# costs one not-found read; being wrong in the mean direction silently drops a sport from the
+# accuracy job for a month, which is the failure this replaces.
+#
+# NCAAB is inside a window here and still will not grade: it is not in the ESPN settler's
+# HANDLED_SPORTS because no NCAAB team registry exists. That is deliberate and visible --
+# the scorecard will carry the sport with zero graded rows rather than omit it silently.
+SEASON_WINDOWS = {
+    "mlb": ((3, 20), (11, 5)),
+    "nba": ((10, 1), (6, 25)),
+    "ncaab": ((11, 1), (4, 10)),
+    "ncaaf": ((8, 20), (1, 20)),
+    "nfl": ((9, 1), (2, 15)),
+    "nhl": ((9, 15), (6, 30)),
+    "soccer": ((7, 15), (6, 5)),
+    "wnba": ((5, 1), (10, 20)),
+}
+ALL_SPORTS = tuple(sorted(SEASON_WINDOWS))
+
+
+def in_season(sport: str, today: date) -> bool:
+    """Whether `sport` is inside its (coarse) season window on `today`.
+
+    Windows wrap the new year where the end month/day is before the start's -- NFL runs
+    September to mid-February, so a January date is IN season and a May date is not.
+    """
+    window = SEASON_WINDOWS.get(str(sport or "").strip().lower())
+    if window is None:
+        return True  # unknown sport: never silently drop it
+    (start_month, start_day), (end_month, end_day) = window
+    start, end, now = (start_month, start_day), (end_month, end_day), (today.month, today.day)
+    return start <= now or now <= end if end < start else start <= now <= end
+
+
+def sports_in_season(today: date) -> tuple[str, ...]:
+    return tuple(sport for sport in ALL_SPORTS if in_season(sport, today))
+
+
 DEFAULT_SPORTS = ("mlb", "nfl", "ncaaf", "soccer", "wnba", "nhl")
 EXPORT_PAUSE_SECONDS = 2.0
 TOOL = "publish_model_scorecard"
@@ -250,7 +296,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--publish", action="store_true")
     parser.add_argument("--verify", action="store_true")
-    parser.add_argument("--sports", default=",".join(DEFAULT_SPORTS))
+    parser.add_argument("--sports", default="auto",
+                        help="comma-separated, or 'auto' (default): every sport inside its "
+                             "SEASON_WINDOWS entry on the run date. 'all' reads every sport regardless.")
     parser.add_argument("--max-board-dates", type=int, default=10)
     parser.add_argument("--resamples", type=int, default=None)
     parser.add_argument("--weekly", choices=("auto", "on", "off"), default="auto")
@@ -263,7 +311,14 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     bs = msc.load_bucket_search()
     today = msc.central_today(now, bs.SCORECARD.central_date)
-    sports = [s.strip().lower() for s in args.sports.split(",") if s.strip()]
+    if args.sports.strip().lower() == "auto":
+        sports = list(sports_in_season(date.fromisoformat(today)))
+        log(f"SPORTS_IN_SEASON date={today} sports={','.join(sports)} "
+            f"off_season={','.join(s for s in ALL_SPORTS if s not in sports) or 'none'}")
+    elif args.sports.strip().lower() == "all":
+        sports = list(ALL_SPORTS)
+    else:
+        sports = [s.strip().lower() for s in args.sports.split(",") if s.strip()]
     reader = WebReader(base_url(), token)
     cache = Path(tempfile.mkdtemp(prefix="model_scorecard_cache_"))
     log(f"START today_central={today} base={base_url()} data_root={data_root()} sports={','.join(sports)}")

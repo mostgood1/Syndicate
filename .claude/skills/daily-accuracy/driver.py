@@ -123,23 +123,42 @@ def cell_key(cell: dict[str, Any]) -> str:
 
 
 def window_is_degraded(scorecard: dict[str, Any], name: str) -> tuple[bool, str]:
-    """A window is DEGRADED when its label promises more history than it holds.
+    """A window is DEGRADED when its label promises more history than backs it.
 
-    Two independent tests, because either alone is fooled:
-      * its cells are identical to a SHORTER window's -- it contains nothing extra;
-      * the recorder started fewer days ago than the label claims.
+    THE PRODUCER OWNS THIS NUMBER. `model_scorecard.window_span` publishes
+    `effective_days`/`degraded` in the artifact, and when it is present this reads it
+    rather than recomputing -- two independently-computed answers to one question is
+    precisely the argument this whole tool exists to avoid.
+
+    The fallback below is for artifacts published BEFORE that field existed (today's
+    included), and it uses the producer's definition exactly: a window claims the
+    kickoff dates `[today - days, today)`, the recorder can only back
+    `[recorder_start, ...)`, and `effective_days` is what survives the intersection.
+
+    That definition is also what EXPLAINS the degenerate case rather than merely
+    flagging it: on 2026-09-20 the `7d` and `28d` windows both had `effective_days = 6`,
+    which is why their cells were byte-identical. A second, independent test -- "are
+    these cells identical to a shorter window's" -- is kept as a cross-check, because
+    a recorder-date test alone would miss the same collapse arising any other way.
     """
     windows = scorecard.get("windows") or {}
     window = windows.get(name) or {}
     nominal_days = int("".join(ch for ch in name if ch.isdigit()) or 0)
     coverage = window.get("coverage") or {}
 
-    started = _parse_utc((coverage.get("recorder_start") or "") + "T00:00:00Z")
-    generated = _parse_utc(scorecard.get("generated_at"))
-    if started and generated:
-        held = (generated - started).days + 1
-        if nominal_days and held < nominal_days:
-            return True, f"label promises {nominal_days}d, recorder has held {held}d (since {coverage.get('recorder_start')})"
+    span = coverage.get("window_span") or {}
+    if span.get("degraded") is not None:
+        if span.get("degraded"):
+            return True, str(span.get("degraded_reason") or f"backed by {span.get('effective_days')}d, not {nominal_days}d")
+    else:
+        started = _parse_utc((coverage.get("recorder_start") or "") + "T00:00:00Z")
+        today = _parse_utc((str(scorecard.get("today_central")) or "") + "T00:00:00Z")
+        if started and today and nominal_days:
+            first = today - timedelta(days=nominal_days)
+            effective = max(0, (today - max(first, started)).days)
+            if effective < nominal_days:
+                return True, (f"backed by {effective}d of population, not {nominal_days}d "
+                              f"(recorder started {coverage.get('recorder_start')})")
 
     mine = {cell_key(cell) for cell in cells_of(window)}
     for other_name, other in windows.items():

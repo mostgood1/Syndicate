@@ -57,9 +57,19 @@ a job can look perfectly healthy having produced nothing. Judge by the artifact.
 **Windows can be shorter than their label.** Measured 2026-09-20: `7d` and `28d`
 held identical cells (263 each) because the population recorder only started
 2026-09-14. A `28d` heading over 6 days of data is a claim the data does not
-support. The driver flags this two independent ways — recorder age versus the
-label, and "are these cells identical to a shorter window's" — because either
-test alone is foolable.
+support.
+
+**The producer owns this number.** `model_scorecard.window_span` publishes
+`nominal_days`, `effective_days` and `degraded` in the artifact, and the driver
+reads it rather than recomputing — two independently-computed answers to one
+question is the argument this whole tool exists to avoid. The driver keeps a
+fallback for artifacts published before that field existed, using the producer's
+definition exactly, plus an independent "are these cells identical to a shorter
+window's" cross-check.
+
+`effective_days` also *explains* the degenerate case instead of merely flagging
+it: on 2026-09-20 **both** windows had `effective_days = 6`, which is precisely
+why their cells were byte-identical.
 
 **Ungraded rows are reported as a RATE, never a count.** A count has no
 denominator: soccer's 2,887 `player_not_in_box` is unreadable until you know it
@@ -69,15 +79,27 @@ sits against 14,319 graded rows (11.5%). Sorted worst-rate-first.
 missing from the payload, and they mean opposite things:
 
 - *NO SETTLER, in season* — a real gap; nothing can grade that sport.
-- *off-season (settler ready)* — deliberate. NBA and NCAAB are excluded from the
-  daily read while out of season (`publish_model_scorecard.py`, `DEFAULT_SPORTS`)
-  because each board date would spend a not-found read on them. A **cost
-  decision, not a defect** — do not "fix" it by re-adding them mid-summer.
-- *SETTLER REGISTERED, ZERO ROWS, in season* — a defect. This is what NHL read on
-  2026-09-20.
+- *off-season (settler ready)* — deliberate, and now automatic. Reading an
+  out-of-season sport spends a not-found read per board date, so the job reads
+  only sports inside their season window (`publish_model_scorecard.SEASON_WINDOWS`,
+  `--sports auto`). This used to be a hand-maintained tuple whose comment said
+  "add them back when their seasons open" and relied on somebody remembering;
+  NBA now switches itself on in late October. `--sports all` overrides.
+- *SETTLER REGISTERED, ZERO ROWS, in season* — a defect. This is what **NHL** read
+  on 2026-09-20, and the cause was **not** the settler: the recorder had zero NHL
+  board parts on every date, so nothing NHL-shaped ever reached grading. Look
+  upstream of the settler for this shape of zero.
 
-The season windows in `driver.py` (`SEASON_WINDOWS`) exist **only to label**;
-they never change what is graded.
+**Sport coverage as of 2026-09-20.** Graded: mlb, nfl, ncaaf, soccer, wnba, nhl
+(nhl in season, zero rows — see above), **nba** (registered 2026-09-20; opens late
+October, so *reachability* is proved and correctness is not yet measurable).
+**ncaab is the one sport that cannot be graded**, for exactly one reason: no NCAAB
+team registry exists, so every game would resolve to `team_unresolved`. Everything
+else for it is in place. It is still *read*, so it appears with zero rows rather
+than vanishing.
+
+The season windows in `driver.py` mirror the producer's and are used **only to
+label** the report; they never change what is graded.
 
 ## Reading a verdict honestly
 

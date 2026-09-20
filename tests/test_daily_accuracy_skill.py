@@ -55,19 +55,40 @@ def _scorecard(*, windows, generated_at="2026-09-20T11:31:56Z", recorder_start="
 
 
 def test_a_window_backed_by_less_history_than_its_label_is_degraded():
-    """The production case: 28d over a recorder that started 6 days ago."""
+    """The production case: 28d over a recorder that started 2026-09-14."""
     card = _scorecard(windows={"28d": {"cells": [_cell()]}})
     degraded, why = driver.window_is_degraded(card, "28d")
     assert degraded is True
-    assert "28d" in why and "7d" in why
+    assert "6d" in why and "28d" in why
 
 
 def test_the_same_check_passes_a_window_its_recorder_can_back():
     """off != on -- without this the checker could be hard-coded to DEGRADED."""
-    card = _scorecard(windows={"7d": {"cells": [_cell()]}})
+    card = _scorecard(windows={"7d": {"cells": [_cell()]}}, recorder_start="2026-09-01")
     degraded, why = driver.window_is_degraded(card, "7d")
     assert degraded is False
     assert why == ""
+
+
+def test_the_producers_published_verdict_is_preferred_over_recomputing_it():
+    """`model_scorecard.window_span` owns this number. Two independently-computed
+    answers to one question is the argument this tool exists to avoid, so a
+    published `window_span` must win even when the fallback would disagree."""
+    card = _scorecard(windows={"28d": {"cells": [_cell()], "coverage": {
+        "window_span": {"nominal_days": 28, "effective_days": 28, "degraded": False,
+                        "degraded_reason": None}}}}, recorder_start="2026-09-14")
+    # The fallback, left to itself, would call this degraded (recorder started 6d ago).
+    assert driver.window_is_degraded(card, "28d") == (False, "")
+
+
+def test_a_published_degraded_verdict_carries_the_producers_own_reason():
+    card = _scorecard(windows={"28d": {"cells": [_cell()], "coverage": {
+        "window_span": {"nominal_days": 28, "effective_days": 6, "degraded": True,
+                        "degraded_reason": "the recorder started 2026-09-14, so this "
+                                           "window is backed by 6d of population, not 28d"}}}})
+    degraded, why = driver.window_is_degraded(card, "28d")
+    assert degraded is True
+    assert why.startswith("the recorder started 2026-09-14")
 
 
 def test_identical_cells_to_a_shorter_window_are_degraded_even_with_a_long_recorder():

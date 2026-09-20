@@ -87,7 +87,24 @@ __all__ = [
 ]
 
 GRADER_VERSION = "espn/1"
-HANDLED_SPORTS = frozenset({"nfl", "ncaaf", "wnba"})
+# NBA added 2026-09-20 (lane `daily-accuracy-suite`). It is a REGISTRATION, not a new
+# settler: the WNBA path already grades ESPN basketball -- same summary box, same
+# `_BASKETBALL_SINGLE`/`_BASKETBALL_DOUBLES` stat tables, same four quarters -- and
+# `team_aliases` already carries an NBA map (`team_aliases.py:709`).
+#
+# NCAAB IS DELIBERATELY NOT HERE, and the reason is one thing only: there is no NCAAB
+# team registry. `_resolve_team` sends every non-NCAAF sport to `canonical_team`, whose
+# alias map has no `ncaab` entry, so every NCAAB game would resolve to None and the
+# settler would return `team_unresolved` for 100% of rows -- a sport that LOOKS covered
+# and grades nothing, which is worse than an honest absence. NCAAF needed a 684-team,
+# 2,342-key registry that REFUSES its 128 ambiguous names ("tigers" names 25 schools);
+# NCAAB needs the same and it does not exist yet. Everything else below is ready for it
+# (`_SPORT_PATHS`, the halves in `_REGULATION_PERIODS`/`_segment_closed`), so adding the
+# registry and this one string is the whole remaining job. NCAAB opens in November.
+HANDLED_SPORTS = frozenset({"nfl", "ncaaf", "wnba", "nba"})
+
+# Every basketball sport reads the same ESPN summary box and the same stat tables.
+BASKETBALL_SPORTS = frozenset({"wnba", "nba", "ncaab"})
 
 NCAAF_PLAYER_STATS_SNAPSHOT = (
     "ncaaf_source/source_artifacts/data/processed/player_game_stats/ncaaf_player_game_stats_snapshot.csv"
@@ -98,6 +115,9 @@ _SPORT_PATHS = {
     "nfl": "football/nfl",
     "ncaaf": "football/college-football",
     "wnba": "basketball/wnba",
+    "nba": "basketball/nba",
+    # Present but unreachable until `ncaab` joins HANDLED_SPORTS -- see the note there.
+    "ncaab": "basketball/mens-college-basketball",
 }
 # FBS, and a page size that holds a full Saturday (`poll_ncaaf_live_state` measured it).
 _SCOREBOARD_EXTRA = {"ncaaf": "&groups=80&limit=200"}
@@ -111,6 +131,13 @@ _LINE_MARKETS = frozenset({"h2h", "h2h_3_way", "spreads", "spreads_alt"})
 # full game is its job and passes through.
 _FULL_GAME_MARKETS_HANDLED = frozenset({"h2h_3_way", "spreads_alt", "totals_alt"})
 _REGULATION_PERIODS = 4
+# NCAAB plays two 20-minute HALVES, not quarters, so regulation is 2 periods there and a
+# `h2h_3_way` graded on `values[:4]` would silently fold overtime into regulation.
+_REGULATION_PERIODS_BY_SPORT = {"ncaab": 2}
+
+
+def regulation_periods(sport: str) -> int:
+    return _REGULATION_PERIODS_BY_SPORT.get(str(sport or "").strip().lower(), _REGULATION_PERIODS)
 
 # ---- reasons (ungraded), each a different job ----------------------------------------
 R_NO_COMMENCE = "no_commence_time"
@@ -242,10 +269,21 @@ _WNBA_KEYS = {
 _WNBA_THREES_KEY = "threePointFieldGoalsMade-threePointFieldGoalsAttempted"
 
 
-def _wnba_market(market: str) -> str:
+def _basketball_market(sport: str, market: str) -> str:
+    """Canonical market key for a basketball sport.
+
+    Keyed on the SPORT rather than pinned to "wnba": `market_keys` maps nba, wnba and
+    ncaab all onto the same `_BASKETBALL` table (`market_keys.py:643`), so this is the
+    same answer for all three -- but asking under the caller's own sport means a future
+    per-league divergence is honoured instead of silently answered as WNBA.
+    """
     from syndicate.features.shared.market_keys import canonical_market_key
 
-    return str(canonical_market_key("wnba", market) or market)
+    return str(canonical_market_key(sport, market) or canonical_market_key("wnba", market) or market)
+
+
+def _wnba_market(market: str) -> str:
+    return _basketball_market("wnba", market)
 
 
 _NO_SCORER_NAMES = frozenset({"no scorer", "no touchdown scorer", "no td scorer"})
@@ -273,8 +311,8 @@ def _non_player(sport: str, name: Any) -> bool:
 def _prop_supported(sport: str, market: str) -> bool:
     if sport in ("nfl", "ncaaf"):
         return _football_field(market) is not None
-    if sport == "wnba":
-        canonical = _wnba_market(market)
+    if sport in BASKETBALL_SPORTS:
+        canonical = _basketball_market(sport, market)
         return canonical in _WNBA_SINGLE or canonical in _WNBA_DOUBLES
     return False
 
@@ -607,7 +645,7 @@ class EspnPopulationSettler:
         away = event["away"]["linescores"]
         if home is None or away is None:
             return None
-        if sport == "wnba":
+        if sport in BASKETBALL_SPORTS:
             from syndicate.features.shared.bet_status_wnba import _segment_points
 
             return _segment_points({"home": home, "away": away}, segment)
@@ -617,13 +655,19 @@ class EspnPopulationSettler:
         return (float(pair[0]), float(pair[1])) if pair else None
 
     @staticmethod
-    def _segment_closed(segment: str, event: Mapping[str, Any]) -> bool:
-        """A live game closes a fixed segment once the period after its last one is under way."""
+    def _segment_closed(segment: str, event: Mapping[str, Any], sport: str = "") -> bool:
+        """A live game closes a fixed segment once the period after its last one is under way.
+
+        `h1` ends at a different PERIOD NUMBER depending on the sport: period 2 of 4 in
+        quarter sports, period 1 of 2 in NCAAB's halves. Reading NCAAB's h1 as "closed
+        once period > 2" would never close it in regulation.
+        """
         if event["completed"]:
             return True
         if segment == "h2":
             return False
-        last = {"q1": 1, "q2": 2, "q3": 3, "q4": 4, "h1": 2}.get(segment)
+        halves = regulation_periods(sport) == 2
+        last = ({"h1": 1} if halves else {"q1": 1, "q2": 2, "q3": 3, "q4": 4, "h1": 2}).get(segment)
         period = event.get("period")
         return last is not None and period is not None and period > last
 
@@ -634,8 +678,9 @@ class EspnPopulationSettler:
                 return None, R_GAME_NOT_FINAL
             if market == "h2h_3_way":
                 home, away = event["home"]["linescores"], event["away"]["linescores"]
-                regulation = [values[:_REGULATION_PERIODS] for values in (home, away) if values is not None]
-                if len(regulation) != 2 or any(len(values) < _REGULATION_PERIODS or None in values for values in regulation):
+                periods = regulation_periods(sport)
+                regulation = [values[:periods] for values in (home, away) if values is not None]
+                if len(regulation) != 2 or any(len(values) < periods or None in values for values in regulation):
                     return None, R_REGULATION_ACTUAL
                 pair = (float(sum(regulation[0])), float(sum(regulation[1])))
             else:
@@ -644,7 +689,7 @@ class EspnPopulationSettler:
                 pair = (event["home"]["score"], event["away"]["score"])
             source = "espn_final"
         else:
-            if not self._segment_closed(segment, event):
+            if not self._segment_closed(segment, event, sport):
                 return None, R_SEGMENT_NOT_FINAL
             pair = self._segment_pair(sport, segment, event)
             if pair is None:
@@ -678,8 +723,8 @@ class EspnPopulationSettler:
     def _settle_prop(self, sport: str, market: str, shaped: Mapping[str, Any],
                      event: Mapping[str, Any]) -> tuple[str | None, str | None]:
         key = _player_key(shaped.get("player_name"))
-        if sport == "wnba":
-            return self._settle_wnba_prop(market, key, shaped, event)
+        if sport in BASKETBALL_SPORTS:
+            return self._settle_basketball_prop(sport, market, key, shaped, event)
 
         field = _football_field(market)
         line = shaped.get("line")
@@ -717,9 +762,13 @@ class EspnPopulationSettler:
             return None, R_STAT_UNAVAILABLE
         return self._grade(market, shaped.get("side"), line, value, "espn_box")
 
-    def _settle_wnba_prop(self, market: str, key: str, shaped: Mapping[str, Any],
-                          event: Mapping[str, Any]) -> tuple[str | None, str | None]:
-        summary = self._summary("wnba", event["event_id"])
+    def _settle_basketball_prop(self, sport: str, market: str, key: str, shaped: Mapping[str, Any],
+                                event: Mapping[str, Any]) -> tuple[str | None, str | None]:
+        """WNBA, NBA and (once it has a team registry) NCAAB. ESPN serves one box shape
+        for all three, so the only thing that was ever WNBA-specific here was the
+        hard-coded sport in the summary fetch -- which would have fetched the wrong
+        league's box for an NBA event id."""
+        summary = self._summary(sport, event["event_id"])
         if summary is None:
             return None, R_SUMMARY_UNAVAILABLE
         rows = wnba_box_rows(summary)
@@ -731,7 +780,7 @@ class EspnPopulationSettler:
         if not matches or matches[0]["dnp"]:
             return None, R_DNP_VOID
         row = matches[0]
-        canonical = _wnba_market(market)
+        canonical = _basketball_market(sport, market)
         line = shaped.get("line")
         if canonical in _WNBA_DOUBLES:
             stats = [row.get(stat) for stat in _WNBA_DOUBLE_STATS]
