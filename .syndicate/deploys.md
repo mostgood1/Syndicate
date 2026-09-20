@@ -38812,3 +38812,73 @@ carried from an assumption is the same defect as a predicted effect carried from
   - BOARD 79-160 s: grid tick plus the 45 s cache floor. This lane's overlay already removed the 12-35 min shortlist wait; what is left is the tick itself.
 - **The freshness-ceiling lever is now known to be the WRONG one**, and the modelling is kept so nobody re-derives it: tightening `SYNDICATE_INPLAY_OVERLAY_MAX_PRICE_AGE_SECONDS` 300 -> 180 keeps 109 of 377 cards at a 162 s `book_age`-based median — but it would be discarding rows whose PRICE had not moved, not rows the board was slow about. Do not ship it as a latency fix.
 - **Unchanged and still true:** NFL intervals reach the board (peak h1 66, q1 57, h2 29, q3 23, q4 22, q2 20), capture runs at 154 s with 0 failures, and the credit cap holds (NFL 1,485 credits since go-live; 22.0% of plan used).
+
+## 2026-09-20 17:35:05Z -> live 17:39:05Z (12:35-12:39 PM CT) — cron `model-scorecard` `4ef3bff8` -> `361bc93d` (`dep-dao1iibm8hqs73cuiko0`) — lane `daily-accuracy-suite` — **the daily accuracy job now grades NBA, picks its sports from the calendar, and publishes its own coverage limits. PREDICTION HELD.**
+
+**Pre-registered, before triggering.** `--expect live_commit=361bc93d`,
+`--baseline live_commit=4ef3bff8` read at 17:34:08Z (age 15 s at preflight).
+Preflight `CLEAR: no cron run in flight`; claim held by this lane from 17:33:49Z.
+
+**Measured.** `/v1/services/crn-dam0ao942hec73cge0rg/deploys?limit=1` at 17:39:32Z:
+`live_commit=361bc93d status=live finishedAt=2026-09-20T17:39:05.654264Z`.
+Baseline was `4ef3bff8`, live since 2026-09-17T16:47:22Z — 4,367 minutes.
+
+**What is in it.** Four commits of this lane (`a2fe0207` skill, `3fc70cdc` claim
+release, `785e8bc1` the code, `05939ee3` status), all verified ancestors of the
+deployed tip. Three commits from another session ride along (`3e52625e`,
+`6e00aece`, `361bc93d`, artifact_publisher / pull-window) — a cron deploys the
+BRANCH TIP, `commitId` is a 400 on this service, so that is not optional.
+
+**Why a deploy was needed at all:** this cron has `autoDeploy: no`. Everything
+above had been on `main` for ~40 minutes and was reaching nothing.
+
+**VERIFIED BEFORE THE DEPLOY, by dry-running the cron's own entrypoint against
+production** (`--sports auto`, no `--publish`, exit 0):
+
+    SPORTS_IN_SEASON date=2026-09-20 sports=mlb,ncaaf,nfl,nhl,soccer,wnba off_season=nba,ncaab
+    sport_versions  ... "nba": "espn/1" ...     (the pre-deploy artifact has no nba key at all)
+    STATE loaded=yes reset=sport_versions_changed:nba games=222 pending=180
+    WINDOW 7d cells=263 / WINDOW 28d cells=263
+    NOT PUBLISHED (--publish not given)
+
+The grader-signature change reset ONLY nba's history and kept the other 222
+graded games, which is the designed behaviour and was checked rather than assumed.
+
+**What the new coverage fields found immediately**, in that dry run's artifact —
+ungraded as a RATE, which no previous payload carried:
+
+| sport | ungraded | of rows considered | worst single reason |
+|---|--:|--:|---|
+| soccer | **42.83%** | 25,046 | `extra_player_not_in_box` 11.53% |
+| ncaaf | 8.69% | 34,635 | `extra_home_away_disagree` 2.61% |
+| mlb | 7.46% | 62,242 | `prop_player_not_in_boxscore` 4.61% |
+| wnba | 7.19% | 10,957 | `game_not_final` 5.44% |
+| nfl | 2.29% | 3,139 | `extra_dnp_void` 0.92% |
+
+Soccer losing more than four rows in ten was invisible while only per-reason
+counts were published, because no single reason exceeds 11.5%. **That is a
+finding, not a diagnosis** — cause unknown, belongs to its own lane.
+
+Both windows also report `effective_days: 6` against `nominal_days` 7 and 28,
+which is not merely a flag but the EXPLANATION of why production was serving
+byte-identical 263-cell windows: the recorder started 2026-09-14.
+
+**OWED, and explicitly NOT claimed here.**
+- The first post-deploy cron run is **2026-09-21 11:30Z**, which is a Monday and
+  therefore also the **first weekly-backtest run this service has ever done**.
+  Until it lands, the published artifact still carries no `window_span`,
+  no `ungraded_rate_by_sport` and no `nba`.
+- **NBA correctness is NOT measured and must not be claimed.** NBA is out of
+  season until late October; what is proved is REACHABILITY (the sport is handled,
+  the registry advertises `espn/1` for it, and its reads are aimed at
+  `basketball/nba`, not WNBA's endpoints). The grading reading is owed at the
+  first regular-season slate.
+- **NHL still grades zero and this deploy does not address it.** The settler
+  `nhl/1` is registered and nhl is in the read list, but the recorder wrote ZERO
+  nhl board parts on 09-18/19/20 — the gap is upstream of grading, in what feeds
+  the population.
+- **NCAAB cannot be graded** for exactly one reason: no NCAAB team registry, so
+  `canonical_team` returns None for every school. It is read (so it shows with
+  zero rows rather than vanishing) and deliberately absent from `HANDLED_SPORTS`.
+
+Claim released after this row.
