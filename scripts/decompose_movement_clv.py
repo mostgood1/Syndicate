@@ -177,6 +177,26 @@ def american_cents(price: float | None) -> float | None:
     return None
 
 
+def to_movement_key(opening_key):
+    """`_opening_key` -> `movement_join_key`: drop `line=` and `bookmaker=`.
+
+    The two identities answer different questions and BOTH are right.
+    `_opening_key` must separate home -1.5 from home -2.5, and two books' prices,
+    because settlement grades a specific bet at a specific book.
+    `movement_join_key` must NOT, because keying on line or book means a row can
+    only match itself when it did not move -- which conditions the metric on the
+    absence of the very thing it measures.
+
+    Joining on the report key verbatim matches NOTHING. Measured 2026-09-20 on
+    the first end-to-end run: `keys_joined_to_close` 0 against `no_close` 1024.
+    """
+    text = str(opening_key or "").strip()
+    if not text:
+        return None
+    parts = [p for p in text.split("|") if not p.startswith(("line=", "bookmaker="))]
+    return "|".join(parts) or None
+
+
 def fetch(path: str, token: str, timeout: int = 240) -> dict[str, Any]:
     req = urllib.request.Request(f"{BASE}{path}", headers={"X-Admin-Token": token})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -385,9 +405,26 @@ def main() -> int:
                 continue
             rows = payload.get("rows") or []
             for row in rows:
-                key = row.get("key")
-                if key:
-                    closes[(date, key)] = row
+                # THE JOIN, AND IT IS NOT AN IDENTITY. `/api/ops/clv/report`
+                # keys on `_opening_key` -- event|market|player|segment|side
+                # **|line|bookmaker** -- while the trail keys on
+                # `movement_join_key`, which deliberately drops line and book
+                # because movement IS the detection of line and book change.
+                # Using the report key verbatim matches NOTHING: measured
+                # 2026-09-20, keys_joined_to_close 0 against no_close 1024.
+                key = to_movement_key(row.get("key"))
+                if not key:
+                    continue
+                prior = closes.get((date, key))
+                # PREFER THE CLEAN SCOPE. Collapsing line+book folds several
+                # report rows onto one key; a `same_book` close is the
+                # unbiased one, and a `different_book` close carries the
+                # best-of-N selection effect the sim decomposition measured at
+                # +0.411 vs -0.132. Never pooled either way -- `scope` still
+                # splits the output -- but when we must pick one, pick that.
+                if prior is not None and str(prior.get("close_book_scope") or "") == "same_book":
+                    continue
+                closes[(date, key)] = row
             print(
                 f"{date} {sport}: openings={payload.get('openings')} "
                 f"resolved={payload.get('resolved')} rows={len(rows)}",
@@ -411,6 +448,9 @@ def main() -> int:
         "observations_scored": 0,
         "no_close": 0,
         "no_forward_clv": 0,
+        "in_play_close_excluded": 0,
+        "unknown_timing_excluded": 0,
+        "close_line_mismatch": 0,
     }
     for date in dates:
         # EVERY file for the date: the legacy whole-day `<date>.jsonl` AND the
@@ -440,9 +480,44 @@ def main() -> int:
                 continue
             stats["keys_joined_to_close"] += 1
             close_price = close_row.get("close_price")
-            scope = str(close_row.get("book_scope") or "unknown")
+            # `close_book_scope`, NOT `book_scope` -- the latter does not exist
+            # on a clv/report row, so it read "unknown" for every row and
+            # POOLED all three scopes, which this file's own docstring forbids.
+            # Measured 2026-09-20: 3,860 book_agnostic_close / 143 same_book /
+            # 24 different_book_close, so a pooled number is essentially the
+            # biased scope alone.
+            scope = str(close_row.get("close_book_scope") or "unknown")
+            # IN-PLAY CLOSES ARE NOT CLV, the same exclusion
+            # `decompose_sim_clv.py` makes: a close stamped AFTER first pitch is
+            # an in-play price repricing on the game state. Counted, not
+            # silently dropped.
+            age = close_row.get("close_age_seconds")
+            if isinstance(age, (int, float)) and age < 0:
+                stats["in_play_close_excluded"] += 1
+                continue
+            if str(close_row.get("close_timing") or "") not in ("pregame", ""):
+                stats["unknown_timing_excluded"] += 1
+                continue
             for obs in observations(points):
                 stats["observations"] += 1
+                # THE FORWARD LEG MUST BE THE SAME BET, and this is the same
+                # trap `_movement_from_opening` guards with `lines_comparable`.
+                # The observation sits at the CURRENT line; the clv row closes
+                # at ITS line. When a prop ran 1.5 -> 2.5 those are different
+                # bets, and differencing their prices measures the handicap,
+                # not the market. Measured on the first real run: pooled cells
+                # showed -26 to -55 probability points of "forward CLV", which
+                # is not a market move, it is this mismatch.
+                obs_line = obs.get("line")
+                close_line = close_row.get("line")
+                comparable = (obs_line is None and close_line is None) or (
+                    obs_line is not None
+                    and close_line is not None
+                    and abs(float(obs_line) - float(close_line)) < 1e-9
+                )
+                if not comparable:
+                    stats["close_line_mismatch"] += 1
+                    continue
                 forward = forward_clv_pct(obs.get("price"), close_price)
                 if forward is None:
                     stats["no_forward_clv"] += 1
@@ -468,11 +543,12 @@ def main() -> int:
             "\nREFUSING TO REPORT A VERDICT: zero scored observations.\n"
             "  A null result needs a live population and this frame has none.\n"
             f"  trail dir: {trail_dir}\n"
-            "  If trail_files_found is 0 the trail is not on this disk -- it is written on\n"
-            "  refresh-worker and (as of 2026-09-20) is NOT in HOT_ARTIFACT_PATTERNS, so an\n"
-            "  export returns count=0. Check `record_price_trail`'s `bytes_on_disk` before\n"
-            "  reading an empty export as an empty trail: the file is bounded at 48 MB and\n"
-            "  the export refuses any single file over 8 MB.",
+            "  If trail_files_found is 0 the trail is not on this disk. It IS allowlisted\n"
+            "  and IS published per SEALED HOUR since 2026-09-20, so an empty export means\n"
+            "  no hour has sealed yet -- not that publishing is broken.\n"
+            "  If keys_joined_to_close is 0 while no_close is large, the JOIN is wrong and\n"
+            "  not the data: the clv report keys on `_opening_key` (WITH line+bookmaker),\n"
+            "  the trail on `movement_join_key` (WITHOUT). See `to_movement_key`.\n",
             flush=True,
         )
         return 4
