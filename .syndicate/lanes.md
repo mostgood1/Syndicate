@@ -1271,14 +1271,6 @@ death, never life — do not invert it.
 - STATUS `[2026-09-18]` BUILT, not deployed. `graded_outcomes.mlb_player_box_row_from_feed` emits one `player_box` row per regulation final from the SAME cached feed the score rows parse (no extra read); `settlement_identity.grade_record_on_player_box` settles a prop record at its own line/side after every card row fails (phase `box_score`), through `bet_status_mlb._MARKET_TO_STAT` + `box_score_stats` readers. Group guard: `canonical_market_key` folds "Hitter Strikeouts" onto the PITCHER `strikeouts` key, so a declared hitter/pitcher prefix must agree (`prop_market_group_disagrees`). Named misses: `prop_market_unmapped`, `prop_side_unmapped`, `prop_line_missing`, `line_disagrees_with_selection`, `prop_segment_not_graded`, `player_not_in_boxscore`, `player_group_absent`, `player_stat_absent`, `player_id_name_disagree`, `player_name_ambiguous`, `no_player_box_for_game`. Offline on the 5 production samples of the 09-18 run (real statsapi feeds): 4 settle (Leahy K over 3.5 WIN 4; Phillips outs over 13.5 LOSS 11; Ramirez / Nootbaar runs under 0.5 WIN 0), 1 stays pending `player_not_in_boxscore` (Esmerlyn Valdez is in neither 824630 box). Reachability off (boxscore stripped) 0 settled / on 4 `box_score`. Tests: new file 33 passed; 25 settlement/grader files 422 passed. Matcher cost 0.82 ms/prop record locally. Production record vocabulary is only partly known (ledger chunks are worker-local): the new detail counters are the instrument.
 - STATUS `[2026-09-18 15:24Z / 10:24 CT]` LIVE on refresh-worker `84700b9b` since 15:18:03Z, carried by lane `mlb-past-date-chip-score`'s deploy (no deploy of my own; early read 0 Traceback, no failure events). Baseline 15:18:01Z: MLB 21.2%, `prop_not_graded` 7,849. Verify OWED: the 2026-09-19 ~11:00Z settlement autorun (deploys.md 2026-09-18 15:18:03Z entry, four pre-registered clauses).
 - Blocked by: none.
-### intelligence-idle-poll — CLOSED 2026-09-18 (GOAL MET: an untouched post-deploy /intelligence tab stopped POSTing at minute 14; resume unit-tested only) — opened 2026-09-18 — session f26bba3b-72ee-4f8c-9721-3f8c7e4678f1
-- Goal: `/intelligence` stops re-sending its ~5-6 MB `/api/intelligence/query` every 60 s from a tab nobody is interacting with, and resumes on the next interaction; the 09-17 attribution is recorded under `[render-egress-spikes]`.
-- Files: `syndicate/static/shared/polling.js`, `syndicate/templates/intelligence.html`, `tests/js/polling_idle_pause.test.mjs` (NEW), `.syndicate/state_worker.md`
-- Hypothesis: the page already passes `skipWhenHidden: true`, yet a Claude desktop browser pane (UA `Claude/2.110.0 ... MSIX`) polled at exactly 60/h from 2026-09-17T17:56:59Z to 2026-09-18T04:53:47Z, so that pane reports `document.hidden === false` while nobody looks at it. A visibility gate cannot stop it; an interaction-idle gate can.
-- Falsification test: in the unit test, the pre-change `polling.js` still ticks after the idle timeout with no interaction (`off != on`); if it does not, the test is not measuring the change.
-- Verification: (1) `node tests/js/polling_idle_pause.test.mjs` passes and fails against the pre-change `polling.js`; (2) production, after a web deploy the user approves: an open `/intelligence` tab left untouched stops issuing `POST /api/intelligence/query` after the idle timeout (read in Render's `type=request` log by user agent).
-- Blocked by: none
-
 ### soccer-live-corners-dispersion — CLOSED 2026-09-18 — opened 2026-09-18 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
 - Goal: H35 (offline): which count distribution around the PUBLISHED live remaining-corners mean (`prekickoff_pace_v1` = pregame E3 x production `SHARE_TABLE`) prices over/under half-lines best -- Poisson, NB1 (variance a fixed multiple of the mean, the platform's pregame corners convention in `common.nb_sf`) or NB2 (a gamma-mixed rate: variance mu + mu^2/k) -- registered before any dispersion is computed, graded on TEST, and written to the ledger. No engine change; pricing live corners stays parked behind H32.
 - **GOAL: MET 2026-09-18 ~10:13 CT (15:13Z)** (`log/2026-09-18.md`): the TEST run happened on the registered rules, and its numbers and verdict are in the log. **H35 FALSIFIED:** NB1 (phi 1.10, chosen on TRAIN) - Poisson half-line log-loss -0.00054 [-0.00135, +0.00023] over 397 TEST matches; the variance ratio is ~1.15 at every cutoff; Poisson around the published mean is calibrated at the main line (0.45 / 0.45). Pricing stays parked behind H32. Code `13f2386b`, 20 tests.
@@ -1744,98 +1736,50 @@ death, never life — do not invert it.
     - the production caller's window starts at the day before (it fails on today's code);
     - with that window, `load_soccer_projections` matches an evening fixture filed under the previous date, and without it, it does not.
   - Production, after a refresh-worker deploy the user approves: the UTC-09-20 grid artifact's `dates_read` starts `2026-09-19`, `unmatched_by_league.mls` falls from 3,730 to near 0, and the nine evening fixtures on `/api/board/layer1?sport=soccer&date=2026-09-19` carry projections stamped `13:44:16`.
-### closed-lane-archive-20260919-1100 — CLOSED 2026-09-19 — opened 2026-09-19 — session d8048c76-5a5e-49b2-a876-c74841de9549
+### closed-lane-archive-20260919-2116 — CLOSED 2026-09-19 (GOAL MET: 3 of 4 SAFE slugs archived; the 4th deferred, reason recorded) — opened 2026-09-19 — session cb099c12-6971-4e93-b77d-0b7de41cffa3
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
-- Pre-registered reading (owner_liveness.py --idle-min 240, 2026-09-19 ~16:05Z / 11:05 CDT, worktree at origin/main b6e907f2):
-```
-mlb-stop-publishing-edges                sessions[d76b711b=15104m, e1a1dc80=1472m] lastmod[edc425eb=1488m] -> WAIT: uncommitted lanes.md edit mentions it in worktree(s) bandwidth-controlled-transfer
-fotmob-team-name-aliases                 sessions[da346015=5163m] lastmod[1e064aa3=1255m] -> SAFE
-portfolio-no-family-exclusion            sessions[abacd435=1m] lastmod[1a309584=2839m] -> WAIT: abacd435 idle 1m < 240m
-board-category-gates                     sessions[abacd435=1m] lastmod[1a309584=2839m] -> WAIT: abacd435 idle 1m < 240m
-chip-key-test-no-data-blind              sessions[abacd435=1m] lastmod[1a309584=2839m] -> WAIT: abacd435 idle 1m < 240m
-sim-view-reachability-caveat             sessions[abacd435=1m] lastmod[1a309584=2839m] -> WAIT: abacd435 idle 1m < 240m
-sim-view-roi-decision-count              sessions[abacd435=1m] lastmod[1a309584=2839m] -> WAIT: abacd435 idle 1m < 240m
-soccer-prekickoff-freeze                 sessions[abacd435=1m] lastmod[849c6eef=2501m] -> WAIT: abacd435 idle 1m < 240m
-soccer-capture-staleness                 sessions[abacd435=1m] lastmod[1a309584=2839m] -> WAIT: abacd435 idle 1m < 240m
-soccer-forward-graders                   sessions[abacd435=1m] lastmod[f47b6d25=2696m] -> WAIT: abacd435 idle 1m < 240m
-soccer-live-model-study                  sessions[abacd435=1m] lastmod[d8a15f79=2588m] -> WAIT: abacd435 idle 1m < 240m
-prop-evidence-parity                     sessions[4a583d41=0m] lastmod[e2104fcd=2512m] -> WAIT: 4a583d41 idle 0m < 240m
-board-today-freshness                    sessions[a1e40980=1m] lastmod[b114cd4d=2758m] -> WAIT: a1e40980 idle 1m < 240m
-soccer-shot-woodwork-undercount          sessions[a1e40980=1m] lastmod[01be7e7a=2453m] -> WAIT: a1e40980 idle 1m < 240m
-nfl-usage-publish                        sessions[4a583d41=0m] lastmod[7c5a1dad=1041m] -> WAIT: 4a583d41 idle 0m < 240m
-soccer-shot-on-target-definition         sessions[a1e40980=1m] lastmod[38d4fff3=2512m] -> WAIT: a1e40980 idle 1m < 240m
-nfl-prop-week-substrate                  sessions[4a583d41=0m] lastmod[04f51477=83m] -> WAIT: 4a583d41 idle 0m < 240m; block last modified 83m ago by 04f51477 (< 240m)
-soccer-h24-grader                        sessions[abacd435=1m] lastmod[f75c4908=2309m] -> WAIT: abacd435 idle 1m < 240m
-soccer-live-corners-box-fallback         sessions[abacd435=1m] lastmod[da68cf77=1237m] -> WAIT: abacd435 idle 1m < 240m
-soccer-prop-conditioning                 sessions[4a583d41=0m] lastmod[983c77e9=1417m] -> WAIT: 4a583d41 idle 0m < 240m
-mlb-past-date-chip-score                 sessions[860a40b7=1304m] lastmod[84ca68f4=1475m] -> SAFE
-intelligence-idle-poll                   sessions[f26bba3b=0m] lastmod[4a77cd1d=1433m] -> WAIT: f26bba3b idle 0m < 240m
-soccer-live-corners-dispersion           sessions[abacd435=1m] lastmod[3772d175=1489m] -> WAIT: abacd435 idle 1m < 240m
-paper-execution-ledger-batch             sessions[a1e40980=1m] lastmod[86b0d03a=967m] -> WAIT: a1e40980 idle 1m < 240m
-market-history-index-memo                sessions[a1e40980=1m] lastmod[86b0d03a=967m] -> WAIT: a1e40980 idle 1m < 240m
-odds-history-match-precompute            sessions[a1e40980=1m] lastmod[86b0d03a=967m] -> WAIT: a1e40980 idle 1m < 240m
-ncaaf-board-sim-coverage                 sessions[259d6003=68m] lastmod[4db3695d=1239m] -> WAIT: 259d6003 idle 68m < 240m
-ncaaf-sim-inseason-ratings               sessions[259d6003=68m] lastmod[fb0c8de7=996m] -> WAIT: 259d6003 idle 68m < 240m
-ncaaf-player-data                        sessions[259d6003=68m] lastmod[fb0c8de7=996m] -> WAIT: 259d6003 idle 68m < 240m
-mlb-lens-final-pass-scores               sessions[860a40b7=1304m] lastmod[36e658fe=1397m] -> SAFE
-closed-lane-archive-20260918-1306        sessions[4991d2ec=1176m] lastmod[9b3a5497=1203m] -> SAFE
-soccer-live-gameline-name-join           sessions[abacd435=1m] lastmod[07518239=33m] -> WAIT: abacd435 idle 1m < 240m; block last modified 33m ago by 07518239 (< 240m)
-lane-archive-tool-checks                 sessions[4991d2ec=1176m] lastmod[22d1d75b=1206m] -> SAFE
-ledger-tab-escape-fix                    sessions[4991d2ec=1176m] lastmod[9b3a5497=1203m] -> SAFE
-ncaaf-live-resim-blend                   sessions[259d6003=68m] lastmod[3f1a0fb6=905m] -> WAIT: 259d6003 idle 68m < 240m
-soccer-live-loop-cost                    sessions[abacd435=1m] lastmod[b00ecc99=14m] -> WAIT: abacd435 idle 1m < 240m; block last modified 14m ago by b00ecc99 (< 240m)
-SAFE_SLUGS=fotmob-team-name-aliases,mlb-past-date-chip-score,mlb-lens-final-pass-scores,closed-lane-archive-20260918-1306,lane-archive-tool-checks,ledger-tab-escape-fix
-```
-- Step 4 (other worktrees with uncommitted `.syndicate/` edits): 7 dirty; none belongs to owners da346015 / 860a40b7 / 4991d2ec. `polling-idle-pause-all` (session f26bba3b, live) mentions `lane-archive-tool-checks` only inside a regenerated `learnings_index.md` anchor to a learnings entry -- not a lanes.md edit; slug kept.
-- Result: 6 blocks moved to `lanes_closed.md` with one pointer each (46 block lines): `fotmob-team-name-aliases`, `mlb-past-date-chip-score`, `mlb-lens-final-pass-scores`, `closed-lane-archive-20260918-1306`, `lane-archive-tool-checks`, `ledger-tab-escape-fix`. 29 CLOSED blocks WAIT (owners abacd435 / a1e40980 / 4a583d41 / f26bba3b idle 0-1m, 259d6003 idle 66m; `mlb-stop-publishing-edges`, `paper-execution-ledger-batch`, `ncaaf-board-sim-coverage` also named in uncommitted worktree lanes.md edits). Invariant check: claim set unchanged by this edit (199 = 199 against base b6e907f2); the `origin/main` contested-claim FAIL is present in b6e907f2 itself and absent on bcf2b37f.
-- Also restored: `## Archived lanes (full bodies in `lanes_closed.md`)` heading, which upstream `b0838b57` (opening `mls-board-evening-gaps`) deleted as its only removed line; without it the pointer list and the 2026-09-08 note sat inside that OPEN lane's block. Re-landed via patch + `git apply --3way` after the ledger-commit guard refused a behind deploys.md.
-- GOAL (verbatim): "archive CLOSED lane blocks whose owners are idle, verified, ledger-only" -- **GOAL MET** (6 of 35 non-NEVER CLOSED blocks; the rest are owned by live sessions).
+- Pre-registered reading, `owner_liveness.py --idle-min 240` at 2026-09-20 02:19Z (2026-09-19 21:19 CDT), worktree synced to origin/main 84e537c9:
 
-### closed-lane-archive-20260919-1358 — CLOSED 2026-09-19 — opened 2026-09-19 — session b684e529-77b7-4134-8c62-0ff571532dfa
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Pre-registered reading (owner_liveness.py --idle-min 240, 2026-09-19 ~18:58Z / 13:58 CDT, worktree at origin/main bdc45c11; the private watcher (SLUGS rebuilt per poll, NEVER list excluded) had exited at 18:57Z after 89m, present 33, SAFE = the same 4):
 ```
-mlb-stop-publishing-edges                sessions[d76b711b=15279m, e1a1dc80=1647m] lastmod[edc425eb=1662m] -> WAIT: uncommitted lanes.md edit mentions it in worktree(s) bandwidth-controlled-transfer
-ranking-records-build-cost               sessions[0f5b256e=1233m] lastmod[aebc040d=85m] -> WAIT: block last modified 85m ago by aebc040d (< 240m)
-portfolio-no-family-exclusion            sessions[abacd435=8m] lastmod[1a309584=3013m] -> WAIT: abacd435 idle 8m < 240m
-board-category-gates                     sessions[abacd435=8m] lastmod[1a309584=3013m] -> WAIT: abacd435 idle 8m < 240m
-chip-key-test-no-data-blind              sessions[abacd435=8m] lastmod[1a309584=3013m] -> WAIT: abacd435 idle 8m < 240m
-sim-view-reachability-caveat             sessions[abacd435=8m] lastmod[1a309584=3013m] -> WAIT: abacd435 idle 8m < 240m
-sim-view-roi-decision-count              sessions[abacd435=8m] lastmod[1a309584=3013m] -> WAIT: abacd435 idle 8m < 240m
-soccer-prekickoff-freeze                 sessions[abacd435=8m] lastmod[849c6eef=2676m] -> WAIT: abacd435 idle 8m < 240m
-soccer-capture-staleness                 sessions[abacd435=8m] lastmod[1a309584=3013m] -> WAIT: abacd435 idle 8m < 240m
-soccer-forward-graders                   sessions[abacd435=8m] lastmod[f47b6d25=2871m] -> WAIT: abacd435 idle 8m < 240m
-soccer-live-model-study                  sessions[abacd435=8m] lastmod[d8a15f79=2762m] -> WAIT: abacd435 idle 8m < 240m
-prop-evidence-parity                     sessions[4a583d41=1m] lastmod[e2104fcd=2687m] -> WAIT: 4a583d41 idle 1m < 240m
-board-today-freshness                    sessions[a1e40980=1m] lastmod[b114cd4d=2933m] -> WAIT: a1e40980 idle 1m < 240m
-soccer-shot-woodwork-undercount          sessions[a1e40980=1m] lastmod[01be7e7a=2628m] -> WAIT: a1e40980 idle 1m < 240m
-nfl-usage-publish                        sessions[4a583d41=1m] lastmod[7c5a1dad=1216m] -> WAIT: 4a583d41 idle 1m < 240m
-soccer-shot-on-target-definition         sessions[a1e40980=1m] lastmod[38d4fff3=2687m] -> WAIT: a1e40980 idle 1m < 240m
-nfl-prop-week-substrate                  sessions[4a583d41=1m] lastmod[04f51477=257m] -> WAIT: 4a583d41 idle 1m < 240m
-soccer-h24-grader                        sessions[abacd435=8m] lastmod[f75c4908=2484m] -> WAIT: abacd435 idle 8m < 240m
-soccer-live-corners-box-fallback         sessions[abacd435=8m] lastmod[da68cf77=1412m] -> WAIT: abacd435 idle 8m < 240m
-soccer-prop-conditioning                 sessions[4a583d41=1m] lastmod[983c77e9=1592m] -> WAIT: 4a583d41 idle 1m < 240m
-intelligence-idle-poll                   sessions[f26bba3b=173m] lastmod[4a77cd1d=1608m] -> WAIT: f26bba3b idle 173m < 240m
-soccer-live-corners-dispersion           sessions[abacd435=8m] lastmod[3772d175=1664m] -> WAIT: abacd435 idle 8m < 240m
-paper-execution-ledger-batch             sessions[a1e40980=1m] lastmod[86b0d03a=1142m] -> WAIT: a1e40980 idle 1m < 240m
-market-history-index-memo                sessions[a1e40980=1m] lastmod[86b0d03a=1142m] -> WAIT: a1e40980 idle 1m < 240m
-odds-history-match-precompute            sessions[a1e40980=1m] lastmod[86b0d03a=1142m] -> WAIT: a1e40980 idle 1m < 240m
-ncaaf-board-sim-coverage                 sessions[259d6003=242m] lastmod[4db3695d=1414m] -> SAFE
-ncaaf-sim-inseason-ratings               sessions[259d6003=242m] lastmod[fb0c8de7=1170m] -> SAFE
-ncaaf-player-data                        sessions[259d6003=242m] lastmod[fb0c8de7=1170m] -> SAFE
-soccer-live-gameline-name-join           sessions[abacd435=8m] lastmod[07518239=207m] -> WAIT: abacd435 idle 8m < 240m; block last modified 207m ago by 07518239 (< 240m)
-ncaaf-live-resim-blend                   sessions[259d6003=242m] lastmod[3f1a0fb6=1079m] -> SAFE
-soccer-live-loop-cost                    sessions[abacd435=8m] lastmod[b00ecc99=189m] -> WAIT: abacd435 idle 8m < 240m; block last modified 189m ago by b00ecc99 (< 240m)
-mls-board-evening-gaps                   sessions[4a583d41=1m] lastmod[4a7200c0=21m] -> WAIT: 4a583d41 idle 1m < 240m; block last modified 21m ago by 4a7200c0 (< 240m)
-closed-lane-archive-20260919-1100        sessions[d8048c76=167m] lastmod[d7b61bb9=170m] -> WAIT: d8048c76 idle 167m < 240m; block last modified 170m ago by d7b61bb9 (< 240m)
-SAFE_SLUGS=ncaaf-board-sim-coverage,ncaaf-sim-inseason-ratings,ncaaf-player-data,ncaaf-live-resim-blend
+mlb-stop-publishing-edges                sessions[d76b711b=10469m, e1a1dc80=2088m] lastmod[edc425eb=2103m] -> WAIT: uncommitted lanes.md edit mentions it in worktree(s) bandwidth-controlled-transfer
+ranking-records-build-cost               sessions[0f5b256e=1673m] lastmod[aebc040d=525m] -> SAFE
+portfolio-no-family-exclusion            sessions[abacd435=0m] lastmod[1a309584=3454m] -> WAIT: abacd435 idle 0m < 240m
+board-category-gates                     sessions[abacd435=0m] lastmod[1a309584=3454m] -> WAIT: abacd435 idle 0m < 240m
+chip-key-test-no-data-blind              sessions[abacd435=0m] lastmod[1a309584=3454m] -> WAIT: abacd435 idle 0m < 240m
+sim-view-reachability-caveat             sessions[abacd435=0m] lastmod[1a309584=3454m] -> WAIT: abacd435 idle 0m < 240m
+sim-view-roi-decision-count              sessions[abacd435=0m] lastmod[1a309584=3454m] -> WAIT: abacd435 idle 0m < 240m
+soccer-prekickoff-freeze                 sessions[abacd435=0m] lastmod[849c6eef=3116m] -> WAIT: abacd435 idle 0m < 240m
+soccer-capture-staleness                 sessions[abacd435=0m] lastmod[1a309584=3454m] -> WAIT: abacd435 idle 0m < 240m
+soccer-forward-graders                   sessions[abacd435=0m] lastmod[f47b6d25=3312m] -> WAIT: abacd435 idle 0m < 240m
+soccer-live-model-study                  sessions[abacd435=0m] lastmod[d8a15f79=3203m] -> WAIT: abacd435 idle 0m < 240m
+prop-evidence-parity                     sessions[4a583d41=3m] lastmod[e2104fcd=3128m] -> WAIT: 4a583d41 idle 3m < 240m
+board-today-freshness                    sessions[a1e40980=0m] lastmod[b114cd4d=3374m] -> WAIT: a1e40980 idle 0m < 240m
+soccer-shot-woodwork-undercount          sessions[a1e40980=0m] lastmod[01be7e7a=3068m] -> WAIT: a1e40980 idle 0m < 240m
+nfl-usage-publish                        sessions[4a583d41=3m] lastmod[7c5a1dad=1656m] -> WAIT: 4a583d41 idle 3m < 240m
+soccer-shot-on-target-definition         sessions[a1e40980=0m] lastmod[38d4fff3=3127m] -> WAIT: a1e40980 idle 0m < 240m
+nfl-prop-week-substrate                  sessions[4a583d41=3m] lastmod[04f51477=698m] -> WAIT: 4a583d41 idle 3m < 240m
+soccer-h24-grader                        sessions[abacd435=0m] lastmod[f75c4908=2924m] -> WAIT: abacd435 idle 0m < 240m
+soccer-live-corners-box-fallback         sessions[abacd435=0m] lastmod[da68cf77=1852m] -> WAIT: abacd435 idle 0m < 240m
+soccer-prop-conditioning                 sessions[4a583d41=3m] lastmod[983c77e9=2033m] -> WAIT: 4a583d41 idle 3m < 240m
+intelligence-idle-poll                   sessions[f26bba3b=614m] lastmod[4a77cd1d=2049m] -> SAFE
+soccer-live-corners-dispersion           sessions[abacd435=0m] lastmod[3772d175=2104m] -> WAIT: abacd435 idle 0m < 240m
+paper-execution-ledger-batch             sessions[a1e40980=0m] lastmod[86b0d03a=1582m] -> WAIT: a1e40980 idle 0m < 240m
+market-history-index-memo                sessions[a1e40980=0m] lastmod[86b0d03a=1582m] -> WAIT: a1e40980 idle 0m < 240m
+odds-history-match-precompute            sessions[a1e40980=0m] lastmod[86b0d03a=1582m] -> WAIT: a1e40980 idle 0m < 240m
+soccer-live-gameline-name-join           sessions[abacd435=0m] lastmod[07518239=648m] -> WAIT: abacd435 idle 0m < 240m
+soccer-live-loop-cost                    sessions[abacd435=0m] lastmod[b00ecc99=629m] -> WAIT: abacd435 idle 0m < 240m
+mls-board-evening-gaps                   sessions[4a583d41=3m] lastmod[4a7200c0=462m] -> WAIT: 4a583d41 idle 3m < 240m
+closed-lane-archive-20260919-1100        sessions[d8048c76=608m] lastmod[d7b61bb9=611m] -> SAFE
+closed-lane-archive-20260919-1358        sessions[b684e529=421m] lastmod[c3bb6f66=437m] -> SAFE
+SAFE_SLUGS=ranking-records-build-cost,intelligence-idle-poll,closed-lane-archive-20260919-1100,closed-lane-archive-20260919-1358
 ```
-- Step 4 (other worktrees with uncommitted `.syndicate/` edits): 5 dirty (bandwidth-controlled-transfer, layer2-sim-disagrees, live-gameline-accuracy-cut-repoint, mlb-ledger-segment-visibility, soccer-board-mlb-parity); none belongs to owner 259d6003 and no lanes.md diff among them mentions 259d6003 or any of the 4 slugs; all 4 kept. The 4 lane-named worktrees are clean (owner_liveness check).
-- Baseline (origin/main lanes.md in a scratch dir): check_lane_invariants INVARIANTS HOLD, 0 contested claims. After --apply: INVARIANTS HOLD, 199 claims unchanged; numstat lanes.md +8/-38 (4 lane-block lines + 4 pointers / 38 block lines), lanes_closed.md +38/-0.
-- Result: 4 blocks moved to `lanes_closed.md` with one pointer each (38 block lines): `ncaaf-board-sim-coverage`, `ncaaf-sim-inseason-ratings`, `ncaaf-player-data`, `ncaaf-live-resim-blend`. 29 CLOSED blocks WAIT (owners abacd435 / a1e40980 / 4a583d41 idle 1-8m, f26bba3b 173m, d8048c76 167m; `ranking-records-build-cost`, `soccer-live-gameline-name-join`, `soccer-live-loop-cost`, `mls-board-evening-gaps`, `closed-lane-archive-20260919-1100` also last-modified < 240m; `mlb-stop-publishing-edges` is named in bandwidth-controlled-transfer's uncommitted lanes.md edit).
-- GOAL (verbatim): "archive CLOSED lane blocks whose owners are idle, verified, ledger-only" -- **GOAL MET** (4 of 33 non-NEVER CLOSED blocks; the rest are owned by live sessions or recently edited).
+- Goal (restated verbatim): archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- GOAL MET. Moved to `lanes_closed.md` (one pointer each): `intelligence-idle-poll` (owner f26bba3b idle 612m), `closed-lane-archive-20260919-1100` (owner d8048c76 idle 606m), `closed-lane-archive-20260919-1358` (owner b684e529 idle 420m).
+- DEFERRED `ranking-records-build-cost` — SAFE by owner liveness (0f5b256e idle 1672m) but NOT eligible to the archive tool: its header carries no CLOSED date (`### ranking-records-build-cost — CLOSED — opened 2026-09-17 — session ...`), and `archive_closed_lanes_before.py` requires one both to select the block and to source the pointer text. Tools are shared and were not modified. Next run: either the owner adds a close date, or archive it by hand.
+- 26 other CLOSED blocks WAIT: owners abacd435, a1e40980, 4a583d41 were 0-1m idle at 02:19Z; `mlb-stop-publishing-edges` has an uncommitted `lanes.md` edit mentioning it in worktree `bandwidth-controlled-transfer`. Full table above.
+- Step-4 cross-check: the 5 worktrees under `C:	mp\syndicate-sessions` holding uncommitted `.syndicate/` edits (bandwidth-controlled-transfer, layer2-sim-disagrees, live-gameline-accuracy-cut-repoint, mlb-ledger-segment-visibility, soccer-board-mlb-parity) mention none of the 4 SAFE slugs and none of their owner session ids.
+- Measurement: `lanes.md` 655,538 → 645,824 B in-worktree (CRLF); `lanes_closed.md` 904,315 → 918,655 B; 101 block lines moved, 3 pointers added. `check_lane_invariants.py` in-worktree: exit 0, all three invariants `[ok]` (baseline on origin/main in a scratch dir: 2 FAIL — contested `pipeline/execute_portfolio.py`, marker `ncaaf-live-moneyline-release` with no block). No new FAIL.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1859,6 +1803,8 @@ SAFE_SLUGS=ncaaf-board-sim-coverage,ncaaf-sim-inseason-ratings,ncaaf-player-data
 - `closed-lane-archive-20260917-1733` — CLOSED 2026-09-17 — opened 2026-09-17 — session 6627d075-cad9-42fd-9339-040aaba5ce76 (scheduled task archive-closed-lanes-0917) — **GOAL: MET (3 NEVER-listed blocks archived on explicit user override)**
 - `closed-lane-archive-20260918-0837` — CLOSED 2026-09-18 — opened 2026-09-18 — session b0d770fe-e2f6-4691-83ce-2186e7baecb5 (scheduled task archive-closed-lanes-0917) — **GOAL: MET (2 of 16 archived; 14 deferred, owners active)**
 - `closed-lane-archive-20260918-1306` — CLOSED 2026-09-18 — opened 2026-09-18 — session 4991d2ec-b2c2-4040-9042-d98867b768ab — **GOAL MET: 1 of 21 CLOSED blocks moved (`closed-lane-archive-20260918-0837`); 20 wait on live owners**
+- `closed-lane-archive-20260919-1100` — CLOSED 2026-09-19 — opened 2026-09-19 — session d8048c76-5a5e-49b2-a876-c74841de9549
+- `closed-lane-archive-20260919-1358` — CLOSED 2026-09-19 — opened 2026-09-19 — session b684e529-77b7-4134-8c62-0ff571532dfa
 - `combined-board-rows-unreadable-tripwire` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: live on web `da268e07` (15:36:46Z); the field is served on every date, 0 `ROWS_UNREADABLE` lines; stored 113 vs rows 111 is the per-sport `by_sport` cap, not a defect.**
 - `combined-board-state-rows-lost` — CLOSED 2026-09-15 — opened 2026-09-14 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: Q1-Q3 answered with production readings. The reader fix is live on web `b6a0e346` (14:10:07Z): `by_date` 09-15 106 (was 0), 0 `VINTAGE_IGNORED`. One prediction was WRONG (`computed_at` moved to the refused heavy build's state stamp). User decision 2026-09-15: keep the `stale` label, it is true. Postmortem in `learnings.md`.**
 - `convergence-phase7-crps` — ORPHANED, **UNOWNED** `[session abf487e4 ARCHIVED 2026-08-20T21:1xZ]` — — **FIVE FINDINGS: FOUR DEFECTS FIXED AND MEASURED, ONE NOT A DEFECT.** Ladder
@@ -1873,6 +1819,7 @@ SAFE_SLUGS=ncaaf-board-sim-coverage,ncaaf-sim-inseason-ratings,ncaaf-player-data
 - `gameline-trend-paired-pool` — CLOSED 2026-09-12 — session 50d991d1
 - `heavy-build-child-process` — CLOSED 2026-09-17 — opened 2026-09-14 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - `heavy-build-memory-refusal` — CLOSED 2026-09-17 — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
+- `intelligence-idle-poll` — CLOSED 2026-09-18 (GOAL MET: an untouched post-deploy /intelligence tab stopped POSTing at minute 14; resume unit-tested only) — opened 2026-09-18 — session f26bba3b-72ee-4f8c-9721-3f8c7e4678f1
 - `kalshi-line-aware-rungs` — ORPHANED, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — — **CLAIMS RELEASED 2026-08-26 03:3xZ, sess
 - `kalshi-nfl-quote-gap` — CLOSED 2026-09-14 — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - `kalshi-plan-placeable` — CLOSED 2026-09-11 — opened 2026-09-11 — session 82c5bc07-6f67-47d7-9564-3a14f9d916ad — **GOAL: MET. Live places a contracted-only plan: `LIVE_PLAN_WRITTEN venue=kalshi placeable_committed=5/5 paper2_placeable_missing=0` (15:35:54Z) and 15:50:40Z `EXECUTED venue=kalshi plan_source=live positions=5 placed=3 filled=0 failed=1 duplicates=0 skipped=1 refused={'insufficient_venue_balance': 1}`.**
