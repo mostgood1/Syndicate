@@ -38584,3 +38584,18 @@ Scheduled task `fotmob-alias-verify-0919-pm`, which fired ~7h late (21:16 CT, no
   - **(4) The credit cap holds:** NCAAF credits per capture run **229, 220, 115** (03:47-03:55Z, quota `by_sport` deltas at the 150 s cadence) against **~2,100 per run** measured 18:38-18:50Z with every interval on up to 80 events. Whole-service burn 3,969-4,116/h against ~14-20K/h on the afternoon slate.
   - **(5) WNBA: 0 launches** -- no WNBA game was live in the window, so that half is UNMEASURED, not verified.
 - **NOT claimed.** That a full Saturday slate stays near today's spend: (4) was measured on a late-night slate with few games in play. The Sunday NFL slate is the next test, and NFL has no dedicated in-play lane yet -- its capture still rides the combined sweep.
+
+## 2026-09-20 04:10Z (2026-09-19 23:10 CT) — READING, no deploy — refresh-worker `aebc040d` (carries `9df3f4bc`, live since 15:39:17Z inside `7301fe67`) — lane reconciliation-disk-walks — **verify: the TIME clause is MET (23.4 min -> ~15 s). The EQUIVALENCE clause is NOT VERIFIED and cannot be, retrospectively.**
+
+- **(1) Time, the lane's pre-registered bar (sum of `total_s` <= 300 s): MET by a wide margin.** The first autorun after the fix ran 21:29:05-21:29:20Z, 13 dates, `RECONCILE_DATE_TIMING` per date:
+  - `total_s` 1.14-2.16 per date; **sum ~17 s** against the pre-fix clean run of **~23.4 min** (2026-09-18 21:03:51Z -> ~21:27:13Z).
+  - `walk_s` **1.03-1.13 per date** -- one walk, as designed, where it used to be twelve.
+  - Stage split confirms where the time went: `rows_s` 0.00-0.30, `match_s` 0.00, `write_s` 0.00, `ledger_s` 0.02 (1.03 once).
+  - The autorun stamped: `RECONCILIATION_AUTORUN_GATED age_sec` counts up from the 21:29:20Z finish (23,570 s at 04:02:10Z), so it completed and gated rather than dying mid-run as it did on five boots before.
+- **(2) Equivalence: `resolved=0` on all 13 dates, and there is NOTHING to compare it against.**
+  - Dates with `result_rows=0` (06-16..06-27) cannot resolve anything -- expected.
+  - But 07-05 (`predictions=20`, `result_rows=906`) and 07-24 (`predictions=17`, `result_rows=1231`) also resolved 0, and that is NOT explained by the line.
+  - **Why it cannot be settled retrospectively:** `RECONCILE_DATE_TIMING` is NEW in this fix, so no pre-fix per-date counts exist (0 `prediction_reconciliation` log matches in the 2026-09-18 21:00-21:35Z window). `reconciliation_autorun_status.json` is overwritten each run and is not readable from web (`/api/ops/artifacts/read` 404, `export` 403). The old implementation cannot be run against production inputs from here, and this worktree excludes `data/` (9 files), so a local A/B would be a null result over an empty population.
+  - What DOES support equivalence: the lane's 10 tests, including path-list and payload equality against a frozen copy of the `rglob` implementation, and the conflicting-result-file tie-break.
+  - **NOT claimed: that production resolution is unchanged.** `resolved=0` is consistent with both "nothing was resolvable" and "the matcher stopped matching", and this reading cannot separate them.
+- **Follow-up owed (cheap, makes the next run diagnosable):** add a skip-reason breakdown to `RECONCILE_DATE_TIMING` (no result row for key / key absent / already resolved), so a 0-resolved date explains itself instead of needing a comparison that no longer exists.
