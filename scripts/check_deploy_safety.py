@@ -255,11 +255,25 @@ def board_build_state() -> tuple[bool | None, dict[str, Any]]:
     facts: dict[str, Any] = {}
     key = _load_render_key()
     if not key:
+        # NAMED, not just described: this is "cannot ask" (no credential in this
+        # shell), which is a different fact from "asked and could not tell".
+        # A caller that blocks on the second may legitimately skip the first --
+        # `render_deploy.py` needs the same key, so a shell without it cannot
+        # deploy at all and has nothing to guard.
+        facts["missing_api_key"] = True
         facts["reason"] = "RENDER_API_KEY not found in environment or .env"
         return None, facts
     try:
         enters = _render_logs(key, "BUILD_SPAN_ENTER", minutes=_BUILD_LOOKBACK_MINUTES)
-        done = _render_logs(key, "LAYER2_SHORTLIST", minutes=_BUILD_LOOKBACK_MINUTES)
+        # COMPLETION IS `BOARD_BUILD_TIMING`, NOT `LAYER2_SHORTLIST`, and the
+        # difference is a destroyed build. The shortlist write is NOT the end of
+        # the build: the kalshi join, `portfolio_commit` (~90 s), paper execution
+        # and the publish all run after it. MEASURED 2026-09-19 (lane
+        # `preflight-board-build-hold`): a deploy fired on a CLEAR at 16:04:54Z
+        # landed between that day's shortlist write at 16:05:23Z and its publish,
+        # and the SIGTERM at ~16:09Z threw the build away. Reading the shortlist
+        # line as "done" is what made that window look safe.
+        done = _render_logs(key, "BOARD_BUILD_TIMING", minutes=_BUILD_LOOKBACK_MINUTES)
     except Exception as exc:
         facts["reason"] = f"{type(exc).__name__}: {exc}"
         return None, facts

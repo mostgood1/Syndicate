@@ -470,6 +470,82 @@ def is_defunct(proc: dict) -> bool:
     )
 
 
+BOARD_BUILD_HOLD_SERVICE = "refresh-worker"
+
+
+def read_board_build_state() -> tuple[bool | None, dict]:
+    """(in_flight, facts) from `check_deploy_safety.board_build_state()`.
+
+    Loaded BY PATH from this script's own directory rather than by name: this
+    file is run as `py -3 scripts/deploy_preflight.py` from the repo root, from
+    a session worktree, and imported by tests, and only the path is the same in
+    all three. Any failure returns UNKNOWN, never "idle".
+    """
+    try:
+        import importlib.util
+
+        module_path = Path(__file__).resolve().parent / "check_deploy_safety.py"
+        spec = importlib.util.spec_from_file_location("deploy_preflight_board_build", module_path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return module.board_build_state()
+    except Exception as exc:  # noqa: BLE001 -- unreadable is UNKNOWN, which blocks
+        return None, {"reason": f"{type(exc).__name__}: {exc}"}
+
+
+def board_build_verdict(service: str, allow_mid_build: bool, state: tuple[bool | None, dict]) -> tuple[str, int, str] | None:
+    """HOLD while a board build is in flight, UNKNOWN when that is unreadable.
+
+    WHY THIS EXISTS. `preflight` reads the PROCESS TABLE, and refresh-worker's
+    board build is a THREAD inside the long-lived `run_refresh_worker.py`
+    process -- so a build has no child process and the preflight was blind to
+    exactly the most expensive thing a deploy can destroy. MEASURED 2026-09-19:
+    a CLEAR at 16:04:54Z, a deploy fired on it, and the SIGTERM at ~16:09Z threw
+    away a today board that had written its shortlist at 16:05:23Z but not yet
+    published. The board then sat 45 minutes stale during a live NCAAF slate,
+    which is the complaint the user opened this work with.
+
+    UNREADABLE BLOCKS, deliberately, and the asymmetry is `deploy_drain`'s:
+    the cost of a wrong "idle" is a destroyed 23-minute build; the cost of a
+    wrong "busy" is a wait. Only the deployer's side is decided here.
+
+    NOT A GATE ON EVERY SERVICE: web and live-odds-worker build no board, so
+    this returns None for them and their verdicts are unchanged.
+    """
+    if str(service or "").strip() != BOARD_BUILD_HOLD_SERVICE:
+        return None
+    in_flight, facts = state
+    if allow_mid_build:
+        return None
+    # "CANNOT ASK" IS NOT "CANNOT TELL". Without `RENDER_API_KEY` this shell
+    # cannot read the worker -- but it also cannot deploy, because
+    # `render_deploy.py` reads the same key. Blocking here would only fail
+    # offline runs of this tool (its own test suite among them) while guarding
+    # nothing. Every OTHER unreadable state still blocks, below.
+    if in_flight is None and facts.get("missing_api_key"):
+        return None
+    window = (" The natural window is the ~4 min after a `BOARD_BUILD_TIMING` line and before the next"
+              " `BUILD_SPAN_ENTER`; `check_deploy_safety.py --drain` is the other way, and it is for quiet"
+              " windows because it pauses new builds. For a revert or an outage, --allow-mid-build and say"
+              " why in deploys.md.")
+    if in_flight is None:
+        return ("UNKNOWN", EXIT_UNKNOWN,
+                "cannot tell whether a board build is in flight ("
+                + str(facts.get("reason") or "unknown")
+                + "), and an unreadable log is not evidence of a quiet worker" + window)
+    if in_flight:
+        age = facts.get("build_age_seconds")
+        left = facts.get("estimated_seconds_remaining")
+        detail = f" started {facts.get('newest_build_start')}"
+        if age is not None:
+            detail += f", {int(age)}s ago"
+        if left is not None:
+            detail += f", ~{int(left)}s left of a typical build"
+        return ("HOLD", EXIT_HOLD, "a board build is in flight" + detail + "; a deploy throws it away" + window)
+    return None
+
+
 def classify(processes: list[dict]) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
     """Split into (infrastructure, job children, defunct, unidentifiable).
 
@@ -850,6 +926,9 @@ def main() -> int:
                         help="permit a target commit that is NOT on origin/main. Such a "
                              "deploy cannot compose with another session's -- whichever "
                              "lands second silently reverts the first. Record why in deploys.md.")
+    parser.add_argument("--allow-mid-build", action="store_true",
+                        help="permit a refresh-worker deploy while a board build is in flight. "
+                             "For a revert or an already-broken board; recorded on the receipt.")
     parser.add_argument("--allow-rapid", action="store_true",
                         help="permit a deploy inside this service's minimum spacing. The "
                              "escape hatch is here because a rate limit with no override "
@@ -970,6 +1049,19 @@ def main() -> int:
     report["jobs_in_flight"] = [fmt(p) for p in jobs]
     report["defunct"] = [fmt(p) for p in defunct]
     report["unidentifiable"] = [fmt(p) for p in unidentifiable]
+
+    # The board build is a THREAD, so it is invisible to everything above.
+    # Read once, recorded on the receipt whatever the verdict, so a deploy that
+    # went ahead can be checked against what was in flight when it fired.
+    board_build_pair: tuple[bool | None, dict] = (False, {})
+    if args.service == BOARD_BUILD_HOLD_SERVICE:
+        board_build_pair = read_board_build_state()
+    board_build_hold = board_build_verdict(args.service, bool(getattr(args, "allow_mid_build", False)), board_build_pair)
+    report["board_build"] = {
+        "in_flight": board_build_pair[0],
+        "facts": board_build_pair[1],
+        "allow_mid_build": bool(getattr(args, "allow_mid_build", False)),
+    }
 
     # The deploy claim is consulted BEFORE the process checks, because it answers
     # a different question: not "is it safe to deploy now" but "is this yours to
@@ -1106,6 +1198,8 @@ def main() -> int:
         newest = (report.get("cron_run") or {}).get("newest_run") or {}
         reason = (f"cron run {newest.get('id')} started {newest.get('started_at')} and has not "
                   f"ended; deploying now kills it mid-run")
+    elif board_build_hold is not None:
+        verdict, code, reason = board_build_hold
     elif jobs:
         verdict, code = "HOLD", EXIT_HOLD
         reason = f"{len(jobs)} job(s) in flight; a deploy kills them"
