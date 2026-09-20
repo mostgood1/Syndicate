@@ -67,6 +67,47 @@ BASE = os.environ.get("SYNDICATE_BASE_URL", "https://syndicate-an21.onrender.com
 
 #: Below this, a cell's median is noise. Reported anyway, flagged `thin`.
 MIN_PAIRS_PER_CELL = 10
+#: OVER/UNDER SYMMETRY CEILING. Over and under are two sides of ONE
+#: distribution, so |slope_over| must match |slope_under|. This is the strongest
+#: validity test here because it uses no threshold chosen for THIS data -- and
+#: the ceiling sits in a natural GAP. Measured 2026-09-20 over 4 boards, the
+#: asymmetries were 0,1,1,3,4,4,9 | 20,24,29,62 (%): any ceiling from 10% to 19%
+#: gives the identical verdict, so the result does not hinge on this number.
+#:
+#: WHY SYMMETRY AND NOT WRONG-SIGN RATE as the gate: `nfl Rushing Yards` reads
+#: 26-27% wrong-sign pairs yet 1% asymmetry. Individual pairs are noisy; the
+#: MEDIAN is well determined. Wrong-sign rate measures per-pair noise, symmetry
+#: measures whether the median is trustworthy -- and the median is what a
+#: consumer would use. Gating on wrong-sign would have REJECTED a good cell.
+MAX_SIDE_ASYMMETRY = 0.15
+
+#: EXISTENCE GATE -- a one-sided sign test that the correct-sign fraction is
+#: above one half. SYMMETRY CANNOT ANSWER THIS, which is why it is separate.
+#:
+#: Symmetry is a RATIO of the two sides' medians, and a ratio of two near-zero
+#: numbers is noise. Measured 2026-09-20: `nfl Passing Yards` read 20%
+#: asymmetric on one sweep and 2% on the next, because fresh boards moved its
+#: medians by ~0.01 at a magnitude of +/-0.05 -- a tenfold swing that let it
+#: PASS the symmetry gate by luck while 39-43% of its pairs had the wrong sign.
+#: The sign test says what was actually true: p = 0.20 / 0.33, not
+#: distinguishable from zero.
+#:
+#: And it keeps what a wrong-sign-RATE gate would have wrongly thrown out:
+#: `nfl Rushing Yards` has 26% wrong-sign pairs but is 74% correct over n=81,
+#: p = 8.5e-6. The slope plainly exists; its pairs are merely noisy.
+#:
+#: Two gates, two questions: this one asks whether there IS a slope, symmetry
+#: asks whether its SIZE is right. Neither can stand in for the other.
+SIGN_TEST_ALPHA = 0.05
+
+
+def sign_test_p(correct: int, n: int) -> float:
+    """One-sided P(X >= correct | n, 0.5). Exact; no SciPy in this repo."""
+    if n <= 0:
+        return 1.0
+    from math import comb
+
+    return sum(comb(n, i) for i in range(correct, n + 1)) / (2 ** n)
 #: The devig fallback value. A fair of exactly 0.5 is almost never a measurement.
 DEVIG_PLACEHOLDER = 0.5
 
@@ -91,7 +132,7 @@ def identity(row: Any) -> tuple:
     )
 
 
-def collect_pairs(rows: list) -> tuple[dict, dict]:
+def collect_pairs(rows: list, *, date: str | None = None) -> tuple[dict, dict]:
     """`(sport, market, side) -> [slope, ...]` and the exclusion counters."""
     by_identity: dict[tuple, list] = collections.defaultdict(list)
     stats = collections.Counter()
@@ -122,7 +163,7 @@ def collect_pairs(rows: list) -> tuple[dict, dict]:
                 continue
             slope = ((upper[1] - lower[1]) * 100.0) / delta_line
             cell = (key[0], key[2], side)
-            slopes[cell].append(slope)
+            slopes[cell].append((slope, date))
             stats["pairs"] += 1
             # An `over` must fall as its line rises; an `under` must rise.
             if (side == "over" and slope > 0) or (side == "under" and slope < 0):
@@ -132,9 +173,18 @@ def collect_pairs(rows: list) -> tuple[dict, dict]:
 
 def summarise(slopes: dict, wrong: collections.Counter) -> list[dict]:
     out = []
-    for cell, values in slopes.items():
-        values = sorted(values)
+    for cell, tagged in slopes.items():
+        values = sorted(v for v, _ in tagged)
         n = len(values)
+        # CROSS-DAY STABILITY. Pooling days assumes dP/dLine is a structural
+        # property of the market rather than something that drifts. That is a
+        # HYPOTHESIS, so it is measured here rather than assumed: `day_spread`
+        # is the range of the per-day medians, and a cell whose days disagree
+        # by more than its own IQR should not be pooled into one number.
+        by_day = collections.defaultdict(list)
+        for value, day in tagged:
+            by_day[day].append(value)
+        day_medians = {d: round(st.median(v), 4) for d, v in by_day.items() if v}
         out.append(
             {
                 "sport": cell[0],
@@ -145,9 +195,40 @@ def summarise(slopes: dict, wrong: collections.Counter) -> list[dict]:
                 "q1": round(values[n // 4], 4),
                 "q3": round(values[(3 * n) // 4], 4),
                 "wrong_sign_rate": round(wrong[cell] / n, 4) if n else None,
+                "sign_test_p": (
+                    None if cell[2] not in ("over", "under") else
+                    round(sign_test_p(n - wrong[cell], n), 6)
+                ),
                 "thin": n < MIN_PAIRS_PER_CELL,
+                "days": len(day_medians),
+                "day_medians": day_medians,
+                "day_spread": (
+                    round(max(day_medians.values()) - min(day_medians.values()), 4)
+                    if len(day_medians) >= 2
+                    else None
+                ),
+                # POOLABLE only when the days agree to within the cell's own
+                # IQR. Otherwise the pooled median is an average of regimes.
+                "poolable": (
+                    len(day_medians) < 2
+                    or (max(day_medians.values()) - min(day_medians.values()))
+                    <= max(1e-9, values[(3 * n) // 4] - values[n // 4])
+                ),
             }
         )
+    # PAIR EACH OVER WITH ITS UNDER (and home with away) and stamp symmetry.
+    index = {(r["sport"], r["market"], r["side"]): r for r in out}
+    mirror = {"over": "under", "under": "over", "home": "away", "away": "home"}
+    for r in out:
+        other = index.get((r["sport"], r["market"], mirror.get(r["side"], "")))
+        r["asymmetry"] = None
+        r["symmetric"] = None
+        if other is None or r["thin"] or other["thin"]:
+            continue
+        a, b = abs(r["median_pp_per_unit"]), abs(other["median_pp_per_unit"])
+        denom = max(a, b, 1e-9)
+        r["asymmetry"] = round(abs(a - b) / denom, 4)
+        r["symmetric"] = r["asymmetry"] <= MAX_SIDE_ASYMMETRY
     return sorted(out, key=lambda r: (-r["n_pairs"], r["sport"], r["market"]))
 
 
@@ -156,7 +237,9 @@ def main() -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--limit", type=int, default=2000)
-    parser.add_argument("--date", default=None)
+    parser.add_argument("--date", default=None, help="one date (default: the current board)")
+    parser.add_argument("--start", default=None, help="sweep from this date (inclusive)")
+    parser.add_argument("--end", default=None, help="sweep to this date (inclusive)")
     parser.add_argument("--json-out", default=None)
     parser.add_argument(
         "--min-pairs",
@@ -166,13 +249,38 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    payload = fetch_board(limit=args.limit, date=args.date)
-    rows = payload.get("rows") or []
-    slopes, extra = collect_pairs(rows)
-    stats, wrong = extra["stats"], extra["wrong"]
+    # ONE BOARD PER DATE: the endpoint serves each date's FINAL build, so a
+    # sweep of N dates is N snapshots, not N x builds. Retention reached back
+    # only to 2026-09-17 when measured on 2026-09-20 (09-14..09-16 returned
+    # zero rows), so a wide --start contributes nothing for the early dates --
+    # which is why every date's row count is printed below.
+    if args.start and args.end:
+        from datetime import date as _d, timedelta as _td
+        a, b = _d.fromisoformat(args.start), _d.fromisoformat(args.end)
+        dates = [(a + _td(days=i)).isoformat() for i in range((b - a).days + 1)]
+    else:
+        dates = [args.date]
+    slopes = collections.defaultdict(list)
+    stats = collections.Counter()
+    wrong = collections.Counter()
+    written = {}
+    for day in dates:
+        try:
+            payload = fetch_board(limit=args.limit, date=day)
+        except Exception as exc:  # noqa: BLE001
+            print(f"  {day}: FETCH FAILED {type(exc).__name__}: {exc}", flush=True)
+            continue
+        rows = payload.get("rows") or []
+        label = day or "current"
+        written[label] = payload.get("written_at")
+        print(f"  {label}: written_at {payload.get('written_at')}  rows {len(rows)}", flush=True)
+        part, extra = collect_pairs(rows, date=label)
+        for cell, values in part.items():
+            slopes[cell].extend(values)
+        stats.update(extra["stats"])
+        wrong.update(extra["wrong"])
     summary = summarise(slopes, wrong)
-
-    print(f"board written_at {payload.get('written_at')}  rows {len(rows)}", flush=True)
+    print(f"dates swept {len(dates)}, boards with rows {sum(1 for v in written.values() if v)}", flush=True)
     print("\n=== POPULATION ===", flush=True)
     for key in (
         "rows",
@@ -196,17 +304,41 @@ def main() -> int:
     print(f"\n=== dP/dLine, probability points per unit of line ===", flush=True)
     print(f"{'sport':8} {'market':26} {'side':6} {'n':>5} {'median':>9} {'IQR':>18} {'wrong':>6}", flush=True)
     for r in summary:
-        flag = "  <- THIN" if r["thin"] else ""
+        flags = []
+        if r["thin"]:
+            flags.append("THIN")
+        if not r["poolable"]:
+            flags.append("DAYS DISAGREE")
+        if r["symmetric"] is False:
+            flags.append(f"ASYMMETRIC {r['asymmetry']:.0%}")
+        if r.get("sign_test_p") is not None and r["sign_test_p"] >= SIGN_TEST_ALPHA:
+            flags.append(f"NO SLOPE p={r['sign_test_p']:.2g}")
         iqr = f"[{r['q1']:.2f},{r['q3']:.2f}]"
+        spread = "" if r["day_spread"] is None else f"{r['day_spread']:.2f}"
         print(
             f"{r['sport']:8} {r['market'][:26]:26} {r['side'][:6]:6} {r['n_pairs']:>5} "
-            f"{r['median_pp_per_unit']:>9.3f} {iqr:>18} {r['wrong_sign_rate']:>6.0%}{flag}",
+            f"{r['median_pp_per_unit']:>9.3f} {iqr:>18} {r['wrong_sign_rate']:>6.0%} "
+            f"days={r['days']} spread={spread}"
+            + (f"  <- {', '.join(flags)}" if flags else ""),
             flush=True,
         )
 
-    usable = [r for r in summary if not r["thin"]]
+    # USABLE = enough pairs, days agree, AND its mirror side agrees. A cell with
+    # no measurable mirror is NOT usable: symmetry is the check, and an
+    # unverifiable cell must not default to passing it.
+    usable = [
+        r
+        for r in summary
+        if not r["thin"]
+        and r["poolable"]
+        and r["symmetric"] is True
+        # home/away carry no over/under sign to test, so they rest on symmetry
+        # alone -- stated here so that exemption is a decision, not an accident.
+        and (r.get("sign_test_p") is None or r["sign_test_p"] < SIGN_TEST_ALPHA)
+    ]
     print(
-        f"\n{len(usable)} cell(s) at n>={args.min_pairs}, {len(summary) - len(usable)} thin. "
+        f"\n{len(usable)} cell(s) USABLE (n>={args.min_pairs}, days agree, mirror agrees, slope exists), "
+        f"{len(summary) - len(usable)} not. "
         f"A HIGH wrong-sign rate means the cell's median averaged noise -- do not "
         f"use it because it has n.",
         flush=True,
