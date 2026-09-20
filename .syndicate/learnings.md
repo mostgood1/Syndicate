@@ -3303,3 +3303,34 @@ and read one field of five.
 - **What settled (2), and it is the template:** a POSITIVE/NEGATIVE CONTRAST across services, same window. refresh-worker `PUBLISH_OK` **339** (its own direct publishes, so the service and the logger are both alive) against `publishedArtifacts` **0** and `PUBLISH_SKIPPED_UNCHANGED` **0**; live-odds-worker emits both constantly. The live `PUBLISH_OK` is what makes the two zeroes mean something — without it they are indistinguishable from a dead logger.
 - **Why the code could not settle it either:** `live_lens_loop.py:1041` and `live_refresh_loop.py:5993` both call the sweep, the latter calling itself "one of FOUR paths into that sweep", and both runners call `start_live_lens_loop()` behind `SYNDICATE_ENABLE_LIVE_LENS_LOOP`. Which service sweeps is a FLAG that moves with no diff. A comment naming "the only production caller" was stale in the tree while I was reading it.
 - **The rule:** before a zero is evidence, name the line that would be present if the mechanism HAD run, and confirm that line is being emitted somewhere for something. Pair it with `[absent signal is about the emitter]` and `[absence in a window isn't absence]` — this is the same family, and the session count says it keeps recurring in new disguises.
+
+## 2026-09-20 — RELEASING A LANE CLAIM ON `origin/main` ALONE CAN *MANUFACTURE* THE SAME BLOCK, and the second block reads identically to the first `[lane daily-accuracy-suite]`
+
+Nine paths were released from an orphaned lane's `- Files:` line, landed on
+`origin/main`, and the very next edit was blocked again by the SAME lane on the
+SAME file. It looked like the push had not taken effect. It had.
+
+`lane_claims_source.effective_claims` computes
+`local_added = primary - base_claims - main_claims`. While the claim sat on
+`main`, the stale primary tree's identical `(lane, path)` pair was cancelled by
+`main_claims`. **Removing it from `main` is exactly what stops that
+cancellation**, so the primary tree's surviving copy is promoted to a
+local-added claim and re-blocks. The release removed the claim from one source
+and created it in the other.
+
+**The only tell is the `Claim source:` line**, which flipped from
+`origin/main@44e96867` to `primary tree lanes.md, added since fork point
+1a280739`. Everything else in the BLOCKED message — file, lane, remedy text —
+is byte-identical, so a quick re-read looks like a no-op push.
+
+**RULE: a claim take or release is TWO edits, in the same pass** — the worktree
+copy that lands on `main`, and the primary tree's copy that the hooks read. Also:
+the guard blocks on ANY lane other than `current`, so adding your own lane
+alongside the incumbent does nothing; the incumbent's entry has to actually go.
+
+This is the mirror image of the 2026-09-17 fix (`3d3587f7`) that taught the guard
+to read `origin/main`. That fix removed the need to mirror a take into the primary
+tree; it did not remove the need to mirror a RELEASE, because the two operations
+sit on opposite sides of the same set subtraction. The earlier note read as
+"mirroring is no longer the fix", which is true for one direction and false for
+the other — the most expensive kind of half-true.
