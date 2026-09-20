@@ -90,7 +90,7 @@ def test_price_wins_when_both_are_supplied_so_the_cap_cannot_be_breached():
     both = blended_score(ev_pct=1.0, movement_price_delta=20.0, movement_line_prob_delta_pp=9.0)
     price_only = blended_score(ev_pct=1.0, movement_price_delta=20.0)
     assert both == price_only
-    assert both["movement_basis"] == "price"
+    assert both["movement_kind"] == "price"
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ def test_line_move_reports_capped_like_a_price_move_does():
     """
     saturated = blended_score(ev_pct=0.0, movement_line_prob_delta_pp=500.0)
     assert saturated["movement_capped"] is True
-    assert saturated["movement_basis"] == "line"
+    assert saturated["movement_kind"] == "line"
 
 
 # ---------------------------------------------------------------------------
@@ -145,11 +145,32 @@ def test_toward_the_pick_is_positive_and_away_is_negative():
     assert toward["movement_component"] == pytest.approx(-away["movement_component"])
 
 
+def test_score_movement_kind_does_not_collide_with_movement_basis():
+    """Two DIFFERENT questions, so two different names -- pinned deliberately.
+
+    `_movement_from_opening` publishes `movement_basis` ("same_book" /
+    "best_of_n" / "line_moved"): WHERE the comparison came from. The score
+    publishes `movement_kind` ("price" / "line"): WHICH COEFFICIENT scored it.
+    The card builder spreads the movement block onto the row at TOP level while
+    the score dict lands under `score`, so reusing one name would put two fields
+    of the same name and different meaning in one payload and leave the UI
+    reading whichever the spread order happened to win.
+    """
+    result = blended_score(ev_pct=1.0, movement_line_prob_delta_pp=3.0)
+    assert result["movement_kind"] == "line"
+    assert "movement_basis" not in result, (
+        "the score must NOT publish `movement_basis` -- that name belongs to the "
+        "movement block and carries a different vocabulary"
+    )
+    producer_vocabulary = {"same_book", "best_of_n", "line_moved"}
+    assert result["movement_kind"] not in producer_vocabulary
+
+
 def test_zero_is_published_and_distinguished_from_absent():
     """"We compared and it had not moved" != "we had no opening to compare"."""
     absent = blended_score(ev_pct=1.0)
     assert absent["movement_component"] is None
-    assert absent["movement_basis"] is None
+    assert absent["movement_kind"] is None
     zero = blended_score(ev_pct=1.0, movement_line_prob_delta_pp=0.0)
     assert zero["movement_component"] == 0.0
 

@@ -848,13 +848,13 @@ def blended_score(
     move = _as_float(movement_price_delta)
     line_move = _as_float(movement_line_prob_delta_pp)
     value_move = 0.0
-    movement_basis = None
+    movement_kind = None
     if move:
         value_move = _movement_contribution(move)
-        movement_basis = "price"
+        movement_kind = "price"
     elif line_move:
         value_move = _movement_contribution(line_move, weight=_SCORE_MOVEMENT_LINE_WEIGHT)
-        movement_basis = "line"
+        movement_kind = "line"
     # The sim term is CAPPED, not merely weighted -- see `_SCORE_SIM_CAP_PCT`.
     # A bare weight scales with the edge, so a large enough model disagreement
     # always wins eventually; the cap is what makes domination structurally
@@ -918,6 +918,21 @@ def blended_score(
         "movement_component": (
             None if (move is None and line_move is None) else round(value_move, 4)
         ),
+        # NAMED `movement_kind` AND **NOT** `movement_basis`, WHICH IS TAKEN.
+        #
+        # `_movement_from_opening` already publishes `movement_basis`, with a
+        # completely different vocabulary -- "same_book" / "best_of_n" /
+        # "line_moved" -- and the card builder spreads that whole movement block
+        # onto the row at TOP level while this dict lands under `score`. Calling
+        # both `movement_basis` would put two fields of the same name and
+        # different meaning in one payload, one nested and one not, with the UI
+        # reading `item.movement_basis` and getting whichever the spread order
+        # happened to leave. That is the `#364` shape this file keeps paying
+        # for, and renaming costs nothing before anything consumes it.
+        #
+        # They are also genuinely different questions: `movement_basis` says
+        # WHERE the comparison came from, this says WHICH COEFFICIENT scored it.
+        #
         # WHICH HALF OF THE MOVEMENT TERM FIRED: "price", "line", or None when
         # neither did. Published for the same reason `ev_basis` and
         # `model_edge_basis` are: the two halves carry different coefficients
@@ -927,7 +942,7 @@ def blended_score(
         # `movement_component` means a supplied-but-zero move -- "we compared
         # and it had not moved", which is the `#368` distinction this block
         # already makes for `movement_component` itself.
-        "movement_basis": movement_basis,
+        "movement_kind": movement_kind,
         # "AT THE BOUND", not "would the old clip have fired".
         #
         # This used to be `abs(weight * move) > cap`, which under the saturating
@@ -942,12 +957,12 @@ def blended_score(
         # 1% of the bound, so this row's movement is no longer meaningfully
         # ordered against another saturated one. Under the clip that was true
         # from 20 points; under the curve it starts around 92.
-        # `movement_basis` and NOT `bool(move)`: a LINE move that saturates is
+        # `movement_kind` and NOT `bool(move)`: a LINE move that saturates is
         # every bit as capped as a price move that does, and reporting False
         # for it would be this field's own 2026-08-21 defect over again -- a
         # field named for a different quantity than the one it carries.
         "movement_capped": (
-            movement_basis is not None and abs(value_move) >= 0.99 * _SCORE_MOVEMENT_CAP_PCT
+            movement_kind is not None and abs(value_move) >= 0.99 * _SCORE_MOVEMENT_CAP_PCT
         ),
         "book_confidence": confidence,
         "freshness_factor": freshness,
