@@ -36,6 +36,8 @@ from scripts.build_soccer_artifacts import _fill_promoted
 from scripts.build_soccer_artifacts import _load_player_rows
 from scripts.build_soccer_artifacts import _load_team_ratings
 from syndicate.features.soccer.ingestion.fotmob_momentum import fotmob_momentum_block
+from syndicate.features.soccer.ingestion.fotmob_match_id import resolve_fotmob_match_id
+from syndicate.features.soccer.ingestion.fotmob_shots import matches_for_date
 from syndicate.features.soccer.features.live_lens import goal_in_window_probability
 from syndicate.features.soccer.features.live_lens import project_live_match
 from syndicate.features.soccer.features.live_lens import project_live_player_props
@@ -209,7 +211,8 @@ def _build_match_boxes(
 # production, still an honest description of what it computes.
 
 
-def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path, simulations: int) -> dict[str, Any]:
+def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path, simulations: int,
+                fixture_cache: dict[str, Any] | None = None) -> dict[str, Any]:
     # ESPN's SINGLE-DATE scoreboard (`dates=YYYYMMDD`), NOT the one-day RANGE
     # (`dates=YYYYMMDD-YYYYMMDD`) this used to send. They are not the same
     # request to ESPN's edge.
@@ -240,6 +243,35 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
     # Summaries fetched by the live-lens pass below, reused by the box pass so
     # an in-progress match costs ONE `fetch_match_summary`, not two.
     summaries: dict[str, dict[str, Any]] = {}
+
+    # ONE TICK, THREE FOTMOB FIXTURE FETCHES -- not three per in-play match.
+    #
+    # `resolve_fotmob_match_id` fetches `matches_for_date` for the date AND both
+    # neighbours (a fixture can be listed a day either side), caches nothing, and
+    # is called once per in-play match here. Every match on the same date asks
+    # for the SAME three date-wide payloads, so a 12-match tick made 36 fetches
+    # of 3 distinct bodies on top of its 12 `matchDetails` calls -- and FotMob was
+    # 15% of a tick when the loop was profiled (lane `soccer-live-loop-cost`,
+    # 2026-09-19).
+    #
+    # The memo lives for ONE TICK and is shared across leagues when the caller
+    # passes one in (`poll_active_leagues_for_tick` does), because the payload is
+    # date-wide, not league-wide. It is deliberately NOT process-lifetime: a
+    # fixture list that outlives the tick would start answering for a date whose
+    # fixtures have moved. The live series (`matchDetails`) is never cached --
+    # that is the part that changes minute to minute, and it is what momentum
+    # reads.
+    fixtures = fixture_cache if fixture_cache is not None else {}
+
+    def _fixtures_for(date_compact: str) -> list[dict[str, Any]]:
+        rows = fixtures.get(date_compact)
+        if rows is None:
+            rows = matches_for_date(date_compact)
+            fixtures[date_compact] = rows
+        return rows
+
+    def _resolve_match_id(**kwargs: Any) -> int | None:
+        return resolve_fotmob_match_id(**kwargs, _fetch=_fixtures_for)
     if live_events:
         # `as_of` is REQUIRED and this call was missing it, which is the whole
         # live-lens outage. `_load_team_ratings(league, source_root, as_of)`
@@ -403,6 +435,7 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
                     away_team=live_state["away_team"],
                     iso_date=iso_date,
                     as_of_seconds=as_of_seconds,
+                    _resolve=_resolve_match_id,
                 ),
                 "live_player_props": [row.to_dict() for row in sorted(live_props, key=lambda r: r.projected_final_shots, reverse=True)[:12]],
             }
@@ -485,6 +518,10 @@ def poll_active_leagues_for_tick(
     # build_intelligence_overview (intelligence.py) already documents for
     # per-sport iteration.
     games: list[dict[str, Any]] = []
+    # Shared for this tick only -- see the note in `poll_league`. FotMob's
+    # fixture payload is date-wide, so every league in this tick reads the same
+    # three bodies.
+    fixture_cache: dict[str, Any] = {}
     leagues_checked: list[str] = []
     leagues_with_games: list[str] = []
     errors: dict[str, str] = {}
@@ -492,7 +529,8 @@ def poll_active_leagues_for_tick(
         leagues_checked.append(league)
         try:
             payload = poll_league(
-                league, iso_date, source_root=source_root, out_root=out_root, simulations=simulations
+                league, iso_date, source_root=source_root, out_root=out_root, simulations=simulations,
+                fixture_cache=fixture_cache,
             )
         except Exception as error:
             errors[league] = f"{type(error).__name__}: {error}"

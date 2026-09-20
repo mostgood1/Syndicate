@@ -39,7 +39,8 @@ class EspnScoreboardQueryShapeTests(unittest.TestCase):
 
 class PollActiveLeaguesForTickTests(unittest.TestCase):
     def test_flattens_games_across_active_leagues(self) -> None:
-        def _fake_poll_league(league, iso_date, *, source_root, out_root, simulations):
+        def _fake_poll_league(league, iso_date, *, source_root, out_root, simulations,
+                              fixture_cache=None):
             if league == "mls":
                 return {"league": league, "date": iso_date, "count": 1, "games": {"123": {"home_team": "A", "away_team": "B"}}}
             return {"league": league, "date": iso_date, "count": 0, "games": {}}
@@ -62,7 +63,8 @@ class PollActiveLeaguesForTickTests(unittest.TestCase):
         self.assertEqual(result["errors"], {})
 
     def test_one_league_exception_does_not_drop_others(self) -> None:
-        def _fake_poll_league(league, iso_date, *, source_root, out_root, simulations):
+        def _fake_poll_league(league, iso_date, *, source_root, out_root, simulations,
+                              fixture_cache=None):
             if league == "mls":
                 raise RuntimeError("espn down")
             return {"league": league, "date": iso_date, "count": 1, "games": {"999": {"home_team": "C", "away_team": "D"}}}
