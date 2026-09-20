@@ -38749,3 +38749,18 @@ reading in that section that WAS measured is the shortlist fetch, printed by the
 
 Recorded because the value of this file is that its numbers were measured. A wall-clock stamp
 carried from an assumption is the same defect as a predicted effect carried from an earlier reading.
+
+## 2026-09-20 16:00:22Z (11:00 CT) — DEPLOY — live-odds-worker `bad3b94e` -> `76a6f4a2` (`dep-dao065n40ujc73ddspn0`, origin/main) — lane live-inplay-board-cadence — **LIVE 16:06:32Z, 54 min before kickoff; verify: PENDING**
+
+- **Why.** USER 2026-09-20 ~10:45 CT chose "Build it tonight" for NFL, before today's slate. NFL was the one sport whose in-play odds came only from the combined sweep, MEASURED 2026-09-19 at ~1 h per pass with two passes overlapping -- so an NFL interval quote was past the board's 300 s window before it was written.
+- **What, two parts:**
+  - `scripts/refresh_odds_sources.py`: the `nfl_oddsapi_refresh` step now passes `--mode` through. It never did, so `--mode fast` skipped NCAAF's props (which have their own `modes=("full",)` steps) and ran NFL's anyway. `refresh_nfl_oddsapi.py` has implemented the split since it was written: `full` = team odds THEN props THEN the artifact bundle; `fast` = team odds only.
+  - `scripts/run_live_odds_refresh_worker.py`: `_launch_autorun_nfl_lines_refresh`, an NFL twin of the NCAAF lines autorun, on its own lane `live-odds-worker-nfl-lines`, launched by the 30 s capture thread. DEFAULT OFF.
+- **Why `fast` does not starve the board, checked before shipping:** the board's in-play rows come from the shared quote log, and `fetch_nfl_team_odds_local._append_nfl_team_book_quotes` appends `events + segment_payloads` -- full-game AND segment rows. What `fast` skips is the props fetch and the artifact-bundle copy, neither of which feeds `book_grid`.
+- **Env, all three absent before, set 15:53:30Z and read back:** `SYNDICATE_ENABLE_NFL_LINES_REFRESH_AUTORUN=on`, `SYNDICATE_NFL_LINES_REFRESH_INTERVAL_SECONDS=150`, `SYNDICATE_NFL_SEGMENT_PREGAME_INTERVAL_SECONDS=1800`. `SYNDICATE_NFL_SEGMENT_MARKETS` (all) and `_LIVE_WINDOW_SECONDS` (12600) were already set 2026-09-19.
+- **Locks.** Claim `live-inplay-board-cadence` 15:53Z. Preflight HOLD (2-4 jobs) 15:54-16:00Z, then **CLEAR at 16:00:21Z** ("only infrastructure processes running"); the runner fired on it. Nothing was killed. Claim released 16:06:48Z.
+- **Riders:** none of consequence -- `bad3b94e..76a6f4a2` is this change plus ledger commits.
+- **Tests:** 27 in `tests/test_inplay_board_cadence.py`, including that `--mode` actually reaches `refresh_nfl_oddsapi.py` (the defect was its absence). PRE-EXISTING and NOT caused by this change: 7 failed / 7 errors in `tests/test_refresh_odds_sources.py`, identical counts on HEAD's own file, verified by a sha256-backed swap and restored to sha `bcb3cc7b930791fb`.
+- **Baseline at go-live (16:07:00Z):** credits used 1,097,653; by_sport nfl 122,319, ncaaf 207,575. `NFL_LINES_AUTORUN_LAUNCHED` lines: 0 (the lane did not exist).
+- **Expectation:** `NFL_LINES_AUTORUN_LAUNCHED` gaps ~150-200 s once games are in play; NFL credits per run under ~600 in-play; and the FIRST real test of the pregame cap -- last night no NCAAF/NFL event sat inside the 6 h pregame window, so nothing was deferred and the cap was proxied, not verified. Today the signature is cheap runs with ONE larger run per ~30 min.
+- **verify:** `nfl_capture_reading.py` (scratchpad a1e40980), 100 min across kickoff, reporting every 10 min.
