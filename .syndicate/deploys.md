@@ -38798,3 +38798,17 @@ carried from an assumption is the same defect as a predicted effect carried from
   - The remaining serial hops are capture (154 s) -> publish -> grid tick (~2-3 min) -> web cache (45 s floor). The grid tick is now the largest term, and nothing in this lane has touched it.
 - **NOT the sport the goal names.** The goal says "measured on a live NCAAF slate"; NCAAF has no games on a Sunday. This is the same code path on NFL/WNBA, and the NCAAF re-measure is OWED on the next NCAAF slate (Thursday/Saturday) — 09-19's NCAAF numbers (310/316 s) predate the capture fix and are not a post-fix reading.
 - **Capture side, same window:** NFL `NFL_LINES_AUTORUN_LAUNCHED` 22 launches, gaps 152-158 s (median **154**), 0 failures; credits +135 in the first in-play 10 min (~34/run) against ~2,100/run for NCAAF before the cap.
+
+## 2026-09-20 17:25Z (12:25 CT) — CORRECTION to the 17:16Z reading — lane live-inplay-board-cadence — **the metric was measuring the wrong clock; the corrected latency is ~362 s look-to-serve, and the work splits in two**
+
+- **What changed:** every "served in-play quote age" in this session (310 s, 316 s on 09-19; 262 s at 17:16Z today) was `(now - price_grid_generated_at) + book_age_seconds`. `layer2_board.py:2820-2825` documents `book_age_seconds` as **time since the price last MOVED**, and `quote_seen_age_seconds` as **time since we last LOOKED**. The lane's goal names the MOVE-to-served gap, so the pipeline's own lag is the second clock, not the first.
+- **The old numbers are not arithmetic errors** — the baseline used the same formula, so "733 s -> 262 s" is a fair like-for-like improvement. They are the wrong QUANTITY for the goal: they charge market quiescence to the board. `layer2_board.py`'s own table has the gap at platform scale: nfl book_age median 331.6m vs seen_age 270.4m; wnba 376.2m vs 68.5m.
+- **CORRECTED MEASUREMENT (17:22-17:23Z, 369-377 in-play overlay cards, 305 of 369 carrying the second clock):**
+  - time since we LOOKED at the price: **~202 s** median
+  - grid -> serve: **79-160 s** median across two reads
+  - **look-to-serve: ~362 s median** (min 338, p90 362)
+- **So the remaining gap to ~180 s is split, and neither half is where I last said it was:**
+  - CAPTURE ~202 s. With NFL launching every 154 s, a seen-age above that means not every event is refreshed by every run (`SYNDICATE_NFL_SEGMENT_MAX_EVENTS`, per-event call budget, and markets a book does not return).
+  - BOARD 79-160 s: grid tick plus the 45 s cache floor. This lane's overlay already removed the 12-35 min shortlist wait; what is left is the tick itself.
+- **The freshness-ceiling lever is now known to be the WRONG one**, and the modelling is kept so nobody re-derives it: tightening `SYNDICATE_INPLAY_OVERLAY_MAX_PRICE_AGE_SECONDS` 300 -> 180 keeps 109 of 377 cards at a 162 s `book_age`-based median — but it would be discarding rows whose PRICE had not moved, not rows the board was slow about. Do not ship it as a latency fix.
+- **Unchanged and still true:** NFL intervals reach the board (peak h1 66, q1 57, h2 29, q3 23, q4 22, q2 20), capture runs at 154 s with 0 failures, and the credit cap holds (NFL 1,485 credits since go-live; 22.0% of plan used).
