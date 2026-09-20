@@ -173,6 +173,53 @@ portfolio endpoints serve settlement marginals only (`by_sport`,
 `by_market_family`, `by_venue_family`), never per-order rows, so no calibration
 curve exists. Exposing settled orders with their board fields is the unblock.
 
+## [layer2-movement-term] THE BOARD SCORES PRICE MOVEMENT AND SCORED LINE MOVEMENT AT EXACTLY 0.0 — fixed on main, NOT DEPLOYED `[verified 2026-09-20 16:23-18:0xZ, lane layer2-line-movement-scoring]`
+
+**Movement is the board's second-largest value term and was already wired end to
+end** — unusual here. `blended_score` = `ev_pct` + capped sim + capped movement,
+then `min(value, value x reliability)`.
+
+**DEPLOYED COEFFICIENTS, FITTED OUT OF THE SERVED PAYLOAD rather than read from
+config** (1,413 real delta -> component pairs, rms 2.7e-5): **weight 0.05, cap
+1.0, saturating curve** — equal to the code defaults, so no env drift.
+
+Served board 2026-09-20T16:23:40Z, 2,000 of 5,556 rows:
+
+    term                  coverage   non-zero   mean |x|   signed mean
+    ev_component            100%        —         2.585        —
+    movement_component      94.3%      70.7%      0.343      -0.255
+    sim_component           76.1%      76.0%      0.740      +0.223
+
+**LINE MOVEMENT SCORED EXACTLY 0.0, and it is the sharpest class of move.**
+`_movement_from_opening` withholds `movement_price_delta` when the line moved —
+correct, a price at a different handicap is not a price move — and NOTHING
+replaced it. The 114 rows with a null `movement_component` were **exactly** the
+114 `movement_basis=line_moved` rows. The steam detector reads the same withheld
+delta, so steam on a line move was **structurally impossible**, not rare.
+
+**MOVEMENT IS A NET PENALTY**: 1,151 rows negative vs 262 positive,
+`movement_vs_pick` 60.5% away / 15.8% toward. Of 357 `rows_admitted_by_blend`,
+movement admitted **0** and the sim **38** — and demotions were UNCOUNTABLE,
+because a dropped row is not in the served payload either. Line-moved rows split
+**59 away / 55 toward**, i.e. balanced: a discovery signal, not another penalty.
+
+Removing the term reorders **99.5%** of rows (median 61 places of 2,000).
+
+**FIXED ON MAIN, NOTHING DEPLOYED** (`46b2e160`, `96e17478`): line moves score in
+PROBABILITY POINTS (raw |line delta| spans 0.5 to 13.0 across markets and cannot
+share a coefficient), weight **0.3096 DERIVED** as `0.05 x 6.192` from the
+measured median cents-per-probability-point, sign from the already-shipped
+`movement_vs_pick`, through the SAME curve and SAME cap so the term's bound is
+unchanged. Steam fires at `15/6.192` pp. `rows_refused_by_movement` now sits
+beside `rows_admitted_by_movement`, both forwarded to the endpoint.
+
+**THE WEIGHT REMAINS UNVALIDATED.** `scripts/decompose_movement_clv.py` exists
+and has NOT been run. It cannot reuse `decompose_sim_clv.py`'s method: movement
+is measured AGAINST the opening, so the opening record's own movement is 0 by
+construction, and bucketing against `clv_pct` is **CIRCULAR** (CLV is
+open->close, movement at Tk is open->Tk, so Tk lies inside the path). It
+measures FORWARD CLV and prints the circular version only as a labelled control.
+
 ## [sim-weight-clv-decomposition] `_SCORE_SIM_WEIGHT`'s OWN UNBLOCK CONDITION WAS RUN, AND THE ANSWER IS NO — leave `(0.125, 1.5)` alone `[2026-09-04, lane sim-clv-decomposition, READ-ONLY: no deploy, no env var]`
 
 **A non-zero `sim_component` does NOT predict better CLV.** In the direction the
