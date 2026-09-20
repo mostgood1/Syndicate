@@ -202,3 +202,19 @@ because the work kept deviating:
 - **Why it looks cheap to fix:** `normalize` is `" ".join(str(value or "").strip().lower().replace(...).split())` -- pure, tiny, and called with a SMALL set of distinct team strings over and over. `team_aliases.py` already imports `lru_cache` and uses it at `:73, :101, :444, :491`.
 - **Do not just add it:** bound the cache (distinct inputs include more than team names), and measure the span median before/after -- the lane's own pre-registered bar. A perf change to a shared hot module without a before/after is how the 150 s NCAAF knob happened (it changed nothing and read as a fix).
 - `team_aliases.py` was claimed by no OPEN lane at 16:49Z.
+
+## 2026-09-20 17:4xZ — NCAAB is the one traded sport that cannot be graded, and it needs exactly one thing: a team registry `[lane daily-accuracy-suite, session 9b88f9a2]`
+
+- **Measured while adding NBA to the ESPN population settler.** Everything NCAAB needs is now in place EXCEPT name resolution: `_SPORT_PATHS["ncaab"] = "basketball/mens-college-basketball"`, `regulation_periods("ncaab") == 2` (two halves, not four quarters), `_segment_closed` honours halves, and `market_keys` already maps `ncaab` onto the shared `_BASKETBALL` table.
+- **The single blocker.** `population_outcomes_espn._resolve_team` sends every non-NCAAF sport to `team_aliases.canonical_team`, whose alias map has no `ncaab` entry — `canonical_team("ncaab", "Duke Blue Devils")` and `("ncaab", "Gonzaga")` both return `None`. Registering the sport anyway would produce `team_unresolved` on 100% of rows: a sport that LOOKS covered and grades nothing, which is worse than an honest absence.
+- **The precedent and its real cost.** `ncaaf_team_registry` holds 684 teams / 2,342 keys and REFUSES its **128 ambiguous** names ("tigers" names 25 schools). NCAAB is larger (~360 D1 programs) and its nickname collisions are worse. The refusal behaviour is the load-bearing part, not the mapping.
+- **Not urgent, and the date is knowable:** NCAAB opens in November. `tests/test_population_outcomes_basketball.py::test_ncaabs_exclusion_has_exactly_the_documented_cause` pins the CAUSE, so the exclusion cannot quietly outlive the blocker — when `canonical_team("ncaab", ...)` starts resolving, that test fails and says so.
+- **When it is built:** add `"ncaab"` to `population_outcomes_espn.HANDLED_SPORTS` and to the `espn` row of `population_outcomes.SETTLER_MODULES`. That is the whole wiring change.
+
+## 2026-09-20 17:4xZ — soccer is 42.8% ungraded and no single reason explains it `[lane daily-accuracy-suite, session 9b88f9a2]`
+
+- **Measured** on a dry run of the `model-scorecard` cron against production, 2026-09-20: soccer **10,727 ungraded of 25,046 rows considered (42.83%)**, against ncaaf 8.69%, mlb 7.46%, wnba 7.19%, nfl 2.29%.
+- **Why nobody saw it:** the artifact published per-reason COUNTS and no denominator. The largest single soccer reason is `extra_player_not_in_box` at 11.53%; `extra_cards_not_gradeable` 10.48%, `extra_dnp_void` 10.01%, `extra_no_team_names` 8.50%. Four mid-sized reasons, none alarming alone.
+- **Now visible without new work:** `coverage.ungraded_rate_by_sport` ships in the artifact as of `785e8bc1` (live on the cron from 17:39:05Z; first published run 2026-09-21 11:30Z).
+- **A finding, not a diagnosis.** Cause unknown. `extra_no_team_names` at 8.5% in particular suggests a join problem rather than genuinely ungradable markets, but that is a hypothesis and nothing here tested it.
+- **Do not read it as a regression:** there is no earlier rate to compare against, because the field did not exist before today.
