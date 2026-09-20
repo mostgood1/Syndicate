@@ -560,6 +560,49 @@ _SCORE_MOVEMENT_CAP_PCT = _env_float("SYNDICATE_SCORE_MOVEMENT_CAP_PCT", 1.0)
 # flatten. Flattening at 150 is the cap doing its job; flattening at 20 was not.
 _SCORE_MOVEMENT_SATURATING = _env_bool("SYNDICATE_SCORE_MOVEMENT_SATURATING", default=True)
 
+# A LINE MOVE SCORED EXACTLY 0.0, AND THAT IS THE SHARPEST CLASS OF MOVE ON THE
+# BOARD (lane `layer2-line-movement-scoring`, 2026-09-20).
+#
+# `_movement_from_opening` withholds `movement_price_delta` whenever the line
+# moved, and it is RIGHT to -- a price at a different handicap is not a price
+# move, and the loose join key was firing STEAM on that mistake (+1.0 spread
+# differenced against -1.5, "delta" +226). But nothing replaced it. Measured on
+# the served board 2026-09-20T16:23:40Z, 2,000 rows: `movement_component` is
+# non-null on 1,886 and **the 114 nulls are EXACTLY the 114 `line_moved` rows**.
+#
+# It is the same blindness `movement_join_key`'s docstring already diagnosed
+# once and fixed for the join key -- *"a sharp move usually comes with a line
+# move or a best-book switch, which broke the key and erased the evidence"* --
+# surviving one level down in the price gate. And because the steam detector
+# reads that same withheld delta, steam on a line move was not rare, it was
+# STRUCTURALLY IMPOSSIBLE.
+#
+# WHY PROBABILITY POINTS AND NOT RAW LINE DELTA. The 114 rows' |line delta|
+# ranges 0.5 .. 13.0 across totals, batter_total_bases, Receptions and Rushing
+# Yards. Half a run and thirteen receiving yards are not the same event and
+# cannot share a coefficient; `#364`'s unit-mismatch rule forbids exactly this.
+# The no-vig fair probability IS the common unit, it is already persisted on
+# both the opening record and the live quote, and it is what the score's other
+# terms are denominated against.
+#
+# THE COEFFICIENT IS DERIVED, NOT CHOSEN, so the two halves of one term stay on
+# one scale. Measured on the same served board over the 1,413 rows carrying BOTH
+# a cents delta and a probability delta:
+#
+#     cents per probability point   median 6.192   mean 7.405   p10 4.31  p90 11.91
+#
+# so the price weight expressed in probability points is 0.05 * 6.192 = 0.3096.
+# A line move of one probability point therefore scores what a 6.2-cent price
+# move scores, which is the definition of not re-tuning the calibrated term.
+#
+# NOT A RE-FIT OF THE PRICE TERM, and this is the engine standard's rule about
+# adding a MECHANISM to a calibrated engine. Nothing was absorbing line movement
+# -- those rows scored 0.0 -- so this is additive in a region that was blank,
+# not a second estimator of a quantity already fitted. `_SCORE_MOVEMENT_WEIGHT`,
+# `_SCORE_MOVEMENT_CAP_PCT` and the curve are all unchanged, and a same-line row
+# is byte-identical (pinned by a test).
+_SCORE_MOVEMENT_LINE_WEIGHT = _env_float("SYNDICATE_SCORE_MOVEMENT_LINE_WEIGHT", 0.3096)
+
 _SCORE_BOOK_CONFIDENCE = ((1, 0.5), (2, 0.7), (4, 0.85))   # books quoting -> factor
 # THE LADDER RAN OUT AT THREE HOURS AND THE BOARD DID NOT.
 #
@@ -680,8 +723,15 @@ def _freshness_factor(book_age_seconds: Any, seen_age_seconds: Any = None) -> fl
     return 0.08
 
 
-def _movement_contribution(move: float) -> float:
-    """Movement in American-odds points -> its bounded contribution in EV points.
+def _movement_contribution(move: float, *, weight: float | None = None) -> float:
+    """Movement -> its bounded contribution in EV points.
+
+    `weight` overrides `_SCORE_MOVEMENT_WEIGHT` so the LINE term can use its own
+    coefficient while sharing this curve and `_SCORE_MOVEMENT_CAP_PCT`. Sharing
+    the cap is the load-bearing part: price and line movement are mutually
+    exclusive on a row (see `blended_score`), so one cap still bounds the whole
+    movement term at the value it has always had. Defaults to the price weight,
+    so every existing caller is byte-identical.
 
     See the block above `_SCORE_MOVEMENT_SATURATING` for why this is a curve and
     not `clip(weight * move, +/-cap)`. In one line: the clip saturated at 20
@@ -697,7 +747,7 @@ def _movement_contribution(move: float) -> float:
     scoring constant is defensible at all.
     """
     cap = _SCORE_MOVEMENT_CAP_PCT
-    weight = _SCORE_MOVEMENT_WEIGHT
+    weight = _SCORE_MOVEMENT_WEIGHT if weight is None else float(weight)
     if not _SCORE_MOVEMENT_SATURATING:
         return max(-cap, min(cap, weight * move))
     if cap <= 0 or weight <= 0:
@@ -741,13 +791,22 @@ def blended_score(
     price: Any = None,
     fair_prob: Any = None,
     movement_price_delta: Any = None,
+    movement_line_prob_delta_pp: Any = None,
 ) -> dict[str, Any] | None:
     """Rank a board row by value discounted for how much we trust it (#243).
 
     VALUE is additive and in one unit (percentage points): expected value
     against the no-vig fair price, plus the simulation's disagreement with that
-    same fair price at half weight. Both are vig-free, which is the only reason
-    they can be added at all -- #238's whole point.
+    same fair price at half weight, plus how far the market has moved since we
+    published the row. All three are vig-free, which is the only reason they can
+    be added at all -- #238's whole point.
+
+    MOVEMENT ARRIVES AS ONE OF TWO KINDS AND NEVER BOTH: a same-line price delta
+    in American-odds cents, or -- when the line itself moved, which withholds the
+    price delta upstream -- the market's repricing in probability points. They
+    carry different coefficients because their units differ, share one curve and
+    one cap, and are selected between exactly once (see below), so the movement
+    term is bounded at `_SCORE_MOVEMENT_CAP_PCT` no matter which fired.
 
     RELIABILITY is multiplicative: a wide field of books and a price that moved
     recently. Multiplicative because these are not additional value, they are
@@ -773,10 +832,29 @@ def blended_score(
     # the displayed delta to get this (lane `layer2-row-parity`, 2026-09-15). Before
     # that, a price that LENGTHENED -- the market moving away -- scored positive,
     # contrary to the "CLV in miniature" rationale above.
+    #
+    # PRICE AND LINE ARE MUTUALLY EXCLUSIVE, BY CONSTRUCTION UPSTREAM. When the
+    # line moved, `_movement_from_opening` emits no `movement_price_delta` at
+    # all (deliberately -- "a number in that field feeds the score and the steam
+    # detector, and a caveat in a neighbouring key does not stop either of them
+    # reading it"), and it is only then that it emits a line probability delta.
+    # So at most one of these two is ever set on a real row.
+    #
+    # The `elif` is what GUARANTEES that rather than trusting it. If a future
+    # caller ever supplied both, summing them would put two movement terms in
+    # one score and breach the cap the whole mechanism rests on; preferring the
+    # price term keeps the CALIBRATED half in charge and the new half inert,
+    # which is the safe direction for a disagreement.
     move = _as_float(movement_price_delta)
+    line_move = _as_float(movement_line_prob_delta_pp)
     value_move = 0.0
+    movement_basis = None
     if move:
         value_move = _movement_contribution(move)
+        movement_basis = "price"
+    elif line_move:
+        value_move = _movement_contribution(line_move, weight=_SCORE_MOVEMENT_LINE_WEIGHT)
+        movement_basis = "line"
     # The sim term is CAPPED, not merely weighted -- see `_SCORE_SIM_CAP_PCT`.
     # A bare weight scales with the edge, so a large enough model disagreement
     # always wins eventually; the cap is what makes domination structurally
@@ -837,7 +915,19 @@ def blended_score(
         # against our opening and it had not moved" is a different fact from
         # "we had no opening to compare against", and a single absent key
         # cannot say which.
-        "movement_component": None if move is None else round(value_move, 4),
+        "movement_component": (
+            None if (move is None and line_move is None) else round(value_move, 4)
+        ),
+        # WHICH HALF OF THE MOVEMENT TERM FIRED: "price", "line", or None when
+        # neither did. Published for the same reason `ev_basis` and
+        # `model_edge_basis` are: the two halves carry different coefficients
+        # and different confidences, and a reader who sees a row ranked on
+        # movement must be able to find out WHICH movement without re-deriving
+        # it from a neighbouring field. `None` with a non-null
+        # `movement_component` means a supplied-but-zero move -- "we compared
+        # and it had not moved", which is the `#368` distinction this block
+        # already makes for `movement_component` itself.
+        "movement_basis": movement_basis,
         # "AT THE BOUND", not "would the old clip have fired".
         #
         # This used to be `abs(weight * move) > cap`, which under the saturating
@@ -852,7 +942,13 @@ def blended_score(
         # 1% of the bound, so this row's movement is no longer meaningfully
         # ordered against another saturated one. Under the clip that was true
         # from 20 points; under the curve it starts around 92.
-        "movement_capped": bool(move) and abs(value_move) >= 0.99 * _SCORE_MOVEMENT_CAP_PCT,
+        # `movement_basis` and NOT `bool(move)`: a LINE move that saturates is
+        # every bit as capped as a price move that does, and reporting False
+        # for it would be this field's own 2026-08-21 defect over again -- a
+        # field named for a different quantity than the one it carries.
+        "movement_capped": (
+            movement_basis is not None and abs(value_move) >= 0.99 * _SCORE_MOVEMENT_CAP_PCT
+        ),
         "book_confidence": confidence,
         "freshness_factor": freshness,
         "price_reliability": price_reliability,

@@ -3691,6 +3691,16 @@ def board_layer2_shortlist_api():
                 # three times costing an investigation. Zero means the sim is
                 # admitting nothing and the scoring change is inert.
                 "rows_admitted_by_blend": shortlist.get("rows_admitted_by_blend"),
+                # BOTH DIRECTIONS OF THE MOVEMENT TERM, forwarded together --
+                # and forwarded AT ALL, which is this key list's own recurring
+                # defect: a counter that exists at the builder and is invisible
+                # here has cost four investigations by the comments above.
+                # `rows_refused_by_movement` is the one that carries
+                # information: movement is a net penalty on the served board, so
+                # the admitted count is near 0 by construction and quoting it
+                # alone reads as "movement does not affect admission".
+                "rows_admitted_by_movement": shortlist.get("rows_admitted_by_movement"),
+                "rows_refused_by_movement": shortlist.get("rows_refused_by_movement"),
                 # `#381`. The builder has written this since the per-sport floor
                 # shipped; the endpoint's explicit key list dropped it, so the
                 # only readable number was a board-wide `rows_below_value_floor`

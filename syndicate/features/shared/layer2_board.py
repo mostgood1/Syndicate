@@ -797,6 +797,55 @@ def _row_admitted_by_blend(row: Mapping[str, Any], floor: float) -> bool:
     return blended is not None and blended >= floor
 
 
+def _movement_component_of(row: Mapping[str, Any]) -> float | None:
+    """This row's published movement contribution, or None if it has no score."""
+    score = row.get("score")
+    if not isinstance(score, Mapping):
+        return None
+    return _as_float(score.get("movement_component"))
+
+
+def _row_admitted_by_movement(row: Mapping[str, Any], floor: float) -> bool:
+    """True when MOVEMENT alone carried this row over the floor."""
+    value_pct = _row_value_pct(row)
+    move = _movement_component_of(row)
+    if value_pct is None or move is None or value_pct < floor:
+        return False
+    return (value_pct - move) < floor
+
+
+def _row_refused_by_movement(row: Mapping[str, Any], floor: float) -> bool:
+    """True when MOVEMENT alone pushed this row UNDER the floor.
+
+    THE COUNTER THIS FILE WAS MISSING, and the asymmetry was invisible rather
+    than small (lane `layer2-line-movement-scoring`, 2026-09-20).
+
+    `rows_admitted_by_blend` counts only PROMOTIONS -- rows the blend put ON the
+    board. But `_row_value_pct` feeds admission, the movement term is inside it,
+    and on the served board that term is overwhelmingly a PENALTY: signed mean
+    **-0.2545** EV points, 1,151 rows negative against 262 positive, and
+    `movement_vs_pick` 60.5% *away* to 15.8% *toward*. A term shaped like that
+    removes far more rows than it adds -- and every row it removed left no trace
+    in any counter, because a dropped row is not in the served payload either.
+
+    So the published effect of movement on admission was structurally
+    one-directional: the promotions were counted and the demotions could not be.
+    Measured 2026-09-20 on the 2,000 served rows, movement had admitted **0**
+    and the sim **38** -- a reading that looks like "movement does not affect
+    admission" and actually means "we can only see the half that never fires."
+    `learnings.md`'s own rule: a null result needs a live population, and this
+    frame could not produce a non-null one.
+
+    Reported beside `rows_admitted_by_movement` so the two directions are read
+    together and neither can be quoted alone.
+    """
+    value_pct = _row_value_pct(row)
+    move = _movement_component_of(row)
+    if value_pct is None or move is None or value_pct >= floor:
+        return False
+    return (value_pct - move) >= floor
+
+
 def _row_ev_is_hold_restatement(row: Mapping[str, Any]) -> bool:
     """True when this row's `ev_pct` is arithmetically the book's own margin.
 
@@ -3068,6 +3117,25 @@ def build_layer2_rows(
                     if _blended_score_accepts("movement_price_delta")
                     else {}
                 ),
+                # THE LINE HALF, AND IT IS **NOT** NEGATED -- the asymmetry is
+                # deliberate and is stated here because it looks like a bug.
+                #
+                # `movement_price_delta` above is a RAW cents delta whose sign
+                # means "the price went up", so it needs flipping to mean
+                # "toward the pick". `movement_line_prob_delta_pp` is already
+                # signed by `movement_vs_pick` at the point it is computed, i.e.
+                # it ALREADY means "toward the pick" -- positive is toward.
+                # Negating it here would silently reward every line move that
+                # went AWAY from the pick, which is the exact defect the comment
+                # above records being fixed for the price half on 2026-09-15.
+                #
+                # Both therefore reach `blended_score` under ONE convention:
+                # positive = the market moved toward this pick.
+                **(
+                    {"movement_line_prob_delta_pp": movement.get("movement_line_prob_delta_pp")}
+                    if _blended_score_accepts("movement_line_prob_delta_pp")
+                    else {}
+                ),
                 books_quoting=side_best.get("books_quoting") or row.get("books_quoting"),
                 book_age_seconds=side_best.get("age_seconds"),
                 quote_seen_age_seconds=side_best.get("seen_age_seconds"),
@@ -3555,6 +3623,15 @@ def layer2_rows_to_board_cards(
 _STEAM_PRICE_POINTS = 15.0    # American-odds move that counts as sharp
 _STEAM_WINDOW_SECONDS = 3 * 3600
 
+#: The same sharpness bar as `_STEAM_PRICE_POINTS`, in the unit a LINE move is
+#: measured in. CONVERTED, not chosen: 15 cents / 6.192 cents-per-probability-
+#: point = 2.4225 pp, where the divisor is the median measured over the 1,413
+#: rows of the 2026-09-20T16:23:40Z served board that carried both a cents delta
+#: and a probability delta (see `_SCORE_MOVEMENT_LINE_WEIGHT`, which is derived
+#: from the same reading). Deriving it keeps one definition of "sharp" across
+#: both halves of the movement term instead of two bars that drift apart.
+_STEAM_LINE_PROB_POINTS_PP = 15.0 / 6.192
+
 
 def _american_cents(price: Any) -> float | None:
     """American odds on a CONTINUOUS scale, where -100 and +100 are both 0.
@@ -3595,6 +3672,19 @@ def _signed_american(price: Any) -> str:
         return "?"
     rounded = int(round(value))
     return f"+{rounded}" if rounded > 0 else str(rounded)
+
+
+def _format_line(line: Any) -> str:
+    """A handicap as a bettor reads it: 8.5, -1.5, 7 -- never 8.0 or -1.50.
+
+    Companion to `_signed_american` for the line half of `steam_reason`. No sign
+    is forced: a total's 8.5 is not "+8.5", and a spread's own value already
+    carries its sign.
+    """
+    value = _as_float(line)
+    if value is None:
+        return "?"
+    return str(int(value)) if float(value).is_integer() else f"{value:g}"
 
 
 def _line_move_vs_pick(side: str, line_delta: Any) -> str:
@@ -3926,6 +4016,49 @@ def _movement_from_opening(
         prob_delta = out.get("movement_prob_delta_pp") or 0.0
         out["movement_vs_pick"] = "toward" if prob_delta > 0 else ("away" if prob_delta < 0 else "flat")
 
+    # THE LINE MOVE IS THE MOVEMENT, AND UNTIL 2026-09-20 IT SCORED 0.0
+    # (lane `layer2-line-movement-scoring`).
+    #
+    # Withholding `movement_price_delta` above is right and stays. What was
+    # missing is that NOTHING TOOK ITS PLACE, so the sharpest class of move on
+    # the board -- the one that shifts the handicap rather than the price --
+    # contributed nothing to the score and could not fire steam. Measured on the
+    # served board 2026-09-20T16:23:40Z: the 114 rows with a null
+    # `score.movement_component` were EXACTLY the 114 `line_moved` rows.
+    #
+    # MAGNITUDE IN PROBABILITY POINTS, and it has to be. Those rows' |line
+    # delta| spans 0.5 (a total) to 13.0 (Rushing Yards). Half a run and
+    # thirteen receiving yards are not one unit and must not share a
+    # coefficient -- `#364`'s rule exactly. The no-vig fair probability is the
+    # common denominator, is already persisted on both ends, and is the unit the
+    # score's other terms are in. `_SCORE_MOVEMENT_LINE_WEIGHT` carries the
+    # conversion, derived from this same board rather than chosen.
+    #
+    # SIGN IS NOT RE-DERIVED HERE. `movement_vs_pick` -- resolved four lines up,
+    # under the user decision of 2026-09-15 -- already owns it, and it is what
+    # the card renders. A second sign rule is precisely how `movement_direction`
+    # and `movement_line_direction` came to contradict each other. Magnitude
+    # from the fair probabilities, sign from the verdict the board already
+    # shows: they cannot disagree, because there is only one of them.
+    #
+    # COMPUTED FOR THE LINE-MOVED CASE ONLY. On a same-line row the price delta
+    # is authoritative and `blended_score` would ignore this anyway; emitting it
+    # regardless would publish a second movement number that nothing reads.
+    if not lines_comparable and out.get("movement_vs_pick") in {"toward", "away"}:
+        line_fair_open = _as_float(opened.get("fair_probability"))
+        line_fair_now = _as_float(quote.get("fair_probability"))
+        if (
+            line_fair_open is not None
+            and line_fair_now is not None
+            and 0 < line_fair_open < 1
+            and 0 < line_fair_now < 1
+        ):
+            magnitude_pp = abs(line_fair_now - line_fair_open) * 100.0
+            if magnitude_pp > 0:
+                out["movement_line_prob_delta_pp"] = round(
+                    magnitude_pp if out["movement_vs_pick"] == "toward" else -magnitude_pp, 4
+                )
+
     # STEAM: a sharp move in a short window, AT ONE BOOK. Both clock halves are
     # required -- a 30 point drift over eight hours is not steam, and this is
     # the distinction the old implementation never made because it had no
@@ -3953,6 +4086,42 @@ def _movement_from_opening(
         out["steam"] = True
         out["steam_reason"] = (
             f"{_signed_american(price_from)} → {_signed_american(price_to)} at {book} "
+            f"in {age / 60:.0f} min since we published it"
+        )
+    elif (
+        # STEAM ON A LINE MOVE, which was not rare before 2026-09-20 -- it was
+        # STRUCTURALLY IMPOSSIBLE. The branch above requires `delta`, and
+        # `delta` is `movement_price_delta`, which is withheld on exactly the
+        # rows whose line moved. So a sharp move that ALSO moved the handicap
+        # could never raise the flag, and the docstring on `movement_join_key`
+        # had already named this same blindness one level up: *"a sharp move
+        # usually comes with a line move or a best-book switch, which broke the
+        # key and erased the evidence."* Fixing the key left the price gate.
+        #
+        # THRESHOLD IN THE SAME UNIT AS THE MOVE, converted from the price
+        # threshold rather than invented: `_STEAM_PRICE_POINTS` (15 cents) at
+        # the measured 6.192 cents per probability point is
+        # `_STEAM_LINE_PROB_POINTS_PP`. Same sharpness, expressed in the unit a
+        # line move is measured in -- not a second, looser bar.
+        #
+        # NO SAME-BOOK REQUIREMENT, and the reason is not laxity. That clause
+        # exists because a best-of-N PRICE delta can be a change of hands rather
+        # than of price. A LINE move is not a book artefact in the same way: the
+        # handicap moved on the row we published, and `movement_line_delta` is
+        # computed from the row's own line at both ends. The clock halves still
+        # both apply, which is what keeps a slow drift out.
+        line_delta is not None
+        and out.get("movement_line_prob_delta_pp") is not None
+        and abs(out["movement_line_prob_delta_pp"]) >= _STEAM_LINE_PROB_POINTS_PP
+        and age is not None
+        and age <= _STEAM_WINDOW_SECONDS
+    ):
+        out["steam"] = True
+        out["steam_basis"] = "line"
+        out["steam_reason"] = (
+            f"line {_format_line(out.get('movement_line_from'))} → "
+            f"{_format_line(out.get('movement_line_to'))} "
+            f"({out['movement_line_prob_delta_pp']:+.1f} pp) "
             f"in {age / 60:.0f} min since we published it"
         )
     return out
@@ -4560,6 +4729,8 @@ def select_shortlist(
     # direct measure of the 2026-08-22 scoring change; zero here means the sim
     # is admitting nothing and the change is inert.
     admitted_by_blend = 0
+    admitted_by_movement = 0
+    refused_by_movement = 0
     beyond_quote_age = 0
     implausible_book = 0
     stale_kickoff = 0
@@ -4717,9 +4888,13 @@ def select_shortlist(
             row_floor = family_floors.get(_market_family(row.get("market")), sport_floor)
             if value_pct is not None and value_pct < row_floor:
                 below_value_floor += 1
+                if _row_refused_by_movement(row, row_floor):
+                    refused_by_movement += 1
                 continue
             if _row_admitted_by_blend(row, row_floor):
                 admitted_by_blend += 1
+            if _row_admitted_by_movement(row, row_floor):
+                admitted_by_movement += 1
             kept.append(row)
         rows = kept
 
@@ -4880,6 +5055,14 @@ def select_shortlist(
         # produces it, because a filter whose effect cannot be read is one
         # nobody can tell apart from a thin slate.
         "rows_admitted_by_blend": admitted_by_blend,
+        # BOTH DIRECTIONS, ALWAYS, AND NEVER ONE WITHOUT THE OTHER. See
+        # `_row_refused_by_movement`: the movement term is a net PENALTY on the
+        # served board (signed mean -0.2545 EV points), so counting only what it
+        # PROMOTED reported the half that essentially never fires and hid the
+        # half that does. A reader quoting `rows_admitted_by_movement` on its
+        # own is reading a number that is near 0 by construction.
+        "rows_admitted_by_movement": admitted_by_movement,
+        "rows_refused_by_movement": refused_by_movement,
         # `#391`. Reported beside the other rejections for the reason `#373`
         # added `rows_implausible_book`: a rule that trims silently is a rule
         # nobody can tell apart from a thin slate.

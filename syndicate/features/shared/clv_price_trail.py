@@ -245,6 +245,22 @@ def record_price_trail(
         "keys": len(trail),
         "truncated_at_ceiling": truncated,
         "files_pruned": pruned,
+        # THE SIZE, BECAUSE THE TRANSPORT HAS A CAP AND NOTHING REPORTED IT
+        # (lane `layer2-line-movement-scoring`, 2026-09-20).
+        #
+        # This file is bounded at `_MAX_TRAIL_BYTES` (48 MB), but the artifact
+        # export refuses any single file over **8 MB**
+        # (`SYNDICATE_ARTIFACT_EXPORT_MAX_FILE_BYTES`). Those two numbers differ
+        # by 6x, so a trail can be perfectly valid on the worker and silently
+        # untransferable -- and until now no counter, log line or artifact field
+        # said which side of 8 MB it was on. Allowlisting it in
+        # `HOT_ARTIFACT_PATTERNS` PERMITS the transfer (`#208`); this is what
+        # lets anyone check the transfer can actually happen.
+        #
+        # Read AFTER the append, so it is the size a pull would see, and
+        # `None` rather than 0 when the file does not exist -- absent and empty
+        # are different facts and a bare 0 cannot tell them apart.
+        "bytes_on_disk": (path.stat().st_size if path.exists() else None),
     }
     if error:
         report["error"] = error
