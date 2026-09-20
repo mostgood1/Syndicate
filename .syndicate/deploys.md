@@ -39025,3 +39025,14 @@ day, so treat this as "the ceiling was genuinely in play", not as a day total.
 Each hourly chunk at ~560 KB is nowhere near the bound, which is the property
 the chunking was for.
 
+
+## 2026-09-20 21:21Z (16:21 CT) — READING — live-odds-worker `76a6f4a2` — lane live-inplay-board-cadence — **the WNBA half of the capture thread is VERIFIED, and my "unmeasured" was a NULL-POPULATION error twice over**
+
+- **What I claimed, twice** (deploys.md 03:36Z-equivalent and 17:47Z): "the WNBA half is UNMEASURED -- 0 WNBA launches in any reading window". **Wrong, and for the reason the ledger already names:**
+  - The 03:36-04:36Z window had **no WNBA games in progress** (middle of the night), so the launcher's liveness gate correctly refused. A null result over an empty population.
+  - The 16:07-17:47Z window reported `wnba (0, ...)` because **that watcher only tracked NFL and NCAAF tokens** -- the WNBA counter in it was vestigial. The absence was in my instrument, not in the service.
+- **MEASURED (live-odds-worker, today):** `WNBA_LIVE_AUTORUN_LAUNCHED` **88 times, 00:03:56Z-21:20:41Z**. `WNBA_LIVE_AUTORUN_FAILED` **0**, `WNBA_LIVE_AUTORUN_ERROR` **0**.
+- **Cadence since 16:00Z: 63 launches, first at 17:03:45Z**, gaps **median 248 s** [242-255], against `_wnba_live_refresh_interval_seconds()`'s 240 s default (`SYNDICATE_WNBA_LIVE_REFRESH_INTERVAL_SECONDS` absent) plus the capture thread's 30 s tick granularity. `SYNDICATE_ENABLE_WNBA_LIVE_REFRESH_AUTORUN` reads ON.
+- **The liveness gate is visibly correct, not merely quiet:** the first launch of the afternoon is 17:03:45Z, minutes after the WNBA slate started, and nothing fired in the hours before it. `_wnba_has_live_game` (artifact, then ESPN fallback) is gating on games actually in progress.
+- **So all three sports on the capture thread are now verified:** NCAAF 152 s (n=18), NFL 154 s (n=38), WNBA 248 s (n=63) -- each at its own configured interval, 0 failures across all three.
+- **The rule this breaks, again:** a null result needs a live population, and an absent signal is a fact about the EMITTER until shown otherwise. Both were already standing rules; I hit them anyway by reading my own watcher's zero as the service's zero.
