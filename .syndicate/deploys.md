@@ -38599,3 +38599,15 @@ Scheduled task `fotmob-alias-verify-0919-pm`, which fired ~7h late (21:16 CT, no
   - What DOES support equivalence: the lane's 10 tests, including path-list and payload equality against a frozen copy of the `rglob` implementation, and the conflicting-result-file tie-break.
   - **NOT claimed: that production resolution is unchanged.** `resolved=0` is consistent with both "nothing was resolvable" and "the matcher stopped matching", and this reading cannot separate them.
 - **Follow-up owed (cheap, makes the next run diagnosable):** add a skip-reason breakdown to `RECONCILE_DATE_TIMING` (no result row for key / key absent / already resolved), so a 0-resolved date explains itself instead of needing a comparison that no longer exists.
+
+## 2026-09-20 04:12Z (2026-09-19 23:12 CT) — READING, no deploy — refresh-worker (gate live since `ef5ab75b` 15:08:29Z) — lane sim-sizing-skill-gate — **verify (3) MET: the first LIVE orders after the gate carry `sim_share_of_stake` 0. Lane's three readings are now all MET.**
+
+- **Population:** every LIVE-mode order submitted after the gate went live, polled every 10 min by `gate_live_orders.py` (scratchpad a1e40980) off `/api/portfolio/live`. **7 orders**, 19:46:18Z-20:43:36Z, across ncaaf, soccer and nfl.
+- **Result: 7 of 7 carry `sim_share=0.0` and `picked=price_shopping`. Non-zero `sim_share`: 0.**
+  - `19:46:18Z ncaaf totals under 46.5 stake=$1.41 sim_share=0.0 picked=price_shopping model_edge=None filled`
+  - `20:13:53Z ncaaf spreads home 24.5 stake=$2.3213 sim_share=0.0 picked=price_shopping model_edge=4.0 filled`
+  - `20:19:52Z soccer totals under 3.5 stake=$1.00 sim_share=0.0 picked=price_shopping model_edge=3.34 filled`
+  - `20:43:36Z nfl Receptions under 3.5 stake=$1.14 sim_share=0.0 picked=price_shopping model_edge=-0.1 filled`
+- **The discriminating cases are the two with a real sim edge** (`model_edge` 4.0 and 3.34): the sim had an opinion, the row still shows `sim_share=0.0` and was sized by price shopping. That is the gate doing the thing it was built for, not an absence of sim edges. `model_edge=-0.1` on the NFL row shows the sim also did not veto a price-shopping bet.
+- **Together with the earlier readings:** (1) tests, (2) `sim_share_of_staked` 0.0 on 3 of 3 plans (16:10:38Z), (3) this. USER 2026-09-19: "We need everything to be MEANINGFUL", then "All sports" for "only measured skill moves money".
+- **NOT claimed:** that price shopping itself is profitable in-play. Pregame price shopping is the platform's one measured edge (+2.79 ROI pts); the in-play consensus rows the new overlay puts on the board are UNMEASURED, and that is the nightly skill scoreboard's next job.
