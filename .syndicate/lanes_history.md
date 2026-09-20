@@ -34060,3 +34060,89 @@ lost no protection and no open lane left the session-start digest.
 - Baseline: 430 of 938 served NCAAF rows are props and 0 carry a sim view (2026-09-18 14:55Z); `NCAAF_PLAYER_STATS_ENABLE_REFRESH_WORKER_AUTORUN` unset, production snapshot held 2026 weeks 1-2 on 09-17; the prop-evidence projection layer is empty by design (`no_producer`).
 - **STATUS 2026-09-18 ~19:10Z: LANDED `99410d40`..`86715b97`, LIVE on refresh-worker (`1c5caea6` 18:19:57Z, now `ef3fb857`) and web (`b7faeb34` 18:54:31Z). Ask VERIFIED; prop-projection reading OWED.** Ask on production 19:05Z: "How has Arch Manning played this season in college football?" -> "Last 2 games — Arch Manning (Texas, CFBD box scores)" with the 2026 season-to-date rows (2 games: 500 pass yds, 5 TD; 250.0 per game); baseline 18:07:52Z had no player table. Latency 14.3 s / 19.5 s (10.6 s without the fetcher; MLB control 6.9 s) -- the fetcher itself is 0.152 s cold on production's snapshot. The fetcher was pulled (`e67c8b8a`) and restored (`b7faeb34`) within 30 min: see `deploys.md` 18:09:25Z -- the health-check failures it was suspected of recur with no requests and after every web deploy. The autorun flag was ALREADY `true` (daily at ~22:48Z since at least 09-15); the survey had read the code default. Production's snapshot is 8,115 rows, 2026 weeks 1-2 only (no 2025), so the last-season prior falls back to the role prior. Reading owed after the ~22:48Z run: `[ncaaf_prop_projections] WRITTEN`, >= 1 `ncaaf_prop_projections_2026_wk*.json` on web (0 at 18:07:52Z), >= 50% of NCAAF prop rows with `projected` (0/460). Not done: a matched NCAAF player name does not route the sport (`ask_the_syndicate.py`, not in scope); `_ncaaf_player_log_evidence` unchanged.
 
+
+
+## RELEASED LANE BLOCKS MOVED FROM `lanes.md` — 2026-09-19
+
+Moved verbatim by `scripts/archive_released_lanes.py`; nothing summarised or
+deleted. Every slug here held ZERO file claims at move time, verified against
+`lane-guard.py`'s own `_claims()` — so `lane-guard` lost no protection.
+Slugs: mls-board-evening-gaps, wnba-postgame-to-disk.
+
+### wnba-postgame-to-disk — CLOSED, GOAL MET — opened 2026-09-19, closed 2026-09-20 03:12Z — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **`#675`: WNBA dated box scores and recon reach web, the backfill is drained, and the Ask's STALE row is gone**
+
+- Goal: [user 2026-09-19: "proceed next" on `#675`] a WNBA slate date's box scores appear on WEB within a day of the game (`wnba_source/data/processed/boxscores_<date>.csv`), its three recon files reach web too, the dates missing since 2026-08-25 are backfilled, and a WNBA board-row prop Ask's recent-form table stops printing its STALE row.
+- **GOAL VERDICT (2026-09-20 03:12Z / 2026-09-19 22:12 CT): GOAL: MET.** Goal (verbatim): "a WNBA slate date's box scores appear on WEB within a day of the game (`wnba_source/data/processed/boxscores_<date>.csv`), its three recon files reach web too, the dates missing since 2026-08-25 are backfilled, and a WNBA board-row prop Ask's recent-form table stops printing its STALE row."
+  - Three readings in `deploys.md`: 15:55:52Z (box + recon reach web), 17:59:14Z (the Ask STALE row is gone), and 03:12Z 09-20 (the backfill is drained).
+  - Web lists every WNBA date with games 08-26..09-18 (08-26, 08-27, 08-28, 08-29, 08-30, 09-17, 09-18); 115 dated files against a baseline of 108 ending 08-25. 08-31..09-16 had NO games (a 17-day break), shown by `/wnba/api/cards` falling back to the previous date on each of them.
+  - The fix is `0465103e` (+ `f6972a2b` comments), live on refresh-worker since 15:39:17Z (`dep-danammh42hec73drs0ig`).
+  - 11 ticks; 4 landed in a web deploy's switchover and published false; every one succeeded on the next hourly attempt, none near the 3-attempt cap.
+  - **Known risk, left as a lead:** a publish failure consumes one of a date's 3 rebuild attempts. If web ever flaps through all three, that date drops out of the backfill. The fix is to count only BUILD failures against the cap, with a separate bound so a permanently refused path cannot starve older dates.
+- Files:
+  - `syndicate/features/shared/refresh_state_store.py` (the `_KEYVALUE_EXCLUDED_PATH_MARKERS` tuple ONLY: one marker for dated WNBA box scores)
+  - `scripts/run_refresh_worker.py` (`_wnba_postgame_target_dates` and `_run_wnba_postgame_producer_tick` ONLY)
+  - `tests/test_wnba_postgame_publish_disk.py` (NEW)
+  - `tests/test_wnba_postgame_producer_tick.py` (the `store` fixture ONLY: it sets the rebuild cap to 0, so those tests keep draining not-yet-done dates)
+- Recon, measured 2026-09-19 ~14:50-15:05Z (read off the session's message timestamps; the earlier "15:3xZ" upper bound was wrong):
+  - WNBA games are being played daily; web's cards list 3-5 a day through 2026-09-20.
+  - Web's newest dated box score is `boxscores_2026-08-25.csv`: 108 files for 2026, all written in one batch on 08-26 20:23Z. **CORRECTED 15:18:49Z: this line and `0465103e`'s comments first said 08-24.** The web listing reads 108 files, newest 08-25. So the first lost slate is 08-26. The comments were fixed in `f6972a2b`.
+  - Web's `boxscores_history.csv` is republished every few minutes by live-odds-worker (`PUBLISH_OK` / `PUBLISH_SKIPPED_UNCHANGED checksum=5db9fb6d1af9`), and its newest game is 2026-06-30. That is `#469`'s stale copy; this lane does not change it.
+  - refresh-worker's hourly WNBA postgame producer DOES build every slate. `[wnba_boxscores] WROTE date=2026-09-18 games=3 rows=59` at 04:10:45Z and 05:44:59Z, and recon `games 3 / props 59 / quarters 3 ok`. Its own publish result reads `keyvalue_backed_not_a_file` for all FOUR files, so none reaches web.
+- **Hypothesis (two defects, one producer):**
+  - (D1) The publish block (`run_refresh_worker.py` ~1627) asks `_keyvalue_backed(path)` BEFORE `path.is_file()`. Under `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` that predicate is true for every path not in `_KEYVALUE_EXCLUDED_PATH_MARKERS`, so the three recon CSVs are refused. `build_wnba_recon` writes them to disk with a plain `write_text`, so they are real files that are never published.
+  - (D2) `build_wnba_boxscores.build_date` writes through `refresh_state_store.write_text_file`, which under keyvalue puts `boxscores_<date>.csv` in Redis (10-day TTL) and never on disk. So it can never be published, and it is gone after 10 days.
+  - FIX: publish a file that is on disk, whatever the backend; and exclude `wnba_source/data/processed/boxscores_20` (dated files only; `boxscores_history.csv` is untouched) from keyvalue, so the WRITER (`write_text_file`) and the settler's READER (`bet_status_wnba._final_csv_rows`, `read_text_file`) both move to disk together. BACKFILL: the producer also rebuilds a date that is `done` with recon `ok` but has no box score on disk, at most 3 attempts per date, with the lookback widened from 21 to 30 days so 2026-08-25 is inside it.
+  - **CORRECTED BEFORE LANDING: the backfill keys on "never PUBLISHED from here", not on "not on disk".** The settlement pass (`intelligence_state._refresh_wnba_boxscores`) runs on the same service every ~3 min. It builds today's and yesterday's box score through the same `write_text_file`, and it does not publish. Once the marker puts that write on disk, "on disk" no longer means "on web", and 2026-09-18 would have been skipped for good. The producer status now carries `box_published: {date: true}` next to `box_rebuilds`. Test: `test_a_box_score_the_settlement_pass_already_wrote_is_still_published`.
+  - **The settler shares the writer's disk, READ LIVE at 15:10:34Z (single-key reads):** `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` is `true` on refresh-worker and `false` on web and live-odds-worker. `SYNDICATE_REFRESH_STATE_BACKEND` is `keyvalue` on all three. So `settle_orders`, and through it `bet_status_wnba._final_csv_rows`, runs only where the box score is written. Other store-API readers of the dated file: none (`ops.py`'s probe and the vendor/props readers read disk).
+  - **Landed `0465103e`**, 2026-09-19 ~15:14Z. `tests/test_wnba_postgame_publish_disk.py` has 8 tests. All 8 fail on a pre-change copy of `origin/main` and pass on the new code, and the file plus the tick tests total 23. Related suites (`refresh_state_store*`, `*keyvalue*`, `bet_status_wnba*`, `build_wnba_boxscores`, `wnba_postgame*`) ran 175 passed, 2 skipped.
+  - **Transient, expected after the deploy:** the settler reads disk from then on, so slates 09-09..09-17 are unreadable to it until the backfill REBUILDS each one onto refresh-worker's disk (one per hour, newest first). They were in keyvalue before. The settlement pass rebuilds 09-18 itself. Settlement grades today and yesterday first, and an already-graded order is not re-read.
+- Falsification: after refresh-worker runs the fix, (a) the next producer tick's `published` shows `true` for `boxscores_<date>.csv` and the recon files, and web lists that `boxscores_<date>.csv` with a fresh mtime; (b) over the following day, web gains the dated files for 2026-08-25 onward. If a tick publishes nothing, or web's newest dated file stays 08-24, the hypothesis is wrong.
+- Verification: offline tests that fail on today's code (path routing under the keyvalue backend; publish ordering; the backfill rule and its retry cap), then production after a deploy the user approves: web's `boxscores_<yesterday>.csv` and `recon_*` present with fresh mtimes, the backlog draining, and a WNBA prop Ask whose recent form carries no STALE row.
+- Not this lane, recorded: `linescores_<date>.json` has the same keyvalue shape (`write_json_file`), but segment settlement may read it from keyvalue today, so moving it needs its own look. live-odds-worker's stale `boxscores_history.csv` (`#469`) is also left alone.
+
+### mls-board-evening-gaps — CLOSED, GOAL MET — opened 2026-09-19, closed 2026-09-19 18:3xZ — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **all 13 MLS 09-19 fixtures projected; fix `6419eea5` live via `aebc040d`**
+
+- Goal: [user 2026-09-19 "proceed next steps", on the MLS lead this session filed in lane `soccer-prop-conditioning`] name, each with a measurement, why (a) 5 of today's 13 MLS fixtures are absent from the soccer Layer 1 board and (b) 4 fixtures that ARE on it carry 0 projections, while web's `mls/.../recommendations_2026-09-19.json` (generated 13:44:16Z) has all 13 with props; then fix what is in scope, before the first kickoff at 23:30Z if the user approves a deploy.
+- **GOAL VERDICT (2026-09-19 18:36Z / 13:36 CT): GOAL: MET.** Goal (verbatim): "name, each with a measurement, why (a) 5 of today's 13 MLS fixtures are absent from the soccer Layer 1 board and (b) 4 fixtures that ARE on it carry 0 projections, while web's `mls/.../recommendations_2026-09-19.json` (generated 13:44:16Z) has all 13 with props; then fix what is in scope, before the first kickoff at 23:30Z if the user approves a deploy."
+  - (a) ANSWERED: its premise was my filter error. No fixture is absent (H1 exonerated).
+  - (b) ANSWERED and WIDER: 9 fixtures, not 4 (H2). The cause is measured.
+  - **The fix is LIVE, but not by this lane's deploy.** Refresh-worker went `7301fe67` → `aebc040d` (`dep-dand50jm8hqs73au6i90`, fired 18:20:50Z by lane `live-inplay-board-cadence` / session a1e40980 with preflight CLEAR and the board build idle, live 18:26:24Z; their `deploys.md` entry lists `6419eea5` as a rider). `aebc040d` contains `6419eea5`, session a1e40980's `c55644af`, and its env (slow refresh 3600, profilers off).
+  - This lane's approved deploy NEVER fired.
+    - It was gated on today's board build landing (peer a1e40980: preflight cannot see the in-process build). A hold for the peer's env write cost the 16:53Z window. The 17:49Z window was HOLD ×5 on the MLB daily sim (launched 17:47:22Z).
+    - USER then chose "Fire at next board landing" (kill the MLB sim if needed). The runner was re-armed at 18:27Z to override ONLY a jobs-in-flight HOLD.
+    - It was STOPPED at 18:28Z, unfired, on seeing `aebc040d` live: a second deploy would only have killed the sim. The claim is free.
+  - **READ 18:32:45-18:36:18Z (`deploys.md` READING 18:36:18Z):** the first UTC-09-20 grid after go-live (18:29:49Z) has `dates_read[0]` = 2026-09-19 and `unmatched_by_league` `{"?": 1}` (mls 3730 → 0). Layer 1 09-19 has all 13 MLS fixtures projected; the nine evening fixtures carry 130-157 rows each (baseline 0-1). Board `rows_with_projection` went 5,044 → 6,296 of ~7,410.
+- Files:
+  - `syndicate/features/shared/board_enrichment.py` (the soccer branch's projection-window lines in `_attach_projections_by_sport` ONLY). Checked 16:1xZ: no OPEN lane claims it; the last claim was released 2026-09-17 by the ownership sweep.
+  - `tests/test_soccer_projection_previous_day.py` (NEW)
+- Recon, measured 2026-09-19 16:00-16:05Z:
+  - `/api/board/layer1?sport=soccer&date=2026-09-19` (built 16:01:31Z, America/Chicago date scope) lists 8 MLS games.
+  - The 4 kicking off at 23:30Z (CLB@MTL, CLT@DC, LAF@SJ, ORL@NE) are fully projected: 122-174 props each, stamped `13:44:16`.
+  - The 4 listed at 00:30-02:30Z on 09-20 (LA@MIN, TOR@STL, VAN@RSL, ATL@POR) have rows (145-183) and `rows_with_projection` 0.
+  - Absent from both the 09-19 and 09-20 boards: DAL, HOU, SKC (00:30Z) and NSH, COL (01:30Z).
+  - The artifact reports `rows_total` 11,673 and `rows_truncated` 5,673. The cap is `BOOK_GRID_ARTIFACT_MAX_ROWS` = 6000 (`book_grid_artifact.py:99`), applied as `grid[:6000]` AFTER `book_grid.py:875` sorts by `-books_quoting`.
+  - The "board read an OLDER copy" theory from the original lead is RETRACTED for today: projected rows carry `2026-09-19T08:44:16-05:00` = 13:44:16Z, the current file.
+  - Layer 2 shortlist carries 0 soccer player props (it did on 09-17 too, so that is not new).
+- **Hypotheses (not yet tested):**
+  - (H1) The 5 absent fixtures are cut by the 6000-row bound. On a Saturday with 57 soccer games, MLS markets have fewer books quoting than the European leagues, so every row of those fixtures sorts below row 6000. Falsified if any of their rows is in the served artifact, or if their `books_quoting` is not below the cut row's.
+  - (H2) The 4 present evening fixtures lose projections in the soccer projection join, and the join is date-keyed so that a UTC-09-20 kickoff misses the file dated 09-19. Falsified if the join does not key by date, or if another present 00:30Z+ fixture IS projected.
+- **RESULTS, 2026-09-19 16:06-16:10Z:**
+  - **(H1) EXONERATED; the "5 absent fixtures" was MY FILTER ERROR.**
+    - All 13 MLS fixtures ARE on the 09-19 Layer 1 board.
+    - DAL, HOU, SKC, NSH and COL carry game-level `league: None`, because each has one row with no league, beside 150-155 `mls` rows. I had filtered on the game's `league == "mls"`.
+    - Their Layer 2 rows include 3-5-book totals, and every multi-book row sorts above the cut: 5,143 multi-book rows against 6,000 kept. The cut itself is real. It keeps all multi-book rows plus 857 of 6,538 single-book rows, taken in MARKET-NAME order; that is a separate question for another lane.
+  - **(H2) CONFIRMED.** Measured on the 16:06:01Z build:
+    - All NINE MLS fixtures kicking off after 00:00Z on 09-20 carry 0-1 projected rows (the lead's "9 of 13", exactly). The 4 kicking off at 23:30Z on 09-19 are projected (133-185 rows).
+    - Their rows live in the UTC-09-20 grid artifact (`bookgrid` date 2026-09-20, built 15:55:41Z). It reads `projections.dates_read = [09-20 .. 09-26]` and reports `unmatched_by_league: {"mls": 3730}`. Its `unmatched_fixture_sample` names exactly those nine fixtures.
+    - The sim files them in `recommendations_2026-09-19.json`, under the LOCAL date. SD @ MIA, filed under 09-20, is projected in the same artifact.
+    - Code path: `board_enrichment.py` `_attach_projections_by_sport` soccer branch → `resolve_window_dates("soccer", selected_date, window="slate")` (`layer1_board.py:240`, "FORWARD ONLY, deliberately"), called with `selected_date` = the artifact's UTC date → `load_soccer_projections` reads `recommendations_<d>.json` for those dates only.
+    - This is the mirror image of `artifact_read_dates` (`layer1_board.py`), which fixed the quote side of the same UTC-vs-local mismatch by reading date+1. The Ask and prop-evidence callers anchor on the LOCAL date, so they already read 09-19 and are not affected.
+    - It recurs every day. The 09-19 artifact equally misses 09-18's evening fixtures.
+- **FIX:** the grid build's soccer projection window also reads the day BEFORE its UTC anchor, first in order so the anchor's own file wins any overlap.
+  - It widens the read set only: a projection attaches only to a row that is in the grid and matches the fixture.
+  - Cost: one more date of files per league (about 1/7 more than the current window). `oldest_sim_age_hours`, which is a metric only, will read one day older. Each row's `age_hours` comes from its own match's file.
+- Verification:
+  - Offline:
+    - the production caller's window starts at the day before (it fails on today's code);
+    - with that window, `load_soccer_projections` matches an evening fixture filed under the previous date, and without it, it does not.
+  - Production, after a refresh-worker deploy the user approves: the UTC-09-20 grid artifact's `dates_read` starts `2026-09-19`, `unmatched_by_league.mls` falls from 3,730 to near 0, and the nine evening fixtures on `/api/board/layer1?sport=soccer&date=2026-09-19` carry projections stamped `13:44:16`.
