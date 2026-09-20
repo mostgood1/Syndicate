@@ -1075,7 +1075,11 @@ death, never life — do not invert it.
   - 104 passed / 1 skipped across the 10 reconciliation suites, plus 3/3 `test_refresh_worker -k reconcil`.
   - Local timing on a 5,550-directory tree: 13.4 s → 0.82 s per date.
 
-### wnba-sim-distributions — OPEN — opened 2026-09-18 — session a1e40980-cceb-493f-adf9-5a5ca879acf6
+### wnba-sim-distributions — CLOSED, GOAL MET — opened 2026-09-18, closed 2026-09-20 16:42Z — session a1e40980-cceb-493f-adf9-5a5ca879acf6
+- **CLOSED 2026-09-20 16:42Z. Goal, verbatim: "give Layer 2 a WNBA sim probability for every line the sim can honestly answer, from distributions the WNBA smart sim already draws but never publishes." — GOAL: MET.**
+  - Coverage (2), 09-19 board: 405 edges of 698 served (15 before), 405 dist-priced, combos 102/102 with a probability, alt-line reason 0.
+  - Memory clause, read 2026-09-20 (deploys.md 16:42Z): publish-hour peak **241.0 MB** against a **507 MB** baseline peak, clause allowed +50 MB. Population confirmed live (autorun launched 05:38:22Z, props process resident across 51 samples). CAVEAT: different hour and a smaller postseason slate, so this is no evidence of an increase rather than proof of none.
+  - VALUE CAVEAT, carried: the WNBA sim's prop/total/spread probabilities carry no signal beyond the market, so this coverage sizes no money under the gate (`sim-sizing-skill-gate`, CLOSED).
 - **CHECKPOINT 2026-09-19 ~16:05Z.** Goal, verbatim: "give Layer 2 a WNBA sim probability for every line the sim can honestly answer, from distributions the WNBA smart sim already draws but never publishes." — **GOAL: NOT MET.**
   - Coverage reading (2) met on the 09-19 board: 405 edges of 698 served (15 before), 405 dist-priced, combos 102/102 with a probability, alt-line reason 0.
   - LEFT: the memory clause (live-odds-worker WNBA-refresh peak RSS in the ~05Z publish hour vs the 507 MB baseline) is unread.
