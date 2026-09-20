@@ -6,9 +6,38 @@ from typing import Any
 from typing import Mapping
 
 
+# Field names per dataclass TYPE, computed once.
+#
+# `_serialize` runs once per possession and once per step of every simulated
+# half, so on a live tick it is called on the order of 100k times per in-play
+# match (~300 simulations x ~200 possessions). It used to call
+# `dataclasses.fields(value)` on each of those, and `fields()` builds a fresh
+# tuple through `tuple(<generator>)` -- whose `_PyTuple_Resize` raises
+# `SystemError: Objects/tupleobject.c:927: bad argument to internal function`
+# when the half-built tuple's refcount is not 1. On live-odds-worker, which runs
+# several sport loops at once, that killed a whole league's poll for a tick 8
+# times between 2026-09-13 and 2026-09-20 (`LEAGUE_POLL_FAILED ...
+# error=SystemError`, traceback through `contracts._serialize` ->
+# `dataclasses.fields`). These classes are frozen and their field sets are
+# static, so the call belongs once per TYPE, not once per VALUE.
+#
+# A race between two threads filling this dict is harmless: both compute the
+# same tuple and the dict write is atomic.
+_FIELD_NAMES: dict[type, tuple[str, ...]] = {}
+
+
+def _field_names(cls: type) -> tuple[str, ...]:
+    names = _FIELD_NAMES.get(cls)
+    if names is None:
+        names = tuple(item.name for item in fields(cls))
+        _FIELD_NAMES[cls] = names
+    return names
+
+
 def _serialize(value: Any) -> Any:
     if is_dataclass(value):
-        return {item.name: _serialize(getattr(value, item.name)) for item in fields(value)}
+        cls = value if isinstance(value, type) else type(value)
+        return {name: _serialize(getattr(value, name)) for name in _field_names(cls)}
     if isinstance(value, Enum):
         return value.value
     if isinstance(value, Mapping):
