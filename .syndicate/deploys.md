@@ -38675,3 +38675,60 @@ Scheduled task `fotmob-alias-verify-0919-pm`, which fired ~7h late (21:16 CT, no
 - **NOT FALSIFIED, explicitly.** The pre-registered falsifier was “NEXT-DAY gaps stay > 3 while the `after` phase reads `ran=yes`”. The `after` phase does read `ran=yes` (37 lines, 23 of 24 builds) AND the gaps fell to 3. Option A's mechanism does what it was designed to do; the failure is in the second clause, which option A was never designed to touch.
 - **Left, and owed to the user as a decision, not an action:** (a) the floor is **3600 live** — restore 1200, or accept 3600 and re-grade; (b) tomorrow's 4 h 12 min starvation after the Central roll, with `throttled=yes` on every tomorrow queue line, is a new finding and needs its own lane or an explicit accept; (c) a clean >= 22 h re-read at a single floor before this lane can close.
 
+
+## 2026-09-20 15:55Z -- reading -- refresh-worker `aebc040d` -- lane `layer2-prior-date-live-carryover` -- **R3 MET**
+
+Read-only reading by scheduled task `layer2-carryover-crossing-reading-0920`, taken 15:36-15:55Z (10:36 CDT onward). Nothing was deployed, no env var was changed, no code was edited. **Eight games were live across the midnight CT roll on the night of 2026-09-19 (one MLB, seven NCAAF). The carryover rebuilt the 09-19 Layer 2 shortlist 12 times from 05:05:31Z to 06:46:32Z, then STOPPED on `decision=skip reason=nothing_live_at_last_build` at 06:52:51Z -- 10.1 min after the last crossing game's final play, and 4.1 h before the 6 h cap. The served 09-19 shortlist has 0 `game_state=live`. (a)-(d) all MET; with R2 recorded 2026-09-14, the lane's GOAL is MET and the lane is CLOSED.**
+
+**STEP 0: the code is on the loop path, checked by content.**
+- `fleet_live_commits` at 15:36Z (10:36 CDT):
+  - web `bdc45c11`, live 2026-09-19T18:58:36Z.
+  - refresh-worker `aebc040d`, live 2026-09-19T18:26:24Z (13:26 CDT 09-19).
+  - live-odds-worker `bad3b94e`, live 2026-09-20T03:36:09Z.
+- `git show aebc040d:pipeline/intelligence_state.py` has 2 matches for `_maybe_carry_over_prior_date_layer2`. `aebc040d` is an ancestor of origin/main. Its `finished_at` is 09-19 18:26:24Z and it is still the live deploy, so it was live across the whole roll window with no deploy in it.
+
+**STEP 1: eight games were live across midnight CT.** Roll 2026-09-20T05:00:00Z.
+- **MLB**, statsapi schedule 09-19: 15 games, all Final. Last play `about.endTime` was read for **all 15**, not only the late starts.
+  - **MIN @ LAA (823976), first pitch 01:38Z: last play 2026-09-20T05:15:24.118Z (00:15:24 CDT) -- CROSSED, by 15.4 min.**
+  - Next latest, none crossing: MIA @ SD (823249) 04:30:40Z, SF @ LAD (823899) 04:03:09Z, NYY @ AZ (825029) 03:29:29Z, WSH @ STL (823003) 03:16:05Z, SEA @ COL (824304) 02:59:01Z. The other nine all ended before 02:00Z.
+- **NCAAF.** `site.api.espn.com` answered HTTP **403** (Akamai "Access Denied", Reference #18.c6b2d717) on every header set tried, for BOTH `scoreboard` and `summary`, from PowerShell and curl alike. That is a property of this request path, not of ESPN: two other ESPN hosts answered normally and were used instead -- `sports.core.api.espn.com` (event enumeration by date) and `site.web.api.espn.com` (the identical `summary` payload, with `drives[].plays[].wallclock`). This is therefore the specified play-level evidence, **not** the weaker `game-chips` fallback.
+  - `core/.../events?dates=20260919` returns **71** events. Eight kick at or after 2026-09-20T01:30Z; the five kicking 00:00-00:15Z were read as well, so the negative is measured rather than assumed.
+  - Latest play `wallclock` per game (all Final):
+    - **UAB @ UL (401862776), kick 00:00Z: 06:42:43Z (01:42 CDT) -- CROSSED. LAST play of the night.** 174 plays over 6 h 43 m; a delay is the likely cause but was not confirmed.
+    - **FRES @ SJSU (401860888), kick 03:00Z: 06:38:23Z (01:38 CDT) -- CROSSED.**
+    - **PUR @ UCLA (401858458), kick 03:00Z: 06:37:38Z (01:37 CDT) -- CROSSED.**
+    - **MONT @ ORST (401860886), kick 03:00Z: 06:23:08Z (01:23 CDT) -- CROSSED.**
+    - **NDSU @ SAC (401864507), kick 02:30Z: 05:53:44Z (00:53 CDT) -- CROSSED.**
+    - **JMU @ SDSU (401860887), kick 02:00Z: 05:41:20Z (00:41 CDT) -- CROSSED.**
+    - **NIU @ ARIZ (401856793), kick 02:30Z: 05:37:36Z (00:37 CDT) -- CROSSED.**
+    - **SDAK @ BOIS (401860885), kick 02:00Z: 05:25:26Z (00:25 CDT) -- CROSSED.**
+    - Did not cross: CLT @ APP 04:33:17Z, BYU @ CSU 03:28:15Z, ETAM @ TLSA 03:17:02Z, UTSA @ TEX 03:13:31Z, ARST @ TCU 03:09:01Z.
+- **The 09-19 reading's confound did not recur, as that reading predicted.** It found the carryover held open for 6 h by 10 Kalshi WNBA total rows that stayed quoted after the final, and wrote: "A real crossing may still stop cleanly on 09-19/20 if no stale-live WNBA rows exist for that date." There are **0 wnba rows for 09-19** (per-sport shortlist `total_rows=0`), and the stop fired. The confound is therefore still unfixed -- it was absent here, not cured.
+
+**STEP 2: the carryover ran while they were live and stopped when they ended.**
+`render_logs --text "LAYER2_CARRYOVER"` 04:50-13:00Z: covered 05:05:31..12:08:45Z, **22 matches over 2 pages**.
+- **12 `decision=built reason=live_at_last_build`, 05:05:31Z to 06:46:32Z (00:05-01:46 CDT)**, `elapsed_s` 92.7-155.96. The first carries `live_rows=23 chips_live=8` -- the pre-roll build's live state, which is what armed it.
+- `live_rows_now`/`chips_live_now` decay across those 12: 115/8, 23/8, 23/7, 30/6, 18/6, 14/4, 4/3, 2/3, 0/3, 2/2, 0/2, **0/0 at 06:46:32Z**. Note it read 0 live rows at 06:22:46Z and recovered to 2 at 06:29:52Z, so a single 0 is not the stop -- both counters have to be 0.
+- Two `wait` decisions: 05:05:36Z `reason=rate_limited`, 05:55:14Z `reason=sim_subprocess_resident`.
+- **STOP: 06:52:51.973Z (01:52 CDT) `decision=skip reason=nothing_live_at_last_build hours_since_roll=1.88 max_hours=6.0 live_rows=0 chips_live=0`.** This is the condition that had never fired -- not on 09-14, not on 09-18, not on the 09-19 night.
+- Two later `decision=built reason=unknown_since_restart`, 07:42:51Z and 09:04:37Z (02:42 and 04:04 CDT): the loop lost its in-memory last-build state twice in 4 h. Each rebuilt once, read `live_rows_now=0 chips_live_now=0`, and skipped again 7-8 min later (07:50:31Z, 09:12:40Z) on `nothing_live_at_last_build`, so the stop condition held both times. **Not attributed:** no deploy happened in the window (refresh-worker's `finished_at` is 09-19 18:26:24Z) and Render events were not read. The 09-19 night showed the same pattern 3 times, so it is not specific to this slate and is a standing question, not a finding of this reading.
+- Then `past_cap` at 11:00:00Z, 11:14:39Z and 12:08:45Z. The cap was reached **4.1 h after** the real stop, so it cannot have masked it -- which is exactly what the 09-18 and 09-19 nights could not show.
+- `LAYER2_FAST_REFRESH date=2026-09-19`, 03:30-13:00Z: covered 03:34:47..09:04:37Z, **19 matches over 2 pages**. The last 09-19 fast build anywhere in the window is 09:04:37Z, consistent with the carryover having stopped rather than with a log gap.
+  - Before the roll: 5 builds, 03:34:47-04:36:25Z, `sports` including `mlb`, `live_rows` 18-335, `chips_live` 9-17.
+  - After the roll: 12 builds, 05:05:30Z-06:46:31Z, `rows` 1,400-2,384. `mlb` drops out of `sports` from 05:19:43Z (MIN @ LAA ended 05:15:24Z); `ncaaf` drops out from 06:39:26Z.
+  - Gaps after the roll, in minutes: 5.6, 8.7, 8.7, 9.7, 8.2, **17.0**, 10.4, 9.0, 7.1, 9.6, 7.1. The single gap over 15 min is 05:46:18 -> 06:03:18Z, and its reason is the `wait reason=sim_subprocess_resident` quoted above at 05:55:14Z.
+- Failure markers, 04:50-13:00Z: `LAYER2_CARRYOVER_FAILED`, `LAYER2_GUARD_SKIP` and `LAYER2_FAST_REFRESH_FAILED` each matched **nothing** (1 page each).
+
+**STEP 3: the served artifact.** `GET /api/board/layer2-shortlist?sport=all&date=2026-09-19&limit=2000` at 15:51:08Z (10:51 CDT):
+- `written_at` **2026-09-20T09:04:12Z** (04:04 CDT), after the roll. `build_age_seconds` 24,416.7. That write is the 09:04:37Z restart build.
+- `total_rows` 2,371; `returned` 2,000 (nfl 1,998 + soccer 2, under `per_sport_limit` 2000).
+- **0 `game_state=live`.** `rows_live_state_stale` **0**, with `live_state_max_build_age_seconds` 1800.0. The build is 6.8 h old, so ANY row that had been live at build would have been relabelled and counted there; 0 means no row in the artifact was live at build at all. That is a stronger read than scanning the 2,000 returned rows.
+- Per-sport reads at `limit=10000`, same `written_at`: ncaaf 3 rows, nfl 1,998, soccer 370, mlb 0, wnba 0 -- **0 live and 0 stale in every one.**
+
+**Criteria.**
+- **(a) MET.** 12 `built` after 05:00Z while the crossing games ran, at a 5.6-10.4 min cadence except one 17.0 min gap, whose `sim_subprocess_resident` wait is quoted.
+- **(b) MET.** Last crossing final 06:42:43Z (UAB @ UL); `nothing_live_at_last_build` at 06:52:51Z, **10.1 min later** -- one fast build, inside the 2-build allowance.
+- **(c) MET.** The last fast build before the stop, 06:46:31Z, shows `live_rows=0 chips_live=0`.
+- **(d) MET.** `written_at` 09:04:12Z > 05:00:00Z, and 0 `game_state=live` across every sport.
+
+**Lane verdict: GOAL MET; lane CLOSED 2026-09-20.** W1 and R1 were recorded 2026-09-13, R2 on 2026-09-14 14:54Z (refresh-worker `fb0c91cf`). This commit also closes the lane's block in `lanes.md`. `layer2-carryover-crossing-reading-0920` was the last backup task; no further reading is owed and none was armed.
