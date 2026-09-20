@@ -38764,3 +38764,16 @@ carried from an assumption is the same defect as a predicted effect carried from
 - **Baseline at go-live (16:07:00Z):** credits used 1,097,653; by_sport nfl 122,319, ncaaf 207,575. `NFL_LINES_AUTORUN_LAUNCHED` lines: 0 (the lane did not exist).
 - **Expectation:** `NFL_LINES_AUTORUN_LAUNCHED` gaps ~150-200 s once games are in play; NFL credits per run under ~600 in-play; and the FIRST real test of the pregame cap -- last night no NCAAF/NFL event sat inside the 6 h pregame window, so nothing was deferred and the cap was proxied, not verified. Today the signature is cheap runs with ONE larger run per ~30 min.
 - **verify:** `nfl_capture_reading.py` (scratchpad a1e40980), 100 min across kickoff, reporting every 10 min.
+
+## 2026-09-20 16:25:14Z (11:25 CT) — READING, no deploy — refresh-worker — lane preflight-board-build-hold — **verify: MET, offline and on production. Lane CLOSED.**
+
+- **What changed (`bafe9660`, tooling only -- no service deploy):**
+  - `deploy_preflight.py` returns HOLD for refresh-worker while a board build is in flight, UNKNOWN when that is unreadable, and names the way to get a window. `--allow-mid-build` is the escape, recorded on the receipt. Only refresh-worker is gated; web and live-odds-worker build no board.
+  - `check_deploy_safety.board_build_state()` reads completion from **`BOARD_BUILD_TIMING`**, not `LAYER2_SHORTLIST`. The shortlist write is mid-build: the kalshi join, `portfolio_commit` (~90 s), paper execution and the publish all follow it.
+- **(1) Offline: 10 tests in `tests/test_preflight_board_build_hold.py`, all failing on the pre-change code** -- verified by loading `HEAD:scripts/*` into a temp dir: `board_build_verdict` and `read_board_build_state` do not exist there, and `board_build_state` asks for `LAYER2_SHORTLIST`, never `BOARD_BUILD_TIMING`.
+- **(2) PRODUCTION, 16:25:14Z, refresh-worker (claim free, read-only, `--no-expectation`):**
+  - `verdict: HOLD -- a board build is in flight started 2026-09-20T16:24:54.488897799Z; a deploy throws it away`.
+  - Receipt `board_build`: `in_flight: true`, `newest_build_start 16:24:54.488Z`, `newest_build_complete 16:12:52.005Z`.
+  - The build had started **20 s** before the check. On the pre-change marker this same moment reads CLEAR once the shortlist line lands, which is exactly the window that destroyed the 16:04:54Z build yesterday.
+- **(3) No regression:** 72 passed across `test_preflight_board_build_hold.py`, `test_deploy_preflight.py`, `test_deploy_safety_build_estimate.py`. Five existing preflight tests DID fail first, all on "RENDER_API_KEY not found"; that is "cannot ask", not "cannot tell" -- such a shell cannot deploy either (`render_deploy.py` reads the same key) -- so `board_build_state` now NAMES the case (`missing_api_key`) and the verdict treats it as not-applicable. Every other unreadable state still blocks, pinned by its own test.
+- **Cost, stated:** every refresh-worker deploy now waits for a real window (the ~4 min after a `BOARD_BUILD_TIMING`), and the drain remains the quiet-window path. Both of this session's deploys yesterday and today found natural CLEARs, so the window exists in practice.
