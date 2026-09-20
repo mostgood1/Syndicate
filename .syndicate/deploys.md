@@ -38732,3 +38732,20 @@ Read-only reading by scheduled task `layer2-carryover-crossing-reading-0920`, ta
 - **(d) MET.** `written_at` 09:04:12Z > 05:00:00Z, and 0 `game_state=live` across every sport.
 
 **Lane verdict: GOAL MET; lane CLOSED 2026-09-20.** W1 and R1 were recorded 2026-09-13, R2 on 2026-09-14 14:54Z (refresh-worker `fb0c91cf`). This commit also closes the lane's block in `lanes.md`. `layer2-carryover-crossing-reading-0920` was the last backup task; no further reading is owed and none was armed.
+
+### CORRECTION to the 2026-09-20 15:55Z reading above -- the reading's OWN clock, not its findings
+
+The section above says the reading was "taken 15:36-15:55Z (10:36 CDT onward)" and dates
+`fleet_live_commits` "at 15:36Z (10:36 CDT)". **15:36Z was not measured; it was assumed.** The
+scheduled task's `lastRunAt` is **2026-09-20T15:45:34.399Z**, so the run began at 15:45:34Z (10:45:34
+CDT) and the fleet read was about 15:46Z (10:46 CDT), not 15:36Z. The reading window was
+**15:46-15:55Z (10:46-10:55 CDT)**, about 9 minutes.
+
+**No verdict, criterion or production number changes.** Every timestamp the verdict rests on is read
+out of the data itself and is unaffected: the log line stamps (05:05:31Z .. 12:08:45Z), the game end
+times from statsapi and ESPN, and the artifact's `written_at` 2026-09-20T09:04:12Z. The one clock
+reading in that section that WAS measured is the shortlist fetch, printed by the fetch itself as
+`2026-09-20T15:51:08Z`, and it stands.
+
+Recorded because the value of this file is that its numbers were measured. A wall-clock stamp
+carried from an assumption is the same defect as a predicted effect carried from an earlier reading.
