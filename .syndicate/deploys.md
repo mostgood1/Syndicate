@@ -38930,3 +38930,16 @@ No in-flight sim was killed.
 refresh-worker's live `aebc040d`, so this ships many other lanes' work. That is
 the dominant risk, not the movement term.
 
+
+## 2026-09-20 18:19Z (13:19 CT) — READING, no deploy — the served board across the full NFL slate — lane live-inplay-board-cadence — **the post-transition window REFUTES my own prediction; the goal is NOT MET and the number is ~298 s**
+
+- **63 samples, 17:01:51-18:19:02Z**, `/api/intelligence/query` every ~75 s, NFL + WNBA + MLB + soccer + NHL in play.
+- **THE PREDICTION I MADE AND THE DATA REFUSED.** At 17:16Z I recorded that the 262 s figure "INCLUDES the kickoff transition" and that "a window after the slate settles will be cleaner". Split at 17:20Z:
+  - kickoff transition (n=15): median-of-medians **270 s**, <=180 s in 3/15
+  - post-transition (n=48): median-of-medians **298 s**, <=180 s in **3/48**
+  - The settled window is **slightly WORSE, not cleaner**. The earlier 262 s was a small-sample artifact of the first fifteen minutes, not a transition penalty. The caveat I attached was plausible, specific — and wrong.
+- **Full in-play window: median-of-medians 297 s**, best single sample 43 s, <=180 s in **6 of 63** (10%), <=300 s in 36 of 63. Overlay cards median 210, peak **1,091**.
+- **Intervals hold up across the slate** (peak per segment, post-transition): nfl q2 50, h1 50, q1 33, h2 31, q3 23, q4 21; wnba h1 18, q1 10, h2 6; mlb first5 78, first1 17, first3 11; soccer h1 1.
+- **Against the two baselines:** the shortlist-only board this replaced read 733 s and rising on 09-19; the same board's shortlist rows in this window read 551-700 s while the overlay read ~298 s. So the overlay is consistently serving prices roughly half as old as the path it replaced — on a card population that peaked at 1,091.
+- **AND the metric still overstates the board's own lag**, per the 17:25Z correction: this figure is grid->serve + `book_age` (time since the price MOVED). The pipeline-only clock (`quote_seen_age`) measured **~362 s look-to-serve** at 17:22Z, which is the number to beat and is worse than this one, not better.
+- **VERDICT: GOAL NOT MET.** ~180 s target; 297-298 s measured; 10% of samples inside target. The work that remains is named in the lane and is split between capture (~202 s since we last looked) and the board (79-160 s grid->serve), with the freshness ceiling explicitly ruled out as the lever.
