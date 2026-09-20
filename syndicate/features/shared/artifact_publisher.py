@@ -682,12 +682,26 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # each market (audit §7 #1) and web is the only place it can be inspected --
     # the same worker-writes/web-reads split the settlement inputs above sit in.
     #
-    # Small by construction, which is why it is allowlisted at all: it is
-    # first-sighting-only, so it is bounded by DISTINCT MARKETS PER DAY rather
-    # than by ticks. Measured on the real payload: **584 bytes/record, ~90KB a
-    # day**, against the evaluation chunk ledger's 40,555 bytes/record. This is
-    # deliberately the opposite of the `odds_events/<date>.jsonl` case the next
-    # comment refuses -- that one reached 1.2GB in a day.
+    # Bounded by DISTINCT MARKETS PER DAY rather than by ticks (first-sighting
+    # only), which is why it is allowlisted at all -- but "small" is NO LONGER
+    # TRUE and the number that said so was 345x stale.
+    #
+    # THE ORIGINAL NOTE, kept because it is what the sizing decision rested on:
+    # "584 bytes/record, ~90KB a day", against the evaluation chunk ledger's
+    # 40,555 bytes/record.
+    #
+    # MEASURED 2026-09-20 on web's disk (`/api/ops/artifacts/export`, lane
+    # `pull-window-dated-scope`, after lane `layer2-line-movement-scoring`
+    # reported it): **09-19 is 31.1 MB and 09-20 is 15.7 MB**, and the export
+    # REFUSES both -- `count 0, oversize_skipped 1, oversize_bytes 31,120,228`
+    # -- because it caps a single file at 8 MiB. Every day since 2026-09-01 is
+    # over that cap. So this pattern still PERMITS the worker->web push (the
+    # files are on web's disk), while the CONTENT export of it returns nothing,
+    # which is a backup hole rather than a live-path failure.
+    #
+    # NOT ESTABLISHED: whether `pull_hot_artifacts` is affected too. The files
+    # being present on web is consistent with the sync working; nobody has
+    # measured it. Do not infer it from this comment.
     #
     # `#208`'s lesson applies here as it does everywhere in this tuple:
     # allowlisting PERMITS the transfer, it does not make one happen.
@@ -705,6 +719,15 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # or came back. Web must carry this pattern BEFORE refresh-worker pushes, or
     # the push is refused as not allowlisted.
     "reports/intelligence/clv_departures/*.jsonl",
+    # The PRICE TRAIL beside the two ledgers above (lane
+    # `layer2-line-movement-scoring`, session 105fd5dd, 2026-09-20): the
+    # per-market price path a movement score is computed from. Added by lane
+    # `pull-window-dated-scope`, which holds this module, at that lane's request
+    # and on its owner's user decision -- the pattern list itself is unheld, and
+    # this lane recorded "no objection" to the same shape for
+    # `model-scorecard-cron` and `prop-evidence-parity` on 2026-09-17.
+    # Allowlisting PERMITS the transfer; the producer still has to publish.
+    "reports/intelligence/clv_price_trail/*.jsonl",
     # The PRE-PUBLICATION population (`opportunity_population_ledger`, lane
     # `accuracy-assessment-0914`, user decision "Build it for all sports"): every
     # candidate a Layer 2 build priced, published or not, first sighting per side per
