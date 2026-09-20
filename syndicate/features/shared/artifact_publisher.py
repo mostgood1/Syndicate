@@ -727,10 +727,34 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # this lane recorded "no objection" to the same shape for
     # `model-scorecard-cron` and `prop-evidence-parity` on 2026-09-17.
     #
-    # THIS ENTRY IS NECESSARY AND NOT SUFFICIENT, and the shortfall is silent.
-    # `sweep_changed_hot_artifacts` is generic over this tuple, so the entry
-    # alone does make the trail eligible -- no call site needed. But the sweep
-    # obeys `_PUBLISH_MAX_BYTES` (12 MiB) and `_publish_skip_reason` returns
+    # THIS ENTRY IS INERT FOR THE TRAIL TODAY, and the ceiling is NOT why.
+    # MEASURED 2026-09-20 17:36Z, the positive/negative contrast rather than an
+    # absence: on refresh-worker `PUBLISH_OK` 339 (its per-path direct
+    # publishes) but `publishedArtifacts` **0** and `PUBLISH_SKIPPED_UNCHANGED`
+    # **0** since 16:30Z, while live-odds-worker emits both constantly. So the
+    # SWEEP DOES NOT RUN on refresh-worker -- and `pipeline/layer2_shortlist.py`
+    # writes the trail THERE (`[clv_price_trail] TRAIL date=2026-09-20
+    # rows_in=4956 written=1182` at 17:14:36Z), with no `publish_hot_artifact`
+    # call of its own. A file that is neither swept nor directly published does
+    # not travel at any size.
+    #
+    # Which service sweeps is a FLAG, not a fact of the code: `live_lens_loop`
+    # and `live_refresh_loop` both call the sweep (`live_refresh_loop.py:5993`
+    # calls itself "one of FOUR paths into that sweep"), and both runners call
+    # `start_live_lens_loop()` behind `SYNDICATE_ENABLE_LIVE_LENS_LOOP`. So do
+    # not settle this from the source -- read the positive markers per service.
+    #
+    # The entry STAYS: it is harmless, it is required the moment the trail is
+    # published by any route, and removing it guarantees nothing transfers.
+    # Reported and corrected by lane `layer2-line-movement-scoring`; this lane
+    # had earlier read the trail's absence from `SWEEP_SKIPPED` as "producer not
+    # deployed", which was WRONG on both halves -- it is deployed (`aebc040d`
+    # carries the module and 3 `record_price_trail` call sites), and the absence
+    # is unreachability, not a file that fits.
+    #
+    # The ceiling below is real but SECONDARY for this path, and binds the
+    # swept services: the sweep obeys `_PUBLISH_MAX_BYTES` (12 MiB) and
+    # `_publish_skip_reason` returns
     # `too_large:<size>` UNLESS the path sits in `_FAILED_DIRECT_PUBLISH`, which
     # only a FAILED DIRECT publish ever populates. `clv_openings` clears the
     # ceiling because it calls `publish_hot_artifact` itself
