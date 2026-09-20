@@ -1623,29 +1623,15 @@ death, never life — do not invert it.
 - Verification: (1) offline tests that fail on today's code (the call is reachable from `_run_owned_generation`; zeros stay zeros; merge keeps history and dedupes; seed-pull failure skips). (2) Production, after a refresh-worker deploy the user approves: the first NHL refresh after 2026-09-19 games finish rewrites web's copy, with 2026010xxx rows present, and a preseason NHL prop Ask's recent-form newest game dated within days of its slate.
 - Blocked by: none. Production reading needs a deploy (user) and finished preseason games (from 2026-09-19 evening ET).
 
-### wnba-postgame-to-disk — OPEN — opened 2026-09-19 — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **`#675`; LIVE on refresh-worker `7301fe67` since 15:39:17Z; readings owed**
+### wnba-postgame-to-disk — CLOSED, GOAL MET — opened 2026-09-19, closed 2026-09-20 03:12Z — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **`#675`: WNBA dated box scores and recon reach web, the backfill is drained, and the Ask's STALE row is gone**
 
 - Goal: [user 2026-09-19: "proceed next" on `#675`] a WNBA slate date's box scores appear on WEB within a day of the game (`wnba_source/data/processed/boxscores_<date>.csv`), its three recon files reach web too, the dates missing since 2026-08-25 are backfilled, and a WNBA board-row prop Ask's recent-form table stops printing its STALE row.
-- **GOAL VERDICT (2026-09-19 ~18:35Z / 13:35 CT): NOT MET. Three of four clauses are MET; the backfill is draining.** Goal (verbatim): "a WNBA slate date's box scores appear on WEB within a day of the game (`wnba_source/data/processed/boxscores_<date>.csv`), its three recon files reach web too, the dates missing since 2026-08-25 are backfilled, and a WNBA board-row prop Ask's recent-form table stops printing its STALE row."
-  - Deployed on the user's "Deploy now": refresh-worker `ef5ab75b` -> `7301fe67` (`dep-danammh42hec73drs0ig`), fired 15:33:46Z, live 15:39:17Z (`deploys.md` entry). Claim released ~15:43Z.
-  - **MET, box scores and recon reach web** (`deploys.md` READING 15:55:52Z). The first tick on the new code (15:55:46Z) logged `date` 2026-09-18, `box_rebuild` true, and `published` true for the box score and all three recon files. At 15:55:52Z web listed 109 dated box scores, newest `2026-09-18` (baseline 08-25), plus `recon_{games,props,quarters}_2026-09-18.csv` (baseline 0).
-  - The settlement pass wrote 09-18 and 09-17 to disk six minutes before that tick and published neither. That is the case the "published, not on disk" rule exists for.
-  - **MET, the Ask STALE row** (`deploys.md` READING 17:59:14Z). After 09-17 published (the 17:57:02Z retry), the same 4 board-prop Asks (3 on PHX @ DAL, 1 on SEA @ GS) print no STALE row. They printed `STALE ... 25/27 days` at 15:55Z.
-  - **OWED, the backfill:** 2 of ~24 slates are on web (09-18, 09-17); next is 09-16 → 08-26, one per hour, newest first.
-    - The 09-17 tick at 16:56:01Z published false ×4 during another session's web deploy (`4043e136`). The retry an hour later published all four (attempt 2 of 3).
-    - Refresh-worker restarted at 18:26:24Z (`aebc040d`, not this lane's deploy). The producer's interval gate lives in keyvalue and survives it.
-  - Close when web lists every dated `boxscores_2026-*.csv` from 08-26 to yesterday.
-    - A missing date is legitimate only if it had no games (recon `no_final`).
-    - The closing reading is SCHEDULED as task `wnba-675-backfill-reading-0920`, firing 2026-09-20 19:30Z / 14:30 CDT. It reads web's listing, explains each missing date from refresh-worker's `WNBA_POSTGAME_PRODUCER` lines, and closes the lane or records what is left.
-    - **The drain estimate is CORRECTED (19:06Z): the backlog is small.**
-      - The first post-restart tick (19:00:55Z) took **08-30**, not 09-16.
-      - Web's `/wnba/api/cards` shows 0 games for 09-03..09-16 (each request falls back to an earlier empty date), and 08-31 falls back to 08-30. So there was a ~2-week no-game break, and those dates are rightly skipped (done `no_final`, BELIEVED; the closing reading verifies from recon status).
-      - Left: 08-30 (retry) → 08-26, then 08-25..08-21 re-published (web already has them), plus the 09-19 slate after midnight CT. That is ~10 ticks, done ~05:00Z 09-20 if nothing collides.
-    - **RISK, measured today: a publish failure costs one of a date's 3 attempts, and web restarts keep causing them.**
-      - 2 of the 5 ticks so far landed in a web deploy's switchover. 09-17 at 16:56:01Z hit `4043e136`. 08-30 at 19:00:55Z hit `bdc45c11` (live 18:58:36Z, then `server_failed` health checks at 19:02:08Z and 19:04:21Z): `Connection refused` / `Name or service not known` on every worker→web publish 18:57-19:03Z.
-      - A date whose 3 attempts all collide is dropped from the backfill.
-      - Fix if the closing reading finds one: count an attempt only when the BUILD fails, never a publish failure, with a separate bound so a permanently refused path cannot starve older dates.
-      - Not done now: it needs a refresh-worker deploy, and three were fought over today.
+- **GOAL VERDICT (2026-09-20 03:12Z / 2026-09-19 22:12 CT): GOAL: MET.** Goal (verbatim): "a WNBA slate date's box scores appear on WEB within a day of the game (`wnba_source/data/processed/boxscores_<date>.csv`), its three recon files reach web too, the dates missing since 2026-08-25 are backfilled, and a WNBA board-row prop Ask's recent-form table stops printing its STALE row."
+  - Three readings in `deploys.md`: 15:55:52Z (box + recon reach web), 17:59:14Z (the Ask STALE row is gone), and 03:12Z 09-20 (the backfill is drained).
+  - Web lists every WNBA date with games 08-26..09-18 (08-26, 08-27, 08-28, 08-29, 08-30, 09-17, 09-18); 115 dated files against a baseline of 108 ending 08-25. 08-31..09-16 had NO games (a 17-day break), shown by `/wnba/api/cards` falling back to the previous date on each of them.
+  - The fix is `0465103e` (+ `f6972a2b` comments), live on refresh-worker since 15:39:17Z (`dep-danammh42hec73drs0ig`).
+  - 11 ticks; 4 landed in a web deploy's switchover and published false; every one succeeded on the next hourly attempt, none near the 3-attempt cap.
+  - **Known risk, left as a lead:** a publish failure consumes one of a date's 3 rebuild attempts. If web ever flaps through all three, that date drops out of the backfill. The fix is to count only BUILD failures against the cap, with a separate bound so a permanently refused path cannot starve older dates.
 - Files:
   - `syndicate/features/shared/refresh_state_store.py` (the `_KEYVALUE_EXCLUDED_PATH_MARKERS` tuple ONLY: one marker for dated WNBA box scores)
   - `scripts/run_refresh_worker.py` (`_wnba_postgame_target_dates` and `_run_wnba_postgame_producer_tick` ONLY)
