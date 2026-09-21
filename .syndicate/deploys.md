@@ -39562,3 +39562,21 @@ Integrity: 0 of 315 fee-net rows with `score.ev_component != score_v2.ev_net_pct
 
 **Why (from code, not guessed):** at scoring time a Kalshi price is a captured quote from bookmaker `kalshi` with NO ticker anywhere -- `apply_venue_quotes` stamps `venue_ref` onto the rows AFTER `build_layer2_rows` scored them (`pipeline/layer2_shortlist.py:1752` vs `:1611`). 45 of the 82 served MLB Kalshi rows carry a ticker that arrived too late to be read. `569ebca1`'s test passed because its fixture put the ticker on `side_best`, where production never has one -- a reachability test on a fixture, not on the production shape. Harmless: the fallback is the flagged full-rate bound, unchanged.
 **Corrected on main:** `03d3f801` names the series from (sport, market, segment) and takes the rate from `venue_fees`' measured table. Run over these production rows with the ticker withheld: 81 of 82 MLB Kalshi rows resolve; every non-MLB row keeps x1.0 (its real rate). Deploy of `03d3f801` follows under the same user approval; its reading is the next entry.
+
+
+## 2026-09-21 22:58:30Z -> live 23:03:59Z (5:58-6:03 PM CT) — refresh-worker `b99143e2` -> `03d3f801` (`dep-daord5g0cd8s73ao68e0`) — lane `layer2-score-outcome-calibration` — **MLB Kalshi rows now pay their real x0.5 fee: 21 of 21 resolved, 0 on the assumed rate, every fee equal to the measured table rate. One absolute threshold MISSED because the population shrank at first pitch.**
+
+**User decision (chat):** "yes, deploy the MLB fee fix" -- the approved fix; `569ebca1` (deployed 22:31Z) was inert, this is its correction.
+**Target chosen to EXCLUDE two newer commits on main, not the tip:** `3af16744` (lane `layer2-restate-series-date`; inert on refresh-worker -- serve-time restate, its verification needs a web deploy) and `e7f216bf` (NFL projections generator, `generate_smartsim2_nfl_projections.py`, runs on refresh-worker -- NOT shipped for its owner on MNF night). `03d3f801` is on origin/main and descends from live `b99143e2`; ride-along = none. (A first preflight read `OFF_MAIN` only because of my typo `03d3f801e`; re-run on the full SHA returned `CLEAR: only infrastructure processes running` 22:58:21Z.)
+
+    field                               baseline 22:57:11Z   predicted   measured on the first new board (written 23:08:29Z)
+    live_commit                         b99143e2             03d3f801    03d3f801
+    MLB Kalshi rows resolved (series)   0                    >= 39       21 of 21   <- threshold MISSED, rate HELD
+    MLB Kalshi rows at assumed x1.0     57                   <= 18       0
+    fee_net rows                        236                  > 0         187
+
+**Why 21 and not >= 39:** the MLB supply fell UPSTREAM of scoring as first pitch neared -- `per_sport.mlb.available` 407 -> 255, game rows 166 -> 39 (22:36Z vs 23:08Z boards); first-5 alternate lines (31 of the 82 MLB Kalshi rows at 22:36Z) leave at first pitch. The fee change cannot shrink it (half rate RAISES those rows' value). The prediction should have been a rate, not a count.
+**Integrity:** every resolved row's `fee_per_contract` == 0.07 x m x P(1-P) with m from `venue_fees` (0 mismatches); non-MLB Kalshi rows stay `kalshi_assumed_full_rate` (their series ARE x1.0); 0 sportsbook rows carry `score_fee_net`; `score_v2` on 1,883 of 1,883 rows. MLB Kalshi rows in the top 100: 0 -> 2.
+
+**Claim:** at 23:10Z the refresh-worker claim was already held by lane `nfl-projection-partial-week` (acquired ~23:05Z, AFTER this deploy went live 23:03:59Z; not forced). Nothing to release; not touched. Its next deploy of main composes with this one: `03d3f801` is on main.
+**verify (OWED, unchanged from the 21:43:55Z entry):** fee-net CLV of the served top-K vs the pre-deploy baseline over >= 7 finished slates, same slates paired (`scripts/score_ranking_backtest.py`); paper-order ROI by venue after 09-21.
