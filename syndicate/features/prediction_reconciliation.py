@@ -19,6 +19,7 @@ import logging
 import os
 import time
 from collections import Counter
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -395,7 +396,45 @@ def _candidate_result_debug_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict
     return candidates
 
 
-def pending_prediction_dates(*, ledger_path: Path | str | None = None) -> list[str]:
+AUTORUN_MAX_AGE_DAYS_ENV = "SYNDICATE_RECONCILIATION_MAX_AGE_DAYS"
+DEFAULT_AUTORUN_MAX_AGE_DAYS = 14
+
+
+def _is_settled(prediction: Mapping[str, Any]) -> bool:
+    result = prediction.get("result") if isinstance(prediction.get("result"), Mapping) else None
+    return bool(result) and _normalize_text(result.get("outcome")) in {"win", "loss", "push", "void"}
+
+
+def autorun_max_age_days() -> int | None:
+    """How far back the DAILY AUTORUN retries unsettled dates. None = no cutoff.
+
+    WHY A CUTOFF `[2026-09-21, lane reconciliation-disk-walks, user decision]`. Since #72
+    (2026-07-27) only the bet slip writes this ledger, so the autorun's retry set had become
+    1,458 stale rows: 1,396 June query-era predictions whose dates have NO result files on
+    disk, retried every day, forever. The 09-20 run held refresh-worker's main loop ~74 s
+    (plus `emit_for_date` per date before it) and resolved 0. A result that exists turns up
+    within days of the game, so rows older than this are left for hand settlement or an
+    explicit `--date` run; they stay in the ledger untouched. `0` or a negative value turns
+    the cutoff off.
+    """
+    raw = str(os.environ.get(AUTORUN_MAX_AGE_DAYS_ENV) or "").strip()
+    if not raw:
+        return DEFAULT_AUTORUN_MAX_AGE_DAYS
+    try:
+        value = int(raw)
+    except ValueError:
+        print(f"[prediction_reconciliation] {AUTORUN_MAX_AGE_DAYS_ENV}={raw!r} is not an integer; "
+              f"using {DEFAULT_AUTORUN_MAX_AGE_DAYS}", flush=True)
+        return DEFAULT_AUTORUN_MAX_AGE_DAYS
+    return value if value > 0 else None
+
+
+def pending_prediction_dates(
+    *,
+    ledger_path: Path | str | None = None,
+    max_age_days: int | None = None,
+    today: str | None = None,
+) -> list[str]:
     """Distinct dates (YYYY-MM-DD) carrying at least one still-unsettled
     prediction.
 
@@ -405,18 +444,36 @@ def pending_prediction_dates(*, ledger_path: Path | str | None = None) -> list[s
     downtime, the autorun flag not being live yet, or simply placing a bet
     a few days ahead of the game all produce a prediction that's dated
     outside "yesterday/today" forever, even once real result data exists.
+
+    `max_age_days` is OPT-IN (default None = every date, as before): the
+    daily autorun passes `autorun_max_age_days()`, while
+    `scripts/backfill_portfolio_settlement.py` keeps the full list. Dates older
+    than `today - max_age_days` are dropped and counted in one log line.
     """
     ledger_root = Path(ledger_path) if ledger_path is not None else None
     predictions = load_all_predictions(ledger_path=ledger_root)
-    dates: set[str] = set()
+    per_date: Counter[str] = Counter()
     for prediction in predictions:
-        result = prediction.get("result") if isinstance(prediction.get("result"), Mapping) else None
-        if result and _normalize_text(result.get("outcome")) in {"win", "loss", "push", "void"}:
+        if _is_settled(prediction):
             continue
         prediction_date = _prediction_date(prediction)
         if prediction_date:
-            dates.add(prediction_date)
-    return sorted(dates)
+            per_date[prediction_date] += 1
+    dates = sorted(per_date)
+    if max_age_days is None:
+        return dates
+    anchor = date.fromisoformat(str(today)[:10]) if today else date.today()
+    cutoff = (anchor - timedelta(days=int(max_age_days))).isoformat()
+    kept = [value for value in dates if value >= cutoff]
+    aged_out = [value for value in dates if value < cutoff]
+    if aged_out:
+        print(
+            f"[prediction_reconciliation] RECONCILE_DATES_AGED_OUT dates={len(aged_out)} "
+            f"predictions={sum(per_date[value] for value in aged_out)} oldest={aged_out[0]} newest={aged_out[-1]} "
+            f"cutoff={cutoff} max_age_days={max_age_days} (kept {len(kept)} dates)",
+            flush=True,
+        )
+    return kept
 
 
 def reconcile_prediction_results_for_date(
@@ -439,7 +496,13 @@ def reconcile_prediction_results_for_date(
     loaded_ledger = time.perf_counter()
     # ONE walk per date, shared by the rows and the reported file list (it
     # used to be two, each six rglobs of the whole disk).
-    result_paths = _candidate_result_paths(date_token, roots)
+    #
+    # AND NONE when nothing on the date can change `[2026-09-21]`: a date with no
+    # prediction, or only settled ones, walks the disk to match nothing. The autorun
+    # always adds yesterday and today, and on 2026-09-20 today alone (0 predictions,
+    # 37,290 result rows) held the main loop 20 s.
+    walk = "done" if any(not _is_settled(prediction) for prediction in scoped_predictions) else "skipped_nothing_pending"
+    result_paths = _candidate_result_paths(date_token, roots) if walk == "done" else []
     walked = time.perf_counter()
     result_rows = _result_rows_from_paths(result_paths)
     keyed_rows = _keyed_result_rows(result_rows)
@@ -465,8 +528,7 @@ def reconcile_prediction_results_for_date(
     write_seconds = 0.0
 
     for prediction in scoped_predictions:
-        result = prediction.get("result") if isinstance(prediction.get("result"), Mapping) else None
-        if result and _normalize_text(result.get("outcome")) in {"win", "loss", "push", "void"}:
+        if _is_settled(prediction):
             skipped += 1
             skip_reasons["already_resolved"] += 1
             reconciled_predictions.append(dict(prediction))
@@ -530,7 +592,7 @@ def reconcile_prediction_results_for_date(
         f"result_files={len(result_paths)} result_rows={len(result_rows)} "
         f"ledger_s={loaded_ledger - started:.2f} walk_s={walked - loaded_ledger:.2f} "
         f"rows_s={read_rows - walked:.2f} match_s={finished - read_rows - write_seconds:.2f} "
-        f"write_s={write_seconds:.2f} total_s={finished - started:.2f}",
+        f"write_s={write_seconds:.2f} total_s={finished - started:.2f} walk={walk}",
         flush=True,
     )
 

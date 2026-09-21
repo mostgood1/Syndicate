@@ -1352,11 +1352,12 @@ def _run_mlb_actuals_writer_tick() -> dict[str, Any] | None:
 
     from scripts.build_mlb_actuals import write_mlb_actuals_for_date
     from syndicate.features.prediction_reconciliation import pending_prediction_dates
+    from syndicate.features.prediction_reconciliation import autorun_max_age_days
 
     today_date = central_today_iso()
     yesterday_date = (date.fromisoformat(today_date) - timedelta(days=1)).isoformat()
     try:
-        stale_pending_dates = pending_prediction_dates()
+        stale_pending_dates = pending_prediction_dates(max_age_days=autorun_max_age_days(), today=today_date)
     except Exception:
         stale_pending_dates = []
     target_dates = tuple(sorted({yesterday_date, today_date, *stale_pending_dates}))
@@ -3147,6 +3148,7 @@ def _launch_autorun_reconciliation(
     )
 
     from syndicate.features.prediction_reconciliation import pending_prediction_dates
+    from syndicate.features.prediction_reconciliation import autorun_max_age_days
     from syndicate.features.prediction_reconciliation import reconcile_prediction_results_for_date
 
     today_date = central_today_iso()
@@ -3161,7 +3163,7 @@ def _launch_autorun_reconciliation(
     # advance bet placed a few days ahead of the game) could never be
     # retried again, no matter how long the app kept running.
     try:
-        stale_pending_dates = pending_prediction_dates()
+        stale_pending_dates = pending_prediction_dates(max_age_days=autorun_max_age_days(), today=today_date)
     except Exception:
         stale_pending_dates = []
     target_dates = tuple(sorted({yesterday_date, today_date, *stale_pending_dates}))

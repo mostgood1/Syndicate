@@ -324,3 +324,70 @@ def test_the_timing_line_says_WHY_nothing_resolved(tree: Path, tmp_path: Path, c
     assert '"already_resolved":1' in line2, line2
     assert '"no_result_row_matched":1' in line2, line2
     assert "resolved=0" in line2 and "skipped=2" in line2
+
+
+
+# --- 2026-09-21: nothing to change, nothing to walk; and an age cutoff for the autorun ------------
+
+
+def test_a_date_with_nothing_pending_is_not_walked(tree: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+    """The autorun always adds yesterday and today. On 2026-09-20 today alone (0 predictions,
+    37,290 result rows) held refresh-worker's main loop 20 s, walking the disk to match nothing."""
+    from syndicate.features.prediction_ledger import record_result
+
+    ledger_path = tmp_path / "prediction_ledger.json"
+    _record(ledger_path, "p1", player="Jane Doe")
+    record_result(prediction_id="p1", outcome="win", ledger_path=ledger_path)
+    calls: list[str] = []
+    real = recon._candidate_result_paths
+    monkeypatch.setattr(recon, "_candidate_result_paths", lambda d, r: calls.append(d) or real(d, r))
+
+    empty = recon.reconcile_prediction_results_for_date(OTHER_DATE, ledger_path=ledger_path, result_roots=[tree])
+    settled = recon.reconcile_prediction_results_for_date(DATE, ledger_path=ledger_path, result_roots=[tree])
+    assert calls == [], "a date with nothing pending must not walk the disk"
+    assert empty["summary"]["predictions"] == 0 and settled["summary"]["skipped"] == 1
+    lines = [l for l in capsys.readouterr().out.splitlines() if "RECONCILE_DATE_TIMING" in l]
+    assert len(lines) == 2 and all(l.endswith("walk=skipped_nothing_pending") for l in lines), lines
+
+    # off != on: one pending prediction and the walk happens, exactly once.
+    _record(ledger_path, "p2", player="Jane Doe")
+    recon.reconcile_prediction_results_for_date(DATE, ledger_path=ledger_path, result_roots=[tree])
+    assert calls == [DATE]
+    assert capsys.readouterr().out.strip().splitlines()[-1].endswith("walk=done")
+
+
+def test_the_autorun_age_cutoff_drops_old_dates_and_says_how_many(tmp_path: Path, capsys) -> None:
+    ledger_path = tmp_path / "prediction_ledger.json"
+    for index, day in enumerate(("2026-06-15", "2026-06-15", "2026-09-10", "2026-09-18")):
+        _record(ledger_path, f"p{index}", player=f"Player {index}", date_value=day)
+    capsys.readouterr()
+
+    kept = recon.pending_prediction_dates(ledger_path=ledger_path, max_age_days=14, today="2026-09-21")
+    assert kept == ["2026-09-10", "2026-09-18"]
+    line = next(l for l in capsys.readouterr().out.splitlines() if "RECONCILE_DATES_AGED_OUT" in l)
+    assert "dates=1 predictions=2" in line and "cutoff=2026-09-07" in line, line
+
+    # OPT-IN: the backfill script calls it with no cutoff and must still see every date.
+    assert recon.pending_prediction_dates(ledger_path=ledger_path) == ["2026-06-15", "2026-09-10", "2026-09-18"]
+
+
+def test_the_autorun_age_knob(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(recon.AUTORUN_MAX_AGE_DAYS_ENV, raising=False)
+    assert recon.autorun_max_age_days() == 14
+    for raw, want in (("30", 30), ("0", None), ("-1", None), ("banana", 14)):
+        monkeypatch.setenv(recon.AUTORUN_MAX_AGE_DAYS_ENV, raw)
+        assert recon.autorun_max_age_days() == want, raw
+
+
+def test_every_autorun_call_passes_the_cutoff() -> None:
+    """Reachability, by the SYNTAX TREE rather than a text search (a comment cannot satisfy it)."""
+    import ast
+
+    source = (Path(__file__).resolve().parents[1] / "scripts" / "run_refresh_worker.py").read_text(encoding="utf-8")
+    calls = [node for node in ast.walk(ast.parse(source))
+             if isinstance(node, ast.Call) and getattr(node.func, "id", getattr(node.func, "attr", None)) == "pending_prediction_dates"]
+    assert len(calls) == 2, "expected the reconciliation autorun and the MLB actuals writer"
+    for call in calls:
+        keywords = {kw.arg: kw.value for kw in call.keywords}
+        assert "max_age_days" in keywords and "today" in keywords, ast.unparse(call)
+        assert getattr(keywords["max_age_days"].func, "id", None) == "autorun_max_age_days", ast.unparse(call)
