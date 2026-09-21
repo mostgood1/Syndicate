@@ -93,12 +93,50 @@ _RENDER_OWNER_ID = "tea-d2bb5n95pdvs73cje4fg"
 _BUILD_LOOKBACK_MINUTES = 180
 
 
+def _main_worktree_root() -> Path:
+    """The primary checkout, where the gitignored `.env` lives. Twin of `deploy_preflight._main_worktree_root`."""
+    import subprocess
+
+    for args in (
+        ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        ["git", "rev-parse", "--git-common-dir"],
+    ):
+        try:
+            done = subprocess.run(args, cwd=str(REPO_ROOT), capture_output=True, text=True, timeout=15)
+        except Exception:
+            continue
+        raw = (done.stdout or "").strip() if done.returncode == 0 else ""
+        if not raw:
+            continue
+        common = Path(raw)
+        if not common.is_absolute():
+            common = (REPO_ROOT / common).resolve()
+        if common.name == ".git" and common.parent.is_dir():
+            return common.parent
+    return REPO_ROOT
+
+
 def _load_render_key() -> str:
+    """The environment, then `.env` beside this script, then the MAIN worktree's `.env`.
+
+    THE FALLBACK IS THE WHOLE FIX `[2026-09-21, lane preflight-board-build-hold]`. `.env` is
+    gitignored, so a session worktree -- where the protocol says every deploy is run from -- has
+    none. This loader used to stop at the worktree and return "", while `render_deploy.py` and
+    `deploy_preflight._api_key()` fall back to the main worktree and deploy fine. So the board-build
+    HOLD read `missing_api_key`, mapped it to "not applicable", and said nothing on every refresh-worker
+    preflight from 2026-09-20 to 2026-09-21: a guard that could not ask, beside a deploy that could.
+    Every Render call through this loader sent an empty Bearer and got HTTP 400 with an empty body.
+    Same order as `deploy_preflight._env_files`: a `.env` beside the script still wins.
+    """
     key = str(os.environ.get("RENDER_API_KEY") or "").strip()
     if key:
         return key
-    env_path = REPO_ROOT / ".env"
-    if env_path.exists():
+    seen: set[Path] = set()
+    for root in (REPO_ROOT, _main_worktree_root()):
+        env_path = (root / ".env").resolve()
+        if env_path in seen or not env_path.exists():
+            continue
+        seen.add(env_path)
         for line in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
             name, _, value = line.partition("=")
             if name.strip() == "RENDER_API_KEY":

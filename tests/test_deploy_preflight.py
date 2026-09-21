@@ -442,6 +442,7 @@ class TooSoonVerdictTests(unittest.TestCase):
         with mock.patch.object(deploy_preflight, "_api_key", return_value="k"), \
              mock.patch.object(deploy_preflight, "live_deploy", return_value={"commit": {"id": "f" * 40}}), \
              mock.patch.object(deploy_preflight, "fleet_live_commits", return_value={}), \
+             mock.patch.object(deploy_preflight, "read_board_build_state", return_value=(False, {})), \
              mock.patch.object(deploy_preflight, "newest_log",
                                return_value=(sample_now, "ALL_PROCESS_MEMORY " + __import__("json").dumps(
                                    {"processes": processes, "process_count": len(processes)}))), \
@@ -509,6 +510,7 @@ class TooSoonVerdictTests(unittest.TestCase):
         with mock.patch.object(deploy_preflight, "_api_key", return_value="k"), \
              mock.patch.object(deploy_preflight, "live_deploy", return_value={"commit": {"id": "f" * 40}}), \
              mock.patch.object(deploy_preflight, "fleet_live_commits", return_value={}), \
+             mock.patch.object(deploy_preflight, "read_board_build_state", return_value=(False, {})), \
              mock.patch.object(deploy_preflight, "newest_log", return_value=None), \
              mock.patch.object(deploy_preflight, "last_restarting_deploy",
                                return_value=_deploy(minutes_ago=2)["deploy"]), \

@@ -129,6 +129,35 @@ def test_no_render_key_is_unknown(safety, monkeypatch):
     assert in_flight is None and "RENDER_API_KEY" in str(facts.get("reason"))
 
 
+def test_a_session_worktree_finds_the_key_in_the_main_worktree(safety, monkeypatch, tmp_path):
+    """The protocol runs every deploy from a session worktree, and `.env` is gitignored.
+
+    MEASURED 2026-09-21: from a worktree this loader returned "", `board_build_state()` reported
+    `missing_api_key`, and the HOLD mapped that to "not applicable" on every refresh-worker preflight
+    -- while `render_deploy.py`, which falls back to the main worktree, deployed normally.
+    """
+    main, worktree = tmp_path / "main", tmp_path / "worktree"
+    main.mkdir()
+    worktree.mkdir()
+    (main / ".env").write_text('OTHER=1\nRENDER_API_KEY="rnd_from_main"\n', encoding="utf-8")
+    monkeypatch.delenv("RENDER_API_KEY", raising=False)
+    monkeypatch.setattr(safety, "REPO_ROOT", worktree)
+    monkeypatch.setattr(safety, "_main_worktree_root", lambda: main)
+    assert safety._load_render_key() == "rnd_from_main"
+    # A `.env` beside the script still wins, as in `deploy_preflight._env_files`.
+    (worktree / ".env").write_text("RENDER_API_KEY=rnd_local\n", encoding="utf-8")
+    assert safety._load_render_key() == "rnd_local"
+
+
+def test_this_checkout_resolves_a_main_worktree_that_holds_the_real_env(safety):
+    """Reachability on the machine that deploys: the resolver lands on a tree with a `.env` in it."""
+    root = safety._main_worktree_root()
+    assert (root / ".git").exists(), root
+    if not (root / ".env").exists():
+        pytest.skip("no .env on this machine (CI); the layout test above pins the logic")
+    assert safety._load_render_key(), "the main worktree has a .env but the loader still found no key"
+
+
 def test_no_api_key_is_not_applicable_rather_than_a_block(preflight, safety, monkeypatch):
     """"Cannot ask" is not "cannot tell".
 
