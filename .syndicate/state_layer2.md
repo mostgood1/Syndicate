@@ -539,7 +539,9 @@ client-side JS). Trace the served `book` field to its writer before acting.
    `7882372f`]`: a game whose kickoff MOVED (NCAAF announces times late) has quote rows in two
    shards, hence two grids, both inside the window. Served NCAAF 09-26 board: 11 duplicate
    game-market rows on 4 evening games -> 0; `merge_grid_rows_across_dates` keeps the fresher
-   `updated_at` copy and the payload reports `rows_dropped_cross_date_duplicates` (11).
+   `updated_at` copy and the payload reports `rows_dropped_cross_date_duplicates`: 11 at 17:06Z,
+   **55 at 19:21Z on grids rebuilt 18:30Z after the NCAAF writer fix** (fresh 09-26 copies win;
+   still 0 duplicates; = an offline merge of the same two grids).
 3. **THE PROJECTION SIDE OF (1) WAS STILL OPEN FOR SOCCER** `[defect verified
    2026-09-19 16:06-16:10Z, lane mls-board-evening-gaps; FIXED by `6419eea5`,
    VERIFIED 18:29-18:36Z on refresh-worker `aebc040d`: the UTC-09-20 grid reads
