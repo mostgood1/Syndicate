@@ -6365,6 +6365,93 @@ def _book_grid_refresh_interval_seconds() -> int:
 # board -- the one anyone is actually betting -- keeps the fast cadence.
 _BOOK_GRID_FORWARD_INTERVAL_MULTIPLE = 6
 
+# LEVER 2b of lane `live-inplay-board-cadence` `[2026-09-21, user decision "start on b"]`.
+# While ANY game is live the tick runs at the live cadence, and it used to rebuild EVERY
+# sport's today-grid at that cadence. Measured on 2026-09-20's live windows (44 ticks): a
+# tick takes ~80 s median (p90 156 s), one sport after another, and the gap between ticks
+# is ~150 s; in one tick NCAAF spent 17 s on a grid with nothing live. So on the live
+# cadence, a sport with nothing live and nothing starting soon is rebuilt on the NON-live
+# cadence instead (600 s, the same interval the whole tick uses when nothing is live).
+# Less work, never more. A sport is always rebuilt when it was live last tick, when one of
+# its games starts within the lead or should already have started, or when it has not been
+# built today.
+_BOOK_GRID_NONLIVE_SPORT_INTERVAL_SECONDS = 600
+_BOOK_GRID_SPORT_STATE: dict[str, dict[str, Any]] = {}
+
+
+def _book_grid_skip_nonlive_enabled() -> bool:
+    """Kill switch: `SYNDICATE_BOOK_GRID_SKIP_NONLIVE_SPORTS=off` rebuilds every sport every tick again."""
+    raw = str(os.environ.get("SYNDICATE_BOOK_GRID_SKIP_NONLIVE_SPORTS") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _book_grid_nonlive_lead_seconds() -> int:
+    raw = str(os.environ.get("SYNDICATE_BOOK_GRID_NONLIVE_LEAD_SECONDS") or "").strip()
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return 900
+
+
+def _book_grid_live_cadence_active() -> bool:
+    """True when this tick runs on the ADAPTIVE live cadence. An explicit
+    `SYNDICATE_BOOK_GRID_REFRESH_INTERVAL_SECONDS` pin answers the cadence by hand, and
+    this never skips work under it."""
+    try:
+        int(str(os.environ.get("SYNDICATE_BOOK_GRID_REFRESH_INTERVAL_SECONDS") or "").strip())
+        return False
+    except ValueError:
+        return bool(_BOOK_GRID_LAST_RUN.get("any_live"))
+
+
+def _book_grid_sport_state_from_payload(payload: Mapping[str, Any], now: float) -> dict[str, Any]:
+    """{"live": any row's game is live, "next_start": earliest kickoff not yet live or over}.
+
+    A kickoff up to 30 minutes in the PAST still counts as upcoming when its game is not
+    marked live or final: the live flag lags the clock, and those are exactly the
+    first-quarter minutes the lane exists for.
+    """
+    live = False
+    next_start: float | None = None
+    for row in payload.get("rows") or []:
+        game = row.get("game") if isinstance(row, Mapping) else None
+        state = str(game.get("state") or "").strip().lower() if isinstance(game, Mapping) else ""
+        if state == "live":
+            live = True
+            continue
+        if state in {"final", "post", "completed"}:
+            continue
+        try:
+            kickoff = datetime.fromisoformat(str(row.get("commence_time") or "").replace("Z", "+00:00")).timestamp()
+        except (TypeError, ValueError):
+            continue
+        if kickoff >= now - 1800 and (next_start is None or kickoff < next_start):
+            next_start = kickoff
+    return {"live": live, "next_start": next_start}
+
+
+def _book_grid_sport_starting_soon(info: Mapping[str, Any] | None, now: float) -> bool:
+    nxt = (info or {}).get("next_start")
+    return nxt is not None and now >= float(nxt) - _book_grid_nonlive_lead_seconds()
+
+
+def _book_grid_sport_due_today(sport: str, selected_date: str, now: float, *, live_cadence: bool) -> tuple[bool, str]:
+    """Whether this tick rebuilds `sport`'s TODAY grid, and why. Always True off the live cadence."""
+    if not live_cadence:
+        return True, "all_due"
+    if not _book_grid_skip_nonlive_enabled():
+        return True, "skip_off"
+    info = _BOOK_GRID_SPORT_STATE.get(sport)
+    if not info or info.get("date") != selected_date:
+        return True, "not_built_today"
+    if info.get("live"):
+        return True, "live"
+    if _book_grid_sport_starting_soon(info, now):
+        return True, "starting_soon"
+    if now - float(info.get("built_at") or 0.0) >= _BOOK_GRID_NONLIVE_SPORT_INTERVAL_SECONDS:
+        return True, "nonlive_interval_elapsed"
+    return False, "not_live"
+
 
 def _book_grid_per_sport_window_enabled() -> bool:
     """Prune (sport, date) pairs no board will ever read. `#565`.
@@ -6597,8 +6684,12 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
 
     written: list[str] = []
     skipped: list[str] = []
+    skipped_not_live: list[str] = []
+    live_sports: list[str] = []
     any_live_today = False
     out_of_window = 0
+    # Decided ONCE, from the previous tick, before anything is built (lever 2b).
+    live_cadence = _book_grid_live_cadence_active()
     for build_date in dates:
         for sport in ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"):
             if build_date in rebuild_only and sport not in rebuild_only[build_date]:
@@ -6609,6 +6700,12 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
             if not _sport_covers_date(sport, selected_date, build_date):
                 out_of_window += 1
                 continue
+            if build_date == selected_date:
+                due, _why = _book_grid_sport_due_today(sport, selected_date, now, live_cadence=live_cadence)
+                if not due:
+                    # Skipped BEFORE the shard reconcile too, the expensive half (lever 2b).
+                    skipped_not_live.append(sport)
+                    continue
             try:
                 # RECONCILE THE SHARD FIRST (`#331`). This worker is not the
                 # service that captures odds -- live-odds-worker is, and it
@@ -6673,12 +6770,14 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
                     if build_date == selected_date:
                         skipped.append(sport)
                     continue
-                if build_date == selected_date and not any_live_today:
-                    for _row in (payload.get("rows") or []):
-                        _g = _row.get("game")
-                        if isinstance(_g, dict) and str(_g.get("state") or "").lower() == "live":
-                            any_live_today = True
-                            break
+                if build_date == selected_date:
+                    # Per sport now, not "stop at the first live row": the next tick's skip
+                    # decision needs every sport's own state (lever 2b).
+                    sport_state = _book_grid_sport_state_from_payload(payload, now)
+                    _BOOK_GRID_SPORT_STATE[sport] = {"date": selected_date, "built_at": now, **sport_state}
+                    if sport_state["live"]:
+                        any_live_today = True
+                        live_sports.append(sport)
                 path = write_book_grid_artifact(sport, build_date, payload)
                 label = f"{sport}:{payload.get('rows_total')}"
                 written.append(label if build_date == selected_date else f"{label}@{build_date}")
@@ -6718,7 +6817,16 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     # Only TODAY's build counts: yesterday's artifact is full of finals and a
     # forward date cannot have a live game, so including them would latch the
     # fast cadence on permanently.
-    _BOOK_GRID_LAST_RUN["any_live"] = bool(any_live_today)
+    #
+    # A kickoff inside the lead also puts the NEXT tick on the live cadence (lever 2b).
+    # Before this, with nothing else live, the first in-play build after a kickoff could
+    # wait out the whole 600 s non-live interval -- the first-quarter lines this lane is
+    # about. Today's sports only, so the latch-on concern above still holds.
+    starting_soon = sorted(
+        sport for sport, info in _BOOK_GRID_SPORT_STATE.items()
+        if info.get("date") == selected_date and not info.get("live") and _book_grid_sport_starting_soon(info, now)
+    )
+    _BOOK_GRID_LAST_RUN["any_live"] = bool(any_live_today or starting_soon)
 
     # Marked only after the pass, so a crash mid-rebuild retries next tick
     # rather than marking the day done and leaving it frozen for good.
@@ -6748,6 +6856,10 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
         # 10 minutes during a live slate looks identical to one rebuilding every
         # 2 unless the tick says which it chose.
         "any_live": bool(any_live_today),
+        "live_sports": live_sports,
+        "starting_soon": starting_soon,
+        "skipped_not_live": skipped_not_live,
+        "live_cadence": live_cadence,
         "next_interval_seconds": _book_grid_refresh_interval_seconds(),
     }
 
