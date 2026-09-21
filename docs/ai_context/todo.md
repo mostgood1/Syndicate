@@ -18734,7 +18734,7 @@ would have taken production down.
 **(superseded, retained so the error is auditable)** THE LOCAL RUN IS DONE. 2026-08-14. THE STAGE COSTS 127MB. THE GUARD RESERVES
 3,000MB — a 23x OVER-RESERVATION.
 
-Harness: `C:	mp\measure_overview.py` — patches `_overview_headroom_exhausted`
+Harness: `C:\tmp\measure_overview.py` — patches `_overview_headroom_exhausted`
 to False, wraps `_build_sport_overview`, brackets each sport with process RSS.
 All 8 sports ran to completion, which has not happened in production in the
 observed window.
@@ -48009,7 +48009,7 @@ the emitter was fine and the window was in the future.
   documented it. It stays expensive because the date is not printed: the
   rollover decision is `logger.info("BETTING_BOARD_PUBLISH_DATE")` only, and per
   #37 that never reaches Render. Print it.
-- **Before reconciling, check that shipped work reached this list.** Run:<br><br>`git log --format=%s -80 | grep -oE '#[0-9]{1,3}' | sort -u`<br><br>…and confirm every ID appears in `todo.md` or `todo_closed.md`. This was #71,
+- **Before reconciling, check that shipped work reached this list.** Run:<br><br>`git log --format=%s -80 | grep -oE '#[0-9]{1,3}\b' | sort -u`<br><br>…and confirm every ID appears in `todo.md` or `todo_closed.md`. This was #71,
   closed 2026-07-27 after an audit found #64 to be the only historical gap — but
   the gap mattered: #64 shipped the exact instrumentation another item was still
   asking to build. Run for 2026-07-27: 30 IDs, all present.
