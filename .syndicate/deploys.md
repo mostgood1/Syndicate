@@ -39158,3 +39158,33 @@ that caught this and it cost one deploy to learn.
 - **MY MODEL WAS WRONG ABOUT HOP 6.** The decomposition charged ~60 s to "web cache". That term is really "time to the next request that lands on the worker holding the stale entry" — a function of client poll rate and worker count, NOT of any cache setting. The modelled web-only gain (306 -> 253 s) was therefore unachievable by this knob, and the `/api/intelligence/query` page polls every 60 s by design.
 - **THE REAL WEB-SIDE LEVER, named and NOT taken:** make the rebuild PROACTIVE (a background refresher that rebuilds when an overlay lands) instead of lazy. That is a code change on the service that restarts on health-check timeouts and would add steady CPU there, so it needs its own decision and its own before/after -- not a knob.
 - **Third inert knob in one session**, all three found only by measuring the EMITTED behaviour: `SYNDICATE_NCAAF_LINES_REFRESH_INTERVAL_SECONDS` 300->150 (launcher ran once per loop pass), the `clv_price_trail` allowlist entry (no sweep on the writing service), and now this floor (threshold below the trigger).
+
+## 2026-09-21 01:10Z (2026-09-20 20:10 CT) — REVERT VERIFIED — refresh-worker `d419cc24` -> `f1fe4ee1` (`dep-dao82tuk1f9s73b1l8m0`) — lane `layer2-line-move-magnitude` — **verify: MET. Conflicts 174 -> 0.**
+
+Live 01:03:02Z; read against board `written_at` **01:09:35Z**, after it.
+
+    movement_line_sign_conflict rows     174 -> **0**
+    rows_with_movement_line_prob_basis   342 -> 0      (the field is reverted with the change)
+    line_moved rows scored               342/652 -> 419/459   (the prior magnitude is back)
+    movement_component                   n=837, signed mean -0.0651, max |x| 1.0000 (cap holds)
+
+**`088f39fe` SURVIVES THE REVERT — 19 rows still carry
+`movement_line_gate_waived`.** The revert undid `d419cc24` only, so the
+moneyline line-gate fix that had been sitting unshipped all day is now live and
+stays live. That was worth checking rather than assuming: a careless revert
+would have taken it with them.
+
+**A ROLLBACK NEEDS A NEW COMMIT, and preflight is what caught the mistake.**
+Deploying the ancestor `96e17478` was refused — *"already contained in live
+`d419cc24`, the deploy is redundant"* — because Render deploys a commit, not a
+diff. Had the guard not refused it, the deploy would have reported success and
+changed nothing, and the 174 conflicts would have stayed live behind a green
+receipt.
+
+**COST OF THE EPISODE: two deploys and ~48 minutes of a bounded defect.** The
+thing that bounded it was building `movement_line_sign_conflict` BEFORE
+deploying — the argument it tested was mine, and it was wrong. Without that
+field the magnitude would have shipped as a quiet wrong signal in the ranking,
+indistinguishable from a working feature at every level except the data. That
+is `model_engine_standard.md`'s own thesis, paid for once.
+
