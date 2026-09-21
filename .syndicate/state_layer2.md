@@ -175,6 +175,16 @@ curve exists. Exposing settled orders with their board fields is the unblock.
 
 ## [layer2-movement-term] EVERY LAYER 2 ROW IS NOW COMPARED WITH ITS OWN LINE'S OPENING — line_moved 913 -> 0, verified `[2026-09-20 16:23Z -> 2026-09-21 14:41Z, lanes layer2-line-movement-scoring / layer2-line-move-magnitude]`
 
+**ADVERSE-MOVEMENT CHECK `[verified 2026-09-21, lane layer2-adverse-movement-sanity]`:** the top of
+the board is enriched for price moves AGAINST the pick (67% of the top 100 vs 50% board-wide) because a
+lengthened price carries more EV (H1). Those rows are NOT adverse selection: same-book forward CLV
+(observation -> close) on 09-20's finished, trail-covered games, toward minus away -- nfl -9.92
+[-11.49, -8.36] n 213/206, wnba -6.50 [-7.62, -5.38] n 382/466, mlb -14.23 [-20.15, -8.32] n 31/31;
+circular controls near 0. Away-moved rows revert and beat the close. NCAAF unmeasured until its
+first trail-covered slate (Thu 09-24). The term's sign therefore looks backwards for a bet-now
+ranking -- **NOT changed**: one evening of evidence; re-run over 5-7 days first
+(`findings_2026-09-21_top_opps_adverse_movement.md`).
+
 **Movement is the board's second-largest value term and was already wired end to
 end** — unusual here. `blended_score` = `ev_pct` + capped sim + capped movement,
 then `min(value, value x reliability)`.
@@ -525,6 +535,11 @@ client-side JS). Trace the served `book` field to its writer before acting.
    `artifact_window_days` (never below the display window). **The display width
    is UNCHANGED at 7** and `#565`'s per-sport cost pruning survives — three extra
    shard checks for NCAAF, none for any other sport.
+4. **READING THE NEXT DAY'S GRID COULD SHOW ONE MARKET TWICE** `[verified 2026-09-21 17:06Z, web
+   `7882372f`]`: a game whose kickoff MOVED (NCAAF announces times late) has quote rows in two
+   shards, hence two grids, both inside the window. Served NCAAF 09-26 board: 11 duplicate
+   game-market rows on 4 evening games -> 0; `merge_grid_rows_across_dates` keeps the fresher
+   `updated_at` copy and the payload reports `rows_dropped_cross_date_duplicates` (11).
 3. **THE PROJECTION SIDE OF (1) WAS STILL OPEN FOR SOCCER** `[defect verified
    2026-09-19 16:06-16:10Z, lane mls-board-evening-gaps; FIXED by `6419eea5`,
    VERIFIED 18:29-18:36Z on refresh-worker `aebc040d`: the UTC-09-20 grid reads

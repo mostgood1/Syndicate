@@ -938,8 +938,9 @@ Full assessment with every reading:
 > games (33 carrying a model probability), and
 > `PREGAME_PROJECTION_JOIN sport=ncaaf considered=94 projected=47`. What
 > remains TRUE from this block: `odds_history_input entry_count=0
-> present=false` — **there is still no NCAAF odds history, so no CLV is
-> measurable for opening weekend.** ALSO SUPERSEDED `[2026-08-27T15:47Z]`: the
+> present=false` — there is still no NCAAF odds history; **CLV no longer depends on it: since
+> 2026-09-21 NCAAF closes come from `book_quotes` (09-19 board: 5,346 resolved, see state.md
+> [open-problems]).** ALSO SUPERSEDED `[2026-08-27T15:47Z]`: the
 > projections this block reports as absent now reach the shared contract on
 > 51/51 cards — see `[ncaaf-board-surfaces]`. The readings below are the 08-25 state,
 > kept because the diagnosis chain in them is still the right one.

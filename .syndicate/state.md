@@ -233,6 +233,13 @@ Product decisions, not engineering ones. Do not re-take them.
 - **NHL and soccer market anchoring** make those engines' market-relative
   evaluation partly circular. Quantify before believing any CLV number for them.
 
+- **NFL / WNBA / NCAAF CLV CLOSES EXIST AS OF 2026-09-21 (web `de6da1b7`)** -- from the per-book quote
+  log (`book_quotes`), for any market odds history lacks: 09-20 nfl 3,056 / wnba 4,116 resolved,
+  ncaaf 09-19 board 5,346, all same-book; mlb's 4,947 history rows byte-identical. Unstarted games and
+  in-play openings are refused by name (`not_started`, `opened_in_play`). **`a720941d` (no close for an
+  unstarted game from the HISTORY path too) is on main and refresh-worker, NOT yet on web** -- until
+  it is, today's-date web reports count provisional closes (mlb 09-21: 971 of 1,102). Lane
+  `clv-close-from-book-quotes`.
 - **`/api/ops/clv/report` WORKS AS OF 2026-08-15 19:36:45Z, and it produced this
   system's first unbiased CLV number.** It had been blind: the route runs on
   **web**, `load_openings` is a `path.exists()` on a local file, and web was
