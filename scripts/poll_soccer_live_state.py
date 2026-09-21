@@ -38,7 +38,7 @@ from scripts.build_soccer_artifacts import _load_team_ratings
 from syndicate.features.soccer.ingestion.fotmob_momentum import fotmob_momentum_block
 from syndicate.features.soccer.ingestion.fotmob_match_id import resolve_fotmob_match_id
 from syndicate.features.soccer.ingestion.fotmob_shots import matches_for_date
-from syndicate.features.soccer.features.live_lens import goal_in_window_probability
+from syndicate.features.soccer.features.live_lens import goal_window_probabilities
 from syndicate.features.soccer.features.live_lens import project_live_match
 from syndicate.features.soccer.features.live_lens import project_live_player_props
 from syndicate.features.soccer.features.live_lens import simulate_live_paths
@@ -367,10 +367,11 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
             # The sim's own values are kept on the returned projection as `sim_*`, and H32 grades the pair.
             projection, corners_audit = apply_live_corners(
                 projection, live_state, pregame_corners_from_payload(pregame_payload, event_id))
-            goal_windows = {
-                label: goal_in_window_probability(live_state, home_rating=home_rating, away_rating=away_rating, window_seconds=seconds, simulations=simulations)
-                for label, seconds in _GOAL_WINDOWS_SECONDS.items()
-            }
+            # Read off the SAME paths, not simulated again: the two window passes
+            # were 22% of a tick (timed 2026-09-19), and truncating the clock to
+            # the window also biased them low -- `goal_window_probabilities` has
+            # the measurement.
+            goal_windows = goal_window_probabilities(paths, live_state, windows=_GOAL_WINDOWS_SECONDS)
             home_players = _team_player_rows(player_rows, live_state["home_team"])
             away_players = _team_player_rows(player_rows, live_state["away_team"])
             live_props = project_live_player_props(

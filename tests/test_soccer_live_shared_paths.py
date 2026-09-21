@@ -118,19 +118,31 @@ def test_the_poller_simulates_each_match_once_for_both_consumers(monkeypatch, tm
     result = poller.poll_league("epl", "2026-09-19", source_root=tmp_path / "src", out_root=tmp_path / "out", simulations=n)
     game = result["games"]["401900001"]
     assert game["projection"]["simulations"] == n and game["live_player_props"]
-    assert len(calls) == 3 * n
+    # n, not 3n: the projection and the props share one set of paths, and the two
+    # goal windows are now READ OFF those same paths instead of simulating their
+    # own truncated clocks (`goal_window_probabilities`).
+    assert len(calls) == n
 
 
-# ---------------------------------------------------------------------------- (B) the goal window's own length
+# ---------------------------------------------------------------------------- (B) the goal window's clock
 
-@pytest.mark.parametrize("half,remaining,window,simulated", [
-    (2, 1800.0, 300.0, 300),     # was 600: the 2nd-half stoppage base (300 s) doubled "next 5 min"
-    (2, 1800.0, 600.0, 600),     # was 900
-    (1, 1500.0, 600.0, 600),     # was 750 (1st-half base 150 s)
-    (2, 400.0, 600.0, 700),      # the window reaches the half's end: the stoppage IS still to be played
-    (2, 300.0, 300.0, 600),      # exactly to the end: same
+@pytest.mark.parametrize("half,remaining,window", [
+    (2, 1800.0, 300.0),
+    (2, 1800.0, 600.0),
+    (1, 1500.0, 600.0),
+    (2, 400.0, 600.0),
+    (2, 300.0, 300.0),
 ])
-def test_a_goal_window_simulates_its_own_length_and_stoppage_only_at_the_halfs_end(monkeypatch, half, remaining, window, simulated):
+def test_a_goal_window_simulates_the_REAL_clock_and_is_cut_by_timestamp(monkeypatch, half, remaining, window):
+    """It used to resume with `clock_remaining = window`, which is a different
+    match: `situation_model.classify_urgency` reads that field, so a "next 5
+    minutes" at the 60th minute was played as the last 5 minutes of a half.
+    Measured 2026-09-21 (N=3000, neutral ratings): that ran 0.0183 low for
+    next-5 and 0.0277 low for next-10 with a one-goal lead. The window is now
+    taken out of a real-clock path by timestamp, so every simulation must see
+    the match's own remaining clock -- plus the half's stoppage base, which is
+    still to be played.
+    """
     clocks = []
     real = ll.simulate_match
 
@@ -142,4 +154,30 @@ def test_a_goal_window_simulates_its_own_length_and_stoppage_only_at_the_halfs_e
     state = {"home_team": "Home FC", "away_team": "Away FC", "half": half, "clock_remaining": remaining,
              "score_home": 0, "score_away": 0}
     p = ll.goal_in_window_probability(state, home_rating={}, away_rating={}, window_seconds=window, simulations=3)
-    assert set(clocks) == {simulated} and 0.0 <= p <= 1.0
+
+    assert len(set(clocks)) == 1, clocks
+    simulated = clocks[0]
+    assert simulated > remaining, (simulated, remaining)          # the stoppage base is included
+    assert simulated < remaining + 400.0, (simulated, remaining)  # and nothing else is
+    assert 0.0 <= p <= 1.0
+
+
+def test_a_longer_window_never_scores_lower_on_the_same_paths():
+    """The windows come from ONE set of paths now, so this is exact rather than
+    statistical: a goal inside 5 minutes is inside 10 minutes, every path."""
+    state = {"home_team": "Home FC", "away_team": "Away FC", "half": 2, "clock_remaining": 1800.0,
+             "score_home": 1, "score_away": 0}
+    paths = ll.simulate_live_paths(state, home_rating={}, away_rating={}, simulations=40, seed=7)
+    out = ll.goal_window_probabilities(paths, state, windows={"next_5": 300.0, "next_10": 600.0})
+    assert out["next_5"] <= out["next_10"]
+
+
+def test_a_window_that_reaches_the_half_end_counts_stoppage_goals():
+    """The rule the old code had and this keeps: a window at or beyond the time
+    left counts every goal still to come in the half, stoppage included, so it
+    equals a window twice as long."""
+    state = {"home_team": "Home FC", "away_team": "Away FC", "half": 2, "clock_remaining": 300.0,
+             "score_home": 0, "score_away": 0}
+    paths = ll.simulate_live_paths(state, home_rating={}, away_rating={}, simulations=40, seed=11)
+    out = ll.goal_window_probabilities(paths, state, windows={"at_the_edge": 300.0, "well_past": 1200.0})
+    assert out["at_the_edge"] == out["well_past"]

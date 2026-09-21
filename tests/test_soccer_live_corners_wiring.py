@@ -58,7 +58,8 @@ def wired(monkeypatch, tmp_path):
     monkeypatch.setattr(poller, "_load_player_rows", lambda *a, **k: [])
     monkeypatch.setattr(poller, "_rating_for", lambda *a, **k: {"attack_rating": 0.0, "defense_rating": 0.0})
     monkeypatch.setattr(poller, "project_live_match", lambda *a, **k: _projection())
-    monkeypatch.setattr(poller, "goal_in_window_probability", lambda *a, **k: 0.1)
+    monkeypatch.setattr(poller, "goal_window_probabilities",
+                        lambda paths, state, *, windows, **k: {label: 0.1 for label in windows})
     monkeypatch.setattr(poller, "project_live_player_props", lambda *a, **k: [])
     monkeypatch.setattr(poller, "fotmob_momentum_block", lambda *a, **k: {"supported": False})
     monkeypatch.setattr(poller, "_build_match_boxes", lambda *a, **k: {})

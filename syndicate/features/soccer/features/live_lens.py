@@ -36,6 +36,7 @@ from dataclasses import field
 from random import Random
 from statistics import mean
 from typing import Any
+from typing import Mapping
 
 from syndicate.features.soccer.sim_engine.soccersim.calibration_profile import CalibrationProfile
 from syndicate.features.soccer.sim_engine.soccersim.calibration_profile import SOCCER_CALIBRATION_PROFILE
@@ -250,6 +251,12 @@ class LivePaths:
 
     key: tuple
     outputs: tuple
+    # The clock these paths were resumed from, in seconds, INCLUDING the
+    # half's stoppage base when `include_stoppage` was set. A goal window
+    # reads a step's own `clock_remaining` and needs this to turn it into
+    # elapsed time; recomputing it from `live_state` would silently drift
+    # from whatever profile built these paths.
+    resume_clock: float = 0.0
 
 
 def _paths_key(live_state: dict[str, Any], home_rating: dict[str, float], away_rating: dict[str, float],
@@ -303,7 +310,7 @@ def simulate_live_paths(
             away_defense_rating=away.get("defense_rating", 0.0),
         )
         outputs.append(simulate_match(simulation_input, rng=Random(run_seed), profile=profile, initial_state=resume_state))
-    return LivePaths(key=key, outputs=tuple(outputs))
+    return LivePaths(key=key, outputs=tuple(outputs), resume_clock=float(resume_state.clock_remaining))
 
 
 def _live_outputs(paths: LivePaths | None, consumer: str, live_state: dict[str, Any], **inputs: Any) -> tuple:
@@ -395,6 +402,66 @@ def project_live_match(
     )
 
 
+def _first_goal_elapsed(output: Any, *, resume_clock: float, half: int) -> float | None:
+    """Seconds from the resume point to the FIRST goal of the current half, or
+    None if the half ends goalless.
+
+    Read at STEP level, not possession level: `possession_simulator` checks the
+    clock before every event, so a window edge falls between steps, and crediting
+    a whole possession would count goals from events that a truncated run could
+    never have reached.
+    """
+    for possession in output.possession_log:
+        for step in possession.get("steps") or ():
+            if int(step.get("goals_scored") or 0) <= 0:
+                continue
+            start = step.get("start_state") or {}
+            if int(start.get("half") or half) != half:
+                return None                      # the first goal is in a later half
+            return resume_clock - float(start.get("clock_remaining") or 0.0)
+    return None
+
+
+def goal_window_probabilities(
+    paths: LivePaths,
+    live_state: dict[str, Any],
+    *,
+    windows: Mapping[str, float],
+    ndigits: int = 4,
+) -> dict[str, float]:
+    """P(at least one goal within each window), read off paths simulated from the
+    match's REAL remaining clock.
+
+    WHY NOT TRUNCATE THE CLOCK, which is what this used to do. The simulator's
+    dynamics READ the clock: `situation_model.classify_urgency` returns
+    DESPERATION (2nd half, <= 480 s left, trailing by 1-2), TRAILING_PUSH
+    (<= 1500 s, trailing), PROTECT_LEAD (<= 900 s, leading) and CLOSING_HALF
+    (1st half, <= 120 s). Resuming with `clock_remaining = W` therefore simulated
+    "the last W seconds of a half", not "the next W seconds of this match".
+    Measured 2026-09-21, N=3000, neutral ratings: the published number was LOW by
+    0.0183 (next 5) and 0.0277 (next 10) at the 60th minute with a one-goal lead,
+    and by 0.0150 / 0.0190 trailing by one or two, while the states where no
+    urgency rule can fire agreed to 0.0000 exactly.
+
+    Taking the window out of a real-clock path by TIMESTAMP is also free: these
+    paths already exist for the projection and the player props, so the two
+    window passes (22% of a live tick, timed 2026-09-19) cost nothing at all.
+
+    A window that reaches the end of the half counts every goal left in the half,
+    stoppage included -- the rule `goal_in_window_probability` already used.
+    """
+    half = int(live_state["half"])
+    remaining = float(live_state["clock_remaining"])
+    firsts = [_first_goal_elapsed(output, resume_clock=float(paths.resume_clock), half=half)
+              for output in paths.outputs]
+    n = max(1, len(firsts))
+    out: dict[str, float] = {}
+    for label, seconds in windows.items():
+        edge = float("inf") if float(seconds) >= remaining else float(seconds)
+        out[label] = round(sum(1 for first in firsts if first is not None and first < edge) / n, ndigits)
+    return out
+
+
 def goal_in_window_probability(
     live_state: dict[str, Any],
     *,
@@ -407,49 +474,23 @@ def goal_in_window_probability(
     possession_owner: str = "home",
 ) -> float:
     """P(at least one goal in the next ``window_seconds``), from the live
-    state forward. Truncates the resumed clock at
-    ``min(clock_remaining, window_seconds)`` and caps ``halves`` at the
-    current half, so the simulation stops at the window's edge instead of
-    continuing into a later half -- windows that would cross a half
-    boundary are silently clamped to "rest of this half" rather than
-    spanning into the next one (a scope boundary, not a bug: "goal in the
-    next N minutes" asks are normally well within a half).
+    state forward.
+
+    Simulates the REAL remaining clock and takes the window out of the
+    resulting paths by timestamp -- see ``goal_window_probabilities``, which
+    does the counting and documents why truncating the clock was wrong. A
+    window that would cross into a later half is clamped to "rest of this
+    half", as before.
+
+    In production the poller already holds these paths, so it calls
+    ``goal_window_probabilities`` directly and simulates nothing extra; this
+    entry point exists for callers that have only a state.
     """
-    home_rating = apply_red_card_penalty(home_rating, int(live_state.get("home_red_cards") or 0))
-    away_rating = apply_red_card_penalty(away_rating, int(live_state.get("away_red_cards") or 0))
-    truncated_clock = min(float(live_state["clock_remaining"]), max(0.0, window_seconds))
-    # STOPPAGE ONLY IF THE WINDOW REACHES THE END OF THE HALF. `build_resume_state` adds the half's stoppage base
-    # to whatever clock it is given, which is right for "the rest of the half" and wrong for a window that ends
-    # before it: measured 2026-09-19, a second-half "next 5 min" simulated 600 s and "next 10 min" 900 s (base
-    # 300 s), a first-half "next 10 min" 750 s (base 150 s), inflating both published windows. A window that
-    # does reach the half's end still gets the stoppage, because those minutes really are still to be played.
-    reaches_half_end = max(0.0, window_seconds) >= float(live_state["clock_remaining"])
-    already_home = int(live_state["score_home"])
-    already_away = int(live_state["score_away"])
-
-    scored = 0
-    n = max(1, simulations)
-    for offset in range(n):
-        run_seed = seed + offset
-        resume_state = build_resume_state(
-            {**live_state, "clock_remaining": truncated_clock}, possession_owner=possession_owner,
-            include_stoppage=reaches_half_end,
-        )
-        simulation_input = SoccerSimSimulationInput(
-            home_team=live_state["home_team"],
-            away_team=live_state["away_team"],
-            seed=run_seed,
-            halves=int(live_state["half"]),  # don't simulate beyond the current (truncated) half
-            home_attack_rating=home_rating.get("attack_rating", 0.0),
-            home_defense_rating=home_rating.get("defense_rating", 0.0),
-            away_attack_rating=away_rating.get("attack_rating", 0.0),
-            away_defense_rating=away_rating.get("defense_rating", 0.0),
-        )
-        output = simulate_match(simulation_input, rng=Random(run_seed), profile=profile, initial_state=resume_state)
-        if int(output.final_score["home"]) > already_home or int(output.final_score["away"]) > already_away:
-            scored += 1
-    return round(scored / n, 4)
-
+    paths = simulate_live_paths(
+        live_state, home_rating=home_rating, away_rating=away_rating, profile=profile,
+        simulations=simulations, seed=seed, possession_owner=possession_owner, include_stoppage=True,
+    )
+    return goal_window_probabilities(paths, live_state, windows={"w": float(window_seconds)})["w"]
 
 @dataclass(frozen=True)
 class LivePlayerPropProjection:
@@ -634,6 +675,7 @@ __all__ = [
     "apply_red_card_penalty",
     "build_resume_state",
     "goal_in_window_probability",
+    "goal_window_probabilities",
     "project_live_match",
     "project_live_player_props",
     "simulate_live_paths",
