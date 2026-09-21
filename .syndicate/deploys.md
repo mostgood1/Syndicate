@@ -39455,3 +39455,19 @@ The 18:09Z sweep filed 949 evening-game rows under the Central day and none unde
 **Residual, not from this change:** some of those cards still carry rows at the superseded 16:00Z kickoff with 09-20 prices -- LINES the books no longer quote (different `line`, so not a duplicate of anything). Stale lines lingering in a change-log grid; a board-freshness question, recorded here rather than chased.
 
 Claim released after this entry.
+
+
+## 2026-09-21 19:21Z — OWED READING discharged for the 17:24Z refresh-worker entry — lane `clv-close-from-book-quotes` — **layer1 board dedupe holds on the first grid built from the fixed writer**
+
+`/api/board/layer1?sport=ncaaf&date=2026-09-26&window=day`, read 19:21:44Z. The grid artifacts were rebuilt
+18:30:14Z (09-26, 445 rows) and 18:30:16Z (09-27, 57 rows) -- AFTER the 18:09Z sweep that filed the 9
+Saturday-evening games under 2026-09-26.
+
+    field                                   17:06Z (web 7882372f)   19:21:44Z (this read)
+    duplicate market rows, all 53 games                       0                       0
+    rows_dropped_cross_date_duplicates                       11                      55
+    offline merge of the same two grid artifacts             11                      55
+
+The fresh 09-26 copies win: of the evening games' game rows, 57 come from the 09-26 grid and 3 from the
+frozen 09-27 grid. Those 3 have no 09-26 counterpart (lines last quoted <= 17:06Z and not since) -- the
+stale-line residual already recorded, not duplicates.
