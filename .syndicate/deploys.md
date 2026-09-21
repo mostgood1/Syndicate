@@ -39071,3 +39071,34 @@ the chunking was for.
 - **Expectation.** Expiry-age median well under 86 s, and the served in-play card age down by roughly the difference. Modelled gain for the web-only pair: 306 -> **253 s (17%)**.
 - **PRE-REGISTERED ROLLBACK RULE:** more than **3** `server_failed` outside the first 10 min after go-live, within 2 h -> revert by DELETING the env key (back to the 45 s default) and redeploying. The risk is named rather than assumed: this service restarts on health-check timeouts, and a lower floor means more board rebuilds per minute.
 - **verify:** `web_floor_reading.py` (scratchpad a1e40980), every 10 min for 60 min, across the Sunday night game.
+
+## 2026-09-21 00:18Z (2026-09-20 19:18 CT) — DEPLOY — refresh-worker `96e17478` -> `d419cc24` (`dep-dao7ffrm8hqs73diuol0`, origin/main) — lane `layer2-line-move-magnitude` — **verify: PENDING**
+
+**ONE SERVICE, DELIBERATELY.** `_movement_from_opening` runs in the BUILDER, and
+the new `curve` parameter is OPTIONAL, so a web/worker version mix is safe by
+construction. web stays on `d70a7b3c`; blast radius is one service.
+
+**PREDICTIONS, WRITTEN BEFORE THE RESULT.** Baseline read 2026-09-21T00:17:44Z
+against board `written_at` 00:13:22Z (1,143 rows, 622 line-moved, 535 scored):
+
+    field                                baseline -> expected
+    rows_with_movement_line_prob_basis   0        -> more than 0
+    moneyline_line_gate_waived_rows      0        -> more than 0   (088f39fe, unshipped until now)
+    line_moved_rows_scored               535/622  -> FEWER, and that is the POINT
+    movement_line_sign_conflict_rows     0        -> stays 0       [THE LANE'S VERIFICATION]
+
+**A DROP IN SCORED ROWS IS THE INTENDED OUTCOME, NOT A REGRESSION.** The old
+magnitude scored every line-moved row with a cross-handicap difference that
+could contradict its own sign. The new one scores only rows whose ORIGINAL bet
+is still priced on the board (exact or interpolated), and gives the rest NO
+term. Replayed coverage was 373 of 719 (52%), and that is an UPPER BOUND --
+the replay supplied an opening fair for every row and ~10% of real openings
+have none. **If scored rows do NOT fall, the new path is not firing.**
+
+**`movement_line_sign_conflict` IS THE REAL VERIFICATION AND COULD NOT BE READ
+OFFLINE.** Sign agreement is argued from construction, and the replay could not
+test it: real opening fairs live only in the openings ledger (15.7 MB, over the
+8 MB export cap), so the replay substituted a stand-in and its conflict count
+was meaningless and is not recorded. This field is the instrument; a non-zero
+reading falsifies the construction argument.
+
