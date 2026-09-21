@@ -234,9 +234,17 @@ def append_quotes(
     # shard's change-log semantics stay intact.
     all_events = list(events) + list(segment_payloads or [])
 
+    from syndicate.features.shared.odds_book_quotes import kickoff_shard_date
+
     by_date: dict[str, list[dict[str, Any]]] = {}
     for event in all_events:
-        commence = str(event.get("commence_time") or "")[:10]
+        # THE CENTRAL KICKOFF DAY, like every other writer of this log
+        # (`bucket_quote_rows_by_kickoff_date`) and every reader of it. This was
+        # `commence_time[:10]` -- the UTC day -- so every kickoff after 7 PM
+        # Central went into the NEXT day's shard while the same game's props
+        # went into the right one. MEASURED 2026-09-21: 635 of 635 unmatched
+        # NCAAF openings on the 09-20 board, 11 Saturday games 00:00-03:00Z.
+        commence = kickoff_shard_date(event)
         if not commence:
             # No kickoff date means no shard the board would ever read it from.
             # Dropping it is honest; filing it under today is not.

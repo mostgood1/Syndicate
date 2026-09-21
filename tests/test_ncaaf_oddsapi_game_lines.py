@@ -546,3 +546,33 @@ def test_the_state_abbreviation_alias_does_not_capture_real_saint_schools():
     # And the abbreviation still reaches the State schools it was added for.
     assert ol.resolve_team("Boise St. Broncos") == "Boise State"
     assert ol.resolve_team("Arizona St. Sun Devils") == "Arizona State"
+
+
+def test_an_evening_kickoff_is_filed_under_its_central_day_not_the_utc_day(monkeypatch):
+    """`commence_time[:10]` is the UTC day, so a 9:30 PM CT Saturday kickoff
+    (02:30Z Sunday) went into Sunday's shard while its props went into
+    Saturday's. Measured 2026-09-21: 635 of 635 unmatched NCAAF openings on the
+    09-20 board, 11 games. Every other writer and every reader uses the Central
+    day (`odds_book_quotes.kickoff_shard_date`)."""
+    import syndicate.features.shared.odds_book_quotes as obq
+    from scripts import fetch_ncaaf_oddsapi_game_lines as mod
+
+    filed: dict[str, list[str]] = {}
+
+    def fake_append(*, sport, date_str, rows, captured_at):
+        filed.setdefault(date_str, []).extend(row["event_id"] for row in rows)
+        return {"appended": len(rows)}
+
+    monkeypatch.setattr(obq, "append_book_quotes", fake_append)
+    monkeypatch.setattr(
+        obq, "quote_rows_from_oddsapi_events",
+        lambda events, market_map=None: [{"event_id": e["id"]} for e in events],
+    )
+    events = [
+        {"id": "evening", "commence_time": "2026-09-20T02:30:00Z"},    # 9:30 PM CT, 09-19
+        {"id": "afternoon", "commence_time": "2026-09-19T19:30:00Z"},  # 2:30 PM CT, 09-19
+        {"id": "undated", "commence_time": ""},
+    ]
+    result = mod.append_quotes(events)
+    assert filed == {"2026-09-19": ["evening", "afternoon"]}, "evening game went to the UTC day"
+    assert set(result["dates"]) == {"2026-09-19"}
