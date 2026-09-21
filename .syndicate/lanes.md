@@ -1259,6 +1259,7 @@ death, never life — do not invert it.
 - Files: `.syndicate/findings_2026-09-21_top_opps_adverse_movement.md`. **Read-only** -- no code, no deploy.
 - Next: once NCAAF's 09-24+ games are FINAL, sync the trail (`reports/intelligence/clv_price_trail/*` via `/api/ops/artifacts/stream`, size-checked) and run `scripts/decompose_movement_clv.py --start <d> --end <d> --sports ncaaf --trail-dir <dir> --show-circular` per finished date. Never a date whose games are still to start unless `a720941d` is live on web (web's history path otherwise returns provisional closes).
 - Hypotheses H1-H3, sub-investigation Z1-Z5 and their readings: moved verbatim to `lanes_history.md` (checkpoint 2026-09-21 ~18:3xZ); findings file carries the tables.
+- **SCHEDULED:** local scheduled task `ncaaf-adverse-movement-check` fires once 2026-09-25 10:00 CT (C:/Users/tempadmin/.claude/scheduled-tasks/ncaaf-adverse-movement-check/SKILL.md) -- runs the NCAAF check on finished games plus a multi-day NFL/WNBA/MLB re-run and records the verdict here. Runs only while the Claude app is open (else on next launch).
 - Blocked by: NCAAF games (Thu 09-24 onward).
 
 ### clv-close-from-book-quotes — CLOSED 2026-09-21 — opened 2026-09-21 — session 9e340058-bff6-4723-bb50-46c4aa37b9de
