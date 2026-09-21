@@ -981,6 +981,142 @@ def _as_float(value: Any) -> float | None:
     return None if parsed != parsed else parsed  # NaN
 
 
+# ---------------------------------------------------------------------------
+# SCORE V2 -- A SHADOW RANKING, PUBLISHED BESIDE `score`, RANKING NOTHING YET
+# ---------------------------------------------------------------------------
+# Lane `layer2-score-outcome-calibration`, 2026-09-21. The first time the board's
+# score was graded against outcomes and closes (findings_2026-09-21_layer2_score_outcomes.md):
+#
+#   * today's `score` DOES carry real price edge: its top-10 per date x sport beat
+#     the same book's close by +3.94% ROI-equivalent [+3.06, +4.81], 59.5% of the
+#     time (20 dates, 931 games, 157,079 published openings);
+#   * but the paper bets it produced hit 45.6% against a 45.2% break-even, ROI
+#     +0.5% [-6, +9], and realized ROI FALLS as stated EV rises -- -26.7% [-46, -6]
+#     above 5.27%, every one of those orders on Kalshi or Polymarket;
+#   * Kalshi rows trail Kalshi's OWN close by 1.58 points [-2.05, -1.15] before any
+#     fee, and the ranking is fee-blind: 19% of today's top-10 are Kalshi rows.
+#
+# V2 IS THE INDUSTRY FORM OF THE SAME BOARD, NOT A NEW MODEL:
+#   1. EV NET OF THE VENUE'S FEE. Kalshi 0.07 x m x P(1-P) per $1 contract, m read
+#      per SERIES (`venue_fees`); Polymarket 0.015 per contract flat (measured).
+#      Execution already pays these; ranking as though it did not is the defect.
+#   2. RANKED BY FRACTIONAL-KELLY LOG GROWTH, the standard risk-adjusted rank: at
+#      equal edge it prefers the likelier outcome, because a longshot's variance
+#      eats growth. On the same CLV population it matched today's edge (+3.73% vs
+#      +3.94%, intervals overlapping) with the top-10's break-even rising 0.378 ->
+#      0.469 and beat-the-close 59.5% -> 61.7% -- the hit rate the product asked for,
+#      at the same edge quality and lower variance.
+#   3. THE SAME RELIABILITY DISCOUNT and the same `min` rule as `blended_score`:
+#      book breadth x freshness x price reliability earned their place (fee-net EV
+#      x reliability +3.85% vs bare fee-net EV +3.44%).
+#
+# WHAT V2 LEAVES OUT, ON EVIDENCE: the sim term (its own unblock test falsified a
+# raise at power, `[sim-weight-clv-decomposition]`) and the movement term (three
+# sports say moves AGAINST the pick revert and beat the close, the opposite of how
+# the term scores them; `layer2-adverse-movement-sanity` owns that re-run).
+#
+# SHADOW BY CONSTRUCTION: nothing reads `score_v2` to rank, admit or size. Switching
+# the board or the sizer onto it is the user's decision, after the nightly grading
+# shows it holding out of sample. Off switch: SYNDICATE_SCORE_V2=0.
+_SCORE_V2_ENABLED = _env_bool("SYNDICATE_SCORE_V2", default=True)
+_SCORE_V2_KELLY_FRACTION = _env_float("SYNDICATE_SCORE_V2_KELLY_FRACTION", 0.25)
+SCORE_V2_VERSION = "v2-2026-09-21"
+
+
+def venue_fee_per_contract(bookmaker: Any, price_prob: float, *, venue_ref: Any = None) -> tuple[float, str, bool]:
+    """(fee per $1 contract, basis, is_upper_bound) for taking at `price_prob`.
+
+    Only the venues with a MEASURED fee schedule are charged; every other book is
+    0.0 with basis "none" -- a sportsbook's margin is already in its price.
+    An unknown Kalshi series is charged the full rate and flagged as a bound,
+    because understating a fee invents edge (`venue_fees`' own rule).
+    """
+    from syndicate.features.shared import venue_fees
+
+    book = str(bookmaker or "").strip().lower()
+    p = min(1.0, max(0.0, float(price_prob)))
+    if book == "kalshi":
+        multiplier = venue_fees.kalshi_fee_multiplier_for_series(venue_ref)
+        if multiplier is None:
+            return (venue_fees.KALSHI_BASE_TAKER_RATE * venue_fees.KALSHI_ASSUMED_FEE_MULTIPLIER
+                    * p * (1.0 - p), "kalshi_assumed_full_rate", True)
+        return venue_fees.KALSHI_BASE_TAKER_RATE * multiplier * p * (1.0 - p), "kalshi_series", False
+    if book == "polymarket":
+        return venue_fees.POLYMARKET_MEASURED_NOTIONAL_RATE, "polymarket_measured_notional", False
+    return 0.0, "none", False
+
+
+def kelly_growth_bp(p: float, decimal_odds: float, *, fraction: float) -> float | None:
+    """Expected log growth, in basis points of bankroll, of a `fraction`-Kelly stake.
+
+    None when there is no positive-EV stake to size (full Kelly <= 0).
+    """
+    b = decimal_odds - 1.0
+    if not (0.0 < p < 1.0) or b <= 0:
+        return None
+    full = (p * decimal_odds - 1.0) / b
+    if full <= 0:
+        return None
+    f = min(0.999, fraction * full)
+    return 1e4 * (p * math.log1p(f * b) + (1.0 - p) * math.log1p(-f))
+
+
+def score_v2(
+    *,
+    price: Any,
+    fair_prob: Any,
+    bookmaker: Any = None,
+    venue_ref: Any = None,
+    books_quoting: Any = None,
+    book_age_seconds: Any = None,
+    quote_seen_age_seconds: Any = None,
+) -> dict[str, Any] | None:
+    """Fee-net, risk-adjusted, reliability-discounted rank of one priced side. SHADOW.
+
+    `score_v2` is the fractional-Kelly log growth in basis points when the fee-net EV
+    is positive, and the fee-net EV in percent (<= 0) when it is not -- both are zero
+    at zero EV, so every sizable row sorts above every row that is not, and the
+    unsizable ones keep their EV order. The reliability discount applies under the
+    same `min` rule as `blended_score`, for the same reason: a discount must never
+    promote a negative row.
+
+    None when the row has no usable price or fair -- nothing to rank.
+    """
+    if not _SCORE_V2_ENABLED:
+        return None
+    p = _as_float(fair_prob)
+    decimal = None
+    american = _as_float(price)
+    if american is not None and american != 0:
+        decimal = 1.0 + (american / 100.0 if american > 0 else 100.0 / abs(american))
+    if p is None or not (0.0 < p < 1.0) or decimal is None or decimal <= 1.0:
+        return None
+    price_prob = 1.0 / decimal
+    fee, fee_basis, fee_bound = venue_fee_per_contract(bookmaker, price_prob, venue_ref=venue_ref)
+    decimal_net = 1.0 / (price_prob + fee)
+    ev_net = p * decimal_net - 1.0
+    growth = kelly_growth_bp(p, decimal_net, fraction=_SCORE_V2_KELLY_FRACTION)
+    value = growth if growth is not None else 100.0 * ev_net
+    confidence = _book_confidence(books_quoting)
+    freshness = _freshness_factor(book_age_seconds, quote_seen_age_seconds)
+    price_rel = _price_reliability(price, p)
+    reliability = confidence * freshness * price_rel
+    discounted = value * reliability
+    return {
+        "score_v2": round(min(value, discounted), 6),
+        "version": SCORE_V2_VERSION,
+        "basis": "kelly_growth_bp" if growth is not None else "ev_net_pct",
+        "ev_net_pct": round(100.0 * ev_net, 4),
+        "kelly_growth_bp": None if growth is None else round(growth, 6),
+        "kelly_fraction": _SCORE_V2_KELLY_FRACTION,
+        "fee_per_contract": round(fee, 6),
+        "fee_basis": fee_basis,
+        "fee_is_upper_bound": fee_bound,
+        "reliability": round(reliability, 6),
+        "reliability_applied": discounted <= value,
+    }
+
+
 def model_edge_pct(model_prob: Any, fair_prob: Any) -> float | None:
     """The simulation's disagreement with the market, in probability points.
 

@@ -3178,6 +3178,19 @@ def build_layer2_rows(
             # otherwise (the row is passed so its bucket can be looked up).
             score = _apply_skill_reliability(score, candidate.get("projection"), row=candidate)
             candidate["score"] = score
+            # SHADOW RANK, READ BY NOTHING (lane `layer2-score-outcome-calibration`):
+            # fee-net EV ranked by fractional-Kelly growth under the same reliability
+            # discount. Published so it can be graded against `score` on the same
+            # rows; ranking, admission and sizing all still read `score`.
+            candidate["score_v2"] = _shadow_score_v2(
+                price=price,
+                fair_prob=fair,
+                bookmaker=bettable_book,
+                venue_ref=candidate.get("venue_ref") or row.get("venue_ref"),
+                books_quoting=side_best.get("books_quoting") or row.get("books_quoting"),
+                book_age_seconds=side_best.get("age_seconds"),
+                quote_seen_age_seconds=side_best.get("seen_age_seconds"),
+            )
             if score is not None:
                 scored += 1
             candidates.append(candidate)
@@ -3814,6 +3827,22 @@ def movement_join_key(row: Mapping[str, Any]) -> str | None:
             f"side={str(row.get('side') or '').strip().lower()}",
         )
     )
+
+
+def _shadow_score_v2(**kwargs: Any) -> dict[str, Any] | None:
+    """`opportunity_signals.score_v2`, or None -- never an exception out of the builder.
+
+    A shadow field must not be able to cost the board it shadows: a missing
+    function (a deploy skew) or any error inside it yields None for that row,
+    and `score` -- the field everything reads -- is untouched either way.
+    """
+    try:
+        from syndicate.features.shared import opportunity_signals as _signals
+
+        scorer = getattr(_signals, "score_v2", None)
+        return None if scorer is None else scorer(**kwargs)
+    except Exception:  # noqa: BLE001 -- a shadow field fails closed, never loud
+        return None
 
 
 @lru_cache(maxsize=8)
