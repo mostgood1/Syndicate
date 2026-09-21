@@ -39502,3 +39502,28 @@ Verified by CONTENT, not deploy state: `not_started` on the odds-history path ex
     nfl 2026-09-20 reasons                          quotes_not_started 528  renamed       not_started 528, all others equal
 
 Lane `clv-close-from-book-quotes` CLOSED on this reading.
+
+
+## 2026-09-21 21:55Z (16:55 CDT) — READING, no deploy — refresh-worker, first reconciliation autorun on `cacfd33a` — lane `reconciliation-disk-walks` (scheduled task `reconciliation-age-cutoff-reading-0921`)
+
+**Code under test.** Live commit at the autorun: `edb32b45` (live 17:27:08Z); `git merge-base --is-ancestor cacfd33a edb32b45` = 0 (contains). Note: refresh-worker was deployed again by another lane, `dd43fd49`, created 21:43:55Z, live 21:49:21Z, AFTER the autorun; it also contains `cacfd33a`. Source: refresh-worker Render logs API, population-checked (`BUILD_SPAN_ENTER stage=kalshi_board_join` at 21:33:04Z in the same window; 1,640 `reconcil` rows 16:37Z-21:48Z).
+
+**Autorun.** `RECONCILIATION_AUTORUN_RUNNING last_epoch_age_sec=86428` at **21:32:38.61Z (16:32:38 CDT)**; the next `GATED` lines read `age_sec=865` at 21:47:19Z, so it stamped.
+
+| # | prediction | reading | grade |
+|---|---|---|---|
+| 1 | one `RECONCILE_DATES_AGED_OUT` dates=11 predictions=1438 oldest=06-15 newest=09-03 cutoff=09-07 max_age_days=14 | 21:32:38.64Z, exactly those values, `(kept 0 dates)`; one line for the run | PASS |
+| 2 | `RECONCILE_DATE_TIMING` only for 09-20 and 09-21, each `walk=skipped_nothing_pending`, result_files=0 | 09-20 (21:32:54.45Z) and 09-21 (21:32:54.67Z) only; both predictions=0, result_files=0, total_s 0.20 / 0.21, `walk=skipped_nothing_pending` | PASS |
+| 3 | first to last RECONCILE line "a few seconds, not ~74 s" | **16.06 s** (21:32:38.61 -> 21:32:54.67Z). The reconciliation itself is **0.41 s** (sum of total_s; 74 s on 09-20). The other **15.8 s** is `emit_settlement_inputs`, which runs BETWEEN `pending_prediction_dates` (prints AGED_OUT) and the first reconcile (`run_refresh_worker.py:3184-3195`): 09-20 closing_lines 36,626 rows published 21:32:52Z, 09-21 3,732 rows 21:32:54Z. The prediction did not model that stage | **FAIL as worded** (reconcile phase 0.41 s) |
+| 4 | the MLB actuals writer also ages the same dates out | hourly `RECONCILE_DATES_AGED_OUT` with the identical values at 16:55:47, 17:55:49, 18:56:09, 19:56:23, 20:56:33Z; first one 18 min after the 16:37:31Z deploy | PASS |
+
+Goal time clause (autorun <= 5 min, and verify (2)'s summed total_s <= 300 s): **MET**, 16.1 s held incl. emit, 0.41 s reconcile. "Every date's result unchanged": NOT SHOWABLE, nothing in the population is resolvable (0 predictions on both kept dates).
+
+**Rider — `BUILD_SPAN_EXIT stage=portfolio_commit elapsed_s`** (same logs API, deduped):
+
+    window                               commit      n    median   p90    max
+    13:30-16:30Z (baseline, re-read)     c70329c2    50   13.2     15.4   17.6
+    16:37:31-17:27:08Z                   e9df684b    12   13.4     14.9   18.2
+    17:27:08-21:49:21Z                   edb32b45    67   15.8     18.7   22.8
+
+Median **+2.6 s**, p90 +3.3 s, max +5.2 s on `edb32b45`: just under the ~3 s flag on the median, over it on p90. Not attributed: `CLV_QUOTES_FALLBACK` in that window is 391 lines, `seconds=` sum 25.84 s, max 0.82 s (~0.39 s per build), shards_read at most 2 (`['2026-09-20','2026-09-21']`), `not_started` sum 0 (a720941d skips unstarted games: `attempted=0` lines), resolved sum 310, shards_failed none. On `e9df684b`: 64 lines, sum 4.62 s, max 0.69 s, not_started sum 51,893, resolved 216. CONFOUND: the baseline is a morning window and the `edb32b45` window runs into the Monday evening MLB/MNF slate; this is not a same-load A/B. Reported to lane `clv-close-from-book-quotes` via this entry.
