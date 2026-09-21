@@ -1250,6 +1250,19 @@ death, never life — do not invert it.
 - Verdict: GOAL MET — 1 of 4 CLOSED blocks SAFE at idle 240m (13:52Z / 08:52 CDT); 3 WAIT on live owners a1e40980, 105fd5dd. Table in `.syndicate/log/2026-09-21.md`.
 - Moved: `closed-lane-archive-20260920-2125`
 
+### layer2-adverse-movement-sanity — OPEN — opened 2026-09-21 — session 9e340058-bff6-4723-bb50-46c4aa37b9de
+- Goal: establish, with outcomes and not only board state, WHY the top of the Layer 2 board is enriched for rows whose price has moved AGAINST the pick, and whether those rows are adverse selection (bad) or value (good) -- answered by a forward-CLV contrast by movement direction on the published board, with the n it rests on.
+- Why: USER 2026-09-21 ~15:2xZ: "I'm concerned that a majority of our top board opps have line movement in the opposite direction of the recommendation. We should sanity check this." CONFIRMED on board `written_at` 15:25:28Z: `movement_vs_pick=away` is **67% of the top 100** (64% top 25, 62% top 250) against **50% of the whole board**; `toward` is 12% of the top 100 against 21%.
+- Files: NEW `.syndicate/findings_2026-09-21_top_opps_adverse_movement.md`. **Read-only** -- no code, no deploy.
+- **Hypotheses, written BEFORE any test:**
+  - **H1 (mechanical selection).** A price that LENGTHENED at the recommended book carries higher EV against a fair that moved less, and EV dominates the score, so away-moved rows rank higher by arithmetic, not by signal. *Predicts:* top-board `away` rows have higher `ev_component` than `toward` rows; the movement penalty is smaller than the EV gain.
+  - **H2 (single-book lag).** The `away` move is the recommended book lagging or diverging while the consensus fair did NOT move with it. *Predicts:* for top `away` rows, `|movement_prob_delta_pp|` at the book greatly exceeds `|movement_fair_delta_pp|` (the consensus move, same line).
+  - **H3 (adverse selection -- the bad case).** The move is information and the market is right: these rows keep moving against us to the close. *Predicts:* NEGATIVE forward CLV (observation -> close) for `away` rows relative to `toward`/`flat`, same book scope.
+  - **H1 and H3 are not exclusive** -- H1 explains WHY they rank, H3 says whether ranking them is a mistake. H3 is the one that matters.
+- Falsification: H1 is false if top `away` rows do NOT carry higher EV than `toward` ones. H2 is false if the consensus fair moved about as far as the book price. H3 is false if forward CLV for `away` is >= `toward` within a scope, at a stated n. **A null on H3 at thin n is NOT a pass** -- it is recorded as unresolved, with the n needed.
+- Verification: the findings file states the forward-CLV contrast per book scope with its n and CI, the H1/H2 decomposition on the top 100, and a verdict per hypothesis. The population for H3 is the published board over the dates the hourly price trail covers (it started 2026-09-20 ~18:25Z).
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
