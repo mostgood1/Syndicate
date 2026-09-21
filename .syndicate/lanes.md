@@ -1271,6 +1271,15 @@ death, never life — do not invert it.
 - Hypotheses B1-B4, pre- and post-deploy readings: moved verbatim to `lanes_history.md` (checkpoint 2026-09-21 ~18:3xZ).
 - Blocked by: none.
 
+### ncaaf-live-h2h-top-scores — OPEN — opened 2026-09-21 — session a1e40980-cceb-493f-adf9-5a5ca879acf6
+- Goal: explain, with evidence from production rows, why SERVED NCAAF in-play full-game moneyline rows (`ln=opportunity`) score far above the board's norm (as high as 86 against a typical #1 of ~6) while realising -0.38/game over 09-14..09-20, and name the fix. Any change to board scoring or gating is the USER's decision.
+- Files: none. Read-only diagnosis over the recorder rows already fetched this session (09-14..09-21) and the served board; no code edited.
+- Why: USER 2026-09-21 "yes start on 1", to protect the board bet from on Saturday's big NCAAF slate. Lead `leads.md` 2026-09-21 14:5xZ; readings `log/2026-09-21.md` ~09:3x-09:5x CT.
+- Hypothesis (written before testing): H1 STALE OR THIN FAIR -- in-play, the consensus fair (`fp`) comes from few books (`bq`) or old quotes (`ba`) and lags the game, so the best live price looks +EV against a fair the game has already moved past. H2 WRONG JOIN -- the fair or the price belongs to another market, segment or phase (e.g. a pregame fair on a live price), so EV is huge by construction. H3 SCORE PATH -- an outlier EV reaches `score` without the usual compression on some `ev_basis`, so a +40% EV scores 86 where the board's value term normally caps near single digits.
+- Falsification test: H1 fails if the served rows' `bq` / `ba` look like the rest of the live board; H2 fails if `fp` and the price agree with each other's side / line and the two sides' fairs sum to ~1; H3 fails if `sc` tracks `ev` / `vp` on the same curve as other rows.
+- Verification: a per-row table of the served rows (price, fair, fair method, books, quote age, EV, value, score, lane, the game state at sighting, outcome) that makes one hypothesis true on the data, plus the fix named and priced.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
