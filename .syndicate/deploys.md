@@ -39225,3 +39225,18 @@ Freshness judged on the artifact's own `generated_at` **2026-09-21T11:32:51Z** (
 - Overlay: `switch_enabled=True valid=True buckets=9`, expires 2026-09-24T11:32:51Z.
 
 **Discharges** `daily-accuracy-suite` OWED (a). Does NOT discharge (b) NBA correctness (late Oct) or (c) NCAAB registry; the lane's goal stays NOT MET.
+
+## 2026-09-21 14:00Z (09:00 CT) — DEPLOY — live-odds-worker `9c28e63d` (live 2026-09-21T13:58:34Z) — lanes soccer-live-serialize-fields-race, soccer-live-fotmob-fixture-cache, soccer-live-goal-window-from-paths — **verify: OWED, and nothing can be read today**
+
+- **Authorised by the user in chat** ("proceed next action", after this session named the deploy as the next action; the timing choice "Now, first CLEAR" was theirs on 2026-09-20). Fired by this session's deployer, `dep-daojde3m8hqs73eu6bhg`.
+- **Carries three landed soccer-live changes**, one restart instead of three: `c612db03` (the sim serializer caches field names per dataclass TYPE — the `SystemError ... tupleobject.c:927` in the league poll), `858a1763` (one tick fetches FotMob's fixture list 3 times, not 3 per in-play match), `9c28e63d` (goal windows read off the shared real-clock paths).
+- **From `76a6f4a2`**, which was still live at deploy time and is contained in `9c28e63d`: nothing reverted.
+- **MEASURED at go-live: the changed poller imports and ticks.** First soccer `live_state` writes on the new code at **13:59:54Z** (epl, la_liga; 80 s after go-live), and **0** `Traceback` lines from 13:58:30Z. That is the only reading today can give: the writes carry 0 games because there are none.
+- **The gate, lock-free first:** polled WITHOUT the claim (learnings.md 2026-09-20), CLEAR at 13:52:51Z ("only infrastructure processes running"); claim acquired 13:52:51Z; preflight re-run WITH the claim CLEAR at 13:52:55Z; deploy fired 13:52:56Z; live 2026-09-21T13:58:34Z.
+- **The restart cost no in-play tick, and there is none to read today:** 0 soccer matches in play at 13:52Z, and no tracked fixtures on 2026-09-21 at all — FotMob lists 68 fixtures worldwide and none in the ten tracked leagues (control: 45 tracked on 09-20), and production's pregame artifacts for 09-21 are 0 files. Production's own 13:51:34Z live_state writes agreed (0 games, 0 boxes, all ten leagues). **Not an outage.**
+- **BASELINE CORRECTION.** The preflight receipt records `soccer_league_poll_failed_systemerror_lines=0`. That was a FAILED READ by the deployer, whose counter never checked the log tool's `COVERED` line. Re-read at ~13:56Z: **10** failures over 2026-09-13T01:04Z .. 2026-09-20T19:34:46Z (20 lines = 10 failures + 10 tracebacks). The receipt's other two baselines are right: the live commit's own code truncated the goal window's clock, and fetched the fixture list 3 times per in-play match. The deployer now refuses to proceed without a `COVERED` line.
+- **Readings owed, all waiting on a tracked slate** (next: 2026-09-27 per FotMob, MLS x10; European leagues not yet listed):
+  1. served goal windows at a known live state equal the new method, and rise where a side leads or trails at mid-half (60' 1-0 next-5 0.1090 -> 0.1273 at N=3000) — lane `soccer-live-goal-window-from-paths`;
+  2. 0 SystemError `LEAGUE_POLL_FAILED` over in-play exposure at least that of 09-13..09-20, against 10 — armed as scheduled task `soccer-serialize-systemerror-read-0929`;
+  3. FotMob under 6% of a tick with memo on — the local profiler, needs >= 6 matches in play, no deploy needed;
+  4. the tick's cost at n simulations per in-play match, down from 3n.
