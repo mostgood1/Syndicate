@@ -746,14 +746,17 @@ def build_scorecard(
             "coverage": coverage(state, games, today, days),
             "cells": rows,
             "verdict_changes": verdict_changes(previous, rows, label),
-            "price_cells": [price_row(r) for r in price],
+            # Rows with no +EV game are dropped: they say only "nothing here was +EV", which absence
+            # says too. Measured 2026-09-21 on production: 274 of 975 price rows, ~100 KB of a
+            # payload web loads whole on every request (698 KB with them, 258 KB before the price side).
+            "price_cells": [price_row(r) for r in price if r["games"]],
         }
         if days == max(WINDOWS):
             bucket_results = evaluate_ids(games, bs=bs, select=is_bucket, min_games=bs.MIN_GAMES,
                                           min_dates=bs.MIN_DATES, resamples=resamples, seed=bs.SEED, q=bs.FDR_Q)
             by_method = evaluate_price(games, bs=bs, select=is_fair_method_bucket, min_games=REPORT_MIN_GAMES,
                                        min_dates=REPORT_MIN_DATES, resamples=resamples, seed=bs.SEED, q=bs.FDR_Q)
-            windows[label]["price_by_fair_method"] = [price_row(r) for r in by_method]
+            windows[label]["price_by_fair_method"] = [price_row(r) for r in by_method if r["games"]]
     longest = f"{max(WINDOWS)}d"
     method = {"unit": "game", "skill_metric": "brier(model)-brier(market) on the side, per game",
               "report_min_games": REPORT_MIN_GAMES, "report_min_dates": REPORT_MIN_DATES,

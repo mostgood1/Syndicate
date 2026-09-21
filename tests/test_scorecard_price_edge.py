@@ -229,6 +229,14 @@ def test_the_scorecard_serves_the_price_side_and_the_overlay_is_untouched_by_it(
     live = [r for r in by_method if r["phase"] == "live" and r["segment"] == "q1"]
     assert live and live[0]["fair_method"] == "consensus" and live[0]["verdict"] == msc.PRICE_EDGE_HOLDS
     assert "price_by_fair_method" not in scorecard["windows"]["7d"]
+    # The model-only pregame rows here were priced at +EV too, so to exercise the drop, add a cell whose
+    # every side is -EV: it must be graded (priced) and still not SERVED, since it has no +EV game.
+    minus_ev = [dict(r, price=-400.0, pnl=0.25 if r["y"] else -1.0) for r in _rows(sport="nfl", segment="h2")]
+    served, _ = msc.build_scorecard(_state(rows + minus_ev), bs=bs, today="2026-09-19", now=NOW, grader={}, run={},
+                                    resamples=300)
+    for label in ("7d", "28d"):
+        assert all(c["games"] > 0 for c in served["windows"][label]["price_cells"]), label
+        assert not [c for c in served["windows"][label]["price_cells"] if c["sport"] == "nfl"], label
     assert "price-shopping edge" in msc.markdown(scorecard)
 
     stripped = _state(rows)
