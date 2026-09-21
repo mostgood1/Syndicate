@@ -1278,6 +1278,15 @@ death, never life — do not invert it.
 - Verification: a findings file with the decile tables (n games / dates stated), the v2-vs-score held-out comparison, and -- if v2 wins -- a served board carrying `score_v2` read on production.
 - Blocked by: none.
 
+### layer2-blend-admission-test-anchor — CLOSED, GOAL MET 2026-09-21 — opened 2026-09-21 — session 35e1fa38-e1dd-4a78-aa90-1a214af3d151
+- **VERDICT: GOAL MET, hypothesis CONFIRMED.** Old anchor: first `LAYER2_SHORTLIST date=` = `intelligence_state.py:6104` (the comment); window lacked `admitted_by_blend=` -> 1 failed / 10 passed. Fix: `_shortlist_log_formats` reads the AST (`JoinedStr` constant text), finds exactly ONE emitter (the `print` at `:6962`) and asserts the pair on EVERY emitter; a new control test asserts a comment + docstring quoting the line yields no emitter. File: **12 passed**. REACHABILITY, each on the real line in this worktree only: `admitted_by_blend=` removed -> FAILS; `below_floor=` removed -> FAILS; emitter renamed so only the comment carries the text -> FAILS ("no f-string emits"). Restored from a byte copy, sha256 `28e6ffec…` before = after, `git status` empty. The lane-postwrite hook flagged that temporary mutation of `live-inplay-board-cadence`'s file. It was mine, reverted, in a private worktree, and never committed. Lead in `leads.md` (2026-09-21 15:3xZ) marked RESOLVED.
+- Goal: [user 2026-09-21] `tests/test_layer2_blend_admission.py::test_the_admission_counters_reach_the_log_line` passes on origin/main by anchoring on the REAL emitted `LAYER2_SHORTLIST date=` log format, not on the prose occurrence `f7ae4ce3` added in a comment earlier in `pipeline/intelligence_state.py`.
+- Files: `tests/test_layer2_blend_admission.py` (that one test only). NOT claimed: `pipeline/intelligence_state.py` (held by OPEN lane `live-inplay-board-cadence`; the comment is left as written).
+- Hypothesis: the test's `source.index("LAYER2_SHORTLIST date=")` returns the FIRST occurrence, which since `f7ae4ce3` is the comment ("LAYER2_SHORTLIST date=2026-09-16` was written at 22:03Z"), so the 1600-char window never reaches the print call carrying `admitted_by_blend=` / `below_floor=`.
+- Falsification test: if the first occurrence of `LAYER2_SHORTLIST date=` is still the emitted format string (i.e. the comment is not earlier), the hypothesis is wrong and the counters are genuinely missing from the log line.
+- Verification: (1) the test passes on this worktree; (2) REACHABILITY -- with `admitted_by_blend=` removed from the real log line (temporary, reverted), the test FAILS; same for a comment-only copy of the text; (3) only this test file is run.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

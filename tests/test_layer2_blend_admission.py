@@ -111,6 +111,33 @@ def test_the_admission_counter_survives_the_endpoint_hop():
     assert body["rows_below_value_floor"] == 7
 
 
+def _shortlist_log_formats(source):
+    """The literal text of every f-string that EMITS `LAYER2_SHORTLIST date=`.
+
+    Read from the AST, not the source text. This test used to anchor on
+    `source.index("LAYER2_SHORTLIST date=")`, and `f7ae4ce3` quoted the line in a
+    COMMENT earlier in the file -- the first occurrence became the comment, its
+    1600-char window never reached the print call, and the test went red with the
+    log line unchanged. Comments are not in the AST and a docstring is never a
+    `JoinedStr`, so prose that quotes the line can neither satisfy nor break this.
+    Adjacent literals with comments between them parse as ONE `JoinedStr`, which
+    is the shape the real line has."""
+    import ast
+
+    formats = []
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.JoinedStr):
+            continue
+        text = "".join(
+            part.value
+            for part in node.values
+            if isinstance(part, ast.Constant) and isinstance(part.value, str)
+        )
+        if "LAYER2_SHORTLIST date=" in text:
+            formats.append(text)
+    return formats
+
+
 def test_the_admission_counters_reach_the_log_line():
     """Both counters must appear in `LAYER2_SHORTLIST`, because the artifact and
     the endpoint are unreachable from a session without HTTP access to the web
@@ -118,13 +145,28 @@ def test_the_admission_counters_reach_the_log_line():
 
     Asserted as a PAIR: `admitted_by_blend` without `below_floor` is a number
     nobody can judge, which is the failure `#373`/`#381`/`#397` each record one
-    hop earlier."""
+    hop earlier. Asserted on EVERY emitter, so a second path that prints the line
+    without the pair fails too."""
     import inspect
 
     import pipeline.intelligence_state as state
 
-    source = inspect.getsource(state)
-    marker = source.index("LAYER2_SHORTLIST date=")
-    window = source[marker : marker + 1600]
-    assert "admitted_by_blend=" in window
-    assert "below_floor=" in window
+    formats = _shortlist_log_formats(inspect.getsource(state))
+    assert formats, "no f-string emits `LAYER2_SHORTLIST date=` any more"
+    for text in formats:
+        assert "admitted_by_blend=" in text
+        assert "below_floor=" in text
+
+
+def test_prose_quoting_the_log_line_is_not_an_emitter():
+    """The anchor's own control: the exact shape `f7ae4ce3` introduced -- a
+    comment and a docstring quoting the line, counters and all -- yields nothing,
+    so the test above cannot pass on prose."""
+    source = (
+        "def f():\n"
+        '    """`LAYER2_SHORTLIST date=x below_floor=1 admitted_by_blend=2`"""\n'
+        "    # `LAYER2_SHORTLIST date=2026-09-16` was written at 22:03Z\n"
+        "    # below_floor= admitted_by_blend=\n"
+        "    return 1\n"
+    )
+    assert _shortlist_log_formats(source) == []
