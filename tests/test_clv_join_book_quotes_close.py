@@ -193,9 +193,50 @@ def test_the_shard_is_the_central_kickoff_date_and_is_read_once(tmp_path):
         _quote("2026-09-20T23:00:00+00:00", -118, commence_time=late),
         _quote("2026-09-20T23:00:00+00:00", -102, commence_time=late, selection="away", line=6.5),
     ]}, calls)
-    assert [call[1] for call in calls] == [_DATE], "one read, keyed by the Central date"
+    # Central date first, then the UTC date a UTC-keyed writer would have used.
+    assert [call[1] for call in calls] == [_DATE, "2026-09-21"]
     assert calls[0][2] == frozenset({_EVENT})
     assert report["resolved"] == 2
+
+
+def test_a_quote_filed_under_the_utc_date_is_still_found(tmp_path):
+    """fetch_ncaaf_oddsapi_game_lines filed by `commence_time[:10]`: 635 of 635
+    unmatched NCAAF 09-20-board openings were evening games whose game lines sat
+    in the NEXT day's shard."""
+    late = "2026-09-21T02:30:00Z"   # 9:30 PM CT on the 20th
+    _record(tmp_path, _opening(commence_time=late))
+    calls: list = []
+    report = compute_clv_for_date(
+        _DATE, "nfl", root=tmp_path, history_payload={"markets": {}}, now=_NOW,
+        quote_rows=_loader({_DATE: [], "2026-09-21": [
+            _quote("2026-09-21T01:30:00+00:00", -118, commence_time=late)]}, calls),
+    )
+    assert [call[1] for call in calls] == [_DATE, "2026-09-21"]
+    assert report["resolved"] == 1, report["unresolved_reasons"]
+    assert report["rows"][0]["close_price"] == -118.0
+
+
+def test_the_close_is_the_latest_change_across_both_shards(tmp_path):
+    late = "2026-09-21T02:30:00Z"
+    _record(tmp_path, _opening(commence_time=late))
+    report = compute_clv_for_date(
+        _DATE, "nfl", root=tmp_path, history_payload={"markets": {}}, now=_NOW,
+        quote_rows=_loader({
+            _DATE: [_quote("2026-09-21T02:00:00+00:00", -125, commence_time=late)],
+            "2026-09-21": [_quote("2026-09-21T01:00:00+00:00", -110, commence_time=late)],
+        }),
+    )
+    assert report["rows"][0]["close_price"] == -125.0, "the later change, whichever shard"
+
+
+def test_one_absent_shard_of_two_is_not_absence(tmp_path):
+    late = "2026-09-21T02:30:00Z"
+    _record(tmp_path, _opening(commence_time=late))
+    report = compute_clv_for_date(
+        _DATE, "nfl", root=tmp_path, history_payload={"markets": {}}, now=_NOW,
+        quote_rows=_loader({"2026-09-21": [_quote("2026-09-21T01:00:00+00:00", -110, commence_time=late)]}),
+    )
+    assert report["resolved"] == 1
 
 
 def test_a_price_unchanged_since_before_the_opening_is_refused_under_its_own_name(tmp_path):
@@ -240,8 +281,26 @@ def test_an_opening_recorded_after_kickoff_is_named_in_play_and_never_looked_up(
         _quote("2026-09-20T10:30:00+00:00", -120, commence_time=early_kickoff),
     ]}, calls)
     assert report["unresolved_reasons"] == {"opened_in_play": 1}
-    assert report["book_quotes_fallback"]["opened_in_play"] == 1
+    assert report["book_quotes_fallback"]["attempted"] == 0, "labelled before any source"
     assert calls == [], "an in-play opening's shard was read"
+
+
+def test_an_in_play_opening_is_named_so_on_the_history_path_too(tmp_path):
+    """mlb 2026-09-20: 1,397 history refusals were in-play openings under three
+    source-shaped names (387 close_precedes_open, 576 line_mismatch, 434
+    no_pregame_observation)."""
+    early_kickoff = "2026-09-20T11:00:00Z"
+    _record(tmp_path, _opening(sport="mlb", market="h2h", side="home", line=None,
+                               commence_time=early_kickoff,
+                               quote={"price": -120, "bookmaker": "betmgm"}))
+    key = (f"event_id={_EVENT}|home_team=Baltimore Ravens|away_team=Cleveland Browns"
+           "|market=h2h|bookmaker=betmgm")
+    payload = {"markets": {key: {"history": [{
+        "captured_at": "2026-09-20T10:30:00+00:00", "entity": "Baltimore Ravens",
+        "last_odds": -150.0, "line": {"home_odds": "-150", "away_odds": "+118"},
+    }], "closing_price": None, "closing_line": None}}}
+    report = compute_clv_for_date(_DATE, "mlb", root=tmp_path, history_payload=payload)
+    assert report["unresolved_reasons"] == {"opened_in_play": 1}, "was close_precedes_open"
 
 
 def test_a_missing_shard_and_a_missing_kickoff_are_named(tmp_path):
@@ -319,3 +378,79 @@ def test_the_default_reader_streams_plain_and_gzip_and_parses_only_wanted_events
     for path in (plain, packed):
         got = list(_iter_quote_rows(path, frozenset({_EVENT})))
         assert [row["event_id"] for row in got] == [_EVENT], path.name
+
+
+# ---------------------------------------------------------------------------
+# A price that never moved after the opening, confirmed by the sidecar
+# ---------------------------------------------------------------------------
+
+def _flat_report(tmp_path, state, now=_NOW):
+    """Opening at 12:00Z; the only change was at 11:00Z (before it)."""
+    from syndicate.features.shared.odds_book_quotes import quote_key
+
+    _record(tmp_path, _opening())
+    close_row = _quote("2026-09-20T11:00:00+00:00", -105)
+    key = quote_key(close_row)
+    asked: list = []
+
+    def read_state(sport, shard, keys):
+        asked.append((shard, keys))
+        return {key: state} if state is not None else None
+
+    report = compute_clv_for_date(
+        _DATE, "nfl", root=tmp_path, history_payload={"markets": {}},
+        quote_rows=_loader({_DATE: [close_row]}), now=now, quote_state=read_state,
+    )
+    return report, asked, key
+
+
+def test_a_flat_price_seen_after_the_opening_is_a_close(tmp_path):
+    report, asked, key = _flat_report(tmp_path, (-105, "2026-09-20T16:55:00+00:00"))
+    assert asked == [(_DATE, frozenset({key}))]
+    assert report["resolved"] == 1, report["unresolved_reasons"]
+    row = report["rows"][0]
+    assert row["close_price"] == -105.0
+    assert row["close_captured_at"] == "2026-09-20T16:55:00Z", "observed at last_seen"
+    assert row["close_age_seconds"] == 300.0
+    assert row["close_confirmed_at"] == "2026-09-20T16:55:00+00:00"
+    assert row["clv_pct"] == 0.0 and row["beat_close"] is False
+    assert report["book_quotes_fallback"]["confirmed_by_last_seen"] == 1
+
+
+def test_seen_through_kickoff_means_observed_at_kickoff(tmp_path):
+    report, _, _ = _flat_report(tmp_path, (-105, "2026-09-20T17:20:00+00:00"))
+    row = report["rows"][0]
+    assert row["close_captured_at"] == "2026-09-20T17:00:00Z"
+    assert row["close_age_seconds"] == 0.0 and row["close_timing"] == "pregame"
+
+
+def test_last_seen_before_the_opening_is_the_pulled_market_case(tmp_path):
+    report, _, _ = _flat_report(tmp_path, (-105, "2026-09-20T11:30:00+00:00"))
+    assert report["unresolved_reasons"] == {"quotes_unchanged_since_open": 1}
+
+
+def test_a_different_latest_price_confirms_nothing(tmp_path):
+    report, _, _ = _flat_report(tmp_path, (-140, "2026-09-20T18:00:00+00:00"))
+    assert report["unresolved_reasons"] == {"quotes_unchanged_since_open": 1}
+
+
+def test_no_sidecar_leaves_the_refusal_in_place(tmp_path):
+    report, _, _ = _flat_report(tmp_path, None)
+    assert report["unresolved_reasons"] == {"quotes_unchanged_since_open": 1}
+
+
+def test_the_default_state_reader_matches_escaped_names_without_loading_every_key(tmp_path, monkeypatch):
+    import syndicate.features.shared.odds_book_quotes as obq
+    from syndicate.features.shared.clv_join import read_quote_state_for_keys
+
+    monkeypatch.setattr(obq, "book_quotes_path", lambda sport, date: tmp_path / f"{date}.jsonl")
+    wanted = "mlb|prop|e1|fanduel|full|batter_hits|over|José Ramírez|0.5"
+    state = {
+        wanted: [0.5, -150, "2026-09-20T22:00:00+00:00"],
+        "mlb|game|e1|fanduel|full|h2h|home||nan": [float("nan"), 120, "2026-09-20T21:00:00+00:00"],
+        "legacy|two|slots": [1.5, -110],
+    }
+    (tmp_path / f"{_DATE}.state.json").write_text(json.dumps(state, separators=(",", ":")), encoding="utf-8")
+    got = read_quote_state_for_keys("mlb", _DATE, frozenset({wanted, "legacy|two|slots"}))
+    assert got == {wanted: (-150, "2026-09-20T22:00:00+00:00")}
+    assert read_quote_state_for_keys("mlb", "2026-01-01", frozenset({wanted})) is None

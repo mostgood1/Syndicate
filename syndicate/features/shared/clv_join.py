@@ -594,6 +594,35 @@ def _row_quote_key(row: Mapping[str, Any]) -> tuple[str, str, str, str, str, flo
     )
 
 
+def _candidate_shard_dates(commence_time: Any) -> tuple[str, ...]:
+    """The shards one kickoff's quotes can be in: its Central date, then its UTC date.
+
+    `odds_book_quotes.kickoff_shard_date` files by the CENTRAL day, and that is
+    the date asked first. But a writer that keyed by UTC put every kickoff after
+    7 PM Central in the NEXT day's shard -- MEASURED 2026-09-21: 635 of 635
+    unmatched NCAAF openings on the 09-20 board were 11 Saturday games at
+    00:00-03:00Z whose game lines sat in `2026-09-20` while their props sat in
+    `2026-09-19` (`fetch_ncaaf_oddsapi_game_lines.py` used `commence_time[:10]`).
+    Fixing the writer stops new misfiles; reading both is what recovers the ones
+    already on disk. Identical for a daytime kickoff, so it costs nothing there.
+    """
+    from syndicate.features.shared.odds_book_quotes import kickoff_shard_date
+
+    central = kickoff_shard_date({"commence_time": commence_time})
+    if not central:
+        return ()
+    kickoff = _parse_ts(commence_time)
+    utc = kickoff.astimezone(timezone.utc).date().isoformat() if kickoff is not None else central
+    return (central,) if utc == central else (central, utc)
+
+
+def _opened_in_play(opening: Mapping[str, Any]) -> bool:
+    """Recorded at or after its own kickoff -- judged on the OPENING's clock."""
+    kickoff = _parse_ts(opening.get("commence_time"))
+    opened = _parse_ts(opening.get("captured_at"))
+    return kickoff is not None and opened is not None and opened >= kickoff
+
+
 def _iter_quote_rows(path: Path, event_ids: frozenset) -> Iterator[dict[str, Any]]:
     """Stream one shard, PARSING only the rows for `event_ids`.
 
@@ -631,9 +660,50 @@ def read_quote_rows_for_events(
     return _iter_quote_rows(path, event_ids)
 
 
+# (sport, central kickoff date, state keys wanted) -> {key: (price, last_seen)}
+# for those keys, or None when the shard has no state file.
+QuoteStateReader = Callable[[str, str, frozenset], "Mapping[str, tuple[Any, str]] | None"]
+
+_STATE_ENTRY_RE = re.compile(r'("(?:[^"\\]|\\.)*"):\[([^\[\]]*)\]')
+
+
+def read_quote_state_for_keys(
+    sport: str, shard_date: str, keys: frozenset
+) -> Mapping[str, tuple[Any, str]] | None:
+    """The default `QuoteStateReader`: last-seen entries from a shard's sidecar.
+
+    The sidecar is one JSON object, `{quote_key: [line, price, last_seen]}`, and
+    `last_seen` moves on EVERY poll that sees the price unchanged -- which is
+    exactly the observation the change log itself never writes. Read by scanning
+    the raw text rather than `json.loads`-ing it: ncaaf 2026-09-19's is 11.4 MB
+    and 88,809 keys, and only the handful asked for are materialised. Keys are
+    matched in their JSON-encoded form because the writer escapes non-ASCII
+    (`Jos\\u00e9`), so a decoded name would never match the file's bytes.
+    """
+    from syndicate.features.shared.odds_book_quotes import book_quotes_path
+
+    path = book_quotes_path(sport, shard_date).with_suffix(".state.json")
+    if not path.is_file():
+        return None
+    wanted = {json.dumps(key): key for key in keys}
+    found: dict[str, tuple[Any, str]] = {}
+    text = path.read_text(encoding="utf-8")
+    for match in _STATE_ENTRY_RE.finditer(text):
+        key = wanted.get(match.group(1))
+        if key is None:
+            continue
+        try:
+            value = json.loads("[" + match.group(2) + "]")
+        except ValueError:
+            continue
+        if len(value) >= 3 and value[2]:
+            found[key] = (value[1], str(value[2]))
+    return found
+
+
 def _resolve_from_quotes(
     opening: Mapping[str, Any],
-    by_book: Mapping[str, tuple[datetime, float, datetime]] | None,
+    by_book: Mapping[str, tuple[datetime, float, datetime, str, str]] | None,
     *,
     seen: bool,
 ) -> dict[str, Any]:
@@ -677,7 +747,7 @@ def _resolve_from_quotes(
         # Deterministic: the most recently observed book, ties by name.
         chosen_book = max(by_book, key=lambda book: (by_book[book][0], book))
 
-    stamp, price, commence = by_book[chosen_book]
+    stamp, price, commence, state_key, source_shard = by_book[chosen_book]
     out.update(
         close_price=price,
         close_source=BOOK_QUOTES_CLOSE_SOURCE,
@@ -693,6 +763,11 @@ def _resolve_from_quotes(
     if override is not None:
         out["matched_bookmaker"] = chosen_book
         out["open_price_override"] = override
+    # Internal: what `_confirm_unchanged_closes` needs to look this close up in
+    # the sidecar. Never copied onto a report row.
+    out["_quote_state_key"] = state_key
+    out["_quote_commence"] = commence
+    out["_quote_shard"] = source_shard
     return out
 
 
@@ -702,6 +777,7 @@ def _quote_closes_for_openings(
     loader: QuoteRowsLoader,
     *,
     now: datetime | None = None,
+    state_reader: QuoteStateReader | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Resolve each pending opening from the quote log, one shard read per date.
 
@@ -715,7 +791,7 @@ def _quote_closes_for_openings(
     five days of games). Without it, each build would stream every one of
     those shards to produce provisional numbers nobody should read.
     """
-    from syndicate.features.shared.odds_book_quotes import kickoff_shard_date
+    from syndicate.features.shared.odds_book_quotes import quote_key
 
     started = time.perf_counter()
     cutoff = now or datetime.now(timezone.utc)
@@ -724,20 +800,21 @@ def _quote_closes_for_openings(
         "resolved": 0,
         "not_started": 0,
         "opened_in_play": 0,
+        "confirmed_by_last_seen": 0,
         "shards_read": [],
         "shards_absent": [],
         "shards_failed": {},
         "rows_parsed": 0,
     }
-    shard_of: list[str | None] = []
+    shard_of: list[tuple[str, ...]] = []
     not_started: set[int] = set()
     in_play: set[int] = set()
     needed_by_date: dict[str, dict[tuple, datetime | None]] = {}
     for position, opening in enumerate(pending):
-        shard = kickoff_shard_date({"commence_time": opening.get("commence_time")})
-        shard_of.append(shard)
+        shards = _candidate_shard_dates(opening.get("commence_time"))
+        shard_of.append(shards)
+        shard = shards[0] if shards else None
         kickoff = _parse_ts(opening.get("commence_time"))
-        opened = _parse_ts(opening.get("captured_at"))
         # AN OPENING RECORDED AFTER KICKOFF HAS NO PREGAME CLOSE, BY DEFINITION.
         # MEASURED on the 2026-09-20 report: every `quotes_no_pregame_quote`
         # row was one (nfl 3,322, wnba 1,604, mlb 105), and so were 1,153 nfl /
@@ -746,7 +823,9 @@ def _quote_closes_for_openings(
         # looked up. The opening's own clock decides, conservatively: 16 wnba
         # rows whose quote carried a LATER kickoff than the opening did would
         # otherwise have taken a pregame close for a bet the board made in play.
-        if kickoff is not None and opened is not None and opened >= kickoff:
+        # (compute_clv_for_date labels these before any source; kept for
+        # direct callers of this function.)
+        if _opened_in_play(opening):
             in_play.add(position)
             stats["opened_in_play"] += 1
             continue
@@ -754,18 +833,18 @@ def _quote_closes_for_openings(
             not_started.add(position)
             stats["not_started"] += 1
             continue
-        if shard:
-            needed_by_date.setdefault(shard, {})[_opening_quote_key(opening)] = _parse_ts(
+        for candidate in shards:
+            needed_by_date.setdefault(candidate, {})[_opening_quote_key(opening)] = _parse_ts(
                 opening.get("commence_time")
             )
 
-    best: dict[tuple, dict[str, tuple[datetime, float, datetime]]] = {}
+    best: dict[tuple, dict[str, tuple[datetime, float, datetime, str, str]]] = {}
     seen: set[tuple] = set()
     failed: set[str] = set()
     for shard in sorted(needed_by_date):
         needed = needed_by_date[shard]
         events = frozenset(key[0] for key in needed if key[0])
-        shard_best: dict[tuple, dict[str, tuple[datetime, float, datetime]]] = {}
+        shard_best: dict[tuple, dict[str, tuple[datetime, float, datetime, str, str]]] = {}
         shard_seen: set[tuple] = set()
         parsed = 0
         try:
@@ -796,7 +875,7 @@ def _quote_closes_for_openings(
                 slot = shard_best.setdefault(key, {})
                 previous = slot.get(book)
                 if previous is None or stamp > previous[0]:
-                    slot[book] = (stamp, price, commence)
+                    slot[book] = (stamp, price, commence, quote_key(row), shard)
         except Exception as exc:
             # A partial read is discarded whole, never used: see _iter_quote_rows.
             stats["shards_failed"][shard] = f"{type(exc).__name__}: {exc}"
@@ -805,29 +884,117 @@ def _quote_closes_for_openings(
         finally:
             stats["rows_parsed"] += parsed
         stats["shards_read"].append(shard)
-        best.update(shard_best)
+        # MERGED, not replaced: one key can now be in two shards, and the close
+        # is the latest pregame change across both.
+        for key, books in shard_best.items():
+            slot = best.setdefault(key, {})
+            for book, entry in books.items():
+                if book not in slot or entry[0] > slot[book][0]:
+                    slot[book] = entry
         seen.update(shard_seen)
 
     resolved_rows: list[dict[str, Any]] = []
-    for position, (opening, shard) in enumerate(zip(pending, shard_of)):
+    for position, (opening, shards) in enumerate(zip(pending, shard_of)):
         if position in in_play:
             resolved = {"close_price": None, "unresolved_reason": "opened_in_play"}
         elif position in not_started:
             resolved = {"close_price": None, "unresolved_reason": "quotes_not_started"}
-        elif not shard:
+        elif not shards:
             resolved = {"close_price": None, "unresolved_reason": "quotes_no_kickoff_time"}
-        elif shard in failed:
+        elif any(shard in failed for shard in shards):
+            # Either shard could hold the latest price; a partial view is refused.
             resolved = {"close_price": None, "unresolved_reason": "quotes_read_error"}
-        elif shard in stats["shards_absent"]:
+        elif all(shard in stats["shards_absent"] for shard in shards):
             resolved = {"close_price": None, "unresolved_reason": "quotes_shard_absent"}
         else:
             key = _opening_quote_key(opening)
             resolved = _resolve_from_quotes(opening, best.get(key), seen=key in seen)
+        resolved_rows.append(resolved)
+
+    if state_reader is not None:
+        _confirm_unchanged_closes(pending, shard_of, resolved_rows, sport, state_reader, stats)
+    for resolved in resolved_rows:
+        resolved.pop("_quote_state_key", None)
+        resolved.pop("_quote_commence", None)
+        resolved.pop("_quote_shard", None)
         if resolved.get("close_price") is not None:
             stats["resolved"] += 1
-        resolved_rows.append(resolved)
     stats["seconds"] = round(time.perf_counter() - started, 3)
     return resolved_rows, stats
+
+
+def _confirm_unchanged_closes(
+    pending: list[Mapping[str, Any]],
+    shard_of: list[tuple[str, ...]],
+    resolved_rows: list[dict[str, Any]],
+    sport: str,
+    state_reader: QuoteStateReader,
+    stats: dict[str, Any],
+) -> None:
+    """Rescue a close whose last CHANGE predates the opening, when we SAW it after.
+
+    The change log alone cannot tell "the price did not move after we opened"
+    from "the book pulled the market and we stopped seeing it", so such a close
+    is refused (`quotes_unchanged_since_open`). MEASURED on the 2026-09-20 report
+    that refusal held 2,040 nfl / 581 wnba / 667 mlb PREGAME openings -- the flat
+    markets specifically, which left every average computed without its zeros.
+
+    The sidecar settles it: `last_seen` moves on every poll that sees the same
+    price. If the sidecar's latest price for that key IS the close and it was
+    seen after the opening, the price was demonstrably still on offer then, and
+    the close stands -- observed at `last_seen`, or at kickoff when we kept
+    seeing it through the start. Anything else stays refused: a later price
+    means the value we would confirm is not the one on record, and a last
+    sighting before the opening is the pulled-market case itself.
+    """
+    candidates: dict[str, list[int]] = {}
+    for position, resolved in enumerate(resolved_rows):
+        if resolved.get("close_price") is None or not resolved.get("_quote_state_key"):
+            continue
+        open_at = _parse_ts(pending[position].get("captured_at"))
+        close_at = _parse_ts(resolved.get("close_captured_at"))
+        if open_at is None or close_at is None or close_at > open_at:
+            continue
+        # The sidecar of the shard the close CAME FROM -- with two candidate
+        # shards per kickoff, the opening's own date is not necessarily it.
+        shard = resolved.get("_quote_shard")
+        if shard:
+            candidates.setdefault(shard, []).append(position)
+
+    for shard, positions in sorted(candidates.items()):
+        keys = frozenset(resolved_rows[p]["_quote_state_key"] for p in positions)
+        try:
+            state = state_reader(sport, shard, keys)
+        except Exception as exc:
+            stats.setdefault("state_failed", {})[shard] = f"{type(exc).__name__}: {exc}"
+            continue
+        if not state:
+            continue
+        for position in positions:
+            resolved = resolved_rows[position]
+            entry = state.get(resolved["_quote_state_key"])
+            if entry is None:
+                continue
+            latest_price, last_seen_raw = entry
+            last_seen = _parse_ts(last_seen_raw)
+            open_at = _parse_ts(pending[position].get("captured_at"))
+            commence = resolved.get("_quote_commence")
+            if (
+                last_seen is None
+                or open_at is None
+                or commence is None
+                or _as_float(latest_price) != resolved.get("close_price")
+                or last_seen <= open_at
+            ):
+                continue
+            observed = min(last_seen, commence)
+            resolved.update(
+                close_captured_at=observed.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                close_age_seconds=round((commence - observed).total_seconds(), 1),
+                close_confirmed_at=last_seen_raw,
+                close_price_field="book_quote_price_confirmed_last_seen",
+            )
+            stats["confirmed_by_last_seen"] += 1
 
 
 def compute_clv_for_date(
@@ -838,6 +1005,7 @@ def compute_clv_for_date(
     history_payload: Mapping[str, Any] | None = None,
     quote_rows: QuoteRowsLoader | None = None,
     now: datetime | None = None,
+    quote_state: QuoteStateReader | None = None,
 ) -> dict[str, Any]:
     """Pair every recorded opening for `sport` on `date` with its close.
 
@@ -939,6 +1107,16 @@ def compute_clv_for_date(
     resolutions: list[tuple[Mapping[str, Any], str | None, dict[str, Any]]] = []
     for opening in openings:
         key = _history_key(opening)
+        # BEFORE ANY SOURCE IS ASKED. A bet the live board recorded after kickoff
+        # has no pregame close, and every source then fails on it under a name
+        # that points at the SOURCE. MEASURED on mlb 2026-09-20: 1,397 history
+        # refusals were in-play openings -- 387 `close_precedes_open`, 576
+        # `line_mismatch`, 434 `no_pregame_observation` -- against ZERO in-play
+        # openings among the 4,947 history resolved, so this relabels failures
+        # and cannot remove a close.
+        if _opened_in_play(opening):
+            resolutions.append((opening, key, {"close_price": None, "unresolved_reason": "opened_in_play"}))
+            continue
         state = markets.get(key) if key else None
         resolved = resolve_close(opening, state if isinstance(state, Mapping) else None)
 
@@ -1017,8 +1195,10 @@ def compute_clv_for_date(
         resolutions.append((opening, key, resolved))
 
     loader = quote_rows
+    state_reader = quote_state
     if loader is None and history_payload is None:
         loader = read_quote_rows_for_events
+        state_reader = state_reader or read_quote_state_for_keys
     pending_at = [
         index
         for index, (_opening, key, resolved) in enumerate(resolutions)
@@ -1033,7 +1213,8 @@ def compute_clv_for_date(
         quotes_fallback = {"attempted": 0, "resolved": 0}
     else:
         quote_resolved, quotes_fallback = _quote_closes_for_openings(
-            [resolutions[index][0] for index in pending_at], sport, loader, now=now
+            [resolutions[index][0] for index in pending_at], sport, loader, now=now,
+            state_reader=state_reader,
         )
         for index, resolved in zip(pending_at, quote_resolved):
             opening, key, _history = resolutions[index]
@@ -1144,6 +1325,8 @@ def compute_clv_for_date(
         # to what it was before that source existed.
         if resolved.get("close_bookmaker"):
             row["close_bookmaker"] = resolved["close_bookmaker"]
+        if resolved.get("close_confirmed_at"):
+            row["close_confirmed_at"] = resolved["close_confirmed_at"]
         rows.append(row)
 
     resolved_count = len(rows)
@@ -1310,10 +1493,11 @@ def compute_clv_for_date(
         flush=True,
     )
     print(
-        "[clv_join] CLV_QUOTES_FALLBACK date=%s sport=%s attempted=%s resolved=%s not_started=%s opened_in_play=%s "
+        "[clv_join] CLV_QUOTES_FALLBACK date=%s sport=%s attempted=%s resolved=%s not_started=%s opened_in_play=%s confirmed_by_last_seen=%s "
         "shards_read=%s shards_absent=%s shards_failed=%s rows_parsed=%s seconds=%s skipped=%s"
         % (date, sport, quotes_fallback.get("attempted"), quotes_fallback.get("resolved"),
            quotes_fallback.get("not_started"), quotes_fallback.get("opened_in_play"),
+           quotes_fallback.get("confirmed_by_last_seen"),
            quotes_fallback.get("shards_read"), quotes_fallback.get("shards_absent"),
            quotes_fallback.get("shards_failed"), quotes_fallback.get("rows_parsed"),
            quotes_fallback.get("seconds"), quotes_fallback.get("skipped")),
