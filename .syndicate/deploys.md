@@ -39146,3 +39146,15 @@ build, a side's fair must be monotone in its line — and admit only identities
 that pass. The `movement_line_sign_conflict` field stays; it is the instrument
 that caught this and it cost one deploy to learn.
 
+
+## 2026-09-21 00:40Z (2026-09-20 19:40 CT) — READING — web `d70a7b3c` (live 00:08:39Z) — lane live-inplay-board-cadence — **verify: the cache-floor change is INERT. No gain, no harm, and the reason is a third inert-knob instance in one session.**
+
+- **Expectation was:** expiry-age median well under the 86 s baseline (floor 45 -> 22). **Measured: 44 s at n=2 (00:19Z), then 85 s at n=10 (00:29Z) — i.e. UNCHANGED from the 86 s baseline.** The first reading was a two-sample artifact; the second is the answer.
+- **WHY IT CANNOT BITE, measured rather than reasoned:**
+  - Overlay files ARRIVE on web every **~18 s** (86 `ops.publish ACCEPTED book_grid_inplay_*` since go-live; p25 3 s, p75 41 s). So overlay arrival is not the gate either.
+  - The combined-board rebuild is **LAZY**: it happens only when a REQUEST finds the entry stale. So `COMBINED_BOARD_OVERLAY_EXPIRED age_s` measures REQUEST ARRIVAL, not the floor.
+  - Board queries arrive every **28 s median** across **2 gunicorn workers** (`WEB_CONCURRENCY=2`), so a given worker sees one about every **~56 s** — already older than 45 s, let alone 22 s. The floor is below the trigger, so lowering it changes nothing.
+- **HEALTH: 0 `server_failed` since go-live** (rollback rule was >3 outside the first 10 min in 2 h). So the change is harmless as well as useless; it is left in place rather than spending a second restart to remove an inert key, and this entry is the record that it does nothing.
+- **MY MODEL WAS WRONG ABOUT HOP 6.** The decomposition charged ~60 s to "web cache". That term is really "time to the next request that lands on the worker holding the stale entry" — a function of client poll rate and worker count, NOT of any cache setting. The modelled web-only gain (306 -> 253 s) was therefore unachievable by this knob, and the `/api/intelligence/query` page polls every 60 s by design.
+- **THE REAL WEB-SIDE LEVER, named and NOT taken:** make the rebuild PROACTIVE (a background refresher that rebuilds when an overlay lands) instead of lazy. That is a code change on the service that restarts on health-check timeouts and would add steady CPU there, so it needs its own decision and its own before/after -- not a knob.
+- **Third inert knob in one session**, all three found only by measuring the EMITTED behaviour: `SYNDICATE_NCAAF_LINES_REFRESH_INTERVAL_SECONDS` 300->150 (launcher ran once per loop pass), the `clv_price_trail` allowlist entry (no sweep on the writing service), and now this floor (threshold below the trigger).
