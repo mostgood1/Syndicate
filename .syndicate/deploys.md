@@ -39256,3 +39256,31 @@ Freshness judged on the artifact's own `generated_at` **2026-09-21T11:32:51Z** (
 **What it answered, same run, 28d window (really 09-14..09-20; NCAAF/soccer have 3-4 dates):** live `edge_holds` NCAAF full-game totals (73 games, predicted EV +0.415, realised ROI/game +0.311 [+0.183, +0.465]) and MLB first-3 alt totals (17, +0.098 predicted, +0.719 [+0.242, +1.191]). Live `edge_fails` NCAAF full-game h2h (62, +0.301 predicted, -0.372 [-0.557, -0.173]) and five soccer live player-prop markets: first / anytime / last goal scorer, shots, shots on target (15-31 games, predicted +0.27..+0.43, realised -0.39..-0.76). Every NCAAF / NFL / WNBA quarter and half is `insufficient`. Population = the recorder's earliest live sighting per side, not orders. A recorded price is not proof of a fill.
 
 **verify (OWED, the 2026-09-22 11:30Z run = 06:30 CDT):** (1) `run.reset` names the grader-signature change and history is regraded (`state.graded_games` about 291 plus 09-21's finals); (2) `windows.7d.price_cells` and `windows.28d.price_cells` non-empty, `windows.28d.price_by_fair_method` present, and no served price row has `games == 0`; (3) the overlay's validated set equals the 8 predicted above, give or take buckets moved by 09-21's games, and none reads `beats_market`; (4) the payload is about 0.6 MB; (5) the run exits 0 and publishes. Read it at `/api/model-scorecard` after 11:40Z.
+
+## 2026-09-21 14:30Z (09:30 CT) — DEPLOY — refresh-worker `f1fe4ee1` -> `c70329c2` (`dep-daojv3id0e5s738jbqhg`, origin/main) — lane `layer2-line-move-magnitude` — **verify: PENDING**
+
+**PER-LINE OPENINGS INDEX.** `c1710042` (`layer2_board.py`) + `c70329c2` (the wiring in
+`layer2_shortlist.py`, edited under the release in `aa00b139` and user decision "take the
+co-claim and apply it"). User decision for this deploy: "if clean, commit and deploy with
+preflight". **Clean = A/B'd:** the 61 test files importing `layer2_shortlist` gave 15 failed /
+1,124 passed WITH and WITHOUT the change, and ZERO failures exist only with it (the 15 are
+pre-existing: 14 NCAAF projection tests, and `test_layer2_blend_admission`, broken by
+`f7ae4ce3` on 2026-09-16).
+
+**PREFLIGHT HELD FIRST**: 14:27Z `HOLD: 4 job(s) in flight` (a live soccer odds refresh). Waited;
+14:30:15Z CLEAR, deployed inside it.
+
+**PREDICTIONS, WRITTEN BEFORE THE RESULT.** Baseline 14:27:02Z vs board `written_at`
+14:21:14Z (2,000 rows). Replayed first with the real functions over the real 2026-09-21
+ledger (current logic reproduced production 1,988/1,988):
+
+    field                          baseline -> expected                        replay
+    line_moved rows                913      -> tens, not hundreds              903 -> 23
+    movement_opening_match=same_line  0     -> the large majority of keyed rows   1,963
+    rows at the movement cap       317      -> about 50                        328 -> 50
+    rows_admitted_by_blend         119      -> same order   [NEGATIVE CONTROL]
+
+**THE SIGN THE FIX IS NOT REACHING THE BUILDER**: `movement_opening_match` absent, or
+`earliest_line` dominating. Rows move onto the EXISTING calibrated price path, so no new
+estimator is on trial here -- only whether rows are routed to it.
+
