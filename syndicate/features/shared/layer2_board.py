@@ -3084,11 +3084,22 @@ def build_layer2_rows(
             # feed the score when -- and only when -- `SYNDICATE_SCORE_FEE_NET` is on
             # (lane `layer2-score-outcome-calibration`). Ranking, admission and sizing
             # read `score`; `score_v2` itself ranks nothing.
+            # THE TICKER LIVES ON THE SIDE AT BUILD TIME. `venue_quote_fanin` stamps
+            # `side_best["venue_ref"]`; the row-level key is set later. Reading only the
+            # row charged every Kalshi row the assumed x1.0 fee -- measured on the first
+            # fee-net board (2026-09-21 21:53Z), which doubled the real x0.5 on all 96 MLB
+            # Kalshi rows. The side's ticker counts only when that side IS the priced book.
+            side_venue_ref = (
+                side_best.get("venue_ref")
+                if str(side_best.get("bookmaker") or "").strip().lower()
+                == str(bettable_book or "").strip().lower()
+                else None
+            )
             shadow_v2 = _shadow_score_v2(
                 price=price,
                 fair_prob=fair,
                 bookmaker=bettable_book,
-                venue_ref=candidate.get("venue_ref") or row.get("venue_ref"),
+                venue_ref=side_venue_ref or candidate.get("venue_ref") or row.get("venue_ref"),
                 books_quoting=side_best.get("books_quoting") or row.get("books_quoting"),
                 book_age_seconds=side_best.get("age_seconds"),
                 quote_seen_age_seconds=side_best.get("seen_age_seconds"),

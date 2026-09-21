@@ -166,3 +166,23 @@ def test_fee_net_switch_on_moves_only_the_value_term_and_only_at_a_fee_venue(mon
     for row in book_rows.values():
         assert "score_fee_net" not in row
         assert row["score"]["ev_component"] == pytest.approx(row["ev_pct"], abs=1e-3)
+
+
+def test_the_kalshi_ticker_is_read_from_the_priced_side_so_mlb_pays_its_half_rate(monkeypatch):
+    """At build time the ticker is on `side_best` (venue fan-in), not the row. Reading only
+    the row charged all 96 MLB Kalshi rows the assumed x1.0 on 2026-09-21."""
+    monkeypatch.setattr(OS, "SCORE_FEE_NET_ENABLED", True)
+    row = _kalshi_grid_row()
+    row["best"]["over"]["venue_ref"] = "KXMLBTOTAL-26SEP21STLCOL-8"
+    row["best"]["under"]["venue_ref"] = "KXMLBTOTAL-26SEP21STLCOL-8"
+    rows = _by_side(build_layer2_rows([row]))
+    assert rows, "fixture produced no opportunities"
+    for scored in rows.values():
+        v2 = scored["score_v2"]
+        assert v2["fee_basis"] == "kalshi_series" and v2["fee_is_upper_bound"] is False
+        P = _p(scored["quote"]["price"]) if isinstance(scored.get("quote"), dict) else None
+        if P is not None:
+            assert v2["fee_per_contract"] == pytest.approx(0.07 * 0.5 * P * (1 - P), abs=1e-6)
+    # Without a ticker anywhere it stays the flagged full-rate bound (the prior behaviour).
+    bare = _by_side(build_layer2_rows([_kalshi_grid_row()]))
+    assert all(r["score_v2"]["fee_basis"] == "kalshi_assumed_full_rate" for r in bare.values())
