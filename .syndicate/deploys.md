@@ -39488,3 +39488,17 @@ stale-line residual already recorded, not duplicates.
 (3) look-to-serve on served in-play overlay cards, (now - `price_grid_generated_at`) + `quote_seen_age_seconds`, median below the ~362 s of 2026-09-20 17:22Z. The modelled saving is ~50-70 s: a median around 290-310 s would be the lever doing what was predicted, and above ~340 s it did not;
 (4) no web health regression: `server_failed` <= 3 after the first 10 min over 2 h.
 Kill switch: `SYNDICATE_COMBINED_BOARD_OVERLAY_WARMER=off` (env change + deploy; a user decision).
+
+
+## 2026-09-21 19:27Z — VERIFIED `a720941d` on web (rode peer lane `live-inplay-board-cadence`'s deploy, `00cc059b`, live 19:25:27Z) — lane `clv-close-from-book-quotes`
+
+Verified by CONTENT, not deploy state: `not_started` on the odds-history path exists only in `a720941d`.
+`/api/ops/clv/report?rows=1`, read 19:27:11Z:
+
+    field                                         baseline 17:07:51Z      predicted     measured 19:27:11Z
+    mlb 2026-09-21 resolved rows, unstarted games   971 of 1,102            0             0 (resolved 148, not_started 1,151)
+    mlb 2026-09-20 rows                             5,457                   identical     byte-identical (5,457)
+    nfl 2026-09-20 rows                             3,056                   identical     byte-identical (3,056)
+    nfl 2026-09-20 reasons                          quotes_not_started 528  renamed       not_started 528, all others equal
+
+Lane `clv-close-from-book-quotes` CLOSED on this reading.
