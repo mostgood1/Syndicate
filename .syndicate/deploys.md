@@ -39548,3 +39548,17 @@ Integrity: 0 of 315 fee-net rows with `score.ev_component != score_v2.ev_net_pct
 **KNOWN GAP, found in this reading:** every Kalshi row is charged `kalshi_assumed_full_rate` -- the build reads `venue_ref` off the ROW, but at build time the ticker lives on the per-side quote (`venue_quote_fanin` stamps `side_best["venue_ref"]`). Correct for WNBA/NFL/NCAAF (x1.0); **the 96 MLB Kalshi rows are charged DOUBLE their real x0.5 fee** (conservative, flagged `fee_is_upper_bound`). Fix owed (reads `side_best`), a separate deploy.
 
 **verify (OWED):** the effect is on OUTCOMES, not board state: fee-net CLV of the served top-K vs the pre-deploy baseline over >= 7 finished slates (`scripts/score_ranking_backtest.py`, same slates paired), and paper-order ROI by venue after 09-21. **For lane `live-inplay-board-cadence`:** tonight's lever-1 reading (20:15 CDT) and any grid-cadence reading now run WITH lever 2b live -- attribute accordingly.
+
+
+## 2026-09-21 22:28:34Z -> live 22:31:53Z (5:28-5:31 PM CT) — refresh-worker `dd43fd49` -> `b99143e2` (`dep-daoqv4mk1f9s738dvqn0`) — lane `layer2-score-outcome-calibration` — **PREDICTION FAILED: the MLB Kalshi half-rate fix `569ebca1` is INERT in production**
+
+**User decision (chat):** "yes, deploy the MLB fee fix". Ride-along: `569ebca1` + `65b86c0f` (test only). Preflight held three times (TOO_SOON until 22:14Z; board builds starting ~every minute; odds jobs in flight) and returned `CLEAR: only infrastructure processes running` at 22:28:21Z on a fresh baseline (22:26:54Z).
+
+    field                               baseline 22:26:54Z   predicted   measured on the first new board (written 22:36:03Z)
+    live_commit                         dd43fd49             b99143e2    b99143e2
+    MLB Kalshi rows at kalshi_series    0                    >= 43       0        <- FAILED
+    MLB Kalshi rows at assumed x1.0     86                   <= 43       82 of 82 <- FAILED
+    fee_net rows                        296                  > 0         266
+
+**Why (from code, not guessed):** at scoring time a Kalshi price is a captured quote from bookmaker `kalshi` with NO ticker anywhere -- `apply_venue_quotes` stamps `venue_ref` onto the rows AFTER `build_layer2_rows` scored them (`pipeline/layer2_shortlist.py:1752` vs `:1611`). 45 of the 82 served MLB Kalshi rows carry a ticker that arrived too late to be read. `569ebca1`'s test passed because its fixture put the ticker on `side_best`, where production never has one -- a reachability test on a fixture, not on the production shape. Harmless: the fallback is the flagged full-rate bound, unchanged.
+**Corrected on main:** `03d3f801` names the series from (sport, market, segment) and takes the rate from `venue_fees`' measured table. Run over these production rows with the ticker withheld: 81 of 82 MLB Kalshi rows resolve; every non-MLB row keeps x1.0 (its real rate). Deploy of `03d3f801` follows under the same user approval; its reading is the next entry.
