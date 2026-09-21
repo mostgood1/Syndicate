@@ -1282,12 +1282,15 @@ death, never life — do not invert it.
 > swept lanes had a Verification result, which is why they were not CLOSED.
 
 - `archive-test-reports-redirect` — CLOSED 2026-09-16 — opened 2026-09-16 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **GOAL: MET**
+- `ask-answer-substance` — ask-answer-substance — **CLOSED-VERIFIED 2026-08-16 — 8 deploys, all measured, live web `9f617f34`. The inline quick ask names a bet a human can place → `lanes_closed.md`.
 - `ask-rail-evidence` — CLOSED 2026-09-11 — opened 2026-09-11 — session 7d69025a-1bfa-4440-9eae-04c5299fe99f — **GOAL MET: the Ask rail renders every evidence table and chart, and "Konnor Griffin" no longer returns AJ Griffin (2 -> 0 on production)**
 - `ask-sport-parity` — CLOSED 2026-09-11 — opened 2026-09-11 — session 7d69025a-1bfa-4440-9eae-04c5299fe99f — **GOAL MET for every sport with rows on the board; web `1421ee3c` live 22:32:51Z**
 - `board-category-gates` — CLOSED 2026-09-16 — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77 — **GOAL: MET** (2026-09-16 ~14:20 CT). Readings (`deploys.md` 18:45:03Z): (a) first shortlist build after `b59887db` went live (18:50:42Z) logged `excluded_market=0` and the served shortlist reports `excluded_markets []`, `rows_excluded_market 0` (was 3,489-3,6 ... Body in `lanes_history.md`.**
 - `board-eval-reader-chunk-ceiling` — CLOSED 2026-09-17 — opened 2026-09-16 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - `board-today-freshness` — CLOSED 2026-09-17 — opened 2026-09-17 — session a1e40980-cceb-493f-adf9-5a5ca879acf6 — body in `lanes_history.md`.
 - `book-grid-gameline-ledger-log` — CLOSED 2026-09-14 — opened 2026-09-14 — session 8518e917-502e-4212-b876-11d6eb76ab71
+- `branch-overlap-baseline-instrumentation` — branch-overlap-baseline-instrumentation — CLOSED 2026-08-16 — the baseline was sampling hours where the failure does not happen — session: `branch-ove → `lanes_closed.md`.
+- `branch-overlap-manual-run-marker` — branch-overlap-manual-run-marker — CLOSED — opened 2026-08-16 — session: `branch-overlap-baseline-watch` — verified in production 2026-08-16T19:52:23+ → `lanes_closed.md`.
 - `brand-logo-v3` — CLOSED — opened 2026-09-14, closed 2026-09-14 — session 08fb3eec-6daf-4680-a64d-bd7f914ad2e7
 - `census-rescue-0910` — CLOSED 2026-09-10 — opened 2026-09-10 — session 78cad512 — **GOAL: MET: census rescue landed (`ab43454d`), three shipped lanes closed, unmeasured-deploy count 3 -> 1**
 - `chip-key-test-no-data-blind` — CLOSED 2026-09-16 — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77 — **GOAL: MET** (`f9040bb3`). Data-less worktree: 4 passed, 2 SKIPPED with the stated reason; with the primary tree's `data/`: 6 passed; mutation (map present, `canonical_team` -> None): both data tests FAIL. Body in `lanes_history.md`.**
@@ -1306,8 +1309,10 @@ death, never life — do not invert it.
 - `closed-lane-archive-20260920-1630` — CLOSED 2026-09-20 (GOAL MET: 1 block archived) — opened 2026-09-20 — session b36808cc-d879-4ab5-b4bb-85b135106db4
 - `closed-lane-archive-20260920-2125` — CLOSED 2026-09-20 (GOAL MET: 1 block archived) — opened 2026-09-20 — session 77fa95fb-3e05-45ab-b361-8c74c77354a6
 - `closed-lane-archive-20260921-0851` — CLOSED 2026-09-21 (GOAL MET: 1 block archived) — opened 2026-09-21 — session 1276501b-d2fa-40fb-96c1-4c2eb6c16082
+- `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `combined-board-rows-unreadable-tripwire` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: live on web `da268e07` (15:36:46Z); the field is served on every date, 0 `ROWS_UNREADABLE` lines; stored 113 vs rows 111 is the per-sport `by_sport` cap, not a defect.**
 - `combined-board-state-rows-lost` — CLOSED 2026-09-15 — opened 2026-09-14 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: Q1-Q3 answered with production readings. The reader fix is live on web `b6a0e346` (14:10:07Z): `by_date` 09-15 106 (was 0), 0 `VINTAGE_IGNORED`. One prediction was WRONG (`computed_at` moved to the refused heavy build's state stamp). User decision 2026-09-15: keep the `stale` label, it is true. Postmortem in `learnings.md`.**
+- `commit-guard-reads-wrong-index` — commit-guard-reads-wrong-index — CLOSED 2026-08-16 — the guard read the MAIN worktree's index while the commit used another one — session: `live-gamel → `lanes_closed.md`.
 - `convergence-phase7-crps` — ORPHANED, **UNOWNED** `[session abf487e4 ARCHIVED 2026-08-20T21:1xZ]` — — **FIVE FINDINGS: FOUR DEFECTS FIXED AND MEASURED, ONE NOT A DEFECT.** Ladder
 - `cron-deploy-locks` — CLOSED-VERIFIED 2026-09-08 — opened 2026-09-08 — session e371dfde — **the three cron services cannot be claimed, and the guard's refusal to say so rea
 - `deploy-guard-file-scripts` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: `af7c895c` classifies a deploy made by a script FILE; in the PRIMARY tree a `py -3 <file>` deploy returns exit 2, while the graft builder's dry-run and a GET + `data =` assignment return exit 0.**
@@ -1318,6 +1323,7 @@ death, never life — do not invert it.
 - `football-layer2-live-parity` — ORPHANED 2026-09-17 — opened 2026-09-10 — session 2edf8b82-9f8a-4d32-bf26-ca43ecd1ea5a (archived 2026-09-11, so UNOWNED) — **ORPHANED, UNOWNED [ownership sweep 2026-09-17 ~17:10Z, session a1e40980, user decision: owning session 2edf8b82 archived 2026-09-11, transcript idle 143.0 h; no uncommitted ...** — body in `lanes_history.md`.
 - `fotmob-season-scoped-league-ids` — CLOSED 2026-09-15 — opened 2026-09-15 — session da346015-cd58-450a-a9e0-bba6bdb00403 — **GOAL: MET: FotMob league matching is season-proof (primaryId + country), deployed to live-odds-worker `c725cc29`, verified on a LIVE Eredivisie match 18:18:47Z**
 - `fotmob-team-name-aliases` — CLOSED 2026-09-18 — opened 2026-09-15 — session da346015-cd58-450a-a9e0-bba6bdb00403 (ARCHIVED 2026-09-15, so UNOWNED)
+- `game-shape-capture` — game-shape-capture — UPDATE 2026-08-16 ~23:0xZ (checkpoint) — **PRIMITIVE COMMITTED `af3017e6`; EMIT STILL BLOCKED; HANDOFF SENT** → `lanes_closed.md`.
 - `gameline-trend-paired-pool` — CLOSED 2026-09-12 — session 50d991d1
 - `heavy-build-child-process` — CLOSED 2026-09-17 — opened 2026-09-14 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - `heavy-build-memory-refusal` — CLOSED 2026-09-17 — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
@@ -1329,6 +1335,9 @@ death, never life — do not invert it.
 - `kalshi-spread-join-sign` — **ORPHANED (reopened 2026-08-26)** — — session syndicate-43 (ENDED) — UNOWNED — six things verified; WNBA settlement is BUILT, LANDED and NOT DEPLOYED
 - `lane-archive-tool-checks` — CLOSED 2026-09-18 — opened 2026-09-18 — session 4991d2ec-b2c2-4040-9042-d98867b768ab — **GOAL MET: both tools WAIT `fotmob-team-name-aliases` (last modified by a non-header session)**
 - `lane-guard-main-claims` — CLOSED 2026-09-17 — opened 2026-09-17 — session a1e40980-cceb-493f-adf9-5a5ca879acf6 — **GOAL: MET**
+- `layer1-board-coverage` — layer1-board-coverage — UPDATE 2026-08-16 17:5xZ — **DEPLOYED AND FALSIFICATION TEST PASSED. Supersedes this lane's "UNDEPLOYED" line above.** → `lanes_closed.md`.
+- `layer1-board-coverage` — layer1-board-coverage — **CLOSE REFUSED 2026-08-16 18:0xZ.** Verification is not met, and a NEW production defect was found in this lane's own scope w → `lanes_closed.md`.
+- `layer1-board-coverage` — layer1-board-coverage — SCOPE ADDED 2026-08-16 20:0xZ — the HR threshold ladder → `lanes_closed.md`.
 - `layer1-model-edge-join` — ORPHANED — — opened 2026-08-30 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57 — **UNOWNED, session 1c88bcca archived 2026-08-31.** Scorer released to
 - `layer2-accuracy-audit` — ORPHANED, UNOWNED, SESSION ARCHIVED 2026-08-31 ~23:5xZ — — **CLAIMS: NONE HELD, all four services free.** Handoff armed: scheduled task `check-mlb-pre
 - `layer2-cap-raise` — ORPHANED, **UNOWNED** `[session 5611932c ARCHIVED 2026-09-01 ~01:4xZ]` — — opened 2026-08-31 — **GOAL MET; ALL THREE INCIDENT DEFECTS CLOSED + VERIFIE
@@ -1341,6 +1350,7 @@ death, never life — do not invert it.
 - `learnings-instrument-family-consolidation` — **CLOSED 2026-09-08 — THE FOLD WAS REJECTED ON THE EVIDENCE; A MAP SHIPPED INSTEAD** — opened 2026-09-08 — session e51345f0-a9cd-4de1-939e-deaa6ea9918
 - `ledger-repair-invariants` — **ORPHANED 2026-09-08** — opened 2026-09-05 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 To resume: **NO FILES CLAIMED** (`.syndicate/` and `.claude
 - `ledger-tab-escape-fix` — CLOSED 2026-09-18 — opened 2026-09-18 — session 4991d2ec-b2c2-4040-9042-d98867b768ab — **GOAL MET: 3 lines repaired, 0 tab or BEL bytes left in lanes.md / lanes_closed.md**
+- `live-edge-basis` — live-edge-basis — CLOSED-VERIFIED 2026-08-17 — **SHIPPED AND MEASURED. `edge_basis` observed on served rows (refresh-worker `b20072cd`, build 17:44:30 → `lanes_closed.md`.
 - `live-gameline-accuracy-cut-repoint` — CLOSED 2026-09-12 — session 50d991d1
 - `live-odds-worker-oom` — CLOSED 2026-09-15 — opened 2026-09-12 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **GOAL: MET**
 - `market-history-index-memo` — CLOSED 2026-09-18 (GOAL: MET) — opened 2026-09-18 — session a1e40980-cceb-493f-adf9-5a5ca879acf6 — body in `lanes_history.md`.
@@ -1353,6 +1363,7 @@ death, never life — do not invert it.
 - `mlb-live-lens-payload-dup` — CLOSED 2026-09-15 — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **GOAL: MET**
 - `mlb-live-prop-prob-merge` — ORPHANED — — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57 — **UNOWNED, session 1c88bcca archived 2026-08-31.** Fix deployed, unver
 - `mlb-live-segment-pricing` — **CLOSED-MEASURED 2026-09-08** — opened 2026-09-07 — session 3492626c — **MEASURED: first5 DISCRIMINATES at 3.82 sigma out of sample (top tercile 67.4
+- `mlb-mobile-live-residual` — mlb-mobile-live-residual — CLOSED 2026-08-16 — HYPOTHESIS FALSIFIED; it is a false alarm, the Live fit is convex and `fitRatio` cannot see curvature — → `lanes_closed.md`.
 - `mlb-past-date-chip-score` — CLOSED 2026-09-18 — opened 2026-09-18 — session 860a40b7-573a-4471-9f94-8b978dd9cfe0 — **GOAL MET: served 09-15 MLB book-grid `games_with_outcome` 0 -> 15 (skipped-no-score 15 -> 0) after refresh-worker `84700b9b` (live 15:18:03Z) + one-shot rebuild; env key deleted after**
 - `mlb-prop-phase1` — **CLOSED-VERIFIED 2026-09-08** — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **`#624` STEP 1 COMPLETE AND VERIFIED ON EVERY SPO
 - `mlb-resolver-write-side-effect` — ORPHANED, **NARROWED — — NOT A LIVE INCIDENT** — opened 2026-08-29 — session 6475567d-f806-45a7-880c-f633718f2411 — **UNOWNED, handed off**
@@ -1368,16 +1379,20 @@ death, never life — do not invert it.
 - `ncaaf-live-resim-wire` — CLOSED 2026-09-10 — opened 2026-09-05 — session 520cd594 — **GOAL: MET on its one testable outcome (`sources_seen {live_resim: 9}` = `live_resimmed 9`; 74-83 rows `live_aware`); edge clause withheld by design; residuals moved to `leads.md`**
 - `ncaaf-pace-block` — ORPHANED, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — — NCAAF calibration re-fitted and PROMOTED
 - `ncaaf-player-data` — CLOSED 2026-09-18 (GOAL: MET; artifact on web, 197/209 prop rows projected on the first board after it, Ask last-N + season-to-date + projections live) — opened 2026-09-18 — session 259d6003-bff3-416d-835f-12f4f7f584d8
+- `ncaaf-schedule-fallback` — ncaaf-schedule-fallback — **CLOSED-VERIFIED 2026-08-16 — `#445` fixed in `483bb9dd`, on `origin/main`. NOT DEPLOYED (NCAAF opens 08-29)** — opened 202 → `lanes_closed.md`.
 - `ncaaf-segment-capture` — **ORPHANED 2026-09-08** — opened 2026-09-05 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 To resume: **NO FILES CLAIMED** (deliberate -- claiming the
 - `ncaaf-segment-markets` — **CLOSED-VERIFIED 2026-09-08** — opened 2026-09-05 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **SETTLEMENT HAZARD CONFIRMED, FIXED AND LANDED (`
 - `ncaaf-sim-inseason-ratings` — CLOSED 2026-09-18 (GOAL: MET; blend applied 23:16:15Z, served 57/57 before Saturday kickoffs; totals effect unmeasured -> todo #677) — opened 2026-09-18 — session 259d6003-bff3-416d-835f-12f4f7f584d8
 - `ncaaf-tbd-kickoff-date` — CLOSED 2026-09-11 — opened 2026-09-11 — session 53eaee9c-46e9-4c34-8075-d63d7f63c933 — **GOAL MET: the TBD Saturday games left Friday's strip and read "Sat Sep 12 · TBD" on Saturday, on refresh-worker `889d4e12` and web `0022ecb1`.**
 - `ncaaf-window-reason` — CLOSED 2026-09-11 — opened 2026-09-09 — session 2edf8b82-9f8a-4d32-bf26-ca43ecd1ea5a
+- `nfl-fantasy-projections` — CLOSED-VERIFIED 2026-08-21 — `/nfl/fantasy` live: ESPN-scoring 2026 season+weekly projections, VOR board, and a news layer that captures, accumulates and renders (web `003a5866`)  → `lanes_closed.md`.
 - `nfl-layer2-kalshi-identity` — CLOSED 2026-09-13 — opened 2026-09-10 — session 53eaee9c-46e9-4c34-8075-d63d7f63c933 — **GOAL MET: Kalshi NFL prop quotes carry display labels and game identity (1,299 of 1,299 in web's 09-13 shard), and with games live 0 served NFL rows lack identity; the prop-artifact half was met 2026-09-10.**
 - `nfl-live-props-board-lane` — CLOSED 2026-09-15 — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - `nfl-live-props-missing` — CLOSED 2026-09-13 — opened 2026-09-13 — session ed8bb082-2b7f-4de3-8f8c-f33071f42ce0 — **GOAL MET: first zero stage was `events_in_scope` dropping started events (0 of 1,998 props seen after kickoff); fix `637278e3` live on live-odds-worker, and Layer 2 served 278 live NFL props at 22:44:36Z (0 before).**
 - `nfl-live-resim-flagged` — **ORPHANED 2026-09-08** — opened 2026-09-07 — session 3492626c — **BUILT, DEFAULT OFF, and NOT WIRED. The producer exists and nothing calls it. `SYNDI
 - `nfl-ncaaf-ui-parity` — **CLOSED-VERIFIED 2026-09-08, REOPENED AND RE-CLOSED THE SAME DAY** — opened 2026-09-07 — session 5f605b51-5a4b-4bac-a629-10d7ed796928 — **GOAL (verba
+- `nfl-pbp-fetcher` — nfl-pbp-fetcher — **CLOSED-VERIFIED 2026-08-16 18:31:15Z — pbp_2025.csv written on the mounted disk (97,951,481 bytes, 46,452 REG plays) and the guard → `lanes_closed.md`.
+- `nfl-pbp-root-resolution` — nfl-pbp-root-resolution — **CLOSED 2026-08-16 — resolution mechanism PROVEN CORRECT and the hypothesis FALSIFIED in the same reading. `#441` root caus → `lanes_closed.md`.
 - `nfl-projection-et-datekey` — **CLOSED-VERIFIED 2026-09-08** — opened 2026-09-04 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **DEFECT CONFIRMED ON `origin/main`, FIXED, MUTATI
 - `nfl-prop-certainty-refusal` — CLOSED 2026-09-12 — opened 2026-09-12 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - `nfl-prop-grading` — ORPHANED 2026-09-17 — opened 2026-09-10 — session 2edf8b82-9f8a-4d32-bf26-ca43ecd1ea5a (archived 2026-09-11, so UNOWNED) — **ORPHANED, UNOWNED [ownership sweep 2026-09-17 ~17:10Z, session a1e40980, user decision: owning session 2edf8b82 archived 2026-09-11, transcript idle 143.0 h; no uncommitted ...** — body in `lanes_history.md`.
@@ -1410,10 +1425,12 @@ death, never life — do not invert it.
 - `ranking-records-build-cost` — CLOSED — opened 2026-09-17 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — body in `lanes_history.md`.
 - `refresh-worker-disk-inventory` — CLOSED 2026-09-13 — opened 2026-09-13 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - `render-cron-failures` — CLOSED 2026-09-08, **GOAL: MET 2026-09-09** — opened 2026-09-08 — session e371dfde — **all three defects fixed, deployed and MEASURED, and the SCHEDULED runs the goal asked for are now READ**: `sim-input-reports` `crn-dafj4ie7bikc738q9ol0-29815620` 07:00:35Z→ 07:02:26Z `successful` with `nhl_source ... alarms=21`; `ci-suite` `crn-dafg4h0u01pc73aavs6g-29815680` 08:00:37Z→ 08:44:58Z `nonZeroExit: 1` with **no `oomKilled`**, `collected=16668`, 9/10 steps rc=0, 15 NEW of which 14 are the 3000 MB floor on a 2048 MB runner. Shape change: the layout-independent stable core is **14, not 15**. Block updated in place in `lanes_history.md`; readings in `deploys.md` 2026-09-09 08:44:58Z.
+- `render-events-reader` — render-events-reader — CLOSED-VERIFIED 2026-08-16 — **`scripts/render_events.py` + `tests/test_render_events.py` SHIPPED TO THE TREE (no deploy — this → `lanes_closed.md`.
 - `render-web-request-path` — **ORPHANED, UNOWNED, CLAIMS RELEASED** `[session 726ef4ff checkpointed and archived 2026-08-22 ~19:4xZ]` — — **SHIPPED AND MEASURED; ONE ITEM OWED**
 - `sept-spike-captures` — CLOSED 2026-09-11 — opened 2026-09-11 — session 92a71e78-b21c-4366-a900-f7a3f6fc434d — **ALL NINE CAPTURED CLEAN, AND EVERY ONE METERED BELOW ITS SERVED TRAFFIC (m/app 0.17-0.66). The pre-registered test resolved to its second branch: the 09-08 run stands alone.**
 - `session-scope-drift-guard` — **CLOSED 2026-09-08 — falsification test RAN: rate passes (0.50 firings/session, 73% silent), precision does NOT (6 of 11 firings were in-goal). Kept,
 - `settled-sample-nfl-reconcile` — CLOSED 2026-09-10 — opened 2026-09-04 — session none recorded — **GOAL: MET: the consumer counted order rows, not decisions (`53d8f9c9`); prod `nfl: 12` / credibility 0.25 on 09-04 and 09-10**
+- `sim-scheduling` — sim-scheduling — **DEPLOYED AND MEASURED 2026-08-16 21:2xZ.** `#441` verified live; `#445` shipped but unverifiable today; layer2 (both halves) shippe → `lanes_closed.md`.
 - `sim-sizing-skill-gate` — CLOSED, GOAL MET — opened 2026-09-19, closed 2026-09-20 04:12Z — session a1e40980-cceb-493f-adf9-5a5ca879acf6 — body in `lanes_history.md`.
 - `sim-view-reachability-caveat` — CLOSED 2026-09-16 — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77 — **GOAL: MET** (2026-09-16 ~17:55 CT). Web `c49ecd3d` has been live since 22:45:21Z; the read at 22:46:11Z has no `unreachable` key, `market_fair_only` equal to the four, and the flag on 20 of 20 cross buckets with 0 disagreeing with their verdict (`deploys.md` ... Body in `lanes_history.md`.**
 - `sim-view-roi-decision-count` — CLOSED 2026-09-17 — opened 2026-09-16 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77 — **GOAL: MET** (2026-09-17 01:15Z). Web `6b26e0c1` has been live since 01:10:24Z. The read at 01:11:16Z has `decisions` and `settled_decisions` on 20/20 cross and 5/5 pooled buckets and 0 bucket violations; `sample` shows 373 decisions, 2 in more than one verdi ... Body in `lanes_history.md`.**
@@ -1424,6 +1441,7 @@ death, never life — do not invert it.
 - `soccer-h24-grader` — CLOSED 2026-09-17 — opened 2026-09-17 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77 — **GOAL: MET 2026-09-17 ~20:40 CT** (`log/2026-09-17.md`): the first production grade joined 2 finished frozen La Liga matches through outcome, FotMob factor (full window), both arms and the football-data close. Body in `lanes_history.md`.**
 - `soccer-live-corners-box-fallback` — CLOSED 2026-09-18 — opened 2026-09-18 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77 — **GOAL: MET** (`deploys.md` READING 19:26Z): the served Belgian game Gent v Standard Liege read `corners_source=box_fallback` 2-0 at 17' and 2-4 at 25', equal to ESPN's own box, with `commentary_empty` 0-0 before any corner; the published total includes the co ... Body in `lanes_history.md`.**
 - `soccer-live-corners-dispersion` — CLOSED 2026-09-18 — opened 2026-09-18 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77 — **GOAL: MET 2026-09-18 ~10:13 CT (15:13Z)** (`log/2026-09-18.md`): the TEST run happened on the registered rules, and its numbers and verdict are in the log. Body in `lanes_history.md`.**
+- `soccer-live-game-state` — soccer-live-game-state — CLOSED-VERIFIED 2026-08-16 18:56Z — a kicked-off match is no longer `pregame`, and no finished match carries an edge → `lanes_closed.md`.
 - `soccer-live-gameline-name-join` — CLOSED 2026-09-19 — opened 2026-09-18 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77 — **GOAL: MET.** refresh-worker `ef5ab75b` (live 15:08:29Z) contains `a67eb26c`, `a2b1b466` and `f80120f3`. Served soccer book grid 15:27:39Z: 17 in-play matches, 16 JOINED + 1 STALE (Strasbourg @ Paris FC, keys equal, quotes past the ceiling), 0 DEFECT, 0 RESID ... Body in `lanes_history.md`.**
 - `soccer-live-loop-cost` — CLOSED 2026-09-19 — opened 2026-09-19 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77 — **GOAL: MET** (~10:49 CT (15:49Z)): a steady production tick on today's live slate (15 matches in play, 80 sims) timed at 73.2 s locally, Monte Carlo 73% (projection 25.7%, player props 25.2%, goal windows 22.1%), FotMob momentum 15.1%, ESPN 5.0%, disk 6.0%; t ... Body in `lanes_history.md`.**
 - `soccer-live-model-study` — CLOSED 2026-09-17 — opened 2026-09-17 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77 — **GOAL: MET** (2026-09-17 ~16:05 CT): all three live-model claims from `#664` item 7 now have a pre-registered held-out verdict and none licensed an engine change from this lane. Body in `lanes_history.md`.**
@@ -1435,10 +1453,22 @@ death, never life — do not invert it.
 - `soccer-shot-on-target-definition` — CLOSED 2026-09-17 — opened 2026-09-17 — session a1e40980-cceb-493f-adf9-5a5ca879acf6 — body in `lanes_history.md`.
 - `soccer-shot-woodwork-undercount` — CLOSED 2026-09-17 — opened 2026-09-17 — session a1e40980-cceb-493f-adf9-5a5ca879acf6 — body in `lanes_history.md`.
 - `soccer-unfed-inputs` — CLOSED 2026-09-10 — opened 2026-09-07 — session 520cd594 — **GOAL: MET: soccer gate runs in production (alarms 6 -> 2, both unsourced) and the market prior's A/B moved; prior stays OFF on a null backtest; closed by `census-rescue-0910` on user decision**
+- `spread-line-sign-convention` — spread-line-sign-convention — CLOSED-VERIFIED 2026-08-16 — **ARTIFACT OUTPUT NOW MEASURED: 12 of 12 MLB spreads rows correct on the served shortlist ( → `lanes_closed.md`.
 - `state-read-expand-choke-point` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: `_read_state_payload` expands; the round-trip test FAILS with the expansion removed (5 failed) and passes with it; no production behaviour change, not deployed.**
 - `todo-id-alloc-worktrees` — CLOSED 2026-09-10 — opened 2026-09-10 — session 4d4e0959-c99d-4777-bebb-37851c341e75 — **GOAL MET: one id lock per machine (the git common dir) and a mark that includes `origin/main`. The unfixed script handed 101 to two real worktrees; the fix gives 108/109. 15/15 tests. `--show` equals the independent mark (652), and this lane's own `#653` came from the fixed tool. Tooling only, no deploy.**
 - `todo-id-push-reserve` — CLOSED 2026-09-10 — opened 2026-09-10 — session 4d4e0959-c99d-4777-bebb-37851c341e75 — **GOAL MET: ids are reserved on the remote. Two separate clones got 101/102 through a real bare remote (the previous version gave 101/101); that remote REJECTED a stale-base reservation; the real reservation `f08c0125` (`#654`) touched one file and started no CI run. Tooling only, no deploy.**
 - `tripwire-bucket-window` — CLOSED 2026-09-10 — opened 2026-09-10 — session 92a71e78-b21c-4366-a900-f7a3f6fc434d — **FIXED AND VERIFIED: the tripwire, the arm 2 gate and the reader all pair a bandwidth bucket with its own hour; all 23 captures re-derived and both falsification tests passed.**
+- `ui-probe-baseline-nfl-ncaaf` — ui-probe-baseline-nfl-ncaaf — CLOSED 2026-08-16 — armed for nfl/ncaaf only; mlb stays watch-only — opened 2026-08-16 — session: ui-probe-rerun-compare → `lanes_closed.md`.
+- `ui-probe-curvature-detection` — ui-probe-curvature-detection — CLOSED 2026-08-16 — `curved` forces `reliable:false`; Preview (the falsification case) is not flagged — opened 2026-08- → `lanes_closed.md`.
+- `ui-probe-desktop-height-model` — ui-probe-desktop-height-model — CLOSED 2026-08-16 — desktop is UNFITTABLE, not mis-tuned; measured the floor instead of tuning the threshold — opened  → `lanes_closed.md`.
+- `ui-probe-peer-deviation-gate` — ui-probe-peer-deviation-gate — CLOSED 2026-08-16 — one model-free height rule; production green, coverage gap printed — opened 2026-08-16 — session: u → `lanes_closed.md`.
+- `ui-probe-peer-min-group` — ui-probe-peer-min-group — CLOSED 2026-08-16 — verdicts need n>=3; thin groups reported, never dropped — opened 2026-08-16 — session: ui-probe-rerun-co → `lanes_closed.md`.
+- `ui-probe-proportional-budget` — ui-probe-proportional-budget — CLOSED 2026-08-16 — shipped; falsification test FIRED (proportional does not tighten the spread) but it fixes the width → `lanes_closed.md`.
+- `ui-probe-settle-plateau` — ui-probe-settle-plateau — CLOSED 2026-08-16 — the settle now needs 2400ms of stillness, and a verdict resting on absence says so — opened 2026-08-16 — → `lanes_closed.md`.
+- `ui-probe-tab-click-race` — ui-probe-tab-click-race — CLOSED 2026-08-16 — cause UNPROVEN and not reproduced; the blindness that made it undiagnosable is fixed — opened 2026-08-16 → `lanes_closed.md`.
+- `ui-probe-tie-floor-tracking` — ui-probe-tie-floor-tracking — CLOSED 2026-08-16 — floor collected on every row; 5 of 6 stable, mlb mobile fires the rule at 2.06x — opened 2026-08-16  → `lanes_closed.md`.
+- `ui-probe-tie-statistic` — ui-probe-tie-statistic — CLOSED 2026-08-16 — implemented as decided; the statistic did NOT help and the instability is the SLATE — opened 2026-08-16 — → `lanes_closed.md`.
+- `ui-probe-tracked-statistic-revert` — ui-probe-tracked-statistic-revert — CLOSED 2026-08-16 — reverted to worstGroupPx; exposed and fixed two false alarms that were failing a healthy board → `lanes_closed.md`.
 - `venue-candidate-key-token-guard` — ORPHANED, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — — opened 2026-08-27 — session 764eca35-178c
 - `venue-quote-line-join` — ORPHANED, **UNOWNED** (session 3515d143 archived 2026-08-27 ~21:45Z; ALL CLAIMS RELEASED, worktree clean, nothing uncommitted) — — **SIX DEFECTS FIXED
 - `watcher-admin-token` — CLOSED 2026-09-10 — opened 2026-09-10 — session 78cad512 — **GOAL: MET: the unknown-submit watcher authenticates (X-Admin-Token via a temp header file) and its scheduled run reads http=200**
@@ -1596,88 +1626,3 @@ decision was about).
 ## MERGED FROM origin/main - reconciliation pass
 
 Blocks whose content was absent from the merged result. Appended verbatim, nothing edited.
-
-## Archived lanes (full bodies in `lanes_closed.md`)
-- `live-edge-basis` — live-edge-basis — CLOSED-VERIFIED 2026-08-17 — **SHIPPED AND MEASURED. `edge_basis` observed on served rows (refresh-worker `b20072cd`, build 17:44:30 → `lanes_closed.md`.
-- `nfl-pbp-root-resolution` — nfl-pbp-root-resolution — **CLOSED 2026-08-16 — resolution mechanism PROVEN CORRECT and the hypothesis FALSIFIED in the same reading. `#441` root caus → `lanes_closed.md`.
-- `render-events-reader` — render-events-reader — CLOSED-VERIFIED 2026-08-16 — **`scripts/render_events.py` + `tests/test_render_events.py` SHIPPED TO THE TREE (no deploy — this → `lanes_closed.md`.
-- `ui-probe-settle-plateau` — ui-probe-settle-plateau — CLOSED 2026-08-16 — the settle now needs 2400ms of stillness, and a verdict resting on absence says so — opened 2026-08-16 — → `lanes_closed.md`.
-- `ui-probe-desktop-height-model` — ui-probe-desktop-height-model — CLOSED 2026-08-16 — desktop is UNFITTABLE, not mis-tuned; measured the floor instead of tuning the threshold — opened  → `lanes_closed.md`.
-- `ui-probe-tie-floor-tracking` — ui-probe-tie-floor-tracking — CLOSED 2026-08-16 — floor collected on every row; 5 of 6 stable, mlb mobile fires the rule at 2.06x — opened 2026-08-16  → `lanes_closed.md`.
-- `ui-probe-tie-statistic` — ui-probe-tie-statistic — CLOSED 2026-08-16 — implemented as decided; the statistic did NOT help and the instability is the SLATE — opened 2026-08-16 — → `lanes_closed.md`.
-- `ui-probe-tracked-statistic-revert` — ui-probe-tracked-statistic-revert — CLOSED 2026-08-16 — reverted to worstGroupPx; exposed and fixed two false alarms that were failing a healthy board → `lanes_closed.md`.
-- `branch-overlap-baseline-instrumentation` — branch-overlap-baseline-instrumentation — CLOSED 2026-08-16 — the baseline was sampling hours where the failure does not happen — session: `branch-ove → `lanes_closed.md`.
-- `ui-probe-baseline-nfl-ncaaf` — ui-probe-baseline-nfl-ncaaf — CLOSED 2026-08-16 — armed for nfl/ncaaf only; mlb stays watch-only — opened 2026-08-16 — session: ui-probe-rerun-compare → `lanes_closed.md`.
-- `mlb-mobile-live-residual` — mlb-mobile-live-residual — CLOSED 2026-08-16 — HYPOTHESIS FALSIFIED; it is a false alarm, the Live fit is convex and `fitRatio` cannot see curvature — → `lanes_closed.md`.
-- `branch-overlap-manual-run-marker` — branch-overlap-manual-run-marker — CLOSED — opened 2026-08-16 — session: `branch-overlap-baseline-watch` — verified in production 2026-08-16T19:52:23+ → `lanes_closed.md`.
-- `ui-probe-peer-deviation-gate` — ui-probe-peer-deviation-gate — CLOSED 2026-08-16 — one model-free height rule; production green, coverage gap printed — opened 2026-08-16 — session: u → `lanes_closed.md`.
-- `layer1-board-coverage` — layer1-board-coverage — UPDATE 2026-08-16 17:5xZ — **DEPLOYED AND FALSIFICATION TEST PASSED. Supersedes this lane's "UNDEPLOYED" line above.** → `lanes_closed.md`.
-- `ui-probe-curvature-detection` — ui-probe-curvature-detection — CLOSED 2026-08-16 — `curved` forces `reliable:false`; Preview (the falsification case) is not flagged — opened 2026-08- → `lanes_closed.md`.
-- `ui-probe-proportional-budget` — ui-probe-proportional-budget — CLOSED 2026-08-16 — shipped; falsification test FIRED (proportional does not tighten the spread) but it fixes the width → `lanes_closed.md`.
-- `layer1-board-coverage` — layer1-board-coverage — **CLOSE REFUSED 2026-08-16 18:0xZ.** Verification is not met, and a NEW production defect was found in this lane's own scope w → `lanes_closed.md`.
-- `soccer-live-game-state` — soccer-live-game-state — CLOSED-VERIFIED 2026-08-16 18:56Z — a kicked-off match is no longer `pregame`, and no finished match carries an edge → `lanes_closed.md`.
-- `ui-probe-tab-click-race` — ui-probe-tab-click-race — CLOSED 2026-08-16 — cause UNPROVEN and not reproduced; the blindness that made it undiagnosable is fixed — opened 2026-08-16 → `lanes_closed.md`.
-- `layer1-board-coverage` — layer1-board-coverage — SCOPE ADDED 2026-08-16 20:0xZ — the HR threshold ladder → `lanes_closed.md`.
-- `ui-probe-peer-min-group` — ui-probe-peer-min-group — CLOSED 2026-08-16 — verdicts need n>=3; thin groups reported, never dropped — opened 2026-08-16 — session: ui-probe-rerun-co → `lanes_closed.md`.
-- `sim-scheduling` — sim-scheduling — **DEPLOYED AND MEASURED 2026-08-16 21:2xZ.** `#441` verified live; `#445` shipped but unverifiable today; layer2 (both halves) shippe → `lanes_closed.md`.
-- `game-shape-capture` — game-shape-capture — UPDATE 2026-08-16 ~23:0xZ (checkpoint) — **PRIMITIVE COMMITTED `af3017e6`; EMIT STILL BLOCKED; HANDOFF SENT** → `lanes_closed.md`.
-- `ncaaf-schedule-fallback` — ncaaf-schedule-fallback — **CLOSED-VERIFIED 2026-08-16 — `#445` fixed in `483bb9dd`, on `origin/main`. NOT DEPLOYED (NCAAF opens 08-29)** — opened 202 → `lanes_closed.md`.
-- `nfl-pbp-fetcher` — nfl-pbp-fetcher — **CLOSED-VERIFIED 2026-08-16 18:31:15Z — pbp_2025.csv written on the mounted disk (97,951,481 bytes, 46,452 REG plays) and the guard → `lanes_closed.md`.
-- `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
-- `spread-line-sign-convention` — spread-line-sign-convention — CLOSED-VERIFIED 2026-08-16 — **ARTIFACT OUTPUT NOW MEASURED: 12 of 12 MLB spreads rows correct on the served shortlist ( → `lanes_closed.md`.
-- `commit-guard-reads-wrong-index` — commit-guard-reads-wrong-index — CLOSED 2026-08-16 — the guard read the MAIN worktree's index while the commit used another one — session: `live-gamel → `lanes_closed.md`.
-- `ask-answer-substance` — ask-answer-substance — **CLOSED-VERIFIED 2026-08-16 — 8 deploys, all measured, live web `9f617f34`. The inline quick ask names a bet a human can place → `lanes_closed.md`.
-
-> Moved 2026-08-15 to bring this file back under the digest budget.
-> Nothing was deleted. Each line points at a full body — including the
-> file/line maps and the ORPHANED lanes' resume notes.
-
-- `mlb-prop-oos-calibration` — mlb-prop-oos-calibration — CLOSED-VERIFIED 2026-08-15 — D4 CLOSED: the split ran on production, `batter_hits` is the one verdict that did NOT survive  → `lanes_closed.md`.
-- `probability-clamp-removal` — probability-clamp-removal — CLOSED-VERIFIED 2026-08-15 — WNBA site fixed, scored 5/5, shipped as `de0c367f`; the other TWO sites are held by other OPE → `lanes_closed.md`.
-- `probability-differential-test` — probability-differential-test — CLOSED-VERIFIED 2026-08-15 — harness + table + owners shipped as `d448a100`; ONE live misprice CONFIRMED in production → `lanes_closed.md`.
-- `soccer-backtest-leakage` — soccer-backtest-leakage — CLOSED-VERIFIED 2026-08-14 — **ARCHIVED to `lanes_closed.md`**. Audit §7 #6. HEAD `2dcca4fe`; `50fd7fe2` ALONE IS UNSAFE TO  → `lanes_closed.md`.
-- `ask-headline-from-board` — ask-headline-from-board — CLOSED-VERIFIED 2026-08-15 — web `c774fe1a` live 03:29:56Z; B01 delta 0.000 and refusal 4/8 matching its control, both measu → `lanes_closed.md`.
-- `recommendation-lane-correctness` — recommendation-lane-correctness — CLOSED-VERIFIED 2026-08-14 — 4 shipped+measured; A3a (`28291eb6`) HELD BACK BY CHOICE, not by doubt — opened 2026-08 → `lanes_closed.md`.
-- `soccer-odds-coverage` — soccer-odds-coverage — ORPHANED-CLAIMS-RELEASED 2026-08-15 — claims on `refresh_odds_sources.py` released; the per-league cadence is NOT fixed — opene → `lanes_closed.md`.  **ORPHANED — resume notes + file claims in the archive.**
-- `soccer-projection-gap` — soccer-projection-gap — ORPHANED-CLAIMS-RELEASED 2026-08-15 — it claimed NO files; the 30% projection coverage is unchanged — opened 2026-08-14 — sess → `lanes_closed.md`.  **ORPHANED — resume notes + file claims in the archive.**
-- `wnba-skill-backtest` — wnba-skill-backtest — CLOSED-VERIFIED 2026-08-14 — opened 2026-08-14 — session: nfl-day-of-game → `lanes_closed.md`.
-- `wnba-skill-backtest` — wnba-skill-backtest — CLOSED-VERIFIED — superseded header, kept for the file/line map → `lanes_closed.md`.
-- `odds-capture-stall` — odds-capture-stall — CLOSED 2026-08-14 — NOT A DEFECT: the 2h gap IS the configured pregame cadence → `lanes_closed.md`.
-- `board-ui-freshness-slip-books` — board-ui-freshness-slip-books — CLOSED 2026-08-14 — all three shipped and verified → `lanes_closed.md`.
-- `build-time-estimate` — build-time-estimate — CLOSED 2026-08-14 — board build timed at ~2-4 min on current code; estimator can no longer collapse to ~0 — opened 2026-08-14 —  → `lanes_closed.md`.
-- `layer2-board-freshness` — layer2-board-freshness — CLOSED-VERIFIED 2026-08-14 (memory follow-on lives on branch `memory/overview-sum-to-max`, undeployed) — 3h clean window, all → `lanes_closed.md`.
-- `projection-skill-declaration` — projection-skill-declaration — CLOSED-VERIFIED 2026-08-14 — opened 2026-08-14 — session: nfl-day-of-game → `lanes_closed.md`.
-- `projection-skill-declaration` — projection-skill-declaration — CLOSED-VERIFIED — superseded header, kept for the file/line map → `lanes_closed.md`.
-- `projection-degeneracy-detector` — projection-degeneracy-detector — CLOSED-VERIFIED 2026-08-14 — opened 2026-08-14 — session: nfl-day-of-game → `lanes_closed.md`.
-- `projection-degeneracy-detector` — projection-degeneracy-detector — CLOSED-VERIFIED — superseded header, kept for the file/line map → `lanes_closed.md`.
-- `anon-allocation-site` — anon-allocation-site — ORPHANED-REASSIGNED 2026-08-15 — file claims released to `memory-watchdog-435`; the lane's OWN FINDINGS ARE NOT CLOSED — opened → `lanes_closed.md`.  **ORPHANED — resume notes + file claims in the archive.**
-- `nfl-degenerate-writer` — nfl-degenerate-writer — CLOSED-VERIFIED 2026-08-13 — opened 2026-08-13 — session: nfl-day-of-game → `lanes_closed.md`.
-- `nfl-degenerate-writer` — nfl-degenerate-writer — CLOSED-VERIFIED — superseded header, kept for the file/line map → `lanes_closed.md`.
-- `refresh-worker-anon-leak` — refresh-worker-anon-leak — ORPHANED-REASSIGNED 2026-08-15 — file claims released to `memory-watchdog-435`; the leak itself IS STILL UNEXPLAINED — open → `lanes_closed.md`.  **ORPHANED — resume notes + file claims in the archive.**
-- `nfl-day-of-game` — nfl-day-of-game — CLOSED-VERIFIED 2026-08-13 — opened 2026-08-13 — session: nfl-day-of-game → `lanes_closed.md`.
-- `nfl-day-of-game` — nfl-day-of-game — CLOSED-VERIFIED — superseded header, kept for the file/line map → `lanes_closed.md`.
-- `quote-join-enrich-cost` — quote-join-enrich-cost — CLOSED 2026-08-14 — all three verification criteria MET → `lanes_closed.md`.
-- `checkpoint-witness` — checkpoint-witness — CLOSED 2026-08-13 — opened 2026-08-13 — session: hooks-test → `lanes_closed.md`.
-- `checkpoint-guard-scope` — checkpoint-guard-scope — CLOSED-VOID 2026-08-13 — opened 2026-08-13 — session: hooks-test → `lanes_closed.md`.
-- `memory-guard-reclaimable` — memory-guard-reclaimable — CLOSED 2026-08-13 — fix VERIFIED, and it uncovered a leak → `lanes_closed.md`.
-- `mlb-props-regen` — mlb-props-regen — ORPHANED-CLAIMS-RELEASED 2026-08-15 — `live_refresh_loop.py` released; the props-regen fixes are NOT confirmed shipped — opened 2026 → `lanes_closed.md`.  **ORPHANED — resume notes + file claims in the archive.**
-- `hooks-enforcement-test` — hooks-enforcement-test — CLOSED 2026-08-13 — opened 2026-08-13 — session: hooks-test → `lanes_closed.md`.
-- `intelligence-state-red-baseline` — intelligence-state-red-baseline — CLOSED 2026-08-13 — opened 2026-08-13 — session: intel-state-baseline → `lanes_closed.md`.
-- `board-transport` — board-transport — CLOSED 2026-08-13 (work measured 08-10/11) → `lanes_closed.md`.
-- `sim-execution-observability` — sim-execution-observability — CLOSED-PENDING-MEASUREMENT 2026-08-13 → `lanes_closed.md`.
-- `soccer-sim-grouping` — soccer-sim-grouping — CLOSED 2026-08-10 — shipped and verified, one thread handed on → `lanes_closed.md`.
-- `layer1-live-tier` — layer1-live-tier — CLOSED-PENDING-MEASUREMENT 2026-08-13 → `lanes_closed.md`.
-- `internal-hostname-cutover` — internal-hostname-cutover — CLOSED 2026-08-13 — verified in production → `lanes_closed.md`.
-- `internal-hostname-cutover` — internal-hostname-cutover — CLOSED — opened 2026-08-13 — session: <name> → `lanes_closed.md`.
-- `ask-refusal-gate` — ask-refusal-gate — CLOSED-VERIFIED 2026-08-14 — refusal 3/8 -> 6/8 in production, zero regressions — opened 2026-08-14 — session: ask-audit → `lanes_closed.md`.
-- `ask-board-candidates` — ask-board-candidates — ORPHANED-CLAIMS-RELEASED 2026-08-15 — `ask_the_syndicate_data.py` released; M1 SHIPPED but a REVERT OF IT IS STAGED IN GIT — op → `lanes_closed.md`.  **ORPHANED — resume notes + file claims in the archive.**
-- `board-ui-visible-defects` — board-ui-visible-defects — CLOSED-VERIFIED 2026-08-14 — deployed as web `aadcde77`, every criterion measured in production — opened 2026-08-14 — sessi → `lanes_closed.md`.
-- `memory-cutover-ship` — memory-cutover-ship — CLOSED-VERIFIED 2026-08-15 — `#387` shipped in TWO halves (`cfee9c6e` + `705eeefc`), sports=8 restored, peak 34.3% of ceiling —  → `lanes_closed.md`.
-- `board-contract-absent-not-neutral` — board-contract-absent-not-neutral — ORPHANED-CLAIMS-RELEASED 2026-08-15 — 6 claims released incl. `game_board_contract.py`; partial work IS committed  → `lanes_closed.md`.  **ORPHANED — resume notes + file claims in the archive.**
-- `mlb-oom-outlier-2003z` — mlb-oom-outlier-2003z — CLOSED 2026-08-15 — QUESTION WAS MALFORMED: no outlier, 16 kills that day; H1 falsified — opened 2026-08-15 — session: memory- → `lanes_closed.md`.
-- `mlb-hydration-oom-435` — mlb-hydration-oom-435 — CLOSED 2026-08-15 — `build_cards_page_context` is 2 of 6 kills, NOT the common factor — opened 2026-08-15 — session: memory-cu → `lanes_closed.md`.
-- `memory-watchdog-435` — memory-watchdog-435 — CLOSED-VERIFIED 2026-08-15 — watchdog + 3 censuses live; ROOT CAUSE FOUND: append-only quote shard, 92.4% superseded, 6.3x read  → `lanes_closed.md`.
-- `odds-props-fabricated-probability` — odds-props-fabricated-probability — ORPHANED-CLAIMS-RELEASED 2026-08-15 — the two prop-refresh scripts released; work committed, artifact effect UNMEA → `lanes_closed.md`.  **ORPHANED — resume notes + file claims in the archive.**
-- `soccer-card-end-to-end` — soccer-card-end-to-end — CLOSED-VERIFIED 2026-08-15 — deployed as web `7e334509`, every criterion measured in production — opened 2026-08-15 — session → `lanes_closed.md`.
-- `model-audit-devig-and-hygiene` — model-audit-devig-and-hygiene — CLOSED-VERIFIED 2026-08-15 — #5 falsified then collapsed for real + D5 done (`2ac3c6bc`, committed, NOT deployed, cons → `lanes_closed.md`.
-- `nfl-fantasy-projections` — CLOSED-VERIFIED 2026-08-21 — `/nfl/fantasy` live: ESPN-scoring 2026 season+weekly projections, VOR board, and a news layer that captures, accumulates and renders (web `003a5866`)  → `lanes_closed.md`.
