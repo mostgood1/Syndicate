@@ -260,14 +260,14 @@ def test_a_game_that_has_not_started_has_no_close_and_its_shard_is_never_opened(
                      calls)
     assert [call[1] for call in calls] == [_DATE], "the future kickoff's shard was read"
     assert report["resolved"] == 1
-    assert report["unresolved_reasons"] == {"quotes_not_started": 1}
-    assert report["book_quotes_fallback"]["not_started"] == 1
+    assert report["unresolved_reasons"] == {"not_started": 1}
+    assert report["book_quotes_fallback"]["attempted"] == 1, "labelled before any source"
 
     # One minute before kickoff the same game is still not closed.
     early = _report(tmp_path, {_DATE: [_quote("2026-09-20T16:30:00+00:00", -120)]},
                     now=datetime(2026, 9, 20, 16, 59, tzinfo=timezone.utc))
     assert early["resolved"] == 0
-    assert early["unresolved_reasons"].get("quotes_not_started") == 2
+    assert early["unresolved_reasons"].get("not_started") == 2
 
 
 def test_an_opening_recorded_after_kickoff_is_named_in_play_and_never_looked_up(tmp_path):
@@ -301,6 +301,24 @@ def test_an_in_play_opening_is_named_so_on_the_history_path_too(tmp_path):
     }], "closing_price": None, "closing_line": None}}}
     report = compute_clv_for_date(_DATE, "mlb", root=tmp_path, history_payload=payload)
     assert report["unresolved_reasons"] == {"opened_in_play": 1}, "was close_precedes_open"
+
+
+def test_a_game_that_has_not_started_gets_no_history_close_either(tmp_path):
+    """mlb 2026-09-21 read at ~15:40Z: 1,039 'resolved' rows for games starting
+    from ~17:00Z. The history path's last pregame point was just the latest price."""
+    _record(tmp_path, _opening(sport="mlb", market="h2h", side="home", line=None,
+                               quote={"price": -120, "bookmaker": "betmgm"}))
+    key = (f"event_id={_EVENT}|home_team=Baltimore Ravens|away_team=Cleveland Browns"
+           "|market=h2h|bookmaker=betmgm")
+    payload = {"markets": {key: {"history": [{
+        "captured_at": "2026-09-20T14:00:00+00:00", "entity": "Baltimore Ravens",
+        "last_odds": -150.0, "line": {"home_odds": "-150", "away_odds": "+118"},
+    }], "closing_price": None, "closing_line": None}}}
+    before_kickoff = datetime(2026, 9, 20, 15, 0, tzinfo=timezone.utc)
+    report = compute_clv_for_date(_DATE, "mlb", root=tmp_path, history_payload=payload, now=before_kickoff)
+    assert report["unresolved_reasons"] == {"not_started": 1}
+    after = compute_clv_for_date(_DATE, "mlb", root=tmp_path, history_payload=payload, now=_NOW)
+    assert after["resolved"] == 1 and after["rows"][0]["close_source"] == "last_pregame_quote"
 
 
 def test_a_missing_shard_and_a_missing_kickoff_are_named(tmp_path):

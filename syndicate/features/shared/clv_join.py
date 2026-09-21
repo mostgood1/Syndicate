@@ -784,7 +784,7 @@ def _quote_closes_for_openings(
     ONLY GAMES THAT HAVE STARTED. A game that has not kicked off has no close
     yet -- its "last quote before kickoff" is just the current price, and
     differencing an opening against it is not CLV. So those openings are named
-    `quotes_not_started` and their shards are never opened. This is also what
+    `not_started` and their shards are never opened. This is also what
     bounds the cost where it matters most: `portfolio_commit` reaches this
     through `order_clv` on EVERY board build on refresh-worker, for today's
     date, whose openings mostly point at future kickoffs (ncaaf's board carries
@@ -898,7 +898,7 @@ def _quote_closes_for_openings(
         if position in in_play:
             resolved = {"close_price": None, "unresolved_reason": "opened_in_play"}
         elif position in not_started:
-            resolved = {"close_price": None, "unresolved_reason": "quotes_not_started"}
+            resolved = {"close_price": None, "unresolved_reason": "not_started"}
         elif not shards:
             resolved = {"close_price": None, "unresolved_reason": "quotes_no_kickoff_time"}
         elif any(shard in failed for shard in shards):
@@ -1105,6 +1105,7 @@ def compute_clv_for_date(
     # kickoff date for whatever history could not place -- a shard is up to
     # 186 MB, so it is streamed once for all of them, never once per opening.
     resolutions: list[tuple[Mapping[str, Any], str | None, dict[str, Any]]] = []
+    cutoff = now or datetime.now(timezone.utc)
     for opening in openings:
         key = _history_key(opening)
         # BEFORE ANY SOURCE IS ASKED. A bet the live board recorded after kickoff
@@ -1116,6 +1117,16 @@ def compute_clv_for_date(
         # and cannot remove a close.
         if _opened_in_play(opening):
             resolutions.append((opening, key, {"close_price": None, "unresolved_reason": "opened_in_play"}))
+            continue
+        # NOR DOES A GAME THAT HAS NOT KICKED OFF. Its "last observation before
+        # kickoff" is simply the latest price, and every source would hand it
+        # back as a close. MEASURED 2026-09-21: an mlb report read at ~15:40Z
+        # counted 1,039 resolved rows for games that started from ~17:00Z --
+        # provisional prices that fed a forward-CLV verdict as if they were
+        # closes. One rule for every source, decided here.
+        kickoff = _parse_ts(opening.get("commence_time"))
+        if kickoff is not None and kickoff > cutoff:
+            resolutions.append((opening, key, {"close_price": None, "unresolved_reason": "not_started"}))
             continue
         state = markets.get(key) if key else None
         resolved = resolve_close(opening, state if isinstance(state, Mapping) else None)
