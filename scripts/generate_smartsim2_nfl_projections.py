@@ -679,8 +679,9 @@ def week_schedule_from_real_schedule(season: int, week: int) -> list[dict[str, s
     isn't otherwise read by this script, which normally derives its game
     list from real play-by-play. Same idea as
     generate_smartsim2_ncaaf_projections.py's games_from_cfbd_when_engine_schedule_empty --
-    a second, independent real source, used only when the primary one is
-    empty, never silently blended with it."""
+    a second, independent real source. It is now the PRIMARY game list, unioned
+    with the pbp's by game_id in week_game_list(): used only as a fallback for
+    an EMPTY pbp week, it dropped every unplayed game once one had been played."""
     path = _real_schedule_path(season)
     if not path.exists():
         return []
@@ -701,6 +702,33 @@ def week_schedule_from_real_schedule(season: int, week: int) -> list[dict[str, s
                 continue
             rows.append({"game_id": game_id, "home_team": home_team, "away_team": away_team})
     return rows
+
+
+def week_game_list(
+    season: int, week: int, plays: list[tuple[int, str, str, str, float]]
+) -> tuple[list[dict[str, str]], dict[str, int]]:
+    """Every game of the week: the real schedule's rows, plus any game the pbp
+    has that the schedule lacks (a playoff game not yet in schedule_{season}.csv),
+    deduplicated by game_id.
+
+    The pbp alone is the wrong list for a week in progress: it only holds games
+    already PLAYED. The real schedule used to be read only when the pbp week was
+    EMPTY, so once one game had been played every unplayed game dropped out of
+    the file. Measured on production 2026-09-20/21: 2026 week 2 served 1 game
+    (Thursday's) from Friday night until Sunday night, then 8 of 16, with that
+    night's Monday game absent; week 1 lost its Monday game on 2026-09-14 the
+    same way. A union can never list fewer games than either source."""
+    pbp_rows = week_schedule(season, week, plays)
+    real_rows = week_schedule_from_real_schedule(season, week)
+    merged: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for row in real_rows:
+        if row["game_id"] not in seen:
+            seen.add(row["game_id"])
+            merged.append(row)
+    pbp_only = [row for row in pbp_rows if row["game_id"] not in seen]
+    merged.extend(pbp_only)
+    return merged, {"pbp_rows": len(pbp_rows), "real_schedule_rows": len(real_rows), "pbp_only_rows": len(pbp_only)}
 
 
 def build_projection(
@@ -833,13 +861,9 @@ def main() -> None:
     # surfacing as suspiciously round numbers 300 seeds later.
     assert_ratings_data_available(season=args.season, current_plays=current_plays, prior_plays=prior_plays)
 
-    schedule_rows = week_schedule(args.season, args.week, current_plays)
-    used_real_schedule_fallback = False
-    if not schedule_rows:
-        schedule_rows = week_schedule_from_real_schedule(args.season, args.week)
-        used_real_schedule_fallback = True
-        log(f"PBP_SCHEDULE_EMPTY falling back to real schedule_{args.season}.csv rows={len(schedule_rows)}")
-    log(f"SCHEDULE rows={len(schedule_rows)} used_real_schedule_fallback={used_real_schedule_fallback}")
+    schedule_rows, schedule_counts = week_game_list(args.season, args.week, current_plays)
+    schedule_detail = " ".join(f"{key}={value}" for key, value in schedule_counts.items())
+    log(f"SCHEDULE rows={len(schedule_rows)} {schedule_detail}")
 
     projections: list[SmartSimNflProjection] = []
     all_injury_diagnostics: list[dict] = []
@@ -939,7 +963,8 @@ def main() -> None:
 
     log(f"WRITE_DONE path={path} projections={len(projections)} elapsed={elapsed:.1f}s injury_adjustments={len(all_injury_diagnostics)}")
     print(f"schedule_rows={len(schedule_rows)}")
-    print(f"used_real_schedule_fallback={used_real_schedule_fallback}")
+    for key, value in schedule_counts.items():
+        print(f"{key}={value}")
     print(f"injury_adjustments_applied={len(all_injury_diagnostics)}")
     print(f"projections_written={len(projections)}")
     print(f"elapsed_seconds={elapsed:.1f}")

@@ -205,6 +205,88 @@ class RealScheduleFallbackTests(unittest.TestCase):
             content = artifact_path.read_text(encoding="utf-8")
             self.assertIn("2026_01_NE_SEA", content)
 
+    def _write_partial_week_pbp(self, tmp, season, week, teams, played_games):
+        """Current-season pbp for a week IN PROGRESS: every club has earlier-week
+        plays (so ratings exist), and only `played_games` carry plays at `week`
+        -- the state the file is in on a Sunday evening or a Monday."""
+        import csv
+        import os
+
+        directory = os.path.join(tmp, "tracking", "nflverse", "pbp")
+        os.makedirs(directory, exist_ok=True)
+        fieldnames = ["season_type", "week", "game_id", "home_team", "away_team", "posteam", "defteam", "play_type", "epa"]
+        with open(os.path.join(directory, f"pbp_{season}.csv"), "w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            for index, team in enumerate(teams):
+                other = teams[(index + 1) % len(teams)]
+                game_id = f"{season}_{week - 1:02d}_{other}_{team}"
+                base = {"season_type": "REG", "week": str(week - 1), "game_id": game_id, "home_team": team, "away_team": other}
+                writer.writerow({**base, "posteam": team, "defteam": other, "play_type": "pass", "epa": f"{0.10 + index * 0.05:.2f}"})
+                writer.writerow({**base, "posteam": other, "defteam": team, "play_type": "run", "epa": f"{-0.08 - index * 0.03:.2f}"})
+            for game_id, home_team, away_team in played_games:
+                base = {"season_type": "REG", "week": str(week), "game_id": game_id, "home_team": home_team, "away_team": away_team}
+                writer.writerow({**base, "posteam": home_team, "defteam": away_team, "play_type": "pass", "epa": "0.05"})
+                writer.writerow({**base, "posteam": away_team, "defteam": home_team, "play_type": "run", "epa": "-0.02"})
+
+    def test_main_keeps_unplayed_games_when_the_week_is_partly_played(self) -> None:
+        # The production defect, 2026-09-21: the pbp held 8 of week 2's 16
+        # games, the schedule fallback only fired on an EMPTY pbp week, and the
+        # file dropped the other 8 -- that night's Monday game among them.
+        import csv
+        import os
+        import sys
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+
+        scheduled = [
+            ("2026_02_DET_BUF", "BUF", "DET"),
+            ("2026_02_CAR_ATL", "ATL", "CAR"),
+            ("2026_02_NYG_LA", "LA", "NYG"),
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            self._write_real_schedule(tmp, 2026, [
+                {"game_id": game_id, "week": "2", "home_team": home, "away_team": away}
+                for game_id, home, away in scheduled
+            ])
+            self._write_partial_week_pbp(tmp, 2026, 2, ["BUF", "DET", "ATL", "CAR", "LA", "NYG"], played_games=scheduled[:1])
+            self._write_prior_season_pbp(tmp, 2025, ["BUF", "DET", "ATL", "CAR", "LA", "NYG"])
+            with patch.dict(os.environ, {"SYNDICATE_NFL_SOURCE_ROOT": tmp}, clear=False), patch.object(gen, "DATA_ROOT", Path(tmp)), patch.object(gen, "nfl_artifact_output_root", lambda: Path(tmp)), patch.object(
+                sys, "argv", ["generate_smartsim2_nfl_projections.py", "--season", "2026", "--week", "2", "--seeds", "2"],
+            ):
+                # The fixture must reproduce the production state, or this test
+                # proves nothing: the pbp's own week-2 list is ONE game.
+                self.assertEqual([row["game_id"] for row in gen.week_schedule(2026, 2, [])], ["2026_02_DET_BUF"])
+                gen.main()
+            artifact_path = Path(tmp) / "smartsim2_projections_2026_wk2.csv"
+            with artifact_path.open(encoding="utf-8", newline="") as handle:
+                written = [row["game_id"] for row in csv.DictReader(handle)]
+
+        self.assertEqual(sorted(written), sorted(game_id for game_id, _, _ in scheduled))
+
+    def test_week_game_list_unions_by_game_id(self) -> None:
+        # A game only the pbp knows (a playoff game not yet in the schedule
+        # file) is kept; a game in both appears once.
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            self._write_real_schedule(tmp, 2026, [
+                {"game_id": "2026_02_DET_BUF", "week": "2", "home_team": "BUF", "away_team": "DET"},
+                {"game_id": "2026_02_NYG_LA", "week": "2", "home_team": "LA", "away_team": "NYG"},
+            ])
+            pbp_rows = [
+                {"game_id": "2026_02_DET_BUF", "home_team": "BUF", "away_team": "DET"},
+                {"game_id": "2026_02_X_Y", "home_team": "Y", "away_team": "X"},
+            ]
+            with patch.object(gen, "DATA_ROOT", Path(tmp)), patch.object(gen, "nfl_artifact_output_root", lambda: Path(tmp)), patch.object(gen, "week_schedule", lambda season, week, plays: pbp_rows):
+                rows, counts = gen.week_game_list(2026, 2, [])
+
+        self.assertEqual([row["game_id"] for row in rows], ["2026_02_DET_BUF", "2026_02_NYG_LA", "2026_02_X_Y"])
+        self.assertEqual(counts, {"pbp_rows": 2, "real_schedule_rows": 2, "pbp_only_rows": 1})
+
 
 class BuildProjectionTests(unittest.TestCase):
     def test_seeded_output_is_deterministic_and_shaped_correctly(self) -> None:
