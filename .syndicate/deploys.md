@@ -39102,3 +39102,47 @@ test it: real opening fairs live only in the openings ledger (15.7 MB, over the
 was meaningless and is not recorded. This field is the instrument; a non-zero
 reading falsifies the construction argument.
 
+
+## 2026-09-21 00:30Z (2026-09-20 19:30 CT) — MEASUREMENT for the 00:18Z deploy — refresh-worker `d419cc24` — lane `layer2-line-move-magnitude` — **verify: FAILED. 3 of 4 MET, the one that mattered NOT MET. REVERTING.**
+
+Read against board `written_at` **00:28:17Z**, after the 00:21:07Z deploy.
+
+    field                                baseline -> measured      verdict
+    rows_with_movement_line_prob_basis   0        -> 342           MET (exact 328, interpolated 14)
+    moneyline_line_gate_waived_rows      0        -> 26            MET
+    line_moved_rows_scored               535/622  -> 342/652       MET (the intended drop)
+    movement_line_sign_conflict_rows     0        -> **174**       *** NOT MET ***
+
+**THE CONSTRUCTION ARGUMENT IS FALSIFIED, BY THE INSTRUMENT BUILT TO TEST IT.**
+I argued that a line move toward the pick must raise the ORIGINAL bet's
+probability, so sign and magnitude could not disagree. **174 of 342 scored rows
+(51%) disagree.** The argument was wrong, and it was wrong because it assumed
+something never checked: that the board's ALTERNATE-LINE FAIRS ARE MUTUALLY
+CONSISTENT. They are not.
+
+    mlb spreads_alt away  -1.5 -> +0.5   vs_pick away   delta **+37.22 pp**  component 1.0
+    nfl spreads     home  -1.5 -> -0.5   vs_pick away   delta **+16.10 pp**  component 0.9932
+
+Away moving from -1.5 to +0.5 makes away WEAKER, so `away -1.5` must become
+LESS likely. The curve says it gained 37 probability points. That is not a
+market move; it is two independently devigged alternate lines disagreeing.
+
+**AND IT IS WORSE THAN THE DEFECT IT REPLACED.** 105 of the 174 conflicts are
+sub-1 pp devig noise and harmless, but **85 rows carry a material score
+contribution (>=0.10) with a conflicting sign, and the worst sit AT THE CAP
+(1.0) pointing against the board's own displayed direction.** The old magnitude
+was unsound but bounded and always agreed with the chip; this one puts
+full-strength contributions the other way on 85 rows.
+
+**REVERTING to `96e17478`.** NOT with `--allow-rapid`, though preflight offers
+it for reverts: the defect is bounded (a capped term, 85 of 1,150 rows, no
+outage) while a rapid deploy freezes the board ~21 min and discards the build in
+flight (`#563`). Waiting out the 25 min spacing is strictly less disruptive.
+
+**WHAT WOULD BE NEEDED, recorded so this is not retried blind:** the same-bet
+comparison is only as good as the consistency of the alternate-line fairs it
+differences. Before any retry, MEASURE that consistency directly — within one
+build, a side's fair must be monotone in its line — and admit only identities
+that pass. The `movement_line_sign_conflict` field stays; it is the instrument
+that caught this and it cost one deploy to learn.
+
