@@ -153,7 +153,7 @@ Landed: the live-gameline measurement (178/178 rows, 10/10 games, against a pre-
 NOT landed: `state.md`. My edits there were surgical insertions into a contended table cell on a file 42 upstream commits stale; replaying them safely needs the same re-derivation the lanes work got, and I did not do it. **The measurement is fully recorded in `deploys.md`, so nothing is lost — but `state.md`, the file sessions read FIRST, does not yet carry it.** That is the one real gap left.
 
 ### A PREFIX BUG, CAUGHT BY AN ASSERTION
-`### <slug>` also matches a LONGER slug — a hyphen is a word boundary — so `ncaaf-live-resim` matched `ncaaf-live-resim-wire`, a different and still-OPEN lane. The pointer step asserted and refused to write 50 possibly-wrong lines. Checked directly on `origin/main` afterwards: `ncaaf-live-resim-wire` is still OPEN, `ncaaf-live-resim` is archived. Slug matching now uses `(?![a-z0-9-])`. **The assertion did the work a summary would not have.**
+`### <slug>\b` also matches a LONGER slug — a hyphen is a word boundary — so `ncaaf-live-resim` matched `ncaaf-live-resim-wire`, a different and still-OPEN lane. The pointer step asserted and refused to write 50 possibly-wrong lines. Checked directly on `origin/main` afterwards: `ncaaf-live-resim-wire` is still OPEN, `ncaaf-live-resim` is archived. Slug matching now uses `(?![a-z0-9-])`. **The assertion did the work a summary would not have.**
 
 <!-- primary tree (uncommitted) .syndicate/log/2026-09-08.md lines 744-744; nearest heading: ### ENCODING, FIFTH TIME -->
 

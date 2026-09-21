@@ -4536,7 +4536,7 @@ resets it, so a post-deploy reading always looks healthy.
 - *(evidence in `learnings_evidence.md`)*
 ## 2026-09-03 — FORBIDDEN: editing a ledger file with Python TEXT-mode I/O. It rewrites every line ending in the file, and `git diff` will not show you. `[scheduled task live-gameline-accuracy-snapshot, checkpoint]`
 
-- **Why nothing caught it.** `git diff --numstat` read `1	1` — correct, because `core.autocrlf` normalises on the way in, so the COMMIT would have been exactly the intended line. The mutation lived only in the working file, which is the copy every concurrent session reads directly. Git's warning (*"LF will be replaced by CRLF the next time Git touches it"*) is printed on every such diff and reads as boilerplate.
+- **Why nothing caught it.** `git diff --numstat` read `1\t1` — correct, because `core.autocrlf` normalises on the way in, so the COMMIT would have been exactly the intended line. The mutation lived only in the working file, which is the copy every concurrent session reads directly. Git's warning (*"LF will be replaced by CRLF the next time Git touches it"*) is printed on every such diff and reads as boilerplate.
 - *(evidence in `learnings_evidence.md`)*
 ## 2026-09-03 — FORBIDDEN: judging what a reworded ledger would lose by a LINE-level diff. It reports as unique the prose that was superseded, which is exactly the prose you must not land. `[state.md archival pass]`
 
@@ -4689,7 +4689,7 @@ resets it, so a post-deploy reading always looks healthy.
 - *(evidence in `learnings_evidence.md`)*
 ## 2026-09-04 — FORBIDDEN: verifying a ledger mutation with a BEFORE/AFTER set comparison computed by the parser that is blind to the thing at risk
 
-- **Neither check could have detected the failure it was standing in for, and the second was not independent.** Both sides of my comparison came from `check_lane_invariants.claims()`, which skips any block whose header fails `OPEN_RE = OPEN`. My own block's header read `**REOPENED 2026-09-03 for the READ side**` — and `OPEN` correctly rejects `REOPENED`, there being no word boundary inside it. So the six files that block declared were **never in the claim set at all**, and a block holding six unenforced claims moved out of `lanes.md` reporting `claims unchanged`.
+- **Neither check could have detected the failure it was standing in for, and the second was not independent.** Both sides of my comparison came from `check_lane_invariants.claims()`, which skips any block whose header fails `OPEN_RE = \bOPEN\b`. My own block's header read `**REOPENED 2026-09-03 for the READ side**` — and `\bOPEN\b` correctly rejects `REOPENED`, there being no word boundary inside it. So the six files that block declared were **never in the claim set at all**, and a block holding six unenforced claims moved out of `lanes.md` reporting `claims unchanged`.
 - *(evidence in `learnings_evidence.md`)*
 ## 2026-09-03 — FORBIDDEN: reporting a commit as PUSHED on the strength of a command that also succeeds when it is not. And after a rebase, `--is-ancestor` on the old SHA is not evidence it is absent. `[session c38d3e5c with f97ad5ab]`
 

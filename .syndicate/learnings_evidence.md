@@ -23312,7 +23312,7 @@ urgency completely had I assumed the opposite.
 
 A one-line surgical fix to `state.md` (+178 chars) left the file **11,249 bytes SMALLER**. `io.open(...).read()` converted 11,427 CRLF to LF on read; writing back with `newline=''` made that permanent across all 750KB.
 
-**Why nothing caught it.** `git diff --numstat` read `1	1` — correct, because `core.autocrlf` normalises on the way in, so the COMMIT would have been exactly the intended line. The mutation lived only in the working file, which is the copy every concurrent session reads directly. Git's warning (*"LF will be replaced by CRLF the next time Git touches it"*) is printed on every such diff and reads as boilerplate.
+**Why nothing caught it.** `git diff --numstat` read `1\t1` — correct, because `core.autocrlf` normalises on the way in, so the COMMIT would have been exactly the intended line. The mutation lived only in the working file, which is the copy every concurrent session reads directly. Git's warning (*"LF will be replaced by CRLF the next time Git touches it"*) is printed on every such diff and reads as boilerplate.
 
 It was caught by `wc -c` — a size that moved the wrong DIRECTION for an edit that only added text. The arithmetic then closed exactly: 750877 - 739628 + 178 = 11427 CRs.
 
@@ -24142,8 +24142,8 @@ re-parsing HEAD's copy against the written one ... (37 -> 37, identical)"*.
 **Neither check could have detected the failure it was standing in for, and the
 second was not independent.** Both sides of my comparison came from
 `check_lane_invariants.claims()`, which skips any block whose header fails
-`OPEN_RE = OPEN`. My own block's header read `**REOPENED 2026-09-03 for the
-READ side**` — and `OPEN` correctly rejects `REOPENED`, there being no word
+`OPEN_RE = \bOPEN\b`. My own block's header read `**REOPENED 2026-09-03 for the
+READ side**` — and `\bOPEN\b` correctly rejects `REOPENED`, there being no word
 boundary inside it. So the six files that block declared were **never in the
 claim set at all**, and a block holding six unenforced claims moved out of
 `lanes.md` reporting `claims unchanged`.
@@ -24169,7 +24169,7 @@ consistently wrong.
 
 `scripts/check_lane_claims.py::_near_miss_open` (session f97ad5ab) now fails on
 a block that declares files under a header containing `OPEN` but failing
-`OPEN` — REOPENED, OPENED — which is the emitter-side fix for this class.
+`\bOPEN\b` — REOPENED, OPENED — which is the emitter-side fix for this class.
 
 ## 2026-09-04 — FORBIDDEN: asserting absence from a range whose START YOU CHOSE — and the reason this one got through, which is the actually useful part
 

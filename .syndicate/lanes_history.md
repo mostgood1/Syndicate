@@ -16013,7 +16013,7 @@ needed: `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` (currently ABSENT = enabled).
   artifact rebuild** — the board build is the only choke point that bakes
   `finals_index` into the artifact, and web already proved presence != reachability
   for the sibling fix on 2026-08-28 15:09:55Z. Ride along; do not fire a deploy.
-  Worktree `C:	mp\syndicate-sessions
+  Worktree `C:\tmp\syndicate-sessions
 inals-silent-score-drop`, branch
   `session/finals-silent-score-drop` off `origin/main` `9618cc75`.
   Two counters, because `finals_seen`/`finals_level` count ROWS and the
@@ -19319,7 +19319,7 @@ session is actively editing it.
   `scripts/run_refresh_worker.py` for the backoff, and the user asked for a
   diagnosis.
 - **FIX COMMITTED 2026-08-29 — `ba8bf640` on `session/ncaaf-no-orders`, in this
-  session's own worktree (`C:	mp\syndicate-sessions
+  session's own worktree (`C:\tmp\syndicate-sessions
 caaf-no-orders`). NOT
   pushed, NOT deployed, no deploy claim taken.**
   New `syndicate/features/ncaaf/cfbd_backoff.py`: the policy as a pure,
@@ -23669,7 +23669,7 @@ lost no protection and no open lane left the session-start digest.
   (b) statistics must be MATCH-CLUSTERED — player rows in a match share one
   anchor shift, and the player-level sign test read p=0.0027 against its own
   t of -1.28.
-- Scratchpad scripts carry absolute paths (`C:	mp\syndicate-sessions\...`,
+- Scratchpad scripts carry absolute paths (`C:\tmp\syndicate-sessions\...`,
   a hardcoded `.env`) and `m2/m6/m7` names; they must be made
   `REPO_ROOT`-relative and renamed to the `backtest_/validate_/fetch_` convention
   before landing. A copy-paste would be unrunnable for anyone else.
@@ -32832,7 +32832,7 @@ Lines that sat UNCOMMITTED in the primary checkout's `.syndicate/lanes.md` (HEAD
 
 They are mirror copies other sessions wrote into the shared tree (lane headers, goal and claim lines, checkpoint verdicts, `Mirror:` markers), mostly from 2026-09-10..09-15. Each lane's CURRENT block lives in `lanes.md` or `lanes_closed.md` on main. These are believed SUPERSEDED, but that was NOT proven line by line, so they are kept here instead of discarded. `ratio` is the best `difflib` similarity to any line on main, and `where` is that line; below ~0.85 the wording is not on main.
 
-Each line is copied verbatim, indented 4 spaces inside the fence so that no `### <slug> — OPEN` text starts a line (the lane checkers scan for that shape). The U+FFFD characters were already in the mirror copy. Source backup: `C:	mp\primary-tree-backup-2026-09-15iles\.syndicate\lanes.md` (sha256 in its `manifest.json`).
+Each line is copied verbatim, indented 4 spaces inside the fence so that no `### <slug> — OPEN` text starts a line (the lane checkers scan for that shape). The U+FFFD characters were already in the mirror copy. Source backup: `C:\tmp\primary-tree-backup-2026-09-15\files\.syndicate\lanes.md` (sha256 in its `manifest.json`).
 
 ### mirror lines — `football-layer2-live-parity` (1)
 
@@ -34764,7 +34764,7 @@ SAFE_SLUGS=ranking-records-build-cost,intelligence-idle-poll,closed-lane-archive
 - GOAL MET. Moved to `lanes_closed.md` (one pointer each): `intelligence-idle-poll` (owner f26bba3b idle 612m), `closed-lane-archive-20260919-1100` (owner d8048c76 idle 606m), `closed-lane-archive-20260919-1358` (owner b684e529 idle 420m).
 - DEFERRED `ranking-records-build-cost` — SAFE by owner liveness (0f5b256e idle 1672m) but NOT eligible to the archive tool: its header carries no CLOSED date (`### ranking-records-build-cost — CLOSED — opened 2026-09-17 — session ...`), and `archive_closed_lanes_before.py` requires one both to select the block and to source the pointer text. Tools are shared and were not modified. Next run: either the owner adds a close date, or archive it by hand.
 - 26 other CLOSED blocks WAIT: owners abacd435, a1e40980, 4a583d41 were 0-1m idle at 02:19Z; `mlb-stop-publishing-edges` has an uncommitted `lanes.md` edit mentioning it in worktree `bandwidth-controlled-transfer`. Full table above.
-- Step-4 cross-check: the 5 worktrees under `C:	mp\syndicate-sessions` holding uncommitted `.syndicate/` edits (bandwidth-controlled-transfer, layer2-sim-disagrees, live-gameline-accuracy-cut-repoint, mlb-ledger-segment-visibility, soccer-board-mlb-parity) mention none of the 4 SAFE slugs and none of their owner session ids.
+- Step-4 cross-check: the 5 worktrees under `C:\tmp\syndicate-sessions` holding uncommitted `.syndicate/` edits (bandwidth-controlled-transfer, layer2-sim-disagrees, live-gameline-accuracy-cut-repoint, mlb-ledger-segment-visibility, soccer-board-mlb-parity) mention none of the 4 SAFE slugs and none of their owner session ids.
 - Measurement: `lanes.md` 655,538 → 645,824 B in-worktree (CRLF); `lanes_closed.md` 904,315 → 918,655 B; 101 block lines moved, 3 pointers added. `check_lane_invariants.py` in-worktree: exit 0, all three invariants `[ok]` (baseline on origin/main in a scratch dir: 2 FAIL — contested `pipeline/execute_portfolio.py`, marker `ncaaf-live-moneyline-release` with no block). No new FAIL.
 
 ### closed-lane-archive-20260919-2216 — CLOSED 2026-09-19 (GOAL NOT MET: 1 SAFE slug, 0 archivable — the shared tool rejects it) — opened 2026-09-19 — session 8eb963f9-1145-462a-ae71-d373a184d6ad

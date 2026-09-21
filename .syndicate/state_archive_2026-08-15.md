@@ -1279,7 +1279,7 @@ Nothing new is convicted. Four candidates are struck off, which narrows it.
   `session-start.sh` v3 requires literal `— OPEN`, so the digest reports **1
   open lane when the file lists 2**. v1's substring test had the opposite
   failure (it counted `NO LANE WAS EVER OPENED` as open). Neither strictness
-  is right: the fix is `OPEN` against the status field only, which
+  is right: the fix is `\bOPEN\b` against the status field only, which
   accepts `DEPLOYED, MEASUREMENT OPEN` and rejects `OPENED`/`REOPENED`.
   **FIXED in `559d353d`** — both hooks now take the field between the 1st
   and 2nd em-dash and match the WORD `OPEN` in it. Both agree on the same

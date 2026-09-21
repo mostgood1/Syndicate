@@ -1595,7 +1595,7 @@ half was held overnight through an OOM incident.)
   `/preflight`; re-read the live SHA in the same step that deploys (it moved
   five times on 08-13 and a stale one nearly shipped a rollback).
 - **FALSIFICATION TEST RUN 2026-08-14 02:3xZ — PASSED. The lane proceeds.**
-  Local, deploy-free (`C:	mp	raced_vs_real.py`), Python 3.11.9 / numpy
+  Local, deploy-free (`C:\tmp\traced_vs_real.py`), Python 3.11.9 / numpy
   1.26.4, `tracemalloc.start(1)`:
   ```
   allocation              RSS       traced    seen
@@ -1776,7 +1776,7 @@ Run against the REAL program, not the guard functions. 105 tests pass.
     shard loads completely buries a ~300MB/hour trend.
   - **The right metric was already in `.syndicate` memory: THE FLOOR IS THE
     RATCHET.** A leak raises the trough between cycles; peaks say nothing.
-    v3 (`C:	mp\leak_sampler3.py` -> `C:	mp\leak_floor.jsonl`) records
+    v3 (`C:\tmp\leak_sampler3.py` -> `C:\tmp\leak_floor.jsonl`) records
     min/p50/max across every reading in each window, every 5 min. **Read the
     running minimum of the per-window mins**, not the point series.
   - Current floor for reference: **anon min 1670.0MB at 23:19Z** (restart
@@ -1786,7 +1786,7 @@ Run against the REAL program, not the guard functions. 105 tests pass.
     whole-cycle trough. The running minimum across many windows is what
     approximates the true floor — a single window's min can still sit above it.
 - **CHECKPOINT 2026-08-13 23:3xZ — measurement running, NOT yet conclusive.**
-  - Floor sampler v3 live (`C:	mp\leak_sampler3.py` -> `C:	mp\leak_floor.jsonl`),
+  - Floor sampler v3 live (`C:\tmp\leak_sampler3.py` -> `C:\tmp\leak_floor.jsonl`),
     5-min windows, min/p50/max per window. **Read the RUNNING MINIMUM of the
     per-window mins**, never a point sample — v2's point series produced a
     retracted +2418 MB/hour.
