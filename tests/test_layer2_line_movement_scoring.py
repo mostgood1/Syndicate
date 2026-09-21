@@ -199,13 +199,6 @@ def _opening(*, line, price, fair, captured_at, key, bookmaker="betmgm"):
     }
 
 
-def _curve(row, points):
-    """`{line: fair}` -- what the board prices the SAME bet at, at each line,
-    RIGHT NOW. Alternate lines are published side by side, which is what makes a
-    same-bet comparison possible without any model."""
-    return {layer2_board.movement_join_key(row): dict(points)}
-
-
 def _now_iso(minutes_ago: float) -> str:
     from datetime import datetime, timedelta, timezone
 
@@ -216,52 +209,22 @@ def test_line_move_emits_a_probability_delta_where_it_used_to_emit_nothing():
     row = _row(line=7.5, price=-110, fair=0.61)
     key = layer2_board.movement_join_key(row)
     openings = {key: _opening(line=8.5, price=-110, fair=0.52, captured_at=_now_iso(30), key=key)}
-    # Our bet was `over 8.5` at .52; the market now prices that SAME bet at .43.
-    out = layer2_board._movement_from_opening(row, openings, _curve(row, {8.5: 0.43, 7.5: 0.61}))
+    out = layer2_board._movement_from_opening(row, openings)
 
     assert out["movement_basis"] == "line_moved"
     assert out.get("movement_price_delta") is None, "the price gate must still withhold this"
+    # A total FALLING with the pick on the OVER is the market moving AWAY.
     assert out["movement_vs_pick"] == "away"
-    assert out["movement_line_prob_basis"] == "same_bet_exact"
     assert out["movement_line_prob_delta_pp"] == pytest.approx(-9.0, abs=1e-6)
-    assert out.get("movement_line_sign_conflict") is None
 
 
 def test_line_move_toward_the_pick_is_signed_positive():
     row = _row(line=9.5, price=-110, fair=0.60)
     key = layer2_board.movement_join_key(row)
     openings = {key: _opening(line=8.5, price=-110, fair=0.52, captured_at=_now_iso(30), key=key)}
-    out = layer2_board._movement_from_opening(row, openings, _curve(row, {8.5: 0.63, 9.5: 0.60}))
+    out = layer2_board._movement_from_opening(row, openings)
     assert out["movement_vs_pick"] == "toward"
     assert out["movement_line_prob_delta_pp"] > 0
-    assert out.get("movement_line_sign_conflict") is None
-
-
-def test_the_magnitude_is_interpolated_when_the_open_line_is_not_quoted_now():
-    row = _row(line=9.5, price=-110, fair=0.60)
-    key = layer2_board.movement_join_key(row)
-    openings = {key: _opening(line=8.5, price=-110, fair=0.52, captured_at=_now_iso(30), key=key)}
-    out = layer2_board._movement_from_opening(row, openings, _curve(row, {8.0: 0.70, 9.0: 0.60}))
-    assert out["movement_line_prob_basis"] == "same_bet_interpolated"
-    assert out["movement_line_prob_delta_pp"] == pytest.approx(13.0, abs=1e-6)
-
-
-def test_the_magnitude_is_NEVER_extrapolated_past_the_observed_lines():
-    """Past the ends the probability curve flattens; a straight line overstates."""
-    row = _row(line=9.5, price=-110, fair=0.60)
-    key = layer2_board.movement_join_key(row)
-    openings = {key: _opening(line=8.5, price=-110, fair=0.52, captured_at=_now_iso(30), key=key)}
-    out = layer2_board._movement_from_opening(row, openings, _curve(row, {9.0: 0.60, 10.0: 0.55}))
-    assert out.get("movement_line_prob_delta_pp") is None
-
-
-def test_no_curve_means_no_line_term_rather_than_the_old_wrong_one():
-    """48% of line-moved rows have no curve point at their opening line. They get
-    NOTHING -- not the cross-handicap number that could contradict itself."""
-    row = _row(line=9.5, price=-110, fair=0.60)
-    key = layer2_board.movement_join_key(row)
-    openings = {key: _opening(line=8.5, price=-110, fair=0.52, captured_at=_now_iso(30), key=key)}
-    assert layer2_board._movement_from_opening(row, openings, None).get("movement_line_prob_delta_pp") is None
 
 
 def test_same_line_row_emits_no_line_probability_delta():
@@ -300,7 +263,7 @@ def test_steam_fires_on_a_sharp_recent_line_move():
     row = _row(line=10.5, price=-110, fair=0.62)
     key = layer2_board.movement_join_key(row)
     openings = {key: _opening(line=8.5, price=-110, fair=0.52, captured_at=_now_iso(20), key=key)}
-    out = layer2_board._movement_from_opening(row, openings, _curve(row, {8.5: 0.62}))
+    out = layer2_board._movement_from_opening(row, openings)
     assert out.get("steam") is True
     assert out.get("steam_basis") == "line"
     assert "line 8.5" in out["steam_reason"] and "10.5" in out["steam_reason"]
@@ -320,7 +283,7 @@ def test_a_small_recent_line_move_is_not_steam():
     row = _row(line=8.0, price=-110, fair=0.531)
     key = layer2_board.movement_join_key(row)
     openings = {key: _opening(line=8.5, price=-110, fair=0.52, captured_at=_now_iso(20), key=key)}
-    out = layer2_board._movement_from_opening(row, openings, _curve(row, {8.5: 0.531}))
+    out = layer2_board._movement_from_opening(row, openings)
     assert abs(out["movement_line_prob_delta_pp"]) < layer2_board._STEAM_LINE_PROB_POINTS_PP
     assert out.get("steam") is not True
 
@@ -450,6 +413,6 @@ def test_a_present_opening_fair_still_scores():
     row = _row(side="over", line=9.5, price=-130, fair=0.58)
     key = layer2_board.movement_join_key(row)
     opening = _opening(line=8.5, price=110, fair=0.50, captured_at=_now_iso(30), key=key)
-    out = layer2_board._movement_from_opening(row, {key: opening}, _curve(row, {8.5: 0.58}))
+    out = layer2_board._movement_from_opening(row, {key: opening})
     assert out["movement_vs_pick"] == "toward"
     assert out["movement_line_prob_delta_pp"] == pytest.approx(8.0, abs=1e-6)
