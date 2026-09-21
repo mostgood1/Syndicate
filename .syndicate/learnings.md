@@ -3251,6 +3251,22 @@ but they came from an environment production never runs.
   skip-worktree bit, so deleting it afterwards shows as a tracked DELETION. `git sparse-checkout
   reapply` restores the bit; check `git status` for ` D` before any commit.
 - *(evidence: `log/2026-09-18.md` ~14:40Z; lane `soccer-prop-conditioning`)*
+
+**SEEN AGAIN 2026-09-21, in a form this rule's title does not name: a TEST RESULT, not a
+measurement** `[lane layer2-line-move-magnitude, session 9e340058]`. I A/B'd 61 test files in a
+session worktree, found 15 failing in both arms, and wrote into five places -- two `deploys.md`
+entries, a lane block, the log and a peer message -- that they were "red on main". **14 of them
+were `test_ncaaf_game_projections.py`, which resolves team names through the NCAAF team
+registry under `data/`** -- the exact dependency this rule describes -- and its fixture copies
+that registry (`:305`). All absent in the worktree; never run on a full checkout. Caught only
+when asked to record them as a lead. Withdrawn in `fb176d26`.
+
+**The rule generalises past joins: in a worktree, NO conclusion about code that reads `data/`
+-- a measurement, a test verdict, a null -- is evidence about main.** A same-tree A/B is still
+valid for COMPARING two arms (both lacked the data equally); it says nothing about whether
+either arm is broken. `session_worktree.py` prints this on every `open` (~92 tests fail for
+`data/` absence alone); I read it and did not apply it to my own failure list.
+
 ## 2026-09-18 — FORBIDDEN: certifying a cross-source NAME join as exact from one fixture `[lane soccer-live-corners-book-test]`
 
 - **What the code said** (`syndicate/features/shared/soccer_live_gameline_source.py`, `soccer_live_gameline_index` docstring): the live pricer keys matches on full team names with no alias table because "Gate 1 measured that this join is exact for soccer: the ESPN names in the live-state artifact matched the OddsAPI grid on 286 rows for the 2026-08-20 la_liga fixture."
