@@ -907,23 +907,23 @@ def build_layer2_shortlist(
     # `_opening_key` itself is NOT changed: it is right for the settlement join
     # it was built for, and this is a different question asked of the same data.
     openings_index: dict[str, Any] = {}
+    openings_by_line: dict[str, Any] = {}
     openings_error: str | None = None
     openings_records = 0
     try:
         from syndicate.features.shared.clv_opening_ledger import load_openings
-        from syndicate.features.shared.layer2_board import movement_join_key
+        from syndicate.features.shared.layer2_board import index_openings
 
-        for record in load_openings(selected_date) or []:
-            if not isinstance(record, Mapping):
-                continue
-            openings_records += 1
-            key = movement_join_key(record)
-            # FIRST WRITE WINS -- the ledger is append-only, so a key recurs and
-            # the earliest occurrence is the opening by definition. Doubly so
-            # now: under the loose key, later records for the same bet are
-            # exactly the moved versions we are measuring against.
-            if key and key not in openings_index:
-                openings_index[key] = record
+        _opening_records = [r for r in (load_openings(selected_date) or []) if isinstance(r, Mapping)]
+        openings_records = len(_opening_records)
+        # TWO INDEXES, FIRST WRITE WINS IN BOTH (lane `layer2-line-move-magnitude`).
+        # `openings_index` is the earliest opening per bet on the LOOSE key --
+        # how a genuine line move still finds its opening -- and is unchanged.
+        # `openings_by_line` adds the first opening AT EACH LINE, so a row whose
+        # own line was published before is compared with ITSELF. Collapsing to
+        # the earliest alone put 59% of line-moved rows against a DIFFERENT
+        # line's opening; see `layer2_board.index_openings`.
+        openings_index, openings_by_line = index_openings(_opening_records)
     except Exception as exc:
         openings_error = f"{type(exc).__name__}: {exc}"
 
@@ -1599,7 +1599,21 @@ def build_layer2_shortlist(
                         record_population(candidates, sport=_sport, date=str(selected_date or ""))
             except Exception:
                 _population_sink = None
-            result = build_layer2_rows(grid, openings=openings_index, population_sink=_population_sink)
+            # ASK THE CALLEE, the file's standing rule for a kwarg the other
+            # blob may not have yet (`c324447d` blanked the board once for want
+            # of it). An older `layer2_board.py` simply runs without the index.
+            try:
+                import inspect as _inspect
+
+                _rows_take_by_line = "openings_by_line" in _inspect.signature(build_layer2_rows).parameters
+            except (TypeError, ValueError):
+                _rows_take_by_line = False
+            result = build_layer2_rows(
+                grid,
+                openings=openings_index,
+                population_sink=_population_sink,
+                **({"openings_by_line": openings_by_line} if _rows_take_by_line else {}),
+            )
             sport_opportunities = list(result.get("opportunities") or [])
             # `sport` is carried on the grid row already, but stamp defensively:
             # select_shortlist buckets per sport and a missing slug would
@@ -1968,6 +1982,8 @@ def build_layer2_shortlist(
             card_extras["price_trail"] = price_trail_index
         if "row_context" in card_params:
             card_extras["row_context"] = row_context
+        if "openings_by_line" in card_params:
+            card_extras["openings_by_line"] = openings_by_line
         if accepts:
             shortlist["cards"] = layer2_rows_to_board_cards(rows_for_cards, openings=openings_index, **card_extras)
         else:
