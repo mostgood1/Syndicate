@@ -1022,28 +1022,12 @@ _SCORE_V2_ENABLED = _env_bool("SYNDICATE_SCORE_V2", default=True)
 _SCORE_V2_KELLY_FRACTION = _env_float("SYNDICATE_SCORE_V2_KELLY_FRACTION", 0.25)
 SCORE_V2_VERSION = "v2-2026-09-21"
 
-
-def venue_fee_per_contract(bookmaker: Any, price_prob: float, *, venue_ref: Any = None) -> tuple[float, str, bool]:
-    """(fee per $1 contract, basis, is_upper_bound) for taking at `price_prob`.
-
-    Only the venues with a MEASURED fee schedule are charged; every other book is
-    0.0 with basis "none" -- a sportsbook's margin is already in its price.
-    An unknown Kalshi series is charged the full rate and flagged as a bound,
-    because understating a fee invents edge (`venue_fees`' own rule).
-    """
-    from syndicate.features.shared import venue_fees
-
-    book = str(bookmaker or "").strip().lower()
-    p = min(1.0, max(0.0, float(price_prob)))
-    if book == "kalshi":
-        multiplier = venue_fees.kalshi_fee_multiplier_for_series(venue_ref)
-        if multiplier is None:
-            return (venue_fees.KALSHI_BASE_TAKER_RATE * venue_fees.KALSHI_ASSUMED_FEE_MULTIPLIER
-                    * p * (1.0 - p), "kalshi_assumed_full_rate", True)
-        return venue_fees.KALSHI_BASE_TAKER_RATE * multiplier * p * (1.0 - p), "kalshi_series", False
-    if book == "polymarket":
-        return venue_fees.POLYMARKET_MEASURED_NOTIONAL_RATE, "polymarket_measured_notional", False
-    return 0.0, "none", False
+# FEE-NET EV IN THE LIVE `score` -- DEFAULT OFF; turning it on is the user's call.
+# When on, `layer2_board` feeds a market-fair row's value term the EV net of the
+# venue's fee (Kalshi / Polymarket; every other book is unchanged). The only part of
+# v2 with a robust out-of-sample gain on its own: +0.79 pts [+0.27, +1.29] of fee-net
+# CLV at the top 10, +0.71 [+0.40, +1.04] at the top 25, over 82 date x sport slates.
+SCORE_FEE_NET_ENABLED = _env_bool("SYNDICATE_SCORE_FEE_NET", default=False)
 
 
 def kelly_growth_bp(p: float, decimal_odds: float, *, fraction: float) -> float | None:
@@ -1065,13 +1049,18 @@ def score_v2(
     *,
     price: Any,
     fair_prob: Any,
-    bookmaker: Any = None,
-    venue_ref: Any = None,
+    fee_per_contract: Any = 0.0,
+    fee_basis: str = "none",
+    fee_is_upper_bound: bool = False,
     books_quoting: Any = None,
     book_age_seconds: Any = None,
     quote_seen_age_seconds: Any = None,
 ) -> dict[str, Any] | None:
     """Fee-net, risk-adjusted, reliability-discounted rank of one priced side. SHADOW.
+
+    `fee_per_contract` is the venue's taker fee per $1 contract at this price, supplied
+    by the caller (`layer2_board.venue_fee_per_contract`, which reads `venue_fees`) so
+    this module stays pure arithmetic, as its header promises.
 
     `score_v2` is the fractional-Kelly log growth in basis points when the fee-net EV
     is positive, and the fee-net EV in percent (<= 0) when it is not -- both are zero
@@ -1092,7 +1081,9 @@ def score_v2(
     if p is None or not (0.0 < p < 1.0) or decimal is None or decimal <= 1.0:
         return None
     price_prob = 1.0 / decimal
-    fee, fee_basis, fee_bound = venue_fee_per_contract(bookmaker, price_prob, venue_ref=venue_ref)
+    fee = _as_float(fee_per_contract) or 0.0
+    if fee < 0:
+        return None  # a negative fee is a rebate nobody offers; refuse rather than invent edge
     decimal_net = 1.0 / (price_prob + fee)
     ev_net = p * decimal_net - 1.0
     growth = kelly_growth_bp(p, decimal_net, fraction=_SCORE_V2_KELLY_FRACTION)
@@ -1111,7 +1102,7 @@ def score_v2(
         "kelly_fraction": _SCORE_V2_KELLY_FRACTION,
         "fee_per_contract": round(fee, 6),
         "fee_basis": fee_basis,
-        "fee_is_upper_bound": fee_bound,
+        "fee_is_upper_bound": bool(fee_is_upper_bound),
         "reliability": round(reliability, 6),
         "reliability_applied": discounted <= value,
     }

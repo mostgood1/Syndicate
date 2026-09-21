@@ -17,38 +17,44 @@ def _p(american):
     return 100 / (american + 100) if american > 0 else -american / (-american + 100)
 
 
+def _v2(price, fair, bookmaker=None, venue_ref=None, **rest):
+    """The production path: fee from `layer2_board`, arithmetic from `opportunity_signals`."""
+    return layer2_board._shadow_score_v2(price=price, fair_prob=fair, bookmaker=bookmaker,
+                                         venue_ref=venue_ref, **rest)
+
+
 def test_kalshi_fee_is_read_per_series_and_nets_the_ev():
     # The served #1 row of 2026-09-21: +113 on Kalshi (P = 0.4695) against fair 0.4935.
     gross = OS.expected_value_pct(113, 0.4935)
-    full = OS.score_v2(price=113, fair_prob=0.4935, bookmaker="kalshi", venue_ref="KXWNBATOTAL-26SEP22X-179")
+    full = _v2(113, 0.4935, "kalshi", "KXWNBATOTAL-26SEP22X-179")
     P = _p(113)
     assert full["fee_basis"] == "kalshi_series" and full["fee_is_upper_bound"] is False
     assert full["fee_per_contract"] == pytest.approx(0.07 * 1.0 * P * (1 - P), abs=1e-6)
     assert full["ev_net_pct"] == pytest.approx(100 * (0.4935 / (P + 0.07 * P * (1 - P)) - 1), abs=1e-3)
     assert gross > 5.0 > full["ev_net_pct"] + 3.0  # a 5.1% headline is ~1.3% after the fee
 
-    half = OS.score_v2(price=113, fair_prob=0.4935, bookmaker="kalshi", venue_ref="KXMLBTOTAL-26SEP22X-8")
+    half = _v2(113, 0.4935, "kalshi", "KXMLBTOTAL-26SEP22X-8")
     assert half["fee_per_contract"] == pytest.approx(0.07 * 0.5 * P * (1 - P), abs=1e-6)
     assert half["ev_net_pct"] > full["ev_net_pct"]
 
 
 def test_an_unknown_kalshi_series_is_charged_the_full_rate_and_says_so():
-    row = OS.score_v2(price=113, fair_prob=0.4935, bookmaker="kalshi", venue_ref=None)
+    row = _v2(113, 0.4935, "kalshi", None)
     assert row["fee_basis"] == "kalshi_assumed_full_rate"
     assert row["fee_is_upper_bound"] is True
 
 
 def test_polymarket_fee_is_flat_per_contract_and_sportsbooks_pay_none():
-    poly = OS.score_v2(price=113, fair_prob=0.4935, bookmaker="polymarket")
+    poly = _v2(113, 0.4935, "polymarket")
     assert poly["fee_per_contract"] == pytest.approx(0.015)
-    book = OS.score_v2(price=113, fair_prob=0.4935, bookmaker="draftkings")
+    book = _v2(113, 0.4935, "draftkings")
     assert book["fee_per_contract"] == 0.0 and book["fee_basis"] == "none"
     assert book["ev_net_pct"] == pytest.approx(OS.expected_value_pct(113, 0.4935), abs=1e-3)
 
 
 def test_at_equal_edge_the_likelier_bet_ranks_higher():
     # +4% EV both: an even-money shot and a +400 longshot, same book breadth and age.
-    common = dict(bookmaker="draftkings", books_quoting=8, book_age_seconds=60, quote_seen_age_seconds=60)
+    common = dict(books_quoting=8, book_age_seconds=60, quote_seen_age_seconds=60)
     even = OS.score_v2(price=100, fair_prob=0.52, **common)
     longshot = OS.score_v2(price=400, fair_prob=0.208, **common)
     assert even["basis"] == longshot["basis"] == "kelly_growth_bp"
@@ -56,7 +62,7 @@ def test_at_equal_edge_the_likelier_bet_ranks_higher():
 
 
 def test_negative_ev_ranks_on_its_ev_below_every_sizable_row_and_is_never_promoted():
-    common = dict(bookmaker="draftkings", books_quoting=1, book_age_seconds=50_000)  # min reliability
+    common = dict(books_quoting=1, book_age_seconds=50_000)  # min reliability
     bad = OS.score_v2(price=-110, fair_prob=0.49, **common)
     worse = OS.score_v2(price=-110, fair_prob=0.45, **common)
     tiny = OS.score_v2(price=100, fair_prob=0.505, **common)
@@ -117,3 +123,46 @@ def test_the_shadow_cannot_move_the_ranking_or_break_the_build(monkeypatch):
         (r["side"], r["score"]["score"]) for r in base_rows]
     assert all(r.get("score_v2") is None for r in broken_rows)
     assert layer2_board._shadow_score_v2(price=-110, fair_prob=0.5) is None
+
+
+def test_a_negative_fee_is_refused_not_turned_into_edge():
+    assert OS.score_v2(price=-110, fair_prob=0.5, fee_per_contract=-0.01) is None
+
+
+def _kalshi_grid_row():
+    row = _grid_row()
+    row["best"] = {
+        "over": {"price": 113, "bookmaker": "kalshi", "age_seconds": 30.0, "books_quoting": 6},
+        "under": {"price": -130, "bookmaker": "kalshi", "age_seconds": 30.0, "books_quoting": 6},
+    }
+    return row
+
+
+def _by_side(result):
+    rows = result["opportunities"] if isinstance(result, dict) else result
+    return {r["side"]: r for r in rows}
+
+
+def test_fee_net_switch_off_leaves_the_score_byte_identical(monkeypatch):
+    monkeypatch.setattr(OS, "SCORE_FEE_NET_ENABLED", False)
+    rows = _by_side(build_layer2_rows([_kalshi_grid_row()]))
+    assert rows, "fixture produced no opportunities"
+    for row in rows.values():
+        assert "score_fee_net" not in row
+        assert row["score"]["ev_component"] == pytest.approx(row["ev_pct"], abs=1e-3)
+
+
+def test_fee_net_switch_on_moves_only_the_value_term_and_only_at_a_fee_venue(monkeypatch):
+    monkeypatch.setattr(OS, "SCORE_FEE_NET_ENABLED", True)
+    rows = _by_side(build_layer2_rows([_kalshi_grid_row()]))
+    assert rows, "fixture produced no opportunities"
+    for row in rows.values():
+        assert row.get("score_fee_net") is True
+        # the displayed EV stays GROSS (portfolio_commit rebuilds the fair from it) ...
+        assert row["score"]["ev_component"] == pytest.approx(row["score_v2"]["ev_net_pct"], abs=1e-3)
+        assert row["score"]["ev_component"] < row["ev_pct"]
+    # ... and a sportsbook row is untouched even with the switch on.
+    book_rows = _by_side(build_layer2_rows([_grid_row()]))
+    for row in book_rows.values():
+        assert "score_fee_net" not in row
+        assert row["score"]["ev_component"] == pytest.approx(row["ev_pct"], abs=1e-3)

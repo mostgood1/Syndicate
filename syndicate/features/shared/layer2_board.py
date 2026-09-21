@@ -3080,6 +3080,33 @@ def build_layer2_rows(
                 value_ev = ev
                 ev_basis = EV_BASIS_MARKET
                 blend_model_edge = model_edge
+            # SHADOW RANK, computed before the score so the fee-net EV it carries can
+            # feed the score when -- and only when -- `SYNDICATE_SCORE_FEE_NET` is on
+            # (lane `layer2-score-outcome-calibration`). Ranking, admission and sizing
+            # read `score`; `score_v2` itself ranks nothing.
+            shadow_v2 = _shadow_score_v2(
+                price=price,
+                fair_prob=fair,
+                bookmaker=bettable_book,
+                venue_ref=candidate.get("venue_ref") or row.get("venue_ref"),
+                books_quoting=side_best.get("books_quoting") or row.get("books_quoting"),
+                book_age_seconds=side_best.get("age_seconds"),
+                quote_seen_age_seconds=side_best.get("seen_age_seconds"),
+            )
+            # THE VENUE'S FEE IN THE VALUE TERM, market-fair rows only, OFF by default.
+            # Measured over 82 date x sport slates (20 dates): today's score with its
+            # EV term net of the fee actually paid beat today's score by +0.71 pts of
+            # fee-net CLV at the top 25 [+0.40, +1.04]. `ev_pct` itself stays GROSS --
+            # `portfolio_commit` rebuilds the fair from it -- so only the rank moves.
+            fee_net_applied = False
+            if (
+                ev_basis == EV_BASIS_MARKET
+                and shadow_v2 is not None
+                and _score_fee_net_enabled()
+                and shadow_v2.get("fee_basis") != "none"
+            ):
+                value_ev = shadow_v2["ev_net_pct"]
+                fee_net_applied = True
             # Computed ONCE, here, and stamped onto the candidate so the card
             # builder reuses it rather than recomputing against the same index.
             # Ranking on a movement number the card does not show (or showing
@@ -3178,19 +3205,9 @@ def build_layer2_rows(
             # otherwise (the row is passed so its bucket can be looked up).
             score = _apply_skill_reliability(score, candidate.get("projection"), row=candidate)
             candidate["score"] = score
-            # SHADOW RANK, READ BY NOTHING (lane `layer2-score-outcome-calibration`):
-            # fee-net EV ranked by fractional-Kelly growth under the same reliability
-            # discount. Published so it can be graded against `score` on the same
-            # rows; ranking, admission and sizing all still read `score`.
-            candidate["score_v2"] = _shadow_score_v2(
-                price=price,
-                fair_prob=fair,
-                bookmaker=bettable_book,
-                venue_ref=candidate.get("venue_ref") or row.get("venue_ref"),
-                books_quoting=side_best.get("books_quoting") or row.get("books_quoting"),
-                book_age_seconds=side_best.get("age_seconds"),
-                quote_seen_age_seconds=side_best.get("seen_age_seconds"),
-            )
+            candidate["score_v2"] = shadow_v2
+            if fee_net_applied:
+                candidate["score_fee_net"] = True
             if score is not None:
                 scored += 1
             candidates.append(candidate)
@@ -3829,6 +3846,39 @@ def movement_join_key(row: Mapping[str, Any]) -> str | None:
     )
 
 
+def venue_fee_per_contract(bookmaker: Any, price_prob: float, *, venue_ref: Any = None) -> tuple[float, str, bool]:
+    """(fee per $1 contract, basis, is_upper_bound) for taking at `price_prob`.
+
+    Only the venues with a MEASURED fee schedule are charged; every other book is
+    0.0 with basis "none" -- a sportsbook's margin is already in its price.
+    An unknown Kalshi series is charged the full rate and flagged as a bound,
+    because understating a fee invents edge (`venue_fees`' own rule).
+    """
+    from syndicate.features.shared import venue_fees
+
+    book = str(bookmaker or "").strip().lower()
+    p = min(1.0, max(0.0, float(price_prob)))
+    if book == "kalshi":
+        multiplier = venue_fees.kalshi_fee_multiplier_for_series(venue_ref)
+        if multiplier is None:
+            return (venue_fees.KALSHI_BASE_TAKER_RATE * venue_fees.KALSHI_ASSUMED_FEE_MULTIPLIER
+                    * p * (1.0 - p), "kalshi_assumed_full_rate", True)
+        return venue_fees.KALSHI_BASE_TAKER_RATE * multiplier * p * (1.0 - p), "kalshi_series", False
+    if book == "polymarket":
+        return venue_fees.POLYMARKET_MEASURED_NOTIONAL_RATE, "polymarket_measured_notional", False
+    return 0.0, "none", False
+
+
+def _score_fee_net_enabled() -> bool:
+    """`opportunity_signals.SCORE_FEE_NET_ENABLED`, False if that module predates it."""
+    try:
+        from syndicate.features.shared import opportunity_signals as _signals
+
+        return bool(getattr(_signals, "SCORE_FEE_NET_ENABLED", False))
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _shadow_score_v2(**kwargs: Any) -> dict[str, Any] | None:
     """`opportunity_signals.score_v2`, or None -- never an exception out of the builder.
 
@@ -3840,7 +3890,15 @@ def _shadow_score_v2(**kwargs: Any) -> dict[str, Any] | None:
         from syndicate.features.shared import opportunity_signals as _signals
 
         scorer = getattr(_signals, "score_v2", None)
-        return None if scorer is None else scorer(**kwargs)
+        if scorer is None:
+            return None
+        bookmaker = kwargs.pop("bookmaker", None)
+        venue_ref = kwargs.pop("venue_ref", None)
+        price_prob = implied_probability(kwargs.get("price"))
+        if price_prob is not None:
+            fee, basis, bound = venue_fee_per_contract(bookmaker, price_prob, venue_ref=venue_ref)
+            kwargs.update(fee_per_contract=fee, fee_basis=basis, fee_is_upper_bound=bound)
+        return scorer(**kwargs)
     except Exception:  # noqa: BLE001 -- a shadow field fails closed, never loud
         return None
 
