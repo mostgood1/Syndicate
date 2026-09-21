@@ -30,6 +30,15 @@ NO POOLING ACROSS GRADER VERSIONS (2026-09-01 FORBIDDEN rule). The state carries
 signature; when it changes, history is RESET and rebuilt from the recorder, and the
 scorecard says so. Every payload names the versions that produced it.
 
+THE PRICE SIDE `[2026-09-21, lane inplay-skill-scoreboard]`. Everything above grades the MODEL
+(`p_model = fair + model_edge_pct/100`), and the money placed live is sized by PRICE SHOPPING:
+best price against the side's fair. Measured on production that day, the model side cannot say
+anything about that edge -- live rows carry no model edge (graded live model rows over 28d: mlb 0,
+wnba 0, nfl 0, ncaaf 16, soccer 118), so every live bucket read `insufficient` and would forever.
+`price_cells` / `price_by_fair_method` grade the price itself: realised ROI per game of the sides
+whose recorded best price was +EV against their recorded fair, beside the EV predicted for them.
+Reporting only -- nothing here reaches the overlay.
+
 TWO THRESHOLDS, ON PURPOSE.
 - The REPORT (category cells) uses `REPORT_MIN_GAMES` / `REPORT_MIN_DATES`: NFL plays 16
   games a week and a scorecard that says "insufficient" for a season is useless to read.
@@ -72,6 +81,11 @@ OVERLAY_TTL_HOURS = 72
 KEEP_FIELDS = ("k", "t", "sport", "ct", "ht", "at", "px", "fp", "fm", "bq", "ba", "me", "gs")
 NOT_FINAL_MARKERS = ("not_final", "not_started", "not_complete", "no_chips_for_kickoff_date", "in_progress",
                      "unavailable", "not_in_live_state")
+
+PRICE_EDGE_HOLDS = "edge_holds"
+PRICE_EDGE_FAILS = "edge_fails"
+PRICE_UNPROVEN = "unproven"
+PRICE_INSUFFICIENT = "insufficient"
 
 VERDICT_NAMES = {
     mbs.VERDICT_SKILL_POCKET: "beats_market",
@@ -279,6 +293,33 @@ def _accumulate(ids: dict[str, list[float]], row: Mapping[str, Any]) -> None:
             acc[5] += 1
 
 
+def _decimal_odds(american: float) -> float:
+    """`layer2_live_scorecard.decimal_odds` -- the conversion `grade_population` prices `pnl` with."""
+    return 1.0 + (american / 100.0 if american > 0 else 100.0 / -american)
+
+
+def _accumulate_price(px: dict[str, list[float]], row: Mapping[str, Any]) -> None:
+    """Per cell, and per cell x fair_method: [+EV rows, their pnl, their predicted EV, priced rows].
+
+    Separate from `ids` on purpose: `is_cell` / `is_bucket` count pipes, so a price key in the
+    same dict would be read as a model cell.
+    """
+    buckets = list(row.get("buckets") or [])
+    price, fair, pnl = row.get("price"), row.get("p_market"), row.get("pnl")
+    if not buckets or price is None or fair is None or pnl is None or price == 0:
+        return
+    prefix = "|".join(buckets[0].split("|")[:4])
+    ev = fair * _decimal_odds(price) - 1.0
+    keys = [prefix] + [b for b in buckets if b.rsplit("|", 1)[-1].startswith("fair_method=")]
+    for key in keys:
+        acc = px.setdefault(key, [0, 0.0, 0.0, 0])
+        acc[3] += 1
+        if ev > 0:
+            acc[0] += 1
+            acc[1] += pnl
+            acc[2] += ev
+
+
 def grade_pending(
     state: dict[str, Any],
     *,
@@ -324,10 +365,12 @@ def grade_pending(
             counts["waiting_for_final"] += 1
             continue
         ids: dict[str, list[float]] = {}
+        px: dict[str, list[float]] = {}
         for row in graded:
             _accumulate(ids, row)
+            _accumulate_price(px, row)
         sport = key.split("|", 1)[0]
-        state["games"][key] = {"date": kickoff, "sport": sport, "rows": len(graded), "ids": ids}
+        state["games"][key] = {"date": kickoff, "sport": sport, "rows": len(graded), "ids": ids, "px": px}
         day_counts = state["ungraded"].setdefault(kickoff, {})
         for sport_name, reasons in by_sport.items():
             target = day_counts.setdefault(sport_name, {})
@@ -370,10 +413,14 @@ def evaluate_ids(
 
     results: list[dict[str, Any]] = []
     for bucket_id, entries in sorted(per_id.items()):
-        skill_pairs = [(day, acc[0] / acc[1]) for day, acc in entries if acc[1]]
+        # SORTED: the bootstrap resamples by index, so an unsorted list made the verdict depend on
+        # the order games were READ. A run sees insertion order and the saved state comes back
+        # key-sorted; measured 2026-09-21 on production's state, 4 of 12 shuffles of the same
+        # games changed the validated set. `bucket_search.evaluate_buckets` sorts the same way.
+        skill_pairs = sorted((day, acc[0] / acc[1]) for day, acc in entries if acc[1])
         market_means = [acc[2] / acc[1] for _day, acc in entries if acc[1]]
         model_means = [acc[3] / acc[1] for _day, acc in entries if acc[1]]
-        roi_pairs = [(day, acc[4] / acc[5]) for day, acc in entries if acc[5]]
+        roi_pairs = sorted((day, acc[4] / acc[5]) for day, acc in entries if acc[5])
         result: dict[str, Any] = {
             "bucket_id": bucket_id,
             "games": len(skill_pairs),
@@ -456,6 +503,86 @@ def cell_row(result: Mapping[str, Any]) -> dict[str, Any]:
         "roi_ci95": [_round(v, 5) for v in result["roi_ci95"]] if result["roi_ci95"] else None,
         "roi_games": result["roi_games"],
     }
+
+
+def is_fair_method_bucket(bucket_id: str) -> bool:
+    return is_bucket(bucket_id) and bucket_id.rsplit("|", 1)[-1].startswith("fair_method=")
+
+
+def evaluate_price(
+    games: Iterable[Mapping[str, Any]],
+    *,
+    bs: Any,
+    select: Callable[[str], bool],
+    min_games: int,
+    min_dates: int,
+    resamples: int,
+    seed: int,
+    q: float,
+) -> list[dict[str, Any]]:
+    """The price-shopping edge per id: realised ROI per GAME of the +EV rows, with a bootstrap CI.
+
+    Same unit, statistics and FDR family treatment as `evaluate_ids`, over `game["px"]`. A game
+    counts toward an id only if it had at least one +EV row there.
+    """
+    per_id: dict[str, list[tuple[str, list[float]]]] = collections.defaultdict(list)
+    for game in games:
+        for price_id, acc in (game.get("px") or {}).items():
+            if select(price_id):
+                per_id[price_id].append((str(game.get("date")), acc))
+
+    results: list[dict[str, Any]] = []
+    for price_id, entries in sorted(per_id.items()):
+        pairs = sorted((day, acc[1] / acc[0]) for day, acc in entries if acc[0])
+        rows = sum(acc[0] for _day, acc in entries)
+        boot = bs.bootstrap_mean([v for _, v in pairs], resamples=resamples,
+                                 seed=bs._bucket_seed(seed, price_id, "price_roi")) if pairs else None
+        results.append({
+            "id": price_id,
+            "games": len(pairs),
+            "dates": len({day for day, _ in pairs}),
+            "rows": rows,
+            "priced_rows": sum(acc[3] for _day, acc in entries),
+            "predicted_ev": (sum(acc[2] for _day, acc in entries) / rows) if rows else None,
+            "realised_roi": (sum(acc[1] for _day, acc in entries) / rows) if rows else None,
+            "roi": boot["mean"] if boot else None,
+            "ci95": [boot["ci_lower"], boot["ci_upper"]] if boot else None,
+            "p": boot["p"] if boot else None,
+            "lodo_stable": bs.leave_one_date_out_stable(pairs) if pairs else False,
+        })
+
+    eligible = [r for r in results if r["games"] >= min_games and r["dates"] >= min_dates and r["p"] is not None]
+    passing = bs.benjamini_hochberg([r["p"] for r in eligible], q)
+    for index, result in enumerate(eligible):
+        result["fdr_pass"] = index in passing
+    for result in results:
+        verdict = PRICE_INSUFFICIENT
+        if result.get("fdr_pass") is not None:
+            verdict = PRICE_UNPROVEN
+            lower, upper = result["ci95"]
+            if result["fdr_pass"] and result["lodo_stable"] and (lower > 0 or upper < 0):
+                verdict = PRICE_EDGE_HOLDS if lower > 0 else PRICE_EDGE_FAILS
+        result["verdict"] = verdict
+        result["games_short"] = max(0, min_games - result["games"])
+        result["dates_short"] = max(0, min_dates - result["dates"])
+    return results
+
+
+def price_row(result: Mapping[str, Any]) -> dict[str, Any]:
+    parts = result["id"].split("|")
+    row: dict[str, Any] = dict(zip(("sport", "market", "segment", "phase"), parts[:4]))
+    if len(parts) > 4:
+        row["fair_method"] = parts[4].partition("=")[2]
+    row.update({
+        "games": result["games"], "dates": result["dates"],
+        "ev_rows": result["rows"], "priced_rows": result["priced_rows"],
+        "predicted_ev": _round(result["predicted_ev"], 5), "realised_roi": _round(result["realised_roi"], 5),
+        "roi_per_game": _round(result["roi"], 5),
+        "roi_ci95": [_round(v, 5) for v in result["ci95"]] if result["ci95"] else None,
+        "p": _round(result["p"], 5), "lodo_stable": result["lodo_stable"], "verdict": result["verdict"],
+        "games_short": result["games_short"], "dates_short": result["dates_short"],
+    })
+    return row
 
 
 def window_games(state: Mapping[str, Any], today: str, days: int) -> list[Mapping[str, Any]]:
@@ -613,19 +740,27 @@ def build_scorecard(
                              resamples=resamples, seed=bs.SEED, q=bs.FDR_Q)
         rows = [cell_row(r) for r in cells]
         label = f"{days}d"
+        price = evaluate_price(games, bs=bs, select=is_cell, min_games=REPORT_MIN_GAMES, min_dates=REPORT_MIN_DATES,
+                               resamples=resamples, seed=bs.SEED, q=bs.FDR_Q)
         windows[label] = {
             "coverage": coverage(state, games, today, days),
             "cells": rows,
             "verdict_changes": verdict_changes(previous, rows, label),
+            "price_cells": [price_row(r) for r in price],
         }
         if days == max(WINDOWS):
             bucket_results = evaluate_ids(games, bs=bs, select=is_bucket, min_games=bs.MIN_GAMES,
                                           min_dates=bs.MIN_DATES, resamples=resamples, seed=bs.SEED, q=bs.FDR_Q)
+            by_method = evaluate_price(games, bs=bs, select=is_fair_method_bucket, min_games=REPORT_MIN_GAMES,
+                                       min_dates=REPORT_MIN_DATES, resamples=resamples, seed=bs.SEED, q=bs.FDR_Q)
+            windows[label]["price_by_fair_method"] = [price_row(r) for r in by_method]
     longest = f"{max(WINDOWS)}d"
     method = {"unit": "game", "skill_metric": "brier(model)-brier(market) on the side, per game",
               "report_min_games": REPORT_MIN_GAMES, "report_min_dates": REPORT_MIN_DATES,
               "overlay_min_games": bs.MIN_GAMES, "overlay_min_dates": bs.MIN_DATES, "fdr_q": bs.FDR_Q,
-              "resamples": resamples, "seed": bs.SEED, "population": "opportunity_population_ledger (priced, not published)"}
+              "resamples": resamples, "seed": bs.SEED, "population": "opportunity_population_ledger (priced, not published)",
+              "price_metric": "realised ROI per game of sides whose recorded best price was +EV against their recorded "
+                              "fair; report bar, BH across each family; reporting only, never the overlay"}
     overlay = overlay_payload(bucket_results, now=now, window=f"{longest} to {today}", method=method, grader=grader)
     counts = collections.Counter(r["verdict"] for r in bucket_results)
     scorecard = {
@@ -680,6 +815,17 @@ def markdown(scorecard: Mapping[str, Any]) -> str:
         if window["verdict_changes"]:
             lines += ["", "Verdict changes since the previous scorecard:"]
             lines += [f"- {c['cell']}: {c['from']} -> {c['to']}" for c in window["verdict_changes"]]
+        price_cells = window.get("price_cells") or []
+        if price_cells:
+            lines += ["", f"### {label} price-shopping edge: sides whose best price was +EV against their fair", "",
+                      "| sport | market | segment | phase | games | dates | +EV rows | predicted EV | realised ROI/game [95% CI] | verdict |",
+                      "|---|---|---|---|---|---|---|---|---|---|"]
+            for cell in sorted(price_cells, key=lambda c: (c["sport"], c["phase"], c["segment"], c["market"])):
+                ci = cell["roi_ci95"]
+                roi = "" if cell["roi_per_game"] is None else f"{cell['roi_per_game']:+.3f} [{ci[0]:+.3f}, {ci[1]:+.3f}]"
+                ev = "" if cell["predicted_ev"] is None else f"{cell['predicted_ev']:+.3f}"
+                lines.append(f"| {cell['sport']} | {cell['market']} | {cell['segment']} | {cell['phase']} | {cell['games']} | "
+                             f"{cell['dates']} | {cell['ev_rows']} | {ev} | {roi} | {cell['verdict']} |")
         lines.append("")
     overlay = scorecard["overlay"]
     lines.append(f"Scoring overlay: {overlay['buckets']} validated buckets (of {scorecard['buckets']['tested']} tested; "

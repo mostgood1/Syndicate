@@ -585,6 +585,10 @@ def grade_population(
             "p_model": p_model,
             "model_edge_pct": edge,
             "pnl": pnl,
+            # The price the side was offered at. `pnl` alone cannot say whether a row was +EV
+            # against its fair (a loss is -1 at any price), so without this the price-shopping
+            # edge -- the one that sizes live money -- cannot be graded at all.
+            "price": price,
         })
     if ungraded_by_sport is not None:
         ungraded_by_sport.update({name: dict(counts) for name, counts in sorted(by_sport.items())})
@@ -684,9 +688,14 @@ def evaluate_buckets(
 
     results: list[dict[str, Any]] = []
     for bucket_id, games in sorted(per_bucket.items()):
-        skill_pairs = [(g["date"], sum(g["diff"]) / len(g["diff"])) for g in games.values() if g["diff"]]
+        # SORTED, so a verdict is a function of the data and not of the order rows arrived in.
+        # `bootstrap_mean` resamples by INDEX from a fixed seed, so the same values in another
+        # order give another CI. Measured 2026-09-21 on production's scorecard state: 4 of 12
+        # shuffles of the same games changed the validated set. `model_scorecard.evaluate_ids`
+        # sorts the same way, which keeps the two evaluators in parity.
+        skill_pairs = sorted((g["date"], sum(g["diff"]) / len(g["diff"])) for g in games.values() if g["diff"])
         market_means = [sum(g["market"]) / len(g["market"]) for g in games.values() if g["market"]]
-        roi_pairs = [(g["date"], sum(g["pnl"]) / len(g["pnl"])) for g in games.values() if g["pnl"]]
+        roi_pairs = sorted((g["date"], sum(g["pnl"]) / len(g["pnl"])) for g in games.values() if g["pnl"])
         result: dict[str, Any] = {
             "bucket_id": bucket_id,
             "games": len(skill_pairs),
