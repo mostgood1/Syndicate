@@ -2719,6 +2719,14 @@ def build_layer2_rows(
     is folded into the SCORE, and the score is computed before selection --
     computing movement later would rank on one number and display another.
     """
+    # ONE PASS TO BUILD THE CURVE, AND IT COSTS NO EXTRA DEVIG.
+    # `_resolve_fair` is the expensive call in the loop below, so it is
+    # memoised here by grid index and read back rather than recomputed.
+    # `build_book_grid` already returns a `list`, so materialising is a
+    # reference copy, not a second read of the shard.
+    grid = list(grid or ())
+    _fair_cache: dict[int, Any] = {}
+    line_curve = build_line_curve(grid, _fair_cache)
     candidates: list[dict[str, Any]] = []
     lanes: dict[str, int] = {}
     rows_in = 0
@@ -2733,12 +2741,12 @@ def build_layer2_rows(
     no_bettable_book = 0
     repriced_to_bettable = 0
 
-    for row in grid:
+    for _grid_index, row in enumerate(grid):
         rows_in += 1
         sides = [str(side) for side in (row.get("sides") or []) if side]
         if not sides:
             continue
-        fair_resolution = _resolve_fair(row, sides)
+        fair_resolution = _fair_cache.get(_grid_index) or _resolve_fair(row, sides)
         fair_by_side, fair_method = fair_resolution.fair_by_side, fair_resolution.method
         best = row.get("best") or {}
         game = row.get("game") if isinstance(row.get("game"), Mapping) else None
@@ -3084,7 +3092,7 @@ def build_layer2_rows(
             # Ranking on a movement number the card does not show (or showing
             # one the ranking did not use) is the `#364` unit-mismatch shape:
             # two numbers that have to be the same number.
-            movement = _movement_from_opening(candidate, openings)
+            movement = _movement_from_opening(candidate, openings, line_curve)
             candidate["movement"] = movement
             # SAME CROSS-FILE HAZARD AS THE CARD BUILDER, one level down.
             # `opportunity_signals.py` is a separate blob and can be a deploy
@@ -3836,8 +3844,84 @@ def _blended_score_accepts(parameter: str) -> bool:
         return False
 
 
+def build_line_curve(grid: Any, fair_cache: Any = None) -> dict[str, dict[float, float]]:
+    """`movement_join_key -> {line: fair_probability}` for THIS build.
+
+    THE SAME BET AT SEVERAL LINES AT ONCE, which is what makes a sound
+    line-movement magnitude possible (lane `layer2-line-move-magnitude`).
+
+    The board publishes alternate lines side by side. So when a row has moved
+    from L0 to L1, this index usually still holds that identity AT L0 -- the
+    market's price for OUR ORIGINAL BET, at ITS ORIGINAL LINE, right now.
+    Differencing that against the opening compares the SAME BET at two times
+    and needs no model at all. Measured on the served board, 719 line-moved
+    rows: exact 276 (38.4%) plus interpolable 97 (13.5%) = **51.9%**, against
+    32.7% for a global per-market slope.
+
+    NO SECOND FAIR RESOLUTION. `_resolve_fair` is the expensive part of the
+    caller's loop, so this takes `fair_cache` -- the caller resolves once, fills
+    it here, and reads it back in the main loop. Building this index therefore
+    costs one pass over a list the caller already holds (`build_book_grid`
+    returns a `list`), not a second devig of every market.
+    """
+    curve: dict[str, dict[float, float]] = {}
+    for index, row in enumerate(grid or ()):
+        if not isinstance(row, Mapping):
+            continue
+        sides = [str(side) for side in (row.get("sides") or []) if side]
+        if not sides:
+            continue
+        resolution = None if fair_cache is None else fair_cache.get(index)
+        if resolution is None:
+            resolution = _resolve_fair(row, sides)
+            if fair_cache is not None:
+                fair_cache[index] = resolution
+        line = _as_float(row.get("line"))
+        if line is None:
+            continue
+        for side in sides:
+            fair = _as_float(resolution.fair_by_side.get(side))
+            # A fair outside (0,1) is not a probability, and exactly 0.5 is the
+            # devig fallback when only one side is quoted -- both would corrupt
+            # a difference taken against them.
+            if fair is None or not (0.0 < fair < 1.0) or abs(fair - 0.5) < 1e-9:
+                continue
+            key = movement_join_key({"event_id": row.get("event_id"), "market": row.get("market"),
+                                     "player_name": row.get("player_name"),
+                                     "segment": row.get("segment"), "side": side})
+            if key:
+                curve.setdefault(key, {})[line] = fair
+    return curve
+
+
+def _fair_now_at(curve_points: Mapping[float, float] | None, line: float) -> tuple[float | None, str]:
+    """This identity's CURRENT fair at `line`: exact, else interpolated.
+
+    Interpolation is linear and only BETWEEN two observed lines -- never
+    extrapolated past the ends, where the probability curve flattens and a
+    straight line would overstate the move.
+    """
+    if not curve_points:
+        return None, "none"
+    exact = curve_points.get(line)
+    if exact is not None:
+        return float(exact), "same_bet_exact"
+    below = [value for value in curve_points if value < line]
+    above = [value for value in curve_points if value > line]
+    if not below or not above:
+        return None, "none"
+    low, high = max(below), min(above)
+    span = high - low
+    if span <= 0:
+        return None, "none"
+    weight = (line - low) / span
+    return float(curve_points[low] + (curve_points[high] - curve_points[low]) * weight), "same_bet_interpolated"
+
+
 def _movement_from_opening(
-    row: Mapping[str, Any], openings: Mapping[str, Mapping[str, Any]] | None
+    row: Mapping[str, Any],
+    openings: Mapping[str, Mapping[str, Any]] | None,
+    curve: Mapping[str, Mapping[float, float]] | None = None,
 ) -> dict[str, Any]:
     """Movement against the price WE published, not against a 20MB shard.
 
@@ -4063,43 +4147,54 @@ def _movement_from_opening(
     # COMPUTED FOR THE LINE-MOVED CASE ONLY. On a same-line row the price delta
     # is authoritative and `blended_score` would ignore this anyway; emitting it
     # regardless would publish a second movement number that nothing reads.
-    if not lines_comparable and out.get("movement_vs_pick") in {"toward", "away"}:
-        line_fair_open = _as_float(opened.get("fair_probability"))
-        line_fair_now = _as_float(quote.get("fair_probability"))
-        # NO IMPLIED-FROM-PRICE FALLBACK HERE, AND THE ATTEMPT IS WHY.
-        #
-        # 128 served rows had a current fair and were blocked solely on the
-        # OPENING's, so falling back to implied-from-price looked like free
-        # coverage. It is not: on a LINE-MOVED row the two prices belong to
-        # DIFFERENT BETS, so the difference measures the handicap change, not
-        # the market. `tests/test_layer2_movement_live_segment.py::
-        # test_a_moved_line_cannot_fire_steam` caught it immediately --
-        # home +1.0 @ -104 (p .5098) -> home -1.5 @ +122 (p .4505) made the
-        # probability FALL 5.94 pp while `_line_move_vs_pick` correctly called
-        # the same move "toward". Sign and magnitude disagreed.
-        #
-        # **THAT CONTRADICTION IS LATENT IN THE FAIR-BASED PATH TOO** and is a
-        # REAL LIMITATION of this term, recorded rather than papered over: a
-        # cross-handicap probability difference is not a clean measure of how
-        # far the market moved. The SIGN is sound (`movement_vs_pick` owns it);
-        # the MAGNITUDE is only approximate, and is bounded by the shared cap,
-        # which is what keeps it safe to rank on. The proper fix is a magnitude
-        # derived from the LINE delta normalised per market -- not from
-        # probabilities read at two different handicaps. NOT attempted here.
-        #
-        # Leaving these rows unscored is the correct trade: better a row with
-        # no movement term than one with a confidently wrong one.
-        if (
-            line_fair_open is not None
-            and line_fair_now is not None
-            and 0 < line_fair_open < 1
-            and 0 < line_fair_now < 1
-        ):
-            magnitude_pp = abs(line_fair_now - line_fair_open) * 100.0
-            if magnitude_pp > 0:
-                out["movement_line_prob_delta_pp"] = round(
-                    magnitude_pp if out["movement_vs_pick"] == "toward" else -magnitude_pp, 4
-                )
+    # THE MAGNITUDE IS THE SAME BET AT TWO TIMES, NOT TWO BETS AT ONE TIME.
+    #
+    # This replaces `|fair_now - fair_open|`, which took the fair at the NEW
+    # handicap against the fair at the OLD one -- two different bets -- so it
+    # mixed the handicap change with the market's repricing and could
+    # contradict its own sign. Measured: `home +1.0 @ -104` (p .5098) ->
+    # `home -1.5 @ +122` (p .4505) made the probability FALL 5.94 pp while
+    # `_line_move_vs_pick` correctly called that move **toward** the pick.
+    #
+    # Instead: the opening record holds the fair for OUR ORIGINAL BET at ITS
+    # OWN line (`opened["line"]`, `opened["fair_probability"]`), and
+    # `build_line_curve` holds what the market prices that SAME bet at NOW,
+    # because the board publishes alternate lines side by side. The difference
+    # is one bet re-priced over time.
+    #
+    # SIGN AND MAGNITUDE CANNOT DISAGREE, BY CONSTRUCTION AND NOT BY TUNING.
+    # `_line_move_vs_pick` is DEFINED as "the market now rates this side more
+    # likely", and the original bet at L0 is precisely what benefits from that,
+    # so a move toward the pick raises this probability. `movement_vs_pick` is
+    # therefore no longer consulted to SIGN the magnitude -- the magnitude
+    # carries its own sign -- and any disagreement between them is a real
+    # defect rather than a definition, which is why it is counted below.
+    #
+    # NO FALLBACK TO THE OLD CROSS-HANDICAP NUMBER. When the curve does not
+    # hold this bet's opening line (48% of line-moved rows when measured), the
+    # row gets NO line term. Better an unscored row than a confidently wrong
+    # one -- the same trade this file already makes for a missing opening fair.
+    if not lines_comparable:
+        open_line_for_bet = _as_float(opened.get("line"))
+        fair_at_open = _as_float(opened.get("fair_probability"))
+        if open_line_for_bet is not None and fair_at_open is not None and 0.0 < fair_at_open < 1.0:
+            points = (curve or {}).get(movement_join_key(row) or "")
+            fair_now_same_bet, basis = _fair_now_at(points, open_line_for_bet)
+            if fair_now_same_bet is not None:
+                delta_pp = (fair_now_same_bet - fair_at_open) * 100.0
+                if abs(delta_pp) > 1e-9:
+                    out["movement_line_prob_delta_pp"] = round(delta_pp, 4)
+                    out["movement_line_prob_basis"] = basis
+                    out["movement_line_fair_from"] = round(fair_at_open, 6)
+                    out["movement_line_fair_to"] = round(fair_now_same_bet, 6)
+                    # COUNTED, NOT ASSERTED. The agreement above is an argument;
+                    # this is the instrument that would catch it being wrong.
+                    verdict = out.get("movement_vs_pick")
+                    if verdict in {"toward", "away"} and (
+                        (delta_pp > 0 and verdict == "away")
+                        or (delta_pp < 0 and verdict == "toward")
+                    ):
+                        out["movement_line_sign_conflict"] = True
 
     # STEAM: a sharp move in a short window, AT ONE BOOK. Both clock halves are
     # required -- a 30 point drift over eight hours is not steam, and this is
