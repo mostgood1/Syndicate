@@ -39471,3 +39471,20 @@ Saturday-evening games under 2026-09-26.
 The fresh 09-26 copies win: of the evening games' game rows, 57 come from the 09-26 grid and 3 from the
 frozen 09-27 grid. Those 3 have no 09-26 counterpart (lines last quoted <= 17:06Z and not since) -- the
 stale-line residual already recorded, not duplicates.
+
+## 2026-09-21 19:21:58Z -> live 19:25:27Z (2:21-2:25 PM CT) — web `7882372f` -> `00cc059b` (`dep-daoo7lh42hec7391n7b0`) — lane `live-inplay-board-cadence` — **lever 1: a watched combined board is rebuilt as soon as a newer in-play overlay lands. The warmer is running in both gunicorn processes. PREDICTION HELD; the in-play effect is owed tonight.**
+
+**Decision.** User in chat: "yes start on lever 1", then "yes deploy web and schedule tonight's measurement".
+
+**What is in it (code, `7882372f..00cc059b`):** `8bd59f95` (`pipeline/intelligence_state.py`, the warmer; the tests and `tests/conftest.py` do not ship behaviour) and `a720941d` (`clv_join.py`, lane `clv-close-from-book-quotes`: a game that has not kicked off gets no CLV close from any source, so TODAY's `/api/ops/clv/report` drops provisional rows; past dates byte-identical; no board payload change). Nothing else, and no `render.yaml`.
+
+**Pre-registered.** `--expect live_commit=00cc059b`, `--baseline live_commit=7882372f` read at 19:21:33Z. Preflight `CLEAR: only infrastructure processes running` (2 defunct children awaiting reap). Claim held from ~19:21Z.
+
+**Measured.** `/deploys` poll: build 19:22:06Z -> update 19:23:48Z -> `live 00cc059b finishedAt=2026-09-21T19:25:27.134507Z`. Web logs since 19:25Z: `COMBINED_BOARD_OVERLAY_WARMER_STARTED pid=62` and `pid=63`, both `interval_s=5 window_s=600 armed_by=hosted:RENDER`, so both gunicorn workers run it. `server_failed` events since 19:25Z: **0** (read 19:26Z). A served `/api/intelligence/query` at 19:25:53Z took 5.9 s with 0 in-play overlay cards (nothing was live on a Monday afternoon; this is not evidence either way).
+
+**verify (OWED, scheduled task `inplay-warmer-live-reading-0921`, 20:15 CDT, during MNF + the MLB evening slate):**
+(1) `COMBINED_BOARD_OVERLAY_WARMED` lines appear, with `overlay_age_s` median <= ~60 s (5 s poll + the 45 s floor) and `build_s` <= ~18 s;
+(2) request-driven `COMBINED_BOARD_OVERLAY_EXPIRED` lines fall toward 0, because requests find a board already rebuilt;
+(3) look-to-serve on served in-play overlay cards, (now - `price_grid_generated_at`) + `quote_seen_age_seconds`, median below the ~362 s of 2026-09-20 17:22Z. The modelled saving is ~50-70 s: a median around 290-310 s would be the lever doing what was predicted, and above ~340 s it did not;
+(4) no web health regression: `server_failed` <= 3 after the first 10 min over 2 h.
+Kill switch: `SYNDICATE_COMBINED_BOARD_OVERLAY_WARMER=off` (env change + deploy; a user decision).
