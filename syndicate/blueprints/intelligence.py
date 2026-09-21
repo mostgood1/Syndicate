@@ -3264,6 +3264,7 @@ def board_layer1_api():
     from syndicate.features.shared.layer1_board import (
         artifact_read_dates,
         build_layer1_board,
+        merge_grid_rows_across_dates,
         partition_board_by_state,
         resolve_window_dates,
     )
@@ -3312,7 +3313,7 @@ def board_layer1_api():
     # -> 8, `rows_other_dates` still 0.
     read_dates = artifact_read_dates(window_dates, today=central_today_iso())
 
-    rows: list = []
+    rows_by_date: list = []
     precomputed: dict | None = None
     missing_dates: list[str] = []
     for window_date in read_dates:
@@ -3330,7 +3331,9 @@ def board_layer1_api():
             # so `generated_at` describes the day the caller asked about rather
             # than whichever day happened to be read last.
             precomputed = day_artifact
-        rows.extend(day_artifact.get("rows") or [])
+        rows_by_date.append((window_date, day_artifact.get("rows") or []))
+    # One copy per market across the day grids -- see `merge_grid_rows_across_dates`.
+    rows, cross_date_duplicates = merge_grid_rows_across_dates(rows_by_date)
 
     absent_reason: str | None = None
     if not isinstance(precomputed, dict):
@@ -3362,6 +3365,9 @@ def board_layer1_api():
     # three artifacts is a partial board, and saying so is the difference between
     # "those days have no games" and "we have not built them yet".
     board["window_dates_missing_artifact"] = missing_dates
+    # Copies of one market dropped because two day grids both held it (a moved
+    # kickoff). Stated so a thinner row count is attributable, not mysterious.
+    board["rows_dropped_cross_date_duplicates"] = cross_date_duplicates
     # Provenance, so a thin board is attributable to the ARTIFACT rather than
     # read as the slate. `#331` is the standing reason this matters: the grid was
     # built from 1.7% of the day's odds and every count downstream looked real.

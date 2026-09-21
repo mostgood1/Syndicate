@@ -316,6 +316,70 @@ def artifact_read_dates(window_dates: "Sequence[str] | Iterable[str]", *, today:
     return ordered
 
 
+def _grid_row_identity(row: Mapping[str, Any]) -> tuple[Any, ...] | None:
+    """What makes two grid rows the SAME market: game, kind, market, segment, player, line."""
+    event_id = str(row.get("event_id") or "").strip()
+    if not event_id:
+        return None
+    try:
+        line: Any = None if row.get("line") is None else round(float(row.get("line")), 3)
+    except (TypeError, ValueError):
+        line = str(row.get("line"))
+    return (
+        event_id,
+        str(row.get("kind") or "").strip().lower(),
+        str(row.get("market") or "").strip().lower(),
+        str(row.get("segment") or "full").strip().lower() or "full",
+        str(row.get("player_name") or "").strip().casefold(),
+        line,
+    )
+
+
+def merge_grid_rows_across_dates(
+    rows_by_date: "Sequence[tuple[str, Sequence[Mapping[str, Any]]]]",
+) -> tuple[list[Mapping[str, Any]], int]:
+    """Concatenate the grids `artifact_read_dates` opened, keeping ONE copy of a market.
+
+    **WIDENING THE READ SET CAN SHOW ONE MARKET TWICE**, even though it can never
+    show a wrong-date game. The quote log is sharded by kickoff date, and a game's
+    kickoff can MOVE: NCAAF announces times late, so a game quoted at a 16:00Z
+    placeholder and later set to 03:00Z Sunday has rows in two shards, hence two
+    grids, both with a local game date inside the window. MEASURED on the served
+    NCAAF 2026-09-26 board, 2026-09-21: 11 duplicate game-market rows on 4 evening
+    games (Nevada, UL Monroe, Sacramento State, Washington), the stale copy
+    carrying the superseded kickoff and prices last updated 09-20.
+
+    Across grids the fresher row wins (`updated_at`, the newest book update the
+    row holds); within one grid nothing is touched -- the pivot's own row order
+    is load-bearing (`build_book_grid` anchors on the first row per line) and a
+    duplicate inside one grid is not this defect. Order is preserved: the kept
+    row takes the position of the first copy. Returns the rows and how many
+    copies were dropped, so the board can say so.
+    """
+    merged: list[Mapping[str, Any]] = []
+    position: dict[tuple[Any, ...], int] = {}
+    source: dict[tuple[Any, ...], str] = {}
+    dropped = 0
+    for date_text, rows in rows_by_date or ():
+        for row in rows or ():
+            identity = _grid_row_identity(row) if isinstance(row, Mapping) else None
+            if identity is None:
+                merged.append(row)
+                continue
+            at = position.get(identity)
+            if at is None or source.get(identity) == date_text:
+                if at is None:
+                    position[identity] = len(merged)
+                    source[identity] = date_text
+                merged.append(row)
+                continue
+            dropped += 1
+            if str(row.get("updated_at") or "") > str(merged[at].get("updated_at") or ""):
+                merged[at] = row
+                source[identity] = date_text
+    return merged, dropped
+
+
 # The three states a game can be in, plus the one that matters most here.
 #
 # `unknown` IS A STATE, not a synonym for pregame. A row whose game state failed

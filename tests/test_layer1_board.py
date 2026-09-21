@@ -402,3 +402,43 @@ def test_worker_forward_days_track_the_boards_own_window_table():
 
     assert max_slate_window_days() == max(slate_window_days(s) for s in ("mlb", "nfl", "ncaaf", "soccer"))
     assert max_slate_window_days() == slate_window_days("soccer") == 7
+
+
+# ---------------------------------------------------------------------------
+# One copy of a market across the day grids the board reads
+# ---------------------------------------------------------------------------
+
+def _grid_row(updated_at, *, line=7.5, market="spreads", event_id="e497e36c", **over):
+    row = {"event_id": event_id, "kind": "game", "market": market, "segment": "full",
+           "player_name": None, "line": line, "updated_at": updated_at}
+    row.update(over)
+    return row
+
+
+def test_a_market_in_two_day_grids_keeps_the_fresher_copy():
+    """Served NCAAF 2026-09-26 board, 2026-09-21: Washington's spread sat in the
+    09-26 grid under a superseded 16:00Z kickoff (updated 09-20) AND in the 09-27
+    grid under the real 03:00Z one -- two rows for one market."""
+    from syndicate.features.shared.layer1_board import merge_grid_rows_across_dates
+
+    stale = _grid_row("2026-09-20T04:21:40Z", commence_time="2026-09-26T16:00:00Z")
+    fresh = _grid_row("2026-09-21T14:05:46Z", commence_time="2026-09-27T03:00:00Z")
+    other = _grid_row("2026-09-21T14:00:00Z", market="totals", line=45.5)
+    rows, dropped = merge_grid_rows_across_dates([("2026-09-26", [stale, other]), ("2026-09-27", [fresh])])
+    assert dropped == 1
+    assert rows == [fresh, other], "fresher copy, in the first copy's position"
+
+    # And the other way round: the anchor day's copy is the fresh one.
+    rows, dropped = merge_grid_rows_across_dates([("2026-09-26", [fresh]), ("2026-09-27", [stale])])
+    assert rows == [fresh] and dropped == 1
+
+
+def test_different_lines_and_rows_inside_one_grid_are_left_alone():
+    from syndicate.features.shared.layer1_board import merge_grid_rows_across_dates
+
+    a = _grid_row("2026-09-21T10:00:00Z", line=7.5)
+    b = _grid_row("2026-09-21T11:00:00Z", line=9.5)          # an alternate line: its own market
+    same_grid_twice = _grid_row("2026-09-21T12:00:00Z", line=7.5)
+    no_event = {"kind": "game", "market": "h2h", "updated_at": "2026-09-21T12:00:00Z"}
+    rows, dropped = merge_grid_rows_across_dates([("2026-09-26", [a, b, same_grid_twice, no_event])])
+    assert rows == [a, b, same_grid_twice, no_event] and dropped == 0
