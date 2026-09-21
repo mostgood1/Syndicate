@@ -39333,3 +39333,21 @@ change still caused ZERO failures -- and `test_layer2_blend_admission`, which is
 absence alone; I read that line when opening the worktree and did not apply it to my own
 failure list.
 
+
+## 2026-09-21 16:34:27Z -> live 16:37:31Z (11:34-11:37 AM CT) — refresh-worker `c70329c2` -> `e9df684b` (`dep-daolp4o473hc73ctd4i0`) — lane `reconciliation-disk-walks` — **the reconciliation autoruns stop retrying dates older than 14 days and skip the disk walk for dates with nothing pending; the CLV lane's quote fallback + its started-games guard ride along. PREDICTION HELD.**
+
+**Decision.** User in chat: "yes do it" (the reconciliation change, to the recommendation that named a refresh-worker deploy), then "proceed with the deploy when it finishes". The deploy was HELD at 16:2x-16:32Z at the request of lane `clv-close-from-book-quotes` (session 9e340058), whose `1dc4f7ec` sits under this change on main. Unguarded it would have streamed future-kickoff quote shards inside `portfolio_commit` on every build. Their guard `e9df684b` (only started games are looked up) landed first.
+
+**What is in it (ride-along enumerated at 16:3xZ, `c70329c2..e9df684b`, code paths only):** `cacfd33a` (this lane: `prediction_reconciliation.py` + the two `pending_prediction_dates()` calls in `run_refresh_worker.py`), `46e5e434` (`check_deploy_safety.py` key fallback: local tooling, not run by the worker), `1dc4f7ec` + `e9df684b` (`clv_join.py`, lane `clv-close-from-book-quotes`). No `render.yaml`, no env change.
+
+**Pre-registered.** `--expect live_commit=e9df684b`, `--baseline live_commit=c70329c2` read at 16:34:05Z (re-read after the HOLD; first read 16:32:33Z). First preflight 16:32Z: **HOLD** on a real in-flight board build (started 16:32:09Z). It is the first protocol deploy the board-build hold has guarded since this morning's worktree-key fix. Re-run after the build completed: `CLEAR: only infrastructure processes running` at ~16:34Z, the worker idle since `BOARD_BUILD_TIMING` 16:33:18Z (build window watched from the worktree).
+
+**Measured.** `/v1/services/srv-d91dpertqb8s73co8ls0/deploys?limit=2` at 16:38:12Z: `e9df684b live finishedAt=2026-09-21T16:37:31.068353Z`; `c70329c2 deactivated`. Build 16:34:37Z -> update 16:36:39Z -> live 16:37:31Z. Claim held from 16:32:33Z, released after this entry.
+
+**Baseline for the CLV cost, read before the deploy:** `BUILD_SPAN_EXIT stage=portfolio_commit elapsed_s` over 13:30-16:30Z, n=50: median 13.2 s, p90 15.4 s, max 17.6 s.
+
+**verify (OWED):**
+(1) the next reconciliation autorun (~21:3xZ): one `RECONCILE_DATES_AGED_OUT` line (predicted: dates=11, predictions=1438 UNSETTLED -- the 20 already-resolved rows are not counted -- oldest 2026-06-15, newest 2026-09-03, cutoff 2026-09-07); `RECONCILE_DATE_TIMING` lines only for yesterday and today; both carry `walk=skipped_nothing_pending`; the run takes seconds, not ~74 s;
+(2) the MLB actuals writer's target dates shrink the same way;
+(3) `portfolio_commit` span median over the first ~2 h after live versus 13.2 s, read beside the `[clv_join] CLV_QUOTES_FALLBACK ... seconds=` lines.
+**Reading scheduled:** task `reconciliation-age-cutoff-reading-0921`, 2026-09-21 16:45 CDT, carrying (1)-(3) plus the MLB actuals writer and the CLV cost.
