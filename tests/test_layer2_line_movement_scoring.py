@@ -416,3 +416,102 @@ def test_a_present_opening_fair_still_scores():
     out = layer2_board._movement_from_opening(row, {key: opening})
     assert out["movement_vs_pick"] == "toward"
     assert out["movement_line_prob_delta_pp"] == pytest.approx(8.0, abs=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# PER-LINE OPENINGS (lane `layer2-line-move-magnitude`, 2026-09-21).
+#
+# The openings index collapsed every line of a bet onto whichever line was
+# recorded FIRST, while the board publishes several lines of one bet at once.
+# So every other line was compared across handicaps and classed `line_moved`:
+# 538 of 912 line-moved rows on the live board still had their opening line
+# published in the same build. Replayed against the real 2026-09-21 ledger with
+# the real functions: line_moved 903 -> 23, rows at the cap 328 -> 50.
+# ---------------------------------------------------------------------------
+
+
+def _ledger(row, *records):
+    """Real ledger records carry the bet's identity -- `_opening_record` writes
+    event_id, market, side, player and segment -- and `index_openings` keys on
+    exactly those. The older `_opening` helper omits them because its callers
+    hand `_movement_from_opening` a PRE-KEYED dict; stamping them here is what
+    makes these records look like the ledger rather than like that shortcut."""
+    identity = {f: row.get(f) for f in ("event_id", "market", "side", "player_name", "segment")}
+    return [{**identity, **record} for record in records]
+
+
+def test_per_line_index_is_reachable_off_differs_from_on():
+    """Reachability BEFORE correctness: the SAME row must classify differently
+    with and without the per-line index, or the change is inert."""
+    row = _row(line=9.5, price=-120, fair=0.55)
+    row["quote"]["book_prices"] = {"betmgm": -120}
+    key = layer2_board.movement_join_key(row)
+    first = _opening(line=8.5, price=-110, fair=0.52, captured_at=_now_iso(60), key=key)
+    own = _opening(line=9.5, price=-105, fair=0.50, captured_at=_now_iso(30), key=key)
+    own["book_prices"] = {"betmgm": -105}
+    earliest, by_line = layer2_board.index_openings(_ledger(row, first, own))
+
+    off = layer2_board._movement_from_opening(row, earliest)
+    on = layer2_board._movement_from_opening(row, earliest, by_line)
+    assert off["movement_basis"] == "line_moved", "today: compared with a DIFFERENT line"
+    assert on["movement_basis"] == "same_book", "fixed: compared with ITS OWN line"
+    assert on["movement_opening_match"] == "same_line"
+    assert on.get("movement_price_delta") is not None
+
+
+def test_index_keeps_the_first_record_per_key_AND_per_line():
+    row = _row(line=8.5, price=-110, fair=0.5)
+    key = layer2_board.movement_join_key(row)
+    a = _opening(line=8.5, price=-110, fair=0.52, captured_at=_now_iso(90), key=key)
+    b = _opening(line=9.5, price=-105, fair=0.48, captured_at=_now_iso(60), key=key)
+    a_later = _opening(line=8.5, price=-130, fair=0.55, captured_at=_now_iso(30), key=key)
+    earliest, by_line = layer2_board.index_openings(_ledger(row, a, b, a_later))
+    assert earliest[key]["price"] == -110, "the ledger is append-only: first write is the opening"
+    assert by_line[key][8.5]["price"] == -110, "and per line too -- a later 8.5 is a MOVE, not an opening"
+    assert by_line[key][9.5]["price"] == -105
+
+
+def test_a_genuinely_new_line_still_reads_as_a_line_move():
+    """The loose key exists so a real line move still finds an opening. That must
+    survive: a line never published before falls back to the earliest opening."""
+    row = _row(line=10.5, price=-110, fair=0.55)
+    key = layer2_board.movement_join_key(row)
+    first = _opening(line=8.5, price=-110, fair=0.52, captured_at=_now_iso(60), key=key)
+    earliest, by_line = layer2_board.index_openings(_ledger(row, first))
+    out = layer2_board._movement_from_opening(row, earliest, by_line)
+    assert out["movement_basis"] == "line_moved"
+    assert out["movement_opening_match"] == "earliest_line"
+
+
+def test_without_the_per_line_index_the_output_is_unchanged():
+    """An older caller passes no per-line index and must see EXACTLY the old
+    output -- including no new field."""
+    row = _row(line=9.5, price=-120, fair=0.55)
+    key = layer2_board.movement_join_key(row)
+    first = _opening(line=8.5, price=-110, fair=0.52, captured_at=_now_iso(60), key=key)
+    earliest, _ = layer2_board.index_openings(_ledger(row, first))
+    assert "movement_opening_match" not in layer2_board._movement_from_opening(row, earliest)
+
+
+def test_line_keys_are_rounded_so_8_5_and_8_50_are_one_line():
+    row = _row(line=8.50, price=-120, fair=0.55)
+    key = layer2_board.movement_join_key(row)
+    own = _opening(line=8.5, price=-110, fair=0.52, captured_at=_now_iso(30), key=key)
+    earliest, by_line = layer2_board.index_openings(_ledger(row, own))
+    out = layer2_board._movement_from_opening(row, earliest, by_line)
+    assert out["movement_opening_match"] == "same_line"
+
+
+def test_a_lineless_market_matches_itself():
+    row = _row(side="home", line=None, price=-140, fair=0.57, market="h2h")
+    key = layer2_board.movement_join_key(row)
+    own = _opening(line=None, price=-120, fair=0.55, captured_at=_now_iso(30), key=key)
+    earliest, by_line = layer2_board.index_openings(_ledger(row, own))
+    out = layer2_board._movement_from_opening(row, earliest, by_line)
+    assert out["movement_opening_match"] == "same_line"
+    assert out["movement_basis"] != "line_moved"
+
+
+def test_the_index_skips_what_it_cannot_key():
+    earliest, by_line = layer2_board.index_openings([{"market": "totals"}, "not a mapping", None])
+    assert earliest == {} and by_line == {}

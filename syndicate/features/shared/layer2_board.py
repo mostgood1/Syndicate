@@ -2711,6 +2711,7 @@ def build_layer2_rows(
     grid: Iterable[Mapping[str, Any]],
     openings: Mapping[str, Mapping[str, Any]] | None = None,
     population_sink: Any = None,
+    openings_by_line: Mapping[str, Mapping[float | None, Mapping[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     """Fan a market grid out into ranked, gated one-side candidates.
 
@@ -3084,7 +3085,7 @@ def build_layer2_rows(
             # Ranking on a movement number the card does not show (or showing
             # one the ranking did not use) is the `#364` unit-mismatch shape:
             # two numbers that have to be the same number.
-            movement = _movement_from_opening(candidate, openings)
+            movement = _movement_from_opening(candidate, openings, openings_by_line)
             candidate["movement"] = movement
             # SAME CROSS-FILE HAZARD AS THE CARD BUILDER, one level down.
             # `opportunity_signals.py` is a separate blob and can be a deploy
@@ -3468,6 +3469,7 @@ def layer2_rows_to_board_cards(
     openings: Mapping[str, Mapping[str, Any]] | None = None,
     price_trail: Mapping[str, Any] | None = None,
     row_context: Mapping[str, Any] | None = None,
+    openings_by_line: Mapping[str, Mapping[float | None, Mapping[str, Any]]] | None = None,
 ) -> list[dict[str, Any]]:
     """Translate L2-A rows into the shape the board card normaliser expects.
 
@@ -3601,14 +3603,14 @@ def layer2_rows_to_board_cards(
                 # words, `segment` is the raw token a filter can group on.
                 "segment_label": _segment_label(row.get("segment"), sport),
                 **_layer2_board_columns(row, quote, score),
-                **(row.get("movement") if isinstance(row.get("movement"), Mapping) else _movement_from_opening(row, openings)),
+                **(row.get("movement") if isinstance(row.get("movement"), Mapping) else _movement_from_opening(row, openings, openings_by_line)),
                 # The sparkline draws the SAME price pair the movement label states,
                 # so it reads the movement just spread above (recomputed only for a
                 # row that arrived without one; `_movement_from_opening` does no IO).
                 **_movement_series_columns(
                     row,
                     price_trail,
-                    row.get("movement") if isinstance(row.get("movement"), Mapping) else _movement_from_opening(row, openings),
+                    row.get("movement") if isinstance(row.get("movement"), Mapping) else _movement_from_opening(row, openings, openings_by_line),
                 ),
                 **_live_projection_columns(row),
                 # `layer2-row-parity`: the face and the sentence the legacy rows
@@ -3836,8 +3838,59 @@ def _blended_score_accepts(parameter: str) -> bool:
         return False
 
 
+def _opening_line_key(line: Any) -> float | None:
+    """A line as an index key: rounded so 8.5 and 8.50 are one line; None stays None."""
+    value = _as_float(line)
+    return None if value is None else round(value, 3)
+
+
+def index_openings(
+    records: Iterable[Mapping[str, Any]],
+) -> tuple[dict[str, Mapping[str, Any]], dict[str, dict[float | None, Mapping[str, Any]]]]:
+    """`(earliest_by_key, by_key_and_line)` from the append-only openings ledger.
+
+    TWO INDEXES, BECAUSE ONE WAS ANSWERING TWO QUESTIONS (lane
+    `layer2-line-move-magnitude`, 2026-09-21).
+
+    The caller used to keep only `earliest_by_key`: first write wins on the
+    LINE-LESS `movement_join_key`. That key is deliberately loose -- it is how a
+    row still finds its opening after a genuine line move. But the board
+    publishes SEVERAL LINES OF ONE BET AT ONCE (alternate markets and main
+    markets alike), so collapsing on it gave every line the opening of
+    WHICHEVER LINE HAPPENED TO BE RECORDED FIRST. Every other line was then
+    compared across handicaps and classed `line_moved`. Measured on the live
+    board 2026-09-21T13:52:19Z: **538 of 912 line-moved rows (59%) still had
+    their opening line published in the same build**, 506 of them scored on it
+    at median |component| 0.975 (233 at the cap) against 0.352 for the rest.
+
+    `by_key_and_line` keeps the first record AT EACH LINE, so a row whose own
+    line was published before is compared with ITSELF. Replayed against the
+    real 2026-09-21 ledger (the current logic reproduced production's
+    classification 1,988/1,988): **97.5% of line-moved rows had an opening at
+    their own line** with the last 20 min of writes excluded, so this is not
+    the current build seeing its own appends.
+
+    FIRST WRITE WINS IN BOTH, for the same reason: the ledger is append-only,
+    so the first occurrence is the opening by definition, and later records for
+    the same line are exactly the moved versions movement is measured against.
+    """
+    earliest: dict[str, Mapping[str, Any]] = {}
+    by_line: dict[str, dict[float | None, Mapping[str, Any]]] = {}
+    for record in records or ():
+        if not isinstance(record, Mapping):
+            continue
+        key = movement_join_key(record)
+        if not key:
+            continue
+        earliest.setdefault(key, record)
+        by_line.setdefault(key, {}).setdefault(_opening_line_key(record.get("line")), record)
+    return earliest, by_line
+
+
 def _movement_from_opening(
-    row: Mapping[str, Any], openings: Mapping[str, Mapping[str, Any]] | None
+    row: Mapping[str, Any],
+    openings: Mapping[str, Mapping[str, Any]] | None,
+    openings_by_line: Mapping[str, Mapping[float | None, Mapping[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     """Movement against the price WE published, not against a 20MB shard.
 
@@ -3888,7 +3941,25 @@ def _movement_from_opening(
     key = movement_join_key(row)
     if not key:
         return {"movement_state": "unkeyable"}
-    opened = openings.get(key)
+    # SAME LINE FIRST, THE EARLIEST LINE ONLY AS THE FALLBACK. See
+    # `index_openings`: when this row's own line was published before, its own
+    # opening is the one to compare against -- that is a PRICE comparison of one
+    # bet, not a cross-handicap one. The earliest opening is used only when this
+    # line never appeared, which is the case a genuine line move produces.
+    #
+    # `openings_by_line` is optional so an older caller gets exactly the old
+    # behaviour, including no new output field; `movement_opening_match` is
+    # stamped only when the caller supplied the per-line index.
+    opening_match = None
+    opened = None
+    if openings_by_line is not None:
+        same_line = (openings_by_line.get(key) or {}).get(_opening_line_key(row.get("line")))
+        if isinstance(same_line, Mapping):
+            opened, opening_match = same_line, "same_line"
+    if opened is None:
+        opened = openings.get(key)
+        if openings_by_line is not None and isinstance(opened, Mapping):
+            opening_match = "earliest_line"
     if not isinstance(opened, Mapping):
         return {"movement_state": "no_opening_for_row"}
 
@@ -3906,6 +3977,13 @@ def _movement_from_opening(
         "movement_open_line": open_line,
         "movement_open_bookmaker": opened.get("bookmaker"),
     }
+    if opening_match is not None:
+        # WHICH OPENING THIS ROW WAS COMPARED WITH. `same_line` is a price
+        # comparison of one bet; `earliest_line` is the cross-handicap
+        # comparison, and should now be the rare case -- a line that was never
+        # published before. A board where `earliest_line` dominates is a board
+        # where the per-line index is not reaching this function.
+        out["movement_opening_match"] = opening_match
 
     # PRICE DELTA IS ONLY MEANINGFUL AT THE SAME LINE. Measured in production
     # 2026-08-16 22:20Z, immediately after the loose join key shipped: **19 of
