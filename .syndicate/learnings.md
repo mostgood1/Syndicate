@@ -3334,3 +3334,11 @@ tree; it did not remove the need to mirror a RELEASE, because the two operations
 sit on opposite sides of the same set subtraction. The earlier note read as
 "mirroring is no longer the fix", which is true for one direction and false for
 the other — the most expensive kind of half-true.
+
+## 2026-09-21 — FORBIDDEN: windowing a simulation by TRUNCATING the clock it is told is left, when the simulator's dynamics read that clock `[session abacd435, measured offline]`
+
+- **What is wrong:** `live_lens.goal_in_window_probability` answers "goal in the next W seconds" by resuming the match with `clock_remaining = W`. `soccersim.situation_model.classify_urgency` reads exactly that field: 2nd half and <= 480 s left while trailing by 1-2 is DESPERATION, <= 1500 s trailing is TRAILING_PUSH, <= 900 s leading is PROTECT_LEAD, 1st half <= 120 s is CLOSING_HALF. So the window is not "the next five minutes of this match"; it is "the last five minutes of a half", played by both sides accordingly.
+- **Measured 2026-09-21, N=3000 per estimate, neutral ratings:** at the 60th minute the published number is LOW by 0.0183 (next 5) and 0.0277 (next 10) when a side leads by one, and by 0.0150 / 0.0190 when a side trails by one or two — 8-12% relative, six of six affected pairs negative. Four control pairs where no urgency rule can fire agree to 0.0000 exactly, because identical seeds give identical path prefixes.
+- **The rule:** before windowing a simulation by shortening its clock, list every input the simulator derives FROM that clock. If any behaviour switches on it, the truncation is a DIFFERENT MODEL, not a shorter run of the same one. Simulate the real remaining time and take the window out of the resulting path by TIMESTAMP — which is also cheaper, because one path answers every window.
+- **The near neighbour, same function, one day earlier:** `build_resume_state`'s `include_stoppage` default made this same window simulate W PLUS the half's stoppage (2026-09-19 entry). Both bugs have one shape: the window's clock is not the match's clock, and no test read the clock the window was handed.
+- *(evidence: `scratchpad/goal_window_urgency_bias.py`, `log/2026-09-21.md`, and the cost lead in `leads.md`)*
