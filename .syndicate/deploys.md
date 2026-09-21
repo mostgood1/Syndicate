@@ -39188,3 +39188,40 @@ field the magnitude would have shipped as a quiet wrong signal in the ranking,
 indistinguishable from a working feature at every level except the data. That
 is `model_engine_standard.md`'s own thesis, paid for once.
 
+
+## 2026-09-21 13:55Z (08:55 CT) — READING, no deploy — cron `model-scorecard` (`crn-dam0ao942hec73cge0rg`, `361bc93d`) — lane `daily-accuracy-suite` (UNOWNED; scheduled task `model-scorecard-first-weekly-run-0921`) — **all four pre-registered predictions HELD; the first weekly-backtest run went 68 ok / 1 failed, and the failure is a deliberate refusal**
+
+Freshness judged on the artifact's own `generated_at` **2026-09-21T11:32:51Z** (2.3h old at read, fresh), not on `lastRunAt`. Read via `.claude/skills/daily-accuracy/driver.py` (exit 0) and `/api/model-scorecard` directly; weekly report via `/api/ops/artifacts/export` (`reports/model_scorecard/weekly/weekly_backtests_20260921.json`).
+
+1. **Window flip (the off != on pair): HELD.** They moved in OPPOSITE directions, which is the only outcome that proves the field discriminates.
+
+       windows.7d.coverage.window_span   effective_days 7  nominal 7   degraded FALSE  (09-20: 6, TRUE)
+       windows.28d.coverage.window_span  effective_days 7  nominal 28  degraded TRUE   backed_from 2026-09-14
+
+2. **`window_span` and `ungraded_rate_by_sport` PRESENT: HELD.** Both sit under `windows.<w>.coverage.*` in both windows (there is no top-level `coverage` key — the prediction's `coverage.` prefix is that nested object).
+3. **`grader.sport_versions.nba == "espn/1"`: HELD, and the reset was nba-only.** `run.reset = sport_versions_changed:nba`; `state.resets = [{sports:["nba"], from:{nba:null}, to:{nba:"espn/1"}, games_dropped:0}]`; `state.graded_games` **291** (09-20 dry run: 222) — the other sports' history was retained and grew, not wiped.
+4. **`weekly_backtests` present: HELD.** Summary `{status: ok, exit_code: 0, seconds: 280.9, published: [.json, .md]}`. The published report: **69 jobs, 68 ok, 1 failed**, over dates 09-14..09-20.
+
+       family              jobs  status    max peak_rss_mb
+       layer2_inputs          7  7 ok        30.6
+       layer2_scorecard      56  56 ok      285.9   <- the heaviest job of the run
+       mlb_props              1  ok          34.2
+       ncaaf_inputs           1  ok          28.2
+       ncaaf_player_props     1  ok          40.4
+       nfl_pbp                1  ok          35.5
+       nfl_props              1  ok         113.4
+       wnba_projection        1  FAILED      24.5   exit 1
+
+   **The one failure is the job REFUSING, by design, not crashing:** `summary.refused=True, measurable_games=10` — 30 WNBA dates considered, 17 with no projection artifact, 21 games joined to a final, only **10 of 21 (47.6%) carry `pred_margin`** (< `--min-games 30`). Its own text: the finding is the COVERAGE, not the skill — production WNBA game_cards carry a projection on under half of completed games. Information, not an emergency. Peak RSS never exceeded 286 MB, so memory is not a concern for this cron.
+
+**Two reader gaps, recorded not fixed (no new work opened):**
+- The driver prints `weekly present: 0 job(s)` — it reads `jobs`/`results` from the scorecard's `weekly_backtests` SUMMARY, which carries neither; the per-job list only exists in the published weekly report. "0 jobs" is the reader's zero, not the runner's. Anyone trusting the skill's line would conclude the weekly run did nothing.
+- The summary's `status: ok` coexists with a failed job, because the runner exits 0 whenever at least one job succeeds (documented at `scripts/run_weekly_backtests.py:49`). A per-job failure is only visible in the report's `counts`.
+
+**Recorded without prediction:**
+- `ungraded_rate` (7d / 28d): soccer **40.04% / 40.57%** (of 38,918 / 39,267 considered; 09-20 dry run 42.83% of 25,046), ncaaf 8.69% / 8.69%, wnba 7.81% / 7.81%, mlb 7.61% / 7.61%, nfl 7.13% / 7.22% (09-20: 2.29% — up; top nfl reasons `no_chip_match` 854 and `extra_dnp_void` 500). Soccer's worst reasons: `extra_cards_not_gradeable` 11.7%, `extra_player_not_in_box` 11.0%, `extra_dnp_void` 10.8%, `extra_no_team_names` 5.4%.
+- Verdicts: **299 cells** (09-20: 263) — 1 `beats_market` (soccer|player_shots|full|pregame, n=51g/7d, lodo_stable), 2 `loses_to_market` (mlb batter_home_runs, mlb h2h_3_way first5), 42 `parity`, **254 `insufficient` (84.9%) — no sample, not no edge**. 6 verdict changes since 09-20, 0 cells disappeared; both mlb `loses_to_market` cells on 09-20 (batter_hits, h2h_3_way first1) moved to `parity`.
+- Coverage: mlb 95 games / 7 dates, soccer 88/8, ncaaf 76/3, nfl 17/4, wnba 8/2, **nhl 7 games / 1 date — no longer zero** (the recorder gap upstream closed for at least one date; not a settler finding either way). NBA 0 (off-season, correct), NCAAB 0 (no team registry, deliberate).
+- Overlay: `switch_enabled=True valid=True buckets=9`, expires 2026-09-24T11:32:51Z.
+
+**Discharges** `daily-accuracy-suite` OWED (a). Does NOT discharge (b) NBA correctness (late Oct) or (c) NCAAB registry; the lane's goal stays NOT MET.
