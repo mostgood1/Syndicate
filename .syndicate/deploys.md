@@ -39527,3 +39527,24 @@ Goal time clause (autorun <= 5 min, and verify (2)'s summed total_s <= 300 s): *
     17:27:08-21:49:21Z                   edb32b45    67   15.8     18.7   22.8
 
 Median **+2.6 s**, p90 +3.3 s, max +5.2 s on `edb32b45`: just under the ~3 s flag on the median, over it on p90. Not attributed: `CLV_QUOTES_FALLBACK` in that window is 391 lines, `seconds=` sum 25.84 s, max 0.82 s (~0.39 s per build), shards_read at most 2 (`['2026-09-20','2026-09-21']`), `not_started` sum 0 (a720941d skips unstarted games: `attempted=0` lines), resolved sum 310, shards_failed none. On `e9df684b`: 64 lines, sum 4.62 s, max 0.69 s, not_started sum 51,893, resolved 216. CONFOUND: the baseline is a morning window and the `edb32b45` window runs into the Monday evening MLB/MNF slate; this is not a same-load A/B. Reported to lane `clv-close-from-book-quotes` via this entry.
+
+
+## 2026-09-21 21:43:55Z -> live 21:49:21Z (4:43-4:49 PM CT) — refresh-worker `edb32b45` -> `dd43fd49` (`dep-daoqa6ugekts73ekvchg`) + env `SYNDICATE_SCORE_FEE_NET=1` — lane `layer2-score-outcome-calibration` — **fee-net EV in the Layer 2 score is LIVE; score_v2 shadow on every row. ALL FOUR PREDICTIONS HELD. Lever 2b (`3072ab01`) RODE ALONG on the user's decision.**
+
+**User decision (in chat, 2026-09-21 ~16:4x CT):** "turn on fee-net and deploy refresh-worker"; then, asked whether to exclude lever 2b, chose **"Ship main now, both go"** -- so peer lane `live-inplay-board-cadence`'s lever 2b is live from 21:49:21Z, ahead of the Tue 10:00 CDT deploy it was scheduled for.
+**Ride-along, enumerated at preflight:** code since `edb32b45` = `3072ab01` (lever 2b, `run_refresh_worker.py`, kill switch `SYNDICATE_BOOK_GRID_SKIP_NONLIVE_SPORTS=off`) + `1e9b687b` (scripts only) + `456e264f` / `97f01a37` (score). Nothing else.
+**Env:** `SYNDICATE_SCORE_FEE_NET` was ABSENT (single-key GET 404) -> PUT `1` 21:42:33Z (read back `1`), BEFORE the deploy was triggered. **NOT in `render.yaml`** -- a `blueprint_sync` that rewrites the env block could drop it; the durability fix is a render.yaml push (all three services locked), a separate user decision.
+**Preflight:** `CLEAR: only infrastructure processes running` 21:43:04Z (no MLB sim in flight), claim held by this lane from 21:41:41Z.
+
+**Measured** on the FIRST board written by the new code (`written_at` 21:53:18Z; the verifier refused the 21:46:35Z pre-deploy board as STALE). Baseline read 21:41:15Z on the served board:
+
+    field                                   baseline     predicted     measured 21:54:10Z
+    live_commit                             edb32b45     dd43fd49      dd43fd49
+    rows carrying score_v2                  0            >= 1990       2000 of 2000
+    rows with score_fee_net                 0            > 0           315
+    Kalshi+Polymarket rows in the top 100   62           <= 20         8   (top 25: 16 -> 1)
+
+Integrity: 0 of 315 fee-net rows with `score.ev_component != score_v2.ev_net_pct` or gross `ev_pct` not above net (the displayed EV stays GROSS, as designed); 0 sportsbook rows carrying `score_fee_net`. New process booted 21:49:59Z (`MALLOC_ARENA_INIT pid=39`); `Traceback` since 21:49Z: none.
+**KNOWN GAP, found in this reading:** every Kalshi row is charged `kalshi_assumed_full_rate` -- the build reads `venue_ref` off the ROW, but at build time the ticker lives on the per-side quote (`venue_quote_fanin` stamps `side_best["venue_ref"]`). Correct for WNBA/NFL/NCAAF (x1.0); **the 96 MLB Kalshi rows are charged DOUBLE their real x0.5 fee** (conservative, flagged `fee_is_upper_bound`). Fix owed (reads `side_best`), a separate deploy.
+
+**verify (OWED):** the effect is on OUTCOMES, not board state: fee-net CLV of the served top-K vs the pre-deploy baseline over >= 7 finished slates (`scripts/score_ranking_backtest.py`, same slates paired), and paper-order ROI by venue after 09-21. **For lane `live-inplay-board-cadence`:** tonight's lever-1 reading (20:15 CDT) and any grid-cadence reading now run WITH lever 2b live -- attribute accordingly.
