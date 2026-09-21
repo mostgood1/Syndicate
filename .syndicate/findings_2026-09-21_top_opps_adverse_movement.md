@@ -103,3 +103,34 @@ n 55/45. Re-run when NCAAF/WNBA/NFL closes resolve and several more days accumul
   history shards ever, and no WNBA shard for 08-31..09-21. Football has two further defects behind
   that one (week-keyed shards vs a date-keyed join lookup; legacy writer inputs absent on web), so
   waiting will not fill this gap. Movement and edge in those sports cannot be graded by CLV until fixed.
+
+## UPDATE 2026-09-21 ~17:10Z — NFL and WNBA answered; a correction to the MLB population
+
+Lane `clv-close-from-book-quotes` gave the CLV join a close for NFL, WNBA and NCAAF (the
+per-book quote log; web `1dc4f7ec` -> `de6da1b7`, every prediction matched). Re-run of
+`scripts/decompose_movement_clv.py` on **2026-09-20 only** -- every game on that date had
+finished -- against the published trail (which starts 09-20 ~18:25Z, so it covers the late
+NFL window, SNF, the evening WNBA and MLB games). Forward CLV, same-book price moves,
+toward minus away (negative = rows that moved AWAY beat the close by more):
+
+| sport | toward − away, 95% CI | n toward / away | circular control |
+|---|---|---|---|
+| **NFL** | **−9.92 [−11.49, −8.36]** | 213 / 206 | +0.35 |
+| **WNBA** | **−6.50 [−7.62, −5.38]** | 382 / 466 | +1.15 |
+| MLB | −14.23 [−20.15, −8.32] | 31 / 31 (book-agnostic −12.78, n 146/301) | +0.35 |
+| NCAAF | not measurable yet -- Saturday's games predate the trail | 0 | — |
+
+**H3 (adverse selection) is REJECTED for NFL and WNBA as well as MLB.** Rows whose price
+moved against the pick revert toward it and beat the close at the same book; the circular
+open->close control stays near zero. NCAAF is owed after this week's games (Thu 09-24 on).
+
+**CORRECTION to the MLB population above.** The "MLB 4,947 (09-20) + 1,039 (09-21)" rows
+included 09-21 closes read at ~15:40Z, before that day's games started: the odds-history
+path handed back the latest price as a "close" (today's report at 17:07:51Z: 971 of 1,102
+resolved rows were unstarted games). Fixed in `a720941d` (no close for an unstarted game
+from any source). The MLB verdict does not change -- the 09-20-only numbers above point the
+same way -- but the 09-21 part of the earlier n was not CLV.
+
+**Movement term: still NOT changed.** Three sports now agree in sign with CIs well clear
+of zero, so the sign looks backwards for a bet-now ranking. But this is one evening of
+trail coverage. Re-run over 5-7 days (and NCAAF's first slate) before proposing a change.
