@@ -42,7 +42,14 @@ identity lives in `k` in `KEY_FIELDS` order; `parse_population_key` splits it ba
     sc score       vp value_pct          sr skill_reliability (only when it applied)
     ss model_skill.status   vc verdict_class   el established_loss_rel
     ln board_lane  gs game_state   la live_aware (only when true)
+    s2 score_v2    n2 score_v2's fee-net EV %   fb its fee basis   bk the priced bookmaker
 Values are copied from the candidate, never re-derived; an absent value records null.
+
+`s2`/`n2`/`fb`/`bk` `[2026-09-21, lane layer2-score-outcome-calibration, user decision "take
+the recorder ledger file and record score_v2"]`: the shadow rank (`opportunity_signals.score_v2`)
+and the fee it netted, so the nightly scorecard can grade `score_v2` against `sc` on the same
+priced population. `bk` because the fee -- and so `n2` -- depends on the venue, and the record
+carried no bookmaker before. ~60 B more per record against `MAX_DAY_BYTES`' 3x headroom.
 """
 
 from __future__ import annotations
@@ -170,6 +177,7 @@ def population_record(row: Mapping[str, Any], key: str, captured_at: str, *, spo
     projection = _mapping(row.get("projection"))
     score = _mapping(row.get("score"))
     skill = _mapping(projection.get("model_skill"))
+    shadow = _mapping(row.get("score_v2"))
     return {
         "k": key,
         "t": captured_at,
@@ -197,6 +205,10 @@ def population_record(row: Mapping[str, Any], key: str, captured_at: str, *, spo
         "ln": row.get("board_lane"),
         "gs": row.get("game_state"),
         "la": True if projection.get("live_aware") else None,
+        "s2": _as_float(shadow.get("score_v2")),
+        "n2": _as_float(shadow.get("ev_net_pct")),
+        "fb": shadow.get("fee_basis"),
+        "bk": quote.get("bookmaker"),
     }
 
 

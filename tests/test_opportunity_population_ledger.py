@@ -266,3 +266,54 @@ def test_the_sidecar_distinguishes_the_live_sighting(tmp_path):
     pop.record_population([_row(game_state="live")], sport="mlb", date="2026-09-14", now=LIVE_NOW, root=tmp_path)
     keys = pop.keys_path("2026-09-14", "mlb", root=tmp_path).read_text(encoding="utf-8").split()
     assert keys == [pop.population_key(_row()) + pop.LIVE_KEY_SUFFIX]
+
+
+# --------------------------------------------------------------------------
+# score_v2 on the record (lane layer2-score-outcome-calibration, 2026-09-21)
+# --------------------------------------------------------------------------
+
+
+def _scoring_grid_row():
+    """A grid row the builder actually SCORES (one book on both sides -> a same-book fair)."""
+    return {
+        "sport": "mlb", "event_id": "evt-9", "kind": "game", "market": "totals", "segment": "full",
+        "line": 8.5, "player_name": None, "home_team": "St. Louis Cardinals",
+        "away_team": "Colorado Rockies", "commence_time": "2026-09-14T23:15:00Z",
+        "sides": ["over", "under"], "books_quoting": 11,
+        "game": {"state": "pregame", "status_token": "6:15P CT"},
+        "best": {
+            "over": {"price": -110, "bookmaker": "draftkings", "age_seconds": 52.0, "books_quoting": 9},
+            "under": {"price": -105, "bookmaker": "draftkings", "age_seconds": 60.0, "books_quoting": 9},
+        },
+    }
+
+
+def test_a_record_copies_score_v2_and_the_priced_bookmaker():
+    row = _row()
+    row["quote"] = {**(row.get("quote") or {}), "bookmaker": "kalshi"}
+    row["score_v2"] = {"score_v2": 1.234567, "ev_net_pct": 2.5, "fee_basis": "kalshi_series_from_market"}
+    record = pop.population_record(row, pop.population_key(row), "2026-09-14T17:00:00Z", sport="mlb")
+    assert (record["s2"], record["n2"], record["fb"], record["bk"]) == (1.2346, 2.5, "kalshi_series_from_market", "kalshi")
+    line = json.dumps(record, sort_keys=True, separators=(",", ":"))
+    assert len(line.encode("utf-8")) < 520, "this repeats tens of thousands of times a day"
+
+
+def test_a_row_without_score_v2_records_nulls_not_a_guess():
+    record = pop.population_record(_row(), pop.population_key(_row()), "2026-09-14T17:00:00Z", sport="mlb")
+    assert record["s2"] is None and record["n2"] is None and record["fb"] is None
+
+
+def test_reachability_the_builders_sink_carries_score_v2_onto_the_record():
+    """Through the REAL builder and sink -- the path production records from -- not a
+    hand-built row: every scored candidate the sink receives yields a non-null `s2`."""
+    from syndicate.features.shared.layer2_board import build_layer2_rows
+
+    received = []
+    result = build_layer2_rows([_scoring_grid_row()], population_sink=received.extend)
+    scored = [c for c in received if c.get("score") is not None]
+    assert scored, "fixture produced no scored candidate -- the test would prove nothing"
+    for candidate in scored:
+        record = pop.population_record(candidate, pop.population_key(candidate), "2026-09-14T17:00:00Z", sport="mlb")
+        assert record["s2"] is not None and record["n2"] is not None
+        assert record["fb"] == "none" and record["bk"] == "draftkings"
+    assert result["candidates"] == 2

@@ -129,7 +129,11 @@ def graded_row(record: Mapping[str, Any], graded: Mapping[str, Any]) -> dict[str
         "ln": record.get("ln"),
         "gs": record.get("gs"),
         "la": record.get("la"),
-        # Openings-only extras (`pull-openings`): the recorder stores no bookmaker.
+        # score_v2 as the recorder stores it from 2026-09-21 (`s2`/`n2`/`fb`), and the priced
+        # bookmaker -- recorded from the same date, and always present on openings records.
+        "s2": _num(record.get("s2")),
+        "n2": _num(record.get("n2")),
+        "fb": record.get("fb"),
         "bk": record.get("bk"),
         "bp": record.get("bp"),
         "qsa": _num(record.get("qsa")),
