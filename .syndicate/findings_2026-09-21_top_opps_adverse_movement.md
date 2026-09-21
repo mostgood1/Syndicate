@@ -97,5 +97,9 @@ n 55/45. Re-run when NCAAF/WNBA/NFL closes resolve and several more days accumul
   across two calendar days at the same hour shares one file; points survive (epoch-sorted) but
   publish-on-seal can mark the file sent before the second day's points arrive.
 - **The CLV join resolved 0 NCAAF / WNBA / NFL rows** for 2026-09-20 and 09-21, including
-  Saturday's NCAAF slate. Either those closes are not captured or the join does not cover
-  them — either way, movement and edge in those sports cannot yet be graded by CLV.
+  Saturday's NCAAF slate. **ROOT-CAUSED 2026-09-21 (lane block, Z-series):** the closes are not
+  captured. The odds-history writer never runs on the fast-mode lanes that refresh those sports
+  (`refresh_odds_sources.py:3083` returns before the post-refresh step); web holds 0 NFL and 0 NCAAF
+  history shards ever, and no WNBA shard for 08-31..09-21. Football has two further defects behind
+  that one (week-keyed shards vs a date-keyed join lookup; legacy writer inputs absent on web), so
+  waiting will not fill this gap. Movement and edge in those sports cannot be graded by CLV until fixed.
