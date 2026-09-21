@@ -1852,6 +1852,12 @@ def _merge_inplay_overlay(cards: list[dict[str, Any]], requested_date: str, *, s
     return {"replaced": replaced, "added": len(overlay) - replaced}
 
 
+#: Sports where one team pair cannot play on consecutive days, so a chip filed
+#: under an ADJACENT date (ESPN's date for a late kickoff) is still the card's
+#: game. Everything else (MLB series, NHL home-and-home) must match exactly.
+_RESTATE_ADJACENT_DATE_SPORTS = frozenset({"nfl", "ncaaf", "soccer"})
+
+
 def _refresh_layer2_live_state(
     cards: list[dict[str, Any]],
     requested_dates: Sequence[str],
@@ -1994,9 +2000,27 @@ def _refresh_layer2_live_state(
                 fresh = False
         return chips_out, fresh
 
-    index: dict[tuple[str, str, str], dict[str, Any]] = {}
+    # KEYED BY THE CHIP'S DATE, NOT THE PAIR ALONE (lane `layer2-restate-series-date`).
+    #
+    # This indexed every requested date's chips under `(sport, away, home)`,
+    # first indexed wins, and looked a card up by the pair only. An MLB series
+    # plays the same pair on consecutive days, so tomorrow's game took TODAY's
+    # chip. Measured on the served board 2026-09-21 ~22:25Z: the worker wrote
+    # all 36 rows of 09-22 TOR @ BAL as `pregame` / `opportunity`; the board
+    # served them `market_state live`, and the serve-time re-gate set them `dead`
+    # (a pregame price fails the live rules). Once today's game is final the same
+    # join stamps tomorrow `final`, and `attach_actual` hands it today's score.
+    # The same class as `board_enrichment.attach_live_game_state_from_lens`'s
+    # THIRD GUARD (2026-09-03), in a function that guard never covered.
+    #
+    # A chip's date is the date it was requested for (chips carry a start time
+    # but no slate date). A card's is its `game_date`, the kickoff's Central
+    # date on every served card (measured 1,906 of 1,906 with a kickoff), and
+    # `commence_time` when that is absent.
+    index: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    pair_dates: dict[tuple[str, str, str], set[str]] = {}
 
-    def _index_chip(chip: Mapping[str, Any]) -> None:
+    def _index_chip(chip: Mapping[str, Any], chip_date: str) -> None:
         sport = str(chip.get("sport") or "").strip().lower()
         away_side = (chip.get("away") or {})
         home_side = (chip.get("home") or {})
@@ -2006,9 +2030,11 @@ def _refresh_layer2_live_state(
             return
         for a in aways:
             for h in homes:
-                index.setdefault((sport, a, h), chip)
+                index.setdefault((sport, chip_date, a, h), chip)
+                pair_dates.setdefault((sport, a, h), set()).add(chip_date)
 
     for requested_date in requested_dates or ():
+        chip_date = str(requested_date).strip()[:10]
         published, published_fresh = _published_chips(str(requested_date))
         inline: list[Mapping[str, Any]] = []
         if build_game_chips is not None:
@@ -2019,17 +2045,51 @@ def _refresh_layer2_live_state(
         ordered = (published + inline) if published_fresh else (inline + published)
         for chip in ordered:
             if isinstance(chip, Mapping):
-                _index_chip(chip)
+                _index_chip(chip, chip_date)
     if not index:
         return 0
+
+    from syndicate.features.shared.timezone import central_date_from_iso
+
+    def _card_date(card: Mapping[str, Any]) -> str | None:
+        text = str(card.get("game_date") or "").strip()[:10]
+        if len(text) == 10:
+            return text
+        resolved = central_date_from_iso(card.get("commence_time"))
+        return resolved.isoformat() if resolved is not None else None
+
+    def _adjacent(day: str) -> list[str]:
+        try:
+            anchor = date.fromisoformat(day)
+        except ValueError:
+            return []
+        return [(anchor + timedelta(days=step)).isoformat() for step in (-1, 1)]
+
+    def _chip_for(sport: str, card_date: str | None, a: str, h: str) -> Mapping[str, Any] | None:
+        if card_date is None:
+            # UNKNOWN IS NOT A LICENCE TO PICK A DATE. Only a pair that appears on
+            # exactly one requested date is unambiguous; a series pair is not.
+            dates = pair_dates.get((sport, a, h)) or set()
+            return index.get((sport, next(iter(dates)), a, h)) if len(dates) == 1 else None
+        chip = index.get((sport, card_date, a, h))
+        if chip is None and sport in _RESTATE_ADJACENT_DATE_SPORTS:
+            # Football chips live on ESPN's date, and a pair cannot meet on
+            # consecutive days in these sports, so an adjacent date is still
+            # this game. Nearest first; both are one day away.
+            for day in _adjacent(card_date):
+                chip = index.get((sport, day, a, h))
+                if chip is not None:
+                    break
+        return chip
 
     restated = 0
     for card in cards:
         sport = str(card.get("sport") or card.get("sport_slug") or "").strip().lower()
+        card_date = _card_date(card)
         chip = None
         for a in _keys(sport, card.get("away_team"), card.get("away_key")):
             for h in _keys(sport, card.get("home_team"), card.get("home_key")):
-                chip = index.get((sport, a, h))
+                chip = _chip_for(sport, card_date, a, h)
                 if chip:
                     break
             if chip:
