@@ -7593,3 +7593,10 @@ SAFE_SLUGS=ncaaf-board-sim-coverage,ncaaf-sim-inseason-ratings,ncaaf-player-data
 - **GOAL VERDICT (2026-09-20 21:31Z / 16:31 CDT):** *archive CLOSED lane blocks whose owners are idle, verified, ledger-only* — **MET.** `owner_liveness.py --idle-min 240` on origin/main returned `SAFE_SLUGS=layer2-prior-date-live-carryover` (owner `887508de` transcript idle 10,254 m; block lastmod `d568b64e` 334 m); every other CLOSED block read WAIT and was left untouched. Applied: 26 block lines out of `lanes.md`, 26 into `lanes_closed.md`, net +1 pointer; claims 171 and OPEN headers 37 unchanged; `check_lane_invariants.py` INVARIANTS HOLD before and after, same single pre-existing hint. Full table and narrative in `.syndicate/log/2026-09-20.md`.
 - Slugs moved: `layer2-prior-date-live-carryover`
 - Slugs deferred (owner not idle): `preflight-board-build-hold` and `wnba-sim-distributions` (owner `a1e40980`, idle 12 m); `layer2-line-movement-scoring` (owner `105fd5dd`, idle 0 m — it closed mid-run).
+
+### closed-lane-archive-20260920-2125 — CLOSED 2026-09-20 (GOAL MET: 1 block archived) — opened 2026-09-20 — session 77fa95fb-3e05-45ab-b361-8c74c77354a6
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- **GOAL VERDICT (2026-09-21 02:25Z / 2026-09-20 21:25 CDT):** *archive CLOSED lane blocks whose owners are idle, verified, ledger-only* — **MET.** `owner_liveness.py --idle-min 240` on origin/main `5b8c7c9d` returned `SAFE_SLUGS=closed-lane-archive-20260920-1630` (owner `b36808cc` idle 271 m; block lastmod `d0f04277` 286 m). The other 3 CLOSED blocks read WAIT and were left alone. Applied: 7 lines out of `lanes.md`, 7 into `lanes_closed.md`, +1 pointer; claims 169 and OPEN headers 38 unchanged; `check_lane_invariants.py` INVARIANTS HOLD before and after. Table in `.syndicate/log/2026-09-20.md`.
+- Slugs moved: `closed-lane-archive-20260920-1630`
+- Slugs deferred (owner not idle): `preflight-board-build-hold`, `wnba-sim-distributions` (owner `a1e40980`, idle 0 m); `layer2-line-movement-scoring` (owner `105fd5dd`, idle 0 m).

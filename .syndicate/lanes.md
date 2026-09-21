@@ -1228,12 +1228,11 @@ death, never life — do not invert it.
 - Blocked by: none for the code. Production needs a live-odds-worker deploy, which this session does not currently have permission to run.
 - Note: no registered forward test reads `goal_windows` (checked 2026-09-21 across `scripts/soccer_season_audit/`), so nothing graded moves; the consumers are the served live surface and `game_shape.py`'s documentation.
 
-### closed-lane-archive-20260920-2125 — CLOSED 2026-09-20 (GOAL MET: 1 block archived) — opened 2026-09-20 — session 77fa95fb-3e05-45ab-b361-8c74c77354a6
+### closed-lane-archive-20260921-0851 — CLOSED 2026-09-21 (GOAL MET: 1 block archived) — opened 2026-09-21 — session 1276501b-d2fa-40fb-96c1-4c2eb6c16082
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
-- **GOAL VERDICT (2026-09-21 02:25Z / 2026-09-20 21:25 CDT):** *archive CLOSED lane blocks whose owners are idle, verified, ledger-only* — **MET.** `owner_liveness.py --idle-min 240` on origin/main `5b8c7c9d` returned `SAFE_SLUGS=closed-lane-archive-20260920-1630` (owner `b36808cc` idle 271 m; block lastmod `d0f04277` 286 m). The other 3 CLOSED blocks read WAIT and were left alone. Applied: 7 lines out of `lanes.md`, 7 into `lanes_closed.md`, +1 pointer; claims 169 and OPEN headers 38 unchanged; `check_lane_invariants.py` INVARIANTS HOLD before and after. Table in `.syndicate/log/2026-09-20.md`.
-- Slugs moved: `closed-lane-archive-20260920-1630`
-- Slugs deferred (owner not idle): `preflight-board-build-hold`, `wnba-sim-distributions` (owner `a1e40980`, idle 0 m); `layer2-line-movement-scoring` (owner `105fd5dd`, idle 0 m).
+- Verdict: GOAL MET — 1 of 4 CLOSED blocks SAFE at idle 240m (13:52Z / 08:52 CDT); 3 WAIT on live owners a1e40980, 105fd5dd. Table in `.syndicate/log/2026-09-21.md`.
+- Moved: `closed-lane-archive-20260920-2125`
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1265,6 +1264,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20260919-2116` — CLOSED 2026-09-19 (GOAL MET: 3 of 4 SAFE slugs archived; the 4th deferred, reason recorded) — opened 2026-09-19 — session cb099c12-6971-4e93-b77d-0b7de41cffa3 — body in `lanes_history.md`.
 - `closed-lane-archive-20260919-2216` — CLOSED 2026-09-19 (GOAL NOT MET: 1 SAFE slug, 0 archivable — the shared tool rejects it) — opened 2026-09-19 — session 8eb963f9-1145-462a-ae71-d373a184d6ad — body in `lanes_history.md`.
 - `closed-lane-archive-20260920-1630` — CLOSED 2026-09-20 (GOAL MET: 1 block archived) — opened 2026-09-20 — session b36808cc-d879-4ab5-b4bb-85b135106db4
+- `closed-lane-archive-20260920-2125` — CLOSED 2026-09-20 (GOAL MET: 1 block archived) — opened 2026-09-20 — session 77fa95fb-3e05-45ab-b361-8c74c77354a6
 - `combined-board-rows-unreadable-tripwire` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: live on web `da268e07` (15:36:46Z); the field is served on every date, 0 `ROWS_UNREADABLE` lines; stored 113 vs rows 111 is the per-sport `by_sport` cap, not a defect.**
 - `combined-board-state-rows-lost` — CLOSED 2026-09-15 — opened 2026-09-14 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: Q1-Q3 answered with production readings. The reader fix is live on web `b6a0e346` (14:10:07Z): `by_date` 09-15 106 (was 0), 0 `VINTAGE_IGNORED`. One prediction was WRONG (`computed_at` moved to the refused heavy build's state stamp). User decision 2026-09-15: keep the `stale` label, it is true. Postmortem in `learnings.md`.**
 - `convergence-phase7-crps` — ORPHANED, **UNOWNED** `[session abf487e4 ARCHIVED 2026-08-20T21:1xZ]` — — **FIVE FINDINGS: FOUR DEFECTS FIXED AND MEASURED, ONE NOT A DEFECT.** Ladder
