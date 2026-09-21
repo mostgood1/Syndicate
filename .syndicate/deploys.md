@@ -39382,3 +39382,35 @@ Every deploy-2 prediction matched exactly. Same-book pregame averages, deploy 2:
 **Not claimed:** CLV is not ROI. `quotes_unchanged_since_open` (nfl 2,040 / wnba 581 / mlb 667 pregame openings) is still refused -- flat markets, excluded from every average; work in progress. NCAAF 09-20 board has 635 started-game openings with no matching quote -- unexplained, work in progress.
 
 Claim released after this entry.
+
+
+## 2026-09-21 16:53Z–17:05Z — web `de6da1b7`, live-odds-worker `de6da1b7`, web `7882372f` — lane `clv-close-from-book-quotes` — **every web prediction matched exactly; live-odds-worker verification PENDING the next NCAAF capture**
+
+**1. web `de6da1b7`** (`dep-daom272jnfac73eqe8lg`, live 16:57:05Z). Three reader fixes found by reading deploy 2's production output: flat closes confirmed from the shard sidecar's `last_seen`; in-play openings labelled `opened_in_play` before any source (history path too); each opening reads its Central-date AND its UTC-date shard. Rode along: only `scripts/fetch_ncaaf_oddsapi_game_lines.py` (inert on web). Preflight CLEAR against a baseline read 16:53:00Z. **Predicted by replaying the committed code offline on the production files** (openings ledgers, book_quotes shards + sidecars, mlb odds history, all fetched via `/api/ops/artifacts/stream`).
+
+**verify:** `/api/ops/clv/report?rows=1`, read 16:58:07Z.
+
+    report              baseline  predicted  measured   same_book avg (pred = measured)
+    nfl   2026-09-20      2,376      3,056      3,056   0.1627
+    wnba  2026-09-20      3,902      4,116      4,116   0.5509
+    mlb   2026-09-20      5,232      5,457      5,457   0.1400   history rows 4,947/4,947 byte-identical
+    ncaaf 2026-09-20 bd       0        478        478   0.3286   no_matching 635 -> 0
+    ncaaf 2026-09-19 bd   3,229      5,346      5,346   0.1422   no_matching 979 -> 0
+
+Every unresolved-reason count matched too. `confirmed_by_last_seen`: nfl 675, wnba 214, mlb 227, ncaaf 68 / 1,477. Quote pass 1.3–8.0 s (ncaaf 09-19, three shards incl. 186 MB).
+
+**2. live-odds-worker `de6da1b7`** (`dep-daom37egekts73apti9g`, live 16:59:05Z). The NCAAF game-lines writer files by CENTRAL kickoff day (was `commence_time[:10]`, UTC). Everything else riding along (layer2 board/shortlist, reconciliation, model_scorecard, clv_join) runs on refresh-worker or web. Preflight CLEAR, baseline 16:55:27Z.
+**verify (PENDING):** the 9 Saturday-evening NCAAF games (00:00–03:00Z 09-27) currently file game lines under `2026-09-27`; their rows in `2026-09-26` last captured 2026-09-20T11:55:07Z. Expect the first NCAAF capture after 16:59:05Z to advance their `last_seen` in the `2026-09-26` sidecar and not in `2026-09-27`. A watcher polls both every 10 min; the result is owed as an append to this entry.
+
+**3. web `7882372f`** (`dep-daom5v8473hc73cuuecg`, live 17:05:29Z). The layer1 board keeps one copy of a market across the day grids it reads (fresher `updated_at` wins; within-grid rows untouched). Only this commit rode along. Baseline read 17:01:27Z.
+
+**verify:** `/api/board/layer1?sport=ncaaf&date=2026-09-26&window=day`, read 17:06:18Z.
+
+    field                                   baseline   predicted   measured
+    duplicate game-market rows (all games)        11           0          0
+    rows_dropped_cross_date_duplicates        absent         >=11         11  (offline replay on the two grids: 11)
+    games                                         53          53         53
+
+mlb / nfl / wnba boards served normally, `rows_dropped_cross_date_duplicates` 0.
+
+**Held, not deployed:** web `a720941d` (no close for an unstarted game from ANY source; today's mlb report counted 1,102 resolved at 17:07:51Z, 971 of them games not yet started). Main's tip also carries a peer's web change (`8bd59f95`, lane `live-inplay-board-cadence`) that should go out under its own baseline; the peer is told, and `a720941d` rides with that deploy. Web and live-odds-worker claims released.
