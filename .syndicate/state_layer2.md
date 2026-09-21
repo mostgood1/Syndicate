@@ -173,7 +173,7 @@ portfolio endpoints serve settlement marginals only (`by_sport`,
 `by_market_family`, `by_venue_family`), never per-order rows, so no calibration
 curve exists. Exposing settled orders with their board fields is the unblock.
 
-## [layer2-movement-term] THE BOARD SCORES PRICE MOVEMENT AND SCORED LINE MOVEMENT AT EXACTLY 0.0 — fixed on main, NOT DEPLOYED `[verified 2026-09-20 16:23-18:0xZ, lane layer2-line-movement-scoring]`
+## [layer2-movement-term] THE BOARD NOW SCORES LINE MOVEMENT — DEPLOYED AND MEASURED; the magnitude is still unsound and one fix was FALSIFIED `[verified 2026-09-20 16:23Z -> 2026-09-21 01:10Z, lanes layer2-line-movement-scoring / layer2-line-move-magnitude]`
 
 **Movement is the board's second-largest value term and was already wired end to
 end** — unusual here. `blended_score` = `ev_pct` + capped sim + capped movement,
@@ -205,13 +205,28 @@ because a dropped row is not in the served payload either. Line-moved rows split
 
 Removing the term reorders **99.5%** of rows (median 61 places of 2,000).
 
-**FIXED ON MAIN, NOTHING DEPLOYED** (`46b2e160`, `96e17478`): line moves score in
-PROBABILITY POINTS (raw |line delta| spans 0.5 to 13.0 across markets and cannot
-share a coefficient), weight **0.3096 DERIVED** as `0.05 x 6.192` from the
-measured median cents-per-probability-point, sign from the already-shipped
-`movement_vs_pick`, through the SAME curve and SAME cap so the term's bound is
-unchanged. Steam fires at `15/6.192` pp. `rows_refused_by_movement` now sits
-beside `rows_admitted_by_movement`, both forwarded to the endpoint.
+**DEPLOYED AND MEASURED** (refresh-worker + web `96e17478`, live 18:25:13Z; read against
+`written_at` 18:34:07Z): line-moved rows scoring nothing **1266 -> 160**, so **1,063 rows now
+score a line move that scored 0.0**. `rows_refused_by_movement` 349, `rows_admitted_by_movement`
+167 (it had admitted 0). Signed mean **-0.2545 -> +0.0170**: no longer a net penalty. Cap held.
+The moneyline line-gate waiver (`088f39fe`) is also live.
+
+**THE 5.7% WAS A POINT-IN-TIME READING, NOT A CEILING.** 114/2000 rows were line-moved at
+16:23Z; **1,266/2000 (63.3%)** at 18:16Z. The share grows through the day as lines move.
+
+**THE MAGNITUDE IS STILL UNSOUND, AND IS WHAT IS LIVE.** For a line-moved row it is
+`|fair_now - fair_open|` with the two fairs at DIFFERENT handicaps, so it can contradict its own
+sign (`home +1.0 @ -104` -> `home -1.5 @ +122`: probability falls 5.94 pp while
+`movement_vs_pick` correctly says toward). It stays live because it is bounded by the cap and is
+SIGNED by `movement_vs_pick`, so it never visibly contradicts the displayed chip.
+
+**A FIX WAS FALSIFIED IN PRODUCTION — do not retry it blind.** Same-bet repricing (`d419cc24`)
+differenced a bet's fair at its opening line against the same bet's fair now. Sound only if the
+board's ALTERNATE-LINE FAIRS ARE MUTUALLY CONSISTENT, and **they are not**: 174 of 342 scored rows
+conflicted, and `away -1.5 -> +0.5` (away getting WEAKER) showed `away -1.5` gaining **37.22 pp**.
+85 material rows at/near the cap pointed against the displayed chip. Reverted (`f1fe4ee1`),
+conflicts **174 -> 0**. **Prerequisite for any retry: within one build a side's fair must be
+MONOTONE in its line**, and only identities that pass are admitted.
 
 **THE WEIGHT REMAINS UNVALIDATED.** `scripts/decompose_movement_clv.py` exists
 and has NOT been run. It cannot reuse `decompose_sim_clv.py`'s method: movement

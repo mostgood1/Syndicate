@@ -80,6 +80,56 @@ once after being removed — a stale-read write on this shared file resurrected
 them alongside their own replacement. If they show up a third time, delete
 them again rather than assuming the merge was reverted: the merged rule and
 the evidence file are the source of truth.
+## 2026-09-21 FORBIDDEN: shipping a "by construction" guarantee without checking the property of the DATA it rests on `[lane layer2-line-move-magnitude]`
+
+An argument can be valid and still false in production, because its PREMISES
+are claims about data. Mine was valid: *a line move toward the pick must raise
+the ORIGINAL bet's probability, so sign and magnitude cannot disagree.* I built
+on it, deployed it, and the first board under it returned **174 conflicts in
+342 scored rows (51%)**.
+
+The premise nobody checked: that the board's ALTERNATE-LINE FAIRS ARE MUTUALLY
+CONSISTENT. They are not. `mlb spreads_alt away -1.5 -> +0.5` (away getting
+WEAKER) showed `away -1.5` gaining **37.22 probability points** — two
+independently devigged alternate lines disagreeing. The logic was fine; its
+input violated a property the logic silently required.
+
+**It was checkable offline in one query** — within one build, is a side's fair
+monotone in its line? — and I skipped it because the construction "proved" it
+could not matter.
+
+**THE RULE.** When a guarantee is derived rather than measured, list the
+properties of the INPUT the derivation assumes, and measure each one on real
+data BEFORE building. "By construction" is a statement about the code; it says
+nothing about whether the data honours the code's assumptions.
+
+**What contained the damage, and is the reusable half:** the instrument
+(`movement_line_sign_conflict`) was built BEFORE deploying, to test the
+argument rather than trust it. It cost one deploy to learn this. Without it the
+magnitude ships as a quiet wrong signal in the ranking — indistinguishable from
+a working feature at every level except the data, which is
+`model_engine_standard.md`'s own thesis. Reverted in `f1fe4ee1`.
+
+
+## 2026-09-21 FORBIDDEN: rolling back by redeploying an ANCESTOR SHA `[lane layer2-line-move-magnitude]`
+
+Render deploys a COMMIT, not a diff. Redeploying an ancestor of the live SHA is
+a no-op that reports success — the live commit already contains it.
+
+I tried to revert `d419cc24` by deploying its parent `96e17478`. Preflight
+refused: *"96e17478 is already contained in live d419cc24 -- the deploy is
+redundant."* Without that refusal the deploy would have gone green, changed
+nothing, and left 174 sign conflicts live **behind a successful receipt** —
+the most dangerous shape a failed rollback can take, because the receipt is
+what the next reader trusts.
+
+**THE RULE.** A rollback is a NEW commit (`git revert <sha>`), pushed, then
+deployed like any other change and verified by the same measurement that
+caught the defect. Then CHECK WHAT SURVIVED: `git revert` of one commit leaves
+its neighbours, which is right, but confirm it — here `088f39fe` (the moneyline
+waiver) had to be read back off the served board to be sure the revert had not
+taken it too. Correct rollback: `f1fe4ee1`, conflicts **174 -> 0**.
+
 ## 2026-09-20 FORBIDDEN: reading a comment REPEATED across files as corroboration `[lane layer2-line-movement-scoring]`
 
 A sentence copied into six places is **one claim with six copies**, not six
