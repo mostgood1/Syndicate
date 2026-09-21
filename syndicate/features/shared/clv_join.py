@@ -700,24 +700,45 @@ def _quote_closes_for_openings(
     pending: list[Mapping[str, Any]],
     sport: str,
     loader: QuoteRowsLoader,
+    *,
+    now: datetime | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Resolve each pending opening from the quote log, one shard read per date."""
+    """Resolve each pending opening from the quote log, one shard read per date.
+
+    ONLY GAMES THAT HAVE STARTED. A game that has not kicked off has no close
+    yet -- its "last quote before kickoff" is just the current price, and
+    differencing an opening against it is not CLV. So those openings are named
+    `quotes_not_started` and their shards are never opened. This is also what
+    bounds the cost where it matters most: `portfolio_commit` reaches this
+    through `order_clv` on EVERY board build on refresh-worker, for today's
+    date, whose openings mostly point at future kickoffs (ncaaf's board carries
+    five days of games). Without it, each build would stream every one of
+    those shards to produce provisional numbers nobody should read.
+    """
     from syndicate.features.shared.odds_book_quotes import kickoff_shard_date
 
     started = time.perf_counter()
+    cutoff = now or datetime.now(timezone.utc)
     stats: dict[str, Any] = {
         "attempted": len(pending),
         "resolved": 0,
+        "not_started": 0,
         "shards_read": [],
         "shards_absent": [],
         "shards_failed": {},
         "rows_parsed": 0,
     }
     shard_of: list[str | None] = []
+    not_started: set[int] = set()
     needed_by_date: dict[str, dict[tuple, datetime | None]] = {}
-    for opening in pending:
+    for position, opening in enumerate(pending):
         shard = kickoff_shard_date({"commence_time": opening.get("commence_time")})
         shard_of.append(shard)
+        kickoff = _parse_ts(opening.get("commence_time"))
+        if shard and kickoff is not None and kickoff > cutoff:
+            not_started.add(position)
+            stats["not_started"] += 1
+            continue
         if shard:
             needed_by_date.setdefault(shard, {})[_opening_quote_key(opening)] = _parse_ts(
                 opening.get("commence_time")
@@ -773,8 +794,10 @@ def _quote_closes_for_openings(
         seen.update(shard_seen)
 
     resolved_rows: list[dict[str, Any]] = []
-    for opening, shard in zip(pending, shard_of):
-        if not shard:
+    for position, (opening, shard) in enumerate(zip(pending, shard_of)):
+        if position in not_started:
+            resolved = {"close_price": None, "unresolved_reason": "quotes_not_started"}
+        elif not shard:
             resolved = {"close_price": None, "unresolved_reason": "quotes_no_kickoff_time"}
         elif shard in failed:
             resolved = {"close_price": None, "unresolved_reason": "quotes_read_error"}
@@ -797,6 +820,7 @@ def compute_clv_for_date(
     root: Any = None,
     history_payload: Mapping[str, Any] | None = None,
     quote_rows: QuoteRowsLoader | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     """Pair every recorded opening for `sport` on `date` with its close.
 
@@ -804,7 +828,8 @@ def compute_clv_for_date(
     A caller that injects `history_payload` has chosen its close source, so the
     quote log is consulted only if it also injects `quote_rows` -- a result that
     depended on whatever shards happen to sit on this machine's disk would not
-    be the result the caller asked for.
+    be the result the caller asked for. `now` is the instant a game counts as
+    started (the quote log only closes games that have); tests pin it.
     """
     from syndicate.features.shared.clv_opening_ledger import FAIR_PROVENANCE_FIELDS, load_openings
 
@@ -991,7 +1016,7 @@ def compute_clv_for_date(
         quotes_fallback = {"attempted": 0, "resolved": 0}
     else:
         quote_resolved, quotes_fallback = _quote_closes_for_openings(
-            [resolutions[index][0] for index in pending_at], sport, loader
+            [resolutions[index][0] for index in pending_at], sport, loader, now=now
         )
         for index, resolved in zip(pending_at, quote_resolved):
             opening, key, _history = resolutions[index]
@@ -1268,10 +1293,10 @@ def compute_clv_for_date(
         flush=True,
     )
     print(
-        "[clv_join] CLV_QUOTES_FALLBACK date=%s sport=%s attempted=%s resolved=%s "
+        "[clv_join] CLV_QUOTES_FALLBACK date=%s sport=%s attempted=%s resolved=%s not_started=%s "
         "shards_read=%s shards_absent=%s shards_failed=%s rows_parsed=%s seconds=%s skipped=%s"
         % (date, sport, quotes_fallback.get("attempted"), quotes_fallback.get("resolved"),
-           quotes_fallback.get("shards_read"), quotes_fallback.get("shards_absent"),
+           quotes_fallback.get("not_started"), quotes_fallback.get("shards_read"), quotes_fallback.get("shards_absent"),
            quotes_fallback.get("shards_failed"), quotes_fallback.get("rows_parsed"),
            quotes_fallback.get("seconds"), quotes_fallback.get("skipped")),
         flush=True,

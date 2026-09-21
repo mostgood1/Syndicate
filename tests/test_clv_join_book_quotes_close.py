@@ -25,6 +25,8 @@ _DATE = "2026-09-20"
 _OPEN_AT = datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc)
 _KICKOFF = "2026-09-20T17:00:00Z"
 _EVENT = "2143ade9684fd876b68a4e8cbf451f05"
+# Every game below has kicked off by this instant; the not-started test moves it.
+_NOW = datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc)
 
 
 def _opening(**over):
@@ -85,10 +87,10 @@ def _loader(rows_by_shard, calls=None):
     return load
 
 
-def _report(tmp_path, rows_by_shard, calls=None):
+def _report(tmp_path, rows_by_shard, calls=None, now=_NOW):
     return compute_clv_for_date(
         _DATE, "nfl", root=tmp_path, history_payload={"markets": {}},
-        quote_rows=_loader(rows_by_shard, calls),
+        quote_rows=_loader(rows_by_shard, calls), now=now,
     )
 
 
@@ -204,6 +206,29 @@ def test_a_price_unchanged_since_before_the_opening_is_refused_under_its_own_nam
     assert report["unresolved_reasons"] == {"quotes_unchanged_since_open": 1}
 
 
+def test_a_game_that_has_not_started_has_no_close_and_its_shard_is_never_opened(tmp_path):
+    """The board-build guard. `portfolio_commit` reaches this on EVERY build for
+    today's date, whose openings mostly point at future kickoffs; a current price
+    is not a close, and reading those shards each build would buy nothing."""
+    _record(tmp_path, _opening(), _opening(event_id="future-game", commence_time="2026-09-26T19:30:00Z"))
+    calls: list = []
+    report = _report(tmp_path, {_DATE: [_quote("2026-09-20T16:30:00+00:00", -120)],
+                                "2026-09-26": [_quote("2026-09-21T10:00:00+00:00", -115,
+                                                      event_id="future-game",
+                                                      commence_time="2026-09-26T19:30:00Z")]},
+                     calls)
+    assert [call[1] for call in calls] == [_DATE], "the future kickoff's shard was read"
+    assert report["resolved"] == 1
+    assert report["unresolved_reasons"] == {"quotes_not_started": 1}
+    assert report["book_quotes_fallback"]["not_started"] == 1
+
+    # One minute before kickoff the same game is still not closed.
+    early = _report(tmp_path, {_DATE: [_quote("2026-09-20T16:30:00+00:00", -120)]},
+                    now=datetime(2026, 9, 20, 16, 59, tzinfo=timezone.utc))
+    assert early["resolved"] == 0
+    assert early["unresolved_reasons"].get("quotes_not_started") == 2
+
+
 def test_a_missing_shard_and_a_missing_kickoff_are_named(tmp_path):
     _record(tmp_path, _opening(), _opening(event_id="no-kickoff", commence_time=None))
     report = _report(tmp_path, {})
@@ -221,7 +246,7 @@ def test_a_read_that_fails_midway_is_discarded_not_used(tmp_path):
         return rows()
 
     report = compute_clv_for_date(_DATE, "nfl", root=tmp_path, history_payload={"markets": {}},
-                                  quote_rows=load)
+                                  quote_rows=load, now=_NOW)
     assert report["resolved"] == 0
     assert report["unresolved_reasons"] == {"quotes_read_error": 1}
     assert _DATE in report["book_quotes_fallback"]["shards_failed"]
