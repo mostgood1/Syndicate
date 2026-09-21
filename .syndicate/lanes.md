@@ -1262,6 +1262,12 @@ death, never life — do not invert it.
   - **H1 and H3 are not exclusive** -- H1 explains WHY they rank, H3 says whether ranking them is a mistake. H3 is the one that matters.
 - Falsification: H1 is false if top `away` rows do NOT carry higher EV than `toward` ones. H2 is false if the consensus fair moved about as far as the book price. H3 is false if forward CLV for `away` is >= `toward` within a scope, at a stated n. **A null on H3 at thin n is NOT a pass** -- it is recorded as unresolved, with the n needed.
 - Verification: the findings file states the forward-CLV contrast per book scope with its n and CI, the H1/H2 decomposition on the top 100, and a verdict per hypothesis. The population for H3 is the published board over the dates the hourly price trail covers (it started 2026-09-20 ~18:25Z).
+- **SUB-INVESTIGATION 2026-09-21 ~16:0xZ -- USER: "investigate why those sports resolve to zero".** The CLV join resolved 0 NCAAF / WNBA / NFL rows for 09-20 AND 09-21 (MLB 4,947 + 1,039; soccer 231), which blocks this lane's goal for 45 of the 67 top-100 away rows. Pipeline order: openings recorded -> closes captured -> join -> report; find the FIRST stage that reads zero before touching any code. **Hypotheses, BEFORE testing:**
+  - **Z1 (no openings).** Nothing was recorded for those sports on those dates. *Predicts:* `openings=0`.
+  - **Z2 (no closes).** Openings exist, but no CLOSE is captured for those sports -- the close source (odds history / closing capture) is absent or empty for them. *Predicts:* openings > 0 and `unresolved_reasons` dominated by a no-close reason.
+  - **Z3 (identity mismatch).** Closes exist, but the join key does not match between openings and closes (event id format, market name, side vocabulary). *Predicts:* closes present for the event but a no-match reason.
+  - **Z4 (filtered).** Rows resolve but a timing/scope filter drops them (in-play / unknown-timing exclusion). *Predicts:* a timing reason.
+  - **Z5 (not finished).** Games had not closed. *Plausible for 09-21, NOT for Saturday 09-20 NCAAF* -- so Z5 alone cannot explain 09-20.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
