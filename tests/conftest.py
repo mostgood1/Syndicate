@@ -63,6 +63,21 @@ def session_reports_root_floor():
 
 
 @pytest.fixture(autouse=True)
+def _no_combined_board_overlay_warmer(monkeypatch):
+    """Keep the combined-board overlay warmer THREAD out of the test process.
+
+    The warmer starts once per process, lazily, from the first
+    `read_combined_intelligence_response` call, and it is ON by default when the
+    process looks hosted. Several tests patch `RENDER=true` around an intelligence
+    endpoint, so whichever test first touched the combined board would decide
+    whether a real 5 s polling thread ran for the rest of the session: an
+    order-dependent suite. The warmer's own tests set the switch back on and
+    replace `threading.Thread`.
+    """
+    monkeypatch.setenv("SYNDICATE_COMBINED_BOARD_OVERLAY_WARMER", "off")
+
+
+@pytest.fixture(autouse=True)
 def _season_pull_already_done():
     """Keep the suite from performing `sweep_changed_hot_artifacts`'s boot pull.
 

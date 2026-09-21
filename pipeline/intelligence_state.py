@@ -9166,6 +9166,16 @@ _COMBINED_INTELLIGENCE_RESPONSE_CACHE: dict[tuple[Any, ...], tuple[float, dict[s
 # (180 s on web), which added up to 3 min to every in-play price. A newer overlay
 # file now refuses the cache hit, after `inplay_overlay_cache_min_age_seconds()`.
 _COMBINED_OVERLAY_MTIME_BY_KEY: dict[tuple[Any, ...], float] = {}
+# Lever 1 of the same lane `[2026-09-21, user decision "yes start on lever 1"]`: the
+# expiry above only takes effect when a REQUEST arrives, so a new overlay waited for
+# the next visitor (~56 s per gunicorn worker measured on 2026-09-20) and that
+# visitor then paid a 5-18 s rebuild. The warmer below rebuilds a board someone is
+# WATCHING as soon as a newer overlay lands. It is per process: each worker keeps its
+# own cache, and each warms only the keys its own requests created.
+_COMBINED_BOARD_ACTIVE_KEYS: dict[tuple[Any, ...], float] = {}
+_COMBINED_BOARD_ACTIVE_WINDOW_SECONDS = 600.0
+_COMBINED_BOARD_WARMER_LOCK = threading.Lock()
+_COMBINED_BOARD_WARMER_STARTED = False
 # `#632`: one rebuild at a time for a given key. NOT a cache -- the store above
 # stays exactly as it is, because its bound is ROW COUNT and this cache measured
 # 37.50 MB while obeying its 32-entry cap. A generic entry-capped cache would
@@ -9264,6 +9274,112 @@ def _combined_board_overlay_state(
         return newest, False
     expired = newest > _COMBINED_OVERLAY_MTIME_BY_KEY.get(cache_key, 0.0) and (time.time() - cached[0]) >= min_age
     return newest, expired
+
+
+def combined_board_overlay_warmer_state() -> tuple[bool, str]:
+    """(enabled, why). ON by default only on a hosted deployment, which is web in practice:
+    every caller of `read_combined_intelligence_response` is a web route, and the warmer
+    starts lazily from that function. OFF in tests and local runs unless asked for.
+    `SYNDICATE_COMBINED_BOARD_OVERLAY_WARMER=off` is the kill switch."""
+    raw = str(os.environ.get("SYNDICATE_COMBINED_BOARD_OVERLAY_WARMER") or "").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True, "env_on"
+    if raw in {"0", "false", "no", "off"}:
+        return False, "env_off"
+    try:
+        from syndicate.features.shared.request_path_guard import hosted_signal
+
+        signal = hosted_signal()
+    except Exception:  # noqa: BLE001 -- unknown is not hosted; the default stays off
+        signal = None
+    return (True, f"hosted:{signal}") if signal else (False, "not_hosted")
+
+
+def _combined_board_overlay_warmer_interval_seconds() -> float:
+    return max(1.0, float(_env_int("SYNDICATE_COMBINED_BOARD_OVERLAY_WARMER_INTERVAL_SECONDS", 5)))
+
+
+def _note_combined_board_request(cache_key: tuple[Any, ...]) -> None:
+    """A request watched this board: keep it warm for the next window, and make sure the warmer runs."""
+    _COMBINED_BOARD_ACTIVE_KEYS[cache_key] = time.time()
+    _ensure_combined_board_overlay_warmer()
+
+
+def _warm_combined_board_overlays_once(now: float | None = None) -> list[dict[str, Any]]:
+    """Rebuild every recently watched board whose in-play overlay is newer than its build.
+
+    The decision is `_combined_board_overlay_state`'s, unchanged -- including the
+    `inplay_overlay_cache_min_age_seconds` floor, which bounds rebuilds per key -- so the
+    warmer does the SAME rebuilds a request would have done, only without waiting for the
+    request. It goes through `read_combined_intelligence_response` itself, so the
+    single-flight still holds: a request arriving mid-rebuild is served the previous board.
+    """
+    now = time.time() if now is None else now
+    warmed: list[dict[str, Any]] = []
+    for cache_key, last_seen in list(_COMBINED_BOARD_ACTIVE_KEYS.items()):
+        if now - last_seen > _COMBINED_BOARD_ACTIVE_WINDOW_SECONDS:
+            _COMBINED_BOARD_ACTIVE_KEYS.pop(cache_key, None)
+            continue
+        cached = _COMBINED_INTELLIGENCE_RESPONSE_CACHE.get(cache_key)
+        if cached is None:
+            continue
+        newest, expired = _combined_board_overlay_state(list(cache_key[0]), cached, cache_key)
+        if not expired:
+            continue
+        started = time.time()
+        try:
+            read_combined_intelligence_response(list(cache_key[0]), sport=cache_key[1], limit=cache_key[2], _warm=True)
+        except Exception as exc:  # noqa: BLE001 -- a failed warm leaves the request path as it was
+            print(f"[intelligence_state] COMBINED_BOARD_OVERLAY_WARM_FAILED {type(exc).__name__}: {exc}", flush=True)
+            continue
+        rebuilt = _COMBINED_INTELLIGENCE_RESPONSE_CACHE.get(cache_key)
+        record = {
+            "dates": len(cache_key[0]),
+            "sport": cache_key[1],
+            "overlay_age_s": round(started - newest, 1),
+            "build_s": round(time.time() - started, 2),
+            "rebuilt": bool(rebuilt is not None and rebuilt[0] >= started),
+        }
+        # `overlay_age_s` is how long after the newest overlay landed this rebuild STARTED --
+        # the web half of the move-to-served gap that the warmer exists to shrink.
+        print(
+            f"[intelligence_state] COMBINED_BOARD_OVERLAY_WARMED dates={record['dates']} sport={record['sport']} "
+            f"overlay_age_s={record['overlay_age_s']} build_s={record['build_s']} rebuilt={record['rebuilt']}",
+            flush=True,
+        )
+        warmed.append(record)
+    return warmed
+
+
+def _combined_board_overlay_warmer_loop() -> None:
+    interval = _combined_board_overlay_warmer_interval_seconds()
+    while True:
+        time.sleep(interval)
+        try:
+            _warm_combined_board_overlays_once()
+        except Exception as exc:  # noqa: BLE001 -- the loop must outlive any one pass
+            print(f"[intelligence_state] COMBINED_BOARD_OVERLAY_WARMER_ERROR {type(exc).__name__}: {exc}", flush=True)
+
+
+def _ensure_combined_board_overlay_warmer() -> None:
+    global _COMBINED_BOARD_WARMER_STARTED
+    if _COMBINED_BOARD_WARMER_STARTED:
+        return
+    with _COMBINED_BOARD_WARMER_LOCK:
+        if _COMBINED_BOARD_WARMER_STARTED:
+            return
+        _COMBINED_BOARD_WARMER_STARTED = True
+        enabled, why = combined_board_overlay_warmer_state()
+        if not enabled:
+            print(f"[intelligence_state] COMBINED_BOARD_OVERLAY_WARMER_OFF pid={os.getpid()} reason={why}", flush=True)
+            return
+        threading.Thread(target=_combined_board_overlay_warmer_loop, name="combined-board-overlay-warmer", daemon=True).start()
+        print(
+            f"[intelligence_state] COMBINED_BOARD_OVERLAY_WARMER_STARTED pid={os.getpid()} "
+            f"interval_s={_combined_board_overlay_warmer_interval_seconds():.0f} "
+            f"window_s={_COMBINED_BOARD_ACTIVE_WINDOW_SECONDS:.0f} armed_by={why}",
+            flush=True,
+        )
 
 
 def _combined_board_response_cache_ttl_seconds() -> float:
@@ -9396,6 +9512,7 @@ def read_combined_intelligence_response(
     *,
     sport: str = "all",
     limit: int | None = None,
+    _warm: bool = False,
 ) -> dict[str, Any]:
     """Unions several already-computed per-date responses into one cross-date
     board -- the read-side half of #93's follow-up: the default board is
@@ -9426,6 +9543,10 @@ def read_combined_intelligence_response(
     if not requested_dates:
         requested_dates = [central_today_iso()]
     cache_key = (tuple(sorted(requested_dates)), str(sport or "all").strip().lower(), limit)
+    if not _warm:
+        # Only a REQUEST marks a board as watched; the warmer's own call must not keep
+        # a board warm that nobody has asked for in the last window.
+        _note_combined_board_request(cache_key)
     ttl_seconds = _combined_board_response_cache_ttl_seconds()
     cached = _COMBINED_INTELLIGENCE_RESPONSE_CACHE.get(cache_key)
     overlay_mtime, overlay_expired = _combined_board_overlay_state(requested_dates, cached, cache_key)

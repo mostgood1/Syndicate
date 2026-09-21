@@ -482,3 +482,118 @@ def test_the_nfl_odds_step_passes_the_refresh_mode_through(monkeypatch):
         assert "--mode" in command, "the step drops --mode, so fast runs props anyway"
         seen[mode] = command[command.index("--mode") + 1]
     assert seen == {"fast": "fast", "full": "full"}
+
+
+
+# --- lever 1: warm a watched board as soon as a newer overlay lands (2026-09-21) ------------------
+#
+# Before: the expiry above only fired when a REQUEST arrived, so a new overlay waited for the next
+# visitor (~56 s per gunicorn worker on 2026-09-20), who then paid the 5-18 s rebuild.
+
+
+KEY = (("2026-09-19",), "all", None)
+
+
+@pytest.fixture()
+def warm(combined, monkeypatch):
+    from pipeline import intelligence_state as st
+
+    st._COMBINED_BOARD_ACTIVE_KEYS.clear()
+    monkeypatch.setattr(st, "_ensure_combined_board_overlay_warmer", lambda: None)  # no real thread in tests
+    return (st,) + tuple(combined)
+
+
+def test_a_watched_board_is_rebuilt_when_a_newer_overlay_lands_with_no_request(warm, capsys):
+    import time
+
+    st, read, age_entry, land_overlay = warm
+    land_overlay(time.time() - 100)
+    assert read() == 1
+    assert KEY in st._COMBINED_BOARD_ACTIVE_KEYS, "a request must mark the board as watched"
+    seen_at = st._COMBINED_BOARD_ACTIVE_KEYS[KEY]
+
+    land_overlay(time.time())
+    age_entry(60)
+    warmed = st._warm_combined_board_overlays_once()
+    assert len(warmed) == 1 and warmed[0]["rebuilt"] is True
+    # The warmer's own call must not keep a board warm that nobody asked for.
+    assert st._COMBINED_BOARD_ACTIVE_KEYS[KEY] == seen_at
+    assert read() == 2, "the warmer rebuilt it; the next request is served that board, not a second rebuild"
+    assert "COMBINED_BOARD_OVERLAY_WARMED" in capsys.readouterr().out
+
+
+def test_the_warmer_leaves_a_board_alone_when_no_newer_overlay_landed(warm):
+    import time
+
+    st, read, age_entry, land_overlay = warm
+    land_overlay(time.time() - 100)
+    assert read() == 1
+    age_entry(120)
+    assert st._warm_combined_board_overlays_once() == []
+    assert read() == 1
+
+
+def test_the_warmer_keeps_the_rebuild_floor(warm):
+    """Same decision as a request: a board younger than the floor is not rebuilt, so the
+    warmer cannot rebuild more often than requests already could."""
+    import time
+
+    st, read, age_entry, land_overlay = warm
+    land_overlay(time.time() - 100)
+    assert read() == 1
+    land_overlay(time.time())
+    assert st._warm_combined_board_overlays_once() == []
+
+
+def test_a_board_nobody_watched_recently_is_dropped_not_warmed(warm):
+    import time
+
+    st, read, age_entry, land_overlay = warm
+    land_overlay(time.time() - 100)
+    assert read() == 1
+    st._COMBINED_BOARD_ACTIVE_KEYS[KEY] = time.time() - st._COMBINED_BOARD_ACTIVE_WINDOW_SECONDS - 1
+    land_overlay(time.time())
+    age_entry(60)
+    assert st._warm_combined_board_overlays_once() == []
+    assert KEY not in st._COMBINED_BOARD_ACTIVE_KEYS
+
+
+def test_the_warmer_is_on_by_default_only_when_hosted(monkeypatch):
+    from pipeline import intelligence_state as st
+    from syndicate.features.shared import request_path_guard as guard
+
+    monkeypatch.delenv("SYNDICATE_COMBINED_BOARD_OVERLAY_WARMER", raising=False)
+    monkeypatch.setattr(guard, "hosted_signal", lambda: None)
+    assert st.combined_board_overlay_warmer_state() == (False, "not_hosted")
+    monkeypatch.setattr(guard, "hosted_signal", lambda: "RENDER")
+    assert st.combined_board_overlay_warmer_state() == (True, "hosted:RENDER")
+    monkeypatch.setenv("SYNDICATE_COMBINED_BOARD_OVERLAY_WARMER", "off")
+    assert st.combined_board_overlay_warmer_state() == (False, "env_off"), "the kill switch beats hosted"
+    monkeypatch.setattr(guard, "hosted_signal", lambda: None)
+    monkeypatch.setenv("SYNDICATE_COMBINED_BOARD_OVERLAY_WARMER", "on")
+    assert st.combined_board_overlay_warmer_state() == (True, "env_on")
+
+
+def test_the_warmer_thread_starts_once_and_only_when_enabled(monkeypatch):
+    from pipeline import intelligence_state as st
+
+    started: list[str] = []
+
+    class FakeThread:
+        def __init__(self, target=None, name=None, daemon=None):
+            self.name = name
+
+        def start(self):
+            started.append(self.name)
+
+    monkeypatch.setattr(st.threading, "Thread", FakeThread)
+    monkeypatch.setattr(st, "_COMBINED_BOARD_WARMER_STARTED", False)
+    monkeypatch.setenv("SYNDICATE_COMBINED_BOARD_OVERLAY_WARMER", "off")
+    st._ensure_combined_board_overlay_warmer()
+    assert started == []
+
+    monkeypatch.setattr(st, "_COMBINED_BOARD_WARMER_STARTED", False)
+    monkeypatch.setenv("SYNDICATE_COMBINED_BOARD_OVERLAY_WARMER", "on")
+    st._ensure_combined_board_overlay_warmer()
+    st._ensure_combined_board_overlay_warmer()
+    assert started == ["combined-board-overlay-warmer"], "one thread per process"
