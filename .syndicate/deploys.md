@@ -39149,7 +39149,7 @@ that caught this and it cost one deploy to learn.
 
 ## 2026-09-21 00:40Z (2026-09-20 19:40 CT) — READING — web `d70a7b3c` (live 00:08:39Z) — lane live-inplay-board-cadence — **verify: the cache-floor change is INERT. No gain, no harm, and the reason is a third inert-knob instance in one session.**
 
-- **Expectation was:** expiry-age median well under the 86 s baseline (floor 45 -> 22). **Measured: 44 s at n=2 (00:19Z), then 85 s at n=10 (00:29Z) — i.e. UNCHANGED from the 86 s baseline.** The first reading was a two-sample artifact; the second is the answer.
+- **Expectation was:** expiry-age median well under the 86 s baseline (floor 45 -> 22). **Measured over the full hour, 6 readings to 01:10Z: 44 (n=2), 85 (n=10), 75 (n=25), 81 (n=31), 78 (n=36), 83 (n=44) — median 83 s at the final n=44 against an 86 s baseline, i.e. UNCHANGED.** The opening 44 s was a two-sample artifact; the flat series is the answer. `server_failed` stayed at **0 for the whole hour** (rollback rule >3).
 - **WHY IT CANNOT BITE, measured rather than reasoned:**
   - Overlay files ARRIVE on web every **~18 s** (86 `ops.publish ACCEPTED book_grid_inplay_*` since go-live; p25 3 s, p75 41 s). So overlay arrival is not the gate either.
   - The combined-board rebuild is **LAZY**: it happens only when a REQUEST finds the entry stale. So `COMBINED_BOARD_OVERLAY_EXPIRED age_s` measures REQUEST ARRIVAL, not the floor.
