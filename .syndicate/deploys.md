@@ -39414,3 +39414,22 @@ Every unresolved-reason count matched too. `confirmed_by_last_seen`: nfl 675, wn
 mlb / nfl / wnba boards served normally, `rows_dropped_cross_date_duplicates` 0.
 
 **Held, not deployed:** web `a720941d` (no close for an unstarted game from ANY source; today's mlb report counted 1,102 resolved at 17:07:51Z, 971 of them games not yet started). Main's tip also carries a peer's web change (`8bd59f95`, lane `live-inplay-board-cadence`) that should go out under its own baseline; the peer is told, and `a720941d` rides with that deploy. Web and live-odds-worker claims released.
+
+
+## 2026-09-21 17:1xZ — CORRECTION to the 16:53Z entry, item 2 (live-odds-worker `de6da1b7`) — lane `clv-close-from-book-quotes` — **the writer fix is NOT live where it matters**
+
+The premise was wrong. The capture that files NCAAF game lines into `book_quotes` ran at
+17:06Z inside **refresh-worker's** pregame sweep (lane `refresh-worker`, started 17:05:26Z,
+sports mlb,nhl,wnba,nfl,ncaaf,soccer, launcher `srv-d91dpertqb8s73co8ls0`), which runs
+`e9df684b` -- before the fix. **Measured:** that capture wrote 244 rows for the 9
+Saturday-evening games into `2026-09-27` again, and 1,096 rows for daytime games into
+`2026-09-26`; zero evening-game rows reached `2026-09-26`. The live-odds-worker deploy is
+live and harmless but inert for this: its `ncaaf-lines` lane last ran 09-20.
+
+**Consequence: none visible.** The CLV join reads both the Central and the UTC shard
+(`d9bcae3e`, live on web) and the layer1 board keeps one copy per market across day grids
+(`7882372f`, live), so the misfiling costs neither. The writer fix takes effect with the
+next refresh-worker deploy from main; main's tip also carries peer lane
+`live-inplay-board-cadence`'s `8bd59f95` (`intelligence_state.py`), so that deploy is
+coordinated with the peer, who has been told. **verify (still owed):** after that deploy's
+first sweep, NCAAF evening-game rows land in `book_quotes/2026-09-26`, not `2026-09-27`.
