@@ -39314,3 +39314,22 @@ board against a ledger cut 20 min earlier; by 14:40Z more lines of each bet had 
 published at least once, so more rows found their own-line opening. The direction and
 order of magnitude held.
 
+
+## 2026-09-21 15:0xZ — CORRECTION to the 14:30Z and 14:41Z entries — lane `layer2-line-move-magnitude` (closed) — **no deploy; a claim withdrawn**
+
+Both entries described the A/B baseline as "15 pre-existing failures: 14 NCAAF projection
+tests, and `test_layer2_blend_admission`", and called them red on main. **14 of those 15 were
+not shown to fail on main.** The A/B ran in a session worktree, which excludes `data/` by
+design; checked: the NCAAF source root, the team registry that
+`test_ncaaf_game_projections.py:305` copies into its fixture, and every projection CSV are
+absent there. Those 14 fail for that absence and were never run on a full checkout.
+
+**What stands:** the A/B's own conclusion -- both arms ran in the same data-less tree, so the
+change still caused ZERO failures -- and `test_layer2_blend_admission`, which is genuinely red
+(source-text search broken by `f7ae4ce3`; reproduced independently by session a1e40980).
+
+**How it was caught:** asked to record the 14 as a lead, I checked their data dependency first.
+`session_worktree.py` warns on every `open` that ~92 tests fail in a worktree for `data/`
+absence alone; I read that line when opening the worktree and did not apply it to my own
+failure list.
+
