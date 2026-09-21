@@ -39284,3 +39284,33 @@ ledger (current logic reproduced production 1,988/1,988):
 `earliest_line` dominating. Rows move onto the EXISTING calibrated price path, so no new
 estimator is on trial here -- only whether rows are routed to it.
 
+
+## 2026-09-21 14:41Z (09:41 CT) — MEASUREMENT for the 14:30Z deploy — refresh-worker `c70329c2` — lane `layer2-line-move-magnitude` — **verify: MET, 4 of 4**
+
+Live 14:36:42Z; read against board `written_at` **14:40:44Z**, after it -- the new code's
+own output, not the pre-deploy build.
+
+    field                          baseline -> measured        predicted          replay
+    line_moved rows                913      -> **0**           tens               903 -> 23
+    movement_opening_match=same_line  0     -> **1,949/2,000** large majority     1,963
+    rows at the movement cap       317      -> **63**          about 50           328 -> 50
+    rows_admitted_by_blend         119      -> 112             same order [NEG]   --
+    median |movement_component|    --       -> **0.221**                          0.221
+
+**Every published row is now compared with ITS OWN line's opening.** The 913 rows that
+were paired with a DIFFERENT line of the same bet are gone; they are price comparisons
+on the existing calibrated path (`same_book` 1,244 / `best_of_n` 756). The median
+component matches the replay to three places.
+
+**THE 51 `earliest_line` ROWS WERE CHECKED, NOT WAVED THROUGH** -- `earliest_line` without
+`line_moved` looked contradictory. All 51 are MONEYLINE: line None at both ends, every one
+`movement_line_gate_waived=moneyline_has_no_handicap`, basis `same_book` 38 / `best_of_n`
+13. The `088f39fe` waiver is routing lineless markets to a price comparison exactly as
+designed. **Refinement to the pre-registered failure signal:** `earliest_line` is a warning
+only OUTSIDE moneyline -- and outside moneyline it is 0.
+
+**PREDICTED TENS, MEASURED ZERO, and that is not a miss.** The replay ran on the 14:06Z
+board against a ledger cut 20 min earlier; by 14:40Z more lines of each bet had been
+published at least once, so more rows found their own-line opening. The direction and
+order of magnitude held.
+
