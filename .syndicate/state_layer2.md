@@ -173,6 +173,19 @@ portfolio endpoints serve settlement marginals only (`by_sport`,
 `by_market_family`, `by_venue_family`), never per-order rows, so no calibration
 curve exists. Exposing settled orders with their board fields is the unblock.
 
+## [layer2-score-outcomes] THE BOARD'S SCORE, GRADED ON OUTCOMES AND CLOSES FOR THE FIRST TIME -- real price edge, fee-blind ranking, non-monotone deciles `[2026-09-21, lane layer2-score-outcome-calibration, MEASURED on production files; code on main, NOT deployed]`
+
+**Read `findings_2026-09-21_layer2_score_outcomes.md` before changing any score term.** Three datasets: the recorder graded row by row (194,983 rows, 09-14..09-20, `scripts/score_ranking_backtest.py`), CLV on published openings with today's score recomputed exactly (157,079 rows, 931 games, 82 slates, 09-01..09-20), and paper bets (2,699 settled).
+
+- **Price edge is REAL:** today's top-10 per slate beat the same book's close by +3.94% ROI-equivalent [+3.19, +4.80], 59.5% of the time. Outlier prices (5+ pp off the median book) correct toward us (+4.59%): no winner's curse in CLV terms.
+- **But the ranking is FEE-BLIND:** Kalshi rows trail Kalshi's own close by -1.58 pts [-2.05, -1.15] before fees; 90 of 109 positive-EV Kalshi rows on the 09-21 board are non-positive after the fee; paper orders above 5.27% stated EV (all Kalshi/Polymarket) lost -26.7% [-46, -6].
+- **Deciles are non-monotone:** top score decile ROI -14.9%, no better than deciles 2/3/6/8; paper bets hit 45.6% vs 45.2% break-even.
+- **Efficient markets are where edge is least real:** 7+ books quoting = lowest CLV (+1.57%) and -13.8% ROI [-26, -3]; main pregame lines at EV 2-5.27% -21.2% [-37, -3].
+- **`book_margin_model` fair is overstated 8.5 pp** (hit 18.0% vs 26.5%, 264 games).
+- **A global favourite-longshot recalibration was measured and REJECTED:** slope > 1 in aggregate, but +EV longshots are calibrated; the +EV shortfall is at even money.
+
+**ON MAIN, NOT DEPLOYED:** `score_v2` shadow (`456e264f`, `97f01a37`; quarter-Kelly growth at the fee-net price x reliability; ranks nothing) and `SYNDICATE_SCORE_FEE_NET` (default OFF; fee-net EV in the value term; `ev_pct` stays gross). **Fee-netting beats today's score: +0.71 pts fee-net CLV at the top 25 [+0.40, +1.04], 82 slates.** The Kelly re-rank raises the top-10 break-even 0.378 -> 0.464 at equal edge overall, but is sport-dependent (soccer +3.00, NCAAF -2.71). Owed steps and decisions: todo `#679`.
+
 ## [layer2-movement-term] EVERY LAYER 2 ROW IS NOW COMPARED WITH ITS OWN LINE'S OPENING — line_moved 913 -> 0, verified `[2026-09-20 16:23Z -> 2026-09-21 14:41Z, lanes layer2-line-movement-scoring / layer2-line-move-magnitude]`
 
 **ADVERSE-MOVEMENT CHECK `[verified 2026-09-21, lane layer2-adverse-movement-sanity]`:** the top of
