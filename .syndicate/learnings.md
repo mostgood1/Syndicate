@@ -147,6 +147,15 @@ a working feature at every level except the data, which is
 `model_engine_standard.md`'s own thesis. Reverted in `f1fe4ee1`.
 
 
+**CORRECTED THE SAME DAY — the rule stands, its worked example's CAUSE was wrong.** This
+entry names "alternate-line fairs are not mutually consistent" as the unchecked premise.
+Decomposing all 173 conflicts showed only **14%** had a non-monotone curve; **86%** were
+correctly monotone. The real cause was the OPENINGS INDEX pairing different lines of one
+bet, so the opening read at L0 was often not that bet's opening -- fixed and verified
+(`line_moved` 913 -> 0, `deploys.md` 2026-09-21 14:41Z). The lesson is therefore doubly
+true: the premise that failed was not even the one I named, and I named it from one vivid
+row. See the entry below on diagnosing from the most vivid example.
+
 ## 2026-09-21 FORBIDDEN: rolling back by redeploying an ANCESTOR SHA `[lane layer2-line-move-magnitude]`
 
 Render deploys a COMMIT, not a diff. Redeploying an ancestor of the live SHA is

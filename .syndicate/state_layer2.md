@@ -173,7 +173,7 @@ portfolio endpoints serve settlement marginals only (`by_sport`,
 `by_market_family`, `by_venue_family`), never per-order rows, so no calibration
 curve exists. Exposing settled orders with their board fields is the unblock.
 
-## [layer2-movement-term] THE LIVE LINE-MOVEMENT TERM MOSTLY SCORES TWO DIFFERENT LINES, NOT A MOVE — the openings index collapses lines; one fix was FALSIFIED `[verified 2026-09-20 16:23Z -> 2026-09-21 01:10Z, lanes layer2-line-movement-scoring / layer2-line-move-magnitude]`
+## [layer2-movement-term] EVERY LAYER 2 ROW IS NOW COMPARED WITH ITS OWN LINE'S OPENING — line_moved 913 -> 0, verified `[2026-09-20 16:23Z -> 2026-09-21 14:41Z, lanes layer2-line-movement-scoring / layer2-line-move-magnitude]`
 
 **Movement is the board's second-largest value term and was already wired end to
 end** — unusual here. `blended_score` = `ev_pct` + capped sim + capped movement,
@@ -211,31 +211,41 @@ score a line move that scored 0.0**. `rows_refused_by_movement` 349, `rows_admit
 167 (it had admitted 0). Signed mean **-0.2545 -> +0.0170**: no longer a net penalty. Cap held.
 The moneyline line-gate waiver (`088f39fe`) is also live.
 
-**MOST OF THOSE "LINE MOVES" ARE NOT MOVES — measured 2026-09-21T13:52:19Z on the live board.** The openings index in `pipeline/layer2_shortlist.py` is keyed by the LINE-LESS `movement_join_key`, first write wins, and the board publishes several lines of one bet at once. So every line except the first-recorded is paired with a DIFFERENT line's opening. **538 of 912 line-moved rows (59%) still have their opening line published in the same build** (a lower bound: served rows are a subset of the grid); **506 are scored on it**, with median `|movement_component|` **0.975** against **0.352** for the rest, **233 at the cap**, 9 in the top 50. Boost/penalty 272/234: noise, not bias. **So the 1,063 figure above measures rows that RECEIVED a line score, not rows whose line moved.** The fix is a per-line openings index, not a new magnitude.
+**THOSE 1,063 WERE MOSTLY NOT MOVES — FOUND 2026-09-21, FIXED AND VERIFIED THE SAME DAY.**
+The openings index in `pipeline/layer2_shortlist.py` was keyed by the LINE-LESS
+`movement_join_key`, first write wins, while the board publishes several lines of one bet
+at once -- so every line but the first-recorded was compared with a DIFFERENT line's
+opening. Live board 13:52:19Z: 538 of 912 line-moved rows (59%) still had their opening
+line published in the same build; 506 were scored at median |component| 0.975 (233 at the
+cap) against 0.352 for the rest.
 
-**THE 5.7% WAS A POINT-IN-TIME READING, NOT A CEILING.** 114/2000 rows were line-moved at
-16:23Z; **1,266/2000 (63.3%)** at 18:16Z. The share grows through the day as lines move.
+**FIXED: a PER-LINE openings index** (`c1710042` + `c70329c2`, refresh-worker live
+2026-09-21T14:36:42Z). `index_openings` keeps the earliest opening per bet AND the first
+opening at each line; `_movement_from_opening` uses the row's OWN line first and the earliest
+only when the row's line was never published. **Verified on the 14:40:44Z board, 4 of 4:**
+`line_moved` **913 -> 0**; `movement_opening_match=same_line` on **1,949 / 2,000**; rows at
+the cap **317 -> 63**; `rows_admitted_by_blend` 119 -> 112 (negative control). The other 51
+rows are moneyline (`earliest_line`, line None both ends, `088f39fe` waiver) and get a price
+comparison too. So the board's movement term is now, in effect, PRICE movement of the same
+bet at the same line -- the calibrated path.
 
-**THE MAGNITUDE IS STILL UNSOUND, AND IS WHAT IS LIVE.** For a line-moved row it is
-`|fair_now - fair_open|` with the two fairs at DIFFERENT handicaps, so it can contradict its own
-sign (`home +1.0 @ -104` -> `home -1.5 @ +122`: probability falls 5.94 pp while
-`movement_vs_pick` correctly says toward). It stays live because it is bounded by the cap and is
-SIGNED by `movement_vs_pick`, so it never visibly contradicts the displayed chip.
+**THE CROSS-HANDICAP MAGNITUDE STILL EXISTS FOR GENUINE LINE MOVES AND IS STILL UNSOUND**
+(`|fair_now - fair_open|` at two handicaps; can contradict its own sign) -- but on the verified
+board it has **0 non-moneyline rows to act on**. Whether genuine line moves need a better
+magnitude is an OPEN question, not a live defect.
 
-**A FIX WAS FALSIFIED IN PRODUCTION — do not retry it blind.** Same-bet repricing (`d419cc24`)
-differenced a bet's fair at its opening line against the same bet's fair now. Sound only if the
-board's ALTERNATE-LINE FAIRS ARE MUTUALLY CONSISTENT, and **they are not**: 174 of 342 scored rows
-conflicted, and `away -1.5 -> +0.5` (away getting WEAKER) showed `away -1.5` gaining **37.22 pp**.
-85 material rows at/near the cap pointed against the displayed chip. Reverted (`f1fe4ee1`),
-conflicts **174 -> 0**. **Prerequisite for any retry: within one build a side's fair must be
-MONOTONE in its line**, and only identities that pass are admitted.
+**THE SAME-BET FIX (`d419cc24`) WAS FALSIFIED AND REVERTED (`f1fe4ee1`) — and the cause was
+mis-diagnosed at first.** 174 of 342 scored rows conflicted. It was blamed on inconsistent
+alternate-line fairs, from one vivid spreads row; decomposing all 173 showed **86% had a
+correctly monotone curve** (only 14% did not) and only 7 were spreads. The dominant cause was
+the openings index above -- the opening read at L0 was often not that bet's opening.
 
-**THE WEIGHT REMAINS UNVALIDATED.** `scripts/decompose_movement_clv.py` exists
-and has NOT been run. It cannot reuse `decompose_sim_clv.py`'s method: movement
-is measured AGAINST the opening, so the opening record's own movement is 0 by
-construction, and bucketing against `clv_pct` is **CIRCULAR** (CLV is
-open->close, movement at Tk is open->Tk, so Tk lies inside the path). It
-measures FORWARD CLV and prints the circular version only as a labelled control.
+**THE WEIGHT REMAINS UNVALIDATED.** `scripts/decompose_movement_clv.py` ran end to end
+2026-09-20 (n=101 from one 35-minute trail chunk, one date, one sport) after three of its own
+defects were fixed by running it; **no CLV result is claimed.** It measures FORWARD CLV
+(observation -> close), because movement is a leading segment of the open -> close path and
+the naive contrast is circular.
+
 
 ## [sim-weight-clv-decomposition] `_SCORE_SIM_WEIGHT`'s OWN UNBLOCK CONDITION WAS RUN, AND THE ANSWER IS NO — leave `(0.125, 1.5)` alone `[2026-09-04, lane sim-clv-decomposition, READ-ONLY: no deploy, no env var]`
 
