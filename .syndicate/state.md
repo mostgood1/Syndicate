@@ -522,7 +522,7 @@ once this index exists: re-splitting would orphan the parts.
 | [kalshi-quote-capture-coupling] | Kalshi quote capture ran ONLY inside the heavy board build — a refused heavy build stopped it for every sport  | `state_kalshi.md` |
 | [layer2-board-keyvalue-ceiling] | THE BOARD'S CEILING IS THE COMBINED KEY, NOT THE SHARDS — and `per_sport=3000` corrupted production for ~29 mi | `state_layer2.md` |
 | [layer2-realized-accuracy] | THE LAYER 2 BOARD'S REALIZED ACCURACY — the portfolio book is the surface, and the measurement chain is broken | `state_layer2.md` |
-| [layer2-movement-term] | THE BOARD NOW SCORES LINE MOVEMENT — DEPLOYED AND MEASURED; the magnitude is still unsound and one fix was FALSIFIED `[2026-09-21` | `state_layer2.md` |
+| [layer2-movement-term] | THE LIVE LINE-MOVEMENT TERM MOSTLY SCORES TWO DIFFERENT LINES, NOT A MOVE — the openings index collapses lines `[2026-09-21` | `state_layer2.md` |
 | [sim-weight-clv-decomposition] | `_SCORE_SIM_WEIGHT`'s OWN UNBLOCK CONDITION WAS RUN, AND THE ANSWER IS NO — leave `(0.125, 1.5)` alone `[2026- | `state_layer2.md` |
 | [layer2_board_display] | LAYER 2 BOARD -- USER-VISIBLE DISPLAY BUGS, 2026-08-20 AUDIT | `state_layer2.md` |
 | [layer1-layer2-boards] | LAYER 1 / LAYER 2 BOARDS — session briefs exist; three facts worth not re-deriving `[code read 08-16 11:2x CDT | `state_layer2.md` |

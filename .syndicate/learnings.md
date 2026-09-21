@@ -80,6 +80,42 @@ once after being removed — a stale-read write on this shared file resurrected
 them alongside their own replacement. If they show up a third time, delete
 them again rather than assuming the merge was reverted: the merged rule and
 the evidence file are the source of truth.
+## 2026-09-21 FORBIDDEN: diagnosing a failure from its most vivid example `[lane layer2-line-move-magnitude]`
+
+I diagnosed 174 sign conflicts from ONE row -- `mlb spreads_alt away -1.5 ->
++0.5`, "+37.22 pp" -- quoted it in four commits, the findings file, the lane,
+state.md and learnings.md, and wrote the retry prerequisite around it ("a side's
+fair must be monotone in its line"). Then the check ran: that example was one
+of **7 spreads in 174**; only **14%** of conflicts had a non-monotone curve at
+all; **86%** had a correctly monotone curve. The prerequisite I had recorded as
+"the first step, not an optional one" explained a minority of the failure.
+
+**THE RULE.** Before a diagnosis enters the ledger, DECOMPOSE the whole
+failure population into its candidate causes and report the share of each.
+An example is evidence that a mechanism EXISTS, never that it DOMINATES. The
+most extreme row is selected for being extreme, which makes it the least
+representative row available.
+
+
+## 2026-09-21 FORBIDDEN: verifying that a signal was COMPUTED as verifying that it is REAL `[lane layer2-line-move-magnitude]`
+
+The 2026-09-20 deploy was recorded as VERIFIED on "1,063 rows now score a line
+move that scored 0.0". That number counts rows that RECEIVED a line score. It
+never asked whether the line had moved. Measured the next day on the live
+board: **538 of 912 line-moved rows (59%) still had their opening line
+published in the same build**, because the openings index collapses a bet's
+simultaneously-published lines onto whichever was recorded first. Those rows
+carried median `|component|` 0.975 against 0.352 -- **233 at the cap** -- so
+the verified headline was mostly the gap between two different lines.
+
+**THE RULE.** A verification must include one check that the population the
+feature acts on IS the population it claims to act on -- here, "is the
+opening line actually gone?" -- not only that the feature produced output.
+Coverage going up is equally what a feature firing on the WRONG rows looks
+like. Same family as `[feedback_presence_is_not_reachability]`, one level up:
+the code was reached, the output was produced, and neither proved it was about
+the right thing.
+
 ## 2026-09-21 FORBIDDEN: shipping a "by construction" guarantee without checking the property of the DATA it rests on `[lane layer2-line-move-magnitude]`
 
 An argument can be valid and still false in production, because its PREMISES

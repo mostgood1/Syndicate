@@ -173,7 +173,7 @@ portfolio endpoints serve settlement marginals only (`by_sport`,
 `by_market_family`, `by_venue_family`), never per-order rows, so no calibration
 curve exists. Exposing settled orders with their board fields is the unblock.
 
-## [layer2-movement-term] THE BOARD NOW SCORES LINE MOVEMENT — DEPLOYED AND MEASURED; the magnitude is still unsound and one fix was FALSIFIED `[verified 2026-09-20 16:23Z -> 2026-09-21 01:10Z, lanes layer2-line-movement-scoring / layer2-line-move-magnitude]`
+## [layer2-movement-term] THE LIVE LINE-MOVEMENT TERM MOSTLY SCORES TWO DIFFERENT LINES, NOT A MOVE — the openings index collapses lines; one fix was FALSIFIED `[verified 2026-09-20 16:23Z -> 2026-09-21 01:10Z, lanes layer2-line-movement-scoring / layer2-line-move-magnitude]`
 
 **Movement is the board's second-largest value term and was already wired end to
 end** — unusual here. `blended_score` = `ev_pct` + capped sim + capped movement,
@@ -210,6 +210,8 @@ Removing the term reorders **99.5%** of rows (median 61 places of 2,000).
 score a line move that scored 0.0**. `rows_refused_by_movement` 349, `rows_admitted_by_movement`
 167 (it had admitted 0). Signed mean **-0.2545 -> +0.0170**: no longer a net penalty. Cap held.
 The moneyline line-gate waiver (`088f39fe`) is also live.
+
+**MOST OF THOSE "LINE MOVES" ARE NOT MOVES — measured 2026-09-21T13:52:19Z on the live board.** The openings index in `pipeline/layer2_shortlist.py` is keyed by the LINE-LESS `movement_join_key`, first write wins, and the board publishes several lines of one bet at once. So every line except the first-recorded is paired with a DIFFERENT line's opening. **538 of 912 line-moved rows (59%) still have their opening line published in the same build** (a lower bound: served rows are a subset of the grid); **506 are scored on it**, with median `|movement_component|` **0.975** against **0.352** for the rest, **233 at the cap**, 9 in the top 50. Boost/penalty 272/234: noise, not bias. **So the 1,063 figure above measures rows that RECEIVED a line score, not rows whose line moved.** The fix is a per-line openings index, not a new magnitude.
 
 **THE 5.7% WAS A POINT-IN-TIME READING, NOT A CEILING.** 114/2000 rows were line-moved at
 16:23Z; **1,266/2000 (63.3%)** at 18:16Z. The share grows through the day as lines move.
