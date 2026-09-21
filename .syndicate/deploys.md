@@ -39433,3 +39433,25 @@ next refresh-worker deploy from main; main's tip also carries peer lane
 `live-inplay-board-cadence`'s `8bd59f95` (`intelligence_state.py`), so that deploy is
 coordinated with the peer, who has been told. **verify (still owed):** after that deploy's
 first sweep, NCAAF evening-game rows land in `book_quotes/2026-09-26`, not `2026-09-27`.
+
+
+## 2026-09-21 17:24Z — refresh-worker `edb32b45` (main's tip) — lane `clv-close-from-book-quotes` — **NCAAF writer fix VERIFIED where the capture runs; peer `8bd59f95` inert here, measured**
+
+**Why this deploy.** The 17:1xZ correction above: NCAAF game lines are captured in refresh-worker's pregame sweep, not on live-odds-worker, so `de6da1b7`'s writer fix needed refresh-worker. Carried from `e9df684b`: `de6da1b7` (writer: Central kickoff day), `d9bcae3e` + `a720941d` (clv_join: last-seen confirmation, in-play and not-started labels on every path -- on refresh-worker this reaches `order_clv` inside `portfolio_commit`), `7882372f` (layer1 merge -- web-route only), and peer lane `live-inplay-board-cadence`'s `8bd59f95` (`intelligence_state.py` combined-board overlay warmer). **8bd59f95's inertness on refresh-worker was re-derived here, not taken from the peer:** its only trigger is `read_combined_intelligence_response`, whose callers are web routes/templates (`intelligence.py:2026/2146`, `ask_the_syndicate.py:389`, `hub_summary` via the sport blueprints and `mlb/hub`), and its import-time additions are dicts, a lock, a flag and defs. Peer consented (option c).
+
+**Locks.** Claim `refresh-worker` from ~17:14Z. Preflight HOLD while the 17:05Z pregame sweep and then two board builds were in flight; a poller re-ran it every 60 s and it went CLEAR at 17:23:54Z (baseline 17:16:40Z). Deploy `dep-daomgeo473hc73d03pk0` 17:24:11Z, live **17:27:08Z**.
+
+**verify:** Saturday-evening NCAAF games (9 events, kickoffs 00:00–03:00Z 09-27), rows in `ncaaf_source/tracking/book_quotes/`, via `/api/ops/artifacts/stream`:
+
+    field                                         baseline (17:16:40Z)     measured 18:18:05Z
+    evening-game rows in 2026-09-26 (newest)      274 (09-20T11:55:07)     1,223 (09-21T18:09:12)   <- first sweep after live
+    evening-game rows in 2026-09-27 (newest)      3,671 (09-21T17:06:13)   3,671 (09-21T17:06:13)   frozen
+    COMBINED_BOARD_OVERLAY_WARMER lines, refresh-worker logs, 17:27:08Z..18:18Z    0 (render_logs.py, window covered)
+
+The 18:09Z sweep filed 949 evening-game rows under the Central day and none under the UTC day.
+
+**Still owed:** the served NCAAF 09-26 board read 18:18:34Z shows 0 duplicate market rows, but its grid artifact was generated 17:29:41Z, BEFORE the 18:09Z sweep -- so the new shape (fresh copy in the 09-26 grid vs frozen copy in 09-27) is not yet exercised on production. Owed at the next grid rebuild: duplicates still 0, `rows_dropped_cross_date_duplicates` rises.
+
+**Residual, not from this change:** some of those cards still carry rows at the superseded 16:00Z kickoff with 09-20 prices -- LINES the books no longer quote (different `line`, so not a duplicate of anything). Stale lines lingering in a change-log grid; a board-freshness question, recorded here rather than chased.
+
+Claim released after this entry.
