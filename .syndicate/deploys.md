@@ -39351,3 +39351,34 @@ failure list.
 (2) the MLB actuals writer's target dates shrink the same way;
 (3) `portfolio_commit` span median over the first ~2 h after live versus 13.2 s, read beside the `[clv_join] CLV_QUOTES_FALLBACK ... seconds=` lines.
 **Reading scheduled:** task `reconciliation-age-cutoff-reading-0921`, 2026-09-21 16:45 CDT, carrying (1)-(3) plus the MLB actuals writer and the CLV cost.
+
+
+## 2026-09-21 16:24Z + 16:35Z — web `1dc4f7ec` then `f89d4789` — lane `clv-close-from-book-quotes` — **CLV closes for NFL / WNBA / NCAAF: 0 -> resolved, same-book; MLB history rows byte-identical**
+
+**What shipped.** `clv_join` takes the close from the per-book quote log (`*_source/tracking/book_quotes/<central kickoff date>.jsonl`) for any opening whose market odds history lacks: same book first, then our price at another book we quoted, then any book as `different_book_close` (kept out of the headline). The close is the last CHANGE we observed strictly before kickoff. Deploy 2 adds two guards found by reading deploy 1's production output: games not yet started get no close (`quotes_not_started`), and openings the live board recorded after kickoff are `opened_in_play`, never looked up.
+
+**Rode along to web (on main, not mine):** `model_scorecard.py`, soccer `live_lens.py`, `pipeline/layer2_shortlist.py` + `layer2_board.py` (my per-line openings fix, live on refresh-worker since c70329c2), and on deploy 2 `prediction_reconciliation.py` (`cacfd33a`, peer lane `reconciliation-disk-walks`; its functional change runs only in `run_refresh_worker.py`, inert on web).
+
+**Locks.** Claim `web` held by this lane from 16:22Z. Preflight CLEAR for `1dc4f7ec` (baseline read 16:22:52Z) and for `f89d4789` (baseline = deploy 1's reads at 16:31:58Z). Live: `dep-daolkclbedkc73aovlig` 16:30:52Z; `dep-daolpo0ae00c73c2i6d0` 16:39:06Z.
+
+**verify:** `/api/ops/clv/report?date=2026-09-20&sport=<s>&rows=1`, read by a watcher after each deploy went live.
+
+    field (2026-09-20)          baseline  after dep 1         predicted dep 2   measured dep 2
+    nfl  resolved                    0    2,639 (263 provis.)   2,376             2,376
+    nfl  opened_in_play              -    -                     4,546             4,546
+    nfl  quotes_not_started          -    -                       528               528
+    wnba resolved                    0    3,918                 3,902             3,902
+    wnba opened_in_play              -    -                     2,788             2,788
+    mlb  resolved                4,947    5,233                 5,232             5,232
+    mlb  history rows identical      -    4,947 / 4,947         4,947             4,947 / 4,947
+    ncaaf 09-18 board resolved       0    2,536 (all started)
+    ncaaf 09-19 board resolved       0    3,240 (3,237 started)
+    ncaaf 09-20 board resolved       0    547 (ALL provisional)  0                 0
+
+Every deploy-2 prediction matched exactly. Same-book pregame averages, deploy 2: nfl +0.21 (n 2,376), wnba +0.58 (n 3,902), mlb 0.0316 -> 0.1996 (same_book_n 244 -> 529; MOVES because the fallback reaches MLB's own no-market/segment rows, pre-registered as amended B3). NCAAF 09-18 +0.13, 09-19 +0.16 (read on deploy 1; those boards' games had all started).
+
+**Cost, production (web):** quote pass 0.99-2.29 s per report on deploy 2 (nfl 239,023 rows parsed in 2.285 s); 3.95 s for ncaaf 09-19 on deploy 1, including the 186 MB shard. Projected 16 s pre-deploy; the event-id prefilter parses only the wanted events' rows.
+
+**Not claimed:** CLV is not ROI. `quotes_unchanged_since_open` (nfl 2,040 / wnba 581 / mlb 667 pregame openings) is still refused -- flat markets, excluded from every average; work in progress. NCAAF 09-20 board has 635 started-game openings with no matching quote -- unexplained, work in progress.
+
+Claim released after this entry.
