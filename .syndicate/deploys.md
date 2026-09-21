@@ -39058,3 +39058,16 @@ the chunking was for.
 - **So the two biggest queues are the two CADENCES** (capture 154 s, grid 137 s), each contributing about half its interval. Everything else is 30-60 s of transport.
 - **What ~180 s would cost, stated as a decision rather than taken:** halving BOTH cadences is the only way there. Capture 154 -> ~80 s roughly doubles per-sport credit burn (NFL spent 3,726 credits in 100 min at 154 s). Grid 137 -> ~70 s doubles a refresh-worker loop whose board build already runs 6-14 min and whose periodic work has caused restart loops before (`#241`). Neither is a knob I would turn without the user weighing that.
 - **Side reading, MLB:** in-play `seen_age` p50 **210 s** (first5 n=38, full n=26) with 0 rows under 180 s — and MLB is NOT on the capture thread, so that is one combined-sweep cycle. It is the same arithmetic from the other direction.
+
+## 2026-09-21 00:05:21Z (2026-09-20 19:05 CT) — DEPLOY (env, same-code tip) — web `bdc45c11` -> `d70a7b3c` (`dep-dao79gbm8hqs73di82s0`, origin/main) — lane live-inplay-board-cadence — **LIVE 00:08:39Z; verify: PENDING**
+
+- **Why.** USER 2026-09-20 ~19:0x CT chose "Web-only first" from a priced menu, after the hop-by-hop decomposition showed the ~362 s look-to-serve has NO dominant term. The web-side hops are the only ones that cost no OddsAPI credits and do not touch the worker that places live orders.
+- **What.** ONE knob: `SYNDICATE_INPLAY_OVERLAY_CACHE_MIN_AGE_SECONDS` **absent (code default 45) -> 22**, set 00:04:49Z and read back. It gates both hop 5 (overlay write -> web merge) and hop 6 (web cache), because a landed overlay can only be picked up once the cached entry is older than the floor. No code change: `d70a7b3c` is the main tip and web was on `bdc45c11`; the code delta is ledger-only.
+- **What was NOT done, and why it matters:** the capture-interval experiment I had proposed an hour earlier was dropped before spending anything. Modelled on the measured means (baseline 306 s): halving capture alone reaches **267 s (13%)** for double that sport's credits, and my claim that halving both cadences reaches ~180 s was wrong -- it reaches **233 s**. The target needs FOUR hops halved (`lanes.md`, `d70a7b3c`).
+- **Locks.** Claim `live-inplay-board-cadence` 00:05Z; preflight CLEAR; claim released 00:08:54Z after live.
+- **Baseline, read 00:03-00:04Z:**
+  - `COMBINED_BOARD_OVERLAY_EXPIRED` entry ages since 23:30Z: **median 86 s** (n=8, range 55-178).
+  - Web health: **1 `server_failed` in the last 12 h** (16 since 2026-09-18T18:18Z).
+- **Expectation.** Expiry-age median well under 86 s, and the served in-play card age down by roughly the difference. Modelled gain for the web-only pair: 306 -> **253 s (17%)**.
+- **PRE-REGISTERED ROLLBACK RULE:** more than **3** `server_failed` outside the first 10 min after go-live, within 2 h -> revert by DELETING the env key (back to the 45 s default) and redeploying. The risk is named rather than assumed: this service restarts on health-check timeouts, and a lower floor means more board rebuilds per minute.
+- **verify:** `web_floor_reading.py` (scratchpad a1e40980), every 10 min for 60 min, across the Sunday night game.
