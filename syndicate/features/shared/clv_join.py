@@ -723,6 +723,7 @@ def _quote_closes_for_openings(
         "attempted": len(pending),
         "resolved": 0,
         "not_started": 0,
+        "opened_in_play": 0,
         "shards_read": [],
         "shards_absent": [],
         "shards_failed": {},
@@ -730,11 +731,25 @@ def _quote_closes_for_openings(
     }
     shard_of: list[str | None] = []
     not_started: set[int] = set()
+    in_play: set[int] = set()
     needed_by_date: dict[str, dict[tuple, datetime | None]] = {}
     for position, opening in enumerate(pending):
         shard = kickoff_shard_date({"commence_time": opening.get("commence_time")})
         shard_of.append(shard)
         kickoff = _parse_ts(opening.get("commence_time"))
+        opened = _parse_ts(opening.get("captured_at"))
+        # AN OPENING RECORDED AFTER KICKOFF HAS NO PREGAME CLOSE, BY DEFINITION.
+        # MEASURED on the 2026-09-20 report: every `quotes_no_pregame_quote`
+        # row was one (nfl 3,322, wnba 1,604, mlb 105), and so were 1,153 nfl /
+        # 1,168 wnba of `quotes_unchanged_since_open` -- live-board rows, named
+        # as if the QUOTES were the gap. Named for what they are, and never
+        # looked up. The opening's own clock decides, conservatively: 16 wnba
+        # rows whose quote carried a LATER kickoff than the opening did would
+        # otherwise have taken a pregame close for a bet the board made in play.
+        if kickoff is not None and opened is not None and opened >= kickoff:
+            in_play.add(position)
+            stats["opened_in_play"] += 1
+            continue
         if shard and kickoff is not None and kickoff > cutoff:
             not_started.add(position)
             stats["not_started"] += 1
@@ -795,7 +810,9 @@ def _quote_closes_for_openings(
 
     resolved_rows: list[dict[str, Any]] = []
     for position, (opening, shard) in enumerate(zip(pending, shard_of)):
-        if position in not_started:
+        if position in in_play:
+            resolved = {"close_price": None, "unresolved_reason": "opened_in_play"}
+        elif position in not_started:
             resolved = {"close_price": None, "unresolved_reason": "quotes_not_started"}
         elif not shard:
             resolved = {"close_price": None, "unresolved_reason": "quotes_no_kickoff_time"}
@@ -1293,10 +1310,11 @@ def compute_clv_for_date(
         flush=True,
     )
     print(
-        "[clv_join] CLV_QUOTES_FALLBACK date=%s sport=%s attempted=%s resolved=%s not_started=%s "
+        "[clv_join] CLV_QUOTES_FALLBACK date=%s sport=%s attempted=%s resolved=%s not_started=%s opened_in_play=%s "
         "shards_read=%s shards_absent=%s shards_failed=%s rows_parsed=%s seconds=%s skipped=%s"
         % (date, sport, quotes_fallback.get("attempted"), quotes_fallback.get("resolved"),
-           quotes_fallback.get("not_started"), quotes_fallback.get("shards_read"), quotes_fallback.get("shards_absent"),
+           quotes_fallback.get("not_started"), quotes_fallback.get("opened_in_play"),
+           quotes_fallback.get("shards_read"), quotes_fallback.get("shards_absent"),
            quotes_fallback.get("shards_failed"), quotes_fallback.get("rows_parsed"),
            quotes_fallback.get("seconds"), quotes_fallback.get("skipped")),
         flush=True,

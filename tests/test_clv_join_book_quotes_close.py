@@ -229,6 +229,21 @@ def test_a_game_that_has_not_started_has_no_close_and_its_shard_is_never_opened(
     assert early["unresolved_reasons"].get("quotes_not_started") == 2
 
 
+def test_an_opening_recorded_after_kickoff_is_named_in_play_and_never_looked_up(tmp_path):
+    """The live board records openings too. A bet made in play has no PREGAME
+    close, and before this label every one of them read as a quote-log gap
+    (nfl 3,322 `quotes_no_pregame_quote` on 2026-09-20, all in play)."""
+    early_kickoff = "2026-09-20T11:00:00Z"   # the opening is recorded at 12:00Z
+    _record(tmp_path, _opening(commence_time=early_kickoff))
+    calls: list = []
+    report = _report(tmp_path, {_DATE: [
+        _quote("2026-09-20T10:30:00+00:00", -120, commence_time=early_kickoff),
+    ]}, calls)
+    assert report["unresolved_reasons"] == {"opened_in_play": 1}
+    assert report["book_quotes_fallback"]["opened_in_play"] == 1
+    assert calls == [], "an in-play opening's shard was read"
+
+
 def test_a_missing_shard_and_a_missing_kickoff_are_named(tmp_path):
     _record(tmp_path, _opening(), _opening(event_id="no-kickoff", commence_time=None))
     report = _report(tmp_path, {})
