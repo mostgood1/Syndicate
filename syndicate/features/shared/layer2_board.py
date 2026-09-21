@@ -3100,6 +3100,9 @@ def build_layer2_rows(
                 fair_prob=fair,
                 bookmaker=bettable_book,
                 venue_ref=side_venue_ref or candidate.get("venue_ref") or row.get("venue_ref"),
+                sport=candidate.get("sport") or row.get("sport"),
+                market=candidate.get("market") or row.get("market"),
+                segment=candidate.get("segment") or row.get("segment"),
                 books_quoting=side_best.get("books_quoting") or row.get("books_quoting"),
                 book_age_seconds=side_best.get("age_seconds"),
                 quote_seen_age_seconds=side_best.get("seen_age_seconds"),
@@ -3857,13 +3860,67 @@ def movement_join_key(row: Mapping[str, Any]) -> str | None:
     )
 
 
-def venue_fee_per_contract(bookmaker: Any, price_prob: float, *, venue_ref: Any = None) -> tuple[float, str, bool]:
+# THE KALSHI SERIES A BOARD ROW WOULD TRADE, BY (sport, market, segment).
+#
+# WHY IT EXISTS: at scoring time a Kalshi price is a captured quote from bookmaker
+# "kalshi" with NO ticker -- `apply_venue_quotes` stamps `venue_ref` onto the rows
+# AFTER `build_layer2_rows` has scored them (`pipeline/layer2_shortlist.py`). Measured
+# on the first two fee-net boards (2026-09-21 21:53Z and 22:36Z): 82 of 82 MLB Kalshi
+# rows fell back to the assumed x1.0 fee, 45 of them carrying a ticker on the served
+# row that arrived too late to be read.
+#
+# THIS NAMES THE SERIES ONLY. The RATE still comes from `venue_fees`' measured table,
+# so a wrong or absent entry here can only fall back to the flagged full-rate bound --
+# never invent a cheaper fee. Every pair below was read off served rows' own tickers
+# on 2026-09-21 (market -> ticker prefix), or is a full-game series in the same table.
+_KALSHI_SERIES_BY_MARKET: dict[tuple[str, str, str], str] = {
+    ("mlb", "h2h", "full"): "KXMLBGAME",
+    ("mlb", "spreads", "full"): "KXMLBSPREAD",
+    ("mlb", "totals", "full"): "KXMLBTOTAL",
+    ("mlb", "totals", "first5"): "KXMLBF5TOTAL",
+    ("mlb", "spreads", "first5"): "KXMLBF5SPREAD",
+    ("mlb", "batter_hits", "full"): "KXMLBHIT",
+    ("mlb", "batter_rbis", "full"): "KXMLBRBI",
+    ("mlb", "batter_hits_runs_rbis", "full"): "KXMLBHRR",
+    ("mlb", "batter_total_bases", "full"): "KXMLBTB",
+    ("mlb", "batter_home_runs", "full"): "KXMLBHR",
+    ("mlb", "batter_stolen_bases", "full"): "KXMLBSB",
+    ("mlb", "strikeouts", "full"): "KXMLBKS",
+    ("mlb", "outs", "full"): "KXMLBOUTS",
+    ("mlb", "earned_runs", "full"): "KXMLBERA",
+    ("mlb", "hits_allowed", "full"): "KXMLBHA",
+    ("mlb", "walks", "full"): "KXMLBWA",
+}
+
+
+def kalshi_series_for_market(sport: Any, market: Any, segment: Any = None) -> str | None:
+    """The Kalshi series for a board row, or None when it is not mapped."""
+    base = str(market or "").strip().lower()
+    if base.endswith("_alt"):
+        base = base[: -len("_alt")]
+    seg = str(segment or "full").strip().lower() or "full"
+    if seg == "full_game":
+        seg = "full"
+    return _KALSHI_SERIES_BY_MARKET.get((str(sport or "").strip().lower(), base, seg))
+
+
+def venue_fee_per_contract(
+    bookmaker: Any,
+    price_prob: float,
+    *,
+    venue_ref: Any = None,
+    sport: Any = None,
+    market: Any = None,
+    segment: Any = None,
+) -> tuple[float, str, bool]:
     """(fee per $1 contract, basis, is_upper_bound) for taking at `price_prob`.
 
     Only the venues with a MEASURED fee schedule are charged; every other book is
     0.0 with basis "none" -- a sportsbook's margin is already in its price.
-    An unknown Kalshi series is charged the full rate and flagged as a bound,
-    because understating a fee invents edge (`venue_fees`' own rule).
+    Kalshi's multiplier is resolved per SERIES: from the ticker when the row has one,
+    else from the series its (sport, market, segment) trades on; an unresolved series
+    is charged the full rate and flagged as a bound, because understating a fee
+    invents edge (`venue_fees`' own rule).
     """
     from syndicate.features.shared import venue_fees
 
@@ -3871,10 +3928,15 @@ def venue_fee_per_contract(bookmaker: Any, price_prob: float, *, venue_ref: Any 
     p = min(1.0, max(0.0, float(price_prob)))
     if book == "kalshi":
         multiplier = venue_fees.kalshi_fee_multiplier_for_series(venue_ref)
+        basis = "kalshi_series"
+        if multiplier is None:
+            inferred = kalshi_series_for_market(sport, market, segment)
+            multiplier = venue_fees.kalshi_fee_multiplier_for_series(inferred)
+            basis = "kalshi_series_from_market"
         if multiplier is None:
             return (venue_fees.KALSHI_BASE_TAKER_RATE * venue_fees.KALSHI_ASSUMED_FEE_MULTIPLIER
                     * p * (1.0 - p), "kalshi_assumed_full_rate", True)
-        return venue_fees.KALSHI_BASE_TAKER_RATE * multiplier * p * (1.0 - p), "kalshi_series", False
+        return venue_fees.KALSHI_BASE_TAKER_RATE * multiplier * p * (1.0 - p), basis, False
     if book == "polymarket":
         return venue_fees.POLYMARKET_MEASURED_NOTIONAL_RATE, "polymarket_measured_notional", False
     return 0.0, "none", False
@@ -3905,9 +3967,13 @@ def _shadow_score_v2(**kwargs: Any) -> dict[str, Any] | None:
             return None
         bookmaker = kwargs.pop("bookmaker", None)
         venue_ref = kwargs.pop("venue_ref", None)
+        sport = kwargs.pop("sport", None)
+        market = kwargs.pop("market", None)
+        segment = kwargs.pop("segment", None)
         price_prob = implied_probability(kwargs.get("price"))
         if price_prob is not None:
-            fee, basis, bound = venue_fee_per_contract(bookmaker, price_prob, venue_ref=venue_ref)
+            fee, basis, bound = venue_fee_per_contract(
+                bookmaker, price_prob, venue_ref=venue_ref, sport=sport, market=market, segment=segment)
             kwargs.update(fee_per_contract=fee, fee_basis=basis, fee_is_upper_bound=bound)
         return scorer(**kwargs)
     except Exception:  # noqa: BLE001 -- a shadow field fails closed, never loud

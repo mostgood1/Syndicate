@@ -183,6 +183,40 @@ def test_the_kalshi_ticker_is_read_from_the_priced_side_so_mlb_pays_its_half_rat
         P = _p(scored["quote"]["price"]) if isinstance(scored.get("quote"), dict) else None
         if P is not None:
             assert v2["fee_per_contract"] == pytest.approx(0.07 * 0.5 * P * (1 - P), abs=1e-6)
-    # Without a ticker anywhere it stays the flagged full-rate bound (the prior behaviour).
+    # Without a ticker, an MLB full-game total resolves its series from the market ...
     bare = _by_side(build_layer2_rows([_kalshi_grid_row()]))
-    assert all(r["score_v2"]["fee_basis"] == "kalshi_assumed_full_rate" for r in bare.values())
+    assert all(r["score_v2"]["fee_basis"] == "kalshi_series_from_market" for r in bare.values())
+    # ... and an UNMAPPED sport/market stays the flagged full-rate bound.
+    nfl = _kalshi_grid_row()
+    nfl["sport"] = "nfl"
+    nfl_rows = _by_side(build_layer2_rows([nfl]))
+    assert nfl_rows and all(r["score_v2"]["fee_basis"] == "kalshi_assumed_full_rate"
+                            and r["score_v2"]["fee_is_upper_bound"] for r in nfl_rows.values())
+
+
+def test_market_inference_names_the_series_and_the_measured_table_sets_the_rate():
+    """At scoring time a Kalshi price carries NO ticker (the venue restamp runs after
+    `build_layer2_rows`); 82 of 82 MLB Kalshi rows paid the assumed x1.0 on 2026-09-21."""
+    P = 0.47
+    half = 0.07 * 0.5 * P * (1 - P)
+    full = 0.07 * 1.0 * P * (1 - P)
+    cases = [
+        (("mlb", "batter_hits", "full"), half),
+        (("mlb", "strikeouts", "full"), half),
+        (("mlb", "totals_alt", "first5"), half),     # KXMLBF5TOTAL
+        (("mlb", "spreads_alt", "first5"), half),    # KXMLBF5SPREAD
+        (("mlb", "earned_runs", "full"), full),      # KXMLBERA is x1.0 in the measured table
+        (("mlb", "hits_allowed", "full"), full),     # KXMLBHA
+    ]
+    for (sport, market, segment), expected in cases:
+        fee, basis, bound = layer2_board.venue_fee_per_contract(
+            "kalshi", P, sport=sport, market=market, segment=segment)
+        assert basis == "kalshi_series_from_market" and bound is False, (market, basis)
+        assert fee == pytest.approx(expected, abs=1e-9), market
+    # a ticker, when present, wins over the market
+    fee, basis, _ = layer2_board.venue_fee_per_contract(
+        "kalshi", P, venue_ref="KXMLBERA-26SEP21X-2", sport="mlb", market="batter_hits", segment="full")
+    assert basis == "kalshi_series" and fee == pytest.approx(full, abs=1e-9)
+    # first inning is NOT mapped (its series is x1.0 and unverified here): the flagged bound
+    fee, basis, bound = layer2_board.venue_fee_per_contract("kalshi", P, sport="mlb", market="totals", segment="first1")
+    assert basis == "kalshi_assumed_full_rate" and bound is True
