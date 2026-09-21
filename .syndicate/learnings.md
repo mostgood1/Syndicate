@@ -3116,6 +3116,7 @@ THIS entry: the escape examples inside the text were themselves parsed by Python
   scan for the double-encoded em-dash byte sequence must return 0.
 - Then re-run the PARSER, not the linter: `lane_claims._claims(text)` must list your files.
 - *(evidence: `log/2026-09-17.md`; 6 + 4 + 1 occurrences repaired in-session)*
+- **The same mechanism, second shape, measured 2026-09-21 (session 35e1fa38):** a heredoc does not only mangle `\xNN`. It turns `\t` `\b` `\a` `\f` into CONTROL BYTES: `C:\tmp` -> `C:<TAB>mp`, and the regex `\bOPEN\b` -> `<BS>OPEN<BS>`, which sat inside THIS file's archives as a corrupted rule. A ledger-wide scan found **54 bytes in 18 files**, all restored (`cd3037b8`, `76e36bad`, `e8815bd1`, `352a5445`). The check above misses them all. **Add:** after any scripted ledger write, a scan for bytes < 0x20 other than CR/LF must return 0. `_env_xref.txt` is a real TSV and the only exception.
 
 ### 2026-09-17 (session 4a583d41, lane nfl-usage-publish) — FORBIDDEN: backgrounding an instrument you adapted but never watched complete ONE cycle
 
