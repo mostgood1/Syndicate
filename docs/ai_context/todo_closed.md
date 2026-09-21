@@ -2784,3 +2784,8 @@ Residual, genuinely open: nothing bounds per-order size. If order records grow
 for that, and it fires on the persist path before the ceiling is reached.
 
 ---
+
+### `#680` — **CLOSED 2026-09-21 — the NFL weekly projection file dropped every game not yet played; tonight's NYG @ LA was missing from /nfl/cards** — FOUND and FIXED 2026-09-21, lane `nfl-projection-partial-week`, session dae18452
+- **Cause:** `scripts/generate_smartsim2_nfl_projections.py` took the week's game list from the current season's pbp (games already played) and read `schedule_<season>.csv` only when that list was EMPTY. Measured on production: 2026 week 2 published 16 games (09-18) -> 1 (09-19, 09-20: Thursday's only) -> 8 (09-21 01:26Z, 7:26 PM CT Sunday); week 1 lost its Monday game on 09-14.
+- **Fix:** `e7f216bf` — `week_game_list()` unions the real schedule with the pbp by game_id. Test fails on old code (1 game) and passes on the fix.
+- **Verified in production:** refresh-worker `e7f216bf` live 23:41:44Z; `/nfl/api/cards` 8 -> 16 games incl. `2026_02_NYG_LA` at 23:48:16Z. Measurement: `.syndicate/deploys.md` 23:36:26Z entry. Follow-ups filed as leads (`leads.md` 2026-09-21 23:5xZ): the board reads a 2026-08-01 projection file; week-2 projections are 10-27 pts off the market.

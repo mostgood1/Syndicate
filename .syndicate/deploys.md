@@ -39580,3 +39580,18 @@ Integrity: 0 of 315 fee-net rows with `score.ev_component != score_v2.ev_net_pct
 
 **Claim:** at 23:10Z the refresh-worker claim was already held by lane `nfl-projection-partial-week` (FORCE-acquired ~23:05Z per that lane's own message, user-directed, AFTER this deploy went live 23:03:59Z; the claim file's `forced` field reads None, so the file does not record it). Nothing to release; not touched. Its next deploy of main composes with this one: `03d3f801` is on main.
 **verify (OWED, unchanged from the 21:43:55Z entry):** fee-net CLV of the served top-K vs the pre-deploy baseline over >= 7 finished slates, same slates paired (`scripts/score_ranking_backtest.py`); paper-order ROI by venue after 09-21.
+
+## 2026-09-21 23:36:26Z -> live 23:41:44Z (6:36-6:41 PM CT) — refresh-worker `03d3f801` -> `e7f216bf` (`dep-daoruue0tbcc73fepm0g`) — lane `nfl-projection-partial-week` — **VERIFIED: `/nfl/api/cards` serves 16 of 16 Week 2 games incl. tonight's NYG @ LA, 27 min before its 00:15Z kickoff**
+
+**User decisions (chat):** "yes, fix it and deploy"; "force the claim if they don't answer"; the env change below approved by answer to a direct question ("Yes, set it").
+**Claim:** FORCE-acquired 23:05:01Z from `layer2-score-outcome-calibration` (session 236bd219, desktop `local_0b24adbb`), whose `03d3f801` deploy went live 23:03:59Z. Two messages sent to it, both queued, no reply by the force. **Preflight:** TOO_SOON at 23:28:21Z; then an MLB `evening_next_day_sim` for **2026-09-22** was in flight (started 23:04:52Z at that boot, ended 23:35:39Z) — waited for it, NOT killed; `CLEAR: only infrastructure processes running` at 23:35:59Z.
+**Env:** `SEASON_PROJECTION_REFRESH_INTERVAL_SECONDS` absent -> `72000` set before the deploy (rode it) to force the week-2 rebuild before kickoff; -> `86400` at 23:49Z, which equals the absent default (`int(raw or 86400)`) but is **NOT yet in the running process** — the next refresh-worker deploy injects it. Until then the process uses 20 h: next NFL wk2 relaunch ~2026-09-22 19:46Z, next NCAAF ~11:25Z (not ~15:25Z). Harmless, stated so nobody reads it as drift.
+**Ride-along:** `3af16744` (lane `layer2-restate-series-date`, `pipeline/intelligence_state.py` `_refresh_layer2_live_state`) sits on main between `03d3f801` and `e7f216bf`; this is its first time on refresh-worker. Not measured here.
+
+    field                                     baseline 23:35:59Z   predicted   measured
+    live_commit                               03d3f801             e7f216bf    e7f216bf (live 23:41:44Z)
+    projection interval in process            absent (86400)       72000       72000   `SEASON_PROJECTION_LAUNCHING sport=nfl season=2026 week=2 reason=artifact_stale age_seconds=80379 interval_seconds=72000` 23:46:00Z
+    wk2 PUBLISH_OK bytes                      1896                 ~3443       3443    `PUBLISH_OK path=nfl_source/smartsim2_projections_2026_wk2.csv` 23:47:43Z
+    nfl_wk2_cards_games (/nfl/api/cards)      8                    16          16      23:48:16Z, `2026_02_NYG_LA` present (status "Week 2"); web disk file 16 rows, generated 23:46:09..23:47:43Z; `/nfl/api/picks` carries NYG too
+
+The 8 games served before the fix kept identical numbers (DET_BUF margin 4.91 -> 4.91, CAR_ATL 3.173 -> 3.17, NO_BAL 17.79 -> 17.79): the fix changed the game list only. **verify:** the table. Next natural exercise of the partial-week case: the Friday 09-25 rebuild after Thursday's week-3 game, which on the old code collapsed the file to the Thursday game (09-19 and 09-20 publishes, 539 bytes).
