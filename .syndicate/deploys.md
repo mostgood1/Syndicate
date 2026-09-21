@@ -39036,3 +39036,25 @@ the chunking was for.
 - **The liveness gate is visibly correct, not merely quiet:** the first launch of the afternoon is 17:03:45Z, minutes after the WNBA slate started, and nothing fired in the hours before it. `_wnba_has_live_game` (artifact, then ESPN fallback) is gating on games actually in progress.
 - **So all three sports on the capture thread are now verified:** NCAAF 152 s (n=18), NFL 154 s (n=38), WNBA 248 s (n=63) -- each at its own configured interval, 0 failures across all three.
 - **The rule this breaks, again:** a null result needs a live population, and an absent signal is a fact about the EMITTER until shown otherwise. Both were already standing rules; I hit them anyway by reading my own watcher's zero as the service's zero.
+
+## 2026-09-21 00:00Z (2026-09-20 19:00 CT) — READING, no deploy — the whole in-play chain, hop by hop — lane live-inplay-board-cadence — **the remaining ~180 s gap has NO dominant term; it is six comparable queues**
+
+- **Why this reading:** the lane's goal is ~180 s look-to-serve and the measured figure is ~362 s. Before changing anything, each hop was timed on production rather than reasoned about. Two of my earlier guesses about WHERE the time sits were wrong (see below).
+- **THE CHAIN, measured 2026-09-20 22:30-00:00Z:**
+
+  | hop | measurement | mean wait |
+  |---|---|---|
+  | 1. capture interval (NFL) | 154 s median, n=38 | ~77 s |
+  | 2. capture -> publish to web | **17-53 s** (launch 23:55:06 -> `PUBLISH_OK` 23:55:23; 23:52:30 -> 23:52:59; 23:49:57 -> 23:50:37) | ~35 s |
+  | 3. web -> refresh-worker pull | `PULL_OK` **110 since 23:00Z, median gap 8 s** | ~10-30 s |
+  | 4. grid build / overlay write | `INPLAY_OVERLAY sport=mlb` **median 137 s** [116-310] | ~68 s |
+  | 5. overlay write -> web merge | 17-80 s (17:17:43 -> 17:18:2xZ) | ~45 s |
+  | 6. web combined-board cache | 45 s floor; `COMBINED_BOARD_OVERLAY_EXPIRED` at ages 67-72 s | ~60 s |
+
+  Sum of means **~295-315 s**, against **~362 s** measured look-to-serve. The chain accounts for the number.
+- **TWO GUESSES OF MINE, REFUTED by this reading:**
+  - I expected the PUBLISH to ride live-odds-worker's slow 2-10 min main-loop pass. It does not — the sidecar publishes **17-53 s after each capture launch**, tracking capture, not the loop.
+  - I expected refresh-worker's PULL to be a ~5-6 min queue. It is not — 110 pulls since 23:00Z at a median 8 s gap.
+- **So the two biggest queues are the two CADENCES** (capture 154 s, grid 137 s), each contributing about half its interval. Everything else is 30-60 s of transport.
+- **What ~180 s would cost, stated as a decision rather than taken:** halving BOTH cadences is the only way there. Capture 154 -> ~80 s roughly doubles per-sport credit burn (NFL spent 3,726 credits in 100 min at 154 s). Grid 137 -> ~70 s doubles a refresh-worker loop whose board build already runs 6-14 min and whose periodic work has caused restart loops before (`#241`). Neither is a knob I would turn without the user weighing that.
+- **Side reading, MLB:** in-play `seen_age` p50 **210 s** (first5 n=38, full n=26) with 0 rows under 180 s — and MLB is NOT on the capture thread, so that is one combined-sweep cycle. It is the same arithmetic from the other direction.
