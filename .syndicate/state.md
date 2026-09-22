@@ -549,6 +549,7 @@ once this index exists: re-splitting would orphan the parts.
 | [ncaaf-kickoff-cache] | AN UPCOMING NCAAF CARD READ "TBD" BECAUSE THE COMMITTED CFBD CACHE WAS THE JULY SNAPSHOT — FIXED BOTH HALVES `[verifi | `state_layer2.md` |
 | [segment-misgrade-regrade] | 53 OF 173 SETTLED SEGMENT ORDERS WERE GRADED AGAINST THE WRONG ACTUAL — 30.6%, AND THE ERRORS NEARLY CANCEL `[ | `state_ledger.md` |
 | [live-gameline-ledger-key] | THE LIVE-GAMELINE LEDGER MERGED UP TO 14 GAMES INTO ONE RECORD - the key had no `event_id` and `game_pk` is  | `state_ledger.md` |
+| [live-gameline-clv-impact] | THE LEDGER'S PAIR-KEYED GAME IDENTITY COST NO PUBLISHED NUMBER AND REFUSED A WHOLE WINDOW - and its root  | `state_ledger.md` |
 | [stale-test-triage] | "THE TEST IS STALE" IS A HYPOTHESIS, AND IT WAS WRONG FOR 4 OF 18 `[2026-09-05, lane stale-test-repair, commit | `state_ledger.md` |
 | [full-suite-completes] | THE FULL SUITE RAN TO COMPLETION FOR THE FIRST TIME -- 15,307 tests, 61m06s, and the 27 "NEW" failures are 6 p | `state_ledger.md` |
 | [github-actions-dead] | GITHUB ACTIONS RUNS AGAIN FROM 2026-09-10 (billing fixed by the user); `ci.yml` GATED NOTHING 2026-08-22..2026 | `state_ledger.md` |

@@ -1508,3 +1508,24 @@ The 09-04 and 08-29 collisions are the doubleheader shape with a PRESENT gamePk:
 `d25664f0` (refresh-worker, live 2026-09-22T21:04:52Z) appends `event_id` as a sixth slot, leaving the existing prefix unchanged. **No migration:** every record already carries `event_id` and the previous-observation map is rebuilt from the file each run, so an existing file re-keys consistently; the change can only SPLIT records that were wrongly merged, never merge separate ones.
 
 **NOT measured:** records appended after 21:04:52Z (none yet at 21:05:13Z - the worker had just rebooted and appends during board builds), and a later date's census showing one record per event where the old key spanned several. Anything downstream that read this ledger before 2026-09-22 was reading a history de-duplicated ACROSS GAMES on the affected keys.
+
+
+## [live-gameline-clv-impact] THE LEDGER'S PAIR-KEYED GAME IDENTITY COST NO PUBLISHED NUMBER AND REFUSED A WHOLE WINDOW - and its root cause is still on `main` `[measured 2026-09-22, lane dh-grading-ledger-joins]`
+
+Full working: `.syndicate/findings_2026-09-22_ledger_key_clv_impact.md`.
+
+**True CLV is untouched.** `clv_join._history_key` requires a non-empty `event_id` and returns `None` without one, so a doubleheader's halves were always two histories. Everything that grades against `game_pk` is exposed: `bucket_realised_performance.py`, `subset_edge_scan.py`, `score_live_gameline_offline.py`, and the worker-side `live_gameline_score.py` (pk first, event second).
+
+**What the rows actually contained.** On all three past doubleheaders both odds events were joined to game 1's live state and written under game 1's gamePk - identical score series, inning and recorded-at window. The second event's rows are phantom duplicates of game 1 carrying game 2's prices (09-04 DET@CLE 69 rows; 08-29 AZ@SF 222; 08-29 BOS@NYY 137).
+
+Replaying `bucket_realised_performance.py --rows-jsonl` over the production rows:
+
+    window        rows     DHs  as written                                  phantom rows dropped
+    09-01..09-07  28,627     1  reproduces the published h2h buckets        BYTE-IDENTICAL output
+    08-26..09-01  46,788     2  calib 0.522 vs 0.492 -> REFUSED, no report  0.523 vs 0.501 -> n=78 +1.11pp
+
+So the published `reports/bucket_realised_mlb.json` is exactly right: the `(bucket, game_pk)` dedupe discarded every contaminated row. A week earlier the same defect pushed h2h calibration 0.030 past the 3pp gate and the script refused the window - **the gate caught it**, which is what its docstring said it was for ("points at MY join, not the book").
+
+**STILL BROKEN:** `build_live_gameline_index` (`live_gameline_join.py:1257`) maps `(away_team, home_team)` -> ONE projection; `:1372` stamps its `game_pk`. `d25664f0` splits the RECORDS, not the projection. Owned by lane `live-edge-basis` - handed over, not edited.
+
+**NOT measured:** whether a future doubleheader's second half now carries its own pk. Today's TB@NYY halves never overlapped (G1 FINAL 0-2 before G2's 23:05Z start) and today's 132 records are all on ev `394e1e2b`, so nothing today discriminates. Scheduled reading `mlb-dh-g2-ledger-reading-0922` at 18:40 CT.
