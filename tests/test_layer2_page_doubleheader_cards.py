@@ -1,0 +1,228 @@
+"""Layer 2 page rail: each half of a doubleheader is its own card, on its own chip.
+
+MEASURED ON PRODUCTION 2026-09-22 -- TB @ NYY split doubleheader:
+
+    G1  gamePk 823543  chip start 17:05Z  "12:05P CT"   OddsAPI event 394e1e2b.. commence 17:06Z
+    G2  gamePk 823494  chip start 23:05Z  "6:05P CT"    OddsAPI event 574050c1.. commence 23:06Z
+
+The page rendered ONE TB @ NYY card holding both games' opportunities, plus an
+empty card for G1's unclaimed chip. Three steps in `intelligence.html` did it:
+the exact matchup index was `Map.set` (last chip wins, so both halves' rows
+joined G2's chip); a Layer 2 row's id (OddsAPI hash) never hits the chip id
+index (gamePk); and the merge pass folded every group sharing a chip and text.
+
+WHY NODE FROM PYTEST. The functions live inside the page's IIFE, so they are
+not importable; the harnesses in `tests/js/` slice them out of the template and
+run them under node, and this does the same. Unlike those harnesses it runs the
+REAL `loadGameChips` (with `fetch` stubbed) instead of seeding the chip indexes
+by hand -- the defect is IN how that function builds the exact index, and a
+hand-seeded index cannot express it.
+
+A/B against another template (e.g. the pre-change one):
+    SYNDICATE_TEMPLATE_HTML=<path> python -m pytest tests/test_layer2_page_doubleheader_cards.py
+Only the 8-character event-id prefixes are production values; the rest of each
+id is padding.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+from pathlib import Path
+
+import pytest
+
+TEMPLATE = Path(__file__).resolve().parents[1] / "syndicate" / "templates" / "intelligence.html"
+NODE = shutil.which("node")
+
+pytestmark = pytest.mark.skipif(NODE is None, reason="node is not installed")
+
+G1_EVENT = "394e1e2b00000000000000000000aaaa"
+G2_EVENT = "574050c100000000000000000000bbbb"
+
+HARNESS = r"""
+import fs from 'fs';
+const html = fs.readFileSync(process.argv[2], 'utf8').split('\r\n').join('\n');
+function slice(a, b) {
+  const i = html.indexOf(a), j = html.indexOf(b, i + 1);
+  if (i < 0 || j < 0 || j <= i) throw new Error(`slice ${a} .. ${b} not found`);
+  return html.slice(i, j);
+}
+const src = [
+  slice('let gameChipsById = new Map();', "// The chip-less card's matchup, shortened."),
+  slice('function chipForGame', 'function chipTeamRow'),
+  slice('function displayMatchup', 'function gameKey'),
+  slice('function gameKey', '// A whole-numbered line must keep its decimal'),
+  slice('function deriveGameCards', 'function renderGameCards'),
+].join('\n');
+
+let payload = { chips: [] };
+const state = { sport: 'all', date: '2026-09-22' };
+const fetchStub = async () => ({ ok: true, json: async () => payload });
+const recommendationState = (item) => item.market_state || 'pregame';
+const built = new Function('state', 'fetch', 'renderBoardBody', 'recommendationState',
+  src + `; return {
+    loadGameChips, deriveGameCards, chipForGame, gameKey,
+    indexes: () => ({ byId: gameChipsById, byMatchup: gameChipsByMatchup }),
+    mergeMap: () => gameKeyMergeMap,
+  };`)(state, fetchStub, () => {}, recommendationState);
+
+const G1_EVENT = '__G1__', G2_EVENT = '__G2__';
+const side = (abbr, name) => ({ abbr, name, key: name.toLowerCase(), score: null });
+const chip = (gameKey, start, token, away = side('TB', 'Tampa Bay Rays'), home = side('NYY', 'New York Yankees')) => ({
+  sport: 'mlb', league: null, league_display: null, game_key: gameKey,
+  matchup: `${away.abbr} @ ${home.abbr}`, away, home, state: 'pregame', status_token: token,
+  score_suppressed: null, leader: null, start_time_utc: start,
+});
+const G1 = () => chip('823543', '2026-09-22T17:05:00+00:00', '12:05P CT');
+const G2 = () => chip('823494', '2026-09-22T23:05:00+00:00', '6:05P CT');
+// The board-card shape `layer2_rows_to_board_cards` emits for an MLB row.
+const row = (eventId, extra = {}) => ({
+  sport: 'mlb', sport_slug: 'mlb', event_id: eventId, game_pk: eventId, source: 'layer2_shortlist',
+  matchup: 'Tampa Bay Rays @ New York Yankees', away_team: 'Tampa Bay Rays', home_team: 'New York Yankees',
+  away_key: 'tampa bay rays', home_key: 'new york yankees', market_state: 'pregame', ...extra,
+});
+const g1Rows = (extra) => [row(G1_EVENT, extra), row(G1_EVENT, extra), row(G1_EVENT, extra)];
+const g2Rows = (extra) => [row(G2_EVENT, extra), row(G2_EVENT, extra)];
+const withCommence = (start) => ({ commence_time: start });
+const withGameKey = (key) => ({ game: { game_key: key } });
+
+// The group `deriveGameCards` would seat for a row, resolved on its own --
+// what each half joins BEFORE any merge.
+function groupChip(r) {
+  const game = r.game && typeof r.game === 'object' ? r.game : null;
+  const group = {
+    key: built.gameKey(r), sportSlug: 'mlb', sport: 'MLB', matchup: r.matchup,
+    awayKey: r.away_key, homeKey: r.home_key,
+    ownGameKey: (game && game.game_key) || null,
+    commenceTime: r.commence_time || (game && game.start_time_utc) || null,
+  };
+  const c = built.chipForGame(group);
+  return c ? c.game_key : null;
+}
+
+async function scenario(chips, rows) {
+  payload = { chips };
+  await built.loadGameChips();
+  const idx = built.indexes();
+  const cards = built.deriveGameCards(rows).map((card) => {
+    const c = built.chipForGame(card);
+    return { key: card.key, matchup: card.matchup, count: card.count, chip: c ? c.game_key : null };
+  });
+  const merge = built.mergeMap();
+  return {
+    chips_indexed_by_id: idx.byId.size,
+    cards,
+    merged_to: Object.fromEntries(rows.map((r) => [built.gameKey(r), merge.get(built.gameKey(r)) || built.gameKey(r)])),
+    row_chip: Object.fromEntries(rows.map((r) => [built.gameKey(r), groupChip(r)])),
+  };
+}
+
+const out = {};
+out.by_commence_time = await scenario([G1(), G2()], [...g1Rows(withCommence('2026-09-22T17:06:00Z')), ...g2Rows(withCommence('2026-09-22T23:06:00Z'))]);
+{
+  const exact = built.indexes().byMatchup;
+  const size = (k) => { const v = exact.get(k); return Array.isArray(v) ? v.length : (v ? 1 : 0); };
+  out.exact_index = { abbr: size('mlb|tb @ nyy'), full_name: size('mlb|tampa bay rays @ new york yankees') };
+}
+out.by_game_key = await scenario([G1(), G2()], [...g1Rows(withGameKey('823543')), ...g2Rows(withGameKey('823494'))]);
+out.no_discriminator = await scenario([G1(), G2()], [...g1Rows(), ...g2Rows()]);
+out.g2_has_no_rows = await scenario([G1(), G2()], [...g1Rows(withCommence('2026-09-22T17:06:00Z'))]);
+out.one_chip_missing = await scenario([G2()], [...g1Rows(withCommence('2026-09-22T17:06:00Z')), ...g2Rows(withCommence('2026-09-22T23:06:00Z'))]);
+out.no_chips = await scenario([], [...g1Rows(withCommence('2026-09-22T17:06:00Z')), ...g2Rows(withCommence('2026-09-22T23:06:00Z'))]);
+out.no_chips_same_game_two_ids = await scenario([], [...g1Rows(withCommence('2026-09-22T17:06:00Z')), ...g2Rows(withCommence('2026-09-22T17:06:00Z'))]);
+out.inseparable_starts = await scenario(
+  [G1(), chip('823494', '2026-09-22T17:30:00+00:00', '12:30P CT')],
+  [...g1Rows(withCommence('2026-09-22T17:06:00Z'))]);
+out.single_game_pair = await scenario(
+  [chip('823600', '2026-09-22T23:05:00+00:00', '6:05P CT', side('BOS', 'Boston Red Sox'), side('BAL', 'Baltimore Orioles'))],
+  [{ ...row('c0ffee0000000000000000000000cccc'), matchup: 'Boston Red Sox @ Baltimore Orioles',
+     away_team: 'Boston Red Sox', home_team: 'Baltimore Orioles', away_key: 'boston red sox', home_key: 'baltimore orioles',
+     commence_time: '2026-09-23T23:05:00Z' }]);
+out.same_game_listed_twice = await scenario([G1(), G1()], [...g1Rows()]);
+console.log(JSON.stringify(out));
+"""
+
+
+@pytest.fixture(scope="module")
+def observed(tmp_path_factory: pytest.TempPathFactory) -> dict:
+    script = tmp_path_factory.mktemp("doubleheader_cards") / "harness.mjs"
+    script.write_text(HARNESS.replace("__G1__", G1_EVENT).replace("__G2__", G2_EVENT), encoding="utf-8")
+    template = os.environ.get("SYNDICATE_TEMPLATE_HTML") or str(TEMPLATE)
+    proc = subprocess.run([NODE, str(script), template], capture_output=True, text=True, timeout=120)
+    assert proc.returncode == 0, proc.stderr
+    return json.loads(proc.stdout)
+
+
+def _cards_by_chip(result: dict) -> dict:
+    return {card["chip"]: card for card in result["cards"]}
+
+
+def test_harness_ran_the_real_chip_load(observed: dict) -> None:
+    # `loadGameChips` swallows every exception into its catch block, so a throw
+    # inside it would leave empty indexes and every assertion below would be
+    # made against a page with no chips at all. Prove the load happened.
+    assert observed["by_commence_time"]["chips_indexed_by_id"] == 2
+
+
+def test_exact_index_keeps_both_halves(observed: dict) -> None:
+    assert observed["exact_index"] == {"abbr": 2, "full_name": 2}
+
+
+@pytest.mark.parametrize("name", ["by_commence_time", "by_game_key"])
+def test_each_half_joins_its_own_chip_and_card(observed: dict, name: str) -> None:
+    result = observed[name]
+    mlb = f"mlb|{G1_EVENT}", f"mlb|{G2_EVENT}"
+    assert result["row_chip"] == {mlb[0]: "823543", mlb[1]: "823494"}
+    cards = _cards_by_chip(result)
+    assert len(result["cards"]) == 2, result["cards"]
+    assert cards["823543"]["count"] == 3 and cards["823543"]["key"] == mlb[0]
+    assert cards["823494"]["count"] == 2 and cards["823494"]["key"] == mlb[1]
+    # A click on either card filters the board to that half only.
+    assert result["merged_to"] == {mlb[0]: mlb[0], mlb[1]: mlb[1]}
+
+
+def test_no_discriminator_attaches_no_chip(observed: dict) -> None:
+    result = observed["no_discriminator"]
+    assert set(result["row_chip"].values()) == {None}
+    # No card that carries opportunities is wearing either half's scoreboard.
+    assert all(card["chip"] is None for card in result["cards"] if card["count"])
+    # The two chip-seeded cards each still show their OWN game's scoreboard.
+    assert sorted(card["chip"] for card in result["cards"] if not card["count"]) == ["823494", "823543"]
+
+
+def test_a_half_with_no_rows_keeps_its_own_chip(observed: dict) -> None:
+    # The count-0 card seeded from G2's chip must show G2, not re-join the pair.
+    result = observed["g2_has_no_rows"]
+    assert sorted((card["chip"], card["count"]) for card in result["cards"]) == [("823494", 0), ("823543", 3)]
+
+
+def test_halves_not_merged_when_one_chip_is_missing(observed: dict) -> None:
+    result = observed["one_chip_missing"]
+    assert sorted(card["count"] for card in result["cards"]) == [2, 3], result["cards"]
+
+
+def test_chipless_halves_not_merged_but_same_game_still_is(observed: dict) -> None:
+    assert sorted(card["count"] for card in observed["no_chips"]["cards"]) == [2, 3]
+    # Two ids for ONE game (same commence time) still collapse -- #165's merge.
+    assert [card["count"] for card in observed["no_chips_same_game_two_ids"]["cards"]] == [5]
+
+
+def test_starts_it_cannot_separate_are_refused(observed: dict) -> None:
+    assert set(observed["inseparable_starts"]["row_chip"].values()) == {None}
+
+
+def test_single_chip_pair_behaves_as_before(observed: dict) -> None:
+    # One chip on the pair: it is the game, even with a commence time a day off
+    # (the page keeps its own date filtering; this join does not add one).
+    result = observed["single_game_pair"]
+    assert list(result["row_chip"].values()) == ["823600"]
+    assert [(card["chip"], card["count"]) for card in result["cards"]] == [("823600", 1)]
+
+
+def test_one_game_listed_twice_is_one_candidate(observed: dict) -> None:
+    result = observed["same_game_listed_twice"]
+    assert set(result["row_chip"].values()) == {"823543"}
+    assert [(card["chip"], card["count"]) for card in result["cards"]] == [("823543", 3)]

@@ -2208,12 +2208,36 @@
       const looseCollisions = new Set();
       const byCanonical = new Map();
       const canonicalCollisions = new Set();
+      // THE EXACT INDEX HOLDS EVERY CHIP ON A MATCHUP, NOT THE LAST ONE SEEN.
+      // It was `Map.set`, so on a doubleheader the later game silently owned
+      // the key -- measured on production 2026-09-22, TB @ NYY: G1 (gamePk
+      // 823543, 17:05Z) and G2 (823494, 23:05Z) share both the abbr and the
+      // full-name key, so every board row for EITHER half joined G2's chip, the
+      // two halves merged into one rail card, and G1's chip was left unclaimed
+      // and seated as a second, empty card. The canonical and loose indexes
+      // below refuse a collision outright; this one keeps the candidates and
+      // lets `chipForGame` choose on the row's own start time, or refuse.
+      // One GAME listed twice (same `game_key`) is still one game, so it
+      // replaces its earlier entry the way `byId` does rather than becoming a
+      // second candidate that could never be told apart from the first.
+      const addExactMatchup = (indexKey, chip) => {
+        const list = byMatchup.get(indexKey);
+        if (!list) {
+          byMatchup.set(indexKey, [chip]);
+          return;
+        }
+        if (list.includes(chip)) return;
+        const chipKey = String(chip.game_key || "").trim();
+        const sameGame = chipKey ? list.findIndex((other) => String(other.game_key || "").trim() === chipKey) : -1;
+        if (sameGame >= 0) list[sameGame] = chip;
+        else list.push(chip);
+      };
       for (const chip of chips) {
         const sport = String(chip.sport || "").toLowerCase();
         const key = String(chip.game_key || "").trim();
         if (key) byId.set(`${sport}|${key}`, chip);
         const matchup = String(chip.matchup || "").trim().toLowerCase();
-        if (matchup) byMatchup.set(`${sport}|${matchup}`, chip);
+        if (matchup) addExactMatchup(`${sport}|${matchup}`, chip);
         // #365: ALSO index by FULL NAMES, because chip.matchup is built from
         // ABBREVIATIONS ("CLE @ DET") while a Layer 2 board row's matchup is
         // built from full names ("Cleveland Guardians @ Detroit Tigers"). Both
@@ -2228,7 +2252,7 @@
         // status/score/start time all live on the chip, not on the board row.
         const awayName = String((chip.away || {}).name || "").trim().toLowerCase();
         const homeName = String((chip.home || {}).name || "").trim().toLowerCase();
-        if (awayName && homeName) byMatchup.set(`${sport}|${awayName} @ ${homeName}`, chip);
+        if (awayName && homeName) addExactMatchup(`${sport}|${awayName} @ ${homeName}`, chip);
         // A THIRD INDEX, NORMALIZED, because the two above are both EXACT and
         // soccer is the sport where exact never holds. Chip names come from the
         // league's own card builder ("CF Montréal", "Atlanta United FC"); a
@@ -2344,8 +2368,16 @@
     // what the card HEAD prints, and "LA LIGA" is a better label than "SOCCER";
     // only the join moves to the slug.
     const sport = String(group.sportSlug || group.sport || "").toLowerCase();
+    // THE ROW'S OWN GAME, WHEN THE SERVER NAMED IT. A Layer 2 row's id is the
+    // OddsAPI event hash and a chip's is the gamePk, so the lookup above never
+    // hits for an MLB board row and every one fell to the team-pair indexes --
+    // which cannot tell a doubleheader's halves apart (2026-09-22 TB @ NYY, see
+    // `addExactMatchup` in `loadGameChips`). `game.game_key` is the chip id the
+    // server's game-block join already chose on start time, so it is exact.
+    const ownGameKey = String(group.ownGameKey || "").trim();
+    if (ownGameKey && gameChipsById.has(`${sport}|${ownGameKey}`)) return gameChipsById.get(`${sport}|${ownGameKey}`);
     const matchup = String(group.matchup || "").trim().toLowerCase();
-    const exact = gameChipsByMatchup.get(`${sport}|${matchup}`);
+    const exact = pickChipByStart(gameChipsByMatchup.get(`${sport}|${matchup}`), group);
     if (exact) return exact;
     // Before the normalised index, because this is a LOOKUP and that is an
     // approximation. Both sides were stamped by the same server-side alias map
@@ -2364,6 +2396,58 @@
     const sides = matchup.split(" @ ");
     if (sides.length !== 2) return null;
     return gameChipsByMatchupLoose.get(`${sport}|${normalizeClubName(sides[0])} @ ${normalizeClubName(sides[1])}`) || null;
+  }
+
+  // A TEAM PAIR IS NOT A GAME ON A DOUBLEHEADER. The browser half of the
+  // server's rule (`syndicate/features/shared/doubleheader.py`
+  // `pick_by_start_time`, same 45-minute separation): the two halves are hours
+  // apart and a book's `commence_time` sits within minutes of first pitch, so
+  // two candidates the row's start cannot separate by 45 minutes are refused.
+  const DOUBLEHEADER_MIN_SEPARATION_MS = 45 * 60 * 1000;
+
+  function chipStartMs(value) {
+    const text = String(value == null ? "" : value).trim();
+    if (!text) return null;
+    const parsed = Date.parse(text);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  // The row's own game id and start, carried onto the group so `chipForGame`
+  // can separate a doubleheader. `game` is the server's game block (its
+  // `game_key` is the chip id, chosen on start time); `commence_time` is the
+  // odds feed's own clock and is preferred for that reason.
+  function rowOwnGameKey(item) {
+    const game = item && item.game && typeof item.game === "object" ? item.game : null;
+    return String((game && game.game_key) || "").trim() || null;
+  }
+
+  function rowCommenceTime(item) {
+    const game = item && item.game && typeof item.game === "object" ? item.game : null;
+    return String((item && item.commence_time) || (game && game.start_time_utc) || "").trim() || null;
+  }
+
+  // One chip from an exact-index entry. A lone chip is returned exactly as
+  // before (a bare chip, not an array, is accepted too -- the shape every
+  // index held until 2026-09-22). Several chips on one matchup: the one whose
+  // start is nearest the group's own start, only when the runner-up is at
+  // least 45 minutes farther. No start on the group, an untimed chip, or two
+  // starts it cannot separate -> null: the card goes chip-less rather than
+  // carrying the other game's score and clock.
+  function pickChipByStart(found, group) {
+    if (!found) return null;
+    if (!Array.isArray(found)) return found;
+    if (found.length < 2) return found[0] || null;
+    const target = chipStartMs(group && group.commenceTime);
+    if (target === null) return null;
+    const ranked = [];
+    for (const chip of found) {
+      const at = chipStartMs(chip && chip.start_time_utc);
+      if (at === null) return null;
+      ranked.push({ gap: Math.abs(at - target), chip });
+    }
+    ranked.sort((a, b) => a.gap - b.gap);
+    if (ranked[1].gap - ranked[0].gap < DOUBLEHEADER_MIN_SEPARATION_MS) return null;
+    return ranked[0].chip;
   }
 
   // The card head's left label. THE CHIP'S LEAGUE WINS, because it is a fact
@@ -2433,6 +2517,8 @@
       matchup: displayMatchup(item) || "",
       awayKey: String(item.away_key || "").trim().toLowerCase() || null,
       homeKey: String(item.home_key || "").trim().toLowerCase() || null,
+      ownGameKey: rowOwnGameKey(item),
+      commenceTime: rowCommenceTime(item),
     });
     const league = chip ? String(chip.league_display || "").trim() : "";
     return league ? league.toUpperCase() : fallback;
@@ -2570,9 +2656,15 @@
           // every consumer treats them as optional rather than required.
           awayKey: String(item.away_key || "").trim().toLowerCase() || null,
           homeKey: String(item.home_key || "").trim().toLowerCase() || null,
+          // The game's own id and start, for the doubleheader join -- see
+          // `pickChipByStart`. Backfilled below from any row, like the keys.
+          ownGameKey: rowOwnGameKey(item),
+          commenceTime: rowCommenceTime(item),
         });
       }
       const group = groups.get(key);
+      if (!group.ownGameKey) group.ownGameKey = rowOwnGameKey(item);
+      if (!group.commenceTime) group.commenceTime = rowCommenceTime(item);
       // THE JOIN KEYS ARE A FACT ABOUT THE GAME, NOT ABOUT WHICHEVER ROW WAS
       // SEATED FIRST. The group above is built from its first row only, and
       // the two soccer row families disagree on what they carry: the steam /
@@ -2673,6 +2765,51 @@
     // groups, 35 chip-resolved, exactly 2 chips hit by more than one group --
     // both NFL. Every other sport was already clean, so this adds two merges
     // and changes nothing else.
+    //
+    // TWO STARTS HOURS APART ARE TWO GAMES, WHATEVER THE TEXT SAYS. Measured on
+    // production 2026-09-22: TB @ NYY's doubleheader halves (OddsAPI commence
+    // 17:06Z and 23:06Z) were one rail card holding both games' opportunities.
+    // `chipForGame` now separates them when it can; this is the guard for when
+    // it cannot (one half's chip missing from the feed, or neither resolving a
+    // chip at all, where the chip-less text+date rule below would merge them).
+    // Every cluster is split on the groups' OWN `commenceTime`, single-linkage
+    // at the 45-minute doubleheader separation. It is not a date check -- #165
+    // follow-up #3's stray duplicate carried a wrong DATE and no commence time,
+    // and a group with no commence time splits nothing: fewer than two timed
+    // groups returns the cluster exactly as it came in. Untimed groups join the
+    // part whose times sit around the chip's start (the chip's own game), or
+    // stay together on their own when that is not exactly one part.
+    const splitByStartTime = (keys, chip) => {
+      const timed = [];
+      const untimed = [];
+      for (const key of keys) {
+        const at = chipStartMs(groups.get(key).commenceTime);
+        if (at === null) untimed.push(key);
+        else timed.push({ at, key });
+      }
+      if (timed.length < 2) return [keys];
+      timed.sort((a, b) => a.at - b.at);
+      const parts = [];
+      for (const entry of timed) {
+        const last = parts[parts.length - 1];
+        if (last && entry.at - last.lastAt < DOUBLEHEADER_MIN_SEPARATION_MS) {
+          last.keys.push(entry.key);
+          last.lastAt = entry.at;
+        } else {
+          parts.push({ firstAt: entry.at, lastAt: entry.at, keys: [entry.key] });
+        }
+      }
+      if (parts.length < 2) return [keys];
+      if (untimed.length) {
+        const anchor = chip ? chipStartMs(chip.start_time_utc) : null;
+        const home = anchor === null
+          ? []
+          : parts.filter((part) => anchor > part.firstAt - DOUBLEHEADER_MIN_SEPARATION_MS && anchor < part.lastAt + DOUBLEHEADER_MIN_SEPARATION_MS);
+        if (home.length === 1) home[0].keys.push(...untimed);
+        else parts.push({ keys: untimed });
+      }
+      return parts.map((part) => part.keys);
+    };
     gameKeyMergeMap = new Map();
     const clusters = [];
     const chipClusters = new Map();
@@ -2699,8 +2836,9 @@
       // check -- WSH @ ATL's stray duplicate carried its own RESOLVABLE BUT
       // WRONG date (824892 stamped 07-31 while showing the same live score as
       // 824894, dated 07-30), so a date guard here would stop merging it.
+      // (The commence-time split is not that guard: see `splitByStartTime`.)
       if (byText.size < 2) {
-        clusters.push(chipKeys);
+        clusters.push(...splitByStartTime(chipKeys, chip));
         continue;
       }
       // Text DIFFERS -- the new cross-text case, and the one place a wrong
@@ -2724,9 +2862,9 @@
           return !date || !chipDate || date === chipDate;
         });
         if (compatible) joined.push(...textKeys);
-        else clusters.push(textKeys);
+        else clusters.push(...splitByStartTime(textKeys, chip));
       }
-      clusters.push(joined);
+      clusters.push(...splitByStartTime(joined, chip));
     }
     if (chiplessKeys.length) {
       // A group with NO chip has no identity signal to cluster on, so it falls
@@ -2761,7 +2899,7 @@
           if (!dateClusters.has(clusterKey)) dateClusters.set(clusterKey, []);
           dateClusters.get(clusterKey).push(key);
         }
-        clusters.push(...dateClusters.values());
+        for (const dateKeys of dateClusters.values()) clusters.push(...splitByStartTime(dateKeys, null));
       }
     }
     for (const clusterKeys of clusters) {
@@ -2883,6 +3021,12 @@
         // card. The chip's own state is the only honest answer here.
         allFinal: chip.state === "final",
         fallbackDate: null,
+        // Its OWN chip's id and start. `key` above is `chip|...`, which the id
+        // index never holds, so without these a doubleheader half seated here
+        // re-joined through the team pair -- the other half's chip before
+        // 2026-09-22, no chip at all once that index began refusing to guess.
+        ownGameKey: String(chip.game_key || "").trim() || null,
+        commenceTime: chip.start_time_utc || null,
       });
     }
 
