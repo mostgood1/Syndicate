@@ -410,6 +410,43 @@ def tracked_week() -> dict[str, int] | None:
     return {"season": season, "week": week}
 
 
+# Keyed on (path, mtime): the week lists are built on the request path, several
+# times per page, and a projection file only changes when it is regenerated.
+_BACKFILL_VERDICTS: dict[str, tuple[float, bool]] = {}
+
+
+def is_preseason_backfill_projection(path: Path) -> bool:
+    """True for a week >= 2 projection file in which NO row carries current-season
+    data -- i.e. it was built before any of that season was played.
+
+    Measured 2026-09-22: web's disk held the 2026-08-01 backfill for weeks 4-18
+    (`prior_season_fallback` on every team) beside the live pipeline's weeks 1-3,
+    so every NFL week list offered weeks 4-18 with pre-season numbers and the
+    market board defaulted to week 18. From week 2 on, a live build always has
+    current-season plays (`current_season_blend` / `current_season_rolling`).
+    Week 1 is legitimately prior-season only and is never flagged. Checked over
+    every git-tracked file: no 2025 week >= 2 matches; every 2026 backfill does.
+    """
+    match = _SMARTSIM2_PROJECTION_FILENAME_RE.match(path.name)
+    if not match or int(match.group("week")) < 2:
+        return False
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return False
+    cached = _BACKFILL_VERDICTS.get(str(path))
+    if cached is not None and cached[0] == mtime:
+        return cached[1]
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            sources = [str(row.get("rating_source") or "") for row in csv.DictReader(handle)]
+    except (OSError, csv.Error):
+        return False
+    verdict = bool(sources) and not any("current_season" in source for source in sources)
+    _BACKFILL_VERDICTS[str(path)] = (mtime, verdict)
+    return verdict
+
+
 def _smartsim2_standalone_seasons_and_weeks() -> dict[int, list[int]]:
     """Every real (season, week) with an already-generated real Monte
     Carlo projection artifact on disk -- independent of whether
@@ -424,7 +461,7 @@ def _smartsim2_standalone_seasons_and_weeks() -> dict[int, list[int]]:
     result: dict[int, list[int]] = {}
     for path in source_root.glob("smartsim2_projections_*_wk*.csv"):
         match = _SMARTSIM2_PROJECTION_FILENAME_RE.match(path.name)
-        if not match:
+        if not match or is_preseason_backfill_projection(path):
             continue
         season = int(match.group("season"))
         week = int(match.group("week"))

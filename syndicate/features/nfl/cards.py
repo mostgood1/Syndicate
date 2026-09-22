@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import glob
+from pathlib import Path
 import json
 import os
 import re
@@ -19,6 +20,7 @@ from syndicate.features.nfl.smartsim2_projection import read_projection_artifact
 from syndicate.features.nfl.sources import available_weeks
 from syndicate.features.nfl.sources import build_module_links
 from syndicate.features.nfl.sources import default_nfl_source_root
+from syndicate.features.nfl.sources import is_preseason_backfill_projection
 from syndicate.features.nfl.sources import smartsim2_projection_path
 from syndicate.features.nfl.sources import default_week
 from syndicate.features.nfl.sources import latest_season
@@ -2183,7 +2185,8 @@ def nfl_projection_available_weeks(season: int) -> list[int]:
     weeks: list[int] = []
     for path in glob.glob(pattern):
         match = re.search(r"_wk(\d+)\.csv$", path)
-        if match:
+        # A week whose only file is the pre-season backfill is not offered.
+        if match and not is_preseason_backfill_projection(Path(path)):
             weeks.append(int(match.group(1)))
     return sorted(set(weeks))
 

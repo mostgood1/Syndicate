@@ -1174,6 +1174,14 @@ death, never life — do not invert it.
 - Verification: a written attribution in deploys.md with the per-cycle numbers, plus the OOM count for refresh-worker over the event history the API returns. Read-only: no deploy, no env change; a fix, if any, opens its own claim.
 - Blocked by: none
 
+### nfl-hide-backfill-weeks — OPEN — opened 2026-09-22 — session dae18452-227b-42cc-a4f4-a4a4ee4cec3e
+- Goal: NFL week lists (cards / picks / live lens / archive via `available_weeks`, and the market board via `nfl_projection_available_weeks`) omit weeks whose only projection is the 2026-08-01 pre-season backfill; requesting such a week falls back to the default week. User: "hide the future weeks that only have old projections".
+- Files: `syndicate/features/nfl/sources.py` (`_smartsim2_standalone_seasons_and_weeks` + a new `is_preseason_backfill_projection` ONLY), `syndicate/features/nfl/cards.py` (`nfl_projection_available_weeks` ONLY), `tests/test_nfl_hide_backfill_weeks.py` (NEW).
+- Rule (content, not date): a week >= 2 projection file in which NO row carries current-season data (`rating_source` never contains `current_season`) was built before any of that season was played. Week 1 is exempt (legitimately prior-season only). Checked over every git-tracked file: 2025 wk2-18/22 all carry current-season data (none would hide); 2025 wk1 exempt; 2026 wk1-18 git copies carry none. Web's disk: wk1-3 live (wk2 `current_season_rolling`, wk3 `current_season_blend`), wk4-18 the backfill (measured wk4/wk18 `prior_season_fallback`, generated 2026-08-01).
+- Falsification test: after the web deploy, `/nfl/api/weeks` or the market board still lists week 4+, or a live week (1-3) disappears.
+- Verification: tests fail on old code / pass on new; after a user-approved web deploy, `/nfl/api/weeks` `available_weeks` for 2026 = [1, 2, 3], `/nfl/api/market-board` `available_weeks` = [1, 2, 3], `?week=18` on the market board and cards falls back to week 3, and week 3 still serves 16 games.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
