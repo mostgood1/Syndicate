@@ -1488,3 +1488,23 @@ alone and failed only in a parallel run. Fix landed as **`70d9b4a7`** (verified 
 `ba732005` from lane `data-mirror-write-guard-sweep` was SKIPPED on rebase and is
 NOT on main — do not go looking for it. Found independently by both lanes. **A cache key coarser than the predicate it
 caches is a correctness bug, not a performance trade.**
+
+
+## [live-gameline-ledger-key] THE LIVE-GAMELINE LEDGER MERGED UP TO 14 GAMES INTO ONE RECORD - the key had no `event_id` and `game_pk` is usually absent `[verified 2026-09-22, lane dh-grading-ledger-joins]`
+
+`record_key` was `(game_pk, segment, market, line, books_key)`. `game_pk` comes from the live-gameline projection and is NOT set on the segment-refusal path, so on a normal slate most records carry no game identity at all - production 2026-09-22: **25 of 132 records had one**. Two different games then collide whenever segment, market, line and `books_key` agree, and `_moved` dedupes on the answer, keeping whichever landed last.
+
+Counted over production ledger files (read 2026-09-22 20:4xZ):
+
+    date        records  old keys  keys spanning >1 game  worst                    game_pk present
+    2026-09-20    1,250       653                     13  ONE key over 14 games    261 of 1,250
+    2026-09-21      746       407                      2  3 games each             375 of 746
+    2026-09-04    3,041       639                      1  a doubleheader's halves  3,041 of 3,041
+    2026-08-29    5,554       383                      2  same                     5,554 of 5,554
+    2026-09-22      132       111                      0  --                        25 of 132
+
+The 09-04 and 08-29 collisions are the doubleheader shape with a PRESENT gamePk: both halves carried 824424 / 823177, because the live-gameline index was keyed on the team pair. A present `game_pk` did not separate them; `event_id` does.
+
+`d25664f0` (refresh-worker, live 2026-09-22T21:04:52Z) appends `event_id` as a sixth slot, leaving the existing prefix unchanged. **No migration:** every record already carries `event_id` and the previous-observation map is rebuilt from the file each run, so an existing file re-keys consistently; the change can only SPLIT records that were wrongly merged, never merge separate ones.
+
+**NOT measured:** records appended after 21:04:52Z (none yet at 21:05:13Z - the worker had just rebooted and appends during board builds), and a later date's census showing one record per event where the old key spanned several. Anything downstream that read this ledger before 2026-09-22 was reading a history de-duplicated ACROSS GAMES on the affected keys.
