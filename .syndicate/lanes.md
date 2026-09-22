@@ -1163,6 +1163,14 @@ death, never life — do not invert it.
 - Verification: test fails on old code / passes on new; after a user-approved web deploy, the served payload's `week` equals the target week and its `source_path` names that week's file; an explicit `?week=18` still returns 18.
 - Blocked by: none
 
+### refresh-worker-oom-0922 — OPEN — opened 2026-09-22 — session f134a8b3-915e-4818-9888-74a031242421
+- Goal: explain the refresh-worker `oomKilled` (4Gi) at 2026-09-22 04:08:47Z (23:08 CDT 09-21): name the process and stage that took the container from ~3.8 GB `memory.current` (anon ~2.1 GB, inactive_file ~1.6 GB) to 4 GiB, and say whether it recurs (other OOMs in the event history with the same shape).
+- Files: none
+- Hypothesis (written 2026-09-22 ~15:3xZ / 10:3x CDT, BEFORE testing; evidence so far: main pid 39 RSS flat 1805 MB 04:07-04:08:18Z, last stage `board_contract_end` right after `[INTEL_TRACE] evaluation_bundle duration_ms=154699` at 04:08:36.79Z, watchdog anon 2052->2403 MB at 175.6 MB/s at 04:08:37Z then 10 s with no samples; an MLB fingerprint resim (`changed_games=2`, 823169/824787, launched 04:01:36Z) running as a subprocess tree): **H1** the intelligence-state cycle's post-`evaluation_bundle` stage (state assembly / serialize / publish) in pid 39 adds >1 GB anon in seconds, and that alone reaches the cap with ~2.2 GB already unreclaimable. **H2** the MLB resim's sim children (`--workers 2`) grew in the unobserved 10 s. **H3** reclaimable page cache (~1.5 GB) was not reclaimable in time (dirty/writeback from a big publish), so the effective cap was lower than 4 GiB minus anon.
+- Falsification test: H1 is falsified if earlier intelligence-state cycles on the same boot show NO anon climb >=~500 MB in the seconds after `evaluation_bundle`. H2 is falsified if MLB fingerprint resims on earlier nights never take their children above a few hundred MB combined. H3 is weakened if the other OOMs in the history happened with small inactive_file.
+- Verification: a written attribution in deploys.md with the per-cycle numbers, plus the OOM count for refresh-worker over the event history the API returns. Read-only: no deploy, no env change; a fix, if any, opens its own claim.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
