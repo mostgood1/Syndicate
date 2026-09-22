@@ -39988,3 +39988,18 @@ User asked, after the NHL fix: "now check the same for NBA and WNBA compact card
 
 **The upstream is not the limit, and that was checked before writing any code:** CFBD `/games?year=2026&week=4&seasonType=regular&classification=fbs` returned **71 games, `startTimeTBD: False` on 71 of 71**, kickoffs 19:30Z x12 / 16:00Z x11 / 23:00Z x7 / 23:30Z x6 (read 19:0xZ with the production key). Our worker's copy still flagged 43. ESPN agrees (63 of 65 timed).
 Claim released after this entry.
+
+## 2026-09-22 19:31:55Z -> live 19:35:19Z (2:31-2:35 PM CT) — web `3ba363ff` -> `ec620c7d` (`dep-dapdfasja7ms73aulkng`) — lane `home-page-embed-size` — **SIZE VERIFIED (-61%); LATENCY LARGELY UNMOVED, so the embed was NOT the dominant cost**
+
+**User decision (chat):** "Deploy web now". Claim 19:30:52Z (free), preflight CLEAR 19:31:46Z, released 19:50Z. **Carries** `ec620c7d` (this lane) and `97066dbe` (lane `ncaaf-tbd-kickoff-cache`, already live on refresh-worker 19:15:35Z; its verification is its own).
+
+    field                                   baseline 19:30:52Z (warm)      predicted        measured
+    live_commit                             3ba363ff                       ec620c7d         ec620c7d (live 19:35:19Z)
+    `/` page bytes                          31,233,724 (4,569,989 gzip)    ~13.5 M          12,225,709 (1,817,193 gzip) -- **-61%**
+    embed chars                             30,994,816                     ~13.5 M          11,986,801
+    `ranked_all` rows                       3,270                          unchanged        3,279 (slate grew; board renders the same way)
+    declarations                            none                           both             `_embed_dropped: ["board_contract.cards"]`, `_dropped_row_fields: ["trace","score_breakdown"]`; rows carry neither field
+    `/` server duration (access log)        median 7,843 ms, p90 15,188, max 25,063 (n=10, 19:00-19:31Z)   below 4.4 s   median **7,600 ms**, p90 8,554, max 12,562 (n=11, 19:42Z+, warm)
+    direct TTFB (single client)             4.45 / 11.68 / 4.94 s          lower            2.90 / 2.96 / 3.38 s warm (36 / 34 / 49 s during the first ~6 min of boot)
+
+**THE PREDICTION ON LATENCY IS NOT MET AND THE READING IS WHY IT MATTERS.** Server-side median moved 7,843 -> 7,600 ms (-3%, n=10/11 -- inside noise), while the p90 and max halved. So SERIALISING 19 MB was not what the page spends its seconds on; **building** the response is (`read_combined_intelligence_response` + `_hydrate_board_response_payload` per request, uncached). The size win is real and independently useful (bandwidth: gzip 4.57 -> 1.82 MB per home request, against the 919-1,157 MB/h spikes the bandwidth tripwire recorded). **Do not read this deploy as "the home page is fixed".** Next lever, unmeasured: cache the hydrated+slimmed payload per (state fingerprint, date) so repeat requests skip the build.
