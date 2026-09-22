@@ -39723,3 +39723,15 @@ All WARMED lines are `sport=all`. `WARM_FAILED` 0, `WARMER_ERROR` 0, `WARMER_OFF
 
 Orders placed (real money): `tsc-cfb-tcu-ucf-2026-09-26-total-49pt5` over 49.5 at +108, $1.05 (plan 4.0%, 4.17% at the 0.48 ask); `tsc-mlb-cws-kc-2026-09-22-8pt5` over 8.5 at +120, $1.13 (Kelly ratio 0.979 for the price move). The third position was refused by a PER-LINE gate, `commence_unknown` (an MLB strikeouts prop with no commence_time). `Traceback` since 14:21Z: none.
 **The 13:47:19Z entry's owed (c)/(d) are DISCHARGED here:** every `POLYMARKET_PRICED_AT_ASK` line after the change carries `ev_at_ask_pct` and no `fee_bound`; both rows at/above the 2% minimum placed.
+
+## 2026-09-22 14:43:11Z -> live 14:46:28Z (9:43-9:46 AM CT) — live-odds-worker `210dd3aa` -> `c11d3730` (`dep-dap97vqjnfac73avl3c0`) — lane `nfl-live-lens-stale-projections` — **VERIFIED: the NFL live lens serves the live projections, 16/16**
+
+**User decision (chat, asked directly):** "Deploy when clear". Claim acquired 14:42:46Z (free), preflight `CLEAR: only infrastructure processes running` 14:43:03Z, released ~14:49Z. **Carries** only this session's code beyond `210dd3aa`: `22f4f536` (board projection guard, already verified on refresh-worker `3d9058b3`; `nfl_game_projections.py` is not on live-odds-worker's board path) and `c11d3730` (this lane). Everything else in range is ledger / evidence files.
+
+    field                                            baseline 14:42:46Z                                   predicted               measured
+    live_commit                                      210dd3aa                                             c11d3730                c11d3730 (live 14:46:28Z)
+    live-odds-worker log NFL_PROJECTION_PULL         none                                                 present for wk3          `[live_lens_loop] NFL_PROJECTION_PULL path=nfl_source/smartsim2_projections_2026_wk3.csv ok=True written=1` 14:47:51Z
+    /nfl/api/live-lens source_path                   /opt/render/project/src/data/nfl_source/..._wk3.csv  /opt/render/project/data/...   /opt/render/project/data/nfl_source/smartsim2_projections_2026_wk3.csv (snapshot generated 14:47:51Z)
+    lens games matching /nfl/api/cards?week=3        0/16 (16/16 matched the checkout's 2026-08-01 file)  16/16                   16/16 (home and away means within 0.06)
+
+The last pre-fix snapshot (generated 14:45:00Z, old process) still read the checkout; the first snapshot after the pull is correct. **verify:** the table.
