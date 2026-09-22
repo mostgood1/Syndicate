@@ -72,9 +72,9 @@ def _env_bool(name: str, *, default: bool = False) -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
-# Last-resort backstop only. With the lock container-local AND pid-checked, this
-# fires just for PID reuse inside one long-lived container -- not for the
-# cross-boot case, which cannot happen any more.
+# Last-resort backstop only. PID reuse inside one container is now caught by the
+# holder's kernel start time (`_process_start_marker`); this remains for a
+# platform with no /proc, where the pid is all the lock can record.
 _BOOTSTRAP_LOCK_MAX_AGE_SECONDS = 1800
 
 
@@ -103,6 +103,34 @@ def _pid_is_running(pid: int) -> bool:
         # backstop still breaks a lock that reads "alive" forever.
         return True
     return True
+
+
+def _process_start_marker(pid: int) -> str | None:
+    """The kernel's start time for `pid` (field 22 of /proc/<pid>/stat), or None.
+
+    A pid alone does not name a process: measured 2026-09-22, Render's
+    health-check SIGTERM restarts gunicorn IN THE SAME CONTAINER (so the temp-dir
+    lock survives), the killed sync never ran its `finally`, and the re-booted
+    workers logged `[bootstrap] SKIP a live sibling holds the lock pid=62
+    age=291s` -- pid 62 by then belonged to some other process. pid + start time
+    is unique for the life of the kernel. None where /proc does not exist; the
+    caller then falls back to pid liveness alone.
+    """
+    try:
+        with open(f"/proc/{int(pid)}/stat", encoding="utf-8") as handle:
+            return _start_time_from_proc_stat(handle.read())
+    except (OSError, ValueError):
+        return None
+
+
+def _start_time_from_proc_stat(stat: str) -> str | None:
+    """Field 22 (`starttime`) of a /proc/<pid>/stat line. `comm` (field 2) is
+    parenthesised and may itself contain spaces or ')', so fields are counted
+    from the LAST ')': what follows it starts at field 3."""
+    if ")" not in stat:
+        return None
+    fields = stat.rsplit(")", 1)[1].split()
+    return fields[19] if len(fields) > 19 else None
 
 
 def _bootstrap_lock_path() -> str:
@@ -188,41 +216,56 @@ def _bootstrap_render_data(bootstrap_main: Callable[[], int] | None = None) -> N
                         flush=True,
                     )
                     return False
+                # "<pid> <kernel start time>", or the bare pid where /proc does
+                # not exist. The start time is what tells a live holder from a
+                # different process that has since been given the same pid.
+                pid = os.getpid()
+                marker = _process_start_marker(pid)
+                record = f"{pid} {marker}" if marker else str(pid)
                 try:
-                    os.write(fd, str(os.getpid()).encode("utf-8"))
+                    os.write(fd, record.encode("utf-8"))
                 finally:
                     os.close(fd)
                 return True
 
-            def _lock_holder() -> tuple[int, float]:
+            def _lock_holder() -> tuple[int, str | None, float]:
                 try:
                     with open(lock_path, encoding="utf-8") as handle:
-                        holder = int((handle.read() or "").strip() or 0)
+                        parts = (handle.read() or "").split()
+                    holder = int(parts[0]) if parts else 0
+                    marker = parts[1] if len(parts) > 1 else None
                 except (OSError, ValueError):
-                    holder = 0
+                    holder, marker = 0, None
                 try:
                     age = max(0.0, time.time() - os.path.getmtime(lock_path))
                 except OSError:
                     age = 0.0
-                return holder, age
+                return holder, marker, age
 
             # Every branch below PRINTS. `logger.info` does not reach Render's
             # log collector, and a silent skip is what made the 2026-08-20
             # incident invisible: the boot that dropped its sync looked exactly
             # like a boot that had nothing to do.
             if not _take_lock():
-                holder, age = _lock_holder()
+                holder, marker, age = _lock_holder()
                 alive = _pid_is_running(holder)
-                if alive and age < _BOOTSTRAP_LOCK_MAX_AGE_SECONDS:
+                # A recorded start time that no longer matches means the pid was
+                # REUSED: the holder died (an in-place gunicorn restart after a
+                # health-check SIGTERM) and something else now has its number.
+                # An unreadable current start time is not evidence of reuse, so
+                # it falls back to pid liveness, as before.
+                current = _process_start_marker(holder) if alive and marker else None
+                reused = bool(marker and current and current != marker)
+                if alive and not reused and age < _BOOTSTRAP_LOCK_MAX_AGE_SECONDS:
                     print(
                         f"[bootstrap] SKIP a live sibling holds the lock "
-                        f"pid={holder} age={age:.0f}s",
+                        f"pid={holder} start={marker or '?'} age={age:.0f}s",
                         flush=True,
                     )
                     return
                 print(
                     f"[bootstrap] RECLAIM stale lock pid={holder} alive={alive} "
-                    f"age={age:.0f}s -- its holder is gone, so this boot syncs",
+                    f"reused={reused} age={age:.0f}s -- its holder is gone, so this boot syncs",
                     flush=True,
                 )
                 try:
@@ -233,7 +276,11 @@ def _bootstrap_render_data(bootstrap_main: Callable[[], int] | None = None) -> N
                     print("[bootstrap] SKIP another worker won the reclaim race", flush=True)
                     return
 
-            print(f"[bootstrap] LOCK pid={os.getpid()} path={lock_path}", flush=True)
+            print(
+                f"[bootstrap] LOCK pid={os.getpid()} start={_process_start_marker(os.getpid()) or '?'} "
+                f"path={lock_path}",
+                flush=True,
+            )
             try:
                 # Unrelated to the lock, kept from the original: a cold dyno may
                 # not have the mounted root yet.

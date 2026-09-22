@@ -181,6 +181,101 @@ class AppBootstrapTests(unittest.TestCase):
             finally:
                 _remove_lock()
 
+    # --- the lock, after 2026-09-22 -----------------------------------------
+    #
+    # The 2026-08-20 fix moved the lock into the container's temp dir on the
+    # premise that a restart is a NEW container. Measured 2026-09-22 it is not:
+    # Render's health-check SIGTERM restarts gunicorn in place, so the lock
+    # survived, and the re-booted workers logged `SKIP a live sibling holds the
+    # lock pid=62 age=291s` -- pid 62 by then named a different process.
+
+    def _lock_left_by_a_killed_first_boot(self, data_root: str, marker: str) -> str:
+        """What the real writer records mid-sync -- exactly what a SIGTERM that
+        kills the sync thread leaves behind, since its `finally` never runs."""
+        captured: dict[str, str] = {}
+
+        def _sync_that_reads_its_own_lock() -> int:
+            with open(syndicate_app._bootstrap_lock_path(), encoding="utf-8") as handle:
+                captured["record"] = handle.read()
+            return 0
+
+        with patch("syndicate.app._process_start_marker", return_value=marker, create=True):
+            _run_bootstrap_once(_sync_that_reads_its_own_lock, data_root=data_root)
+        with open(syndicate_app._bootstrap_lock_path(), "w", encoding="utf-8") as handle:
+            handle.write(captured["record"])
+        return captured["record"]
+
+    def test_a_killed_holders_lock_is_reclaimed_when_its_pid_now_names_another_process(self) -> None:
+        # THE REGRESSION TEST. The pid is alive; the process behind it is not the
+        # one that took the lock. The old code SKIPPED here for up to 30 min.
+        calls: list[int] = []
+
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                self._lock_left_by_a_killed_first_boot(tmp, marker="1000")
+                with patch("syndicate.app._pid_is_running", return_value=True), patch(
+                    "syndicate.app._process_start_marker", return_value="2000", create=True
+                ):
+                    _run_bootstrap_once(lambda: calls.append(1) or 0, data_root=tmp)
+            finally:
+                _remove_lock()
+
+        self.assertEqual(calls, [1], "a reused pid must not skip this boot's sync")
+
+    def test_a_lock_whose_holder_is_the_same_live_process_still_blocks(self) -> None:
+        # `off != on` for the new check: same pid, SAME start time -> a sibling
+        # that really is mid-sync. Reclaiming here would run two syncs at once.
+        calls: list[int] = []
+
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                self._lock_left_by_a_killed_first_boot(tmp, marker="1000")
+                with patch("syndicate.app._pid_is_running", return_value=True), patch(
+                    "syndicate.app._process_start_marker", return_value="1000", create=True
+                ):
+                    _run_bootstrap_once(lambda: calls.append(1) or 0, data_root=tmp)
+            finally:
+                _remove_lock()
+
+        self.assertEqual(calls, [])
+
+    def test_an_unreadable_start_time_falls_back_to_pid_liveness(self) -> None:
+        # No /proc (or unreadable) is not evidence of reuse: keep the old rule.
+        calls: list[int] = []
+
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                with open(syndicate_app._bootstrap_lock_path(), "w", encoding="utf-8") as handle:
+                    handle.write("4242 1000")
+                with patch("syndicate.app._pid_is_running", return_value=True), patch(
+                    "syndicate.app._process_start_marker", return_value=None, create=True
+                ):
+                    _run_bootstrap_once(lambda: calls.append(1) or 0, data_root=tmp)
+            finally:
+                _remove_lock()
+
+        self.assertEqual(calls, [])
+
+    def test_process_start_marker_is_stable_for_this_process(self) -> None:
+        # The helper itself: a kernel start time on Linux, None where there is
+        # no /proc (this suite also runs on Windows).
+        first = syndicate_app._process_start_marker(os.getpid())
+        self.assertEqual(first, syndicate_app._process_start_marker(os.getpid()))
+        if first is not None:
+            self.assertTrue(first.isdigit())
+        self.assertIsNone(syndicate_app._process_start_marker(-1))
+
+    def test_start_time_is_field_22_even_when_comm_has_spaces_and_parens(self) -> None:
+        # The Linux parse, exercised on any platform. Fields 3..21 are filler
+        # here; field 22 (starttime) is 987654.
+        tail = " ".join(["S"] + [str(n) for n in range(4, 22)] + ["987654", "123", "456"])
+        self.assertEqual(syndicate_app._start_time_from_proc_stat(f"62 (gunicorn) {tail}"), "987654")
+        self.assertEqual(
+            syndicate_app._start_time_from_proc_stat(f"62 (web (worker) 2) {tail}"), "987654"
+        )
+        self.assertIsNone(syndicate_app._start_time_from_proc_stat("62 (short) S 1 2"))
+        self.assertIsNone(syndicate_app._start_time_from_proc_stat(""))
+
     def test_pid_is_running_agrees_with_reality_for_this_process(self) -> None:
         # The helper itself, not a mock of it. Kept portable: a made-up high pid
         # raises OSError rather than ProcessLookupError on some platforms, and
