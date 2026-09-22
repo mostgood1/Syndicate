@@ -39608,3 +39608,22 @@ The 8 games served before the fix kept identical numbers (DET_BUF margin 4.91 ->
     projection interval in process       72000                                   86400                     OWED -- next SEASON_PROJECTION_LAUNCHING line
 
 **What the NFL rebuild should show, from a local REPLAY that is exact:** the real generator run locally at `312d67eb` on nflverse 2026 pbp (fetched 00:07Z) + 2025 pbp, with `SYNDICATE_NFL_RATING_PRIOR_GAMES=0`, reproduces production's 23:47:43Z week-2 file **16/16 `margin_mean` identical (max abs diff 0.0000)**. The same run with the blend: mean |model - close| **12.06 -> 2.63**, max **29.1 -> 7.3**, margin SD **14.26 -> 5.10** (close 5.43); NYG @ LA **-17.82 -> +2.83** (close +8.5). Publish was stubbed out in that run (`artifact_published=False`). **verify:** the first `SEASON_PROJECTION_LAUNCHING sport=nfl` after 00:12:34Z (week 2 due ~2026-09-22 23:48Z at 86400, or week 3's first build), then web's `smartsim2_projections_2026_wk<N>.csv` `rating_source` reads `current_season_blend` and its margin SD is near 5, not 14.
+
+
+## 2026-09-22 00:1xZ — VERIFIED `053ddd9e` (recorder score_v2) and `4ee86561` (venue-order ceiling + pre-submit fee) on refresh-worker `f0e60bec` — deployed by lane `nfl-early-season-rating-shrinkage` (`dep-daosd8142hec7380i76g`, triggered 00:06:56Z, live 00:12:34Z = 7:12 PM CT) — lane `layer2-score-outcome-calibration` — **BOTH HOLD**
+
+**Why this lane did not deploy them:** the NFL lane's user chose "Ship all now" in that session and it deployed origin/main's tip, carrying both of this lane's commits (my user had approved "Bundle into 1:30 AM deploy"). This lane's scheduled task `deploy-recorder-score-v2-0922` is DISABLED as redundant. The env ride-along (`SEASON_PROJECTION_REFRESH_INTERVAL_SECONDS` 72000 -> 86400) and `312d67eb` are that lane's to record.
+
+**A -- recorder (`053ddd9e`), records written after 00:12:34Z (read ~00:17Z):** 770 new records (2026-09-21 board date: wnba 758, mlb 10, nhl 2). All four keys on **770/770**; `s2` non-null on **758/759** scored (`sc` non-null) records; `bk` non-null **770/770**. Fee basis: none 726, kalshi_assumed_full_rate 25, polymarket_measured_notional 4, kalshi_series 3, null 12. Predictions (every record keyed; >= 95% s2 on scored; >= 95% bk) **HELD**.
+
+**B -- venue plans (`4ee86561`), `/api/portfolio/paper?date=2026-09-21` `paper2`:** the plan read at 00:17Z was generated 19:11:12 CT (00:11:12Z), 82 s BEFORE live -- rejected as old code. First plan from the new process, generated 19:18:09 CT (00:18:09Z), read 00:19:21Z:
+
+    venue        positions old -> new   max position ev_pct old -> new   venue_ev_implausible   below_min_ev_pct_net_of_fee
+    kalshi       53 -> 6                12.63 -> 5.11                    24                     36
+    polymarket    9 -> 3                 8.81 -> 4.08                     9                      8
+    novig        20 -> 18                4.95 -> 5.02                     0                      - (no fee)
+    prophetx     18 -> 18                5.00 -> 5.02                     0                      - (no fee)
+
+Predictions: (a) net-of-fee / ceiling refusals > 0 -- **HELD** (both venues with fees); (b) no venue position with ev_pct > 5.263 -- **HELD** (max 5.11); (c) main plan untouched by this path -- 49 positions, not compared against a same-instant baseline (NOT claimed beyond "the code path is venue-only").
+**Real money:** `/api/portfolio/live` at ~00:20Z: 9 Kalshi orders today, ALL submitted BEFORE live; **6 of the 9 carried stated EV > 5.26% (max 28.0%)** -- the class the ceiling now refuses. 0 live orders since live, so the live-order half is **OWED**: the next live Kalshi/Polymarket orders must show ev_pct <= 5.263 and positive EV after the venue fee.
+Served board after live (written 00:16:57Z): `score_v2` on 1,835 of 1,837 rows, fee-net on 158.
