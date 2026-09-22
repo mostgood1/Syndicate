@@ -1107,6 +1107,65 @@ def _polymarket_cross_ticks() -> int:
         return 0
 
 
+def _polymarket_gte_prop(slug: str, market: str) -> dict[str, Any] | None:
+    """`{market, token, line}` when `slug` is an admitted `gte<N>` player prop.
+
+    The BOARD JOIN's decoder, imported rather than re-implemented: a second
+    decoder here could disagree with the one that chose the slug. Game-line
+    markets never ask. A failed import is LOUD -- the soccer branch in the
+    resolver records why a swallowed ImportError is how a branch goes inert.
+    """
+    if market in _TOTAL_MARKETS or market in _SPREAD_MARKETS:
+        return None
+    try:
+        from syndicate.features.shared.polymarket_board_join import (
+            _parse_player_prop,
+            parse_slug,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[execute_portfolio] PROP_DECODER_UNAVAILABLE {exc!r}"
+            " -- every Polymarket player prop will refuse",
+            flush=True,
+        )
+        return None
+    return _parse_player_prop(parse_slug(slug) or {})
+
+
+def _gte_prop_disagreement(prop: Mapping[str, Any], request: Any, market: str) -> str | None:
+    """The refusal when a prop slug does not describe the position, else None.
+
+    Market, line and player, each against the request. The player check uses
+    the board join's own name encoders (3+3, and the 4+3 collision form), so a
+    slug the join matched passes and a different player's never does.
+    """
+    if prop.get("market") != market:
+        return "prop_slug_market_disagrees"
+    try:
+        line = float(getattr(request, "line", None))
+    except (TypeError, ValueError):
+        return "prop_line_unreadable"
+    if abs(line - float(prop.get("line"))) > 1e-9:
+        return "prop_slug_line_disagrees"
+    from syndicate.features.shared.polymarket_board_join import (
+        _polymarket_player_token,
+        _polymarket_token_alt43,
+    )
+
+    player = getattr(request, "player_name", None)
+    tokens = {_polymarket_player_token(player), _polymarket_token_alt43(player)} - {None}
+    if str(prop.get("token") or "") not in tokens:
+        return "prop_slug_player_disagrees"
+    return None
+
+
+def _readable_leg_index(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _polymarket_resolve_market(request) -> tuple | None:
     """`(slug, price, tick_size, min_qty)` for one Polymarket US position, or
     `None` to refuse cleanly -- which `polymarket_us_submitter` turns into an
@@ -1340,6 +1399,10 @@ def _polymarket_resolve_market(request) -> tuple | None:
     # are literally `Yes`/`No` -- no outcome names a team -- and its
     # corroborator is the subject match itself.
     yes_no_subject_index = None
+    # Set when a `gte<N>` PLAYER PROP resolves: the index of the outcome named
+    # `Yes`. See the prop branch below.
+    prop_yes_index = None
+    prop = _polymarket_gte_prop(slug, market)
 
     if market in _TOTAL_MARKETS:
         # UNAMBIGUOUS. `Over` and `Under` name the side directly, and our own
@@ -1366,6 +1429,46 @@ def _polymarket_resolve_market(request) -> tuple | None:
         # token is a candidate answer and it is UNVERIFIED against the
         # outcomes array, so it stays a candidate.
         refusal = "spread_side_needs_verified_team_mapping"
+    elif prop is not None:
+        # A `gte<N>` PLAYER PROP -- "will Michael Soroka record at least 5
+        # strikeouts?" -- with outcomes literally `Yes`/`No`. There was NO
+        # branch for these: a prop fell through to the team matcher below, which
+        # cannot match a player against `Yes`/`No`, and then to the soccer
+        # subject rule, which asks whether the slug's subject is our TEAM. Every
+        # Polymarket player prop refused `yes_no_market_subject_is_not_our_side`.
+        # Measured 2026-09-22 15:57:22Z, the first pass after `commence_time`
+        # stopped masking it: `astatc-mlb-az-col-2026-09-22-k-micsor-gte5`,
+        # Soroka over 4.5, plan EV 4.39%.
+        #
+        # THE SIDE IS FIXED BY THE SLUG'S GRAMMAR, like a total's `Over`: "at
+        # least N" is the board's OVER of N-0.5, so over buys `Yes` and under
+        # buys `No`. `No` IS the under here -- a count has no draw leg, unlike
+        # the soccer 3-way where `No` would be buying an outcome nobody chose.
+        # `_resolve_outcome_side` maps `over`/`under` to YES/NO by name, the rule
+        # measured 9 of 9 correct on settled totals.
+        #
+        # THE SLUG MUST AGREE WITH THE POSITION -- market, line AND player --
+        # before anything is priced. The board join chose this slug for this
+        # row, so a disagreement is a join defect, and it refuses by name.
+        refusal = _gte_prop_disagreement(prop, request, market)
+        if refusal is None:
+            wanted = {"over": "yes", "under": "no"}.get(our_side)
+            names = [str(name or "").strip().lower() for name in outcomes]
+            if wanted is None:
+                refusal = "prop_side_not_over_under"
+            elif sorted(names) != ["no", "yes"]:
+                refusal = "prop_outcomes_not_yes_no"
+            else:
+                # BY NAME, never by position: Yes/No arrays ship in both orders.
+                position = names.index(wanted)
+                try:
+                    price = float(prices[position])
+                except (TypeError, ValueError, IndexError):
+                    price = None
+                    refusal = "prop_side_unpriced"
+                else:
+                    outcome_index = position
+                    prop_yes_index = names.index("yes")
     else:
         for position, (name, raw_price) in enumerate(zip(outcomes, prices)):
             side = _side_for_team(name, resolution, sport=sport)
@@ -1675,6 +1778,34 @@ def _polymarket_resolve_market(request) -> tuple | None:
         )
         yes_leg_index = yes_no_subject_index
         yes_leg_reason = "yes_no_market_subject"
+    elif prop_yes_index is not None:
+        # THE YES LEG IS THE OUTCOME NAMED `Yes`. The venue's own `yesLegIndex`
+        # (from `marketSides[].long`) is the second witness: when it is stated
+        # and points anywhere else, `Yes` is not the long token on this market
+        # and buying YES would buy the other outcome -- refused, never guessed.
+        # When it is not stated, the name stands, as it does for a total. The
+        # team gate below does not apply: it corroborates against the AWAY
+        # team's position, and a prop's outcomes name no team.
+        venue_yes = _readable_leg_index(yes_leg_index)
+        agree = yes_leg_index is None or venue_yes == prop_yes_index
+        print(
+            f"[execute_portfolio] POLYMARKET_YES_LEG slug={slug}"
+            f" yes_leg_index={prop_yes_index} venue_yes_leg_index={yes_leg_index!r}"
+            f" venue_reason={yes_leg_reason!r} our_index={outcome_index}"
+            f" agree={agree} reason='gte_prop_yes_by_name' outcomes={outcomes!r}",
+            flush=True,
+        )
+        if not agree:
+            print(
+                f"[execute_portfolio] POLYMARKET_SIDE_REFUSED slug={slug}"
+                f" market={market!r} side={our_side!r}"
+                " reason=prop_yes_leg_disagrees_with_venue"
+                f" yes_by_name={prop_yes_index} venue_yes_leg_index={yes_leg_index!r}",
+                flush=True,
+            )
+            return None
+        yes_leg_index = prop_yes_index
+        yes_leg_reason = "gte_prop_yes_by_name"
     elif market not in _TOTAL_MARKETS and market not in _SPREAD_MARKETS:
         agree = (
             yes_leg_index is not None
