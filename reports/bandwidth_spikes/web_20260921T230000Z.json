@@ -1,0 +1,332 @@
+{
+  "app": {
+    "access_lines": 6430,
+    "instrument_blind": false,
+    "instrument_partial": false,
+    "log_lines": 16579,
+    "note": "served_bytes is RESPONSE size only; a POST body (e.g. artifacts/publish) is NOT counted here",
+    "served_bytes": 404978593,
+    "served_mb": 386.22,
+    "top_clients": [
+      {
+        "bytes": 76518503,
+        "count": 233,
+        "key": "10.197.132.149"
+      },
+      {
+        "bytes": 67030309,
+        "count": 346,
+        "key": "10.196.139.142"
+      },
+      {
+        "bytes": 66892719,
+        "count": 294,
+        "key": "10.192.206.9"
+      },
+      {
+        "bytes": 54434515,
+        "count": 2383,
+        "key": "10.196.47.22"
+      },
+      {
+        "bytes": 47402499,
+        "count": 239,
+        "key": "10.198.147.6"
+      },
+      {
+        "bytes": 32769641,
+        "count": 237,
+        "key": "10.198.170.132"
+      },
+      {
+        "bytes": 23697330,
+        "count": 221,
+        "key": "10.192.193.135"
+      },
+      {
+        "bytes": 20952227,
+        "count": 947,
+        "key": "10.193.57.230"
+      },
+      {
+        "bytes": 14484471,
+        "count": 665,
+        "key": "10.193.57.249"
+      },
+      {
+        "bytes": 767853,
+        "count": 26,
+        "key": "10.193.57.207"
+      },
+      {
+        "bytes": 28526,
+        "count": 839,
+        "key": "10.228.18.171"
+      }
+    ],
+    "top_paths": [
+      {
+        "bytes": 295680441,
+        "count": 64,
+        "key": "/api/intelligence/query"
+      },
+      {
+        "bytes": 82447386,
+        "count": 303,
+        "key": "/api/ops/artifacts/export"
+      },
+      {
+        "bytes": 10286801,
+        "count": 3,
+        "key": "/"
+      },
+      {
+        "bytes": 8552426,
+        "count": 1152,
+        "key": "/api/ops/artifacts/stream"
+      },
+      {
+        "bytes": 5125974,
+        "count": 8,
+        "key": "/api/board/layer2-shortlist"
+      },
+      {
+        "bytes": 785792,
+        "count": 11,
+        "key": "/nfl/fantasy"
+      },
+      {
+        "bytes": 575789,
+        "count": 52,
+        "key": "/api/board/game-chips"
+      },
+      {
+        "bytes": 363026,
+        "count": 2817,
+        "key": "/api/ops/artifacts/publish"
+      },
+      {
+        "bytes": 322899,
+        "count": 1034,
+        "key": "/wnba/api/final_player_boxscore"
+      },
+      {
+        "bytes": 280976,
+        "count": 4,
+        "key": "/api/portfolio/live"
+      },
+      {
+        "bytes": 173138,
+        "count": 1,
+        "key": "/mlb/api/cards"
+      },
+      {
+        "bytes": 120858,
+        "count": 4,
+        "key": "/nfl/api/cards"
+      }
+    ]
+  },
+  "bucket": "2026-09-21T23:00:00Z",
+  "captured_at": "2026-09-22T13:47:54Z",
+  "deploys_in_window": [],
+  "edge": {
+    "bytes": 317529247,
+    "mb": 302.82,
+    "requests": 1553,
+    "top_clients": [
+      {
+        "bytes": 312456666,
+        "count": 426,
+        "key": "73.75.177.190"
+      },
+      {
+        "bytes": 3396616,
+        "count": 2,
+        "key": "165.225.63.38"
+      },
+      {
+        "bytes": 173359,
+        "count": 1,
+        "key": "52.167.144.181"
+      },
+      {
+        "bytes": 167588,
+        "count": 2,
+        "key": "74.7.242.149"
+      },
+      {
+        "bytes": 125119,
+        "count": 1,
+        "key": "9.129.37.35"
+      },
+      {
+        "bytes": 124761,
+        "count": 1,
+        "key": "20.169.77.36"
+      },
+      {
+        "bytes": 118250,
+        "count": 1,
+        "key": "74.7.242.145"
+      },
+      {
+        "bytes": 114281,
+        "count": 1,
+        "key": "40.116.73.212"
+      },
+      {
+        "bytes": 84079,
+        "count": 3,
+        "key": "74.7.229.177"
+      },
+      {
+        "bytes": 51927,
+        "count": 96,
+        "key": "4.154.85.163"
+      },
+      {
+        "bytes": 51925,
+        "count": 96,
+        "key": "20.55.127.227"
+      },
+      {
+        "bytes": 51925,
+        "count": 96,
+        "key": "172.208.154.24"
+      }
+    ],
+    "top_paths": [
+      {
+        "bytes": 292001856,
+        "count": 64,
+        "key": "/api/intelligence/query"
+      },
+      {
+        "bytes": 10026893,
+        "count": 243,
+        "key": "/api/ops/artifacts/stream"
+      },
+      {
+        "bytes": 6921696,
+        "count": 3,
+        "key": "/"
+      },
+      {
+        "bytes": 5128397,
+        "count": 8,
+        "key": "/api/board/layer2-shortlist"
+      },
+      {
+        "bytes": 788305,
+        "count": 11,
+        "key": "/nfl/fantasy"
+      },
+      {
+        "bytes": 714453,
+        "count": 8,
+        "key": "/api/ops/artifacts/export"
+      },
+      {
+        "bytes": 591493,
+        "count": 52,
+        "key": "/api/board/game-chips"
+      },
+      {
+        "bytes": 549635,
+        "count": 1025,
+        "key": "/wnba/api/final_player_boxscore"
+      },
+      {
+        "bytes": 282112,
+        "count": 4,
+        "key": "/api/portfolio/live"
+      },
+      {
+        "bytes": 173359,
+        "count": 1,
+        "key": "/mlb/api/cards"
+      },
+      {
+        "bytes": 121738,
+        "count": 4,
+        "key": "/nfl/api/cards"
+      },
+      {
+        "bytes": 59854,
+        "count": 2,
+        "key": "/mlb/api/game/824001/card-detail"
+      }
+    ],
+    "top_user_agents": [
+      {
+        "bytes": 169823956,
+        "count": 134,
+        "key": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, l"
+      },
+      {
+        "bytes": 116358950,
+        "count": 339,
+        "key": "Python-urllib/3.11"
+      },
+      {
+        "bytes": 24164250,
+        "count": 14,
+        "key": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+      },
+      {
+        "bytes": 5256739,
+        "count": 16,
+        "key": "curl/8.14.1"
+      },
+      {
+        "bytes": 559182,
+        "count": 13,
+        "key": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/"
+      },
+      {
+        "bytes": 549635,
+        "count": 1025,
+        "key": "Mozilla/5.0"
+      },
+      {
+        "bytes": 294994,
+        "count": 5,
+        "key": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatibl"
+      },
+      {
+        "bytes": 282112,
+        "count": 4,
+        "key": "curl/8.21.0"
+      },
+      {
+        "bytes": 239429,
+        "count": 3,
+        "key": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatib"
+      }
+    ]
+  },
+  "metered_mb": 1121.9149,
+  "note": "bucket is labelled by its hour's START: window_covered is label..label+1h (changed 2026-09-10; captures before then read the hour BEFORE the label -- see `rederived.prior` where present). edge_* is public traffic only; app_* includes internal service-to-service.",
+  "other_services_same_hour": {
+    "live-odds-worker": 21.5,
+    "refresh-worker": 10.6
+  },
+  "publish_into_web": {
+    "live-odds-worker": {
+      "bytes": 148526597,
+      "mb": 141.65,
+      "publishes": 401
+    },
+    "refresh-worker": {
+      "bytes": 130312124,
+      "mb": 124.28,
+      "publishes": 148
+    }
+  },
+  "service": "web",
+  "window_covered": {
+    "end": "2026-09-22T00:00:00Z",
+    "start": "2026-09-21T23:00:00Z"
+  }
+}
