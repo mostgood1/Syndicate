@@ -993,9 +993,11 @@ def polymarket_us_submitter(resolve_market):
         body = order_body(request, **fields)
         if _price_at_ask_enabled():
             # PRICED AT THE ASK [#662 step 2]. Refuses when the ask is unreadable
-            # or its EV net of fees is under the plan's minimum; otherwise sends
-            # at the ask with the stake re-sized by Kelly there and capped at the
-            # resting size. Re-validated so every refusal still fires in build.
+            # or its EV AT THE ASK is under the plan's minimum; otherwise sends at
+            # the ask with the stake re-sized by Kelly for the price move and capped
+            # at the resting size. Re-validated so every refusal still fires in build.
+            # NO FEE HERE: the venue plan deducts it before submit (`venue_scope` +
+            # `portfolio_commit`, user decision 2026-09-21/22).
             fields = _price_at_ask(request, body, fields)
             order_body(request, **fields)
         else:
@@ -1221,9 +1223,17 @@ def _kelly_fraction(p_model: float, cost: float) -> float:
 
 
 def _price_at_ask(request: Any, body: Mapping[str, Any], fields: Mapping[str, Any]) -> dict[str, Any]:
-    """`fields` re-priced at our side's ask, or an `OrderBuildError` naming why not."""
-    from syndicate.features.shared.venue_fees import POLYMARKET_ASSUMED_WORST_CASE_RATE
+    """`fields` re-priced at our side's ask, or an `OrderBuildError` naming why not.
 
+    THE FEE IS NOT CHARGED HERE (user decision 2026-09-22: "remove the fee check at submit
+    in polymarket orders", after "we should have the fee deduction prior to submit not at
+    submit"). The venue plan already did it: `venue_scope` stamps the Polymarket fee and
+    the EV net of it, `portfolio_commit` refuses a row that is not positive after the fee
+    and sizes the stake on the fee-inclusive price (`4ee86561`). Charging the fee bound
+    again here counted it twice. What stays is the PRICE check: the ask is where the
+    order will actually fill, so the plan's EV is re-derived there (no fee), held to the
+    plan's own minimum, and the stake is scaled by Kelly for the price move alone.
+    """
     slug = body.get("marketSlug")
     side = body.get("outcomeSide")
     facts: dict[str, Any] = {"slug": slug, "side": side, "sent_plan": fields.get("price_dollars")}
@@ -1256,10 +1266,9 @@ def _price_at_ask(request: Any, body: Mapping[str, Any], fields: Mapping[str, An
     if not planned or not isinstance(ev, (int, float)) or isinstance(ev, bool):
         refuse("ask_ev_unknown", "no planned price or ev_pct on the position")
     p_model = planned * (1.0 + float(ev) / 100.0)
-    fee = float(POLYMARKET_ASSUMED_WORST_CASE_RATE)
-    cost = ask[0] + fee
-    ev_net = (p_model / cost - 1.0) * 100.0
-    facts.update(planned_p=round(planned, 4), planned_ev_pct=ev, fee_bound=fee, ev_net_at_ask_pct=round(ev_net, 2))
+    cost = ask[0]
+    ev_at_ask = (p_model / cost - 1.0) * 100.0
+    facts.update(planned_p=round(planned, 4), planned_ev_pct=ev, ev_at_ask_pct=round(ev_at_ask, 2))
 
     try:
         from syndicate.features.shared.portfolio_settings import resolve_settings
@@ -1268,8 +1277,8 @@ def _price_at_ask(request: Any, body: Mapping[str, Any], fields: Mapping[str, An
     except Exception as exc:  # noqa: BLE001 -- the threshold is not optional
         refuse("ask_min_ev_unknown", f"portfolio settings unreadable {type(exc).__name__}")
     facts["min_ev_pct"] = min_ev
-    if ev_net < min_ev:
-        refuse("ask_ev_below_min", f"ev_net_at_ask={ev_net:.2f} < min_ev={min_ev}")
+    if ev_at_ask < min_ev:
+        refuse("ask_ev_below_min", f"ev_at_ask={ev_at_ask:.2f} < min_ev={min_ev}")
 
     k_plan = _kelly_fraction(p_model, planned)
     k_ask = _kelly_fraction(p_model, cost)

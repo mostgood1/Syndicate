@@ -958,7 +958,8 @@ def test_off_by_default_the_build_is_the_step_one_build(monkeypatch, capsys):
 
 def test_the_measured_car_atl_shape_is_refused(monkeypatch, capsys):
     """(b) Planned 17.7% at 0.47 against a 0.545 ask x 30 (production 2026-09-15 15:00:21Z):
-    fair 0.5526 over a 0.565 cost is -2.2% net, under the 2% minimum."""
+    fair 0.5526 at the 0.545 ask is +1.4%, under the 2% minimum -- refused on PRICE alone
+    (no fee is charged at submit since 2026-09-22; the plan deducts it)."""
     request = _priced(american=0.4695, ev=17.702522)
     sent, refused = _ask_build(request, monkeypatch, price=0.47,
                                book=_book(bids=(("0.54", "10"),), offers=(("0.545", "30.0"),)))
@@ -966,17 +967,28 @@ def test_the_measured_car_atl_shape_is_refused(monkeypatch, capsys):
     assert "decision=refuse reason=ask_ev_below_min" in capsys.readouterr().out
 
 
-def test_a_small_edge_places_at_the_ask_with_the_stake_kelly_shrunk(monkeypatch, capsys):
-    """(c) +122 (p = 100/222 = 0.45045) at 10% EV, ask 0.45: fair 0.49550 over the 0.47
-    cost (ask + 0.02 fee bound) is +5.42% net, and Kelly at that cost is 0.5869 of
-    Kelly at plan, so $10 becomes $5.86 (floored to the cent)."""
+def test_a_small_edge_places_at_the_ask_and_no_fee_shrinks_the_stake(monkeypatch, capsys):
+    """(c) +122 (p = 100/222 = 0.45045) at 10% EV, ask 0.45: fair 0.49550 at the 0.45 ask
+    is +10.1%. The ask is a hair BETTER than the plan, so the Kelly ratio caps at 1.0 and
+    the plan's $10 goes out whole. It used to be cut to $5.86 by a 0.02 fee bound charged
+    here -- the fee the plan now deducts before submit (user decision 2026-09-22)."""
     sent, refused = _ask_build(_priced(), monkeypatch)
     assert refused is None
     assert sent["price_dollars"] == 0.45
-    assert sent["stake_dollars"] == 5.86
-    assert sent["stake_dollars"] <= 10.0
+    assert sent["stake_dollars"] == 10.0
     assert sent["max_quantity"] == 151604.01
     assert "decision=place" in capsys.readouterr().out
+
+
+def test_no_fee_is_charged_at_submit(monkeypatch, capsys):
+    """User decision 2026-09-22: "remove the fee check at submit in polymarket orders".
+    +122 at 3.5% EV, ask 0.45 (a hair better than plan): +3.5% at the ask clears the 2%
+    minimum. The removed 0.02 fee bound made the cost 0.47 and refused it at -0.9%."""
+    request = _priced(ev=3.5)
+    sent, refused = _ask_build(request, monkeypatch)
+    assert refused is None, refused
+    out = capsys.readouterr().out
+    assert "decision=place" in out and "fee_bound" not in out and "ev_at_ask_pct=" in out
 
 
 def test_a_thin_ask_caps_the_quantity(monkeypatch):
@@ -1002,19 +1014,23 @@ def test_an_empty_ask_side_refuses(monkeypatch):
 
 
 def test_the_minimum_is_the_plans_own_setting(monkeypatch):
-    """The same +5.43% build refuses when the portfolio minimum is 6%."""
-    sent, refused = _ask_build(_priced(), monkeypatch, min_ev=6.0)
+    """The same +10.1% build refuses when the portfolio minimum is 11%."""
+    sent, refused = _ask_build(_priced(), monkeypatch, min_ev=11.0)
     assert sent is None and refused == "ask_ev_below_min"
 
 
 def test_a_no_order_is_priced_at_one_minus_the_best_yes_bid(monkeypatch):
-    """NO at plan 0.2398 / 7.2% EV against the measured PHI-TEN book (bid 0.76):
-    ask 0.24, cost 0.26, fair 0.2571 -> -1.1% net, refused. The measured order
-    that re-submitted 34 times would not have been sent."""
+    """NO at plan 0.2398 / 7.2% EV against the measured PHI-TEN book (bid 0.76): the NO
+    ask is 1 - 0.76 = 0.24, fair 0.2571 -> +7.1% AT THE ASK, so it places (it was refused
+    at -1.1% only by the 0.02 fee bound charged here before 2026-09-22; the plan now
+    deducts the fee -- at 0.015/contract this row is +0.9% after it -- before submit).
+    The 34-times re-submit it once caused is closed by `_venue_rejected_unchanged`
+    (`1f9c9c62`, live on live-odds-worker), not by this check."""
     request = _priced(side="under", american=0.2398, ev=7.197926)
     sent, refused = _ask_build(request, monkeypatch, price=0.245,
                                book=_book(bids=(("0.76", "8192.7"),), offers=(("0.765", "100"),)))
-    assert sent is None and refused == "ask_ev_below_min"
+    assert refused is None
+    assert sent["price_dollars"] == 0.24
 
 
 def test_a_cap_below_one_increment_is_a_named_refusal():
