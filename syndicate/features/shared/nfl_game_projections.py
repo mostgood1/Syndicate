@@ -52,7 +52,7 @@ from typing import Any, Iterable, Mapping
 from zoneinfo import ZoneInfo
 
 from syndicate.features.shared.team_aliases import teams_match
-from syndicate.features.shared.source_roots import preferred_source_roots
+from syndicate.features.shared.source_roots import preferred_source_roots, repo_root_from
 from syndicate.features.shared.live_edge_policy import live_edge_unavailable_reason
 from syndicate.features.shared.nfl_preseason_calibration import (
     calibrated_total,
@@ -189,6 +189,10 @@ class NflGameProjectionIndex:
     # outside, and they are completely different situations.
     rows_dropped_degenerate: int = 0
     rows_superseded_by_newer: int = 0
+    # Regular-season rows NOT loaded from the git checkout because the live
+    # pipeline has produced regular-season files -- see
+    # `load_nfl_game_projections`. Nonzero is the guard working.
+    rows_skipped_stale_checkout: int = 0
 
     def lookup(self, game_date: str, home: Any, away: Any) -> dict[str, Any] | None:
         """Resolve a projection for one board row.
@@ -228,6 +232,20 @@ def _source_roots() -> list[Path]:
     )
 
 
+def _checkout_root() -> Path:
+    """The git checkout's `data/nfl_source` -- a cold-start safety net, not the
+    pipeline's output (the generator writes through `nfl_artifact_output_root`)."""
+    return (repo_root_from(__file__) / "data" / "nfl_source").resolve()
+
+
+def _is_under(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root)
+    except (OSError, ValueError):
+        return False
+    return True
+
+
 def _read_csv_rows(path: Path) -> list[dict[str, str]]:
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
@@ -262,6 +280,28 @@ def load_nfl_game_projections(selected_date: str) -> NflGameProjectionIndex:
                     home_by_id.setdefault(gid, _norm(row.get("home_team")))
                     away_by_id.setdefault(gid, _norm(row.get("away_team")))
 
+    # THE CHECKOUT'S REGULAR-SEASON FILES ARE A PRE-SEASON BACKFILL, not a
+    # projection. `data/nfl_source/smartsim2_projections_2026_wk{2..18}.csv` in
+    # git were generated 2026-08-01 by an older estimator and scale, and the
+    # NEWEST-WINS rule below only ever displaces them game by game -- so any game
+    # the live file lacks falls through to them. Measured 2026-09-21 23:48Z:
+    # NYG @ LA, absent from a partial live week-2 file, was served on the board
+    # at `generated_at 2026-08-01T14:33:19-05:00`; and on 2026-09-22 the index
+    # held 321 games against 16 live ones, weeks 4-18 all from the backfill,
+    # waiting for the first week-4 game to reach the board before week 4 is
+    # built. A stale model number on a betting board is worse than an empty
+    # cell (see the degenerate-row note below). So once the live pipeline has
+    # written ANY regular-season file for the season, the checkout's
+    # regular-season series is not read. With no live file (cold start, local
+    # development) the checkout is all there is and is read as before.
+    checkout = _checkout_root()
+    regular_pattern = f"smartsim2_projections_{season}_wk*.csv"
+    live_regular_exists = any(
+        not _is_under(Path(path_text), checkout)
+        for root in _source_roots()
+        for path_text in glob.glob(str(root / regular_pattern))
+    )
+
     seen_files: set[str] = set()
     for root in _source_roots():
         patterns = (
@@ -295,6 +335,9 @@ def load_nfl_game_projections(selected_date: str) -> NflGameProjectionIndex:
                 if resolved in seen_files:
                     continue
                 seen_files.add(resolved)
+                if live_regular_exists and pattern.endswith(regular_pattern) and _is_under(Path(path_text), checkout):
+                    index.rows_skipped_stale_checkout += len(_read_csv_rows(Path(path_text)))
+                    continue
                 for row in _read_csv_rows(Path(path_text)):
                     gid = str(row.get("game_id") or "").strip()
                     day = gameday_by_id.get(gid, "")
@@ -699,6 +742,7 @@ def attach_nfl_game_projections(
         # nflverse pbp file on whichever root the generator resolved.
         "rows_dropped_degenerate": index.rows_dropped_degenerate,
         "rows_superseded_by_newer": index.rows_superseded_by_newer,
+        "rows_skipped_stale_checkout": index.rows_skipped_stale_checkout,
     }
     warning = _slate_bias_warning(list(total_edge_by_game.values()))
     if warning:
