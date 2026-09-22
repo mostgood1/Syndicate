@@ -1994,9 +1994,22 @@ def verify_order_paths(
                     if price is None:
                         note(market, "no_live_price", str(ticker))
                         continue
-                    from syndicate.features.shared.kalshi_orders import order_body
+                    # THE LIVE ENTRY POINT, not `order_body` -- the same rule
+                    # the Polymarket branch above states ("THE DRY RUN MUST
+                    # BUILD THE SAME BODY THE LIVE PATH DOES"), and it was
+                    # broken here for Kalshi. `build_order_body` is what
+                    # `kalshi_submitter._build` calls, and it selects v1/v2 off
+                    # `KALSHI_ORDER_CONTRACT`; this imported v1 `order_body`
+                    # DIRECTLY, and v1 does not pass the board line to
+                    # `_side_to_kalshi`. So every spread reported
+                    # `spread_line_missing: None` for a position the live path
+                    # builds: measured 2026-09-22, kalshi `spreads` 117
+                    # position-passes over 55 passes with 0 `would_build`,
+                    # while the same row built `side='bid'` through
+                    # `build_order_body` (`#683`).
+                    from syndicate.features.shared.kalshi_orders import build_order_body
 
-                    order_body(request, price_dollars=price)
+                    build_order_body(request, price_dollars=price)
                     note(market, "would_build", f"{ticker} @ {price}")
             except Exception as exc:
                 # The venue's own reason, by TYPE and message. A verifier that

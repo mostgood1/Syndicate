@@ -236,7 +236,19 @@ def order_body(request: Any, *, price_dollars: float | None = None) -> dict[str,
         # means deriving it from a catalogue that may have moved since we priced.
         raise OrderBuildError("no_venue_ticker")
 
-    side = _side_to_kalshi(getattr(request, "side", None), getattr(request, "market", None))
+    # THE SIGNED BOARD LINE, the third argument `order_body_v2` has always
+    # passed and this one never did. A spread's leg comes from the SIGN of its
+    # line, so without it `_side_to_kalshi` can only raise
+    # `spread_line_missing` -- which it did for every spread that reached this
+    # builder. v1 is the retained rollback path (`build_order_body`,
+    # `KALSHI_ORDER_CONTRACT=v1`), so a rollback would have taken spreads down
+    # with it. Measured 2026-09-22 through `verify_order_paths`, which called
+    # this builder directly: 117 position-passes, 0 built (`#683`).
+    side = _side_to_kalshi(
+        getattr(request, "side", None),
+        getattr(request, "market", None),
+        getattr(request, "line", None),
+    )
     price = price_dollars
     if price is None:
         raise OrderBuildError("no_price_dollars")

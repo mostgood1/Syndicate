@@ -1271,6 +1271,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - STATUS 2026-09-22 ~19:5xZ: **THE REDUNDANCY HALF OF H1 IS FALSIFIED, AND THE CHECK THAT CAUGHT IT IS THE POINT.** The first implementation dropped `board_contract.cards` only on proof that every card is a subset of its ranked row; run against production's own embed it REFUSED -- 642 of 3,244 cards carry a DIFFERENT value (`gate` 633, `live_projection` 6, `actual` 2, `is_live` 1). The lists are not copies and no alias can rebuild one from the other. The drop now rests on NON-CONSUMPTION, the basis `_drop_unconsumed_row_diagnostics` already uses: `intelligence.html` is the embed's only consumer and never reads the list, the drop is declared as `_embed_dropped`, and `test_the_page_still_does_not_read_the_embedded_board_cards` fails if a new reader appears. H2 holds and is applied. **Measured offline on production's own 32,561,144-char embed: 13,478,649 chars, 58.6% smaller**, slimming takes 0.07 s and does NOT mutate the input the API path shares. Tests: 11 pass, the 4 behavioural ones fail on the old code; 22 intelligence test files, 0 failures. Code `5f16...` pending commit; NOT DEPLOYED.
 
+### kalshi-verifier-builder-parity — OPEN — opened 2026-09-22 — session 236bd219-f6ce-4a72-b4fe-c01486105d6d
+- Goal: `verify_order_paths` builds a Kalshi order through the SAME entry point the live submitter uses, so `ORDER_PATH` can never again refuse a position the live path would place -- kalshi `spreads` reported `spread_line_missing` on 117 position-passes while `build_order_body` builds the identical row (`#683`, lane `kalshi-spread-line-missing`).
+- Files: `pipeline/execute_portfolio.py` (the kalshi branch's builder import in `verify_order_paths` ONLY), `syndicate/features/shared/kalshi_orders.py` (`order_body`'s `_side_to_kalshi` call ONLY -- the v1 rollback path passes the line too), NEW `tests/test_kalshi_builder_parity.py`.
+- Hypothesis: n/a (the cause is measured and named in `#683`).
+- Falsification test: after the change, v1 `order_body` still refuses a spread whose line is absent or ZERO (the pick'em rule is deliberate and must survive), and the verifier still refuses what the live builder refuses.
+- Verification: `pytest tests/test_kalshi_builder_parity.py` plus the kalshi order/executor suites green; an AST test that fails if the verifier imports a builder the submitter does not use; and, after a live-odds-worker deploy, the next `ORDER_PATH venue=kalshi` line shows `spreads` under `would_build` instead of `spread_line_missing`. **The live half (an actual kalshi spread order) is NOT observable while kalshi cash is $0.22 -- every position is refused `insufficient_venue_balance`; that is a separate lead and must not be claimed as this lane's verification.**
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
