@@ -40003,3 +40003,18 @@ Claim released after this entry.
     direct TTFB (single client)             4.45 / 11.68 / 4.94 s          lower            2.90 / 2.96 / 3.38 s warm (36 / 34 / 49 s during the first ~6 min of boot)
 
 **THE PREDICTION ON LATENCY IS NOT MET AND THE READING IS WHY IT MATTERS.** Server-side median moved 7,843 -> 7,600 ms (-3%, n=10/11 -- inside noise), while the p90 and max halved. So SERIALISING 19 MB was not what the page spends its seconds on; **building** the response is (`read_combined_intelligence_response` + `_hydrate_board_response_payload` per request, uncached). The size win is real and independently useful (bandwidth: gzip 4.57 -> 1.82 MB per home request, against the 919-1,157 MB/h spikes the bandwidth tripwire recorded). **Do not read this deploy as "the home page is fixed".** Next lever, unmeasured: cache the hydrated+slimmed payload per (state fingerprint, date) so repeat requests skip the build.
+
+## 2026-09-22 19:42:03Z -> live 19:45:21Z (2:42-2:45 PM CT) — live-odds-worker `f15ffb80` -> `ace8fce6` (`dep-dapdk2rm8hqs739e1bfg`) — lane `kalshi-verifier-builder-parity` — **the order-path verifier builds Kalshi spreads through the LIVE entry point: VERIFIED, `spreads` 2 refused -> 2 `would_build`**
+
+**User decisions (chat):** "yes, apply the fix", then "deploy live-odds-worker" (todo `#683`).
+**Carries** beyond `f15ffb80`: `ace8fce6` (this lane) plus seven commits already on main from other lanes -- `ec620c7d` home-page embed, `97066dbe` NCAAF games-cache staleness, `7b36e599` the census script (this session, offline tooling), `3ba363ff` gunicorn access timing, `3e8ff188` NHL chip start/clock, `63512622` bootstrap lock kernel start time, `041ee664` Layer 2 doubleheader rail cards. Their readings are owed by their own lanes.
+**Preflight:** claim 19:41:46Z (free); `CLEAR: only infrastructure processes running` 19:41Z; deploy triggered separately 19:42:03Z.
+
+    field                                     baseline (19:41:35Z)                     predicted      measured (first kalshi pass 19:49:46Z)
+    live_commit                               f15ffb80                                 ace8fce6       ace8fce6 (live 19:45:21Z)
+    ORDER_PATH kalshi `spreads`               {'spread_line_missing': 2} (19:27:35Z)   would_build    **{'would_build': 2}**
+    other kalshi families in that pass        would_build                              unchanged      all would_build (batter_total_bases 1, strikeouts 1, totals 2, batter_hits_runs_rbis 1, player_points 1, batter_hits 1); positions=9, zero refusals of any kind
+
+**What this does and does not prove.** It proves the INSTRUMENT now describes the live path: the verifier builds through `build_order_body`, the same entry point `kalshi_submitter` uses, so `spreads` stops being reported as unplaceable. It does NOT prove a Kalshi spread ORDER, and cannot today: kalshi cash is $0.22 and every position is refused `insufficient_venue_balance` (11/11 18:50:08Z, 13/13 19:03:22Z). That is a separate funding lead, not this fix's business.
+**Also shipped in the same commit:** v1 `order_body` now passes the line too, so a `KALSHI_ORDER_CONTRACT=v1` rollback cannot take live spreads down. 19 tests, 3 of which fail on the old code, incl. an AST guard against the verifier being pointed back at a builder the submitter does not call.
+Claim released after this entry.
