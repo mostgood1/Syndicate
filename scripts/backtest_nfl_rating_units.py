@@ -175,7 +175,106 @@ def run(train_seasons, test_season, *, per_game, label):
     return {"a": a, "b": b, **s}
 
 
+def _per_week_table(plays):
+    """team -> side ('o'/'d') -> {week: EPA summed over that game}."""
+    table = {}
+    for week, posteam, defteam, _play_type, epa in plays:
+        for team, side in ((posteam, "o"), (defteam, "d")):
+            if team:
+                bucket = table.setdefault(team, {}).setdefault(side, {})
+                bucket[week] = bucket.get(week, 0.0) + epa
+    return table
+
+
+def _centred_per_game(table, team, side, before_week):
+    """(per-game EPA minus the league's per-TEAM mean, games) -- `_rating_pair`'s
+    centring, without its scale (a linear factor the fitted slope absorbs)."""
+    def per_game(t):
+        weeks = [v for w, v in table.get(t, {}).get(side, {}).items() if before_week is None or w < before_week]
+        return (sum(weeks) / len(weeks), len(weeks)) if weeks else (None, 0)
+    value, games = per_game(team)
+    if value is None:
+        return None, 0
+    means = [v for v, _ in (per_game(t) for t in table) if v is not None]
+    return value - sum(means) / len(means), games
+
+
+_TABLES = {}
+
+
+def _season_table(season):
+    # A pbp season is ~100 MB of CSV; the K grid would otherwise re-read it per K.
+    if season not in _TABLES:
+        _TABLES[season] = _per_week_table(load_pbp_plays(season))
+    return _TABLES[season]
+
+
+def blend_rows(season, prior_games):
+    """`team_rating`'s per-game path: this season's games blended with the prior
+    season as (n*current + K*prior)/(n+K); K=0 is the pre-2026-09-21 estimator
+    (current if any, else prior). Pbp spells the Rams `LA`."""
+    cur, pri = _season_table(season), _season_table(season - 1)
+    cache = {}
+
+    def rate(team, week, side):
+        key = (team, week, side)
+        if key not in cache:
+            c, n = _centred_per_game(cur, team, side, week)
+            p, _ = _centred_per_game(pri, team, side, None)
+            if c is None:
+                cache[key] = p
+            elif p is None or prior_games <= 0:
+                cache[key] = c
+            else:
+                cache[key] = (n * c + prior_games * p) / (n + prior_games)
+        return cache[key]
+
+    rows = []
+    for g in season_games(season):
+        home, away = ({"LAR": "LA"}.get(t, t) for t in (g["home"], g["away"]))
+        parts = [rate(t, g["week"], s) for t in (home, away) for s in ("o", "d")]
+        if None in parts:
+            continue
+        ho, hd, ao, ad = parts
+        rows.append({**g, "diff": (ho - ao) - (hd - ad)})
+    return rows
+
+
+# The slope the ENGINE applies at NFL_RATING_SCALE 20, measured 2026-09-21 by
+# regressing production's own 2026 wk1 `margin_mean` (all 16 on
+# prior_season_fallback) on this file's centred 2025 differential: 0.5471,
+# intercept +0.59, residual SD 0.884. Not the ~0.42 the scale comment implies.
+ENGINE_SLOPE_AT_SCALE_20 = 0.5471
+
+
+def run_prior_games(train_seasons, test_season, grid=(0, 1, 2, 3, 4, 5, 6, 8, 10, 12)):
+    """Choose K on TRAIN with the slope fixed at what production applies, then
+    report the held-out season by week bucket against K=0 and the market."""
+    b = ENGINE_SLOPE_AT_SCALE_20
+    fits = {}
+    for k in grid:
+        tr = [r for s in train_seasons for r in blend_rows(s, k)]
+        a = statistics.fmean(r["margin"] - b * r["diff"] for r in tr)
+        fits[k] = (a, sum(abs(a + b * r["diff"] - r["margin"]) for r in tr) / len(tr))
+        print(f"  K={k:>2}  train MAE {fits[k][1]:.3f}")
+    chosen = min(fits, key=lambda k: fits[k][1])
+    print(f"\nchosen on {train_seasons}: K={chosen}; tested on {test_season}, slope {b}")
+    buckets = (("wk1", 1, 1), ("wk2-4", 2, 4), ("wk5-9", 5, 9), ("wk10+", 10, 99), ("ALL", 1, 99))
+    tests = {k: blend_rows(test_season, k) for k in (0, chosen)}
+    for name, lo, hi in buckets:
+        sel = {k: [r for r in rows if lo <= r["week"] <= hi] for k, rows in tests.items()}
+        errs = {k: [abs(fits[k][0] + b * r["diff"] - r["margin"]) for r in rows] for k, rows in sel.items()}
+        delta = [x - y for x, y in zip(errs[chosen], errs[0])]
+        market = statistics.fmean(abs(r["market"] - r["margin"]) for r in sel[0])
+        print(f"  {name:6} n={len(delta):3}  K=0 {statistics.fmean(errs[0]):6.2f}  K={chosen} "
+              f"{statistics.fmean(errs[chosen]):6.2f}  (delta {statistics.fmean(delta):+.2f} +- "
+              f"{statistics.pstdev(delta) / len(delta) ** 0.5:.2f})  market {market:6.2f}")
+
+
 if __name__ == "__main__":
+    if "--prior-games" in sys.argv:
+        run_prior_games((2023, 2024), 2025)
+        raise SystemExit(0)
     have = [s for s in (2022, 2023, 2024, 2025)
             if (REPO / f"data/nfl_source/tracking/nflverse/pbp/pbp_{s}.csv").exists()]
     print("pbp seasons available:", have)

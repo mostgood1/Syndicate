@@ -56,6 +56,57 @@ class TeamRatingTests(unittest.TestCase):
         self.assertEqual(source, "neutral_no_data")
 
 
+class PpgRatingBlendTests(unittest.TestCase):
+    """The per-game path production runs (`SYNDICATE_NFL_PPG_RATINGS=1`).
+
+    2026-09-21: from week 2 the rating was ONLY this season's games, so a
+    week-2 rating was one game of EPA -- NYG @ LA served at NYG by 17.8 against
+    a close of LA -8.5. These pin the blend that replaced it."""
+
+    # One wild week-1 game for KC this season; a calm, longer prior season.
+    CURRENT = [_play(1, "KC", "DEN", "pass", 3.0), _play(1, "DEN", "KC", "run", -2.0)]
+    PRIOR = [
+        _play(week, off, dfn, "pass", epa)
+        for week in range(1, 11)
+        for off, dfn, epa in (("KC", "DEN", 0.4), ("DEN", "KC", -0.1))
+    ]
+
+    def _rating(self, week, env):
+        import os
+        from unittest.mock import patch
+
+        with patch.dict(os.environ, {"SYNDICATE_NFL_PPG_RATINGS": "1", **env}, clear=False):
+            if "SYNDICATE_NFL_RATING_PRIOR_GAMES" not in env:
+                # ABSENT is the default under test; a developer's shell must not leak in.
+                os.environ.pop("SYNDICATE_NFL_RATING_PRIOR_GAMES", None)
+            return gen.team_rating("KC", week=week, current_plays=self.CURRENT, prior_plays=self.PRIOR)
+
+    def test_week_two_blends_one_game_with_four_games_of_prior(self) -> None:
+        current = gen._rating_pair(self.CURRENT, team="KC", before_week=2)
+        prior = gen._rating_pair(self.PRIOR, team="KC", before_week=None)
+        offense, defense, source = self._rating(2, {})
+        self.assertEqual(source, "current_season_blend")
+        # n=1 game this season against K=4: one fifth current, four fifths prior.
+        self.assertAlmostEqual(offense, (current[0] + 4 * prior[0]) / 5)
+        self.assertAlmostEqual(defense, (current[1] + 4 * prior[1]) / 5)
+        # Reachability: the blend must actually move the number off the old path.
+        self.assertNotAlmostEqual(offense, current[0])
+
+    def test_zero_prior_games_restores_the_old_estimator(self) -> None:
+        current = gen._rating_pair(self.CURRENT, team="KC", before_week=2)
+        offense, defense, source = self._rating(2, {"SYNDICATE_NFL_RATING_PRIOR_GAMES": "0"})
+        self.assertEqual(source, "current_season_rolling")
+        self.assertAlmostEqual(offense, current[0])
+        self.assertAlmostEqual(defense, current[1])
+
+    def test_week_one_is_unchanged_prior_season(self) -> None:
+        prior = gen._rating_pair(self.PRIOR, team="KC", before_week=None)
+        offense, defense, source = self._rating(1, {})
+        self.assertEqual(source, "prior_season_fallback")
+        self.assertAlmostEqual(offense, prior[0])
+        self.assertAlmostEqual(defense, prior[1])
+
+
 class WeekScheduleTests(unittest.TestCase):
     def test_includes_post_season_games(self) -> None:
         import csv

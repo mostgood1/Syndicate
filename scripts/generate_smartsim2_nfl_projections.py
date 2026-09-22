@@ -445,6 +445,55 @@ def _rating_pair(
     return ((off - off_mean) / NFL_RATING_SCALE, -((dfn - def_mean) / NFL_RATING_SCALE))
 
 
+# LAST SEASON COUNTS AS THIS MANY GAMES OF EVIDENCE in a team's rating, and this
+# season's games take over as they are played: rating = (n*current + K*prior)/(n+K).
+#
+# THE DEFECT, measured on production 2026-09-21: the PPG path switched from the
+# whole prior season (week 1) to ONLY this season's games from week 2, so a
+# week-2 rating was ONE game of EPA through `NFL_RATING_SCALE`. The served week-2
+# file put NYG @ LA at NYG by 17.8 against a close of LA -8.5, JAX @ DEN at -26.6
+# against +2.5, IND @ KC at +27.6 against +6.5.
+#
+# FITTED WALK-FORWARD, against ACTUAL MARGINS, not against the market. Ratings
+# for week w use plays before w; K chosen on 2023-24 with the slope FIXED at the
+# 0.547 the engine applies at scale 20 (measured on production's own 2026 wk1
+# file, n=16, residual SD 0.88); scored on a 2025 the fit never saw
+# (`scripts/backtest_nfl_rating_units.py --prior-games`):
+#
+#                        K=0 (old)   K=4     market
+#     weeks 2-4 MAE      13.17       10.16   9.81    (n=48, delta -3.00 +- 0.78)
+#     all weeks MAE      10.86       10.36   9.72    (n=272, delta -0.50 +- 0.20)
+#     weeks 10+ MAE      10.18       10.32   9.56    (+0.13 +- 0.15, inside noise)
+#
+# The train optimum is flat over K=3..5; 4 is its centre. A prior-season
+# regression factor was also searched and did not beat plain K=4 on train, so it
+# is not here. The blended model STILL LOSES TO THE CLOSE and must not price --
+# this makes the display sane, the same disposition as `NFL_RATING_SCALE`.
+#
+# K=0 restores the old estimator exactly. Week 1 (n=0) is unchanged by
+# construction, which keeps the preseason generator's output unchanged too.
+NFL_RATING_PRIOR_GAMES = 4.0
+
+
+def _rating_prior_games() -> float:
+    """`SYNDICATE_NFL_RATING_PRIOR_GAMES` overrides; ABSENT means 4.0 (the blend
+    is ON). Stated because "absent != off" is a documented trap here: this one
+    is on when absent, and `0` is the kill switch back to the old estimator."""
+    raw = str(os.environ.get("SYNDICATE_NFL_RATING_PRIOR_GAMES") or "").strip()
+    try:
+        value = float(raw) if raw else NFL_RATING_PRIOR_GAMES
+    except ValueError:
+        value = NFL_RATING_PRIOR_GAMES
+    return max(0.0, value)
+
+
+def _games_before(plays: list[tuple[int, str, str, str, float]], *, team: str, before_week: int | None) -> int:
+    """Distinct weeks this team had offensive plays before `before_week` -- the
+    same game count `_epa_per_game` divides by."""
+    return len({week for week, posteam, _defteam, _play_type, _epa in plays
+                if posteam == team and (before_week is None or week < before_week)})
+
+
 def _drive_priors_enabled() -> bool:
     """OFF by default. `SYNDICATE_NFL_DRIVE_PRIORS=1` turns it on.
 
@@ -599,7 +648,10 @@ def team_rating(
     """Returns (offense_rating, defense_rating, rating_source_tag). Falls
     back to the entire prior season when this season has no qualifying
     plays yet for this team (week 1, or an early bye); defaults to neutral
-    0.0 when neither source has data, rather than raising.
+    0.0 when neither source has data, rather than raising. On the per-game
+    path, once this season has games they are BLENDED with the prior season
+    (`current_season_blend`, see `NFL_RATING_PRIOR_GAMES`) rather than
+    replacing it outright.
 
     The team code is translated into the play-by-play's spelling first --
     see `_PBP_TEAM_CODE_ALIASES`. Without it Washington and the LA Rams match
@@ -621,12 +673,20 @@ def team_rating(
                 return prior_offense, -prior_defense_allowed, "prior_season_fallback"
         return 0.0, 0.0, "neutral_no_data"
     current = _rating_pair(current_plays, team=team, before_week=week)
+    prior = _rating_pair(prior_plays, team=team, before_week=None) if prior_plays else None
     if current is not None:
+        prior_games = _rating_prior_games()
+        if prior is not None and prior_games > 0:
+            played = _games_before(current_plays, team=team, before_week=week)
+            weight = played / (played + prior_games)
+            return (
+                weight * current[0] + (1.0 - weight) * prior[0],
+                weight * current[1] + (1.0 - weight) * prior[1],
+                "current_season_blend",
+            )
         return current[0], current[1], "current_season_rolling"
-    if prior_plays:
-        prior = _rating_pair(prior_plays, team=team, before_week=None)
-        if prior is not None:
-            return prior[0], prior[1], "prior_season_fallback"
+    if prior is not None:
+        return prior[0], prior[1], "prior_season_fallback"
     return 0.0, 0.0, "neutral_no_data"
 
 

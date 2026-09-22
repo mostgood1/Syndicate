@@ -1119,6 +1119,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - Outcome: **GOAL MET 2026-09-21 23:48:16Z** — `e7f216bf` live on refresh-worker 23:41:44Z; week 2 rebuilt 23:46:00Z, `PUBLISH_OK` 3443 bytes 23:47:43Z; `/nfl/api/cards` 8 -> 16 games incl. `2026_02_NYG_LA` 27 min before kickoff. Test fails on old code (1 game) / passes on fix. Hypothesis CONFIRMED. Interval key reset to 86400 (not yet injected). Two leads filed in `leads.md`. Measurement: `deploys.md` 23:36:26Z entry.
 
+### nfl-early-season-rating-shrinkage — OPEN — opened 2026-09-21 — session dae18452-227b-42cc-a4f4-a4a4ee4cec3e
+- Goal: NFL weekly projections stop swinging on a handful of games: the rating blends this season's games with last season's in proportion to games played, the blend weight is fitted walk-forward against ACTUAL margins (not against the market), and the fix is live so the next week-2/3 rebuild uses it.
+- Files: `scripts/generate_smartsim2_nfl_projections.py` (`team_rating` / `_rating_pair` and a new blend helper ONLY), `scripts/backtest_nfl_rating_units.py`, `tests/test_generate_smartsim2_nfl_projections.py`.
+- Hypothesis (written BEFORE testing, 2026-09-21 ~23:58Z): H1 `team_rating` switches from the whole prior season (week 1) to ONLY this season's games from week 2, with no shrinkage, so a week-2 rating is one game of EPA x `NFL_RATING_SCALE` 20. Evidence: production wk2 file 23:47:43Z, model home margin vs close: NYG@LA -17.8 vs +8.5, JAX@DEN -26.6 vs +2.5, IND@KC +27.6 vs +6.5, GB@NYJ +17.0 vs -6. H2 a games-weighted blend `(n*cur + k*prior)/(n+k)` lowers out-of-sample margin MAE in weeks 2-5 without raising it in weeks 10+. H3 the blend changes the rating spread, so the scale fitted on the old estimator (slope 0.404 -> ~20.9) may no longer be right; it must be refit with it, per the standard's mechanism-vs-estimator rule.
+- Falsification test: walk-forward, k (and any prior regression) chosen on 2023-24 ONLY, scored on 2025: if weeks 2-5 MAE at the chosen k is not below k=0, or all-weeks MAE rises, H2 is false and nothing ships. Substrate: local nflverse pbp 2022-2025 (completed seasons; per-season REG game counts printed and checked) + nflverse `games.csv` for outcomes and `spread_line`.
+- Verification: backtest table (per week bucket, model vs market vs k=0, n games stated); unit test that fails on old code; after a user-approved refresh-worker deploy, the regenerated week-2 file's margin SD and max |margin| vs the 23:47:43Z file, read from web's disk and `/nfl/api/cards`.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
