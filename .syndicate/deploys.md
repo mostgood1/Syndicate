@@ -39792,3 +39792,23 @@ The size of the burst tracks the chunk. The only code in that window that scales
     /nfl/api/market-board?week=18           week 18                                week 18     week 18, 16 games
 
 **Not changed, and still true:** web's disk holds the 2026-08-01 backfill for weeks 4-18 (`prior_season_fallback`), so an explicit future week on the cards / picks / market board still shows pre-season projections until the pipeline builds that week. **verify:** the table.
+
+## 2026-09-22 15:45:58Z -> live 15:48:56Z (10:45:58-10:48:56 AM CT) — refresh-worker `3d9058b3` -> `48376cc1` (`dep-dapa5djtqb8s73fsg9fg`) — lane `layer2-score-outcome-calibration` — **MLB prop `commence_time` no longer blanked by undated Polymarket quotes: VERIFIED (board 383 -> 0 undated, Polymarket pass `commence_unknown` 0)**
+
+**User decisions (chat):** "yes, deploy refresh-worker" (for `0b5518ab`), then "include the OOM fix too, deploy main" -- so origin/main, not the `3689c081` I had first targeted to keep another lane's undecided fix out.
+**Carries** beyond `3d9058b3`: `0b5518ab` (this lane: `book_grid` takes `commence_time` from the freshest DATED quote and teams/league from the first row that has them; `_capture_polymarket_quotes` stamps home/away/commence from the board rows per event); `45608cb3` (lane `refresh-worker-oom-0922`: stream the board-state ledger chunk line count -- **its verification is OWED BY THAT LANE**, not measured here; its session is unattended and could not be messaged); `27af7934` / `c11d3730` (NFL, already live and verified on web / live-odds-worker); `bf3eb38c` (Polymarket pause removal, runs on live-odds-worker, live there since 15:03:32Z).
+**Window:** claim acquired 15:31:38Z. Preflight HOLD 15:31Z-15:45Z (odds-refresh jobs incl. `build_soccer_artifacts --league mls`, then back-to-back board builds -- full build ~200-260 s every 6-7 min, odds jobs in the gaps). `check_deploy_safety.py --drain` REFUSED (`[UNKNOWN] Drain requires the keyvalue backend` -- not configured locally; not pulled from Render). Polled preflight at 10 s; `CLEAR: only infrastructure processes running` 15:45:47Z; deploy triggered 15:45:58Z (separate command). Nothing killed.
+
+    field                                        baseline                        predicted   measured
+    live_commit                                  3d9058b3                        48376cc1    48376cc1 (live 15:48:56Z)
+    mlb prop rows commence_time null (served)    383 of 1,820 (read 15:42:31Z,   0           0 of 1,822 -- board written 15:53:54Z (first after live)
+                                                 board 15:36:12Z; 455 @ 15:31Z)
+      of which best quote = polymarket           (the blanked population)        0           0 of 187
+    mlb game rows commence_time null             0                               0           0 of 110
+    POLYMARKET_QUOTE_CAPTURE identity_stamped=   field absent                    > 0         584 (15:55:57Z line; matches=719 appended=23)
+    polymarket prop quotes ON DISK dated+teams   0 of 6,089 (before 15:48:56Z)   all new     23 of 23 written after live (web's shard via /api/ops/artifacts/stream)
+    polymarket pass commence_unknown refusals    2 / 2 / 1 (15:09, 15:25, 15:41Z) 0          0 (15:57:50Z pass)
+
+**Predicted from the replay** (`0b5518ab` commit message): 403 -> 0 undated prop grid rows over production's 09-22 shard, 0 existing values changed -- matched.
+**NEW BLOCKER, NOT THIS CHANGE (lead filed).** With the start time present, the same Soroka strikeout row (`astatc-mlb-az-col-2026-09-22-k-micsor-gte5`, over 4.5, plan ev 4.39) now reaches the NEXT gate and is refused `market_unresolved_for_position` (15:57:46Z; `ORDER_PATH ... strikeouts: {market_unresolved: 1}`): `resolve_market` finds no market for the slug in live-odds-worker's Polymarket slate. The missing `commence_time` had been hiding it.
+Claim released after this entry.
