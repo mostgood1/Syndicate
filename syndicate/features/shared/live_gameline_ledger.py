@@ -151,6 +151,29 @@ def record_key(row: Mapping[str, Any]) -> tuple:
     had `_moved` compare a 9.5 row against an 8.5 row and dedupe on the answer,
     silently keeping whichever landed last. `str()` rather than the raw value so
     `9.5` and `"9.5"` cannot split one market into two.
+
+    THE GAME IS IN THE KEY BY `event_id`, NOT ONLY BY `game_pk`, AND THE
+    DIFFERENCE IS MEASURED. `game_pk` comes from the live-gameline projection
+    and is absent on the segment-refusal path (`game_pk: None` below), so on a
+    normal slate most records carry no game identity at all -- production
+    2026-09-22: 25 of 132 records had one. Two DIFFERENT games then collide
+    whenever segment, market, line and `books_key` agree, and `_moved` dedupes
+    on the answer, keeping whichever landed last.
+
+    Counted over production ledgers (read 2026-09-22):
+
+        date        records  old keys  keys spanning >1 game  worst
+        2026-09-20    1,250       653                     13  ONE key over 14 games
+        2026-09-21      746       407                      2  3 games
+        2026-09-04    3,041       639                      1  a doubleheader's two halves
+        2026-08-29    5,554       383                      2  same
+
+    The 09-04 and 08-29 collisions are the doubleheader shape twice over: both
+    halves carried the SAME `game_pk` (824424, 823177) because the live index
+    was keyed on the team pair, so even a present `game_pk` did not separate
+    them. `event_id` is on every record already (132 of 132 that day), so
+    re-keying an existing file is consistent and needs no migration -- the
+    previous-observation map is rebuilt from the file on every run.
     """
     return (
         row.get("game_pk"),
@@ -158,6 +181,9 @@ def record_key(row: Mapping[str, Any]) -> tuple:
         str(row.get("market") or ""),
         str(row.get("line") if row.get("line") is not None else ""),
         str(row.get("books_key") or ""),
+        # Last so the tuple's existing prefix is unchanged for a reader
+        # comparing old and new keys side by side.
+        str(row.get("event_id") or ""),
     )
 
 

@@ -90,15 +90,28 @@ def _http_json(url: str, timeout: int = 120) -> Any:
         return None
 
 
-def _final_scores_for_date(date_str: str) -> dict[tuple[str, str], tuple[int, int]]:
-    """(away_name, home_name) -> (away_runs, home_runs) for finals only.
+def _final_scores_for_date(date_str: str) -> dict[Any, tuple[int, int]]:
+    """Final scores keyed BY gamePk, plus by (away_name, home_name) where that
+    pair played exactly once.
 
     Free StatsAPI, deliberately not our own graded artifacts: those carry the
     same single-book price this script is measuring against.
+
+    KEYED ON THE GAME, NOT THE PAIR. A doubleheader plays one pair twice, so a
+    name-keyed dict let the second game's final overwrite the first and BOTH
+    were then regraded against it -- the same defect measured across the
+    serving side on 2026-09-22 (TB @ NYY, gamePks 823543 / 823494). The
+    summary's own `outputs` carry `game_pk`, and StatsAPI carries `gamePk`, so
+    the exact key is on both sides; the name key is kept only for a pair that
+    is unambiguous that day, which is what an older summary without a gamePk
+    can still use. A doubleheader pair is therefore ABSENT from the name index
+    rather than wrong in it.
     """
     url = f"{STATSAPI}?sportId=1&date={date_str}&hydrate=linescore"
     payload = _http_json(url)
-    out: dict[tuple[str, str], tuple[int, int]] = {}
+    out: dict[Any, tuple[int, int]] = {}
+    by_pair: dict[tuple[str, str], tuple[int, int]] = {}
+    pairs_seen: dict[tuple[str, str], int] = {}
     for day in ((payload or {}).get("dates") or []):
         for game in (day.get("games") or []):
             status = str(((game.get("status") or {}).get("abstractGameState")) or "")
@@ -112,7 +125,16 @@ def _final_scores_for_date(date_str: str) -> dict[tuple[str, str], tuple[int, in
             away_runs, home_runs = away.get("score"), home.get("score")
             if not away_name or not home_name or away_runs is None or home_runs is None:
                 continue
-            out[(away_name, home_name)] = (int(away_runs), int(home_runs))
+            game_pk = str(game.get("gamePk") or "").strip()
+            score = (int(away_runs), int(home_runs))
+            if game_pk:
+                out[game_pk] = score
+            pair = (away_name, home_name)
+            pairs_seen[pair] = pairs_seen.get(pair, 0) + 1
+            by_pair[pair] = score
+    for pair, count in pairs_seen.items():
+        if count == 1:
+            out[pair] = by_pair[pair]
     return out
 
 
@@ -286,7 +308,13 @@ def main(argv: list[str] | None = None) -> int:
             away_name = NAME_BY_ABBR.get(str(output.get("away") or "").strip())
             if not home_name or not away_name:
                 continue
-            score = finals.get((away_name, home_name))
+            # The gamePk first: it is exact and separates a doubleheader's
+            # halves. The name pair is the fallback for an older summary with
+            # no gamePk, and holds only pairs that played once that day.
+            game_pk = str(output.get("game_pk") or "").strip()
+            score = finals.get(game_pk) if game_pk else None
+            if score is None:
+                score = finals.get((away_name, home_name))
             if score is None:
                 skipped_no_outcome += 1
                 continue

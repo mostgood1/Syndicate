@@ -6,7 +6,7 @@ import math
 import os
 import sys
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -931,9 +931,17 @@ def _base_game_row_from_report(date_str: str, game: Dict[str, Any], market_game:
     }
 
 
-def _load_game_lines_lookup(path: Path) -> Dict[Tuple[str, str], Dict[str, Any]]:
+def _load_game_lines_lookup(path: Path) -> Dict[Tuple[str, str], List[Dict[str, Any]]]:
+    """(away, home) -> EVERY odds row for that pair, in file order.
+
+    A LIST, because a team pair is not a game. A doubleheader puts two OddsAPI
+    events on one pair and this kept whichever came last, so BOTH games graded
+    against the later event's lines -- the same defect measured on the serving
+    side 2026-09-22 (TB @ NYY, events 394e1e2b 17:06Z and 574050c1 23:06Z).
+    `_match_report_game_row` picks the one that belongs to each report game.
+    """
+    out: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
     doc = _read_json_dict(path)
-    out: Dict[Tuple[str, str], Dict[str, Any]] = {}
     for row in doc.get("games") or []:
         if not isinstance(row, dict):
             continue
@@ -941,8 +949,83 @@ def _load_game_lines_lookup(path: Path) -> Dict[Tuple[str, str], Dict[str, Any]]
         home_team = str(row.get("home_team") or "").strip()
         if not away_team or not home_team:
             continue
-        out[(away_team, home_team)] = row
+        out.setdefault((away_team, home_team), []).append(row)
     return out
+
+
+def _schedule_starts_by_game_pk(date_str: str) -> Dict[str, str]:
+    """gamePk -> StatsAPI `gameDate`, from the day's `schedule_raw.json`.
+
+    The report's games carry a `game_pk` and NO start time, and the odds rows
+    carry a `commence_time` and no gamePk, so neither side alone can separate a
+    doubleheader. `daily_update.py` snapshots the raw StatsAPI schedule beside
+    the odds docs (`daily/snapshots/<date>/schedule_raw.json`), which carries
+    both -- so the join is read from data both halves already agree on.
+
+    Empty when the snapshot is absent, which makes the caller REFUSE rather
+    than guess. Never raises: a grading pass must not die on a missing file.
+    """
+    out: Dict[str, str] = {}
+    for root in _odds_data_roots():
+        path = root / "daily" / "snapshots" / str(date_str) / "schedule_raw.json"
+        try:
+            if not path.is_file():
+                continue
+            with path.open("r", encoding="utf-8") as handle:
+                games = json.load(handle)
+        except Exception:
+            continue
+        for game in games if isinstance(games, list) else []:
+            if not isinstance(game, dict):
+                continue
+            game_pk = str(game.get("gamePk") or game.get("game_pk") or "").strip()
+            start = str(game.get("gameDate") or game.get("game_date") or "").strip()
+            if game_pk and start and game_pk not in out:
+                out[game_pk] = start
+    return out
+
+
+def _match_report_game_row(
+    game: Dict[str, Any],
+    rows: List[Dict[str, Any]],
+    starts_by_game_pk: Dict[str, str],
+) -> Optional[Dict[str, Any]]:
+    """The odds row for THIS report game, or None when it cannot be told apart.
+
+    One row: that is the game, as before. Several (a doubleheader): the row
+    whose `commence_time` is nearest this game's scheduled start, and only when
+    it is clearly nearest -- the same 45-minute separation the serving side
+    uses (`syndicate/features/shared/doubleheader.py`). None otherwise, because
+    grading a pick against the OTHER half's closing lines is a wrong number
+    wearing a right one's clothes, and a missing grade is visible.
+    """
+    if len(rows) <= 1:
+        return rows[0] if rows else None
+    start = _parse_utc_timestamp(starts_by_game_pk.get(str(_safe_int(game.get("game_pk")) or "").strip()))
+    if start is None:
+        return None
+    scored: List[Tuple[float, Dict[str, Any]]] = []
+    for row in rows:
+        commence = _parse_utc_timestamp(row.get("commence_time"))
+        if commence is None:
+            return None
+        scored.append((abs((commence - start).total_seconds()), row))
+    scored.sort(key=lambda item: item[0])
+    if len(scored) > 1 and (scored[1][0] - scored[0][0]) < 45 * 60:
+        return None
+    return scored[0][1]
+
+
+def _parse_utc_timestamp(value: Any) -> Optional[datetime]:
+    """ISO-8601 (`Z` or offset) -> aware UTC datetime, or None."""
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
 
 
 def _lineup_id_sets(game: Dict[str, Any]) -> Dict[str, set[int]]:
@@ -1110,6 +1193,7 @@ def _collect_report_game_recommendations(
         return out
 
     line_lookup = _load_game_lines_lookup(game_lines_path)
+    schedule_starts = _schedule_starts_by_game_pk(date_str)
     # NAME THE FILE WE ACTUALLY READ, ALWAYS -- not only when it is missing.
     # `Missing game-line match for <game>` says a join failed and says nothing
     # about which of the six candidate docs was joined against, so diagnosing
@@ -1131,9 +1215,19 @@ def _collect_report_game_recommendations(
         home_name = str(((game.get("home") or {}).get("name") or "")).strip()
         if not away_name or not home_name:
             continue
-        market_game = line_lookup.get((away_name, home_name))
+        pair_rows = line_lookup.get((away_name, home_name)) or []
+        market_game = _match_report_game_row(game, pair_rows, schedule_starts)
         if not isinstance(market_game, dict):
-            warnings.append(f"Missing game-line match for {away_name} at {home_name}")
+            if len(pair_rows) > 1:
+                # NAMED, because "missing" and "ambiguous" have different owners:
+                # the first is an alias/coverage gap, the second is a
+                # doubleheader whose halves this pass refused to tell apart.
+                warnings.append(
+                    f"Ambiguous game-line match for {away_name} at {home_name}: "
+                    f"{len(pair_rows)} odds rows on the pair and no scheduled start to separate them"
+                )
+            else:
+                warnings.append(f"Missing game-line match for {away_name} at {home_name}")
             continue
 
         base = _base_game_row_from_report(date_str, game, market_game)
