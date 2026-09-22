@@ -39812,3 +39812,17 @@ The size of the burst tracks the chunk. The only code in that window that scales
 **Predicted from the replay** (`0b5518ab` commit message): 403 -> 0 undated prop grid rows over production's 09-22 shard, 0 existing values changed -- matched.
 **NEW BLOCKER, NOT THIS CHANGE (lead filed).** With the start time present, the same Soroka strikeout row (`astatc-mlb-az-col-2026-09-22-k-micsor-gte5`, over 4.5, plan ev 4.39) now reaches the NEXT gate and is refused `market_unresolved_for_position` (15:57:46Z; `ORDER_PATH ... strikeouts: {market_unresolved: 1}`): `resolve_market` finds no market for the slug in live-odds-worker's Polymarket slate. The missing `commence_time` had been hiding it.
 Claim released after this entry.
+
+## 2026-09-22 15:59:39Z -> live 16:06:11Z (10:59-11:06 AM CT) — web `27af7934` -> `585ddca0` (`dep-dapabqvf3r2c73bvgf80`) — lane `nfl-hide-backfill-weeks` — **VERIFIED; web was UNSTABLE for ~7 min after it, cause NOT established**
+
+**User decision (chat, asked directly):** "Deploy web now". Claim 15:59Z (free), preflight CLEAR 15:59:32Z, released ~16:19Z. **Deployed `585ddca0`, NOT origin/main's tip:** three doubleheader commits from another lane (`9ad08717`, `a988ab4d`, `5b509b55`) landed after the user approved the ride-along set, so the approved commit was deployed instead (it is on main and descends from live). **Carries:** `585ddca0` (this lane), `45608cb3` (board-state ledger line count streamed; lane refresh-worker-oom-0922), `0b5518ab` (Polymarket quote identity stamp + book_grid commence_time; user decision).
+
+    field                                   baseline 15:59:17Z     predicted     measured (16:17:51Z, once stable)
+    live_commit                             27af7934               585ddca0      585ddca0 (live 16:06:11Z)
+    /nfl/api/weeks available_weeks          [1..18]                [1,2,3]       [1, 2, 3]
+    /nfl/api/market-board available_weeks   [1..18]                [1,2,3]       [1, 2, 3]
+    /nfl/api/market-board?week=18           week 18                week 3        week 3, 16 games
+    /nfl/api/cards?week=18                  week 18 (backfill)     week 3        2026 Week 3, 16 games, ..._wk3.csv
+    /nfl/api/picks?week=18                  --                     --            week 18, have_data False, 0 rows (picks' existing `explicit_missing_week` empty state: no stale numbers, no fallback -- by design)
+
+**POST-DEPLOY INSTABILITY -- recorded, not explained.** Render events: `server_failed` 16:08:48Z and 16:12:02Z, both `HTTP health check failed (timed out after 5 seconds)`, `server_available` 16:11:02Z. Gunicorn booted THREE times (16:06:02 pids 62/63; 16:07:24 and 16:10:54 pids 40/41 = container restarts). All routes 502 at 16:07:22-16:07:30Z and 16:10:46-16:11:03Z; 200s in between took up to 8 s (`/api/health`), 17-23 s (market board, cards) and 42-55 s (`/nfl/api/weeks`); from ~16:14Z every NFL endpoint and `/api/health` answer in 0.2-0.5 s, no further events through 16:19Z. **Web's two previous deploys today (03:35Z, 15:36Z) booted ONCE with no `server_failed`.** This lane's change was measured and ruled out by MAGNITUDE, not by experiment: `week_summaries()` 2.63 -> 3.90 ms/call locally (37 extra `stat()` + a cached one-time read), called 3 times per NFL page build (counted) -- ~4 ms/page, against a whole-process stall that also slowed `/api/health`. The two other commits in the deploy were NOT examined. **Open:** a lead, not a lane.
