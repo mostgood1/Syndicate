@@ -39749,3 +39749,19 @@ The last pre-fix snapshot (generated 14:45:00Z, old process) still read the chec
     polymarket pass                     positions=3, per-line refusals     same shape  positions=4 placed=0 duplicates=2 (the two 14:26Z totals orders) refused={'commence_unknown': 2}
 
 `Traceback` since 15:03Z: none. **LEAD (not this change):** the two refusals are MLB STRIKEOUTS props (`astatc-mlb-...-k-...`) with NO `commence_time` on the live-plan row -- a per-line data gap that stops every such Polymarket prop at `commence_unknown`; recorded in leads.md.
+
+## 2026-09-22 15:1xZ (10:1x CDT) — READING, no deploy — lane `live-inplay-board-cadence` — **lever 2b (`3072ab01`, refresh-worker grid tick skips non-live sports on the live cadence): still live, 0 grid errors, neither restart is the grid tick; no kill switch**
+**Context.** Scheduled task `deploy-lever-2b-refresh-worker-0922` was a DEPLOY, turned into a reading: 2b went live 09-21 21:49:21Z as a ride-along of `dd43fd49` (lane `layer2-score-outcome-calibration`, user "Ship main now, both go"). Nothing deployed, no claim, no env touched.
+**Live commit.** refresh-worker `3d9058b3` (live 14:03:40Z 09-22, trigger api). Every refresh-worker deploy since 21:49:21Z (`dd43fd49`, `b99143e2`, `03d3f801`, `e7f216bf`, `f0e60bec`, `3d9058b3`) contains `3072ab01` (`merge-base --is-ancestor` true for each), so 2b never dropped out.
+**Instrument.** Render logs API, refresh-worker, 21:49:21Z 09-21 -> 15:04Z 09-22, queried in 1-h windows paged to exhaustion (a single whole-window query returned only 23:02-02:59Z: do not trust it), deduped by log id. Proven non-empty on both sides of that artefact (ticks at 22:50Z and 14:15-14:57Z).
+    BOOK_GRID_TICK lines        219 (live_cadence true 147: 22Z-04Z; false 72: 05Z-15Z at 600 s)
+    BOOK_GRID_TICK_ERROR        0
+    BOOK_GRID_BUILD_ERROR       0
+    skipped_not_live on live-cadence ticks: soccer 119, nfl 54, nhl 38, wnba 23, mlb 1
+The 147 / skipped counts match the lever-1 reading's context line (13:4xZ entry) from an independent window.
+**Health (events API).** 5 deploy cycles (22:28, 22:58, 23:36, 00:06, 14:00Z) plus two restarts:
+- 04:08:47Z (23:08 CDT) `server_failed oomKilled 4Gi`. `last_stage=board_contract_end`, directly after `[INTEL_TRACE] evaluation_bundle duration_ms=154699`; anon 2133 -> 2403 MB at 175.6 MB/s in one step. The last grid tick ended at 04:07:16Z, 81 s earlier. **Not attributable to the grid tick** on this evidence (not proven innocent; 2b only removes grid work).
+- 13:25:03Z (08:25 CDT) `server_failed earlyExit`: `[worker_recycle] RECYCLE_EXIT reason=heavy_build_refused consecutive_refusals=5 stage=pre_source_state_fingerprint`, a deliberate recycle, not the grid tick.
+Note for the owners of memory: container memory read 3716/4096 MB (90.7%) at 15:04Z.
+**Last night's lever-1 reading** (`inplay-warmer-live-reading-0921`, 13:4xZ entry above) flagged nothing about refresh-worker; its 2b line is context only.
+**Recommendation.** Keep 2b on. No kill switch (`SYNDICATE_BOOK_GRID_SKIP_NONLIVE_SPORTS=off` not warranted). Measuring the live window is the separate task `lever-2b-live-reading-0922` (20:00 CDT).
