@@ -8253,6 +8253,10 @@ def main() -> int:
                 "game_number": game_number,
                 "series_game_number": series_game_number,
                 "status": status_obj,
+                # StatsAPI scheduled start (UTC ISO). Lets the card builder tell a
+                # doubleheader's two OddsAPI events apart by commence_time
+                # (2026-09-22 TB @ NYY). Additive: readers must tolerate its absence.
+                "game_date": g.get("gameDate"),
             },
             "away": asdict(t_away),
             "home": asdict(t_home),

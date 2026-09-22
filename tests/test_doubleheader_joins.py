@@ -273,3 +273,187 @@ def test_the_ticker_resolver_gives_each_half_its_own_ticker():
     resolve = kalshi_ticker_resolver(out["matches"])
     assert resolve(rows[0]) == G1_TB
     assert resolve(rows[1]) == G2_TB
+
+
+# --- the sim projections (the model probability admission and sizing read) ---
+
+
+def _sim_game(pk, number, home_win, tb_mean, p_tb_cal):
+    # Trimmed from production's daily_summary_2026_09_22.json (both halves).
+    return {
+        "game_pk": pk,
+        "game_number": number,
+        "double_header": "S",
+        "away": "TB",
+        "home": "NYY",
+        "full": {"home_win_prob": home_win, "away_win_prob": round(1 - home_win, 3), "tie_prob": 0.0},
+        "hitter_props_likelihood_topn": {
+            "total_bases_2plus": [
+                {"batter_id": 666018, "name": "Jonathan Aranda", "team": "TB",
+                 "p_tb_2plus": p_tb_cal + 0.05, "p_tb_2plus_cal": p_tb_cal, "tb_mean": tb_mean}
+            ]
+        },
+    }
+
+
+@pytest.fixture
+def dh_index(tmp_path):
+    import json
+
+    from syndicate.features.shared.prop_projections import load_prop_projections
+
+    summary = tmp_path / "daily_summary_2026_09_22.json"
+    summary.write_text(json.dumps({"outputs": [
+        _sim_game(823543, 1, 0.606, 1.513, 0.298),
+        _sim_game(823494, 2, 0.531, 1.502, 0.308),
+    ]}), encoding="utf-8")
+    return load_prop_projections(summary)
+
+
+def _proj_row(game_pk, **kw):
+    row = {
+        "sport": "mlb",
+        "home_team": "New York Yankees",
+        "away_team": "Tampa Bay Rays",
+        "game": {"game_key": game_pk} if game_pk else {},
+    }
+    row.update(kw)
+    return row
+
+
+def _aranda_tb(game_pk):
+    return _proj_row(game_pk, market="batter_total_bases", player_name="Jonathan Aranda", line=1.5,
+                     sides=["over", "under"], consensus={"over": 140, "under": -170})
+
+
+def _moneyline(game_pk):
+    return _proj_row(game_pk, market="h2h", player_name=None, sides=["home"])
+
+
+def test_each_half_reads_its_own_game_line_projection(dh_index):
+    from syndicate.features.shared.prop_projections import attach_projections
+
+    rows = [_moneyline("823543"), _moneyline("823494")]
+    coverage = attach_projections(rows, dh_index)
+    assert rows[0]["projection"]["model_prob_over"] == pytest.approx(0.606, abs=1e-3)
+    assert rows[1]["projection"]["model_prob_over"] == pytest.approx(0.531, abs=1e-3)
+    assert coverage["rows_resolved_by_game_pk"] == 2
+
+
+def test_each_half_reads_its_own_player_projection(dh_index):
+    from syndicate.features.shared.prop_projections import attach_projections
+
+    rows = [_aranda_tb("823543"), _aranda_tb("823494")]
+    attach_projections(rows, dh_index)
+    assert rows[0]["projection"]["projected"] == pytest.approx(1.513)
+    assert rows[1]["projection"]["projected"] == pytest.approx(1.502)
+
+
+def test_a_doubleheader_row_with_no_game_id_gets_no_projection(dh_index):
+    from syndicate.features.shared.prop_projections import attach_projections
+
+    rows = [_moneyline(None), _aranda_tb(None)]
+    coverage = attach_projections(rows, dh_index)
+    assert "projection" not in rows[0] and "projection" not in rows[1]
+    assert coverage["rows_refused_game_ambiguous"] == 2
+
+
+def test_a_row_never_takes_the_other_halfs_sim_when_its_own_is_missing(tmp_path):
+    import json
+
+    from syndicate.features.shared.prop_projections import attach_projections, load_prop_projections
+
+    summary = tmp_path / "daily_summary_2026_09_22.json"
+    summary.write_text(json.dumps({"outputs": [_sim_game(823543, 1, 0.606, 1.513, 0.298)]}), encoding="utf-8")
+    index = load_prop_projections(summary)
+    rows = [_moneyline("823494"), _aranda_tb("823494"), _moneyline("823543")]
+    coverage = attach_projections(rows, index)
+    assert "projection" not in rows[0] and "projection" not in rows[1]
+    assert rows[2]["projection"]["model_prob_over"] == pytest.approx(0.606, abs=1e-3)
+    assert coverage["rows_refused_other_game"] == 2
+
+
+def test_an_ordinary_game_is_unchanged_without_a_game_id(tmp_path):
+    import json
+
+    from syndicate.features.shared.prop_projections import attach_projections, load_prop_projections
+
+    summary = tmp_path / "daily_summary_2026_09_22.json"
+    summary.write_text(json.dumps({"outputs": [_sim_game(823543, 1, 0.606, 1.513, 0.298)]}), encoding="utf-8")
+    rows = [_moneyline(None), _aranda_tb(None)]
+    coverage = attach_projections(rows, load_prop_projections(summary))
+    assert rows[0]["projection"]["model_prob_over"] == pytest.approx(0.606, abs=1e-3)
+    assert rows[1]["projection"]["projected"] == pytest.approx(1.513)
+    assert coverage["rows_resolved_by_game_pk"] == 0
+
+
+def test_the_chip_join_stamps_the_game_id_projections_read(chips):
+    chips({"2026-09-22": [dict(_chip(G1_START, "12:05P CT"), game_key="823543"),
+                          dict(_chip(G2_START, "6:05P CT"), game_key="823494")]})
+    grid = [_grid_row(G1_COMMENCE), _grid_row(G2_COMMENCE)]
+    BE.attach_game_state(grid, sport="mlb", selected_date="2026-09-22")
+    assert [row["game"]["game_key"] for row in grid] == ["823543", "823494"]
+
+
+# --- the Polymarket board join (the order path's slug) ----------------------
+
+
+def _pm_market(slug, outcomes, prices, market_type):
+    import json
+
+    return {
+        "slug": slug, "sportsMarketTypeV2": market_type,
+        "outcomes": json.dumps(outcomes), "outcomePrices": json.dumps(prices),
+        "orderPriceMinTickSize": "0.005", "minimumTradeQty": "0.01", "orderable": True,
+    }
+
+
+def _pm_row(event_id, commence, market, side, line=None):
+    return {"sport": "mlb", "event_id": event_id, "market": market, "side": side, "line": line,
+            "home_team": "New York Yankees", "away_team": "Tampa Bay Rays", "commence_time": commence}
+
+
+# Slugs as the venue listed them on 2026-09-22.
+_PM_TOTAL, _PM_ML = "SPORTS_MARKET_TYPE_TOTAL", "SPORTS_MARKET_TYPE_MONEYLINE"
+_PM_MARKETS = [
+    _pm_market("tsc-mlb-tb-nyy-2026-09-22-dh1-8pt5", ["Over", "Under"], ["0.45", "0.56"], _PM_TOTAL),
+    _pm_market("tsc-mlb-tb-nyy-2026-09-22-dh1-7pt5", ["Over", "Under"], ["0.55", "0.46"], _PM_TOTAL),
+    _pm_market("tsc-mlb-tb-nyy-2026-09-22-dh2-7pt5", ["Over", "Under"], ["0.50", "0.51"], _PM_TOTAL),
+    _pm_market("aec-mlb-tb-nyy-2026-09-22-dh1", ["Rays", "Yankees"], ["0.40", "0.61"], _PM_ML),
+    _pm_market("aec-mlb-tb-nyy-2026-09-22-dh2", ["Rays", "Yankees"], ["0.46", "0.55"], _PM_ML),
+]
+
+
+def _pm_slugs(rows):
+    from syndicate.features.shared.polymarket_board_join import join_polymarket_to_board, polymarket_ticker_resolver
+
+    out = join_polymarket_to_board(_PM_MARKETS, rows, sport="mlb", selected_date="2026-09-22")
+    resolve = polymarket_ticker_resolver(out.get("matches") or [])
+    return [(resolve(row) or {}).get("slug") for row in rows], out
+
+
+def test_each_polymarket_half_trades_only_its_own_contract():
+    rows = [
+        _pm_row("g1", G1_COMMENCE, "totals", "over", 7.5), _pm_row("g2", G2_COMMENCE, "totals", "over", 7.5),
+        _pm_row("g1", G1_COMMENCE, "h2h", "home"), _pm_row("g2", G2_COMMENCE, "h2h", "home"),
+    ]
+    slugs, out = _pm_slugs(rows)
+    assert slugs == [
+        "tsc-mlb-tb-nyy-2026-09-22-dh1-7pt5", "tsc-mlb-tb-nyy-2026-09-22-dh2-7pt5",
+        "aec-mlb-tb-nyy-2026-09-22-dh1", "aec-mlb-tb-nyy-2026-09-22-dh2",
+    ]
+    assert out["doubleheader_candidates_kept"] == 4
+
+
+def test_a_line_only_game_one_lists_never_pairs_with_game_two():
+    # dh1 lists 8.5; dh2 does not. Game 2's 8.5 row must get NOTHING.
+    rows = [_pm_row("g1", G1_COMMENCE, "totals", "over", 8.5), _pm_row("g2", G2_COMMENCE, "totals", "over", 8.5)]
+    slugs, _ = _pm_slugs(rows)
+    assert slugs == ["tsc-mlb-tb-nyy-2026-09-22-dh1-8pt5", None]
+
+
+def test_a_lone_half_on_the_board_is_refused_not_guessed():
+    # Only game 2's row: its number cannot be read from the board alone.
+    slugs, out = _pm_slugs([_pm_row("g2", G2_COMMENCE, "totals", "over", 8.5)])
+    assert slugs == [None]
+    assert out["doubleheader_candidates_skipped"]["half_unresolved"] >= 1

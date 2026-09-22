@@ -8,7 +8,7 @@ import os
 import shutil
 import subprocess
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -4097,6 +4097,67 @@ def _base_game_row(sim_obj: Dict[str, Any], market_game: Optional[Dict[str, Any]
     }
 
 
+def _parse_utc_timestamp(value: Any) -> Optional[datetime]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
+
+
+def _match_market_game_row(sim_obj: Dict[str, Any], rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Pick THIS sim's game-lines row from every row sharing its (away, home) pair.
+
+    A doubleheader puts two OddsAPI events on one team pair. Keyed on the pair
+    alone, the later event overwrote the earlier one and BOTH games were priced
+    against game 2's lines -- measured 2026-09-22, TB @ NYY: G1 gamePk 823543
+    (17:05Z) and G2 823494 (23:05Z) both served commence_time 23:06Z, so G1's
+    official picks carried G2's event_id and odds.
+
+    One row: returned unchanged, as before. Several: the row whose
+    commence_time is nearest the sim's scheduled start (schedule.game_date);
+    records written before that field existed fall back to the pair's rows in
+    commence order, index game_number - 1. Neither discriminates: None -- no
+    line is better than the other game's line.
+    """
+    if len(rows) <= 1:
+        return rows[0] if rows else None
+    schedule = sim_obj.get("schedule") or {}
+    label = (
+        f"gamePk={sim_obj.get('game_pk')} {(sim_obj.get('away') or {}).get('name')} @ "
+        f"{(sim_obj.get('home') or {}).get('name')} ({len(rows)} odds rows on the pair)"
+    )
+    stamped = [(_parse_utc_timestamp(row.get("commence_time")), row) for row in rows]
+    if any(ts is None for ts, _ in stamped):
+        print(f"[multi-profile] game lines REFUSED for {label}: a row has no parseable commence_time", flush=True)
+        return None
+    timed = sorted(stamped, key=lambda item: item[0])
+
+    scheduled_start = _parse_utc_timestamp(schedule.get("game_date"))
+    if scheduled_start is not None:
+        gaps = sorted((abs((ts - scheduled_start).total_seconds()), idx) for idx, (ts, _) in enumerate(timed))
+        if gaps[0][0] < gaps[1][0]:
+            row = timed[gaps[0][1]][1]
+            print(f"[multi-profile] game lines for {label}: event {row.get('event_id')} by start time", flush=True)
+            return row
+
+    game_number = schedule.get("game_number")
+    if isinstance(game_number, int) and not isinstance(game_number, bool) and 1 <= game_number <= len(timed):
+        ts, row = timed[game_number - 1]
+        if sum(1 for other, _ in timed if other == ts) == 1:
+            print(f"[multi-profile] game lines for {label}: event {row.get('event_id')} by game_number={game_number}", flush=True)
+            return row
+
+    print(
+        f"[multi-profile] game lines REFUSED for {label}: no start time or game_number discriminates the rows",
+        flush=True,
+    )
+    return None
+
+
 def _collect_game_recommendations(sim_dir: Path, game_lines_path: Path, policy: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
     out: Dict[str, List[Dict[str, Any]]] = {"totals": [], "ml": []}
     if not game_lines_path.exists():
@@ -4133,16 +4194,17 @@ def _collect_game_recommendations(sim_dir: Path, game_lines_path: Path, policy: 
         return doc
 
     games = (_read_json(game_lines_path).get("games") or [])
-    line_lookup = {
-        (g.get("away_team"), g.get("home_team")): g
-        for g in games
-        if isinstance(g, dict) and g.get("away_team") and g.get("home_team")
-    }
+    # A LIST per team pair, not one row: a doubleheader's two events share the
+    # pair, and a dict keyed on it kept only the last (2026-09-22 TB @ NYY).
+    line_lookup: Dict[Tuple[Any, Any], List[Dict[str, Any]]] = {}
+    for g in games:
+        if isinstance(g, dict) and g.get("away_team") and g.get("home_team"):
+            line_lookup.setdefault((g.get("away_team"), g.get("home_team")), []).append(g)
 
     for sim_obj in _iter_sim_records(sim_dir):
         away_name = (sim_obj.get("away") or {}).get("name")
         home_name = (sim_obj.get("home") or {}).get("name")
-        market_game = line_lookup.get((away_name, home_name))
+        market_game = _match_market_game_row(sim_obj, line_lookup.get((away_name, home_name)) or [])
         if not market_game:
             continue
 

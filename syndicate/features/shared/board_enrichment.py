@@ -322,6 +322,11 @@ def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
             "matchup": chip.get("matchup"),
             "home_score": (chip.get("home") or {}).get("score"),
             "away_score": (chip.get("away") or {}).get("score"),
+            # THE GAME'S OWN ID (MLB: the gamePk), resolved above on start time.
+            # Downstream joins that would otherwise key on the team pair -- the
+            # sim projections (`prop_projections._row_game_pk`) -- read it to
+            # tell a doubleheader's halves apart.
+            "game_key": chip.get("game_key") or None,
         }
         matched += 1
 

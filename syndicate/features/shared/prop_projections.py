@@ -317,6 +317,25 @@ _SEGMENT_PAYLOADS: dict[str, str] = {
 }
 
 
+def _game_pk_text(value: Any) -> str:
+    """A gamePk as a digit string -- the sim writes an int, the chip a string."""
+    text = str(value if value is not None else "").strip()
+    if text.endswith(".0"):
+        text = text[:-2]
+    return text if text.isdigit() and text != "0" else ""
+
+
+def _row_game_pk(row: Mapping[str, Any]) -> str:
+    """The gamePk a board row belongs to, from the chip join's `game.game_key`.
+
+    `attach_game_state` resolves the chip on the row's own start time, so on a
+    doubleheader this is the row's OWN half. Absent when the chip join ran
+    before this field existed or could not separate the pair.
+    """
+    game = row.get("game") if isinstance(row.get("game"), Mapping) else {}
+    return _game_pk_text(game.get("game_key")) or _game_pk_text(row.get("game_pk"))
+
+
 class PropProjectionIndex:
     """Lookup from (player, market, line) to what the sim projected.
 
@@ -344,14 +363,48 @@ class PropProjectionIndex:
         # is the join the sim already made, not a second name match.
         self._player_ids: dict[str, str] = {}
         self.games = 0
+        # ONE SUB-INDEX PER SIMULATED GAME, keyed by gamePk (as a digit string).
+        #
+        # Every key above is game-blind -- a team pair, a player name -- and the
+        # later `ingest_game` overwrites the earlier. On a doubleheader the two
+        # halves share both, so the whole slate's view of either game was the
+        # half that happened to load LAST. Measured 2026-09-22, TB @ NYY: game
+        # 1's moneyline row read game 2's sim (home 0.531; game 1's own sim says
+        # 0.606) and both halves' Jonathan Aranda rows read one projection.
+        # `for_game_pk` hands back the sub-index for one game; `attach_projections`
+        # uses it whenever the row's own gamePk is known (the chip join stamps
+        # it, resolved on start time) and refuses a pair or player that spans
+        # two games when it is not.
+        self._by_game_pk: dict[str, "PropProjectionIndex"] = {}
+        self._pair_game_pks: dict[tuple[str, str], list[str]] = {}
+        self._player_game_pks: dict[str, set[str]] = {}
 
     # -- build ----------------------------------------------------------
-    def ingest_game(self, game: Mapping[str, Any], *, pitcher_names: Mapping[str, str] | None = None) -> None:
+    def ingest_game(
+        self,
+        game: Mapping[str, Any],
+        *,
+        pitcher_names: Mapping[str, str] | None = None,
+        _sub_index: bool = False,
+    ) -> None:
         self.games += 1
 
         # Game-level payloads, one per simulated segment.
         away = str(game.get("away") or "").strip().upper()
         home = str(game.get("home") or "").strip().upper()
+        game_pk = _game_pk_text(game.get("game_pk"))
+        if game_pk and not _sub_index:
+            sub = self._by_game_pk.get(game_pk)
+            if sub is None:
+                sub = PropProjectionIndex()
+                self._by_game_pk[game_pk] = sub
+            sub.ingest_game(game, pitcher_names=pitcher_names, _sub_index=True)
+            if away and home:
+                pks = self._pair_game_pks.setdefault((away, home), [])
+                if game_pk not in pks:
+                    pks.append(game_pk)
+            for name in sub.player_names():
+                self._player_game_pks.setdefault(name, set()).add(game_pk)
         if away and home:
             segments = {
                 name: game.get(name)
@@ -427,6 +480,35 @@ class PropProjectionIndex:
     def player_id(self, player_name: Any) -> str | None:
         """MLBAM id for a name the sim projected, or None when absent or ambiguous."""
         return self._player_ids.get(_norm_name(player_name)) or None
+
+    def player_names(self) -> set[str]:
+        """Every normalised name this index can project, pitchers and hitters."""
+        return set(self._pitchers) | set(self._hitter_means) | {key[0] for key in self._hitters}
+
+    def for_game_pk(self, game_pk: Any) -> "PropProjectionIndex | None":
+        """The sub-index holding ONLY this game's sim, or None if it was not simulated."""
+        return self._by_game_pk.get(_game_pk_text(game_pk))
+
+    def game_pks_for_pair(self, *, sport: Any, home_team: Any, away_team: Any) -> list[str]:
+        """gamePks the sim holds for this TEAM PAIR -- two on a doubleheader."""
+        if not self._pair_game_pks:
+            return []
+        try:
+            from syndicate.features.shared.team_aliases import teams_match
+        except Exception:
+            return []
+        out: list[str] = []
+        for (away_tri, home_tri), pks in self._pair_game_pks.items():
+            try:
+                if teams_match(sport, home_team, home_tri) and teams_match(sport, away_team, away_tri):
+                    out.extend(pk for pk in pks if pk not in out)
+            except Exception:
+                continue
+        return out
+
+    def game_pks_for_player(self, player_name: Any) -> set[str]:
+        """gamePks whose sim projects this player -- two when he plays both halves."""
+        return set(self._player_game_pks.get(_norm_name(player_name)) or ())
 
     def _derived_hrr_mean(self, name: str) -> float | None:
         """Hits + Runs + RBIs, summed from the components the sim DOES write.
@@ -1106,6 +1188,38 @@ def _edge_unavailable_reason(
     return "no two-sided fair could be computed from the quoted prices"
 
 
+def _index_for_row(index: PropProjectionIndex, row: Mapping[str, Any]) -> tuple[PropProjectionIndex | None, str]:
+    """Which index may answer for this row: the slate's, one game's, or none.
+
+    `single` -- the pair/player is in at most one simulated game: the slate
+    index, exactly as before. `resolved` -- it spans two games and the row
+    names its own gamePk: that game's sub-index. `ambiguous` -- it spans two
+    games and the row names none. `other_game` -- the row's gamePk is known and
+    the sim holds this pair/player only for a DIFFERENT game (the other half's
+    sim, when this half's was not built). The last two are refused: the other
+    half's projection next to this half's price is a confident wrong number,
+    which is worse than a blank.
+    """
+    player = row.get("player_name")
+    if player:
+        pks = index.game_pks_for_player(player)
+    else:
+        pks = set(
+            index.game_pks_for_pair(
+                sport=row.get("sport"), home_team=row.get("home_team"), away_team=row.get("away_team")
+            )
+        )
+    row_pk = _row_game_pk(row)
+    if row_pk and pks and row_pk not in pks:
+        return None, "other_game"
+    if len(pks) <= 1:
+        return index, "single"
+    sub = index.for_game_pk(row_pk) if row_pk else None
+    if sub is None:
+        return None, "ambiguous"
+    return sub, "resolved"
+
+
 def attach_projections(grid_rows: list[dict[str, Any]], index: PropProjectionIndex) -> dict[str, Any]:
     """Stamp `projection` onto each grid row that the sim can answer for.
 
@@ -1126,20 +1240,33 @@ def attach_projections(grid_rows: list[dict[str, Any]], index: PropProjectionInd
     player_no_projection = 0      # name known; no value for this market/line
     game_rows = 0
     game_no_projection = 0
+    # Doubleheader routing, counted by outcome (see `_index_for_row`).
+    game_pk_resolved = 0
+    game_pk_ambiguous = 0
+    game_pk_other_game = 0
     for row in grid_rows:
         player = row.get("player_name")
         sides = list(row.get("sides") or ())
         considered += 1
         projected_side = None
+        row_index, routing = _index_for_row(index, row)
+        if routing == "resolved":
+            game_pk_resolved += 1
+        elif routing == "ambiguous":
+            game_pk_ambiguous += 1
+        elif routing == "other_game":
+            game_pk_other_game += 1
         if player:
             player_rows += 1
-            projection = index.project(
-                player_name=player, market=row.get("market"), line=row.get("line")
+            projection = (
+                row_index.project(player_name=player, market=row.get("market"), line=row.get("line"))
+                if row_index is not None
+                else None
             )
-            if projection is None:
+            if projection is None and row_index is not None:
                 # Asked BEFORE the row is dropped, because after the `continue`
                 # the name is gone and the reason is unrecoverable.
-                if index.knows_player(player):
+                if row_index.knows_player(player):
                     player_no_projection += 1
                 else:
                     player_unmatched_name += 1
@@ -1156,9 +1283,9 @@ def attach_projections(grid_rows: list[dict[str, Any]], index: PropProjectionInd
             )
             projected_side = over_side
             game_rows += 1
-            if over_side is not None:
+            if over_side is not None and row_index is not None:
                 projection = project_game_market(
-                    index,
+                    row_index,
                     sport=row.get("sport"),
                     home_team=row.get("home_team"),
                     away_team=row.get("away_team"),
@@ -1289,4 +1416,12 @@ def attach_projections(grid_rows: list[dict[str, Any]], index: PropProjectionInd
         "pct_player_name_missed": (
             round(100.0 * player_unmatched_name / player_rows, 1) if player_rows else 0.0
         ),
+        # DOUBLEHEADER ROUTING. `resolved`: a pair/player the sim holds for two
+        # games, projected from the row's own game. `ambiguous`: the same, with
+        # no gamePk on the row -- refused. `other_game`: the sim holds it only
+        # for a different game than the row's -- refused. Zero on a day with no
+        # doubleheader; absence of the FIELD means the code is not deployed.
+        "rows_resolved_by_game_pk": game_pk_resolved,
+        "rows_refused_game_ambiguous": game_pk_ambiguous,
+        "rows_refused_other_game": game_pk_other_game,
     }

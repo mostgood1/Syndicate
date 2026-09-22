@@ -245,6 +245,33 @@ def parse_slug(slug: Any) -> dict[str, Any] | None:
     }
 
 
+_DOUBLEHEADER_TOKEN = re.compile(r"^dh(?P<number>[1-9])$")
+
+
+def _doubleheader_number(parsed: Mapping[str, Any]) -> int | None:
+    """The `dhN` modifier of a doubleheader slug, or None for an ordinary game.
+
+    Polymarket names each half of a doubleheader in EVERY market family's slug
+    -- `aec-mlb-tb-nyy-2026-09-22-dh1`, `asc-...-dh2-neg-1pt5`,
+    `tsc-...-dh1-f5-2pt5` (read from production 2026-09-22) -- and that token
+    is the only thing that tells the two halves' contracts apart: league,
+    date, clubs, market and line are all shared.
+    """
+    for token in parsed.get("modifiers") or ():
+        match = _DOUBLEHEADER_TOKEN.match(str(token or "").strip().lower())
+        if match:
+            return int(match.group("number"))
+    return None
+
+
+def _eastern_date(epoch: float) -> str:
+    """The venue's slug date for a start: the game's Eastern calendar date."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    return datetime.fromtimestamp(epoch, tz=ZoneInfo("America/New_York")).date().isoformat()
+
+
 def _slug_number(token: str) -> float | None:
     match = _SLUG_NUMBER.match(str(token or "").strip().lower())
     if not match:
@@ -1324,6 +1351,10 @@ def _join_polymarket_to_board_impl(
     to parse, the date was wrong, or the venue simply does not quote the sport.
     """
     refusals: dict[str, int] = {}
+    # `dhN` contracts: candidates kept for their own half, and candidates
+    # skipped (another half's contract, or a half whose number is unreadable).
+    doubleheader_matched = [0]
+    doubleheader_refused = {"other_half": 0, "half_unresolved": 0}
     # Shapes behind the parse refusals. A count says how many; only a sample
     # says WHAT, and every unexplained refusal this week needed the sample.
     shapes: list[dict[str, Any]] = []
@@ -1836,6 +1867,39 @@ def _join_polymarket_to_board_impl(
             if pair not in slot:
                 slot.append(pair)
 
+    # EACH FIXTURE'S DISTINCT STARTS PER GAME DATE, for the doubleheader check
+    # in the candidate loop. A board row's game number is its start's rank
+    # among its fixture's starts on that Eastern date -- readable only when
+    # BOTH halves are on the board, so `_row_game_number` answers None
+    # otherwise and a `dhN` contract is then refused rather than guessed.
+    from syndicate.features.shared.doubleheader import start_epoch as _start_epoch
+
+    fixture_starts: dict[tuple[str, str, str, str], set[float]] = {}
+    for board_row in board_rows:
+        _bl = _norm(board_row.get("sport") or sport)
+        _bh = board_row.get("home") or board_row.get("home_team")
+        _ba = board_row.get("away") or board_row.get("away_team")
+        _start = _start_epoch(board_row.get("commence_time"))
+        if _bl and _bh and _ba and _start is not None:
+            fixture_starts.setdefault(
+                (_bl, str(_bh), str(_ba), _eastern_date(_start)), set()
+            ).add(_start)
+
+    def _row_game_number(board_row: Mapping[str, Any]) -> int | None:
+        _start = _start_epoch(board_row.get("commence_time"))
+        if _start is None:
+            return None
+        _key = (
+            _norm(board_row.get("sport") or sport),
+            str(board_row.get("home") or board_row.get("home_team")),
+            str(board_row.get("away") or board_row.get("away_team")),
+            _eastern_date(_start),
+        )
+        starts = sorted(fixture_starts.get(_key) or ())
+        if len(starts) < 2 or _start not in starts:
+            return None
+        return starts.index(_start) + 1
+
     # WHICH BOARD PLAYERS SHARE A DERIVED TOKEN, PER GAME. Two of our own
     # players encoding to one token cannot be told apart at the venue, so BOTH
     # refuse -- picking either is the wrong-person order this module exists to
@@ -2076,6 +2140,23 @@ def _join_polymarket_to_board_impl(
                 board_fixtures.get((league, date)),
             ):
                 continue
+            # A DOUBLEHEADER HALF PAIRS ONLY WITH ITS OWN HALF'S CONTRACT.
+            # Measured 2026-09-22, TB @ NYY: the venue lists `dh1` and `dh2`
+            # markets that share league, date, clubs, market and (often) line,
+            # so a total or spread one half lists at a line the other does not
+            # (`tsc-...-dh1-8pt5` vs `tsc-...-dh2-5pt5`) would pair with
+            # EITHER half's row -- an order on the other game. The contract's
+            # `dhN` must equal the row's game number (its start's rank among
+            # the fixture's starts that day); an unreadable number refuses.
+            _dh = _doubleheader_number(candidate["parsed"])
+            if _dh is not None:
+                _row_n = _row_game_number(board_row)
+                if _row_n != _dh:
+                    doubleheader_refused[
+                        "half_unresolved" if _row_n is None else "other_half"
+                    ] += 1
+                    continue
+                doubleheader_matched[0] += 1
             if picked is not None:
                 # AMBIGUITY IS A REFUSAL. Two venue markets claiming one board
                 # row, resolved by iteration order, is a bet on whichever came
@@ -2556,6 +2637,10 @@ def _join_polymarket_to_board_impl(
         "polymarket_markets": len(markets),
         "indexed": sum(len(v) for v in index.values()),
         "refusals": refusals,
+        # Zero on a day with no doubleheader; absence of the FIELD means the
+        # code is not deployed.
+        "doubleheader_candidates_kept": doubleheader_matched[0],
+        "doubleheader_candidates_skipped": dict(doubleheader_refused),
         "unreadable_shapes": shapes,
         # What we FETCH and discard, by (venue type, league). Complete counts
         # plus one sampled row each, so "out of scope" is a decision that can
