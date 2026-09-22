@@ -154,6 +154,21 @@ def _observed_at(row: Mapping[str, Any]) -> str:
     return str(row.get("book_updated_at") or row.get("snapshot_ts") or row.get("captured_at") or "")
 
 
+def _first_present(rows: Iterable[Mapping[str, Any]], field: str) -> Any:
+    """The first non-empty `field` across `rows`, or None.
+
+    For the grid row's identity fields, which used to be read off `rows[0]`. A
+    venue's own quote rows can arrive with no teams or start time (Polymarket's
+    did: measured 2026-09-22, 5,995 of 5,995 MLB prop quotes), so whichever row
+    happened to sort first could blank the field for the whole grid row.
+    """
+    for row in rows:
+        value = row.get(field)
+        if value not in (None, ""):
+            return value
+    return None
+
+
 def _seen_age_seconds(
     row: Mapping[str, Any], last_seen: Mapping[str, str] | None, *, now: datetime
 ) -> float | None:
@@ -734,7 +749,6 @@ def build_book_grid(
                     f"{_duration(worst_lag)} behind this market; no current price exists"
                 )
 
-            first = sides_rows[0]
             # `#435`. `commence_time` is REVISED during a slate -- measured on
             # the MLB 2026-08-09 shard, 12 of 15 events carried more than one
             # value, spread up to 7 minutes. Taking it off `sides_rows[0]` meant
@@ -752,16 +766,30 @@ def build_book_grid(
             # 18:20:00 -> 18:16:30) makes the largest value a stale one. What is
             # wanted is "what does the most recent report say", and ties break on
             # the value so the result never depends on iteration order.
-            commence_time = str(
-                max(
-                    sides_rows,
-                    key=lambda row: (
-                        _observed_at(row),
-                        str(row.get("commence_time") or ""),
-                    ),
-                ).get("commence_time")
-                or ""
-            ) or None
+            #
+            # THE FRESHEST REPORT THAT SAYS SOMETHING. A quote row with no start
+            # time is not a report that the game has none -- it is a writer that
+            # did not know it. Polymarket's own prop quotes were written with
+            # `commence_time: null` (measured 2026-09-22, MLB shard: 5,995 of
+            # 5,995), and whenever one was the newest observation it BLANKED the
+            # row: 457 of 1,823 MLB prop rows on the 15:11Z board, every one with
+            # a dated sibling quote in the same group. Downstream that reads as
+            # `commence_unknown` at the Polymarket submitter and `no_kickoff` in
+            # the recorder's grading.
+            dated_rows = [row for row in sides_rows if str(row.get("commence_time") or "").strip()]
+            commence_time = (
+                str(
+                    max(
+                        dated_rows,
+                        key=lambda row: (
+                            _observed_at(row),
+                            str(row.get("commence_time") or ""),
+                        ),
+                    ).get("commence_time")
+                ).strip()
+                if dated_rows
+                else None
+            )
             # THE MARKET-BASIS VERDICT, attached at the producer.
             #
             # `edge_vs_consensus_pct` in `best[side]` is the NUMBER; this is
@@ -804,8 +832,8 @@ def build_book_grid(
                     # line -- which side anchored is an accident of iteration
                     # order, and #262 is what that ambiguity cost.
                     "line": anchor_key,
-                    "home_team": first.get("home_team"),
-                    "away_team": first.get("away_team"),
+                    "home_team": _first_present(sides_rows, "home_team"),
+                    "away_team": _first_present(sides_rows, "away_team"),
                     "commence_time": commence_time,
                     # LEAGUE, carried rather than keyed (`#330`). All ten soccer
                     # leagues share the `soccer` sport slug and the
@@ -822,7 +850,7 @@ def build_book_grid(
                     # book coverage -- its own comment says so. `event_id` is
                     # already globally unique, so league adds no disambiguation
                     # to the key and only risk. Carried like the team names are.
-                    "league": first.get("league"),
+                    "league": _first_present(sides_rows, "league"),
                     "sides": side_names,
                     "books": books,
                     "books_quoting": len(books),

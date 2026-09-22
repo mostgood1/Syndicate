@@ -395,6 +395,11 @@ def read_portfolio_plan(selected_date: str | None) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
+# The game identity a quote row needs and a venue match does not carry. Same
+# three fields, same order, as `kalshi_odds_refresh._capture_kalshi_quotes`.
+_QUOTE_IDENTITY_FIELDS = ("home_team", "away_team", "commence_time")
+
+
 def _capture_polymarket_quotes(
     report: "Mapping[str, Any] | None",
     board_rows: "Sequence[Mapping[str, Any]] | None",
@@ -431,7 +436,19 @@ def _capture_polymarket_quotes(
             quote_rows_from_polymarket_matches,
         )
 
+        # THE GAME'S IDENTITY, from the same board rows as the sport -- the
+        # Kalshi capture has done this since 2026-09-10 and this sibling never
+        # did. `quote_rows_from_polymarket_matches` names the event and nothing
+        # else about it, so every Polymarket quote reached the shard with
+        # `commence_time`, `home_team` and `away_team` all null. MEASURED
+        # 2026-09-22 on web's MLB shard: 5,995 of 5,995 Polymarket prop quotes.
+        # `book_grid` took the grid row's start time from the newest quote, so
+        # whenever that was Polymarket's the row lost it -- 457 of 1,823 MLB
+        # prop rows on the 15:11Z board -- and the submitter refused those rows
+        # `commence_unknown`. First non-empty value per field, from ANY row of
+        # the event, matching the Kalshi rule.
         sport_by_event: dict[str, str] = {}
+        identity_by_event: dict[str, dict[str, str]] = {}
         for row in board_rows or ():
             if not isinstance(row, Mapping):
                 continue
@@ -439,9 +456,16 @@ def _capture_polymarket_quotes(
             sport = str(row.get("sport") or "").strip().lower()
             if event_id and sport:
                 sport_by_event.setdefault(event_id, sport)
+            if event_id:
+                identity = identity_by_event.setdefault(event_id, {})
+                for field in _QUOTE_IDENTITY_FIELDS:
+                    value = str(row.get(field) or "").strip()
+                    if value and field not in identity:
+                        identity[field] = value
 
         by_sport: dict[str, list[dict[str, Any]]] = {}
         no_sport = 0
+        identity_stamped = 0
         for match in matches:
             if not isinstance(match, Mapping):
                 continue
@@ -469,6 +493,17 @@ def _capture_polymarket_quotes(
             )
             if not rows:
                 continue
+            # Stamped on the QUOTE ROWS, not the matches: the row builder
+            # copies a fixed field set that does not include these three, and
+            # it lives in a file another lane holds (`book-quotes-splice-repair`).
+            for quote_row in rows:
+                identity = identity_by_event.get(str(quote_row.get("event_id") or "").strip()) or {}
+                gained = False
+                for field, value in identity.items():
+                    if not str(quote_row.get(field) or "").strip():
+                        quote_row[field] = value
+                        gained = True
+                identity_stamped += int(gained)
             result = append_book_quotes(
                 sport=sport,
                 date_str=str(selected_date or "").strip(),
@@ -496,7 +531,8 @@ def _capture_polymarket_quotes(
             # discriminates.
             f" matches={len(matches)} sports={sorted(by_sport)}"
             f" appended={captured} appended_by_sport={appended_by_sport}"
-            f" game_lines={game_line_rows} no_sport={no_sport}",
+            f" game_lines={game_line_rows} no_sport={no_sport}"
+            f" identity_stamped={identity_stamped}",
             flush=True,
         )
     except Exception as exc:  # noqa: BLE001 -- instrumentation must not fail the commit
