@@ -190,6 +190,33 @@ def game_token(sport: Any, home: Any, away: Any) -> str | None:
     return "+".join(sorted([str(one).strip().lower(), str(two).strip().lower()]))
 
 
+def doubleheader_quote_key(key: str | None, number: int | None) -> str | None:
+    """`key` qualified with the doubleheader half a VENUE CONTRACT names.
+
+    Measured 2026-09-22, TB @ NYY split doubleheader: every venue key here is
+    game-blind for props (`prop_quote_key` names the player, and a player plays
+    both halves) and names only the CLUB PAIR for game lines (`game_token`, the
+    same for both halves). `select_quote` then kept one quote per key, so game
+    2's Jonathan Aranda rows were stamped with game 1's Kalshi price and
+    ticker. A contract that names its half -- Kalshi's `...TBNYYG1...`,
+    Polymarket's `...-dh1` -- is keyed with `|dh<n>`, and a board row on a
+    doubleheader looks up only its own half's keys (`venue_quote_fanin`).
+    """
+    if not key or not number:
+        return key
+    return f"{key}|dh{int(number)}"
+
+
+def kalshi_doubleheader_number(ticker: Any) -> int | None:
+    """The `G<n>` half a Kalshi ticker's event names, or None for an ordinary game."""
+    try:
+        from syndicate.features.shared.kalshi_catalogue import _split_doubleheader, event_blob_from_ticker
+    except Exception:  # noqa: BLE001
+        return None
+    blob = event_blob_from_ticker(ticker)
+    return _split_doubleheader(blob)[1] if blob else None
+
+
 def prop_quote_key(sport: Any, market: Any, player: Any, side: Any, line: float | None) -> str | None:
     """The join key for a PLAYER PROP, or None when the player cannot be named.
 
@@ -674,6 +701,8 @@ def kalshi_outcome(
         if primary_key is None:
             prop_unnamed += 1
             continue
+        k_half = kalshi_doubleheader_number(row.get("ticker"))
+        primary_key = doubleheader_quote_key(primary_key, k_half)
         quotes.append(
             Quote(
                 key=primary_key,
@@ -734,6 +763,7 @@ def kalshi_outcome(
                     # it to a different game would be incoherent.
                     else quote_key(sport, market, mirrored, line, k_game)
                 )
+                mirror_key = doubleheader_quote_key(mirror_key, k_half)
                 quotes.append(
                     Quote(
                         key=mirror_key,
@@ -1009,10 +1039,19 @@ def polymarket_us_outcome(sport: str, selected_date: str, *, games: Any = None) 
                     (str(parsed_slug.get("away") or ""), str(parsed_slug.get("home") or ""))
                 )
                 pm_game = event_game_token(learned)
+        # The `dh<n>` half the slug names, if any (see `doubleheader_quote_key`).
+        pm_half = next(
+            (
+                int(str(token)[2:])
+                for token in (parsed_slug.get("modifiers") or ())
+                if len(str(token)) == 3 and str(token).startswith("dh") and str(token)[2:].isdigit()
+            ),
+            None,
+        )
         for side, probability in sides:
             quotes.append(
                 Quote(
-                    key=quote_key(sport, market, side, line, pm_game),
+                    key=doubleheader_quote_key(quote_key(sport, market, side, line, pm_game), pm_half),
                     source="polymarket_us",
                     sport=str(sport or ""),
                     market=market,

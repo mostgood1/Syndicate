@@ -264,14 +264,6 @@ def _doubleheader_number(parsed: Mapping[str, Any]) -> int | None:
     return None
 
 
-def _eastern_date(epoch: float) -> str:
-    """The venue's slug date for a start: the game's Eastern calendar date."""
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-
-    return datetime.fromtimestamp(epoch, tz=ZoneInfo("America/New_York")).date().isoformat()
-
-
 def _slug_number(token: str) -> float | None:
     match = _SLUG_NUMBER.match(str(token or "").strip().lower())
     if not match:
@@ -1867,38 +1859,24 @@ def _join_polymarket_to_board_impl(
             if pair not in slot:
                 slot.append(pair)
 
-    # EACH FIXTURE'S DISTINCT STARTS PER GAME DATE, for the doubleheader check
-    # in the candidate loop. A board row's game number is its start's rank
-    # among its fixture's starts on that Eastern date -- readable only when
-    # BOTH halves are on the board, so `_row_game_number` answers None
-    # otherwise and a `dhN` contract is then refused rather than guessed.
-    from syndicate.features.shared.doubleheader import start_epoch as _start_epoch
+    # EACH BOARD EVENT'S DOUBLEHEADER HALF, for the check in the candidate loop:
+    # its rank by start among its fixture's DISTINCT events that Eastern date
+    # (`shared/doubleheader.doubleheader_event_ranks`). Readable only when BOTH
+    # halves are on the board, so `_row_game_number` answers None otherwise and
+    # a `dhN` contract is then refused rather than guessed.
+    from syndicate.features.shared.doubleheader import doubleheader_event_ranks
 
-    fixture_starts: dict[tuple[str, str, str, str], set[float]] = {}
-    for board_row in board_rows:
-        _bl = _norm(board_row.get("sport") or sport)
-        _bh = board_row.get("home") or board_row.get("home_team")
-        _ba = board_row.get("away") or board_row.get("away_team")
-        _start = _start_epoch(board_row.get("commence_time"))
-        if _bl and _bh and _ba and _start is not None:
-            fixture_starts.setdefault(
-                (_bl, str(_bh), str(_ba), _eastern_date(_start)), set()
-            ).add(_start)
+    dh_ranks, _dh_unrankable = doubleheader_event_ranks(
+        board_rows,
+        fixture_of=lambda r: (
+            _norm(r.get("sport") or sport),
+            str(r.get("home") or r.get("home_team") or ""),
+            str(r.get("away") or r.get("away_team") or ""),
+        ) if (r.get("home") or r.get("home_team")) and (r.get("away") or r.get("away_team")) else None,
+    )
 
     def _row_game_number(board_row: Mapping[str, Any]) -> int | None:
-        _start = _start_epoch(board_row.get("commence_time"))
-        if _start is None:
-            return None
-        _key = (
-            _norm(board_row.get("sport") or sport),
-            str(board_row.get("home") or board_row.get("home_team")),
-            str(board_row.get("away") or board_row.get("away_team")),
-            _eastern_date(_start),
-        )
-        starts = sorted(fixture_starts.get(_key) or ())
-        if len(starts) < 2 or _start not in starts:
-            return None
-        return starts.index(_start) + 1
+        return dh_ranks.get(str(board_row.get("event_id") or "").strip())
 
     # WHICH BOARD PLAYERS SHARE A DERIVED TOKEN, PER GAME. Two of our own
     # players encoding to one token cannot be told apart at the venue, so BOTH

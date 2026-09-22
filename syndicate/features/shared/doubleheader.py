@@ -33,7 +33,7 @@ attach NOTHING rather than the other game's price, projection or ticker
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Callable, Iterable, TypeVar
+from typing import Any, Callable, Iterable, Mapping, TypeVar
 
 T = TypeVar("T")
 
@@ -170,3 +170,56 @@ def pick_by_start_time(
     if max_gap_seconds is not None and best_gap > float(max_gap_seconds):
         return None, BEYOND_MAX_GAP
     return timed[0][2], NEAREST_START
+
+
+def eastern_date_of(epoch: float) -> str:
+    """The game's Eastern calendar date -- the date the venues name a game by."""
+    from zoneinfo import ZoneInfo
+
+    return datetime.fromtimestamp(epoch, tz=ZoneInfo("America/New_York")).date().isoformat()
+
+
+def doubleheader_event_ranks(
+    rows: Iterable[Any],
+    *,
+    fixture_of: Callable[[Any], Any],
+) -> tuple[dict[str, int], set[str]]:
+    """Which half of a doubleheader each board row's event is: ``({event_id: n}, unrankable)``.
+
+    Rows are grouped by ``fixture_of(row)`` (the club pair, however the caller
+    spells it) and the Eastern date of their `commence_time`. A group holding
+    two or more DISTINCT `event_id`s is a doubleheader; its events are ranked
+    1, 2, ... by their earliest start. Ranked by EVENT, not by start, so one
+    event whose rows disagree on the minute cannot read as two games.
+
+    Readable only when both halves are in `rows`: a lone half cannot be told
+    from an ordinary game, and it is simply absent from the map -- callers
+    that need a half number must then refuse, never assume game 1. Events that
+    share a start with another event of the group are returned in
+    `unrankable`.
+    """
+    groups: dict[tuple[Any, str], dict[str, float]] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        event_id = str(row.get("event_id") or "").strip()
+        start = start_epoch(row.get("commence_time"))
+        fixture = fixture_of(row)
+        if not event_id or start is None or not fixture:
+            continue
+        events = groups.setdefault((fixture, eastern_date_of(start)), {})
+        known = events.get(event_id)
+        events[event_id] = start if known is None else min(known, start)
+    ranks: dict[str, int] = {}
+    unrankable: set[str] = set()
+    for events in groups.values():
+        if len(events) < 2:
+            continue
+        ordered = sorted(events.items(), key=lambda item: item[1])
+        starts = [start for _, start in ordered]
+        for position, (event_id, start) in enumerate(ordered, start=1):
+            if starts.count(start) > 1:
+                unrankable.add(event_id)
+            else:
+                ranks[event_id] = position
+    return ranks, unrankable

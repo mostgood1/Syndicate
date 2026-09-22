@@ -517,3 +517,59 @@ def test_the_restate_dedupes_one_game_seen_twice(restate_chips, monkeypatch):
     card = _restate_card(G1_COMMENCE, market="h2h", line=None)
     assert state_module._refresh_layer2_live_state([card], ["2026-09-22"], attach_actual=False) == 1
     assert card["market_state"] == "live"
+
+
+# --- the venue quote fan-in (the board's displayed venue price and venue_ref) --
+
+
+_KALSHI_TB_PAYLOAD = {
+    "fetched_at": "2026-09-22T16:00:00Z",
+    "series": {"KXMLBTB": {"markets": [
+        {"ticker": G1_TB, "series": "KXMLBTB", "title": "Jonathan Aranda: 2+ total bases?",
+         "yes_ask_dollars": 0.40, "no_ask_dollars": 0.62},
+        {"ticker": G2_TB, "series": "KXMLBTB", "title": "Jonathan Aranda: 2+ total bases?",
+         "yes_ask_dollars": 0.44, "no_ask_dollars": 0.58},
+    ]}},
+}
+
+
+def _fanin(rows, monkeypatch):
+    import time
+
+    from syndicate.features.shared import venue_quote_adapters as adapters
+    from syndicate.features.shared.venue_quote_fanin import apply_venue_quotes, collect_quotes
+
+    monkeypatch.setattr(adapters, "_artifact", lambda parts: (_KALSHI_TB_PAYLOAD, time.time()))
+    now = time.time()
+    collected = {"mlb": collect_quotes("mlb", "2026-09-22", adapters={"kalshi": adapters.kalshi_outcome}, now=now)}
+    return apply_venue_quotes(rows, "2026-09-22", collected_by_sport=collected, now=now)
+
+
+def _fanin_row(event_id, commence):
+    return {"sport": "mlb", "event_id": event_id, "market": "batter_total_bases", "player_name": "Jonathan Aranda",
+            "side": "over", "line": 1.5, "home_team": "New York Yankees", "away_team": "Tampa Bay Rays",
+            "commence_time": commence}
+
+
+def test_each_half_is_stamped_with_its_own_venue_contract(monkeypatch):
+    result = _fanin([_fanin_row("394e1e2b", G1_COMMENCE), _fanin_row("574050c1", G2_COMMENCE)], monkeypatch)
+    refs = {row["event_id"]: row.get("venue_ref") for row in result["rows"]}
+    assert refs == {"394e1e2b": G1_TB, "574050c1": G2_TB}
+    assert result["doubleheader_rows"] == {"qualified": 2, "unrankable": 0}
+
+
+def test_an_ordinary_row_never_takes_a_doubleheader_contract(monkeypatch):
+    # Only one TB @ NYY event on the board: its half cannot be named, and the
+    # venue's contracts both name a half -- so neither may attach.
+    result = _fanin([_fanin_row("574050c1", G2_COMMENCE)], monkeypatch)
+    assert result["rows"][0].get("venue_ref") is None
+    assert result["stamped"] == 0
+
+
+def test_the_kalshi_and_polymarket_adapters_name_the_half():
+    from syndicate.features.shared.venue_quote_adapters import doubleheader_quote_key, kalshi_doubleheader_number
+
+    assert kalshi_doubleheader_number(G1_TB) == 1 and kalshi_doubleheader_number(G2_TB) == 2
+    assert kalshi_doubleheader_number("KXMLBTB-26SEP231305TBNYY-TBJARANDA8-2") is None
+    assert doubleheader_quote_key("mlb|totals|over|7.5", 2) == "mlb|totals|over|7.5|dh2"
+    assert doubleheader_quote_key("mlb|totals|over|7.5", None) == "mlb|totals|over|7.5"

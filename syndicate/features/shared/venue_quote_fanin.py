@@ -491,6 +491,48 @@ def stamp_candidate_freshness(candidate: dict[str, Any], quote: Quote | None) ->
     return stamped
 
 
+def _doubleheader_ranks_for(rows: Sequence[Mapping[str, Any]], sport: str) -> tuple[dict[str, int], set[str]]:
+    """Each row event's doubleheader half for this sport (`doubleheader_event_ranks`).
+
+    Rows are grouped on the SAME club-pair token the fan-in keys game lines by
+    (`game_token`), falling back to the raw names for a sport with no club map.
+    """
+    from syndicate.features.shared.doubleheader import doubleheader_event_ranks
+    from syndicate.features.shared.venue_quote_adapters import game_token
+
+    def _fixture(row: Mapping[str, Any]) -> Any:
+        if str(row.get("sport") or sport).strip().lower() != sport:
+            return None
+        home, away = row.get("home_team"), row.get("away_team")
+        if not (home and away):
+            return None
+        return game_token(sport, home, away) or (str(home), str(away))
+
+    return doubleheader_event_ranks(rows, fixture_of=_fixture)
+
+
+def _keys_for_half(
+    keys: Sequence[str], row: Mapping[str, Any], ranks: Mapping[str, int], unrankable: set[str]
+) -> tuple[list[str], str | None]:
+    """A doubleheader row looks up ONLY its own half's keys (`doubleheader_quote_key`).
+
+    Returns ``(keys, outcome)``: outcome ``"qualified"`` for a ranked half,
+    ``"unrankable"`` (no keys at all -- the half cannot be named, so no quote
+    may attach) or None for an ordinary game, whose keys are unchanged. An
+    ordinary row never meets a `|dh<n>` key, and a doubleheader row never meets
+    a half-blind one: a quote that does not say which half it prices is the
+    other half's price as often as not.
+    """
+    from syndicate.features.shared.venue_quote_adapters import doubleheader_quote_key
+
+    event_id = str(row.get("event_id") or "").strip()
+    if event_id in ranks:
+        return [str(doubleheader_quote_key(str(k), ranks[event_id])) for k in keys], "qualified"
+    if event_id in unrankable:
+        return [], "unrankable"
+    return list(keys), None
+
+
 def apply_venue_quotes(
     rows: Sequence[Mapping[str, Any]],
     selected_date: str,
@@ -542,6 +584,8 @@ def apply_venue_quotes(
     unmatched_samples: list[str] = []
     unmatched_by_sport: dict[str, int] = {}
     unmatched_by_sport_sample: dict[str, list[str]] = {}
+    dh_by_sport: dict[str, tuple[dict[str, int], set[str]]] = {}
+    dh_counts = {"qualified": 0, "unrankable": 0}
 
     for row in rows:
         sport = str(row.get("sport") or "").strip().lower()
@@ -550,6 +594,8 @@ def apply_venue_quotes(
             continue
         if sport not in row_claimants:
             row_claimants[sport] = _key_claimants(rows, sport)
+        if sport not in dh_by_sport:
+            dh_by_sport[sport] = _doubleheader_ranks_for(rows, sport)
         if sport not in by_sport:
             try:
                 # `games` is passed ONLY when the board actually named some.
@@ -580,7 +626,9 @@ def apply_venue_quotes(
         # `venue_quote_key`, so requiring one would have matched nothing and
         # reported a confident `stamped=0` -- the "zero that looks like a
         # working feed" failure this module documents three times over.
-        keys = _candidate_keys(row, sport)
+        keys, dh_outcome = _keys_for_half(_candidate_keys(row, sport), row, *dh_by_sport[sport])
+        if dh_outcome:
+            dh_counts[dh_outcome] += 1
         # Every key this sport ASKED FOR, for the overlap counter below.
         wanted_by_sport.setdefault(sport, set()).update(str(k) for k in keys)
         quotes_for_sport = payload.get("quotes") or {}
@@ -730,6 +778,10 @@ def apply_venue_quotes(
         "rows_in": len(rows),
         "stamped": stamped,
         "cross_game_rejected": cross_game_rejected,
+        # Doubleheader rows keyed to their own half (`qualified`) and rows
+        # whose half could not be named (`unrankable`, left unpriced). Zero on
+        # a day with no doubleheader; absence of the FIELD means undeployed.
+        "doubleheader_rows": dict(dh_counts),
         "ambiguous_unnamed_rejected": ambiguous_unnamed_rejected,
         "segment_mismatch_detected": segment_mismatch_detected,
         "segment_refusal_enabled": _SEGMENT_REFUSAL_ENABLED,
@@ -1528,6 +1580,10 @@ def apply_venue_quotes_to_grid(
     cross_game_rejected = 0
     ambiguous_unnamed_rejected = 0
     grid_claimants: dict[str, set[str]] | None = None
+    grid_dh_ranks, grid_dh_unrankable = _doubleheader_ranks_for(
+        [row for row in (grid or []) if isinstance(row, Mapping)], sport_slug
+    )
+    grid_dh_counts = {"qualified": 0, "unrankable": 0}
     # THE DEFECT'S OWN SIZE. `_detected` rather than `_rejected`: with
     # `_SEGMENT_REFUSAL_ENABLED` False these pairings are counted and still
     # used, which is the measuring stage. See `_segment_disagrees`.
@@ -1597,6 +1653,9 @@ def apply_venue_quotes_to_grid(
             candidates = [str(quote_key(sport_slug, market, side_key, line))]
             if role_keyed and row_game:
                 candidates.append(str(quote_key(sport_slug, market, side_key, line, row_game)))
+            candidates, _dh_outcome = _keys_for_half(candidates, row, grid_dh_ranks, grid_dh_unrankable)
+            if _dh_outcome:
+                grid_dh_counts[_dh_outcome] += 1
             quote = None
             for candidate in candidates:
                 found = quotes.get(candidate)
@@ -1882,6 +1941,7 @@ def apply_venue_quotes_to_grid(
         # NOTHING printed, which made the mechanism unreadable in production --
         # the instrument-blindness failure this repo has on file five times.
         "cross_game_rejected": cross_game_rejected,
+        "doubleheader_sides": dict(grid_dh_counts),
         # Reported for the same reason, and the DENOMINATOR beside it:
         # "no live venue edges" and "the comparison never ran" are different
         # facts that look identical without `sides_seen`.
