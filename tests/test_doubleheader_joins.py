@@ -208,3 +208,68 @@ def test_a_tomorrow_row_in_todays_grid_is_not_corrected_from_todays_game(lens):
     coverage = BE.attach_live_game_state_from_lens(grid, sport="mlb", selected_date="2026-09-22")
     assert grid[0]["game"]["state"] == "pregame"
     assert coverage["rows_refused_other_day_game"] == 1
+
+
+# --- the Kalshi prop join (the order path's ticker) -------------------------
+
+
+def _kalshi_tb(ticker):
+    return {
+        "ticker": ticker,
+        "series": "KXMLBTB",
+        "title": "Jonathan Aranda: 2+ total bases?",
+        "yes_american": 150,
+        "no_american": -170,
+        "yes_probability": 0.4,
+        "no_probability": 0.62,
+    }
+
+
+def _aranda_row(event_id, commence):
+    return {
+        "sport": "mlb",
+        "event_id": event_id,
+        "market": "batter_total_bases",
+        "player_name": "Jonathan Aranda",
+        "line": 1.5,
+        "side": "Over",
+        "home_team": "New York Yankees",
+        "away_team": "Tampa Bay Rays",
+        "commence_time": commence,
+        "quote": {"price": 140},
+    }
+
+
+G1_TB = "KXMLBTB-26SEP221305TBNYYG1-TBJARANDA8-2"
+G2_TB = "KXMLBTB-26SEP221805TBNYYG2-TBJARANDA8-2"
+
+
+def test_each_kalshi_prop_contract_pairs_only_with_its_own_games_row():
+    from syndicate.features.shared.kalshi_board_join import join_kalshi_to_board
+
+    rows = [_aranda_row("394e1e2b", G1_COMMENCE), _aranda_row("574050c1", G2_COMMENCE)]
+    out = join_kalshi_to_board([_kalshi_tb(G1_TB), _kalshi_tb(G2_TB)], rows, selected_date="2026-09-22")
+    pairs = sorted((m["ticker"], m["board_event_id"]) for m in out["matches"])
+    assert pairs == [(G1_TB, "394e1e2b"), (G2_TB, "574050c1")]
+    assert out["prop_game_resolved"] == 2
+
+
+def test_a_game_two_contract_never_pairs_with_game_ones_lone_row():
+    # Only game 1's row is on the board: game 2's contract must not take it.
+    from syndicate.features.shared.kalshi_board_join import REASON_PROP_GAME_UNRESOLVED, join_kalshi_to_board
+
+    rows = [_aranda_row("394e1e2b", G1_COMMENCE)]
+    out = join_kalshi_to_board([_kalshi_tb(G2_TB)], rows, selected_date="2026-09-22")
+    assert out["matches"] == []
+    assert out["reasons"] == {REASON_PROP_GAME_UNRESOLVED: 1}
+
+
+def test_the_ticker_resolver_gives_each_half_its_own_ticker():
+    # What the order path submits: `kalshi_ticker_resolver` over the join.
+    from syndicate.features.shared.kalshi_board_join import join_kalshi_to_board, kalshi_ticker_resolver
+
+    rows = [_aranda_row("394e1e2b", G1_COMMENCE), _aranda_row("574050c1", G2_COMMENCE)]
+    out = join_kalshi_to_board([_kalshi_tb(G1_TB), _kalshi_tb(G2_TB)], rows, selected_date="2026-09-22")
+    resolve = kalshi_ticker_resolver(out["matches"])
+    assert resolve(rows[0]) == G1_TB
+    assert resolve(rows[1]) == G2_TB

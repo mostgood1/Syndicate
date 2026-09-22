@@ -187,6 +187,13 @@ REASON_NEEDS_EVENT_MAPPING = "needs_event_mapping"
 # which is what makes the measurement readable before anything is priced.
 REASON_EVENT_UNMATCHED = "event_not_on_our_board"
 REASON_EVENT_AMBIGUOUS = "event_matches_two_games"
+# A PROP contract whose game could not be pinned to one of the board rows it
+# keys onto. A prop's key is (market, player, line) -- no game -- so on a
+# doubleheader the same player's rows from BOTH halves share it, and the
+# ticker's own `...G1`/`...G2` event is the only thing that says which one the
+# contract settles on. Refused rather than guessed: a contract paired with the
+# other half's row is an order on the wrong game.
+REASON_PROP_GAME_UNRESOLVED = "prop_game_not_resolved"
 REASON_GAME_LINES_DISABLED = "game_lines_disabled"
 # INSIDE THE HORIZON, AND THIS SPORT IS NOT ON THE FORWARD LIST.
 #
@@ -1172,6 +1179,8 @@ def join_kalshi_to_board(
     # `> 0` on any future slate is the verification. `0` alongside a board that
     # HAS a duplicate team-pair is the fix still not working.
     doubleheader_resolved = 0
+    # Props restricted to their ticker's own game (see REASON_PROP_GAME_UNRESOLVED).
+    prop_game_resolved = 0
 
     # `segment_for_board_row` is imported here rather than at module scope to
     # match how `_segments_agree` and `_row_key` already reach it -- this file
@@ -1729,6 +1738,35 @@ def join_kalshi_to_board(
             _refuse(REASON_NO_BOARD_ROW)
             continue
 
+        # WHICH GAME THIS CONTRACT SETTLES ON. Measured 2026-09-22, TB @ NYY
+        # doubleheader: `KXMLBTB-26SEP221305TBNYYG1-TBJARANDA8-2` keyed onto
+        # Jonathan Aranda's TB 1.5 rows from BOTH halves, and so did game 2's
+        # contract; the resolver below keeps the LAST match per row, so one
+        # half always carried the other game's ticker -- the ticker the order
+        # path submits. The game-line branch has resolved the event since
+        # 2026-09-04; props never asked. Asked here only when it can matter --
+        # rows from more than one game, or a ticker carrying a doubleheader
+        # suffix -- so an ordinary prop never gains a new way to be refused
+        # (its club codes are never consulted today).
+        from syndicate.features.shared.kalshi_catalogue import (
+            _split_doubleheader,
+            event_blob_from_ticker,
+        )
+
+        row_events = {str(r.get("event_id") or "") for r in rows}
+        _dh_number = _split_doubleheader(event_blob_from_ticker(market.get("ticker")) or "")[1]
+        if len(row_events) > 1 or _dh_number is not None:
+            resolution = _resolve_event(market, rows, club_code_names)
+            wanted_event = str(resolution.get("event_id") or "")
+            if str(resolution.get("status") or "") != "ok" or not wanted_event:
+                _refuse(REASON_PROP_GAME_UNRESOLVED)
+                continue
+            rows = [r for r in rows if str(r.get("event_id") or "") == wanted_event]
+            if not rows:
+                _refuse(REASON_PROP_GAME_UNRESOLVED)
+                continue
+            prop_game_resolved += 1
+
         yes_price = _as_float(market.get("yes_american"))
         no_price = _as_float(market.get("no_american"))
         if yes_price is None and no_price is None:
@@ -1953,6 +1991,10 @@ def join_kalshi_to_board(
         # commence-time split, and it is reported even when zero so that "no
         # doubleheader today" and "the fix did nothing" stay distinguishable.
         "doubleheader_resolved": doubleheader_resolved,
+        # Prop contracts pinned to their own game on a doubleheader (or across
+        # a multi-date board). Zero on a day with no such pair; absence of the
+        # FIELD means the code is not deployed.
+        "prop_game_resolved": prop_game_resolved,
         # How many board rows described a bet another row already described --
         # main line and alternate line for the same event/line/side/segment.
         # Reported even when zero, for the same reason `doubleheader_resolved`
