@@ -39851,3 +39851,37 @@ Claim released after this entry.
 
 ## 2026-09-22 16:51:13Z (11:51 AM CT) -- READING (owed by the 16:27:12Z entry) -- lane `layer2-score-outcome-calibration` -- **the first Polymarket player-prop order FILLED**
 `[polymarket_us_orders] ORDER_STATE order=CNAV8SPX4WPA slug='astatc-mlb-az-col-2026-09-22-k-micsor-gte5' state='ORDER_STATE_FILLED' side=OUTCOME_SIDE_YES cum=2 leaves=0 avgPx=0.4500`; `FILL_PRICE recorded=0.45`; `COMMISSION raw='0.0300' filled=2.0 fill_cost=0.9` (0.015/contract, the flat Polymarket fee the plan deducts). Limit 0.45 = fill 0.45, no slippage. Stake 1.05 planned -> 0.90 filled: whole-contract quantity (min qty 1). First venue read after submit (the 16:35:23Z read ran 4 s before the 16:35:27Z submit). Settlement owed after the game (first pitch 00:41Z).
+
+## 2026-09-22 16:29:43Z -> live 16:32:50Z (11:29-11:32 AM CT) — refresh-worker `48376cc1` -> `f15ffb80` (`dep-dapaptpsrm7s73epkif0`) — lane `mlb-doubleheader-e2e` — **VERIFIED: TB @ NYY doubleheader halves each read their own game on the first board built**
+
+**User decision (chat):** "Push + deploy now" (before G1 12:05 CT), then "keep going, deploy when the window opens".
+**Carries** beyond `48376cc1`: this lane's `9ad08717` (chip + live-lens joins pick by start time), `a988ab4d` (Kalshi prop contract -> its own game's row), `5b509b55` (sim projections per gamePk, Polymarket `dhN`, vendored pick lines), `0731d3ae` (web restate; inert here), `f15ffb80` (venue fan-in `|dh<n>` keys); plus `585ddca0` (NFL backfill weeks, web-side, already live on web) and ledger commits.
+**Window:** claim 15:59:54Z. Preflight TOO_SOON 16:00-16:14Z (another lane's 15:48:56Z deploy), then HOLD 16:14-16:28Z (odds-refresh job pid 646 + back-to-back board builds 16:14/16:17/16:18/16:24/16:25/16:26Z). `check_deploy_safety.py --drain` unusable from a local shell (needs the keyvalue URL; refuses rather than writing a local flag). CLEAR 16:28:52Z; a stale preflight child from a stopped poller then overwrote the receipt with a `0731d3ae` CLEAR, so re-ran: CLEAR 16:29:37Z for `f15ffb80`, deployed 16:29:43Z. No MLB sim in flight (process list: infra only).
+
+    field                                               baseline 16:29:32Z          predicted                measured (board written ~16:37:38Z, read 16:38:21Z)
+    live_commit                                         48376cc1                    f15ffb80                 f15ffb80 (live 16:32:50Z)
+    l2 TB@NYY G2 rows game.start_time_utc               17:05Z "12:05P CT"          23:05Z                   23:05Z "6:05P CT" (G1 rows 17:05Z "12:05P CT")
+    l2 TB@NYY G1 h2h projection model_prob_over         0.531 (= G2's sim)          0.606                    0.606
+    l2 TB@NYY G1 Aranda TB 1.5 projected                1.502 (= G2's sim)          1.513                    1.513 (G2 row keeps its own 1.502)
+    enrichment.game_state.rows_resolved_by_start_time   absent                      present, >= 2            310 (rows_ambiguous_game 0, rows_refused_other_day_game 0)
+    game.game_key on rows                               absent                      --                       823543 on G1 rows, 823494 on G2 rows
+    enrichment.projections rows_resolved_by_game_pk     absent                      --                       269 (rows_refused_game_ambiguous 0, rows_refused_other_game 7)
+    enrichment.venue_reprice.doubleheader_sides         absent                      --                       {"qualified": 507, "unrankable": 0}
+    l2 TB@NYY G2 prop rows venue_ref                    G1 ticker (...TBNYYG1...)   not G1's                 None -- Kalshi lists NO G2 prop events yet (public API 16:4xZ: KXMLBTB/KXMLBHIT-26SEP221905TBNYYG2 = 0 markets; KXMLBGAME-...G2 = 2 active), so nothing is the honest answer
+
+**OWED / OPEN:** (1) `rows_refused_other_game=7` -- rows whose own gamePk is known but whose player the sim projects only in another game; by construction a blank, never a wrong number, but the 7 were not identified (the grid artifact is not exported; web's grid is capped at 300 rows). (2) the Kalshi/Polymarket ORDER-path fixes (`a988ab4d`, `5b509b55`) have no TB/NYY venue position to read yet (`/api/portfolio/plan` 16:1xZ: none); the reading is a planned TB/NYY venue position whose ticker/slug names its own half. (3) the vendored pick-line fix applies at the next MLB sim run (today's picks were written before deploy).
+
+## 2026-09-22 16:48:56Z -> live 16:52:19Z (11:48-11:52 AM CT) — web `585ddca0` -> `041ee664` (`dep-dapb2u3m8hqs73959mdg`) — lane `mlb-doubleheader-e2e` — **VERIFIED: the Layer 2 page and the serve-time restate keep the doubleheader halves apart, read with G1 LIVE**
+
+**User decision (chat):** "Push + deploy now"; `_refresh_layer2_live_state` and the page's chip matching TAKEN by user decision (owner lanes archived). Claim 16:48Z (free), preflight CLEAR 16:48Z for `041ee664`.
+**Carries** beyond `585ddca0`: this lane's `9ad08717`..`041ee664` (web executes `0731d3ae` restate, `041ee664` page, and `attach_game_state` in the serve-time `/api/board/book-grid`); rest is worker code + ledger.
+
+    field                                                   baseline 16:48:26Z               predicted          measured
+    live_commit                                             585ddca0                         041ee664           041ee664 (live 16:52:19Z)
+    /intelligence contains `pickChipByStart`                0                                > 0                3 (16:53:15Z)
+    Games rail TB-NYY cards                                 one merged card on G2's chip + an empty G1 card (node replay of the OLD template on the production shape; not read on the live page)  two, own chips     two (17:03:56Z): "MLB · TOP 1 ● LIVE TB 0 NYY 0" and "MLB · 6:05P CT PREGAME TB – NYY"
+    6:05P CT card, rows shown when selected                 both halves' rows (same replay)  G2's only          G2's (incl. Max Fried, Drew Rasmussen; no Martinez/Rodón) (16:55Z)
+    served G2 rows market_state while G1 live               unmeasurable (both pregame)      pregame            pregame x4, game 823494 "6:05P CT" (17:04:11Z; chips 17:02:31Z: 823543 live TOP 1, 823494 pregame)
+
+**WEB WAS UNREACHABLE ~16:56-17:01Z AFTER GOING LIVE -- same shape as the 16:06Z web deploy (NFL lane), cause NOT established:** Render events `server_failed` 16:54:47Z and 16:56:32Z, both `HTTP health check failed (timed out after 5 seconds)`, `server_available` 16:54:57Z / 16:57:17Z, no OOM/eviction; external requests 000/502 until 17:01:47Z, then stable. Two consecutive web deploys today show it, so it is not this change's; recorded, not diagnosed.
+Claims (web, refresh-worker) released after this entry.
