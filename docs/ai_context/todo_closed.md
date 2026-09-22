@@ -2789,3 +2789,12 @@ for that, and it fires on the persist path before the ceiling is reached.
 - **Cause:** `scripts/generate_smartsim2_nfl_projections.py` took the week's game list from the current season's pbp (games already played) and read `schedule_<season>.csv` only when that list was EMPTY. Measured on production: 2026 week 2 published 16 games (09-18) -> 1 (09-19, 09-20: Thursday's only) -> 8 (09-21 01:26Z, 7:26 PM CT Sunday); week 1 lost its Monday game on 09-14.
 - **Fix:** `e7f216bf` — `week_game_list()` unions the real schedule with the pbp by game_id. Test fails on old code (1 game) and passes on the fix.
 - **Verified in production:** refresh-worker `e7f216bf` live 23:41:44Z; `/nfl/api/cards` 8 -> 16 games incl. `2026_02_NYG_LA` at 23:48:16Z. Measurement: `.syndicate/deploys.md` 23:36:26Z entry. Follow-ups filed as leads (`leads.md` 2026-09-21 23:5xZ): the board reads a 2026-08-01 projection file; week-2 projections are 10-27 pts off the market.
+
+---
+
+### `#681` — **CLOSED 2026-09-22 — MLB prop rows lost `commence_time` whenever Polymarket's undated quote was the newest, and Polymarket refused them `commence_unknown`** — FOUND and FIXED 2026-09-22, lane `layer2-score-outcome-calibration`, session 236bd219
+
+- **What.** 457 of 1,823 MLB prop rows on the 09-22 15:11Z board had `commence_time: null`, across seven markets, each with a dated sibling row on the same event. `_capture_polymarket_quotes` (`pipeline/portfolio_commit.py`) wrote Polymarket's own quotes with no start time or teams (5,995 of 5,995 on web's 09-22 shard), and `build_book_grid` took a row's start time from the NEWEST quote. The Polymarket submitter then refused those rows `commence_unknown`, and the recorder could not grade them (`no_kickoff`).
+- **Fix, `0b5518ab`.** Grid: the freshest DATED quote (`#435`'s newest-report rule kept); teams and league from the first row that has them. Capture: stamps home/away/commence from the board rows per event and logs `identity_stamped=`. Replay over production's 09-22 shard predicted 403 -> 0 undated prop grid rows, 0 existing values changed.
+- **Verified.** refresh-worker `48376cc1` live 15:48:56Z: served board 383 -> 0 undated of 1,822; `identity_stamped=584`; 23 of 23 new Polymarket quotes dated on disk; Polymarket pass `commence_unknown` 0 (15:57:50Z). Layer 1 book grid 0 of 1,877. `deploys.md` 15:45:58Z entry.
+

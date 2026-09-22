@@ -173,7 +173,7 @@ portfolio endpoints serve settlement marginals only (`by_sport`,
 `by_market_family`, `by_venue_family`), never per-order rows, so no calibration
 curve exists. Exposing settled orders with their board fields is the unblock.
 
-## [layer2-score-outcomes] THE BOARD'S SCORE, GRADED ON OUTCOMES AND CLOSES FOR THE FIRST TIME -- real price edge, fee-blind ranking, non-monotone deciles `[2026-09-21, lane layer2-score-outcome-calibration, MEASURED on production files; code on main, NOT deployed]`
+## [layer2-score-outcomes] THE BOARD'S SCORE, GRADED ON OUTCOMES AND CLOSES FOR THE FIRST TIME -- real price edge, fee-blind ranking, non-monotone deciles `[2026-09-21, lane layer2-score-outcome-calibration, MEASURED on production files; fee-net score, score_v2 shadow + recorder fields and the venue fee/ceiling LIVE and VERIFIED 2026-09-21/22]`
 
 **Read `findings_2026-09-21_layer2_score_outcomes.md` before changing any score term.** Three datasets: the recorder graded row by row (194,983 rows, 09-14..09-20, `scripts/score_ranking_backtest.py`), CLV on published openings with today's score recomputed exactly (157,079 rows, 931 games, 82 slates, 09-01..09-20), and paper bets (2,699 settled).
 
@@ -184,7 +184,7 @@ curve exists. Exposing settled orders with their board fields is the unblock.
 - **`book_margin_model` fair is overstated 8.5 pp** (hit 18.0% vs 26.5%, 264 games).
 - **A global favourite-longshot recalibration was measured and REJECTED:** slope > 1 in aggregate, but +EV longshots are calibrated; the +EV shortfall is at even money.
 
-**ON MAIN, NOT DEPLOYED:** `score_v2` shadow (`456e264f`, `97f01a37`; quarter-Kelly growth at the fee-net price x reliability; ranks nothing) and `SYNDICATE_SCORE_FEE_NET` (default OFF; fee-net EV in the value term; `ev_pct` stays gross). **Fee-netting beats today's score: +0.71 pts fee-net CLV at the top 25 [+0.40, +1.04], 82 slates.** The Kelly re-rank raises the top-10 break-even 0.378 -> 0.464 at equal edge overall, but is sport-dependent (soccer +3.00, NCAAF -2.71). Owed steps and decisions: todo `#679`.
+**LIVE AND VERIFIED (2026-09-21/22):** the fee-net value term (`SYNDICATE_SCORE_FEE_NET=1`, `dd43fd49`; MLB Kalshi half-rate series `03d3f801`, live 23:03:59Z 09-21 -- the first MLB fix `569ebca1` was INERT, 0 of 82, because the ticker is stamped after scoring); the `score_v2` shadow on every row (quarter-Kelly growth at the fee-net price x reliability; ranks nothing) and the recorder's `s2/n2/fb/bk` fields (`053ddd9e`); venue plans refuse `venue_ev_implausible` (> 5.263%) and `below_min_ev_pct_net_of_fee` and size on the fee-inclusive price (`4ee86561`). All on refresh-worker since `f0e60bec` 2026-09-22 00:12:34Z: Kalshi venue positions 53 -> 6, max EV 12.63 -> 5.11. Polymarket charges no fee at submit (`210dd3aa`, live-odds-worker 13:53:35Z 09-22). `ev_pct` stays gross. **Fee-netting beats the old score: +0.71 pts fee-net CLV at the top 25 [+0.40, +1.04], 82 slates.** The Kelly re-rank raises the top-10 break-even 0.378 -> 0.464 at equal edge overall, but is sport-dependent (soccer +3.00, NCAAF -2.71): NOT promoted, todo `#679` step 5 after 14+ days of recorder grading (from 09-22). The live-order half of the ceiling is owed by scheduled task `venue-fee-ceiling-live-orders-reading-0922` (13:00 CT 09-22).
 
 ## [layer2-movement-term] EVERY LAYER 2 ROW IS NOW COMPARED WITH ITS OWN LINE'S OPENING — line_moved 913 -> 0, verified `[2026-09-20 16:23Z -> 2026-09-21 14:41Z, lanes layer2-line-movement-scoring / layer2-line-move-magnitude]`
 

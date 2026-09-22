@@ -163,6 +163,8 @@ the three tickers were named before the reading. It never rewrites `outcome` or
 `pnl_dollars`. `learnings.md` had recorded this class as "caught twice by a human
 looking at a screen and zero times by a machine"; that is no longer true.
 
+**PLAYER PROPS (`gte<N>`, outcomes `Yes`/`No`) RESOLVE BY THE SLUG'S GRAMMAR** `[2026-09-22, `69db91e8`, live-odds-worker `f15ffb80` 16:30:04Z, PLACEMENT VERIFIED; side proof owed]`. There was no prop branch: every prop fell into the team matcher, then the soccer 3-way subject rule, and refused `yes_no_market_subject_is_not_our_side` (counted as `market_unresolved_for_position`). Now, once the slug agrees with the position's market, line and player (the join's own encoders), over takes the outcome named `Yes` and under the one named `No`, BY NAME. The venue's `yesLegIndex` is a second witness that can only refuse. First order: Soroka K 5+ YES `CNAV8SPX4WPA`, `venue_yes_leg_index=0 agree=True`, filled 2/2 @ 0.45 (16:51:13Z). The side is proven only by settlement: scheduled `soroka-prop-settlement-reading-0923` (08:00 CT 09-23), todo `#682`.
+
 ## [polymarket-vs-kalshi-prop-prices] — MEASURED 2026-09-01, MLB, production shard
 
 **First cross-venue PROP price comparison the platform has ever been able to
@@ -1488,6 +1490,7 @@ whatever game lines displace them. `dropped_by_date` still reports every one.
 
 **DECIDED AND DONE 2026-09-11.** On the user's decision the hold is DELETED, in `f8b67afa` on live-odds-worker, live 2026-09-11T15:09:21Z.
 - A Polymarket order is now built pregame or not at all. `polymarket_us_submitter.build` refuses `game_started` and `commence_unknown`.
+  - **`commence_unknown` on MLB props was a DATA defect, FIXED 2026-09-22 (`0b5518ab`, `#681`):** Polymarket's own quotes were written with no `commence_time` or teams (5,995 of 5,995 on 09-22), and `book_grid` took a row's start from the NEWEST quote, blanking 455 of 1,820 MLB prop rows. Refresh-worker `48376cc1` live 15:48:56Z: board 383 -> 0 undated, the Polymarket pass `commence_unknown` 0.
 - **UNPAUSED 2026-09-22 14:21:18Z** (user decision: "unpause everything - we cant just globally eliminate a market, thats not how our app works. every line is its own decision"): `SYNDICATE_POLYMARKET_PAUSED_MARKETS=none` on live-odds-worker (was `total`, set 2026-09-11); verified on the first pass 14:26:11Z, `placed=2`, 0 `market_paused`. The pause MECHANISM is REMOVED from the code (user decision 2026-09-22 "remove the pause mechanism from the code"; `bf3eb38c`, LIVE on live-odds-worker 2026-09-22 15:03:32Z, verified: 0 `market_paused` since). Its env key was DELETED from live-odds-worker 2026-09-22 14:43:59Z (single-key DELETE 204; an absent key pauses nothing in the old code too).
 - **Verified at 15:51:04Z**, on the first pass on a plan holding totals and near-even pregame moneylines: `positions=5 placed=2 refused={'market_paused': 3}`, with no hold key. Jets–Titans at 0.49 and Mariners–A's at 0.415 were submitted pregame. `game_started` has not yet had a population in production, because no unpaused position was past kickoff.
 - The pricing follow-up, trading off the executable ask and net of fees, is todo `#662`.
