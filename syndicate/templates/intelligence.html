@@ -12,7 +12,12 @@
 
 <main class="board-page">
 
-  <script id="initial-intelligence-response" type="application/json">{{ initial_intelligence_response | default({}) | tojson }}</script>
+  {# `initial_intelligence_response_json` is the SAME text `| tojson` produces, built
+     once per TTL per worker instead of once per request (see
+     `blueprints/intelligence.py::cached_home_embed_json`; measured 2026-09-22, the
+     build is ~7.6 s and the serialisation is not the cost). The `tojson` branch
+     stays for every other caller of this template, which passes the object. #}
+  <script id="initial-intelligence-response" type="application/json">{% if initial_intelligence_response_json %}{{ initial_intelligence_response_json }}{% else %}{{ initial_intelligence_response | default({}) | tojson }}{% endif %}</script>
 
   <form id="board-toolbar" class="cards-control-card board-toolbar">
     <div class="board-toolbar-row">

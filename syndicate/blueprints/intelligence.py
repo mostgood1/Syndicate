@@ -4,10 +4,11 @@ import logging
 import hashlib
 import json
 import os
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 from urllib.parse import quote
 
 from flask import Blueprint, jsonify, make_response, redirect, render_template, request
@@ -2052,6 +2053,107 @@ def _slim_embedded_board_payload(response: Any) -> Any:
     return _drop_unconsumed_row_diagnostics(slim)
 
 
+# THE EMBED IS BUILT ONCE PER WINDOW, NOT ONCE PER REQUEST.
+#
+# MEASURED 2026-09-22, after `ec620c7d` took the embed from 30,994,816 to
+# 11,986,801 chars: the server-side median for `/` moved 7,843 -> 7,600 ms, i.e.
+# NOT AT ALL. Serialising is not the cost; BUILDING is -- every request runs
+# `read_combined_intelligence_response` + `_hydrate_board_response_payload` +
+# `_slim_embedded_board_payload` from scratch, and web has 8 request slots, so
+# ~34 home requests after a boot (median 12.3 s each) is what fills them.
+#
+# WHAT IS CACHED IS THE RENDERED JSON STRING, not the payload. The object graph
+# behind 12 MB of JSON is 5-10x that in Python, and web's memory guard recycles
+# a worker at 650 MB anon (`gunicorn.conf.py`); a str is the payload's own size
+# and skips `tojson` on top of the build.
+#
+# TTL + SINGLE FLIGHT, and NOT `lru_cache` -- `features/soccer/sources.py`
+# records why in prose: gunicorn workers never auto-recycle, so an lru_cache here
+# would freeze the first-ever read until the next deploy, turning a latency bug
+# into a silent staleness bug. While one thread rebuilds, the others serve the
+# PREVIOUS string rather than queueing behind it: a slot held for 7 s is exactly
+# what starves `/healthz` (lane `web-flap-0922`). Staleness is bounded by the TTL
+# and is harmless here -- the page fetches `/api/intelligence/query` on load and
+# replaces the embed seconds later.
+#
+# EMPTINESS IS NEVER CACHED. `learnings.md` 2026-08-18 has the rule (1,282 BVP
+# cache files, every one `by_batter: {}`): a build that resolved nothing is
+# returned but not stored, so recovery is immediate.
+_HOME_EMBED_CACHE: dict[str, tuple[float, str]] = {}
+_HOME_EMBED_LOCKS: dict[str, "threading.Lock"] = {}
+_HOME_EMBED_REGISTRY_LOCK = threading.Lock()
+
+
+def _home_embed_cache_seconds() -> int:
+    """Absent = 60s. `0` disables the cache (every request rebuilds)."""
+    raw = str(os.environ.get("SYNDICATE_HOME_EMBED_CACHE_SECONDS") or "").strip()
+    try:
+        return max(0, int(float(raw))) if raw else 60
+    except ValueError:
+        return 60
+
+
+def _embed_json_text(payload: Any) -> str:
+    """Exactly what `| tojson` would have produced -- same escaping, so the
+    `<script>` block is byte-for-byte what the template used to emit."""
+    from jinja2.utils import htmlsafe_json_dumps
+
+    return str(htmlsafe_json_dumps(payload, dumps=lambda obj, **kw: json.dumps(obj, default=str, **kw)))
+
+
+def _embed_is_cacheable(payload: Any) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    rows = payload.get("ranked_all")
+    return bool(isinstance(rows, list) and rows)
+
+
+def _home_embed_lock(key: str) -> "threading.Lock":
+    with _HOME_EMBED_REGISTRY_LOCK:
+        lock = _HOME_EMBED_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _HOME_EMBED_LOCKS[key] = lock
+        return lock
+
+
+def cached_home_embed_json(key: str, build: "Callable[[], Any]") -> str:
+    """The embed's JSON text for `key`, built at most once per TTL per worker."""
+    ttl = _home_embed_cache_seconds()
+    if ttl <= 0:
+        return _embed_json_text(build())
+
+    cached = _HOME_EMBED_CACHE.get(key)
+    if cached and cached[0] > time.time():
+        return cached[1]
+
+    lock = _home_embed_lock(key)
+    if not lock.acquire(blocking=not cached):
+        # Someone is rebuilding and we hold a previous string: serve it rather
+        # than hold a request slot for the length of a build.
+        print(f"[home_embed] STALE_SERVED key={key} chars={len(cached[1])}", flush=True)
+        return cached[1]
+    try:
+        fresh = _HOME_EMBED_CACHE.get(key)
+        if fresh and fresh[0] > time.time():
+            return fresh[1]
+        started = time.time()
+        payload = build()
+        text = _embed_json_text(payload)
+        elapsed_ms = int((time.time() - started) * 1000)
+        cacheable = _embed_is_cacheable(payload)
+        if cacheable:
+            _HOME_EMBED_CACHE[key] = (time.time() + ttl, text)
+        print(
+            f"[home_embed] BUILD key={key} ms={elapsed_ms} chars={len(text)} "
+            f"ttl_s={ttl} cached={cacheable}",
+            flush=True,
+        )
+        return text
+    finally:
+        lock.release()
+
+
 @intelligence_bp.get("/intelligence")
 def intelligence_home():
     # #93 follow-up, extended alongside intelligence_query_api's identical
@@ -2062,16 +2164,25 @@ def intelligence_home():
     explicit_date = bool(explicit_date_value)
     selected_date = explicit_date_value or central_today_iso()
     if combined_board_default_enabled():
-        try:
-            requested_dates = [explicit_date_value] if explicit_date else None
-            initial_response = read_combined_intelligence_response(dates=requested_dates, sport="all")
-            initial_response = _hydrate_board_response_payload(initial_response)
-        except Exception:
-            _LOGGER.exception("COMBINED_BOARD_RESPONSE_FAILURE")
-            initial_response = _empty_default_intelligence_response()
+
+        def _build_embed_payload() -> Any:
+            try:
+                requested_dates = [explicit_date_value] if explicit_date else None
+                built = read_combined_intelligence_response(dates=requested_dates, sport="all")
+                built = _hydrate_board_response_payload(built)
+            except Exception:
+                _LOGGER.exception("COMBINED_BOARD_RESPONSE_FAILURE")
+                built = _empty_default_intelligence_response()
+            return _slim_embedded_board_payload(built)
+
+        # Keyed on the WINDOW, not the visitor: the default board and an explicit
+        # ?date= are different pages, and nothing else in this response varies per
+        # request. `central_today_iso()` is in the key so the cache cannot serve
+        # yesterday's default board after the date rolls.
+        cache_key = f"date={explicit_date_value}" if explicit_date else f"default:{central_today_iso()}"
         return render_template(
             "intelligence.html",
-            initial_intelligence_response=_slim_embedded_board_payload(initial_response),
+            initial_intelligence_response_json=cached_home_embed_json(cache_key, _build_embed_payload),
             initial_intelligence_selected_date=selected_date if explicit_date else None,
             initial_intelligence_today_iso=central_today_iso(),
         )
