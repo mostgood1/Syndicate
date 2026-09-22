@@ -39695,3 +39695,17 @@ All WARMED lines are `sport=all`. `WARM_FAILED` 0, `WARMER_ERROR` 0, `WARMER_OFF
 
 **Why not measurable:** the first execution pass after boot (13:57:39-13:58:08Z) built the live Polymarket plan (`positions=3`) and refused all three `market_paused` (`SYNDICATE_POLYMARKET_PAUSED_MARKETS` matches `total` / `batter_total_bases`) BEFORE the ask step -- `EXECUTED ... placed=0 refused={'market_paused': 3}`. The TCU-UCF order is not in today's plan. `Traceback` since boot: none. Fills/commissions reconcile normally (`FILL_PRICE`, `COMMISSION` lines 13:58:01Z).
 **verify (OWED):** the first `POLYMARKET_PRICED_AT_ASK` line after 13:53:35Z carries `ev_at_ask_pct=` and NO `fee_bound=`; a row whose EV at the ask is >= 2% places (decision=place). Folded into scheduled task `venue-fee-ceiling-live-orders-reading-0922` (13:00 CT today).
+
+## 2026-09-22 14:00:15Z -> live 14:03:40Z (9:00-9:03 AM CT) — refresh-worker `f0e60bec` -> `3d9058b3` (`dep-dap8jrp42hec7399akl0`) — lane `nfl-board-stale-projection-fallback` — **VERIFIED: the NFL board no longer reads the checkout's 2026-08-01 backfill**
+
+**User decision (chat, asked directly):** "Deploy now, ship all". Claim acquired 13:59Z (free), preflight `CLEAR: only infrastructure processes running` 14:00:07Z, released 14:09Z.
+**Carries:** `22f4f536` (this lane: `load_nfl_game_projections` skips the git checkout's regular-season series once a live regular-season file exists). Ride-along `210dd3aa` (Polymarket: no fee check at submit, user decision 2026-09-22) -- its code runs on **live-odds-worker** behind `SYNDICATE_POLYMARKET_PRICE_AT_ASK=1`, so this refresh-worker deploy does not activate it; not measured here. Other commits in range are ledger/report only.
+
+    field (served /api/board/layer2-shortlist?sport=nfl, game_coverage)   baseline 13:59:18Z (board 13:57:00Z)   predicted   measured (first post-deploy board, written 14:08:21Z)
+    live_commit                                                          f0e60bec                                3d9058b3    3d9058b3 (live 14:03:40Z)
+    rows_skipped_stale_checkout                                          absent                                  272         272
+    games_in_index                                                       321                                     97          97
+    rows_with_projection / rows_considered                               88 / 127                                ~unchanged  93 / 132 (slate +5 rows), unmatched_game_rows 0
+    rows_superseded_by_newer                                             96                                      --          48
+
+272 is the exact row count of the 18 git-tracked `smartsim2_projections_2026_wk*.csv` files; 97 = the 48 live regular-season games (wk1-3) + the preseason series (untouched). **verify:** the table.
