@@ -39848,3 +39848,6 @@ Claim released after this entry.
 
 **The venue's own YES-leg field was read for the first time on a prop:** `venue_yes_leg_index=0` on `['Yes','No']`, agreeing with the by-name rule (n=1 market). A disagreement would have refused (`prop_yes_leg_disagrees_with_venue`).
 **Not measured here:** the fill (submitted, `executions=0` at submit) and the settlement. Claim released after this entry.
+
+## 2026-09-22 16:51:13Z (11:51 AM CT) -- READING (owed by the 16:27:12Z entry) -- lane `layer2-score-outcome-calibration` -- **the first Polymarket player-prop order FILLED**
+`[polymarket_us_orders] ORDER_STATE order=CNAV8SPX4WPA slug='astatc-mlb-az-col-2026-09-22-k-micsor-gte5' state='ORDER_STATE_FILLED' side=OUTCOME_SIDE_YES cum=2 leaves=0 avgPx=0.4500`; `FILL_PRICE recorded=0.45`; `COMMISSION raw='0.0300' filled=2.0 fill_cost=0.9` (0.015/contract, the flat Polymarket fee the plan deducts). Limit 0.45 = fill 0.45, no slippage. Stake 1.05 planned -> 0.90 filled: whole-contract quantity (min qty 1). First venue read after submit (the 16:35:23Z read ran 4 s before the 16:35:27Z submit). Settlement owed after the game (first pitch 00:41Z).
