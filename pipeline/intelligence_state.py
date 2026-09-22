@@ -2017,8 +2017,23 @@ def _refresh_layer2_live_state(
     # but no slate date). A card's is its `game_date`, the kickoff's Central
     # date on every served card (measured 1,906 of 1,906 with a kickoff), and
     # `commence_time` when that is absent.
-    index: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    # A LIST OF GAMES PER (sport, date, pair), not one chip. A doubleheader
+    # puts two games on one date and pair; indexing one chip (first wins) gave
+    # both halves' cards game 1's state and SCORE -- measured 2026-09-22, TB @
+    # NYY -- and `_attach_layer2_live_actual` then graded game 2's totals rows
+    # on game 1's runs and pruned them as decided. Chips are deduplicated on the
+    # GAME (id, start, matchup), so the worker-published and inline copies of
+    # one game stay one candidate and the preferred source (listed first)
+    # keeps precedence exactly as `setdefault` gave it.
+    index: dict[tuple[str, str, str, str], list[Mapping[str, Any]]] = {}
     pair_dates: dict[tuple[str, str, str], set[str]] = {}
+
+    def _chip_identity(chip: Mapping[str, Any]) -> tuple[str, str, str]:
+        return (
+            str(chip.get("game_key") or ""),
+            str(chip.get("start_time_utc") or ""),
+            str(chip.get("matchup") or ""),
+        )
 
     def _index_chip(chip: Mapping[str, Any], chip_date: str) -> None:
         sport = str(chip.get("sport") or "").strip().lower()
@@ -2028,9 +2043,12 @@ def _refresh_layer2_live_state(
         homes = _keys(sport, home_side.get("name"), home_side.get("key"))
         if not (sport and aways and homes):
             return
+        identity = _chip_identity(chip)
         for a in aways:
             for h in homes:
-                index.setdefault((sport, chip_date, a, h), chip)
+                slot = index.setdefault((sport, chip_date, a, h), [])
+                if all(_chip_identity(known) != identity for known in slot):
+                    slot.append(chip)
                 pair_dates.setdefault((sport, a, h), set()).add(chip_date)
 
     for requested_date in requested_dates or ():
@@ -2065,35 +2083,50 @@ def _refresh_layer2_live_state(
             return []
         return [(anchor + timedelta(days=step)).isoformat() for step in (-1, 1)]
 
-    def _chip_for(sport: str, card_date: str | None, a: str, h: str) -> Mapping[str, Any] | None:
+    def _chip_for(sport: str, card_date: str | None, a: str, h: str) -> list[Mapping[str, Any]]:
         if card_date is None:
             # UNKNOWN IS NOT A LICENCE TO PICK A DATE. Only a pair that appears on
             # exactly one requested date is unambiguous; a series pair is not.
             dates = pair_dates.get((sport, a, h)) or set()
-            return index.get((sport, next(iter(dates)), a, h)) if len(dates) == 1 else None
-        chip = index.get((sport, card_date, a, h))
-        if chip is None and sport in _RESTATE_ADJACENT_DATE_SPORTS:
+            return list(index.get((sport, next(iter(dates)), a, h)) or ()) if len(dates) == 1 else []
+        chips = list(index.get((sport, card_date, a, h)) or ())
+        if not chips and sport in _RESTATE_ADJACENT_DATE_SPORTS:
             # Football chips live on ESPN's date, and a pair cannot meet on
             # consecutive days in these sports, so an adjacent date is still
             # this game. Nearest first; both are one day away.
             for day in _adjacent(card_date):
-                chip = index.get((sport, day, a, h))
-                if chip is not None:
+                chips = list(index.get((sport, day, a, h)) or ())
+                if chips:
                     break
-        return chip
+        return chips
+
+    from syndicate.features.shared.doubleheader import MAX_SAME_GAME_GAP_SECONDS, pick_by_start_time
 
     restated = 0
     for card in cards:
         sport = str(card.get("sport") or card.get("sport_slug") or "").strip().lower()
         card_date = _card_date(card)
-        chip = None
+        candidates: list[Mapping[str, Any]] = []
         for a in _keys(sport, card.get("away_team"), card.get("away_key")):
             for h in _keys(sport, card.get("home_team"), card.get("home_key")):
-                chip = _chip_for(sport, card_date, a, h)
-                if chip:
+                candidates = _chip_for(sport, card_date, a, h)
+                if candidates:
                     break
-            if chip:
+            if candidates:
                 break
+        if not candidates:
+            continue
+        # THE CARD'S OWN GAME among the pair's games that date: nearest start to
+        # the card's `commence_time`. Two it cannot separate restate nothing --
+        # the card keeps the state it was built with rather than the other
+        # half's (see `shared/doubleheader.py`).
+        _game = card.get("game") if isinstance(card.get("game"), Mapping) else {}
+        chip, _pick = pick_by_start_time(
+            candidates,
+            card.get("commence_time") or _game.get("start_time_utc"),
+            start_of=lambda c: c.get("start_time_utc"),
+            max_gap_seconds=MAX_SAME_GAME_GAP_SECONDS if sport == "mlb" else None,
+        )
         if not chip:
             continue
         state = str(chip.get("state") or "").strip().lower()

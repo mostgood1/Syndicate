@@ -457,3 +457,63 @@ def test_a_lone_half_on_the_board_is_refused_not_guessed():
     slugs, out = _pm_slugs([_pm_row("g2", G2_COMMENCE, "totals", "over", 8.5)])
     assert slugs == [None]
     assert out["doubleheader_candidates_skipped"]["half_unresolved"] >= 1
+
+
+# --- the web's serve-time restate (`_refresh_layer2_live_state`) ------------
+
+
+@pytest.fixture
+def restate_chips(monkeypatch):
+    import pipeline.intelligence_state as state_module
+    from syndicate.features.shared import game_chip_scoreboard
+
+    table: dict[str, list] = {}
+    monkeypatch.setattr(state_module, "read_game_chips", lambda _date: None)
+    monkeypatch.setattr(game_chip_scoreboard, "build_game_chips", lambda date, _sports: list(table.get(str(date), [])))
+    return table
+
+
+def _restate_chip(pk, start, state, away_score=None, home_score=None):
+    return {
+        "sport": "mlb", "game_key": pk, "start_time_utc": start, "state": state, "matchup": "TB @ NYY",
+        "away": {"name": "Tampa Bay Rays", "score": away_score},
+        "home": {"name": "New York Yankees", "score": home_score},
+    }
+
+
+def _restate_card(commence, market="totals", line=7.5):
+    return {
+        "sport": "mlb", "kind": "game", "market": market, "line": line, "side": "over",
+        "away_team": "Tampa Bay Rays", "home_team": "New York Yankees",
+        "game_date": "2026-09-22", "commence_time": commence,
+        "market_state": "pregame", "lane": "pregame", "is_live": False,
+    }
+
+
+def test_the_restate_gives_each_half_its_own_state_and_score(restate_chips):
+    import pipeline.intelligence_state as state_module
+
+    # Game 1 live and already past the 7.5 total; game 2 not started.
+    restate_chips["2026-09-22"] = [
+        _restate_chip("823543", "2026-09-22T17:05:00+00:00", "live", away_score=5, home_score=4),
+        _restate_chip("823494", "2026-09-22T23:05:00+00:00", "pregame"),
+    ]
+    g1, g2 = _restate_card(G1_COMMENCE), _restate_card(G2_COMMENCE)
+    restated = state_module._refresh_layer2_live_state([g1, g2], ["2026-09-22"])
+    assert restated == 1
+    assert g1["market_state"] == "live" and g1["actual"] == 9.0
+    assert g2["market_state"] == "pregame" and g2["is_live"] is False
+    # Game 2's total is NOT graded on game 1's runs, so it is not pruned as decided.
+    assert "actual" not in g2 and not g2.get("decided")
+
+
+def test_the_restate_dedupes_one_game_seen_twice(restate_chips, monkeypatch):
+    import pipeline.intelligence_state as state_module
+
+    # The worker-published copy and the inline copy of ONE game are one candidate.
+    chip = _restate_chip("823543", "2026-09-22T17:05:00+00:00", "live", 1, 0)
+    restate_chips["2026-09-22"] = [chip]
+    monkeypatch.setattr(state_module, "read_game_chips", lambda _date: {"chips": [dict(chip)], "written_at": None})
+    card = _restate_card(G1_COMMENCE, market="h2h", line=None)
+    assert state_module._refresh_layer2_live_state([card], ["2026-09-22"], attach_actual=False) == 1
+    assert card["market_state"] == "live"
