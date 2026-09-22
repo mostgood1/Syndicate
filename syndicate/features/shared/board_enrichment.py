@@ -2207,12 +2207,19 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                     sources=(FIRST5_LENS_SOURCE,),
                     analytic_std_err=None,
                     sport=sport,
+                    # Needed to turn the lens' Central clock string into an
+                    # instant, which is what separates a doubleheader's halves.
+                    slate_date=selected_date,
                 )
             coverage = attach_live_gamelines(
                 grid,
                 build_live_gameline_index(
                     snapshot,
                     diagnostics=index_diag,
+                    # Same reason as the first5 index above: without the date a
+                    # lens game's "1:10 PM" cannot be compared to a row's
+                    # `commence_time`, and the pair stays ambiguous.
+                    slate_date=selected_date,
                     sources=lens_sources_for_sport(sport),
                     # None for MLB, so its sims-derived interval stays in charge and
                     # its behaviour is unchanged. Set only for a sport whose live

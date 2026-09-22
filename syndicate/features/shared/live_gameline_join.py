@@ -61,6 +61,14 @@ import math
 import os
 from collections.abc import Mapping
 from typing import Any
+from syndicate.features.shared.doubleheader import (
+    MAX_SAME_GAME_GAP_SECONDS,
+    NO_CANDIDATES,
+    SINGLE,
+    central_clock_start_epoch,
+    pick_by_start_time,
+    start_epoch,
+)
 from syndicate.features.shared.probability_refusal import refuse_published_certainty
 
 # How many standard errors an edge must clear before it is published. 2.0 is a
@@ -1254,15 +1262,103 @@ def _norm_team(value: Any) -> str:
     return " ".join(str(value or "").strip().lower().split())
 
 
+REASON_GAME_AMBIGUOUS = "team_pair_covers_more_than_one_game"
+
+
+class LiveGamelineIndex(dict):
+    """`(away, home)` -> one projection, PLUS every candidate for that pair.
+
+    A doubleheader puts two live games under one team pair, and the plain dict
+    this used to be could only hold one of them -- `index[key] = projection`,
+    last write wins. Measured over production ledgers 2026-09-22
+    (`.syndicate/findings_2026-09-22_ledger_key_clv_impact.md`): on all three
+    past doubleheaders BOTH odds events were priced against whichever half was
+    live and written under ITS gamePk, so the second event's rows carry the
+    first game's score series and window -- 09-04 DET@CLE 69 rows, 08-29 AZ@SF
+    222, 08-29 BOS@NYY 137.
+
+    The mapping keeps its old shape and its old meaning for every pair that has
+    exactly one game, which is nearly all of them. `candidates` is what a
+    doubleheader needs, and `resolve_live_gameline` is the only thing that
+    should read it.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.candidates: dict[tuple[str, str], list[dict[str, Any]]] = {}
+
+
+def resolve_live_gameline(
+    index: Mapping[tuple[str, str], Mapping[str, Any]],
+    key: tuple[str, str],
+    *,
+    target_start: Any = None,
+    game_pk: Any = None,
+    sport: Any = None,
+) -> tuple[Mapping[str, Any] | None, str]:
+    """`(projection, reason)` -- the ONE game this row's team pair means.
+
+    A pair with a single candidate answers exactly as the plain lookup always
+    did. A pair with several is separated by the row's own start
+    (`commence_time`) against each candidate's, and an EXACT `game_pk` match
+    wins outright over any clock reasoning.
+
+    A pair it cannot separate returns `(None, REASON_GAME_AMBIGUOUS)`. That is
+    the point of the change: the old answer was to hand over whichever game
+    happened to be indexed, which is `learnings.md`'s "unknown must not default
+    permissive" -- and it stayed silent for months because a wrong projection
+    and a right one are the same SHAPE.
+
+    A plain `dict` (a caller's literal, a fixture) has no `candidates`, so it
+    falls back to the mapping and keeps its old behaviour.
+    """
+    pool = getattr(index, "candidates", None)
+    rows = pool.get(key) if isinstance(pool, dict) else None
+    if not rows:
+        hit = index.get(key)
+        return (hit, SINGLE) if hit is not None else (None, NO_CANDIDATES)
+    if len(rows) == 1:
+        return rows[0], SINGLE
+
+    # `game_pk` FIRST, and only on an unambiguous match. The row knows its own
+    # game whenever the board stamped one, and no amount of clock reasoning
+    # beats the identity itself.
+    wanted = str(game_pk or "").strip()
+    if wanted:
+        exact = [row for row in rows if str(row.get("game_pk") or "").strip() == wanted]
+        if len(exact) == 1:
+            return exact[0], "game_pk"
+
+    hit, reason = pick_by_start_time(
+        rows,
+        target_start,
+        start_of=lambda row: row.get("start_epoch"),
+        # A doubleheader's halves are hours apart, so the only candidate for a
+        # pair can still be ANOTHER DAY's game once two are in play.
+        max_gap_seconds=(MAX_SAME_GAME_GAP_SECONDS
+                         if str(sport or "").strip().lower() == "mlb" else None),
+    )
+    if hit is None:
+        return None, REASON_GAME_AMBIGUOUS
+    return hit, reason
+
+
 def build_live_gameline_index(
     snapshot: Any,
     *,
     sources: tuple[str, ...] | None = None,
     analytic_std_err: float | None = None,
     sport: Any = None,
+    slate_date: Any = None,
     diagnostics: dict[str, Any] | None = None,
 ) -> dict[tuple[str, str], dict[str, Any]]:
     """(away_team, home_team) -> the live moneyline projection.
+
+    **AND EVERY CANDIDATE FOR THAT PAIR, under `.candidates`** -- see
+    `LiveGamelineIndex`. `slate_date` is what lets a lens game's `startTime`
+    become an instant: production writes it as a Central clock string ("1:10 PM"
+    / "6:15 PM" for 824424 / 824387 on 2026-09-04), and without the date only an
+    ISO `gameDate` can separate two halves.
 
     JOINED ON FULL TEAM NAMES, WHICH MATCH EXACTLY. Verified against production
     2026-08-15: the snapshot carries `matchup.home.name` "San Francisco Giants"
@@ -1310,7 +1406,7 @@ def build_live_gameline_index(
             "accepted_sources": list(sources or _DEFAULT_LENS_SOURCES),
         })
 
-    index: dict[tuple[str, str], dict[str, Any]] = {}
+    index = LiveGamelineIndex()
     if not isinstance(snapshot, Mapping):
         if diag is not None:
             diag["reason"] = "snapshot_is_not_a_mapping"
@@ -1370,6 +1466,15 @@ def build_live_gameline_index(
             continue
         projection = dict(projection)
         projection["game_pk"] = game.get("gamePk")
+        # THE START, so a team pair carrying two games can be separated later.
+        # `gameDate` when the lens carries one; otherwise the Central clock
+        # string production actually writes ("1:10 PM"), which needs the slate
+        # date to become an instant. Absent stays absent -- an unresolvable
+        # candidate must make the pair AMBIGUOUS, not silently win.
+        projection["start_epoch"] = (
+            start_epoch(game.get("gameDate"))
+            or central_clock_start_epoch(slate_date, game.get("startTime"))
+        )
         # Stamped per HIT rather than read at pricing time so the interval and
         # the projection it describes travel together -- a later caller cannot
         # accidentally price one sport's probability against another's bar.
@@ -1377,7 +1482,12 @@ def build_live_gameline_index(
             projection["analytic_std_err"] = float(analytic_std_err)
         if sport is not None:
             projection["sport"] = str(sport).strip().lower()
-        index[key] = projection
+        # FIRST WINS in the mapping, not last. For the single-game pairs that
+        # are nearly all of them this is the same projection either way; for a
+        # doubleheader neither answer is right, which is what `candidates` and
+        # the resolver are for.
+        index.candidates.setdefault(key, []).append(projection)
+        index.setdefault(key, projection)
         if diag is not None:
             diag["indexed"] = int(diag["indexed"]) + 1
     return index
@@ -1437,8 +1547,13 @@ def attach_live_gamelines(
             # whole point is to record what the price would have been.
             seg_hit = None
             if segment_index is not None and segment in _FIRST5_SEGMENTS:
-                seg_hit = segment_index.get(
-                    (_norm_team(row.get("away_team")), _norm_team(row.get("home_team"))))
+                seg_hit, _seg_why = resolve_live_gameline(
+                    segment_index,
+                    (_norm_team(row.get("away_team")), _norm_team(row.get("home_team"))),
+                    target_start=row.get("commence_time"),
+                    game_pk=row.get("game_pk") or game.get("game_pk"),
+                    sport=sport,
+                )
             priceable_segment = (
                 segment in _FIRST5_SEGMENTS
                 and segment_index is not None
@@ -1543,9 +1658,25 @@ def attach_live_gamelines(
             continue
 
         key = (_norm_team(row.get("away_team")), _norm_team(row.get("home_team")))
-        hit = row_index.get(key)
+        # THE ROW'S OWN GAME, not its team pair. A doubleheader puts two live
+        # games under one pair and the old `row_index.get(key)` handed both
+        # rows whichever one was indexed -- measured on three production
+        # doubleheaders, and the second event's ledger rows carry the first
+        # game's score series to prove it.
+        hit, why = resolve_live_gameline(
+            row_index, key,
+            target_start=row.get("commence_time"),
+            game_pk=row.get("game_pk") or game.get("game_pk"),
+            sport=sport,
+        )
         if hit is None:
-            record(coverage, {"priceable": False, "withheld_reason": REASON_NO_LIVE_PROJECTION}, projected=False)
+            # AMBIGUOUS IS ITS OWN REASON. "we could not tell which of this
+            # pair's two games you are" and "there is no live projection for
+            # this pair" have different owners, and flattening them would make
+            # the coverage counters unable to say a doubleheader was refused.
+            reason = (REASON_GAME_AMBIGUOUS if why == REASON_GAME_AMBIGUOUS
+                      else REASON_NO_LIVE_PROJECTION)
+            record(coverage, {"priceable": False, "withheld_reason": reason}, projected=False)
             continue
 
         # THE STALENESS GATE SITS HERE, ABOVE THE MARKET BRANCH, ON PURPOSE.
