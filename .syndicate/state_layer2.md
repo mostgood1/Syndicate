@@ -790,3 +790,33 @@ deployed three times on the evening of 2026-08-26. Same family as
 - Whether the carryover keeps rebuilding a board while a game is live across midnight CT, what spacing it holds under production contention, and whether it stops with 0 live rows.
 - These are owed to scheduled tasks `layer2-carryover-roll-reading-0914` (the 09-14 roll), `layer2-carryover-crossing-reading-0915`, and backup `layer2-carryover-crossing-reading-0919`.
 - Cost: while the carryover runs, today's board and the prior date alternate ~3-minute fast builds.
+
+
+## [mlb-doubleheader-joins] A TEAM PAIR WAS NOT A GAME: EVERY MLB DOUBLEHEADER JOIN COLLAPSED, AND SIX ARE NOW FIXED AND LIVE `[verified 2026-09-22, lane mlb-doubleheader-e2e]`
+
+TB @ NYY played a split doubleheader on 2026-09-22 (gamePk 823543 17:05Z, 823494 23:05Z; OddsAPI events `394e1e2b` 17:06Z, `574050c1` 23:06Z). Every join that keyed a game on its TEAM PAIR kept one half for both, measured on the served board at 16:29Z:
+
+    join                                    was                                   now (board ~16:37:38Z, deploys.md 16:29:43Z)
+    attach_game_state (chip)                G2 rows read G1's chip "12:05P CT"    own chip; rows_resolved_by_start_time 310, ambiguous 0
+    attach_live_game_state_from_lens        first lens game per pair              own game (G1 live never moved G2)
+    prop_projections game lines             G1 h2h 0.531 (= G2's sim)             0.606 (its own); rows_resolved_by_game_pk 269
+    prop_projections player props           both halves 1.502/0.308 (= G2's)      G1 1.513, G2 1.502
+    kalshi_board_join props                 both rows -> one ticker               each contract to its own game's row (`prop_game_resolved`)
+    polymarket_board_join                   a line only one half lists paired     `dhN` must equal the row's game number
+    venue fan-in (`venue_quote_fanin`)      G2 rows stamped G1's ticker/price     `|dh<n>` keys; doubleheader_sides qualified 507
+    vendor pick lines (daily_update_multi)  both cards priced off G2's event      823543 -> 394e1e2b 17:06Z, 823494 -> 574050c1 23:06Z (cards 17:28Z)
+    `_refresh_layer2_live_state` (web)      G2 cards took G1's state and score     own chip (G2 pregame while G1 LIVE, 17:04:11Z)
+    Layer 2 page rail                       one merged card + an empty one        two cards: "TOP 1 ● LIVE" and "6:05P CT PREGAME" (17:03:56Z)
+
+The rule is one helper, `shared/doubleheader.py`: nearest start to the row's own `commence_time`, refusing a pair it cannot separate by 45 min and (MLB) a lone hit more than 12 h away. The same rule fixes a SERIES collision: the pair repeats on consecutive days and a multi-date board took whichever date's chip was indexed first.
+
+**NOT measured:** the ORDER path on a real position -- no TB/NYY venue position was planned or ordered through 17:3xZ, so the Kalshi/Polymarket fixes are verified only offline on production ticker/slug shapes. Kalshi listed no G2 PROP events at all that day (public API), so "G2 prop `venue_ref` = None" is the honest answer, not a join failure.
+**STILL PAIR-KEYED (not fixed):** vendor `build_season_betting_cards_manifest._load_game_lines_lookup` (grading), the OddsAPI props file (one entry per player, events merged), `live_gameline_ledger.record_key` (no event_id), `settlement_identity` phases 2/3 for records with no id. Order SETTLEMENT is safe: `bet_status_mlb` matches on commence_time within 1 h and refuses `ambiguous_doubleheader`.
+
+## [nhl-chip-start-time] NHL CHIPS CARRIED NO START TIME AND NO STATUS TOKEN UNTIL 2026-09-22 — FIXED AND LIVE (pregame half) `[verified 2026-09-22, lane nhl-compact-card-start-time]`
+
+Every NHL chip read `start_time_utc: None`, `status_token: None` and `game_key` "1".."10" (a row index), so the Layer 2 Games rail showed a bare "NHL PREGAME" where every other sport shows "MLB · 5:35P CT". The NHL card game is built from `predictions_<date>.csv`, which carries only `date` (`odds.commence_time` = "2026-09-22", no `T`). The live overlay `_apply_nhl_live_scores` ALREADY fetched the NHL schedule (`NhlWebClient.scoreboard_day`: id, `startTimeUTC`, state, period, clock; 10 of 10 of that day's cards join by full team name) and `_load_nhl_scoreboard_rows` dropped `gameDate` on the way.
+
+`3e8ff188` (refresh-worker, live 17:34:59Z): the loader keeps `gameDate`, the overlay stamps it (refusing the client's `<date>T00:00:00Z` placeholder) and sets `live_state.period` / `.clock`. Measured: chips 0/10 -> 10/10 with start time and token (artifact 17:35:51Z), rail "NHL · 6:00P CT PREGAME NYI – NYR" (17:36:51Z), NHL now interleaved by start with MLB/WNBA.
+
+**NOT measured:** the LIVE half (state live, "P<n> <clock>", scores) -- owed after first puck 23:00Z. The card's `gamePk` is deliberately still the row index: other NHL rows join on it.
