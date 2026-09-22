@@ -240,6 +240,12 @@ def ensure_games_cached(season: int, *, cache_dir: Path = DEFAULT_CACHE_DIR, api
     return path
 
 
+#: How close a game has to be before a `startTimeTBD` flag reads as STALE rather
+#: than as the upstream's honest answer. CFBD firms kickoff times about two weeks
+#: out; 10 days keeps this inside that window, so a genuinely undecided November
+#: kickoff never triggers a refresh.
+_TBD_KICKOFF_FIRM_SECONDS = 10 * 24 * 3600
+
 # A game is over well inside this many hours of kickoff. CFBD flips `completed`
 # when it ingests the final; the window only has to exceed game length plus that
 # ingest lag, and being generous costs one extra day of staleness at most.
@@ -298,9 +304,32 @@ def games_payload_is_stale(payload: Any, *, now: float) -> bool:
         # already raises on a corrupt file.
         return False
     cutoff = now - _GAME_COMPLETION_GRACE_SECONDS
+    tbd_cutoff = now + _TBD_KICKOFF_FIRM_SECONDS
     for game in payload:
         if not isinstance(game, dict):
             continue
+        # A KICKOFF THAT IS STILL "TBD" THIS CLOSE TO THE GAME IS ALSO PROOF THE
+        # SNAPSHOT IS BEHIND -- the second way this file goes stale, and the one
+        # the `completed` rule above cannot see.
+        #
+        # Measured 2026-09-22 (four days before the games): the worker's
+        # `games_2026.json.gz` flagged `startTimeTBD` on 43 of 65 week-4 games,
+        # so `build_ncaaf_chip_games` wrote `startTime: None`, every one fell
+        # back to noon Central (`2026-09-26T17:00:00+00:00`) and the board's
+        # compact cards read "Sat Sep 26 - TBD". CFBD had already firmed them:
+        # `/games?year=2026&week=4` returned `startTimeTBD: False` on 71 of 71
+        # with real kickoffs. Nothing triggered a refresh, because every one of
+        # those games is in the FUTURE and `completed: False` is correct for it.
+        #
+        # Bounded to the firming window on purpose: CFBD fills kickoff times
+        # roughly two weeks out, so a TBD in November is the upstream's honest
+        # answer and must not put this file in a refresh loop against a MONTHLY
+        # quota. Only a TBD whose own kickoff date is already inside the window
+        # counts, and a past TBD is left to the `completed` rule below.
+        if game.get("startTimeTBD") is True:
+            kickoff = _kickoff_epoch(game)
+            if kickoff is not None and now <= kickoff <= tbd_cutoff:
+                return True
         if game.get("completed"):
             continue
         kickoff = _kickoff_epoch(game)
