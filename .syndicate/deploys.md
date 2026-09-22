@@ -39885,3 +39885,19 @@ Claim released after this entry.
 
 **WEB WAS UNREACHABLE ~16:56-17:01Z AFTER GOING LIVE -- same shape as the 16:06Z web deploy (NFL lane), cause NOT established:** Render events `server_failed` 16:54:47Z and 16:56:32Z, both `HTTP health check failed (timed out after 5 seconds)`, `server_available` 16:54:57Z / 16:57:17Z, no OOM/eviction; external requests 000/502 until 17:01:47Z, then stable. Two consecutive web deploys today show it, so it is not this change's; recorded, not diagnosed.
 Claims (web, refresh-worker) released after this entry.
+
+## 2026-09-22 17:29:18Z -> live 17:34:59Z (12:29-12:34 PM CT) — refresh-worker `f15ffb80` -> `3e8ff188` (`dep-dapblrm0tbcc73dqeahg`) — lane `nhl-compact-card-start-time` — **VERIFIED (pregame half): NHL chips carry start time and status token; Layer 2 rail shows "NHL · 6:00P CT"**
+
+**User request (chat):** "take a look at the NHL compact cards on layer 2 board, ensure these are displaying start time and other details pregame/live like every other sport" (deploy approved for this session's board fixes). Claim 17:16Z (free); preflight HOLD 17:17-17:28Z (MLB daily sim `run_mlb_daily_sim_job` -> `daily_update.py --workflow ui-daily` in flight, then board builds), CLEAR 17:29:01Z for `3e8ff188`.
+**Carries** beyond `f15ffb80`: `3e8ff188` (NHL: `_load_nhl_scoreboard_rows` keeps `gameDate`, `_apply_nhl_live_scores` stamps it + `live_state.period/clock`, `scoreboard_day` emits abbrevs), web `041ee664` page commit (inert here), ledger commits.
+
+    field                                                   baseline 17:28:52Z   predicted   measured
+    live_commit                                             f15ffb80             3e8ff188    3e8ff188 (live 17:34:59Z)
+    /api/board/game-chips?sport=nhl today: with start_time  0 of 10              10 of 10    10 of 10 (artifact published 17:35:51Z, read 17:36:01Z)
+    ... with status_token                                   0 of 10              10 of 10    10 of 10 ("CBJ @ BUF 6:00P CT", ... "TBL @ NSH 7:00P CT")
+    Layer 2 page Games rail NHL cards                       "NHL PREGAME NYI – NYR" (no time, unsorted at the top)   "NHL · <time>"   "NHL · 6:00P CT PREGAME NYI – NYR", "NHL · 7:00P CT PREGAME TBL – NSH" -- interleaved by start with MLB/WNBA (17:36:51Z)
+
+**OWED:** the LIVE half -- once NHL games start (first puck 23:00Z / 6:00 PM CT), a chip reads `state live`, `status_token` "P<n> <clock>" and scores. Web still runs the pre-fix `home.py` for inline chip builds / home-page strips (web `041ee664` < `3e8ff188`); the Layer 2 rail reads the worker artifact, so it is not affected.
+
+**Doubleheader lane reading taken during this window (`mlb-doubleheader-e2e`, vendored pick lines, owed since 16:32Z):** the MLB daily sim that held this preflight ran on `f15ffb80`; `/mlb/api/cards?date=2026-09-22` read 17:28Z: card 823543 `markets.ml.commence_time` 17:06Z / event `394e1e2b`, card 823494 23:06Z / `574050c1` (both cards read 23:06Z before the fix). VERIFIED.
+Claim released after this entry.
