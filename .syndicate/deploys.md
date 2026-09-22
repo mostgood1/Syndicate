@@ -39901,3 +39901,46 @@ Claims (web, refresh-worker) released after this entry.
 
 **Doubleheader lane reading taken during this window (`mlb-doubleheader-e2e`, vendored pick lines, owed since 16:32Z):** the MLB daily sim that held this preflight ran on `f15ffb80`; `/mlb/api/cards?date=2026-09-22` read 17:28Z: card 823543 `markets.ml.commence_time` 17:06Z / event `394e1e2b`, card 823494 23:06Z / `574050c1` (both cards read 23:06Z before the fix). VERIFIED.
 Claim released after this entry.
+
+
+## 2026-09-22 18:23:54Z (13:23 CDT) — READING (owed by the 00:1xZ entry) — lane layer2-score-outcome-calibration — live exchange orders under the venue fee + ceiling: **HELD on n=8 (all Polymarket); the KALSHI half is STILL OWED — zero Kalshi live orders since the deploy**
+
+Owed by the `2026-09-22 00:1xZ` entry (`4ee86561`, live on refresh-worker `f0e60bec` at 2026-09-22 00:12:34Z / 09-21 19:12 CDT), whose PLAN half was verified (Kalshi venue positions 53 -> 6, max EV 12.63 -> 5.11) and whose LIVE-ORDER half was not. Pre-deploy population: 6 of that day's 9 real Kalshi orders carried stated EV > 5.26%, max 28.0%.
+
+**Population.** `/api/portfolio/live?on=all&show=all` read 2026-09-22 18:20Z (13:20 CDT) — 336 live orders ever, `state_recorded_by` live-odds-worker. Orders with `submitted_at` > 2026-09-22T00:12:34Z: **8, every one of them Polymarket, every one `status=filled`**. That is the whole post-deploy population on ANY book, not just the exchanges — the same filter without the venue clause returns the same 8.
+
+    submitted_at (UTC)  venue       sport/market              price   P        ev_pct   fee/$1   fee basis                      after-fee EV %   venue_ticker
+    14:26:04Z (09:26)   polymarket  ncaaf/totals              +108    0.4808   4.000    0.01500  polymarket_measured_notional   +0.853           tsc-cfb-tcu-ucf-2026-09-26-total-49pt5
+    14:26:08Z (09:26)   polymarket  mlb/totals                +120    0.4545   4.663    0.01500  polymarket_measured_notional   +1.319           tsc-mlb-cws-kc-2026-09-22-8pt5
+    16:35:26Z (11:35)   polymarket  mlb/strikeouts            +122    0.4505   4.391    0.01500  polymarket_measured_notional   +1.027           astatc-mlb-az-col-2026-09-22-k-micsor-gte5
+    16:51:31Z (11:51)   polymarket  mlb/batter_total_bases    +133    0.4292   4.765    0.01500  polymarket_measured_notional   +1.227           astatc-mlb-az-col-2026-09-22-tb-ketmar-gte3
+    16:57:07Z (11:57)   polymarket  mlb/outs                  +100    0.5000   4.921    0.01500  polymarket_measured_notional   +1.865           astatc-mlb-stl-pit-2026-09-22-outs-andpal-gte16
+    16:57:10Z (11:57)   polymarket  nfl/h2h                   -135    0.5745   3.796    0.01500  polymarket_measured_notional   +1.154           aec-nfl-ten-nyg-2026-09-27
+    16:57:13Z (11:57)   polymarket  mlb/batter_hits_runs_rbis -108    0.5192   4.455    0.01500  polymarket_measured_notional   +1.522           astatc-mlb-cle-bos-2026-09-22-hrr-chadel-gte2
+    17:08:50Z (12:08)   polymarket  mlb/batter_hits           -163    0.6198   3.120    0.01500  polymarket_measured_notional   +0.683           astatc-mlb-cle-bos-2026-09-22-hits-chadel-gte1
+
+    P = implied prob of `requested_price`; fair = P x (1 + ev_pct/100);
+    fee = syndicate.features.shared.venue_fees.taker_fee_per_contract(book, P, venue_ref=venue_ticker, sport=, market=, segment=)
+          -- every row resolved `polymarket_measured_notional`, is_upper_bound=False;
+    after-fee EV = (fair / (P + fee) - 1) x 100.
+
+**Pre-registered predictions, both HELD, n = 8.**
+
+    (a) no such order has ev_pct > 5.263    violations 0    max observed ev_pct 4.921 (mlb/outs 16:57:07Z)
+    (b) every such order has after-fee EV > 0   violations 0    min observed +0.683 (mlb/batter_hits 17:08:50Z)
+
+**STATED PLAINLY: this population has WEAK DISCRIMINATING POWER, and the reading says so rather than banking it.** No order in it came within 0.34 pts of the 5.263 ceiling, so all 8 would have passed a build with NO ceiling; and none came within 0.68 pts of the fee floor, so all 8 would have passed with NO fee deduction. A healthy reading is evidence only once you know what makes it read unhealthy (`learnings.md`, instrument blindness). What discriminates is the refusal side, below.
+
+**The gates ARE firing, and on a non-null population — `/api/portfolio/paper?date=2026-09-22`, `generated_at` 2026-09-22 13:12:38 CDT (18:12:38Z), `paper2` per-venue counters:**
+
+    venue       rows_in   positions   venue_ev_implausible (scope)   below_min_ev_pct_net_of_fee
+    kalshi      1185      10          18                             55
+    polymarket   902      13           6                             44
+    novig        865      30           -- (no fee/ceiling gate)       --
+    prophetx    1413      52           --                             --
+
+24 rows refused by the 5.263% ceiling and 99 by the after-fee floor on ONE build. Both reasons exist only in the `4ee86561` code, and both are non-zero on both exchange venues — so the mechanism is reachable and binding at plan time, which is what makes the clean live-order table above mean something.
+
+**OWED, unchanged in substance, narrowed: the KALSHI live-order half.** The last live Kalshi order of any kind was `2026-09-21T05:07:01Z` (09-21 00:07 CDT) — **19h05m BEFORE this deploy went live**. Zero Kalshi orders have been submitted since. The pre-deploy violations were all Kalshi, so this reading cannot retire that half; it retires the general claim (no post-deploy exchange order carried an implausible or after-fee-negative stated EV) on the population that exists. Kalshi's plan produced 10 positions on today's build, so the venue is not shut out at plan time — the gap is between plan and live submit, and it is not this lane's subject. **Re-read the Kalshi half after the next live Kalshi order.**
+
+No deploy, no env change, no order action taken for this reading. READ-ONLY.
