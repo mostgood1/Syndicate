@@ -788,37 +788,14 @@ def test_kickoff_itself_is_refused_and_one_second_before_is_not():
     _refuse_after_commence(request, now=kickoff - dt.timedelta(seconds=1))
 
 
-def test_totals_are_not_paused_by_default(monkeypatch):
-    """The pause is CONFIGURATION: absent means nothing is paused."""
-    monkeypatch.delenv(_PAUSED, raising=False)
-    token, calls = _build(_gated(market="totals"))
-    assert token == "market_unresolved_for_position" and len(calls) == 1
-
-
-def test_a_paused_market_is_refused_before_the_market_resolves(monkeypatch):
+def test_there_is_no_market_wide_pause_the_old_switch_is_ignored(monkeypatch):
+    """User decision 2026-09-22: "every line is its own decision". The removed
+    `SYNDICATE_POLYMARKET_PAUSED_MARKETS` switch, even set to `total` as it was from
+    2026-09-11, no longer refuses anything: a totals position reaches the resolver."""
     monkeypatch.setenv(_PAUSED, "total")
-    token, calls = _build(_gated(market="totals"))
-    assert token == "market_paused" and calls == []
-
-
-def test_the_pause_covers_alternate_totals_and_spares_moneylines(monkeypatch):
-    monkeypatch.setenv(_PAUSED, "total")
-    assert _build(_gated(market="alternate_totals_corners"))[0] == "market_paused"
-    token, calls = _build(_gated(market="h2h"))
-    assert token == "market_unresolved_for_position" and len(calls) == 1
-
-
-def test_none_pauses_nothing(monkeypatch):
-    monkeypatch.setenv(_PAUSED, "none")
-    token, calls = _build(_gated(market="totals"))
-    assert token == "market_unresolved_for_position" and len(calls) == 1
-
-
-def test_the_pause_is_checked_before_kickoff(monkeypatch):
-    """A paused market past kickoff reads `market_paused`: the configured
-    refusal names itself first, so the pause is countable on its own."""
-    monkeypatch.setenv(_PAUSED, "total")
-    assert _build(_gated(market="totals", commence=_PAST))[0] == "market_paused"
+    for market in ("totals", "alternate_totals_corners", "batter_total_bases"):
+        token, calls = _build(_gated(market=market))
+        assert token == "market_unresolved_for_position" and len(calls) == 1, market
 
 
 # --------------------------------------------------------------------------

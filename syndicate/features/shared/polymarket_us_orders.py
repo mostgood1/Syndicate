@@ -948,15 +948,18 @@ def polymarket_us_submitter(resolve_market):
     line below AFTER its row had been written, and a lost update kept the row.
     Calling `submit` directly is build-then-send, unchanged.
 
-    KICKOFF AND PAUSE COME FIRST `[2026-09-11, user decision, lane
-    polymarket-e2e-review]`. Before the market is even resolved, `build`
-    refuses a position at or after its kickoff (`game_started`), one whose
-    kickoff cannot be read (`commence_unknown`), and a market paused by
-    configuration (`market_paused`). See `_refuse_after_commence`.
+    KICKOFF COMES FIRST `[2026-09-11, user decision, lane polymarket-e2e-review]`.
+    Before the market is even resolved, `build` refuses a position at or after its
+    kickoff (`game_started`) and one whose kickoff cannot be read
+    (`commence_unknown`). See `_refuse_after_commence`.
+
+    THERE IS NO MARKET-WIDE PAUSE. The `SYNDICATE_POLYMARKET_PAUSED_MARKETS` switch
+    (`market_paused`, set to `total` 2026-09-11) was REMOVED 2026-09-22 on the user's
+    decision: "we cant just globally eliminate a market, thats not how our app works.
+    every line is its own decision". A line is refused only on its own merits.
     """
 
     def build(request: Any):
-        _refuse_paused_market(request)
         _refuse_after_commence(request)
         resolved = resolve_market(request)
         if not resolved:
@@ -1030,34 +1033,6 @@ def polymarket_us_submitter(resolve_market):
 # Both checks run in `build`, the one build every Polymarket order passes, and
 # BEFORE the market is resolved. A refusal at build writes no ledger row, and
 # `execution_ledger._refusal_token` counts it by the text before the colon.
-
-_PAUSED_MARKETS_ENV = "SYNDICATE_POLYMARKET_PAUSED_MARKETS"
-
-
-def _paused_market_tokens() -> tuple[str, ...]:
-    """Market-name substrings refused LIVE on this venue. EMPTY BY DEFAULT.
-
-    `SYNDICATE_POLYMARKET_PAUSED_MARKETS`, comma-separated, matched as a
-    substring of the position's `market`, so `total` covers `totals` and
-    `alternate_totals_corners`. `none`, `off` or `0` pauses nothing.
-
-    A PAUSE IS CONFIGURATION, NOT CODE. It was set 2026-09-11 because
-    Polymarket totals lost in BOTH books: paper -40.7% over 106 settled, live
-    -34.0% over 33. It ends when that is explained. Paper never builds through
-    this submitter, so paper keeps measuring the paused markets.
-    """
-    raw = str(os.environ.get(_PAUSED_MARKETS_ENV) or "").strip().lower()
-    if raw in ("", "none", "off", "0"):
-        return ()
-    return tuple(token for token in (part.strip() for part in raw.split(",")) if token)
-
-
-def _refuse_paused_market(request: Any) -> None:
-    market = str(getattr(request, "market", "") or "").strip().lower()
-    for token in _paused_market_tokens():
-        if token in market:
-            raise OrderBuildError(f"market_paused: {market!r} matches {token!r} in {_PAUSED_MARKETS_ENV}")
-
 
 def _refuse_after_commence(request: Any, *, now: _dt.datetime | None = None) -> None:
     """Refuse a build at or after kickoff, or when kickoff cannot be read.
