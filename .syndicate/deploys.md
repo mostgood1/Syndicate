@@ -39973,3 +39973,18 @@ User asked, after the NHL fix: "now check the same for NBA and WNBA compact card
 **The NHL defect was NOT structural to basketball.** NHL had no start time at all, for TODAY, because its card comes from `predictions_<date>.csv` (date only). NBA and WNBA both carry a real start time and a token, and both have the same live wiring as each other -- `_apply_nba_live_scores` / `_apply_wnba_live_scores` plus a "processed game cards + live scoreboard supplement" source, applied when the requested date is TODAY. Today's WNBA cards already carry `live_state.away_pts` / `home_pts` (0.0 pregame).
 **The 2026-06-05 NBA chip's missing score is the PAST-DATE path, not an NBA defect:** the supplement runs only for today, so a past date's card reads its scheduled state (WNBA 09-21 reads `status: Scheduled`, `final: False`, the same way). MLB differs because it has per-date `feed_live` artifacts, so its 09-21 chips read final with scores. That inconsistency is about HISTORY, not the pregame/live display, and is not claimed by any lane.
 **NOT measured:** the LIVE rendering for either sport -- NBA cannot be read until its season starts, WNBA is covered by the scheduled task below.
+
+## 2026-09-22 19:09:15Z -> live 19:15:35Z (2:09-2:15 PM CT) — refresh-worker `3e8ff188` -> `97066dbe` (`dep-dapd4moae00c73cmr5u0`) — lane `ncaaf-kickoff-cache-staleness` — **DEPLOYED; the reading is DEFERRED to the next NCAAF projection run (~2026-09-23 15:37Z), which is what refreshes the cache**
+
+**User (chat):** "fix it now, before Saturday", after "now check NFL and NCAAF compact cards too". Claim 19:08:39Z, preflight CLEAR 19:09:03Z for `97066dbe`, no jobs in flight.
+**What it changes:** `games_payload_is_stale` now also treats a `startTimeTBD` whose own kickoff is within 10 days as stale. The producer is untouched: `refresh_games_cache` (called by `scripts/generate_smartsim2_ncaaf_projections.py`) is quota-latched, throttled, and never clobbers a good file.
+**Why the effect is not immediate:** the refresh runs inside the NCAAF projection generator, which is launched on a DAILY cadence -- `SEASON_PROJECTION_LAUNCHING sport=ncaaf ... reason=artifact_stale interval_seconds=86400` at 2026-09-21T15:25:25Z and 2026-09-22T15:36:51Z (both read from the worker's logs). The next launch is ~2026-09-23T15:37Z, four days before the games.
+
+    field                                               baseline 19:08:58Z      predicted                              measured
+    live_commit                                         3e8ff188                97066dbe                               97066dbe (live 19:15:35Z)
+    chips ncaaf 2026-09-26 at the 17:00Z placeholder    43 of 65                0, after the next projection run        OWED (2026-09-23, scheduled task `ncaaf-kickoff-refresh-reading-0923`)
+    chips ncaaf 2026-09-26 with a "TBD" status_token    42                      0                                      OWED, same run
+    the function itself                                 `False` for a TBD kickoff 4 days out (origin/main)   `True`    `True` (offline, real function, both directions)
+
+**The upstream is not the limit, and that was checked before writing any code:** CFBD `/games?year=2026&week=4&seasonType=regular&classification=fbs` returned **71 games, `startTimeTBD: False` on 71 of 71**, kickoffs 19:30Z x12 / 16:00Z x11 / 23:00Z x7 / 23:30Z x6 (read 19:0xZ with the production key). Our worker's copy still flagged 43. ESPN agrees (63 of 65 timed).
+Claim released after this entry.
