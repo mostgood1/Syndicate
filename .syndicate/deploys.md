@@ -39735,3 +39735,17 @@ Orders placed (real money): `tsc-cfb-tcu-ucf-2026-09-26-total-49pt5` over 49.5 a
     lens games matching /nfl/api/cards?week=3        0/16 (16/16 matched the checkout's 2026-08-01 file)  16/16                   16/16 (home and away means within 0.06)
 
 The last pre-fix snapshot (generated 14:45:00Z, old process) still read the checkout; the first snapshot after the pull is correct. **verify:** the table.
+
+
+## 2026-09-22 14:49:36Z -> live 15:03:32Z (9:49-10:03 AM CT) — live-odds-worker `c11d3730` -> `bf3eb38c` (`dep-dap9avtg1s2s739t4m60`) — lane `layer2-score-outcome-calibration` — **the Polymarket market-wide pause mechanism is gone from the running code; behaviour-neutral, VERIFIED**
+
+**User decision (chat):** "deploy live-odds-worker now" (after "remove the pause mechanism from the code").
+**Ride-along:** none -- live was `c11d3730` (lane `nfl-live-lens-stale-projections`, deployed 14:46:28Z, CLOSED/verified); `bf3eb38c` is the only code commit in `c11d3730..bf3eb38c`. The env key was already DELETED 14:43:59Z.
+**Preflight:** `CLEAR: only infrastructure processes running` 14:49Z; the build sat in `build_in_progress` ~12 min (Render build queue) before `update_in_progress` 15:01:57Z.
+
+    field                               baseline 14:49:22Z                 predicted   measured (first polymarket pass 15:09:03Z)
+    live_commit                         c11d3730                           bf3eb38c    bf3eb38c
+    market_paused refusals              0 (14:42:15Z pass)                 0           0 -- `market_paused` 0 lines since 15:03:32Z
+    polymarket pass                     positions=3, per-line refusals     same shape  positions=4 placed=0 duplicates=2 (the two 14:26Z totals orders) refused={'commence_unknown': 2}
+
+`Traceback` since 15:03Z: none. **LEAD (not this change):** the two refusals are MLB STRIKEOUTS props (`astatc-mlb-...-k-...`) with NO `commence_time` on the live-plan row -- a per-line data gap that stops every such Polymarket prop at `commence_unknown`; recorded in leads.md.
