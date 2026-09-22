@@ -20,6 +20,12 @@
 - **Verified so far.** live-odds-worker `f15ffb80` live 16:30:04Z: first pass placed it YES (`CNAV8SPX4WPA`), `venue_yes_leg_index=0 agree=True`, `refused={}`; FILLED 2/2 @ 0.45 at 16:51:13Z (`deploys.md`).
 - **Close when** scheduled task `soroka-prop-settlement-reading-0923` shows the grade matches Soroka's box-score strikeouts (WIN iff >= 5); then move this item to `todo_closed.md`. A grade that contradicts the count means the prop side mapping is INVERTED -- stop Polymarket props first.
 
+### `#683` — **Kalshi `spreads` is planned every cycle and has NEVER built an order: `spread_line_missing`** — FOUND 2026-09-22 by `scripts/venue_order_family_census.py` on its first real run, lane `venue-order-family-census`, session 236bd219 — **OPEN, not diagnosed**
+- **What.** Census over `ORDER_PATH` lines, 2026-09-22 00:00Z..16:30:04Z: kalshi `spreads` 117 position-passes over 55 passes, **0 built**, all refused `spread_line_missing`; `spreads_alt` 4 over 3 passes, same. Unchanged after 16:30Z (36 over 18). Kalshi `totals`, `h2h`, `strikeouts` and the other prop families build in the SAME passes, so it is spread-specific, not a venue or plan-wide outage.
+- **Where it is raised.** `syndicate/features/shared/kalshi_orders.py:213` (`_side_to_kalshi`): a spread's leg comes from the SIGN of its line, so an absent, unreadable or ZERO line refuses rather than guessing a leg. That refusal is correct; the question is why the position has no line.
+- **Not yet diagnosed.** Whether the line is never set on the board row, dropped in `venue_scope` / the plan, or arrives as `0`. Read one refused position end to end (board row -> plan row -> `OrderRequest.line`) before changing anything.
+- **Close when** kalshi `spreads` shows `would_build` > 0 in the daily census (`venue-order-family-census-daily`), or the family is deliberately and explicitly not placed at this venue, recorded as such.
+
 ### `#671` — **NFL per-game player stats never reach web, so every NFL prop answer has an empty recent-form layer** — FOUND 2026-09-17, lane `prop-evidence-parity`, NOT STARTED, no owner
 
 - **Measured.** `nfl_source/fantasy/nfl_fantasy_usage_*.json` IS allowlisted in `HOT_ARTIFACT_PATTERNS`, and the production export listing returns **0 files**; `nfl_source/tracking/nflverse/` on web holds only `injuries_2026.csv`, `roster_2026.csv`, `schedules_games.csv` — no pbp, no player_stats. So over the 40 real NFL board prop rows sampled 2026-09-17, `recent_form` is `artifact_missing` on 40/40, while the other six layers fill.
