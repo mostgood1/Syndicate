@@ -39958,3 +39958,18 @@ No deploy, no env change, no order action taken for this reading. READ-ONLY.
 **The `RECLAIM ... reused=True` branch is NOT exercised in production** -- it needs an in-place restart, and this deploy had none (no `server_failed` through 18:33Z). It is covered offline by a test that replays production's sequence and fails on the old code.
 
 **FIRST PAYOFF OF THE DURATIONS, and it ranks what `web-flap-0922` could only count** (161 access lines, 18:28:02-18:33Z, the post-boot window): `/` 34 requests median **12,303 ms** max **86,508 ms**; `/wnba/api/live_player_boxscore` 6, median 13,427, max 71,111; `/api/intelligence/query` 2 at 44,486; `/nfl/api/weeks` 1 at 61,399; `/api/board/game-chips` 6, median 688, max 11,991; `/api/ops/artifacts/publish` 37, median **33 ms**, max 5,805; `/api/ops/artifacts/stream` 8, median 1 ms. So the home page dominates the 8 slots after a boot and the worker artifact traffic is cheap -- the opposite of what the request COUNTS suggested. **verify:** the table.
+
+## 2026-09-22 18:3xZ (1:3x PM CT) — READING, no deploy — lane `nhl-compact-card-start-time` — **NBA AND WNBA COMPACT CARDS CHECKED AGAINST THE NHL DEFECT: both are sound; the NHL gap does not generalise**
+
+User asked, after the NHL fix: "now check the same for NBA and WNBA compact cards". Read-only; web `3ba363ff`, chips artifact published 18:27:59Z.
+
+    sport / date          chips  start_time  status_token  state      score
+    wnba 2026-09-22        5      5           5             pregame    -- ("CON @ WSH 6:30P CT", "GSV @ POR 9:00P CT")
+    nba  2026-09-22        0      --          --            --         -- (OFFSEASON: ESPN scoreboard 20260922 = 0 events)
+    nba  2026-06-05        1      1           1             final      none ("NYK @ SAS", token FINAL)
+    wnba 2026-09-21        2      2           2             pregame    none (tokens "Mon Sep 21 · 9:07P CT")
+    mlb  2026-09-21        3      0           3             final      3-4, 2-9, 2-5
+
+**The NHL defect was NOT structural to basketball.** NHL had no start time at all, for TODAY, because its card comes from `predictions_<date>.csv` (date only). NBA and WNBA both carry a real start time and a token, and both have the same live wiring as each other -- `_apply_nba_live_scores` / `_apply_wnba_live_scores` plus a "processed game cards + live scoreboard supplement" source, applied when the requested date is TODAY. Today's WNBA cards already carry `live_state.away_pts` / `home_pts` (0.0 pregame).
+**The 2026-06-05 NBA chip's missing score is the PAST-DATE path, not an NBA defect:** the supplement runs only for today, so a past date's card reads its scheduled state (WNBA 09-21 reads `status: Scheduled`, `final: False`, the same way). MLB differs because it has per-date `feed_live` artifacts, so its 09-21 chips read final with scores. That inconsistency is about HISTORY, not the pregame/live display, and is not claimed by any lane.
+**NOT measured:** the LIVE rendering for either sport -- NBA cannot be read until its season starts, WNBA is covered by the scheduled task below.
