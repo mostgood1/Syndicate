@@ -10,7 +10,7 @@ from syndicate.features.nfl.smartsim2_projection import SMARTSIM2_PUBLIC_LABEL
 from syndicate.features.nfl.smartsim2_projection import read_projection_artifact
 from syndicate.features.nfl.sources import available_weeks
 from syndicate.features.nfl.sources import build_module_links
-from syndicate.features.nfl.sources import default_nfl_source_root
+from syndicate.features.nfl.sources import smartsim2_projection_path
 from syndicate.features.nfl.sources import default_week
 from syndicate.features.nfl.sources import format_odds
 from syndicate.features.nfl.sources import latest_season
@@ -230,7 +230,7 @@ def _standalone_smartsim2_pick_cards(season: int, week: int) -> list[dict[str, A
     same real reason: a new season (2026) the older recs-snapshot pipeline
     has never been refreshed for still has real SmartSim 2.0 projections
     on disk."""
-    projections = read_projection_artifact(season=season, week=week, data_root=default_nfl_source_root())
+    projections = read_projection_artifact(season=season, week=week, data_root=smartsim2_projection_path(season, week).parent)
     scored_cards: list[tuple[float, dict[str, Any]]] = []
     for projection in projections:
         home_team = str(projection.home_team or "Home").strip() or "Home"
@@ -294,7 +294,7 @@ def _standalone_smartsim2_picks_context(*, season: int, resolved_week: int, week
             intro_title="NFL Picks",
             intro_body=f"No stored NFL weekly recommendation snapshot exists for this week yet, so this board shows {SMARTSIM2_PUBLIC_LABEL}'s own projections directly, unblended.",
             aria_label="NFL picks board",
-            source_path=str(default_nfl_source_root() / f"smartsim2_projections_{season}_wk{resolved_week}.csv"),
+            source_path=str(smartsim2_projection_path(season, resolved_week)),
             source_title=f"NFL {SMARTSIM2_PUBLIC_LABEL} standalone projections",
             source_date_display=f"{season} Week {resolved_week}",
             rank_cards=standalone_cards,

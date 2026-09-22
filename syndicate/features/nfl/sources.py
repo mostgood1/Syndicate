@@ -375,6 +375,19 @@ def data_path(*parts: str) -> Path:
     return nfl_artifact_output_root() / relative
 
 
+def smartsim2_projection_path(season: int, week: int) -> Path:
+    """The weekly SmartSim2 projection file, resolved PER FILE -- see `data_path`.
+
+    `#672`'s pattern a fifth time. Cards, picks and the market board loaded this
+    file from `default_nfl_source_root()`, whose `upcoming_recs_*.csv` probe
+    lands on the repo checkout on any service whose disk lacks that file.
+    Measured 2026-09-22: the NFL live lens, built on live-odds-worker, served
+    the checkout's 2026-08-01 week-3 file (16/16 games matched it, 0/16 matched
+    the live file) while web's own cards served the live file.
+    """
+    return data_path(f"smartsim2_projections_{season}_wk{week}.csv")
+
+
 def _count_csv_rows(path: Path) -> int:
     try:
         with path.open("r", encoding="utf-8", newline="") as handle:

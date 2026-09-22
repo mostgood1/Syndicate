@@ -19,6 +19,7 @@ from syndicate.features.nfl.smartsim2_projection import read_projection_artifact
 from syndicate.features.nfl.sources import available_weeks
 from syndicate.features.nfl.sources import build_module_links
 from syndicate.features.nfl.sources import default_nfl_source_root
+from syndicate.features.nfl.sources import smartsim2_projection_path
 from syndicate.features.nfl.sources import default_week
 from syndicate.features.nfl.sources import latest_season
 from syndicate.features.nfl.sources import nfl_source_roots
@@ -1990,7 +1991,7 @@ def build_cards_page_context(selected_week: int, *, season: int | None = None, s
         # SmartSim2 projection artifact before giving up to an empty
         # state, mirroring NCAAF cards.py's own engine/SmartSim2-standalone
         # split.
-        projections = read_projection_artifact(season=season, week=resolved_week, data_root=default_nfl_source_root())
+        projections = read_projection_artifact(season=season, week=resolved_week, data_root=smartsim2_projection_path(season, resolved_week).parent)
         if projections:
             games = [_game_from_smartsim_projection(projection, season, resolved_week) for projection in projections]
             using_smartsim_fallback = True
@@ -2102,7 +2103,7 @@ def build_cards_page_context(selected_week: int, *, season: int | None = None, s
         for game in games
     ]
     if using_smartsim_fallback:
-        source_path = str(default_nfl_source_root() / f"smartsim2_projections_{season}_wk{resolved_week}.csv")
+        source_path = str(smartsim2_projection_path(season, resolved_week))
         source_title = "NFL SmartSim 2.0 standalone projections"
     else:
         source_path = _snapshot_source_path(season, resolved_week)
@@ -2381,7 +2382,7 @@ def build_nfl_market_board(season: int, week: int) -> dict[str, Any]:
     syndicate.features.nfl.props (real quoted lines joined against a real
     season-to-date player rate, not a trained model -- see that module's
     docstring)."""
-    projections = read_projection_artifact(season=season, week=week, data_root=default_nfl_source_root())
+    projections = read_projection_artifact(season=season, week=week, data_root=smartsim2_projection_path(season, week).parent)
     weeks = nfl_projection_available_weeks(season)
     props_odds_rows, props_sim_rows = nfl_props_rows_for_week(season, week)
 

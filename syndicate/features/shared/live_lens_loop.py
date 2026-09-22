@@ -92,6 +92,34 @@ def _wnba_build_wrapper(date_str: str) -> dict[str, Any]:
 	return _wnba_build(date_str, limit=50)
 
 
+# THE NFL PROJECTION FILE NEVER REACHED THIS WORKER'S DISK. It is generated on
+# refresh-worker and published to web only, so the cards builder this loop calls
+# found no live file here and fell back to the repo checkout's 2026-08-01
+# backfill -- measured 2026-09-22, the served lens matched that file on 16/16
+# week-3 games and the live file on 0/16. Pulled from web before each build,
+# throttled: `pull_streamed_artifact` sends the local mtime, so an unchanged
+# file is a 304 and writes nothing.
+_NFL_PROJECTION_PULL_AT: dict[tuple[int, int], float] = {}
+_NFL_PROJECTION_PULL_INTERVAL_SECONDS = 600.0
+
+
+def _pull_nfl_projection(season: int, week: int) -> None:
+	key = (int(season), int(week))
+	now = time.time()
+	if now - _NFL_PROJECTION_PULL_AT.get(key, 0.0) < _NFL_PROJECTION_PULL_INTERVAL_SECONDS:
+		return
+	_NFL_PROJECTION_PULL_AT[key] = now
+	relative = f"nfl_source/smartsim2_projections_{key[0]}_wk{key[1]}.csv"
+	try:
+		from syndicate.features.shared.artifact_publisher import pull_streamed_artifact
+
+		ok, written = pull_streamed_artifact(relative, timeout_seconds=30)
+	except Exception as exc:  # noqa: BLE001 -- a pull must never break the lens tick
+		print(f"[live_lens_loop] NFL_PROJECTION_PULL_FAILED path={relative} error={type(exc).__name__}", flush=True)
+		return
+	print(f"[live_lens_loop] NFL_PROJECTION_PULL path={relative} ok={ok} written={written}", flush=True)
+
+
 def _nfl_build_wrapper(date_str: str) -> dict[str, Any]:
 	# NFL's live-lens snapshot is week-scoped, not date-scoped like every
 	# other sport this loop drives -- date_str (central_today_iso(), passed
@@ -115,6 +143,8 @@ def _nfl_build_wrapper(date_str: str) -> dict[str, Any]:
 	season = _nfl_latest_season()
 	preseason_week = _nfl_preseason_target_week(season)
 	week = preseason_week if preseason_week is not None else _nfl_default_week(season)
+	if preseason_week is None:
+		_pull_nfl_projection(season, week)
 	return _nfl_build(week, season)
 
 
