@@ -40072,3 +40072,16 @@ The 09-04 and 08-29 collisions are the doubleheader shape with a PRESENT `game_p
     embed chars                            ~12.0 M                              unchanged          12,044,664 (rows unchanged)
 
 **Read the min, not just the median:** 227 ms is a cache hit -- the build is gone from that request entirely. The median still carries the builds because in this window almost all `/` traffic was my own 8 samples; with real traffic the hit rate rises. Build cost itself is unchanged (2.5-16 s) and is paid once per 60 s per worker. **Not addressed:** each worker caches separately (2x the builds), and the first request after every window still pays. Raising `SYNDICATE_HOME_EMBED_CACHE_SECONDS` or sharing the string through the keyvalue store are the next levers, unmeasured. **verify:** the table.
+
+## 2026-09-22 22:23:46Z -> live 22:29:39Z (5:23-5:29 PM CT) — web `ebd17ee2` -> `eddcfb60` (`dep-dapfvsnf3r2c73ckgokg`) — lane `home-embed-cache-shared` — **VERIFIED: one build per window for the whole container, not one per worker**
+
+**User decision (chat):** "share the cache across workers", then "Deploy web now". Claim 22:23:19Z (free), preflight CLEAR 22:23:37Z, released 22:41Z. **Carries** `eddcfb60` (this lane) and `4a231ac8` (lane `live-gameline-game-identity`: the live game-line index keys the GAME, not the team pair; its verification is its own).
+
+    field                              baseline (per-worker cache, 22:05-22:08Z)   predicted              measured (shared, 22:35:40-22:39:10Z, same 12-request pattern)
+    live_commit                        ebd17ee2                                    eddcfb60               eddcfb60 (live 22:29:39Z)
+    `[home_embed]` lines               BUILD 6 in 8 min, no FILE_HIT               ~1 BUILD per window    **BUILD 3, FILE_HIT 2** over 3.2 min = one build per 60 s window across BOTH workers
+    the sibling read is real           --                                          byte-identical         `FILE_HIT ... chars=14035948` matches the preceding `BUILD ... chars=14035948`
+    `/` server duration (access log)   median 1,634 ms, min 227, max 9,435 (n=8)   lower median           median **497 ms**, min 226, max 10,128 (n=12); under 1 s on **7 of 12** (was 4 of 8)
+    direct TTFB (single client)        0.45-0.74 s on hits, 3-9.7 s on rebuilds    same, fewer rebuilds   0.41-1.81 s on 9 of 12; 10.3 / 6.2 / 8.2 s on the three window boundaries
+
+**What is NOT fixed:** the first request of each window still pays the whole build (4.7-9.7 s here), and the build cost itself is untouched. The cache only stops the SAME work being repeated. A longer TTL or a producer that refreshes the file off the request path (the worker already rebuilds the board on its own cadence) are the next levers, unmeasured. **verify:** the table.
