@@ -333,6 +333,11 @@ class NhlWebClient:
                         "gameDate": game.get("startTimeUTC") or f"{date}T00:00:00Z",
                         "home": self._team_name(game.get("homeTeam", {})),
                         "away": self._team_name(game.get("awayTeam", {})),
+                        # The tri-codes, so a consumer can join on the code
+                        # when the display names drift (e.g. a franchise
+                        # rename) -- `_apply_nhl_live_scores` keys on both.
+                        "home_abbr": (game.get("homeTeam") or {}).get("abbrev"),
+                        "away_abbr": (game.get("awayTeam") or {}).get("abbrev"),
                         "home_goals": game.get("homeTeam", {}).get("score"),
                         "away_goals": game.get("awayTeam", {}).get("score"),
                         "gameState": game.get("gameState"),

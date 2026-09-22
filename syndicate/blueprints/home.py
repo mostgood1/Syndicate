@@ -4711,6 +4711,10 @@ def _load_nhl_scoreboard_rows(selected_date: str) -> list[dict[str, Any]]:
                 return [
                     {
                         "gamePk": row.get("gamePk") or row.get("game_id"),
+                        # THE SCHEDULED START (`startTimeUTC`). Dropped here
+                        # until 2026-09-22, which is why every NHL chip had no
+                        # start time: the card game itself only knows its date.
+                        "gameDate": row.get("gameDate") or row.get("startTimeUTC"),
                         "away": row.get("away") or row.get("away_team"),
                         "home": row.get("home") or row.get("home_team"),
                         "away_abbr": row.get("away_abbr") or row.get("away_tri"),
@@ -4743,6 +4747,7 @@ def _load_nhl_scoreboard_rows(selected_date: str) -> list[dict[str, Any]]:
         out.append(
             {
                 "gamePk": row.get("gamePk") or row.get("game_id"),
+                "gameDate": row.get("gameDate") or row.get("startTimeUTC"),
                 "away": row.get("away") or row.get("away_team"),
                 "home": row.get("home") or row.get("home_team"),
                 "away_abbr": row.get("away_abbr") or row.get("away_tri"),
@@ -4817,7 +4822,23 @@ def _apply_nhl_live_scores(games: list[dict[str, Any]], selected_date: str) -> l
             "in_progress": state in {"LIVE", "CRIT"},
             "final": state == "OFF",
             "status": " | ".join(detail_bits) if detail_bits else selected_date,
+            # Read directly by the chip's `_live_status_token` ("P2 10:21"),
+            # the same fields every other period sport's live state carries.
+            "period": period or None,
+            "clock": clock or None,
         }
+        # THE START TIME THE CARD NEVER HAD. The NHL card game is built from
+        # `predictions_<date>.csv`, which carries only the date, so every NHL
+        # chip read `start_time_utc: None` and the Layer 2 rail showed a bare
+        # "NHL PREGAME" (measured 2026-09-22). The schedule row carries the real
+        # `startTimeUTC`; `scoreboard_day` writes `<date>T00:00:00Z` when the API
+        # has none, which is a placeholder, not a 7 PM ET start the day before.
+        start = str(row.get("gameDate") or "").strip()
+        if "T" in start and not start.startswith(f"{selected_date}T00:00:00"):
+            updated["gameDate"] = start
+            odds = dict(game.get("odds") or {}) if isinstance(game.get("odds"), dict) else {}
+            odds["commence_time"] = start
+            updated["odds"] = odds
         status = dict(game.get("status") or {}) if isinstance(game.get("status"), dict) else {}
         if away_goals is not None:
             status["away_score"] = away_goals
