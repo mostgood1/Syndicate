@@ -39680,3 +39680,18 @@ All WARMED lines are `sport=all`. `WARM_FAILED` 0, `WARMER_ERROR` 0, `WARMER_OFF
 5. Exited 0 and published: **PASS** -- `cron_job_run_ended successful`, no failed run in the last 10 events, `generated_at` fresh.
 **Also read (28d live price verdicts).** Every pre-registered verdict held: edge_holds ncaaf totals full live (73 g, 3 d) and mlb totals_alt first3 live (17/7); edge_fails ncaaf h2h full live (62/3), soccer live first/anytime/last goal scorer (48/4 each), player_shots (26/4), player_shots_on_target (42/4), mlb strikeouts full pregame (17/6). New edge_fails not predicted: nfl anytime td full live (16/3), nfl rushing yards full live (17/4), soccer totals h1 live (15/5). Every NCAAF/NFL/WNBA quarter and half is insufficient except ncaaf spreads h1 live = **unproven at 3 dates** (28 g), the first NCAAF half to reach 3 dates; no NCAAF quarter above 1 date.
 **Verdict.** GOAL: NOT MET under the pre-set rule (3 and 4 FAIL). The consensus x live x segment slice IS readable in `28d.price_by_fair_method`. Owed: USER decision on the 9 soccer skill pockets (kill switch `skill_overlay` or accept them).
+
+
+## 2026-09-22 13:47:19Z -> live 13:53:35Z (8:47-8:53 AM CT) — live-odds-worker `de6da1b7` -> `210dd3aa` (`dep-dap8dpp42hec7398jrqg`) — lane `layer2-score-outcome-calibration` — **Polymarket submit no longer charges a fee; LIVE and content-verified; the behaviour reading is OWED (no order reached the ask step yet)**
+
+**User decisions (chat):** "remove the fee check at submit in polymarket orders"; asked when to deploy, chose **"Now"** (a quiet window: 8:47 AM CT, no games live).
+**Ride-along, enumerated (code since `de6da1b7`, 15 commits):** `210dd3aa` (this change); this lane's `4ee86561`, `053ddd9e`, `03d3f801`, `569ebca1`, `97f01a37`, `456e264f`, `1e9b687b` (already live on refresh-worker; on live-odds-worker only the paths it runs matter); `312d67eb`, `e7f216bf` (NFL projection generator -- refresh-worker path, inert here); `3af16744`, `8bd59f95`, `a720941d`, `7882372f` (web paths); `3072ab01` (refresh-worker script). Env unchanged: `SYNDICATE_POLYMARKET_PRICE_AT_ASK=1` (single-key read 2026-09-21), `SYNDICATE_SCORE_FEE_NET` absent here (any Layer 2 build on this service stays shadow-only).
+**Preflight:** `CLEAR: only infrastructure processes running` 13:47:08Z; claim held by this lane from 13:46:49Z.
+
+    field                               baseline 13:46:28Z                                  predicted     measured
+    live_commit                         de6da1b7                                            210dd3aa      210dd3aa (live 13:53:35Z)
+    POLYMARKET_PRICED_AT_ASK log        fee_bound=0.02 ev_net_at_ask_pct=... (70 lines/24h)  no fee_bound  NOT YET MEASURABLE
+    TCU-UCF YES (plan 3.57% @ 0.595)    refuse, ev_net_at_ask 0.2 (ask 0.59)                place         NOT YET MEASURABLE
+
+**Why not measurable:** the first execution pass after boot (13:57:39-13:58:08Z) built the live Polymarket plan (`positions=3`) and refused all three `market_paused` (`SYNDICATE_POLYMARKET_PAUSED_MARKETS` matches `total` / `batter_total_bases`) BEFORE the ask step -- `EXECUTED ... placed=0 refused={'market_paused': 3}`. The TCU-UCF order is not in today's plan. `Traceback` since boot: none. Fills/commissions reconcile normally (`FILL_PRICE`, `COMMISSION` lines 13:58:01Z).
+**verify (OWED):** the first `POLYMARKET_PRICED_AT_ASK` line after 13:53:35Z carries `ev_at_ask_pct=` and NO `fee_bound=`; a row whose EV at the ask is >= 2% places (decision=place). Folded into scheduled task `venue-fee-ceiling-live-orders-reading-0922` (13:00 CT today).
