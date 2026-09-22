@@ -39831,3 +39831,20 @@ Claim released after this entry.
 **How it went live.** The user said "yes deploy refresh-worker". The claim was held by `layer2-score-outcome-calibration` (then `mlb-doubleheader-e2e`), so this lane did not acquire or force it. `48376cc1` went live 15:48:56Z and CONTAINS `45608cb3` (`merge-base --is-ancestor` true). `f15ffb80` (`mlb-doubleheader-e2e`, update_in_progress at 16:32Z) contains it too. No deploy is owed by this lane.
 **Reading, boot 15:48:56Z -> 16:29:40Z** (Render logs, paged): 6 `BOARD_STATE_LEDGER_RECORDED`, every `chunk_lines_on_disk` an integer (7164, 369, 7237, 7310, 7383, 7456); 0 `error:`. Anon step `evaluation_bundle` -> `RECORDED`: 0 / -66 / -2 MB on the 3 sampled cycles, 3 cycles unsampled. Pre-fix baseline at a comparable chunk size (6.3-6.9k lines, 14:30-15:33Z): 3 / 117 / 0 / 15 / 195 MB.
 **Not yet proven.** 3 samples at half last night's chunk size. The real test is tonight's slate at ~13k+ lines, where the old code reached +512 / +561 MB. The ~1.6 GB unobserved climb before the 04:08Z kill stays unexplained. `oomKilled` recurrence is the lagging signal.
+
+## 2026-09-22 16:27:12Z -> live 16:30:04Z (11:27-11:30 AM CT) — live-odds-worker `bf3eb38c` -> `f15ffb80` (`dep-dapaoo3m8hqs7393q74g`) — lane `layer2-score-outcome-calibration` — **Polymarket `gte<N>` player props now resolve and place: VERIFIED (Soroka K over 4.5 submitted YES, `CNAV8SPX4WPA`)**
+
+**User decisions (chat):** "yes, deploy live-odds-worker" (for `69db91e8`, after "fix the strikeout market resolution"); then, asked directly because the target carries the OPEN, not-deploy-ready lane `mlb-doubleheader-e2e` (web's 16:0xZ deploy had deliberately left it out, and `69db91e8` sits ON TOP of four of its five commits, so no main commit carries this fix without it): **"Deploy main now"**.
+**Carries** beyond `bf3eb38c`: `69db91e8` (this lane: the prop branch in `_polymarket_resolve_market`); `0b5518ab` (this lane, already live on refresh-worker); lane `mlb-doubleheader-e2e` `9ad08717` `a988ab4d` `5b509b55` `0731d3ae` `f15ffb80` (board enrichment / Kalshi prop join / Polymarket join / venue quote fan-in per doubleheader half -- **its verification is OWED BY THAT LANE**, "on the next doubleheader the board builds after deploy"; TB @ NYY G2 is 23:05Z today); `45608cb3` (OOM line count, runs on refresh-worker); `27af7934` / `585ddca0` (NFL, web).
+**Preflight:** claim 16:26:53Z (free); `CLEAR: only infrastructure processes running` 16:27Z; deploy triggered 16:27:12Z (separate command); live 16:30:04Z.
+
+    field                                           baseline (16:26:43Z)                      predicted   measured (first pass 16:35:29Z)
+    live_commit                                     bf3eb38c                                  f15ffb80    f15ffb80
+    polymarket market_unresolved_for_position       1 (15:57:50Z and 16:15:53Z passes)        0           0 -- refused={}
+    Soroka K `-micsor-gte5` POLYMARKET_SIDE_REFUSED yes_no_market_subject_is_not_our_side x4  none        none; POLYMARKET_YES_LEG yes_leg_index=0 venue_yes_leg_index=0 agree=True reason='gte_prop_yes_by_name'
+    ORDER_PATH strikeouts                           {market_unresolved: 1}                    would_build {would_build: 1} @ 0.46
+    the order                                       never built                               built       PRICED_AT_ASK decision=place ev_at_ask 4.5 >= min 2.0; SUBMIT YES BUY qty=2.0 @ 0.45 GTD 00:41Z; id CNAV8SPX4WPA; LIVE_ORDER status=submitted stake 1.05
+    PROP_DECODER_UNAVAILABLE / Traceback            --                                        0           0 since 16:30:04Z
+
+**The venue's own YES-leg field was read for the first time on a prop:** `venue_yes_leg_index=0` on `['Yes','No']`, agreeing with the by-name rule (n=1 market). A disagreement would have refused (`prop_yes_leg_disagrees_with_venue`).
+**Not measured here:** the fill (submitted, `executions=0` at submit) and the settlement. Claim released after this entry.
