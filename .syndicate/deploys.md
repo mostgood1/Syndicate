@@ -40059,3 +40059,16 @@ The 09-04 and 08-29 collisions are the doubleheader shape with a PRESENT `game_p
 
 **No migration:** every record already carries `event_id` and the previous-observation map is rebuilt from the file each run, so an existing file re-keys consistently. The change can only SPLIT records that were wrongly merged; it cannot merge any that were separate.
 **OWED:** records appended after 21:04:52Z, and a later date's census showing old-key groups that span more than one event now hold one record per event. Claim released after this entry.
+
+## 2026-09-22 21:53:11Z -> live 21:59:19Z (4:53-4:59 PM CT) — web `cc5bdfb1` -> `ebd17ee2` (`dep-dapfhhvf3r2c73cj18rg`) — lane `home-page-embed-size` — **VERIFIED: the `/` embed is built once per TTL per worker; server-side median 4,387 -> 1,634 ms**
+
+**User decision (chat):** "cache the rebuild", then "Deploy web now". Claim 21:52:06Z (free), preflight CLEAR 21:53:04Z, released 22:10Z. **Carries** `ebd17ee2` (this lane) and `d25664f0` (lane `grading-game-identity`: "name the GAME, not the team pair"; its verification is its own).
+
+    field                                  baseline (warm, 21:40-21:53Z)        predicted          measured (warm, 22:05-22:08Z)
+    live_commit                            cc5bdfb1                             ebd17ee2           ebd17ee2 (live 21:59:19Z)
+    `/` server duration (access log)       median 4,387 ms, p90 9,700, max 12,890, min 2,883 (n=5)   repeat < 1 s   median **1,634 ms**, p90 3,411, max 9,435, **min 227** (n=8)
+    direct TTFB (single client)            3.07 / 3.13 / 13.08 / 4.57 s         < 1 s on a hit     3.48 / 3.01 (builds) then **0.74 / 0.58 / 0.55 / 0.45** (hits), 9.68 / 2.98 on later rebuilds
+    `[home_embed]` log line                absent                               BUILD per window   `BUILD key=default:2026-09-22 ms=16073 chars=12044664 ttl_s=60 cached=True` 21:59:34Z, 6 builds in 8 min across 2 workers (was one per request)
+    embed chars                            ~12.0 M                              unchanged          12,044,664 (rows unchanged)
+
+**Read the min, not just the median:** 227 ms is a cache hit -- the build is gone from that request entirely. The median still carries the builds because in this window almost all `/` traffic was my own 8 samples; with real traffic the hit rate rises. Build cost itself is unchanged (2.5-16 s) and is paid once per 60 s per worker. **Not addressed:** each worker caches separately (2x the builds), and the first request after every window still pays. Raising `SYNDICATE_HOME_EMBED_CACHE_SECONDS` or sharing the string through the keyvalue store are the next levers, unmeasured. **verify:** the table.
