@@ -820,3 +820,16 @@ Every NHL chip read `start_time_utc: None`, `status_token: None` and `game_key` 
 `3e8ff188` (refresh-worker, live 17:34:59Z): the loader keeps `gameDate`, the overlay stamps it (refusing the client's `<date>T00:00:00Z` placeholder) and sets `live_state.period` / `.clock`. Measured: chips 0/10 -> 10/10 with start time and token (artifact 17:35:51Z), rail "NHL · 6:00P CT PREGAME NYI – NYR" (17:36:51Z), NHL now interleaved by start with MLB/WNBA.
 
 **NOT measured:** the LIVE half (state live, "P<n> <clock>", scores) -- owed after first puck 23:00Z. The card's `gamePk` is deliberately still the row index: other NHL rows join on it.
+
+
+## [ncaaf-kickoff-cache] AN UPCOMING NCAAF CARD READ "TBD" BECAUSE THE COMMITTED CFBD CACHE WAS THE JULY SNAPSHOT — FIXED BOTH HALVES `[verified 2026-09-22, lane ncaaf-kickoff-cache-staleness]`
+
+Measured four days before the games: `/api/board/game-chips?sport=ncaaf&date=2026-09-26` returned 65 chips with **43 on the noon-Central fallback** (`2026-09-26T17:00:00+00:00`) and 42 `status_token`s reading "Sat Sep 26 - TBD". `build_ncaaf_chip_games` writes `startTime: None` when the schedule row says `startTimeTBD`, and `_resolve_scheduled_start_utc` then falls back to noon.
+
+**TWO THINGS WERE TRUE AT ONCE, and only the second moved the board:**
+1. `games_payload_is_stale` only asked whether a game that kicked off >12 h ago was still `completed: False`, so kickoff times firming up never triggered a refresh. `97066dbe` adds: a `startTimeTBD` whose own kickoff is within 10 days is stale (bounded to CFBD's firming window; the producer stays quota-latched and throttled).
+2. **`DEFAULT_CACHE_DIR` IS THE REPO CHECKOUT, NOT THE DISK** (`/opt/render/project/src/data/ncaaf_source/historical_truth/games_2026.json.gz`), so a worker-side refresh is ephemeral and never reaches web -- and the chips for an UPCOMING date are built INLINE ON WEB (`source: inline_artifact_missing`; today's read `worker_artifact`), from web's committed copy. That copy was the July snapshot: 888 rows, `completed: False` on 888 of 888, 42 week-4 TBD. `cc5bdfb1` re-fetched it from CFBD.
+
+After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens **42 -> 0**, distinct starts 14 -> 20 matching CFBD/ESPN (19:30Z x12, 16:00Z x11, 23:00Z x7, 23:30Z x6). The single chip still at 17:00Z is LIN @ EMU, a REAL noon-CT kickoff.
+
+**NOT measured:** the worker's in-process interval after the 20:32:19Z revert (config proven; `3600` was proven in-process at 19:52:18Z beforehand). **Worth knowing:** NBA/WNBA/NHL chips for a PAST date read pregame with no score because the live supplement is today-only, while MLB reads final with scores off its per-date `feed_live` artifacts; nobody claims that.
