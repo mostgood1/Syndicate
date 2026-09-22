@@ -2108,6 +2108,60 @@ def _embed_is_cacheable(payload: Any) -> bool:
     return bool(isinstance(rows, list) and rows)
 
 
+def _home_embed_cache_path(key: str) -> str:
+    """The CONTAINER-LOCAL copy both gunicorn workers read. `#2026-09-22`.
+
+    The in-process cache above is per WORKER, so web's two workers each paid the
+    build every window -- 6 `[home_embed] BUILD` lines in 8 minutes, measured --
+    and every recycle by the memory guard (650 MB anon, `gunicorn.conf.py`)
+    starts cold. The workers share this container's filesystem, which is what
+    `app.py:_bootstrap_lock_path` already relies on, so the rendered text goes in
+    the temp dir and the second worker reads it instead of rebuilding.
+
+    NOT the keyvalue store: it refuses writes over 8 MB (`#638`, 3,192 refusals
+    in 40 hours) and this string is ~12 MB. NOT the mounted disk either -- this
+    is a per-boot cache, and the temp dir dies with the container, which is
+    exactly the lifetime wanted.
+    """
+    import tempfile
+
+    digest = hashlib.sha1(key.encode("utf-8"), usedforsecurity=False).hexdigest()[:16]
+    return os.path.join(tempfile.gettempdir(), f"syndicate_home_embed_{digest}.json")
+
+
+def _read_home_embed_file(key: str, ttl: int) -> str | None:
+    """The sibling worker's copy, if it is still inside the TTL. `None` on any
+    problem at all: a cache that raises is worse than a cache that misses."""
+    path = _home_embed_cache_path(key)
+    try:
+        age = time.time() - os.path.getmtime(path)
+        if age > ttl:
+            return None
+        with open(path, "r", encoding="utf-8") as handle:
+            text = handle.read()
+    except OSError:
+        return None
+    return text or None
+
+
+def _write_home_embed_file(key: str, text: str) -> None:
+    """Atomic, so a reader never sees half a payload: write a sibling temp file
+    and `os.replace` it, which is atomic within a filesystem on POSIX and
+    Windows alike."""
+    path = _home_embed_cache_path(key)
+    staging = f"{path}.{os.getpid()}.tmp"
+    try:
+        with open(staging, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        os.replace(staging, path)
+    except OSError as exc:
+        print(f"[home_embed] FILE_WRITE_FAILED key={key} {type(exc).__name__}", flush=True)
+        try:
+            os.remove(staging)
+        except OSError:
+            pass
+
+
 def _home_embed_lock(key: str) -> "threading.Lock":
     with _HOME_EMBED_REGISTRY_LOCK:
         lock = _HOME_EMBED_LOCKS.get(key)
@@ -2127,6 +2181,15 @@ def cached_home_embed_json(key: str, build: "Callable[[], Any]") -> str:
     if cached and cached[0] > time.time():
         return cached[1]
 
+    # THE SIBLING WORKER'S COPY, before paying for a build. This is the whole
+    # point of the file layer: a cold worker -- a fresh one, or the other one in
+    # this container -- serves what its sibling already built.
+    shared = _read_home_embed_file(key, ttl)
+    if shared:
+        _HOME_EMBED_CACHE[key] = (time.time() + ttl, shared)
+        print(f"[home_embed] FILE_HIT key={key} chars={len(shared)}", flush=True)
+        return shared
+
     lock = _home_embed_lock(key)
     if not lock.acquire(blocking=not cached):
         # Someone is rebuilding and we hold a previous string: serve it rather
@@ -2137,6 +2200,12 @@ def cached_home_embed_json(key: str, build: "Callable[[], Any]") -> str:
         fresh = _HOME_EMBED_CACHE.get(key)
         if fresh and fresh[0] > time.time():
             return fresh[1]
+        shared = _read_home_embed_file(key, ttl)
+        if shared:
+            # A sibling finished while this thread waited for the lock.
+            _HOME_EMBED_CACHE[key] = (time.time() + ttl, shared)
+            print(f"[home_embed] FILE_HIT key={key} chars={len(shared)} after_lock=1", flush=True)
+            return shared
         started = time.time()
         payload = build()
         text = _embed_json_text(payload)
@@ -2144,6 +2213,7 @@ def cached_home_embed_json(key: str, build: "Callable[[], Any]") -> str:
         cacheable = _embed_is_cacheable(payload)
         if cacheable:
             _HOME_EMBED_CACHE[key] = (time.time() + ttl, text)
+            _write_home_embed_file(key, text)
         print(
             f"[home_embed] BUILD key={key} ms={elapsed_ms} chars={len(text)} "
             f"ttl_s={ttl} cached={cacheable}",

@@ -13,6 +13,7 @@ behind it, and the text is byte-identical to what `| tojson` produced before.
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 
@@ -22,10 +23,15 @@ from syndicate.blueprints import intelligence as intel
 
 
 @pytest.fixture(autouse=True)
-def _clean_cache(monkeypatch):
+def _clean_cache(monkeypatch, tmp_path):
     monkeypatch.setattr(intel, "_HOME_EMBED_CACHE", {})
     monkeypatch.setattr(intel, "_HOME_EMBED_LOCKS", {})
     monkeypatch.delenv("SYNDICATE_HOME_EMBED_CACHE_SECONDS", raising=False)
+    # The shared layer is a real file in the container's temp dir; point it at a
+    # per-test directory so these tests cannot read each other's copies.
+    monkeypatch.setattr(intel, "_home_embed_cache_path",
+                        lambda key: str(tmp_path / f"embed_{key.replace(':', '_').replace('=', '_')}.json"),
+                        raising=False)
     yield
 
 
@@ -52,12 +58,23 @@ def test_the_second_request_inside_the_ttl_does_not_rebuild():
     assert len(build.calls) == 1, "the embed was rebuilt inside its TTL"
 
 
+def _expire(key="default"):
+    """Age BOTH layers. Since the shared file exists, expiring only the
+    in-process entry is not expiry -- the worker would (correctly) serve the
+    file, which is what two of these tests caught when the file layer landed."""
+    stamp, text = intel._HOME_EMBED_CACHE.get(key, (0.0, ""))
+    if text:
+        intel._HOME_EMBED_CACHE[key] = (time.time() - 1, text)
+    path = intel._home_embed_cache_path(key)
+    if os.path.exists(path):
+        old = time.time() - 3600
+        os.utime(path, (old, old))
+
+
 def test_the_cache_expires():
     build = _counting_build()
     intel.cached_home_embed_json("default", build)
-    # Expire it the way the wall clock would.
-    stamp, text = intel._HOME_EMBED_CACHE["default"]
-    intel._HOME_EMBED_CACHE["default"] = (time.time() - 1, text)
+    _expire()
     intel.cached_home_embed_json("default", build)
     assert len(build.calls) == 2
 
@@ -102,8 +119,7 @@ def test_a_rebuild_in_flight_serves_the_previous_text_instead_of_queueing():
         return _payload(tag=f"build{len(calls)}")
 
     first = intel.cached_home_embed_json("default", slow_build)
-    stamp, text = intel._HOME_EMBED_CACHE["default"]
-    intel._HOME_EMBED_CACHE["default"] = (time.time() - 1, text)   # now stale
+    _expire()                                                      # both layers
 
     started = threading.Event()
     result = {}
@@ -140,3 +156,88 @@ def test_the_text_is_what_tojson_produced_and_is_script_safe():
     assert text == str(htmlsafe_json_dumps(payload, dumps=lambda o, **kw: json.dumps(o, default=str, **kw)))
     assert "</script>" not in text
     assert json.loads(text)["ranked_all"][0]["note"] == "</script><b>&'\""
+
+
+# --------------------------------------------------------------------------
+# THE SHARED LAYER (2026-09-22). The in-process cache is per WORKER: web runs
+# two, so each paid the build every window (6 BUILD lines in 8 min, measured),
+# and every recycle by the memory guard starts cold. Both workers share this
+# container's filesystem -- the same fact `app.py:_bootstrap_lock_path` relies
+# on -- so the rendered text goes in the temp dir.
+# --------------------------------------------------------------------------
+
+
+def _as_a_cold_worker(monkeypatch):
+    """A worker with an empty in-process cache, sharing the same container."""
+    monkeypatch.setattr(intel, "_HOME_EMBED_CACHE", {})
+    monkeypatch.setattr(intel, "_HOME_EMBED_LOCKS", {})
+
+
+def test_a_cold_worker_reads_the_siblings_file_instead_of_building(monkeypatch):
+    build = _counting_build()
+    first = intel.cached_home_embed_json("default", build)
+
+    _as_a_cold_worker(monkeypatch)
+    second = intel.cached_home_embed_json("default", build)
+
+    assert second == first
+    assert len(build.calls) == 1, "the second worker rebuilt instead of reading the file"
+
+
+def test_a_stale_file_is_not_served(monkeypatch):
+    build = _counting_build()
+    intel.cached_home_embed_json("default", build)
+    path = intel._home_embed_cache_path("default")
+    old = time.time() - 3600
+    os.utime(path, (old, old))
+
+    _as_a_cold_worker(monkeypatch)
+    intel.cached_home_embed_json("default", build)
+    assert len(build.calls) == 2
+
+
+def test_an_unreadable_file_falls_back_to_a_build(monkeypatch):
+    build = _counting_build()
+    intel.cached_home_embed_json("default", build)
+    path = intel._home_embed_cache_path("default")
+    os.remove(path)
+    os.mkdir(path)                      # a directory where the file should be
+
+    _as_a_cold_worker(monkeypatch)
+    text = intel.cached_home_embed_json("default", build)
+    assert json.loads(text)["ranked_all"]
+    assert len(build.calls) == 2
+
+
+def test_an_empty_build_writes_no_file():
+    build = _counting_build({"ranked_all": []})
+    intel.cached_home_embed_json("default", build)
+    assert not os.path.exists(intel._home_embed_cache_path("default"))
+
+
+def test_zero_neither_writes_nor_reads_the_file(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_HOME_EMBED_CACHE_SECONDS", "0")
+    build = _counting_build()
+    intel.cached_home_embed_json("default", build)
+    assert not os.path.exists(intel._home_embed_cache_path("default"))
+    assert len(build.calls) == 1
+
+
+def test_a_failed_write_neither_raises_nor_corrupts_the_previous_copy(monkeypatch, capsys):
+    """A cache that raises is worse than a cache that misses."""
+    build = _counting_build(_payload(tag="first"))
+    intel.cached_home_embed_json("default", build)
+    good = open(intel._home_embed_cache_path("default"), encoding="utf-8").read()
+
+    def _boom(src, dst):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(intel.os, "replace", _boom)
+    _as_a_cold_worker(monkeypatch)
+    path = intel._home_embed_cache_path("default")
+    os.utime(path, (time.time() - 3600, time.time() - 3600))   # force a rebuild
+    text = intel.cached_home_embed_json("default", _counting_build(_payload(tag="second")))
+
+    assert json.loads(text)["ranked_all"][0]["tag"] == "second"   # served anyway
+    assert open(path, encoding="utf-8").read() == good            # previous copy intact
+    assert "FILE_WRITE_FAILED" in capsys.readouterr().out

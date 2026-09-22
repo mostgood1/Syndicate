@@ -1297,6 +1297,14 @@ death, never life — do not invert it.
 - Verification: tests that FAIL on origin/main and pass here, driven by the production shapes (lens `startTime` is a Central clock string - "1:10 PM" / "6:15 PM" for 824424 / 824387 - and a grid row carries `event_id` + `commence_time` at top level, both read off production 2026-09-22). PRODUCTION READING OWED: the next MLB doubleheader whose halves OVERLAP in the live window, where the second event's ledger rows must carry their own gamePk.
 - Blocked by: none
 
+### home-embed-cache-shared — OPEN — opened 2026-09-22 — session dae18452-227b-42cc-a4f4-a4a4ee4cec3e
+- Goal: the `/` embed is built once per TTL per CONTAINER, not once per worker. Measured on production as `[home_embed] BUILD` lines falling to about one per TTL window while `/` stays fast, and a worker with a cold in-process cache serving without a build.
+- Files: `syndicate/blueprints/intelligence.py` (the home-embed cache ONLY), `tests/test_home_embed_cache.py`.
+- Hypothesis (written BEFORE the change): the cache is per PROCESS, so web's 2 gunicorn workers each build every window -- measured 2026-09-22 22:05-22:08Z, 6 `[home_embed] BUILD` lines in 8 minutes where one per 60 s window would be ~8 across both workers, and every worker recycle (the memory guard recycles at 650 MB anon) starts cold. Both workers share the CONTAINER's filesystem -- `app.py:_bootstrap_lock_path` relies on exactly that, and its `SKIP a live sibling` line proves one worker sees the other's file -- so a temp-dir copy of the rendered text lets the second worker read instead of build. The keyvalue store is NOT the place: it refuses writes over 8 MB (`#638`, 3,192 refusals) and this string is ~12 MB.
+- Falsification test: with the file layer live, a worker whose in-process entry is missing still rebuilds (the file is not read), or the file's freshness is judged wrongly and a stale board is served past the TTL.
+- Verification: tests (a second process-level cache reads the file and does not build; expiry, corruption, empty and the `0` switch all fall back to a build); then production after a user-approved web deploy: `[home_embed] BUILD` lines per TTL window and `/` server durations from the access log, warm-vs-warm.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
