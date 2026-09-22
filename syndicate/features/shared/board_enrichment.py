@@ -250,31 +250,80 @@ def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
                         return True
         return False
 
+    # A TEAM PAIR IS NOT A GAME. This loop used to `break` on the first chip
+    # whose teams matched, so both halves of a doubleheader took game 1's chip
+    # -- measured 2026-09-22, TB @ NYY game 2 (commence 23:06Z) served
+    # `12:05P CT` / `start_time_utc 17:05Z` -- and a series pair on a
+    # multi-date board took whichever date's chip was fetched first. Every
+    # matching chip is collected now and `pick_by_start_time` keeps the one
+    # nearest the row's own `commence_time`; a pair it cannot separate gets NO
+    # game block (counted as `ambiguous_game`), never the other game's.
+    from syndicate.features.shared.doubleheader import (
+        BEYOND_MAX_GAP,
+        MAX_SAME_GAME_GAP_SECONDS,
+        pick_by_start_time,
+    )
+
+    # MLB's two clocks are both precise (StatsAPI `gameDate`, OddsAPI
+    # `commence_time`), so there a lone pair hit a day away is refused too: it
+    # is the same pair's game from another date of the series.
+    max_gap = MAX_SAME_GAME_GAP_SECONDS if sport == "mlb" else None
+    ambiguous_game = 0
+    other_day_game = 0
+    doubleheader_resolved = 0
     for row in grid:
         home = row.get("home_team")
         away = row.get("away_team")
         if not home or not away:
             continue
+        pair_hits = []
         for chip in chips:
             chip_home = (chip.get("home") or {}) if isinstance(chip.get("home"), dict) else {}
             chip_away = (chip.get("away") or {}) if isinstance(chip.get("away"), dict) else {}
             try:
                 if _side_matches(home, chip_home) and _side_matches(away, chip_away):
-                    row["game"] = {
-                        "state": chip.get("state"),
-                        "start_time_utc": chip.get("start_time_utc"),
-                        "status_token": chip.get("status_token"),
-                        "matchup": chip.get("matchup"),
-                        "home_score": (chip.get("home") or {}).get("score"),
-                        "away_score": (chip.get("away") or {}).get("score"),
-                    }
-                    matched += 1
-                    break
+                    pair_hits.append(chip)
             except Exception:
                 continue
-        else:
+        if not pair_hits:
             for team in (home, away):
                 unmatched[str(team)] = unmatched.get(str(team), 0) + 1
+            continue
+        # ONE GAME FETCHED FOR TWO DATES IS STILL ONE GAME. Football queries a
+        # kickoff's ESPN date and its UTC date, so the same chip can arrive
+        # twice; only DISTINCT games (id + start) are candidates. A
+        # doubleheader's halves differ in both (`game_key` is the gamePk).
+        seen_games: set[tuple[str, str, str]] = set()
+        distinct_hits = []
+        for hit in pair_hits:
+            identity = (str(hit.get("game_key") or ""), str(hit.get("start_time_utc") or ""), str(hit.get("matchup") or ""))
+            if identity not in seen_games:
+                seen_games.add(identity)
+                distinct_hits.append(hit)
+        pair_hits = distinct_hits
+        chip, pick_reason = pick_by_start_time(
+            pair_hits,
+            row.get("commence_time"),
+            start_of=lambda c: c.get("start_time_utc"),
+            max_gap_seconds=max_gap,
+        )
+        if chip is None:
+            if pick_reason == BEYOND_MAX_GAP:
+                other_day_game += 1
+            else:
+                ambiguous_game += 1
+            continue
+        if pick_reason != "single":
+            doubleheader_resolved += 1
+        row["game"] = {
+            "state": chip.get("state"),
+            "start_time_utc": chip.get("start_time_utc"),
+            "status_token": chip.get("status_token"),
+            "matchup": chip.get("matchup"),
+            "home_score": (chip.get("home") or {}).get("score"),
+            "away_score": (chip.get("away") or {}).get("score"),
+        }
+        matched += 1
 
     # NCAAF ROWS THE CHIPS MISSED FALL BACK TO THE ESPN CAPTURE. The NCAAF chip
     # builder keeps a game only if it has a CARD, so an FBS-vs-FCS game (no card)
@@ -326,6 +375,11 @@ def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
             unmatched = still
 
     coverage = {"chips": len(chips), "rows_matched": matched}
+    # Reported even at zero so "no doubleheader / no series collision today"
+    # and "the resolution never ran" stay distinguishable in the payload.
+    coverage["rows_resolved_by_start_time"] = doubleheader_resolved
+    coverage["rows_ambiguous_game"] = ambiguous_game
+    coverage["rows_refused_other_day_game"] = other_day_game
     if capture_matched:
         coverage["rows_matched_by_capture"] = capture_matched
     # NO CHIPS IS NOT A JOIN FAILURE, and reporting it as one is the exact
@@ -665,6 +719,14 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
     """
     if sport not in _LIVE_GAME_STATE_SPORTS:
         return {"supported": False, "reason": f"no live status source wired for {sport}", "rows_corrected": 0}
+    from syndicate.features.shared.doubleheader import (
+        BEYOND_MAX_GAP,
+        MAX_SAME_GAME_GAP_SECONDS,
+        central_clock_start_epoch,
+        pick_by_start_time,
+        start_epoch,
+    )
+
     try:
         from syndicate.features.shared.refresh_state_store import data_root, read_json_file
         from syndicate.features.shared.team_aliases import teams_match
@@ -842,6 +904,13 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
                         "detailed": (game.get("status") or {}).get("detailed"),
                         "home_score": (score or {}).get("home"),
                         "away_score": (score or {}).get("away"),
+                        # THE START, so a doubleheader's halves stay apart (see
+                        # the join below). The snapshot's games carry no ISO
+                        # `gameDate` -- only the Central clock its cards show
+                        # (`startTime` "12:05 PM") and the slate date, checked
+                        # equal to `selected_date` above.
+                        "start": start_epoch(game.get("gameDate"))
+                        or central_clock_start_epoch(lens_date, game.get("startTime")),
                     }
                 )
     except Exception:
@@ -875,9 +944,13 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
 
     # The team-pair resolution is memoised: `teams_match` over every row against
     # every game is the one place this could get expensive on a 3,385-row grid.
-    resolved: dict[tuple[str, str], dict | None] = {}
+    # It memoises the pair's HITS, not one game: a pair is not a game.
+    resolved: dict[tuple[str, str], list[dict]] = {}
     corrected = 0
     transitions: dict[str, int] = {}
+    ambiguous_game = 0
+    other_day_game = 0
+    doubleheader_resolved = 0
 
     for row in grid:
         game = row.get("game")
@@ -891,11 +964,35 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
             continue
         key = (str(home), str(away))
         if key not in resolved:
-            resolved[key] = next(
-                (g for g in lens_games if _side_matches(home, g["home"]) and _side_matches(away, g["away"])),
-                None,
+            resolved[key] = [
+                g for g in lens_games if _side_matches(home, g["home"]) and _side_matches(away, g["away"])
+            ]
+        pair_hits = resolved[key]
+        if sport == "mlb":
+            # A DOUBLEHEADER'S HALVES AND A SERIES' DAYS SHARE THIS PAIR. The
+            # first hit used to win, so on 2026-09-22 TB @ NYY game 2's pregame
+            # rows would have read game 1's `live` and then its `final` -- and a
+            # tomorrow row in today's grid (the shard is keyed by capture date)
+            # took today's state, which the THIRD GUARD above never covered: it
+            # checks the SNAPSHOT's date, not the row's. The lens carries every
+            # game of its slate (preview included), so both halves are
+            # candidates and the one nearest the row's start wins; a pair it
+            # cannot separate, or a lone game a day away, corrects nothing.
+            hit, pick_reason = pick_by_start_time(
+                pair_hits,
+                row.get("commence_time") or game.get("start_time_utc"),
+                start_of=lambda g: g.get("start"),
+                max_gap_seconds=MAX_SAME_GAME_GAP_SECONDS,
             )
-        hit = resolved[key]
+            if hit is None and pair_hits:
+                if pick_reason == BEYOND_MAX_GAP:
+                    other_day_game += 1
+                else:
+                    ambiguous_game += 1
+            elif hit is not None and pick_reason != "single":
+                doubleheader_resolved += 1
+        else:
+            hit = pair_hits[0] if pair_hits else None
         if hit is None or hit["state"] == before:
             continue
         game["state"] = hit["state"]
@@ -915,6 +1012,11 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
         "supported": True,
         "lens_games": len(lens_games),
         "rows_corrected": corrected,
+        # MLB only; reported at zero so "no doubleheader today" and "never ran"
+        # stay distinguishable.
+        "rows_resolved_by_start_time": doubleheader_resolved,
+        "rows_ambiguous_game": ambiguous_game,
+        "rows_refused_other_day_game": other_day_game,
         "snapshot_age_seconds": round(age_seconds, 1) if age_seconds is not None else None,
         # Named transitions, not a bare count: `live->final` is the reported bug
         # being fixed, while a flood of `pregame->live` would mean the chip join
