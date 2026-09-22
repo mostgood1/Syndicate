@@ -24,6 +24,7 @@ from syndicate.features.nfl.props import nfl_props_available_weeks
 from syndicate.features.nfl.sources import available_weeks
 from syndicate.features.nfl.sources import default_week
 from syndicate.features.nfl.sources import latest_season
+from syndicate.features.nfl.sources import nfl_target_week
 from syndicate.features.nfl.sources import preseason_target_week
 from syndicate.features.nfl.sources import tracked_week
 from syndicate.features.nfl.sources import week_summaries
@@ -222,6 +223,17 @@ def _selected_market_board_week(season: int) -> int:
                 return requested
         except ValueError:
             pass
+    # THE CURRENT WEEK, NOT THE LAST FILE. `weeks[-1]` meant "the latest week
+    # anything was generated for" while only generated weeks had files. Web's
+    # disk now also holds the 2026-08-01 backfill for weeks 4-18, so the default
+    # was week 18 all season -- measured 2026-09-22, served `week 18` from the
+    # backfill's wk18 file while week 3 was being played. `default_week` already
+    # documents and fixes this degeneration for the cards; this selector never
+    # used it. It checks a different week list (recommendation weeks), so the
+    # target is checked against THIS board's projection weeks here.
+    target = nfl_target_week(season)
+    if target is not None and target in weeks:
+        return target
     return weeks[-1] if weeks else default_week(season)
 
 

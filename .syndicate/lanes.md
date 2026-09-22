@@ -1154,6 +1154,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - Outcome: **GOAL MET 2026-09-22 14:47:51Z** — `c11d3730` live on live-odds-worker 14:46:28Z (user: "Deploy when clear"); `NFL_PROJECTION_PULL ... ok=True written=1` at 14:47:51Z and the snapshot built that second reads `/opt/render/project/data/.../wk3.csv`, matching web's live cards on 16/16 games (0/16 before). Hypothesis CONFIRMED (both halves: resolver + missing file). Measurement: `deploys.md` 14:43:11Z entry.
 
+### nfl-market-board-default-week — OPEN — opened 2026-09-22 — session dae18452-227b-42cc-a4f4-a4a4ee4cec3e
+- Goal: `/nfl/api/market-board` with no `week` parameter serves the CURRENT week (the calendar target week), not week 18. Measured on production as `week` = the value `nfl_target_week` returns (3 on 2026-09-22).
+- Files: `syndicate/blueprints/nfl.py` (`_selected_market_board_week` ONLY), `tests/test_nfl_market_board_default_week.py` (NEW).
+- Hypothesis (written BEFORE the change, measured 2026-09-22 14:49:56Z): `_selected_market_board_week` defaults to `weeks[-1]`, the highest week with ANY projection file, and web's disk holds the 2026-08-01 backfill for weeks 4-18 (wk4 generated 2026-08-01T19:38:59, wk18 20:28:17, all `prior_season_fallback`), so the default is always 18. Served: `week 18`, 16 games from `/opt/render/project/data/nfl_source/smartsim2_projections_2026_wk18.csv`. `sources.default_week` already documents and fixes this exact degeneration ("last available degenerates to week 18") by preferring `nfl_target_week`; this selector never used it.
+- Falsification test: with the fix live, `/nfl/api/market-board` still returns week 18 -> the selector is not what picks the week.
+- Verification: test fails on old code / passes on new; after a user-approved web deploy, the served payload's `week` equals the target week and its `source_path` names that week's file; an explicit `?week=18` still returns 18.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
