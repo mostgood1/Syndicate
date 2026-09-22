@@ -40034,3 +40034,28 @@ Claim released after this entry.
     worker in-process interval                         86400            3600 then 86400   3600 proven at 19:52:18Z; 86400 re-injected 20:32:19Z (line owed)
 
 **OWED:** one `interval_seconds=86400` line from the worker after the 20:32:19Z boot, to prove the revert in-process rather than in config. Claims (refresh-worker, web) released 20:32Z.
+
+## 2026-09-22 21:01:26Z -> live 21:04:52Z (4:01-4:04 PM CT) — refresh-worker `cc5bdfb1` -> `d25664f0` (`dep-dapep9g473hc7397tc4g`) — lane `dh-grading-ledger-joins` — **DEPLOYED: the ledger key names the GAME; the reading is the next appended records**
+
+**User (chat):** "deploy it now" (after "fix the remaining pair-keyed joins in grading and ledger"). Claim 20:49:54Z, preflight TOO_SOON 20:49-21:00Z then CLEAR 21:01:17Z for `d25664f0`; no jobs in flight.
+**Carries:** `record_key` + `event_id` (live here), the vendored season-cards manifest fix and the regrade script fix (both OFFLINE paths -- they run in grading passes, not in the worker loop, so this deploy only puts them on disk).
+
+**THE DEFECT, COUNTED BEFORE THE CHANGE** (production ledgers, read 20:4xZ; `event_id` was already on every record, `game_pk` on a minority):
+
+    date        records  old keys  keys spanning >1 game  worst                      game_pk present
+    2026-09-20    1,250       653                     13  ONE key over 14 games      261 of 1,250
+    2026-09-21      746       407                      2  3 games each               375 of 746
+    2026-09-04    3,041       639                      1  a doubleheader's halves    3,041 of 3,041
+    2026-08-29    5,554       383                      2  same                       5,554 of 5,554
+    2026-09-22      132       111                      0  --                          25 of 132
+
+The 09-04 and 08-29 collisions are the doubleheader shape with a PRESENT `game_pk`: both halves carried 824424 / 823177, because the live-gameline index was keyed on the team pair. So a present gamePk did not separate them either; `event_id` does.
+
+    field                                          baseline 20:49:55Z          predicted                          measured
+    live_commit                                    cc5bdfb1                    d25664f0                           d25664f0 (live 21:04:52Z)
+    record_key slots                               5 (no event_id)             6, existing prefix unchanged       offline: prefix identical, slot 6 = event_id
+    2026-09-22 keys spanning >1 event              0 of 111 (132 records)      0, each event its own record       OWED -- the next appended records
+    tests failing on origin/main                   --                          16                                 16 (ledger ones fail with the literal colliding tuple)
+
+**No migration:** every record already carries `event_id` and the previous-observation map is rebuilt from the file each run, so an existing file re-keys consistently. The change can only SPLIT records that were wrongly merged; it cannot merge any that were separate.
+**OWED:** records appended after 21:04:52Z, and a later date's census showing old-key groups that span more than one event now hold one record per event. Claim released after this entry.
