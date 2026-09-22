@@ -39779,3 +39779,16 @@ The size of the burst tracks the chunk. The only code in that window that scales
 **Recurrence.** oomKilled on refresh-worker since 2026-08-31: 3 (09-02 15:32Z, 09-12 12:10Z, 09-22 04:08Z). 09-12 is a DIFFERENT shape (`last_stage=cards_context_page_cache_hit`, anon sustained 3.5-3.97 GB). Plus 44 `earlyExit` server_failed, which are deliberate `worker_recycle` exits, not OOMs.
 **Grid tick (lever 2b):** not involved. Last `BOOK_GRID_TICK` ended 04:07:16Z.
 **Candidate fix (NOT made, user decision).** Count the chunk by streaming (`sum(1 for line in open(...) if line.strip())`): constant memory, same number. That removes a ~0.5 GB transient that grows every day of a slate. `pipeline/intelligence_state.py` is claimed by OPEN lanes `live-inplay-board-cadence` and `layer2-restate-series-date` (function-scoped), so the fix needs that handover.
+
+## 2026-09-22 15:29:43Z -> live 15:36:37Z (10:29-10:36 AM CT) — web `a6ba19c5` -> `27af7934` (`dep-dap9tpvf3r2c73ehigb0`) — lane `nfl-market-board-default-week` — **VERIFIED: `/nfl/api/market-board` defaults to the current week (3), not 18**
+
+**User decision (chat, asked directly):** "Deploy web now". Claim acquired 15:03Z (free); preflight CLEAR 15:03:41Z and again 15:29:08Z (2 defunct children, already dead); released ~15:38Z.
+**A STUCK BUILD, CANCELLED IN THE BUILD PHASE.** The first attempt `dep-dap9hkqd0e5s73f6gf8g` (15:03:47Z) sat at `==> Cloning from https://github.com/mostgood1/Syndicate` for 25 min with no further build-log line; cancelled 15:29:20Z while still `build_in_progress`, so web was never restarted (stayed live on `a6ba19c5`). Context: another session's live-odds-worker build (`bf3eb38c`, 14:49:35Z) also stalled ~10 min at clone before pip ran, then finished at 15:03:32Z. The retry built in ~4.5 min. The deploy guard treats `/cancel` as a deploy POST, which needs a CLEAR preflight <15 min old.
+**Carries (web-path code since `a6ba19c5`):** `27af7934` (this lane), `c11d3730` (cards/picks per-file projection resolver; web already resolved to its disk, no change expected), `22f4f536` (board projection guard), and two user-decided Polymarket commits `210dd3aa` / `bf3eb38c`, whose code runs on live-odds-worker's submitter and is inert on web.
+
+    field                                   baseline 15:29:08Z                     predicted   measured (15:37Z)
+    live_commit                             a6ba19c5                               27af7934    27af7934 (live 15:36:37Z)
+    /nfl/api/market-board (no week)         week 18, ..._wk18.csv                  week 3      week 3, 16 games, /opt/render/project/data/nfl_source/smartsim2_projections_2026_wk3.csv
+    /nfl/api/market-board?week=18           week 18                                week 18     week 18, 16 games
+
+**Not changed, and still true:** web's disk holds the 2026-08-01 backfill for weeks 4-18 (`prior_season_fallback`), so an explicit future week on the cards / picks / market board still shows pre-season projections until the pipeline builds that week. **verify:** the table.
