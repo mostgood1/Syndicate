@@ -3346,6 +3346,12 @@ def _record_canonical_board_state_ledger_fingerprint(selected_date: str, fingerp
     write_json_file(_canonical_board_state_ledger_fingerprint_path(), stored)
 
 
+def _count_nonblank_lines(path: Path) -> int:
+    """Non-blank lines in `path`, read one line at a time (constant memory)."""
+    with open(path, encoding="utf-8") as handle:
+        return sum(1 for line in handle if line.strip())
+
+
 def maybe_record_board_state_to_evaluation_ledger(state: dict[str, Any]) -> dict[str, Any] | None:
     """Persist a board-state response's current recommendations to the
     evaluation ledger, gated on source_fingerprint rather than called
@@ -3445,6 +3451,13 @@ def maybe_record_board_state_to_evaluation_ledger(state: dict[str, Any]) -> dict
     # BEFORE writing, silently, so a non-zero input count is compatible with
     # nothing being persisted at all. `landed` reads the chunk back off disk
     # so the two can never be conflated again.
+    #
+    # STREAMED, NOT read_text().splitlines(). That held the whole day's chunk
+    # plus a list of its lines at once: +512 / +561 MB of anon for ~2 s at
+    # 12,723 / 13,617 lines on 2026-09-21, growing with the chunk through the
+    # slate, once per board cycle -- and refresh-worker was oomKilled inside
+    # this window at 04:08:47Z 09-22 (deploys.md, lane refresh-worker-oom-0922).
+    # A log count is not worth half a gigabyte.
     landed: int | str = "unknown"
     try:
         from syndicate.features.shared.intelligence_evaluation import DEFAULT_LEDGER_PATH
@@ -3452,7 +3465,7 @@ def maybe_record_board_state_to_evaluation_ledger(state: dict[str, Any]) -> dict
 
         chunk_path = _ledger_chunk_path(DEFAULT_LEDGER_PATH, selected_date)
         if chunk_path.exists():
-            landed = sum(1 for line in chunk_path.read_text(encoding="utf-8").splitlines() if line.strip())
+            landed = _count_nonblank_lines(chunk_path)
         else:
             landed = 0
     except Exception as exc:
