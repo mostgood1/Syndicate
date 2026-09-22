@@ -39944,3 +39944,17 @@ Owed by the `2026-09-22 00:1xZ` entry (`4ee86561`, live on refresh-worker `f0e60
 **OWED, unchanged in substance, narrowed: the KALSHI live-order half.** The last live Kalshi order of any kind was `2026-09-21T05:07:01Z` (09-21 00:07 CDT) — **19h05m BEFORE this deploy went live**. Zero Kalshi orders have been submitted since. The pre-deploy violations were all Kalshi, so this reading cannot retire that half; it retires the general claim (no post-deploy exchange order carried an implausible or after-fee-negative stated EV) on the population that exists. Kalshi's plan produced 10 positions on today's build, so the venue is not shut out at plan time — the gap is between plan and live submit, and it is not this lane's subject. **Re-read the Kalshi half after the next live Kalshi order.**
 
 No deploy, no env change, no order action taken for this reading. READ-ONLY.
+
+## 2026-09-22 18:21:34Z -> live 18:28:02Z (1:21-1:28 PM CT) — web `041ee664` -> `3ba363ff` (`dep-dapcebn40ujc73973bjg`) — lanes `web-access-log-durations` + `bootstrap-lock-pid-reuse` — **BOTH VERIFIED; this deploy did NOT flap**
+
+**User decisions (chat, asked each time):** "gunicorn.conf.py, scoped take", "Deploy web now", and -- after a third lane's commit landed between the approval and the deploy -- "Include it, deploy main". Claim 18:21:13Z (free), preflight CLEAR 18:21:27Z, released 18:30Z. **Carries:** `3ba363ff` (access-log duration), `63512622` (bootstrap lock start marker) and `3e8ff188` (lane `nhl-compact-card-start-time`: NHL chip start time / period-clock on `home.py` + `local_nhl_odds.py`; that lane was deploying the same code to refresh-worker at the time -- ITS verification is its own).
+
+    field                          baseline 18:21:13Z                                          predicted        measured
+    live_commit                    041ee664                                                    3ba363ff         3ba363ff (live 18:28:02Z)
+    access line suffix             `... "Render/1.0"` (no duration)                            `<n>ms`          `... "Render/1.0" 739ms` (18:28:58Z) and 161 lines with durations by 18:33Z
+    bootstrap lock record          pid only                                                    pid + start      `[bootstrap] LOCK pid=63 start=1442778898 path=/tmp/syndicate_bootstrap_sync.lock` 18:28:19Z -- a NUMERIC start proves /proc is read on Render
+    sibling worker behaviour       `SKIP ... pid=<n> age=<s>`                                  same, + start    `[bootstrap] SKIP a live sibling holds the lock pid=63 start=1442778898 age=7s` 18:28:29Z (correct: same live process)
+
+**The `RECLAIM ... reused=True` branch is NOT exercised in production** -- it needs an in-place restart, and this deploy had none (no `server_failed` through 18:33Z). It is covered offline by a test that replays production's sequence and fails on the old code.
+
+**FIRST PAYOFF OF THE DURATIONS, and it ranks what `web-flap-0922` could only count** (161 access lines, 18:28:02-18:33Z, the post-boot window): `/` 34 requests median **12,303 ms** max **86,508 ms**; `/wnba/api/live_player_boxscore` 6, median 13,427, max 71,111; `/api/intelligence/query` 2 at 44,486; `/nfl/api/weeks` 1 at 61,399; `/api/board/game-chips` 6, median 688, max 11,991; `/api/ops/artifacts/publish` 37, median **33 ms**, max 5,805; `/api/ops/artifacts/stream` 8, median 1 ms. So the home page dominates the 8 slots after a boot and the worker artifact traffic is cheap -- the opposite of what the request COUNTS suggested. **verify:** the table.
