@@ -34,8 +34,16 @@ def _rows(n=3, sport="mlb"):
 def _rehydrate(payload):
     """The client's rebuild, mirrored. Kept deliberately literal so a divergence
     between this and `intelligence.html` shows up as a test failure rather than
-    as a blank board in production."""
+    as a blank board in production.
+
+    `_embed_dropped` and `_dropped_row_fields` are NOT rebuilt -- they are keys
+    the page does not read, declared so a consumer can tell "dropped on purpose"
+    from "the server had no value". The tests below compare against an original
+    with those removed, never against the untouched one."""
     out = dict(payload)
+    out.pop("_embed_dropped", None)
+    out.pop("_dropped_row_fields", None)
+    out.pop("_dropped_row_aliases", None)
     aliases = out.pop("_embed_aliases", None) or {}
     for key, source in aliases.items():
         if source == "__group_ranked_all_by_sport__":
@@ -117,8 +125,12 @@ def test_the_six_way_duplication_collapses_and_rebuilds_identically():
         assert gone not in slim, f"{gone} should have been dropped as redundant"
     assert "ranked_all" in slim and "board_contract" in slim
 
-    # The whole point: the client rebuild must restore the ORIGINAL exactly.
-    assert _rehydrate(slim) == original
+    # `board_contract.cards` is dropped as UNREAD (see the 2026-09-22 block
+    # below), so the rebuild restores everything else.
+    expected = dict(original)
+    expected["board_contract"] = {k: v for k, v in contract.items() if k != "cards"}
+    expected["boardContract"] = dict(expected["board_contract"])
+    assert _rehydrate(slim) == expected
 
 
 def test_the_saving_is_material_not_cosmetic():
@@ -136,10 +148,77 @@ def test_the_saving_is_material_not_cosmetic():
     before = len(json.dumps(original, default=str))
     after = len(json.dumps(_slim_embedded_board_payload(original), default=str))
     assert after < before * 0.45, f"only {100 * (1 - after / before):.0f}% saved"
-    assert _rehydrate(_slim_embedded_board_payload(original)) == original
+    expected = dict(original)
+    expected["board_contract"] = {k: v for k, v in contract.items() if k != "cards"}
+    expected["boardContract"] = dict(expected["board_contract"])
+    assert _rehydrate(_slim_embedded_board_payload(original)) == expected
 
 
 def test_rehydrate_tolerates_a_payload_with_no_aliases():
     """An older server, or one where nothing was redundant. Must not throw."""
     payload = {"ranked_all": _rows(2)}
     assert _rehydrate(payload) == payload
+
+
+# --------------------------------------------------------------------------
+# 2026-09-22: the same page, 3,244 rows later. MEASURED on the served `/`:
+# 32,802,992 bytes (4,579,458 gzipped), TTFB 4.1-8.5 s against 0.46 s for
+# `/nfl`, and the embed was 99.3% of it -- `ranked_all` 15.54 MB and
+# `board_contract.cards` 15.53 MB. The two are NOT copies (642 of 3,244 cards
+# carry a different `gate` / `live_projection` / `actual` / `is_live`), so no
+# alias can rebuild one from the other. They are dropped as UNREAD instead,
+# which is only safe while the page does not read them -- pinned below.
+# --------------------------------------------------------------------------
+
+
+def test_the_board_cards_list_is_dropped_from_the_embed_and_declared():
+    rows = _rows(3)
+    cards = [dict(row) for row in rows]
+    cards[1]["gate"] = "blocked"          # production's shape: NOT a copy
+    contract = {"cards": cards, "lane_counts": {"live": 2}, "recommendation_count": 3}
+    original = {"ranked_all": rows, "board_contract": contract}
+
+    slim = _slim_embedded_board_payload(original)
+
+    assert "cards" not in slim["board_contract"]
+    assert slim["_embed_dropped"] == ["board_contract.cards"]
+    # Everything else the page DOES read survives.
+    assert slim["board_contract"]["lane_counts"] == {"live": 2}
+    assert slim["board_contract"]["recommendation_count"] == 3
+    assert slim["ranked_all"] == rows
+    # The API shares this object: slimming the embed must not mutate it.
+    assert original["board_contract"]["cards"] == cards
+
+
+def test_row_diagnostics_are_dropped_from_the_embed_and_declared():
+    """The page asks the API for exactly this (`drop_row_diagnostics: true`);
+    the embed never applied it. 1.67 MB of the 2026-09-22 payload."""
+    rows = [{"sport": "mlb", "id": 1, "trace": {"steps": [1, 2, 3]}, "score_breakdown": {"a": 1}}]
+    slim = _slim_embedded_board_payload({"ranked_all": rows, "board_contract": {"cards": list(rows)}})
+
+    row = slim["ranked_all"][0]
+    assert "trace" not in row and "score_breakdown" not in row
+    assert row["sport"] == "mlb" and row["id"] == 1
+    assert set(slim["_dropped_row_fields"]) >= {"trace", "score_breakdown"}
+
+
+def test_the_page_still_does_not_read_the_embedded_board_cards():
+    """THE GUARD for the drop above. `intelligence.html` is the embed's only
+    consumer; it mentions `board_contract.cards` twice, both harmless: the
+    row-alias repair loop (which tolerates the key's absence) and a comment.
+    A new READ here means the embed must stop dropping the list."""
+    import pathlib
+
+    template = (pathlib.Path(__file__).resolve().parents[1]
+                / "syndicate" / "templates" / "intelligence.html").read_text(encoding="utf-8")
+    reads = [line.strip() for line in template.splitlines()
+             if "board_contract.cards" in line or "boardContract.cards" in line]
+    code_reads = [line for line in reads if not line.startswith("//")]
+    assert code_reads == [
+        "const boardCards = payload.board_contract && Array.isArray(payload.board_contract.cards)",
+        "? [payload.board_contract.cards]",
+    ], (
+        "intelligence.html now reads board_contract.cards somewhere new: "
+        f"{code_reads}. The embed drops that list (_slim_embedded_board_payload); "
+        "either stop dropping it or make the new reader tolerate its absence."
+    )

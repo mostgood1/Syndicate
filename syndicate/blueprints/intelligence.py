@@ -2006,9 +2006,50 @@ def _slim_embedded_board_payload(response: Any) -> Any:
             slim.pop("by_sport", None)
             aliases["by_sport"] = "__group_ranked_all_by_sport__"
 
+    # `board_contract.cards` IS `ranked_all` AGAIN, and the exact-match rule above
+    # cannot see it. MEASURED on the served `/` 2026-09-22: the page was
+    # 32,802,992 bytes (4,579,458 gzipped) with TTFB 4.1-8.5 s against 0.46 s for
+    # `/nfl`, and 99.3% of it was this embed -- `ranked_all` 15.54 MB and
+    # `board_contract.cards` 15.53 MB, the SAME 3,244 rows. They are not
+    # byte-identical only because 695 cards omit `board_lane` / `gate` /
+    # `market_state`, so `_same` keeps both copies.
+    #
+    # DROPPED AS UNREAD, NOT AS REDUNDANT -- and the difference is measured, not
+    # assumed. The first version of this checked that every card was a subset of
+    # its ranked row and would have dropped the list on that proof; run against
+    # production's own payload it REFUSED, because 642 of the 3,244 cards carry a
+    # DIFFERENT value than the row (`gate` on 633, `live_projection` 6, `actual`
+    # 2, `is_live` 1). So the two lists are not copies, and no alias can rebuild
+    # one from the other.
+    #
+    # The justification is the same one `_drop_unconsumed_row_diagnostics` uses:
+    # the only consumer of this embed is `intelligence.html`, and it never reads
+    # `board_contract.cards`. Its sole mentions are the row-alias repair loop
+    # (`:734`), which tolerates the key's absence, and a comment (`:4128`).
+    # `tests/test_intelligence.py::test_the_page_still_does_not_read_the_embedded_board_cards`
+    # fails if that stops being true. The rest of `board_contract` (summary,
+    # waterfall, lane counts, `recommendation_count`, `card_fields`) is KEPT --
+    # the page reads it (`:1688`) -- and the page's own next request
+    # (`/api/intelligence/query`, fired on load) carries the full contract for
+    # any future consumer.
+    contract = slim.get("board_contract")
+    if isinstance(contract, dict) and isinstance(contract.get("cards"), list) and contract.get("cards"):
+        contract = dict(contract)
+        contract.pop("cards", None)
+        slim["board_contract"] = contract
+        slim["_embed_dropped"] = ["board_contract.cards"]
+
     if aliases:
         slim["_embed_aliases"] = aliases
-    return slim
+
+    # THE SAME SLIMMING THIS PAGE ASKS THE API FOR ONE REQUEST LATER. `intelligence.html`
+    # sends `drop_row_diagnostics: true` (`:4141`) for fields it never reads -- `trace`,
+    # `score_breakdown`, unconsumed `quote` sub-fields, all-null `movement` fields and
+    # rebuildable row aliases -- and rebuilds/tolerates them from `_dropped_row_fields` /
+    # `_dropped_row_aliases` (`:725-750`) whichever producer sent them. The embed never
+    # applied it: measured 2026-09-22, `trace` 0.69 MB + `score_breakdown` 0.98 MB per row
+    # list. Applied here, on the template's copy only, never on the API's.
+    return _drop_unconsumed_row_diagnostics(slim)
 
 
 @intelligence_bp.get("/intelligence")
