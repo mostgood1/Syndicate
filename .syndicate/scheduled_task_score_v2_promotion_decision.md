@@ -120,6 +120,28 @@ The instructions in `.syndicate/scheduled_task_layer2_fee_net_7_slate.md` under
    of the population carried `s2`; if coverage is partial, the contrast is on a
    subset and must be labelled as one.
 
+## Two things the 2026-09-22 dry run found — fold these into the run
+
+Measured by this task's tool pre-approval dry run, 2026-09-22 16:25-16:29 CDT,
+which exercised every command shape in the section above against live data.
+
+1. **`origin/main` MOVES UNDER YOU MID-RUN. Pin the SHA.** The dry run read
+   `ebd17ee2` at its first step and `44e09175` a few minutes later — **89 commits
+   landed on `main` that day** from parallel sessions. So: capture
+   `git rev-parse origin/main` **once**, build the snapshot from that exact SHA
+   (`git archive --format=tar -o <tar> <SHA> scripts syndicate pipeline ...`), and
+   quote that SHA in the findings file. Never re-read `origin/main` later in the
+   run and assume it is the tree you measured. Everything read for this reading —
+   the briefs, the prior findings, the scripts — must come from the one pinned SHA.
+2. **`rows=1` is NOT a size control on `/api/ops/clv/report`.** With `rows=1` the
+   MLB request still returned **1,074,201 bytes**, and `/api/portfolio/paper?date=<d>`
+   returned **2,281,659 bytes**. Budget for multi-megabyte responses per
+   (date, sport) — this reading fans out over ~14 dates x ~6 sports — and write each to a file
+   rather than holding several in memory.
+3. **The NCAAF registry copy is confirmed load-bearing, not a precaution.** On the
+   dry run's single-day window NCAAF contributed **2,334 of 16,505 records**.
+   Skipping the copy does not error; it silently removes a sport.
+
 ## Read first
 
 - `.syndicate/findings_2026-09-29_layer2_fee_net_out_of_sample.md` — the 7-slate
