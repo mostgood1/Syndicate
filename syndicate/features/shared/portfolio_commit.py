@@ -763,7 +763,12 @@ def sizing_candidate(row: Mapping[str, Any], inputs: SizingInputs) -> dict[str, 
     return {
         # `implied_probability` is deliberately absent; the sizer derives it
         # from `odds`. See the module docstring.
-        "odds": inputs.american_price,
+        #
+        # FEE-INCLUSIVE FOR A VENUE ROW: the price the sizer sees is what one $1
+        # contract actually COSTS (venue price + fee), so Kelly sizes the bet that is
+        # really being bought. The COMMITTED price (`inputs.american_price`, the
+        # position's `price`) is left alone -- it is what the order is sent at.
+        "odds": _fee_inclusive_odds(inputs.american_price, row.get("venue_fee_per_contract")),
         "model_probability": inputs.model_probability,
         # THE VISIBLE EDIT the docstring above promised (P2, 2026-09-08). Read by
         # `compute_bet_size` ONLY under `SYNDICATE_KELLY_ON_FAIR`; absent that
@@ -784,6 +789,40 @@ def sizing_candidate(row: Mapping[str, Any], inputs: SizingInputs) -> dict[str, 
         # its full stake. The board's own blended score is the right ordering.
         "adjusted_score": _score_value(row),
     }
+
+
+def _min_ev_net_of_fee_pct() -> float:
+    """A venue row must beat this EV AFTER the venue's fee. 0.0 = "positive after fees".
+
+    `SYNDICATE_PORTFOLIO_MIN_EV_NET_OF_FEE_PCT` overrides; an unreadable value falls back
+    to 0.0 rather than to something permissive.
+    """
+    import os
+
+    raw = str(os.environ.get("SYNDICATE_PORTFOLIO_MIN_EV_NET_OF_FEE_PCT") or "").strip()
+    try:
+        value = float(raw) if raw else 0.0
+    except ValueError:
+        return 0.0
+    return value if value == value else 0.0
+
+
+def _fee_inclusive_odds(american: Any, fee_per_contract: Any) -> Any:
+    """American odds for a contract costing its price PLUS the venue's per-contract fee.
+
+    Unchanged when there is no fee (every sportsbook row, every non-venue plan). If the
+    fee would push the cost to $1 or more there is nothing to size, and the original
+    price is returned so the sizer's own zero-edge handling applies unchanged.
+    """
+    fee = _as_float(fee_per_contract)
+    price = _as_float(american)
+    if not fee or fee <= 0 or price is None or price == 0:
+        return american
+    implied = 100.0 / (price + 100.0) if price > 0 else abs(price) / (abs(price) + 100.0)
+    cost = implied + fee
+    if not 0.0 < cost < 1.0:
+        return american
+    return (100.0 * (1.0 - cost) / cost) if cost < 0.5 else (-100.0 * cost / (1.0 - cost))
 
 
 def _score_value(row: Mapping[str, Any]) -> float | None:
@@ -1016,6 +1055,22 @@ def commit_portfolio(
         ev_pct = _as_float(row.get("ev_pct"))
         if ev_pct is None or ev_pct < resolved.min_ev_pct:
             refuse("below_min_ev_pct", row)
+            continue
+        # THE VENUE'S FEE COMES OFF BEFORE SUBMIT (user decision 2026-09-21: "we should
+        # have the fee deduction prior to submit not at submit"). A venue-scoped row
+        # carries its EV net of that venue's fee (`venue_scope`) and must still be
+        # POSITIVE after it (user decision 2026-09-21, "Positive after fees"): the 2%
+        # minimum above keeps applying to the venue price. Refused by its own name so
+        # the counter says how many bets the fee alone removed. Rows with no venue fee
+        # are unchanged.
+        #
+        # WHY NOT 2% AFTER THE FEE: measured on the 09-08..09-20 paper venue orders
+        # (746 inside the ceiling), that bar kept 85 (0.0% ROI net of fees) and removed
+        # 661 that returned +3.9% net; "positive after fees" keeps 415 (+4.2% net) and
+        # drops 331 negative after the fee. Noisy either way -- the floor is a setting.
+        ev_net = _as_float(row.get("ev_pct_net_of_fee"))
+        if ev_net is not None and ev_net <= _min_ev_net_of_fee_pct():
+            refuse("below_min_ev_pct_net_of_fee", row)
             continue
 
         sport = str(row.get("sport") or "").strip().lower()

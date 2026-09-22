@@ -63,8 +63,10 @@ def test_a_worse_venue_price_produces_a_worse_EV_not_the_inherited_one():
 
 
 def test_a_better_venue_price_produces_a_better_EV():
+    # -120 -> -110 keeps the venue EV (5.17%) under the implausible-book ceiling; the
+    # 2026-09-21 fixture's -130 -> -105 re-derived 11.4%, which the ceiling now refuses.
     scoped, _ = scope_rows_to_venue(
-        [_row(best=-130, ev_pct=1.0, book_prices={"draftkings": -130, "kalshi": -105})],
+        [_row(best=-120, ev_pct=1.0, book_prices={"draftkings": -120, "kalshi": -110})],
         "kalshi",
     )
     assert scoped[0]["ev_pct"] > 1.0
@@ -145,7 +147,7 @@ def test_every_row_is_accounted_for():
 
 def test_book_matching_is_case_insensitive():
     scoped, _ = scope_rows_to_venue(
-        [_row(book_prices={"DraftKings": -110, "KALSHI": -105})], "kalshi"
+        [_row(book_prices={"DraftKings": -110, "KALSHI": -108})], "kalshi"
     )
     assert len(scoped) == 1
 
@@ -205,14 +207,14 @@ def test_a_scoped_row_sizes_through_the_unmodified_pipeline():
     from syndicate.features.shared.portfolio_commit import commit_portfolio
 
     scoped, _ = scope_rows_to_venue(
-        [_row(best=-130, ev_pct=1.0, book_prices={"draftkings": -130, "kalshi": -105})],
+        [_row(best=-120, ev_pct=1.0, book_prices={"draftkings": -120, "kalshi": -110})],
         "kalshi",
     )
     plan = commit_portfolio(scoped, selected_date="2026-08-22")
     positions = plan.get("positions") or []
     assert positions, plan.get("refusals")
     assert positions[0]["book"] == "kalshi"
-    assert positions[0]["price"] == -105
+    assert positions[0]["price"] == -110
 
 
 # --- pricing from the VENUE's own feed ------------------------------------

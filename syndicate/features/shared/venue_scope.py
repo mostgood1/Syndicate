@@ -55,6 +55,24 @@ REASON_UNUSABLE_VENUE_PRICE = "unusable_venue_price"
 REASON_NO_BEST_PRICE = "no_best_price"
 REASON_NO_EV_PCT = "no_ev_pct"
 REASON_FAIR_OUT_OF_RANGE = "derived_fair_probability_out_of_range"
+# THE SHORTLIST'S IMPLAUSIBLE-BOOK GATE, applied to the VENUE's price (user decision
+# 2026-09-21, "apply the 5.26 ceiling and fee to venue-repriced orders"). The board drops
+# any row whose EV implies a book total under `_MIN_IMPLIED_BOOK_TOTAL_PCT` (95% -> EV >
+# 5.26%) because no real book prices a market that way; this function then re-derives EV
+# at the venue's own price and could land far past it. Measured on the paper book
+# 09-08..09-20: orders above 5.27% stated EV -- 133, ALL Kalshi or Polymarket
+# venue-repriced -- returned -26.7% ROI [-46.3, -5.9].
+REASON_VENUE_EV_IMPLAUSIBLE = "venue_ev_implausible"
+
+
+def _min_implied_book_total_pct() -> float:
+    """The shortlist's own threshold (env-overridable there), never a copy of it."""
+    try:
+        from syndicate.features.shared.layer2_board import _MIN_IMPLIED_BOOK_TOTAL_PCT
+
+        return float(_MIN_IMPLIED_BOOK_TOTAL_PCT)
+    except Exception:
+        return 95.0
 
 
 def _as_float(value: Any) -> float | None:
@@ -162,6 +180,33 @@ def scope_rows_to_venue(
             continue
 
         venue_ev_pct = (fair * (venue_profit + 1.0) - 1.0) * 100.0
+        if 100.0 / (1.0 + venue_ev_pct / 100.0) < _min_implied_book_total_pct():
+            _refuse(REASON_VENUE_EV_IMPLAUSIBLE)
+            continue
+
+        # THE CONTRACT ID FIRST, because the fee depends on it: Kalshi's multiplier is
+        # a property of the SERIES (MLB game/total/batter series x0.5, others x1.0).
+        venue_ticker = None
+        ticker_failed = False
+        if ticker_resolver is not None:
+            try:
+                venue_ticker = ticker_resolver(row)
+            except Exception:
+                ticker_failed = True
+
+        # THE VENUE'S FEE, DEDUCTED HERE -- BEFORE ANY ORDER EXISTS (user decision
+        # 2026-09-21: "we should have the fee deduction prior to submit not at submit").
+        # `ev_pct` stays GROSS on purpose: `portfolio_commit` rebuilds the fair from it
+        # and the price, and the Polymarket submit check re-derives the model
+        # probability from it; a fee-net value there would deflate the fair and let the
+        # fee be counted twice. The plan's gate and sizer read the two fields below.
+        from syndicate.features.shared.venue_fees import taker_fee_per_contract
+
+        venue_prob = 1.0 / (venue_profit + 1.0)
+        fee, fee_basis, fee_bound = taker_fee_per_contract(
+            venue, venue_prob, venue_ref=venue_ticker, sport=row.get("sport"),
+            market=row.get("market"), segment=row.get("segment"))
+        ev_net_pct = (fair / (venue_prob + fee) - 1.0) * 100.0
 
         scoped_quote = dict(quote)
         scoped_quote["price"] = venue_price
@@ -180,20 +225,21 @@ def scope_rows_to_venue(
         scoped_row["unrestricted_bookmaker"] = quote.get("bookmaker")
         scoped_row["venue"] = str(venue).strip().lower()
         scoped_row["price_source"] = price_source
+        scoped_row["venue_fee_per_contract"] = round(fee, 6)
+        scoped_row["venue_fee_basis"] = fee_basis
+        scoped_row["venue_fee_is_upper_bound"] = bool(fee_bound)
+        scoped_row["ev_pct_net_of_fee"] = round(ev_net_pct, 6)
         if ticker_resolver is not None:
             # THE VENUE'S CONTRACT ID, stamped beside the venue's price and from
             # the same match. An order needs both, and deriving the ticker later
             # would derive it from a catalogue that may have moved since we
             # priced -- so the thing we priced and the thing we buy could differ
             # with nothing recording that they did.
-            try:
-                scoped_row["venue_ticker"] = ticker_resolver(row)
-            except Exception:
-                # A ticker we cannot resolve leaves the row PRICED and
-                # UNPLACEABLE, which the order builder refuses by name. Better
-                # than dropping the row: the paper book still records what the
-                # strategy would have done.
-                scoped_row["venue_ticker"] = None
+            #
+            # A ticker we cannot resolve leaves the row PRICED and UNPLACEABLE,
+            # which the order builder refuses by name. Better than dropping the
+            # row: the paper book still records what the strategy would have done.
+            scoped_row["venue_ticker"] = None if ticker_failed else venue_ticker
         scoped.append(scoped_row)
         _refuse(REASON_SCOPED)
 
