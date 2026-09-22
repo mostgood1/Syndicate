@@ -40018,3 +40018,19 @@ Claim released after this entry.
 **What this does and does not prove.** It proves the INSTRUMENT now describes the live path: the verifier builds through `build_order_body`, the same entry point `kalshi_submitter` uses, so `spreads` stops being reported as unplaceable. It does NOT prove a Kalshi spread ORDER, and cannot today: kalshi cash is $0.22 and every position is refused `insufficient_venue_balance` (11/11 18:50:08Z, 13/13 19:03:22Z). That is a separate funding lead, not this fix's business.
 **Also shipped in the same commit:** v1 `order_body` now passes the line too, so a `KALSHI_ORDER_CONTRACT=v1` rollback cannot take live spreads down. 19 tests, 3 of which fail on the old code, incl. an AST guard against the verifier being pointed back at a builder the submitter does not call.
 Claim released after this entry.
+
+## 2026-09-22 19:43:15Z -> live 19:49:24Z, and 20:29:31Z -> live 20:32:19Z — refresh-worker `97066dbe` -> `cc5bdfb1` (`dep-dapdkksja7ms73av7gh0`, `dep-dapeaaqjnfac7385s7e0`) + web `ec620c7d` -> `cc5bdfb1` (`dep-dapdvmjm8hqs739fa6a0`, live 20:11Z) — lane `ncaaf-kickoff-cache-staleness` — **GOAL MET: upcoming NCAAF compact cards show real kickoffs, 43 placeholder starts / 42 "TBD" -> 0 / 0**
+
+**User (chat):** "don't wait for the daily run, force the refresh now", then "revert the interval now" / "deploy the revert when it clears".
+**A TEMPORARY ENV OVERRIDE, AND IT IS BACK:** `SEASON_PROJECTION_REFRESH_INTERVAL_SECONDS` 86400 -> 3600 (single-key PUT 19:5xZ), re-injected by the 19:43:15Z deploy -- proven in-process by `SEASON_PROJECTION_LAUNCHING sport=nfl ... interval_seconds=3600` at 19:52:18Z, then `sport=ncaaf` at ~19:54Z. Set back to 86400 at 19:59:14Z and re-injected by the 20:29:31Z deploy. The key affects nfl+ncaaf only, one sport per tick, 1 h per-sport cooldown.
+
+**WHAT THE FORCED RUN DID NOT FIX, and this is the part worth keeping:** the refresh writes into `DEFAULT_CACHE_DIR`, which resolves to the repo CHECKOUT (`/opt/render/project/src/data/ncaaf_source/historical_truth/games_2026.json.gz`), NOT the mounted disk -- so it is ephemeral (the next deploy replaces it) and it never reaches web (the path is not in `HOT_ARTIFACT_PATTERNS`). And the chips a user sees for an upcoming date are not the worker's at all: `/api/board/game-chips?sport=ncaaf&date=2026-09-26` reads `source: inline_artifact_missing` (today's reads `worker_artifact`), i.e. built INLINE ON WEB from web's committed copy. That copy was the July snapshot: 888 rows, `completed: False` on 888 of 888, 42 week-4 TBD. So the fix that actually moved the board was `cc5bdfb1` -- the committed cache re-fetched from CFBD -- carried to web at 20:11Z.
+
+    field                                          baseline 19:08:58Z   predicted   measured (20:11:20Z, web `cc5bdfb1`)
+    chips ncaaf 2026-09-26 at the 17:00Z placeholder   43 of 65         0           0 -- the one chip left at 17:00Z is LIN @ EMU, a REAL noon-CT kickoff (ESPN lists it at 17:00Z too)
+    chips ncaaf 2026-09-26 with a "TBD" token          42               0           0
+    distinct start times across the 65 chips           14               ~20         20, matching CFBD/ESPN (19:30Z x12, 16:00Z x11, 23:00Z x7, 23:30Z x6)
+    committed games_2026 week-4 startTimeTBD           42 of 71         0           0 (888 rows unchanged, `completed` 0 -> 260: 99/86/75 across weeks 1-3)
+    worker in-process interval                         86400            3600 then 86400   3600 proven at 19:52:18Z; 86400 re-injected 20:32:19Z (line owed)
+
+**OWED:** one `interval_seconds=86400` line from the worker after the 20:32:19Z boot, to prove the revert in-process rather than in config. Claims (refresh-worker, web) released 20:32Z.
