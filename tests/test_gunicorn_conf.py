@@ -131,3 +131,31 @@ def test_gunicorn_itself_loads_the_hooks():
     for name in ("post_fork", "post_request"):
         cfg.set(name, namespace[name])
         assert cfg.settings[name].get() is namespace[name]
+
+
+# --- the access log duration (lane `web-access-log-durations`, 2026-09-22) -------------
+
+_DEFAULT_ACCESS_FORMAT = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
+_ATOMS = {"h": "10.228.18.171", "l": "-", "u": "-", "t": "[22/Sep/2026:11:11:01 -0500]",
+          "r": "GET /healthz HTTP/1.1", "s": "200", "b": "34", "f": "-", "a": "Render/1.0", "M": 12}
+
+
+def test_access_log_lines_end_with_the_request_duration():
+    """Web's access lines could COUNT the requests holding its 8 slots during a flap but not
+    rank them (lane `web-flap-0922`); gunicorn's `%(M)s` is request time in milliseconds."""
+    line = conf.access_log_format % _ATOMS
+    assert line.endswith('"Render/1.0" 12ms')
+    # Everything gunicorn logged before is still there, in the same order.
+    assert line.startswith(_DEFAULT_ACCESS_FORMAT % _ATOMS)
+
+
+def test_gunicorn_itself_reads_the_access_log_format():
+    """Reachability: gunicorn accepts the setting, and its logger supplies the `M` atom."""
+    config = pytest.importorskip("gunicorn.config")
+    glogging = pytest.importorskip("gunicorn.glogging")
+    cfg = config.Config()
+    namespace = {}
+    exec(compile(_SRC.read_text(encoding="utf-8"), str(_SRC), "exec"), namespace)
+    cfg.set("access_log_format", namespace["access_log_format"])
+    assert cfg.access_log_format.endswith("%(M)sms")
+    assert "'M':" in pathlib.Path(glogging.__file__).read_text(encoding="utf-8")

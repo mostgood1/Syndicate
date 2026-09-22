@@ -3,7 +3,8 @@
 Gunicorn loads `./gunicorn.conf.py` from its working directory by default, so this takes
 effect on web without touching `render.yaml` or the start command (a `render.yaml` push is
 a production change through `blueprint_sync`). Settings passed on the command line and in
-`GUNICORN_CMD_ARGS` still win over anything here; this file only adds HOOKS.
+`GUNICORN_CMD_ARGS` still win over anything here; this file adds HOOKS and one setting
+(`access_log_format`, see below).
 
 WHY. Web was `oomKilled` at its 2 GiB limit 2026-09-17 16:36:52Z and was back at anon
 1,684 MB / 2,047 of 2,048 MB by 17:30:11Z. Workers already auto-restart every ~1,000
@@ -44,6 +45,15 @@ import time
 
 RECYCLE_STAMP_PATH = os.environ.get("SYNDICATE_WEB_WORKER_RECYCLE_STAMP") or "/tmp/syndicate_web_worker_recycle.stamp"
 CHECK_EVERY_REQUESTS = 5
+
+# THE ACCESS LOG CARRIES EACH REQUEST'S DURATION -- lane `web-access-log-durations`
+# `[2026-09-22]`. Gunicorn's default format plus `%(M)s` (request time in ms). Web
+# runs 8 request slots (2 workers x 4 threads) and ~43% of its deploys since
+# 2026-09-15 were followed by `/healthz` timeouts when those slots filled
+# (lane `web-flap-0922`); the log could COUNT the requests in flight but not say
+# which ones held a slot for seconds. `GUNICORN_CMD_ARGS` sets `--access-logfile -`
+# and no format, so this setting applies; a command-line format would override it.
+access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(M)sms'
 
 
 def _env_int(name: str, default: int) -> int:
