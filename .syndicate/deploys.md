@@ -39709,3 +39709,17 @@ All WARMED lines are `sport=all`. `WARM_FAILED` 0, `WARMER_ERROR` 0, `WARMER_OFF
     rows_superseded_by_newer                                             96                                      --          48
 
 272 is the exact row count of the 18 git-tracked `smartsim2_projections_2026_wk*.csv` files; 97 = the 48 live regular-season games (wk1-3) + the preseason series (untouched). **verify:** the table.
+
+
+## 2026-09-22 14:15:12Z -> live 14:21:18Z (9:15-9:21 AM CT) — live-odds-worker `210dd3aa` env re-inject (`dep-dap8qrv40ujc73bvdpf0`) — `SYNDICATE_POLYMARKET_PAUSED_MARKETS` `total` -> `none` — lane `layer2-score-outcome-calibration` — **UNPAUSED and VERIFIED; also DISCHARGES the 13:47:19Z entry's owed reading (no fee at submit: HELD)**
+
+**User decision (chat):** "unpause polymarket totals and batter props"; shown that the paper bets the new gates would still place had lost (totals -13.1% on 42, batter props -59.3% on 10), answered "unpause everything - we cant just globally eliminate a market, thats not how our app works. every line is its own decision".
+**Env:** single-key PUT 14:13:24Z, readback `none` (was `total`, set 2026-09-11 after totals lost -40.7% paper / -34.0% live). NOT in `render.yaml` (checked), so a blueprint sync does not restore it. Same commit re-deployed with `--reinject-env`; preflight HELD once on an ESPN live-status fetch, then `CLEAR` 14:15:01Z.
+
+    field                                   baseline 14:13:09Z                     predicted   measured (first pass 14:26:11Z)
+    env SYNDICATE_POLYMARKET_PAUSED_MARKETS total                                   none        none
+    market_paused refusals, polymarket pass 3 of 3 positions (13:58:08Z)            0           0  (positions=3 placed=2 refused={'commence_unknown': 1})
+    POLYMARKET_PRICED_AT_ASK log             fee_bound=0.02 ev_net_at_ask_pct=...   no fee      no fee_bound: ev_at_ask_pct 4.17 / 4.56, both decision=place
+
+Orders placed (real money): `tsc-cfb-tcu-ucf-2026-09-26-total-49pt5` over 49.5 at +108, $1.05 (plan 4.0%, 4.17% at the 0.48 ask); `tsc-mlb-cws-kc-2026-09-22-8pt5` over 8.5 at +120, $1.13 (Kelly ratio 0.979 for the price move). The third position was refused by a PER-LINE gate, `commence_unknown` (an MLB strikeouts prop with no commence_time). `Traceback` since 14:21Z: none.
+**The 13:47:19Z entry's owed (c)/(d) are DISCHARGED here:** every `POLYMARKET_PRICED_AT_ASK` line after the change carries `ev_at_ask_pct` and no `fee_bound`; both rows at/above the 2% minimum placed.
