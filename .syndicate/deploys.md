@@ -40792,3 +40792,34 @@ Claim released after this entry.
 **OWED:** scheduled task `polymarket-h2h-nickname-reading-0926`, Saturday 2026-09-26 10:00 AM CT. It checks the predicate first, refuses to pass on a null population (it re-schedules itself instead), and pre-registers the one regression this change could cause: the fallback now feeds `away_index` on rows that used to refuse before reaching the yes-leg gate, so a NEW `yes_leg_disagrees_with_away_index` refusal would be the tell.
 **Also true, and not this fix's business:** nothing places at either venue right now -- polymarket is capital-bound (`marginRequirement` $6.12 of $6.25) and kalshi is dormant by user decision. `would_build` is as far as any h2h evidence can go until that changes.
 Claim released after this entry.
+
+## 2026-09-23 19:34:28Z -> live 19:37:21Z (2:34-2:37 PM CT) — live-odds-worker `70ba6867` -> `fe73ed81` (`dep-daq2jh4a9krc73avh2ug`) — lane `mlb-doubleheader-e2e` — **VERIFIED: MLB PUBLISHES LIVE PROP EDGES FOR THE FIRST TIME**
+
+**User decision (chat):** "fix the vendor row and open the upstream PR", then "deploy it and read the carry". Claim 19:31:0xZ (re-acquired; the prior one was allowed to EXPIRE at 47.5 min rather than renewed while idle), preflight CLEAR 19:34:16Z, released after this entry. **Carries** `c065cf99` (the vendor row fix) on top of `7094b69a` / `70ba6867` / `e7899507` from earlier today.
+
+    field                                 baseline                         measured
+    live-odds-worker commit               70ba6867                         fe73ed81 (live 19:37:21.657Z)
+    LIVE_PROB_CARRIED `mc_rows_with_prob` 0 on EVERY line ever logged      **9** (gamePk 824785)
+    LIVE_PROB_CARRIED `carried`           0 on every line ever logged      **9**
+    snapshot_live_prob_indexed            0                                **8**
+    snapshot_live_prob_seen               0                                **8**
+    rows_live_edged                       0                                **5**
+    live rows `with_live_prob`            0 of 190                         **8 of 188**
+
+    19:40:01Z  LIVE_PROB_CARRIED gamePk=824785 source_rows=9 source_with_prob=9
+                                 mc_rows_with_prob=9 card_rows=85 carried=9
+
+**verify:** the table — `mc_rows_with_prob` 0 -> 9 on the carry counter, and `rows_live_edged` 0 -> 5 on a board build that STARTED 19:45:14Z, after the first post-fix lens tick at 19:40:01Z. The first four reads (19:40:46Z..19:44:52Z) all returned the 19:33:34Z build, which predates the deploy, and reading any of them would have recorded this as a failure.
+
+**THE WITHHELD REASONS MOVED EXACTLY AS THE GATE MAP PREDICTED**, which is the strongest single piece of evidence here:
+
+    before  {no_live_probability: 139, over_already_decided: 5}
+    after   {no_live_probability: 129, no_fair_value_no_pregame_projection: 3, over_already_decided: 5}
+
+`no_live_probability` fell by 10 and a NEW reason appeared, owned by the PREGAME JOIN rather than by anything in this chain. That is the signature recorded in `leads.md` before the deploy: the carry succeeding shows up as the blocker moving to a different owner.
+
+**What this completes.** MLB had never published a live prop probability. `5bab0685` (2026-08-30) was written to fix it and never ran, because `11815f8b` (2026-07-28) had orphaned the function it lived in. Today: `7094b69a` fixed a real spelling defect in that dead code, `70ba6867` instrumented it, `e7899507` moved the carry onto the live path, `4cc2263e` instrumented the four silent returns that hid the next hop, and `c065cf99` added the two vendor keys the row needed to be keyed at all. Each one was necessary; none alone was sufficient.
+
+**Upstream PR opened:** mostgood1/MLB-BettingV2#1. Without it the next `vendor/` re-pull reverts `c065cf99` and this regresses.
+
+**NOT claimed:** (a) only ONE of two live games carried — 824223 read `source_rows=0` on the 19:40:01Z tick having read 10 at 19:01:57Z; different tick, different payload, and a second reading is owed before saying anything about it. (b) 5 edges on 188 live rows is a real result and a SMALL one; `no_live_probability` is still 129. (c) `rows_live_edged` is the count the board serves, not money — nothing here says the edges are right.
