@@ -211,14 +211,72 @@ def _side_score(game: dict[str, Any], side: str) -> str | None:
     return None
 
 
+# Games that WILL NOT BE PLAYED as scheduled. MLB's `abstractGameState` maps
+# every one of these onto **"Final"**, so reading that field alone presents a
+# postponed game as finished.
+#
+# Measured on production 2026-09-23: TOR @ BAL, gamePk 824785, StatsAPI
+# `detailedState: "Postponed"`, `codedGameState: "D"`, `abstractGameState:
+# "Final"`. The chip served `state: "final"`, `status_token: "FINAL"` -- and
+# `start_time_utc: 2026-09-23T17:35:00Z`, a game that had "finished" but starts
+# tomorrow. It had been rescheduled into the next day's split doubleheader.
+#
+# The 0-0 guard below ALREADY caught that something was wrong -- it stamped
+# `level_final_impossible_for_sport` and suppressed the score -- but it named
+# the wrong cause and let the FINAL token through. `codedGameState` is the
+# field that discriminates and nothing read it.
+_NOT_PLAYED_CODED = {"D": "POSTPONED", "C": "CANCELLED", "U": "SUSPENDED"}
+# Text is the FALLBACK, because not every provider passes the coded state.
+# Ordered longest-first is unnecessary here; the tokens do not overlap.
+_NOT_PLAYED_TEXTS = (
+    ("postponed", "POSTPONED"),
+    ("cancelled", "CANCELLED"),
+    ("canceled", "CANCELLED"),
+    ("suspended", "SUSPENDED"),
+)
+
+
+def _not_played_token(game: dict[str, Any], status_texts: str) -> str | None:
+    """`POSTPONED` / `CANCELLED` / `SUSPENDED`, or None for an ordinary game."""
+    status = game.get("status") if isinstance(game.get("status"), dict) else {}
+    live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+    for source in (status, live_state, game):
+        if not isinstance(source, dict):
+            continue
+        coded = _text(source.get("codedGameState") or source.get("coded_game_state")).strip().upper()
+        if coded in _NOT_PLAYED_CODED:
+            return _NOT_PLAYED_CODED[coded]
+    for needle, token in _NOT_PLAYED_TEXTS:
+        if needle in status_texts:
+            return token
+    return None
+
+
+def _status_texts(game: dict[str, Any]) -> str:
+    """Every status string this game carries, lowercased into one haystack.
+
+    Shared so `_game_flags` and `build_game_chip` cannot drift about what they
+    are reading -- two readers of the same question disagreeing is a cost this
+    file has already paid once, in the 0-0 final guard below.
+    """
+    status = game.get("status") if isinstance(game.get("status"), dict) else {}
+    live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+    return " ".join(
+        _text(value).lower()
+        for value in (status.get("abstract"), status.get("detailed"), status.get("status"),
+                      live_state.get("status"), game.get("status_badge"))
+    )
+
+
 def _game_flags(game: dict[str, Any]) -> tuple[bool, bool]:
     status = game.get("status") if isinstance(game.get("status"), dict) else {}
     live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
     state_text = _text(game.get("gameState")).upper()
-    status_texts = " ".join(
-        _text(value).lower()
-        for value in (status.get("abstract"), status.get("detailed"), status.get("status"), live_state.get("status"), game.get("status_badge"))
-    )
+    status_texts = _status_texts(game)
+    # BEFORE the live/final reads, because "Final" is exactly what MLB reports
+    # for these and the text check below would otherwise win.
+    if _not_played_token(game, status_texts) is not None:
+        return False, False
     is_live = bool(
         game.get("shared_is_live")
         or status.get("is_live")
@@ -471,9 +529,15 @@ def build_game_chip(sport: str, game: dict[str, Any]) -> dict[str, Any]:
     home_score = _side_score(game, "home")
     zero_zero = away_score == "0" and home_score == "0"
     score_suppressed: str | None = None
+    not_played_token = _not_played_token(game, _status_texts(game))
+    # A game that will not be played has no score to show, and its reason is
+    # its own: `pregame_placeholder` would say the game is still coming, which
+    # for a postponement is only true of a DIFFERENT game on another date.
+    if not_played_token is not None and zero_zero:
+        score_suppressed = f"game_{not_played_token.lower()}"
     # A 0-0 score on a game that is neither live nor final is a schedule
     # placeholder, not a real score.
-    if zero_zero and not is_live and not is_final:
+    elif zero_zero and not is_live and not is_final:
         score_suppressed = "pregame_placeholder"
     # AND SO IS A 0-0 "FINAL" IN A SPORT THAT CANNOT END LEVEL. `is_final` and
     # the score come from unrelated fields -- `_game_flags` reads status text,
@@ -506,7 +570,14 @@ def build_game_chip(sport: str, game: dict[str, Any]) -> dict[str, Any]:
         away_score = None
         home_score = None
 
-    if is_final:
+    if not_played_token is not None:
+        # ITS OWN STATE, not one of the three. Every downstream gate tests for
+        # `live`/`in_progress` or `final` explicitly, so a fourth value falls
+        # through all of them -- which is the correct handling for a game that
+        # is not being played: no live pricing, no settled outcome.
+        state = not_played_token.lower()
+        status_token = "PPD" if not_played_token == "POSTPONED" else not_played_token
+    elif is_final:
         state = "final"
         status_token = "FINAL"
     elif is_live:
