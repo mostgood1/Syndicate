@@ -38,6 +38,18 @@ FOUR INSTRUMENT TRAPS ARE BAKED IN, because each produced a wrong reading first:
    A capture that dies halfway is worse than none, because the logs it was
    racing keep ageing.
 
+5. **A PAGE BUDGET THAT RUNS OUT IS A FLOOR, NOT A TOTAL.** `_logs` pages
+   BACKWARD from the end of the window, so exhausting the budget drops the
+   OLDEST part of the hour -- and until 2026-09-23 it did that silently, at
+   200 pages x 100 lines = 20,000. The 2026-09-23T01:00Z web capture landed on
+   exactly `log_lines: 20000` and reported `served_mb: 395.62` as a total; the
+   ratio `metered / app-served` computed from it (1.04) was really a CEILING,
+   and that ratio is the whole `[render-egress-spikes]` argument. Neither
+   existing guard could see it: `instrument_blind` and `instrument_partial` are
+   both about the EMITTER writing lines, this is about the READER not asking
+   for them. Every section now carries `read` and `read_truncated`, the app
+   section carries `served_is_floor`, and both print paths say `>=`.
+
 WHAT IT DOES NOT DO. It cannot say what the meter counts -- that contradiction
 is unresolved and this tool is not an argument about it. It captures evidence so
 the NEXT occurrence is analysed from complete logs instead of remembered ones.
@@ -145,23 +157,50 @@ def _metric(key: str, name: str, resource: str, start: str, end: str) -> dict[st
     return dict(out)
 
 
-def _logs(key: str, resource: str, start: str, end: str, log_type: str, max_pages: int = 200) -> list[tuple[str, str, dict]]:
+#: The API serves 100 lines per page, so a page budget IS a line budget.
+#: This was 200 (= 20,000 lines) until 2026-09-23, and it truncated SILENTLY:
+#: see trap 5 in the module docstring. 900 matches `render_bandwidth_report.py`,
+#: which has paged the same API against the same owner without trouble.
+LOG_PAGE_SIZE = 100
+DEFAULT_MAX_LOG_PAGES = 900
+
+#: Reasons `_logs` stopped. Only these two mean it read the WHOLE window; every
+#: other reason leaves older lines unread, so any total derived from the rows is
+#: a floor. Listed explicitly rather than inferred, because "unknown" must not
+#: fall through to the complete branch.
+_COMPLETE_STOPS = ("reached window start", "no more lines")
+
+
+def _logs(key: str, resource: str, start: str, end: str, log_type: str,
+          max_pages: int = DEFAULT_MAX_LOG_PAGES,
+          meta: dict[str, Any] | None = None) -> list[tuple[str, str, dict]]:
     """Page BACKWARD, deduplicating by id.
 
     The API returns the NEWEST `limit` lines inside the window, so a forward
     pager re-reads the tail forever and never reaches the start.
+
+    Trap 5: this pager can run out of budget before it reaches `start`, and it
+    returns the newest `max_pages * 100` lines with NO signal that the rest
+    exist. Pass `meta` to find out: it is filled with `truncated`, `stop_reason`,
+    `pages`, `lines` and `oldest_reached`. The return type is unchanged because
+    `controlled_transfer_read.py`, `controlled_transfer_arm2_watch.py` and
+    `controlled_transfer_probe.py` all import this function.
     """
     seen: set[str] = set()
     rows: list[tuple[str, str, dict]] = []
     cursor = end
+    pages = 0
+    stop_reason = "page budget exhausted"
     for _ in range(max_pages):
         params = {
-            "ownerId": OWNER_ID, "resource": resource, "limit": "100",
+            "ownerId": OWNER_ID, "resource": resource, "limit": str(LOG_PAGE_SIZE),
             "startTime": start, "endTime": cursor, "type": log_type,
         }
         payload = _get("https://api.render.com/v1/logs?" + urllib.parse.urlencode(params, doseq=True), key)
         entries = payload.get("logs") or []
+        pages += 1
         if not entries:
+            stop_reason = "no more lines"
             break
         fresh = 0
         for entry in entries:
@@ -172,11 +211,26 @@ def _logs(key: str, resource: str, start: str, end: str, log_type: str, max_page
             labels = {item["name"]: item["value"] for item in entry.get("labels", [])}
             rows.append((entry["timestamp"], entry.get("message", ""), labels))
         oldest = min(entry["timestamp"] for entry in entries)
-        if fresh == 0 or oldest <= start:
+        if oldest <= start:
+            stop_reason = "reached window start"
+            break
+        if fresh == 0:
+            # Every id on this page was already seen and none of them predate
+            # `start`: the cursor cannot move, so older lines stay unread.
+            stop_reason = "cursor stalled (a full page of duplicate ids)"
             break
         cursor = oldest
         time.sleep(0.4)
     rows.sort()
+    if meta is not None:
+        meta.update({
+            "pages": pages,
+            "max_pages": max_pages,
+            "lines": len(rows),
+            "stop_reason": stop_reason,
+            "oldest_reached": rows[0][0] if rows else None,
+            "truncated": stop_reason not in _COMPLETE_STOPS,
+        })
     return rows
 
 
@@ -202,7 +256,48 @@ def _served_display(app: dict) -> str:
     """
     if app.get("instrument_blind"):
         return "UNREADABLE (access-log emitter off)"
+    if app.get("served_is_floor"):
+        # A floor rendered as a total is the same class of error as a dead
+        # emitter rendered as 0.0: both read as a small number rather than as
+        # the refusal they are. `>=` is the whole point -- it stops a reader
+        # dividing metered by it and getting a ratio that is really a bound.
+        return f">= {app['served_mb']} MB (FLOOR -- {app.get('floor_reason') or 'partial read'})"
     return f"{app['served_mb']} MB"
+
+
+def _floor_reason(meta: dict[str, Any], start: str, which: str) -> str:
+    """Say what was NOT read, in the units a reader needs to judge the total.
+
+    Naming the oldest line reached is the difference between "this number is
+    wrong somehow" and "this number covers 01:31Z..02:00Z of a 01:00Z hour".
+    """
+    oldest = meta.get("oldest_reached") or "?"
+    return (
+        f"{which} log read stopped at {meta.get('pages')} pages "
+        f"({meta.get('lines')} lines, {meta.get('max_pages')} page budget): "
+        f"{meta.get('stop_reason')}. Lines older than {oldest} were NEVER READ, so this "
+        f"covers {oldest}..window end, not {start}..window end. Every total and every "
+        f"top_* list below is a FLOOR. Re-run with a larger --max-log-pages for a complete "
+        f"read; do NOT divide metered_mb by it."
+    )
+
+
+def _truncation_warnings(report: dict[str, Any]) -> list[str]:
+    """Every floor in this capture, as lines a reader cannot skim past.
+
+    The JSON carries `read_truncated` on each section, but a capture is read
+    from the terminal first and the file later -- and the whole point of the
+    2026-09-23 defect was that a floor printed as a total.
+    """
+    out: list[str] = []
+    for section in ("edge", "app"):
+        block = report.get(section) or {}
+        if block.get("read_truncated"):
+            out.append(str(block.get("floor_reason") or f"{section} log read was TRUNCATED"))
+    for worker, block in (report.get("publish_into_web") or {}).items():
+        if isinstance(block, dict) and block.get("read_truncated"):
+            out.append(str(block.get("floor_reason") or f"{worker} log read was TRUNCATED"))
+    return out
 
 
 #: Every public request reaches gunicorn and is logged there, so an edge request
@@ -270,7 +365,8 @@ def _top(pairs: dict[str, list[int]], limit: int = 12) -> list[dict[str, Any]]:
     ]
 
 
-def capture(service: str, bucket: str, key: str, metered_mb: float | None = None) -> dict[str, Any]:
+def capture(service: str, bucket: str, key: str, metered_mb: float | None = None,
+            max_log_pages: int = DEFAULT_MAX_LOG_PAGES) -> dict[str, Any]:
     """Everything that could bear on one spike hour, gathered while it exists."""
     start, end = _bucket_window(bucket)
     resource = SERVICE_IDS[service]
@@ -288,7 +384,8 @@ def capture(service: str, bucket: str, key: str, metered_mb: float | None = None
         ),
     }
 
-    edge = _logs(key, resource, start, end, "request")
+    edge_meta: dict[str, Any] = {}
+    edge = _logs(key, resource, start, end, "request", max_pages=max_log_pages, meta=edge_meta)
     edge_paths: dict[str, list[int]] = defaultdict(lambda: [0, 0])
     edge_ips: dict[str, list[int]] = defaultdict(lambda: [0, 0])
     edge_uas: dict[str, list[int]] = defaultdict(lambda: [0, 0])
@@ -308,9 +405,14 @@ def capture(service: str, bucket: str, key: str, metered_mb: float | None = None
     report["edge"] = {
         "requests": len(edge), "bytes": edge_total, "mb": round(edge_total / 1048576, 2),
         "top_paths": _top(edge_paths), "top_clients": _top(edge_ips), "top_user_agents": _top(edge_uas),
+        "read": edge_meta,
+        "read_truncated": bool(edge_meta.get("truncated")),
     }
+    if edge_meta.get("truncated"):
+        report["edge"]["floor_reason"] = _floor_reason(edge_meta, start, "edge")
 
-    app = _logs(key, resource, start, end, "app")
+    app_meta: dict[str, Any] = {}
+    app = _logs(key, resource, start, end, "app", max_pages=max_log_pages, meta=app_meta)
     app_paths: dict[str, list[int]] = defaultdict(lambda: [0, 0])
     app_ips: dict[str, list[int]] = defaultdict(lambda: [0, 0])
     app_total = 0
@@ -337,14 +439,23 @@ def capture(service: str, bucket: str, key: str, metered_mb: float | None = None
     # discriminator: it separates "nothing was served" (edge empty too, a real
     # quiet hour) from "nobody wrote it down".
     app_blind = access_lines == 0 and report["edge"]["requests"] > 0
+    app_truncated = bool(app_meta.get("truncated"))
     report["app"] = {
         "log_lines": len(app), "access_lines": access_lines,
         "served_bytes": None if app_blind else app_total,
         "served_mb": None if app_blind else round(app_total / 1048576, 2),
         "top_paths": _top(app_paths), "top_clients": _top(app_ips),
         "instrument_blind": app_blind,
+        "read": app_meta,
+        "read_truncated": app_truncated,
+        # THE FIELD A READER MUST CHECK BEFORE DIVIDING. `instrument_blind` and
+        # `instrument_partial` are both about the EMITTER; this one is about the
+        # READER running out of pages, which neither of them can see.
+        "served_is_floor": app_truncated and not app_blind,
         "note": "served_bytes is RESPONSE size only; a POST body (e.g. artifacts/publish) is NOT counted here",
     }
+    if app_truncated and not app_blind:
+        report["app"]["floor_reason"] = _floor_reason(app_meta, start, "app")
     gap = None if app_blind else _emitter_gap([ts for ts, _m, _l in edge], access_ts)
     report["app"]["instrument_partial"] = gap is not None
     if gap:
@@ -361,7 +472,9 @@ def capture(service: str, bucket: str, key: str, metered_mb: float | None = None
     # and the largest single flow into web. Read from the WORKER side.
     publish: dict[str, Any] = {}
     for worker in ("refresh-worker", "live-odds-worker"):
-        rows = _logs(key, SERVICE_IDS[worker], start, end, "app", max_pages=90)
+        worker_meta: dict[str, Any] = {}
+        rows = _logs(key, SERVICE_IDS[worker], start, end, "app",
+                     max_pages=max_log_pages, meta=worker_meta)
         total = 0
         count = 0
         for _ts, message, _labels in rows:
@@ -370,7 +483,13 @@ def capture(service: str, bucket: str, key: str, metered_mb: float | None = None
             match = _PUBLISH_BYTES.search(message)
             if match:
                 total += int(match.group(1)); count += 1
-        publish[worker] = {"publishes": count, "bytes": total, "mb": round(total / 1048576, 2)}
+        publish[worker] = {
+            "publishes": count, "bytes": total, "mb": round(total / 1048576, 2),
+            "read": worker_meta,
+            "read_truncated": bool(worker_meta.get("truncated")),
+        }
+        if worker_meta.get("truncated"):
+            publish[worker]["floor_reason"] = _floor_reason(worker_meta, start, worker)
     report["publish_into_web"] = publish
 
     try:
@@ -431,14 +550,21 @@ def run_check(args: argparse.Namespace, key: str) -> int:
                 print(f"  {bucket}  {mb:8.1f} MB  already captured -> {existing.name}")
                 continue
             print(f"  {bucket}  {mb:8.1f} MB  CAPTURING...")
-            report = capture(service, bucket, key, metered_mb=mb)
+            report = capture(service, bucket, key, metered_mb=mb,
+                             max_log_pages=getattr(args, "max_log_pages", DEFAULT_MAX_LOG_PAGES))
             OUT_DIR.mkdir(parents=True, exist_ok=True)
             out = OUT_DIR / f"{service}_{bucket.replace(':', '').replace('-', '')}.json"
             out.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
             fired += 1
-            print(f"      edge {report['edge']['mb']} MB / {report['edge']['requests']} reqs | "
+            edge_flag = " (FLOOR, truncated read)" if report["edge"].get("read_truncated") else ""
+            pub_flag = " (FLOOR)" if any(
+                v.get("read_truncated") for v in report["publish_into_web"].values()
+            ) else ""
+            print(f"      edge {report['edge']['mb']} MB{edge_flag} / {report['edge']['requests']} reqs | "
                   f"app served {_served_display(report['app'])} | "
-                  f"publish in {sum(v['mb'] for v in report['publish_into_web'].values()):.1f} MB")
+                  f"publish in {sum(v['mb'] for v in report['publish_into_web'].values()):.1f} MB{pub_flag}")
+            for line in _truncation_warnings(report):
+                print(f"      !! {line}")
             print(f"      -> {out}")
     if not fired:
         print("no new spike to capture")
@@ -483,6 +609,8 @@ def rederive_all(services: list[str], key: str) -> int:
             prior = report["rederived"]["prior"]
             app = report["app"]
             flag = " BLIND" if app.get("instrument_blind") else (" PARTIAL" if app.get("instrument_partial") else "")
+            if app.get("served_is_floor"):
+                flag += " FLOOR"
             print(f"  {bucket}  metered {report['metered_mb']}  edge {prior['edge_mb']} -> "
                   f"{report['edge']['mb']} MB ({prior['edge_requests']} -> {report['edge']['requests']} reqs)  "
                   f"served {prior['app_served_mb']} -> {app['served_mb']}{flag}", flush=True)
@@ -502,6 +630,11 @@ def main() -> int:
     parser.add_argument("--interval-minutes", type=int, default=20)
     parser.add_argument("--capture", metavar="BUCKET", help="capture one bucket explicitly, e.g. 2026-09-04T18:00:00Z")
     parser.add_argument("--force", action="store_true", help="re-capture a bucket already on disk")
+    parser.add_argument("--max-log-pages", type=int, default=DEFAULT_MAX_LOG_PAGES,
+                        help=(f"log pages per read, {LOG_PAGE_SIZE} lines each "
+                              f"(default {DEFAULT_MAX_LOG_PAGES} = "
+                              f"{DEFAULT_MAX_LOG_PAGES * LOG_PAGE_SIZE:,} lines). Exhausting it "
+                              "marks the section a FLOOR rather than truncating silently"))
     parser.add_argument("--rederive", action="store_true",
                         help="re-capture every capture on disk on the corrected window, keeping the prior numbers")
     args = parser.parse_args()
@@ -514,13 +647,16 @@ def main() -> int:
 
     if args.capture:
         service = args.services[0]
-        report = capture(service, args.capture, key)
+        report = capture(service, args.capture, key, max_log_pages=args.max_log_pages)
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         out = OUT_DIR / f"{service}_{args.capture.replace(':', '').replace('-', '')}.json"
         out.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
         print(json.dumps({k: v for k, v in report.items() if k not in ("edge", "app")}, indent=2))
-        print(f"edge {report['edge']['mb']} MB / {report['edge']['requests']} reqs")
+        edge_flag = " (FLOOR, truncated read)" if report["edge"].get("read_truncated") else ""
+        print(f"edge {report['edge']['mb']} MB{edge_flag} / {report['edge']['requests']} reqs")
         print(f"app served {_served_display(report['app'])} / {report['app']['access_lines']} access lines")
+        for line in _truncation_warnings(report):
+            print(f"!! {line}")
         for row in report["edge"]["top_paths"][:5]:
             print(f"   edge {row['bytes']/1048576:8.2f} MB  n={row['count']:5d}  {row['key'][:60]}")
         for row in report["app"]["top_paths"][:5]:
