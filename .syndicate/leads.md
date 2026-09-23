@@ -516,3 +516,38 @@ Before it, `11815f8b^` had them at `live_lens.py:1000` and `:1280`.
 **NEXT STEP IS A DESIGN QUESTION, NOT A PATCH.** Do NOT simply re-add the call: `11815f8b` removed it deliberately while making cards the primary ROW SOURCE, and restoring it would re-introduce whatever that change was for. The question to answer first is where cards now become the row source in the cards-primary path, and whether the MC probability should be carried there instead. `5bab0685`'s docstring already argues the trade (124 card rows vs 27 MC rows; keep the cards' ROWS, carry only the PROBABILITY) — that reasoning survives the move, its location does not.
 
 **Not yet decided: whether the dead subtree should be deleted.** `learnings.md` says to remove confirmed dead code in the same pass, but here it holds the only implementation of a behaviour the product still wants, and deleting it would discard `5bab0685`'s and today's reasoning along with it. Recommend it stays until the carry has a live home, then goes.
+
+## 2026-09-23 — WHERE CARDS BECOME THE ROW SOURCE, and why the live probability is missing there: TWO producers, only one wired `[lane mlb-doubleheader-e2e, session 3692ff18]`
+
+Answers the design question left open by the dead-code lead above. **The fix does not belong in the orphaned merge; a live-prop path already exists and is missing one field.**
+
+**The live path, post-`11815f8b` (cards-primary):**
+
+    _cards_backed_live_lens_report   live_lens.py:1311
+      -> _card_to_live_lens_row      :1240      <- CARDS BECOME THE ROW SOURCE HERE
+           card_props = _live_props_from_card(card)                    :1244
+           if _card_status_bucket(card) == "live":                     :1250
+               live_detail_props = _live_props_from_game_detail(...)   :1251
+               if live_detail_props: card_props = live_detail_props    :1252-53
+
+`:1251` is the live branch and it ALREADY normalises: `_live_props_from_game_detail` runs its rows through `_normalize_live_prop_row`, which maps `live_model_prob_over` -> `liveModelProbOver`. **So if its producer emitted the probability, it would arrive correctly with no carry at all** — the orphaned merge was duplicating a mechanism this path already has.
+
+**It does not emit it. THERE ARE TWO LIVE-PROP PRODUCERS AND ONLY ONE IS WIRED:**
+
+    A. cards.py `live_prop_rows_for_game` -> `_live_prop_rows_computed`
+       feeds the live lens TODAY. Real actuals + live projections.
+       Greps clean for `live_model_prob_over` / `liveModelProbOver` -- it NEVER emits either.
+
+    B. the vendored MC pricer (`flask_frontend.py:14763`, the `LIVE_MC_PRICED` lines)
+       DOES emit `live_model_prob_over`. Its rows reached the lens only through the
+       merge that `11815f8b` orphaned.
+
+**That is exactly the published shape.** `snapshot_by_game_state.live {rows 1,050, with_live_projection 1,030, with_live_prob 0}`: producer A supplies the projections, and nothing supplies the probabilities because producer B is unwired.
+
+**So the fix is one of two, and it is a real choice, not a patch:**
+1. **Make producer A emit it** — `_live_prop_rows_computed` gains `live_model_prob_over` from whatever distribution it already has. Keeps one producer, no merge.
+2. **Wire producer B into the live branch** — carry the MC probability onto `_live_props_from_game_detail`'s rows inside `_card_to_live_lens_row`, which is where both could be available. This is `5bab0685`'s reasoning relocated: keep the cards'/detail ROWS, carry only the PROBABILITY.
+
+Option 2 preserves the argument `5bab0685` made about row counts (124 card rows vs 27 MC rows); option 1 avoids a second producer entirely and is cleaner IF the distribution is already in hand there. **Unmeasured: whether `_live_prop_rows_computed` has access to a rest-of-game distribution it could price from.** That is the next thing to check and it decides between them.
+
+**And `_live_props_from_game_detail` has FOUR silent `return []` paths** (`:597` no game_pk, `:604` request-path refusal, `:611` import failure, `:616` producer raised). Whichever option is taken, those want the same treatment as the merge's two returns got in `70ba6867` — otherwise the next person debugging a zero here hits the same blank wall.
