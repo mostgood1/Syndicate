@@ -40323,3 +40323,18 @@ Both halves are now measured:
 **GOAL: MET.** No rollback is recommended: the board is strictly better than the old-code baseline (16 -> 0), not worse. **Closing the lane is the USER's decision; it was not closed here.**
 
 **verify:** `tomorrow_series_stated` = 0 on all four samples while `series_live_pairs` was 7-8 and MLB `today_stated` live was 367-558 — the population, the defect count and the reachability check all read off the same served payload at the same instant.
+
+## 2026-09-23 14:07:55Z -> live 14:11:14Z (9:07-9:11 AM CT) — web `bc383640` -> `4f8bcdef` (`dep-daptqeugekts73f6n3k0`) — lane `mlb-doubleheader-e2e` — **VERIFIED: a postponed game no longer renders as FINAL**
+
+**User decision (chat):** "fix the postponed FINAL label too", then "deploy it tonight". Claim 14:07:34Z, preflight CLEAR 14:07:4xZ, released after this entry. **Carries** `e7d8e8d4` (this fix) plus whatever else reached `origin/main`; the tip was deployed, not a cherry-pick.
+
+    field                          baseline 14:06:30Z   predicted    measured 14:12:19Z
+    web live_commit                bc383640             4f8bcdef     4f8bcdef (live 14:11:14.445Z)
+    chip 824785 `state`            final                postponed    **postponed**
+    chip 824785 `status_token`     FINAL                PPD          **PPD**
+
+**verify:** the table — chip `824785` on `/api/board/game-chips?sport=mlb&date=2026-09-22` reading `postponed` / `PPD` where it read `final` / `FINAL`, on a read taken **past the 30s `_CACHE_TTL_SECONDS`** so the pre-deploy list could not be the answer.
+
+**This also settles a reachability question the fix was written under.** Two MLB status sources reach this builder and they behave differently: `mlb/cards.py:1461` `_source_status` forwards `{"abstract", "detailed"}` from StatsAPI (so `detailed: "Postponed"` arrives, and the TEXT fallback fires), while `mlb/betting_card.py:190` `_status_for_date` is a DATE HEURISTIC returning a hard-coded `{"abstract": "Final", "detailed": "Final"}` — a postponement through that path is invisible to both the coded check and the text. Before the deploy I could not tell which fed the chip and said so. **The flip proves the StatsAPI path feeds it**, and that the `codedGameState` branch is currently DEAD on this source — `_source_status` does not forward it. Kept anyway: it is the correct field, other providers pass it, and `graded_outcomes.py:243` already reads it.
+
+**NOT covered by this deploy:** `refresh-worker` still runs `fba49b50` and builds chips of its own during a board build, so the board's internal copy keeps the old labelling until it takes this commit. The user-visible rail is served by web and is fixed.
