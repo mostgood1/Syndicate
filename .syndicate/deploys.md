@@ -40359,3 +40359,46 @@ Both halves are now measured:
 **Restart caveat handed to the MLB lane BEFORE their reading, and acted on:** this deploy restarts the worker between the two halves of today's TOR @ BAL doubleheader (G1 17:35Z, G2 22:35Z). Their 18:15 CT scheduled reading now names a worker restart as in-frame alongside `fba49b50`/`4a231ac8` rather than reporting a clean before/after. Their 14:16:28Z baseline: `rows_matched 2,541`, `rows_ambiguous_game 0`, `rows_resolved_by_start_time 165`.
 
 **`check_deploy_safety.py --drain` was unusable and that cost ~15 min of queueing.** It refuses off-box (`[UNKNOWN] Drain requires the keyvalue backend ... Refusing rather than pretending`) and the peer chased it to the root: `SYNDICATE_REFRESH_STATE_URL` is a Render-INTERNAL hostname that cannot resolve from a dev machine, and `ops.py` exposes no drain route. The tool is right to refuse; `deploy_preflight`'s HOLD text recommends a path with no reachable transport from where the recommendation is read. Board builds ran 14:06 / 14:19 / 14:25:45Z and the window came at 14:34:04Z (`CLEAR: only infrastructure processes running`).
+
+## 2026-09-23 14:36Z (09:36 AM CT) - refresh-worker f0e60bec - process projection interval - PASS
+
+Read-only reading, scheduled task `verify-nfl-rating-blend-0922`. No deploy, no claim, no env write, no code change. All times UTC with US Central (CDT, UTC-5) in parentheses.
+
+**Question owed:** did deploy `dep-daosd8142hec7380i76g` (refresh-worker, commit `f0e60bec`, live 2026-09-22T00:12:34Z / 09-21 07:12 PM CT) move `SEASON_PROJECTION_REFRESH_INTERVAL_SECONDS` **in the running process** from the ride-along 72000 to 86400? The week-3 build that verified the NFL rating blend printed `reason=artifact_missing_no_prior_launch`, which carries no interval, so the value had never been observed process-side.
+
+- **baseline:** 72000 (set before the 09-21 deploy to force the week-2 rebuild; Render env value moved to 86400 at 2026-09-21 23:49Z / 06:49 PM CT).
+- **predicted:** 86400 in the process.
+- **measured:** **86400**. PASS.
+
+**The measurement** - refresh-worker logs, `srv-d91dpertqb8s73co8ls0`:
+
+```
+2026-09-22T04:43:44.856819638Z [refresh_worker] SEASON_PROJECTION_ARTIFACT_MISSING sport=nfl_props
+  artifact_missing_after_launch since_launch_seconds=33 interval_seconds=86400
+  path=/opt/render/project/data/nfl_source/nfl_prop_projections_2026_wk3.json
+```
+
+04:43:44.86Z = 2026-09-21 11:43:44 PM CT, 1m10s after the week-3 NFL launch at 04:42:34Z. It sits inside `f0e60bec`'s deploy window (previous deploy ended 2026-09-22T00:12:34Z, next began 14:00:16Z), so this process carries that deploy's injected env. The same reading repeats 47 more times through 19:28:48Z, always `interval_seconds=86400`.
+
+**Why this line is admissible for the question.** `interval_seconds=` in the `artifact_missing_after_launch` reason is `interval = float(_season_projection_refresh_interval_seconds())` (`scripts/run_refresh_worker.py:5692`, helper at `:4460`), which reads `SEASON_PROJECTION_REFRESH_INTERVAL_SECONDS` and nothing else - the same variable, the same function `_season_projection_should_launch` the NFL launch decision uses; `nfl_props` is just another sport key through the same call (`:5888`). Checked against the DEPLOYED commit, not the primary tree: `git show f0e60bec:scripts/run_refresh_worker.py` and `git show 97066dbe:scripts/run_refresh_worker.py` are byte-identical. `render.yaml` does not carry the key at either commit, and no other file in the tree reads it.
+
+**The line the task asked for, and why it is not the answer.** The first `SEASON_PROJECTION_LAUNCHING sport=nfl` after 04:45Z 09-22 is:
+
+```
+2026-09-22T19:52:18.719704846Z [refresh_worker] SEASON_PROJECTION_LAUNCHING sport=nfl season=2026
+  week=3 reason=artifact_stale age_seconds=54485 interval_seconds=3600
+```
+
+19:52:18Z = 02:52:18 PM CT 09-22. It reads **3600**, and it speaks for a LATER deploy, not `f0e60bec`: `dep-dapdkksja7ms73av7gh0` (commit `97066dbe`) ended 19:49:24Z, 2m54s earlier. Six refresh-worker deploys landed between `f0e60bec` and it (14:03:40Z, 15:48:56Z, 16:32:50Z, 17:34:59Z, 19:15:35Z, 19:49:24Z), each re-injecting whatever the env held at its own boot.
+
+**Side finding, not this lane's to fix: the key was 3600 for one deploy generation.** Same variable, across the 19:49:24Z boundary, both processes on `97066dbe`:
+
+- 19:43:27Z (02:43:27 PM CT), process from the 19:15:35Z deploy: `nfl_props ... interval_seconds=86400`.
+- 19:52:18Z (nfl) and 19:52:53Z (ncaaf), process from the 19:49:24Z deploy: `interval_seconds=3600`.
+
+So the Render env value was 3600 at 19:49:24Z boot. It is **86400 again now** - single-key read `GET /v1/services/srv-d91dpertqb8s73co8ls0/env-vars/SEASON_PROJECTION_REFRESH_INTERVAL_SECONDS` at 2026-09-23T14:36Z (09:36 AM CT) returns `86400` (never the list API). And 3600 is not in any process since: it would mean hourly NFL and NCAAF relaunches, and there are **zero** `SEASON_PROJECTION_LAUNCHING` lines of any sport between 19:52:53Z 09-22 and 14:40Z 09-23, 18h47m, with `SEASON_PROJECTION_ENABLE_REFRESH_WORKER_AUTORUN=1` still set and the loop demonstrably launching at 19:52Z from the same code. The population is live; the silence is a reading.
+
+**Consequence for the NFL autorun:** none outstanding. The week-3 artifact was rebuilt ~19:52Z 09-22, which reset its clock, so the next NFL week relaunch is due ~19:52Z 09-23 (02:52 PM CT), not the ~04:44Z the task predicted - the 04:44Z estimate assumed the 04:44:14Z build was the last one.
+
+**verify:** the 04:43:44.856819638Z log line above, `interval_seconds=86400`, emitted by a process inside `f0e60bec`'s deploy window, from the helper that reads the env var under test. Nothing further owed on this obligation.
+
