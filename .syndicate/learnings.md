@@ -3705,3 +3705,36 @@ re-appeared the moment a new reader looked at OPEN ones. A header names who OPEN
 - **How to apply:** when a baseline is recorded for something to be monitored against, record the estimator beside it (`pstdev`, ddof=0) and pin it in the monitor's own instructions. And give the monitor the invariant, not just the method: *if the input did not change, the output CANNOT have changed, so a difference is yours*. The re-run that confirmed the fix said exactly that in its own entry, which is how the instrument confirmed itself rather than being taken on trust. Sibling: `feedback_measure_same_instant` -- same class, different axis.
 - **Also, from the same runs:** `list_task_runs` reports `status: "running"` for a scheduled run that finished its work and committed ten minutes earlier -- the field tracks the SESSION being open, not the task being done. Do not read "running" as "still working"; the commit and the notification are the completion signals.
 - **ADDENDUM `[lane nfl-total-sum-direction-scale, session f09f27bf, the run this entry is about]`: the reason it produced a false CAUSE and not merely a false number.** The factor is applied to every SD in the report, so the MODEL and MARKET columns inflate by the same 3.28% and appear to move together -- and co-movement is precisely the signature of "market lines shifted while the model held". The run therefore had a ready, plausible mechanism to attribute the difference to, wrote `2.59 (was 2.51)` as market drift, and stopped looking. A scale error on a shared estimator does not present as noise; it presents as a CORRELATION, and a correlation invites an explanation. **So: the invariant above is not a sanity check to run when something looks wrong -- it must be run BEFORE the difference is explained, because a difference that has already been explained is never re-examined.** Concretely, on identical input bytes the recompute matched the baseline on 4 of 4 to the reported precision (4.47 / 2.51 / 5.29 / 4.86); the one number that could not have moved, the model SD, was sitting in the report having moved, and that alone settles it without any statistics at all. Sibling: `feedback_read_the_field_you_already_have`.
+
+## 2026-09-23 — A NOTATION THE LEDGER USES IS NOT A NOTATION THE PARSER HONOURS, AND ONLY THE PARSER DECIDES
+
+- **What I believed:** that a claim written in `lanes.md` guards the thing it
+  names. Everyone writing one believes this; it is why they write it.
+- **What is true:** three different spellings guarded NOTHING, for months, and
+  no instrument said so. `.../event_simulator.py` (an elision a human reads
+  instantly and `matches` cannot resolve). `tests/fixtures/settlement_player_box/`
+  (the conventional trailing slash, which `_norm` stripped, turning a directory
+  into a file that cannot exist -- 0 of 6 files guarded). And a whole class in
+  the other direction: prose CITING a file under a `- Files:` line became a
+  claim, so a lane "held" files it had only mentioned, and one such phantom
+  blocked a real edit today.
+- **How I found out:** a claim I had to TAKE under a user decision turned out
+  to be a citation; auditing for siblings turned up the elisions; auditing
+  those turned up the directory. Each was found by fixing the one before it --
+  none by the checks that run every session.
+- **The rule going forward:** when a guard reads human-written notation, the
+  notation and the predicate are two halves that must be TESTED AGAINST EACH
+  OTHER, the way this repo already insists for two guards that must agree. The
+  cheap version is a census: for every claim, does it match at least one real
+  file? That question takes one pass over `git ls-tree` and would have found
+  all three the day they were written.
+- **And the audit itself needs the same scepticism.** My first census reported
+  a `(NEW)` file reservation as a dead claim -- "no tracked file matches" is
+  not "guards nothing", and a prospective claim starts working the moment the
+  file exists. An audit that conflates the two reports a working reservation
+  as a defect.
+- **Failure direction, stated because it decided the method:** tightening a
+  claim parser DROPS claims, which unguards files and stops nobody -- silent.
+  So every change was measured against the live ledger BEFORE shipping, and
+  that is the only reason an early cut that dropped three real test-file
+  claims was caught rather than deployed.

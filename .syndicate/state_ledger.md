@@ -1540,3 +1540,29 @@ So the published `reports/bucket_realised_mlb.json` is exactly right: the `(buck
 **ROOT CAUSE FIXED ON `main` 2026-09-22 (`4a231ac8`), NOT DEPLOYED.** `build_live_gameline_index` mapped `(away_team, home_team)` -> ONE projection (last write wins) and stamped its `game_pk`; `d25664f0` had split the ledger RECORDS, not the projection. The index now keeps every candidate per pair and `resolve_live_gameline` picks the row's own game - exact `game_pk` first, then the row's `commence_time` against each candidate's start - and REFUSES a pair it cannot separate as `team_pair_covers_more_than_one_game`. Falsified on `origin/main` with its own API: two lens games for one pair gave `index size 1` and both events resolved to `824387`; here the same input gives `[824424, 824387]`. 15 new tests, 467 existing pass. The claim came from OPEN lane `accuracy-assessment-0914` on the user's decision.
 
 **NOT measured:** whether a future doubleheader's second half now carries its own pk. Today's TB@NYY halves never overlapped (G1 FINAL 0-2 before G2's 23:05Z start) and today's 132 records are all on ev `394e1e2b`, so nothing today discriminates. Scheduled reading `mlb-dh-g2-ledger-reading-0922` at 18:40 CT.
+
+## [lane-claim-parser-holes] THREE CLAIM SHAPES GUARDED NOTHING AND NOTHING REPORTED IT -- ALL THREE FIXED `[2026-09-23, lane polymarket-corners-btts-order-branch]`
+
+`lane-guard.py:199` enforces with `lane_claims.matches` and nothing else -- no
+directory semantics, no globs. Three shapes were silently empty:
+
+| shape | example | guarded | fix |
+|---|---|---|---|
+| elided path | `.../event_simulator.py` | 0 files, since written | spelled out (`960d1678`) |
+| prose citation | a sentence nested under `- Files:` | claimed by ACCIDENT | `ef326851` |
+| directory | `tests/fixtures/settlement_player_box/` | 0 of 6 inside | `3552e722` |
+
+And the contest REPORT keyed on the path as spelled, so two lanes could hold
+one file with no contest printed (`201a307f`). Enforcement was never wrong;
+the census was, which is the worse half -- a session reads the census to
+decide a file is free.
+
+**Census after the fixes, and this is the number to re-derive rather than
+trust:** 138 claims x 39,553 files in `git ls-tree -r HEAD` (the TRACKED tree;
+a worktree omits `data/`'s 34,690 files). 134 guard >= 1 file, none guards
+more than one. The 4 that guard nothing are 2 prose fragments, 1 `(NEW)`
+reservation (correct -- it guards the moment the file exists) and nothing else.
+
+**Two properties now tested, not assumed:** a bare `/` from prose cannot claim
+the repository (4 such tokens exist in the live ledger), and `box/` does not
+bleed into `box_old/`.
