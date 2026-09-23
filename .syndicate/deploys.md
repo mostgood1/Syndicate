@@ -40085,3 +40085,41 @@ The 09-04 and 08-29 collisions are the doubleheader shape with a PRESENT `game_p
     direct TTFB (single client)        0.45-0.74 s on hits, 3-9.7 s on rebuilds    same, fewer rebuilds   0.41-1.81 s on 9 of 12; 10.3 / 6.2 / 8.2 s on the three window boundaries
 
 **What is NOT fixed:** the first request of each window still pays the whole build (4.7-9.7 s here), and the build cost itself is untouched. The cache only stops the SAME work being repeated. A longer TTL or a producer that refreshes the file off the request path (the worker already rebuilds the board on its own cadence) are the next levers, unmeasured. **verify:** the table.
+
+## 2026-09-23 00:09:50Z (7:09 PM CT) — refresh-worker `d25664f0` (live 2026-09-22T21:04:52Z) — lane `dh-grading-ledger-joins` — **VERIFIED on a live population: the ledger key separates games it used to merge**
+
+This discharges the OWED reading on the `d25664f0` entry above. It was unmeasurable at deploy time and I said so: no MLB game was live between 21:04:52Z and ~23:05Z, so "0 records appended" was an empty frame, not a pass. TB@NYY G2 (823494) went live at 23:05Z and supplied the population.
+
+    field                                   baseline 22:02:52Z (pre-G2)   predicted                      measured 00:09:50Z
+    records in the 09-22 ledger             132                           more, once a game is live      1,689
+    records appended after 21:04:52Z        0 (no game live)              > 0 under the new key          **1,336**
+    every record carries `event_id`         132 of 132                    unchanged                      **1,689 of 1,689**
+    G2 event `574050c1` rows                0                             carry 823494, not G1's 823543  **135 rows: 41 under 823494, 94 under none. ZERO under 823543**
+    old 5-slot keys spanning > 1 event      0 of 111                      the defect's true size         **186 of 556 (33%)**
+
+**The 186 is the finding.** Each of those 186 old-key groups holds records from MORE THAN ONE GAME that agree on `(game_pk, segment, market, line, books_key)`. Under the old key `_moved` deduped across them and kept whichever landed last; under `d25664f0` each event keeps its own record, and all 1,689 are in the file. On 2026-09-20 the same census read 13 of 653 (2%) — **a full evening slate is 33%, sixteen times denser.** The earlier number was measured on a thin file and understated the defect.
+
+**`game_pk` is still absent on most rows** (roughly 1,100 of 1,689), exactly as the original diagnosis said — it comes from the live-gameline projection and is never set on the segment-refusal path. That is why `event_id`, not `game_pk`, was the right sixth slot.
+
+**verify:** the table — specifically `574050c1` holding 41 rows under 823494 and none under 823543, and 186 of 556 old keys spanning more than one event while every record survives.
+
+**NOT proven by this:** that a doubleheader's two halves are separated while BOTH are live. G1 823543 was Final (last row 19:09:46Z) before G2's first row at 22:41:32Z, so the halves never overlapped in the ledger. That remains the open reading for `4a231ac8`.
+
+## 2026-09-22 22:07:39Z — refresh-worker `9c22d245` — **CANCELLED at 22:30:47Z, never live** — lane `live-gameline-game-identity`
+
+**User decision (chat):** "deploy it now", then "cancel it and redeploy". Claim 22:03:06Z, preflight CLEAR 22:07:25Z (the run before it returned UNKNOWN on a log-read 503; `--allow-mid-build` was NOT used). Deploy `dep-dapfoapsrm7s73fb58og`.
+
+**Why cancelled:** stalled. Twenty prior refresh-worker deploys all finished in **2.8–6.3 minutes**; this one sat at `build_in_progress` for **23 minutes** having emitted only `==> Downloading cache...` and `==> Cloning from ...` at 22:07:41Z, with no `build_ended` event.
+
+    field                       before cancel                 predicted            measured after
+    deploy status               build_in_progress 22.7 min    canceled             canceled, finishedAt 22:30:47.869Z
+    `build_ended` event         absent                        after the cancel     22:30:48.717Z (i.e. the cancel ended it)
+    container restart           --                            NONE, pre-build_ended cancel is cheap  **none: last `MALLOC_ARENA_INIT` still 21:05:29Z pid=39, the d25664f0 boot**
+    `server_failed` events      0                             0                    0
+    live commit                 d25664f0                      unchanged            d25664f0
+
+**The cheap-cancel window is real and this confirms it from the other side.** `deploy_preflight`'s docstring records the expensive case — a cancel AFTER `build_ended` causes a restart, measured 2026-08-10 by a pid namespace change. Cancelling BEFORE it left the running container untouched, and the unchanged `MALLOC_ARENA_INIT` pid is the reading that proves it.
+
+**NOT redeployed.** At 22:34:10Z the worker had an MLB sim running (`pid=3313, reason=tip_off_window`) — the pre-game sim for the very game we wanted to observe — and a 90-minute watch (22:34Z → 00:07Z, 45 polls) never once returned CLEAR: during an evening slate the refresh-worker is continuously running a sim, an odds refresh or a board build. The claim EXPIRED at ~22:48Z unused and was not renewed. `9c22d245` is on `main` and not in production.
+
+**Operational note:** `preflight && deploy` chained in ONE Bash call is refused — `deploy-guard.py` reads the command string before anything runs, so it sees the deploy with no fresh preflight. Separate calls, preflight immediately before.
