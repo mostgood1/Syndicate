@@ -1111,6 +1111,14 @@ death, never life — do not invert it.
 - Verification: (1) REACHABILITY FIRST — the as-shipped arm refuses and the fixed arm builds, same slug, same row, same request (`off != on`); (2) a `gt` threshold that DISAGREES with the board line still refuses, and so does a Yes/No corners market carrying NO `gt` token — the polarity gate is the evidence, never a default; (3) `btts` builds by literal name; (4) a synthetic joinable market with no branch refuses `no_order_branch_for_market` rather than `yes_no_market_subject_is_not_our_side`; (5) the existing `tests/test_execute_portfolio.py` stays green; (6) production reading after deploy: the corners family leaves `market_unresolved` in the next `venue_order_family_census.py --hours 24`.
 - Blocked by: none. NOTE — `syndicate/features/shared/polymarket_board_join.py` is claimed by OPEN lane `mlb-doubleheader-e2e` and is deliberately NOT claimed here and NOT edited: the corners decoder (`parse_slug`, `_greater_than_line`, `_is_yes_no_market`) and the market vocabulary (`_JOINABLE_BOARD_MARKETS`) are IMPORTED from it read-only, which is also the right design — `_polymarket_gte_prop`'s docstring already says a second decoder here could disagree with the one that chose the slug.
 
+### census-placement-half — OPEN — opened 2026-09-23 — session 236bd219-f6ce-4a72-b4fe-c01486105d6d
+- Goal: `venue_order_family_census.py` also reads the PLACEMENT stage, so a venue that BUILDS every position and places none can never read CLEAR -- today kalshi builds fine and every order dies at `EXECUTED ... refused={'insufficient_venue_balance': N}`, which `ORDER_PATH` (the dry run) cannot see. A venue whose dormancy is a DECISION must be declared on the command line, not assumed by the check.
+- Files: `scripts/venue_order_family_census.py`, `tests/test_venue_order_family_census.py`. NOT claimed: `pipeline/execute_portfolio.py` (held by OPEN lane `polymarket-corners-btts-order-branch`; the `EXECUTED` line is READ, not changed).
+- Hypothesis: n/a (the blind spot is measured: 2026-09-23 census read CLEAR for kalshi while 11/11 and 13/13 positions were refused `insufficient_venue_balance`).
+- Falsification test: over the real 24h window the new placement half must report kalshi `never_places` with `insufficient_venue_balance` as the dominant token, and polymarket `placing`. If kalshi reads `placing`, the parse is wrong.
+- Verification: `pytest tests/test_venue_order_family_census.py` green, including tests built from VERBATIM production `EXECUTED` lines; the real 24h run showing kalshi never_places / polymarket placing; and `--dormant-venue kalshi` turning kalshi's row from ALERT into a stated, non-alerting DORMANT line while a dormant venue that DID place still alerts (a stale declaration must not hide a change).
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
