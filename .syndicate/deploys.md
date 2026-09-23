@@ -40123,3 +40123,44 @@ This discharges the OWED reading on the `d25664f0` entry above. It was unmeasura
 **NOT redeployed.** At 22:34:10Z the worker had an MLB sim running (`pid=3313, reason=tip_off_window`) — the pre-game sim for the very game we wanted to observe — and a 90-minute watch (22:34Z → 00:07Z, 45 polls) never once returned CLEAR: during an evening slate the refresh-worker is continuously running a sim, an odds refresh or a board build. The claim EXPIRED at ~22:48Z unused and was not renewed. `9c22d245` is on `main` and not in production.
 
 **Operational note:** `preflight && deploy` chained in ONE Bash call is refused — `deploy-guard.py` reads the command string before anything runs, so it sees the deploy with no fresh preflight. Separate calls, preflight immediately before.
+
+## 2026-09-23 00:23:37Z (7:23 PM CT) — **READING, no deploy** — NHL + WNBA LIVE chips — lane `nhl-compact-card-start-time`
+
+**NHL: PASS. WNBA: PASS.** The owed LIVE half of `3e8ff188` (refresh-worker, live 2026-09-22T17:34:59Z; rode to web on `3ba363ff`, 18:28:02Z) is now measured. Scheduled task `nhl-live-chip-reading-0922`. Read-only: no deploy, no env change, no claim, no preflight.
+
+Payload `/api/board/game-chips?date=2026-09-22`, fetched 00:23:5xZ: `source: worker_artifact`, `published_at: 2026-09-23T00:23:37Z`, **`artifact_age_seconds: 18.7`** (max 180) — fresh, so nothing below is a stale-feed artefact. 184 chips (soccer 153, mlb 16, nhl 10, wnba 5). **The endpoint ignores `?sport=` — `sport=nhl` and `sport=wnba` returned byte-identical 77,136-byte payloads carrying all four sports; filter on the chip's own `sport` field.**
+
+    NHL (10)      state     status_token   start_time_utc              away  home   | NHLE /v1/schedule
+    CBJ @ BUF     live      "P2"           2026-09-22T23:00:00+00:00   0     0      | LIVE per=2  0-0
+    DET @ PIT     live      "P2"           2026-09-22T23:00:00+00:00   3     1      | LIVE per=2  3-2  (lag)
+    FLA @ CAR     live      "P2"           2026-09-22T23:00:00+00:00   2     1      | LIVE per=2  2-1
+    NYI @ NYR     live      "P2"           2026-09-22T23:00:00+00:00   0     3      | LIVE per=2  0-3
+    PHI @ BOS     live      "P2"           2026-09-22T23:00:00+00:00   1     1      | LIVE per=2  1-1
+    EDM @ WPG     live      "P1"           2026-09-23T00:00:00+00:00   0     0      | LIVE per=1  0-0
+    TBL @ NSH     live      "P1"           2026-09-23T00:00:00+00:00   0     0      | LIVE per=1  0-0
+    VAN @ CGY     pregame   "8:00P CT"     2026-09-23T01:00:00+00:00   -     -      | FUT
+    UTA @ LAK     pregame   "9:00P CT"     2026-09-23T02:00:00+00:00   -     -      | FUT
+    VGK @ SJS     pregame   "9:00P CT"     2026-09-23T02:00:00+00:00   -     -      | FUT
+
+    WNBA (5)      state     status_token   start_time_utc              away  home   | ESPN scoreboard
+    CON @ WSH     live      "Q2 0.0"       2026-09-22T23:33:00+00:00   42    44     | in  per=2 clock=0.0  42-44
+    MIN @ IND     live      "Q1 2:03"      2026-09-23T00:04:00+00:00   16    25     | in  per=1 clock=2:03 16-27  (lag)
+    TOR @ CHI     live      "Q1 0.0"       2026-09-23T00:05:00+00:00   20    18     | in  per=1 clock=0.0  20-18
+    GSV @ POR     pregame   "9:00P CT"     2026-09-23T02:00:00+00:00   -     -      | pre
+    LAS @ LVA     pregame   "9:00P CT"     2026-09-23T02:00:00+00:00   -     -      | pre
+
+**Every criterion met, per sport.** At least one chip `state: "live"` with a period-shaped token and numeric scores on BOTH sides: NHL 7 of 10 ("P2" x5, "P1" x2), WNBA 3 of 5 ("Q2"/"Q1", two of them with a clock). Chips not yet started keep the "9:00P CT"-shaped token and a real `start_time_utc`: NHL 3 of 3, WNBA 2 of 2. No chip anywhere read `status_token: "LIVE"` or `None`, which is the failure shape `_live_status_token` produces when it finds neither `live_state.period` nor a parsable status.
+
+**Cross-checked against the leagues, not just against itself** (`api-web.nhle.com/v1/schedule/2026-09-22`, `site.api.espn.com/.../wnba/scoreboard?dates=20260922`, both read 00:25-00:26Z): **the period number agrees on 10 of 10 NHL and 5 of 5 WNBA**, and pregame/live/FUT agrees on all 15. Two scores differ by one bucket — DET @ PIT 3-1 vs 3-2, MIN @ IND 16-25 vs 16-27 — both in-progress games read ~2 minutes after the artifact was published; every other score matches exactly. That is read-time skew on a live game, not a join defect.
+
+**Layer 2 Games rail** (`/intelligence`, rendered in a browser 00:26Z — the rail is client-rendered from this same endpoint, so the served HTML carries no chip text and grepping it proves nothing):
+
+    "NHL · P2 | ● LIVE | NYI | 0 | NYR | 3"        "WNBA · Q2 0.0 | ● LIVE | CON | 42 | WSH | 44"
+    "NHL · P1 | ● LIVE | EDM | 0 | WPG | 0"        "WNBA · Q1 2:03 | ● LIVE | MIN | 16 | IND | 25"
+    "NHL · 8:00P CT | PREGAME | VAN | – | CGY | –" "WNBA · 9:00P CT | PREGAME | GSV | – | POR | –"
+
+All 15 cards carry the period or the start time. **Not one bare "LIVE" and not one bare "NHL PREGAME"** — which is the exact string this lane was opened against.
+
+**NHL live tokens carry NO clock ("P2", not "P2 10:21"), and that is the SOURCE, not the fix.** NHL's own `/v1/schedule/<date>` returned `clock: null` on **7 of 7** live games in the same window, and `NhlWebClient.scoreboard_day` (`syndicate/local_nhl_odds.py:316`) reads that endpoint — `data = self._get(f"/schedule/{date}")` — so `clock_value` is None before it ever reaches `_apply_nhl_live_scores`. The chip is faithful to what it is given. `/v1/score/<date>` and the gamecenter feed do carry a running clock; picking one up is a separate change and nobody claims it. WNBA, whose ESPN feed does carry a clock, renders it ("Q1 2:03"), and the two "0.0" tokens are the known end-of-period value, matching ESPN's `displayClock` exactly.
+
+**verify:** the two tables — specifically NHL 7 of 10 chips at `state: "live"` with "P<n>" and numeric scores on both sides while 3 of 3 unstarted chips keep "8:00P CT"/"9:00P CT", WNBA 3 of 5 at "Q<n>", and the period agreeing with each league's own scoreboard on 15 of 15 — taken off an artifact 18.7 s old.
