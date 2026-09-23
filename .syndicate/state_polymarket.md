@@ -101,6 +101,16 @@ one hour on orders with `filled=0.0` and now returns NOTHING.** That line means
 "the condition never arose" looks like. **The halt's RECOVERY is not attributable
 to this** — `9733a01a` + `77ca329a` cleared it; this fixes what is RECORDED.
 
+## [polymarket-capital-is-margin-held] POLYMARKET'S CASH IS NOT ITS BUYING POWER: `marginRequirement` HOLDS IT, and the venue tells us in a field we were discarding `[verified 2026-09-23, lane polymarket-balance-detail]`
+
+Reading 2026-09-23 12:11:02-05:00, first stamp after `49b8881b`: `buyingPower` **$0.13**, `currentBalance` **$6.25**, `openOrders` **0**, `unsettledFunds` **0**, **`marginRequirement` 6.12** -- exactly the gap, and `displayedCash` 0.1316 is what the venue's own UI shows. So the account is not empty, it is COMMITTED: margin held against open positions.
+
+- **`buyingPower` is the right number to gate on** and `execution_guard` already uses it; `currentBalance` is fiat only, per the docs quoted at `venue_balances.py:415-423`.
+- **`pendingWithdrawals` was the leading hypothesis and is REFUTED** (count 0, total 0). Reasoning would have picked it.
+- The venue sends **19 fields**; we were keeping 4. `venue_balances` now records `encumbered_dollars`, `detail.numbers`, `detail.nested` and `detail.keys` (names only, no strings -- these readings are served by the ops API), and the same on each history row.
+- **NOT established: WHICH positions generate the margin.** `[polymarket-no-fill-size-is-gross-capped]`'s $1.00/contract NO hold is plausible and unproven at the contract level; that needs a positions read, a different endpoint.
+- Consequence for any reading of this venue: since 2026-09-23 10:04:57Z every order is refused `insufficient_venue_balance`, correctly. `would_build` is the ceiling on evidence until margin frees as positions settle.
+
 ## [polymarket-h2h-buys-the-wrong-side] POLYMARKET MONEYLINES BUY THE WRONG TEAM: `outcomes[0]` is not reliably the YES leg `[verified 2026-08-28, lanes portfolio-venue-and-side-integrity / venue-candidate-key-token-guard]`
 
 `outcome_side_for_index` assumes `OUTCOME_SIDE_YES` buys `outcomes[0]`. It does

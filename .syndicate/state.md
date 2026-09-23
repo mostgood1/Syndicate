@@ -604,6 +604,7 @@ once this index exists: re-splitting would orphan the parts.
 | [polymarket-low-activity] | — VERIFIED 2026-08-27, refresh-worker + live-odds-worker | `state_polymarket.md` |
 | [polymarket-venue-join] | VERIFIED 2026-08-29, all three services on `95c4fb12` | `state_polymarket.md` |
 | [polymarket-orders-are-cancelled] | 2026-08-30 — the venue cancels them, we re-place them, and nobody knows why | `state_polymarket.md` |
+| [polymarket-capital-is-margin-held] | POLYMARKET'S CASH IS NOT ITS BUYING POWER: `marginRequirement` HOLDS IT, and the venue tells us in a field we were discarding `[verified 2026-09-23]` | `state_polymarket.md` |
 | [polymarket-no-fill-size-is-gross-capped] | A POLYMARKET **NO** ORDER IS CHECKED AGAINST **$1.00 PER CONTRACT** AND CHARGED THE **NET** — **5 of 5 NO orde | `state_polymarket.md` |
 | [polymarket-resting-orders-do-not-encumber-cash] | 2026-08-31T15:45Z — CONFIRMED by a before/after pair, after I doubted it | `state_polymarket.md` |
 | [polymarket-price-gate-leaks-by-crossing] | 2026-08-31T16:05Z — FIXED AND DEPLOYED. The ceiling used to be checked against a price the venue never receive | `state_polymarket.md` |
