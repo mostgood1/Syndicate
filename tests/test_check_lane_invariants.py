@@ -327,6 +327,101 @@ def lane_claims_groups(text):
     return claim_groups(claims_by_path(text))
 
 
+NARRATIVE_UNDER_FILES = """## OPEN
+
+### alpha - OPEN - opened 2026-09-23
+- Files: `real/claimed.py`.
+  - **Carried from another lane:** (iv) `SOME_ID` settled by rule.
+    - A balance read is no longer possible:
+      - `evidence/cited.json` keeps 128 readings, about half a day.
+    - The first order filled 4.07 of 7.94, see `docs/note.md`.
+- Goal: something.
+"""
+
+LABELLED_PATH_LIST = """## OPEN
+
+### alpha - OPEN - opened 2026-09-23
+- Files: `src/thing.py` (NEW).
+    - Tests: `tests/test_a.py`, `tests/test_b.py`.
+- Goal: something.
+"""
+
+WRAPPED_DECLARATION = """## OPEN
+
+### alpha - OPEN - opened 2026-09-23
+- Files (claimed 2026-08-15, collision check CLEAR via
+  the hook's own `_claims()`): `syndicate/features/shared/clv_join.py`,
+  `tests/test_clv_close_timing.py` (new).
+- Goal: something.
+"""
+
+
+def test_narrative_under_a_files_line_does_not_CLAIM():
+    """THE PROSE-CITATION DEFECT, on the live shape that found it (2026-09-23).
+
+    A Files block ended only at a blank line or a new top-level field, so every
+    nested bullet under it was read as part of the declaration -- narrative ten
+    bullets deep included. `polymarket-ask-pricing` "claimed"
+    `.syndicate/state_polymarket.md`, `venue_balance_history.json` and the
+    token `i.e` purely by CITING them, and that claim blocked a real edit.
+
+    An accidental claim is not protection -- `lane_claims._claims` already says
+    it "moves the moment the prose does".
+    """
+    claimed = {path for _slug, path in mod.claims(NARRATIVE_UNDER_FILES)}
+    assert claimed == {"real/claimed.py"}
+    for cited in ("evidence/cited.json", "docs/note.md"):
+        assert cited not in claimed, cited
+
+
+def test_a_LABELLED_path_list_is_still_a_claim():
+    """The label branch, and it is load-bearing.
+
+    `book-quotes-splice-repair` writes `- Tests: `test_a.py`, `test_b.py`.` as
+    a nested bullet and plainly means it. An earlier cut of this rule had no
+    label branch and dropped all three of its test files -- and dropping a real
+    claim silently UNGUARDS a file, which is the failure direction that matters.
+    """
+    claimed = {path for _slug, path in mod.claims(LABELLED_PATH_LIST)}
+    assert claimed == {"src/thing.py", "tests/test_a.py", "tests/test_b.py"}
+
+
+def test_a_WRAPPED_declaration_still_claims_every_path():
+    """Unchanged behaviour, pinned. The rule applies to BULLETS only, so the
+    three-physical-line declaration `lane_claims._claims` documents -- whose
+    continuations begin with a word, not a bullet -- keeps working."""
+    claimed = {path for _slug, path in mod.claims(WRAPPED_DECLARATION)}
+    assert "syndicate/features/shared/clv_join.py" in claimed
+    assert "tests/test_clv_close_timing.py" in claimed
+
+
+def test_a_terminating_bullet_that_names_a_path_is_REPORTED():
+    """Dropping a claim is silent by nature, so the rule has to be visible.
+
+    A lane that writes a real claim as a sentence gets a hint naming the line,
+    instead of a file that quietly stopped being guarded.
+    """
+    # The real-world shape terminates on a bullet that names NO path, and a
+    # pathless bullet cannot have been a claim -- so it is correctly silent.
+    # Asserting otherwise is what the first cut of this test got wrong.
+    assert mod.bullets_that_end_a_files_block(NARRATIVE_UNDER_FILES) == []
+
+    # The case the hint exists for: a real claim written as a sentence.
+    claim_as_prose = """## OPEN
+
+### alpha - OPEN - opened 2026-09-23
+- Files: `real/claimed.py`.
+  - We also need to guard `also/guarded.py` for this work.
+- Goal: something.
+"""
+    assert "also/guarded.py" not in {p for _s, p in mod.claims(claim_as_prose)}
+    hits = mod.bullets_that_end_a_files_block(claim_as_prose)
+    assert len(hits) == 1 and "also/guarded.py" in hits[0]
+
+    # And a clean declaration produces no noise.
+    assert mod.bullets_that_end_a_files_block(LABELLED_PATH_LIST) == []
+
+
 def test_open_under_archived_is_caught():
     text = ONE_HOLDER + "\n## Archived lanes\n\n### gamma — OPEN — opened 2026-08-17\n- Files: `c/four.py`.\n"
     assert mod.open_lanes_under_archived(text) == ["gamma"]

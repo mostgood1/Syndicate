@@ -324,6 +324,62 @@ def _paths_in(text):
     return out
 
 
+_BULLET_RE = re.compile(r"^[-*+•]\s+")
+
+# A SHORT label introducing a path list -- `Tests:`, `Also:`, `New:`. Bounded at
+# 24 characters ON PURPOSE: `soccer-corners-model-rebuild` writes "Engine files
+# are claimed only when stage 2 begins, after stage 1 picks an estimator:" and
+# that sentence ends in a colon too. A label is a word or three; a sentence is
+# not a label, and the bound is the only thing that tells them apart.
+_FILES_LABEL_RE = re.compile(r"^[*_]{0,2}[A-Za-z][\w ()/-]{0,24}[*_]{0,2}:\s*")
+
+
+def _files_bullet_continues(stripped):
+    """True when a NESTED BULLET inside a Files block is still DECLARING paths.
+
+    THE DEFECT THIS CLOSES, measured 2026-09-23. A Files block ended only at a
+    blank line or a new top-level field, so every nested bullet under it was
+    read as part of the declaration -- including narrative written ten bullets
+    deep. `polymarket-ask-pricing` "claimed" `.syndicate/state_polymarket.md`,
+    `venue_balance_history.json` and the token `i.e` purely by CITING them in
+    prose, and that claim blocked a real edit. An accidental claim is not
+    protection: `_claims`'s own comment already says it "moves the moment the
+    prose does".
+
+    A declaration is a path list, optionally behind a short label -- the ledger
+    writes `- Tests: `test_x.py`, `test_y.py`.` and that IS a claim. Narrative
+    starts with a word or a bolded sentence. Once narrative starts the block is
+    over: a lane does not return to declaring files halfway down its history.
+
+    NOT APPLIED TO WRAPPED (NON-BULLET) LINES, which keep counting exactly as
+    before -- that is the `clv_join.py` shape `_claims` documents, where the
+    declaration runs across three physical lines and none of the continuations
+    begins with a bullet.
+
+    THE FAILURE DIRECTION IS THE DANGEROUS ONE, so this was measured before it
+    shipped, not after: on the live ledger it drops 8 of 138 claims and every
+    one is correct BY THE OWNING LANE'S OWN WORDS -- three citations above,
+    `- NOT `pipeline/kalshi_odds_refresh.py`, which `kalshi-precap-board-lines`
+    holds:` (a disclaimer this parser had been reading as a claim), and four
+    engine files their lane says are "claimed only when stage 2 begins". The
+    three `- Tests: ...` claims in `book-quotes-splice-repair` SURVIVE, which
+    is what the label branch is for -- an earlier cut without it dropped them,
+    and dropping a real claim silently unguards a file.
+
+    `check_lane_invariants.py` reports every bullet that ENDS a block while
+    naming a path, so a real claim written as prose is visible rather than
+    silently gone.
+    """
+    body = _BULLET_RE.sub("", stripped).strip().lstrip("*_").strip()
+    body = _FILES_LABEL_RE.sub("", body, count=1).strip()
+    if not body:
+        return False
+    if body.startswith("`"):
+        return True
+    token = body.split()[0].strip("`<>*_()[],;.")
+    return "/" in token or "\\" in token or bool(PATHISH_RE.match(token))
+
+
 def _claims(text):
     """Yield (slug, claimed_path) for every OPEN lane."""
     slug = None
@@ -393,6 +449,13 @@ def _claims(text):
             # `_claimable_prefix` still cuts at "NOT claimed, deliberately".
             # (An earlier version of this comment credited `_is_disclaimer`,
             # which `_claims` has never called. Corrected 2026-09-03.)
+            # NARRATIVE ENDS THE DECLARATION. See `_files_bullet_continues`:
+            # nested bullets continue a Files block only while they are still
+            # path lists, because everything below a lane's declaration is its
+            # history and citing a file there is not claiming it.
+            if _BULLET_RE.match(stripped) and not _files_bullet_continues(stripped):
+                in_files = False
+                continue
             if open_lane:
                 for f in _paths_in(_claimable_prefix(stripped).lstrip("- ")):
                     yield slug, f

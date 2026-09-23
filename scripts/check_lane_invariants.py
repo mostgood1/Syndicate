@@ -98,6 +98,8 @@ try:
         _claims,
         _DISCLAIMER_MARKERS,
         _paths_in,
+        _BULLET_RE,
+        _files_bullet_continues,
         claim_groups,
     )
 except Exception as exc:  # pragma: no cover - only when the module is missing
@@ -305,6 +307,43 @@ def prose_paths_in_files_blocks(text, claim_set=None):
     return hits
 
 
+def bullets_that_end_a_files_block(text):
+    """Nested bullets that TERMINATE a Files declaration while naming a path.
+
+    HINT ONLY, and it exists because the terminating rule can only fail one
+    way that matters: a lane writes a real claim as a sentence, the block ends
+    before it, and the file is silently unguarded. Dropping a claim is the
+    dangerous direction -- nobody is stopped, so nobody comes looking.
+
+    Every hit is a line a human should read once: either it is narrative (the
+    rule is right, do nothing) or it is a claim that needs moving up into the
+    `- Files:` line. Measured on the live ledger the day the rule shipped, all
+    hits were narrative.
+    """
+    hits, in_files = [], False
+    for line in text.splitlines():
+        if HEADER_RE.match(line):
+            in_files = False
+            continue
+        if FILES_RE.match(line):
+            in_files = True
+            continue
+        if in_files:
+            stripped = line.strip()
+            if not stripped or (FIELD_RE.match(line) and not line[:1].isspace()):
+                in_files = False
+                continue
+            if _BULLET_RE.match(stripped) and not _files_bullet_continues(stripped):
+                in_files = False
+                # Only worth a human's time when the bullet actually names
+                # something path-shaped; a prose bullet with no path in it
+                # cannot have been a claim.
+                if _paths_in(_claimable_prefix(stripped)):
+                    hits.append(stripped[:100])
+                continue
+    return hits
+
+
 def _ledger_text(root: pathlib.Path, name: str) -> str:
     """One ledger file's text, BOM-stripped. A UTF-8 BOM survives
     `errors="replace"` and would otherwise glue itself to the first heading."""
@@ -456,6 +495,13 @@ def main(argv=None) -> int:
     for path, holders in sorted(contested.items()):
         print(f"        {path}")
         print(f"          held by: {', '.join(holders)}")
+
+    ended = bullets_that_end_a_files_block(text)
+    if ended:
+        print(f"[hint] {len(ended)} nested bullet(s) END a '- Files:' block while naming a"
+              " path -- narrative, or a claim that needs moving up into the Files line?")
+        for line in ended[:5]:
+            print(f"        {line}")
 
     print(f"[{'FAIL' if stray else 'ok  '}] no OPEN lane under '## Archived lanes'")
     for slug in stray:
