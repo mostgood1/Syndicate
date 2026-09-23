@@ -596,23 +596,50 @@ def _live_props_from_game_detail(selected_date: str, game_pk: int) -> list[dict[
     back to the plain card props (still real, just without a live actual
     until the next tick fills it in).
     """
+    # FOUR SILENT `return []` PATHS, NOW NAMED. On a LIVE game this function is
+    # what supplies the card row's props, and an empty result there empties the
+    # whole live prop tier without a word.
+    #
+    # Measured on live-odds-worker 2026-09-23 18:48:14Z, the first tick after
+    # `e7899507` put `_carry_live_probability` on the live path: it logged 8
+    # games, EVERY ONE Scheduled or Pre-Game with `source_rows=0` (correct --
+    # a pregame game has no live rows), and the only two games `In Progress`
+    # (824223, 824785, both priced by `LIVE_MC_PRICED` in that same tick) did
+    # not appear at all. The carry is guarded `if carried_props:`, so no line
+    # means the card row had NO `liveProps` -- which on a live game means this
+    # function returned [] and said nothing about which of its four exits it
+    # took.
+    #
+    # `:604` is the one to suspect first and the reason this is instrumented
+    # rather than guessed: `refuse_if_compute_in_request_path` is a REQUEST-PATH
+    # guard, and this docstring says the work "belongs on the live-lens worker
+    # tick" -- which is exactly where it now runs. If that guard also refuses on
+    # a worker tick it empties every live game, silently, forever.
     if not game_pk:
+        print("[live_lens] GAME_DETAIL_PROPS_EMPTY reason=no_game_pk "
+              f"date={selected_date}", flush=True)
         return []
     from syndicate.features.shared.request_path_guard import refuse_if_compute_in_request_path
 
     try:
         refuse_if_compute_in_request_path("mlb_live_lens_game_detail_props")
-    except Exception:
+    except Exception as exc:
+        print("[live_lens] GAME_DETAIL_PROPS_EMPTY reason=request_path_refused "
+              f"date={selected_date} gamePk={game_pk} error={type(exc).__name__}", flush=True)
         return []
 
     try:
         from syndicate.features.mlb.cards import live_prop_rows_for_game
-    except Exception:
+    except Exception as exc:
+        print("[live_lens] GAME_DETAIL_PROPS_EMPTY reason=import_failed "
+              f"date={selected_date} gamePk={game_pk} error={type(exc).__name__}", flush=True)
         return []
 
     try:
         raw_rows = live_prop_rows_for_game(selected_date, game_pk)
-    except Exception:
+    except Exception as exc:
+        print("[live_lens] GAME_DETAIL_PROPS_EMPTY reason=producer_raised "
+              f"date={selected_date} gamePk={game_pk} error={type(exc).__name__}", flush=True)
         return []
 
     rows = [_normalize_live_prop_row(row) for row in raw_rows if isinstance(row, dict)]
@@ -621,6 +648,13 @@ def _live_props_from_game_detail(selected_date: str, game_pk: int) -> list[dict[
         key=lambda value: float(value.get("rankingScore") or value.get("estimatedWinProb") or value.get("modelProbOver") or value.get("odds") or 0.0),
         reverse=True,
     )
+    # THE SUCCEEDING PATH IS COUNTED TOO. "the producer returned nothing" is a
+    # FIFTH state, distinct from all four refusals above, and without this line
+    # it is indistinguishable from them -- the same flattening that made the
+    # merge's two bare returns unreadable.
+    print("[live_lens] GAME_DETAIL_PROPS "
+          f"date={selected_date} gamePk={game_pk} raw={len(raw_rows) if isinstance(raw_rows, list) else 0} "
+          f"normalised={len(rows)}", flush=True)
     return rows
 
 
