@@ -354,3 +354,37 @@ The peer proposed reading it with G1 final and G2 live — "both halves in the l
 **Not an option: reading tomorrow's split and calling it verified.** It would produce a green number from a code path the fix does not change.
 
 **Tomorrow's TOR @ BAL is still worth reading** — for the CHIP-side picker (`board_enrichment.attach_game_state` + `pick_by_start_time`), which is a different fix, verified tonight only on a slate whose one doubleheader had both halves in the chip set. A real split doubleheader tests per-half row routing and the `game_key` stamping directly. Scoped and scheduled as `mlb-dh-chip-split-reading-0923`; it does NOT bear on `4a231ac8`.
+
+## 2026-09-23 — the 191 ambiguous rows are RESOLVED: a POSTPONED game, refused correctly. And a postponed game renders as **FINAL** on the rail. `[lane mlb-doubleheader-e2e, session 3692ff18]`
+
+**Closes the "191 ambiguous rows" lead above.** Replayed the real join over the production book grid (3,500 rows, generated 01:08:24Z) and the production chips, using the repo's own `teams_match` and `pick_by_start_time`:
+
+    nearest_start_over_untimed      3,318
+    ambiguous_no_candidate_time       182     <-- ALL of them ONE game
+
+**Every ambiguous row is Toronto Blue Jays @ Baltimore Orioles**, and the cause is that **tonight's TOR @ BAL was POSTPONED**:
+
+    StatsAPI 09-22   pk 824785  22:35Z  Postponed         (dh='N')
+    StatsAPI 09-23   pk 824785  17:35Z  +  pk 824784  22:35Z   (dh='S')
+
+The postponement is what CREATED tomorrow's split doubleheader. The board still carries 182 rows for tonight's odds event (`commence 2026-09-22T22:36Z`) and the only candidates are 19 hours away:
+
+    candidates = ['824785@2026-09-23T17:35', '824785@None', '824784@None']
+
+**The refusal is CORRECT and is the guard doing its job.** A game block here would have stamped tomorrow's rescheduled game's state onto tonight's dead odds event. Checked the blast radius: **0 of the 200 served shortlist rows are TOR @ BAL**, so nothing priceable for a postponed game reaches the board. No action needed on the join. **This is not residual damage from `fba49b50`; it is `fba49b50` working.**
+
+## 2026-09-23 — NEW: a POSTPONED MLB game is served as `state: final`, `status_token: FINAL` `[found while closing the above]`
+
+The 09-22 chip for the postponed game, as served by `/api/board/game-chips`:
+
+    game_key 824785   matchup "TOR @ BAL"   state "final"   status_token "FINAL"
+    start_time_utc "2026-09-23T17:35:00+00:00"   away.score null   home.score null
+    score_suppressed "level_final_impossible_for_sport"
+
+**StatsAPI: `detailedState: "Postponed"`, `codedGameState: "D"`, `abstractGameState: "Final"`.**
+
+MLB's `abstractGameState` maps a postponement onto **Final**, and the chip builder reads that field, so the Layer 2 rail shows **"TOR @ BAL FINAL"** for a game that was postponed and is being played tomorrow. Note the chip ALSO carries the new 09-23T17:35 start while claiming final — a final game that starts in the future.
+
+`score_suppressed: "level_final_impossible_for_sport"` shows an existing guard already caught the anomaly (a scoreless MLB final is impossible) and suppressed the score — but it labelled the cause wrongly and let the FINAL token through. **The discriminating field is `codedGameState: "D"`, and nothing reads it.** Unknown must not map onto a confident branch.
+
+**Next step:** read `codedGameState` in the chip builder and give postponed its own state/token rather than inheriting `abstractGameState`'s Final. Check the other non-playing coded states while there (`D` postponed, `C` cancelled, `U` suspended) — each is currently indistinguishable from a real final.
