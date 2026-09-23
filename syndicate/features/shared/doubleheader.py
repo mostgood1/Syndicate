@@ -50,6 +50,10 @@ NO_CANDIDATES = "no_candidates"
 AMBIGUOUS_NO_TARGET_TIME = "ambiguous_no_target_time"
 AMBIGUOUS_NO_CANDIDATE_TIME = "ambiguous_no_candidate_time"
 AMBIGUOUS_NOT_SEPARABLE = "ambiguous_not_separable"
+# A timed candidate matching the target to within the separation window, chosen
+# over candidates that carry no start at all. Named apart from `NEAREST_START`
+# so a payload can show how much of the board rests on it.
+NEAREST_START_OVER_UNTIMED = "nearest_start_over_untimed"
 
 
 def start_epoch(value: Any) -> float | None:
@@ -161,7 +165,32 @@ def pick_by_start_time(
         return None, AMBIGUOUS_NO_CANDIDATE_TIME
     timed.sort(key=lambda item: (item[0], item[1]))
     if len(timed) < len(pool):
-        # An untimed candidate could be the nearer game; it cannot be ruled out.
+        # AN UNTIMED CANDIDATE CANNOT VETO A NEAR-EXACT TIME MATCH, and the
+        # first version of this rule said it could. Measured on production
+        # 2026-09-23 00:2xZ, MLB Layer 2: **rows_matched 0, ambiguous 3,533**,
+        # no live MLB opportunities on the board at all, while soccer, ncaaf,
+        # wnba and nhl were 0 ambiguous. MLB is the sport that plays SERIES, so
+        # every pair has a chip on today's date AND tomorrow's -- and
+        # tomorrow's starts are not published yet: **16 of 16 chips for
+        # 2026-09-23 carried `start_time_utc: None`, against 0 of 16 for
+        # 09-22**, so 15 of 15 team pairs held at least one untimed candidate
+        # and this branch refused every row.
+        #
+        # A start that matches the target to within the separation window IS
+        # that game -- the odds `commence_time` and StatsAPI's start agree to
+        # the minute (TB @ NYY: 17:06Z against 17:05Z). An unknown cannot
+        # displace it, so the veto is kept only where it does real work: the
+        # winner must ALSO be clear of the runner-up by that same window, which
+        # is exactly the doubleheader case. A row whose own half is the untimed
+        # one still finds no near match -- the other half is hours away -- and
+        # is still refused rather than handed its sibling's numbers.
+        best_gap = timed[0][0]
+        clear_of_runner_up = (
+            len(timed) == 1
+            or (timed[1][0] - best_gap) >= float(min_separation_seconds)
+        )
+        if best_gap <= float(min_separation_seconds) and clear_of_runner_up:
+            return timed[0][2], NEAREST_START_OVER_UNTIMED
         return None, AMBIGUOUS_NO_CANDIDATE_TIME
     best_gap = timed[0][0]
     runner_up_gap = timed[1][0]

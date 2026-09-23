@@ -49,7 +49,6 @@ def test_candidate_order_does_not_decide():
     "target, starts, reason",
     [
         (None, [G1_START, G2_START], DH.AMBIGUOUS_NO_TARGET_TIME),
-        (G1_COMMENCE, [G1_START, None], DH.AMBIGUOUS_NO_CANDIDATE_TIME),
         (G1_COMMENCE, [None, None], DH.AMBIGUOUS_NO_CANDIDATE_TIME),
         # Two games inside the separation window cannot be told apart on time.
         ("2026-09-22T17:30:00Z", ["2026-09-22T17:05:00Z", "2026-09-22T17:55:00Z"], DH.AMBIGUOUS_NOT_SEPARABLE),
@@ -58,6 +57,48 @@ def test_candidate_order_does_not_decide():
 def test_a_pair_it_cannot_separate_returns_nothing(target, starts, reason):
     games = [{"start": s} for s in starts]
     assert DH.pick_by_start_time(games, target, start_of=lambda g: g["start"]) == (None, reason)
+
+
+# --- an untimed candidate must not veto a near-exact match -----------------
+#
+# This took MLB's Layer 2 board to ZERO live opportunities. Measured on
+# production 2026-09-23 00:2xZ: `rows_matched 0, rows_ambiguous_game 3,533`,
+# soccer/ncaaf/wnba/nhl all 0 ambiguous. MLB plays SERIES, so every pair has a
+# chip today AND tomorrow, and tomorrow's starts are not published yet --
+# **16 of 16 chips for 2026-09-23 carried `start_time_utc: None` against 0 of
+# 16 for 09-22**, so 15 of 15 pairs held an untimed candidate. Replaying the
+# real 32 chips against the real 200 rows: 0 of 200 resolved before, 200 of 200
+# after, every one `nearest_start_over_untimed`.
+
+
+def test_an_untimed_candidate_does_not_veto_a_near_exact_match():
+    games = [{"pk": 823543, "start": G1_START}, {"pk": 823492, "start": None}]
+    hit, why = DH.pick_by_start_time(games, G1_COMMENCE, start_of=lambda g: g["start"])
+    assert (hit["pk"], why) == (823543, DH.NEAREST_START_OVER_UNTIMED)
+
+
+def test_the_untimed_escape_still_refuses_a_doubleheaders_other_half():
+    # The row is G2's; G2's own chip is the untimed one. G1 is hours away, so
+    # nothing is near-exact and the row gets NO game block -- never G1's.
+    games = [{"pk": 823543, "start": G1_START}, {"pk": 823494, "start": None}]
+    hit, why = DH.pick_by_start_time(games, G2_COMMENCE, start_of=lambda g: g["start"])
+    assert (hit, why) == (None, DH.AMBIGUOUS_NO_CANDIDATE_TIME)
+
+
+def test_the_untimed_escape_needs_a_clear_runner_up():
+    # Two timed candidates inside the separation window plus an untimed one:
+    # the near match is not unique, so it is still refused.
+    games = [{"start": "2026-09-22T17:05:00Z"}, {"start": "2026-09-22T17:20:00Z"}, {"start": None}]
+    assert DH.pick_by_start_time(games, "2026-09-22T17:06:00Z",
+                                 start_of=lambda g: g["start"]) == (None, DH.AMBIGUOUS_NO_CANDIDATE_TIME)
+
+
+def test_a_far_timed_candidate_does_not_win_over_an_untimed_one():
+    # Tomorrow's game is the only timed candidate and it is 24h away: that is
+    # not a near-exact match, so the pair stays ambiguous.
+    games = [{"start": "2026-09-24T00:41:00Z"}, {"start": None}]
+    assert DH.pick_by_start_time(games, "2026-09-23T00:41:00Z",
+                                 start_of=lambda g: g["start"]) == (None, DH.AMBIGUOUS_NO_CANDIDATE_TIME)
 
 
 def test_a_single_candidate_is_kept_without_a_gap_bound():
