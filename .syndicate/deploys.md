@@ -40658,3 +40658,35 @@ edit landed this distinction upstream while this deploy was in flight.
 
 **Not deployed anywhere else.** web `4f8bcdef` and refresh-worker `b4fe8cc0`
 are untouched by this lane.
+
+## 2026-09-23 16:19:02Z (11:19 AM CT) — READING, no deploy — live-odds-worker `b2779a98` (live 16:11:43Z) — lane `polymarket-corners-btts-order-branch` — **EXPECTATION 2 MET: the first ORDER_PATH pass on the new dispatch builds 5 of 5. The obligation left open by the 16:05:15Z row is DISCHARGED. The corners and BTTS family readings are still owed.**
+
+The line, 7m19s after the deploy went live:
+
+    2026-09-23T16:19:02.887919486Z [live_odds_worker] ORDER_PATH venue=polymarket
+      status=ok positions=5
+      markets={'totals': {'would_build': 3}, 'hits_allowed': {'would_build': 1},
+               'batter_hits_runs_rbis': {'would_build': 1}}
+
+Against the 16:00:59Z baseline on `c5daf58e` (`positions=4`, `totals` 2,
+`hits_allowed` 1, `batter_hits_runs_rbis` 1, all building): **every family that
+was building still builds, and `no_order_branch_for_market` appears nowhere.**
+
+**Why this was the reading that mattered.** The change did not add a branch
+beside the others -- it re-dispatched EVERY market, and made the team matcher
+reachable only for markets in a DERIVED vocabulary. A mistake there would have
+silenced `totals` (whose outcomes are `Over`/`Under`, not Yes/No) or the
+`gte` props, which is a larger regression than the defect being fixed. Both
+arms are in this one line: `totals` through `_TOTAL_MARKETS`, `hits_allowed`
+and `batter_hits_runs_rbis` through the prop branch.
+
+**STILL OWED, unchanged.** (1) No corners position was planned in this pass or
+either baseline pass, so `alternate_totals_corners` has not been exercised on
+the new code in production -- next pre-kickoff corners market, or tomorrow's
+`venue_order_family_census.py --hours 24`. (2) BTTS has never reached the
+order path at all. Neither is obtainable on demand, and neither is evidence of
+a fill while both venues refuse on `insufficient_venue_balance`.
+
+**Log ingestion lagged ~2 min:** a poll at 16:19:03Z returned nothing for a
+line stamped 16:19:02.887Z; the next poll returned it. Worth knowing before
+reading a null result off this API as an absence.
