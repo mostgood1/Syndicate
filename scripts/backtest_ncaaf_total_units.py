@@ -23,8 +23,33 @@ sport's totals with no evidence behind them.
     n=544" into 2024 alone earlier in this work. Never again without the count
     in front of it.
 
+TWO BASES, AND THE DIFFERENCE BETWEEN THEM IS THE WHOLE POINT:
+
+  default      per-play PPA summed to a game, walk-forward in-season. The BEST
+               available rating, but NOT the engine's units, so its coefficients
+               cannot be turned into a keep ratio.
+  --sp-units   centred SP+ / SP_RATING_SCALE with DEFENCE NEGATED, i.e. exactly
+               what `sp_offense_defense_rating` hands the engine. Comparable to
+               the engine's measured response -- but built from the PRIOR
+               season's SP+, because every `sp_ratings_*.json` cache was fetched
+               in Sept 2026, so a within-season fit would predict games from
+               ratings computed OUT OF those games. A prior-season rating is
+               strictly weaker than the in-season blend the engine actually
+               uses mid-season, so the keep ratios it implies are a LOWER BOUND.
+
+THE TEAM-NAME JOIN USES THE GENERATOR'S OWN `norm()`, NOT `.lower()`. That is
+not a detail: `norm` maps "state" -> "st" and strips punctuation, and without it
+22.5% / 23.4% of team-slots failed to match ("Florida State" never finds
+"florida st"). With it, 0.7% / 1.4% -- and the residue is not a name bug at all,
+it is Kennesaw State (2024), Missouri State and Delaware (2025) MOVING UP TO
+FBS, so they genuinely have no prior-season SP+ and dropping them is correct.
+Fixing the join moved the keep ratios barely at all (0.068 -> 0.062 offence,
+0.222 -> 0.253 defence), which is worth knowing: the coverage hole cost
+credibility, not accuracy.
+
 Usage:
   py -3 scripts/backtest_ncaaf_total_units.py
+  py -3 scripts/backtest_ncaaf_total_units.py --sp-units
 """
 from __future__ import annotations
 
@@ -183,8 +208,73 @@ def fit(X, y):
     return my - sum(b * mi for b, mi in zip(beta, m)), beta, 1 - ss / tot
 
 
+# What the NCAAF engine itself applies, measured 2026-09-23 on 5x5 grids with
+# one direction pinned at zero, using the PROMOTED profile
+# (`ncaaf-goal-line-refit-1`, 24 overrides) -- which is what production runs and
+# which responds MORE strongly than the shipped default (+17.00/-11.04 level,
+# +7.46/-4.93 difference). R2 0.984-0.991.
+ENGINE_LEVEL = (23.1717, -14.2067)
+ENGINE_DIFFERENCE = (9.5921, -5.2508)
+
+
+def sp_rows(season: int, rating_season: int):
+    """Games rated by the PRIOR season's SP+, in the engine's own units.
+
+    Joined with the generator's `norm()`. Returns (rows, dropped)."""
+    from scripts.generate_smartsim2_ncaaf_projections import SP_RATING_SCALE, norm
+
+    raw = json.loads((truth_root() / f"sp_ratings_{rating_season}.json").read_text(encoding="utf-8"))["teams"]
+    index = {norm(k): (float(v[0]), float(v[1])) for k, v in raw.items()}
+    off_mean = statistics.fmean(v[0] for v in index.values())
+    def_mean = statistics.fmean(v[1] for v in index.values())
+    out, dropped = [], 0
+    for game in season_games(season):
+        home, away = index.get(norm(game["home"])), index.get(norm(game["away"]))
+        if home is None or away is None:
+            dropped += 1  # a team that moved up to FBS has no prior-season SP+
+            continue
+        ho, hd = (home[0] - off_mean) / SP_RATING_SCALE, -(home[1] - def_mean) / SP_RATING_SCALE
+        ao, ad = (away[0] - off_mean) / SP_RATING_SCALE, -(away[1] - def_mean) / SP_RATING_SCALE
+        out.append({**game, "osum": ho + ao, "dsum": hd + ad, "odif": ho - ao, "ddif": hd - ad})
+    return out, dropped
+
+
+def run_sp_units() -> None:
+    train, dropped_tr = sp_rows(2024, 2023)
+    test, dropped_te = sp_rows(2025, 2024)
+    print("ENGINE UNITS (centred SP+/10, defence negated), PRIOR-season ratings\n")
+    print(f"COVERAGE: train 2024 n={len(train)} (dropped {dropped_tr})   "
+          f"test 2025 n={len(test)} (dropped {dropped_te})")
+    print("  dropped = teams with no prior-season SP+ because they moved up to FBS\n")
+    if not train or not test:
+        raise SystemExit("insufficient coverage to fit -- refusing rather than reporting a number")
+    specs = {
+        "level only        ": lambda r: [r["osum"], r["dsum"]],
+        "level + difference": lambda r: [r["osum"], r["dsum"], r["odif"], r["ddif"]],
+    }
+    for name, f in specs.items():
+        a, b, r2 = fit([f(r) for r in train], [r["total"] for r in train])
+        err = [abs(a + sum(bi * xi for bi, xi in zip(b, f(r))) - r["total"]) for r in test]
+        print(f"  {name}  train R2 {r2:.4f}  held-out MAE {statistics.fmean(err):6.3f}  "
+              f"coeffs {[round(x, 3) for x in b]}")
+    flat = statistics.fmean([r["total"] for r in train])
+    print(f"  {'flat league mean  ':18}  {'':15}  held-out MAE "
+          f"{statistics.fmean(abs(flat - r['total']) for r in test):6.3f}")
+    _, b, _ = fit([[r["osum"], r["dsum"]] for r in train], [r["total"] for r in train])
+    print(f"\n  ACTUALS support level ({b[0]:+.3f}, {b[1]:+.3f})")
+    print(f"  ENGINE applies        ({ENGINE_LEVEL[0]:+.3f}, {ENGINE_LEVEL[1]:+.3f})")
+    print(f"  implied keep ratios:  offence {b[0]/ENGINE_LEVEL[0]:.3f}   defence {b[1]/ENGINE_LEVEL[1]:.3f}")
+    print("\n  THESE ARE A LOWER BOUND, NOT A SETTING. The prior-season SP+ used here is")
+    print("  strictly weaker than the in-season blend the engine consumes mid-season, and a")
+    print("  weaker predictor earns smaller coefficients. Reconstruct an as-of-week rating")
+    print("  before turning any of this into drive_success_sensitivity.")
+
+
 def main() -> None:
     print(f"truth tree: {truth_root()}\n")
+    if "--sp-units" in sys.argv:
+        run_sp_units()
+        return
     tables = {s: per_week_ppa(s) for s in (2022, 2023, 2024, 2025)}
     print("COVERAGE, printed before any fit:")
     for s in (2022, 2023, 2024, 2025):
