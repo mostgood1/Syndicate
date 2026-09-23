@@ -40690,3 +40690,68 @@ a fill while both venues refuse on `insufficient_venue_balance`.
 **Log ingestion lagged ~2 min:** a poll at 16:19:03Z returned nothing for a
 line stamped 16:19:02.887Z; the next poll returned it. Worth knowing before
 reading a null result off this API as an absence.
+
+## 2026-09-23 16:3xZ — READING, no deploy — NCAAF week-4 kickoffs still real four days out `[lane ncaaf-kickoff-cache-staleness, scheduled task ncaaf-kickoff-refresh-reading-0923, READ-ONLY]`
+
+**PASS — no regression.** This was booked as the FIRST reading of `97066dbe`'s
+staleness rule; it is instead a REGRESSION check, because the lane's second fix
+(`cc5bdfb1`, web's committed CFBD cache re-fetched) had already moved the board
+at 2026-09-22T20:11:20Z. Baseline to beat: **43 placeholder / 42 TBD of 65**
+(2026-09-22 19:08:58Z).
+
+`/api/board/game-chips?sport=ncaaf&date=2026-09-26`, read 2026-09-23T16:36Z:
+
+| reading | 09-22 baseline | now |
+|---|---|---|
+| chips on the 17:00:00+00:00 placeholder | 43 | **1** |
+| `status_token` containing "TBD" | 42 | **0** (of all 218 chips in the payload) |
+| distinct starts, 09-26/27 window | 14 | **23** |
+
+The one chip left at 17:00Z is **LIN @ EM** with token "Sat Sep 26 · 12:00P CT",
+and it is CORRECT: ESPN lists exactly one 17:00Z event that day and it is
+LIN @ EMU. Sample tokens: VT @ BC / SDS @ TOL / ILL @ OS / WF @ LOU all
+"Sat Sep 26 · 11:00A CT" on `2026-09-26T16:00:00+00:00`.
+
+**Truth cross-checked against ESPN, NOT against our own copy and NOT against
+CFBD** (monthly quota; one request was already spent 09-22):
+`scoreboard?dates=20260926&groups=80` returns **65 events, 20 distinct
+kickoffs, 0 with a TBD status detail**. Our top-of-distribution matches it
+game-for-game: 19:30Z x12 (ESPN x12), 16:00Z x11 (x11), 23:00Z x7 (x7),
+23:30Z x11 (x6 — ours counts non-FBS rows ESPN's `groups=80` excludes; the
+payload carries 80 chips in the 09-26/27 window against ESPN's 65 FBS events,
+which is why 23 distinct starts against 20).
+
+**The served Layer 2 page agrees** (`/intelligence`, 13,423,435 B): **zero
+occurrences of "TBD" in the whole document**, against a live population —
+`2026-09-26` appears 1,086 times and the embedded 09-26 starts spread across
+23:30 x106 / 16:00 x86 / 19:30 x69 / 23:00 x52 / 21:00 x20 / …, with
+`2026-09-26T17:00` appearing 5 times (the one real noon-CT game). A null "TBD"
+count off a document that could not have shown 09-26 would prove nothing; this
+one could.
+
+**The generator DID run** — `SEASON_PROJECTION_LAUNCHING sport=ncaaf season=2026
+week=4 reason=artifact_stale age_seconds=70946 interval_seconds=60000` at
+**2026-09-23T15:42:19.614Z** (nfl at 15:41:43Z), the only two launch lines since
+19:52:53Z 09-22.
+
+**AND IT IS NOT WHAT THIS READING MEASURES.** The payload reads
+`source: inline_artifact_missing`, `published_at: None`,
+`artifact_age_seconds: None` — an upcoming-date NCAAF chip is built INLINE ON
+WEB from WEB's committed cache, exactly as the lane recorded on 09-22. So the
+15:42Z worker run is corroboration that the daily producer is alive, not the
+cause of the green reading; the cause is `cc5bdfb1` in web's checkout. A future
+regression here would come from the committed file going stale again, which is
+what `97066dbe` guards on the worker side and what this reading CANNOT test.
+
+**The `interval_seconds=60000` in that line is NOT this lane's drift and needs
+no action here.** It belongs to the NFL lane at `lanes.md:1102`, which lowered
+`SEASON_PROJECTION_REFRESH_INTERVAL_SECONDS` 86400 -> 60000 at 15:24:11Z to
+force a wk3 rebuild and set it back to 86400 at 15:47:13Z, with its own residual
+reading scheduled for 09-24. This lane's own owed item — an in-process
+`interval_seconds=86400` line proving the 20:32:19Z revert — is therefore
+**superseded, not discharged and not re-owed**: the value was moved twice by
+another lane after that boot, its 86400 is corroborated by a single-key env read
+at 14:36Z today, and the 09-24 reading that lane already booked is the one that
+prints the line.
+
+**Read-only as instructed: no deploy, no env change, no claim, no preflight.**
