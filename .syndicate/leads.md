@@ -439,3 +439,33 @@ Hundreds of MC rows priced; **zero probabilities published.** That is the SAME s
 - **2026-09-23 11:4x CT (lane `polymarket-corners-btts-order-branch`, session a3eac387): a STATE UPDATE IS OWED in `state_polymarket.md`, and one line there is now contradicted by measurement. I could not write it — the file is claimed by OPEN lane `polymarket-ask-pricing`.** (1) **Stale:** the `[polymarket-venue-join]` headline reads *"Soccer, corners, BTTS and NCAAF now execute on Polymarket"* (VERIFIED 2026-08-29). Its evidence is all JOIN counts (`matched`, `no_match|soccer|alternate_totals_corners 37 -> 3`), and joining is not ordering: measured 2026-09-23, corners was planned 8 times and built **0**, and BTTS has never reached the order path at all. The word to correct is "execute" -> "join"; the counts under it are sound and should stay. (2) **Missing:** the order-stage fact, which belongs beside the `gte<N>` prop entry at `:166` and in the same shape — *Yes/No TOTALS (`cor-all-gt<line>`) and Yes/No SIDES (`btts`) now resolve by the slug's grammar* `[2026-09-23, `abc6d4b8`, live-odds-worker `b2779a98` 16:11:43Z; NO-REGRESSION VERIFIED (`ORDER_PATH` 16:19:02.887Z, 5 of 5 `would_build`); CORNERS AND BTTS PRODUCTION READINGS OWED]`. Note the section at `:363` already states the premise the fix relies on — *"`gt` states the direction, so `Yes` = over"* — so the polarity was in the ledger 25 days before anything could act on it.
 
 - **2026-09-23 12:0x CT (lane `polymarket-corners-btts-order-branch`, session a3eac387): the lane-claim checker cannot see that `state_polymarket.md` and `.syndicate/state_polymarket.md` are the same file, so two OPEN lanes can hold one path and `check_lane_invariants.py` reports no contest.** `lane_claims.claims_by_path` keys on the path AS SPELLED; `matches()` does the suffix-tolerant compare, but only for a query, never between two claim keys. Measured today: `claims_by_path` returned `[('state_polymarket.md', ['polymarket-ask-pricing']), ('.syndicate/state_polymarket.md', ['polymarket-corners-btts-order-branch'])]` while the invariant check listed only `todo.md` and `board_enrichment.py` as contested. The write-time guard uses `matches()` and DID block correctly, so the hole is in the REPORT, not the enforcement -- which is the worse half to have wrong, because the census is what a session reads before deciding a file is free. Fix shape: normalise keys through one canonicaliser before grouping, the same way `matches()` compares. Related and already hinted by the checker itself: a claim can be created by a PROSE citation inside a lane block (that is where `polymarket-ask-pricing`'s claim on this file came from -- four `state_polymarket.md [subject]` references, no `- Files:` entry), so the contested set is inflated by citations at the same time as it is deflated by spelling.
+
+## 2026-09-23 — CORRECTION: the offline replay for `4a231ac8` is NOT available, and the downstream map for tonight's carry reading `[lane mlb-doubleheader-e2e, session 3692ff18]`
+
+**Two things established while waiting for today's G1, both of which save the next session time.**
+
+### 1. Offline replay of the live-gameline index is impossible from retained data — strike that option
+
+`leads.md` above offers "offline replay against the three measured production cases (08-29 AZ@SF, 08-29 BOS@NYY, 09-04 DET@CLE)" as the alternative to waiting for 2027. **It is not an option.** `build_live_gameline_index` consumes a lens snapshot's `gameLens` lanes and `matchup` team names; the RETAINED artifact carries neither:
+
+    mlb_source/data/live_lens/live_lens_report_2026_09_04.json   16 games, keys = ['gamePk','startTime','status']
+    mlb_source/data/live_lens/live_lens_report_2026_08_29.json   17 games, same keys
+    games carrying `gameLens`: 0 of 16, and 0 of 17
+    pk 824424 / 824387, 823177 / 823176: gameLens=0, sources=[], matchup=NO
+
+The snapshot the index actually reads at runtime is `data/live/<sport>_live_lens.json`, which is overwritten continuously and has no history. So there is **no retained input anywhere** to replay the index against, for any past doubleheader.
+
+**What that leaves, and it should be stated plainly rather than left as an open option:** the strongest available evidence for `4a231ac8` is already taken — the falsification on `origin/main` using the production SHAPES (two lens games for one pair gave `index size 1` with both events resolving to `824387`; the fixed code gives `[824424, 824387]`), plus 15 tests. What does NOT exist and cannot be manufactured is a PRODUCTION reading. The lane stays **NOT VERIFIED** and the only route is a future doubleheader whose halves are live simultaneously.
+
+### 2. The map for tonight's carry reading, so its result is self-interpreting
+
+Once `no_live_probability` clears, the next gate in `live_projection_join` is `market_fair_prob_over`, and it splits by OWNER:
+
+    live_prob present, fair ABSENT, no pregame projection  -> the PREGAME JOIN never produced one;
+                                                              no live edge is possible whatever the re-sim does
+    live_prob present, fair ABSENT, pregame projection yes -> the DE-VIG could not answer;
+                                                              narrowed by `market_fair_unavailable_reason` (`#536`)
+    one-sided quote + live-aware projection                -> priced against `modelled_fair_edge` (`#539`),
+                                                              counted SEPARATELY from `edged` on purpose
+
+So tonight: `edge_withheld_by_reason` moving OFF `no_live_probability` and onto a fair-value reason means **the carry worked and the next blocker belongs to a different owner** — not that the fix failed. `rows_live_edged > 0` means it went all the way.
