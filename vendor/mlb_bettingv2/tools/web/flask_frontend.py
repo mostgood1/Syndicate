@@ -17444,6 +17444,19 @@ def _normalize_live_lens_live_prop_row(row: Dict[str, Any], snapshot: Optional[D
         "playerName": _prop_owner_name(row),
         "teamSide": row.get("team_side"),
         "selection": row.get("selection"),
+        # MARKET IDENTITY TRAVELS ON THE ROW, not only inside the transient dict
+        # handed to `_prop_result_state` below. Consumers key live prop rows on
+        # (player, market, line); without these two the market half is always
+        # empty and the key cannot be built at all.
+        #
+        # Measured on Syndicate's live-odds-worker 2026-09-23 19:01:57Z, MLB
+        # games 824785 and 824223 both live: its carry read 24 and 10 rows from
+        # this payload, found `liveModelProbOver` present on 23 and 10 of them
+        # respectively -- and still keyed ZERO, because `market`/`prop` were
+        # absent here. The probability was produced, published, read, and then
+        # dropped for want of the field that says which market it belongs to.
+        "market": row.get("market"),
+        "prop": row.get("prop"),
         "line": market_line,
         "actual": actual_value,
         "modelMean": model_mean,
