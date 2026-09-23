@@ -487,6 +487,95 @@ def _rating_prior_games() -> float:
     return max(0.0, value)
 
 
+# HOW MUCH OF THE TWO TEAMS' COMMON LEVEL THE TOTAL KEEPS. The margin reads the
+# DIFFERENCE between the two teams' ratings and the total reads their LEVEL (the
+# sum), and until now one gain served both: `NFL_RATING_SCALE` was fitted by OLS
+# of ACTUAL MARGIN on the rating DIFFERENTIAL, and the level inherited it.
+#
+# THE DEFECT, measured on production's served 2026 wk3 board (n=16): model total
+# SD 9.02 against a market SD of 2.51 -- 3.60x -- with mean bias only +0.29 and
+# corr +0.652 to the market. Unbiased, correlated, over-amplified: a GAIN defect,
+# not a level or a sign one. CIN @ PIT priced at 33.2 against a close of 47.5 and
+# BAL @ DAL at 62.4 against 51.5. The MARGIN over the same 16 games was fine
+# (SD 5.58 vs market 4.86, MAE 2.38), which is what localises this to the level.
+#
+# FITTED AGAINST ACTUAL TOTALS, NOT THE MARKET, walk-forward, train 2023-24 and
+# scored on a 2025 the fit never saw (`--total-level`). Regressing actual totals
+# on the two level components over 544 games:
+#
+#     total = 44.67 + 0.3525*(off_h+off_a) + 0.0148*(def_h+def_a)   R2 = 0.042
+#
+# against the 0.797 / 0.764 the ENGINE applies. Offence is over-applied ~2.3x;
+# DEFENCE is over-applied by ~50x -- historically a team's defensive EPA says
+# almost NOTHING about a game's total, and the engine weights it nearly like
+# offence. R2 = 0.042 is the honest headline: the level barely predicts a total
+# at all, which is why the market's own totals sit in a 12-point band.
+#
+# 1.0 RESTORES TODAY'S BEHAVIOUR EXACTLY and is the kill switch. Week 1 and the
+# neutral/no-data branches are unaffected in KIND -- they shrink the same way,
+# because a level nobody has evidence for is exactly the case for shrinking.
+#
+# MEASURED END TO END on 2025 wk10, 300 seeds (lambda 1.0 -> 0.3, n=14):
+# SD(total_mean) 4.76 -> 2.33, mean total 43.41 -> 43.73 (the LEVEL is kept, the
+# SPREAD of levels is not), and lambda=1.0 reproduced the pre-change file on all
+# 14 games and all five projected fields -- the kill switch is exact, not close.
+#
+# THE RESIDUAL IS NOT REACHABLE FROM HERE. The shrink scales only the part of
+# the total the ratings explain, so SD_after/SD_before = sqrt(lambda^2*R2 +
+# 1-R2): 0.52 predicted against 0.49 measured on wk10 (R2 0.80). On production's
+# wk3 (R2 0.89) that predicts 9.02 -> ~3.9 against a market 2.51, and even
+# lambda=0 would only reach ~3.0. The rest is the sim's own non-level variance
+# and needs a different lever.
+#
+# THIS IS AN ESTIMATOR CHANGE, NOT A NEW MECHANISM: it re-fits a gain that was
+# never fitted in this direction.
+NFL_TOTAL_LEVEL_SHRINK = 0.3
+
+
+def _total_level_shrink() -> float:
+    """`SYNDICATE_NFL_TOTAL_LEVEL_SHRINK` overrides; ABSENT means the fitted
+    value (the shrink is ON). "Absent != off" is a documented trap here, so:
+    this one is ON when absent, and `1` is the kill switch back to the old gain."""
+    raw = str(os.environ.get("SYNDICATE_NFL_TOTAL_LEVEL_SHRINK") or "").strip()
+    try:
+        value = float(raw) if raw else NFL_TOTAL_LEVEL_SHRINK
+    except ValueError:
+        value = NFL_TOTAL_LEVEL_SHRINK
+    return max(0.0, value)
+
+
+def shrink_rating_level(
+    home_off: float, home_def: float, away_off: float, away_def: float, shrink: float,
+) -> tuple[float, float, float, float]:
+    """Scale the two teams' COMMON level by `shrink`, leaving every DIFFERENCE
+    between them untouched.
+
+    Each side splits into level +/- half-difference; scaling only the level is
+    what leaves every DIFFERENCE exactly intact. Ratings are CENTRED on the
+    league, so shrinking toward 0 shrinks toward the league-average total --
+    the right target for a quantity the evidence says is barely knowable.
+
+    THIS IS EXACT IN THE RATINGS AND ONLY STATISTICAL IN THE OUTPUT, and the
+    difference matters. The sim is not linear in its ratings, so a shrunk level
+    sends each seed down a different play path and `margin_mean` moves. Measured
+    on 2025 wk10, 300 seeds, lambda 1.0 -> 0.3 (n=14): mean SIGNED margin change
+    +0.108 (t = +0.61, no systematic shift), RMS of the per-game change over
+    that game's OWN seed standard error 0.86, where 1.0 is exactly seed noise,
+    and 1 game over 2 SE against 0.7 expected by chance. So the margin is
+    unchanged in expectation and wobbles only as far as 300 seeds already wobble
+    it (+/- ~0.75 pts/game). Do not read `margin_mean` differences below about
+    1.5 points between two runs as an effect of anything.
+    """
+    if shrink == 1.0:
+        return home_off, home_def, away_off, away_def
+    out = []
+    for home, away in ((home_off, away_off), (home_def, away_def)):
+        level, half = (home + away) / 2.0, (home - away) / 2.0
+        out.append((shrink * level + half, shrink * level - half))
+    (new_home_off, new_away_off), (new_home_def, new_away_def) = out
+    return new_home_off, new_home_def, new_away_off, new_away_def
+
+
 def _games_before(plays: list[tuple[int, str, str, str, float]], *, team: str, before_week: int | None) -> int:
     """Distinct weeks this team had offensive plays before `before_week` -- the
     same game count `_epa_per_game` divides by."""
@@ -831,6 +920,22 @@ def build_projection(
         for team_name, notes in ((home_team, home_off_notes + home_def_notes), (away_team, away_off_notes + away_def_notes)):
             for note in notes:
                 injury_diagnostics.append({"game_id": game_id, "team": team_name, **note})
+
+    # AFTER the injury adjustment, not before: this is the last point every
+    # rating path shares, so it is the one place that governs what the engine
+    # actually receives. Shrinking earlier would let the injury deltas put an
+    # un-shrunk level back -- and injuries are one-sided downgrades, so they
+    # land almost entirely in the level rather than the difference.
+    level_shrink = _total_level_shrink()
+    home_off, home_def, away_off, away_def = shrink_rating_level(
+        home_off, home_def, away_off, away_def, level_shrink
+    )
+    if level_shrink != 1.0:
+        # THE ARTIFACT RECORDS ITS OWN SETTING. Reading `current_season_blend`
+        # off the served wk3 CSV is what proved the K=4 blend had reached
+        # production; a shrink that left no trace in the file would have to be
+        # taken on faith from a deploy log instead.
+        rating_source += f"+level_shrink_{level_shrink:g}"
 
     # BUILT ONCE PER GAME, NOT PER SEED. It does not vary with the seed, and
     # rebuilding it inside the loop would scan every play 300 times per game.

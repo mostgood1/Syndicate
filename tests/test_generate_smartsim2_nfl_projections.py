@@ -391,5 +391,76 @@ class BuildProjectionTests(unittest.TestCase):
         self.assertEqual(notes, [])
 
 
+class TotalLevelShrinkTests(unittest.TestCase):
+    """The LEVEL gain, fitted separately from the DIFFERENCE gain.
+
+    2026-09-22: production's served 2026 wk3 board priced totals with SD 9.02
+    against a market SD of 2.51 -- 3.60x -- while the MARGIN over the same 16
+    games was calibrated (5.58 vs 4.86). `NFL_RATING_SCALE` was fitted by OLS of
+    actual MARGIN on the rating DIFFERENTIAL and the level inherited it; against
+    544 actual games the level wants 0.35 on offence and 0.01 on defence where
+    the engine applies 0.80 and 0.76.
+
+    THE FIRST TEST IS THE ONE THAT MATTERS: the shrink must not move the
+    DIFFERENCE between the two teams, which is what the margin reads.
+
+    IT PINS THE RATINGS, NOT `margin_mean`, and that is deliberate -- the sim is
+    not linear in its ratings, so the simulated margin does move a little. It was
+    measured rather than assumed: on 2025 wk10 at 300 seeds the mean signed
+    change was +0.108 (t = +0.61) with an RMS of 0.86 seed-standard-errors, i.e.
+    unchanged in expectation and wandering only as far as the seeds already
+    wander. A test asserting `margin_mean` equality would fail on that noise and
+    teach the next reader that the shrink moves the margin, which it does not."""
+
+    RATINGS = (0.40, -0.10, 0.06, 0.22)  # home_off, home_def, away_off, away_def
+
+    def test_the_difference_between_the_teams_is_exactly_preserved(self) -> None:
+        for shrink in (0.0, 0.3, 0.5, 1.0):
+            with self.subTest(shrink=shrink):
+                ho, hd, ao, ad = gen.shrink_rating_level(*self.RATINGS, shrink)
+                before_off, before_def = self.RATINGS[0] - self.RATINGS[2], self.RATINGS[1] - self.RATINGS[3]
+                self.assertAlmostEqual(ho - ao, before_off, places=12)
+                self.assertAlmostEqual(hd - ad, before_def, places=12)
+
+    def test_level_is_scaled_by_the_shrink(self) -> None:
+        ho, hd, ao, ad = gen.shrink_rating_level(*self.RATINGS, 0.3)
+        self.assertAlmostEqual(ho + ao, 0.3 * (self.RATINGS[0] + self.RATINGS[2]), places=12)
+        self.assertAlmostEqual(hd + ad, 0.3 * (self.RATINGS[1] + self.RATINGS[3]), places=12)
+
+    def test_shrink_of_one_is_an_exact_no_op(self) -> None:
+        # The kill switch has to return the SAME numbers, not merely close ones:
+        # it is what a revert falls back to.
+        self.assertEqual(gen.shrink_rating_level(*self.RATINGS, 1.0), self.RATINGS)
+
+    def test_zero_shrink_sends_the_level_to_the_league_mean(self) -> None:
+        # Ratings are centred, so level 0 IS the league-average total.
+        ho, hd, ao, ad = gen.shrink_rating_level(*self.RATINGS, 0.0)
+        self.assertAlmostEqual(ho + ao, 0.0, places=12)
+        self.assertAlmostEqual(hd + ad, 0.0, places=12)
+
+    def _shrink(self, env):
+        import os
+        from unittest.mock import patch
+
+        with patch.dict(os.environ, env, clear=False):
+            if "SYNDICATE_NFL_TOTAL_LEVEL_SHRINK" not in env:
+                # ABSENT is the default under test; a developer's shell must not leak in.
+                os.environ.pop("SYNDICATE_NFL_TOTAL_LEVEL_SHRINK", None)
+            return gen._total_level_shrink()
+
+    def test_absent_means_the_fitted_value_not_off(self) -> None:
+        # "absent != off" is a documented trap in this repo and this knob is ON
+        # when absent -- the reverse of `SYNDICATE_NFL_DRIVE_PRIORS`.
+        self.assertEqual(self._shrink({}), gen.NFL_TOTAL_LEVEL_SHRINK)
+        self.assertLess(gen.NFL_TOTAL_LEVEL_SHRINK, 1.0)
+
+    def test_env_overrides_and_one_is_the_kill_switch(self) -> None:
+        self.assertEqual(self._shrink({"SYNDICATE_NFL_TOTAL_LEVEL_SHRINK": "1"}), 1.0)
+        self.assertEqual(self._shrink({"SYNDICATE_NFL_TOTAL_LEVEL_SHRINK": "0.5"}), 0.5)
+
+    def test_a_typo_falls_back_to_the_fitted_value(self) -> None:
+        self.assertEqual(self._shrink({"SYNDICATE_NFL_TOTAL_LEVEL_SHRINK": "nope"}), gen.NFL_TOTAL_LEVEL_SHRINK)
+
+
 if __name__ == "__main__":
     unittest.main()

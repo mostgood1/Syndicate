@@ -1,5 +1,57 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#684` — **NFL totals were priced from a LEVEL gain nobody ever fitted: model total SD 3.60x the market's on the served 2026 wk3 board** — FOUND and FIXED 2026-09-22, lane `nfl-total-sum-direction-scale`, session dae18452 — **OPEN until a regenerated production wk3 file is read**
+
+The margin reads the two teams' rating DIFFERENCE and the total reads their
+LEVEL (the sum), and one gain served both: `NFL_RATING_SCALE` was fitted by OLS
+of ACTUAL MARGIN on the rating DIFFERENTIAL (`ENGINE_SLOPE_AT_SCALE_20`), and
+the level inherited it for free. Measured on production's served wk3 board
+(n=16): totals SD 9.02 vs market 2.51, MAE 6.73, worst miss 14.3 (CIN @ PIT
+priced 33.2 against a close of 47.5; BAL @ DAL 62.4 against 51.5) — while the
+MARGIN over the same 16 games was fine (SD 5.58 vs 4.86, MAE 2.38). Mean bias
+was only +0.29 with corr +0.652: unbiased, correlated, over-amplified — a GAIN
+defect, not a level or a sign one.
+
+Fitted against ACTUAL totals (never the market), train 2023-24, scored on a 2025
+the fit never saw (`scripts/backtest_nfl_rating_units.py --total-level`):
+`total = 44.67 + 0.3525*(off_h+off_a) + 0.0148*(def_h+def_a)`, R2 = 0.042,
+against the 0.797 / 0.764 the engine applies. **Defence is over-applied ~50x** —
+a team's defensive EPA says almost nothing about a game's total. Fix is a
+margin-neutral level shrink (`NFL_TOTAL_LEVEL_SHRINK = 0.3`, env
+`SYNDICATE_NFL_TOTAL_LEVEL_SHRINK`, `1` restores today exactly); the artifact
+tags itself `+level_shrink_0.3` in `rating_source`.
+
+**Two traps worth keeping.** (1) `_centred_per_game(..., 'd', ...)` is EPA
+ALLOWED and is NOT negated, though `_rating_pair` negates it — so the total
+takes `+(d_h+d_a)` and the margin `-(d_h-d_a)`. Getting that sign backwards
+measured r = 0.19 against the engine's own output and read as "the ratings
+barely drive the total"; on the correct basis the same 16 games give R2 = 0.89.
+Fit the two components SEPARATELY rather than assuming a combined basis.
+(2) The `smartsim2_ratings_*.json` artifact is NOT a faithful record of what the
+engine consumed — same run, same output, reconstructing inputs from the artifact
+gave margin r = 0.215 where `_centred_per_game` gave r = 0.989. See `#685`.
+
+### `#685` — **`smartsim2_ratings_*.json` is not a faithful record of the ratings the engine consumed — anything diagnosed from it is diagnosed from the wrong numbers** — FOUND 2026-09-22, lane `nfl-total-sum-direction-scale`, session dae18452 — **OPEN, NOT STARTED**
+
+Isolated on ONE local run of 2025 wk10 (same process, same output CSV), by
+reconstructing the engine's inputs two ways and regressing its own `margin_mean`
+on each:
+
+    from smartsim2_ratings_2025_wk10.json   margin ~ diff  slope +0.141  r = 0.215
+    from _centred_per_game (recomputed)     margin ~ diff  slope +0.521  r = 0.989
+
+The engine is deterministic in its ratings, so r = 0.989 is what a faithful
+reconstruction looks like and r = 0.215 is not one. Cause NOT yet established —
+candidates are the centring, the `NFL_RATING_SCALE` divisor, and whether the
+file is written before or after the injury adjustment. It cost a wrong
+intermediate reading during `#684` (a production slope of +0.77 that was really
++0.19 on a faithful reconstruction, and a claimed rating-sum SD of 27.5 against
+a true 9.06).
+
+Until it is fixed: **do not diagnose the NFL sim from the ratings artifact.**
+Recompute with `_centred_per_game` and check the reconstruction reproduces
+`margin_mean` at r > 0.95 before trusting any number drawn from it.
+
 ### `#676` — **NCAAF player prop projections: take the first production reading after the ~22:48Z daily player-stats run** — FOUND 2026-09-18, lane `ncaaf-player-data`, session 259d6003 — **CLOSED 2026-09-18: `[ncaaf_prop_projections] WRITTEN season=2026 week=3` 22:57:37Z; artifact on web; 197/209 (94%) NCAAF prop rows `projected` on the first board after it; Ask projection layer live (`deploys.md` 23:16:09Z)**
 - The projection build is chained onto the player-stats refresh, which launches daily at ~22:48Z (`NCAAF_PLAYER_STATS_LAUNCHING`; `NCAAF_PLAYER_STATS_ENABLE_REFRESH_WORKER_AUTORUN` is already `true`). Reading: refresh-worker logs `[ncaaf_prop_projections] WRITTEN season=2026 week=3`; web's `/api/ops/artifacts/export?pattern=ncaaf_source/data/ncaaf_prop_projections_*&names_only=1` count >= 1 (0 at 18:07:52Z); on the first board after it, >= 50% of NCAAF prop rows on `/api/intelligence/query` carry `projected` (0/460 at 18:07:52Z). Production's snapshot holds 2026 weeks 1-2 only (8,115 rows, no 2025), so every projection's last-season prior falls back to the role prior -- say so in the reading. Record in `deploys.md` against the 2026-09-18 18:09:25Z entry.
 

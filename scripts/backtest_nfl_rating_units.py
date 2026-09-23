@@ -85,6 +85,8 @@ def season_games(season):
                 # home-margin-positive (VERIFIED 2026-09-07: as-is gives market
                 # SU 65.3% / MAE 9.72; negated gives 34.7% / 14.49, i.e. worse
                 # than a coin flip, which is how the sign error announced itself).
+                "total": float(r["home_score"]) + float(r["away_score"]),
+                "market_total": float(r["total_line"]) if r.get("total_line") else None,
             })
         except (TypeError, ValueError):
             continue
@@ -209,6 +211,98 @@ def _season_table(season):
     return _TABLES[season]
 
 
+def level_rows(season, prior_games=4.0):
+    """`blend_rows`, but carrying the two directions SEPARATELY.
+
+    The MARGIN reads the teams' DIFFERENCE, the TOTAL reads their common LEVEL,
+    and the engine applies one gain to both. `--total-level` fits the level's
+    own gain; `--prior-games` and the scale fit the difference's.
+
+    THE DEFENCE SIGN DIFFERS BETWEEN THE TWO DIRECTIONS AND IT IS EASY TO GET
+    BACKWARDS. `_centred_per_game(..., 'd', ...)` is EPA ALLOWED -- higher is a
+    WORSE defence -- and is NOT negated here, though `_rating_pair` negates it
+    before the engine sees it. So the margin takes `-(hd - ad)` (a better home
+    defence RAISES the home margin) while the total takes `+(hd + ad)` (two
+    leakier defences RAISE the total). Regressing the total on `(o_h+o_a) -
+    (d_h+d_a)` instead measured r = 0.19 against the engine's own output on
+    2026 wk3 and read as "the ratings barely drive the total"; on the correct
+    basis the same 16 games give R2 = 0.89. Fit the two components separately
+    when in doubt -- it is what caught this.
+    """
+    cur, pri = _season_table(season), _season_table(season - 1)
+    cache = {}
+
+    def rate(team, week, side):
+        key = (team, week, side)
+        if key not in cache:
+            c, n = _centred_per_game(cur, team, side, week)
+            p, _ = _centred_per_game(pri, team, side, None)
+            if c is None:
+                cache[key] = p
+            elif p is None or prior_games <= 0:
+                cache[key] = c
+            else:
+                cache[key] = (n * c + prior_games * p) / (n + prior_games)
+        return cache[key]
+
+    rows = []
+    for g in season_games(season):
+        home, away = ({"LAR": "LA"}.get(t, t) for t in (g["home"], g["away"]))
+        parts = [rate(t, g["week"], s) for t in (home, away) for s in ("o", "d")]
+        if None in parts:
+            continue
+        ho, hd, ao, ad = parts
+        rows.append({**g, "osum": ho + ao, "dsum": hd + ad})
+    return rows
+
+
+# WHAT THE ENGINE ITSELF APPLIES TO THE LEVEL, at NFL_RATING_SCALE 20 with the
+# K=4 blend. Measured by regressing the GENERATOR's own `total_mean` on the two
+# level components over 2025 weeks 5/9/10/13/17 (300 seeds, all flags default),
+# pooled -- the same method `ENGINE_SLOPE_AT_SCALE_20` uses for the margin, on a
+# larger sample because a single week's n=14 put the pair at 0.631/0.444 while
+# production's 2026 wk3 n=16 put it at 0.797/0.764.
+ENGINE_TOTAL_LEVEL_COEFFS = (0.797, 0.764)  # (offence_sum, defence_sum)
+
+
+def run_total_level(train_seasons, test_season, grid=(0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0)):
+    """Choose the level SHRINK on TRAIN against ACTUAL totals, report held out.
+
+    lambda = 1.0 is what production does today. The engine's level term is held
+    FIXED at what it actually applies, so lambda is the only free parameter and
+    it means exactly one thing: the fraction of the level the engine should keep.
+    """
+    bo, bd = ENGINE_TOTAL_LEVEL_COEFFS
+    def level(r):
+        return bo * r["osum"] + bd * r["dsum"]
+
+    fits = {}
+    train = [r for s in train_seasons for r in level_rows(s)]
+    for lam in grid:
+        a = statistics.fmean(r["total"] - lam * level(r) for r in train)
+        fits[lam] = (a, sum(abs(a + lam * level(r) - r["total"]) for r in train) / len(train))
+        print(f"  lambda={lam:<4}  train MAE {fits[lam][1]:.3f}")
+    chosen = min(fits, key=lambda k: fits[k][1])
+    print(f"\nchosen on {train_seasons}: lambda={chosen}; tested on {test_season}")
+    test = level_rows(test_season)
+    for name, lo, hi in (("wk1", 1, 1), ("wk2-4", 2, 4), ("wk5-9", 5, 9), ("wk10+", 10, 99), ("ALL", 1, 99)):
+        sel = [r for r in test if lo <= r["week"] <= hi]
+        if not sel:
+            continue
+        errs = {k: [abs(fits[k][0] + k * level(r) - r["total"]) for r in sel] for k in (1.0, chosen)}
+        delta = [x - y for x, y in zip(errs[chosen], errs[1.0])]
+        mk = [r for r in sel if r.get("market_total")]
+        market = statistics.fmean(abs(r["market_total"] - r["total"]) for r in mk) if mk else float("nan")
+        print(f"  {name:6} n={len(sel):3}  today {statistics.fmean(errs[1.0]):6.2f}  "
+              f"lambda={chosen} {statistics.fmean(errs[chosen]):6.2f}  (delta {statistics.fmean(delta):+.2f} +- "
+              f"{statistics.pstdev(delta) / len(delta) ** 0.5:.2f})  market {market:6.2f}")
+    sd_today = statistics.pstdev([fits[1.0][0] + level(r) for r in test])
+    sd_new = statistics.pstdev([fits[chosen][0] + chosen * level(r) for r in test])
+    mk = [r for r in test if r.get("market_total")]
+    print(f"\n  SD of the model's own totals on {test_season}: today {sd_today:.2f} -> "
+          f"lambda={chosen} {sd_new:.2f}   (market {statistics.pstdev([r['market_total'] for r in mk]):.2f})")
+
+
 def blend_rows(season, prior_games):
     """`team_rating`'s per-game path: this season's games blended with the prior
     season as (n*current + K*prior)/(n+K); K=0 is the pre-2026-09-21 estimator
@@ -274,6 +368,9 @@ def run_prior_games(train_seasons, test_season, grid=(0, 1, 2, 3, 4, 5, 6, 8, 10
 if __name__ == "__main__":
     if "--prior-games" in sys.argv:
         run_prior_games((2023, 2024), 2025)
+        raise SystemExit(0)
+    if "--total-level" in sys.argv:
+        run_total_level((2023, 2024), 2025)
         raise SystemExit(0)
     have = [s for s in (2022, 2023, 2024, 2025)
             if (REPO / f"data/nfl_source/tracking/nflverse/pbp/pbp_{s}.csv").exists()]
