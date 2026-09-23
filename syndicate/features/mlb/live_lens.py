@@ -1034,15 +1034,49 @@ def _carry_live_probability(
             return None
         return (name, market, line)
 
+    # NORMALISE THE SOURCE ROWS. `live_row["liveProps"]` is the RAW report row
+    # set -- `_game_from_report_row` passes it straight through, while
+    # `_live_props_from_card` runs its rows through `_normalize_live_prop_row`.
+    # So the two sides of this merge speak different spellings, and reading the
+    # raw side with normalised key names finds nothing:
+    #
+    #   producer (vendor `flask_frontend.py:14763`) writes `live_model_prob_over`
+    #   the normaliser maps that (and `player_name`/`batter_name`, `threshold`)
+    #   onto `liveModelProbOver` / `playerName` / `line`
+    #
+    # Measured 2026-09-23, 00:00-01:30Z, 10 MLB games live: `LIVE_MC_PRICED`
+    # reported rows=8,19,17,28,36,45 across six games while the published
+    # snapshot read `with_live_prob: 0` and NEITHER of this function's log lines
+    # was ever emitted -- `by_key` was empty on every call.
+    #
+    # Reusing the normaliser rather than adding a second spelling check here is
+    # deliberate, for the reason this function's docstring already gives about
+    # the market key: a second copy of the rule drifts silently, and the drift
+    # looks exactly like this defect.
     source_rows = live_row.get("liveProps") if isinstance(live_row.get("liveProps"), list) else []
     by_key: dict[Any, dict[str, Any]] = {}
-    for prop in source_rows:
+    source_with_prob = 0
+    for raw in source_rows:
+        if not isinstance(raw, dict):
+            continue
+        prop = _normalize_live_prop_row(raw)
         if not isinstance(prop, dict) or prop.get("liveModelProbOver") is None:
             continue
+        source_with_prob += 1
         key = _key(prop)
         if key is not None:
             by_key.setdefault(key, prop)
     if not by_key:
+        # PRINTED ON THE FAILING PATH TOO. This return used to be silent, above
+        # a comment calling the counter "THE POINT" -- so the one state anyone
+        # needed to see was the one state that reported nothing, and the fix
+        # looked identical to no fix for three weeks.
+        print(
+            f"[live_lens] LIVE_PROB_CARRIED gamePk={live_row.get('gamePk')} "
+            f"source_rows={len(source_rows)} source_with_prob={source_with_prob} "
+            f"mc_rows_with_prob=0 card_rows={len(card_props)} carried=0",
+            flush=True,
+        )
         return card_props
 
     carried = 0
@@ -1072,6 +1106,7 @@ def _carry_live_probability(
     # no enrichment at the only place anyone looks.
     print(
         f"[live_lens] LIVE_PROB_CARRIED gamePk={live_row.get('gamePk')} "
+        f"source_rows={len(source_rows)} source_with_prob={source_with_prob} "
         f"mc_rows_with_prob={len(by_key)} card_rows={len(card_props)} carried={carried}",
         flush=True,
     )
