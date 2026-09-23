@@ -375,3 +375,75 @@ def test_a_dead_emitter_still_reads_as_UNREADABLE_not_as_a_floor():
 def test_the_default_budget_is_larger_than_the_one_that_truncated():
     """20,000 lines was not enough for a real spike hour on web."""
     assert tw.DEFAULT_MAX_LOG_PAGES * tw.LOG_PAGE_SIZE > 20_000
+
+
+# --- --recomplete must never overwrite an expired window -------------------
+#
+# Render's log retention is why this tool exists at all. Re-reading a window
+# whose logs have aged out returns a SMALLER read; writing that over the stored
+# capture would destroy the only record of the hour.
+
+
+def _report(app_lines, access, served, edge_reqs=10, edge_bytes=100, pub=None):
+    return {
+        "app": {"log_lines": app_lines, "access_lines": access, "served_bytes": served},
+        "edge": {"requests": edge_reqs, "bytes": edge_bytes},
+        "publish_into_web": pub or {"refresh-worker": {"publishes": 5, "bytes": 500}},
+    }
+
+
+def test_a_SHRINKING_read_is_refused_as_expired():
+    stored = _report(20000, 4943, 414832767)
+    fresh = _report(1200, 300, 30000000)
+
+    regressions = tw._expiry_regressions(stored, fresh)
+
+    assert regressions, "a smaller re-read must be refused"
+    assert any("app.log_lines" in r for r in regressions)
+
+
+def test_a_GROWING_read_is_accepted():
+    """The OFF side: the whole point of the pass is that a complete read is
+    LARGER than the truncated one it replaces."""
+    stored = _report(20000, 4943, 414832767)
+    fresh = _report(20120, 5010, 415775597)
+
+    assert tw._expiry_regressions(stored, fresh) == []
+
+
+def test_a_shrinking_PUBLISH_count_is_also_refused():
+    """The worker logs aged out even though web's did not."""
+    stored = _report(100, 10, 1000, pub={"refresh-worker": {"publishes": 264, "bytes": 288000000}})
+    fresh = _report(100, 10, 1000, pub={"refresh-worker": {"publishes": 3, "bytes": 4000}})
+
+    regressions = tw._expiry_regressions(stored, fresh)
+
+    assert any("publish_into_web.refresh-worker.publishes" in r for r in regressions), regressions
+
+
+def test_a_capture_with_no_read_block_needs_recompleting():
+    """Every capture written before 2026-09-23 -- its truncation is UNKNOWN,
+    which must not read as 'fine'."""
+    assert tw._needs_recomplete(_report(20000, 4943, 414832767)) is True
+
+
+def test_a_capture_already_read_completely_is_skipped():
+    complete = _report(20120, 5010, 415775597)
+    for section in ("app", "edge"):
+        complete[section]["read"] = {"truncated": False}
+        complete[section]["read_truncated"] = False
+    complete["publish_into_web"]["refresh-worker"]["read"] = {"truncated": False}
+    complete["publish_into_web"]["refresh-worker"]["read_truncated"] = False
+
+    assert tw._needs_recomplete(complete) is False
+
+
+def test_a_truncated_section_needs_recompleting_even_with_a_read_block():
+    partly = _report(20000, 4943, 414832767)
+    for section in ("app", "edge"):
+        partly[section]["read"] = {"truncated": False}
+        partly[section]["read_truncated"] = False
+    partly["publish_into_web"]["refresh-worker"]["read"] = {"truncated": True}
+    partly["publish_into_web"]["refresh-worker"]["read_truncated"] = True
+
+    assert tw._needs_recomplete(partly) is True

@@ -335,6 +335,79 @@ def _emitter_gap(edge_ts: list[str], access_ts: list[str]) -> str | None:
             + " -- served_mb is a PARTIAL total, do not divide by it")
 
 
+def _monotonic_counters(report: dict[str, Any]) -> dict[str, int]:
+    """Counters that can only GROW between two reads of the same window.
+
+    A log line is immutable once written, so a re-read that returns FEWER of
+    them than the stored capture did is reading a window that has partly aged
+    out -- never a smaller hour.
+    """
+    out: dict[str, int] = {}
+    app = report.get("app") or {}
+    for field in ("log_lines", "access_lines", "served_bytes"):
+        value = app.get(field)
+        if isinstance(value, int):
+            out[f"app.{field}"] = value
+    edge = report.get("edge") or {}
+    for field in ("requests", "bytes"):
+        value = edge.get(field)
+        if isinstance(value, int):
+            out[f"edge.{field}"] = value
+    for worker, block in (report.get("publish_into_web") or {}).items():
+        if not isinstance(block, dict):
+            continue
+        for field in ("publishes", "bytes"):
+            value = block.get(field)
+            if isinstance(value, int):
+                out[f"publish_into_web.{worker}.{field}"] = value
+    return out
+
+
+def _expiry_regressions(stored: dict[str, Any], fresh: dict[str, Any]) -> list[str]:
+    """THE REASON `--recomplete` CANNOT JUST OVERWRITE.
+
+    Render's log retention is the whole reason this tool exists: it captures a
+    spike WHILE the logs are still there. Re-reading a window whose logs have
+    since aged out returns a SMALLER read, and writing that over the stored
+    capture would destroy the only record of the hour. A shrinking counter is
+    the discriminator, and the pass refuses on it rather than writing.
+    """
+    old = _monotonic_counters(stored)
+    new = _monotonic_counters(fresh)
+    return [f"{k}: stored {old[k]} -> re-read {new[k]}"
+            for k in sorted(old) if k in new and new[k] < old[k]]
+
+
+def _window_is_readable(key: str, service: str, start: str, end: str,
+                        stored: dict[str, Any]) -> bool:
+    """Cheap expiry check: ONE page before spending a full capture on the window.
+
+    Render keeps logs for ~14 days (measured 2026-09-23: buckets at and before
+    `2026-09-09T13:00Z` returned 0 rows, `2026-09-09T18:00Z` onward returned
+    lines). `_expiry_regressions` would catch an expired window anyway, but
+    only after paging the whole capture -- so this keeps a pass over the full
+    archive from spending hours re-reading hours that are gone.
+
+    A stored capture with no lines of its own cannot regress, so it is left to
+    the full check rather than judged here.
+    """
+    stored_lines = (stored.get("app") or {}).get("log_lines")
+    if not isinstance(stored_lines, int) or stored_lines <= 0:
+        return True
+    return bool(_logs(key, SERVICE_IDS[service], start, end, "app", max_pages=1))
+
+
+def _needs_recomplete(stored: dict[str, Any]) -> bool:
+    """A capture needs re-reading if it predates the `read` block (so it was
+    taken on the 200-page budget and its truncation is UNKNOWN), or if it
+    records a truncated read."""
+    sections: list[dict[str, Any]] = [stored.get("app") or {}, stored.get("edge") or {}]
+    sections += [b for b in (stored.get("publish_into_web") or {}).values() if isinstance(b, dict)]
+    if any(s.get("read_truncated") for s in sections):
+        return True
+    return not all("read" in s for s in sections if s)
+
+
 def _prior_numbers(old: dict[str, Any]) -> dict[str, Any]:
     """What a capture said before it was re-derived on the corrected window.
 
@@ -618,6 +691,85 @@ def rederive_all(services: list[str], key: str) -> int:
     return done
 
 
+def recomplete_all(services: list[str], key: str, max_log_pages: int = DEFAULT_MAX_LOG_PAGES,
+                   dry_run: bool = False) -> dict[str, int]:
+    """Re-read every capture taken on a budget too small to finish the window.
+
+    Captures written before 2026-09-23 used 200 pages for the edge and app logs
+    and NINETY for the two worker publish logs -- 9,000 lines against hours that
+    routinely carry 14,000-15,000. So `publish_into_web` is understated across
+    the whole set, not only in the two captures that visibly hit the app cap.
+    Measured on `2026-09-23T01:00Z`: 462.1 MB stored against 725.0 MB read
+    completely, a 36% shortfall, while the app `served_mb` in the same capture
+    was short by 0.23%.
+
+    Idempotent, and REFUSES rather than overwrites: see `_expiry_regressions`.
+    """
+    counts = {"rewritten": 0, "already_complete": 0, "expired": 0, "refused_expired": 0}
+    for service in services:
+        for path in sorted(OUT_DIR.glob(f"{service}_*.json")):
+            named = _CAPTURE_NAME.match(path.name)
+            if not named or named.group("service") != service:
+                continue
+            stored = json.loads(path.read_text(encoding="utf-8"))
+            bucket = stored.get("bucket")
+            if not bucket:
+                continue
+            if not _needs_recomplete(stored):
+                counts["already_complete"] += 1
+                print(f"  {bucket}  already read completely -- skipped", flush=True)
+                continue
+            start, end = _bucket_window(bucket)
+            if not _window_is_readable(key, service, start, end, stored):
+                counts["expired"] += 1
+                print(f"  {bucket}  EXPIRED (0 log lines remain) -- stored capture KEPT", flush=True)
+                continue
+            try:
+                metered = _metric(key, "bandwidth", SERVICE_IDS[service], start, end).get(bucket)
+            except Exception:  # pragma: no cover - the stored meter reading stands
+                metered = None
+            fresh = capture(service, bucket, key,
+                            metered_mb=metered if metered is not None else stored.get("metered_mb"),
+                            max_log_pages=max_log_pages)
+
+            regressions = _expiry_regressions(stored, fresh)
+            if regressions:
+                counts["refused_expired"] += 1
+                print(f"  {bucket}  REFUSED -- the window has partly aged out; stored capture KEPT",
+                      flush=True)
+                for line in regressions:
+                    print(f"        {line}", flush=True)
+                continue
+
+            if stored.get("rederived"):
+                fresh["rederived"] = stored["rederived"]
+            fresh["recompleted"] = {
+                "at": dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "reason": (
+                    "re-read on a page budget large enough to finish the window. The stored "
+                    "numbers were taken at 200 pages (edge/app) and 90 pages (worker publish "
+                    "logs), both of which truncate silently and produce FLOORS. Quote the "
+                    "top-level numbers; `recompleted.prior` is what the file said before."
+                ),
+                "max_log_pages": max_log_pages,
+                "prior": _prior_numbers(stored),
+                "prior_counters": _monotonic_counters(stored),
+            }
+            app = fresh["app"]
+            old_pub = sum(float((v or {}).get("mb") or 0)
+                          for v in (stored.get("publish_into_web") or {}).values())
+            new_pub = sum(float((v or {}).get("mb") or 0) for v in fresh["publish_into_web"].values())
+            if not dry_run:
+                path.write_text(json.dumps(fresh, indent=2, sort_keys=True), encoding="utf-8")
+            counts["rewritten"] += 1
+            print(f"  {bucket}  served {(stored.get('app') or {}).get('served_mb')} -> "
+                  f"{app['served_mb']} MB | publish {old_pub:.1f} -> {new_pub:.1f} MB"
+                  f"{'  [DRY RUN]' if dry_run else ''}", flush=True)
+    print(f"recompleted {counts['rewritten']}, already complete {counts['already_complete']}, "
+          f"expired {counts['expired']}, refused mid-read {counts['refused_expired']}")
+    return counts
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--services", nargs="+", default=["web"], choices=sorted(SERVICE_IDS))
@@ -637,12 +789,22 @@ def main() -> int:
                               "marks the section a FLOOR rather than truncating silently"))
     parser.add_argument("--rederive", action="store_true",
                         help="re-capture every capture on disk on the corrected window, keeping the prior numbers")
+    parser.add_argument("--recomplete", action="store_true",
+                        help=("re-read every capture taken on a budget too small to finish its "
+                              "window, keeping the prior numbers. REFUSES to overwrite a capture "
+                              "whose logs have partly aged out"))
+    parser.add_argument("--dry-run", action="store_true",
+                        help="with --recomplete: read and report, write nothing")
     args = parser.parse_args()
 
     key = _api_key()
 
     if args.rederive:
         rederive_all(args.services, key)
+        return 0
+
+    if args.recomplete:
+        recomplete_all(args.services, key, max_log_pages=args.max_log_pages, dry_run=args.dry_run)
         return 0
 
     if args.capture:
