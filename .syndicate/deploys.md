@@ -40581,3 +40581,21 @@ row Soroka 9 K on a `gte5` market graded `won` for +$1.07.
 **verify:** the table. `rating_source` carrying `+level_shrink_0.3` on the served wk3 CSV is the field that proves it.
 
 **ENV REVERTED: `60000` -> `86400` at 15:47:13Z** (`render_env_set` reported `before '60000'`, so exactly what was set was unset). A revert-deploy follows to make the running process see it; until it lands the process still holds 60000, which is a 16.7h cadence rather than 24h and is harmless by construction -- 60000 was chosen over the obvious 3600 precisely so that a forgotten or failed revert degrades to a mild cadence change instead of the hourly relaunch loop `_season_projection_should_launch`'s docstring records (90 launches/day on the 4GB box that also runs the MLB sims). NCAAF shares the interval and also rebuilt.
+
+## 2026-09-23 16:05:27Z -> restarted 16:12:19Z (11:05-11:12 AM CT) — refresh-worker `b4fe8cc0` ENV REVERT (`dep-dapvhho473hc73cdiprg`) — lane `nfl-total-sum-direction-scale` — **OBLIGATION DISCHARGED; one residual reading named and SCHEDULED**
+
+**User decision (chat):** "don't forget to revert the interval after". Zero code delta, `--reinject-env`, same SHA.
+
+    field                            baseline                      predicted   measured
+    stored env value (single-key API) 60000                        86400       **86400** (read 16:17Z)
+    `render_env_set` before-value     --                           60000       **`before '60000'`** -- exactly what was set was unset
+    container restart after the set   env set 15:47:13Z            restarts    `==> Running 'python scripts/run_refresh_worker.py'` **16:12:19Z**
+
+**WHAT I CANNOT READ TODAY, AND WHY -- STATED RATHER THAN GLOSSED.** There is no direct reading of the value the RUNNING process holds. The only line that prints it is emitted by the season-projection gate, and `_log_season_projection_skip` deliberately does NOT log `artifact_fresh` ("the healthy steady state and would be pure noise every tick"). The wk3 artifact rebuilt at 15:41:55Z, so the gate is in exactly that silent branch. So this entry rests on three things, not on a live reading:
+1. the stored value reads `86400`;
+2. a container restart occurred AFTER the env was set, which is the documented re-inject mechanism;
+3. **the identical procedure was proven end-to-end on this exact key and service 40 minutes earlier** -- set `60000` 15:24:11Z, deploy 15:32:36Z, and the process itself printed `interval_seconds=60000` at 15:41:43Z. The forward direction is measured; the reverse uses the same mechanism.
+
+**THE RESIDUAL READING COMES DUE TOMORROW AND IS SCHEDULED, NOT LEFT AS PROSE** (`caveat = scheduled defect`). The timing alone discriminates: under the reverted 86400 the wk3 artifact goes stale at **~15:42Z 09-24**; had the revert NOT reached the process (still 60000 = 16.7h) it would go stale at **~08:20Z 09-24**, ~7h earlier, and the `SEASON_PROJECTION_LAUNCHING` line would carry `interval_seconds=60000`. A single reading after 16:00Z on 09-24 distinguishes them and reads the interval explicitly.
+
+**Blast radius while it was lowered (15:41-16:12Z):** NFL wk3 and NCAAF wk4 each rebuilt once, which was the point. No relaunch loop was possible -- 60000 was chosen over 3600 so the rebuilt artifacts are fresh for 16.7h.
