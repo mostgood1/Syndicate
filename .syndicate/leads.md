@@ -486,3 +486,33 @@ So tonight: `edge_withheld_by_reason` moving OFF `no_live_probability` and onto 
   - **`accuracy-assessment-0914` -> `scripts/assess_active_market_accuracy.py` -- A FALSE POSITIVE OF MY OWN AUDIT.** It is marked `(NEW)` on its Files line: a RESERVATION for a file that does not exist yet. It guards nothing today only because there is nothing to guard, and it starts guarding the moment anyone creates that path -- which is the point of reserving it. "No tracked file matches" is not the same question as "guards nothing", and an audit that conflates them reports a working reservation as a defect.
   - **What this did NOT find:** no remaining `.../` elisions (the four in `soccer-corners-model-rebuild` were the only ones, fixed in `960d1678`), no glob claims, and no claim matching more than one file. So after today the guarded set is honest apart from the one directory.
   - **FIXED 2026-09-23 14:0x CT, `3552e722`** (user: "fix mlb-settlement-props-join too"). Not by naming the 6 files -- by making the trailing slash mean what the author meant. `_norm`'s `.strip("/")` took BOTH ends, so `tests/fixtures/settlement_player_box/` became a file path that cannot exist; `matches` now gives a trailing-slash claim subtree semantics. **Only claims WRITTEN with the slash take that branch**, so no existing file claim changes meaning: measured 132 -> 138 (lane, file) guard pairs on the live ledger, exactly the 6 fixture files. Chosen over naming them because a 7th fixture added tomorrow would be silently unguarded -- the same bug class this session spent the day closing. **Two failure modes designed against rather than discovered, both tested:** a bare `/` from prose (there are 4 in the live ledger, from text like "3 / 4") must not become a claim on the whole repository -- the leading strip empties it and `_paths_in` drops it; and `box/` must not bleed into `box_old/` -- the trailing slash is what prevents it. **CORRECTION to what I wrote in the audit above:** I said a prefix arm "would change enforcement for every lane". That was wrong and I had the number to check it -- exactly one claim in the file is written as a directory, so the real blast radius was one claim and six files.
+
+## 2026-09-23 — ROOT CAUSE: the MLB cards merge is DEAD CODE, orphaned 2026-07-28. Two fixes to the live prop carry were inert by construction. `[lane mlb-doubleheader-e2e, session 3692ff18]`
+
+Closes the "carry is deployed and inert" lead above with the actual cause, which is one level up from where I was looking.
+
+**`_merge_cards_context_into_report` has no production caller.** Repo-wide, the only non-test reference is its own definition:
+
+    _merge_cards_context_into_report   live_lens.py:1361   <- called ONLY by a test I wrote today
+      _merge_cards_context_into_live_row  :1116            <- called only at :1413, INSIDE the dead function
+        _carry_live_probability            :988            <- called only at :1175, inside that
+
+**`11815f8b` (2026-07-28, "#124/#128: make MLB live-lens cards-primary") removed both call sites** and left the subtree in place:
+
+    -    payload = _merge_cards_context_into_report(payload, selected_date)
+    -        merged_report = _merge_cards_context_into_report(report, selected_date)
+
+Before it, `11815f8b^` had them at `live_lens.py:1000` and `:1280`.
+
+**So the answer to "why has MLB never published a live prop probability" is that the merge which carries it was orphaned on 2026-07-28**, five weeks before anyone tried to fix the carry.
+
+**Two fixes are inert BY CONSTRUCTION, not by configuration, and the ledger should say so:**
+- `5bab0685` (2026-08-30) — its commit message documents the exact symptom ("produced 27, published 0") and it patched code that had already been unreachable for a month.
+- `7094b69a` (2026-09-23, mine) — a REAL defect (raw rows read with normalised key names) in the same dead subtree. Correct, and it does nothing.
+- `70ba6867` (2026-09-23, mine) — instrumentation on the dead function's two silent returns. It is what PROVED the deadness: deployed to live-odds-worker at 18:05:28Z, `TICK_COMPLETE` ran at 18:07:55Z, and NONE of `CARDS_MERGE_SKIPPED` / `CARDS_MERGE` / `LIVE_PROB_CARRIED` emitted — and those three cover every exit the function has.
+
+**How three weeks of silence happened.** Every layer refused quietly. The carry's own counter sat after a silent early return; the merge's two exits were bare `return report`; and above all of it the function simply was not called, which no counter anywhere could report. `LIVE_MC_PRICED` kept printing rows the whole time, so the producer looked healthy and the failure had no visible owner.
+
+**NEXT STEP IS A DESIGN QUESTION, NOT A PATCH.** Do NOT simply re-add the call: `11815f8b` removed it deliberately while making cards the primary ROW SOURCE, and restoring it would re-introduce whatever that change was for. The question to answer first is where cards now become the row source in the cards-primary path, and whether the MC probability should be carried there instead. `5bab0685`'s docstring already argues the trade (124 card rows vs 27 MC rows; keep the cards' ROWS, carry only the PROBABILITY) — that reasoning survives the move, its location does not.
+
+**Not yet decided: whether the dead subtree should be deleted.** `learnings.md` says to remove confirmed dead code in the same pass, but here it holds the only implementation of a behaviour the product still wants, and deleting it would discard `5bab0685`'s and today's reasoning along with it. Recommend it stays until the carry has a live home, then goes.
