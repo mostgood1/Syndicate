@@ -1107,6 +1107,62 @@ def _polymarket_cross_ticks() -> int:
         return 0
 
 
+def _polymarket_team_side(name: Any, resolution: Mapping[str, Any], sport: Any) -> str | None:
+    """`'home'` / `'away'` / None for ONE outcome name on a team market.
+
+    `kalshi_board_join._side_for_team` first, unchanged, then the BOARD JOIN's
+    OWN matcher as a fallback -- because the join is what chose this slug, and
+    the two disagreeing is how a market we matched became a market we cannot
+    price.
+
+    MEASURED 2026-09-23. Polymarket writes college h2h outcomes as bare SCHOOL
+    NICKNAMES: `aec-cfb-col-bayl-2026-09-26` ships `['Buffaloes', 'Bears']`.
+    Against that row (`Baylor Bears` / `Colorado Buffaloes`, sport ncaaf)
+    `_side_for_team` returns None for 'Buffaloes', 'Bears' AND both full names,
+    while `team_aliases.teams_match` returns away and home, each uniquely. So
+    h2h refused `team_side_not_in_outcomes` 29 times that day with ZERO
+    not-found / stale / unorderable -- the slug was in the slate and the money
+    path simply held the weaker matcher. `#683` one market over.
+
+    UNIQUE OR NOTHING, which is the whole safety property and not a detail: a
+    name that resolves to BOTH board teams returns None and the order refuses.
+    A team side picked by guess is what bought TEXAS at the White Sox's price
+    on 2026-08-25, and the join applies this same uniqueness rule where it
+    matches (`hits[0] if len(hits) == 1 else None`).
+    """
+    # Imported HERE, not read off the module: `_polymarket_resolve_market`
+    # imports it inside itself, so a module-level read is a NameError -- which
+    # is what this helper did on its first run.
+    from syndicate.features.shared.kalshi_board_join import _side_for_team
+
+    side = _side_for_team(name, resolution, sport=sport)
+    if side is not None:
+        return side
+    try:
+        from syndicate.features.shared.team_aliases import teams_match
+    except Exception as exc:  # noqa: BLE001 -- loud, never silently inert
+        print(
+            f"[execute_portfolio] TEAM_ALIAS_MATCHER_UNAVAILABLE {exc!r}"
+            " -- nickname-only h2h outcomes will keep refusing",
+            flush=True,
+        )
+        return None
+    text = str(name or "").strip()
+    if not text:
+        return None
+    hits: list[str] = []
+    for candidate_side, field in (("home", "home_team"), ("away", "away_team")):
+        team = str(resolution.get(field) or "").strip()
+        if not team:
+            continue
+        try:
+            if teams_match(sport, text, team):
+                hits.append(candidate_side)
+        except Exception:  # noqa: BLE001 -- a matcher failure is "no match"
+            continue
+    return hits[0] if len(hits) == 1 else None
+
+
 def _polymarket_gte_prop(slug: str, market: str) -> dict[str, Any] | None:
     """`{market, token, line}` when `slug` is an admitted `gte<N>` player prop.
 
@@ -1650,7 +1706,11 @@ def _polymarket_resolve_market(request) -> tuple | None:
         refusal = "no_order_branch_for_market"
     else:
         for position, (name, raw_price) in enumerate(zip(outcomes, prices)):
-            side = _side_for_team(name, resolution, sport=sport)
+            # `_polymarket_team_side`, not `_side_for_team` directly: the venue
+            # writes college outcomes as nicknames the latter cannot resolve.
+            # It also feeds `away_index` below, so the corroborator now has a
+            # witness on the markets that used to refuse before reaching it.
+            side = _polymarket_team_side(name, resolution, sport)
             if side == "away":
                 # THE CORROBORATING WITNESS, collected in the pass that is
                 # already running. Independent of `marketSides`: this comes
