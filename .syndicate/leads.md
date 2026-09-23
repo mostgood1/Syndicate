@@ -396,3 +396,30 @@ fl_source\source_artifacts\smartsim2_projections_2025_wk10_injury_notes.json`. `
 - **Why it matters:** the flag is documented in-file as an opt-in for a "validated experiment", so the next person to take that experiment pays the crash first. A scheduled caller would read a non-zero exit and conclude the RUN failed, when it did not.
 - **Where to look:** the `injury_notes_path.write_text(...)` call in `scripts/generate_smartsim2_nfl_projections.py` needs the same `parents=True, exist_ok=True` mkdir the projection writer already does.
 - **Not verified on production:** the refresh-worker's disk may already have the directory, in which case this only bites fresh checkouts and worktrees. Read `nfl_artifact_output_root()/source_artifacts` on the worker before sizing it.
+
+## 2026-09-23 — the live-prop probability carry (`5bab0685`) is DEPLOYED AND INERT, and its counter cannot report the failure `[lane mlb-doubleheader-e2e, session 3692ff18]`
+
+Follows the `snapshot_live_prob_indexed: 0` lead above. The cause is not a missing fix — **the fix shipped on 2026-08-30 and is in the live commit.**
+
+    git: 5bab0685 "carry the live prop probability across the cards merge -- produced 27, published 0"
+    contained in fba49b50 YES, d25664f0 YES, b4fe8cc0 YES (live on refresh-worker 14:40:51Z)
+
+**It is inert. Measured 2026-09-23 over the 00:00-01:30Z window, 10 MLB games live:**
+
+    producer   [live_props] LIVE_MC_PRICED  game=823494 rows=8   game=824867 rows=19
+                                            game=824061 rows=17  game=824624 rows=28
+                                            game=822840 rows=36  game=824302 rows=45
+    published  snapshot_by_game_state.live {rows 1,050, with_live_projection 1,030, with_live_prob 0}
+               snapshot_live_prob_indexed 0
+
+Hundreds of MC rows priced; **zero probabilities published.** That is the SAME symptom `5bab0685` was written to fix ("produced 27, published 0"), still present with the fix live.
+
+**Neither of the carry's log lines is EMITTED in that window** — not `LIVE_PROB_CARRIED`, not `LIVE_PROB_CARRY_IMPORT_FAILED`. The same tooling and window returns `LIVE_MC_PRICED` normally, so the search works and the absence is real (`feedback_absent_signal_is_about_the_emitter`).
+
+**By elimination, it exits at `if not by_key: return card_props`.** The function is reached — `_carry_live_probability` is called inside `if card_props:`, the same block that sets `merged["liveProps"] = card_props`, and the published snapshot has 1,050 live rows with 1,030 projections, which ARE the card rows. So `card_props` was non-empty and the call happened. The import did not fail (no `..._IMPORT_FAILED`). What is left is `by_key` empty, i.e. **`live_row["liveProps"]` holds no row carrying `liveModelProbOver` at merge time.** The MC-priced rows are not where the carry looks for them.
+
+**THE INSTRUMENT CANNOT SEE ITS OWN FAILURE.** The `print` is placed AFTER that early return, under a comment reading "THE COUNTER IS THE POINT ... a silent enrichment would be indistinguishable from no enrichment at the only place anyone looks." The counter reports every case EXCEPT the one that is happening. Moving it above the `if not by_key` return (printing `mc_rows_with_prob=0 carried=0`) makes the failure self-reporting and is a two-line change.
+
+**Next step, in order:** (1) move the counter above the early return so the state is visible at all; (2) find where `LIVE_MC_PRICED`'s rows are written into the lens row — the carry reads `live_row["liveProps"]`, and the evidence says the MC rows are on a different key or are merged after this point; (3) only then judge whether the keying (`_norm_name`, `_snapshot_market`, `float(line)`) matches, which is what the fix's docstring worries about and which cannot be the cause while `by_key` is empty.
+
+**Not a regression, and not caused by anything shipped this session.** MLB has never published a live prop edge — that is what `5bab0685`'s own commit message says — and this stage only became observable at all after `fba49b50` restored the board's game-state join.
