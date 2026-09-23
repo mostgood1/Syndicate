@@ -576,6 +576,105 @@ def shrink_rating_level(
     return new_home_off, new_home_def, new_away_off, new_away_def
 
 
+# THE ENGINE ADDS POINTS TO A GAME'S TOTAL PURELY BECAUSE THE TEAMS ARE
+# MISMATCHED, AND NOTHING IN THE DATA SUPPORTS THAT. `#686`.
+#
+# The stated model cannot do this. Scoring is `offense_rating*3.0 -
+# defense_rating*2.2` per possession (play_simulator.py:429), so
+# `total = 3.0*(off_h+off_a) - 2.2*(def_h+def_a)` -- a function of SUMS only,
+# in which the difference cannot appear. It appears anyway, through a
+# nonlinearity in the drive/possession machinery.
+#
+# MEASURED CAUSALLY, not inferred from a regression on live games: `simulate_game`
+# called directly on a 5x5 grid of (off_diff, def_diff) with BOTH SUMS PINNED AT
+# EXACTLY ZERO, 150 seeds/cell, so nothing but the mismatch varies:
+#
+#     total_shift = +7.3493 * off_diff - 4.8940 * def_diff     R2 0.933
+#
+# residual SD 0.67 against a per-cell seed SE of 0.97 -- the linear form captures
+# all of the signal there is. The response is ODD (checked at +/-0.2/0.4/0.8: the
+# sign of the difference flips the sign of the shift), so this is linear in the
+# SIGNED difference and not in `abs()`. Over a typical game that is ~4.5 points
+# of total per 1 SD of mismatch.
+#
+# REALITY GIVES THIS DIRECTION A COEFFICIENT OF ZERO, which is why the whole
+# response is removed rather than rescaled: `corr(|market spread|, ACTUAL total)`
+# on 2025 = -0.032, and adding difference terms to an actual-total fit (train
+# 2023-24, scored on a held-out 2025) moves MAE 10.709 -> 10.679, i.e. nothing.
+# Lopsidedness does not predict a total.
+#
+# APPLIED TO THE TWO SCORE MEANS, NOT TO `total_mean`. Half comes off each side,
+# so `total = home + away` is corrected while `margin = home - away` is
+# UNCHANGED -- and every field in the artifact still agrees with every other.
+# Editing `total_mean` alone would have left `home_score_mean + away_score_mean
+# != total_mean` in the file for the next reader to trip over.
+#
+# `total_stdev` IS DELIBERATELY UNTOUCHED: this is a bias in the LOCATION, not
+# in the dispersion, and the over/under price is
+# `1 - normal_cdf((line - mean)/stdev)` (`nfl_game_projections.py:545`,
+# `basis=smartsim2_total_normal`) -- verified against the served board on all 16
+# wk3 games at max |diff| 0.0000 -- so correcting the mean carries the
+# probability with it exactly.
+#
+# THIS IS A POST-HOC CALIBRATION OF AN ENGINE DEFECT AND SHOULD NOT BE THE LAST
+# WORD. The nonlinearity lives in `smartsim2`, which NCAAF also uses; fixing it
+# at source is the right repair and needs that sport's own actual-outcome fit
+# first. `#686` carries both options.
+NFL_TOTAL_DIFF_RESPONSE_OFFENSE = 7.3493
+NFL_TOTAL_DIFF_RESPONSE_DEFENSE = -4.8940
+
+
+def total_difference_response(
+    home_off: float, home_def: float, away_off: float, away_def: float,
+) -> float:
+    """Points of TOTAL the engine adds purely because the two teams differ."""
+    return (
+        NFL_TOTAL_DIFF_RESPONSE_OFFENSE * (home_off - away_off)
+        + NFL_TOTAL_DIFF_RESPONSE_DEFENSE * (home_def - away_def)
+    )
+
+
+def _total_diff_correction() -> float:
+    """How much of that spurious response to REMOVE. **OFF BY DEFAULT.**
+
+    `SYNDICATE_NFL_TOTAL_DIFF_CORRECTION` overrides; ABSENT means 0.0, so this
+    ships INERT and `=1` arms it. Absent is OFF here, unlike
+    `SYNDICATE_NFL_TOTAL_LEVEL_SHRINK` two screens up, where absent is ON --
+    the two knobs in this one file default opposite ways and the reason is
+    entirely in the evidence, not in taste.
+
+    WHY IT SHIPS DISABLED, when the mechanism it removes is definitely real and
+    definitely unsupported by the data. Because REMOVING it bought nothing
+    measurable. Paired on 272 held-out 2025 games (train 2023-24, n=544):
+
+        today -> correction alone       delta -0.076 +- 0.172  t=-0.44  142/272
+        correction + lambda 0.3 -> 0.5  delta -0.071 +- 0.072  t=-0.99  141/272
+        today -> BOTH                   delta -0.147 +- 0.185  t=-0.79  139/272
+
+    139 of 272 is a coin flip. And the bucket that matters in September is the
+    WRONG SIGN: weeks 2-4 move +0.531 +- 0.475, i.e. worse.
+
+    IT ALSO MAKES THE BOARD LESS USEFUL, which is the argument that actually
+    decided it. On 2025 wk10 the correction takes the model's total SD to 1.58
+    against a market ~4.2. A model that never disagrees with the market by more
+    than a point is not a safer model, it is an unreadable one -- the same
+    pathology as the `2.6x too little` differentiation this file's
+    `NFL_RATING_SCALE` comment was written about, approached from the other side.
+
+    KEEP IT, DO NOT DELETE IT. The defect is real and measured (`#686`), the
+    correction is exact and reversible, and the RIGHT repair is the engine
+    nonlinearity itself -- which `smartsim2` shares with NCAAF and which needs
+    that sport's own actual-outcome fit first. This is the scaffolding for that
+    work, not a failed experiment.
+    """
+    raw = str(os.environ.get("SYNDICATE_NFL_TOTAL_DIFF_CORRECTION") or "").strip()
+    try:
+        value = float(raw) if raw else 0.0
+    except ValueError:
+        value = 0.0
+    return max(0.0, value)
+
+
 def _games_before(plays: list[tuple[int, str, str, str, float]], *, team: str, before_week: int | None) -> int:
     """Distinct weeks this team had offensive plays before `before_week` -- the
     same game count `_epa_per_game` divides by."""
@@ -981,16 +1080,33 @@ def build_projection(
     totals = [h + a for h, a in zip(home_scores, away_scores)]
     home_win_rate = sum(1 for m in margins if m > 0) / seeds
 
+    # `#686`. HALF OFF EACH SIDE, so the TOTAL moves and the MARGIN cannot.
+    # Uses the ratings the engine actually received (post level-shrink, post
+    # injury adjustment) -- the level shrink leaves differences untouched by
+    # construction, so this reads the same either way, but the ratings the sim
+    # SAW are the only defensible input to a correction of what the sim DID.
+    diff_correction = _total_diff_correction() * total_difference_response(
+        home_off, home_def, away_off, away_def
+    )
+    home_score_mean = statistics.fmean(home_scores) - diff_correction / 2.0
+    away_score_mean = statistics.fmean(away_scores) - diff_correction / 2.0
+    if diff_correction:
+        rating_source += f"+diff_corr_{_total_diff_correction():g}"
+
     projection = SmartSimNflProjection(
         game_id=game_id,
         season=season,
         week=week,
         home_team=home_team,
         away_team=away_team,
-        home_score_mean=round(statistics.fmean(home_scores), 3),
-        away_score_mean=round(statistics.fmean(away_scores), 3),
+        home_score_mean=round(home_score_mean, 3),
+        away_score_mean=round(away_score_mean, 3),
+        # DERIVED from the two corrected sides rather than recomputed from
+        # `totals`, so `home + away == total` holds in the written row. The
+        # margin stays `fmean(margins)`: the correction takes the SAME amount
+        # off both sides, so it cancels there exactly.
         margin_mean=round(statistics.fmean(margins), 3),
-        total_mean=round(statistics.fmean(totals), 3),
+        total_mean=round(home_score_mean + away_score_mean, 3),
         margin_stdev=round(statistics.pstdev(margins), 3),
         total_stdev=round(statistics.pstdev(totals), 3),
         home_win_rate=round(home_win_rate, 4),

@@ -262,7 +262,12 @@ def level_rows(season, prior_games=4.0):
 # pooled -- the same method `ENGINE_SLOPE_AT_SCALE_20` uses for the margin, on a
 # larger sample because a single week's n=14 put the pair at 0.631/0.444 while
 # production's 2026 wk3 n=16 put it at 0.797/0.764.
-ENGINE_TOTAL_LEVEL_COEFFS = (0.797, 0.764)  # (offence_sum, defence_sum)
+# RE-MEASURED 2026-09-23 on a 5x5 grid with the DIFFERENCES pinned at zero
+# (R2 0.982, residual SD 0.76 vs a 0.97 seed SE), replacing a regression over 16
+# live games that omitted the difference term and so absorbed part of a response
+# that was not the level's. Offence barely moved (0.797 -> 0.805); DEFENCE was
+# overstated by 34% (0.764 -> 0.570), which is where the bias sat.
+ENGINE_TOTAL_LEVEL_COEFFS = (0.8046, 0.5702)  # (offence_sum, defence_sum)
 
 
 def run_total_level(train_seasons, test_season, grid=(0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0)):

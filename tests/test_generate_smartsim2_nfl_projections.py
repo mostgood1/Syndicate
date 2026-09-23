@@ -462,5 +462,77 @@ class TotalLevelShrinkTests(unittest.TestCase):
         self.assertEqual(self._shrink({"SYNDICATE_NFL_TOTAL_LEVEL_SHRINK": "nope"}), gen.NFL_TOTAL_LEVEL_SHRINK)
 
 
+class TotalDifferenceCorrectionTests(unittest.TestCase):
+    """`#686`: the engine adds total purely for a MISMATCH, and reality gives
+    that direction a coefficient of zero.
+
+    Measured causally on a 5x5 grid with both rating SUMS pinned at zero:
+    `total_shift = +7.3493*off_diff - 4.8940*def_diff`, R2 0.933, residual SD
+    0.67 against a 0.97 seed SE. `corr(|market spread|, ACTUAL total)` on 2025
+    is -0.032, so the response is REMOVED rather than rescaled."""
+
+    def test_response_is_zero_when_the_teams_match(self) -> None:
+        self.assertEqual(gen.total_difference_response(0.2, -0.1, 0.2, -0.1), 0.0)
+
+    def test_response_is_odd_in_the_difference(self) -> None:
+        # Measured at +/-0.2/0.4/0.8: flipping the sign of the mismatch flips the
+        # sign of the shift. A correction built on abs() would be wrong here.
+        a = gen.total_difference_response(0.3, -0.2, -0.1, 0.1)
+        b = gen.total_difference_response(-0.1, 0.1, 0.3, -0.2)
+        self.assertAlmostEqual(a, -b, places=12)
+
+    def test_offence_and_defence_push_the_total_opposite_ways(self) -> None:
+        off_only = gen.total_difference_response(0.4, 0.0, 0.0, 0.0)
+        def_only = gen.total_difference_response(0.0, 0.4, 0.0, 0.0)
+        self.assertGreater(off_only, 0.0)
+        self.assertLess(def_only, 0.0)
+
+    def _correction(self, env):
+        import os
+        from unittest.mock import patch
+
+        with patch.dict(os.environ, env, clear=False):
+            if "SYNDICATE_NFL_TOTAL_DIFF_CORRECTION" not in env:
+                os.environ.pop("SYNDICATE_NFL_TOTAL_DIFF_CORRECTION", None)
+            return gen._total_diff_correction()
+
+    def test_absent_means_OFF_and_that_is_deliberate(self) -> None:
+        """This knob ships INERT, unlike the level shrink in the same file.
+
+        Removing the response bought nothing measurable: paired on 272 held-out
+        games, today -> both is -0.147 +- 0.185 (t=-0.79), better on 139/272,
+        and weeks 2-4 go the WRONG WAY at +0.531 +- 0.475. Pinned as a test so
+        that flipping the default later is a deliberate act with a failing test
+        attached, not a quiet edit."""
+        self.assertEqual(self._correction({}), 0.0)
+
+    def test_the_mechanism_is_still_REACHABLE_when_armed(self) -> None:
+        # Shipping disabled must not mean shipping untestable: off != on.
+        self.assertEqual(self._correction({"SYNDICATE_NFL_TOTAL_DIFF_CORRECTION": "1"}), 1.0)
+        self.assertNotEqual(self._correction({}), self._correction({"SYNDICATE_NFL_TOTAL_DIFF_CORRECTION": "1"}))
+
+    def test_a_typo_falls_back_to_OFF(self) -> None:
+        self.assertEqual(self._correction({"SYNDICATE_NFL_TOTAL_DIFF_CORRECTION": "nope"}), 0.0)
+
+    def test_disabled_leaves_every_score_mean_untouched(self) -> None:
+        """The whole point of landing it dark: with the default, the correction
+        term is exactly 0.0, so no score mean moves by even a rounding unit."""
+        import os
+        from unittest.mock import patch
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("SYNDICATE_NFL_TOTAL_DIFF_CORRECTION", None)
+            delta = gen._total_diff_correction() * gen.total_difference_response(0.4, -0.3, -0.2, 0.25)
+        self.assertEqual(delta, 0.0)
+
+    def test_taking_half_off_each_side_moves_total_and_not_margin(self) -> None:
+        """The arithmetic the wiring depends on, pinned independently of the sim."""
+        home_raw, away_raw = 27.0, 19.0
+        delta = gen.total_difference_response(0.3, -0.1, -0.1, 0.2)
+        home, away = home_raw - delta / 2.0, away_raw - delta / 2.0
+        self.assertAlmostEqual(home - away, home_raw - away_raw, places=12)
+        self.assertAlmostEqual((home + away) - (home_raw + away_raw), -delta, places=12)
+
+
 if __name__ == "__main__":
     unittest.main()

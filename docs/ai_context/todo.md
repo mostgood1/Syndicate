@@ -1,9 +1,47 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#686` — **The NFL sim's TOTAL responds to the rating DIFFERENCE, which carries no total signal at all — a second gain applied in a direction with no evidence** — FOUND 2026-09-23, lane `nfl-total-residual-dispersion`, session dae18452 — **OPEN, diagnosed and quantified, NOT fixed**
+### `#686` — **The NFL sim's TOTAL responds to the rating DIFFERENCE, which carries no total signal at all** — FOUND and BUILT 2026-09-23, lane `nfl-total-residual-dispersion`, session dae18452 — **OPEN: the correction is LANDED AND DISABLED (`SYNDICATE_NFL_TOTAL_DIFF_CORRECTION`, absent = 0), because removing the response bought nothing measurable**
 
 Same class as `#684`, found while checking whether that fix had merely pulled
 the sim toward the market. It had not — but this remains.
+
+**THE MEASUREMENT, WHICH IS WHY IT SHIPPED DARK.** Paired on 272 held-out 2025
+games, fitted on 2023-24 (n=544):
+
+    today -> correction alone         delta -0.076 +- 0.172   t=-0.44   142/272
+    correction + lambda 0.3 -> 0.5    delta -0.071 +- 0.072   t=-0.99   141/272
+    today -> BOTH                     delta -0.147 +- 0.185   t=-0.79   139/272
+    original (pre-#684) -> BOTH       delta -0.352 +- 0.244   t=-1.44   145/272
+
+Every point estimate favours the change and NOT ONE is distinguishable from
+zero; 139/272 is a coin flip. Weeks 2-4 -- the bucket live in September -- go
+the WRONG WAY at **+0.531 +- 0.475**.
+
+**The argument that actually decided it was usefulness, not significance.** The
+correction takes 2025 wk10's model total SD to **1.58** against a market ~4.2.
+A model that never disagrees with the market by more than a point is not safer,
+it is unreadable -- the same pathology as the "2.6x too little differentiation"
+that `NFL_RATING_SCALE`'s own comment was written about, reached from the other
+side. lambda=0.5 pulls it back to 3.08, but that lambda was chosen partly by
+looking at the held-out set, which is peeking.
+
+**THE LEVEL SHRINK WAS RE-FITTED ON TOP AND DID NOT MOVE.** With the difference
+response removed the train optimum is flat over lambda 0.2-0.5 and still centres
+on **0.3** (10.275 at 0.3 vs 10.301 at 0.5), so `#684` stands unchanged. What
+DID change is `ENGINE_TOTAL_LEVEL_COEFFS`: re-measured on a 5x5 grid with the
+differences pinned at zero (R2 0.982) it is **(0.8046, 0.5702)**, not the
+(0.797, 0.764) taken from a 16-game regression that omitted the difference term.
+Offence barely moved; **defence was overstated by 34%** -- the omitted-variable
+bias sat almost entirely there.
+
+**A COVERAGE DEFECT IN MY OWN MEASUREMENT, CAUGHT LATE AND WORTH THE WARNING.**
+Mid-session the pbp source was switched from a junction to a local copy holding
+only 2024-2026. `_season_table` returns an EMPTY table for a missing season
+rather than raising, so every fit reported as "train 2023-24, n=256" was
+actually **2024 alone**, with no prior season for the blend. It surfaced only
+because an unrelated 2023-only split crashed. All figures above are re-run on
+the real 544/272. Print per-season coverage before any fit -- CLAUDE.md says
+exactly this and it still got past me.
 
 **The engine.** `total ∝ 3.0(off_h+off_a) − 2.2(def_h+def_a)` depends only on
 SUMS, so a linear engine's total cannot respond to the difference. It does,
