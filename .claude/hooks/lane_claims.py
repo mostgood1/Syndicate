@@ -440,6 +440,73 @@ def matches(rel, claimed):
     return rel == claimed or rel.endswith("/" + claimed) or claimed.endswith("/" + rel)
 
 
+def same_file(a, b):
+    """True when two CLAIM SPELLINGS guard the same file, by the guard's rule.
+
+    `matches(rel, claimed)` answers "does this claim guard this PATH ON DISK",
+    so it has a side that is a real path. A reader asking "do these two claims
+    collide" has two claims and no path, and the arms are not symmetric as
+    written -- so it must ask in both directions or it gets half an answer.
+
+    WHY THIS EXISTS, measured 2026-09-23. `claims_by_path` keys on the path AS
+    SPELLED, and `check_lane_invariants.contested_files` grouped on that key.
+    So `state_polymarket.md` (claimed by `polymarket-ask-pricing`) and
+    `.syndicate/state_polymarket.md` (claimed by
+    `polymarket-corners-btts-order-branch`) were counted as TWO files with one
+    holder each, and the contested-files check printed nothing while two OPEN
+    lanes held one file. `lane-guard` was never fooled -- it calls `matches`
+    and blocked correctly -- so the defect was entirely in the REPORT.
+
+    That is the worse half to have wrong. Enforcement failing is loud: someone
+    is stopped and comes looking. A census that under-reports is silent, and
+    the census is what a session reads to decide a file is free to take. Same
+    shape as `open_lanes_under_archived`'s docstring one file over, in the
+    opposite direction: that one over-reported and "reads as vigilance", this
+    one under-reports and reads as an all-clear.
+    """
+    return matches(a, b) or matches(b, a)
+
+
+def claim_groups(text):
+    """[(spellings, slugs)] -- claims grouped by the FILE they guard.
+
+    `claims_by_path` remains the right answer for "who claimed this exact
+    string"; this is the right answer for "how many lanes hold this file",
+    which is the only question a contest check is asking.
+
+    Grouping is transitive ON PURPOSE, and it is not over-merging. A BARE
+    claim like `cards.py` genuinely guards `mlb/cards.py` AND `nba/cards.py`
+    -- that is what `lane-guard` does with it -- so a group that pulls all
+    three together is reporting the enforcement, not exceeding it. The
+    spellings are returned alongside the slugs so a reader can see WHY three
+    names became one file instead of having to re-derive it.
+    """
+    by_spelling = claims_by_path(text)
+    spellings = sorted(by_spelling)
+    parent = {s: s for s in spellings}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for i, a in enumerate(spellings):
+        for b in spellings[i + 1:]:
+            if same_file(a, b):
+                ra, rb = find(a), find(b)
+                if ra != rb:
+                    parent[rb] = ra
+
+    grouped = {}
+    for s in spellings:
+        root = find(s)
+        names, slugs = grouped.setdefault(root, (set(), set()))
+        names.add(s)
+        slugs.update(by_spelling[s])
+    return [(sorted(n), sorted(s)) for n, s in grouped.values()]
+
+
 def is_exempt(path):
     """True for the ledger and the harness config, which are never lane-guarded.
 

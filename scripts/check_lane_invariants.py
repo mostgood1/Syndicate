@@ -98,6 +98,7 @@ try:
         _claims,
         _DISCLAIMER_MARKERS,
         _paths_in,
+        claim_groups,
     )
 except Exception as exc:  # pragma: no cover - only when the module is missing
     # DELIBERATELY NOT FAIL-OPEN, and that is the opposite of `lane-guard.py`'s
@@ -176,11 +177,29 @@ def claims(text: str) -> set[tuple[str, str]]:
     return set(_claims(text))
 
 
-def contested_files(claim_set) -> dict[str, list[str]]:
-    by_file = collections.defaultdict(set)
-    for slug, path in claim_set:
-        by_file[path].add(slug)
-    return {p: sorted(s) for p, s in by_file.items() if len(s) > 1}
+def contested_files(text: str) -> dict[str, list[str]]:
+    """{file: [slug, ...]} for every file held by more than one OPEN lane.
+
+    TAKES THE TEXT, NOT THE CLAIM SET, because the grouping must run through
+    `lane_claims.claim_groups` -- the same `matches` predicate `lane-guard`
+    enforces with. It used to take `claim_set` and group on the path AS
+    SPELLED, which is the defect: measured 2026-09-23, `state_polymarket.md`
+    and `.syndicate/state_polymarket.md` counted as two files with one holder
+    each while two OPEN lanes held one file, and this check printed nothing.
+    See `lane_claims.same_file` for the whole incident.
+
+    A group with more than one spelling SAYS SO in the key, because "held by
+    two lanes" is not actionable until you can see that one wrote a bare
+    basename and the other a full path.
+    """
+    out = {}
+    for spellings, slugs in claim_groups(text):
+        if len(slugs) > 1:
+            key = spellings[0]
+            if len(spellings) > 1:
+                key += "  (one file, claimed as: " + ", ".join(spellings) + ")"
+            out[key] = slugs
+    return out
 
 
 def open_lanes_under_archived(text: str) -> list[str]:
@@ -416,7 +435,7 @@ def main(argv=None) -> int:
         return 3
 
     claim_set = claims(text)
-    contested = contested_files(claim_set)
+    contested = contested_files(text)
     stray = open_lanes_under_archived(text)
     orphaned, stale_markers = orphaned_lane_markers(text, args.path)
     prose = prose_paths_in_files_blocks(text, claim_set)

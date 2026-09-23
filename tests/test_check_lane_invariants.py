@@ -236,13 +236,13 @@ CONTESTED = """## OPEN
 
 
 def test_clean_ledger_passes():
-    assert mod.contested_files(mod.claims(ONE_HOLDER)) == {}
+    assert mod.contested_files(ONE_HOLDER) == {}
     assert mod.open_lanes_under_archived(ONE_HOLDER) == []
     assert mod.main([_write(ONE_HOLDER)]) == 0
 
 
 def test_two_open_lanes_on_one_file_fails():
-    contested = mod.contested_files(mod.claims(CONTESTED))
+    contested = mod.contested_files(CONTESTED)
     assert contested == {"shared/thing.py": ["alpha", "beta"]}
     assert mod.main([_write(CONTESTED)]) == 1
 
@@ -250,7 +250,81 @@ def test_two_open_lanes_on_one_file_fails():
 def test_a_closed_lane_does_not_contest():
     """Only OPEN lanes hold claims -- a closed one sharing a path is fine."""
     text = CONTESTED.replace("### beta — OPEN", "### beta — CLOSED-VERIFIED")
-    assert mod.contested_files(mod.claims(text)) == {}
+    assert mod.contested_files(text) == {}
+
+
+TWO_SPELLINGS = """## OPEN
+
+### alpha - OPEN - opened 2026-08-17
+- Files: `a/shared/thing.py`.
+
+### beta - OPEN - opened 2026-08-17
+- Files: `shared/thing.py`.
+"""
+
+SAME_BASENAME = """## OPEN
+
+### alpha - OPEN - opened 2026-08-17
+- Files: `mlb/cards.py`.
+
+### beta - OPEN - opened 2026-08-17
+- Files: `nba/cards.py`.
+"""
+
+
+def test_two_spellings_of_one_file_are_ONE_contest():
+    """THE HOLE THIS CLOSED, on the live shape that found it (2026-09-23).
+
+    `claims_by_path` keys on the path AS SPELLED, so a bare name in one lane
+    and a full path in another counted as two files with one holder each --
+    and this check printed a green line while two OPEN lanes held one file.
+    `lane-guard` was never fooled: it calls `matches`, which is suffix
+    tolerant, and blocked correctly. Only the REPORT was wrong, which is the
+    half nobody notices, because a census that under-reports reads as an
+    all-clear and the census is what a session consults to decide a file is
+    free to take.
+    """
+    spellings = {path for _, path in mod.claims(TWO_SPELLINGS)}
+    assert spellings == {"a/shared/thing.py", "shared/thing.py"}
+
+    contested = mod.contested_files(TWO_SPELLINGS)
+    assert len(contested) == 1, contested
+    key, holders = next(iter(contested.items()))
+    assert holders == ["alpha", "beta"]
+    # The key must SAY it was two spellings. "Held by two lanes" is not
+    # actionable until the reader can see that one wrote a bare basename.
+    assert "one file, claimed as:" in key
+    assert "a/shared/thing.py" in key and "shared/thing.py" in key
+
+
+def test_distinct_files_sharing_a_basename_are_NOT_merged():
+    """The grouping must not OVER-report either.
+
+    `mlb/cards.py` and `nba/cards.py` satisfy neither direction of `matches`,
+    so two lanes holding one each is two files and no contest. This is the
+    failure direction `open_lanes_under_archived` documents in its own
+    docstring: a report of more violations than exist "reads as vigilance, so
+    nobody doubts it".
+    """
+    assert mod.contested_files(SAME_BASENAME) == {}
+
+
+def test_the_report_and_the_guard_cannot_disagree_about_one_file():
+    """Closing the loop: whatever the report groups, the guard must also treat
+    as one file. Asserting the PREDICATE is shared, not just the outcome."""
+    from lane_claims import same_file
+
+    groups = {tuple(s): h for s, h in lane_claims_groups(TWO_SPELLINGS)}
+    [(spellings, _holders)] = [(s, h) for s, h in groups.items() if len(h) > 1]
+    for a in spellings:
+        for b in spellings:
+            assert same_file(a, b), (a, b)
+
+
+def lane_claims_groups(text):
+    from lane_claims import claim_groups
+
+    return claim_groups(text)
 
 
 def test_open_under_archived_is_caught():
