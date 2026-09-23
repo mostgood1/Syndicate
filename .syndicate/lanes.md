@@ -1078,6 +1078,14 @@ death, never life — do not invert it.
 - Verification: `--total-level` on scripts/backtest_nfl_rating_units.py printing train/held-out total MAE for the lambda grid against lambda=1 (today) and the market, plus a regenerated week showing total SD collapsed with the margin unmoved beyond seed noise.
 - Blocked by: none
 - Progress 2026-09-22: HYPOTHESIS CONFIRMED but only after TWO wrong intermediate readings, both recorded (`#684`, `#685`). Fitted lambda=0.3 (centre of a flat train optimum 0.2-0.4); held-out 2025 total MAE 10.97 -> 10.68 against a market 10.39, better in 4 of 5 week buckets. End-to-end on 2025 wk10 at 300 seeds: lambda=1.0 reproduces the pre-change file on all 14 games and all 5 projected fields; SD(total) 4.76 -> 2.33; margin unchanged in expectation (mean signed +0.108, t=+0.61, RMS 0.86 seed-SEs). EXONERATED along the way: drive priors (off 4.76 / on 5.24) and injury adjustment (4.17) -- neither produces production's signature. NOT YET DEPLOYED; the shrink only reaches the board on the next NFL projection REBUILD.
+### tripwire-applog-page-cap - OPEN - opened 2026-09-23 - session 8ce91d9d-ac1c-498f-90d3-89a2bc5fd620
+- Goal: `bandwidth_tripwire.py` can no longer report an app-log `served_mb` that is silently a FLOOR. A truncated app-log read is either avoided or declared in the capture JSON and in both print paths.
+- Files: `scripts/bandwidth_tripwire.py`
+- Hypothesis: `_logs()` pages backward with `limit=100` and `max_pages=200`, so it stops at 20,000 lines and returns a TRUNCATED list with no signal. The 2026-09-23T01:00Z web capture has `app.log_lines == 20000` exactly, which is the cap hit, not a coincidence -- so its `served_mb 395.62` covers only the newest part of the hour and `metered/app-served 1.04` is a CEILING. `instrument_partial` was False because `_emitter_gap()` only fires when EDGE requests sit outside the access-line span, which is a different failure mode.
+- Falsification test: page the same window with no practical cap. If the full app-log line count for 2026-09-23T01:00..02:00Z is <= 20,000 and the oldest line reached at page 200 is already <= the window start, the pager was NOT truncating and `served_mb` is a complete total -- hypothesis dead, and the 20,000 is coincidence.
+- Verification: (1) the re-read total for that window, stated as lines and MB, against the captured 20,000 / 395.62 MB; (2) a capture run over a known-truncating window emits the new flag, and one over a short window does not (off != on, per the reachability rule); (3) the corrected `metered/app-served` for the 01:00Z bucket, or an explicit statement that it is unavailable.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
