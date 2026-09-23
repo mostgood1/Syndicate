@@ -3635,3 +3635,17 @@ the other — the most expensive kind of half-true.
   IMPOSSIBLE one, where the tell is not a suspicious speed but silence.
 - **Cost:** none -- caught by the change itself, in the same session. Nine
   tests and two files corrected (`abc6d4b8`).
+
+## 2026-09-23 — RULE: a fix whose job is to EMIT a special character must not CONTAIN one — the first draft of the em-dash fix stored a literal U+2014 `[lane lane-open-emits-em-dash]`
+
+- **What happened.** `scripts/lane_open.py` was written to stop lanes being opened with ASCII hyphens instead of U+2014 (two lanes in nineteen hours; `lane_claims.LANE_RE` requires the em-dash, and the session-start digest will not list a hyphen-headed lane as OPEN, so an arriving session sees no claim on its paths). The source was authored as `EM = "—"`. The authoring tool takes JSON arguments and **decoded the escape**, so the file on disk held the raw bytes `E2 80 94`. Measured with `od -An -c`: `E M   =   " 342 200 224 "`.
+- **Why that is the defect and not a detail.** The file existed to be immune to transcoding and was storing the exact byte sequence it warns about, under a comment claiming it was written as an escape *"so that no editor, console re-encoding or copy-paste can turn it back into a hyphen"*. One ASCII-fying pass and it silently emits hyphens again — the fix reintroducing its own bug, with its documentation asserting the opposite.
+- **The same file had a SECOND instance.** Its success message printed the separator, and the console returned `U+FFFD` on the very first run. `lane-guard.py:158-160` already refuses to print a literal one for exactly this reason — *"an instruction to use U+2014 that arrives as a mangled byte is worse than no instruction at all"*. The precedent was in the adjacent file and went unapplied until it bit.
+- **What did NOT catch it.** Ten passing tests. Nor the mutation test — flipping `EM` to a hyphen turned 5 of 10 red and proved the suite load-bearing, but a LITERAL em-dash passes every one of those tests, because it works perfectly until something downstream mangles it. It surfaced only when a restore-from-backup printed `EM = "—"` where an escape had been written, and the bytes were then read directly.
+- **How to apply:**
+  - Build the character from its CODEPOINT (`chr(0x2014)`), keep the source pure ASCII, and PIN that with a test asserting zero bytes `> 127` in the file (`test_source_is_pure_ascii`). A comment promising ASCII is not a constraint; a test is.
+  - Never print the character in the tool's own output. Print its NAME (`"U+2014"`).
+  - **Check the BYTES, not the rendering.** A terminal, an editor and a diff all display `—` whether the source holds the literal or produces it. `od -An -c` / a `b > 127` scan is the only discriminator, and rendering is what makes this invisible to review.
+  - Authoring tools that take JSON arguments decode `\uXXXX` into the character. To write the escape through one, escape the backslash — or better, do not want the escape.
+  - Generalises past em-dashes: any tool whose job is to emit a byte sequence the surrounding stack is known to mangle — BOMs, CRLF, tabs, NBSP, RTL marks — should construct it, not contain it. Related: `feedback_shell_layer_transcodes_bytes`.
+  - *(evidence: `49b8881b` the fix, `fdfe579f` the close; lane `lane-open-emits-em-dash` in `lanes.md` carries the full verdict)*
