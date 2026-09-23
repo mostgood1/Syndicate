@@ -3606,3 +3606,32 @@ the other — the most expensive kind of half-true.
 - **The rule going forward:** every dated ledger file is SHARED and append-only by convention -- `log/<date>.md`, `deploys.md`, `leads.md`, `learnings.md`. Read the existing bytes, append, and gate the commit on **0 deletions** for that path. A whole-file write is only ever correct for a file you just created in the same command, and even then the existence check has to be in the write itself, not in your memory of it.
 - **Cost:** none this time -- restored verbatim from `HEAD~1` (`b4cd14d7`, 13 added / 0 deleted against the pre-clobber version). The near-miss is the point: the same code path had a `.exists()` branch on 09-22 and did not on 09-23.
 
+
+## 2026-09-23 — A SHARED TEST FIXTURE THAT OMITS A FIELD PRODUCTION ALWAYS SUPPLIES CAN HIDE AN ENTIRE DISPATCH
+
+- **What I believed:** that `tests/test_execute_portfolio.py` covering
+  `_polymarket_resolve_market` across 9 moneyline tests meant the resolver's
+  market dispatch was exercised.
+- **What is true:** the shared fixture `_PolyReq` carried **no `market`
+  attribute at all**, so `market` read `""` in every one of those tests. They
+  ran the fall-through arm -- the team matcher -- and could never have noticed
+  that a market with no branch lands there. Production cannot produce that
+  input: `_order_from_position` returns None unless `market` is non-empty
+  (`pipeline/execute_portfolio.py`, `if not (position_key and event_id and
+  market and side and sport)`). The same omission sat in
+  `tests/test_polymarket_slate_freshness.py::_Request`.
+- **How I found out:** adding a branch keyed on `market` turned 9 passing
+  tests red at once, all with `market='' ... reason=no_order_branch_for_market`.
+  The fixture had been asserting on a path for a year that no live request
+  could take.
+- **The rule going forward:** when a stub request/row fixture omits a field
+  the production constructor REQUIRES, that is not a harmless default -- it is
+  a different input class, and every test built on it is evidence about the
+  wrong one. When adding a branch keyed on such a field, a sudden mass failure
+  of old tests is the fixture confessing, not the change breaking. Check what
+  the real constructor refuses before "fixing" the assertions.
+- **Sibling, not duplicate, of `confirm-the-code-ran`:** that rule is about a
+  fixture picking a CHEAPER path than production. This is a fixture picking an
+  IMPOSSIBLE one, where the tell is not a suspicious speed but silence.
+- **Cost:** none -- caught by the change itself, in the same session. Nine
+  tests and two files corrected (`abc6d4b8`).
