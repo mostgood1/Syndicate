@@ -2171,8 +2171,77 @@ def _home_embed_lock(key: str) -> "threading.Lock":
         return lock
 
 
+def _home_embed_max_stale_seconds() -> int:
+    """How old a copy may be and still be served while a refresh runs behind it.
+
+    Default 10 min. Past this the caller waits for a real build: the point of
+    serving stale is to keep a request slot free, not to show a board from an
+    hour ago after a quiet period.
+    """
+    raw = str(os.environ.get("SYNDICATE_HOME_EMBED_MAX_STALE_SECONDS") or "").strip()
+    try:
+        return max(0, int(float(raw))) if raw else 600
+    except ValueError:
+        return 600
+
+
+def _build_and_store_home_embed(key: str, build: "Callable[[], Any]", ttl: int, *, source: str) -> str:
+    started = time.time()
+    payload = build()
+    text = _embed_json_text(payload)
+    cacheable = _embed_is_cacheable(payload)
+    if cacheable:
+        _HOME_EMBED_CACHE[key] = (time.time() + ttl, text)
+        _write_home_embed_file(key, text)
+    print(
+        f"[home_embed] BUILD key={key} source={source} ms={int((time.time() - started) * 1000)} "
+        f"chars={len(text)} ttl_s={ttl} cached={cacheable}",
+        flush=True,
+    )
+    return text
+
+
+def _spawn_home_embed_refresh(key: str, build: "Callable[[], Any]", ttl: int) -> bool:
+    """Rebuild BEHIND the response. Mirrors `_warm_combined_board_overlays_once`'s
+    contract one layer up: the same rebuild a request would have done, without a
+    request waiting for it.
+
+    NOT periodic work -- `#241` is the precedent for why that is never free. This
+    only runs when a request arrives after the window expired, so an idle service
+    does nothing, and the per-key lock means one refresh at a time.
+    """
+    lock = _home_embed_lock(key)
+    if not lock.acquire(blocking=False):
+        return False   # a refresh (or an inline build) already holds it
+    app = None
+    try:
+        from flask import current_app
+
+        app = current_app._get_current_object()
+    except Exception:  # noqa: BLE001 -- no app context is not a reason to skip the refresh
+        app = None
+
+    def _run() -> None:
+        try:
+            if app is not None:
+                # The build path reaches `current_app`; a bare thread has no
+                # application context and would raise instead of rebuilding.
+                with app.app_context():
+                    _build_and_store_home_embed(key, build, ttl, source="background")
+            else:
+                _build_and_store_home_embed(key, build, ttl, source="background")
+        except Exception as exc:  # noqa: BLE001 -- a failed refresh leaves the served copy as it was
+            print(f"[home_embed] REFRESH_FAILED key={key} {type(exc).__name__}: {exc}", flush=True)
+        finally:
+            lock.release()
+
+    threading.Thread(target=_run, name="home-embed-refresh", daemon=True).start()
+    return True
+
+
 def cached_home_embed_json(key: str, build: "Callable[[], Any]") -> str:
-    """The embed's JSON text for `key`, built at most once per TTL per worker."""
+    """The embed's JSON text for `key`, built at most once per TTL per container
+    and never on a request's own thread once a copy exists."""
     ttl = _home_embed_cache_seconds()
     if ttl <= 0:
         return _embed_json_text(build())
@@ -2190,12 +2259,31 @@ def cached_home_embed_json(key: str, build: "Callable[[], Any]") -> str:
         print(f"[home_embed] FILE_HIT key={key} chars={len(shared)}", flush=True)
         return shared
 
+    # A STALE COPY BEATS A SLOT HELD FOR SECONDS. Measured 2026-09-22 with the
+    # per-container cache: the three requests that landed on a window boundary
+    # took 10.3 / 6.2 / 8.2 s while the other nine took 0.41-1.81 s. Whoever
+    # arrives first now gets the previous copy and the rebuild runs behind it.
+    # The cap applies to the IN-MEMORY copy too, not just the file: a worker
+    # that served nothing for an hour holds an hour-old entry, and "serve stale"
+    # is about keeping a slot free, not about showing an hour-old board.
+    max_stale = _home_embed_max_stale_seconds()
+    stale = None
+    if cached and (time.time() - (cached[0] - ttl)) <= max_stale:
+        stale = cached[1]
+    elif not cached:
+        stale = _read_home_embed_file(key, max_stale)
+    if stale:
+        spawned = _spawn_home_embed_refresh(key, build, ttl)
+        print(
+            f"[home_embed] STALE_SERVED key={key} chars={len(stale)} refresh={int(spawned)}",
+            flush=True,
+        )
+        return stale
+
+    # Nothing usable: the first request after a boot, or a copy past the stale
+    # cap. This one waits, under the lock so eight slots cannot all build.
     lock = _home_embed_lock(key)
-    if not lock.acquire(blocking=not cached):
-        # Someone is rebuilding and we hold a previous string: serve it rather
-        # than hold a request slot for the length of a build.
-        print(f"[home_embed] STALE_SERVED key={key} chars={len(cached[1])}", flush=True)
-        return cached[1]
+    lock.acquire()
     try:
         fresh = _HOME_EMBED_CACHE.get(key)
         if fresh and fresh[0] > time.time():
@@ -2206,20 +2294,7 @@ def cached_home_embed_json(key: str, build: "Callable[[], Any]") -> str:
             _HOME_EMBED_CACHE[key] = (time.time() + ttl, shared)
             print(f"[home_embed] FILE_HIT key={key} chars={len(shared)} after_lock=1", flush=True)
             return shared
-        started = time.time()
-        payload = build()
-        text = _embed_json_text(payload)
-        elapsed_ms = int((time.time() - started) * 1000)
-        cacheable = _embed_is_cacheable(payload)
-        if cacheable:
-            _HOME_EMBED_CACHE[key] = (time.time() + ttl, text)
-            _write_home_embed_file(key, text)
-        print(
-            f"[home_embed] BUILD key={key} ms={elapsed_ms} chars={len(text)} "
-            f"ttl_s={ttl} cached={cacheable}",
-            flush=True,
-        )
-        return text
+        return _build_and_store_home_embed(key, build, ttl, source="request")
     finally:
         lock.release()
 

@@ -71,12 +71,24 @@ def _expire(key="default"):
         os.utime(path, (old, old))
 
 
+def _wait_for(predicate, timeout=5.0):
+    """Background refreshes are threads; poll rather than sleep a fixed time."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.02)
+    return predicate()
+
+
 def test_the_cache_expires():
     build = _counting_build()
     intel.cached_home_embed_json("default", build)
     _expire()
     intel.cached_home_embed_json("default", build)
-    assert len(build.calls) == 2
+    # The rebuild now happens BEHIND the response (see the 2026-09-22 block at
+    # the bottom), so it is the thread, not this call, that raises the count.
+    assert _wait_for(lambda: len(build.calls) == 2), f"no rebuild ran: {len(build.calls)}"
 
 
 def test_two_windows_do_not_share_an_entry():
@@ -241,3 +253,113 @@ def test_a_failed_write_neither_raises_nor_corrupts_the_previous_copy(monkeypatc
     assert json.loads(text)["ranked_all"][0]["tag"] == "second"   # served anyway
     assert open(path, encoding="utf-8").read() == good            # previous copy intact
     assert "FILE_WRITE_FAILED" in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------
+# REFRESH OFF THE REQUEST PATH (2026-09-22). With the per-container cache, the
+# three requests that landed on a window boundary took 10.3 / 6.2 / 8.2 s while
+# the other nine took 0.41-1.81 s. A stale copy is now served immediately and
+# the rebuild runs behind it -- the same rebuild a request would have done,
+# which is `_warm_combined_board_overlays_once`'s contract one layer up.
+# --------------------------------------------------------------------------
+
+
+def test_a_stale_copy_is_served_immediately_and_refreshed_behind_it():
+    slow = threading.Event()
+    calls = []
+
+    def build():
+        calls.append(1)
+        if len(calls) > 1:
+            slow.wait(3)              # a real rebuild takes seconds
+        return _payload(tag=f"build{len(calls)}")
+
+    first = intel.cached_home_embed_json("default", build)
+    _expire()
+
+    began = time.time()
+    served = intel.cached_home_embed_json("default", build)
+    waited = time.time() - began
+
+    assert served == first, "the caller must get the previous copy"
+    assert waited < 1.0, f"the caller waited {waited:.1f}s for the rebuild"
+    assert _wait_for(lambda: len(calls) == 2), "no background refresh ran"
+    slow.set()
+    # Once the refresh lands, the next caller gets the NEW text, no build.
+    assert _wait_for(lambda: intel.cached_home_embed_json("default", build) != first, timeout=6)
+    assert len(calls) == 2
+
+
+def test_only_one_refresh_runs_at_a_time():
+    release = threading.Event()
+    calls = []
+
+    def build():
+        calls.append(1)
+        if len(calls) > 1:
+            release.wait(3)
+        return _payload(tag=f"build{len(calls)}")
+
+    intel.cached_home_embed_json("default", build)
+    _expire()
+    for _ in range(4):
+        intel.cached_home_embed_json("default", build)
+
+    assert _wait_for(lambda: len(calls) == 2)
+    time.sleep(0.2)
+    assert len(calls) == 2, f"{len(calls) - 1} refreshes ran for one expiry"
+    release.set()
+
+
+def test_an_ancient_in_memory_copy_is_not_served_either(monkeypatch):
+    """The cap is not only about the file: a worker idle for an hour holds an
+    hour-old entry in memory, and that must not be served either."""
+    monkeypatch.setenv("SYNDICATE_HOME_EMBED_MAX_STALE_SECONDS", "30")
+    build = _counting_build(_payload(tag="first"))
+    intel.cached_home_embed_json("default", build)
+    text, = [v[1] for v in [intel._HOME_EMBED_CACHE["default"]]]
+    intel._HOME_EMBED_CACHE["default"] = (time.time() - 3600, text)   # ancient
+    path = intel._home_embed_cache_path("default")
+    old_stamp = time.time() - 3600
+    os.utime(path, (old_stamp, old_stamp))
+
+    fresh_build = _counting_build(_payload(tag="second"))
+    served = intel.cached_home_embed_json("default", fresh_build)
+    assert json.loads(served)["ranked_all"][0]["tag"] == "second"
+    assert len(fresh_build.calls) == 1
+
+
+def test_past_the_staleness_cap_the_caller_waits_for_a_real_build(monkeypatch):
+    """off != on for the cap: serving stale is about keeping a slot free, not
+    about showing an hour-old board after a quiet period."""
+    monkeypatch.setenv("SYNDICATE_HOME_EMBED_MAX_STALE_SECONDS", "0")
+    build = _counting_build(_payload(tag="second"))
+    intel._HOME_EMBED_CACHE.clear()
+    path = intel._home_embed_cache_path("default")
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write('{"ranked_all": [{"tag": "ancient"}]}')
+    old = time.time() - 3600
+    os.utime(path, (old, old))
+
+    text = intel.cached_home_embed_json("default", build)
+    assert json.loads(text)["ranked_all"][0]["tag"] == "second"
+    assert len(build.calls) == 1
+
+
+def test_a_failing_background_refresh_leaves_the_served_copy_usable(capsys):
+    calls = []
+
+    def build():
+        calls.append(1)
+        if len(calls) > 1:
+            raise RuntimeError("board read failed")
+        return _payload(tag="good")
+
+    first = intel.cached_home_embed_json("default", build)
+    _expire()
+    served = intel.cached_home_embed_json("default", build)
+    assert served == first
+    assert _wait_for(lambda: "REFRESH_FAILED" in capsys.readouterr().out or len(calls) > 1)
+    # The previous copy is still there to serve, and the next request is not stuck.
+    _expire()
+    assert intel.cached_home_embed_json("default", build) == first
