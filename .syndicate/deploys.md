@@ -40925,3 +40925,26 @@ The 20:58Z row reports model total SD 4.61 against a 4.47 baseline, and annotate
 ## 2026-09-23 21:12Z — `check-nfl-wk3-board-after-rebuild`, first scheduled run: NO REBUILD YET, BOARD UNCHANGED, TAG PRESENT.
 
 Artifact `nfl_source/smartsim2_projections_2026_wk3.csv` still stamped `2026-09-23T15:41:55Z`..`15:44:59Z` (16 rows, one build); the 86400s interval is not due until ~2026-09-24T15:42Z, so this is expected, not a stall. `+level_shrink_0.3` on **16 of 16** rows — `#684` not reverted or overwritten. Served board (`/nfl/api/market-board`, `source_path` = that same on-disk CSV, 16 games, all `pregame`) reproduces the baseline to the digit on population SD (ddof=0): model total SD **4.47** (market 2.51), MAE vs market **2.60**, **1** game 7+ off (CIN @ PIT, 38.79 vs 47.50, -8.71), model margin SD **5.29** (market 4.86) — which independently confirms the estimator pin recorded in the correction above. Rebuild-survival is still the open question and comes due after ~2026-09-24T15:42Z. Read-only run: no deploy, no env change, no claim taken, nothing regenerated. Lane `nfl-total-sum-direction-scale`, CLOSED.
+
+---
+
+## 2026-09-23 21:1xZ (4:1x PM CDT) — **CORRECTION to the 20:58Z reading** — lane `nfl-total-sum-direction-scale` (CLOSED) — no deploy — **MY ATTRIBUTION WAS WRONG. Nothing drifted. I used the SAMPLE SD (ddof=1) where the baseline is POPULATION SD (ddof=0), and then explained my own 3.28% inflation as "the market moving".**
+
+**What the 20:58Z row claims and what is true.** That row reported model total SD 4.61 against a 4.47 baseline, model margin SD 5.46 against 5.29, and market columns 2.59 / 5.02 against 2.51 / 4.86 — and attributed all four moves to market lines shifting between fetches. Recomputed on the SAME payload with `statistics.pstdev`:
+
+| metric | baseline | 20:58Z reported (`stdev`) | correct (`pstdev`) |
+|---|--:|--:|--:|
+| model total SD | 4.47 | 4.61 | **4.47** |
+| market total SD | 2.51 | 2.59 | **2.51** |
+| model margin SD | 5.29 | 5.46 | **5.29** |
+| market margin SD | 4.86 | 5.02 | **4.86** |
+
+**All four match the baseline exactly.** Not approximately — to the reported precision, on all four. Total MAE 2.60 and the 7+ count of 1 are unaffected (neither takes an SD) and stand.
+
+**The mechanism.** `statistics.stdev` divides by n-1, `pstdev` by n. At n=16 that is a fixed `sqrt(16/15)` = **1.03280** on EVERY SD, model and market alike. 4.47 x 1.0328 = 4.616; 2.51 x 1.0328 = 2.592; 5.29 x 1.0328 = 5.464; 4.86 x 1.0328 = 5.019. Four for four.
+
+**Why the error was self-concealing, which is the part worth keeping.** The inflation hit the model and market columns EQUALLY, so the two "moved together" — and moving together is exactly the signature of a market shift with a fixed model. I read a constant scale factor as a correlation and wrote down a cause. The check that would have caught it was available and free: the model numbers come from byte-identical CSV rows, so the model SD COULD NOT have moved, and one number that cannot move but did is a bug in the instrument, not in the world. I noted the byte-identity in the same entry and still did not draw the inference.
+
+**Blast radius: this reading only.** No deploy, no code, no env, no artifact was touched by either row, and the 09-23 15:32:36Z verification of `#684` used the population convention throughout and is unaffected. The reading's actual verdict is unchanged and in fact stronger: the board is byte-identical to the verified build, not merely close to it.
+
+**Pinned so it cannot recur.** The scheduled task `check-nfl-wk3-board-after-rebuild` now mandates `pstdev` in its own text and names this dry run as the precedent. Left unpinned, a permanent +3.28% phantom would sit under every future reading and would disguise the first REAL regression as a bit more of the usual drift. The task is re-armed for 2026-09-24 16:30Z (11:30 AM CDT), ~48 min after the ~15:42Z rebuild is due.
