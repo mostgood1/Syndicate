@@ -28,13 +28,32 @@ not predict a total.
 response would take wk3's total SD from **4.47 to ~3.26**, against a market
 2.51 and an evidence-supported ~2.7.
 
-**Two fix shapes, not yet chosen.** (1) NFL-only, at the generator: subtract
-the fitted difference-response from `total_mean`. Surgical, but it would desync
-`total_mean` from `total_stdev` and from the simulated distribution the
-over/under probabilities are drawn from — check that before choosing it.
-(2) In the engine, remove the nonlinearity itself: correct, but
-`smartsim2` is SHARED WITH NCAAF, so it needs the same actual-outcome fit run
-for that sport before touching it.
+**THE COUPLING CONCERN IS REFUTED — CHECKED 2026-09-23, and it was MY OWN
+objection.** I wrote that an output-side correction "would desync `total_mean`
+from the distribution the over/under probabilities are drawn from". There is no
+such distribution. `nfl_game_projections.py:545` computes
+`model_prob_over = 1 - _normal_cdf((line - mean) / stdev)` and stamps
+`basis = "smartsim2_total_normal"` — a closed form over the two SUMMARY stats,
+nothing else. Verified numerically against the served board, all 16 wk3 games,
+max |board - normal| = **0.0000**. So correcting the mean carries the
+probability with it, exactly and automatically. NCAAF is the same shape
+(`_ncaaf_cover_probability(line, mean, stdev)`).
+
+**PREFERRED FIX (now unblocked): correct the two SCORE means, not the total.**
+Subtract delta/2 from `home_score_mean` and delta/2 from `away_score_mean`,
+where delta is the fitted difference-response. Then `total = home + away` is
+corrected, `margin = home - away` is UNCHANGED, and the artifact stays
+internally consistent — no field contradicts another, which a bare `total_mean`
+edit would have caused. `total_stdev` is untouched: this is a location bias, not
+a dispersion one.
+
+**Still open, and the reason this is not done yet:** the correction is a
+POST-HOC calibration of a mechanism that lives in the engine. `smartsim2` is
+SHARED WITH NCAAF, so the honest alternative — removing the nonlinearity at
+source — needs the same actual-outcome fit run for that sport first. Doing the
+NFL-only output correction is the smaller, reversible step; doing the engine
+one is the right one. Decide which, and re-fit the level shrink (`#684`) AFTER
+either, since the two gains are not independent (`mechanism vs estimator`).
 
 **RETRACTED, and kept because it nearly became a third defect.** Week 2 looked
 anomalous (R2 0.530 with all four terms, ~47% unexplained, far beyond the 0.69
