@@ -3674,3 +3674,27 @@ the other — the most expensive kind of half-true.
 - **What happened:** appending two lines to `lanes.md` produced a **1,524 / 1,522** diff -- the whole file rewritten. `.syndicate/*.md` is STORED as LF and CHECKED OUT as CRLF, and an earlier session had rewritten the file, so the separator I had used successfully hours before was now wrong. Two spliced separators landed as bare LF inside a CRLF body, and git saw every line as changed.
 - **Why it matters here specifically:** these files are shared, append-only, and read at every session start. A whole-file rewrite in a lanes/deploys commit is indistinguishable from a destructive edit at review time, and the ledger-commit guard gates on exactly that.
 - **How to apply:** read the bytes you are editing from `git show HEAD:<path>`, detect the separator from THAT blob (not from the working file, not from memory), splice, write. Then run `git diff --numstat` and refuse to commit unless the numbers are the ones you intended -- 2 added / 0 deleted for a two-line append. The numstat check is what caught this; nothing else would have.
+
+## 2026-09-23 OVERTURNED: “lanes.md is over cap, so archive its CLOSED lane blocks” `[scheduled task archive-closed-lanes-0917, session 8a815e5b, no lane]`
+
+The job was scheduled every 2 h on that premise and moved 3, 0, 0, 0 blocks. The premise was arithmetically
+impossible and nothing in the loop checked it. Measured on origin/main 2026-09-23: OPEN blocks are **423,218 B of
+524,327 B (80.7%)** across 41 lanes; CLOSED is **25,886 B (4.9%)** across 3. Archiving EVERY CLOSED block leaves
+~498 KB against a 234 KB cap — still 2.1x. The reclaimable mass is 7 OPEN lanes dormant on both clocks: 95,379 B,
+3.7x the entire CLOSED population.
+
+**RULE: size a cleanup job against the segment it can actually touch BEFORE scheduling it, and record that
+denominator in the job itself.** Four runs of 0 read as “the system is working” — and that reading was even true —
+while the file grew 4,366 B in 40 minutes from a segment the job was forbidden to touch. A repeatedly null job is
+evidence about its TARGET, not only about its subject.
+
+## 2026-09-23 FORBIDDEN: calling a lane ABANDONED from its owner session's idleness alone `[same session]`
+
+`bandwidth-controlled-transfer` is the single largest block in lanes.md (68,525 B, 13% of the file). Every session
+id in its header was idle **7.0 days**. The block had been modified **0.2 days** earlier, by a session the header
+does not name. An owner-idle test alone would have flagged the most actively-written lane in the file as dormant.
+
+**RULE: dormancy needs BOTH clocks — owner transcript idle AND `git blame` committer-time on the block's own lines.**
+This is the same failure `owner_liveness.py`'s last-modifier check was added for on 2026-09-18
+(`fotmob-team-name-aliases`, closed by a session it never named); it was fixed there for CLOSED blocks and
+re-appeared the moment a new reader looked at OPEN ones. A header names who OPENED a lane, never who is writing it.
