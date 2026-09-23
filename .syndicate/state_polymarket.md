@@ -163,6 +163,8 @@ the three tickers were named before the reading. It never rewrites `outcome` or
 `pnl_dollars`. `learnings.md` had recorded this class as "caught twice by a human
 looking at a screen and zero times by a machine"; that is no longer true.
 
+**YES/NO TOTALS (`cor-all-gt<line>`) AND YES/NO SIDES (`btts`) RESOLVE BY THE SLUG'S GRAMMAR TOO** `[2026-09-23, `abc6d4b8`, live-odds-worker `b2779a98` 16:11:43Z; NO-REGRESSION VERIFIED, CORNERS AND BTTS PRODUCTION READINGS OWED]`. Same defect as the props one entry down, two families later. `alternate_totals_corners` is in neither `_TOTAL_MARKETS` (its outcomes are `Yes`/`No`, not `Over`/`Under`) nor the `gte<N>` prop grammar (`gt`, not `gte`), so it fell to the team matcher and then the soccer subject rule: planned on 8 passes over the 24 h to 09-23 09:48 CT, **built 0**, every one refusing `yes_no_market_subject_is_not_our_side`. Now over takes the outcome named `Yes` and under the one named `No`, gated on the slug's `gt<N>` token with N EQUAL TO THE POSITION'S LINE -- the rule `_probability_for_side` already used on the pricing side, with the decoder IMPORTED from the join rather than a second copy. `btts` resolves by literal outcome name. A market with no branch now refuses `no_order_branch_for_market` instead of falling into a team matcher that can only read team outcomes, and the team-outcome vocabulary is DERIVED from `MARKET_TYPE_TO_BOARD`. **VERIFIED:** `ORDER_PATH` 16:19:02.887Z builds 5 of 5 (`totals` 3, `hits_allowed` 1, `batter_hits_runs_rbis` 1) against a 4-of-4 baseline at 16:00:59Z -- the reading that matters, because the dispatch changed for EVERY market. **OWED:** a corners position on the new code (none has been planned since), and any BTTS position at all (none ever). **NOT A CLAIM ABOUT FILLS:** `ORDER_PATH` is `verify_order_paths`, a DRY RUN, and both venues refuse every live order on `insufficient_venue_balance`.
+
 **PLAYER PROPS (`gte<N>`, outcomes `Yes`/`No`) RESOLVE BY THE SLUG'S GRAMMAR** `[2026-09-22, `69db91e8`, live-odds-worker `f15ffb80` 16:30:04Z, PLACEMENT VERIFIED; side proof owed]`. There was no prop branch: every prop fell into the team matcher, then the soccer 3-way subject rule, and refused `yes_no_market_subject_is_not_our_side` (counted as `market_unresolved_for_position`). Now, once the slug agrees with the position's market, line and player (the join's own encoders), over takes the outcome named `Yes` and under the one named `No`, BY NAME. The venue's `yesLegIndex` is a second witness that can only refuse. First order: Soroka K 5+ YES `CNAV8SPX4WPA`, `venue_yes_leg_index=0 agree=True`, filled 2/2 @ 0.45 (16:51:13Z). The side is proven only by settlement: scheduled `soroka-prop-settlement-reading-0923` (08:00 CT 09-23), todo `#682`.
 
 ## [polymarket-vs-kalshi-prop-prices] — MEASURED 2026-09-01, MLB, production shard
@@ -339,8 +341,16 @@ all of the above were in a line that looked cut off.
 
 ## [polymarket-venue-join] VERIFIED 2026-08-29, all three services on `95c4fb12`
 
-**Soccer, corners, BTTS and NCAAF now execute on Polymarket.** Readings are
+**Soccer, corners, BTTS and NCAAF now JOIN on Polymarket.** Readings are
 post-`BOOTED` lines on refresh-worker, not post-`finishedAt`.
+
+**"EXECUTE" IS WHAT THIS SAID UNTIL 2026-09-23, AND IT WAS WRONG BY ONE WHOLE
+STAGE.** Every number below is a JOIN count -- `matched`, `no_match|...` --
+and a board row matching a venue market is not an order. Measured 09-23 over
+24 h: `alternate_totals_corners` was planned on 8 passes and BUILT **0**, and
+`btts` had never reached the order path at all. The order stage is a separate
+fact with its own entry (see the Yes/No TOTALS and SIDES entry above); this
+section is sound about the join and says nothing about ordering.
 
 ```
 matched                              85 (15:22Z) -> 167 (19:08Z)
