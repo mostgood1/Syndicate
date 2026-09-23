@@ -1145,6 +1145,14 @@ death, never life — do not invert it.
 - Verification: `pytest tests/test_venue_balances.py` green including a payload with extra numerics and `pendingWithdrawals`; then, after a live-odds-worker deploy, `/api/portfolio/live` -> `balances.venues.polymarket.detail` shows the venue's own field names and numbers, and the gap between `cash_dollars` and `buying_power_dollars` is either EXPLAINED by one of them or provably absent from the payload.
 - Blocked by: none. NO new venue endpoint is called -- a second independent caller per venue is a documented incident class here (`#139/#144`, `#148`); this only keeps more of a response we already make.
 
+### lane-open-emits-em-dash — OPEN — opened 2026-09-23 — session 74dc52b3-2d7d-46fb-a646-d678f21c1a0d
+- Goal: a lane opened through the documented path always carries U+2014 separators -- `lane_claims.LANE_RE` matches its header, `lane-guard` never lists it as malformed, and the block lands inside `## OPEN`
+- Files: scripts/lane_open.py (NEW), tests/test_lane_open.py (NEW), .claude/commands/lane.md
+- Hypothesis: n/a (build lane). Root cause MEASURED, not hypothesised: the template in lane.md already specifies U+2014 and sessions substitute a hyphen anyway -- 2 lanes in 19 h on 2026-09-23.
+- Falsification test: the tool writes a header that ASCII_LANE_RE matches and LANE_RE does not, or a block outside the `## OPEN` section.
+- Verification: REACHABILITY FIRST (off != on): mutating EM to a hyphen must make the suite RED -- measured, 5 of 10 failed and the tool refused to write. Then: 10 tests green, the tool source is pure ASCII, and this lane block itself was written by the tool.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

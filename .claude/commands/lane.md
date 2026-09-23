@@ -42,7 +42,31 @@ intend to reach it now.
    the claim set is unchanged before writing). `py -3
    scripts/check_lane_invariants.py` is the check, and it runs at session start.
 
-   The block to insert:
+   **USE THE TOOL. Do not hand-write the header.**
+
+```
+py -3 scripts/lane_open.py --slug <slug> --goal "<single testable outcome>" \
+    --files "<explicit paths>" [--hypothesis ...] [--falsification ...] \
+    [--verification ...] [--blocked-by none] [--dry-run]
+```
+
+   It writes the block at the END of the `## OPEN` section (step 5's whole
+   point), writes your per-session marker (step 6), refuses a duplicate slug or
+   a missing session id, and REFUSES TO WRITE AT ALL unless the header it built
+   matches `lane_claims.LANE_RE` — the regex `lane-guard` and the session-start
+   digest actually parse on.
+
+   **Why a tool and not the template below.** The template has always shown
+   U+2014 and sessions keep typing an ASCII hyphen anyway: `tripwire-applog-page-cap`
+   (opened `2d192e9a`, repaired `3e39e88b` 48 min later) and
+   `live-gameline-game-identity` (opened `5dd126e7`, repaired `60fd67a8` ~18 h
+   later) — two in nineteen hours on 2026-09-23. A hyphen header is not
+   cosmetic: `lane-guard` blocks the owner until it is fixed, and until then the
+   digest does not list the lane as OPEN, so **an arriving session sees no claim
+   on those paths**. The repair also gets made in the primary shared tree and
+   committed from a worktree, leaving dirt that aborts later fast-forwards.
+
+   The shape it produces, for reading — not for copying:
 
 ```
 ### <slug> — OPEN — opened <date> — session <id or name>
@@ -54,7 +78,15 @@ intend to reach it now.
 - Blocked by: <lane slug or none>
 ```
 
-6. Write the lane slug to **your own per-session marker**,
+   If you must write it by hand (the tool is unavailable), **copy the separator
+   from an existing OPEN header rather than typing it**, then verify with
+   `bash .claude/hooks/session-start.sh | grep -i guarded`.
+
+6. **`lane_open.py` already did this** unless you passed `--no-marker`; read on
+   only if you wrote the block by hand, and keep reading either way — the reason
+   below is why the tool writes the per-session file and never the bare one.
+
+   Write the lane slug to **your own per-session marker**,
    `.syndicate/.current-lane.<your session id>` — resolve the id with
    `Bash: echo $CLAUDE_CODE_SESSION_ID`, then `Write` the slug to
    `.syndicate/.current-lane.<that value>`. Both `lane-guard.py` and
