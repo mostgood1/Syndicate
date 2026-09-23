@@ -175,6 +175,45 @@ class CalibrationProfile:
     drive_success_sensitivity: float = 1.0
     drive_success_anchor: float = 0.40
 
+    # SPLIT OFFENCE/DEFENCE SENSITIVITIES. Both default 1.0, an EXACT algebraic
+    # no-op, so every shipped profile is byte-identical until one is set.
+    #
+    # WHY THE SINGLE DIAL ABOVE IS NOT ENOUGH, measured 2026-09-23 (`#686`/`#687`,
+    # lane `smartsim2-total-nonlinearity`). Fitting ACTUAL totals against the
+    # ratings each sport's generator really feeds the engine, and comparing with
+    # what the engine applies (5x5 grids, one direction pinned, R2 0.98+):
+    #
+    #                      keep offence   keep defence
+    #     NFL                  0.438          0.026
+    #     NCAAF                0.112          0.399
+    #
+    # The two sports are near MIRROR IMAGES. `drive_success_sensitivity` shrinks
+    # the whole spread toward `drive_success_anchor` and therefore applies ONE
+    # ratio to both, which cannot satisfy either sport. A per-sport single dial
+    # would still be a compromise; this is the split that is not.
+    #
+    # NFL's numbers come from `backtest_nfl_rating_units.py --total-level`
+    # (train 2023-24 n=544, held out 2025 n=272). NCAAF's come from
+    # `backtest_ncaaf_total_units.py --asof` (train 2024 n=655, held out 2025
+    # n=645), on the as-of-week `blend_ppa` k=2 rating the generator actually
+    # runs mid-season -- NOT the prior-season SP+ basis, which is a DEGRADED
+    # rating and returned roughly half these ratios (0.062 / 0.253).
+    #
+    # SHAPE. Each dial shrinks its own team-quality term toward that term's
+    # value at a NEUTRAL index of 0.5 -- the engine's own convention, the same
+    # 0.5 that `0.5 + rating` uses. The `returning`, `coach`, `market_prior`
+    # and `transfer_volatility` terms are NOT touched: they are not team-quality
+    # carriers and shrinking them would move the MEAN, which is already right.
+    # With both at 1.0 the expression reduces to the original literal sum, which
+    # is why the default cannot perturb a single seeded result.
+    #
+    # NOT FITTED, NOT ARMED. These are the dials the fits argue for; setting
+    # them is a separate act that must re-check the MEAN (via
+    # `drive_success_anchor`) and the MARGIN, because this is a mechanism change
+    # to a calibrated engine.
+    drive_success_offense_sensitivity: float = 1.0
+    drive_success_defense_sensitivity: float = 1.0
+
     # Ordinary-gain yardage magnitude ("drive-yardage generation"): multiplies
     # the GAIN outcome's yardage base in play_simulator.simulate_play.
     drive_yardage_multiplier: float = 1.0

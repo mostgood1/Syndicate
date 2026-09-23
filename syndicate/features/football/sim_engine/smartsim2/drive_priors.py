@@ -284,6 +284,50 @@ def _market_prior_index(market_features: Mapping[str, Any]) -> float:
     return _clamp(score, 0.0, 1.0)
 
 
+DRIVE_SUCCESS_OFFENSE_WEIGHT = 0.28
+DRIVE_SUCCESS_DEFENSE_WEIGHT = 0.22
+# The engine's own neutral: the same 0.5 that `0.5 + rating` uses, and the value
+# `_offense_strength` returns when a payload carries nothing.
+DRIVE_SUCCESS_NEUTRAL_INDEX = 0.5
+
+
+def drive_success_team_terms(
+    offense_index: float,
+    defense_index: float,
+    *,
+    offense_sensitivity: float = 1.0,
+    defense_sensitivity: float = 1.0,
+) -> tuple[float, float]:
+    """The two TEAM-QUALITY terms of `drive_success_probability`, each shrunk
+    toward its value at a neutral index, independently.
+
+    A SEPARATE FUNCTION so the arithmetic can be tested directly. It was not,
+    at first, and the test harness silently passed flat `offense_index` keys
+    that `build_drive_priors` does not read -- every case ran at neutral 0.5,
+    so the dials looked broken when the payload was.
+
+    At the 1.0 defaults the neutral term cancels exactly
+    (`n*w + 1.0*(i - n)*w == i*w`) for ANY index, which is what keeps the
+    shipped profiles byte-identical. See
+    `CalibrationProfile.drive_success_offense_sensitivity` for why the two
+    directions need separate dials: the measured keep ratios are near mirror
+    images across the two sports (NFL 0.438/0.026, NCAAF 0.112/0.399).
+
+    Returns `(offense_term, defense_term)`; the defence term is NEGATIVE,
+    because a stronger defence suppresses drive success.
+    """
+    neutral = DRIVE_SUCCESS_NEUTRAL_INDEX
+    offense_term = (
+        neutral * DRIVE_SUCCESS_OFFENSE_WEIGHT
+        + offense_sensitivity * ((offense_index - neutral) * DRIVE_SUCCESS_OFFENSE_WEIGHT)
+    )
+    defense_term = -(
+        neutral * DRIVE_SUCCESS_DEFENSE_WEIGHT
+        + defense_sensitivity * ((defense_index - neutral) * DRIVE_SUCCESS_DEFENSE_WEIGHT)
+    )
+    return offense_term, defense_term
+
+
 def build_drive_priors(
     source: SmartSim2SimulationInput | Mapping[str, Any],
     *,
@@ -329,13 +373,31 @@ def build_drive_priors(
     # of NCAAF's total over-dispersion and why the dial has this shape.
     # `sensitivity == 1.0` is an exact algebraic no-op for ANY anchor, so the
     # default path is byte-identical to the hardcoded formula it replaces.
+    # THE TWO TEAM-QUALITY TERMS ARE SHRUNK SEPARATELY, each toward its own
+    # value at a NEUTRAL index of 0.5 (the engine's convention, the same 0.5 as
+    # `0.5 + rating`). With both sensitivities at their 1.0 default this reduces
+    # algebraically to the original literal sum -- `_NEUTRAL_INDEX` cancels --
+    # so the shipped profiles stay byte-identical. See
+    # `CalibrationProfile.drive_success_offense_sensitivity` for the measured
+    # reason the single dial above cannot serve both sports: the keep ratios are
+    # near mirror images (NFL 0.438/0.026, NCAAF 0.112/0.399).
+    #
+    # The returning / coach / market_prior / transfer terms are deliberately NOT
+    # shrunk: they are not team-quality carriers, and moving them would move the
+    # MEAN, which is already correct.
+    _offense_term, _defense_term = drive_success_team_terms(
+        offense_index,
+        defense_index,
+        offense_sensitivity=float(getattr(profile, "drive_success_offense_sensitivity", 1.0)),
+        defense_sensitivity=float(getattr(profile, "drive_success_defense_sensitivity", 1.0)),
+    )
     _drive_success_raw = (
         0.24
-        + offense_index * 0.28
+        + _offense_term
         + returning_index * 0.06
         + coach_index * 0.04
         + market_prior_index * 0.03
-        - defense_index * 0.22
+        + _defense_term
         - transfer_volatility * 0.04
     )
     _anchor = float(getattr(profile, "drive_success_anchor", 0.40))
