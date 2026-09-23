@@ -572,3 +572,33 @@ So it has a **full-game PREGAME histogram**, the banked actual, and a progress f
 **RECOMMENDATION: option 2.** Carry the MC `live_model_prob_over` onto `_live_props_from_game_detail`'s rows inside `_card_to_live_lens_row` (`live_lens.py:1240-1253`), where the live branch already runs `_normalize_live_prop_row` and would map the spelling for free. This is `5bab0685`'s reasoning relocated to the live path, and `7094b69a`'s normalise-the-source fix applies there unchanged.
 
 **Still to check before writing it:** whether the vendored MC rows are reachable from `_card_to_live_lens_row`'s context at all — producer B runs in `flask_frontend.py` and its rows reached the lens only via the orphaned merge, so the artifact/handoff it writes to needs identifying. That is the one open unknown; everything else about the fix is now decided.
+
+## 2026-09-23 — LAST HOP FOUND: the live merge already holds both sides and deliberately skips props. The fix is three lines. `[lane mlb-doubleheader-e2e, session 3692ff18]`
+
+Closes the design question. **There is a LIVE equivalent of the orphaned merge, it already has the MC payload in hand, and it discards exactly the field we need.**
+
+    _persist_live_lens_report                          live_lens.py:1569
+      payload    = _cards_backed_live_lens_report(...)        <- producer A rows (no probability)
+      mc_payload = _live_projection_enhancement_payload(...)  <- :1574-79 calls the VENDOR's
+                                                                 _live_lens_payload(date, persist=True)
+      payload    = _enhance_cards_report_with_live_projection(payload, mc_payload)
+        -> _enhance_card_row_with_live_projection(row, projection_row)
+
+The vendor payload is the MC side: `_live_lens_payload` (`flask_frontend.py:17493`) builds its prop rows through `_normalize_live_lens_live_prop_row` (`:17432`) from `_current_live_prop_rows` (`:14585`) — the function that logs `LIVE_MC_PRICED` and writes `live_model_prob_over` at `:14763`.
+
+**`_enhance_card_row_with_live_projection` receives that row and skips its props on purpose.** Its own docstring: *"row's props -- the card artifact is the reliable source for those (#124)"*. It enhances `gameLens` and status only. So the probability arrives at this function on every tick and is thrown away.
+
+**THE FIX IS TO CALL THE FUNCTION WE ALREADY HAVE, FROM HERE.** `_carry_live_probability` (`:988`) does exactly this and nothing else: keep the existing ROWS, stamp only `liveModelProbOver` and its own `liveEdge` onto rows with a counterpart, never overwrite, never invent. `7094b69a` already fixed its one real defect (it read the raw source rows with normalised key names), and `70ba6867` already gave it a counter that prints on both paths. **It has been correct and dead; this makes it live.**
+
+Sketch, inside `_enhance_card_row_with_live_projection`, on the props the card row is keeping:
+
+    card_props = enhanced.get("liveProps") ...
+    if card_props:
+        enhanced["liveProps"] = _carry_live_probability(card_props, projection_row)
+        # and mirror onto "props"/"trackedProps" as `_merge_cards_context_into_live_row` did
+
+**Why this is the right place and not the dead merge:** `11815f8b` removed the cards-context merge because cards became the primary ROW SOURCE — and this function is the surviving expression of that same decision. Carrying only the probability respects it exactly; `5bab0685`'s trade-off argument (keep the 124 card rows, do not swap to the 27 MC rows) is preserved rather than reversed.
+
+**Still unmeasured before writing it:** that `projection_row["liveProps"]` is populated on a live tick — the vendor payload is built per date and its prop rows come from `_current_live_prop_rows`, which `LIVE_MC_PRICED` shows returning 29-52 rows per live game, but I have not read the vendor payload's own shape. `_carry_live_probability`'s counter (`source_rows`, `source_with_prob`) answers it on the first tick after the change, which is what that counter is for.
+
+**Also still owed:** the four silent `return []` paths in `_live_props_from_game_detail` (`:597`, `:604`, `:611`, `:616`).
