@@ -1102,6 +1102,14 @@ death, never life — do not invert it.
 - Verification: (1) the re-read total for that window, stated as lines and MB, against the captured 20,000 / 395.62 MB; (2) a capture run over a known-truncating window emits the new flag, and one over a short window does not (off != on, per the reachability rule); (3) the corrected `metered/app-served` for the 01:00Z bucket, or an explicit statement that it is unavailable.
 - Blocked by: none
 
+### polymarket-corners-btts-order-branch — OPEN — opened 2026-09-23 — session a3eac387-559b-455c-bc5e-195c2a678c28
+- Goal: a Polymarket `alternate_totals_corners` position with a `gt<N>` slug whose N equals the board line BUILDS an order (over->`Yes`, under->`No`), `btts` builds by literal name, and any OTHER joinable board market with no branch refuses under its OWN named token instead of falling through to the team matcher.
+- Files: `pipeline/execute_portfolio.py`, `tests/test_execute_portfolio.py`
+- Hypothesis: n/a — the cause is MEASURED, not hypothesised (`leads.md` 2026-09-23, production `POLYMARKET_SIDE_REFUSED ... reason=yes_no_market_subject_is_not_our_side` at 14:48:34.747Z and 15:06:24.029Z on `astatc-mls-sea-rsl-2026-09-23-cor-all-gt10pt5`).
+- Falsification test: the as-shipped replay of that exact slug reproduces production's refusal token; if it stops doing so, the replay is no longer on production's path and every result below is void.
+- Verification: (1) REACHABILITY FIRST — the as-shipped arm refuses and the fixed arm builds, same slug, same row, same request (`off != on`); (2) a `gt` threshold that DISAGREES with the board line still refuses, and so does a Yes/No corners market carrying NO `gt` token — the polarity gate is the evidence, never a default; (3) `btts` builds by literal name; (4) a synthetic joinable market with no branch refuses `board_market_has_no_order_branch` rather than `yes_no_market_subject_is_not_our_side`; (5) the existing `tests/test_execute_portfolio.py` stays green; (6) production reading after deploy: the corners family leaves `market_unresolved` in the next `venue_order_family_census.py --hours 24`.
+- Blocked by: none. NOTE — `syndicate/features/shared/polymarket_board_join.py` is claimed by OPEN lane `mlb-doubleheader-e2e` and is deliberately NOT claimed here and NOT edited: the corners decoder (`parse_slug`, `_greater_than_line`, `_is_yes_no_market`) and the market vocabulary (`_JOINABLE_BOARD_MARKETS`) are IMPORTED from it read-only, which is also the right design — `_polymarket_gte_prop`'s docstring already says a second decoder here could disagree with the one that chose the slug.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
