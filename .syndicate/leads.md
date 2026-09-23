@@ -602,3 +602,29 @@ Sketch, inside `_enhance_card_row_with_live_projection`, on the props the card r
 **Still unmeasured before writing it:** that `projection_row["liveProps"]` is populated on a live tick — the vendor payload is built per date and its prop rows come from `_current_live_prop_rows`, which `LIVE_MC_PRICED` shows returning 29-52 rows per live game, but I have not read the vendor payload's own shape. `_carry_live_probability`'s counter (`source_rows`, `source_with_prob`) answers it on the first tick after the change, which is what that counter is for.
 
 **Also still owed:** the four silent `return []` paths in `_live_props_from_game_detail` (`:597`, `:604`, `:611`, `:616`).
+
+## 2026-09-23 — the carry is ALIVE and CORRECT; live games never reach it. Next suspect: `_live_props_from_game_detail`'s four silent returns. `[lane mlb-doubleheader-e2e, session 3692ff18]`
+
+`e7899507` live on live-odds-worker 18:46:45Z. **`_carry_live_probability` executed in production for the first time since it was written on 2026-08-30** — 8 lines on the first tick, where three weeks of ticks had produced none.
+
+    18:48:14Z  LIVE_PROB_CARRIED gamePk=824868 source_rows=0 source_with_prob=0 card_rows=3  carried=0
+               ... 8 games, every one source_rows=0
+    18:48:11Z  LIVE_MC_PRICED game=824223 rows=19
+    18:48:13Z  LIVE_MC_PRICED game=824785 rows=23
+
+**The two sets are disjoint, and StatsAPI explains it exactly:**
+
+    carry ran on   822841, 823086, 823894, 824060, 824625, 824868, 824951  Scheduled
+                   824301                                                   Pre-Game
+    MC priced      824223, 824785                                           In Progress
+    In Progress right now: exactly those 2
+
+**So the carry is CORRECT and is simply never reaching a game with anything to do.** `source_rows=0` on a Scheduled game is the right answer — a pregame game has no live prop rows. The vendor key is right too: `_live_lens_payload` stores `live_prop_rows` under `"liveProps"` (`flask_frontend.py:17608`), which is exactly what the carry reads.
+
+**Live games never reach it because their card row has no `liveProps`.** The carry is guarded `if carried_props:` and logs nothing when the card row has none — and there is no line for 824223 or 824785. So on a LIVE game, `_card_to_live_lens_row`'s live branch is producing no props.
+
+**NEXT SUSPECT, and it is the thing already flagged as owed:** `_live_props_from_game_detail` (`live_lens.py:589`) has FOUR silent `return []` paths — `:597` no game_pk, `:604` `refuse_if_compute_in_request_path`, `:611` import failure, `:616` the producer raised. On a live game it is meant to supply the rows. One of those four is firing on live-odds-worker and saying nothing. **`:604` is the one to look at first**: `refuse_if_compute_in_request_path("mlb_live_lens_game_detail_props")` is a REQUEST-PATH guard, and whether it also refuses on a worker tick is exactly the kind of thing that would silently empty every live game.
+
+Instrument those four the way `70ba6867` did the merge's two, deploy, and read one tick. Do NOT guess between them — the counter is two lines and the answer is one tick away.
+
+**What is now established, and should not be re-derived:** the carry mechanism, its key names, its source key, and its placement in the live path are all correct and verified in production. The remaining defect is upstream of it, in what supplies a LIVE game's card-row props.
