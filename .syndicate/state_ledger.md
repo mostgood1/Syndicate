@@ -940,6 +940,17 @@ unbounded.
   A's checkpoint silence session B's warning, losing B's work silently.
   `.syndicate/**` is excluded from work-at-risk: it is the persistence, not the
   thing persisted. **Exit 1 on Stop is advisory**, not a gate.
+- **AN UNATTENDED RUN CANNOT MESSAGE ANOTHER SESSION — the ask has to go in the
+  ledger instead** `[verified 2026-09-23, scheduled task archive-closed-lanes-0917,
+  session 17fb7689]`. `mcp__ccd_session_mgmt__send_message` refuses outright from a
+  scheduled-task run ("unavailable in unattended sessions (scheduled-task runs and
+  remote-dispatched trees)") and cannot DELIVER to one either; `SendMessage` is a
+  different tool that addresses agent teammates, not CCD sessions, so it is not a
+  fallback. Consequence: a scheduled job that finds another lane's worktree blocking
+  it has no way to tell that lane. Record the ask in `log/<date>.md` and name the
+  roster session id, which is found by transcript search on the holder's scratchpad
+  path — the lane header carries the CLI uuid (`8ce91d9d`), which the roster cannot
+  match (here: roster `local_b2ab05a7`).
 - **The 3-lane cap in policy has no enforcement** — `/lane open` checks file
   collisions only and never counts. Eight lanes are open today.
 
