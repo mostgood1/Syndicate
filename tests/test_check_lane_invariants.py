@@ -422,6 +422,72 @@ def test_a_terminating_bullet_that_names_a_path_is_REPORTED():
     assert mod.bullets_that_end_a_files_block(LABELLED_PATH_LIST) == []
 
 
+DIRECTORY_CLAIM = """## OPEN
+
+### alpha - OPEN - opened 2026-09-23
+- Files: `tests/fixtures/box/` (NEW), `src/real.py`.
+- Goal: something.
+"""
+
+STRAY_SLASH = """## OPEN
+
+### alpha - OPEN - opened 2026-09-23
+- Files: `src/real.py`. Ratio was 3 / 4 across the run.
+- Goal: something.
+"""
+
+
+def test_a_trailing_slash_claim_guards_the_DIRECTORY():
+    """The ledger already writes `tests/fixtures/box/` to mean "this
+    directory", and `_norm` used to strip the slash -- turning it into a file
+    path that can never exist. Measured 2026-09-23:
+    `mlb-settlement-props-join` claimed `tests/fixtures/settlement_player_box/`
+    and guarded NONE of the 6 tracked files inside it.
+    """
+    from lane_claims import matches
+
+    claimed = {path for _slug, path in mod.claims(DIRECTORY_CLAIM)}
+    assert "tests/fixtures/box/" in claimed
+    assert matches("tests/fixtures/box/a.json", "tests/fixtures/box/")
+    assert matches("tests/fixtures/box/deep/b.json", "tests/fixtures/box/")
+    # An ordinary file claim on the same line is untouched.
+    assert matches("src/real.py", "src/real.py")
+
+
+def test_a_directory_claim_does_NOT_bleed_into_a_SIBLING_prefix():
+    """The trailing slash is what stops `box/` from guarding `box_old/`.
+
+    Without it this would be a plain prefix test, and a directory claim would
+    silently capture every sibling whose name merely starts the same way --
+    over-guarding a file nobody claimed, which blocks an innocent lane with a
+    reason that reads like a real conflict.
+    """
+    from lane_claims import matches
+
+    assert not matches("tests/fixtures/box_old/a.json", "tests/fixtures/box/")
+    assert not matches("tests/fixtures/boxes/a.json", "tests/fixtures/box/")
+
+
+def test_a_STRAY_SLASH_IN_PROSE_CANNOT_CLAIM_THE_REPOSITORY():
+    """THE DANGEROUS READING, designed against rather than discovered.
+
+    Prose punctuation reaches the tokeniser -- the live ledger has four bare
+    `/` tokens from sentences like "3 / 4". If `_norm` kept a lone slash as a
+    directory marker, `/` would become a claim on the ENTIRE repository, held
+    by whichever lane's prose contained it. The leading strip makes it empty
+    and `_paths_in` drops it.
+    """
+    from lane_claims import _norm, matches
+
+    assert _norm("/") == ""
+    claimed = {path for _slug, path in mod.claims(STRAY_SLASH)}
+    assert "/" not in claimed
+    assert "" not in claimed
+    assert claimed == {"src/real.py"}
+    # And belt-and-braces on the predicate itself.
+    assert not matches("anything/at/all.py", "")
+
+
 def test_open_under_archived_is_caught():
     text = ONE_HOLDER + "\n## Archived lanes\n\n### gamma — OPEN — opened 2026-08-17\n- Files: `c/four.py`.\n"
     assert mod.open_lanes_under_archived(text) == ["gamma"]

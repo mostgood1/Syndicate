@@ -292,7 +292,27 @@ def _claimable_prefix(line):
 
 
 def _norm(p):
-    return p.replace("\\", "/").strip("/")
+    """Normalise a claim token, KEEPING a trailing slash as a directory marker.
+
+    `.strip("/")` used to take both ends, which silently turned the ledger's
+    own directory notation into a file path that can never exist.
+    `mlb-settlement-props-join` wrote `tests/fixtures/settlement_player_box/`
+    -- trailing slash, plainly "this directory" -- and it became
+    `tests/fixtures/settlement_player_box`, matching NONE of the 6 tracked
+    files inside it (measured 2026-09-23). The author used the conventional
+    spelling and the parser threw the convention away.
+
+    THE LEADING STRIP STAYS, and the empty result is load-bearing: a bare `/`
+    token (prose punctuation reaches this function -- there are 4 such tokens
+    in the live ledger) normalises to "" and `_paths_in` drops it. Without
+    that, `/` would become a directory claim on the entire repository, held by
+    whichever lane's prose contained a stray slash. The dangerous reading of a
+    permissive marker is the one to design against.
+    """
+    p = p.replace("\\", "/")
+    trailing = p.endswith("/")
+    p = p.strip("/")
+    return (p + "/") if (p and trailing) else p
 
 
 def _paths_in(text):
@@ -500,6 +520,14 @@ def matches(rel, claimed):
     records a case where a suffix match hid a path bug by accident, so this
     is deliberately NOT tightened here without re-reading that entry.
     """
+    if claimed.endswith("/"):
+        # A DIRECTORY CLAIM GUARDS ITS SUBTREE. Trailing slash is how the
+        # ledger already writes "this directory" (see `_norm`); before
+        # 2026-09-23 it guarded nothing at all, which is worse than either
+        # reading. Only claims WRITTEN with the slash take this branch, so no
+        # existing file claim changes meaning -- measured blast radius on the
+        # live ledger the day it shipped: one claim, six files.
+        return rel.startswith(claimed)
     return rel == claimed or rel.endswith("/" + claimed) or claimed.endswith("/" + rel)
 
 
