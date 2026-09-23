@@ -329,3 +329,28 @@ Raised by session `local_ec0ac779` as `no_live_probability` on 802 of 827 withhe
 **NOT a regression from `fba49b50`.** These counters read 0/0/0 before the fix only because no row reached the stage at all, so there is no before to compare against. Tonight is the first time this stage has been observable for MLB — which is itself a result: restoring the game-state join made the next stage down measurable for the first time.
 
 **Next step:** find the writer of the live-probability snapshot and ask why it indexed 0 while 1,030 live projections exist. Start at `snapshot_live_prob_indexed` in the live-projection enrichment, not at the 802 — the withheld reason is the symptom and the index size is the cause. Sibling rule: `feedback_read_the_field_you_already_have`.
+
+## 2026-09-23 — `4a231ac8`'s production verification is NOT OBTAINABLE this season, and the weaker frame does not substitute `[lane live-gameline-game-identity, session 3692ff18]`
+Session `local_ec0ac779` established the schedule; **both halves re-derived here from StatsAPI.**
+
+    2026-09-23   16 games   TOR @ BAL, doubleHeader='S' (SPLIT), G1 824785 17:35Z / G2 824784 22:35Z
+    09-24..09-27 12/15/15/15 games, ZERO repeated pairs
+    09-29..10-01 4/4/4 (postseason), ZERO repeated pairs
+
+**One doubleheader remains in the regular season, it is a SPLIT, and nothing follows it.**
+
+The peer proposed reading it with G1 final and G2 live — "both halves in the lens". **Measured tonight, that frame cannot discriminate the fix:**
+
+    index_diagnostics  games_in_snapshot 16   indexed 10   skipped_no_accepted_lane 6
+                       accepted_sources ['live_mc']
+    StatsAPI 09-22     live 10, final 2, preview 4        -> indexed == live, EXACTLY
+
+**Only LIVE games carry an accepted `live_mc` lane**; the 6 skipped are the 2 final plus the 4 preview. So `build_live_gameline_index` holds two candidates for one pair ONLY when both halves are live AT THE SAME TIME. On a split doubleheader G1 is final before G2 starts, is skipped as `no_accepted_lane`, and the pair takes the single-candidate path — which answers identically on pre- and post-`4a231ac8` code. Being in the lens is not being in the index (`feedback_presence_is_not_reachability`).
+
+**So the options are honest ones, not a frame that looks like verification:**
+1. **Offline replay** against the three measured production cases — 2026-08-29 AZ@SF (823177/823176), 2026-08-29 BOS@NYY (823539/823501), 2026-09-04 DET@CLE (824424/824387) — where both halves DID carry live rows under one gamePk. A real corpus, not production, and the lane must say which it is.
+2. **Accept SHIPPED AND NOT VERIFIED into the offseason** and take the reading on the first overlapping doubleheader of 2027.
+
+**Not an option: reading tomorrow's split and calling it verified.** It would produce a green number from a code path the fix does not change.
+
+**Tomorrow's TOR @ BAL is still worth reading** — for the CHIP-side picker (`board_enrichment.attach_game_state` + `pick_by_start_time`), which is a different fix, verified tonight only on a slate whose one doubleheader had both halves in the chip set. A real split doubleheader tests per-half row routing and the `game_key` stamping directly. Scoped and scheduled as `mlb-dh-chip-split-reading-0923`; it does NOT bear on `4a231ac8`.
