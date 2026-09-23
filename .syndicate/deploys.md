@@ -40402,3 +40402,23 @@ So the Render env value was 3600 at 19:49:24Z boot. It is **86400 again now** - 
 
 **verify:** the 04:43:44.856819638Z log line above, `interval_seconds=86400`, emitted by a process inside `f0e60bec`'s deploy window, from the helper that reads the env var under test. Nothing further owed on this obligation.
 
+
+## 2026-09-23 14:07-15:1xZ (9:07-10:1x AM CDT) -- refresh-worker `fba49b50` -- lane `refresh-worker-oom-0922` -- **READING, no deploy. PASS: the streamed ledger-chunk count is flat at full chunk size.**
+
+No claim taken, no env change, no code change. Scheduled task `refresh-worker-oom-fix-reading-0922`.
+
+    field                                     reading
+    refresh-worker live commit                fba49b50 (dep-dapi2kvf3r2c73enuidg, 00:52:38Z 09-23) -- CONTAINS 45608cb3
+    peak chunk_lines_on_disk post-fix         12,775 @ 04:52:28Z 09-23  (pre-fix cost +512 MB at 12,723)
+    cycles at chunk >= 12,000                 6  (02:52:29Z - 04:52:28Z 09-23)
+    step, spec window (bundle, REC+0.5s]      2 of 6 sampled, both +0 MB   [watchdog gap 2.08s median > the 0.02-1.10s window]
+    step, [bundle-5s, REC+5s]                 6 of 6 sampled (4-5 samples each), max +1 MB
+    max step, all 14 paired cycles            +83 MB -- on a 702-line chunk, not the count
+    integer chunk_lines_on_disk               82 / 82 RECORDED lines, 16:00Z 09-22 - 09:00Z 09-23; 0 `error:`
+    oomKilled since 15:48:56Z 09-22           0   (feed still shows the original 04:08:47Z 09-22 oomKilled, so 0 is real)
+    server_failed since 15:48:56Z 09-22       11, ALL earlyExit:true / evicted:false
+    anon max, 00:05-05:00Z                    3,025 MB of 4,096 -- peak stage board_contract_end (NOT this fix)
+
+**verify:** the `[bundle-5s, REC+5s]` row -- all 6 cycles at 12,048-12,775 chunk lines sampled 4-5 times each, max anon step **+1 MB** off a 1,703-2,432 MB base, where the old `read_text().splitlines()` cost +512 MB at 12,723 lines. The wider window is used because the spec's window is SHORTER THAN THE SAMPLING PERIOD (2.08 s median gap vs 0.02-1.10 s), so it leaves 4 of 6 cycles unsampled; it is not a weaker test, since the pre-fix bursts were each caught by a single sample of this same watchdog.
+
+**Lane not closed** -- user's call. Closing returns `pipeline/intelligence_state.py` to `layer2-restate-series-date`.
