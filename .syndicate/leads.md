@@ -312,3 +312,20 @@ Three candidates, none tested:
 - **A second shape of the untimed defect.** `AMBIGUOUS_NOT_SEPARABLE` (two timed candidates inside the 45-min window) and `AMBIGUOUS_NO_TARGET_TIME` (a row with no `commence_time`) are both still live branches and neither is counted separately.
 
 **The cheap next step is to split `rows_ambiguous_game` by REASON** — it is currently one bucket, so the three cases above are indistinguishable in the payload, which is the same "flattening three states into one zero" mistake the join's own comments warn about elsewhere. Then read which pairs land in it.
+
+## 2026-09-23 — MLB live PROP edges are 0 because the live-probability index is EMPTY (`snapshot_live_prob_indexed: 0`) `[lane mlb-doubleheader-e2e, session 3692ff18]`
+Raised by session `local_ec0ac779` as `no_live_probability` on 802 of 827 withheld prop rows; **re-derived here off the same 00:59:44Z board build, and the payload names a sharper cause than the withheld reason does.**
+
+    live_projections   rows_live_considered 1,575   rows_live_projected 827   rows_live_edged 0
+                       edge_withheld_by_reason {'no_live_probability': 802, 'over_already_decided': 25}
+                       snapshot_live_prob_indexed: 0          <-- THE FIELD THAT DISCRIMINATES
+                       snapshot_by_game_state.live: {rows 1,050, with_live_projection 1,030, with_live_prob 0}
+                       live_games_in_snapshot: 10
+
+**1,030 of 1,050 live rows carry a live PROJECTION and ZERO carry a live PROBABILITY**, and the index that would hold them reports **0 entries**. So this is not 802 rows each failing a check — it is one producer yielding nothing, and every row downstream then reporting the same named refusal. `802 + 25 = 827` exactly, so nothing is silently lost; the accounting is honest and the hole is upstream of it.
+
+**The gameline side is fine and proves the board is not simply dead:** `rows_live_gameline_edged 30`, `index_size 10` from 16 games in the snapshot (`skipped_no_accepted_lane 6`). Its withholds are all named and ordinary — `segment_pricing_disabled 256`, `segment_is_not_full_game 210`, `quote_older_than_live_pricing_ceiling 52`, `prob_interval_swamps_edge 33`.
+
+**NOT a regression from `fba49b50`.** These counters read 0/0/0 before the fix only because no row reached the stage at all, so there is no before to compare against. Tonight is the first time this stage has been observable for MLB — which is itself a result: restoring the game-state join made the next stage down measurable for the first time.
+
+**Next step:** find the writer of the live-probability snapshot and ask why it indexed 0 while 1,030 live projections exist. Start at `snapshot_live_prob_indexed` in the live-projection enrichment, not at the 802 — the withheld reason is the symptom and the index size is the cause. Sibling rule: `feedback_read_the_field_you_already_have`.
