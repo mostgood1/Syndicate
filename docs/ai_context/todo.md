@@ -1,5 +1,49 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#686` — **The NFL sim's TOTAL responds to the rating DIFFERENCE, which carries no total signal at all — a second gain applied in a direction with no evidence** — FOUND 2026-09-23, lane `nfl-total-residual-dispersion`, session dae18452 — **OPEN, diagnosed and quantified, NOT fixed**
+
+Same class as `#684`, found while checking whether that fix had merely pulled
+the sim toward the market. It had not — but this remains.
+
+**The engine.** `total ∝ 3.0(off_h+off_a) − 2.2(def_h+def_a)` depends only on
+SUMS, so a linear engine's total cannot respond to the difference. It does,
+via a nonlinearity. Measured causally (`simulate_game` directly, 150 seeds,
+seed SE ±0.97, level held at EXACTLY zero):
+
+    (c) offence LEVEL     0 -> 0.4   total +6.71   margin flat   CORRECT
+    (d) defence LEVEL     0 -> 0.4   total -4.67   margin flat   CORRECT
+    (a) offence DIFF      0 -> 0.4   total +2.42   margin +6.01  SPURIOUS
+    (b) defence DIFF      0 -> 0.4   total -2.69   margin +5.15  SPURIOUS
+
+So a pure mismatch moves the total ±2.4-2.7 pts per 0.4 of difference, about a
+third the size of the level effect.
+
+**Reality says the coefficient is ZERO.** `corr(|market spread|, ACTUAL total)`
+on 2025 = **−0.032**. Adding difference terms to an actual-total fit (train
+2023-24, held out 2025): MAE 10.709 -> 10.679, i.e. nothing. Lopsidedness does
+not predict a total.
+
+**Size of the prize:** on the served wk3 file, R2(total) on the level alone is
+0.522 and 0.990 with the difference terms added. Removing the difference
+response would take wk3's total SD from **4.47 to ~3.26**, against a market
+2.51 and an evidence-supported ~2.7.
+
+**Two fix shapes, not yet chosen.** (1) NFL-only, at the generator: subtract
+the fitted difference-response from `total_mean`. Surgical, but it would desync
+`total_mean` from `total_stdev` and from the simulated distribution the
+over/under probabilities are drawn from — check that before choosing it.
+(2) In the engine, remove the nonlinearity itself: correct, but
+`smartsim2` is SHARED WITH NCAAF, so it needs the same actual-outcome fit run
+for that sport before touching it.
+
+**RETRACTED, and kept because it nearly became a third defect.** Week 2 looked
+anomalous (R2 0.530 with all four terms, ~47% unexplained, far beyond the 0.69
+seed SE). It was MY reconstruction: the wk2 file was generated 2026-09-21T23:46Z
+and declares `rating_source ...[current_season_rolling/...]` — the pre-blend K=0
+estimator — while I reconstructed with K=4. Redone at K=0: r(margin) 0.296 ->
+**0.985**, R2(total) 0.530 -> **0.949**. No third defect. The `rating_source`
+column said so the whole time. `feedback_read_the_field_you_already_have`.
+
 ### `#684` — **NFL totals were priced from a LEVEL gain nobody ever fitted: model total SD 3.60x the market's on the served 2026 wk3 board** — FOUND and FIXED 2026-09-22, lane `nfl-total-sum-direction-scale`, session dae18452 — **OPEN until a regenerated production wk3 file is read**
 
 The margin reads the two teams' rating DIFFERENCE and the total reads their
