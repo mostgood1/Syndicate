@@ -236,13 +236,13 @@ CONTESTED = """## OPEN
 
 
 def test_clean_ledger_passes():
-    assert mod.contested_files(ONE_HOLDER) == {}
+    assert mod.contested_files(mod.claims(ONE_HOLDER)) == {}
     assert mod.open_lanes_under_archived(ONE_HOLDER) == []
     assert mod.main([_write(ONE_HOLDER)]) == 0
 
 
 def test_two_open_lanes_on_one_file_fails():
-    contested = mod.contested_files(CONTESTED)
+    contested = mod.contested_files(mod.claims(CONTESTED))
     assert contested == {"shared/thing.py": ["alpha", "beta"]}
     assert mod.main([_write(CONTESTED)]) == 1
 
@@ -250,7 +250,7 @@ def test_two_open_lanes_on_one_file_fails():
 def test_a_closed_lane_does_not_contest():
     """Only OPEN lanes hold claims -- a closed one sharing a path is fine."""
     text = CONTESTED.replace("### beta — OPEN", "### beta — CLOSED-VERIFIED")
-    assert mod.contested_files(text) == {}
+    assert mod.contested_files(mod.claims(text)) == {}
 
 
 TWO_SPELLINGS = """## OPEN
@@ -287,7 +287,7 @@ def test_two_spellings_of_one_file_are_ONE_contest():
     spellings = {path for _, path in mod.claims(TWO_SPELLINGS)}
     assert spellings == {"a/shared/thing.py", "shared/thing.py"}
 
-    contested = mod.contested_files(TWO_SPELLINGS)
+    contested = mod.contested_files(mod.claims(TWO_SPELLINGS))
     assert len(contested) == 1, contested
     key, holders = next(iter(contested.items()))
     assert holders == ["alpha", "beta"]
@@ -306,7 +306,7 @@ def test_distinct_files_sharing_a_basename_are_NOT_merged():
     docstring: a report of more violations than exist "reads as vigilance, so
     nobody doubts it".
     """
-    assert mod.contested_files(SAME_BASENAME) == {}
+    assert mod.contested_files(mod.claims(SAME_BASENAME)) == {}
 
 
 def test_the_report_and_the_guard_cannot_disagree_about_one_file():
@@ -322,9 +322,9 @@ def test_the_report_and_the_guard_cannot_disagree_about_one_file():
 
 
 def lane_claims_groups(text):
-    from lane_claims import claim_groups
+    from lane_claims import claim_groups, claims_by_path
 
-    return claim_groups(text)
+    return claim_groups(claims_by_path(text))
 
 
 def test_open_under_archived_is_caught():

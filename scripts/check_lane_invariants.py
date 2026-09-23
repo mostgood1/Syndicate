@@ -177,23 +177,30 @@ def claims(text: str) -> set[tuple[str, str]]:
     return set(_claims(text))
 
 
-def contested_files(text: str) -> dict[str, list[str]]:
+def contested_files(claim_set) -> dict[str, list[str]]:
     """{file: [slug, ...]} for every file held by more than one OPEN lane.
 
-    TAKES THE TEXT, NOT THE CLAIM SET, because the grouping must run through
-    `lane_claims.claim_groups` -- the same `matches` predicate `lane-guard`
-    enforces with. It used to take `claim_set` and group on the path AS
-    SPELLED, which is the defect: measured 2026-09-23, `state_polymarket.md`
-    and `.syndicate/state_polymarket.md` counted as two files with one holder
-    each while two OPEN lanes held one file, and this check printed nothing.
-    See `lane_claims.same_file` for the whole incident.
+    SAME SIGNATURE AS ALWAYS -- `tests/test_lane_guard_prohibition_marker.py`
+    calls this with a claim set, and changing it to take text broke that file
+    on the first cut of this fix.
+
+    What changed is the GROUPING: it runs through `lane_claims.claim_groups`,
+    the same `matches` predicate `lane-guard` enforces with, instead of the
+    path AS SPELLED. Measured 2026-09-23, the old way counted
+    `state_polymarket.md` and `.syndicate/state_polymarket.md` as two files
+    with one holder each while two OPEN lanes held one file, and this check
+    printed a green line. See `lane_claims.same_file` for the whole incident.
 
     A group with more than one spelling SAYS SO in the key, because "held by
     two lanes" is not actionable until you can see that one wrote a bare
     basename and the other a full path.
     """
+    by_spelling = collections.defaultdict(set)
+    for slug, path in claim_set:
+        by_spelling[path].add(slug)
+
     out = {}
-    for spellings, slugs in claim_groups(text):
+    for spellings, slugs in claim_groups(by_spelling):
         if len(slugs) > 1:
             key = spellings[0]
             if len(spellings) > 1:
@@ -435,7 +442,7 @@ def main(argv=None) -> int:
         return 3
 
     claim_set = claims(text)
-    contested = contested_files(text)
+    contested = contested_files(claim_set)
     stray = open_lanes_under_archived(text)
     orphaned, stale_markers = orphaned_lane_markers(text, args.path)
     prose = prose_paths_in_files_blocks(text, claim_set)

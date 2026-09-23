@@ -467,8 +467,16 @@ def same_file(a, b):
     return matches(a, b) or matches(b, a)
 
 
-def claim_groups(text):
+def claim_groups(by_spelling):
     """[(spellings, slugs)] -- claims grouped by the FILE they guard.
+
+    TAKES THE {path: {slug}} MAPPING, NOT THE LEDGER TEXT. It only needs the
+    mapping, and taking text would have forced every caller to re-parse -- or,
+    worse, forced a SIGNATURE CHANGE on `contested_files`, which is how the
+    first cut of this fix broke `test_lane_guard_prohibition_marker.py`: that
+    file calls it with a claim set, and a caller I had already listed in a grep
+    and not read. Callers with text pass `claims_by_path(text)`; callers with a
+    claim set build the mapping themselves.
 
     `claims_by_path` remains the right answer for "who claimed this exact
     string"; this is the right answer for "how many lanes hold this file",
@@ -481,7 +489,6 @@ def claim_groups(text):
     spellings are returned alongside the slugs so a reader can see WHY three
     names became one file instead of having to re-derive it.
     """
-    by_spelling = claims_by_path(text)
     spellings = sorted(by_spelling)
     parent = {s: s for s in spellings}
 
