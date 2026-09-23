@@ -435,6 +435,16 @@ def fetch_polymarket_balance() -> dict[str, Any]:
             "raw_value": spendable,
             "raw_field": "buyingPower" if buying_power is not None else "currentBalance",
             "unit_assumption": "documented",
+            # WHAT THE GAP IS MADE OF, or the proof that this payload does not
+            # say. `buying_power_dollars` minus `cash_dollars` is a number we
+            # could always compute and never explain; `detail` carries the
+            # venue's own other fields so the next reader is not guessing.
+            "encumbered_dollars": (
+                round(current - buying_power, 2)
+                if buying_power is not None and current is not None
+                else None
+            ),
+            "detail": _balance_detail(row),
         }
 
     return {"venue": "polymarket", "status": "path_unknown", "attempts": attempts}
@@ -442,6 +452,64 @@ def fetch_polymarket_balance() -> dict[str, Any]:
 
 def _round_or_none(value: float | None) -> float | None:
     return None if value is None else round(value, 2)
+
+
+#: How many of the venue's own numeric fields a reading keeps. The point is to
+#: stop GUESSING which field explains an encumbrance, so the bound is generous;
+#: it exists only so a shape change cannot grow the artifact without limit.
+_DETAIL_NUMBER_LIMIT = 24
+
+
+def _balance_detail(row: Mapping[str, Any]) -> dict[str, Any]:
+    """Everything ELSE the venue said, as numbers and key names.
+
+    WHY THIS EXISTS. On 2026-09-23 Polymarket reported `buyingPower` $0.13
+    against `currentBalance` $6.25, with `openOrders` 0 and `unsettledFunds` 0 --
+    so ~$6.12 of the cash was encumbered and, the docs being explicit that
+    buying power "factors in all security valuations and open orders", the
+    reason had to be in the account or in the positions. We kept four fields, so
+    the honest answer to "by what?" was "our records cannot say". Every number
+    below was already in a response we make anyway.
+
+    NUMBERS AND KEY NAMES ONLY, and that is a privacy bound as much as a size
+    one: a venue payload can carry identifiers, and a reading that sweeps up
+    strings would put them in an artifact that the ops API serves. Numerics are
+    copied, nested structures are SUMMARISED (count and total) rather than
+    embedded, and everything else contributes its KEY NAME to `keys` so a later
+    reader can prove what the venue did and did not offer -- `keys` is the half
+    that makes an ABSENCE provable, which is the outcome this may well have.
+
+    `pendingWithdrawals[].balance` is named in `_polymarket_cash_row`'s own
+    docstring as a field this payload carries, so it is the first candidate and
+    is summarised rather than dropped.
+    """
+    numbers: dict[str, float] = {}
+    nested: dict[str, dict[str, Any]] = {}
+    keys: list[str] = []
+    for key in sorted(str(k) for k in row.keys()):
+        keys.append(key)
+        value = row.get(key)
+        if isinstance(value, bool):
+            continue
+        number = _as_number(value)
+        if number is not None:
+            if len(numbers) < _DETAIL_NUMBER_LIMIT:
+                numbers[key] = round(float(number), 4)
+            continue
+        if isinstance(value, (list, tuple)):
+            total = 0.0
+            counted = 0
+            for item in value:
+                if not isinstance(item, Mapping):
+                    continue
+                for field in ("balance", "amount", "value"):
+                    item_number = _as_number(item.get(field))
+                    if item_number is not None:
+                        total += float(item_number)
+                        counted += 1
+                        break
+            nested[key] = {"count": len(value), "summed_entries": counted, "total": round(total, 4)}
+    return {"numbers": numbers, "nested": nested, "keys": keys}
 
 
 def _polymarket_cash_row(payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -500,6 +568,15 @@ def balance_history_path():
     return reports_root() / "intelligence" / "venue_balance_history.json"
 
 
+def _detail_part(reading: Mapping[str, Any], part: str) -> dict[str, Any] | None:
+    """`reading["detail"][part]`, or None for anything that is not a mapping."""
+    detail = reading.get("detail")
+    if not isinstance(detail, Mapping):
+        return None
+    value = detail.get(part)
+    return value if isinstance(value, Mapping) and value else None
+
+
 def _history_entry(stamp: Mapping[str, Any]) -> dict[str, Any]:
     """One reading, reduced to what a later question can be asked of it.
 
@@ -523,6 +600,17 @@ def _history_entry(stamp: Mapping[str, Any]) -> dict[str, Any]:
                 # Kalshi's per-shard cash (`#573`), so "which shard ran dry
                 # when that order failed" is answerable later. Absent elsewhere.
                 "shards": reading.get("shards"),
+                # The encumbrance, and the venue's own numbers behind it. A
+                # history is for arithmetic across time, and the question this
+                # answers -- "WHEN did the capital become unavailable, and which
+                # field moved" -- cannot be asked of a single reading.
+                "encumbered_dollars": reading.get("encumbered_dollars"),
+                # `or {}` is NOT enough here: a malformed reading can carry a
+                # STRING, which is truthy and has no `.get`. `_history_entry`
+                # must never raise -- `test_recording_never_raises_even_if_a
+                # _venue_blows_up` is the test that says so, and it caught this.
+                "detail_numbers": _detail_part(reading, "numbers"),
+                "detail_nested": _detail_part(reading, "nested"),
             }
     return row
 

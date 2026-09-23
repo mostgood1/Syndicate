@@ -474,3 +474,92 @@ def test_recording_balances_also_appends_to_the_trail(store, monkeypatch):
     assert len(trail) == 1
     assert trail[0]["polymarket"]["dollars"] == 96.05
     assert trail[0]["kalshi"]["dollars"] == 50.19
+
+
+# ---------------------------------------------------------------------------
+# WHAT ENCUMBERS THE CAPITAL -- measured 2026-09-23: `buyingPower` $0.13 against
+# `currentBalance` $6.25 with `openOrders` 0 and `unsettledFunds` 0, and our
+# four stored fields could not say what held the other ~$6.12. Every number
+# below was already in a response we make; none of it is a new venue call.
+# ---------------------------------------------------------------------------
+
+
+def test_the_encumbrance_is_recorded_as_a_number(monkeypatch):
+    _polymarket(monkeypatch, lambda url: _pm_payload(currentBalance=6.25, buyingPower=0.13,
+                                                     openOrders=0, unsettledFunds=0))
+    row = vb.fetch_polymarket_balance()
+    assert row["cash_dollars"] == 6.25 and row["buying_power_dollars"] == 0.13
+    assert row["encumbered_dollars"] == 6.12
+
+
+def test_the_venue_s_OWN_other_numbers_are_kept(monkeypatch):
+    """The point of the change: stop guessing which field explains the gap."""
+    _polymarket(monkeypatch, lambda url: _pm_payload(
+        currentBalance=6.25, buyingPower=0.13, collateralHeld=5.99, marginRequirement=0.13))
+    detail = vb.fetch_polymarket_balance()["detail"]
+    assert detail["numbers"]["collateralHeld"] == 5.99
+    assert detail["numbers"]["marginRequirement"] == 0.13
+    assert detail["numbers"]["currentBalance"] == 6.25, "the headline fields are numbers too"
+
+
+def test_pending_withdrawals_are_SUMMARISED_not_dropped(monkeypatch):
+    """`_polymarket_cash_row`'s own docstring names this field as one the row
+    carries, so it is the first candidate for the encumbrance."""
+    _polymarket(monkeypatch, lambda url: _pm_payload(pendingWithdrawals=[
+        {"balance": 4.0, "id": "wd-1"}, {"balance": 2.12, "id": "wd-2"}]))
+    detail = vb.fetch_polymarket_balance()["detail"]
+    assert detail["nested"]["pendingWithdrawals"] == {"count": 2, "summed_entries": 2, "total": 6.12}
+
+
+def test_an_ABSENCE_is_provable_from_the_key_list(monkeypatch):
+    """The likely outcome, and it must be a RESULT rather than a dead end: if
+    nothing in the payload explains the gap, the keys say what the venue did
+    and did not offer."""
+    _polymarket(monkeypatch, lambda url: _pm_payload(currentBalance=6.25, buyingPower=0.13))
+    detail = vb.fetch_polymarket_balance()["detail"]
+    assert detail["keys"] == ["buyingPower", "currency", "currentBalance", "openOrders", "unsettledFunds"]
+    assert not any(k.lower().startswith(("collateral", "margin", "position")) for k in detail["keys"])
+
+
+def test_strings_and_identifiers_are_never_copied(monkeypatch):
+    """Numbers and key names only: a reading is served by the ops API, and a
+    payload can carry identifiers."""
+    _polymarket(monkeypatch, lambda url: _pm_payload(accountId="acct-secret-123", nickname="me"))
+    detail = vb.fetch_polymarket_balance()["detail"]
+    assert "accountId" in detail["keys"] and "accountId" not in detail["numbers"]
+    assert "acct-secret-123" not in repr(detail)
+
+
+def test_a_boolean_is_not_a_balance_number(monkeypatch):
+    _polymarket(monkeypatch, lambda url: _pm_payload(isRestricted=True))
+    detail = vb.fetch_polymarket_balance()["detail"]
+    assert "isRestricted" in detail["keys"] and "isRestricted" not in detail["numbers"]
+
+
+def test_the_number_count_is_bounded(monkeypatch):
+    extra = {f"field{i}": float(i) for i in range(60)}
+    _polymarket(monkeypatch, lambda url: _pm_payload(**extra))
+    detail = vb.fetch_polymarket_balance()["detail"]
+    assert len(detail["numbers"]) == vb._DETAIL_NUMBER_LIMIT
+    assert len(detail["keys"]) == 65, "keys stay complete -- the bound is on values, not on the shape"
+
+
+def test_the_history_row_carries_the_encumbrance_for_arithmetic_over_time():
+    """"WHEN did the capital become unavailable" cannot be asked of one reading."""
+    stamp = {"recorded_at": "2026-09-23T16:35:16Z", "venues": {"polymarket": {
+        "status": "ok", "dollars": 0.13, "cash_dollars": 6.25, "open_orders_dollars": 0.0,
+        "encumbered_dollars": 6.12,
+        "detail": {"numbers": {"collateralHeld": 5.99}, "nested": {}, "keys": ["collateralHeld"]}}}}
+    row = vb._history_entry(stamp)["polymarket"]
+    assert row["encumbered_dollars"] == 6.12
+    assert row["detail_numbers"] == {"collateralHeld": 5.99}
+
+
+def test_a_malformed_detail_never_raises_in_the_history():
+    """A reading is written by another process; `_history_entry` must survive
+    any shape it finds. `or {}` did not: a string is truthy and has no `.get`."""
+    for bad in ("not-a-dict", 7, None, {"numbers": "nope"}):
+        stamp = {"recorded_at": "t", "venues": {"polymarket": {"status": "ok", "detail": bad}}}
+        row = vb._history_entry(stamp)["polymarket"]
+        assert row["detail_numbers"] is None and row["detail_nested"] is None
+
