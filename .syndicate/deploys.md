@@ -40206,3 +40206,120 @@ All 15 cards carry the period or the start time. **Not one bare "LIVE" and not o
 **SHIPPED BUT NOT VERIFIED — `4a231ac8`.** It rode this deploy. Its discriminating reading does not exist and could not have been taken tonight: TB@NYY's halves never overlapped in the live window (G1's last ledger row 19:09:46Z, G2's first 22:41:32Z), so the pair always had ONE live candidate and the single-candidate path answered. It needs a doubleheader whose halves overlap. **Shipped is not verified and this entry does not claim otherwise.**
 
 **Two operational facts from getting this out.** (1) The first CLEAR, at 00:45:10Z, was gone **20 seconds later** — `fetch_mlb_injuries.py` claimed the window. The guard requires preflight and deploy to be SEPARATE tool calls, so there is always a gap to lose; a 75s poll cannot catch it and a 20s poll did. (2) `check_deploy_safety.py --drain`, which `deploy_preflight`'s own HOLD text recommends, **cannot be run from a developer machine at all**: `SYNDICATE_REFRESH_STATE_URL` is a Render-internal hostname and `ops.py` exposes no drain route. It refused correctly rather than writing a local flag and claiming success.
+
+## 2026-09-23 01:00-01:30Z (8:00-8:30 PM CT 09-22) — **READING, no deploy** — LEVER 2b in a LIVE window — lane `live-inplay-board-cadence`
+
+**(a) PASS. (b) PASS. (c) PASS (with a caveat stated below). (d) FAIL — and lever 2b is EXONERATED for it; the kill switch would not close it.** Scheduled task `lever-2b-live-reading-0922`, Part 1. Read-only: no deploy, no env change, no claim, no preflight. Window measured **2026-09-23 00:00-01:00Z (7:00-8:00 PM CT 09-22)**.
+
+**2b is live for the WHOLE window.** refresh-worker ran `d25664f0` (live 2026-09-22T21:04:52Z) to 00:52:38Z and `fba49b50` (live 2026-09-23T00:52:38Z, lane `mlb-doubleheader-e2e`) after; `git merge-base --is-ancestor 3072ab01 <sha>` exits 0 for both. A deploy by another lane therefore lands INSIDE the window (build 00:46:12Z, live 00:52:38Z) — every number below is reported with and without it.
+
+### (1) `BOOK_GRID_TICK`: the 2b fields are populated and the skip fires
+
+**n = 25** lines; **23 of 25 `live_cadence=true`** (92%).
+
+| field | value |
+|---|---|
+| `live_sports` | wnba 25/25, nhl 25/25, **mlb 3/25 (only from the 00:55:10Z tick)** |
+| `skipped_not_live` | non-empty on **19 of 25** ticks — nfl 19, soccer 19; **no sport with a live game was ever skipped** |
+| `starting_soon` | **mlb on 22 of 25 ticks** — the kickoff guard, holding MLB in the build all window |
+| `skipped_no_shard` | nba / ncaaf / ncaab 25 each (pre-existing `#565` path, not 2b) |
+
+`written` carried `mlb:3471`-`mlb:3561` on **every** tick. **MLB was never skipped.**
+
+### (2) Tick duration and gap — both below the 09-20 baseline
+
+Duration = the `stage=post_mlb_sim_tick` `MALLOC_ARENA` line preceding each `BOOK_GRID_TICK {`, to that line (22 such lines in-window).
+
+| metric | tonight, ALL n=24 | tonight, EXCL 00:44:35-00:55Z | baseline 09-20 aft. | baseline 09-20 eve. |
+|---|--:|--:|--:|--:|
+| tick duration median | **42 s** | **42 s** | 82 s | 74 s |
+| tick duration p90 | **95 s** | **75 s** | 156 s | 120 s |
+| gap median | 142 s | 142 s | 148-150 s | 148-150 s |
+| gap p90 | 194 s | 178 s | 186-223 s | 186-223 s |
+
+The two ticks over 300 s (00:48:53 dur 323 s, 00:55:10 dur 344 s) straddle the `server_failed` at 00:44:35Z and the deploy live at 00:52:38Z; they are restart artefacts, not tick cost.
+
+**DIFFERENT SLATES, said plainly.** Tonight: **wnba + nhl live the whole window, mlb live only from 00:55:10Z, nfl and soccer present but not live** (hence the skip). Baseline 09-20 was a Sunday: **NFL / NCAAF / WNBA**. So (b)'s comparison is not like-for-like on sport mix, and part of the drop is the skip doing exactly what it was built to do — removing nfl and soccer from 19 of 25 ticks. **The MEDIAN gap barely moved (142 vs 148-150 s), exactly as pre-registered:** it is bound by the 120 s interval measured from tick start.
+
+### (3) Memory — the ceiling is NOT the grid tick
+
+`memory_anon_mb`, n = **4,005** samples in-window: **median 2,045 MB, p90 2,241 MB, max 2,849 MB** of a 4,096 MB cap — **1,247 MB headroom at the worst sample**. 3,837 of those samples fall inside a tick window (median 2,073 MB).
+
+**The peak is not a grid tick.** The top samples are `MEMORY_WATCHDOG` lines with `last_stage: "board_..."` — 00:40:00Z at 2,849 MB with `climb_mb_per_s: 136.2`, 00:39:58Z at 2,559 MB at 138.1 MB/s. That is the intelligence-state board stage, the same shape lane `refresh-worker-oom-0922` attributed the 2026-09-22 04:08:47Z `oomKilled`(4Gi) to — **still reaching 2,849 MB after that lane's streaming-count fix went live at 15:48:56Z today.** Recorded here as a lead for that lane, not diagnosed.
+
+### (4) Errors and restarts
+
+**0 `BOOK_GRID_TICK_ERROR`, 0 `BOOK_GRID_BUILD_ERROR`, 0 `INPLAY_OVERLAY_FAILED`.** *Zero proven, not assumed:* the broader `BOOK_GRID_TICK` query is a SUPERSET of `BOOK_GRID_TICK_ERROR` and returned 25 lines, 0 containing `ERROR`; a bare `ERROR` query over the same window returns **782 lines**, so the text filter is demonstrably matching.
+
+**Restarts — a rate, not a count.** `server_failed` on refresh-worker:
+
+| window | hours | `server_failed` | rate |
+|---|--:|--:|--:|
+| PRE-2b 2026-09-19T21:49:21Z .. 2026-09-21T21:49:21Z | 48.0 | 21 (all `earlyExit`) | **0.44/h** |
+| POST-2b 2026-09-21T21:49:21Z .. 2026-09-23T01:20Z | 27.5 | 5 (1 `oomKilled`, 4 `earlyExit`) | **0.18/h** |
+| this window 00:00-01:00Z | 1.0 | 1 (`earlyExit` 00:44:35Z) | 1.00/h |
+
+Restarts are a PRE-EXISTING baseline condition and the rate **fell** after 2b. One landed in this window; so did a deploy from another lane. **(c) PASS**, with that caveat on the window's own n=1.
+
+### (5) Coverage — the reason the kickoff guard exists
+
+Kickoffs inside 00:00-01:00Z, from `/api/board/game-chips?date=2026-09-22`, against the first `INPLAY_OVERLAY sport=<s> ... rows_inplay>0`:
+
+| sport | kickoff | first in-play build | lag |
+|---|---|---|--:|
+| nhl | 00:00:00Z (EDM @ WPG, TBL @ NSH) | 00:00:43Z, `rows_inplay=18` | **43 s** PASS |
+| wnba | 00:04:00Z (MIN @ IND), 00:05:00Z (TOR @ CHI) | 00:02:11Z `rows=25`, next 00:05:08Z `rows=52` | **<= 8 s** PASS |
+| mlb | **00:05:00Z (NYM @ TEX)**, 00:40:00Z (AZ @ COL) | **00:53:48Z, `rows_inplay=1069`** | **2,928 s FAIL** |
+| nfl, soccer | 0 kickoffs in window | — | n/a |
+
+### (d) FAILS, and 2b DID NOT CAUSE IT
+
+MLB lagged its 00:05:00Z kickoff by **48m48s**. The evidence exonerates lever 2b:
+
+- **MLB was never skipped.** It appears in `skipped_not_live` on **0 of 25** ticks, in `starting_soon` on **22 of 25**, and in `written` on **25 of 25** at 3,471-3,561 rows. The 2b kickoff guard held MLB in the build for the entire window — precisely the case it was added for.
+- **The overlay is gated elsewhere.** `_write_inplay_overlay_best_effort` (`syndicate/features/shared/book_grid_artifact.py:830`) returns **silently** — printing nothing — when `select_inplay_rows` is empty and the key is not in `_INPLAY_PUBLISHED_NONEMPTY`. `select_inplay_rows` (via `is_inplay_fresh_row`) requires the row's game to read **live** AND a price seen within 300 s. So the missing lines mean MLB had **zero fresh in-play rows**, not that a build was skipped.
+- `live_sports` did not contain `mlb` until 00:55:10Z, on state read from the previous tick's payload — so the row state itself was not live, on a grid that was being rebuilt every tick.
+
+**RECOMMENDATION.** The pre-registration says a (d) FAIL recommends `SYNDICATE_BOOK_GRID_SKIP_NONLIVE_SPORTS=off`. **It is recorded and NOT recommended:** 2b never skipped MLB, so flipping the switch cannot change this outcome — it would only restore the nfl/soccer work 2b removed. The real defect is upstream, in MLB row live-state / price freshness between 00:05Z and 00:53Z, and it is a LEAD, not this lane's fix. The switch is the USER's call; nothing was set.
+
+**Knob (a) `SYNDICATE_BOOK_GRID_LIVE_REFRESH_INTERVAL_SECONDS` 120 -> 60: affordable on TIME, NOT clearly affordable on MEMORY.** Time: tick duration median 42 s and p90 75 s now fit inside a 60 s interval, which they did not at the 82/156 baseline — this is exactly the headroom 2b was built to create. Memory: the worker peaked at **2,849 MB anon of 4,096** in this window, that peak is set by the intelligence board stage rather than the grid, and the container was `oomKilled` 21 hours ago in that same stage. Doubling grid tick frequency adds work on top of a ceiling 2b does not relieve. **A step to 90 s would be the conservative first move.** The USER's decision; nothing was changed.
+
+**verify:** the 25 `BOOK_GRID_TICK` lines themselves — `skipped_not_live` non-empty on 19 of them with nfl/soccer only, `starting_soon: ["mlb"]` on 22, tick duration median 42 s / p90 75 s against the 09-20 baseline's 74-82 / 120-156, and 0 of 782 in-window `ERROR`-matching lines being a grid error.
+
+## 2026-09-23 01:07-01:36Z (8:07-8:36 PM CT 09-22) — **READING, no deploy** — restate fix with MLB SERIES GAMES LIVE — lane `layer2-restate-series-date`
+
+**(e) PASS. (f) PASS. (g) PASS. GOAL: MET — and closing the lane is the USER's decision.** Scheduled task `lever-2b-live-reading-0922`, Part 2. Read-only: no deploy, no env change, no claim, no preflight.
+
+**The fix is live.** Web's live commit is `bc383640` (live 2026-09-23T00:34:55Z, lane `home-embed-background-refresh`), and `git merge-base --is-ancestor 3af16744 bc383640` exits 0. The fix went live on `a6ba19c5` at 2026-09-22T03:35:58Z and has ridden every web deploy since.
+
+### The four samples
+
+`POST /api/intelligence/query {"question": "top edges today"}`, `response.ranked_all`. Card game date = `game_date[:10]`, else the Central (UTC-5) date of `commence_time` — **0 of 2,997-3,429 cards lacked a date on any sample**, so nothing fell through to the fallback silently. pair = (sport, away, home) from `matchup`. today = 2026-09-22 Central.
+
+| # | fetched (UTC) | CT | `ranked_all` | **(e) `tomorrow_series_stated`** | **(f) `today_stated`** | of which MLB live | **(g) `series_live_pairs`** |
+|--:|---|---|--:|--:|--:|--:|--:|
+| 1 | 01:06:59Z | 8:06:59 PM | 3,397 | **0** | 755 | 517 | **8** |
+| 2 | 01:14:05Z | 8:14:05 PM | 3,429 | **0** | 791 | 491 | **8** |
+| 3 | 01:21:18Z | 8:21:18 PM | 3,291 | **0** | 625 | 367 | **7** |
+| 4 | 01:35:58Z | 8:35:58 PM | 2,997 | **0** | 711 | 558 | **7** |
+
+**(e) PASS — 0 on all four, against the old-code baseline of 16** (2026-09-21 22:45Z: WSH @ DET 11, TOR @ BAL 5). Nothing to print: the offender list is empty on every sample.
+
+**(f) PASS — the restate is demonstrably still acting.** 625-791 stated cards per sample, 367-558 of them MLB `live`. Sample 4 also carries 5 WNBA `final`, so the `final` branch is exercised too, not just `live`. A fix that passed by restating nothing would show zero here; this does not.
+
+**(g) PASS — every sample had a real population, so none of this is a null result.** 7-8 MLB pairs per sample had a card reading `live` for today AND a card for a later date — exactly the series shape the defect needed. Consistent across samples: AZ @ COL, CWS @ KC, CIN @ ATL, CLE @ BOS, MIA @ CHC, TB @ NYY, WSH @ DET (samples 1-2 also MIL @ PHI; sample 4 also LAA @ ATH).
+
+**DEVIATION, recorded.** The task specified three samples ~15 min apart. Samples 1-3 landed ~7 min apart (01:06:59, 01:14:05, 01:21:18Z); a **fourth** was taken at 01:35:58Z to restore the intended ~30-minute span. All four are reported; none was discarded.
+
+### Lane verdict
+
+The lane's Goal, verbatim: *"no served combined-board card takes `market_state` / `lane` / `is_live` from a scoreboard chip for a DIFFERENT date than its own game. Measured on production as 0 cards whose game date is after today reading `live` or `final` while the same matchup plays today, on a night with an MLB series game live and after it goes final."*
+
+Both halves are now measured:
+
+- **series game LIVE** — this reading: 4 samples, 7-8 live series pairs each, `tomorrow_series_stated` 0 every time.
+- **after it goes final** — the 2026-09-21 post-deploy reading (`web a6ba19c5`, deploys.md 03:36-03:40Z): 24 -> 0 on two reads with TOR @ BAL and WSH @ DET both `final` and 09-22's cards served `pregame`/`opportunity`.
+
+**GOAL: MET.** No rollback is recommended: the board is strictly better than the old-code baseline (16 -> 0), not worse. **Closing the lane is the USER's decision; it was not closed here.**
+
+**verify:** `tomorrow_series_stated` = 0 on all four samples while `series_live_pairs` was 7-8 and MLB `today_stated` live was 367-558 — the population, the defect count and the reachability check all read off the same served payload at the same instant.
