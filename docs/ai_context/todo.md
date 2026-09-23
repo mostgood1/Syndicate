@@ -1,5 +1,44 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#687` — **NCAAF now has an actual-outcome TOTAL fit, which is what the shared `smartsim2` repair was blocked on** — BUILT 2026-09-23, lane `smartsim2-total-nonlinearity`, session dae18452 — **OPEN: the fit exists; the engine-side repair is not done**
+
+`scripts/backtest_ncaaf_total_units.py`. The NCAAF analogue of
+`backtest_nfl_rating_units.py --total-level`, and the thing that made a
+two-sport fix impossible: arming `drive_success_sensitivity` for NCAAF without
+this would have changed that sport's totals with no evidence behind them.
+
+**It makes ZERO CFBD calls.** Everything comes from the committed
+`data/ncaaf_source/historical_truth/` tree (games + per-week plays carrying
+CFBD's own per-play `ppa`). That is a hard requirement, not a convenience: the
+CFBD quota is MONTHLY and shared by ten snapshot builders on one key, and
+exhausting it already caused a real incident (`cfbd_quota_latch.py`).
+
+Walk-forward (week-w ratings use only weeks < w, blended with the prior season
+at K=4), fitted on ACTUAL totals and never on the market, coverage printed
+before any fit. Train 2023-24 **n=1,450**, held out 2025 **n=762**:
+
+    level only          train R2 0.0625   held-out MAE 12.839   coeffs (0.3289, 0.3983)
+    level + difference  train R2 0.0663   held-out MAE 12.859   + (0.0928, 0.0758)
+    flat league mean                      held-out MAE 13.186
+
+**TWO RESULTS THAT MATTER.** (1) Unlike the NFL, NCAAF's rating LEVEL really
+does beat a flat mean out of sample (12.839 vs 13.186), so there is genuine
+signal to preserve -- shrink it carefully. (2) The DIFFERENCE terms make it
+WORSE out of sample (12.859 vs 12.839), exactly as in the NFL: **mismatch does
+not predict a total in either sport.** `#686`'s premise holds for NCAAF too.
+
+**NOT DONE, and it is the next step:** convert these coefficients into the
+engine's units (NCAAF rides `SP_RATING_SCALE = 10.0` and a PPA index, not the
+NFL's /20 EPA), measure the NCAAF profile's own level response on a pinned grid
+the way the NFL's was measured, and only then fit `drive_success_anchor` (to
+hold the mean) and `drive_success_sensitivity` (to fix the spread) per sport.
+
+**A caveat kept in the output rather than dropped:** the script also prints
+`corr(|ACTUAL margin|, ACTUAL total) = +0.172`, and that number is
+CONTAMINATED -- it uses an outcome, not a pre-game line, so it is not
+comparable to the NFL's `corr(|market spread|, ACTUAL total) = -0.032`. The
+held-out MAE comparison is the clean test. Labelled in the source and on stdout.
+
 ### `#686` — **The NFL sim's TOTAL responds to the rating DIFFERENCE, which carries no total signal at all** — FOUND and BUILT 2026-09-23, lane `nfl-total-residual-dispersion`, session dae18452 — **OPEN: the correction is LANDED AND DISABLED (`SYNDICATE_NFL_TOTAL_DIFF_CORRECTION`, absent = 0), because removing the response bought nothing measurable**
 
 Same class as `#684`, found while checking whether that fix had merely pulled
