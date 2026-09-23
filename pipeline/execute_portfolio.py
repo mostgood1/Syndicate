@@ -1132,6 +1132,80 @@ def _polymarket_gte_prop(slug: str, market: str) -> dict[str, Any] | None:
     return _parse_player_prop(parse_slug(slug) or {})
 
 
+def _polymarket_gt_total(slug: str) -> float | None:
+    """The `gt<N>` threshold a Yes/No TOTAL slug states, or None.
+
+    `astatc-mls-sea-rsl-2026-09-23-cor-all-gt10pt5` is "more than 10.5
+    corners". THE BOARD JOIN'S DECODER, imported rather than re-implemented,
+    for exactly the reason `_polymarket_gte_prop` gives one function up: a
+    second decoder here could disagree with the one that CHOSE the slug -- and
+    this one decides which side of a real order we buy.
+
+    `_line_from_modifiers` cannot stand in for it. Measured 2026-09-23,
+    `_slug_number('gt10pt5')` is None, so the plain line reader returns None
+    for precisely these slugs; `_greater_than_line` is the one that reads them.
+
+    A failed import is LOUD and REFUSES -- the soccer branch in the resolver
+    records why a swallowed ImportError is how a branch goes inert.
+    """
+    try:
+        from syndicate.features.shared.polymarket_board_join import (
+            _greater_than_line,
+            parse_slug,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[execute_portfolio] GT_TOTAL_DECODER_UNAVAILABLE {exc!r}"
+            " -- every Polymarket Yes/No total will refuse",
+            flush=True,
+        )
+        return None
+    return _greater_than_line(parse_slug(slug) or {})
+
+
+def _polymarket_yes_no_outcomes(outcomes: Sequence[Any]) -> bool:
+    """`outcomes` is exactly `Yes`/`No`, in either order."""
+    return {str(name or "").strip().lower() for name in outcomes or ()} == {"yes", "no"}
+
+
+def _as_line(value: Any) -> float | None:
+    try:
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _team_outcome_markets() -> frozenset[str]:
+    """Board markets whose OUTCOMES NAME TEAMS -- the only ones the team
+    matcher below can read.
+
+    DERIVED from the board join's own map rather than restated, because the
+    two must agree and that file's header already says what happens when they
+    do not: "the board-side gate used to read `MARKET_TYPE_TO_BOARD.values()`
+    directly, so admitting BTTS on the venue side left the board side still
+    refusing it -- one half of the join fixed and the other silently not".
+    The order builder never joined that discipline and kept its own literals
+    one layer down, which is how `alternate_totals_corners` reached the team
+    matcher at all.
+
+    The literal fallback is what has shipped all along and is correct today.
+    It exists so an import failure degrades to the PREVIOUS behaviour, loudly,
+    rather than refusing every moneyline on this venue.
+    """
+    try:
+        from syndicate.features.shared.polymarket_board_join import MARKET_TYPE_TO_BOARD
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[execute_portfolio] BOARD_VOCABULARY_UNAVAILABLE {exc!r}"
+            " -- falling back to the shipped team-outcome literal",
+            flush=True,
+        )
+        return frozenset({"h2h"})
+    return frozenset(MARKET_TYPE_TO_BOARD.values()) - _TOTAL_MARKETS - _SPREAD_MARKETS
+
+
 def _gte_prop_disagreement(prop: Mapping[str, Any], request: Any, market: str) -> str | None:
     """The refusal when a prop slug does not describe the position, else None.
 
@@ -1402,6 +1476,12 @@ def _polymarket_resolve_market(request) -> tuple | None:
     # Set when a `gte<N>` PLAYER PROP resolves: the index of the outcome named
     # `Yes`. See the prop branch below.
     prop_yes_index = None
+    # The REASON that goes on the receipt beside `prop_yes_index`. Three
+    # branches now resolve a Yes/No market by name and they are not the same
+    # evidence: a `gte` prop, a `gt` total, and BTTS naming its own outcome.
+    # One shared index with one hardcoded reason would have logged all three
+    # as the prop rule.
+    yes_by_name_reason = "gte_prop_yes_by_name"
     prop = _polymarket_gte_prop(slug, market)
 
     if market in _TOTAL_MARKETS:
@@ -1469,6 +1549,105 @@ def _polymarket_resolve_market(request) -> tuple | None:
                 else:
                     outcome_index = position
                     prop_yes_index = names.index("yes")
+    elif _polymarket_yes_no_outcomes(outcomes) and our_side in {"over", "under"}:
+        # A YES/NO TOTAL. Corners today (`cor-all-gt10pt5`); any future family
+        # the venue states a direction for, without another branch.
+        #
+        # WHY IT EXISTS. Measured over the 24 h to 2026-09-23 09:48 CT
+        # (14:48:35Z): `alternate_totals_corners` was planned on 8 passes and
+        # built 0, every one refusing `yes_no_market_subject_is_not_our_side`.
+        # It is in neither `_TOTAL_MARKETS` (its outcomes are Yes/No, not
+        # Over/Under) nor the prop grammar (`gt`, not `gte`), so it fell to the
+        # team matcher below and then to the soccer subject rule. That is the
+        # THIRD instance of one mode, after the 2026-08-25 totals incident and
+        # `#682`'s player props, both narrated in this function's own docstring.
+        #
+        # THE SAME RULE THE PRICING SIDE ALREADY USES, not a second one:
+        # `polymarket_board_join._probability_for_side` maps over -> `Yes` and
+        # under -> `No` on a Yes/No market, gated on the slug's `gt<N>` token.
+        # Its polarity carries two independent confirmations, recorded there:
+        # the token itself (`gt10pt5` IS "greater than 10.5", so nothing is
+        # inferred from word order) and the venue's prices (`Yes` at 0.76 on a
+        # 7.5 corners line tracks OVER at a magnitude the reverse reading
+        # cannot explain).
+        #
+        # GATED ON THE `gt` TOKEN, NEVER ON "Yes/No plus a line". The gate IS
+        # the evidence, so a family that never declared a direction can never
+        # be silently assigned one -- it keeps refusing, by name.
+        #
+        # AND THE THRESHOLD MUST EQUAL OUR LINE. `gt10pt5` against a position
+        # on 9.5 is a DIFFERENT CONTRACT, and pricing one as the other is the
+        # rung mismatch this path refuses everywhere else.
+        threshold = _polymarket_gt_total(slug)
+        our_line = _as_line(getattr(request, "line", None))
+        if threshold is None:
+            refusal = "yes_no_total_states_no_direction"
+        elif our_line is None:
+            refusal = "yes_no_total_position_has_no_line"
+        elif abs(threshold - our_line) > 1e-9:
+            refusal = "yes_no_total_line_disagrees_with_slug"
+        else:
+            wanted = "yes" if our_side == "over" else "no"
+            names = [str(name or "").strip().lower() for name in outcomes]
+            for position, raw_price in enumerate(prices):
+                if names[position] != wanted:
+                    continue
+                try:
+                    price = float(raw_price)
+                except (TypeError, ValueError):
+                    price = None
+                else:
+                    outcome_index = position
+                    # Rides the prop branch's yes-leg channel, so the venue's
+                    # own `yesLegIndex` still gets to contradict us.
+                    prop_yes_index = names.index("yes")
+                    yes_by_name_reason = "gt_total_yes_by_name"
+                break
+            if outcome_index is None:
+                refusal = "yes_no_total_side_unpriced"
+    elif _polymarket_yes_no_outcomes(outcomes) and our_side in {"yes", "no"}:
+        # BTTS AND ANY OTHER MARKET THAT NAMES ITS OWN OUTCOME. The board side
+        # is literally `yes`/`no` and so are the venue's outcomes, so this is a
+        # name compare with nothing to infer -- the same literal compare
+        # `_probability_for_side` already uses on the pricing side, whose own
+        # comment says `btts` and `totals` "name their own outcome".
+        #
+        # UNMEASURED, AND SAID SO. No BTTS position reached the order path in
+        # the censused 24 h, so this branch is the SAME defect as corners
+        # caught before it could be observed: `btts` is one of the five names
+        # in `_JOINABLE_BOARD_MARKETS` and had no branch here either. It is
+        # reachability-tested below, not production-proven.
+        names = [str(name or "").strip().lower() for name in outcomes]
+        for position, raw_price in enumerate(prices):
+            if names[position] != our_side:
+                continue
+            try:
+                price = float(raw_price)
+            except (TypeError, ValueError):
+                price = None
+            else:
+                outcome_index = position
+                prop_yes_index = names.index("yes")
+                yes_by_name_reason = "yes_no_side_by_name"
+            break
+        if outcome_index is None:
+            refusal = "yes_no_side_unpriced"
+    elif market not in _team_outcome_markets():
+        # THE SAFETY NET, and the whole reason corners was silent for as long
+        # as the join has produced corners matches.
+        #
+        # The team matcher below can only read outcomes that NAME TEAMS, which
+        # is `h2h` and nothing else. Every other market reaching it is a
+        # category error -- and it does not fail loudly, it fails as
+        # `team_side_not_in_outcomes` or, on a Yes/No market, as
+        # `yes_no_market_subject_is_not_our_side`: tokens that describe a
+        # venue data problem and read like one at every level except the code.
+        # `#682` and this lane are both that sentence.
+        #
+        # An unhandled market now refuses under its OWN name, so the next
+        # family the join admits cannot be silently inert -- it says so on the
+        # first pass, in the line `venue_order_family_census.py` already reads.
+        refusal = "no_order_branch_for_market"
     else:
         for position, (name, raw_price) in enumerate(zip(outcomes, prices)):
             side = _side_for_team(name, resolution, sport=sport)
@@ -1792,7 +1971,7 @@ def _polymarket_resolve_market(request) -> tuple | None:
             f"[execute_portfolio] POLYMARKET_YES_LEG slug={slug}"
             f" yes_leg_index={prop_yes_index} venue_yes_leg_index={yes_leg_index!r}"
             f" venue_reason={yes_leg_reason!r} our_index={outcome_index}"
-            f" agree={agree} reason='gte_prop_yes_by_name' outcomes={outcomes!r}",
+            f" agree={agree} reason={yes_by_name_reason!r} outcomes={outcomes!r}",
             flush=True,
         )
         if not agree:
@@ -1805,7 +1984,7 @@ def _polymarket_resolve_market(request) -> tuple | None:
             )
             return None
         yes_leg_index = prop_yes_index
-        yes_leg_reason = "gte_prop_yes_by_name"
+        yes_leg_reason = yes_by_name_reason
     elif market not in _TOTAL_MARKETS and market not in _SPREAD_MARKETS:
         agree = (
             yes_leg_index is not None

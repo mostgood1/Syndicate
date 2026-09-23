@@ -949,6 +949,14 @@ class _PolyReq:
     docstring on why -- the artifact carries no `id`)."""
 
     venue_ticker = "aec-mlb-tex-chw-2026-08-24"
+    # `market` WAS ABSENT HERE, and that made every test below run a path
+    # production cannot produce: `_order_from_position` REFUSES a position
+    # whose market is empty (`if not (... and market and ...)`), so a real
+    # request always carries one. The resolver now dispatches on it -- a market
+    # it has no branch for refuses by name instead of falling into the team
+    # matcher -- and an empty string is exactly such a market. A moneyline is
+    # `h2h`, which is what these rows have always been.
+    market = "h2h"
     side = "home"
     home_team = "CHW"
     away_team = "TEX"
@@ -2005,3 +2013,166 @@ def test_every_venue_adapter_wired_today_BUILDS_before_it_sends():
         assert callable(getattr(adapter, "build", None)), venue
         # And the wrapper live mode actually hands to `place_order`.
         assert callable(getattr(guarded_submit(adapter), "build", None)), venue
+
+
+# ---------------------------------------------------------------------------
+# YES/NO MARKETS THAT NAME THEIR OWN DIRECTION -- corners, BTTS
+# ---------------------------------------------------------------------------
+#
+# `alternate_totals_corners` was PLANNED 8 times and BUILT 0 over the 24 h to
+# 2026-09-23 09:48 CT (14:48:35Z), every pass refusing
+# `yes_no_market_subject_is_not_our_side` -- a token that reads like a venue
+# data gap. The slug and outcomes below are the ones production logged at
+# 14:48:34.747Z, not invented ones.
+#
+# REACHABILITY BEFORE CORRECTNESS: the first test asserts the BRANCH ran, by
+# the reason on the receipt, because a resolution that happens to be right for
+# another reason proves nothing about a branch that is supposed to be new.
+
+_CORNERS_SLUG = "astatc-mls-sea-rsl-2026-09-23-cor-all-gt10pt5"
+_BTTS_SLUG = "astatc-lg1-lil-psg-2026-09-23-btts"
+
+
+def _yes_no_row(*, slug, prices=("0.47", "0.53")):
+    return _polymarket_row(slug=slug, teams=("Yes", "No"), prices=prices)
+
+
+class _CornersReq(_PolyReq):
+    """The board row production had: MLS, corners over 10.5."""
+
+    venue_ticker = _CORNERS_SLUG
+    market = "alternate_totals_corners"
+    side = "over"
+    line = 10.5
+    sport = "soccer"
+    home_team = "Real Salt Lake"
+    away_team = "Seattle Sounders"
+    requested_price = None
+
+
+def test_corners_over_buys_yes_and_says_which_rule_did_it(monkeypatch):
+    runner = _artifact_env(monkeypatch, markets=[_yes_no_row(slug=_CORNERS_SLUG)])
+    resolved = runner._polymarket_resolve_market(_CornersReq())
+    assert resolved is not None, "the corners branch did not resolve"
+    slug, price, _tick, _min_qty, index, yes_leg = resolved
+    assert slug == _CORNERS_SLUG
+    # `Yes` is outcomes[0] at 0.47, and over BUYS Yes -- the polarity the slug
+    # states (`gt10pt5` is "more than 10.5") and the venue's prices corroborate.
+    assert (index, price) == (0, 0.47)
+    # THE BRANCH, NAMED. Without this the test passes on any resolution that
+    # happens to land on index 0.
+    assert yes_leg == (0, "gt_total_yes_by_name")
+
+
+def test_corners_under_buys_no(monkeypatch):
+    runner = _artifact_env(monkeypatch, markets=[_yes_no_row(slug=_CORNERS_SLUG)])
+
+    class _Under(_CornersReq):
+        side = "under"
+
+    resolved = runner._polymarket_resolve_market(_Under())
+    assert resolved is not None
+    assert (resolved[4], resolved[1]) == (1, 0.53)
+
+
+def test_corners_refuses_when_the_slug_threshold_is_not_our_line(monkeypatch):
+    """`gt10pt5` against a position on 9.5 is a DIFFERENT CONTRACT. This is the
+    rung mismatch the join refuses on the pricing side, and it has to be
+    refused here too -- the price would look entirely reasonable."""
+    runner = _artifact_env(monkeypatch, markets=[_yes_no_row(slug=_CORNERS_SLUG)])
+
+    class _WrongRung(_CornersReq):
+        line = 9.5
+
+    assert runner._polymarket_resolve_market(_WrongRung()) is None
+
+
+def test_corners_refuses_a_yes_no_market_that_states_no_direction(monkeypatch):
+    """THE GATE IS THE EVIDENCE. A Yes/No contract carrying no `gt` token has
+    not said which way its Yes points, so it keeps refusing rather than being
+    assigned a polarity it never declared -- the same rule, and the same
+    reason, as the pricing side."""
+    bare = "astatc-mls-sea-rsl-2026-09-23-cor-all"
+    runner = _artifact_env(monkeypatch, markets=[_yes_no_row(slug=bare)])
+
+    class _NoDirection(_CornersReq):
+        venue_ticker = bare
+
+    assert runner._polymarket_resolve_market(_NoDirection()) is None
+
+
+def test_corners_refuses_when_the_position_carries_no_line(monkeypatch):
+    runner = _artifact_env(monkeypatch, markets=[_yes_no_row(slug=_CORNERS_SLUG)])
+
+    class _NoLine(_CornersReq):
+        line = None
+
+    assert runner._polymarket_resolve_market(_NoLine()) is None
+
+
+def test_btts_resolves_by_literal_outcome_name(monkeypatch):
+    """BTTS names its own outcome on BOTH sides -- the board side is `yes`/`no`
+    and so are the venue's outcomes. UNMEASURED in production: no BTTS position
+    reached the order path in the censused window, so this is the same defect
+    as corners, caught before it could be observed."""
+    runner = _artifact_env(
+        monkeypatch, markets=[_yes_no_row(slug=_BTTS_SLUG, prices=("0.58", "0.42"))]
+    )
+
+    class _Btts(_CornersReq):
+        venue_ticker = _BTTS_SLUG
+        market = "btts"
+        side = "yes"
+        line = None
+
+    resolved = runner._polymarket_resolve_market(_Btts())
+    assert resolved is not None
+    assert (resolved[4], resolved[1]) == (0, 0.58)
+    assert resolved[5] == (0, "yes_no_side_by_name")
+
+    class _BttsNo(_Btts):
+        side = "no"
+
+    resolved_no = runner._polymarket_resolve_market(_BttsNo())
+    assert resolved_no is not None
+    assert (resolved_no[4], resolved_no[1]) == (1, 0.42)
+
+
+def test_a_market_with_no_branch_refuses_under_its_own_name(monkeypatch, capsys):
+    """THE WHOLE POINT OF THE LANE. An unhandled market used to fall into the
+    team matcher and refuse `team_side_not_in_outcomes` or
+    `yes_no_market_subject_is_not_our_side` -- tokens that describe a venue
+    data problem. It now says what is actually true, so the next family the
+    join admits cannot be silently inert."""
+    exotic = "astatc-mls-sea-rsl-2026-09-23-exact-score-0-0"
+    runner = _artifact_env(monkeypatch, markets=[
+        _polymarket_row(slug=exotic, teams=("0-0", "Any other"), prices=("0.08", "0.92"))
+    ])
+
+    class _Exotic(_CornersReq):
+        venue_ticker = exotic
+        market = "exact_score"
+        side = "home"
+        line = None
+
+    assert runner._polymarket_resolve_market(_Exotic()) is None
+    assert "reason=no_order_branch_for_market" in capsys.readouterr().out
+
+
+def test_the_team_outcome_vocabulary_is_derived_from_the_board_join():
+    """Two guards that must agree should not be two literals -- the board
+    join's own header, applied one layer down. If the join ever maps a venue
+    type onto a new TEAM-outcome board market, the team matcher admits it
+    without an edit here."""
+    import pipeline.execute_portfolio as runner
+    from syndicate.features.shared.polymarket_board_join import MARKET_TYPE_TO_BOARD
+
+    derived = runner._team_outcome_markets()
+    assert derived == (
+        frozenset(MARKET_TYPE_TO_BOARD.values())
+        - runner._TOTAL_MARKETS
+        - runner._SPREAD_MARKETS
+    )
+    # And it is not empty, which is the failure that would silently route every
+    # moneyline into `no_order_branch_for_market`.
+    assert "h2h" in derived

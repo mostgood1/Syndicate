@@ -86,6 +86,10 @@ def test_the_slate_writer_runs_BEFORE_the_execution_tick():
 
 class _Request:
     venue_ticker = "aec-mlb-pit-sd-2026-08-24"
+    # A moneyline. Stated because the resolver dispatches on `market` and a
+    # market it has no branch for refuses by name -- an absent one is exactly
+    # that, and `_order_from_position` never builds a request without it.
+    market = "h2h"
     home_team = "San Diego Padres"
     away_team = "Pittsburgh Pirates"
     sport = "mlb"
