@@ -675,6 +675,35 @@ def _total_diff_correction() -> float:
     return max(0.0, value)
 
 
+def nfl_calibration_profile():
+    """`NFL_CALIBRATION_PROFILE`, optionally with blowout damping armed.
+
+    `SYNDICATE_NFL_BLOWOUT_DAMPING` is the strength; ABSENT or `0` means the
+    shipped profile is returned UNCHANGED (`is`-identical, so nothing can be
+    perturbed by merely importing this). `#686`, lane
+    `smartsim2-total-nonlinearity`.
+
+    **DO NOT ARM THIS IN PRODUCTION WITHOUT RE-FITTING FIRST.** The mechanism is
+    real and the defect it addresses is measured, but it is a MECHANISM added to
+    a CALIBRATED engine: it moves the MARGIN in exactly the blowout games, and
+    the NFL margin is currently calibrated (2026 wk3 spread MAE 1.89 vs the
+    market). `model_engine_standard.md` requires re-fitting the rates that were
+    absorbing it, and this ledger records two mechanisms interacting NEGATIVELY
+    in 4 of 4 markets. The knob exists so the fit can be RUN, not so the
+    behaviour can be switched on.
+    """
+    raw = str(os.environ.get("SYNDICATE_NFL_BLOWOUT_DAMPING") or "").strip()
+    try:
+        strength = float(raw) if raw else 0.0
+    except ValueError:
+        strength = 0.0
+    if strength <= 0.0:
+        return NFL_CALIBRATION_PROFILE
+    import dataclasses as _dc
+
+    return _dc.replace(NFL_CALIBRATION_PROFILE, blowout_damping_strength=strength)
+
+
 def _games_before(plays: list[tuple[int, str, str, str, float]], *, team: str, before_week: int | None) -> int:
     """Distinct weeks this team had offensive plays before `before_week` -- the
     same game count `_epa_per_game` divides by."""
@@ -1050,6 +1079,12 @@ def build_projection(
         else {}
     )
 
+    # Resolved ONCE per game, not per seed: it reads the environment, and the
+    # shipped profile is returned `is`-identical when the knob is absent.
+    sim_profile = nfl_calibration_profile()
+    if getattr(sim_profile, "blowout_damping_strength", 0.0):
+        rating_source += f"+blowout_damp_{sim_profile.blowout_damping_strength:g}"
+
     home_scores: list[int] = []
     away_scores: list[int] = []
     for seed in range(1, seeds + 1):
@@ -1063,7 +1098,7 @@ def build_projection(
             away_offense_rating=away_off,
             away_defense_rating=away_def,
         )
-        output = simulate_game(sim_input, profile=NFL_CALIBRATION_PROFILE)
+        output = simulate_game(sim_input, profile=sim_profile)
         home_scores.append(output.final_score["home"])
         away_scores.append(output.final_score["away"])
         # STOP DISCARDING `quarter_log`. `#S1`. The sim computed a per-quarter

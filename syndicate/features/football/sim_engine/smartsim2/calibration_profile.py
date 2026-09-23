@@ -79,6 +79,59 @@ class CalibrationProfile:
     explosive_rating_defense_weight: float = 2.5
 
     # --------------------------------------------------------------------
+    # BLOWOUT DAMPING -- OFF BY DEFAULT (`strength = 0.0` is an exact no-op).
+    #
+    # WHY IT EXISTS. This engine scores at FULL RATE in the fourth quarter of a
+    # 30-point game. Measured 2026-09-23 (`#686`, lane
+    # `smartsim2-total-nonlinearity`): the Q4/Q1 scoring ratio is 1.447 in a
+    # matched game and 1.412 in a badly mismatched one -- i.e. unchanged. Real
+    # football does the opposite: a leading team kneels, runs the clock, plays
+    # conservatively and empties the bench.
+    #
+    # WHAT IT IS FOR. Points-per-drive is CONVEX in yards-per-play (converting
+    # first downs is sharply nonlinear), so a mismatch raises the projected
+    # TOTAL -- measured at `+7.3493*off_diff - 4.8940*def_diff`, R2 0.933, with
+    # both rating SUMS pinned at zero. That convexity is real football and is
+    # not the defect. The defect is that nothing pays it back, because the
+    # damping that cancels it in reality is missing here. Reality's verdict on
+    # the net effect: `corr(|market spread|, ACTUAL total)` on 2025 = -0.032.
+    #
+    # WHY IT SHIPS OFF AND MUST BE FITTED BEFORE IT IS ARMED. This is a
+    # MECHANISM added to a CALIBRATED engine, which `model_engine_standard.md`
+    # says requires re-fitting the rates that were absorbing it -- and this
+    # ledger records two mechanisms interacting NEGATIVELY in 4 of 4 markets.
+    # It also moves the MARGIN in exactly the blowout games, and the NFL margin
+    # is currently calibrated (2026 wk3 spread MAE 1.89 vs the market). NCAAF
+    # shares this engine and has no actual-outcome total fit at all yet.
+    # Arming it for either sport is a fitting exercise, not a flag flip.
+    #
+    # **IT DOES NOT FIX `#686`, AND THAT WAS MEASURED, NOT ASSUMED.** It was
+    # built to remove the total's spurious response to the rating DIFFERENCE.
+    # It does not. Sweeping off_diff -0.4..+0.4 with the level pinned, the
+    # fitted `total ~ off_diff` slope is +5.93 at strength 0.0 and +6.00 at
+    # strength 0.9 -- flat. Only the mean total drifts (44.18 -> 43.86).
+    #
+    # The reason, obvious afterwards: at off_diff 0.4 the average margin is
+    # about 5 points, which is not a blowout, so damping keyed to a 14-point
+    # lead almost never fires -- while the points-per-drive convexity that
+    # CAUSES the response operates at every margin, close games included. The
+    # response is not a blowout phenomenon.
+    #
+    # So this is kept for its OWN sake: the engine genuinely has no
+    # garbage-time behaviour, which matters for quarter/half markets and for
+    # the tail of the score distribution. It is NOT the repair for `#686`.
+    #
+    # SHAPE. The damping scales the possessing team's SCORING weights
+    # (touchdown, field-goal attempt, explosive) when that team is LEADING,
+    # ramping from the start of Q3 to the end of Q4 and with the size of the
+    # lead. It deliberately does NOT damp the trailing team: garbage-time
+    # points are real, and it is the leader easing off that caps a blowout.
+    blowout_damping_strength: float = 0.0
+    blowout_damping_lead_threshold: float = 14.0
+    blowout_damping_lead_span: float = 14.0
+    blowout_damping_quarter_seconds: float = 900.0
+
+    # --------------------------------------------------------------------
     # DRIVE-SUCCESS SENSITIVITY -- the carrier the note above points at
     # --------------------------------------------------------------------
     #

@@ -69,6 +69,45 @@ def _field_goal_success_probability(
     )
 
 
+def blowout_damping_factor(
+    play_state: PlayState,
+    profile: CalibrationProfile = NFL_CALIBRATION_PROFILE,
+) -> float:
+    """How much of the possessing team's SCORING rate survives, in (0, 1].
+
+    Returns exactly 1.0 -- an arithmetic no-op, not an approximate one -- when
+    `blowout_damping_strength` is 0, which is the default for both sports. See
+    that field in `calibration_profile.py` for why the mechanism exists and why
+    arming it is a fitting exercise rather than a flag flip.
+
+    Only the LEADER is damped. A trailing team's garbage-time points are real;
+    what caps a blowout is the leader kneeling, running clock and resting
+    starters. Damping both sides would model the symptom, not the behaviour.
+
+    `seconds_remaining` is per-QUARTER here (`classify_urgency` treats it that
+    way: `quarter >= 4 and seconds_remaining <= 150`), so lateness is built from
+    the quarter plus progress through it, and ramps from the START of Q3 to the
+    end of Q4. Overtime cannot reach the lead threshold by construction, so it
+    is never damped.
+    """
+    strength = float(getattr(profile, "blowout_damping_strength", 0.0) or 0.0)
+    if strength <= 0.0:
+        return 1.0
+    lead = float(play_state.score_differential)
+    threshold = float(getattr(profile, "blowout_damping_lead_threshold", 14.0))
+    if lead <= threshold:
+        return 1.0
+    span = float(getattr(profile, "blowout_damping_lead_span", 14.0)) or 1.0
+    excess = _clamp((lead - threshold) / span, 0.0, 1.0)
+
+    quarter_seconds = float(getattr(profile, "blowout_damping_quarter_seconds", 900.0)) or 900.0
+    through_quarter = _clamp(1.0 - (float(play_state.seconds_remaining) / quarter_seconds), 0.0, 1.0)
+    elapsed_quarters = (float(play_state.quarter) - 1.0) + through_quarter
+    lateness = _clamp((elapsed_quarters - 2.0) / 2.0, 0.0, 1.0)
+
+    return _clamp(1.0 - strength * excess * lateness, 0.0, 1.0)
+
+
 def _play_outcome_weights(
     play_state: PlayState,
     priors: DrivePriorProfile,
@@ -101,6 +140,11 @@ def _play_outcome_weights(
         field_goal_attempt += 0.08 + red_zone * 0.06
         turnover += 0.01 + long_yardage * 0.02
         gain += 0.03
+
+    # BLOWOUT DAMPING, applied to the SCORING weights only and AFTER the
+    # down/red-zone bumps below would otherwise be added, so the damping cannot
+    # be undone by a later `+=`. A no-op at the default strength of 0.0.
+    damping = blowout_damping_factor(play_state, profile)
 
     if play_state.red_zone:
         touchdown += 0.06
@@ -156,17 +200,24 @@ def _play_outcome_weights(
         gain *= profile.red_zone_gain_stiffening
         incomplete_pass += 0.07
 
+    # `damping` is 1.0 unless blowout damping is armed, so these three
+    # multiplications are exact no-ops by default. Applied HERE, after every
+    # `+=` above, so no later adjustment can undo it -- and INSIDE `max()`, so
+    # the existing 0.01 floor still guards a fully damped weight. The weights
+    # are normalised below, so damping the SCORING outcomes automatically
+    # shifts that probability onto gains and punts: the leader keeps moving the
+    # ball and stops finishing drives, which is the behaviour being modelled.
     weights = {
         PlayOutcome.GAIN: max(0.01, gain),
-        PlayOutcome.EXPLOSIVE_GAIN: max(0.01, explosive_gain),
+        PlayOutcome.EXPLOSIVE_GAIN: max(0.01, explosive_gain * damping),
         PlayOutcome.SACK: max(0.01, sack),
         PlayOutcome.PENALTY: max(0.01, penalty),
         PlayOutcome.TURNOVER: max(0.01, turnover),
         PlayOutcome.INCOMPLETE_PASS: max(0.01, incomplete_pass),
-        PlayOutcome.TOUCHDOWN: max(0.01, touchdown),
+        PlayOutcome.TOUCHDOWN: max(0.01, touchdown * damping),
     }
     if play_state.down >= 4 and play_state.field_goal_range:
-        weights[PlayOutcome.FIELD_GOAL_ATTEMPT] = max(0.01, field_goal_attempt)
+        weights[PlayOutcome.FIELD_GOAL_ATTEMPT] = max(0.01, field_goal_attempt * damping)
     total = sum(weights.values())
     return {key: value / total for key, value in weights.items()}
 
