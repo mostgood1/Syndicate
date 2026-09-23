@@ -40530,3 +40530,29 @@ StatsAPI box-score line, 5 agreements and 0 contradictions, with the decisive
 row Soroka 9 K on a `gte5` market graded `won` for +$1.07.
 
 `#682` is CLOSED on this reading (moved to `todo_closed.md`).
+
+## 2026-09-23 15:16:21Z -> live 15:22:16Z (10:16-10:22 AM CT) — live-odds-worker `ace8fce6` -> `c5daf58e` (`dep-dapuqhek1f9s73cvm3pg`) — lane `mlb-doubleheader-e2e` — **MEASUREMENT OWED (needs live MLB games), reading scheduled 1:10 PM CT**
+
+**User decision (chat):** "fix the counter and trace where the MC rows land", then "deploy it and read the carry during tonight's games". Claim 15:15:2xZ, preflight CLEAR 15:16:0xZ, released after this entry because its 45-min TTL cannot span to the reading. **Carries** `7094b69a` (this lane) plus whatever else reached `origin/main`.
+
+**THE SERVICE CHOICE IS THE LOAD-BEARING PART.** The obvious target was refresh-worker — it builds the board and every other deploy this session went there. It would have been INERT: `live_lens_loop` runs on **live-odds-worker**, measured over 00:30-01:10Z —
+
+    live-odds-worker  01:08:13Z  [live_lens_loop] TICK_COMPLETE results={'mlb': True, 'wnba': True, 'soccer': True, 'nfl': True}
+    refresh-worker    (no TICK_COMPLETE, no LIVE_LENS tick, at all)
+
+`LIVE_MC_PRICED` appears on BOTH services and does NOT discriminate; `TICK_COMPLETE` does. live-odds-worker had been on `ace8fce6` since 2026-09-22T19:45:21Z, 20 hours stale.
+
+**What shipped.** `7094b69a`: `_carry_live_probability` now normalises its source rows through the existing `_normalize_live_prop_row` before keying, and its counter prints on the FAILING path as well as the succeeding one.
+
+    field                            baseline 15:15:38Z (no games live)   predicted (during live games)
+    live-odds-worker commit          ace8fce6                             c5daf58e  -- MET, live 15:22:16.505Z
+    `LIVE_PROB_CARRIED` lines        never emitted, in all history        present
+    ... `carried=`                   n/a                                  > 0 on at least one line
+    `snapshot_live_prob_indexed`     0                                    > 0
+    `snapshot_live_prob_seen`        0                                    > 0
+    `rows_live_edged`                0                                    > 0
+    snapshot_by_game_state           {pregame: {rows 39, with_live_prob 0, with_live_projection 0}}
+
+**verify:** OWED. Only the commit is met so far, and a commit being live proves nothing about this fix. The rest needs MLB games in progress — the earliest is today's G1 at 17:35Z. Scheduled reading `mlb-live-prob-carry-reading-0923`, 1:10 PM CT, built to return THREE outcomes: published / did not publish / could not be told. It stops with NO VERDICT if no game is live, because a zero carry against zero live games is an empty frame; it reports `source_rows` and `source_with_prob` separately so a `carried=0` distinguishes "no MC rows reached the merge" from "they reached it and the key did not match"; and it treats `snapshot_live_prob_indexed` still 0 while `carried > 0` as a SEPARATE downstream defect rather than a failed fix.
+
+**If it carries, it is the first live prop probability MLB has ever published** — `5bab0685`'s own commit message says the symptom it was written to fix ("produced 27, published 0") has been the standing state since before 2026-08-30, and it was still the state with that fix live.
