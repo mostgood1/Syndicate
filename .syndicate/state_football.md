@@ -199,6 +199,8 @@ overrides; `1` is the kill switch and is byte-exact.
     worst miss          14.3 -> 8.7
     margin SD           5.58 -> 5.29    (market 4.86; the level shrank, the difference did not)
 
+**THE BASELINE ABOVE IS POPULATION SD (`statistics.pstdev`, ddof=0), AND A MONITOR MUST MATCH IT.** A scheduled re-reading on 2026-09-23 used the SAMPLE SD and every figure came out exactly sqrt(16/15) = 3.28% high on n=16 -- 4.47 read as 4.61, 2.51 as 2.59 -- on a byte-identical artifact that could not have changed, and its ledger row annotated the market as `(was 2.51)` as though lines had moved. Unpinned that is a PERMANENT phantom regression which would disguise the first real one. The task prompt now pins ddof=0; a re-run reproduced 4.47 / 2.51 / 2.60 / 5.29 to the digit.
+
 **WHAT THIS IS NOT.** It is not a market-fit. The shrink improves accuracy
 against ACTUAL totals, not only against the market: held-out 2025 MAE 10.97 ->
 10.68 (market 10.39), and on 2026 wk1-2 production files scored against real
