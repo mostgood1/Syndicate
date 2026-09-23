@@ -2809,3 +2809,12 @@ for that, and it fires on the persist path before the ceiling is reached.
 - **Close when** the verifier and the live builder agree on a spread (test + the daily census showing kalshi `spreads` `would_build` > 0 once the account can fund an order).
 - **CLOSED 2026-09-22** by `ace8fce6` (live-odds-worker live 19:45:21Z): `verify_order_paths` builds through `build_order_body` and v1 `order_body` passes the line. Reading, first kalshi pass after the deploy (19:49:46Z): `'spreads': {'would_build': 2}`, was `{'spread_line_missing': 2}`; all 9 positions in that pass build. `deploys.md` 19:42:03Z entry. **The remaining half of the original close condition -- a placed kalshi spread -- is blocked by FUNDING, not by code: kalshi cash $0.22, every position refused `insufficient_venue_balance`. That is the open lead, and this item is not held open for it.**
 
+---
+
+### `#682` — **Polymarket player props: the order resolver had no `gte<N>` prop branch, so every one refused at build — FIXED and placing; the settlement proof of the side is owed** — FOUND and FIXED 2026-09-22, lane `layer2-score-outcome-calibration`, session 236bd219 — **CLOSED 2026-09-23**
+- **What.** `astatc-mlb-az-col-2026-09-22-k-micsor-gte5` (Soroka over 4.5) refused `market_unresolved_for_position`. The preceding `POLYMARKET_SIDE_REFUSED reason=yes_no_market_subject_is_not_our_side outcomes=['Yes','No']` showed the market WAS in the slate: a prop fell into the team matcher, then the soccer 3-way subject rule.
+- **Fix, `69db91e8`.** A slug the board join's `_parse_player_prop` admits resolves over -> `Yes`, under -> `No` by name, after refusing any market/line/player disagreement; the venue's `yesLegIndex` can only refuse (`prop_yes_leg_disagrees_with_venue`).
+- **Verified so far.** live-odds-worker `f15ffb80` live 16:30:04Z: first pass placed it YES (`CNAV8SPX4WPA`), `venue_yes_leg_index=0 agree=True`, `refused={}`; FILLED 2/2 @ 0.45 at 16:51:13Z (`deploys.md`).
+- **Close when** scheduled task `soroka-prop-settlement-reading-0923` shows the grade matches Soroka's box-score strikeouts (WIN iff >= 5); then move this item to `todo_closed.md`. A grade that contradicts the count means the prop side mapping is INVERTED -- stop Polymarket props first.
+- **CLOSED 2026-09-23** by scheduled task `soroka-prop-settlement-reading-0923`: GRADED CORRECTLY, Soroka 9 K (7.0 IP, StatsAPI 824302), pnl +$1.07; and 4 of 4 other settled `astatc-` props on 09-22 also match their box scores (5/5, both sides of the mapping); deploys.md 14:55Z entry.
+

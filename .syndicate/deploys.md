@@ -40422,3 +40422,111 @@ No claim taken, no env change, no code change. Scheduled task `refresh-worker-oo
 **verify:** the `[bundle-5s, REC+5s]` row -- all 6 cycles at 12,048-12,775 chunk lines sampled 4-5 times each, max anon step **+1 MB** off a 1,703-2,432 MB base, where the old `read_text().splitlines()` cost +512 MB at 12,723 lines. The wider window is used because the spec's window is SHORTER THAN THE SAMPLING PERIOD (2.08 s median gap vs 0.02-1.10 s), so it leaves 4 of 6 cycles unsampled; it is not a weaker test, since the pre-fix bursts were each caught by a single sample of this same watchdog.
 
 **Lane not closed** -- user's call. Closing returns `pipeline/intelligence_state.py` to `layer2-restate-series-date`.
+
+## 2026-09-23 14:55Z -- READING (owed by the 2026-09-22 16:51:13Z entry) -- lane layer2-score-outcome-calibration -- first Polymarket player-prop order settled: GRADED CORRECTLY
+
+Read at 2026-09-23 14:55Z (09:5x AM CT) by scheduled task `soroka-prop-settlement-reading-0923`.
+Source: `GET /api/portfolio/live?date=2026-09-22&show=all&on=all` on web
+(`show_all=1` / `all_dates=1` are NOT the parameter names -- the route reads
+`?show=all` and `?on=all`, `intelligence.py:5611`; the first fetch returned 4
+orders with `show_all=False`, the corrected one 342 with `show_all=True`).
+Box scores: `statsapi.mlb.com/api/v1/game/<pk>/boxscore`, `game_pk` is null on
+every one of these orders so the pks come from the 2026-09-22 schedule.
+NO deploy, NO env change, NO order action.
+
+**THE ORDER THIS READING WAS OWED FOR -- `CNAV8SPX4WPA`, WON, +$1.07.**
+
+    venue_order_id        CNAV8SPX4WPA
+    venue_ticker          astatc-mlb-az-col-2026-09-22-k-micsor-gte5
+    player / market       Michael Soroka / strikeouts, over 4.5, segment full
+    status / outcome      filled / won
+    fill                  2.0 contracts @ 0.45 = $0.90 stake, fees $0.03
+    pnl_dollars           +1.07
+    settled_value         null (top level); grade_check.settled_value 6.0
+    graded_at             2026-09-23T03:16:17.353188Z  (10:16 PM CT 09-22)
+    settled_at_venue      2026-09-23T03:16:00.640402915Z
+    venue_resolved_at     2026-09-22T16:35:27.921734Z  (= the FILL read, 11:35 AM CT;
+                          this field and `settled_at` both carry the fill, not the resolution)
+    settled_by            venue
+    held_side             POSITION_RESOLUTION_SIDE_LONG
+    grade_check           agrees=true, our_outcome=won, venue_outcome=won,
+                          checked_at 2026-09-23T03:22:50Z
+    game_pk               null  (AZ @ COL is 824302, from the schedule)
+
+**StatsAPI 824302 (Arizona Diamondbacks @ Colorado Rockies, Final): Michael
+Soroka 7.0 IP, 9 K**, 2 H, 1 BB, 1 ER. 9 >= 5, so "at least 5 strikeouts"
+resolves YES and our `over 4.5` = OUTCOME_SIDE_YES must win. It did.
+
+**(a) HELD.** Pre-registered: `strikeOuts >= 5` -> WIN, pnl ~ +$1.07
+(2 x (1 - 0.45) - 0.03). Actual: won, pnl **+1.07** exactly.
+
+**(b) HELD.** `grade_check.agrees = true`; our independent grade and the
+venue's resolution both say `won`.
+
+**(c) HELD, 5 of 5.** Every settled `astatc-` player prop on 09-22 -- both
+sides of the mapping, 2 `over` (YES) and 2 `under` (NO) besides Soroka --
+grades the way its box score says it must:
+
+    order          slug family / side          player            stat (StatsAPI)   ledger   pnl
+    CNAV8SPX4WPA   k-micsor-gte5   over 4.5    Michael Soroka    9 K  (7.0 IP)     won      +1.0700
+    CNB2YTE0YWP9   tb-ketmar-gte3  over 2.5    Ketel Marte       1 TB (5 AB, 1 H)  lost     -1.0492
+    CNB53QT6EWP7   outs-andpal-gte16 under 15.5 Andre Pallante   18 outs (6.0 IP)  lost     -2.5400
+    CNB5C1E8WWPD   hrr-chadel-gte2 under 1.5   Chase DeLauter    3 (2 H, 1 R, 0 RBI) lost   -1.1180
+    CNBAHVFFYWPF   hits-chadel-gte1 over 0.5   Chase DeLauter    2 H               won      +1.0777
+
+    over  wins iff stat >= N:  9>=5 won OK,  1>=3 false lost OK,  2>=1 won OK
+    under wins iff stat <= N-1: 18<=15 false lost OK,  3<=1 false lost OK
+
+Fills and grades for the other four: Marte 2.44 @ 0.43 / $1.05 / fee $0.04,
+graded 03:23:16Z, `settled_at_venue` 03:16:15Z; Pallante 5.08 @ 0.50 / $2.54 /
+$0.09, graded 01:25:44Z, venue 01:19:33Z; DeLauter hrr 2.15 @ 0.52 / $1.12 /
+$0.04 and DeLauter hits 2.96 @ 0.62 / $1.84 / $0.05, both graded 01:54:55Z,
+venue 01:47:56Z / 01:47:17Z. Games: STL @ PIT 823328, CLE @ BOS 824709.
+Net over the five: **-$2.5595** (2 won, 3 lost). Pks 824302/823328/824709 all
+Final; TOR @ BAL was the only postponement on the date and no prop touched it.
+
+**THE SIDE MAPPING FOR POLYMARKET PLAYER PROPS IS CONFIRMED END TO END**, in
+both directions: a slug `gte<N>` market with our `over` sent as
+OUTCOME_SIDE_YES pays iff the stat reaches N, and our `under` sent as NO pays
+iff it does not. `69db91e8` (live-odds-worker `f15ffb80`, live 16:30:04Z
+09-22) is verified by money, not by a log line.
+
+**Two things observed in the same read, neither an inversion, both worth a
+later look.**
+
+1. `CNB2YTE0YWP9` (Marte, side `over` = YES) carries
+   `held_side=POSITION_RESOLUTION_SIDE_SHORT` while the other four carry
+   `LONG` -- including the two `under`/NO orders. The GRADE does not come from
+   this field: `grade_polymarket_resolution` takes the sign of the realized
+   delta (`venue_settlement.py:339-401`) and `held_side` is recorded
+   informationally, so nothing was decided by it here. And it cannot mean "we
+   held NO" on this order, because holding NO on "at least 3 total bases" with
+   1 TB would have PAID, and the venue booked the full cost basis as a loss
+   (-1.0492 = 2.44 x 0.43). But `#595`'s decisive h2h case read SHORT as
+   evidence about which leg we held (`polymarket_us_markets.py:1494`,
+   `execute_portfolio.py:1754`), so a prop where the field disagrees with our
+   submitted side and with the money is worth understanding before the field
+   is leaned on again.
+2. Our own grader returned `not_decided_yet` for `batter_total_bases`
+   (`CNB2YTE0YWP9`, `grade_check.agrees=null`, checked 03:39:02Z) while the
+   venue had graded it. The other four all have `agrees=true`. So (b) is
+   tested on 4 of 5 and the fifth is an ABSENT grade, not a disagreement --
+   the venue's resolution there matches the box score independently.
+3. On the three losses `pnl_dollars` equals exactly `-(contracts x price)`
+   with the fee OUTSIDE it ($0.04 + $0.09 + $0.04 = $0.17 unbooked), while
+   the wins are net of fee (Soroka 2 x 0.55 - 0.03). Both numbers come from
+   the venue's realized delta, so this is a note about what `pnl_dollars`
+   means on a loss, not a claim that money is missing.
+
+**Still open, not part of this reading:** three `astatc-` props placed for the
+09-23 slate are filled and ungraded -- `CNRQHGJYEWPH` Chris Sale outs over
+16.5 (3.80 @ 0.47), `CNS758CCYWPE` George Lombard Jr. hits over 0.5 (2.48 @
+0.56), `CNSWN6QK6WP9` Yandy Diaz hits+runs+RBIs over 1.5 (2.63 @ 0.47). They
+are further tests of the same mapping once their games finish.
+
+**verify:** the (c) table -- five settled Polymarket player props, each one's
+ledger grade read from `/api/portfolio/live` against that player's own
+StatsAPI box-score line, 5 agreements and 0 contradictions, with the decisive
+row Soroka 9 K on a `gte5` market graded `won` for +$1.07.
+
+`#682` is CLOSED on this reading (moved to `todo_closed.md`).
