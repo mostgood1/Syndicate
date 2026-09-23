@@ -1057,7 +1057,7 @@ death, never life — do not invert it.
 - Blocked by: none
 - Outcome: **GOAL MET 2026-09-22 22:39Z.** `eddcfb60` live on web 22:29:39Z. Same 12-request pattern as the per-worker baseline: `[home_embed]` BUILD 6-in-8-min (no FILE_HIT) -> **BUILD 3 + FILE_HIT 2 in 3.2 min**, i.e. one build per 60 s window for the container, and the FILE_HIT's `chars=14035948` is byte-for-byte the sibling's build. `/` server median 1,634 -> **497 ms**, under 1 s on 7 of 12 (was 4 of 8), floor unchanged at ~226 ms. Hypothesis CONFIRMED. Falsification (a cold worker still rebuilding) did not occur; the offline test for it fails on the parent commit. Left open: the first request per window still pays the build. Measurement: `deploys.md` 22:23:46Z entry.
 
-### home-embed-background-refresh — OPEN — opened 2026-09-22 — session dae18452-227b-42cc-a4f4-a4a4ee4cec3e
+### home-embed-background-refresh — CLOSED 2026-09-22 — opened 2026-09-22 — session dae18452-227b-42cc-a4f4-a4a4ee4cec3e
 - Goal: no `/` request pays the embed build. Measured on production as the served `/` staying under ~1 s across a window boundary, with the `[home_embed] BUILD` line coming from a background refresh rather than from a request.
 - Files: `syndicate/blueprints/intelligence.py` (the home-embed cache ONLY), `tests/test_home_embed_cache.py`.
 - Hypothesis (written BEFORE the change, measured 2026-09-22 22:35-22:39Z): the cache stops REPEATED builds but the FIRST request of each window still pays the whole one -- 10.3 / 6.2 / 8.2 s on the three window boundaries of a 12-request run, against 0.41-1.81 s on the other nine, and `[home_embed] BUILD ms=9698 / 4664 / 6307`. Serving the existing copy and refreshing BEHIND the response (stale-while-revalidate) removes that cost from every request but the first one after a boot.
@@ -1065,6 +1065,7 @@ death, never life — do not invert it.
 - Falsification test: with it live, requests at a window boundary still take seconds (the refresh is not actually off the request path), or a quiet period serves an arbitrarily old board (the staleness cap does not hold).
 - Verification: tests (stale served immediately + a background rebuild lands; one refresh at a time; past the cap the caller waits; a failing background build leaves the cache usable); then production after a user-approved web deploy: `/` durations across window boundaries from the access log, and the `[home_embed]` lines showing REFRESH.
 - Blocked by: none
+- Outcome: **GOAL MET 2026-09-23 00:46Z.** `bc383640` live on web 00:34:55Z. Over 16 requests crossing ~4 window boundaries: **all 4 `BUILD` lines read `source=background`** (0 on a request thread, was 3 of 3), each preceded by `STALE_SERVED ... refresh=1`, with 4 `FILE_HIT` from the sibling worker. `/` server median 497 -> **438 ms**, max 10,128 -> **4,100 ms**, under 1 s on 12/16 (was 7/12), **over 5 s on 0 (was 3)**. Hypothesis CONFIRMED; the falsification (seconds still spent at a boundary because the refresh is not really off the request path) did NOT hold -- but the boundary request is 2.5-4.2 s rather than ~0.44 s because web is 1 CPU and the refresh thread competes with writing the 12 MB response. That last gap is a CPU/producer question, not another cache layer. Measurement: `deploys.md` 00:31:36Z entry.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

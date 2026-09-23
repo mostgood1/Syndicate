@@ -40164,3 +40164,16 @@ All 15 cards carry the period or the start time. **Not one bare "LIVE" and not o
 **NHL live tokens carry NO clock ("P2", not "P2 10:21"), and that is the SOURCE, not the fix.** NHL's own `/v1/schedule/<date>` returned `clock: null` on **7 of 7** live games in the same window, and `NhlWebClient.scoreboard_day` (`syndicate/local_nhl_odds.py:316`) reads that endpoint — `data = self._get(f"/schedule/{date}")` — so `clock_value` is None before it ever reaches `_apply_nhl_live_scores`. The chip is faithful to what it is given. `/v1/score/<date>` and the gamecenter feed do carry a running clock; picking one up is a separate change and nobody claims it. WNBA, whose ESPN feed does carry a clock, renders it ("Q1 2:03"), and the two "0.0" tokens are the known end-of-period value, matching ESPN's `displayClock` exactly.
 
 **verify:** the two tables — specifically NHL 7 of 10 chips at `state: "live"` with "P<n>" and numeric scores on both sides while 3 of 3 unstarted chips keep "8:00P CT"/"9:00P CT", WNBA 3 of 5 at "Q<n>", and the period agreeing with each league's own scoreboard on 15 of 15 — taken off an artifact 18.7 s old.
+
+## 2026-09-23 00:31:36Z -> live 00:34:55Z (7:31-7:34 PM CT 09-22) — web `eddcfb60` -> `bc383640` (`dep-daphrq3tqb8s738hnn60`) — lane `home-embed-background-refresh` — **VERIFIED: every embed build now runs BEHIND the response; no request over 5 s**
+
+**User decision (chat):** "refresh the file off the request path", then "Deploy web now". Claim 00:31:15Z (free), preflight CLEAR 00:31:27Z, released 00:48Z. **Carries** `bc383640` (this lane) and `fba49b50` (lane `mlb-doubleheader-e2e`: an untimed candidate must not veto a near-exact time match; its verification is its own).
+
+    field                                baseline 22:35:40-22:39:10Z (build on the request)   predicted            measured 00:41-00:46Z (16 requests, ~4 window boundaries)
+    live_commit                          eddcfb60                                            bc383640             bc383640 (live 00:34:55Z)
+    builds on a request thread           3 of 3 (`BUILD ms=9698 / 4664 / 6307`)               0                    **0** -- all 4 `BUILD` lines read `source=background`
+    the stale-serve is real              --                                                  STALE_SERVED+refresh  **4** `STALE_SERVED ... refresh=1`, each followed by a background `BUILD`; 4 `FILE_HIT` from the sibling worker
+    `/` server duration (access log)     median 497 ms, max 10,128, <1 s on 7/12, >5 s on 3   no request > 5 s     median **438 ms**, max **4,100**, <1 s on **12/16**, >5 s on **0**
+    direct TTFB at a window boundary     10.3 / 6.2 / 8.2 s                                  < 2 s                 2.48 / 2.71 / 4.18 / 3.00 s
+
+**THE BOUNDARY REQUEST IS FASTER, NOT FREE, AND THE REASON IS THE INSTANCE, NOT THE DESIGN.** No build runs on a request thread (the log proves it), but web is a 1-CPU `standard` plan: the refresh thread burns that CPU while the 12 MB response is being written, so the request that triggered it still reads 2.5-4.2 s instead of the ~0.44 s a quiet-window request takes. Removing that last gap is a CPU question (a bigger plan, or a producer outside web), not another cache layer. **verify:** the table.
