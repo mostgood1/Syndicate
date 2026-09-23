@@ -40823,3 +40823,36 @@ Claim released after this entry.
 **Upstream PR opened:** mostgood1/MLB-BettingV2#1. Without it the next `vendor/` re-pull reverts `c065cf99` and this regresses.
 
 **NOT claimed:** (a) only ONE of two live games carried — 824223 read `source_rows=0` on the 19:40:01Z tick having read 10 at 19:01:57Z; different tick, different payload, and a second reading is owed before saying anything about it. (b) 5 edges on 188 live rows is a real result and a SMALL one; `no_live_probability` is still 129. (c) `rows_live_edged` is the count the board serves, not money — nothing here says the edges are right.
+
+### 2026-09-23 19:57Z (2:57 PM CT) — SECOND READING on `fe73ed81`, owed by the entry above — **CONFIRMS, and resolves its one open caveat**
+
+The 19:34:28Z entry recorded 5 edges off a single board build and explicitly did NOT claim the result was stable, nor explain why only one of two live games carried. Both are now answered.
+
+    field                        first 19:45:14Z    second 19:49:40Z
+    snapshot_live_prob_indexed          8                  36
+    snapshot_live_prob_seen             8                  36
+    rows_live_edged                     5                  **28**
+    live rows / with_live_prob      188 / 8            333 / 36
+
+**THE ONE-GAME CAVEAT WAS GAME PROGRESS, NOT A DEFECT.** Carried rows track how much game is LEFT:
+
+    19:54:43  gamePk=823168  2nd inning   source_rows=31  source_with_prob=29  mc_rows_with_prob=29  carried=29
+    19:56:43  gamePk=823168  2nd inning   source_rows=33  source_with_prob=31  mc_rows_with_prob=31  carried=31
+    19:54:43  gamePk=824785  8th inning   source_rows=1                                              carried=1
+    19:56:43  gamePk=824785  8th inning   source_rows=0                                              carried=0
+    19:54:43  gamePk=824223  9th End      source_rows=0                                              carried=0
+
+An early-inning game has ~30 live props still open; an 8th-inning game has one; a game in the 9th has none. The 19:40:01Z reading caught 824785 in the 8th and 824223 in the 9th — which is why it saw 9 and 0, and why holding that as UNEXPLAINED rather than asserting either way was right. `source_with_prob` is 29/31 and 31/33 (~94%), consistent with the 23/24 seen at 19:01:57Z.
+
+**The withheld reasons continue to move off this chain:**
+
+    no_live_probability                   249   (of 333 live rows -- still the bulk)
+    no_fair_value_no_pregame_projection     7   (was 3)
+    no_fair_value_devig_failed              1   (NEW)
+    over_already_decided                    5
+
+Two FAIR-VALUE reasons now, both owned downstream — the pregame join and the de-vig — exactly the signature `leads.md` recorded before the deploy.
+
+**verify:** `rows_live_edged` **28** and `snapshot_live_prob_indexed` **36** on a board build started 19:49:40Z, with `LIVE_PROB_CARRIED ... carried=31` at 19:56:43Z as the producing line.
+
+**STILL NOT CLAIMED:** `no_live_probability` at 249 of 333 is the majority — the carry only fires where the MC priced that player-market, so most live rows still have no probability, and that ceiling is the MC's coverage rather than anything in this chain. And nothing here says the 28 edges are CORRECT; that is a calibration question and `bucket_realised_performance.py` is its instrument, not this counter.
