@@ -488,6 +488,8 @@ once this index exists: re-splitting would orphan the parts.
 | [nfl-board-projection-coverage] | NFL BOARD PROJECTION COVERAGE IS 100% `[measured 2026-09-04T23:19:34Z on the served payload, lanes nfl-project | `state_football.md` |
 | [ncaaf-zero-orders-is-two-gates] | NCAAF ZERO ORDERS — SUPERSEDED 2026-09-11: the paper portfolio HOLDS NCAAF orders and they GRADE end-to-end; t | `state_football.md` |
 | [ncaaf-team-registry-two-files] | THE RESOLVER READS THE *SNAPSHOT*, AND THE FILE BESIDE IT IS OLDER AND DIFFERENT `[measured 2026-09-03]` | `state_football.md` |
+| [smartsim2-total-carrier] | THE ENGINE OVER-APPLIES TEAM QUALITY TO THE TOTAL IN BOTH FOOTBALL SPORTS, AND THE IN-ENGINE DIAL CANNOT REACH THE TARGET `[2026-09-23]` | `state_football.md` |
+| [nfl-total-level-gain] | THE TOTAL WAS PRICED FROM A GAIN NOBODY FITTED, AND IT IS NOW SHRUNK AND VERIFIED ON THE SERVED BOARD `[2026-09-23]` | `state_football.md` |
 | [nfl-rating-units] | NFL'S SIM COULD NOT TELL TEAMS APART. THE CAUSE WAS THE SCALE CONSTANT, **NOT** A UNITS DEFECT — that diagnosi | `state_football.md` |
 | [football-smartsim2] | FOOTBALL (NFL + NCAAF) — smartsim2 runs on FOUR SCALARS `[measured 2026-08-18, lane football-model-owner]` | `state_football.md` |
 | [ncaaf-calibration-profile-live] | THE PROMOTED NCAAF PROFILE IS LIVE, AND PROMOTING ONE IS A **CODE DEPLOY** `[verified 2026-09-05, render]` | `state_football.md` |

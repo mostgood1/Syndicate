@@ -111,6 +111,113 @@ claimed those keys because the rows are not in the file that is read.
 print `team_registry_snapshot_path()` and grep THAT file. Grepping the
 sibling `ncaaf_team_registry.csv` will show the team and prove nothing.
 
+## [smartsim2-total-carrier] THE ENGINE OVER-APPLIES TEAM QUALITY TO THE TOTAL IN BOTH FOOTBALL SPORTS, AND THE IN-ENGINE DIAL CANNOT REACH THE TARGET `[measured 2026-09-23, lane smartsim2-total-nonlinearity]`
+
+Everything here is MEASURED on pinned 5x5 grids (one direction held at exactly
+zero, R2 0.93-0.99) or on held-out fits. **Nothing here is armed.**
+
+**THE ENGINE'S RESPONSE, in each sport's own units:**
+
+    NFL     LEVEL  +16.092 / -11.405    DIFFERENCE  +7.3493 / -4.8940
+    NCAAF   LEVEL  +23.172 / -14.207    DIFFERENCE  +9.5921 / -5.2508   (PROMOTED profile)
+    NCAAF   LEVEL  +17.002 / -11.043    DIFFERENCE  +7.4558 / -4.9287   (shipped default)
+
+The DIFFERENCE response is near-identical across sports and profiles, so it is
+**a property of the shared engine, not of either sport's calibration**. And
+**production's NCAAF profile responds MORE strongly than its shipped default**.
+
+**WHAT ACTUAL OUTCOMES SUPPORT** (fitted on totals, never the market):
+
+    NFL     keep offence 0.438   defence 0.026   (train 2023-24 n=544, test 2025 n=272)
+    NCAAF   keep offence 0.112   defence 0.399   (train 2024 n=655, test 2025 n=645)
+
+NCAAF's use the AS-OF-WEEK `blend_ppa` k=2 rating the generator really runs
+(`backtest_ncaaf_total_units.py --asof`). A prior-season-SP+ basis is a DEGRADED
+rating returning roughly half those ratios (0.062/0.253) -- a lower bound, not a
+setting.
+
+**THE IN-ENGINE DIAL IS THE WRONG-SIZED LEVER, AND THIS IS THE LOAD-BEARING
+FINDING.** Armed at each sport's fitted ratios, the REALISED keeps are:
+
+    NFL     set 0.438 / 0.026  ->  realised 0.759 / 0.572
+    NCAAF   set 0.112 / 0.399  ->  realised 0.860 / 0.919
+
+`drive_success` is ONE channel; the yardage formula
+(`offense_rating*3.0 - defense_rating*2.2`) carries the rest untouched. So
+`[nfl-total-level-gain]`'s PRE-ENGINE shrink is the correct lever for the LEVEL
+-- it scales every channel proportionally -- and stacking the two would
+over-shrink (0.3 x 0.759 ~= 0.228 against a 0.438 target).
+
+**`drive_success_anchor` WAS WRONG FOR BOTH SPORTS: 0.40 -> 0.3271.** Only
+`anchor == E[raw]` makes the shrink mean-preserving, and the population mean of
+the unshrunk `drive_success_probability` through production's empty-payload path
+measures **0.3271** for NFL (n=32) and NCAAF (n=1309) alike -- under that path it
+is not a per-sport quantity. The 0.073 error is exactly the +3.86 mean-total
+drift seen when a sensitivity was swept to 0.3.
+
+**THE CAUSE IS NOT A BUG.** Points-per-drive is CONVEX in yards-per-play, which
+is real football. What the engine LACKS is what cancels it in reality: blowout
+damping (Q4/Q1 scoring ratio 1.447 matched vs 1.412 mismatched -- unchanged).
+That mechanism is built and INERT, and does NOT fix the difference response
+(slope +5.93 at strength 0.0, +6.00 at 0.9): at realistic mismatches the average
+margin is ~5 points, so a 14-point-lead trigger never fires.
+
+**EVERYTHING FROM THIS WORK IS INERT BY DEFAULT AND VERIFIED INERT** (default
+regenerations reproduce the pre-change file on all 14 games and all 8 fields):
+blowout damping 0.0, `SYNDICATE_NFL_TOTAL_DIFF_CORRECTION` absent = 0, split
+offence/defence sensitivities 1.0/1.0, corrected anchor.
+
+**DO NOT RE-FIT ANY ONE OF THESE IN ISOLATION.** Pre-engine ratings, in-engine
+drive success and the post-engine output correction are three calibrations
+around ONE carrier; each fit is valid only in the configuration it was measured
+in.
+
+## [nfl-total-level-gain] THE TOTAL WAS PRICED FROM A GAIN NOBODY FITTED, AND IT IS NOW SHRUNK AND VERIFIED ON THE SERVED BOARD `[measured and DEPLOYED 2026-09-23, lane nfl-total-sum-direction-scale]`
+
+**THE DEFECT.** The margin reads the two teams' rating DIFFERENCE and the total
+reads their LEVEL. `NFL_RATING_SCALE` was fitted by OLS of ACTUAL MARGIN on the
+DIFFERENTIAL (see `[nfl-rating-units]`), and the level inherited that gain for
+free. Measured on the served 2026 wk3 board: model total SD **9.02** against a
+market **2.51**, MAE vs market 6.73, worst miss 14.3 (CIN @ PIT priced 33.2
+against a close of 47.5) -- while the MARGIN over the same 16 games was fine
+(SD 5.58 vs 4.86, MAE 2.38). Mean bias was +0.29 and corr +0.652: unbiased,
+correlated, over-amplified -- a GAIN defect, not a level or sign defect.
+
+**THE FIX, FITTED ON ACTUAL TOTALS AND NEVER ON THE MARKET.** Train 2023-24
+(n=544), scored on a held-out 2025 (n=272), `backtest_nfl_rating_units.py
+--total-level`. `NFL_TOTAL_LEVEL_SHRINK = 0.3`, applied to the two teams' common
+LEVEL and leaving every difference intact. `SYNDICATE_NFL_TOTAL_LEVEL_SHRINK`
+overrides; `1` is the kill switch and is byte-exact.
+
+**VERIFIED ON THE SERVED BOARD 2026-09-23** (refresh-worker `b4fe8cc0` live
+14:40:51Z; artifact rebuilt 15:41:55Z carrying `rating_source
+...+level_shrink_0.3`):
+
+    total SD            9.02 -> 4.47    (market 2.51)
+    MAE vs market       6.73 -> 2.60
+    games 7+ pts off       9 -> 1
+    worst miss          14.3 -> 8.7
+    margin SD           5.58 -> 5.29    (market 4.86; the level shrank, the difference did not)
+
+**WHAT THIS IS NOT.** It is not a market-fit. The shrink improves accuracy
+against ACTUAL totals, not only against the market: held-out 2025 MAE 10.97 ->
+10.68 (market 10.39), and on 2026 wk1-2 production files scored against real
+scores 12.98 -> 12.26 (market 11.19). **The model still LOSES to the close on
+totals and must not price them** -- the same disposition `[nfl-rating-units]`
+records for the margin.
+
+**THE RESIDUAL IS NAMED AND CANNOT BE REACHED FROM HERE.** CIN @ PIT stays -8.7
+from the market: the sim's own non-level variance. The dispersion model
+(`SD_after/SD_before = sqrt(lambda^2*R2 + 1-R2)`) predicted 3.9 and measured
+4.47, so it runs ~15% optimistic and should not be quoted tighter.
+
+**A SECOND, SEPARATE DEFECT IS OPEN AND NOT FIXED (`#686`).** The engine's total
+also responds to the rating DIFFERENCE -- measured causally with both sums
+pinned at zero: NFL `+7.3493*off_diff -4.8940*def_diff`, NCAAF promoted
+`+9.5921/-5.2508`. Reality gives that direction a coefficient of zero. The
+correction for it is LANDED AND DISABLED because removing it bought nothing
+measurable (t=-0.79, better on 139/272). See `[smartsim2-total-carrier]`.
+
 ## [nfl-rating-units] NFL'S SIM COULD NOT TELL TEAMS APART. THE CAUSE WAS THE SCALE CONSTANT, **NOT** A UNITS DEFECT — that diagnosis is FALSIFIED `[measured 2026-09-06; corrected and DEPLOYED 2026-09-07/08, lane nfl-rating-units]`
 
 **UPDATE 2026-09-08 — THE UNITS DIAGNOSIS BELOW IS FALSIFIED, AND THE SCALE IS NOW LIVE.**
