@@ -302,3 +302,13 @@ because the work kept deviating:
 - **What this slate CANNOT say:** the calibration lane measured the Kelly re-rank as SPORT-DEPENDENT (soccer +3.00, NCAAF -2.71 at the top 10). Neither sport had a 09-21 kickoff, so this reading is silent on exactly the split that blocks promotion.
 - **Where the decision lives:** todo `#679` step 5 — promote `score_v2` per sport after 14+ days of recorder grading from 09-22. This is day 1 of that window, not a reason to shorten it.
 - **Evidence:** `.syndicate/findings_2026-09-22_layer2_board_0921_reading.md` §6; reproduce with `py -3 scripts/score_ranking_backtest.py pull --start 2026-09-14 --end 2026-09-21 --out <f>`, then rank the rows with `date == 2026-09-21` and `t >= 2026-09-21T21:49:21Z` by `s2` against `sc`.
+
+## 2026-09-23 — 191 MLB board rows are still `rows_ambiguous_game` after `fba49b50` `[lane mlb-doubleheader-e2e, session 3692ff18]`
+Measured 00:59:51Z on the first board build after the fix went live: `rows_matched 3,358`, `rows_ambiguous_game 191`, `rows_resolved_by_start_time 3,358`, `rows_refused_other_day_game 0`. The outage is over (it was 100% ambiguous, 0 matched) but **5.4% of rows still get no game block, and nothing has explained them.**
+
+Three candidates, none tested:
+- **Pre-existing.** `board_enrichment._side_matches`' docstring measured MLB at **35 ambiguous rows on 2026-08-29** in BOTH argument orders and called them pre-existing. 191 is larger than 35, but the slate and row count differ.
+- **No chip at all.** A pair whose chip the builder never produced falls to `unmatched`, not to `ambiguous` — so this should NOT be the cause, and if it is, the counters are lying.
+- **A second shape of the untimed defect.** `AMBIGUOUS_NOT_SEPARABLE` (two timed candidates inside the 45-min window) and `AMBIGUOUS_NO_TARGET_TIME` (a row with no `commence_time`) are both still live branches and neither is counted separately.
+
+**The cheap next step is to split `rows_ambiguous_game` by REASON** — it is currently one bucket, so the three cases above are indistinguishable in the payload, which is the same "flattening three states into one zero" mistake the join's own comments warn about elsewhere. Then read which pairs land in it.

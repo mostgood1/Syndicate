@@ -40177,3 +40177,30 @@ All 15 cards carry the period or the start time. **Not one bare "LIVE" and not o
     direct TTFB at a window boundary     10.3 / 6.2 / 8.2 s                                  < 2 s                 2.48 / 2.71 / 4.18 / 3.00 s
 
 **THE BOUNDARY REQUEST IS FASTER, NOT FREE, AND THE REASON IS THE INSTANCE, NOT THE DESIGN.** No build runs on a request thread (the log proves it), but web is a 1-CPU `standard` plan: the refresh thread burns that CPU while the 12 MB response is being written, so the request that triggered it still reads 2.5-4.2 s instead of the ~0.44 s a quiet-window request takes. Removing that last gap is a CPU question (a bigger plan, or a producer outside web), not another cache layer. **verify:** the table.
+
+## 2026-09-23 00:46:12Z -> live 00:52:38Z (7:46-7:52 PM CT) — refresh-worker `d25664f0` -> `fba49b50` (`dep-dapi2kvf3r2c73enuidg`) — lane `mlb-doubleheader-e2e` — **VERIFIED: MLB Layer 2 went from ZERO live opportunities to 114 live rows**
+
+**User decision (chat):** "deploy it now", then — shown the in-flight job tree — "wait for the job, then deploy", then "keep polling and deploy as soon as it clears". Claim 00:26:37Z, preflight CLEAR 00:45:52Z, released after this entry. **Carries** `fba49b50` (this lane) and `4a231ac8` (lane `live-gameline-game-identity`, stranded on main since its own deploy was cancelled at 22:30Z; **its verification is its own and does NOT exist yet** — see below).
+
+**The outage this fixes was mine**, introduced by this session's doubleheader work and found by session `local_ec0ac779`: `pick_by_start_time` refused a team pair when ANY candidate carried no start. MLB is the only sport that plays SERIES, so every pair holds a chip for today AND tomorrow — and **16 of 16 chips for 2026-09-23 had `start_time_utc: None` against 0 of 16 for 09-22**, so 15 of 15 pairs were refused.
+
+    field                              baseline 00:45:10Z    predicted        measured 00:59:51Z
+    live_commit                        d25664f0              fba49b50         fba49b50 (live 00:52:38.437Z)
+    mlb rows_matched                   0                     nonzero          **3,358**
+    mlb rows_ambiguous_game            3,475                 0                **191** (residue, see below)
+    mlb rows_resolved_by_start_time    0                     ~ the row count  **3,358**
+    mlb rows_refused_other_day_game    0                     0                0
+    mlb board rows with market_state live  0                 nonzero          **114**
+    MLB games live at the reading      --                    > 0 or void      **10** (StatsAPI)
+
+**The reading is gated on the ARTIFACT, not the deploy.** At 00:55:58Z — three minutes after the deploy went live — the served board was still the build from **00:40:47Z, twelve minutes OLDER than the deployed code**, reading `matched 0, ambiguous 3,475`: identical to the baseline because it WAS the baseline. Reading the board at "deploy live" would have recorded this fix as broken. The watcher held for a build whose START (`now - build_age_seconds`) was later than `deploy_ended`, which arrived at 00:59:44Z.
+
+**`live rows 114` is a real number, not a null:** StatsAPI had **10 MLB games in progress** at the reading. A `live rows 0` on a finished slate would have been an empty frame and the watcher was built to say so; it did not have to.
+
+**verify:** the table — specifically `rows_matched 0 -> 3,358` and `market_state live 0 -> 114` against 10 live games, off a board build that started 00:59:44Z, after the 00:52:38Z deploy.
+
+**RESIDUE, recorded as the finding rather than buried by the drop: 191 rows are still ambiguous.** That is 5.4% of 3,549, down from 100%, and it is NOT explained. It may be the pre-existing MLB ambiguity (`_side_matches`' docstring measured 35 such rows on 2026-08-29 and called them pre-existing), it may be pairs with no chip at all, or it may be a second shape of the same defect. Opened as a lead; not diagnosed tonight.
+
+**SHIPPED BUT NOT VERIFIED — `4a231ac8`.** It rode this deploy. Its discriminating reading does not exist and could not have been taken tonight: TB@NYY's halves never overlapped in the live window (G1's last ledger row 19:09:46Z, G2's first 22:41:32Z), so the pair always had ONE live candidate and the single-candidate path answered. It needs a doubleheader whose halves overlap. **Shipped is not verified and this entry does not claim otherwise.**
+
+**Two operational facts from getting this out.** (1) The first CLEAR, at 00:45:10Z, was gone **20 seconds later** — `fetch_mlb_injuries.py` claimed the window. The guard requires preflight and deploy to be SEPARATE tool calls, so there is always a gap to lose; a 75s poll cannot catch it and a 20s poll did. (2) `check_deploy_safety.py --drain`, which `deploy_preflight`'s own HOLD text recommends, **cannot be run from a developer machine at all**: `SYNDICATE_REFRESH_STATE_URL` is a Render-internal hostname and `ops.py` exposes no drain route. It refused correctly rather than writing a local flag and claiming success.
