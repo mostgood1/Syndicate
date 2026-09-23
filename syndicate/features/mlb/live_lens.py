@@ -1359,13 +1359,47 @@ def _cards_backed_live_lens_report(selected_date: str) -> dict[str, Any] | None:
 
 
 def _merge_cards_context_into_report(report: dict[str, Any], selected_date: str) -> dict[str, Any]:
+    # BOTH EARLY RETURNS BELOW USED TO BE SILENT, AND THAT IS WHY THE LIVE PROP
+    # PROBABILITY DEFECT SURVIVED A FIX.
+    #
+    # `_carry_live_probability` is reachable ONLY through this function. Measured
+    # on live-odds-worker 2026-09-23 17:5xZ, with the carry fix (`7094b69a`)
+    # confirmed deployed in the live commit `49b8881b`:
+    #
+    #     [live_props] LIVE_MC_PRICED  17:47:27Z game=824785 rows=29
+    #                                  17:49:39Z game=824223 rows=52
+    #     [live_lens_loop] TICK_COMPLETE 17:44:49Z, 17:48:24Z  results={'mlb': True, ...}
+    #     [live_lens] LIVE_PROB_CARRIED  -- NEVER EMITTED
+    #
+    # The carry prints on its failing path too, so never printing means it is
+    # never CALLED -- and the only way that happens while the tick runs is one
+    # of the two returns here. Neither said anything, so the trace stopped at a
+    # blank wall: the producer priced, the tick ran, and nothing downstream
+    # existed to say which of these two doors it went out of.
+    #
+    # `print`, not `logging`: `logger.info` does not reach Render's log
+    # collector on these services.
     try:
         cards_context = build_cards_page_context(selected_date)
-    except Exception:
+    except Exception as exc:
+        print(
+            f"[live_lens] CARDS_MERGE_SKIPPED date={selected_date} reason=cards_context_raised "
+            f"error={type(exc).__name__}",
+            flush=True,
+        )
         return report
 
     cards = cards_context.get("games") if isinstance(cards_context.get("games"), list) else []
     if not cards:
+        # DISTINCT FROM THE RAISE ABOVE. "the cards page blew up" and "it
+        # returned no games" have different owners, and one bare `return report`
+        # covered both -- the same flattening this file's own comments warn
+        # about elsewhere.
+        print(
+            f"[live_lens] CARDS_MERGE_SKIPPED date={selected_date} reason=no_cards "
+            f"context_keys={sorted(cards_context.keys())[:8] if isinstance(cards_context, dict) else 'not_a_dict'}",
+            flush=True,
+        )
         return report
 
     cards_by_game_pk = {int(card.get("gamePk") or 0): card for card in cards if isinstance(card, dict) and int(card.get("gamePk") or 0)}
@@ -1377,6 +1411,17 @@ def _merge_cards_context_into_report(report: dict[str, Any], selected_date: str)
         game_pk = int(row.get("gamePk") or 0)
         card = cards_by_game_pk.get(game_pk)
         merged_games.append(_merge_cards_context_into_live_row(row, card) if isinstance(card, dict) else row)
+    # THE SUCCEEDING PATH IS COUNTED TOO, so "the merge ran" stops being an
+    # inference. `matched` is what gates every `_carry_live_probability` call:
+    # a row with no card never reaches it, so a zero here explains a zero carry
+    # without anyone having to read this file.
+    matched_cards = sum(1 for row in games
+                        if isinstance(row, dict) and cards_by_game_pk.get(int(row.get("gamePk") or 0)))
+    print(
+        f"[live_lens] CARDS_MERGE date={selected_date} cards={len(cards)} "
+        f"report_games={len(games)} matched={matched_cards}",
+        flush=True,
+    )
     merged_report = dict(report)
     if merged_games:
         merged_report["games"] = merged_games
