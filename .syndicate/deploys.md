@@ -40755,3 +40755,23 @@ at 14:36Z today, and the 09-24 reading that lane already booked is the one that
 prints the line.
 
 **Read-only as instructed: no deploy, no env change, no claim, no preflight.**
+
+## 2026-09-23 17:02:0xZ -> live 17:05:18Z (12:02-12:05 PM CT) — live-odds-worker `b2779a98` -> `49b8881b` (`dep-daq0c57lk1mc73d4lc20`) — lane `polymarket-balance-detail` — **ANSWERED: the encumbrance is `marginRequirement` $6.12, to the cent**
+
+**User decisions (chat):** "yes, build the balance detail read", then "deploy live-odds-worker".
+**Carries** beyond `b2779a98`: `6255f91b` (this lane), `c8cda8a0` (census placement half, this session), `49b8881b` (lane-open em-dash tooling + tests, another lane). No production behaviour beyond the reading itself: the balance stamp keeps more of a payload we already fetch.
+**Preflight:** claim 16:5xZ; HOLD 16:56Z-17:01Z on an in-flight `refresh_odds_sources.py` -> `build_soccer_schedule.py --league ligue_1` (polled at 20 s, nothing killed); `CLEAR` 17:01:30Z and again immediately before the deploy call.
+
+    field                                   baseline (16:54:48Z)   predicted   measured (first post-deploy stamp, 12:11:02-05:00 / 17:11:02Z)
+    live_commit                             b2779a98               49b8881b    49b8881b (live 17:05:18Z)
+    polymarket reading has `detail`         absent                 present     present
+    buying_power / cash                     0.13 / 6.25            unchanged   0.13 / 6.25
+    encumbered_dollars                      (not computed)         6.12        6.12
+    **marginRequirement**                   **not recorded**       --          **6.12 -- EXACTLY the gap**
+    pendingWithdrawals (the first candidate) not recorded          --          count 0, total 0.0 -- **REFUTED**
+    keys the venue sends                    4 kept of ?            --          **19**: assetAvailable, assetNotional, availableToWithdraw, balanceReservation, bonusHold, bonusReservation, buyingPower, currency, currentBalance, depositReservation, displayedAvailableSoon, displayedBonus, displayedCash, lastUpdated, marginRequirement, openOrders, pendingCredit, pendingWithdrawals, unsettledFunds
+
+**THE ANSWER.** Polymarket is holding **$6.12 of MARGIN** against open positions, leaving $0.13 buying power on $6.25 of cash -- and `displayedCash` is 0.1316, i.e. the venue's own UI would show us 13 cents. Every polymarket order since 10:04:57Z has been refused `insufficient_venue_balance` against that number, correctly.
+**What this does NOT settle:** WHICH positions generate the margin. `state_polymarket.md [polymarket-no-fill-size-is-gross-capped]` (a NO order checked against $1.00/contract, charged the net) is the plausible mechanism and remains UNPROVEN at the contract level -- that needs a positions read, which is a different endpoint and a separate decision.
+**Method note:** the answer was in a response we had been making all along and discarding 15 of 19 fields from. The four we kept could not express it.
+Claim released after this entry.
