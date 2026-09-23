@@ -40856,3 +40856,52 @@ Two FAIR-VALUE reasons now, both owned downstream — the pregame join and the d
 **verify:** `rows_live_edged` **28** and `snapshot_live_prob_indexed` **36** on a board build started 19:49:40Z, with `LIVE_PROB_CARRIED ... carried=31` at 19:56:43Z as the producing line.
 
 **STILL NOT CLAIMED:** `no_live_probability` at 249 of 333 is the majority — the carry only fires where the MC priced that player-market, so most live rows still have no probability, and that ceiling is the MC's coverage rather than anything in this chain. And nothing here says the 28 edges are CORRECT; that is a calibration question and `bucket_realised_performance.py` is its instrument, not this counter.
+
+---
+
+## 2026-09-23 20:58Z (3:58 PM CDT) — **READING, no deploy** — refresh-worker `b4fe8cc0` / web `4f8bcdef` — lane `nfl-total-sum-direction-scale` (CLOSED) — scheduled task `check-nfl-wk3-board-after-rebuild`, READ-ONLY — **THE REBUILD HAS NOT RUN YET. The artifact is still the 15:41:55Z build recorded by the 15:32:36Z ENV RE-INJECT row above, so this is that same reading re-taken from the SERVED BOARD, not a fresh one. `+level_shrink_0.3` is present on 16 of 16 rows. The board is healthy.**
+
+**1. Rebuild: NO.** `/api/ops/artifacts/stream?path=nfl_source/smartsim2_projections_2026_wk3.csv`, read 20:58:50Z.
+
+- `generated_at` spans `2026-09-23T15:41:55Z .. 15:44Z` across the 16 rows — byte-identical vintage to the build the 15:32:36Z row verified. Nothing has rebuilt since.
+- This is **not a fault**: the projection interval is 86400 s, so the next rebuild is due ~2026-09-24T15:42Z, ~18.7 h after this reading. The scheduled task fired early. No worker logs were checked, because the staleness window has not opened.
+- `rating_source` on **16 of 16** rows: `nflverse_pbp_epa_rolling[current_season_blend/current_season_blend]+level_shrink_0.3`. **THE TAG IS PRESENT.** The fix has not been reverted or overwritten.
+
+**2. The served board** — `/nfl/api/market-board?season=2026&week=3`, `source_path=/opt/render/project/data/nfl_source/smartsim2_projections_2026_wk3.csv`, `using_sample_data=false`, 16 games, **all 16 `game_state=pregame`** (week-3 kickoffs start 09-25, so the population is not mixed). `full_game` / `market_type=game` rows only.
+
+| metric | 09-23 baseline (pre-rebuild-check) | this reading | market |
+|---|--:|--:|--:|
+| model total SD | 4.47 | **4.61** | 2.59 (was 2.51) |
+| total MAE vs market | 2.60 | **2.60** | — |
+| games 7+ pts off | 1 | **1** | — |
+| model margin SD | 5.29 | **5.46** | 5.02 (was 4.86) |
+| margin MAE vs market | — | 1.89 | — |
+
+Mean signed total bias **+0.23**, so the model is not sitting to one side of the market.
+
+**3. Reading.** Totals are unchanged within noise — MAE identical to two decimals, one game 7+ off, same game. The small moves in *both* the model and market SDs (total 4.47 -> 4.61 against 2.51 -> 2.59; margin 5.29 -> 5.46 against 4.86 -> 5.02) are the **market lines** having moved between the two fetches, not the model: the model numbers come from the same CSV bytes. Nothing regressed, and nothing improved — this reading cannot show either, because no new projection was produced.
+
+**4. The one 7+ game, again: CIN @ PIT**, market 47.5 vs model 38.79, gap **-8.71** (baseline 8.7). This is the non-level variance `#686` names, which the level-shrink fix provably cannot reach. **EXPECTED, not a regression.**
+
+Per-game, sorted by absolute total gap (market / model / gap · market margin / model margin, home-positive):
+
+| game | mkt tot | mod tot | gap | mkt mrg | mod mrg |
+|---|--:|--:|--:|--:|--:|
+| CIN @ PIT | 47.5 | 38.79 | **-8.71** | -1.5 | 0.54 |
+| LAC @ BUF | 48.5 | 52.91 | +4.41 | 3.0 | 10.03 |
+| NYJ @ DET | 45.5 | 49.16 | +3.66 | 9.5 | 6.70 |
+| TEN @ NYG | 44.5 | 47.87 | +3.37 | 3.0 | 3.98 |
+| ARI @ SF | 46.5 | 49.48 | +2.98 | 11.5 | 8.97 |
+| CAR @ CLE | 39.5 | 36.66 | -2.84 | -1.5 | -3.34 |
+| LAR @ DEN | 45.5 | 42.71 | -2.79 | -3.0 | -3.31 |
+| HOU @ IND | 45.5 | 47.75 | +2.25 | -1.5 | -0.92 |
+| PHI @ CHI | 46.5 | 48.56 | +2.06 | 1.5 | 2.25 |
+| MIN @ TB | 44.5 | 42.61 | -1.89 | 1.5 | -2.07 |
+| BAL @ DAL | 51.5 | 53.34 | +1.84 | -2.5 | -1.91 |
+| KC @ MIA | 44.5 | 43.12 | -1.38 | -7.5 | -8.27 |
+| NE @ JAX | 45.5 | 44.19 | -1.31 | 1.5 | 1.23 |
+| SEA @ WSH | 46.5 | 47.59 | +1.09 | -3.5 | -7.73 |
+| LV @ NO | 42.5 | 43.43 | +0.93 | 3.5 | 4.27 |
+| ATL @ GB | 46.5 | 46.44 | -0.06 | 7.5 | 6.27 |
+
+**5. WHAT THIS READING DOES NOT ESTABLISH.** It does not show the fix surviving a rebuild, because no rebuild happened. The rebuild-survival question is still open and comes due after ~2026-09-24T15:42Z. Two margins moved more than 4 pts away from the market (SEA @ WSH -4.2, LAC @ BUF +7.0); both are pregame market drift plus the sim's own margin spread, and neither is touched by the level-shrink term. No deploy, no env change, no claim taken, nothing regenerated.
