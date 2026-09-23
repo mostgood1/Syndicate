@@ -40905,3 +40905,19 @@ Per-game, sorted by absolute total gap (market / model / gap · market margin / 
 | ATL @ GB | 46.5 | 46.44 | -0.06 | 7.5 | 6.27 |
 
 **5. WHAT THIS READING DOES NOT ESTABLISH.** It does not show the fix surviving a rebuild, because no rebuild happened. The rebuild-survival question is still open and comes due after ~2026-09-24T15:42Z. Two margins moved more than 4 pts away from the market (SEA @ WSH -4.2, LAC @ BUF +7.0); both are pregame market drift plus the sim's own margin spread, and neither is touched by the level-shrink term. No deploy, no env change, no claim taken, nothing regenerated.
+
+## 2026-09-23 21:0xZ — **CORRECTION to the 20:58Z reading above: NOTHING MOVED. The four SD figures differ from the 09-23 baseline only because the two readings used DIFFERENT ESTIMATORS.**
+
+The 20:58Z row reports model total SD 4.61 against a 4.47 baseline, and annotates the market as `2.59 (was 2.51)` — which reads as though the lines moved. They did not. That reading used the SAMPLE standard deviation (ddof=1); the baseline used the POPULATION one (ddof=0). On n=16 that inflates every figure by exactly sqrt(16/15) = 3.28%:
+
+    metric              baseline (pop)   x sqrt(16/15)   as reported (sample)
+    model total SD           4.47            4.617              4.61
+    model margin SD          5.29            5.463              5.46
+    market total SD          2.51            2.592              2.59
+    market margin SD         4.86            5.019              5.02
+
+**All four match to within 0.012.** The artifact was byte-identical (no rebuild), so the model totals could not have changed and neither could the market column. There is no drift here to explain and none to chase.
+
+**WHY THIS IS WORTH A ROW RATHER THAN A SHRUG.** Left alone it is a permanent +3.28% phantom regression: every future run of this task would compare a ddof=1 figure against a ddof=0 baseline and show the board drifting away from a fix that is in fact unchanged. The first real regression would then arrive as "a bit more of the usual drift". A silent estimator mismatch between a baseline and its monitor is worse than a wrong number, because it is self-consistent.
+
+**FIXED AT SOURCE:** `check-nfl-wk3-board-after-rebuild`'s prompt now pins the estimator (population SD, `statistics.pstdev`, ddof=0) and states that the 4.47 / 5.29 / 2.51 baseline is on that convention. Caught by running the task early as a dry run — which is what the dry run was for.
