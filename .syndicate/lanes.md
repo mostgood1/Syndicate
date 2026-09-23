@@ -1074,6 +1074,14 @@ death, never life — do not invert it.
 - Verification: a test that FAILS on the as-shipped resolver with the verbatim production row, passes after; the MLB path unchanged; then, after a live-odds-worker deploy, `ORDER_PATH venue=polymarket` shows `h2h` `would_build` where it read `market_unresolved`, and NO new `yes_leg_disagrees_with_away_index` refusals appear (the fallback now feeds the corroborator, so a disagreement would surface there).
 - Blocked by: none.
 
+### lane-archive-tools-mirror — CLOSED 2026-09-23 (GOAL MET) — opened 2026-09-23 — session 17fb7689
+- Goal: put the out-of-git lane-archive tools somewhere a rewrite cannot silently revert them
+- Goal verdict: **GOAL MET.** `py -3 scripts/lane_archive_tools/verify_mirror.py` exits 0, 3/3 MATCH.
+- Files: `scripts/lane_archive_tools/` (new: 3 mirrored tools + README.md + verify_mirror.py), `.gitattributes` (one scoped `-text` line)
+- The live copies still run from `C:	mp\lane-archive-tools\`; this is a recovery mirror, not a move.
+- `-text` is load-bearing: `core.autocrlf` is true here and the three files disagree on line endings, so without it every hash comparison reports a phantom revert.
+- Narrative, measurements and the context-line fix this protects: `.syndicate/log/2026-09-23.md` (22:00Z, 22:20Z, 22:30Z, 22:45Z, 23:0xZ).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

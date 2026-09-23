@@ -7,3 +7,11 @@
 # one failure mode these scripts are written to avoid.
 .claude/hooks/*.sh text eol=lf
 .claude/hooks/*.py text eol=lf
+
+# Byte-exact mirror of the out-of-git lane-archive tools; see
+# scripts/lane_archive_tools/README.md. `-text` disables ALL eol conversion, so a sha256
+# against the live copies in C:	mp\lane-archive-tools is a valid revert check.
+# core.autocrlf is true on the dev machine and the three files do NOT agree on line
+# endings (two CRLF, one LF), so without this they would check out rewritten and every
+# comparison would report a phantom revert.
+scripts/lane_archive_tools/*.py -text
