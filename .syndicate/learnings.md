@@ -3649,3 +3649,11 @@ the other — the most expensive kind of half-true.
   - Authoring tools that take JSON arguments decode `\uXXXX` into the character. To write the escape through one, escape the backslash — or better, do not want the escape.
   - Generalises past em-dashes: any tool whose job is to emit a byte sequence the surrounding stack is known to mangle — BOMs, CRLF, tabs, NBSP, RTL marks — should construct it, not contain it. Related: `feedback_shell_layer_transcodes_bytes`.
   - *(evidence: `49b8881b` the fix, `fdfe579f` the close; lane `lane-open-emits-em-dash` in `lanes.md` carries the full verdict)*
+
+## 2026-09-23 — RULE: when a number cannot be explained, look at what the upstream response ALREADY contains before adding a call, a model, or a hypothesis `[lane polymarket-balance-detail, session 236bd219]`
+- **What I believed:** polymarket's $6.12 gap between cash and buying power needed either a new positions endpoint or an inference from our own order ledger. I had written the leading candidate into the lead: collateral on NO positions via `pendingWithdrawals` / the $1-per-contract hold.
+- **What was actually true:** the `/account/balances` response we fetch EVERY CYCLE carries 19 fields, one of which is `marginRequirement` = **6.12**, matching the gap to the cent. `pendingWithdrawals` was 0. We were storing 4 of the 19 and discarding the rest, so the answer had been arriving all day and being thrown away.
+- **How I found out:** persisting the other 15 fields -- no new venue call, no new credential, ~90 lines including tests -- and reading the first stamp after the deploy.
+- **The rule going forward:** before proposing a new call or a derived estimate for an unexplained number, print the FULL key set of the payload you already receive. Keep key names even when you do not keep values: a complete key list is what makes an ABSENCE provable, and it is the difference between "the venue does not tell us" and "we never looked".
+- **Cost:** none realised -- but the lead I had already filed named the wrong mechanism, and a session picking it up would have started on a positions endpoint that was never needed.
+
