@@ -26,6 +26,8 @@ from venue_order_family_census import (  # noqa: E402
     render,
 )
 
+import pytest  # noqa: E402
+
 # Verbatim from live-odds-worker, 2026-09-22 15:57:22Z -- the pass that exposed the defect.
 BEFORE = (
     "2026-09-22T15:57:22.458959386Z",
@@ -161,3 +163,155 @@ def test_positions_and_window_are_reported():
     venue = report["venues"]["polymarket"]
     assert venue["passes"] == 2 and venue["positions_total"] == 6
     assert venue["first_seen"] == BEFORE[0] and venue["last_seen"] == AFTER[0]
+
+
+# ===========================================================================
+# THE PLACEMENT HALF -- `ORDER_PATH` says a position WOULD build; `EXECUTED`
+# says whether anything reached the venue. Reading only the first called
+# 2026-09-23 CLEAR for kalshi while all 11 positions died at
+# `insufficient_venue_balance`. Lines below are verbatim from production.
+# ===========================================================================
+
+KALSHI_BROKE = (
+    "2026-09-23T16:01:12.673223488Z",
+    "[execute_portfolio] EXECUTED date=2026-09-23 mode=live venue=kalshi plan_source=live armed=True "
+    "positions=7 placed=0 filled=0 failed=0 duplicates=0 retried=0 skipped=7 "
+    "refused={'insufficient_venue_balance': 7} spent={'dollars': 0.0, 'orders': 0} summary={'selected_date': '2026-09-23'}",
+)
+POLY_BROKE = (
+    "2026-09-23T16:01:24.552789787Z",
+    "[execute_portfolio] EXECUTED date=2026-09-23 mode=live venue=polymarket plan_source=live armed=True "
+    "positions=4 placed=0 filled=0 failed=0 duplicates=0 retried=0 skipped=4 "
+    "refused={'insufficient_venue_balance': 4} spent={'dollars': 5.67, 'orders': 4} summary={'selected_date': '2026-09-23'}",
+)
+POLY_PLACING = (
+    "2026-09-22T16:35:29.247140022Z",
+    "[execute_portfolio] EXECUTED date=2026-09-22 mode=live venue=polymarket plan_source=live armed=True "
+    "positions=2 placed=1 filled=0 failed=0 duplicates=1 retried=0 skipped=0 refused={} "
+    "spent={'dollars': 3.31, 'orders': 3} summary={'selected_date': '2026-09-22'}",
+)
+
+
+def test_a_venue_that_builds_and_places_nothing_ALERTS():
+    """The blind spot itself."""
+    report = census([AFTER] * 3, exec_lines=[POLY_BROKE] * 3, placement_checked=True)
+    assert report["verdict"] == "ALERT", render(report)
+    assert exit_code(report) == EXIT_ALERT
+    row = report["placement_alerts"][0]
+    assert row["venue"] == "polymarket" and row["status"] == "never_places"
+    assert row["placed"] == 0 and row["positions"] == 12
+    assert row["refusals"] == {"insufficient_venue_balance": 12}
+    assert "places nothing" in report["reason"]
+
+
+def test_a_DECLARED_dormant_venue_is_reported_and_does_not_alert():
+    """User decision 2026-09-23: kalshi is unfunded on purpose. Declaring it
+    states the expectation; it must still be printed, never hidden."""
+    report = census([AFTER] * 3, exec_lines=[KALSHI_BROKE, POLY_PLACING],
+                    dormant_venues=["kalshi"], placement_checked=True)
+    assert report["verdict"] == "CLEAR", render(report)
+    assert report["placement"]["kalshi"]["status"] == "dormant_by_decision"
+    assert report["placement"]["kalshi"]["declared_dormant"] is True
+    text = render(report)
+    assert "kalshi PLACEMENT: dormant_by_decision" in text and "declared dormant" in text
+
+
+def test_a_dormant_venue_that_PLACES_alerts_because_the_declaration_is_stale():
+    """Checked in BOTH directions: the day kalshi is funded, a stale
+    --dormant-venue must not quietly suppress the venue."""
+    funded = (POLY_PLACING[0], POLY_PLACING[1].replace("venue=polymarket", "venue=kalshi"))
+    report = census([AFTER], exec_lines=[funded, POLY_PLACING], dormant_venues=["kalshi"], placement_checked=True)
+    assert report["verdict"] == "ALERT"
+    assert report["placement_alerts"][0]["status"] == "placing_while_declared_dormant"
+    assert "declared dormant and PLACED" in report["reason"]
+
+
+def test_a_placing_venue_is_clear():
+    report = census([AFTER], exec_lines=[POLY_PLACING], placement_checked=True)
+    assert report["verdict"] == "CLEAR", render(report)
+    assert report["placement"]["polymarket"]["status"] == "placing"
+    assert report["placement"]["polymarket"]["placed_total"] == 1
+
+
+def test_a_pass_with_no_positions_is_not_a_placement_failure():
+    idle = (POLY_BROKE[0], POLY_BROKE[1].replace("positions=4", "positions=0").replace(
+        "refused={'insufficient_venue_balance': 4}", "refused={}"))
+    report = census([AFTER], exec_lines=[idle], placement_checked=True)
+    assert report["placement"]["polymarket"]["status"] == "no_positions"
+    assert report["verdict"] == "CLEAR"
+
+
+def test_a_PAPER_pass_is_ignored():
+    """Paper places nothing by definition; counting it would make every venue
+    look dead."""
+    paper = (POLY_BROKE[0], POLY_BROKE[1].replace("mode=live", "mode=paper"))
+    report = census([AFTER], exec_lines=[paper], placement_checked=True)
+    assert report["placement"] == {}
+    assert report["verdict"] == "INCONCLUSIVE"
+    assert "no live EXECUTED line" in report["reason"]
+
+
+def test_building_with_NO_live_execution_line_is_INCONCLUSIVE_not_clear():
+    report = census([AFTER], exec_lines=[], placement_checked=True)
+    assert report["verdict"] == "INCONCLUSIVE"
+    assert exit_code(report) == EXIT_INCONCLUSIVE
+    assert report["placement_unknown"] == ["polymarket"]
+    assert "polymarket PLACEMENT: UNKNOWN" in render(report)
+
+
+def test_not_asking_about_placement_is_not_the_same_as_asking_and_finding_none():
+    """An empty `exec_lines` cannot tell those apart, so the caller says which.
+    The family-half-only call keeps the old verdict AND says what it did not check."""
+    report = census([AFTER])
+    assert report["verdict"] == "CLEAR"
+    assert report["placement_checked"] is False and report["placement_unknown"] == []
+    assert "placement: NOT CHECKED" in render(report)
+
+
+def test_an_unreadable_refused_payload_is_INCONCLUSIVE():
+    bad = (POLY_BROKE[0], POLY_BROKE[1].replace("refused={'insufficient_venue_balance': 4}",
+                                                "refused={'insufficient_venue_ba"))
+    report = census([AFTER], exec_lines=[bad], placement_checked=True)
+    assert report["verdict"] == "INCONCLUSIVE", render(report)
+    assert any("refused_unreadable" in u for u in report["unreadable"])
+
+
+def test_both_halves_failing_are_both_named_in_the_reason():
+    report = census([BEFORE] * 4, exec_lines=[POLY_BROKE] * 2, placement_checked=True)
+    assert report["verdict"] == "ALERT"
+    assert "zero builds" in report["reason"] and "places nothing" in report["reason"]
+
+
+@pytest.mark.parametrize("venue_arg", ["kalshi", "KALSHI", " Kalshi "])
+def test_the_dormant_declaration_is_case_and_space_insensitive(venue_arg):
+    report = census([AFTER], exec_lines=[KALSHI_BROKE, POLY_PLACING],
+                    dormant_venues=[venue_arg], placement_checked=True)
+    assert report["placement"]["kalshi"]["status"] == "dormant_by_decision"
+
+
+def test_a_measured_failure_outranks_an_unknown_and_the_unknown_is_still_named():
+    """One venue missing its EXECUTED line must not bury another venue's
+    measured failure -- both exits are non-zero, so ALERT first loses nothing."""
+    kalshi_path = (AFTER[0], AFTER[1].replace("venue=polymarket", "venue=kalshi"))
+    report = census([AFTER, kalshi_path], exec_lines=[POLY_BROKE], placement_checked=True)
+    assert report["verdict"] == "ALERT", render(report)
+    assert "polymarket builds and places nothing" in report["reason"]
+    assert "placement UNKNOWN for kalshi" in report["reason"]
+
+
+def test_the_placement_row_says_WHEN_it_last_placed():
+    """`placing` over a window is true and not the whole answer: a venue can
+    place early and refuse for hours after. Measured 2026-09-23: polymarket
+    placed 12 and then refused 406 straight."""
+    report = census([AFTER], exec_lines=[POLY_PLACING, POLY_BROKE], placement_checked=True)
+    row = report["placement"]["polymarket"]
+    assert row["status"] == "placing" and row["last_placed"] == POLY_PLACING[0]
+    assert row["last_seen"] == POLY_BROKE[0], "the window still ends at the latest pass"
+    assert "last_placed=2026-09-22T16:35:29" in render(report)
+
+
+def test_a_venue_that_never_placed_says_so_rather_than_printing_nothing():
+    report = census([AFTER], exec_lines=[POLY_BROKE], placement_checked=True)
+    assert report["placement"]["polymarket"]["last_placed"] is None
+    assert "last_placed=never in this window" in render(report)
+
