@@ -40556,3 +40556,28 @@ row Soroka 9 K on a `gte5` market graded `won` for +$1.07.
 **verify:** OWED. Only the commit is met so far, and a commit being live proves nothing about this fix. The rest needs MLB games in progress — the earliest is today's G1 at 17:35Z. Scheduled reading `mlb-live-prob-carry-reading-0923`, 1:10 PM CT, built to return THREE outcomes: published / did not publish / could not be told. It stops with NO VERDICT if no game is live, because a zero carry against zero live games is an empty frame; it reports `source_rows` and `source_with_prob` separately so a `carried=0` distinguishes "no MC rows reached the merge" from "they reached it and the key did not match"; and it treats `snapshot_live_prob_indexed` still 0 while `carried > 0` as a SEPARATE downstream defect rather than a failed fix.
 
 **If it carries, it is the first live prop probability MLB has ever published** — `5bab0685`'s own commit message says the symptom it was written to fix ("produced 27, published 0") has been the standing state since before 2026-08-30, and it was still the state with that fix live.
+
+## 2026-09-23 15:32:36Z -> sim launched 15:41:43Z -> artifact 15:41:55Z (10:32-10:41 AM CT) — refresh-worker `b4fe8cc0` ENV RE-INJECT (`dep-dapv251srm7s73aurd9g`) — lane `nfl-total-sum-direction-scale` — **THE NFL TOTAL FIX IS VERIFIED IN PRODUCTION**
+
+**User decision (chat):** "can you trigger the rebuild instead of waiting" -> "Force it: env + deploy", and "don't forget to revert the interval after". Zero code delta: same SHA, `--reinject-env`, the env was the only changed variable.
+
+**WHY A DEPLOY WAS NEEDED AT ALL, AND WHY THE FIRST TRIGGER DID NOTHING.** `/api/ops/odds-refresh/run --sports nfl --phase live` (job `92a8aeb2...`, 14:44:55Z) ran fine and refreshed NFL odds, but the sim is NOT part of the refresh job. It is a separate season-projection autorun gated on the ARTIFACT's own mtime: `_season_projection_should_launch` returns `artifact_fresh` while `age_seconds < interval`, and the wk3 file was 19.4h old against an interval of 86400. Zero `smartsim2` lines in the logs after the trigger — checked rather than assumed. So the lever was the interval, not the refresh.
+
+    field                        baseline                      predicted              measured
+    SEASON_PROJECTION_REFRESH..  86400 (explicit, read 15:22Z) 60000 seen by process  `SEASON_PROJECTION_LAUNCHING sport=nfl season=2026 week=3 reason=artifact_stale age_seconds=71217 **interval_seconds=60000**` 15:41:43Z
+    wk3 `generated_at`           2026-09-22T19:52:28Z          advances past deploy   **2026-09-23T15:41:55Z**
+    wk3 `rating_source`          `[current_season_blend/...]`  carries the tag        `...+level_shrink_0.3`
+    wk3 total SD                 9.02   (market 2.51)          ~3.9                   **4.47**
+    wk3 MAE vs market            6.73                          ~2.5                   **2.60**
+    wk3 games 7+ pts off market  9                             1                      **1**
+    wk3 worst miss               14.3                          --                     **8.7**
+    wk3 margin SD                5.58   (market 4.86)          UNCHANGED              **5.29** (inside the +/-0.75/game seed noise)
+    wk3 mean total               45.98  (market 45.69)         ~unchanged             **45.91**
+
+**BOTH SIGNALS WERE REQUIRED AND BOTH LANDED.** A fresh `generated_at` alone would only prove something ran after the deploy; `+level_shrink_0.3` is the positive assertion that the NEW code produced these numbers. Confirmed twice, by two watchers on different code paths.
+
+**THE ONE PREDICTION THAT MISSED, STATED RATHER THAN ROUNDED AWAY:** total SD came in at **4.47 against ~3.9 predicted**. The estimate came from `SD_after/SD_before = sqrt(lambda^2*R2 + 1-R2)` with R2 = 0.89 measured on n=16; the residual non-level variance is larger than that fit implied. The direction and every other figure were right; the dispersion model is ~15% optimistic and should not be quoted tighter than that. CIN @ PIT remains -8.7 from the market -- the sim's own non-level variance, which this lever provably cannot reach and which the code comment says so in advance.
+
+**verify:** the table. `rating_source` carrying `+level_shrink_0.3` on the served wk3 CSV is the field that proves it.
+
+**ENV REVERTED: `60000` -> `86400` at 15:47:13Z** (`render_env_set` reported `before '60000'`, so exactly what was set was unset). A revert-deploy follows to make the running process see it; until it lands the process still holds 60000, which is a 16.7h cadence rather than 24h and is harmless by construction -- 60000 was chosen over the obvious 3600 precisely so that a forgotten or failed revert degrades to a mild cadence change instead of the hourly relaunch loop `_season_projection_should_launch`'s docstring records (90 launches/day on the 4GB box that also runs the MLB sims). NCAAF shares the interval and also rebuilt.
