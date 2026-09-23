@@ -1515,6 +1515,46 @@ def _enhance_card_row_with_live_projection(card_row: dict[str, Any], projection_
             enhanced["props"] = projection_props
             enhanced["trackedProps"] = projection_props
 
+    # THE LIVE PROBABILITY TRAVELS, AND NOTHING ELSE DOES.
+    #
+    # The card rows stay the primary ROW SOURCE -- that is `#124 follow-up (a)`
+    # and the paragraph above is unchanged. What was ALSO being discarded here
+    # is the one field the card path cannot produce: the MC re-sim's
+    # `liveModelProbOver`, P(over) from its REST-OF-GAME distribution.
+    #
+    # `projection_row` is the vendor payload (`_live_projection_enhancement_payload`
+    # -> `flask_frontend._live_lens_payload`), whose prop rows come from
+    # `_current_live_prop_rows` -- the function that logs `LIVE_MC_PRICED` and
+    # writes `live_model_prob_over` at `flask_frontend.py:14763`. It has arrived
+    # at this function on every tick and been thrown away.
+    #
+    # WHY HERE AND NOT IN THE CARDS-CONTEXT MERGE. That merge
+    # (`_merge_cards_context_into_report`) is DEAD: `11815f8b` (2026-07-28,
+    # "make MLB live-lens cards-primary") removed both of its call sites and
+    # left the subtree standing, so `5bab0685`'s carry -- written 2026-08-30 to
+    # cure exactly this, "produced 27, published 0" -- has never once run.
+    # Measured 2026-09-23 on live-odds-worker: `LIVE_MC_PRICED` priced 29 rows
+    # for 824785 and 52 for 824223, `TICK_COMPLETE` ran, and NONE of
+    # `CARDS_MERGE` / `CARDS_MERGE_SKIPPED` / `LIVE_PROB_CARRIED` emitted --
+    # three lines covering every exit that function has.
+    #
+    # `_carry_live_probability` is the right mechanism in the wrong place, so it
+    # is called from the live path instead of being reimplemented: it keeps the
+    # existing rows, stamps only `liveModelProbOver` and its own `liveEdge` onto
+    # rows with a counterpart, never overwrites one already present, and never
+    # invents one. `5bab0685`'s trade-off (keep the ~124 card rows, do NOT swap
+    # to the ~27 MC rows) is preserved rather than reversed.
+    carried_props = enhanced.get("liveProps") if isinstance(enhanced.get("liveProps"), list) else []
+    if carried_props:
+        carried_props = _carry_live_probability(carried_props, projection_row)
+        enhanced["liveProps"] = carried_props
+        # Mirrored onto the aliases the readers use, exactly as
+        # `_merge_cards_context_into_live_row` did -- `live_projection_join`
+        # walks `liveProps`, other surfaces walk `props`/`trackedProps`, and a
+        # probability on only one of them is a bug that reads as coverage.
+        enhanced["props"] = carried_props
+        enhanced["trackedProps"] = carried_props
+
     projection_matchup = projection_row.get("matchup") if isinstance(projection_row.get("matchup"), dict) else {}
     projection_score = projection_matchup.get("score") if isinstance(projection_matchup.get("score"), dict) else None
     if isinstance(projection_score, dict) and (projection_score.get("away") is not None or projection_score.get("home") is not None):
