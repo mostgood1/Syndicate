@@ -40775,3 +40775,20 @@ prints the line.
 **What this does NOT settle:** WHICH positions generate the margin. `state_polymarket.md [polymarket-no-fill-size-is-gross-capped]` (a NO order checked against $1.00/contract, charged the net) is the plausible mechanism and remains UNPROVEN at the contract level -- that needs a positions read, which is a different endpoint and a separate decision.
 **Method note:** the answer was in a response we had been making all along and discarding 15 of 19 fields from. The four we kept could not express it.
 Claim released after this entry.
+
+## 2026-09-23 17:47:5xZ -> live 17:51:38Z (12:47-12:51 PM CT) — live-odds-worker `49b8881b` -> `b9a5efaa` (`dep-daq11mmk1f9s73dip450`) — lane `polymarket-h2h-nickname-sides` — **SHIPPED, READING OWED: no h2h population exists to measure. EXPECTATION WAIVED at preflight, on purpose.**
+
+**User decision (chat):** "deploy live-odds-worker" (after "fix the polymarket h2h resolution").
+**Carries** beyond `49b8881b`: `b197b569` (this lane -- the team branch reads nickname outcomes through the board join's matcher, unique-or-nothing), `7dc10e34` (NFL `#686`, landed DISABLED), `cfc11b0f` / `201a307f` / `ef326851` (lane-claims tooling, another lane). **NOT a ride-along: the corners/btts branch `abc6d4b8` was ALREADY LIVE** -- `merge-base --is-ancestor abc6d4b8 49b8881b` is true, so it has been running since 17:05:18Z and its own reading belongs to lane `polymarket-corners-btts-order-branch`.
+**Preflight:** claim 17:47Z; `CLEAR: only infrastructure processes running (1 defunct child awaiting reap)`; **`--no-expectation`**, reason recorded on the receipt: the h2h population is EMPTY (0 of the 6 polymarket plan positions are h2h; the plan holds `batter_hits_runs_rbis` 3, `totals` 2, `player_points` 1), so no `ORDER_PATH` reading can show `h2h` `would_build` today.
+
+    field                          baseline (17:45:49Z)                    measured now (17:52Z)
+    live_commit                    49b8881b                                **b9a5efaa** (live 17:51:38Z)
+    fix in the running commit      --                                      **`merge-base --is-ancestor b197b569 b9a5efaa` = TRUE** (the predicate, checked before anything else)
+    polymarket h2h positions       **0** (none in any pass since ~17:3xZ)   0 -- nothing to read
+    h2h `team_side_not_in_outcomes` 29 earlier today                        n/a, no population
+
+**WHY THIS IS NOT VERIFIED, stated plainly:** a fix that ships into an empty population has been DEPLOYED, not PROVEN. The 29 refusals were college h2h (`aec-cfb-col-bayl-2026-09-26`, outcomes `['Buffaloes','Bears']`), and that slate is Saturday.
+**OWED:** scheduled task `polymarket-h2h-nickname-reading-0926`, Saturday 2026-09-26 10:00 AM CT. It checks the predicate first, refuses to pass on a null population (it re-schedules itself instead), and pre-registers the one regression this change could cause: the fallback now feeds `away_index` on rows that used to refuse before reaching the yes-leg gate, so a NEW `yes_leg_disagrees_with_away_index` refusal would be the tell.
+**Also true, and not this fix's business:** nothing places at either venue right now -- polymarket is capital-bound (`marginRequirement` $6.12 of $6.25) and kalshi is dormant by user decision. `would_build` is as far as any h2h evidence can go until that changes.
+Claim released after this entry.
