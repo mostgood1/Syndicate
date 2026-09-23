@@ -173,7 +173,37 @@ class CalibrationProfile:
     # is NCAAF until its own profile overrides it. This field being present
     # changes nothing on its own -- it only makes the dial reachable.
     drive_success_sensitivity: float = 1.0
-    drive_success_anchor: float = 0.40
+    # ANCHOR CORRECTED 0.40 -> 0.3271, MEASURED, 2026-09-23 (lane
+    # `smartsim2-total-nonlinearity`). It is the population mean of the UNSHRUNK
+    # `drive_success_probability` over production-shaped inputs, which is the
+    # only value that makes the shrink mean-preserving: E[p] = anchor +
+    # s*(E[raw] - anchor) equals E[raw] for ANY s only when anchor == E[raw].
+    #
+    # Measured on each sport's real ratings, through production's own
+    # empty-payload path (drive priors default OFF, so `offense_index` reduces
+    # to `0.5 + rating/2`):
+    #
+    #     NFL    2026 wk3 blended ratings,  n=32    mean drive_success 0.3271
+    #     NCAAF  2025 as-of-week blend_ppa, n=1309  mean drive_success 0.3271
+    #
+    # THE TWO SPORTS AGREE TO FOUR DECIMALS, and that is the real finding: under
+    # the empty-payload path this is NOT a per-sport quantity. It is the formula
+    # evaluated at neutral indices, and both sports' ratings are centred (mean
+    # offense_index 0.4989 / 0.4981, defence 0.4983 / 0.4971). The old 0.40 was
+    # simply wrong for both, and by enough to matter -- it is what produced the
+    # +3.86 mean-total drift measured when `drive_success_sensitivity` was swept
+    # to 0.3, because shrinking toward 0.40 pulls a 0.3271 population UP.
+    #
+    # THIS CHANGE IS AN EXACT NO-OP TODAY. At `sensitivity == 1.0` the anchor
+    # cancels algebraically (`a + 1.0*(raw - a) == raw`) for ANY anchor, so
+    # nothing moves until a sensitivity is set. It is corrected NOW so that the
+    # first person to set one does not silently inherit a mean shift.
+    #
+    # NOTE THE 0.405 FIGURE ELSEWHERE IN THIS FILE IS NOT THIS. That is a
+    # league-mean `offense_index` under a POPULATED feature payload
+    # (`SYNDICATE_NFL_DRIVE_PRIORS=1`), which production does not run. Measured
+    # on the path production actually uses, the indices sit at ~0.498.
+    drive_success_anchor: float = 0.3271
 
     # SPLIT OFFENCE/DEFENCE SENSITIVITIES. Both default 1.0, an EXACT algebraic
     # no-op, so every shipped profile is byte-identical until one is set.

@@ -114,5 +114,44 @@ class ReachabilityTests(unittest.TestCase):
         self.assertNotAlmostEqual(mean_total(flattened), mean_total(NFL_CALIBRATION_PROFILE), places=3)
 
 
+class AnchorTests(unittest.TestCase):
+    """`drive_success_anchor`, corrected 0.40 -> 0.3271 from measurement.
+
+    The anchor is the only value that makes the single dial mean-preserving:
+    E[p] = anchor + s*(E[raw] - anchor) equals E[raw] for any s only when
+    anchor == E[raw]. Measured through production's empty-payload path, both
+    sports' mean unshrunk drive_success is 0.3271 (NFL n=32 on 2026 wk3
+    blended ratings, NCAAF n=1309 on 2025 as-of-week blend_ppa).
+    """
+
+    MEASURED = 0.3271
+
+    def test_both_sports_carry_the_measured_anchor(self) -> None:
+        for profile in (NFL_CALIBRATION_PROFILE, NCAAF_CALIBRATION_PROFILE):
+            with self.subTest(profile=profile.name):
+                self.assertAlmostEqual(profile.drive_success_anchor, self.MEASURED, places=6)
+
+    def test_the_anchor_is_an_exact_no_op_at_sensitivity_one(self) -> None:
+        """Which is why correcting it today cannot move a single projection.
+
+        `a + 1.0*(raw - a) == raw` for ANY anchor, so this is safe to fix now
+        and dangerous to leave for whoever first sets a sensitivity.
+        """
+        for anchor in (0.0, 0.3271, 0.40, 1.0):
+            for raw in (0.12, 0.3271, 0.55, 0.80):
+                with self.subTest(anchor=anchor, raw=raw):
+                    self.assertAlmostEqual(anchor + 1.0 * (raw - anchor), raw, places=12)
+
+    def test_the_old_anchor_would_have_raised_the_mean(self) -> None:
+        """The defect being corrected, stated as a test rather than a comment.
+
+        Shrinking a 0.3271 population toward 0.40 pulls it UP -- which is the
+        +3.86 mean-total drift measured when the sensitivity was swept to 0.3.
+        """
+        raw, s = self.MEASURED, 0.3
+        self.assertGreater(0.40 + s * (raw - 0.40), raw)
+        self.assertAlmostEqual(self.MEASURED + s * (raw - self.MEASURED), raw, places=12)
+
+
 if __name__ == "__main__":
     unittest.main()
