@@ -551,3 +551,24 @@ Answers the design question left open by the dead-code lead above. **The fix doe
 Option 2 preserves the argument `5bab0685` made about row counts (124 card rows vs 27 MC rows); option 1 avoids a second producer entirely and is cleaner IF the distribution is already in hand there. **Unmeasured: whether `_live_prop_rows_computed` has access to a rest-of-game distribution it could price from.** That is the next thing to check and it decides between them.
 
 **And `_live_props_from_game_detail` has FOUR silent `return []` paths** (`:597` no game_pk, `:604` request-path refusal, `:611` import failure, `:616` producer raised). Whichever option is taken, those want the same treatment as the merge's two returns got in `70ba6867` — otherwise the next person debugging a zero here hits the same blank wall.
+
+## 2026-09-23 — ANSWERED: producer A has a PREGAME distribution, not a rest-of-game one. Take option 2. `[lane mlb-doubleheader-e2e, session 3692ff18]`
+
+Decides the choice left open above. **Option 1 (make producer A emit the live probability) is a MODELLING change, not plumbing. Option 2 (wire producer B) is plumbing of a number that is already computed.**
+
+**What producer A actually holds,** read in `cards.py`:
+
+    _dist_prob_over_line(dist, line)      a discrete outcome->weight histogram; sums weight above the line
+    model_prob_over = _dist_prob_over_line(model_row.get(dist_key), line)   <- computed, and it is the PREGAME P(over)
+    progress_fraction = _live_progress_fraction(actual_payload)             <- present
+    _bounded_live_projection(actual_value, model_mean, progress_fraction)   <- a POINT estimate, not a distribution
+
+So it has a **full-game PREGAME histogram**, the banked actual, and a progress fraction — and it already turns the histogram into a probability. What it does NOT have is any conditioning on what is banked: greps for `remaining` / `share` / `thin` / `scale` / `prorate` inside the synth return nothing but `progress_fraction` and the point-estimate blend.
+
+**That gap is exactly what `#414` is about.** `liveModelProbOver` must be P(over) from the live re-sim's OWN **rest-of-game** distribution. The pregame P(over) is the very thing that was shipped as a fallback and BACKED OUT — measured **bit-identical to the pregame probability on 24 of 28 rows**, with three already-decided props still reading 0.659 / 0.655 / 0.745 and producing +36.5% / +32.3% / +15.8% edges on a board that sorts by edge.
+
+**To take option 1 you would have to derive a rest-of-game distribution** — thinning the full-game histogram by remaining share, or re-simulating — which is new modelling with its own calibration burden, on a path where getting it subtly wrong reproduces the `#414` defect. Producer B already computes that number.
+
+**RECOMMENDATION: option 2.** Carry the MC `live_model_prob_over` onto `_live_props_from_game_detail`'s rows inside `_card_to_live_lens_row` (`live_lens.py:1240-1253`), where the live branch already runs `_normalize_live_prop_row` and would map the spelling for free. This is `5bab0685`'s reasoning relocated to the live path, and `7094b69a`'s normalise-the-source fix applies there unchanged.
+
+**Still to check before writing it:** whether the vendored MC rows are reachable from `_card_to_live_lens_row`'s context at all — producer B runs in `flask_frontend.py` and its rows reached the lens only via the orphaned merge, so the artifact/handoff it writes to needs identifying. That is the one open unknown; everything else about the fix is now decided.
