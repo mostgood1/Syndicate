@@ -628,3 +628,30 @@ Sketch, inside `_enhance_card_row_with_live_projection`, on the props the card r
 Instrument those four the way `70ba6867` did the merge's two, deploy, and read one tick. Do NOT guess between them — the counter is two lines and the answer is one tick away.
 
 **What is now established, and should not be re-derived:** the carry mechanism, its key names, its source key, and its placement in the live path are all correct and verified in production. The remaining defect is upstream of it, in what supplies a LIVE game's card-row props.
+
+## 2026-09-23 — END OF THE TRACE: the vendor's live-lens prop row has NO top-level `market`/`prop`, so the carry key is always None `[lane mlb-doubleheader-e2e, session 3692ff18]`
+
+`4cc2263e` live on live-odds-worker 19:00:37Z. The instrumented tick at 19:01:57Z answers every open question at once.
+
+**The producer is fine — my prime suspect was WRONG and the instrument said so:**
+
+    19:01:57Z  GAME_DETAIL_PROPS gamePk=824223 raw=139 normalised=139
+    19:01:57Z  GAME_DETAIL_PROPS gamePk=824785 raw=104 normalised=104
+    GAME_DETAIL_PROPS_EMPTY: ZERO lines
+
+None of the four refusals fire. `refuse_if_compute_in_request_path` does NOT refuse on a worker tick. Live games produce 104-139 props.
+
+**And the carry now reaches the live games, with the probability present:**
+
+    gamePk=824785  source_rows=24  source_with_prob=23  mc_rows_with_prob=0  card_rows=104  carried=0
+    gamePk=824223  source_rows=10  source_with_prob=10  mc_rows_with_prob=0  card_rows=139  carried=0
+
+**23 of 24 source rows CARRY `liveModelProbOver`, and `by_key` is still empty** — so `_key(prop)` returned None for every one. The key is `(_norm_name(playerName), _snapshot_market(prop), float(line))`.
+
+**ROOT CAUSE: the vendor row has no `market` and no `prop` at top level.** `_normalize_live_lens_live_prop_row` (`flask_frontend.py:17441`) returns `tier, source, playerName, teamSide, selection, line, actual, modelMean, liveProjection, liveEdge, delta, status, ...` — and `market`/`prop` appear ONLY inside the transient dict handed to `_prop_result_state(...)` to compute the status string. They are never on the returned row. `_snapshot_market` therefore finds nothing, and the key is None on every row.
+
+**THE FIX IS ONE LINE IN THE VENDOR, AND IT MUST ALSO GO UPSTREAM.** Add `"market": row.get("market"), "prop": row.get("prop")` to that returned dict. Per `CLAUDE.md`, **a fix landed only in `vendor/` is reverted by the next re-pull** — it has to go to `mostgood1/MLB-BettingV2` as well (precedent: `build_season_betting_cards_manifest.py` 2026-08-31, PRs `NBA-Betting#1` / `WNBA-Betting#1` / `NHL-Betting#1`). The trees have DIVERGED, so re-derive against each rather than porting a diff.
+
+**Do NOT "fix" this by dropping `market` from the key.** `#412` put it there: keying on the display `market` grouping collided 39 unrelated rows onto one key and matched no board market (`miss_no_market_alias 1385 of 1385`). A narrower key is the defect that change cured.
+
+**What is now proven end to end, and must not be re-derived:** the producer prices (LIVE_MC_PRICED 29-52 rows/game), the vendor payload carries the probability on 23 of 24 rows, the live path reaches `_enhance_card_row_with_live_projection`, the carry executes on live games, and `_carry_live_probability`'s own counter reports each hop. The single remaining defect is two absent dict keys on the vendor row.
