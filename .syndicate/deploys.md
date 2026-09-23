@@ -40599,3 +40599,62 @@ row Soroka 9 K on a `gte5` market graded `won` for +$1.07.
 **THE RESIDUAL READING COMES DUE TOMORROW AND IS SCHEDULED, NOT LEFT AS PROSE** (`caveat = scheduled defect`). The timing alone discriminates: under the reverted 86400 the wk3 artifact goes stale at **~15:42Z 09-24**; had the revert NOT reached the process (still 60000 = 16.7h) it would go stale at **~08:20Z 09-24**, ~7h earlier, and the `SEASON_PROJECTION_LAUNCHING` line would carry `interval_seconds=60000`. A single reading after 16:00Z on 09-24 distinguishes them and reads the interval explicitly.
 
 **Blast radius while it was lowered (15:41-16:12Z):** NFL wk3 and NCAAF wk4 each rebuilt once, which was the point. No relaunch loop was possible -- 60000 was chosen over 3600 so the rebuilt artifacts are fresh for 16.7h.
+## 2026-09-23 16:05:15Z -> live 16:11:43Z (11:05-11:11 AM CT) — live-odds-worker `c5daf58e` -> `b2779a98` (`dep-dapvheqd0e5s73aiovig`, origin/main) — lane `polymarket-corners-btts-order-branch` — **DEPLOY LIVE AND THE CODE IS LIVE CODE. Expectation 1 MET. THE FAMILY READING IS OWED, and "builds" is NOT "places" — see the balance note.**
+
+Claim held by this lane 16:03:01Z. Preflight CLEAR 16:04:58Z (only infra
+processes; baseline read 16:00:59Z, age 229s).
+
+**What shipped.** `alternate_totals_corners` was planned on 8 passes and built
+0 over the 24 h to 09:48 CT, every one refusing
+`yes_no_market_subject_is_not_our_side` (production lines 14:48:34.747Z and
+15:06:24.029Z, slug `astatc-mls-sea-rsl-2026-09-23-cor-all-gt10pt5`, outcomes
+`['Yes','No']`). Three branches in `_polymarket_resolve_market`: a Yes/No
+TOTAL branch (over -> `Yes`, under -> `No`, gated on the slug's `gt<N>` token
+with N equal to our line), a Yes/No SIDE branch (`btts`, by literal name), and
+a named `no_order_branch_for_market` refusal for any market the resolver has
+no branch for, with the team-outcome vocabulary DERIVED from the board join's
+`MARKET_TYPE_TO_BOARD` instead of a private literal.
+
+**verify — expectation 1, MET.** `live_odds_worker_live_commit` `c5daf58e` ->
+`b2779a98`, read from the Render deploys API at 16:14:26Z: `live commit
+b2779a98 finished 2026-09-23T16:11:43.624468Z`.
+
+**verify — the code is live code, not a matching label.** `git show
+b2779a98:pipeline/execute_portfolio.py` carries `elif
+_polymarket_yes_no_outcomes(...) and our_side in {"over","under"}` (:1552),
+the `{"yes","no"}` arm (:1608) and `elif market not in
+_team_outcome_markets()` (:1635). A deployed SHA is not a deployed branch, and
+this lane's own subject is a branch that was present and unreachable.
+
+**verify — expectation 2, NOT READ AT TIME OF WRITING.**
+`polymarket_order_path_prop_verdict` = `would_build` (no-regression; the
+dispatch changed for EVERY market, so the props and totals that were building
+must keep building). Baseline 16:00:59Z: `ORDER_PATH venue=polymarket
+status=ok positions=4 markets={'hits_allowed': {'would_build': 1},
+'batter_hits_runs_rbis': {'would_build': 1}, 'totals': {'would_build': 2}}`.
+No post-deploy `ORDER_PATH` line existed at 16:16:58Z — the worker rebooted at
+16:11:43Z and the prior cadence was ~16 min (15:45:00Z, 16:00:59Z), so the
+first pass on the new code is expected ~16:25-16:33Z. **This row is an open
+obligation until that line is read.**
+
+**OWED, and neither is obtainable on demand.** (1) A corners position in the
+plan while its match is pre-kickoff — none was planned at 15:45Z or 16:00:59Z,
+so the family-level reading waits for the next one or for tomorrow's
+`venue_order_family_census.py --hours 24`. (2) A BTTS position: none has EVER
+reached the order path, so that branch is reachability-tested offline and has
+no production reading at all.
+
+**"BUILDS" IS NOT "PLACES", and this deploy changes only the first.** I told
+the user before they authorised it that the effect would be Polymarket
+"actually placing corners orders"; that was WRONG and they should have had the
+accurate version first. `ORDER_PATH` is `verify_order_paths`, a DRY RUN that
+never submits. The live path is refusing every order on both venues for
+funding: `16:01:24Z EXECUTED ... venue=polymarket positions=4 placed=0
+skipped=4 refused={'insufficient_venue_balance': 4}` (and 3 of 3 at
+15:45:30Z; kalshi 7 of 7 at 16:01:12Z, which is the user's stated "not funding
+kalshi now, will later"). So a corners `would_build` proves the resolver, and
+proves nothing about a fill. Credit where due: the peer session's `leads.md`
+edit landed this distinction upstream while this deploy was in flight.
+
+**Not deployed anywhere else.** web `4f8bcdef` and refresh-worker `b4fe8cc0`
+are untouched by this lane.
