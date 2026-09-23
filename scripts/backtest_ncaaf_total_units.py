@@ -270,8 +270,91 @@ def run_sp_units() -> None:
     print("  before turning any of this into drive_success_sensitivity.")
 
 
+def run_asof() -> None:
+    """The fit that can actually set a keep ratio: AS-OF-WEEK ratings.
+
+    Uses the construction the generator really runs mid-season -- `blend_ppa`
+    at k=2, prior-season SP+ blended with a ridge SRS on in-season PPA at
+    weight n/(n+k) -- via `backtest_ncaaf_inseason_blend`'s own loaders and
+    `ratings_asof`, so this is the code that was already graded rather than a
+    reimplementation. Leak-free by construction (week N uses weeks < N), and
+    offline: `ppa_source="plays"` reads the committed plays, never CFBD.
+
+    That blend was graded on MARGIN (12.830 vs 16.334 for the static prior).
+    TOTALS were never graded on it, which is the gap this fills.
+    """
+    from pathlib import Path as _P
+
+    import scripts.backtest_ncaaf_inseason_blend as B
+    from scripts.generate_smartsim2_ncaaf_projections import (
+        INSEASON_BLEND_K, INSEASON_BLEND_MIN_WEEK, SP_RATING_SCALE, norm,
+    )
+
+    data_root = None
+    for cand in (REPO / "data" / "ncaaf_source",
+                 _P(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\ncaaf_source")):
+        if (cand / "historical_truth").exists():
+            data_root = cand
+            break
+    if data_root is None:
+        raise SystemExit("no ncaaf_source tree found")
+
+    s_train = B.load_season(data_root, None, 2024, None, ppa_source="plays")
+    s_test = B.load_season(data_root, None, 2025, s_train, ppa_source="plays")
+    setting = B.Setting("blend_ppa", INSEASON_BLEND_K)
+
+    def build(sd):
+        out, dropped, by_week = [], 0, {}
+        for g in sd.games:
+            if not (g.home_fbs and g.away_fbs) or g.week < INSEASON_BLEND_MIN_WEEK:
+                continue
+            if g.week not in by_week:
+                by_week[g.week] = B.ratings_asof(setting, sd.prior, sd.games, sd.ppa,
+                                                 g.week, sd.beta, sd.index_cache)
+            idx = by_week[g.week]
+            home = idx.get(norm(g.home)) or idx.get(g.home)
+            away = idx.get(norm(g.away)) or idx.get(g.away)
+            if home is None or away is None:
+                dropped += 1
+                continue
+            om = statistics.fmean(v[0] for v in idx.values())
+            dm = statistics.fmean(v[1] for v in idx.values())
+            ho, hd = (home[0] - om) / SP_RATING_SCALE, -(home[1] - dm) / SP_RATING_SCALE
+            ao, ad = (away[0] - om) / SP_RATING_SCALE, -(away[1] - dm) / SP_RATING_SCALE
+            out.append({"total": g.home_points + g.away_points, "week": g.week,
+                        "osum": ho + ao, "dsum": hd + ad, "odif": ho - ao, "ddif": hd - ad})
+        return out, dropped
+
+    train, dt = build(s_train)
+    test, ds = build(s_test)
+    print(f"AS-OF-WEEK ratings (blend_ppa k={INSEASON_BLEND_K}, weeks >= {INSEASON_BLEND_MIN_WEEK}), ENGINE units")
+    print(f"  beta: train {s_train.beta_source}   test {s_test.beta_source}")
+    print(f"  COVERAGE: train 2024 n={len(train)} (dropped {dt})   test 2025 n={len(test)} (dropped {ds})\n")
+    specs = {
+        "level only        ": lambda r: [r["osum"], r["dsum"]],
+        "level + difference": lambda r: [r["osum"], r["dsum"], r["odif"], r["ddif"]],
+    }
+    for name, f in specs.items():
+        a, b, r2 = fit([f(r) for r in train], [r["total"] for r in train])
+        err = [abs(a + sum(bi * xi for bi, xi in zip(b, f(r))) - r["total"]) for r in test]
+        print(f"  {name}  train R2 {r2:.4f}  held-out MAE {statistics.fmean(err):6.3f}  "
+              f"coeffs {[round(x, 3) for x in b]}")
+    flat = statistics.fmean([r["total"] for r in train])
+    print(f"  {'flat league mean  ':18}  {'':15}  held-out MAE "
+          f"{statistics.fmean(abs(flat - r['total']) for r in test):6.3f}")
+    _, b, _ = fit([[r["osum"], r["dsum"]] for r in train], [r["total"] for r in train])
+    print(f"\n  ACTUALS support level ({b[0]:+.3f}, {b[1]:+.3f})")
+    print(f"  ENGINE applies        ({ENGINE_LEVEL[0]:+.3f}, {ENGINE_LEVEL[1]:+.3f})")
+    print(f"  keep ratios: offence {b[0]/ENGINE_LEVEL[0]:.3f}   defence {b[1]/ENGINE_LEVEL[1]:.3f}")
+    print("  (--sp-units, on the DEGRADED prior-season basis, gave 0.062 / 0.253 --")
+    print("   about half, exactly as a lower bound should behave)")
+
+
 def main() -> None:
     print(f"truth tree: {truth_root()}\n")
+    if "--asof" in sys.argv:
+        run_asof()
+        return
     if "--sp-units" in sys.argv:
         run_sp_units()
         return
