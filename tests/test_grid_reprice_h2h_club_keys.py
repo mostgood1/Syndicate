@@ -240,3 +240,61 @@ def test_the_away_side_names_the_away_club():
     keys = _h2h_alias_keys(row, "mlb", "h2h", "away", [])
     assert str(quote_key("mlb", "h2h", "tampa bay rays", None)) in keys
     assert str(quote_key("mlb", "h2h", "new york yankees", None)) not in keys
+
+
+# ---------------------------------------------------------------------------
+# THE INSTRUMENT. `404d2194` shipped this fix and measured nothing, and the
+# counter reached for as the explanation was withdrawn. The per-shape funnel
+# exists so the next reading cannot be ambiguous in the same way.
+# ---------------------------------------------------------------------------
+
+
+def test_the_shape_funnel_separates_no_match_from_discarded_match():
+    """`offered -> present -> taken -> repriced`, per shape, plus `live_*`.
+
+    The discrimination is the point: `role` and `token` are OFFERED here and
+    never PRESENT, because nothing in the pool answers them -- that is the
+    "matches nothing" signature. `club` walks the whole funnel.
+    """
+    grid = [_grid_row(), _grid_row(home="Boston Red Sox", away="Baltimore Orioles")]
+    grid[1]["event_id"] = "evt-bos-bal"
+    club_key = str(quote_key("mlb", "h2h", "new york yankees", None))
+
+    result = apply_venue_quotes_to_grid(
+        grid, "mlb", "2026-09-24",
+        collected=_collected(_quote(club_key, age=23.0)),
+    )
+
+    shapes = result["venue_key_shape"]
+    assert shapes["club"]["offered"] >= 1
+    assert shapes["club"]["present"] == 1
+    assert shapes["club"]["taken"] == 1
+    assert shapes["club"]["repriced"] == 1
+    # The live mirror exists, because the live rows are the population the
+    # game-line join's staleness refusal is actually about.
+    assert shapes["club"]["live_repriced"] == 1
+
+    # OFFERED BUT NEVER PRESENT -- nothing in the pool answers these.
+    assert shapes["role"]["offered"] >= 1
+    assert "present" not in shapes["role"]
+    assert "present" not in shapes.get("token", {})
+
+
+def test_a_shape_that_wins_but_cannot_move_the_age_is_named_separately():
+    """`taken` without `repriced` is the third explanation, and it has to be
+    distinguishable: the row keeps its book age, so the live game-line join
+    downstream still sees the stale number."""
+    # The book is FRESHER than the venue, so the reprice is declined.
+    grid = [_grid_row(book_age=5.0)]
+    club_key = str(quote_key("mlb", "h2h", "new york yankees", None))
+
+    result = apply_venue_quotes_to_grid(
+        grid, "mlb", "2026-09-24",
+        collected=_collected(_quote(club_key, age=200.0)),
+    )
+
+    shapes = result["venue_key_shape"]
+    assert result["repriced"] == 0
+    assert shapes["club"]["taken"] == 1
+    assert shapes["club"].get("repriced", 0) == 0
+    assert shapes["club"]["dropped_book_fresher"] == 1

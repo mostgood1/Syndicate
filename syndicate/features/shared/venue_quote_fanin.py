@@ -1272,6 +1272,39 @@ def _h2h_alias_keys(
     The subtraction stays as a second, narrower check -- it is subsumed, not
     load-bearing, and removing it would change behaviour for no gain.
     """
+    return [key for _shape, key in _h2h_alias_keys_shaped(row, sport, market, side, existing)]
+
+
+# The shape names the instrumentation reports. `role` and `role_game` are built
+# by the caller; these two are this helper's.
+SHAPE_ROLE = "role"
+SHAPE_ROLE_GAME = "role_game"
+SHAPE_CLUB = "club"
+SHAPE_TOKEN = "token"
+
+
+def _h2h_alias_keys_shaped(
+    row: Mapping[str, Any],
+    sport: str,
+    market: Any,
+    side: Any,
+    existing: Sequence[str],
+) -> list[tuple[str, str]]:
+    """`_h2h_alias_keys`, with each key LABELLED by the shape that produced it.
+
+    WHY THE LABEL EXISTS. `404d2194` added these shapes to the grid re-price and
+    measured NO effect, and the counter reached for as the explanation was
+    withdrawn (`deploys.md` 2026-09-24 02:06:45Z). Three explanations survive
+    and a bare match/no-match count cannot tell them apart:
+
+        the club key matches NOTHING                 -> `present` stays 0
+        it matches and something later discards it   -> `present` > 0, `taken` 0
+        it matches rows that were never the problem  -> `taken` > 0, live 0
+
+    So the shape is carried to the lookup and counted there, rather than
+    inferred afterwards from a total. The club key is emitted first and the
+    tokens after, which is the order the caller tries them in.
+    """
     from syndicate.features.shared.venue_quote_adapters import (
         quote_key,
         team_name_tokens,
@@ -1282,17 +1315,17 @@ def _h2h_alias_keys(
     if str(side or "").strip().lower() not in {"home", "away"}:
         return []
 
-    out: list[str] = []
+    out: list[tuple[str, str]] = []
     seen = {str(k) for k in (existing or [])}
 
-    def _add(candidate: Any) -> None:
+    def _add(shape: str, candidate: Any) -> None:
         if candidate is None:
             return
         text = str(candidate)
         if text in seen:
             return
         seen.add(text)
-        out.append(text)
+        out.append((shape, text))
 
     team = row.get(f"{side}_team")
     try:
@@ -1302,13 +1335,13 @@ def _h2h_alias_keys(
     except Exception:
         club = None
     if club:
-        _add(quote_key(sport, market, club, None))
+        _add(SHAPE_CLUB, quote_key(sport, market, club, None))
 
     opponent = "away_team" if side == "home" else "home_team"
     mine = team_name_tokens(sport, team)
     theirs = team_name_tokens(sport, row.get(opponent))
     for token in sorted(mine - theirs):
-        _add(quote_key(sport, market, token, None))
+        _add(SHAPE_TOKEN, quote_key(sport, market, token, None))
     return out
 
 
@@ -1671,6 +1704,29 @@ def apply_venue_quotes_to_grid(
     live_venue_ages_by_source: dict[str, list[float]] = {}
     by_source: dict[str, int] = {}
 
+    # WHICH KEY SHAPE DID WHAT, and why this is counted rather than reasoned
+    # about. `404d2194` added the club/token shapes to this path and measured no
+    # effect; the counter reached for as the explanation was withdrawn
+    # (`deploys.md` 2026-09-24 02:06:45Z), leaving three live explanations that a
+    # match/no-match total cannot separate:
+    #
+    #   offered > 0, present == 0        the shape matches NOTHING in the pool
+    #   present > 0, taken == 0          it matches and a GUARD discards it
+    #   taken > 0, repriced == 0         it wins and the row keeps its book age
+    #
+    # Each event is counted twice -- once overall and once restricted to LIVE
+    # rows -- because the live full-game rows are the only population the
+    # game-line join's staleness refusal is about, and a healthy overall number
+    # said nothing about them last time. A rate needs both, so both are printed.
+    venue_key_shape: dict[str, dict[str, int]] = {}
+
+    def _shape_note(shape: Any, event: str, *, live: bool = False) -> None:
+        bucket = venue_key_shape.setdefault(str(shape or "unknown"), {})
+        bucket[event] = bucket.get(event, 0) + 1
+        if live:
+            key = f"live_{event}"
+            bucket[key] = bucket.get(key, 0) + 1
+
     benchmark_rows = 0
     benchmark_skipped: dict[str, int] = {}
 
@@ -1687,6 +1743,9 @@ def apply_venue_quotes_to_grid(
         # benchmark rewrite below is all-or-nothing per row and cannot be
         # decided one side at a time.
         venue_quotes: dict[str, Any] = {}
+        # Which key SHAPE won each side's lookup, so the second loop below can
+        # attribute its own drops to the shape that got there.
+        venue_quote_shapes: dict[str, str] = {}
         # `#603`. The BARE key first -- unchanged, so every match that works
         # today still works -- then the game-qualified one, and a quote naming a
         # DIFFERENT fixture is refused however well its key matched. Same order
@@ -1709,9 +1768,11 @@ def apply_venue_quotes_to_grid(
         )
         role_keyed = str(market or "").strip().lower() in _ROLE_KEYED_MARKETS
         for side_key in side_names:
-            candidates = [str(quote_key(sport_slug, market, side_key, line))]
+            shaped = [(SHAPE_ROLE, str(quote_key(sport_slug, market, side_key, line)))]
             if role_keyed and row_game:
-                candidates.append(str(quote_key(sport_slug, market, side_key, line, row_game)))
+                shaped.append(
+                    (SHAPE_ROLE_GAME, str(quote_key(sport_slug, market, side_key, line, row_game)))
+                )
             # THE MONEYLINE'S CLUB AND TOKEN SHAPES -- the same vocabulary
             # `_candidate_keys` has always offered, and the reason this pass
             # could not see a single Kalshi moneyline. `_ROLE_KEYED_MARKETS`
@@ -1719,19 +1780,36 @@ def apply_venue_quotes_to_grid(
             # while Kalshi publishes `mlb|h2h|<club>`. Appended AFTER the role
             # keys, so every match that worked here before still resolves first
             # and this can only add matches. See `_h2h_alias_keys`.
-            candidates.extend(
-                _h2h_alias_keys(row, sport_slug, market, side_key, candidates)
+            shaped.extend(
+                _h2h_alias_keys_shaped(
+                    row, sport_slug, market, side_key, [k for _s, k in shaped]
+                )
             )
-            candidates, _dh_outcome = _keys_for_half(candidates, row, grid_dh_ranks, grid_dh_unrankable)
+            candidates, _dh_outcome = _keys_for_half(
+                [k for _s, k in shaped], row, grid_dh_ranks, grid_dh_unrankable
+            )
+            # `_keys_for_half` maps 1:1 or returns [] (an unrankable
+            # doubleheader half, which may match nothing at all), so the shape
+            # labels stay aligned by position.
+            shapes = [s for s, _k in shaped] if candidates else []
+            for _shape in shapes:
+                _shape_note(_shape, "offered", live=row_is_live)
             if _dh_outcome:
                 grid_dh_counts[_dh_outcome] += 1
             quote = None
-            for candidate in candidates:
+            quote_shape = None
+            for candidate, _shape in zip(candidates, shapes):
                 found = quotes.get(candidate)
                 if found is None:
                     continue
+                # THE KEY EXISTS IN THE POOL. Counted BEFORE any guard runs,
+                # because "no quote is published under this shape" and "one is
+                # and we threw it away" are the two hypotheses this whole
+                # instrument exists to separate.
+                _shape_note(_shape, "present", live=row_is_live)
                 if _quote_is_for_another_game(found, row_game):
                     cross_game_rejected += 1
+                    _shape_note(_shape, "refused_cross_game", live=row_is_live)
                     continue
                 # `#603` second pass. A quote that names NO game may only answer
                 # a key that exactly ONE game claims. Measured: the first pass
@@ -1741,6 +1819,7 @@ def apply_venue_quotes_to_grid(
                     found, row_game, candidate, grid_claimants
                 ):
                     ambiguous_unnamed_rejected += 1
+                    _shape_note(_shape, "refused_ambiguous", live=row_is_live)
                     continue
                 # THE GUARD THIS PATH NEVER HAD. `quote_key` above is built
                 # from `market` alone, while the grid row carries `segment`
@@ -1754,16 +1833,28 @@ def apply_venue_quotes_to_grid(
                         segment_mismatch_sample, sport_slug, row, found
                     )
                     if _SEGMENT_REFUSAL_ENABLED:
+                        _shape_note(_shape, "refused_segment", live=row_is_live)
                         continue
                 quote = found
+                quote_shape = _shape
+                _shape_note(_shape, "taken", live=row_is_live)
                 break
             if quote is None or quote.source not in _LIVE_QUOTING_VENUES:
+                # TAKEN AND THEN DROPPED ANYWAY. The shape won the lookup and
+                # the row still keeps its book price, so this is the third
+                # hypothesis' home: a match that changes nothing.
+                if quote is not None and quote_shape is not None:
+                    _shape_note(quote_shape, "dropped_not_live_venue", live=row_is_live)
                 continue
             if quote.american is None:
                 # No price is not a reprice. Refreshing the clock here would be
                 # the age-only laundering this function refuses.
+                if quote_shape is not None:
+                    _shape_note(quote_shape, "dropped_no_price", live=row_is_live)
                 continue
             venue_quotes[side_key] = quote
+            if quote_shape is not None:
+                venue_quote_shapes[side_key] = quote_shape
 
         for side_key in side_names:
             side_best = best.get(side_key)
@@ -1870,6 +1961,16 @@ def apply_venue_quotes_to_grid(
             existing_age = _as_float_or_none(side_best.get("age_seconds"))
             if existing_age is not None and existing_age <= venue_age:
                 # The book really is fresher. Leave it entirely alone.
+                #
+                # THE THIRD HYPOTHESIS' HOME, and the one a match/no-match count
+                # cannot see: the shape won its lookup, the quote had a price,
+                # and the row still keeps the book's age -- so the live
+                # game-line join downstream still sees the stale number.
+                _shape_note(
+                    venue_quote_shapes.get(side_key) or "unknown",
+                    "dropped_book_fresher",
+                    live=row_is_live,
+                )
                 continue
             side_best["price"] = int(quote.american)
             side_best["bookmaker"] = _VENUE_BOOK_NAME.get(quote.source, quote.source)
@@ -1885,6 +1986,13 @@ def apply_venue_quotes_to_grid(
             # rows. `KXMLBTOTAL-26SEP061340MILCIN-4` -> `KXMLBTOTAL`.
             _bump_matched_series(matched_series, sport_slug, row, quote)
             repriced += 1
+            # THE ONLY EVENT THAT MEANS THE AGE ACTUALLY MOVED. Every other
+            # counter above is a way of not getting here.
+            _shape_note(
+                venue_quote_shapes.get(side_key) or "unknown",
+                "repriced",
+                live=row_is_live,
+            )
             by_source[quote.source] = by_source.get(quote.source, 0) + 1
 
         outcome = _reprice_live_benchmark(
@@ -1961,6 +2069,25 @@ def apply_venue_quotes_to_grid(
     # UNCONDITIONAL, including the zero, and WITH ITS DENOMINATOR. A guard whose
     # only evidence is a counter nobody prints is how the first `#603` pass came
     # to look like it was working while rejecting nothing.
+    # WHICH KEY SHAPE DID WHAT. Printed UNCONDITIONALLY, including the all-zero
+    # case, for the reason the line below it already states: a counter nobody
+    # prints is how a mechanism comes to look like it is working.
+    #
+    # Read it as a funnel per shape, and the LIVE numbers are the ones that
+    # matter -- `live_offered -> live_present -> live_taken -> live_repriced`.
+    # The first gap that is total tells you which of the three explanations is
+    # true. `repriced` is the only event that means the row's AGE moved, which
+    # is the thing `attach_live_gamelines` reads.
+    print(
+        f"[venue_quote_fanin] VENUE_KEY_SHAPE sport={sport_slug}"
+        f" sides_seen={sides_seen} shapes={dict(sorted(venue_key_shape.items()))}"
+        " -- per key shape: offered->present->taken->repriced, and `live_*` for"
+        " rows on a game in progress. present==0 means the shape matches"
+        " nothing; taken==0 with present>0 means a guard discards it;"
+        " repriced==0 with taken>0 means the book was still fresher",
+        flush=True,
+    )
+
     print(
         "[venue_quote_fanin] AMBIGUOUS_UNNAMED_REJECTED"
         f" sport={sport_slug} count={ambiguous_unnamed_rejected} sides_seen={sides_seen}"
@@ -2010,6 +2137,10 @@ def apply_venue_quotes_to_grid(
         # NOTHING printed, which made the mechanism unreadable in production --
         # the instrument-blindness failure this repo has on file five times.
         "cross_game_rejected": cross_game_rejected,
+        # The per-shape funnel, carried in the payload as well as the log so the
+        # shortlist artifact holds it and a reader does not have to have been
+        # watching the logs at the time.
+        "venue_key_shape": {k: dict(v) for k, v in sorted(venue_key_shape.items())},
         "doubleheader_sides": dict(grid_dh_counts),
         # Reported for the same reason, and the DENOMINATOR beside it:
         # "no live venue edges" and "the comparison never ran" are different
