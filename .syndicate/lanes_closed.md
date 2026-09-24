@@ -8039,3 +8039,64 @@ SAFE_SLUGS=ncaaf-board-sim-coverage,ncaaf-sim-inseason-ratings,ncaaf-player-data
 - **82,024 B out of `lanes.md` — the largest single reclaim this job has made.** Waited 117 min for the 240 m bar rather than taking the two that cleared first; `dae18452` never woke, so all four went in ONE pass and cost ONE lane block instead of two.
 - The two 14-15 day abandoned worktree diffs (`bandwidth-controlled-transfer`, `mlb-ledger-segment-visibility`) did NOT block: the first is the measured case the 2026-09-23 staleness bound was added for, the second never names these slugs. Both re-verified by hand this run.
 - Readings, the full WAIT table and the Part B dormant-OPEN report: `.syndicate/log/2026-09-24.md`.
+
+### tripwire-applog-page-cap — CLOSED 2026-09-24 — opened 2026-09-23 — session 8ce91d9d-ac1c-498f-90d3-89a2bc5fd620
+- Goal: `bandwidth_tripwire.py` can no longer report an app-log `served_mb` that is silently a FLOOR. A truncated app-log read is either avoided or declared in the capture JSON and in both print paths.
+- Files: `scripts/bandwidth_tripwire.py`
+- Hypothesis: `_logs()` pages backward with `limit=100` and `max_pages=200`, so it stops at 20,000 lines and returns a TRUNCATED list with no signal. The 2026-09-23T01:00Z web capture has `app.log_lines == 20000` exactly, which is the cap hit, not a coincidence -- so its `served_mb 395.62` covers only the newest part of the hour and `metered/app-served 1.04` is a CEILING. `instrument_partial` was False because `_emitter_gap()` only fires when EDGE requests sit outside the access-line span, which is a different failure mode.
+- Falsification test: page the same window with no practical cap. If the full app-log line count for 2026-09-23T01:00..02:00Z is <= 20,000 and the oldest line reached at page 200 is already <= the window start, the pager was NOT truncating and `served_mb` is a complete total -- hypothesis dead, and the 20,000 is coincidence.
+- Verification: (1) the re-read total for that window, stated as lines and MB, against the captured 20,000 / 395.62 MB; (2) a capture run over a known-truncating window emits the new flag, and one over a short window does not (off != on, per the reachability rule); (3) the corrected `metered/app-served` for the 01:00Z bucket, or an explicit statement that it is unavailable.
+- Blocked by: none
+- **RESULT, 2026-09-24 — GOAL MET. The hypothesis held, but the defect that MATTERED was the other one.**
+  `_logs` paged backward at 200 pages x 100 and returned a truncated list with no signal.
+  Confirmed on `2026-09-23T01:00Z`: the capture sat at exactly `log_lines: 20000`, and a re-read
+  needs 202 pages — 20,120 lines, 5,010 access lines, 396.51 MB against the stored 395.62 MB.
+  It stopped at `01:00:56Z`, holding 99.77% of the hour. So `metered/app-served` read 1.04 where
+  the true value is 1.039.
+- **The consequential truncation was the WORKER publish logs, not the app log.** Those reads used a
+  NINETY-page budget (9,000 lines) against hours carrying 14,000-15,000. Over the 49 captures whose
+  logs still exist: `app.served_mb` changed in **2 of 49** (+44.5 MB total), `publish_into_web`
+  changed in **49 of 49**, 15,648 -> 27,099 MB (x1.73), worst x3.22 (`2026-09-21T23:00Z`,
+  265.9 -> 857.2 MB). Every capture in the archive was understating the largest flow into web.
+- **Two `metered / app-served` ratios were floors and are now corrected** — quote these:
+  `2026-09-20T17:00Z` **3.740 -> 3.514** (served 676.30 -> 719.93 MB), one of the anomalous-looking
+  hours; `2026-09-23T01:00Z` 1.041 -> 1.039. No other capture's ratio moved.
+- **RENDER LOG RETENTION IS ~14 DAYS, measured** — and it nearly cost the archive. Probing all 75
+  captures on 2026-09-23: buckets at and before `2026-09-09T13:00Z` return ZERO log lines;
+  `2026-09-09T18:00Z` onward return lines. **26 of 75 are unreadable**, including the ten
+  `2026-09-01..04` buckets that carried ~68% of the month's bill and the whole of `2026-09-08`,
+  the largest day on record. A blind re-derive would have overwritten all 26 with empty reads.
+  `--recomplete` has two independent stops: a one-page readability probe before a full capture is
+  spent, and `_expiry_regressions`, which refuses on any counter that SHRANK (a log line is
+  immutable, so fewer of them means the window aged out). Pass result: **49 rewritten, 26 expired
+  and KEPT, 0 refused mid-read** — the probe caught every expired window. Verified after the fact:
+  0 of the 26 expired files appear in the commit.
+- **Verification, all three criteria met.** (1) The re-read totals above. (2) off != on: at unit level
+  8 tests assert both directions (budget exhausted vs. window start reached), and against production
+  the old 200-page budget produced `served_is_floor: True` with the printed line `>= 395.62 MB
+  (FLOOR ...)` while the complete read produced no floor. (3) The corrected ratios above.
+  34 tests pass in `tests/test_bandwidth_tripwire.py`; 43 across it and the three
+  `controlled_transfer_*` files, which import `_logs` and whose explicit budgets are untouched.
+- **Prior art that existed and was not shared** — `controlled_transfer_arm2_watch.py` had already
+  solved this alone (`APP_LOG_MAX_PAGES = 400` plus a coverage check, with a comment naming the
+  danger: truncation "under-counts the DENOMINATOR, inflates `metered/app`"). The knowledge was in
+  one script; the shared pager did not have it. That is the reusable lesson here.
+- Commits: `8c41cc68` (the floor fix), `a1216149` (`--recomplete`), `03d955b6` (49 re-derived
+  captures). Also `3e39e88b` / `60fd67a8`, em-dash separators in this lane's header and in
+  `live-gameline-game-identity`'s (the latter at the user's direction) — `_malformed_headers` over
+  `origin/main` now returns 0.
+- **Left open, NOT this lane's work:** the lead filed by a parallel session at `d36e9406` is
+  discharged by this work. Still unexamined: why web's access log attributes 0 bytes to
+  `controlled_transfer` probe requests (arms 2 and B both failed P2 that way).
+
+### polymarket-corners-btts-order-branch — CLOSED 2026-09-24, GOAL MET on the measured clause — opened 2026-09-23 — session a3eac387-559b-455c-bc5e-195c2a678c28
+- Goal: a Polymarket `alternate_totals_corners` position with a `gt<N>` slug whose N equals the board line BUILDS an order (over->`Yes`, under->`No`), `btts` builds by literal name, and any OTHER joinable board market with no branch refuses under its OWN named token instead of falling through to the team matcher.
+- **GOAL: MET on clause 1, in production; clauses 2 and 3 are offline-verified with NO LIVE POPULATION.** Reading 2026-09-24 08:56 CT (`deploys.md`): `alternate_totals_corners` built **4 of 4 post-deploy passes** (09-24 00:34:39Z, 00:46:46Z, 00:52:27Z, 00:57:23Z) against **0 of 2 pre-deploy** (09-23 14:48:34.747Z, 15:06:24.029Z) -- the split checked, not assumed, because a 24 h window reaches past the 16:11:43Z deploy. `POLYMARKET_YES_LEG ... reason='gt_total_yes_by_name' agree=True` fired 4x with `our_side=under -> outcome_index=1` and **`venue_yes_leg_index=0`, the venue's own statement of the polarity** -- a stronger witness than the two the fix shipped on, and on a rung (`gt12pt5`) it had never seen.
+- **What the reading does NOT show:** no corners order was SUBMITTED. `ORDER_PATH` is `verify_order_paths`, which calls `_polymarket_resolve_market`/`order_body` directly and never `_refuse_after_commence` or `place_order` (0 and 0 on `origin/main`), so the dry run skips the kickoff gate. It proves the RESOLVER, not a send.
+- **Closed rather than left open for clauses 2 and 3.** `btts` has **0 positions in 24 h** -- unmeasurable, not failing -- and no unhandled market has appeared. Both are covered by the standing `venue_order_family_census.py` (`#682`), which ALERTs on any family with positions and zero builds, so leaving this lane open would add nothing a running instrument does not already do.
+- **FILE RELEASED to lane `polymarket-h2h-nickname-sides` 2026-09-23 ~17:4xZ (session 236bd219), USER-APPROVED ("fix the polymarket h2h resolution"):** `pipeline/execute_portfolio.py`, the TEAM branch's per-outcome side lookup ONLY -- your `abc6d4b8` (corners/btts branches + `no_order_branch_for_market`) is landed and is NOT modified, and `tests/test_execute_portfolio.py` stays yours. I could not offer this by message: this lane's session is a scheduled run and is unattended. **The finding, so you need not re-derive it:** h2h refuses `team_side_not_in_outcomes` 29x today with ZERO not-found/stale/unorderable, on `outcomes=['Buffaloes','Bears']` -- the venue uses school nicknames, `kalshi_board_join._side_for_team` resolves NONE of them, and `team_aliases.teams_match` (the matcher that chose the slug) resolves both uniquely. Want the file back? Say so here and it is yours.
+- Files: `tests/test_execute_portfolio.py`. RELEASED 2026-09-23 ~17:4xZ to lane `polymarket-h2h-nickname-sides` (session 236bd219, user-approved; this lane's code `abc6d4b8` is LANDED and its session is an unattended scheduled run, so the offer could only be recorded, not sent): `pipeline/execute_portfolio.py` -- the TEAM branch's per-outcome side lookup only. Say so in this block to take it back.
+- **GOAL: DRIFTED, and the drift got no lane of its own -- recorded rather than left as a feeling.** About half the session went into `.claude/hooks/lane_claims.py` and `scripts/check_lane_invariants.py`: three holes in the CLAIM PARSER (spelling-blind contest report; prose citations creating claims; directory claims guarding nothing), each found by fixing the one before it, each on explicit user instruction. Landed and tested, not this lane's goal, deliberately given no retro-fitted lane -- finished, owes no reading. `state_ledger.md [lane-claim-parser-holes]`.
+- **Re: the FILE RELEASED above -- ACKNOWLEDGED, keep it.** `pipeline/execute_portfolio.py` is `polymarket-h2h-nickname-sides`'; the nickname finding is a different branch of the same function and this lane has no owed work in it. Confirmed here because that session said it could not reach this one by message (this lane's session began as an unattended scheduled run).
+- Shipped: `abc6d4b8`, live on live-odds-worker as `b2779a98` 2026-09-23T16:11:43Z. Narrative: `log/2026-09-23.md` (entry + 2 addenda); readings in `deploys.md` 16:05:15Z, 16:19:02Z and 2026-09-24 13:56Z.
+- Blocked by: none.
