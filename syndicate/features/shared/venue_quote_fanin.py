@@ -1201,6 +1201,117 @@ def _segment_disagrees(sport: str, row: Mapping[str, Any], quote: Any) -> bool:
     return _row_segment(row) != _quote_segment(sport, quote)
 
 
+def _h2h_alias_keys(
+    row: Mapping[str, Any],
+    sport: str,
+    market: Any,
+    side: Any,
+    existing: Sequence[str],
+) -> list[str]:
+    """The CLUB and TOKEN key shapes a moneyline side can ALSO be quoted under.
+
+    ONE VOCABULARY, BOTH PATHS, and it is here because having it in only one of
+    them was a live defect. `_candidate_keys` (the `apply_venue_quotes` pass)
+    offered the club and token shapes; `apply_venue_quotes_to_grid` offered only
+    the ROLE key, because `_ROLE_KEYED_MARKETS` -- which decides whether a
+    game-qualified variant is even built -- does not contain `h2h`.
+
+    Kalshi keys a moneyline by the CLUB (`venue_quote_adapters.py`, h2h takes
+    `side = subject`), so `mlb|h2h|home` never met `mlb|h2h|new york yankees`.
+    MEASURED on production 2026-09-23T23:2x-23:4xZ, MLB:
+
+        GRID_REPRICE   sides_seen=6517  repriced=60      (this path, BEFORE the join)
+        VENUE_REPRICE  rows_in=12205    stamped=4315     (the other path, AFTER it)
+
+    The grid pass is the only one whose re-stamped age
+    `attach_live_gamelines` can see, so every full-game live MLB row reached the
+    join carrying its 206s sportsbook age and was refused
+    `quote_older_than_live_pricing_ceiling` against a 120s ceiling -- 61 of 61,
+    while Kalshi's own quotes for those fixtures were 22.8s old. The file
+    already warned about exactly this shape: "two paths disagreeing about a
+    row's identity is a join that works on whichever one you happen to read".
+
+    ADDITIVE BY CONSTRUCTION. The caller keeps its role key FIRST and passes it
+    in as `existing`; this only ever appends, and never returns a key the caller
+    already holds. Two sibling suites assert `keys[1]`/`keys[2]` by position and
+    still hold, because the order here is the order they were written in.
+
+    -- the reasoning below is carried verbatim from `_candidate_keys`, where it
+    was written, because it is the safety argument and not commentary --
+
+    No club, no second key -- never a bare team string as a fallback. An
+    unresolved name would build a key that matches nothing and hides the fact
+    that the row could not be placed.
+
+    A THIRD SHAPE: THE CITY OR NICKNAME ALONE. Kalshi names a moneyline by the
+    team and nothing else -- "Texas wins", "Buffalo wins" -- so it publishes
+    `h2h|texas` where the board carries "Texas Rangers". Neither of the two keys
+    above can meet that: the role key says `home`, and the club key says `texas
+    rangers`. Measured 2026-08-25T21:12:14Z, `sources_offered` had kalshi at
+    `nfl|h2h|yes` against a board asking `soccer|h2h|real betis` -- every Kalshi
+    game line offered under a side the board never asks for.
+
+    AMBIGUOUS TOKENS ARE DROPPED, and that is the whole safety property.
+    "chicago" sits inside both "chicago cubs" and "chicago white sox", so on a
+    Cubs/White Sox game it names NEITHER side. Guessing which side a shared name
+    refers to is a bet on the wrong team half the time, at a price that looks
+    confident.
+
+    THE OPPONENT SUBTRACTION BELOW IS NOT THAT PROPERTY, and used to be the only
+    thing standing in for it. The candidate set is resolved against the sport's
+    WHOLE quote pool, so a token only has to be unique across the sport to be
+    safe and being unique within the pair buys nothing. Measured 2026-08-27: a
+    Manchester City row offered `soccer|h2h|city`, a key 14 clubs answer to, and
+    `real` names 4. Worse, a board team the club map could not resolve fell
+    through to a raw string -- "Not A Real Club" offered `mlb|h2h|club`,
+    `mlb|h2h|not`, `mlb|h2h|real`.
+
+    `team_name_tokens` enforces both: it resolves through `canonical_team` (no
+    raw fallback on this side of the join) and keeps only tokens
+    `unambiguous_club_tokens` reports as naming exactly one club in the sport.
+    The subtraction stays as a second, narrower check -- it is subsumed, not
+    load-bearing, and removing it would change behaviour for no gain.
+    """
+    from syndicate.features.shared.venue_quote_adapters import (
+        quote_key,
+        team_name_tokens,
+    )
+
+    if str(market or "").strip().lower() != "h2h":
+        return []
+    if str(side or "").strip().lower() not in {"home", "away"}:
+        return []
+
+    out: list[str] = []
+    seen = {str(k) for k in (existing or [])}
+
+    def _add(candidate: Any) -> None:
+        if candidate is None:
+            return
+        text = str(candidate)
+        if text in seen:
+            return
+        seen.add(text)
+        out.append(text)
+
+    team = row.get(f"{side}_team")
+    try:
+        from syndicate.features.shared.team_aliases import canonical_team
+
+        club = canonical_team(sport, team)
+    except Exception:
+        club = None
+    if club:
+        _add(quote_key(sport, market, club, None))
+
+    opponent = "away_team" if side == "home" else "home_team"
+    mine = team_name_tokens(sport, team)
+    theirs = team_name_tokens(sport, row.get(opponent))
+    for token in sorted(mine - theirs):
+        _add(quote_key(sport, market, token, None))
+    return out
+
+
 def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
     """Every key shape this row could legitimately be quoted under, in order.
 
@@ -1226,7 +1337,6 @@ def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
         game_token,
         prop_quote_key,
         quote_key,
-        team_name_tokens,
     )
 
     explicit = row.get("venue_quote_key")
@@ -1284,62 +1394,11 @@ def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
     # that cliff.
     keys = [quote_key(sport, market, side, line)]
 
-    if market == "h2h" and side in {"home", "away"}:
-        team = row.get(f"{side}_team")
-        try:
-            from syndicate.features.shared.team_aliases import canonical_team
-
-            club = canonical_team(sport, team)
-        except Exception:
-            club = None
-        # No club, no second key -- never a bare team string as a fallback.
-        # An unresolved name would build a key that matches nothing and hides
-        # the fact that the row could not be placed.
-        if club:
-            keys.append(quote_key(sport, market, club, None))
-
-        # A THIRD SHAPE: THE CITY OR NICKNAME ALONE.
-        #
-        # Kalshi names a moneyline by the team and nothing else -- "Texas
-        # wins", "Buffalo wins" -- so it publishes `h2h|texas` where the board
-        # carries "Texas Rangers". Neither of the two keys above can meet that:
-        # the role key says `home`, and the club key says `texas rangers`.
-        # Measured 2026-08-25T21:12:14Z, `sources_offered` had kalshi at
-        # `nfl|h2h|yes` against a board asking `soccer|h2h|real betis` --
-        # every Kalshi game line offered under a side the board never asks for.
-        #
-        # AMBIGUOUS TOKENS ARE DROPPED, and that is the whole safety property.
-        # "chicago" sits inside both "chicago cubs" and "chicago white sox", so
-        # on a Cubs/White Sox game it names NEITHER side. Guessing which side a
-        # shared name refers to is a bet on the wrong team half the time, at a
-        # price that looks confident.
-        #
-        # THE OPPONENT SUBTRACTION BELOW IS NOT THAT PROPERTY, and used to be
-        # the only thing standing in for it. This comment said "the candidate
-        # set here is exactly two clubs and both are known to be playing each
-        # other" -- true of the ROW, and the wrong scope for the LOOKUP. The
-        # loop above resolves each candidate against `quotes_for_sport`, the
-        # sport's WHOLE pool, so a token only has to be unique across the sport
-        # to be safe and being unique within the pair buys nothing. Measured
-        # 2026-08-27: a Manchester City row offered `soccer|h2h|city`, a key 14
-        # clubs answer to, and `real` names 4. Worse, a board team the club map
-        # could not resolve fell through to a raw string -- "Not A Real Club"
-        # offered `mlb|h2h|club`, `mlb|h2h|not`, `mlb|h2h|real` -- directly
-        # contradicting the "no club, no second key" refusal three lines above.
-        #
-        # `team_name_tokens` now enforces both: it resolves through
-        # `canonical_team` (no raw fallback on this side of the join) and keeps
-        # only tokens `unambiguous_club_tokens` reports as naming exactly one
-        # club in the sport. The subtraction stays as a second, narrower check
-        # -- it is subsumed, not load-bearing, and removing it would change
-        # behaviour for no gain.
-        opponent = "away_team" if side == "home" else "home_team"
-        mine = team_name_tokens(sport, team)
-        theirs = team_name_tokens(sport, row.get(opponent))
-        for token in sorted(mine - theirs):
-            candidate = quote_key(sport, market, token, None)
-            if candidate not in keys:
-                keys.append(candidate)
+    # THE CLUB AND TOKEN SHAPES COME FROM `_h2h_alias_keys`, which
+    # `apply_venue_quotes_to_grid` also calls. See its docstring: this vocabulary
+    # existing HERE and not THERE is what kept every Kalshi moneyline out of the
+    # only re-price the live game-line join can see.
+    keys.extend(_h2h_alias_keys(row, sport, market, side, keys))
 
     # APPENDED LAST, so every index above is exactly where it was. Two sibling
     # suites assert `keys[1]`/`keys[2]` by position, and they are asserting a
@@ -1653,6 +1712,16 @@ def apply_venue_quotes_to_grid(
             candidates = [str(quote_key(sport_slug, market, side_key, line))]
             if role_keyed and row_game:
                 candidates.append(str(quote_key(sport_slug, market, side_key, line, row_game)))
+            # THE MONEYLINE'S CLUB AND TOKEN SHAPES -- the same vocabulary
+            # `_candidate_keys` has always offered, and the reason this pass
+            # could not see a single Kalshi moneyline. `_ROLE_KEYED_MARKETS`
+            # excludes `h2h`, so neither line above ever leaves the role key,
+            # while Kalshi publishes `mlb|h2h|<club>`. Appended AFTER the role
+            # keys, so every match that worked here before still resolves first
+            # and this can only add matches. See `_h2h_alias_keys`.
+            candidates.extend(
+                _h2h_alias_keys(row, sport_slug, market, side_key, candidates)
+            )
             candidates, _dh_outcome = _keys_for_half(candidates, row, grid_dh_ranks, grid_dh_unrankable)
             if _dh_outcome:
                 grid_dh_counts[_dh_outcome] += 1
