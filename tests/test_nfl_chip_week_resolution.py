@@ -35,6 +35,29 @@ def two_roots(tmp_path, monkeypatch):
         (disk / f"smartsim2_projections_2026_wk{week}.csv").write_text("game_id\nx\n", encoding="utf-8")
 
     monkeypatch.setattr(nfl_sources, "_source_roots", lambda: [checkout, disk])
+    # BOTH SEAMS. `_source_roots` steers the per-file SEARCH, but when no root
+    # has the requested file `data_path` returns a NAMED FALLBACK under
+    # `default_nfl_source_root()` -- and that path is then `.exists()`-checked
+    # and read. Neither temp root here holds `schedule_2026.csv`, so without
+    # this line `default_week` reached the REPO'S OWN schedule.
+    #
+    # Caught by `scripts/audit_nfl_root_seams.py` while auditing OTHER files:
+    # this test was GREEN and leaking, which is the exact shape it hunts, and
+    # it was written by the same session that wrote the audit.
+    #
+    # THE FIXTURE ALSO WRITES THE SCHEDULE IT WILL BE ASKED FOR, rather than
+    # patching a third helper. `data_path` searches `_source_roots()`, THEN
+    # appends `default_nfl_source_root()`, THEN falls back to
+    # `nfl_artifact_output_root() / relative` -- so isolating by patching alone
+    # means chasing every one of them and re-chasing on the next refactor.
+    # Giving a candidate root the real file ends the search before any fallback,
+    # which is both simpler and closer to what production does.
+    monkeypatch.setattr(nfl_sources, "default_nfl_source_root", lambda: checkout)
+    (checkout / "schedule_2026.csv").write_text(
+        "game_id,season,week,gameday,away_score,home_score\n"
+        "2026_03_ATL_GB,2026,3,2026-09-24,,\n",
+        encoding="utf-8",
+    )
     monkeypatch.setattr(nfl_sources, "is_preseason_backfill_projection", lambda path: False)
     return checkout, disk
 

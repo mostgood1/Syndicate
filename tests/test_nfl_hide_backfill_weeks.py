@@ -42,6 +42,22 @@ def root(tmp_path, monkeypatch):
     _write(nfl, 3, [BLEND] * 16)       # live week 3
     _write(nfl, 4, [PRIOR] * 16)       # the 2026-08-01 backfill
     _write(nfl, 18, [PRIOR] * 16)      # the 2026-08-01 backfill
+    # `_source_roots` AS WELL AS `default_nfl_source_root`, and the first one is
+    # load-bearing as of 2026-09-24. `7931b18a` moved
+    # `_smartsim2_standalone_seasons_and_weeks` (which `available_weeks` is built
+    # on) off `default_nfl_source_root` onto a search across EVERY root, so that
+    # enumeration stops being blind to a week present only on the mounted disk.
+    # This fixture patched only the old helper, so after that change
+    # `available_weeks(2026)` read the REPO'S OWN `data/nfl_source` -- 19
+    # resolutions landing outside the fixture -- and returned `[1]`.
+    #
+    # THE REGRESSION WAS MINE AND THIS FIXTURE IS HOW IT SURFACED. Stated
+    # plainly because the next reader deserves it: `7931b18a` shipped with this
+    # test RED, because the sweep that gated it did not include this file.
+    # Patching the live seam restores what this test is actually for -- proving
+    # weeks 4 and 18 stay OUT of the list because their only projection is the
+    # 2026-08-01 pre-season backfill.
+    monkeypatch.setattr(sources, "_source_roots", lambda: [nfl])
     monkeypatch.setattr(sources, "default_nfl_source_root", lambda: nfl)
     monkeypatch.setattr(cards, "default_nfl_source_root", lambda: nfl)
     monkeypatch.setattr(sources, "_BACKFILL_VERDICTS", {}, raising=False)
