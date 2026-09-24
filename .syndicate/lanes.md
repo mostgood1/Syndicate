@@ -674,11 +674,6 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_snapshot_live_gameline_score_row.py passes including a NEW test that fails on origin/main, plus a real capture of a date with outcomes whose appended row carries a non-null point_forecast and scorer_contract. Reachability before correctness: a payload with a DIFFERENT point_forecast must move the retained value, so the key cannot be a constant.
 - Blocked by: none
 
-### archive-diff-baseline-echo — CLOSED 2026-09-24 (GOAL MET) — opened 2026-09-24 — session ac238d51-545f-473c-b430-430fcd0feca6
-- Goal: owner_liveness.py and wait_owner_idle.py stop attributing origin/main's own lanes.md lines to a worktree whose HEAD is behind: a changed line whose text is already on origin/main no longer blocks a slug, a genuinely novel line still does, and on today's state the three slugs blocked SOLELY by worktree tripwire-applog-page-cap read SAFE while the four with live owners or freshly-modified blocks still read WAIT
-- **GOAL: MET.** All three verification clauses ran. (a) 18 unit tests green on both controls, mutation-checked: replacing the filter with identity turns 5 red. (b) off != on against production state on the LIVE tool post-sync -- `SAFE_SLUGS=lane-archive-tools-mirror,closed-lane-archive-20260923-1829,closed-lane-archive-20260923-2044`, exactly the three predicted and nothing else, while `polymarket-corners-btts-order-branch` and `nhl-ncaab-club-maps` stayed blocked by the same worktree (correctly -- its 13 novel lines are older OPEN versions of exactly those two lanes). (c) `verify_mirror.py` exit 0, 3/3 MATCH.
-- Files: scripts/lane_archive_tools/owner_liveness.py, scripts/lane_archive_tools/wait_owner_idle.py, scripts/lane_archive_tools/README.md, tests/test_lane_archive_tools.py
-- Shipped: `173e42bc`. Live copies in `C:\tmp\lane-archive-tools` synced from the mirror; pre-patch copies in `lane-archive-tools-backups`. Narrative and the fourth-mechanism lead: `log/2026-09-24.md`.
 ### live-gameline-rescore-prefix-window — CLOSED — opened 2026-09-24 — closed 2026-09-24 — session 25e0f859-2737-46ab-ad06-86879c7fd5f8
 - **GOAL: NOT MET AS WRITTEN — the goal's own verification clause is IMPOSSIBLE, and proving that is the main result (2026-09-24).** The goal required each date be verified "by reproducing that date's retained PRE-FIX all_records exactly". It cannot be. The pre-fix scorer (`ad4bc5c6`) keys finals on `game_pk` OR `event_id` off the BOARD GRID, and `findings_2026-09-08` already measured that the served grid no longer rebuilds that index (0 entries against the server's own `finals_seen: 2598`). Replayed it anyway on 08-29: `records_considered` matches **5554/5554 exactly** and it still yields 15 games / n=5380 against the retained 16 / 4917. **The board's population for these dates is unreconstructable** — and separately it is LOSSY and not randomly so (`score_live_gameline_offline.py`: 143 games over 08-20..08-31 where StatsAPI gives 157, the shortfall landing on whichever games upstream score-nulling touched).
 - **DELIVERED INSTEAD, on a weaker anchor that is stamped rather than hidden: 7 of 10 dates, 97 games.** `--expect-records-considered` proves the same LEDGER was scored and REFUSES unless `--finals-population statsapi` is passed, so the row records the selection it really used. Every one of the 7 matched its anchor exactly, and every paired diff reproduces `score_live_gameline_offline.py` to the last digit on an independent code path (08-21 +0.02169, 08-22 +0.02749, 08-23 +0.01721, 08-25 +0.00565, 08-26 +0.00205, 08-27 -0.01045, 08-29 -0.00120).
@@ -691,12 +686,6 @@ death, never life — do not invert it.
 - Falsification test: If a date's retained pre-fix all_records cannot be reproduced by the pre-fix scorer under ANY leave-one-out finals set, its population is not identifiable and that date MUST NOT be pooled -- report it unrecovered rather than appending a plausible number. Also: if the pre-fix scorer reproduces the figure only when fed finals that disagree with StatsAPI, the ledger and the board disagree about outcomes and the cut is unsafe either way.
 - Verification: Per date: pre-fix scorer reproduces retained all_records model+market brier to 5dp AND both n; then the current scorer emits fresh_quotes_only on the identical records/finals. Then pool_live_gameline_trend.py --era each --cut fresh_quotes_only lists all 10 dates and reports no COVERAGE GAP, with the post-fix pool spanning 08-20..09-23.
 - Blocked by: none
-
-### closed-lane-archive-20260924-1219 — CLOSED 2026-09-24 (GOAL MET: 3 blocks archived) — opened 2026-09-24 — session ac238d51-545f-473c-b430-430fcd0feca6
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- **GOAL MET.** `owner_liveness.py --idle-min 240` on origin/main `17d1819c` returned `SAFE_SLUGS=lane-archive-tools-mirror,closed-lane-archive-20260923-1829,closed-lane-archive-20260923-2044`; the other 9 CLOSED blocks read WAIT and were left alone. Applied: 24 lines out of `lanes.md`, 24 into `lanes_closed.md`, +3 pointers. Claims 140 and OPEN headers 37 unchanged; `check_lane_invariants.py` INVARIANTS HOLD before and after, same 2 disclaimed hints, 0 contested either side.
-- Moved: `lane-archive-tools-mirror`, `closed-lane-archive-20260923-1829`, `closed-lane-archive-20260923-2044`. These were unarchivable for ~19 h until `173e42bc` (lane `archive-diff-baseline-echo`) fixed the gate's stale-baseline false positive. Table and narrative: `log/2026-09-24.md`.
 
 ### live-gameline-ledger-0820-shrink — CLOSED — opened 2026-09-24 — closed 2026-09-24 — session 25e0f859-2737-46ab-ad06-86879c7fd5f8
 - **Goal (verbatim): "Explain why 2026-08-20's retained capture read records_considered=4817 while /api/ops/artifacts/stream serves 4,809 records for that date today, and state whether any past ledger may be treated as immutable by a backfill" — GOAL: MET (2026-09-24).**
@@ -745,12 +734,6 @@ death, never life — do not invert it.
 - Files: `.claude/hooks/lane_claims.py` (one new reporting function; the cut semantics stay exactly as they are), `.claude/hooks/lane_claims_source.py` (the same function), `scripts/check_lane_claim_truncation.py` (NEW), `tests/test_lane_claim_truncation.py` (NEW)
 - Landed: `3b51995a` reporter + checker + 11 tests, `9ec4d2aa` the 14 restored claims, `2c45438a` removal of a bare `tests/` directory claim this lane's own take-note had created. Narrative in `log/2026-09-24.md`; verified facts in `state_ledger.md` `[lane-claim-truncation]`.
 - Blocked by: none
-
-### closed-lane-archive-20260924-1413 — CLOSED 2026-09-24 (GOAL MET: 2 blocks archived) — opened 2026-09-24 — session f2b3050b-6b30-4e4a-9c45-4fc05f7f81cc
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 2 of 17 CLOSED blocks; both moved to `lanes_closed.md` with one pointer each. 15 WAIT (owners 16da93b3 / 25e0f859 / ac238d51 idle <= 3m). Table and dormant-OPEN report: `log/2026-09-24.md`.
-- Moved: `tripwire-applog-page-cap`, `polymarket-corners-btts-order-branch`.
 
 ### lane-archive-debt — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - Goal: the 15 closed/orphaned lane blocks the session digest reports as owed are moved out of lanes.md into lanes_closed.md with a one-line pointer each, with lanes.md's OPEN set, claim set and every archived block's full text provably unchanged -- and the digest's LANE ARCHIVE OWED line clears
@@ -841,6 +824,16 @@ death, never life — do not invert it.
 - **A WRITE THAT REPORTED SUCCESS AND DID NOTHING.** A `str.replace` to add `POINTER_RE` silently no-opped (the file holds a literal em-dash, not `\u2014`), `ast.parse` passed because a NameError is a RUNTIME error, and I printed "added; parses clean" having asserted nothing about the replacement landing. The later edit asserts the anchor count.
 - Files: scripts/trim_lane_narrative.py (NEW), tests/test_trim_lane_narrative.py (NEW)
 
+### closed-lane-archive-20260924-1831 — CLOSED 2026-09-24 (GOAL MET: 2 blocks archived) — opened 2026-09-24 — session e9c5ca1c-1117-4fdd-8a4d-23199830aa4f
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness.py --idle-min 240 at 23:31Z (18:31 CDT) returned SAFE for 2 of 16 CLOSED blocks; both moved to lanes_closed.md with one pointer each: `archive-diff-baseline-echo`, `closed-lane-archive-20260924-1219`. Table and WAIT reasons: log/2026-09-24.md.
+
+### closed-lane-archive-20260924-1843 — CLOSED 2026-09-24 (GOAL MET: 1 block archived) — opened 2026-09-24 — session 2c2dcade-9da6-49af-88cf-40c3391341db
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. Moved `closed-lane-archive-20260924-1413` (owner f2b3050b idle 249m, block 265m). 14 CLOSED blocks WAIT (owners 25e0f859/16da93b3/e9c5ca1c under 240m). Table and Part B in `log/2026-09-24.md`.
+
 ### primary-tree-hook-sync — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - Goal: the PRIMARY tree's .claude/hooks/session-start.sh carries origin/main's current version, so the budget-attribution line actually fires for sessions started there -- and the lead claiming that file holds uncommitted local edits is RETRACTED, because it does not
 - **GOAL: MET, and the reading is the line itself.** From the PRIMARY tree the hook now emits `LEDGER OVER BUDGET: ... lanes.md 484KB>234KB **(OPEN 359KB/38 lanes, archivable 44KB)** ...`, where before the copy it emitted the same line with no parenthetical. Fail-open re-verified there too: with no python on PATH the line is byte-identical to its old form.
@@ -850,6 +843,7 @@ death, never life — do not invert it.
 - **STILL TRUE AND NOT FIXED HERE:** the primary tree's `.syndicate/` is ~800 commits behind, so a session started there reads a STALE `lanes.md` (484 KB, and the pre-trim 359 KB OPEN figure) rather than today's 377 KB. The attribution is correct about the file it is shown; the file it is shown is old. Fast-forwarding that tree is a separate, larger operation.
 - Files: `.syndicate/leads.md`. **UNDER-DECLARED AT OPEN and stated rather than quietly widened:** I also wrote the PRIMARY tree's copies of `.claude/hooks/session-start.sh` and `scripts/lane_census.py`, which the goal named but the Files line did not. Collision-checked earlier the same session: no OPEN lane claims either path.
 
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
@@ -857,6 +851,7 @@ death, never life — do not invert it.
 > map and its 'to resume' note. ORPHANED means ABANDONED, NOT DONE: none of the
 > swept lanes had a Verification result, which is why they were not CLOSED.
 
+- `archive-diff-baseline-echo` — CLOSED 2026-09-24 (GOAL MET) — opened 2026-09-24 — session ac238d51-545f-473c-b430-430fcd0feca6
 - `archive-test-reports-redirect` — CLOSED 2026-09-16 — opened 2026-09-16 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8 — **GOAL: MET**
 - `ask-answer-substance` — ask-answer-substance — **CLOSED-VERIFIED 2026-08-16 — 8 deploys, all measured, live web `9f617f34`. The inline quick ask names a bet a human can place → `lanes_closed.md`.
 - `ask-rail-evidence` — CLOSED 2026-09-11 — opened 2026-09-11 — session 7d69025a-1bfa-4440-9eae-04c5299fe99f — **GOAL MET: the Ask rail renders every evidence table and chart, and "Konnor Griffin" no longer returns AJ Griffin (2 -> 0 on production)**
@@ -888,6 +883,8 @@ death, never life — do not invert it.
 - `closed-lane-archive-20260921-0851` — CLOSED 2026-09-21 (GOAL MET: 1 block archived) — opened 2026-09-21 — session 1276501b-d2fa-40fb-96c1-4c2eb6c16082
 - `closed-lane-archive-20260923-1829` — CLOSED 2026-09-23 (GOAL MET: 1 block archived) — opened 2026-09-23 — session d2d19592-9f3e-4dd8-bc71-c21387b5852c
 - `closed-lane-archive-20260923-2044` — CLOSED 2026-09-23 (GOAL MET: 4 blocks archived) — opened 2026-09-23 — session d2d19592-9f3e-4dd8-bc71-c21387b5852c
+- `closed-lane-archive-20260924-1219` — CLOSED 2026-09-24 (GOAL MET: 3 blocks archived) — opened 2026-09-24 — session ac238d51-545f-473c-b430-430fcd0feca6
+- `closed-lane-archive-20260924-1413` — CLOSED 2026-09-24 (GOAL MET: 2 blocks archived) — opened 2026-09-24 — session f2b3050b-6b30-4e4a-9c45-4fc05f7f81cc
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `combined-board-rows-unreadable-tripwire` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: live on web `da268e07` (15:36:46Z); the field is served on every date, 0 `ROWS_UNREADABLE` lines; stored 113 vs rows 111 is the per-sport `by_sport` cap, not a defect.**
