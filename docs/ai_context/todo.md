@@ -1,5 +1,51 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#688` — **The live-tier coverage matrix was maintained BY HAND, and was wrong in three of eight rows within two hours** — BUILT 2026-09-24, lane `live-tier-coverage-check`, session 4ab694ed — **OPEN: the checker gates; the engine gaps it now makes visible are untouched**
+
+`scripts/live_tier_coverage_check.py` derives the matrix by IMPORTING the four
+registries (`_LIVE_LENS_SPORTS` + builders/validators/paths, `_LIVE_PROP_SPORTS`,
+`_LIVE_GAMELINE_SPORTS`, `LIVE_LENS_SOURCES_BY_SPORT`) rather than grepping, and
+exits non-zero on an inconsistent row. Wired into `scripts/migration_gate.py` as
+`live_tier_coverage`, which is NOT in the verdict line's waiver set, so its exit
+code gates.
+
+**WHY.** A hand-built matrix on 2026-09-24 was wrong or stale in three rows
+within two hours of being written: `mlb` game lines read "not fixed" after the
+fix had deployed and measured; `nhl` read "not deployed / needs October" while
+it was live and eleven preseason games sat on that night's slate; `wnba` read
+"producer not wired", which was a misread of the GENERIC runtime refusal at
+`board_enrichment.py:1840` fired by an out-of-season slate —
+`wnba/live_lens.py:413` populates `liveProps`. A fourth cell called `nba`
+"allowlisted with no producer"; it has a builder.
+
+**THE COST WAS REAL, not hypothetical.** On that matrix I recommended
+allowlisting `live/nfl_live_lens.json` as cheap 24h work. NFL's lens is
+pregame-carried by its own docstring, so taking it would have wired a PREGAME
+probability onto a live board — `#340`. `test_r2_fires_for_the_real_nfl_declaration_added_to_the_gameline_gate` reconstructs exactly that and asserts
+the checker refuses it.
+
+**WHAT IT CANNOT DO, stated so it is not over-trusted.** No static check can
+tell a genuinely live probability from a pregame one carried forward. So each
+sport DECLARES its provenance with evidence, and an undeclared sport appearing
+in any registry FAILS (R1). That is the actual gate: a sport cannot be
+board-wired without someone stating, on the record, what its probability is.
+
+**The allowlist column is INFORMATIONAL and explicitly unscored** — resolved the
+same day and verified on all three services, `live/*_live_lens.json` crosses via
+KEYVALUE, never via `HOT_ARTIFACT_PATTERNS`; a 403 from `artifacts/stream` means
+"not on disk", never "cannot cross". Scoring it is what produced the wrong
+recommendation, so the checker prints it and refuses to score it.
+
+**Today's tree is GREEN (fail=0, info=0), and that is the finding**: every gap
+on the hand-built matrix was already fixed or never real. The 8 rules are proved
+to FIRE on synthetic bad configs (`tests/test_live_tier_coverage_check.py`, 14
+tests) because a guard never seen to fail cannot be distinguished from one that
+cannot fail.
+
+**LEFT:** the real remaining work is ENGINE work the checker now makes legible —
+NFL and NBA both need a live re-sim on NHL's refusal-first template before their
+game-line gates can open; `ncaab` has no live tier at all.
+
 ### `#687` — **NCAAF now has an actual-outcome TOTAL fit, which is what the shared `smartsim2` repair was blocked on** — BUILT 2026-09-23, lane `smartsim2-total-nonlinearity`, session dae18452 — **OPEN: the fit exists; the engine-side repair is not done**
 
 `scripts/backtest_ncaaf_total_units.py`. The NCAAF analogue of

@@ -1575,6 +1575,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     command_results.append(module_tracker_result)
 
+    # `#688`. The live-tier coverage matrix, derived from the four registries
+    # rather than maintained by hand. It gates here because a checker nobody
+    # runs is the inert-artifact shape this repo keeps producing -- and because
+    # the thing it guards (a pregame probability wired onto a live board,
+    # `#340`) is cheap to introduce and expensive to notice. Its name is NOT in
+    # the waiver set at the verdict line below, so its exit code is the gate.
+    command_results.append(run_command(
+        "live_tier_coverage",
+        [sys.executable, "scripts/live_tier_coverage_check.py", "--quiet"],
+        timeout_sec=command_timeout,
+    ))
+
     module_tracker_payload: object = {}
     module_tracker_parse_error: str | None = None
     if module_tracker_result.ok:
