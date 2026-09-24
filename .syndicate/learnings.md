@@ -4216,3 +4216,64 @@ cheap and checking the ranking of constraints is what actually moves the number.
   hour because the next lane's falsification clause pointed at exactly that assumption.
 
 ---
+
+## 2026-09-24 FORBIDDEN: recording that a path MOVED LANES by spelling the path, inside a Files or Tests block. Prose ABOUT a path is indistinguishable from a claim OF it `[lane lane-claim-truncation-visible, session 4ab694ed]`
+
+`lane_claims._paths_in` extracts every backticked path-shaped token in a Files
+or Tests block. It has no notion of a sentence. So a note explaining that a file
+was taken AWAY re-claims it.
+
+Both halves of this happened in one session, minutes apart, while I was fixing
+the first:
+
+- "(`test_artifact_publisher.py` TAKEN 2026-09-24 by lane nhl-live-resim)" --
+  re-claimed the very file it was recording the release of, leaving it held by
+  two lanes.
+- "...while the take used the `tests/` prefix" -- a bare DIRECTORY token,
+  which `matches()` extends over the whole subtree. One lane silently claimed
+  EVERY TEST FILE IN THE REPOSITORY, and `check_lane_invariants` reported a
+  single contested "file" held by **29 lanes**.
+
+The second is the dangerous shape: a directory claim is invisible in the diff
+(one word changed), blocks every other session from every test, and reads as a
+sentence about punctuation.
+
+HOW TO APPLY: inside a Files or Tests block, write a take/release note WITHOUT
+spelling the thing as a path -- "the artifact-publisher pull tests were TAKEN by
+lane X", "the tests-directory prefix". Never put a trailing-slash token in
+backticks anywhere in those blocks unless you mean to claim the subtree. After
+any ledger edit that mentions a file, run `py -3 scripts/check_lane_invariants.py`
+and read the claim count, not just the exit line.
+
+---
+
+## 2026-09-24 - RULE: a guard's own recorded blast radius EXPIRES, and "fix the N it flags" is a hypothesis, not an instruction `[lane lane-claim-truncation-visible, session 4ab694ed]`
+
+`_DISCLAIMER_MARKERS` carries a careful measurement: adding `", no "` and four
+siblings "change 4 lines out of 2,186 and every one is a genuine disclaimer",
+with the instruction "Re-measure the same way before adding a sixth". Nobody
+re-measured the EXISTING five. Re-measured 2026-09-24 on the live `lanes.md`:
+**18 Files lines lose a path and 17 of them are OPEN lanes** -- one keeping 0 of
+3, one keeping 6 of 23.
+
+The measurement was true when written and silently stopped being true as the
+ledger's prose style drifted. A number in a comment is a reading with a date,
+not a property.
+
+THE SECOND HALF, and it is the one that nearly caused harm. Asked to "fix the 16
+lanes", the obvious action is to restore every dropped path. READING them showed
+only **ONE** was a genuine under-claim. The dominant shape is
+"RELEASED ... to lane X: `<path>`", where the path after the marker is the file
+being GIVEN AWAY -- restoring those would have re-claimed released files and
+manufactured exactly the false contests the whole exercise was avoiding. One of
+my own alarming summaries ("the lane that owns `render.yaml` holds none of its
+three paths") was flatly wrong: that token sits inside "neither `render.yaml`
+nor the start command changes", a negation.
+
+HOW TO APPLY: when a new checker flags N items, the deliverable is N READINGS,
+not N fixes. Classify before editing, and say out loud how many survived --
+17 -> 1 here. And when you quote a comment's measurement as current, re-run it
+first; this repo's own `A rate, not a count` rule is the same failure one level
+up.
+
+---

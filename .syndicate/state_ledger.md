@@ -1566,3 +1566,48 @@ reservation (correct -- it guards the moment the file exists) and nothing else.
 **Two properties now tested, not assumed:** a bare `/` from prose cannot claim
 the repository (4 such tokens exist in the live ledger), and `box/` does not
 bleed into `box_old/`.
+
+## [lane-claim-truncation] A LANE CAN CLAIM FILES THE GUARD DOES NOT ENFORCE, AND NOTHING SAID SO -- 17 OPEN lanes affected, now REPORTED `[verified 2026-09-24, lane lane-claim-truncation-visible]`
+
+- **The mechanism.** `lane_claims._claimable_prefix` cuts a `- Files:` line at
+  the first `_DISCLAIMER_MARKERS` hit, and the cut is a **PREFIX**, so every
+  path listed AFTER the marker is dropped from the claim map. Correct for a
+  prohibition ("no `render.yaml`"); silently wrong for a line that mentions
+  another lane, or uses a mid-sentence negation, and then keeps listing its own
+  files.
+- **The marker list records its blast radius as "4 lines out of 2,186 and every
+  one is a genuine disclaimer". THAT IS NO LONGER TRUE.** Re-measured on the
+  live `lanes.md` 2026-09-24: **18 Files lines lose a path, 17 of them OPEN.**
+  This session's own lane was credited **2 of its 7** paths, cut at `", no "`
+  inside a parenthetical.
+- **THE CUT IS NOT CHANGED**, deliberately: loosening it would newly contest
+  files across seventeen lanes at once and could block sessions mid-work, and
+  the marker list is the product of three measured `render.yaml` incidents.
+  `lane_claims`' own comment says which way to fail -- "a false contest is loud
+  and gets surfaced, an unclaimed file lets two lanes edit it silently" -- so
+  the silent half is made loud instead.
+- **The instrument:** `lane_claims.claims_lost_to_disclaimer` +
+  `scripts/check_lane_claim_truncation.py`, which resolves each dropped token
+  against the worktree and splits three ways: UNENFORCED (reference-style
+  marker, fails the check), PROBABLY CORRECT (a negation -- the cut working),
+  and PROSE (`Yes/No`, `2b/3`). Enforcement is PROVEN unchanged: `claims_by_path`
+  returns **143 identical paths** under origin/main's parser and the new one.
+- **READING THE 17 CHANGED THE ANSWER, and this is the part to carry.** Only
+  **ONE** (`accuracy-assessment-0914`, 14 paths restored) was a genuine
+  under-claim. The dominant shape is "RELEASED ... to lane X: `<path>`", where
+  the path after the marker is the file being GIVEN AWAY -- fixing those would
+  re-claim released files. A claimed earlier reading that
+  `web-memory-guard` "owns `render.yaml` and holds none of its three paths" was
+  WRONG: that token sits inside "neither `render.yaml` nor the start command
+  changes", a negation.
+- **PROSE ABOUT A PATH IS INDISTINGUISHABLE FROM A CLAIM OF IT.** Recording a
+  take re-created the claim twice in one session -- once by spelling the
+  filename in backticks, once by writing the `tests/` prefix in backticks, which
+  became a bare DIRECTORY claim that `matches()` extends over the whole subtree
+  (one lane claiming every test file; the checker reported one contested "file"
+  held by 29 lanes). Record a take WITHOUT spelling the thing as a path.
+- **`check_lane_invariants.py` now reports `INVARIANTS HOLD`** (156 claims,
+  every one with exactly one OPEN holder), against `LEDGER INCOHERENT` at
+  session start.
+
+---

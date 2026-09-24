@@ -699,6 +699,8 @@ once this index exists: re-splitting would orphan the parts.
 | [streamed-pull-append-only-tail] | `pull_streamed_artifact` sends NO `since=` on append-only tails — web's stream route 304'd before Range and fr | `state_worker.md` |
 | [refresh-worker-heavy-build-refusal] | refresh-worker's heavy build is refused for hours once the MAIN PROCESS settles above ~2.2 GB after its first  | `state_worker.md` |
 | [mlb-live-gameline-venue-segment] | MLB LIVE GAME LINES SERVE NO SIM EDGE BECAUSE THE VENUES QUOTE FULL-GAME CONTRACTS AND THE LIVE BOARD IS MOSTLY SEGMENTS | `state_layer2.md` |
+| [nhl-live-resim] | NHL HAS A LIVE RE-SIM: hockeysim RESUMES from period/clock/score, and the whole chain is wired and INERT until the season opens | `state_model.md` |
+| [lane-claim-truncation] | A LANE CAN CLAIM FILES THE GUARD DOES NOT ENFORCE, AND NOTHING SAID SO -- 17 OPEN lanes affected, now REPORTED | `state_ledger.md` |
 
 ### `[web-oom-leak]` UPDATE — the instrument is fixed and the growth has a SUSPECT, 2026-09-04T00:4xZ `[session b2b5b45b]`
 

@@ -833,3 +833,54 @@ only has to be CAUGHT once and need not coincide with the deploy. Windows last
 under 25 seconds; **poll at ~12s**. CLEAR arrived on the 4th poll. Also expect the
 25-minute deploy-spacing lockout (`#563`) — the worker is often idle DURING the
 lockout and busy by the time it lifts, which is exactly why waiting kept losing.
+
+## [nhl-live-resim] NHL HAS A LIVE RE-SIM: hockeysim RESUMES from period/clock/score, and the whole chain is wired and INERT until the season opens `[verified offline 2026-09-24, lane nhl-live-resim]`
+
+- **The engine could always do this; its entrypoint could not.** `GameState`
+  has always carried `period` / `clock` / per-team `score` (`state.py:36-40`),
+  the period loop has always been a pure function of `(gs, rates, period_idx)`
+  (`engine.py:2019`, the PRODUCTION path per `runtime.py:40-48`), and
+  **`period_seconds` was ALREADY a parameter** --
+  `T = int(period_seconds or self.cfg.seconds_per_period)` (`engine.py:526`),
+  already exercised with a non-default value by the overtime call
+  (`engine.py:2064`). `simulate_with_lineups` simply never passed them.
+- **NOT A NEW MECHANISM**, so `model_engine_standard` 4.4's re-fit requirement
+  does not bite: goals are Poisson in `rate * T / 3600`, so the remainder of a
+  period is the same process over a shorter interval. No rate changed.
+- **MEASURED, n=300 shared seeds, rates fixed:**
+
+      pregame entrypoint                   p(home) 0.4867   14.94 ms/sim
+      resumed P1 20:00, 0-0  (identity)    p(home) 0.4867   14.53 ms/sim
+      resumed P3 10:00, home -1 (1-2)      p(home) 0.1867    3.44 ms/sim
+      resumed P3 05:00, home -2 (1-3)      p(home) 0.0233    2.05 ms/sim
+      resumed P3 05:00, home +2 (3-1)      p(home) 0.9867    1.89 ms/sim
+      resumed P3 00:30, home +3 (4-1)      p(home) 1.0000    1.07 ms/sim
+
+  The identity is asserted SEED FOR SEED: resuming at the opening faceoff IS the
+  pregame sim. **Cost FALLS as the game runs**, so a live re-sim is always
+  cheaper than the pregame sim it updates -- which is what makes a per-tick
+  budget affordable on the 2GB live-odds-worker.
+- **The chain, end to end:** `nhl/live_resim.py` (moneyline ONLY --
+  `modelHomeWinProb` + `simsRun`; margin/total distributions deliberately NOT
+  published because no NHL live totals estimator has been graded) -> registered
+  in `_LIVE_LENS_SPORTS` with builder/validator/path -> `live/nhl_live_lens.json`
+  in `HOT_ARTIFACT_PATTERNS` **and** the unconditional per-cycle pull (it carries
+  no date, so the incremental pull structurally cannot request it) ->
+  `_LIVE_GAMELINE_SPORTS` + `LIVE_LENS_SOURCES_BY_SPORT["nhl"] = ("live_resim",)`.
+- **THE REFUSAL STAMP IS REJECTED**, and that pairing is the point (`#414`):
+  a game the producer refused (no clock, intermission, unrecognised state)
+  publishes a lane stamped `pregame_only` carrying NO probability, and that stamp
+  is not an accepted source. NHL is deliberately NOT in `_LIVE_PROP_SPORTS`
+  (no live prop producer) and NOT in `ANALYTIC_LIVE_STD_ERR_BY_SPORT` (it
+  publishes `simsRun`, so `prob_std_err` derives the interval).
+- **Reads `/v1/score/<date>`, not `/v1/schedule`**, which returns `clock: null`
+  on live games (7 of 7 measured 2026-09-22). A missing clock REFUSES rather
+  than assuming a full period.
+- **INERT AND CORRECTLY SO:** `attach_live_gamelines_for_sport([], sport="nhl")`
+  returns `supported=True  reason='no published live-lens snapshot'  rows=0`.
+- **NOT CLAIMED: that the probability is CALIBRATED.** hockeysim is an EV/Poisson
+  approximation per period and its market backtest is unpowered (n=14-15 games /
+  12 dates). Verified is the ORDERING and the puck-drop identity.
+  **PRODUCTION READING OWED** and not obtainable before early October 2026.
+
+---
