@@ -47,6 +47,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO))
+from syndicate.features.shared.live_gameline_accuracy import (  # noqa: E402
+    RETAINED_SCORE_KEYS,
+)
+
 DEFAULT_BASE = "https://syndicate-an21.onrender.com"
 HISTORY = REPO / "reports" / "live_gameline_accuracy" / "history.jsonl"
 
@@ -248,6 +253,22 @@ def main() -> int:
         "rows_considered": gl.get("rows_live_gameline_considered"),
         "withheld_by_reason": gl.get("withheld_by_reason"),
     }
+
+    # EVERY REMAINING SCORING FIELD, FROM THE WORKER-SIDE LIST RATHER THAN A
+    # SECOND COPY OF IT. The dict above is an allowlist and its own comment says
+    # so; what that comment could not say is that the OTHER capture's allowlist
+    # had moved on without it. `point_forecast` (contract 3, `d3492bb4`
+    # 2026-09-08: totals and spreads scored on the POINT FORECAST against the
+    # line) and `scorer_contract` -- the scorer's designated pooling boundary,
+    # which spares a reader the capture-time proxy -- were served on every build
+    # and retained on NONE: 0 of 80 rows on 2026-09-24.
+    #
+    # Assigned with `score.get()` rather than the worker's skip-if-None, because
+    # THIS history distinguishes absent from null and a test pins it: absent
+    # means the board never served the key, null means it served nothing for it.
+    # Collapsing those is what made the 08-30/08-31 gap unreadable for weeks.
+    for key in RETAINED_SCORE_KEYS:
+        row.setdefault(key, score.get(key))
 
     po = row.get("priceable_only") or {}
     m, k = (po.get("model") or {}), (po.get("market") or {})

@@ -91,6 +91,26 @@ _MAX_ROWS_PER_FILE = 2_000
 # spans two different row sets.
 _SCORE_CUTS = ("all_records", "last_per_game", "priceable_only")
 
+# EVERY OTHER SCORING FIELD A RETAINED ROW KEEPS, AND THE ONE LIST BOTH
+# CAPTURES READ. `scripts/snapshot_live_gameline_score.py` used to hold its own
+# hand-written copy of this, and the two DRIFTED: the keys below were added
+# here on 2026-09-08 with contract 3 and never added there, so as of 2026-09-24
+# **0 of 80 rows in the local history carried `point_forecast` or
+# `scorer_contract`** -- the totals/spreads measurement was computed on every
+# board build and retained nowhere. The board had been serving it the whole
+# time (09-23: 23 keys, `point_forecast.spreads.hit_rate` 0.61373 over 286 hits
+# / 16 games). Two allowlists for one contract is the defect; a shared constant
+# is the fix, because a test that merely COMPARES two lists still lets both go
+# stale against the scorer.
+RETAINED_SCORE_KEYS = (
+    "finals_index", "unscored", "reason",
+    "records_by_market", "scored_markets",
+    "scorer_contract", "point_forecast_markets",
+    "unmeasured", "point_forecast", "segment_actuals_supplied",
+    "fresh_quotes_only", "fresh_quote_seconds", "quote_age_absent",
+    "by_quote_age", "by_quote_age_cumulative",
+)
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -228,12 +248,7 @@ def build_row(
     # point of contract 3, and worthless if each build overwrote them. The
     # quote-age blocks were served from 2026-09-01 and never retained,
     # which is this allowlist doing exactly what the comment above warns.
-    for extra in ("finals_index", "unscored", "reason",
-                  "records_by_market", "scored_markets",
-                  "scorer_contract", "point_forecast_markets",
-                  "unmeasured", "point_forecast", "segment_actuals_supplied",
-                  "fresh_quotes_only", "fresh_quote_seconds", "quote_age_absent",
-                  "by_quote_age", "by_quote_age_cumulative"):
+    for extra in RETAINED_SCORE_KEYS:
         value = score.get(extra)
         if value is not None:
             row[extra] = value

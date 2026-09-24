@@ -161,3 +161,73 @@ def test_reachability_the_keys_come_from_the_payload_not_a_default(tmp_path):
     _rc, row = _run(mod, tmp_path, served)
     assert row["records_by_market"] == {"h2h": 99}
     assert row["scored_markets"] == ["h2h", "spreads"]
+
+
+def test_local_capture_retains_everything_the_worker_twin_does(tmp_path):
+    """THE TWO CAPTURES SHARE ONE LIST, so they cannot drift again.
+
+    They already had. `live_gameline_accuracy.build_row` gained
+    `scorer_contract`, `point_forecast`, `point_forecast_markets`, `unmeasured`,
+    `segment_actuals_supplied`, `quote_age_absent` and `by_quote_age_cumulative`
+    on 2026-09-08 with contract 3; this script's hand-written copy of the same
+    allowlist was never updated. Measured 2026-09-24 over the whole retained
+    history: **0 of 80 rows carried `point_forecast` or `scorer_contract`**, so
+    the totals/spreads measurement -- the entire point of contract 3 -- was
+    computed on every board build and kept nowhere, while the board served it
+    all along (09-23: 23 keys, `point_forecast.spreads.hit_rate` 0.61373 over
+    286 hits / 16 games).
+
+    Asserting against `RETAINED_SCORE_KEYS` rather than a literal list is the
+    point: a test that pinned its own copy would be a THIRD place to forget.
+    """
+    from syndicate.features.shared.live_gameline_accuracy import RETAINED_SCORE_KEYS
+
+    mod = _load()
+    served = json.loads(json.dumps(_SERVED))
+    served["live_gameline_score"].update({
+        "scorer_contract": 3,
+        "point_forecast_markets": ["spreads", "totals"],
+        "point_forecast": {"spreads": {"all_records": {"hit_rate": 0.61373,
+                                                       "games": 16}}},
+        "unmeasured": {"no_final_score_for_game": 7},
+        "segment_actuals_supplied": True,
+        "quote_age_absent": 0,
+        "by_quote_age_cumulative": {"le_120s": {"model": {"brier": 0.17, "n": 5}}},
+    })
+    _rc, row = _run(mod, tmp_path, served)
+    for key in RETAINED_SCORE_KEYS:
+        assert key in row, f"{key} dropped by the local capture"
+    assert row["point_forecast"]["spreads"]["all_records"]["hit_rate"] == 0.61373
+    assert row["scorer_contract"] == 3
+
+
+def test_reachability_point_forecast_is_read_not_defaulted(tmp_path):
+    """REACHABILITY BEFORE CORRECTNESS: `off != on`.
+
+    A retained key wired to a constant would satisfy the test above. Feeding a
+    different payload must move the retained value.
+    """
+    mod = _load()
+    served = json.loads(json.dumps(_SERVED))
+    served["live_gameline_score"]["point_forecast"] = {"totals": {"hit_rate": 0.42}}
+    served["live_gameline_score"]["scorer_contract"] = 99
+    _rc, row = _run(mod, tmp_path, served)
+    assert row["point_forecast"] == {"totals": {"hit_rate": 0.42}}
+    assert row["scorer_contract"] == 99
+
+
+def test_absent_and_null_stay_distinguishable(tmp_path):
+    """A board that never served the key vs one that served nothing for it.
+
+    This history keeps the key present-but-null (unlike the worker twin, which
+    omits it), because collapsing the two is precisely what made the
+    2026-08-30/08-31 gap unreadable: `fresh_quotes_only` ABSENT dated the
+    OBSERVER, while null dated the SCORER, and for weeks nothing could tell
+    which had happened.
+    """
+    mod = _load()
+    served = json.loads(json.dumps(_SERVED))
+    served["live_gameline_score"].pop("point_forecast", None)
+    _rc, row = _run(mod, tmp_path, served)
+    assert "point_forecast" in row
+    assert row["point_forecast"] is None
