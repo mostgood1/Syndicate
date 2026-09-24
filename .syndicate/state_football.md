@@ -2706,3 +2706,38 @@ starters.
 **Still true, from code:**
 - `_row_slate_date` slices `commence_time[:10]` (the UTC date) for rows WITHOUT `slate_date`, so other sports' evening kickoffs can join the next day's shard (a lead in `leads.md`).
 - Opportunity-contract counters file non-today builds under today's key.
+## [nhl-ncaab-club-maps] NHL AND NCAAB HAVE CLUB MAPS; EVERY SPORT SYNDICATE COVERS NOW DOES `[verified in production 2026-09-24 02:07:26Z, lane nhl-ncaab-club-maps]`
+
+`team_aliases._alias_map` returned `{}` for `nhl` and `ncaab`, so `club_key` fell
+through to raw text and `same_club` ran on `teams_match`'s heuristics. Measured
+2026-09-23: those heuristics were **False on 4 of 5** real NHL variants -- `('Ottawa
+Senators','OTT')`, the e-acute Montreal spelling **TheOddsAPI's own listing returns**,
+ESPN's bare `LA`, and `('Utah Mammoth','Utah Hockey Club')`. Only exact string equality
+passed.
+
+- **NHL**: 73 keys / 33 canonicals (32 clubs + Arizona, which the source still lists
+  separately and which is NOT merged into Utah -- that would rewrite historical rows on
+  a claim the source does not make). Derived from `local_nhl_odds.TEAM_NAME_TO_ABBR`,
+  the table the NHL pipeline already resolves names through, so the map cannot drift
+  from the join it serves. Canonical = the first name the source lists for a tri-code,
+  a fact about the source's ORDER rather than a judgement.
+- **NCAAB**: 1,341 keys / 362 D1 schools from `ncaab_team_registry.csv`, committed
+  BESIDE the code. Not under `data/`, because a `data/`-derived map builds EMPTY in a
+  session worktree in silence -- the soccer failure. 57 ambiguous tokens dropped
+  (`bulldogs` 14 schools, `tigers` 12, `wildcats` 10), **0 leaked**.
+- **`ncaab` is now GRADED**: it joined `HANDLED_SPORTS`, `SETTLER_MODULES` and so
+  `sport_versions`. It has graded NOTHING yet -- the season opens in November.
+
+**THE MAPS REMOVE MORE WRONG ANSWERS THAN MISSES.** Gate (b) over the real token
+vocabulary: nhl 11,130 ordered pairs / 123 verdicts changed / 0 broken / 0 residual
+wrong; ncaab 67,340 pairs / 139 changed / 0 broken / 0 residual wrong. **30 of those
+were pre-existing FALSE POSITIVES** the heuristics produced -- `COL` vs `Columbus Blue
+Jackets`, `Arizona` vs `Arizona St`, `ala` vs `North Alabama Lions` all answered True.
+
+**PRODUCTION READING** (`deploys.md` 2026-09-24 02:00:21Z): NHL chips carrying both
+`away.key` and `home.key` went **0 of 4 -> 4 of 4** on artifact 02:07:26Z, controls
+unchanged. **Only `chip_join_key` was measured**; the venue joins, `attach_game_state`
+and the settlement identity path read the same maps and are UNMEASURED.
+
+**LIVE ON refresh-worker ONLY** (`f2558c36`). `web` and `live-odds-worker` do not have
+this code.

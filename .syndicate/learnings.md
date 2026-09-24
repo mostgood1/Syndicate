@@ -3738,3 +3738,35 @@ re-appeared the moment a new reader looked at OPEN ones. A header names who OPEN
   So every change was measured against the live ledger BEFORE shipping, and
   that is the only reason an early cut that dropped three real test-file
   claims was caught rather than deployed.
+### 2026-09-24 - FORBIDDEN: writing a watcher or guard whose predicate matches on how a state PRINTS rather than on what it MEANS
+
+- **What we believed:** that polling a CLI for a known phrase is a fine way to
+  detect a state. Four separate times in one session it was not.
+- **What was actually true, four times in one session (lane `nhl-ncaab-club-maps`):**
+  1. A claim watcher polled for the literal token `free`. An expired claim prints
+     `EXPIRED (does not block)` -- acquirable, different words. The claim freed at
+     01:02:48Z and the loop sat through it to its own deadline, ~3 min wasted.
+  2. An auto-deploy script found its window, then ABORTED on its own guard: it
+     tested for `"held by YOU"` (which is `deploy_preflight`'s phrasing) while
+     `deploy_claim.py acquire` prints `HELD by <lane>`. The claim was already mine.
+  3. `Path.read_text` does universal-newline translation, so a CRLF ledger file was
+     read as LF and written back as LF -- an EOL rewrite nobody asked for. (Harmless
+     only because `.gitattributes` normalises; the alarm was mine too.)
+  4. A `render_logs.py --text` filter was written as a regex alternation
+     (`A\|B\|C`) against a tool that does LITERAL substring matching. "nothing
+     matched" was read as "no sim running" -- a null result from a query that could
+     never have matched anything.
+- **How we found out:** each one surfaced only because a second, independent reading
+  disagreed with the watcher -- a manual `status`, a hand-run preflight, a byte-level
+  diff, a re-run with a single substring.
+- **The rule going forward:** gate on the EXIT CODE, the parsed field, or the byte,
+  never on a phrase. When only text is available, assert the match is non-empty
+  before trusting a negative -- `absent signal` is a fact about the matcher until
+  proven a fact about the world. And a tool's `--text` is literal unless its own
+  help says otherwise.
+- **Cost:** ~4 minutes and one aborted deploy trigger; no wrong number reached the
+  ledger, because every one was caught by a disagreeing second reading rather than
+  by the watcher itself. That is the part that does not generalise -- a watcher
+  nobody double-checks fails silently.
+
+---
