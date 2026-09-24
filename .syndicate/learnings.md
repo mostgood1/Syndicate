@@ -4288,3 +4288,39 @@ up.
 - **What happened.** Two lanes were opened with `lane_open.py`, which writes the block into the primary tree's `lanes.md`. Both blocks were GONE from that file by the time the closing commit tried to read them back — the file moved 491,116 -> 494,543 -> 493,938 B while the work was in progress, so a peer session had rewritten it. Neither block had been committed, so neither existed anywhere: not locally, not on `origin/main`.
 - **What made it visible at all** was `.syndicate/.current-lane.<session-id>` still holding the slug, and the closing script's regex failing loudly rather than silently writing an empty block. A bare shared `.current-lane` would have given no signal.
 - **Rule.** If a lane's block matters, commit it soon after opening it, or reconstruct it from the fields at close and SAY SO in the block. Never assume the block you wrote is still in a shared `lanes.md` minutes later — read it back before relying on it, and treat "the slug is not in the file" as a peer overwrite rather than as your own error.
+### 2026-09-24 — FORBIDDEN: asking the user to authorise an interruption by quoting how LONG it lasts. A duration is not a cost until the interrupted thing's own cadence sits beside it.
+
+- **What we believed:** that restarting `live-odds-worker` mid-slate costs "**~5-6 minutes
+  with no in-play odds capture**" on 4 live MLB games. I put that to the user as the price
+  of a fleet-alignment deploy and they authorised it on that number. It came from this
+  service's own boot time, measured earlier the same day (live 14:23:51Z -> `venue_poll
+  STARTED` 14:28:58Z).
+- **What was actually true, measured across the restart:** the gap was **11m36s**
+  (`MLB_LIVE_PROBE` 20:01:50Z -> 20:13:26Z) — **longer** than I said, because the last
+  pre-restart probe fired 5m56s BEFORE the instance was replaced, so the gap is
+  time-to-replacement PLUS boot, not boot alone. And **far cheaper** than the framing
+  implied, because the loop's own cadence in the pre-deploy hour was:
+
+      8m41s  5m23s  7m01s  10m25s  5m52s  6m06s  6m29s  7m20s     median ~6m45s, max 10m25s
+
+  **The restart cost about ONE EXTRA CYCLE — 1.1x the largest gap this loop takes with
+  nothing wrong.** I had described it as a blackout of a continuously-capturing service.
+- **Why the two errors matter together.** Wrong in BOTH directions is what made it
+  undetectable: had I only overstated it, the measurement would have looked like good
+  news and been banked; had I only understated the duration, the cadence would have
+  rescued me. A number that is too big on one axis and too small on the other survives a
+  sanity check.
+- **The rule, with the trigger attached.** `feedback_rate_not_count` already says a count
+  without a denominator is not a finding. The new surface is that **an ESTIMATE offered to
+  a human as the basis for a decision is held to the same standard as a finding, and
+  earlier** — the denominator has to be read BEFORE the question is asked, not after
+  the action is taken. Here it was one log query against the hour before the deploy, and I
+  had already run that query's cousin for the baseline.
+- **How we found out:** only because the lane's Verification required measuring the gap
+  rather than asserting the deploy succeeded. Had the lane said "confirm the poll resumes",
+  the estimate would never have been checked and the wrong figure would have been reused
+  for the next mid-slate restart.
+- **Cost:** none to production — the interruption was real but ordinary. The cost was to
+  the decision: the user weighed a trade-off against a number I had not measured.
+
+---

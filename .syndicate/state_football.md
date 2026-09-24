@@ -2769,5 +2769,21 @@ answers with a different week than asked -- the substitution was silent, which i
 **READING:** `by_matchup` **0 -> 1,230 of 1,230**, `chip_dates` moving from week-1 finals
 to the current week, off a line the new code emitted at 15:54:56Z. `deploys.md 776db7a5`.
 
-**LIVE ON refresh-worker ONLY.** web and live-odds-worker run `f2558c36`; web's INLINE
-chip path for archived dates is UNMEASURED for this fix.
+**LIVE ON ALL THREE SERVICES** `[verified 2026-09-24 20:14:23Z, lanes web-nfl-week-alignment + live-odds-worker-nfl-week-alignment]`: refresh-worker 15:49:10Z, web 19:22:32Z, live-odds-worker 20:07:46Z, all `7931b18a`.
+
+**WEB WAS NEVER DEFECTIVE, AND THAT IS NOW MEASURED RATHER THAN INFERRED.** Its probed
+root carries weeks 1-3, so `_resolved_week` had a real `available_weeks` to answer from
+and each archived date resolved ITS OWN week: `09-20 -> 2026_02 x16`, `09-14 -> 2026_01
+x16`, `control_value=3`, all three IDENTICAL across the deploy (a null prediction stated
+before it and held). **The two services disagreed because their DISKS did, not their
+logic, which is why verifying the fix on one said nothing about the other.**
+
+**THE END-TO-END READING, on the surface the user looks at:** `/api/board/game-chips?date=2026-09-24`
+serves `source=worker_artifact`, 16 nfl chips, all `2026_03`, and a sample chip is
+COMPLETE rather than the fallback — `2026_03_ATL_GB`, `ATL @ GB`, kickoff
+`2026-09-25T00:15:00+00:00`, `state=pregame`, `status_token=7:15P CT`. That is the
+user-reported card, rendering. `deploys.md 5703578e` (web) / `a6740a82` (live-odds-worker).
+
+**`WEEK_SUBSTITUTED` HAS STILL NEVER BEEN OBSERVED IN PRODUCTION.** By construction it
+should now stay silent on all three services, so its silence is NOT evidence the emitter
+works — that is proved by test only. Owed: one real sighting.
