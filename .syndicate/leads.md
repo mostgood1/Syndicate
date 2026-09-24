@@ -210,7 +210,9 @@ because the work kept deviating:
 - **Do not just add it:** bound the cache (distinct inputs include more than team names), and measure the span median before/after -- the lane's own pre-registered bar. A perf change to a shared hot module without a before/after is how the 150 s NCAAF knob happened (it changed nothing and read as a fix).
 - `team_aliases.py` was claimed by no OPEN lane at 16:49Z.
 
-## 2026-09-20 17:4xZ — NCAAB is the one traded sport that cannot be graded, and it needs exactly one thing: a team registry `[lane daily-accuracy-suite, session 9b88f9a2]`
+## [RESOLVED 2026-09-24] 2026-09-20 17:4xZ — NCAAB is the one traded sport that cannot be graded, and it needs exactly one thing: a team registry `[lane daily-accuracy-suite, session 9b88f9a2]`
+
+> **RESOLVED 2026-09-24 by lane `nhl-ncaab-club-maps` (`f2558c36`).** The registry it asked for exists (`syndicate/features/shared/ncaab_team_registry.csv`, 362 D1 schools, committed beside the code rather than under `data/`), `canonical_team("ncaab", ...)` resolves and refuses correctly, and `ncaab` joined `HANDLED_SPORTS`. **It was "exactly one thing" in the sense of one registry, but THREE lists had to move** -- graded, advertised, and read. NCAAB still grades nothing until the season opens in November.
 
 - **Measured while adding NBA to the ESPN population settler.** Everything NCAAB needs is now in place EXCEPT name resolution: `_SPORT_PATHS["ncaab"] = "basketball/mens-college-basketball"`, `regulation_periods("ncaab") == 2` (two halves, not four quarters), `_segment_closed` honours halves, and `market_keys` already maps `ncaab` onto the shared `_BASKETBALL` table.
 - **The single blocker.** `population_outcomes_espn._resolve_team` sends every non-NCAAF sport to `team_aliases.canonical_team`, whose alias map has no `ncaab` entry — `canonical_team("ncaab", "Duke Blue Devils")` and `("ncaab", "Gonzaga")` both return `None`. Registering the sport anyway would produce `team_unresolved` on 100% of rows: a sport that LOOKS covered and grades nothing, which is worse than an honest absence.
