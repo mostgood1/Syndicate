@@ -837,3 +837,47 @@ Measured four days before the games: `/api/board/game-chips?sport=ncaaf&date=202
 After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens **42 -> 0**, distinct starts 14 -> 20 matching CFBD/ESPN (19:30Z x12, 16:00Z x11, 23:00Z x7, 23:30Z x6). The single chip still at 17:00Z is LIN @ EMU, a REAL noon-CT kickoff.
 
 **HELD 2026-09-23 16:36Z, four days still out** (read-only scheduled reading): placeholder starts **1**, "TBD" tokens **0 of 218**, distinct starts 23 in the 09-26/27 window; the surviving 17:00Z chip is LIN @ EM and ESPN lists exactly one 17:00Z event that day, LIN @ EMU. ESPN cross-check 65 events / 20 distinct kickoffs / 0 TBD, matching on 19:30Z x12, 16:00Z x11, 23:00Z x7; `/intelligence` carries zero "TBD" in 13.4 MB against a live 09-26 population. **The reading still reads `source: inline_artifact_missing`, so `97066dbe`'s worker-side staleness rule is UNTESTED IN PRODUCTION BY CONSTRUCTION** — the served upcoming-date chip never comes from the worker's copy, so only a re-staled COMMITTED cache could exercise it. **SUPERSEDED, not measured:** the worker's in-process interval after the 20:32:19Z revert (config proven; `3600` was proven in-process at 19:52:18Z beforehand). The NFL lane moved that key 86400 -> 60000 -> 86400 on 09-23, so the 15:42:19Z NCAAF launch line reads `interval_seconds=60000` for THAT lane's reason and its 09-24 reading owns the residual. **Worth knowing:** NBA/WNBA/NHL chips for a PAST date read pregame with no score because the live supplement is today-only, while MLB reads final with scores off its per-date `feed_live` artifacts; nobody claims that.
+
+## [mlb-live-gameline-venue-segment] MLB LIVE GAME LINES SERVE NO SIM EDGE BECAUSE THE VENUES QUOTE FULL-GAME CONTRACTS AND THE LIVE BOARD IS MOSTLY SEGMENTS - the key-vocabulary fix was real and was NOT the constraint `[verified 2026-09-24, refresh-worker `38155379`, lane mlb-live-gameline-venue-freshness]`
+
+- **The symptom, served board 2026-09-23 ~23:21Z:** live MLB props 45 of 58 rows
+  `projection.live_aware`; live MLB game lines **0 of 57**.
+- **THE BOOKS CANNOT MEET THE 120s LIVE-PRICING CEILING.** Over ALL 202
+  sportsbook live MLB game rows `quote_seen_age_seconds` is
+  p25=p50=p75=max=**206s** -- a single capture stamp -- and `book_age` p50 261s.
+  **1 of 202** passes. The venues can: Kalshi MLB 22.8s, Polymarket 78.5s.
+- **THE BINDING CONSTRAINT IS SEGMENT, NOT FRESHNESS AND NOT KEYS.** Live funnel
+  (`VENUE_KEY_SHAPE`, 2026-09-24T16:40:33Z): of **427** live sides only **23**
+  find a venue quote at all, and **17 of those 23 (74%) are refused for segment
+  mismatch**, leaving **6** repriced. `SEGMENT_MISMATCH_GRID count=17` agrees and
+  its samples name it -- `mlb|first5|h2h <- kalshi|full|h2h|KXMLBGAME-...`,
+  `mlb|first5|totals|3.5 <- kalshi|full|totals|KXMLBTOTAL-...`. Every reprice
+  that lands is a `full` row (`matched={'full|kalshi|KXMLBTOTAL': 42,
+  'full|polymarket_us|-': 24}`). `_segment_disagrees` is RIGHT to refuse: pricing
+  a first-five moneyline off a full-game contract is a category error.
+- **THE TWO VENUE PASSES SPOKE DIFFERENT VOCABULARIES, and fixing that moved
+  nothing.** `apply_venue_quotes_to_grid` runs BEFORE `attach_live_gamelines` --
+  the only pass whose re-stamped age the join can see -- and built ROLE keys
+  only (`_ROLE_KEYED_MARKETS` excludes `h2h`), while Kalshi keys a moneyline by
+  CLUB. `_candidate_keys`, which HAS the club/token shapes, runs AFTER the join.
+  `404d2194` gave the grid path those shapes and measured **NOT MET** (stale
+  refusals unchanged as a RATE: 100%/100%/87.7% after vs 100%/94.7% before).
+  The instrument then showed the shape is HEALTHY -- pregame 24/24/24/24
+  (offered/present/taken/repriced) = 12 games x 2 h2h sides; live 8 offered, 8
+  present -- so it was simply never the bottleneck. `role` keys match nothing at
+  all (3531 offered, 0 present), which is why the club shape was needed.
+- **EXONERATED:** the `book_age` (time since the price MOVED) vs `seen_age`
+  precedence swap admits **ZERO** extra rows on the full 202-row population. It
+  looked promising on the served top-200 only because every fresh row in that
+  slice is an exchange row -- a selection artefact.
+- **RETRACTED:** `AMBIGUOUS_UNNAMED_REJECTED sport=mlb` 0 -> 164 is NOT evidence
+  of the club-key change. The jump is 01:51:37Z and the deploy went live
+  02:06:45Z, 15 min later, with no deploy on either worker between 19:37:21Z and
+  02:06:32Z. `_key_claimants` maps only ROLE keys, so that guard cannot reject a
+  CLUB key. Cause of the jump is in the data and UNIDENTIFIED.
+- **NOT YET MEASURED:** whether the 6 live sides that do reprice clear the 120s
+  ceiling downstream. At the 16:40Z read the join held only 6 full-game rows
+  (`considered=61` = 31 `segment_pricing_disabled` + 24 `segment_is_not_full_game`
+  + 6 stale) -- too thin. Needs a fuller slate.
+
+---

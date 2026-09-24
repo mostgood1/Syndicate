@@ -3981,3 +3981,33 @@ be re-justified from scratch on different grounds.
   in the function's own docstring so the next editor cannot re-introduce it blind.
 
 ---
+
+## 2026-09-24 - RULE: a hypothesis can be RIGHT about the defect and WRONG about it being the BOTTLENECK, and fixing a real-but-non-binding defect measures IDENTICALLY to shipping something broken `[lane mlb-live-gameline-venue-freshness, session 4ab694ed]`
+
+I diagnosed that the grid venue re-price -- the only pass whose re-stamped age
+`attach_live_gamelines` can see -- spoke ROLE keys while Kalshi keys a moneyline
+by CLUB. That diagnosis was CORRECT. `404d2194` fixed it and production moved by
+nothing, and I spent the next several hours treating "no effect" as evidence the
+fix had not REACHED, hunting for a guard eating it, and mis-attributing a
+counter to it.
+
+The instrument settled it the other way. The club shape is **healthy**: pregame
+24 offered / 24 present / 24 taken / 24 repriced -- every h2h side on a 12-game
+slate. It was never the bottleneck. Of 427 live sides only 23 find a venue quote
+at all and **17 of those 23 are refused for SEGMENT MISMATCH**, because the
+venues quote FULL-GAME contracts while the live board is mostly first3/first5.
+
+**The two situations are indistinguishable from the outcome metric alone.** "The
+fix did not reach" and "the fix reached and something else is the constraint"
+both read as a flat line, and only the first one tempts you to keep fixing the
+thing you already fixed.
+
+HOW TO APPLY: before shipping a fix for a constraint you have NAMED but not
+SIZED, add the counter that sizes it -- what fraction of the refused population
+does this defect actually explain? If the answer is unknown, the fix is a guess
+about the bottleneck no matter how certain the mechanism is. And when a
+correctly-diagnosed fix measures flat, the FIRST hypothesis should be "it was
+not the binding constraint", not "it did not run" -- checking reachability is
+cheap and checking the ranking of constraints is what actually moves the number.
+
+---
