@@ -35496,3 +35496,145 @@ historical lines.
   - SUPERSEDED FRAMING, kept for the like-for-like comparison: **262 s median-of-medians** (`book_age`-based) over 12 in-play samples [80-488], 3 of 12 at or under the ~180 s target, 9 of 12 under 300 s, best sample 43 s — against a 733 s baseline. NFL intervals DO reach the board: peak h1 66, q1 57, h2 29, q3 23, q4 22, q2 20.
   - **WNBA half VERIFIED 2026-09-20 21:21Z** (deploys.md): 88 launches today, 0 failures; 63 since 16:00Z at a **248 s** median against its 240 s interval, first at 17:03:45Z when the slate started. My earlier "unmeasured, 0 launches" was a null-population error twice: one window had no WNBA games, the other's watcher tracked only NFL/NCAAF. LEFT, smaller: a lead is open on the merge replacing a fresher card with an older one (`leads.md` 16:46Z) — observed conditions, no displacement shown.
 
+
+## TRIMMED FROM `lanes.md` — 2026-09-24 (polymarket-ask-pricing)
+
+Moved verbatim, nothing summarised, by session 16da93b3 on the user's instruction.
+Owner session 0f5b256e is ARCHIVED. The lane stays OPEN in `lanes.md` with its
+contract, its newest entry, everything still OUTSTANDING and every claim-bearing
+line. These are the 63 historical lines.
+
+- **CLAIM TAKEN 2026-09-22 by lane `layer2-score-outcome-calibration` (session 236bd219), USER decision "remove the fee check at submit in polymarket orders":** `polymarket_us_orders.py` + `tests/test_polymarket_us_orders.py`. Scope: `_price_at_ask` stops charging the fee bound (the venue plan now deducts the fee BEFORE submit, `4ee86561`); the re-price at the ask, the min-EV check at the ask and the Kelly re-size stay. Recorded in both blocks.
+- **OWNER SESSION 0f5b256e ARCHIVED 2026-09-18 ~22:40Z / 17:40 CDT (user: "if this session is complete we should archive"); this lane is UNOWNED until picked up.** Waiting on the USER: the Polymarket account holds $0.96 (live-odds-worker `VENUE_BALANCES`, 09-18), so step 2 has no population until it is funded.
+- **WHY NO LIVE POLYMARKET ORDER SINCE 09-15 (read 2026-09-18 ~14:45Z / 09:45 CDT, session 0f5b256e): THE ACCOUNT IS OUT OF MONEY.** live-odds-worker `VENUE_BALANCES ... polymarket=ok:0.96` (and `kalshi=ok:8.87`) at 13:44Z and 14:00:36Z. Live Polymarket `[execute_portfolio] EXECUTED ... mode=live venue=polymarket` passes by day: 09-15 138 passes, 39 placed, refused insufficient_venue_balance 928 / market_paused 212 / market_unresolved_for_position 66 / over_max_order_dollars 5; 09-16 146 passes, **0 placed**, insufficient_venue_balance 2,718; 09-17 149 passes, 0 placed, 1,431 (+7 over_max); 09-18 to 14:01Z 78 passes, 0 placed, 563 (+8 market_paused, +7 over_max). The plan side is healthy (`ORDER_PATH venue=polymarket status=ok positions=12`, 11 positions at 14:01Z); the stop is the balance check, BEFORE the submitter -- which is why neither `POLYMARKET_PRICED_AT_ASK` nor the rejection path has fired. **Consequence:** #662 step 2 and lane polymarket-rejected-resubmit-loop cannot be read until the Polymarket account is funded; funding is the user's action, not a code change.
+- **CATCH-UP 2026-09-18 ~14:30Z / 09:30 CDT, session 0f5b256e (read-only). The "0 `POLYMARKET_BOOK_AT_BUILD`" is EXPLAINED, not a fault:** (1) the step-1 instrument runs only in the `else` branch of `polymarket_us_submitter.build` (`syndicate/features/shared/polymarket_us_orders.py` ~:994-1004), i.e. only when `_price_at_ask_enabled()` is false; live-odds-worker has `SYNDICATE_POLYMARKET_PRICE_AT_ASK=1` (single-key read), so step 1's instrument is unreachable BY DESIGN while step 2 is on -- the `Left: 20 BOOK_AT_BUILD lines` item above is OBSOLETE. (2) That submitter serves LIVE orders only (`pipeline/execute_portfolio.py:762`); the 42 `PAPER2_EXECUTED venue=paper:polymarket` passes on 09-17 are paper and never touch it. (3) Step 2 has had NO population: `/api/ops/execution/ledger-summary?days=5` shows `live:polymarket` orders only on 2026-09-15 (4: 3 filled, 1 rejected) and NONE on 09-16..09-19, and `POLYMARKET_PRICED_AT_ASK` has 0 lines on live-odds-worker since 09-16 00:20Z. `SYNDICATE_EXECUTION_MODE=live`; `SYNDICATE_POLYMARKET_PAUSED_MARKETS` is set (value length 5, not read). **Left: step 2's reading needs a live Polymarket order; the open question is WHY no live Polymarket order has been built since 09-15** (paused markets, plan admission, or the price-at-ask refusal itself refusing at build -- `_price_at_ask` refuses unreadable asks or EV under the minimum, and those refusals were not read here).
+  - **`POLYMARKET_PRICE_AT_ASK` was set to `on` by single-key PUT at ~23:14Z** (verified `before: absent / after: on`; the LIST API was never used). Render only re-injects env on a deploy, so lane `legacy-steam-crossing-delta`'s main-tip deploy of `cc141267` at 23:27:50Z is what activated it -- **paired deliberately** `[user: "Pair with the steam deploy (Recommended)"]`, because a same-SHA redeploy of `2d579fd1` would have been refused as redundant and, worse, would have rolled back `ca80edf0` and `a2a1fa32`.
+  - **Reading so far: 0 decisions in 45 min. THAT IS A TIMEOUT, NOT A RESULT** -- the flag's effect is unmeasured, not refuted. Builds run ~1 per 2 h and the slate was ending. Watcher restarted with a ~3.7 h horizon and an explicit TIMEOUT verdict, so a zero can never be read as "the flag is off" or "the prices are wrong".
+  - **Lead (iv) is CLOSED** by `state_polymarket.md [polymarket-no-fill-size-is-gross-capped]`: the 4.07-of-7.94 fill is a buying-power cap, not a mystery.
+  - **Step 1 Verification, MET.** Read on live-odds-worker `54f3d662`, which contains `1afec00f` and `16de339b` by ancestry, with 3 `POLYMARKET_BOOK_AT_BUILD` and 2 `TIME_IN_FORCE_GOOD_TILL_DATE` source lines. `SYNDICATE_POLYMARKET_BOOK_AT_BUILD` is absent, so the instrument is ON.
+    - 09-11 16:02Z to 09-15 16:30Z: **63 `POLYMARKET_BOOK_AT_BUILD`**, 28 unique (day, slug, side).
+    - 1 `POLYMARKET_BOOK_READ_FAILED` (09-14 22:04:41Z, `PolymarketUSAuthError`). Its order still SUBMITTED 3 s later, so **0 orders were blocked by a failed read**.
+    - Distribution: `state_polymarket.md [polymarket-ask-at-build-step1]`.
+  - **Falsification FIRED, so the hypothesis is SUPPORTED on a small tail.** The test required "within one tick and within 1 point in the large-EV rows as well". First line per (day, slug, side):
+    - planned EV < 5: 11/13 within 1 pt.
+    - 5-10: 3/10 within 1 pt (median gap -5.1).
+    - 10-20: n=2, gaps -16.3 and 0.
+    - >= 20: n=3, 0/3 marketable, ask 34-40 ticks above the sent price, EV at the ask 32-50 points below plan.
+    - n=5 above 10% planned EV: direction clear, size not.
+  - **Kickoff expiry, MET.** 64 of 64 `SUBMIT url=https://api.polymarket.us` since 09-12 carry `tif=TIME_IN_FORCE_GOOD_TILL_DATE goodTillTime=<kickoff>`. `ORDER_STATE` shows the stored `goodTillTime`, and 8 reconciles read `order_state_expired`. No `LIVE_ORDER status=failed`.
+  - **LEAD, not this goal: a venue-REJECTED order is re-submitted every pass.** `aec-nfl-phi-ten-2026-09-20` NO, 6.53 @ 0.245 ($1.60), was submitted 34+ times on 09-15 from 05:18Z, ~17 min apart. Each one reconciles `submitted->rejected` (`ORDER_STATE_REJECTED cum=0`, 0 filled, so no money moved). No reject reason is logged anywhere in the path.
+    - Since 09-12, Polymarket reconciles are 23 filled / 34 rejected (all 34 this one ticker) / 8 expired / 9 new.
+    - Untested candidate: a venue minimum on order notional (the $1.60 stake is the smallest seen).
+    - Precedent: `state_polymarket.md [polymarket-orders-are-cancelled]` (08-30).
+    - Owner: needs its own lane or todo, on the user's decision. **Opened 2026-09-15 as lane `polymarket-rejected-resubmit-loop`.**
+  - **STEP 2, USER DECISION 2026-09-15 ~11:20 CDT: "build step 2".** Pre-registered BEFORE code:
+    - **Switch.** `SYNDICATE_POLYMARKET_PRICE_AT_ASK`, ON only for `1/true/yes/on`. Absent means off, reproducing today's build byte-for-byte (the step-1 instrument unchanged). Nothing changes on production until the env is set AND a deploy carries it, and both are the user's call.
+    - **Where.** `polymarket_us_submitter.build`, after `order_body` validates (the same place as step 1). No other file changes behaviour. `execute_portfolio`, `portfolio_commit` and `check_order` are untouched.
+    - **Book.** One signed book read. If the ask for our side is unreadable (read failure, empty side), it REFUSES `ask_unreadable`. Unknown must not default permissive; this reverses step 1's never-block rule on purpose, and only when the switch is on.
+    - **EV at the ask, net of fees.**
+      - `p_model = planned_p * (1 + ev_pct/100)`, the same fair step 1 logs.
+      - `cost = ask + fee_per_contract`, with `fee_per_contract = POLYMARKET_ASSUMED_WORST_CASE_RATE` (0.02, `venue_fees.py:465`). That is a bound above the measured 0.015 at mid-price and the 0.0107 measured at 0.235, stated as a bound.
+      - `ev_net_pct = (p_model / cost - 1) * 100`.
+      - It refuses `ask_ev_below_min` when `ev_net_pct < resolve_settings().min_ev_pct` (the plan's own minimum, default 2.0).
+    - **Kelly at the ask.**
+      - `k(c) = (p_model - c) / (1 - c)`.
+      - `stake_at_ask = planned_stake * min(1, k(cost) / k(planned_p))`, so it only ever shrinks. `check_order` already charged the planned stake, so no cap can be exceeded.
+    - **Price and size.**
+      - The price sent is the ask, snapped up to the tick.
+      - `quantity = min(floor(stake_at_ask / ask), floor(ask_qty))` to the market's increment.
+      - Below one increment it refuses `ask_size_below_minimum`.
+    - **Log.** One `POLYMARKET_PRICED_AT_ASK` line per build: planned price and stake, ask and size, fee bound, `ev_net_pct`, Kelly ratio, the stake and quantity sent, and the decision.
+    - **Falsification.**
+      - (a) With the switch off, a build is byte-identical to today's.
+      - (b) With it on, a 20%-planned build whose ask sits 34 ticks above the quote (the measured `aec-nfl-car-atl` shape, planned 17.7, `ev_at_ask` 1.39) must REFUSE.
+      - (c) A small-edge build at the quote must place at the ask with its stake at or below plan.
+      - (d) A thin ask must cap quantity at `ask_qty`.
+      - (e) A read failure must refuse.
+      - Any of these failing means step 2 is not what it claims.
+    - **Verification after an enabled deploy:** `POLYMARKET_PRICED_AT_ASK` lines on live-odds-worker, refusals by reason, and every placed order's sent price equal to the logged ask. Then fills vs refusals against step 1's population.
+    - **Files:** unchanged (the orders module and its test file).
+  - **STATUS 2026-09-15 ~11:40 CDT: step 2 LANDED `a7a40471`, NOT DEPLOYED, switch absent everywhere.**
+    - Falsification (a)-(e) all pass as tests, plus the measured PHI-TEN NO order refused and a named sub-increment cap. 789 passed / 9 skipped across 24 Polymarket and execution files.
+    - NOT run: the unwired check of the new refusal tests against HEAD's module.
+    - **ENABLING IS BLOCKED ON A NO-SIDE QUESTION** raised by lane `polymarket-rejected-resubmit-loop` (H2'). If the venue prices or holds a NO buy on the complement (`(1-price) x qty`; NO buys are recorded `ORDER_SIDE_SELL`), then step 2's NO handling may be mispriced: ask = 1 - best YES bid, sent as the NO price. The step-1 instrument uses the same convention, so its NO rows in `[polymarket-ask-at-build-step1]` inherit the doubt; YES rows do not. Confirm the NO price convention first (one accepted NO order's `price` vs its fill, and the balance held), or enable for YES only.
+  - Left: STEP 1's reading, 20 or more `POLYMARKET_BOOK_AT_BUILD` lines. There are 0 so far. The instrument has been live since 16:02:43Z, but no NEW Polymarket order has been built since: the totals are paused before build, and the placed moneylines are duplicates.
+  - STEP 2 waits on that population and on the user's go. Nothing blocks it except the population.
+  - Also carried, added on the user's decision rather than part of this goal: every Polymarket order expires at kickoff (`16de339b`, live 16:53:31Z). Its first good-till-date `SUBMIT` is owed.
+- Status at the 2026-09-11 checkpoint (17:40Z):
+  - Three Polymarket passes since 16:53:31Z (17:01, 17:15 and 17:31Z) placed nothing. They refused only `market_paused`, plus one `over_max_order_dollars` at 17:01Z.
+  - There was no `SUBMIT`, no book line and no traceback.
+  - The two orders resting since 15:51Z predate the expiry and are the user's to cancel.
+- To pick this up: read the `SUBMIT url=https://api.polymarket.us` and `POLYMARKET_BOOK_AT_BUILD` lines on live-odds-worker after 16:53:31Z with `scripts/render_logs.py`. For passes, match `EXECUTED date=` and filter, because `plan_source=` sits between `venue=` and `armed=`.
+- History: the 16:02–16:53Z progress entries were moved VERBATIM to `lanes_history.md` at this checkpoint.
+
+
+## TRIMMED FROM `lanes.md` — 2026-09-24 (polymarket-rejected-resubmit-loop)
+
+Moved verbatim, nothing summarised, by session 16da93b3 on the user's instruction.
+Owner session 0f5b256e is ARCHIVED. The lane stays OPEN in `lanes.md` with its
+contract, its newest entry, everything still OUTSTANDING and every claim-bearing
+line. These are the 63 historical lines.
+
+  - **(H1) minimum notional: DEAD by its own falsifier.** It died if any accepted order had stake <= $1.60 or qty <= 6.53. The 22:02:39Z order was accepted at qty **4.72**, stake **~$1.16**. Both clauses fire.
+  - **(H2) insufficient buying power: DEAD AS WRITTEN, ALIVE IN ITS GROSS FORM, and I retracted it once before catching that.** Its falsifier was stated in NET dollars and the balance did cover the $1.60 stake (flat at $2.84 across all 34). In GROSS terms ($1.00 x 6.53 = $6.53) it was never covered -- the same condition that capped both partial fills. **This is now the leading explanation.**
+  - **(H3'/price convention) DEAD.** `CDZ89ZCJ8SJR` was sent at 0.40 against a YES price of 0.605 (the OLD convention) and filled IN FULL, 13.57 of 13.57. Sending the NO price does not cause a rejection.
+  - **What is still unexplained is the FORM, not the cause:** insufficient gross REJECTS pre-`1efdea18` and PARTIALLY FILLS after it. The venue's docs say "no partial fills on insufficient buying power", which would mean that commit changed more than the price field. Evidence is ONE ticker on the reject arm, so pre/post is not established.
+  - Population: 44 distinct NO orders in 09-11..09-15 -- 5 filled, 34 rejected (all one ticker), 5 resting. Table in `state_polymarket.md [polymarket-no-fill-size-is-gross-capped]`.
+  - **Cheap next step for whoever picks this up:** size a NO order so that `1.00 x qty <= buying power` and see whether it is accepted. That tests H2-gross directly and costs one order.
+- **Deliberately NOT claimed** (kept off the `Files:` line, because a disclaimer there is parsed as a CLAIM and shows up as a contested file): `pipeline/execute_portfolio.py` is held by OPEN lane `kalshi-shard-balance-gate`. This lane's fix is built to need no change there.
+- Origin: found while reading step 1 of `polymarket-ask-pricing` (`deploys.md` 2026-09-15 ~15:55Z).
+- **MEASURED 2026-09-15 before any code, live-odds-worker `54f3d662`:**
+  - `aec-nfl-phi-ten-2026-09-20`, `OUTCOME_SIDE_NO`, qty 6.53 @ 0.245 ($1.60), GTD to kickoff 09-20 17:00Z.
+  - First `SUBMIT` 05:18:13Z. Every ~17 min after that: `LIVE_ORDER status=submitted`, then on the next reconcile `ORDER_STATE_REJECTED cum=0 leaves=0` and `RECONCILED key=ea31ca3ed3577aca5fdf014b submitted->rejected`, then a re-build and re-submit. 34+ cycles by 14:43Z.
+  - Book at every build: `ask=0.24 ask_qty` ~8,000-9,500, `marketable=True`, `state=MARKET_STATE_OPEN`. So neither price nor depth explains a reject.
+  - No reject reason on any log line.
+  - Since 09-12, Polymarket reconciles: 23 filled, 8 expired, 9 new, 34 rejected, and all 34 are this ticker. 0 filled, so no fill and no spend.
+  - Same passes: `refused={'insufficient_venue_balance': 4-6}` for other positions.
+  - **(1) `execution_ledger.place_order`**, LIVE, after the duplicate check and BEFORE the build: `_venue_rejected_unchanged(request)`.
+    - When the key's row is `rejected` with `error == venue_order_state_rejected` and the same `requested_price` and `requested_stake_dollars`, it refuses `venue_rejected_unchanged` via `_unrecorded_refusal`.
+    - Nothing is built, sent or written, and `execute_portfolio`'s existing refused-at-build branch counts it by name (no change to that file).
+    - A re-sized or re-priced order under the same key is sent. Venue cancels and expiries, and our own pre-send rejects, keep today's retry. A row missing either figure is treated as changed.
+  - **(2) `polymarket_us_orders.submit_order`** logs `SUBMIT_RESPONSE` (keys, order keys, id, status, executions count) before reducing the response. It never raises.
+  - **Tests:**
+    - 5 in `test_execution_ledger.py`: unchanged not sent and no write; re-sized sent; cancel, expiry and pre-send reject still retried.
+    - 2 in `test_polymarket_us_orders.py`: shape logged; unloggable response never fails the send.
+    - 312 passed across the orders, ledger and execute_portfolio files (clean origin/main baseline: 224 in ledger+portfolio, now 229).
+    - NOT run: the unwired check against HEAD's module.
+  - (3), charging NO orders `(1-price) x qty`, waits on the NO-convention reading.
+  - **NO CONVENTION SETTLED 2026-09-15 ~12:50 CDT (read-only agent; docs + logs + balances): Polymarket US `price` IS ALWAYS THE YES PRICE. H2' CONFIRMED.**
+    - **Docs.** The partner order data model: "`price` is always the YES price; there is no separate NO book"; buying 10 NO at $0.20 is `SIDE_SELL ... price = 80`. The orders concepts page: "buy NO at $0.40 ... selling YES at $0.60". Collateral: a NO buy posts $1 margin less the sale proceeds, so it holds (1 - YES price). Open orders consume buying power at submit.
+    - **Balances, to the cent:**
+      - YES `CDYRSDTS4SJR` (cin-mil) 23.97 @ avgPx 0.365 + $0.33 commission = $9.08, and the balance went 100.60 -> 91.52.
+      - NO `CDZ89ZCJ8SJR` (dal-nyg) sent `price 0.4`, filled `avgPx 0.6050`, fee 0.19. The balance went 91.52 -> 85.97 = $5.55 = 13.57 x 0.395 + 0.19. Charging at X = 0.40 would have been $5.62.
+      - `C65VD0R72KDG`: `price 0.22`, `avgPx 0.235`, `ORDER_SIDE_SELL` / `BUY_SHORT` fits only a YES sell with price improvement.
+    - **phi-ten explained.** Sent NO @ 0.245 means SELL YES at 0.245 or better, worst case (1-0.245) x 6.53 = $4.93 against $2.84 buying power, so it was rejected instantly. The book (YES bid 0.76) means it would have cost 0.24 x 6.53 = $1.57 if sent correctly.
+    - **Consequences, inferred from the rule, not measured per order:**
+      - Every live Polymarket NO order has sent p_NO as the price, i.e. a YES floor, so its effective NO ceiling was 1 - p_NO (no price protection). Near-even markets hid it.
+      - `C65VD0R72KDG` is probably mis-booked: NO cost 1 - 0.235 = 0.765 (~$10.04 + 0.14), recorded as 0.235 / $3.09. `_fill_price`'s closest-to-limit rule (`polymarket_us_orders.py:~2038-2053`) chose the wrong reading. Unconfirmed by a balance read.
+    - **Required changes, NOT started, user decision:**
+      - (i) `order_body` sends `price = 1 - p_NO` for NO, snapped DOWN on the YES grid (a sell stays marketable); step 2 keeps the NO cost for EV and quantity and sends the YES bid.
+      - (ii) `check_order` charges a NO order `(1 - price_sent) x qty` + fee (equal to the stake once (i) ships), plus open orders on the instrument.
+      - (iii) `_fill_price`: NO fill = 1 - avgPx, always.
+      - (iv) re-check `C65VD0R72KDG` against the balance ledger endpoint.
+      - Until (i) ships, NO orders keep sending an unprotected price. Pausing Polymarket NO orders is the user's call; no side-level pause exists today.
+    - The step-1 table's NO rows in `[polymarket-ask-at-build-step1]` inherit this; the YES rows do not.
+- **DIAGNOSIS 2026-09-15 ~11:45 CDT (read-only agent for session 0f5b256e; logs + code; extracts in the session scratchpad). No code changed.**
+  - **(R) CONFIRMED: why it re-submits.**
+    - A venue `ORDER_STATE_REJECTED` is mapped into the dead group (`venue_order_states.py:58`). Reconcile then writes OUR `rejected` status (`execution_ledger.py:2602-2615`).
+    - Our `rejected` means "never reached the venue" (`execution_guard.py:176-182`, `execution_ledger.py:1245-1255`), so the next pass counts it `retried` and writes a fresh `submitted` row (`execute_portfolio.py:597`, `execution_ledger.py:1243-1259`).
+    - There is no cap or backoff (`_MAX_PRIOR_ATTEMPTS=10` only bounds history). It was designed for pre-send rejects (410/503), never for a venue-state reject.
+  - **(H1) venue minimum notional: REFUTED.** Smaller orders were accepted since 09-12: `atc-lal-get-dep` $1.04 / 2.73 filled, `aec-mlb-tex-az` $1.18 filled, `aec-cfb-syra-pitt` $1.18 filled, `aec-mlb-bal-nym` NO $1.11 / 2.55 accepted then expired.
+  - **(H3) NO side or NFL market alone: REFUTED.** NO orders were accepted on bal-tor, laa-wsh, nyj-ten x2, bal-nym and dal-nyg; 09-20 NFL moneylines min-chi and car-atl were accepted.
+  - **The reject reason is unrecordable as built.** The order object has no reason field (24 keys; docs agree), and `submit_order` discards the create response beyond id/status. The reject is instant: created 05:18:13.888Z, last transact 05:18:13.889Z. Venue intent `ORDER_INTENT_BUY_SHORT`.
+  - **LEADING (H2'), untested: buying power under a NO-cost convention.**
+    - If the venue holds `(1 - price) x qty` for a NO buy, that is $4.93 against Polymarket buying power of $2.84, flat 05:17-16:09Z.
+    - This is the only NO order priced far from even (0.245; the others were 0.40-0.495).
+    - Supporting: the venue records NO buys as `ORDER_SIDE_SELL` (`state_polymarket.md:67`); `C65VD0R72KDG` filled at 0.235 vs a 0.22 limit, read as sell-side improvement.
+    - Discriminator: the same order accepted once buying power is >= $4.93, OR a NO order with `(1-p) x q` under the balance accepted. Alternatives: (2) price read as out of bounds on the other side; (3) this market refuses shorts, decided by a YES order on phi-ten being accepted.
+  - **Stopped by itself:** last submit 14:43:48Z, last reject 15:00:05Z. Passes 15:00-16:10Z built nothing for phi-ten, cause not logged. 34 submits / 34 rejects 05:18-14:43Z.
+  - **Money:** 0 fees (buying power flat across all 34), no 429s, day caps not inflated (`spent_today` excludes rejected). BUT while the row is `submitted`, `_live_stake_since` (`execution_guard.py:549`) reserves $1.60 of the $2.84, which can push other positions in the same pass into `insufficient_venue_balance`. Not confirmed per position.
+  - **Proposed changes, NOT started, need the user's go and a Files declaration first:**
+    - (1) a venue `order_state_rejected` gets its own non-retryable status, or a capped/backed-off retry on `prior_attempts` (`execution_ledger.reconcile_live_orders` / `execute_portfolio.py:597`);
+    - (2) log the create response's keys (and `executions`) in `submit_order`;
+    - (3) only if H2' is confirmed, charge a Polymarket NO order `(1-price) x qty` in `check_order`'s balance gate and re-check the NO price convention in `order_body`.
+
