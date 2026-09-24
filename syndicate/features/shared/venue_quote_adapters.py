@@ -688,15 +688,59 @@ def kalshi_outcome(
         # already names the PLAYER, which is a stronger identity than the game.
         # h2h is excluded for the same reason it is on the board side: its side
         # IS the club, so it cannot collide across fixtures.
+        # THE FIXTURE IDENTITY AND THE KEY ARE TWO DIFFERENT QUESTIONS, and
+        # conflating them is what left every h2h quote unable to defend itself.
+        #
+        # `k_game` used to be resolved ONLY for `_ROLE_KEYED_MARKETS`, because
+        # only those markets want the game IN THEIR KEY. h2h does not: its side
+        # is the club, and the board asks for the bare `mlb|h2h|<club>`. But the
+        # same `None` then landed on `Quote.game`, so an h2h quote could not NAME
+        # its fixture -- and `venue_quote_fanin._unconfirmed_on_a_contested_key`
+        # requires BOTH halves to name the same game before it will let an
+        # unnamed quote answer a CONTESTED key.
+        #
+        # The premise for the exclusion -- "its side IS the club, so it cannot
+        # collide across fixtures" -- is true within one date and FALSE on the
+        # grid, which spans more than today. Measured on the served board
+        # 2026-09-23: mlb `available` 1846 against `available_today` 1097, so a
+        # club key CAN be claimed by tonight's game and tomorrow's, and a
+        # doubleheader collides on a single date.
+        #
+        # WHAT THIS IS AND IS NOT JUSTIFIED BY, because the first attempt to
+        # justify it was WRONG and the retraction belongs next to the code.
+        # `AMBIGUOUS_UNNAMED_REJECTED sport=mlb` went 0 -> 164 at
+        # 2026-09-24T01:51:37Z and was read as this defect biting. It is not:
+        # that jump PRE-DATES refresh-worker `f2558c36` going live at 02:06:45Z
+        # by 15 minutes, and the Render deploys API shows NO deploy on either
+        # worker between 19:37:21Z and 02:06:32Z -- so no code changed and the
+        # cause is in the data, still unidentified. `_key_claimants`
+        # (`venue_quote_fanin.py`) also only ever maps ROLE keys, so a CLUB key
+        # is absent from it and `_unconfirmed_on_a_contested_key` returns False
+        # for one -- that guard cannot have been rejecting club keys at all.
+        #
+        # This change is therefore a SAFETY fix, not a coverage one, and must
+        # not be sold as the latter. `polymarket_us_outcome` already states the
+        # rule -- "`game` is still carried so the fan-in can reject a bare-key
+        # match that lands on the wrong fixture" -- and h2h was the one family
+        # that carried nothing, contradicting it. With the identity present,
+        # `_quote_is_for_another_game` can refuse a club-keyed quote that lands
+        # on the wrong fixture; without it, it provably cannot.
+        #
+        # The key is byte-identical to what this published before, so no match
+        # that works today can be lost. It can REMOVE a match that was landing
+        # on the wrong game, which is the point.
         k_game = (
             _kalshi_game_token(row.get("ticker"), sport, games)
-            if (not prop_player and market in _ROLE_KEYED_MARKETS)
+            if not prop_player
             else None
         )
+        # ONLY role-keyed markets carry the fixture INSIDE the key. h2h keys stay
+        # bare so the board's `mlb|h2h|<club>` lookup is unchanged.
+        k_game_in_key = k_game if market in _ROLE_KEYED_MARKETS else None
         primary_key = (
             prop_quote_key(sport, market, prop_player, side, line)
             if prop_player
-            else quote_key(sport, market, side, line, k_game)
+            else quote_key(sport, market, side, line, k_game_in_key)
         )
         if primary_key is None:
             prop_unnamed += 1
@@ -758,10 +802,14 @@ def kalshi_outcome(
                 mirror_key = (
                     prop_quote_key(sport, market, prop_player, mirrored, line)
                     if prop_player
-                    # Same `k_game` as the primary leg: the mirror is the OTHER
-                    # SIDE of the same contract on the same fixture, so keying
-                    # it to a different game would be incoherent.
-                    else quote_key(sport, market, mirrored, line, k_game)
+                    # Same `k_game_in_key` as the primary leg: the mirror is the
+                    # OTHER SIDE of the same contract on the same fixture, so
+                    # keying it to a different game would be incoherent. It must
+                    # track the PRIMARY's key-shape decision, not the raw
+                    # identity -- this branch never runs for h2h (the guard above
+                    # is `market != "h2h"`), so the two are equal here today, and
+                    # using the key-shaped one keeps them equal if that changes.
+                    else quote_key(sport, market, mirrored, line, k_game_in_key)
                 )
                 mirror_key = doubleheader_quote_key(mirror_key, k_half)
                 quotes.append(
@@ -1023,22 +1071,39 @@ def polymarket_us_outcome(sport: str, selected_date: str, *, games: Any = None) 
         # Where the slug does NOT name both clubs, the key stays bare and this
         # adapter behaves exactly as it did. `game` is still carried so the
         # fan-in can reject a bare-key match that lands on the wrong fixture.
-        # ROLE-KEYED MARKETS ONLY, mirroring `_candidate_keys`. An h2h key
-        # already names the game implicitly (its side is the CLUB), so
-        # qualifying it adds a key nothing asks for. Totals and spreads name
-        # nothing, which is where every one of the 26 shared quotes was.
-        pm_game = None
-        if market in _ROLE_KEYED_MARKETS:
+        #
+        # THE IDENTITY IS RESOLVED FOR EVERY GAME-LINE MARKET; ONLY ROLE-KEYED
+        # ONES CARRY IT IN THE KEY. Those are two different questions and this
+        # block used to answer both with one `if`, which meant an h2h quote
+        # carried `game=None` -- contradicting the sentence three lines above.
+        # An h2h key names its game implicitly WITHIN A DATE, and the grid spans
+        # more than today (served board 2026-09-23: mlb `available` 1846 vs
+        # `available_today` 1097); a doubleheader collides on one date. So the
+        # implicit naming is not sound, and without `game` the fan-in cannot
+        # refuse a club-keyed quote that lands on the wrong fixture.
+        #
+        # SAFETY, NOT COVERAGE -- see the Kalshi twin above for the full note,
+        # including the retraction of the `AMBIGUOUS_UNNAMED_REJECTED 0 -> 164`
+        # reading that was first offered as evidence for this and does not
+        # support it (it pre-dates the deploy by 15 minutes, with no deploy on
+        # either worker in the window).
+        #
+        # The key is byte-identical to what this published before, so no match
+        # that works today can be lost; the quote simply gains the name it needs
+        # to be checkable.
+        pm_game = game_token(sport, parsed_slug.get("home"), parsed_slug.get("away"))
+        if pm_game is None:
             # The club-pair token first -- unchanged for every sport whose clubs
             # canonicalise (mlb, nfl, wnba, soccer). Only when that is
             # impossible does the event fallback apply, so nothing that works
             # today changes shape.
-            pm_game = game_token(sport, parsed_slug.get("home"), parsed_slug.get("away"))
-            if pm_game is None:
-                learned = _pair_games.get(
-                    (str(parsed_slug.get("away") or ""), str(parsed_slug.get("home") or ""))
-                )
-                pm_game = event_game_token(learned)
+            learned = _pair_games.get(
+                (str(parsed_slug.get("away") or ""), str(parsed_slug.get("home") or ""))
+            )
+            pm_game = event_game_token(learned)
+        # ONLY role-keyed markets put the fixture INSIDE the key. h2h keys stay
+        # bare so the board's `<sport>|h2h|<club>` lookup is unchanged.
+        pm_game_in_key = pm_game if market in _ROLE_KEYED_MARKETS else None
         # The `dh<n>` half the slug names, if any (see `doubleheader_quote_key`).
         pm_half = next(
             (
@@ -1051,7 +1116,7 @@ def polymarket_us_outcome(sport: str, selected_date: str, *, games: Any = None) 
         for side, probability in sides:
             quotes.append(
                 Quote(
-                    key=doubleheader_quote_key(quote_key(sport, market, side, line, pm_game), pm_half),
+                    key=doubleheader_quote_key(quote_key(sport, market, side, line, pm_game_in_key), pm_half),
                     source="polymarket_us",
                     sport=str(sport or ""),
                     market=market,
