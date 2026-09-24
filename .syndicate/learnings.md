@@ -4011,3 +4011,49 @@ not the binding constraint", not "it did not run" -- checking reachability is
 cheap and checking the ranking of constraints is what actually moves the number.
 
 ---
+### 2026-09-24 - FORBIDDEN: gating a change that MOVES A PATCHED SEAM on a hand-picked test subset. The blast radius is every test that patches the OLD symbol, and it is enumerable.
+
+- **What we believed:** that a careful, hand-picked regression sweep across the
+  files "in the area" was an adequate gate for `7931b18a`, which moved two NFL
+  week ENUMERATORS off `default_nfl_source_root()` onto `_source_roots()`. Eight
+  files, 120 passing tests, shipped.
+- **What was actually true:** the subset had a hole exactly where the change had
+  reach. `tests/test_nfl_hide_backfill_weeks.py` patches
+  `default_nfl_source_root` and calls `available_weeks()`, so moving that
+  enumerator took it off the seam the fixture steers. It went GREEN -> RED and
+  **the deploy went to production with it red** (control: 6 passed against
+  `7931b18a^`, 1 failed after). Nothing else caught it: the earlier full sweep
+  had run before this change existed, and the hand-picked one did not include
+  the file.
+- **Production was NOT harmed, and that is the trap.** Searching every root is
+  precisely the fix, and its reading (`CHIP_JOIN_COVERAGE` 0 of 1,227 -> 1,230 of
+  1,230) stands. What broke was VERIFICATION: the guard proving pre-season
+  backfill weeks stay hidden stopped reaching its own fixture, so it asserted
+  nothing. A regression that leaves behaviour correct and a guard hollow is the
+  hardest kind to notice, because every signal you look at is green.
+- **How we found out:** the follow-up audit this same session opened to hunt
+  stale seams in OTHER files. Its first finding was the auditor's own regression,
+  one commit old.
+- **The rule going forward:** when a change moves a symbol that tests PATCH, the
+  gate is not "tests in the area". It is mechanical and cheap --
+  `grep -rl "<the old symbol>" tests/` gives the exact blast radius, and every
+  hit either patches a live seam, patches nothing, or must be run. On this
+  change that was 26 files; the honest subset was knowable in one command and I
+  did not run it.
+- **A grep is the START of the split, never the answer.** Those 26 resolved to
+  16 already-safe / 5 mention-only / 5 candidates, and running the candidates
+  under instrumentation found **1** genuinely affected test. Reporting "26 files
+  affected" would have been as wrong as reporting none.
+- **Instrument the RESOLUTION, not the call.** The audit
+  (`scripts/audit_nfl_root_seams.py`) first reported 2 extra affected tests;
+  both were `data_path` returning a NAMED FALLBACK for a file that does not
+  exist -- a path into `data/nfl_source` that reads nothing. Requiring
+  `.exists()` is the whole difference between "resolved a path" and "read a
+  file". An instrument that cannot tell those apart manufactures the defect it
+  exists to find, and it flagged its own author's new test correctly only after
+  that fix.
+- **Cost:** one deploy shipped with a red test, ~20 minutes to find and repair,
+  nothing wrong in production. Cheap only because the audit was opened; had it
+  not been, a hollow guard would have sat green indefinitely.
+
+---
