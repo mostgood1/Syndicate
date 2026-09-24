@@ -146,6 +146,46 @@ class WeekScheduleTests(unittest.TestCase):
 
 
 class RealScheduleFallbackTests(unittest.TestCase):
+    def setUp(self) -> None:
+        """Keep the tracking resolver inside a tempdir.
+
+        These tests write their own schedule and patch `gen.DATA_ROOT` /
+        `gen.nfl_artifact_output_root`, which covers the SCHEDULE. It does not
+        cover `nfl_sources._resolve_nfl_tracking_path`, the separate resolver
+        behind the pbp, the injuries file and the depth chart -- it searches
+        `_source_roots()` and falls back to a real root, so it reached the
+        repo's own 11 MB `pbp_2026.csv`.
+
+        Measured 2026-09-24 by `scripts/audit_nfl_root_seams.py`: 2 escaping
+        resolutions, while GREEN. The class name says "RealSchedule", which
+        makes it easy to assume the production read is deliberate; it is not --
+        the fixture writes the schedule it expects to be read.
+        """
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+
+        from syndicate.features.nfl import sources as nfl_sources
+
+        # RESOLVES AGAINST `gen.DATA_ROOT` AT CALL TIME, not against a tempdir
+        # fixed here. Each test in this class patches `gen.DATA_ROOT` to its own
+        # directory and writes the artifacts it wants found; a fixed root would
+        # override that and starve them -- which it did on the first attempt,
+        # turning 2 green tests red (`test_main_falls_back_when_no_pbp_exists_yet`
+        # and `test_main_keeps_unplayed_games_when_the_week_is_partly_played`).
+        #
+        # Reading `gen.DATA_ROOT` lazily keeps each test authoritative over its
+        # own fixture while still preventing the fall-through to a real root:
+        # a file the test did not write is now ABSENT, which is exactly what
+        # "no pbp exists yet" is supposed to mean.
+        patcher = patch.object(
+            nfl_sources,
+            "_resolve_nfl_tracking_path",
+            lambda relative: Path(gen.DATA_ROOT) / relative,
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def _write_real_schedule(self, tmp, season, rows):
         import csv
         import os

@@ -41,6 +41,21 @@ class PreseasonCardsTestCase(unittest.TestCase):
         source_roots_patcher = patch.object(nfl_sources, "_source_roots", return_value=[self.root])
         source_roots_patcher.start()
         self.addCleanup(source_roots_patcher.stop)
+        # AND `data_path`'S LAST ESCAPE HATCH. The three patches above steer the
+        # SEARCH; when no candidate root has the requested file `data_path`
+        # returns `nfl_artifact_output_root() / relative` -- a fourth helper,
+        # unpatched -- and that path is then `.exists()`-checked and read.
+        #
+        # Measured 2026-09-24 by `scripts/audit_nfl_root_seams.py`: three tests
+        # in this class resolved into the repo's own `data/nfl_source` while
+        # GREEN. This fixture was already unusually careful -- it patches
+        # `default_nfl_source_root` on TWO modules and `_source_roots` -- which
+        # is the point: isolating a resolver by patching its inputs one at a
+        # time leaves whichever hatch was added last, and only running the code
+        # finds it.
+        output_root_patcher = patch.object(nfl_sources, "nfl_artifact_output_root", return_value=self.root)
+        output_root_patcher.start()
+        self.addCleanup(output_root_patcher.stop)
         nfl_cards._team_branding_index.cache_clear()
         self.addCleanup(nfl_cards._team_branding_index.cache_clear)
 
