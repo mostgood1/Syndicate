@@ -4104,3 +4104,43 @@ cheap and checking the ranking of constraints is what actually moves the number.
   closed. It is narrowed, not closed, and it re-opens a little each day.
 
 ---
+
+### 2026-09-24 (session f5615aa2, no lane) — OVERTURNED: "the dry-run prompt replaced the stored prompt, restore it." A scheduled task's RUN-TIME OVERRIDE is not an edit to its stored prompt — and "restoring" a prompt that was never changed replaces a correct one with a paraphrase
+
+- **The belief, and who held it.** The one-time task `layer2-score-v2-promotion-decision-1006`
+  (fires 2026-10-06 10:00 CDT, closes todo `#679` step 5) was run early on 2026-09-22 under a
+  temporary DRY RUN brief, whose own text said *"the real one is restored immediately after this
+  run."* The follow-up instruction was "restore the real task prompt now" — premised on the stored
+  prompt having been overwritten.
+- **What was actually true, measured.** `SKILL.md` already held the real brief: 6,703 bytes, mtime
+  2026-09-22 16:19:37 Central, **zero** matches for
+  `dry.?run|pre-approval|l2dry6|temporary prompt|graded_dry|no-op push`, and every real-brief marker
+  present (`NEVER deploys`, the PROMOTE/DO NOT PROMOTE/REJECT rule, the multiple-comparisons guard,
+  the NCAAF-registry trap, the `findings_2026-10-06_*.md` output path). The dry-run text reached the
+  session as a **dispatch-time override**, never as a write to the stored prompt.
+- **The second false fear, also measured.** The early run did **not** consume the one-time fire:
+  `fireAt` = `nextRunAt` = `2026-10-06T15:00:00.000Z`, `enabled: true`, `totalRuns: 1`. An early
+  manual run and a scheduled fire are separate things.
+- **What the damage would have been.** The only recoverable source for a "restore" was the repo
+  brief `.syndicate/scheduled_task_score_v2_promotion_decision.md` (161 lines on `origin/main`).
+  Rebuilding `SKILL.md` from it would have swapped a correct, condensed 6.7 KB prompt — one that
+  deliberately *defers* to the versioned repo brief — for a fresh paraphrase, silently dropping
+  whatever the paraphrase missed. The task then fires unattended at 10:00 on 10-06 with nobody
+  reading it.
+- **How to apply.**
+  - **Read the artifact before restoring it.** "Restore X" is a claim about X's current state, not an
+    instruction that is safe to execute blind. Diff or grep the target for the contaminant FIRST;
+    a no-op restore and a destructive one are indistinguishable from the request alone.
+  - For scheduled tasks specifically: `list_scheduled_tasks` → the entry's `path` is the stored
+    prompt, and `fireAt`/`nextRunAt`/`enabled` say whether the schedule is still armed. Check both;
+    they answer different questions and both were assumed wrong here.
+  - **A reconstruction is not a restoration.** If no byte-identical source of the original exists,
+    say so and stop, rather than producing a lookalike. Related: `retraction-is-not-innocence`
+    (withdrawing a claim does not establish the opposite) — here, an instruction premised on a
+    false state does not make the state false.
+  - Note `list_scheduled_tasks` returns **79,771 characters / 1,347 lines** and exceeds the
+    tool-result token cap outright — grep the saved tool-result file, do not try to read it directly.
+- **Cost:** none. Nothing was overwritten; the check cost two tool calls. The exposure was a correct
+  prompt for an unattended 10-06 decision run, replaced two days before it fires.
+
+---
