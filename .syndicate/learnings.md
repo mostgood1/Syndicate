@@ -4065,3 +4065,42 @@ cheap and checking the ranking of constraints is what actually moves the number.
 - **What made it diagnosable was a per-date control, not the architecture.** The architecture alone would have supported the two-copy story as a plausible narrative for anything. The evidence is that the 2026-08-27 bulk capture wrote SEVEN dates in one run and **six match today's stream exactly** (8070, 4223, 1718, 6534, 10406, 7644); only 08-20 differs. A retention trim, a compaction or a re-seed cannot single out one date.
 - **Rule.** Before describing a served artifact as changed, deleted, truncated or shrunk, establish WHICH SERVICE'S DISK answered you. On Render the disks are not shared; an ops route reads its own. Then read the writer for a delete path. A difference between "what a build recorded" and "what a route serves" is a TRANSPORT fact until proven otherwise, and the default should be staleness, not mutation.
 - **The operative consequence, which outlives the anecdote:** a past ledger fetched from `stream` is NOT necessarily the file the board scored, so any backfill or re-score reading one must anchor on something the original build recorded (`records_considered`, or exact reproduction of a retained figure) and REFUSE on mismatch. `rescore_live_gameline_date.py` does, and that gate is the only reason this was visible at all — it refused exactly the two dates where the copies diverge, and all ten it passed matched their anchor.
+
+## 2026-09-24 — A FIX DEFINED RELATIVE TO A MOVING REFERENCE DECAYS AGAINST A FROZEN TARGET — `drop_upstream_echoes` narrows less against the same worktree every day, and nothing announces it `[session ac238d51, lanes archive-diff-baseline-echo / closed-lane-archive-20260924-1219]`
+
+- **What I shipped and what I believed.** `173e42bc` added `drop_upstream_echoes()` to the
+  lane-archive gate: discard a changed line whose text is already on `origin/main`, because a
+  worktree that is BEHIND renders upstream's own lines as its own. Verified off != on, both
+  directions, and it freed three blocks that had been stuck 19 h. I wrote it up as *the* answer to
+  the stale-baseline mechanism.
+- **What is actually true.** The filter is defined against `origin/main`, which MOVES. The target —
+  an abandoned worktree — does NOT. Every commit that rewrites a line the worktree still holds takes
+  that line out of `origin/main`'s set, and the line stops being discountable. So the same frozen
+  diff gets *less* filterable over time, monotonically, with no one touching it.
+- **Measured the same afternoon, like for like** — identical diff, identical filter, only the
+  reference moved: worktree `tripwire-applog-page-cap` showed **13** lines "not on `origin/main`"
+  against tip `c4e2a022`, and **30** against the tip **two hours later**. Nothing in the worktree
+  changed. Its false-positive weight against the gate grows on its own.
+- **Why this is not just a caveat.** It inverts the maintenance story. I recorded the blockage as
+  *bounded* — the 3-day `--diff-stale-min` clock frees it at 2026-09-27 06:04Z — and that is still
+  true, but the cost of waiting is NOT flat, and a worktree that gets touched (resetting the mtime
+  clock) without being rebased becomes progressively harder to filter with no upper bound at all.
+- **How to apply.**
+  - When a predicate is written as `X is already in <live reference>`, ask what happens as the
+    reference moves and the subject does not. If the answer is "the predicate weakens", the fix has
+    a half-life and the write-up must say so.
+  - **State the decay next to the verification.** An off != on reading is a measurement at ONE
+    instant against ONE reference; it does not license "this is fixed" for a filter whose reference
+    is a moving branch. Re-read it later against the same subject — that is what caught this.
+  - Prefer, where it is available, a comparison against something that does not move: the merge-base
+    of the worktree's HEAD with `origin/main` answers "did THIS session change it" without decaying.
+    Not done here; recorded as the shape of a durable fix.
+  - Generalises past this gate: any staleness/dedup/allowlist check phrased against `origin/main`,
+    `latest`, `HEAD` or "current config" has this property. Related:
+    `re-baseline-before-judging` (a handed-down baseline expires) — same physics, opposite direction:
+    there the BASELINE went stale, here the REFERENCE moves and the subject goes stale against it.
+- **Cost:** none yet — the reclaim landed and the three blocks are archived. The exposure is a future
+  session reading the 2026-09-24 entry above, or the tool's README, and concluding the mechanism is
+  closed. It is narrowed, not closed, and it re-opens a little each day.
+
+---
