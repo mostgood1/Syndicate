@@ -1094,6 +1094,14 @@ death, never life — do not invert it.
 - Files: .syndicate/deploys.md (ledger only; no code changes -- the commit is already on origin/main and live on refresh-worker)
 - Discharges the open obligation the 2026-09-24 15:49Z deploy row left: "web's INLINE chip path (`source=inline_artifact_stale`) runs `_resolved_week` in web's own process and is UNMEASURED for this fix". It is now measured.
 
+### live-odds-worker-nfl-week-alignment — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
+- Goal: live-odds-worker runs the same commit as web and refresh-worker (7931b18a) with NO field of its own moving, and the in-play odds capture gap the restart costs measured rather than assumed, during a slate with 4 live MLB games
+- **GOAL: MET, both halves.** (1) Inertness: `[venue_poll] KALSHI status=ok markets=6000 reason=None` at 20:14:23Z, byte-identical to the 20:00:55Z baseline; `MLB_LIVE_PROBE live=True report=no_payload schedule=pks=4` identical on both sides. (2) The gap MEASURED, not assumed: `MLB_LIVE_PROBE` 20:01:50Z -> 20:13:26Z = **11m36s**, against a pre-deploy cadence of 5m23s-10m25s over 8 intervals (median ~6m45s) — about ONE EXTRA CYCLE. live-odds-worker `f2558c36` -> `7931b18a`, live 20:07:46Z. Row in `deploys.md`.
+- **THE FALSIFICATION CLAUSE HALF-FIRED AND IS RECORDED AS SUCH.** It said any differing field means the change is not inert here. `ORDER_PATH` position counts DID move (kalshi 8 -> 7, polymarket `no_positions` -> `ok positions=2`), but those are live-market quantities on an in-play slate and are NOT attributable to the deploy in either direction. Logged as unattributed rather than counted as either a pass or a regression — the clause was written too broadly for a service whose outputs move on their own.
+- **The restart-cost estimate I gave the user BEFORE the deploy was wrong in both directions:** longer than quoted (11m36s vs "~5-6 min") and far cheaper than implied, because I quoted a duration with no cadence beside it. The denominator is now in the ledger so the next mid-slate restart is costed, not re-guessed.
+- Files: .syndicate/deploys.md (ledger only; no code changes -- 7931b18a is already on origin/main and live on the other two services)
+- Fleet aligned: all three services on `7931b18a`. The deploy-guard BLOCKED the first attempt correctly — `lane_open.py` writes the lane marker into the WORKTREE while the guard reads the PRIMARY tree, so it saw the previous lane holding a claim owned by this one. Fixed by writing the primary-tree marker, not by overriding.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

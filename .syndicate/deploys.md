@@ -41251,3 +41251,30 @@ Today's board now serves CURRENT-WEEK chips through web, off the artifacts refre
 **Locks.** Claim `web-nfl-week-alignment` acquired 19:12:29Z; preflight `CLEAR` at 19:15:32Z for the exact SHA, baseline age 165s, `only infrastructure processes running` (2 defunct children, already dead). Build 19:15:53Z -> live 19:22:32Z, ~6m40s, polled to `live` rather than assumed.
 
 **Still open after this row:** the `WEEK_SUBSTITUTED` line has never been OBSERVED in production. By construction it should now stay silent on all three services, so its silence is expected and is NOT evidence the emitter works — that is proved by test only (`feedback_absent_signal_is_about_the_emitter`).
+---
+
+## 2026-09-24 20:01:59Z -> live 20:07:46Z (3:01-3:07 PM CDT) — live-odds-worker `f2558c36` -> `7931b18a` (`dep-daqo3dpsrm7s73dq2us0`) — lane `live-odds-worker-nfl-week-alignment` — **FLEET NOW ON ONE COMMIT. A null prediction held, and the restart cost I quoted BEFORE the deploy was overstated because I quoted a duration with no cadence beside it.**
+
+**predict:** `kalshi_venue_poll` `ok_markets6000_at_2000_34Z` -> `resumes_ok_markets6000_after_restart`. Baseline read 20:00:55Z. Deliberately NULL: the NFL week enumerators and the `WEEK_SUBSTITUTED` print are exercised by the chip builder (refresh-worker) and web's inline path; this service calls neither.
+
+**verify: MET, 20:14:23Z** — `[venue_poll] KALSHI status=ok markets=6000 reason=None`, byte-identical to the 20:00:34Z baseline. `ORDER_PATH` resumed 20:14:40Z. Boot sequence observed rather than assumed: `[venue_poll] STARTED interval_seconds=120` at **20:13:13Z**, 5m27s after live — against 5m07s measured on this service at 14:23:51Z, so boot cost is stable.
+
+**THE COST NUMBER I GAVE BEFORE THE DEPLOY WAS A DURATION WITHOUT A DENOMINATOR.** I told the user a restart costs "~5-6 minutes with no in-play odds capture" on 4 live MLB games, and they authorised it on that basis. The measured gap was **larger** than I said and **cheaper** than I implied, which is the combination that should have made me check first:
+
+    MLB_LIVE_PROBE   last before 20:01:50Z   first after 20:13:26Z   gap 11m36s
+
+11m36s, not 5-6 — because the last pre-restart probe fired **5m56s BEFORE** the instance was replaced, so the gap is (time-to-replacement) + (boot), not boot alone. But the probe's OWN cadence in the pre-deploy hour, 8 intervals:
+
+    8m41s  5m23s  7m01s  10m25s  5m52s  6m06s  6m29s  7m20s      median ~6m45s, max 10m25s
+
+**So 11m36s is about ONE EXTRA PROBE CYCLE, and only 1.1x the largest gap this loop takes on its own with nothing wrong.** I had framed it as a blackout of a continuously-capturing service. `feedback_rate_not_count`: I have the denominator recorded now, and the next mid-slate restart of this service should be costed against it rather than re-derived from the boot time.
+
+**WHAT DID NOT MOVE, and what did.** Code-determined fields are identical across the restart: `KALSHI status=ok markets=6000 reason=None`, and `MLB_LIVE_PROBE live=True report=no_payload schedule=pks=4` on both sides. The `ORDER_PATH` position counts DID move — kalshi `positions=8` (19:57:19Z, 20:02:40Z) -> `positions=7` (20:14:40Z), and polymarket `status=no_positions` -> `status=ok positions=2`. **Those are live-market quantities on an in-play slate and I cannot attribute them to this deploy in either direction.** Recording them as unattributed rather than folding them into the null result; the polymarket one moves toward MORE activity, so neither reads as a regression.
+
+**`WEEK_SUBSTITUTED` matched nothing on this service after 20:07:00Z, which proves nothing.** It is expected silent here by construction, and an emitter that has never been OBSERVED cannot be tested by its own silence (`feedback_absent_signal_is_about_the_emitter`). Still owed, on some service, the first real sighting.
+
+**A misreading of mine, caught in the same minute:** I called the post-boot `KALSHI status=` line "overdue" at 20:14:21Z when `STARTED` was 20:13:13Z and the interval is 120s — 68 seconds in, not overdue at all. I had printed the clock in the same command and read past it.
+
+**Locks.** Claim acquired 20:00:39Z; preflight `CLEAR` 20:01:22Z for the exact SHA, baseline age 23s, the only processes being `run_live_odds_refresh_worker.py` and its shell. **The deploy-guard BLOCKED the first attempt** and was right to: `lane_open.py` wrote the new lane marker into the WORKTREE while the guard reads the PRIMARY tree, so it still saw `web-nfl-week-alignment` holding a claim owned by `live-odds-worker-nfl-week-alignment`. Fixed by writing the primary-tree marker, not by overriding the guard.
+
+**FLEET:** web `7931b18a` (19:22:32Z), live-odds-worker `7931b18a` (20:07:46Z), refresh-worker `7931b18a` (15:49:10Z — that third value is PREFLIGHT's reading at 20:01:22Z, not a fresh one; my own service-id lookup for refresh-worker 404'd afterwards and I did not chase it).
