@@ -17,6 +17,7 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 from syndicate.features.nfl import player_stats
+from syndicate.features.nfl import sources as nfl_sources
 from syndicate.features.nfl import props as nfl_props
 
 import backtest_nfl_props as bt
@@ -120,6 +121,26 @@ class CollectRawIntegrationTests(unittest.TestCase):
         )
         self._props_env_patch.start()
         self.addCleanup(self._props_env_patch.stop)
+        # AND THE ROOT LIST ITSELF. The env var PREPENDS the temp root; it does
+        # not replace the list. `collect_raw([2025])` scans EVERY week of the
+        # season, so for the weeks this fixture does not write,
+        # `nfl_props_path` walked on to the repo's own tracked
+        # `oddsapi_player_props_2025_wk*.csv` -- and those are NOT the
+        # header-only stubs the resolver's docstring describes.
+        #
+        # MEASURED 2026-09-24, because the "they are only stubs, so it is
+        # harmless" story was a hypothesis and it is FALSE: **45 of the 58
+        # tracked props files carry real data rows**, many 300-600 KB. Only 13
+        # are 6-byte stubs. `_csv_has_data_rows` therefore ACCEPTS them, and the
+        # audit counted 13 such resolutions in this class -- a "tiny synthetic
+        # season" quietly mixed with real market history.
+        #
+        # Patching `_source_roots` makes the temp root the ONLY root, so a week
+        # the fixture did not write is ABSENT, which is what a synthetic season
+        # means.
+        self._roots_patch = patch.object(nfl_sources, "_source_roots", return_value=[Path(self.nfl_root)])
+        self._roots_patch.start()
+        self.addCleanup(self._roots_patch.stop)
         os.environ.pop("SYNDICATE_DATA_ROOT", None)
         player_stats.load_player_plays.cache_clear()
         player_stats.player_name_index.cache_clear()
