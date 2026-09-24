@@ -4144,3 +4144,38 @@ cheap and checking the ranking of constraints is what actually moves the number.
   prompt for an unattended 10-06 decision run, replaced two days before it fires.
 
 ---
+
+## 2026-09-24 — `git checkout -- <path>` ON A STAGED CHANGE IS A SILENT NO-OP, AND A DESTRUCTIVE COMMAND THAT DOES NOTHING REPORTS EXACTLY LIKE ONE THAT WORKED `[session ac238d51]`
+
+- **What happened.** Authorised to discard a redundant `.syndicate/deploys.md` diff in another
+  session's worktree, I ran `git -C <wt> checkout -- .syndicate/deploys.md`. No output, exit 0. The
+  file was still `438 0` against HEAD.
+- **Why.** `git status` read `M ` — **staged**, with the working tree already matching the index.
+  `checkout -- <path>` restores the working tree FROM THE INDEX, and the index held the change, so
+  it faithfully restored the thing I was trying to remove. `checkout HEAD -- <path>` (or
+  `restore --source=HEAD --staged --worktree`) is what resets both.
+- **Why this is dangerous rather than merely annoying.** Destructive git commands are silent on
+  success. So "no output, exit 0" is the SAME observation for *did exactly what I asked* and *did
+  nothing at all*, and the direction of the error is the one that does not announce itself — I was
+  one step from reporting a discard that had not happened. The inverse error (discarding more than
+  intended) at least leaves evidence.
+- **How to apply.**
+  - **Read the two-column status code before any restore.** `M ` is staged, ` M` is worktree-only,
+    `MM` is both. `checkout --` only addresses the second column.
+  - **Verify a destructive operation by its POSTCONDITION, never by its exit code** —
+    `git diff HEAD -- <path>` empty AND the status entry gone. Same family as
+    `confirm-the-code-ran`: assert the state, not the invocation.
+  - Related in the opposite direction: `git checkout -- <file>` on an UNCOMMITTED file destroys it
+    outright (it did exactly that to my own patch earlier the same day, and `discard-guard.py`
+    refused the same command on a sibling file). The command is under-powered on staged content and
+    over-powered on unstaged content, which is a bad combination to carry a vague mental model into.
+- **Second failure the same minute, logged because it has its own rule already.** I had described
+  that worktree as "two ledger files, 0 untracked". It held **53 entries** including a staged
+  `scripts/` file — because I had run `git status --porcelain -- .syndicate` and separately counted
+  only `??` lines, then characterised the WHOLE worktree from those two filtered queries. That is
+  `compound-absence-claim` exactly: a claim over a population from a check that could only ever see
+  part of it. **When the next action is destructive, re-run the query UNFILTERED first.**
+- **Cost:** none. The no-op was caught by verification, the discard was then done correctly, all 323
+  discarded lines were confirmed present on `origin/main`, and the untouched files stayed untouched.
+
+---
