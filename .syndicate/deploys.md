@@ -41024,3 +41024,21 @@ Polymarket is **PLACING** again: `placed=3`, last at 2026-09-24T13:42:56Z
 overnight. Kalshi still places nothing -- 646 positions, 646
 `insufficient_venue_balance` -- which is the user's standing "not funding
 kalshi now" decision and is the census's own ALERT (exit 1), not a defect.
+## 2026-09-24 14:00:48Z (9:00 AM CDT) - **READING, no deploy** - refresh-worker `f2558c36` - lane `nhl-ncaab-club-maps` (CLOSED)
+
+**The club-map fix HELD overnight, on a population 3x the one it was verified against.** Yesterday's verification was 4 NHL chips; today's slate is 11.
+
+Artifact `2026-09-24T13:59:17Z`, `source=worker_artifact`, read 14:00:48Z:
+
+| sport | chips keyed (both `away.key` and `home.key`) |
+|---|---|
+| nhl | **11 / 11** |
+| mlb | 12 / 12 |
+| nfl | 16 / 16 |
+| wnba | 5 / 5 |
+| ncaaf | 1 / 1 |
+| soccer | 153 / 153 |
+
+**EVERY SPORT ON THE LIVE BOARD IS NOW 100% KEYED** -- the "every sport Syndicate covers has a club map" claim, checked against a served board rather than against the code. Values correct, not merely non-null: `boston bruins`/`philadelphia flyers`, `buffalo sabres`/`detroit red wings`, `florida panthers`/`tampa bay lightning`, `nashville predators`/`carolina hurricanes`. refresh-worker still `f2558c36` -- not reverted.
+
+**A HYPOTHESISED WEB EXPECTATION WAS KILLED BY THIS CHECK, and that is why it is recorded.** `web` builds chips INLINE when the worker artifact is missing (`source=inline_artifact_missing`), which is the normal path for an upcoming date, so a future-date chip looked like a measurable field for a `web` deploy. It is not: 2026-09-26 and 2026-09-29 both return `inline_artifact_missing` with **ZERO chips of any sport**, so there is no field there to move. **`web` (`4f8bcdef`) and `live-odds-worker` (`fe73ed81`) still do not carry the club maps and are NOT deployed**, because neither has a stated expectation and a guessed prediction spends a reboot and poisons its own measurement. The fleet is split on alias behaviour, deliberately and on the record.
