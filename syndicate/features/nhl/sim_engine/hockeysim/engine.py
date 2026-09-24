@@ -2005,8 +2005,47 @@ class GameSimulator:
         st_home: Optional[Dict[str, float]] = None,
         st_away: Optional[Dict[str, float]] = None,
         special_teams_cal: Optional[Dict[str, float]] = None,
+        resume_period_idx: int = 0,
+        resume_seconds_remaining: Optional[int] = None,
+        resume_home_score: int = 0,
+        resume_away_score: int = 0,
     ) -> Tuple[GameState, List[Event]]:
+        """Simulate a game, optionally RESUMING from a live state.
+
+        THE RESUME ARGUMENTS ARE ADDITIVE AND DEFAULT TO THE PREGAME RUN. With
+        `resume_period_idx=0`, `resume_seconds_remaining=None` and both scores 0
+        -- the defaults -- every line below behaves exactly as it did before
+        this parameter block existed: the loop starts at period 0, each period
+        gets `self.cfg.seconds_per_period`, and the state starts 0-0. That
+        identity is asserted by `test_nhl_live_resim`, not assumed.
+
+        WHY THIS IS NOT A NEW MECHANISM, and so does not trip
+        `model_engine_standard` §4.4's re-fit requirement: `period_seconds` was
+        ALREADY a parameter of `simulate_period_with_lines`
+        (`T = int(period_seconds or self.cfg.seconds_per_period)`) and is
+        already exercised with a non-default value by the overtime call below.
+        Goals are Poisson in `rate * T / 3600`, so simulating the remainder of a
+        period is the SAME process over a shorter interval -- not a different
+        one. Nothing here changes a rate.
+
+        The score is seeded rather than seeded-and-scaled for the same reason:
+        the line-level simulator already reads the running score for its score
+        effects (trailing teams shoot more, and more so late and at larger
+        differentials), so a resumed state changes the answer through the
+        mechanism that already exists.
+
+        WHAT THE RETURNED `GameState` MEANS ON A RESUME. `gs.home.score` is the
+        FINAL score (seeded + rest-of-game), which is what a win probability
+        needs. Per-player `stats` are REST-OF-GAME ONLY -- the banked boxscore
+        is not replayed -- so this path must never be used to project a season
+        or full-game player prop. `live_resim.py` publishes the moneyline and
+        nothing else, which is why that is safe there.
+        """
         gs = self._init_game_state(home_name, away_name, roster_home, roster_away)
+        start_idx = max(0, int(resume_period_idx))
+        gs.home.score = int(resume_home_score)
+        gs.away.score = int(resume_away_score)
+        gs.period = start_idx
         events_all: List[Event] = []
         assist_model = str(getattr(self.cfg, "assist_model", "onice") or "onice").strip().lower()
         if assist_model in ("on_ice", "on-ice"):
@@ -2015,8 +2054,22 @@ class GameSimulator:
             assist_model = "off"
         if assist_model not in ("onice", "legacy", "off"):
             assist_model = "onice"
-        for pd in range(self.cfg.periods):
-            hg, ag, ev = self.period_sim.simulate_period_with_lines(gs, self.rates, pd, lineup_home, lineup_away, st_home=st_home, st_away=st_away, special_teams_cal=special_teams_cal, period_seconds=self.cfg.seconds_per_period)
+        for pd in range(start_idx, self.cfg.periods):
+            # ONLY THE PERIOD WE RESUME INTO IS SHORT. Every later period is a
+            # whole one, and on a pregame run (`resume_seconds_remaining=None`)
+            # this is `self.cfg.seconds_per_period` for all of them, which is
+            # the literal expression that was here before.
+            period_seconds = self.cfg.seconds_per_period
+            if pd == start_idx and resume_seconds_remaining is not None:
+                period_seconds = max(0, int(resume_seconds_remaining))
+            if period_seconds <= 0:
+                # Resumed exactly at a period boundary: nothing left to play in
+                # THIS period. Skipping is correct and is not the same as
+                # simulating a zero-length one -- a Poisson draw with lam->0
+                # would be a no-op anyway, but the event stream would carry a
+                # period that did not happen.
+                continue
+            hg, ag, ev = self.period_sim.simulate_period_with_lines(gs, self.rates, pd, lineup_home, lineup_away, st_home=st_home, st_away=st_away, special_teams_cal=special_teams_cal, period_seconds=period_seconds)
             gs.home.score += int(hg)
             gs.away.score += int(ag)
             has_assist_events = any(getattr(x, "kind", None) == "assist" for x in (ev or []))

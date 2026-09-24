@@ -57,3 +57,64 @@ def run_hockeysim_game(
             special_teams_cal=special_teams_cal,
         )
     return simulator.simulate(home_name, away_name, roster_home, roster_away)
+
+
+def run_hockeysim_game_from_state(
+    home_name: str,
+    away_name: str,
+    roster_home: List[Dict],
+    roster_away: List[Dict],
+    rates: RateModels,
+    *,
+    period_idx: int,
+    seconds_remaining: int,
+    home_score: int,
+    away_score: int,
+    lineup_home: Optional[List[Dict]] = None,
+    lineup_away: Optional[List[Dict]] = None,
+    st_home: Optional[Dict[str, float]] = None,
+    st_away: Optional[Dict[str, float]] = None,
+    special_teams_cal: Optional[Dict[str, float]] = None,
+    profile: Optional[SimConfig] = None,
+    seed: Optional[int] = None,
+) -> Tuple[GameState, List[Event]]:
+    """Simulate the REMAINDER of a game already in progress.
+
+    The live-lens resume this module's header reserves a place for. It runs the
+    same production path as `run_hockeysim_game` -- `simulate_with_lineups` --
+    and differs only in that the period loop starts at `period_idx` with
+    `seconds_remaining` left on the clock and the score already on the board.
+
+    `period_idx` IS ZERO-BASED, matching the engine's own loop
+    (`for pd in range(self.cfg.periods)`), NOT the 1-based period a scoreboard
+    shows. First period is 0. The caller converts; getting this wrong resumes a
+    whole period early and the answer stays plausible, which is why it is said
+    here rather than left to be inferred.
+
+    THE RETURNED SCORE IS FINAL (banked + rest-of-game). Per-player `stats` are
+    REST-OF-GAME ONLY -- the banked boxscore is not replayed -- so this must not
+    feed a full-game player prop. `live_resim` publishes the moneyline alone.
+
+    LINEUPS ARE REQUIRED IN PRACTICE. Without them the caller falls to the
+    roster-only path, which has no line rotation and no score effects, and the
+    score effects are precisely what makes a resumed state produce a different
+    answer. This signature accepts `None` to match its sibling, and
+    `live_resim` refuses rather than silently taking that path.
+    """
+    cfg = build_nhl_sim_config(seed=seed, profile=profile)
+    simulator = GameSimulator(cfg, rates)
+    return simulator.simulate_with_lineups(
+        home_name,
+        away_name,
+        roster_home,
+        roster_away,
+        lineup_home or [],
+        lineup_away or [],
+        st_home=st_home,
+        st_away=st_away,
+        special_teams_cal=special_teams_cal,
+        resume_period_idx=int(period_idx),
+        resume_seconds_remaining=int(seconds_remaining),
+        resume_home_score=int(home_score),
+        resume_away_score=int(away_score),
+    )
