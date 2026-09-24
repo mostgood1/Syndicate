@@ -16,6 +16,28 @@ class NflTargetWeekTests(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
         self.nfl_root = os.path.join(self._tmp.name, "nfl_source")
         os.makedirs(self.nfl_root, exist_ok=True)
+        # PATCHES `_source_roots`, NOT `default_nfl_source_root`. `nfl_target_week`
+        # reads through `real_schedule_path` -> `data_path`, and `#672` moved
+        # `data_path` off `default_nfl_source_root` onto a PER-FILE search across
+        # `_source_roots()`. This setUp kept patching the old seam, so the patch
+        # stopped reaching the code under test and these cases silently read the
+        # REPO'S OWN `data/nfl_source/schedule_2026.csv` instead of the fixture
+        # they had just written.
+        #
+        # THAT IS WHY TWO OF THESE FOUR WERE RED (2026-09-24): the real schedule
+        # has unplayed games in week 1, so `completed_weeks_are_skipped` got 1
+        # where it wrote a fixture demanding 2, and `all_games_played_returns_none`
+        # got 1 where it demanded None. **And a third was passing VACUOUSLY** --
+        # `all_games_unplayed_returns_lowest_week` expects 1, which the real file
+        # also returns, so it would have passed no matter what the fixture said.
+        # A stale seam does not only break tests; it quietly converts them into
+        # assertions about production data.
+        #
+        # `default_nfl_source_root` is patched too, so the named-fallback branch
+        # inside `data_path` cannot escape to a real root either.
+        self._roots_patch = patch.object(sources, "_source_roots", return_value=[Path(self.nfl_root)])
+        self._roots_patch.start()
+        self.addCleanup(self._roots_patch.stop)
         self._root_patch = patch.object(sources, "default_nfl_source_root", return_value=Path(self.nfl_root))
         self._root_patch.start()
         self.addCleanup(self._root_patch.stop)
@@ -33,6 +55,16 @@ class NflTargetWeekTests(unittest.TestCase):
 
     def test_missing_file_returns_none(self) -> None:
         self.assertIsNone(sources.nfl_target_week(2099))
+
+    def test_the_fixture_is_what_is_being_read(self) -> None:
+        """Guards the seam itself. Without this, a future change to `data_path`
+        can silently re-point these cases at the repo's real schedule and three
+        of them would still pass -- which is exactly what happened between
+        `#672` and 2026-09-24."""
+        self._write_schedule(2026, [{"week": "7", "home_score": "", "away_score": ""}])
+        self.assertEqual(sources.real_schedule_path(2026).parent, Path(self.nfl_root))
+        # A week number the real schedule cannot produce as its target.
+        self.assertEqual(sources.nfl_target_week(2026), 7)
 
     def test_all_games_unplayed_returns_lowest_week(self) -> None:
         self._write_schedule(2026, [
