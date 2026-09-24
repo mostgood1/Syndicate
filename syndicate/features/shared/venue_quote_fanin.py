@@ -1746,6 +1746,10 @@ def apply_venue_quotes_to_grid(
         # Which key SHAPE won each side's lookup, so the second loop below can
         # attribute its own drops to the shape that got there.
         venue_quote_shapes: dict[str, str] = {}
+        # The freshest venue age that actually repriced a side on THIS row, held
+        # until after `_reprice_live_benchmark` has read the old row age. None
+        # means no side was repriced and the row's clocks must not move.
+        _row_venue_age: float | None = None
         # `#603`. The BARE key first -- unchanged, so every match that works
         # today still works -- then the game-qualified one, and a quote naming a
         # DIFFERENT fixture is refused however well its key matched. Same order
@@ -1985,6 +1989,51 @@ def apply_venue_quotes_to_grid(
             # full-game contract" -- is answered by the grouping, not by the
             # rows. `KXMLBTOTAL-26SEP061340MILCIN-4` -> `KXMLBTOTAL`.
             _bump_matched_series(matched_series, sport_slug, row, quote)
+
+            # THE ROW'S OWN CLOCKS, NOT JUST THE SIDE'S -- and this is the whole
+            # reason a venue reprice never reached the live game-line join.
+            #
+            # `book_grid` writes TWO ages per row: `age_seconds` at row level
+            # (`book_grid.py:861`, from the newest observation at BUILD time) and
+            # `seen_age_seconds` at row level, explicitly a MIN across cells --
+            # "the row's freshest observation, not an average that no book
+            # actually offers". Everything above this line updates only
+            # `best[side]`, so the row kept the sportsbook's build-time age
+            # forever.
+            #
+            # `attach_live_gamelines` gates on the ROW:
+            # `quote_age_verdict(row.get("age_seconds"), ...)`
+            # (`live_gameline_join.py:1709`). So the freshness landed on the grid
+            # and never reached the gate.
+            #
+            # MEASURED on a full live MLB slate 2026-09-24T19:25:20Z:
+            # `VENUE_KEY_SHAPE` reported **49 live sides repriced** of 114 that
+            # found a venue quote, while `LIVE_GAMELINE_JOIN` in the SAME build
+            # reported `considered=292 priceable=0` with **59 stale of 59
+            # full-game rows** -- 100%, unchanged, with the fresh prices sitting
+            # one level down.
+            #
+            # MIN, NEVER MAX. A repriced side can only make the row's freshest
+            # observation younger; it must never age a row UP, or a single stale
+            # venue quote would launder a row that a fresher book had already
+            # made current. That is the same direction `book_grid`'s own `min()`
+            # takes, so this preserves the field's definition rather than
+            # inventing a second one.
+            #
+            # ACCUMULATED HERE, WRITTEN AFTER THE BENCHMARK REWRITE, and the
+            # ordering is the correctness -- writing it here broke
+            # `_reprice_live_benchmark` outright. That function reads the SAME
+            # row field as ITS notion of "the existing benchmark's age"
+            # (`existing_age <= venue_age -> existing_benchmark_is_fresher`), so
+            # lowering it first made every live row refuse its own benchmark
+            # rewrite: `benchmark_rows` went 1 -> 0 and five tests failed. The
+            # row-level `age_seconds` is doing DOUBLE DUTY -- `book_grid`'s
+            # "freshest observation on this row" and the benchmark's "how old is
+            # the thing I am replacing" -- and only one of those may be updated
+            # before the other has read it.
+            if _row_venue_age is None or venue_age < _row_venue_age:
+                _row_venue_age = venue_age
+
             repriced += 1
             # THE ONLY EVENT THAT MEANS THE AGE ACTUALLY MOVED. Every other
             # counter above is a way of not getting here.
@@ -2002,6 +2051,22 @@ def apply_venue_quotes_to_grid(
             benchmark_rows += 1
         elif outcome:
             benchmark_skipped[outcome] = benchmark_skipped.get(outcome, 0) + 1
+
+        # THE ROW'S OWN CLOCKS, LAST -- after `_reprice_live_benchmark` has read
+        # the OLD `age_seconds` as the age of the benchmark it is replacing.
+        #
+        # This is the write that makes a venue reprice visible to
+        # `attach_live_gamelines`, which gates on `row.get("age_seconds")`
+        # (`live_gameline_join.py:1709`), not on `best[side]`. Without it the
+        # fresh price landed on the grid and the gate went on reading the
+        # sportsbook's build-time age -- measured on a full live MLB slate
+        # 2026-09-24T19:25:20Z as 49 live sides repriced against 59 stale of 59
+        # full-game rows in the SAME build.
+        if _row_venue_age is not None and isinstance(row, dict):
+            for _clock in ("age_seconds", "seen_age_seconds"):
+                _existing = _as_float_or_none(row.get(_clock))
+                if _existing is None or _row_venue_age < _existing:
+                    row[_clock] = _row_venue_age
 
     # THE CADENCE, PRINTED WITH ITS DENOMINATOR AND ITS TAIL.
     #

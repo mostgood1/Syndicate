@@ -298,3 +298,76 @@ def test_a_shape_that_wins_but_cannot_move_the_age_is_named_separately():
     assert shapes["club"]["taken"] == 1
     assert shapes["club"].get("repriced", 0) == 0
     assert shapes["club"]["dropped_book_fresher"] == 1
+
+
+# ---------------------------------------------------------------------------
+# THE ROW'S OWN CLOCKS. `attach_live_gamelines` gates on the ROW, not the side,
+# so a reprice that only freshens `best[side]` never reaches the gate.
+# ---------------------------------------------------------------------------
+
+
+def _row_with_clocks(book_age=206.0):
+    """A grid row carrying BOTH row-level clocks, as `book_grid` writes them."""
+    r = _grid_row(book_age=book_age)
+    r["age_seconds"] = book_age
+    r["seen_age_seconds"] = book_age
+    r["best"]["home"]["seen_age_seconds"] = book_age
+    return r
+
+
+def test_a_reprice_lowers_the_ROW_clocks_not_only_the_side():
+    """The defect this fixes. MEASURED on production 2026-09-24T19:25:20Z: 49
+    live sides repriced while the join reported 59 stale of 59 full-game rows in
+    the SAME build, because the fresh price sat one level down."""
+    grid = [_row_with_clocks()]
+    club = str(quote_key("mlb", "h2h", "new york yankees", None))
+
+    result = apply_venue_quotes_to_grid(
+        grid, "mlb", "2026-09-24", collected=_collected(_quote(club, age=23.0)),
+    )
+
+    assert result["repriced"] == 1
+    assert grid[0]["age_seconds"] == pytest.approx(23.0, abs=3.0)
+    assert grid[0]["seen_age_seconds"] == pytest.approx(23.0, abs=3.0)
+
+
+def test_the_live_gameline_gate_FLIPS_on_the_repriced_row():
+    """off != on stated against the real gate, not against a field value.
+
+    `quote_age_verdict` returns a refusal verdict or None; MLB's ceiling is
+    120s. 206s refuses, and the venue's 23s must not."""
+    from syndicate.features.shared.live_gameline_join import quote_age_verdict
+
+    grid = [_row_with_clocks()]
+    assert quote_age_verdict(grid[0]["age_seconds"], sport="mlb") is not None, "premise"
+
+    club = str(quote_key("mlb", "h2h", "new york yankees", None))
+    apply_venue_quotes_to_grid(
+        grid, "mlb", "2026-09-24", collected=_collected(_quote(club, age=23.0)),
+    )
+    assert quote_age_verdict(grid[0]["age_seconds"], sport="mlb") is None, (
+        "the row still reads stale to the gate after a successful reprice"
+    )
+
+
+def test_a_stale_venue_quote_can_NEVER_age_a_fresh_row_UP():
+    """MIN, never MAX. Otherwise one slow venue quote launders a row that a
+    fresher book had already made current -- the age-only laundering this
+    module refuses everywhere else."""
+    grid = [_row_with_clocks(book_age=15.0)]
+    club = str(quote_key("mlb", "h2h", "new york yankees", None))
+
+    apply_venue_quotes_to_grid(
+        grid, "mlb", "2026-09-24", collected=_collected(_quote(club, age=400.0)),
+    )
+    assert grid[0]["age_seconds"] == pytest.approx(15.0)
+    assert grid[0]["seen_age_seconds"] == pytest.approx(15.0)
+
+
+def test_a_row_the_venue_does_not_quote_keeps_its_clocks():
+    grid = [_row_with_clocks()]
+    apply_venue_quotes_to_grid(
+        grid, "mlb", "2026-09-24",
+        collected=_collected(_quote(str(quote_key("mlb", "h2h", "nobody", None)))),
+    )
+    assert grid[0]["age_seconds"] == pytest.approx(206.0)
