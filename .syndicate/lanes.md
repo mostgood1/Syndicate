@@ -1066,6 +1066,15 @@ death, never life — do not invert it.
 - Verification AS BUILT: green on origin/main; R1 refuses any sport present in a registry and absent from DECLARATIONS; the allowlist stays INFO and unscored. Four cells of the hand-built matrix that prompted this lane were wrong or stale: mlb, nhl, wnba and nba. Narrative in log/2026-09-24.md; item registered as 688.
 - Blocked by: none
 
+### nfl-live-resim-activation — OPEN — opened 2026-09-24 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: NFL's live re-sim reaches the Layer 2 board: resolve the snapshot-path collision so one producer owns live/nfl_live_lens.json, open the game-line gate and lens source with the live_resim stamp, and make the coverage checker fail on the real state before it passes on the fixed one
+- Files: syndicate/features/nfl/live_resim.py
+- **TWO FILES THIS LANE WILL NEED ARE HELD ELSEWHERE AND ARE NOT TAKEN.** The coverage checker and its tests belong to lane live-tier-coverage-check, which built them; the R8 rule and the corrected nfl provenance landed as THAT lane's work, not this one's. The shared live-lens loop module is held by lane nhl-live-resim, and the collision fix (dropping nfl from the lens registry, the ncaaf precedent) cannot be made until that lane releases it. Ask before editing.
+- Hypothesis: NFL already has a working live re-sim on refresh-worker's tick (default OFF) that is invisible to the board for two independent reasons: no game-line gate entry, and a snapshot path shared with the pregame-carried lens loop whose last writer wins
+- Falsification test: If nfl/live_resim.py turns out not to produce a genuine live probability, or if the two producers do not in fact resolve the same key, the premise is wrong and the gate must stay shut
+- Verification: The coverage checker FAILS on the pre-fix tree naming both defects, and passes after; two producers no longer resolve one path; enabling the flag is a separate money decision and is NOT part of this goal
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

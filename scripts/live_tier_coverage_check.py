@@ -133,12 +133,20 @@ DECLARATIONS: dict[str, Declaration] = {
         note="Moneyline only. Margin/total distributions are withheld on purpose.",
     ),
     "nfl": Declaration(
-        gameline=PREGAME_CARRIED,
+        gameline=LIVE_RESIM,
         props=PROPS_NONE,
-        evidence="nfl/live_lens.py -- 'Win probability and edges stay "
-                 "pregame-computed in this pass'",
-        note="Ticks, and is correctly ABSENT from the game-line gate. R2 fires the "
-             "moment anyone adds it. Needs an engine, not an allowlist entry.",
+        evidence="nfl/live_resim.py restarts smartsim2 from the live quarter, clock "
+                 "and score (`resim_live_game`, MAX_RESUMABLE_PERIOD=4) and ticks on "
+                 "refresh-worker (`run_refresh_worker._run_nfl_live_resim_tick`)",
+        alternate_producer="syndicate/features/nfl/live_resim.py "
+                           "(refresh-worker's own loop, behind SYNDICATE_NFL_LIVE_RESIM, "
+                           "code default OFF -- absent on all three services 2026-09-24)",
+        note="I FIRST DECLARED THIS `pregame_carried` FROM THE WRONG MODULE. "
+             "`nfl/live_lens.py` is pregame-carried and says so, but it is the LENS "
+             "page builder, not the sport's live tier -- `nfl/live_resim.py` (600 "
+             "lines) is. The wrong declaration made R6 and R8 silent on the one sport "
+             "they were built for, which is the documented soft spot of this file: "
+             "the registries are derived, the provenance is asserted.",
     ),
     "ncaaf": Declaration(
         gameline=LIVE_RESIM,
@@ -164,6 +172,27 @@ DECLARATIONS: dict[str, Declaration] = {
     ),
 }
 
+
+# KNOWN-OPEN findings, mirroring `migration_gate.ALLOWED_AUDIT_FINDINGS`. A
+# waived finding is printed as [KNOWN] and does NOT fail the gate; anything else
+# does. THE WAIVER CANNOT ROT: a waived finding that stops firing is itself a
+# FAIL (`R0_STALE_WAIVER`), because a fix nobody removed the waiver for is
+# indistinguishable from a rule that quietly stopped working -- the same
+# `missing_allowed_findings` guard the migration gate already applies.
+#
+# Every entry names the lane that owns it. An entry with no owner is a defect
+# nobody is fixing wearing the costume of one somebody is.
+KNOWN_OPEN: dict[tuple[str, str], str] = {
+    ("R6_LIVE_PRODUCER_WITHOUT_GATE", "nfl"):
+        "lane `nfl-live-resim-activation` (2026-09-24): the re-sim ticks on "
+        "refresh-worker behind SYNDICATE_NFL_LIVE_RESIM (default OFF) and the "
+        "board never reads it. Enabling it publishes live money edges on an "
+        "engine documented to lose to the close -- a user decision, not wiring.",
+    ("R8_SNAPSHOT_PATH_COLLISION", "nfl"):
+        "lane `nfl-live-resim-activation` (2026-09-24): the lens loop and the "
+        "re-sim share one key. Latent while the flag is OFF; must be resolved "
+        "BEFORE it is ever turned on, or the pregame writer races the live one.",
+}
 
 @dataclass
 class Finding:
@@ -214,6 +243,67 @@ def load_registries() -> Registries:
         gameline=frozenset(_LIVE_GAMELINE_SPORTS),
         sources=frozenset(LIVE_LENS_SOURCES_BY_SPORT),
         allowlisted=frozenset(allowlisted),
+    )
+
+
+def resim_snapshot_path(sport: str) -> str | None:
+    """Where a sport's `live_resim` module publishes, if it has one.
+
+    Signatures differ on purpose and both are real: `nhl` takes no argument
+    (the lens-loop registry calls it directly), `ncaaf`/`nfl` take a data root.
+    Probing both is what lets this be a DERIVED check rather than another
+    assertion -- and an assertion is exactly what failed for nfl.
+    """
+    import importlib
+
+    try:
+        module = importlib.import_module(f"syndicate.features.{sport}.live_resim")
+    except Exception:
+        return None
+    resolver = getattr(module, "live_lens_snapshot_path", None)
+    if resolver is None:
+        return None
+    from syndicate.features.shared.refresh_state_store import data_root
+
+    for args in ((), (data_root(),)):
+        try:
+            return str(resolver(*args))
+        except TypeError:
+            continue
+        except Exception:
+            return None
+    return None
+
+
+def loop_snapshot_path(sport: str) -> str | None:
+    """Where `live_lens_loop`'s tick publishes for this sport, if registered."""
+    try:
+        from syndicate.features.shared.live_lens_loop import _LIVE_LENS_SNAPSHOT_PATHS
+    except Exception:
+        return None
+    resolver = _LIVE_LENS_SNAPSHOT_PATHS.get(sport)
+    if resolver is None:
+        return None
+    try:
+        return str(resolver())
+    except Exception:
+        return None
+
+
+def _loop_resolver_is_the_resim(sport: str) -> bool:
+    """True when the lens loop registered the RESIM's own path resolver.
+
+    That is one producer wearing two names, not two producers sharing a key.
+    """
+    import importlib
+
+    try:
+        from syndicate.features.shared.live_lens_loop import _LIVE_LENS_SNAPSHOT_PATHS
+        module = importlib.import_module(f"syndicate.features.{sport}.live_resim")
+    except Exception:
+        return False
+    return _LIVE_LENS_SNAPSHOT_PATHS.get(sport) is getattr(
+        module, "live_lens_snapshot_path", None
     )
 
 
@@ -296,6 +386,31 @@ def evaluate(reg: Registries, declarations: dict[str, Declaration]) -> list[Find
                 "game-line gate -- the re-sim runs and nothing consumes it",
             ))
 
+        # R8 -- TWO PRODUCERS, ONE KEY. Found on nfl 2026-09-24: the lens loop
+        # (live-odds-worker, pregame-carried) and the live re-sim
+        # (refresh-worker) resolve the SAME `live/nfl_live_lens.json`, which on
+        # Render is one Redis key. Last writer wins, on a ~60s cadence, from two
+        # services -- and the pregame one overwriting the live one is `#340`
+        # arriving by race rather than by wiring. Latent only because the resim
+        # flag defaults OFF.
+        # SAME PATH IS NOT ENOUGH -- it must be TWO PRODUCERS. `nhl` registers
+        # its resim's OWN resolver in the loop (`live_lens_loop.py` imports
+        # `nhl.live_resim.live_lens_snapshot_path` as `_nhl_snapshot_path`), so
+        # one producer owns the path and there is nothing to race. Comparing
+        # only the strings flagged nhl on the first run of this rule -- a row
+        # that is correct as-is, which this lane's own falsification test
+        # forbids. Function IDENTITY separates the two cases exactly.
+        loop_path = loop_snapshot_path(sport)
+        resim_path = resim_snapshot_path(sport)
+        if loop_path and resim_path and loop_path == resim_path                 and not _loop_resolver_is_the_resim(sport):
+            findings.append(Finding(
+                "R8_SNAPSHOT_PATH_COLLISION", sport, "FAIL",
+                f"the lens-loop builder and {sport}/live_resim.py both publish "
+                f"{loop_path} -- one key, two writers on two services, last write "
+                "wins. One producer must own the path (the `ncaaf` precedent: it is "
+                "absent from the lens loop and its re-sim owns the file)",
+            ))
+
         # I1 -- informational ONLY, see the module docstring.
         if sport in reg.allowlisted and sport not in reg.builders:
             findings.append(Finding(
@@ -354,16 +469,30 @@ def main(argv: list[str] | None = None) -> int:
         print(render_matrix(reg, DECLARATIONS))
         print()
 
-    fails = [f for f in findings if f.level == "FAIL"]
+    raw_fails = [f for f in findings if f.level == "FAIL"]
     infos = [f for f in findings if f.level == "INFO"]
+
+    fails = [f for f in raw_fails if (f.rule, f.sport) not in KNOWN_OPEN]
+    known = [f for f in raw_fails if (f.rule, f.sport) in KNOWN_OPEN]
+
+    fired = {(f.rule, f.sport) for f in raw_fails}
+    stale = [key for key in KNOWN_OPEN if key not in fired]
 
     for finding in fails + infos:
         print(f"[{finding.level}] {finding.rule} {finding.sport}: {finding.message}")
+    for finding in known:
+        print(f"[KNOWN] {finding.rule} {finding.sport}: "
+              f"{KNOWN_OPEN[(finding.rule, finding.sport)]}")
+    for rule, sport in sorted(stale):
+        print(f"[FAIL] R0_STALE_WAIVER {sport}: {rule} is waived in KNOWN_OPEN but no "
+              "longer fires -- if it is fixed, DELETE the waiver; if the rule broke, "
+              "that is the bug")
 
     print()
-    print(f"LIVE_TIER_COVERAGE sports={len(ALL_SPORTS)} "
-          f"declared={len(DECLARATIONS)} fail={len(fails)} info={len(infos)}")
-    return 1 if fails else 0
+    print(f"LIVE_TIER_COVERAGE sports={len(ALL_SPORTS)} declared={len(DECLARATIONS)} "
+          f"fail={len(fails)} known_open={len(known)} stale_waiver={len(stale)} "
+          f"info={len(infos)}")
+    return 1 if (fails or stale) else 0
 
 
 if __name__ == "__main__":

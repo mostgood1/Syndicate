@@ -25,6 +25,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from scripts.live_tier_coverage_check import (  # noqa: E402
     DECLARATIONS,
+    KNOWN_OPEN,
     LIVE_PROJECTION,
     LIVE_RESIM,
     NONE,
@@ -78,19 +79,29 @@ def test_r1_fires_when_a_registry_names_an_undeclared_sport():
     assert "R1_UNDECLARED" in _rules(findings)
 
 
-def test_r2_fires_for_the_real_nfl_declaration_added_to_the_gameline_gate():
-    # THE 2026-09-24 MISTAKE, reconstructed from the REAL declaration rather
-    # than a synthetic one, so the test tracks the actual nfl row.
-    declarations = dict(_MLB_OK)
-    declarations["nfl"] = DECLARATIONS["nfl"]
-    assert declarations["nfl"].gameline == PREGAME_CARRIED
+def test_r2_fires_for_a_pregame_carried_producer_added_to_the_gameline_gate():
+    """`#340`: a pregame probability published under a live label.
 
-    clean = evaluate(_registries(lens={"mlb", "nfl"}), declarations)
-    assert "R2_PREGAME_UNDER_LIVE_LABEL" not in _rules(clean), (
-        "nfl is correct as-is today: it ticks and is absent from the gate"
+    THIS TEST USED TO KEY OFF `nfl`'s REAL DECLARATION, and that was wrong in a
+    way worth recording. `nfl/live_lens.py` genuinely is pregame-carried and
+    says so -- but it is the LENS PAGE builder, not the sport's live tier.
+    `nfl/live_resim.py` is, so nfl's declaration is `live_resim` and this test
+    can no longer borrow it. The rule is unchanged; only my example was wrong.
+    """
+    declarations = dict(_MLB_OK)
+    declarations["carried"] = Declaration(
+        gameline=PREGAME_CARRIED, props=PROPS_NONE,
+        evidence="synthetic: a lens that overlays live score onto a pregame number",
     )
 
-    wired = evaluate(_registries(lens={"mlb", "nfl"}, gameline={"mlb", "nfl"}), declarations)
+    clean = evaluate(_registries(lens={"mlb", "carried"}), declarations)
+    assert "R2_PREGAME_UNDER_LIVE_LABEL" not in _rules(clean), (
+        "a pregame-carried producer is fine while it stays out of the gate"
+    )
+
+    wired = evaluate(
+        _registries(lens={"mlb", "carried"}, gameline={"mlb", "carried"}), declarations
+    )
     assert "R2_PREGAME_UNDER_LIVE_LABEL" in _rules(wired)
 
 
@@ -186,14 +197,69 @@ def test_every_sport_in_a_real_registry_is_declared():
     assert in_any <= set(DECLARATIONS), sorted(in_any - set(DECLARATIONS))
 
 
-def test_real_tree_has_no_failing_row():
+def test_real_tree_failures_are_exactly_the_known_open_defects():
     try:
         reg = load_registries()
     except Exception as exc:  # pragma: no cover
         pytest.skip(f"registries unavailable in this tree: {exc!r}")
-    assert _rules(evaluate(reg, DECLARATIONS)) == set()
+    actual = {(f.rule, f.sport) for f in evaluate(reg, DECLARATIONS) if f.level == "FAIL"}
+    assert actual == set(KNOWN_OPEN), (
+        f"unexpected: {sorted(actual - set(KNOWN_OPEN))} | fixed (remove the waiver): "
+        f"{sorted(set(KNOWN_OPEN) - actual)}"
+    )
+
+
+def test_r8_does_not_fire_for_nhl_which_registers_its_own_resim_resolver():
+    """The false positive caught on R8's first run, pinned so it cannot return.
+
+    `nhl` publishes to the same path from the lens loop AND from
+    `nhl/live_resim.py` -- but they are the SAME FUNCTION, imported as an alias.
+    One producer. Flagging it would be a row that is correct as-is, which this
+    lane's falsification criterion forbids.
+    """
+    try:
+        reg = load_registries()
+    except Exception as exc:  # pragma: no cover
+        pytest.skip(f"registries unavailable in this tree: {exc!r}")
+    offenders = {f.sport for f in evaluate(reg, DECLARATIONS)
+                 if f.rule == "R8_SNAPSHOT_PATH_COLLISION"}
+    assert "nhl" not in offenders
+
+
+def test_r8_fires_where_two_distinct_producers_share_a_path():
+    """`nfl` today: the lens loop builds it pregame-carried on live-odds-worker
+    while `nfl/live_resim.py` re-sims it on refresh-worker, both onto one key."""
+    try:
+        reg = load_registries()
+    except Exception as exc:  # pragma: no cover
+        pytest.skip(f"registries unavailable in this tree: {exc!r}")
+    offenders = {f.sport for f in evaluate(reg, DECLARATIONS)
+                 if f.rule == "R8_SNAPSHOT_PATH_COLLISION"}
+    assert "nfl" in offenders
 
 
 def test_every_declaration_carries_evidence():
     for sport, decl in DECLARATIONS.items():
         assert decl.evidence.strip(), f"{sport} declares provenance with no evidence"
+
+
+def test_every_waiver_names_an_owning_lane():
+    """A waiver with no owner is an unfixed defect wearing a fixed one's costume."""
+    for key, reason in KNOWN_OPEN.items():
+        assert "lane `" in reason, f"{key} is waived with no owning lane"
+
+
+def test_the_waived_findings_are_exactly_the_ones_that_still_fire():
+    """The rot-check, from the other side: no waiver may outlive its fix.
+
+    `main()` turns a stale waiver into R0_STALE_WAIVER and a non-zero exit. This
+    asserts the same invariant at the unit level so the failure is attributable
+    to a rule rather than to a gate run.
+    """
+    try:
+        reg = load_registries()
+    except Exception as exc:  # pragma: no cover
+        pytest.skip(f"registries unavailable in this tree: {exc!r}")
+    fired = {(f.rule, f.sport) for f in evaluate(reg, DECLARATIONS) if f.level == "FAIL"}
+    stale = sorted(set(KNOWN_OPEN) - fired)
+    assert not stale, f"waived but no longer firing -- delete these: {stale}"
