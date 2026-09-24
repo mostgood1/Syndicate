@@ -410,3 +410,59 @@ def test_a_refused_lane_still_validates():
     )
     assert LR.validate_live_lens_snapshot(snap)
     assert snap["games"][0]["gameLens"][0]["liveResimRefusal"] == "no_clock"
+
+
+# ---------------------------------------------------------------------------
+# 6. THE BOARD WIRING -- registered, and the refusal stamp REJECTED
+# ---------------------------------------------------------------------------
+
+
+def test_nhl_is_registered_for_live_game_lines():
+    from syndicate.features.shared.board_enrichment import _LIVE_GAMELINE_SPORTS
+
+    assert "nhl" in _LIVE_GAMELINE_SPORTS
+
+
+def test_nhl_is_NOT_registered_for_live_props():
+    """There is no NHL live PROP producer. An unlisted sport must fail closed
+    and say so -- registering it would light up a column nothing feeds."""
+    from syndicate.features.shared.board_enrichment import _LIVE_PROP_SPORTS
+
+    assert "nhl" not in _LIVE_PROP_SPORTS
+
+
+def test_the_join_accepts_the_resim_stamp_and_REJECTS_the_refusal_stamp():
+    """The `#414` guard, stated as a pair.
+
+    `live_resim` must be accepted or nothing prices. `pregame_only` must NOT
+    be, or a game the producer explicitly refused -- no clock, intermission,
+    unknown state -- gets priced off whatever that lane carries. The refused
+    lane carries no probability at all, but accepting its stamp would still be
+    the bug: it would make a refusal look like a producer that had an opinion.
+    """
+    from syndicate.features.shared.live_gameline_join import lens_sources_for_sport
+
+    sources = lens_sources_for_sport("nhl")
+    assert LR.LIVE_RESIM_LENS_SOURCE in sources
+    assert LR.PREGAME_LENS_SOURCE not in sources
+
+
+def test_nhl_has_no_analytic_error_bar_so_the_sim_count_governs():
+    """NHL publishes `simsRun`; `prob_std_err` derives the interval from it.
+    An analytic value here would substitute a number nobody measured for one
+    the producer already reports."""
+    from syndicate.features.shared.live_gameline_join import analytic_std_err_for_sport
+
+    assert analytic_std_err_for_sport("nhl") is None
+
+
+def test_out_of_season_nhl_reports_a_NAMED_empty_not_an_unsupported_sport():
+    """Until October there is no snapshot. The join must say WHICH absence it
+    is -- `supported: True` with a named reason -- so "not wired" and "wired and
+    empty" stay distinguishable on the day the season opens."""
+    from syndicate.features.shared.board_enrichment import attach_live_gamelines_for_sport
+
+    cov = attach_live_gamelines_for_sport([], sport="nhl", selected_date="2026-09-24")
+    assert cov["supported"] is True
+    assert cov["rows_live_gameline_edged"] == 0
+    assert "reason" in cov and cov["reason"]

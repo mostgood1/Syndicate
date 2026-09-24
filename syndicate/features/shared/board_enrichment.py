@@ -2102,7 +2102,29 @@ _LIVE_PROP_SPORTS = frozenset({"mlb", "wnba", "soccer"})
 # of naming the sport. The alternative (leave ncaaf out until the worker is
 # wired) makes the two failures read identically, which is the confusion
 # `build_live_gameline_index`'s `sources_seen` diagnostics exist to end.
-_LIVE_GAMELINE_SPORTS = frozenset({"mlb", "wnba", "soccer", "ncaaf"})
+# `nhl` JOINED 2026-09-24 (lane `nhl-live-resim`). Its live tier is a genuine
+# re-sim: `nhl/live_resim.py` restarts hockeysim from the current period, clock
+# and score, and publishes `modelHomeWinProb` + `simsRun` -- exactly what
+# `price_moneyline` prices and what `prob_std_err` needs. Before this, NHL had
+# no live tier at all: `nhl/live_lens.py` overlays a scoreboard on the PREGAME
+# `sim` payload and recomputes nothing, so a team down 1-3 in the third carried
+# its puck-drop win probability.
+#
+# ENABLING THE SPORT CHANGES NO EDGE UNTIL THE PRODUCER RUNS, and it is
+# deliberately enabled anyway -- the same reasoning ncaaf's entry above records.
+# NHL is out of season until early October 2026, so today this returns
+# `supported: True` with `no published live-lens snapshot` and every live row
+# stays suppressed, which is the board it already serves. The alternative --
+# register it on opening night -- makes "the producer is not wired" and "the
+# producer ran and matched nothing" read identically on the one day it matters.
+#
+# The MEASURED resume behaviour this rests on (n=300 shared seeds, rates fixed):
+# resuming at the opening faceoff reproduces the pregame run bit-identically
+# (p(home) 0.4867 both ways), while P3 05:00 two goals down reads 0.0233 and two
+# goals up reads 0.9867. NOT CLAIMED: that the probability is CALIBRATED --
+# hockeysim is an EV/Poisson approximation per period and its market backtest is
+# unpowered (n=14-15 games / 12 dates).
+_LIVE_GAMELINE_SPORTS = frozenset({"mlb", "wnba", "soccer", "ncaaf", "nhl"})
 
 
 def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: str) -> dict:

@@ -105,6 +105,19 @@ LIVE_LENS_SOURCES_BY_SPORT: dict[str, tuple[str, ...]] = {
     # exactly the case where falling back to the pregame probability produces
     # `#340` in a live label (`#414`), so the stamp is what keeps the two apart.
     "ncaaf": ("live_resim",),
+    # NHL's re-sim restarts hockeysim from the current period, clock and score
+    # (`nhl/live_resim.py`). Same stamp as ncaaf and for the same reason: that
+    # module also publishes a lane stamped `pregame_only` for every game it
+    # REFUSED to price -- a missing clock, an intermission, an unrecognised
+    # game state -- and that lane must be rejected here. A refusal is exactly
+    # the case where falling back to the pregame probability produces `#340` in
+    # a live label (`#414`), so the stamp is what keeps the two apart.
+    #
+    # NOT in `ANALYTIC_LIVE_STD_ERR_BY_SPORT`, deliberately: NHL publishes
+    # `simsRun`, so `prob_std_err` derives the interval from the sim count the
+    # same way it does for MLB. Adding an analytic error bar would substitute a
+    # number nobody measured for one the producer already reports.
+    "nhl": ("live_resim",),
 }
 _DEFAULT_LENS_SOURCES: tuple[str, ...] = (LIVE_STATE_LENS_SOURCE,)
 
