@@ -146,130 +146,22 @@ death, never life — do not invert it.
   - (a) MET by the refresh-worker reading at 22:12:03Z (`deploys.md`): 16 tail syncs, 0 failures, 15 whole resyncs, 0 web refusals, stale glued copies each dropped exactly one line.
   - (b) MET 03:05Z: **79 mlb 09-15 merges from live-odds-worker, 0 refused**, against a control of 335 book_quotes merges over 6 shards.
   - (c) OWED: the full capture day. The clean stretch so far is 22:05:52Z -> 03:02:33Z (~5 h), and the last 4 refusals were the stale 09-19/09-20 copies healing as predicted.
-- **VERDICT (checkpoint 2026-09-15 ~16:55 CDT).** Goal: "[user 2026-09-15: "open the lane and bring me the plan"] no `book_quotes` shard gains a headless fragment line, and the shards already damaged are repaired. Read on production after the fix: 0 lines failing `json.loads` in newly written shards on web and refresh-worker across a full capture day; the refresh-worker byte-offset tail pull never appends into a file that is not a byte prefix of web's copy (the mismatch case is logged by name); and the affected historical shards read clean or are listed with their bad-line counts." — **GOAL: NOT MET.**
-  - **Done since the 15:10 verdict (P5, user decisions "do 1-3" and "All three, staggered"):**
-    - `070a05bf`: publish-time sanitize, torn-tail newline, the tail-sync `.pending` sidecar, glued-line split.
-    - live-odds-worker: off-main `991a94d5`, live 21:02:40Z. Web refusals on its soccer 09-15 merges went 43/43/43 -> 0/0/0. Superseded by `8c089e8c`, which contains it.
-    - web: `dd014d14` live 21:40:47Z. Glued-line salvage applied 21:44:39Z: 7 split, 7 rows written, 0 errors; re-check `glued_lines 0`, bad lines 20 (the orphans).
-    - The rest is in `deploys.md` 20:52:30Z, 21:34:51Z and 21:44:39Z.
-  - **Left:**
-    - (a) refresh-worker gets `070a05bf` inside lane soccer-player-role-allocation's pinned `2d579fd1` (waiting on the MLB sim). The reading is mine: 0 `STREAM_TAIL_SYNC_FAILED`, no `.pending` left, and its stale glued soccer 09-19 copy resyncs (refused 1 line at 21:45:19Z).
-    - (b) live-odds-worker's mlb 09-15 merge after the fix: no merge of that shard from it since 20:30Z.
-    - (c) the goal's "full capture day" reading.
-  - **Instrument gap:** `BOOK_QUOTES_LOCAL_BAD_DROPPED` never appeared although the refusals stopped. Believed, not verified: the publish runs in a child process whose stdout is not collected.
-  - **Claims:** the artifact publisher module was released to lane soccer-live-scoreboard-range-stale (776ad2bc, plus that lane's prefix on the Files-amended bullet). Junk claim tokens were reworded out of this block at this checkpoint.
+- **TRIMMED 2026-09-24 by session 16da93b3 (the user directly: "trim book-quotes-splice-repair too"). 110 lines / 17573 B of HISTORY moved VERBATIM to `lanes_history.md` under `## TRIMMED FROM lanes.md — 2026-09-24 (book-quotes-splice-repair)`; nothing summarised, nothing deleted, fully reversible. OWNER SESSION IS GONE: `get_session local_0f5b256e-...` returns "Session not found", agreeing with this block's own ARCHIVED 2026-09-18 note. **The lane stays OPEN per the user decision 2026-09-17 "leave book-quotes open".** EVERY CLAIM-BEARING LINE WAS KEPT, and which lines those are was MEASURED (removal changes `lane_claims._claims`) rather than pattern-matched: a first attempt chose contiguous ranges and lost 5 of this lane's claims, because `**Files:**` inside the P3 pre-registration and `Tests:` inside P5 declare paths too. Their ancestor bullets were kept with them so no indented child is orphaned. Block was 26687 B.
+
 - Goal: [user 2026-09-15: "open the lane and bring me the plan"] no `book_quotes` shard gains a headless fragment line, and the shards already damaged are repaired. Read on production after the fix: 0 lines failing `json.loads` in newly written shards on web and refresh-worker across a full capture day; the refresh-worker byte-offset tail pull never appends into a file that is not a byte prefix of web's copy (the mismatch case is logged by name); and the affected historical shards read clean or are listed with their bad-line counts.
 - Files: `syndicate/features/shared/artifact_merge.py` (P1: refuse non-JSON lines for book_quotes paths), `tests/test_publish_append_only_merge.py` (P1 tests only), `tests/test_book_quotes_bad_lines.py` (NEW). the artifact publisher module (P2: `pull_streamed_artifact` and new private sync helpers ONLY; TAKEN 2026-09-15 ~13:05 CT from lane `accuracy-assessment-0914`, which held it for one `HOT_ARTIFACT_PATTERNS` entry after taking it from `quote-state-publish-retry` on 09-14. Neither owner session (498e87fd, ed8bb082) could be found by transcript search. User decision "Take it for the pull only (Recommended)". The publish retry wrapper and the pattern entry stay untouched), **User decision 2026-09-15 ~13:40 CDT: "Approve all phases (Recommended)".** **Artifact publisher module RELEASED 2026-09-15 ~16:15 CDT to lane soccer-live-scoreboard-range-stale** (user decision there: "Take a scoped claim", pull watermark functions only; this lane's P2 and P5 edits there landed in 55fee786 and 070a05bf). **RELEASED 2026-09-17 ~12:35Z as a SCOPED TRANSFER to lane `pull-window-dated-scope` (session a1e40980), granted by this lane's session 0f5b256e; by agreement this lane keeps its P2 pull tests there and re-claims the file when that lane closes:** that file's P2 pull tests, since TAKEN away (see the note at the end of this line). **`tests/test_artifact_publisher.py` TAKEN 2026-09-24 by lane `nhl-live-resim` (session 4ab694ed).** Registering nhl's live-lens snapshot in `HOT_ARTIFACT_PATTERNS` and the unconditional pull list broke 5 assertions here: one allowlist negative-control that used `live/nhl_live_lens.json` as its not-allowlisted example, and four pull counts that moved 3 to 4. Taken on the user's decision 2026-09-24 ("take it and fix the tests"); this session's marker points at `layer2-today-next-day-starvation`, so this lane was dormant. Reverting is one edit: drop the path from the taking lane.
   - `syndicate/features/shared/odds_book_quotes.py` (RETURNED 2026-09-21 by lane `board-build-stage-slowdown`, parked, per the `ece6c650` grant; what it added is landed: the LATEST-cache stats counter + `take_latest_cache_stats()`, `bdf874bf`)
   - SCOPED OUT 2026-09-18 ~19:20Z to lane board-build-stage-slowdown (a1e40980, user-decided cache counter; instrument only): `read_book_quotes_latest` + a NEW stats counter + `take_latest_cache_stats()`; whole file for the guard -- held by lane board-build-stage-slowdown until it closes, then it returns here with this lane's P0 scope (bad-line counter in `iter_book_quotes` / `read_book_quotes`): `syndicate/features/shared/odds_book_quotes.py`
-- Origin: lane `book-quotes-prefer-fuller-copy`, root cause 2026-09-15 ~12:40 CDT (that block and `deploys.md` 2026-09-15 16:03:59Z).
-- **Established before this lane, cited from that block:**
-  - refresh-worker appends venue quote rows locally (`append_book_quotes`, no lock) AND tail-pulls web's copy with `Range: bytes=<local size>-` (`pull_streamed_artifact`), so after a local append the pull starts mid-line.
-  - Web's line-union merge keeps the fragment.
-  - Web's mlb 09-03 has 29 lines failing `json.loads` at 63,389,054 B / 140,224 lines, the same size and line count as refresh-worker's plain copy.
-  - live-odds-worker never tail-pulls that shard.
 - Hypothesis for the plan: two independent guards close it: (a) refuse a tail append unless local bytes are a prefix of web's, and (b) web's merge refuses non-JSON lines. Repair: re-derive each damaged shard as the union of its parseable lines, dropping fragments that are the tail of an intact line.
 - Falsification test: a fragment appears in a shard written after both guards are live, OR a dropped "fragment" turns out not to be a suffix of any intact line (that would be data loss, not repair).
 - Verification: per the Goal, recorded in `deploys.md`.
 - Blocked by: the user's approval of the plan.
 - **P5 PRE-REGISTRATION 2026-09-15 ~15:55 CDT (user: "do 1-3", then "All three, staggered (Recommended)" and "Its own deploy, after BQ (Recommended)" for price-at-ask). Code `070a05bf` on main; 207 tests pass on main and on the off-main deploy commits.**
   - **Files, scope widened (no other OPEN lane claims these):**
-    - `odds_book_quotes.py`: `sanitize_book_quotes_shard`, and a newline written in `append_book_quotes` before rows when the last byte is not one.
-    - `artifact_publisher.py`: the sanitize call in `publish_hot_artifact` for append-only paths, plus the `.pending` sidecar in `_apply_synced_tail` and `_resync_append_only_whole`. The retry wrapper and pattern entries are untouched.
-    - `book_quotes_repair.py`: split glued lines.
     - Tests: `test_book_quotes_bad_lines.py`, `test_book_quotes_repair.py` (the artifact-publisher pull tests were TAKEN 2026-09-24 by lane nhl-live-resim; it was claimed here under the BARE spelling while the take used the tests-directory prefix, so both stood and `check_lane_invariants` read ONE file as contested).
-  - **OFF-MAIN deploys, by necessity.** Main carries `soccer-player-role-allocation` steps A `e53274f2` and B `b33ef901`, which that lane's peer records as not approved for deploy. Each deploy is `<service live SHA> + cherry-pick 070a05bf`, `--allow-off-main`, the precedent of lane `soccer-live-scoreboard-range-stale` (`18be9107`). Both owner sessions were messaged 20:5xZ.
-  - **Deploy 1, live-odds-worker `18be9107 + 070a05bf` = `991a94d5`.**
-    - Baseline read 20:47:42Z: web `MERGE_REFUSED_BAD_LINES` 11 since 20:00Z; live-odds-worker book_quotes `ARTIFACT_MERGE_DEFERRED` 19; `BOOK_QUOTES_LOCAL_BAD_DROPPED` 0; `BOOK_QUOTES_TORN_TAIL_TERMINATED` 0. Re-read inside 15 min of preflight.
-    - Expect: `BOOK_QUOTES_LOCAL_BAD_DROPPED` once per stale shard it publishes (mlb 09-15 `dropped` about 10, soccer 09-15 about 43), then 0 web refusals on merges from `publisher=live-odds-worker`.
-    - Falsified if web still refuses a `publisher=live-odds-worker` merge 30 min after the first drop line, or a drop line reports `kept` far below the shard's row count.
-  - **Deploy 2, refresh-worker `<live> + 070a05bf`.** Expect `STREAM_TAIL_SYNC_OK` to continue with 0 `STREAM_TAIL_SYNC_FAILED`, no `.pending` left after a successful sync, and `BOOK_QUOTES_LOCAL_BAD_DROPPED` only where its copy holds bad lines. Waits on preflight HOLD for an MLB sim.
-  - **Deploy 3, web `<live> + 070a05bf`.** Then a repair dry run (`glued_lines` and `salvaged_rows` expected on the soccer 09-13, 09-18 and 09-20 orphans) and the apply only on the user's OK.
-  - **Then price-at-ask:** its own live-odds-worker env set (single-key PUT `SYNDICATE_POLYMARKET_PRICE_AT_ASK=1`) plus a deploy, after Deploy 1 reads clean. Verification as pre-registered in lane `polymarket-ask-pricing`.
-- **P4 READING 2026-09-15 19:28-19:50Z (after the P3 apply). Check (1) MET; check (2) NOT MET, and the cause is outside P2's scope.**
-  - (1) The post-apply dry run found 20 bad lines, all of them the orphans, and 0 fragments.
-  - (3) refresh-worker resynced each touched shard with `STREAM_SYNC_WHOLE reason=overlap_mismatch`, dropping exactly web's refused counts (mlb 09-15 17, soccer 09-15 43, 09-17 14, 09-18 35, 09-19 53, 09-20 20), then went back to `STREAM_TAIL_SYNC_OK`.
-  - (2) Web still refuses on today's shards: mlb 09-15 `refused=10` at 19:43:36Z, and soccer 09-15 `refused=43` at 19:43:44, 19:43:49, 19:50:04, 19:50:08 and 19:50:10Z.
-  - **Every one reads `publisher=live-odds-worker`** (web `ARTIFACT_MERGE_DEFERRED` in the same second). live-odds-worker holds its own copies of those shards, carrying the old fragments, and republishes them whole.
-  - It never re-syncs a shard it already has: `_missing_required_artifact_relative_paths` only asks for artifacts the service lacks (`artifact_publisher.py` ~2956-3001), and it logged 0 pull/sync lines for soccer 09-15 since 19:20Z.
-  - **Harmless to data:** P1 refuses the lines, so web's copy stays clean.
-  - **Cleared by:** live-odds-worker dropping non-JSON lines from its local copy (a code change plus a deploy, user decision), or those shards leaving its publish window.
-  - **Retracted in-session:** a lead that the refusals were `clv_openings/clv_departures` publishes. `_requires_json_lines` matches `book_quotes` only, and `dir=` prints the grandparent folder `tracking`.
-
-- **MAP 2026-09-15 ~13:30 CDT (read-only agent; code + logs + bounded GETs on web's stream route).**
-  - **Every sampled shard has fragments** (bad = fails `json.loads`):
-    - mlb 09-15 14, then 15 a quarter-hour later
-    - mlb 09-14 33
-    - soccer 09-13 190
-    - nfl 09-13 3
-    - ncaaf 09-11 36
-    - soccer 09-15 41
-    - nfl 09-14 14
-  - The damage is ongoing: a new 79-byte headless line landed at exactly web's previous file size via a merge.
-  - **The pull checks nothing.** `pull_streamed_artifact` tail path (`artifact_publisher.py:3193-3222`): `Range: bytes=<local size>-`, appends on any 206, with no prefix, hash, size or newline check. It ignores the route's `X-Artifact-Size`. A 416 counts as success.
-  - **Refresh-worker republishes the splices.** It publishes whole files (`SWEEP_REPAIRING` republishes tail-pulled bytes too).
-  - **Web keeps them.** Its merge appends every new whole-line digest, with no JSON check (`artifact_merge.py:180-193`).
-  - **Readers drop fragments silently** (`iter_book_quotes` and `read_book_quotes` `except: continue`), and NO counter exists anywhere.
-  - **A POSSIBLE SECOND WRITER:** ncaaf 09-11 fragments recur ~hourly with ~240 `STREAM_TAIL_OK` and NO logged append on refresh-worker. Its local file grew 4,098 B with no log line, which fits an unlogged child-process (weekly OddsAPI) writer. Unproven.
-  - **Claims:** `artifact_publisher.py` is held by `quote-state-publish-retry` (retry wrapper only) and possibly `accuracy-assessment-0914` (scope unverified). `artifact_merge.py` is unclaimed. `odds_book_quotes.py` is held by this session's `book-quotes-prefer-fuller-copy`.
-- **PLAN (proposed to the user 2026-09-15, NOT approved, nothing claimed):**
-  - **P0, measure first (refresh-worker + web).** A per-shard bad-line counter in `iter_book_quotes` and `read_book_quotes`: `BOOK_QUOTES_BAD_LINES sport date n`, once per shard per process. It gives the baseline and the verify instrument.
-  - **P1, the web merge refuses non-JSON lines** for `book_quotes` paths (`artifact_merge.py`), logging `MERGE_REFUSED_BAD_LINES`. This stops fragments landing on web from ANY publisher, the unproven second writer included. Web deploy.
-  - **P2, the refresh-worker tail pull verifies the prefix** (`artifact_publisher.pull_streamed_artifact`):
-    - Request from `local_size - overlap`, compare the overlap bytes with the local tail, and require the reply to start on a line boundary and `X-Artifact-Size >= local_size`.
-    - On mismatch it does NOT append. It logs `STREAM_TAIL_PREFIX_MISMATCH`, pulls web's whole copy to a temp file, and writes back the union of valid JSON lines (web ∪ local), atomically, so a local row not yet merged is not lost.
-    - Needs coordination with `quote-state-publish-retry`. Refresh-worker deploy.
-  - **P3, repair (one-shot, web first, then refresh-worker).** Per shard, drop only lines that fail `json.loads` AND are a byte suffix of an intact line in the same shard, with an atomic rewrite. Any other bad line is kept and counted (`REPAIR_ORPHAN_BAD_LINE`), never deleted blind. Refresh-worker's local plain and `.gz` copies are then replaced by web's repaired copy.
-  - **P4, verify:** a full capture day with `BOOK_QUOTES_BAD_LINES = 0` on new shards on web and refresh-worker, 0 fragments merged, and every `STREAM_TAIL_PREFIX_MISMATCH` resolved by a whole pull.
-  - **Order:** P0+P1 (web) -> P0+P2 (refresh-worker) -> P3 -> P4. Each is a separate deploy, measured before the next.
-- **STATUS 2026-09-15 ~13:55 CDT: P0 + P1 BUILT, NOT DEPLOYED. GOAL: NOT MET.**
-  - **P1** `artifact_merge._merge_append_only_locked`: for a target under `book_quotes/` ending `.jsonl`, an incoming line that is not a JSON object is refused (not added, not digested), counted as `refused_bad_lines` in the result, and logged once per merge as `MERGE_REFUSED_BAD_LINES` with a 120-byte sample. Existing bytes are still copied untouched. Other append-only families are unchanged.
-  - **P0** `odds_book_quotes.iter_book_quotes` / `read_book_quotes` count lines that fail `json.loads` or are not objects, and print `BOOK_QUOTES_BAD_LINES sport= shard= bad= lines=` when a shard's bad count changes in the process.
-  - **Tests:**
-    - 4 new in `test_book_quotes_bad_lines.py` (counted once, never yielded; cached reader counts; clean shard silent; growth re-reported).
-    - 3 new in `test_publish_append_only_merge.py` (fragment refused with the prefix kept; non-object JSON refused; another family still takes any line).
-    - 4 endpoint tests' bare-text fixtures became JSON rows, since the guard refuses bare text by design.
-    - 196 passed across the merge, book-quotes and publisher files.
-    - Book-quotes readers elsewhere: 173 passed. The 2 failures in `test_data_mirror_write_guard.py` are this worktree having no `data/` (by design of `session_worktree.py`), unrelated.
-  - **Deploy target:** web carries P1 and the P0 counter (web reads shards for exports and boards); refresh-worker carries P0 later with P2. Each deploy goes to the user first.
-- **P1 + P0 DEPLOYED to web `9ed5c5ad`, live 17:35:11Z.** First reading at 17:39Z: 13 book_quotes merges, 0 refused, 0 bad-line lines (too short to read a zero as a pass). See `deploys.md`.
-- **P2 REDESIGNED BEFORE CODE, 2026-09-15 ~12:55 CT.**
-  - **Why the approved P2 was dropped:** the overlap check plus whole-file-union fallback would misfire on nearly every cycle. refresh-worker appends its own rows between pulls, so every tail after a local append mismatches and forces a ~100 MB whole re-pull, the #241 restart-loop pattern. Its Layer 2 build reads those rows immediately (`layer2_shortlist.py:928` `read_book_quotes_latest`), so moving local writes to an outbox would delay venue prices on the board by a cycle.
-  - **User decision: "Sync marker + tail rewrite (Recommended)".**
-  - **The design:**
-    - A sidecar `<shard>.webpos` records how many leading bytes of the local shard are web's bytes.
-    - The tail pull requests `Range: bytes=<webpos - overlap>-` and verifies the overlap against local bytes `[webpos-overlap, webpos)`.
-    - On a match, under a per-shard lock shared with `append_book_quotes`, it reads the local-only rows after `webpos`, truncates at `webpos`, appends web's new tail, re-appends the local-only valid JSON rows web's tail does not already contain, and advances `webpos`.
-    - On a mismatch, or a missing or implausible `webpos`, it does ONE whole pull plus the local-only valid rows, and resets `webpos`. It is logged by name.
-  - **Files amended:**
-    - Released 2026-09-18 ~19:45Z (file scoped out to board-build-stage-slowdown; see the Files note above) -- was: the scope widening to the append lock in `append_book_quotes` in `odds_book_quotes.py`.
-    - RELEASED 2026-09-15 ~21:20Z to lane `soccer-live-scoreboard-range-stale` (see this block's Files line); the amendment as written: `artifact_publisher.py` stays `pull_streamed_artifact` only, plus a private helper.
 - **STATUS 2026-09-15 ~13:25 CT: P2 BUILT, NOT DEPLOYED.**
-  - `odds_book_quotes.shard_append_lock` (flock on `.<shard>.lock`; a no-op without fcntl; never blocks a write) wraps the append in `append_book_quotes`.
-  - `artifact_publisher.pull_streamed_artifact` routes an append-only shard WITH a local copy to `_pull_append_only_synced`:
-    - it reads `.<shard>.webpos` (missing, <=0 or > size means the file size);
-    - it asks `Range: bytes=<webpos-4096>-` and compares the overlap with our bytes;
-    - on a match it calls `_apply_synced_tail` under the lock: cut at webpos, write web's new bytes, re-append local rows web's tail lacks (dropping non-JSON), advance webpos, log `STREAM_TAIL_SYNC_OK`;
-    - on a mismatch, 416 or non-206 it calls `_resync_append_only_whole`: one full pull plus local valid rows web lacks, webpos = web size, log `STREAM_SYNC_WHOLE reason=`.
-  - A missing local copy is a plain whole pull that now records webpos. The old blind `STREAM_TAIL_OK` append is gone.
-  - Tests: 6 new `AppendOnlySyncedPullTests` (matched tail keeps an unmerged local row; a merged local row is not duplicated; a spliced copy resyncs whole and drops the fragment; 416 resyncs whole; nothing new writes nothing; a missing copy records webpos). The old tail test was updated to the overlap Range. 273 passed across the publisher, merge, book-quotes, capture, shard and retry files.
-  - **Expected on the first deploy:** one `STREAM_SYNC_WHOLE reason=overlap_mismatch` per shard refresh-worker has spliced (no webpos yet and a diverged copy), then `STREAM_TAIL_SYNC_OK` each cycle. The first pass costs one whole pull per touched shard (today, yesterday and forward dates), not one per cycle.
   - **P3 PRE-REGISTERED 2026-09-15 ~13:20 CT, BEFORE CODE (user: "while we wait, start P3 repair of the damaged shards").**
-    - **Where it runs:** on WEB's disk, the source every worker pulls from. One-off Render jobs have no disk and web has no shell, so an admin endpoint `POST /api/ops/book-quotes/repair` spawns a CHILD process (same pattern and reason as `scripts/merge_published_artifact.py`: memory returns on exit, and web does no heavy computation in-process) running `scripts/repair_book_quotes_fragments.py`.
-    - **DRY RUN BY DEFAULT.** It writes only when the body says `apply: true`, and applying is a separate user decision after the dry-run counts are read.
-    - **The rule per shard** (`syndicate/features/shared/book_quotes_repair.py`, NEW), under the SAME per-path merge lock the merge child takes (`append_only_merge_lock`):
-      - Pass 1 collects the lines that are not JSON objects.
-      - Pass 2 marks a bad line VERIFIED only if it is a byte SUFFIX of an intact line in the same shard (the splice signature measured on web: 27 of 29 in mlb 09-03).
-      - With `apply`, it rewrites via temp + `os.replace` without the verified fragments.
-      - ORPHAN bad lines (not a suffix of anything) are KEPT and counted, never deleted blind.
-      - Logs: one `REPAIR_SHARD` JSON line per shard (bytes before/after, lines, bad, verified, orphan, samples), then `REPAIR_DONE`.
-    - **Scope:** `<sport>_source/tracking/book_quotes/*.jsonl` dated >= `since`, for the sports in the body.
-    - **Consequence, stated:** a repaired web shard is no longer a byte extension of what refresh-worker holds. With P2 live, refresh-worker's next sync of that shard mismatches its overlap and does ONE `STREAM_SYNC_WHOLE`, pulling the repaired copy (intended). refresh-worker's LOCAL `.gz` compacted copies of old dates are not touched by this.
-    - **Falsification:** a dry run reporting 0 verified on a shard web already showed with fragments (mlb 09-03: 29 bad), or `apply` removing a line that parses.
-    - **Verification:** dry-run counts on production, then after `apply` the same shard re-read through the stream route with 0 verified fragments left and its intact line count unchanged.
     - **Files:** `syndicate/features/shared/book_quotes_repair.py` (NEW), `scripts/repair_book_quotes_fragments.py` (NEW), `tests/test_book_quotes_repair.py` (NEW). **RELEASED 2026-09-16 ~14:2xZ to lane `web-export-timeout` by user decision ("fix the watermark so it stops skipping truncated files"), scoped to the artifact-export PATTERN branch — this lane's one repair route is untouched and stays yours to reclaim:** `syndicate/blueprints/ops.py` (RETURNED AGAIN 2026-09-16 14:13Z by lane `web-export-timeout`, which held `_artifact_export_budget_bytes` for the 48 MB budget ~14:0x-14:13Z). History: it was first RETURNED to this lane 05:1xZ, the per-file size cap having shipped and verified on all three services (`deploys.md` 04:01:38Z, 04:13:43Z, 05:01:10Z). It was held by lane `web-export-timeout` for the artifact-export PATTERN branch only. This lane's one repair route is unaffected and can re-claim the file when it needs it; `pull_streamed_artifact`, the sync helpers and the pull's watermark semantics are all untouched. The marker placement is deliberate: `lane_claims` cuts at the FIRST disclaimer, so the three files above stay claimed and only what follows is released.
-  - **Guard note:** lane-guard reads the PRIMARY tree's lane ledger, which was 350+ commits stale. The claim transfer landed on origin main (`209bd9b8`) did not unblock the edit until the same edits were mirrored into the primary tree's copy (`accuracy-assessment-0914` Files line, `quote-state-publish-retry` Files line, and its nested `shared:` bullet, which parsed as a live claim).
-
 ### polymarket-rejected-resubmit-loop — OPEN — opened 2026-09-15 — session 0f5b256e-5e9a-4a7d-99be-c421cd010fa8
 - **OWNER SESSION 0f5b256e ARCHIVED 2026-09-18 ~22:40Z / 17:40 CDT (user: "if this session is complete we should archive"); this lane is UNOWNED until picked up.** Waiting on the USER: the rejection-loop fix is unshipped and needs a deploy decision.
 - **VERDICT 2026-09-16 00:20Z (2026-09-15 19:20 CT), session 0f5b256e.** Goal (verbatim): "[user 2026-09-15: "open a lane for the rejection loop"] a Polymarket order the venue REJECTS is not re-submitted unchanged on every pass, and its reject reason is logged." -- **GOAL: NOT MET** (the fix is built and unshipped), but the DIAGNOSIS moved a long way and two hypotheses are settled.
@@ -1053,6 +945,16 @@ death, never life — do not invert it.
 - **The goal said "unchanged at 158" and the measured pair was 161 -> 161.** 158 was the count when the goal was written; two lanes opened and closed since. The INVARIANT held, which is what the clause was for, but the literal number in it was stale before the work started.
 - **WHAT WAS DELIBERATELY NOT TRIMMED.** `- Files:` stays, because `lanes_history.md`'s own header warns that archiving the claim-declaring block leaves `lane-guard` unable to see the claim at all. The ENTIRE current-arm group stays too (2026-09-23 re-arm, the code-mismatch caveat, band reachability, the limits, the **STILL OWED** reading, the prompt-update discharge) — live operational state on someone else's lane is not mine to compress. Only history between the contract and the current arm moved.
 - `check_lane_claims.py` still exits 1, unchanged: its `[BAD] 2 claims name NO FILE IN THE REPO` is pre-existing and untouched. The 156->161 and 7->9 deltas in its output are THIS lane's own two exempt-path claims, which disappear with this close.
+- Files: .syndicate/lanes.md, .syndicate/lanes_history.md
+
+
+### bookquotes-lane-block-trim — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
+- Goal: the book-quotes-splice-repair block in lanes.md drops its historical narrative to lanes_history.md VERBATIM while keeping, untouched, its header, the owner-archived and user-decision-leave-open lines, the 09-17 verdict with its OWED items, the 09-16 progress group whose (c) is the only thing left, the FULL Goal+Files region including its indented claim continuations, and Hypothesis through Blocked by -- with the claim set byte-identical and the lane still OPEN
+- **GOAL: MET.** `book-quotes-splice-repair` went **26,687 B / 135 lines -> 10,049 B / 27 lines**; 110 historical lines (17,573 B) moved VERBATIM to `lanes_history.md`. `lanes.md` **416 KB -> 402 KB**, OPEN blocks **305 KB -> 290 KB**, overage **182 KB -> 168 KB**. Largest OPEN is now `live-inplay-board-cadence` 20 KB (`a1e40980`).
+- **THE FALSIFICATION CLAUSE FIRED ON THE FIRST ATTEMPT AND IS WHY THIS IS CORRECT.** v1 chose keep/move by contiguous ranges and the pre-write check reported the claim set dropping **5 of this lane's 9 claims**: a `**Files:**` bullet inside the P3 pre-registration and a `Tests:` bullet inside P5 declare paths too, not just the `- Files:` line. Nothing was written. v2 DERIVES the keep set instead — for every line, remove it and see whether `lane_claims._claims` changes — which found **5** claim-bearing lines including `**Files, scope widened**`, a line that declares no path itself but whose removal breaks parsing of its children. A grep for `Files:` would have dropped it.
+- **VERIFIED, all before writing:** claims total **162 -> 162 identical**, this lane's **9 -> 9 identical**; **0** orphaned indented lines (each claim line kept with its ancestor chain); every moved non-blank line present verbatim in `lanes_history.md`; every kept line still present; OPEN headers **41 -> 41** and the header still reads OPEN. `check_lane_invariants.py` exit 0 `INVARIANTS HOLD`; `check_lane_claims.py` exit 1 on its pre-existing `[BAD] 2 of 162`, with **0** book-quotes mentions in its complaints.
+- **THE LANE STAYS OPEN BY USER DECISION**, 2026-09-17 "leave book-quotes open", recorded in the block itself and preserved there. Its owner session `0f5b256e` is gone (`get_session` "Session not found", agreeing with the block's own ARCHIVED 2026-09-18 note), which is the same justification as the bandwidth trim.
+- Also kept untouched: the 09-17 verdict with its OWED item, and the 09-16 progress group whose **(c) the full capture day** is the only thing the goal has left. The Goal+Files region was not touched at all — two sessions edited exactly there at 14:16 and 14:17Z today doing claim maintenance.
 - Files: .syndicate/lanes.md, .syndicate/lanes_history.md
 
 
