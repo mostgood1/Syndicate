@@ -511,6 +511,66 @@ def claims_by_path(text):
     return out
 
 
+def claims_lost_to_disclaimer(text, open_only=True):
+    """Paths a Files line NAMES but `_claimable_prefix` cuts away.
+
+    WHY THIS EXISTS, and why it reports rather than changes the cut.
+
+    `_claimable_prefix` truncates a Files line at the first disclaimer marker,
+    and the cut is a PREFIX -- so every path listed AFTER the marker is dropped
+    too. That is correct for a prohibition ("no `render.yaml`") and silently
+    wrong for a sentence that merely MENTIONS another lane before continuing to
+    claim ("`a.py` (loop ONLY, no rate change), `b.py`" cuts at ", no ").
+
+    `_DISCLAIMER_MARKERS` records its own blast radius as "4 lines out of 2,186
+    and every one is a genuine disclaimer". RE-MEASURED 2026-09-24 against the
+    live `lanes.md`: **18 Files lines lose a path and 17 of them are OPEN
+    lanes** -- `web-memory-guard` keeps 0 of 3 (it loses `render.yaml`,
+    `gunicorn.conf.py` and its own test), `soccer-live-fotmob-fixture-cache`
+    keeps 0 of 3, `accuracy-assessment-0914` keeps 6 of 23. A lane can believe
+    it holds files that every other session sees as free.
+
+    THE CUT IS NOT CHANGED HERE, DELIBERATELY. Loosening it would newly contest
+    files across seventeen lanes at once and could block sessions mid-work, and
+    the marker list is the product of three measured incidents on `render.yaml`
+    alone. This module's own reasoning says which direction to fail:
+
+        "Losing a claim is the WORSE direction: a false contest is loud and
+         gets surfaced, an unclaimed file lets two lanes edit it silently."
+
+    So the loss is made LOUD instead. Callers resolve the dropped tokens
+    against the worktree to separate real paths from the noise the extractor
+    also picks up (`Yes/No`, `2b/3`, `origin/main`).
+
+    Yields `(slug, open_lane, marker, lost_paths)`; `marker` is the disclaimer
+    text that caused the cut, so a report can name the words to rewrite.
+    """
+    slug = None
+    open_lane = False
+    for line in text.splitlines():
+        if HEADER_RE.match(line):
+            m = LANE_RE.match(line) or ASCII_LANE_RE.match(line)
+            if m:
+                slug = m.group(1)
+                open_lane = bool(OPEN_RE.search(m.group(2)))
+            else:
+                slug, open_lane = None, False
+            continue
+        fm = FILES_RE.match(line)
+        if not fm:
+            continue
+        if open_only and not open_lane:
+            continue
+        body = fm.group(1)
+        kept = set(_paths_in(_claimable_prefix(body)))
+        lost = sorted(set(_paths_in(body)) - kept)
+        if not lost:
+            continue
+        low = _mask_backticked(body).lower()
+        hits = sorted((low.find(mk), mk) for mk in _DISCLAIMER_MARKERS if low.find(mk) != -1)
+        yield slug, open_lane, (hits[0][1] if hits else ""), lost
+
+
 def matches(rel, claimed):
     """The claim-vs-path test, exactly as `lane-guard.main()` writes it.
 

@@ -1134,6 +1134,13 @@ death, never life — do not invert it.
 - Hypothesis (written before the change): a plain copy is worse than absence because `here` is the script's own directory. CONFIRMED by the measurement above.
 - Files: `scripts/lane_archive_tools/verify_mirror.py`, `scripts/lane_archive_tools/README.md`, and the live out-of-git copy. No OPEN lane claimed them. Nothing deployed — offline tooling. 25 lane-archive tests still green.
 - BLOCK REBUILT rather than extracted, for the second time today: the shared primary tree's `lanes.md` loses blocks to peer writes before they can be committed.
+### lane-claim-truncation-visible — OPEN — opened 2026-09-24 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: Every OPEN lane whose Files line loses a path to the disclaimer prefix cut is REPORTED by name, with the marker that cut it and the paths dropped, by a checker that exits non-zero. No claim's enforcement changes.
+- Files: `.claude/hooks/lane_claims.py` (one new reporting function; the cut semantics stay exactly as they are), `.claude/hooks/lane_claims_source.py` (the same function), `scripts/check_lane_claim_truncation.py` (NEW), `tests/test_lane_claim_truncation.py` (NEW)
+- Hypothesis: _claimable_prefix cuts a Files line at the first _DISCLAIMER_MARKERS hit, and the cut is a PREFIX, so every path listed after the marker is dropped. The code records that measurement as 4 lines of 2,186 with every one a genuine disclaimer. Re-measured 2026-09-24 against the live lanes.md: 18 Files lines lose a path and 17 of them are OPEN lanes, including web-memory-guard keeping 0 of 3 (it loses render.yaml, gunicorn.conf.py and its test) and soccer-live-fotmob-fixture-cache keeping 0 of 3. A lane can therefore believe it holds files that every other session sees as free.
+- Falsification test: If the dropped tokens are overwhelmingly NOT real repository paths (noise like Yes/No, 2b/3, origin/main) then the cut is doing its job and the right output is a much smaller report, not a parser change. Resolve each dropped token against the worktree before reporting it.
+- Verification: The checker names web-memory-guard and soccer-live-fotmob-fixture-cache with their dropped paths and exits non-zero; it exits zero on a lanes.md whose Files lines carry no post-marker paths. Enforcement is unchanged: claims_by_path over the live lanes.md returns the SAME map before and after this lane.
+- Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
