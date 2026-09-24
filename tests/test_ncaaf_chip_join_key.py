@@ -247,10 +247,16 @@ def test_chip_join_key_is_additive_for_every_other_sport(ncaaf_registry):
     # non-vacuous positive even in a worktree with no `data/`.
     assert team_aliases.chip_join_key("nfl", "Carolina Panthers") == "carolina panthers"
     assert team_aliases.chip_join_key("nfl", "GB") == "green bay packers"
-    # nhl and ncaab also resolve `_alias_map` to {} and are deliberately NOT
-    # given a resolver here -- this change is scoped to the sport whose cards
-    # were reported wrong.
-    assert team_aliases.chip_join_key("nhl", "Boston Bruins") is None
-    assert team_aliases.chip_join_key("ncaab", "Duke Blue Devils") is None
+    # nhl and ncaab used to resolve `_alias_map` to {} and were deliberately
+    # left alone by the NCAAF change -- "this change is scoped to the sport
+    # whose cards were reported wrong". They gained maps of their own on
+    # 2026-09-23 (lane `nhl-ncaab-club-maps`), each behind the 2026-08-29
+    # entry's two gates. This test's subject is still the NCAAF change being
+    # additive, and it still is; what moved these two was a different change.
+    assert team_aliases.chip_join_key("nhl", "Boston Bruins") == "boston bruins"
+    assert team_aliases.chip_join_key("ncaab", "Duke Blue Devils") == "duke"
+    # An unconfigured sport still refuses, so "additive" is not read off a
+    # table where every entry happens to resolve.
+    assert team_aliases.chip_join_key("curling", "Team Gushue") is None
     assert team_aliases.chip_join_key("ncaaf", "") is None
     assert team_aliases.chip_join_key("ncaaf", "Not A Real School Aardvarks") is None

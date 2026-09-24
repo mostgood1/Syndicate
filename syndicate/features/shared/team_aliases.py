@@ -700,10 +700,153 @@ def soccer_fixture_clubs(home_code: Any, away_code: Any) -> tuple[str, str] | No
     return None
 
 
+# NHL's ESPN-only two-letter abbreviations. THE ONLY FOUR JOIN-GRADE TOKENS
+# `local_nhl_odds.TEAM_NAME_TO_ABBR` DOES NOT ALREADY CARRY, and every one was
+# OBSERVED rather than recalled: `scripts/survey_nhl_club_tokens.py` enumerates
+# the abbreviation and full/display name emitted by all four NHL feeds this
+# repo reads (NHL api-web, ESPN, TheOddsAPI's two sport keys, the captured
+# `book_quotes` shard) and reports what the source misses. Measured
+# 2026-09-23: **70 join-grade tokens, 66 covered, exactly these 4 not.**
+#
+# This is the 2026-08-29 rule's gate (a) done in the only way that satisfies
+# it: a supplement may contain a string a real feed emitted and nothing else.
+# Re-run the survey before adding a fifth.
+_NHL_ESPN_ABBR_SUPPLEMENT: dict[str, str] = {
+    "la": "LAK",
+    "nj": "NJD",
+    "sj": "SJS",
+    "tb": "TBL",
+}
+
+
+@lru_cache(maxsize=1)
+def _nhl_alias_to_name() -> dict[str, str]:
+    """NHL alias -> canonical club name, derived from `local_nhl_odds`.
+
+    WHY THIS SPORT NEEDED ONE. `_alias_map` returned `{}` for nhl, so
+    `club_key` fell through to raw text and `same_club` relied on
+    `teams_match`'s heuristics. Measured 2026-09-23, those heuristics are False
+    on the real variants: `('Ottawa Senators', 'OTT')`, `('Montreal Canadiens',
+    <the e-acute spelling>)` -- which is the form TheOddsAPI's own listing
+    returns -- and `('Utah Mammoth', 'Utah Hockey Club')`, the franchise
+    rename. Only an exact string match was passing.
+
+    THE SOURCE IS THE ONE THE NHL PIPELINE ALREADY USES.
+    `local_nhl_odds.TEAM_NAME_TO_ABBR` is what `_team_abbr` resolves names
+    through and what `hockeysim.features.market_lines._game_key` keys the odds
+    join on, so this map cannot drift from the join it is meant to serve. It
+    already carries both Utah spellings and both St. Louis punctuations, and
+    `normalize`'s accent fold handles the Montreal case without an entry.
+
+    CANONICAL = THE FIRST NAME THE SOURCE LISTS FOR A TRI-CODE, not a name
+    chosen here. The source is ordered current-name-first ("utah mammoth"
+    before "utah hockey club" before "utah hc"; "st. louis blues" before "st
+    louis blues"), so first-wins is a rule about the source rather than a
+    judgement about hockey. A test pins it.
+
+    VALUES STAY FULL CLUB NAMES because `_nickname_alias_map` splits them on
+    whitespace and takes the last word: tri-code values would derive garbage.
+    For this league that yields real colloquialisms -- `leafs`, `wings`,
+    `jackets`, `knights` -- each unambiguous inside 32 clubs.
+
+    ARIZONA AND UTAH STAY SEPARATE. They are one franchise and
+    `local_nhl_odds._alias_team_abbr` folds ARI onto UTA for seasons >=
+    20252026, but the SOURCE lists them as two tri-codes and merging them here
+    would be this map inventing a fact about relocation that its source does
+    not state -- and would silently rewrite historical Arizona rows. A feed
+    emitting "ARI" today resolves to Arizona, which is a miss, not a wrong
+    answer.
+
+    AMBIGUOUS KEYS ARE DROPPED, the same rule `_soccer_alias_to_name` and
+    `_ncaaf_alias_to_name` apply. Nothing collides today; the pass exists so a
+    future source edit cannot quietly introduce a confident wrong answer.
+    """
+    try:
+        from syndicate.local_nhl_odds import TEAM_ABBRS, TEAM_NAME_TO_ABBR
+    except Exception:
+        return {}
+
+    canonical_by_abbr: dict[str, str] = {}
+    for name, abbr in TEAM_NAME_TO_ABBR.items():
+        canonical_by_abbr.setdefault(str(abbr).upper(), normalize(name))
+    if not canonical_by_abbr:
+        return {}
+
+    offers: dict[str, set[str]] = {}
+
+    def offer(token: object, abbr: str) -> None:
+        key = normalize(token)
+        canonical = canonical_by_abbr.get(str(abbr).upper())
+        if key and canonical:
+            offers.setdefault(key, set()).add(canonical)
+
+    for name, abbr in TEAM_NAME_TO_ABBR.items():
+        offer(name, abbr)
+    for abbr in TEAM_ABBRS:
+        offer(abbr, abbr)
+    for abbr in canonical_by_abbr:
+        offer(abbr, abbr)
+    for token, abbr in _NHL_ESPN_ABBR_SUPPLEMENT.items():
+        offer(token, abbr)
+
+    return {key: next(iter(owners)) for key, owners in offers.items() if len(owners) == 1}
+
+
+@lru_cache(maxsize=1)
+def _ncaab_alias_to_name() -> dict[str, str]:
+    """NCAAB alias -> canonical school, derived from the committed D1 registry.
+
+    SAME SHAPE AS `_ncaaf_alias_to_name`, AND FOR THE SAME REASONS -- read that
+    docstring first; only the differences are recorded here.
+
+    THE SOURCE. `ncaab_team_registry.csv`, 362 Division I programmes fetched
+    from ESPN's own team list by `scripts/build_ncaab_team_registry.py`. NCAAF
+    derives from a CFBD snapshot under `data/`; this one is committed beside
+    the code, because a map derived from `data/` is EMPTY in a session worktree
+    and says nothing about it.
+
+    WHY THERE IS NO DIVISION FILTER, unlike NCAAF's FBS-only rule. NCAAF's
+    registry carries 684 teams across four divisions and the board cards
+    FBS-vs-FBS, so every non-FBS row was a source of codes meaning something
+    else. ESPN's men's-basketball list IS Division I and nothing below it, so
+    there is no second population to filter out -- and D1 is the level that
+    gets priced. If a future source adds D2/D3, this needs NCAAF's treatment:
+    count collisions across ALL divisions, then filter.
+
+    AMBIGUOUS KEYS RESOLVE TO NOTHING, and in this sport that is most of the
+    mascots. The collision pass is the whole safety argument: `teams_match`
+    returns this map's verdict without falling through to its heuristics, so a
+    key two schools both claim would become a confident wrong answer rather
+    than a miss. `tests/test_nhl_ncaab_club_maps.py` pins that the worst
+    offenders -- `wildcats`, `bulldogs`, `tigers`, `eagles` -- are NOT keys.
+
+    A SCHOOL WITH NO UNIQUE TOKEN SIMPLY HAS NO ENTRY, which puts it back on
+    `teams_match`'s heuristics: today's behaviour, not a regression.
+    """
+    try:
+        from syndicate.features.shared.ncaab_team_registry import iter_team_alias_offers
+    except Exception:
+        return {}
+
+    offers: dict[str, set[str]] = {}
+    try:
+        for token, school in iter_team_alias_offers():
+            key = normalize(token)
+            canonical = normalize(school)
+            if key and canonical:
+                offers.setdefault(key, set()).add(canonical)
+    except Exception:
+        return {}
+
+    return {key: next(iter(owners)) for key, owners in offers.items() if len(owners) == 1}
+
+
 def _alias_map(sport: str) -> dict[str, str]:
     slug = normalize(sport)
     if slug == "mlb":
         return _mlb_alias_to_name()
+    if slug == "nhl":
+        return _nhl_alias_to_name()
     if slug == "nfl":
         return dict(_NFL_ALIAS_TO_NAME)
     if slug in {"nba", "wnba"}:
@@ -720,6 +863,8 @@ def _alias_map(sport: str) -> dict[str, str]:
         return _soccer_alias_to_name()
     if slug == "ncaaf":
         return _ncaaf_alias_to_name()
+    if slug == "ncaab":
+        return _ncaab_alias_to_name()
     return {}
 
 
@@ -753,6 +898,21 @@ def _nickname_alias_map(sport: str) -> dict[str, str]:
     wnba 0 added, because its vendored supplement already carries them.
     """
     slug = normalize(sport)
+    if slug == "ncaab":
+        # NCAAB DECLINES FOR EXACTLY NCAAF'S REASON, and the failure is worse
+        # here because the population is bigger. Canonical values are SCHOOLS,
+        # so the last word is a qualifier, not a nickname: "Abilene Christian"
+        # -> `christian`, "Air Force" -> `force`, "Boston College" -> `college`,
+        # "Mississippi State" -> `state`. Measured on the 362-school registry,
+        # `state` alone is the last word of 20+ schools, so it would be dropped
+        # as shared -- but `christian`, `force` and `college` read as unique and
+        # would each become a confident wrong answer for any row naming a
+        # different Christian/Force/College programme.
+        #
+        # Real NCAAB nicknames are MASCOTS and they already reach `_alias_map`
+        # through the registry's `mascot` column under the same collision pass
+        # NCAAF uses, which is the right mechanism for this sport.
+        return {}
     if slug == "ncaaf":
         # NCAAF IS THE ONE SPORT WHERE THIS DERIVATION'S PREMISE IS FALSE, so it
         # declines rather than deriving badly. Every rule above rests on a club

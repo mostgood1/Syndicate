@@ -37,9 +37,17 @@ from typing import Any
 SETTLER_MODULES: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
     ("mlb", "syndicate.features.shared.population_outcomes_mlb", "MlbPopulationSettler", ("mlb",)),
     ("soccer", "syndicate.features.shared.population_outcomes_soccer", "SoccerPopulationSettler", ("soccer",)),
-    # `nba` added 2026-09-20 (lane `daily-accuracy-suite`). NCAAB is absent on purpose and
-    # for exactly one reason -- no team registry -- documented at `population_outcomes_espn.HANDLED_SPORTS`.
-    ("espn", "syndicate.features.shared.population_outcomes_espn", "EspnPopulationSettler", ("nfl", "ncaaf", "wnba", "nba")),
+    # `nba` added 2026-09-20 (lane `daily-accuracy-suite`); `ncaab` added 2026-09-23 (lane
+    # `nhl-ncaab-club-maps`) once its one documented blocker -- no team registry -- was cleared
+    # by `ncaab_team_registry.csv`. The reasoning lives at `population_outcomes_espn.HANDLED_SPORTS`.
+    #
+    # THIS TUPLE AND `HANDLED_SPORTS` ARE TWO LISTS NAMING ONE FACT, and they are read by
+    # different things: the settler decides what it GRADES from `HANDLED_SPORTS`, while
+    # `sport_versions` -- what the scorecard stamps itself with -- is built from the column
+    # here. Moving one alone does not fail loudly; it produces a sport that is graded and not
+    # advertised (or advertised and not graded), which reads as a quiet coverage change.
+    # `tests/test_population_outcomes_basketball.py` pins them in agreement.
+    ("espn", "syndicate.features.shared.population_outcomes_espn", "EspnPopulationSettler", ("nfl", "ncaaf", "wnba", "nba", "ncaab")),
     ("nhl", "syndicate.features.shared.population_outcomes_nhl", "NhlPopulationSettler", ("nhl",)),
 )
 

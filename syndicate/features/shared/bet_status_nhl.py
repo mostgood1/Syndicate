@@ -57,10 +57,17 @@ THE JOIN
 --------------------------------------------------------------------------
 
 `event_id` is OddsAPI's hash and addresses nothing here, so the game is found by TEAM PAIR,
-home against home. `team_aliases.canonical_team("nhl", ...)` resolves NOTHING (its `_alias_map`
-has no NHL branch), so the map is `local_nhl_odds.TEAM_NAME_TO_ABBR` via `_team_abbr` -- the
+home against home. The map is `local_nhl_odds.TEAM_NAME_TO_ABBR` via `_team_abbr` -- the
 same module that writes the NHL odds rows these orders come from -- and it is strict: an
 unknown name is None, never a three-letter guess. The API side is its own `abbrev`.
+
+  This paragraph used to add "`team_aliases.canonical_team("nhl", ...)` resolves NOTHING (its
+  `_alias_map` has no NHL branch)". **That stopped being true on 2026-09-23**: `_alias_map`
+  now has an NHL branch, DERIVED FROM THIS VERY TABLE, so `canonical_team("nhl", ...)`
+  resolves. Nothing here changes -- this file never called it, and going through `_team_abbr`
+  keeps the resolution in the module that owns the vocabulary. The note is corrected rather
+  than deleted because it reads as a reason to prefer `_team_abbr`, and that reason is gone;
+  the remaining reason is provenance, not capability.
 
 Dates searched: the kickoff's US-Eastern date first (and the previous day for a pre-06:00 ET
 kickoff), then the order's plan date -- `bet_status_nfl.order_capture_dates`, shared.

@@ -92,16 +92,37 @@ GRADER_VERSION = "espn/1"
 # `_BASKETBALL_SINGLE`/`_BASKETBALL_DOUBLES` stat tables, same four quarters -- and
 # `team_aliases` already carries an NBA map (`team_aliases.py:709`).
 #
-# NCAAB IS DELIBERATELY NOT HERE, and the reason is one thing only: there is no NCAAB
-# team registry. `_resolve_team` sends every non-NCAAF sport to `canonical_team`, whose
-# alias map has no `ncaab` entry, so every NCAAB game would resolve to None and the
-# settler would return `team_unresolved` for 100% of rows -- a sport that LOOKS covered
-# and grades nothing, which is worse than an honest absence. NCAAF needed a 684-team,
-# 2,342-key registry that REFUSES its 128 ambiguous names ("tigers" names 25 schools);
-# NCAAB needs the same and it does not exist yet. Everything else below is ready for it
-# (`_SPORT_PATHS`, the halves in `_REGULATION_PERIODS`/`_segment_closed`), so adding the
-# registry and this one string is the whole remaining job. NCAAB opens in November.
-HANDLED_SPORTS = frozenset({"nfl", "ncaaf", "wnba", "nba"})
+# NCAAB ADDED 2026-09-23 (lane `nhl-ncaab-club-maps`; these claims were released to it
+# from the unowned `daily-accuracy-suite` on the user's decision). This comment is the
+# receipt for the condition NCAAB was excluded under, which was stated here and has
+# now been met.
+#
+# It used to read: "NCAAB IS DELIBERATELY NOT HERE, and the reason is one thing only:
+# there is no NCAAB team registry ... NCAAF needed a 684-team, 2,342-key registry that
+# REFUSES its 128 ambiguous names ("tigers" names 25 schools); NCAAB needs the same and
+# it does not exist yet ... adding the registry and this one string is the whole
+# remaining job."
+#
+# THE REGISTRY NOW EXISTS, built to that specification.
+# `syndicate/features/shared/ncaab_team_registry.csv` carries 362 Division I programmes
+# and feeds `team_aliases._ncaab_alias_to_name` through the same collision pass NCAAF
+# uses: 1,341 keys over 362 schools, 57 ambiguous tokens DROPPED (`bulldogs` names 14
+# schools, `tigers` 12, `wildcats` 10) and 0 leaked into the map. So `_resolve_team` ->
+# `canonical_team("ncaab", ...)` resolves, and the failure this exclusion existed to
+# prevent -- `team_unresolved` on 100% of rows, a sport that LOOKS covered and grades
+# nothing -- cannot occur.
+#
+# THE REFUSAL IS AS LOAD-BEARING AS THE RESOLUTION. A map that answered "Tigers" would
+# be WORSE than the empty one it replaced, because `teams_match` treats a map as
+# authoritative and skips its heuristics, turning a miss into a confident wrong answer.
+# `canonical_team("ncaab", "Tigers")` is None, pinned in both
+# `tests/test_population_outcomes_basketball.py` and `tests/test_nhl_ncaab_club_maps.py`.
+#
+# THIS REGISTRATION GRADES NOTHING UNTIL NOVEMBER, when NCAAB opens. It is made now
+# because the blocker cleared now, and an empty season is the cheapest window in which
+# to be wrong about it. Everything else was already in place and pinned
+# (`_SPORT_PATHS["ncaab"]`, `BASKETBALL_SPORTS`, the halves in `regulation_periods`).
+HANDLED_SPORTS = frozenset({"nfl", "ncaaf", "wnba", "nba", "ncaab"})
 
 # Every basketball sport reads the same ESPN summary box and the same stat tables.
 BASKETBALL_SPORTS = frozenset({"wnba", "nba", "ncaab"})

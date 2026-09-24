@@ -37,23 +37,34 @@ def _row(sport: str, **extra):
 # --------------------------------------------------------------------------------------
 
 
-def test_nba_is_handled_and_ncaab_is_not():
+def test_nba_and_ncaab_are_both_handled_now():
+    """NCAAB was this test's out-exemplar until 2026-09-23, when its one documented
+    blocker -- no team registry -- was cleared and it joined `HANDLED_SPORTS`."""
     settler = espn.EspnPopulationSettler()
     assert settler.handles(_row("nba")) is True
-    assert settler.handles(_row("ncaab")) is False
+    assert settler.handles(_row("ncaab")) is True
     # The control: the sports that were already handled still are.
     assert settler.handles(_row("wnba")) is True
     assert settler.handles(_row("nfl", market="passing yards")) is True
     # And a market this settler does not own stays unowned for NBA too -- registration
-    # widened the SPORT set, it did not widen what the settler claims.
+    # widened the SPORT set, it did not widen what the settler claims. Same for NCAAB.
     assert settler.handles(_row("nba", market="h2h", player_name=None)) is False
+    assert settler.handles(_row("ncaab", market="h2h", player_name=None)) is False
+    # A sport this settler genuinely does not own, so "handles" is not read off a table
+    # where every entry happens to be True.
+    assert settler.handles(_row("nhl")) is False
 
 
 def test_an_unhandled_sport_returns_none_meaning_not_mine_rather_than_a_verdict():
     """`None` is 'some other settler's problem'. A `(status, reason)` tuple would claim
-    NCAAB as graded-and-refused, which is a different and wrong statement."""
+    the row as graded-and-refused, which is a different and wrong statement.
+
+    NCAAB was the exemplar until it was registered on 2026-09-23; NHL carries the case
+    now. The rule is what matters, not which sport illustrates it -- and NHL is the
+    honest choice because this settler really does not own it (its zero was diagnosed
+    as UPSTREAM of the settler by lane `daily-accuracy-suite`)."""
     settler = espn.EspnPopulationSettler()
-    assert settler(_row("ncaab")) is None
+    assert settler(_row("nhl")) is None
 
 
 def test_the_registry_advertises_a_version_for_nba_and_none_for_ncaab():
@@ -62,9 +73,30 @@ def test_the_registry_advertises_a_version_for_nba_and_none_for_ncaab():
     composite = po.build_extra_settler()
     versions = composite.sport_versions
     assert versions.get("nba") == espn.GRADER_VERSION
-    assert "ncaab" not in versions
+    # NCAAB advertises a version from 2026-09-23, the same day it joined HANDLED_SPORTS.
+    # A sport missing here is a sport the artifact cannot claim to have graded, so the
+    # two must move together or the scorecard stamps itself with a lie in one direction
+    # or the other.
+    assert versions.get("ncaab") == espn.GRADER_VERSION
     for already in ("nfl", "ncaaf", "wnba"):
         assert versions.get(already) == espn.GRADER_VERSION
+    # A sport this settler does not grade must still be advertised by ITS OWN settler,
+    # not by espn -- or the assertion above only proves the dict is non-empty.
+    assert versions.get("nhl") != espn.GRADER_VERSION
+
+
+def test_the_two_lists_that_name_the_espn_settlers_sports_agree():
+    """`HANDLED_SPORTS` decides what the settler GRADES; `SETTLER_MODULES`'s sports
+    column decides what `sport_versions` ADVERTISES. Two lists, one fact, read by
+    different things -- and moving one alone fails silently, as a sport that is graded
+    and not stamped (or stamped and not graded).
+
+    Added 2026-09-23 after registering NCAAB required editing both, in two files, with
+    nothing connecting them but a comment."""
+    declared = dict((name, sports) for name, _module, _cls, sports in po.SETTLER_MODULES)
+    assert set(declared["espn"]) == set(espn.HANDLED_SPORTS), (
+        sorted(set(declared["espn"]) ^ set(espn.HANDLED_SPORTS))
+    )
 
 
 def test_nba_reads_the_nba_endpoint_not_wnbas():
@@ -76,16 +108,31 @@ def test_nba_reads_the_nba_endpoint_not_wnbas():
     assert espn._SPORT_PATHS["nba"] != espn._SPORT_PATHS["wnba"]
 
 
-def test_ncaabs_exclusion_has_exactly_the_documented_cause():
-    """NCAAB is out because no team registry resolves its names -- not for any other
-    reason. If this assertion ever fails, the blocker is gone and NCAAB should be added
-    to HANDLED_SPORTS. Pinning the CAUSE stops the exclusion outliving it."""
+def test_ncaabs_documented_blocker_is_gone_and_ncaab_is_now_registered():
+    """**THE BLOCKER THIS TEST EXISTED TO PIN HAS BEEN CLEARED, and the test firing is
+    what reported it.** That is the whole point of pinning a cause.
+
+    It used to assert `canonical_team("ncaab", ...) is None` and said: "If this
+    assertion ever fails, the blocker is gone and NCAAB should be added to
+    HANDLED_SPORTS." On 2026-09-23 (lane `nhl-ncaab-club-maps`) NCAAB gained a
+    362-school registry and a club map, so it failed -- and the instruction it carried
+    was followed in the same change rather than filed.
+
+    WHAT IS ASSERTED NOW. Both halves, because either alone is a trap: the map must
+    RESOLVE real schools, and it must REFUSE shared mascots. A map that answered
+    "Tigers" would satisfy a resolution-only test while being worse than the empty map
+    it replaced -- `teams_match` treats a map as authoritative and skips its
+    heuristics, so a wrong answer would be confident rather than absent.
+    """
     from syndicate.features.shared.team_aliases import canonical_team
 
-    assert canonical_team("ncaab", "Duke Blue Devils") is None
-    assert canonical_team("ncaab", "Gonzaga") is None
+    assert canonical_team("ncaab", "Duke Blue Devils") == "duke"
+    assert canonical_team("ncaab", "Gonzaga") == "gonzaga"
+    assert canonical_team("ncaab", "Tigers") is None
+    assert canonical_team("ncaab", "Bulldogs") is None
     # ... while the sport NBA joined on does resolve, which is why NBA could be added.
     assert canonical_team("nba", "Boston Celtics") is not None
+    assert "ncaab" in espn.HANDLED_SPORTS
 
 
 def test_everything_except_the_registry_is_already_in_place_for_ncaab():

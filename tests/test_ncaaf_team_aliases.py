@@ -285,9 +285,16 @@ def test_the_other_sports_maps_are_the_same_size_as_before(
         ("wnba", "min", "minnesota lynx"),
         ("nba", "min", "minnesota timberwolves"),
         ("soccer", "Real Madrid", "real madrid"),
-        # Sports that still have no map at all, and must keep refusing.
-        ("nhl", "TOR", None),
-        ("ncaab", "Duke", None),
+        # nhl and ncaab gained maps on 2026-09-23 (lane `nhl-ncaab-club-maps`),
+        # so these two rows moved from `None` to a resolution. They stay in this
+        # table because its job is "the NCAAF change did not alter any other
+        # sport", and that still holds -- what altered them was a later,
+        # deliberate change with its own gates, not this one.
+        ("nhl", "TOR", "toronto maple leafs"),
+        ("ncaab", "Duke", "duke"),
+        # A sport with no branch at all, so the "still refusing" case this table
+        # used to cover through nhl/ncaab is still covered by something.
+        ("curling", "Team Gushue", None),
     ],
 )
 def test_resolution_for_every_other_sport_is_unchanged(sport, token, expected) -> None:
@@ -300,9 +307,20 @@ def test_unambiguous_club_tokens_unchanged_for_the_other_sports(sport, tokens) -
 
 
 def test_the_sports_with_no_map_still_get_an_empty_token_set() -> None:
-    """`unknown` must not default permissive. nhl and ncaab keep refusing."""
-    assert ta.unambiguous_club_tokens("nhl") == frozenset()
-    assert ta.unambiguous_club_tokens("ncaab") == frozenset()
+    """`unknown` must not default permissive -- the rule, not the exemplars.
+
+    nhl and ncaab were the exemplars until 2026-09-23, when both gained a map
+    (lane `nhl-ncaab-club-maps`). **EVERY SPORT SYNDICATE COVERS NOW HAS ONE**,
+    so the only way left to exercise the refusing branch is a slug with no
+    branch at all. That is a weaker exemplar and it is the honest one: the
+    alternative is deleting the test and losing the rule with it.
+    """
+    assert ta.unambiguous_club_tokens("curling") == frozenset()
+    assert ta.unambiguous_club_tokens("") == frozenset()
+    # ... and the sports that DID gain maps now offer tokens, which is what
+    # makes the assertions above a real contrast rather than a vacuous pass.
+    assert ta.unambiguous_club_tokens("nhl")
+    assert ta.unambiguous_club_tokens("ncaab")
 
 
 @needs_registry

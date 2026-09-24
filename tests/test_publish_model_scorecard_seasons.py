@@ -94,13 +94,22 @@ def test_the_settler_registry_and_the_season_table_agree_on_which_sports_exist()
     """A sport in the read list that no settler handles reads zero forever; a sport with a
     settler and no window never gets read. Both are silent, so pin the relationship.
 
-    NCAAB is the ONE deliberate exception and it is named here rather than excused by a
-    loose assertion -- it is read (so it appears with zero rows rather than vanishing) and
-    it is not graded (no team registry). When that changes, this test is what says so.
+    NCAAB WAS the one deliberate exception -- read (so it appeared with zero rows rather
+    than vanishing) but not graded, for want of a team registry -- and this test said "when
+    that changes, this test is what says so". **It said so on 2026-09-23** (lane
+    `nhl-ncaab-club-maps`): the registry landed, `canonical_team("ncaab", ...)` resolves,
+    and ncaab joined both `HANDLED_SPORTS` and `SETTLER_MODULES`.
+
+    So the exception is gone and the relationship is now exact in BOTH directions. That is
+    a stronger assertion than the one it replaces, and it is kept as a set comparison
+    rather than a subset check for the same reason the original named its exception: a
+    loose assertion here hides both silent failures this test exists to catch -- a sport
+    read but never graded (zero forever) and a sport graded but never read.
     """
     from syndicate.features.shared import population_outcomes as po
 
     graded = set(po.build_extra_settler().sport_versions)
     read = set(ALL_SPORTS)
     assert graded - read == set(), f"settler handles sports nothing reads: {graded - read}"
-    assert read - graded == {"ncaab"}, f"unexpected ungraded sports in the read list: {read - graded}"
+    assert read - graded == set(), f"unexpected ungraded sports in the read list: {read - graded}"
+    assert "ncaab" in graded and "ncaab" in read

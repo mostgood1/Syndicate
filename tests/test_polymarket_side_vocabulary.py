@@ -175,14 +175,21 @@ def test_a_sport_with_NO_club_map_offers_no_token_keys():
     """The absence has to be present, or the rule above is only tested where a
     map exists to disagree with.
 
-    `_alias_map` returns `{}` for ncaab and nhl, so nothing in those sports can
-    be shown unambiguous and `unknown` must not land on the permissive branch.
-    (NCAAF was a third exemplar until it gained a map on 2026-09-09; it is
-    asserted separately below, where it is now the STRONGER case.)
+    THIS TEST HAS NOW OUTLIVED ALL THREE OF ITS ORIGINAL EXEMPLARS. NCAAF
+    gained a map on 2026-09-09; nhl and ncaab gained theirs on 2026-09-23 (lane
+    `nhl-ncaab-club-maps`). **Every sport Syndicate covers now has a club
+    map**, so the mapless branch can only be reached through a slug that has no
+    `_alias_map` branch at all.
+
+    That is a weaker exemplar than a real sport, and it is kept rather than
+    deleted because the RULE it guards is the load-bearing part: `unknown` must
+    not land on the permissive branch. A guard deleted when its last example
+    disappears is how a permissive default gets reintroduced with nothing
+    reporting it.
     """
     for sport, home, away in (
-        ("nhl", "Boston Bruins", "Toronto Maple Leafs"),
-        ("ncaab", "Duke Blue Devils", "North Carolina Tar Heels"),
+        ("curling", "Team Gushue", "Team Bottcher"),
+        ("handball", "Barcelona", "Veszprem"),
     ):
         row = {"sport": sport, "market": "h2h", "side": "home", "line": None,
                "home_team": home, "away_team": away}
