@@ -3869,3 +3869,34 @@ be re-justified from scratch on different grounds.
   that job, whatever its age. Reported, not patched (the task file reserves tool changes).
 
 ---
+### 2026-09-24 - REPEAT of `a null result needs a live population`: I sampled only the side of a window where the frame COULD NOT be non-null, and nearly skipped a real deploy
+
+- **What we believed:** that web's inline chip path was UNMEASURABLE, so a `web`
+  deploy of the club maps had no stated expectation and should not be made. I
+  wrote that into `deploys.md` at 14:00:48Z as a finding.
+- **What was actually true:** the inline path was measurable and the fix was
+  VISIBLY MISSING on it. `/api/board/game-chips` serves the worker's artifact for
+  a current date and builds chips inline on web otherwise. I tested only FORWARD
+  dates (2026-09-26, 09-29), which return `inline_artifact_missing` with **zero
+  chips of any sport** because no slate exists yet -- a frame that could not have
+  been non-null. PAST dates run the same code over a real slate: 2026-09-22 served
+  **nhl 0/10** keyed and 09-20 **0/7**, while mlb/nfl/soccer/wnba were complete in
+  the same responses. Every archived NHL date was still showing the original defect
+  after refresh-worker was fixed.
+- **How we found out:** the user asked for the deploy anyway. Looking for an
+  expectation a second time, with past dates in the window, produced one in a
+  single request.
+- **Why this is a REPEAT and not a new rule:** `learnings.md` already carries *a
+  null result needs a live population -- prove the frame could have been non-null*.
+  The forward dates had no games at all. The rule was right, known, and written
+  down, and I still did not apply it, because "I checked the inline path" FELT like
+  a population check while being a check of two empty days.
+- **The rule going forward, sharpened:** when a probe returns nothing, name the
+  population it ran over BEFORE concluding anything -- and if that population is
+  zero, the probe has measured nothing at all. A window has two sides; sampling one
+  is not sampling the window.
+- **Cost:** nearly a skipped deploy that mattered. Zero once corrected: the
+  correction is recorded in `deploys.md` beside the original claim rather than
+  replacing it, so both readings stay visible.
+
+---

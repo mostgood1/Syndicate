@@ -1026,6 +1026,14 @@ death, never life — do not invert it.
 - The two 14-15 day abandoned worktree diffs (`bandwidth-controlled-transfer`, `mlb-ledger-segment-visibility`) did NOT block: the first is the measured case the 2026-09-23 staleness bound was added for, the second never names these slugs. Both re-verified by hand this run.
 - Readings, the full WAIT table and the Part B dormant-OPEN report: `.syndicate/log/2026-09-24.md`.
 
+### club-maps-fleet-rollout — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
+- Goal: web and live-odds-worker carry f2558c36's club maps; on web the reading is NHL chips on an INLINE-built past date (source=inline_artifact_stale) going 0/10 -> 10/10 keyed for 2026-09-22, which is the fleet split as a user sees it
+- **GOAL: MET.** Both services deployed and both readings taken. **web** `4f8bcdef` -> `f2558c36` (`dep-daqitb3tqb8s73elhva0`, live 14:14:13Z): `/api/board/game-chips?date=2026-09-22`, `source=inline_artifact_stale`, **nhl keyed 0/10 -> 10/10** at 14:14:50Z with the served commit read back as `f2558c36` first; controls mlb 16/16, soccer 153/153, wnba 5/5 unchanged. **live-odds-worker** `fe73ed81` -> `f2558c36` (`dep-daqj1t67bikc738mpl1g`, live 14:23:51Z): a NULL prediction, labelled as one -- no field of that service was known to move and its NHL outputs were absent or stale -- MET at 14:29:48Z, `[venue_poll] KALSHI status=ok markets=6000` identical to baseline. Fleet now web / refresh-worker / live-odds-worker all `f2558c36`. Working in `deploys.md` (`4119db20`).
+- **THE HYPOTHESIS WAS CONFIRMED AND IT MATTERED:** `/api/board/game-chips` has TWO code paths, and after refresh-worker alone was fixed, every ARCHIVED NHL date still served null keys from web's inline builder (09-22 nhl 0/10, 09-20 nhl 0/7) while today's worker-built chips carried them. The fleet split was user-visible.
+- **THIS BLOCK WAS NEVER ON origin/main WHILE THE LANE WAS OPEN.** `lane_open.py` ran in the primary tree, so the claim was local-only: `lane-guard` honoured it (it enforces origin/main PLUS local additions) but no other session could see it. No collision occurred; recorded because the next session should not infer from this file that the lane was visible.
+- No code changed. `f2558c36` was already on `origin/main` and live on refresh-worker before this lane opened; this lane only moved two services onto it.
+- Narrative: `.syndicate/log/2026-09-24.md` (lane `nhl-ncaab-club-maps` section) and `deploys.md` rows 14:07:40Z / 14:17:24Z.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
