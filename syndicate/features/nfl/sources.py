@@ -169,6 +169,24 @@ def nfl_props_path(season: int, week: int) -> Path:
     existence discriminates. **The props family is TRACKED IN GIT as header-only
     stubs**, so the checkout does contain it, and existence discriminates nothing.
 
+    PRECISE AS OF 2026-09-24, because a reader turned this sentence into a
+    reason to ignore a real leak (mine): git tracks **14** of these files, of
+    which **13 are 6-byte stubs and ONE is not** --
+    `oddsapi_player_props_2025_wk22.csv`, 10,274 B, with real rows. So
+    `_csv_has_data_rows` below is not merely belt-and-braces against empty
+    stubs; there is already a tracked file it will ACCEPT, and a caller that
+    falls through to the checkout for season 2025 gets real market data rather
+    than nothing.
+
+    AND A DEV MACHINE IS NOT THE CHECKOUT. The primary tree this was measured
+    on carried **58** props files on disk -- the 14 tracked plus **44
+    UNTRACKED** local captures (2023, 2024, most of 2025), most of them
+    300-600 KB of real market history. `git ls-files` and `ls` disagree by 3x
+    here, which is `CLAUDE.md`'s "`data/**` in git is a lossy mirror" in one
+    directory. A test or script that falls through to "the checkout" on a
+    developer's machine is therefore reading whatever that machine happens to
+    have generated, and the amount is unbounded.
+
     Measured on production 2026-08-27, which is what this function is for:
 
         mounted disk  nfl_source/oddsapi_player_props_2026_wk1.csv  42,753 B
