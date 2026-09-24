@@ -149,6 +149,114 @@ def summarise(rows, today=None):
     }
 
 
+
+# --- Byte attribution for the over-budget alarm -------------------------------
+# WHY THIS LIVES HERE rather than in a new tool: this module's own rule, quoted
+# from `pending_deploys.py`, is that "a second tool answering the same question
+# differently is worse than no second tool". "Which blocks are the bytes in" is
+# the same question as "which lanes are OPEN", so this reuses the OPEN test
+# above verbatim. A fresh parser here would make the attribution disagree with
+# the count printed beside it -- the exact failure that docstring prevents.
+#
+# WHY IT EXISTS AT ALL, measured 2026-09-24. The digest emitted
+# `LEDGER OVER BUDGET: lanes.md 485KB>234KB` next to
+# `LANE ARCHIVE OWED: 15 closed/orphaned lanes`, neither carrying a size. Read
+# together they are problem and remedy, and a session read them exactly that
+# way -- opened a lane, archived nine blocks, and only then measured what
+# archiving could recover: CLOSED blocks were 45 KB of a 245 KB overage while
+# OPEN blocks held 359 KB. The named remedy could not have closed the named gap.
+# Worse, the ARCHIVE line fires only at `CLOSED > 12`, so that same run dropped
+# the count to 10 and SILENCED it while the overage stood: an alarm that goes
+# quiet on partial payment of the wrong debt.
+BLOCK_END_RE = re.compile(r"^#{2}\s")
+
+
+def block_bytes(text):
+    """Bytes per lane block, split by whether the guard considers it OPEN.
+
+    Returns (open_bytes, other_bytes, outside_bytes, per_open) where `per_open`
+    is [(slug, bytes, session_prefix)] descending. `outside_bytes` is every byte
+    NOT inside a `### ` block -- section headers, the archived-pointer list,
+    preamble -- reported apart because it belongs to no lane and so is nobody's
+    to trim.
+    """
+    open_b = other_b = outside_b = 0
+    per_open = {}
+    sess = {}
+    cur = None
+    cur_open = False
+    for line in text.splitlines():
+        if HEADER_RE.match(line):
+            m = LANE_RE.match(line) or ASCII_LANE_RE.match(line)
+            if m:
+                cur, cur_open = m.group(1), bool(OPEN_RE.search(m.group(2)))
+                s = re.search(r"session ([0-9a-f]{8})", line)
+                sess[cur] = s.group(1) if s else "unowned"
+            else:
+                cur, cur_open = None, False
+        elif BLOCK_END_RE.match(line):
+            cur, cur_open = None, False
+        n = len(line.encode("utf-8")) + 1
+        if cur is None:
+            outside_b += n
+        elif cur_open:
+            open_b += n
+            per_open[cur] = per_open.get(cur, 0) + n
+        else:
+            other_b += n
+    ranked = sorted(((s, b, sess.get(s, "?")) for s, b in per_open.items()),
+                    key=lambda r: -r[1])
+    return open_b, other_b, outside_b, ranked
+
+
+def budget_line(text, cap):
+    """One line naming WHERE an over-budget lanes.md's bytes are, or None.
+
+    None when the file is under budget, so a caller stays SILENT rather than
+    printing a reassuring line. This is an alarm, not a dashboard.
+    """
+    if not cap or cap <= 0:
+        # An absent cap must not fall through to the permissive branch: with
+        # cap=0 every file is "over budget" and the line advertises a 0KB cap.
+        # Found by this function's own verification, not reasoned about.
+        raise ValueError("budget_line needs the ENFORCED cap; got %r" % (cap,))
+    size = len(text.encode("utf-8"))
+    if size <= cap:
+        return None
+    ob, cb, xb, ranked = block_bytes(text)
+
+    def kb(n):
+        return "%dKB" % (n // 1024)
+
+    over = size - cap
+    line = ("lanes.md %s over a %s cap: OPEN blocks %s across %d lanes, "
+            "closed/other blocks %s, unattributed %s."
+            % (kb(size), kb(cap), kb(ob), len(ranked), kb(cb), kb(xb)))
+    if ranked:
+        line += (" Archiving closed lanes recovers at most %s of the %s overage"
+                 " -- the rest needs the OWNING session. Largest OPEN: %s %s (%s)."
+                 % (kb(cb), kb(over), ranked[0][0], kb(ranked[0][1]),
+                    ranked[0][2]))
+    return line
+
+
+def budget_digest(text, cap):
+    """The attribution in ~36 chars, for the session-start digest, or None.
+
+    Deliberately says `archivable` rather than naming a remedy: the point is the
+    SIZE of what archiving can recover, sitting next to the overage, so the two
+    cannot be read as problem and solution. Bounded by construction so no caller
+    needs to truncate it.
+    """
+    if not cap or cap <= 0:
+        raise ValueError("budget_digest needs the ENFORCED cap; got %r" % (cap,))
+    size = len(text.encode("utf-8"))
+    if size <= cap:
+        return None
+    ob, cb, _xb, ranked = block_bytes(text)
+    return "OPEN %dKB/%d lanes, archivable %dKB" % (ob // 1024, len(ranked),
+                                                    cb // 1024)
+
 def read_ref(ref):
     """`lanes.md` at a git ref, or None. Never raises."""
     if ref == "WORKTREE":
@@ -201,6 +309,12 @@ def main(argv=None):
     ap.add_argument("--digest", action="store_true",
                     help="one line, for the session-start digest")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--budget", action="store_true",
+                    help="one line naming WHERE an over-budget lanes.md's "
+                         "bytes are; silent and exit 0 when under budget")
+    ap.add_argument("--budget-digest", action="store_true",
+                    help="the same attribution in ~36 chars for the "
+                         "session-start digest; silent when under budget")
     ap.add_argument("--ref", default="origin/main",
                     help="ref to compare the worktree against, or WORKTREE to "
                          "skip the comparison (default: origin/main)")
@@ -219,6 +333,25 @@ def main(argv=None):
         if ref_text is not None:
             origin = summarise(lanes(ref_text))
             n_behind = behind(args.ref)
+
+    if args.budget or args.budget_digest:
+        # The cap comes from the one component that ENFORCES it. A local copy
+        # of the number is precisely the drift `ledger_caps.py` exists to stop.
+        try:
+            from ledger_caps import cap as _enforced_cap
+            lanes_cap = _enforced_cap("lanes.md")
+        except Exception as exc:
+            sys.stderr.write("lane_census: cannot read the enforced cap (%s)" % exc + chr(10))
+            return 2
+        fn = budget_digest if args.budget_digest else budget_line
+        try:
+            line = fn(tree_text, lanes_cap)
+        except ValueError as exc:
+            sys.stderr.write("lane_census: %s" % exc + chr(10))
+            return 2
+        if line:
+            print(line)
+        return 0
 
     if args.digest:
         print(digest_line(tree, origin, n_behind))

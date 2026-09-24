@@ -1044,6 +1044,18 @@ death, never life — do not invert it.
 - `INVARIANTS HOLD` was already true on the BASE file, so the digest's session-start `LEDGER INCOHERENT` was cleared by someone else, NOT by this run. Checked before claiming it.
 - Files: .syndicate/lanes.md, .syndicate/lanes_closed.md
 
+### lanes-budget-attribution — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
+- Goal: the session-start LEDGER OVER BUDGET line for lanes.md states WHERE the overage is -- bytes in CLOSED blocks (mechanical, archivable) versus OPEN blocks (needs the owning session) plus the largest OPEN holder -- so no reader can infer from it that archiving closed lanes will fix the budget, which is the inference I drew today and acted on
+- **GOAL: MET.** The digest now emits `lanes.md 468KB>234KB (OPEN 360KB/39 lanes, archivable 27KB)` — read off an actual run of the modified hook, not from the code. A reader sees a 234KB overage beside 27KB of archivable bytes, so the inference I drew this morning is no longer available.
+- **Falsification clause NEARLY FIRED and changed the design.** The digest body measured **1664 B against BUDGET=1800**, so the full sentence (~280 B) would have tripped `DIGEST OVERFLOW` — the clause's exact condition. Resolved by folding a **38 B** form into the EXISTING line instead of adding one: body is now 1703 B, no overflow, 97 B spare. The full sentence lives on as `--budget`, for a human.
+- **The silencing is now OBSERVED, not predicted:** `LANE ARCHIVE OWED` fires at `CLOSED > 12`, and after this morning's archive took the count to 10 the line is **GONE from the digest** while `lanes.md 468KB>234KB` still fires. An alarm that went quiet on partial payment of the wrong debt.
+- **VERIFIED off != on in BOTH failure directions, by running the hook:** python absent (`env -i PATH=/usr/bin:/bin`) — line byte-identical to today's; python present but exiting 1 (a stub on a POSIX PATH) — also byte-identical; python working — parenthetical appears. Fails open like every other python call in that file.
+- **Tests: `tests/test_lane_census_budget.py`, 12 passing, and 3 mutations caught** (permissive cap guard removed, outside bytes dropped, closed bytes counted as OPEN). `test_ledger_caps.py` 7/7 including "no other file hardcodes a ledger cap" — the new code reads the cap through `ledger_caps.cap()`. `test_lane_archive_tools.py` 25 passed.
+- **THREE OF MY OWN CHECKS WERE VACUOUS and only a control caught each:** a `PATH="C:/..."` stub was never found (a colon in `C:` splits PATH), so an "it falls back" claim rested on nothing; `git hash-object` without `-w` stores no object, so an EOL check read an EMPTY blob and printed a pass; and my own split test passed under the mutation it existed to catch, because a conflated bucket merely goes to 0.
+- Files: scripts/lane_census.py, .claude/hooks/session-start.sh
+- **NOT DONE, and it is the actual debt:** 360 KB of OPEN blocks across 39 lanes is 76% of the file and **none of it is mine** — I own 0 OPEN blocks. The largest is `bandwidth-controlled-transfer` 69 KB (session `40d9e921`), 30% of the overage alone. Trimming it is the OWNING session's to do; editing across lanes is forbidden. This lane made the debt attributable, not smaller.
+- **CAVEAT ON REACH:** hooks run from the tree they live in, so this changes nothing for a session started in the PRIMARY tree until the file is copied there. On `origin/main` is not the same as in effect.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

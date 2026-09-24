@@ -391,7 +391,27 @@ for f in lanes.md:240000 learnings.md:460000; do
   n=${f%%:*}; cap=${f##*:}
   if [ -f ".syndicate/$n" ]; then
     SZ=$(wc -c < ".syndicate/$n" 2>/dev/null | tr -d ' ')
-    [ "${SZ:-0}" -gt "$cap" ] && BLOAT="${BLOAT}${n} $((SZ/1024))KB>$((cap/1024))KB, "
+    if [ "${SZ:-0}" -gt "$cap" ]; then
+      # WHERE the bytes are, for lanes.md only. Without it this line names a
+      # size and no owner, and the LANE ARCHIVE OWED line below reads as its
+      # remedy. Measured 2026-09-24: closed blocks were 45KB of a 245KB
+      # overage and OPEN blocks 361KB, so archiving could not have closed the
+      # gap -- a session archived nine blocks before measuring that. Worse,
+      # ARCHIVE OWED fires only at CLOSED>12, so that same run took it to 10
+      # and SILENCED it while the overage stood. `archivable` is stated as a
+      # SIZE, not a remedy, so the two cannot be read as problem and solution.
+      # +38B, deliberately: the body was 1664B against BUDGET=1800, and the
+      # full sentence (~280B) overflows. That form is `--budget`, for a human.
+      # FAILS OPEN like every python call here: no python, no script or a
+      # non-zero exit leaves this line exactly as it read before.
+      WHERE=""
+      if [ "$n" = "lanes.md" ] && command -v python >/dev/null 2>&1 \
+         && [ -f scripts/lane_census.py ]; then
+        W=$(python scripts/lane_census.py --budget-digest 2>/dev/null)
+        [ -n "$W" ] && WHERE=" ($W)"
+      fi
+      BLOAT="${BLOAT}${n} $((SZ/1024))KB>$((cap/1024))KB${WHERE}, "
+    fi
   fi
 done
 [ -n "$BLOAT" ] && add "LEDGER OVER BUDGET: ${BLOAT%, } — these are read every session."
