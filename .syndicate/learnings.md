@@ -3943,3 +3943,41 @@ be re-justified from scratch on different grounds.
 - **Rule.** When the gate that makes a reconstruction trustworthy cannot be met, do not lower it silently. (1) Make the weaker anchor a SEPARATE, named option that refuses unless the caller also declares what is now unproven — here `--expect-records-considered` proves only that the same LEDGER was scored and exits 3 without `--finals-population statsapi`. (2) Stamp the row with what it actually used. (3) Teach the CONSUMER to split on that stamp and print both sub-pools, so the weaker rows can never be read as the stronger ones. Absent may map to the strong value only when that is true BY CONSTRUCTION (every ordinary capture reads a board build, so absent IS `board`) — never as a convenience.
 - **Corollary on lane goals.** A goal can carry a verification clause that turns out to be impossible. That is `GOAL: NOT MET` plus a finding — not licence to swap in a weaker check and call it MET. Here the impossibility WAS the main result, and it is now the reason nobody re-attempts this the same way.
 - **A refusal is a measurement.** The three dates the anchor rejected are worth more than the seven it passed: `08-24` anchors fine and has ZERO rows at the 120s cut (genuinely empty at the fresh cut, not frozen — now an honest coverage gap); `08-28` fails ordinarily (capture taken mid-slate, 6,466 vs 6,534); and `08-20`'s capture read **4,817 records where the ledger serves 4,809 TODAY** — an APPEND-ONLY ledger that shrank by 8. Nothing else was looking at that, and only a gate that refuses could have surfaced it. See `leads.md`.
+
+## 2026-09-24 — A NARROWING FILTER THAT RETURNS THE WRONG SHAPE DOES NOT NARROW ITS PREDICATE, IT VOIDS IT — and a voided guard looks like the fix working spectacularly well `[lane archive-diff-baseline-echo, session ac238d51, caught pre-merge]`
+
+- **What I was doing.** Inserting `drop_upstream_echoes()` into the lane-archive gate between
+  `changed_lines_only()` and its consumer, to stop a stale-baseline worktree diff blocking CLOSED
+  lanes. A pure narrowing change: drop some lines, keep the rest.
+- **What I wrote.** A list comprehension taking and returning a **list** of lines, because that is
+  the shape the logic reads most naturally in.
+- **What the pipeline actually passes.** `changed_lines_only()` returns the lines **joined into one
+  string**, and both call sites then ask `slug in text`. Handed a string, my comprehension iterated
+  it CHARACTER BY CHARACTER and returned a list of single characters. `slug in <list of one-char
+  strings>` is False for **every** slug, always.
+- **So the guard did not get narrower. It stopped existing.** Every CLOSED block would have read
+  SAFE, and the archiver would have moved lane blocks whose owners were mid-edit — the exact
+  incident the whole worktree check was built for on 2026-09-15. I set out to reduce false positives
+  and my first draft removed all true positives instead.
+- **The failure mode presents as SUCCESS, which is why nothing else would have caught it.** A
+  too-permissive gate prints MORE `SAFE` and archives MORE blocks. Running it and eyeballing the
+  output would have shown the three stuck slugs cleared — the exact result I was hoping for, with
+  five more beside them — and I would have read that as the fix working better than expected. No
+  exception, no log line, no diff in the shape of the output.
+- **What caught it:** one unit test asserting the CONSUMER'S predicate rather than the function's
+  logic — `assert "beta-lane" in out` on a line that must survive, plus `isinstance(out, str)`. The
+  logic tests all passed against the list version.
+- **How to apply.**
+  - When inserting a function into an existing pipeline, the contract is **the shape the next
+    consumer requires**, not the shape the logic reads well in. Read the consumer, not the producer.
+  - Test the consumer's actual predicate. Here that is `slug in out`, not "the right lines came back".
+  - **For anything whose job is to say NO, ask what a bug makes it say.** A guard fails toward YES,
+    and YES is silent. State the permissive failure explicitly and write the test that fails on it.
+    Same family as `unknown-must-not-default-permissive`, but the cause is a TYPE, not a branch.
+  - Sibling of `confirm-the-code-ran`: there a fixture picked a cheaper path and the failure looked
+    like a *good* result (80x too fast). Here a shape error makes a guard look maximally effective.
+    Both are cases where the wrong answer is the one you were hoping to see.
+- **Cost:** none. Caught pre-merge, pinned by `test_returns_a_string_not_a_list`, and the reason is
+  in the function's own docstring so the next editor cannot re-introduce it blind.
+
+---
