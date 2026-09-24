@@ -401,3 +401,54 @@ def test_real_history_pooled_diff_equals_the_rows_own_paired_diff():
     weighted = sum(r[cut]["model_minus_market_brier"] * r["games_with_outcome"]
                    for r in best.values()) / games
     assert res["diff"] == pytest.approx(weighted, abs=5e-5)
+
+
+# --- game population --------------------------------------------------------
+
+def test_absent_population_reads_as_board_not_as_unknown():
+    """Every ordinary capture reads a board build, so absent IS board.
+
+    Not a permissive default: only a re-score can be anything else, and a
+    re-score always stamps what it used.
+    """
+    assert mod.row_population(row("2026-09-02", 14, "2026-09-03T04:52:03")) == "board"
+
+
+def test_a_rescored_row_declares_its_population():
+    r = row("2026-08-21", 15, "2026-09-24T12:00:00", stamped=True)
+    r["finals_population"] = "statsapi"
+    assert mod.row_population(r) == "statsapi"
+
+
+def test_a_mixed_population_pool_reports_the_split():
+    """A pool spanning two selections of GAMES must not hide it behind one number.
+
+    The board's finals index is lossy and NOT randomly so -- 143 games against
+    StatsAPI's 157 over 08-20..08-31, the shortfall landing on whichever games
+    upstream score-nulling touched. Averaging two selections into one headline
+    is the cross-population comparison this module already refuses one layer
+    up, for scorer eras.
+    """
+    a = row("2026-09-02", 10, "2026-09-03T04:52:03", stamped=True,
+            model=0.20, market=0.25)
+    b = row("2026-08-21", 30, "2026-09-24T12:00:00", stamped=True,
+            model=0.40, market=0.30)
+    b["finals_population"] = "statsapi"
+    res = mod.pool([a, b], "priceable_only")
+    pops = res["by_population"]
+    assert set(pops) == {"board", "statsapi"}
+    assert pops["board"]["games"] == 10
+    assert pops["statsapi"]["games"] == 30
+    assert pops["board"]["diff"] == pytest.approx(-0.05)
+    assert pops["statsapi"]["diff"] == pytest.approx(+0.10)
+    # The headline is the game-weighted blend of the two, which is exactly why
+    # it has to be read with the split beside it.
+    assert res["diff"] == pytest.approx((10 * -0.05 + 30 * 0.10) / 40)
+
+
+def test_a_single_population_pool_reports_one_entry():
+    """REACHABILITY: the split must not appear when there is nothing to split."""
+    a = row("2026-09-02", 10, "2026-09-03T04:52:03", stamped=True)
+    b = row("2026-09-03", 12, "2026-09-04T04:52:03", stamped=True)
+    res = mod.pool([a, b], "priceable_only")
+    assert list(res["by_population"]) == ["board"]

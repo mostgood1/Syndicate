@@ -159,6 +159,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--expect-model", type=float, help="retained all_records model brier")
     ap.add_argument("--expect-market", type=float, help="retained all_records market brier")
     ap.add_argument("--expect-n", help="retained all_records n, as MODEL/MARKET")
+    ap.add_argument("--expect-records-considered", type=int,
+                    help="WEAKER ANCHOR, for a date whose retained figures came from the "
+                         "PRE-FIX scorer and so cannot be reproduced by design. Proves the "
+                         "same ledger reached the scorer; it does NOT prove the same finals "
+                         "population, so it requires --finals-population statsapi.")
+    ap.add_argument("--finals-population", choices=("board", "statsapi"), default="board",
+                    help="Which population this row is scored on. 'board' means the retained "
+                         "figures were reproduced exactly, so the row is comparable with a "
+                         "board capture. 'statsapi' means they could not be and the row is "
+                         "scored on the sport's own record -- a DIFFERENT population, which "
+                         "must never be pooled with 'board' rows unmarked.")
     ap.add_argument("--append", action="store_true", help="append the verified row to history.jsonl")
     ap.add_argument("--json-out", help="also write the full score object here")
     args = ap.parse_args(argv)
@@ -210,33 +221,79 @@ def main(argv: list[str] | None = None) -> int:
           f" fresh_quote_seconds={score.get('fresh_quote_seconds')}")
 
     # --- verification gate ---------------------------------------------
-    if args.expect_model is None or args.expect_market is None or not args.expect_n:
+    if args.expect_records_considered is not None:
+        # THE PRE-FIX WINDOW, AND WHY THE STRONG GATE CANNOT SERVE IT.
+        # `75cf9aec` fixed a scorer that compared totals `P(over)` and spreads
+        # `P(home covers)` against "did the home team win", so for any date
+        # summarised before it the retained `all_records` MEASURES THAT BUG.
+        # The current scorer cannot reproduce it, by design, and a gate
+        # demanding it would refuse every such date forever.
+        #
+        # Reproducing the PRE-FIX number with the PRE-FIX code was tried and
+        # does not close the gap either: that scorer keys finals on `game_pk`
+        # OR `event_id` off the board grid, and `findings_2026-09-08` measured
+        # that the served grid no longer rebuilds that index (0 entries against
+        # the server's own `finals_seen: 2598`). Measured here on 08-29 against
+        # `ad4bc5c6`: the replay matches `records_considered` 5554/5554 exactly
+        # and still yields 15 games / n=5380 against the retained 16 / 4917.
+        #
+        # So the board's population is UNRECONSTRUCTABLE for these dates. It is
+        # also known to be LOSSY: `score_live_gameline_offline.py` measured the
+        # board's index at 143 games over 08-20..08-31 where StatsAPI gives
+        # 157, and the shortfall lands on whichever games upstream score
+        # nulling touched, so it is not random.
+        #
+        # This anchor therefore proves only that the SAME LEDGER was scored.
+        # The row records that in `finals_population`, so a pool can split on
+        # it instead of averaging two populations into one number.
+        if args.finals_population != "statsapi":
+            print("--expect-records-considered proves only the LEDGER, never the board's"
+                  " finals population, so it requires --finals-population statsapi.",
+                  file=sys.stderr)
+            return 3
+        got_rc = score.get("records_considered")
+        ok_rc = got_rc == args.expect_records_considered
+        print("")
+        print(f"  ANCHOR records_considered: got={got_rc}"
+              f" expected={args.expect_records_considered}"
+              f" {'OK' if ok_rc else 'MISMATCH'}")
+        if not ok_rc:
+            print("ANCHOR FAILED: this is not the ledger the board scored.", file=sys.stderr)
+            return 4
+        print("    => the same ledger, scored on the StatsAPI population.")
+        checks = {"records_considered": (got_rc, args.expect_records_considered)}
+
+    elif args.expect_model is None or args.expect_market is None or not args.expect_n:
         print("\nNO EXPECTATION: pass --expect-model/--expect-market/--expect-n (the retained\n"
               "all_records figures) so the re-score can be proved to be the board's own\n"
-              "measurement. Refusing to append a row nothing checked.", file=sys.stderr)
+              "measurement, or --expect-records-considered for a pre-fix date whose retained\n"
+              "figures the current scorer cannot reproduce. Refusing to append a row nothing\n"
+              "checked.", file=sys.stderr)
         return 3
 
-    want_model_n, _, want_market_n = args.expect_n.partition("/")
-    got = score["all_records"]
-    checks = {
-        "model_brier": (got["model"]["brier"], args.expect_model),
-        "market_brier": (got["market"]["brier"], args.expect_market),
-        "model_n": (got["model"]["n"], int(want_model_n)),
-        "market_n": (got["market"]["n"], int(want_market_n)),
-    }
-    failed = {k: v for k, v in checks.items()
-              if (abs(v[0] - v[1]) > 1e-5 if isinstance(v[1], float) else v[0] != v[1])}
-    print("\n  VERIFICATION against the retained summary (all_records):")
-    for key, (got_v, want_v) in checks.items():
-        print(f"    {key:13s} got={got_v} retained={want_v} {'OK' if key not in failed else 'MISMATCH'}")
-    if failed:
-        print(f"\nVERIFICATION FAILED on {sorted(failed)} -- this re-score is NOT the board's\n"
-              "measurement, so its fresh_quotes_only is not poolable with the rest of the\n"
-              "series. Find the finals the board actually had (a leave-one-out search over\n"
-              "StatsAPI finals identifies a late game the board never saw) before appending.",
-              file=sys.stderr)
-        return 4
-    print("    => EXACT: the current scorer reproduces the retained measurement.")
+    else:
+        want_model_n, _, want_market_n = args.expect_n.partition("/")
+        got = score["all_records"]
+        checks = {
+            "model_brier": (got["model"]["brier"], args.expect_model),
+            "market_brier": (got["market"]["brier"], args.expect_market),
+            "model_n": (got["model"]["n"], int(want_model_n)),
+            "market_n": (got["market"]["n"], int(want_market_n)),
+        }
+        failed = {k: v for k, v in checks.items()
+                  if (abs(v[0] - v[1]) > 1e-5 if isinstance(v[1], float) else v[0] != v[1])}
+        print("\n  VERIFICATION against the retained summary (all_records):")
+        for key, (got_v, want_v) in checks.items():
+            print(f"    {key:13s} got={got_v} retained={want_v}"
+                  f" {'OK' if key not in failed else 'MISMATCH'}")
+        if failed:
+            print(f"\nVERIFICATION FAILED on {sorted(failed)} -- this re-score is NOT the board's\n"
+                  "measurement, so its fresh_quotes_only is not poolable with the rest of the\n"
+                  "series. Find the finals the board actually had (a leave-one-out search over\n"
+                  "StatsAPI finals identifies a late game the board never saw) before appending.",
+                  file=sys.stderr)
+            return 4
+        print("    => EXACT: the current scorer reproduces the retained measurement.")
 
     # --- the row --------------------------------------------------------
     row = {
@@ -264,8 +321,17 @@ def main(argv: list[str] | None = None) -> int:
         # block below is what earns it.
         "backfill": True,
         "rescored_from_ledger": True,
+        # WHICH POPULATION THIS ROW'S GAMES CAME FROM. A pool that averages
+        # `board` and `statsapi` rows is comparing two selections of games, and
+        # the difference is NOT random -- the board's index drops whichever
+        # games upstream score nulling touched. Recorded at top level, not
+        # buried in `rescore`, because it decides whether a row may be pooled.
+        "finals_population": args.finals_population,
         "rescore": {
             "reason": "retained summary predates fresh_quotes_only (4d20ea00, 2026-09-01)",
+            "finals_population": args.finals_population,
+            "anchor": ("records_considered" if args.expect_records_considered is not None
+                       else "retained_all_records_exact"),
             "ledger_path": LEDGER_PATH.format(date=date),
             "ledger_bytes": len(raw),
             "ledger_sha256_16": hashlib.sha256(raw).hexdigest()[:16],

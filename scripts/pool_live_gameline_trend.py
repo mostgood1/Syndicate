@@ -187,6 +187,28 @@ def latest_dated(rows):
     return max(dates) if dates else None
 
 
+def row_population(row):
+    """Which selection of GAMES this row's brier was computed over.
+
+    `board` is every ordinary capture: the games the board's own finals index
+    resolved at build time. `statsapi` appears only on rows re-scored from a
+    ledger for a date whose board population could not be reconstructed (the
+    pre-fix window -- see `rescore_live_gameline_date.py`), and is the sport's
+    own record instead.
+
+    ABSENT MEANS `board`, and that is not a permissive default: every row
+    without the field was written by a capture reading a board build, so it IS
+    a board population by construction. Only a re-score can be anything else,
+    and a re-score always stamps it.
+
+    The two are NOT interchangeable. `score_live_gameline_offline.py` measured
+    the board's index at 143 games over 08-20..08-31 where StatsAPI gives 157,
+    and the shortfall lands on whichever games upstream score-nulling touched
+    -- so it is a biased selection, not a random sample of the same thing.
+    """
+    return str(row.get("finals_population") or "board")
+
+
 def pool(rows, cut):
     """Game-weighted pool over ONE era. Refuses a mixed-era set."""
     eras = {row_era(r) for r in rows}
@@ -220,7 +242,28 @@ def pool(rows, cut):
     if not games:
         return {"era": eras.pop() if eras else None, "cut": cut,
                 "dates": 0, "games": 0, "per_date": {},
-                "population_mismatch": [], "paired_exclusions": []}
+                "population_mismatch": [], "paired_exclusions": [],
+                "by_population": {}}
+    # THE SAME POOL, SPLIT BY WHICH GAMES IT SELECTED. Reported always, so a
+    # headline can never quietly average two selections: the era split already
+    # exists for the same reason one layer up.
+    by_population = {}
+    for date, row in best.items():
+        vals = cut_values(row, cut)
+        n = row["games_with_outcome"]
+        acc = by_population.setdefault(
+            row_population(row),
+            {"dates": 0, "games": 0, "_m": 0.0, "_k": 0.0, "date_list": []})
+        acc["dates"] += 1
+        acc["games"] += n
+        acc["_m"] += vals["model"] * n
+        acc["_k"] += vals["market"] * n
+        acc["date_list"].append(date)
+    for acc in by_population.values():
+        acc["model"] = acc.pop("_m") / acc["games"]
+        acc["market"] = acc.pop("_k") / acc["games"]
+        acc["diff"] = acc["model"] - acc["market"]
+        acc["date_list"].sort()
     return {
         "era": eras.pop() if eras else None,
         "cut": cut,
@@ -231,6 +274,7 @@ def pool(rows, cut):
         "diff": (model - market) / games,
         "population_mismatch": mismatched,
         "paired_exclusions": paired_exclusions,
+        "by_population": by_population,
         "per_date": dict(
             (d, dict(games=r["games_with_outcome"], **cut_values(r, cut)))
             for d, r in sorted(best.items())
@@ -308,6 +352,24 @@ def main(argv=None):
                  res["diff"]))
         print("  NEGATIVE diff = the model beat the market. Independent unit "
               "is GAMES (%d), not records." % res["games"])
+        pops = res.get("by_population") or {}
+        if len(pops) > 1:
+            print("  ** THIS POOL SPANS %d GAME POPULATIONS -- the figure above "
+                  "averages two different selections of games, so read the "
+                  "split, not the headline: **" % len(pops))
+            for name in sorted(pops):
+                acc = pops[name]
+                print("       %-9s %3d dates %4d games  model %.5f  market "
+                      "%.5f  diff %+0.5f"
+                      % (name, acc["dates"], acc["games"], acc["model"],
+                         acc["market"], acc["diff"]))
+                print("                   %s..%s"
+                      % (acc["date_list"][0], acc["date_list"][-1]))
+            print("       `board` is the games the board's own finals index "
+                  "resolved; `statsapi` is the sport's record, used where the "
+                  "board population could not be reconstructed. The board's "
+                  "index is LOSSY and not randomly so (143 games vs 157 over "
+                  "08-20..08-31), so neither is a superset of the other.")
         if res["population_mismatch"]:
             print("  ** NOT LIKE-FOR-LIKE on these dates -- the model and "
                   "market briers span DIFFERENT row sets, so their difference "
