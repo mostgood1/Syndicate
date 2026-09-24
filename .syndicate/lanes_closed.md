@@ -8015,3 +8015,27 @@ SAFE_SLUGS=ncaaf-board-sim-coverage,ncaaf-sim-inseason-ratings,ncaaf-player-data
 - **THERE IS NO FREE FIX, and this is why the lane is not closing with a patch.** Reducing `rating_offense_weight`/`rating_defense_weight` would kill the convexity AND the MARGIN response, which is currently calibrated (wk3 spread MAE 1.89 vs market). Adding damping fixes the total but changes the margin in exactly the blowout games, and `smartsim2` feeds NCAAF, the segment/quarter distributions and win probability as well. `model_engine_standard.md`: adding a MECHANISM to a calibrated engine requires re-fitting the rates that were absorbing it, and this ledger already records two mechanisms interacting NEGATIVELY in 4 of 4 markets.
 - **Staged design for whoever takes it** (not implemented, deliberately): damp `drive_success_probability` / `explosive_play_probability` as a function of (score margin, time remaining) behind a flag defaulting OFF; re-fit NFL's calibration rates; build NCAAF's actual-outcome total fit, which does not exist yet, and re-fit its profile; then verify TOTALS and MARGINS out-of-sample for BOTH sports plus no regression in the segment markets. `#686`'s output-side correction stays landed-disabled as the fallback if that work is not taken.
 - Context: user asked for the engine fix after `#686` landed disabled. `#684` (level shrink) is live and unaffected by this lane.
+
+### lane-archive-tools-mirror — CLOSED 2026-09-23 (GOAL MET) — opened 2026-09-23 — session 17fb7689
+- Goal: put the out-of-git lane-archive tools somewhere a rewrite cannot silently revert them
+- Goal verdict: **GOAL MET.** `py -3 scripts/lane_archive_tools/verify_mirror.py` exits 0, 3/3 MATCH.
+- Files: `scripts/lane_archive_tools/` (new: 3 mirrored tools + README.md + verify_mirror.py), `.gitattributes` (one scoped `-text` line)
+- The live copies still run from `C:	mp\lane-archive-tools\`; this is a recovery mirror, not a move.
+- `-text` is load-bearing: `core.autocrlf` is true here and the three files disagree on line endings, so without it every hash comparison reports a phantom revert.
+- Narrative, measurements and the context-line fix this protects: `.syndicate/log/2026-09-23.md` (22:00Z, 22:20Z, 22:30Z, 22:45Z, 23:0xZ).
+
+### closed-lane-archive-20260923-1829 — CLOSED 2026-09-23 (GOAL MET: 1 block archived) — opened 2026-09-23 — session d2d19592-9f3e-4dd8-bc71-c21387b5852c
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Goal verdict: **GOAL MET.** `owner_liveness.py --idle-min 240` on origin/main `1fee0423` returned `SAFE_SLUGS=polymarket-balance-detail` (owner `236bd219` idle 271 m; block lastmod `c984d02b` 379 m). The other 5 CLOSED blocks read WAIT and were left alone. Applied: 4 lines out of `lanes.md`, 4 into `lanes_closed.md`, +1 pointer; claims 132 and OPEN headers 37 unchanged; `check_lane_invariants.py` INVARIANTS HOLD before and after.
+- Slugs moved: `polymarket-balance-detail`
+- Part A's reading, the WAIT reasons, and the Part B dormant-OPEN table: `.syndicate/log/2026-09-23.md`.
+
+### closed-lane-archive-20260923-2044 — CLOSED 2026-09-23 (GOAL MET: 4 blocks archived) — opened 2026-09-23 — session d2d19592-9f3e-4dd8-bc71-c21387b5852c
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Goal verdict: **GOAL MET.** `owner_liveness.py --idle-min 240` on origin/main `f2558c36` returned all four targets SAFE: `segments-joint-v1` (owner `2edf8b82` idle 13,361 m), `render-yaml-env-drift` (`b56b699e` 14,755 m), `nfl-total-residual-dispersion` and `smartsim2-total-nonlinearity` (`dae18452` 244 m); blocks lastmod `b4cdc11d` 265 m and `ed6fdc37` 329 m. Applied: 125 lines out of `lanes.md`, 127 into `lanes_closed.md`, +4 pointers; claims 145 and OPEN headers 34 unchanged; `check_lane_invariants.py` INVARIANTS HOLD before and after, same 2 disclaimed-path hints.
+- Slugs moved: `segments-joint-v1`, `render-yaml-env-drift`, `nfl-total-residual-dispersion`, `smartsim2-total-nonlinearity`
+- **82,024 B out of `lanes.md` — the largest single reclaim this job has made.** Waited 117 min for the 240 m bar rather than taking the two that cleared first; `dae18452` never woke, so all four went in ONE pass and cost ONE lane block instead of two.
+- The two 14-15 day abandoned worktree diffs (`bandwidth-controlled-transfer`, `mlb-ledger-segment-visibility`) did NOT block: the first is the measured case the 2026-09-23 staleness bound was added for, the second never names these slugs. Both re-verified by hand this run.
+- Readings, the full WAIT table and the Part B dormant-OPEN report: `.syndicate/log/2026-09-24.md`.

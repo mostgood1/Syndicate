@@ -990,21 +990,6 @@ death, never life — do not invert it.
 - Verification: a test that FAILS on the as-shipped resolver with the verbatim production row, passes after; the MLB path unchanged; then, after a live-odds-worker deploy, `ORDER_PATH venue=polymarket` shows `h2h` `would_build` where it read `market_unresolved`, and NO new `yes_leg_disagrees_with_away_index` refusals appear (the fallback now feeds the corroborator, so a disagreement would surface there).
 - Blocked by: none.
 
-### lane-archive-tools-mirror — CLOSED 2026-09-23 (GOAL MET) — opened 2026-09-23 — session 17fb7689
-- Goal: put the out-of-git lane-archive tools somewhere a rewrite cannot silently revert them
-- Goal verdict: **GOAL MET.** `py -3 scripts/lane_archive_tools/verify_mirror.py` exits 0, 3/3 MATCH.
-- Files: `scripts/lane_archive_tools/` (new: 3 mirrored tools + README.md + verify_mirror.py), `.gitattributes` (one scoped `-text` line)
-- The live copies still run from `C:	mp\lane-archive-tools\`; this is a recovery mirror, not a move.
-- `-text` is load-bearing: `core.autocrlf` is true here and the three files disagree on line endings, so without it every hash comparison reports a phantom revert.
-- Narrative, measurements and the context-line fix this protects: `.syndicate/log/2026-09-23.md` (22:00Z, 22:20Z, 22:30Z, 22:45Z, 23:0xZ).
-
-### closed-lane-archive-20260923-1829 — CLOSED 2026-09-23 (GOAL MET: 1 block archived) — opened 2026-09-23 — session d2d19592-9f3e-4dd8-bc71-c21387b5852c
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Goal verdict: **GOAL MET.** `owner_liveness.py --idle-min 240` on origin/main `1fee0423` returned `SAFE_SLUGS=polymarket-balance-detail` (owner `236bd219` idle 271 m; block lastmod `c984d02b` 379 m). The other 5 CLOSED blocks read WAIT and were left alone. Applied: 4 lines out of `lanes.md`, 4 into `lanes_closed.md`, +1 pointer; claims 132 and OPEN headers 37 unchanged; `check_lane_invariants.py` INVARIANTS HOLD before and after.
-- Slugs moved: `polymarket-balance-detail`
-- Part A's reading, the WAIT reasons, and the Part B dormant-OPEN table: `.syndicate/log/2026-09-23.md`.
-
 ### mlb-live-gameline-venue-freshness — OPEN — opened 2026-09-23 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
 - Goal: A live MLB full-game row priced from a fresh venue quote (Kalshi ~23s / Polymarket ~78s) reaches attach_live_gamelines with an age under the 120s ceiling, so LIVE_GAMELINE_JOIN sport=mlb reports priceable>0 where it reports 0 today.
 - Files: syndicate/features/shared/venue_quote_fanin.py, syndicate/features/shared/venue_quote_adapters.py, syndicate/features/shared/live_gameline_join.py, pipeline/layer2_shortlist.py -- CLAIM TAKEN 2026-09-23, not free: the first two were claimed by OPEN lane mlb-doubleheader-e2e and the third by OPEN lane live-gameline-game-identity, both session 3692ff18-8c0a-4e3c-9144-62db455acf14, which is NOT in the session roster (ListAgents shows one unrelated peer; no session id carries that prefix) and so could not be asked to release. Removed from both donor Files lines by THIS lane, not by their owner, on the user's explicit decision 2026-09-23 ('take the claim and go after the exchange rows', then 'guessing that session orphaned the files you need, take them'). Same precedent as live-gameline-game-identity taking live_gameline_join.py from accuracy-assessment-0914. pipeline/layer2_shortlist.py was UNCLAIMED.
@@ -1019,15 +1004,6 @@ death, never life — do not invert it.
 - NOT MEASURED, and not claimed: NCAAB has graded nothing (season opens November); every non-chip consumer of these maps (venue joins, `attach_game_state`, settlement identity); and `web` / `live-odds-worker`, which DO NOT carry this code.
 - Claims RETURNED on close to `daily-accuracy-suite`: `syndicate/features/shared/population_outcomes_espn.py`, `syndicate/features/shared/population_outcomes.py`, `tests/test_population_outcomes_basketball.py`, `tests/test_publish_model_scorecard_seasons.py`. That lane's NCAAB clause, recorded NOT MET for want of a team registry, is now MET -- its owner should re-read it.
 - Narrative: `.syndicate/log/2026-09-24.md`. State: `[nhl-ncaab-club-maps]` in `state_football.md`. Commit `f2558c36`.
-### closed-lane-archive-20260923-2044 — CLOSED 2026-09-23 (GOAL MET: 4 blocks archived) — opened 2026-09-23 — session d2d19592-9f3e-4dd8-bc71-c21387b5852c
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Goal verdict: **GOAL MET.** `owner_liveness.py --idle-min 240` on origin/main `f2558c36` returned all four targets SAFE: `segments-joint-v1` (owner `2edf8b82` idle 13,361 m), `render-yaml-env-drift` (`b56b699e` 14,755 m), `nfl-total-residual-dispersion` and `smartsim2-total-nonlinearity` (`dae18452` 244 m); blocks lastmod `b4cdc11d` 265 m and `ed6fdc37` 329 m. Applied: 125 lines out of `lanes.md`, 127 into `lanes_closed.md`, +4 pointers; claims 145 and OPEN headers 34 unchanged; `check_lane_invariants.py` INVARIANTS HOLD before and after, same 2 disclaimed-path hints.
-- Slugs moved: `segments-joint-v1`, `render-yaml-env-drift`, `nfl-total-residual-dispersion`, `smartsim2-total-nonlinearity`
-- **82,024 B out of `lanes.md` — the largest single reclaim this job has made.** Waited 117 min for the 240 m bar rather than taking the two that cleared first; `dae18452` never woke, so all four went in ONE pass and cost ONE lane block instead of two.
-- The two 14-15 day abandoned worktree diffs (`bandwidth-controlled-transfer`, `mlb-ledger-segment-visibility`) did NOT block: the first is the measured case the 2026-09-23 staleness bound was added for, the second never names these slugs. Both re-verified by hand this run.
-- Readings, the full WAIT table and the Part B dormant-OPEN report: `.syndicate/log/2026-09-24.md`.
-
 ### club-maps-fleet-rollout — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - Goal: web and live-odds-worker carry f2558c36's club maps; on web the reading is NHL chips on an INLINE-built past date (source=inline_artifact_stale) going 0/10 -> 10/10 keyed for 2026-09-22, which is the fleet split as a user sees it
 - **GOAL: MET.** Both services deployed and both readings taken. **web** `4f8bcdef` -> `f2558c36` (`dep-daqitb3tqb8s73elhva0`, live 14:14:13Z): `/api/board/game-chips?date=2026-09-22`, `source=inline_artifact_stale`, **nhl keyed 0/10 -> 10/10** at 14:14:50Z with the served commit read back as `f2558c36` first; controls mlb 16/16, soccer 153/153, wnba 5/5 unchanged. **live-odds-worker** `fe73ed81` -> `f2558c36` (`dep-daqj1t67bikc738mpl1g`, live 14:23:51Z): a NULL prediction, labelled as one -- no field of that service was known to move and its NHL outputs were absent or stale -- MET at 14:29:48Z, `[venue_poll] KALSHI status=ok markets=6000` identical to baseline. Fleet now web / refresh-worker / live-odds-worker all `f2558c36`. Working in `deploys.md` (`4119db20`).
@@ -1087,6 +1063,12 @@ death, never life — do not invert it.
 - Verification: Per date: pre-fix scorer reproduces retained all_records model+market brier to 5dp AND both n; then the current scorer emits fresh_quotes_only on the identical records/finals. Then pool_live_gameline_trend.py --era each --cut fresh_quotes_only lists all 10 dates and reports no COVERAGE GAP, with the post-fix pool spanning 08-20..09-23.
 - Blocked by: none
 
+### closed-lane-archive-20260924-1219 — CLOSED 2026-09-24 (GOAL MET: 3 blocks archived) — opened 2026-09-24 — session ac238d51-545f-473c-b430-430fcd0feca6
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- **GOAL MET.** `owner_liveness.py --idle-min 240` on origin/main `17d1819c` returned `SAFE_SLUGS=lane-archive-tools-mirror,closed-lane-archive-20260923-1829,closed-lane-archive-20260923-2044`; the other 9 CLOSED blocks read WAIT and were left alone. Applied: 24 lines out of `lanes.md`, 24 into `lanes_closed.md`, +3 pointers. Claims 140 and OPEN headers 37 unchanged; `check_lane_invariants.py` INVARIANTS HOLD before and after, same 2 disclaimed hints, 0 contested either side.
+- Moved: `lane-archive-tools-mirror`, `closed-lane-archive-20260923-1829`, `closed-lane-archive-20260923-2044`. These were unarchivable for ~19 h until `173e42bc` (lane `archive-diff-baseline-echo`) fixed the gate's stale-baseline false positive. Table and narrative: `log/2026-09-24.md`.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
@@ -1123,6 +1105,8 @@ death, never life — do not invert it.
 - `closed-lane-archive-20260920-1630` — CLOSED 2026-09-20 (GOAL MET: 1 block archived) — opened 2026-09-20 — session b36808cc-d879-4ab5-b4bb-85b135106db4
 - `closed-lane-archive-20260920-2125` — CLOSED 2026-09-20 (GOAL MET: 1 block archived) — opened 2026-09-20 — session 77fa95fb-3e05-45ab-b361-8c74c77354a6
 - `closed-lane-archive-20260921-0851` — CLOSED 2026-09-21 (GOAL MET: 1 block archived) — opened 2026-09-21 — session 1276501b-d2fa-40fb-96c1-4c2eb6c16082
+- `closed-lane-archive-20260923-1829` — CLOSED 2026-09-23 (GOAL MET: 1 block archived) — opened 2026-09-23 — session d2d19592-9f3e-4dd8-bc71-c21387b5852c
+- `closed-lane-archive-20260923-2044` — CLOSED 2026-09-23 (GOAL MET: 4 blocks archived) — opened 2026-09-23 — session d2d19592-9f3e-4dd8-bc71-c21387b5852c
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `combined-board-rows-unreadable-tripwire` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: live on web `da268e07` (15:36:46Z); the field is served on every date, 0 `ROWS_UNREADABLE` lines; stored 113 vs rows 111 is the per-sport `by_sport` cap, not a defect.**
 - `combined-board-state-rows-lost` — CLOSED 2026-09-15 — opened 2026-09-14 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: Q1-Q3 answered with production readings. The reader fix is live on web `b6a0e346` (14:10:07Z): `by_date` 09-15 106 (was 0), 0 `VINTAGE_IGNORED`. One prediction was WRONG (`computed_at` moved to the refused heavy build's state stamp). User decision 2026-09-15: keep the `stale` label, it is true. Postmortem in `learnings.md`.**
@@ -1149,6 +1133,7 @@ death, never life — do not invert it.
 - `kalshi-precap-board-lines` — CLOSED 2026-09-11 — opened 2026-09-11 — session 49bfef11-a4a3-4fe4-8df4-76ec94e45893 — **GOAL: MET. NCAAF 09-12 Kalshi rows 1/13 -> 20/20 contracted; live placed 6 NCAAF Saturday orders**
 - `kalshi-spread-join-sign` — **ORPHANED (reopened 2026-08-26)** — — session syndicate-43 (ENDED) — UNOWNED — six things verified; WNBA settlement is BUILT, LANDED and NOT DEPLOYED
 - `lane-archive-tool-checks` — CLOSED 2026-09-18 — opened 2026-09-18 — session 4991d2ec-b2c2-4040-9042-d98867b768ab — **GOAL MET: both tools WAIT `fotmob-team-name-aliases` (last modified by a non-header session)**
+- `lane-archive-tools-mirror` — CLOSED 2026-09-23 (GOAL MET) — opened 2026-09-23 — session 17fb7689
 - `lane-guard-main-claims` — CLOSED 2026-09-17 — opened 2026-09-17 — session a1e40980-cceb-493f-adf9-5a5ca879acf6 — **GOAL: MET**
 - `layer1-board-coverage` — layer1-board-coverage — UPDATE 2026-08-16 17:5xZ — **DEPLOYED AND FALSIFICATION TEST PASSED. Supersedes this lane's "UNDEPLOYED" line above.** → `lanes_closed.md`.
 - `layer1-board-coverage` — layer1-board-coverage — **CLOSE REFUSED 2026-08-16 18:0xZ.** Verification is not met, and a NEW production defect was found in this lane's own scope w → `lanes_closed.md`.
