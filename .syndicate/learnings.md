@@ -3900,3 +3900,30 @@ be re-justified from scratch on different grounds.
   replacing it, so both readings stay visible.
 
 ---
+
+## 2026-09-24 — A VENUE'S BALANCE STATE IS A SAMPLE, NOT A PROPERTY, AND I REPORTED ONE AS THE OTHER
+
+- **What I said, to the user, on 2026-09-23:** "both venues refuse every live
+  order on `insufficient_venue_balance`" -- offered as the standing state of
+  the world, and used to argue that a deploy enabling a new market family was
+  a smaller change than it sounded.
+- **What is true:** that was a reading of two passes, 15 minutes apart, on one
+  evening. Polymarket has placed 5 orders today. Only KALSHI is
+  standing-dormant, and only because the user decided not to fund it. The
+  balance moves on its own: measured 09-24, polymarket went 0.13 -> 1.39 ->
+  0.31 (an NCAAF total took 1.05) -> 6.59, all inside three hours.
+- **How I found out:** the census's PLACEMENT line the next day read
+  `polymarket ... placing ... placed=3`, flatly contradicting what I had told
+  the user the evening before.
+- **The rule going forward:** a venue's cash, buying power, rate-limit state
+  or dormancy is a SAMPLE with a timestamp, never a property to reason from.
+  Say "at 16:01Z polymarket refused 4 of 4 on balance", never "polymarket
+  refuses on balance". The difference decides whether a reader treats a
+  deploy as inert.
+- **The one exception is a stated DECISION,** which is a property until it is
+  revoked: kalshi is unfunded because the user said so, and that survives any
+  single reading.
+- **Cost:** a wrong characterisation of a live-money deploy's blast radius,
+  given to the user before they authorised it. Corrected in `deploys.md` the
+  next day. Sibling of `re-baseline before judging`: there the stale number
+  was someone else's, here it was my own, 18 hours old.
