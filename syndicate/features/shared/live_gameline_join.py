@@ -104,6 +104,15 @@ LIVE_LENS_SOURCES_BY_SPORT: dict[str, tuple[str, ...]] = {
     # REFUSED to price -- and that lane must be rejected here. A refusal is
     # exactly the case where falling back to the pregame probability produces
     # `#340` in a live label (`#414`), so the stamp is what keeps the two apart.
+    # NFL re-sims smartsim2 from the live quarter, clock and score
+    # (`nfl/live_resim.py`, refresh-worker's own tick). Same stamp as ncaaf and
+    # nhl, and for the same reason: that module also publishes a lane stamped
+    # `pregame` for every game it REFUSED to price, and that lane must be
+    # rejected here. NFL stamped its refusals `live_resim` until 2026-09-24, so
+    # they were excluded only by carrying no probability -- which is exactly the
+    # "keying on the probability's PRESENCE" failure `live_gameline_from_lens`
+    # warns about. The stamp is the discriminator again.
+    "nfl": ("live_resim",),
     "ncaaf": ("live_resim",),
     # NHL's re-sim restarts hockeysim from the current period, clock and score
     # (`nhl/live_resim.py`). Same stamp as ncaaf and for the same reason: that

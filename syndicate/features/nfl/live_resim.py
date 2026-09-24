@@ -339,8 +339,21 @@ def build_game_lens(
     """
     as_of = live_state_as_of or datetime.now(timezone.utc).isoformat()
     if isinstance(result, NflResimRefusal):
+        # STAMPED `pregame`, NOT `live_resim`. This module said it was "shaped
+        # exactly like NCAAF's" while stamping refusals with the LIVE source and
+        # leaving `PREGAME_LENS_SOURCE` defined-but-unused -- ncaaf/live_resim.py
+        # uses it (line 472) and the join rejects it by stamp.
+        #
+        # It mattered the moment nfl was wired: `live_gameline_from_lens` keys on
+        # `source` first and only then requires `modelHomeWinProb`. With the live
+        # stamp, a refused game was excluded solely because it carries no
+        # probability -- and that function's own docstring warns that keying on
+        # the probability's presence "would silently accept a lens the re-sim
+        # never touched". The stamp is the intended discriminator; this restores
+        # it, so a refusal is rejected for WHAT IT IS rather than for what it
+        # happens to lack.
         return [{
-            "source": LIVE_RESIM_LENS_SOURCE,
+            "source": PREGAME_LENS_SOURCE,
             "ok": False,
             "as_of": as_of,
             "refusal": result.to_dict(),
@@ -367,7 +380,14 @@ def summarise(games: list[Mapping[str, Any]]) -> dict[str, Any]:
     resimmed = 0
     for game in games or []:
         for lane in game.get("gameLens") or []:
-            if lane.get("source") != LIVE_RESIM_LENS_SOURCE:
+            # BOTH STAMPS, because this module's own lanes now carry two.
+            # Refusals moved to `pregame` on 2026-09-24 so the board's join can
+            # reject them BY STAMP; this filter still read the live stamp only,
+            # which silently took `refused` and `refusals_by_reason` to zero.
+            # That is the precise failure the docstring above forbids -- "a zero
+            # without one is not a result" -- and it would have reported a
+            # healthy, fully-refusing slate as a slate with nothing to refuse.
+            if lane.get("source") not in (LIVE_RESIM_LENS_SOURCE, PREGAME_LENS_SOURCE):
                 continue
             if lane.get("ok"):
                 resimmed += 1
@@ -424,7 +444,20 @@ def live_lens_snapshot_path(data_root: Any) -> Any:
     """
     from pathlib import Path
 
-    return Path(data_root) / "live" / "nfl_live_lens.json"
+    # `nfl_live_resim.json`, NOT `nfl_live_lens.json`. Those were the same file
+    # until 2026-09-24, which made this module and `nfl/live_lens.py` two
+    # producers writing ONE Redis key from two services on a ~60s cadence --
+    # last write wins, and the pregame writer overwriting this one is `#340`
+    # arriving by race. It was latent only because the flag defaulted OFF.
+    #
+    # NOT resolved the `ncaaf` way (drop nfl from the lens loop and let the
+    # re-sim own the file): `nfl/live_lens.py:_load_live_lens_snapshot` READS
+    # that path for the live-lens PAGE and validates `cards`/`rank_cards`/
+    # `season`/`week`, which this snapshot does not carry. The page would fall
+    # through to rebuilding from cards ON THE WEB REQUEST PATH -- the one thing
+    # the runtime split forbids. So the two producers get two paths, and
+    # `board_enrichment._LIVE_GAMELINE_SNAPSHOT_PATHS` points the board here.
+    return Path(data_root) / "live" / "nfl_live_resim.json"
 
 
 def validate_live_lens_snapshot(snapshot: Any) -> tuple[bool, str]:

@@ -183,15 +183,12 @@ DECLARATIONS: dict[str, Declaration] = {
 # Every entry names the lane that owns it. An entry with no owner is a defect
 # nobody is fixing wearing the costume of one somebody is.
 KNOWN_OPEN: dict[tuple[str, str], str] = {
-    ("R6_LIVE_PRODUCER_WITHOUT_GATE", "nfl"):
-        "lane `nfl-live-resim-activation` (2026-09-24): the re-sim ticks on "
-        "refresh-worker behind SYNDICATE_NFL_LIVE_RESIM (default OFF) and the "
-        "board never reads it. Enabling it publishes live money edges on an "
-        "engine documented to lose to the close -- a user decision, not wiring.",
-    ("R8_SNAPSHOT_PATH_COLLISION", "nfl"):
-        "lane `nfl-live-resim-activation` (2026-09-24): the lens loop and the "
-        "re-sim share one key. Latent while the flag is OFF; must be resolved "
-        "BEFORE it is ever turned on, or the pregame writer races the live one.",
+    # EMPTY, and it got here the right way. It held two `nfl` findings on
+    # 2026-09-24 -- R6 (a live producer with no game-line gate) and R8 (two
+    # producers on one Redis key). Both were fixed the same day, and the
+    # rot-check above turned the surviving waivers into R0_STALE_WAIVER
+    # failures until they were deleted. That is the intended lifecycle: a
+    # waiver is a dated debt, not a standing exemption.
 }
 
 @dataclass

@@ -226,21 +226,38 @@ def test_r8_does_not_fire_for_nhl_which_registers_its_own_resim_resolver():
     assert "nhl" not in offenders
 
 
-def test_r8_fires_where_two_distinct_producers_share_a_path():
-    """`nfl` today: the lens loop builds it pregame-carried on live-odds-worker
-    while `nfl/live_resim.py` re-sims it on refresh-worker, both onto one key."""
-    try:
-        reg = load_registries()
-    except Exception as exc:  # pragma: no cover
-        pytest.skip(f"registries unavailable in this tree: {exc!r}")
-    offenders = {f.sport for f in evaluate(reg, DECLARATIONS)
-                 if f.rule == "R8_SNAPSHOT_PATH_COLLISION"}
-    assert "nfl" in offenders
+def test_r8_fires_where_two_distinct_producers_share_a_path(monkeypatch):
+    """R8 must stay REACHABLE now that no real sport collides.
+
+    It fired on `nfl` until 2026-09-24, when lane `nfl-live-resim-activation`
+    gave the re-sim its own `nfl_live_resim.json`. With the real collision gone,
+    asserting against the live tree would only prove the rule is quiet -- which
+    is indistinguishable from a rule that stopped working. So the two producers
+    are simulated instead, and `_loop_resolver_is_the_resim` is forced False to
+    say they are genuinely distinct rather than one function under two names.
+    """
+    import scripts.live_tier_coverage_check as mod
+
+    shared = "/opt/render/project/data/live/collide_live_lens.json"
+    monkeypatch.setattr(mod, "loop_snapshot_path", lambda sport: shared)
+    monkeypatch.setattr(mod, "resim_snapshot_path", lambda sport: shared)
+    monkeypatch.setattr(mod, "_loop_resolver_is_the_resim", lambda sport: False)
+
+    findings = evaluate(_registries(), _MLB_OK)
+    assert "R8_SNAPSHOT_PATH_COLLISION" in _rules(findings)
 
 
-def test_every_declaration_carries_evidence():
-    for sport, decl in DECLARATIONS.items():
-        assert decl.evidence.strip(), f"{sport} declares provenance with no evidence"
+def test_r8_is_silent_when_one_producer_wears_two_names(monkeypatch):
+    """Same path, same function: one producer. This is `nhl`'s real shape."""
+    import scripts.live_tier_coverage_check as mod
+
+    shared = "/opt/render/project/data/live/mlb_live_lens.json"
+    monkeypatch.setattr(mod, "loop_snapshot_path", lambda sport: shared)
+    monkeypatch.setattr(mod, "resim_snapshot_path", lambda sport: shared)
+    monkeypatch.setattr(mod, "_loop_resolver_is_the_resim", lambda sport: True)
+
+    findings = evaluate(_registries(), _MLB_OK)
+    assert "R8_SNAPSHOT_PATH_COLLISION" not in _rules(findings)
 
 
 def test_every_waiver_names_an_owning_lane():

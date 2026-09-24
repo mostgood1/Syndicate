@@ -115,7 +115,12 @@ def test_a_refusal_still_produces_a_LANE():
     assert len(lanes) == 1
     assert lanes[0]["ok"] is False
     assert lanes[0]["refusal"]["reason"] == "degenerate_ratings"
-    assert lanes[0]["source"] == "live_resim"
+    # `pregame`, not `live_resim`, since 2026-09-24. The board join keys on the
+    # stamp first, so a refusal wearing the LIVE stamp was excluded only by
+    # carrying no probability -- the "keying on presence" trap that
+    # `live_gameline_from_lens` documents. ncaaf has always stamped refusals
+    # this way; nfl defined the constant and never used it.
+    assert lanes[0]["source"] == "pregame"
 
 
 def test_summarise_reports_the_BREAKDOWN_not_just_a_count():
@@ -219,7 +224,11 @@ def test_snapshot_path_is_the_KEYVALUE_route():
     carried by `pull_hot_artifacts`' `*<date>*` glob, and the symptom would look
     exactly like the producer never running."""
     p = str(live_lens_snapshot_path("/opt/render/project/data")).replace("\\", "/")
-    assert p.endswith("/live/nfl_live_lens.json")
+    # `nfl_live_resim.json`, not `nfl_live_lens.json`. They were the same file
+    # until 2026-09-24, which made this module and `nfl/live_lens.py` two
+    # writers on ONE Redis key from two services. Still the keyvalue route --
+    # that is what this test is about -- just no longer a shared key.
+    assert p.endswith("/live/nfl_live_resim.json")
 
 
 def test_validator_REJECTS_a_snapshot_with_no_games_list():

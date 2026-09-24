@@ -818,7 +818,8 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
                     "rows_corrected": 0,
                 }
         else:
-            snapshot = read_json_file(data_root() / "live" / f"{sport}_live_lens.json")
+            filename = _LIVE_GAMELINE_SNAPSHOT_PATHS.get(sport, f"{sport}_live_lens.json")
+            snapshot = read_json_file(data_root() / "live" / filename)
             if not isinstance(snapshot, dict):
                 return {"supported": True, "reason": "no published live-lens snapshot", "rows_corrected": 0}
             page = snapshot.get("page_context") if isinstance(snapshot.get("page_context"), dict) else snapshot
@@ -2124,7 +2125,23 @@ _LIVE_PROP_SPORTS = frozenset({"mlb", "wnba", "soccer"})
 # goals up reads 0.9867. NOT CLAIMED: that the probability is CALIBRATED --
 # hockeysim is an EV/Poisson approximation per period and its market backtest is
 # unpowered (n=14-15 games / 12 dates).
-_LIVE_GAMELINE_SPORTS = frozenset({"mlb", "wnba", "soccer", "ncaaf", "nhl"})
+_LIVE_GAMELINE_SPORTS = frozenset({"mlb", "wnba", "soccer", "ncaaf", "nhl", "nfl"})
+
+# WHERE THE BOARD READS EACH SPORT'S LIVE SNAPSHOT, when it is not the default
+# `live/<sport>_live_lens.json`. `nfl` is the one entry and it exists because
+# that sport has TWO producers: `nfl/live_lens.py` builds the pregame-carried
+# snapshot the live-lens PAGE reads, and `nfl/live_resim.py` re-sims from the
+# live quarter/clock/score for the BOARD. They shared one path until
+# 2026-09-24 -- one Redis key, two writers, two services, last write wins.
+#
+# A MAP RATHER THAN AN `if sport == "nfl"`, because this file already carries a
+# soccer special case ten lines below and a third would be the point at which
+# nobody can answer "where does sport X read from" without reading the function.
+# `scripts/live_tier_coverage_check.py` R8 fails any sport whose two producers
+# resolve one path, so a future collision is caught rather than discovered.
+_LIVE_GAMELINE_SNAPSHOT_PATHS: dict[str, str] = {
+    "nfl": "nfl_live_resim.json",
+}
 
 
 def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: str) -> dict:
