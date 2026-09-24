@@ -41149,3 +41149,24 @@ further.** Resolver, side, price, yes-leg and venue corroboration all verified
 (13:56Z row); the only thing between this family and a live order was the
 account balance, which is a funding decision and not a code question. Nothing
 here is owed.
+## 2026-09-24 14:07:40Z -> live 14:14:13Z (9:07-9:14 AM CDT) - web `4f8bcdef` -> `f2558c36` (`dep-daqitb3tqb8s73elhva0`) - lane `club-maps-fleet-rollout`
+
+**predict:** `nhl_inline_chips_keyed_0922` 0of10 -> 10of10. Baseline read 14:07:15Z.
+
+**verify: MET, 14:14:50Z.** `/api/board/game-chips?date=2026-09-22`, `source=inline_artifact_stale`, **served commit read back as `f2558c36`** before the payload was trusted: **nhl 0/10 -> 10/10 keyed**, controls unchanged in the same response (mlb 16/16, soccer 153/153, wnba 5/5).
+
+**THIS DEPLOY EXISTS BECAUSE ONE ENDPOINT HAS TWO CODE PATHS.** `/api/board/game-chips` serves the WORKER's artifact for a current date and builds chips **INLINE ON WEB** when that artifact is missing or stale -- `source=inline_artifact_missing` / `inline_artifact_stale`. After refresh-worker alone went to `f2558c36` on 2026-09-24 02:06Z, today's chips were keyed and **every archived date was not**: 09-22 read nhl 0/10, 09-20 nhl 0/7, while mlb/nfl/soccer/wnba were complete on the same responses. A user opening an archived NHL date saw exactly the defect the fix had supposedly closed.
+
+**A PREVIOUS READING OF MINE WAS WRONG AND IS CORRECTED HERE.** The 14:00:48Z row says a future-date chip "is not" a measurable field for a web deploy because 09-26/09-29 return `inline_artifact_missing` with ZERO chips. That is true and it was the wrong generalisation: I checked only FORWARD dates, where no slate exists yet, and concluded the inline path was unmeasurable. PAST dates exercise the same path over a real slate and measure it precisely. **A null result from one side of a window is not a null result.**
+
+## 2026-09-24 14:17:24Z -> live 14:23:51Z (9:17-9:23 AM CDT) - live-odds-worker `fe73ed81` -> `f2558c36` (`dep-daqj1t67bikc738mpl1g`) - lane `club-maps-fleet-rollout`
+
+**predict:** `kalshi_venue_poll` -> `resumes_ok_after_restart`. Baseline `ok markets=6000 at 14:15:01Z`, read 14:16:14Z.
+
+**A DELIBERATELY NULL PREDICTION, and it is labelled as one.** No field of this service is known to move: `venue_quote_fanin` emits on refresh-worker, not here; this service's NHL outputs were absent or stale at deploy time (`book_quotes/2026-09-24.jsonl` **404**, games 9h out; `odds-history/matchup-coverage?sport=nhl` last written 2026-09-23T23:47:42-05:00). So the claim is NO REGRESSION plus a healthy restart, which is what a fleet-consistency deploy actually asserts. Inventing a positive expectation here would have been a guess dressed as a measurement.
+
+**verify: MET, 14:29:48Z.** `[venue_poll] KALSHI status=ok markets=6000 reason=None` -- identical to baseline. Boot sequence observed: `[venue_poll] STARTED interval_seconds=120` 14:28:58Z, `[live_refresh_loop] MLB_LIVE_PROBE` 14:29:10Z, `ALL_PROCESS_MEMORY` flowing at 519-525 MB accounted / 2048 MB ceiling.
+
+**AN ABSENT LINE WAS NEARLY READ AS A FAILURE.** At 14:24:11Z, 20 s after live, `KALSHI status=` matched NOTHING, and ten polls over five minutes still matched nothing. The service was not broken -- it takes ~5 min to boot, and the poll only STARTED at 14:28:58Z. Checking whether the worker was emitting ANY line (it was: memory, probe, poll-started) is what separated "not yet" from "not at all".
+
+**FLEET NOW ALIGNED:** web / refresh-worker / live-odds-worker all `f2558c36`, all `live`. The split recorded in the 14:00:48Z row is closed.
