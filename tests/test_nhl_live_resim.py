@@ -199,6 +199,7 @@ def test_a_period_boundary_resume_plays_no_zero_length_period():
 # 4. THE PRODUCER -- state parsing, and the refusal contract
 # ---------------------------------------------------------------------------
 
+import json  # noqa: E402
 from syndicate.features.nhl import live_resim as LR  # noqa: E402
 
 
@@ -335,3 +336,77 @@ def test_a_game_with_no_slate_features_refuses_rather_than_vanishing():
     lane = snap["games"][0]["gameLens"][0]
     assert lane["source"] == LR.PREGAME_LENS_SOURCE
     assert lane["liveResimRefusal"] == "no_slate_features"
+
+
+# ---------------------------------------------------------------------------
+# 5. THE WIRING -- registered, allowlisted, and able to cross services
+# ---------------------------------------------------------------------------
+
+
+def test_nhl_is_registered_in_the_live_lens_loop_with_all_three_entries():
+    """A sport in `_LIVE_LENS_SPORTS` with no builder raises at tick time, on
+    the worker, where nobody is watching. Assert the registry is COMPLETE rather
+    than that nhl appears in the tuple."""
+    from syndicate.features.shared.live_lens_loop import (
+        _LIVE_LENS_BUILDERS,
+        _LIVE_LENS_SNAPSHOT_PATHS,
+        _LIVE_LENS_SPORTS,
+        _LIVE_LENS_VALIDATORS,
+    )
+
+    assert "nhl" in _LIVE_LENS_SPORTS
+    for registry in (_LIVE_LENS_BUILDERS, _LIVE_LENS_VALIDATORS, _LIVE_LENS_SNAPSHOT_PATHS):
+        missing = [s for s in _LIVE_LENS_SPORTS if s not in registry]
+        assert not missing, f"registered sports with no entry: {missing}"
+
+
+def test_the_nhl_snapshot_path_is_allowlisted_so_it_can_cross_services():
+    """The producer runs on live-odds-worker and the board is built on
+    refresh-worker. An unallowlisted snapshot is a file that exists and cannot
+    cross -- `#124`, and `model_engine_standard` §3."""
+    from syndicate.features.shared.artifact_publisher import is_hot_artifact_relative_path
+
+    assert is_hot_artifact_relative_path("live/nhl_live_lens.json")
+
+
+def test_the_snapshot_path_is_under_the_mounted_data_root_not_the_checkout():
+    """An input under the repo checkout is destroyed by the next deploy."""
+    from syndicate.features.shared.refresh_state_store import data_root
+
+    assert LR.live_lens_snapshot_path() == data_root() / "live" / "nhl_live_lens.json"
+
+
+def test_the_validator_rejects_a_non_finite_probability():
+    """A NaN serialises to invalid JSON and poisons every reader downstream."""
+    good = LR.build_live_lens_snapshot(
+        "2026-10-08", sims=5,
+        score_rows=[_score_row()],
+        slate_features=[_StubFeatures("2026020123", "Toronto Maple Leafs", "Ottawa Senators")],
+    )
+    assert LR.validate_live_lens_snapshot(good)
+
+    bad = json.loads(json.dumps(good))
+    bad["games"][0]["gameLens"][0]["modelHomeWinProb"] = float("nan")
+    assert not LR.validate_live_lens_snapshot(bad)
+
+    out_of_range = json.loads(json.dumps(good))
+    out_of_range["games"][0]["gameLens"][0]["modelHomeWinProb"] = 1.4
+    assert not LR.validate_live_lens_snapshot(out_of_range)
+
+
+def test_the_validator_accepts_an_EMPTY_slate():
+    """Out of season the builder returns no games. Refusing to publish that
+    would leave YESTERDAY's snapshot in place to be read as today's."""
+    empty = LR.build_live_lens_snapshot("2026-07-04", sims=5, score_rows=[], slate_features=[])
+    assert empty["games"] == []
+    assert LR.validate_live_lens_snapshot(empty)
+
+
+def test_a_refused_lane_still_validates():
+    """A refusal is a publishable lane, not a broken snapshot."""
+    snap = LR.build_live_lens_snapshot(
+        "2026-10-08", sims=5,
+        score_rows=[_score_row(clock={"timeRemaining": None})], slate_features=[],
+    )
+    assert LR.validate_live_lens_snapshot(snap)
+    assert snap["games"][0]["gameLens"][0]["liveResimRefusal"] == "no_clock"

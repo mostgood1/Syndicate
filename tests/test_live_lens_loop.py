@@ -201,8 +201,11 @@ class LiveLensLoopTests(unittest.TestCase):
         self.assertTrue(meta["results"]["soccer"]["ok"])
         self.assertTrue(meta["results"]["nfl"]["ok"])
         self.assertFalse(meta["ok"])
-        # nba, wnba, soccer, nfl snapshot writes + the tick-summary write itself.
-        self.assertEqual(mocked_write.call_count, 5)
+        # nba, wnba, soccer, nfl, nhl snapshot writes + the tick-summary write
+        # itself. nhl joined 2026-09-24 (lane `nhl-live-resim`); the count is
+        # asserted rather than bounded because a sport that silently stops
+        # writing is the failure this test exists to catch.
+        self.assertEqual(mocked_write.call_count, 6)
 
     def test_start_live_lens_loop_noop_when_disabled(self) -> None:
         with patch.dict(os.environ, {"SYNDICATE_ENABLE_LIVE_LENS_LOOP": "false"}, clear=False):
@@ -362,7 +365,16 @@ class LiveLensLoopTests(unittest.TestCase):
             self.assertIn(sport, live_lens_loop._LIVE_LENS_BUILDERS)
             self.assertIn(sport, live_lens_loop._LIVE_LENS_VALIDATORS)
             self.assertIn(sport, live_lens_loop._LIVE_LENS_SNAPSHOT_PATHS)
-        self.assertEqual(len(live_lens_loop._LIVE_LENS_SPORTS), 5)
+        # 6 since nhl joined 2026-09-24 (lane `nhl-live-resim`), whose builder is a
+        # RE-SIM rather than a state overlay. The count is asserted on purpose: it is
+        # what catches an addition that forgot one of the three dispatch tables, which
+        # would raise on the worker at tick time where nobody is watching.
+        self.assertEqual(len(live_lens_loop._LIVE_LENS_SPORTS), 6)
+        for sport in ("nhl",):
+            self.assertIn(sport, live_lens_loop._LIVE_LENS_SPORTS)
+            self.assertIn(sport, live_lens_loop._LIVE_LENS_BUILDERS)
+            self.assertIn(sport, live_lens_loop._LIVE_LENS_VALIDATORS)
+            self.assertIn(sport, live_lens_loop._LIVE_LENS_SNAPSHOT_PATHS)
         self.assertEqual(set(live_lens_loop._LIVE_LENS_SPORTS), set(live_lens_loop._LIVE_LENS_BUILDERS))
         self.assertEqual(set(live_lens_loop._LIVE_LENS_SPORTS), set(live_lens_loop._LIVE_LENS_VALIDATORS))
         self.assertEqual(set(live_lens_loop._LIVE_LENS_SPORTS), set(live_lens_loop._LIVE_LENS_SNAPSHOT_PATHS))

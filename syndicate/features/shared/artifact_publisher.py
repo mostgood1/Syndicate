@@ -1334,6 +1334,22 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "live/mlb_live_lens.json",
     "live/nba_live_lens.json",
     "live/wnba_live_lens.json",
+    # `nhl` ADDED 2026-09-24 (lane `nhl-live-resim`), and it is a REQUIREMENT of
+    # the producer rather than a convenience: `nhl/live_resim.py` runs on
+    # live-odds-worker's live-lens tick and the board that consumes it is built
+    # on refresh-worker. Without an entry here the snapshot is a file that
+    # exists and cannot cross -- `model_engine_standard` §3's "every input
+    # allowlisted", and exactly the `#124` shape this block already records for
+    # MLB's live props.
+    "live/nhl_live_lens.json",
+    # KNOWN GAP, NOT FIXED HERE. `soccer`, `nfl` and `ncaaf` all publish a
+    # live-lens snapshot that is absent from this list, so
+    # `/api/ops/artifacts/stream?path=live/nfl_live_lens.json` answers 403
+    # `path is not an allowed hot artifact` (measured 2026-09-23). Soccer's
+    # board join reads a different path so it is unaffected; nfl's lens is
+    # pregame-carried today so crossing it would buy nothing yet. Adding them
+    # is a per-cycle egress decision for a lane that owns those sports, and is
+    # recorded in `leads.md` rather than taken silently here.
     # The LOCKED CARD -- the day's actual recommendations, and the one input a
     # betting-day payload cannot be rebuilt without. `season_betting_day_*.json`
     # already crosses and names this file in its own `summary.card_path`, so the
@@ -3154,7 +3170,17 @@ def pull_hot_artifacts(*, date_str: str | None = None, timeout_seconds: int = _B
     # live games), while every other service's independent recompute from
     # the lighter, dated live_lens_report_*.json alone produces the
     # liveProps/archivedLiveProps keys with zero rows in them.
-    for relative_path in ("live/mlb_live_lens.json", "live/nba_live_lens.json", "live/wnba_live_lens.json"):
+    # `nhl` added 2026-09-24 for the same reason the other three are here: the
+    # file carries NO DATE in its name, so `_date_glob_patterns` can never match
+    # it and the incremental pull structurally cannot request it. It has to be
+    # fetched unconditionally or it is only ever as fresh as the last
+    # missing-artifact repair, which fires once and then never again.
+    for relative_path in (
+        "live/mlb_live_lens.json",
+        "live/nba_live_lens.json",
+        "live/wnba_live_lens.json",
+        "live/nhl_live_lens.json",
+    ):
         live_lens_succeeded, live_lens_written = _pull_hot_artifacts_request(
             _export_url(exact_path=relative_path), token, timeout_seconds=timeout_seconds
         )

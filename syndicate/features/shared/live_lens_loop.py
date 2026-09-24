@@ -19,6 +19,9 @@ from syndicate.features.nba.live_lens import validate_live_lens_snapshot as _nba
 from syndicate.features.nfl.live_lens import build_live_lens_snapshot as _nfl_build
 from syndicate.features.nfl.live_lens import live_lens_snapshot_path as _nfl_snapshot_path
 from syndicate.features.nfl.live_lens import validate_live_lens_snapshot as _nfl_validate
+from syndicate.features.nhl.live_resim import build_live_lens_snapshot as _nhl_build
+from syndicate.features.nhl.live_resim import live_lens_snapshot_path as _nhl_snapshot_path
+from syndicate.features.nhl.live_resim import validate_live_lens_snapshot as _nhl_validate
 from syndicate.features.nfl.sources import default_week as _nfl_default_week
 from syndicate.features.nfl.sources import latest_season as _nfl_latest_season
 from syndicate.features.nfl.sources import preseason_target_week as _nfl_preseason_target_week
@@ -178,7 +181,19 @@ def _soccer_build_wrapper(date_str: str) -> dict[str, Any]:
 	)
 
 
-_LIVE_LENS_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "soccer", "nfl")
+# `nhl` JOINED 2026-09-24 (lane `nhl-live-resim`). It is the only entry here
+# whose builder is a RE-SIM rather than a state overlay: `nhl/live_resim.py`
+# restarts hockeysim from the current period, clock and score. Registering it
+# is what makes the tick build NHL at all -- the sport was absent from this
+# tuple entirely, so no loop ever produced an NHL snapshot.
+#
+# ENABLING IT PUBLISHES NOTHING UNTIL THERE ARE GAMES, and it is deliberately
+# enabled anyway, for the reason `_LIVE_GAMELINE_SPORTS` states about ncaaf: out
+# of season the builder returns an empty `games` list, which the validator
+# accepts and the join reads as a real "no live NHL games" rather than as an
+# absent producer. The alternative -- register it in October -- makes those two
+# failures look identical on the day it matters most.
+_LIVE_LENS_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "soccer", "nfl", "nhl")
 
 _LIVE_LENS_BUILDERS: dict[str, Callable[[str], dict[str, Any]]] = {
 	"mlb": _mlb_build_wrapper,
@@ -186,6 +201,9 @@ _LIVE_LENS_BUILDERS: dict[str, Callable[[str], dict[str, Any]]] = {
 	"wnba": _wnba_build_wrapper,
 	"soccer": _soccer_build_wrapper,
 	"nfl": _nfl_build_wrapper,
+	# No wrapper: `build_live_lens_snapshot(date_str)` already matches this
+	# signature. NFL needs one only because it resolves a season/week first.
+	"nhl": _nhl_build,
 }
 
 _LIVE_LENS_VALIDATORS: dict[str, Callable[[Any], bool]] = {
@@ -194,6 +212,7 @@ _LIVE_LENS_VALIDATORS: dict[str, Callable[[Any], bool]] = {
 	"wnba": _wnba_validate,
 	"soccer": _soccer_validate,
 	"nfl": _nfl_validate,
+	"nhl": _nhl_validate,
 }
 
 _LIVE_LENS_SNAPSHOT_PATHS: dict[str, Callable[[], Path]] = {
@@ -202,6 +221,7 @@ _LIVE_LENS_SNAPSHOT_PATHS: dict[str, Callable[[], Path]] = {
 	"wnba": _wnba_snapshot_path,
 	"soccer": _soccer_snapshot_path,
 	"nfl": _nfl_snapshot_path,
+	"nhl": _nhl_snapshot_path,
 }
 
 

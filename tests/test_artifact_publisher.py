@@ -300,9 +300,9 @@ class HotArtifactAllowlistTests(unittest.TestCase):
         self.assertFalse(is_hot_artifact_relative_path(f"/{HOT_RELATIVE_PATH}"))
         self.assertFalse(is_hot_artifact_relative_path(f"wnba_source/../../../{HOT_RELATIVE_PATH}"))
 
-    def test_accepts_the_three_live_lens_snapshots_but_rejects_lookalikes(self) -> None:
-        # #124: live-odds-worker's live_lens_loop.py writes these three paths
-        # (data_root()/live/{mlb,nba,wnba}_live_lens.json) every ~60s while
+    def test_accepts_the_live_lens_snapshots_but_rejects_lookalikes(self) -> None:
+        # #124: live-odds-worker's live_lens_loop.py writes these paths
+        # (data_root()/live/{mlb,nba,wnba,nhl}_live_lens.json) every ~60s while
         # games are live, with real populated liveProps/archivedLiveProps --
         # they were never allowlisted at all, so the loop's own periodic
         # publish_changed_hot_artifacts sweep always skipped them
@@ -317,7 +317,15 @@ class HotArtifactAllowlistTests(unittest.TestCase):
         # or the same filename nested a level deeper, must not slip through.
         self.assertFalse(is_hot_artifact_relative_path("live/mlb_live_lens_backup.json"))
         self.assertFalse(is_hot_artifact_relative_path("mlb_source/live/mlb_live_lens.json"))
-        self.assertFalse(is_hot_artifact_relative_path("live/nhl_live_lens.json"))
+        # `nhl` WAS this negative control until 2026-09-24, when
+        # `nhl/live_resim.py` gave NHL a real live re-sim and the snapshot was
+        # allowlisted (lane `nhl-live-resim`). The PROPERTY under test is that
+        # this is not a wildcard over `live/*_live_lens.json`, so the example
+        # moves to a sport that genuinely has no live-lens producer rather than
+        # the assertion being deleted.
+        self.assertTrue(is_hot_artifact_relative_path("live/nhl_live_lens.json"))
+        self.assertFalse(is_hot_artifact_relative_path("live/ncaab_live_lens.json"))
+        self.assertFalse(is_hot_artifact_relative_path("live/ncaaf_live_lens.json"))
 
 
 class PublishHotArtifactClientTests(unittest.TestCase):
@@ -503,7 +511,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
             # export's 24MB budget) and are unconditional, so a bare
             # call_count here started counting a second transport's requests.
             requested_urls = {call.args[0].full_url for call in mocked_urlopen.call_args_list}
-            self.assertEqual(len([url for url in requested_urls if "/artifacts/export?" in url]), 5, requested_urls)
+            self.assertEqual(len([url for url in requested_urls if "/artifacts/export?" in url]), 6, requested_urls)
             pattern_urls = {url for url in requested_urls if "pattern=" in url}
             live_lens_urls = {url for url in requested_urls if "path=live%2F" in url}
             # Every request now carries a since= floor: "no watermark" used to
@@ -523,6 +531,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
                     "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fmlb_live_lens.json",
                     "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fnba_live_lens.json",
                     "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fwnba_live_lens.json",
+                    "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fnhl_live_lens.json",
                 },
             )
             self.assertTrue(all("since=" not in url for url in live_lens_urls))
@@ -1275,18 +1284,22 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
                 pull_hot_artifacts(date_str=date_str)
         return [call.args[0].full_url for call in mocked_urlopen.call_args_list]
 
-    # #124: the three live-lens snapshot fetches (mlb/nba/wnba_live_lens.json)
+    # #124: the live-lens snapshot fetches (mlb/nba/wnba/nhl_live_lens.json)
     # run unconditionally on EVERY pull, regardless of watermark or whether the
     # file already exists locally -- unlike the missing-artifact repair pass,
     # they carry no date in their filename at all, so the date-pattern glob
     # can never match them, and they need to stay fresh every cycle rather
     # than being fetched once and left stale forever. Every test below has to
-    # account for these three extra `path=` requests alongside whatever the
+    # account for these FOUR extra `path=` requests alongside whatever the
     # missing-required-artifact repair pass contributes.
     _LIVE_LENS_SNAPSHOT_URLS = {
         "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fmlb_live_lens.json",
         "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fnba_live_lens.json",
         "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fwnba_live_lens.json",
+        # `nhl` joined 2026-09-24 (lane `nhl-live-resim`): its live re-sim runs
+        # on live-odds-worker and the board that reads it is built on
+        # refresh-worker, so the snapshot has to cross. FOUR now, not three.
+        "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fnhl_live_lens.json",
     }
 
     @staticmethod
@@ -1380,7 +1393,7 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
         # their number varies with the soccer look-ahead window, so folding them
         # into a fixed total would make this assertion break on a calendar
         # change rather than on a repair-pass regression.
-        self.assertEqual(len([url for url in urls if "/artifacts/export?" in url]), 5, urls)
+        self.assertEqual(len([url for url in urls if "/artifacts/export?" in url]), 6, urls)
 
     def test_repair_runs_after_the_normal_date_scoped_pull(self) -> None:
         # Ordering matters: the incremental pull may itself supply the file, in
@@ -1392,7 +1405,7 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
 
         # Counted over the export endpoint: the quote-log stream pulls (#209)
         # are a separate, unconditional transport and vary in number.
-        self.assertEqual(len([url for url in urls if "/artifacts/export?" in url]), 12, urls)
+        self.assertEqual(len([url for url in urls if "/artifacts/export?" in url]), 13, urls)
         self.assertNotIn("path=", urls[0])
         self.assertNotIn("path=", urls[1])
         for later_url in urls[2:]:

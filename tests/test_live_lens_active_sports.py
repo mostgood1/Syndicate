@@ -69,7 +69,7 @@ class ActiveSportsTests(unittest.TestCase):
         ) as mock_tick, patch.object(live_lens_loop, "write_json_file"):
             meta = live_lens_loop._run_live_lens_tick()
 
-        self.assertEqual(meta["skippedSports"], ["nba"])
+        self.assertEqual(meta["skippedSports"], ["nba", "nhl"])
         self.assertEqual(set(meta["activeSports"]), {"mlb", "wnba", "soccer", "nfl"})
         self.assertNotIn("nba", meta["results"])
         self.assertNotIn("nba", [call.args[0] for call in mock_tick.call_args_list])
@@ -84,7 +84,7 @@ class ActiveSportsTests(unittest.TestCase):
             meta = live_lens_loop._run_live_lens_tick()
 
         self.assertTrue(meta["ok"])
-        self.assertEqual(sorted(meta["skippedSports"]), ["nba", "nfl", "soccer", "wnba"])
+        self.assertEqual(sorted(meta["skippedSports"]), ["nba", "nfl", "nhl", "soccer", "wnba"])
 
 
 if __name__ == "__main__":

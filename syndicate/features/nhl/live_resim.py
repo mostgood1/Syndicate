@@ -414,6 +414,65 @@ def build_game_lens(
     }]
 
 
+def live_lens_snapshot_path():
+    """Where the tick writes, and the join reads.
+
+    A single always-overwritten file, not date-scoped at the PATH level --
+    matching the mlb/nba/wnba/soccer/nfl convention, where the snapshot's own
+    `date` field carries which slate it covers. `data_root()` is the MOUNTED
+    disk (`SYNDICATE_DATA_ROOT`), never a source-tree-relative path: an input
+    under the repo checkout is destroyed by the next deploy
+    (`model_engine_standard` §3).
+
+    THIS PATH MUST BE ALLOWLISTED or no other service can read it. See
+    `artifact_publisher.HOT_ARTIFACT_PATTERNS` -- the producer runs on
+    live-odds-worker and the board is built on refresh-worker, so an
+    unallowlisted snapshot is a file that exists and cannot cross.
+    """
+    from syndicate.features.shared.refresh_state_store import data_root
+
+    return data_root() / "live" / "nhl_live_lens.json"
+
+
+def validate_live_lens_snapshot(snapshot: Any) -> bool:
+    """Is this snapshot safe to publish?
+
+    Deliberately shape-only, and deliberately NOT a check that any game was
+    priced: an empty `games` list on a date with no NHL fixtures is a correct
+    snapshot, and refusing to publish it would leave the previous day's file in
+    place to be read as today's. The non-finite check is the one that matters --
+    a NaN win probability serialises to invalid JSON and poisons every reader.
+    """
+    if not isinstance(snapshot, dict):
+        return False
+    if not str(snapshot.get("date") or "").strip():
+        return False
+    games = snapshot.get("games")
+    if not isinstance(games, list):
+        return False
+    for game in games:
+        if not isinstance(game, Mapping):
+            return False
+        lanes = game.get("gameLens")
+        if not isinstance(lanes, list):
+            return False
+        for lane in lanes:
+            if not isinstance(lane, Mapping):
+                return False
+            prob = lane.get("modelHomeWinProb")
+            if prob is None:
+                continue
+            try:
+                value = float(prob)
+            except (TypeError, ValueError):
+                return False
+            # NaN fails every comparison with itself; a probability outside
+            # [0, 1] is a bug that must not reach a pricer.
+            if value != value or value < 0.0 or value > 1.0:
+                return False
+    return True
+
+
 def fetch_score_rows(date_str: str, *, timeout_seconds: float = 10.0) -> list[dict[str, Any]]:
     """`/v1/score/<date>` games, or `[]`.
 
