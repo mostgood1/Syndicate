@@ -3829,3 +3829,43 @@ retraction is not innocence, and the follow-on fix I had already written had to
 be re-justified from scratch on different grounds.
 
 ---
+
+## 2026-09-24 -- A WORKTREE DIFF IS EVIDENCE ABOUT ITS BASELINE, NOT ABOUT ITS AUTHOR: a FRESH diff from a LIVE session attributed 310 of upstream's own lines to it `[scheduled task archive-closed-lanes-0917, session ac238d51, no lane]`
+
+- **What I believed.** That after the two 2026-09-23 fixes -- `changed_lines_only()` for context
+  lines, and `--diff-stale-min` for abandoned WIP -- "worktree holds an uncommitted `lanes.md` diff
+  naming this slug" was a trustworthy live-owner signal. Both fixes were measured, both were right,
+  and I read them as having closed the family.
+- **What is true.** They closed two mechanisms of three. Today `owner_liveness.py --idle-min 240`
+  returned `SAFE_SLUGS=` empty on **6 of 6** CLOSED blocks, and one worktree
+  (`tripwire-applog-page-cap`) was the reason on all six -- including three whose owners were idle
+  722-866 m and whose blocks were last modified 738-881 m ago, i.e. past both 240 m clocks by 8-14
+  hours with nothing else against them.
+- **Why neither guard fired, correctly.** That worktree's `lanes.md` was written 8.4 h ago, so the
+  3-day staleness bound treats it as fresh -- and it IS fresh. Its session was idle 17 m, so it is
+  live -- and it IS live. The slugs appear on real `+`/`-` lines, not context, so the narrowing does
+  not apply either. Every guard gave the right answer to the question it was asked.
+- **The question none of them asked.** Its HEAD is **134 commits behind `origin/main`**. A diff
+  against a stale baseline renders upstream's edits as the worktree's own. Classified against
+  `origin/main`'s copy: of 310 changed lines, only **13 `+` lines are novel**, and all 13 are OLDER
+  versions of two lanes that upstream has since CLOSED. Each of the three blocked slugs was named by
+  **exactly one** line, a `+` whose text is **byte-identical to `origin/main`**.
+- **How to apply.** When a diff is used as evidence that someone is WORKING on something, the
+  baseline is part of the claim. `git diff HEAD` answers "how does this tree differ from the commit
+  it was cut from", which on a stale checkout is mostly a question about upstream. Compare the
+  changed text against the CURRENT shared tip before attributing it to the worktree's owner: a line
+  already on `origin/main` cannot be that session's pending work, and a session that edits a block
+  to exactly what upstream already says has made a no-op edit, so the narrowing cannot hide real work.
+- **Do not fix it by widening the staleness bound.** That bound separates abandoned WIP from live
+  work and was measured for exactly that. This case is a live session with a fresh file; moving the
+  bound would discard true signals to suppress a false one. Same shape as
+  `gate-on-the-output-not-the-input`: the guard encoded an assumption about HOW a diff goes wrong.
+- **Sibling of `untracked-is-not-new`.** There, `??` meant "not in MY index" and was read as "new".
+  Here, a `+` line means "not in MY HEAD" and was read as "authored here". Both are statements about
+  the reader's baseline that look like statements about the file.
+- **Cost:** none yet -- 3,297 B of eligible lane blocks deferred one cycle, and the deferral is the
+  gate being conservative, which is the correct failure direction. The cost would be unbounded if the
+  worktree is never committed: while it sits there, NO CLOSED block in `lanes.md` can be archived by
+  that job, whatever its age. Reported, not patched (the task file reserves tool changes).
+
+---
