@@ -1086,6 +1086,14 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 2 of 17 CLOSED blocks; both moved to `lanes_closed.md` with one pointer each. 15 WAIT (owners 16da93b3 / 25e0f859 / ac238d51 idle <= 3m). Table and dormant-OPEN report: `log/2026-09-24.md`.
 - Moved: `tripwire-applog-page-cap`, `polymarket-corners-btts-order-branch`.
 
+### web-nfl-week-alignment — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
+- Goal: web runs the same commit as refresh-worker for the NFL week enumerators, with its currently-correct behaviour UNCHANGED: archived-date inline chips keep resolving their own week (09-20 -> 2026_02 x16, 09-14 -> 2026_01 x16) and /nfl/api/cards?season=2026 keeps control_value=3
+- **GOAL: MET.** The null prediction was stated before the deploy and held exactly. Served commit read back FIRST (`/api/ops/version` -> `7931b18a4e...`), then the two baseline requests re-run at 19:23:14Z: `09-20` still `inline_artifact_stale` 16 nfl all `2026_02`, `09-14` still 16 all `2026_01`, `control_value` still 3. web `f2558c36` -> `7931b18a`, live 19:22:32Z. Row in `deploys.md`.
+- **The unplanned positive reading is the stronger one:** `date=2026-09-24` serves `source=worker_artifact`, 16 nfl chips, all `2026_03`, and a sample chip is COMPLETE (`2026_03_ATL_GB`, `ATL @ GB`, kickoff `2026-09-25T00:15:00Z`, `state=pregame`) rather than the chip-less fallback — the card from the screenshot that opened the investigation, rendering. The 15:49Z row could only measure this at the worker.
+- **Hypothesis CONFIRMED:** web never had the defect; its probed root already carried weeks 1-3, so `_resolved_week` never substituted. Scanning every root can only ADD weeks, which is why no change was the correct prediction. The falsification clause (chips moving week, or `control_value` off 3) did not fire.
+- Files: .syndicate/deploys.md (ledger only; no code changes -- the commit is already on origin/main and live on refresh-worker)
+- Discharges the open obligation the 2026-09-24 15:49Z deploy row left: "web's INLINE chip path (`source=inline_artifact_stale`) runs `_resolved_week` in web's own process and is UNMEASURED for this fix". It is now measured.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

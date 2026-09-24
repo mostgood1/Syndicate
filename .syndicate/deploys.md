@@ -41222,3 +41222,32 @@ after   chips=16 chip_dates=['2026-09-25','2026-09-27','2026-09-28','2026-09-29'
 **Tests:** 120 passed across `test_nfl_week_pinning`, `_week_resolution`, `_sources_data_path`, `_chip_week_resolution`, `chip_horizon_opt_in`, `_projection_output_root`, `_market_board`, `_preseason_cards`; 8 new in `tests/test_nfl_chip_week_resolution.py`. **PRE-EXISTING AND NOT CAUSED BY THIS:** `tests/test_nfl_sources.py::NflTargetWeekTests::test_completed_weeks_are_skipped` and `::test_all_games_played_returns_none` fail on UNMODIFIED `origin/main` in the same environment (control run with both changed files checked out to origin/main). They sit in the area this change touches, which is exactly how a red test hides a new one; taken next.
 
 **Not deployed:** web (`f2558c36`) and live-odds-worker (`f2558c36`) do not carry `7931b18a`. The chips are built on refresh-worker alone, so this deploy is what moves the measured field -- but web's INLINE chip path (`source=inline_artifact_stale`, used for archived dates) runs `_resolved_week` in web's own process and is UNMEASURED for this fix.
+---
+
+## 2026-09-24 02:22 PM CT — web `f2558c36` -> `7931b18a` — lane `web-nfl-week-alignment` — **A NULL PREDICTION, STATED BEFORE THE DEPLOY AND HELD: web never had the week-1 chip defect, and this deploy discharges the "web's INLINE chip path is UNMEASURED" obligation the 15:49Z row left open.** Fleet now on ONE commit for the NFL week seam.
+
+**verify:** the SERVED payload, same two requests before and after, plus the served commit read back first.
+
+    served commit   /api/ops/version -> 7931b18a4e8cbc88d122427144d9b4066b45be2a  (commit_source=env)
+
+| reading | baseline 19:12:47Z (`f2558c36`) | after 19:23:14Z (`7931b18a`) |
+|---|---|---|
+| `/api/board/game-chips?date=2026-09-20` | `inline_artifact_stale` 16 nfl, all `2026_02` | **identical** |
+| `/api/board/game-chips?date=2026-09-14` | `inline_artifact_stale` 16 nfl, all `2026_01` | **identical** |
+| `/nfl/api/cards?season=2026` | `control_value=3` | **identical** |
+
+**WHY A NULL PREDICTION WAS THE RIGHT ONE, and why it is still worth a deploy.** The defect was never web's. Web's probed NFL root carries weeks 1-3, so `_resolved_week` had a real `available_weeks` to answer from and each archived date resolved ITS OWN week correctly — `09-20 -> 2026_02`, `09-14 -> 2026_01`. That is the same code path that returned **1** on refresh-worker, and it was correct here for a reason that is about the DISK, not the logic: **the two services disagreed because their roots did, so verifying the fix on one service says nothing about the other.** Predicting "unchanged" and measuring it is what separates "web was fine" from "web was fine and still is".
+
+**THE POSITIVE READING, unplanned and better evidence than the null one.** The date that actually matters was read in the same pass:
+
+    2026-09-24   source=worker_artifact   nfl=16   game_key prefixes {'2026_03': 16}
+
+Today's board now serves CURRENT-WEEK chips through web, off the artifacts refresh-worker rebuilt at 15:54:56Z, and a sample chip is complete rather than the fallback: `{"game_key": "2026_03_ATL_GB", "matchup": "ATL @ GB", "away": {"abbr": "ATL"}, "home": {"abbr": "GB"}, "start_time_utc": "2026-09-25T00:15:00+00:00", "state": "pregame", "status_token": "7:15P CT"}`. **That is the card from the screenshot that opened the investigation, rendering.** The end-to-end path — worker enumerates the right week -> builds chips -> web serves them -> the card has abbreviations, kickoff and state — is now measured on the surface the user looks at, which the 15:49Z row's `CHIP_JOIN_COVERAGE` line could only measure at the worker.
+
+**A CHECK OF MINE THAT WAS WRONG AND CHANGED NOTHING:** a field-fill tally printed `away_abbr 0/16`, `status 0/16`, `home_score 0/16`. Those are not the chip's key names — it nests them as `away.abbr`, `state` and `status_token`, all populated. Flat-key names against a nested payload; had I not printed the sample chip beside the tally I would have reported a live regression off it (`feedback_read_the_field_you_already_have`).
+
+**WHAT THIS DEPLOY SHIPPED BESIDES THE FIX.** `7931b18a` was chosen over `origin/main`'s moving tip deliberately, so web and refresh-worker land on the SAME commit rather than two commits that both "contain the fix". It still carries every commit between `f2558c36` and `7931b18a` from other sessions; that is unavoidable and is not a claim that they were reviewed here. live-odds-worker remains on `f2558c36` and builds no chips.
+
+**Locks.** Claim `web-nfl-week-alignment` acquired 19:12:29Z; preflight `CLEAR` at 19:15:32Z for the exact SHA, baseline age 165s, `only infrastructure processes running` (2 defunct children, already dead). Build 19:15:53Z -> live 19:22:32Z, ~6m40s, polled to `live` rather than assumed.
+
+**Still open after this row:** the `WEEK_SUBSTITUTED` line has never been OBSERVED in production. By construction it should now stay silent on all three services, so its silence is expected and is NOT evidence the emitter works — that is proved by test only (`feedback_absent_signal_is_about_the_emitter`).
