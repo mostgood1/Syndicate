@@ -8183,3 +8183,9 @@ SAFE_SLUGS=ncaaf-board-sim-coverage,ncaaf-sim-inseason-ratings,ncaaf-player-data
 - Files: none (ledger-only)
 - **GOAL MET.** `owner_liveness.py --idle-min 240` on origin/main `17d1819c` returned `SAFE_SLUGS=lane-archive-tools-mirror,closed-lane-archive-20260923-1829,closed-lane-archive-20260923-2044`; the other 9 CLOSED blocks read WAIT and were left alone. Applied: 24 lines out of `lanes.md`, 24 into `lanes_closed.md`, +3 pointers. Claims 140 and OPEN headers 37 unchanged; `check_lane_invariants.py` INVARIANTS HOLD before and after, same 2 disclaimed hints, 0 contested either side.
 - Moved: `lane-archive-tools-mirror`, `closed-lane-archive-20260923-1829`, `closed-lane-archive-20260923-2044`. These were unarchivable for ~19 h until `173e42bc` (lane `archive-diff-baseline-echo`) fixed the gate's stale-baseline false positive. Table and narrative: `log/2026-09-24.md`.
+
+### closed-lane-archive-20260924-1413 — CLOSED 2026-09-24 (GOAL MET: 2 blocks archived) — opened 2026-09-24 — session f2b3050b-6b30-4e4a-9c45-4fc05f7f81cc
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 2 of 17 CLOSED blocks; both moved to `lanes_closed.md` with one pointer each. 15 WAIT (owners 16da93b3 / 25e0f859 / ac238d51 idle <= 3m). Table and dormant-OPEN report: `log/2026-09-24.md`.
+- Moved: `tripwire-applog-page-cap`, `polymarket-corners-btts-order-branch`.

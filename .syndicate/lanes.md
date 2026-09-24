@@ -735,12 +735,6 @@ death, never life — do not invert it.
 - Landed: `3b51995a` reporter + checker + 11 tests, `9ec4d2aa` the 14 restored claims, `2c45438a` removal of a bare `tests/` directory claim this lane's own take-note had created. Narrative in `log/2026-09-24.md`; verified facts in `state_ledger.md` `[lane-claim-truncation]`.
 - Blocked by: none
 
-### closed-lane-archive-20260924-1413 — CLOSED 2026-09-24 (GOAL MET: 2 blocks archived) — opened 2026-09-24 — session f2b3050b-6b30-4e4a-9c45-4fc05f7f81cc
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read SAFE for 2 of 17 CLOSED blocks; both moved to `lanes_closed.md` with one pointer each. 15 WAIT (owners 16da93b3 / 25e0f859 / ac238d51 idle <= 3m). Table and dormant-OPEN report: `log/2026-09-24.md`.
-- Moved: `tripwire-applog-page-cap`, `polymarket-corners-btts-order-branch`.
-
 ### lane-archive-debt — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - Goal: the 15 closed/orphaned lane blocks the session digest reports as owed are moved out of lanes.md into lanes_closed.md with a one-line pointer each, with lanes.md's OPEN set, claim set and every archived block's full text provably unchanged -- and the digest's LANE ARCHIVE OWED line clears
 - **GOAL: NOT MET AS STATED, and the goal's own premise was the first thing to fall.** The digest says **15**; the real population is **18** CLOSED slugs in `lanes.md`. Of those, **9 were archivable and are archived**; the other 9 are gated and unpayable by anyone right now. So the `LANE ARCHIVE OWED` line will NOT clear, and that is the correct outcome rather than a shortfall.
@@ -835,6 +829,11 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: MET. owner_liveness.py --idle-min 240 at 23:31Z (18:31 CDT) returned SAFE for 2 of 16 CLOSED blocks; both moved to lanes_closed.md with one pointer each: `archive-diff-baseline-echo`, `closed-lane-archive-20260924-1219`. Table and WAIT reasons: log/2026-09-24.md.
 
+### closed-lane-archive-20260924-1843 — CLOSED 2026-09-24 (GOAL MET: 1 block archived) — opened 2026-09-24 — session 2c2dcade-9da6-49af-88cf-40c3391341db
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. Moved `closed-lane-archive-20260924-1413` (owner f2b3050b idle 249m, block 265m). 14 CLOSED blocks WAIT (owners 25e0f859/16da93b3/e9c5ca1c under 240m). Table and Part B in `log/2026-09-24.md`.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
@@ -875,6 +874,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20260923-1829` — CLOSED 2026-09-23 (GOAL MET: 1 block archived) — opened 2026-09-23 — session d2d19592-9f3e-4dd8-bc71-c21387b5852c
 - `closed-lane-archive-20260923-2044` — CLOSED 2026-09-23 (GOAL MET: 4 blocks archived) — opened 2026-09-23 — session d2d19592-9f3e-4dd8-bc71-c21387b5852c
 - `closed-lane-archive-20260924-1219` — CLOSED 2026-09-24 (GOAL MET: 3 blocks archived) — opened 2026-09-24 — session ac238d51-545f-473c-b430-430fcd0feca6
+- `closed-lane-archive-20260924-1413` — CLOSED 2026-09-24 (GOAL MET: 2 blocks archived) — opened 2026-09-24 — session f2b3050b-6b30-4e4a-9c45-4fc05f7f81cc
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `combined-board-rows-unreadable-tripwire` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: live on web `da268e07` (15:36:46Z); the field is served on every date, 0 `ROWS_UNREADABLE` lines; stored 113 vs rows 111 is the per-sport `by_sport` cap, not a defect.**
