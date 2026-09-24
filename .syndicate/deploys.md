@@ -41382,3 +41382,47 @@ seed, p(home) 0.4867 both ways, n=300). This deploy verifies the TICK. The
 EDGE's quality is owed at opening night and is written here as owed.
 
 ---
+
+## 2026-09-24 20:41Z - CORRECTION to the refresh-worker `f92bf1b4` entry above: n=1 -> n=4, and MY STATED REASON FOR n=1 WAS WRONG
+
+**What I wrote, eight minutes before it became false:** "a fourth build was not
+reachable tonight", justified by the MLB board cadence "stretching past 12
+minutes". Both halves are wrong. The four post-boot indexed builds landed
+20:15:38, 20:25:49, 20:31:30 and 20:39:29Z -- 6 to 10 minutes apart, never 12.
+I had two watchers running for exactly this and wrote the caveat instead of
+reading them.
+
+**The reading, n=4, all four post-boot and all on `f92bf1b4`:**
+
+    20:15:38Z  considered=229  full_game=57  stale=37 -> 64.9%   priceable=14
+    20:25:49Z  considered=200  full_game=44  stale=28 -> 63.6%   priceable= 5
+    20:31:30Z  considered=200  full_game=44  stale=39 -> 88.6%   priceable= 1
+    20:39:29Z  considered=220  full_game=54  stale=36 -> 66.7%   priceable= 9
+
+    pooled     140/199 = 70.4%      (baseline 100.0% on 3 of 3)
+    below 100% on 4 of 4 builds;  priceable>0 on 4 of 4 (baseline 0)
+
+The refusal arithmetic is internally consistent on every build -- the four
+`why` counts sum exactly to `withheld`, and `considered - withheld` equals
+`priceable` -- so each withheld row carries exactly one reason and `full_game =
+considered - segment_pricing_disabled - segment_is_not_full_game` is exact, not
+an estimate.
+
+**verify: MET at n=4, not n=1.** The prediction was `lt_100`; every build is
+below it and the pooled rate is 70.4%.
+
+**THE VARIANCE IS THE PART WORTH KEEPING, and it argues against my own result.**
+Build 3 reads 88.6% stale with `priceable=1` -- much worse than the other three
+-- and the spread 63.6-88.6% across 24 minutes is wider than the gap between a
+working fix and a broken one would need to be. The confound is visible in the
+same lines: `considered` falls 229 -> 200 as the slate goes final, so the
+surviving population is increasingly games whose quotes have stopped updating.
+That means **tonight's four builds are four readings of ONE decaying slate, not
+four independent slates**, and the pooled 70.4% should not be quoted as the
+steady-state rate. A mid-slate reading on a fresh MLB card (Sep 25-28, before
+the regular season ends) is still owed and is the number that should be cited.
+
+**What this correction does NOT change:** `priceable` 0 -> 14 was unpredicted on
+the first build and stays unpredicted; it is now unpredicted on 4 of 4.
+
+---
