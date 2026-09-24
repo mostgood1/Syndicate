@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from syndicate.features.nfl import player_stats
 from syndicate.features.nfl import props
+from syndicate.features.nfl import sources
 
 
 class NflPropsTests(unittest.TestCase):
@@ -39,6 +40,48 @@ class NflPropsTests(unittest.TestCase):
         self._player_stats_root_patch = patch.object(player_stats, "default_nfl_source_root", return_value=Path(self.nfl_root))
         self._player_stats_root_patch.start()
         self.addCleanup(self._player_stats_root_patch.stop)
+        # AND THE DEPTH CHART, for the SAME reason as the pbp above -- this one
+        # was missed. `SYNDICATE_NFL_SOURCE_ROOT` PREPENDS the temp root to the
+        # candidate list rather than replacing it, so a file the temp root does
+        # not have still falls through to the repo's copy:
+        # `nfl_depth_chart_snapshot_path` -> `_resolve_nfl_tracking_path` found
+        # the tracked `depth_2026_snapshot.csv` and 4 of these tests read it.
+        #
+        # Measured 2026-09-24 by `scripts/audit_nfl_root_seams.py`. All four were
+        # GREEN while doing it, which is the hazard: an env var that isolates
+        # MOST reads looks like isolation, and the tests it does not cover are
+        # silently asserting against whatever git last shipped.
+        #
+        # A header-only file, so the resolver stops here and the adjustment sees
+        # an empty depth chart -- the honest hermetic answer, not a fixture
+        # pretending to be real depth data.
+        #
+        # AND THE RESOLVER ITSELF, which is the one that actually closes this.
+        # `_resolve_nfl_tracking_path` serves the pbp, the injuries and the depth
+        # chart, and it searches `_source_roots()` -- so the env var PREPENDS the
+        # temp root and any file the temp root lacks still falls through to the
+        # repo. The pbp is the one that bit: the comment above says these tests
+        # must not reach "the real repo's production pbp", and the mitigation it
+        # chose -- patching `player_stats.default_nfl_source_root` -- has been
+        # INERT since `#441` moved `nfl_pbp_path` off that helper. That is
+        # precisely the failure this file's own comment names two lines earlier:
+        # "a mock of an uncalled function is green and proves nothing." It was
+        # green and proving nothing for months.
+        self._tracking_patch = patch.object(
+            sources, "_resolve_nfl_tracking_path", lambda relative: Path(self.nfl_root) / relative
+        )
+        self._tracking_patch.start()
+        self.addCleanup(self._tracking_patch.stop)
+        depth_dir = Path(self.nfl_root) / "source_artifacts" / "data" / "processed" / "depth"
+        depth_dir.mkdir(parents=True, exist_ok=True)
+        for season in (2025, 2026):
+            (depth_dir / f"depth_{season}_snapshot.csv").write_text(
+                "player_id,player_name,team,position,depth_rank,role,starter_flag,"
+                "backup_flag,positional_group,roster_status,season,snapshot_date,"
+                "source_system,source_file,source_date,source_player_id,"
+                "source_player_name,source_team_name,notes\n",
+                encoding="utf-8",
+            )
         props._nfl_raw_player_props.cache_clear()
         player_stats.load_player_plays.cache_clear()
         player_stats.player_name_index.cache_clear()
