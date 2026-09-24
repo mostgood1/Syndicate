@@ -4364,3 +4364,40 @@ without Y"), that is a claim with a date: re-derive it from
 `_keyvalue_backed` + the reader's own call before building a plan on it.
 
 ---
+### 2026-09-24 — FORBIDDEN: trusting a structural guard to protect CONTENT. A keep-set guard cannot see damage to MEANING, and mine passed while gutting a contract.
+
+- **What we believed:** that a trim of someone else's lane block was safe once the
+  checks passed -- claim set identical as a set, zero orphaned indented lines, OPEN
+  count unchanged, every moved line present verbatim in `lanes_history.md`, every
+  kept line still present. Five blocks were trimmed on that basis.
+- **What was actually true:** on `polymarket-rejected-resubmit-loop` the keep rule
+  kept `- Hypothesis (to test, not believed), ranked:` and `- Falsification test:`
+  while moving their indented children, which ARE the content. The result is a
+  contract that promises a list and delivers nothing. **Every check passed:** no
+  claim moved, nothing was orphaned by indentation, the claim set matched exactly.
+  The guards measure STRUCTURE and PRESENCE; the damage was to MEANING, and nothing
+  automated in that set can see it.
+- **How we found out:** the dry run printed the keep set with a reason per line and
+  a human read it. Nothing else would have. The fix is mechanical once seen -- a
+  kept contract key, or any kept line ending in a colon, keeps its whole subtree.
+- **The rule:** a tool that REMOVES prose gets an opt-in `--apply` and a dry run
+  that prints what it will keep and why. The reviewer is the instrument. Structural
+  checks are necessary and are not sufficient, and the gap between them is exactly
+  the class of damage that survives review because the report is green.
+- **Two more from the same hour, same shape:**
+  - **A vacuous test, found only by mutation.** `test_a_claim_bearing_line_is_kept`
+    used a plain `- Files:` line, which a DIFFERENT rule keeps anyway, so deleting
+    the claim rule left the suite green. A keep-policy test is vacuous unless its
+    fixture isolates the one rule under test -- "keep more" passes every
+    nothing-was-lost assertion.
+  - **A write that reported success and did nothing.** A `str.replace` adding a
+    constant silently no-opped because the file held a literal em-dash rather than
+    `\u2014`; `ast.parse` then passed, because the resulting NameError is a RUNTIME
+    error. I printed "added; parses clean" having asserted nothing about the
+    replacement landing. **Assert the anchor count before writing, and assert the
+    symbol exists after.**
+- **Cost:** none shipped -- all three were caught before a write. The cost was that
+  three of five automated guards reported green on a transformation that would have
+  destroyed a lane's contract.
+
+---

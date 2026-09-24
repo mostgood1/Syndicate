@@ -831,6 +831,16 @@ death, never life — do not invert it.
 - **Owner and every other session named in either block was checked, none live:** `0f5b256e` (archived, and `book-quotes-splice-repair` records it), plus `236bd219` and `a3eac387` from ask-pricing's borrow notes — all three `get_session` "Session not found", one live peer on the roster and unrelated. ask-pricing last changed 09-23 11:45; resubmit-loop had **0 changes** across 250 commits to `lanes.md`.
 - Files: .syndicate/lanes.md, .syndicate/lanes_history.md
 
+### lane-narrative-trimmer — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
+- Goal: the narrative trimmer that did five trims today exists IN THE REPO with tests, not only in a session scratchpad, so the rule it encodes survives this session and the next person can run it dry
+- **GOAL: MET.** `scripts/trim_lane_narrative.py` (NEW) + `tests/test_trim_lane_narrative.py` (NEW, 16 passing, **4 of 4 mutations caught**). Verified against the live ledger: a dry run on `kalshi-shard-balance-gate` plans 44 lines/14,865 B -> keep 20/5,804 B, and a re-run across all five blocks trimmed today now moves **0 B**.
+- **TWO DEFECTS THE VERIFICATION FOUND, both of which would have destroyed content:**
+  - **NOT IDEMPOTENT.** The pointer line carries the trim date, so it won the "newest dated entry" slot and displaced the REAL newest entry, which a second run then moved out. Measured on `polymarket-ask-pricing`: a re-run wanted to move `CLAIM TAKEN 2026-09-23`. A trimmer that eats more on every run is worse than none.
+  - **MORE AGGRESSIVE THAN THE HAND TRIMS IT CLAIMS TO ENCODE.** On `bandwidth-controlled-transfer` it would move a further 3,839 B — 5 of the 6 current-arm lines that trim kept ON PURPOSE — and 1,150 B more from `book-quotes-splice-repair`. Fixed by making a previous trim's judgement BINDING: a block carrying a pointer is skipped unless `--retrim`.
+- **A TEST OF MINE WAS VACUOUS and only the mutation check found it.** `test_a_claim_bearing_line_is_kept` used a plain `- Files:` line, which the CONTRACT rule keeps anyway — so deleting the claim rule entirely left the suite GREEN. Rebuilt on a `**Files:**` nested under a non-contract parent, the `book-quotes` shape, which no other rule explains; the test now asserts that too.
+- **A WRITE THAT REPORTED SUCCESS AND DID NOTHING.** A `str.replace` to add `POINTER_RE` silently no-opped (the file holds a literal em-dash, not `\u2014`), `ast.parse` passed because a NameError is a RUNTIME error, and I printed "added; parses clean" having asserted nothing about the replacement landing. The later edit asserts the anchor count.
+- Files: scripts/trim_lane_narrative.py (NEW), tests/test_trim_lane_narrative.py (NEW)
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
