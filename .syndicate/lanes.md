@@ -1126,6 +1126,15 @@ death, never life — do not invert it.
 - Files: `scripts/lane_archive_tools/archive_closed_lanes_before.py`, `scripts/lane_archive_tools/README.md`, `tests/test_lane_archive_tools.py`, and the live out-of-git copy `C:\tmp\lane-archive-tools\archive_closed_lanes_before.py`. No OPEN lane claimed any of them at 2026-09-24. Nothing deployed — offline tooling.
 - **BLOCK REBUILT, NOT EXTRACTED:** `lane_open.py` wrote it into the shared primary tree's `lanes.md` and a peer session's write to that same file removed it before it was ever committed (493,938 B locally against 492,426 B on `origin/main` at close). The per-session marker still held the slug, which is the only reason the loss was noticed. Nothing was archived this session — `SAFE_SLUGS=` remains empty for unrelated reasons.
 
+### verify-mirror-live-copy — CLOSED — opened 2026-09-24 — closed 2026-09-24 — session 25e0f859-2737-46ab-ad06-86879c7fd5f8
+- **Goal (verbatim): "verify_mirror.py exists in C:/tmp/lane-archive-tools and CANNOT report a vacuous pass from there: run with its default --live it refuses (same directory both sides), and run against the git mirror it reports the real 3-file comparison" — GOAL: MET (2026-09-24).** All three readings taken.
+- **The vacuous pass was MEASURED, not predicted.** Copied as-is and run from the live directory with defaults it printed `3 mirrored file(s), 0 discrepancy(ies)` and exit 0 while comparing that directory with ITSELF — output byte-identical to a genuine pass. A plain copy would have been worse than the file being absent.
+- **After the guard, three readings:** (a) from the git mirror, defaults — real check, 3 files, 0 discrepancies, exit 0, unchanged; (b) from the live directory, defaults — REFUSES, **exit 2**, naming both sides; (c) from the live directory with `--live <repo>/scripts/lane_archive_tools` — the real comparison, exit 0.
+- **And it can still FAIL:** against a temp copy with one file altered it reports DIFFERS, 1 discrepancy, exit 1. The live files were never touched to establish that.
+- Hypothesis (written before the change): a plain copy is worse than absence because `here` is the script's own directory. CONFIRMED by the measurement above.
+- Files: `scripts/lane_archive_tools/verify_mirror.py`, `scripts/lane_archive_tools/README.md`, and the live out-of-git copy. No OPEN lane claimed them. Nothing deployed — offline tooling. 25 lane-archive tests still green.
+- BLOCK REBUILT rather than extracted, for the second time today: the shared primary tree's `lanes.md` loses blocks to peer writes before they can be committed.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

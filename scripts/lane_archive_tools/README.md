@@ -114,6 +114,16 @@ a clean 0. Unit tests: `tests/test_lane_archive_tools.py` — 7 more, carrying b
 synced tree and an AHEAD tree must NOT refuse) and a mutation check that the script ACTS on the
 function rather than merely computing it.
 
-**`verify_mirror.py` is in this directory but NOT in `C:\tmp\lane-archive-tools\`** (checked
-2026-09-24). It is the mirror-integrity checker, so its absence from the live directory means
-nothing there verifies itself; copy it across if you want that check to run where the task runs.
+**`verify_mirror.py` now sits in BOTH directories (2026-09-24), and the plain copy needed a guard.**
+It treats its OWN directory as the mirror and defaults `--live` to the out-of-git tools directory,
+so copied there and run with defaults it compared that directory WITH ITSELF and printed
+`3 mirrored file(s), 0 discrepancy(ies)`, exit 0 — byte-identical to a genuine pass and
+impossible to fail. Measured before the guard, not reasoned about. That invocation now exits **2**.
+From the live directory run it as `--live <repo>\scripts\lane_archive_tools`: the comparison is
+symmetric, so MATCH/DIFFERS are correct and only the MISSING-LIVE / MISSING-MIRROR labels read
+from the other side.
+
+It is excluded from its own comparison (`p.name != Path(__file__).name`) at both ends, so its
+presence in the live directory raises no MISSING-MIRROR and the three-file check is unchanged.
+Confirmed it can still FAIL: against a temp copy with one file altered it reports DIFFERS,
+1 discrepancy, exit 1 — the live files were not touched to establish that.

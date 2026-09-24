@@ -12,7 +12,19 @@ core.autocrlf (true on the dev machine) rewrites line endings on checkout and ev
 reports DIFFERS for that reason alone. If you see a whole-file DIFFERS with equal line counts,
 check that rule before concluding anything was reverted.
 
+THIS SCRIPT NOW LIVES IN BOTH PLACES, AND THAT IS WHY IT REFUSES A SAME-DIRECTORY RUN.
+`here` is whatever directory THIS FILE sits in, and `--live` defaults to the out-of-git tools
+directory. Copied into that directory and run with defaults, both sides resolve to the same path
+and every file is compared WITH ITSELF: measured 2026-09-24, it printed
+`3 mirrored file(s), 0 discrepancy(ies)` and exit 0 -- byte-identical to a genuine pass, and
+unfalsifiable. A check that cannot fail is worse than no check, so that invocation exits 2.
+
+The comparison itself is symmetric, so from the live directory pass `--live <repo>/scripts/
+lane_archive_tools` and the MATCH/DIFFERS verdicts are correct; only the MISSING-LIVE /
+MISSING-MIRROR labels read from the other side's point of view.
+
 Usage:  py -3 scripts/lane_archive_tools/verify_mirror.py [--live <dir>]
+        py -3 C:\tmp\lane-archive-tools\verify_mirror.py --live <repo>\scripts\lane_archive_tools
 """
 import argparse
 import hashlib
@@ -27,6 +39,12 @@ args = ap.parse_args()
 
 here = Path(__file__).resolve().parent
 live = Path(args.live)
+if here.resolve() == live.resolve():
+    print("REFUSING: --live is this script's own directory, so every file would be compared with\n"
+          "itself and report MATCH no matter what was reverted -- a pass that cannot fail.\n"
+          f"  both sides: {here}\n"
+          "Run it from the git mirror, or pass --live pointing at the OTHER copy.")
+    sys.exit(2)
 names = sorted(p.name for p in here.glob("*.py") if p.name != Path(__file__).name)
 if not names:
     print("no mirrored .py files found next to this script")
