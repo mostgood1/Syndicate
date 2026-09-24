@@ -13,8 +13,23 @@ Verifies before writing: claim set identical AS A SET; OPEN header count unchang
 non-blank line present in the new lanes_closed.md; no header of a moved slug left in lanes.md;
 exactly one pointer per moved slug; both files unchanged on disk since read. CRLF preserved.
 Only blank lines at removal boundaries are touched. Default dry run; --apply writes.
+
+REFUSES FIRST, in BOTH modes, if this worktree's lanes.md or lanes_closed.md is missing any
+non-blank line that `origin/main` has. Line 24 has always said "a worktree synced to
+origin/main" and nothing enforced it. The gate that decides WHICH slugs are safe
+(`owner_liveness.py`) reads `origin/main`; this script reads and rewrites `ARCHIVE_WORKTREE`, and
+nothing compared them. Measured 2026-09-24 in the primary tree, 133 commits behind:
+`lanes_closed.md` 998,153 B here against 1,092,512 B on `origin/main`, so `--apply` plus a commit
+would have reverted ~94 KB of archived lane bodies -- including three slugs archived that same
+morning. The existing "both files unchanged on disk since read" check cannot see this: it guards
+against a concurrent LOCAL writer, not a stale BASELINE.
+
+CONTAINMENT, not equality -- a worktree legitimately AHEAD (a lane closed locally, not yet
+pushed) must still be able to archive. Only missing upstream content is a revert.
+Exit 3 on refusal. `--allow-stale-worktree` waives it and prints what it waived.
 """
 import re
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -29,6 +44,7 @@ CUTOFF = os.environ.get("ARCHIVE_CUTOFF", "2026-09-15")  # before-date rule; --o
 APPLY = "--apply" in sys.argv
 ONLY = set(sys.argv[sys.argv.index("--only") + 1].split(",")) if "--only" in sys.argv else None
 OWNER_IDLE_VERIFIED = "--owner-idle-verified" in sys.argv
+ALLOW_STALE = "--allow-stale-worktree" in sys.argv
 
 BOUNDARY = re.compile(r"^#{2,3}\s")
 HEADER = re.compile(r"^### (\S+) ")
@@ -43,10 +59,75 @@ def claims(text):
     return set(mod._claims(text))
 
 
+def missing_upstream_lines(worktree_text, main_text):
+    """Non-blank lines `origin/main` has that this worktree's copy does not.
+
+    CONTAINMENT rather than equality, because the two trees differ for two very
+    different reasons and only one of them is dangerous. A worktree AHEAD -- a
+    lane closed locally and not yet pushed -- adds lines, and archiving from it
+    reverts nothing. A worktree BEHIND is missing lines that exist upstream, and
+    writing it back DELETES them. Equality would refuse both and make the tool
+    unusable in the ordinary case.
+
+    Set membership, so a line repeated upstream but present once here passes:
+    the question is whether the content survives, not how many times. Blank
+    lines carry no content and this script rewrites them at removal boundaries
+    by design, so they are excluded -- including them would refuse every tree.
+    """
+    have = set(worktree_text.replace("\r\n", "\n").split("\n"))
+    return [l for l in main_text.replace("\r\n", "\n").split("\n")
+            if l.strip() and l not in have]
+
+
+def _origin_main_blob(worktree, relative):
+    """`origin/main`'s copy of one file, or None if the ref cannot be read."""
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(worktree), "cat-file", "-p", "origin/main:" + relative],
+            capture_output=True, timeout=60)
+    except Exception:
+        return None
+    return out.stdout.decode("utf-8", "replace") if out.returncode == 0 else None
+
+
 raw_lanes = LANES.read_bytes()
 raw_closed = CLOSED.read_bytes()
 lanes_text = raw_lanes.decode("utf-8")
 closed_text = raw_closed.decode("utf-8")
+
+# THE BASELINE GATE. Runs in BOTH modes on purpose: a clean dry run followed by
+# a refusing --apply would send the operator looking for the wrong problem, and
+# the dry run is what gets read and believed.
+_head = subprocess.run(["git", "-C", str(W), "rev-parse", "origin/main"],
+                       capture_output=True, timeout=60)
+_main_sha = _head.stdout.decode().strip() if _head.returncode == 0 else ""
+_stale = {}
+if not _main_sha:
+    _stale["<ref>"] = ["origin/main cannot be resolved in this worktree"]
+else:
+    for _rel, _txt in ((".syndicate/lanes.md", lanes_text),
+                       (".syndicate/lanes_closed.md", closed_text)):
+        _main_txt = _origin_main_blob(W, _rel)
+        if _main_txt is None:
+            _stale[_rel] = ["origin/main:" + _rel + " could not be read"]
+            continue
+        _gap = missing_upstream_lines(_txt, _main_txt)
+        if _gap:
+            _stale[_rel] = _gap
+if _stale:
+    print("WORKTREE IS BEHIND origin/main (" + (_main_sha[:12] or "unresolved") + ").")
+    for _rel in sorted(_stale):
+        _gap = _stale[_rel]
+        print("  " + _rel + ": " + str(len(_gap)) + " non-blank line(s) on origin/main are absent here")
+        for _l in _gap[:3]:
+            print("      " + _l[:110])
+        if len(_gap) > 3:
+            print("      ... and " + str(len(_gap) - 3) + " more")
+    if not ALLOW_STALE:
+        print("REFUSING: writing this tree back would DELETE that content. "
+              "Sync the worktree, or pass --allow-stale-worktree.")
+        sys.exit(3)
+    print("WAIVED by --allow-stale-worktree: the lines above will be lost if this is committed.")
 nl = "\r\n" if "\r\n" in lanes_text else "\n"
 cnl = "\r\n" if "\r\n" in closed_text else "\n"
 lines = lanes_text.split(nl)

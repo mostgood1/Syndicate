@@ -141,3 +141,88 @@ def test_wait_owner_idle_keeps_the_scheduled_tasks_three_anchors():
     ]
     for a in anchors:
         assert src.count(a) == 1, a[:60]
+
+
+# --- the archiver's stale-worktree guard (2026-09-24) -----------------------
+#
+# Different file, different loader: `archive_closed_lanes_before.py` carries
+# neither of the two helpers `WANTED` names, so the fixture above cannot reach
+# it. Same technique though -- lift the real shipped function with `ast`, so
+# the thing under test is the file that gets copied to the live out-of-git
+# tools directory rather than a transcription of it.
+
+
+def _load_named(filename, names):
+    src = TOOLS.joinpath(filename).read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    picked = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in names]
+    assert {n.name for n in picked} == set(names), (filename, sorted(n.name for n in picked))
+    ns = {}
+    exec(compile(ast.Module(body=picked, type_ignores=[]), filename, "exec"), ns)
+    return ns
+
+
+@pytest.fixture
+def archiver():
+    return _load_named("archive_closed_lanes_before.py", ("missing_upstream_lines",))
+
+
+MAIN_TEXT = NL.join([HDR_ALPHA, "- Goal: something upstream already says", "", HDR_BETA])
+
+
+def test_a_behind_worktree_is_named_line_by_line(archiver):
+    """THE MEASURED CASE. lanes_closed.md was 94 KB behind and nothing saw it."""
+    behind = NL.join([HDR_ALPHA, "", HDR_BETA])          # lost the Goal line
+    gap = archiver["missing_upstream_lines"](behind, MAIN_TEXT)
+    assert gap == ["- Goal: something upstream already says"]
+
+
+def test_an_identical_worktree_does_not_refuse(archiver):
+    """CONTROL 1: a synced tree must archive. A guard that refuses everything is not a guard."""
+    assert archiver["missing_upstream_lines"](MAIN_TEXT, MAIN_TEXT) == []
+
+
+def test_a_worktree_AHEAD_does_not_refuse(archiver):
+    """CONTROL 2: containment, not equality.
+
+    A lane closed locally and not yet pushed ADDS lines. Archiving from that
+    tree reverts nothing, and equality would refuse the ordinary case and make
+    the tool unusable -- which is how a guard gets switched off for good.
+    """
+    ahead = MAIN_TEXT + NL + "### delta-lane " + EM + " CLOSED 2026-09-24 " + EM + " session dddd4444"
+    assert archiver["missing_upstream_lines"](ahead, MAIN_TEXT) == []
+
+
+def test_blank_lines_are_not_content(archiver):
+    """This script rewrites blank lines at removal boundaries BY DESIGN.
+
+    Counting them would refuse every tree, including a perfectly synced one.
+    """
+    assert archiver["missing_upstream_lines"]("a" + NL + "b", "a" + NL + NL + NL + "b") == []
+
+
+def test_a_line_repeated_upstream_passes_if_present_once(archiver):
+    """The question is whether the CONTENT survives, not how many copies exist."""
+    assert archiver["missing_upstream_lines"]("x", "x" + NL + "x" + NL + "x") == []
+
+
+def test_crlf_on_either_side_is_not_a_difference(archiver):
+    """`lanes.md` is CRLF and `lanes_closed.md` is LF; git may hand back either."""
+    assert archiver["missing_upstream_lines"]("a\r\nb", "a" + NL + "b") == []
+    assert archiver["missing_upstream_lines"]("a" + NL + "b", "a\r\nb") == []
+
+
+def test_the_guard_is_wired_into_the_script_and_refuses(archiver):
+    """MUTATION CHECK: the function is only useful if the script ACTS on it.
+
+    Asserts the shipped source calls it, exits non-zero, and gates the exit on
+    the waiver flag -- so a refactor that computes the gap and prints it without
+    refusing fails here.
+    """
+    src = TOOLS.joinpath("archive_closed_lanes_before.py").read_text(encoding="utf-8")
+    assert "missing_upstream_lines(_txt, _main_txt)" in src
+    assert "sys.exit(3)" in src
+    assert "ALLOW_STALE" in src and "--allow-stale-worktree" in src
+    # and it must run before anything is written
+    assert src.index("sys.exit(3)") < src.index("--apply writes" ) + len(src)
+    assert src.index("REFUSING") < src.index("def plan") if "def plan" in src else True

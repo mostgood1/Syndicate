@@ -21,7 +21,7 @@ or by hand — the hashes below are of the bytes as committed:
 |---|---|---|
 | `owner_liveness.py` | `dcb5f31e6120ed4f216414b20d329b5c1bdb48b828616d8ab77b1e94c26a7d18` | CRLF |
 | `wait_owner_idle.py` | `1e23f5f14f7dccfe81b21bd0e5606c570fe70e8bfb42fcd35f36e87b5efcf0d0` | CRLF |
-| `archive_closed_lanes_before.py` | `5f92bc4440223eb5d7eee39f3d5857884e1a587527383fa440ed531fab7ecb8b` | LF |
+| `archive_closed_lanes_before.py` | `97097937f301e7e012ac9a8a8886112ada7facd435920ccddb39db93511b1734` | LF |
 
 **The three do not agree on line endings, and `core.autocrlf` is `true` on the dev machine.**
 `.gitattributes` therefore carries `scripts/lane_archive_tools/*.py -text`, which disables all
@@ -83,3 +83,37 @@ because both callers then run `slug in text`. Its first draft took a list, itera
 character by character and returned single characters — on which `slug in text` is False for every
 slug, silently disabling the worktree check entirely and making every CLOSED block archivable. That
 is worse than the bug being fixed, and only the unit test caught it.
+
+## 2026-09-24 — `archive_closed_lanes_before.py` REFUSES a worktree that is BEHIND
+
+The two tools disagreed about which tree they were talking about. `owner_liveness.py` decides SAFE
+by reading **`origin/main`**; this one resolved everything under `ARCHIVE_WORKTREE` and rewrote
+**that** tree. Nothing compared them — although line 24 has always said "a worktree synced to
+origin/main", which made the requirement documented and unenforced.
+
+Measured in the primary tree, 133 commits behind: `lanes_closed.md` **998,153 B** against
+`origin/main`'s **1,092,512 B**. A dry run there reported a clean
+`eligible 0 | claims unchanged 143 | OPEN headers 37 unchanged`, and an `--apply` plus a commit
+would have deleted **~94 KB** of archived lane bodies — including the three slugs archived that
+same morning. The existing "both files unchanged on disk since read" check cannot see this: it
+guards against a concurrent LOCAL writer, not a stale BASELINE.
+
+`missing_upstream_lines()` is **containment, not equality**. A tree legitimately AHEAD (a lane
+closed locally and not yet pushed) only ADDS lines and reverts nothing; refusing that would make
+the tool unusable in the ordinary case, which is how a guard ends up switched off for good. Blank
+lines are excluded because this script rewrites them at removal boundaries by design, so counting
+them would refuse every tree including a synced one.
+
+It runs in BOTH modes on purpose: a clean dry run followed by a refusing `--apply` sends the
+operator after the wrong problem, and the dry run is the output that gets read and believed.
+Exit **3**. `--allow-stale-worktree` waives it and prints exactly what will be lost.
+
+Verified off != on against real state: it refuses the 133-behind primary tree, naming **206**
+missing `lanes_closed.md` lines and **3** in `lanes.md`, where that same tree previously reported
+a clean 0. Unit tests: `tests/test_lane_archive_tools.py` — 7 more, carrying both controls (a
+synced tree and an AHEAD tree must NOT refuse) and a mutation check that the script ACTS on the
+function rather than merely computing it.
+
+**`verify_mirror.py` is in this directory but NOT in `C:\tmp\lane-archive-tools\`** (checked
+2026-09-24). It is the mirror-integrity checker, so its absence from the live directory means
+nothing there verifies itself; copy it across if you want that check to run where the task runs.

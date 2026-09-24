@@ -1115,6 +1115,17 @@ death, never life — do not invert it.
 - **`28bd4023` STANDS.** The test leak it fixed is real on a clean checkout (via the one tracked file with rows) and was 13 real captures on the machine it was found on. The FIX was right; the JUSTIFICATION NUMBER was not, which is why the retraction is recorded beside it rather than the commit being revisited.
 - No behaviour change: docstring only. 55 passed across the NFL sources/props tests with zero escaping resolutions.
 
+### archive-writer-stale-worktree-guard — CLOSED — opened 2026-09-24 — closed 2026-09-24 — session 25e0f859-2737-46ab-ad06-86879c7fd5f8
+- **Goal (verbatim): "archive_closed_lanes_before.py REFUSES to write when its worktree's lanes.md or lanes_closed.md is missing content that origin/main has, so an --apply from a behind checkout can no longer revert archiving done elsewhere; measured today at ~94 KB of lanes_closed.md" — GOAL: MET (2026-09-24).** Every verification clause ran.
+- **off != on against REAL state:** the 133-behind primary tree now exits **3**, naming **206** missing `lanes_closed.md` lines and **3** in `lanes.md`; that same tree previously reported a clean `eligible 0 | claims unchanged 143 | OPEN headers 37 unchanged`. `--allow-stale-worktree` proceeds and prints what would be lost.
+- **Both controls pass, because a guard that refuses everything gets switched off:** an identical tree and a tree legitimately AHEAD (a lane closed locally, not yet pushed) both still archive. The rule is CONTAINMENT, not equality — only MISSING upstream content is a revert.
+- **Mutation-checked:** with the filter replaced by `if False]` the behind-case test fails, so the test can fail. 25 tests green (18 existing + 7 new), one of which asserts the SCRIPT ACTS on the function rather than merely computing it.
+- **Mirror protocol honoured:** the LIVE copy under `C:\tmp\lane-archive-tools\` (what scheduled task `archive-closed-lanes-0917` actually runs) and the git mirror carry the same bytes; `verify_mirror.py` reports **3 mirrored files, 0 discrepancies** against the updated README hash. Pure LF preserved per the `-text` attribute.
+- Hypothesis (written before the fix): the gate and the writer disagree about WHICH TREE they mean — `owner_liveness.py` decides SAFE from `origin/main` while this script resolves and rewrites `ARCHIVE_WORKTREE`, and nothing compares them. CONFIRMED.
+- Falsification: if the writer already refused a behind baseline, the dry run in a 133-behind checkout would have said so instead of reporting a clean 0. It did not.
+- Files: `scripts/lane_archive_tools/archive_closed_lanes_before.py`, `scripts/lane_archive_tools/README.md`, `tests/test_lane_archive_tools.py`, and the live out-of-git copy `C:\tmp\lane-archive-tools\archive_closed_lanes_before.py`. No OPEN lane claimed any of them at 2026-09-24. Nothing deployed — offline tooling.
+- **BLOCK REBUILT, NOT EXTRACTED:** `lane_open.py` wrote it into the shared primary tree's `lanes.md` and a peer session's write to that same file removed it before it was ever committed (493,938 B locally against 492,426 B on `origin/main` at close). The per-session marker still held the slug, which is the only reason the loss was noticed. Nothing was archived this session — `SAFE_SLUGS=` remains empty for unrelated reasons.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
