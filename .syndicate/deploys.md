@@ -41170,3 +41170,33 @@ here is owed.
 **AN ABSENT LINE WAS NEARLY READ AS A FAILURE.** At 14:24:11Z, 20 s after live, `KALSHI status=` matched NOTHING, and ten polls over five minutes still matched nothing. The service was not broken -- it takes ~5 min to boot, and the poll only STARTED at 14:28:58Z. Checking whether the worker was emitting ANY line (it was: memory, probe, poll-started) is what separated "not yet" from "not at all".
 
 **FLEET NOW ALIGNED:** web / refresh-worker / live-odds-worker all `f2558c36`, all `live`. The split recorded in the 14:00:48Z row is closed.
+## 2026-09-24 15:45:40Z -> live 15:49:10Z (10:45-10:49 AM CDT) - refresh-worker `38155379` -> `7931b18a` (`dep-daqkb97lk1mc73e36qcg`) - lane `nfl-chip-week-resolution`
+
+**USER-REPORTED SYMPTOM:** tonight's ATL @ GB card on the Layer 2 compact board rendered the CHIP-LESS fallback -- full club names and an opportunity count instead of abbreviations, a kickoff and score rows -- while the MLB cards beside it rendered normally.
+
+**predict:** `nfl_chip_join_by_matchup` `0of1227_chipdates_Sep10to15` -> a NON-ZERO join with `chip_dates` covering the current week. Baseline read 15:44:04Z.
+
+**verify: MET, 15:55:23Z**, off a `CHIP_JOIN_COVERAGE` line the NEW code produced at **15:54:56Z**, after live at 15:49:10Z:
+
+```
+before  chips=16 chip_dates=['2026-09-10','2026-09-11','2026-09-13','2026-09-14','2026-09-15'] cards=1227
+        by_id=0 by_matchup=0    by_canonical=0
+after   chips=16 chip_dates=['2026-09-25','2026-09-27','2026-09-28','2026-09-29']              cards=1230
+        by_id=0 by_matchup=1230 by_canonical=0  needs_fallback=0  no_chip_available=0
+```
+
+**0 of 1,227 -> 1,230 of 1,230**, and the chip dates moved from week-1 finals to this week's games.
+
+**GATED ON A LINE THE NEW CODE EMITTED, not on the deploy's status.** `CHIP_JOIN_COVERAGE` is written during a board build, so the first line after the reboot is the first one produced by the new build; a line read at 15:49:14Z would have described the OLD one. The watcher printed `no CHIP_JOIN_COVERAGE line yet since 15:49:10Z (absent != negative)` for ~5 minutes before the real line arrived -- the same trap that nearly produced a false NOT MET on the live-odds-worker deploy three hours earlier.
+
+**ROOT CAUSE -- `#672` LEFT HALF-FINISHED.** `_first_existing_root` picks an NFL root by probing for `upcoming_recs_*.csv`, a GIT-TRACKED file the ephemeral checkout has and the mounted disk may not, so it can return the CHECKOUT on a service whose disk holds the real artifacts. `#672` fixed `data_path` to resolve PER FILE and left the ENUMERATORS on the single probed root, so `_smartsim2_standalone_seasons_and_weeks()` reported `available_weeks(2026) = [1]` while the per-file lookup found week 3 on the disk. `cards._resolved_week(3)` then fell through `default_week`'s `weeks[-1]` to **1** and the chip builder built WEEK-1 chips against current-week cards. Web, whose probe landed on a root carrying more weeks, resolved 3 and served week-3 cards: **two services, two answers, one line.** A third instance of the same mistake was found while fixing the first two (`week_summaries` built each projection week's `path` by joining the name onto the probed root).
+
+**THE DATE->WEEK RESOLVER WAS CHECKED BEFORE BEING BLAMED and is innocent:** `regular_season_game_ids_for_date(2026, '2026-09-24')` returns week 3 correctly, and production's `schedule_2026.csv` carries `2026_03_ATL_GB` on gameday 2026-09-24.
+
+**THE SILENCE WAS THE OTHER HALF.** A week substitution logged nothing, raised nothing and counted nothing -- 1,227 unjoined cards, and the only signal in the system was a human looking at the board. `_resolved_week` now prints `[nfl_cards] WEEK_SUBSTITUTED season= requested= resolved= available=` on a REAL substitution only; a test asserts a clean resolve emits nothing, so it cannot decay into noise.
+
+**Locks.** Claim held from 15:43:5xZ. Preflight HELD once on a board build and was NOT overridden -- the previous deploy's `--allow-mid-build` authorisation was deliberately not carried forward to this one -- and the second poll returned `CLEAR: only infrastructure processes running`. No board build discarded, no job killed.
+
+**Tests:** 120 passed across `test_nfl_week_pinning`, `_week_resolution`, `_sources_data_path`, `_chip_week_resolution`, `chip_horizon_opt_in`, `_projection_output_root`, `_market_board`, `_preseason_cards`; 8 new in `tests/test_nfl_chip_week_resolution.py`. **PRE-EXISTING AND NOT CAUSED BY THIS:** `tests/test_nfl_sources.py::NflTargetWeekTests::test_completed_weeks_are_skipped` and `::test_all_games_played_returns_none` fail on UNMODIFIED `origin/main` in the same environment (control run with both changed files checked out to origin/main). They sit in the area this change touches, which is exactly how a red test hides a new one; taken next.
+
+**Not deployed:** web (`f2558c36`) and live-odds-worker (`f2558c36`) do not carry `7931b18a`. The chips are built on refresh-worker alone, so this deploy is what moves the measured field -- but web's INLINE chip path (`source=inline_artifact_stale`, used for archived dates) runs `_resolved_week` in web's own process and is UNMEASURED for this fix.
