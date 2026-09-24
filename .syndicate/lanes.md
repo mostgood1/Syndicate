@@ -1102,6 +1102,14 @@ death, never life — do not invert it.
 - Files: .syndicate/deploys.md (ledger only; no code changes -- 7931b18a is already on origin/main and live on the other two services)
 - Fleet aligned: all three services on `7931b18a`. The deploy-guard BLOCKED the first attempt correctly — `lane_open.py` writes the lane marker into the WORKTREE while the guard reads the PRIMARY tree, so it saw the previous lane holding a claim owned by this one. Fixed by writing the primary-tree marker, not by overriding.
 
+### lane-archive-debt — OPEN — opened 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
+- Goal: the 15 closed/orphaned lane blocks the session digest reports as owed are moved out of lanes.md into lanes_closed.md with a one-line pointer each, with lanes.md's OPEN set, claim set and every archived block's full text provably unchanged -- and the digest's LANE ARCHIVE OWED line clears
+- Files: .syndicate/lanes.md, .syndicate/lanes_closed.md
+- Hypothesis: the 20:00Z run (82c06a05) archived 0 because its criterion is OWNER LIVENESS, not closed-ness, so blocks whose owning session is still live are skipped regardless of CLOSED status. If so the digest's 15 and that run's 0 are measuring different populations and neither is wrong
+- Falsification test: if 82c06a05 archived 0 for some other reason -- a date cutoff, a dry-run default, a claim-bearing guard -- then the owner-liveness hypothesis is wrong and re-running the same tool will archive 0 again. Also: if my own re-derived count is not ~15, the digest number is stale and the debt is a different size than stated
+- Verification: byte-level, not a count: every block removed from lanes.md must appear VERBATIM in lanes_closed.md (substring assertion per block), the OPEN block set must be identical before and after, check_lane_claims.py / check_lane_invariants.py must not regress, and the lanes.md size must actually fall toward the 234KB budget
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
