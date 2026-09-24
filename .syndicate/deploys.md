@@ -40968,3 +40968,59 @@ The split-squad halves resolve to the SAME canonical pair in opposite orientatio
 **Not deployed:** `web` (still `4f8bcdef`) and `live-odds-worker` (still `fe73ed81`). Both use `team_aliases` and both are FREE of claims, but neither has a stated expectation yet, and a guessed prediction spends a reboot and poisons its own measurement. The chips field measured here is produced by refresh-worker alone, so this deploy is what moves it.
 
 **Gates that made this admissible at all** (the 2026-08-29 conditional prohibition on populating an alias map, discharged not overridden, same route as NCAAF's on 2026-09-09): gate (a) `scripts/survey_nhl_club_tokens.py` -- 70 join-grade tokens across four NHL feeds, 66 already covered by `local_nhl_odds.TEAM_NAME_TO_ABBR`, 4 uncovered and those 4 ARE the entire supplement. gate (b) `scripts/gate_b_nhl_semantics_flip.py` -- 11,130 ordered pairs, 123 verdicts changed, **0 broken, 0 residual wrong**, including 4 pre-existing FALSE POSITIVES removed (`COL` vs `Columbus Blue Jackets` answered True); the ncaab twin -- 67,340 pairs, 139 changed, 0 broken, 0 residual wrong, 26 false positives removed (`Arizona` vs `Arizona St`). 1,879 tests green.
+
+## 2026-09-24 08:56 CT (13:56Z) — READING, no deploy — live-odds-worker `b2779a98` (live 2026-09-23T16:11:43Z) — lane `polymarket-corners-btts-order-branch` — **THE CORNERS READING OWED BY THE 2026-09-23 16:05:15Z ROW IS IN, AND IT IS MET: 4 of 4 post-deploy passes BUILD, 0 of 2 pre-deploy did. The polarity is corroborated by the VENUE'S OWN FIELD, which is stronger than the evidence the fix shipped on.**
+
+`venue_order_family_census.py --hours 24`, window 2026-09-23T13:59:53Z ..
+2026-09-24T13:36:15Z, 306 `ORDER_PATH` + 302 `EXECUTED` lines, 0 unreadable:
+
+    polymarket alternate_totals_corners  passes=6 occurrences=6 builds=4
+                                         {'market_unresolved': 2, 'would_build': 4}
+
+**The 2 refusals are PRE-DEPLOY and the 4 builds are POST-DEPLOY** -- checked,
+not assumed, because a 24 h window from 13:56Z reaches back past the 16:11:43Z
+deploy:
+
+| when | verdict |
+|---|---|
+| 09-23 14:48:34.747Z, 15:06:24.029Z | `market_unresolved` / `yes_no_market_subject_is_not_our_side` |
+| 09-24 00:34:39Z, 00:46:46Z, 00:52:27Z, 00:57:23Z | `would_build` @ 0.65 / 0.53 / 0.55 / 0.55 |
+
+**The predicted line fired, and the venue agrees with it.** Predicted in the
+deploy row: `POLYMARKET_YES_LEG ... reason='gt_total_yes_by_name' agree=True`.
+Actual, 4x:
+
+    POLYMARKET_YES_LEG slug=astatc-mls-sea-rsl-2026-09-23-cor-all-gt12pt5
+      yes_leg_index=0 venue_yes_leg_index=0 venue_reason=None our_index=1
+      agree=True reason='gt_total_yes_by_name' outcomes=['Yes', 'No']
+
+`our_side=under -> outcome_index=1` (`No`), exactly the shipped mapping, and
+**`venue_yes_leg_index=0` is the venue's OWN statement that `Yes` is index 0**
+-- a second, independent witness. The fix shipped on two weaker ones (the `gt`
+token's wording, and a price-magnitude argument). It is a DIFFERENT RUNG too
+(`gt12pt5`, not yesterday's `gt10pt5`), so the threshold-equals-our-line gate
+was exercised on a line it had never seen.
+
+**WHAT THIS DOES NOT SHOW, and the distinction is load-bearing.** No corners
+order was submitted -- `grep cor-all-gt` over everything since the deploy
+returns `ORDER_PATH`, `POLYMARKET_CROSS`, `POLYMARKET_ARTIFACT_PRICE` and
+`POLYMARKET_YES_LEG`, and no `LIVE_ORDER`. `ORDER_PATH` is
+`verify_order_paths`, which calls `_polymarket_resolve_market` and
+`order_body` DIRECTLY and never `_refuse_after_commence` or `place_order`
+(counted on `origin/main`: 0 and 0). So the dry run SKIPS the kickoff gate,
+and a `would_build` proves the RESOLVER, never that a live order would have
+been sent. Why this one did not reach submit is NOT established here.
+
+**STILL UNMEASURABLE, with the population named:** `btts` does not appear in
+the census at all -- 0 positions in 24 h -- so its branch and the
+`no_order_branch_for_market` refusal remain offline-verified with no live
+frame. That is unmeasurable, not failing, and the standing census is the
+instrument that will say so the day a BTTS position exists.
+
+**A CORRECTION TO THE 16:05:15Z ROW, which is now out of date.** It records
+both venues refusing every live order on `insufficient_venue_balance`.
+Polymarket is **PLACING** again: `placed=3`, last at 2026-09-24T13:42:56Z
+(`aec-mlb-cle-bos-2026-09-24` h2h), plus NCAAF and NFL totals submitted
+overnight. Kalshi still places nothing -- 646 positions, 646
+`insufficient_venue_balance` -- which is the user's standing "not funding
+kalshi now" decision and is the census's own ALERT (exit 1), not a defect.
