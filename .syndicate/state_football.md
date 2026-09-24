@@ -2741,3 +2741,33 @@ and the settlement identity path read the same maps and are UNMEASURED.
 
 **LIVE ON refresh-worker ONLY** (`f2558c36`). `web` and `live-odds-worker` do not have
 this code.
+## [nfl-chip-week-enumeration] NFL CHIPS WERE BUILT FOR WEEK 1 BECAUSE THE WEEK ENUMERATORS READ ONE ROOT - FIXED AND VERIFIED IN PRODUCTION `[verified 2026-09-24 15:54:56Z, lane nfl-chip-week-resolution]`
+
+Every NFL compact card on the Layer 2 board rendered its CHIP-LESS fallback -- full
+club names and an opportunity count instead of abbreviations, kickoff and scores --
+because the chips described WEEK 1 while the cards were current-week.
+`CHIP_JOIN_COVERAGE sport=nfl ... cards=1227 by_id=0 by_matchup=0 by_canonical=0`:
+**0 of 1,227 joined**, against wnba `by_matchup=1116 no_chip_available=0` in the same pass.
+
+**CAUSE: `#672` LEFT HALF-FINISHED.** `_first_existing_root` picks an NFL root by
+probing for `upcoming_recs_*.csv` -- a GIT-TRACKED file the ephemeral checkout has and
+the mounted disk may not -- so it can return the CHECKOUT on a service whose disk holds
+the real artifacts. `#672` fixed `data_path` to resolve PER FILE and left the two week
+ENUMERATORS on that single probed root, so `available_weeks(2026)` read `[1]` on
+refresh-worker while the per-file lookup found week 3 on the disk.
+`cards._resolved_week(3)` then fell through `default_week`'s `weeks[-1]` to **1**.
+**Web, whose probe landed on a root carrying more weeks, resolved 3 and served week-3
+cards: two services, two answers, from one line.** The date->week resolver was CHECKED
+and is innocent -- `regular_season_game_ids_for_date(2026,'2026-09-24')` returns 3.
+
+**FIXED** (`7931b18a`, refresh-worker live 15:49:10Z): both enumerators scan every root;
+`week_summaries` resolves a projection week's path per file; and `_resolved_week` now
+PRINTS `[nfl_cards] WEEK_SUBSTITUTED season= requested= resolved= available=` when it
+answers with a different week than asked -- the substitution was silent, which is why
+1,227 unjoined cards went unreported.
+
+**READING:** `by_matchup` **0 -> 1,230 of 1,230**, `chip_dates` moving from week-1 finals
+to the current week, off a line the new code emitted at 15:54:56Z. `deploys.md 776db7a5`.
+
+**LIVE ON refresh-worker ONLY.** web and live-odds-worker run `f2558c36`; web's INLINE
+chip path for archived dates is UNMEASURED for this fix.

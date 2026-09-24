@@ -4179,3 +4179,40 @@ cheap and checking the ranking of constraints is what actually moves the number.
   discarded lines were confirmed present on `origin/main`, and the untouched files stayed untouched.
 
 ---
+### 2026-09-24 - FORBIDDEN: counting files under `data/**` with `ls` and calling the result "tracked". I did, twice, and published the number.
+
+- **What we believed:** that `oddsapi_player_props_*.csv` is tracked in git with real
+  data in most weeks -- "**45 of 58 tracked props files carry real data rows**" -- and
+  that this REFUTED `nfl_props_path`'s docstring claim that the family ships as
+  header-only stubs. Recorded in `28bd4023` and in the closing block of lane
+  `nfl-props-backtest-seam` (`55fe7f8e`), and used as the justification for a repair.
+- **What was actually true:** git tracks **14** of those files and **13 are 6-byte
+  stubs**. The 58 were the PRIMARY TREE's WORKING DIRECTORY -- 44 of them UNTRACKED
+  local captures a developer's pipeline had generated. Measured both ways afterwards:
+
+      worktree @ origin/main   git-tracked 14   on disk 14
+      primary tree             git-tracked 14   on disk 58   (44 `??`)
+
+- **How we found out:** the follow-up lane re-ran the same count in a WORKTREE and got
+  a different answer. Nothing else would have caught it -- the number was plausible,
+  specific, and load-bearing.
+- **Why it is worth its own entry when `CLAUDE.md` already says this.** `CLAUDE.md`
+  states it outright: "`git ls-files` vs. what is on disk is a real distinction here...
+  **Say which you used.**" I did not say which I used, because I did not notice there
+  was a choice -- `ls` in a repo directory FEELS like reading the repo. The rule needs
+  the trigger attached: **any count of files under `data/**` is `git ls-files` or it is
+  not about the repo**, and the two differ by 3x in this one directory.
+- **The retraction is in-place, not a deletion.** Both recorded claims keep their
+  original text marked `[RETRACTED ...]`, because a wrong number that was ACTED ON is a
+  record worth keeping (`feedback_retraction_is_not_innocence`: withdrawing a bad claim
+  gives "not proven", never "proven innocent").
+- **What survived the retraction, and it matters:** ONE tracked file
+  (`oddsapi_player_props_2025_wk22.csv`, 10,274 B) does carry real rows, so
+  `_csv_has_data_rows` already has a checkout file it will ACCEPT and the leak the repair
+  closed was real on a clean checkout -- just smaller than claimed. **The fix was right
+  and the justification was wrong**, which is the combination that survives review and
+  should not.
+- **Cost:** a false number published in two commits and a lane block; caught within the
+  hour because the next lane's falsification clause pointed at exactly that assumption.
+
+---
