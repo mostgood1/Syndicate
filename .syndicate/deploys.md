@@ -40599,6 +40599,22 @@ row Soroka 9 K on a `gte5` market graded `won` for +$1.07.
 **THE RESIDUAL READING COMES DUE TOMORROW AND IS SCHEDULED, NOT LEFT AS PROSE** (`caveat = scheduled defect`). The timing alone discriminates: under the reverted 86400 the wk3 artifact goes stale at **~15:42Z 09-24**; had the revert NOT reached the process (still 60000 = 16.7h) it would go stale at **~08:20Z 09-24**, ~7h earlier, and the `SEASON_PROJECTION_LAUNCHING` line would carry `interval_seconds=60000`. A single reading after 16:00Z on 09-24 distinguishes them and reads the interval explicitly.
 
 **Blast radius while it was lowered (15:41-16:12Z):** NFL wk3 and NCAAF wk4 each rebuilt once, which was the point. No relaunch loop was possible -- 60000 was chosen over 3600 so the rebuilt artifacts are fresh for 16.7h.
+
+### 2026-09-24 17:15Z (12:15 PM CT) — residual reading for the 16:05:27Z ENV REVERT above — **REVERT CONFIRMED BY THE PROCESS ITSELF** — lane `nfl-total-sum-direction-scale` (CLOSED; no lane opened, read-only, no deploy)
+
+Scheduled task `verify-nfl-season-projection-interval-revert`. Read `py -3 scripts/render_logs.py --service refresh-worker --text SEASON_PROJECTION --start 2026-09-24T00:00:00Z` (COVERED 00:45:39Z..15:52:24Z, 4 matches). The line:
+
+    2026-09-24T15:45:36.149908811Z  [refresh_worker] SEASON_PROJECTION_LAUNCHING sport=nfl season=2026 week=3 reason=artifact_stale age_seconds=86436 interval_seconds=86400
+
+    field                                 predicted (revert applied)   predicted (not applied)   measured
+    `interval_seconds` in the launch line 86400                        60000                     **86400**
+    NFL wk3 relaunch time                 >= ~15:42Z 09-24             ~08:20Z 09-24             **15:45:36Z** (age 86436s)
+    any NFL LAUNCHING line before 15:42Z  none                         one                       **none** (only two `SEASON_PROJECTION_TIMEOUT` lines, sport=nfl_preseason 00:45Z / nfl_props 02:15Z — other sports)
+
+NCAAF agrees independently: `SEASON_PROJECTION_LAUNCHING sport=ncaaf ... week=4 ... age_seconds=86519 interval_seconds=86400` at 15:52:24Z. So the env set + `--reinject-env` deploy DID reach the running process; the mechanism stands.
+
+**Level-shrink still in the served artifact.** `/api/ops/artifacts/stream?path=nfl_source/smartsim2_projections_2026_wk3.csv` read 17:1xZ: Last-Modified 15:47:33Z, `generated_at` 15:45:46Z..15:46:00Z (the rebuild this launch produced), 16 rows, `rating_source` = `nflverse_pbp_epa_rolling[current_season_blend/current_season_blend]+level_shrink_0.3` on 16/16, `total_mean` population SD **4.466** (sample 4.612; 4.47 on 09-23). Not reverted, not overwritten.
+
 ## 2026-09-23 16:05:15Z -> live 16:11:43Z (11:05-11:11 AM CT) — live-odds-worker `c5daf58e` -> `b2779a98` (`dep-dapvheqd0e5s73aiovig`, origin/main) — lane `polymarket-corners-btts-order-branch` — **DEPLOY LIVE AND THE CODE IS LIVE CODE. Expectation 1 MET. THE FAMILY READING IS OWED, and "builds" is NOT "places" — see the balance note.**
 
 Claim held by this lane 16:03:01Z. Preflight CLEAR 16:04:58Z (only infra
