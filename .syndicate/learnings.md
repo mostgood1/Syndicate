@@ -4324,3 +4324,43 @@ up.
   the decision: the user weighed a trade-off against a number I had not measured.
 
 ---
+
+## 2026-09-24 RULE: an instrument that reads ONE channel cannot testify about a system with TWO. A 403 from the disk-gated route is not evidence about the Redis crossing `[lane nhl-live-resim, session 4ab694ed]`
+
+`live/*_live_lens.json` crosses services through **keyvalue (Redis)**, not
+through `HOT_ARTIFACT_PATTERNS`. Verified on production 2026-09-24, all three
+services: `SYNDICATE_REFRESH_STATE_BACKEND` is `keyvalue` on web,
+refresh-worker and live-odds-worker; `live/` matches none of
+`_KEYVALUE_EXCLUDED_PATH_MARKERS`; so `write_json_file` returns after the Redis
+SET and `read_json_file` after the GET, and **neither ever touches disk**. The
+board reader is `read_json_file(data_root()/"live"/f"{sport}_live_lens.json")`.
+
+Three comments in `artifact_publisher.py` said or implied otherwise, and I wrote
+one of them THAT MORNING ("without an entry here the snapshot is a file that
+exists and cannot cross"). The measured fact underneath them was real --
+`/api/ops/artifacts/stream?path=live/nfl_live_lens.json` answers 403 -- but that
+route reads DISK and gates on `target.is_file()`. For a keyvalue-backed path
+there is no file, so **403 there means "not on disk", never "cannot cross"**.
+The same file warns about this exact conflation twenty lines further down.
+
+THE COST, inside one hour: I recommended "allowlist `live/nfl_live_lens.json`,
+cheap 24h work" as the top Wave-1 item. It would have bought nothing, and if
+NFL's lens had been wired on the strength of it, it would have shipped `#340` --
+a pregame probability under a live label.
+
+THE CROSSING'S ACTUAL PRECONDITION is key identity, and nothing asserts it:
+`_state_key_for_path` is `{namespace}:refresh-state:{ABSOLUTE RESOLVED PATH}`.
+Measured: `SYNDICATE_DATA_ROOT` is `/opt/render/project/data` on all three, and
+the namespace is `syndicate` on all three -- set explicitly on web, ABSENT on
+both workers where the code defaults to that same string. A service given a
+different data root would break every such join SILENTLY, with no reason
+emitted, and the allowlist would look like the culprit.
+
+HOW TO APPLY: before citing an instrument as evidence about a path, ask which
+CHANNEL it reads. Disk-gated routes (`artifacts/stream`, `pull_hot_artifacts`,
+the export sweep) are blind to every keyvalue-backed path -- which is most
+operational state. And when a comment asserts a MECHANISM ("X cannot cross
+without Y"), that is a claim with a date: re-derive it from
+`_keyvalue_backed` + the reader's own call before building a plan on it.
+
+---

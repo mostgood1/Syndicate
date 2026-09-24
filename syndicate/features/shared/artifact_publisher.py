@@ -1307,6 +1307,15 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # on a path that already crosses. Deliberately narrow: this one filename
     # pattern in one already-allowlisted directory, not `tracking/**`.
     "*_source/tracking/book_quotes/*.state.json",
+    # #124 -- READ THE MECHANISM BELOW WITH A CAVEAT ADDED 2026-09-24. This
+    # block attributes the zeroes to the missing allowlist entry, but on today's
+    # config these paths are keyvalue-backed on every service and never reach
+    # disk, so a missing entry could not have been the channel. Either the
+    # backend/routing differed then or the real cause was elsewhere; the
+    # 2026-08 config was NOT re-measured, so this is flagged as unresolved
+    # rather than overturned. The observations below (the prop-row counts) are
+    # measurements and stand; the CAUSAL story is the part in doubt.
+    #
     # #124: the actual root cause of MLB live props reading zero everywhere
     # except web. syndicate/features/shared/live_lens_loop.py runs on
     # live-odds-worker (per its own header comment: "runs independently ...
@@ -1334,22 +1343,56 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "live/mlb_live_lens.json",
     "live/nba_live_lens.json",
     "live/wnba_live_lens.json",
-    # `nhl` ADDED 2026-09-24 (lane `nhl-live-resim`), and it is a REQUIREMENT of
-    # the producer rather than a convenience: `nhl/live_resim.py` runs on
-    # live-odds-worker's live-lens tick and the board that consumes it is built
-    # on refresh-worker. Without an entry here the snapshot is a file that
-    # exists and cannot cross -- `model_engine_standard` §3's "every input
-    # allowlisted", and exactly the `#124` shape this block already records for
-    # MLB's live props.
+    # `nhl` ADDED 2026-09-24 (lane `nhl-live-resim`). I FIRST WROTE THAT THIS WAS
+    # A REQUIREMENT -- that without an entry the snapshot "is a file that exists
+    # and cannot cross". THAT WAS WRONG, corrected the same day, and the correct
+    # statement matters for all four entries above:
+    #
+    # ON RENDER THESE PATHS ARE NEVER FILES AT ALL. `live/` matches none of
+    # `_KEYVALUE_EXCLUDED_PATH_MARKERS`, and `SYNDICATE_REFRESH_STATE_BACKEND` is
+    # `keyvalue` on web, refresh-worker AND live-odds-worker (all three read
+    # 2026-09-24). So `write_json_file` returns after the Redis SET and
+    # `read_json_file` after the Redis GET -- neither touches disk. The board
+    # reader is literally `read_json_file(data_root()/"live"/f"{sport}_live_lens.json")`
+    # (`board_enrichment.attach_live_gamelines_for_sport`), so the snapshot
+    # crosses services through Redis whether or not it is named here.
+    #
+    # THE CROSSING'S REAL PRECONDITION IS KEY IDENTITY, NOT THIS LIST.
+    # `_state_key_for_path` is `{namespace}:refresh-state:{ABSOLUTE RESOLVED
+    # PATH}`, so two services agree only if they agree on both. Measured
+    # 2026-09-24: `SYNDICATE_DATA_ROOT` is `/opt/render/project/data` on all
+    # three, and the namespace is `syndicate` on all three -- set explicitly on
+    # web, ABSENT on both workers where `_state_namespace()` defaults to the
+    # same string. A future service given a different data root would break
+    # every one of these joins silently, and nothing here would say so.
+    #
+    # THE ENTRIES STAY, and are not dead: with a non-keyvalue backend (local
+    # dev, `SYNDICATE_REFRESH_STATE_BACKEND` unset) `_keyvalue_backed` is False,
+    # these DO go to disk, and then the allowlist is what publishes them.
+    # Inert on Render, load-bearing off it.
     "live/nhl_live_lens.json",
-    # KNOWN GAP, NOT FIXED HERE. `soccer`, `nfl` and `ncaaf` all publish a
-    # live-lens snapshot that is absent from this list, so
-    # `/api/ops/artifacts/stream?path=live/nfl_live_lens.json` answers 403
-    # `path is not an allowed hot artifact` (measured 2026-09-23). Soccer's
-    # board join reads a different path so it is unaffected; nfl's lens is
-    # pregame-carried today so crossing it would buy nothing yet. Adding them
-    # is a per-cycle egress decision for a lane that owns those sports, and is
-    # recorded in `leads.md` rather than taken silently here.
+    # `soccer`, `nfl` and `ncaaf` publish a live-lens snapshot and are absent
+    # from this list. THAT IS NOT A CROSSING GAP, and the 2026-09-23 note here
+    # that implied it was has been corrected: by the routing above they cross
+    # through Redis exactly like the four named entries, so adding them would
+    # change nothing on Render.
+    #
+    # The measured fact is narrower and still true --
+    # `/api/ops/artifacts/stream?path=live/nfl_live_lens.json` answers 403 `path
+    # is not an allowed hot artifact`. That route reads DISK and gates on
+    # `target.is_file()`; a keyvalue-backed path has no file, so 403 here means
+    # "not on disk", NOT "the data cannot reach another service". Reading it as
+    # the latter is precisely the 403-vs-404 conflation this same file warns
+    # about ~20 lines below ("a check that collapses 403 onto 404 turns 'I am
+    # not permitted to look' into 'it does not exist'"), and it cost a wrong
+    # recommendation on 2026-09-24 before it was caught.
+    #
+    # The REAL reason not to wire nfl is unchanged and has nothing to do with
+    # this list: its lens is pregame-carried by its own docstring ("Win
+    # probability and edges stay pregame-computed in this pass",
+    # `nfl/live_lens.py`), so putting it on the board would ship a pregame
+    # number under a live label -- `#340`. Soccer's board join reads a
+    # different path entirely. Both need ENGINE work, not an allowlist entry.
     # The LOCKED CARD -- the day's actual recommendations, and the one input a
     # betting-day payload cannot be rebuilt without. `season_betting_day_*.json`
     # already crosses and names this file in its own `summary.card_path`, so the
