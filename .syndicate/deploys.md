@@ -41278,3 +41278,107 @@ Today's board now serves CURRENT-WEEK chips through web, off the artifacts refre
 **Locks.** Claim acquired 20:00:39Z; preflight `CLEAR` 20:01:22Z for the exact SHA, baseline age 23s, the only processes being `run_live_odds_refresh_worker.py` and its shell. **The deploy-guard BLOCKED the first attempt** and was right to: `lane_open.py` wrote the new lane marker into the WORKTREE while the guard reads the PRIMARY tree, so it still saw `web-nfl-week-alignment` holding a claim owned by `live-odds-worker-nfl-week-alignment`. Fixed by writing the primary-tree marker, not by overriding the guard.
 
 **FLEET:** web `7931b18a` (19:22:32Z), live-odds-worker `7931b18a` (20:07:46Z), refresh-worker `7931b18a` (15:49:10Z — that third value is PREFLIGHT's reading at 20:01:22Z, not a fresh one; my own service-id lookup for refresh-worker 404'd afterwards and I did not chase it).
+
+## 2026-09-24 20:07:28Z -> live 20:11:14Z (3:07-3:11 PM CDT) - refresh-worker `7931b18a` -> `f92bf1b4` (`dep-daqo603tqb8s73bbjlpg`) - lane `mlb-live-gameline-venue-freshness`
+
+**What shipped.** A venue re-price now lowers the ROW's `age_seconds` /
+`seen_age_seconds`, not only `best[side]`'s. `attach_live_gamelines` gates on
+`row.get("age_seconds")`, which `book_grid` set once at grid-build time from the
+newest sportsbook observation and nothing updated afterwards -- so every fresh
+venue price landed one level BELOW the gate that was refusing it.
+
+**predict:** stated on the preflight receipt at 20:06:59Z, as a RATE rather than
+a count because the population swings with the live index --
+`mlb_stale_pct_of_full_game_rows_on_indexed_builds` **100.0 (on 3 of 3 indexed
+builds) -> lt_100**.
+
+**verify: MET, n=1 POST-BOOT INDEXED BUILD, AND THE n IS THE CAVEAT.** Build
+2026-09-24T20:15:38Z, refresh-worker on `f92bf1b4`:
+
+    index=4  considered=229  projected=20  priceable=14  withheld=215
+    why={'quote_older_than_live_pricing_ceiling': 37,
+         'prob_interval_swamps_edge': 6,
+         'segment_pricing_disabled': 96,
+         'segment_is_not_full_game': 76}
+
+    full-game rows = 229 - 96 - 76 = 57
+    stale          = 37 / 57 = 64.9%      (baseline 100.0%, three builds)
+
+The three baseline builds were 59/59, 66/66, 51/51 -- 100% each. **ONE post-boot
+build is a thin sample, and it is LABELLED rather than waited out**: the MLB
+board cadence stretched past 12 minutes as the slate went final, so a fourth
+build was not reachable tonight. The direction is unambiguous and the mechanism
+is the one that was fixed, but a second slate should re-read this before it is
+cited as settled.
+
+**NOT PREDICTED, and not retrofitted into the prediction: `priceable` 0 -> 14.**
+MLB live game lines carry a sim-derived edge for the first time. The receipt
+predicted the refusal falling, not edges appearing; the better half of this
+outcome was unclaimed and is recorded as unclaimed.
+
+**THE NEXT GATE APPEARED, exactly as stated before the deploy.**
+`prob_interval_swamps_edge: 6` is new -- rows freed from the staleness refusal
+now meet the min-sims noise bound. That is the mechanism behaving as described,
+not a new defect. The segment off-switch still governs the bulk: 96 + 76 = 172
+of 229 considered rows are first3/first5, a separate and deliberate decision.
+
+**DISCLOSURE, against myself.** This deploy silently carried the NHL BOARD
+wiring (`8665f0ec`, `1858d3ba`, `88ffa2cc`, `5a0ec14d` are all ancestors of
+`f92bf1b4`) and its receipt said nothing about NHL. It is inert on this service
+-- `attach_live_gamelines_for_sport([], sport="nhl")` returns `supported=True
+reason='no published live-lens snapshot' rows=0` -- but "inert" is a claim, and
+a receipt that names one sport while shipping two is incomplete.
+
+**Three links had to be fixed for this number to move, each broken differently:**
+the grid pass spoke only role keys while Kalshi keys by club (`404d2194`, no
+measurable effect on its own); the shape funnel made the loss attributable
+(`38155379`); and this, the row-clock write, was the one that reached the gate.
+The first two measured as failures and were correctly recorded as failures.
+
+---
+
+## 2026-09-24 20:19:54Z -> live 20:26:06Z (3:19-3:26 PM CDT) - live-odds-worker `7931b18a` -> `f92bf1b4` (`dep-daqobqmk1f9s73ct05ng`) - lane `nhl-live-resim`
+
+**What shipped.** NHL's live-lens tick. `_LIVE_LENS_SPORTS` gains `nhl` with
+builder / validator / snapshot-path entries, so the loop BUILDS an NHL snapshot;
+`live/nhl_live_lens.json` is allowlisted and in the unconditional per-cycle
+pull. The board half was already live on refresh-worker via the entry above.
+
+**predict:** stated on the preflight receipt at 20:19:34Z --
+`live_odds_worker_live_commit` **7931b18a -> f92bf1b4**,
+`live_lens_activeSports_contains_nhl` **false -> true**, and
+`live_lens_results_has_nhl_key` **false -> true**, from
+`/api/ops/live-lens/status`.
+
+**verify: MET, n=1 post-boot tick.** Tick `2026-09-24T20:27:56Z` (first tick
+whose `lastTickAt` postdates the 20:26:06Z boot):
+
+    activeSports: ['mlb', 'wnba', 'soccer', 'nfl', 'nhl']
+    results     : ['mlb', 'nfl', 'nhl', 'soccer', 'wnba']
+    nhl         : {"sport": "nhl", "ok": true, "date": "2026-09-24",
+                   "startedAt": "2026-09-24T20:27:54Z",
+                   "finishedAt": "2026-09-24T15:27:54-05:00",
+                   "path": "/opt/render/project/data/live/nhl_live_lens.json"}
+    skippedSports: ['nba']
+
+All three fields moved as predicted. The empty-slate signature is the one the
+validator was written to accept on purpose, so "no live NHL games" stays
+distinguishable from "no producer".
+
+**INSTRUMENT NOTE, found while taking this reading and worth the line.**
+`latestStatus.lastTickAt` and `latestTick` update INDEPENDENTLY: at 20:27:0xZ
+`latestTick.activeSports` already carried `nhl` while `lastTickAt` still read
+`20:22:06Z`. Gating on `lastTickAt > boot` is the conservative choice and the
+one used here, but anyone reading `lastTickAt` as the age of the payload beside
+it will be wrong in the direction of thinking data is older than it is.
+
+**NOT CLAIMED, and not obtainable before early October 2026:** that the NHL live
+probability is CALIBRATED. hockeysim is an EV/Poisson approximation per period
+and its market backtest is unpowered (n=14-15 games / 12 dates). What IS
+verified, offline and on the real production path, is the ORDERING (monotone in
+the scoreline: P3 05:00 two down 0.0233, two up 0.9867) and the puck-drop
+IDENTITY (resuming at the opening faceoff reproduces the pregame run seed for
+seed, p(home) 0.4867 both ways, n=300). This deploy verifies the TICK. The
+EDGE's quality is owed at opening night and is written here as owed.
+
+---
