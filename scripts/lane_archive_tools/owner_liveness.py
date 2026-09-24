@@ -9,6 +9,7 @@ SAFE requires ALL of:
   * the newest commit touching ANY line of the block on origin/main (git blame, committer time) is
     >= --idle-min old -- catches a close/edit by a session the header does not name;
   * no worktree under C:\\tmp\\syndicate-sessions has a RECENT uncommitted `.syndicate/lanes.md` diff
+    whose changed lines are NOT already `origin/main`'s own content (drop_upstream_echoes)
     that mentions the slug (the owner may be reopening it), and the lane-named worktree, if any, is
     clean. "Recent" means the worktree file's mtime is within --diff-stale-min (default 3 days,
     deliberately NOT --idle-min); an older diff is abandoned
@@ -51,6 +52,8 @@ subprocess.run(["git", "-C", str(W), "fetch", "-q", "origin"], check=True)
 text = subprocess.run(["git", "-C", str(W), "show", "origin/main:.syndicate/lanes.md"],
                       capture_output=True, check=True).stdout.decode("utf-8")
 L = text.split("\n")
+# origin/main's own lanes.md lines, captured BEFORE the worktree loop rebinds `text`.
+MAIN_LINES = set(L)
 mod = types.ModuleType("lane_claims_ro")
 guard = W / ".claude" / "hooks" / "lane_claims.py"
 exec(compile(guard.read_text(encoding="utf-8"), str(guard), "exec"), mod.__dict__)
@@ -79,6 +82,47 @@ def changed_lines_only(diff):
                      if l[:1] in ("+", "-") and not l.startswith(("+++", "---")))
 
 
+def drop_upstream_echoes(changed, main_lines):
+    """Discard changed lines whose content is ALREADY what `origin/main` says. Added 2026-09-24.
+
+    `changed_lines_only()` answers "did this worktree CHANGE a line naming the slug". It compares
+    against the worktree's OWN HEAD, so on a checkout that is behind, UPSTREAM's edits render as
+    that worktree's +/- lines and are attributed to its session. This is a THIRD false-positive
+    mechanism, distinct from the two fixed on 2026-09-23 (unchanged CONTEXT lines; ABANDONED
+    diffs), and neither of those guards can see it -- the diff is genuinely fresh and the owner
+    genuinely live, so both correctly decline to act.
+
+    Measured 2026-09-24: worktree `tripwire-applog-page-cap`, HEAD 143 commits behind, named 6 of
+    the 8 CLOSED slugs. Of its 310 changed lines only 13 were novel, and every one of the 3 slugs
+    blocked SOLELY by it was named by exactly ONE + line byte-identical to `origin/main`. A second
+    worktree, only 18 commits behind, produced the same effect on 5 slugs an hour earlier and had
+    stopped doing so an hour after that -- so this is the ordinary, intermittent state of a large
+    worktree pool, not one stale outlier a run can expect to be absent.
+
+    The rule: a + line whose text is already on `origin/main`, and a - line whose text is already
+    absent from it, say nothing about this worktree's pending work. Everything else is kept -- a
+    novel + line, and a - line removing content `origin/main` still has.
+
+    This NARROWS the check and cannot hide real work: a session that edits a block to exactly what
+    upstream already says has made a no-op edit, and any other edit leaves a line failing both
+    tests. The comparison is whole-line set membership, so a genuine edit that reproduced a line
+    existing verbatim elsewhere in `origin/main`'s lanes.md would be discounted; lane lines are
+    long and distinctive enough that this has not been observed, but it is a real bound on the
+    method and not a proof.
+
+    Takes and returns the SAME shape as `changed_lines_only()`: the diff text joined by
+    newlines, NOT a list. The first draft of this function took a list, so it iterated the
+    string CHARACTER BY CHARACTER and returned a list of single characters -- on which the
+    callers' `slug in diff` test is False for every slug, silently disabling the worktree
+    check altogether and making every CLOSED block archivable. Caught by
+    test_the_measured_case before it ran anywhere. Keep the two signatures in step.
+    """
+    return "\n".join(
+        l for l in changed.split("\n")
+        if not ((l[:1] == "+" and l[1:] in main_lines)
+                or (l[:1] == "-" and l[1:] not in main_lines)))
+
+
 worktree_diffs = {}
 stale_diffs = {}   # name -> (age_minutes, diff text); mentioned in output, but NOT a WAIT reason
 for d in SESS.iterdir() if SESS.exists() else []:
@@ -103,7 +147,8 @@ for d in SESS.iterdir() if SESS.exists() else []:
             age_min = (time.time() - (d / ".syndicate" / "lanes.md").stat().st_mtime) / 60
         except OSError:
             age_min = None
-        text = changed_lines_only(r.stdout.decode("utf-8", "replace"))
+        text = drop_upstream_echoes(changed_lines_only(r.stdout.decode("utf-8", "replace")),
+                                    MAIN_LINES)
         if age_min is not None and age_min > args.diff_stale_min:
             stale_diffs[d.name] = (age_min, text)
         else:

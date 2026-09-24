@@ -71,7 +71,48 @@ def changed_lines_only(diff):
                      if l[:1] in ("+", "-") and not l.startswith(("+++", "---")))
 
 
-def worktree_lanes_diffs():
+def drop_upstream_echoes(changed, main_lines):
+    """Discard changed lines whose content is ALREADY what `origin/main` says. Added 2026-09-24.
+
+    `changed_lines_only()` answers "did this worktree CHANGE a line naming the slug". It compares
+    against the worktree's OWN HEAD, so on a checkout that is behind, UPSTREAM's edits render as
+    that worktree's +/- lines and are attributed to its session. This is a THIRD false-positive
+    mechanism, distinct from the two fixed on 2026-09-23 (unchanged CONTEXT lines; ABANDONED
+    diffs), and neither of those guards can see it -- the diff is genuinely fresh and the owner
+    genuinely live, so both correctly decline to act.
+
+    Measured 2026-09-24: worktree `tripwire-applog-page-cap`, HEAD 143 commits behind, named 6 of
+    the 8 CLOSED slugs. Of its 310 changed lines only 13 were novel, and every one of the 3 slugs
+    blocked SOLELY by it was named by exactly ONE + line byte-identical to `origin/main`. A second
+    worktree, only 18 commits behind, produced the same effect on 5 slugs an hour earlier and had
+    stopped doing so an hour after that -- so this is the ordinary, intermittent state of a large
+    worktree pool, not one stale outlier a run can expect to be absent.
+
+    The rule: a + line whose text is already on `origin/main`, and a - line whose text is already
+    absent from it, say nothing about this worktree's pending work. Everything else is kept -- a
+    novel + line, and a - line removing content `origin/main` still has.
+
+    This NARROWS the check and cannot hide real work: a session that edits a block to exactly what
+    upstream already says has made a no-op edit, and any other edit leaves a line failing both
+    tests. The comparison is whole-line set membership, so a genuine edit that reproduced a line
+    existing verbatim elsewhere in `origin/main`'s lanes.md would be discounted; lane lines are
+    long and distinctive enough that this has not been observed, but it is a real bound on the
+    method and not a proof.
+
+    Takes and returns the SAME shape as `changed_lines_only()`: the diff text joined by
+    newlines, NOT a list. The first draft of this function took a list, so it iterated the
+    string CHARACTER BY CHARACTER and returned a list of single characters -- on which the
+    callers' `slug in diff` test is False for every slug, silently disabling the worktree
+    check altogether and making every CLOSED block archivable. Caught by
+    test_the_measured_case before it ran anywhere. Keep the two signatures in step.
+    """
+    return "\n".join(
+        l for l in changed.split("\n")
+        if not ((l[:1] == "+" and l[1:] in main_lines)
+                or (l[:1] == "-" and l[1:] not in main_lines)))
+
+
+def worktree_lanes_diffs(main_lines):
     """Uncommitted-edit check (added 2026-09-18, session 4991d2ec; same rule as owner_liveness.py):
     worktree name -> its uncommitted `.syndicate/lanes.md` diff. A slug named in one may be being
     reopened by a live session even though origin/main reads CLOSED.
@@ -92,7 +133,8 @@ def worktree_lanes_diffs():
                 age_min = (time.time() - (d / ".syndicate" / "lanes.md").stat().st_mtime) / 60
             except OSError:
                 age_min = None
-            text = changed_lines_only(r.stdout.decode("utf-8", "replace"))
+            text = drop_upstream_echoes(changed_lines_only(r.stdout.decode("utf-8", "replace")),
+                                        main_lines)
             if age_min is not None and age_min > DIFF_STALE_MIN:
                 stale[d.name] = (age_min, text)
             else:
@@ -129,7 +171,7 @@ while True:
     L = subprocess.run(["git", "-C", W, "show", "origin/main:.syndicate/lanes.md"], capture_output=True).stdout.decode("utf-8").split("\n")
     stamp = time.strftime("%H:%MZ", time.gmtime())
     lastmod = block_last_mod(L)
-    wt_diffs, wt_stale = worktree_lanes_diffs()
+    wt_diffs, wt_stale = worktree_lanes_diffs(set(L))
     claimed, open_slugs = claim_state(L)
     present, safe, report = 0, [], []
     for s in SLUGS:

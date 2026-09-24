@@ -1062,6 +1062,14 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_snapshot_live_gameline_score_row.py passes including a NEW test that fails on origin/main, plus a real capture of a date with outcomes whose appended row carries a non-null point_forecast and scorer_contract. Reachability before correctness: a payload with a DIFFERENT point_forecast must move the retained value, so the key cannot be a constant.
 - Blocked by: none
 
+### archive-diff-baseline-echo — OPEN — opened 2026-09-24 — session ac238d51-545f-473c-b430-430fcd0feca6
+- Goal: owner_liveness.py and wait_owner_idle.py stop attributing origin/main's own lanes.md lines to a worktree whose HEAD is behind: a changed line whose text is already on origin/main no longer blocks a slug, a genuinely novel line still does, and on today's state the three slugs blocked SOLELY by worktree tripwire-applog-page-cap read SAFE while the four with live owners or freshly-modified blocks still read WAIT
+- Files: scripts/lane_archive_tools/owner_liveness.py, scripts/lane_archive_tools/wait_owner_idle.py, scripts/lane_archive_tools/README.md, tests/test_lane_archive_tools.py
+- Hypothesis: The worktree-collision check compares a worktree's uncommitted lanes.md diff against that worktree's OWN HEAD, so on a checkout even 18 commits behind, upstream's edits render as the worktree's own +/- lines and are attributed to its session. Measured 2026-09-24: worktree tripwire-applog-page-cap (143 behind) names 6 of 8 CLOSED slugs; of its 310 changed lines only 13 are novel, and each of the 3 sole-blocked slugs is named by exactly one + line byte-identical to origin/main.
+- Falsification test: If discounting changed lines whose text is already on origin/main flips any slug with a live owner (<240m) or a freshly-modified block (<240m) to SAFE, the filter is too wide and must be reverted. Equally, if a worktree that genuinely edits a lane block stops being detected in the added test, the narrowing is unsound.
+- Verification: (a) new tests pass BOTH controls: an upstream-echo line does not block, a novel line still does; (b) off != on on production state -- owner_liveness.py --idle-min 240 flips exactly lane-archive-tools-mirror, closed-lane-archive-20260923-1829, closed-lane-archive-20260923-2044 from WAIT to SAFE and changes nothing else; (c) verify_mirror.py exits 0 with 3/3 MATCH after syncing C:\tmp.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
