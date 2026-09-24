@@ -5,7 +5,17 @@
     "instrument_partial": false,
     "log_lines": 9000,
     "note": "served_bytes is RESPONSE size only; a POST body (e.g. artifacts/publish) is NOT counted here",
+    "read": {
+      "lines": 9000,
+      "max_pages": 900,
+      "oldest_reached": "2026-09-21T16:00:02.518722518Z",
+      "pages": 91,
+      "stop_reason": "no more lines",
+      "truncated": false
+    },
+    "read_truncated": false,
     "served_bytes": 210272913,
+    "served_is_floor": false,
     "served_mb": 200.53,
     "top_clients": [
       {
@@ -128,7 +138,7 @@
     ]
   },
   "bucket": "2026-09-21T16:00:00Z",
-  "captured_at": "2026-09-21T17:10:09Z",
+  "captured_at": "2026-09-24T02:11:11Z",
   "deploys_in_window": [
     {
       "commit": "de6da1b72f",
@@ -152,6 +162,15 @@
   "edge": {
     "bytes": 200201400,
     "mb": 190.93,
+    "read": {
+      "lines": 1665,
+      "max_pages": 900,
+      "oldest_reached": "2026-09-21T16:00:20.460404248Z",
+      "pages": 18,
+      "stop_reason": "no more lines",
+      "truncated": false
+    },
+    "read_truncated": false,
     "requests": 1665,
     "top_clients": [
       {
@@ -325,7 +344,7 @@
       }
     ]
   },
-  "metered_mb": 876.44257,
+  "metered_mb": 879.36316,
   "note": "bucket is labelled by its hour's START: window_covered is label..label+1h (changed 2026-09-10; captures before then read the hour BEFORE the label -- see `rederived.prior` where present). edge_* is public traffic only; app_* includes internal service-to-service.",
   "other_services_same_hour": {
     "live-odds-worker": 12.2,
@@ -333,15 +352,63 @@
   },
   "publish_into_web": {
     "live-odds-worker": {
-      "bytes": 42660723,
-      "mb": 40.68,
-      "publishes": 433
+      "bytes": 69988388,
+      "mb": 66.75,
+      "publishes": 670,
+      "read": {
+        "lines": 12983,
+        "max_pages": 900,
+        "oldest_reached": "2026-09-21T16:00:07.533638473Z",
+        "pages": 131,
+        "stop_reason": "no more lines",
+        "truncated": false
+      },
+      "read_truncated": false
     },
     "refresh-worker": {
-      "bytes": 27454311,
-      "mb": 26.18,
-      "publishes": 65
+      "bytes": 71873355,
+      "mb": 68.54,
+      "publishes": 131,
+      "read": {
+        "lines": 27613,
+        "max_pages": 900,
+        "oldest_reached": "2026-09-21T16:00:00.668447715Z",
+        "pages": 277,
+        "stop_reason": "reached window start",
+        "truncated": false
+      },
+      "read_truncated": false
     }
+  },
+  "recompleted": {
+    "at": "2026-09-24T02:31:24Z",
+    "max_log_pages": 900,
+    "prior": {
+      "app_access_lines": 4171,
+      "app_instrument_blind": false,
+      "app_served_mb": 200.53,
+      "captured_at": "2026-09-21T17:10:09Z",
+      "edge_mb": 190.93,
+      "edge_requests": 1665,
+      "metered_mb": 876.44257,
+      "publish_into_web_mb": 66.86,
+      "window_covered": {
+        "end": "2026-09-21T17:00:00Z",
+        "start": "2026-09-21T16:00:00Z"
+      }
+    },
+    "prior_counters": {
+      "app.access_lines": 4171,
+      "app.log_lines": 9000,
+      "app.served_bytes": 210272913,
+      "edge.bytes": 200201400,
+      "edge.requests": 1665,
+      "publish_into_web.live-odds-worker.bytes": 42660723,
+      "publish_into_web.live-odds-worker.publishes": 433,
+      "publish_into_web.refresh-worker.bytes": 27454311,
+      "publish_into_web.refresh-worker.publishes": 65
+    },
+    "reason": "re-read on a page budget large enough to finish the window. The stored numbers were taken at 200 pages (edge/app) and 90 pages (worker publish logs), both of which truncate silently and produce FLOORS. Quote the top-level numbers; `recompleted.prior` is what the file said before."
   },
   "service": "web",
   "window_covered": {

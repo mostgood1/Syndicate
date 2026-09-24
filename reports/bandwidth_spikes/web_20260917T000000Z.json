@@ -5,7 +5,17 @@
     "instrument_partial": false,
     "log_lines": 7881,
     "note": "served_bytes is RESPONSE size only; a POST body (e.g. artifacts/publish) is NOT counted here",
+    "read": {
+      "lines": 7881,
+      "max_pages": 900,
+      "oldest_reached": "2026-09-17T00:00:00.102395332Z",
+      "pages": 79,
+      "stop_reason": "reached window start",
+      "truncated": false
+    },
+    "read_truncated": false,
     "served_bytes": 273237449,
+    "served_is_floor": false,
     "served_mb": 260.58,
     "top_clients": [
       {
@@ -123,11 +133,20 @@
     ]
   },
   "bucket": "2026-09-17T00:00:00Z",
-  "captured_at": "2026-09-17T12:04:20Z",
+  "captured_at": "2026-09-23T19:14:26Z",
   "deploys_in_window": [],
   "edge": {
     "bytes": 179590597,
     "mb": 171.27,
+    "read": {
+      "lines": 371,
+      "max_pages": 900,
+      "oldest_reached": "2026-09-17T00:00:00.183809989Z",
+      "pages": 4,
+      "stop_reason": "reached window start",
+      "truncated": false
+    },
+    "read_truncated": false,
     "requests": 371,
     "top_clients": [
       {
@@ -289,15 +308,63 @@
   },
   "publish_into_web": {
     "live-odds-worker": {
-      "bytes": 157400452,
-      "mb": 150.11,
-      "publishes": 497
+      "bytes": 236747712,
+      "mb": 225.78,
+      "publishes": 742,
+      "read": {
+        "lines": 13523,
+        "max_pages": 900,
+        "oldest_reached": "2026-09-17T00:00:00.186468597Z",
+        "pages": 136,
+        "stop_reason": "reached window start",
+        "truncated": false
+      },
+      "read_truncated": false
     },
     "refresh-worker": {
-      "bytes": 120852801,
-      "mb": 115.25,
-      "publishes": 113
+      "bytes": 160443450,
+      "mb": 153.01,
+      "publishes": 143,
+      "read": {
+        "lines": 11485,
+        "max_pages": 900,
+        "oldest_reached": "2026-09-17T00:00:00.272548758Z",
+        "pages": 115,
+        "stop_reason": "reached window start",
+        "truncated": false
+      },
+      "read_truncated": false
     }
+  },
+  "recompleted": {
+    "at": "2026-09-23T19:33:09Z",
+    "max_log_pages": 900,
+    "prior": {
+      "app_access_lines": 3690,
+      "app_instrument_blind": false,
+      "app_served_mb": 260.58,
+      "captured_at": "2026-09-17T12:04:20Z",
+      "edge_mb": 171.27,
+      "edge_requests": 371,
+      "metered_mb": 549.3148,
+      "publish_into_web_mb": 265.36,
+      "window_covered": {
+        "end": "2026-09-17T01:00:00Z",
+        "start": "2026-09-17T00:00:00Z"
+      }
+    },
+    "prior_counters": {
+      "app.access_lines": 3690,
+      "app.log_lines": 7881,
+      "app.served_bytes": 273237449,
+      "edge.bytes": 179590597,
+      "edge.requests": 371,
+      "publish_into_web.live-odds-worker.bytes": 157400452,
+      "publish_into_web.live-odds-worker.publishes": 497,
+      "publish_into_web.refresh-worker.bytes": 120852801,
+      "publish_into_web.refresh-worker.publishes": 113
+    },
+    "reason": "re-read on a page budget large enough to finish the window. The stored numbers were taken at 200 pages (edge/app) and 90 pages (worker publish logs), both of which truncate silently and produce FLOORS. Quote the top-level numbers; `recompleted.prior` is what the file said before."
   },
   "service": "web",
   "window_covered": {
