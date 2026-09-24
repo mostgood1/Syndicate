@@ -3770,3 +3770,62 @@ re-appeared the moment a new reader looked at OPEN ones. A header names who OPEN
   nobody double-checks fails silently.
 
 ---
+
+## 2026-09-24 FORBIDDEN: stating a deploy expectation as a COUNT when the population it counts can change size between the baseline and the verify `[lane mlb-live-gameline-venue-freshness, session 4ab694ed]`
+
+`deploy_preflight.py --expect` records a prediction on the receipt, and it is
+what a later reader uses to decide whether the deploy worked. I wrote
+`live_gameline_join_mlb_stale_refusals=lt_110` against a baseline of 110.
+
+Post-deploy it read 57 / 43 / 48. The expectation PASSES, literally, and the
+deploy did nothing. The count fell because the MLB slate was ending -- the same
+builds show `considered` 603 -> 332 and the live-lens index 10 -> 6. Against
+the denominator that matters, full-game rows the join actually considered, the
+refusal rate is 100% / 100% / 87.7% after and 100% / 94.7% before. Nothing
+moved.
+
+**The receipt would have recorded a success that is not one**, and it would
+have been believed, because a receipt is exactly the artefact a later session
+reads instead of re-deriving. `learnings.md` already carries "A rate, not a
+count" for findings; this extends it to the PREDICTION, which is worse, because
+a finding gets re-examined and a discharged expectation does not.
+
+HOW TO APPLY: if the population can change size -- a slate ending, games going
+final, a window narrowing -- the `--expect` field must be the rate, or a pair
+(numerator AND denominator) so the reader can compute it. "Fewer refusals" is
+not a prediction when the thing being refused is also disappearing.
+
+---
+
+## 2026-09-24 FORBIDDEN: overriding your own local probe with a production number you have not tied to your change by TIME `[lane mlb-live-gameline-venue-freshness, session 4ab694ed]`
+
+I probed `_key_claimants` locally and it returned an EMPTY set for a club key,
+which means `_unconfirmed_on_a_contested_key` returns False for one and that
+guard cannot reject it. I then saw `AMBIGUOUS_UNNAMED_REJECTED sport=mlb` go
+0 -> 166 in production shortly after my commit went live, called it "my new
+keys are matching and the guard is rejecting them", reported it, and BUILT A
+SECOND FIX on that reading.
+
+Both halves were checkable and I checked neither before reporting:
+
+- **The clock.** The jump is at 01:51:37Z. The deploy went live at 02:06:45Z --
+  FIFTEEN MINUTES LATER. "Shortly after" was never verified against the
+  deploy's own `finishedAt`.
+- **The control.** The Render deploys API shows NO deploy on refresh-worker or
+  live-odds-worker between 19:37:21Z and 02:06:32Z. No code changed at all in
+  the window where the counter moved, so nothing of mine could be responsible.
+
+The local probe was RIGHT and I discarded it because the production number felt
+more authoritative. A production reading is more authoritative about PRODUCTION;
+it says nothing about CAUSE until it is tied to the change by time and by a
+control.
+
+HOW TO APPLY: before attributing any counter movement to your deploy, print the
+deploy's `finishedAt` next to the first moved sample, and enumerate every deploy
+on every service in the window. If a local probe contradicts the attribution,
+the probe is a falsification test -- run it down rather than outvote it. And
+when a reading is withdrawn, withdraw everything built on it in the same breath:
+retraction is not innocence, and the follow-on fix I had already written had to
+be re-justified from scratch on different grounds.
+
+---

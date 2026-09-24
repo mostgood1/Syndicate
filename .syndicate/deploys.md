@@ -41042,3 +41042,69 @@ Artifact `2026-09-24T13:59:17Z`, `source=worker_artifact`, read 14:00:48Z:
 **EVERY SPORT ON THE LIVE BOARD IS NOW 100% KEYED** -- the "every sport Syndicate covers has a club map" claim, checked against a served board rather than against the code. Values correct, not merely non-null: `boston bruins`/`philadelphia flyers`, `buffalo sabres`/`detroit red wings`, `florida panthers`/`tampa bay lightning`, `nashville predators`/`carolina hurricanes`. refresh-worker still `f2558c36` -- not reverted.
 
 **A HYPOTHESISED WEB EXPECTATION WAS KILLED BY THIS CHECK, and that is why it is recorded.** `web` builds chips INLINE when the worker artifact is missing (`source=inline_artifact_missing`), which is the normal path for an upcoming date, so a future-date chip looked like a measurable field for a `web` deploy. It is not: 2026-09-26 and 2026-09-29 both return `inline_artifact_missing` with **ZERO chips of any sport**, so there is no field there to move. **`web` (`4f8bcdef`) and `live-odds-worker` (`fe73ed81`) still do not carry the club maps and are NOT deployed**, because neither has a stated expectation and a guessed prediction spends a reboot and poisons its own measurement. The fleet is split on alias behaviour, deliberately and on the record.
+
+## 2026-09-24 02:06:45Z (9:06 PM CDT, 2026-09-23) - **READING, NOT MY DEPLOY** - refresh-worker `f2558c36` - lane `mlb-live-gameline-venue-freshness`
+
+**Whose deploy this was.** `nhl-ncaab-club-maps` created and owned
+`dep-daq88d8u01pc73f7835g`; its own entry above records what it shipped. My
+commit `404d2194` was an ANCESTOR of the deployed tip and rode along. I took a
+refresh-worker claim at 00:17:44Z intending my own deploy, was held by the
+guard (an MLB daily sim job, then the board-build cadence), and the claim
+LAPSED at 01:02:44Z before a window opened. I did not deploy and did not force
+one. This entry measures MY commit only.
+
+**What `404d2194` was.** `apply_venue_quotes_to_grid` -- the venue re-price
+that runs BEFORE `attach_live_gamelines`, and so the only one whose re-stamped
+age the live game-line join can see -- built candidate keys from the ROLE
+alone, and `_ROLE_KEYED_MARKETS` excludes `h2h`. Kalshi keys a moneyline by
+CLUB. The commit gave the grid path the club/token key shapes
+`_candidate_keys` has offered since 2026-08-25.
+
+**predict:** stated on the preflight receipt at 00:42:01Z, baselines from the
+00:41:04Z build -- `grid_reprice_mlb_repriced` 56 -> gt_56, and
+`live_gameline_join_mlb_stale_refusals` 110 -> lt_110.
+
+**verify: NOT MET.** The counts moved and the RATE did not.
+
+    reading            considered  full-game rows  stale  stale as % of full-game
+    PRE  23:20:52Z        413            61          61        100.0%
+    PRE  00:06:36Z        603           113         107(+6)     100.0%
+    POST 02:11:19Z        404            65          57(+8)      87.7%
+    POST 02:24:30Z        327            43          43         100.0%
+    POST 02:30:27Z        332            48          48         100.0%
+
+`grid_reprice_mlb_repriced` post = 84 / 68 / 70 against a PRE range of 53-100:
+inside the noise, no movement, and no regression. `priceable` stayed 0.
+
+**THE EXPECTATION WAS WRITTEN AS A COUNT AND WOULD HAVE SCORED A FALSE PASS.**
+110 -> 57/43/48 satisfies `lt_110` literally. It fell because the SLATE ended:
+`considered` 603 -> 332 and the live index 10 -> 6. Against the denominator
+that matters -- full-game rows the join actually considered -- every single one
+is still refused. A deploy prediction over a population that can change size
+between baseline and verify must name a RATE.
+
+**RETRACTED: `AMBIGUOUS_UNNAMED_REJECTED sport=mlb` 0 -> 164 IS NOT MINE.** I
+reported it as the club keys matching and a `#603` guard rejecting them, and
+acted on that -- it is the stated reason I built the follow-on adapter change.
+It does not hold. The jump is at **01:51:37Z**; `f2558c36` went live at
+**02:06:45Z**, fifteen minutes LATER, and the Render deploys API shows no
+deploy on refresh-worker or live-odds-worker between 19:37:21Z and 02:06:32Z --
+so no code changed and the cause is in the data, still unidentified.
+Independently, `_key_claimants` only ever maps ROLE keys
+(`venue_quote_fanin.py`), so a CLUB key is absent from it and
+`_unconfirmed_on_a_contested_key` returns False for one: that guard cannot have
+been rejecting club keys at all. My own local probe said so before the
+production attribution did, and I trusted the production number over it.
+
+**STILL UNKNOWN, and it is the open question for this lane:** why the club keys
+produced no measurable effect. Reachability was never established for
+`404d2194` -- `count 0 -> 166` was the only candidate signal and it is
+withdrawn -- so "the keys are generated and match nothing", "they match and are
+discarded later", and "the rows they would help are not the refused ones" are
+all still live. The next live MLB slate is the frame; the season ends
+2026-09-28, so there are few left.
+
+**Also landed this lane, NOT deployed:** `062c7414`, h2h quotes now carry their
+fixture in `Quote.game` in BOTH adapters while their key stays bare. That is a
+SAFETY fix (a club-keyed quote can no longer price the wrong game) and is
+explicitly not evidence-backed as a freshness fix -- see its message.
