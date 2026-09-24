@@ -41108,3 +41108,44 @@ all still live. The next live MLB slate is the frame; the season ends
 fixture in `Quote.game` in BOTH adapters while their key stays bare. That is a
 SAFETY fix (a club-keyed quote can no longer price the wrong game) and is
 explicitly not evidence-backed as a freshness fix -- see its message.
+
+## 2026-09-24 09:1x CT (14:1xZ) — READING, no deploy — live-odds-worker `b2779a98` — lane `polymarket-corners-btts-order-branch` (CLOSED) — **WHY THE CORNERS LINE BUILT BUT NEVER SUBMITTED: THE ACCOUNT HAD 31 CENTS. Not the kickoff gate, not EV, not a missing plan entry.** Closes the "NOT established here" left open by the 13:56Z row.
+
+The paired lines settle it -- same pass, same single position:
+
+    00:46:46.846Z ORDER_PATH venue=polymarket status=ok positions=1
+                  markets={'alternate_totals_corners': {'would_build': 1}}
+    00:47:06.484Z EXECUTED   ... positions=1 placed=0 skipped=1
+                  refused={'insufficient_venue_balance': 1}
+
+`positions=1` on BOTH sides and corners was the ONLY market in the plan, so
+the refused position IS the corners one -- no inference needed. Identical at
+00:52/00:53 and 00:57. `insufficient_venue_balance` is
+`execution_guard.py:861`, raised on `stake > balance["available"]` from a LIVE
+venue read -- real cash, not a day cap (the caps have their own reasons,
+`over_max_day_dollars_*`). So the stake exceeded what was there; the refusal
+does not print the stake, and **> $0.31 is all it licenses.**
+
+**The balance timeline, and it is ordinary:**
+
+| time | polymarket available |
+|---|---|
+| 2026-09-23 23:45:40Z | 0.13 |
+| 2026-09-24 00:08:30Z | **1.39** (money arrives) |
+| 00:09:56Z | LIVE_ORDER **placed**, `tsc-cfb-tcu-ucf-...-total-49pt5`, stake **1.05** |
+| 00:15:03Z .. 01:58:45Z | **0.31**, flat -- spans ALL FOUR corners passes |
+| 02:03:56Z | **6.59** (more arrives) |
+| 02:36:09Z | LIVE_ORDER placed, `tsc-nfl-kc-mia-...-total-45pt5`, stake 1.47 |
+
+**An NCAAF total 24 minutes earlier had taken the cash the corners line
+needed**, and by the time the account refilled at 02:03:56Z the corners
+position was already out of the plan (`ORDER_PATH ... status=no_positions` at
+01:03:52Z). The window in which it was BOTH planned and affordable never
+existed -- about 23 minutes of eligibility against a balance that sat at 0.31
+for 103 minutes.
+
+**So the order path is now proven to the last gate before submit, and no
+further.** Resolver, side, price, yes-leg and venue corroboration all verified
+(13:56Z row); the only thing between this family and a live order was the
+account balance, which is a funding decision and not a code question. Nothing
+here is owed.
