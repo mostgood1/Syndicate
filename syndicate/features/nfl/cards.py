@@ -283,12 +283,42 @@ def _available_card_weeks(season: int | None = None) -> list[int]:
 
 
 def _resolved_week(selected_week: int, *, season: int | None = None) -> int:
+    """The requested week, or the default when the requested one has no data.
+
+    SUBSTITUTION IS ANNOUNCED. This function answering with a DIFFERENT week
+    than it was asked for is not a detail -- it is the whole of the 2026-09-24
+    defect, and it was silent. `available_weeks` on refresh-worker reported
+    `[1]` (see `sources._smartsim2_standalone_seasons_and_weeks` for why), so a
+    caller asking for week 3 got week 1 and built WEEK-1 chips against
+    current-week cards: `CHIP_JOIN_COVERAGE sport=nfl ... cards=1223 by_id=0
+    by_matchup=0 by_canonical=0`, 0 of 1,223 joined, and every NFL compact card
+    on the Layer 2 board silently fell back to its chip-less shape. Nothing
+    logged, nothing raised, nothing counted -- the only signal was a human
+    noticing the cards looked different.
+
+    `print`, not `logger.info`: `logger.info` never reaches Render's collector
+    (CLAUDE.md). It fires ONLY on a real substitution, so a correct resolve
+    stays silent and this cannot become noise.
+
+    It still SUBSTITUTES rather than refusing, deliberately: raising here would
+    take out the cards page for a week that genuinely has no data, which is a
+    worse failure than showing a neighbouring week. The fix for the silence is
+    to say so; the fix for the WRONG week is the enumeration in `sources.py`.
+    """
     resolved_season = int(season or latest_season())
     try:
         requested_week = int(selected_week)
     except Exception:
         requested_week = int(default_week(resolved_season))
-    return resolve_selected_value(requested_week, _available_card_weeks(resolved_season), default_week(resolved_season))
+    available = _available_card_weeks(resolved_season)
+    resolved = resolve_selected_value(requested_week, available, default_week(resolved_season))
+    if resolved != requested_week:
+        print(
+            f"[nfl_cards] WEEK_SUBSTITUTED season={resolved_season} "
+            f"requested={requested_week} resolved={resolved} available={available}",
+            flush=True,
+        )
+    return resolved
 
 
 @lru_cache(maxsize=8)

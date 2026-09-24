@@ -456,25 +456,72 @@ def _smartsim2_standalone_seasons_and_weeks() -> dict[int, list[int]]:
     exactly, same real reason: upcoming_recs_*.csv is only ever refreshed
     for whichever season that older pipeline still tracks (confirmed:
     2025-only), so a newer season (2026) with real projections but no
-    real recs snapshot needs a second, independent real signal."""
-    source_root = default_nfl_source_root()
+    real recs snapshot needs a second, independent real signal.
+
+    ENUMERATES EVERY ROOT, not `default_nfl_source_root()`. `#672` established
+    that `_first_existing_root` probes for `upcoming_recs_*.csv` -- a
+    GIT-TRACKED file the repo checkout has and the mounted disk may not -- so
+    that helper can return the EPHEMERAL CHECKOUT on a service whose disk holds
+    the real artifacts. `#672` fixed `data_path` to resolve PER FILE and left
+    this enumeration behind, which is the same defect one layer up: the
+    per-file lookup finds `smartsim2_projections_2026_wk3.csv` on the disk
+    while this function, globbing the checkout, reports week 3 does not exist.
+
+    MEASURED 2026-09-24, and it is the reported defect. On refresh-worker
+    `available_weeks(2026)` was `[1]`, so `cards._resolved_week(3)` fell to
+    `default_week`'s `weeks[-1]` and built WEEK-1 chips against current-week
+    cards: `CHIP_JOIN_COVERAGE sport=nfl chips=16
+    chip_dates=['2026-09-10'..'2026-09-15'] cards=1223 by_id=0 by_matchup=0
+    by_canonical=0` -- 0 of 1,223 joined, so every NFL compact card on the
+    Layer 2 board rendered the chip-less fallback. Web, whose checkout probe
+    happened to land on a root carrying more weeks, resolved week 3 and served
+    week-3 cards: two services, two answers, from this one line.
+
+    A week is REAL if any root has its projection. Unioning cannot hide a week
+    that exists and cannot invent one that does not."""
     result: dict[int, list[int]] = {}
-    for path in source_root.glob("smartsim2_projections_*_wk*.csv"):
-        match = _SMARTSIM2_PROJECTION_FILENAME_RE.match(path.name)
-        if not match or is_preseason_backfill_projection(path):
+    for source_root in _source_roots():
+        try:
+            paths = list(source_root.glob("smartsim2_projections_*_wk*.csv"))
+        except OSError:
             continue
-        season = int(match.group("season"))
-        week = int(match.group("week"))
-        result.setdefault(season, []).append(week)
+        for path in paths:
+            match = _SMARTSIM2_PROJECTION_FILENAME_RE.match(path.name)
+            if not match or is_preseason_backfill_projection(path):
+                continue
+            season = int(match.group("season"))
+            week = int(match.group("week"))
+            result.setdefault(season, []).append(week)
     for season in result:
         result[season] = sorted(set(result[season]))
     return result
 
 
+def _upcoming_recs_paths() -> list[Path]:
+    """Every `upcoming_recs_*.csv` across ALL roots, nearest root first.
+
+    Same `#672` reason as `_smartsim2_standalone_seasons_and_weeks`: globbing
+    only `default_nfl_source_root()` enumerates whichever root won the
+    `upcoming_recs_*.csv` probe and is blind to the others, so a week present
+    on the mounted disk but absent from the checkout (or vice versa) reads as
+    not existing at all. A file seen in more than one root is deduplicated by
+    NAME, keeping the first root's copy, which matches `data_path`'s own
+    nearest-root-wins rule.
+    """
+    seen: dict[str, Path] = {}
+    for root in _source_roots():
+        try:
+            paths = sorted(root.glob("upcoming_recs_*.csv"))
+        except OSError:
+            continue
+        for path in paths:
+            seen.setdefault(path.name, path)
+    return [seen[name] for name in sorted(seen)]
+
+
 def week_summaries() -> list[dict[str, Any]]:
     grouped: dict[tuple[int, int], dict[str, Any]] = {}
-    source_root = default_nfl_source_root()
-    for path in sorted(source_root.glob("upcoming_recs_*.csv")):
+    for path in _upcoming_recs_paths():
         match = _SNAPSHOT_RE.match(path.name)
         if not match:
             continue
@@ -519,7 +566,12 @@ def week_summaries() -> list[dict[str, Any]]:
                     "season": season,
                     "week": week,
                     "count": 1,
-                    "path": str(source_root / f"smartsim2_projections_{season}_wk{week}.csv"),
+                    # PER FILE, not `default_nfl_source_root() / name`. The week
+                    # may have been found in a root the probe did NOT pick, so
+                    # joining its name onto the probed root names a file that
+                    # does not exist -- the same `#672` mistake this function
+                    # was just fixed for, three lines further up.
+                    "path": str(smartsim2_projection_path(season, week)),
                     "has_publish": False,
                     "has_full": True,
                 }
