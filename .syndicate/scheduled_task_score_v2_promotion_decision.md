@@ -98,7 +98,11 @@ The instructions in `.syndicate/scheduled_task_layer2_fee_net_7_slate.md` under
 1. **The primary checkout is ~1,200 commits behind `origin/main`** and
    `scripts/score_ranking_backtest.py` / `score_ranking_analysis.py` do not exist
    in it. Work from a `git archive` snapshot of `origin/main`. Write the tar to a
-   FILE — piping `git archive` through PowerShell corrupts it.
+   FILE — piping `git archive` through PowerShell corrupts it. **Record the SHA you
+   cut it from** (`git rev-parse origin/main`) and state it in the findings file:
+   `origin/main` moves during a run — measured 2026-09-22, it advanced one commit
+   mid-run from a parallel session's push — so a result attributed to
+   "`origin/main`" names nothing reproducible.
 2. **Copy the NCAAF team registry into the snapshot**
    (`data/ncaaf_source/source_artifacts/data/processed/team_registry/*.csv`,
    git-tracked). `git archive` excludes `data/`, and without it every NCAAF row
