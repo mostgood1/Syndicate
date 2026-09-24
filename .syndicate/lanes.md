@@ -1045,6 +1045,14 @@ death, never life — do not invert it.
 - Verification: scripts/rescore_live_gameline_date.py re-scores 08-30 with the CURRENT scorer and reproduces its retained all_records/priceable_only briers EXACTLY (0.15138/0.18455 n=618/526 and 0.13400/0.19644 n=249/249) -- proving the re-score is the same measurement -- and additionally emits a fresh_quotes_only block. Then pool_live_gameline_trend.py --era each --cut fresh_quotes_only lists 08-30 and 08-31 and reports no COVERAGE GAP for them.
 - Blocked by: none
 
+### nfl-chip-week-resolution — OPEN — opened 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
+- Goal: refresh-worker builds NFL chips for the CURRENT week, so the Layer 2 compact cards join: CHIP_JOIN_COVERAGE sport=nfl goes by_id+by_matchup+by_canonical 0 of 1223 to a non-zero join, and the chips' chip_dates stop reading 2026-09-10..15
+- Files: syndicate/features/nfl/sources.py, syndicate/features/nfl/cards.py, tests/test_nfl_chip_week_resolution.py
+- Hypothesis: available_weeks() globs ONLY upcoming_recs_*.csv, which is absent from HOT_ARTIFACT_PATTERNS and therefore never syncs between services; the worker has only wk1 of that family while it DOES have wk3 smartsim2 projections (the family build_cards_page_context actually falls back to and serves from), so _resolved_week(3) silently downgrades to 1 via default_week's weeks[-1] fallback
+- Falsification test: if the worker's available_weeks still excludes week 3 after sources.py also counts smartsim2 projection weeks, the projection artifact is not on the worker's disk either and the fix is an allowlist/publish problem instead
+- Verification: unit: available_weeks includes a week that has ONLY a smartsim2 projection and no upcoming_recs, and _resolved_week returns the requested week rather than substituting; production: refresh-worker CHIP_JOIN_COVERAGE sport=nfl by_matchup>0 with chip_dates covering the current week, read from render_logs after deploy
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
