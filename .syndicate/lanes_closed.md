@@ -8294,3 +8294,9 @@ SAFE_SLUGS=ncaaf-board-sim-coverage,ncaaf-sim-inseason-ratings,ncaaf-player-data
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 8 SAFE / 10 WAIT (all 10 = owner 16da93b3 idle 0m); archive tool dry run + --apply clean, check_lane_invariants exit 0 before and after.
 - Moved: live-gameline-rescore-0830-0831, gameline-observer-retains-point-forecast, live-gameline-rescore-prefix-window, live-gameline-ledger-0820-shrink, archive-writer-stale-worktree-guard, verify-mirror-live-copy, closed-lane-archive-20260924-1831, closed-lane-archive-20260924-1843. Table: log/2026-09-25.md.
+
+### closed-lane-archive-20260925-1328 — CLOSED 2026-09-25 (GOAL MET: 2 blocks archived) — opened 2026-09-25 — session 20602d39-14ea-4d04-99fa-87fef04acad5
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET — owner_liveness.py --idle-min 240 at 18:28Z returned SAFE for 2 of 16 CLOSED blocks; both moved to lanes_closed.md with one pointer each. Table in log/2026-09-25.md.
+- Moved: `wnba-future-date-cache-carry`, `closed-lane-archive-20260925-0903`.

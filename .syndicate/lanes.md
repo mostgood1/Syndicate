@@ -727,12 +727,6 @@ death, never life — do not invert it.
 - **The subtree rule is what makes this safe on someone else's block:** a bare `- Files:` parent with its claims as indented children keeps the whole subtree; the naive rule dropped four real claims from `soccer-live-corners-stage2` in testing.
 - Files: .syndicate/lanes.md, .syndicate/lanes_history.md
 
-### closed-lane-archive-20260925-1328 — CLOSED 2026-09-25 (GOAL MET: 2 blocks archived) — opened 2026-09-25 — session 20602d39-14ea-4d04-99fa-87fef04acad5
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET — owner_liveness.py --idle-min 240 at 18:28Z returned SAFE for 2 of 16 CLOSED blocks; both moved to lanes_closed.md with one pointer each. Table in log/2026-09-25.md.
-- Moved: `wnba-future-date-cache-carry`, `closed-lane-archive-20260925-0903`.
-
 ### nfl-ncaaf-live-props — OPEN — opened 2026-09-25 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
 - **GOAL: NOT MET, NOT STARTED, and correctly so.** Scoped and sized: props are 95% of NFL's board markets and 82% of NCAAF's, neither sport is in `_LIVE_PROP_SPORTS`. The lane's own falsification test refuted its hypothesis before any code -- `build_live_prop_index` requires `modelProbOver`, a live PROBABILITY, and `nfl/props.py` has no live re-projection. A remaining-time rescale was written and PARKED UNWIRED (`8c1a64ae`) on the direction to solve in-season issues properly rather than ship a quick win. NCAAF is further back: no live player box module at all.
 - **HYPOTHESIS REFUTED the same hour, by this lane's own falsification test, BEFORE any code.** I wrote that NFL was close and needed only a liveProps bridge plus the gate entry. It is not. `build_live_prop_index` keys on (player, market, line) and requires `modelProbOver` -- a live PROBABILITY per player-market-line, not a stat line. MLB supplies it from a projection report that already carries liveProps. `nfl/props.py` has no modelProbOver, no in-game/remaining logic and no live re-projection of any kind. NFL live props is an ENGINE build.
@@ -790,6 +784,12 @@ death, never life — do not invert it.
 - Verification: Unit tests that a contention refusal leaves the global marker at its prior value while a NON-contention failure still advances it, plus that both typed refusals are detected as contention and a state_unconfirmed refusal is NOT.
 - Blocked by: none
 
+### closed-lane-archive-20260925-1811 — CLOSED 2026-09-25 (GOAL MET: 1 block archived) — opened 2026-09-25 — session 97d5cc75-9c62-45c2-84b6-454a203760bc
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET — owner_liveness.py --idle-min 240 at 23:11Z returned SAFE for 1 of 17 CLOSED blocks; moved to lanes_closed.md with one pointer. Table in log/2026-09-25.md.
+- Moved: `closed-lane-archive-20260925-1328`.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
@@ -835,6 +835,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20260924-1831` — CLOSED 2026-09-24 (GOAL MET: 2 blocks archived) — opened 2026-09-24 — session e9c5ca1c-1117-4fdd-8a4d-23199830aa4f
 - `closed-lane-archive-20260924-1843` — CLOSED 2026-09-24 (GOAL MET: 1 block archived) — opened 2026-09-24 — session 2c2dcade-9da6-49af-88cf-40c3391341db
 - `closed-lane-archive-20260925-0903` — CLOSED 2026-09-25 (GOAL MET: 8 blocks archived) — opened 2026-09-25 — session ca9b282a-e7fa-46d4-9351-fe3e8e32cee1
+- `closed-lane-archive-20260925-1328` — CLOSED 2026-09-25 (GOAL MET: 2 blocks archived) — opened 2026-09-25 — session 20602d39-14ea-4d04-99fa-87fef04acad5
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `combined-board-rows-unreadable-tripwire` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: live on web `da268e07` (15:36:46Z); the field is served on every date, 0 `ROWS_UNREADABLE` lines; stored 113 vs rows 111 is the per-sport `by_sport` cap, not a defect.**
