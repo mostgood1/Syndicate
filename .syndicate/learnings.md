@@ -4633,3 +4633,31 @@ the same thing that caught it here, just hours too late.
 - **Cost:** two contested claims live on `origin/main` for ~4 minutes, repaired in `3b2ce9a4`.
 
 ---
+### 2026-09-25 — FORBIDDEN: shipping a second fix for a symptom you have not measured. The first fix was right and insufficient, and I only learned why by reading one field.
+
+- **What we believed:** that the traditional-doubleheader join failed because the 45-minute
+  separation rule could not resolve halves published five minutes apart. True, and it took the
+  rail from 4 tiles to 3.
+- **What was actually true for the REMAINING tile:** the unjoined group carried
+  `commence_time 23:06:00Z` while both chips started 20:05Z and 20:10Z -- **~3 hours from
+  both**. A traditional doubleheader has no real second start until game 1 ends, so StatsAPI
+  publishes a NOMINAL placeholder minutes after game 1 while the book publishes the REALISTIC
+  one. No time window could ever bridge it, and widening the near-exact window -- the obvious
+  next move -- would have broken the controls that keep it honest while still not working.
+- **What I did instead of measuring, twice.** I wrote a surplus-chip display rule that (a)
+  shipped INERT, because it keyed groups on display text and chips on abbreviations, and (b)
+  was the wrong trade anyway, removing a duplicate TILE by HIDING a game's clock -- which an
+  existing test asserted against on purpose. Both were guesses at a symptom I had not read.
+- **The one field that settled it** took a single query of the payload the page already had.
+  It turned the next fix from "widen the tolerance" into "pair on ORDER", which is exact,
+  needs no time agreement, and had a mechanism already in the repo
+  (`doubleheader_event_ranks`).
+- **How to apply:** when a fix moves a symptom without clearing it, the next action is a
+  READING of the surviving case, not a second fix. "It got better" is the most expensive place
+  to stop measuring, because the remaining failure now looks like a tuning problem.
+- **A corollary worth its own line: inert code passes its tests.** The surplus rule was green
+  because it never fired. A new branch needs a test that proves it EXECUTES -- `off != on` --
+  before any test of what it does.
+- **Cost:** two deploys and one revert that a single payload read would have made unnecessary.
+
+---

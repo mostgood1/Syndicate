@@ -1313,7 +1313,7 @@ Lane `mlb-sim-retrigger-churn` (OPEN). Readings: `deploys.md` 2026-09-18 01:14:0
 - **Only refresh-worker runs the sim decision:** `SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER` TRUE there, FALSE on live-odds-worker, absent (= False by code default) on web. `SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS=600` is pinned in render.yaml.
 - **Debounce live since 2026-09-18 01:20:00Z:** `SYNDICATE_MLB_SIM_FINGERPRINT_MIN_GAP_SECONDS` default 3600 holds fingerprint-only launches; tip-off, cold-start, join-mismatch, board-missing and props-regen stay immediate. Verified executing: 7 debounces 01:20-04:20Z.
 - **Props-regen is now the visible driver:** `MLB_PROPS_REGEN_DUE` fired at 01:58, 03:08 and 04:10Z, each time widening a launch to the full slate, because `daily_top_props` stayed at 0 candidates after each regen. Its launches carry the `fingerprint_change` LABEL (the reason string prefers it), so count `MLB_DAILY_SIM_TRIGGERED` lines by cause, not by label. Open: whether zero is correct late in the day.
-## [mlb-traditional-doubleheader-join] A TRADITIONAL DOUBLEHEADER COULD NEVER CLEAR THE 45-MINUTE SEPARATION RULE -- FIXED ON MAIN, **NOT DEPLOYED** `[verified by test 2026-09-25, lane mlb-traditional-dh-join]`
+## [mlb-traditional-doubleheader-join] A TRADITIONAL DOUBLEHEADER COULD NEVER CLEAR THE 45-MINUTE SEPARATION RULE -- FIXED, DEPLOYED AND VERIFIED ON THE RENDERED BOARD `[verified 2026-09-25 18:07Z, lanes mlb-traditional-dh-join + dh-ordinal-pairing]`
 
 `doubleHeader: "Y"` (traditional) is played back-to-back on ONE admission, so StatsAPI
 publishes game 2's NOMINAL start minutes after game 1's -- BAL @ NYY 2026-09-25: **823491
@@ -1334,7 +1334,20 @@ the separation question has no answer, only when the winner is also strictly nea
 runner-up, reported as `nearest_start_near_exact`. The unclaimed-chip pass additionally seats
 only the SURPLUS chips beyond the chip-less groups already standing for a fixture.
 
-**NOT DEPLOYED -- web runs the old rule, so the served board STILL seats four tiles.** Proven
-by test only: 114 passed across seven doubleheader suites, with controls that a row 10 minutes
-off both halves and an equidistant row are still refused, and that the split DH still takes the
-original `nearest_start` path. OWED: a web deploy and the board reading.
+**DEPLOYED AND READ OFF THE RENDERED BOARD, web `42b9be30` live 18:07:42Z.** BAL @ NYY seats
+**TWO** tiles, both on card-group keys -- `mlb|d4b069a134ec` "MLB — 3:05P CT" and
+`mlb|3fe14d478bc1` "MLB — 3:10P CT" -- so each half carries its own opportunities AND its own
+clock, with no `chip|`-seeded tile left. CHC @ BOS unchanged at 2. Rail total 28 -> 26.
+
+**THE NEAR-EXACT RULE WAS NECESSARY AND NOT SUFFICIENT.** It joined game 1 and took the rail
+from 4 tiles to 3. Game 2 needed a second mechanism, because the two feeds disagree about its
+start by ~3 HOURS: the row group carried `commence_time 23:06:00Z` against chips at 20:05Z and
+20:10Z. A traditional doubleheader has no real second start until game 1 ends, so StatsAPI
+publishes a NOMINAL placeholder while the book publishes the REALISTIC one. No time window
+bridges that; `pickChipByStart` refusing is correct.
+
+**ORDINAL PAIRING closes it** (`buildDoubleheaderOrdinals`, the browser twin of
+`doubleheader_event_ranks`): game 1 precedes game 2 in both lists. It fires only on equal
+counts of timed groups and chips, >= 2 of each, distinct starts on both sides, canonical club
+keys on both, and only AFTER the clock has refused. Control: one group against two chips
+resolves to NOTHING.
