@@ -587,6 +587,33 @@ def _clean_name_key(value: object) -> str:
     return re.sub(r"\s+", " ", text).strip().lower()
 
 
+def _board_tz_name() -> str:
+    """The timezone the BOARD scopes dates in, read from the board's own env var.
+
+    Hard-coding "America/Chicago" here would be correct today and silently wrong
+    the day someone sets `SYNDICATE_BOARD_TZ`. The consumer is
+    `layer1_board._BOARD_TZ`; this reads the same variable with the same default
+    so the producer and the consumer cannot disagree.
+    """
+    return os.environ.get("SYNDICATE_BOARD_TZ", "America/Chicago")
+
+
+def _commence_date_board(commence_time_iso: Optional[str]) -> Optional[str]:
+    """The game's calendar date IN THE BOARD'S TIMEZONE, or None.
+
+    NOT `commence_time[:10]` (that is the UTC date, and an evening-Central game
+    is the NEXT UTC day) and NOT the collector's run date -- see
+    `_append_nhl_book_quotes` for what filing by run date cost.
+    """
+    if not commence_time_iso:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(commence_time_iso).replace("Z", "+00:00"))
+        return parsed.astimezone(ZoneInfo(_board_tz_name())).strftime("%Y-%m-%d")
+    except Exception:
+        return None
+
+
 def _commence_date_et(commence_time_iso: Optional[str]) -> Optional[str]:
     if not commence_time_iso:
         return None
@@ -984,11 +1011,42 @@ def _append_nhl_book_quotes(frame, *, date: str, kind: str) -> None:
                         "book_updated_at": record.get("book_last_update"),
                     }
                 )
-        append_book_quotes(
-            sport="nhl",
-            date_str=str(date),
-            rows=rows,
-            captured_at=_utc_now_iso(),
+        # SHARDED BY THE GAME'S DATE, NOT THE COLLECTOR'S RUN DATE.
+        #
+        # This filed EVERY row under `date` -- the run/partition date. The fetch
+        # window is deliberately +/-8h (`_date_range_utc`), so a run for
+        # 2026-09-25 sweeps up the previous evening's Central games and filed
+        # them as 09-25. Measured on production 2026-09-25: the NHL board grid
+        # for 09-25 held 18 rows and Layer 1 dropped ALL 18 as
+        # `rows_other_dates {2026-09-24: 18}`, so NHL had ZERO board rows on a
+        # night it had four games -- and the live re-sim, whose whole chain was
+        # fixed the same day, had nothing to join to.
+        #
+        # A row's own `commence_time` is the only authority on which slate it
+        # belongs to. Rows that carry none fall back to the run date and are
+        # COUNTED, never silently merged.
+        buckets: dict[str, list[dict]] = {}
+        undated = 0
+        for row in rows:
+            bucket = _commence_date_board(row.get("commence_time"))
+            if bucket is None:
+                bucket = str(date)
+                undated += 1
+            buckets.setdefault(bucket, []).append(row)
+        for bucket_date, bucket_rows in sorted(buckets.items()):
+            append_book_quotes(
+                sport="nhl",
+                date_str=bucket_date,
+                rows=bucket_rows,
+                captured_at=_utc_now_iso(),
+            )
+        # OBSERVABLE ON PURPOSE. The failure above was invisible for days because
+        # nothing ever said which slate the captured rows landed on.
+        print(
+            f"[local_nhl_odds] NHL_QUOTE_SHARDS kind={kind} run_date={date} "
+            f"by_game_date={ {k: len(v) for k, v in sorted(buckets.items())} } "
+            f"undated={undated} tz={_board_tz_name()}",
+            flush=True,
         )
     except Exception as exc:  # noqa: BLE001
         print(f"[odds_book_quotes] nhl {kind} append FAILED {type(exc).__name__}: {exc}")
