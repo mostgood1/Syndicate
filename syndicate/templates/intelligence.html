@@ -2436,10 +2436,21 @@
       const a = String(group.awayKey || "").trim().toLowerCase();
       const h = String(group.homeKey || "").trim().toLowerCase();
       const at = chipStartMs(group.commenceTime);
-      if (!sport || !a || !h || at === null) continue;
-      const key = `${sport}|${a} @ ${h}|${centralDateOfMs(at)}`;
-      if (!byFixture.has(key)) byFixture.set(key, { groups: [], chips: [] });
-      byFixture.get(key).groups.push({ at, key: group.key });
+      if (!sport || !a || !h) continue;
+      // A group with NO start of its own still has a DATE. Once its half is
+      // under way the books pull its markets and it arrives timeless, showing
+      // a bare date label -- measured 2026-09-25 21:34Z, where the live half
+      // sat on `mlb|d4b069a134ec` with "2 opportunities" and no clock beside a
+      // gamePk-keyed group holding the same game's scoreboard. It is bucketed
+      // on `fallbackDate`, which is the same YYYY-MM-DD shape
+      // `centralDateOfMs` emits, so timed and untimed groups for one venue-day
+      // land together and two different days' meetings never can.
+      const bucketDate = at === null ? group.fallbackDate : centralDateOfMs(at);
+      if (!bucketDate) continue;
+      const key = `${sport}|${a} @ ${h}|${bucketDate}`;
+      if (!byFixture.has(key)) byFixture.set(key, { groups: [], chips: [], untimed: [] });
+      if (at === null) byFixture.get(key).untimed.push(group);
+      else byFixture.get(key).groups.push({ at, key: group.key });
     }
     if (!byFixture.size) return out;
     // Chip side: the same key, built the same way, so the two agree by
@@ -2454,16 +2465,57 @@
       if (byFixture.has(key)) byFixture.get(key).chips.push({ at, chip });
     }
     const distinct = (arr) => new Set(arr.map((x) => x.at)).size === arr.length;
-    const pairInOrder = (gs, cs) => {
-      gs.sort((x, y) => x.at - y.at);
-      cs.sort((x, y) => x.at - y.at);
-      for (let i = 0; i < gs.length; i += 1) out.set(gs[i].key, cs[i].chip);
-    };
+    const stateOf = (entry) => String((entry.chip || {}).state || "").trim().toLowerCase();
     for (const bucket of byFixture.values()) {
-      const { groups: gs, chips: cs } = bucket;
+      const { groups: gs, chips: cs, untimed } = bucket;
+      // Which chips this bucket has already handed out, so the timeless pass
+      // below can never re-award one that an ordered pass already took.
+      const claimed = new Set();
+      const pairInOrder = (a, b) => {
+        a.sort((x, y) => x.at - y.at);
+        b.sort((x, y) => x.at - y.at);
+        for (let i = 0; i < a.length; i += 1) {
+          out.set(a[i].key, b[i].chip);
+          claimed.add(b[i].chip);
+        }
+      };
+      pairTimed(gs, cs, pairInOrder);
+      // THIRD PASS: a group with no start of its own, which neither ordered
+      // pass can place. Measured 2026-09-25 21:34Z on `42b9be30`: once a half
+      // is under way its odds group arrives TIMELESS (a bare "FRI SEP 25"
+      // label, "2 opportunities") while a gamePk-keyed group carries the same
+      // game's scoreboard. The two then sit in DIFFERENT clustering universes
+      // in the merge pass below -- chipped groups cluster on a shared chip
+      // object, chipless ones on matchup TEXT -- so they can never meet and
+      // the game seats twice. Crossing those universes on text is exactly what
+      // `#165` follow-up #1 shows silently merging two REAL games, which on a
+      // doubleheader is both halves. Giving the timeless group its chip
+      // instead lets the existing, proven merge do the collapsing.
+      if (cs.length < 2 || !untimed.length) continue;
+      if (cs.some((entry) => !stateOf(entry))) continue;
+      for (const group of untimed) {
+        const want = group.hasLive ? "live" : (group.allFinal ? "final" : "pregame");
+        // EXACTLY ONE, or nothing. Two halves in the same state name no winner,
+        // and a wrong merge here HIDES A GAME -- the worst outcome this rail
+        // has, and the one `#165`'s three live follow-ups were all chasing.
+        const candidates = cs.filter((e) => stateOf(e) === want && !claimed.has(e.chip));
+        if (candidates.length !== 1) continue;
+        out.set(group.key, candidates[0].chip);
+        claimed.add(candidates[0].chip);
+      }
+    }
+    return out;
+  }
+
+  // The two ORDERED passes, split out so the timeless pass above still runs
+  // when they decline. `pair` records what it hands out.
+  function pairTimed(gs, cs, pair) {
+    const distinct = (arr) => new Set(arr.map((x) => x.at)).size === arr.length;
+    const stateOf = (entry) => String((entry.chip || {}).state || "").trim().toLowerCase();
+    {
       if (gs.length >= 2 && gs.length === cs.length && distinct(gs) && distinct(cs)) {
-        pairInOrder(gs, cs);
-        continue;
+        pair(gs, cs);
+        return;
       }
       // A HALF THAT HAS STARTED LOSES ITS ODDS GROUP, so the counts above can
       // never match and the ordinal pass refuses. Measured 2026-09-25 20:33Z on
@@ -2478,21 +2530,19 @@
       // 20:10Z), so no widening of `DOUBLEHEADER_NEAR_EXACT_MS` could ever
       // bridge it -- see the 23:06Z case in `pickChipByStart`. CHC @ BOS the
       // same day has the same shape with `final` instead of `live`.
-      if (cs.length < 2 || !gs.length || gs.length >= cs.length) continue;
-      const stateOf = (entry) => String((entry.chip || {}).state || "").trim().toLowerCase();
+      if (cs.length < 2 || !gs.length || gs.length >= cs.length) return;
       // UNKNOWN MUST NOT RELAX THE RULE. A chip with no state would silently
       // drop out of `pregame` below and make the counts match by omission,
       // which is the failure mode where a missing field reads as a decision.
-      if (cs.some((entry) => !stateOf(entry))) continue;
+      if (cs.some((entry) => !stateOf(entry))) return;
       const pregame = cs.filter((entry) => stateOf(entry) === "pregame");
       // Still an ordinal pairing, so it still needs one chip per group and
       // starts it can order. Two pregame chips against one group stays
       // ambiguous and is refused, exactly as before.
-      if (pregame.length !== gs.length) continue;
-      if (!distinct(gs) || !distinct(pregame)) continue;
-      pairInOrder(gs, pregame);
+      if (pregame.length !== gs.length) return;
+      if (!distinct(gs) || !distinct(pregame)) return;
+      pair(gs, pregame);
     }
-    return out;
   }
 
   // A TEAM PAIR IS NOT A GAME ON A DOUBLEHEADER. The browser half of the

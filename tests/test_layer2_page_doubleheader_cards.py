@@ -183,6 +183,23 @@ out.inplay_refused_when_a_state_is_missing = await scenario(
 // set is 2 against 1 group -- ambiguous, and refused.
 out.inplay_refused_when_both_halves_pregame = await scenario(
   [LIVE_G1('pregame'), LIVE_G2()], [...g2Rows(withCommence(LATE_GROUP))]);
+// TIMELESS GROUP: once a half is under way its odds group arrives with NO
+// commence_time, only a date label -- measured 21:34Z. It cannot be ordered,
+// so it is placed by matching its own live/final state to exactly one chip.
+const untimedLive = () => ({ game_date: '2026-09-25', market_state: 'live' });
+out.untimed_live_group_joins_the_live_chip = await scenario(
+  [LIVE_G1(), LIVE_G2()],
+  [...g1Rows(untimedLive()), ...g2Rows(withCommence(LATE_GROUP))]);
+// CONTROL: no date means no bucket. Without an anchor the group could be
+// paired across two different days' meetings of the same clubs.
+out.untimed_group_without_a_date_is_refused = await scenario(
+  [LIVE_G1(), LIVE_G2()],
+  [...g1Rows({ market_state: 'live' }), ...g2Rows(withCommence(LATE_GROUP))]);
+// CONTROL: two chips in the SAME state name no winner. A wrong merge here
+// hides a game, so ambiguity must refuse.
+out.untimed_group_refused_when_two_chips_share_its_state = await scenario(
+  [LIVE_G1('live'), LIVE_G2('live')],
+  [...g1Rows(untimedLive()), ...g2Rows(withCommence(LATE_GROUP))]);
 console.log(JSON.stringify(out));
 """
 
@@ -363,4 +380,49 @@ def test_two_pregame_halves_against_one_group_are_still_refused(observed: dict) 
     for, and it must survive the new branch.
     """
     pairs = observed["inplay_refused_when_both_halves_pregame"]["row_chip"]
+    assert set(pairs.values()) == {None}, pairs
+
+
+def test_a_timeless_group_is_placed_by_its_own_live_state(observed: dict) -> None:
+    """THE GROUP-VS-GROUP CASE, measured on production 2026-09-25 21:34Z.
+
+    Once a half is under way its odds group arrives TIMELESS -- a bare
+    "FRI SEP 25" label with "2 opportunities" and no clock -- while a
+    gamePk-keyed group carries the same game's scoreboard. The merge pass
+    cannot fold them: chipped groups cluster on a shared chip OBJECT and
+    chipless ones on matchup TEXT, so the two never meet and the game seats
+    twice. Giving the timeless group its chip puts both in the same chip
+    cluster and the existing merge collapses them.
+
+    REACHABILITY: no ordered pass can place this group -- it has no start at
+    all, so it never enters the timed list. Without the state match it stays
+    chipless and this returns None.
+    """
+    pairs = observed["untimed_live_group_joins_the_live_chip"]["row_chip"]
+    g1 = [k for k in pairs if k.endswith("aaaa")]
+    g2 = [k for k in pairs if k.endswith("bbbb")]
+    assert g1 and g2
+    assert pairs[g1[0]] == "823543", pairs   # the LIVE chip
+    assert pairs[g2[0]] == "823494", pairs   # the pregame half, via the state pass
+
+
+def test_a_timeless_group_with_no_date_is_refused(observed: dict) -> None:
+    """CONTROL: the date is the only thing keeping this within one venue-day.
+
+    A group with no start AND no date has nothing anchoring it to today, so
+    pairing it risks handing it a chip from another day's meeting of the same
+    two clubs -- the exact failure `#165` follow-up #1 recorded.
+    """
+    pairs = observed["untimed_group_without_a_date_is_refused"]["row_chip"]
+    g1 = [k for k in pairs if k.endswith("aaaa")]
+    assert g1 and pairs[g1[0]] is None, pairs
+
+
+def test_a_timeless_group_is_refused_when_two_chips_share_its_state(observed: dict) -> None:
+    """CONTROL: exactly one candidate, or nothing.
+
+    Two live chips name no winner. A wrong merge HIDES A GAME, which is the
+    worst outcome this rail has, so ambiguity must refuse rather than pick.
+    """
+    pairs = observed["untimed_group_refused_when_two_chips_share_its_state"]["row_chip"]
     assert set(pairs.values()) == {None}, pairs
