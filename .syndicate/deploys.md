@@ -41886,3 +41886,47 @@ the worktree `data/` mirror guard. Neither was re-run against a clean tree.
   mechanism this change does not touch: its odds group (`mlb|d4b069a134ec`, LIVE,
   "2 opportunities") and a gamePk-keyed group (`mlb|823491`, "TOP 6 BAL 8 NYY 1")
   both stand. Neither is a loose chip, so no chip-join rule can merge them.
+
+## 2026-09-25 22:29:15Z — live-odds-worker — `890b90e4` — lane `refresh-mutex-visibility`
+
+**What shipped:** typed refresh-launch refusals and a log line at the RAISE site.
+`RefreshLaneBusy` / `RefreshStateUnconfirmed` (both `ValueError` subclasses, so all
+14 `launch_refresh_run` call sites keep working unchanged), `REFRESH_LAUNCH_REFUSED`
+emitted from `ops_refresh._raise_refresh_refusal`, and `ODDS_SWEEP_REFUSED` in the
+loop carrying date/phase/which SPORTS lost.
+
+**Why:** on 2026-09-25 a per-service mutex collision produced NO log line at all.
+The WNBA pregame run (stamp `20260925_212433`) held the shared `live-odds-worker`
+lane across two mlb/nhl/ncaaf sweep attempts (21:24:58Z, 21:26:24Z); the third won
+at 21:28:42Z. Meanwhile `ODDS_SWEEP_LAUNCHED` — which fires BEFORE the launch and
+so reports intent — printed `sports=mlb,nhl count=2`. NHL's collector produced
+nothing from 15:44:17Z and its board carried ZERO rows on a four-game night. Four
+causes were proposed and retracted before the mutex was suspected.
+
+- claim: `refresh-mutex-visibility`, token `2f9d4f8e9ca4c4f2`, acquired 22:18Z
+- preflight: HOLD at 22:18:29Z (3 jobs in flight — a soccer MLS artifact build
+  under the combined sweep); re-ran CLEAR at 22:22:41Z, deployed 47s later
+- expect: `live_commit=5f432684 -> 890b90e4`; baseline read 22:18:29Z
+
+**verify: MET on the deploy expectation.** Live commit read at 22:31:26Z is
+`890b90e4`, status `live`, finishedAt 22:29:15.157651Z, from baseline `5f432684`.
+
+**verify: NOT YET MET on the thing that matters.** The reading that proves this
+works is a `REFRESH_LAUNCH_REFUSED` line on a real collision, and no collision has
+occurred in the window since 22:29:15Z. Watcher running. **A null result here is a
+RATE, not a failure** — it means no contention in the window — and this deploy is
+deliberately the visibility change ONLY, so WNBA pregame still shares the sweep's
+lane and collisions remain observable.
+
+**CORRECTION carried on this deploy's own commit message.** `f4698da2` claims
+splitting the mutex finer "would reintroduce that OOM". That is WRONG. Measured
+22:13:53Z in a single fetch: two lanes on the SAME container both `running`
+(`live-odds-worker` pid 6472, `live-odds-worker-ncaaf-lines` pid 8532), and again
+at 22:19:08Z with ncaaf-lines relaunched as pid 8804. A distinct lane per launch
+type is the established pattern here. Container during that window: 1,692–1,712MB
+of 2,048, but only 948–980MB UNRECLAIMABLE (46–48%) — real headroom ~1GB, not the
+~340MB the `headroom` field reports.
+
+**NOT DEPLOYED YET:** `8edd8778` gives WNBA pregame its own lane
+(`live-odds-worker-wnba-pregame`) — the cure for the starvation, user decision
+2026-09-25. Held back so this deploy carries one change.
