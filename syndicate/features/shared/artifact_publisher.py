@@ -105,6 +105,21 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # halves so a future tidy-up cannot hit either one silently.
     "*_source/source_artifacts/data/sim_input_report/sim_input_report_*.json",
     "*_source/data/book_grid/book_grid_*.json",
+    # THE SHARD DISTRIBUTION FOR NHL QUOTE CAPTURE, and it is here because a
+    # `print()` could not do the job. `refresh_odds_sources._run_command` runs
+    # every producer under `subprocess.run(capture_output=True)` and discards a
+    # successful step's stdout, so the collector's own log line is invisible in
+    # production -- measured 2026-09-25: 298 odds-refresh control lines since a
+    # boot, 0 of the collector's. A deploy was gated on that line and the gate
+    # could not fire.
+    #
+    # `local_nhl_odds._write_quote_shard_report` writes the counts here instead,
+    # so `/api/ops/artifacts/stream?path=nhl_source/data/odds/quote_shards/<date>.json`
+    # answers "which slate did today's captured rows land on" -- the question
+    # that took a four-retraction investigation to answer once.
+    #
+    # Cost: a few hundred bytes per sport-date, one small object, no history.
+    "*_source/data/odds/quote_shards/*.json",
     # RECONCILIATION OUTPUTS -- the graded "what actually happened" side of the
     # evaluation chain (`props_actuals_<date>.csv`, `game_results_<date>.*`),
     # written by `build_mlb_actuals` under the refresh-worker autorun.

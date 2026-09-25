@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 import time
@@ -938,7 +939,7 @@ def _nhl_segment_of(raw_market: object) -> tuple[str, str]:
     return mapped if mapped else ("full", key)
 
 
-def _append_nhl_book_quotes(frame, *, date: str, kind: str) -> None:
+def _append_nhl_book_quotes(frame, *, date: str, kind: str) -> dict:
     """Route NHL's already-multi-book frames into the shared quote log.
 
     Like soccer and NCAAB, NHL was never a Class A capture defect -- both
@@ -1042,14 +1043,38 @@ def _append_nhl_book_quotes(frame, *, date: str, kind: str) -> None:
             )
         # OBSERVABLE ON PURPOSE. The failure above was invisible for days because
         # nothing ever said which slate the captured rows landed on.
+        distribution = {
+            "kind": kind,
+            "run_date": str(date),
+            "by_game_date": {k: len(v) for k, v in sorted(buckets.items())},
+            "undated": int(undated),
+            "tz": _board_tz_name(),
+        }
+        # THE PRINT IS FOR A HUMAN RUNNING THIS LOCALLY AND NOTHING ELSE.
+        # `refresh_odds_sources._run_command` runs every producer under
+        # `subprocess.run(capture_output=True)` and DISCARDS a successful step's
+        # stdout, so gating a deploy on this line is gating on silence -- which
+        # is exactly what was done on 2026-09-25 and had to be retracted. The
+        # RETURN VALUE is the emitter production can hear; the caller writes it
+        # beside the other artifacts, where the publisher sweeps it and
+        # `/api/ops/artifacts/stream` can read it.
         print(
-            f"[local_nhl_odds] NHL_QUOTE_SHARDS kind={kind} run_date={date} "
-            f"by_game_date={ {k: len(v) for k, v in sorted(buckets.items())} } "
-            f"undated={undated} tz={_board_tz_name()}",
+            f"[local_nhl_odds] NHL_QUOTE_SHARDS {json.dumps(distribution, sort_keys=True)}",
             flush=True,
         )
+        return distribution
     except Exception as exc:  # noqa: BLE001
         print(f"[odds_book_quotes] nhl {kind} append FAILED {type(exc).__name__}: {exc}")
+        # A FAILURE IS A READING TOO. Returning None here would make "the append
+        # blew up" indistinguishable from "nothing was captured" in the artifact.
+        return {
+            "kind": kind,
+            "run_date": str(date),
+            "by_game_date": {},
+            "undated": 0,
+            "tz": _board_tz_name(),
+            "error": f"{type(exc).__name__}: {exc}",
+        }
 
 
 def collect_and_write_player_props(*, artifact_root: Path, date: str, source: str = "oddsapi") -> Dict:
@@ -1066,8 +1091,36 @@ def collect_and_write_player_props(*, artifact_root: Path, date: str, source: st
     return {"raw_count": int(len(raw.index)), "combined_count": int(len(combined.index)), "output_path": output_path}
 
 
+def _write_quote_shard_report(*, artifact_root: Path, date: str, distribution: dict | None) -> Optional[Path]:
+    """Put the shard distribution where PRODUCTION can read it.
+
+    Under the artifact root, so the publisher's sweep carries it and
+    `/api/ops/artifacts/stream?path=nhl_source/data/odds/quote_shards/<date>.json`
+    serves it -- the same route that already serves this sport's odds history.
+    A `print` cannot do this job: the orchestrator discards a successful step's
+    stdout, so the line exists only for a local run.
+    """
+    if not isinstance(distribution, dict):
+        return None
+    try:
+        out_dir = Path(artifact_root) / "data" / "odds" / "quote_shards"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        path = out_dir / f"{date}.json"
+        payload = dict(distribution)
+        payload["written_at"] = _utc_now_iso()
+        path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        return path
+    except Exception as exc:  # noqa: BLE001
+        print(f"[local_nhl_odds] NHL_QUOTE_SHARD_REPORT_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return None
+
+
 def collect_and_write_team_odds(*, artifact_root: Path, date: str, markets: str = "h2h,spreads,totals") -> Dict:
     market_list = [market.strip() for market in str(markets or "h2h,spreads,totals").split(",") if market.strip()]
     frame = collect_oddsapi_team_odds(date, markets=market_list if market_list else None)
-    _append_nhl_book_quotes(frame, date=date, kind="game")
-    return write_team_odds(frame, artifact_root=artifact_root, date=date, source="oddsapi")
+    shards = _append_nhl_book_quotes(frame, date=date, kind="game")
+    _write_quote_shard_report(artifact_root=artifact_root, date=date, distribution=shards)
+    result = write_team_odds(frame, artifact_root=artifact_root, date=date, source="oddsapi")
+    if isinstance(result, dict):
+        result["quote_shards"] = shards
+    return result

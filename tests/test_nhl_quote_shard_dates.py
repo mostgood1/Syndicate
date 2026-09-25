@@ -116,18 +116,61 @@ def test_a_row_without_a_commence_time_falls_back_and_is_counted(captured, capsy
     # A dated row on the PREVIOUS slate plus an undated one, so the fallback is
     # visible instead of being absorbed into the same bucket.
     frame = pd.DataFrame([_row("2026-09-25T00:00:00Z"), _row("")])
-    mod._append_nhl_book_quotes(frame, date="2026-09-25", kind="game")
-    assert sorted(captured) == [("2026-09-24", 1), ("2026-09-25", 1)], captured
-    out = capsys.readouterr().out
-    assert "NHL_QUOTE_SHARDS" in out
-    assert "undated=1" in out
+    dist = mod._append_nhl_book_quotes(frame, date="2026-09-25", kind="game")
+    assert dist["undated"] == 1
+    assert dist["by_game_date"] == {"2026-09-24": 1, "2026-09-25": 1}
 
 
-def test_the_shard_distribution_is_logged(captured, capsys):
-    """This was invisible for days because nothing reported it."""
+def test_the_distribution_is_RETURNED_not_only_printed(captured):
+    """A print cannot verify a deploy here, and that is not a style preference.
+
+    `refresh_odds_sources._run_command` runs producers under
+    `subprocess.run(capture_output=True)` and DISCARDS a successful step's
+    stdout. A deploy was gated on the printed line on 2026-09-25 and the gate
+    could not fire -- 298 odds-refresh control lines since boot, 0 of these.
+    The RETURN VALUE is what the caller writes to a published artifact.
+    """
     frame = pd.DataFrame([_row("2026-09-26T00:00:00Z")])
-    mod._append_nhl_book_quotes(frame, date="2026-09-25", kind="game")
-    out = capsys.readouterr().out
-    assert "NHL_QUOTE_SHARDS" in out
-    assert "by_game_date=" in out
-    assert "tz=" in out
+    dist = mod._append_nhl_book_quotes(frame, date="2026-09-25", kind="game")
+    assert dist["by_game_date"] == {"2026-09-25": 1}
+    assert dist["tz"] == "America/Chicago"
+    assert dist["run_date"] == "2026-09-25"
+
+
+def test_the_shard_report_is_written_where_the_publisher_sweeps(tmp_path):
+    """And the path must be ALLOWLISTED, or it is another silent instrument."""
+    import fnmatch
+
+    from syndicate.features.shared.artifact_publisher import HOT_ARTIFACT_PATTERNS
+
+    dist = {"kind": "game", "run_date": "2026-09-25",
+            "by_game_date": {"2026-09-25": 4}, "undated": 0, "tz": "America/Chicago"}
+    written = mod._write_quote_shard_report(
+        artifact_root=tmp_path, date="2026-09-25", distribution=dist
+    )
+    assert written is not None
+    rel = str(Path(written).relative_to(tmp_path)).replace("\\", "/")
+    assert rel == "data/odds/quote_shards/2026-09-25.json"
+
+    published = f"nhl_source/{rel}"
+    assert any(fnmatch.fnmatch(published, pat) for pat in HOT_ARTIFACT_PATTERNS), (
+        f"{published} is not allowlisted -- it would never reach production"
+    )
+
+
+def test_a_failed_append_still_returns_a_reading():
+    """"The append blew up" must not read as "nothing was captured"."""
+    import syndicate.features.shared.odds_book_quotes as obq
+
+    original = obq.append_book_quotes
+    try:
+        def _boom(**_kw):
+            raise RuntimeError("redis down")
+
+        obq.append_book_quotes = _boom
+        frame = pd.DataFrame([_row("2026-09-26T00:00:00Z")])
+        dist = mod._append_nhl_book_quotes(frame, date="2026-09-25", kind="game")
+    finally:
+        obq.append_book_quotes = original
+    assert "error" in dist and "RuntimeError" in dist["error"]
+    assert dist["by_game_date"] == {}
