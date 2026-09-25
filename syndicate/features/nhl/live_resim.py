@@ -119,6 +119,8 @@ _DEFAULT_SIMS = 200
 _DEFAULT_BUDGET_SECONDS = 25.0
 
 _SCORE_URL = "https://api-web.nhle.com/v1/score/{date}"
+# See `fetch_score_rows`: the endpoint 403s Python's default UA.
+_SCORE_HEADERS = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
 
 
 @dataclass(frozen=True)
@@ -473,18 +475,48 @@ def validate_live_lens_snapshot(snapshot: Any) -> bool:
     return True
 
 
+class NhlSlateFetchFailed(RuntimeError):
+    """The slate could not be READ. Its own type so it cannot be confused with
+    a slate that is genuinely empty -- those have opposite meanings and
+    opposite fixes, and conflating them cost a full live slate (below)."""
+
+
 def fetch_score_rows(date_str: str, *, timeout_seconds: float = 10.0) -> list[dict[str, Any]]:
-    """`/v1/score/<date>` games, or `[]`.
+    """`/v1/score/<date>` games. RAISES `NhlSlateFetchFailed` if it cannot read.
 
     Reads the SCORE endpoint rather than `/v1/schedule`, which returns
     `clock: null` on live games -- 7 of 7 measured 2026-09-22.
+
+    THE USER-AGENT IS LOAD-BEARING, measured 2026-09-25 against the live
+    endpoint, same instant, same URL:
+
+        default urllib UA -> HTTP 403 Forbidden
+        "Mozilla/5.0"     -> 200, 11 games
+
+    `api-web.nhle.com` refuses `Python-urllib/3.x`. Without this header EVERY
+    fetch 403s, and the old `except Exception: return []` turned that into an
+    empty slate -- so the producer reported `ok: true` in under a second while
+    six NHL games were live, and the board read `games_in_snapshot: 0` with no
+    refusal to look at. Measured on production 2026-09-24 23:37Z and again
+    01:39Z; the tick had been publishing an empty slate since it was deployed.
+    A date-basis theory (UTC vs Central at midnight) was tested FIRST and
+    refuted -- the 23:37Z reading predates the UTC flip.
+
+    SO THE BARE SWALLOW IS GONE TOO, and that is the bigger half. A fetch that
+    fails must not be spelled the same way as a slate with no games: `learnings`
+    has this as a standing rule (an unknown must not default onto the permissive
+    branch) and this is what violating it looks like in production.
     """
     url = _SCORE_URL.format(date=str(date_str or "")[:10])
+    request = urllib.request.Request(url, headers=dict(_SCORE_HEADERS))
     try:
-        with urllib.request.urlopen(url, timeout=timeout_seconds) as resp:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as resp:
             payload = json.load(resp)
-    except Exception:
-        return []
+    except Exception as exc:
+        code = getattr(exc, "code", "")
+        print(f"[nhl_live_resim] NHL_SCORE_FETCH_FAILED date={str(date_str or '')[:10]} "
+              f"{type(exc).__name__} {code}", flush=True)
+        raise NhlSlateFetchFailed(f"{type(exc).__name__} {code}".strip()) from exc
     games = payload.get("games") if isinstance(payload, Mapping) else None
     return [g for g in (games or []) if isinstance(g, Mapping)]
 
@@ -515,7 +547,19 @@ def build_live_lens_snapshot(
     generated_at = _utc_now_iso()
     date_key = str(date_str or "")[:10]
 
-    rows = list(score_rows) if score_rows is not None else fetch_score_rows(date_key)
+    slate_error: str | None = None
+    if score_rows is not None:
+        rows = list(score_rows)
+    else:
+        try:
+            rows = fetch_score_rows(date_key)
+        except NhlSlateFetchFailed as exc:
+            # NOT re-raised: one bad slate must not kill the whole live-lens
+            # tick for every other sport. But it is RECORDED, so an empty
+            # `games` list can be read as "could not fetch" rather than as
+            # "nothing was scheduled".
+            rows = []
+            slate_error = str(exc) or "fetch_failed"
 
     if slate_features is None:
         from syndicate.features.nhl.sim_engine.hockeysim.features.loaders import (
@@ -566,4 +610,32 @@ def build_live_lens_snapshot(
         "budgetSeconds": float(budget_seconds),
         "elapsedSeconds": round(time.monotonic() - started, 3),
         "games": out_games,
+        # COVERAGE, so a zero is never bare. `slateRows` separates "the slate
+        # had no games" from "the slate could not be read" (`slateError`), and
+        # the refusal breakdown says why a game that WAS read produced no
+        # probability. The absence of this block is why the 2026-09-24 failure
+        # took a log dig and an endpoint A/B to explain instead of one read.
+        "coverage": {
+            "slateRows": len(rows),
+            "slateError": slate_error,
+            "games": len(out_games),
+            "liveResimmed": sum(
+                1 for g in out_games
+                for lane in (g.get("gameLens") or [])
+                if lane.get("ok")
+            ),
+            "refusalsByReason": _refusals_by_reason(out_games),
+        },
     }
+
+
+def _refusals_by_reason(games: list[dict[str, Any]]) -> dict[str, int]:
+    """A zero without this is not a result -- the same rule NCAAF and NFL state."""
+    reasons: dict[str, int] = {}
+    for game in games or []:
+        for lane in game.get("gameLens") or []:
+            if lane.get("ok"):
+                continue
+            reason = str((lane.get("refusal") or {}).get("reason") or "unknown")
+            reasons[reason] = reasons.get(reason, 0) + 1
+    return reasons

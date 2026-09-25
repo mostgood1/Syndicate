@@ -466,3 +466,51 @@ def test_out_of_season_nhl_reports_a_NAMED_empty_not_an_unsupported_sport():
     assert cov["supported"] is True
     assert cov["rows_live_gameline_edged"] == 0
     assert "reason" in cov and cov["reason"]
+
+
+# --- the 2026-09-24 production failure, pinned -------------------------------
+
+def test_a_failed_slate_fetch_is_not_spelled_like_an_empty_slate(monkeypatch):
+    """The defect that cost a full live NHL slate.
+
+    `fetch_score_rows` swallowed every exception and returned `[]`, so a 403
+    from `api-web.nhle.com` (which refuses Python's default User-Agent) was
+    indistinguishable from "no games scheduled". The producer reported ok in
+    under a second while six games were live, and the board read
+    `games_in_snapshot: 0` with nothing to diagnose.
+    """
+    import syndicate.features.nhl.live_resim as mod
+
+    def boom(*_a, **_k):
+        raise mod.NhlSlateFetchFailed("HTTPError 403")
+
+    monkeypatch.setattr(mod, "fetch_score_rows", boom)
+    failed = mod.build_live_lens_snapshot("2026-09-24", slate_features=[])
+
+    empty = mod.build_live_lens_snapshot("2026-09-24", score_rows=[], slate_features=[])
+
+    # Both have no games -- and that is exactly why the COVERAGE must differ.
+    assert failed["games"] == [] and empty["games"] == []
+    assert failed["coverage"]["slateError"] == "HTTPError 403"
+    assert empty["coverage"]["slateError"] is None
+
+
+def test_the_score_request_sends_a_user_agent(monkeypatch):
+    """Without it the endpoint 403s -- measured, not assumed (see the docstring)."""
+    import syndicate.features.nhl.live_resim as mod
+
+    seen = {}
+
+    class _Resp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self): return b'{"games": []}'
+
+    def fake_urlopen(request, timeout=None):
+        seen["ua"] = request.get_header("User-agent")
+        return _Resp()
+
+    monkeypatch.setattr(mod.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(mod.json, "load", lambda _r: {"games": []})
+    mod.fetch_score_rows("2026-09-24")
+    assert seen["ua"], "the request went out with no User-Agent -- the endpoint 403s that"
