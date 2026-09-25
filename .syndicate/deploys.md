@@ -41947,3 +41947,48 @@ of 2,048, but only 948–980MB UNRECLAIMABLE (46–48%) — real headroom ~1GB, 
   confirms no regression; it cannot show the new pass firing. That needs a
   timeless group, which needs the game-1-to-game-2 transition. Game 1 was still
   `In Progress` (top 8) when this was written. Scheduled check armed.
+
+## 2026-09-25 22:38:34Z — live-odds-worker — `8edd8778` — lane `refresh-mutex-visibility`
+
+**What shipped:** `_launch_autorun_wnba_pregame_refresh` now passes
+`lane="live-odds-worker-wnba-pregame"`. It was the ONE autorun on this service
+still passing no `lane=`, so it fell back to the combined mlb/nhl/ncaaf sweep's
+shared lane. User decision 2026-09-25, against relying on `5f432684`'s rewind alone.
+
+- claim `420c387826c47dee`; preflight CLEAR 22:32Z; expect `890b90e4 -> 8edd8778`,
+  baseline read 22:31:26Z
+- **verify: MET on the deploy.** live at 22:38:34.701336Z.
+- **verify: NOT YET MET on the behaviour.** The new lane only materialises when
+  WNBA pregame next LAUNCHES; its interval is 14400s off an on-disk epoch that
+  survives the restart, and the last run was 21:24:33Z, so expect ~01:24Z. Lane
+  list at 22:38:36Z still reads the six pre-existing lanes. Watcher running.
+
+### THE 890b90e4 RECEIPT IS NOW COMPLETE — verify: MET
+
+The reading the previous entry said had not happened yet, observed on production
+**2026-09-25T22:37:09.679862163Z**:
+
+    [ops_refresh] REFRESH_LAUNCH_REFUSED reason=lane_busy lane=live-odds-worker
+    pid=341 run_stamp=20260925_223458
+    error=A refresh run is already active (pid=341). Cancel it before starting a new run.
+
+Reason class, lane, holding pid and run stamp in a single line. Before this
+deploy that collision produced NO log output at all — it existed only in
+`meta["error"]`, overwritten by the next tick.
+
+### AND IT IMMEDIATELY CORRECTED A BELIEF THIS SESSION WAS ACTING ON
+
+`lane=live-odds-worker` with holder `run_stamp=20260925_223458` means this
+refusal was **the combined sweep colliding with ITSELF**, not WNBA pregame. The
+lane comment at `run_live_odds_refresh_worker.py:381` already called that lane
+"already self-colliding" and I had read past it.
+
+So: WNBA pregame was a REAL source of the 21:24Z starvation (its stamp
+`20260925_212433` held the lane across two measured sweep attempts) and the
+`8edd8778` split removes it — but it is **NOT the only source**. The sweep
+self-collides independently, and the split does nothing about that. First
+measured rate: 1 refusal in the 8m from 22:29:15Z to 22:37:09Z.
+
+**NOT CLAIMED:** that NHL's starvation is now cured. The WNBA source is removed
+and the rewind covers the rest, but self-collision is an OPEN defect that this
+instrument has now made countable for the first time.
