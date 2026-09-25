@@ -134,3 +134,62 @@ same way -- but the 09-21 part of the earlier n was not CLV.
 **Movement term: still NOT changed.** Three sports now agree in sign with CIs well clear
 of zero, so the sign looks backwards for a bet-now ranking. But this is one evening of
 trail coverage. Re-run over 5-7 days (and NCAAF's first slate) before proposing a change.
+
+## UPDATE 2026-09-25 — NCAAF
+
+Scheduled task `ncaaf-adverse-movement-check`, run 2026-09-25 ~15:20-15:50Z (10:20-10:50 CT). Read-only:
+no code, no deploy. The trail was synced from web: all 139 `reports/intelligence/clv_price_trail/*` files
+were fetched via `/api/ops/artifacts/stream`, and every one matched its listed `bytes`. Harness:
+`scripts/decompose_movement_clv.py --show-circular` at origin/main `29482a44`. Pre-check: `/api/ops/clv/report`
+for NCAAF 09-24 has `resolved` 77. Forward CLV is in probability points; diff = toward − away, and a
+negative value means the away-moved rows beat the close by more. **CLV, not ROI.**
+
+**What is new here, and it matters: the harness CI treats every re-rank as independent.** One trail key
+(event|market|player|segment|side) contributes one observation per re-rank, so `n` counts re-ranks, not
+bets or games. I re-ran a scratch copy of the harness (the repo is not modified). It reproduces every
+number below exactly and also records the key per observation. That gives two more honest CIs: a Welch
+test on per-key means, and a 2,000-draw bootstrap that resamples events.
+
+| sport, window | scope | diff (harness), 95% CI | n toward/away obs | keys t/a | events | key-level diff, CI | event-cluster bootstrap CI | circular control |
+|---|---|---|---|---|---|---|---|---|
+| **NCAAF 09-20..25** | price:same_book | −2.53 [−3.66, −1.40] | 71/68 | **11/11** | **1** | −1.40 [−2.65, −0.16] | n/a (1 event) | +0.76 |
+| NCAAF | line:same_book | — | 0/2 | 0/1 | 1 | — | — | — |
+| NFL 09-20..24 | price:same_book | −2.81 [−3.29, −2.33] | 931/1282 | 242/290 | 16 | −4.96 [−5.95, −3.97] | [−11.35, −1.55] | +2.97 |
+| NFL | line:same_book | −1.39 [−2.51, −0.27] | 150/133 | 72/60 | 11 | −1.88 [−3.98, +0.22] | [−4.26, −0.18] | +0.19 |
+| WNBA 09-20..24 | price:same_book | −3.13 [−3.38, −2.89] | 4849/7668 | 1266/1609 | 18 | −3.57 [−4.06, −3.07] | [−3.94, −2.58] | +2.34 |
+| WNBA | line:same_book | −2.32 [−3.22, −1.42] | 347/347 | 99/95 | 16 | −2.65 [−4.25, −1.04] | [−4.77, −0.68] | +0.44 |
+| MLB 09-20..24 | price:same_book | −7.37 [−8.00, −6.74] | 1704/2121 | 558/721 | 56 | −7.02 [−7.89, −6.16] | [−8.61, −6.10] | +1.60 |
+| MLB | line:same_book | −2.23 [−3.10, −1.37] | 321/254 | 100/62 | 51 | −3.31 [−5.42, −1.20] | [−3.44, −0.97] | −0.01 |
+| MLB | price:book_agnostic_close | −2.12 [−2.37, −1.88] | 1434/4606 | 706/1437 | 56 | −3.05 [−3.44, −2.66] | [−3.15, −1.28] | +0.26 |
+
+`price:book_agnostic_close` is **absent** for NCAAF, NFL and WNBA: every joined close for those sports
+comes back `same_book`. They are the quote-log closes from `clv-close-from-book-quotes`. Joined keys:
+NCAAF 81 of 30,415 in the trail, NFL 1,395, WNBA 2,558, MLB 4,900.
+
+### NCAAF verdict: UNRESOLVED
+
+The sign agrees with the other three sports: away-moved rows beat the close. But **the whole scored
+population is ONE game** (event `9e0eaa3f…`, Thursday 09-24): 11 keys per arm, re-observed across the
+09-21..24 board dates. With one event, no CI can separate "away-moved rows revert" from "this game's market
+did something." The harness's [−3.66, −1.40] is not a pass at this n. The other 30,334 NCAAF trail keys
+have no close yet, because they are Saturday 09-26 games. Per-date split for the one game: 09-21 −1.20,
+09-22 −1.25, 09-23 +0.09, 09-24 −3.90.
+**n still needed:** at least ~50 keys per arm spread over at least ~10 games. Saturday 09-26's full slate should give
+that. Re-run over 2026-09-26..27 after those games are final.
+
+### NFL / WNBA / MLB over five dates: the 09-20 finding holds, smaller and still clear of zero
+
+- **Away-moved rows beat the close at the same book in all three sports.** This holds for both price and line moves, and
+  under the event-cluster bootstrap. The one exception is NFL line at key level, where the upper bound is +0.22.
+  **H3 stays REJECTED for NFL, WNBA and MLB, now on 16, 18 and 56 events.**
+- The effect is **smaller** than on 09-20 alone: NFL −9.92 → −2.81, WNBA −6.50 → −3.13. MLB grew
+  (−14.23 at n 31/31 → −7.37 at n 1704/2121). NFL rests on only 16 games; its event-cluster CI is wide
+  ([−11.35, −1.55]) but excludes 0.
+- **CORRECTION to "the interim movement is transient and fully reverts" (09-21).** Over five dates the
+  circular price:same_book control is NOT near zero: NFL +2.97, WNBA +2.34, MLB +1.60. Open→close CLV =
+  interim move + forward. So the away-moved rows revert **partly**, not fully. The move partly persists to the
+  close, and part of it comes back. For a bet-now ranking only the forward leg matters, and it still favours away.
+
+**Movement term: the sign looks backwards for a bet-now ranking. A weight change is now a user decision.**
+Three sports, five dates, event-clustered CIs clear of zero: the term penalises the rows that beat the close.
+It was **NOT changed** (`_SCORE_MOVEMENT_WEIGHT` / `_SCORE_MOVEMENT_LINE_WEIGHT` untouched).

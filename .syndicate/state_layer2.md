@@ -197,9 +197,12 @@ the board is enriched for price moves AGAINST the pick (67% of the top 100 vs 50
 lengthened price carries more EV (H1). Those rows are NOT adverse selection: same-book forward CLV
 (observation -> close) on 09-20's finished, trail-covered games, toward minus away -- nfl -9.92
 [-11.49, -8.36] n 213/206, wnba -6.50 [-7.62, -5.38] n 382/466, mlb -14.23 [-20.15, -8.32] n 31/31;
-circular controls near 0. Away-moved rows revert and beat the close. NCAAF unmeasured until its
-first trail-covered slate (Thu 09-24). The term's sign therefore looks backwards for a bet-now
-ranking -- **NOT changed**: one evening of evidence; re-run over 5-7 days first
+circular controls near 0. Away-moved rows revert and beat the close.
+**RE-RUN `[verified 2026-09-25, 09-20..24, event-clustered]`:** same-book price forward CLV toward
+minus away: nfl -2.81 (event bootstrap [-11.35, -1.55], 16 games), wnba -3.13 ([-3.94, -2.58], 18),
+mlb -7.37 ([-8.61, -6.10], 56). The effect is smaller than on 09-20 but still clear of zero. Circular controls are +1.6..+3.0,
+so the reversion is PARTIAL. NCAAF is UNRESOLVED: -2.53 but on ONE game (11/11 keys); re-run after the 09-26 slate.
+The term's sign looks backwards for a bet-now ranking. **NOT changed; a weight change is a user decision**
 (`findings_2026-09-21_top_opps_adverse_movement.md`).
 
 **Movement is the board's second-largest value term and was already wired end to
