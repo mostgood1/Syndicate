@@ -723,3 +723,40 @@ NOT INVESTIGATED FURTHER: whether the 09-23 recommendations artifact exists.
 That is the next read and it decides producer-gap vs window-too-narrow.
 
 ---
+
+## 2026-09-25 UPDATE to the soccer lead - it may be MLS-ONLY, not "intermittent", and the earlier framing understated it `[session 4ab694ed]`
+
+Probed `soccer_source/<league>/api/recommendations/recommendations_<date>.json`
+on 2026-09-26, a date MLS demonstrably has:
+
+    mls              FOUND matches=14
+    premier_league   404      epl          404
+    laliga           404      la_liga      404
+    seriea           404      serie_a      404
+    ligue1           404      ligue_1      404
+    eredivisie       404      bundesliga   404      championship 404
+
+Both spellings were tried for every league that has two in the codebase, so this
+is not a slug guess failing. On today's evidence soccer's pregame projections
+exist for MLS ONLY, and the 09-22/09-23 MLS gaps recorded above sit ON TOP of
+that. `board_enrichment` reports `enriched_no_projections` and has been saying
+so all along.
+
+TWO REASONS THIS IS NOT YET A FINDING, stated so nobody acts on it as one:
+
+  * The eight slugs came from a GREP, not from the code's own league registry.
+    If the real layout nests differently or sits at another level, every probe
+    is a false 404 -- the same shape as the 403-read-as-absence error made twice
+    already in this session.
+  * `board_enrichment` resolves roots via `preferred_artifact_roots(__file__,
+    env_var="SYNDICATE_SOCCER_SOURCE_ROOT", ...)`, so production may read a root
+    that is not the one being probed.
+
+NEXT READ, and it must come first: get the league list and the recommendations
+path from the code that WRITES them, not from a grep of string literals. Only
+then is "MLS-only" a claim. Until that is done the safe statement is the
+measured one: an MLS fixture reached the board with 443 markets and zero
+projections, and no non-MLS league returned a recommendations artifact at any
+path tried.
+
+---
