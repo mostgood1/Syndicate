@@ -3017,33 +3017,25 @@
     // that pass.)
     const railDate = String(state.date || "").slice(0, 10) || null;
     const claimedChips = new Set();
-    // CHIP-LESS GROUPS ALREADY STANDING FOR A FIXTURE, per sport+matchup.
+    // NO SURPLUS RULE HERE, and the attempt to add one on 2026-09-25 was a BAD
+    // TRADE that `test_no_discriminator_attaches_no_chip` already documented:
+    // when nothing can be joined, seating BOTH chips is what keeps each half's
+    // scoreboard and clock visible. Suppressing a chip because a chip-less card
+    // stands for the same fixture removes a duplicate TILE at the cost of
+    // HIDING that game's live state -- worse than the duplication it fixes.
     //
-    // Reported 2026-09-25: BAL @ NYY seated FOUR tiles for two games -- two
-    // chip-less cards beside their own two unclaimed chips. The near-exact rule
-    // in `pickChipByStart` fixes that case at the join, but the join is allowed
-    // to refuse (a group whose own start is unreliable), and when it does, this
-    // loop used to seat the refused chip as an ADDITIONAL card -- so one game
-    // occupied two tiles: a card with the opportunities and a chip with the
-    // clock.
+    // It also SHIPPED INERT and passed its tests for that reason: it keyed
+    // chip-less groups on `group.matchup` (display text, `Baltimore Orioles @
+    // New York Yankees`) and chips on their abbreviations (`BAL @ NYY`), so the
+    // two never matched and the branch never fired. The board still showed
+    // three BAL @ NYY tiles after it deployed.
     //
-    // SEAT ONLY THE SURPLUS. A fixture with 2 chip-less groups and 2 unclaimed
-    // chips is two games already fully represented -- seat none. A fixture with
-    // 1 group and 2 chips has a game with no rows at all -- seat one, because
-    // the alternative is HIDING it, which is the failure this whole block
-    // exists to prevent and is strictly worse than a duplicate.
-    const chiplessByFixture = new Map();
+    // The duplicate belongs to the JOIN, not to this loop: `pickChipByStart`
+    // removes it by ANSWERING which half a group is, rather than by dropping
+    // the evidence for the half it cannot name.
     for (const group of groups.values()) {
       const chip = chipForGame(group);
-      if (chip) {
-        claimedChips.add(chip);
-        continue;
-      }
-      const sport = String(group.sportSlug || group.sport || "").toLowerCase();
-      const matchup = String(group.matchup || "").trim().toLowerCase();
-      if (!sport || !matchup) continue;
-      const fixture = `${sport}|${matchup}`;
-      chiplessByFixture.set(fixture, (chiplessByFixture.get(fixture) || 0) + 1);
+      if (chip) claimedChips.add(chip);
     }
     for (const chip of new Set(gameChipsById.values())) {
       if (claimedChips.has(chip)) continue;
@@ -3060,16 +3052,6 @@
       if (!away || !home) continue;
       const key = `chip|${sport}|${String(chip.game_key || `${away}@${home}`)}`;
       if (groups.has(key)) continue;
-      // The surplus rule -- see `chiplessByFixture`. A chip-less group already
-      // standing for this fixture absorbs one chip; only what is left over is
-      // seated, so a refused doubleheader shows two tiles rather than four and
-      // a game with no rows of its own still shows.
-      const fixture = `${sport}|${away} @ ${home}`.toLowerCase();
-      const absorbed = chiplessByFixture.get(fixture) || 0;
-      if (absorbed > 0) {
-        chiplessByFixture.set(fixture, absorbed - 1);
-        continue;
-      }
       groups.set(key, {
         key,
         sport: sport.toUpperCase(),
