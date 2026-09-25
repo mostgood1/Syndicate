@@ -41426,3 +41426,26 @@ the regular season ends) is still owed and is the number that should be cited.
 the first build and stays unpredicted; it is now unpredicted on 4 of 4.
 
 ---
+
+## 2026-09-24 23:47Z -> 2026-09-25 00:57Z (6:47-7:57 PM CDT 09-24) — READING, no deploy — lane `live-inplay-board-cadence` — **first NCAAF slate since the lever-1 warmer: look-to-serve median of medians 299 s vs the ~180 s target (baseline ~362 s); q1 cards served on 2 of 8 reads; a refresh-worker deploy and a live-odds-worker OOM fell inside the window. GOAL: NOT MET**
+**Context.** Scheduled task `ncaaf-inplay-board-remeasure-0924`. One game, LIB @ CC (kickoff 23:30Z), chip `state=live` on all 8 reads (Q1 10:27 -> Q2 9:54). Live commits: web `7931b18a` (live 19:22:32Z), refresh-worker `f92bf1b4` -> `ce9be1ea` MID-WINDOW, live-odds-worker `f92bf1b4`. All contain `8bd59f95` (`merge-base --is-ancestor`, checked for `7931b18a` and `f92bf1b4`).
+**Instrument.** 8 POSTs of `/api/intelligence/query` `{"question":"top edges today"}` at 10-min intervals from 23:47:23Z. Cards: `sport=="ncaaf"` and `source=="layer2_inplay_overlay"`. Look-to-serve (LTS) = (response time - `price_grid_generated_at`) + `quote.quote_seen_age_seconds`; book-age version uses `book_age_seconds`. Companion reads of production `ncaaf_source/data/book_grid/book_grid{,_inplay}_2026-09-24.json` via `/api/ops/artifacts/stream`, 7 reads. Web logs API paged to exhaustion over 23:45-00:58Z (non-zero proven: 100 `GET` lines on page 1).
+
+    read  UTC       NCAAF overlay cards (segments)                  LTS med (n)   <=180   book-age med   <=180
+    0     23:47:42  0                                               --            --      --             --
+    1     23:57:37  0  (1 ncaaf shortlist row live)                 --            --      --             --
+    2     00:07:37  30 (full 7, h1 7, q1 6, q3 4, h2 3, q2 2, q4 1) 280.3 (27)    0       286.0 (30)     11
+    3     00:17:42  21 (full 10, h1 7, q4 2, q1 1, q2 1)            79.7 (21)     15      103.2 (21)     12
+    4     00:28:03  2  (full 2)                                     318.6 (2)     0       341.5 (2)      0
+    5     00:37:34  4  (full 4)                                     201.2 (4)     0       265.0 (4)      0
+    6     00:47:34  5  (full 5)                                     335.7 (3)     0       370.4 (5)      0
+    7     00:57:40  6  (full 5, h1 1)                               325.4 (6)     0       305.2 (6)      0
+
+**LTS median of medians (6 non-empty reads): 299 s**; 15 of 63 cards (24%) <= 180 s. Book-age: 296 s; 23 of 68 (34%). Against the 09-20 NFL baseline ~362 s this is ~63 s lower. It is a different sport and a thin population (68 cards, one game), and read 3's 80 s shows the floor when the grid is fresh.
+**Why reads 0-1 are empty and q1 thins out (grid artifact).** The overlay publishes only live rows seen within `max_price_age_seconds=300`, then shortlist-selects: `rows_inplay` 7-71, `opportunities` 14-89, `cards` 0-42 per write (the 23:46:24Z write had `cards=0`). NCAAF q1 rows exist in the grid throughout Q1 (3-9 live), but their raw book age climbed to 900-2,100 s late in the quarter, so they fall out of the 300 s window. q1 cards were served on 2 of 8 reads (6, then 1).
+**Unexplained, noted only.** At 23:46Z the NCAAF and WNBA live grid rows carried `seen_age_seconds` ~400 s against `age_seconds` ~85 s (seen older than the book's own update). By 00:20Z it was consistent (seen 58 s). At read 0 all 71 WNBA overlay cards had `quote_seen_age_seconds` null. From read 1 they were populated (NCAAF 63 of 68).
+**Warmer (web logs, 23:45-00:58Z).** `COMBINED_BOARD_OVERLAY_WARMED` **91** (all `sport=all`), `overlay_age_s` median **4.7** / p90 **33.8**, `build_s` median **19.8** / max **34.9** (09-21 MNF: 5.5 / 21.2, so build is ~3.6x slower tonight and above the ~18 s bound at the median). `EXPIRED` 113, `SERVED_STALE` 15, `WARM_FAILED` **0**, `WARMER_ERROR` **0**, `WARMER_STARTED` 20 (web `Booting worker` 18, `Autorestarting` 0, `WORKER TIMEOUT` 0).
+**Restarts / deploys in the window.** Web: no deploy, no event. **refresh-worker: deploy `ce9be1ea` (another lane: "nfl: wire the live re-sim to the board"), started 23:49:39Z, live 23:56:14Z**; `server_failed` `earlyExit` 00:56:05Z (the deliberate worker_recycle shape). **live-odds-worker: `server_failed` `oomKilled` (2Gi) 00:07:23Z.** NCAAF capture continued: 27 `NCAAF_LINES_AUTORUN_LAUNCHED`, gap median 153.5 s, one 337 s gap at 00:05:26Z.
+**Graded against the lane goal.** Population non-empty, with q1 present (thinly). Rows came from the in-play overlay, not a full board build: PASS. Look-to-serve 299 s > ~180 s: FAIL. No restart during the slate: FAIL (refresh-worker deploy plus live-odds-worker OOM, neither caused by this lane). **GOAL: NOT MET.**
+**Remaining levers, the USER's decisions (not acted on):** lever 2, the refresh-worker grid tick ~137 s -> ~70 s (periodic work on refresh-worker); lever 3, capture cadence 154 s -> ~80 s (~2x OddsAPI credits for in-play sports). Next NCAAF slates: Fri 09-25 (5 games, 6:00-9:30 PM CT) and Sat 09-26 (big slate).
+**verify:** the table, plus the WARMED/EXPIRED counts above.
