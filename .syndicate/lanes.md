@@ -750,6 +750,9 @@ death, never life — do not invert it.
 - **GOAL: NOT MET.** Deployed `146f3954` to web 21:39:56Z and measured 21:40:26Z: BAL @ NYY went 4 tiles -> **3**, not 2. What the deploy DID achieve is verified -- `chip|mlb|823489` is gone and `mlb|3fe14d478bc1` acquired the chip ("3:10P CT PREGAME BAL -- NYY --" where it showed a bare date label), so the state pairing fires.
 - **WHAT IS LEFT, and it is a different mechanism:** game 1 seats TWICE -- odds group `mlb|d4b069a134ec` (LIVE, "2 opportunities") beside gamePk-keyed group `mlb|823491` (scoreboard). **Neither is a loose chip**, so no chip-join rule can merge them; this is group-vs-group duplication and needs the merge pass, not `chipForGame`.
 - **BLOCKING:** the premise moves under you. At 20:33Z game 1 had NO group; at 21:34Z it had two. Any fix here must be measured against a re-read baseline, not a remembered one.
+- Hypothesis (CONFIRMED 21:40Z, the pairing fires): buildDoubleheaderOrdinals refuses because its equal-counts guard sees 1 group against 2 chips once game 1's odds group disappears; pairing state-compatible candidates before ordinal resolves it, since the surviving group is PREGAME and exactly one chip is PREGAME.
+- Falsification test: If the surviving group's state is absent or does not discriminate (two PREGAME chips against one PREGAME group), the rule must refuse and the tile count stays 3.
+- Verification: Served board read at /intelligence with StatsAPI showing 823491 In Progress and 823489 Scheduled: exactly 2 BAL @ NYY tiles and no loose chip| tile for the half that has a group.
 - Files: `syndicate/templates/intelligence.html` (`buildDoubleheaderOrdinals`, `chipForGame`'s ordinal lookup and `pickChipByStart` ONLY -- lane `live-inplay-board-cadence` holds `boardDateFreshnessParts` in the same file, regions disjoint; checked 2026-09-25), `tests/test_layer2_page_doubleheader_cards.py`
 - Blocked by: none
 
