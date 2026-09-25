@@ -4754,3 +4754,21 @@ an intended list, and a publish-derived stamp list.
   only the SURPLUS chips". A removal has to delete the CLAIM, not just the code.
 
 ---
+
+## 2026-09-25 RULE: a pairing that demands EQUAL COUNTS from two feeds breaks when either feed retires members on its own schedule. Test it across the lifecycle, not at one instant `[no lane, scheduled dh-rail-recheck-0925-live]`
+
+- **What was believed:** `42b9be30`'s ordinal pairing was verified at 18:07Z with both
+  games pregame. At 19:51Z a PASS with game 1 "LIVE" was read as surviving the
+  transition. That run was already withdrawn: warmup, not in-play.
+- **What happened in play (20:33Z, 21:12Z):** the guard `gs.length === cs.length`
+  refused, because the ODDS side retired game 1's event once it started while
+  StatsAPI kept both chips. The feeds disagree about membership on a SCHEDULE, not
+  by accident. A guard written against a snapshot where both had 2 members could
+  not see that.
+- **How to apply:** for any join that counts, orders or pairs members across two
+  feeds, write down when each feed ADDS and DROPS a member (pregame open, first
+  pitch, final, postponement) and verify at each boundary. The pre-registered
+  risks for this run (start revision, chip reshape) were both wrong. The real
+  one was membership, which nobody listed.
+
+---
