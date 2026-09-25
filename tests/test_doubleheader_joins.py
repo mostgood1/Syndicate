@@ -614,3 +614,75 @@ def test_the_kalshi_and_polymarket_adapters_name_the_half():
     assert kalshi_doubleheader_number("KXMLBTB-26SEP231305TBNYY-TBJARANDA8-2") is None
     assert doubleheader_quote_key("mlb|totals|over|7.5", 2) == "mlb|totals|over|7.5|dh2"
     assert doubleheader_quote_key("mlb|totals|over|7.5", None) == "mlb|totals|over|7.5"
+
+
+# --------------------------------------------------------------------------
+# TRADITIONAL doubleheaders -- added 2026-09-25 from the production defect.
+#
+# The suite above is built on a SPLIT doubleheader (TB @ NYY, ~6 h apart). A
+# TRADITIONAL one (`doubleHeader: "Y"`) is played back-to-back on one
+# admission, so StatsAPI publishes game 2's NOMINAL start five minutes after
+# game 1's -- and the 45-minute separation rule can NEVER be satisfied by it.
+#
+# Measured 2026-09-25 on the served board: BAL @ NYY, 823491 20:05Z game 1 and
+# 823489 20:10Z game 2, produced FOUR tiles for two games -- two chip-less
+# cards (`51 opportunities`, `6 opportunities`) beside their own two unclaimed
+# chips. CHC @ BOS the same day (`"S"`, 17:05Z / 22:05Z) joined correctly.
+BAL_G1, BAL_G1_START = 823491, "2026-09-25T20:05:00Z"
+BAL_G2, BAL_G2_START = 823489, "2026-09-25T20:10:00Z"
+
+
+def _bal_pool():
+    return [{"pk": BAL_G1, "start": BAL_G1_START}, {"pk": BAL_G2, "start": BAL_G2_START}]
+
+
+def _pick(target):
+    from syndicate.features.shared.doubleheader import pick_by_start_time
+
+    return pick_by_start_time(_bal_pool(), target, start_of=lambda c: c["start"])
+
+
+def test_traditional_doubleheader_each_half_resolves_to_itself():
+    from syndicate.features.shared.doubleheader import NEAREST_START_NEAR_EXACT
+
+    g1, why1 = _pick(BAL_G1_START)
+    g2, why2 = _pick(BAL_G2_START)
+    assert (g1["pk"], why1) == (BAL_G1, NEAREST_START_NEAR_EXACT)
+    assert (g2["pk"], why2) == (BAL_G2, NEAREST_START_NEAR_EXACT)
+
+
+def test_traditional_doubleheader_tolerates_the_books_minute_of_jitter():
+    # This file's own premise: "a book's commence time sits within minutes of
+    # the scheduled first pitch" -- measured at ONE minute for TB @ NYY.
+    hit, _why = _pick("2026-09-25T20:06:00Z")
+    assert hit["pk"] == BAL_G1
+
+
+def test_a_row_ten_minutes_off_both_halves_is_still_refused():
+    # CONTROL. Without this the window could be widened to anything and the
+    # suite would stay green -- the near-exact rule must not become
+    # nearest-wins. `unknown must not default permissive`.
+    from syndicate.features.shared.doubleheader import AMBIGUOUS_NOT_SEPARABLE
+
+    hit, why = _pick("2026-09-25T20:15:00Z")
+    assert hit is None and why == AMBIGUOUS_NOT_SEPARABLE
+
+
+def test_a_row_equidistant_between_the_halves_is_still_refused():
+    # CONTROL. Equal gaps name no winner however small they are.
+    from syndicate.features.shared.doubleheader import AMBIGUOUS_NOT_SEPARABLE
+
+    hit, why = _pick("2026-09-25T20:07:30Z")
+    assert hit is None and why == AMBIGUOUS_NOT_SEPARABLE
+
+
+def test_the_split_doubleheader_answer_is_unchanged():
+    # CONTROL that the case which already worked still takes the ORIGINAL path:
+    # CHC @ BOS, 17:05Z and 22:05Z, must resolve as `nearest_start`, not via the
+    # new branch. A fix that quietly reroutes the healthy case is not a fix.
+    from syndicate.features.shared.doubleheader import NEAREST_START, pick_by_start_time
+
+    pool = [{"pk": 824703, "start": "2026-09-25T17:05:00Z"},
+            {"pk": 824706, "start": "2026-09-25T22:05:00Z"}]
+    hit, why = pick_by_start_time(pool, "2026-09-25T17:06:00Z", start_of=lambda c: c["start"])
+    assert (hit["pk"], why) == (824703, NEAREST_START)

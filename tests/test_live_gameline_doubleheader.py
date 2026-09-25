@@ -124,10 +124,45 @@ def test_a_pair_it_cannot_separate_is_refused_not_guessed():
     assert why == REASON_GAME_AMBIGUOUS
 
 
-def test_two_games_inside_the_separation_window_are_refused():
+def test_two_games_inside_the_separation_window_resolve_on_a_near_exact_start():
+    """CHANGED 2026-09-25, and the old expectation was the bug.
+
+    This used to assert a refusal, because the rule only asked whether the
+    winner was 45 minutes clearer than the runner-up. Here the target matches
+    824424 to the SECOND and is 30 minutes from 824387 -- knowable, and the old
+    rule answered None anyway.
+
+    That blanket refusal is what broke the board: a TRADITIONAL doubleheader
+    (`doubleHeader: "Y"`) publishes its halves five minutes apart, so it could
+    never clear the window and BAL @ NYY seated four tiles for two games on
+    2026-09-25. See `doubleheader.NEAR_EXACT_SECONDS`.
+    """
     index = _index(_lens_game(824424, "1:10 PM", 0.62), _lens_game(824387, "1:40 PM", 0.41))
     hit, why = resolve_live_gameline(
         index, PAIR, target_start="2026-09-04T18:10:00Z", sport="mlb")
+    assert hit is not None and hit["game_pk"] == 824424
+    assert why == "nearest_start_near_exact"
+
+
+def test_a_start_inside_the_window_but_not_near_exact_is_still_refused():
+    """CONTROL: the near-exact rule must not become a nearest-wins rule.
+
+    10 minutes from one half and 20 from the other is exactly the shape the
+    refusal exists for -- a row whose own time cannot be trusted to name its
+    game. Without this, `NEAR_EXACT_SECONDS` could be widened to anything and
+    the suite would stay green.
+    """
+    index = _index(_lens_game(824424, "1:10 PM", 0.62), _lens_game(824387, "1:40 PM", 0.41))
+    hit, why = resolve_live_gameline(
+        index, PAIR, target_start="2026-09-04T18:20:00Z", sport="mlb")
+    assert hit is None and why == REASON_GAME_AMBIGUOUS
+
+
+def test_a_target_equidistant_between_two_games_is_still_refused():
+    """CONTROL: equal gaps name no winner, however near-exact they are."""
+    index = _index(_lens_game(824424, "1:10 PM", 0.62), _lens_game(824387, "1:40 PM", 0.41))
+    hit, why = resolve_live_gameline(
+        index, PAIR, target_start="2026-09-04T18:25:00Z", sport="mlb")
     assert hit is None and why == REASON_GAME_AMBIGUOUS
 
 

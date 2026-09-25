@@ -210,8 +210,20 @@ def test_chipless_halves_not_merged_but_same_game_still_is(observed: dict) -> No
     assert [card["count"] for card in observed["no_chips_same_game_two_ids"]["cards"]] == [5]
 
 
-def test_starts_it_cannot_separate_are_refused(observed: dict) -> None:
-    assert set(observed["inseparable_starts"]["row_chip"].values()) == {None}
+def test_starts_inside_the_window_resolve_when_one_is_near_exact(observed: dict) -> None:
+    """CHANGED 2026-09-25, and the old expectation was the bug.
+
+    The fixture's row commences 17:06Z against chips at 17:05Z and 17:30Z: one
+    minute from its own game and twenty-four from the other. The browser rule
+    refused it anyway, because it only asked whether the winner was 45 minutes
+    clearer than the runner-up.
+
+    That blanket refusal is unreachable-by-construction for a TRADITIONAL
+    doubleheader, whose halves are published five minutes apart -- BAL @ NYY
+    seated four tiles for two games on 2026-09-25. `pickChipByStart` now also
+    accepts a near-exact absolute match. See `DOUBLEHEADER_NEAR_EXACT_MS`.
+    """
+    assert set(observed["inseparable_starts"]["row_chip"].values()) == {"823543"}
 
 
 def test_single_chip_pair_behaves_as_before(observed: dict) -> None:

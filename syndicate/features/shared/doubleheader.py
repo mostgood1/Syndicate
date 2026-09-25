@@ -43,6 +43,35 @@ T = TypeVar("T")
 #: candidates inside it cannot be told apart on time and are refused.
 MIN_SEPARATION_SECONDS = 45 * 60
 
+#: A TRADITIONAL doubleheader can NEVER clear the separation window, and the
+#: rule above was written for the SPLIT kind only.
+#:
+#: Measured 2026-09-25, MLB Layer 2: BAL @ NYY carried `doubleHeader: "Y"` --
+#: both games played back-to-back on one admission, so StatsAPI publishes game
+#: 2's NOMINAL start five minutes after game 1's (823491 20:05Z game 1, 823489
+#: 20:10Z game 2). Gaps of 0 s and 300 s never differ by 45 minutes, so every
+#: row on both halves returned `ambiguous_not_separable`, no `game_key` was
+#: stamped, and the board seated FOUR tiles for two games: two chip-less cards
+#: (`51 opportunities`, `6 opportunities`) beside their own two unclaimed
+#: chips. CHC @ BOS the same day was `doubleHeader: "S"` -- 17:05Z and 22:05Z --
+#: and joined correctly. The refusal was right in intent and unreachable by
+#: construction rather than evidential.
+#:
+#: The separation rule asks "is the winner clearly nearer than the runner-up",
+#: which is unanswerable at five minutes. This asks the question the data CAN
+#: answer: **is the winner a near-exact match in absolute terms?** This file's
+#: own premise is that "a book's commence time sits within minutes of the
+#: scheduled first pitch", measured at ONE minute for TB @ NYY (17:06Z against
+#: 17:05Z). A target within this window of one candidate, and strictly nearer to
+#: it than to any other, identifies that half on its own evidence instead of by
+#: elimination.
+#:
+#: Deliberately far smaller than the five-minute spacing it resolves: a row must
+#: land within two minutes of its own half AND be strictly closer to it than to
+#: the sibling, so a row whose time is unreliable still fails and is still
+#: refused. Widening this past half the nominal spacing would begin guessing.
+NEAR_EXACT_SECONDS = 120
+
 # Reasons, stable strings -- callers count them.
 SINGLE = "single"
 NEAREST_START = "nearest_start"
@@ -54,6 +83,12 @@ AMBIGUOUS_NOT_SEPARABLE = "ambiguous_not_separable"
 # over candidates that carry no start at all. Named apart from `NEAREST_START`
 # so a payload can show how much of the board rests on it.
 NEAREST_START_OVER_UNTIMED = "nearest_start_over_untimed"
+# A near-EXACT absolute match chosen where the runner-up is closer than the
+# separation window -- the traditional-doubleheader case. Named apart from
+# `NEAREST_START` for the same reason as the line above: a payload can show how
+# much of the board rests on the narrower rule, and if this count is ever large
+# outside a doubleheader slate the window is doing work it was not meant to.
+NEAREST_START_NEAR_EXACT = "nearest_start_near_exact"
 
 
 def start_epoch(value: Any) -> float | None:
@@ -123,6 +158,7 @@ def pick_by_start_time(
     start_of: Callable[[T], Any],
     min_separation_seconds: float = MIN_SEPARATION_SECONDS,
     max_gap_seconds: float | None = None,
+    near_exact_seconds: float = NEAR_EXACT_SECONDS,
 ) -> tuple[T | None, str]:
     """Return ``(candidate, reason)`` -- the one game a team-pair join means.
 
@@ -195,6 +231,16 @@ def pick_by_start_time(
     best_gap = timed[0][0]
     runner_up_gap = timed[1][0]
     if runner_up_gap - best_gap < float(min_separation_seconds):
+        # THE TRADITIONAL-DOUBLEHEADER BRANCH. See `NEAR_EXACT_SECONDS`: the
+        # halves are minutes apart by MLB's own scheduling convention, so the
+        # separation question has no answer and the absolute one does. Accepted
+        # only when the winner is a near-exact match AND strictly nearer than
+        # the runner-up -- equal gaps stay ambiguous, because two candidates the
+        # same distance from the target name no winner at all.
+        if best_gap <= float(near_exact_seconds) and runner_up_gap > best_gap:
+            if max_gap_seconds is not None and best_gap > float(max_gap_seconds):
+                return None, BEYOND_MAX_GAP
+            return timed[0][2], NEAREST_START_NEAR_EXACT
         return None, AMBIGUOUS_NOT_SEPARABLE
     if max_gap_seconds is not None and best_gap > float(max_gap_seconds):
         return None, BEYOND_MAX_GAP

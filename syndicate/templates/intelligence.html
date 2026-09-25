@@ -2409,6 +2409,10 @@
   // apart and a book's `commence_time` sits within minutes of first pitch, so
   // two candidates the row's start cannot separate by 45 minutes are refused.
   const DOUBLEHEADER_MIN_SEPARATION_MS = 45 * 60 * 1000;
+  // The browser twin of `doubleheader.NEAR_EXACT_SECONDS`. Kept beside the
+  // separation constant so the two rules are read together, and deliberately
+  // far below the five-minute spacing it resolves -- see `pickChipByStart`.
+  const DOUBLEHEADER_NEAR_EXACT_MS = 120 * 1000;
 
   function chipStartMs(value) {
     const text = String(value == null ? "" : value).trim();
@@ -2451,7 +2455,28 @@
       ranked.push({ gap: Math.abs(at - target), chip });
     }
     ranked.sort((a, b) => a.gap - b.gap);
-    if (ranked[1].gap - ranked[0].gap < DOUBLEHEADER_MIN_SEPARATION_MS) return null;
+    if (ranked[1].gap - ranked[0].gap < DOUBLEHEADER_MIN_SEPARATION_MS) {
+      // THE TRADITIONAL-DOUBLEHEADER BRANCH -- the browser half of the server's
+      // `NEAR_EXACT_SECONDS` rule, same 120 s window.
+      //
+      // Reported 2026-09-25: BAL @ NYY seated FOUR tiles for two games -- two
+      // chip-less cards (`51 opportunities`, `6 opportunities`) beside their own
+      // two unclaimed chips. StatsAPI calls it `doubleHeader: "Y"`, played
+      // back-to-back on one admission, so game 2's NOMINAL start is five minutes
+      // after game 1's (20:05Z and 20:10Z). Gaps of 0 s and 300 s can never
+      // differ by 45 minutes, so the separation test refused both halves every
+      // time -- correct in intent, unreachable by construction. CHC @ BOS the
+      // same day was `"S"` (17:05Z / 22:05Z) and joined fine.
+      //
+      // A near-exact absolute match identifies the half on its own evidence
+      // rather than by elimination. Strictly nearer than the runner-up, so equal
+      // gaps stay null; and at 120 s a group whose start is unreliable still
+      // falls through to chip-less rather than wearing its sibling's clock.
+      if (ranked[0].gap <= DOUBLEHEADER_NEAR_EXACT_MS && ranked[1].gap > ranked[0].gap) {
+        return ranked[0].chip;
+      }
+      return null;
+    }
     return ranked[0].chip;
   }
 
@@ -2992,9 +3017,33 @@
     // that pass.)
     const railDate = String(state.date || "").slice(0, 10) || null;
     const claimedChips = new Set();
+    // CHIP-LESS GROUPS ALREADY STANDING FOR A FIXTURE, per sport+matchup.
+    //
+    // Reported 2026-09-25: BAL @ NYY seated FOUR tiles for two games -- two
+    // chip-less cards beside their own two unclaimed chips. The near-exact rule
+    // in `pickChipByStart` fixes that case at the join, but the join is allowed
+    // to refuse (a group whose own start is unreliable), and when it does, this
+    // loop used to seat the refused chip as an ADDITIONAL card -- so one game
+    // occupied two tiles: a card with the opportunities and a chip with the
+    // clock.
+    //
+    // SEAT ONLY THE SURPLUS. A fixture with 2 chip-less groups and 2 unclaimed
+    // chips is two games already fully represented -- seat none. A fixture with
+    // 1 group and 2 chips has a game with no rows at all -- seat one, because
+    // the alternative is HIDING it, which is the failure this whole block
+    // exists to prevent and is strictly worse than a duplicate.
+    const chiplessByFixture = new Map();
     for (const group of groups.values()) {
       const chip = chipForGame(group);
-      if (chip) claimedChips.add(chip);
+      if (chip) {
+        claimedChips.add(chip);
+        continue;
+      }
+      const sport = String(group.sportSlug || group.sport || "").toLowerCase();
+      const matchup = String(group.matchup || "").trim().toLowerCase();
+      if (!sport || !matchup) continue;
+      const fixture = `${sport}|${matchup}`;
+      chiplessByFixture.set(fixture, (chiplessByFixture.get(fixture) || 0) + 1);
     }
     for (const chip of new Set(gameChipsById.values())) {
       if (claimedChips.has(chip)) continue;
@@ -3011,6 +3060,16 @@
       if (!away || !home) continue;
       const key = `chip|${sport}|${String(chip.game_key || `${away}@${home}`)}`;
       if (groups.has(key)) continue;
+      // The surplus rule -- see `chiplessByFixture`. A chip-less group already
+      // standing for this fixture absorbs one chip; only what is left over is
+      // seated, so a refused doubleheader shows two tiles rather than four and
+      // a game with no rows of its own still shows.
+      const fixture = `${sport}|${away} @ ${home}`.toLowerCase();
+      const absorbed = chiplessByFixture.get(fixture) || 0;
+      if (absorbed > 0) {
+        chiplessByFixture.set(fixture, absorbed - 1);
+        continue;
+      }
       groups.set(key, {
         key,
         sport: sport.toUpperCase(),
