@@ -1313,7 +1313,7 @@ Lane `mlb-sim-retrigger-churn` (OPEN). Readings: `deploys.md` 2026-09-18 01:14:0
 - **Only refresh-worker runs the sim decision:** `SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER` TRUE there, FALSE on live-odds-worker, absent (= False by code default) on web. `SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS=600` is pinned in render.yaml.
 - **Debounce live since 2026-09-18 01:20:00Z:** `SYNDICATE_MLB_SIM_FINGERPRINT_MIN_GAP_SECONDS` default 3600 holds fingerprint-only launches; tip-off, cold-start, join-mismatch, board-missing and props-regen stay immediate. Verified executing: 7 debounces 01:20-04:20Z.
 - **Props-regen is now the visible driver:** `MLB_PROPS_REGEN_DUE` fired at 01:58, 03:08 and 04:10Z, each time widening a launch to the full slate, because `daily_top_props` stayed at 0 candidates after each regen. Its launches carry the `fingerprint_change` LABEL (the reason string prefers it), so count `MLB_DAILY_SIM_TRIGGERED` lines by cause, not by label. Open: whether zero is correct late in the day.
-## [mlb-traditional-doubleheader-join] A TRADITIONAL DOUBLEHEADER COULD NEVER CLEAR THE 45-MINUTE SEPARATION RULE -- FIXED, DEPLOYED AND VERIFIED ON THE RENDERED BOARD `[verified 2026-09-25 18:07Z, lanes mlb-traditional-dh-join + dh-ordinal-pairing]`
+## [mlb-traditional-doubleheader-join] A TRADITIONAL DOUBLEHEADER COULD NEVER CLEAR THE 45-MINUTE SEPARATION RULE -- FIXED AND DEPLOYED; VERIFIED ON THE RENDERED BOARD **PREGAME AND AT WARMUP ONLY** `[verified 2026-09-25 18:07Z and 19:51Z; IN-PLAY STILL UNVERIFIED]`
 
 `doubleHeader: "Y"` (traditional) is played back-to-back on ONE admission, so StatsAPI
 publishes game 2's NOMINAL start minutes after game 1's -- BAL @ NYY 2026-09-25: **823491
@@ -1325,19 +1325,22 @@ stamped, `chipForGame`'s exact route with nothing to match, and the refused chip
 extra tiles. **The Layer 2 rail showed FOUR tiles for two games** -- two chip-less cards
 (`51 opportunities`, `6 opportunities`) beside their own two chips.
 
-`doubleHeader: "S"` (SPLIT) was never affected: CHC @ BOS the same day, 17:05Z / 22:05Z, joined
-correctly. **The data was right at every hop** -- chips and cards both carried the correct
+`doubleHeader: "S"` (SPLIT) was unaffected BY THIS DEFECT and **has a different one of its
+own, measured 19:51Z** -- see the CHC @ BOS paragraph at the end of this section. StatsAPI
+19:59Z: 824703 17:05Z (Final), 824706 **21:35Z** (the 22:05Z once recorded here is wrong). **The data was right at every hop** -- chips and cards both carried the correct
 gamePks on all four games.
 
 **FIXED** (`ae36edb8`): `NEAR_EXACT_SECONDS = 120` accepts a near-exact ABSOLUTE match where
 the separation question has no answer, only when the winner is also strictly nearer than the
-runner-up, reported as `nearest_start_near_exact`. The unclaimed-chip pass additionally seats
-only the SURPLUS chips beyond the chip-less groups already standing for a fixture.
+runner-up, reported as `nearest_start_near_exact`. **A surplus-chip pass was written and then REMOVED in `4d785045`** -- it shipped
+INERT (groups keyed on display text, chips on abbreviations) and was the wrong trade
+besides, since suppressing a chip removes a duplicate TILE by HIDING a game's clock. Do
+not look for it in the code; this line described it for a day after it was gone.
 
 **DEPLOYED AND READ OFF THE RENDERED BOARD, web `42b9be30` live 18:07:42Z.** BAL @ NYY seats
 **TWO** tiles, both on card-group keys -- `mlb|d4b069a134ec` "MLB — 3:05P CT" and
 `mlb|3fe14d478bc1` "MLB — 3:10P CT" -- so each half carries its own opportunities AND its own
-clock, with no `chip|`-seeded tile left. CHC @ BOS unchanged at 2. Rail total 28 -> 26.
+clock, with no `chip|`-seeded tile left. CHC @ BOS 2 at that instant. Rail total 28 -> 26. **Both halves were PREGAME for that reading.**
 
 **THE NEAR-EXACT RULE WAS NECESSARY AND NOT SUFFICIENT.** It joined game 1 and took the rail
 from 4 tiles to 3. Game 2 needed a second mechanism, because the two feeds disagree about its
@@ -1351,3 +1354,23 @@ bridges that; `pickChipByStart` refusing is correct.
 counts of timed groups and chips, >= 2 of each, distinct starts on both sides, canonical club
 keys on both, and only AFTER the clock has refused. Control: one group against two chips
 resolves to NOTHING.
+
+
+**THE VERIFICATION IS PREGAME AND WARMUP, NOT IN-PLAY, AND A CHIP'S `state=live` DOES NOT
+DISTINGUISH THEM.** The 19:51Z re-read reported game 1 "LIVE (Top 1, 0-0)" and that was a
+WARMUP board: StatsAPI 19:59Z gave 823491 `detailedState: Warmup`, `abstractGameState: Live`,
+`currentInning 1 Top`, start **20:05Z** -- so the reading predated first pitch by 14 minutes.
+`abstractGameState` flips at warmup, and the board's live styling follows it, so a live-looking
+tile is not evidence that a pitch has been thrown. **Anything that must hold once a half is
+actually in play is still unverified**, including the ordinal rule's dependence on distinct
+starts surviving a state change.
+
+**CHC @ BOS (SPLIT) SEATS THREE TILES ONCE GAME 1 GOES FINAL `[measured 19:51Z, lead in
+leads.md, no lane]`.** Game 1 is seated twice: `mlb|a85710fa5f6f` (odds row group,
+`commence_time 17:06:00Z`, chip-less, reads LIVE, 3 opportunities) and `mlb|824703` (rows keyed
+by gamePk, rendered FINAL 3-4 from chip 824703, `start_time_utc 17:05Z`). Game 2 joined fine.
+**Not caused by `ae36edb8`/`42b9be30`, on a timeline rather than an opinion:** `42b9be30` was
+already live at 18:07Z when this fixture read 2, and what changed since is 824703 going Final.
+Two loose ends for whoever takes it: the feeds disagree by **60 seconds** (17:06Z vs 17:05Z),
+which is INSIDE the 120 s near-exact window and should have joined; and one game producing two
+ROW GROUPS is a grouping defect upstream of any chip join.

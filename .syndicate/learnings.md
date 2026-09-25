@@ -4724,3 +4724,33 @@ board join read 24 s before the producer's tick, a cadence marker written from
 an intended list, and a publish-derived stamp list.
 
 ---
+### 2026-09-25 — FORBIDDEN: reading a board tile's LIVE styling, or a chip's `state=live`, as evidence that play has started. `abstractGameState` flips at WARMUP.
+
+- **What we believed:** that a re-check showing game 1 "LIVE (Top 1, 0-0)" had
+  observed the pregame-to-live transition -- the one state the doubleheader join
+  had never been tested in. A scheduled run reported exactly that, and it was the
+  headline of its own log entry.
+- **What was actually true:** StatsAPI 19:59Z gave 823491 `detailedState: Warmup`
+  with `abstractGameState: Live`, `currentInning 1 Top`, **start 20:05Z**. The
+  reading was taken at 19:51Z -- **14 minutes before first pitch**. The abstract
+  state flips at warmup and the board's live styling follows it, so "Top 1, 0-0"
+  is what a game that has not started looks like.
+- **Why this is the expensive direction of error.** It manufactures a PASS for
+  the exact case that was missing. A false negative gets re-checked; a false
+  positive closes the question and the untested path ships. The run also wrote
+  it into the daily log as verified.
+- **How to apply:** when a state transition is the thing under test, read
+  `detailedState` (or compare `now` against the posted start) -- never
+  `abstractGameState`, never the chip's `state`, never the rendered styling. If
+  the check runs before first pitch, its result is a PREGAME result whatever the
+  tile says.
+- **Two mechanism facts found alongside it, both cheap to re-learn wrongly:**
+  a manual "Run now" does NOT consume a one-time `fireAt` (verified: `enabled`
+  and `nextRunAt` unchanged after dispatch), but it DOES delay it -- the
+  dispatcher refuses a second concurrent run, so a 59-minute pre-approval run
+  pushed a 19:30Z fire to 19:50:24Z. Pre-approving a scheduled check is not free.
+- **And a state.md line survived the code it described:** the surplus-chip pass
+  was removed in `4d785045` while `state_mlb.md` still claimed the fix "seats
+  only the SURPLUS chips". A removal has to delete the CLAIM, not just the code.
+
+---
