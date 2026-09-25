@@ -174,3 +174,33 @@ def test_a_failed_append_still_returns_a_reading():
         obq.append_book_quotes = original
     assert "error" in dist and "RuntimeError" in dist["error"]
     assert dist["by_game_date"] == {}
+
+
+# --- the WNBA playoff transition receipt -------------------------------------
+
+def test_the_playoff_transition_receipt_is_allowlisted():
+    """A step that is invisible on every channel cannot be verified.
+
+    `refresh_wnba_oddsapi_props._run_playoff_transition_if_needed` writes
+    `playoff_transition_<season>_<date>.json`. Before 2026-09-25 it was
+    unreachable two ways at once: its `print` goes into the step's stdout, which
+    the orchestrator DISCARDS on success, and the artifact matched no allowlist
+    pattern, so `/api/ops/artifacts/stream` answered **403** -- which is "not
+    permitted to look", not "does not exist", and was nearly read as the latter.
+
+    The transition returns `skipped` while the regular season is incomplete.
+    WNBA's ended 2026-09-24 and the playoffs open 2026-09-27, so it fires once a
+    season and gets one chance.
+    """
+    import fnmatch
+
+    from syndicate.features.shared.artifact_publisher import HOT_ARTIFACT_PATTERNS
+
+    published = (
+        "wnba_source/source_artifacts/data/processed/"
+        "playoff_transition_2026_2026-09-27.json"
+    )
+    assert any(fnmatch.fnmatch(published, pat) for pat in HOT_ARTIFACT_PATTERNS), (
+        f"{published} is not allowlisted -- the transition receipt cannot cross "
+        "services and the step stays unverifiable"
+    )

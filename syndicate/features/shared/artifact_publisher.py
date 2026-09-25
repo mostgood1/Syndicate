@@ -198,6 +198,24 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/source_artifacts/data/processed/recommendations*.csv",
     "*_source/source_artifacts/data/processed/props_recommendations*.json",
     "*_source/source_artifacts/data/processed/props_recommendations*.csv",
+    # THE PLAYOFF TRANSITION RECEIPT. `refresh_wnba_oddsapi_props`'s
+    # `_run_playoff_transition_if_needed` calls the source app's
+    # `run_playoff_transition`, which writes
+    # `playoff_transition_<season>_<date>.json`. Until this entry that file was
+    # invisible from outside: its `print` goes into the step's stdout, which the
+    # orchestrator DISCARDS on success, and the artifact matched no pattern, so
+    # `/api/ops/artifacts/stream` answered 403 -- "not permitted to look", which
+    # is not "does not exist" and must not be read as it.
+    #
+    # WHY IT MATTERS NOW, and the timing is the whole point: the transition
+    # returns `skipped` while "regular season has not completed". WNBA's regular
+    # season ended 2026-09-24 and the playoffs open 2026-09-27, so this
+    # mechanism has NEVER had to fire this season and gets one chance. A step
+    # that is invisible on both available channels is the same defect that let
+    # NHL publish an empty slate through six live games.
+    #
+    # Cost: one small JSON per season-date, written at most once a season.
+    "*_source/source_artifacts/data/processed/playoff_transition_*.json",
     "*_source/source_artifacts/data/processed/game_cards_*.csv",
     "*_source/source_artifacts/data/processed/cards_sim_detail_*.json",
     "*_source/source_artifacts/data/processed/cards_props_snapshot_*.json",
