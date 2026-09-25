@@ -838,6 +838,15 @@ death, never life — do not invert it.
 - Verification: Walk the documented pipeline order (odds sources, candidate generation, artifact generation, artifact storage, artifact read) and name the FIRST stage that reads zero for nhl, with the same stage non-zero for ncaaf as a control
 - Blocked by: none
 
+### dh-fix-web-deploy — CLOSED — opened 2026-09-25, closed 2026-09-25 — session 16da93b3-0e56-4617-857a-6705b02ff912
+- Goal: web runs a commit containing ae36edb8 and the Layer 2 compact rail seats TWO tiles for the BAL @ NYY doubleheader on 2026-09-25 instead of four -- read off the rendered board before and after, not off an API count
+- **GOAL: NOT MET.** The rail seats **THREE** BAL @ NYY tiles, not two. Read off the RENDERED board before and after, with the served commit checked first: 4 -> 3. CHC @ BOS 2 -> 2, both card-group keys, so the split doubleheader did not regress.
+- **What DID work:** game 1's group (`mlb|d4b069a134ec`) joined its chip and now carries `MLB — 3:05P CT`. The near-exact rule is doing exactly what it was written for.
+- **What is LEFT, and I did not establish it:** game 2's group (`mlb|3fe14d478bc1`, `6 opportunities`) still does not join, so `chip|mlb|823489` is still seated beside it. `pickChipByStart` needs that group's OWN start and I never read what it carries — absent, wrong, or outside the 120 s window are all still live possibilities.
+- **My second fix was dead code and I shipped it.** The surplus-chip rule keyed groups on display text and chips on abbreviations, so it never fired; it passed its test for that reason. The trade was also wrong — the test it passed asserts both chips stay seated so each half keeps its scoreboard. Removed in `4d785045`.
+- **A fabricated SHA, caught by preflight** (`OFF_MAIN`): I invented 30 characters of `ae36edb8`'s hash from a 10-character prefix.
+- Files: `.syndicate/deploys.md`, `syndicate/templates/intelligence.html` (declared after the fact — scope-guard named it and it was the GOAL, not a lead).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

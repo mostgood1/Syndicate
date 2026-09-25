@@ -41738,3 +41738,47 @@ logs, not a subprocess `print`; (2) then the Layer 1 reading. Until (1), this
 row stays an open obligation.
 
 ---
+---
+
+## 2026-09-25 12:14-12:21 PM CDT (17:14:58Z -> live 17:21:27Z) — web `7931b18a` -> `ae36edb8` (`dep-darao4nlot8c73dv6jqg`), then 17:29:09Z -> live 17:32:37Z `ae36edb8` -> `4d785045` (`dep-daraup8u01pc73c5ddo0`) — lane `dh-fix-web-deploy` — **PARTIAL: the rail went 4 tiles -> 3, not the 2 the goal asked for.**
+
+**predict:** `bal_nyy_rail_tiles` `4` -> `2`. Baseline read 17:14:11Z off the RENDERED board.
+
+**verify: NOT MET at 2 — MET at 3.** Served commit read back first
+(`/api/ops/version` -> `ae36edb89f1f...`, later `4d785045`), then the rail:
+
+| tile | key | before | after |
+|---|---|---|---|
+| `MLB — FRI SEP 25 ... 84 opportunities` | `mlb|d4b069a134ec` | chip-less | **`MLB — 3:05P CT`, JOINED** |
+| `MLB — FRI SEP 25 ... 6 opportunities` | `mlb|3fe14d478bc1` | chip-less | chip-less, unchanged |
+| `MLB — 3:05P CT` | seeded chip | seeded | claimed by the group above |
+| `MLB — 3:10P CT` | `chip|mlb|823489` | seeded | seeded, unchanged |
+
+**BAL @ NYY 4 -> 3. CHC @ BOS 2 -> 2, both tiles card-group keys** (`mlb|a85710fa`,
+`mlb|c1c95aa0`), so the split doubleheader did not regress.
+
+**THE NEAR-EXACT JOIN WORKS AND IS KEEPING.** Game 1's group resolved its chip and now
+carries the clock. That half of the reported defect is fixed on the surface the user looks at.
+
+**WHAT IS LEFT, stated as the open question it is:** game 2's group
+(`mlb|3fe14d478bc1...`, `6 opportunities`) still does not join, so its chip is still seated
+beside it. `pickChipByStart` needs the group's OWN start to name a half, and I have NOT read
+what that group carries — so I do not know whether its `commence_time` is absent, wrong, or
+simply outside the 120 s window. That reading is the next step and it is not done.
+
+**A SECOND DEPLOY TO REMOVE MY OWN DEAD CODE.** The surplus-chip rule that shipped in
+`ae36edb8` never fired: it keyed chip-less groups on `group.matchup` (display text,
+`Baltimore Orioles @ New York Yankees`) and chips on abbreviations (`BAL @ NYY`). It also
+passed `test_no_discriminator_attaches_no_chip` FOR THAT REASON — inert code cannot break an
+assertion. And the trade was wrong regardless: that test deliberately asserts both chips are
+seated when nothing joins, so each half keeps its scoreboard. Removed in `4d785045` rather
+than repaired, because repairing it would have started hiding live state.
+
+**A FABRICATED SHA, caught by preflight.** The first preflight returned `OFF_MAIN` for
+`ae36edb89f83b0e5...` — I had the 10-character prefix from the land script and invented the
+remaining 30 characters. Real SHA `ae36edb89f1f717c01f57353b019363b18a4d498`. Preflight's
+containment check is what stopped a deploy of a commit that does not exist.
+
+**Locks.** Claim held from 17:14:11Z; two preflights `CLEAR` for the exact SHAs. A third
+preflight returned `NO_EXPECTATION` because I passed a `--baseline-read-at` 677 s in the
+FUTURE; re-run with the real reading time.
