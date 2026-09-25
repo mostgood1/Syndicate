@@ -4977,6 +4977,65 @@ def _read_pregame_sport_sweep_epochs() -> dict[str, float]:
 	return out
 
 
+def _rewind_pregame_sport_sweep_epochs(prior: dict[str, float], sports: list[str]) -> None:
+	"""Undo the record-first stamp for sports whose launch produced NO run.
+
+	WHY THIS EXISTS. `_record_pregame_sport_sweep_epochs` is called BEFORE the
+	launch on purpose -- its own comment: "a launch that dies costs one skipped
+	interval instead of a duplicate sweep. A missed refresh is self-correcting
+	on the next tick." That trade is correct for a FAST-cadence sport: mlb
+	relaunches every ~90s, so a died launch costs 90s and genuinely
+	self-corrects.
+
+	IT IS NOT CORRECT FOR A SLOW-CADENCE SPORT. Measured on production
+	2026-09-25: nhl's interval is 7200s, its 19:24:30Z launch reported
+	`sports=mlb,nhl` and NO run was created (every second from 19:24:15 to
+	19:24:44 probed; two runs, wnba and ncaaf, neither with nhl). The marker
+	advanced anyway, so "one skipped interval" was TWO HOURS -- and because
+	mlb/ncaaf hold a refresh in flight almost continuously during a live slate,
+	nhl's rare slot collides nearly every time. Its collector had produced
+	nothing since 15:44:17Z and its board carried ZERO rows on a four-game
+	night. That is starvation, not a skipped tick.
+
+	SAFE BECAUSE THE DUPLICATE GUARD IS SOMEWHERE ELSE. `#20`'s protection is
+	`_record_odds_refresh_launch`, a single GLOBAL marker written before any of
+	this and read independently. The per-sport epochs are cadence only, so
+	restoring them cannot reintroduce a concurrent sweep -- it only lets a sport
+	be due again on the next tick, where the global guard still decides whether
+	anything launches at all.
+
+	Rewinding rather than never-stamping keeps record-first intact for the
+	window where the outcome is unknown.
+	"""
+	try:
+		existing = _read_pregame_sport_sweep_epochs()
+		restored: list[str] = []
+		for sport in sports:
+			normalized = str(sport).strip().lower()
+			was = prior.get(normalized)
+			if was is None:
+				# No prior marker: the sport has never swept. Removing the key
+				# restores exactly that, rather than inventing an epoch.
+				if existing.pop(normalized, None) is not None:
+					restored.append(f"{normalized}=never")
+			elif existing.get(normalized) != was:
+				existing[normalized] = float(was)
+				restored.append(f"{normalized}={int(was)}")
+		if restored:
+			write_json_file(_pregame_sport_sweep_epochs_path(), existing)
+			print(
+				f"[live_refresh_loop] PREGAME_CADENCE_MARKER_REWOUND {' '.join(sorted(restored))}",
+				flush=True,
+			)
+	except Exception as exc:
+		# Failing to rewind leaves the old behaviour (one skipped interval),
+		# which is the pre-existing bug and not a new one.
+		print(
+			f"[live_refresh_loop] PREGAME_CADENCE_REWIND_FAILED error={type(exc).__name__}: {exc}",
+			flush=True,
+		)
+
+
 def _record_pregame_sport_sweep_epochs(epoch: float, sports: list[str]) -> None:
 	try:
 		existing = _read_pregame_sport_sweep_epochs()
@@ -5873,6 +5932,11 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			# marker when the sport is NOT live, and a marker refreshed
 			# during live play just means the first post-slate pregame sweep
 			# waits one interval, with the slate-end data still fresh).
+			# Captured BEFORE the stamp so a launch that produces no run can be
+			# rewound -- see `_rewind_pregame_sport_sweep_epochs`. Read here
+			# rather than inside the stamp so the two see the same file state.
+			_pregame_marker_prior = _read_pregame_sport_sweep_epochs()
+			_pregame_marker_sports = list(launched_sports)
 			_record_pregame_sport_sweep_epochs(tick_started_epoch, list(launched_sports))
 			_record_odds_sweep_launch(tick_started_epoch, list(launched_sports))
 			# THE EVENT LINE. Every other launch-side print in this file is a
@@ -5949,6 +6013,23 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		except Exception as exc:
 			meta["ok"] = False
 			meta["error"] = f"{type(exc).__name__}: {exc}"
+
+	# STARVATION FIX. A launch that produced no run must not cost a sport its
+	# whole interval. `meta["ok"]` is True for a launch that RETURNED, so the
+	# run's own `ok` is checked too -- a refusal comes back as a result, not as
+	# an exception, and treating "returned" as "ran" is what let nhl advance its
+	# 2-hour marker on a launch that created nothing (measured 2026-09-25).
+	try:
+		_launch_result = meta.get("result") if isinstance(meta.get("result"), dict) else None
+		_launch_ran = bool(meta.get("ok")) and not meta.get("skipped")
+		if _launch_ran and _launch_result is not None:
+			_launch_ran = bool(_launch_result.get("ok", True))
+		if not _launch_ran and _pregame_marker_sports:
+			_rewind_pregame_sport_sweep_epochs(_pregame_marker_prior, _pregame_marker_sports)
+	except NameError:
+		# The markers were never stamped on this path (skip_launch, or a
+		# non-pregame phase). Nothing to rewind.
+		pass
 
 	meta["finishedAt"] = _utc_now()
 	write_json_file(_meta_dir() / "latest_live_refresh_tick.json", meta)
