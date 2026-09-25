@@ -228,6 +228,39 @@ def _wnba_pregame_refresh_interval_seconds() -> int:
     return max(1, value)
 
 
+def _wnba_pregame_refresh_lane() -> str:
+    """An EXPLICIT lane, so this can never contend with the combined sweep.
+
+    THE BUG THIS CLOSES, measured 2026-09-25 on live-odds-worker. This launch
+    was the ONE autorun on this service that still passed no `lane=`, so it
+    fell back to `_refresh_lane_key()` -- the shared `live-odds-worker` lane,
+    which is the combined mlb/nhl/ncaaf sweep's lane. Its run (stamp
+    20260925_212433) then held that mutex across two sweep attempts (21:24:58Z,
+    21:26:24Z). NHL's pregame cadence is 7200s, so losing its slot cost it the
+    whole interval: its collector produced nothing from 15:44:17Z and its board
+    carried ZERO rows on a four-game night.
+
+    Its three siblings on this service already do exactly this -- WNBA live
+    (`_wnba_live_refresh_lane`), NCAAF lines, NFL lines -- and production runs
+    two of these lanes concurrently as a matter of course (confirmed in a
+    single fetch at 2026-09-25T22:13:53Z: `live-odds-worker` pid 6472 and
+    `live-odds-worker-ncaaf-lines` pid 8532, both `running`).
+
+    ON THE MEMORY QUESTION, because this container is 2GB and the split is what
+    makes concurrency possible: the ~1.3-1.5GB RSS figure recorded above is the
+    FULL phase. This autorun is `phase="pregame"`, which deliberately EXCLUDES
+    the sim leg for exactly that reason. Measured during the concurrent window
+    above, the container read 1,692-1,712MB of 2,048 but only 948-980MB
+    UNRECLAIMABLE (46-48%) -- the rest is reclaimable page cache, so real
+    headroom is ~1GB, not the ~340MB the `headroom` field reports. NOT MEASURED
+    and stated so it is not cited as done: this autorun's own peak RSS.
+
+    Overridable for tests / multi-instance setups, same as its siblings.
+    """
+    raw_value = str(os.environ.get("SYNDICATE_WNBA_PREGAME_REFRESH_LANE") or "").strip()
+    return raw_value or "live-odds-worker-wnba-pregame"
+
+
 def _wnba_pregame_autorun_status_path() -> Path:
     return reports_root() / "refresh_status" / "latest" / "wnba_pregame_autorun_status.json"
 
@@ -289,6 +322,7 @@ def _launch_autorun_wnba_pregame_refresh() -> None:
             skip_mirror=True,
             mode=str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_MODE") or "full"),
             launch_mode="web_process",
+            lane=_wnba_pregame_refresh_lane(),
         )
     except Exception as exc:
         if _is_refresh_run_contention_error(exc):
