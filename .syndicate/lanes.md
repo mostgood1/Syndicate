@@ -725,6 +725,18 @@ death, never life — do not invert it.
 - Verdict: GOAL MET — owner_liveness.py --idle-min 240 at 18:28Z returned SAFE for 2 of 16 CLOSED blocks; both moved to lanes_closed.md with one pointer each. Table in log/2026-09-25.md.
 - Moved: `wnba-future-date-cache-carry`, `closed-lane-archive-20260925-0903`.
 
+### nfl-ncaaf-live-props — OPEN — opened 2026-09-25 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- **HYPOTHESIS REFUTED the same hour, by this lane's own falsification test, BEFORE any code.** I wrote that NFL was close and needed only a liveProps bridge plus the gate entry. It is not. `build_live_prop_index` keys on (player, market, line) and requires `modelProbOver` -- a live PROBABILITY per player-market-line, not a stat line. MLB supplies it from a projection report that already carries liveProps. `nfl/props.py` has no modelProbOver, no in-game/remaining logic and no live re-projection of any kind. NFL live props is an ENGINE build.
+- **What NFL DOES have, and it is the data layer not the model:** `live_player_box.py` fetches ESPN summary player stats and `nfl/cards.py:1949` stamps `game['live_player_box']` for every in-progress game. Settlement (`bet_status_nfl`) and grading (`population_outcomes_espn`) both consume it. I first claimed it was UNCONSUMED -- that was a too-narrow grep and is retracted; it is the second wrong claim I have made from a bad grep today.
+- **SIZING, measured not guessed:** props are 95% of NFL's board markets (76 game vs 1431 prop on the 09-27 slate) and 82% of NCAAF's (514 vs 2404 on 09-26). So the sport with a working live GAME-LINE tier still has no live tier over 95% of its board. NCAAF is further back again: no live_player_box module at all, so it needs the data layer before the model.
+- **NOT STARTED, and deliberately not started on a wrong scope.** The next decision is whether a live NFL prop projection is a re-sim from game state (the NHL/NCAAF shape) or a remaining-time rescale of the pregame projection (cheaper, and what WNBA's unpriced live projection does). That choice decides whether this ships before Sunday or not at all.
+- Goal: NFL and NCAAF live player props reach the Layer 2 board the way MLB's do: the lens snapshot carries liveProps per game and the sport is in the live-prop gate, measured on production as rows_live_projected greater than zero on a live slate
+- Files: syndicate/features/nfl/live_player_box.py
+- Hypothesis: NFL is close and NCAAF is not. NFL already stamps live_player_box on cards from ESPN summaries for in-progress games, so the live STATS exist and only the liveProps bridge plus the gate entry are missing. NCAAF has no live player box module at all, so it needs the data layer first
+- Falsification test: If NFL's live_player_box carries no per-player market-shaped stats, or MLB's liveProps contract needs inputs NFL cannot supply, then NFL is not close and the hypothesis is wrong
+- Verification: board_delivery_probe plus rows_live_projected on a live NFL slate (Sunday) shows live prop coverage greater than zero, with the same reading refused before the change
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
