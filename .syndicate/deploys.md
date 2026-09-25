@@ -42071,3 +42071,40 @@ Only its cost is removed.
 list at 22:56:42Z still shows the six pre-existing lanes, as expected until that
 autorun's next launch (~01:24Z). refresh-worker still runs `d5449df7` and has
 none of today's three fixes.
+
+### `8edd8778` — verify: MET, 2026-09-25T23:26:54Z — and TWO CORRECTIONS I owe
+
+**The split works, behaviourally.** The new lane appeared:
+`live-odds-worker-wnba-pregame state=running pid=2448`, seven lanes now. And the
+discriminating check: across 7 refusals in the following window, **every one
+carries `lane=live-odds-worker` with the combined sweep's own run stamps** and
+NOT ONE carries the wnba-pregame lane. WNBA pregame ran at ~23:24Z and refused
+nobody. Before the split it held that shared lane and starved NHL.
+
+**CORRECTION 1 — the interval I quoted was the CODE DEFAULT, not production.**
+I wrote "~01:24Z" twice, from `_wnba_pregame_refresh_interval_seconds`'s 14400s
+fallback. It fired at ~23:24Z. Last run 21:24:33Z + 7200s = 23:24:33Z, and the
+watcher saw it within one 180s poll. So
+`SYNDICATE_WNBA_PREGAME_REFRESH_INTERVAL_SECONDS` is set to 7200 in the
+environment and the code default never applied. Reading a configurable interval
+out of the source and stating it as the production value was the error.
+
+**CORRECTION 2 — the self-collision rate I gave was 4x too low.** I said "~1
+refusal per 16 min" from a SINGLE observation in a window that contained a deploy
+restart. Measured properly on `ec10612a` over 22:56:21Z -> 23:25:33Z: **7
+refusals in 29.2 min = 1 per 4.2 min**, across 5 distinct holder runs
+(`230229`, `230809`, `231130`, `231855`, `232408`) — so roughly 1.4 refusals per
+sweep, steady state. The sweep runs about every 6 min and the tick attempts far
+more often than that.
+
+That makes the remaining defect bigger than I implied, though not more harmful:
+each refusal is now a no-op because the marker is rewound. What is left is
+wasted attempts and log volume, which is an OPTIMISATION (check
+`is_refresh_run_active` before attempting, accepting it is racy and the mutex
+stays authoritative), not a correctness bug.
+
+**The outcome this whole arc was for, read 23:28:37Z:** NHL layer 1
+`games=4 rows=19 in_grid=37 other_dates=18`, up from `rows=17 in_grid=35` at
+21:46Z and against ZERO rows on a four-game night earlier today. Sustained 1h42m.
+`proj=0 / no_projection_source_for_sport` is the separate NHL projection gap and
+is NOT claimed as fixed here.
