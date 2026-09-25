@@ -1313,7 +1313,7 @@ Lane `mlb-sim-retrigger-churn` (OPEN). Readings: `deploys.md` 2026-09-18 01:14:0
 - **Only refresh-worker runs the sim decision:** `SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER` TRUE there, FALSE on live-odds-worker, absent (= False by code default) on web. `SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS=600` is pinned in render.yaml.
 - **Debounce live since 2026-09-18 01:20:00Z:** `SYNDICATE_MLB_SIM_FINGERPRINT_MIN_GAP_SECONDS` default 3600 holds fingerprint-only launches; tip-off, cold-start, join-mismatch, board-missing and props-regen stay immediate. Verified executing: 7 debounces 01:20-04:20Z.
 - **Props-regen is now the visible driver:** `MLB_PROPS_REGEN_DUE` fired at 01:58, 03:08 and 04:10Z, each time widening a launch to the full slate, because `daily_top_props` stayed at 0 candidates after each regen. Its launches carry the `fingerprint_change` LABEL (the reason string prefers it), so count `MLB_DAILY_SIM_TRIGGERED` lines by cause, not by label. Open: whether zero is correct late in the day.
-## [mlb-traditional-doubleheader-join] A TRADITIONAL DOUBLEHEADER COULD NEVER CLEAR THE 45-MINUTE SEPARATION RULE -- FIXED AND DEPLOYED; VERIFIED ON THE RENDERED BOARD **PREGAME AND AT WARMUP ONLY** `[verified 2026-09-25 18:07Z and 19:51Z; IN-PLAY STILL UNVERIFIED]`
+## [mlb-traditional-doubleheader-join] A TRADITIONAL DOUBLEHEADER COULD NEVER CLEAR THE 45-MINUTE SEPARATION RULE -- FIXED PREGAME, **REGRESSES ONCE A HALF IS IN PLAY** `[pregame verified 18:07Z/19:51Z; IN-PLAY MEASURED FAILING 20:33Z on 42b9be30]`
 
 `doubleHeader: "Y"` (traditional) is played back-to-back on ONE admission, so StatsAPI
 publishes game 2's NOMINAL start minutes after game 1's -- BAL @ NYY 2026-09-25: **823491
@@ -1374,3 +1374,37 @@ already live at 18:07Z when this fixture read 2, and what changed since is 82470
 Two loose ends for whoever takes it: the feeds disagree by **60 seconds** (17:06Z vs 17:05Z),
 which is INSIDE the 120 s near-exact window and should have joined; and one game producing two
 ROW GROUPS is a grouping defect upstream of any chip join.
+
+
+**IN-PLAY: THE RAIL GOES BACK TO THREE TILES, AND MY OWN GUARD IS WHAT REFUSES
+`[measured 2026-09-25 20:33Z, served commit 42b9be30 read from /api/ops/version]`.**
+StatsAPI 20:30Z: 823491 `In Progress` (inning 2 Middle), 823489 `Scheduled` -- the exact
+configuration the join had never been tested in. The rail seats `chip|mlb|823491` (LIVE, loose),
+`mlb|3fe14d478bc1` (PREGAME, "6 opportunities", now showing a DATE label instead of a clock)
+and `chip|mlb|823489` (PREGAME, loose). Game 1 has ONE tile; **game 2 has TWO** -- that is the
+duplicate.
+
+**Root cause, from the served payload rather than the DOM:** `/api/intelligence/query` carries
+exactly **ONE** BAL @ NYY group -- `event_id 3fe14d478bc1`, `commence_time 23:05:00Z`, **4
+rows** (every other MLB fixture has 78-110). Game 1 has **no group at all**: not an odds group,
+not a gamePk-keyed one. So `buildDoubleheaderOrdinals` sees **1 group against 2 chips** and
+refuses, which is exactly what its control test asserts it must do. The guard is correct; the
+ASSUMPTION under it -- that both halves keep a group -- is false once a half goes live.
+
+**Group loss is NOT a general consequence of going live.** A live NCAAF game
+(`ncaaf|d9a781a6`, Q1 3:06) is still GROUP-keyed on the same rail, and all 15 MLB hash groups
+are pregame. Both non-pregame MLB games today are DH halves, so MLB-vs-doubleheader is NOT
+separated by this reading -- do not report it as either.
+
+**The discriminator a fix can use, and it is exact:** the surviving group is PREGAME while the
+chips are {823491 LIVE, 823489 PREGAME}, so exactly ONE chip is state-compatible. Pairing on
+state before ordinal resolves this with no time agreement -- the feeds are 2h55m apart here
+(group 23:05Z vs chip 20:10Z), so no window ever bridges it. Controls such a change needs:
+two PREGAME chips against one group must still refuse, and a MISSING state must refuse rather
+than fall through permissive.
+
+**Also found, unrelated and its own defect:** 6 MLB "Steam" watchlist groups
+(822681, 822760, 823409, 823816, 824058, 824544; 1-9 rows each) carry a numeric gamePk as
+`game_pk` with **no team names and no `commence_time`**, so they seat as bare tiles. Every
+other row on the board carries a 32-hex event hash in that same field -- `game_pk` is
+heterogeneous by fixture, which is why an exact gamePk join is not available to the browser.
