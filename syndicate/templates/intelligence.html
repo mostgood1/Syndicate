@@ -2384,6 +2384,11 @@
     const matchup = String(group.matchup || "").trim().toLowerCase();
     const exact = pickChipByStart(gameChipsByMatchup.get(`${sport}|${matchup}`), group);
     if (exact) return exact;
+    // ORDER, where the clock could not decide -- see `buildDoubleheaderOrdinals`.
+    // Consulted only after `pickChipByStart` has refused, so a fixture whose
+    // starts DO separate never reaches it and keeps the measured answer.
+    const ordinal = dhOrdinalChips.get(group.key);
+    if (ordinal) return ordinal;
     // Before the normalised index, because this is a LOOKUP and that is an
     // approximation. Both sides were stamped by the same server-side alias map
     // (`canonical_team`), so a hit here means the two feeds named the same
@@ -2401,6 +2406,63 @@
     const sides = matchup.split(" @ ");
     if (sides.length !== 2) return null;
     return gameChipsByMatchupLoose.get(`${sport}|${normalizeClubName(sides[0])} @ ${normalizeClubName(sides[1])}`) || null;
+  }
+
+  // groupKey -> chip, for doubleheaders only time cannot resolve. Rebuilt on
+  // every render by `buildDoubleheaderOrdinals`; empty until then, so an early
+  // `chipForGame` simply misses rather than throwing.
+  let dhOrdinalChips = new Map();
+
+  // The Central calendar date of an epoch-ms start -- the same rule
+  // `chipCentralDate` applies to a chip, hoisted so BOTH sides of the pairing
+  // below bucket identically. A doubleheader is one venue-day by definition,
+  // so a date bucket keeps two different days' meetings of the same clubs from
+  // ever being paired with each other.
+  function centralDateOfMs(ms) {
+    if (ms === null || ms === undefined || Number.isNaN(ms)) return null;
+    try {
+      return new Date(ms).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function buildDoubleheaderOrdinals(groups) {
+    const out = new Map();
+    const byFixture = new Map();
+    // Row side: one entry per group carrying BOTH canonical keys and a start.
+    for (const group of groups.values()) {
+      const sport = String(group.sportSlug || group.sport || "").toLowerCase();
+      const a = String(group.awayKey || "").trim().toLowerCase();
+      const h = String(group.homeKey || "").trim().toLowerCase();
+      const at = chipStartMs(group.commenceTime);
+      if (!sport || !a || !h || at === null) continue;
+      const key = `${sport}|${a} @ ${h}|${centralDateOfMs(at)}`;
+      if (!byFixture.has(key)) byFixture.set(key, { groups: [], chips: [] });
+      byFixture.get(key).groups.push({ at, key: group.key });
+    }
+    if (!byFixture.size) return out;
+    // Chip side: the same key, built the same way, so the two agree by
+    // construction rather than by two spellings happening to match.
+    for (const chip of new Set(gameChipsById.values())) {
+      const sport = String(chip.sport || "").toLowerCase();
+      const a = String((chip.away || {}).key || "").trim().toLowerCase();
+      const h = String((chip.home || {}).key || "").trim().toLowerCase();
+      const at = chipStartMs(chip.start_time_utc);
+      if (!sport || !a || !h || at === null) continue;
+      const key = `${sport}|${a} @ ${h}|${centralDateOfMs(at)}`;
+      if (byFixture.has(key)) byFixture.get(key).chips.push({ at, chip });
+    }
+    for (const bucket of byFixture.values()) {
+      const { groups: gs, chips: cs } = bucket;
+      if (gs.length < 2 || gs.length !== cs.length) continue;
+      const distinct = (arr) => new Set(arr.map((x) => x.at)).size === arr.length;
+      if (!distinct(gs) || !distinct(cs)) continue;
+      gs.sort((x, y) => x.at - y.at);
+      cs.sort((x, y) => x.at - y.at);
+      for (let i = 0; i < gs.length; i += 1) out.set(gs[i].key, cs[i].chip);
+    }
+    return out;
   }
 
   // A TEAM PAIR IS NOT A GAME ON A DOUBLEHEADER. The browser half of the
@@ -2723,6 +2785,34 @@
       if (itemState === "live") group.hasLive = true;
       if (itemState !== "final") group.allFinal = false;
     }
+    // ORDINAL PAIRING FOR A DOUBLEHEADER NO CLOCK CAN RESOLVE. Built here,
+    // once the group map is complete and before anything calls `chipForGame`.
+    //
+    // Measured on the served board 2026-09-25, and it is NOT the near-exact
+    // case: BAL @ NYY's two row-groups commence at **20:05Z and 23:06Z** while
+    // its two chips start at **20:05Z and 20:10Z**. Game 2's group is ~3 HOURS
+    // from BOTH halves, because the two sources disagree about what game 2's
+    // start even means -- StatsAPI publishes the NOMINAL placeholder five
+    // minutes after game 1 (a traditional doubleheader has no real second
+    // time until game 1 ends), while the book publishes the REALISTIC one.
+    // `pickChipByStart` refuses, correctly; no time window can bridge three
+    // hours without guessing, and widening one would break the controls that
+    // keep it honest.
+    //
+    // ORDER is the discriminator both sides still agree on: game 1 precedes
+    // game 2 in each list. This is the browser twin of
+    // `doubleheader.doubleheader_event_ranks`, which already ranks board-row
+    // events 1..n by earliest start within a fixture and date.
+    //
+    // Deliberately narrow, because ordinal pairing is an ASSUMPTION about
+    // order rather than a measurement: only when a fixture has the SAME number
+    // of timed groups as timed chips, at least two of each, every start
+    // DISTINCT on both sides, and both sides carrying the server alias map's
+    // canonical club keys -- the one spelling measured identical across feeds
+    // (`baltimore orioles` / `new york yankees` on all four). Anything else
+    // falls through and the card stays chip-less.
+    dhOrdinalChips = buildDoubleheaderOrdinals(groups);
+
     // #165: collapse groups that share the same sport+matchup text AND are
     // confirmed to be the same real game (same live-scoreboard chip, or a
     // compatible date when neither resolves a chip) into one -- two

@@ -142,6 +142,21 @@ out.single_game_pair = await scenario(
      away_team: 'Boston Red Sox', home_team: 'Baltimore Orioles', away_key: 'boston red sox', home_key: 'baltimore orioles',
      commence_time: '2026-09-23T23:05:00Z' }]);
 out.same_game_listed_twice = await scenario([G1(), G1()], [...g1Rows()]);
+// TRADITIONAL doubleheader whose two sources disagree about game 2's start by
+// HOURS: StatsAPI publishes the nominal placeholder 5 min after game 1, the
+// book publishes the realistic one. Measured on production 2026-09-25,
+// BAL @ NYY: chips 20:05Z / 20:10Z against row groups 20:05Z / 23:06Z.
+out.ordinal_pairing = await scenario(
+  [chip('823491', '2026-09-25T20:05:00+00:00', '3:05P CT'),
+   chip('823489', '2026-09-25T20:10:00+00:00', '3:10P CT')],
+  [...g1Rows(withCommence('2026-09-25T20:05:00Z')),
+   ...g2Rows(withCommence('2026-09-25T23:06:00Z'))]);
+// CONTROL: one half only. Counts differ, so ordinal pairing must NOT fire --
+// otherwise a lone game would be handed whichever chip sorted first.
+out.ordinal_refused_when_counts_differ = await scenario(
+  [chip('823491', '2026-09-25T20:05:00+00:00', '3:05P CT'),
+   chip('823489', '2026-09-25T20:10:00+00:00', '3:10P CT')],
+  [...g2Rows(withCommence('2026-09-25T23:06:00Z'))]);
 console.log(JSON.stringify(out));
 """
 
@@ -238,3 +253,35 @@ def test_one_game_listed_twice_is_one_candidate(observed: dict) -> None:
     result = observed["same_game_listed_twice"]
     assert set(result["row_chip"].values()) == {"823543"}
     assert [(card["chip"], card["count"]) for card in result["cards"]] == [("823543", 3)]
+
+
+def test_ordinal_pairing_resolves_a_doubleheader_no_clock_can(observed: dict) -> None:
+    """The BAL @ NYY case, 2026-09-25: the two sources are HOURS apart on game 2.
+
+    StatsAPI publishes a traditional doubleheader's game 2 at a NOMINAL start
+    five minutes after game 1 (there is no real second time until game 1 ends);
+    the book publishes the realistic one, ~3 h later. `pickChipByStart` refuses
+    -- correctly, and no time window could bridge it without guessing. ORDER is
+    the discriminator both sides still agree on.
+    """
+    result = observed["ordinal_pairing"]
+    pairs = result["row_chip"]
+    assert sorted(v for v in pairs.values() if v) == ["823489", "823491"], pairs
+    # game 1's rows (20:05Z) take game 1's chip, game 2's (23:06Z) take game 2's
+    g1 = [k for k in pairs if k.endswith("aaaa")]
+    g2 = [k for k in pairs if k.endswith("bbbb")]
+    assert g1 and g2
+    assert pairs[g1[0]] == "823491"
+    assert pairs[g2[0]] == "823489"
+
+
+def test_ordinal_pairing_is_refused_when_the_counts_differ(observed: dict) -> None:
+    """CONTROL: ordinal pairing is an assumption about ORDER, not a measurement.
+
+    One row-group against two chips cannot say which half it is, so the pairing
+    must not fire -- without this the rule would hand a lone game whichever chip
+    happened to sort first, which is exactly the wrong-scoreboard failure the
+    whole doubleheader module exists to prevent.
+    """
+    result = observed["ordinal_refused_when_counts_differ"]
+    assert set(result["row_chip"].values()) == {None}, result["row_chip"]
