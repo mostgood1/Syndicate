@@ -4661,3 +4661,34 @@ the same thing that caught it here, just hours too late.
 - **Cost:** two deploys and one revert that a single payload read would have made unnecessary.
 
 ---
+
+## 2026-09-25 - RULE: a CADENCE MARKER records that a sport was LISTED, not that its producer ran. Never read one as evidence of work `[lane nhl-board-rows-missing, session 4ab694ed]`
+
+NHL's pregame sweep marker reset on schedule all evening -- `marker_age_s` went
+6955 -> 93 across the 19:23Z boundary, exactly as a 2-hour cadence should. It
+looked like proof the collector had run. It is not:
+
+    live_refresh_loop.py:5868  launched_sports = launch_sports.split(",") if ... else
+                               _live_refresh_loop_effective_sports(selected_date)
+    live_refresh_loop.py:5876  _record_pregame_sport_sweep_epochs(tick_started_epoch,
+                               list(launched_sports))
+
+The marker is written for every sport in the INTENDED list, before any statement
+about whether that sport's step executed, produced output, or failed.
+
+THE MEASUREMENT THAT BROKE THE TIE, and it is the only one that could. A shard
+report is written UNCONDITIONALLY by `collect_and_write_team_odds`, even for an
+empty frame. Sweep at 19:24:26Z, marker reset, shard report still 404 four
+minutes later -> the collector did not run. The NHL odds artifact had likewise
+been frozen at 15:44:17Z through two prior sweeps that both moved the marker.
+
+HOW TO APPLY: before citing a timestamp, interval or marker as evidence that
+work HAPPENED, find the line that writes it and check what it is a function of.
+A marker written from the launch LIST is a fact about scheduling; only an
+artifact written by the producing function itself is a fact about production.
+This is the fourth signal in one session that looked like it answered the
+question and belonged to a different emitter -- the others being absent log
+lines from a discarded subprocess stream, a 403 read as absence, and a board
+join read 24 s before the producer's tick.
+
+---
