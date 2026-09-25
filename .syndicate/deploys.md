@@ -41595,3 +41595,29 @@ zero games reached the board with a probability. What this deploy proves is that
 the producer can SEE its slate. That is the first of three gates, not the last.
 
 ---
+
+## 2026-09-25 14:06-14:20Z (9:06-9:20 AM CDT) - READING ONLY, no deploy - refresh-worker fix `02684624` (live in `d5449df7`, finished 02:35:10Z) - lane `wnba-future-date-cache-carry`
+
+**What was read.** The seed-(3) fix (a FUTURE date never substitutes an older
+slate into `live_state`) on the first real no-game eve since it went live.
+2026-09-24 had 5 WNBA games; 09-25 and 09-26 have none (ESPN, read 14:06Z).
+
+**predict:** future-date builds of 09-25 happen on the 09-24 eve, and every one
+has `game_count=0`; `live_state` for 09-25/09-26 holds 0 games.
+
+**verify: MET.**
+
+    live commit      d5449df7 ⊇ 02684624 (ancestor + both content markers x1)
+    fallback_return  selected_date=2026-09-25: 16 lines, ALL game_count=0
+                     first 19:35:04Z (14:35 CDT), last 03:43:48Z (22:43 CDT)
+                     game_count>0: 0   (control: 1,208 lines 09-24 game_count=5)
+                     6 x 2h windows 17:00Z-05:00Z, all covered (none null)
+    live_state       2026-09-25: 0 games | 2026-09-26: 0 games
+    game-chips 09-25 179 chips, 0 WNBA (worker_artifact, published 14:05:50Z)
+    layer2 hygiene   exit 3 no_slate, frozen_chips None, wnba_chips []
+
+On 09-16 the same log line read `selected_date=2026-09-16 game_count=4` and the key
+held the four 08-30 FINALs. The frame fired 16 times this eve, and every build of
+it was empty.
+
+---
