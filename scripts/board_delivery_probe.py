@@ -71,6 +71,42 @@ def _get(base: str, path: str, params: dict[str, str], token: str, timeout: floa
         return json.loads(response.read().decode())
 
 
+# The UPSTREAM schedule, per sport. Without this the probe can report "no rows"
+# and cannot say whether that is correct. That gap produced a FALSE REPORT on
+# 2026-09-25: an empty future WNBA date was called a total board gap, when the
+# pipeline was healthy and simply had no games. It also let NHL's real defect --
+# four games upstream, zero on the board -- read the same as a quiet day.
+#
+# ESPN's scoreboard is one shape for seven sports. Soccer is league-scoped and
+# deliberately returns UNKNOWN rather than a wrong zero: a sport whose schedule
+# cannot be established must not be scored as "no games".
+_ESPN_PATHS = {
+    "mlb": "baseball/mlb",
+    "nfl": "football/nfl",
+    "ncaaf": "football/college-football",
+    "nba": "basketball/nba",
+    "wnba": "basketball/wnba",
+    "ncaab": "basketball/mens-college-basketball",
+    "nhl": "hockey/nhl",
+}
+
+
+def upstream_games(sport: str, date: str, *, timeout: float) -> int | None:
+    """How many games the WORLD says exist, or None when unknowable."""
+    path = _ESPN_PATHS.get(sport)
+    if not path:
+        return None
+    url = (f"https://site.api.espn.com/apis/site/v2/sports/{path}/scoreboard"
+           f"?dates={date.replace('-', '')}")
+    try:
+        request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            payload = json.loads(response.read().decode())
+        return len(payload.get("events") or [])
+    except Exception:
+        return None
+
+
 def probe_sport(sport: str, date: str, *, base: str, token: str, timeout: float) -> dict[str, Any]:
     out: dict[str, Any] = {"sport": sport, "date": date}
 
@@ -105,6 +141,7 @@ def probe_sport(sport: str, date: str, *, base: str, token: str, timeout: float)
     except Exception as exc:  # noqa: BLE001
         out["grid_error"] = f"{type(exc).__name__} {getattr(exc, 'code', '')}".strip()
 
+    out["upstream_games"] = upstream_games(sport, date, timeout=min(timeout, 30.0))
     out["verdict"] = _verdict(out)
     return out
 
@@ -120,7 +157,19 @@ def _verdict(row: dict[str, Any]) -> str:
     games = row.get("games") or 0
     rows = row.get("rows") or 0
     in_grid = row.get("rows_in_grid") or 0
+    upstream = row.get("upstream_games")
+
+    # THE COMPARISON THIS PROBE EXISTS FOR. Games the world has and the board
+    # does not is the defect; everything else about an empty board is weather.
+    if upstream and not games:
+        return "MISSING_FROM_BOARD"
+
     if not games and not rows:
+        if upstream is None:
+            # Unknowable upstream. Say so rather than scoring it as fine --
+            # `no_games` here would be the same false clean this probe was
+            # built to stop giving.
+            return "no_board_rows_schedule_unknown"
         if in_grid:
             # Rows exist in the grid and the board scoped them out. THIS IS NOT
             # BY ITSELF A BUG and the verdict must not pretend otherwise: the
@@ -176,7 +225,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"BOARD DELIVERY  date={date}  base={args.base_url}")
     header = (f"{'sport':7s} {'games':>5} {'rows':>6} {'proj':>6} {'proj%':>6} "
-              f"{'fair':>5} {'lens':>5} {'live':>4} {'cand':>5} {'writ':>5}  verdict")
+              f"{'fair':>5} {'up':>4} {'lens':>5} {'live':>4} {'cand':>5} {'writ':>5}  verdict")
     print(header)
     print("-" * len(header))
     for row in rows:
@@ -186,11 +235,14 @@ def main(argv: list[str] | None = None) -> int:
         pct = f"{100 * projected / total:.0f}%" if total else "-"
         states = row.get("lens_states") if isinstance(row.get("lens_states"), dict) else {}
         print(f"{row['sport']:7s} {games:>5} {total:>6} {projected:>6} {pct:>6} "
-              f"{row.get('rows_modelled_fair') or 0:>5} {row.get('lens_games') or 0:>5} "
+              f"{row.get('rows_modelled_fair') or 0:>5} "
+              f"{('?' if row.get('upstream_games') is None else row.get('upstream_games')):>4} "
+              f"{row.get('lens_games') or 0:>5} "
               f"{int(states.get('live') or 0):>4} {row.get('gameline_candidates') or 0:>5} "
               f"{row.get('gameline_written') or 0:>5}  {row['verdict']}")
     print()
-    print("verdicts: no_games (nothing scheduled -- NOT a failure) | "
+    print("verdicts: MISSING_FROM_BOARD (games exist upstream, board has none -- THE defect) |")
+    print("          no_games (nothing scheduled -- NOT a failure) | "
           "grid_rows_other_dates (grid has rows the board scoped out;")
     print("          BENIGN when nothing is scheduled today, a DATE BUG when the sport has games -- check the schedule) |")
     print("          pregame_missing | pregame_delivering | "
