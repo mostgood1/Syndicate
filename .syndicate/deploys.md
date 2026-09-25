@@ -41471,3 +41471,127 @@ the first build and stays unpredicted; it is now unpredicted on 4 of 4.
 **verify:** the per-read table above, plus WARMED 97 / request-driven EXPIRED 4.
 
 ---
+
+## 2026-09-24 23:49:38Z -> live 23:56:14Z (6:49-6:56 PM CDT) - refresh-worker `f92bf1b4` -> `ce9be1ea` (`dep-daqreed9fdbs73c3nldg`) - lane `nfl-live-resim-activation`
+
+**What shipped.** NFL's live re-sim reaches the board: `nfl` added to
+`_LIVE_GAMELINE_SPORTS` and `LIVE_LENS_SOURCES_BY_SPORT`, refusals restamped
+`pregame` so the join rejects them BY STAMP, and the re-sim given its own
+`live/nfl_live_resim.json` instead of sharing one Redis key with the
+pregame-carried lens. `SYNDICATE_NFL_LIVE_RESIM` set `absent -> 1` on
+refresh-worker BEFORE the deploy (an env change alone does not reach the
+running process).
+
+**predict:** `nfl_gameline_join_present` **false -> true**;
+`refresh_worker_nfl_live_resim_env` **absent -> enabled**. Baseline read
+23:48:56Z: 0 NFL join lines, against a live MLB control of 23 in the same
+window -- the control matters, it is what proves the instrument can read
+non-zero.
+
+**verify: MET on the stated fields, AND THE DEPLOY STILL DID NOT WORK.** 11 join
+lines appeared where there had been none. But every one read:
+
+    index=0 considered=71 withheld=71
+    index_why={'games_in_snapshot': 16, 'indexed': 0,
+               'skipped_no_accepted_lane': 16, 'sources_seen': {}}
+
+`sources_seen` EMPTY was the tell -- not `{pregame: 16}`, not
+`{live_resim: 16}`, but no lens lanes at all, which a re-sim snapshot cannot
+produce because a refusal still emits a lane. It was reading the PREGAME lens.
+
+**CAUSE, MINE:** `s.replace(old, new, 1)` matched the FIRST occurrence of the
+snapshot read line. That is `attach_live_game_state_from_lens` (line 821), not
+`attach_live_gamelines_for_sport` (2215). TWO harms, and the second is worse
+than the one I was fixing: the intended fix never landed, AND NFL's live
+SCORE/CLOCK reader was silently repointed at a file with a different shape.
+
+**A PREDICTION I ALMOST MADE THAT WOULD HAVE SCORED A FALSE PASS.** The first
+instrument I reached for was `LIVE_GAMELINE_BUILD sport=nfl`. It already fired
+52 times before this deploy -- it is `book_grid`'s build, not gated on
+`_LIVE_GAMELINE_SPORTS`. Checking its baseline is the only reason the receipt
+names the JOIN line instead.
+
+**Also: this deploy was CANCELED and a different one won.** `dep-daqre4l9fdbs73c3meh0`
+(mine, 23:49:38Z) was canceled 40 s in by `dep-daqreed9fdbs73c3nldg`, same
+commit, which went live at 23:56:14Z. The code is right either way; I did not
+fire the deploy that landed, and that is recorded rather than smoothed over.
+
+---
+
+## 2026-09-25 02:32:19Z -> live 02:35:10Z (9:32-9:35 PM CDT) - refresh-worker `ce9be1ea` -> `d5449df7` (`dep-daqtqcp42hec73c88h80`) - lane `nfl-live-resim-activation`
+
+**What shipped.** The call-site correction (`3887fdd6`): line 821 restored to
+the lens, the snapshot-path map applied ONLY inside
+`attach_live_gamelines_for_sport`. Carried the NHL fetch fix too (`fde7e7d4`),
+which is INERT on this service -- see the next entry.
+
+**predict:** `nfl_join_sources_seen_nonempty` **false -> true**. Baseline
+02:31:37Z: 14 join lines reading `sources_seen: {}`.
+
+**verify: MET.** Post-boot join 2026-09-25T02:41:05Z:
+
+    index_why={'games_in_snapshot': 16, 'indexed': 0,
+               'skipped_no_accepted_lane': 16,
+               'sources_seen': {'pregame': 16}, 'accepted_sources': ['live_resim']}
+
+One field verifies BOTH NFL fixes: the join now reads `nfl_live_resim.json`
+(the call site landed correctly), and refusals carry the `pregame` stamp and
+are rejected BY STAMP rather than merely dropped for lacking a probability.
+
+**NOT CLAIMED: a priceable NFL live edge.** All 16 refuse because TNF
+(ATL @ GB, 00:15Z) was over by the time this landed. That is the refusal
+contract behaving, not a failure -- and the edge reading is OWED on the Week 4
+Sunday slate. A receipt that called this "NFL live edges are working" would be
+false.
+
+**Preflight held FOUR times before this window** -- a 7-process MLB tip-off sim
+tree, then an odds refresh, then the board-build cadence. The deploy that ran
+read `CLEAR: only infrastructure processes running`. Nothing was killed, and
+the ~3 h of waiting is the reason.
+
+---
+
+## 2026-09-25 02:49:33Z -> live 02:55:51Z (9:49-9:55 PM CDT) - live-odds-worker `f92bf1b4` -> `d5449df7` (`dep-daqu2fe0tbcc73899sbg`) - lane `nfl-live-resim-activation`
+
+**What shipped.** The NHL slate fetch (`fde7e7d4`), ON THE SERVICE THAT RUNS IT.
+`start_live_lens_loop()` is in `run_live_odds_refresh_worker.py`, so NHL's
+producer lives here; the identical commit had been live on refresh-worker since
+02:35:10Z and did nothing, because that service does not run the loop.
+
+**ROOT CAUSE, measured same-instant on the live endpoint:**
+
+    default urllib UA -> HTTP 403 Forbidden    <- exactly what fetch_score_rows sent
+    "Mozilla/5.0"     -> 200, 11 games
+
+`api-web.nhle.com` refuses Python's default User-Agent, and
+`except Exception: return []` spelled that 403 as an empty slate. So the tick
+reported `ok: true` in under a second while SIX NHL games were live, and the
+board read `games_in_snapshot: 0` with no refusal to inspect. A date-basis
+theory (UTC vs Central) was tested FIRST and REFUTED: the 23:37Z reading
+predates the UTC flip and already showed zero.
+
+**predict:** `nhl_join_games_in_snapshot_gt_zero` **false -> true**.
+
+**verify: MET.** Post-boot join 2026-09-25T03:01:14Z:
+
+    index_why={'games_in_snapshot': 11, 'indexed': 0,
+               'skipped_no_team_names': 9, 'skipped_no_accepted_lane': 2,
+               'sources_seen': {'pregame_only': 2}}
+
+0 -> 11. The slate is read, and 2 games carry correctly-stamped refusal lanes
+the join rejects.
+
+**AND IT IMMEDIATELY SURFACED THE NEXT DEFECT, ALSO MINE: `skipped_no_team_names: 9`.**
+In `build_live_lens_snapshot`, a game refused at `live_state_from_score_row` is
+appended with `away_name: ""` and `home_name: ""`. The join cannot match a
+nameless game to a board row, so it drops it -- meaning the refusal I publish
+ON PURPOSE is invisible for exactly the games that refused EARLIEST. The
+"a refusal must be named, not a silent zero" rule, broken one level below where
+I applied it. 9 of 11 games. OPEN, lane `nhl-live-resim`.
+
+**STILL NOT CLAIMED, and not obtainable tonight:** that the NHL live probability
+is CALIBRATED, or that any NHL game produced a priceable edge. `indexed: 0`, so
+zero games reached the board with a probability. What this deploy proves is that
+the producer can SEE its slate. That is the first of three gates, not the last.
+
+---
