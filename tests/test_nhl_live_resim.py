@@ -514,3 +514,72 @@ def test_the_score_request_sends_a_user_agent(monkeypatch):
     monkeypatch.setattr(mod.json, "load", lambda _r: {"games": []})
     mod.fetch_score_rows("2026-09-24")
     assert seen["ua"], "the request went out with no User-Agent -- the endpoint 403s that"
+
+
+# --- a refusal the board can MATCH ------------------------------------------
+
+def _named_row(state: str = "FINAL", away: str = "Bruins", home: str = "Flyers"):
+    return {
+        "id": 2026020001,
+        "gameState": state,
+        "awayTeam": {"name": {"default": away}, "score": 2},
+        "homeTeam": {"name": {"default": home}, "score": 3},
+    }
+
+
+def test_a_refused_game_still_carries_team_names(monkeypatch):
+    """The 2026-09-25 defect: 9 of 11 games dropped as `skipped_no_team_names`.
+
+    `game_not_started` and `game_final` return BEFORE the team block is read, so
+    the refusal branch had no state to take names from and published `""`. The
+    join keys on names, so those refusals could not be matched to a board row --
+    making the refusal this module publishes ON PURPOSE invisible for exactly
+    the games that refused earliest.
+    """
+    import syndicate.features.nhl.live_resim as mod
+
+    snap = mod.build_live_lens_snapshot(
+        "2026-09-24", score_rows=[_named_row()], slate_features=[]
+    )
+    game = snap["games"][0]
+    assert game["away_name"] == "Bruins"
+    assert game["home_name"] == "Flyers"
+    lane = game["gameLens"][0]
+    assert lane["source"] == mod.PREGAME_LENS_SOURCE
+    assert lane["liveResimRefusal"] == "game_final"
+
+
+def test_refusal_names_use_the_same_extractor_as_a_success():
+    """Identical formatting, or the join matches one and not the other."""
+    import syndicate.features.nhl.live_resim as mod
+
+    row = _named_row(state="LIVE")
+    away, home = mod.team_names_from_score_row(row)
+    assert (away, home) == ("Bruins", "Flyers")
+    # the success path must agree, field for field
+    row_live = dict(row)
+    row_live["periodDescriptor"] = {"number": 2}
+    row_live["clock"] = {"timeRemaining": "10:00", "inIntermission": False}
+    state = mod.live_state_from_score_row(row_live)
+    if not isinstance(state, mod.NhlResimRefusal):
+        assert (state.away_name, state.home_name) == (away, home)
+
+
+def test_coverage_reports_the_real_reason_not_unknown():
+    """The coverage block shipped reading NFL's lane shape (`ok`, `refusal.reason`).
+
+    NHL lanes carry neither, so on the real slate it reported `liveResimmed: 0`
+    unconditionally and `{'unknown': N}` -- a confidently wrong instrument, in
+    the very block added to stop a bare zero.
+    """
+    import syndicate.features.nhl.live_resim as mod
+
+    snap = mod.build_live_lens_snapshot(
+        "2026-09-24",
+        score_rows=[_named_row(), _named_row(state="FUT", away="Sabres", home="Red Wings")],
+        slate_features=[],
+    )
+    reasons = snap["coverage"]["refusalsByReason"]
+    assert "unknown" not in reasons, reasons
+    assert reasons.get("game_final") == 1, reasons
+    assert sum(reasons.values()) == 2, reasons

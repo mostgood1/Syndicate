@@ -185,6 +185,27 @@ def _as_int(value: Any) -> Optional[int]:
         return None
 
 
+def team_names_from_score_row(row: Mapping[str, Any]) -> tuple[str, str]:
+    """`(away_name, home_name)` from a raw `/v1/score` row, or `("", "")`.
+
+    SHARED BY THE SUCCESS PATH AND THE REFUSAL PATH ON PURPOSE. The join keys on
+    team names, so a refusal whose names are formatted even slightly differently
+    from a success's is a refusal the board cannot match -- which is the same
+    invisibility this module exists to remove, arriving one level lower down.
+    One extractor means the two cannot drift.
+    """
+    if not isinstance(row, Mapping):
+        return "", ""
+
+    def _one(side: Any) -> str:
+        block = side if isinstance(side, Mapping) else {}
+        name = block.get("name")
+        value = name.get("default") if isinstance(name, Mapping) else name
+        return str(value or "").strip()
+
+    return _one(row.get("awayTeam")), _one(row.get("homeTeam"))
+
+
 def live_state_from_score_row(row: Mapping[str, Any]) -> NhlLiveGameState | NhlResimRefusal:
     """Read one `/v1/score/<date>` game into a resume state, or refuse by name.
 
@@ -238,8 +259,7 @@ def live_state_from_score_row(row: Mapping[str, Any]) -> NhlLiveGameState | NhlR
         # game by up to 20 minutes.
         return NhlResimRefusal("in_intermission")
 
-    home_name = str(home.get("name", {}).get("default") if isinstance(home.get("name"), Mapping) else home.get("name") or "").strip()
-    away_name = str(away.get("name", {}).get("default") if isinstance(away.get("name"), Mapping) else away.get("name") or "").strip()
+    away_name, home_name = team_names_from_score_row(row)
     if not home_name or not away_name:
         return NhlResimRefusal("no_team_names")
 
@@ -576,9 +596,19 @@ def build_live_lens_snapshot(
     for row in rows:
         state = live_state_from_score_row(row)
         if isinstance(state, NhlResimRefusal):
+            # NAMES COME FROM THE RAW ROW, not from the state -- there is no
+            # state, that is what a refusal means. Measured on production
+            # 2026-09-25T03:01:14Z: publishing `""` here made the board drop
+            # **9 of 11** games as `skipped_no_team_names`, so the refusal this
+            # module publishes ON PURPOSE was invisible for exactly the games
+            # that refused EARLIEST -- `game_not_started` and `game_final`
+            # return before the team block is ever read. A refusal the board
+            # cannot match is indistinguishable from a game the producer never
+            # saw, which is the ambiguity this whole module exists to remove.
+            ref_away, ref_home = team_names_from_score_row(row)
             out_games.append({
-                "away_name": "",
-                "home_name": "",
+                "away_name": ref_away,
+                "home_name": ref_home,
                 "gameLens": build_game_lens(None, state, live_state_as_of=generated_at),
             })
             continue
@@ -622,7 +652,7 @@ def build_live_lens_snapshot(
             "liveResimmed": sum(
                 1 for g in out_games
                 for lane in (g.get("gameLens") or [])
-                if lane.get("ok")
+                if lane.get("source") == LIVE_RESIM_LENS_SOURCE
             ),
             "refusalsByReason": _refusals_by_reason(out_games),
         },
@@ -630,12 +660,25 @@ def build_live_lens_snapshot(
 
 
 def _refusals_by_reason(games: list[dict[str, Any]]) -> dict[str, int]:
-    """A zero without this is not a result -- the same rule NCAAF and NFL state."""
+    """A zero without this is not a result -- the same rule NCAAF and NFL state.
+
+    READS THIS MODULE'S OWN LANE SHAPE, which is not NFL's. Written first as a
+    copy of NFL's (`lane["ok"]`, `lane["refusal"]["reason"]`) and shipped that
+    way in `fde7e7d4`; NHL lanes carry NEITHER key, so on the real slate it
+    reported `liveResimmed: 0` unconditionally and `{'unknown': 11}` for the
+    reasons. Telemetry that is confidently wrong is worse than none, and this
+    block exists precisely to stop a bare zero -- so it produced the defect it
+    was added to prevent. Caught by running it against the live slate rather
+    than a fixture.
+
+    The discriminator here is `source`: a refusal is stamped
+    `PREGAME_LENS_SOURCE` and carries `liveResimRefusal`.
+    """
     reasons: dict[str, int] = {}
     for game in games or []:
         for lane in game.get("gameLens") or []:
-            if lane.get("ok"):
+            if lane.get("source") == LIVE_RESIM_LENS_SOURCE:
                 continue
-            reason = str((lane.get("refusal") or {}).get("reason") or "unknown")
+            reason = str(lane.get("liveResimRefusal") or "unknown")
             reasons[reason] = reasons.get(reason, 0) + 1
     return reasons
