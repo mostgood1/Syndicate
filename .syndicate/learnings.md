@@ -4772,3 +4772,23 @@ an intended list, and a publish-derived stamp list.
   one was membership, which nobody listed.
 
 ---
+### 2026-09-25 — FORBIDDEN: reading the DOM within a few seconds of a reload and reporting what is missing. The board loads in two waves and the second one is slower.
+
+- **What I claimed:** that every MLB opportunity card had disappeared from the rail --
+  17 tiles, all chip-keyed, zero group tiles, zero "opportunities". I was about to
+  report a board-wide outage.
+- **What was actually true:** I had read 5 seconds after `location.reload()`. Chips come
+  from a GET (`/api/board/game-chips`) and cards from a POST
+  (`/api/intelligence/query`) that takes longer. The next read, seconds later, showed
+  **16 MLB group tiles**. Nothing was missing; the page was mid-load.
+- **Why it nearly cost a revert:** I had deployed minutes earlier, so the obvious
+  explanation was my own change, and the obvious action was to roll back a fix that was
+  working correctly.
+- **How to apply:** after a reload, wait for the SLOW wave or assert on it before
+  reporting absence -- e.g. require a non-zero card count, or poll until it stabilises.
+  An absence measured during a load is a statement about your timing, not the page.
+- **The same session's other version of this:** `-p no:randomly` emitted nothing for ten
+  minutes and I called it hung; the output was buffered behind `| tail -5`. Both are the
+  same error -- treating "I cannot see it yet" as "it is not there".
+
+---

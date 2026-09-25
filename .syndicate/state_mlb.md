@@ -1313,7 +1313,7 @@ Lane `mlb-sim-retrigger-churn` (OPEN). Readings: `deploys.md` 2026-09-18 01:14:0
 - **Only refresh-worker runs the sim decision:** `SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER` TRUE there, FALSE on live-odds-worker, absent (= False by code default) on web. `SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS=600` is pinned in render.yaml.
 - **Debounce live since 2026-09-18 01:20:00Z:** `SYNDICATE_MLB_SIM_FINGERPRINT_MIN_GAP_SECONDS` default 3600 holds fingerprint-only launches; tip-off, cold-start, join-mismatch, board-missing and props-regen stay immediate. Verified executing: 7 debounces 01:20-04:20Z.
 - **Props-regen is now the visible driver:** `MLB_PROPS_REGEN_DUE` fired at 01:58, 03:08 and 04:10Z, each time widening a launch to the full slate, because `daily_top_props` stayed at 0 candidates after each regen. Its launches carry the `fingerprint_change` LABEL (the reason string prefers it), so count `MLB_DAILY_SIM_TRIGGERED` lines by cause, not by label. Open: whether zero is correct late in the day.
-## [mlb-traditional-doubleheader-join] A TRADITIONAL DOUBLEHEADER COULD NEVER CLEAR THE 45-MINUTE SEPARATION RULE -- FIXED PREGAME; IN PLAY **IMPROVED 4 TILES -> 3, STILL NOT 2** `[pregame verified 18:07Z/19:51Z; in-play 20:33Z failing on 42b9be30, 21:40Z partly fixed on 146f3954]`
+## [mlb-traditional-doubleheader-join] A TRADITIONAL DOUBLEHEADER COULD NEVER CLEAR THE 45-MINUTE SEPARATION RULE -- FIXED PREGAME; IN PLAY 4 TILES -> 3 -> 2, **THE LAST STEP UNATTRIBUTED** `[pregame 18:07Z/19:51Z; in-play 20:33Z failing, 21:40Z 146f3954, 22:22Z c081d2e3 -- transition reading STILL OWED]`
 
 `doubleHeader: "Y"` (traditional) is played back-to-back on ONE admission, so StatsAPI
 publishes game 2's NOMINAL start minutes after game 1's -- BAL @ NYY 2026-09-25: **823491
@@ -1430,3 +1430,25 @@ group `mlb|823491` (scoreboard, "TOP 6 BAL 8 NYY 1"). Neither is a loose chip, s
 **AND THE PREMISE MOVES.** At 20:33Z game 1 had NO group of any kind; at 21:34Z it had
 two. An hour apart, same game, same commit. Any further work here must re-read its
 baseline immediately before judging, because a remembered one expires inside an inning.
+
+
+**THE SECOND FIX SHIPPED AND IS NOT VERIFIED TO FIRE `[web c081d2e3 live 22:21:22Z]`.**
+`buildDoubleheaderOrdinals` now also places a group with NO start of its own, bucketed on
+`fallbackDate` and matched on its own live/final state against EXACTLY ONE chip in that
+fixture-and-date bucket. Measured at 22:22:02Z: bal 2, chc 2, mlb 17, total 26, unchanged
+from the 22:17:09Z baseline, with both BAL tiles still carrying their chips. That is a
+NO-REGRESSION result and nothing more -- the symptom had aged out at ~22:08Z, so the new
+pass had nothing to act on. **A no-change prediction cannot show a mechanism working.**
+
+**WHY IT IS NOT A MERGE FIX.** Two groups for one game sit in different clustering
+universes: chipped groups cluster on a shared chip OBJECT, chipless ones on matchup TEXT.
+Crossing those on text is what `#165` follow-up #1 recorded silently merging two REAL
+games -- on a doubleheader that is both halves, and a wrong merge HIDES A GAME. Placing
+the timeless group instead lets the existing proven merge collapse it. Guards, each with
+a test: no date means no pairing; two chips sharing the group's state refuse; a chip an
+ordered pass already handed out cannot be re-awarded; and `>= 2 chips` confines it to
+doubleheaders, since a bucket of only untimed groups has `gs.length 0`, which both
+ordered passes reject.
+
+**OWED: one reading at the game-1-to-game-2 transition.** Until then the mechanism is
+believed, not known.

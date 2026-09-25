@@ -41930,3 +41930,20 @@ of 2,048, but only 948–980MB UNRECLAIMABLE (46–48%) — real headroom ~1GB, 
 **NOT DEPLOYED YET:** `8edd8778` gives WNBA pregame its own lane
 (`live-odds-worker-wnba-pregame`) — the cure for the starvation, user decision
 2026-09-25. Held back so this deploy carries one change.
+## 2026-09-25 22:21:22Z -- web `c081d2e3` -- place a TIMELESS doubleheader group
+
+- lane: `dh-state-aware-pairing`   claim: web   preflight: CLEAR (only gunicorn,
+  2 defunct children already dead). Deploy `dep-darf61npn0mc73cal6pg`, trigger
+  `api`, created 22:17:42Z, live 22:21:22Z per `/api/ops/version`.
+- predicted from a 22:17:09Z baseline: **NO CHANGE** -- `bal_tiles` 2 -> 2,
+  `chc_tiles` 2 -> 2, `mlb_tiles` 17 -> 17. The symptom was not on the board:
+  the duplicate group aged out on its own at ~22:08Z.
+- **verify: measured 22:22:02Z on served `c081d2e3` -- bal 2, chc 2, mlb 17,
+  total 26, and BOTH BAL tiles still carry their chips (`mlb|823491` "TOP 8
+  LIVE", `mlb|3fe14d478bc1` "3:10P CT PREGAME"). Nothing was merged away.**
+  That is the safety property that mattered here, because the failure mode of a
+  wrong merge is HIDING A GAME, not showing an extra tile.
+- **THE FIX ITSELF IS NOT VERIFIED IN PRODUCTION.** A no-change prediction
+  confirms no regression; it cannot show the new pass firing. That needs a
+  timeless group, which needs the game-1-to-game-2 transition. Game 1 was still
+  `In Progress` (top 8) when this was written. Scheduled check armed.
