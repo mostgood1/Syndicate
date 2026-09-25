@@ -41992,3 +41992,51 @@ measured rate: 1 refusal in the 8m from 22:29:15Z to 22:37:09Z.
 **NOT CLAIMED:** that NHL's starvation is now cured. The WNBA source is removed
 and the rewind covers the rest, but self-collision is an OPEN defect that this
 instrument has now made countable for the first time.
+
+## 2026-09-25 22:56:21Z — live-odds-worker — `ec10612a` — lane `refresh-contention-cost`
+
+**What shipped:** a launch refused BEFORE it started no longer costs a refresh
+interval. (1) `_run_live_refresh_tick` captures the global
+`last_odds_refresh_launch` marker before writing it and restores it when the
+refusal is a `RefreshRunRefused`; (2) `_is_refresh_run_contention_error` detects
+contention by TYPE instead of `"already active" in str(exc)`.
+
+**How it was found — by the instrument shipped three hours earlier.** Production
+22:37:09Z: `ODDS_SWEEP_REFUSED reason=lane_busy phase=live sports=mlb,ncaaf
+detail={lane: live-odds-worker, pid: 341, run_stamp: 20260925_223458}`. The tick
+tried to launch 2m11s after the run it was waiting on — the combined sweep
+colliding with ITSELF, not WNBA.
+
+**The cost it removes, and why it was real:**
+- `_record_odds_refresh_launch` is written BEFORE the launch.
+  `_off_hours_gate_blocks_launch` reads it and BLOCKS a launch while
+  `now - epoch < ceiling`; `_odds_refresh_starved` reads it to judge stalling.
+  A refusal that swept nothing therefore SUPPRESSED REAL LAUNCHES for up to the
+  ceiling, and made genuine starvation unseeable.
+- `_is_refresh_run_contention_error` missed `"already QUEUED for the external
+  runner"` entirely — no `"already active"` substring — so four autoruns reset a
+  FULL 4h cadence epoch over one lost race. `#472`, still live on that message.
+
+**The line that does not move:** only `RefreshRunRefused` is rewound, and by
+construction it is raised before anything starts. A launch that DIED is NOT
+rewound — it may have started a sweep, and there "a launch that dies costs one
+skipped interval instead of a duplicate sweep" (`#20`) is correct. Tests pin the
+generic-exception case as hard as the typed one. This cannot create a duplicate:
+what refused us is the mutex, and it refuses the retry for as long as the holder
+runs.
+
+- claim `ca0ac4b03bdda2b8`; preflight CLEAR 22:53:0xZ; expect
+  `8edd8778 -> ec10612a`, baseline read 22:52:53Z
+- **verify: MET on the deploy.** live at 22:56:21.628567Z.
+- **verify: PENDING on the behaviour.** Needs a real refusal to produce
+  `ODDS_REFRESH_LAUNCH_MARKER_REWOUND`. Prior rate ~1 refusal per 16 min, so a
+  null result in a short window is a RATE, not a failure. The watcher also flags
+  the inverse — a refusal with NO rewind beside it — which WOULD be a defect.
+
+**NOT CLAIMED:** that self-collision is eliminated. It is not; the sweep still
+outlives its own tick interval. What changes is that losing that race no longer
+suppresses the next real launch.
+
+**NOT DEPLOYED:** refresh-worker still runs `d5449df7` (02:35:10Z) and shares
+`live_refresh_loop`, so it does not have this fix. Deliberate — that service is
+far behind and deploying it is a much larger change than this one.
