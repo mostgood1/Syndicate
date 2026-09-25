@@ -41809,3 +41809,62 @@ refusing is correct. ORDER is the discriminator both sides still agree on.
 shipped a surplus-chip rule that was DEAD CODE and a bad trade; `4d785045` removed it;
 `42b9be30` added ordinal pairing and reached 2. The near-exact rule earns its place — it is
 what joined game 1.
+
+## 2026-09-25 20:44:45Z -> live ~20:48Z (3:44 PM CDT) - live-odds-worker `c78a0b16` -> `5f432684` (`dep-dardqf8u01pc73cf3tng`) - lane `nhl-board-rows-missing`
+
+**What shipped.** A pregame cadence marker is now REWOUND when its launch
+produced no run. `_record_pregame_sport_sweep_epochs` still stamps BEFORE the
+launch -- its own comment is right that "a launch that dies costs one skipped
+interval instead of a duplicate sweep" -- but the stamp is restored once the
+launch is KNOWN to have created nothing.
+
+**THE BUG IT FIXES, measured.** NHL's interval is 7200s. At 19:24:30Z the loop
+printed `ODDS_SWEEP_LAUNCHED sports=mlb,nhl` and NO run containing nhl was
+created (every second 19:24:15-19:24:44 probed: two runs, wnba and ncaaf). The
+marker advanced anyway, so nhl waited another two hours -- and because mlb and
+ncaaf hold a refresh in flight almost continuously during a live slate, nhl's
+rare slot collided nearly every time. Its collector had produced nothing since
+15:44:17Z; its board carried ZERO rows on a four-game night. The record-first
+trade is correct at mlb's ~90 s cadence and is a repeating multi-hour outage at
+nhl's two hours.
+
+**predict:** `nhl_cadence_marker_rewound_line_present` **false -> true**
+(`PREGAME_CADENCE_MARKER_REWOUND` is new in this commit, so its appearance is
+itself proof the new code is running).
+
+**verify: MET, and the EFFECT is confirmed too, not just the mechanism.**
+
+    20:55:27Z  PREGAME_CADENCE_MARKER_REWOUND mlb=1790369565 ncaaf=1790369565
+    20:55:27Z  PREGAME_CADENCE_DETAIL nfl:13839/28800 nhl:5460/7200 wnba:10513/28800
+
+The rewind fired. And mlb/ncaaf DROPPED OUT of the cadence-skipped list in the
+same tick -- their markers were restored, so they are due again on the NEXT tick
+instead of waiting an interval. That is the intended behaviour observed on
+production, not inferred.
+
+**AN UNEXPECTED READING WORTH MORE THAN THE FIX: launches die OFTEN, and for
+mlb and ncaaf too.** They never noticed, because at ~90 s cadence a lost launch
+is invisible and self-correcting exactly as the comment says. NHL's 2-hour
+interval is what turned the same routine event into a multi-hour outage. The
+defect was never NHL-specific; only its cost was.
+
+**NOT CLAIMED, and this is the honest boundary.** NHL has NOT yet been shown to
+get a run. Its next slot is ~21:24Z (`marker_age_s=5460/7200` at 20:55:27Z).
+Three outcomes and they mean different things: a rewind followed by an nhl run
+is the fix working end to end; repeated rewinds with no nhl run is CONTENTION,
+a different defect needing a different fix, and must not be reported as a
+partial win; no rewind at all with the marker still advancing would mean my
+reading of the launch path is wrong.
+
+**SAFE AGAINST `#20`.** The duplicate-sweep guard is
+`_record_odds_refresh_launch`, a single GLOBAL marker written before any of this
+and read independently; the per-sport epochs are cadence only. A test pins that
+the two are different paths so a later change cannot quietly make the rewind
+roll back the concurrency guard.
+
+**Test caveat, stated rather than smoothed:** 253 passed in the live-refresh
+suites, 1 failed and 13 errored. The failure (`recycles_after_max_uptime`) MOCKS
+the tick while every line of this change is inside the tick; the 13 errors are
+the worktree `data/` mirror guard. Neither was re-run against a clean tree.
+
+---
