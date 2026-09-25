@@ -71,11 +71,21 @@ const built = new Function('state', 'fetch', 'renderBoardBody', 'recommendationS
 
 const G1_EVENT = '__G1__', G2_EVENT = '__G2__';
 const side = (abbr, name) => ({ abbr, name, key: name.toLowerCase(), score: null });
-const chip = (gameKey, start, token, away = side('TB', 'Tampa Bay Rays'), home = side('NYY', 'New York Yankees')) => ({
+const chip = (gameKey, start, token, away = side('TB', 'Tampa Bay Rays'), home = side('NYY', 'New York Yankees'), state = 'pregame') => ({
   sport: 'mlb', league: null, league_display: null, game_key: gameKey,
-  matchup: `${away.abbr} @ ${home.abbr}`, away, home, state: 'pregame', status_token: token,
+  matchup: `${away.abbr} @ ${home.abbr}`, away, home, state, status_token: token,
   score_suppressed: null, leader: null, start_time_utc: start,
 });
+// The IN-PLAY shape, measured off production 2026-09-25 20:33Z: a traditional
+// doubleheader's halves start five minutes apart, and the surviving odds group
+// carries a commence_time ~3 HOURS from BOTH of them. That spacing is the whole
+// point -- it is what makes the clock unable to answer, so a test built on the
+// ordinary 17:05/23:05 pair would pass with the state branch inert.
+const LIVE_G1 = (state = 'live') =>
+  chip('823543', '2026-09-25T20:05:00+00:00', 'BOT 4', undefined, undefined, state);
+const LIVE_G2 = (state = 'pregame') =>
+  chip('823494', '2026-09-25T20:10:00+00:00', '3:10P CT', undefined, undefined, state);
+const LATE_GROUP = '2026-09-25T23:05:00Z';
 const G1 = () => chip('823543', '2026-09-22T17:05:00+00:00', '12:05P CT');
 const G2 = () => chip('823494', '2026-09-22T23:05:00+00:00', '6:05P CT');
 // The board-card shape `layer2_rows_to_board_cards` emits for an MLB row.
@@ -157,6 +167,22 @@ out.ordinal_refused_when_counts_differ = await scenario(
   [chip('823491', '2026-09-25T20:05:00+00:00', '3:05P CT'),
    chip('823489', '2026-09-25T20:10:00+00:00', '3:10P CT')],
   [...g2Rows(withCommence('2026-09-25T23:06:00Z'))]);
+// IN PLAY: game 1 is under way and has lost its odds group, so ONE group faces
+// TWO chips and the counts can never match. The chips' own `state` separates
+// them; the clock cannot, since the group sits ~3h from both.
+out.inplay_live_half_has_no_group = await scenario(
+  [LIVE_G1(), LIVE_G2()], [...g2Rows(withCommence(LATE_GROUP))]);
+// The split-doubleheader shape of the same thing: game 1 FINAL rather than live.
+out.inplay_final_half_has_no_group = await scenario(
+  [LIVE_G1('final'), LIVE_G2()], [...g2Rows(withCommence(LATE_GROUP))]);
+// CONTROL: a chip with no state must REFUSE, not drop out of the pregame set
+// and make the counts match by omission.
+out.inplay_refused_when_a_state_is_missing = await scenario(
+  [LIVE_G1(''), LIVE_G2()], [...g2Rows(withCommence(LATE_GROUP))]);
+// CONTROL: two halves still to come. Both chips are pregame, so the pregame
+// set is 2 against 1 group -- ambiguous, and refused.
+out.inplay_refused_when_both_halves_pregame = await scenario(
+  [LIVE_G1('pregame'), LIVE_G2()], [...g2Rows(withCommence(LATE_GROUP))]);
 console.log(JSON.stringify(out));
 """
 
@@ -285,3 +311,56 @@ def test_ordinal_pairing_is_refused_when_the_counts_differ(observed: dict) -> No
     """
     result = observed["ordinal_refused_when_counts_differ"]
     assert set(result["row_chip"].values()) == {None}, result["row_chip"]
+
+
+def test_a_live_half_with_no_group_lets_the_other_half_join(observed: dict) -> None:
+    """THE IN-PLAY CASE, which the ordinal pass alone could not reach.
+
+    Measured on production 2026-09-25 20:33Z on served `42b9be30`: with 823491
+    `In Progress` and 823489 `Scheduled`, the payload carried ONE BAL @ NYY
+    group (`3fe14d478bc1`, 23:05:00Z, 4 rows against 78-110 for every other
+    fixture) and the live half had no group at all. One group against two chips
+    fails the equal-counts guard, so the rail seated THREE tiles for two games:
+    one for the live half, and two for the half that still had both.
+
+    THIS IS ALSO THE REACHABILITY TEST. The group sits 2h55m from one chip and
+    3h00m from the other -- five minutes apart, so `pickChipByStart` cannot
+    separate them, and 2h55m is far outside `DOUBLEHEADER_NEAR_EXACT_MS`. No
+    clock rule can answer here, which is why this scenario returns None with the
+    state branch removed and `823494` with it in place.
+    """
+    pairs = observed["inplay_live_half_has_no_group"]["row_chip"]
+    assert set(pairs.values()) == {"823494"}, pairs
+
+
+def test_a_final_half_with_no_group_behaves_the_same(observed: dict) -> None:
+    """The split-doubleheader shape: CHC @ BOS the same day, game 1 FINAL.
+
+    `final` and `live` both mean "not pregame", so one rule covers both, and
+    keying on the `pregame` value rather than enumerating the others is what
+    makes that true.
+    """
+    pairs = observed["inplay_final_half_has_no_group"]["row_chip"]
+    assert set(pairs.values()) == {"823494"}, pairs
+
+
+def test_a_chip_with_no_state_refuses_rather_than_matching_by_omission(observed: dict) -> None:
+    """CONTROL: an unknown state must not land on the permissive branch.
+
+    A stateless chip would silently fall out of the `pregame` filter and leave
+    the counts matching -- a failed read spelled as a decision. `learnings.md`
+    2026-09-14: unknown must not default permissive.
+    """
+    pairs = observed["inplay_refused_when_a_state_is_missing"]["row_chip"]
+    assert set(pairs.values()) == {None}, pairs
+
+
+def test_two_pregame_halves_against_one_group_are_still_refused(observed: dict) -> None:
+    """CONTROL: the state filter must not become "pair with whatever is left".
+
+    Both halves still to come means two pregame chips against one group, which
+    names no winner. This is the same ambiguity the equal-counts guard exists
+    for, and it must survive the new branch.
+    """
+    pairs = observed["inplay_refused_when_both_halves_pregame"]["row_chip"]
+    assert set(pairs.values()) == {None}, pairs

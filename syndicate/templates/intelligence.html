@@ -2453,14 +2453,44 @@
       const key = `${sport}|${a} @ ${h}|${centralDateOfMs(at)}`;
       if (byFixture.has(key)) byFixture.get(key).chips.push({ at, chip });
     }
-    for (const bucket of byFixture.values()) {
-      const { groups: gs, chips: cs } = bucket;
-      if (gs.length < 2 || gs.length !== cs.length) continue;
-      const distinct = (arr) => new Set(arr.map((x) => x.at)).size === arr.length;
-      if (!distinct(gs) || !distinct(cs)) continue;
+    const distinct = (arr) => new Set(arr.map((x) => x.at)).size === arr.length;
+    const pairInOrder = (gs, cs) => {
       gs.sort((x, y) => x.at - y.at);
       cs.sort((x, y) => x.at - y.at);
       for (let i = 0; i < gs.length; i += 1) out.set(gs[i].key, cs[i].chip);
+    };
+    for (const bucket of byFixture.values()) {
+      const { groups: gs, chips: cs } = bucket;
+      if (gs.length >= 2 && gs.length === cs.length && distinct(gs) && distinct(cs)) {
+        pairInOrder(gs, cs);
+        continue;
+      }
+      // A HALF THAT HAS STARTED LOSES ITS ODDS GROUP, so the counts above can
+      // never match and the ordinal pass refuses. Measured 2026-09-25 20:33Z on
+      // `42b9be30`, with 823491 `In Progress` and 823489 `Scheduled`: the served
+      // payload carried ONE BAL @ NYY group (`3fe14d478bc1`, 23:05:00Z, 4 rows
+      // against 78-110 for every other fixture) and game 1 had no group of any
+      // kind. The rail went back to three tiles -- one for the live half, TWO
+      // for the half that still had both a group and a chip.
+      //
+      // The chips' own `state` separates them exactly, with no appeal to the
+      // clock: the feeds sit 2h55m apart here (group 23:05Z against chip
+      // 20:10Z), so no widening of `DOUBLEHEADER_NEAR_EXACT_MS` could ever
+      // bridge it -- see the 23:06Z case in `pickChipByStart`. CHC @ BOS the
+      // same day has the same shape with `final` instead of `live`.
+      if (cs.length < 2 || !gs.length || gs.length >= cs.length) continue;
+      const stateOf = (entry) => String((entry.chip || {}).state || "").trim().toLowerCase();
+      // UNKNOWN MUST NOT RELAX THE RULE. A chip with no state would silently
+      // drop out of `pregame` below and make the counts match by omission,
+      // which is the failure mode where a missing field reads as a decision.
+      if (cs.some((entry) => !stateOf(entry))) continue;
+      const pregame = cs.filter((entry) => stateOf(entry) === "pregame");
+      // Still an ordinal pairing, so it still needs one chip per group and
+      // starts it can order. Two pregame chips against one group stays
+      // ambiguous and is refused, exactly as before.
+      if (pregame.length !== gs.length) continue;
+      if (!distinct(gs) || !distinct(pregame)) continue;
+      pairInOrder(gs, pregame);
     }
     return out;
   }

@@ -719,6 +719,7 @@ death, never life — do not invert it.
 - **The hypothesis was MEASURED before the fix, not after:** the unjoined group carried `commence_time 23:06:00Z` against chips at 20:05Z/20:10Z — ~3 h from both. StatsAPI publishes a traditional DH's game 2 at a NOMINAL placeholder; the book publishes the realistic start. No time window bridges it, so `pickChipByStart` refusing is correct and widening it would have been guessing.
 - **Narrow by construction:** ordinal pairing fires only on equal counts of timed groups and chips, at least 2 of each, distinct starts on both sides, canonical keys on both, and only AFTER the clock has refused. Control test: one group against two chips resolves to NOTHING.
 - Files: syndicate/templates/intelligence.html, tests/test_layer2_page_doubleheader_cards.py, .syndicate/deploys.md
+- **THAT VERDICT IS PREGAME-ONLY.** Measured 20:33Z the same day on the same commit `42b9be30`, with 823491 `In Progress`: the rail is back to **3** tiles, because game 1's odds group disappears once it goes live and the equal-counts guard then sees 1 group against 2 chips. Successor lane: `dh-state-aware-pairing`.
 ### open-block-bloat-batch — CLOSED — opened 2026-09-25, closed 2026-09-25 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - Goal: every OPEN lane whose owners are provably idle >=240m by transcript mtime has its historical narrative moved out of lanes.md into lanes_history.md VERBATIM, each lane still OPEN with its contract, subtrees, outstanding items and every claim-bearing line, and the claim set unchanged
 - **GOAL: MET.** 21 OPEN lanes trimmed in one pass; `lanes.md` 393245 -> 345869 B. Claim set IDENTICAL, 0 orphans, every moved line verbatim in `lanes_history.md`.
@@ -743,6 +744,13 @@ death, never life — do not invert it.
 - Hypothesis: NFL is close and NCAAF is not. NFL already stamps live_player_box on cards from ESPN summaries for in-progress games, so the live STATS exist and only the liveProps bridge plus the gate entry are missing. NCAAF has no live player box module at all, so it needs the data layer first
 - Falsification test: If NFL's live_player_box carries no per-player market-shaped stats, or MLB's liveProps contract needs inputs NFL cannot supply, then NFL is not close and the hypothesis is wrong
 - Verification: board_delivery_probe plus rows_live_projected on a live NFL slate (Sunday) shows live prop coverage greater than zero, with the same reading refused before the change
+- Blocked by: none
+### dh-state-aware-pairing — OPEN — opened 2026-09-25 — session 16da93b3-0e56-4617-857a-6705b02ff912
+- Goal: The Layer 2 rail seats ONE tile per doubleheader half while a half is IN PLAY, verified by reading the served board with StatsAPI confirming one half In Progress and the other Scheduled.
+- Files: `syndicate/templates/intelligence.html` (`buildDoubleheaderOrdinals`, `chipForGame`'s ordinal lookup and `pickChipByStart` ONLY -- lane `live-inplay-board-cadence` holds `boardDateFreshnessParts` in the same file, regions disjoint; checked 2026-09-25), `tests/test_layer2_page_doubleheader_cards.py`
+- Hypothesis: buildDoubleheaderOrdinals refuses because its equal-counts guard sees 1 group against 2 chips once game 1's odds group disappears; pairing state-compatible candidates before ordinal resolves it, since the surviving group is PREGAME and exactly one chip is PREGAME.
+- Falsification test: If the surviving group's state is absent or does not discriminate (two PREGAME chips against one PREGAME group), the rule must refuse and the tile count stays 3.
+- Verification: Served board read at /intelligence with StatsAPI showing 823491 In Progress and 823489 Scheduled: exactly 2 BAL @ NYY tiles and no loose chip| tile for the half that has a group.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
