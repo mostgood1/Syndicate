@@ -4792,3 +4792,32 @@ an intended list, and a publish-derived stamp list.
   same error -- treating "I cannot see it yet" as "it is not there".
 
 ---
+
+## 2026-09-25 - a CONFIGURABLE default read out of the source is not a production value
+
+FORBIDDEN: quoting a code default as the production setting for anything an env
+var can override, without reading the environment.
+
+`_wnba_pregame_refresh_interval_seconds()` returns `int(raw or 14400)`. I read
+the 14400 and told the user TWICE that WNBA pregame would next launch "~01:24Z".
+It launched at ~23:24Z. Production sets
+`SYNDICATE_WNBA_PREGAME_REFRESH_INTERVAL_SECONDS=7200`, so the fallback I quoted
+had never applied. Off by two hours, stated as fact in a deploy receipt.
+
+Same shape as the existing "absent is not off" rule: the `or DEFAULT` idiom makes
+the source look authoritative when it is only the fallback branch. Read the env,
+or say "code default, production unread".
+
+## 2026-09-25 - a rate from ONE observation, in a window containing a restart
+
+FORBIDDEN: reporting a rate computed from a single event -- doubly so when the
+window contains a deploy or restart that changes the behaviour being counted.
+
+I reported the refresh self-collision rate as "~1 per 16 min" from ONE refusal in
+a window spanning a deploy restart. Measured on a clean window (22:56:21Z ->
+23:25:33Z, single deployed commit): 7 refusals in 29.2 min = 1 per 4.2 min,
+across 5 distinct holder runs. Four times higher, and it had been used to
+characterise how significant the remaining defect was.
+
+One event gives an interval, not a rate. It cannot tell "rare" apart from
+"I happened to look between two of them".
