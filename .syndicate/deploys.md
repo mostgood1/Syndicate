@@ -42040,3 +42040,34 @@ suppresses the next real launch.
 **NOT DEPLOYED:** refresh-worker still runs `d5449df7` (02:35:10Z) and shares
 `live_refresh_loop`, so it does not have this fix. Deliberate — that service is
 far behind and deploying it is a much larger change than this one.
+
+### `ec10612a` — verify: MET, 2026-09-25T23:04:44Z
+
+The pending behaviour reading above, observed on production. Two lines 0.8ms
+apart:
+
+    23:04:44.281213166Z [ops_refresh] REFRESH_LAUNCH_REFUSED reason=lane_busy
+        lane=live-odds-worker pid=245 run_stamp=20260925_230229
+    23:04:44.281995750Z [live_refresh_loop] ODDS_REFRESH_LAUNCH_MARKER_REWOUND
+        restored_epoch=1790377315.175026
+
+**1 refusal, 1 rewind — a 1:1 pairing**, which is the part that matters; the
+watcher was explicitly checking for the inverse (a refusal with no rewind), and
+would have exited non-zero on it.
+
+**The restored value is the RIGHT one, not merely a non-null one.** Epoch
+1790377315.175026 is 2026-09-25T23:01:55Z — **169s BEFORE** the refusal, and it
+is the tick that launched the very run now holding the lane (`run_stamp
+20260925_230229`, 34s later). So the marker points at the last launch that
+actually produced a run, which is exactly what `_off_hours_gate_blocks_launch`
+and `_odds_refresh_starved` need it to mean. Had the rewind restored a re-stamp
+of the refused tick, this delta would have been ~0.
+
+**Still NOT claimed:** self-collision is not eliminated — the sweep continues to
+outlive its own tick interval, and this window contained another instance of it.
+Only its cost is removed.
+
+**Still open:** the WNBA-pregame lane (`8edd8778`) remains unverified — the lane
+list at 22:56:42Z still shows the six pre-existing lanes, as expected until that
+autorun's next launch (~01:24Z). refresh-worker still runs `d5449df7` and has
+none of today's three fixes.
