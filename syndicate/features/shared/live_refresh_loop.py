@@ -18,6 +18,7 @@ from typing import Any
 from syndicate.features.shared.artifact_publisher import sweep_changed_hot_artifacts
 from syndicate.features.shared.ops_refresh import _active_sports_for_date
 from syndicate.features.shared.ops_refresh import is_refresh_run_active
+from syndicate.features.shared.ops_refresh import RefreshRunRefused
 from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.schedule_adapter import events_starting_within
 from syndicate.features.shared.schedule_adapter import fetch_schedule_for_date
@@ -5918,6 +5919,18 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		# self-correcting on the next tick; a duplicate is not -- it burns
 		# credits and can stack two heavy pipelines in a 2GB container.
 		# _record_pregame_launch above already had it right.
+		# Captured so a launch that NEVER STARTED can put it back. This marker is
+		# read as "when did odds last refresh" by `_off_hours_gate_blocks_launch`
+		# (which BLOCKS a launch while `now - epoch < ceiling`) and by
+		# `_odds_refresh_starved`. A refusal that advances it therefore
+		# suppresses REAL launches for up to the ceiling on the strength of a
+		# refresh that did not happen -- the same record-first defect the
+		# per-sport pregame epochs had, on the global marker.
+		_global_launch_prior = _read_last_odds_refresh_launch()
+		# Bound HERE, beside the capture, so both share the same fate on the
+		# skip_launch path: unbound -> NameError -> the rewind block below
+		# treats it as "nothing was ever stamped, nothing to undo".
+		_launch_refused_before_start = False
 		_record_odds_refresh_launch(tick_started_epoch)
 		try:
 			# launch_sports is None when unconfigured (launch_refresh_run then
@@ -6010,6 +6023,7 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			meta["ok"] = False
 			meta["skipped"] = True
 			meta["error"] = str(exc)
+			_launch_refused_before_start = isinstance(exc, RefreshRunRefused)
 			# THE SILENCE THIS CLOSES. `launch_refresh_run` refuses BEFORE it
 			# starts anything -- the lane is busy, or its state cannot be read
 			# -- and until now that refusal existed ONLY in `meta["error"]`, a
@@ -6070,6 +6084,23 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		_launch_ran = bool(meta.get("ok")) and not meta.get("skipped")
 		if _launch_ran and _launch_result is not None:
 			_launch_ran = bool(_launch_result.get("ok", True))
+		# THE GLOBAL MARKER. Rewound ONLY for a typed refusal, which by
+		# construction is raised before `launch_refresh_run` starts anything --
+		# so nothing swept, and claiming one did is simply false. A launch that
+		# DIED is deliberately NOT rewound: it may have started a sweep, and the
+		# record-first trade above ("a launch that dies costs one skipped
+		# interval instead of a duplicate sweep", `#20`) is right for that case.
+		#
+		# This cannot produce a duplicate sweep: the thing that refused us is the
+		# mutex, and it refuses the retry too for as long as the holder runs.
+		if _launch_refused_before_start:
+			if _global_launch_prior:
+				write_json_file(_last_odds_refresh_launch_path(), _global_launch_prior)
+				print(
+					f"[live_refresh_loop] ODDS_REFRESH_LAUNCH_MARKER_REWOUND "
+					f"restored_epoch={_global_launch_prior.get('epoch')}",
+					flush=True,
+				)
 		if not _launch_ran and _pregame_marker_sports:
 			_rewind_pregame_sport_sweep_epochs(_pregame_marker_prior, _pregame_marker_sports)
 	except NameError:

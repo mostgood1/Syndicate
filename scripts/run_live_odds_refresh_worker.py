@@ -37,6 +37,7 @@ from syndicate.features.shared.refresh_state_store import write_json_file
 from syndicate.features.shared.memory_observability import log_all_process_memory
 from syndicate.features.shared.memory_observability import log_runtime_memory
 from syndicate.features.shared.ops_refresh import _active_sports_for_date
+from syndicate.features.shared.ops_refresh import RefreshRunRefused
 from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.timezone import central_today_iso
 from vendor.mlb_bettingv2.tools.web.flask_frontend import start_live_lens_background_loop
@@ -89,7 +90,21 @@ def _is_refresh_run_contention_error(exc: Exception) -> bool:
     worker's own short poll cadence, not this function's interval) retries
     again -- succeeding the moment the slot frees up rather than being
     locked out for up to a full cadence window over one race.
+    TYPE FIRST, SUBSTRING ONLY AS A FALLBACK (2026-09-25). The substring test
+    alone had a hole this docstring's own `#472` reasoning applies to squarely:
+    `launch_refresh_run` also refuses with "A refresh run is already QUEUED for
+    the external runner", which contains no "already active" -- so that
+    contention was NOT recognised, and every caller below reset its full 4h
+    cadence epoch over a lost race. Exactly the bug `#472` fixed for the other
+    message.
+
+    `RefreshRunRefused` covers both, and by construction covers only refusals
+    raised BEFORE any work starts -- which is what makes skipping the epoch
+    reset safe. A launch that DIED mid-flight is not one of these and must
+    still cost an interval, because it may have started a sweep.
     """
+    if isinstance(exc, RefreshRunRefused):
+        return True
     return isinstance(exc, ValueError) and "already active" in str(exc)
 
 
