@@ -4577,3 +4577,36 @@ producer's own clock (a tick status, an artifact mtime, a generatedAt) and
 require it to postdate the boot before any consumer reading counts.
 
 ---
+
+## 2026-09-25 FORBIDDEN: gating a deploy's verification on a `print()` inside a step the orchestrator runs as a SUBPROCESS. Production cannot hear it `[lane nhl-board-rows-missing, session 4ab694ed]`
+
+I shipped a fix to NHL's odds collector and added `NHL_QUOTE_SHARDS` in the same
+commit, specifically so the deploy could be verified by "did the new code run".
+Measured since boot:
+
+    odds-refresh job lines (control): 298
+    NHL_QUOTE_SHARDS lines:             0
+
+The control proves the cadence was running, so the null discriminates. The cause
+is `refresh_odds_sources._run_command`, which runs every producer under
+`subprocess.run(capture_output=True)` and DISCARDS a successful step's stdout.
+
+THE PART THAT MAKES THIS A RULE RATHER THAN A MISTAKE: **I had diagnosed exactly
+this trap TWO HOURS EARLIER in the same session.** I used the absence of
+`local_nhl_odds` log lines to conclude "NHL odds never run", was refuted by a
+25.9 KB NHL odds artifact, and wrote the discard behaviour down as the reason.
+Then I put my own new instrument in the same swallowed stream.
+
+Knowing a trap is not the same as applying it. The application step is
+mechanical and skippable, and I skipped it because the instrument felt like part
+of the fix rather than part of the verification.
+
+HOW TO APPLY: before naming a log line in `--expect`, ask WHERE IT IS EMITTED
+FROM. If the emitter is a step the orchestrator launches as a subprocess, the
+line is for a human reading a local run, not for production verification. Put
+the number somewhere production can hear: a published artifact, a counter in the
+step's RETURN VALUE that the orchestrator logs, or an ops route. And verify the
+instrument can fire BEFORE relying on it -- one grep with a control, which is
+the same thing that caught it here, just hours too late.
+
+---

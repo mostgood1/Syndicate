@@ -41677,3 +41677,64 @@ yielding a probability) is testable tonight on preseason; rung 6 (calibration)
 not before the regular season.
 
 ---
+
+## 2026-09-25 16:21:42Z -> live 16:25:02Z (11:21-11:25 AM CDT) - live-odds-worker `c78a0b16` -> `a65d9129` (`dep-dar9v5id0e5s73c1nthg`) - lane `nhl-board-rows-missing` - **VERIFY OWED, AND THE GATE I CHOSE CANNOT FIRE**
+
+**Whose lane this is.** The work and the receipt belong to `nhl-board-rows-missing`.
+The deploy claim was taken under `nhl-live-resim` because `deploy-guard.py`
+derives the lane from the BRANCH (`session/nhl-live-resim`), not from the
+`.current-lane` marker -- syncing the marker twice did not move it. Recorded so
+the claim name is not mistaken for the owner.
+
+**What shipped.** NHL quote rows are sharded by the GAME's date in the BOARD's
+timezone instead of the collector's RUN date. Two date errors were stacked,
+either of which empties the NHL board:
+
+  1. `_append_nhl_book_quotes` filed every row under the run date, and the fetch
+     window is deliberately +/-8h, so a run for 09-25 swept up the previous
+     evening's Central games and filed them as 09-25.
+  2. A game's date came from `commence_time[:10]` -- the UTC date. A 7pm-Central
+     game is `T00:00:00Z` the NEXT day, so it read 09-26 while
+     `layer1_board._BOARD_TZ` scopes America/Chicago.
+
+**predict:** `nhl_layer1_rows_gt_zero` **false -> true**, from a baseline read
+16:13:30Z: `rows 0, rows_in_grid 18, rows_other_dates 18,
+other_dates {2026-09-24: 18}`.
+
+**verify: NOT MET AS OF 16:44:50Z, 20 minutes after live, AND THE READING IS
+INCONCLUSIVE RATHER THAN NEGATIVE.** Layer 1 nhl is byte-identical to baseline
+on BOTH dates:
+
+    nhl 2026-09-25: rows=0 in_grid=18 other_dates=18 other={'2026-09-24': 18}
+    nhl 2026-09-26: rows=0 in_grid=18 other_dates=18 other={'2026-09-24': 18}
+
+**THE INSTRUMENT I ADDED TO GATE THIS IS STRUCTURALLY INVISIBLE, AND THAT IS MY
+DEFECT, NOT AN UNKNOWN.** The plan was to wait for `NHL_QUOTE_SHARDS` -- a line
+added in this very commit -- as proof the new code ran. Measured since boot:
+
+    odds-refresh job lines (control): 298
+    NHL_QUOTE_SHARDS lines:             0
+
+The control proves the cadence is running, so this is a discriminating null.
+The cause is one I had ALREADY WRITTEN DOWN two hours earlier in this session:
+`refresh_odds_sources._run_command` runs every producer under
+`subprocess.run(capture_output=True)` and DISCARDS a successful step's stdout.
+My `print()` lives inside that subprocess. I put the instrument in the one place
+production cannot hear it, after diagnosing exactly that trap.
+
+**SO I CANNOT DISTINGUISH "the NHL collector has not run since boot" from "it ran
+and still misfiles".** Both produce this reading. Stating that rather than
+picking the flattering one: three times today a plausible mechanism was named
+one step too early and refuted by the next measurement.
+
+**WHAT THIS DEPLOY DOES NOT CHANGE, stated before the reading so it cannot be
+reframed after:** the 18 already-written rows are appended history and are NOT
+rewritten, so `rows_other_dates` staying ~18 was never going to be the signal.
+Only NEW captures land in the corrected shard.
+
+**OWED, in order:** (1) an instrument production can actually hear -- the shard
+distribution belongs in a published artifact or a return value the orchestrator
+logs, not a subprocess `print`; (2) then the Layer 1 reading. Until (1), this
+row stays an open obligation.
+
+---
