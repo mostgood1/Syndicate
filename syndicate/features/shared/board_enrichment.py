@@ -818,8 +818,7 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
                     "rows_corrected": 0,
                 }
         else:
-            filename = _LIVE_GAMELINE_SNAPSHOT_PATHS.get(sport, f"{sport}_live_lens.json")
-            snapshot = read_json_file(data_root() / "live" / filename)
+            snapshot = read_json_file(data_root() / "live" / f"{sport}_live_lens.json")
             if not isinstance(snapshot, dict):
                 return {"supported": True, "reason": "no published live-lens snapshot", "rows_corrected": 0}
             page = snapshot.get("page_context") if isinstance(snapshot.get("page_context"), dict) else snapshot
@@ -2212,7 +2211,16 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                 }
             coverage = attach_live_gamelines(grid, index, sport=sport)
         else:
-            snapshot = read_json_file(data_root() / "live" / f"{sport}_live_lens.json")
+            # THE GAME-LINE JOIN reads the RE-SIM's snapshot where a sport has
+            # one, which for `nfl` is a different file from the lens the live
+            # SCORE/CLOCK reader above uses. Patched here and ONLY here: an
+            # earlier version of this change hit the first textual match in the
+            # file instead, which is `attach_live_game_state_from_lens` -- so the
+            # join kept reading the pregame lens (`sources_seen: {}`, 16 games,
+            # 0 indexed, measured on live TNF 2026-09-25 01:13Z) while the live
+            # game-state reader was silently repointed at a file it cannot parse.
+            filename = _LIVE_GAMELINE_SNAPSHOT_PATHS.get(sport, f"{sport}_live_lens.json")
+            snapshot = read_json_file(data_root() / "live" / filename)
             if not isinstance(snapshot, dict):
                 return {
                     "supported": True,

@@ -66,8 +66,20 @@ def test_wnba_source_is_accepted_and_mlbs_is_not_weakened():
     assert lens_sources_for_sport("mlb") == (LIVE_STATE_LENS_SOURCE,)
     # An unknown sport gets MLB's stamp, NOT "anything". A sport whose lens shape
     # nobody has looked at must fail to join and be counted, not be admitted.
-    assert lens_sources_for_sport("nhl") == (LIVE_STATE_LENS_SOURCE,)
+    #
+    # THE EXAMPLE MOVED, THE INVARIANT DID NOT. This used `nhl`, which was then a
+    # sport nobody had looked at. It has its own re-sim and its own stamp since
+    # 2026-09-24, so asserting the default for it tested nothing about defaults
+    # and broke the moment the stamp landed. `ncaab` has no live tier of any
+    # kind (`scripts/live_tier_coverage_check.py` declares it `none`), so it is
+    # the honest stand-in now.
+    assert lens_sources_for_sport("ncaab") == (LIVE_STATE_LENS_SOURCE,)
     assert lens_sources_for_sport(None) == (LIVE_STATE_LENS_SOURCE,)
+    # And the sports that DO have a looked-at shape carry their own stamp, which
+    # is what keeps a refusal lane (`pregame`) from being admitted as live.
+    assert lens_sources_for_sport("nhl") == ("live_resim",)
+    assert lens_sources_for_sport("nfl") == ("live_resim",)
+    assert lens_sources_for_sport("ncaaf") == ("live_resim",)
 
 
 def test_the_wnba_snapshot_indexes_under_wnba_sources():
