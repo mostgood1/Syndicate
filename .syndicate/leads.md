@@ -679,3 +679,44 @@ None of the four refusals fire. `refuse_if_compute_in_request_path` does NOT ref
 - **Worktree `tripwire-applog-page-cap` is abandoned residue that blocks lane archiving, and its "unique" content GROWS the longer it sits** `[2026-09-24, session ac238d51; the owner could not be messaged -- see below]`. `C:\tmp\syndicate-sessions\tripwire-applog-page-cap`, HEAD `8c41cc68`, **168 commits behind `origin/main`**, **0 unpushed commits, 0 untracked files**, holding uncommitted `.syndicate/lanes.md` (129/181) and `.syndicate/deploys.md`. Measured 2026-09-24 ~17:55Z: **`deploys.md` is wholly redundant -- 438 changed lines, 0 not on `origin/main`, 0 removing content `origin/main` still has.** `lanes.md` has 30 `+` lines not currently on `origin/main` and 6 `-` lines that would remove live content; spot-checked, the 30 are OLDER versions of lanes upstream has since advanced (e.g. `polymarket-corners-btts-order-branch` as `OPEN` where `origin/main` now reads `CLOSED`). That reading says "stale snapshot", not "unheld work" -- but the call is the owner's, and nothing here should be discarded on my say-so. **THE COMPOUNDING IS THE POINT:** the SAME diff under the SAME filter yielded **13** novel lines against tip `c4e2a022` and **30** against the tip two hours later. Nothing in the worktree changed; `origin/main` moved. So its false-positive weight against the archive gate GROWS without anyone touching it, and `drop_upstream_echoes` (`173e42bc`) narrows less against it every day -- the filter only discounts lines upstream STILL has. **Why no one was messaged:** `send_message` is unavailable in unattended sessions, and this job is one; separately, both sessions whose scratchpad paths carry the lane's uuid `8ce91d9d` are runs of the recurring scheduled task `bandwidth-spike-tripwire` (`local_b2ab05a7`, `local_7b13c938`), also unattended and not running. **The lane has no reachable owner -- it is a job, not a session**, so the documented fallback (a recorded ask) is the only channel. **Action for a human or any interactive session:** commit or discard those two files, or close the worktree; `deploys.md` can be discarded on the measurement above, `lanes.md` needs one look at the 30 lines first. Until then every archive run re-flags it in the raw step-4 sweep and needs a hand re-verification (twice so far: 2026-09-23 and 2026-09-24).
 
 - `[2026-09-24, session 25e0f859, no lane — read-only]` **The lane archiver's SAFETY GATE reads `origin/main` while its WRITER reads and rewrites the WORKTREE, and nothing checks the two agree.** `owner_liveness.py`'s docstring says it decides SAFE "for every CLOSED lane block on origin/main's lanes.md"; `archive_closed_lanes_before.py` resolves everything under `ARCHIVE_WORKTREE` and writes there. Run in a checkout that is behind, `--apply` rewrites a STALE `lanes.md` / `lanes_closed.md`, and committing that reverts whatever archiving happened upstream meanwhile. Measured today in the primary tree (133 commits behind): `lanes_closed.md` local **998,153 B** vs `origin/main` **1,092,512 B** — a `--apply` + commit there would have silently dropped **~94 KB** of archived lane bodies, including the three slugs archived earlier the same day. The writer DOES verify "both files unchanged on disk since read", which catches a concurrent local writer and cannot see this at all. Cheap fix: have the writer refuse unless `git rev-parse HEAD` equals `origin/main`, or unless its two files match their `origin/main` blobs. Not patched here — the live copies under `C:\tmp\lane-archive-tools\` belong to scheduled task `archive-closed-lanes-0917`, and the git copies are a mirror of them (`scripts/lane_archive_tools/README.md`).
+
+## 2026-09-25 - SOCCER: a real MLS fixture reached the board with 443 markets and ZERO projections, and the board said so in a field nobody read `[session 4ab694ed, no lane]`
+
+Measured on production, same API, two dates:
+
+    soccer 2026-09-23  RSL @ SEA (mls)  443 markets  rows_modelled_fair=6     proj=0
+                       enrichment = "enriched_no_projections"
+    soccer 2026-09-27  MIA @ CLB (mls)  411 markets  rows_modelled_fair=3629  proj=370
+                       enrichment = "enriched"
+
+So soccer's pregame projection is INTERMITTENT, not absent -- which is worse to
+find, because a sport that never projects is obvious and one that sometimes does
+looks healthy on any day you happen to check.
+
+`enriched_no_projections` is its OWN enrichment state, distinct from `no_rows`.
+The board has been reporting this precisely and it went unread for the whole of
+a session spent auditing "which sports are complete".
+
+WHERE TO START. `board_enrichment` (~1584) calls
+`load_soccer_projections(roots, selected_date, window_dates=soccer_window)` and
+returns `rows_with_projection: 0` with reason "no soccer recommendations for
+this date" when `index.matches` is empty. The window is
+`[previous_day, selected_date]`. That module's own comment records that soccer
+**shards by KICKOFF date and "almost nothing kicks off today"**, and that
+`#379`'s window widening once SHIPPED INERT because this caller never passed a
+window. It passes one now, so the question is whether two days is wide enough
+for a league whose shard key is kickoff date -- or whether the 09-23
+recommendations artifact simply was not produced.
+
+TWO THINGS I GOT WRONG ON THE WAY HERE, both retracted:
+  * I carried "soccer edged=0 on a de-vig gap" as a finding for most of a
+    session. There is NO de-vig logic in `soccer_live_gameline_source` at all.
+    Unverified, dropped.
+  * I twice described soccer as fine because its live join emits a named
+    refusal ("no soccer match in play"). That refusal is about LIVENESS and says
+    nothing about PREGAME projections, which is where the defect is.
+
+NOT INVESTIGATED FURTHER: whether the 09-23 recommendations artifact exists.
+That is the next read and it decides producer-gap vs window-too-narrow.
+
+---
