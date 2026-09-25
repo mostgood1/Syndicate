@@ -41782,3 +41782,30 @@ containment check is what stopped a deploy of a commit that does not exist.
 **Locks.** Claim held from 17:14:11Z; two preflights `CLEAR` for the exact SHAs. A third
 preflight returned `NO_EXPECTATION` because I passed a `--baseline-read-at` 677 s in the
 FUTURE; re-run with the real reading time.
+---
+
+## 2026-09-25 01:00-01:07 PM CDT (18:00:36Z -> live 18:07:42Z) — web `4d785045` -> `42b9be30` (`dep-darbdh6k1f9s73b8io40`) — lane `dh-ordinal-pairing` — **GOAL MET: the BAL @ NYY rail seats TWO tiles, each half on its own chip.**
+
+**predict:** `bal_nyy_rail_tiles` `3` -> `2`. Baseline read 18:00:17Z off the RENDERED board.
+
+**verify: MET.** Served commit read back first, then the rail:
+
+    before  mlb|d4b069a134ec  "3:05P CT"             ->  "MLB — 3:05P CT"
+            mlb|3fe14d478bc1  "6 opportunities"      ->  "MLB — 3:10P CT"
+            chip|mlb|823489   "3:10P CT" (unclaimed) ->  gone, now claimed
+
+Both tiles are card-group keys, so each half carries its own opportunities AND its own clock.
+CHC @ BOS unchanged at 2 (`mlb|824703` live, `mlb|c1c95aa0` pregame), so the split
+doubleheader did not regress. Rail total 27 -> 26.
+
+**WHAT ACTUALLY FIXED IT WAS NOT THE NEAR-EXACT RULE.** Reading what the unjoined group
+carried settled it: `commence_time 2026-09-25T23:06:00Z` against chips at 20:05Z and 20:10Z
+— roughly THREE HOURS from both halves. A traditional doubleheader has no real second start
+until game 1 ends, so StatsAPI publishes a NOMINAL placeholder five minutes after game 1 while
+the book publishes the REALISTIC one. No time window bridges that, and `pickChipByStart`
+refusing is correct. ORDER is the discriminator both sides still agree on.
+
+**THREE DEPLOYS FOR ONE DEFECT:** `ae36edb8` (near-exact join) took 4 tiles -> 3 and also
+shipped a surplus-chip rule that was DEAD CODE and a bad trade; `4d785045` removed it;
+`42b9be30` added ordinal pairing and reached 2. The near-exact rule earns its place — it is
+what joined game 1.

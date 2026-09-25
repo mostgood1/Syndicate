@@ -847,14 +847,12 @@ death, never life — do not invert it.
 - **A fabricated SHA, caught by preflight** (`OFF_MAIN`): I invented 30 characters of `ae36edb8`'s hash from a 10-character prefix.
 - Files: `.syndicate/deploys.md`, `syndicate/templates/intelligence.html` (declared after the fact — scope-guard named it and it was the GOAL, not a lead).
 
-### dh-ordinal-pairing — OPEN — opened 2026-09-25 — session 16da93b3-0e56-4617-857a-6705b02ff912
+### dh-ordinal-pairing — CLOSED — opened 2026-09-25, closed 2026-09-25, closed 2026-09-25 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - Goal: the BAL @ NYY rail seats TWO tiles on 2026-09-25, read off the rendered board, by pairing a doubleheader's halves on ORDER when the two sources disagree about game 2's start by hours
+- **GOAL: MET.** The rail seats **TWO** BAL @ NYY tiles, both on card-group keys (`mlb|d4b069a134ec` 3:05P, `mlb|3fe14d478bc1` 3:10P), no `chip|` tile left. CHC @ BOS unchanged at 2. Read off the RENDERED board, served commit `42b9be30` checked first.
+- **The hypothesis was MEASURED before the fix, not after:** the unjoined group carried `commence_time 23:06:00Z` against chips at 20:05Z/20:10Z — ~3 h from both. StatsAPI publishes a traditional DH's game 2 at a NOMINAL placeholder; the book publishes the realistic start. No time window bridges it, so `pickChipByStart` refusing is correct and widening it would have been guessing.
+- **Narrow by construction:** ordinal pairing fires only on equal counts of timed groups and chips, at least 2 of each, distinct starts on both sides, canonical keys on both, and only AFTER the clock has refused. Control test: one group against two chips resolves to NOTHING.
 - Files: syndicate/templates/intelligence.html, tests/test_layer2_page_doubleheader_cards.py, .syndicate/deploys.md
-- Hypothesis: MEASURED, not assumed: group 3fe14d478bc1 carries commence_time 2026-09-25T23:06:00Z while both chips start 20:05Z and 20:10Z -- ~3 h from BOTH halves. StatsAPI publishes a traditional DH's game 2 at a NOMINAL placeholder 5 min after game 1; the book publishes the realistic start. No time window can bridge that, so pickChipByStart refuses correctly. Both sides carry identical canonical keys (baltimore orioles / new york yankees), so ORDER is a usable discriminator
-- Falsification test: if the rail still shows 3 tiles the ordinal map is not reaching chipForGame for these groups. If CHC @ BOS or any single-game fixture changes, the pairing fired where it should not -- it must be inert unless counts match, starts are distinct on both sides, and both carry canonical keys
-- Verification: the RENDERED board after deploy: BAL @ NYY 3 -> 2 tiles with both on card-group keys (no chip| key), CHC @ BOS unchanged at 2, served commit read back first; plus the unit control that one group against two chips resolves to NOTHING
-- Blocked by: none
-
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
