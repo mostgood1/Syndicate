@@ -822,6 +822,18 @@ death, never life — do not invert it.
 - **CLAIM RETURNED.** `doubleheader.py` and `tests/test_doubleheader_joins.py` go back to `mlb-doubleheader-e2e` in this commit. My first borrow left both paths on that lane's Files line as well as mine and created **2 contested claims** (`check_lane_invariants` VIOLATED) -- repaired in `3b2ce9a4`; the check that missed it flattened claims to a `{path: lane}` dict, which cannot represent a contest.
 - **NOT VERIFIED IN PRODUCTION:** nothing is deployed. The board reading that would confirm it -- BAL @ NYY seating 2 tiles rather than 4 -- needs a web deploy and is OWED.
 - Files: (returned to `mlb-doubleheader-e2e`) `syndicate/templates/intelligence.html`, `tests/test_layer2_page_doubleheader_cards.py`, `tests/test_live_gameline_doubleheader.py`.
+### nhl-board-rows-missing — OPEN — opened 2026-09-25 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- **ROOT CAUSE FOUND 2026-09-25: NHL rows exist and are dropped by a DATE-ATTRIBUTION disagreement, not a missing fetch.** Layer 1 for nhl/2026-09-25 reports rows_in_grid 18, rows_other_dates 18, other_dates {2026-09-24: 18}, enrichment no_rows. The odds artifact for shard 2026-09-25 carries date 2026-09-26, game_date 2026-09-25 and source_path data/odds/team/date=2026-09-26/oddsapi.csv for market NHL:2026-09-25:BOS@WSH:moneyline. Three date fields, two answers.
+- **WHY: `local_nhl_odds.collect_oddsapi_team_odds` reasons in UTC** -- it parses the requested date as UTC midnight (`_date_range_utc`, a deliberate +/-8h window), so an evening-Central game is stamped the NEXT UTC day. Layer 1 scopes in America/Chicago (`date_scope.timezone`). NHL breaks UNIQUELY because its slate is evening-Central, i.e. next-day UTC, and its collector is the one reasoning in UTC.
+- **THREE CAUSES I NAMED AND RETRACTED before this, all from plausible mechanisms instead of walking the stages in order.** (1) `SYNDICATE_ACTIVE_SPORTS` differing between workers -- wrong, the board uses `_active_sports_for_date`, which is calendar-based and lists nhl. (2) The `execution_mode == source` branch returning empty steps -- wrong, EVERY sport hits it including mlb and ncaaf, which have thousands of rows. (3) "Zero NHL odds activity in 24h" -- wrong and worst: inferred from absent `local_nhl_odds` log lines when producers run under `subprocess.run(capture_output=True)` and successful stdout is DISCARDED, a trap this repo has already written down.
+- **NEXT:** decide which field is authoritative (`game_date` is the correct one) and make the grid/board join on it, or normalise the collector to Central. NOT yet fixed; no code changed in this lane.
+- Goal: Find why NHL has ZERO rows on the Layer 1 odds board on both 2026-09-25 and 2026-09-26 while NCAAF and NFL have thousands, and get NHL board rows so the live re-sim and pregame projections have somewhere to land
+- Files: scripts/nhl_board_rows_probe.py
+- Hypothesis: NHL odds are never captured -- the first zero is at the odds-source or candidate-generation stage, not at artifact read or the board. NCAAF and NFL prove the downstream path works, so the break is upstream of the grid
+- Falsification test: If NHL odds ARE captured and present in the quote store for 09-25, the hypothesis is wrong and the break is downstream in candidate generation or the grid build
+- Verification: Walk the documented pipeline order (odds sources, candidate generation, artifact generation, artifact storage, artifact read) and name the FIRST stage that reads zero for nhl, with the same stage non-zero for ncaaf as a control
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
