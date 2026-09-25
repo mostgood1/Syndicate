@@ -767,6 +767,14 @@ death, never life — do not invert it.
 - Verification: A cutoff-replay harness scores the shipped live function against real final totals over completed NCAAF games, reports the worst PREDICTED-PROBABILITY bucket gap (not the aggregate, not by minutes-left), and only then is a sigma entered in ANALYTIC_LIVE_STD_ERR_BY_MARKET. Production check afterwards is live_resim_published_no_distribution_for_this_market falling from its measured 16 of 17
 - Blocked by: none
 
+### refresh-mutex-visibility — OPEN — opened 2026-09-25 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: A launch refused by the per-service refresh mutex prints a named line identifying the sports that lost and the holder, and a fail-closed manifest-read refusal is distinguishable in that line from a benign lane-busy collision, so a mutex loss is never again diagnosed as an absent producer.
+- Files: syndicate/features/shared/live_refresh_loop.py (the launch_refresh_run exception handlers ONLY), syndicate/features/shared/ops_refresh.py (the refusal message text and a typed refusal class ONLY), tests/test_refresh_mutex_visibility.py (NEW)
+- Hypothesis: NHL's collector silence on 2026-09-25 was a per-service mutex collision that produced no log line at all; the loss is invisible because the ValueError is swallowed into meta only.
+- Falsification test: If the refused ValueError already reaches a log line on any path, or if the WNBA run holding the lane was stale rather than genuinely running, the premise is wrong.
+- Verification: A production log line naming a refused sweep with its reason class, plus unit tests proving the two refusal classes render differently and that the benign class does not mask the fail-closed one.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
