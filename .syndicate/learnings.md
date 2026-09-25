@@ -4610,3 +4610,26 @@ instrument can fire BEFORE relying on it -- one grep with a control, which is
 the same thing that caught it here, just hours too late.
 
 ---
+### 2026-09-25 — FORBIDDEN: checking a claim set as a `{path: lane}` mapping. A dict cannot represent a contest, so the check passes at the exact moment it should fail.
+
+- **What we believed:** that my borrow of `doubleheader.py` from an idle lane had moved the
+  claim, because the script asserted on the claim set before pushing and the assertion passed.
+- **What was actually true:** the borrow APPENDED a note to the holder's `Files:` line and left
+  both backticked paths on it, so `_claims` attributed each path to that lane AND to mine.
+  `check_lane_invariants.py` went `VIOLATED: 2 contested file(s)` -- breaking the coherence I
+  had restored an hour earlier in the same session.
+- **Why the check could not have caught it.** It built `{str(path): lane}` from the claim
+  pairs. Two lanes holding one path collapse into one entry, last writer wins, and the contest
+  -- the only failure that matters for a claim edit -- becomes invisible by construction.
+  **Claims are a SET of (lane, path) pairs; any check that flattens them to a mapping is blind
+  to the thing it is checking for.**
+- **How we found out:** `lane-guard` refused the very next edit, naming the holder. The guard
+  was the instrument; my own verification was not.
+- **How to apply:** verify claim edits as `{(lane, path)}` and assert on
+  `{p for _,p in after if len({l for l,q in after if q == p}) > 1} == set()`. And when
+  borrowing, REMOVE the path from the holder's line -- the repo's own form
+  (`book-quotes-splice-repair`: "Files: RETURNED ... are HANDED to lane ...") -- rather than
+  annotating it, because the parser reads paths, not prose.
+- **Cost:** two contested claims live on `origin/main` for ~4 minutes, repaired in `3b2ce9a4`.
+
+---

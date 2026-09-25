@@ -1313,3 +1313,28 @@ Lane `mlb-sim-retrigger-churn` (OPEN). Readings: `deploys.md` 2026-09-18 01:14:0
 - **Only refresh-worker runs the sim decision:** `SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER` TRUE there, FALSE on live-odds-worker, absent (= False by code default) on web. `SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS=600` is pinned in render.yaml.
 - **Debounce live since 2026-09-18 01:20:00Z:** `SYNDICATE_MLB_SIM_FINGERPRINT_MIN_GAP_SECONDS` default 3600 holds fingerprint-only launches; tip-off, cold-start, join-mismatch, board-missing and props-regen stay immediate. Verified executing: 7 debounces 01:20-04:20Z.
 - **Props-regen is now the visible driver:** `MLB_PROPS_REGEN_DUE` fired at 01:58, 03:08 and 04:10Z, each time widening a launch to the full slate, because `daily_top_props` stayed at 0 candidates after each regen. Its launches carry the `fingerprint_change` LABEL (the reason string prefers it), so count `MLB_DAILY_SIM_TRIGGERED` lines by cause, not by label. Open: whether zero is correct late in the day.
+## [mlb-traditional-doubleheader-join] A TRADITIONAL DOUBLEHEADER COULD NEVER CLEAR THE 45-MINUTE SEPARATION RULE -- FIXED ON MAIN, **NOT DEPLOYED** `[verified by test 2026-09-25, lane mlb-traditional-dh-join]`
+
+`doubleHeader: "Y"` (traditional) is played back-to-back on ONE admission, so StatsAPI
+publishes game 2's NOMINAL start minutes after game 1's -- BAL @ NYY 2026-09-25: **823491
+20:05Z g1, 823489 20:10Z g2**. Both `pick_by_start_time`
+(`syndicate/features/shared/doubleheader.py`) and its browser twin `pickChipByStart`
+(`syndicate/templates/intelligence.html`) required the runner-up to be **45 minutes farther**
+than the winner, so gaps of 0 s and 300 s were refused **by construction**: no `game_key`
+stamped, `chipForGame`'s exact route with nothing to match, and the refused chips seated as
+extra tiles. **The Layer 2 rail showed FOUR tiles for two games** -- two chip-less cards
+(`51 opportunities`, `6 opportunities`) beside their own two chips.
+
+`doubleHeader: "S"` (SPLIT) was never affected: CHC @ BOS the same day, 17:05Z / 22:05Z, joined
+correctly. **The data was right at every hop** -- chips and cards both carried the correct
+gamePks on all four games.
+
+**FIXED** (`ae36edb8`): `NEAR_EXACT_SECONDS = 120` accepts a near-exact ABSOLUTE match where
+the separation question has no answer, only when the winner is also strictly nearer than the
+runner-up, reported as `nearest_start_near_exact`. The unclaimed-chip pass additionally seats
+only the SURPLUS chips beyond the chip-less groups already standing for a fixture.
+
+**NOT DEPLOYED -- web runs the old rule, so the served board STILL seats four tiles.** Proven
+by test only: 114 passed across seven doubleheader suites, with controls that a row 10 minutes
+off both halves and an equidistant row are still refused, and that the split DH still takes the
+original `nearest_start` path. OWED: a web deploy and the board reading.
