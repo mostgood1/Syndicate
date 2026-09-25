@@ -4439,3 +4439,85 @@ without Y"), that is a claim with a date: re-derive it from
   was still reachable from `2ee87e4c`.
 
 ---
+
+## 2026-09-25 FORBIDDEN: a one-shot `replace(old, new, 1)` on a line that is not UNIQUE in the file. The edit lands on the first match, and the damage is the site you did NOT mean to touch `[lane nfl-live-resim-activation, session 4ab694ed]`
+
+`snapshot = read_json_file(data_root() / "live" / f"{sport}_live_lens.json")`
+appears twice in `board_enrichment.py`. I meant
+`attach_live_gamelines_for_sport` (line 2215) and hit
+`attach_live_game_state_from_lens` (line 821), then deployed it.
+
+TWO HARMS, AND THE ONE I DID NOT INTEND WAS WORSE. The fix never landed -- the
+join kept reading the pregame lens. AND NFL's live SCORE/CLOCK reader was
+silently repointed at a file with a different shape. A failed fix is a null
+result; a working function quietly pointed at the wrong data is a regression,
+and nothing in the change said so.
+
+IT WAS ONLY CAUGHT BY A FIELD I HAD NOT PREDICTED ON. `index_why.sources_seen`
+came back `{}` -- not `{pregame: 16}`, not `{live_resim: 16}`, but NO lanes at
+all, which a re-sim snapshot cannot produce because a refusal still emits a
+lane. The predicted field (`nfl_gameline_join_present`) read TRUE and the deploy
+was still broken.
+
+HOW TO APPLY: before a one-shot replace, COUNT the matches. If more than one,
+anchor on something unique (the enclosing `def`, a neighbouring line) or edit by
+line number after locating the right function. Afterwards, grep the changed
+token and check WHICH function each hit lives in -- `head -N file | grep -n
+'^def '` answers that in one command. And when a receipt's predicted field
+passes, read one field that would look different if the change had landed
+somewhere else.
+
+---
+
+## 2026-09-25 - RULE: an instrument that ALREADY FIRES before your change cannot verify it. Read its baseline, not its name `[lane nfl-live-resim-activation, session 4ab694ed]`
+
+Wiring NFL's live tier, the obvious success signal was
+`LIVE_GAMELINE_BUILD sport=nfl`. It sounds exactly like the thing being turned
+on. Measured before deploying: it had ALREADY fired **52 times** in the same
+window, because it is `book_grid`'s build and is not gated on
+`_LIVE_GAMELINE_SPORTS`. Predicting on it would have scored a PASS on a deploy
+that changed nothing about it.
+
+The discriminator was the neighbouring `LIVE_GAMELINE_JOIN sport=nfl`: **0**
+lines, against a live MLB control of **23** in the same window. The control is
+the half people skip -- a zero only means something once you have shown the
+instrument can read non-zero right now.
+
+THE SAME MISTAKE IN ITS OTHER FORM, same session: I watched
+`/nhl/api/live-lens` for an hour as evidence about the BOARD. It is the PAGE
+api and never reads the re-sim snapshot, so `live_resim_mentions=0` there was
+uninformative rather than reassuring -- while the board instrument I had
+already used correctly for MLB sat one command away.
+
+HOW TO APPLY: before naming a field in `--expect`, read its CURRENT value and a
+control. Two questions, both cheap: *is it already non-zero?* and *what would
+make it read differently?* If a healthy-looking reading would be produced by
+doing nothing, it is not a verification.
+
+---
+
+## 2026-09-25 - RULE: a FETCH that failed must not be spelled like a RESULT that is empty, and a missing request header is a real cause `[lane nhl-live-resim, session 4ab694ed]`
+
+NHL's producer published an empty slate through six live games. Root cause,
+measured same-instant on the live endpoint:
+
+    default urllib UA -> HTTP 403 Forbidden
+    "Mozilla/5.0"     -> 200, 11 games
+
+`api-web.nhle.com` refuses `Python-urllib/3.x`. **And I had already hit this
+myself, in my own probe, hours earlier** -- I added a User-Agent to the probe to
+make it work and never connected it to the producer I had written.
+
+What made it undiagnosable was the second line:
+`except Exception: return []`. A 403 became "no games scheduled", so the tick
+reported `ok: true` in under a second and the board read
+`games_in_snapshot: 0` with no refusal to inspect. The sub-second duration was
+itself the tell -- a tick that re-simmed six live games cannot finish that fast.
+
+HOW TO APPLY: a network read that fails gets its OWN type or its own recorded
+reason, never the same empty collection an honest zero produces. When a
+producer publishes nothing, check the FETCH before the logic. And when you fix
+something in a throwaway probe to make it work, ask whether production does the
+same thing -- the workaround IS the finding.
+
+---

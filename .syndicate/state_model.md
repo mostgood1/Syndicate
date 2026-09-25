@@ -834,7 +834,29 @@ under 25 seconds; **poll at ~12s**. CLEAR arrived on the 4th poll. Also expect t
 25-minute deploy-spacing lockout (`#563`) — the worker is often idle DURING the
 lockout and busy by the time it lifts, which is exactly why waiting kept losing.
 
-## [nhl-live-resim] NHL HAS A LIVE RE-SIM: hockeysim RESUMES from period/clock/score, and the whole chain is wired and INERT until the season opens `[verified offline 2026-09-24, lane nhl-live-resim]`
+## [nhl-live-resim] NHL HAS A LIVE RE-SIM AND IT CAN NOW SEE ITS SLATE -- but no NHL game has yet reached the board with a probability `[measured on production 2026-09-25T03:01:14Z, lane nhl-live-resim]`
+
+- **"INERT until the season opens" was WRONG and is retracted.** NHL preseason began
+  2026-09-19; eleven games were played on 2026-09-24 and six were live at once. The
+  chain was exercised, not idle.
+- **THE PRODUCER PUBLISHED AN EMPTY SLATE THROUGH ALL OF IT**, root-caused and fixed
+  the same night (`fde7e7d4`, live on live-odds-worker 02:55:51Z). Measured
+  same-instant on the live endpoint: Python's default urllib User-Agent gets **HTTP
+  403**, `Mozilla/5.0` gets **200 with 11 games**. `except Exception: return []` then
+  spelled that 403 as "no games scheduled", so the tick reported `ok: true` in under a
+  second with `games_in_snapshot: 0` and nothing to diagnose.
+- **VERIFIED AFTER THE FIX:** `games_in_snapshot` **0 -> 11**,
+  `sources_seen: {'pregame_only': 2}` -- the slate is read and refusals are correctly
+  stamped and rejected.
+- **STILL NOT TRUE: `indexed: 0`.** No NHL game has reached the board carrying a
+  probability. This is the FIRST of three gates, not the last.
+- **OPEN, and it blocks the next gate:** `skipped_no_team_names` **9 of 11** -- a game
+  refused at `live_state_from_score_row` is published with empty `away_name` /
+  `home_name`, so the join cannot match it and drops it. The refusal published ON
+  PURPOSE is invisible for exactly the games that refused earliest.
+- **Calibration remains unobtainable** before the regular season. Offline-verified
+  only: puck-drop identity (seed for seed, p(home) 0.4867 both ways, n=300) and
+  monotone ordering in the scoreline.
 
 - **The engine could always do this; its entrypoint could not.** `GameState`
   has always carried `period` / `clock` / per-team `score` (`state.py:36-40`),
