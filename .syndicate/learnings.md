@@ -4692,3 +4692,35 @@ lines from a discarded subprocess stream, a 403 read as absence, and a board
 join read 24 s before the producer's tick.
 
 ---
+
+## 2026-09-25 - RULE: a SAMPLE or a DERIVED LIST is not the population, and "never" is a claim about the population `[lane nhl-board-rows-missing, session 4ab694ed]`
+
+Two categorical claims in one thread, both wrong, both from the same move:
+
+  * "NHL is never in a refresh run." Built from every-9th-stamp sampling of 182
+    runs PLUS a log tail beginning at 20:02 -- after NHL's 2-hourly slot had
+    closed. The direct launch line then read
+    `ODDS_SWEEP_LAUNCHED sports=mlb,nhl` at 19:24:30Z.
+  * "No run stamp for mlb,nhl exists." The stamp list was harvested from PUBLISH
+    log lines, so any run that publishes nothing is INVISIBLE to it. Absence in
+    that list is not absence in the world.
+
+Neither was a reasoning error about the system. Both were forgetting what the
+evidence was made of: a stride-sampled subset, and a list filtered by an
+unrelated predicate.
+
+HOW TO APPLY: before writing "never", "none" or "zero", say out loud what the
+denominator is and how it was built. If it was sampled, sample-based statements
+are bounded ("not in 21 of 182") and the categorical one is unavailable. If it
+was derived from a log grep, name the predicate that filtered it -- a list of
+things that PUBLISHED cannot answer a question about things that RAN. And when a
+cheap direct instrument exists (here: the one launch line that prints the sport
+set), read THAT instead of reconstructing the population from side effects.
+
+THE SESSION TALLY, because the pattern outweighs any single case: five signals
+looked like they answered the question and belonged to a different emitter --
+absent log lines from a discarded subprocess stream, a 403 read as absence, a
+board join read 24 s before the producer's tick, a cadence marker written from
+an intended list, and a publish-derived stamp list.
+
+---
