@@ -6010,9 +6010,55 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			meta["ok"] = False
 			meta["skipped"] = True
 			meta["error"] = str(exc)
+			# THE SILENCE THIS CLOSES. `launch_refresh_run` refuses BEFORE it
+			# starts anything -- the lane is busy, or its state cannot be read
+			# -- and until now that refusal existed ONLY in `meta["error"]`, a
+			# field the next tick overwrites, readable solely by catching the
+			# exact tick via /api/ops/live-refresh/state.
+			#
+			# Measured 2026-09-25 on live-odds-worker: ODDS_SWEEP_LAUNCHED
+			# printed `sports=mlb,nhl count=2` at 19:24:30Z and NO run
+			# containing nhl was ever created -- that line fires before the
+			# launch, so it reports INTENT, not outcome. With no refusal line
+			# the log positively asserted a sweep that never happened, and
+			# four causes were proposed and retracted before the mutex was
+			# suspected at all.
+			#
+			# `reason` separates a BENIGN collision (lane_busy: a real job is
+			# running, this retries next tick) from a FAIL-CLOSED refusal
+			# (state_unconfirmed: nothing is running and nothing will ever
+			# release it, so refreshes stop permanently). Both look identical
+			# in `str(exc)` and only one is an incident.
+			try:
+				_refusal_detail = getattr(exc, "detail", None)
+				print(
+					f"[live_refresh_loop] ODDS_SWEEP_REFUSED "
+					f"reason={getattr(exc, 'reason_code', 'untyped')} "
+					f"date={selected_date} phase={effective_phase} "
+					f"sports={launch_sports or '<resolved>'} "
+					f"detail={json.dumps(_refusal_detail, sort_keys=True) if _refusal_detail else '{}'} "
+					f"error={exc}",
+					flush=True,
+				)
+			except Exception:
+				# Logging a refusal must never become a second failure.
+				pass
 		except Exception as exc:
 			meta["ok"] = False
 			meta["error"] = f"{type(exc).__name__}: {exc}"
+			# Same reasoning as the refusal above: an unexpected launch
+			# failure was equally invisible, and reads downstream as "the
+			# producer never ran" rather than "the launch raised".
+			try:
+				print(
+					f"[live_refresh_loop] ODDS_SWEEP_LAUNCH_FAILED "
+					f"date={selected_date} phase={effective_phase} "
+					f"sports={launch_sports or '<resolved>'} "
+					f"error={type(exc).__name__}: {exc}",
+					flush=True,
+				)
+			except Exception:
+				pass
 
 	# STARVATION FIX. A launch that produced no run must not cost a sport its
 	# whole interval. `meta["ok"]` is True for a launch that RETURNED, so the

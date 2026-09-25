@@ -429,7 +429,10 @@ def _latest_sport_refresh_log_path(*, manifest: dict[str, Any], sport: str) -> P
 def _ensure_refresh_context_consistent(context: dict[str, Any]) -> None:
     consistency_error = str(context.get("consistency_error") or "").strip()
     if consistency_error:
-        raise ValueError(consistency_error)
+        # Fail-closed, not busy: an inconsistent lane has no running job to
+        # finish and release it, so this refuses every launch until a human
+        # looks. It must not be logged as a benign collision.
+        _raise_refresh_refusal(RefreshStateUnconfirmed(consistency_error))
 
 
 def _this_service_identity() -> str:
@@ -454,6 +457,91 @@ _REFRESH_WORKER_LANE_KEY = "refresh-worker"
 # from the job's own authority -- see _assert_no_active_refresh_run's use of
 # this below.
 _TERMINAL_REFRESH_STATES = frozenset({"finished", "failed", "canceled"})
+
+
+class RefreshRunRefused(ValueError):
+    """A refresh launch was refused BEFORE any work started.
+
+    Subclasses ValueError ON PURPOSE: every existing `except ValueError`
+    around `launch_refresh_run` keeps catching these unchanged, so adding the
+    type is not a behaviour change for any caller. What it adds is a
+    `reason_code` the caller can LOG.
+
+    WHY THAT MATTERS, measured 2026-09-25 on live-odds-worker. A refusal here
+    was swallowed into `meta["error"]` and printed NOWHERE, while the loop's
+    own `ODDS_SWEEP_LAUNCHED` line -- which fires BEFORE the launch and so
+    reports intent, not outcome -- said `sports=mlb,nhl`. No run containing
+    nhl was ever created. NHL's collector went silent from 15:44Z, its board
+    carried zero rows on a four-game night, and FOUR separate causes were
+    proposed and retracted before the mutex was suspected at all.
+    """
+
+    reason_code = "refused"
+
+    def __init__(self, message: str, **detail: Any) -> None:
+        super().__init__(message)
+        self.detail: dict[str, Any] = {k: v for k, v in detail.items() if v is not None}
+
+
+class RefreshLaneBusy(RefreshRunRefused):
+    """Something else is genuinely running in this lane. BENIGN, self-correcting.
+
+    The right response is to retry on the next tick, NOT to treat the sport as
+    swept -- that is what `_rewind_pregame_sport_sweep_epochs` in
+    `live_refresh_loop` exists to do. The mutex itself is correct at this
+    granularity: two `refresh_odds_sources.py` process trees in one 2GB
+    container is the documented OOM this guard was built for, and
+    `_refresh_lane_key`'s own comment draws the line at "only same-container
+    runs pose any real OOM risk".
+    """
+
+    reason_code = "lane_busy"
+
+
+class RefreshStateUnconfirmed(RefreshRunRefused):
+    """The lane's state could not be READ, so the launch fails CLOSED.
+
+    THIS IS NOT BENIGN AND MUST NEVER READ AS A BUSY LANE. A busy lane is
+    released by the job that holds it, seconds or minutes later. A lane whose
+    manifest cannot be read refuses every launch FOREVER -- there is no
+    running job to finish, so nothing will ever clear it, and the symptom is
+    identical: refreshes simply stop. The two are indistinguishable in
+    `str(exc)`, which is exactly why the reason code exists.
+    """
+
+    reason_code = "state_unconfirmed"
+
+
+def _raise_refresh_refusal(exc: "RefreshRunRefused") -> None:
+    """Print the refusal, then raise it. THE CHOKE POINT ALL CALLERS SHARE.
+
+    `launch_refresh_run` has FOURTEEN call sites across the loop, both workers,
+    two blueprints and the autorun paths, and they swallow a refusal in at
+    least four different shapes -- into `meta["error"]`, into a status JSON, or
+    silently. Logging in any one of them fixes only the path whose symptom you
+    happened to be chasing; on 2026-09-25 that was the live-refresh tick, and
+    the other thirteen would have stayed dark.
+
+    So the line is emitted HERE, where every refusal is constructed, and the
+    callers' own lines (which add local context such as which SPORTS lost) are
+    additions to it rather than substitutes for it.
+
+    `print`, not `logger.info`: logger.info does not reach Render's log
+    collector at all.
+    """
+    detail = getattr(exc, "detail", None) or {}
+    try:
+        print(
+            f"[ops_refresh] REFRESH_LAUNCH_REFUSED "
+            f"reason={getattr(exc, 'reason_code', 'untyped')} "
+            f"{' '.join(f'{k}={v}' for k, v in sorted(detail.items()))} "
+            f"error={exc}".replace("  ", " "),
+            flush=True,
+        )
+    except Exception:
+        # A refusal must never be made worse by the attempt to report it.
+        pass
+    raise exc
 
 
 def _per_service_refresh_lanes_enabled() -> bool:
@@ -630,7 +718,7 @@ def _assert_refresh_manifest_read_ok(context: dict[str, Any]) -> None:
     # this guard in production, stacking process trees until the container
     # OOMed. Refuse to launch rather than guess when we can't confirm state.
     if context.get("manifest_read_ok") is False:
-        raise ValueError("Cannot confirm refresh-run state (manifest read failed) -- refusing to launch a new run until state is confirmed.")
+        _raise_refresh_refusal(RefreshStateUnconfirmed("Cannot confirm refresh-run state (manifest read failed) -- refusing to launch a new run until state is confirmed."))
 
 
 def _assert_no_active_refresh_run(lane: str | None = None) -> None:
@@ -666,7 +754,7 @@ def _assert_no_active_refresh_run(lane: str | None = None) -> None:
     if pid is not None and state not in _TERMINAL_REFRESH_STATES:
         try:
             if _refresh_run_still_active(manifest, run_summary=run_summary):
-                raise ValueError(f"A refresh run is already active (pid={pid}). Cancel it before starting a new run.")
+                _raise_refresh_refusal(RefreshLaneBusy(f"A refresh run is already active (pid={pid}). Cancel it before starting a new run.", lane=lane, pid=pid, run_stamp=manifest.get("runStamp") or manifest.get("stamp")))
         except ValueError:
             raise
         except Exception:
@@ -700,9 +788,9 @@ def _assert_no_active_refresh_run(lane: str | None = None) -> None:
             queue_state = str(external_runner.get("queue_state") or "").strip().lower()
 
     if state == "pending_external":
-        raise ValueError("A refresh run is already queued for the external runner. Cancel it before starting a new run.")
+        _raise_refresh_refusal(RefreshLaneBusy("A refresh run is already queued for the external runner. Cancel it before starting a new run.", lane=lane, queue_state=queue_state))
     if state == "running" and queue_state in {"queued", "running"}:
-        raise ValueError("A refresh run is already queued for the external runner. Cancel it before starting a new run.")
+        _raise_refresh_refusal(RefreshLaneBusy("A refresh run is already queued for the external runner. Cancel it before starting a new run.", lane=lane, queue_state=queue_state))
 
 
 def is_refresh_run_active(lane: str | None = None) -> bool:
