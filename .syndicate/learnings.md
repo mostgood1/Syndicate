@@ -4521,3 +4521,59 @@ something in a throwaway probe to make it work, ask whether production does the
 same thing -- the workaround IS the finding.
 
 ---
+
+## 2026-09-25 - RULE: COUNT THE MATCHES BEFORE YOU WRITE. Four defects in one session, one shape `[lane nhl-live-resim, session 4ab694ed]`
+
+Every one of these was a write whose TARGET was not unique, and in three of the
+four the damage was at a site I never looked at:
+
+- `s.replace(old, new, 1)` on a snapshot-read line that appears twice in
+  `board_enrichment.py` -- landed in `attach_live_game_state_from_lens`, not the
+  game-line join. The fix never shipped AND a working reader was repointed at a
+  file it cannot parse. **Deployed.**
+- An appended test helper `_score_row()` SHADOWED an existing one of the same
+  name in the same file. 14 passing tests went red instantly.
+- A blanket `replace("_score_row(", "_named_row(")` to repair that also renamed
+  `team_names_from_score_row` -> `team_names_from_named_row`.
+- And then `live_state_from_score_row` the same way.
+
+The first one is the expensive one and the pattern is worth naming: a one-shot
+replace is SILENT about ambiguity. It does not fail when there are two matches;
+it picks one. So the failure mode is not an error, it is a correct-looking edit
+in the wrong place, and it survives review because the diff reads exactly as
+intended.
+
+HOW TO APPLY: before any `replace(..., 1)` or appended helper, COUNT --
+`grep -c` the string, `grep -n "^def name"` the symbol. If the count is not 1,
+anchor on something unique (the enclosing `def`, a neighbouring line) or edit by
+line number. Afterwards, grep the changed token and print WHICH function each
+hit is in: `head -N file | grep -n '^def '` answers that in one command. The
+cost of not doing it here was a production deploy that changed the wrong
+behaviour and verified as a pass on its own predicted field.
+
+---
+
+## 2026-09-25 - RULE: "deploy live" and "artifact rebuilt" are DIFFERENT EVENTS when producer and consumer are different services `[lane nhl-live-resim, session 4ab694ed]`
+
+Measured, one fix, 90 seconds apart:
+
+    14:26:46Z  deploy live on live-odds-worker
+    14:27:54Z  board join on refresh-worker -> the OLD number
+    14:28:18Z  producer tick, first run on the new code, rewrites the snapshot
+    14:33:26Z  board join -> the new number, prediction MET
+
+Reading the 14:27:54Z line would have recorded a FAILED fix. The consumer runs
+on a different service with its own cadence and reads an ARTIFACT, so it keeps
+serving the pre-boot file until the producer rewrites it.
+
+This is the third distinct instance in one session of a correct-looking reading
+supporting a wrong conclusion -- the others being a fix deployed to a service
+that does not run the code, and an instrument (`LIVE_GAMELINE_BUILD sport=nfl`)
+that already fired 52 times before the change.
+
+HOW TO APPLY: when the thing you changed WRITES and the thing you read CONSUMES,
+gate the verification on the WRITER's timestamp, never the deploy's. Find the
+producer's own clock (a tick status, an artifact mtime, a generatedAt) and
+require it to postdate the boot before any consumer reading counts.
+
+---

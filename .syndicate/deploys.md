@@ -41621,3 +41621,59 @@ held the four 08-30 FINALs. The frame fired 16 times this eve, and every build o
 it was empty.
 
 ---
+
+## 2026-09-25 14:20:45Z -> live 14:26:46Z (9:20-9:26 AM CDT) - live-odds-worker `d5449df7` -> `c78a0b16` (`dep-dar86fe0tbcc739d1t4g`) - lane `nhl-live-resim`
+
+**What shipped.** Two fixes to NHL's producer, both found by reading its output
+against the REAL slate rather than a fixture.
+
+1. **Refused games now carry team names.** `game_not_started` and `game_final`
+   return from `live_state_from_score_row` BEFORE the team block is read, so the
+   refusal branch had no state to take names from and published `""`. The join
+   keys on names, so the board dropped them -- the refusal this module publishes
+   ON PURPOSE was invisible for exactly the games that refused EARLIEST. Names
+   now come from the raw row through ONE shared extractor used by both paths;
+   two extractors would eventually format one differently and match a success
+   but not a refusal.
+2. **The `coverage` block was reading NFL's lane shape.** Added in `fde7e7d4`
+   using `lane["ok"]` and `lane["refusal"]["reason"]`. NHL lanes carry NEITHER
+   -- the discriminator is `source`. So on the real slate it reported
+   `liveResimmed: 0` unconditionally and `{'unknown': 11}` for the reasons. A
+   block added to stop a bare zero produced exactly that, and it was LIVE on
+   production from 02:55Z to 14:26Z. Local check after the fix:
+   `{'game_final': 11}`.
+
+**predict:** stated on the preflight receipt at 14:14:45Z, from a baseline read
+the same minute -- `nhl_join_skipped_no_team_names` **4 -> 0** and
+`nhl_join_sources_seen_nonempty` **false -> true**.
+
+**verify: BOTH MET.** Board join 2026-09-25T14:33:26Z:
+
+    index_why={'games_in_snapshot': 4, 'indexed': 0,
+               'skipped_no_team_names': 0,        (was 4 of 4)
+               'skipped_no_accepted_lane': 4,     (was 0)
+               'sources_seen': {'pregame_only': 4}}   (was {})
+
+All four games are now MATCHED by the board and rejected on the stamp. The
+refusal is visible and attributable instead of silently dropped.
+
+**THE FIRST POST-BOOT JOIN STILL READ 4, AND REPORTING IT WOULD HAVE BEEN WRONG.**
+
+    14:26:46Z  deploy live
+    14:27:54Z  board join  -> skipped_no_team_names: 4   READ THE OLD SNAPSHOT
+    14:28:18Z  NHL tick    -> first run on new code, rewrote the snapshot
+    14:33:26Z  board join  -> skipped_no_team_names: 0
+
+The producer (live-odds-worker) and the consumer (refresh-worker) are separate
+services on separate cadences, so "deploy live" and "artifact rebuilt" are
+different events ~90 s apart. Gating the reading on the TICK timestamp, not the
+deploy timestamp, is the only reason this receipt says MET.
+
+**NOT CLAIMED: `indexed: 0`, and it was stated BEFORE the deploy so it could not
+be reframed after.** No NHL board rows exist mid-day Thursday, so that number
+could not move today and counts neither way. NHL is at rung 3 of 6 -- it can see
+its slate and its refusals reach the board with reasons. Rung 4 (a live game
+yielding a probability) is testable tonight on preseason; rung 6 (calibration)
+not before the regular season.
+
+---
