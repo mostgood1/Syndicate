@@ -746,13 +746,12 @@ death, never life — do not invert it.
 - Verification: board_delivery_probe plus rows_live_projected on a live NFL slate (Sunday) shows live prop coverage greater than zero, with the same reading refused before the change
 - Blocked by: none
 ### dh-state-aware-pairing — OPEN — opened 2026-09-25 — session 16da93b3-0e56-4617-857a-6705b02ff912
-- Goal: The Layer 2 rail seats ONE tile per doubleheader half while a half is IN PLAY, verified by reading the served board with StatsAPI confirming one half In Progress and the other Scheduled.
+- Goal (verbatim): The Layer 2 rail seats ONE tile per doubleheader half while a half is IN PLAY, verified by reading the served board with StatsAPI confirming one half In Progress and the other Scheduled.
+- **GOAL: NOT MET.** Deployed `146f3954` to web 21:39:56Z and measured 21:40:26Z: BAL @ NYY went 4 tiles -> **3**, not 2. What the deploy DID achieve is verified -- `chip|mlb|823489` is gone and `mlb|3fe14d478bc1` acquired the chip ("3:10P CT PREGAME BAL -- NYY --" where it showed a bare date label), so the state pairing fires.
+- **WHAT IS LEFT, and it is a different mechanism:** game 1 seats TWICE -- odds group `mlb|d4b069a134ec` (LIVE, "2 opportunities") beside gamePk-keyed group `mlb|823491` (scoreboard). **Neither is a loose chip**, so no chip-join rule can merge them; this is group-vs-group duplication and needs the merge pass, not `chipForGame`.
+- **BLOCKING:** the premise moves under you. At 20:33Z game 1 had NO group; at 21:34Z it had two. Any fix here must be measured against a re-read baseline, not a remembered one.
 - Files: `syndicate/templates/intelligence.html` (`buildDoubleheaderOrdinals`, `chipForGame`'s ordinal lookup and `pickChipByStart` ONLY -- lane `live-inplay-board-cadence` holds `boardDateFreshnessParts` in the same file, regions disjoint; checked 2026-09-25), `tests/test_layer2_page_doubleheader_cards.py`
-- Hypothesis: buildDoubleheaderOrdinals refuses because its equal-counts guard sees 1 group against 2 chips once game 1's odds group disappears; pairing state-compatible candidates before ordinal resolves it, since the surviving group is PREGAME and exactly one chip is PREGAME.
-- Falsification test: If the surviving group's state is absent or does not discriminate (two PREGAME chips against one PREGAME group), the rule must refuse and the tile count stays 3.
-- Verification: Served board read at /intelligence with StatsAPI showing 823491 In Progress and 823489 Scheduled: exactly 2 BAL @ NYY tiles and no loose chip| tile for the half that has a group.
 - Blocked by: none
-
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

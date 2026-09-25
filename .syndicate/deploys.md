@@ -41868,3 +41868,21 @@ the tick while every line of this change is inside the tick; the 13 errors are
 the worktree `data/` mirror guard. Neither was re-run against a clean tree.
 
 ---
+## 2026-09-25 21:39:56Z -- web `146f3954` -- state-aware doubleheader pairing
+
+- lane: `dh-state-aware-pairing`   claim: web, held by that lane   preflight: CLEAR
+  (only gunicorn; 1 defunct child already dead). Deploy `dep-dareiifpn0mc73c8co8g`,
+  trigger `api`, created 21:36:09Z, live 21:39:56Z read off `/api/ops/version`.
+- predicted BEFORE deploying, with a baseline read at 21:34:34Z:
+  `bal_tiles` 4 -> 3, `loose_chip_823489_tiles` 1 -> 0.
+- **verify: measured 21:40:26Z on served `146f3954` -- BAL @ NYY seats 3 tiles and
+  `chip|mlb|823489` is GONE (0), and `mlb|3fe14d478bc1` now reads "3:10P CT PREGAME
+  BAL -- NYY --" where it read a bare "FRI SEP 25" date label before.** That second
+  half is the reading that proves the PAIRING fired rather than a tile merely
+  disappearing: the group acquired the chip's clock and team row. The only
+  `chip|`-keyed MLB tile left is `chip|mlb|824703`.
+- **THE GOAL IS NOT MET AND THIS DEPLOY WAS NOT PREDICTED TO MEET IT.** One tile per
+  half means 2; the rail is at 3. Game 1 is still seated TWICE, by a different
+  mechanism this change does not touch: its odds group (`mlb|d4b069a134ec`, LIVE,
+  "2 opportunities") and a gamePk-keyed group (`mlb|823491`, "TOP 6 BAL 8 NYY 1")
+  both stand. Neither is a loose chip, so no chip-join rule can merge them.
