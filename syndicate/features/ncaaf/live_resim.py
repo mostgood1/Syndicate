@@ -436,6 +436,29 @@ def resim_live_game(
     # bias every probability downward by that share.
     home_win_prob = (home_wins + 0.5 * ties) / ran
 
+    # THE DRAWS, KEPT RATHER THAN DISCARDED -- AND STILL NOT PUBLISHED.
+    #
+    # These histograms are what a pricer would need for totals and spreads, and
+    # the module docstring is explicit that NCAAF must not price them until a
+    # live estimator has been GRADED (`#499`: WNBA totals waited for a 249-game
+    # / 23,712-sample backtest). Nothing here changes that: `build_game_lens`
+    # constructs its lane field by field and does NOT forward this dict, so a
+    # key added here reaches no lens and no pricer. Turning pricing on is a
+    # deliberate edit to that literal, made on the strength of a grade.
+    #
+    # What they unblock is the GRADE ITSELF. A cutoff-replay harness has to
+    # score the SHIPPED function; re-implementing the loop would measure
+    # something production does not run, which is the same error as scoring
+    # against ratings production never used.
+    margin_dist: dict[str, int] = {}
+    total_dist: dict[str, int] = {}
+    for value in margins:
+        key = str(value)
+        margin_dist[key] = margin_dist.get(key, 0) + 1
+    for value in totals:
+        key = str(value)
+        total_dist[key] = total_dist.get(key, 0) + 1
+
     return {
         "home_win_prob": round(home_win_prob, 6),
         "sims_run": ran,
@@ -443,6 +466,11 @@ def resim_live_game(
         "total_mean": round(sum(totals) / ran, 3),
         "possession_unknown": possession_unknown,
         "ties": ties,
+        # Same shape as the pregame sidecar's `margin_dist` / `total_points_dist`
+        # (home-positive margin), so a reader that already understands one
+        # understands the other.
+        "margin_dist": margin_dist,
+        "total_dist": total_dist,
     }
 
 
