@@ -42205,3 +42205,22 @@ cannot see it.
 **All three services are now current on `origin/main` ancestry:**
 web `beb95060` (03:51:56Z), refresh-worker `c6b6246c` (03:14:25Z),
 live-odds-worker `ec10612a` (22:56:21Z).
+## 2026-09-26 14:43:54Z -- web `7761ce59` -- pair a timeless DH group by ELIMINATION
+
+- lane: `dh-state-aware-pairing`   claim: web   preflight: CLEAR (only gunicorn).
+  Deploy `dep-darth617lnhs73epiet0`, trigger `api`, created 14:37:12Z, live
+  14:43:54Z per `/api/ops/version`.
+- **Checked containment before deploying:** web was serving `beb95060`, NOT the
+  `c081d2e3` this session last deployed -- another session had deployed in
+  between. `beb95060` is an ancestor of `7761ce59` (3 commits between), so this
+  composes rather than reverting it. Serialisation is not composition; being on
+  `main` is what makes a deploy cumulative.
+- predicted from a 14:36:45Z baseline, stable across 3 reads: `mlb_tiles` 13 -> 13,
+  `mlb_chip_tiles` 0 -> 0.
+- **verify: measured 14:44:45Z on served `7761ce59`, stable across 3 reads --
+  `mlb_tiles` 13, `mlb_chip_tiles` 0, total 106, and ZERO duplicate MLB matchup
+  texts. 13 tiles for 13 games, one per game.**
+- **THE FIRING PATH IS STILL UNVERIFIED, and cannot be tested today: there is no
+  doubleheader on 2026-09-26** (13 games, 0 doubleheaders, StatsAPI). This is a
+  no-regression reading plus the removal of a latent wrong merge. OWED: one
+  reading on the next doubleheader.

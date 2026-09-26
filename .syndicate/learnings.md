@@ -4821,3 +4821,33 @@ characterise how significant the remaining defect was.
 
 One event gives an interval, not a rate. It cannot tell "rare" apart from
 "I happened to look between two of them".
+### 2026-09-26 — FORBIDDEN: keying a mechanism on a field without reading what that field actually holds IN THE CASE THE MECHANISM HANDLES -- and writing the fixture from the same assumption, which makes the test agree with you.
+
+- **What I believed:** that a board group's state (`hasLive`/`allFinal`, from its rows'
+  `market_state`) tracks its game, so a timeless doubleheader group could be matched to
+  the chip in the same state.
+- **What production held:** `market_state: "pregame"` on a group whose game was in the
+  TOP OF THE 9th and whose own tile rendered LIVE. Measured 2026-09-25 22:39Z on served
+  `c081d2e3`. The pass computed `want = "pregame"`, never matched the live chip, and the
+  rail seated that game twice -- the exact symptom the fix was written for.
+- **The field is unreliable PRECISELY where the mechanism needs it.** A group goes
+  timeless because its markets were pulled when the game started; the same staleness that
+  removes its clock is what leaves its state behind. So the one case the pass exists for
+  is the one case the field lies in. That is not bad luck -- it is a reason to expect it.
+- **THE TESTS AGREED WITH ME BECAUSE I WROTE THEM TO.** The scenario fed the timeless
+  group `market_state: 'live'`, a value production does not produce there. Reachability
+  was proved -- the test did fail without the change -- and it was still vacuous about
+  the real world. **`off != on` proves the branch executes, not that its input exists.**
+  A fixture built from the assumption cannot test the assumption; the shape has to come
+  from a reading.
+- **What replaced it needs no field at all:** elimination. When the ordered passes have
+  claimed every chip but one and one timeless group is left, the pair is forced by the
+  bucket's own definition. Prefer a rule that derives from structure over one that
+  believes a value.
+- **A second defect rode along, unnoticed until the rewrite:** the old per-group loop
+  handed the first of two same-state timeless groups a chip by ITERATION ORDER -- a wrong
+  merge, which on this rail HIDES A GAME. It had passing tests too.
+- **Cost:** two deploys, and a production failure that a single payload read before
+  writing the pass would have prevented.
+
+---

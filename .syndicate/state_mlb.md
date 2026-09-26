@@ -1313,7 +1313,7 @@ Lane `mlb-sim-retrigger-churn` (OPEN). Readings: `deploys.md` 2026-09-18 01:14:0
 - **Only refresh-worker runs the sim decision:** `SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER` TRUE there, FALSE on live-odds-worker, absent (= False by code default) on web. `SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS=600` is pinned in render.yaml.
 - **Debounce live since 2026-09-18 01:20:00Z:** `SYNDICATE_MLB_SIM_FINGERPRINT_MIN_GAP_SECONDS` default 3600 holds fingerprint-only launches; tip-off, cold-start, join-mismatch, board-missing and props-regen stay immediate. Verified executing: 7 debounces 01:20-04:20Z.
 - **Props-regen is now the visible driver:** `MLB_PROPS_REGEN_DUE` fired at 01:58, 03:08 and 04:10Z, each time widening a launch to the full slate, because `daily_top_props` stayed at 0 candidates after each regen. Its launches carry the `fingerprint_change` LABEL (the reason string prefers it), so count `MLB_DAILY_SIM_TRIGGERED` lines by cause, not by label. Open: whether zero is correct late in the day.
-## [mlb-traditional-doubleheader-join] A TRADITIONAL DOUBLEHEADER COULD NEVER CLEAR THE 45-MINUTE SEPARATION RULE -- FIXED PREGAME; IN PLAY 4 TILES -> 3 -> 2, **THE LAST STEP UNATTRIBUTED** `[pregame 18:07Z/19:51Z; in-play 20:33Z failing, 21:40Z 146f3954, 22:22Z c081d2e3 -- transition reading STILL OWED]`
+## [mlb-traditional-doubleheader-join] A TRADITIONAL DOUBLEHEADER COULD NEVER CLEAR THE 45-MINUTE SEPARATION RULE -- FIXED PREGAME; THE IN-PLAY FIX IS DEPLOYED AND **NEVER YET EXERCISED** `[in-play FAILED 22:39Z on c081d2e3; elimination rule 7761ce59 live 09-26 14:43Z, no-regression only -- no doubleheader on 09-26]`
 
 `doubleHeader: "Y"` (traditional) is played back-to-back on ONE admission, so StatsAPI
 publishes game 2's NOMINAL start minutes after game 1's -- BAL @ NYY 2026-09-25: **823491
@@ -1452,3 +1452,28 @@ ordered passes reject.
 
 **OWED: one reading at the game-1-to-game-2 transition.** Until then the mechanism is
 believed, not known.
+
+
+**THE FIRST TIMELESS PASS COULD NEVER FIRE, AND PRODUCTION SAID SO `[measured 2026-09-25
+22:39Z on c081d2e3]`.** With 823491 in the top of the 9th and 823489 `Scheduled` -- the
+lane's own conditions -- the rail seated BAL @ NYY THREE times: the timeless group
+`mlb|d4b069a134ec` ("FRI SEP 25 LIVE, 1 opportunity"), `mlb|823491` (scoreboard), and
+game 2's group. The pass asked the GROUP what state it was in; its row carried
+`market_state: "pregame"` while its game was live and its own tile rendered LIVE. **A
+group's state is exactly the field that is unreliable for the case this pass handles.**
+
+**IT NOW PAIRS BY ELIMINATION AND CONSULTS NO STATE `[web 7761ce59, live 2026-09-26
+14:43:54Z]`.** When the ordered passes have claimed every chip but one and exactly one
+timeless group remains, the pair is FORCED -- the bucket is one sport, one club pair and
+one date, so the group is one of that fixture's halves and the other is already spoken
+for. Refuses unless exactly one remains on each side.
+
+**IT ALSO CLOSED A LATENT WRONG MERGE THAT WAS LIVE.** In `c081d2e3`, two timeless groups
+sharing a state were resolved by ITERATION ORDER -- the first one took a state-matching
+chip, possibly the wrong half. A wrong merge HIDES A GAME.
+`test_two_timeless_groups_are_refused` fails against that template and passes now.
+
+**NO-REGRESSION ONLY, and the reason is the calendar.** 14:44:45Z, stable across 3 reads:
+13 MLB tiles for 13 games, 0 chip-keyed, 0 duplicate matchup texts. **There is no
+doubleheader on 2026-09-26**, so nothing exercised the new pass. OWED: one reading on the
+next doubleheader.
