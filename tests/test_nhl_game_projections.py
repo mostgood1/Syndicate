@@ -17,11 +17,13 @@ THE THREE REFUSALS, each from a measured property of the real artifact:
      are exact complements -- the same bet stated twice -- so P(home covers
      +1.5) is simply not in this artifact.
 
-And the fourth, which is a belt over a defect elsewhere: NHL's board reported
-`state: pregame` fifteen hours after puck drop, so `#340`'s live-edge guard
-could not fire and this join published `edge_vs_market_pct +54.83` against a
-SETTLED market quoting +800/-750. `_started_game_reason` reads `commence_time`
-off the row instead.
+The live rule is NOT a fourth refusal here: `#340` is owned by the shared
+`live_edge_unavailable_reason`. A per-sport belt lived in this module on
+2026-09-26 because NHL game state was wrong (the board said `pregame`
+fifteen hours after puck drop, and this join published
+`edge_vs_market_pct +54.83` against a settled market). The state defect was
+fixed and the belt removed once the shared guard was measured doing the job
+alone -- 23 of 23 rows on a finished slate.
 """
 
 from __future__ import annotations
@@ -203,27 +205,55 @@ def _fair_half(_row_arg):
     return 0.5
 
 
-def test_a_started_game_gets_no_edge():
-    """`#340`: a pregame model priced against a market that watched the game."""
+def test_the_live_rule_is_DELEGATED_to_the_shared_guard(monkeypatch):
+    """`#340` is owned by `live_edge_unavailable_reason`, not re-implemented here.
+
+    A per-sport belt lived in this module on 2026-09-26, reading `commence_time`
+    off the row, because NHL game state was WRONG -- the board said `pregame`
+    fifteen hours after puck drop, so the shared guard could not fire and this
+    join published `edge_vs_market_pct +54.83` against a settled market. The
+    state defect was fixed (`0c9b6329`) and the belt was removed once the shared
+    guard was MEASURED doing the job alone: 23 of 23 rows on a finished slate.
+    """
+    monkeypatch.setattr(
+        "syndicate.features.shared.live_edge_policy.live_edge_unavailable_reason",
+        lambda _row: "game is final: the market is settled",
+    )
     row = _row("h2h", commence=PAST)
     projection = gp._game_projection(row, "h2h", _entry())
     gp._price_against_market(row, projection, _fair_half)
     assert projection["edge_vs_market_pct"] is None
-    assert "already started" in projection["edge_unavailable_reason"]
+    assert projection["edge_unavailable_reason"] == "game is final: the market is settled"
 
 
-def test_a_pregame_row_still_gets_its_edge():
-    """The negative control. Without it the guard could suppress everything."""
+def test_a_pregame_row_still_gets_its_edge(monkeypatch):
+    """THE NEGATIVE CONTROL. Without it, a guard that suppressed everything
+    would pass the test above and blank the edge column."""
+    monkeypatch.setattr(
+        "syndicate.features.shared.live_edge_policy.live_edge_unavailable_reason",
+        lambda _row: None,
+    )
     row = _row("h2h", commence=FUTURE)
     projection = gp._game_projection(row, "h2h", _entry())
     gp._price_against_market(row, projection, _fair_half)
     assert projection["edge_vs_market_pct"] == pytest.approx((0.38405 - 0.5) * 100, abs=0.01)
 
 
-def test_an_unparseable_commence_time_fails_OPEN():
-    """Blanking edges on a parsing gap is the harm `live_edge_policy` warns of."""
-    assert gp._started_game_reason({"commence_time": "not-a-time"}) is None
-    assert gp._started_game_reason({}) is None
+def test_this_module_carries_NO_live_rule_of_its_own():
+    """A belt reintroduced quietly would diverge from `#340` without anyone
+    choosing that. If NHL state regresses, fix the STATE JOIN, not this file."""
+    import inspect
+
+    assert "_started_game_reason" not in inspect.getsource(gp)
+    # Scoped to the EDGE path only. `attach_nhl_game_projections` reads
+    # `commence_time` for DATE SCOPING, which is correct and unrelated -- an
+    # assertion over the whole module would flag that and teach the next reader
+    # to delete the wrong thing.
+    pricing = inspect.getsource(gp._price_against_market)
+    assert "commence_time" not in pricing, (
+        "the edge path is reading a clock again instead of the shared guard"
+    )
+    assert "live_edge_unavailable_reason" in pricing
 
 
 # --------------------------------------------------------------------------

@@ -829,6 +829,14 @@ death, never life — do not invert it.
 - Verification: A production NHL board for a past date reports final states and non-null scores, and its games carry a status token; plus unit tests that today's live path is unchanged and that a failed fetch degrades to the snapshot rather than blanking the slate.
 - Blocked by: none
 
+### nhl-drop-started-game-belt — OPEN — opened 2026-09-26 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: The per-sport started-game belt is gone from nhl/game_projections.py and the shared #340 guard alone still suppresses every edge on a finished NHL slate.
+- Files: syndicate/features/nhl/game_projections.py (`_started_game_reason` and its call ONLY), tests/test_nhl_game_projections.py (the belt's tests ONLY)
+- Hypothesis: The belt is now redundant: NHL game state is correct since 0c9b6329, so live_edge_unavailable_reason fires on its own.
+- Falsification test: If any row on a finished NHL slate is allowed an edge by the shared guard alone, the belt is still load-bearing and must stay.
+- Verification: Measured on production 2026-09-26T18:33Z BEFORE removing: 2026-09-25 states={final:4} and the shared guard returns 'game is final' for 23 of 23 rows; dates beyond the lookback carry 0 rows so the case I worried about cannot arise; today's 8 pregame games correctly allow edges. After removal, a production read of a finished slate must still publish zero edges.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

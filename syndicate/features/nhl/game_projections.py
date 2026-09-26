@@ -56,6 +56,21 @@ which is measured as LOSING to the close, hockeysim has no powered market
 backtest -- it is an EV/Poisson approximation per period and the sample is
 n=14-15 games. `model_skill` therefore reports "unmeasured", which is a third
 value beside good and bad, and a reader must not infer either.
+
+THE LIVE RULE IS THE SHARED ONE, and this module adds nothing to it.
+`live_edge_unavailable_reason` (`#340`) alone decides whether a row may carry an
+edge. A per-sport belt lived here briefly on 2026-09-26, reading `commence_time`
+off the row, because NHL GAME STATE WAS WRONG: the board reported `pregame`
+fifteen hours after puck drop, so the shared guard could not fire and this join
+published `edge_vs_market_pct +54.83` against a settled market quoting
++800/-750. The state defect was fixed in `0c9b6329`, and the belt was REMOVED
+only after the shared guard was MEASURED doing the job by itself -- 18:33Z that
+day, a finished 2026-09-25 slate read `states={'final': 4}` and
+`live_edge_unavailable_reason` returned "game is final" for 23 of 23 rows, while
+that day's 8 genuinely pregame games correctly still allowed an edge.
+
+If NHL state ever regresses, the edges come back wrong HERE. The guard to fix is
+the state join, not this file.
 """
 
 from __future__ import annotations
@@ -294,48 +309,6 @@ def _game_projection(
     return None
 
 
-def _started_game_reason(row: Mapping[str, Any]) -> str | None:
-    """A PER-SPORT BELT over `live_edge_unavailable_reason`, and why it is needed.
-
-    That policy keys on the GAME STATE and says, deliberately, that an unknown
-    state still allows an edge -- correct, because a resolvable-state gap should
-    not blank the whole edge column.
-
-    NHL's state is not unknown, it is WRONG. Measured 2026-09-26 on the served
-    board: BOS @ WSH `commence_time=2026-09-25T23:08:24Z` still reported
-    `state: pregame` with null scores about fifteen hours after puck drop. So
-    the guard could not fire, and this join published `edge_vs_market_pct
-    +54.83` for over 5.5 against a SETTLED market quoting +800 / -750 -- the
-    exact `#340` failure, a pregame model priced against a market that already
-    knows the answer.
-
-    `commence_time` is on the row and is not derived from the broken join, so it
-    answers the only question that matters here: has the market already watched
-    this game. Absent or unparseable -> None, i.e. fail OPEN to the policy above,
-    because blanking edges on a parsing gap is the harm the policy warns about.
-
-    DELETE THIS once NHL game state is trustworthy; it is compensation for a
-    defect elsewhere, not a rule about hockey.
-    """
-    raw = str(row.get("commence_time") or "").strip()
-    if not raw:
-        return None
-    try:
-        from datetime import datetime, timezone
-
-        start = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-        if start.tzinfo is None:
-            start = start.replace(tzinfo=timezone.utc)
-        if datetime.now(timezone.utc) < start:
-            return None
-    except (ValueError, TypeError):
-        return None
-    return (
-        "the game has already started (commence_time " + raw + "): a pregame projection "
-        "cannot be priced against a market that has watched it"
-    )
-
-
 def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any], no_vig_over) -> None:
     """Stamp the market fair and the edge -- or the NAMED reason there is none.
 
@@ -345,10 +318,9 @@ def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any], no
     from syndicate.features.shared.live_edge_policy import live_edge_unavailable_reason
 
     fair = no_vig_over(row)
-    started_reason = _started_game_reason(row)
     projection["market_fair_prob_over"] = round(float(fair), 4) if fair is not None else None
     prob = projection.get("model_prob_over")
-    live_reason = live_edge_unavailable_reason(row) or started_reason
+    live_reason = live_edge_unavailable_reason(row)
     if live_reason:
         projection["edge_vs_market_pct"] = None
         projection["edge_unavailable_reason"] = live_reason
