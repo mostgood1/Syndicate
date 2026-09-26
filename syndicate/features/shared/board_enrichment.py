@@ -1734,6 +1734,35 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
 
         return _merge_nfl_coverage(game_coverage, prop_coverage)
 
+    if sport == "nhl":
+        # NHL Layer 1 reported `no_projection_source_for_sport` while
+        # `predictions_<date>.csv` was being written and published the whole
+        # time -- 14 games on production for 2026-09-26. The sim was never
+        # missing; this branch was.
+        #
+        # NOT routed through the NCAAF/NFL modules: they stamp their own
+        # `source` and their caveats describe a football margin model measured
+        # against the close. hockeysim is unmeasured, which is a different
+        # claim, and publishing NHL rows under another sport's provenance is
+        # the FORBIDDEN rule from 2026-08-21.
+        try:
+            from syndicate.features.nhl.game_projections import (
+                attach_nhl_game_projections,
+                load_nhl_game_projections,
+            )
+
+            index = load_nhl_game_projections(selected_date)
+            if not index.games:
+                return {
+                    "supported": True,
+                    "rows_with_projection": 0,
+                    "reason": "no NHL hockeysim predictions for this date",
+                }
+            return attach_nhl_game_projections(grid, index, selected_date=selected_date)
+        except Exception:
+            _LOGGER.exception("BOOK_GRID_PROJECTION_FAILURE sport=nhl date=%s", selected_date)
+            return {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
+
     if sport != "mlb":
         return {"supported": False, "reason": f"no projection source wired for {sport}"}
     try:

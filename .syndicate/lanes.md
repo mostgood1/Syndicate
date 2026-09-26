@@ -808,6 +808,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - MET: moved `closed-lane-archive-20260925-1811` (owner 97d5cc75 idle 906m). 18 WAIT (owners 16da93b3/4ab694ed live); detail in log/2026-09-26.md.
 
+### nhl-game-projections — OPEN — opened 2026-09-26 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: NHL Layer 1 reports enriched instead of no_projection_source_for_sport: every matched game publishes a line-independent PROJECTION, and a probability ONLY for the exact market line the model priced, with every refusal counted by name.
+- Files: syndicate/features/nhl/game_projections.py (NEW), syndicate/features/shared/board_enrichment.py (the new nhl branch inside _attach_projections_by_sport ONLY -- a different function from the _LIVE_GAMELINE_SPORTS/live-gameline work this session's lane nfl-live-resim-activation holds in the same file), tests/test_nhl_game_projections.py (NEW)
+- Hypothesis: The NHL sim already publishes predictions_<date>.csv on production (14 games for 2026-09-26, verified by HTTP200); the board shows proj=0 purely because _attach_projections_by_sport has no nhl branch. This is a join to wire, not sim work.
+- Falsification test: If the predictions artifact were absent or empty on production, or carried no usable probabilities on any date, the fix would be sim work and this lane is wrong.
+- Verification: Layer 1 nhl enrichment flips off no_projection_source_for_sport with rows_with_projection > 0 on a date with board rows, AND unit tests prove p_over=0.0/anchor_state=no_market is refused rather than published, and that a probability is never attached to a line other than the one the model priced.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
