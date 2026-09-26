@@ -42161,3 +42161,47 @@ because a catch-up cannot be staged one change at a time.
 `REFRESH_LAUNCH_REFUSED` in the 7 min after the deploy, which is expected — this
 service's refresh lane was not contending in that window. It is a RATE of zero
 so far, not a failure, and not evidence the code is inert here.
+
+## 2026-09-26 03:51:56Z — web — `beb95060` — lane `web-catchup`
+
+**What shipped, and it is SMALLER than "web was 5h stale" suggests.** 15 commits,
+but only TWO code files, and one of them web never imports:
+`scripts/run_live_odds_refresh_worker.py` (+49, worker-only) and
+`syndicate/features/shared/live_refresh_loop.py` (+31, the global
+odds-refresh marker rewind). Web ALREADY had the typed refusals and
+choke-point logging — verified by ancestry, `f4698da2` is an ancestor of the
+deployed `c081d2e3`, which another session shipped at 22:21:04Z.
+
+**Risk checks before the POST, all clean:**
+- no new periodic work (no `Thread(`, `while True`, `start_*_loop`,
+  `daemon=True`, `*_INTERVAL_SECONDS`) — the `#241` class
+- **no request-path change at all**: nothing under `syndicate/blueprints/`,
+  `syndicate/templates/`, `pipeline/`, `requirements.txt` or `app.py`
+- preflight CLEAR 03:48:4xZ (gunicorn master + 2 workers at 674/633MB, plus 2
+  defunct children already dead and unkillable by a deploy)
+
+- claim `608fb9823a60501a`; expect `c081d2e3 -> beb95060`; baseline read 03:48:28Z
+- **verify: MET on the deploy.** live_commit `beb95060`, finishedAt
+  03:51:56.776621Z.
+- **verify: MET on SERVING, which is the one that matters for web.** The board
+  was read directly, not just the deploy API, every ~100s for 10 minutes:
+  `mlb HTTP200 games=17 rows=3418` and `nhl HTTP200 games=4 rows=17` on every
+  single sample, 03:53:58Z -> 04:02:32Z.
+- **verify: MET on no OOM.** Render events since live: 1, the `deploy_ended`
+  itself. Nothing concerning across the full 10 min. Web `oomKilled` on
+  2026-09-17, so this is the failure mode that had to be waited out rather than
+  assumed.
+
+**Read carefully, NOT as a regression:** mlb `proj` was 224 at +1m and +3m, then
+2554 from +5m — that is post-restart cache/artifact warm-up, not a defect. And
+mlb `rows=3418 proj=2554` here versus `rows=3764 proj=2910` at 23:28Z is a
+DIFFERENT TIME on a finishing slate, not a loss: board coverage splits by game
+state, and a finished slate reads as a regression if that is ignored.
+
+**NOT CLAIMED:** any memory improvement. Every deploy reboots, so web's RSS looks
+good for the first minutes regardless; the floor is the ratchet and 10 minutes
+cannot see it.
+
+**All three services are now current on `origin/main` ancestry:**
+web `beb95060` (03:51:56Z), refresh-worker `c6b6246c` (03:14:25Z),
+live-odds-worker `ec10612a` (22:56:21Z).

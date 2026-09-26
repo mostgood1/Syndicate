@@ -800,6 +800,15 @@ death, never life — do not invert it.
 - Verification: Live commit on refresh-worker equals the target, no sim killed (preflight CLEAR on in-flight jobs before the POST), and the service reaches a steady state afterwards.
 - Blocked by: none
 
+### web-catchup — CLOSED — opened 2026-09-25, closed 2026-09-26 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- **GOAL: MET.** web live on `beb95060` at 2026-09-26T03:51:56.776621Z (from `c081d2e3`). SERVING verified by reading the BOARD, not the deploy API: `mlb HTTP200 games=17 rows=3418` and `nhl HTTP200 games=4 rows=17` on every sample across 10 minutes (03:53:58Z -> 04:02:32Z). NO OOM: Render events since live = 1, the deploy_ended itself (web oomKilled 2026-09-17, so this was waited out rather than assumed). The range was far smaller than '5h stale' implies -- 15 commits but only 2 code files, and NO request-path change at all (nothing in blueprints/templates/pipeline/requirements/app.py); web already had the typed refusals, since `f4698da2` is an ancestor of `c081d2e3`. NOT CLAIMED: any memory improvement -- every deploy reboots and 10 min cannot see the ratchet. mlb proj 224 -> 2554 over the window is cache warm-up, and mlb rows 3418 vs 3764 at 23:28Z is a finishing slate, NOT a regression. Receipt in deploys.md.
+- Goal: web runs a commit containing the global odds-refresh marker rewind, deployed without disrupting a board build, and comes back serving with no OOM.
+- Files: .syndicate/deploys.md (this deploy's receipt ONLY)
+- Hypothesis: n/a -- deploy of already-landed, already-verified code.
+- Falsification test: n/a
+- Verification: Live commit on web equals the target, the board serves after the restart, and the Render events API shows no oomKilled or restart beyond the deploy lifecycle.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
