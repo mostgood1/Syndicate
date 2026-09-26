@@ -42305,3 +42305,52 @@ delete it once NHL game state is trustworthy.
   arriving, not this change: the new pass fires only on a bucket with >= 2 chips
   for the same clubs on one date, and **there are no doubleheaders on 2026-09-26**.
 - Still a no-regression reading only. The firing path waits for a doubleheader.
+
+## 2026-09-26 17:12:03Z — refresh-worker — `0c9b6329` — lane `nhl-game-state-past-dates`
+
+**What shipped:** an NHL board for a date that is not today now learns its games
+are FINAL. Scores were applied only when the requested date equalled today, so a
+past-date board reported `state: pregame` with null scores -- BOS @ WSH still
+said pregame FIFTEEN HOURS after puck drop. That silently disabled `#340`'s
+live-edge guard, which keys on game state and deliberately allows an edge when
+the state is UNKNOWN; a state that is WRONG sails straight through it.
+
+- **verify: MET, 2026-09-26T17:16:40Z.** Layer 1 nhl for 2026-09-25:
+  `states={'final': 4}` and `with_scores=4`, from `{'pregame': 4}` / 0 scores.
+  The artifact carries `generated_at=17:15:45Z`, AFTER this deploy finished at
+  17:12:03Z. The two reads before it (`gen=15:34:35Z`) still showed pregame and
+  were correctly NOT counted either way -- a pre-deploy artifact proves nothing,
+  and that distinction is what made the earlier wrong-service deploy legible.
+- **The scores are RIGHT, not merely non-null:** BOS @ WSH 2-3, NYR @ NYI 6-1,
+  DAL @ MIN 2-1, WPG @ COL 2-5 -- identical to what the NHL endpoint returned
+  when queried directly before any code was written.
+
+**THE API WAS NEVER THE PROBLEM, checked before writing anything.** Same-instant
+A/B at 15:58:55Z on `api-web.nhle.com/v1/schedule/2026-09-25`: production's own
+`syndicate-nhl/1.0` -> HTTP200, 4 games, `states={'FINAL': 4}`; `Mozilla/5.0` ->
+identical; urllib's DEFAULT UA -> 403. The User-Agent trap that bit this module
+before is real and is NOT this bug.
+
+**AND THE OBVIOUS ONE-LINE FIX WOULD HAVE BEEN A SILENT NO-OP.**
+`odds/games/date=*/scoreboard.csv` is DELIBERATELY absent from
+`HOT_ARTIFACT_PATTERNS` (a `date=*` pattern makes every dated pull list every
+historical game-date folder; web's export walk already ran past its timeout,
+2026-09-16). So the snapshot exists only on the service that WROTE it, while the
+board is built on another. Ungating the call alone would have changed nothing.
+
+Cost is bounded: an 8-day lookback (`SYNDICATE_NHL_SCOREBOARD_LOOKBACK_DAYS`),
+FUTURE dates refused outright, past dates cached 1h because a final score is
+immutable, and TODAY never cached on either read or write.
+
+- claim `06ea80263c95930f`; expect `e3dca09d -> 0c9b6329`; baseline read 17:05:48Z
+- **The window took 58 minutes to find.** Preflight HELD continuously from
+  16:06Z (board builds, then 5-8 job batches as the Saturday slate ramped); my
+  first claim EXPIRED at 16:51Z un-used. CLEAR at 17:04:28Z, re-acquired,
+  deployed 17:06:08Z. No in-flight build was killed to take it.
+
+**STILL PRESENT, deliberately:** `_started_game_reason` in
+`nhl/game_projections.py`, the per-sport belt added when this state was wrong.
+NOT removed yet, and not because of caution alone: it still covers dates OUTSIDE
+the 8-day lookback and any game whose state join fails for another reason.
+Removing it should follow a reading that NHL state is right across the window,
+not this single date.
