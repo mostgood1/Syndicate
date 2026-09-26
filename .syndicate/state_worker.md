@@ -2247,3 +2247,45 @@ outlier cold reading. Three paired replications erased it: **cold 31.32s vs warm
   - The worker exits (Render restarts it) after >= N consecutive refusals (env, now 1; 0 disables), uptime >= 30 min, no live child, no drain.
   - On `fb0c91cf`, refusals came back 50m45s after live (14:30:34Z). They were then reset by an admitted build at 15:22Z before any recycle.
   - The later boots (15:38Z, 17:29Z, 19:07Z, 21:03Z) logged 0 refusals before the next deploy. No `RECYCLE_EXIT` has ever been observed.
+
+## [refresh-run-lanes] Refresh-run lane topology, and refusals are now LOGGED [verified 2026-09-25/26]
+
+`SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES` is ON in production. A lane is one
+"only one refresh run at a time" mutex, and an explicit `lane=` on
+`launch_refresh_run` creates a private one. SEVEN lanes exist; two on the SAME
+container run concurrently as a matter of course (measured in one fetch
+22:13:53Z: `live-odds-worker` pid 6472 and `live-odds-worker-ncaaf-lines` pid
+8532, both running).
+
+    live-odds-worker                 the COMBINED sweep (the tick) + look-ahead
+    live-odds-worker-ncaaf-lines     _launch_autorun_ncaaf_lines_refresh
+    live-odds-worker-nfl-lines       _launch_autorun_nfl_lines_refresh
+    live-odds-worker-wnba-live       _launch_autorun_wnba_live_refresh
+    live-odds-worker-wnba-pregame    _launch_autorun_wnba_pregame_refresh  [NEW 8edd8778]
+    refresh-worker                   mlb / weekly_sports / soccer_weekly autoruns
+    web                              (idle since 2026-08-31)
+
+STILL SHARING the combined sweep's lane, so still able to contend with it:
+`_launch_autorun_soccer_pregame_refresh` (live-odds-worker) and all three
+refresh-worker autoruns.
+
+**A refused launch now NAMES itself** (`890b90e4`+): `REFRESH_LAUNCH_REFUSED
+reason=<lane_busy|state_unconfirmed> lane= pid= run_stamp=` from
+`ops_refresh._raise_refresh_refusal` (the raise site, so all 14 call sites), plus
+`ODDS_SWEEP_REFUSED ... sports=` from the loop. `lane_busy` is benign and
+self-correcting; `state_unconfirmed` is FAIL-CLOSED - nothing is running to
+release it, so it refuses every launch permanently. Do not read them as the same.
+
+**A refusal no longer costs an interval** (`ec10612a`+): the global
+`last_odds_refresh_launch` marker is rewound on any `RefreshRunRefused`, because
+`_off_hours_gate_blocks_launch` reads it as "when did odds last refresh" and
+would otherwise suppress real launches. A launch that DIED is deliberately not
+rewound.
+
+**OPEN, not fixed:** the combined sweep SELF-COLLIDES - it outlives its own tick
+interval. Measured on a clean window 22:56:21Z->23:25:33Z: 7 refusals in 29.2
+min = 1 per 4.2 min across 5 holder runs. Harmless now (each is a no-op), but it
+is wasted attempts and log volume.
+
+**Production intervals are env-set, not the code defaults.** WNBA pregame runs at
+7200s, not the 14400s fallback in `_wnba_pregame_refresh_interval_seconds`.
