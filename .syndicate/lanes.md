@@ -790,7 +790,8 @@ death, never life — do not invert it.
 - Verdict: GOAL MET — owner_liveness.py --idle-min 240 at 23:11Z returned SAFE for 1 of 17 CLOSED blocks; moved to lanes_closed.md with one pointer. Table in log/2026-09-25.md.
 - Moved: `closed-lane-archive-20260925-1328`.
 
-### refresh-worker-catchup — OPEN — opened 2026-09-25 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+### refresh-worker-catchup — CLOSED — opened 2026-09-25, closed 2026-09-26 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- **GOAL: MET.** refresh-worker live on `c6b6246c` at 2026-09-26T03:14:25.164124Z (from `d5449df7`, 25h old), verified by read at 03:21:48Z. NO SIM KILLED: preflight HELD three times on three different blockers (MLB sim `run_mlb_daily_sim_job` pid 592 at 02:45Z; odds sweep + soccer MLS build at 03:03Z; in-process board build at 03:10Z), CLEAR at 03:11:17Z, deployed 03:11:25Z -- 8 seconds later. STEADY: the Render EVENTS API (not logs) shows 5 events since 03:11Z, all deploy lifecycle, no restart/OOM/crash; worker still emitting heartbeats at +7m. Pre-deploy risk check found ZERO new periodic work in the 66-commit range (the `#241` restart-loop class). NOT CLAIMED: that 66 commits of behaviour are verified -- only the deploy and the absence of a restart are; the bisect surface for any later regression on this service is 66 commits, the accepted cost of the gap. Receipt + two recorded instrument errors of mine in deploys.md.
 - Goal: refresh-worker runs a commit containing tonight's three refresh fixes, deployed without killing an in-flight MLB sim, and its refresh lane emits the refusal instrumentation the other worker already has.
 - Files: .syndicate/deploys.md (this deploy's receipt ONLY)
 - Hypothesis: n/a -- this is a deploy of already-landed, already-verified code, not a diagnostic.
