@@ -200,6 +200,18 @@ out.untimed_group_without_a_date_is_refused = await scenario(
 out.untimed_group_refused_when_two_chips_share_its_state = await scenario(
   [LIVE_G1('live'), LIVE_G2('live')],
   [...g1Rows(untimedLive()), ...g2Rows(withCommence(LATE_GROUP))]);
+// THE MEASURED PRODUCTION SHAPE, 2026-09-25 22:39Z: the timeless group's rows
+// say `pregame` while its game is in the top of the 9th. The first version of
+// the pass read that field and could never fire.
+const untimedButStale = () => ({ game_date: '2026-09-25', market_state: 'pregame' });
+out.untimed_group_with_a_stale_state_still_pairs = await scenario(
+  [LIVE_G1(), LIVE_G2()],
+  [...g1Rows(untimedButStale()), ...g2Rows(withCommence(LATE_GROUP))]);
+// CONTROL: two timeless groups leave nothing forced -- elimination needs
+// exactly one on each side.
+out.two_untimed_groups_are_refused = await scenario(
+  [LIVE_G1(), LIVE_G2()],
+  [...g1Rows(untimedButStale()), ...g2Rows(untimedButStale())]);
 console.log(JSON.stringify(out));
 """
 
@@ -419,10 +431,46 @@ def test_a_timeless_group_with_no_date_is_refused(observed: dict) -> None:
 
 
 def test_a_timeless_group_is_refused_when_two_chips_share_its_state(observed: dict) -> None:
-    """CONTROL: exactly one candidate, or nothing.
+    """CONTROL: exactly one unclaimed chip, or nothing.
 
-    Two live chips name no winner. A wrong merge HIDES A GAME, which is the
-    worst outcome this rail has, so ambiguity must refuse rather than pick.
+    Both chips live means the ordered pass claims neither, so TWO chips remain
+    unclaimed against one timeless group and nothing is forced. A wrong merge
+    HIDES A GAME, which is the worst outcome this rail has, so ambiguity must
+    refuse rather than pick.
     """
     pairs = observed["untimed_group_refused_when_two_chips_share_its_state"]["row_chip"]
+    assert set(pairs.values()) == {None}, pairs
+
+
+def test_a_timeless_group_pairs_even_when_its_own_state_is_stale(observed: dict) -> None:
+    """THE REGRESSION TEST FOR THE FIRST VERSION OF THIS PASS.
+
+    Measured on production 2026-09-25 22:39Z on served `c081d2e3`: the timeless
+    BAL @ NYY group carried `market_state: "pregame"` while its game was in the
+    top of the 9th and its own tile rendered LIVE. The pass asked the group what
+    state it was in, got "pregame", and could never match the live chip -- so it
+    never fired, and the rail seated game 1 twice.
+
+    Pairing is now by ELIMINATION: the ordered pass takes the pregame chip for
+    game 2's timed group, and the one chip and one timeless group left over are
+    forced. The group's own state is never consulted, which is the point -- it
+    is exactly the field that is unreliable here.
+    """
+    pairs = observed["untimed_group_with_a_stale_state_still_pairs"]["row_chip"]
+    g1 = [k for k in pairs if k.endswith("aaaa")]
+    g2 = [k for k in pairs if k.endswith("bbbb")]
+    assert g1 and g2
+    assert pairs[g1[0]] == "823543", pairs   # the live half, despite saying pregame
+    assert pairs[g2[0]] == "823494", pairs
+
+
+def test_two_timeless_groups_are_refused(observed: dict) -> None:
+    """CONTROL: elimination needs exactly one on each side.
+
+    With both groups timeless the ordered passes claim nothing, so two chips
+    face two groups and no pairing is forced. Without this the rule could
+    degrade into "hand them out in some order", which is the guessing the
+    doubleheader module exists to prevent.
+    """
+    pairs = observed["two_untimed_groups_are_refused"]["row_chip"]
     assert set(pairs.values()) == {None}, pairs

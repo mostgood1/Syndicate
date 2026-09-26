@@ -2465,7 +2465,6 @@
       if (byFixture.has(key)) byFixture.get(key).chips.push({ at, chip });
     }
     const distinct = (arr) => new Set(arr.map((x) => x.at)).size === arr.length;
-    const stateOf = (entry) => String((entry.chip || {}).state || "").trim().toLowerCase();
     for (const bucket of byFixture.values()) {
       const { groups: gs, chips: cs, untimed } = bucket;
       // Which chips this bucket has already handed out, so the timeless pass
@@ -2491,18 +2490,28 @@
       // `#165` follow-up #1 shows silently merging two REAL games, which on a
       // doubleheader is both halves. Giving the timeless group its chip
       // instead lets the existing, proven merge do the collapsing.
-      if (cs.length < 2 || !untimed.length) continue;
-      if (cs.some((entry) => !stateOf(entry))) continue;
-      for (const group of untimed) {
-        const want = group.hasLive ? "live" : (group.allFinal ? "final" : "pregame");
-        // EXACTLY ONE, or nothing. Two halves in the same state name no winner,
-        // and a wrong merge here HIDES A GAME -- the worst outcome this rail
-        // has, and the one `#165`'s three live follow-ups were all chasing.
-        const candidates = cs.filter((e) => stateOf(e) === want && !claimed.has(e.chip));
-        if (candidates.length !== 1) continue;
-        out.set(group.key, candidates[0].chip);
-        claimed.add(candidates[0].chip);
-      }
+      // BY ELIMINATION, NOT BY THE GROUP'S OWN STATE. The first version of this
+      // asked whether the group was live or final and matched that against the
+      // chips' states. It could never fire: measured 2026-09-25 22:39Z on
+      // `c081d2e3`, the timeless BAL @ NYY group carried `market_state:
+      // "pregame"` while its game was in the top of the 9th and its own tile
+      // rendered LIVE. A group's state is exactly the field that is unreliable
+      // for the case this pass exists to handle, so it is not consulted.
+      //
+      // What IS reliable is what the ordered passes above already settled. When
+      // they have claimed every chip but one, and one timeless group is left,
+      // the remaining pair is forced: the bucket is one sport, one club pair and
+      // one date, so a group in it is one of that fixture's halves, and the
+      // other half is already spoken for.
+      //
+      // EXACTLY ONE ON EACH SIDE, or nothing -- a wrong merge HIDES A GAME,
+      // which is the worst outcome this rail has and the one `#165`'s three
+      // live follow-ups were all chasing.
+      if (cs.length < 2 || untimed.length !== 1) continue;
+      const unclaimed = cs.filter((entry) => !claimed.has(entry.chip));
+      if (unclaimed.length !== 1) continue;
+      out.set(untimed[0].key, unclaimed[0].chip);
+      claimed.add(unclaimed[0].chip);
     }
     return out;
   }
