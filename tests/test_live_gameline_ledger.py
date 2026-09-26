@@ -208,12 +208,25 @@ class TestDurability:
                              build_records([_row()], sport="mlb", date_str="d"))
         assert out["written"] == 0 and "error" in out
 
-    def test_the_build_cap_is_reported_not_silent(self, tmp_path):
-        """A silent cap reads as 'that is all that happened'."""
+    def test_the_build_cap_is_reported_not_silent(self, tmp_path, monkeypatch):
+        """A silent cap reads as 'that is all that happened'.
+
+        CAP-AGNOSTIC as of 2026-09-26. This used to hardcode 600 rows against a
+        cap of 500, so it broke the moment the cap moved -- and the cap HAD to
+        move: 500 encoded "a live slate tops out around 15 games", which an
+        NCAAF Saturday disproved by dropping 13,383 records in one afternoon. A
+        test that pins the value instead of the BEHAVIOUR argues against fixing
+        the value. Pin the behaviour, set the cap explicitly.
+        """
+        import syndicate.features.shared.live_gameline_ledger as _led
+
+        monkeypatch.setattr(_led, "_MAX_RECORDS_PER_BUILD", 500)
         p = tmp_path / "led.jsonl"
         rows = [_row(game_pk=i) for i in range(600)]
         out = append_records(p, build_records(rows, sport="mlb", date_str="d"))
         assert out["truncated_build_cap"] == 100 and out["written"] == 500
+        # The loss is attributable, not just counted.
+        assert sum(out["truncated_build_cap_by_segment"].values()) == 100
 
     def test_the_kill_switch_writes_nothing(self, tmp_path, monkeypatch):
         monkeypatch.setenv("MLB_LIVE_GAMELINE_LEDGER_ENABLED", "0")

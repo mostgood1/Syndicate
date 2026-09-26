@@ -92,11 +92,52 @@ LEDGER_VERSION = 5
 # file and not the other shipped inert with every test green.
 from syndicate.features.shared.live_gameline_join import REFUSAL_KEY as _REFUSAL_KEY
 
-# A live slate tops out around 15 games x a handful of priceable markets. 500
-# is far above that and still bounds a pathological build.
-_MAX_RECORDS_PER_BUILD = 500
-# ~600 bytes/record x 20k = ~12 MB/day worst case, on a disk with 50 GB.
-_MAX_RECORDS_PER_FILE = 20_000
+def _int_env(name: str, default: int) -> int:
+    """A positive int from the environment, or the default.
+
+    Both caps are env-overridable so a bad default can be corrected WITHOUT a
+    deploy -- this one went unnoticed for as long as it did because changing it
+    meant shipping code.
+    """
+    raw = str(os.environ.get(name) or "").strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+# THE OLD COMMENT HERE WAS THE BUG, and it is kept so the shape is legible:
+# "A live slate tops out around 15 games x a handful of priceable markets. 500
+# is far above that and still bounds a pathological build."
+#
+# That is true of MLB and false of college football. An NCAAF Saturday is ~65
+# games, and every game carries SEVEN segments (full, h1, h2, q1-q4), so
+# candidates scale with games x segments x markets rather than with games.
+#
+# MEASURED ON PRODUCTION, refresh-worker 2026-09-26 15:00-18:55Z, before any
+# edit, while the slate was still running:
+#
+#     ncaaf   121 builds   max 937 candidates   61 builds truncated (50%)
+#             max 437 dropped in ONE build      13,383 records dropped in total
+#     mlb      69 builds   max 137 candidates    0 truncated
+#     nhl / nfl / soccer                         0 truncated
+#
+# So half of every NCAAF build on the biggest slate of the season was silently
+# losing records -- and `records[:N]` keeps the FIRST N, so the loss was not
+# even random: it fell on whatever sorted last, consistently.
+#
+# 5000 restores the comment's original INTENT (far above a real slate, still
+# bounding a pathological build) against the real slate size rather than MLB's.
+_MAX_RECORDS_PER_BUILD = _int_env("SYNDICATE_LIVE_GAMELINE_MAX_RECORDS_PER_BUILD", 5_000)
+# RAISED IN STEP WITH THE BUILD CAP, because raising one into the other is how a
+# fix becomes a worse bug: this cap does not truncate, it STOPS WRITING FOR THE
+# REST OF THE DAY. With the build cap lifted, ncaaf writes ~140 records/build
+# instead of 75, and ~360 builds/day would reach ~50k -- past the old 20k.
+# `truncated_file` is 0 for every sport today, so this is headroom being added
+# BEFORE it binds, not after. ~600 bytes/record x 120k = ~72 MB/day worst case,
+# on a disk with 50 GB.
+_MAX_RECORDS_PER_FILE = _int_env("SYNDICATE_LIVE_GAMELINE_MAX_RECORDS_PER_FILE", 120_000)
 
 
 def _now_iso() -> str:
@@ -591,6 +632,12 @@ def append_records(path: Path, records: list[dict[str, Any]]) -> dict[str, Any]:
         "written_by_segment": {},
         "skipped_unchanged_by_segment": {},
         "truncated_build_cap": 0,
+        # SPLIT, for the same reason `written_by_segment` is: a total cannot say
+        # WHICH bet was lost. `records[:N]` keeps the FIRST N, so truncation is
+        # systematic rather than random -- it falls on whatever sorts last, the
+        # same shape as the MLB first5-vs-full skew that made a capped scorer
+        # read healthy. If this cap ever binds again, this says on what.
+        "truncated_build_cap_by_segment": {},
         "truncated_file_cap": 0,
         "enabled": True,
     }
@@ -601,7 +648,10 @@ def append_records(path: Path, records: list[dict[str, Any]]) -> dict[str, Any]:
         return coverage
 
     if len(records) > _MAX_RECORDS_PER_BUILD:
-        coverage["truncated_build_cap"] = len(records) - _MAX_RECORDS_PER_BUILD
+        dropped = records[_MAX_RECORDS_PER_BUILD:]
+        coverage["truncated_build_cap"] = len(dropped)
+        for rec in dropped:
+            _bump_segment(coverage["truncated_build_cap_by_segment"], rec)
         records = records[:_MAX_RECORDS_PER_BUILD]
 
     try:
