@@ -382,10 +382,23 @@ def main(argv: list[str] | None = None) -> int:
               "production ran is not a reading about production.", flush=True)
         return 3
 
+    # DEDUPED BY EVENT ID. ESPN's college-football scoreboard returns a whole
+    # WEEK for some dates (2026-09-19 returns 71 games; 2026-09-20 returns 0),
+    # so a multi-date window can hand back the same fixture more than once. A
+    # double-counted game inflates every bucket's n and makes an unpowered
+    # sample look powered, which is the one thing a grade must not do.
+    seen: set[str] = set()
     games: list[dict[str, Any]] = []
+    duplicates = 0
     for date_str in dates:
         try:
-            games.extend(completed_games(date_str))
+            for game in completed_games(date_str):
+                key = game["event_id"]
+                if key in seen:
+                    duplicates += 1
+                    continue
+                seen.add(key)
+                games.append(game)
         except Exception as exc:  # noqa: BLE001
             print(f"  {date_str}: fetch failed {type(exc).__name__}", flush=True)
     if args.limit:
@@ -403,6 +416,7 @@ def main(argv: list[str] | None = None) -> int:
     result = score(rows, lines=lines)
     result["dates"] = len(dates)
     result["completed_games_found"] = len(games)
+    result["duplicate_events_skipped"] = duplicates
     result["games_unrated_refused"] = unrated
     result["sims_per_cutoff"] = args.sims
     result["lines_scored"] = lines
