@@ -495,6 +495,40 @@ def main(argv=None) -> int:
     for path, holders in sorted(contested.items()):
         print(f"        {path}")
         print(f"          held by: {', '.join(holders)}")
+    if contested:
+        # THE REMEDY IS PRINTED AT THE INCIDENT, not left in learnings.md.
+        #
+        # This exact mistake has now cost at least three sessions a cycle:
+        # a lane recorded that a path had MOVED by spelling the path inside its
+        # own `- Files:` line, and thereby re-claimed the file it was releasing.
+        # It is already a standing rule (`learnings.md` 2026-09-24 FORBIDDEN,
+        # written by one of the sessions that then repeated it) -- but that file
+        # is ~4,900 lines and nothing points you at the entry while you are
+        # mid-edit on a Files line. The checker is where the incident surfaces,
+        # so the rule belongs here. Suggested by lane `dh-state-aware-pairing`
+        # (session 16da93b3) after verifying the mechanism in the parser.
+        #
+        # Markers come from `_DISCLAIMER_MARKERS` itself, never a copy: a hint
+        # that drifts from the parser it describes is worse than none.
+        print()
+        print("        WHY A PATH YOU MEANT TO RELEASE IS STILL CLAIMED:")
+        print(r"        `_paths_in` splits a '- Files:' line on [,\s]+ and keeps every")
+        print("        path-shaped token. It has NO notion of a sentence, so prose ABOUT")
+        print("        a path is indistinguishable from a claim OF it -- writing")
+        print("        \"(TAKEN by lane x)\" or \"REMOVED, now held elsewhere\" next to the")
+        print("        path RE-CLAIMS the file you were releasing.")
+        print("        To release: delete the path, or say it naming NO path.")
+        print("        A disclaimer marker governs only what FOLLOWS it (`_claimable_prefix`")
+        print("        cuts the line AT the marker), so a marker AFTER the path releases")
+        print("        nothing. And the token must match: \"all unclaimed\" is NOT \"not claimed\".")
+        print("        Recognised markers, as words (the parser holds more):")
+        # Word-shaped only: sorting the raw tuple leads with punctuation entries
+        # like ", no " and ". no ", which read as noise in an incident message.
+        # Read from `_DISCLAIMER_MARKERS` itself so this cannot drift from it.
+        _words = [m for m in sorted(_DISCLAIMER_MARKERS) if m[:1].isalpha()]
+        print(f"          {', '.join(_words[:7])} ...")
+        print("        Standing rule: learnings.md 2026-09-24 FORBIDDEN (recording that")
+        print("        a path MOVED LANES by spelling it inside a Files or Tests block).")
 
     ended = bullets_that_end_a_files_block(text)
     if ended:

@@ -835,3 +835,52 @@ def test_when_git_cannot_answer_the_message_does_not_claim_it_checked(tmp_path, 
     out = capsys.readouterr().out
     assert "upstream NOT CHECKED" in out
     assert "upstream cannot have it" not in out
+
+
+# ---------------------------------------------------------------------------
+# The remedy printed AT the incident. Added 2026-09-26 after this mistake cost
+# a third session a cycle: a lane recorded that a path had MOVED by spelling the
+# path inside its own `- Files:` line, and so re-claimed the file it was
+# releasing. It is already `learnings.md` 2026-09-24 FORBIDDEN -- but that file
+# is ~4,900 lines and nothing points you at the entry mid-edit, so the rule
+# belongs in the output of the check that catches it.
+# ---------------------------------------------------------------------------
+
+def test_a_contested_file_prints_why_prose_still_claims(capsys):
+    assert mod.main([_write(CONTESTED)]) == 1
+    out = capsys.readouterr().out
+    assert "WHY A PATH YOU MEANT TO RELEASE IS STILL CLAIMED" in out
+    # The two facts that actually unblock the reader.
+    assert "NO notion of a sentence" in out
+    assert "governs only what FOLLOWS it" in out
+
+
+def test_the_remedy_names_real_markers_not_a_hand_copied_list(capsys):
+    """A hint that drifts from the parser it describes is worse than none."""
+    mod.main([_write(CONTESTED)])
+    out = capsys.readouterr().out
+    shown = [m for m in mod._DISCLAIMER_MARKERS if m[:1].isalpha() and m in out]
+    assert shown, "no recognised marker reached the output"
+    for marker in shown:
+        assert marker in mod._DISCLAIMER_MARKERS
+
+
+def test_the_remedy_does_not_lead_with_punctuation_markers(capsys):
+    """`sorted(_DISCLAIMER_MARKERS)` leads with ', no ' and '. no ', which read
+    as noise in an incident message. Word-shaped markers only."""
+    mod.main([_write(CONTESTED)])
+    out = capsys.readouterr().out
+    marker_line = next(
+        (l for l in out.splitlines() if "collision check" in l or "held by" in l),
+        "",
+    )
+    assert marker_line, "the marker line never printed"
+    assert not marker_line.strip().startswith(","), marker_line
+    assert not marker_line.strip().startswith("."), marker_line
+
+
+def test_a_clean_ledger_prints_no_remedy(capsys):
+    """NEGATIVE CONTROL. Guidance on a healthy run is noise that trains people
+    to skip the whole report."""
+    assert mod.main([_write(ONE_HOLDER)]) == 0
+    assert "WHY A PATH YOU MEANT TO RELEASE" not in capsys.readouterr().out
