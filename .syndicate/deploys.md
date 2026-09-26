@@ -42224,3 +42224,55 @@ live-odds-worker `ec10612a` (22:56:21Z).
   doubleheader on 2026-09-26** (13 games, 0 doubleheaders, StatsAPI). This is a
   no-regression reading plus the removal of a latent wrong merge. OWED: one
   reading on the next doubleheader.
+
+## 2026-09-26 15:32:03Z — refresh-worker — `e3dca09d` — lane `nhl-game-projections`
+
+**What shipped:** the NHL branch of `_attach_projections_by_sport`, joining
+hockeysim's `predictions_<date>.csv` onto Layer 1. The sim was never missing --
+the branch was.
+
+- **verify: MET on the board, 2026-09-26T15:33:46Z.** Layer 1 nhl
+  `games=4 rows=17 rows_with_projection=17 enrichment=enriched`, from
+  `proj=0 enrichment=no_projection_source_for_sport`. The artifact carries
+  `generated_at=15:33:08Z`, AFTER this deploy finished at 15:32:03Z, so it was
+  built by the new code -- an artifact stamped before the deploy would have
+  proved nothing.
+- **verify: MET on the refusals, read off the SERVED payload.** 17 projected,
+  7 priced, 10 refused. `any probability == 0.0` -> **False**: the fabricated
+  certainty never reached the board. `source` is `nhl_hockeysim` on all 17 (not
+  another sport's provenance) and `model_skill` is `unmeasured` on all 17.
+  Per market: h2h 4/4 priced; spreads 4 projected / 3 priced (one refused at
+  +1.5, the line this artifact does not carry); **totals 9 projected / 0
+  priced**, every one refused for `anchor_state=no_market` -- which matches the
+  0/14 anchored measured in that date's artifact before writing a line of code.
+
+**I DEPLOYED THE WRONG SERVICE FIRST, and the payload is what caught it.** web
+`e3dca09d` went live 15:10:11Z and the board did NOT change. The reason string
+was still `no projection source wired for nhl` -- the FALLTHROUGH arm -- so the
+branch was not running. The discriminator was provenance, not the verdict:
+2026-09-26's artifact read `generated_at=15:11:00Z`, one minute AFTER that
+deploy, and still carried the old reason. Staleness and wrong-service look
+identical without that field. The Layer 1 board is built by
+`book_grid_artifact.write_book_grid_artifact`, called from
+`run_refresh_worker._run_book_grid_artifact_tick` -- REFRESH-WORKER, exactly as
+the architecture says (web reads precomputed artifacts and does no heavy
+computation). The web deploy was harmless but unnecessary.
+
+- claim `3d6c89e2098b3e1a`; expect `c6b6246c -> e3dca09d`; baseline read 15:28:39Z
+- preflight HELD three times (board build 15:18:24Z, board build 15:20:50Z, then
+  3 jobs) and returned CLEAR at 15:28:43Z; deployed 15:28:49Z, 6s later
+
+**NOT CLAIMED: that hockeysim is any good.** It is unmeasured and says so on
+every row. Worth a look: the served edges range -44.71 to +6.34 percentage
+points, and a disagreement that large on a moneyline is either real edge or
+poor calibration. `model_skill: unmeasured` is the honest label, but whether
+`layer2_board._apply_skill_reliability` DISCOUNTS an unmeasured model the way it
+discounts a measured-losing one is unverified and is filed as a follow-up.
+
+**STILL OPEN, and it is a real defect elsewhere:** NHL game state is wrong --
+the board reported `state: pregame` with null scores fifteen hours after puck
+drop. `#340`'s live-edge guard keys on that state, so it could not fire, and
+this join published `edge_vs_market_pct +54.83` against a SETTLED market
+(+800/-750) until `_started_game_reason` was added as a per-sport belt reading
+`commence_time`. That belt is compensation for the defect, not a fix for it;
+delete it once NHL game state is trustworthy.
