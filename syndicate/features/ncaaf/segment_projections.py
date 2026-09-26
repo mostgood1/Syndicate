@@ -57,6 +57,7 @@ acts through ranking rather than through a blank column.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared.probability_refusal import refuse_published_certainty

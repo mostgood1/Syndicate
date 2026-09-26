@@ -27,6 +27,7 @@ WHAT THESE TESTS PROTECT, in the order the failures would hurt:
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -258,6 +259,38 @@ def test_absent_inputs_return_empty_rather_than_raising(monkeypatch):
     )
     blocks, ids = sp.load_ncaaf_segment_inputs("2099-01-01")
     assert blocks == {} and ids == {}
+
+
+def test_the_loader_BODY_actually_runs_with_a_real_source(monkeypatch, tmp_path):
+    """THE TEST THAT WAS MISSING, and its absence shipped a NameError.
+
+    The stub above returns EMPTY `sources`, so the for-loop body never executes
+    -- and the body referenced `Path` without importing it. Every test passed,
+    the module imported cleanly, and production raised
+    `BOOK_GRID_SEGMENT_PROJECTION_FAILURE` on the first real build. Exercising
+    a function is not exercising its LINES.
+    """
+    csv_path = tmp_path / "smartsim2_projections_2026_wk4.csv"
+    csv_path.write_text(
+        "game_id,home_team,away_team" + chr(10) + "401869941,Coastal Carolina,Liberty" + chr(10),
+        encoding="utf-8",
+    )
+    (tmp_path / "smartsim2_segment_distributions_2026_wk4.json").write_text(
+        json.dumps({"schema_version": 1, "games": {"401869941": _block(q1=_seg())}}),
+        encoding="utf-8",
+    )
+
+    class _Index:
+        sources = [str(csv_path)]
+
+    monkeypatch.setattr(
+        "syndicate.features.ncaaf.game_projections.load_ncaaf_game_projections",
+        lambda _d: _Index(),
+    )
+    blocks, ids = sp.load_ncaaf_segment_inputs("2026-09-26")
+    assert "401869941" in blocks, "the artifact beside the CSV was not read"
+    from syndicate.features.ncaaf.game_projections import _norm
+    assert ids[(_norm("Coastal Carolina"), _norm("Liberty"))] == "401869941"
 
 
 def test_a_raising_index_is_swallowed_into_empty(monkeypatch):
