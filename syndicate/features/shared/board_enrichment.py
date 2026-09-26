@@ -1732,6 +1732,36 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
             _LOGGER.exception("BOOK_GRID_PROP_PROJECTION_FAILURE sport=ncaaf date=%s", selected_date)
             prop_coverage = {"supported": True, "error": "prop projection join failed", "rows_with_projection": 0}
 
+        # SEGMENTS. Measured on the served board 2026-09-26T18:51Z: full-game
+        # rows were 686/898 = 76% projected while h1/h2/q1-q4 were 0 of 1,598 --
+        # 64% of every NCAAF game row showing a price with no model. The
+        # per-segment distributions already existed, published and current
+        # (`smartsim2_segment_distributions_<season>_wk<week>.json`, 58 games,
+        # regenerated that same afternoon); nothing consumed them.
+        #
+        # A THIRD INDEPENDENT JOIN, like game and props above, and it can only
+        # write rows whose segment is h1/h2/q1-q4 -- exactly the ones
+        # `attach_ncaaf_game_projections` skips by design -- so the two can
+        # never contend for the same row.
+        try:
+            from syndicate.features.ncaaf.segment_projections import (
+                attach_ncaaf_segment_projections,
+                load_ncaaf_segment_inputs,
+            )
+
+            blocks, game_ids = load_ncaaf_segment_inputs(selected_date)
+            if blocks:
+                game_coverage = {
+                    **game_coverage,
+                    **attach_ncaaf_segment_projections(
+                        grid, blocks=blocks, game_id_by_pair=game_ids, selected_date=selected_date
+                    ),
+                    "supported": True,
+                }
+        except Exception:
+            # Independent of the two joins above and never able to break them.
+            _LOGGER.exception("BOOK_GRID_SEGMENT_PROJECTION_FAILURE sport=ncaaf date=%s", selected_date)
+
         return _merge_nfl_coverage(game_coverage, prop_coverage)
 
     if sport == "nhl":
