@@ -785,12 +785,6 @@ death, never life — do not invert it.
 - Verification: Unit tests that a contention refusal leaves the global marker at its prior value while a NON-contention failure still advances it, plus that both typed refusals are detected as contention and a state_unconfirmed refusal is NOT.
 - Blocked by: none
 
-### closed-lane-archive-20260925-1811 — CLOSED 2026-09-25 (GOAL MET: 1 block archived) — opened 2026-09-25 — session 97d5cc75-9c62-45c2-84b6-454a203760bc
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET — owner_liveness.py --idle-min 240 at 23:11Z returned SAFE for 1 of 17 CLOSED blocks; moved to lanes_closed.md with one pointer. Table in log/2026-09-25.md.
-- Moved: `closed-lane-archive-20260925-1328`.
-
 ### refresh-worker-catchup — CLOSED — opened 2026-09-25, closed 2026-09-26 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
 - **GOAL: MET.** refresh-worker live on `c6b6246c` at 2026-09-26T03:14:25.164124Z (from `d5449df7`, 25h old), verified by read at 03:21:48Z. NO SIM KILLED: preflight HELD three times on three different blockers (MLB sim `run_mlb_daily_sim_job` pid 592 at 02:45Z; odds sweep + soccer MLS build at 03:03Z; in-process board build at 03:10Z), CLEAR at 03:11:17Z, deployed 03:11:25Z -- 8 seconds later. STEADY: the Render EVENTS API (not logs) shows 5 events since 03:11Z, all deploy lifecycle, no restart/OOM/crash; worker still emitting heartbeats at +7m. Pre-deploy risk check found ZERO new periodic work in the 66-commit range (the `#241` restart-loop class). NOT CLAIMED: that 66 commits of behaviour are verified -- only the deploy and the absence of a restart are; the bisect surface for any later regression on this service is 66 commits, the accepted cost of the gap. Receipt + two recorded instrument errors of mine in deploys.md.
 - Goal: refresh-worker runs a commit containing tonight's three refresh fixes, deployed without killing an in-flight MLB sim, and its refresh lane emits the refusal instrumentation the other worker already has.
@@ -808,6 +802,11 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: Live commit on web equals the target, the board serves after the restart, and the Render events API shows no oomKilled or restart beyond the deploy lifecycle.
 - Blocked by: none
+
+### closed-lane-archive-20260926-0934 — CLOSED 2026-09-26 (GOAL MET: 1 block archived) — opened 2026-09-26 — session fb059fb4-bd9f-477f-9afe-c71398cdd5a1
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- MET: moved `closed-lane-archive-20260925-1811` (owner 97d5cc75 idle 906m). 18 WAIT (owners 16da93b3/4ab694ed live); detail in log/2026-09-26.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -855,6 +854,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20260924-1843` — CLOSED 2026-09-24 (GOAL MET: 1 block archived) — opened 2026-09-24 — session 2c2dcade-9da6-49af-88cf-40c3391341db
 - `closed-lane-archive-20260925-0903` — CLOSED 2026-09-25 (GOAL MET: 8 blocks archived) — opened 2026-09-25 — session ca9b282a-e7fa-46d4-9351-fe3e8e32cee1
 - `closed-lane-archive-20260925-1328` — CLOSED 2026-09-25 (GOAL MET: 2 blocks archived) — opened 2026-09-25 — session 20602d39-14ea-4d04-99fa-87fef04acad5
+- `closed-lane-archive-20260925-1811` — CLOSED 2026-09-25 (GOAL MET: 1 block archived) — opened 2026-09-25 — session 97d5cc75-9c62-45c2-84b6-454a203760bc
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `combined-board-rows-unreadable-tripwire` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: live on web `da268e07` (15:36:46Z); the field is served on every date, 0 `ROWS_UNREADABLE` lines; stored 113 vs rows 111 is the per-sport `by_sport` cap, not a defect.**

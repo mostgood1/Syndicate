@@ -8300,3 +8300,9 @@ SAFE_SLUGS=ncaaf-board-sim-coverage,ncaaf-sim-inseason-ratings,ncaaf-player-data
 - Files: none (ledger-only)
 - Verdict: GOAL MET — owner_liveness.py --idle-min 240 at 18:28Z returned SAFE for 2 of 16 CLOSED blocks; both moved to lanes_closed.md with one pointer each. Table in log/2026-09-25.md.
 - Moved: `wnba-future-date-cache-carry`, `closed-lane-archive-20260925-0903`.
+
+### closed-lane-archive-20260925-1811 — CLOSED 2026-09-25 (GOAL MET: 1 block archived) — opened 2026-09-25 — session 97d5cc75-9c62-45c2-84b6-454a203760bc
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET — owner_liveness.py --idle-min 240 at 23:11Z returned SAFE for 1 of 17 CLOSED blocks; moved to lanes_closed.md with one pointer. Table in log/2026-09-25.md.
+- Moved: `closed-lane-archive-20260925-1328`.
