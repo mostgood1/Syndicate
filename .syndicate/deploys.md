@@ -42108,3 +42108,56 @@ stays authoritative), not a correctness bug.
 21:46Z and against ZERO rows on a four-game night earlier today. Sustained 1h42m.
 `proj=0 / no_projection_source_for_sport` is the separate NHL projection gap and
 is NOT claimed as fixed here.
+
+## 2026-09-26 03:14:25Z — refresh-worker — `c6b6246c` — lane `refresh-worker-catchup`
+
+**What shipped:** refresh-worker catching up 25 hours, from `d5449df7`
+(2026-09-25T02:35:10Z). 66 commits; 10 code files, +1231/-22. Carries tonight's
+three refresh fixes (`ops_refresh` typed refusals + choke-point logging,
+`live_refresh_loop` cadence/global-marker rewinds), NHL odds + live-resim, and
+another session's doubleheader/intelligence-template work. Two files are inert
+here: `scripts/board_delivery_probe.py` (never imported by the worker) and
+`syndicate/features/nfl/live_prop_projection.py` (parked, nothing imports it).
+
+**Risk check BEFORE the deploy — no new periodic work.** Grepped the whole range
+for new `Thread(`, `while True`, `start_*_loop`, `daemon=True` and
+`*_INTERVAL_SECONDS` reads: zero hits. That is the `#241` class that put this
+service into a production restart loop, and it is absent here.
+
+**NO SIM WAS KILLED, which is the thing that mattered.** Preflight HELD three
+separate times, each on a DIFFERENT blocker:
+1. 02:45Z — an in-flight MLB sim (`run_mlb_daily_sim_job.py` pid 592 with
+   `daily_update.py --workflow ui-daily` pid 593). Waited it out.
+2. 03:03Z — an odds sweep (`refresh_odds_sources.py` pid 1043) with a soccer MLS
+   artifact build child.
+3. 03:10Z — an in-process BOARD BUILD started 03:09:33Z.
+CLEAR at 03:11:17Z; deployed at 03:11:25Z, **8 seconds later**.
+
+- claim `c3d4fa77f03d5a0d`; expect `d5449df7 -> c6b6246c`; baseline read 03:11:12Z
+- **verify: MET.** live_commit `c6b6246c`, status live, finishedAt
+  03:14:25.164124Z, read 03:21:48Z.
+- **verify: MET on steady state.** Render EVENTS API (where restarts and OOM
+  kills live, not the logs) shows 5 events since 03:11Z and all five are deploy
+  lifecycle: deploy_started, build_started, build_ended succeeded,
+  server_available, deploy_ended succeeded. No restart, no OOM, no crash through
+  03:21:48Z.
+
+**TWO INSTRUMENT ERRORS OF MINE, recorded so the readings are not over-trusted:**
+- My first watcher looked only for the MLB sim and announced "DEPLOY WINDOW
+  OPEN" while an odds sweep was starting; the very next preflight said HOLD. A
+  watcher that models ONE blocker cannot clear a gate that checks several. The
+  fix was to poll the authoritative gate itself.
+- My post-deploy watcher's `boot_lines` counter is meaningless: its fallback
+  pattern `run_refresh_worker` matches the cmdline inside every
+  `ALL_PROCESS_MEMORY` sample, so it tracked heartbeats, not boots. The restart
+  question was answered from the events API instead. Do not cite `boot_lines`.
+
+**NOT CLAIMED:** that 66 commits of behaviour are verified. Only the deploy and
+the absence of a restart are. If something regresses on this service, the bisect
+surface is 66 commits — the cost of the 25-hour gap, accepted deliberately
+because a catch-up cannot be staged one change at a time.
+
+**Refusal instrumentation on this service: not yet exercised.** 0
+`REFRESH_LAUNCH_REFUSED` in the 7 min after the deploy, which is expected — this
+service's refresh lane was not contending in that window. It is a RATE of zero
+so far, not a failure, and not evidence the code is inert here.

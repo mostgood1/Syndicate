@@ -790,6 +790,14 @@ death, never life — do not invert it.
 - Verdict: GOAL MET — owner_liveness.py --idle-min 240 at 23:11Z returned SAFE for 1 of 17 CLOSED blocks; moved to lanes_closed.md with one pointer. Table in log/2026-09-25.md.
 - Moved: `closed-lane-archive-20260925-1328`.
 
+### refresh-worker-catchup — OPEN — opened 2026-09-25 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: refresh-worker runs a commit containing tonight's three refresh fixes, deployed without killing an in-flight MLB sim, and its refresh lane emits the refusal instrumentation the other worker already has.
+- Files: .syndicate/deploys.md (this deploy's receipt ONLY)
+- Hypothesis: n/a -- this is a deploy of already-landed, already-verified code, not a diagnostic.
+- Falsification test: n/a
+- Verification: Live commit on refresh-worker equals the target, no sim killed (preflight CLEAR on in-flight jobs before the POST), and the service reaches a steady state afterwards.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
