@@ -4692,8 +4692,81 @@ def _apply_wnba_live_scores(games: list[dict[str, Any]], selected_date: str) -> 
     return enriched
 
 
+# `nhl-game-state-past-dates`, 2026-09-26. A board for a date that is not today
+# reported every game as `pregame` with null scores -- BOS @ WSH still said
+# pregame FIFTEEN HOURS after puck drop. Two gates caused it, and neither was
+# the NHL API: measured same-instant 15:58:55Z, production's own
+# `syndicate-nhl/1.0` returns HTTP200 with `states={'FINAL': 4}` for 2026-09-25,
+# so the endpoint serves past dates perfectly well.
+#
+# The disk fallback CANNOT cover this. `odds/games/date=*/scoreboard.csv` is
+# deliberately absent from `HOT_ARTIFACT_PATTERNS` -- a `date=*` directory
+# pattern makes every dated pull list every historical game-date folder, and
+# web's export walk already ran past its timeout (2026-09-16). So the snapshot
+# only exists on the service that WROTE it, and the board is built elsewhere.
+#
+# Hence: let the API answer for recent past dates too, and CACHE those, because
+# a final score never changes. TODAY IS NEVER CACHED -- that path is live and
+# must stay live.
+_NHL_SCOREBOARD_LOOKBACK_DAYS = 8
+_NHL_PAST_SCOREBOARD_TTL_SECONDS = 3600.0
+_NHL_PAST_SCOREBOARD_CACHE: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+
+
+def _nhl_scoreboard_lookback_days() -> int:
+    raw = str(os.environ.get("SYNDICATE_NHL_SCOREBOARD_LOOKBACK_DAYS") or "").strip()
+    try:
+        return max(0, int(raw or _NHL_SCOREBOARD_LOOKBACK_DAYS))
+    except ValueError:
+        return _NHL_SCOREBOARD_LOOKBACK_DAYS
+
+
+def _nhl_scoreboard_api_eligible(selected_date: str, *, today: str) -> bool:
+    """Today, or a past date inside the lookback window.
+
+    BOUNDED on purpose. Unbounded, a board window over an archive would fetch
+    once per historical date per build, and `#241` is the standing reminder
+    that new periodic worker work is never free. A FUTURE date is not eligible
+    either: there is no score to learn and the request would be pure cost.
+    """
+    if selected_date == today:
+        return True
+    try:
+        from datetime import date as _date
+
+        want = _date.fromisoformat(str(selected_date)[:10])
+        now = _date.fromisoformat(str(today)[:10])
+    except (ValueError, TypeError):
+        return False
+    delta = (now - want).days
+    return 0 < delta <= _nhl_scoreboard_lookback_days()
+
+
+def _nhl_scoreboard_cache_get(selected_date: str, *, today: str) -> list[dict[str, Any]] | None:
+    if selected_date == today:
+        return None  # live: never served from cache
+    hit = _NHL_PAST_SCOREBOARD_CACHE.get(selected_date)
+    if not hit:
+        return None
+    stamped, rows = hit
+    if (time.time() - stamped) > _NHL_PAST_SCOREBOARD_TTL_SECONDS:
+        _NHL_PAST_SCOREBOARD_CACHE.pop(selected_date, None)
+        return None
+    return rows
+
+
+def _nhl_scoreboard_cache_put(selected_date: str, rows: list[dict[str, Any]], *, today: str) -> None:
+    if selected_date == today or not rows:
+        return
+    _NHL_PAST_SCOREBOARD_CACHE[selected_date] = (time.time(), rows)
+
+
 def _load_nhl_scoreboard_rows(selected_date: str) -> list[dict[str, Any]]:
-    if selected_date == central_today_iso():
+    _today = central_today_iso()
+    _cached = _nhl_scoreboard_cache_get(selected_date, today=_today)
+    if _cached is not None:
+        return _cached
+    if _nhl_scoreboard_api_eligible(selected_date, today=_today):
         try:
             from syndicate.local_nhl_odds import NhlWebClient
 
@@ -4708,7 +4781,7 @@ def _load_nhl_scoreboard_rows(selected_date: str) -> list[dict[str, Any]]:
                         return value
                     return None
 
-                return [
+                mapped = [
                     {
                         "gamePk": row.get("gamePk") or row.get("game_id"),
                         # THE SCHEDULED START (`startTimeUTC`). Dropped here
@@ -4728,7 +4801,11 @@ def _load_nhl_scoreboard_rows(selected_date: str) -> list[dict[str, Any]]:
                     for row in rows
                     if isinstance(row, dict)
                 ]
+                _nhl_scoreboard_cache_put(selected_date, mapped, today=_today)
+                return mapped
         except Exception:
+            # Degrade to the snapshot below rather than blanking the slate: an
+            # empty scoreboard is indistinguishable from a day with no games.
             pass
 
     path = scoreboard_snapshot_path(selected_date)
@@ -6311,7 +6388,18 @@ class _NHLDataProvider(_HomeSportDataProviderBase):
         ):
             return []
         games = list(payload.get("games") or [])
-        return _apply_nhl_live_scores(games, context.context_label) if is_active_today else games
+        # NOT gated on `is_active_today` any more (`nhl-game-state-past-dates`,
+        # 2026-09-26). Scores are what turn a finished game from `pregame` into
+        # `final`, and a board for YESTERDAY needs them as much as today's --
+        # more, because `#340`'s live-edge guard keys on that state and a wrong
+        # `pregame` silently disables it. Measured: BOS @ WSH read `pregame`
+        # with null scores fifteen hours after puck drop.
+        #
+        # Cost is bounded inside `_load_nhl_scoreboard_rows` (lookback window +
+        # a cache for past dates, which are immutable once final), and
+        # `_apply_nhl_live_scores` returns `games` untouched when it finds no
+        # rows -- so this is a no-op wherever there is nothing to learn.
+        return _apply_nhl_live_scores(games, context.context_label)
 
     def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
         betting_rows = _pregame_prop_rows_from_betting_card("nhl", context_label=context.context_label, season=context.season, week=context.week)
