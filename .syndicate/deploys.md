@@ -42378,3 +42378,78 @@ not this single date.
 **Graded.** (G1) NCAAF LTS median of medians 241 s > ~180 s: **NOT MET**. Segment: 241 s by LTS (inseparable) or 329 s by book-age: **NOT MET**. (G2) no restart during the window: **FAIL**. Web had 5 OOM kills (above). refresh-worker had 2 earlyExits and a deploy by another lane. live-odds-worker was clean. (G3) lever-1 health: warmer clauses PASS (0 WARM_FAILED/WARMER_ERROR; request-driven EXPIRED 5 vs 79 WARMED), but **`server_failed` 5 > 3: FAIL**. The kills are OOMs aligned with the probe, not warmer errors. The kill switch `SYNDICATE_COMBINED_BOARD_OVERLAY_WARMER=off` is recommended to the USER only as the pre-registered response; the evidence points at the query route's memory, and the warmer's own share of web memory is unmeasured. It was NOT set. **GOAL: NOT MET.**
 **Dominant remaining term.** No single term. Grid age median ~105 s (tick gap 185 s vs 120 s configured) and quote-seen age median ~110 s (capture) are about equal. The segment/full split shows no segment penalty today. Next levers are USER decisions, as before: lever 2 (grid tick: first find why the 120 s cadence runs at 185 s), lever 3 (capture cadence ~154 s -> ~80 s, more OddsAPI credits). **Owed before any further reading of this kind:** decide whether the web OOM on `/api/intelligence/query` is real. A future reading should not probe web at 10-min cadence until it is.
 **verify:** the per-read table, WARMED 79 / request-driven EXPIRED 5, and the 5 web `oomKilled` timestamps (events API).
+
+## 2026-09-26 refresh-worker — `9c236b11` (20:24:35Z) then `fadd57e0` (21:14:41Z) — lanes `ncaaf-live-gameline-build-cap`, `ncaaf-segment-projections`, `nhl-drop-started-game-belt`
+
+Three changes, two deploys, because the first one shipped a NameError.
+
+### THE BUILD CAP — verify: MET
+
+`_MAX_RECORDS_PER_BUILD` 500 -> 5000. Its own comment held the bug: "a live
+slate tops out around 15 games", true of MLB and false of a 65-game NCAAF
+Saturday where every game carries seven segments. BEFORE, measured 15:00-18:55Z:
+121 builds, max 937 candidates, **61 builds truncated (50%)**, 13,383 records
+dropped, and `records[:N]` keeps the FIRST N so the loss fell on whatever sorted
+last, every time. AFTER, 18 post-deploy builds: **max_cand 1042, dropped 0** --
+under the old cap that was 542 records lost per build. `_MAX_RECORDS_PER_FILE`
+raised 20k -> 120k in the same change, because it does not truncate a build, it
+STOPS WRITING FOR THE DAY, and lifting one into the other would have turned a
+partial loss into a total one.
+
+### NCAAF SEGMENTS — verify: MET on the second deploy
+
+BEFORE, 18:51Z: full 686/898 = 76%, and **h1/h2/q1-q4 all 0 of 1,598** -- 64% of
+every NCAAF game row showing a price with no model. AFTER, artifact generated
+21:16:44Z, read 21:18:58Z:
+
+    full  708/966 = 73%    h1 322/433 = 74%    h2 190/253 = 75%
+    q1 254/349 = 73%   q2 214/301 = 71%   q3 220/305 = 72%   q4 214/283 = 76%
+
+Every segment now sits where full game sits. Sources are cleanly separated --
+`ncaaf_smartsim2` 664, `ncaaf_smartsim2_segment` 1414, no row claimed twice --
+and 1,412 of 1,414 segment rows carry a probability. Board-wide
+`rows_with_projection` 2,121 -> 3,445.
+
+It was a JOIN, not modelling: the per-segment distributions were already
+published and current (58 games, regenerated 16:20:22Z the same afternoon) with
+nothing consuming them.
+
+### I SHIPPED A NameError AND MY OWN LOGGING CAUGHT IT IN TWO MINUTES
+
+`9c236b11` went live 20:24:35Z; at 20:26:49Z every ncaaf build logged
+`BOOK_GRID_SEGMENT_PROJECTION_FAILURE`, traceback ending at
+`segment_projections.py:356` -- `path = Path(str(source))`, and the module never
+imported `Path`. Segment coverage on a FRESH artifact read 0 of 1,907, exactly as
+before the change.
+
+**Why every test passed:** the loader's only test stubbed the index with an
+EMPTY `sources` list, so the for-loop body never executed and the undefined name
+was never reached. 23 tests green, module imports clean, first line of real work
+raises. Exercising a function is not exercising its LINES.
+
+The fix is two things: the import, and
+`test_the_loader_BODY_actually_runs_with_a_real_source`, which writes a real CSV
+and sidecar and hands the loader an index that NAMES them. PROVEN to catch it,
+not assumed: with the import removed it fails `NameError` at line 356 -- the
+production line number -- and passes restored, module checksum verified
+identical after the experiment.
+
+**Blast radius was contained by design:** the branch's own try/except meant the
+board kept building and serving throughout, identical to before the change plus
+the working cap fix. That is why `--allow-rapid` was NOT used when preflight
+returned `TOO_SOON` (25 min minimum spacing, `#563`): the board was not broken,
+and a rapid redeploy would have frozen it for ~21 min to fix something nobody
+could see.
+
+- claims `8e0cd691baedd32f` then `c338f19cb2c2e2f9`; both deploys took a CLEAR
+  window within 9 and 19 seconds. No in-flight MLB sim or board build was killed
+  across ~5 hours of waiting for windows on a saturated Saturday worker.
+
+**ALSO LIVE on these deploys, not separately verified here:** the NHL
+started-game belt removal (`7a06a596`), whose own verification was taken before
+the merge -- a finished NHL slate published zero edges, all 13 rows carrying the
+SHARED guard's "game is final".
+
+**NOT CLAIMED:** that any of these probabilities are good. smartsim2 is measured
+LOSING to the close at game level and says so on every row, segments included,
+with an explicit note that no per-segment skill measurement exists yet.
