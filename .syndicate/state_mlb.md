@@ -1477,3 +1477,26 @@ chip, possibly the wrong half. A wrong merge HIDES A GAME.
 13 MLB tiles for 13 games, 0 chip-keyed, 0 duplicate matchup texts. **There is no
 doubleheader on 2026-09-26**, so nothing exercised the new pass. OWED: one reading on the
 next doubleheader.
+
+
+**AN ID-RESOLVING GROUP IS NOT AN UNPAIRED ONE `[web 7fd1102f, live 2026-09-26 16:08:27Z]`.**
+A startless group whose own id IS a chip id already resolves by `chipForGame`'s exact
+route, so counting it toward `untimed` made the count 2 and elimination refused. It is now
+skipped, and both groups end up holding the SAME chip -- which is what lets the merge
+collapse them into one tile. Measured directly against `buildDoubleheaderOrdinals` on the
+22:39Z shape: `{mlb|ODDS -> 823543, mlb|G2 -> 823494}`, with two odds groups refusing and
+a gamePk+timed pair placing nothing.
+
+**THE FIRST ATTEMPT AT THIS FAILED ON A BRANCH, NOT ON THE IDEA.** Guarding the
+`at === null` arm rather than testing the TIME first sent an id-resolving timeless group
+into the TIMED list with `at: null`, where it sorts against real stamps as `NaN` and the
+ordered pass hands out every chip. That is why an earlier reading showed the scoreboard
+group taking the pairing and the odds group getting none.
+
+**THE MERGE COLLAPSE NOW HAS A TEST, AND HAD NONE BEFORE.** `state.date` in the page
+harness is `2026-09-22` and `deriveGameCards` filters against it, so every scenario dated
+2026-09-25 yields ZERO cards -- which is why every test in that file asserts `row_chip` and
+none had ever asserted `cards`. The new case is dated 09-22 and asserts ONE CARD PER HALF.
+
+**Still no-regression only** (13 MLB tiles, 0 duplicate matchups, 16:09:17Z). No
+doubleheader exists on 2026-09-26 to exercise it, and none remains this season.

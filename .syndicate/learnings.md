@@ -4851,3 +4851,28 @@ One event gives an interval, not a rate. It cannot tell "rare" apart from
   writing the pass would have prevented.
 
 ---
+### 2026-09-26 — FORBIDDEN: guarding one ARM of an if/else when you mean to EXCLUDE. The item does not drop out -- it falls into the other branch, silently reclassified.
+
+- **What I wrote:** `if (at === null && !resolvesChipById(group)) untimed.push(group); else
+  groups.push({ at, key })`, intending "skip this group".
+- **What it did:** sent the skipped group into the `else` -- the TIMED list -- carrying
+  `at: null`. It then sorted against real timestamps, where `null - number` is `NaN`, and
+  the ordered pass handed out every chip. The group I meant to exclude took the pairing and
+  the group that needed one got nothing.
+- **Why it was hard to see:** the suite stayed green (22 passed), because no existing test
+  had two startless groups in one bucket. The symptom only appeared when I drove the
+  function directly with the measured production shape.
+- **How to apply:** to exclude, test the DISCRIMINATOR first and make the exclusion its own
+  terminal branch -- `if (at !== null) {...} else if (!excluded) {...}`. A condition
+  tightened on one arm of a binary is not a filter; it is a re-router.
+- **AND THE SECOND ERROR WAS THE INSTRUMENT.** I concluded "the change does the opposite of
+  its design" from a probe that iterated CARDS while the card list was empty, so the column
+  that would have shown the exclusion working printed nothing at all. An empty collection
+  prints as silence and reads as evidence. **Check that your probe returned a non-empty
+  population before drawing anything from what it did not show** -- the same rule as
+  `feedback_null_result_needs_a_live_population`, applied to a debug print rather than a
+  query.
+- **Cost:** one wrong public statement ("behaviour is UNKNOWN"), one backed-out change that
+  was correct in design, and a ledger entry that had to be withdrawn.
+
+---

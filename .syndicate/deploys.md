@@ -42288,3 +42288,20 @@ delete it once NHL game state is trustworthy.
 - OPEN QUESTION (not this lane's diagnosis): on 2026-09-23 the plan carried CFB h2h positions days ahead (the 29 refusals included `aec-cfb-col-bayl-2026-09-26`); in the last ~48h the polymarket plan carried none on the Saturday of the college slate. Whether CFB h2h still enters the portfolio plan at all is upstream of this fix and decides whether it can ever be read.
 - PLACEMENT (not this fix's business): polymarket placed=0 of 182 positions, all `insufficient_venue_balance`; kalshi dormant by decision (961, same refusal). Evidence stops at would_build. (Separately, a resting CFB order `aec-cfb-navy-uab-2026-09-25` created 2026-09-20 FILLED 19.52 @ 0.74 at 2026-09-26T02:40Z -- pre-fix order, not evidence either way.)
 - verify (still owed): a pass carrying an `aec-cfb-*` h2h position with nickname outcomes shows `POLYMARKET_YES_LEG ... agree=True` and `would_build`, with 0 `team_side_not_in_outcomes` and 0 `yes_leg_disagrees_with_away_index` on that slug. Re-scheduled for Sat 2026-10-03.
+## 2026-09-26 16:08:27Z -- web `7fd1102f` -- an id-resolving group is not an unpaired one
+
+- lane: `dh-state-aware-pairing`   claim: web   preflight: CLEAR.
+  Deploy `dep-daruoqjncjis73f6j8s0`, trigger `api`, created 16:01:46Z, live
+  16:08:27Z per `/api/ops/version`.
+- **Containment checked first:** web was serving `e3dca09d` (another session had
+  deployed since mine, the second time today). It IS an ancestor of `7fd1102f`,
+  2 commits between, so nothing of theirs was reverted.
+- predicted from a 16:01:23Z baseline, stable across 3 reads: `mlb_tiles` 13 -> 13,
+  `duplicate_mlb_matchups` 0 -> 0.
+- **verify: measured 16:09:17Z on served `7fd1102f`, stable across 3 reads --
+  `mlb_tiles` 13, `duplicate_mlb_matchups` 0, total 106.**
+- **NOT PREDICTED, and stated rather than ignored:** the MLB chip/group split moved
+  13 chip-keyed -> 13 group-keyed between the two reads. That is the odds rows
+  arriving, not this change: the new pass fires only on a bucket with >= 2 chips
+  for the same clubs on one date, and **there are no doubleheaders on 2026-09-26**.
+- Still a no-regression reading only. The firing path waits for a doubleheader.
