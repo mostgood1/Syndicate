@@ -2282,10 +2282,29 @@ release it, so it refuses every launch permanently. Do not read them as the same
 would otherwise suppress real launches. A launch that DIED is deliberately not
 rewound.
 
-**OPEN, not fixed:** the combined sweep SELF-COLLIDES - it outlives its own tick
-interval. Measured on a clean window 22:56:21Z->23:25:33Z: 7 refusals in 29.2
-min = 1 per 4.2 min across 5 holder runs. Harmless now (each is a no-op), but it
-is wasted attempts and log volume.
+**The combined sweep SELF-COLLIDES, and that is BACKPRESSURE, NOT A DEFECT**
+[investigated + closed 2026-09-26, USER DECISION: leave it]. The tick polls on a
+~60s interval against a sweep taking ~4-6 min, the mutex serialises, the tick
+retries. Do not re-litigate it as a bug; the numbers below are why.
+
+Measured 2026-09-25T22:56Z -> 2026-09-26T13:47Z: **177 launches vs 96 refused
+attempts (35%)**, and the refuse rate is FLAT across every sport sharing the
+tick -- mlb 36%, ncaaf 36%, nhl 37% (wnba 46% on n=26). A starved sport would
+show a refuse rate far above the others; none does. 65 distinct holder
+run_stamps behind those 96 refusals (mean 1.48, median 1) -- the tick discovers
+'busy' once and moves on, it does not spin.
+
+A refusal costs NOTHING now: raised before `launch_refresh_run` starts anything,
+so no OddsAPI call, and `ec10612a` rewinds the global marker. The two real harms
+(invisible; cost a refresh interval) are both fixed.
+
+**DO NOT 'fix' this with `is_refresh_run_active` as a pre-check.** It has NO
+stale-pid healing -- its own docstring says it deliberately skips the
+reconciliation `_assert_no_active_refresh_run` performs -- so it can report a
+lane busy when the real guard would have healed the manifest and allowed the
+launch. A pre-check on it would SKIP launches that would have succeeded, which
+is the starvation class this whole 2026-09-25 arc existed to remove. Any future
+pre-check must use an authoritative read WITH healing and must FAIL OPEN.
 
 **Production intervals are env-set, not the code defaults.** WNBA pregame runs at
 7200s, not the 14400s fallback in `_wnba_pregame_refresh_interval_seconds`.
