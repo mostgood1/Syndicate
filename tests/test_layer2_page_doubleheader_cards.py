@@ -212,6 +212,24 @@ out.untimed_group_with_a_stale_state_still_pairs = await scenario(
 out.two_untimed_groups_are_refused = await scenario(
   [LIVE_G1(), LIVE_G2()],
   [...g1Rows(untimedButStale()), ...g2Rows(untimedButStale())]);
+// THE FULL 22:39Z PRODUCTION SHAPE: game 1 arrives as TWO startless groups --
+// the timeless ODDS group and a gamePk-keyed group carrying its scoreboard --
+// beside game 2's timed group. The gamePk group resolves its chip by id, so it
+// must NOT count toward `untimed`, or elimination sees 2 and refuses.
+const gamePkRows = (pk, extra) => [row(pk, extra), row(pk, extra), row(pk, extra)];
+// DATED 2026-09-22 ON PURPOSE. `state.date` in this harness is 2026-09-22 and
+// deriveGameCards filters against it, so a scenario dated 09-25 yields ZERO
+// cards -- which is why every other test here asserts `row_chip` and none has
+// ever asserted `cards`. This one must, because the merge collapse IS the
+// behaviour under test.
+const D22_G1 = () => chip('823543', '2026-09-22T20:05:00+00:00', 'BOT 4', undefined, undefined, 'live');
+const D22_G2 = () => chip('823494', '2026-09-22T20:10:00+00:00', '3:10P CT', undefined, undefined, 'pregame');
+const d22Stale = () => ({ game_date: '2026-09-22', market_state: 'pregame' });
+out.production_shape_two_startless_groups = await scenario(
+  [D22_G1(), D22_G2()],
+  [...g1Rows(d22Stale()),
+   ...gamePkRows('823543', { game_date: '2026-09-22', market_state: 'live' }),
+   ...g2Rows(withCommence('2026-09-22T23:05:00Z'))]);
 console.log(JSON.stringify(out));
 """
 
@@ -474,3 +492,29 @@ def test_two_timeless_groups_are_refused(observed: dict) -> None:
     """
     pairs = observed["two_untimed_groups_are_refused"]["row_chip"]
     assert set(pairs.values()) == {None}, pairs
+
+
+def test_the_real_production_shape_collapses_to_one_card_per_half(observed: dict) -> None:
+    """END TO END on the measured 2026-09-25 22:39Z shape, which is what failed.
+
+    Game 1 arrived as TWO startless groups -- the timeless odds group ("FRI SEP
+    25 LIVE, 1 opportunity") and a gamePk-keyed group holding its scoreboard --
+    beside game 2's timed group. The rail seated BAL @ NYY three times.
+
+    The gamePk group resolves its chip by the EXACT id route, so it is not
+    unpaired and must not count toward `untimed`; otherwise elimination sees two
+    startless groups and refuses, and the fix does nothing for the very case it
+    was written for. With it excluded, the odds group takes the remaining chip,
+    BOTH groups then hold the SAME chip object, and the merge pass collapses
+    them.
+
+    This asserts CARDS, not just the pairing -- one tile per half is the goal,
+    and the merge is the step that delivers it.
+    """
+    result = observed["production_shape_two_startless_groups"]
+    pairs = result["row_chip"]
+    g1 = [k for k in pairs if k.endswith("aaaa")]
+    assert g1 and pairs[g1[0]] == "823543", pairs
+    # One card per half: game 1's two groups merged, game 2 stands alone.
+    assert len(result["cards"]) == 2, result["cards"]
+    assert sorted(c["chip"] for c in result["cards"]) == ["823494", "823543"], result["cards"]

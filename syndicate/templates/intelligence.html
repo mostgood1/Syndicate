@@ -2427,6 +2427,16 @@
     }
   }
 
+  // The two EXACT routes `chipForGame` tries before any clock or ordinal rule.
+  // Pure lookups, so this can be asked while the ordinal map is still being
+  // built without any circularity.
+  function resolvesChipById(group) {
+    if (gameChipsById.has(group.key)) return true;
+    const sport = String(group.sportSlug || group.sport || "").toLowerCase();
+    const ownGameKey = String(group.ownGameKey || "").trim();
+    return Boolean(ownGameKey && gameChipsById.has(`${sport}|${ownGameKey}`));
+  }
+
   function buildDoubleheaderOrdinals(groups) {
     const out = new Map();
     const byFixture = new Map();
@@ -2449,8 +2459,19 @@
       if (!bucketDate) continue;
       const key = `${sport}|${a} @ ${h}|${bucketDate}`;
       if (!byFixture.has(key)) byFixture.set(key, { groups: [], chips: [], untimed: [] });
-      if (at === null) byFixture.get(key).untimed.push(group);
-      else byFixture.get(key).groups.push({ at, key: group.key });
+      // ONLY IF IT IS ACTUALLY UNPAIRED. A startless group whose own id IS a
+      // chip id resolves by the exact route in `chipForGame` and needs no
+      // elimination -- counting it would make `untimed` 2 and refuse. That is
+      // the real 2026-09-25 22:39Z shape: game 1 had the timeless ODDS group AND
+      // a gamePk-keyed group (`mlb|823491`) carrying its scoreboard, both
+      // startless. Both then resolve the SAME chip, which is exactly what lets
+      // the merge pass below collapse them into one tile.
+      // Order matters: test the TIME first. Guarding the `at === null` arm
+      // instead sends an id-resolving timeless group down the `else` and into
+      // the TIMED list with `at: null`, where it sorts against real stamps as
+      // NaN and the ordered pass hands out every chip.
+      if (at !== null) byFixture.get(key).groups.push({ at, key: group.key });
+      else if (!resolvesChipById(group)) byFixture.get(key).untimed.push(group);
     }
     if (!byFixture.size) return out;
     // Chip side: the same key, built the same way, so the two agree by
