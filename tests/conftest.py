@@ -719,6 +719,55 @@ def _is_inside_tracked_data_mirror(path: object) -> bool:
     return False
 
 
+def _resolve_dir_fd(path: object, dir_fd: object) -> object | None:
+    """The path an `os.*(..., dir_fd=N)` call ACTUALLY touches, or None.
+
+    **WHY THIS EXISTS, MEASURED 2026-09-27 (lane `pytest-baseline-dirfd`).**
+    `shutil.rmtree` on Linux removes a tree with its fd-based walker:
+    `os.rmdir(entry.name, dir_fd=topfd)`. The name is RELATIVE TO `topfd`, but
+    the wrappers below resolved it with `os.path.abspath`, i.e. against the
+    CWD -- the repo root. So removing ANY temp directory that contains a folder
+    named `data` read as `os.rmdir -> <repo>/data`, and the guard failed the
+    test. Reproduced with a test that only builds and removes
+    `tmp_path/x/data/...` (FAILED + teardown ERROR; the same tree without a
+    `data` folder passes; the real `data/` untouched). That false positive is
+    what took CI's pytest-baseline from 19 recorded failures to ~517.
+
+    An absolute path ignores `dir_fd` (POSIX), so it is returned unchanged. A
+    relative one is joined onto the directory the fd names, read from
+    `/proc/self/fd`. Where that cannot be read (no procfs), the call is NOT
+    attributable and returns None: resolving it against the CWD is the defect
+    itself, not a safe default. CI and Render are Linux, so this only relaxes
+    the guard where it could not attribute correctly anyway.
+    """
+    if dir_fd is None:
+        return path
+    try:
+        raw = os.fspath(path)  # type: ignore[arg-type]
+    except TypeError:
+        return None
+    if isinstance(raw, bytes):
+        try:
+            raw = raw.decode()
+        except Exception:
+            return None
+    if os.path.isabs(raw):
+        return raw
+    try:
+        base = os.readlink(f"/proc/self/fd/{int(dir_fd)}")  # type: ignore[arg-type]
+    except (OSError, ValueError, TypeError):
+        return None
+    return os.path.join(base, raw)
+
+
+def _inside_mirror_via(path: object, dir_fd: object) -> tuple[bool, object]:
+    """(inside the mirror?, the resolved path) for a call that may carry dir_fd."""
+    resolved = _resolve_dir_fd(path, dir_fd)
+    if resolved is None:
+        return False, path
+    return _is_inside_tracked_data_mirror(resolved), resolved
+
+
 def _git_ignores(path: object) -> bool:
     """Does `.gitignore` already exclude this path?
 
@@ -893,16 +942,19 @@ def _install_data_mirror_write_guard() -> None:
 
     for _name in ("makedirs", "mkdir"):
         def _guarded_os_mkdir(path, *args, _original=getattr(os, _name), _name=_name, **kwargs):
-            if _is_inside_tracked_data_mirror(path) and _would_create(path):
-                _record_data_mirror_write(f"os.{_name}", path)
+            inside, resolved = _inside_mirror_via(path, kwargs.get("dir_fd"))
+            if inside and _would_create(resolved):
+                _record_data_mirror_write(f"os.{_name}", resolved)
             return _original(path, *args, **kwargs)
 
         setattr(os, _name, _guarded_os_mkdir)
 
     for _name in ("remove", "unlink", "rmdir"):
         def _guarded_os_delete(path, *args, _original=getattr(os, _name), _name=_name, **kwargs):
-            if _is_inside_tracked_data_mirror(path):
-                _record_data_mirror_write(f"os.{_name}", path)
+            # `dir_fd` is how shutil.rmtree calls these -- see `_resolve_dir_fd`.
+            inside, resolved = _inside_mirror_via(path, kwargs.get("dir_fd"))
+            if inside:
+                _record_data_mirror_write(f"os.{_name}", resolved)
             return _original(path, *args, **kwargs)
 
         setattr(os, _name, _guarded_os_delete)
@@ -925,16 +977,20 @@ def _install_data_mirror_write_guard() -> None:
         _os_open_write_flags |= getattr(os, _flag_name, 0)
 
     def _guarded_os_open(path, flags, *args, **kwargs):
-        if (flags & _os_open_write_flags) and _is_inside_tracked_data_mirror(path):
-            _record_data_mirror_write(f"os.open(flags=0x{flags:x})", path)
+        if flags & _os_open_write_flags:
+            inside, resolved = _inside_mirror_via(path, kwargs.get("dir_fd"))
+            if inside:
+                _record_data_mirror_write(f"os.open(flags=0x{flags:x})", resolved)
         return _os_open(path, flags, *args, **kwargs)
 
     os.open = _guarded_os_open
 
     for _name in ("replace", "rename"):
         def _guarded_os_move(src, dst, *args, _original=getattr(os, _name), _name=_name, **kwargs):
-            if _is_inside_tracked_data_mirror(dst) or _is_inside_tracked_data_mirror(src):
-                _record_data_mirror_write(f"os.{_name}", dst)
+            dst_inside, dst_resolved = _inside_mirror_via(dst, kwargs.get("dst_dir_fd"))
+            src_inside, _src_resolved = _inside_mirror_via(src, kwargs.get("src_dir_fd"))
+            if dst_inside or src_inside:
+                _record_data_mirror_write(f"os.{_name}", dst_resolved)
             return _original(src, dst, *args, **kwargs)
 
         setattr(os, _name, _guarded_os_move)
