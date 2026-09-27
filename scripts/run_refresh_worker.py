@@ -4686,7 +4686,14 @@ def _nfl_news_capture_interval_seconds() -> int:
         value = int(raw or 21600)
     except Exception:
         value = 21600
-    return max(1800, value)
+    value = max(1800, value)
+    # Lane `slate-starting-soon-phase`: see `_nfl_injuries_fetch_interval_seconds`.
+    try:
+        from syndicate.features.shared.slate_phase import starting_soon_poll_interval
+
+        return starting_soon_poll_interval("nfl", value, env_key="NFL_NEWS_STARTING_SOON_INTERVAL_SECONDS")
+    except Exception:
+        return value
 
 
 def _nfl_news_capture_state_path() -> Path:
@@ -4998,7 +5005,17 @@ def _nfl_injuries_fetch_interval_seconds() -> int:
         value = int(raw or 21600)
     except Exception:
         value = 21600
-    return max(3600, value)
+    value = max(3600, value)
+    # Lane `slate-starting-soon-phase`: inside T-3h the 6h timer can miss the
+    # whole pre-kickoff window, so poll every NFL_INJURIES_STARTING_SOON_INTERVAL_SECONDS
+    # (default 900). Only while SYNDICATE_SLATE_STARTING_SOON_ENABLED is on;
+    # the 3600 floor above still binds the rest of the day.
+    try:
+        from syndicate.features.shared.slate_phase import starting_soon_poll_interval
+
+        return starting_soon_poll_interval("nfl", value, env_key="NFL_INJURIES_STARTING_SOON_INTERVAL_SECONDS")
+    except Exception:
+        return value
 
 
 def _nfl_injuries_fetch_state_path() -> Path:
