@@ -140,7 +140,16 @@ RESIM_ENV = {"SYNDICATE_NFL_LIVE_RESIM": "1"}
 
 def _fetch_week(season: int, week: int, *, seasontype: int = 2,
                 timeout: float = 45.0) -> list[dict[str, Any]]:
-    url = f"{ESPN}?seasontype={int(seasontype)}&week={int(week)}&year={int(season)}"
+    # `dates=`, NOT `year=`. ESPN's NFL scoreboard IGNORES `year` and serves the
+    # CURRENT week for any value of it -- verified 2026-09-27: `year=2024&week=1`
+    # returned events dated 2026-09-10..13, while `dates=2024&week=1` returned
+    # 2024-09-06..08. The flag was inert for every past season and silently
+    # returned today's games instead, which reads as a successful fetch.
+    #
+    # The 2026 grade in this file is unaffected -- 2026 IS the current season, so
+    # the wrong parameter happened to return the right games -- but a fit on
+    # "prior seasons" built through it was training on its own test set.
+    url = f"{ESPN}?seasontype={int(seasontype)}&week={int(week)}&dates={int(season)}"
     with urllib.request.urlopen(urllib.request.Request(url), timeout=timeout) as response:
         return json.loads(response.read().decode("utf-8")).get("events") or []
 
