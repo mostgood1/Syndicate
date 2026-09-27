@@ -812,38 +812,52 @@ PROP_CAPTURE_CLOCK_SECONDS = 120
 def _maybe_capture_prop_snapshot(row: Any, resolved: Any, *, date_str: str) -> None:
     """Persist one per-quarter player box, if this game is at a boundary.
 
-    WHY THIS LIVES HERE AND NOT ON THE BOX FETCHER. `nfl_player_box_index` is
-    called only from the WEB blueprint, in a request path -- so capturing there
-    would write to web's disk (which the worker cannot read) and would only fire
-    when somebody happened to load the cards page. A collector that depends on
-    browsing is not a collector. This runs on refresh-worker, on the live tick,
-    whether or not anyone is looking.
+    READS THE RAW ROW, NOT THE PARSED SIM STATE, and that distinction cost a
+    live slate on 2026-09-27. The first version gated on
+    `isinstance(resolved, NflLiveGameState)` -- i.e. on the game being
+    SIMULATABLE. But `live_state_from_row` refuses a game that is not "in
+    progress", and **a game at a quarter boundary is in a BREAK**: measured at
+    22:07Z, LV@NO sat at `Q2 0:00` while the tick reported `live_resimmed 3`
+    against 4 live games on the board. So the capture returned silently at
+    exactly the moments it exists for, and halftime -- the longest and most
+    reliably observable boundary of the three -- was missed every time.
 
-    THE COST IS BOUNDED AND THAT IS DELIBERATE (`#241`: periodic worker work is
-    never free). One ESPN summary per game per BOUNDARY -- about three fetches
-    per game across a whole game, not one per tick -- and the idempotence marker
-    means the repeats a 120-second window produces cost a single `exists()`.
+    A game at halftime has already produced the Q2 production this is
+    collecting. Whether the re-sim can resume from it is a different question
+    and not this one's business.
 
-    Never raises: a capture must not be able to cost the tick its snapshot.
+    WHY THIS HOOK AND NOT THE BOX FETCHER. `nfl_player_box_index` is called only
+    from the WEB blueprint, in a request path: it would write to a disk the
+    worker cannot read, and only when somebody loaded the cards page. A
+    collector that depends on browsing is not a collector.
+
+    COST IS BOUNDED (`#241`): one ESPN summary per game per BOUNDARY, about
+    three across a whole game, and the idempotence marker makes the repeats a
+    120-second window produces cost a single `exists()`.
+
+    Never raises: a capture must not cost the tick its snapshot.
     """
     try:
-        if not isinstance(resolved, NflLiveGameState):
+        if not isinstance(row, Mapping):
             return
-        period = int(resolved.period)
+        period_raw = row.get("period")
+        clock_raw = row.get("clock_seconds")
+        if period_raw is None or clock_raw is None:
+            return
+        period, clock = int(period_raw), int(clock_raw)
         if period not in (1, 2, 3):
             return
-        if int(resolved.clock_seconds) > PROP_CAPTURE_CLOCK_SECONDS:
+        if clock > PROP_CAPTURE_CLOCK_SECONDS:
             return
-        event_id = str((row or {}).get("event_id") or "").strip() if isinstance(row, Mapping) else ""
+        # A FINAL game is not at a boundary worth capturing: Q4's end is the
+        # final box, which is not lossy and is already fetched elsewhere.
+        if str(row.get("state") or "").strip().lower() == "final":
+            return
+
+        event_id = str(row.get("event_id") or "").strip()
         if not event_id:
-            # NAMED, NOT SILENT. This branch cost a live slate on 2026-09-27:
-            # the tick adapter did not carry `event_id`, so every game returned
-            # here and the capture produced zero CAPTURED lines and zero FAILED
-            # lines -- indistinguishable from "no game was ever in the window".
-            # It only fires for a game genuinely AT a boundary, so it cannot
-            # become per-tick noise.
             print("[nfl_live_resim] PROP_CAPTURE_SKIPPED reason=no_event_id "
-                  f"period={period} clock={resolved.clock_seconds}", flush=True)
+                  f"period={period} clock={clock}", flush=True)
             return
 
         from syndicate.features.nfl.live_prop_capture import (
@@ -867,9 +881,9 @@ def _maybe_capture_prop_snapshot(row: Any, resolved: Any, *, date_str: str) -> N
             period=period,
             date_str=date_str,
             player_rows=rows,
-            home_score=resolved.home_score,
-            away_score=resolved.away_score,
-            clock_seconds=resolved.clock_seconds,
+            home_score=row.get("home_score"),
+            away_score=row.get("away_score"),
+            clock_seconds=clock,
         )
     except Exception as exc:  # noqa: BLE001
         print(f"[nfl_live_resim] PROP_CAPTURE_FAILED {type(exc).__name__}: {exc}", flush=True)
