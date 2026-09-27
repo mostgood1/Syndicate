@@ -209,3 +209,15 @@ def test_board_endpoint_serves_published_phases(monkeypatch):
     store.clear()
     body = app.test_client().get("/api/intelligence/slate-phases").get_json()
     assert body == {"available": False, "reason": "not_published", "sports": {}}
+
+
+def test_soccer_relaunch_cooldown_unchanged_when_on(monkeypatch):
+    """Soccer is excluded: its 1800 s cooldown must not drop to 600 s."""
+    monkeypatch.setattr(loop, "_next_fixture_epoch", lambda sport, now_epoch: KICKOFF)
+    monkeypatch.setattr(
+        loop,
+        "_read_last_pregame_launch",
+        lambda: {"date": "2026-09-27", "epoch": NOW - 900, "sports": {"soccer": NOW - 900}},
+    )
+    monkeypatch.setenv(FLAG, "true")
+    assert loop._pregame_relaunch_blocked(now_epoch=NOW, date_str="2026-09-27", sports=["soccer"]) is True

@@ -31,7 +31,8 @@ running** -- so the stale NFL prices were PROPS, which ride only the 2h combined
 3. Enable starting-soon on an NFL Sunday; verify NFL launches <= 30 min apart inside T-3h,
    `T_WINDOW_SWEEP_DUE` with `nfl:ramp:`/`nfl:closing:`, `NFL_INJURIES_FETCH_LAUNCHING interval_s=900`.
 4. Board label per sport -- BUILT 2026-09-27 (`GET /api/intelligence/slate-phases`, sport tabs show LIVE / SOON · countdown); shows nothing until the observe flag is on for a worker.
-5. **Known limits:** nflverse injuries follow practice reports, NOT game-day inactives (needs
+5. **Soccer is EXCLUDED** (user, 2026-09-27): `STARTING_SOON_EXCLUDED_SPORTS`; its own league-scoped path already sweeps every tick inside 3h, and the 600 s cooldown would have ~tripled it.
+6. **Known limits:** nflverse injuries follow practice reports, NOT game-day inactives (needs
    another source); NCAAF has no injury feed; NCAAB has no live checker, so its T-windows
    keep firing mid-slate, bounded only by the min gap.
 

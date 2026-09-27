@@ -82,6 +82,17 @@ KICKOFF_GRACE_SECONDS = 60 * 60
 
 _LIVE_CACHE_TTL_SECONDS = 90.0
 
+#: Sports that never enter `starting_soon` (user decision 2026-09-27). SOCCER,
+#: because it already has a faster pre-kickoff path of its own: with
+#: `SYNDICATE_PREGAME_LEAGUE_SCOPED_CADENCE` on, a league whose kickoff is < 3h out
+#: is due on EVERY tick (`_due_leagues_for_sport`, `due:imminent...`), held back
+#: only by the 1800 s relaunch cooldown -- and its T-75/T-10 provider predates
+#: this module. Starting soon would drop that cooldown to 600 s, i.e. roughly
+#: triple soccer's pre-kickoff sweeps across up to ten leagues, for no gap it
+#: closes. An excluded sport can still read `live`; only `starting_soon` is
+#: withheld, so the cadence, cooldown and off-hours changes never touch it.
+STARTING_SOON_EXCLUDED_SPORTS: frozenset[str] = frozenset({"soccer"})
+
 
 def _env(env: Mapping[str, str] | None) -> Mapping[str, str]:
     return os.environ if env is None else env
@@ -182,6 +193,8 @@ def classify(
     if next_fixture_epoch is None:
         return SlatePhase(sport, PHASE_PREGAME, None, "no_fixture_found")
     seconds_out = float(next_fixture_epoch) - float(now_epoch)
+    if sport in STARTING_SOON_EXCLUDED_SPORTS:
+        return SlatePhase(sport, PHASE_PREGAME, seconds_out, "starting_soon_excluded")
     window = starting_soon_window_seconds(sport, env)
     if seconds_out <= 0:
         if -seconds_out <= KICKOFF_GRACE_SECONDS:
@@ -266,7 +279,9 @@ def current_phase(
             date_str = central_today_iso()
         next_epoch = next_fixture(sport, now_epoch=now)
         if not need_live and (
-            next_epoch is None or float(next_epoch) - now > starting_soon_window_seconds(sport, env)
+            sport in STARTING_SOON_EXCLUDED_SPORTS
+            or next_epoch is None
+            or float(next_epoch) - now > starting_soon_window_seconds(sport, env)
         ):
             return classify(sport, now_epoch=now, next_fixture_epoch=next_epoch, is_live=None, env=env)
         is_live = _cached_is_live(sport, date_str, live_checkers.get(sport), now)
