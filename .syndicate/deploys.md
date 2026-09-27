@@ -42492,3 +42492,33 @@ Both at production's `DEFAULT_SIMS = 120` and production's SP+ ratings. `#499`'s
 ### A PREFLIGHT DEFECT FOUND WHILE WAITING, worth more than this deploy
 
 refresh-worker's preflight samples the process list from `ALL_PROCESS_MEMORY` log lines — and that heartbeat thread is started and stopped INSIDE a `refresh_odds_sources` run (`scripts/refresh_odds_sources.py:3561`). So the sample exists only while an odds refresh is running, which is exactly when jobs are in flight. The two states are therefore: odds refresh running -> fresh sample showing jobs -> HOLD; nothing running -> sample ages past 180s -> UNKNOWN. **Measured: 80 consecutive polls over 37 minutes returned 41 HOLD and 39 UNKNOWN and zero CLEAR.** The CLEAR that finally allowed this deploy came from a 46s-old sample taken in the gap after a run ended — a narrow band, reached by luck rather than by design. `check_deploy_safety.py` (live endpoints) and `deploy_preflight.py` (stale process list) disagreed at the same instant more than once during this wait.
+
+### MEASURED 2026-09-26 10:03 PM CT — obligation from the row above DISCHARGED. The prediction held.
+
+Board artifact `generated_at 2026-09-27T03:03:55Z`, i.e. AFTER `deploy_ended 02:46:11Z`. Stable across two reads 20 s apart.
+
+| | baseline 02:42:50Z | first post-deploy board 02:48:39Z | 03:03:55Z |
+|---|--:|--:|--:|
+| `live_resim_published_no_distribution_for_this_market` | 112 | 93 | **7** |
+| `rows_live_gameline_priceable` | 4 | 2 | **16** |
+| `rows_live_gameline_edged` | 2 | 2 | **16** |
+| live_resim games indexed | 24 | 15 | 12 |
+
+**THE FIRST POST-DEPLOY BOARD WAS NOT THE ANSWER, AND WAS NOT READ AS ONE.** At 02:48:39Z — 2.5 minutes after `deploy_ended` — the counter read 93, inside the 112-188 band the OLD code wandered across 80 polls. It was reported as a FAILED prediction at the time rather than explained away, and the cause was that the board had joined a lens written before the worker finished booting. The next build, off a lens the new code wrote, is the measurement.
+
+**WHY 7 AND NOT 0.** The reason is emitted per ROW, and 12 games were still live against 24 at baseline; the residue is rows whose lens lane is a refusal or whose game went final between the lens write and the board join. 7 against a 112 baseline is a collapse, not a drift: 80 polls of natural variation on the old code never went below 112.
+
+**THE INTERNAL CHECK THAT MAKES THIS MORE THAN A FALLING COUNTER.** The withheld mass MOVED DOWNSTREAM rather than vanishing, which is what a real gate opening looks like:
+
+| reason | 02:48:39Z | 03:03:55Z |
+|---|--:|--:|
+| `live_resim_published_no_distribution_for_this_market` | 93 | 7 |
+| `no_two_sided_market_price` | 7 | 70 |
+| `no_live_gameline_projection` | 119 | 47 |
+| `prob_interval_swamps_edge` | 3 | 9 |
+
+Rows that used to die at the distribution gate now pass it and meet the NEXT gate. `prob_interval_swamps_edge` rising is the precision bar doing its job on newly-priceable rows.
+
+**EDGES: 2 -> 16.** Eight-fold, and it is the weaker half of this reading — `rows_live_gameline_edged` depends on where the market is, not only on whether we can price. The counter that belongs to this change is the withheld reason, and that is the one that collapsed.
+
+Claim released. NOT claimed: that these prices are profitable. The margin correction in particular is fitted on a season whose bias drifts (-0.485 earlier half, -1.631 later) and reached only 0.1105 out of sample; it should be refit as the season accumulates.
