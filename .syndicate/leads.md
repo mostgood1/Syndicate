@@ -831,3 +831,57 @@ that deploys contributed none of it.
 The last one: `LIVE_ORDER status=submitted venue=kalshi ticker=KXNFLREC-26SEP27BALDAL-DALJWILLIAMS33-3 ... stake=1.61`, one order per pass, the passes on either side refusing `insufficient_shard_balance` 2-3. **Reading, not proof:** $1-3 stakes, one at a time, is the shape of cash freed by settling positions, not of a deposit. The census flag assumes "placing" means "funded"; that is UNVERIFIED here. **Decision owed to the user, not a defect:** either kalshi stays dormant (drop nothing; accept this ALERT daily, or teach the census a `trickle` state) or the account was funded (drop `--dormant-venue kalshi` from the scheduled task). A `VENUE_BALANCES`/`KALSHI_SHARD_BALANCES` read over the window would settle which. Also: `insufficient_shard_balance` (237 of 489 refusals) is the `#573` per-shard gate firing, as designed.
 
 ---
+
+## 2026-09-27 — CORRECTION to the MLB-sim-kill lead above, and the REAL cause: refresh-worker is running at its 4 GB ceiling. Max 100.0% of cap, minimum headroom 0 MB, measured over one hour `[lane worker-memory-heartbeat]`
+
+**FIRST, A RETRACTION.** The lead above says there was "no memory telemetry within
+minutes of either kill". **That is false, and it was my query that was blind, not
+the instrument.** `scripts/render_logs.py` truncates long lines, so grepping for
+`container_memory_pct_of_max` without `--max-field` matches nothing even when the
+line is present. Re-queried with `--max-field 20000`: **50 `ALL_PROCESS_MEMORY`
+lines exist in 06:30-07:00Z**, spanning the 06:51:50Z `oomKilled`. Same error shape
+as `feedback_absence_in_a_window_is_not_absence` and the standing rule that an
+absent signal is a statement about the emitter until you have checked the reader.
+
+**WHAT THE TELEMETRY ACTUALLY SHOWS, and it is worse than the kill count.**
+Hourly window 14:20Z-15:15Z, 132 samples:
+
+    max container_memory_pct_of_max   100.0 %
+    min headroom                        0 MB
+    sustained 94-99.6% from 14:54Z onward
+
+And around the earlier OOM the jump is not a slow leak:
+
+    06:57:57  pct=65.1  mb=2664
+    06:58:01  pct=65.1  mb=2666
+    06:58:19  pct=99.8  mb=4089     <- +1422 MB in 18 seconds
+
+**THE RAMP IS BOOT-CONFOUNDED, exactly as `project_worker_memory_is_boot_confounded`
+warns.** My own deploy restarted the worker at 14:49:15Z; `accounted_rss_mb` read
+641 MB at 14:50 and 2693 MB by 15:08 -- roughly 2 GB in 18 minutes. Every deploy
+resets this, so any fix will look like it worked for five minutes.
+
+**DO NOT CALL IT A LEAK YET.** `container_memory_mb` 4080 against
+`accounted_rss_mb` 2430 is a ~1.6 GB gap, and `memory.current` includes page cache
+(`project_memory_current_is_page_cache`: a 2.7 GB plateau once turned out to be
+file cache). The kernel reclaims cache before OOM-killing, so 96% with a large
+reclaimable share is not the same as 96% anonymous. The discriminating read is
+`memory_observability.memory_headroom_snapshot`, which already splits reclaimable
+from unreclaimable -- USE IT before attributing this to any allocation site.
+
+**WHAT SURVIVES OF THE ORIGINAL LEAD, unchanged and still measured:** 2 of 7 MLB
+sims killed in 5.61 h (29%), 38.9 min of wasted compute, attributed to an
+`earlyExit` and an `oomKilled`, and ZERO of three deploys killed a sim. The
+mechanism for the kills is now identified: the worker sits at its memory cap.
+
+**AND WHAT SURVIVES OF THE HEARTBEAT JUSTIFICATION, narrowed.** Telemetry is NOT
+generally absent -- during a busy Sunday slate the coupling is invisible because
+odds refreshes run near-continuously (max gap 139 s over 74 minutes, 0 gaps past
+the 180 s preflight limit). The coupling still bites in QUIET periods, where it is
+measured: a 16-minute gap at 01:16-01:43Z, and 39 of 80 preflight polls returning
+UNKNOWN between 02:03 and 02:40Z. So `worker-memory-heartbeat` is worth shipping
+for preflight reachability and quiet-window coverage, NOT because OOM diagnosis is
+impossible today. The commit message for `87ce81d7` overstates this; this row is
+the correction.
+
+---
