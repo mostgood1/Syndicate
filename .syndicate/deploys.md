@@ -42589,3 +42589,29 @@ This is the COMBINED effect of `9c28e63d`, `c612db03`, `858a1763` and whatever t
 **Two things seen in passing, both outside this lane's change (leads, not graded):**
 1. **First-half stoppage is served as the second half.** 761843 at `status_detail 45'+6'`, `status_period 1`, was served as `half 2, clock_remaining 2700` — so its windows (0.15 / 0.30) describe the opening of the second half, not the remaining first-half stoppage time.
 2. **Second-half stoppage serves a 0.0 goal chance.** At 90'+1' .. 90'+4', `clock_remaining = 0.0` and both windows are exactly 0.0, although goals are scored in stoppage time.
+
+---
+
+## 2026-09-27 03:02 PM CT — refresh-worker `ffd320ec` (lane `nfl-ncaaf-live-props`) — WIRE the NFL per-quarter prop capture. **MEASUREMENT OWED: no `CAPTURED` line observed yet.**
+
+Deploy `dep-dasncm7pn0mc7396892g`, created 20:02:32Z, `deploy_ended` 20:05:28Z. Preflight CLEAR on a 70 s sample. Claim taken as `nfl-ncaaf-live-props` and RELEASED at 20:06Z.
+
+### A MID-SLATE DEPLOY, taken deliberately on a user decision
+
+The standing instruction was to hold every deploy until the slate quiets. The user overrode it for this one change only ("wire it before the games end"), because the thing it collects is the one item in this lane that EXPIRES: `live_player_box`'s cache is in-memory only, so every live slate generates the per-quarter player production an empirical prop model needs and discards it. There is no backfill.
+
+**The restart cost less than was quoted when the decision was asked for, and that is stated rather than quietly banked.** The estimate offered was "kills the in-flight MLB sim and board build". At the moment the locks were taken the MLB sim had already finished and the board build was idle; only an odds refresh was in flight, which `check_deploy_safety`'s own docstring records as costing nothing (the next cycle rewrites those artifacts). So no sim was killed. The decision was made on a worse estimate than the outcome.
+
+### THE OBVIOUS HOOK WAS THE WRONG ONE
+
+`nfl_player_box_index` is called only from `syndicate/blueprints/nfl.py` — the WEB service, in a request path. Capturing there would write to web's disk, which the worker cannot read, and would only fire when somebody happened to load the NFL cards page. **A collector that depends on browsing is not a collector.** The hook is `nfl/live_resim.build_live_lens_snapshot`, on refresh-worker, which already iterates live games carrying period, clock and score.
+
+### verify: A REAL `[nfl_prop_capture] CAPTURED` LINE, and absence is NOT yet failure
+
+The capture fires only within 120 s of the end of Q1/Q2/Q3. At deploy time the 1pm ET games were already in Q4 with their boundaries behind them, so the first opportunity is the 4pm window's Q1 boundary at roughly 20:40Z. A verifier polls every 3 minutes for 3 hours and reports the first line with its event, period and row count.
+
+**If no line appears by the end of tonight's slate, that is a REAL DEFECT and must be read as one** — it would mean the hook is not reaching live games — not as "the window was quiet". The distinction is the whole reason the expected timing is written down here before the reading.
+
+### NOT claimed
+
+That any prop is priced, projected or published. This writes observations to disk and nothing else. The parked `live_prop_projection` keeps its posture of emitting `liveProjection` and never `liveModelProbOver`, and remains unwired.
