@@ -462,3 +462,88 @@ def injury_file_changed(
     except Exception as exc:  # noqa: BLE001 -- a lost baseline costs one extra sweep
         print(f"[slate_phase] INJURY_FINGERPRINT_WRITE_FAILED sport={sport} {type(exc).__name__}: {exc}", flush=True)
     return previous is not None and previous != current
+
+
+# ---------------------------------------------------------------------------
+# Publishing the phases to the web board.
+#
+# WHY A FILE OF ITS OWN. The web service computes nothing here -- resolving a
+# phase costs schedule fetches and ESPN subprocesses, the load the web must
+# never carry. The worker's tick meta already reaches web through
+# `latest_live_refresh_tick.json`, but BOTH workers overwrite that key every
+# tick, so with the observe flag on one service only, the phases would appear
+# and vanish with whichever tick wrote last. This file is written ONLY by a
+# service that is observing, so what the board reads is always a real
+# resolution, stamped with when and where it was made.
+# ---------------------------------------------------------------------------
+
+#: A published phase older than this is not shown. Ticks run about once a
+#: minute, so 15 minutes of silence means the observing loop has stopped;
+#: a "starting soon" label frozen from an hour ago would be a wrong claim.
+PUBLISHED_MAX_AGE_SECONDS = 15 * 60
+
+
+def published_phases_path() -> Path:
+    from syndicate.features.shared.refresh_state_store import reports_root
+
+    return reports_root() / "live_refresh_loop" / "slate_phases.json"
+
+
+def publish_phases(
+    phases: Mapping[str, SlatePhase],
+    *,
+    now_epoch: float,
+    write: Callable[[Path, Any], Any],
+    path: Path | None = None,
+    env: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Write the phases for the web board. Stores the START EPOCH, not seconds,
+    so the board can count down from its own clock without re-reading."""
+    sports: dict[str, Any] = {}
+    for sport, phase in sorted(phases.items()):
+        next_start = None if phase.seconds_to_next is None else float(now_epoch) + float(phase.seconds_to_next)
+        sports[sport] = {"phase": phase.phase, "next_start_epoch": next_start, "reason": phase.reason}
+    payload = {
+        "written_at_epoch": float(now_epoch),
+        "service": str(_env(env).get("RENDER_SERVICE_NAME") or "").strip() or None,
+        "starting_soon_enabled": starting_soon_enabled(env),
+        "sports": sports,
+    }
+    try:
+        write(path or published_phases_path(), payload)
+    except Exception as exc:  # noqa: BLE001 -- the board simply shows no label
+        print(f"[slate_phase] SLATE_PHASE_PUBLISH_FAILED {type(exc).__name__}: {exc}", flush=True)
+    return payload
+
+
+def read_published_phases(
+    *,
+    read: Callable[[Path], Any],
+    now_epoch: float | None = None,
+    path: Path | None = None,
+    max_age_seconds: float = PUBLISHED_MAX_AGE_SECONDS,
+) -> dict[str, Any]:
+    """What the board may show. `sports` is EMPTY unless the file is fresh --
+    missing, unreadable and stale all mean "no label", and `reason` says which."""
+    now = float(now_epoch if now_epoch is not None else time.time())
+    try:
+        payload = read(path or published_phases_path())
+    except Exception:  # noqa: BLE001
+        payload = None
+    if not isinstance(payload, dict):
+        return {"available": False, "reason": "not_published", "sports": {}}
+    try:
+        written = float(payload.get("written_at_epoch") or 0.0)
+    except (TypeError, ValueError):
+        written = 0.0
+    age = now - written if written > 0 else None
+    base = {"written_at_epoch": written or None, "age_seconds": None if age is None else int(age), "service": payload.get("service")}
+    if age is None or age > max_age_seconds or age < -60:
+        return {**base, "available": False, "reason": "stale", "sports": {}}
+    sports = payload.get("sports") if isinstance(payload.get("sports"), dict) else {}
+    clean: dict[str, Any] = {}
+    for sport, row in sports.items():
+        if not isinstance(row, dict) or row.get("phase") not in {PHASE_PREGAME, PHASE_STARTING_SOON, PHASE_LIVE}:
+            continue
+        clean[str(sport)] = {"phase": row["phase"], "next_start_epoch": row.get("next_start_epoch")}
+    return {**base, "available": True, "reason": "fresh", "sports": clean}

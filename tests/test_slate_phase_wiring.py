@@ -171,3 +171,41 @@ def test_nfl_injury_and_news_poll_intervals(monkeypatch):
     on = (worker._nfl_injuries_fetch_interval_seconds(), worker._nfl_news_capture_interval_seconds())
     assert off == (21600, 21600)
     assert on == (900, 900)
+
+
+def test_tick_publishes_for_the_board_only_while_observing(monkeypatch):
+    written = {}
+    monkeypatch.setattr(loop, "write_json_file", lambda path, payload: written.__setitem__(str(path), payload))
+    monkeypatch.setattr(loop, "_active_sports_for_date", lambda date_str: "nfl")
+    monkeypatch.delenv("SYNDICATE_SLATE_PHASE_OBSERVE", raising=False)
+    loop._slate_phases_for_tick(now_epoch=NOW, date_str="2026-09-27")
+    assert written == {}, "flag off: nothing published"
+    monkeypatch.setenv("SYNDICATE_SLATE_PHASE_OBSERVE", "true")
+    loop._slate_phases_for_tick(now_epoch=NOW, date_str="2026-09-27")
+    (path, payload), = written.items()
+    assert path.endswith("live_refresh_loop/slate_phases.json")
+    assert payload["sports"]["nfl"]["phase"] == sp.PHASE_STARTING_SOON
+    assert payload["sports"]["nfl"]["next_start_epoch"] == KICKOFF
+
+
+def test_board_endpoint_serves_published_phases(monkeypatch):
+    from flask import Flask
+
+    from syndicate.blueprints import intelligence as blueprint
+
+    store = {}
+    sp.publish_phases(
+        {"nfl": sp.SlatePhase("nfl", sp.PHASE_STARTING_SOON, 4500.0, "t")},
+        now_epoch=__import__("time").time(),
+        write=lambda path, payload: store.__setitem__(str(path), payload),
+    )
+    monkeypatch.setattr(blueprint, "read_json_file", lambda path: store.get(str(path)))
+    app = Flask(__name__)
+    app.register_blueprint(blueprint.intelligence_bp)
+    body = app.test_client().get("/api/intelligence/slate-phases").get_json()
+    assert body["available"] is True
+    assert body["sports"]["nfl"]["phase"] == "starting_soon"
+
+    store.clear()
+    body = app.test_client().get("/api/intelligence/slate-phases").get_json()
+    assert body == {"available": False, "reason": "not_published", "sports": {}}

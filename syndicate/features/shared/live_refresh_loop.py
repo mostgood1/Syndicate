@@ -5708,6 +5708,9 @@ def _slate_phases_for_tick(*, now_epoch: float, date_str: str) -> dict[str, Any]
 		sports = [item.strip().lower() for item in str(_active_sports_for_date(date_str) or "").split(",") if item.strip()]
 		phases = _slate_phase.resolve_phases(sports, now_epoch=now_epoch, date_str=date_str)
 		_slate_phase.print_transitions(phases, prefix="[live_refresh_loop]")
+		# For the web board (`/api/intelligence/slate-phases`). Its own shared-state
+		# file, written only while observing -- see `slate_phase.publish_phases`.
+		_slate_phase.publish_phases(phases, now_epoch=now_epoch, write=write_json_file)
 		return {
 			"enabled": _slate_phase.starting_soon_enabled(),
 			"observing": True,
