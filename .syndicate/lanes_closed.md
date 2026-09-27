@@ -8441,3 +8441,9 @@ SAFE_SLUGS=ncaaf-board-sim-coverage,ncaaf-sim-inseason-ratings,ncaaf-player-data
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - MET: moved `closed-lane-archive-20260925-1811` (owner 97d5cc75 idle 906m). 18 WAIT (owners 16da93b3/4ab694ed live); detail in log/2026-09-26.md.
+
+### closed-lane-archive-20260926-1750 — CLOSED 2026-09-26 (GOAL MET: 15 blocks archived) — opened 2026-09-26 — session 25882a2a-fcb0-444d-a75b-c0f0a2899d3e
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 SAFE for 15; moved them to lanes_closed.md with one pointer each. 9 CLOSED blocks WAIT (session 4ab694ed active). Table + bytes in log/2026-09-26.md.
+- Moved: lane-archive-debt, lanes-budget-attribution, bw-lane-block-trim, bookquotes-lane-block-trim, inplay-cadence-block-trim, polymarket-blocks-trim, lane-narrative-trimmer, primary-tree-hook-sync, primary-tree-fastforward, bad-claim-prose-fix, mlb-traditional-dh-join, dh-fix-web-deploy, dh-ordinal-pairing, open-block-bloat-batch, closed-lane-archive-20260926-0934

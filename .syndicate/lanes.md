@@ -728,11 +728,11 @@ death, never life — do not invert it.
 - Verification: Measured on production 2026-09-26T19:2xZ BEFORE any code: ncaaf_source/data/smartsim2_segment_distributions_2026_wk4.json returns HTTP200 with 58 games, generated 16:20:22Z the same day, carrying empirical total_points_dist and margin_dist plus means for all 7 segments (full, q1-q4, h1, h2); the sibling projections CSV carries game_id + teams for the same 58 games, which bridges artifact to board. AFTER: a production read showing NCAAF segment rows with rows_with_projection above 0.
 - Blocked by: none
 
-### closed-lane-archive-20260926-1750 — CLOSED 2026-09-26 (GOAL MET: 15 blocks archived) — opened 2026-09-26 — session 25882a2a-fcb0-444d-a75b-c0f0a2899d3e
+### closed-lane-archive-20260926-2234 — CLOSED 2026-09-26 (GOAL MET: 1 block archived) — opened 2026-09-26 — session 74f24894-f1fd-4067-870d-756a809e19ce
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 SAFE for 15; moved them to lanes_closed.md with one pointer each. 9 CLOSED blocks WAIT (session 4ab694ed active). Table + bytes in log/2026-09-26.md.
-- Moved: lane-archive-debt, lanes-budget-attribution, bw-lane-block-trim, bookquotes-lane-block-trim, inplay-cadence-block-trim, polymarket-blocks-trim, lane-narrative-trimmer, primary-tree-hook-sync, primary-tree-fastforward, bad-claim-prose-fix, mlb-traditional-dh-join, dh-fix-web-deploy, dh-ordinal-pairing, open-block-bloat-batch, closed-lane-archive-20260926-0934
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 SAFE for 1; 9 WAIT (session 4ab694ed active). Detail in log/2026-09-26.md.
+- Moved: closed-lane-archive-20260926-1750
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -785,6 +785,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20260925-1328` — CLOSED 2026-09-25 (GOAL MET: 2 blocks archived) — opened 2026-09-25 — session 20602d39-14ea-4d04-99fa-87fef04acad5
 - `closed-lane-archive-20260925-1811` — CLOSED 2026-09-25 (GOAL MET: 1 block archived) — opened 2026-09-25 — session 97d5cc75-9c62-45c2-84b6-454a203760bc
 - `closed-lane-archive-20260926-0934` — CLOSED 2026-09-26 (GOAL MET: 1 block archived) — opened 2026-09-26 — session fb059fb4-bd9f-477f-9afe-c71398cdd5a1
+- `closed-lane-archive-20260926-1750` — CLOSED 2026-09-26 (GOAL MET: 15 blocks archived) — opened 2026-09-26 — session 25882a2a-fcb0-444d-a75b-c0f0a2899d3e
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `combined-board-rows-unreadable-tripwire` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: live on web `da268e07` (15:36:46Z); the field is served on every date, 0 `ROWS_UNREADABLE` lines; stored 113 vs rows 111 is the per-sport `by_sport` cap, not a defect.**
