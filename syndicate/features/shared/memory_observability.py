@@ -7,6 +7,7 @@ import json
 import os
 import re
 import sys
+import threading
 import time
 import types
 import uuid
@@ -2327,6 +2328,120 @@ def log_all_process_memory(stage: str, **extra: Any) -> dict[str, Any]:
         print(f"PROCESS_ENUM_DEBUG {json.dumps(debug_payload, default=str, sort_keys=True)}", file=sys.stderr, flush=True)
     print(f"ALL_PROCESS_MEMORY {json.dumps(payload, default=str, sort_keys=True)}", file=sys.stderr, flush=True)
     return payload
+
+
+# ---------------------------------------------------------------------------
+# THE STANDALONE MEMORY HEARTBEAT. Owned by NO job, which is the entire point.
+# ---------------------------------------------------------------------------
+#
+# THE DEFECT IT FIXES, measured 2026-09-27. `ALL_PROCESS_MEMORY` was emitted
+# ONLY by a heartbeat thread that `refresh_odds_sources` starts and stops around
+# its own run (`scripts/refresh_odds_sources.py:3561`). So the one line that
+# carries container memory existed exactly while a job was running, and nowhere
+# else. Two things followed, and both cost real time:
+#
+#   1. THE WORKER'S MEMORY AT THE MOMENT IT DIES WAS UNRECORDABLE. refresh-worker
+#      terminated 8 times in 16.8 h (1 per 2.1 h), one of them an explicit
+#      `oomKilled` at 06:51:50Z that threw away a 14-minute MLB sim. There was no
+#      memory telemetry within minutes of either kill, so "these earlyExits are
+#      OOMs" could not be tested at all -- the reading that would settle it is
+#      precisely the one the instrument did not take.
+#   2. `deploy_preflight.py` COULD NEVER RETURN CLEAR for this service. It samples
+#      the process list from these lines, so: a job is running -> fresh sample
+#      showing jobs in flight -> HOLD; no job running -> sample ages past 180 s ->
+#      UNKNOWN. Measured: 80 consecutive polls over 37 minutes gave 41 HOLD, 39
+#      UNKNOWN and ZERO CLEAR. A deploy got through only by catching a 46-second
+#      window just after a run ended.
+#
+# SAME TOKEN, DELIBERATELY. This emits `ALL_PROCESS_MEMORY` with the same payload
+# shape rather than a new name, because `deploy_preflight.parse_processes` and
+# `check_worker_memory_gate.py` already read that token. A new token would fix the
+# OOM blindness and leave the preflight defect exactly where it was.
+#
+# IT MAY DOUBLE-EMIT while an odds refresh is running. That is accepted: both
+# readers take the NEWEST line, `label` distinguishes the emitters for anyone
+# reading the log, and de-duplicating would mean editing a file this lane does not
+# hold to coordinate state across two threads.
+#
+# WORKER PERIODIC WORK IS NEVER FREE (`#241` restarted production in a loop), so:
+# one thread per process and never more, a default interval of 60 s matching the
+# emitter this supplements, every cycle wrapped so a raising snapshot can never
+# kill the process it exists to observe, and an env switch that turns it off
+# without a deploy.
+_MEMORY_HEARTBEAT_DEFAULT_SECONDS = 60.0
+_MEMORY_HEARTBEAT_STARTED: dict[str, Any] = {"thread": None}
+_MEMORY_HEARTBEAT_STOP = threading.Event()
+
+
+def memory_heartbeat_interval_seconds() -> float:
+    """Seconds between beats. `0`, `off`, `false` or `no` disables it entirely.
+
+    ABSENT MEANS ON at the default. Stated because CLAUDE.md's standing rule is
+    that absent != off and the code's default is what decides -- and because the
+    whole point of this thread is to be running when nobody remembered to ask.
+    """
+    raw = str(os.environ.get("SYNDICATE_MEMORY_HEARTBEAT_SECONDS") or "").strip().lower()
+    if raw in {"off", "false", "no"}:
+        return 0.0
+    if not raw:
+        return _MEMORY_HEARTBEAT_DEFAULT_SECONDS
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return _MEMORY_HEARTBEAT_DEFAULT_SECONDS
+    return value if value > 0 else 0.0
+
+
+def start_standalone_memory_heartbeat(*, label: str) -> bool:
+    """Start the job-independent heartbeat. Idempotent. Returns whether it ran.
+
+    Returns False when it is disabled or already running, so a caller can log
+    which of those happened instead of assuming it started.
+    """
+    interval = memory_heartbeat_interval_seconds()
+    if interval <= 0:
+        return False
+    if _MEMORY_HEARTBEAT_STARTED.get("thread") is not None:
+        return False
+
+    started_at = time.time()
+
+    def _beat() -> None:
+        next_tick = time.monotonic() + interval
+        while not _MEMORY_HEARTBEAT_STOP.wait(max(0.0, next_tick - time.monotonic())):
+            try:
+                log_all_process_memory(
+                    "standalone_heartbeat",
+                    label=label,
+                    pid=os.getpid(),
+                    started_at=started_at,
+                    interval_seconds=interval,
+                )
+            except Exception as exc:  # noqa: BLE001
+                # A MONITOR MUST NOT BE ABLE TO KILL WHAT IT MONITORS. Printed
+                # rather than swallowed, so a permanently-failing snapshot is
+                # visible instead of reading as a quiet gap in the telemetry --
+                # which is the exact failure mode this whole thread exists to end.
+                print(f"MEMORY_HEARTBEAT_FAILED {type(exc).__name__}: {exc}",
+                      file=sys.stderr, flush=True)
+            next_tick += interval
+
+    thread = threading.Thread(target=_beat, name=f"memory-heartbeat:{label}", daemon=True)
+    _MEMORY_HEARTBEAT_STARTED["thread"] = thread
+    thread.start()
+    print(f"MEMORY_HEARTBEAT_STARTED label={label} interval_seconds={interval} pid={os.getpid()}",
+          file=sys.stderr, flush=True)
+    return True
+
+
+def stop_standalone_memory_heartbeat() -> None:
+    """For tests. Production never stops it -- that is the defect it fixes."""
+    _MEMORY_HEARTBEAT_STOP.set()
+    thread = _MEMORY_HEARTBEAT_STARTED.get("thread")
+    if thread is not None:
+        thread.join(timeout=5.0)
+    _MEMORY_HEARTBEAT_STARTED["thread"] = None
+    _MEMORY_HEARTBEAT_STOP.clear()
 
 
 _HEAP_CENSUS_STATE: dict[str, int] = {"count": 0}

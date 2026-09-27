@@ -195,6 +195,19 @@ def ratings_are_degenerate(
     return abs(home_net - away_net) < RATING_SEPARATION_FLOOR
 
 
+def _histogram(values: list[int]) -> dict[str, int]:
+    """`{value: count}` over integer draws, keyed by str so it survives JSON.
+
+    Same shape as the pregame sidecar's `margin_dist` / `total_points_dist` and
+    as NCAAF's, so a reader who understands one understands the others.
+    """
+    out: dict[str, int] = {}
+    for value in values:
+        key = str(value)
+        out[key] = out.get(key, 0) + 1
+    return out
+
+
 def resim_live_game(
     state: NflLiveGameState,
     *,
@@ -320,6 +333,23 @@ def resim_live_game(
         "sims_run": ran,
         "margin_mean": round(sum(margins) / ran, 4),
         "total_mean": round(sum(totals) / ran, 4),
+        # THE DRAWS, not just their means. This loop already built them per sim
+        # and threw them away at the return -- the same defect NCAAF carried
+        # until 2026-09-26 and MLB until `0315f548`.
+        #
+        # WHAT THIS DOES NOT DO: publish. `build_game_lens` below still
+        # constructs its lane field by field and carries NEITHER
+        # `totalRunsDist` NOR `marginDist`, so `live_gameline_join` cannot price
+        # a live NFL total or spread and keeps refusing them BY NAME. That gate
+        # opens on the strength of a cutoff-replay grade and nothing else --
+        # NCAAF's shipped on a grade that turned out to be fitted on 22-day-stale
+        # SP+ ratings and had to be withdrawn hours later, which is the whole
+        # argument for measuring before publishing rather than after.
+        #
+        # `margin_dist` is HOME-POSITIVE (`home - away`), matching
+        # `run_margin_dist` and what `price_distribution_market` expects.
+        "margin_dist": _histogram(margins),
+        "total_dist": _histogram(totals),
         "possession_marginalised": state.possession_owner is None,
         "elapsed_seconds": round(time.time() - started, 3),
     }

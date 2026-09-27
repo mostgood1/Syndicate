@@ -5501,6 +5501,35 @@ def _run_mlb_sim_tick() -> dict[str, Any]:
 	any_live rather than accepting them as params so it's safe to call from
 	any context.
 	"""
+	# THE WORKER'S MEMORY HEARTBEAT IS STARTED HERE, LAZILY AND IDEMPOTENTLY,
+	# AND THIS IS A COMPROMISE THAT SHOULD BE READ AS ONE.
+	#
+	# The right hook is the worker's boot in `scripts/run_refresh_worker.py`.
+	# That file is claimed by OPEN lane `live-inplay-board-cadence` in a
+	# DIFFERENT session, and editing across lanes is exactly what the protocol
+	# forbids, so it was not taken. This function is the only thing the worker
+	# imports from a module this lane does hold, and the worker calls it every
+	# non-drained cycle of its main loop -- so the FIRST such cycle after boot
+	# starts the thread, and the thread then lives independently of every job,
+	# which is the property that matters.
+	#
+	# WHAT THE COMPROMISE COSTS, stated rather than discovered later: if the
+	# worker boots straight into a drain, or if this tick is ever gated off,
+	# the heartbeat never starts and the blindness returns silently. Moving the
+	# call to worker boot is the follow-up, and it needs that lane's owner.
+	#
+	# `start_standalone_memory_heartbeat` is idempotent and returns False when
+	# already running or disabled, so calling it per tick costs a dict lookup.
+	try:
+		from syndicate.features.shared.memory_observability import (
+			start_standalone_memory_heartbeat,
+		)
+
+		start_standalone_memory_heartbeat(label="refresh_worker")
+	except Exception as exc:  # noqa: BLE001
+		# Never let observability break the tick it is attached to.
+		print(f"[live_refresh_loop] MEMORY_HEARTBEAT_START_FAILED {type(exc).__name__}: {exc}", flush=True)
+
 	meta: dict[str, Any] = {}
 	if not _mlb_sim_tick_owner_here():
 		return meta
