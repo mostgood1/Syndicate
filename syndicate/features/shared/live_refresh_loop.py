@@ -5764,7 +5764,21 @@ def _nfl_injuries_file_for_date(date_str: str) -> Path | None:
 #: Sports whose injury FILE, when it changes while the slate starts soon,
 #: forces a sweep. NBA/WNBA are not here: `_should_force_sim_rerun` already
 #: fingerprints their lineups/injuries every tick inside the tip-off window.
-_STARTING_SOON_INJURY_FILES = {"nfl": _nfl_injuries_file_for_date}
+def _nfl_game_injuries_file_for_date(date_str: str) -> Path | None:
+	"""ESPN game-day statuses (`scripts/fetch_nfl_game_injuries.py`, lane
+	`nfl-game-day-injuries`). Timestamp-free, so it changes only when a status does."""
+	try:
+		from syndicate.features.nfl.game_injuries import statuses_path
+
+		return statuses_path(date_str)
+	except Exception:
+		return None
+
+
+#: Sport -> resolvers of injury files whose change forces a sweep. A value may be
+#: one resolver or a tuple; each file is fingerprinted separately. NFL watches
+#: the nflverse practice-report CSV AND the game-day ESPN statuses.
+_STARTING_SOON_INJURY_FILES = {"nfl": (_nfl_injuries_file_for_date, _nfl_game_injuries_file_for_date)}
 
 
 def _starting_soon_injury_change_sports(sports: Iterable[str], *, now_epoch: float, date_str: str) -> set[str]:
@@ -5780,24 +5794,29 @@ def _starting_soon_injury_change_sports(sports: Iterable[str], *, now_epoch: flo
 	changed: set[str] = set()
 	for sport in sports:
 		normalized = str(sport or "").strip().lower()
-		resolver = _STARTING_SOON_INJURY_FILES.get(normalized)
-		if resolver is None:
+		resolvers = _STARTING_SOON_INJURY_FILES.get(normalized)
+		if resolvers is None:
 			continue
+		if callable(resolvers):
+			resolvers = (resolvers,)
 		try:
 			if _slate_phase.current_phase(normalized, now_epoch=now_epoch, date_str=date_str, need_live=False).phase != _slate_phase.PHASE_STARTING_SOON:
 				continue
-			path = resolver(date_str)
-			if path is None:
-				continue
-			if _slate_phase.injury_file_changed(
-				normalized,
-				path,
-				read_state=read_json_file,
-				write_state=write_json_file,
-				state_path=_meta_dir() / "starting_soon_injury_fingerprints.json",
-				date_str=date_str,
-			):
-				changed.add(normalized)
+			for index, resolver in enumerate(resolvers):
+				path = resolver(date_str)
+				if path is None:
+					continue
+				# First file keeps the bare sport key so its stored baseline survives.
+				state_key = normalized if index == 0 else f"{normalized}:{index}"
+				if _slate_phase.injury_file_changed(
+					state_key,
+					path,
+					read_state=read_json_file,
+					write_state=write_json_file,
+					state_path=_meta_dir() / "starting_soon_injury_fingerprints.json",
+					date_str=date_str,
+				):
+					changed.add(normalized)
 		except Exception as exc:
 			print(f"[live_refresh_loop] STARTING_SOON_INJURY_CHECK_FAILED sport={normalized} {type(exc).__name__}: {exc}", flush=True)
 	if changed:
