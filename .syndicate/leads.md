@@ -764,3 +764,54 @@ projections, and no non-MLS league returned a recommendations artifact at any
 path tried.
 
 ---
+
+## 2026-09-27 — MLB daily sims are being killed at a 29% rate, and DEPLOYS ARE NOT THE CAUSE. The worker terminates itself about once every 2 hours `[found while deploying ncaaf-live-totals-distribution; no lane]`
+
+**I raised this having blamed my own deploys, and the data says they were clean.**
+Measured over the window with MLB sim activity, 2026-09-27T01:15:39Z .. 06:52:10Z
+(5.61 h), from `MLB_DAILY_SIM_TRIGGERED` / `_END` / `_ORPHANED` on refresh-worker:
+
+    triggered 7   completed 5   KILLED 2   kill rate 29%
+    completed mean duration 23.5 min (21.9 .. 27.8)
+    WASTED compute 38.9 min = 11.5% of the window's wall time
+
+ATTRIBUTION, by nearest termination event within 10 minutes:
+
+    run 20260927_041653  ran 24.6 min, died 04:41:29  <- earlyExit at 04:41:11
+    run 20260927_063754  ran 14.3 min, died 06:52:10  <- oomKilled  at 06:51:50
+
+The first one is the expensive shape: mean completion is 23.5 min and it was
+killed at 24.6 min, i.e. it did essentially the whole job and published nothing.
+
+**ZERO of three deploys killed a sim.** 02:43:02-02:46:11, 03:49:30-03:52:38 and
+14:46:08-14:49:15 each had 0 sims in flight. `deploy_preflight.py`'s job check did
+exactly what it exists for, so the standing rule "deploying kills an in-flight MLB
+sim" is TRUE about the mechanism and MISLEADING about the current cost: the cost
+is the worker's own restarts.
+
+THE REAL SIGNAL: 8 terminations in 16.8 h = **1 per 2.1 h** (09-26T22:00Z ..
+09-27T14:49Z), of which exactly 1 is an explicit `oomKilled`. Two have a crash-loop
+shape rather than a leak shape:
+
+    11:16:17 server_available -> 11:17:03 earlyExit   (46 s lifetime)
+    12:17:55 server_available -> 12:17:59 earlyExit   ( 4 s lifetime)
+
+A 4-second lifetime is a boot-time death. **No Python traceback is logged for any
+earlyExit** in 11:00-12:30, and an exit with no traceback is a SIGKILL signature,
+which is consistent with the one event Render did label `oomKilled`. So the
+hypothesis to test is that most `earlyExit`s here ARE OOM kills that Render did not
+label.
+
+WHY THIS IS HARD TO SEE, and it is the same blindness that cost an hour tonight:
+`ALL_PROCESS_MEMORY` is emitted by a heartbeat thread started and stopped INSIDE a
+`refresh_odds_sources` run (`scripts/refresh_odds_sources.py:3561`). There is
+therefore NO memory telemetry when no odds refresh is running -- I found none at all
+around either kill -- so the container's memory at the moment it dies is exactly the
+reading that does not exist. Any investigation has to fix the instrument first.
+
+NEXT READ: a free-standing memory heartbeat (not owned by the odds-refresh job), then
+correlate container RSS against `earlyExit` timestamps. Until that exists, "earlyExit
+== OOM" stays a hypothesis; what is MEASURED is the 29% kill rate, the 38.9 min, and
+that deploys contributed none of it.
+
+---
