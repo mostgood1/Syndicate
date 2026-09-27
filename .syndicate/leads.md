@@ -815,3 +815,11 @@ correlate container RSS against `earlyExit` timestamps. Until that exists, "earl
 that deploys contributed none of it.
 
 ---
+
+## 2026-09-27 — KALSHI IS PLACING AGAIN while declared dormant: 6 orders in 24 h, a trickle, not proven to be a deposit `[scheduled venue-order-family-census-daily, session fa155f32, no lane]`
+
+`py -3 scripts/venue_order_family_census.py --hours 24 --dormant-venue kalshi` exit 1, window 2026-09-26 10:15 CT .. 2026-09-27 09:54 CT (15:15:56Z .. 14:54:20Z), live-odds-worker, 332 `ORDER_PATH` + 330 `EXECUTED` lines, 0 unreadable:
+`kalshi PLACEMENT: placing_while_declared_dormant -- passes=165 positions=592 placed=6 filled=0 refusals={'insufficient_venue_balance': 252, 'insufficient_shard_balance': 237} last_placed=2026-09-27T06:23:32Z`.
+The last one: `LIVE_ORDER status=submitted venue=kalshi ticker=KXNFLREC-26SEP27BALDAL-DALJWILLIAMS33-3 ... stake=1.61`, one order per pass, the passes on either side refusing `insufficient_shard_balance` 2-3. **Reading, not proof:** $1-3 stakes, one at a time, is the shape of cash freed by settling positions, not of a deposit. The census flag assumes "placing" means "funded"; that is UNVERIFIED here. **Decision owed to the user, not a defect:** either kalshi stays dormant (drop nothing; accept this ALERT daily, or teach the census a `trickle` state) or the account was funded (drop `--dormant-venue kalshi` from the scheduled task). A `VENUE_BALANCES`/`KALSHI_SHARD_BALANCES` read over the window would settle which. Also: `insufficient_shard_balance` (237 of 489 refusals) is the `#573` per-shard gate firing, as designed.
+
+---
