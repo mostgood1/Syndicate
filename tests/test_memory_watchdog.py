@@ -17,6 +17,8 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
+import pytest
+
 from syndicate.features.shared import memory_observability as mo
 
 
@@ -328,6 +330,17 @@ def test_census_never_runs_on_the_sampler_thread():
         assert started.get("target") is mo._run_censuses
     finally:
         mo._WATCHDOG_STATE.pop("heap_censused", None)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_per_process_census_budgets(monkeypatch):
+    """The untracked and pymalloc censuses are capped at 3 calls per PROCESS and
+    return None once spent. Under xdist an earlier test in the same worker (any
+    that ran a worker `main()`) may have spent them, so a test here that expects
+    a reading got None depending on scheduling. Each test starts from zero, and
+    the process's own count is restored afterwards."""
+    monkeypatch.setitem(mo._UNTRACKED_CENSUS_STATE, "count", 0)
+    monkeypatch.setitem(mo._PYMALLOC_STATS_STATE, "count", 0)
 
 
 # --- #435 step five: the UNTRACKED (str/bytes) census -------------------------

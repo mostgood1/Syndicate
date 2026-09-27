@@ -7,9 +7,8 @@
     "--dist=loadscope"
   ],
   "total_testcases": 21008,
-  "failing_count": 48,
+  "failing_count": 43,
   "failing": [
-    "tests.test_cfbd_quota_latch.TheTransitionMidRetry::test_a_SHORT_WINDOW_429_still_climbs_the_ladder",
     "tests.test_daily_update_secret_redaction::test_off_is_not_on",
     "tests.test_daily_update_secret_redaction::test_ordinary_values_survive",
     "tests.test_daily_update_secret_redaction::test_secret_named_values_are_redacted",
@@ -18,12 +17,8 @@
     "tests.test_kalshi_plan_placeable::test_the_writer_puts_the_live_plan_beside_an_UNCHANGED_paper2_plan",
     "tests.test_live_lens_loop.LiveLensLoopTests::test_one_sport_failure_does_not_block_others",
     "tests.test_live_refresh_loop.LiveRefreshLoopTests::test_odds_refresh_memory_headroom_snapshot_reports_insufficient_and_sufficient",
-    "tests.test_live_refresh_loop.LiveRefreshLoopTests::test_run_live_odds_refresh_worker_sleeps_for_adaptive_idle_interval",
-    "tests.test_malloc_trim_release::test_gc_and_trim_are_attributed_separately",
     "tests.test_memory_observability::test_malloc_arena_snapshot_degrades_quietly_off_glibc",
     "tests.test_memory_observability::test_memory_headroom_snapshot_reports_insufficient_and_sufficient",
-    "tests.test_memory_watchdog::test_pymalloc_stats_parse_real_cpython_labels",
-    "tests.test_memory_watchdog::test_untracked_census_deduplicates_shared_strings",
     "tests.test_migration_gate.MigrationGateRuntimeDependencyTests::test_evaluate_protected_local_resolvers_passes_current_contracts",
     "tests.test_nhl_chip_start_time::test_a_pregame_nhl_chip_shows_its_start_time",
     "tests.test_ops_live_lens_status.TestTheAllowlistFixWouldHaveBeenInert::test_the_exclusion_list_is_still_the_known_set",

@@ -90,6 +90,23 @@ def _fire_only_the_bootstrap(func):
     return func
 
 
+
+def _no_worker_background_threads():
+    """`run_live_odds_refresh_worker.main()` starts two DAEMON threads -- the venue
+    poll and the in-play capture loop (on by default). Both read the same module
+    state these tests patch: the capture loop checks `_LIVE_REFRESH_LOOP_STOP.is_set()`
+    and both call the module's `time`. So a patched `is_set` side_effect list could
+    be consumed by a thread (StopIteration), a call count could gain one, and the
+    patched sleep could be hit twice -- depending only on thread scheduling. That is
+    why these tests flipped between CI runs (lane `pytest-baseline-dirfd`,
+    2026-09-27). The threads are not what these tests measure, so neither starts."""
+    from contextlib import ExitStack
+
+    stack = ExitStack()
+    stack.enter_context(patch.object(run_live_odds_refresh_worker, "start_venue_poll_loop", return_value=False))
+    stack.enter_context(patch.object(run_live_odds_refresh_worker, "start_inplay_capture_loop", return_value=False))
+    return stack
+
 class LiveRefreshLoopTests(unittest.TestCase):
     def setUp(self) -> None:
         # The #15 per-sport pregame cadence filter consults real liveness
@@ -2673,7 +2690,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
         mocked_release.assert_called_once()
 
     def test_run_live_odds_refresh_worker_starts_live_lens_loop(self) -> None:
-        with patch.object(run_live_odds_refresh_worker, "_acquire_process_lock", return_value=True), patch.object(
+        with patch.object(run_live_odds_refresh_worker, "_acquire_process_lock", return_value=True), _no_worker_background_threads(), patch.object(
             run_live_odds_refresh_worker,
             "_start_live_lens_reports",
             return_value=None,
@@ -2705,7 +2722,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
         # the tick's own result, not the fixed base interval.
         pregame_meta = {"phase": "pregame", "adaptive": True, "anyLive": False}
         mocked_sleep = Mock(return_value=None)
-        with patch.object(run_live_odds_refresh_worker, "_acquire_process_lock", return_value=True), patch.object(
+        with patch.object(run_live_odds_refresh_worker, "_acquire_process_lock", return_value=True), _no_worker_background_threads(), patch.object(
             run_live_odds_refresh_worker,
             "_start_live_lens_reports",
             return_value=None,
@@ -2733,7 +2750,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
         # blame (see docs/fix_notes_log.md); it should exit cleanly on its own
         # once max uptime is reached so Render restarts it fresh, rather than
         # relying only on _LIVE_REFRESH_LOOP_STOP ever being set.
-        with patch.object(run_live_odds_refresh_worker, "_acquire_process_lock", return_value=True), patch.object(
+        with patch.object(run_live_odds_refresh_worker, "_acquire_process_lock", return_value=True), _no_worker_background_threads(), patch.object(
             run_live_odds_refresh_worker,
             "_start_live_lens_reports",
             return_value=None,
