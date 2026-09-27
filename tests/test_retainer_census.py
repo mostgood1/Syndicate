@@ -90,6 +90,16 @@ class DeepSizeTests(unittest.TestCase):
         self.assertLessEqual(budget[0], 0)
 
 
+class _OnlyModules:
+    """`sys` with `modules` narrowed to the named entries; all else delegates."""
+
+    def __init__(self, *names: str) -> None:
+        self.modules = {name: sys.modules[name] for name in names}
+
+    def __getattr__(self, attr: str):
+        return getattr(sys, attr)
+
+
 class CensusTests(unittest.TestCase):
 
     def setUp(self) -> None:
@@ -106,7 +116,13 @@ class CensusTests(unittest.TestCase):
         sys.modules.pop(self._name, None)
 
     def test_it_FINDS_a_large_module_level_cache_and_ranks_it_first(self) -> None:
-        census = MOD.module_retainer_census(top=5)
+        # The census walks `sys.modules` in insertion order under a shared node
+        # budget and keeps only the global top N, and this probe is inserted
+        # LAST. Under xdist a worker that already imported hundreds of
+        # `syndicate.*` modules spends the budget, or fills the top 5, before
+        # the walk reaches it -- so the census sees only the probe here.
+        with mock.patch.object(MOD, "sys", _OnlyModules(self._name)):
+            census = MOD.module_retainer_census(top=5)
 
         names = [(r["module"], r["name"]) for r in census["top"]]
         self.assertIn((self._name, "_BIG_CACHE"), names)

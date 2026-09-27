@@ -382,3 +382,42 @@ def test_every_tracked_vendor_data_tree_is_covered(data_mirror_write_guard):
     guarded = {os.path.normcase(root) for root in data_mirror_write_guard.mirror_roots()}
     for tree in sorted(tracked_trees):
         assert os.path.normcase(str(REPO_ROOT / tree)) in guarded, tree
+
+
+# --- `dir_fd=`: how shutil.rmtree calls os.rmdir / os.unlink ------------------
+#
+# Lane `pytest-baseline-dirfd`, 2026-09-27. The wrappers resolved a `dir_fd`-
+# relative name against the CWD, so `shutil.rmtree` of ANY temp directory with a
+# folder named `data` inside read as a write into `<repo>/data` -- the false
+# positive behind ~500 of CI pytest-baseline's "new failures". These pin BOTH
+# directions: the scratch tree must pass, and a real dir_fd write into the mirror
+# must still be caught.
+
+
+def test_rmtree_of_a_scratch_tree_containing_data_is_not_the_mirror(data_mirror_write_guard, tmp_path):
+    scratch = tmp_path / "bundle" / "data" / "nfl_source"
+    scratch.mkdir(parents=True)
+    (scratch / "upcoming_recs_2026_wk4.csv").write_text("a\n", encoding="utf-8")
+    import shutil
+
+    shutil.rmtree(tmp_path / "bundle")
+    assert data_mirror_write_guard.consume() == []
+    assert not (tmp_path / "bundle").exists()
+
+
+def test_a_dir_fd_write_into_the_real_mirror_is_still_refused(data_mirror_write_guard):
+    mirror = REPO_ROOT / "data"
+    if not mirror.is_dir():
+        pytest.skip("this worktree has no data/ mirror (see session_worktree.py)")
+    if not Path("/proc/self/fd").is_dir():
+        pytest.skip("no procfs: dir_fd calls are deliberately unattributable here")
+    fd = os.open(mirror, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        with pytest.raises(RuntimeError, match="TRACKED data/ MIRROR"):
+            os.rmdir("_write_guard_dirfd_selfcheck", dir_fd=fd)
+    finally:
+        os.close(fd)
+    recorded = data_mirror_write_guard.consume()
+    assert len(recorded) == 1 and "os.rmdir" in recorded[0]
+    # Resolved through the fd, not the CWD: the record names the real target.
+    assert str(mirror / "_write_guard_dirfd_selfcheck") in recorded[0]

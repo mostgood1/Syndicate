@@ -131,7 +131,12 @@ def test_end_to_end_a_signalled_process_records_and_dies():
         proc.wait(timeout=20)
         rest = proc.stdout.read()
         assert "SHOULD NOT REACH HERE" not in rest
-        assert "WORKER_SHUTDOWN" in rest, rest[:400]
+        # The exit code is in the message because CI once saw `rest == ''` --
+        # the child died after SIGTERM having printed NOTHING, which the
+        # handler (print first, `os._exit(0)` in a `finally`) cannot do on its
+        # own. A negative code names the signal that killed it (-9: something
+        # else SIGKILLed this pid), so a recurrence says what happened.
+        assert "WORKER_SHUTDOWN" in rest, f"returncode={proc.returncode} output={rest[:400]!r}"
     finally:
         if proc.poll() is None:
             proc.kill(); proc.wait(timeout=10)

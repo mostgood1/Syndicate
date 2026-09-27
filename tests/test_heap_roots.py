@@ -61,6 +61,17 @@ CENSUS_NODE_CAP = 400_000
 
 
 
+class _OnlyModules:
+    """`sys` with `modules` narrowed to the named entries (the SAME module
+    objects, so later mutation in a test is seen); everything else delegates."""
+
+    def __init__(self, *names: str) -> None:
+        self.modules = {name: sys.modules[name] for name in names}
+
+    def __getattr__(self, attr: str):
+        return getattr(sys, attr)
+
+
 class WiderRootTests(unittest.TestCase):
 
     def setUp(self) -> None:
@@ -83,6 +94,14 @@ class WiderRootTests(unittest.TestCase):
         module.Holder = Holder
         module.SINGLETON = Singleton()
         sys.modules[self._name] = module
+        # The census walks ALL of `sys.modules` in insertion order under one
+        # node budget, and this probe is inserted LAST. Raising the cap to
+        # 400,000 (above) still lost to a CI xdist worker that had imported far
+        # more than 40 modules: `node_budget_exhausted` before the probe. The
+        # claims here are about THIS module's roots, so the census sees only it.
+        narrowed = mock.patch.object(MOD, "sys", _OnlyModules(self._name))
+        narrowed.start()
+        self.addCleanup(narrowed.stop)
 
     def tearDown(self) -> None:
         sys.modules.pop(self._name, None)

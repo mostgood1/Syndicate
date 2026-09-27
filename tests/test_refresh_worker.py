@@ -1940,7 +1940,21 @@ def _run_main_once(rrw, tmp_path, monkeypatch, *, env=None):
         ],
     )
     spawned: list = []
-    monkeypatch.setattr(rrw.subprocess, "Popen", lambda *a, **k: spawned.append(a) or _FakePopen())
+    real_popen = rrw.subprocess.Popen
+
+    def fake_popen(*a, **k):
+        # `rrw.subprocess` IS the global `subprocess` module, so this also
+        # catches ctypes' `ldconfig -p` probe from `find_library("c")` in
+        # memory_observability's once-per-process libc resolve. Whether that
+        # probe runs depends on whether an earlier test in the same xdist
+        # worker already resolved libc -- so it is let through, not counted.
+        argv = a[0] if a else k.get("args")
+        if isinstance(argv, (list, tuple)) and argv and str(argv[0]).endswith("ldconfig"):
+            return real_popen(*a, **k)
+        spawned.append(a)
+        return _FakePopen()
+
+    monkeypatch.setattr(rrw.subprocess, "Popen", fake_popen)
     monkeypatch.setattr(rrw, "_run_mlb_sim_tick", lambda: None)
     monkeypatch.setattr(rrw, "_run_mlb_actuals_writer_tick", lambda: None)
     monkeypatch.setattr(rrw, "_run_mlb_betting_day_backfill_tick", lambda: None)

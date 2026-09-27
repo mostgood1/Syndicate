@@ -18,6 +18,7 @@ latch was ever consulted, which is the failure mode that matters here.
 
 from __future__ import annotations
 
+import functools
 import json
 import time
 import unittest
@@ -144,6 +145,23 @@ class TheTransitionMidRetry(_Isolated):
     it. On the run that DISCOVERS the exhaustion the latch saved zero calls.
     """
 
+    def _urlopen_raising(self, err):
+        """`urllib.request.urlopen` patched to raise `err`, counting ONLY calls
+        from this test's thread. The patch is process-global, and under a full
+        run daemon threads left by other tests (pollers that call urlopen) hit
+        it too -- measured 88 calls against an expected 5."""
+        import threading
+
+        me = threading.get_ident()
+        mine: list[int] = []
+
+        def fake(*args, **kwargs):
+            if threading.get_ident() == me:
+                mine.append(1)
+            raise err
+
+        return fake, mine
+
     def _http_429(self, body: str):
         import urllib.error
         import io
@@ -158,12 +176,13 @@ class TheTransitionMidRetry(_Isolated):
 
         latch.clear_latch()
         err = self._http_429('{"message":"Monthly call quota exceeded."}')
-        with mock.patch("urllib.request.urlopen", side_effect=err) as opened:
+        fake, mine = self._urlopen_raising(err)
+        with mock.patch("urllib.request.urlopen", side_effect=fake):
             with mock.patch.dict("os.environ", {"CFBD_API_KEY": "k"}):
                 with self.assertRaises(latch.QuotaExhausted):
                     gen._cfbd_get("/ppa/teams", {"year": 2026})
         self.assertEqual(
-            opened.call_count, 1,
+            len(mine), 1,
             "the ladder must stop on the FIRST monthly-quota 429; production spent 5",
         )
         self.assertIsNotNone(latch.quota_latched_until(), "and the latch must still be set")
@@ -177,12 +196,17 @@ class TheTransitionMidRetry(_Isolated):
 
         latch.clear_latch()
         err = self._http_429('{"message":"Too many requests"}')
-        with mock.patch("urllib.request.urlopen", side_effect=err) as opened:
+        fake, mine = self._urlopen_raising(err)
+        # `call_with_retry`'s `sleep=time.sleep` default is bound at def time,
+        # so patching `cfbd_backoff.time.sleep` never reached it and this test
+        # really slept ~20s. Inject the no-op sleep through the seam instead.
+        no_sleep = functools.partial(cfbd_backoff.call_with_retry, sleep=lambda _s: None)
+        with mock.patch("urllib.request.urlopen", side_effect=fake):
             with mock.patch.dict("os.environ", {"CFBD_API_KEY": "k"}):
-                with mock.patch.object(cfbd_backoff.time, "sleep"):
+                with mock.patch.object(gen, "call_with_retry", no_sleep):
                     with self.assertRaises(Exception):
                         gen._cfbd_get("/ppa/teams", {"year": 2026})
-        self.assertEqual(opened.call_count, cfbd_backoff.MAX_ATTEMPTS)
+        self.assertEqual(len(mine), cfbd_backoff.MAX_ATTEMPTS)
         self.assertIsNone(latch.quota_latched_until(), "a throttle must NOT latch")
 
 if __name__ == "__main__":

@@ -8038,16 +8038,6 @@ def main() -> int:
         ):
             if args.run_once:
                 return 0
-        elif _launch_autorun_nfl_game_injuries_fetch(
-            # DIRECTLY BEHIND THE NFLVERSE INJURIES FETCH -- same `#341` priority
-            # tier; inside the T-3h window this is the most time-sensitive
-            # NFL input there is. Off by default; fixture-window gated.
-            latest_manifest_path=latest_manifest_path,
-            worker_status_path=worker_status_path,
-            refresh_cycle=refresh_cycle,
-        ):
-            if args.run_once:
-                return 0
         elif _launch_autorun_nfl_roster_snapshot(
             # DIRECTLY BEHIND THE INJURIES FETCH -- same `#341`
             # starvation reasoning as the branches above: equally
@@ -8110,6 +8100,19 @@ def main() -> int:
             # rather than running inline, so the poll loop is free again
             # immediately. It sits behind the pbp fetch specifically because it
             # CONSUMES what that job produces.
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_nfl_game_injuries_fetch(
+            # DIRECTLY BEHIND THE NFL PRODUCER BLOCK AND ITS FANTASY CONSUMER --
+            # not between them. `test_nfl_roster_depth_autorun` pins roster at
+            # injuries+1 and `test_nfl_fantasy_artifact_autorun` allows only the
+            # artifact's own producers between pbp and it; this job feeds neither.
+            # Still in the high NFL tier (`#341`): 600 s gated, fixture-window
+            # gated, off by default.
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,

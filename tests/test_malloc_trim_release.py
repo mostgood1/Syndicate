@@ -104,12 +104,21 @@ def test_gc_and_trim_are_attributed_separately(capsys, monkeypatch):
     # credit 590MB to the trim and not 600MB, because only the trim half
     # discriminates hypothesis (1) allocator retention from (2) live
     # str/bytes/ndarray the heap census cannot enumerate.
+    # Readings advance ONLY on this test's thread. The patch is module-global,
+    # and a memory-watchdog daemon thread left running by an earlier test in
+    # the same xdist worker also calls `_read_container_memory_stat` -- one
+    # stolen reading shifts every attribution below.
+    import threading
+
+    me = threading.get_ident()
     readings = iter([1500, 1490, 900])
-    monkeypatch.setattr(
-        memory_observability,
-        "_read_container_memory_stat",
-        lambda: {"anon": next(readings) * 1024 * 1024},
-    )
+
+    def fake_stat():
+        if threading.get_ident() != me:
+            return {"anon": 1500 * 1024 * 1024}
+        return {"anon": next(readings) * 1024 * 1024}
+
+    monkeypatch.setattr(memory_observability, "_read_container_memory_stat", fake_stat)
     monkeypatch.setattr(memory_observability, "_current_process_rss_bytes", lambda: 1400 * 1024 * 1024)
     monkeypatch.setattr(memory_observability, "_resolve_malloc_trim", lambda: (lambda _size: 1))
 
