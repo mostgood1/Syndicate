@@ -370,3 +370,78 @@ def test_the_separation_check_compares_SIDES_not_the_four_numbers():
     # home net = 2.0 - 1.0 = 1.0 ; away net = 2.0 - 1.0 = 1.0 -> no separation
     assert lr.ratings_are_degenerate(home_offense=2.0, home_defense=1.0,
                                      away_offense=2.0, away_defense=1.0) is True
+
+
+# --------------------------------------------------------------------------
+# RATING UNCERTAINTY PROPAGATION, added 2026-09-27. Ships INERT.
+# --------------------------------------------------------------------------
+
+def _sd_of(dist):
+    pairs = [(float(k), int(v)) for k, v in dist.items()]
+    n = sum(c for _, c in pairs)
+    mu = sum(v * c for v, c in pairs) / n
+    return (sum(c * (v - mu) ** 2 for v, c in pairs) / n) ** 0.5
+
+
+def _resim(sd):
+    from syndicate.features.nfl import live_resim as lr
+    state = lr.NflLiveGameState(away_team="B", home_team="A", period=2,
+                                clock_seconds=900, home_score=7, away_score=0)
+    return lr.resim_live_game(state, home_offense=0.30, home_defense=0.10,
+                              away_offense=0.05, away_defense=0.05,
+                              sims=200, env={"SYNDICATE_NFL_LIVE_RESIM": "1"},
+                              rating_sd=sd)
+
+
+def test_it_ships_INERT_and_off_is_bit_identical():
+    """Default OFF, and off must reproduce the point-estimate run exactly.
+
+    NFL live re-sim is ENABLED in production and prices the moneyline, so a
+    mechanism that changed published probabilities the moment it landed would
+    be switched on by merging rather than by deciding. `rating_sd=0` must take
+    the untouched `base` path, not a perturbation that happens to be small.
+    """
+    a, b = _resim(0.0), _resim(0.0)
+    assert a["rating_sd"] == 0.0
+    assert a["margin_dist"] == b["margin_dist"], "the off path is not deterministic"
+    assert a["model_home_win_prob"] == b["model_home_win_prob"]
+
+
+def test_turning_it_ON_widens_the_distribution_off_eq_on_would_be_inert():
+    """off != on, on the quantity the mechanism exists to move."""
+    off, on = _resim(0.0), _resim(0.75)
+    assert _sd_of(on["margin_dist"]) > _sd_of(off["margin_dist"]) * 1.05, (
+        "rating_sd is not widening anything -- the mechanism is inert"
+    )
+    assert on["rating_sd"] == 0.75, "the published result does not say it was used"
+
+
+def test_it_is_DETERMINISTIC_so_two_variants_compare_on_the_same_draws():
+    """A harness that cannot reproduce its own rows compares random seeds."""
+    a, b = _resim(0.5), _resim(0.5)
+    assert a["margin_dist"] == b["margin_dist"]
+
+
+def test_an_UNKNOWN_rating_source_is_never_MORE_CONFIDENT_than_a_known_one():
+    """Unknown must not take the permissive branch.
+
+    Here "permissive" means "this rating is well determined", which would
+    publish a confident probability off a source nobody has measured.
+
+    THE ASSERTION IS `>= max(known)`, NOT `> some narrow entry`. An earlier
+    version compared a narrow source against a wide one, which baked in the
+    assumption that the table HAS distinct values. The empirical fit collapsed
+    it to a single value -- at rating_sd 1.0 the two sources came back at ratio
+    1.088 and 0.906, straddling 1.0, so a per-source distinction is not
+    warranted by evidence. A test that fails when the table becomes honest was
+    testing the table, not the rule.
+    """
+    from syndicate.features.nfl import live_resim as lr
+
+    widest = max(lr._RATING_UNCERTAINTY_BY_SOURCE.values())
+    for unknown in ("", None, "some_new_source_nobody_graded"):
+        assert lr.rating_uncertainty_for_source(unknown) >= widest, (
+            f"{unknown!r} is treated as better determined than a measured source"
+        )
+    for known, sd in lr._RATING_UNCERTAINTY_BY_SOURCE.items():
+        assert lr.rating_uncertainty_for_source(known) == sd
