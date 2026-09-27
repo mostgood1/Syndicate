@@ -146,3 +146,26 @@ def test_it_writes_JSONL_so_a_restart_mid_slate_loses_at_most_one_line(tmp_path)
     assert text.endswith("\n")
     for line in text.splitlines():
         json.loads(line)   # every line independently parseable
+
+
+def test_the_WORKER_tick_actually_calls_the_capture():
+    """REACHABILITY. A collector nothing calls collects nothing.
+
+    Asserted on the compiled code object, not the source text: the comment
+    above the call names the function, so a grep would pass with the call
+    deleted. Same mistake caught in an NCAAF test on 2026-09-27.
+
+    The hook is on `build_live_lens_snapshot` (refresh-worker) and NOT on
+    `nfl_player_box_index`, because that is called only from the web blueprint
+    in a request path -- it would write to a disk the worker cannot read, and
+    only when somebody loaded the cards page.
+    """
+    from syndicate.features.nfl import live_resim as lr
+
+    names = lr.build_live_lens_snapshot.__code__.co_names
+    assert "_maybe_capture_prop_snapshot" in names, (
+        "the live tick no longer captures; tonight's player boxes would be discarded"
+    )
+    inner = lr._maybe_capture_prop_snapshot.__code__.co_names
+    assert "record_quarter_snapshot" in inner
+    assert "fetch_player_stat_rows" in inner

@@ -74,6 +74,21 @@ def capture_enabled() -> bool:
     return raw not in {"off", "0", "false", "no"}
 
 
+def default_capture_root() -> Any:
+    """The NFL source root production actually writes to.
+
+    Resolved through `sources.default_nfl_source_root`, which honours
+    `SYNDICATE_NFL_SOURCE_ROOT` then `SYNDICATE_DATA_ROOT` then the checkout --
+    so on Render this lands on the MOUNTED DISK and not in the ephemeral
+    checkout, which every deploy replaces. A capture written to the checkout
+    would be discarded by the next deploy, which is the same trap
+    `sp_ratings_durable_path` exists to avoid.
+    """
+    from syndicate.features.nfl.sources import default_nfl_source_root
+
+    return default_nfl_source_root().parent
+
+
 def capture_path(data_root: Any, date_str: str) -> Path:
     """One JSONL per date, beside the other NFL source data.
 
@@ -93,6 +108,7 @@ def snapshot_rows(
     player_rows: Iterable[Mapping[str, Any]],
     home_score: Any = None,
     away_score: Any = None,
+    clock_seconds: Any = None,
 ) -> list[dict[str, Any]]:
     """The rows that WOULD be written, without writing them.
 
@@ -121,6 +137,14 @@ def snapshot_rows(
             rec["home_score_at"] = int(home_score)
         if away_score is not None:
             rec["away_score_at"] = int(away_score)
+        if clock_seconds is not None:
+            # HOW CLOSE TO THE BOUNDARY THIS ACTUALLY IS. The capture fires
+            # inside a window before the quarter ends rather than exactly at
+            # 0:00, because a tick can miss the instant. Recording it lets the
+            # fit filter to genuine boundaries instead of assuming every row is
+            # one -- an assumption that would quietly mix mid-quarter
+            # observations into a cutoff distribution.
+            rec["clock_seconds_at"] = int(clock_seconds)
         for field in CAPTURED_FIELDS:
             value = row.get(field)
             if value is not None:
@@ -138,6 +162,7 @@ def record_quarter_snapshot(
     player_rows: Iterable[Mapping[str, Any]],
     home_score: Any = None,
     away_score: Any = None,
+    clock_seconds: Any = None,
 ) -> int:
     """Append one (event, period) snapshot. Returns rows written. NEVER raises.
 
@@ -158,7 +183,8 @@ def record_quarter_snapshot(
     try:
         rows = snapshot_rows(event_id=event_id, period=period, date_str=date_str,
                              player_rows=player_rows,
-                             home_score=home_score, away_score=away_score)
+                             home_score=home_score, away_score=away_score,
+                             clock_seconds=clock_seconds)
         if not rows:
             return 0
         path = capture_path(data_root, date_str)
