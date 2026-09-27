@@ -164,3 +164,29 @@ def test_the_snapshot_refuses_every_game_when_the_flag_is_off():
     coverage = snapshot.get("coverage") or {}
     assert coverage.get("live_resimmed") == 0
     assert "nfl_live_resim_disabled" in (coverage.get("refusals_by_reason") or {})
+
+
+def test_the_adapter_carries_EVENT_ID_for_the_prop_capture():
+    """It did not, and that cost a live slate on 2026-09-27.
+
+    `live_state_from_row` has no use for `event_id`, so the adapter dropped it.
+    But `nfl/live_resim._maybe_capture_prop_snapshot` reads it to fetch the
+    per-quarter player box, and with the field absent the capture returned
+    SILENTLY on every game of every tick -- zero CAPTURED lines and zero FAILED
+    lines for 37 minutes while three games sat inside the capture window.
+
+    An adapter that drops a field one of its consumers needs is
+    indistinguishable from a feature nobody switched on, which is why this is a
+    test and not a comment.
+    """
+    from scripts._nfl_live_resim_tick import normalise_live_row
+
+    row = normalise_live_row({
+        "event_id": "401772510", "in_progress": True, "final": False,
+        "period": 2, "clock": "0:27", "home_pts": 17, "away_pts": 10,
+    })
+    assert row["event_id"] == "401772510"
+    # and the fields the producer itself needs are untouched
+    assert row["state"] == "in"
+    assert row["period"] == 2
+    assert row["home_score"] == 17

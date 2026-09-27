@@ -836,6 +836,14 @@ def _maybe_capture_prop_snapshot(row: Any, resolved: Any, *, date_str: str) -> N
             return
         event_id = str((row or {}).get("event_id") or "").strip() if isinstance(row, Mapping) else ""
         if not event_id:
+            # NAMED, NOT SILENT. This branch cost a live slate on 2026-09-27:
+            # the tick adapter did not carry `event_id`, so every game returned
+            # here and the capture produced zero CAPTURED lines and zero FAILED
+            # lines -- indistinguishable from "no game was ever in the window".
+            # It only fires for a game genuinely AT a boundary, so it cannot
+            # become per-tick noise.
+            print("[nfl_live_resim] PROP_CAPTURE_SKIPPED reason=no_event_id "
+                  f"period={period} clock={resolved.clock_seconds}", flush=True)
             return
 
         from syndicate.features.nfl.live_prop_capture import (
@@ -850,6 +858,8 @@ def _maybe_capture_prop_snapshot(row: Any, resolved: Any, *, date_str: str) -> N
 
         rows = fetch_player_stat_rows(event_id)
         if not rows:
+            print("[nfl_live_resim] PROP_CAPTURE_SKIPPED reason=no_player_rows "
+                  f"event={event_id} period={period}", flush=True)
             return
         record_quarter_snapshot(
             default_capture_dir().parent,
