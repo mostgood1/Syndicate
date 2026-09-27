@@ -89,7 +89,7 @@ SATURDAY population with fresh ratings (546 rows / 182 games):
 
     uncorrected       worst 0.0411   bias -0.387  CI over games [-1.644, +0.896]
     first shipped     worst 0.0869   bias +0.673  <- +1.06/1.30, too large
-    REFIT +0.387/1.10 worst 0.0397   bias -0.000
+    refit +0.387/1.10 worst 0.0397   bias -0.000  <- then ZEROED as well
 
 Saturday is the right population because NCAAF live games are overwhelmingly a
 Saturday event, and day of week is EXOGENOUS -- a "dates with >= 20 games"
@@ -98,9 +98,15 @@ opening Saturday 2026-08-29. `calibrate_margin_distribution` holds it and,
 unlike the totals one, does NOT clamp: a margin is signed and clamping would
 delete every away-win draw.
 
-WHAT THIS CORRECTION IS NOT. The improvement is 0.0014 and the bias CI spans
-zero, so identity would also be defensible; it is retained as measurably
-not-worse, not as something the evidence demands. A CLAIM MADE EARLIER AND
+THE MARGIN CORRECTION IS NOW IDENTITY TOO `[2026-09-27, user decision]`. Its
+whole improvement was 0.0014 on the worst bucket over a bias whose CI spans
+zero, and a constant fitted to a quantity that cannot be shown non-zero is the
+same mistake as the stale-ratings one, just smaller. BOTH markets now price the
+draws the simulator produced, and both clear `#499`'s 0.150 bar uncorrected
+(totals 0.0556, margin 0.0411). The transform, the env overrides and the
+signed/no-clamp frame are KEPT so a later honest refit has somewhere to land.
+
+A CLAIM MADE EARLIER AND
 RETRACTED: that the margin bias "drifts hard across the season" (-0.485 early
 vs -1.631 late). It does not. That split was confounded by WHICH DATES fell in
 each half -- 31 midweek games sat mostly in the early one -- and on well-powered
@@ -542,19 +548,31 @@ def calibrate_total_distribution(totals: list[int]) -> tuple[float, dict[str, in
 # "dates with >= 20 games" filter picks nearly the same rows but is chosen by
 # looking at the data, and it silently drops opening Saturday 2026-08-29.
 #
-#     uncorrected      worst 0.0411   bias -0.387  CI over games [-1.644, +0.896]
-#     REFIT +0.387/1.10 worst 0.0397  bias -0.000
+#     uncorrected       worst 0.0411   bias -0.387  CI over games [-1.644, +0.896]
+#     refit +0.387/1.10 worst 0.0397   bias -0.000
 #
-# THE IMPROVEMENT IS 0.0014 AND THE CI SPANS ZERO. This is a correction retained
-# because it was asked for and is measurably not worse, NOT one the evidence
-# demands; identity would also be defensible. Both defaults are env-overridable
-# precisely so this can be moved without a deploy.
+# AND THEN IT WAS ZEROED TOO `[2026-09-27, user decision]`, which the numbers
+# above already argued for: the entire improvement is **0.0014** on the worst
+# bucket, and the bias it corrects has a CI that SPANS ZERO. Fitting a constant
+# to a quantity you cannot show is non-zero is how the stale-ratings mistake
+# happened one commit earlier -- it dresses sampling noise as a mechanism, and
+# then every later reading has to be interpreted through it.
+#
+# SO BOTH CALIBRATORS ARE NOW IDENTITY and the board prices the draws the
+# simulator produced. `#499`'s 0.150 bar is cleared UNCORRECTED in both markets
+# (totals 0.0556, margin 0.0411).
+#
+# THE MECHANISM IS KEPT ON PURPOSE. These two functions, their env overrides and
+# the transform in `calibrate_margin_distribution` stay exactly where they are,
+# because the next honest refit -- on a larger sample, with provenance read --
+# needs somewhere to land, and re-deriving the signed/no-clamp frame from scratch
+# is how that gets done wrongly. Identity is a VALUE here, not a missing feature.
 def _live_margin_bias_points() -> float:
     raw = str(os.environ.get("NCAAF_LIVE_MARGIN_BIAS_POINTS") or "").strip()
     try:
         return float(raw)
     except (TypeError, ValueError):
-        return 0.387
+        return 0.0
 
 
 def _live_margin_spread_scale() -> float:
@@ -562,8 +580,8 @@ def _live_margin_spread_scale() -> float:
     try:
         value = float(raw)
     except (TypeError, ValueError):
-        return 1.10
-    return value if value > 0 else 1.10
+        return 1.0
+    return value if value > 0 else 1.0
 
 
 def calibrate_margin_distribution(margins: list[int]) -> tuple[float, dict[str, int]]:

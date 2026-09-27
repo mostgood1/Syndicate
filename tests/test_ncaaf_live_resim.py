@@ -249,23 +249,40 @@ def test_the_margin_calibration_is_SIGNED_and_never_clamps_away_wins():
     assert corrected_mean < 0, "a losing position became a winning one"
 
 
-def test_the_margin_correction_moves_the_distribution_TOWARD_HOME():
-    """The graded bias was -1.058 points: the sim runs against the home side.
+def test_the_margin_correction_is_IDENTITY_but_the_MECHANISM_still_works(monkeypatch):
+    """Zeroed 2026-09-27, and the transform is deliberately kept anyway.
 
-    `off != on` on the correction itself, so a constant silently reset to 0.0
-    cannot pass. Checked on the MEAN rather than a single bucket because the
-    spread term moves individual draws both ways.
+    The refit measured a Saturday bias of -0.387 with a bootstrap CI over games
+    of [-1.644, +0.896] and a worst-bucket improvement of 0.0014. Fitting a
+    constant to a quantity that cannot be shown non-zero is the same error as
+    the stale-ratings one a commit earlier, so the default is identity.
+
+    BOTH HALVES ARE ASSERTED, and the second is the one that matters. A default
+    of 0.0 makes `calibrate_margin_distribution` a pass-through, which means a
+    future bug that silently broke the transform would be invisible -- the
+    identity test would still pass. So the mechanism is exercised through the
+    env override the next refit will use, proving off != on rather than merely
+    that off is off.
     """
     draws = [-7, -3, 0, 3, 7, 10, 14]
     raw_mean = sum(draws) / len(draws)
-    corrected_mean, _ = lr.calibrate_margin_distribution(draws)
-    assert corrected_mean > raw_mean, "the correction is inert or points the wrong way"
-    assert corrected_mean - raw_mean == pytest.approx(lr._live_margin_bias_points(), abs=1e-6)
 
+    # DEFAULT: identity, in the mean and in the histogram.
+    mean_id, hist_id = lr.calibrate_margin_distribution(draws)
+    assert mean_id == pytest.approx(raw_mean, abs=1e-9)
+    counted = {}
+    for d in draws:
+        counted[str(d)] = counted.get(str(d), 0) + 1
+    assert hist_id == counted
 
-# --------------------------------------------------------------------------
-# the snapshot
-# --------------------------------------------------------------------------
+    # MECHANISM: supply a constant and it must actually move, toward home.
+    monkeypatch.setenv("NCAAF_LIVE_MARGIN_BIAS_POINTS", "3.0")
+    mean_on, hist_on = lr.calibrate_margin_distribution(draws)
+    assert mean_on == pytest.approx(raw_mean + 3.0, abs=1e-9), "the transform is broken"
+    assert hist_on != counted
+    # And still signed -- no clamp reintroduced by the override path.
+    assert min(float(k) for k in hist_on) < 0
+
 
 def _games():
     return [
