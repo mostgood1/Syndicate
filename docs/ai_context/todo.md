@@ -1,5 +1,38 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#690` — **NFL game-day injury statuses: capture BUILT dark; whether ESPN carries the INACTIVES list is UNVERIFIED** — PR mostgood1/Syndicate#111, lane `nfl-game-day-injuries`, session 2aff0397 — **OFF: not deployed, never run against a live NFL game**
+
+**Why.** The only NFL injury input was nflverse's season CSV (`fetch_nfl_injuries.py`), which follows the
+Wed-Fri PRACTICE reports. Nothing captured game day -- the T-3h window the starting-soon phase (`#689`) exists
+for. A Questionable player ruled Out ~90 min before kickoff moves props, and the board priced him Questionable.
+Second payoff, not built: `bet_status_nfl.py` / `population_outcomes_espn.py` note a box score "cannot tell an
+inactive player from an active one with no stat line", so books' DNP voids are ungradable today.
+
+**Built (#111):** `syndicate/features/nfl/game_injuries.py` + `scripts/fetch_nfl_game_injuries.py` -- ESPN
+scoreboard, then each game's summary `injuries` block for games T-3h..T+15m; per-game snapshots, `changes.jsonl`,
+and a timestamp-free `statuses_<date>.json` under `nfl_artifact_output_root()/tracking/espn/game_injuries/<date>/`.
+refresh-worker autorun `_launch_autorun_nfl_game_injuries_fetch` (600 s, NFL fixture-window gated) behind
+`NFL_GAME_INJURIES_FETCH_ENABLE_REFRESH_WORKER_AUTORUN` (absent = OFF). The starting-soon trigger watches
+`statuses_<date>.json` too, so a game-day status change forces an NFL odds sweep (needs `#689`'s flag on).
+
+**What is and is not known about the source.** The summary `injuries` SHAPE is confirmed on 132 cached ESPN
+summaries (other sports, same endpoint family) and the parser is tested on a REAL block
+(`tests/fixtures/espn_summary_injuries_real_shape.json`). Its CONTENT is the team injury report: those 132 held
+only `Out` (430) and `Day-To-Day` (59) and never the word "inactive". So game-day Out/Doubtful/Questionable
+moves are captured; **whether ESPN adds INACTIVES -- healthy scratches above all -- is unknown.**
+`site.api.espn.com` (like Render) was blocked from the building session.
+
+**OPEN / owed:**
+1. **Read one live NFL summary before and ~90 min before kickoff** (needs `site.api.espn.com` reachable, or
+   do it on Render). Settles the inactives question before anything is enabled.
+2. Merge #111, then enable the autorun on refresh-worker in a quiet window (can ride the `#689` observe
+   deploy). VERIFY: `NFL_GAME_INJURIES_FETCH` lines ~every 10 min inside T-3h with `events_in_window>0`,
+   `shape_unknown=0`, per-game snapshots on disk, and `STATUS_CHANGE` lines on a Sunday slate.
+3. **Falsification (lane):** if an enabled Sunday shows NO status change for any game between T-3h and kickoff,
+   the summary does not move on game day and this feed adds nothing over nflverse -- then pick another source
+   (NFL.com game-center inactives, or a paid feed).
+4. If ESPN does carry inactives: feed them to prop grading (void DNP) -- a separate, unbuilt consumer.
+
 ### `#689` — **"Slate starting soon" did not exist: inside T-3h five of eight sports swept LESS often, not more** — MERGED 2026-09-27 as `d9323f9f` (PR mostgood1/Syndicate#106), lane `slate-starting-soon-phase`, session 2aff0397 — **DARK: both flags off, nothing deployed**
 
 **Reading that opened it (user, 2026-09-27 ~10:45 CT):** NFL 75 min before its 12:00
