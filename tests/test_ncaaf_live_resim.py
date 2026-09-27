@@ -208,14 +208,32 @@ def test_the_refused_stamp_is_rejected_by_the_join_and_the_priced_one_is_accepte
     assert projection["sims_run"] == 40
 
 
-def test_the_lane_publishes_no_distribution_so_totals_stay_unpriceable():
-    """Deliberate. NCAAF live totals have never been graded (`#499`'s bar)."""
+def test_the_lane_publishes_TOTALS_and_still_withholds_the_MARGIN():
+    """`#499`'s bar was MET for totals on 2026-09-26, and only for totals.
+
+    The cutoff-replay grade (`scripts/backtest_ncaaf_live_totals.py`) scored
+    THIS function over 561 rows / 187 games at production's 120 sims and
+    production's SP+ ratings: worst predicted-probability bucket 0.0492 after
+    the location correction, against WNBA's precedent of 0.150. So
+    `totalRunsDist` reaches `price_distribution_market` and totals are
+    priceable.
+
+    `marginDist` does not. That grade measured totals; the margin estimator has
+    never been scored and `calibrate_total_distribution` does not correct it.
+    Publishing it would open SPREAD pricing on the strength of another
+    market's evidence.
+    """
     state = lr.NcaafLiveGameState(away_team="B", home_team="A", period=3,
                                   clock_seconds=400, home_score=17, away_score=14,
                                   possession_owner="home")
     lane = lr.build_game_lens(state, _resim(state))[0]
-    assert "marginDist" not in lane["projection"]
-    assert "totalRunsDist" not in lane["projection"]
+    assert "marginDist" not in lane["projection"], "spread pricing opened ungraded"
+    dist = lane["projection"]["totalRunsDist"]
+    assert dist, "totals pricing is still shut"
+    # A REAL HISTOGRAM off the real sim path, not an empty dict that would
+    # satisfy the key check while `price_distribution_market` withheld every
+    # row with `no_live_distribution` exactly as before.
+    assert sum(dist.values()) == lane["simsRun"]
 
 
 # --------------------------------------------------------------------------
@@ -302,3 +320,90 @@ def test_validate_rejects_an_empty_or_malformed_snapshot():
     assert lr.validate_live_lens_snapshot(None)[0] is False
     assert lr.validate_live_lens_snapshot({})[0] is False
     assert lr.validate_live_lens_snapshot({"games": [{"home_name": ""}]})[0] is False
+
+
+def test_REACHABILITY_a_published_total_actually_prices_through_the_real_join():
+    """off != on, through the shipped functions, with nothing stubbed.
+
+    Presence is not reachability. The producer carrying `totalRunsDist` is
+    worth nothing unless `live_gameline_from_lens` forwards it and
+    `price_distribution_market` answers a line with it -- exactly the hop that
+    left NHL's predictions publishing to nobody. So this drives the real chain
+    and compares the SAME lane with the key removed:
+
+        with the distribution      -> a model probability at the line
+        without it (the old lens)  -> REASON_NO_LIVE_DISTRIBUTION
+
+    A test that only asserted the ON side would pass just as happily if the
+    join had always been able to price totals, which would mean this lane
+    shipped nothing.
+    """
+    import copy
+
+    from syndicate.features.shared.live_gameline_join import (
+        REASON_NO_LIVE_DISTRIBUTION,
+        lens_sources_for_sport,
+        live_gameline_from_lens,
+        price_distribution_market,
+    )
+
+    sources = lens_sources_for_sport("ncaaf")
+    state = lr.NcaafLiveGameState(away_team="B", home_team="A", period=3,
+                                  clock_seconds=400, home_score=17, away_score=14,
+                                  possession_owner="home")
+    lanes = lr.build_game_lens(state, _resim(state, sims=120))
+
+    hit = live_gameline_from_lens(lanes, sources=sources)
+    assert hit is not None
+    assert hit["total_runs_dist"], "the join dropped the distribution the producer published"
+
+    # The line is taken FROM the sim's own centre, so the test is about
+    # reachability and not about whether this fixture happens to sit on a
+    # priced part of the curve.
+    line = float(lanes[0]["projection"]["total"])
+    on = price_distribution_market(
+        dist=hit["total_runs_dist"], line=line, side="over", market="totals",
+        market_prob=0.5, sims=hit["sims_run"], sport="ncaaf",
+    )
+    assert on["model_prob"] is not None
+    assert on["withheld_reason"] != REASON_NO_LIVE_DISTRIBUTION
+
+    # THE OFF SIDE: the identical lane as it looked before this change.
+    old = copy.deepcopy(lanes)
+    old[0]["projection"].pop("totalRunsDist")
+    old_hit = live_gameline_from_lens(old, sources=sources)
+    off = price_distribution_market(
+        dist=old_hit["total_runs_dist"], line=line, side="over", market="totals",
+        market_prob=0.5, sims=old_hit["sims_run"], sport="ncaaf",
+    )
+    assert off["model_prob"] is None
+    assert off["withheld_reason"] == REASON_NO_LIVE_DISTRIBUTION
+
+
+def test_REACHABILITY_spreads_stay_refused_for_the_named_reason():
+    """The margin gate must be visible as a refusal, not as an absence.
+
+    `no_live_distribution` on a spreads row is the diagnostic that says the
+    margin grade has not happened yet. If this ever starts passing, someone
+    published `marginDist` and the reason to look for is its grade.
+    """
+    from syndicate.features.shared.live_gameline_join import (
+        REASON_NO_LIVE_DISTRIBUTION,
+        lens_sources_for_sport,
+        live_gameline_from_lens,
+        price_distribution_market,
+    )
+
+    state = lr.NcaafLiveGameState(away_team="B", home_team="A", period=3,
+                                  clock_seconds=400, home_score=17, away_score=14,
+                                  possession_owner="home")
+    hit = live_gameline_from_lens(
+        lr.build_game_lens(state, _resim(state)), sources=lens_sources_for_sport("ncaaf"),
+    )
+    assert hit["margin_dist"] == {}
+    verdict = price_distribution_market(
+        dist=hit["margin_dist"], line=-3.5, side="home", market="spreads",
+        market_prob=0.5, sims=hit["sims_run"], sport="ncaaf",
+    )
+    assert verdict["priceable"] is False
+    assert verdict["withheld_reason"] == REASON_NO_LIVE_DISTRIBUTION

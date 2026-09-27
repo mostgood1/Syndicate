@@ -174,12 +174,18 @@ def test_a_ratings_file_of_junk_pairs_RAISES(tmp_path):
 # the gate this harness exists to inform
 # --------------------------------------------------------------------------
 
-def test_the_live_lens_STILL_does_not_publish_the_distributions():
-    """`resim_live_game` now returns `total_dist`/`margin_dist` so the SHIPPED
-    function can be graded. `build_game_lens` must still not carry them: the
-    moment it does, `live_gameline_join` prices totals and spreads, and that is
-    a decision to be made on the strength of a grade, not a side effect of
-    building the ruler.
+def test_the_lens_publishes_TOTALS_and_still_withholds_the_MARGIN():
+    """The gate opened for the market that was graded, and only that one.
+
+    `totalRunsDist` is published because the cutoff-replay grade scored this
+    module's own `resim_live_game` to a worst predicted-probability bucket of
+    0.0492 over 561 rows / 187 games -- past `#499`'s WNBA precedent of 0.150.
+
+    `marginDist` is NOT, because that grade measured TOTALS. Publishing it
+    would open spread pricing in `live_gameline_join.price_distribution_market`
+    on an estimator nothing has scored and that `calibrate_total_distribution`
+    does not correct. If a margin grade later clears, this test changes with
+    it -- deliberately, in the same commit as the evidence.
     """
     from syndicate.features.ncaaf.live_resim import NcaafLiveGameState, build_game_lens
 
@@ -198,7 +204,48 @@ def test_the_live_lens_STILL_does_not_publish_the_distributions():
     }
     lanes = build_game_lens(state, result, live_state_as_of="2026-09-19")
     assert lanes, "no lane produced"
-    for lane in lanes:
-        flat = json.dumps(lane, sort_keys=True, default=str)
-        for key in ("margin_dist", "total_dist", "marginDist", "totalRunsDist"):
-            assert key not in flat, f"the lens now carries {key} -- pricing would open"
+    lane = lanes[0]
+
+    assert lane["projection"]["totalRunsDist"] == {"29": 300}, (
+        "totals pricing is closed -- the graded market must reach the pricer"
+    )
+    flat = json.dumps(lane, sort_keys=True, default=str)
+    for key in ("marginDist", "margin_dist"):
+        assert key not in flat, f"the lens now carries {key} -- SPREAD pricing would open ungraded"
+
+
+def test_the_published_total_histogram_is_the_CALIBRATED_one():
+    """The board must price the numbers that were graded.
+
+    `resim_live_game` corrects `total_dist` in place and reports
+    `total_mean_uncalibrated` beside it. If the lens ever published the RAW
+    draws next to a corrected `total`, the displayed projection and the price
+    would disagree -- and the 0.0492 reading would describe neither.
+    """
+    from syndicate.features.ncaaf.live_resim import (
+        NcaafLiveGameState, build_game_lens, calibrate_total_distribution,
+    )
+
+    totals = [20, 27, 31, 38, 45, 52]
+    corrected_mean, corrected = calibrate_total_distribution(totals)
+    raw = {}
+    for t in totals:
+        raw[str(t)] = raw.get(str(t), 0) + 1
+    assert corrected != raw, "the fixture cannot distinguish corrected from raw"
+
+    state = NcaafLiveGameState(
+        home_team="Texas", away_team="UTSA", period=2, clock_seconds=0,
+        home_score=10, away_score=7, possession_owner=None, as_of="2026-09-19",
+    )
+    lanes = build_game_lens(
+        state,
+        {
+            "home_win_prob": 0.55, "sims_run": 120, "home_margin_mean": 3.0,
+            "total_mean": corrected_mean, "total_mean_uncalibrated": sum(totals) / len(totals),
+            "possession_unknown": False, "ties": 0,
+            "margin_dist": {"3": 6}, "total_dist": corrected,
+        },
+        live_state_as_of="2026-09-19",
+    )
+    assert lanes[0]["projection"]["totalRunsDist"] == corrected
+    assert lanes[0]["projection"]["totalRunsDist"] != raw

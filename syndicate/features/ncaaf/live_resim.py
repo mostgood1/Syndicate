@@ -48,19 +48,35 @@ Q4 0:15 -- so a live re-sim is always cheaper than the pregame sim it updates.
 WHAT IS PUBLISHED, AND WHAT IS DELIBERATELY NOT
 --------------------------------------------------------------------------
 
-ONE MARKET FAMILY: the moneyline. The lane carries `modelHomeWinProb` and
-`simsRun`, which is exactly what `live_gameline_join.price_moneyline` prices,
-and `prob_std_err` derives the interval from `simsRun` the same way it does for
-MLB. Nothing here relaxes `PRICEABLE_SIGMA`.
+TWO MARKET FAMILIES: the moneyline and TOTALS. The lane carries
+`modelHomeWinProb` and `simsRun`, which is exactly what
+`live_gameline_join.price_moneyline` prices, and `prob_std_err` derives the
+interval from `simsRun` the same way it does for MLB. Nothing here relaxes
+`PRICEABLE_SIGMA`.
 
-THE REST-OF-GAME MARGIN AND TOTAL DISTRIBUTIONS ARE **NOT** PUBLISHED, though
-this re-sim has them in hand. `live_gameline_join` would price totals and
-spreads off `marginDist`/`totalRunsDist` the moment they appeared, and no NCAAF
-live totals estimator has ever been graded. `#499` is the precedent in the other
-direction: WNBA totals only became priceable after a 249-game / 23,712-sample
-backtest produced a measured 0.150 interval. Publishing a distribution here
-would open pricing on the strength of a sim count alone. The projection block
-carries the live MEANS for display and nothing a pricer reads.
+TOTALS BECAME PRICEABLE ON 2026-09-26, BY MEASUREMENT AND NOT BY DECISION.
+`scripts/backtest_ncaaf_live_totals.py` replays this module's own
+`resim_live_game` from quarter boundaries in completed games -- the score is
+exact and the clock is 0:00 there, so no play-by-play is needed -- and scores
+its histogram against the real final total. Over 561 cutoff rows / 187 games,
+at production's 120 sims and production's SP+ ratings:
+
+    worst predicted-probability bucket   0.1463  ->  0.0492
+    signed bias                         -2.165   ->  -0.081  points
+    MAE 8.282 against a FROZEN baseline's 27.046
+    out of sample (fit on 101 games, scored on 86)  0.1797 -> 0.0646
+
+`#499`'s WNBA precedent -- a measured worst bucket of 0.150 -- is met and
+beaten. The correction itself lives in `calibrate_total_distribution`, and
+`total_dist` is returned ALREADY CORRECTED so the board prices exactly the
+numbers that were graded.
+
+THE REST-OF-GAME MARGIN DISTRIBUTION IS STILL **NOT** PUBLISHED, though this
+re-sim has it in hand. `live_gameline_join` would price SPREADS off `marginDist`
+the moment it appeared, and the grade above measured totals -- margins have
+never been scored, and `calibrate_total_distribution` deliberately does not
+correct them. The asymmetry is deliberate: a measurement licenses the market it
+measured and no other. `projection.homeMargin` stays a display field.
 
 **NO FALLBACK TO THE PREGAME PROBABILITY, EVER** (`#414`). The re-sim used to
 ship a live mean beside a `modelProbOver` that was bit-identical to the pregame
@@ -585,14 +601,35 @@ def build_game_lens(
         "simsRun": result["sims_run"],
         "liveStateAsOf": live_state_as_of or state.as_of,
         "possessionUnknown": bool(result.get("possession_unknown")),
-        # DISPLAY ONLY. `live_gameline_join` reads `projection.total` and
-        # `projection.homeMargin` for the row's display fields and prices
-        # NEITHER: totals and spreads are priced from `totalRunsDist` /
-        # `marginDist`, which this lane deliberately does not carry (see the
-        # module docstring).
+        # `totalRunsDist` OPENS TOTALS PRICING, and it is published because the
+        # estimator behind it has now been GRADED -- not because the gate was
+        # inconvenient. 561 cutoff-replay rows over 187 completed games at
+        # production's own 120 sims and production's own SP+ ratings:
+        # worst predicted-probability bucket 0.0492 after the location
+        # correction, every bucket gap <= 0.049, MAE 8.282 against a frozen
+        # baseline's 27.046, and the correction re-validated out of sample
+        # (fit on the earlier 101 games, scored on the later 86: 0.1797 ->
+        # 0.0646). That is `#499`'s WNBA precedent met and beaten -- its
+        # measured worst bucket was 0.150.
+        #
+        # THE HISTOGRAM PUBLISHED HERE IS THE CALIBRATED ONE. `resim_live_game`
+        # returns `total_dist` already shifted and scaled by
+        # `calibrate_total_distribution`, so the board prices the same numbers
+        # the grade scored. Publishing the raw draws beside a corrected
+        # `total` would have the display and the price disagree.
+        #
+        # `marginDist` IS STILL WITHHELD, and the asymmetry is the point: the
+        # grade measured TOTALS. Carrying `marginDist` would open SPREAD
+        # pricing on an estimator that has never been scored and that
+        # `calibrate_total_distribution` deliberately does not correct. Its own
+        # grade is the precondition, exactly as this one was.
+        #
+        # `projection.total` / `projection.homeMargin` remain display fields;
+        # the join prices neither.
         "projection": {
             "homeMargin": result["home_margin_mean"],
             "total": result["total_mean"],
+            "totalRunsDist": result.get("total_dist") or {},
             "homeScore": state.home_score,
             "awayScore": state.away_score,
             "period": state.period,

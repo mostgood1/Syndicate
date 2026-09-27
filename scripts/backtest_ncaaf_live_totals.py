@@ -260,6 +260,7 @@ def replay_game(game: dict[str, Any], *, sp_index, means, sims: int) -> list[dic
             "projected_total": result.get("total_mean"),
             "projected_margin": result.get("home_margin_mean"),
             "total_dist": result.get("total_dist") or {},
+            "margin_dist": result.get("margin_dist") or {},
             "sims_run": result.get("sims_run"),
             "possession_unknown": bool(result.get("possession_unknown")),
         })
@@ -303,7 +304,8 @@ def calibrate_dist(dist: Mapping[str, Any], *, shift: float, spread: float) -> d
 
 
 def score(rows: list[dict[str, Any]], *, lines: list[float],
-          shift: float = 0.0, spread: float = 1.0) -> dict[str, Any]:
+          shift: float = 0.0, spread: float = 1.0,
+          market: str = "total") -> dict[str, Any]:
     """Calibration by predicted-probability bucket, plus the hostile baseline."""
     buckets: dict[tuple[float, float], list[tuple[float, int]]] = collections.defaultdict(list)
     abs_err_model: list[float] = []
@@ -317,9 +319,13 @@ def score(rows: list[dict[str, Any]], *, lines: list[float],
     sim_spread: list[float] = []
 
     for row in rows:
-        actual = row["actual_total"]
-        if row.get("projected_total") is not None:
-            projected = float(row["projected_total"]) + shift
+        # MARGIN IS GRADED THE SAME WAY, against `actual_margin` and spread
+        # lines. Home-positive on both sides, so the away-line rule transfers
+        # unchanged: home covers strictly past the line.
+        actual = row["actual_margin"] if market == "margin" else row["actual_total"]
+        proj_key = "projected_margin" if market == "margin" else "projected_total"
+        if row.get(proj_key) is not None:
+            projected = float(row[proj_key]) + shift
             abs_err_model.append(abs(projected - actual))
             signed_err_model.append(projected - actual)
         dist = row.get("total_dist") or {}
@@ -334,8 +340,9 @@ def score(rows: list[dict[str, Any]], *, lines: list[float],
             except (TypeError, ValueError, ZeroDivisionError):
                 pass
         # FROZEN: nobody scores again. Free to anyone watching.
-        abs_err_frozen.append(abs(row["total_at_cutoff"] - actual))
-        dist_for_scoring = row["total_dist"]
+        frozen = (row["score_at_cutoff"][1] - row["score_at_cutoff"][0]) if market == "margin" else row["total_at_cutoff"]
+        abs_err_frozen.append(abs(frozen - actual))
+        dist_for_scoring = row["margin_dist"] if market == "margin" else row["total_dist"]
         if shift or spread != 1.0:
             dist_for_scoring = calibrate_dist(dist_for_scoring, shift=shift, spread=spread)
         for line in lines:
@@ -427,6 +434,7 @@ def main(argv: list[str] | None = None) -> int:
                         help="save replay rows so variants can be scored without re-simulating")
     parser.add_argument("--score-only", default=None,
                         help="score saved rows instead of simulating")
+    parser.add_argument("--market", default="total", choices=("total", "margin"))
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
@@ -443,7 +451,7 @@ def main(argv: list[str] | None = None) -> int:
         saved = json.loads(Path(args.score_only).read_text(encoding="utf-8"))
         rows = saved["rows"]
         lines = [float(x) for x in str(args.lines).split(",") if x.strip()]
-        result = score(rows, lines=lines, shift=args.shift, spread=args.spread)
+        result = score(rows, lines=lines, shift=args.shift, spread=args.spread, market=args.market)
         result.update({k: saved.get(k) for k in
                        ("dates", "completed_games_found", "duplicate_events_skipped",
                         "games_unrated_refused", "ratings_source", "sims_per_cutoff")})
