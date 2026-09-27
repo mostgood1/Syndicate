@@ -5114,6 +5114,122 @@ def _launch_autorun_nfl_injuries_fetch(
 
 
 # ---------------------------------------------------------------------------
+# NFL GAME-DAY injury statuses from ESPN game summaries (lane
+# `nfl-game-day-injuries`). The nflverse fetch above follows PRACTICE reports;
+# this captures what changes on game day, per game, from T-3h to just after
+# kickoff (`syndicate/features/nfl/game_injuries.py` has the source notes,
+# including that ESPN carrying the INACTIVES list is not yet confirmed).
+#
+# DEFAULT OFF, like every sibling autorun. Gated on the NFL fixture clock
+# (`_next_fixture_epoch`) so it runs only inside the capture window, then on
+# its own interval (default 600 s). Marker BEFORE launch, same `#443` rule as
+# the injuries fetch: a crash costs one interval, never a storm.
+# ---------------------------------------------------------------------------
+
+_NFL_GAME_INJURIES_SKIP_LOG_AT: dict[str, float] = {}
+
+
+def _nfl_game_injuries_fetch_enabled() -> bool:
+    raw = str(os.environ.get("NFL_GAME_INJURIES_FETCH_ENABLE_REFRESH_WORKER_AUTORUN") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _nfl_game_injuries_fetch_interval_seconds() -> int:
+    raw = str(os.environ.get("NFL_GAME_INJURIES_FETCH_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = int(raw or 600)
+    except Exception:
+        value = 600
+    return max(300, value)
+
+
+def _nfl_game_injuries_fetch_state_path() -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "nfl_game_injuries_fetch.json"
+
+
+def _nfl_game_in_capture_window(now_epoch: float) -> tuple[bool, str]:
+    """(inside, reason). Fails OPEN on an unreadable fixture clock: the fetch is
+    a free public API behind its own interval, and a missed game day is the
+    failure this feed exists to prevent."""
+    try:
+        from syndicate.features.nfl.game_injuries import window_seconds
+        from syndicate.features.shared.live_refresh_loop import _next_fixture_epoch
+
+        before, _after = window_seconds()
+        next_epoch = _next_fixture_epoch("nfl", now_epoch=now_epoch)
+    except Exception as exc:  # noqa: BLE001
+        return True, f"fixture_clock_unreadable:{type(exc).__name__}"
+    if next_epoch is None:
+        return False, "no_upcoming_nfl_game"
+    seconds_out = float(next_epoch) - float(now_epoch)
+    if seconds_out > before:
+        return False, f"next_game_in_{int(seconds_out)}s"
+    return True, f"next_game_in_{int(seconds_out)}s"
+
+
+def _launch_autorun_nfl_game_injuries_fetch(
+    *,
+    latest_manifest_path: Path,
+    worker_status_path: Path,
+    refresh_cycle: dict[str, int],
+) -> bool:
+    now = time.time()
+
+    def _skip(reason: str, detail: str = "") -> bool:
+        last = _NFL_GAME_INJURIES_SKIP_LOG_AT.get(reason, 0.0)
+        if now - last >= 600.0:
+            _NFL_GAME_INJURIES_SKIP_LOG_AT[reason] = now
+            print(f"[refresh_worker] NFL_GAME_INJURIES_FETCH_SKIPPED reason={reason} {detail}".rstrip(), flush=True)
+        return False
+
+    if not _nfl_game_injuries_fetch_enabled():
+        return _skip("disabled", "NFL_GAME_INJURIES_FETCH_ENABLE_REFRESH_WORKER_AUTORUN is not true")
+    selected_date = central_today_iso()
+    active = {item.strip().lower() for item in _active_sports_for_date(selected_date).split(",") if item.strip()}
+    if "nfl" not in active:
+        return _skip("not_in_season", f"date={selected_date}")
+    inside, window_reason = _nfl_game_in_capture_window(now)
+    if not inside:
+        return _skip("outside_window", window_reason)
+    interval = _nfl_game_injuries_fetch_interval_seconds()
+    state = _refresh_state_store()["read_json_file"](_nfl_game_injuries_fetch_state_path())
+    try:
+        last_attempt = float((state or {}).get("attempted_at_epoch") or 0.0) if isinstance(state, dict) else 0.0
+    except (TypeError, ValueError):
+        last_attempt = 0.0
+    if last_attempt > 0.0 and (now - last_attempt) < interval:
+        return _skip("rate_limited", f"marker_age_s={int(now - last_attempt)}/interval_s={interval}")
+    try:
+        _refresh_state_store()["write_json_file"](
+            _nfl_game_injuries_fetch_state_path(),
+            {"attempted_at_epoch": now, "date": selected_date, "interval_seconds": interval, "window": window_reason},
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[refresh_worker] NFL_GAME_INJURIES_FETCH_MARKER_FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return False
+    script_path = Path(__file__).resolve().parent / "fetch_nfl_game_injuries.py"
+    print(f"[refresh_worker] NFL_GAME_INJURIES_FETCH_LAUNCHING date={selected_date} {window_reason} interval_s={interval}", flush=True)
+    try:
+        process = subprocess.Popen([sys.executable, str(script_path), "--date", selected_date])
+    except Exception as exc:  # noqa: BLE001
+        print(f"[refresh_worker] NFL_GAME_INJURIES_FETCH_LAUNCH_FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return False
+    refresh_cycle["claimed_count"] = int(refresh_cycle.get("claimed_count") or 0) + 1
+    _write_worker_status(
+        worker_status_path=worker_status_path,
+        latest_manifest_path=latest_manifest_path,
+        state="launched",
+        detail=f"Auto-launched NFL game-day injuries fetch ({window_reason}).",
+        ran_job=True,
+        run_exit_code=None,
+        latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+        launch_pid=int(getattr(process, "pid", 0) or 0) or None,
+        refresh_cycle=refresh_cycle,
+    )
+    return True
+
+
+# ---------------------------------------------------------------------------
 # NFL roster and depth-chart snapshot ingestion (`nfl-roster-depth-autorun`
 # lane, sibling to `nfl-injuries-fetcher`'s injuries fetch above).
 #
@@ -7916,6 +8032,16 @@ def main() -> int:
             # it can go mute for weeks while still enabled and correctly
             # configured. Also DAILY-ish gated (default 21600s interval, not
             # literally daily), so it wins at most a handful of ticks per day.
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_nfl_game_injuries_fetch(
+            # DIRECTLY BEHIND THE NFLVERSE INJURIES FETCH -- same `#341` priority
+            # tier; inside the T-3h window this is the most time-sensitive
+            # NFL input there is. Off by default; fixture-window gated.
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,
