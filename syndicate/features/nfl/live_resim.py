@@ -95,7 +95,58 @@ MAX_RESUMABLE_PERIOD = 4
 # guard**, because a named refusal in the lane reads to a later auditor as "the
 # brake held". Kept only because literal-identical ratings are still worth
 # refusing early and cheaply.
-RATING_SEPARATION_FLOOR = 0.5
+#
+# ---------------------------------------------------------------------------
+# RE-CALIBRATED 2026-09-27, AND THE ARITHMETIC ABOVE WAS FITTED TO A RATING
+# SCALE PRODUCTION DOES NOT USE.
+# ---------------------------------------------------------------------------
+#
+# The block above reasons from "NFL rating sd 2.16" and predicts this floor
+# refuses 13% of games. MEASURED on the artifacts production's own tick reads
+# (`nfl_source/smartsim2_ratings_2026_wk<N>.json`, fetched live), the net
+# rating (offense + defense) is nowhere near that scale:
+#
+#     wk1  net sd 0.381   P(|separation| < 0.5) over all 496 pairings = 63.1%
+#     wk2  net sd 0.866                                                28.4%
+#     wk3  net sd 0.329                                                68.3%
+#
+# which is why a cutoff-replay grade of this function refused 15 of 33 games
+# (45%) with `degenerate_ratings`. The 13% was never the live rate.
+#
+# AND THE FLOOR IS NOT SMALL IN THE ENGINE'S UNITS. Measured by driving
+# `resim_live_game` with a controlled separation, tied at kickoff, 400-600 sims:
+#
+#     separation 0.50 -> margin +5.7 to +6.1, p(home) 0.666-0.671
+#     separation 1.00 -> margin +11.3,        p(home) 0.774
+#
+# i.e. roughly 11-12 margin points per 1.0 of separation. So a 0.5 floor
+# refuses every game this model thinks is closer than about a SIX-POINT spread
+# -- which is most of the NFL. It was never a degeneracy test; it was an
+# accidental "only price blowouts" rule.
+#
+# WHY LOWERING IT IS NOT MERELY MOVING THE REFUSAL. At tied kickoff the two
+# guards look coincident: sub-floor separations land inside `UNINFORMATIVE_BAND`
+# anyway, so nothing would change. That reading is an artifact of a state with
+# NO score information. At the states this function is actually called on --
+# quarter boundaries of a game in progress -- the scoreline carries the signal
+# and the output is informative even when the ratings barely separate:
+#
+#     Q1 end  7-0   separation 0.05 -> p 0.7314   priceable
+#     Q3 end 21-14  separation 0.05 -> p 0.8304   priceable
+#     Q3 end 14-21  separation 0.05 -> p 0.1931   priceable
+#     Q2 end 10-7   separation 0.05 -> band-refused (genuinely close)
+#
+# Three of four representative states are priceable at a separation this floor
+# currently refuses, and the one that is not is caught by the band on its own
+# merits. So the floor was costing real coverage.
+#
+# THE NEW VALUE IS DERIVED, NOT PICKED: 0.02 of separation is ~0.25 margin
+# points at the measured sensitivity, which is the scale at which ratings
+# genuinely stop distinguishing two teams. Everything above that is left to
+# `UNINFORMATIVE_BAND`, which guards the OUTPUT -- the quantity that decides
+# whether a price is a coin flip -- and which the comment above correctly
+# identifies as the real guard.
+RATING_SEPARATION_FLOOR = 0.02
 
 # THE REAL GUARD, and it is on the OUTPUT because that is where the defect is.
 #
@@ -179,6 +230,26 @@ def default_sims() -> int:
     return n if 1 <= n <= 2000 else DEFAULT_SIMS
 
 
+def ratings_are_unfed(
+    *, home_offense: float, home_defense: float,
+    away_offense: float, away_defense: float,
+) -> bool:
+    """True when all four ratings are exactly zero, i.e. nothing fed them.
+
+    THIS IS A DIFFERENT FAILURE FROM TWO EVENLY-MATCHED TEAMS and it now gets
+    its own refusal reason. `sp_offense_defense_rating` returns `(0.0, 0.0)` for
+    a team it cannot find, and there is NO week-4 ratings artifact as of
+    2026-09-27 -- so a live tick on a week-4 game rates both sides zero and the
+    old code spelled that "degenerate_ratings", identical to a close game. One
+    is missing data that someone must publish; the other is the model working.
+    A shared reason string made them indistinguishable in the refusal counts,
+    which is how 45% of a grade's sample got attributed to a closed lane's
+    rating compression instead of to an absent file.
+    """
+    return all(abs(float(v)) == 0.0 for v in
+               (home_offense, home_defense, away_offense, away_defense))
+
+
 def ratings_are_degenerate(
     *, home_offense: float, home_defense: float,
     away_offense: float, away_defense: float,
@@ -231,6 +302,15 @@ def resim_live_game(
             "nfl_live_resim_disabled",
             "SYNDICATE_NFL_LIVE_RESIM is not set; NFL regular season has no skill "
             "gate and loses to the close at t=+3.34",
+        )
+    if ratings_are_unfed(home_offense=home_offense, home_defense=home_defense,
+                         away_offense=away_offense, away_defense=away_defense):
+        return NflResimRefusal(
+            "unfed_ratings",
+            "all four ratings are exactly 0.0; nothing fed them. Most likely no "
+            "ratings artifact exists for this week (there was none for week 4 on "
+            "2026-09-27) or the team name did not join. This is missing DATA, not "
+            "two evenly-matched teams",
         )
     if ratings_are_degenerate(home_offense=home_offense, home_defense=home_defense,
                               away_offense=away_offense, away_defense=away_defense):
