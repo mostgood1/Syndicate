@@ -840,7 +840,7 @@ def _maybe_capture_prop_snapshot(row: Any, resolved: Any, *, date_str: str) -> N
 
         from syndicate.features.nfl.live_prop_capture import (
             capture_enabled,
-            default_capture_root,
+            default_capture_dir,
             record_quarter_snapshot,
         )
 
@@ -852,7 +852,7 @@ def _maybe_capture_prop_snapshot(row: Any, resolved: Any, *, date_str: str) -> N
         if not rows:
             return
         record_quarter_snapshot(
-            default_capture_root(),
+            default_capture_dir().parent,
             event_id=event_id,
             period=period,
             date_str=date_str,

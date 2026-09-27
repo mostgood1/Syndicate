@@ -169,3 +169,31 @@ def test_the_WORKER_tick_actually_calls_the_capture():
     inner = lr._maybe_capture_prop_snapshot.__code__.co_names
     assert "record_quarter_snapshot" in inner
     assert "fetch_player_stat_rows" in inner
+
+
+def test_captures_are_written_to_the_WRITE_root_not_the_probing_READ_root():
+    """`#389`/`#441`, and this shipped wrong once already.
+
+    `default_nfl_source_root()` decides a root by PROBING for
+    `upcoming_recs_*.csv` -- an unrelated family the repo mirror ships and the
+    mounted disk does not -- so it resolves to `/opt/render/project/src/data`,
+    the CHECKOUT, which every deploy replaces. Projections were written there
+    for days while the guard read the mounted disk.
+
+    A capture is the worst thing to put in an ephemeral location: the data
+    cannot be regenerated, so a wipe is not a stale artifact, it is a lost
+    slate. Asserted on the code object because a comment naming the right
+    function is exactly what was there while the wrong one was being called.
+    """
+    from syndicate.features.nfl import live_prop_capture as c
+
+    names = c.default_capture_dir.__code__.co_names
+    assert "nfl_artifact_output_root" in names, "capture is using a probing READ root"
+    assert "default_nfl_source_root" not in names
+
+
+def test_the_worker_hook_uses_the_capture_modules_own_root_helper():
+    from syndicate.features.nfl import live_resim as lr
+
+    names = lr._maybe_capture_prop_snapshot.__code__.co_names
+    assert "default_capture_dir" in names
