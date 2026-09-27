@@ -32,6 +32,7 @@ from syndicate.features.shared.refresh_state_store import write_text_file
 from syndicate.features.shared.source_roots import repo_root_from
 from syndicate.features.shared.timezone import central_datetime_from_epoch
 from syndicate.features.shared.timezone import central_today_iso
+from syndicate.features.shared import slate_phase as _slate_phase
 
 try:
 	import fcntl  # type: ignore
@@ -4050,6 +4051,18 @@ def _off_hours_gate_blocks_launch(*, now_epoch: float, any_live: bool | None, da
 	ceiling = _off_hours_game_day_max_staleness_seconds() if game_day else _off_hours_max_staleness_seconds()
 	if ceiling <= 0:
 		return False
+	# Lane `slate-starting-soon-phase`: this ceiling is GLOBAL (any sport's launch
+	# resets it), so at 900 s it could hold a T-10 closing sweep off for most of
+	# its window. While any tracked sport starts soon, use the starting-soon
+	# relaunch cooldown instead -- shorter, but still a storm bound.
+	if _slate_phase.starting_soon_enabled():
+		try:
+			configured = _live_refresh_loop_sports()
+			tracked = [item.strip().lower() for item in configured.split(",") if item.strip()] if configured else list(_LIVE_STATUS_CHECKERS.keys())
+			if any(_slate_phase.current_phase(sport, now_epoch=now_epoch, date_str=resolved_date, need_live=False).phase == _slate_phase.PHASE_STARTING_SOON for sport in tracked):
+				ceiling = min(ceiling, _slate_phase.starting_soon_relaunch_cooldown_seconds())
+		except Exception:
+			pass
 	try:
 		last = _read_last_odds_refresh_launch()
 		last_epoch = float(last.get("epoch") or 0.0)
@@ -4259,12 +4272,37 @@ _T_WINDOW_COMMENCE_PROVIDERS = {
 }
 
 
+# Lane `slate-starting-soon-phase`: the five sports above with no dedicated
+# provider get one from the SHARED schedule adapter -- the same source the
+# fixture clock (`_next_fixture_epoch`) and so the slate phase already trust,
+# rather than a per-sport artifact read that could disagree with it. Only while
+# `SYNDICATE_SLATE_STARTING_SOON_ENABLED` is on. NCAAB has no live checker, so
+# it is not skipped while live; `_slate_phase.t_window_force_allowed` in the
+# tick is what bounds that cost on a many-game slate.
+_T_WINDOW_SCHEDULE_SPORTS: tuple[str, ...] = ("nfl", "ncaaf", "nba", "nhl", "ncaab")
+
+
+def _t_window_sports() -> list[str]:
+	sports = list(_T_WINDOW_COMMENCE_PROVIDERS)
+	if _slate_phase.starting_soon_enabled():
+		sports.extend(sport for sport in _T_WINDOW_SCHEDULE_SPORTS if sport not in _T_WINDOW_COMMENCE_PROVIDERS)
+	return sports
+
+
+def _t_window_provider(sport: str):
+	provider = _T_WINDOW_COMMENCE_PROVIDERS.get(sport)
+	if provider is None and sport in _T_WINDOW_SCHEDULE_SPORTS and _slate_phase.starting_soon_enabled():
+		# `fetch_schedule_for_date` resolved at call time so tests can patch it here.
+		return lambda date_str: _slate_phase.schedule_commence_times(sport, date_str, fetch=fetch_schedule_for_date)
+	return provider
+
+
 def _commence_times_cached(sport: str, date_str: str, *, now_epoch: float) -> list[tuple[str, float]]:
 	key = (sport, date_str)
 	cached = _COMMENCE_TIMES_CACHE.get(key)
 	if cached is not None and (now_epoch - cached[0]) < _COMMENCE_TIMES_CACHE_TTL_SECONDS:
 		return cached[1]
-	provider = _T_WINDOW_COMMENCE_PROVIDERS.get(sport)
+	provider = _t_window_provider(sport)
 	times: list[tuple[str, float]] = []
 	if provider is not None:
 		try:
@@ -4315,7 +4353,7 @@ def _t_window_due_sports(*, now_epoch: float, date_str: str) -> dict[str, dict[s
 	artifact costs precision, never a sweep storm.
 	"""
 	due: dict[str, dict[str, float]] = {}
-	for sport in _T_WINDOW_COMMENCE_PROVIDERS:
+	for sport in _t_window_sports():
 		checker = _LIVE_STATUS_CHECKERS.get(sport)
 		try:
 			if checker is not None and checker(date_str):
@@ -4908,6 +4946,31 @@ def _pregame_sweep_interval_seconds(sport: str) -> int:
 
 
 def _pregame_sweep_interval_for_tick(sport: str, *, now_epoch: float | None = None) -> int:
+	"""The sweep interval, shortened while the sport's slate starts soon.
+
+	Lane `slate-starting-soon-phase`. The fixture ladder's `< 3h` tier hands off to
+	the T-75/T-10 ramp, which has providers for mlb/wnba/soccer only, so for every
+	other sport `_fixture_aware_interval_seconds` returned None and the resolver
+	fell back to the flat 2h baseline -- NFL swept LESS often inside T-3h than
+	the ladder meant. Starting soon can only SHORTEN an interval
+	(`slate_phase.apply_starting_soon_interval`), so every override and escape
+	hatch below keeps working; flag off returns the base interval untouched.
+	"""
+	base = _pregame_sweep_interval_for_tick_base(sport, now_epoch=now_epoch)
+	if not _slate_phase.starting_soon_enabled():
+		return base
+	normalized = str(sport or "").strip().lower()
+	phase = _slate_phase.current_phase(normalized, now_epoch=now_epoch, need_live=False)
+	resolved, reason = _slate_phase.apply_starting_soon_interval(normalized, base, phase)
+	if reason:
+		print(
+			f"[live_refresh_loop] FIXTURE_CADENCE sport={normalized} interval={resolved} reason={reason} base={base}",
+			flush=True,
+		)
+	return resolved
+
+
+def _pregame_sweep_interval_for_tick_base(sport: str, *, now_epoch: float | None = None) -> int:
 	"""What the SWEEP CADENCE should use for this sport right now (`#440` Phase 1b).
 
 	The one place the fixture gate applies. Scoped to this caller on purpose --
@@ -5350,6 +5413,10 @@ def _pregame_relaunch_blocked(*, now_epoch: float, date_str: str, sports: Any = 
 		# global behaviour rather than inventing a per-sport answer.
 		return legacy_epoch > 0.0 and (now_epoch - legacy_epoch) < cooldown
 	per_sport = last.get("sports") if isinstance(last.get("sports"), dict) else {}
+	# Lane `slate-starting-soon-phase`: a starting-soon sport keeps a storm guard,
+	# but a shorter one, so its T-10 closing sweep is not held off by a sweep
+	# twenty minutes earlier. Flag off: every sport gets `cooldown`, as before.
+	starting_soon_on = _slate_phase.starting_soon_enabled()
 	for sport in candidates:
 		try:
 			sport_epoch = float(per_sport.get(sport) or 0.0)
@@ -5357,7 +5424,10 @@ def _pregame_relaunch_blocked(*, now_epoch: float, date_str: str, sports: Any = 
 			sport_epoch = 0.0
 		if sport_epoch <= 0.0:
 			sport_epoch = legacy_epoch
-		if sport_epoch <= 0.0 or (now_epoch - sport_epoch) >= cooldown:
+		sport_cooldown = cooldown
+		if starting_soon_on and _slate_phase.current_phase(sport, now_epoch=now_epoch, date_str=date_str, need_live=False).phase == _slate_phase.PHASE_STARTING_SOON:
+			sport_cooldown = min(cooldown, _slate_phase.starting_soon_relaunch_cooldown_seconds())
+		if sport_epoch <= 0.0 or (now_epoch - sport_epoch) >= sport_cooldown:
 			# One sport being due is enough to let the tick proceed. Which
 			# sports actually launch is then decided by the per-sport filter
 			# that already exists, not here.
@@ -5622,6 +5692,116 @@ def _run_mlb_sim_tick() -> dict[str, Any]:
 	return meta
 
 
+def _slate_phases_for_tick(*, now_epoch: float, date_str: str) -> dict[str, Any]:
+	"""Every in-season sport's slate phase, for the tick meta. Lane `slate-starting-soon-phase`.
+
+	Only while observing (`SYNDICATE_SLATE_PHASE_OBSERVE`, or the starting-soon
+	flag itself): resolving phases costs schedule fetches and ESPN liveness
+	subprocesses, so with both flags absent the tick does nothing new. Printed on
+	each transition (`SLATE_PHASE`) so the phase is readable on production before
+	anything acts on it. Scoped to `_active_sports_for_date` so an off-season
+	sport costs no liveness subprocess. Never raises -- this runs on every tick.
+	"""
+	if not _slate_phase.observe_enabled():
+		return {"enabled": False, "observing": False}
+	try:
+		sports = [item.strip().lower() for item in str(_active_sports_for_date(date_str) or "").split(",") if item.strip()]
+		phases = _slate_phase.resolve_phases(sports, now_epoch=now_epoch, date_str=date_str)
+		_slate_phase.print_transitions(phases, prefix="[live_refresh_loop]")
+		return {
+			"enabled": _slate_phase.starting_soon_enabled(),
+			"observing": True,
+			"sports": {sport: phase.as_meta() for sport, phase in phases.items()},
+		}
+	except Exception as exc:
+		return {"enabled": _slate_phase.starting_soon_enabled(), "error": f"{type(exc).__name__}: {exc}"}
+
+
+def _drop_t_windows_covered_by_recent_sweep(
+	t_window_sports: set[str],
+	t_window_due: dict[str, dict[str, float]],
+	*,
+	now_epoch: float,
+	date_str: str,
+) -> set[str]:
+	"""Credit a due window to a sweep that ran within the min gap instead of
+	forcing another. Bounds a many-game slate (NCAAB's staggered tips, NFL's 13
+	games at 12:00) to one forced sweep per gap rather than one per game."""
+	try:
+		sweep_epochs = _read_pregame_sport_sweep_epochs()
+	except Exception:
+		return t_window_sports
+	covered = {
+		sport
+		for sport in t_window_sports
+		if not _slate_phase.t_window_force_allowed(sweep_epochs.get(sport), now_epoch=now_epoch)
+	}
+	if covered:
+		print(
+			f"[live_refresh_loop] T_WINDOW_COVERED_BY_RECENT_SWEEP sports={','.join(sorted(covered))} "
+			f"min_gap_s={_slate_phase.t_window_min_gap_seconds()}",
+			flush=True,
+		)
+		for sport in covered:
+			_record_t_window_markers(date_str, t_window_due[sport])
+	return t_window_sports - covered
+
+
+def _nfl_injuries_file_for_date(date_str: str) -> Path | None:
+	"""The nflverse injury CSV `fetch_nfl_injuries.py` writes (season = the
+	calendar year, the same rule the fetch autorun uses)."""
+	try:
+		from syndicate.features.nfl.sources import nfl_injuries_path
+
+		return nfl_injuries_path(int(str(date_str)[:4]))
+	except Exception:
+		return None
+
+
+#: Sports whose injury FILE, when it changes while the slate starts soon,
+#: forces a sweep. NBA/WNBA are not here: `_should_force_sim_rerun` already
+#: fingerprints their lineups/injuries every tick inside the tip-off window.
+_STARTING_SOON_INJURY_FILES = {"nfl": _nfl_injuries_file_for_date}
+
+
+def _starting_soon_injury_change_sports(sports: Iterable[str], *, now_epoch: float, date_str: str) -> set[str]:
+	"""Starting-soon sports whose injury file changed since the last tick.
+
+	Forces an ODDS sweep, not a resim: NFL's sim applies no injury adjustment
+	(`generate_smartsim2_nfl_projections.py`, off after its backtest), so a
+	resim would reproduce the same numbers. What an inactive DOES move is the
+	market -- props above all -- and a full sweep is what captures that.
+	"""
+	if not _slate_phase.starting_soon_enabled():
+		return set()
+	changed: set[str] = set()
+	for sport in sports:
+		normalized = str(sport or "").strip().lower()
+		resolver = _STARTING_SOON_INJURY_FILES.get(normalized)
+		if resolver is None:
+			continue
+		try:
+			if _slate_phase.current_phase(normalized, now_epoch=now_epoch, date_str=date_str, need_live=False).phase != _slate_phase.PHASE_STARTING_SOON:
+				continue
+			path = resolver(date_str)
+			if path is None:
+				continue
+			if _slate_phase.injury_file_changed(
+				normalized,
+				path,
+				read_state=read_json_file,
+				write_state=write_json_file,
+				state_path=_meta_dir() / "starting_soon_injury_fingerprints.json",
+				date_str=date_str,
+			):
+				changed.add(normalized)
+		except Exception as exc:
+			print(f"[live_refresh_loop] STARTING_SOON_INJURY_CHECK_FAILED sport={normalized} {type(exc).__name__}: {exc}", flush=True)
+	if changed:
+		print(f"[live_refresh_loop] STARTING_SOON_INJURY_CHANGE_SWEEP sports={','.join(sorted(changed))}", flush=True)
+	return changed
+
+
 def _run_live_refresh_tick() -> dict[str, Any]:
 	tick_started_epoch = datetime.now(timezone.utc).timestamp()
 	adaptive_enabled = _live_refresh_loop_adaptive_enabled()
@@ -5672,6 +5852,7 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		"sports": _live_refresh_loop_sports() or "active",
 	}
 
+	meta["slatePhases"] = _slate_phases_for_tick(now_epoch=tick_started_epoch, date_str=selected_date)
 	meta.update(_run_mlb_sim_tick())
 	weather_launch = _maybe_launch_weather_fetch(now_epoch=tick_started_epoch, date_str=selected_date)
 	if weather_launch is not None:
@@ -5879,6 +6060,16 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			# service that owns it.
 			t_window_due = _t_window_due_sports(now_epoch=tick_started_epoch, date_str=selected_date)
 			t_window_sports = {sport for sport in t_window_due if sport in resolved_launch_sports}
+			if t_window_sports and _slate_phase.starting_soon_enabled():
+				t_window_sports = _drop_t_windows_covered_by_recent_sweep(
+					t_window_sports, t_window_due, now_epoch=tick_started_epoch, date_str=selected_date
+				)
+			injury_sports = _starting_soon_injury_change_sports(
+				resolved_launch_sports, now_epoch=tick_started_epoch, date_str=selected_date
+			)
+			if injury_sports:
+				meta["startingSoonInjurySweeps"] = sorted(injury_sports)
+				force_sports |= injury_sports
 			if t_window_sports:
 				meta["tWindowSweeps"] = {sport: sorted(t_window_due[sport]) for sport in t_window_sports}
 				print(
