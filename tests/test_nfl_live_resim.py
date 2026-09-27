@@ -300,3 +300,73 @@ def test_budget_exhaustion_refuses_BY_NAME_rather_than_shortening_the_slate():
     assert snap["coverage"]["live_resimmed"] + snap["coverage"]["refused"] == 6
     assert "budget_seconds" in snap["coverage"]
     assert reasons  # something refused; which reason depends on machine speed
+
+
+# --------------------------------------------------------------------------
+# THE RATING SEPARATION FLOOR, re-calibrated 2026-09-27. Nothing tested the old
+# behaviour, which is how a constant fitted to the wrong rating scale survived.
+# --------------------------------------------------------------------------
+
+def test_UNFED_ratings_are_named_separately_from_two_close_teams():
+    """`(0.0, 0.0)` is MISSING DATA, not an evenly-matched game.
+
+    `sp_offense_defense_rating` returns zeros for a team it cannot find, and on
+    2026-09-27 there was no week-4 ratings artifact at all -- so a live week-4
+    tick rated both sides zero. The old code spelled that `degenerate_ratings`,
+    the same string as a genuinely close game, and a cutoff-replay grade then
+    attributed 45% of its sample to a CLOSED lane's rating compression instead of
+    to an absent file.
+    """
+    from syndicate.features.nfl import live_resim as lr
+
+    state = lr.NflLiveGameState(away_team="B", home_team="A", period=2,
+                               clock_seconds=900, home_score=7, away_score=0)
+    refusal = lr.resim_live_game(state, home_offense=0.0, home_defense=0.0,
+                                 away_offense=0.0, away_defense=0.0, sims=8,
+                                 env={"SYNDICATE_NFL_LIVE_RESIM": "1"})
+    assert isinstance(refusal, lr.NflResimRefusal)
+    assert refusal.reason == "unfed_ratings", (
+        "an absent ratings artifact is being reported as a close game"
+    )
+    assert lr.ratings_are_unfed(home_offense=0.0, home_defense=0.0,
+                                away_offense=0.0, away_defense=0.0) is True
+    # Real ratings that happen to net out level are NOT unfed -- they are a
+    # genuinely even game, and the separation check owns that case.
+    assert lr.ratings_are_unfed(home_offense=0.4, home_defense=0.4,
+                                away_offense=0.4, away_defense=0.4) is False
+
+
+def test_the_floor_no_longer_refuses_a_SIX_POINT_favourite():
+    """off != on for the re-calibration, at the scale production's ratings use.
+
+    MEASURED: ~11-12 margin points per 1.0 of net separation, so the old 0.5
+    floor refused every game the model thought closer than about a six-point
+    spread -- 63.1% / 28.4% / 68.3% of all pairings on the wk1/wk2/wk3 artifacts.
+    A separation of 0.1 is a ~1.2-point edge and must survive the input check.
+    """
+    from syndicate.features.nfl import live_resim as lr
+
+    assert lr.RATING_SEPARATION_FLOOR == 0.02, (
+        "the floor moved; re-derive it from the engine's measured sensitivity "
+        "rather than adjusting it to taste"
+    )
+    # A 0.1 separation: refused under the old 0.5 floor, allowed now.
+    assert lr.ratings_are_degenerate(home_offense=0.1, home_defense=0.0,
+                                     away_offense=0.0, away_defense=0.0) is False
+    # And the guard still catches ratings that genuinely cannot separate.
+    assert lr.ratings_are_degenerate(home_offense=0.005, home_defense=0.0,
+                                     away_offense=0.0, away_defense=0.0) is True
+
+
+def test_the_separation_check_compares_SIDES_not_the_four_numbers():
+    """Unchanged behaviour, pinned because the re-calibration touched this code.
+
+    What the simulation acts on is home-offense against away-defense and vice
+    versa, so two teams with identical NET strength are indistinguishable even
+    when their individual numbers differ a lot.
+    """
+    from syndicate.features.nfl import live_resim as lr
+
+    # home net = 2.0 - 1.0 = 1.0 ; away net = 2.0 - 1.0 = 1.0 -> no separation
+    assert lr.ratings_are_degenerate(home_offense=2.0, home_defense=1.0,
+                                     away_offense=2.0, away_defense=1.0) is True

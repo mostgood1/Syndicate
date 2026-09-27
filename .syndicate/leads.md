@@ -885,3 +885,63 @@ impossible today. The commit message for `87ce81d7` overstates this; this row is
 the correction.
 
 ---
+
+## 2026-09-27 — NFL's live distribution is genuinely ~35-48% too narrow, and a CALIBRATION CONSTANT IS THE WRONG FIX. The missing variance is RATING uncertainty, not game variance `[lane nfl-live-distribution-grade; asked to "fix the narrow distribution"]`
+
+**THE DEFECT IS REAL.** Over 80 cutoff rows / 32 games from the re-run harness
+(post floor re-calibration), margins:
+
+    ALL                         sim_sd 8.461  residual_sd 12.553  ratio 0.674
+    wk1 CLEAN (prior-season)    sim_sd 8.414  residual_sd 10.219  ratio 0.823
+    wk2+3 LEAKAGE RISK          sim_sd 8.504  residual_sd 14.153  ratio 0.601
+
+It survives the provenance split, so it is not an artifact of the leaky ratings.
+
+**AND THE DIAGNOSIS IS IN THOSE THREE ROWS.** `sim_sd` is FLAT at ~8.4-8.5 while
+`residual_sd` swings 10.2 -> 14.2 with the RATING SOURCE. wk1 is
+`prior_season_fallback` (a full season of evidence, stable); wk2 is
+`current_season_rolling` (one week of games, noisy). The simulator's spread is
+identical in both cases because **it does not know how uncertain its own ratings
+are**. The missing variance is rating uncertainty propagated into the outcome,
+not in-game variance.
+
+That also explains why no single constant can work: the widening actually
+required is x1.214 on wk1 and x1.664 on wk2+3. A global scale is wrong for
+whichever half it was not fitted on.
+
+**I DID NOT SHIP A CONSTANT, AND HERE IS THE EVIDENCE THAT STOPPED ME.** A joint
+grid found shift -4.0 / spread 2.10 reaching worst-bucket 0.1177, which is under
+`#499`'s 0.150 bar and would have read as a pass. It is an artifact twice over:
+
+  1. OUT OF SAMPLE IT INVERTS. Fitted on wk1 alone (shift -2.0, spread 1.30):
+     train 0.0808 -> 0.0662, but **test wk2+3 0.254 -> 0.3495**. The correction
+     actively harms the held-out weeks.
+  2. THE METRIC IS GAMEABLE BY WIDENING, and this is worth knowing beyond NFL.
+     The headline is the worst POWERED bucket, so evacuating a failing bucket
+     below the power floor removes it from the headline. Measured: the 0.9-1.0
+     bucket holds n=83 with gap 0.1515 at spread 1.0, and **n=9 at spread 2.10**
+     -- 74 of 83 cells moved out of the cell that was failing, and the powered
+     count fell 10/10 -> 8/10. Widening "improves" the headline partly by
+     deleting the evidence against it.
+  3. The grid was 221 pairs (17 shifts x 13 spreads) minimised on 32 games and
+     560 CORRELATED cells.
+
+Shipping that would have repeated the same night's NCAAF regression, where a
+correction fitted on stale inputs went live and made calibration worse.
+
+**WHAT WOULD ACTUALLY FIX IT:** propagate rating uncertainty into the draws --
+sample each team's rating per simulation from its own posterior rather than
+treating a point estimate as certain. That widens each game by the amount ITS
+ratings are uncertain (wide for a one-week rolling rating, narrow for a
+full-season one), which is exactly the pattern the three rows above show and
+exactly what a global constant cannot express. It needs its own grade before
+anything is published, and it must NOT be done inside
+`syndicate/features/football/sim_engine/smartsim2/**`: that engine is shared
+with NCAAF, whose live distributions ARE published, and lane `nfl-rating-units`
+already refused to touch it for this reason.
+
+**NOT CHANGED, deliberately:** no NFL calibration constant, and
+`build_game_lens` stays shut for NFL. The margin grade remains a FAIL on the
+larger sample (worst powered bucket 0.3185, MAE 10.146 losing to frozen 8.213).
+
+---
